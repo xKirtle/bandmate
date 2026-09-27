@@ -4,7 +4,7 @@
 
   let {
     songId,
-    occurrenceId,
+    uid,
     section,
     shared,
     autofocus = false,
@@ -13,8 +13,8 @@
     actions,
   }: {
     songId: number;
-    /** Makes element ids unique when a shared Section shows more than once. */
-    occurrenceId: number;
+    /** Makes element ids unique, e.g. when a shared Section shows more than once. */
+    uid: string;
     section: Section;
     /** Other Occurrences show this Section too. */
     shared: boolean;
@@ -130,9 +130,9 @@
 
 <article class="section" class:is-shared={shared} aria-label={section.label || 'Section without a Label'}>
   <div class="head">
-    <label class="visually-hidden" for="label-{occurrenceId}">Label</label>
+    <label class="visually-hidden" for="label-{uid}">Label</label>
     <input
-      id="label-{occurrenceId}"
+      id="label-{uid}"
       class="label"
       bind:value={label}
       onfocus={() => (editingLabel = true)}
@@ -152,9 +152,9 @@
     {/if}
     <div class="actions">{@render actions()}</div>
   </div>
-  <label class="visually-hidden" for="text-{occurrenceId}">Lines</label>
+  <label class="visually-hidden" for="text-{uid}">Lines</label>
   <textarea
-    id="text-{occurrenceId}"
+    id="text-{uid}"
     class="text"
     bind:value={text}
     oninput={typed}

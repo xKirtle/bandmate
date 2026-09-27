@@ -148,10 +148,15 @@ export const api = {
   /** Adds a Section at position in the Arrangement, or at the end. */
   addSection: (songId: number, section: { label?: string; position?: number }) =>
     request<Song>('POST', `/songs/${songId}/sections`, section),
-  /** Adds another Occurrence of an existing Section at position, or at the end. */
+  /** Adds an Occurrence of an existing Section (e.g. one from the Scrapbook) at position, or at the end. */
   addOccurrence: (songId: number, sectionId: number, position?: number) =>
     request<Song>('POST', `/songs/${songId}/occurrences`, { sectionId, position }),
-  /** Takes an Occurrence out of the Arrangement; its Section is never deleted. */
+  /** Creates a Section in the Scrapbook, with no Occurrence. */
+  addToScrapbook: (songId: number, label = '') => request<Song>('POST', `/songs/${songId}/scrapbook`, { label }),
+  /** Permanently deletes a Section; only one in the Scrapbook can be. */
+  deleteSection: (songId: number, sectionId: number) =>
+    request<Song>('DELETE', `/songs/${songId}/sections/${sectionId}`),
+  /** Takes an Occurrence out of the Arrangement; its Section is never deleted. Without Occurrences, it's in the Scrapbook. */
   removeOccurrence: (songId: number, occurrenceId: number) =>
     request<Song>('DELETE', `/songs/${songId}/occurrences/${occurrenceId}`),
   /** Gives an Occurrence of a shared Section its own copy of the Section. */

@@ -1,9 +1,10 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { api, suggestedLabels, type Section, type Song } from './api';
+  import { api, suggestedLabels, type Song } from './api';
   import { hasChords } from './chords';
   import LyricSheetView from './LyricSheetView.svelte';
   import SectionEditor from './SectionEditor.svelte';
+  import { describe } from './sections';
 
   let {
     song,
@@ -54,12 +55,6 @@
     if (id) addOccurrence(id);
   }
 
-  // How a Section is named in lists: its Label, else its first Line.
-  function describe(section: Section) {
-    const first = section.alternates.find((a) => a.active)?.lines.find((l) => l.lyrics.trim())?.lyrics.trim();
-    return section.label || (first ? `“${first}”` : 'Section without a Label');
-  }
-
   function move(index: number, by: -1 | 1) {
     const order = song.arrangement.map((o) => o.id);
     [order[index], order[index + by]] = [order[index + by], order[index]];
@@ -78,7 +73,9 @@
   </div>
 
   {#if song.arrangement.length === 0}
-    <p class="muted">No Sections yet. Add one to start writing.</p>
+    <p class="muted">
+      No Sections here yet. Add one to start writing{song.scrapbook.length > 0 ? ', or put one back from the Scrapbook' : ''}.
+    </p>
   {/if}
 
   {#if mode === 'read'}
@@ -97,7 +94,7 @@
           <li>
             <SectionEditor
               songId={song.id}
-              occurrenceId={occurrence.id}
+              uid="o{occurrence.id}"
               {section}
               shared={occurrence.shared}
               autofocus={added === occurrence.id}
@@ -139,16 +136,18 @@
                   >
                     ⑂
                   </button>
-                  <button
-                    type="button"
-                    class="icon"
-                    onclick={() => change(() => api.removeOccurrence(song.id, occurrence.id))}
-                    aria-label="Remove this Occurrence"
-                    title="Remove this Occurrence; the others stay"
-                  >
-                    ×
-                  </button>
                 {/if}
+                <button
+                  type="button"
+                  class="icon"
+                  onclick={() => change(() => api.removeOccurrence(song.id, occurrence.id))}
+                  aria-label={occurrence.shared ? 'Remove this Occurrence' : 'Move to the Scrapbook'}
+                  title={occurrence.shared
+                    ? 'Remove this Occurrence; the others stay'
+                    : 'Move to the Scrapbook: take it out of the Lyric Sheet but keep it'}
+                >
+                  ×
+                </button>
               {/snippet}
             </SectionEditor>
           </li>
@@ -264,29 +263,5 @@
   }
   .repeat {
     font-weight: 600;
-  }
-  .icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 2.75rem;
-    height: 2.75rem;
-    padding: 0;
-    border: 1px solid transparent;
-    border-radius: 0.5rem;
-    background: transparent;
-    color: var(--text-muted);
-    font: inherit;
-    font-size: 1.125rem;
-    cursor: pointer;
-  }
-  .icon:hover:not(:disabled) {
-    border-color: var(--border);
-    background: var(--bg);
-    color: var(--text);
-  }
-  .icon:disabled {
-    opacity: 0.35;
-    cursor: default;
   }
 </style>

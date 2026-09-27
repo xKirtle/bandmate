@@ -59,6 +59,8 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("PUT /api/songs/{id}/arrangement", a.reorderArrangement)
 	mux.HandleFunc("POST /api/songs/{id}/sections", a.addSection)
 	mux.HandleFunc("PATCH /api/songs/{id}/sections/{sectionID}", a.setSectionLabel)
+	mux.HandleFunc("DELETE /api/songs/{id}/sections/{sectionID}", a.deleteSection)
+	mux.HandleFunc("POST /api/songs/{id}/scrapbook", a.addToScrapbook)
 	mux.HandleFunc("POST /api/songs/{id}/occurrences", a.addOccurrence)
 	mux.HandleFunc("DELETE /api/songs/{id}/occurrences/{occurrenceID}", a.removeOccurrence)
 	mux.HandleFunc("POST /api/songs/{id}/occurrences/{occurrenceID}/detach", a.detach)

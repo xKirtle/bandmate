@@ -2,6 +2,7 @@
   import { onDestroy } from 'svelte';
   import { api, statuses, type Song, type SongChanges, type Status } from '../lib/api';
   import LyricSheet from '../lib/LyricSheet.svelte';
+  import Scrapbook from '../lib/Scrapbook.svelte';
   import { navigate } from '../lib/router.svelte';
   import { timeAgo } from '../lib/time';
 
@@ -163,7 +164,7 @@
 
 <svelte:window onbeforeunload={warnBeforeUnload} />
 
-<header class="bar">
+<header class="bar wide">
   <a class="back" href="/">← Songs</a>
   {#if song}
     <button type="button" class="button danger" onclick={remove} disabled={deleting}>
@@ -172,106 +173,116 @@
   {/if}
 </header>
 
-<main class="page">
+<main class="page wide">
   {#if loadError}
     <p class="error" role="alert">{loadError}</p>
   {:else if song === null}
     <p class="muted">Loading…</p>
   {:else}
-    <label class="visually-hidden" for="song-title">Title</label>
-    <input
-      id="song-title"
-      class="title"
-      bind:value={draft.title}
-      onchange={() => commitText('title')}
-      required
-      autocomplete="off"
-      enterkeyhint="done"
-    />
+    <div class="song">
+      <div class="top">
+        <label class="visually-hidden" for="song-title">Title</label>
+        <input
+          id="song-title"
+          class="title"
+          bind:value={draft.title}
+          onchange={() => commitText('title')}
+          required
+          autocomplete="off"
+          enterkeyhint="done"
+        />
 
-    <p class="save-state muted" role="status">
-      {#if pending > 0}
-        Saving…
-      {:else}
-        Edited <time datetime={song.updatedAt}>{timeAgo(song.updatedAt)}</time>
-      {/if}
-    </p>
-    {#if saveError}
-      <p class="error" role="alert">{saveError}</p>
-    {/if}
+        <p class="save-state muted" role="status">
+          {#if pending > 0}
+            Saving…
+          {:else}
+            Edited <time datetime={song.updatedAt}>{timeAgo(song.updatedAt)}</time>
+          {/if}
+        </p>
+        {#if saveError}
+          <p class="error" role="alert">{saveError}</p>
+        {/if}
 
-    <fieldset class="status">
-      <legend class="visually-hidden">Status</legend>
-      {#each statuses as s (s)}
-        <label class="segment segment-{s}">
-          <input
-            type="radio"
-            name="status"
-            value={s}
-            bind:group={draft.status}
-            onchange={() => save({ status: s }, ['status'])}
-          />
-          {s}
-        </label>
-      {/each}
-    </fieldset>
-
-    <LyricSheet {song} change={send} onUnsaved={setUnsaved} />
-
-    <section class="details" aria-labelledby="details-heading">
-      <h2 id="details-heading">Details</h2>
-      <div class="grid">
-        <label>
-          Key
-          <input
-            bind:value={draft.key}
-            onchange={() => commitText('key')}
-            list="common-keys"
-            autocomplete="off"
-            autocapitalize="characters"
-            enterkeyhint="done"
-            placeholder="—"
-          />
-        </label>
-        <label>
-          BPM
-          <input
-            bind:value={draft.bpm}
-            onchange={() => commitNumber('bpm', 'BPM')}
-            inputmode="numeric"
-            autocomplete="off"
-            enterkeyhint="done"
-            placeholder="—"
-          />
-        </label>
-        <label>
-          Capo
-          <input
-            bind:value={draft.capo}
-            onchange={() => commitNumber('capo', 'Capo')}
-            inputmode="numeric"
-            autocomplete="off"
-            enterkeyhint="done"
-            placeholder="—"
-          />
-        </label>
-        <label>
-          Tuning
-          <input
-            bind:value={draft.tuning}
-            onchange={() => commitText('tuning')}
-            list="common-tunings"
-            autocomplete="off"
-            enterkeyhint="done"
-            placeholder="—"
-          />
-        </label>
+        <fieldset class="status">
+          <legend class="visually-hidden">Status</legend>
+          {#each statuses as s (s)}
+            <label class="segment segment-{s}">
+              <input
+                type="radio"
+                name="status"
+                value={s}
+                bind:group={draft.status}
+                onchange={() => save({ status: s }, ['status'])}
+              />
+              {s}
+            </label>
+          {/each}
+        </fieldset>
       </div>
-      <label>
-        Notes
-        <textarea bind:value={draft.notes} onchange={() => commitText('notes')} rows="5"></textarea>
-      </label>
-    </section>
+
+      <div class="sheet">
+        <LyricSheet {song} change={send} onUnsaved={setUnsaved} />
+      </div>
+
+      <aside class="side">
+        <Scrapbook {song} change={send} onUnsaved={setUnsaved} />
+      </aside>
+
+      <section class="details" aria-labelledby="details-heading">
+        <h2 id="details-heading">Details</h2>
+        <div class="grid">
+          <label>
+            Key
+            <input
+              bind:value={draft.key}
+              onchange={() => commitText('key')}
+              list="common-keys"
+              autocomplete="off"
+              autocapitalize="characters"
+              enterkeyhint="done"
+              placeholder="—"
+            />
+          </label>
+          <label>
+            BPM
+            <input
+              bind:value={draft.bpm}
+              onchange={() => commitNumber('bpm', 'BPM')}
+              inputmode="numeric"
+              autocomplete="off"
+              enterkeyhint="done"
+              placeholder="—"
+            />
+          </label>
+          <label>
+            Capo
+            <input
+              bind:value={draft.capo}
+              onchange={() => commitNumber('capo', 'Capo')}
+              inputmode="numeric"
+              autocomplete="off"
+              enterkeyhint="done"
+              placeholder="—"
+            />
+          </label>
+          <label>
+            Tuning
+            <input
+              bind:value={draft.tuning}
+              onchange={() => commitText('tuning')}
+              list="common-tunings"
+              autocomplete="off"
+              enterkeyhint="done"
+              placeholder="—"
+            />
+          </label>
+        </div>
+        <label>
+          Notes
+          <textarea bind:value={draft.notes} onchange={() => commitText('notes')} rows="5"></textarea>
+        </label>
+      </section>
+    </div>
 
     <datalist id="common-keys">
       {#each commonKeys as k (k)}<option value={k}></option>{/each}
@@ -375,9 +386,47 @@
     margin-bottom: 0.75rem;
   }
 
+  .side {
+    margin-bottom: 2rem;
+  }
+
   @media (min-width: 36rem) {
     .grid {
       grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  /* On wide screens the Scrapbook sits beside the rest of the Song, and
+     stays in view while the Lyric Sheet scrolls. On phones it follows the
+     Lyric Sheet in one column. */
+  @media (min-width: 64rem) {
+    .song {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 22rem;
+      grid-template-rows: auto auto 1fr;
+      grid-template-areas:
+        'top side'
+        'sheet side'
+        'details side';
+      column-gap: 2rem;
+    }
+    .top {
+      grid-area: top;
+    }
+    .sheet {
+      grid-area: sheet;
+    }
+    .details {
+      grid-area: details;
+      align-self: start;
+    }
+    .side {
+      grid-area: side;
+      align-self: start;
+      position: sticky;
+      top: 4.5rem;
+      max-height: calc(100vh - 5.5rem);
+      overflow-y: auto;
     }
   }
 </style>
