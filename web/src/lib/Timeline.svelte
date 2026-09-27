@@ -1189,7 +1189,7 @@
     /* Shared by the headers and the lanes, so they stay level. */
     --track-height: 3.5rem;
     display: flex;
-    /* Each column as tall as its Tracks, scrolling together. */
+    /* Stretched to the height cap, the headers would squash and the lanes be cut off. */
     align-items: flex-start;
     max-height: 40vh;
     margin-top: 0.5rem;
