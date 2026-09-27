@@ -51,6 +51,13 @@
     return !!next;
   }
 
+  /** The current Line if it's shown, or null for its whole Section, e.g. a Chord Line while Chords are hidden. */
+  function shownLine(position: Position): number | null {
+    if (position.line === null || showChords) return position.line;
+    const o = song.arrangement.find((o) => o.id === position.occurrence);
+    return o && linesOf(o).lines.some((l) => l.id === position.line) ? position.line : null;
+  }
+
   function key(occurrence: number, line: number | null = null): string {
     return line === null ? `${occurrence}` : `${occurrence}:${line}`;
   }
@@ -58,7 +65,7 @@
   // Follow playback, unless that would pull the page away from something
   // being typed. Keyed, so it only scrolls once playback moves on, not on
   // every frame.
-  const currentKey = $derived(current && key(current.occurrence, current.line));
+  const currentKey = $derived(current && key(current.occurrence, shownLine(current)));
   $effect(() => {
     if (currentKey === null) return;
     if (inTextField(document.activeElement)) return;
@@ -84,7 +91,7 @@
     {@const section = sections.get(occurrence.sectionId)}
     {#if section}
       {@const { all, lines } = linesOf(occurrence)}
-      {@const isCurrent = current?.occurrence === occurrence.id && current.line === null}
+      {@const isCurrent = currentKey === key(occurrence.id)}
       <section
         class="section"
         class:current={isCurrent}
@@ -112,9 +119,9 @@
         {#each lines as line, n (line.id)}
           {@const cue = occurrence.lineCues[line.id] ?? null}
           {@const k = key(occurrence.id, line.id)}
-          {@const lineCurrent = current?.occurrence === occurrence.id && current.line === line.id}
+          {@const lineCurrent = currentKey === k}
           <div
-            class="row"
+            class="line-box"
             class:current={lineCurrent}
             class:with-gutter={setLineCue}
             aria-current={lineCurrent ? 'true' : undefined}
@@ -202,20 +209,20 @@
   }
   /* A Line with its Cue beside it. The highlight bleeds past the text like
      the Section's, taking in its Chords. */
-  .row {
+  .line-box {
     margin: 0 -0.75rem;
     padding: 0 0.75rem;
     border-radius: 0.375rem;
     scroll-margin: 5rem 0;
     transition: background-color 0.2s;
   }
-  .row.with-gutter {
+  .line-box.with-gutter {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: end;
     gap: 0.5rem;
   }
-  .row.current {
+  .line-box.current {
     background: var(--surface-1);
     box-shadow: inset 3px 0 0 var(--accent);
   }
