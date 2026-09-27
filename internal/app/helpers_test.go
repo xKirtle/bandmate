@@ -139,6 +139,7 @@ type song struct {
 	Capo        *int         `json:"capo"`
 	Tuning      string       `json:"tuning"`
 	Notes       string       `json:"notes"`
+	ShowChords  bool         `json:"showChords"`
 	CreatedAt   string       `json:"createdAt"`
 	UpdatedAt   string       `json:"updatedAt"`
 	Arrangement []occurrence `json:"arrangement"`
@@ -168,10 +169,19 @@ type alternate struct {
 	Lines  []line `json:"lines"`
 }
 
-// line is one Line, as raw text.
+// line is one Line, as raw ChordPro text and parsed into lyrics and Chords.
 type line struct {
-	ID   int64  `json:"id"`
-	Text string `json:"text"`
+	ID        int64   `json:"id"`
+	Text      string  `json:"text"`
+	Lyrics    string  `json:"lyrics"`
+	Chords    []chord `json:"chords"`
+	ChordLine bool    `json:"chordLine"`
+}
+
+// chord is a Chord anchored at a character offset into a Line's lyrics.
+type chord struct {
+	Offset int    `json:"offset"`
+	Name   string `json:"name"`
 }
 
 // songSummary is one entry of the Song list.
