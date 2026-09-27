@@ -16,7 +16,8 @@
   } from './api';
   import BeatPicker from './BeatPicker.svelte';
   import { clampMove, clampTrimEnd, clampTrimStart } from './clipEdit';
-  import { History, sendEdit, type Edit as TimelineEdit } from './history';
+  import { hasCues } from './cues';
+  import { History, isCueEdit, sendEdit, type CueEdit, type Edit as HistoryEdit } from './history';
   import { formatVolume, maxVolume, silence, trackGains, type Levels } from './mixer';
   import { peaksPerSecond } from './peaks';
   import { keptInLoop, outsideLoop, repeats, timelineEnd, type Loop, type Placed } from './schedule';
@@ -54,8 +55,8 @@
   }: {
     song: Song;
     timeline: Timeline;
-    /** Queues a Timeline change; resolves to whether it succeeded. */
-    change: (op: (at: SongAt) => Promise<Timeline>) => Promise<boolean>;
+    /** Queues a Timeline change, or a Cue edit leaving a Song; resolves to whether it succeeded. */
+    change: (op: (at: SongAt) => Promise<Timeline | Song>) => Promise<boolean>;
     /** Sets the Song's BPM. */
     setBpm: (bpm: number) => void;
     /** Hears where playback is, in seconds, every frame while playing, then null once it stops. */
@@ -121,10 +122,11 @@
     }
   });
 
-  // Every edit made here is kept to undo, for as long as the page is open.
-  // The Timeline is only ever the one the latest edit left, unless a
-  // refresh brought in changes made elsewhere: then the edits kept would no
-  // longer undo what they did, so they're forgotten.
+  // Every edit made here is kept to undo, for as long as the page is open,
+  // along with the Cue edits made in the Lyric Sheet. The Timeline is only
+  // ever the one the latest edit left, unless a refresh brought in changes
+  // made elsewhere: then the edits kept would no longer undo what they did,
+  // so they're forgotten.
   const history = new History();
   let undoable = $state(false);
   let redoable = $state(false);
@@ -146,12 +148,16 @@
   }
 
   /**
-   * Sends an edit, based on the Timeline as it is when its turn comes, and
-   * notes in the history what it did.
+   * Sends an edit, based on the Timeline, or for a Cue edit the Song, as it
+   * is when its turn comes, and notes in the history what it did.
    */
-  async function send(at: SongAt, e: TimelineEdit, note: (before: Timeline, after: Timeline) => void) {
-    const before = timeline;
-    let after: Timeline;
+  async function send(
+    at: SongAt,
+    e: HistoryEdit,
+    note: (before: Timeline | Song, after: Timeline | Song) => void,
+  ): Promise<Timeline | Song> {
+    const before = isCueEdit(e) ? song : timeline;
+    let after: Timeline | Song;
     try {
       after = await sendEdit(at, e);
     } catch (err) {
@@ -163,16 +169,27 @@
       throw err;
     }
     note(before, after);
-    editedAt = after.version;
+    // A Cue edit leaves the Timeline as it was.
+    if (!isCueEdit(e)) editedAt = after.version;
     showHistory();
     return after;
   }
 
   /** Queues an edit, to undo later; resolves to whether it succeeded. */
-  function perform(e: TimelineEdit): Promise<boolean> {
-    e = $state.snapshot(e) as TimelineEdit;
+  function perform(e: HistoryEdit): Promise<boolean> {
+    e = $state.snapshot(e) as HistoryEdit;
     queued++;
     return change((at) => send(at, e, (before, after) => history.record(e, before, after))).finally(() => queued--);
+  }
+
+  /** Queues a Cue edit, to undo along with the Timeline's edits; resolves to whether it succeeded. */
+  export function editCues(e: CueEdit): Promise<boolean> {
+    return perform(e);
+  }
+
+  // Clearing doesn't ask first: it can be undone.
+  function clearCues() {
+    perform({ kind: 'clearCues' });
   }
 
   function undo() {
@@ -945,6 +962,12 @@
   </span>
 {/snippet}
 
+{#snippet clearCuesButton()}
+  {#if hasCues(song)}
+    <button type="button" class="button edit-only" onclick={clearCues}>Clear all Cues</button>
+  {/if}
+{/snippet}
+
 <section class="timeline" aria-label="Timeline">
   {#if !empty && !collapsed}
     <!-- A focusable separator with a value is a widget, resized with Up and Down. -->
@@ -972,6 +995,7 @@
     {#if empty}
       <div class="empty">
         <span class="muted">No beat on the Timeline yet.</span>
+        {@render clearCuesButton()}
         <span class="spacer"></span>
         {#if undoable || redoable}{@render undoRedo()}{/if}
         <button type="button" class="button edit-only" onclick={() => (picking = true)}>Add a beat</button>
@@ -1003,6 +1027,7 @@
             ? `Loop ${formatDuration(timeline.loop.start)} to ${formatDuration(timeline.loop.end)}`
             : 'Drag along the top of the ruler to set a Loop'}>Loop</button
         >
+        {@render clearCuesButton()}
         {#if playerState === 'loading'}
           <span class="muted" role="status">Loading audio…</span>
         {/if}

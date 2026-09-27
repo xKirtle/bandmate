@@ -3,7 +3,8 @@
   import { MediaQuery } from 'svelte/reactivity';
   import { api, suggestedLabels, type Line, type Occurrence, type Song, type SongAt } from './api';
   import { hasChords } from './chords';
-  import { currentPosition } from './cues';
+  import { currentPosition, hasCues } from './cues';
+  import type { CueEdit } from './history';
   import LyricSheetView from './LyricSheetView.svelte';
   import SectionEditor from './SectionEditor.svelte';
   import { describe } from './sections';
@@ -12,6 +13,7 @@
     song,
     change,
     onUnsaved,
+    editCues,
     playhead = null,
     hasClips = false,
     seek,
@@ -20,6 +22,8 @@
     /** Sends a Lyric Sheet change; resolves to whether it succeeded. */
     change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
     onUnsaved: (editor: object, unsaved: boolean) => void;
+    /** Sends a Cue edit, to undo later; resolves to whether it succeeded. */
+    editCues: (edit: CueEdit) => Promise<boolean>;
     /** Where the Timeline is playing, in seconds; null while it isn't. */
     playhead?: number | null;
     /** Whether the Timeline has any Clip, so there's something to cue to. */
@@ -39,20 +43,14 @@
   // Cues are edited on wider screens only, and only once there's something
   // to cue to or a Cue already set.
   const wide = new MediaQuery('min-width: 40.0625rem');
-  const canCue = $derived(
-    wide.current && (hasClips || song.arrangement.some((o) => o.cue !== null || Object.keys(o.lineCues).length > 0)),
-  );
+  const canCue = $derived(wide.current && (hasClips || hasCues(song)));
 
   function setCue(occurrence: Occurrence, cue: number | null) {
-    change((at) =>
-      cue === null ? api.clearOccurrenceCue(at, occurrence.id) : api.setOccurrenceCue(at, occurrence.id, cue),
-    );
+    editCues({ kind: 'setOccurrenceCue', occurrenceId: occurrence.id, cue });
   }
 
   function setLineCue(occurrence: Occurrence, line: Line, cue: number | null) {
-    change((at) =>
-      cue === null ? api.clearLineCue(at, occurrence.id, line.id) : api.setLineCue(at, occurrence.id, line.id, cue),
-    );
+    editCues({ kind: 'setLineCue', occurrenceId: occurrence.id, lineId: line.id, cue });
   }
 
   // The Occurrence just added, whose Label gets focus.
@@ -185,6 +183,18 @@
                 >
                   ⧉
                 </button>
+                {#if wide.current && hasCues({ arrangement: [occurrence] })}
+                  <!-- Doesn't ask first: it can be undone. -->
+                  <button
+                    type="button"
+                    class="icon"
+                    onclick={() => editCues({ kind: 'clearOccurrenceCues', occurrenceId: occurrence.id })}
+                    aria-label="Clear this Occurrence's Cues"
+                    title="Clear this Occurrence's Cues"
+                  >
+                    ⌀
+                  </button>
+                {/if}
                 {#if occurrence.shared}
                   <button
                     type="button"

@@ -24,6 +24,11 @@ export interface Position {
   line: number | null;
 }
 
+/** Whether any Occurrence has a Cue, or a Line within it, dormant ones included. */
+export function hasCues(song: { arrangement: readonly CuedOccurrence[] }): boolean {
+  return song.arrangement.some((o) => o.cue !== null || Object.keys(o.lineCues).length > 0);
+}
+
 /** Whether a Line has nothing to cue, so can't take a Cue. */
 export function isBlank(line: { text: string }): boolean {
   return line.text.trim() === '';

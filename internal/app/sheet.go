@@ -140,6 +140,39 @@ func (a *App) clearLineCue(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *App) clearOccurrenceCues(w http.ResponseWriter, r *http.Request) {
+	occurrenceID, ok := pathID(w, r, "occurrenceID")
+	if !ok {
+		return
+	}
+	a.changeSheet(w, r, nil, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
+		return a.songs.ClearOccurrenceCues(r.Context(), id, based, occurrenceID)
+	})
+}
+
+func (a *App) clearCues(w http.ResponseWriter, r *http.Request) {
+	a.changeSheet(w, r, nil, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
+		return a.songs.ClearCues(r.Context(), id, based)
+	})
+}
+
+func (a *App) restoreCues(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Cues []lyricsheet.CueValue `json:"cues"`
+	}
+	a.changeSheet(w, r, &req, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
+		if req.Cues == nil {
+			return lyricsheet.Song{}, &lyricsheet.InvalidError{Msg: "cues is required"}
+		}
+		for _, c := range req.Cues {
+			if c.OccurrenceID == 0 {
+				return lyricsheet.Song{}, &lyricsheet.InvalidError{Msg: "each Cue needs an occurrenceId"}
+			}
+		}
+		return a.songs.RestoreCues(r.Context(), id, based, req.Cues)
+	})
+}
+
 func (a *App) setSectionLabel(w http.ResponseWriter, r *http.Request) {
 	sectionID, ok := pathID(w, r, "sectionID")
 	if !ok {

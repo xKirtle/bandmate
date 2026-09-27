@@ -81,12 +81,19 @@
     return enqueue(op, (s) => (song = s));
   }
 
-  /** Queues a Timeline change like send, and shows the Timeline it returns. */
-  function changeTimeline(op: (at: SongAt) => Promise<TimelineData>): Promise<boolean> {
-    return enqueue(op, (tl) => {
-      timeline = tl;
+  /**
+   * Queues a Timeline change like send, and shows the Timeline it returns,
+   * or the Song, for a Cue edit undone along with the Timeline's edits.
+   */
+  function changeTimeline(op: (at: SongAt) => Promise<TimelineData | Song>): Promise<boolean> {
+    return enqueue(op, (result) => {
+      if (!('tracks' in result)) {
+        song = result;
+        return;
+      }
+      timeline = result;
       // The change moved the Song on too.
-      song = { ...song!, version: tl.version, updatedAt: tl.updatedAt };
+      song = { ...song!, version: result.version, updatedAt: result.updatedAt };
     });
   }
 
@@ -332,6 +339,7 @@
           {song}
           change={send}
           onUnsaved={setUnsaved}
+          editCues={(e) => timelinePanel?.editCues(e) ?? Promise.resolve(false)}
           {playhead}
           seek={(to) => timelinePanel?.seekTo(to)}
           hasClips={timeline?.tracks.some((t) => t.clips.length > 0) ?? false}

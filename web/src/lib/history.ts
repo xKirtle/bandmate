@@ -1,23 +1,31 @@
 import {
   api,
+  type CueValue,
   type NewClip,
   type NewTrack,
+  type Song,
   type SongAt,
   type Timeline,
   type TimelineLoop,
   type TrackChanges,
 } from './api';
 
-// Undo and redo for Timeline edits, kept in the browser while the page is open.
-// Each edit is kept as data, with the edit that undoes it, worked out from
-// the Timeline before and after it. Undoing and redoing send those through
-// the API like any other edit.
+// Undo and redo for Timeline edits and Cue edits, in one history kept in the
+// browser while the page is open. Each edit is kept as data, with the edit
+// that undoes it, worked out from the Timeline, or for a Cue edit the Song,
+// before and after it. Undoing and redoing send those through the API like
+// any other edit.
 //
 // An edit that brings back a deleted Clip or Track gets it a new id. The
 // edits kept that name the old id are then changed to name the new one.
+//
+// A Cue edit is undone by restoring the Cues it changed to what they were,
+// and redone by restoring them to what it left. Restoring leaves out Cues
+// whose Occurrence or Line has gone since, so an undo still works after
+// the Lyric Sheet changed.
 
 /** A change to the Timeline, as the intent sent to the API. */
-export type Edit =
+export type TimelineEdit =
   | { kind: 'addBeat'; beatId: number }
   | { kind: 'addTrack'; track: NewTrack }
   | { kind: 'updateTrack'; trackId: number; changes: TrackChanges }
@@ -31,6 +39,29 @@ export type Edit =
   | { kind: 'setLoop'; loop: TimelineLoop }
   | { kind: 'switchLoop'; on: boolean }
   | { kind: 'clearLoop' };
+
+/** A change to the Song's Cues, as the intent sent to the API. A null cue clears it. */
+export type CueEdit =
+  | { kind: 'setOccurrenceCue'; occurrenceId: number; cue: number | null }
+  | { kind: 'setLineCue'; occurrenceId: number; lineId: number; cue: number | null }
+  | { kind: 'clearOccurrenceCues'; occurrenceId: number }
+  | { kind: 'clearCues' }
+  | { kind: 'restoreCues'; cues: CueValue[] };
+
+export type Edit = TimelineEdit | CueEdit;
+
+const cueKinds = new Set<Edit['kind']>([
+  'setOccurrenceCue',
+  'setLineCue',
+  'clearOccurrenceCues',
+  'clearCues',
+  'restoreCues',
+]);
+
+/** Whether an edit changes the Song's Cues, so leaves a Song rather than a Timeline. */
+export function isCueEdit(edit: Edit): edit is CueEdit {
+  return cueKinds.has(edit.kind);
+}
 
 /** Ids of Tracks and Clips, each in Timeline order. */
 interface Ids {
@@ -54,9 +85,15 @@ export class History {
   #redo: Entry[] = [];
 
   /** Keeps an edit that turned before into after, to undo, unless it changed nothing. */
-  record(edit: Edit, before: Timeline, after: Timeline): void {
-    if (content(before) === content(after)) return;
-    this.#undo.push({ undo: inverse(edit, before, after), redo: { edit, adds: added(before, after) } });
+  record(edit: TimelineEdit, before: Timeline, after: Timeline): void;
+  record(edit: CueEdit, before: Song, after: Song): void;
+  record(edit: Edit, before: Timeline | Song, after: Timeline | Song): void;
+  record(edit: Edit, before: Timeline | Song, after: Timeline | Song): void {
+    const entry = isCueEdit(edit)
+      ? cueEntry(before as Song, after as Song)
+      : timelineEntry(edit, before as Timeline, after as Timeline);
+    if (!entry) return;
+    this.#undo.push(entry);
     this.#redo = [];
   }
 
@@ -71,7 +108,7 @@ export class History {
   }
 
   /** Notes that nextUndo's edit was sent, turning before into after. */
-  undone(before: Timeline, after: Timeline): void {
+  undone(before: Timeline | Song, after: Timeline | Song): void {
     const entry = this.#undo.pop();
     if (!entry) return;
     this.#redo.push(entry);
@@ -79,7 +116,7 @@ export class History {
   }
 
   /** Notes that nextRedo's edit was sent, turning before into after. */
-  redone(before: Timeline, after: Timeline): void {
+  redone(before: Timeline | Song, after: Timeline | Song): void {
     const entry = this.#redo.pop();
     if (!entry) return;
     this.#undo.push(entry);
@@ -93,8 +130,9 @@ export class History {
   }
 
   /** Has every edit kept name the new ids of what a sent step brought back. */
-  #follow(sent: Step, before: Timeline, after: Timeline) {
-    const got = added(before, after);
+  #follow(sent: Step, before: Timeline | Song, after: Timeline | Song) {
+    if (sent.adds.tracks.length === 0 && sent.adds.clips.length === 0) return;
+    const got = added(before as Timeline, after as Timeline);
     const tracks = new Map(sent.adds.tracks.map((id, i) => [id, got.tracks[i]]));
     const clips = new Map(sent.adds.clips.map((id, i) => [id, got.clips[i]]));
     const ids: IdMaps = {
@@ -108,9 +146,42 @@ export class History {
   }
 }
 
+const none: Ids = { tracks: [], clips: [] };
+
+/** What to keep for a Timeline edit that turned before into after, or null if it changed nothing. */
+function timelineEntry(edit: TimelineEdit, before: Timeline, after: Timeline): Entry | null {
+  if (content(before) === content(after)) return null;
+  return { undo: inverse(edit, before, after), redo: { edit, adds: added(before, after) } };
+}
+
+/** What to keep for a Cue edit that turned before into after, or null if it changed nothing. */
+function cueEntry(before: Song, after: Song): Entry | null {
+  const redo = cueChanges(before, after);
+  if (redo.length === 0) return null;
+  return {
+    undo: { edit: { kind: 'restoreCues', cues: cueChanges(after, before) }, adds: none },
+    redo: { edit: { kind: 'restoreCues', cues: redo }, adds: none },
+  };
+}
+
+/** The Cues that differ from one Song to another, each at its value in to: each Occurrence's own, then its Lines'. */
+function cueChanges(from: Song, to: Song): CueValue[] {
+  const was = new Map(from.arrangement.map((o) => [o.id, o]));
+  const changed: CueValue[] = [];
+  for (const o of to.arrangement) {
+    const old = was.get(o.id);
+    if ((old?.cue ?? null) !== o.cue) changed.push({ occurrenceId: o.id, cue: o.cue });
+    const lines = new Set([...Object.keys(old?.lineCues ?? {}), ...Object.keys(o.lineCues)].map(Number));
+    for (const lineId of [...lines].sort((a, b) => a - b)) {
+      const cue = o.lineCues[lineId] ?? null;
+      if ((old?.lineCues[lineId] ?? null) !== cue) changed.push({ occurrenceId: o.id, lineId, cue });
+    }
+  }
+  return changed;
+}
+
 /** The edit that undoes edit, which turned before into after. */
-function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
-  const none: Ids = { tracks: [], clips: [] };
+function inverse(edit: TimelineEdit, before: Timeline, after: Timeline): Step {
   switch (edit.kind) {
     case 'addBeat':
     case 'addTrack':
@@ -188,6 +259,7 @@ function remapStep(step: Step, ids: IdMaps): Step {
 
 /** An edit naming Tracks and Clips by the ids given. */
 function remap(edit: Edit, ids: IdMaps): Edit {
+  if (isCueEdit(edit)) return edit;
   switch (edit.kind) {
     case 'addBeat':
     case 'addTrack':
@@ -220,8 +292,11 @@ function findClip(tl: Timeline, clipId: number) {
   throw new Error(`Clip ${clipId} isn't on the Timeline`);
 }
 
-/** Sends an edit to the Song's Timeline, returning the Timeline it leaves. */
-export function sendEdit(at: SongAt, edit: Edit): Promise<Timeline> {
+/** Sends an edit, returning the Timeline it leaves, or for a Cue edit the Song. */
+export function sendEdit(at: SongAt, edit: TimelineEdit): Promise<Timeline>;
+export function sendEdit(at: SongAt, edit: CueEdit): Promise<Song>;
+export function sendEdit(at: SongAt, edit: Edit): Promise<Timeline | Song>;
+export function sendEdit(at: SongAt, edit: Edit): Promise<Timeline | Song> {
   switch (edit.kind) {
     case 'addBeat':
       return api.addBeatToTimeline(at, edit.beatId);
@@ -249,5 +324,19 @@ export function sendEdit(at: SongAt, edit: Edit): Promise<Timeline> {
       return api.switchLoop(at, edit.on);
     case 'clearLoop':
       return api.clearLoop(at);
+    case 'setOccurrenceCue':
+      return edit.cue === null
+        ? api.clearOccurrenceCue(at, edit.occurrenceId)
+        : api.setOccurrenceCue(at, edit.occurrenceId, edit.cue);
+    case 'setLineCue':
+      return edit.cue === null
+        ? api.clearLineCue(at, edit.occurrenceId, edit.lineId)
+        : api.setLineCue(at, edit.occurrenceId, edit.lineId, edit.cue);
+    case 'clearOccurrenceCues':
+      return api.clearOccurrenceCues(at, edit.occurrenceId);
+    case 'clearCues':
+      return api.clearCues(at);
+    case 'restoreCues':
+      return api.restoreCues(at, edit.cues);
   }
 }

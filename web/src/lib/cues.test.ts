@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { currentPosition, formatCue, nudgeCue, parseCue } from './cues';
+import { currentPosition, formatCue, hasCues, nudgeCue, parseCue } from './cues';
 
 describe('parseCue', () => {
   it('reads plain seconds', () => {
@@ -200,5 +200,19 @@ describe('nudgeCue', () => {
   it('stops at the start of the Timeline', () => {
     expect(nudgeCue(0.05, -1)).toBe(0);
     expect(nudgeCue(0, -1)).toBe(0);
+  });
+});
+
+describe('hasCues', () => {
+  const o = (cue: number | null, lineCues: Record<number, number> = {}) => ({ id: 1, sectionId: 1, cue, lineCues });
+
+  it('is false without any Cue', () => {
+    expect(hasCues({ arrangement: [] })).toBe(false);
+    expect(hasCues({ arrangement: [o(null), o(null)] })).toBe(false);
+  });
+
+  it("counts an Occurrence's Cue, and a Line's, dormant or not", () => {
+    expect(hasCues({ arrangement: [o(null), o(0)] })).toBe(true);
+    expect(hasCues({ arrangement: [o(null, { 7: 3 })] })).toBe(true);
   });
 });
