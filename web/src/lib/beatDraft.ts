@@ -1,6 +1,7 @@
 // A Beat's details as its form's inputs hold them: numbers stay text while
 // typing.
 import type { Beat, BeatDetails } from './api';
+import type { BeatSuggestion } from './beatSuggestion';
 
 export interface BeatDraft {
   title: string;
@@ -11,9 +12,10 @@ export interface BeatDraft {
   notes: string;
 }
 
-export function toDraft(beat: BeatDetails | null, title = ''): BeatDraft {
+/** A draft of a Beat's details, or of a new Beat's suggested ones. */
+export function toDraft(beat: Partial<BeatDetails> | null): BeatDraft {
   return {
-    title: beat?.title ?? title,
+    title: beat?.title ?? '',
     producer: beat?.producer ?? '',
     sourceLink: beat?.sourceLink ?? '',
     bpm: beat?.bpm?.toString() ?? '',
@@ -41,6 +43,20 @@ export function changedDetails(beat: Beat, details: BeatDetails): Partial<BeatDe
   const changes: Partial<BeatDetails> = {};
   for (const field of Object.keys(details) as (keyof BeatDetails)[]) {
     if (details[field] !== beat[field]) Object.assign(changes, { [field]: details[field] });
+  }
+  return changes;
+}
+
+/**
+ * The suggested values a draft doesn't already hold, e.g. to offer after
+ * replacing a Beat's file. Fields the file suggests nothing for are left out.
+ */
+export function offeredChanges(draft: BeatDraft, suggestion: BeatSuggestion): Partial<BeatDraft> {
+  const suggested = toDraft(suggestion);
+  const changes: Partial<BeatDraft> = {};
+  for (const field of Object.keys(suggestion) as (keyof BeatSuggestion)[]) {
+    const value = suggested[field];
+    if (value !== '' && value !== draft[field].trim()) changes[field] = value;
   }
   return changes;
 }

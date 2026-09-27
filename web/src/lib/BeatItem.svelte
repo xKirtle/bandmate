@@ -1,7 +1,8 @@
 <script lang="ts">
   import { api, type Beat } from './api';
   import BeatFields from './BeatFields.svelte';
-  import { changedDetails, fromDraft, toDraft } from './beatDraft';
+  import { changedDetails, fromDraft, offeredChanges, toDraft, type BeatDraft } from './beatDraft';
+  import { suggestForFile } from './beatTags';
   import { playMediaAlone } from './playback';
   import { formatDuration } from './time';
   import { prepareUpload } from './upload';
@@ -24,6 +25,8 @@
   let draft = $state(toDraft(null));
   let busy = $state<string | null>(null);
   let error = $state<string | null>(null);
+  // Details a replaced file suggests, offered rather than applied.
+  let offer = $state<{ fileName: string; changes: Partial<BeatDraft> } | null>(null);
 
   const inUse = $derived(beat.songs.length > 0);
   const facts = $derived(
@@ -33,7 +36,29 @@
   function edit() {
     draft = toDraft(beat);
     error = null;
+    offer = null;
     editing = true;
+  }
+
+  function stopEditing() {
+    editing = false;
+    offer = null;
+  }
+
+  function describeOffer(changes: Partial<BeatDraft>): string {
+    return [
+      changes.title && `“${changes.title}”`,
+      changes.producer && `by ${changes.producer}`,
+      changes.bpm && `${changes.bpm} BPM`,
+      changes.key,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  }
+
+  function useOffer() {
+    if (offer) Object.assign(draft, offer.changes);
+    offer = null;
   }
 
   async function run(label: string, work: () => Promise<void>) {
@@ -57,12 +82,12 @@
     }
     const changes = changedDetails(beat, details);
     if (Object.keys(changes).length === 0) {
-      editing = false;
+      stopEditing();
       return;
     }
     run('Saving…', async () => {
       onChange(await api.updateBeat(beat.id, changes));
-      editing = false;
+      stopEditing();
     });
   }
 
@@ -71,10 +96,13 @@
     const file = input.files?.[0];
     input.value = '';
     if (!file) return;
+    offer = null;
     run('Reading file…', async () => {
-      const decoded = await prepareUpload(file, maxUploadBytes);
+      const [decoded, suggestion] = await Promise.all([prepareUpload(file, maxUploadBytes), suggestForFile(file)]);
       busy = 'Uploading…';
       onChange(await api.replaceBeatFile(beat.id, file, decoded));
+      const changes = offeredChanges(draft, suggestion);
+      if (Object.keys(changes).length > 0) offer = { fileName: file.name, changes };
     });
   }
 
@@ -117,10 +145,19 @@
 
   {#if editing}
     <form onsubmit={save}>
+      {#if offer}
+        <div class="offer" role="status">
+          <p>“{offer.fileName}” suggests {describeOffer(offer.changes)}</p>
+          <div class="actions">
+            <button type="button" class="button" onclick={useOffer}>Use these</button>
+            <button type="button" class="button" onclick={() => (offer = null)}>Keep current</button>
+          </div>
+        </div>
+      {/if}
       <BeatFields bind:draft idPrefix="beat-{beat.id}" />
       <div class="actions">
         <button type="submit" class="button primary" disabled={busy !== null}>Save</button>
-        <button type="button" class="button" onclick={() => (editing = false)} disabled={busy !== null}>Cancel</button>
+        <button type="button" class="button" onclick={stopEditing} disabled={busy !== null}>Cancel</button>
         <span class="spacer"></span>
         {#if inUse}
           <p class="muted hint">Used by a Song, so its file can't be replaced or the Beat deleted.</p>
@@ -199,6 +236,20 @@
   }
   .spacer {
     flex: 1;
+  }
+  .offer {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    background: var(--surface-1);
+  }
+  .offer p {
+    margin: 0;
+    font-size: 0.875rem;
+    overflow-wrap: anywhere;
   }
   .hint {
     margin: 0;
