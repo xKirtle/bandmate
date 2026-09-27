@@ -105,11 +105,14 @@
   const history = new History();
   let undoable = $state(false);
   let redoable = $state(false);
-  let known = untrack(() => timeline.version);
+  // The Song version the latest edit here left the Timeline at.
+  let editedAt = untrack(() => timeline.version);
+  // Edits queued and not yet saved, which undo waits for.
+  let queued = 0;
 
   $effect(() => {
-    if (timeline.version === known) return;
-    known = timeline.version;
+    if (timeline.version === editedAt) return;
+    editedAt = timeline.version;
     history.clear();
     showHistory();
   });
@@ -119,10 +122,15 @@
     redoable = history.nextRedo() !== null;
   }
 
-  /** Sends an edit, based on the Timeline as it is when its turn comes. */
-  async function send(at: SongAt, e: TimelineEdit): Promise<Timeline> {
+  /**
+   * Sends an edit, based on the Timeline as it is when its turn comes, and
+   * notes in the history what it did.
+   */
+  async function send(at: SongAt, e: TimelineEdit, note: (before: Timeline, after: Timeline) => void) {
+    const before = timeline;
+    let after: Timeline;
     try {
-      return await sendEdit(at, e);
+      after = await sendEdit(at, e);
     } catch (err) {
       // Refused because the Song changed elsewhere.
       if (err instanceof ApiError && err.stale) {
@@ -131,40 +139,43 @@
       }
       throw err;
     }
+    note(before, after);
+    editedAt = after.version;
+    showHistory();
+    return after;
   }
 
   /** Queues an edit, to undo later; resolves to whether it succeeded. */
   function perform(e: TimelineEdit): Promise<boolean> {
     e = $state.snapshot(e) as TimelineEdit;
-    return change(async (at) => {
-      const before = timeline;
-      const after = await send(at, e);
-      history.record(e, before, after);
-      known = after.version;
-      showHistory();
-      return after;
+    queued++;
+    return change((at) => send(at, e, (before, after) => history.record(e, before, after))).finally(() => queued--);
+  }
+
+  function undo() {
+    if (!undoable && queued === 0) return;
+    change((at) => {
+      const e = history.nextUndo();
+      return e ? send(at, e, (before, after) => history.undone(before, after)) : unchanged(at);
     });
   }
 
-  /** Undoes or redoes the latest edit, once the edits queued before it are saved. */
-  function travel(back: boolean) {
-    if (!(back ? undoable : redoable)) return;
-    change(async (at) => {
-      const e = back ? history.nextUndo() : history.nextRedo();
-      // Undone meanwhile, e.g. by pressing the key twice quickly.
-      if (!e) {
-        const current = await api.getTimeline(at.id);
-        known = current.version;
-        return current;
-      }
-      const before = timeline;
-      const after = await send(at, e);
-      if (back) history.undone(before, after);
-      else history.redone(before, after);
-      known = after.version;
-      showHistory();
-      return after;
+  function redo() {
+    if (!redoable) return;
+    change((at) => {
+      const e = history.nextRedo();
+      return e ? send(at, e, (before, after) => history.redone(before, after)) : unchanged(at);
     });
+  }
+
+  /**
+   * The Timeline as shown, when there turned out to be nothing to undo or
+   * redo, e.g. after pressing the key twice quickly. Nothing is sent, so
+   * the Song stays at the version it's at.
+   */
+  async function unchanged(at: SongAt): Promise<Timeline> {
+    editedAt = at.version;
+    return { ...timeline, version: at.version, updatedAt: song.updatedAt };
   }
 
   /** Whether typing there is text, which has the browser's own undo. */
@@ -179,7 +190,8 @@
     if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== 'z') return;
     if (event.defaultPrevented || !editable.current || picking || inTextField(event.target)) return;
     event.preventDefault();
-    travel(!event.shiftKey);
+    if (event.shiftKey) redo();
+    else undo();
   }
 
   function keydown(event: KeyboardEvent) {
@@ -639,13 +651,13 @@
 
 {#snippet undoRedo()}
   <span class="history edit-only">
-    <button type="button" class="icon" onclick={() => travel(true)} disabled={!undoable} aria-label="Undo" title="Undo (Ctrl+Z)"
+    <button type="button" class="icon" onclick={undo} disabled={!undoable} aria-label="Undo" title="Undo (Ctrl+Z)"
       >↶</button
     >
     <button
       type="button"
       class="icon"
-      onclick={() => travel(false)}
+      onclick={redo}
       disabled={!redoable}
       aria-label="Redo"
       title="Redo (Ctrl+Shift+Z)">↷</button

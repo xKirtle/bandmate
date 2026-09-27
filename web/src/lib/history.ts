@@ -1,6 +1,14 @@
-import { api, type NewClip, type NewTrack, type SongAt, type Timeline, type TimelineLoop, type TrackChanges } from './api';
+import {
+  api,
+  type NewClip,
+  type NewTrack,
+  type SongAt,
+  type Timeline,
+  type TimelineLoop,
+  type TrackChanges,
+} from './api';
 
-// Undo and redo for Timeline edits, kept for the session in the browser.
+// Undo and redo for Timeline edits, kept in the browser while the page is open.
 // Each edit is kept as data, with the edit that undoes it, worked out from
 // the Timeline before and after it. Undoing and redoing send those through
 // the API like any other edit.

@@ -213,12 +213,7 @@ func (s *Store) AddBeat(ctx context.Context, songID int64, based lyricsheet.Vers
 			trackID).Scan(&start); err != nil {
 			return fmt.Errorf("finding the end of the track: %w", err)
 		}
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO clips (track_id, beat_id, start, source_offset, length) VALUES (?, ?, ?, 0, ?)`,
-			trackID, beatID, start, duration); err != nil {
-			return fmt.Errorf("adding clip: %w", err)
-		}
-		return nil
+		return addClip(ctx, tx, trackID, NewClip{BeatID: beatID, Start: start, Length: duration})
 	})
 }
 
