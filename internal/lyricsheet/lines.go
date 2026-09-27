@@ -13,14 +13,8 @@ import (
 // Lines that are really new get new ids.
 func (s *Store) ReplaceAlternateText(ctx context.Context, songID, alternateID int64, text string) (Song, error) {
 	return s.change(ctx, songID, func(tx *sql.Tx) error {
-		var found int
-		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM alternates a
-			JOIN sections s ON s.id = a.section_id WHERE a.id = ? AND s.song_id = ?`,
-			alternateID, songID).Scan(&found); err != nil {
+		if _, _, err := findAlternate(ctx, tx, songID, alternateID); err != nil {
 			return err
-		}
-		if found == 0 {
-			return ErrNotFound
 		}
 		var oldIDs []int64
 		var oldTexts []string

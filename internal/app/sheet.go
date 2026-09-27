@@ -92,6 +92,52 @@ func (a *App) setSectionLabel(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *App) addAlternate(w http.ResponseWriter, r *http.Request) {
+	sectionID, ok := pathID(w, r, "sectionID")
+	if !ok {
+		return
+	}
+	var req struct {
+		Name string `json:"name"`
+	}
+	a.changeSheet(w, r, &req, func(id int64) (lyricsheet.Song, error) {
+		return a.songs.AddAlternate(r.Context(), id, sectionID, req.Name)
+	})
+}
+
+func (a *App) renameAlternate(w http.ResponseWriter, r *http.Request) {
+	alternateID, ok := pathID(w, r, "alternateID")
+	if !ok {
+		return
+	}
+	var req struct {
+		Name string `json:"name"`
+	}
+	a.changeSheet(w, r, &req, func(id int64) (lyricsheet.Song, error) {
+		return a.songs.RenameAlternate(r.Context(), id, alternateID, req.Name)
+	})
+}
+
+func (a *App) activateAlternate(w http.ResponseWriter, r *http.Request) {
+	alternateID, ok := pathID(w, r, "alternateID")
+	if !ok {
+		return
+	}
+	a.changeSheet(w, r, nil, func(id int64) (lyricsheet.Song, error) {
+		return a.songs.ActivateAlternate(r.Context(), id, alternateID)
+	})
+}
+
+func (a *App) deleteAlternate(w http.ResponseWriter, r *http.Request) {
+	alternateID, ok := pathID(w, r, "alternateID")
+	if !ok {
+		return
+	}
+	a.changeSheet(w, r, nil, func(id int64) (lyricsheet.Song, error) {
+		return a.songs.DeleteAlternate(r.Context(), id, alternateID)
+	})
+}
+
 func (a *App) replaceAlternateText(w http.ResponseWriter, r *http.Request) {
 	alternateID, ok := pathID(w, r, "alternateID")
 	if !ok {

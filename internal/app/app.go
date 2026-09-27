@@ -64,6 +64,10 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("POST /api/songs/{id}/occurrences", a.addOccurrence)
 	mux.HandleFunc("DELETE /api/songs/{id}/occurrences/{occurrenceID}", a.removeOccurrence)
 	mux.HandleFunc("POST /api/songs/{id}/occurrences/{occurrenceID}/detach", a.detach)
+	mux.HandleFunc("POST /api/songs/{id}/sections/{sectionID}/alternates", a.addAlternate)
+	mux.HandleFunc("PATCH /api/songs/{id}/alternates/{alternateID}", a.renameAlternate)
+	mux.HandleFunc("DELETE /api/songs/{id}/alternates/{alternateID}", a.deleteAlternate)
+	mux.HandleFunc("POST /api/songs/{id}/alternates/{alternateID}/activate", a.activateAlternate)
 	mux.HandleFunc("PUT /api/songs/{id}/alternates/{alternateID}/text", a.replaceAlternateText)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not found")

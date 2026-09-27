@@ -167,6 +167,18 @@ export const api = {
   /** Replaces an Alternate's Lines with the lines of text. */
   replaceAlternateText: (songId: number, alternateId: number, text: string) =>
     request<Song>('PUT', `/songs/${songId}/alternates/${alternateId}/text`, { text }),
+  /** Creates an inactive Alternate of a Section, starting as a copy of the active one's Lines. */
+  addAlternate: (songId: number, sectionId: number, name = '') =>
+    request<Song>('POST', `/songs/${songId}/sections/${sectionId}/alternates`, { name }),
+  /** Names an Alternate; "" removes its name. */
+  renameAlternate: (songId: number, alternateId: number, name: string) =>
+    request<Song>('PATCH', `/songs/${songId}/alternates/${alternateId}`, { name }),
+  /** Makes an Alternate the only active one of its Section, in every Occurrence. */
+  activateAlternate: (songId: number, alternateId: number) =>
+    request<Song>('POST', `/songs/${songId}/alternates/${alternateId}/activate`),
+  /** Permanently deletes an inactive Alternate. */
+  deleteAlternate: (songId: number, alternateId: number) =>
+    request<Song>('DELETE', `/songs/${songId}/alternates/${alternateId}`),
   /** Puts the Arrangement in this order of Occurrence ids. */
   reorderArrangement: (songId: number, occurrences: number[]) =>
     request<Song>('PUT', `/songs/${songId}/arrangement`, { occurrences }),
