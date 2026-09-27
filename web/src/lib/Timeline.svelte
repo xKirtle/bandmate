@@ -467,6 +467,11 @@
     }[event.key];
     if (to === undefined) return;
     event.preventDefault();
+    seekTo(to);
+  }
+
+  /** Seeks as asked by hand, bringing the playhead into view, e.g. for a cued Line. */
+  export function seekTo(to: number) {
     following = true;
     seekByHand(to);
     reveal(position);

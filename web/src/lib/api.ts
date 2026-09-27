@@ -20,6 +20,8 @@ export interface Song {
   notes: string;
   /** Whether the Lyric Sheet shows Chords; off hides them without removing them. */
   showChords: boolean;
+  /** Whether Read mode shows the Cue gutter. */
+  showCues: boolean;
   createdAt: string;
   updatedAt: string;
   /** The Lyric Sheet: Occurrences of Sections, in order. */
@@ -63,6 +65,8 @@ export interface Occurrence {
   shared: boolean;
   /** When it starts on the Timeline, in seconds to the millisecond; null without a Cue. */
   cue: number | null;
+  /** Line ids to when each is sung in this Occurrence, in seconds. Lines of inactive Alternates keep theirs, dormant. */
+  lineCues: Record<number, number>;
 }
 
 export interface Section {
@@ -122,7 +126,7 @@ export const commonKeys: readonly string[] = ['C', 'Cm', 'D', 'Dm', 'E', 'Em', '
 
 /** A partial update: only the fields present change; "" or null clears one. */
 export type SongChanges = Partial<
-  Pick<Song, 'title' | 'status' | 'key' | 'bpm' | 'capo' | 'tuning' | 'notes' | 'showChords'>
+  Pick<Song, 'title' | 'status' | 'key' | 'bpm' | 'capo' | 'tuning' | 'notes' | 'showChords' | 'showCues'>
 >;
 
 /** Narrows the Song list. */
@@ -360,6 +364,12 @@ export const api = {
   /** Removes an Occurrence's Cue. */
   clearOccurrenceCue: (at: SongAt, occurrenceId: number) =>
     request<Song>('DELETE', `/songs/${at.id}/occurrences/${occurrenceId}/cue`, undefined, at),
+  /** Gives a Line a Cue within an Occurrence, in seconds; cueing its first Line cues the Occurrence too. */
+  setLineCue: (at: SongAt, occurrenceId: number, lineId: number, cue: number) =>
+    request<Song>('PUT', `/songs/${at.id}/occurrences/${occurrenceId}/lines/${lineId}/cue`, { cue }, at),
+  /** Removes a Line's Cue within an Occurrence. */
+  clearLineCue: (at: SongAt, occurrenceId: number, lineId: number) =>
+    request<Song>('DELETE', `/songs/${at.id}/occurrences/${occurrenceId}/lines/${lineId}/cue`, undefined, at),
   setSectionLabel: (at: SongAt, sectionId: number, label: string) =>
     request<Song>('PATCH', `/songs/${at.id}/sections/${sectionId}`, { label }, at),
   /** Replaces an Alternate's Lines with the lines of text. */

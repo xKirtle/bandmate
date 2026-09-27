@@ -29,6 +29,10 @@ type Occurrence struct {
 	// Cue is when the Occurrence starts on the Timeline, in seconds to the
 	// millisecond, or nil if it has no Cue.
 	Cue *float64 `json:"cue"`
+	// LineCues maps Line ids to when each is sung in this Occurrence, in
+	// seconds. It holds the Cues of Lines in every Alternate of the Section:
+	// those of inactive Alternates lie dormant (ADR 0007).
+	LineCues map[int64]float64 `json:"lineCues"`
 }
 
 // Section is a block of Lines with an optional Label.
@@ -132,6 +136,7 @@ func (s *Store) loadLyricSheet(ctx context.Context, songID int64) (LyricSheet, e
 				return err
 			}
 			o.Cue = cueSeconds(cue)
+			o.LineCues = map[int64]float64{}
 			uses[o.SectionID]++
 			sheet.Arrangement = append(sheet.Arrangement, o)
 			return nil
@@ -139,8 +144,23 @@ func (s *Store) loadLyricSheet(ctx context.Context, songID int64) (LyricSheet, e
 	if err != nil {
 		return LyricSheet{}, fmt.Errorf("reading arrangement: %w", err)
 	}
+	occurrenceAt := map[int64]int{}
 	for i := range sheet.Arrangement {
 		sheet.Arrangement[i].Shared = uses[sheet.Arrangement[i].SectionID] > 1
+		occurrenceAt[sheet.Arrangement[i].ID] = i
+	}
+	err = query(ctx, s.db, `SELECT c.occurrence_id, c.line_id, c.cue_ms
+		FROM line_cues c JOIN occurrences o ON o.id = c.occurrence_id WHERE o.song_id = ?`,
+		[]any{songID}, func(rows *sql.Rows) error {
+			var occurrenceID, lineID, ms int64
+			if err := rows.Scan(&occurrenceID, &lineID, &ms); err != nil {
+				return err
+			}
+			sheet.Arrangement[occurrenceAt[occurrenceID]].LineCues[lineID] = float64(ms) / 1000
+			return nil
+		})
+	if err != nil {
+		return LyricSheet{}, fmt.Errorf("reading line cues: %w", err)
 	}
 	for _, sec := range sheet.Sections {
 		if uses[sec.ID] == 0 {

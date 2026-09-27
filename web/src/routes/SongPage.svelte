@@ -35,6 +35,7 @@
   let timeline = $state<TimelineData | null>(null);
   // Where the Timeline is playing, in seconds; null while it isn't.
   let playhead = $state<number | null>(null);
+  let timelinePanel = $state<Timeline>();
   let draft = $state<Draft>(toDraft(null));
   let loadError = $state<string | null>(null);
   let saveError = $state<string | null>(null);
@@ -332,6 +333,7 @@
           change={send}
           onUnsaved={setUnsaved}
           {playhead}
+          seek={(to) => timelinePanel?.seekTo(to)}
           hasClips={timeline?.tracks.some((t) => t.clips.length > 0) ?? false}
         />
       </div>
@@ -410,7 +412,7 @@
 </main>
 
 {#if song && timeline}
-  <Timeline {song} {timeline} change={changeTimeline} {setBpm} onPlayhead={(at) => (playhead = at)} />
+  <Timeline bind:this={timelinePanel} {song} {timeline} change={changeTimeline} {setBpm} onPlayhead={(at) => (playhead = at)} />
 {/if}
 
 <style>

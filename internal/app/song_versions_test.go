@@ -25,7 +25,7 @@ type versionedWrite struct {
 }
 
 // versionedWrites covers each kind of change: metadata, Status, Lyric Sheet
-// structure, Alternate text and Cues.
+// structure, Alternate text and Cues. Each is sent to versionedSong.
 var versionedWrites = []versionedWrite{
 	{"metadata", func(ts *testServer, s song, v int64) response {
 		return ts.DoAt(v, http.MethodPatch, songPath(s.ID), map[string]any{"key": "Am", "bpm": 92})
@@ -43,13 +43,25 @@ var versionedWrites = []versionedWrite{
 	{"occurrence cue", func(ts *testServer, s song, v int64) response {
 		return ts.DoAt(v, http.MethodPut, cuePath(s.ID, s.Arrangement[0].ID), map[string]any{"cue": 12.5})
 	}},
+	{"line cue", func(ts *testServer, s song, v int64) response {
+		return ts.DoAt(v, http.MethodPut,
+			lineCuePath(s.ID, s.Arrangement[0].ID, s.Sections[0].Alternates[0].Lines[0].ID), map[string]any{"cue": 3})
+	}},
+}
+
+// versionedSong returns a Song with one Section holding one Line, for
+// versionedWrites.
+func (ts *testServer) versionedSong() song {
+	ts.t.Helper()
+	s := ts.songWithSections("Verse")
+	return ts.setText(s.ID, s.Sections[0].Alternates[0].ID, "Old words")
 }
 
 func TestEveryChangeToASongChangesItsVersion(t *testing.T) {
 	for _, w := range versionedWrites {
 		t.Run(w.name, func(t *testing.T) {
 			ts := newTestServer(t)
-			before := ts.songWithSections("Verse")
+			before := ts.versionedSong()
 
 			res := w.send(ts, before, before.Version)
 
@@ -70,7 +82,7 @@ func TestAWriteBasedOnAnOldVersionIsRejectedAndChangesNothing(t *testing.T) {
 	for _, w := range versionedWrites {
 		t.Run(w.name, func(t *testing.T) {
 			ts := newTestServer(t)
-			old := ts.songWithSections("Verse")
+			old := ts.versionedSong()
 			// Another tab changes the Song.
 			current := ts.setLabel(old.ID, old.Sections[0].ID, "Verse 1")
 
