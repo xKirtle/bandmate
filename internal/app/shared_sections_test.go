@@ -206,7 +206,7 @@ func TestDetachingAnOccurrenceGivesItAnIndependentCopyOfItsSection(t *testing.T)
 		t.Errorf("occurrences = %v, want them unchanged %v", occurrenceIDs(got), occurrenceIDs(before))
 	}
 	for _, i := range []int{0, 2} {
-		if got.Arrangement[i] != before.Arrangement[i] {
+		if !reflect.DeepEqual(got.Arrangement[i], before.Arrangement[i]) {
 			t.Errorf("occurrence %d = %+v, want it unchanged %+v", i, got.Arrangement[i], before.Arrangement[i])
 		}
 	}

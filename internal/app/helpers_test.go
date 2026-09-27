@@ -177,6 +177,7 @@ type song struct {
 	Tuning      string       `json:"tuning"`
 	Notes       string       `json:"notes"`
 	ShowChords  bool         `json:"showChords"`
+	ShowCues    bool         `json:"showCues"`
 	CreatedAt   string       `json:"createdAt"`
 	UpdatedAt   string       `json:"updatedAt"`
 	Arrangement []occurrence `json:"arrangement"`
@@ -192,6 +193,8 @@ type occurrence struct {
 	Shared    bool  `json:"shared"`
 	// Cue is the Occurrence's time on the Timeline in seconds, or nil.
 	Cue *float64 `json:"cue"`
+	// LineCues maps Line ids to their Cues in this Occurrence, in seconds.
+	LineCues map[int64]float64 `json:"lineCues"`
 }
 
 // section is a Section with all its Alternates.
