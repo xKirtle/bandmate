@@ -16,6 +16,8 @@ export interface Song {
   capo: number | null;
   tuning: string;
   notes: string;
+  /** Whether the Lyric Sheet shows Chords; off hides them without removing them. */
+  showChords: boolean;
   createdAt: string;
   updatedAt: string;
   /** The Lyric Sheet: Occurrences of Sections, in order. */
@@ -52,7 +54,20 @@ export interface Alternate {
 export interface Line {
   /** Stays the same while the Line is edited. */
   id: number;
+  /** The Line as written, with Chords inline ("Hel[Am]lo"). Only for editing. */
   text: string;
+  /** The Line's lyrics without its Chords. */
+  lyrics: string;
+  /** In the order they appear. */
+  chords: Chord[];
+  /** The Line holds only Chords, e.g. for an intro or solo. */
+  chordLine: boolean;
+}
+
+export interface Chord {
+  /** Characters (Unicode code points, not UTF-16 units) into the lyrics; may equal their length. */
+  offset: number;
+  name: string;
 }
 
 /** Labels offered as suggestions; any text is allowed. */
@@ -72,7 +87,7 @@ export const suggestedLabels: readonly string[] = [
 
 /** A partial update: only the fields present change; "" or null clears one. */
 export type SongChanges = Partial<
-  Pick<Song, 'title' | 'status' | 'key' | 'bpm' | 'capo' | 'tuning' | 'notes'>
+  Pick<Song, 'title' | 'status' | 'key' | 'bpm' | 'capo' | 'tuning' | 'notes' | 'showChords'>
 >;
 
 /** Narrows the Song list. */

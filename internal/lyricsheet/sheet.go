@@ -46,8 +46,20 @@ type Alternate struct {
 
 // Line is one line of an Alternate. Its ID survives edits to its text.
 type Line struct {
-	ID   int64  `json:"id"`
-	Text string `json:"text"`
+	ID int64 `json:"id"`
+	// Text is the Line as written, with Chords inline in ChordPro style
+	// ("Hel[Am]lo"). Lyrics and Chords are Text parsed.
+	Text   string  `json:"text"`
+	Lyrics string  `json:"lyrics"`
+	Chords []Chord `json:"chords"`
+	// ChordLine means the Line holds only Chords, e.g. for an intro or solo.
+	ChordLine bool `json:"chordLine"`
+}
+
+// newLine builds a Line from its stored text.
+func newLine(id int64, text string) Line {
+	lyrics, chords := parseLine(text)
+	return Line{ID: id, Text: text, Lyrics: lyrics, Chords: chords, ChordLine: isChordLine(lyrics, chords)}
 }
 
 // loadLyricSheet reads a Song's whole Lyric Sheet.
@@ -93,14 +105,14 @@ func (s *Store) loadLyricSheet(ctx context.Context, songID int64) (LyricSheet, e
 		FROM lines l JOIN alternates a ON a.id = l.alternate_id JOIN sections s ON s.id = a.section_id
 		WHERE s.song_id = ? ORDER BY l.alternate_id, l.position`,
 		[]any{songID}, func(rows *sql.Rows) error {
-			var l Line
-			var alternateID int64
-			if err := rows.Scan(&l.ID, &alternateID, &l.Text); err != nil {
+			var id, alternateID int64
+			var text string
+			if err := rows.Scan(&id, &alternateID, &text); err != nil {
 				return err
 			}
 			p := alternateAt[alternateID]
 			alt := &sheet.Sections[p.section].Alternates[p.alternate]
-			alt.Lines = append(alt.Lines, l)
+			alt.Lines = append(alt.Lines, newLine(id, text))
 			return nil
 		})
 	if err != nil {
