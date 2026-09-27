@@ -98,6 +98,10 @@ _Avoid_: Timestamp, sync point, marker
 The delay between what the user heard and what the mic captured, measured once by calibration and adjustable per Take.
 _Avoid_: Delay, lag
 
+**Master**:
+A finished recording of a Song made elsewhere (e.g. in a studio), attached to the Song as a result rather than placed on the Timeline.
+_Avoid_: Final, release, finished track
+
 **Mixdown**:
 The Timeline rendered into a single audio file.
 _Avoid_: Bounce, export, render
