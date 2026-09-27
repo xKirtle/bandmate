@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { api, ApiError, statuses, type Song, type SongAt, type SongChanges, type Status } from '../lib/api';
+  import { api, ApiError, commonKeys, statuses, type Song, type SongAt, type SongChanges, type Status } from '../lib/api';
   import LyricSheet from '../lib/LyricSheet.svelte';
   import Scrapbook from '../lib/Scrapbook.svelte';
   import { navigate } from '../lib/router.svelte';
@@ -29,7 +29,6 @@
   let pending = $state(0);
   let deleting = $state(false);
 
-  const commonKeys = ['C', 'Cm', 'D', 'Dm', 'E', 'Em', 'F', 'F#m', 'G', 'Gm', 'A', 'Am', 'Bb', 'B', 'Bm'];
   const commonTunings = ['Standard', 'Drop D', 'Half step down', 'DADGAD', 'Open G', 'Open D'];
 
   $effect(() => {

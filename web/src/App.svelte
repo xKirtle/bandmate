@@ -4,6 +4,7 @@
   import NewSong from './routes/NewSong.svelte';
   import ImportSong from './routes/ImportSong.svelte';
   import SongPage from './routes/SongPage.svelte';
+  import BeatLibrary from './routes/BeatLibrary.svelte';
   import NotFound from './routes/NotFound.svelte';
 
   const songMatch = $derived(router.path.match(/^\/songs\/(\d+)$/));
@@ -13,6 +14,8 @@
 <div class="app" onclick={interceptLinks}>
   {#if router.path === '/'}
     <SongList />
+  {:else if router.path === '/beats'}
+    <BeatLibrary />
   {:else if router.path === '/songs/new'}
     <NewSong />
   {:else if router.path === '/songs/import'}

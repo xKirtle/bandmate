@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/textproto"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -37,11 +39,22 @@ func newTestServer(t *testing.T) *testServer {
 	return startTestServer(t, t.TempDir())
 }
 
+// newTestServerWith starts a server with a fresh data directory and the
+// configuration changed by configure, e.g. to lower the upload cap.
+func newTestServerWith(t *testing.T, configure func(*app.Config)) *testServer {
+	t.Helper()
+	return startTestServer(t, t.TempDir(), configure)
+}
+
 // startTestServer starts a server on an existing data directory, e.g. to
 // simulate a restart.
-func startTestServer(t *testing.T, dataDir string) *testServer {
+func startTestServer(t *testing.T, dataDir string, configure ...func(*app.Config)) *testServer {
 	t.Helper()
-	a, err := app.New(app.Config{DataDir: dataDir, SPA: testSPA})
+	cfg := app.Config{DataDir: dataDir, SPA: testSPA}
+	for _, c := range configure {
+		c(&cfg)
+	}
+	a, err := app.New(cfg)
 	if err != nil {
 		t.Fatalf("starting app: %v", err)
 	}
@@ -100,16 +113,25 @@ func (ts *testServer) do(method, path string, header http.Header, body any) resp
 			ts.t.Fatalf("encoding request body: %v", err)
 		}
 		reader = bytes.NewReader(b)
+		header = header.Clone()
+		if header == nil {
+			header = http.Header{}
+		}
+		header.Set("Content-Type", "application/json")
 	}
-	req, err := http.NewRequest(method, ts.srv.URL+path, reader)
+	return ts.DoRaw(method, path, header, reader)
+}
+
+// DoRaw sends a request with the given headers and body as is, e.g. an
+// upload or a Range request.
+func (ts *testServer) DoRaw(method, path string, header http.Header, body io.Reader) response {
+	ts.t.Helper()
+	req, err := http.NewRequest(method, ts.srv.URL+path, body)
 	if err != nil {
 		ts.t.Fatalf("building request: %v", err)
 	}
 	for name, values := range header {
 		req.Header[name] = values
-	}
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
 	}
 	res, err := ts.srv.Client().Do(req)
 	if err != nil {
@@ -312,4 +334,144 @@ func parseTime(t *testing.T, s string) time.Time {
 		t.Fatalf("parsing time %q: %v", s, err)
 	}
 	return got
+}
+
+// beat is a Beat as the API returns it.
+type beat struct {
+	ID          int64       `json:"id"`
+	Title       string      `json:"title"`
+	Producer    string      `json:"producer"`
+	SourceLink  string      `json:"sourceLink"`
+	BPM         *int        `json:"bpm"`
+	Key         string      `json:"key"`
+	Notes       string      `json:"notes"`
+	FileName    string      `json:"fileName"`
+	ContentType string      `json:"contentType"`
+	Size        int64       `json:"size"`
+	Duration    float64     `json:"duration"`
+	Peaks       []float64   `json:"peaks"`
+	Songs       []songTitle `json:"songs"`
+	CreatedAt   string      `json:"createdAt"`
+	UpdatedAt   string      `json:"updatedAt"`
+}
+
+// songTitle names a Song, e.g. one using a Beat.
+type songTitle struct {
+	ID    int64  `json:"id"`
+	Title string `json:"title"`
+}
+
+// audioUpload is an audio file sent with what the browser worked out from
+// decoding it.
+type audioUpload struct {
+	FileName    string
+	ContentType string
+	Data        []byte
+	// Details holds the other form fields (title, producer, duration,
+	// peaks...), sent as the JSON "details" part.
+	Details map[string]any
+}
+
+// fakeAudio is a stand-in for an audio file: the server keeps files as
+// uploaded and never decodes them.
+func fakeAudio(fileName string) audioUpload {
+	return audioUpload{
+		FileName:    fileName,
+		ContentType: "audio/mpeg",
+		Data:        []byte("ID3 not really an mp3, but the server never decodes it: " + fileName),
+		Details: map[string]any{
+			"duration": 2.5,
+			"peaks":    []float64{0.1, 0.5, 1, 0.25},
+		},
+	}
+}
+
+// with returns a copy of the upload with extra details.
+func (u audioUpload) with(details map[string]any) audioUpload {
+	merged := map[string]any{}
+	for k, v := range u.Details {
+		merged[k] = v
+	}
+	for k, v := range details {
+		merged[k] = v
+	}
+	u.Details = merged
+	return u
+}
+
+// SendUpload sends an audio file as a multipart form, as the SPA does.
+func (ts *testServer) SendUpload(method, path string, u audioUpload) response {
+	ts.t.Helper()
+	var body bytes.Buffer
+	form := multipart.NewWriter(&body)
+	details, err := json.Marshal(u.Details)
+	if err != nil {
+		ts.t.Fatalf("encoding details: %v", err)
+	}
+	if err := form.WriteField("details", string(details)); err != nil {
+		ts.t.Fatal(err)
+	}
+	part, err := form.CreatePart(textproto.MIMEHeader{
+		"Content-Disposition": {fmt.Sprintf(`form-data; name="file"; filename=%q`, u.FileName)},
+		"Content-Type":        {u.ContentType},
+	})
+	if err != nil {
+		ts.t.Fatal(err)
+	}
+	if _, err := part.Write(u.Data); err != nil {
+		ts.t.Fatal(err)
+	}
+	if err := form.Close(); err != nil {
+		ts.t.Fatal(err)
+	}
+	return ts.DoRaw(method, path, http.Header{"Content-Type": {form.FormDataContentType()}}, &body)
+}
+
+// beatPath is where a Beat lives.
+func beatPath(id int64) string {
+	return fmt.Sprintf("/api/beats/%d", id)
+}
+
+// uploadBeat adds a Beat to the Beat Library and returns it.
+func (ts *testServer) uploadBeat(u audioUpload) beat {
+	ts.t.Helper()
+	res := ts.SendUpload(http.MethodPost, "/api/beats", u)
+	expectStatus(ts.t, res, http.StatusCreated)
+	var b beat
+	res.JSON(ts.t, &b)
+	return b
+}
+
+// getBeat reads one Beat, with its peaks.
+func (ts *testServer) getBeat(id int64) beat {
+	ts.t.Helper()
+	res := ts.Do(http.MethodGet, beatPath(id), nil)
+	expectStatus(ts.t, res, http.StatusOK)
+	var b beat
+	res.JSON(ts.t, &b)
+	return b
+}
+
+// listBeats reads the Beat Library, with an optional query string such as
+// "q=trap".
+func (ts *testServer) listBeats(query ...string) []beat {
+	ts.t.Helper()
+	path := "/api/beats"
+	if len(query) > 0 {
+		path += "?" + query[0]
+	}
+	res := ts.Do(http.MethodGet, path, nil)
+	expectStatus(ts.t, res, http.StatusOK)
+	var list []beat
+	res.JSON(ts.t, &list)
+	return list
+}
+
+// beatTitles lists the Beat titles in order.
+func beatTitles(list []beat) []string {
+	out := []string{}
+	for _, b := range list {
+		out = append(out, b.Title)
+	}
+	return out
 }
