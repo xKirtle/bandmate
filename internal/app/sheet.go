@@ -162,7 +162,7 @@ func (a *App) restoreCues(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Cues *[]struct {
 			OccurrenceID int64    `json:"occurrenceId"`
-			LineID       int64    `json:"lineId"`
+			LineID       *int64   `json:"lineId"`
 			Cue          *float64 `json:"cue"`
 		} `json:"cues"`
 	}

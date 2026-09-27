@@ -17,7 +17,14 @@
   import BeatPicker from './BeatPicker.svelte';
   import { clampMove, clampTrimEnd, clampTrimStart } from './clipEdit';
   import { hasCues } from './cues';
-  import { History, restorable, sendEdit, type CueEdit, type Edit as TimelineEdit, type Saved } from './history';
+  import {
+    History,
+    restorable,
+    sendEdit,
+    type Edit as TimelineEdit,
+    type HistoryEdit,
+    type Saved,
+  } from './history';
   import { formatVolume, maxVolume, silence, trackGains, type Levels } from './mixer';
   import { peaksPerSecond } from './peaks';
   import { keptInLoop, outsideLoop, repeats, timelineEnd, type Loop, type Placed } from './schedule';
@@ -174,12 +181,14 @@
    */
   async function send(
     at: SongAt,
-    e: TimelineEdit | CueEdit,
+    e: HistoryEdit,
     note: (before: Timeline, after: Timeline) => void,
   ): Promise<Saved> {
     if (e.kind === 'restoreCues') {
-      // Cues whose Line or Occurrence is gone since can't come back.
-      const after = await saved(api.restoreCues(at, restorable(e.cues, song)));
+      // Cues whose Line or Occurrence is gone since can't come back. With
+      // none left, there's nothing to send, and the step is passed over.
+      const cues = restorable(e.cues, song);
+      const after = cues.length > 0 ? await saved(api.restoreCues(at, cues)) : song;
       note(timeline, timeline);
       showHistory();
       return { song: after };

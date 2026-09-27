@@ -164,7 +164,7 @@ func (s *Store) ClearCues(ctx context.Context, songID int64, based Version) (Son
 // LineID, a Line's Cue within it. A nil Cue means none.
 type CueValue struct {
 	OccurrenceID int64
-	LineID       int64
+	LineID       *int64
 	Cue          *float64
 }
 
@@ -187,10 +187,10 @@ func (s *Store) RestoreCues(ctx context.Context, songID int64, based Version, va
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		for i, v := range values {
 			var err error
-			if v.LineID == 0 {
+			if v.LineID == nil {
 				err = writeOccurrenceCue(ctx, tx, songID, v.OccurrenceID, ms[i])
 			} else {
-				err = writeLineCue(ctx, tx, songID, v.OccurrenceID, v.LineID, ms[i])
+				err = writeLineCue(ctx, tx, songID, v.OccurrenceID, *v.LineID, ms[i])
 			}
 			if err != nil {
 				return err

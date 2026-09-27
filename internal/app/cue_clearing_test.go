@@ -100,6 +100,9 @@ func TestClearingAllCuesLeavesOtherSongsAlone(t *testing.T) {
 	if got.Version == before.Version {
 		t.Errorf("version = %d, want it changed", got.Version)
 	}
+	if !parseTime(t, got.UpdatedAt).After(parseTime(t, before.UpdatedAt)) {
+		t.Errorf("updatedAt = %s, want later than %s", got.UpdatedAt, before.UpdatedAt)
+	}
 	if read := ts.getSong(other.ID); !reflect.DeepEqual(read, other) {
 		t.Errorf("other song = %+v, want it unchanged: %+v", read, other)
 	}
@@ -143,6 +146,9 @@ func TestRestoringCuesSetsAndClearsExactlyThoseGiven(t *testing.T) {
 	}
 	if got.Version == before.Version {
 		t.Errorf("version = %d, want it changed", got.Version)
+	}
+	if !parseTime(t, got.UpdatedAt).After(parseTime(t, before.UpdatedAt)) {
+		t.Errorf("updatedAt = %s, want later than %s", got.UpdatedAt, before.UpdatedAt)
 	}
 	if read := ts.getSong(before.ID); !reflect.DeepEqual(read, got) {
 		t.Errorf("song read back = %+v, want %+v", read, got)

@@ -46,6 +46,9 @@ export interface CueEdit {
   cues: CueValue[];
 }
 
+/** An edit kept to undo or redo: to the Timeline, or to the Cues. */
+export type HistoryEdit = Edit | CueEdit;
+
 /** Ids of Tracks and Clips, each in Timeline order. */
 interface Ids {
   tracks: number[];
@@ -54,7 +57,7 @@ interface Ids {
 
 /** An edit to send, and the ids it's known to give what it adds. */
 interface Step {
-  edit: Edit | CueEdit;
+  edit: HistoryEdit;
   adds: Ids;
 }
 
@@ -92,12 +95,12 @@ export class History {
   }
 
   /** The edit that would undo the latest one, or null if there's none. */
-  nextUndo(): Edit | CueEdit | null {
+  nextUndo(): HistoryEdit | null {
     return this.#undo.at(-1)?.undo.edit ?? null;
   }
 
   /** The edit that would redo the latest one undone, or null if there's none. */
-  nextRedo(): Edit | CueEdit | null {
+  nextRedo(): HistoryEdit | null {
     return this.#redo.at(-1)?.redo.edit ?? null;
   }
 
@@ -262,7 +265,7 @@ function remapStep(step: Step, ids: IdMaps): Step {
 }
 
 /** An edit naming Tracks and Clips by the ids given. */
-function remap(edit: Edit | CueEdit, ids: IdMaps): Edit | CueEdit {
+function remap(edit: HistoryEdit, ids: IdMaps): HistoryEdit {
   switch (edit.kind) {
     case 'restoreCues':
     case 'addBeat':
