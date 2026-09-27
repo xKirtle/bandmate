@@ -97,22 +97,33 @@ const timeFormat = "2006-01-02T15:04:05.000000000Z"
 
 // CreateSong creates a Song with the given title and Status idea.
 func (s *Store) CreateSong(ctx context.Context, title string) (Song, error) {
-	title = strings.TrimSpace(title)
-	if title == "" {
-		return Song{}, errTitleRequired
-	}
-	now := time.Now().UTC().Format(timeFormat)
-	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO songs (title, status, created_at, updated_at) VALUES (?, ?, ?, ?)`,
-		title, StatusIdea, now, now)
-	if err != nil {
-		return Song{}, fmt.Errorf("creating song: %w", err)
-	}
-	id, err := res.LastInsertId()
+	id, err := insertSong(ctx, s.db, title)
 	if err != nil {
 		return Song{}, err
 	}
 	return s.GetSong(ctx, id)
+}
+
+// execer is what both *sql.DB and *sql.Tx offer for writing.
+type execer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+// insertSong creates a Song with the given title and Status idea, and
+// returns its id.
+func insertSong(ctx context.Context, db execer, title string) (int64, error) {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return 0, errTitleRequired
+	}
+	now := time.Now().UTC().Format(timeFormat)
+	id, err := insert(ctx, db,
+		`INSERT INTO songs (title, status, created_at, updated_at) VALUES (?, ?, ?, ?)`,
+		title, StatusIdea, now, now)
+	if err != nil {
+		return 0, fmt.Errorf("creating song: %w", err)
+	}
+	return id, nil
 }
 
 // GetSong returns a Song's full aggregate.

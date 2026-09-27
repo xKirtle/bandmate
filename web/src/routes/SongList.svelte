@@ -42,7 +42,10 @@
 
 <header class="bar">
   <h1>Songs</h1>
-  <a class="button primary" href="/songs/new">New Song</a>
+  <div class="actions">
+    <a class="button" href="/songs/import">Import</a>
+    <a class="button primary" href="/songs/new">New Song</a>
+  </div>
 </header>
 
 <main class="page">
@@ -79,6 +82,7 @@
     <div class="empty">
       <p>No Songs yet.</p>
       <a class="button primary" href="/songs/new">Write your first Song</a>
+      <a class="button" href="/songs/import">Import one</a>
     </div>
   {:else}
     <ul class="songs">
@@ -98,6 +102,10 @@
 </main>
 
 <style>
+  .actions {
+    display: flex;
+    gap: 0.5rem;
+  }
   .filters {
     display: flex;
     flex-direction: column;
