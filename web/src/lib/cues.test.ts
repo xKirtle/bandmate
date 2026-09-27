@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { currentPosition, formatCue, nudgeCue, parseCue } from './cues';
+import { currentPosition, formatCue, hasCues, nudgeCue, parseCue } from './cues';
 
 describe('parseCue', () => {
   it('reads plain seconds', () => {
@@ -187,6 +187,82 @@ describe('currentPosition', () => {
       expect(currentPosition(shared, 21)).toEqual({ occurrence: 2, line: 50 });
       expect(currentPosition(shared, 25)).toEqual({ occurrence: 2, line: 51 });
     });
+  });
+
+  describe('with dormant Line Cues', () => {
+    // A Verse at 0:10 whose inactive Alternate A (Lines 50–51) was cued at
+    // 12 and 16; its active Alternate B (Lines 60–61) has only 60 cued, at 20.
+    const song = {
+      arrangement: [{ id: 1, sectionId: 9, cue: 10, lineCues: { 50: 12, 51: 16, 60: 20 } }],
+      sections: [
+        {
+          id: 9,
+          alternates: [
+            {
+              active: false,
+              lines: [
+                { id: 50, text: 'Old one' },
+                { id: 51, text: 'Old two' },
+              ],
+            },
+            {
+              active: true,
+              lines: [
+                { id: 60, text: 'New one' },
+                { id: 61, text: 'New two' },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    it('ignores them, keeping the active Line current', () => {
+      expect(currentPosition(song, 17)).toEqual({ occurrence: 1, line: 60 });
+      expect(currentPosition(song, 21)).toEqual({ occurrence: 1, line: 60 });
+    });
+
+    it('falls back to the Occurrence Cue when only dormant Cues are past', () => {
+      expect(currentPosition(song, 13)).toEqual({ occurrence: 1, line: 60 });
+    });
+
+    it('is the whole Section when all its Line Cues are dormant', () => {
+      const allDormant = { ...song, arrangement: [{ id: 1, sectionId: 9, cue: 10, lineCues: { 50: 12, 51: 16 } }] };
+      expect(currentPosition(allDormant, 17)).toEqual({ occurrence: 1, line: null });
+    });
+
+    it('is nothing when only dormant Cues are past', () => {
+      const noCue = { ...song, arrangement: [{ id: 1, sectionId: 9, cue: null, lineCues: { 50: 12 } }] };
+      expect(currentPosition(noCue, 13)).toBeNull();
+    });
+  });
+});
+
+describe('hasCues', () => {
+  const sections = [
+    {
+      id: 9,
+      alternates: [
+        { active: false, lines: [{ id: 50, text: 'Old' }] },
+        { active: true, lines: [{ id: 60, text: 'New' }] },
+      ],
+    },
+  ];
+
+  it('is false without any Cues', () => {
+    expect(hasCues({ arrangement: [{ id: 1, sectionId: 9, cue: null, lineCues: {} }], sections })).toBe(false);
+  });
+
+  it('counts an Occurrence Cue', () => {
+    expect(hasCues({ arrangement: [{ id: 1, sectionId: 9, cue: 0, lineCues: {} }], sections })).toBe(true);
+  });
+
+  it('counts a Line Cue of the active Alternate', () => {
+    expect(hasCues({ arrangement: [{ id: 1, sectionId: 9, cue: null, lineCues: { 60: 3 } }], sections })).toBe(true);
+  });
+
+  it('ignores dormant Cues', () => {
+    expect(hasCues({ arrangement: [{ id: 1, sectionId: 9, cue: null, lineCues: { 50: 3 } }], sections })).toBe(false);
   });
 });
 

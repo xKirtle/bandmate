@@ -61,6 +61,15 @@ export function currentPosition(
   return { occurrence: o.id, line: lines.find((l) => !isBlank(l))?.id ?? null };
 }
 
+/** Whether any Occurrence has a Cue in effect: its own, or one on a Line of its active Alternate. Dormant Cues don't count. */
+export function hasCues(song: { arrangement: readonly CuedOccurrence[]; sections: readonly CuedSection[] }): boolean {
+  const sections = new Map(song.sections.map((s) => [s.id, s]));
+  return song.arrangement.some((o) => {
+    const lines = sections.get(o.sectionId)?.alternates.find((a) => a.active)?.lines ?? [];
+    return o.cue !== null || lines.some((l) => o.lineCues[l.id] !== undefined);
+  });
+}
+
 /** Moves a Cue a tenth of a second later (1) or earlier (-1), no earlier than 0. */
 export function nudgeCue(cue: number, by: 1 | -1): number {
   return Math.max(0, Math.round(cue * 1000 + by * 100) / 1000);
