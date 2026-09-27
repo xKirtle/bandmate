@@ -52,10 +52,10 @@ export function changedDetails(beat: Beat, details: BeatDetails): Partial<BeatDe
  * replacing a Beat's file. Fields the file suggests nothing for are left out.
  */
 export function offeredChanges(draft: BeatDraft, suggestion: BeatSuggestion): Partial<BeatDraft> {
-  const offered = toDraft(suggestion);
+  const suggested = toDraft(suggestion);
   const changes: Partial<BeatDraft> = {};
   for (const field of Object.keys(suggestion) as (keyof BeatSuggestion)[]) {
-    const value = offered[field];
+    const value = suggested[field];
     if (value !== '' && value !== draft[field].trim()) changes[field] = value;
   }
   return changes;

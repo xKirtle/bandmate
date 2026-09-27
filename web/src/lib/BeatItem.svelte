@@ -45,7 +45,7 @@
     offer = null;
   }
 
-  function offered(changes: Partial<BeatDraft>): string {
+  function describeOffer(changes: Partial<BeatDraft>): string {
     return [
       changes.title && `“${changes.title}”`,
       changes.producer && `by ${changes.producer}`,
@@ -147,7 +147,7 @@
     <form onsubmit={save}>
       {#if offer}
         <div class="offer" role="status">
-          <p>“{offer.fileName}” suggests {offered(offer.changes)}</p>
+          <p>“{offer.fileName}” suggests {describeOffer(offer.changes)}</p>
           <div class="actions">
             <button type="button" class="button" onclick={useOffer}>Use these</button>
             <button type="button" class="button" onclick={() => (offer = null)}>Keep current</button>

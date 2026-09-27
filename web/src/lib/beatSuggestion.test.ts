@@ -19,6 +19,13 @@ describe('suggestBeatDetails from a filename', () => {
     ['sunset 2024.mp3', null, ''],
     ['Emotions.mp3', null, ''],
     ['sunset_Dm7.wav', null, ''],
+    ['sunset Dm 140.wav', 140, 'Dm'],
+    ['Nights 120bpm F# m.wav', 120, 'F#m'],
+    ['Who Am I.mp3', null, ''],
+    ['I Am Legend 140bpm.mp3', 140, ''],
+    ['Ab-Soul Type Beat.mp3', null, ''],
+    ['Blink 182.mp3', null, ''],
+    ['Room 101.mp3', null, ''],
   ])('%s gives BPM %s and key %s', (fileName, bpm, key) => {
     const suggestion = suggestBeatDetails(fileName);
 
@@ -40,8 +47,26 @@ describe('suggestBeatDetails title from a filename', () => {
     ['iPhone_ringtone_Am.m4a', 'iPhone ringtone'],
     ['140bpm_Am.wav', '140bpm_Am'],
     ['beat', 'Beat'],
+    ['Who Am I.mp3', 'Who Am I'],
+    ['Nights 100 Days.mp3', 'Nights 100 Days'],
+    ['[FREE] Drake Type Beat - "Nights" | 140 BPM.mp3', 'Drake Type Beat - "Nights"'],
+    ['Nights (prod. Kofi) 140bpm.mp3', 'Nights'],
+    ['Nights prod by Kofi.mp3', 'Nights'],
   ])('%s gives “%s”', (fileName, title) => {
     expect(suggestBeatDetails(fileName).title).toBe(title);
+  });
+});
+
+describe('suggestBeatDetails producer from a filename', () => {
+  it.each([
+    ['Nights (prod. Kofi) 140bpm.mp3', 'Kofi'],
+    ['Nights [Prod. By Kofi].mp3', 'Kofi'],
+    ['Nights prod by Kofi.mp3', 'Kofi'],
+    ['Nights - produced by Kofi & Ana | 92 BPM.wav', 'Kofi & Ana'],
+    ['Nights.mp3', ''],
+    ['Product Launch.mp3', ''],
+  ])('%s gives “%s”', (fileName, producer) => {
+    expect(suggestBeatDetails(fileName).producer).toBe(producer);
   });
 });
 
@@ -63,8 +88,10 @@ describe('suggestBeatDetails from tags', () => {
     ['a spelled-out key', { key: 'E minor' }, { title: 'Dark Trap', producer: '', bpm: 140, key: 'Em' }],
     ['a major key', { key: 'Dbmaj' }, { title: 'Dark Trap', producer: '', bpm: 140, key: 'Db' }],
     ['a plain major key', { key: 'G' }, { title: 'Dark Trap', producer: '', bpm: 140, key: 'G' }],
+    ['a lowercase key', { key: 'f#m' }, { title: 'Dark Trap', producer: '', bpm: 140, key: 'F#m' }],
+    ['a producer in the filename', { artist: 'Ana' }, { title: 'Nights', producer: 'Ana', bpm: null, key: '' }, 'Nights (prod. Kofi).mp3'],
     ['a key in another notation', { key: '8A' }, { title: 'Dark Trap', producer: '', bpm: 140, key: '8A' }],
-  ])('with %s', (_, tags, suggestion) => {
-    expect(suggestBeatDetails(fileName, tags)).toEqual(suggestion);
+  ])('with %s', (_, tags, suggestion, name = fileName) => {
+    expect(suggestBeatDetails(name, tags)).toEqual(suggestion);
   });
 });
