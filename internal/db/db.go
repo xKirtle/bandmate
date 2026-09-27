@@ -1,0 +1,95 @@
+// Package db opens Bandmate's SQLite database and keeps its schema up to date.
+package db
+
+import (
+	"context"
+	"database/sql"
+	"embed"
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
+
+	_ "modernc.org/sqlite" // pure-Go SQLite driver, registered as "sqlite"
+)
+
+// FileName is the database file's name inside the data directory.
+const FileName = "bandmate.db"
+
+//go:embed migrations/*.sql
+var migrations embed.FS
+
+// Open opens (creating if needed) the database in dataDir and applies any
+// pending migrations.
+func Open(ctx context.Context, dataDir string) (*sql.DB, error) {
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		return nil, fmt.Errorf("creating data directory: %w", err)
+	}
+	dsn := "file:" + filepath.Join(dataDir, FileName) +
+		"?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
+	conn, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("opening database: %w", err)
+	}
+	// SQLite allows one writer at a time; a single connection avoids
+	// "database is locked" errors for a single-user app.
+	conn.SetMaxOpenConns(1)
+	if err := migrate(ctx, conn); err != nil {
+		conn.Close()
+		return nil, err
+	}
+	return conn, nil
+}
+
+// migrate applies every embedded migration not yet recorded in
+// schema_migrations, in file name order, each in its own transaction.
+func migrate(ctx context.Context, conn *sql.DB) error {
+	if _, err := conn.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
+		name TEXT PRIMARY KEY,
+		applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+	)`); err != nil {
+		return fmt.Errorf("creating schema_migrations: %w", err)
+	}
+
+	// Glob returns names in lexical order, which is the order to apply them.
+	names, err := fs.Glob(migrations, "migrations/*.sql")
+	if err != nil {
+		return err
+	}
+
+	for _, path := range names {
+		name := strings.TrimSuffix(filepath.Base(path), ".sql")
+		var applied int
+		if err := conn.QueryRowContext(ctx,
+			`SELECT COUNT(*) FROM schema_migrations WHERE name = ?`, name).Scan(&applied); err != nil {
+			return fmt.Errorf("checking migration %s: %w", name, err)
+		}
+		if applied > 0 {
+			continue
+		}
+		script, err := migrations.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if err := apply(ctx, conn, name, string(script)); err != nil {
+			return fmt.Errorf("applying migration %s: %w", name, err)
+		}
+	}
+	return nil
+}
+
+func apply(ctx context.Context, conn *sql.DB, name, script string) error {
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, script); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations (name) VALUES (?)`, name); err != nil {
+		return err
+	}
+	return tx.Commit()
+}

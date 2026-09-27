@@ -1,0 +1,12 @@
+# Local data (SQLite database, later audio)
+/data/
+
+# Go build output
+/bandmate
+
+# Frontend
+web/node_modules/
+web/dist/*
+!web/dist/.gitkeep
+
+.env
