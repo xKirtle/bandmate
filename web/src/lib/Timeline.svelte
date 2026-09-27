@@ -1,21 +1,31 @@
 <script lang="ts">
   import { onDestroy, untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
-  import { api, type Beat, type Clip, type Song, type SongAt, type Timeline, type Track, type TrackChanges } from './api';
+  import {
+    api,
+    type Beat,
+    type Clip,
+    type Song,
+    type SongAt,
+    type Timeline,
+    type TimelineLoop,
+    type Track,
+    type TrackChanges,
+  } from './api';
   import BeatPicker from './BeatPicker.svelte';
   import { clampMove, clampTrimEnd, clampTrimStart } from './clipEdit';
   import { formatVolume, maxVolume, silence, trackGains, type Levels } from './mixer';
   import { peaksPerSecond } from './peaks';
-  import { timelineEnd, type Placed } from './schedule';
+  import { repeats, timelineEnd, type Loop, type Placed } from './schedule';
   import { formatDuration } from './time';
   import { TimelinePlayer, type PlayableClip, type PlayerState } from './timelinePlayer';
   import { bars } from './waveform';
 
   // The Timeline, docked under the Lyric Sheet: its Tracks and Clips, and
-  // playback with each Track's volume, mute and solo. Editing (adding Beats,
-  // adding, renaming, reordering and deleting Tracks, moving, trimming,
-  // duplicating and deleting Clips) is only offered on wider screens; on a
-  // phone it only plays and mixes.
+  // playback with each Track's volume, mute and solo, and the Loop. Editing
+  // (adding Beats, adding, renaming, reordering and deleting Tracks, moving,
+  // trimming, duplicating and deleting Clips, setting and clearing the Loop)
+  // is only offered on wider screens; on a phone it only plays and mixes.
   let {
     song,
     timeline,
@@ -56,8 +66,14 @@
     ),
   );
   const length = $derived(timelineEnd(clips));
-  // Room after the last Clip, to drag Clips later on the Timeline.
-  const span = $derived(length > 0 ? length + Math.max(10, length / 4) : 0);
+  // Room after the last Clip, or the Loop if it ends later, to drag Clips
+  // and the Loop later on the Timeline.
+  const reach = $derived(length > 0 ? Math.max(length, timeline.loop?.end ?? 0) : 0);
+  const span = $derived(reach > 0 ? reach + Math.max(10, reach / 4) : 0);
+  // The Loop playback repeats: the saved one, while it's on.
+  const playingLoop = $derived<Loop | null>(
+    timeline.loop?.on ? { start: timeline.loop.start, end: timeline.loop.end } : null,
+  );
   const empty = $derived(clips.length === 0);
   // Matches the phone layout below, which hides editing.
   const editable = new MediaQuery('min-width: 40.0625rem');
@@ -152,20 +168,23 @@
   // A change to what plays is heard right away. The Timeline is replaced
   // after every change to it, so compare what would play, not the objects,
   // and in an order reordering Tracks doesn't change.
-  const playKey = $derived(JSON.stringify([...playable].sort((a, b) => a.trackId - b.trackId || a.start - b.start)));
+  const playKey = $derived(
+    JSON.stringify([[...playable].sort((a, b) => a.trackId - b.trackId || a.start - b.start), playingLoop]),
+  );
   $effect(() => {
     void playKey;
     untrack(() => {
-      if (playerState !== 'stopped') play(playable, player.position());
+      if (playerState !== 'stopped') play(player.position());
     });
   });
 
-  // Follow the playhead every frame while playing, and stop at the end.
+  // Follow the playhead every frame while playing, and stop at the end,
+  // unless going round the Loop.
   $effect(() => {
     if (playerState !== 'playing') return;
     let frame = requestAnimationFrame(function follow() {
       if (!dragging) position = player.position();
-      if (position >= length) {
+      if (position >= length && !player.repeating) {
         player.stop();
         player.seek(length);
         position = length;
@@ -176,9 +195,9 @@
     return () => cancelAnimationFrame(frame);
   });
 
-  function play(clipsToPlay: PlayableClip[], from: number) {
+  function play(from: number) {
     error = null;
-    player.play(clipsToPlay, from).catch((e: Error) => (error = e.message));
+    player.play(playable, from, playingLoop).catch((e: Error) => (error = e.message));
   }
 
   function toggle() {
@@ -187,14 +206,14 @@
       position = player.position();
       return;
     }
-    // At the end, playing starts over.
-    play(playable, position >= length ? 0 : position);
+    // At the end, playing starts over, unless there's a Loop yet to go round.
+    play(position >= length && !repeats(position, playingLoop) ? 0 : position);
   }
 
   function seek(to: number) {
     position = Math.max(0, Math.min(length, to));
     if (playerState === 'stopped') player.seek(position);
-    else play(playable, position);
+    else play(position);
   }
 
   // Clicking on the ruler seeks. Dragging moves the playhead, and while
@@ -419,6 +438,92 @@
     }
   }
 
+  // Setting the Loop: dragging along the top of the ruler marks a new one,
+  // switched on, and dragging its edges adjusts it. It's saved on release,
+  // and until the saved Timeline comes back, shown where it was dropped.
+  interface LoopEdit {
+    mode: 'new' | 'start' | 'end';
+    /** The time the Loop is marked from: where a new one was started, or its edge that isn't dragged. */
+    anchor: number;
+    /** Where the pointer went down, to tell a click from a drag. */
+    fromX: number;
+    moved: boolean;
+    loop: TimelineLoop;
+    saving: boolean;
+  }
+  let loopEdit = $state<LoopEdit | null>(null);
+  const loop = $derived(loopEdit?.moved ? loopEdit.loop : timeline.loop);
+  // The shortest Loop the browser sets, in seconds, so a stray click doesn't
+  // set one. The server only needs its start before its end.
+  const minLoop = 0.25;
+
+  /** The time under a point on the loop bar, within the Timeline shown. */
+  function loopTimeAt(clientX: number): number {
+    return Math.max(0, Math.min(span, spanTimeAt(clientX)));
+  }
+
+  function loopDown(event: PointerEvent) {
+    if (!editable.current || event.button !== 0 || loopEdit) return;
+    const edge = (event.target as HTMLElement).dataset.edge as 'start' | 'end' | undefined;
+    const current = timeline.loop;
+    const t = loopTimeAt(event.clientX);
+    event.preventDefault();
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    const common = { fromX: event.clientX, moved: false, saving: false };
+    loopEdit =
+      edge && current
+        ? { ...common, mode: edge, anchor: edge === 'start' ? current.end : current.start, loop: current }
+        : { ...common, mode: 'new', anchor: t, loop: { start: t, end: t, on: true } };
+  }
+
+  function loopMove(event: PointerEvent) {
+    if (!loopEdit || loopEdit.saving) return;
+    // A small wobble while clicking isn't a drag.
+    if (!loopEdit.moved && Math.abs(event.clientX - loopEdit.fromX) < 4) return;
+    loopEdit.moved = true;
+    const t = loopTimeAt(event.clientX);
+    const { mode, anchor, loop: shown } = loopEdit;
+    loopEdit.loop =
+      mode === 'start'
+        ? { ...shown, start: Math.max(0, Math.min(t, anchor - minLoop)) }
+        : mode === 'end'
+          ? { ...shown, end: Math.max(t, anchor + minLoop) }
+          : { ...shown, start: Math.min(anchor, t), end: Math.max(anchor, t) };
+  }
+
+  async function loopUp() {
+    if (!loopEdit || loopEdit.saving) return;
+    const { moved, loop: to } = loopEdit;
+    const current = timeline.loop;
+    const unchanged = current && to.start === current.start && to.end === current.end && to.on === current.on;
+    if (!moved || unchanged || to.end - to.start < minLoop) {
+      loopEdit = null;
+      return;
+    }
+    loopEdit.saving = true;
+    await change((at) => api.setLoop(at, to));
+    loopEdit = null;
+  }
+
+  function loopCancel() {
+    if (!loopEdit?.saving) loopEdit = null;
+  }
+
+  function switchLoop() {
+    if (!timeline.loop) return;
+    const on = !timeline.loop.on;
+    change((at) => api.switchLoop(at, on));
+  }
+
+  function clearLoop() {
+    change((at) => api.clearLoop(at));
+  }
+
+  /** A stretch of the Timeline's position and width across it, cut off at its end. */
+  function spanStyle(from: number, to: number): { left: string; width: string } {
+    return { left: `${percent(from)}%`, width: `${Math.max(0, percent(Math.min(to, span) - from))}%` };
+  }
+
   // Ruler marks at a round interval, about one every 1/8 of the Timeline.
   const tickStep = $derived([1, 2, 5, 10, 15, 30, 60, 120, 300, 600].find((s) => span / s <= 8) ?? 1200);
   const ticks = $derived(
@@ -462,6 +567,16 @@
           {/if}
         </button>
         <span class="time muted">{formatDuration(position)} / {formatDuration(length)}</span>
+        <button
+          type="button"
+          class="toggle loop-toggle edit-only"
+          aria-pressed={timeline.loop?.on ?? false}
+          disabled={!timeline.loop}
+          onclick={switchLoop}
+          title={timeline.loop
+            ? `Loop ${formatDuration(timeline.loop.start)} to ${formatDuration(timeline.loop.end)}`
+            : 'Drag along the top of the ruler to set a Loop'}>Loop</button
+        >
         {#if playerState === 'loading'}
           <span class="muted" role="status">Loading audio…</span>
         {/if}
@@ -557,6 +672,39 @@
           {/each}
         </div>
         <div class="lanes" bind:this={lanesElement}>
+          <!-- Pointer only, like dragging Clips; the Loop is switched on and off with its button. -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div
+            class="loop-bar"
+            class:editable={editable.current}
+            title={editable.current ? 'Drag to set a Loop' : undefined}
+            onpointerdown={loopDown}
+            onpointermove={loopMove}
+            onpointerup={loopUp}
+            onpointercancel={loopCancel}
+          >
+            {#if loop}
+              {@const at = spanStyle(loop.start, loop.end)}
+              <div
+                class="loop"
+                class:on={loop.on}
+                style:left={at.left}
+                style:width={at.width}
+                title="Loop {formatDuration(loop.start)} to {formatDuration(loop.end)}"
+              >
+                <span class="loop-edge start edit-only" data-edge="start" title="Drag to move the Loop's start"></span>
+                <button
+                  type="button"
+                  class="loop-clear edit-only"
+                  onpointerdown={(e) => e.stopPropagation()}
+                  onclick={clearLoop}
+                  aria-label="Clear the Loop"
+                  title="Clear the Loop">×</button
+                >
+                <span class="loop-edge end edit-only" data-edge="end" title="Drag to move the Loop's end"></span>
+              </div>
+            {/if}
+          </div>
           <div
             class="ruler"
             role="slider"
@@ -637,6 +785,10 @@
               {/each}
             </div>
           {/each}
+          {#if loop?.on}
+            {@const at = spanStyle(loop.start, loop.end)}
+            <span class="loop-shade" style:left={at.left} style:width={at.width} aria-hidden="true"></span>
+          {/if}
           <span class="playhead" style:left="{percent(position)}%" aria-hidden="true"></span>
         </div>
       </div>
@@ -730,6 +882,10 @@
     height: 1.5rem;
     flex-shrink: 0;
   }
+  /* Beside the loop bar and the ruler. */
+  .ruler-gap {
+    height: 2.25rem;
+  }
   .head {
     display: flex;
     flex-direction: column;
@@ -810,6 +966,76 @@
     position: relative;
     flex: 1;
     min-width: 0;
+  }
+  .loop-bar {
+    position: relative;
+    height: 0.75rem;
+    overflow: hidden;
+    background: var(--surface-1);
+    touch-action: none;
+  }
+  .loop-bar.editable {
+    cursor: crosshair;
+  }
+  .loop {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    justify-content: center;
+    border-radius: 0.125rem;
+    background: var(--border);
+  }
+  .loop.on {
+    background: var(--accent);
+    color: var(--accent-text);
+  }
+  .loop-edge {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 0.375rem;
+    cursor: ew-resize;
+  }
+  .loop-edge.start {
+    left: 0;
+  }
+  .loop-edge.end {
+    right: 0;
+  }
+  .loop-edge:hover {
+    background: var(--text);
+    opacity: 0.4;
+  }
+  .loop-clear {
+    display: none;
+    padding: 0 0.25rem;
+    border: none;
+    background: none;
+    color: inherit;
+    font-size: 0.75rem;
+    line-height: 0.75rem;
+    cursor: pointer;
+  }
+  .loop:hover .loop-clear,
+  .loop-clear:focus-visible {
+    display: block;
+  }
+  .loop-shade {
+    position: absolute;
+    top: 0.75rem;
+    bottom: 0;
+    background: var(--accent);
+    opacity: 0.08;
+    pointer-events: none;
+  }
+  .toggle.loop-toggle {
+    width: auto;
+    padding: 0 0.375rem;
+  }
+  .toggle.loop-toggle:disabled {
+    opacity: 0.5;
+    cursor: default;
   }
   .ruler {
     position: relative;
@@ -956,8 +1182,9 @@
       width: 1.75rem;
       height: 1.5rem;
     }
-    /* .clip-actions shows on hover, so it needs hiding here too. */
-    .clip .clip-actions {
+    /* .clip-actions and .loop-clear show on hover, so they need hiding here too. */
+    .clip .clip-actions,
+    .loop .loop-clear {
       display: none;
     }
   }

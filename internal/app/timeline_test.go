@@ -14,6 +14,15 @@ type timeline struct {
 	UpdatedAt string       `json:"updatedAt"`
 	Tracks    []track      `json:"tracks"`
 	Beats     []clipSource `json:"beats"`
+	// Loop is null until one is set.
+	Loop *loop `json:"loop"`
+}
+
+// loop is the stretch of the Timeline that playback repeats while it's on.
+type loop struct {
+	Start float64 `json:"start"`
+	End   float64 `json:"end"`
+	On    bool    `json:"on"`
 }
 
 // track is a lane on the Timeline with its Clips, in Timeline order.
@@ -220,7 +229,7 @@ func TestTheTimelineOfAnUnknownSongIsNotFound(t *testing.T) {
 }
 
 // timelineChanges covers each kind of Timeline change, sent based on a
-// version of a Song whose Timeline holds one Beat.
+// version of a Song whose Timeline holds one Beat and a Loop.
 var timelineChanges = []struct {
 	name string
 	send func(ts *testServer, songID int64, tl timeline, version int64) response
@@ -257,14 +266,31 @@ var timelineChanges = []struct {
 	{"delete a track", func(ts *testServer, songID int64, tl timeline, v int64) response {
 		return ts.DoAt(v, http.MethodDelete, trackPath(songID, tl.Tracks[0].ID), nil)
 	}},
+	{"set the loop", func(ts *testServer, songID int64, tl timeline, v int64) response {
+		return ts.DoAt(v, http.MethodPut, loopPath(songID), map[string]any{"start": 4, "end": 8, "on": true})
+	}},
+	{"switch the loop on", func(ts *testServer, songID int64, tl timeline, v int64) response {
+		return ts.DoAt(v, http.MethodPatch, loopPath(songID), map[string]any{"on": true})
+	}},
+	{"clear the loop", func(ts *testServer, songID int64, tl timeline, v int64) response {
+		return ts.DoAt(v, http.MethodDelete, loopPath(songID), nil)
+	}},
+}
+
+// timelineToChange sets up a Song whose Timeline holds one 10-second Beat and
+// a Loop that's off, for timelineChanges.
+func timelineToChange(t *testing.T, ts *testServer) (song, timeline) {
+	t.Helper()
+	s := ts.createSong("Night Drive")
+	timelineChange(t, ts.addBeatToSong(s.ID, ts.beatOfLength("Beat", 10).ID))
+	return s, timelineChange(t, ts.setLoop(s.ID, map[string]any{"start": 1, "end": 5}))
 }
 
 func TestChangingTheTimelineCountsAsEditingTheSong(t *testing.T) {
 	for _, c := range timelineChanges {
 		t.Run(c.name, func(t *testing.T) {
 			ts := newTestServer(t)
-			s := ts.createSong("Night Drive")
-			before := timelineChange(t, ts.addBeatToSong(s.ID, ts.beatOfLength("Beat", 10).ID))
+			s, before := timelineToChange(t, ts)
 			ts.createSong("Edited Since")
 
 			got := timelineChange(t, c.send(ts, s.ID, before, before.Version))
@@ -289,8 +315,7 @@ func TestATimelineChangeBasedOnAnOldVersionIsRejectedAndChangesNothing(t *testin
 	for _, c := range timelineChanges {
 		t.Run(c.name, func(t *testing.T) {
 			ts := newTestServer(t)
-			s := ts.createSong("Night Drive")
-			old := timelineChange(t, ts.addBeatToSong(s.ID, ts.beatOfLength("Beat", 10).ID))
+			s, old := timelineToChange(t, ts)
 			ts.updateSong(s.ID, map[string]any{"notes": "Edited in another tab"})
 			current := ts.getTimeline(s.ID)
 
@@ -347,6 +372,7 @@ func TestDeletingASongDeletesItsTimelineButKeepsItsBeats(t *testing.T) {
 	b := ts.beatOfLength("Dark Trap", 10)
 	gone := ts.createSong("Gone")
 	timelineChange(t, ts.addBeatToSong(gone.ID, b.ID))
+	timelineChange(t, ts.setLoop(gone.ID, map[string]any{"start": 1, "end": 5, "on": true}))
 
 	expectStatus(t, ts.Do(http.MethodDelete, songPath(gone.ID), nil), http.StatusNoContent)
 
@@ -838,5 +864,120 @@ func TestANewBeatAfterTheBeatTrackIsDeletedGoesOnANewBeatTrack(t *testing.T) {
 	}
 	if want := []string{fmt.Sprintf("%d@0+10", p.short.ID)}; !reflect.DeepEqual(clipsOf(got, 1), want) {
 		t.Errorf("clips = %q, want %q", clipsOf(got, 1), want)
+	}
+}
+
+func loopPath(songID int64) string {
+	return timelinePath(songID) + "/loop"
+}
+
+// setLoop sends a request to set a Song's Loop.
+func (ts *testServer) setLoop(songID int64, body map[string]any) response {
+	ts.t.Helper()
+	return ts.Do(http.MethodPut, loopPath(songID), body)
+}
+
+func TestALoopCanBeSetOverAStretchOfTheTimeline(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+
+	got := timelineChange(t, ts.setLoop(p.song.ID, map[string]any{"start": 2.5, "end": 12, "on": true}))
+
+	want := &loop{Start: 2.5, End: 12, On: true}
+	if !reflect.DeepEqual(got.Loop, want) {
+		t.Errorf("loop = %+v, want %+v", got.Loop, want)
+	}
+	if !reflect.DeepEqual(got.Tracks, p.tl.Tracks) {
+		t.Errorf("tracks = %+v, want them unchanged: %+v", got.Tracks, p.tl.Tracks)
+	}
+	if read := ts.getTimeline(p.song.ID); !reflect.DeepEqual(read, got) {
+		t.Errorf("read timeline = %+v, want %+v", read, got)
+	}
+}
+
+func TestALoopsStartMustBeBeforeItsEnd(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+	before := timelineChange(t, ts.setLoop(p.song.ID, map[string]any{"start": 2, "end": 6, "on": true}))
+
+	for _, stretch := range [][2]float64{{8, 8}, {8, 4}} {
+		expectError(t, ts.setLoop(p.song.ID, map[string]any{"start": stretch[0], "end": stretch[1], "on": true}),
+			http.StatusBadRequest, "a Loop's start must be before its end")
+	}
+	expectError(t, ts.setLoop(p.song.ID, map[string]any{"start": -1, "end": 4}),
+		http.StatusBadRequest, "a Loop can't start before 0:00")
+	expectError(t, ts.setLoop(p.song.ID, map[string]any{"start": 1}),
+		http.StatusBadRequest, "start and end are required")
+
+	if got := ts.getTimeline(p.song.ID); !reflect.DeepEqual(got, before) {
+		t.Errorf("timeline = %+v, want it unchanged: %+v", got, before)
+	}
+}
+
+// switchLoop sends a request to switch a Song's Loop on or off.
+func (ts *testServer) switchLoop(songID int64, on bool) response {
+	ts.t.Helper()
+	return ts.Do(http.MethodPatch, loopPath(songID), map[string]any{"on": on})
+}
+
+func TestALoopCanBeSwitchedOnAndOffKeepingItsStretch(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+	timelineChange(t, ts.setLoop(p.song.ID, map[string]any{"start": 2, "end": 6}))
+
+	on := timelineChange(t, ts.switchLoop(p.song.ID, true))
+	off := timelineChange(t, ts.switchLoop(p.song.ID, false))
+
+	if want := (&loop{Start: 2, End: 6, On: true}); !reflect.DeepEqual(on.Loop, want) {
+		t.Errorf("loop switched on = %+v, want %+v", on.Loop, want)
+	}
+	if want := (&loop{Start: 2, End: 6}); !reflect.DeepEqual(off.Loop, want) {
+		t.Errorf("loop switched off = %+v, want %+v", off.Loop, want)
+	}
+}
+
+func TestAnUnsetLoopCantBeSwitchedOn(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+
+	expectStatus(t, ts.switchLoop(p.song.ID, true), http.StatusNotFound)
+	expectError(t, ts.Do(http.MethodPatch, loopPath(p.song.ID), map[string]any{}),
+		http.StatusBadRequest, "on is required")
+
+	if got := ts.getTimeline(p.song.ID); !reflect.DeepEqual(got, p.tl) {
+		t.Errorf("timeline = %+v, want it unchanged: %+v", got, p.tl)
+	}
+}
+
+func TestALoopCanBeCleared(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+	timelineChange(t, ts.setLoop(p.song.ID, map[string]any{"start": 2, "end": 6, "on": true}))
+
+	got := timelineChange(t, ts.Do(http.MethodDelete, loopPath(p.song.ID), nil))
+
+	if got.Loop != nil {
+		t.Errorf("loop = %+v, want none", got.Loop)
+	}
+	if read := ts.getTimeline(p.song.ID); read.Loop != nil {
+		t.Errorf("read loop = %+v, want none", read.Loop)
+	}
+	expectStatus(t, ts.Do(http.MethodDelete, loopPath(p.song.ID), nil), http.StatusNotFound)
+}
+
+func TestALoopIsOffUntilSwitchedOnAndIsSavedWithTheSong(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+
+	set := timelineChange(t, ts.setLoop(p.song.ID, map[string]any{"start": 30, "end": 38}))
+
+	if want := (&loop{Start: 30, End: 38}); !reflect.DeepEqual(set.Loop, want) {
+		t.Errorf("new loop = %+v, want %+v, off", set.Loop, want)
+	}
+	got := timelineChange(t, ts.switchLoop(p.song.ID, true))
+	ts.Stop()
+	restarted := startTestServer(t, ts.DataDir)
+	if read := restarted.getTimeline(p.song.ID); !reflect.DeepEqual(read.Loop, got.Loop) {
+		t.Errorf("loop after restart = %+v, want %+v", read.Loop, got.Loop)
 	}
 }

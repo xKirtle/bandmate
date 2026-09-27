@@ -1,9 +1,10 @@
 // Plays the Timeline: every Clip's audio is fetched, decoded into memory and
 // scheduled on one AudioContext, so Tracks stay sample-accurate with each
 // other (ADR 0006). Each Track plays through its own gain, which follows its
-// volume, mute and solo live.
+// volume, mute and solo live. A Loop's repeats are scheduled a little ahead
+// as they come round, each starting exactly as the one before ends.
 import { playAlone, release } from './playback';
-import { schedule, type Placed } from './schedule';
+import { positionAt, repeats, schedule, type Loop, type Placed } from './schedule';
 
 /** A Clip to play, with where its source's audio is fetched from and the Track it's on. */
 export interface PlayableClip extends Placed {
@@ -21,9 +22,14 @@ function audioContext(): AudioContext {
   return (shared ??= new AudioContext());
 }
 
+// How far ahead a Loop's repeats are scheduled, and how often, in seconds and
+// milliseconds: well clear of timers running late in a busy or hidden tab.
+const lookahead = 2;
+const scheduleEvery = 500;
+
 export class TimelinePlayer {
   #buffers = new Map<string, Promise<AudioBuffer>>();
-  #nodes: AudioBufferSourceNode[] = [];
+  #nodes = new Set<AudioBufferSourceNode>();
   // Each Track's gain by id, and the nodes applying it while playing.
   #gains = new Map<number, number>();
   #trackNodes = new Map<number, GainNode>();
@@ -32,6 +38,12 @@ export class TimelinePlayer {
   // position playback resumes from.
   #from = 0;
   #startedAt = 0;
+  // What's playing: its Clips with their decoded audio, and the Loop, if on.
+  #playing: { clips: readonly PlayableClip[]; buffers: AudioBuffer[]; loop: Loop | null } | null = null;
+  // Up to how long after #startedAt a Loop's repeats are scheduled, and the
+  // timer scheduling the next ones.
+  #scheduledUntil = 0;
+  #timer: ReturnType<typeof setInterval> | undefined;
   // Moves on with every play or stop, so a play still loading when it's
   // superseded never starts.
   #generation = 0;
@@ -62,15 +74,22 @@ export class TimelinePlayer {
   /** The Timeline position, in seconds. */
   position(): number {
     if (this.#state !== 'playing') return this.#from;
-    return this.#from + Math.max(0, audioContext().currentTime - this.#startedAt);
+    const elapsed = Math.max(0, audioContext().currentTime - this.#startedAt);
+    return positionAt(this.#from, this.#playing?.loop ?? null, elapsed);
+  }
+
+  /** Whether playing goes round a Loop for ever, rather than stopping at the end. */
+  get repeating(): boolean {
+    return this.#state === 'playing' && repeats(this.#from, this.#playing?.loop ?? null);
   }
 
   /**
    * Plays clips from a Timeline position, once their audio is decoded, in
-   * place of anything else playing. Call it from a user gesture: browsers
-   * only let sound start from one.
+   * place of anything else playing, repeating the Loop if one is given and
+   * the playhead reaches it. Call it from a user gesture: browsers only let
+   * sound start from one.
    */
-  async play(clips: readonly PlayableClip[], from: number): Promise<void> {
+  async play(clips: readonly PlayableClip[], from: number, loop: Loop | null = null): Promise<void> {
     const context = audioContext();
     // Resumed before anything is awaited, while the gesture still counts.
     const resumed = context.resume();
@@ -89,18 +108,39 @@ export class TimelinePlayer {
     }
     if (generation !== this.#generation) return;
 
-    const clipIndex = new Map(clips.map((c, i) => [c, i]));
+    this.#playing = { clips, buffers, loop };
     // A moment ahead, so every Clip is scheduled before the first sounds.
-    const at = context.currentTime + 0.05;
-    for (const s of schedule(clips, from)) {
+    this.#startedAt = context.currentTime + 0.05;
+    this.#scheduledUntil = 0;
+    this.#scheduleAhead();
+    if (repeats(from, loop)) this.#timer = setInterval(() => this.#scheduleAhead(), scheduleEvery);
+    this.#setState('playing');
+  }
+
+  /** Schedules what plays next: everything, or a Loop's repeats up to the lookahead. */
+  #scheduleAhead() {
+    if (!this.#playing) return;
+    const { clips, buffers, loop } = this.#playing;
+    const context = audioContext();
+    const until = repeats(this.#from, loop) ? context.currentTime - this.#startedAt + lookahead : Infinity;
+    const clipIndex = new Map(clips.map((c, i) => [c, i]));
+    for (const s of schedule(clips, this.#from, loop, { from: this.#scheduledUntil, to: until })) {
+      // Scheduled late, e.g. by a timer held up in a busy tab, a Clip starts
+      // where it would be by now, so it stays in time with the clock.
+      const late = Math.max(0, context.currentTime - (this.#startedAt + s.delay));
+      if (late >= s.duration) continue;
       const node = context.createBufferSource();
       node.buffer = buffers[clipIndex.get(s.clip)!];
       node.connect(this.#trackNode(context, s.clip.trackId));
-      node.start(at + s.delay, s.from, s.duration);
-      this.#nodes.push(node);
+      node.start(this.#startedAt + s.delay + late, s.from + late, s.duration - late);
+      // Let go of each once it's played, as a Loop keeps adding more.
+      node.onended = () => {
+        node.disconnect();
+        this.#nodes.delete(node);
+      };
+      this.#nodes.add(node);
     }
-    this.#startedAt = at;
-    this.#setState('playing');
+    this.#scheduledUntil = until;
   }
 
   /** Sets each Track's gain by id, heard right away if playing. A Track left out plays as is. */
@@ -133,11 +173,14 @@ export class TimelinePlayer {
   }
 
   #silence() {
+    clearInterval(this.#timer);
+    this.#playing = null;
     for (const node of this.#nodes) {
+      node.onended = null;
       node.stop();
       node.disconnect();
     }
-    this.#nodes = [];
+    this.#nodes.clear();
     for (const node of this.#trackNodes.values()) node.disconnect();
     this.#trackNodes.clear();
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { schedule, timelineEnd } from './schedule';
+import { positionAt, repeats, schedule, timelineEnd } from './schedule';
 
 // A 10-second Clip at 0:05 playing a Beat from 2s in, and a 4-second one
 // right after it playing its source from the start.
@@ -42,5 +42,81 @@ describe('timelineEnd', () => {
 
   it('is 0:00 without Clips', () => {
     expect(timelineEnd([])).toBe(0);
+  });
+});
+
+describe('schedule with a Loop', () => {
+  // A Loop over 0:08 to 0:16: the second half of the trimmed Clip and the
+  // first second of the next.
+  const loop = { start: 8, end: 16 };
+
+  it('plays up to the end of the Loop, then repeats it from its start', () => {
+    expect(schedule([trimmed, next], 0, loop, { from: 0, to: 20 })).toEqual([
+      // To the Loop's end.
+      { clip: trimmed, delay: 5, from: 2, duration: 10 },
+      { clip: next, delay: 15, from: 0, duration: 1 },
+      // Its first repeat, from 0:16 on.
+      { clip: trimmed, delay: 16, from: 5, duration: 7 },
+      { clip: next, delay: 23, from: 0, duration: 1 },
+    ]);
+  });
+
+  it('only schedules the repeats that start within the window asked for', () => {
+    // Repeats start 8, 16, 24, 32… seconds after playing from 0:08.
+    expect(schedule([trimmed, next], 8, loop, { from: 10, to: 24 })).toEqual([
+      { clip: trimmed, delay: 16, from: 5, duration: 7 },
+      { clip: next, delay: 23, from: 0, duration: 1 },
+    ]);
+    expect(schedule([trimmed, next], 8, loop, { from: 10, to: 16 })).toEqual([]);
+  });
+
+  it('starting inside the Loop, plays to its end before repeating it', () => {
+    expect(schedule([trimmed, next], 12, loop, { from: 0, to: 5 })).toEqual([
+      { clip: trimmed, delay: 0, from: 9, duration: 3 },
+      { clip: next, delay: 3, from: 0, duration: 1 },
+      { clip: trimmed, delay: 4, from: 5, duration: 7 },
+      { clip: next, delay: 11, from: 0, duration: 1 },
+    ]);
+  });
+
+  it('plays straight on from past the Loop, which the playhead never enters', () => {
+    expect(schedule([trimmed, next], 16, loop, { from: 0, to: 100 })).toEqual([
+      { clip: next, delay: 0, from: 1, duration: 3 },
+    ]);
+  });
+
+  it('refuses to schedule its endless repeats all at once', () => {
+    expect(() => schedule([trimmed], 0, loop)).toThrow(RangeError);
+  });
+
+  it('repeats silence where the Loop holds no Clip', () => {
+    expect(schedule([next], 0, { start: 2, end: 4 }, { from: 0, to: 60 })).toEqual([]);
+  });
+});
+
+describe('positionAt', () => {
+  const loop = { start: 8, end: 16 };
+
+  it('moves on with the time played', () => {
+    expect(positionAt(3, null, 10)).toBe(13);
+    expect(positionAt(16, loop, 10)).toBe(26);
+  });
+
+  it('goes back to the start of the Loop each time it reaches its end', () => {
+    expect(positionAt(0, loop, 15)).toBe(15);
+    expect(positionAt(0, loop, 16)).toBe(8);
+    expect(positionAt(0, loop, 21)).toBe(13);
+    expect(positionAt(12, loop, 4 + 8 * 3 + 2)).toBe(10);
+  });
+});
+
+describe('repeats', () => {
+  const loop = { start: 8, end: 16 };
+
+  it('tells whether playing from a time ever reaches the Loop and repeats it', () => {
+    expect(repeats(0, loop)).toBe(true);
+    expect(repeats(15.9, loop)).toBe(true);
+    expect(repeats(16, loop)).toBe(false);
+    expect(repeats(0, null)).toBe(false);
   });
 });
