@@ -3,13 +3,31 @@
 
 export type Status = 'idea' | 'drafting' | 'finished';
 
+export const statuses: readonly Status[] = ['idea', 'drafting', 'finished'];
+
 /** The full Song aggregate. Every Lyric Sheet change returns one. */
 export interface Song {
   id: number;
   title: string;
   status: Status;
+  /** How to play the Song. "" and null mean "not set". */
+  key: string;
+  bpm: number | null;
+  capo: number | null;
+  tuning: string;
+  notes: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/** A partial update: only the fields present change; "" or null clears one. */
+export type SongChanges = Partial<Omit<Song, 'id' | 'createdAt' | 'updatedAt'>>;
+
+/** Narrows the Song list. */
+export interface SongFilter {
+  status?: Status;
+  /** Matches titles containing it, ignoring case. */
+  q?: string;
 }
 
 /** A Song as shown in the Song list. */
@@ -41,7 +59,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   } catch {
     throw new ApiError(0, "Can't reach Bandmate. Check your connection.");
   }
-  const data = await res.json().catch(() => null);
+  const data = res.status === 204 ? null : await res.json().catch(() => null);
   if (!res.ok) {
     throw new ApiError(res.status, data?.error ?? `Request failed (${res.status})`);
   }
@@ -49,7 +67,15 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export const api = {
-  listSongs: () => request<SongSummary[]>('GET', '/songs'),
+  listSongs: (filter: SongFilter = {}) => {
+    const params = new URLSearchParams();
+    if (filter.status) params.set('status', filter.status);
+    if (filter.q?.trim()) params.set('q', filter.q.trim());
+    const query = params.toString();
+    return request<SongSummary[]>('GET', query ? `/songs?${query}` : '/songs');
+  },
   getSong: (id: number) => request<Song>('GET', `/songs/${id}`),
   createSong: (title: string) => request<Song>('POST', '/songs', { title }),
+  updateSong: (id: number, changes: SongChanges) => request<Song>('PATCH', `/songs/${id}`, changes),
+  deleteSong: (id: number) => request<null>('DELETE', `/songs/${id}`),
 };

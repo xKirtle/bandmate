@@ -116,12 +116,18 @@ a {
   color: var(--accent-text);
 }
 
+.button.danger {
+  color: var(--danger);
+}
+
 .button:disabled {
   opacity: 0.6;
   cursor: default;
 }
 
-input {
+input,
+textarea,
+select {
   width: 100%;
   min-height: 2.75rem;
   padding: 0.5rem 0.75rem;
@@ -134,7 +140,14 @@ input {
   font-size: max(1rem, 16px);
 }
 
+textarea {
+  resize: vertical;
+}
+
 input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+button:focus-visible,
 .button:focus-visible,
 a:focus-visible {
   outline: 2px solid var(--accent);
@@ -148,4 +161,14 @@ a:focus-visible {
 .error {
   color: var(--danger);
   margin: 0;
+}
+
+/* Hidden on screen, still read by screen readers. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

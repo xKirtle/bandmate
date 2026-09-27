@@ -11,7 +11,12 @@ import (
 )
 
 func (a *App) listSongs(w http.ResponseWriter, r *http.Request) {
-	list, err := a.songs.ListSongs(r.Context())
+	query := r.URL.Query()
+	filter := lyricsheet.SongFilter{
+		Status: lyricsheet.Status(query.Get("status")),
+		Title:  query.Get("q"),
+	}
+	list, err := a.songs.ListSongs(r.Context(), filter)
 	if err != nil {
 		writeDomainError(w, err)
 		return
@@ -45,6 +50,35 @@ func (a *App) getSong(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, song)
+}
+
+func (a *App) updateSong(w http.ResponseWriter, r *http.Request) {
+	id, ok := songID(w, r)
+	if !ok {
+		return
+	}
+	var changes lyricsheet.SongChanges
+	if !readJSON(w, r, &changes) {
+		return
+	}
+	song, err := a.songs.UpdateSong(r.Context(), id, changes)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, song)
+}
+
+func (a *App) deleteSong(w http.ResponseWriter, r *http.Request) {
+	id, ok := songID(w, r)
+	if !ok {
+		return
+	}
+	if err := a.songs.DeleteSong(r.Context(), id); err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // readJSON decodes the request body into v, answering 400 if it can't.

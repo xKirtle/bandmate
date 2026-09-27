@@ -54,6 +54,8 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("GET /api/songs", a.listSongs)
 	mux.HandleFunc("POST /api/songs", a.createSong)
 	mux.HandleFunc("GET /api/songs/{id}", a.getSong)
+	mux.HandleFunc("PATCH /api/songs/{id}", a.updateSong)
+	mux.HandleFunc("DELETE /api/songs/{id}", a.deleteSong)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not found")
 	})

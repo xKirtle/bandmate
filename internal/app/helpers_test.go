@@ -121,6 +121,11 @@ type song struct {
 	ID        int64  `json:"id"`
 	Title     string `json:"title"`
 	Status    string `json:"status"`
+	Key       string `json:"key"`
+	BPM       *int   `json:"bpm"`
+	Capo      *int   `json:"capo"`
+	Tuning    string `json:"tuning"`
+	Notes     string `json:"notes"`
 	CreatedAt string `json:"createdAt"`
 	UpdatedAt string `json:"updatedAt"`
 }
@@ -153,12 +158,27 @@ func (ts *testServer) getSong(id int64) song {
 	return s
 }
 
-// listSongs reads the Song list.
-func (ts *testServer) listSongs() []songSummary {
+// listSongs reads the Song list, with an optional query string such as
+// "status=idea&q=night".
+func (ts *testServer) listSongs(query ...string) []songSummary {
 	ts.t.Helper()
-	res := ts.Do(http.MethodGet, "/api/songs", nil)
+	path := "/api/songs"
+	if len(query) > 0 {
+		path += "?" + query[0]
+	}
+	res := ts.Do(http.MethodGet, path, nil)
 	expectStatus(ts.t, res, http.StatusOK)
 	var list []songSummary
 	res.JSON(ts.t, &list)
 	return list
+}
+
+// updateSong applies changes to a Song and returns its aggregate.
+func (ts *testServer) updateSong(id int64, changes map[string]any) song {
+	ts.t.Helper()
+	res := ts.Do(http.MethodPatch, fmt.Sprintf("/api/songs/%d", id), changes)
+	expectStatus(ts.t, res, http.StatusOK)
+	var s song
+	res.JSON(ts.t, &s)
+	return s
 }
