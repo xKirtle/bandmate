@@ -1,6 +1,6 @@
 <script lang="ts">
   import { api, type Master } from './api';
-  import { playAlone } from './playback';
+  import { playMediaAlone } from './playback';
   import { formatDuration } from './time';
   import { bars } from './waveform';
 
@@ -100,7 +100,7 @@
     src={api.masterAudioUrl(songId, master.id)}
     preload="none"
     onplay={(e) => {
-      playAlone(e);
+      playMediaAlone(e);
       playing = true;
     }}
     onpause={() => (playing = false)}

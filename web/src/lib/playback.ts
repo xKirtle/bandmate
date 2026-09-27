@@ -1,10 +1,21 @@
-// Only one thing plays at a time: starting a player pauses the one before.
+// Only one thing plays at a time: the Timeline, a Master or a Beat preview.
+// Starting one stops the one before.
 
-let playing: HTMLMediaElement | null = null;
+let current: { owner: object; stop: () => void } | null = null;
+
+/** Takes over playback for owner, stopping whatever played before. stop is how others stop it. */
+export function playAlone(owner: object, stop: () => void) {
+  if (current && current.owner !== owner) current.stop();
+  current = { owner, stop };
+}
+
+/** Forgets owner, e.g. once it's gone, so nothing tries to stop it any more. */
+export function release(owner: object) {
+  if (current?.owner === owner) current = null;
+}
 
 /** Use as a media element's onplay handler. */
-export function playAlone(event: Event) {
+export function playMediaAlone(event: Event) {
   const player = event.currentTarget as HTMLMediaElement;
-  if (playing && playing !== player) playing.pause();
-  playing = player;
+  playAlone(player, () => player.pause());
 }
