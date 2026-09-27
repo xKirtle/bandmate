@@ -49,8 +49,71 @@ func (a *App) renameTrack(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *App) addTrack(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Name string `json:"name"`
+	}
+	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+		return a.timelines.AddTrack(r.Context(), id, based, req.Name)
+	})
+}
+
+func (a *App) moveClip(w http.ResponseWriter, r *http.Request) {
+	clipID, ok := pathID(w, r, "clipID")
+	if !ok {
+		return
+	}
+	var req struct {
+		TrackID *int64   `json:"trackId"`
+		Start   *float64 `json:"start"`
+	}
+	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+		if req.TrackID == nil || req.Start == nil {
+			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "trackId and start are required"}
+		}
+		return a.timelines.MoveClip(r.Context(), id, based, clipID, *req.TrackID, *req.Start)
+	})
+}
+
+func (a *App) trimClip(w http.ResponseWriter, r *http.Request) {
+	clipID, ok := pathID(w, r, "clipID")
+	if !ok {
+		return
+	}
+	var req struct {
+		Offset *float64 `json:"offset"`
+		Length *float64 `json:"length"`
+	}
+	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+		if req.Offset == nil || req.Length == nil {
+			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "offset and length are required"}
+		}
+		return a.timelines.TrimClip(r.Context(), id, based, clipID, *req.Offset, *req.Length)
+	})
+}
+
+func (a *App) duplicateClip(w http.ResponseWriter, r *http.Request) {
+	clipID, ok := pathID(w, r, "clipID")
+	if !ok {
+		return
+	}
+	a.changeTimeline(w, r, nil, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+		return a.timelines.DuplicateClip(r.Context(), id, based, clipID)
+	})
+}
+
+func (a *App) deleteClip(w http.ResponseWriter, r *http.Request) {
+	clipID, ok := pathID(w, r, "clipID")
+	if !ok {
+		return
+	}
+	a.changeTimeline(w, r, nil, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+		return a.timelines.DeleteClip(r.Context(), id, based, clipID)
+	})
+}
+
 // changeTimeline reads the Song id, the version the change is based on and
-// the request body into req, runs the change and writes the resulting
+// the request body, if any, into req, runs the change and writes the resulting
 // Timeline.
 func (a *App) changeTimeline(w http.ResponseWriter, r *http.Request, req any,
 	change func(songID int64, based lyricsheet.Version) (timeline.Timeline, error)) {
@@ -59,7 +122,7 @@ func (a *App) changeTimeline(w http.ResponseWriter, r *http.Request, req any,
 		return
 	}
 	based, ok := basedOn(w, r)
-	if !ok || !readJSON(w, r, req) {
+	if !ok || (req != nil && !readJSON(w, r, req)) {
 		return
 	}
 	tl, err := change(id, based)

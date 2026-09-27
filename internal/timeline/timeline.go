@@ -231,6 +231,183 @@ func (s *Store) RenameTrack(ctx context.Context, songID int64, based lyricsheet.
 	})
 }
 
+// AddTrack adds an empty Track at the bottom of the Timeline. Its name
+// can't be blank.
+func (s *Store) AddTrack(ctx context.Context, songID int64, based lyricsheet.Version, name string) (Timeline, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return Timeline{}, &lyricsheet.InvalidError{Msg: "a Track's name is required"}
+	}
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO tracks (song_id, name, position)
+			VALUES (?1, ?2, (SELECT COALESCE(MAX(position) + 1, 0) FROM tracks WHERE song_id = ?1))`,
+			songID, name); err != nil {
+			return fmt.Errorf("adding track: %w", err)
+		}
+		return nil
+	})
+}
+
+// tolerance absorbs rounding when comparing times, e.g. a Clip placed right
+// at a neighbour's end as the browser worked it out.
+const tolerance = 1e-6
+
+// errOverlap is refusing a Clip where another already plays on its Track.
+var errOverlap = &lyricsheet.ConflictError{Msg: "Clips can't overlap on a Track"}
+
+// placement is where a Clip is and what it plays, as stored.
+type placement struct {
+	trackID  int64
+	beatID   int64
+	start    float64
+	offset   float64
+	length   float64
+	duration float64 // the source's
+}
+
+// MoveClip moves a Clip to start at a time on a Track of the same Timeline,
+// keeping its trim. It can't overlap a Clip already there.
+func (s *Store) MoveClip(ctx context.Context, songID int64, based lyricsheet.Version, clipID, trackID int64, start float64) (Timeline, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		p, err := clipPlacement(ctx, tx, songID, clipID)
+		if err != nil {
+			return err
+		}
+		var found int
+		err = tx.QueryRowContext(ctx, `SELECT 1 FROM tracks WHERE id = ? AND song_id = ?`, trackID, songID).Scan(&found)
+		if errors.Is(err, sql.ErrNoRows) {
+			return &lyricsheet.InvalidError{Msg: "there's no such Track on this Timeline"}
+		}
+		if err != nil {
+			return fmt.Errorf("reading track: %w", err)
+		}
+		p.trackID, p.start = trackID, start
+		return place(ctx, tx, clipID, p)
+	})
+}
+
+// TrimClip has a Clip play length seconds of its source from offset,
+// without touching the source's file. The audio stays where it was on the
+// Timeline, so trimming the start moves where the Clip starts. It can't
+// reach beyond the source or into a neighbour.
+func (s *Store) TrimClip(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64, offset, length float64) (Timeline, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		p, err := clipPlacement(ctx, tx, songID, clipID)
+		if err != nil {
+			return err
+		}
+		switch {
+		case offset < 0:
+			return &lyricsheet.InvalidError{Msg: "a Clip can't start before its source does"}
+		case length <= 0:
+			return &lyricsheet.InvalidError{Msg: "a Clip must play for some time"}
+		case offset+length > p.duration+tolerance:
+			return &lyricsheet.InvalidError{Msg: "a Clip can't play past the end of its source"}
+		}
+		p.start += offset - p.offset
+		p.offset, p.length = offset, length
+		return place(ctx, tx, clipID, p)
+	})
+}
+
+// DuplicateClip adds a copy of a Clip, with the same trim, right after it on
+// its Track, or after the Track's last Clip if something is in the way.
+func (s *Store) DuplicateClip(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64) (Timeline, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		p, err := clipPlacement(ctx, tx, songID, clipID)
+		if err != nil {
+			return err
+		}
+		p.start += p.length
+		free, err := isFree(ctx, tx, 0, p)
+		if err != nil {
+			return err
+		}
+		if !free {
+			if err := tx.QueryRowContext(ctx, `SELECT MAX(start + length) FROM clips WHERE track_id = ?`,
+				p.trackID).Scan(&p.start); err != nil {
+				return fmt.Errorf("finding the end of the track: %w", err)
+			}
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO clips (track_id, beat_id, start, source_offset, length) VALUES (?, ?, ?, ?, ?)`,
+			p.trackID, p.beatID, p.start, p.offset, p.length); err != nil {
+			return fmt.Errorf("adding clip: %w", err)
+		}
+		return nil
+	})
+}
+
+// DeleteClip removes a Clip from the Timeline. Its Beat stays in the Beat
+// Library.
+func (s *Store) DeleteClip(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64) (Timeline, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		res, err := tx.ExecContext(ctx, `DELETE FROM clips
+			WHERE id = ? AND track_id IN (SELECT id FROM tracks WHERE song_id = ?)`, clipID, songID)
+		if err != nil {
+			return fmt.Errorf("deleting clip: %w", err)
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return lyricsheet.ErrNotFound
+		}
+		return nil
+	})
+}
+
+// clipPlacement reads where one of the Song's Clips is and what it plays.
+func clipPlacement(ctx context.Context, tx *sql.Tx, songID, clipID int64) (placement, error) {
+	var p placement
+	err := tx.QueryRowContext(ctx, `SELECT c.track_id, c.beat_id, c.start, c.source_offset, c.length, b.duration
+		FROM clips c JOIN tracks t ON t.id = c.track_id JOIN beats b ON b.id = c.beat_id
+		WHERE c.id = ? AND t.song_id = ?`, clipID, songID).
+		Scan(&p.trackID, &p.beatID, &p.start, &p.offset, &p.length, &p.duration)
+	if errors.Is(err, sql.ErrNoRows) {
+		return placement{}, lyricsheet.ErrNotFound
+	}
+	if err != nil {
+		return placement{}, fmt.Errorf("reading clip: %w", err)
+	}
+	return p, nil
+}
+
+// place stores a Clip's new placement, if it starts on the Timeline and is
+// clear of the other Clips on its Track.
+func place(ctx context.Context, tx *sql.Tx, clipID int64, p placement) error {
+	if p.start < -tolerance {
+		return &lyricsheet.InvalidError{Msg: "a Clip can't start before 0:00"}
+	}
+	p.start = max(p.start, 0)
+	free, err := isFree(ctx, tx, clipID, p)
+	if err != nil {
+		return err
+	}
+	if !free {
+		return errOverlap
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE clips SET track_id = ?, start = ?, source_offset = ?, length = ? WHERE id = ?`,
+		p.trackID, p.start, p.offset, p.length, clipID); err != nil {
+		return fmt.Errorf("placing clip: %w", err)
+	}
+	return nil
+}
+
+// isFree tells whether p's stretch of its Track is clear of Clips other than
+// clipID (0 for a new Clip). Touching a neighbour's edge is fine.
+func isFree(ctx context.Context, tx *sql.Tx, clipID int64, p placement) (bool, error) {
+	var n int
+	err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM clips
+		WHERE track_id = ? AND id != ? AND start < ? AND start + length > ?`,
+		p.trackID, clipID, p.start+p.length-tolerance, p.start+tolerance).Scan(&n)
+	if err != nil {
+		return false, fmt.Errorf("checking for overlaps: %w", err)
+	}
+	return n == 0, nil
+}
+
 // change runs one change to a Song's Timeline in a transaction, marks the
 // Song as edited, and returns the updated Timeline. If the Song is no longer
 // at the version the change was based on, or fn fails, nothing changes.
