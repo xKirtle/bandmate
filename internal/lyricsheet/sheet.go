@@ -3,6 +3,7 @@ package lyricsheet
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -194,17 +195,9 @@ func (s *Store) change(ctx context.Context, songID int64, fn func(tx *sql.Tx) er
 // position adds it at the end.
 func (s *Store) AddSection(ctx context.Context, songID int64, label string, position *int) (Song, error) {
 	return s.change(ctx, songID, func(tx *sql.Tx) error {
-		var count int
-		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM occurrences WHERE song_id = ?`,
-			songID).Scan(&count); err != nil {
+		pos, err := arrangementPosition(ctx, tx, songID, position)
+		if err != nil {
 			return err
-		}
-		pos := count
-		if position != nil {
-			pos = *position
-		}
-		if pos < 0 || pos > count {
-			return invalid(fmt.Sprintf("position must be between 0 and %d", count))
 		}
 		sectionID, err := insert(ctx, tx, `INSERT INTO sections (song_id, label) VALUES (?, ?)`,
 			songID, cleanLabel(label))
@@ -215,18 +208,155 @@ func (s *Store) AddSection(ctx context.Context, songID int64, label string, posi
 			sectionID); err != nil {
 			return fmt.Errorf("adding alternate: %w", err)
 		}
-		if _, err := tx.ExecContext(ctx,
-			`UPDATE occurrences SET position = position + 1 WHERE song_id = ? AND position >= ?`,
-			songID, pos); err != nil {
-			return fmt.Errorf("making room in arrangement: %w", err)
+		return insertOccurrence(ctx, tx, songID, sectionID, pos)
+	})
+}
+
+// AddOccurrence adds another Occurrence of one of the Song's Sections at
+// position in the Arrangement. A nil position adds it at the end.
+func (s *Store) AddOccurrence(ctx context.Context, songID, sectionID int64, position *int) (Song, error) {
+	return s.change(ctx, songID, func(tx *sql.Tx) error {
+		var found int
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM sections WHERE id = ? AND song_id = ?`,
+			sectionID, songID).Scan(&found); err != nil {
+			return err
 		}
-		if _, err := insert(ctx, tx,
-			`INSERT INTO occurrences (song_id, section_id, position) VALUES (?, ?, ?)`,
-			songID, sectionID, pos); err != nil {
-			return fmt.Errorf("adding occurrence: %w", err)
+		if found == 0 {
+			return ErrNotFound
+		}
+		pos, err := arrangementPosition(ctx, tx, songID, position)
+		if err != nil {
+			return err
+		}
+		return insertOccurrence(ctx, tx, songID, sectionID, pos)
+	})
+}
+
+// RemoveOccurrence takes an Occurrence out of the Arrangement. Its Section is
+// never deleted: other Occurrences keep showing it, and without any it is in
+// the Scrapbook.
+func (s *Store) RemoveOccurrence(ctx context.Context, songID, occurrenceID int64) (Song, error) {
+	return s.change(ctx, songID, func(tx *sql.Tx) error {
+		_, pos, err := findOccurrence(ctx, tx, songID, occurrenceID)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM occurrences WHERE id = ?`, occurrenceID); err != nil {
+			return fmt.Errorf("removing occurrence: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE occurrences SET position = position - 1 WHERE song_id = ? AND position > ?`,
+			songID, pos); err != nil {
+			return fmt.Errorf("closing gap in arrangement: %w", err)
 		}
 		return nil
 	})
+}
+
+// Detach points an Occurrence of a shared Section at a new copy of that
+// Section. The other Occurrences keep the original.
+func (s *Store) Detach(ctx context.Context, songID, occurrenceID int64) (Song, error) {
+	return s.change(ctx, songID, func(tx *sql.Tx) error {
+		sectionID, _, err := findOccurrence(ctx, tx, songID, occurrenceID)
+		if err != nil {
+			return err
+		}
+		var uses int
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM occurrences WHERE section_id = ?`,
+			sectionID).Scan(&uses); err != nil {
+			return err
+		}
+		if uses < 2 {
+			return invalid("only an Occurrence of a shared Section can be Detached")
+		}
+		copyID, err := copySection(ctx, tx, sectionID)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE occurrences SET section_id = ? WHERE id = ?`,
+			copyID, occurrenceID); err != nil {
+			return fmt.Errorf("pointing occurrence at copy: %w", err)
+		}
+		return nil
+	})
+}
+
+// findOccurrence returns the Section and position of one of a Song's
+// Occurrences.
+func findOccurrence(ctx context.Context, tx *sql.Tx, songID, occurrenceID int64) (sectionID int64, pos int, err error) {
+	err = tx.QueryRowContext(ctx, `SELECT section_id, position FROM occurrences WHERE id = ? AND song_id = ?`,
+		occurrenceID, songID).Scan(&sectionID, &pos)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, 0, ErrNotFound
+	}
+	return sectionID, pos, err
+}
+
+// copySection creates a new Section with a Section's Label, all its
+// Alternates (the same one active) and all their Lines, and returns its id.
+func copySection(ctx context.Context, tx *sql.Tx, sectionID int64) (int64, error) {
+	copyID, err := insert(ctx, tx,
+		`INSERT INTO sections (song_id, label) SELECT song_id, label FROM sections WHERE id = ?`, sectionID)
+	if err != nil {
+		return 0, fmt.Errorf("copying section: %w", err)
+	}
+	var alternates []int64
+	err = query(ctx, tx, `SELECT id FROM alternates WHERE section_id = ? ORDER BY id`,
+		[]any{sectionID}, func(rows *sql.Rows) error {
+			var id int64
+			err := rows.Scan(&id)
+			alternates = append(alternates, id)
+			return err
+		})
+	if err != nil {
+		return 0, fmt.Errorf("reading alternates: %w", err)
+	}
+	for _, altID := range alternates {
+		copyAltID, err := insert(ctx, tx, `INSERT INTO alternates (section_id, name, active)
+			SELECT ?, name, active FROM alternates WHERE id = ?`, copyID, altID)
+		if err != nil {
+			return 0, fmt.Errorf("copying alternate: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO lines (alternate_id, position, text)
+			SELECT ?, position, text FROM lines WHERE alternate_id = ? ORDER BY position`,
+			copyAltID, altID); err != nil {
+			return 0, fmt.Errorf("copying lines: %w", err)
+		}
+	}
+	return copyID, nil
+}
+
+// arrangementPosition checks a position to insert at in a Song's
+// Arrangement. A nil position means the end.
+func arrangementPosition(ctx context.Context, tx *sql.Tx, songID int64, position *int) (int, error) {
+	var count int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM occurrences WHERE song_id = ?`,
+		songID).Scan(&count); err != nil {
+		return 0, err
+	}
+	if position == nil {
+		return count, nil
+	}
+	if *position < 0 || *position > count {
+		return 0, invalid(fmt.Sprintf("position must be between 0 and %d", count))
+	}
+	return *position, nil
+}
+
+// insertOccurrence puts an Occurrence of a Section at pos in the
+// Arrangement, moving the ones from pos on down by one.
+func insertOccurrence(ctx context.Context, tx *sql.Tx, songID, sectionID int64, pos int) error {
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE occurrences SET position = position + 1 WHERE song_id = ? AND position >= ?`,
+		songID, pos); err != nil {
+		return fmt.Errorf("making room in arrangement: %w", err)
+	}
+	if _, err := insert(ctx, tx,
+		`INSERT INTO occurrences (song_id, section_id, position) VALUES (?, ?, ?)`,
+		songID, sectionID, pos); err != nil {
+		return fmt.Errorf("adding occurrence: %w", err)
+	}
+	return nil
 }
 
 // SetSectionLabel changes a Section's Label. A blank Label removes it.

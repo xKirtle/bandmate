@@ -268,6 +268,13 @@ func (ts *testServer) setText(songID, alternateID int64, text string) song {
 		fmt.Sprintf("/api/songs/%d/alternates/%d/text", songID, alternateID), map[string]any{"text": text})
 }
 
+// setLabel changes a Section's Label and returns the Song.
+func (ts *testServer) setLabel(songID, sectionID int64, label string) song {
+	ts.t.Helper()
+	return ts.lyricSheetChange(http.MethodPatch,
+		fmt.Sprintf("/api/songs/%d/sections/%d", songID, sectionID), map[string]any{"label": label})
+}
+
 // titles lists the Song titles in order.
 func titles(list []songSummary) []string {
 	out := []string{}

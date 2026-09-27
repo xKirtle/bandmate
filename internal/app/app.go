@@ -59,6 +59,9 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("PUT /api/songs/{id}/arrangement", a.reorderArrangement)
 	mux.HandleFunc("POST /api/songs/{id}/sections", a.addSection)
 	mux.HandleFunc("PATCH /api/songs/{id}/sections/{sectionID}", a.setSectionLabel)
+	mux.HandleFunc("POST /api/songs/{id}/occurrences", a.addOccurrence)
+	mux.HandleFunc("DELETE /api/songs/{id}/occurrences/{occurrenceID}", a.removeOccurrence)
+	mux.HandleFunc("POST /api/songs/{id}/occurrences/{occurrenceID}/detach", a.detach)
 	mux.HandleFunc("PUT /api/songs/{id}/alternates/{alternateID}/text", a.replaceAlternateText)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not found")

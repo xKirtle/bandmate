@@ -148,6 +148,15 @@ export const api = {
   /** Adds a Section at position in the Arrangement, or at the end. */
   addSection: (songId: number, section: { label?: string; position?: number }) =>
     request<Song>('POST', `/songs/${songId}/sections`, section),
+  /** Adds another Occurrence of an existing Section at position, or at the end. */
+  addOccurrence: (songId: number, sectionId: number, position?: number) =>
+    request<Song>('POST', `/songs/${songId}/occurrences`, { sectionId, position }),
+  /** Takes an Occurrence out of the Arrangement; its Section is never deleted. */
+  removeOccurrence: (songId: number, occurrenceId: number) =>
+    request<Song>('DELETE', `/songs/${songId}/occurrences/${occurrenceId}`),
+  /** Gives an Occurrence of a shared Section its own copy of the Section. */
+  detach: (songId: number, occurrenceId: number) =>
+    request<Song>('POST', `/songs/${songId}/occurrences/${occurrenceId}/detach`),
   setSectionLabel: (songId: number, sectionId: number, label: string) =>
     request<Song>('PATCH', `/songs/${songId}/sections/${sectionId}`, { label }),
   /** Replaces an Alternate's Lines with the lines of text. */

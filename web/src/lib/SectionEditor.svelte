@@ -128,7 +128,7 @@
   }
 </script>
 
-<article class="section" aria-label={section.label || 'Section without a Label'}>
+<article class="section" class:is-shared={shared} aria-label={section.label || 'Section without a Label'}>
   <div class="head">
     <label class="visually-hidden" for="label-{occurrenceId}">Label</label>
     <input
@@ -194,11 +194,14 @@
     border-color: var(--border);
     background: var(--bg);
   }
+  .section.is-shared {
+    border-left: 4px solid var(--accent);
+  }
   .shared {
     padding: 0.125rem 0.5rem;
     border-radius: 999px;
-    background: var(--surface-2);
-    color: var(--text-muted);
+    background: var(--accent);
+    color: var(--accent-text);
     font-size: 0.75rem;
     font-weight: 600;
   }
