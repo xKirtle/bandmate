@@ -2,6 +2,7 @@
   import { onDestroy } from 'svelte';
   import { api, ApiError, commonKeys, statuses, type Song, type SongAt, type SongChanges, type Status } from '../lib/api';
   import LyricSheet from '../lib/LyricSheet.svelte';
+  import Masters from '../lib/Masters.svelte';
   import Scrapbook from '../lib/Scrapbook.svelte';
   import { navigate } from '../lib/router.svelte';
   import { timeAgo } from '../lib/time';
@@ -149,6 +150,11 @@
     draft[field] = toDraft(song)[field];
   }
 
+  function setStatus(status: Status) {
+    draft.status = status;
+    save({ status }, ['status']);
+  }
+
   function commitText(field: 'title' | 'key' | 'tuning' | 'notes') {
     if (!song) return;
     const value = field === 'notes' ? draft.notes : draft[field].trim();
@@ -276,7 +282,7 @@
                 name="status"
                 value={s}
                 bind:group={draft.status}
-                onchange={() => save({ status: s }, ['status'])}
+                onchange={() => setStatus(s)}
               />
               {s}
             </label>
@@ -292,60 +298,64 @@
         <Scrapbook {song} change={send} onUnsaved={setUnsaved} />
       </aside>
 
-      <section class="details" aria-labelledby="details-heading">
-        <h2 id="details-heading">Details</h2>
-        <div class="grid">
+      <div class="about">
+        <Masters {song} change={send} onUnsaved={setUnsaved} {setStatus} />
+
+        <section class="details" aria-labelledby="details-heading">
+          <h2 id="details-heading">Details</h2>
+          <div class="grid">
+            <label>
+              Key
+              <input
+                bind:value={draft.key}
+                onchange={() => commitText('key')}
+                list="common-keys"
+                autocomplete="off"
+                autocapitalize="characters"
+                enterkeyhint="done"
+                placeholder="—"
+              />
+            </label>
+            <label>
+              BPM
+              <input
+                bind:value={draft.bpm}
+                onchange={() => commitNumber('bpm', 'BPM')}
+                inputmode="numeric"
+                autocomplete="off"
+                enterkeyhint="done"
+                placeholder="—"
+              />
+            </label>
+            <label>
+              Capo
+              <input
+                bind:value={draft.capo}
+                onchange={() => commitNumber('capo', 'Capo')}
+                inputmode="numeric"
+                autocomplete="off"
+                enterkeyhint="done"
+                placeholder="—"
+              />
+            </label>
+            <label>
+              Tuning
+              <input
+                bind:value={draft.tuning}
+                onchange={() => commitText('tuning')}
+                list="common-tunings"
+                autocomplete="off"
+                enterkeyhint="done"
+                placeholder="—"
+              />
+            </label>
+          </div>
           <label>
-            Key
-            <input
-              bind:value={draft.key}
-              onchange={() => commitText('key')}
-              list="common-keys"
-              autocomplete="off"
-              autocapitalize="characters"
-              enterkeyhint="done"
-              placeholder="—"
-            />
+            Notes
+            <textarea bind:value={draft.notes} onchange={() => commitText('notes')} rows="5"></textarea>
           </label>
-          <label>
-            BPM
-            <input
-              bind:value={draft.bpm}
-              onchange={() => commitNumber('bpm', 'BPM')}
-              inputmode="numeric"
-              autocomplete="off"
-              enterkeyhint="done"
-              placeholder="—"
-            />
-          </label>
-          <label>
-            Capo
-            <input
-              bind:value={draft.capo}
-              onchange={() => commitNumber('capo', 'Capo')}
-              inputmode="numeric"
-              autocomplete="off"
-              enterkeyhint="done"
-              placeholder="—"
-            />
-          </label>
-          <label>
-            Tuning
-            <input
-              bind:value={draft.tuning}
-              onchange={() => commitText('tuning')}
-              list="common-tunings"
-              autocomplete="off"
-              enterkeyhint="done"
-              placeholder="—"
-            />
-          </label>
-        </div>
-        <label>
-          Notes
-          <textarea bind:value={draft.notes} onchange={() => commitText('notes')} rows="5"></textarea>
-        </label>
-      </section>
+        </section>
+      </div>
     </div>
 
     <datalist id="common-keys">
@@ -486,7 +496,7 @@
       grid-template-areas:
         'top side'
         'sheet side'
-        'details side';
+        'about side';
       column-gap: 2rem;
     }
     .top {
@@ -495,8 +505,8 @@
     .sheet {
       grid-area: sheet;
     }
-    .details {
-      grid-area: details;
+    .about {
+      grid-area: about;
       align-self: start;
     }
     .side {

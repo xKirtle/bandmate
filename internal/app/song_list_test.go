@@ -80,3 +80,36 @@ func TestSongListCanBeSearchedByTitle(t *testing.T) {
 		}
 	}
 }
+
+func TestSongListCanBeFilteredByHavingAMasterTogetherWithStatus(t *testing.T) {
+	ts := newTestServer(t)
+	ts.createSong("No Master")
+	ts.uploadMaster(ts.createSong("Mastered Idea").ID, fakeAudio("a.wav"))
+	done := ts.updateSong(ts.createSong("Mastered And Done").ID, map[string]any{"status": "finished"})
+	ts.uploadMaster(done.ID, fakeAudio("b.wav"))
+	ts.uploadMaster(done.ID, fakeAudio("c.wav"))
+	ts.updateSong(ts.createSong("Done Without").ID, map[string]any{"status": "finished"})
+	gone := ts.uploadMaster(ts.createSong("Master Deleted").ID, fakeAudio("d.wav"))
+	ts.lyricSheetChange(http.MethodDelete, masterPath(gone.ID, gone.Masters[0].ID), nil)
+
+	cases := map[string][]string{
+		"hasMaster=true":                 {"Mastered And Done", "Mastered Idea"},
+		"hasMaster=false":                {"Master Deleted", "Done Without", "No Master"},
+		"hasMaster=true&status=finished": {"Mastered And Done"},
+		"hasMaster=true&status=idea":     {"Mastered Idea"},
+		"hasMaster=true&q=idea":          {"Mastered Idea"},
+		"hasMaster=":                     {"Master Deleted", "Done Without", "Mastered And Done", "Mastered Idea", "No Master"},
+	}
+	for query, want := range cases {
+		if got := titles(ts.listSongs(query)); !reflect.DeepEqual(got, want) {
+			t.Errorf("song list for %q = %v, want %v", query, got, want)
+		}
+	}
+}
+
+func TestSongListRejectsAnUnknownMasterFilter(t *testing.T) {
+	ts := newTestServer(t)
+
+	expectError(t, ts.Do(http.MethodGet, "/api/songs?hasMaster=maybe", nil),
+		http.StatusBadRequest, "hasMaster must be true or false")
+}

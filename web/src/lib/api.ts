@@ -28,7 +28,32 @@ export interface Song {
   sections: Section[];
   /** Ids of the Sections with no Occurrence. */
   scrapbook: number[];
+  /** Finished recordings, in the order they were added. */
+  masters: Master[];
 }
+
+/** A finished recording of a Song made elsewhere, never on the Timeline. */
+export interface Master {
+  id: number;
+  /** Tells a Song's Masters apart; starts as the file's name. Only shown once there are two. */
+  name: string;
+  /** Exactly one of a Song's Masters is its main one. */
+  main: boolean;
+  notes: string;
+  /** The file as uploaded, which is kept unchanged. */
+  fileName: string;
+  contentType: string;
+  /** In bytes. */
+  size: number;
+  /** In seconds. */
+  duration: number;
+  /** The waveform, 100 per second. Only when reading one Master, not in the Song. */
+  peaks?: number[];
+  addedAt: string;
+}
+
+/** A partial update to a Master's name or notes. */
+export type MasterChanges = Partial<Pick<Master, 'name' | 'notes'>>;
 
 /** One appearance of a Section in the Arrangement. */
 export interface Occurrence {
@@ -103,6 +128,8 @@ export interface SongFilter {
   status?: Status;
   /** Matches titles containing it, ignoring case. */
   q?: string;
+  /** Only Songs with a Master (true) or without one (false). */
+  hasMaster?: boolean;
 }
 
 /** A Song as shown in the Song list. */
@@ -229,6 +256,7 @@ export const api = {
     const params = new URLSearchParams();
     if (filter.status) params.set('status', filter.status);
     if (filter.q?.trim()) params.set('q', filter.q.trim());
+    if (filter.hasMaster !== undefined) params.set('hasMaster', String(filter.hasMaster));
     const query = params.toString();
     return request<SongSummary[]>('GET', query ? `/songs?${query}` : '/songs');
   },
@@ -272,6 +300,24 @@ export const api = {
   /** Permanently deletes an inactive Alternate. */
   deleteAlternate: (at: SongAt, alternateId: number) =>
     request<Song>('DELETE', `/songs/${at.id}/alternates/${alternateId}`, undefined, at),
+  /** Attaches a finished recording; the Song's first Master is its main one. */
+  addMaster: (at: SongAt, file: File, decoded: DecodedAudio) =>
+    request<Song>('POST', `/songs/${at.id}/masters`, audioForm(file, decoded), at),
+  /** One Master, with its peaks. */
+  getMaster: (songId: number, masterId: number) => request<Master>('GET', `/songs/${songId}/masters/${masterId}`),
+  updateMaster: (at: SongAt, masterId: number, changes: MasterChanges) =>
+    request<Song>('PATCH', `/songs/${at.id}/masters/${masterId}`, changes, at),
+  /** Makes a Master the Song's main one, in place of the one before. */
+  makeMainMaster: (at: SongAt, masterId: number) =>
+    request<Song>('POST', `/songs/${at.id}/masters/${masterId}/main`, undefined, at),
+  /** Deletes a Master and its file; if it was main, the earliest added of the others becomes main. */
+  deleteMaster: (at: SongAt, masterId: number) =>
+    request<Song>('DELETE', `/songs/${at.id}/masters/${masterId}`, undefined, at),
+  /** Where a Master's audio streams from, with seeking. */
+  masterAudioUrl: (songId: number, masterId: number) => `/api/songs/${songId}/masters/${masterId}/audio`,
+  /** Downloads a Master's original file under its uploaded name. */
+  masterDownloadUrl: (songId: number, masterId: number) =>
+    `/api/songs/${songId}/masters/${masterId}/audio?download`,
   /** Puts the Arrangement in this order of Occurrence ids. */
   reorderArrangement: (at: SongAt, occurrences: number[]) =>
     request<Song>('PUT', `/songs/${at.id}/arrangement`, { occurrences }, at),

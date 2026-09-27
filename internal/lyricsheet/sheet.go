@@ -170,27 +170,33 @@ func query(ctx context.Context, q queryer, stmt string, args []any, row func(*sq
 // with a new version, and returns the updated Song. If the Song is no longer
 // at the version the change was based on, or fn fails, nothing changes.
 func (s *Store) change(ctx context.Context, songID int64, based Version, fn func(tx *sql.Tx) error) (Song, error) {
+	if err := s.changeTx(ctx, songID, based, fn); err != nil {
+		return Song{}, err
+	}
+	return s.GetSong(ctx, songID)
+}
+
+// changeTx is change without reading the Song back, for changes with work
+// to do once they're committed.
+func (s *Store) changeTx(ctx context.Context, songID int64, based Version, fn func(tx *sql.Tx) error) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return Song{}, err
+		return err
 	}
 	defer tx.Rollback()
 	res, err := tx.ExecContext(ctx,
 		`UPDATE songs SET updated_at = ?, version = version + 1 WHERE id = ? AND (?3 = 0 OR version = ?3)`,
 		time.Now().UTC().Format(timeFormat), songID, based)
 	if err != nil {
-		return Song{}, fmt.Errorf("touching song: %w", err)
+		return fmt.Errorf("touching song: %w", err)
 	}
 	if err := expectCurrent(ctx, tx, res, songID); err != nil {
-		return Song{}, err
+		return err
 	}
 	if err := fn(tx); err != nil {
-		return Song{}, err
+		return err
 	}
-	if err := tx.Commit(); err != nil {
-		return Song{}, err
-	}
-	return s.GetSong(ctx, songID)
+	return tx.Commit()
 }
 
 // AddSection creates a Section with the given Label, its first (active)

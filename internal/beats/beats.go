@@ -10,11 +10,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math"
-	"mime"
 	"net/http"
 	"net/url"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -77,16 +74,6 @@ type Details struct {
 	Notes      string `json:"notes"`
 }
 
-// Audio describes an uploaded audio file: what came with it, and what the
-// browser worked out by decoding it.
-type Audio struct {
-	FileName string
-	// ContentType is the type the upload declared, if any.
-	ContentType string
-	Duration    float64
-	Peaks       []float64
-}
-
 // SongTitle names a Song.
 type SongTitle struct {
 	ID    int64  `json:"id"`
@@ -109,14 +96,14 @@ const timeFormat = "2006-01-02T15:04:05.000000000Z"
 
 // Add puts an uploaded file into the Beat Library as a new Beat. The file
 // is kept if the Beat is added, and discarded otherwise.
-func (s *Store) Add(ctx context.Context, details Details, a Audio, file *audio.Received) (Beat, error) {
+func (s *Store) Add(ctx context.Context, details Details, a audio.Upload, file *audio.Received) (Beat, error) {
 	defer file.Discard()
 	details, err := details.clean()
 	if err != nil {
 		return Beat{}, err
 	}
-	if err := a.validate(); err != nil {
-		return Beat{}, err
+	if msg := a.Problem(); msg != "" {
+		return Beat{}, invalid(msg)
 	}
 	peaks, err := json.Marshal(a.Peaks)
 	if err != nil {
@@ -133,7 +120,7 @@ func (s *Store) Add(ctx context.Context, details Details, a Audio, file *audio.R
 			file_name, content_type, size, duration, peaks, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		details.Title, details.Producer, details.SourceLink, details.BPM, details.Key, details.Notes,
-		a.FileName, a.mediaType(), file.Size, a.Duration, string(peaks), now, now)
+		a.FileName, a.MediaType(), file.Size, a.Duration, string(peaks), now, now)
 	if err != nil {
 		return Beat{}, fmt.Errorf("adding beat: %w", err)
 	}
@@ -292,10 +279,10 @@ func apply[T any](field *T, c lyricsheet.Change[T]) {
 // Details. It is refused while Songs use the Beat, since their Clips' trims
 // would silently shift. The file is kept if it replaces the old one, and
 // discarded otherwise.
-func (s *Store) ReplaceFile(ctx context.Context, id int64, a Audio, file *audio.Received) (Beat, error) {
+func (s *Store) ReplaceFile(ctx context.Context, id int64, a audio.Upload, file *audio.Received) (Beat, error) {
 	defer file.Discard()
-	if err := a.validate(); err != nil {
-		return Beat{}, err
+	if msg := a.Problem(); msg != "" {
+		return Beat{}, invalid(msg)
 	}
 	b, _, err := s.read(ctx, id)
 	if err != nil {
@@ -316,7 +303,7 @@ func (s *Store) ReplaceFile(ctx context.Context, id int64, a Audio, file *audio.
 	_, err = tx.ExecContext(ctx,
 		`UPDATE beats SET file_name = ?, content_type = ?, size = ?, duration = ?, peaks = ?, updated_at = ?
 		 WHERE id = ?`,
-		a.FileName, a.mediaType(), file.Size, a.Duration, string(peaks), time.Now().UTC().Format(timeFormat), id)
+		a.FileName, a.MediaType(), file.Size, a.Duration, string(peaks), time.Now().UTC().Format(timeFormat), id)
 	if err != nil {
 		return Beat{}, fmt.Errorf("replacing beat file: %w", err)
 	}
@@ -400,49 +387,6 @@ func (d Details) clean() (Details, error) {
 		}
 	}
 	return d, nil
-}
-
-func (a Audio) validate() error {
-	if a.Duration <= 0 || math.IsInf(a.Duration, 0) || math.IsNaN(a.Duration) {
-		return invalid("duration must be more than 0 seconds")
-	}
-	if len(a.Peaks) == 0 {
-		return invalid("peaks are required")
-	}
-	for _, p := range a.Peaks {
-		if p < 0 || p > 1 {
-			return invalid("peaks must be between 0 and 1")
-		}
-	}
-	return nil
-}
-
-// fallbackTypes are the media types of audio files by extension, for
-// uploads that don't declare an audio type.
-var fallbackTypes = map[string]string{
-	".mp3":  "audio/mpeg",
-	".wav":  "audio/wav",
-	".flac": "audio/flac",
-	".m4a":  "audio/mp4",
-	".aac":  "audio/aac",
-	".ogg":  "audio/ogg",
-	".oga":  "audio/ogg",
-	".opus": "audio/ogg",
-	".webm": "audio/webm",
-	".aif":  "audio/aiff",
-	".aiff": "audio/aiff",
-}
-
-// mediaType is the type to serve the file with. Only audio types are
-// trusted: anything else could make a browser treat the file as a page.
-func (a Audio) mediaType() string {
-	if t, _, err := mime.ParseMediaType(a.ContentType); err == nil && strings.HasPrefix(t, "audio/") {
-		return t
-	}
-	if t, ok := fallbackTypes[strings.ToLower(filepath.Ext(a.FileName))]; ok {
-		return t
-	}
-	return "application/octet-stream"
 }
 
 func parseTime(s string) (time.Time, error) {

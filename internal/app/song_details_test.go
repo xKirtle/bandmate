@@ -98,9 +98,9 @@ func TestNewSongHasNoMetadata(t *testing.T) {
 	got := ts.createSong("Bare")
 
 	want := song{ID: got.ID, Version: got.Version, Title: "Bare", Status: "idea", ShowChords: true, CreatedAt: got.CreatedAt, UpdatedAt: got.UpdatedAt,
-		Arrangement: []occurrence{}, Sections: []section{}, Scrapbook: []int64{}}
+		Arrangement: []occurrence{}, Sections: []section{}, Scrapbook: []int64{}, Masters: []master{}}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("new song = %+v, want no key, BPM, capo, tuning, notes or Sections", got)
+		t.Errorf("new song = %+v, want no key, BPM, capo, tuning, notes, Sections or Masters", got)
 	}
 }
 
