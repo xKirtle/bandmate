@@ -1186,7 +1186,11 @@
     font-variant-numeric: tabular-nums;
   }
   .tracks {
+    /* Shared by the headers and the lanes, so they stay level. */
+    --track-height: 3.5rem;
     display: flex;
+    /* Each column as tall as its Tracks, scrolling together. */
+    align-items: flex-start;
     max-height: 40vh;
     margin-top: 0.5rem;
     overflow-y: auto;
@@ -1214,8 +1218,9 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
+    flex-shrink: 0;
     gap: 0.25rem;
-    height: 3.5rem;
+    height: var(--track-height);
     border-bottom: 1px solid var(--border);
   }
   .head-row {
@@ -1227,6 +1232,7 @@
   .name {
     flex: 1;
     min-width: 0;
+    min-height: 0;
     padding: 0 0.125rem;
     border: 1px solid transparent;
     border-radius: 0.25rem;
@@ -1284,6 +1290,8 @@
   .volume {
     flex: 1;
     min-width: 0;
+    min-height: 0;
+    padding: 0;
     accent-color: var(--accent);
   }
   .lanes {
@@ -1389,7 +1397,7 @@
   }
   .lane {
     position: relative;
-    height: 3.5rem;
+    height: var(--track-height);
     border-bottom: 1px solid var(--border);
   }
   .clip {
