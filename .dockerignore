@@ -1,0 +1,6 @@
+.git
+data
+bandmate
+web/node_modules
+web/dist
+.env
