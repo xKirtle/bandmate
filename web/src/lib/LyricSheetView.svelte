@@ -4,6 +4,7 @@
   import CueField from './CueField.svelte';
   import { isBlank, type Position, type TapLine } from './cues';
   import { follower, key } from './follow';
+  import { gutterFields } from './gutter';
 
   let {
     song,
@@ -42,20 +43,14 @@
   }
 
   // The gutter's fields in order down the page, so Enter can go on to the next.
-  const gutter = $derived(
+  const fieldOrder = $derived(
     song.arrangement.flatMap((o) =>
       linesOf(o)
         .lines.filter((l) => !isBlank(l))
         .map((l) => key(o.id, l.id)),
     ),
   );
-  const fields: Record<string, { edit: () => void } | null> = {};
-
-  function editAfter(k: string): boolean {
-    const next = fields[gutter[gutter.indexOf(k) + 1]];
-    next?.edit();
-    return !!next;
-  }
+  const fields = gutterFields();
 
   /** The current Line if it's shown, or null for its whole Section, e.g. a Chord Line while Chords are hidden. */
   function shownLine(position: Position): number | null {
@@ -158,12 +153,12 @@
             </div>
             {#if setLineCue && !isBlank(line)}
               <CueField
-                bind:this={fields[k]}
+                bind:this={() => undefined, (field) => fields.set(k, field)}
                 gutter
                 {cue}
                 label="Line {n + 1}{section.label ? ` of ${section.label}` : ''}"
                 save={(cue) => setLineCue(occurrence, line, cue)}
-                next={() => editAfter(k)}
+                next={() => fields.editAfter(fieldOrder, k)}
               />
             {/if}
           </div>

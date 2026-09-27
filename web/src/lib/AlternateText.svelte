@@ -11,11 +11,11 @@
     track: (el: HTMLElement, line: number) => () => void;
     /** Given, a gutter beside each Line shows its Cue, to change it with. */
     gutter?: {
-      /** Names the Lines for screen readers, e.g. " of Chorus". */
-      of: string;
+      /** Ends each Line's name for screen readers, e.g. " of Chorus". */
+      labelSuffix: string;
       save: (line: Line, cue: number | null) => void;
       /** Hands over a Line's field, or null once it's gone, so Enter elsewhere can go on to it. */
-      field: (line: number, field: { edit: () => void } | null) => void;
+      field: (line: number, field: GutterField | null | undefined) => void;
       /** Opens the next Line's field; answers whether there was one. */
       next: (line: number) => boolean;
     };
@@ -27,6 +27,7 @@
   import { api, type Alternate, type Song, type SongAt } from './api';
   import CueField from './CueField.svelte';
   import { isBlank, linesByRow } from './cues';
+  import type { GutterField } from './gutter';
 
   let {
     uid,
@@ -142,27 +143,28 @@
     <div class="backdrop"></div>
     {#each rows as row, i (i)}
       {@const line = rowLines[i]}
+      {@const gridRow = i + 2}
       {#if line}
         <div
           class="row"
           class:current={line.id === cueing.current}
-          style:grid-row={i + 2}
+          style:grid-row={gridRow}
           aria-hidden="true"
           {@attach (el) => cueing.track(el, line.id)}
         >
           {row || ' '}
         </div>
       {:else}
-        <div class="row" style:grid-row={i + 2} aria-hidden="true">{row || ' '}</div>
+        <div class="row" style:grid-row={gridRow} aria-hidden="true">{row || ' '}</div>
       {/if}
       {#if cueing.gutter && line && !isBlank(line)}
         {@const gutter = cueing.gutter}
-        <div class="gutter" style:grid-row={i + 2}>
+        <div class="gutter" style:grid-row={gridRow}>
           <CueField
-            bind:this={() => undefined, (field) => gutter.field(line.id, field ?? null)}
+            bind:this={() => undefined, (field) => gutter.field(line.id, field)}
             gutter
             cue={cueing.cues[line.id] ?? null}
-            label="Line {alternate.lines.indexOf(line) + 1}{gutter.of}"
+            label="Line {alternate.lines.indexOf(line) + 1}{gutter.labelSuffix}"
             save={(cue) => gutter.save(line, cue)}
             next={() => gutter.next(line.id)}
           />

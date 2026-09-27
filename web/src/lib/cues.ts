@@ -136,7 +136,8 @@ export function nextLine(
 }
 
 /**
- * Which saved Line each row of a text box's text is, while typing that isn't
+ * Which saved Line each row of a text box's text is (a row being a line of
+ * text as typed, not yet a Line), while typing that isn't
  * saved yet may have moved them: rows the same as the saved Lines at the
  * start and end keep them, and the rows between are matched by place, so a
  * Line typed or deleted mid-Section leaves the Lines after it where they

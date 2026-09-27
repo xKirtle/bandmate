@@ -1,10 +1,12 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
+  import type { Cueing } from './AlternateText.svelte';
   import { api, suggestedLabels, type Line, type Occurrence, type Song, type SongAt } from './api';
   import { hasChords } from './chords';
   import { currentPosition, hasCues, isBlank, nextLine, type TapLine } from './cues';
   import { follower, key } from './follow';
+  import { gutterFields } from './gutter';
   import LyricSheetView from './LyricSheetView.svelte';
   import SectionEditor from './SectionEditor.svelte';
   import { describe } from './sections';
@@ -63,9 +65,9 @@
   // follow playback to, and each Line's Cue field, to go on to with Enter.
   // Read mode does the same in LyricSheetView.
   const { track, follow } = follower();
-  const writeFields = new Map<string, { edit: () => void }>();
+  const writeFields = gutterFields();
   // The Line Cue fields in order down the page.
-  const writeGutter = $derived(
+  const writeFieldOrder = $derived(
     song.arrangement.flatMap((o) =>
       (sections.get(o.sectionId)?.alternates.find((a) => a.active)?.lines ?? [])
         .filter((l) => !isBlank(l))
@@ -79,10 +81,21 @@
     follow(writeKey);
   });
 
-  function editAfter(k: string): boolean {
-    const next = writeFields.get(writeGutter[writeGutter.indexOf(k) + 1]);
-    next?.edit();
-    return !!next;
+  /** How an Occurrence's Cues show on its Section's text box in Write mode. */
+  function cueingFor(occurrence: Occurrence, label: string): Cueing {
+    return {
+      cues: occurrence.lineCues,
+      current: current?.occurrence === occurrence.id ? current.line : null,
+      track: (el, line) => track(el, key(occurrence.id, line)),
+      gutter: canCue
+        ? {
+            labelSuffix: label ? ` of ${label}` : '',
+            save: (line, cue) => setLineCue(occurrence, line, cue),
+            field: (line, field) => writeFields.set(key(occurrence.id, line), field),
+            next: (line) => writeFields.editAfter(writeFieldOrder, key(occurrence.id, line)),
+          }
+        : undefined,
+    };
   }
 
   // The Line picked by clicking it in Tap mode, to tap next.
@@ -220,22 +233,7 @@
               {change}
               {onUnsaved}
               cue={canCue ? { at: occurrence.cue, save: (cue) => setCue(occurrence, cue) } : undefined}
-              cueing={{
-                cues: occurrence.lineCues,
-                current: current?.occurrence === occurrence.id ? current.line : null,
-                track: (el, line) => track(el, key(occurrence.id, line)),
-                gutter: canCue
-                  ? {
-                      of: section.label ? ` of ${section.label}` : '',
-                      save: (line, cue) => setLineCue(occurrence, line, cue),
-                      field: (line, field) => {
-                        if (field) writeFields.set(key(occurrence.id, line), field);
-                        else writeFields.delete(key(occurrence.id, line));
-                      },
-                      next: (line) => editAfter(key(occurrence.id, line)),
-                    }
-                  : undefined,
-              }}
+              cueing={cueingFor(occurrence, section.label)}
             >
               {#snippet actions()}
                 <button type="button" class="icon" onclick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">
