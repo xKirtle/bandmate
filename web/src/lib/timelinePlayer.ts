@@ -1,7 +1,7 @@
 // Plays the Timeline: every Clip's audio is fetched, decoded into memory and
 // scheduled on one AudioContext, so Tracks stay sample-accurate with each
 // other (ADR 0006).
-import { playAlone } from './playback';
+import { playAlone, release } from './playback';
 import { schedule, type Placed } from './schedule';
 
 /** A Clip to play, with where its source's audio is fetched from. */
@@ -114,6 +114,7 @@ export class TimelinePlayer {
   /** Stops playing and lets go of the decoded audio. */
   dispose() {
     this.stop();
+    release(this);
     this.#buffers.clear();
   }
 

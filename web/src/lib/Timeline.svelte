@@ -36,7 +36,11 @@
   // is decoded.
   let peaks = $state<Record<number, number[]>>({});
 
-  const player = new TimelinePlayer((s) => (playerState = s));
+  const player = new TimelinePlayer((s) => {
+    playerState = s;
+    // Also when something else playing stopped it.
+    if (s === 'stopped') position = player.position();
+  });
   onDestroy(() => player.dispose());
 
   const beats = $derived(new Map(timeline.beats.map((b) => [b.id, b])));
@@ -78,7 +82,7 @@
   $effect(() => {
     if (playerState !== 'playing') return;
     let frame = requestAnimationFrame(function follow() {
-      position = player.position();
+      if (!dragging) position = player.position();
       if (position >= length) {
         player.stop();
         player.seek(length);
@@ -111,18 +115,31 @@
     else play(playable, position);
   }
 
-  // Clicking or dragging on the ruler seeks.
+  // Clicking on the ruler seeks. Dragging moves the playhead, and while
+  // playing, playback only jumps there on release, so it doesn't stutter.
   let dragging = false;
 
-  function seekAt(event: PointerEvent) {
+  function timeAt(event: PointerEvent): number {
     const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    seek(((event.clientX - box.left) / box.width) * length);
+    return Math.max(0, Math.min(length, ((event.clientX - box.left) / box.width) * length));
   }
 
   function pointerDown(event: PointerEvent) {
     dragging = true;
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-    seekAt(event);
+    seek(timeAt(event));
+  }
+
+  function pointerMove(event: PointerEvent) {
+    if (!dragging) return;
+    if (playerState === 'stopped') seek(timeAt(event));
+    else position = timeAt(event);
+  }
+
+  function pointerUp(event: PointerEvent) {
+    if (!dragging) return;
+    dragging = false;
+    seek(timeAt(event));
   }
 
   function rulerKey(event: KeyboardEvent) {
@@ -140,20 +157,19 @@
     seek(to);
   }
 
-  /** Whether typing a space there types it, rather than playing or pausing. */
-  function takesText(target: EventTarget | null): boolean {
+  /**
+   * Whether a space pressed there is its own: typed into a text field, or
+   * pressing a focused button or checkbox, rather than playing or pausing.
+   */
+  function ownsSpace(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return false;
-    if (target.isContentEditable || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) {
-      return true;
-    }
-    const nonText = ['button', 'checkbox', 'radio', 'range', 'reset', 'submit', 'file', 'color'];
-    return target instanceof HTMLInputElement && !nonText.includes(target.type);
+    return target.isContentEditable || target.closest('input, textarea, select, button, a[href], summary, label') !== null;
   }
 
   function spaceBar(event: KeyboardEvent) {
     if (event.key !== ' ' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
-    if (empty || picking || takesText(event.target)) return;
-    // Otherwise the page would scroll, or a focused button would be pressed too.
+    if (event.defaultPrevented || empty || picking || ownsSpace(event.target)) return;
+    // Otherwise the page would scroll.
     event.preventDefault();
     toggle();
   }
@@ -177,7 +193,7 @@
   );
 
   /** Where a time falls across the Timeline's width, in percent. */
-  function at(time: number): number {
+  function percent(time: number): number {
     return length > 0 ? (time / length) * 100 : 0;
   }
 
@@ -248,13 +264,13 @@
             aria-valuenow={Math.round(position)}
             aria-valuetext="{formatDuration(position)} of {formatDuration(length)}"
             onpointerdown={pointerDown}
-            onpointermove={(e) => dragging && seekAt(e)}
-            onpointerup={() => (dragging = false)}
+            onpointermove={pointerMove}
+            onpointerup={pointerUp}
             onpointercancel={() => (dragging = false)}
             onkeydown={rulerKey}
           >
             {#each ticks as t (t)}
-              <span class="tick" style:left="{at(t)}%">{formatDuration(t)}</span>
+              <span class="tick" style:left="{percent(t)}%">{formatDuration(t)}</span>
             {/each}
           </div>
           {#each timeline.tracks as track (track.id)}
@@ -263,8 +279,8 @@
                 {@const count = Math.max(4, Math.round((clip.length / length) * 400))}
                 <div
                   class="clip"
-                  style:left="{at(clip.start)}%"
-                  style:width="{at(clip.length)}%"
+                  style:left="{percent(clip.start)}%"
+                  style:width="{percent(clip.length)}%"
                   title={beats.get(clip.beatId)?.title}
                 >
                   <span class="clip-title">{beats.get(clip.beatId)?.title}</span>
@@ -278,7 +294,7 @@
               {/each}
             </div>
           {/each}
-          <span class="playhead" style:left="{at(position)}%" aria-hidden="true"></span>
+          <span class="playhead" style:left="{percent(position)}%" aria-hidden="true"></span>
         </div>
       </div>
     {/if}

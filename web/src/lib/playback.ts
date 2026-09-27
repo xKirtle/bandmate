@@ -9,6 +9,11 @@ export function playAlone(owner: object, stop: () => void) {
   current = { owner, stop };
 }
 
+/** Forgets owner, e.g. once it's gone, so nothing tries to stop it any more. */
+export function release(owner: object) {
+  if (current?.owner === owner) current = null;
+}
+
 /** Use as a media element's onplay handler. */
 export function playMediaAlone(event: Event) {
   const player = event.currentTarget as HTMLMediaElement;

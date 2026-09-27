@@ -60,6 +60,9 @@ type Beat struct {
 	Duration float64 `json:"duration"`
 }
 
+// timeFormat is how songs.updated_at is stored.
+const timeFormat = "2006-01-02T15:04:05.000000000Z"
+
 // beatTrackName is the name of the Track a Song's first Beat goes on.
 const beatTrackName = "Beat"
 
@@ -75,9 +78,20 @@ func NewStore(db *sql.DB) *Store {
 
 // Get returns a Song's Timeline.
 func (s *Store) Get(ctx context.Context, songID int64) (Timeline, error) {
+	// Read in one transaction, so the version matches what's read with it.
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return Timeline{}, err
+	}
+	defer tx.Rollback()
+	return read(ctx, tx, songID)
+}
+
+// read returns a Song's Timeline as tx sees it.
+func read(ctx context.Context, tx *sql.Tx, songID int64) (Timeline, error) {
 	tl := Timeline{SongID: songID, Tracks: []Track{}, Beats: []Beat{}}
 	var updated string
-	err := s.db.QueryRowContext(ctx, `SELECT version, updated_at FROM songs WHERE id = ?`, songID).
+	err := tx.QueryRowContext(ctx, `SELECT version, updated_at FROM songs WHERE id = ?`, songID).
 		Scan(&tl.Version, &updated)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Timeline{}, lyricsheet.ErrNotFound
@@ -85,12 +99,12 @@ func (s *Store) Get(ctx context.Context, songID int64) (Timeline, error) {
 	if err != nil {
 		return Timeline{}, fmt.Errorf("reading song: %w", err)
 	}
-	if tl.UpdatedAt, err = time.Parse(time.RFC3339Nano, updated); err != nil {
+	if tl.UpdatedAt, err = time.Parse(timeFormat, updated); err != nil {
 		return Timeline{}, fmt.Errorf("parsing stored time %q: %w", updated, err)
 	}
 
 	trackAt := map[int64]int{}
-	err = query(ctx, s.db, `SELECT id, name FROM tracks WHERE song_id = ? ORDER BY position, id`, []any{songID},
+	err = query(ctx, tx, `SELECT id, name FROM tracks WHERE song_id = ? ORDER BY position, id`, []any{songID},
 		func(rows *sql.Rows) error {
 			t := Track{Clips: []Clip{}}
 			if err := rows.Scan(&t.ID, &t.Name); err != nil {
@@ -104,7 +118,7 @@ func (s *Store) Get(ctx context.Context, songID int64) (Timeline, error) {
 		return Timeline{}, fmt.Errorf("reading tracks: %w", err)
 	}
 
-	err = query(ctx, s.db, `SELECT c.id, c.track_id, c.beat_id, c.start, c.source_offset, c.length
+	err = query(ctx, tx, `SELECT c.id, c.track_id, c.beat_id, c.start, c.source_offset, c.length
 		FROM clips c JOIN tracks t ON t.id = c.track_id
 		WHERE t.song_id = ? ORDER BY c.start, c.id`, []any{songID},
 		func(rows *sql.Rows) error {
@@ -121,7 +135,7 @@ func (s *Store) Get(ctx context.Context, songID int64) (Timeline, error) {
 		return Timeline{}, fmt.Errorf("reading clips: %w", err)
 	}
 
-	err = query(ctx, s.db, `SELECT id, title, bpm, file_name, size, duration FROM beats
+	err = query(ctx, tx, `SELECT id, title, bpm, file_name, size, duration FROM beats
 		WHERE id IN (SELECT c.beat_id FROM clips c JOIN tracks t ON t.id = c.track_id WHERE t.song_id = ?)
 		ORDER BY id`, []any{songID},
 		func(rows *sql.Rows) error {
@@ -178,7 +192,7 @@ func (s *Store) AddBeat(ctx context.Context, songID int64, based lyricsheet.Vers
 func beatTrack(ctx context.Context, tx *sql.Tx, songID int64) (int64, error) {
 	var id int64
 	err := tx.QueryRowContext(ctx, `SELECT t.id FROM tracks t
-		WHERE t.song_id = ? AND EXISTS (SELECT 1 FROM clips c WHERE c.track_id = t.id)
+		WHERE t.song_id = ? AND EXISTS (SELECT 1 FROM clips c WHERE c.track_id = t.id AND c.beat_id IS NOT NULL)
 		ORDER BY t.position, t.id LIMIT 1`, songID).Scan(&id)
 	if err == nil {
 		return id, nil
@@ -232,15 +246,16 @@ func (s *Store) change(ctx context.Context, songID int64, based lyricsheet.Versi
 	if err := fn(tx); err != nil {
 		return Timeline{}, err
 	}
-	if err := tx.Commit(); err != nil {
+	tl, err := read(ctx, tx, songID)
+	if err != nil {
 		return Timeline{}, err
 	}
-	return s.Get(ctx, songID)
+	return tl, tx.Commit()
 }
 
 // query runs a query and calls row for each result row.
-func query(ctx context.Context, db *sql.DB, stmt string, args []any, row func(*sql.Rows) error) error {
-	rows, err := db.QueryContext(ctx, stmt, args...)
+func query(ctx context.Context, tx *sql.Tx, stmt string, args []any, row func(*sql.Rows) error) error {
+	rows, err := tx.QueryContext(ctx, stmt, args...)
 	if err != nil {
 		return err
 	}
