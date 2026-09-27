@@ -94,10 +94,8 @@ func (s *Store) SetLineCue(ctx context.Context, songID int64, based Version, occ
 		if blank(text) {
 			return invalid("a blank Line can't have a Cue")
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO line_cues (occurrence_id, line_id, cue_ms) VALUES (?, ?, ?)
-			ON CONFLICT (occurrence_id, line_id) DO UPDATE SET cue_ms = excluded.cue_ms`,
-			occurrenceID, lineID, ms); err != nil {
-			return fmt.Errorf("setting line cue: %w", err)
+		if err := writeLineCue(ctx, tx, occurrenceID, lineID, sql.NullInt64{Int64: ms, Valid: true}); err != nil {
+			return err
 		}
 		first, err := firstLine(ctx, tx, occurrenceID)
 		if err != nil || first != lineID {
@@ -114,12 +112,26 @@ func (s *Store) ClearLineCue(ctx context.Context, songID int64, based Version, o
 		if _, err := findOccurrenceLine(ctx, tx, songID, occurrenceID, lineID); err != nil {
 			return err
 		}
+		return writeLineCue(ctx, tx, occurrenceID, lineID, sql.NullInt64{})
+	})
+}
+
+// writeLineCue sets or, with a null ms, clears a Line's Cue within an
+// Occurrence, both already checked.
+func writeLineCue(ctx context.Context, tx *sql.Tx, occurrenceID, lineID int64, ms sql.NullInt64) error {
+	if !ms.Valid {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM line_cues WHERE occurrence_id = ? AND line_id = ?`,
 			occurrenceID, lineID); err != nil {
 			return fmt.Errorf("clearing line cue: %w", err)
 		}
 		return nil
-	})
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO line_cues (occurrence_id, line_id, cue_ms) VALUES (?, ?, ?)
+		ON CONFLICT (occurrence_id, line_id) DO UPDATE SET cue_ms = excluded.cue_ms`,
+		occurrenceID, lineID, ms.Int64); err != nil {
+		return fmt.Errorf("setting line cue: %w", err)
+	}
+	return nil
 }
 
 // ClearOccurrenceCues removes all of an Occurrence's Cues: its own, and
@@ -194,30 +206,19 @@ func restoreCue(ctx context.Context, tx *sql.Tx, songID int64, c CueValue, ms sq
 		}
 		return err
 	}
+	// Only a Line's not being in the Section is invalid, so that one's gone.
 	text, err := findOccurrenceLine(ctx, tx, songID, c.OccurrenceID, c.LineID)
-	var inv *InvalidError
-	if errors.Is(err, ErrNotFound) || errors.As(err, &inv) {
+	var gone *InvalidError
+	if errors.Is(err, ErrNotFound) || errors.As(err, &gone) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	if !ms.Valid {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM line_cues WHERE occurrence_id = ? AND line_id = ?`,
-			c.OccurrenceID, c.LineID); err != nil {
-			return fmt.Errorf("clearing line cue: %w", err)
-		}
+	if ms.Valid && blank(text) {
 		return nil
 	}
-	if blank(text) {
-		return nil
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO line_cues (occurrence_id, line_id, cue_ms) VALUES (?, ?, ?)
-		ON CONFLICT (occurrence_id, line_id) DO UPDATE SET cue_ms = excluded.cue_ms`,
-		c.OccurrenceID, c.LineID, ms.Int64); err != nil {
-		return fmt.Errorf("restoring line cue: %w", err)
-	}
-	return nil
+	return writeLineCue(ctx, tx, c.OccurrenceID, c.LineID, ms)
 }
 
 // findOccurrenceLine checks an Occurrence belongs to a Song and a Line to
