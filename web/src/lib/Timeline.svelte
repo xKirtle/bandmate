@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, untrack } from 'svelte';
+  import { onDestroy, tick, untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import {
     api,
@@ -21,14 +21,24 @@
   import { repeats, timelineEnd, type Loop, type Placed } from './schedule';
   import { formatDuration } from './time';
   import { TimelinePlayer, type PlayableClip, type PlayerState } from './timelinePlayer';
-  import { bars } from './waveform';
+  import {
+    follow,
+    ticks as rulerTicks,
+    timeAt as viewTimeAt,
+    view as timelineView,
+    waveWindow,
+    zoom,
+    type View,
+  } from './timelineView';
+  import { barWidth, bars } from './waveform';
 
   // The Timeline, docked under the Lyric Sheet: its Tracks and Clips, and
   // playback with each Track's volume, mute and solo, and the Loop. Editing
   // (adding Beats, adding, renaming, reordering and deleting Tracks, moving,
   // trimming, duplicating and deleting Clips, setting and clearing the Loop,
   // and undoing and redoing all of it along with mixing) is only offered on
-  // wider screens; on a phone it only plays and mixes.
+  // wider screens; on a phone it only plays and mixes. On both it zooms and
+  // scrolls, and follows the playhead while playing.
   let {
     song,
     timeline,
@@ -285,7 +295,7 @@
   // unless going round the Loop.
   $effect(() => {
     if (playerState !== 'playing') return;
-    let frame = requestAnimationFrame(function follow() {
+    let frame = requestAnimationFrame(function track() {
       if (!dragging) position = player.position();
       if (position >= length && !player.repeating) {
         player.stop();
@@ -293,7 +303,8 @@
         position = length;
         return;
       }
-      frame = requestAnimationFrame(follow);
+      if (following && !dragging) reveal(position);
+      frame = requestAnimationFrame(track);
     });
     return () => cancelAnimationFrame(frame);
   });
@@ -309,6 +320,7 @@
       position = player.position();
       return;
     }
+    following = true;
     // At the end, playing starts over, unless there's a Loop yet to go round.
     play(position >= length && !repeats(position, playingLoop) ? 0 : position);
   }
@@ -329,12 +341,18 @@
 
   /** The time under a point across the lanes, which may be past the end. */
   function spanTimeAt(clientX: number): number {
-    const box = lanesElement!.getBoundingClientRect();
-    return ((clientX - box.left) / box.width) * span;
+    return viewTimeAt(view, xIn(clientX));
+  }
+
+  /** How far a point is from the left of the lanes' window, in pixels. */
+  function xIn(clientX: number): number {
+    return clientX - lanesElement!.getBoundingClientRect().left;
   }
 
   function pointerDown(event: PointerEvent) {
     dragging = true;
+    // Clicking the playhead back into view follows it again.
+    following = true;
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
     seek(timeAt(event));
   }
@@ -363,7 +381,9 @@
     }[event.key];
     if (to === undefined) return;
     event.preventDefault();
+    following = true;
     seek(to);
+    reveal(position);
   }
 
   /**
@@ -629,18 +649,101 @@
     return { left: `${percent(from)}%`, width: `${Math.max(0, percent(Math.min(to, span) - from))}%` };
   }
 
-  // Ruler marks at a round interval, about one every 1/8 of the Timeline.
-  const tickStep = $derived([1, 2, 5, 10, 15, 30, 60, 120, 300, 600].find((s) => span / s <= 8) ?? 1200);
-  const ticks = $derived(
-    Array.from({ length: Math.floor(span / tickStep) + 1 }, (_, i) => i * tickStep).filter((t) => t < span),
-  );
+  // Zooming and scrolling: Ctrl+wheel or pinching zooms in and out around
+  // the pointer or the pinch, and the lanes scroll along when zoomed in.
+  // Zoomed all the way out (scale 0), the whole Timeline fits, however long.
+  let scale = $state(0);
+  let scroll = $state(0);
+  let width = $state(0);
+  const view = $derived(timelineView({ span, width, scale, scroll }));
+  // Whether the view follows the playhead while playing: until scrolled
+  // away from by hand, then again once playing starts or the ruler's clicked.
+  let following = true;
+  // Where the lanes were last scrolled to from here, to tell scrolling by hand.
+  let scrolledTo = 0;
 
-  /** Where a time falls across the Timeline's width, in percent. */
+  /** Shows the Timeline zoomed and scrolled as v has it. */
+  async function show(v: View) {
+    scale = v.scale > timelineView({ ...v, scale: 0 }).scale ? v.scale : 0;
+    scroll = scrolledTo = v.scroll;
+    // Once the lanes are as wide as zoomed to.
+    await tick();
+    if (lanesElement) lanesElement.scrollLeft = v.scroll;
+  }
+
+  /** Scrolls the playhead into view, if it isn't. */
+  function reveal(time: number) {
+    const next = follow(view, time);
+    if (next.scroll !== view.scroll) show(next);
+  }
+
+  function scrolled() {
+    scroll = lanesElement!.scrollLeft;
+    // Scrolled by hand, rather than to where it was shown.
+    if (Math.abs(scroll - timelineView({ ...view, scroll: scrolledTo }).scroll) > 1) following = false;
+  }
+
+  function zoomAt(factor: number, clientX: number) {
+    show(zoom(view, factor, xIn(clientX)));
+  }
+
+  // Listened to directly: Svelte's own wheel and touch listeners are
+  // passive, so they can't stop the browser zooming the page instead.
+  $effect(() => {
+    const lanes = lanesElement;
+    if (!lanes) return;
+    const wheel = (event: WheelEvent) => {
+      // A trackpad's pinch comes as Ctrl+wheel too.
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+      const pixels = event.deltaMode === WheelEvent.DOM_DELTA_PIXEL ? event.deltaY : event.deltaY * 33;
+      zoomAt(Math.exp(-Math.max(-100, Math.min(100, pixels)) * 0.005), event.clientX);
+    };
+    let pinch: { distance: number; x: number } | null = null;
+    const pinchOf = ({ touches: [a, b] }: TouchEvent) => ({
+      distance: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
+      x: (a.clientX + b.clientX) / 2,
+    });
+    const touchStart = (event: TouchEvent) => {
+      if (event.touches.length !== 2) return;
+      pinch = pinchOf(event);
+      // The first finger may have started dragging the playhead.
+      dragging = false;
+    };
+    const touchMove = (event: TouchEvent) => {
+      if (!pinch || event.touches.length !== 2) return;
+      event.preventDefault();
+      const now = pinchOf(event);
+      // Zoomed around the pinch, and moved along with it.
+      const zoomed = zoom(view, now.distance / pinch.distance, xIn(now.x));
+      show(timelineView({ ...zoomed, scroll: zoomed.scroll - (now.x - pinch.x) }));
+      pinch = now;
+    };
+    const touchEnd = (event: TouchEvent) => {
+      if (event.touches.length < 2) pinch = null;
+    };
+    lanes.addEventListener('wheel', wheel, { passive: false });
+    lanes.addEventListener('touchstart', touchStart);
+    lanes.addEventListener('touchmove', touchMove, { passive: false });
+    lanes.addEventListener('touchend', touchEnd);
+    lanes.addEventListener('touchcancel', touchEnd);
+    return () => {
+      lanes.removeEventListener('wheel', wheel);
+      lanes.removeEventListener('touchstart', touchStart);
+      lanes.removeEventListener('touchmove', touchMove);
+      lanes.removeEventListener('touchend', touchEnd);
+      lanes.removeEventListener('touchcancel', touchEnd);
+    };
+  });
+
+  const ticks = $derived(rulerTicks(view));
+
+  /** Where a time falls across the Timeline's whole width, in percent. */
   function percent(time: number): number {
     return span > 0 ? (time / span) * 100 : 0;
   }
 
-  /** The Clip's stretch of its Beat's waveform, as count bars. */
+  /** A stretch of a Beat's waveform, from offset seconds in, as count bars. */
   function clipShape(beatId: number, offset: number, clipLength: number, count: number): number[] {
     const all = peaks[beatId] ?? [];
     return bars(all.slice(Math.floor(offset * peaksPerSecond), Math.ceil((offset + clipLength) * peaksPerSecond)), count);
@@ -795,125 +898,138 @@
             </div>
           {/each}
         </div>
-        <div class="lanes" bind:this={lanesElement}>
-          <!-- Pointer only, like dragging Clips; the Loop is switched on and off with its button. -->
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div
-            class="loop-bar"
-            class:editable={editable.current}
-            title={editable.current ? 'Drag to set a Loop' : undefined}
-            onpointerdown={loopDown}
-            onpointermove={loopMove}
-            onpointerup={loopUp}
-            onpointercancel={loopCancel}
-          >
-            {#if loop}
-              {@const at = spanStyle(loop.start, loop.end)}
-              <div
-                class="loop"
-                class:on={loop.on}
-                style:left={at.left}
-                style:width={at.width}
-                title="Loop {formatDuration(loop.start)} to {formatDuration(loop.end)}"
-              >
-                <span class="loop-edge start edit-only" data-edge="start" title="Drag to move the Loop's start"></span>
-                <button
-                  type="button"
-                  class="loop-clear edit-only"
-                  onpointerdown={(e) => e.stopPropagation()}
-                  onclick={clearLoop}
-                  aria-label="Clear the Loop"
-                  title="Clear the Loop">×</button
-                >
-                <span class="loop-edge end edit-only" data-edge="end" title="Drag to move the Loop's end"></span>
-              </div>
-            {/if}
-          </div>
-          <div
-            class="ruler"
-            role="slider"
-            tabindex="0"
-            aria-label="Position"
-            aria-valuemin={0}
-            aria-valuemax={Math.round(length)}
-            aria-valuenow={Math.round(position)}
-            aria-valuetext="{formatDuration(position)} of {formatDuration(length)}"
-            onpointerdown={pointerDown}
-            onpointermove={pointerMove}
-            onpointerup={pointerUp}
-            onpointercancel={() => (dragging = false)}
-            onkeydown={rulerKey}
-          >
-            {#each ticks as t (t)}
-              <span class="tick" style:left="{percent(t)}%">{formatDuration(t)}</span>
-            {/each}
-          </div>
-          {#each shown as { track, clips: placed }, t (track.id)}
-            <div class="lane" bind:this={laneElements[t]}>
-              {#each placed as { clip, at, editing } (clip.id)}
-                {@const count = Math.max(4, Math.round((at.length / span) * 400))}
-                {@const title = beats.get(clip.beatId)?.title}
-                <!-- Focusable for its Delete key; pointer dragging has no key equivalent yet, and its actions are buttons. -->
-                <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+        <div class="lanes" bind:this={lanesElement} bind:clientWidth={width} onscroll={scrolled}>
+          <div class="content" style:width="{span * view.scale}px">
+            <!-- Pointer only, like dragging Clips; the Loop is switched on and off with its button. -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div
+              class="loop-bar"
+              class:editable={editable.current}
+              title={editable.current ? 'Drag to set a Loop' : undefined}
+              onpointerdown={loopDown}
+              onpointermove={loopMove}
+              onpointerup={loopUp}
+              onpointercancel={loopCancel}
+            >
+              {#if loop}
+                {@const at = spanStyle(loop.start, loop.end)}
                 <div
-                  class="clip"
-                  class:editing
-                  class:moving={editing && edit?.mode === 'move'}
-                  style:left="{percent(at.start)}%"
-                  style:width="{percent(at.length)}%"
-                  title={title}
-                  role="group"
-                  aria-label="{title}, {formatDuration(at.start)} to {formatDuration(at.start + at.length)}"
-                  tabindex={editable.current ? 0 : undefined}
-                  onpointerdown={(e) => editDown(e, clip, 'move')}
-                  onkeydown={(e) => clipKey(e, clip)}
+                  class="loop"
+                  class:on={loop.on}
+                  style:left={at.left}
+                  style:width={at.width}
+                  title="Loop {formatDuration(loop.start)} to {formatDuration(loop.end)}"
                 >
-                  <span class="clip-head">
-                    <span class="clip-title">{title}</span>
-                    <span class="clip-actions edit-only">
-                      <button
-                        type="button"
-                        onpointerdown={(e) => e.stopPropagation()}
-                        onclick={() => duplicate(clip)}
-                        aria-label="Duplicate {title}"
-                        title="Duplicate">⧉</button
-                      >
-                      <button
-                        type="button"
-                        onpointerdown={(e) => e.stopPropagation()}
-                        onclick={() => remove(clip)}
-                        aria-label="Delete {title}"
-                        title="Delete (Del)">×</button
-                      >
-                    </span>
-                  </span>
-                  <svg viewBox="0 0 {count} 100" preserveAspectRatio="none" aria-hidden="true">
-                    {#each clipShape(clip.beatId, at.offset, at.length, count) as peak, i (i)}
-                      {@const height = Math.max(2, peak * 100)}
-                      <rect x={i + 0.15} y={(100 - height) / 2} width="0.7" {height} />
-                    {/each}
-                  </svg>
-                  <span
-                    class="trim start edit-only"
-                    aria-hidden="true"
-                    title="Drag to trim the start"
-                    onpointerdown={(e) => editDown(e, clip, 'start')}
-                  ></span>
-                  <span
-                    class="trim end edit-only"
-                    aria-hidden="true"
-                    title="Drag to trim the end"
-                    onpointerdown={(e) => editDown(e, clip, 'end')}
-                  ></span>
+                  <span class="loop-edge start edit-only" data-edge="start" title="Drag to move the Loop's start"></span>
+                  <button
+                    type="button"
+                    class="loop-clear edit-only"
+                    onpointerdown={(e) => e.stopPropagation()}
+                    onclick={clearLoop}
+                    aria-label="Clear the Loop"
+                    title="Clear the Loop">×</button
+                  >
+                  <span class="loop-edge end edit-only" data-edge="end" title="Drag to move the Loop's end"></span>
                 </div>
+              {/if}
+            </div>
+            <div
+              class="ruler"
+              role="slider"
+              tabindex="0"
+              aria-label="Position"
+              aria-valuemin={0}
+              aria-valuemax={Math.round(length)}
+              aria-valuenow={Math.round(position)}
+              aria-valuetext="{formatDuration(position)} of {formatDuration(length)}"
+              onpointerdown={pointerDown}
+              onpointermove={pointerMove}
+              onpointerup={pointerUp}
+              onpointercancel={() => (dragging = false)}
+              onkeydown={rulerKey}
+            >
+              {#each ticks as t (t)}
+                <span class="tick" style:left="{percent(t)}%">{formatDuration(t)}</span>
               {/each}
             </div>
-          {/each}
-          {#if loop?.on}
-            {@const at = spanStyle(loop.start, loop.end)}
-            <span class="loop-shade" style:left={at.left} style:width={at.width} aria-hidden="true"></span>
-          {/if}
-          <span class="playhead" style:left="{percent(position)}%" aria-hidden="true"></span>
+            {#each shown as { track, clips: placed }, t (track.id)}
+              <div class="lane" bind:this={laneElements[t]}>
+                {#each placed as { clip, at, editing } (clip.id)}
+                  {@const wave = waveWindow(view, at.start, at.length)}
+                  {@const title = beats.get(clip.beatId)?.title}
+                  <!-- Focusable for its Delete key; pointer dragging has no key equivalent yet, and its actions are buttons. -->
+                  <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+                  <div
+                    class="clip"
+                    class:editing
+                    class:moving={editing && edit?.mode === 'move'}
+                    style:left="{percent(at.start)}%"
+                    style:width="{percent(at.length)}%"
+                    title={title}
+                    role="group"
+                    aria-label="{title}, {formatDuration(at.start)} to {formatDuration(at.start + at.length)}"
+                    tabindex={editable.current ? 0 : undefined}
+                    onpointerdown={(e) => editDown(e, clip, 'move')}
+                    onkeydown={(e) => clipKey(e, clip)}
+                  >
+                    <span class="clip-head">
+                      <span class="clip-title">{title}</span>
+                      <span class="clip-actions edit-only">
+                        <button
+                          type="button"
+                          onpointerdown={(e) => e.stopPropagation()}
+                          onclick={() => duplicate(clip)}
+                          aria-label="Duplicate {title}"
+                          title="Duplicate">⧉</button
+                        >
+                        <button
+                          type="button"
+                          onpointerdown={(e) => e.stopPropagation()}
+                          onclick={() => remove(clip)}
+                          aria-label="Delete {title}"
+                          title="Delete (Del)">×</button
+                        >
+                      </span>
+                    </span>
+                    <span class="wave">
+                      {#if wave}
+                        <!-- Only around what's in view, a bar every barWidth pixels. -->
+                        <svg
+                          style:left="{wave.from * view.scale}px"
+                          style:width="{wave.bars * barWidth}px"
+                          viewBox="0 0 {wave.bars} 100"
+                          preserveAspectRatio="none"
+                          aria-hidden="true"
+                        >
+                          {#each clipShape(clip.beatId, at.offset + wave.from, (wave.bars * barWidth) / view.scale, wave.bars) as peak, i (i)}
+                            {@const height = Math.max(2, peak * 100)}
+                            <rect x={i + 0.15} y={(100 - height) / 2} width="0.7" {height} />
+                          {/each}
+                        </svg>
+                      {/if}
+                    </span>
+                    <span
+                      class="trim start edit-only"
+                      aria-hidden="true"
+                      title="Drag to trim the start"
+                      onpointerdown={(e) => editDown(e, clip, 'start')}
+                    ></span>
+                    <span
+                      class="trim end edit-only"
+                      aria-hidden="true"
+                      title="Drag to trim the end"
+                      onpointerdown={(e) => editDown(e, clip, 'end')}
+                    ></span>
+                  </div>
+                {/each}
+              </div>
+            {/each}
+            {#if loop?.on}
+              {@const at = spanStyle(loop.start, loop.end)}
+              <span class="loop-shade" style:left={at.left} style:width={at.width} aria-hidden="true"></span>
+            {/if}
+            <span class="playhead" style:left="{percent(position)}%" aria-hidden="true"></span>
+          </div>
         </div>
       </div>
     {/if}
@@ -1091,9 +1207,15 @@
     accent-color: var(--accent);
   }
   .lanes {
-    position: relative;
     flex: 1;
     min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    /* Pinching zooms the Timeline, not the page. */
+    touch-action: pan-x pan-y;
+  }
+  .content {
+    position: relative;
   }
   .loop-bar {
     position: relative;
@@ -1271,10 +1393,15 @@
     background: var(--accent);
     opacity: 0.4;
   }
-  .clip svg {
+  .wave {
+    position: relative;
     flex: 1;
     min-height: 0;
-    width: 100%;
+  }
+  .wave svg {
+    position: absolute;
+    top: 0;
+    height: 100%;
   }
   rect {
     fill: var(--accent);
