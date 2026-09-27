@@ -185,7 +185,7 @@ export interface Timeline {
 export interface Track {
   id: number;
   name: string;
-  /** In dB, from -60 (silence) to +6. */
+  /** In dB, from silence to maxVolume (see mixer.ts). */
   volume: number;
   muted: boolean;
   /** When any Track is soloed, only the soloed ones are heard. */
@@ -194,7 +194,7 @@ export interface Track {
   clips: Clip[];
 }
 
-/** Changes to a Track's name or mixer; fields left out stay as they are. */
+/** Changes to a Track's name or levels; fields left out stay as they are. */
 export type TrackChanges = Partial<Pick<Track, 'name' | 'volume' | 'muted' | 'soloed'>>;
 
 /** A stretch of a Beat placed on a Track, in seconds. */

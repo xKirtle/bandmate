@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onDestroy, untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
-  import { api, type Beat, type Clip, type Song, type SongAt, type Timeline, type Track } from './api';
+  import { api, type Beat, type Clip, type Song, type SongAt, type Timeline, type Track, type TrackChanges } from './api';
   import BeatPicker from './BeatPicker.svelte';
   import { clampMove, clampTrimEnd, clampTrimStart } from './clipEdit';
-  import { formatVolume, maxVolume, silence, trackGains, type Mix } from './mixer';
+  import { formatVolume, maxVolume, silence, trackGains, type Levels } from './mixer';
   import { peaksPerSecond } from './peaks';
   import { timelineEnd, type Placed } from './schedule';
   import { formatDuration } from './time';
@@ -79,31 +79,33 @@
     }
   });
 
-  // Mixer changes are shown and heard right away, before they're saved, so
-  // a fader follows the hand. Once saved, the Timeline has them.
-  let mixing = $state<Record<number, Partial<Mix>>>({});
-  // Saves on their way per Track: its changes are shown until the last lands.
-  const mixSaves = new Map<number, number>();
-  const mixes = $derived<Mix[]>(timeline.tracks.map((t) => ({ ...t, ...mixing[t.id] })));
+  // Changes to a Track's levels are shown and heard right away, before
+  // they're saved, so a fader follows the hand. Once saved, the Timeline has
+  // them.
+  let adjusting = $state<Record<number, Partial<Levels>>>({});
+  const levels = $derived<Levels[]>(timeline.tracks.map((t) => ({ ...t, ...adjusting[t.id] })));
 
-  $effect(() => player.setGains(trackGains(mixes)));
+  $effect(() => player.setGains(trackGains(levels)));
 
-  /** Shows a mixer change right away, without saving it yet. */
-  function preview(track: Track, mix: Partial<Mix>) {
-    mixing[track.id] = { ...mixing[track.id], ...mix };
+  /** Shows a change to a Track's levels right away, without saving it yet. */
+  function preview(track: Track, change: Partial<Levels>) {
+    adjusting[track.id] = { ...adjusting[track.id], ...change };
   }
 
-  async function setMix(track: Track, mix: Partial<Pick<Mix, 'volume' | 'muted' | 'soloed'>>) {
-    preview(track, mix);
-    mixSaves.set(track.id, (mixSaves.get(track.id) ?? 0) + 1);
+  type LevelChanges = Omit<TrackChanges, 'name'>;
+
+  async function setLevels(track: Track, levelChanges: LevelChanges) {
+    preview(track, levelChanges);
     // If it fails, the Track goes back to how it's saved.
-    await change((at) => api.updateTrack(at, track.id, mix));
-    const left = mixSaves.get(track.id)! - 1;
-    if (left > 0) mixSaves.set(track.id, left);
-    else {
-      mixSaves.delete(track.id);
-      delete mixing[track.id];
+    await change((at) => api.updateTrack(at, track.id, levelChanges));
+    // Each value stops being shown over the Timeline's once saved, unless
+    // it's been changed again since, e.g. by a fader still being dragged.
+    const shown = adjusting[track.id];
+    if (!shown) return;
+    for (const key of Object.keys(levelChanges) as (keyof LevelChanges)[]) {
+      if (shown[key] === levelChanges[key]) delete shown[key];
     }
+    if (Object.keys(shown).length === 0) delete adjusting[track.id];
   }
 
   function volumeInput(track: Track, event: Event) {
@@ -111,7 +113,7 @@
   }
 
   function volumeChange(track: Track, event: Event) {
-    setMix(track, { volume: Number((event.currentTarget as HTMLInputElement).value) });
+    setLevels(track, { volume: Number((event.currentTarget as HTMLInputElement).value) });
   }
 
   async function rename(track: Track, event: Event) {
@@ -148,8 +150,9 @@
   }
 
   // A change to what plays is heard right away. The Timeline is replaced
-  // after every change to it, so compare what would play, not the objects.
-  const playKey = $derived(JSON.stringify(playable));
+  // after every change to it, so compare what would play, not the objects,
+  // and in an order reordering Tracks doesn't change.
+  const playKey = $derived(JSON.stringify([...playable].sort((a, b) => a.trackId - b.trackId || a.start - b.start)));
   $effect(() => {
     void playKey;
     untrack(() => {
@@ -481,7 +484,7 @@
         <div class="heads">
           <span class="ruler-gap"></span>
           {#each timeline.tracks as track, i (track.id)}
-            {@const mix = mixes[i]}
+            {@const trackLevels = levels[i]}
             <div class="head" role="group" aria-label="Track {track.name}">
               <div class="head-row">
                 {#if editable.current}
@@ -522,16 +525,16 @@
                 <button
                   type="button"
                   class="toggle mute"
-                  aria-pressed={mix.muted}
-                  onclick={() => setMix(track, { muted: !mix.muted })}
+                  aria-pressed={trackLevels.muted}
+                  onclick={() => setLevels(track, { muted: !trackLevels.muted })}
                   aria-label="Mute {track.name}"
                   title="Mute">M</button
                 >
                 <button
                   type="button"
                   class="toggle solo"
-                  aria-pressed={mix.soloed}
-                  onclick={() => setMix(track, { soloed: !mix.soloed })}
+                  aria-pressed={trackLevels.soloed}
+                  onclick={() => setLevels(track, { soloed: !trackLevels.soloed })}
                   aria-label="Solo {track.name}"
                   title="Solo">S</button
                 >
@@ -541,13 +544,13 @@
                   min={silence}
                   max={maxVolume}
                   step="0.5"
-                  value={mix.volume}
+                  value={trackLevels.volume}
                   aria-label="Volume of {track.name}"
-                  aria-valuetext={formatVolume(mix.volume)}
-                  title="{formatVolume(mix.volume)} (double-click for 0 dB)"
+                  aria-valuetext={formatVolume(trackLevels.volume)}
+                  title="{formatVolume(trackLevels.volume)} (double-click for 0 dB)"
                   oninput={(e) => volumeInput(track, e)}
                   onchange={(e) => volumeChange(track, e)}
-                  ondblclick={() => setMix(track, { volume: 0 })}
+                  ondblclick={() => setLevels(track, { volume: 0 })}
                 />
               </div>
             </div>

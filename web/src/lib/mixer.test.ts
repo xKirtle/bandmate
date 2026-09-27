@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { formatVolume, trackGains } from './mixer';
 
-const track = (id: number, mix: { volume?: number; muted?: boolean; soloed?: boolean } = {}) => ({
+const track = (id: number, levels: { volume?: number; muted?: boolean; soloed?: boolean } = {}) => ({
   id,
   volume: 0,
   muted: false,
   soloed: false,
-  ...mix,
+  ...levels,
 });
 
 describe('trackGains', () => {

@@ -1,8 +1,8 @@
 // How loud each Track plays, from its volume, mute and solo. Plain
 // arithmetic, so playback only has to apply it.
 
-/** A Track's mixer: its volume in dB, and whether it's muted or soloed. */
-export interface Mix {
+/** A Track's levels: its volume in dB, and whether it's muted or soloed. */
+export interface Levels {
   id: number;
   volume: number;
   muted: boolean;
@@ -18,7 +18,7 @@ export const maxVolume = 6;
  * Each Track's gain by id, as a factor of its audio. When some Tracks are
  * soloed, only those play; a muted Track never does, even soloed.
  */
-export function trackGains(tracks: readonly Mix[]): Map<number, number> {
+export function trackGains(tracks: readonly Levels[]): Map<number, number> {
   const soloing = tracks.some((t) => t.soloed);
   return new Map(
     tracks.map((t) => {

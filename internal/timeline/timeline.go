@@ -223,7 +223,7 @@ func beatTrack(ctx context.Context, tx *sql.Tx, songID int64) (int64, error) {
 	return res.LastInsertId()
 }
 
-// TrackChanges is a partial update to a Track's name and mixer values.
+// TrackChanges is a partial update to a Track's name and levels.
 // Fields not Set are unchanged.
 type TrackChanges struct {
 	Name   lyricsheet.Change[string]  `json:"name"`
@@ -270,7 +270,7 @@ func (s *Store) UpdateTrack(ctx context.Context, songID int64, based lyricsheet.
 	})
 }
 
-// errTrackNameRequired is refusing a Track without a name.
+// errTrackNameRequired refuses a Track without a name.
 var errTrackNameRequired = &lyricsheet.InvalidError{Msg: "a Track's name is required"}
 
 // findTrack checks that a Track is on the Song's Timeline.
@@ -323,9 +323,11 @@ func (s *Store) ReorderTracks(ctx context.Context, songID int64, based lyricshee
 		err := query(ctx, tx, `SELECT id FROM tracks WHERE song_id = ?`, []any{songID},
 			func(rows *sql.Rows) error {
 				var id int64
-				err := rows.Scan(&id)
+				if err := rows.Scan(&id); err != nil {
+					return err
+				}
 				current[id] = true
-				return err
+				return nil
 			})
 		if err != nil {
 			return fmt.Errorf("reading tracks: %w", err)
