@@ -1,39 +1,41 @@
 <script lang="ts">
-  import { api, type Master } from './api';
   import { playMediaAlone } from './playback';
+  import { canSetVolume, playerVolume } from './playerVolume.svelte';
   import { formatDuration } from './time';
+  import { gain, loudness } from './volume';
   import { bars } from './waveform';
 
-  // A Master's player: its waveform, which seeks when clicked, and
-  // play/pause. The audio streams through an <audio> element, fetching only
-  // the parts played.
-  let { songId, master }: { songId: number; master: Master } = $props();
+  // A player for a Master or a Beat preview: its waveform, which seeks when
+  // clicked, play/pause and the volume every such player shares. The audio
+  // streams through an <audio> element, fetching only the parts played.
+  let {
+    src,
+    duration,
+    peaks,
+  }: {
+    src: string;
+    /** In seconds. */
+    duration: number;
+    /** The waveform; flat while empty, and the audio still plays. */
+    peaks: number[];
+  } = $props();
 
   const barCount = 160;
 
   let audio = $state<HTMLAudioElement>();
   let playing = $state(false);
   let time = $state(0);
-  let peaks = $state<number[]>([]);
 
-  // The Song is replaced after every change to it; only another Master
-  // needs its peaks fetched again.
-  const masterId = $derived(master.id);
+  const volume = $derived(playerVolume.value);
+  const slider = canSetVolume();
+
   $effect(() => {
-    const id = masterId;
-    let current = true;
-    api.getMaster(songId, id).then(
-      (m) => current && (peaks = m.peaks ?? []),
-      // Without peaks the waveform stays flat; the audio still plays.
-      () => {},
-    );
-    return () => {
-      current = false;
-    };
+    if (!audio) return;
+    audio.muted = volume.muted;
+    if (slider) audio.volume = gain(volume.level);
   });
 
   const shape = $derived(bars(peaks, barCount));
-  const duration = $derived(master.duration);
   const played = $derived(duration > 0 ? Math.min(1, time / duration) : 0);
 
   // timeupdate fires only a few times a second: follow the audio every frame
@@ -97,7 +99,7 @@
 <div class="player">
   <audio
     bind:this={audio}
-    src={api.masterAudioUrl(songId, master.id)}
+    {src}
     preload="none"
     onplay={(e) => {
       playMediaAlone(e);
@@ -146,6 +148,40 @@
   </div>
 
   <span class="time muted">{formatDuration(time)} / {formatDuration(duration)}</span>
+
+  <div class="volume">
+    <button
+      type="button"
+      class="speaker"
+      onclick={playerVolume.toggleMute}
+      aria-label={volume.muted ? 'Unmute' : 'Mute'}
+      aria-pressed={volume.muted}
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path class="cone" d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z" />
+        {#if loudness(volume) === 'muted'}
+          <path d="M15.5 9.5l5 5M20.5 9.5l-5 5" />
+        {:else}
+          <path d="M15 9a4 4 0 0 1 0 6" />
+          {#if loudness(volume) === 'high'}
+            <path d="M17.5 6.5a7.5 7.5 0 0 1 0 11" />
+          {/if}
+        {/if}
+      </svg>
+    </button>
+    {#if slider}
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.01"
+        value={volume.muted ? 0 : volume.level}
+        oninput={(e) => playerVolume.setLevel(e.currentTarget.valueAsNumber)}
+        aria-label="Volume"
+        aria-valuetext={volume.muted ? 'Muted' : `${Math.round(volume.level * 100)}%`}
+      />
+    {/if}
+  </div>
 </div>
 
 <style>
@@ -201,5 +237,55 @@
     flex-shrink: 0;
     font-size: 0.8125rem;
     font-variant-numeric: tabular-nums;
+  }
+  .volume {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  .speaker {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .speaker:hover {
+    color: var(--text);
+  }
+  .speaker:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .speaker svg {
+    width: 1.25rem;
+    height: 1.25rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .speaker .cone {
+    fill: currentColor;
+  }
+  input[type='range'] {
+    display: none;
+    width: 5rem;
+    min-height: 0;
+    padding: 0;
+    accent-color: var(--accent);
+  }
+  /* On narrow screens only mute shows, keeping the waveform wide. */
+  @media (min-width: 36rem) {
+    input[type='range'] {
+      display: block;
+    }
   }
 </style>

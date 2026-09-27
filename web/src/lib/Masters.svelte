@@ -1,6 +1,6 @@
 <script lang="ts">
   import { api, type Master, type Song, type SongAt, type Status } from './api';
-  import MasterPlayer from './MasterPlayer.svelte';
+  import AudioPlayer from './AudioPlayer.svelte';
   import { prepareUpload } from './upload';
 
   // A Song's Masters: finished recordings made elsewhere. The page is made
@@ -30,6 +30,23 @@
     // The server still enforces its limit.
     () => {},
   );
+
+  // Each Master's waveform, fetched once: the Song is replaced after every
+  // change to it but a Master's file never changes.
+  let peaks = $state<Record<number, number[]>>({});
+  const fetched = new Set<number>();
+  $effect(() => {
+    const songId = song.id;
+    for (const { id } of song.masters) {
+      if (fetched.has(id)) continue;
+      fetched.add(id);
+      api.getMaster(songId, id).then(
+        (m) => (peaks[id] = m.peaks ?? []),
+        // Without peaks the waveform stays flat; the audio still plays.
+        () => {},
+      );
+    }
+  });
 
   const several = $derived(song.masters.length > 1);
   // Identifies each Master's name and notes being typed to onUnsaved.
@@ -143,7 +160,7 @@
         </div>
       {/if}
 
-      <MasterPlayer songId={song.id} master={m} />
+      <AudioPlayer src={api.masterAudioUrl(song.id, m.id)} duration={m.duration} peaks={peaks[m.id] ?? []} />
 
       <label class="notes">
         Notes

@@ -82,6 +82,9 @@ _Avoid_: Instrumental, backing track, sample
 The user's collection of uploaded Beats, shared across all Songs.
 _Avoid_: Beat store, uploads
 
+**Beat preview**:
+Listening to a Beat from the Beat Library, outside any Song's Timeline.
+
 **Take**:
 One recording made in the app, keeping a frozen copy of the lyrics that were active when it was recorded.
 _Avoid_: Recording, attempt

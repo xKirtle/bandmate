@@ -1,9 +1,9 @@
 <script lang="ts">
   import { api, type Beat } from './api';
+  import AudioPlayer from './AudioPlayer.svelte';
   import BeatFields from './BeatFields.svelte';
   import { changedDetails, fromDraft, offeredChanges, toDraft, type BeatDraft } from './beatDraft';
   import { suggestForFile } from './beatTags';
-  import { playMediaAlone } from './playback';
   import { formatDuration } from './time';
   import { prepareUpload } from './upload';
 
@@ -29,6 +29,43 @@
   let offer = $state<{ fileName: string; changes: Partial<BeatDraft> } | null>(null);
 
   const inUse = $derived(beat.songs.length > 0);
+  // Changes when the Beat's file is replaced, not when its details are edited.
+  const src = $derived(api.beatAudioUrl(beat));
+  const beatId = $derived(beat.id);
+
+  // The list leaves out peaks: fetch the waveform once the Beat scrolls into
+  // view, and again for a replaced file.
+  let article = $state<HTMLElement>();
+  let seen = $state(false);
+  let peaks = $state<number[]>([]);
+
+  $effect(() => {
+    if (!article || seen) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) seen = true;
+      },
+      { rootMargin: '200px' },
+    );
+    observer.observe(article);
+    return () => observer.disconnect();
+  });
+
+  $effect(() => {
+    if (!seen) return;
+    const id = beatId;
+    void src;
+    let current = true;
+    peaks = [];
+    api.getBeat(id).then(
+      (b) => current && (peaks = b.peaks ?? []),
+      // Without peaks the waveform stays flat; the audio still plays.
+      () => {},
+    );
+    return () => {
+      current = false;
+    };
+  });
   const facts = $derived(
     [beat.bpm ? `${beat.bpm} BPM` : '', beat.key, formatDuration(beat.duration)].filter(Boolean).join(' · '),
   );
@@ -115,7 +152,7 @@
   }
 </script>
 
-<article class="beat" aria-labelledby="beat-{beat.id}-title">
+<article bind:this={article} class="beat" aria-labelledby="beat-{beat.id}-title">
   <div class="head">
     <div class="credit">
       <h2 id="beat-{beat.id}-title">{beat.title}</h2>
@@ -137,7 +174,7 @@
     {/if}
   </div>
 
-  <audio controls preload="none" src={api.beatAudioUrl(beat)} onplay={playMediaAlone}></audio>
+  <AudioPlayer {src} duration={beat.duration} {peaks} />
 
   {#if inUse}
     <p class="songs muted">Used in {beat.songs.map((s) => s.title).join(', ')}</p>
@@ -219,9 +256,6 @@
   }
   .notes {
     white-space: pre-wrap;
-  }
-  audio {
-    width: 100%;
   }
   form {
     display: flex;
