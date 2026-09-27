@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { currentPosition, formatCue, nudgeCue, parseCue } from './cues';
+import { currentPosition, formatCue, nextLine, nudgeCue, parseCue } from './cues';
 
 describe('parseCue', () => {
   it('reads plain seconds', () => {
@@ -200,5 +200,177 @@ describe('nudgeCue', () => {
   it('stops at the start of the Timeline', () => {
     expect(nudgeCue(0.05, -1)).toBe(0);
     expect(nudgeCue(0, -1)).toBe(0);
+  });
+});
+
+describe('nextLine', () => {
+  // Sections by id, each with its active Alternate's Lines, ids given; a
+  // Line starting with "[" holds only Chords. Occurrences in order, by
+  // Section id, numbered from 1.
+  function sheet(sections: Record<number, [number, string][]>, order: number[]) {
+    return {
+      arrangement: order.map((sectionId, i) => ({ id: i + 1, sectionId, cue: null, lineCues: {} })),
+      sections: Object.entries(sections).map(([id, lines]) => ({
+        id: Number(id),
+        alternates: [
+          { active: false, lines: [{ id: 999, text: 'Dormant', chordLine: false }] },
+          { active: true, lines: lines.map(([id, text]) => ({ id, text, chordLine: text.startsWith('[') })) },
+        ],
+      })),
+    };
+  }
+
+  const song = sheet(
+    {
+      1: [
+        [10, 'One'],
+        [11, 'Two'],
+      ],
+      2: [
+        [20, 'Hook'],
+        [21, 'Line'],
+      ],
+    },
+    [1, 2],
+  );
+
+  it('is the first Line of the Arrangement before anything is highlighted', () => {
+    expect(nextLine(song, { current: null, showChords: true })).toEqual({ occurrence: 1, line: 10 });
+  });
+
+  it('is the Line after the highlighted one', () => {
+    expect(nextLine(song, { current: { occurrence: 1, line: 10 }, showChords: true })).toEqual({
+      occurrence: 1,
+      line: 11,
+    });
+  });
+
+  it('goes on into the next Occurrence after its last Line', () => {
+    expect(nextLine(song, { current: { occurrence: 1, line: 11 }, showChords: true })).toEqual({
+      occurrence: 2,
+      line: 20,
+    });
+  });
+
+  it('is nothing after the last Line of the Arrangement', () => {
+    expect(nextLine(song, { current: { occurrence: 2, line: 21 }, showChords: true })).toBeNull();
+  });
+
+  it('skips blank Lines', () => {
+    const spaced = sheet(
+      {
+        1: [
+          [10, '  '],
+          [11, 'One'],
+          [12, ''],
+          [13, 'Two'],
+        ],
+      },
+      [1],
+    );
+    expect(nextLine(spaced, { current: null, showChords: true })).toEqual({ occurrence: 1, line: 11 });
+    expect(nextLine(spaced, { current: { occurrence: 1, line: 11 }, showChords: true })).toEqual({
+      occurrence: 1,
+      line: 13,
+    });
+  });
+
+  describe('with a Chord Line', () => {
+    const intro = sheet(
+      {
+        1: [
+          [10, '[Am] [G]'],
+          [11, 'One'],
+          [12, '[F]'],
+          [13, 'Two'],
+        ],
+      },
+      [1],
+    );
+
+    it('steps onto it while Chords are shown', () => {
+      expect(nextLine(intro, { current: null, showChords: true })).toEqual({ occurrence: 1, line: 10 });
+      expect(nextLine(intro, { current: { occurrence: 1, line: 11 }, showChords: true })).toEqual({
+        occurrence: 1,
+        line: 12,
+      });
+    });
+
+    it('skips it while Chords are hidden', () => {
+      expect(nextLine(intro, { current: null, showChords: false })).toEqual({ occurrence: 1, line: 11 });
+      expect(nextLine(intro, { current: { occurrence: 1, line: 11 }, showChords: false })).toEqual({
+        occurrence: 1,
+        line: 13,
+      });
+    });
+
+    it('goes on from where a hidden one is highlighted', () => {
+      expect(nextLine(intro, { current: { occurrence: 1, line: 12 }, showChords: false })).toEqual({
+        occurrence: 1,
+        line: 13,
+      });
+    });
+  });
+
+  it('is the first Line of a Section highlighted as a whole', () => {
+    expect(nextLine(song, { current: { occurrence: 2, line: null }, showChords: true })).toEqual({
+      occurrence: 2,
+      line: 20,
+    });
+  });
+
+  it('goes on to the next Section from a highlighted one without Lines', () => {
+    const withBreak = sheet(
+      {
+        1: [[10, 'One']],
+        2: [],
+        3: [
+          [30, 'Hook'],
+          [31, 'Line'],
+        ],
+      },
+      [1, 2, 3],
+    );
+    expect(nextLine(withBreak, { current: { occurrence: 2, line: null }, showChords: true })).toEqual({
+      occurrence: 3,
+      line: 30,
+    });
+  });
+
+  it('is a clicked Line, whatever is highlighted', () => {
+    const picked = { occurrence: 1, line: 11 };
+    expect(nextLine(song, { current: null, picked, showChords: true })).toEqual(picked);
+    expect(nextLine(song, { current: { occurrence: 2, line: 21 }, picked, showChords: true })).toEqual(picked);
+    expect(nextLine(song, { current: picked, picked, showChords: true })).toEqual(picked);
+  });
+
+  it('steps through each Occurrence of a shared Section separately', () => {
+    // Chorus, Verse, Chorus: the same Chorus twice.
+    const shared = sheet(
+      {
+        1: [
+          [10, 'Hook'],
+          [11, 'Line'],
+        ],
+        2: [[20, 'Verse']],
+      },
+      [1, 2, 1],
+    );
+    expect(nextLine(shared, { current: { occurrence: 1, line: 11 }, showChords: true })).toEqual({
+      occurrence: 2,
+      line: 20,
+    });
+    expect(nextLine(shared, { current: { occurrence: 2, line: 20 }, showChords: true })).toEqual({
+      occurrence: 3,
+      line: 10,
+    });
+    expect(nextLine(shared, { current: { occurrence: 3, line: 10 }, showChords: true })).toEqual({
+      occurrence: 3,
+      line: 11,
+    });
+    expect(nextLine(shared, { current: null, picked: { occurrence: 3, line: 11 }, showChords: true })).toEqual({
+      occurrence: 3,
+      line: 11,
+    });
   });
 });

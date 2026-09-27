@@ -3,7 +3,7 @@
   import { MediaQuery } from 'svelte/reactivity';
   import { api, suggestedLabels, type Line, type Occurrence, type Song, type SongAt } from './api';
   import { hasChords } from './chords';
-  import { currentPosition } from './cues';
+  import { currentPosition, nextLine, type Position, type TappedLine } from './cues';
   import LyricSheetView from './LyricSheetView.svelte';
   import SectionEditor from './SectionEditor.svelte';
   import { describe } from './sections';
@@ -15,6 +15,7 @@
     playhead = null,
     hasClips = false,
     seek,
+    tapping = false,
   }: {
     song: Song;
     /** Sends a Lyric Sheet change; resolves to whether it succeeded. */
@@ -26,6 +27,8 @@
     hasClips?: boolean;
     /** Seeks the Timeline, e.g. to a cued Line. */
     seek?: (to: number) => void;
+    /** Whether Tap mode is on, so tap can be called, and clicking a Line in Read mode picks it to tap next. */
+    tapping?: boolean;
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
@@ -53,6 +56,30 @@
     change((at) =>
       cue === null ? api.clearLineCue(at, occurrence.id, line.id) : api.setLineCue(at, occurrence.id, line.id, cue),
     );
+  }
+
+  // The Line picked by clicking it in Tap mode, to tap next.
+  let picked = $state<TappedLine | null>(null);
+  // The last tap, and what was current where it was made. Until something
+  // else is current, e.g. while the Cue it set is still being saved, the
+  // next tap goes on from the Line it cued.
+  let lastTap: { line: TappedLine; current: string } | null = null;
+  $effect(() => {
+    if (tapping) return;
+    picked = null;
+    lastTap = null;
+  });
+
+  /** Cues the next Line in Tap mode at a time, in seconds. */
+  export function tap(time: number) {
+    const here = currentPosition(song, time);
+    const current: Position | null = lastTap?.current === JSON.stringify(here) ? lastTap.line : here;
+    // Taps go down the Lines on screen: in Write mode, all of them.
+    const line = nextLine(song, { current, picked, showChords: mode === 'write' || (showChords && songHasChords) });
+    if (!line) return;
+    picked = null;
+    lastTap = { line, current: JSON.stringify(here) };
+    change((at) => api.setLineCue(at, line.occurrence, line.line, time));
   }
 
   // The Occurrence just added, whose Label gets focus.
@@ -145,6 +172,8 @@
       setCue={canCue && showCues ? setCue : undefined}
       setLineCue={canCue && showCues ? setLineCue : undefined}
       {seek}
+      {picked}
+      pick={tapping ? (line) => (picked = line) : undefined}
     />
   {:else}
     <ol class="arrangement">
