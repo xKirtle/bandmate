@@ -351,10 +351,25 @@ func (s *Store) ServeFile(w http.ResponseWriter, r *http.Request, id int64) erro
 	return s.files.Serve(w, r, id, contentType)
 }
 
-// songsUsing lists the Songs with a Clip of the Beat. Until the Timeline
-// exists, no Song uses a Beat.
+// songsUsing lists the Songs with a Clip of the Beat on their Timeline, in
+// the order they were created.
 func (s *Store) songsUsing(ctx context.Context, id int64) ([]SongTitle, error) {
-	return []SongTitle{}, nil
+	rows, err := s.db.QueryContext(ctx, `SELECT id, title FROM songs WHERE id IN (
+			SELECT t.song_id FROM clips c JOIN tracks t ON t.id = c.track_id WHERE c.beat_id = ?)
+		ORDER BY id`, id)
+	if err != nil {
+		return nil, fmt.Errorf("listing songs using beat %d: %w", id, err)
+	}
+	defer rows.Close()
+	songs := []SongTitle{}
+	for rows.Next() {
+		var song SongTitle
+		if err := rows.Scan(&song.ID, &song.Title); err != nil {
+			return nil, err
+		}
+		songs = append(songs, song)
+	}
+	return songs, rows.Err()
 }
 
 func inUse(b Beat, change string) error {

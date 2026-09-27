@@ -15,6 +15,7 @@ import (
 	"github.com/xKirtle/bandmate/internal/beats"
 	"github.com/xKirtle/bandmate/internal/db"
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
+	"github.com/xKirtle/bandmate/internal/timeline"
 )
 
 // Config is everything needed to build the app.
@@ -36,6 +37,9 @@ type App struct {
 	db    *sql.DB
 	songs *lyricsheet.Store
 	beats *beats.Store
+	// timelines owns Songs' Timelines, which are kept apart from the Song
+	// aggregate: most changes to a Song don't need them sent back.
+	timelines *timeline.Store
 	// beatFiles and masterFiles are where uploads are received, next to
 	// the files they will be kept with.
 	beatFiles   *audio.Files
@@ -66,6 +70,7 @@ func New(cfg Config) (*App, error) {
 		db:          conn,
 		songs:       lyricsheet.NewStore(conn, masterFiles),
 		beats:       beats.NewStore(conn, beatFiles),
+		timelines:   timeline.NewStore(conn),
 		beatFiles:   beatFiles,
 		masterFiles: masterFiles,
 		maxUpload:   cfg.MaxUploadBytes,
@@ -112,6 +117,9 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("DELETE /api/songs/{id}/masters/{masterID}", a.deleteMaster)
 	mux.HandleFunc("POST /api/songs/{id}/masters/{masterID}/main", a.makeMainMaster)
 	mux.HandleFunc("GET /api/songs/{id}/masters/{masterID}/audio", a.masterAudio)
+	mux.HandleFunc("GET /api/songs/{id}/timeline", a.getTimeline)
+	mux.HandleFunc("POST /api/songs/{id}/timeline/beats", a.addBeatToTimeline)
+	mux.HandleFunc("PATCH /api/songs/{id}/timeline/tracks/{trackID}", a.renameTrack)
 	mux.HandleFunc("GET /api/config", a.config)
 	mux.HandleFunc("GET /api/beats", a.listBeats)
 	mux.HandleFunc("POST /api/beats", a.addBeat)

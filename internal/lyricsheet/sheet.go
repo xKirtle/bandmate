@@ -184,19 +184,27 @@ func (s *Store) changeTx(ctx context.Context, songID int64, based Version, fn fu
 		return err
 	}
 	defer tx.Rollback()
-	res, err := tx.ExecContext(ctx,
-		`UPDATE songs SET updated_at = ?, version = version + 1 WHERE id = ? AND (?3 = 0 OR version = ?3)`,
-		time.Now().UTC().Format(timeFormat), songID, based)
-	if err != nil {
-		return fmt.Errorf("touching song: %w", err)
-	}
-	if err := expectCurrent(ctx, tx, res, songID); err != nil {
+	if err := Touch(ctx, tx, songID, based); err != nil {
 		return err
 	}
 	if err := fn(tx); err != nil {
 		return err
 	}
 	return tx.Commit()
+}
+
+// Touch marks a Song as edited within tx, giving it a new version, for a
+// change to part of the Song kept elsewhere (e.g. its Timeline). It fails
+// with ErrStale if the Song is no longer at the version the change was based
+// on, and ErrNotFound if there is no such Song.
+func Touch(ctx context.Context, tx *sql.Tx, songID int64, based Version) error {
+	res, err := tx.ExecContext(ctx,
+		`UPDATE songs SET updated_at = ?, version = version + 1 WHERE id = ? AND (?3 = 0 OR version = ?3)`,
+		time.Now().UTC().Format(timeFormat), songID, based)
+	if err != nil {
+		return fmt.Errorf("touching song: %w", err)
+	}
+	return expectCurrent(ctx, tx, res, songID)
 }
 
 // AddSection creates a Section with the given Label, its first (active)

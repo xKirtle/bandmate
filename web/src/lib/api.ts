@@ -169,6 +169,41 @@ export interface Beat extends BeatDetails {
   updatedAt: string;
 }
 
+/** A Song's audio space, in seconds. Every Timeline change returns it. */
+export interface Timeline {
+  songId: number;
+  /** The Song's, which every Timeline change moves on. */
+  version: number;
+  updatedAt: string;
+  /** Top to bottom. */
+  tracks: Track[];
+  /** The Beats the Clips play, each once, without their peaks. */
+  beats: ClipBeat[];
+}
+
+/** A named lane on the Timeline. */
+export interface Track {
+  id: number;
+  name: string;
+  /** In the order they start; they never overlap. */
+  clips: Clip[];
+}
+
+/** A stretch of a Beat placed on a Track, in seconds. */
+export interface Clip {
+  id: number;
+  beatId: number;
+  /** Where the Clip starts on the Timeline. */
+  start: number;
+  /** Where in the Beat it starts playing. */
+  offset: number;
+  /** How long it plays. */
+  length: number;
+}
+
+/** What playing a Clip needs to know about its Beat. */
+export type ClipBeat = Pick<Beat, 'id' | 'title' | 'bpm' | 'fileName' | 'size' | 'duration'>;
+
 /** What the browser worked out by decoding an audio file, sent with it. */
 export interface DecodedAudio {
   /** In seconds. */
@@ -318,6 +353,13 @@ export const api = {
   /** Downloads a Master's original file under its uploaded name. */
   masterDownloadUrl: (songId: number, masterId: number) =>
     `/api/songs/${songId}/masters/${masterId}/audio?download`,
+  getTimeline: (songId: number) => request<Timeline>('GET', `/songs/${songId}/timeline`),
+  /**
+   * Places a whole Beat on the Song's beat Track (the topmost Track holding a
+   * Beat, or a new one named "Beat"), after its last Clip or at 0:00.
+   */
+  addBeatToTimeline: (at: SongAt, beatId: number) =>
+    request<Timeline>('POST', `/songs/${at.id}/timeline/beats`, { beatId }, at),
   /** Puts the Arrangement in this order of Occurrence ids. */
   reorderArrangement: (at: SongAt, occurrences: number[]) =>
     request<Song>('PUT', `/songs/${at.id}/arrangement`, { occurrences }, at),

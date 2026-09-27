@@ -1,9 +1,20 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { api, ApiError, commonKeys, statuses, type Song, type SongAt, type SongChanges, type Status } from '../lib/api';
+  import {
+    api,
+    ApiError,
+    commonKeys,
+    statuses,
+    type Song,
+    type SongAt,
+    type SongChanges,
+    type Status,
+    type Timeline as TimelineData,
+  } from '../lib/api';
   import LyricSheet from '../lib/LyricSheet.svelte';
   import Masters from '../lib/Masters.svelte';
   import Scrapbook from '../lib/Scrapbook.svelte';
+  import Timeline from '../lib/Timeline.svelte';
   import { navigate } from '../lib/router.svelte';
   import { timeAgo } from '../lib/time';
 
@@ -21,6 +32,7 @@
   }
 
   let song = $state<Song | null>(null);
+  let timeline = $state<TimelineData | null>(null);
   let draft = $state<Draft>(toDraft(null));
   let loadError = $state<string | null>(null);
   let saveError = $state<string | null>(null);
@@ -33,9 +45,10 @@
   const commonTunings = ['Standard', 'Drop D', 'Half step down', 'DADGAD', 'Open G', 'Open D'];
 
   $effect(() => {
-    api.getSong(id).then(
-      (s) => {
+    Promise.all([api.getSong(id), api.getTimeline(id)]).then(
+      ([s, tl]) => {
         song = s;
+        timeline = tl;
         draft = toDraft(s);
       },
       (e: Error) => (loadError = e.message),
@@ -62,12 +75,25 @@
    * the Song as shown when its turn comes. Resolves to whether it succeeded.
    */
   function send(op: (at: SongAt) => Promise<Song>): Promise<boolean> {
+    return enqueue(op, (s) => (song = s));
+  }
+
+  /** Queues a Timeline change like send, and shows the Timeline it returns. */
+  function changeTimeline(op: (at: SongAt) => Promise<TimelineData>): Promise<boolean> {
+    return enqueue(op, (tl) => {
+      timeline = tl;
+      // The change moved the Song on too.
+      song = { ...song!, version: tl.version, updatedAt: tl.updatedAt };
+    });
+  }
+
+  function enqueue<T>(op: (at: SongAt) => Promise<T>, show: (result: T) => void): Promise<boolean> {
     // Once the Song is being deleted, a late save would only fail.
     if (deleting) return Promise.resolve(false);
     pending++;
     const done = queue.then(async () => {
       try {
-        song = await op(song!);
+        show(await op(song!));
         saveError = null;
         return true;
       } catch (e) {
@@ -115,11 +141,13 @@
           stale = true;
           return;
         }
+        const latestTimeline = await api.getTimeline(id);
         // A focused field would keep showing the old Song, and typing into
         // it would then overwrite the change made elsewhere. Nothing is
         // unsaved, so leaving it saves nothing.
         if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
         song = latest;
+        timeline = latestTimeline;
         draft = toDraft(latest);
         stale = false;
       } catch {
@@ -148,6 +176,12 @@
   /** Shows what the server has for one field again. */
   function revert<F extends keyof Draft>(field: F) {
     draft[field] = toDraft(song)[field];
+  }
+
+  /** Sets the BPM, e.g. copied from a Beat when asked to. */
+  function setBpm(bpm: number) {
+    draft.bpm = String(bpm);
+    save({ bpm }, ['bpm']);
   }
 
   function setStatus(status: Status) {
@@ -366,6 +400,10 @@
     </datalist>
   {/if}
 </main>
+
+{#if song && timeline}
+  <Timeline {song} {timeline} change={changeTimeline} {setBpm} />
+{/if}
 
 <style>
   .title {

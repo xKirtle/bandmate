@@ -2,7 +2,7 @@
   import { api, type Beat } from './api';
   import BeatFields from './BeatFields.svelte';
   import { changedDetails, fromDraft, toDraft } from './beatDraft';
-  import { playAlone } from './playback';
+  import { playMediaAlone } from './playback';
   import { formatDuration } from './time';
   import { prepareUpload } from './upload';
 
@@ -109,7 +109,7 @@
     {/if}
   </div>
 
-  <audio controls preload="none" src={api.beatAudioUrl(beat)} onplay={playAlone}></audio>
+  <audio controls preload="none" src={api.beatAudioUrl(beat)} onplay={playMediaAlone}></audio>
 
   {#if inUse}
     <p class="songs muted">Used in {beat.songs.map((s) => s.title).join(', ')}</p>
