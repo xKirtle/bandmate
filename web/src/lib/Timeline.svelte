@@ -20,6 +20,7 @@
   import { formatVolume, maxVolume, silence, trackGains, type Levels } from './mixer';
   import { peaksPerSecond } from './peaks';
   import { keptInLoop, outsideLoop, repeats, timelineEnd, type Loop, type Placed } from './schedule';
+  import { inTextField } from './textField';
   import { formatDuration } from './time';
   import { clampHeight, defaultHeight, deviceStorage, heightBounds, readHeight, storeHeight } from './timelineHeight';
   import { TimelinePlayer, type PlayableClip, type PlayerState } from './timelinePlayer';
@@ -49,6 +50,7 @@
     timeline,
     change,
     setBpm,
+    onPlayhead,
   }: {
     song: Song;
     timeline: Timeline;
@@ -56,6 +58,8 @@
     change: (op: (at: SongAt) => Promise<Timeline>) => Promise<boolean>;
     /** Sets the Song's BPM. */
     setBpm: (bpm: number) => void;
+    /** Hears where playback is, in seconds, every frame while playing, then null once it stops. */
+    onPlayhead?: (at: number | null) => void;
   } = $props();
 
   let playerState = $state<PlayerState>('stopped');
@@ -197,13 +201,6 @@
     return { ...timeline, version: at.version, updatedAt: song.updatedAt };
   }
 
-  /** Whether typing there is text, which has the browser's own undo. */
-  function inTextField(target: EventTarget | null): boolean {
-    if (!(target instanceof HTMLElement)) return false;
-    if (target.isContentEditable || target instanceof HTMLTextAreaElement) return true;
-    const notText = ['range', 'checkbox', 'radio', 'button', 'submit', 'reset', 'color', 'file'];
-    return target instanceof HTMLInputElement && !notText.includes(target.type);
-  }
 
   function undoKeys(event: KeyboardEvent) {
     if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== 'z') return;
@@ -308,9 +305,13 @@
   // Follow the playhead every frame while playing, and stop at the end,
   // unless going round the Loop.
   $effect(() => {
+    // Only stopping lets go of the playhead: starting over from elsewhere
+    // (e.g. after an edit) loads for a moment, and keeps it.
+    if (playerState === 'stopped') untrack(() => onPlayhead?.(null));
     if (playerState !== 'playing') return;
     let frame = requestAnimationFrame(function step() {
       if (!dragging) position = player.position();
+      onPlayhead?.(position);
       if (position >= length && !player.repeating) {
         player.stop();
         player.seek(length);

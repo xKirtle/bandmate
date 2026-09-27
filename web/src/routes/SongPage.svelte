@@ -33,6 +33,8 @@
 
   let song = $state<Song | null>(null);
   let timeline = $state<TimelineData | null>(null);
+  // Where the Timeline is playing, in seconds; null while it isn't.
+  let playhead = $state<number | null>(null);
   let draft = $state<Draft>(toDraft(null));
   let loadError = $state<string | null>(null);
   let saveError = $state<string | null>(null);
@@ -325,7 +327,13 @@
       </div>
 
       <div class="sheet">
-        <LyricSheet {song} change={send} onUnsaved={setUnsaved} />
+        <LyricSheet
+          {song}
+          change={send}
+          onUnsaved={setUnsaved}
+          {playhead}
+          hasClips={timeline?.tracks.some((t) => t.clips.length > 0) ?? false}
+        />
       </div>
 
       <aside class="side">
@@ -402,7 +410,7 @@
 </main>
 
 {#if song && timeline}
-  <Timeline {song} {timeline} change={changeTimeline} {setBpm} />
+  <Timeline {song} {timeline} change={changeTimeline} {setBpm} onPlayhead={(at) => (playhead = at)} />
 {/if}
 
 <style>
