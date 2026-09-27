@@ -3,7 +3,8 @@
   import { layoutLine } from './chords';
   import CueField from './CueField.svelte';
   import { isBlank, type Position, type TapLine } from './cues';
-  import { inTextField } from './textField';
+  import { follower, key } from './follow';
+  import { gutterFields } from './gutter';
 
   let {
     song,
@@ -32,7 +33,7 @@
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
-  const shown = new Map<string, HTMLElement>();
+  const { track, follow } = follower();
 
   // The Lines shown for an Occurrence: its active Alternate's, less Chord
   // Lines while Chords are hidden.
@@ -42,20 +43,14 @@
   }
 
   // The gutter's fields in order down the page, so Enter can go on to the next.
-  const gutter = $derived(
+  const fieldOrder = $derived(
     song.arrangement.flatMap((o) =>
       linesOf(o)
         .lines.filter((l) => !isBlank(l))
         .map((l) => key(o.id, l.id)),
     ),
   );
-  const fields: Record<string, { edit: () => void } | null> = {};
-
-  function editAfter(k: string): boolean {
-    const next = fields[gutter[gutter.indexOf(k) + 1]];
-    next?.edit();
-    return !!next;
-  }
+  const fields = gutterFields();
 
   /** The current Line if it's shown, or null for its whole Section, e.g. a Chord Line while Chords are hidden. */
   function shownLine(position: Position): number | null {
@@ -64,26 +59,13 @@
     return o && linesOf(o).lines.some((l) => l.id === position.line) ? position.line : null;
   }
 
-  function key(occurrence: number, line: number | null = null): string {
-    return line === null ? `${occurrence}` : `${occurrence}:${line}`;
-  }
-
   // Follow playback, unless that would pull the page away from something
   // being typed. Keyed, so it only scrolls once playback moves on, not on
   // every frame.
   const currentKey = $derived(current && key(current.occurrence, shownLine(current)));
   $effect(() => {
-    if (currentKey === null) return;
-    if (inTextField(document.activeElement)) return;
-    const block = currentKey.includes(':') ? 'center' : 'start';
-    shown.get(currentKey)?.scrollIntoView({ block, behavior: 'smooth' });
+    follow(currentKey);
   });
-
-  /** Keeps track of each Occurrence's and Line's element, to scroll to. */
-  function track(el: HTMLElement, k: string) {
-    shown.set(k, el);
-    return () => shown.delete(k);
-  }
 
   /** What clicking a Line does: pick it in Tap mode, or else seek to its Cue. Null for nothing. */
   function clickLine(occurrence: Occurrence, line: Line, cue: number | null): (() => void) | null {
@@ -171,12 +153,12 @@
             </div>
             {#if setLineCue && !isBlank(line)}
               <CueField
-                bind:this={fields[k]}
+                bind:this={() => undefined, (field) => fields.set(k, field)}
                 gutter
                 {cue}
                 label="Line {n + 1}{section.label ? ` of ${section.label}` : ''}"
                 save={(cue) => setLineCue(occurrence, line, cue)}
-                next={() => editAfter(k)}
+                next={() => fields.editAfter(fieldOrder, k)}
               />
             {/if}
           </div>

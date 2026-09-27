@@ -135,6 +135,28 @@ export function nextLine(
   return next ? { occurrence: next.occurrence, line: next.line } : null;
 }
 
+/**
+ * Which saved Line each row of a text box's text is (a row being a line of
+ * text as typed, not yet a Line), while typing that isn't
+ * saved yet may have moved them: rows the same as the saved Lines at the
+ * start and end keep them, and the rows between are matched by place, so a
+ * Line typed or deleted mid-Section leaves the Lines after it where they
+ * are. Null for a row with no Line yet. The save matches them for real.
+ */
+export function linesByRow<L extends { text: string }>(text: string, lines: readonly L[]): (L | null)[] {
+  const rows = text.split('\n');
+  const overlap = Math.min(rows.length, lines.length);
+  let start = 0;
+  while (start < overlap && rows[start] === lines[start].text) start++;
+  let end = 0;
+  while (end < overlap - start && rows[rows.length - 1 - end] === lines[lines.length - 1 - end].text) end++;
+  return rows.map((_, i) => {
+    if (i < start) return lines[i];
+    if (i >= rows.length - end) return lines[lines.length - (rows.length - i)];
+    return i < lines.length - end ? lines[i] : null;
+  });
+}
+
 /** Moves a Cue a tenth of a second later (1) or earlier (-1), no earlier than 0. */
 export function nudgeCue(cue: number, by: 1 | -1): number {
   return Math.max(0, Math.round(cue * 1000 + by * 100) / 1000);
