@@ -4,6 +4,6 @@ A Cue links a time on the Timeline to an Occurrence, or to one Line within an Oc
 
 - Line-level Cues rely on Lines keeping their identity when text is edited (the Lyric Sheet matches old and new Lines by a line-level diff).
 - Editing a Line's text keeps its Cue. Deleting the Line drops it.
-- Switching a Section's active Alternate clears the line-level Cues on its Occurrences and keeps the Occurrence-level ones.
+- ~~Switching a Section's active Alternate clears the line-level Cues on its Occurrences and keeps the Occurrence-level ones.~~ Superseded by ADR 0007: those Cues go dormant instead.
 - Detaching an Occurrence carries its Cues over to the copy.
 - Restoring a Snapshot drops Cues whose Lines no longer exist.
