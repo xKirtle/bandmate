@@ -6,12 +6,18 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
 )
 
 func (a *App) listSongs(w http.ResponseWriter, r *http.Request) {
-	list, err := a.songs.ListSongs(r.Context())
+	query := r.URL.Query()
+	filter := lyricsheet.SongFilter{
+		Status: lyricsheet.Status(query.Get("status")),
+		Title:  query.Get("q"),
+	}
+	list, err := a.songs.ListSongs(r.Context(), filter)
 	if err != nil {
 		writeDomainError(w, err)
 		return
@@ -47,10 +53,46 @@ func (a *App) getSong(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, song)
 }
 
-// readJSON decodes the request body into v, answering 400 if it can't.
+func (a *App) updateSong(w http.ResponseWriter, r *http.Request) {
+	id, ok := songID(w, r)
+	if !ok {
+		return
+	}
+	var changes lyricsheet.SongChanges
+	if !readJSON(w, r, &changes) {
+		return
+	}
+	song, err := a.songs.UpdateSong(r.Context(), id, changes)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, song)
+}
+
+func (a *App) deleteSong(w http.ResponseWriter, r *http.Request) {
+	id, ok := songID(w, r)
+	if !ok {
+		return
+	}
+	if err := a.songs.DeleteSong(r.Context(), id); err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// readJSON decodes the request body into v, answering 400 if it can't or if
+// it names a field v doesn't have, so a typo isn't silently ignored.
 func readJSON(w http.ResponseWriter, r *http.Request, v any) bool {
-	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
-		writeError(w, http.StatusBadRequest, "request body must be valid JSON")
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(v); err != nil {
+		msg := "request body must be valid JSON"
+		if field, ok := strings.CutPrefix(err.Error(), "json: unknown field "); ok {
+			msg = "unknown field " + field
+		}
+		writeError(w, http.StatusBadRequest, msg)
 		return false
 	}
 	return true

@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/xKirtle/bandmate/internal/app"
 )
@@ -108,6 +109,18 @@ func (ts *testServer) Do(method, path string, body any) response {
 	return response{Status: res.StatusCode, Header: res.Header, Body: b}
 }
 
+// expectError fails the test unless the response has the given status and
+// error message.
+func expectError(t *testing.T, r response, status int, msg string) {
+	t.Helper()
+	expectStatus(t, r, status)
+	var e struct{ Error string }
+	r.JSON(t, &e)
+	if e.Error != msg {
+		t.Errorf("error = %q, want %q", e.Error, msg)
+	}
+}
+
 // expectStatus fails the test unless the response has the given status.
 func expectStatus(t *testing.T, r response, want int) {
 	t.Helper()
@@ -121,6 +134,11 @@ type song struct {
 	ID        int64  `json:"id"`
 	Title     string `json:"title"`
 	Status    string `json:"status"`
+	Key       string `json:"key"`
+	BPM       *int   `json:"bpm"`
+	Capo      *int   `json:"capo"`
+	Tuning    string `json:"tuning"`
+	Notes     string `json:"notes"`
 	CreatedAt string `json:"createdAt"`
 	UpdatedAt string `json:"updatedAt"`
 }
@@ -153,12 +171,52 @@ func (ts *testServer) getSong(id int64) song {
 	return s
 }
 
-// listSongs reads the Song list.
-func (ts *testServer) listSongs() []songSummary {
+// listSongs reads the Song list, with an optional query string such as
+// "status=idea&q=night".
+func (ts *testServer) listSongs(query ...string) []songSummary {
 	ts.t.Helper()
-	res := ts.Do(http.MethodGet, "/api/songs", nil)
+	path := "/api/songs"
+	if len(query) > 0 {
+		path += "?" + query[0]
+	}
+	res := ts.Do(http.MethodGet, path, nil)
 	expectStatus(ts.t, res, http.StatusOK)
 	var list []songSummary
 	res.JSON(ts.t, &list)
 	return list
+}
+
+// patchSong sends changes to a Song without checking the response.
+func (ts *testServer) patchSong(id int64, changes map[string]any) response {
+	ts.t.Helper()
+	return ts.Do(http.MethodPatch, fmt.Sprintf("/api/songs/%d", id), changes)
+}
+
+// updateSong applies changes to a Song and returns its aggregate.
+func (ts *testServer) updateSong(id int64, changes map[string]any) song {
+	ts.t.Helper()
+	res := ts.patchSong(id, changes)
+	expectStatus(ts.t, res, http.StatusOK)
+	var s song
+	res.JSON(ts.t, &s)
+	return s
+}
+
+// titles lists the Song titles in order.
+func titles(list []songSummary) []string {
+	out := []string{}
+	for _, s := range list {
+		out = append(out, s.Title)
+	}
+	return out
+}
+
+// parseTime reads a timestamp as the API returns it.
+func parseTime(t *testing.T, s string) time.Time {
+	t.Helper()
+	got, err := time.Parse(time.RFC3339Nano, s)
+	if err != nil {
+		t.Fatalf("parsing time %q: %v", s, err)
+	}
+	return got
 }

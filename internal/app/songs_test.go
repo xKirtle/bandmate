@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"net/http"
+	"reflect"
 	"testing"
 )
 
@@ -36,7 +37,7 @@ func TestCreatedSongCanBeRead(t *testing.T) {
 
 	got := ts.getSong(created.ID)
 
-	if got != created {
+	if !reflect.DeepEqual(got, created) {
 		t.Errorf("read song = %+v, want %+v", got, created)
 	}
 }
