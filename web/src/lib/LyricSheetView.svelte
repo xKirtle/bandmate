@@ -3,7 +3,7 @@
   import { layoutLine } from './chords';
   import CueField from './CueField.svelte';
   import { isBlank, type Position } from './cues';
-  import { inTextField } from './textField';
+  import { follower } from './follow';
 
   let {
     song,
@@ -26,7 +26,7 @@
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
-  const shown = new Map<string, HTMLElement>();
+  const { track, follow } = follower();
 
   // The Lines shown for an Occurrence: its active Alternate's, less Chord
   // Lines while Chords are hidden.
@@ -67,17 +67,8 @@
   // every frame.
   const currentKey = $derived(current && key(current.occurrence, shownLine(current)));
   $effect(() => {
-    if (currentKey === null) return;
-    if (inTextField(document.activeElement)) return;
-    const block = currentKey.includes(':') ? 'center' : 'start';
-    shown.get(currentKey)?.scrollIntoView({ block, behavior: 'smooth' });
+    if (currentKey !== null) follow(currentKey, currentKey.includes(':') ? 'center' : 'start');
   });
-
-  /** Keeps track of each Occurrence's and Line's element, to scroll to. */
-  function track(el: HTMLElement, k: string) {
-    shown.set(k, el);
-    return () => shown.delete(k);
-  }
 
   /** Seeks to a cued Line's Cue, unless the click was to select its text. */
   function seekTo(cue: number) {

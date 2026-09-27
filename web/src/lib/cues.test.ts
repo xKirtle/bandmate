@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { currentPosition, formatCue, nudgeCue, parseCue } from './cues';
+import { currentPosition, formatCue, linesByRow, nudgeCue, parseCue } from './cues';
 
 describe('parseCue', () => {
   it('reads plain seconds', () => {
@@ -200,5 +200,42 @@ describe('nudgeCue', () => {
   it('stops at the start of the Timeline', () => {
     expect(nudgeCue(0.05, -1)).toBe(0);
     expect(nudgeCue(0, -1)).toBe(0);
+  });
+});
+
+describe('linesByRow', () => {
+  const saved = [
+    { id: 1, text: 'one' },
+    { id: 2, text: 'two' },
+    { id: 3, text: 'three' },
+  ];
+  const ids = (text: string) => linesByRow(text, saved).map((l) => l?.id ?? null);
+
+  it('matches each row to its Line while the text is as saved', () => {
+    expect(ids('one\ntwo\nthree')).toEqual([1, 2, 3]);
+  });
+
+  it('keeps a Line being edited in place', () => {
+    expect(ids('one\ntwo!\nthree')).toEqual([1, 2, 3]);
+  });
+
+  it('matches no Line to a row just typed, and keeps the Lines after it', () => {
+    expect(ids('one\nnew\ntwo\nthree')).toEqual([1, null, 2, 3]);
+    expect(ids('one\ntwo\nthree\n')).toEqual([1, 2, 3, null]);
+    expect(ids('zero\none\ntwo\nthree')).toEqual([null, 1, 2, 3]);
+  });
+
+  it('keeps the Lines after one just deleted', () => {
+    expect(ids('one\nthree')).toEqual([1, 3]);
+  });
+
+  it('matches rows by place where too much changed to tell', () => {
+    expect(ids('a\nb')).toEqual([1, 2]);
+    expect(ids('a\nb\nc\nd')).toEqual([1, 2, 3, null]);
+  });
+
+  it('gives an empty text box one row', () => {
+    expect(linesByRow('', [])).toEqual([null]);
+    expect(ids('')).toEqual([1]);
   });
 });

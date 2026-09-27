@@ -1,6 +1,32 @@
+<script lang="ts" module>
+  import type { Line } from './api';
+
+  /** How an Occurrence's Cues show on the text box of its active Alternate. */
+  export interface Cueing {
+    /** Line ids to their Cues in the Occurrence, in seconds. */
+    cues: Readonly<Record<number, number>>;
+    /** The Line playback is on, highlighted. */
+    current: number | null;
+    /** Keeps track of a Line's row, to follow playback to. */
+    track: (el: HTMLElement, line: number) => () => void;
+    /** Given, a gutter beside each Line shows its Cue, to change it with. */
+    gutter?: {
+      /** Names the Lines for screen readers, e.g. "of Chorus". */
+      of: string;
+      save: (line: Line, cue: number | null) => void;
+      /** Hands over a Line's field, or null once it's gone, so Enter elsewhere can go on to it. */
+      field: (line: number, field: { edit: () => void } | null) => void;
+      /** Opens the next Line's field; answers whether there was one. */
+      next: (line: number) => boolean;
+    };
+  }
+</script>
+
 <script lang="ts">
   import { onDestroy, untrack } from 'svelte';
   import { api, type Alternate, type Song, type SongAt } from './api';
+  import CueField from './CueField.svelte';
+  import { isBlank, linesByRow } from './cues';
 
   let {
     uid,
@@ -8,6 +34,7 @@
     label,
     change,
     onUnsaved,
+    cueing,
   }: {
     /** Makes the element id unique. */
     uid: string;
@@ -18,6 +45,8 @@
     change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
     /** Tells the page whether this text box holds edits not yet saved. */
     onUnsaved: (editor: object, unsaved: boolean) => void;
+    /** Given, the Lines get a backdrop behind the text box to highlight and cue them. */
+    cueing?: Cueing;
   } = $props();
 
   // How long typing has to pause before the text is saved.
@@ -96,21 +125,64 @@
     el.style.height = 'auto';
     el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
   }
+
+  // The rows of the text box as typed, each with the saved Line it is. Until
+  // typing is saved, a row may be matched to the wrong Line; the save
+  // matches them for real.
+  const rows = $derived(cueing ? text.split('\n') : []);
+  const rowLines = $derived(cueing ? linesByRow(text, alternate.lines) : []);
 </script>
 
 <label class="visually-hidden" for="text-{uid}">{label}</label>
-<textarea
-  id="text-{uid}"
-  class="text"
-  bind:value={text}
-  oninput={typed}
-  onfocus={() => (editingText = true)}
-  onblur={textBlurred}
-  rows="3"
-  placeholder="Write the Lines here, one per line"
-  autocapitalize="sentences"
-  {@attach fitText}
-></textarea>
+<!-- The backdrop renders the rows again behind the text box, wrapping them
+     the same way, so each row's highlight and Cue line up with its text. The
+     text box sits on top and takes every click, so it never seeks. -->
+<div class="field" class:cued={cueing} class:with-gutter={cueing?.gutter} style:--rows={rows.length}>
+  {#if cueing}
+    <div class="bed"></div>
+    {#each rows as row, i (i)}
+      {@const line = rowLines[i]}
+      {#if line}
+        <div
+          class="row"
+          class:current={line.id === cueing.current}
+          style:grid-row={i + 2}
+          aria-hidden="true"
+          {@attach (el) => cueing.track(el, line.id)}
+        >
+          {row || ' '}
+        </div>
+      {:else}
+        <div class="row" style:grid-row={i + 2} aria-hidden="true">{row || ' '}</div>
+      {/if}
+      {#if cueing.gutter && line && !isBlank(line)}
+        {@const gutter = cueing.gutter}
+        <div class="gutter" style:grid-row={i + 2}>
+          <CueField
+            bind:this={() => undefined, (field) => gutter.field(line.id, field ?? null)}
+            gutter
+            cue={cueing.cues[line.id] ?? null}
+            label="Line {alternate.lines.indexOf(line) + 1}{gutter.of}"
+            save={(cue) => gutter.save(line, cue)}
+            next={() => gutter.next(line.id)}
+          />
+        </div>
+      {/if}
+    {/each}
+  {/if}
+  <textarea
+    id="text-{uid}"
+    class="text"
+    bind:value={text}
+    oninput={typed}
+    onfocus={() => (editingText = true)}
+    onblur={textBlurred}
+    rows="3"
+    placeholder="Write the Lines here, one per line"
+    autocapitalize="sentences"
+    {@attach fitText}
+  ></textarea>
+</div>
 
 <style>
   .text {
@@ -122,5 +194,60 @@
     overflow: hidden;
     /* Keeps the text box clear of the sticky header when it scrolls into view. */
     scroll-margin: 4.5rem 0 1rem;
+  }
+  /* One grid row per row of text, between rows as tall as the text box's
+     top and bottom border and padding. The text box spans them all, and the
+     last takes whatever the text box's minimum height adds. */
+  .field.cued {
+    --inset-block: calc(0.5rem + 1px);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: var(--inset-block) repeat(var(--rows), auto) minmax(var(--inset-block), 1fr);
+    column-gap: 0.5rem;
+  }
+  .field.with-gutter {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .cued .text {
+    grid-area: 1 / 1 / -1 / 2;
+    z-index: 2;
+    background: transparent;
+  }
+  .cued .text,
+  .row {
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+  }
+  /* The text box's background, behind the rows. */
+  .bed {
+    grid-area: 1 / 1 / -1 / 2;
+    border-radius: 0.5rem;
+    background: var(--bg);
+  }
+  /* Set like the text box's text, so it wraps the same; its text is never
+     seen, only its highlight. */
+  .row {
+    grid-column: 1;
+    z-index: 1;
+    margin-inline: 1px;
+    padding-inline: 0.75rem;
+    color: transparent;
+    font-size: max(1rem, 16px);
+    line-height: 1.6;
+    pointer-events: none;
+    user-select: none;
+    scroll-margin: 5rem 0;
+    transition: background-color 0.2s;
+  }
+  .row.current {
+    background: var(--surface-2);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+  /* Takes no height, so however tall its field, the rows stay as tall as
+     their text. */
+  .gutter {
+    grid-column: 2;
+    align-self: start;
+    height: 0;
   }
 </style>
