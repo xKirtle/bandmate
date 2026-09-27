@@ -179,6 +179,15 @@ export interface Timeline {
   tracks: Track[];
   /** The Beats the Clips play, each once, without their peaks. */
   beats: ClipBeat[];
+  /** Null until one is set. */
+  loop: TimelineLoop | null;
+}
+
+/** The stretch of the Timeline that playback repeats while it's on, in seconds; start is before end. */
+export interface TimelineLoop {
+  start: number;
+  end: number;
+  on: boolean;
 }
 
 /** A named lane on the Timeline, with its own volume, mute and solo. */
@@ -394,6 +403,12 @@ export const api = {
   /** Removes a Clip from the Timeline; its Beat stays in the Beat Library. */
   deleteClip: (at: SongAt, clipId: number) =>
     request<Timeline>('DELETE', `/songs/${at.id}/timeline/clips/${clipId}`, undefined, at),
+  /** Sets the Song's Loop, replacing any it had. */
+  setLoop: (at: SongAt, loop: TimelineLoop) => request<Timeline>('PUT', `/songs/${at.id}/timeline/loop`, loop, at),
+  /** Switches the Song's Loop on or off, keeping its stretch. */
+  switchLoop: (at: SongAt, on: boolean) => request<Timeline>('PATCH', `/songs/${at.id}/timeline/loop`, { on }, at),
+  /** Removes the Song's Loop. */
+  clearLoop: (at: SongAt) => request<Timeline>('DELETE', `/songs/${at.id}/timeline/loop`, undefined, at),
   /** Puts the Arrangement in this order of Occurrence ids. */
   reorderArrangement: (at: SongAt, occurrences: number[]) =>
     request<Song>('PUT', `/songs/${at.id}/arrangement`, { occurrences }, at),

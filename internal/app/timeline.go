@@ -76,6 +76,38 @@ func (a *App) reorderTracks(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *App) setLoop(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Start *float64 `json:"start"`
+		End   *float64 `json:"end"`
+		On    bool     `json:"on"`
+	}
+	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+		if req.Start == nil || req.End == nil {
+			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "start and end are required"}
+		}
+		return a.timelines.SetLoop(r.Context(), id, based, *req.Start, *req.End, req.On)
+	})
+}
+
+func (a *App) switchLoop(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		On *bool `json:"on"`
+	}
+	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+		if req.On == nil {
+			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "on is required"}
+		}
+		return a.timelines.SwitchLoop(r.Context(), id, based, *req.On)
+	})
+}
+
+func (a *App) clearLoop(w http.ResponseWriter, r *http.Request) {
+	a.changeTimeline(w, r, nil, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+		return a.timelines.ClearLoop(r.Context(), id, based)
+	})
+}
+
 func (a *App) moveClip(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		TrackID *int64   `json:"trackId"`

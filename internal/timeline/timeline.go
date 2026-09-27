@@ -26,6 +26,16 @@ type Timeline struct {
 	Tracks []Track `json:"tracks"`
 	// Beats are the Beats the Clips play, each once, without their peaks.
 	Beats []Beat `json:"beats"`
+	// Loop is nil until one is set.
+	Loop *Loop `json:"loop"`
+}
+
+// Loop is a stretch of the Timeline, in seconds, that playback repeats while
+// it's on. Start is always before End.
+type Loop struct {
+	Start float64 `json:"start"`
+	End   float64 `json:"end"`
+	On    bool    `json:"on"`
 }
 
 // Track is a named lane on the Timeline holding Clips, with its own volume,
@@ -167,6 +177,16 @@ func read(ctx context.Context, tx *sql.Tx, songID int64) (Timeline, error) {
 		})
 	if err != nil {
 		return Timeline{}, fmt.Errorf("reading beats: %w", err)
+	}
+
+	var l Loop
+	err = tx.QueryRowContext(ctx, `SELECT start, end, is_on FROM loops WHERE song_id = ?`, songID).
+		Scan(&l.Start, &l.End, &l.On)
+	switch {
+	case err == nil:
+		tl.Loop = &l
+	case !errors.Is(err, sql.ErrNoRows):
+		return Timeline{}, fmt.Errorf("reading loop: %w", err)
 	}
 	return tl, nil
 }
@@ -359,6 +379,49 @@ func (s *Store) DeleteTrack(ctx context.Context, songID int64, based lyricsheet.
 		res, err := tx.ExecContext(ctx, `DELETE FROM tracks WHERE id = ? AND song_id = ?`, trackID, songID)
 		if err != nil {
 			return fmt.Errorf("deleting track: %w", err)
+		}
+		return expectOneRow(res)
+	})
+}
+
+// SetLoop sets the Song's Loop to repeat from start to end, which must come
+// after start, switched on or off.
+func (s *Store) SetLoop(ctx context.Context, songID int64, based lyricsheet.Version, start, end float64, on bool) (Timeline, error) {
+	switch {
+	case start < -tolerance:
+		return Timeline{}, &lyricsheet.InvalidError{Msg: "a Loop can't start before 0:00"}
+	case end <= start:
+		return Timeline{}, &lyricsheet.InvalidError{Msg: "a Loop's start must be before its end"}
+	}
+	start = max(start, 0)
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO loops (song_id, start, end, is_on) VALUES (?, ?, ?, ?)
+			ON CONFLICT (song_id) DO UPDATE SET start = excluded.start, end = excluded.end, is_on = excluded.is_on`,
+			songID, start, end, on); err != nil {
+			return fmt.Errorf("setting loop: %w", err)
+		}
+		return nil
+	})
+}
+
+// SwitchLoop switches the Song's Loop on or off, keeping its stretch. The
+// Song must have a Loop.
+func (s *Store) SwitchLoop(ctx context.Context, songID int64, based lyricsheet.Version, on bool) (Timeline, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		res, err := tx.ExecContext(ctx, `UPDATE loops SET is_on = ? WHERE song_id = ?`, on, songID)
+		if err != nil {
+			return fmt.Errorf("switching loop: %w", err)
+		}
+		return expectOneRow(res)
+	})
+}
+
+// ClearLoop removes the Song's Loop.
+func (s *Store) ClearLoop(ctx context.Context, songID int64, based lyricsheet.Version) (Timeline, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		res, err := tx.ExecContext(ctx, `DELETE FROM loops WHERE song_id = ?`, songID)
+		if err != nil {
+			return fmt.Errorf("clearing loop: %w", err)
 		}
 		return expectOneRow(res)
 	})
