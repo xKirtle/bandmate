@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onDestroy, untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
-  import { api, type Beat, type Clip, type Song, type SongAt, type Timeline } from './api';
+  import { api, type Beat, type Clip, type Song, type SongAt, type Timeline, type Track, type TrackChanges } from './api';
   import BeatPicker from './BeatPicker.svelte';
   import { clampMove, clampTrimEnd, clampTrimStart } from './clipEdit';
+  import { formatVolume, maxVolume, silence, trackGains, type Levels } from './mixer';
   import { peaksPerSecond } from './peaks';
   import { timelineEnd, type Placed } from './schedule';
   import { formatDuration } from './time';
@@ -11,9 +12,10 @@
   import { bars } from './waveform';
 
   // The Timeline, docked under the Lyric Sheet: its Tracks and Clips, and
-  // playback. Editing (adding Beats and Tracks, moving, trimming, duplicating
-  // and deleting Clips) is only offered on wider screens; on a phone it only
-  // plays.
+  // playback with each Track's volume, mute and solo. Editing (adding Beats,
+  // adding, renaming, reordering and deleting Tracks, moving, trimming,
+  // duplicating and deleting Clips) is only offered on wider screens; on a
+  // phone it only plays and mixes.
   let {
     song,
     timeline,
@@ -49,7 +51,9 @@
   const beats = $derived(new Map(timeline.beats.map((b) => [b.id, b])));
   const clips = $derived(timeline.tracks.flatMap((t) => t.clips));
   const playable = $derived<PlayableClip[]>(
-    clips.map((c) => ({ ...c, source: api.beatAudioUrl(beats.get(c.beatId)!) })),
+    timeline.tracks.flatMap((t) =>
+      t.clips.map((c) => ({ ...c, source: api.beatAudioUrl(beats.get(c.beatId)!), trackId: t.id })),
+    ),
   );
   const length = $derived(timelineEnd(clips));
   // Room after the last Clip, to drag Clips later on the Timeline.
@@ -75,9 +79,80 @@
     }
   });
 
+  // Changes to a Track's levels are shown and heard right away, before
+  // they're saved, so a fader follows the hand. Once saved, the Timeline has
+  // them.
+  let adjusting = $state<Record<number, Partial<Levels>>>({});
+  const levels = $derived<Levels[]>(timeline.tracks.map((t) => ({ ...t, ...adjusting[t.id] })));
+
+  $effect(() => player.setGains(trackGains(levels)));
+
+  /** Shows a change to a Track's levels right away, without saving it yet. */
+  function preview(track: Track, change: Partial<Levels>) {
+    adjusting[track.id] = { ...adjusting[track.id], ...change };
+  }
+
+  type LevelChanges = Omit<TrackChanges, 'name'>;
+
+  async function setLevels(track: Track, levelChanges: LevelChanges) {
+    preview(track, levelChanges);
+    // If it fails, the Track goes back to how it's saved.
+    await change((at) => api.updateTrack(at, track.id, levelChanges));
+    // Each value stops being shown over the Timeline's once saved, unless
+    // it's been changed again since, e.g. by a fader still being dragged.
+    const shown = adjusting[track.id];
+    if (!shown) return;
+    for (const key of Object.keys(levelChanges) as (keyof LevelChanges)[]) {
+      if (shown[key] === levelChanges[key]) delete shown[key];
+    }
+    if (Object.keys(shown).length === 0) delete adjusting[track.id];
+  }
+
+  function volumeInput(track: Track, event: Event) {
+    preview(track, { volume: Number((event.currentTarget as HTMLInputElement).value) });
+  }
+
+  function volumeChange(track: Track, event: Event) {
+    setLevels(track, { volume: Number((event.currentTarget as HTMLInputElement).value) });
+  }
+
+  async function rename(track: Track, event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const name = input.value.trim();
+    if (name === track.name) {
+      input.value = name;
+      return;
+    }
+    // A Track needs a name, so a blank one goes back to what it was.
+    if (!name || !(await change((at) => api.updateTrack(at, track.id, { name })))) input.value = track.name;
+  }
+
+  function nameKey(track: Track, event: KeyboardEvent) {
+    const input = event.currentTarget as HTMLInputElement;
+    if (event.key === 'Enter') input.blur();
+    else if (event.key === 'Escape') {
+      input.value = track.name;
+      input.blur();
+    }
+  }
+
+  /** Moves a Track up or down by one, with its Clips. */
+  function shift(index: number, by: -1 | 1) {
+    const order = timeline.tracks.map((t) => t.id);
+    [order[index], order[index + by]] = [order[index + by], order[index]];
+    change((at) => api.reorderTracks(at, order));
+  }
+
+  // Deleting a Track doesn't ask first either: its Beats stay in the Beat
+  // Library, and undo arrives later.
+  function removeTrack(track: Track) {
+    change((at) => api.deleteTrack(at, track.id));
+  }
+
   // A change to what plays is heard right away. The Timeline is replaced
-  // after every change to it, so compare what would play, not the objects.
-  const playKey = $derived(JSON.stringify(playable));
+  // after every change to it, so compare what would play, not the objects,
+  // and in an order reordering Tracks doesn't change.
+  const playKey = $derived(JSON.stringify([...playable].sort((a, b) => a.trackId - b.trackId || a.start - b.start)));
   $effect(() => {
     void playKey;
     untrack(() => {
@@ -406,10 +481,79 @@
       </div>
 
       <div class="tracks" id="timeline-tracks" hidden={collapsed}>
-        <div class="names">
+        <div class="heads">
           <span class="ruler-gap"></span>
-          {#each timeline.tracks as track (track.id)}
-            <span class="name">{track.name}</span>
+          {#each timeline.tracks as track, i (track.id)}
+            {@const trackLevels = levels[i]}
+            <div class="head" role="group" aria-label="Track {track.name}">
+              <div class="head-row">
+                {#if editable.current}
+                  <input
+                    class="name"
+                    value={track.name}
+                    aria-label="Name of Track {track.name}"
+                    onchange={(e) => rename(track, e)}
+                    onkeydown={(e) => nameKey(track, e)}
+                  />
+                  <span class="track-actions">
+                    <button
+                      type="button"
+                      onclick={() => shift(i, -1)}
+                      disabled={i === 0}
+                      aria-label="Move {track.name} up"
+                      title="Move up">↑</button
+                    >
+                    <button
+                      type="button"
+                      onclick={() => shift(i, 1)}
+                      disabled={i === timeline.tracks.length - 1}
+                      aria-label="Move {track.name} down"
+                      title="Move down">↓</button
+                    >
+                    <button
+                      type="button"
+                      onclick={() => removeTrack(track)}
+                      aria-label="Delete {track.name} and its Clips"
+                      title="Delete the Track and its Clips">×</button
+                    >
+                  </span>
+                {:else}
+                  <span class="name">{track.name}</span>
+                {/if}
+              </div>
+              <div class="head-row">
+                <button
+                  type="button"
+                  class="toggle mute"
+                  aria-pressed={trackLevels.muted}
+                  onclick={() => setLevels(track, { muted: !trackLevels.muted })}
+                  aria-label="Mute {track.name}"
+                  title="Mute">M</button
+                >
+                <button
+                  type="button"
+                  class="toggle solo"
+                  aria-pressed={trackLevels.soloed}
+                  onclick={() => setLevels(track, { soloed: !trackLevels.soloed })}
+                  aria-label="Solo {track.name}"
+                  title="Solo">S</button
+                >
+                <input
+                  class="volume"
+                  type="range"
+                  min={silence}
+                  max={maxVolume}
+                  step="0.5"
+                  value={trackLevels.volume}
+                  aria-label="Volume of {track.name}"
+                  aria-valuetext={formatVolume(trackLevels.volume)}
+                  title="{formatVolume(trackLevels.volume)} (double-click for 0 dB)"
+                  oninput={(e) => volumeInput(track, e)}
+                  onchange={(e) => volumeChange(track, e)}
+                  ondblclick={() => setLevels(track, { volume: 0 })}
+                />
+              </div>
+            </div>
           {/each}
         </div>
         <div class="lanes" bind:this={lanesElement}>
@@ -574,11 +718,11 @@
   .tracks[hidden] {
     display: none;
   }
-  .names {
+  .heads {
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    width: 6rem;
+    width: 11rem;
     padding-right: 0.5rem;
   }
   .ruler-gap,
@@ -586,15 +730,81 @@
     height: 1.5rem;
     flex-shrink: 0;
   }
-  .name {
+  .head {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.25rem;
+    height: 3.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .head-row {
     display: flex;
     align-items: center;
-    height: 3.5rem;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+  .name {
+    flex: 1;
+    min-width: 0;
+    padding: 0 0.125rem;
+    border: 1px solid transparent;
+    border-radius: 0.25rem;
+    background: none;
+    color: var(--text);
+    font: inherit;
     font-size: 0.8125rem;
     font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  input.name:hover,
+  input.name:focus {
+    border-color: var(--border);
+  }
+  .track-actions {
+    display: flex;
+    flex-shrink: 0;
+  }
+  .track-actions button {
+    padding: 0 0.25rem;
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+  .track-actions button:hover:not(:disabled),
+  .track-actions button:focus-visible {
+    color: var(--accent);
+  }
+  .track-actions button:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+  .toggle {
+    flex-shrink: 0;
+    width: 1.5rem;
+    height: 1.25rem;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 0.25rem;
+    background: none;
+    color: var(--text-muted);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .toggle[aria-pressed='true'] {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--accent-text);
+  }
+  .volume {
+    flex: 1;
+    min-width: 0;
+    accent-color: var(--accent);
   }
   .lanes {
     position: relative;
@@ -738,8 +948,13 @@
     .edit-only {
       display: none;
     }
-    .names {
-      width: 4rem;
+    .heads {
+      width: 8rem;
+    }
+    /* Easier to hit with a thumb. */
+    .toggle {
+      width: 1.75rem;
+      height: 1.5rem;
     }
     /* .clip-actions shows on hover, so it needs hiding here too. */
     .clip .clip-actions {
