@@ -4,7 +4,7 @@
   import { api, suggestedLabels, type Line, type Occurrence, type Song, type SongAt } from './api';
   import { hasChords } from './chords';
   import { currentPosition, isBlank } from './cues';
-  import { follower } from './follow';
+  import { follower, key } from './follow';
   import LyricSheetView from './LyricSheetView.svelte';
   import SectionEditor from './SectionEditor.svelte';
   import { describe } from './sections';
@@ -67,14 +67,14 @@
     song.arrangement.flatMap((o) =>
       (sections.get(o.sectionId)?.alternates.find((a) => a.active)?.lines ?? [])
         .filter((l) => !isBlank(l))
-        .map((l) => `${o.id}:${l.id}`),
+        .map((l) => key(o.id, l.id)),
     ),
   );
   const writeKey = $derived(
-    mode === 'write' && current ? `${current.occurrence}${current.line === null ? '' : `:${current.line}`}` : null,
+    mode === 'write' && current ? key(current.occurrence, current.line) : null,
   );
   $effect(() => {
-    if (writeKey !== null) follow(writeKey, writeKey.includes(':') ? 'center' : 'start');
+    follow(writeKey);
   });
 
   function editAfter(k: string): boolean {
@@ -178,9 +178,9 @@
         {@const section = sections.get(occurrence.sectionId)}
         {#if section}
           <li
-            class:current={writeKey === `${occurrence.id}`}
-            aria-current={writeKey === `${occurrence.id}` ? 'true' : undefined}
-            {@attach (el) => track(el, `${occurrence.id}`)}
+            class:current={writeKey === key(occurrence.id)}
+            aria-current={writeKey === key(occurrence.id) ? 'true' : undefined}
+            {@attach (el) => track(el, key(occurrence.id))}
           >
             <SectionEditor
               uid="o{occurrence.id}"
@@ -193,16 +193,16 @@
               cueing={{
                 cues: occurrence.lineCues,
                 current: current?.occurrence === occurrence.id ? current.line : null,
-                track: (el, line) => track(el, `${occurrence.id}:${line}`),
+                track: (el, line) => track(el, key(occurrence.id, line)),
                 gutter: canCue
                   ? {
                       of: section.label ? ` of ${section.label}` : '',
                       save: (line, cue) => setLineCue(occurrence, line, cue),
                       field: (line, field) => {
-                        if (field) writeFields.set(`${occurrence.id}:${line}`, field);
-                        else writeFields.delete(`${occurrence.id}:${line}`);
+                        if (field) writeFields.set(key(occurrence.id, line), field);
+                        else writeFields.delete(key(occurrence.id, line));
                       },
-                      next: (line) => editAfter(`${occurrence.id}:${line}`),
+                      next: (line) => editAfter(key(occurrence.id, line)),
                     }
                   : undefined,
               }}

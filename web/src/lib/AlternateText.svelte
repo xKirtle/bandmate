@@ -139,7 +139,7 @@
      text box sits on top and takes every click, so it never seeks. -->
 <div class="field" class:cued={cueing} class:with-gutter={cueing?.gutter} style:--rows={rows.length}>
   {#if cueing}
-    <div class="bed"></div>
+    <div class="backdrop"></div>
     {#each rows as row, i (i)}
       {@const line = rowLines[i]}
       {#if line}
@@ -219,7 +219,7 @@
     overflow-wrap: break-word;
   }
   /* The text box's background, behind the rows. */
-  .bed {
+  .backdrop {
     grid-area: 1 / 1 / -1 / 2;
     border-radius: 0.5rem;
     background: var(--bg);

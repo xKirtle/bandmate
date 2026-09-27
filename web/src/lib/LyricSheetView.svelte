@@ -3,7 +3,7 @@
   import { layoutLine } from './chords';
   import CueField from './CueField.svelte';
   import { isBlank, type Position } from './cues';
-  import { follower } from './follow';
+  import { follower, key } from './follow';
 
   let {
     song,
@@ -58,16 +58,12 @@
     return o && linesOf(o).lines.some((l) => l.id === position.line) ? position.line : null;
   }
 
-  function key(occurrence: number, line: number | null = null): string {
-    return line === null ? `${occurrence}` : `${occurrence}:${line}`;
-  }
-
   // Follow playback, unless that would pull the page away from something
   // being typed. Keyed, so it only scrolls once playback moves on, not on
   // every frame.
   const currentKey = $derived(current && key(current.occurrence, shownLine(current)));
   $effect(() => {
-    if (currentKey !== null) follow(currentKey, currentKey.includes(':') ? 'center' : 'start');
+    follow(currentKey);
   });
 
   /** Seeks to a cued Line's Cue, unless the click was to select its text. */

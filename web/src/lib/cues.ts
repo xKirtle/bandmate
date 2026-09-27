@@ -71,11 +71,11 @@ export function currentPosition(
  */
 export function linesByRow<L extends { text: string }>(text: string, lines: readonly L[]): (L | null)[] {
   const rows = text.split('\n');
-  const most = Math.min(rows.length, lines.length);
+  const overlap = Math.min(rows.length, lines.length);
   let start = 0;
-  while (start < most && rows[start] === lines[start].text) start++;
+  while (start < overlap && rows[start] === lines[start].text) start++;
   let end = 0;
-  while (end < most - start && rows[rows.length - 1 - end] === lines[lines.length - 1 - end].text) end++;
+  while (end < overlap - start && rows[rows.length - 1 - end] === lines[lines.length - 1 - end].text) end++;
   return rows.map((_, i) => {
     if (i < start) return lines[i];
     if (i >= rows.length - end) return lines[lines.length - (rows.length - i)];
