@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import { api, type Song } from './api';
+  import { api, type Song, type SongAt } from './api';
   import SectionEditor from './SectionEditor.svelte';
   import { describe } from './sections';
 
@@ -11,7 +11,7 @@
   }: {
     song: Song;
     /** Sends a Lyric Sheet change; resolves to whether it succeeded. */
-    change: (op: () => Promise<Song>) => Promise<boolean>;
+    change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
     onUnsaved: (editor: object, unsaved: boolean) => void;
   } = $props();
 
@@ -29,7 +29,7 @@
   let added = $state<number | null>(null);
 
   async function add() {
-    if (!(await change(() => api.addToScrapbook(song.id)))) return;
+    if (!(await change((at) => api.addToScrapbook(at)))) return;
     // The newest Section has the highest id, so it comes last.
     added = song.scrapbook.at(-1) ?? null;
     // Focus it once, not again if it later comes back to the Scrapbook.
@@ -40,14 +40,14 @@
   function putBack(sectionId: number, e: Event & { currentTarget: HTMLSelectElement }) {
     const value = e.currentTarget.value;
     e.currentTarget.value = '';
-    if (value !== '') change(() => api.addOccurrence(song.id, sectionId, Number(value)));
+    if (value !== '') change((at) => api.addOccurrence(at, sectionId, Number(value)));
   }
 
   function remove(sectionId: number) {
     const section = sections.get(sectionId);
     if (!section) return;
     const ok = confirm(`Delete ${describe(section)} for good?\n\nIts Lines go with it. It can't be undone.`);
-    if (ok) change(() => api.deleteSection(song.id, sectionId));
+    if (ok) change((at) => api.deleteSection(at, sectionId));
   }
 </script>
 
@@ -62,7 +62,6 @@
       {#each scrapbook as section (section.id)}
         <li>
           <SectionEditor
-            songId={song.id}
             uid="s{section.id}"
             {section}
             shared={false}

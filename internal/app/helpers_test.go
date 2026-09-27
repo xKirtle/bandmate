@@ -82,6 +82,17 @@ func (r response) JSON(t *testing.T, v any) {
 // Do sends a request with an optional JSON body and returns the response.
 func (ts *testServer) Do(method, path string, body any) response {
 	ts.t.Helper()
+	return ts.do(method, path, nil, body)
+}
+
+// DoAt sends a write based on a given version of the Song, as the SPA does.
+func (ts *testServer) DoAt(version int64, method, path string, body any) response {
+	ts.t.Helper()
+	return ts.do(method, path, http.Header{"If-Match": {fmt.Sprintf("%q", fmt.Sprint(version))}}, body)
+}
+
+func (ts *testServer) do(method, path string, header http.Header, body any) response {
+	ts.t.Helper()
 	var reader io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
@@ -93,6 +104,9 @@ func (ts *testServer) Do(method, path string, body any) response {
 	req, err := http.NewRequest(method, ts.srv.URL+path, reader)
 	if err != nil {
 		ts.t.Fatalf("building request: %v", err)
+	}
+	for name, values := range header {
+		req.Header[name] = values
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
@@ -132,6 +146,7 @@ func expectStatus(t *testing.T, r response, want int) {
 // song is the Song aggregate as the API returns it. Later tickets extend it.
 type song struct {
 	ID          int64        `json:"id"`
+	Version     int64        `json:"version"`
 	Title       string       `json:"title"`
 	Status      string       `json:"status"`
 	Key         string       `json:"key"`

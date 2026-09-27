@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { api, statuses, type Song, type SongChanges, type Status } from '../lib/api';
+  import { api, ApiError, statuses, type Song, type SongAt, type SongChanges, type Status } from '../lib/api';
   import LyricSheet from '../lib/LyricSheet.svelte';
   import Scrapbook from '../lib/Scrapbook.svelte';
   import { navigate } from '../lib/router.svelte';
@@ -23,6 +23,9 @@
   let draft = $state<Draft>(toDraft(null));
   let loadError = $state<string | null>(null);
   let saveError = $state<string | null>(null);
+  // A write was refused, or a refresh couldn't be shown, because the Song
+  // changed elsewhere (e.g. in another tab) since this page loaded it.
+  let stale = $state(false);
   let pending = $state(0);
   let deleting = $state(false);
 
@@ -54,18 +57,21 @@
   // Saves run one after another so they land in the order they were made.
   let queue = Promise.resolve();
 
-  /** Queues a change and shows the Song it returns. Resolves to whether it succeeded. */
-  function send(op: () => Promise<Song>): Promise<boolean> {
+  /**
+   * Queues a change and shows the Song it returns. The change is based on
+   * the Song as shown when its turn comes. Resolves to whether it succeeded.
+   */
+  function send(op: (at: SongAt) => Promise<Song>): Promise<boolean> {
     // Once the Song is being deleted, a late save would only fail.
     if (deleting) return Promise.resolve(false);
     pending++;
     const done = queue.then(async () => {
       try {
-        song = await op();
+        song = await op(song!);
         saveError = null;
         return true;
       } catch (e) {
-        saveError = (e as Error).message;
+        showError(e as Error);
         return false;
       } finally {
         pending--;
@@ -75,11 +81,49 @@
     return done;
   }
 
+  function showError(e: Error) {
+    if (e instanceof ApiError && e.stale) stale = true;
+    else saveError = e.message;
+  }
+
   async function save(changes: SongChanges, fields: (keyof Draft)[]) {
-    if (!(await send(() => api.updateSong(id, changes)))) {
-      // Put back what the server has for the fields that failed.
+    // Put back what the server has for the fields that failed, unless the
+    // Song changed elsewhere: then the edits stay, to be copied out.
+    if (!(await send((at) => api.updateSong(at, changes))) && !stale) {
       for (const f of fields) revert(f);
     }
+  }
+
+  // Coming back to the tab shows what changed meanwhile, e.g. on another
+  // device. It waits for saves already on their way, and never replaces
+  // edits not saved yet: those are based on the Song as it was, so the Song
+  // is marked stale instead.
+  function refresh() {
+    if (document.visibilityState !== 'visible' || !song || deleting) return;
+    queue = queue.then(async () => {
+      try {
+        const latest = await api.getSong(id);
+        if (latest.version === song?.version) return;
+        if (hasUnsavedEdits()) {
+          stale = true;
+          return;
+        }
+        song = latest;
+        draft = toDraft(latest);
+        stale = false;
+      } catch {
+        // Keep showing the Song as it was; the next save reports any problem.
+      }
+    });
+  }
+
+  // Set while reloading on purpose, so leaving doesn't ask again.
+  let reloading = false;
+
+  function reload() {
+    if (hasUnsavedEdits() && !confirm('Reload the Song? Edits that weren’t saved here will be lost.')) return;
+    reloading = true;
+    location.reload();
   }
 
   // Lyric Sheet editors holding edits that aren't saved yet.
@@ -142,7 +186,7 @@
 
   // Closing or reloading the tab can't wait for a save, so ask first.
   function warnBeforeUnload(event: BeforeUnloadEvent) {
-    if (hasUnsavedEdits()) event.preventDefault();
+    if (!reloading && hasUnsavedEdits()) event.preventDefault();
   }
 
   async function remove() {
@@ -153,16 +197,17 @@
     try {
       // Let queued saves finish first, so none of them lands after the delete.
       await queue;
-      await api.deleteSong(id);
+      await api.deleteSong(song);
       navigate('/', { replace: true });
     } catch (e) {
-      saveError = (e as Error).message;
+      showError(e as Error);
       deleting = false;
     }
   }
 </script>
 
 <svelte:window onbeforeunload={warnBeforeUnload} />
+<svelte:document onvisibilitychange={refresh} />
 
 <header class="bar wide">
   <a class="back" href="/">← Songs</a>
@@ -199,7 +244,15 @@
             Edited <time datetime={song.updatedAt}>{timeAgo(song.updatedAt)}</time>
           {/if}
         </p>
-        {#if saveError}
+        {#if stale}
+          <div class="stale" role="alert">
+            <p>
+              This Song changed elsewhere, so edits made here since can’t be saved. Reload to see the latest.
+              Edits that weren’t saved stay where you typed them until then, so copy out anything you want to keep.
+            </p>
+            <button type="button" class="button" onclick={reload}>Reload</button>
+          </div>
+        {:else if saveError}
           <p class="error" role="alert">{saveError}</p>
         {/if}
 
@@ -317,6 +370,21 @@
   }
   .error {
     margin-bottom: 1rem;
+  }
+  .stale {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    margin-bottom: 1rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    background: var(--surface-1);
+  }
+  .stale p {
+    flex: 1 1 16rem;
+    margin: 0;
   }
   .status {
     display: flex;

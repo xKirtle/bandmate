@@ -2,10 +2,9 @@
   import { untrack, type Snippet } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import AlternateText from './AlternateText.svelte';
-  import { api, type Alternate, type Section, type Song } from './api';
+  import { api, type Alternate, type Section, type Song, type SongAt } from './api';
 
   let {
-    songId,
     uid,
     section,
     shared,
@@ -14,7 +13,6 @@
     onUnsaved,
     actions,
   }: {
-    songId: number;
     /** Makes element ids unique, e.g. when a shared Section shows more than once. */
     uid: string;
     section: Section;
@@ -23,7 +21,7 @@
     /** Focus the Label when this becomes true, e.g. for a Section just added. */
     autofocus?: boolean;
     /** Sends a Lyric Sheet change; resolves to whether it succeeded. */
-    change: (op: () => Promise<Song>) => Promise<boolean>;
+    change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
     /** Tells the page whether this editor holds edits not yet saved. */
     onUnsaved: (editor: object, unsaved: boolean) => void;
     actions: Snippet;
@@ -50,7 +48,7 @@
       label = section.label;
       return;
     }
-    if (!(await change(() => api.setSectionLabel(songId, section.id, next)))) label = section.label;
+    if (!(await change((at) => api.setSectionLabel(at, section.id, next)))) label = section.label;
   }
 
   /** How an Alternate is called: its name, else its place among the Section's Alternates. */
@@ -67,7 +65,7 @@
   }
 
   async function addAlternate() {
-    if (!(await change(() => api.addAlternate(songId, section.id)))) return;
+    if (!(await change((at) => api.addAlternate(at, section.id)))) return;
     // The newest Alternate comes last; show it open, ready to change.
     const added = section.alternates.at(-1);
     if (added && !added.active) expanded.add(added.id);
@@ -80,12 +78,12 @@
       input.value = alt.name;
       return;
     }
-    if (!(await change(() => api.renameAlternate(songId, alt.id, next)))) input.value = alt.name;
+    if (!(await change((at) => api.renameAlternate(at, alt.id, next)))) input.value = alt.name;
   }
 
   async function activate(alt: Alternate) {
     const previous = active.id;
-    if (await change(() => api.activateAlternate(songId, alt.id))) {
+    if (await change((at) => api.activateAlternate(at, alt.id))) {
       expanded.delete(alt.id);
       expanded.delete(previous);
     }
@@ -93,7 +91,7 @@
 
   function remove(alt: Alternate) {
     const ok = confirm(`Delete ${nameOf(alt)} for good?\n\nIts Lines go with it. It can't be undone.`);
-    if (ok) change(() => api.deleteAlternate(songId, alt.id));
+    if (ok) change((at) => api.deleteAlternate(at, alt.id));
   }
 
   function syncExpanded(alt: Alternate, e: Event & { currentTarget: HTMLDetailsElement }) {
@@ -162,7 +160,7 @@
     </div>
   {/if}
   {#key active.id}
-    <AlternateText {songId} uid="{uid}-{active.id}" alternate={active} label="Lines" {change} {onUnsaved} />
+    <AlternateText uid="{uid}-{active.id}" alternate={active} label="Lines" {change} {onUnsaved} />
   {/key}
 
   {#if inactive.length > 0}
@@ -189,7 +187,6 @@
                 <div class="pane">
                   <p class="pane-title muted">{nameOf(alt)}</p>
                   <AlternateText
-                    {songId}
                     uid="{uid}-{alt.id}"
                     alternate={alt}
                     label="Lines of {nameOf(alt)}"

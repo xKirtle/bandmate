@@ -17,6 +17,10 @@ import (
 // exist.
 var ErrNotFound = errors.New("not found")
 
+// ErrStale means a change was based on a Version of the Song that is no
+// longer current: the Song changed in the meantime, e.g. from another tab.
+var ErrStale = errors.New("this Song changed elsewhere, so the change wasn't saved")
+
 // InvalidError is a rejected operation. Its message is safe to show the user.
 type InvalidError struct{ Msg string }
 
@@ -54,11 +58,22 @@ func (s Status) valid() bool {
 	return false
 }
 
+// Version is one state of a Song. It goes up with every change to the Song:
+// its metadata, Status or Lyric Sheet.
+//
+// Every change takes the Version it was based on and fails with ErrStale if
+// the Song has changed since. AnyVersion applies the change regardless.
+type Version int64
+
+// AnyVersion skips the Version check.
+const AnyVersion Version = 0
+
 // Song is the full Song aggregate.
 type Song struct {
-	ID     int64  `json:"id"`
-	Title  string `json:"title"`
-	Status Status `json:"status"`
+	ID      int64   `json:"id"`
+	Version Version `json:"version"`
+	Title   string  `json:"title"`
+	Status  Status  `json:"status"`
 	// Key, BPM, Capo and Tuning record how to play the Song. Empty text and
 	// nil numbers mean "not set".
 	Key    string `json:"key"`
@@ -132,9 +147,9 @@ func (s *Store) GetSong(ctx context.Context, id int64) (Song, error) {
 	var bpm, capo sql.NullInt64
 	var created, updated string
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, title, status, song_key, bpm, capo, tuning, notes, show_chords, created_at, updated_at
+		`SELECT id, version, title, status, song_key, bpm, capo, tuning, notes, show_chords, created_at, updated_at
 		 FROM songs WHERE id = ?`, id).
-		Scan(&song.ID, &song.Title, &song.Status, &song.Key, &bpm, &capo, &song.Tuning, &song.Notes,
+		Scan(&song.ID, &song.Version, &song.Title, &song.Status, &song.Key, &bpm, &capo, &song.Tuning, &song.Notes,
 			&song.ShowChords, &created, &updated)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Song{}, ErrNotFound
@@ -226,7 +241,7 @@ type SongChanges struct {
 
 // UpdateSong applies changes to a Song. Every change is validated before
 // anything is written, so a rejected update leaves the Song as it was.
-func (s *Store) UpdateSong(ctx context.Context, id int64, changes SongChanges) (Song, error) {
+func (s *Store) UpdateSong(ctx context.Context, id int64, based Version, changes SongChanges) (Song, error) {
 	var sets []string
 	var args []any
 	set := func(column string, value any) {
@@ -273,28 +288,53 @@ func (s *Store) UpdateSong(ctx context.Context, id int64, changes SongChanges) (
 		set("show_chords", *c.Value)
 	}
 	if len(sets) == 0 {
-		return s.GetSong(ctx, id)
+		song, err := s.GetSong(ctx, id)
+		if err == nil && based != AnyVersion && song.Version != based {
+			return Song{}, ErrStale
+		}
+		return song, err
 	}
-	set("updated_at", time.Now().UTC().Format(timeFormat))
-	res, err := s.db.ExecContext(ctx,
-		`UPDATE songs SET `+strings.Join(sets, ", ")+` WHERE id = ?`, append(args, id)...)
-	if err != nil {
-		return Song{}, fmt.Errorf("updating song: %w", err)
-	}
-	if err := expectOneRow(res); err != nil {
-		return Song{}, err
-	}
-	return s.GetSong(ctx, id)
+	return s.change(ctx, id, based, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx,
+			`UPDATE songs SET `+strings.Join(sets, ", ")+` WHERE id = ?`, append(args, id)...)
+		if err != nil {
+			return fmt.Errorf("updating song: %w", err)
+		}
+		return nil
+	})
 }
 
 // DeleteSong removes a Song. Everything the Song owns references it with
 // ON DELETE CASCADE, so it goes too.
-func (s *Store) DeleteSong(ctx context.Context, id int64) error {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM songs WHERE id = ?`, id)
+func (s *Store) DeleteSong(ctx context.Context, id int64, based Version) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM songs WHERE id = ? AND (?2 = 0 OR version = ?2)`, id, based)
 	if err != nil {
 		return fmt.Errorf("deleting song: %w", err)
 	}
-	return expectOneRow(res)
+	if err := expectOneRow(res); errors.Is(err, ErrNotFound) {
+		return missingOrStale(ctx, s.db, id)
+	} else if err != nil {
+		return err
+	}
+	return nil
+}
+
+// rowQueryer is what both *sql.DB and *sql.Tx offer for reading one row.
+type rowQueryer interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+// missingOrStale explains why a write to a Song, guarded by its Version,
+// matched no row: the Song is gone, or it has moved on to a newer Version.
+func missingOrStale(ctx context.Context, db rowQueryer, id int64) error {
+	var exists bool
+	if err := db.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM songs WHERE id = ?)`, id).Scan(&exists); err != nil {
+		return fmt.Errorf("checking song: %w", err)
+	}
+	if exists {
+		return ErrStale
+	}
+	return ErrNotFound
 }
 
 // expectOneRow turns a write that matched no Song into ErrNotFound.

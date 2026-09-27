@@ -97,7 +97,7 @@ func TestNewSongHasNoMetadata(t *testing.T) {
 
 	got := ts.createSong("Bare")
 
-	want := song{ID: got.ID, Title: "Bare", Status: "idea", ShowChords: true, CreatedAt: got.CreatedAt, UpdatedAt: got.UpdatedAt,
+	want := song{ID: got.ID, Version: got.Version, Title: "Bare", Status: "idea", ShowChords: true, CreatedAt: got.CreatedAt, UpdatedAt: got.UpdatedAt,
 		Arrangement: []occurrence{}, Sections: []section{}, Scrapbook: []int64{}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("new song = %+v, want no key, BPM, capo, tuning, notes or Sections", got)
@@ -120,7 +120,7 @@ func TestSongMetadataCanBeSetAndCleared(t *testing.T) {
 	want := created
 	want.Key, want.BPM, want.Capo, want.Tuning = "F#m", &ninetyTwo, &two, "Drop D"
 	want.Notes = "Slow down in the bridge.\nTry a falsetto hook."
-	want.UpdatedAt = got.UpdatedAt
+	want.Version, want.UpdatedAt = got.Version, got.UpdatedAt
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("song after setting metadata = %+v, want %+v", got, want)
 	}
@@ -131,7 +131,7 @@ func TestSongMetadataCanBeSetAndCleared(t *testing.T) {
 	// Only the fields sent change; null or "" clears a field.
 	got = ts.updateSong(created.ID, map[string]any{"bpm": nil, "tuning": ""})
 
-	want.BPM, want.Tuning, want.UpdatedAt = nil, "", got.UpdatedAt
+	want.BPM, want.Tuning, want.Version, want.UpdatedAt = nil, "", got.Version, got.UpdatedAt
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("song after clearing BPM and tuning = %+v, want %+v", got, want)
 	}
