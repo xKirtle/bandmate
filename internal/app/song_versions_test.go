@@ -1,16 +1,10 @@
 package app_test
 
 import (
-	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
 )
-
-// songPath is where a Song lives.
-func songPath(id int64) string {
-	return fmt.Sprintf("/api/songs/%d", id)
-}
 
 // expectStale fails the test unless the response rejects a write based on an
 // outdated version of the Song.
@@ -126,7 +120,6 @@ func TestDeletingASongBasedOnAnOldVersionIsRejected(t *testing.T) {
 	ts.updateSong(old.ID, map[string]any{"notes": "slow"})
 
 	expectStale(t, ts.DoAt(old.Version, http.MethodDelete, songPath(old.ID), nil))
-	ts.getSong(old.ID)
 
 	current := ts.getSong(old.ID)
 	expectStatus(t, ts.DoAt(current.Version, http.MethodDelete, songPath(old.ID), nil), http.StatusNoContent)

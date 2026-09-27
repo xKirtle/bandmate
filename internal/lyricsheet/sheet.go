@@ -148,6 +148,7 @@ func (s *Store) loadLyricSheet(ctx context.Context, songID int64) (LyricSheet, e
 // queryer is what both *sql.DB and *sql.Tx offer for reading.
 type queryer interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
 // query runs a query and calls row for each result row.
@@ -166,8 +167,8 @@ func query(ctx context.Context, q queryer, stmt string, args []any, row func(*sq
 }
 
 // change runs one change on a Song in a transaction, marks the Song as edited
-// with a new Version, and returns the updated Song. If the Song is no longer
-// at the based Version, or fn fails, nothing changes.
+// with a new version, and returns the updated Song. If the Song is no longer
+// at the version the change was based on, or fn fails, nothing changes.
 func (s *Store) change(ctx context.Context, songID int64, based Version, fn func(tx *sql.Tx) error) (Song, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -180,9 +181,7 @@ func (s *Store) change(ctx context.Context, songID int64, based Version, fn func
 	if err != nil {
 		return Song{}, fmt.Errorf("touching song: %w", err)
 	}
-	if err := expectOneRow(res); errors.Is(err, ErrNotFound) {
-		return Song{}, missingOrStale(ctx, tx, songID)
-	} else if err != nil {
+	if err := expectCurrent(ctx, tx, res, songID); err != nil {
 		return Song{}, err
 	}
 	if err := fn(tx); err != nil {

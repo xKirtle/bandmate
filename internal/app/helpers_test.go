@@ -207,6 +207,11 @@ type songSummary struct {
 	UpdatedAt string `json:"updatedAt"`
 }
 
+// songPath is where a Song lives.
+func songPath(id int64) string {
+	return fmt.Sprintf("/api/songs/%d", id)
+}
+
 // createSong creates a Song with the given title and returns its aggregate.
 func (ts *testServer) createSong(title string) song {
 	ts.t.Helper()
@@ -220,7 +225,7 @@ func (ts *testServer) createSong(title string) song {
 // getSong reads a Song's aggregate.
 func (ts *testServer) getSong(id int64) song {
 	ts.t.Helper()
-	res := ts.Do(http.MethodGet, fmt.Sprintf("/api/songs/%d", id), nil)
+	res := ts.Do(http.MethodGet, songPath(id), nil)
 	expectStatus(ts.t, res, http.StatusOK)
 	var s song
 	res.JSON(ts.t, &s)
@@ -245,7 +250,7 @@ func (ts *testServer) listSongs(query ...string) []songSummary {
 // patchSong sends changes to a Song without checking the response.
 func (ts *testServer) patchSong(id int64, changes map[string]any) response {
 	ts.t.Helper()
-	return ts.Do(http.MethodPatch, fmt.Sprintf("/api/songs/%d", id), changes)
+	return ts.Do(http.MethodPatch, songPath(id), changes)
 }
 
 // updateSong applies changes to a Song and returns its aggregate.

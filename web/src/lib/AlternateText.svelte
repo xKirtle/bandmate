@@ -40,12 +40,11 @@
   const editor = {};
 
   // Show what the server has, unless it would overwrite something being
-  // typed or not yet saved here. A focused box with nothing new typed takes
-  // it too, e.g. when the Song is refreshed, so later typing builds on it.
+  // typed or not yet saved here.
   $effect(() => {
     const t = savedText;
     untrack(() => {
-      if ((!editingText || text === sent) && timer === undefined && inFlight === 0 && !failed) text = sent = t;
+      if (!editingText && timer === undefined && inFlight === 0 && !failed) text = sent = t;
     });
   });
 

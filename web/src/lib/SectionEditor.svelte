@@ -33,6 +33,9 @@
 
   let label = $state(untrack(() => section.label));
   let editingLabel = false;
+  // Identifies the Label or Alternate name being typed to onUnsaved. They
+  // save on change, which comes just before blur.
+  const naming = {};
   // The inactive Alternates shown expanded.
   const expanded = new SvelteSet<number>();
 
@@ -116,8 +119,12 @@
       class="label"
       bind:value={label}
       onfocus={() => (editingLabel = true)}
+      oninput={() => onUnsaved(naming, true)}
       onchange={commitLabel}
-      onblur={() => (editingLabel = false)}
+      onblur={() => {
+        editingLabel = false;
+        onUnsaved(naming, false);
+      }}
       list="label-suggestions"
       placeholder="Label"
       autocomplete="off"
@@ -152,7 +159,9 @@
         id="name-{uid}-{active.id}"
         class="name"
         value={active.name}
+        oninput={() => onUnsaved(naming, true)}
         onchange={(e) => rename(active, e)}
+        onblur={() => onUnsaved(naming, false)}
         placeholder={nameOf(active)}
         autocomplete="off"
         enterkeyhint="done"
@@ -178,7 +187,9 @@
                 id="name-{uid}-{alt.id}"
                 class="name"
                 value={alt.name}
+                oninput={() => onUnsaved(naming, true)}
                 onchange={(e) => rename(alt, e)}
+                onblur={() => onUnsaved(naming, false)}
                 placeholder="Name it (optional)"
                 autocomplete="off"
                 enterkeyhint="done"

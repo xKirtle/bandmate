@@ -17,7 +17,7 @@ import (
 // exist.
 var ErrNotFound = errors.New("not found")
 
-// ErrStale means a change was based on a Version of the Song that is no
+// ErrStale means a change was based on a version of the Song that is no
 // longer current: the Song changed in the meantime, e.g. from another tab.
 var ErrStale = errors.New("this Song changed elsewhere, so the change wasn't saved")
 
@@ -58,14 +58,15 @@ func (s Status) valid() bool {
 	return false
 }
 
-// Version is one state of a Song. It goes up with every change to the Song:
-// its metadata, Status or Lyric Sheet.
+// Version counts the changes to a Song: its metadata, Status or Lyric Sheet.
+// It only guards against overwriting newer work, and is no Snapshot: older
+// versions aren't kept.
 //
-// Every change takes the Version it was based on and fails with ErrStale if
+// Every change takes the version it was based on and fails with ErrStale if
 // the Song has changed since. AnyVersion applies the change regardless.
 type Version int64
 
-// AnyVersion skips the Version check.
+// AnyVersion skips the version check.
 const AnyVersion Version = 0
 
 // Song is the full Song aggregate.
@@ -311,22 +312,16 @@ func (s *Store) DeleteSong(ctx context.Context, id int64, based Version) error {
 	if err != nil {
 		return fmt.Errorf("deleting song: %w", err)
 	}
-	if err := expectOneRow(res); errors.Is(err, ErrNotFound) {
-		return missingOrStale(ctx, s.db, id)
-	} else if err != nil {
+	return expectCurrent(ctx, s.db, res, id)
+}
+
+// expectCurrent checks that a write to a Song, guarded by the version it
+// was based on, matched the Song. If not, the Song is gone (ErrNotFound) or
+// has moved on to a newer version (ErrStale).
+func expectCurrent(ctx context.Context, db queryer, res sql.Result, id int64) error {
+	if err := expectOneRow(res); !errors.Is(err, ErrNotFound) {
 		return err
 	}
-	return nil
-}
-
-// rowQueryer is what both *sql.DB and *sql.Tx offer for reading one row.
-type rowQueryer interface {
-	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
-}
-
-// missingOrStale explains why a write to a Song, guarded by its Version,
-// matched no row: the Song is gone, or it has moved on to a newer Version.
-func missingOrStale(ctx context.Context, db rowQueryer, id int64) error {
 	var exists bool
 	if err := db.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM songs WHERE id = ?)`, id).Scan(&exists); err != nil {
 		return fmt.Errorf("checking song: %w", err)

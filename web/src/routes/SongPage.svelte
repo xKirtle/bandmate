@@ -87,9 +87,16 @@
   }
 
   async function save(changes: SongChanges, fields: (keyof Draft)[]) {
+    let rejectedAsStale = false;
+    const ok = await send((at) =>
+      api.updateSong(at, changes).catch((e) => {
+        rejectedAsStale = e instanceof ApiError && e.stale;
+        throw e;
+      }),
+    );
     // Put back what the server has for the fields that failed, unless the
     // Song changed elsewhere: then the edits stay, to be copied out.
-    if (!(await send((at) => api.updateSong(at, changes))) && !stale) {
+    if (!ok && !rejectedAsStale) {
       for (const f of fields) revert(f);
     }
   }
@@ -108,6 +115,10 @@
           stale = true;
           return;
         }
+        // A focused field would keep showing the old Song, and typing into
+        // it would then overwrite the change made elsewhere. Nothing is
+        // unsaved, so leaving it saves nothing.
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
         song = latest;
         draft = toDraft(latest);
         stale = false;
@@ -252,7 +263,8 @@
             </p>
             <button type="button" class="button" onclick={reload}>Reload</button>
           </div>
-        {:else if saveError}
+        {/if}
+        {#if saveError}
           <p class="error" role="alert">{saveError}</p>
         {/if}
 
