@@ -216,7 +216,7 @@
     moved: boolean;
     /** Where the Clip is shown now. */
     trackId: number;
-    at: Placed;
+    placement: Placed;
     saving: boolean;
   }
   let edit = $state<Edit | null>(null);
@@ -229,7 +229,7 @@
       const placed = track.clips
         .filter((c) => c.id !== edit?.clip.id)
         .map((clip) => ({ clip, at: clip as Placed, editing: false }));
-      if (edit?.trackId === track.id) placed.push({ clip: edit.clip, at: edit.at, editing: true });
+      if (edit?.trackId === track.id) placed.push({ clip: edit.clip, at: edit.placement, editing: true });
       return { track, clips: placed };
     }),
   );
@@ -247,7 +247,9 @@
   function trackAt(clientY: number): number {
     let best = 0;
     let distance = Infinity;
-    laneElements.forEach((lane, i) => {
+    // Only the lanes of Tracks there now: a removed Track's may linger.
+    timeline.tracks.forEach((_, i) => {
+      const lane = laneElements[i];
       if (!lane) return;
       const box = lane.getBoundingClientRect();
       const d = clientY < box.top ? box.top - clientY : clientY > box.bottom ? clientY - box.bottom : 0;
@@ -269,7 +271,7 @@
       grab: spanTimeAt(event.clientX) - clip.start,
       moved: false,
       trackId: trackOf(clip).id,
-      at: clip,
+      placement: clip,
       saving: false,
     };
     window.addEventListener('pointermove', editMove);
@@ -287,29 +289,27 @@
     if (edit.mode === 'move') {
       edit.trackId = trackAt(event.clientY);
       const start = clampMove(othersOn(edit.trackId, clip), clip.length, t - edit.grab);
-      edit.at = { ...clip, start };
+      edit.placement = { ...clip, start };
     } else if (edit.mode === 'start') {
-      edit.at = clampTrimStart(clip, othersOn(edit.trackId, clip), t);
+      edit.placement = clampTrimStart(clip, othersOn(edit.trackId, clip), t);
     } else {
-      edit.at = clampTrimEnd(clip, othersOn(edit.trackId, clip), beats.get(clip.beatId)!.duration, t);
+      edit.placement = clampTrimEnd(clip, othersOn(edit.trackId, clip), beats.get(clip.beatId)!.duration, t);
     }
   }
 
   async function editUp() {
     stopListening();
     if (!edit) return;
-    const { clip, trackId, at, mode } = edit;
+    const { clip, trackId, placement: to, mode } = edit;
     const unchanged =
-      trackId === trackOf(clip).id && at.start === clip.start && at.offset === clip.offset && at.length === clip.length;
+      trackId === trackOf(clip).id && to.start === clip.start && to.offset === clip.offset && to.length === clip.length;
     if (!edit.moved || unchanged) {
       edit = null;
       return;
     }
     edit.saving = true;
-    await change((songAt) =>
-      mode === 'move'
-        ? api.moveClip(songAt, clip.id, trackId, at.start)
-        : api.trimClip(songAt, clip.id, at.offset, at.length),
+    await change((at) =>
+      mode === 'move' ? api.moveClip(at, clip.id, trackId, to.start) : api.trimClip(at, clip.id, to.offset, to.length),
     );
     edit = null;
   }
@@ -330,7 +330,8 @@
     change((at) => api.duplicateClip(at, clip.id));
   }
 
-  // Deleting doesn't ask first: undoing it comes with undo for the Timeline.
+  // Deleting doesn't ask first: no file is lost, and the Beat stays in the
+  // Beat Library to add again.
   function remove(clip: Clip) {
     change((at) => api.deleteClip(at, clip.id));
   }

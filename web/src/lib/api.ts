@@ -374,6 +374,7 @@ export const api = {
   /** Copies a Clip right after itself, or after its Track's last Clip if that's taken. */
   duplicateClip: (at: SongAt, clipId: number) =>
     request<Timeline>('POST', `/songs/${at.id}/timeline/clips/${clipId}/duplicate`, undefined, at),
+  /** Removes a Clip from the Timeline; its Beat stays in the Beat Library. */
   deleteClip: (at: SongAt, clipId: number) =>
     request<Timeline>('DELETE', `/songs/${at.id}/timeline/clips/${clipId}`, undefined, at),
   /** Puts the Arrangement in this order of Occurrence ids. */

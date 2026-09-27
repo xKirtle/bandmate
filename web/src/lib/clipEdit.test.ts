@@ -58,6 +58,16 @@ describe('clampTrimStart', () => {
     expect(clampTrimStart({ ...clip, start: 25, offset: 10 }, neighbours, 12)).toEqual({ start: 20, offset: 5, length: 15 });
   });
 
+  it('stops at the neighbour before it even when rounding leaves them a hair apart', () => {
+    const touching = { start: 20 - 1e-12, offset: 3, length: 10 };
+    expect(clampTrimStart(touching, neighbours, 12).start).toBe(20);
+  });
+
+  it('never trims to before the source, whatever the rounding', () => {
+    expect(clampTrimStart({ start: 10.1, offset: 0.3, length: 5 }, [], 0).offset).toBe(0);
+    expect(clampTrimStart({ start: 7.7, offset: 1.1, length: 5 }, [], 0).offset).toBe(0);
+  });
+
   it('never starts before 0:00', () => {
     expect(clampTrimStart({ start: 2, offset: 5, length: 10 }, [], -1)).toEqual({ start: 0, offset: 3, length: 12 });
   });
@@ -81,6 +91,11 @@ describe('clampTrimEnd', () => {
 
   it('stops at the neighbour after it', () => {
     expect(clampTrimEnd(clip, neighbours, 60, 45)).toEqual({ start: 22, offset: 5, length: 18 });
+  });
+
+  it('stops at the neighbour after it even when rounding leaves them a hair apart', () => {
+    const touching = { start: 30, offset: 0, length: 10 - 1e-12 };
+    expect(clampTrimEnd(touching, neighbours, 60, 45).length).toBe(10);
   });
 
   it('keeps some of the Clip', () => {

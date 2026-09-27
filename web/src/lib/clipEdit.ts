@@ -30,9 +30,13 @@ export function clampMove(others: readonly Placed[], length: number, desired: nu
  */
 export function clampTrimStart(clip: Placed, others: readonly Placed[], desired: number): Placed {
   const end = clip.start + clip.length;
-  const earliest = Math.max(0, clip.start - clip.offset, ...others.map(endOf).filter((e) => e <= clip.start));
+  // Neighbours are told apart by where they start, so one touching the Clip
+  // still counts when rounding leaves its end a hair past the Clip's start.
+  const before = others.filter((c) => c.start < clip.start);
+  const earliest = Math.max(0, clip.start - clip.offset, ...before.map(endOf));
   const start = Math.min(Math.max(desired, earliest), end - minClipLength);
-  return { start, offset: clip.offset + (start - clip.start), length: end - start };
+  // Rounding could otherwise take the trim a hair before the source's start.
+  return { start, offset: Math.max(0, clip.offset + (start - clip.start)), length: end - start };
 }
 
 /**
@@ -43,7 +47,7 @@ export function clampTrimEnd(clip: Placed, others: readonly Placed[], sourceDura
   const end = clip.start + clip.length;
   const latest = Math.min(
     clip.start + sourceDuration - clip.offset,
-    ...others.map((c) => c.start).filter((s) => s >= end),
+    ...others.filter((c) => c.start > clip.start).map((c) => c.start),
   );
   const newEnd = Math.max(Math.min(desired, latest), clip.start + minClipLength);
   return { start: clip.start, offset: clip.offset, length: newEnd - clip.start };

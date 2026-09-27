@@ -297,13 +297,14 @@ func (s *Store) TrimClip(ctx context.Context, songID int64, based lyricsheet.Ver
 			return err
 		}
 		switch {
-		case offset < 0:
+		case offset < -tolerance:
 			return &lyricsheet.InvalidError{Msg: "a Clip can't start before its source does"}
 		case length <= 0:
 			return &lyricsheet.InvalidError{Msg: "a Clip must play for some time"}
 		case offset+length > p.duration+tolerance:
 			return &lyricsheet.InvalidError{Msg: "a Clip can't play past the end of its source"}
 		}
+		offset = max(offset, 0)
 		p.start += offset - p.offset
 		p.offset, p.length = offset, length
 		return place(ctx, tx, clipID, p)
