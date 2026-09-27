@@ -104,3 +104,24 @@ export function waveWindow(v: View, start: number, length: number): { from: numb
   if (last <= first) return null;
   return { from: first * bar, to: Math.min(length, last * bar), bars: last - first };
 }
+
+/** How close to an edge of the window dragging scrolls it, in pixels. */
+const edgeZone = 48;
+
+/**
+ * How fast to scroll while something's dragged x pixels from the left of
+ * the window, in pixels a second, negative to go earlier: still until the
+ * last edgeZone pixels before either edge, then faster the nearer it gets,
+ * up to a window's width a second at the edge and past it. Still where
+ * there's no further to scroll.
+ */
+export function edgeSpeed(v: View, x: number): number {
+  // From -1, at or past the left edge, to 1 at or past the right.
+  const toward =
+    x < edgeZone
+      ? -Math.min(1, (edgeZone - x) / edgeZone)
+      : Math.max(0, Math.min(1, (x - (v.width - edgeZone)) / edgeZone));
+  const most = view({ ...v, scroll: Infinity }).scroll;
+  if (toward === 0 || (toward < 0 && v.scroll <= 0) || (toward > 0 && v.scroll >= most)) return 0;
+  return toward * v.width;
+}

@@ -22,6 +22,7 @@
   import { formatDuration } from './time';
   import { TimelinePlayer, type PlayableClip, type PlayerState } from './timelinePlayer';
   import {
+    edgeSpeed,
     fitScale,
     follow,
     ticks as rulerTicks,
@@ -337,7 +338,10 @@
   // playing, playback only jumps there on release, so it doesn't stutter.
   let dragging = false;
 
-  function timeAt(event: PointerEvent): number {
+  /** Where a pointer is on the page. */
+  type Point = Pick<PointerEvent, 'clientX' | 'clientY'>;
+
+  function timeAt(event: Point): number {
     return Math.max(0, Math.min(length, spanTimeAt(event.clientX)));
   }
 
@@ -351,6 +355,38 @@
     return clientX - lanesElement!.getBoundingClientRect().left;
   }
 
+  // Dragging the playhead, a Clip or the Loop near an edge of the lanes
+  // scrolls them along, faster the nearer, and what's dragged goes with
+  // them. Taking a Clip or the Loop out of view scrolls away from the
+  // playhead, so it stops being followed.
+  let dragScroll: { at: Point; move: (at: Point) => void } | null = null;
+  let dragFrame = 0;
+
+  /** Notes where something's dragged to, scrolling if it's near an edge. */
+  function dragAt(at: Point, move: (at: Point) => void) {
+    dragScroll = { at: { clientX: at.clientX, clientY: at.clientY }, move };
+    if (dragFrame) return;
+    let last = performance.now();
+    dragFrame = requestAnimationFrame(function step(now) {
+      if (!dragScroll) return;
+      const speed = edgeSpeed(view, xIn(dragScroll.at.clientX));
+      if (speed !== 0) {
+        show(timelineView({ ...view, scroll: view.scroll + (speed * (now - last)) / 1000 }));
+        if (!dragging) following = false;
+        dragScroll.move(dragScroll.at);
+      }
+      last = now;
+      dragFrame = requestAnimationFrame(step);
+    });
+  }
+
+  function dragDone() {
+    dragScroll = null;
+    cancelAnimationFrame(dragFrame);
+    dragFrame = 0;
+  }
+  onDestroy(dragDone);
+
   function pointerDown(event: PointerEvent) {
     // A second finger is pinching.
     if (!event.isPrimary) return;
@@ -361,15 +397,17 @@
     seek(timeAt(event));
   }
 
-  function pointerMove(event: PointerEvent) {
+  function pointerMove(event: Point) {
     if (!dragging) return;
     if (playerState === 'stopped') seek(timeAt(event));
     else position = timeAt(event);
+    dragAt(event, pointerMove);
   }
 
   function pointerUp(event: PointerEvent) {
     if (!dragging) return;
     dragging = false;
+    dragDone();
     seek(timeAt(event));
   }
 
@@ -500,7 +538,7 @@
     window.addEventListener('pointercancel', editCancel);
   }
 
-  function editMove(event: PointerEvent) {
+  function editMove(event: Point) {
     if (!edit || edit.saving) return;
     // A small wobble while clicking isn't a drag.
     if (!edit.moved && Math.abs(event.clientX - edit.fromX) < 4) return;
@@ -516,6 +554,7 @@
     } else {
       edit.placement = clampTrimEnd(clip, othersOn(edit.trackId, clip), beats.get(clip.beatId)!.duration, t);
     }
+    dragAt(event, editMove);
   }
 
   async function editUp() {
@@ -543,6 +582,7 @@
   }
 
   function stopListening() {
+    dragDone();
     window.removeEventListener('pointermove', editMove);
     window.removeEventListener('pointerup', editUp);
     window.removeEventListener('pointercancel', editCancel);
@@ -605,7 +645,7 @@
         : { ...common, mode: 'new', anchor: t, loop: { start: t, end: t, on: true } };
   }
 
-  function loopMove(event: PointerEvent) {
+  function loopMove(event: Point) {
     if (!loopEdit || loopEdit.saving) return;
     // A small wobble while clicking isn't a drag.
     if (!loopEdit.moved && Math.abs(event.clientX - loopEdit.fromX) < 4) return;
@@ -618,9 +658,11 @@
         : mode === 'end'
           ? { ...shown, end: Math.max(t, anchor + minLoop) }
           : { ...shown, start: Math.min(anchor, t), end: Math.max(anchor, t) };
+    dragAt(event, loopMove);
   }
 
   async function loopUp() {
+    dragDone();
     if (!loopEdit || loopEdit.saving) return;
     const { moved, loop: to } = loopEdit;
     const current = timeline.loop;
@@ -635,6 +677,7 @@
   }
 
   function loopCancel() {
+    dragDone();
     if (!loopEdit?.saving) loopEdit = null;
   }
 
@@ -734,6 +777,7 @@
       pinch = pinchOf(event);
       // The first finger may have started dragging the playhead or the Loop.
       dragging = false;
+      dragDone();
       loopCancel();
     };
     const touchMove = (event: TouchEvent) => {
@@ -978,7 +1022,10 @@
               onpointerdown={pointerDown}
               onpointermove={pointerMove}
               onpointerup={pointerUp}
-              onpointercancel={() => (dragging = false)}
+              onpointercancel={() => {
+                dragging = false;
+                dragDone();
+              }}
               onkeydown={rulerKey}
             >
               {#each ticks as t (t)}

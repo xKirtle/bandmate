@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fitScale, follow, maxScale, ticks, timeAt, view, waveWindow, xAt, zoom } from './timelineView';
+import { edgeSpeed, fitScale, follow, maxScale, ticks, timeAt, view, waveWindow, xAt, zoom } from './timelineView';
 
 // A 100s Timeline shown 500px wide: fitted, that's 5px a second.
 const fitted = view({ span: 100, width: 500, scale: 0, scroll: 0 });
@@ -150,5 +150,36 @@ describe('waveWindow', () => {
   it('draws nothing of a Clip well out of view', () => {
     expect(waveWindow(zoomed, 60, 10)).toBeNull();
     expect(waveWindow(zoomed, 0, 9)).toBeNull();
+  });
+});
+
+describe('edgeSpeed', () => {
+  // 20px a second, showing 20s to 45s of 100s: room to scroll both ways.
+  const zoomed = view({ span: 100, width: 500, scale: 20, scroll: 400 });
+
+  it('is still while dragging well inside the window', () => {
+    expect(edgeSpeed(zoomed, 250)).toBe(0);
+  });
+
+  it('scrolls later faster the nearer the right edge', () => {
+    // The last 48px ramp up to a window's width a second.
+    expect(edgeSpeed(zoomed, 452)).toBe(0);
+    expect(edgeSpeed(zoomed, 476)).toBe(250);
+    expect(edgeSpeed(zoomed, 500)).toBe(500);
+  });
+
+  it('scrolls earlier near the left edge', () => {
+    expect(edgeSpeed(zoomed, 24)).toBe(-250);
+  });
+
+  it('goes no faster past the edge', () => {
+    expect(edgeSpeed(zoomed, 900)).toBe(500);
+    expect(edgeSpeed(zoomed, -300)).toBe(-500);
+  });
+
+  it('is still where there’s no further to scroll', () => {
+    expect(edgeSpeed(fitted, 490)).toBe(0);
+    expect(edgeSpeed(view({ ...zoomed, scroll: 0 }), 10)).toBe(0);
+    expect(edgeSpeed(view({ ...zoomed, scroll: 1500 }), 490)).toBe(0);
   });
 });
