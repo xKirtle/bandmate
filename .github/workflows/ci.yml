@@ -1,7 +1,9 @@
 name: CI
 
+# Pull requests test every change; pushes to main test again and publish.
 on:
   push:
+    branches: [main]
   pull_request:
 
 # A newer run on the same branch or PR replaces an older one. Runs on main

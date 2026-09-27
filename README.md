@@ -79,7 +79,7 @@ Back it up by copying `data/`.
 
 ### Release flow
 
-1. Open a pull request. The [CI workflow](.github/workflows/ci.yml) type-checks and builds the SPA, runs `go vet` and `go test`, and builds the Docker image. It runs on every push too.
+1. Open a pull request. The [CI workflow](.github/workflows/ci.yml) type-checks and builds the SPA, runs `go vet` and `go test`, and builds the Docker image. Pushes to other branches don't run CI, so open a draft PR for early feedback.
 2. Merge to `main`. CI runs again and, if it passes, publishes the image to `ghcr.io/xkirtle/bandmate` tagged `latest` and with the commit SHA.
 3. Redeploy the stack in Dockhand, which pulls the new `latest`. Migrations run on startup.
 
