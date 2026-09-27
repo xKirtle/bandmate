@@ -1,6 +1,8 @@
 <script lang="ts">
-  import { onDestroy, untrack, type Snippet } from 'svelte';
-  import { api, type Section, type Song } from './api';
+  import { untrack, type Snippet } from 'svelte';
+  import { SvelteSet } from 'svelte/reactivity';
+  import AlternateText from './AlternateText.svelte';
+  import { api, type Alternate, type Section, type Song } from './api';
 
   let {
     songId,
@@ -27,73 +29,19 @@
     actions: Snippet;
   } = $props();
 
-  // How long typing has to pause before the text is saved.
-  const saveDelay = 800;
-
   // The server guarantees exactly one active Alternate.
   const active = $derived(section.alternates.find((a) => a.active)!);
-  const savedText = $derived(active.lines.map((l) => l.text).join('\n'));
+  const inactive = $derived(section.alternates.filter((a) => !a.active));
 
   let label = $state(untrack(() => section.label));
-  let text = $state(untrack(() => savedText));
   let editingLabel = false;
-  let editingText = false;
-  // The last text sent to or loaded from the server.
-  let sent = untrack(() => savedText);
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  let inFlight = 0;
-  // The last save failed, so the text box holds edits the server doesn't have.
-  let failed = false;
-  // Identifies this editor to onUnsaved.
-  const editor = {};
+  // The inactive Alternates shown expanded.
+  const expanded = new SvelteSet<number>();
 
-  // Show what the server has, unless it would overwrite something being
-  // typed or not yet saved here.
-  $effect(() => {
-    const t = savedText;
-    untrack(() => {
-      if (!editingText && timer === undefined && inFlight === 0 && !failed) text = sent = t;
-    });
-  });
   $effect(() => {
     const l = section.label;
     if (!editingLabel) label = l;
   });
-
-  function typed() {
-    clearTimeout(timer);
-    onUnsaved(editor, true);
-    timer = setTimeout(save, saveDelay);
-  }
-
-  async function save() {
-    clearTimeout(timer);
-    timer = undefined;
-    const t = text;
-    if (t !== sent || failed) {
-      const previous = sent;
-      sent = t;
-      inFlight++;
-      failed = !(await change(() => api.replaceAlternateText(songId, active.id, t)));
-      inFlight--;
-      if (failed) sent = previous;
-    }
-    settle();
-  }
-
-  // Once nothing is waiting to be saved, show the server's text again, unless
-  // the last save failed and the text box is the only copy of the edits.
-  function settle() {
-    if (timer !== undefined || inFlight > 0) return;
-    if (failed) return;
-    onUnsaved(editor, false);
-    if (!editingText) text = sent = savedText;
-  }
-
-  function textBlurred() {
-    editingText = false;
-    save();
-  }
 
   async function commitLabel() {
     editingLabel = false;
@@ -105,11 +53,53 @@
     if (!(await change(() => api.setSectionLabel(songId, section.id, next)))) label = section.label;
   }
 
-  // Leaving the page doesn't blur the text box, so save what's still waiting
-  // or failed last time.
-  onDestroy(() => {
-    if (timer !== undefined || failed) save();
-  });
+  /** How an Alternate is called: its name, else its place among the Section's Alternates. */
+  function nameOf(alt: Alternate): string {
+    return alt.name || `Alternate ${section.alternates.indexOf(alt) + 1}`;
+  }
+
+  /** A hint at how an Alternate differs: its first Line that isn't the same in the one in use. */
+  function preview(alt: Alternate): string {
+    if (alt.lines.length === 0) return 'No Lines yet';
+    const i = alt.lines.findIndex((l, j) => l.text !== active.lines[j]?.text);
+    if (i === -1) return alt.lines.length === active.lines.length ? 'Same as in use' : 'Fewer Lines';
+    return `“${alt.lines[i].lyrics.trim() || '(blank Line)'}”`;
+  }
+
+  async function addAlternate() {
+    if (!(await change(() => api.addAlternate(songId, section.id)))) return;
+    // The newest Alternate comes last; show it open, ready to change.
+    const added = section.alternates.at(-1);
+    if (added && !added.active) expanded.add(added.id);
+  }
+
+  async function rename(alt: Alternate, e: Event & { currentTarget: HTMLInputElement }) {
+    const input = e.currentTarget;
+    const next = input.value.trim();
+    if (next === alt.name) {
+      input.value = alt.name;
+      return;
+    }
+    if (!(await change(() => api.renameAlternate(songId, alt.id, next)))) input.value = alt.name;
+  }
+
+  async function activate(alt: Alternate) {
+    const previous = active.id;
+    if (await change(() => api.activateAlternate(songId, alt.id))) {
+      expanded.delete(alt.id);
+      expanded.delete(previous);
+    }
+  }
+
+  function remove(alt: Alternate) {
+    const ok = confirm(`Delete ${nameOf(alt)} for good?\n\nIts Lines go with it. It can't be undone.`);
+    if (ok) change(() => api.deleteAlternate(songId, alt.id));
+  }
+
+  function toggled(alt: Alternate, e: Event & { currentTarget: HTMLDetailsElement }) {
+    if (e.currentTarget.open) expanded.add(alt.id);
+    else expanded.delete(alt.id);
+  }
 
   function focusWhen(on: boolean) {
     return (el: HTMLElement) => {
@@ -117,14 +107,6 @@
       el.focus();
       el.scrollIntoView({ block: 'nearest' });
     };
-  }
-
-  // Grows the text box to fit its text, so long Sections don't scroll inside
-  // a small box (which is awkward with an on-screen keyboard).
-  function fitText(el: HTMLTextAreaElement) {
-    void text;
-    el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
   }
 </script>
 
@@ -150,21 +132,92 @@
         Shared
       </span>
     {/if}
-    <div class="actions">{@render actions()}</div>
+    <div class="actions">
+      <button
+        type="button"
+        class="icon"
+        onclick={addAlternate}
+        aria-label="New Alternate"
+        title="New Alternate: try another version of these Lines without losing this one"
+      >
+        ⇄
+      </button>
+      {@render actions()}
+    </div>
   </div>
-  <label class="visually-hidden" for="text-{uid}">Lines</label>
-  <textarea
-    id="text-{uid}"
-    class="text"
-    bind:value={text}
-    oninput={typed}
-    onfocus={() => (editingText = true)}
-    onblur={textBlurred}
-    rows="3"
-    placeholder="Write the Lines here, one per line"
-    autocapitalize="sentences"
-    {@attach fitText}
-  ></textarea>
+
+  {#if inactive.length > 0}
+    <div class="in-use">
+      <span class="badge">In use</span>
+      <label class="visually-hidden" for="name-{uid}-{active.id}">Name of the Alternate in use</label>
+      <input
+        id="name-{uid}-{active.id}"
+        class="name"
+        value={active.name}
+        onchange={(e) => rename(active, e)}
+        placeholder={nameOf(active)}
+        autocomplete="off"
+        enterkeyhint="done"
+      />
+    </div>
+  {/if}
+  {#key active.id}
+    <AlternateText {songId} uid="{uid}-{active.id}" alternate={active} label="Lines" {change} {onUnsaved} />
+  {/key}
+
+  {#if inactive.length > 0}
+    <ul class="alternates" aria-label="Other Alternates">
+      {#each inactive as alt (alt.id)}
+        <li>
+          <details open={expanded.has(alt.id)} ontoggle={(e) => toggled(alt, e)}>
+            <summary>
+              <span class="alt-name">{nameOf(alt)}</span>
+              <span class="preview muted">{preview(alt)}</span>
+            </summary>
+            <div class="alt-body">
+              <label class="visually-hidden" for="name-{uid}-{alt.id}">Name of {nameOf(alt)}</label>
+              <input
+                id="name-{uid}-{alt.id}"
+                class="name"
+                value={alt.name}
+                onchange={(e) => rename(alt, e)}
+                placeholder="Name it (optional)"
+                autocomplete="off"
+                enterkeyhint="done"
+              />
+              <div class="compare">
+                <div class="pane">
+                  <p class="pane-title muted">{nameOf(alt)}</p>
+                  <AlternateText
+                    {songId}
+                    uid="{uid}-{alt.id}"
+                    alternate={alt}
+                    label="Lines of {nameOf(alt)}"
+                    {change}
+                    {onUnsaved}
+                  />
+                </div>
+                <div class="pane">
+                  <p class="pane-title muted">In use: {nameOf(active)}</p>
+                  <div class="lines-in-use">
+                    {#each active.lines as line (line.id)}
+                      <p>{line.text || ' '}</p>
+                    {:else}
+                      <p class="muted">No Lines yet.</p>
+                    {/each}
+                  </div>
+                </div>
+              </div>
+              <div class="alt-actions">
+                <button type="button" class="button primary" onclick={() => activate(alt)}>Use this one</button>
+                <button type="button" class="button danger" onclick={() => remove(alt)}>Delete</button>
+              </div>
+            </div>
+          </details>
+        </li>
+      {/each}
+    </ul>
+  {/if}
 </article>
 
 <style>
@@ -197,27 +250,110 @@
   .section.is-shared {
     border-left: 4px solid var(--accent);
   }
-  .shared {
+  .shared,
+  .badge {
     padding: 0.125rem 0.5rem;
     border-radius: 999px;
     background: var(--accent);
     color: var(--accent-text);
     font-size: 0.75rem;
     font-weight: 600;
+    white-space: nowrap;
   }
   .actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.25rem;
     margin-left: auto;
   }
-  .text {
-    display: block;
-    min-height: 5.5rem;
-    background: var(--bg);
-    line-height: 1.6;
-    resize: none;
+  .in-use {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  .name {
+    flex: 1;
+    min-width: 0;
+  }
+  .alternates {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 0.5rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  details {
+    border: 1px dashed var(--border);
+    border-radius: 0.5rem;
+  }
+  summary {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0.625rem 0.75rem;
+    cursor: pointer;
+  }
+  summary::marker {
+    content: '';
+  }
+  summary::before {
+    content: '▸';
+    color: var(--text-muted);
+  }
+  details[open] > summary::before {
+    content: '▾';
+  }
+  .alt-name {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .preview {
+    min-width: 0;
     overflow: hidden;
-    /* Keeps the text box clear of the sticky header when it scrolls into view. */
-    scroll-margin: 4.5rem 0 1rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .alt-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0 0.5rem 0.5rem;
+  }
+  /* Side by side where there's room, one above the other on a phone. */
+  .compare {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: 0.5rem;
+  }
+  .pane {
+    min-width: 0;
+  }
+  .pane-title {
+    margin: 0 0 0.25rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+  .lines-in-use {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    font-size: max(1rem, 16px);
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+  }
+  .lines-in-use p {
+    margin: 0;
+    white-space: pre-wrap;
+  }
+  .alt-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .alt-actions .button {
+    flex: 1 1 8rem;
   }
 </style>
