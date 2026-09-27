@@ -1,5 +1,5 @@
-// Package lyricsheet owns a Song and its Lyric Sheet as one aggregate and
-// exposes intent-level operations on it. All domain rules live here; the HTTP
+// Package lyricsheet owns a Song, with its Lyric Sheet and Masters, as one
+// aggregate and exposes intent-level operations on it. All domain rules live here; the HTTP
 // layer only maps requests onto these operations.
 package lyricsheet
 
@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/xKirtle/bandmate/internal/audio"
 )
 
 // ErrNotFound means the requested Song, or the part of it asked for, doesn't
@@ -88,6 +90,8 @@ type Song struct {
 	CreatedAt  time.Time `json:"createdAt"`
 	UpdatedAt  time.Time `json:"updatedAt"`
 	LyricSheet
+	// Masters are in the order they were added.
+	Masters []Master `json:"masters"`
 }
 
 // SongSummary is a Song as shown in the Song list.
@@ -100,12 +104,14 @@ type SongSummary struct {
 
 // Store reads and changes Songs in the database.
 type Store struct {
-	db *sql.DB
+	db          *sql.DB
+	masterFiles *audio.Files
 }
 
-// NewStore returns a Store backed by db.
-func NewStore(db *sql.DB) *Store {
-	return &Store{db: db}
+// NewStore returns a Store backed by db, keeping Masters' audio in
+// masterFiles.
+func NewStore(db *sql.DB, masterFiles *audio.Files) *Store {
+	return &Store{db: db, masterFiles: masterFiles}
 }
 
 // timeFormat keeps sub-second precision and sorts correctly as text.
@@ -168,6 +174,9 @@ func (s *Store) GetSong(ctx context.Context, id int64) (Song, error) {
 	if song.LyricSheet, err = s.loadLyricSheet(ctx, id); err != nil {
 		return Song{}, err
 	}
+	if song.Masters, err = loadMasters(ctx, s.db, id); err != nil {
+		return Song{}, err
+	}
 	return song, nil
 }
 
@@ -177,19 +186,27 @@ type SongFilter struct {
 	// Title keeps Songs whose title contains it, ignoring case and
 	// surrounding spaces.
 	Title string
+	// HasMaster keeps the Songs with at least one Master (true) or with
+	// none (false).
+	HasMaster *bool
 }
 
 // ListSongs returns the Songs matching filter, most recently edited first.
 func (s *Store) ListSongs(ctx context.Context, filter SongFilter) ([]SongSummary, error) {
-	where, args := "", []any{}
+	conditions, args := []string{"1"}, []any{}
 	if filter.Status != "" {
 		if !filter.Status.valid() {
 			return nil, errUnknownStatus
 		}
-		where, args = "WHERE status = ?", append(args, filter.Status)
+		conditions, args = append(conditions, "status = ?"), append(args, filter.Status)
+	}
+	if filter.HasMaster != nil {
+		conditions, args = append(conditions,
+			"EXISTS (SELECT 1 FROM masters WHERE masters.song_id = songs.id) = ?"), append(args, *filter.HasMaster)
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, title, status, updated_at FROM songs `+where+` ORDER BY updated_at DESC, id DESC`, args...)
+		`SELECT id, title, status, updated_at FROM songs WHERE `+strings.Join(conditions, " AND ")+`
+		 ORDER BY updated_at DESC, id DESC`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("listing songs: %w", err)
 	}
@@ -306,13 +323,29 @@ func (s *Store) UpdateSong(ctx context.Context, id int64, based Version, changes
 }
 
 // DeleteSong removes a Song. Everything the Song owns references it with
-// ON DELETE CASCADE, so it goes too.
+// ON DELETE CASCADE, so it goes too, and so do its Masters' files.
 func (s *Store) DeleteSong(ctx context.Context, id int64, based Version) error {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM songs WHERE id = ? AND (?2 = 0 OR version = ?2)`, id, based)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	masters, err := masterIDs(ctx, tx, id)
+	if err != nil {
+		return err
+	}
+	res, err := tx.ExecContext(ctx, `DELETE FROM songs WHERE id = ? AND (?2 = 0 OR version = ?2)`, id, based)
 	if err != nil {
 		return fmt.Errorf("deleting song: %w", err)
 	}
-	return expectCurrent(ctx, s.db, res, id)
+	if err := expectCurrent(ctx, tx, res, id); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	s.removeMasterFiles(masters)
+	return nil
 }
 
 // expectCurrent checks that a write to a Song, guarded by the version it

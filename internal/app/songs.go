@@ -17,6 +17,15 @@ func (a *App) listSongs(w http.ResponseWriter, r *http.Request) {
 		Status: lyricsheet.Status(query.Get("status")),
 		Title:  query.Get("q"),
 	}
+	switch query.Get("hasMaster") {
+	case "":
+	case "true", "false":
+		hasMaster := query.Get("hasMaster") == "true"
+		filter.HasMaster = &hasMaster
+	default:
+		writeError(w, http.StatusBadRequest, "hasMaster must be true or false")
+		return
+	}
 	list, err := a.songs.ListSongs(r.Context(), filter)
 	if err != nil {
 		writeDomainError(w, err)

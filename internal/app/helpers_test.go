@@ -182,6 +182,7 @@ type song struct {
 	Arrangement []occurrence `json:"arrangement"`
 	Sections    []section    `json:"sections"`
 	Scrapbook   []int64      `json:"scrapbook"`
+	Masters     []master     `json:"masters"`
 }
 
 // occurrence is one appearance of a Section in the Arrangement.
@@ -402,6 +403,17 @@ func (u audioUpload) with(details map[string]any) audioUpload {
 // SendUpload sends an audio file as a multipart form, as the SPA does.
 func (ts *testServer) SendUpload(method, path string, u audioUpload) response {
 	ts.t.Helper()
+	return ts.sendUpload(method, path, nil, u)
+}
+
+// sendUploadAt sends an upload based on a given version of the Song.
+func (ts *testServer) sendUploadAt(version int64, method, path string, u audioUpload) response {
+	ts.t.Helper()
+	return ts.sendUpload(method, path, http.Header{"If-Match": {fmt.Sprintf("%q", fmt.Sprint(version))}}, u)
+}
+
+func (ts *testServer) sendUpload(method, path string, header http.Header, u audioUpload) response {
+	ts.t.Helper()
 	var body bytes.Buffer
 	form := multipart.NewWriter(&body)
 	details, err := json.Marshal(u.Details)
@@ -424,7 +436,12 @@ func (ts *testServer) SendUpload(method, path string, u audioUpload) response {
 	if err := form.Close(); err != nil {
 		ts.t.Fatal(err)
 	}
-	return ts.DoRaw(method, path, http.Header{"Content-Type": {form.FormDataContentType()}}, &body)
+	header = header.Clone()
+	if header == nil {
+		header = http.Header{}
+	}
+	header.Set("Content-Type", form.FormDataContentType())
+	return ts.DoRaw(method, path, header, &body)
 }
 
 // beatPath is where a Beat lives.
@@ -472,6 +489,48 @@ func beatTitles(list []beat) []string {
 	out := []string{}
 	for _, b := range list {
 		out = append(out, b.Title)
+	}
+	return out
+}
+
+// master is a Master as the API returns it, in a Song or on its own.
+type master struct {
+	ID          int64     `json:"id"`
+	Name        string    `json:"name"`
+	Main        bool      `json:"main"`
+	Notes       string    `json:"notes"`
+	FileName    string    `json:"fileName"`
+	ContentType string    `json:"contentType"`
+	Size        int64     `json:"size"`
+	Duration    float64   `json:"duration"`
+	Peaks       []float64 `json:"peaks"`
+	AddedAt     string    `json:"addedAt"`
+}
+
+// masterPath is where one of a Song's Masters lives.
+func masterPath(songID, masterID int64) string {
+	return fmt.Sprintf("/api/songs/%d/masters/%d", songID, masterID)
+}
+
+// uploadMaster adds a Master to a Song and returns the Song.
+func (ts *testServer) uploadMaster(songID int64, u audioUpload) song {
+	ts.t.Helper()
+	res := ts.SendUpload(http.MethodPost, songPath(songID)+"/masters", u)
+	expectStatus(ts.t, res, http.StatusOK)
+	var s song
+	res.JSON(ts.t, &s)
+	return s
+}
+
+// masterNames lists a Song's Masters by name, with the main one starred.
+func masterNames(s song) []string {
+	out := []string{}
+	for _, m := range s.Masters {
+		name := m.Name
+		if m.Main {
+			name += "*"
+		}
+		out = append(out, name)
 	}
 	return out
 }

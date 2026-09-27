@@ -30,7 +30,7 @@ func (a *App) addBeat(w http.ResponseWriter, r *http.Request) {
 		beats.Details
 		uploadDetails
 	}
-	file, ok := a.readUpload(w, r, &details)
+	file, ok := a.readUpload(w, r, a.beatFiles, &details)
 	if !ok {
 		return
 	}
@@ -78,7 +78,7 @@ func (a *App) replaceBeatFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var details uploadDetails
-	file, ok := a.readUpload(w, r, &details)
+	file, ok := a.readUpload(w, r, a.beatFiles, &details)
 	if !ok {
 		return
 	}
@@ -119,8 +119,8 @@ type uploadDetails struct {
 	Peaks    []float64 `json:"peaks"`
 }
 
-func (d uploadDetails) audio(fileName, contentType string) beats.Audio {
-	return beats.Audio{FileName: fileName, ContentType: contentType, Duration: d.Duration, Peaks: d.Peaks}
+func (d uploadDetails) audio(fileName, contentType string) audio.Upload {
+	return audio.Upload{FileName: fileName, ContentType: contentType, Duration: d.Duration, Peaks: d.Peaks}
 }
 
 // uploadedFile is the "file" part of an upload, stored under a temporary
@@ -132,11 +132,11 @@ type uploadedFile struct {
 }
 
 // readUpload reads a multipart upload of an audio file ("file") and a JSON
-// object ("details") decoded into details. The file is streamed to disk and
+// object ("details") decoded into details. The file is streamed into files and
 // capped at the upload limit. On failure it answers the request, keeps
 // nothing and returns false; on success the caller keeps or discards the
 // file.
-func (a *App) readUpload(w http.ResponseWriter, r *http.Request, details any) (uploadedFile, bool) {
+func (a *App) readUpload(w http.ResponseWriter, r *http.Request, files *audio.Files, details any) (uploadedFile, bool) {
 	fail := func(file uploadedFile, status int, msg string) (uploadedFile, bool) {
 		if file.Received != nil {
 			file.Discard()
@@ -180,7 +180,7 @@ func (a *App) readUpload(w http.ResponseWriter, r *http.Request, details any) (u
 			if file.Received != nil {
 				return fail(file, http.StatusBadRequest, "send one file")
 			}
-			received, err := a.files.Receive(part, a.maxUpload)
+			received, err := files.Receive(part, a.maxUpload)
 			if errors.Is(err, audio.ErrTooLarge) || errors.As(err, &maxBytes) {
 				return fail(file, http.StatusRequestEntityTooLarge, tooLarge)
 			}

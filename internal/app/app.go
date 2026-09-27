@@ -33,13 +33,16 @@ const DefaultMaxUploadBytes = 500 << 20
 
 // App is a running Bandmate instance.
 type App struct {
-	db        *sql.DB
-	songs     *lyricsheet.Store
-	beats     *beats.Store
-	files     *audio.Files
-	maxUpload int64
-	spa       fs.FS
-	handler   http.Handler
+	db    *sql.DB
+	songs *lyricsheet.Store
+	beats *beats.Store
+	// beatFiles and masterFiles are where uploads are received, next to
+	// the files they will be kept with.
+	beatFiles   *audio.Files
+	masterFiles *audio.Files
+	maxUpload   int64
+	spa         fs.FS
+	handler     http.Handler
 }
 
 // New opens the database in cfg.DataDir, migrates it, and builds the HTTP
@@ -54,13 +57,19 @@ func New(cfg Config) (*App, error) {
 		conn.Close()
 		return nil, err
 	}
+	masterFiles, err := audio.Open(filepath.Join(cfg.DataDir, "audio", "masters"))
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
 	a := &App{
-		db:        conn,
-		songs:     lyricsheet.NewStore(conn),
-		beats:     beats.NewStore(conn, beatFiles),
-		files:     beatFiles,
-		maxUpload: cfg.MaxUploadBytes,
-		spa:       cfg.SPA,
+		db:          conn,
+		songs:       lyricsheet.NewStore(conn, masterFiles),
+		beats:       beats.NewStore(conn, beatFiles),
+		beatFiles:   beatFiles,
+		masterFiles: masterFiles,
+		maxUpload:   cfg.MaxUploadBytes,
+		spa:         cfg.SPA,
 	}
 	if a.maxUpload <= 0 {
 		a.maxUpload = DefaultMaxUploadBytes
@@ -97,6 +106,12 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("DELETE /api/songs/{id}/alternates/{alternateID}", a.deleteAlternate)
 	mux.HandleFunc("POST /api/songs/{id}/alternates/{alternateID}/activate", a.activateAlternate)
 	mux.HandleFunc("PUT /api/songs/{id}/alternates/{alternateID}/text", a.replaceAlternateText)
+	mux.HandleFunc("POST /api/songs/{id}/masters", a.addMaster)
+	mux.HandleFunc("GET /api/songs/{id}/masters/{masterID}", a.getMaster)
+	mux.HandleFunc("PATCH /api/songs/{id}/masters/{masterID}", a.updateMaster)
+	mux.HandleFunc("DELETE /api/songs/{id}/masters/{masterID}", a.deleteMaster)
+	mux.HandleFunc("POST /api/songs/{id}/masters/{masterID}/main", a.makeMainMaster)
+	mux.HandleFunc("GET /api/songs/{id}/masters/{masterID}/audio", a.masterAudio)
 	mux.HandleFunc("GET /api/config", a.config)
 	mux.HandleFunc("GET /api/beats", a.listBeats)
 	mux.HandleFunc("POST /api/beats", a.addBeat)

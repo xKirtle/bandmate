@@ -8,15 +8,17 @@
   let error = $state<string | null>(null);
   let status = $state<Status | undefined>();
   let q = $state('');
+  // Only Songs with a Master; combines with the Status filter.
+  let hasMaster = $state(false);
 
-  const filtering = $derived(status !== undefined || q.trim() !== '');
+  const filtering = $derived(status !== undefined || hasMaster || q.trim() !== '');
   // Not reactive: the first load shouldn't wait, later ones debounce typing.
   let loaded = false;
 
   // Reloads whenever the filters change, waiting for a pause in typing. Only
   // the latest request's answer is shown.
   $effect(() => {
-    const filter = { status, q };
+    const filter = { status, q, hasMaster: hasMaster || undefined };
     let current = true;
     const timer = setTimeout(() => {
       api.listSongs(filter).then(
@@ -37,6 +39,7 @@
 
   function clearFilters() {
     status = undefined;
+    hasMaster = false;
     q = '';
   }
 </script>
@@ -60,13 +63,16 @@
       autocomplete="off"
       enterkeyhint="search"
     />
-    <div class="chips" role="group" aria-label="Filter by Status">
+    <div class="chips" role="group" aria-label="Filter Songs">
       <button type="button" class="chip" aria-pressed={status === undefined} onclick={() => (status = undefined)}>
         All
       </button>
       {#each statuses as s (s)}
         <button type="button" class="chip" aria-pressed={status === s} onclick={() => (status = s)}>{s}</button>
       {/each}
+      <button type="button" class="chip master" aria-pressed={hasMaster} onclick={() => (hasMaster = !hasMaster)}>
+        Has a Master
+      </button>
     </div>
   </search>
 
@@ -115,8 +121,8 @@
   }
   .chips {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.5rem;
-    overflow-x: auto;
   }
   .chip {
     flex-shrink: 0;
@@ -131,6 +137,9 @@
     font-weight: 600;
     text-transform: capitalize;
     cursor: pointer;
+  }
+  .chip.master {
+    text-transform: none;
   }
   .chip[aria-pressed='true'] {
     background: var(--accent);
