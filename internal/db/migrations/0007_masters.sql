@@ -1,7 +1,9 @@
 -- Finished recordings of a Song made elsewhere. Each Master's audio file is
 -- stored on disk, named by the Master's id; these columns describe it.
+-- AUTOINCREMENT keeps a deleted Master's id, and so its file name, from
+-- being reused while that file is still being removed.
 CREATE TABLE masters (
-	id           INTEGER PRIMARY KEY,
+	id           INTEGER PRIMARY KEY AUTOINCREMENT,
 	song_id      INTEGER NOT NULL REFERENCES songs (id) ON DELETE CASCADE,
 	name         TEXT NOT NULL,
 	-- Exactly one of a Song's Masters is its main Master.

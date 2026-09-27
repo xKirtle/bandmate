@@ -52,7 +52,7 @@ export interface Master {
   addedAt: string;
 }
 
-/** What the user enters about a Master. */
+/** A partial update to a Master's name or notes. */
 export type MasterChanges = Partial<Pick<Master, 'name' | 'notes'>>;
 
 /** One appearance of a Section in the Arrangement. */

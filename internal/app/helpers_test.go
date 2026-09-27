@@ -406,8 +406,8 @@ func (ts *testServer) SendUpload(method, path string, u audioUpload) response {
 	return ts.sendUpload(method, path, nil, u)
 }
 
-// sendUploadAt sends an upload based on a given version of the Song.
-func (ts *testServer) sendUploadAt(version int64, method, path string, u audioUpload) response {
+// SendUploadAt sends an upload based on a given version of the Song.
+func (ts *testServer) SendUploadAt(version int64, method, path string, u audioUpload) response {
 	ts.t.Helper()
 	return ts.sendUpload(method, path, http.Header{"If-Match": {fmt.Sprintf("%q", fmt.Sprint(version))}}, u)
 }

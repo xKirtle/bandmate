@@ -32,9 +32,15 @@
   );
 
   const several = $derived(song.masters.length > 1);
-  // Identifies the name or notes being typed to onUnsaved.
-  const naming = {};
-  const noting = {};
+  // Identifies each Master's name and notes being typed to onUnsaved.
+  const editors = new Map<string, object>();
+
+  function editor(m: Master, field: 'name' | 'notes'): object {
+    const key = `${m.id}-${field}`;
+    let e = editors.get(key);
+    if (!e) editors.set(key, (e = {}));
+    return e;
+  }
 
   async function pick(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
@@ -62,7 +68,7 @@
   }
 
   async function rename(m: Master, input: HTMLInputElement) {
-    onUnsaved(naming, false);
+    onUnsaved(editor(m, 'name'), false);
     const next = input.value.trim();
     if (next === m.name) {
       input.value = m.name;
@@ -77,7 +83,7 @@
   }
 
   async function saveNotes(m: Master, input: HTMLTextAreaElement) {
-    onUnsaved(noting, false);
+    onUnsaved(editor(m, 'notes'), false);
     if (input.value === m.notes) return;
     if (!(await change((at) => api.updateMaster(at, m.id, { notes: input.value })))) input.value = m.notes;
   }
@@ -101,7 +107,7 @@
   </div>
 
   {#if song.masters.length === 0 && !busy}
-    <p class="hint muted">The finished recording, once it's made: a studio mix, a demo, a live take.</p>
+    <p class="hint muted">The finished recording, once it's made: a studio mix, a demo, a live recording.</p>
   {/if}
 
   {#if suggestFinished}
@@ -121,9 +127,9 @@
             id="master-{m.id}-name"
             class="name"
             value={m.name}
-            oninput={() => onUnsaved(naming, true)}
+            oninput={() => onUnsaved(editor(m, 'name'), true)}
             onchange={(e) => rename(m, e.currentTarget)}
-            onblur={() => onUnsaved(naming, false)}
+            onblur={() => onUnsaved(editor(m, 'name'), false)}
             autocomplete="off"
             enterkeyhint="done"
           />
@@ -143,9 +149,9 @@
         Notes
         <textarea
           value={m.notes}
-          oninput={() => onUnsaved(noting, true)}
+          oninput={() => onUnsaved(editor(m, 'notes'), true)}
           onchange={(e) => saveNotes(m, e.currentTarget)}
-          onblur={() => onUnsaved(noting, false)}
+          onblur={() => onUnsaved(editor(m, 'notes'), false)}
           rows="2"
         ></textarea>
       </label>

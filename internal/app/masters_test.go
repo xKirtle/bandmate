@@ -213,7 +213,7 @@ type masterChange struct {
 // Song that already has two Masters.
 var masterChanges = []masterChange{
 	{"add", func(ts *testServer, s song, v int64) response {
-		return ts.sendUploadAt(v, http.MethodPost, songPath(s.ID)+"/masters", fakeAudio("third.wav"))
+		return ts.SendUploadAt(v, http.MethodPost, songPath(s.ID)+"/masters", fakeAudio("third.wav"))
 	}},
 	{"edit", func(ts *testServer, s song, v int64) response {
 		return ts.DoAt(v, http.MethodPatch, masterPath(s.ID, s.Masters[0].ID), map[string]any{"notes": "Louder"})

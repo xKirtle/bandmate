@@ -1,6 +1,6 @@
 // Package lyricsheet owns a Song, with its Lyric Sheet and Masters, as one
-// aggregate and exposes intent-level operations on it. All domain rules live here; the HTTP
-// layer only maps requests onto these operations.
+// aggregate and exposes intent-level operations on it. All domain rules
+// live here; the HTTP layer only maps requests onto these operations.
 package lyricsheet
 
 import (

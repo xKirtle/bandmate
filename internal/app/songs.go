@@ -17,11 +17,11 @@ func (a *App) listSongs(w http.ResponseWriter, r *http.Request) {
 		Status: lyricsheet.Status(query.Get("status")),
 		Title:  query.Get("q"),
 	}
-	switch query.Get("hasMaster") {
+	switch hasMaster := query.Get("hasMaster"); hasMaster {
 	case "":
 	case "true", "false":
-		hasMaster := query.Get("hasMaster") == "true"
-		filter.HasMaster = &hasMaster
+		has := hasMaster == "true"
+		filter.HasMaster = &has
 	default:
 		writeError(w, http.StatusBadRequest, "hasMaster must be true or false")
 		return
