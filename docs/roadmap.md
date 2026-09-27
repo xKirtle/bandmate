@@ -14,11 +14,22 @@ Decisions made while designing, recorded so later spec sessions start from them.
 
 ### 2. Listen
 
-- A **Master** is a finished recording made elsewhere, attached to the Song, never placed on the Timeline or included in the Mixdown. A Song can have several Masters. The page is designed for one: a label and a "main" marker only appear once there's a second. The Song list gets a "has a Master" filter, separate from Status. Adding a Master may suggest setting Status to finished but never forces it.
+- A **Master** is a finished recording made elsewhere, attached to the Song, never placed on the Timeline or included in the Mixdown. A Song can have several Masters. The page is designed for one: a free-text name and a "main" marker only appear once there's a second (they're all Masters, never "alternate masters"). A Master has its own waveform, a simple player, optional notes and a download of the original file. The Song list gets a "has a Master" filter, separate from Status. Adding a Master may suggest setting Status to finished but never forces it.
 - Beats are uploaded audio files (no fetching from YouTube or elsewhere). The **Beat Library** is shared across Songs. Credit (producer, source link) sits on the Beat, not the Song. A Beat can't be deleted while a Song uses it.
 - There are no song "modes" (beatless vs. with a beat). Every Song can have Chords and a Timeline, and the UI adapts: an empty Timeline collapses to a slim "add a beat / record" bar.
 - The Timeline is measured in seconds. No BPM grid or snapping in v1. Clips on one Track never overlap.
 - Audio is served with HTTP Range support so seeking works.
+- Audio files live on disk in the data folder, named by id, with metadata in SQLite. Uploads keep their original format, are accepted if the browser can decode them, and have a size cap (500 MB by default, configurable).
+- Waveform peaks and duration are computed in the browser at upload and stored alongside the file, so the Timeline draws before audio finishes decoding.
+- A Beat carries a title, producer, source link, BPM, key and notes (only the title is required). At upload they're pre-filled from the file's tags, falling back to its filename, for the user to confirm. Adding a Beat to a Song with no BPM offers to copy the Beat's. A Beat's file can only be replaced while no Song uses it.
+- The Timeline plays decoded buffers on one Web Audio clock (ADR 0006). Masters and Beat previews use plain `<audio>`. Only one thing plays at a time, and leaving the Song page stops playback.
+- Clips can be trimmed at both edges without touching the file, and one Beat can appear in several Clips. Dragging or trimming a Clip into a neighbour stops at its edge. For layering, use another Track.
+- A Song starts with no Tracks. A new Beat is appended after the last Clip on the topmost Track that already holds a Beat, or on a new "Beat" Track. Tracks carry no kind.
+- Each Track has a volume from silence to +6 dB, mute and solo. Each Song keeps one **Loop**, saved with the Song.
+- Timeline edits have session-scoped undo/redo (buttons and Ctrl+Z / Ctrl+Shift+Z), so deleting a Clip or Track needs no confirmation. Keyboard shortcuts (space, undo) only apply outside text fields.
+- On desktop the Timeline is a collapsible panel docked at the bottom of the Song page, under the Lyric Sheet. On phone it's playback only.
+- Timeline edits and new Masters count as editing the Song (they move it up the Song list). Deleting a Song deletes its Masters and Timeline but never Beats.
+- Stale tabs are guarded against: a tab refetches the Song when it becomes visible again, and every Song carries a version so a write based on an old version is rejected instead of silently overwriting newer work.
 
 ### 3. Record
 
@@ -33,6 +44,7 @@ Decisions made while designing, recorded so later spec sessions start from them.
 - Cues point to Occurrences and Lines (ADR 0005). They're created by tapping along during playback (each key press cues the next Line in the Arrangement) or by clicking/dragging. An Occurrence gets its Cue from the Cue of its first Line.
 - During playback the current Line is highlighted. Chords never carry a time: they're visible on the highlighted Line, nothing more.
 - Songs without audio have no playback clock. Their Chords are purely positional.
+- Reconsider undo/redo for Lyric Sheet structure (delete Section, Detach, reorder, switch Alternate, move to or from the Scrapbook). Step 2 only has undo for the Timeline, and in-field text relies on the browser's native undo. Undoing an Alternate switch would have to restore the line-level Cues it drops (ADR 0005), so this needs deciding alongside Cues, and weighed against Snapshots in step 5.
 
 ### 5. Keep
 
@@ -45,3 +57,5 @@ Decisions made while designing, recorded so later spec sessions start from them.
 
 - Clip fx: fade in/out, gain, silence.
 - Cues on Masters (lyrics highlighting along with a studio recording).
+- Detecting a Beat's BPM and key from the audio itself.
+- Real-time sync between open tabs or devices.

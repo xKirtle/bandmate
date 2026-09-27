@@ -87,8 +87,12 @@ One recording made in the app, keeping a frozen copy of the lyrics that were act
 _Avoid_: Recording, attempt
 
 **Clip**:
-A Beat or a set of Takes placed at a position on a Track; a Clip with several Takes plays exactly one active Take.
+A stretch of a Beat, or a set of Takes, placed at a position on a Track; the same Beat can be used by several Clips, and trimming a Clip never changes the audio file; a Clip with several Takes plays exactly one active Take.
 _Avoid_: Region, segment
+
+**Loop**:
+A stretch of the Timeline that playback repeats, e.g. the hook of a Beat while writing over it; each Song keeps one, which can be switched on or off.
+_Avoid_: Cycle, repeat, region
 
 **Cue**:
 A link from an Occurrence, or from one Line within an Occurrence, to a time on the Timeline.
@@ -99,8 +103,8 @@ The delay between what the user heard and what the mic captured, measured once b
 _Avoid_: Delay, lag
 
 **Master**:
-A finished recording of a Song made elsewhere (e.g. in a studio), attached to the Song as a result rather than placed on the Timeline.
-_Avoid_: Final, release, finished track
+A finished recording of a Song made elsewhere (e.g. in a studio), attached to the Song as a result rather than placed on the Timeline. When a Song has several, each has a free-text name (e.g. "Radio edit", "Acoustic") and one is the **main Master**.
+_Avoid_: Final, release, finished track, alternate master (an Alternate is something else)
 
 **Mixdown**:
 The Timeline rendered into a single audio file.
