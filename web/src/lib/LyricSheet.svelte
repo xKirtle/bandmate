@@ -3,7 +3,7 @@
   import { MediaQuery } from 'svelte/reactivity';
   import { api, suggestedLabels, type Line, type Occurrence, type Song, type SongAt } from './api';
   import { hasChords } from './chords';
-  import { currentPosition, hasCues } from './cues';
+  import { currentPosition, hasCues, nextLine, type TappedLine } from './cues';
   import LyricSheetView from './LyricSheetView.svelte';
   import SectionEditor from './SectionEditor.svelte';
   import { describe } from './sections';
@@ -15,6 +15,7 @@
     playhead = null,
     hasClips = false,
     seek,
+    tapping = false,
   }: {
     song: Song;
     /** Sends a Lyric Sheet change; resolves to whether it succeeded. */
@@ -26,6 +27,8 @@
     hasClips?: boolean;
     /** Seeks the Timeline, e.g. to a cued Line. */
     seek?: (to: number) => void;
+    /** Whether Tap mode is on, so tap can be called, and clicking a Line in Read mode picks it to tap next. */
+    tapping?: boolean;
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
@@ -53,6 +56,29 @@
     );
   }
 
+  // The Line picked by clicking it in Tap mode, to tap next.
+  let picked = $state<TappedLine | null>(null);
+  // A Line is picked in Read mode only, where it's marked.
+  $effect(() => {
+    if (!tapping || mode === 'write') picked = null;
+  });
+  // The latest tap, while the Cue it set is being saved: the Song doesn't
+  // have that Cue yet, so the next tap goes on from it rather than from
+  // what's current.
+  let saving: TappedLine | null = null;
+
+  /** Cues the next Line in Tap mode at a time, in seconds. */
+  export async function tap(time: number) {
+    const current = saving ?? currentPosition(song, time);
+    const line = nextLine(song, { current, picked, showChords: chordsShown });
+    if (!line) return;
+    picked = null;
+    saving = line;
+    await change((at) => api.setLineCue(at, line.occurrence, line.line, time));
+    // Saved, the Song has the Cue; failed, the Line is still to tap.
+    if (saving === line) saving = null;
+  }
+
   // The Occurrence just added, whose Label gets focus.
   let added = $state<number | null>(null);
   // Write edits the raw text; Read shows Chords above the lyrics.
@@ -63,6 +89,9 @@
   $effect(() => {
     showChords = song.showChords;
   });
+
+  // Whether Chord Lines are on screen: always in Write mode, which shows the raw text.
+  const chordsShown = $derived(mode === 'write' || (showChords && songHasChords));
 
   async function toggleChords() {
     const next = showChords;
@@ -138,11 +167,13 @@
     {/if}
     <LyricSheetView
       {song}
-      showChords={showChords && songHasChords}
+      showChords={chordsShown}
       {current}
       setCue={canCue && showCues ? setCue : undefined}
       setLineCue={canCue && showCues ? setLineCue : undefined}
       {seek}
+      {picked}
+      pick={tapping ? (line) => (picked = line) : undefined}
     />
   {:else}
     <ol class="arrangement">

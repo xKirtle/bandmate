@@ -90,6 +90,60 @@ export function hasCues(song: CuedSong): boolean {
   return song.arrangement.some((o) => o.cue !== null || hasLineCue(o, linesOf(o)));
 }
 
+/** A Line as Tap mode steps onto it: whether it holds only Chords, hidden with them. */
+export interface TappedLineText extends CuedLine {
+  chordLine: boolean;
+}
+
+/** A Song, as far as Tap mode steps through its Lines. */
+export interface TappedSong {
+  arrangement: readonly CuedOccurrence[];
+  sections: readonly { id: number; alternates: readonly { active: boolean; lines: readonly TappedLineText[] }[] }[];
+}
+
+/** A Line within one Occurrence, as Tap mode cues it. */
+export interface TappedLine {
+  occurrence: number;
+  line: number;
+}
+
+/**
+ * The Line Tap mode cues next, in the order down the sheet: a Line picked
+ * by clicking it, or else the one after the current Line, the first of a
+ * Section highlighted as a whole, or with nothing highlighted the first of
+ * the Arrangement. Each Occurrence of a shared Section is stepped through
+ * on its own. Only Lines on screen take a tap: never blank ones, nor Chord
+ * Lines while Chords are hidden. Null once there are no more.
+ */
+export function nextLine(
+  song: TappedSong,
+  { current, picked = null, showChords }: { current: Position | null; picked?: TappedLine | null; showChords: boolean },
+): TappedLine | null {
+  const sections = new Map(song.sections.map((s) => [s.id, s]));
+  const sheet = song.arrangement.flatMap((o, place) =>
+    (sections.get(o.sectionId)?.alternates.find((a) => a.active)?.lines ?? []).map((l) => ({
+      place,
+      occurrence: o.id,
+      line: l.id,
+      tappable: !isBlank(l) && (showChords || !l.chordLine),
+    })),
+  );
+  const at = (p: Position) => sheet.findIndex((q) => q.occurrence === p.occurrence && q.line === p.line);
+  const pickedAt = picked === null ? -1 : at(picked);
+  const currentAt = current === null ? -1 : at(current);
+  let from = 0;
+  if (pickedAt >= 0) from = pickedAt;
+  else if (currentAt >= 0) from = currentAt + 1;
+  else if (current !== null) {
+    // The whole Section: from its first Line, or the next Section's if it has none.
+    const place = song.arrangement.findIndex((o) => o.id === current.occurrence);
+    from = sheet.findIndex((p) => p.place >= place);
+    if (from < 0) return null;
+  }
+  const next = sheet.slice(from).find((p) => p.tappable);
+  return next ? { occurrence: next.occurrence, line: next.line } : null;
+}
+
 /** Moves a Cue a tenth of a second later (1) or earlier (-1), no earlier than 0. */
 export function nudgeCue(cue: number, by: 1 | -1): number {
   return Math.max(0, Math.round(cue * 1000 + by * 100) / 1000);
