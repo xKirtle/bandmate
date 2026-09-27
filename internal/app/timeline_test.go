@@ -372,6 +372,7 @@ func TestDeletingASongDeletesItsTimelineButKeepsItsBeats(t *testing.T) {
 	b := ts.beatOfLength("Dark Trap", 10)
 	gone := ts.createSong("Gone")
 	timelineChange(t, ts.addBeatToSong(gone.ID, b.ID))
+	timelineChange(t, ts.setLoop(gone.ID, map[string]any{"start": 1, "end": 5, "on": true}))
 
 	expectStatus(t, ts.Do(http.MethodDelete, songPath(gone.ID), nil), http.StatusNoContent)
 

@@ -16,7 +16,7 @@
   import { clampMove, clampTrimEnd, clampTrimStart } from './clipEdit';
   import { formatVolume, maxVolume, silence, trackGains, type Levels } from './mixer';
   import { peaksPerSecond } from './peaks';
-  import { timelineEnd, type Loop, type Placed } from './schedule';
+  import { repeats, timelineEnd, type Loop, type Placed } from './schedule';
   import { formatDuration } from './time';
   import { TimelinePlayer, type PlayableClip, type PlayerState } from './timelinePlayer';
   import { bars } from './waveform';
@@ -25,8 +25,7 @@
   // playback with each Track's volume, mute and solo, and the Loop. Editing
   // (adding Beats, adding, renaming, reordering and deleting Tracks, moving,
   // trimming, duplicating and deleting Clips, setting and clearing the Loop)
-  // is only offered on wider screens; on a phone it only plays and mixes, and
-  // switches the Loop on or off.
+  // is only offered on wider screens; on a phone it only plays and mixes.
   let {
     song,
     timeline,
@@ -207,8 +206,8 @@
       position = player.position();
       return;
     }
-    // At the end, playing starts over.
-    play(position >= length ? 0 : position);
+    // At the end, playing starts over, unless there's a Loop yet to go round.
+    play(position >= length && !repeats(position, playingLoop) ? 0 : position);
   }
 
   function seek(to: number) {
@@ -454,14 +453,20 @@
   }
   let loopEdit = $state<LoopEdit | null>(null);
   const loop = $derived(loopEdit?.moved ? loopEdit.loop : timeline.loop);
-  // The shortest Loop, in seconds, so a stray click doesn't set one.
+  // The shortest Loop the browser sets, in seconds, so a stray click doesn't
+  // set one. The server only needs its start before its end.
   const minLoop = 0.25;
+
+  /** The time under a point on the loop bar, within the Timeline shown. */
+  function loopTimeAt(clientX: number): number {
+    return Math.max(0, Math.min(span, spanTimeAt(clientX)));
+  }
 
   function loopDown(event: PointerEvent) {
     if (!editable.current || event.button !== 0 || loopEdit) return;
     const edge = (event.target as HTMLElement).dataset.edge as 'start' | 'end' | undefined;
     const current = timeline.loop;
-    const t = Math.max(0, Math.min(span, spanTimeAt(event.clientX)));
+    const t = loopTimeAt(event.clientX);
     event.preventDefault();
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
     const common = { fromX: event.clientX, moved: false, saving: false };
@@ -476,7 +481,7 @@
     // A small wobble while clicking isn't a drag.
     if (!loopEdit.moved && Math.abs(event.clientX - loopEdit.fromX) < 4) return;
     loopEdit.moved = true;
-    const t = Math.max(0, Math.min(span, spanTimeAt(event.clientX)));
+    const t = loopTimeAt(event.clientX);
     const { mode, anchor, loop: shown } = loopEdit;
     loopEdit.loop =
       mode === 'start'
@@ -515,7 +520,7 @@
   }
 
   /** A stretch of the Timeline's position and width across it, cut off at its end. */
-  function stretch(from: number, to: number): { left: string; width: string } {
+  function spanStyle(from: number, to: number): { left: string; width: string } {
     return { left: `${percent(from)}%`, width: `${Math.max(0, percent(Math.min(to, span) - from))}%` };
   }
 
@@ -564,7 +569,7 @@
         <span class="time muted">{formatDuration(position)} / {formatDuration(length)}</span>
         <button
           type="button"
-          class="toggle loop-toggle"
+          class="toggle loop-toggle edit-only"
           aria-pressed={timeline.loop?.on ?? false}
           disabled={!timeline.loop}
           onclick={switchLoop}
@@ -679,7 +684,7 @@
             onpointercancel={loopCancel}
           >
             {#if loop}
-              {@const at = stretch(loop.start, loop.end)}
+              {@const at = spanStyle(loop.start, loop.end)}
               <div
                 class="loop"
                 class:on={loop.on}
@@ -781,7 +786,7 @@
             </div>
           {/each}
           {#if loop?.on}
-            {@const at = stretch(loop.start, loop.end)}
+            {@const at = spanStyle(loop.start, loop.end)}
             <span class="loop-shade" style:left={at.left} style:width={at.width} aria-hidden="true"></span>
           {/if}
           <span class="playhead" style:left="{percent(position)}%" aria-hidden="true"></span>

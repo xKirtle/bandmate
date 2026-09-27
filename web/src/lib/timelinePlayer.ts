@@ -125,10 +125,14 @@ export class TimelinePlayer {
     const until = repeats(this.#from, loop) ? context.currentTime - this.#startedAt + lookahead : Infinity;
     const clipIndex = new Map(clips.map((c, i) => [c, i]));
     for (const s of schedule(clips, this.#from, loop, { from: this.#scheduledUntil, to: until })) {
+      // Scheduled late, e.g. by a timer held up in a busy tab, a Clip starts
+      // where it would be by now, so it stays in time with the clock.
+      const late = Math.max(0, context.currentTime - (this.#startedAt + s.delay));
+      if (late >= s.duration) continue;
       const node = context.createBufferSource();
       node.buffer = buffers[clipIndex.get(s.clip)!];
       node.connect(this.#trackNode(context, s.clip.trackId));
-      node.start(this.#startedAt + s.delay, s.from, s.duration);
+      node.start(this.#startedAt + s.delay + late, s.from + late, s.duration - late);
       // Let go of each once it's played, as a Loop keeps adding more.
       node.onended = () => {
         node.disconnect();
