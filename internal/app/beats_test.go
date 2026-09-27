@@ -293,7 +293,7 @@ func TestAnUnusedBeatsFileCanBeReplaced(t *testing.T) {
 	replacement := audioUpload{
 		FileName:    "slow_burn_final.wav",
 		ContentType: "audio/wav",
-		Data:        []byte("RIFF the final mixdown"),
+		Data:        []byte("RIFF the final version"),
 		Details:     map[string]any{"duration": 3.25, "peaks": []float64{0.2, 0.9}},
 	}
 

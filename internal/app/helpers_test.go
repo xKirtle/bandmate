@@ -418,7 +418,9 @@ func (ts *testServer) SendUpload(method, path string, u audioUpload) response {
 	if err != nil {
 		ts.t.Fatal(err)
 	}
-	part.Write(u.Data)
+	if _, err := part.Write(u.Data); err != nil {
+		ts.t.Fatal(err)
+	}
 	if err := form.Close(); err != nil {
 		ts.t.Fatal(err)
 	}

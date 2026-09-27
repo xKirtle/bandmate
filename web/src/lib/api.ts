@@ -217,9 +217,13 @@ export const api = {
     request<Beat>('PUT', `/beats/${id}/file`, audioForm(file, decoded)),
   /** Deletes an unused Beat and its file. */
   deleteBeat: (id: number) => request<null>('DELETE', `/beats/${id}`),
-  /** Where a Beat's audio streams from, with seeking. The address changes when the file is replaced. */
-  beatAudioUrl: (beat: Pick<Beat, 'id' | 'size' | 'duration'>) =>
-    `/api/beats/${beat.id}/audio?v=${beat.size}-${beat.duration}`,
+  /**
+   * Where a Beat's audio streams from, with seeking. The address changes when
+   * the file is replaced, so players load the new one; the server also has
+   * browsers check a cached file is current.
+   */
+  beatAudioUrl: (beat: Pick<Beat, 'id' | 'fileName' | 'size' | 'duration'>) =>
+    `/api/beats/${beat.id}/audio?v=${encodeURIComponent(`${beat.fileName}-${beat.size}-${beat.duration}`)}`,
 
   listSongs: (filter: SongFilter = {}) => {
     const params = new URLSearchParams();

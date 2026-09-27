@@ -105,6 +105,9 @@ func (f *Files) Serve(w http.ResponseWriter, r *http.Request, id int64, contentT
 	w.Header().Set("Content-Type", contentType)
 	// The type was set on upload; never let a browser guess another one.
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	// A replaced file keeps its address, so check it's still current
+	// before playing a cached copy.
+	w.Header().Set("Cache-Control", "no-cache")
 	http.ServeContent(w, r, "", info.ModTime(), file)
 	return nil
 }

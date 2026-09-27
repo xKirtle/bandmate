@@ -103,11 +103,11 @@
     addError = null;
   }
 
-  function replace(beat: Beat) {
+  function showChanged(beat: Beat) {
     beats = beats?.map((b) => (b.id === beat.id ? beat : b)) ?? null;
   }
 
-  function remove(id: number) {
+  function dropDeleted(id: number) {
     beats = beats?.filter((b) => b.id !== id) ?? null;
   }
 </script>
@@ -169,7 +169,7 @@
   {:else}
     <div class="beats">
       {#each beats as beat (beat.id)}
-        <BeatItem {beat} {maxUploadBytes} onChange={replace} onDelete={remove} />
+        <BeatItem {beat} {maxUploadBytes} onChange={showChanged} onDelete={dropDeleted} />
       {/each}
     </div>
   {/if}

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"mime"
 	"net/http"
@@ -54,8 +55,9 @@ type Beat struct {
 	Size int64 `json:"size"`
 	// Duration is in seconds.
 	Duration float64 `json:"duration"`
-	// Peaks is the waveform: PeaksPerSecond loudest sample values, from 0 to
-	// 1. The Beat Library list leaves them out.
+	// Peaks is the waveform: the loudest sample of each 1/100 of a second,
+	// from 0 to 1, as the browser computed them. The Beat Library list leaves
+	// them out.
 	Peaks []float64 `json:"peaks,omitempty"`
 	// Songs are the Songs using the Beat, which can't be deleted or have its
 	// file replaced while there are any.
@@ -63,10 +65,6 @@ type Beat struct {
 	CreatedAt time.Time   `json:"createdAt"`
 	UpdatedAt time.Time   `json:"updatedAt"`
 }
-
-// PeaksPerSecond is how many waveform peaks the browser computes for each
-// second of audio.
-const PeaksPerSecond = 100
 
 // Details are what the user enters about a Beat. Empty text and a nil BPM
 // mean "not set"; only the title is required.
@@ -346,7 +344,11 @@ func (s *Store) Delete(ctx context.Context, id int64) error {
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM beats WHERE id = ?`, id); err != nil {
 		return fmt.Errorf("deleting beat: %w", err)
 	}
-	return s.files.Remove(id)
+	// The Beat is gone either way; a file left behind only takes space.
+	if err := s.files.Remove(id); err != nil {
+		log.Printf("deleting beat %d: %v", id, err)
+	}
+	return nil
 }
 
 // ServeFile answers a request for a Beat's audio file, with Range support.
