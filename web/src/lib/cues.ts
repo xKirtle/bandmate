@@ -15,7 +15,19 @@ export interface CuedOccurrence {
 /** A Section, as far as its Lines take Cues. */
 export interface CuedSection {
   id: number;
-  alternates: readonly { active: boolean; lines: readonly { id: number; text: string }[] }[];
+  alternates: readonly { active: boolean; lines: readonly CuedLine[] }[];
+}
+
+/** A Line, as far as it takes a Cue. */
+export interface CuedLine {
+  id: number;
+  text: string;
+}
+
+/** A Song, as far as its Cues go. */
+export interface CuedSong {
+  arrangement: readonly CuedOccurrence[];
+  sections: readonly CuedSection[];
 }
 
 /** Where playback is in the Lyric Sheet: an Occurrence, and one of its Lines or null for the whole Section. */
@@ -30,6 +42,20 @@ export function isBlank(line: { text: string }): boolean {
 }
 
 /**
+ * Gives each Occurrence's Lines whose Cues are in effect: those of its
+ * Section's active Alternate. The others' Cues are dormant (ADR 0007).
+ */
+function activeLines(song: CuedSong): (o: CuedOccurrence) => readonly CuedLine[] {
+  const sections = new Map(song.sections.map((s) => [s.id, s]));
+  return (o) => sections.get(o.sectionId)?.alternates.find((a) => a.active)?.lines ?? [];
+}
+
+/** Whether any of an Occurrence's Lines has a Cue in it. */
+function hasLineCue(o: CuedOccurrence, lines: readonly CuedLine[]): boolean {
+  return lines.some((l) => o.lineCues[l.id] !== undefined);
+}
+
+/**
  * Where playback is at time t: the Line or Occurrence whose Cue is the
  * latest at or before t, wherever it is in the Arrangement, and current
  * until the next Cue. Only Lines of the active Alternate count; the others'
@@ -37,15 +63,12 @@ export function isBlank(line: { text: string }): boolean {
  * none of its Lines has a Cue, and otherwise its first Line. Null before
  * the first Cue. Of two cued at the same time, the later on the sheet.
  */
-export function currentPosition(
-  song: { arrangement: readonly CuedOccurrence[]; sections: readonly CuedSection[] },
-  t: number,
-): Position | null {
-  const sections = new Map(song.sections.map((s) => [s.id, s]));
-  type Latest = { at: number; o: CuedOccurrence; line: number | null; lines: readonly { id: number; text: string }[] };
+export function currentPosition(song: CuedSong, t: number): Position | null {
+  const linesOf = activeLines(song);
+  type Latest = { at: number; o: CuedOccurrence; line: number | null; lines: readonly CuedLine[] };
   let latest: Latest | null = null;
   for (const o of song.arrangement) {
-    const lines = sections.get(o.sectionId)?.alternates.find((a) => a.active)?.lines ?? [];
+    const lines = linesOf(o);
     const cues: [number | null | undefined, number | null][] = [
       [o.cue, null],
       ...lines.map((l) => [o.lineCues[l.id], l.id] as [number | undefined, number]),
@@ -57,8 +80,14 @@ export function currentPosition(
   }
   if (latest === null) return null;
   const { o, line, lines } = latest;
-  if (line !== null || !lines.some((l) => o.lineCues[l.id] !== undefined)) return { occurrence: o.id, line };
+  if (line !== null || !hasLineCue(o, lines)) return { occurrence: o.id, line };
   return { occurrence: o.id, line: lines.find((l) => !isBlank(l))?.id ?? null };
+}
+
+/** Whether any Occurrence has a Cue in effect: its own, or one on a Line of its active Alternate. Dormant Cues don't count. */
+export function hasCues(song: CuedSong): boolean {
+  const linesOf = activeLines(song);
+  return song.arrangement.some((o) => o.cue !== null || hasLineCue(o, linesOf(o)));
 }
 
 /** Moves a Cue a tenth of a second later (1) or earlier (-1), no earlier than 0. */

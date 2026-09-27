@@ -329,7 +329,7 @@ func (s *Store) RemoveOccurrence(ctx context.Context, songID int64, based Versio
 }
 
 // Detach points an Occurrence of a shared Section at a new copy of that
-// Section. The other Occurrences keep the original.
+// Section. The other Occurrences keep the original. Its Cues go with it.
 func (s *Store) Detach(ctx context.Context, songID int64, based Version, occurrenceID int64) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		sectionID, _, err := findOccurrence(ctx, tx, songID, occurrenceID)
@@ -344,13 +344,21 @@ func (s *Store) Detach(ctx context.Context, songID int64, based Version, occurre
 		if uses < 2 {
 			return invalid("only an Occurrence of a shared Section can be Detached")
 		}
-		copyID, err := copySection(ctx, tx, sectionID)
+		copyID, lineCopies, err := copySection(ctx, tx, sectionID)
 		if err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE occurrences SET section_id = ? WHERE id = ?`,
 			copyID, occurrenceID); err != nil {
 			return fmt.Errorf("pointing occurrence at copy: %w", err)
+		}
+		// The Occurrence's Line Cues, dormant ones included, go over to the
+		// copy's Lines. Its own Cue stays with it anyway.
+		for lineID, copyLineID := range lineCopies {
+			if _, err := tx.ExecContext(ctx, `UPDATE line_cues SET line_id = ? WHERE occurrence_id = ? AND line_id = ?`,
+				copyLineID, occurrenceID, lineID); err != nil {
+				return fmt.Errorf("moving line cues to copy: %w", err)
+			}
 		}
 		return nil
 	})
@@ -379,12 +387,13 @@ func findOccurrence(ctx context.Context, tx *sql.Tx, songID, occurrenceID int64)
 }
 
 // copySection creates a new Section with a Section's Label, all its
-// Alternates (the same one active) and all their Lines, and returns its id.
-func copySection(ctx context.Context, tx *sql.Tx, sectionID int64) (int64, error) {
+// Alternates (the same one active) and all their Lines. It returns the new
+// Section's id, and the id of each Line's copy by the id of the Line.
+func copySection(ctx context.Context, tx *sql.Tx, sectionID int64) (int64, map[int64]int64, error) {
 	copyID, err := insert(ctx, tx,
 		`INSERT INTO sections (song_id, label) SELECT song_id, label FROM sections WHERE id = ?`, sectionID)
 	if err != nil {
-		return 0, fmt.Errorf("copying section: %w", err)
+		return 0, nil, fmt.Errorf("copying section: %w", err)
 	}
 	var alternates []int64
 	err = query(ctx, tx, `SELECT id FROM alternates WHERE section_id = ? ORDER BY id`,
@@ -395,21 +404,35 @@ func copySection(ctx context.Context, tx *sql.Tx, sectionID int64) (int64, error
 			return err
 		})
 	if err != nil {
-		return 0, fmt.Errorf("reading alternates: %w", err)
+		return 0, nil, fmt.Errorf("reading alternates: %w", err)
 	}
+	lineCopies := map[int64]int64{}
 	for _, altID := range alternates {
 		copyAltID, err := insert(ctx, tx, `INSERT INTO alternates (section_id, name, active)
 			SELECT ?, name, active FROM alternates WHERE id = ?`, copyID, altID)
 		if err != nil {
-			return 0, fmt.Errorf("copying alternate: %w", err)
+			return 0, nil, fmt.Errorf("copying alternate: %w", err)
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO lines (alternate_id, position, text)
-			SELECT ?, position, text FROM lines WHERE alternate_id = ? ORDER BY position`,
-			copyAltID, altID); err != nil {
-			return 0, fmt.Errorf("copying lines: %w", err)
+		var lines []int64
+		err = query(ctx, tx, `SELECT id FROM lines WHERE alternate_id = ? ORDER BY position`,
+			[]any{altID}, func(rows *sql.Rows) error {
+				var id int64
+				err := rows.Scan(&id)
+				lines = append(lines, id)
+				return err
+			})
+		if err != nil {
+			return 0, nil, fmt.Errorf("reading lines: %w", err)
+		}
+		for _, lineID := range lines {
+			lineCopies[lineID], err = insert(ctx, tx, `INSERT INTO lines (alternate_id, position, text)
+				SELECT ?, position, text FROM lines WHERE id = ?`, copyAltID, lineID)
+			if err != nil {
+				return 0, nil, fmt.Errorf("copying line: %w", err)
+			}
 		}
 	}
-	return copyID, nil
+	return copyID, lineCopies, nil
 }
 
 // arrangementPosition checks a position to insert at in a Song's

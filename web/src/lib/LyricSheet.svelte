@@ -3,7 +3,7 @@
   import { MediaQuery } from 'svelte/reactivity';
   import { api, suggestedLabels, type Line, type Occurrence, type Song, type SongAt } from './api';
   import { hasChords } from './chords';
-  import { currentPosition } from './cues';
+  import { currentPosition, hasCues } from './cues';
   import LyricSheetView from './LyricSheetView.svelte';
   import SectionEditor from './SectionEditor.svelte';
   import { describe } from './sections';
@@ -39,9 +39,7 @@
   // Cues are edited on wider screens only, and only once there's something
   // to cue to or a Cue already set.
   const wide = new MediaQuery('min-width: 40.0625rem');
-  const canCue = $derived(
-    wide.current && (hasClips || song.arrangement.some((o) => o.cue !== null || Object.keys(o.lineCues).length > 0)),
-  );
+  const canCue = $derived(wide.current && (hasClips || hasCues(song)));
 
   function setCue(occurrence: Occurrence, cue: number | null) {
     change((at) =>
