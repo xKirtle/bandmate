@@ -225,6 +225,23 @@ var timelineChanges = []struct {
 	{"add a beat", func(ts *testServer, songID int64, tl timeline, v int64) response {
 		return ts.DoAt(v, http.MethodPost, timelinePath(songID)+"/beats", map[string]any{"beatId": tl.Beats[0].ID})
 	}},
+	{"add a track", func(ts *testServer, songID int64, tl timeline, v int64) response {
+		return ts.DoAt(v, http.MethodPost, timelinePath(songID)+"/tracks", map[string]any{"name": "Adlibs"})
+	}},
+	{"move a clip", func(ts *testServer, songID int64, tl timeline, v int64) response {
+		return ts.DoAt(v, http.MethodPost, clipPath(songID, tl.Tracks[0].Clips[0].ID)+"/move",
+			map[string]any{"trackId": tl.Tracks[0].ID, "start": 5})
+	}},
+	{"trim a clip", func(ts *testServer, songID int64, tl timeline, v int64) response {
+		return ts.DoAt(v, http.MethodPost, clipPath(songID, tl.Tracks[0].Clips[0].ID)+"/trim",
+			map[string]any{"offset": 1, "length": 5})
+	}},
+	{"duplicate a clip", func(ts *testServer, songID int64, tl timeline, v int64) response {
+		return ts.DoAt(v, http.MethodPost, clipPath(songID, tl.Tracks[0].Clips[0].ID)+"/duplicate", nil)
+	}},
+	{"delete a clip", func(ts *testServer, songID int64, tl timeline, v int64) response {
+		return ts.DoAt(v, http.MethodDelete, clipPath(songID, tl.Tracks[0].Clips[0].ID), nil)
+	}},
 	{"rename a track", func(ts *testServer, songID int64, tl timeline, v int64) response {
 		return ts.DoAt(v, http.MethodPatch, fmt.Sprintf("%s/tracks/%d", timelinePath(songID), tl.Tracks[0].ID),
 			map[string]any{"name": "Instrumental"})
@@ -329,4 +346,315 @@ func TestDeletingASongDeletesItsTimelineButKeepsItsBeats(t *testing.T) {
 	expectStatus(t, ts.Do(http.MethodGet, beatPath(b.ID)+"/audio", nil), http.StatusOK)
 	// No Song uses it any more, so it can go.
 	expectStatus(t, ts.Do(http.MethodDelete, beatPath(b.ID), nil), http.StatusNoContent)
+}
+
+// clipPath is where one of a Song's Clips lives.
+func clipPath(songID, clipID int64) string {
+	return fmt.Sprintf("%s/clips/%d", timelinePath(songID), clipID)
+}
+
+// moveClip sends a request to move a Clip to a start on a Track.
+func (ts *testServer) moveClip(songID, clipID, trackID int64, start float64) response {
+	ts.t.Helper()
+	return ts.Do(http.MethodPost, clipPath(songID, clipID)+"/move", map[string]any{"trackId": trackID, "start": start})
+}
+
+// trimClip sends a request to have a Clip play length seconds of its
+// source from offset.
+func (ts *testServer) trimClip(songID, clipID int64, offset, length float64) response {
+	ts.t.Helper()
+	return ts.Do(http.MethodPost, clipPath(songID, clipID)+"/trim", map[string]any{"offset": offset, "length": length})
+}
+
+// duplicateClip sends a request to copy a Clip.
+func (ts *testServer) duplicateClip(songID, clipID int64) response {
+	ts.t.Helper()
+	return ts.Do(http.MethodPost, clipPath(songID, clipID)+"/duplicate", nil)
+}
+
+// deleteClip sends a request to delete a Clip.
+func (ts *testServer) deleteClip(songID, clipID int64) response {
+	ts.t.Helper()
+	return ts.Do(http.MethodDelete, clipPath(songID, clipID), nil)
+}
+
+// addTrack sends a request to add a Track at the bottom of a Song's
+// Timeline.
+func (ts *testServer) addTrack(songID int64, name string) response {
+	ts.t.Helper()
+	return ts.Do(http.MethodPost, timelinePath(songID)+"/tracks", map[string]any{"name": name})
+}
+
+// clipAt is a Clip's place on the Timeline and its trim, as
+// "track:start+length@offset".
+func clipAt(tl timeline, clipID int64) string {
+	for i, tr := range tl.Tracks {
+		for _, c := range tr.Clips {
+			if c.ID == clipID {
+				return fmt.Sprintf("%d:%g+%g@%g", i, c.Start, c.Length, c.Offset)
+			}
+		}
+	}
+	return "nowhere"
+}
+
+// twoClips is a Song with a 10-second Beat at 0:00 on its beat Track and a
+// 20-second one at 0:30 after it, and an empty second Track.
+type twoClips struct {
+	song        song
+	short, long beat
+	// first and second are the Clips of the short and the long Beat.
+	first, second int64
+	tl            timeline
+}
+
+func placeTwoClips(t *testing.T, ts *testServer) twoClips {
+	t.Helper()
+	p := twoClips{song: ts.createSong("Night Drive"), short: ts.beatOfLength("Short", 10), long: ts.beatOfLength("Long", 20)}
+	timelineChange(t, ts.addBeatToSong(p.song.ID, p.short.ID))
+	tl := timelineChange(t, ts.addBeatToSong(p.song.ID, p.long.ID))
+	p.first, p.second = tl.Tracks[0].Clips[0].ID, tl.Tracks[0].Clips[1].ID
+	tl = timelineChange(t, ts.moveClip(p.song.ID, p.second, tl.Tracks[0].ID, 30))
+	p.tl = timelineChange(t, ts.addTrack(p.song.ID, "Adlibs"))
+	return p
+}
+
+func TestATrackCanBeAddedAtTheBottom(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.createSong("Night Drive")
+	timelineChange(t, ts.addBeatToSong(s.ID, ts.beatOfLength("Beat", 10).ID))
+
+	got := timelineChange(t, ts.addTrack(s.ID, "  Lead vox "))
+
+	if len(got.Tracks) != 2 || got.Tracks[1].Name != "Lead vox" || len(got.Tracks[1].Clips) != 0 {
+		t.Errorf("tracks = %+v, want an empty \"Lead vox\" Track below the beat Track", got.Tracks)
+	}
+	expectError(t, ts.addTrack(s.ID, " "), http.StatusBadRequest, "a Track's name is required")
+}
+
+func TestAClipCanBeMovedAlongItsTrack(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+
+	if got := clipAt(p.tl, p.second); got != "0:30+20@0" {
+		t.Fatalf("second clip = %s, want it moved to 0:30", got)
+	}
+	got := timelineChange(t, ts.moveClip(p.song.ID, p.first, p.tl.Tracks[0].ID, 12.5))
+
+	if at := clipAt(got, p.first); at != "0:12.5+10@0" {
+		t.Errorf("first clip = %s, want it at 0:12.5", at)
+	}
+	if want := []string{fmt.Sprintf("%d@12.5+10", p.short.ID), fmt.Sprintf("%d@30+20", p.long.ID)}; !reflect.DeepEqual(clipsOf(got, 0), want) {
+		t.Errorf("clips = %q, want %q", clipsOf(got, 0), want)
+	}
+	if read := ts.getTimeline(p.song.ID); !reflect.DeepEqual(read, got) {
+		t.Errorf("read timeline = %+v, want %+v", read, got)
+	}
+}
+
+func TestAClipCanBeMovedOntoAnotherTrack(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+
+	// It may land where it overlaps a Clip on the Track it leaves.
+	got := timelineChange(t, ts.moveClip(p.song.ID, p.second, p.tl.Tracks[1].ID, 5))
+
+	if at := clipAt(got, p.second); at != "1:5+20@0" {
+		t.Errorf("second clip = %s, want it on the second Track at 0:05", at)
+	}
+	if len(got.Tracks[0].Clips) != 1 {
+		t.Errorf("beat track clips = %+v, want only the first left", got.Tracks[0].Clips)
+	}
+}
+
+func TestMovingAClipIntoANeighbourIsRejected(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+	beatTrack := p.tl.Tracks[0].ID
+	timelineChange(t, ts.moveClip(p.song.ID, p.first, p.tl.Tracks[1].ID, 0))
+	before := ts.getTimeline(p.song.ID)
+
+	// The second Clip is at 0:30-0:50 on the beat Track, the first at
+	// 0:00-0:10 on the other one.
+	for name, send := range map[string]func() response{
+		"overlapping its start": func() response { return ts.moveClip(p.song.ID, p.first, beatTrack, 25) },
+		"overlapping its end":   func() response { return ts.moveClip(p.song.ID, p.first, beatTrack, 49.5) },
+		"inside it":             func() response { return ts.moveClip(p.song.ID, p.first, beatTrack, 35) },
+		"covering it":           func() response { return ts.moveClip(p.song.ID, p.second, p.tl.Tracks[1].ID, 0) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			expectError(t, send(), http.StatusConflict, "Clips can't overlap on a Track")
+			if read := ts.getTimeline(p.song.ID); !reflect.DeepEqual(read, before) {
+				t.Errorf("timeline = %+v, want it unchanged: %+v", read, before)
+			}
+		})
+	}
+
+	// A Clip never collides with itself.
+	timelineChange(t, ts.moveClip(p.song.ID, p.first, p.tl.Tracks[1].ID, 0.5))
+	// Touching a neighbour's edge is fine, on either side.
+	got := timelineChange(t, ts.moveClip(p.song.ID, p.first, beatTrack, 20))
+	if at := clipAt(got, p.first); at != "0:20+10@0" {
+		t.Errorf("first clip = %s, want it just before the second", at)
+	}
+	got = timelineChange(t, ts.moveClip(p.song.ID, p.first, beatTrack, 50))
+	if at := clipAt(got, p.first); at != "0:50+10@0" {
+		t.Errorf("first clip = %s, want it just after the second", at)
+	}
+}
+
+func TestAMoveMustStayOnTheSongsTimeline(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+	other := ts.createSong("Other")
+	timelineChange(t, ts.addBeatToSong(other.ID, p.short.ID))
+	otherTrack := ts.getTimeline(other.ID).Tracks[0].ID
+
+	expectError(t, ts.moveClip(p.song.ID, p.first, p.tl.Tracks[0].ID, -1), http.StatusBadRequest,
+		"a Clip can't start before 0:00")
+	expectError(t, ts.moveClip(p.song.ID, p.first, otherTrack, 100), http.StatusBadRequest,
+		"there's no such Track on this Timeline")
+	expectError(t, ts.Do(http.MethodPost, clipPath(p.song.ID, p.first)+"/move", map[string]any{"start": 1}),
+		http.StatusBadRequest, "trackId and start are required")
+	expectStatus(t, ts.moveClip(p.song.ID, 999, p.tl.Tracks[0].ID, 100), http.StatusNotFound)
+	expectStatus(t, ts.moveClip(other.ID, p.first, otherTrack, 100), http.StatusNotFound)
+}
+
+func TestEitherEdgeOfAClipCanBeTrimmedWithinItsSource(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+	fileBefore := ts.Do(http.MethodGet, beatPath(p.long.ID)+"/audio", nil).Body
+
+	// Skipping 4s of the start keeps the rest where it was on the Timeline.
+	got := timelineChange(t, ts.trimClip(p.song.ID, p.second, 4, 16))
+	if at := clipAt(got, p.second); at != "0:34+16@4" {
+		t.Errorf("after trimming the start, second clip = %s, want 0:34+16@4", at)
+	}
+	got = timelineChange(t, ts.trimClip(p.song.ID, p.second, 4, 10.5))
+	if at := clipAt(got, p.second); at != "0:34+10.5@4" {
+		t.Errorf("after trimming the end, second clip = %s, want 0:34+10.5@4", at)
+	}
+	// Trimmed back out, all the way to the source's edges.
+	got = timelineChange(t, ts.trimClip(p.song.ID, p.second, 0, 20))
+	if at := clipAt(got, p.second); at != "0:30+20@0" {
+		t.Errorf("after untrimming, second clip = %s, want 0:30+20@0", at)
+	}
+
+	// Rounding in the browser can leave a trim right back to the source's
+	// start a hair short of it.
+	got = timelineChange(t, ts.trimClip(p.song.ID, p.second, -1e-12, 20))
+	if at := clipAt(got, p.second); at != "0:30+20@0" {
+		t.Errorf("after a trim rounded past the source's start, second clip = %s, want 0:30+20@0", at)
+	}
+
+	if served := ts.Do(http.MethodGet, beatPath(p.long.ID)+"/audio", nil).Body; string(served) != string(fileBefore) {
+		t.Errorf("audio = %q, want the file untouched", served)
+	}
+	if b := ts.getBeat(p.long.ID); b.Duration != 20 {
+		t.Errorf("beat duration = %g, want it untouched", b.Duration)
+	}
+}
+
+func TestATrimCantGoBeyondItsSource(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+
+	for name, c := range map[string]struct {
+		offset, length float64
+		msg            string
+	}{
+		"before its start": {-1, 10, "a Clip can't start before its source does"},
+		"past its end":     {5, 15.5, "a Clip can't play past the end of its source"},
+		"to nothing":       {5, 0, "a Clip must play for some time"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			expectError(t, ts.trimClip(p.song.ID, p.second, c.offset, c.length), http.StatusBadRequest, c.msg)
+		})
+	}
+	expectError(t, ts.Do(http.MethodPost, clipPath(p.song.ID, p.second)+"/trim", map[string]any{"offset": 1}),
+		http.StatusBadRequest, "offset and length are required")
+	// Pulling the start back 1s would start the Clip before 0:00.
+	timelineChange(t, ts.trimClip(p.song.ID, p.first, 2, 8))
+	timelineChange(t, ts.moveClip(p.song.ID, p.first, p.tl.Tracks[0].ID, 1))
+	expectError(t, ts.trimClip(p.song.ID, p.first, 0, 10), http.StatusBadRequest, "a Clip can't start before 0:00")
+
+	if read := ts.getTimeline(p.song.ID); clipAt(read, p.second) != "0:30+20@0" || clipAt(read, p.first) != "0:1+8@2" {
+		t.Errorf("clips = %s and %s, want the rejected trims to change nothing", clipAt(read, p.first), clipAt(read, p.second))
+	}
+}
+
+func TestTrimmingIntoANeighbourIsRejected(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+	// The second Clip plays 5s-15s of its Beat, at 0:35-0:45.
+	timelineChange(t, ts.trimClip(p.song.ID, p.second, 5, 10))
+	// The first Clip plays 0s-8s of its Beat at 0:27-0:35, touching it.
+	timelineChange(t, ts.trimClip(p.song.ID, p.first, 0, 8))
+	before := timelineChange(t, ts.moveClip(p.song.ID, p.first, p.tl.Tracks[0].ID, 27))
+
+	expectError(t, ts.trimClip(p.song.ID, p.first, 0, 8.5), http.StatusConflict, "Clips can't overlap on a Track")
+	expectError(t, ts.trimClip(p.song.ID, p.second, 4.5, 10.5), http.StatusConflict, "Clips can't overlap on a Track")
+
+	if read := ts.getTimeline(p.song.ID); !reflect.DeepEqual(read, before) {
+		t.Errorf("timeline = %+v, want it unchanged: %+v", read, before)
+	}
+}
+
+func TestSeveralClipsCanPlayTheSameBeat(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+
+	// Duplicated, a Clip repeats right after itself when there's room...
+	got := timelineChange(t, ts.duplicateClip(p.song.ID, p.first))
+	want := []string{
+		fmt.Sprintf("%d@0+10", p.short.ID),
+		fmt.Sprintf("%d@10+10", p.short.ID),
+		fmt.Sprintf("%d@30+20", p.long.ID),
+	}
+	if !reflect.DeepEqual(clipsOf(got, 0), want) {
+		t.Errorf("clips = %q, want %q", clipsOf(got, 0), want)
+	}
+	// ...and after the Track's last Clip when there isn't, keeping its trim.
+	timelineChange(t, ts.trimClip(p.song.ID, p.second, 2, 15))
+	got = timelineChange(t, ts.duplicateClip(p.song.ID, p.first))
+	dup := got.Tracks[0].Clips[3]
+	if dup.BeatID != p.short.ID || dup.Start != 47 || dup.Offset != 0 || dup.Length != 10 {
+		t.Errorf("duplicate = %+v, want the short Beat at 0:47", dup)
+	}
+	got = timelineChange(t, ts.duplicateClip(p.song.ID, p.second))
+	dup = got.Tracks[0].Clips[4]
+	if dup.BeatID != p.long.ID || dup.Start != 57 || dup.Offset != 2 || dup.Length != 15 {
+		t.Errorf("duplicate = %+v, want the long Beat's trim at 0:57", dup)
+	}
+	// Adding the same Beat again reuses it too.
+	got = timelineChange(t, ts.addBeatToSong(p.song.ID, p.long.ID))
+
+	if n := len(got.Tracks[0].Clips); n != 6 {
+		t.Errorf("clips = %d, want 6", n)
+	}
+	if len(got.Beats) != 2 {
+		t.Errorf("beats = %+v, want each Beat listed once", got.Beats)
+	}
+	if b := ts.getBeat(p.short.ID); len(b.Songs) != 1 {
+		t.Errorf("beat songs = %+v, want the Song listed once", b.Songs)
+	}
+	expectStatus(t, ts.duplicateClip(p.song.ID, 999), http.StatusNotFound)
+}
+
+func TestAClipCanBeDeleted(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+	timelineChange(t, ts.duplicateClip(p.song.ID, p.first))
+
+	got := timelineChange(t, ts.deleteClip(p.song.ID, p.second))
+
+	if want := []string{fmt.Sprintf("%d@0+10", p.short.ID), fmt.Sprintf("%d@10+10", p.short.ID)}; !reflect.DeepEqual(clipsOf(got, 0), want) {
+		t.Errorf("clips = %q, want %q", clipsOf(got, 0), want)
+	}
+	if len(got.Beats) != 1 || got.Beats[0].ID != p.short.ID {
+		t.Errorf("beats = %+v, want only the Beat still played", got.Beats)
+	}
+	// No Clip plays the long Beat any more, so it can go.
+	expectStatus(t, ts.Do(http.MethodDelete, beatPath(p.long.ID), nil), http.StatusNoContent)
+	expectStatus(t, ts.deleteClip(p.song.ID, p.second), http.StatusNotFound)
 }

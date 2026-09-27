@@ -360,6 +360,23 @@ export const api = {
    */
   addBeatToTimeline: (at: SongAt, beatId: number) =>
     request<Timeline>('POST', `/songs/${at.id}/timeline/beats`, { beatId }, at),
+  /** Adds an empty Track at the bottom of the Timeline. */
+  addTrack: (at: SongAt, name: string) => request<Timeline>('POST', `/songs/${at.id}/timeline/tracks`, { name }, at),
+  /** Moves a Clip to start at a time on a Track, keeping its trim. Refused if it would overlap a Clip there. */
+  moveClip: (at: SongAt, clipId: number, trackId: number, start: number) =>
+    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/${clipId}/move`, { trackId, start }, at),
+  /**
+   * Has a Clip play length seconds of its source from offset. The audio stays
+   * in place on the Timeline, so trimming the start moves where the Clip starts.
+   */
+  trimClip: (at: SongAt, clipId: number, offset: number, length: number) =>
+    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/${clipId}/trim`, { offset, length }, at),
+  /** Copies a Clip right after itself, or after its Track's last Clip if that's taken. */
+  duplicateClip: (at: SongAt, clipId: number) =>
+    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/${clipId}/duplicate`, undefined, at),
+  /** Removes a Clip from the Timeline; its Beat stays in the Beat Library. */
+  deleteClip: (at: SongAt, clipId: number) =>
+    request<Timeline>('DELETE', `/songs/${at.id}/timeline/clips/${clipId}`, undefined, at),
   /** Puts the Arrangement in this order of Occurrence ids. */
   reorderArrangement: (at: SongAt, occurrences: number[]) =>
     request<Song>('PUT', `/songs/${at.id}/arrangement`, { occurrences }, at),

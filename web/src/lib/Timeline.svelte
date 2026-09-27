@@ -1,16 +1,19 @@
 <script lang="ts">
   import { onDestroy, untrack } from 'svelte';
-  import { api, type Beat, type Song, type SongAt, type Timeline } from './api';
+  import { MediaQuery } from 'svelte/reactivity';
+  import { api, type Beat, type Clip, type Song, type SongAt, type Timeline } from './api';
   import BeatPicker from './BeatPicker.svelte';
+  import { clampMove, clampTrimEnd, clampTrimStart } from './clipEdit';
   import { peaksPerSecond } from './peaks';
-  import { timelineEnd } from './schedule';
+  import { timelineEnd, type Placed } from './schedule';
   import { formatDuration } from './time';
   import { TimelinePlayer, type PlayableClip, type PlayerState } from './timelinePlayer';
   import { bars } from './waveform';
 
   // The Timeline, docked under the Lyric Sheet: its Tracks and Clips, and
-  // playback. Adding a Beat is only offered on wider screens; on a phone it
-  // only plays.
+  // playback. Editing (adding Beats and Tracks, moving, trimming, duplicating
+  // and deleting Clips) is only offered on wider screens; on a phone it only
+  // plays.
   let {
     song,
     timeline,
@@ -49,7 +52,11 @@
     clips.map((c) => ({ ...c, source: api.beatAudioUrl(beats.get(c.beatId)!) })),
   );
   const length = $derived(timelineEnd(clips));
+  // Room after the last Clip, to drag Clips later on the Timeline.
+  const span = $derived(length > 0 ? length + Math.max(10, length / 4) : 0);
   const empty = $derived(clips.length === 0);
+  // Matches the phone layout below, which hides editing.
+  const editable = new MediaQuery('min-width: 40.0625rem');
 
   // Decode in the background, so playing can start right away.
   $effect(() => {
@@ -120,8 +127,13 @@
   let dragging = false;
 
   function timeAt(event: PointerEvent): number {
-    const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    return Math.max(0, Math.min(length, ((event.clientX - box.left) / box.width) * length));
+    return Math.max(0, Math.min(length, spanTimeAt(event.clientX)));
+  }
+
+  /** The time under a point across the lanes, which may be past the end. */
+  function spanTimeAt(clientX: number): number {
+    const box = lanesElement!.getBoundingClientRect();
+    return ((clientX - box.left) / box.width) * span;
   }
 
   function pointerDown(event: PointerEvent) {
@@ -186,15 +198,161 @@
     offerBpm = null;
   }
 
+  function addTrack() {
+    change((at) => api.addTrack(at, `Track ${timeline.tracks.length + 1}`));
+  }
+
+  // Editing a Clip: dragging its body moves it, along its Track or onto
+  // another; dragging an edge trims it. It stops at its neighbours, the
+  // source's ends and 0:00 as it goes, and is saved on release. Until the
+  // saved Timeline comes back, the Clip is shown where it was dropped.
+  interface Edit {
+    clip: Clip;
+    mode: 'move' | 'start' | 'end';
+    /** Where the pointer went down, to tell a click from a drag. */
+    fromX: number;
+    /** How far into the Clip it was grabbed, in seconds. */
+    grab: number;
+    moved: boolean;
+    /** Where the Clip is shown now. */
+    trackId: number;
+    placement: Placed;
+    saving: boolean;
+  }
+  let edit = $state<Edit | null>(null);
+  let lanesElement = $state<HTMLElement>();
+  let laneElements = $state<HTMLElement[]>([]);
+
+  /** Each Track's Clips as shown, with the one being edited where it's been dragged to. */
+  const shown = $derived(
+    timeline.tracks.map((track) => {
+      const placed = track.clips
+        .filter((c) => c.id !== edit?.clip.id)
+        .map((clip) => ({ clip, at: clip as Placed, editing: false }));
+      if (edit?.trackId === track.id) placed.push({ clip: edit.clip, at: edit.placement, editing: true });
+      return { track, clips: placed };
+    }),
+  );
+
+  function trackOf(clip: Clip) {
+    return timeline.tracks.find((t) => t.clips.some((c) => c.id === clip.id))!;
+  }
+
+  /** The other Clips on a Track, which the one being edited can't overlap. */
+  function othersOn(trackId: number, clip: Clip): Clip[] {
+    return timeline.tracks.find((t) => t.id === trackId)!.clips.filter((c) => c.id !== clip.id);
+  }
+
+  /** The Track whose lane is nearest to a height on the page. */
+  function trackAt(clientY: number): number {
+    let best = 0;
+    let distance = Infinity;
+    // Only the lanes of Tracks there now: a removed Track's may linger.
+    timeline.tracks.forEach((_, i) => {
+      const lane = laneElements[i];
+      if (!lane) return;
+      const box = lane.getBoundingClientRect();
+      const d = clientY < box.top ? box.top - clientY : clientY > box.bottom ? clientY - box.bottom : 0;
+      if (d < distance) [best, distance] = [i, d];
+    });
+    return timeline.tracks[best].id;
+  }
+
+  function editDown(event: PointerEvent, clip: Clip, mode: Edit['mode']) {
+    if (!editable.current || event.button !== 0 || edit) return;
+    event.stopPropagation();
+    // Clicking a Clip still focuses it, for its keys and buttons.
+    (event.currentTarget as HTMLElement).closest<HTMLElement>('.clip')?.focus();
+    event.preventDefault();
+    edit = {
+      clip,
+      mode,
+      fromX: event.clientX,
+      grab: spanTimeAt(event.clientX) - clip.start,
+      moved: false,
+      trackId: trackOf(clip).id,
+      placement: clip,
+      saving: false,
+    };
+    window.addEventListener('pointermove', editMove);
+    window.addEventListener('pointerup', editUp);
+    window.addEventListener('pointercancel', editCancel);
+  }
+
+  function editMove(event: PointerEvent) {
+    if (!edit || edit.saving) return;
+    // A small wobble while clicking isn't a drag.
+    if (!edit.moved && Math.abs(event.clientX - edit.fromX) < 4) return;
+    edit.moved = true;
+    const t = spanTimeAt(event.clientX);
+    const { clip } = edit;
+    if (edit.mode === 'move') {
+      edit.trackId = trackAt(event.clientY);
+      const start = clampMove(othersOn(edit.trackId, clip), clip.length, t - edit.grab);
+      edit.placement = { ...clip, start };
+    } else if (edit.mode === 'start') {
+      edit.placement = clampTrimStart(clip, othersOn(edit.trackId, clip), t);
+    } else {
+      edit.placement = clampTrimEnd(clip, othersOn(edit.trackId, clip), beats.get(clip.beatId)!.duration, t);
+    }
+  }
+
+  async function editUp() {
+    stopListening();
+    if (!edit) return;
+    const { clip, trackId, placement: to, mode } = edit;
+    const unchanged =
+      trackId === trackOf(clip).id && to.start === clip.start && to.offset === clip.offset && to.length === clip.length;
+    if (!edit.moved || unchanged) {
+      edit = null;
+      return;
+    }
+    edit.saving = true;
+    await change((at) =>
+      mode === 'move' ? api.moveClip(at, clip.id, trackId, to.start) : api.trimClip(at, clip.id, to.offset, to.length),
+    );
+    edit = null;
+  }
+
+  function editCancel() {
+    stopListening();
+    if (!edit?.saving) edit = null;
+  }
+
+  function stopListening() {
+    window.removeEventListener('pointermove', editMove);
+    window.removeEventListener('pointerup', editUp);
+    window.removeEventListener('pointercancel', editCancel);
+  }
+  onDestroy(stopListening);
+
+  function duplicate(clip: Clip) {
+    change((at) => api.duplicateClip(at, clip.id));
+  }
+
+  // Deleting doesn't ask first: no file is lost, and the Beat stays in the
+  // Beat Library to add again.
+  function remove(clip: Clip) {
+    change((at) => api.deleteClip(at, clip.id));
+  }
+
+  function clipKey(event: KeyboardEvent, clip: Clip) {
+    if (event.target !== event.currentTarget || !editable.current) return;
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault();
+      remove(clip);
+    }
+  }
+
   // Ruler marks at a round interval, about one every 1/8 of the Timeline.
-  const tickStep = $derived([1, 2, 5, 10, 15, 30, 60, 120, 300, 600].find((s) => length / s <= 8) ?? 1200);
+  const tickStep = $derived([1, 2, 5, 10, 15, 30, 60, 120, 300, 600].find((s) => span / s <= 8) ?? 1200);
   const ticks = $derived(
-    Array.from({ length: Math.floor(length / tickStep) + 1 }, (_, i) => i * tickStep).filter((t) => t < length),
+    Array.from({ length: Math.floor(span / tickStep) + 1 }, (_, i) => i * tickStep).filter((t) => t < span),
   );
 
   /** Where a time falls across the Timeline's width, in percent. */
   function percent(time: number): number {
-    return length > 0 ? (time / length) * 100 : 0;
+    return span > 0 ? (time / span) * 100 : 0;
   }
 
   /** The Clip's stretch of its Beat's waveform, as count bars. */
@@ -234,6 +392,7 @@
         {/if}
         <span class="spacer"></span>
         <button type="button" class="button edit-only" onclick={() => (picking = true)}>Add a beat</button>
+        <button type="button" class="button edit-only" onclick={addTrack}>Add a track</button>
         <button
           type="button"
           class="icon"
@@ -253,7 +412,7 @@
             <span class="name">{track.name}</span>
           {/each}
         </div>
-        <div class="lanes">
+        <div class="lanes" bind:this={lanesElement}>
           <div
             class="ruler"
             role="slider"
@@ -273,23 +432,63 @@
               <span class="tick" style:left="{percent(t)}%">{formatDuration(t)}</span>
             {/each}
           </div>
-          {#each timeline.tracks as track (track.id)}
-            <div class="lane">
-              {#each track.clips as clip (clip.id)}
-                {@const count = Math.max(4, Math.round((clip.length / length) * 400))}
+          {#each shown as { track, clips: placed }, t (track.id)}
+            <div class="lane" bind:this={laneElements[t]}>
+              {#each placed as { clip, at, editing } (clip.id)}
+                {@const count = Math.max(4, Math.round((at.length / span) * 400))}
+                {@const title = beats.get(clip.beatId)?.title}
+                <!-- Focusable for its Delete key; pointer dragging has no key equivalent yet, and its actions are buttons. -->
+                <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
                 <div
                   class="clip"
-                  style:left="{percent(clip.start)}%"
-                  style:width="{percent(clip.length)}%"
-                  title={beats.get(clip.beatId)?.title}
+                  class:editing
+                  class:moving={editing && edit?.mode === 'move'}
+                  style:left="{percent(at.start)}%"
+                  style:width="{percent(at.length)}%"
+                  title={title}
+                  role="group"
+                  aria-label="{title}, {formatDuration(at.start)} to {formatDuration(at.start + at.length)}"
+                  tabindex={editable.current ? 0 : undefined}
+                  onpointerdown={(e) => editDown(e, clip, 'move')}
+                  onkeydown={(e) => clipKey(e, clip)}
                 >
-                  <span class="clip-title">{beats.get(clip.beatId)?.title}</span>
+                  <span class="clip-head">
+                    <span class="clip-title">{title}</span>
+                    <span class="clip-actions edit-only">
+                      <button
+                        type="button"
+                        onpointerdown={(e) => e.stopPropagation()}
+                        onclick={() => duplicate(clip)}
+                        aria-label="Duplicate {title}"
+                        title="Duplicate">⧉</button
+                      >
+                      <button
+                        type="button"
+                        onpointerdown={(e) => e.stopPropagation()}
+                        onclick={() => remove(clip)}
+                        aria-label="Delete {title}"
+                        title="Delete (Del)">×</button
+                      >
+                    </span>
+                  </span>
                   <svg viewBox="0 0 {count} 100" preserveAspectRatio="none" aria-hidden="true">
-                    {#each clipShape(clip.beatId, clip.offset, clip.length, count) as peak, i (i)}
+                    {#each clipShape(clip.beatId, at.offset, at.length, count) as peak, i (i)}
                       {@const height = Math.max(2, peak * 100)}
                       <rect x={i + 0.15} y={(100 - height) / 2} width="0.7" {height} />
                     {/each}
                   </svg>
+                  <span
+                    class="trim start edit-only"
+                    aria-hidden="true"
+                    title="Drag to trim the start"
+                    onpointerdown={(e) => editDown(e, clip, 'start')}
+                  ></span>
+                  <span
+                    class="trim end edit-only"
+                    aria-hidden="true"
+                    title="Drag to trim the end"
+                    onpointerdown={(e) => editDown(e, clip, 'end')}
+                  ></span>
                 </div>
               {/each}
             </div>
@@ -438,13 +637,75 @@
     border-radius: 0.25rem;
     background: var(--surface-1);
   }
+  @media (min-width: 40.0625rem) {
+    .clip {
+      cursor: grab;
+    }
+  }
+  .clip:focus-visible,
+  .clip.editing {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  .clip.editing {
+    z-index: 1;
+  }
+  .clip.moving {
+    cursor: grabbing;
+    opacity: 0.85;
+  }
+  .clip-head {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
   .clip-title {
+    flex: 1;
+    min-width: 0;
     padding: 0 0.25rem;
     font-size: 0.6875rem;
     font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .clip-actions {
+    display: none;
+    flex-shrink: 0;
+  }
+  .clip:hover .clip-actions,
+  .clip:focus-within .clip-actions {
+    display: flex;
+  }
+  .clip-actions button {
+    padding: 0 0.25rem;
+    border: none;
+    background: none;
+    color: var(--text);
+    font-size: 0.75rem;
+    line-height: 1.25;
+    cursor: pointer;
+  }
+  .clip-actions button:hover,
+  .clip-actions button:focus-visible {
+    color: var(--accent);
+  }
+  .trim {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 0.375rem;
+    cursor: ew-resize;
+  }
+  .trim.start {
+    left: 0;
+  }
+  .trim.end {
+    right: 0;
+  }
+  .trim:hover {
+    background: var(--accent);
+    opacity: 0.4;
   }
   .clip svg {
     flex: 1;
@@ -479,6 +740,10 @@
     }
     .names {
       width: 4rem;
+    }
+    /* .clip-actions shows on hover, so it needs hiding here too. */
+    .clip .clip-actions {
+      display: none;
     }
   }
 </style>
