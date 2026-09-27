@@ -116,9 +116,12 @@ func pathID(w http.ResponseWriter, r *http.Request, name string) (int64, bool) {
 // writeDomainError maps Lyric Sheet errors onto HTTP responses.
 func writeDomainError(w http.ResponseWriter, err error) {
 	var invalid *lyricsheet.InvalidError
+	var conflict *lyricsheet.ConflictError
 	switch {
 	case errors.As(err, &invalid):
 		writeError(w, http.StatusBadRequest, invalid.Msg)
+	case errors.As(err, &conflict):
+		writeError(w, http.StatusConflict, conflict.Msg)
 	case errors.Is(err, lyricsheet.ErrNotFound):
 		writeError(w, http.StatusNotFound, "not found")
 	default:

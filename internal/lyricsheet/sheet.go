@@ -199,17 +199,59 @@ func (s *Store) AddSection(ctx context.Context, songID int64, label string, posi
 		if err != nil {
 			return err
 		}
-		sectionID, err := insert(ctx, tx, `INSERT INTO sections (song_id, label) VALUES (?, ?)`,
-			songID, cleanLabel(label))
+		sectionID, err := insertSection(ctx, tx, songID, label)
 		if err != nil {
-			return fmt.Errorf("adding section: %w", err)
-		}
-		if _, err := insert(ctx, tx, `INSERT INTO alternates (section_id, active) VALUES (?, 1)`,
-			sectionID); err != nil {
-			return fmt.Errorf("adding alternate: %w", err)
+			return err
 		}
 		return insertOccurrence(ctx, tx, songID, sectionID, pos)
 	})
+}
+
+// AddToScrapbook creates a Section with the given Label and its first
+// (active) Alternate, with no Occurrence, so it starts in the Scrapbook.
+func (s *Store) AddToScrapbook(ctx context.Context, songID int64, label string) (Song, error) {
+	return s.change(ctx, songID, func(tx *sql.Tx) error {
+		_, err := insertSection(ctx, tx, songID, label)
+		return err
+	})
+}
+
+// DeleteSection permanently deletes a Section in the Scrapbook, with its
+// Alternates and Lines. A Section still in the Arrangement can't be deleted.
+func (s *Store) DeleteSection(ctx context.Context, songID, sectionID int64) (Song, error) {
+	return s.change(ctx, songID, func(tx *sql.Tx) error {
+		var uses int
+		err := tx.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM occurrences WHERE section_id = s.id)
+			FROM sections s WHERE s.id = ? AND s.song_id = ?`, sectionID, songID).Scan(&uses)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		if uses > 0 {
+			return conflict("only a Section in the Scrapbook can be deleted; remove it from the Arrangement first")
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM sections WHERE id = ?`, sectionID); err != nil {
+			return fmt.Errorf("deleting section: %w", err)
+		}
+		return nil
+	})
+}
+
+// insertSection creates a Section with its first (active) Alternate and
+// returns its id.
+func insertSection(ctx context.Context, tx *sql.Tx, songID int64, label string) (int64, error) {
+	sectionID, err := insert(ctx, tx, `INSERT INTO sections (song_id, label) VALUES (?, ?)`,
+		songID, cleanLabel(label))
+	if err != nil {
+		return 0, fmt.Errorf("adding section: %w", err)
+	}
+	if _, err := insert(ctx, tx, `INSERT INTO alternates (section_id, active) VALUES (?, 1)`,
+		sectionID); err != nil {
+		return 0, fmt.Errorf("adding alternate: %w", err)
+	}
+	return sectionID, nil
 }
 
 // AddOccurrence adds another Occurrence of one of the Song's Sections at

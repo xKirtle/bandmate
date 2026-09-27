@@ -27,6 +27,25 @@ func (a *App) addSection(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *App) addToScrapbook(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Label string `json:"label"`
+	}
+	a.changeSheet(w, r, &req, func(id int64) (lyricsheet.Song, error) {
+		return a.songs.AddToScrapbook(r.Context(), id, req.Label)
+	})
+}
+
+func (a *App) deleteSection(w http.ResponseWriter, r *http.Request) {
+	sectionID, ok := pathID(w, r, "sectionID")
+	if !ok {
+		return
+	}
+	a.changeSheet(w, r, nil, func(id int64) (lyricsheet.Song, error) {
+		return a.songs.DeleteSection(r.Context(), id, sectionID)
+	})
+}
+
 func (a *App) addOccurrence(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		SectionID *int64 `json:"sectionId"`

@@ -23,6 +23,14 @@ func (e *InvalidError) Error() string { return e.Msg }
 
 func invalid(msg string) error { return &InvalidError{Msg: msg} }
 
+// ConflictError is an operation the Song's current state doesn't allow. Its
+// message is safe to show the user.
+type ConflictError struct{ Msg string }
+
+func (e *ConflictError) Error() string { return e.Msg }
+
+func conflict(msg string) error { return &ConflictError{Msg: msg} }
+
 var (
 	errTitleRequired = invalid("title is required")
 	errUnknownStatus = invalid("status must be idea, drafting or finished")
