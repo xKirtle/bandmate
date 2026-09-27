@@ -213,12 +213,7 @@ func (s *Store) AddBeat(ctx context.Context, songID int64, based lyricsheet.Vers
 			trackID).Scan(&start); err != nil {
 			return fmt.Errorf("finding the end of the track: %w", err)
 		}
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO clips (track_id, beat_id, start, source_offset, length) VALUES (?, ?, ?, 0, ?)`,
-			trackID, beatID, start, duration); err != nil {
-			return fmt.Errorf("adding clip: %w", err)
-		}
-		return nil
+		return addClip(ctx, tx, trackID, NewClip{BeatID: beatID, Start: start, Length: duration})
 	})
 }
 
@@ -265,9 +260,8 @@ func (s *Store) UpdateTrack(ctx context.Context, songID int64, based lyricsheet.
 		sets, args = append(sets, "name = ?"), append(args, name)
 	}
 	if c := changes.Volume; c.Set {
-		if c.Value < Silence || c.Value > MaxVolume {
-			return Timeline{}, &lyricsheet.InvalidError{
-				Msg: fmt.Sprintf("a Track's volume goes from %g dB (silence) to +%g dB", Silence, MaxVolume)}
+		if err := checkVolume(c.Value); err != nil {
+			return Timeline{}, err
 		}
 		sets, args = append(sets, "volume = ?"), append(args, c.Value)
 	}
@@ -288,6 +282,15 @@ func (s *Store) UpdateTrack(ctx context.Context, songID int64, based lyricsheet.
 		}
 		return expectOneRow(res)
 	})
+}
+
+// checkVolume checks that a Track's volume is from Silence to MaxVolume.
+func checkVolume(volume float64) error {
+	if volume < Silence || volume > MaxVolume {
+		return &lyricsheet.InvalidError{
+			Msg: fmt.Sprintf("a Track's volume goes from %g dB (silence) to +%g dB", Silence, MaxVolume)}
+	}
+	return nil
 }
 
 // errTrackNameRequired refuses a Track without a name.
@@ -318,18 +321,75 @@ func expectOneRow(res sql.Result) error {
 	return nil
 }
 
-// AddTrack adds an empty Track at the bottom of the Timeline. Its name
-// can't be blank.
-func (s *Store) AddTrack(ctx context.Context, songID int64, based lyricsheet.Version, name string) (Timeline, error) {
-	name = strings.TrimSpace(name)
+// NewTrack is a Track to add: by default empty, at the bottom of the
+// Timeline, at 0 dB and neither muted nor soloed. Undo uses the rest to
+// bring a deleted Track back as it was.
+type NewTrack struct {
+	Name string `json:"name"`
+	// Position is where it goes, from 0 (the top) to the number of Tracks
+	// (the bottom), pushing those from there down; nil for the bottom.
+	Position *int      `json:"position"`
+	Volume   float64   `json:"volume"`
+	Muted    bool      `json:"muted"`
+	Soloed   bool      `json:"soloed"`
+	Clips    []NewClip `json:"clips"`
+}
+
+// AddTrack adds a Track to the Timeline. Its name can't be blank, its
+// volume must be from Silence to MaxVolume, and its Clips follow the same
+// rules as placing a Clip.
+func (s *Store) AddTrack(ctx context.Context, songID int64, based lyricsheet.Version, t NewTrack) (Timeline, error) {
+	name := strings.TrimSpace(t.Name)
 	if name == "" {
 		return Timeline{}, errTrackNameRequired
 	}
+	if err := checkVolume(t.Volume); err != nil {
+		return Timeline{}, err
+	}
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO tracks (song_id, name, position)
-			VALUES (?1, ?2, (SELECT COALESCE(MAX(position) + 1, 0) FROM tracks WHERE song_id = ?1))`,
-			songID, name); err != nil {
+		var order []int64
+		err := query(ctx, tx, `SELECT id FROM tracks WHERE song_id = ? ORDER BY position, id`, []any{songID},
+			func(rows *sql.Rows) error {
+				var id int64
+				if err := rows.Scan(&id); err != nil {
+					return err
+				}
+				order = append(order, id)
+				return nil
+			})
+		if err != nil {
+			return fmt.Errorf("reading tracks: %w", err)
+		}
+		pos := len(order)
+		if t.Position != nil {
+			if *t.Position < 0 || *t.Position > len(order) {
+				return &lyricsheet.InvalidError{Msg: "a Track's position must be from 0 to the number of Tracks"}
+			}
+			pos = *t.Position
+		}
+		res, err := tx.ExecContext(ctx, `INSERT INTO tracks (song_id, name, position, volume, muted, soloed)
+			VALUES (?, ?, ?, ?, ?, ?)`, songID, name, pos, t.Volume, t.Muted, t.Soloed)
+		if err != nil {
 			return fmt.Errorf("adding track: %w", err)
+		}
+		// Renumbered around it, as deleting Tracks may have left gaps.
+		for i, id := range order {
+			at := i
+			if i >= pos {
+				at++
+			}
+			if _, err := tx.ExecContext(ctx, `UPDATE tracks SET position = ? WHERE id = ?`, at, id); err != nil {
+				return fmt.Errorf("making room for the track: %w", err)
+			}
+		}
+		trackID, err := res.LastInsertId()
+		if err != nil {
+			return err
+		}
+		for _, c := range t.Clips {
+			if err := addClip(ctx, tx, trackID, c); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
@@ -475,19 +535,88 @@ func (s *Store) TrimClip(ctx context.Context, songID int64, based lyricsheet.Ver
 		if err != nil {
 			return err
 		}
-		switch {
-		case offset < -tolerance:
-			return &lyricsheet.InvalidError{Msg: "a Clip can't start before its source does"}
-		case length <= 0:
-			return &lyricsheet.InvalidError{Msg: "a Clip must play for some time"}
-		case offset+length > p.duration+tolerance:
-			return &lyricsheet.InvalidError{Msg: "a Clip can't play past the end of its source"}
+		if err := checkTrim(offset, length, p.duration); err != nil {
+			return err
 		}
 		offset = max(offset, 0)
 		p.start += offset - p.offset
 		p.offset, p.length = offset, length
 		return place(ctx, tx, clipID, p)
 	})
+}
+
+// checkTrim checks that a Clip playing length seconds of a source from
+// offset stays within the source's duration.
+func checkTrim(offset, length, duration float64) error {
+	switch {
+	case offset < -tolerance:
+		return &lyricsheet.InvalidError{Msg: "a Clip can't start before its source does"}
+	case length <= 0:
+		return &lyricsheet.InvalidError{Msg: "a Clip must play for some time"}
+	case offset+length > duration+tolerance:
+		return &lyricsheet.InvalidError{Msg: "a Clip can't play past the end of its source"}
+	}
+	return nil
+}
+
+// NewClip is a stretch of a Beat to place on a Track: where it starts on
+// the Timeline, and where in the Beat it starts playing and for how long,
+// in seconds.
+type NewClip struct {
+	BeatID int64   `json:"beatId"`
+	Start  float64 `json:"start"`
+	Offset float64 `json:"offset"`
+	Length float64 `json:"length"`
+}
+
+// PlaceClip places a stretch of a Beat on a Track of the Timeline, e.g. to
+// bring back a deleted Clip as it was. It must stay within its Beat, start
+// on the Timeline and not overlap a Clip already there.
+func (s *Store) PlaceClip(ctx context.Context, songID int64, based lyricsheet.Version, trackID int64, c NewClip) (Timeline, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		var found int
+		err := tx.QueryRowContext(ctx, `SELECT 1 FROM tracks WHERE id = ? AND song_id = ?`, trackID, songID).Scan(&found)
+		if errors.Is(err, sql.ErrNoRows) {
+			return &lyricsheet.InvalidError{Msg: "there's no such Track on this Timeline"}
+		}
+		if err != nil {
+			return fmt.Errorf("reading track: %w", err)
+		}
+		return addClip(ctx, tx, trackID, c)
+	})
+}
+
+// addClip adds a new Clip to a Track of the Song, if it stays within its
+// Beat, starts on the Timeline and is clear of the Clips already there.
+func addClip(ctx context.Context, tx *sql.Tx, trackID int64, c NewClip) error {
+	var duration float64
+	err := tx.QueryRowContext(ctx, `SELECT duration FROM beats WHERE id = ?`, c.BeatID).Scan(&duration)
+	if errors.Is(err, sql.ErrNoRows) {
+		return &lyricsheet.InvalidError{Msg: "there's no such Beat in the Beat Library"}
+	}
+	if err != nil {
+		return fmt.Errorf("reading beat: %w", err)
+	}
+	if err := checkTrim(c.Offset, c.Length, duration); err != nil {
+		return err
+	}
+	if c.Start < -tolerance {
+		return &lyricsheet.InvalidError{Msg: "a Clip can't start before 0:00"}
+	}
+	p := placement{trackID: trackID, beatID: c.BeatID, start: max(c.Start, 0), offset: max(c.Offset, 0), length: c.Length}
+	free, err := isFree(ctx, tx, 0, p)
+	if err != nil {
+		return err
+	}
+	if !free {
+		return errOverlap
+	}
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO clips (track_id, beat_id, start, source_offset, length) VALUES (?, ?, ?, ?, ?)`,
+		p.trackID, p.beatID, p.start, p.offset, p.length); err != nil {
+		return fmt.Errorf("adding clip: %w", err)
+	}
+	return nil
 }
 
 // DuplicateClip adds a copy of a Clip, with the same trim, right after it on
