@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy, tick, untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
+  import { innerHeight } from 'svelte/reactivity/window';
   import {
     api,
     ApiError,
@@ -20,6 +21,7 @@
   import { peaksPerSecond } from './peaks';
   import { repeats, timelineEnd, type Loop, type Placed } from './schedule';
   import { formatDuration } from './time';
+  import { clampHeight, defaultHeight, deviceStorage, heightBounds, readHeight, storeHeight } from './timelineHeight';
   import { TimelinePlayer, type PlayableClip, type PlayerState } from './timelinePlayer';
   import {
     edgeSpeed,
@@ -517,6 +519,57 @@
     return timeline.tracks[best].id;
   }
 
+  // The Tracks area's height, dragged by the Timeline's top edge. Null is the
+  // default, which follows the window.
+  let chosenHeight = $state<number | null>(readHeight(deviceStorage()));
+  let headsHeight = $state(0);
+  let lanesHeight = $state(0);
+  let resizing: { y: number; height: number } | null = null;
+  const heightStep = 32;
+
+  const bounds = $derived.by(() => {
+    // One Track and the ruler above it.
+    const first = laneElements[0];
+    const least = first ? first.offsetTop + first.offsetHeight : 0;
+    return heightBounds(innerHeight.current ?? 0, least, Math.max(headsHeight, lanesHeight));
+  });
+  const tracksHeight = $derived(clampHeight(chosenHeight ?? defaultHeight(innerHeight.current ?? 0), bounds));
+
+  function resize(height: number) {
+    chosenHeight = clampHeight(height, bounds);
+  }
+
+  function resizeDown(event: PointerEvent) {
+    if (!event.isPrimary || event.button !== 0) return;
+    event.preventDefault();
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    resizing = { y: event.clientY, height: tracksHeight };
+  }
+
+  function resizeMove(event: PointerEvent) {
+    // Dragging up makes it taller.
+    if (resizing) resize(resizing.height + resizing.y - event.clientY);
+  }
+
+  function resizeUp() {
+    if (!resizing) return;
+    resizing = null;
+    storeHeight(deviceStorage(), chosenHeight);
+  }
+
+  function resizeKey(event: KeyboardEvent) {
+    const by = { ArrowUp: heightStep, ArrowDown: -heightStep }[event.key];
+    if (by === undefined) return;
+    event.preventDefault();
+    resize(tracksHeight + by);
+    storeHeight(deviceStorage(), chosenHeight);
+  }
+
+  function resetHeight() {
+    chosenHeight = null;
+    storeHeight(deviceStorage(), null);
+  }
+
   function editDown(event: PointerEvent, clip: Clip, mode: Edit['mode']) {
     if (!editable.current || !event.isPrimary || event.button !== 0 || edit) return;
     event.stopPropagation();
@@ -846,6 +899,28 @@
 {/snippet}
 
 <section class="timeline" aria-label="Timeline">
+  {#if !empty && !collapsed}
+    <!-- A focusable separator with a value is a widget, resized with Up and Down. -->
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+    <div
+      class="resize"
+      role="separator"
+      tabindex="0"
+      aria-orientation="horizontal"
+      aria-controls="timeline-tracks"
+      aria-label="Resize the Timeline"
+      aria-valuemin={Math.round(bounds.min)}
+      aria-valuemax={Math.round(bounds.max)}
+      aria-valuenow={Math.round(tracksHeight)}
+      title="Drag to resize the Timeline (double-click to reset)"
+      onpointerdown={resizeDown}
+      onpointermove={resizeMove}
+      onpointerup={resizeUp}
+      onpointercancel={resizeUp}
+      onkeydown={resizeKey}
+      ondblclick={resetHeight}
+    ></div>
+  {/if}
   <div class="inner">
     {#if empty}
       <div class="empty">
@@ -899,8 +974,8 @@
         </button>
       </div>
 
-      <div class="tracks" id="timeline-tracks" hidden={collapsed}>
-        <div class="heads">
+      <div class="tracks" id="timeline-tracks" hidden={collapsed} style:max-height="{tracksHeight}px">
+        <div class="heads" bind:offsetHeight={headsHeight}>
           <span class="ruler-gap"></span>
           {#each timeline.tracks as track, i (track.id)}
             {@const trackLevels = levels[i]}
@@ -975,7 +1050,13 @@
             </div>
           {/each}
         </div>
-        <div class="lanes" bind:this={lanesElement} bind:clientWidth={width} onscroll={scrolled}>
+        <div
+          class="lanes"
+          bind:this={lanesElement}
+          bind:clientWidth={width}
+          bind:offsetHeight={lanesHeight}
+          onscroll={scrolled}
+        >
           <div class="content" style:width="{span * view.scale}px">
             <!-- Pointer only, like dragging Clips; the Loop is switched on and off with its button. -->
             <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -1139,6 +1220,30 @@
     border-top: 1px solid var(--border);
     background: var(--bg);
   }
+  /* A few pixels either side of the top border, to be easy to grab. */
+  .resize {
+    position: absolute;
+    top: -0.3125rem;
+    right: 0;
+    left: 0;
+    z-index: 1;
+    height: 0.5625rem;
+    cursor: row-resize;
+    touch-action: none;
+  }
+  .resize:hover::after,
+  .resize:focus-visible::after {
+    content: '';
+    position: absolute;
+    top: 0.1875rem;
+    right: 0;
+    left: 0;
+    height: 0.1875rem;
+    background: var(--accent);
+  }
+  .resize:focus-visible {
+    outline: none;
+  }
   .inner {
     max-width: 72rem;
     margin: 0 auto;
@@ -1191,7 +1296,6 @@
     display: flex;
     /* Stretched to the height cap, the headers would squash and the lanes be cut off. */
     align-items: flex-start;
-    max-height: 40vh;
     margin-top: 0.5rem;
     overflow-y: auto;
   }
