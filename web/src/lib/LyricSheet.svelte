@@ -3,7 +3,8 @@
   import { MediaQuery } from 'svelte/reactivity';
   import { api, suggestedLabels, type Line, type Occurrence, type Song, type SongAt } from './api';
   import { hasChords } from './chords';
-  import { currentPosition, hasCues, nextLine, type TapLine } from './cues';
+  import { currentPosition, hasCues, isBlank, nextLine, type TapLine } from './cues';
+  import { follower, key } from './follow';
   import LyricSheetView from './LyricSheetView.svelte';
   import SectionEditor from './SectionEditor.svelte';
   import { describe } from './sections';
@@ -37,6 +38,8 @@
   const inArrangement = $derived(
     [...new Set(song.arrangement.map((o) => o.sectionId))].flatMap((id) => sections.get(id) ?? []),
   );
+  // Write edits the raw text; Read shows Chords above the lyrics.
+  let mode = $state<'write' | 'read'>('write');
   // Where playback is in the Lyric Sheet.
   const current = $derived(playhead === null ? null : currentPosition(song, playhead));
   // Cues are edited on wider screens only, and only once there's something
@@ -54,6 +57,32 @@
     change((at) =>
       cue === null ? api.clearLineCue(at, occurrence.id, line.id) : api.setLineCue(at, occurrence.id, line.id, cue),
     );
+  }
+
+  // In Write mode, each Occurrence's Lines and whole Section are tracked, to
+  // follow playback to, and each Line's Cue field, to go on to with Enter.
+  // Read mode does the same in LyricSheetView.
+  const { track, follow } = follower();
+  const writeFields = new Map<string, { edit: () => void }>();
+  // The Line Cue fields in order down the page.
+  const writeGutter = $derived(
+    song.arrangement.flatMap((o) =>
+      (sections.get(o.sectionId)?.alternates.find((a) => a.active)?.lines ?? [])
+        .filter((l) => !isBlank(l))
+        .map((l) => key(o.id, l.id)),
+    ),
+  );
+  // Write mode shows every Line, Chord Lines included, so whatever is
+  // current is on screen.
+  const writeKey = $derived(mode === 'write' && current ? key(current.occurrence, current.line) : null);
+  $effect(() => {
+    follow(writeKey);
+  });
+
+  function editAfter(k: string): boolean {
+    const next = writeFields.get(writeGutter[writeGutter.indexOf(k) + 1]);
+    next?.edit();
+    return !!next;
   }
 
   // The Line picked by clicking it in Tap mode, to tap next.
@@ -81,8 +110,6 @@
 
   // The Occurrence just added, whose Label gets focus.
   let added = $state<number | null>(null);
-  // Write edits the raw text; Read shows Chords above the lyrics.
-  let mode = $state<'write' | 'read'>('write');
   const songHasChords = $derived(hasChords(song));
   // Follows the server, except while a change to it is being sent.
   let showChords = $state(untrack(() => song.showChords));
@@ -180,7 +207,11 @@
       {#each song.arrangement as occurrence, i (occurrence.id)}
         {@const section = sections.get(occurrence.sectionId)}
         {#if section}
-          <li>
+          <li
+            class:current={writeKey === key(occurrence.id)}
+            aria-current={writeKey === key(occurrence.id) ? 'true' : undefined}
+            {@attach (el) => track(el, key(occurrence.id))}
+          >
             <SectionEditor
               uid="o{occurrence.id}"
               {section}
@@ -188,6 +219,23 @@
               autofocus={added === occurrence.id}
               {change}
               {onUnsaved}
+              cue={canCue ? { at: occurrence.cue, save: (cue) => setCue(occurrence, cue) } : undefined}
+              cueing={{
+                cues: occurrence.lineCues,
+                current: current?.occurrence === occurrence.id ? current.line : null,
+                track: (el, line) => track(el, key(occurrence.id, line)),
+                gutter: canCue
+                  ? {
+                      of: section.label ? ` of ${section.label}` : '',
+                      save: (line, cue) => setLineCue(occurrence, line, cue),
+                      field: (line, field) => {
+                        if (field) writeFields.set(key(occurrence.id, line), field);
+                        else writeFields.delete(key(occurrence.id, line));
+                      },
+                      next: (line) => editAfter(key(occurrence.id, line)),
+                    }
+                  : undefined,
+              }}
             >
               {#snippet actions()}
                 <button type="button" class="icon" onclick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">
@@ -343,6 +391,12 @@
     margin: 0 0 0.75rem;
     padding: 0;
     list-style: none;
+  }
+  /* Playback is on the Section as a whole, before its Lines are cued. */
+  .arrangement > .current {
+    border-radius: 0.75rem;
+    box-shadow: 0 0 0 2px var(--accent);
+    scroll-margin-top: 5rem;
   }
   .add-row {
     display: flex;
