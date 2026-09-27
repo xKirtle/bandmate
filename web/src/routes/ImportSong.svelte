@@ -42,7 +42,8 @@
     <label for="lyrics">Lyrics</label>
     <p id="lyrics-hint" class="muted">
       Paste plain text or ChordPro. Blank lines split Sections, lines like <code>Chorus:</code> or
-      <code>[Chorus]</code> become Labels, and <code>[Am]</code> becomes a Chord.
+      <code>[Chorus]</code> become Labels, and <code>[Am]</code> becomes a Chord. Repeated Sections are
+      shared, and a Label on its own repeats the last Section with that Label.
     </p>
     <!-- svelte-ignore a11y_autofocus -->
     <textarea
