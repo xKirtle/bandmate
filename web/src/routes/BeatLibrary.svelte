@@ -5,7 +5,8 @@
   import { fromDraft, toDraft, type BeatDraft } from '../lib/beatDraft';
   import MainNav from '../lib/MainNav.svelte';
   import { formatDuration } from '../lib/time';
-  import { baseName, prepareUpload } from '../lib/upload';
+  import { suggestForFile } from '../lib/beatTags';
+  import { prepareUpload } from '../lib/upload';
 
   let beats = $state<Beat[] | null>(null);
   let loadError = $state<string | null>(null);
@@ -68,8 +69,8 @@
     addError = null;
     addBusy = `Reading “${file.name}”…`;
     try {
-      const decoded = await prepareUpload(file, maxUploadBytes);
-      adding = { file, decoded, draft: toDraft(null, baseName(file.name)) };
+      const [decoded, suggestion] = await Promise.all([prepareUpload(file, maxUploadBytes), suggestForFile(file)]);
+      adding = { file, decoded, draft: toDraft(suggestion) };
     } catch (e) {
       addError = (e as Error).message;
     } finally {

@@ -4,7 +4,8 @@
   import BeatFields from './BeatFields.svelte';
   import { fromDraft, toDraft, type BeatDraft } from './beatDraft';
   import { formatDuration } from './time';
-  import { baseName, prepareUpload } from './upload';
+  import { suggestForFile } from './beatTags';
+  import { prepareUpload } from './upload';
 
   // Picks a Beat to add to a Song: one from the Beat Library, found by
   // searching, or a new upload, which joins the Library first.
@@ -71,8 +72,8 @@
     error = null;
     busy = `Reading “${file.name}”…`;
     try {
-      const decoded = await prepareUpload(file, maxUploadBytes);
-      adding = { file, decoded, draft: toDraft(null, baseName(file.name)) };
+      const [decoded, suggestion] = await Promise.all([prepareUpload(file, maxUploadBytes), suggestForFile(file)]);
+      adding = { file, decoded, draft: toDraft(suggestion) };
     } catch (e) {
       error = (e as Error).message;
     } finally {

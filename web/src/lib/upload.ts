@@ -26,11 +26,6 @@ export async function decodeAudio(file: File): Promise<DecodedAudio> {
   return { duration: buffer.duration, peaks: peaks(channels, buffer.sampleRate) };
 }
 
-/** A file's name without its extension, e.g. as a default title. */
-export function baseName(fileName: string): string {
-  return fileName.replace(/\.[^.]+$/, '');
-}
-
 /** "4.2 MB" */
 export function formatSize(bytes: number): string {
   const mb = bytes / (1 << 20);
