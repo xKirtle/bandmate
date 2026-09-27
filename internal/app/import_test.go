@@ -13,6 +13,20 @@ func (ts *testServer) importSong(title, text string) response {
 	return ts.Do(http.MethodPost, "/api/songs/import", map[string]any{"title": title, "text": text})
 }
 
+// importSheet pastes text into a new Song titled Midnight Drive, expects it
+// to be created and to read back the same, and returns it.
+func (ts *testServer) importSheet(text string) song {
+	ts.t.Helper()
+	res := ts.importSong("Midnight Drive", text)
+	expectStatus(ts.t, res, http.StatusCreated)
+	var s song
+	res.JSON(ts.t, &s)
+	if read := ts.getSong(s.ID); !reflect.DeepEqual(read, s) {
+		ts.t.Errorf("song read back = %+v, want %+v", read, s)
+	}
+	return s
+}
+
 // shownSection is one Occurrence of a Song as the user reads it: its
 // Section's Label and the texts of its active Lines.
 type shownSection struct {
@@ -83,7 +97,6 @@ func TestImportSplitsPastedTextIntoSections(t *testing.T) {
 			"[Verse]\nCity lights\nChorus:\nMe home",
 			[]shownSection{{"Verse", []string{"City lights"}}, {"Chorus", []string{"Me home"}}},
 		},
-		// Repeating an earlier Section this way comes with merging, in #11.
 		"heading with no lines is an empty section": {
 			"Intro:\n[Verse]\nCity lights\n\n[Chorus]\n\nMe home",
 			[]shownSection{{"Intro", []string{}}, {"Verse", []string{"City lights"}}, {"Chorus", []string{}}, {"", []string{"Me home"}}},
@@ -128,6 +141,30 @@ func TestImportSplitsPastedTextIntoSections(t *testing.T) {
 			"{title: Other Name}\n{t: Other}\nCity lights",
 			[]shownSection{{"", []string{"City lights"}}},
 		},
+		"chordpro section directives": {
+			"{start_of_verse}\nCity lights\n{end_of_verse}\n{start_of_chorus}\nMe home\n{end_of_chorus}\n{start_of_bridge}\nSo far\n{end_of_bridge}",
+			[]shownSection{{"Verse", []string{"City lights"}}, {"Chorus", []string{"Me home"}}, {"Bridge", []string{"So far"}}},
+		},
+		"short chordpro section directives": {
+			"{sov}\nCity lights\n{eov}\n{soc}\nMe home\n{eoc}\n{sob}\nSo far\n{eob}",
+			[]shownSection{{"Verse", []string{"City lights"}}, {"Chorus", []string{"Me home"}}, {"Bridge", []string{"So far"}}},
+		},
+		"a section directive can name its label": {
+			"{start_of_verse: Verse 2}\nCity lights\n{end_of_verse}",
+			[]shownSection{{"Verse 2", []string{"City lights"}}},
+		},
+		"section directive names ignore case": {
+			"{Start_Of_Chorus}\nMe home\n{EOC}",
+			[]shownSection{{"Chorus", []string{"Me home"}}},
+		},
+		"an end directive closes the section": {
+			"{soc}\nMe home\n{eoc}\nCity lights",
+			[]shownSection{{"Chorus", []string{"Me home"}}, {"", []string{"City lights"}}},
+		},
+		"a section directive closes the one before": {
+			"City lights\n{soc}\nMe home",
+			[]shownSection{{"", []string{"City lights"}}, {"Chorus", []string{"Me home"}}},
+		},
 		"brackets inside a line are lyrics": {
 			"[Chorus] x2\nMe home",
 			[]shownSection{{"", []string{"[Chorus] x2", "Me home"}}},
@@ -137,18 +174,157 @@ func TestImportSplitsPastedTextIntoSections(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ts := newTestServer(t)
 
-			res := ts.importSong("Midnight Drive", c.text)
+			s := ts.importSheet(c.text)
 
-			expectStatus(t, res, http.StatusCreated)
-			var s song
-			res.JSON(t, &s)
 			if got := readSheet(s); !reflect.DeepEqual(got, c.want) {
 				t.Errorf("sheet = %+v, want %+v", got, c.want)
 			}
-			if read := ts.getSong(s.ID); !reflect.DeepEqual(read, s) {
-				t.Errorf("song read back = %+v, want %+v", read, s)
+		})
+	}
+}
+
+// sharing numbers each Occurrence of a Song by its Section, in order of first
+// appearance, so Occurrences of one shared Section get the same number.
+func sectionNumbers(s song) []int {
+	number := map[int64]int{}
+	out := []int{}
+	for _, o := range s.Arrangement {
+		if _, ok := number[o.SectionID]; !ok {
+			number[o.SectionID] = len(number)
+		}
+		out = append(out, number[o.SectionID])
+	}
+	return out
+}
+
+func TestImportMergesRepeatedSections(t *testing.T) {
+	cases := map[string]struct {
+		text     string
+		want     []shownSection
+		sections []int
+	}{
+		"an identical chorus three times is one section": {
+			"[Chorus]\nMe home\ntonight\n\n[Verse]\nCity lights\n\n[Chorus]\nMe home\ntonight\n\n[Verse]\nSo far\n\n[Chorus]\nMe home\ntonight",
+			[]shownSection{
+				{"Chorus", []string{"Me home", "tonight"}}, {"Verse", []string{"City lights"}},
+				{"Chorus", []string{"Me home", "tonight"}}, {"Verse", []string{"So far"}},
+				{"Chorus", []string{"Me home", "tonight"}},
+			},
+			[]int{0, 1, 0, 2, 0},
+		},
+		"whitespace at line ends is ignored": {
+			"Me home\ntonight\n\n  Me home \ntonight\t",
+			[]shownSection{{"", []string{"Me home", "tonight"}}, {"", []string{"Me home", "tonight"}}},
+			[]int{0, 0},
+		},
+		"sections that differ slightly do not merge": {
+			"Me home\ntonight\n\nMe home\ntonight!\n\nMe home\n\nMe  home\ntonight\n\nMe home\ntonight\nagain",
+			[]shownSection{
+				{"", []string{"Me home", "tonight"}}, {"", []string{"Me home", "tonight!"}}, {"", []string{"Me home"}},
+				{"", []string{"Me  home", "tonight"}}, {"", []string{"Me home", "tonight", "again"}},
+			},
+			[]int{0, 1, 2, 3, 4},
+		},
+		"different chords do not merge": {
+			"Me [Am]home\n\nMe [F]home",
+			[]shownSection{{"", []string{"Me [Am]home"}}, {"", []string{"Me [F]home"}}},
+			[]int{0, 1},
+		},
+		"a label on the first one is kept": {
+			"Chorus:\nMe home\n\nMe home",
+			[]shownSection{{"Chorus", []string{"Me home"}}, {"Chorus", []string{"Me home"}}},
+			[]int{0, 0},
+		},
+		"a label on a later one is kept": {
+			"Me home\n\nChorus:\nMe home",
+			[]shownSection{{"Chorus", []string{"Me home"}}, {"Chorus", []string{"Me home"}}},
+			[]int{0, 0},
+		},
+		"labels differing only in case merge": {
+			"[Chorus]\nMe home\n\n[chorus]\nMe home",
+			[]shownSection{{"Chorus", []string{"Me home"}}, {"Chorus", []string{"Me home"}}},
+			[]int{0, 0},
+		},
+		"different labels do not merge": {
+			"[Intro]\n[Am] [F]\n\n[Outro]\n[Am] [F]",
+			[]shownSection{{"Intro", []string{"[Am] [F]"}}, {"Outro", []string{"[Am] [F]"}}},
+			[]int{0, 1},
+		},
+		"a heading on its own repeats the section with that label": {
+			"[Chorus]\nMe home\n\n[Verse]\nCity lights\n\n[Chorus]",
+			[]shownSection{{"Chorus", []string{"Me home"}}, {"Verse", []string{"City lights"}}, {"Chorus", []string{"Me home"}}},
+			[]int{0, 1, 0},
+		},
+		"a repeat heading ignores case": {
+			"Chorus:\nMe home\n\nCHORUS:",
+			[]shownSection{{"Chorus", []string{"Me home"}}, {"Chorus", []string{"Me home"}}},
+			[]int{0, 0},
+		},
+		"a repeat heading picks the most recent match": {
+			"[Chorus]\nMe home\n\n[Chorus]\nCity lights\n\n[Chorus]",
+			[]shownSection{{"Chorus", []string{"Me home"}}, {"Chorus", []string{"City lights"}}, {"Chorus", []string{"City lights"}}},
+			[]int{0, 1, 1},
+		},
+		"a repeat heading matches a label kept on merge": {
+			"Me home\n\n[Chorus]\nMe home\n\n[Verse]\nCity lights\n\n[Chorus]",
+			[]shownSection{
+				{"Chorus", []string{"Me home"}}, {"Chorus", []string{"Me home"}},
+				{"Verse", []string{"City lights"}}, {"Chorus", []string{"Me home"}},
+			},
+			[]int{0, 0, 1, 0},
+		},
+		"a repeat heading without an earlier match is an empty section": {
+			"[Verse]\nCity lights\n\n[Chorus]\n\n[Chorus]",
+			[]shownSection{{"Verse", []string{"City lights"}}, {"Chorus", []string{}}, {"Chorus", []string{}}},
+			[]int{0, 1, 1},
+		},
+		"a heading does not repeat a later section": {
+			"[Chorus]\n[Verse]\nCity lights\n\n[Chorus]\nMe home",
+			[]shownSection{{"Chorus", []string{}}, {"Verse", []string{"City lights"}}, {"Chorus", []string{"Me home"}}},
+			[]int{0, 1, 2},
+		},
+		"an empty chordpro section repeats the chorus": {
+			"{soc}\nMe home\n{eoc}\n{sov}\nCity lights\n{eov}\n{soc}\n{eoc}",
+			[]shownSection{{"Chorus", []string{"Me home"}}, {"Verse", []string{"City lights"}}, {"Chorus", []string{"Me home"}}},
+			[]int{0, 1, 0},
+		},
+		"a repeated chordpro chorus merges": {
+			"{soc}\nMe home\n{eoc}\n\n{soc}\nMe home\n{eoc}",
+			[]shownSection{{"Chorus", []string{"Me home"}}, {"Chorus", []string{"Me home"}}},
+			[]int{0, 0},
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			ts := newTestServer(t)
+
+			s := ts.importSheet(c.text)
+
+			if got := readSheet(s); !reflect.DeepEqual(got, c.want) {
+				t.Errorf("sheet = %+v, want %+v", got, c.want)
+			}
+			if got := sectionNumbers(s); !reflect.DeepEqual(got, c.sections) {
+				t.Errorf("sections by occurrence = %v, want %v", got, c.sections)
 			}
 		})
+	}
+}
+
+func TestAWronglyMergedOccurrenceCanBeDetached(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.importSheet("[Chorus]\nMe home\n\n[Verse]\nCity lights\n\n[Chorus]\nMe home")
+	last := s.Arrangement[2]
+
+	got := ts.lyricSheetChange(http.MethodPost, detachPath(s.ID, last.ID), nil)
+
+	if sectionNumbers(got)[2] != 2 {
+		t.Fatalf("sections by occurrence = %v, want the last one on its own", sectionNumbers(got))
+	}
+	copied := sectionOf(t, got, got.Arrangement[2])
+	ts.setText(got.ID, copied.Alternates[0].ID, "Me home again")
+	want := []shownSection{{"Chorus", []string{"Me home"}}, {"Verse", []string{"City lights"}}, {"Chorus", []string{"Me home again"}}}
+	if sheet := readSheet(ts.getSong(s.ID)); !reflect.DeepEqual(sheet, want) {
+		t.Errorf("sheet = %+v, want %+v", sheet, want)
 	}
 }
 
