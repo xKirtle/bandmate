@@ -6,15 +6,6 @@ import (
 	"testing"
 )
 
-// titles lists the Song titles in order.
-func titles(list []songSummary) []string {
-	out := []string{}
-	for _, s := range list {
-		out = append(out, s.Title)
-	}
-	return out
-}
-
 func TestSongListIsSortedByMostRecentlyEdited(t *testing.T) {
 	ts := newTestServer(t)
 	oldest := ts.createSong("Oldest")

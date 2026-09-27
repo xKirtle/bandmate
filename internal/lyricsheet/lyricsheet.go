@@ -23,6 +23,11 @@ func (e *InvalidError) Error() string { return e.Msg }
 
 func invalid(msg string) error { return &InvalidError{Msg: msg} }
 
+var (
+	errTitleRequired = invalid("title is required")
+	errUnknownStatus = invalid("status must be idea, drafting or finished")
+)
+
 // Status is where a Song stands in its lifecycle.
 type Status string
 
@@ -81,7 +86,7 @@ const timeFormat = "2006-01-02T15:04:05.000000000Z"
 func (s *Store) CreateSong(ctx context.Context, title string) (Song, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
-		return Song{}, invalid("title is required")
+		return Song{}, errTitleRequired
 	}
 	now := time.Now().UTC().Format(timeFormat)
 	res, err := s.db.ExecContext(ctx,
@@ -136,7 +141,7 @@ func (s *Store) ListSongs(ctx context.Context, filter SongFilter) ([]SongSummary
 	where, args := "", []any{}
 	if filter.Status != "" {
 		if !filter.Status.valid() {
-			return nil, invalid("status must be idea, drafting or finished")
+			return nil, errUnknownStatus
 		}
 		where, args = "WHERE status = ?", append(args, filter.Status)
 	}
@@ -201,13 +206,13 @@ func (s *Store) UpdateSong(ctx context.Context, id int64, changes SongChanges) (
 	if c := changes.Title; c.Set {
 		title := strings.TrimSpace(c.Value)
 		if title == "" {
-			return Song{}, invalid("title is required")
+			return Song{}, errTitleRequired
 		}
 		set("title", title)
 	}
 	if c := changes.Status; c.Set {
 		if !c.Value.valid() {
-			return Song{}, invalid("status must be idea, drafting or finished")
+			return Song{}, errUnknownStatus
 		}
 		set("status", c.Value)
 	}
@@ -241,10 +246,8 @@ func (s *Store) UpdateSong(ctx context.Context, id int64, changes SongChanges) (
 	if err != nil {
 		return Song{}, fmt.Errorf("updating song: %w", err)
 	}
-	if n, err := res.RowsAffected(); err != nil {
+	if err := expectOneRow(res); err != nil {
 		return Song{}, err
-	} else if n == 0 {
-		return Song{}, ErrNotFound
 	}
 	return s.GetSong(ctx, id)
 }
@@ -256,6 +259,11 @@ func (s *Store) DeleteSong(ctx context.Context, id int64) error {
 	if err != nil {
 		return fmt.Errorf("deleting song: %w", err)
 	}
+	return expectOneRow(res)
+}
+
+// expectOneRow turns a write that matched no Song into ErrNotFound.
+func expectOneRow(res sql.Result) error {
 	n, err := res.RowsAffected()
 	if err != nil {
 		return err

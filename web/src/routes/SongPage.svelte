@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { api, statuses, type Song, type SongChanges } from '../lib/api';
+  import { onDestroy } from 'svelte';
+  import { api, statuses, type Song, type SongChanges, type Status } from '../lib/api';
   import { navigate } from '../lib/router.svelte';
   import { timeAgo } from '../lib/time';
 
@@ -8,6 +9,7 @@
   // What the inputs show. Numbers stay text while typing.
   interface Draft {
     title: string;
+    status: Status;
     key: string;
     bpm: string;
     capo: string;
@@ -38,6 +40,7 @@
   function toDraft(s: Song | null): Draft {
     return {
       title: s?.title ?? '',
+      status: s?.status ?? 'idea',
       key: s?.key ?? '',
       bpm: s?.bpm?.toString() ?? '',
       capo: s?.capo?.toString() ?? '',
@@ -57,22 +60,24 @@
         saveError = null;
       } catch (e) {
         saveError = (e as Error).message;
-        // Put back what the server has for the fields that failed, and
-        // re-render so a rejected Status choice unchecks too.
-        if (song) song = { ...song };
-        const saved = toDraft(song);
-        for (const f of fields) draft[f] = saved[f];
+        // Put back what the server has for the fields that failed.
+        for (const f of fields) revert(f);
       } finally {
         pending--;
       }
     });
   }
 
+  /** Shows what the server has for one field again. */
+  function revert<F extends keyof Draft>(field: F) {
+    draft[field] = toDraft(song)[field];
+  }
+
   function commitText(field: 'title' | 'key' | 'tuning' | 'notes') {
     if (!song) return;
     const value = field === 'notes' ? draft.notes : draft[field].trim();
     if (value === song[field]) {
-      draft[field] = song[field];
+      revert(field);
       return;
     }
     save({ [field]: value }, [field]);
@@ -83,12 +88,39 @@
     const text = draft[field].trim();
     if (text !== '' && !/^\d+$/.test(text)) {
       saveError = `${label} must be a whole number`;
-      draft[field] = toDraft(song)[field];
+      revert(field);
       return;
     }
     const value = text === '' ? null : Number(text);
-    if (value === song[field]) return;
+    if (value === song[field]) {
+      revert(field);
+      return;
+    }
     save({ [field]: value }, [field]);
+  }
+
+  function commitAll() {
+    for (const f of ['title', 'key', 'tuning', 'notes'] as const) commitText(f);
+    commitNumber('bpm', 'BPM');
+    commitNumber('capo', 'Capo');
+  }
+
+  // Inputs save on change, which fires on blur. Leaving with the browser's
+  // back button doesn't blur, so save whatever is still being edited.
+  onDestroy(commitAll);
+
+  function hasUnsavedEdits() {
+    if (!song) return false;
+    if (pending > 0) return true;
+    const saved = toDraft(song);
+    return (Object.keys(saved) as (keyof Draft)[]).some(
+      (f) => (f === 'notes' ? draft[f] : draft[f].trim()) !== saved[f],
+    );
+  }
+
+  // Closing or reloading the tab can't wait for a save, so ask first.
+  function warnBeforeUnload(event: BeforeUnloadEvent) {
+    if (hasUnsavedEdits()) event.preventDefault();
   }
 
   async function remove() {
@@ -97,6 +129,8 @@
     if (!ok) return;
     deleting = true;
     try {
+      // Let queued saves finish first, so none of them lands after the delete.
+      await queue;
       await api.deleteSong(id);
       navigate('/', { replace: true });
     } catch (e) {
@@ -105,6 +139,8 @@
     }
   }
 </script>
+
+<svelte:window onbeforeunload={warnBeforeUnload} />
 
 <header class="bar">
   <a class="back" href="/">← Songs</a>
@@ -151,8 +187,8 @@
             type="radio"
             name="status"
             value={s}
-            checked={song.status === s}
-            onchange={() => save({ status: s }, [])}
+            bind:group={draft.status}
+            onchange={() => save({ status: s }, ['status'])}
           />
           {s}
         </label>

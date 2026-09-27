@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"reflect"
 	"testing"
-	"time"
 )
 
 func TestSongStatusCanChangeBetweenAnyStatuses(t *testing.T) {
@@ -28,15 +27,9 @@ func TestUnknownStatusIsRejected(t *testing.T) {
 	ts := newTestServer(t)
 	created := ts.updateSong(ts.createSong("Midnight Drive").ID, map[string]any{"status": "drafting"})
 
-	res := ts.Do(http.MethodPatch, fmt.Sprintf("/api/songs/%d", created.ID),
-		map[string]any{"status": "released", "title": "Renamed"})
+	res := ts.patchSong(created.ID, map[string]any{"status": "released", "title": "Renamed"})
 
-	expectStatus(t, res, http.StatusBadRequest)
-	var e struct{ Error string }
-	res.JSON(t, &e)
-	if e.Error != "status must be idea, drafting or finished" {
-		t.Errorf("error = %q, want a message naming the valid Statuses", e.Error)
-	}
+	expectError(t, res, http.StatusBadRequest, "status must be idea, drafting or finished")
 	if got := ts.getSong(created.ID); !reflect.DeepEqual(got, created) {
 		t.Errorf("song after rejected change = %+v, want it unchanged %+v", got, created)
 	}
@@ -60,9 +53,9 @@ func TestRenamingToBlankTitleIsRejected(t *testing.T) {
 	ts := newTestServer(t)
 	created := ts.createSong("Keep Me")
 
-	res := ts.Do(http.MethodPatch, fmt.Sprintf("/api/songs/%d", created.ID), map[string]any{"title": "  "})
+	res := ts.patchSong(created.ID, map[string]any{"title": "  "})
 
-	expectStatus(t, res, http.StatusBadRequest)
+	expectError(t, res, http.StatusBadRequest, "title is required")
 	if got := ts.getSong(created.ID); !reflect.DeepEqual(got, created) {
 		t.Errorf("song after rejected rename = %+v, want it unchanged %+v", got, created)
 	}
@@ -94,19 +87,9 @@ func TestEveryChangeUpdatesTheUpdatedTime(t *testing.T) {
 func TestChangingUnknownSongIsNotFound(t *testing.T) {
 	ts := newTestServer(t)
 
-	res := ts.Do(http.MethodPatch, "/api/songs/999", map[string]any{"title": "Ghost"})
+	res := ts.patchSong(999, map[string]any{"title": "Ghost"})
 
 	expectStatus(t, res, http.StatusNotFound)
-}
-
-// parseTime reads a timestamp as the API returns it.
-func parseTime(t *testing.T, s string) time.Time {
-	t.Helper()
-	got, err := time.Parse(time.RFC3339Nano, s)
-	if err != nil {
-		t.Fatalf("parsing time %q: %v", s, err)
-	}
-	return got
 }
 
 func TestNewSongHasNoMetadata(t *testing.T) {
@@ -164,20 +147,16 @@ func TestInvalidMetadataIsRejected(t *testing.T) {
 		"capo off neck":   {map[string]any{"capo": 25}, "capo must be between 0 and 24"},
 		"fractional BPM":  {map[string]any{"bpm": 92.5}, "request body must be valid JSON"},
 		"BPM as a string": {map[string]any{"bpm": "fast"}, "request body must be valid JSON"},
+		"misspelt field":  {map[string]any{"stauts": "finished"}, `unknown field "stauts"`},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			ts := newTestServer(t)
 			created := ts.createSong("Midnight Drive")
 
-			res := ts.Do(http.MethodPatch, fmt.Sprintf("/api/songs/%d", created.ID), c.change)
+			res := ts.patchSong(created.ID, c.change)
 
-			expectStatus(t, res, http.StatusBadRequest)
-			var e struct{ Error string }
-			res.JSON(t, &e)
-			if e.Error != c.error {
-				t.Errorf("error = %q, want %q", e.Error, c.error)
-			}
+			expectError(t, res, http.StatusBadRequest, c.error)
 			if got := ts.getSong(created.ID); !reflect.DeepEqual(got, created) {
 				t.Errorf("song after rejected change = %+v, want it unchanged %+v", got, created)
 			}

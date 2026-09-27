@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
 )
@@ -81,10 +82,17 @@ func (a *App) deleteSong(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// readJSON decodes the request body into v, answering 400 if it can't.
+// readJSON decodes the request body into v, answering 400 if it can't or if
+// it names a field v doesn't have, so a typo isn't silently ignored.
 func readJSON(w http.ResponseWriter, r *http.Request, v any) bool {
-	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
-		writeError(w, http.StatusBadRequest, "request body must be valid JSON")
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(v); err != nil {
+		msg := "request body must be valid JSON"
+		if field, ok := strings.CutPrefix(err.Error(), "json: unknown field "); ok {
+			msg = "unknown field " + field
+		}
+		writeError(w, http.StatusBadRequest, msg)
 		return false
 	}
 	return true
