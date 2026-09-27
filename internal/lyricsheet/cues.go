@@ -87,17 +87,8 @@ func (s *Store) SetLineCue(ctx context.Context, songID int64, based Version, occ
 		return Song{}, err
 	}
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		text, err := findOccurrenceLine(ctx, tx, songID, occurrenceID, lineID)
-		if err != nil {
+		if err := writeLineCue(ctx, tx, songID, occurrenceID, lineID, sql.NullInt64{Int64: ms, Valid: true}); err != nil {
 			return err
-		}
-		if blank(text) {
-			return invalid("a blank Line can't have a Cue")
-		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO line_cues (occurrence_id, line_id, cue_ms) VALUES (?, ?, ?)
-			ON CONFLICT (occurrence_id, line_id) DO UPDATE SET cue_ms = excluded.cue_ms`,
-			occurrenceID, lineID, ms); err != nil {
-			return fmt.Errorf("setting line cue: %w", err)
 		}
 		first, err := firstLine(ctx, tx, occurrenceID)
 		if err != nil || first != lineID {
@@ -111,12 +102,99 @@ func (s *Store) SetLineCue(ctx context.Context, songID int64, based Version, occ
 // own Cue stays, even when it's the first Line's.
 func (s *Store) ClearLineCue(ctx context.Context, songID int64, based Version, occurrenceID, lineID int64) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		if _, err := findOccurrenceLine(ctx, tx, songID, occurrenceID, lineID); err != nil {
-			return err
-		}
+		return writeLineCue(ctx, tx, songID, occurrenceID, lineID, sql.NullInt64{})
+	})
+}
+
+// writeLineCue sets or, with a null ms, clears a Line's Cue within one of a
+// Song's Occurrences. The Line must be in the Occurrence's Section, and
+// can't be blank to be given a Cue.
+func writeLineCue(ctx context.Context, tx *sql.Tx, songID, occurrenceID, lineID int64, ms sql.NullInt64) error {
+	text, err := findOccurrenceLine(ctx, tx, songID, occurrenceID, lineID)
+	if err != nil {
+		return err
+	}
+	if !ms.Valid {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM line_cues WHERE occurrence_id = ? AND line_id = ?`,
 			occurrenceID, lineID); err != nil {
 			return fmt.Errorf("clearing line cue: %w", err)
+		}
+		return nil
+	}
+	if blank(text) {
+		return invalid("a blank Line can't have a Cue")
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO line_cues (occurrence_id, line_id, cue_ms) VALUES (?, ?, ?)
+		ON CONFLICT (occurrence_id, line_id) DO UPDATE SET cue_ms = excluded.cue_ms`,
+		occurrenceID, lineID, ms); err != nil {
+		return fmt.Errorf("setting line cue: %w", err)
+	}
+	return nil
+}
+
+// ClearOccurrenceCues removes an Occurrence's Cue and all its Lines' Cues,
+// dormant ones included.
+func (s *Store) ClearOccurrenceCues(ctx context.Context, songID int64, based Version, occurrenceID int64) (Song, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		if err := writeOccurrenceCue(ctx, tx, songID, occurrenceID, sql.NullInt64{}); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM line_cues WHERE occurrence_id = ?`, occurrenceID); err != nil {
+			return fmt.Errorf("clearing line cues: %w", err)
+		}
+		return nil
+	})
+}
+
+// ClearCues removes every Cue in a Song, dormant ones included.
+func (s *Store) ClearCues(ctx context.Context, songID int64, based Version) (Song, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, `UPDATE occurrences SET cue_ms = NULL WHERE song_id = ?`, songID); err != nil {
+			return fmt.Errorf("clearing occurrence cues: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM line_cues
+			WHERE occurrence_id IN (SELECT id FROM occurrences WHERE song_id = ?)`, songID); err != nil {
+			return fmt.Errorf("clearing line cues: %w", err)
+		}
+		return nil
+	})
+}
+
+// CueValue is one Cue to restore: an Occurrence's own Cue or, with a
+// LineID, a Line's Cue within it. A nil Cue means none.
+type CueValue struct {
+	OccurrenceID int64
+	LineID       int64
+	Cue          *float64
+}
+
+// RestoreCues sets each Cue given to its value, in seconds, or clears it,
+// and leaves every other Cue alone. It puts back what another Cue edit
+// changed, e.g. to undo it, so unlike setting a Cue, the first Line and its
+// Occurrence don't follow each other: each is given its own value.
+func (s *Store) RestoreCues(ctx context.Context, songID int64, based Version, values []CueValue) (Song, error) {
+	ms := make([]sql.NullInt64, len(values))
+	for i, v := range values {
+		if v.Cue == nil {
+			continue
+		}
+		m, err := cueMillis(*v.Cue)
+		if err != nil {
+			return Song{}, err
+		}
+		ms[i] = sql.NullInt64{Int64: m, Valid: true}
+	}
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		for i, v := range values {
+			var err error
+			if v.LineID == 0 {
+				err = writeOccurrenceCue(ctx, tx, songID, v.OccurrenceID, ms[i])
+			} else {
+				err = writeLineCue(ctx, tx, songID, v.OccurrenceID, v.LineID, ms[i])
+			}
+			if err != nil {
+				return err
+			}
 		}
 		return nil
 	})

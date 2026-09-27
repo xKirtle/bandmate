@@ -14,6 +14,7 @@
   let {
     song,
     change,
+    editCues,
     onUnsaved,
     playhead = null,
     hasClips = false,
@@ -23,6 +24,8 @@
     song: Song;
     /** Sends a Lyric Sheet change; resolves to whether it succeeded. */
     change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
+    /** Sends a Cue edit, to undo with the Timeline's edits; resolves to whether it succeeded. */
+    editCues: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
     onUnsaved: (editor: object, unsaved: boolean) => void;
     /** Where the Timeline is playing, in seconds; null while it isn't. */
     playhead?: number | null;
@@ -50,13 +53,13 @@
   const canCue = $derived(wide.current && (hasClips || hasCues(song)));
 
   function setCue(occurrence: Occurrence, cue: number | null) {
-    change((at) =>
+    editCues((at) =>
       cue === null ? api.clearOccurrenceCue(at, occurrence.id) : api.setOccurrenceCue(at, occurrence.id, cue),
     );
   }
 
   function setLineCue(occurrence: Occurrence, line: Line, cue: number | null) {
-    change((at) =>
+    editCues((at) =>
       cue === null ? api.clearLineCue(at, occurrence.id, line.id) : api.setLineCue(at, occurrence.id, line.id, cue),
     );
   }
@@ -116,7 +119,7 @@
     if (!line) return;
     picked = null;
     pendingTap = line;
-    await change((at) => api.setLineCue(at, line.occurrence, line.line, time));
+    await editCues((at) => api.setLineCue(at, line.occurrence, line.line, time));
     // Saved, the Song has the Cue; failed, the Line is still to tap.
     if (pendingTap === line) pendingTap = null;
   }
@@ -260,6 +263,18 @@
                 >
                   ⧉
                 </button>
+                {#if canCue && hasCues({ arrangement: [occurrence], sections: song.sections })}
+                  <!-- Doesn't ask first: it can be undone. It clears dormant Cues too. -->
+                  <button
+                    type="button"
+                    class="icon"
+                    onclick={() => editCues((at) => api.clearOccurrenceCues(at, occurrence.id))}
+                    aria-label="Clear this Occurrence's Cues"
+                    title="Clear this Occurrence's Cues"
+                  >
+                    ⌀
+                  </button>
+                {/if}
                 {#if occurrence.shared}
                   <button
                     type="button"

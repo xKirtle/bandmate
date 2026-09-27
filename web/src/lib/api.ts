@@ -103,6 +103,13 @@ export interface Chord {
   name: string;
 }
 
+/** One Cue's value: an Occurrence's own or, with a lineId, a Line's within it; null for none. */
+export interface CueValue {
+  occurrenceId: number;
+  lineId?: number;
+  cue: number | null;
+}
+
 /** The Song a write goes to, at the version it was based on. */
 export type SongAt = Pick<Song, 'id' | 'version'>;
 
@@ -370,6 +377,13 @@ export const api = {
   /** Removes a Line's Cue within an Occurrence. */
   clearLineCue: (at: SongAt, occurrenceId: number, lineId: number) =>
     request<Song>('DELETE', `/songs/${at.id}/occurrences/${occurrenceId}/lines/${lineId}/cue`, undefined, at),
+  /** Removes an Occurrence's Cue and all its Lines' Cues, dormant ones included. */
+  clearOccurrenceCues: (at: SongAt, occurrenceId: number) =>
+    request<Song>('DELETE', `/songs/${at.id}/occurrences/${occurrenceId}/cues`, undefined, at),
+  /** Removes every Cue in the Song. */
+  clearCues: (at: SongAt) => request<Song>('DELETE', `/songs/${at.id}/cues`, undefined, at),
+  /** Sets each Cue given to its value, or clears it, as they were before another Cue edit; the first Line and its Occurrence don't follow each other. */
+  restoreCues: (at: SongAt, cues: CueValue[]) => request<Song>('PATCH', `/songs/${at.id}/cues`, { cues }, at),
   setSectionLabel: (at: SongAt, sectionId: number, label: string) =>
     request<Song>('PATCH', `/songs/${at.id}/sections/${sectionId}`, { label }, at),
   /** Replaces an Alternate's Lines with the lines of text. */

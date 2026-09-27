@@ -140,6 +140,44 @@ func (a *App) clearLineCue(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *App) clearOccurrenceCues(w http.ResponseWriter, r *http.Request) {
+	occurrenceID, ok := pathID(w, r, "occurrenceID")
+	if !ok {
+		return
+	}
+	a.changeSheet(w, r, nil, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
+		return a.songs.ClearOccurrenceCues(r.Context(), id, based, occurrenceID)
+	})
+}
+
+func (a *App) clearCues(w http.ResponseWriter, r *http.Request) {
+	a.changeSheet(w, r, nil, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
+		return a.songs.ClearCues(r.Context(), id, based)
+	})
+}
+
+// restoreCues sets each Cue given to its value, or clears it with a null
+// cue: an Occurrence's own Cue, or with a lineId, a Line's within it.
+func (a *App) restoreCues(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Cues *[]struct {
+			OccurrenceID int64    `json:"occurrenceId"`
+			LineID       int64    `json:"lineId"`
+			Cue          *float64 `json:"cue"`
+		} `json:"cues"`
+	}
+	a.changeSheet(w, r, &req, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
+		if req.Cues == nil {
+			return lyricsheet.Song{}, &lyricsheet.InvalidError{Msg: "cues is required"}
+		}
+		values := make([]lyricsheet.CueValue, len(*req.Cues))
+		for i, c := range *req.Cues {
+			values[i] = lyricsheet.CueValue{OccurrenceID: c.OccurrenceID, LineID: c.LineID, Cue: c.Cue}
+		}
+		return a.songs.RestoreCues(r.Context(), id, based, values)
+	})
+}
+
 func (a *App) setSectionLabel(w http.ResponseWriter, r *http.Request) {
 	sectionID, ok := pathID(w, r, "sectionID")
 	if !ok {

@@ -16,7 +16,8 @@
   } from './api';
   import BeatPicker from './BeatPicker.svelte';
   import { clampMove, clampTrimEnd, clampTrimStart } from './clipEdit';
-  import { History, sendEdit, type Edit as TimelineEdit } from './history';
+  import { hasCues } from './cues';
+  import { History, restorable, sendEdit, type CueEdit, type Edit as TimelineEdit, type Saved } from './history';
   import { formatVolume, maxVolume, silence, trackGains, type Levels } from './mixer';
   import { peaksPerSecond } from './peaks';
   import { keptInLoop, outsideLoop, repeats, timelineEnd, type Loop, type Placed } from './schedule';
@@ -41,11 +42,12 @@
   // playback with each Track's volume, mute and solo, and the Loop. Editing
   // (adding Beats, adding, renaming, reordering and deleting Tracks, moving,
   // trimming, duplicating and deleting Clips, setting and clearing the Loop,
-  // and undoing and redoing all of it along with mixing) is only offered on
-  // wider screens; on a phone it only plays, mixes and switches the Loop on
-  // and off. On both it zooms and scrolls, and follows the playhead while
-  // playing. While the Loop is on, the playhead stays inside it. Tap mode,
-  // also only on wider screens, cues the next Line at the playhead.
+  // and undoing and redoing all of it along with mixing and Cue edits) is
+  // only offered on wider screens; on a phone it only plays, mixes and
+  // switches the Loop on and off. On both it zooms and scrolls, and follows
+  // the playhead while playing. While the Loop is on, the playhead stays
+  // inside it. Tap mode, also only on wider screens, cues the next Line at
+  // the playhead.
   let {
     song,
     timeline,
@@ -57,8 +59,8 @@
   }: {
     song: Song;
     timeline: Timeline;
-    /** Queues a Timeline change; resolves to whether it succeeded. */
-    change: (op: (at: SongAt) => Promise<Timeline>) => Promise<boolean>;
+    /** Queues a Timeline change, or a Cue edit; resolves to whether it succeeded. */
+    change: (op: (at: SongAt) => Promise<Saved>) => Promise<boolean>;
     /** Sets the Song's BPM. */
     setBpm: (bpm: number) => void;
     /** Hears where playback is, in seconds, every frame while playing, then null once it stops. */
@@ -128,10 +130,11 @@
     }
   });
 
-  // Every edit made here is kept to undo, for as long as the page is open.
-  // The Timeline is only ever the one the latest edit left, unless a
-  // refresh brought in changes made elsewhere: then the edits kept would no
-  // longer undo what they did, so they're forgotten.
+  // Every edit made here, and every Cue edit (see editCues), is kept to
+  // undo, for as long as the page is open. The Timeline is only ever the
+  // one the latest edit left, unless a refresh brought in changes made
+  // elsewhere: then the edits kept would no longer undo what they did, so
+  // they're forgotten.
   const history = new History();
   let undoable = $state(false);
   let redoable = $state(false);
@@ -152,27 +155,41 @@
     redoable = history.nextRedo() !== null;
   }
 
-  /**
-   * Sends an edit, based on the Timeline as it is when its turn comes, and
-   * notes in the history what it did.
-   */
-  async function send(at: SongAt, e: TimelineEdit, note: (before: Timeline, after: Timeline) => void) {
-    const before = timeline;
-    let after: Timeline;
+  /** Waits for a save, forgetting every edit kept if it's refused because the Song changed elsewhere. */
+  async function saved<T>(save: Promise<T>): Promise<T> {
     try {
-      after = await sendEdit(at, e);
+      return await save;
     } catch (err) {
-      // Refused because the Song changed elsewhere.
       if (err instanceof ApiError && err.stale) {
         history.clear();
         showHistory();
       }
       throw err;
     }
+  }
+
+  /**
+   * Sends an edit, based on the Timeline or Song as it is when its turn
+   * comes, and notes in the history what it did.
+   */
+  async function send(
+    at: SongAt,
+    e: TimelineEdit | CueEdit,
+    note: (before: Timeline, after: Timeline) => void,
+  ): Promise<Saved> {
+    if (e.kind === 'restoreCues') {
+      // Cues whose Line or Occurrence is gone since can't come back.
+      const after = await saved(api.restoreCues(at, restorable(e.cues, song)));
+      note(timeline, timeline);
+      showHistory();
+      return { song: after };
+    }
+    const before = timeline;
+    const after = await saved(sendEdit(at, e));
     note(before, after);
     editedAt = after.version;
     showHistory();
-    return after;
+    return { timeline: after };
   }
 
   /** Queues an edit, to undo later; resolves to whether it succeeded. */
@@ -180,6 +197,22 @@
     e = $state.snapshot(e) as TimelineEdit;
     queued++;
     return change((at) => send(at, e, (before, after) => history.record(e, before, after))).finally(() => queued--);
+  }
+
+  /**
+   * Queues a Cue edit, e.g. from the Lyric Sheet, to undo along with the
+   * Timeline's edits, in the order they were made; resolves to whether it
+   * succeeded.
+   */
+  export function editCues(op: (at: SongAt) => Promise<Song>): Promise<boolean> {
+    queued++;
+    return change(async (at) => {
+      const before = song;
+      const after = await saved(op(at));
+      history.recordCues(before, after);
+      showHistory();
+      return { song: after };
+    }).finally(() => queued--);
   }
 
   function undo() {
@@ -203,9 +236,9 @@
    * redo, e.g. after pressing the key twice quickly. Nothing is sent, so
    * the Song stays at the version it's at.
    */
-  async function unchanged(at: SongAt): Promise<Timeline> {
+  async function unchanged(at: SongAt): Promise<Saved> {
     editedAt = at.version;
-    return { ...timeline, version: at.version, updatedAt: song.updatedAt };
+    return { timeline: { ...timeline, version: at.version, updatedAt: song.updatedAt } };
   }
 
 
@@ -1055,6 +1088,15 @@
             onpointerdown={(e) => e.preventDefault()}
             onclick={tap}
             title="Cue the next Line here (Enter)">Tap</button
+          >
+        {/if}
+        {#if hasCues(song)}
+          <!-- Doesn't ask first: it can be undone. -->
+          <button
+            type="button"
+            class="button edit-only"
+            onclick={() => editCues((at) => api.clearCues(at))}
+            title="Clear every Cue in the Song">Clear all Cues</button
           >
         {/if}
         {#if playerState === 'loading'}
