@@ -83,15 +83,15 @@ Back it up by copying `data/`.
 
 ### Release flow
 
-1. Open a pull request. The [CI workflow](.github/workflows/ci.yml) type-checks, unit-tests and builds the SPA, runs `go vet` and `go test`, and builds the Docker image. Pushes to other branches don't run CI, so open a draft PR for early feedback.
-2. Merge to `main`. CI runs again and, if it passes, publishes the image to `ghcr.io/xkirtle/bandmate` tagged `latest` and with the commit SHA.
+1. Open a pull request. The [CI workflow](.github/workflows/ci.yml) type-checks, unit-tests and builds the SPA, and runs `go vet` and `go test`. Pushes to other branches don't run CI, so open a draft PR for early feedback.
+2. Merge to `main`. CI runs again and, if it passes, builds and publishes the image to `ghcr.io/xkirtle/bandmate` tagged `latest` and with the commit SHA.
 3. Redeploy the stack in Dockhand, which pulls the new `latest`. Migrations run on startup.
 
 To roll back, set `BANDMATE_IMAGE=ghcr.io/xkirtle/bandmate:<older-sha>` in the stack's `.env` and redeploy.
 
 ### One-time setup
 
-- **Block failing changes.** In the repo's settings, add a branch protection rule (or ruleset) for `main` that requires the `test` and `image` checks to pass before merging.
+- **Block failing changes.** In the repo's settings, add a branch protection rule (or ruleset) for `main` that requires the `test` check to pass before merging. (`image` only runs on `main`, so pull requests show it as skipped.)
 - **Package visibility.** The first publish creates the `bandmate` package under the account's GitHub packages. Check its visibility there. If it's public, nothing else is needed. If it's private, log the MiniPC in to the registry with a personal access token (classic) that has the `read:packages` scope:
 
   ```sh
