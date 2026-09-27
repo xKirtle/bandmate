@@ -38,6 +38,10 @@ jobs:
         working-directory: web
         run: npm run check
 
+      - name: Unit-test the SPA
+        working-directory: web
+        run: npm test
+
       # The Go binary embeds web/dist, so build it before the Go steps.
       - name: Build the SPA
         working-directory: web

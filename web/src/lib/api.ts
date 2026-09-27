@@ -90,6 +90,9 @@ export const suggestedLabels: readonly string[] = [
   'Outro',
 ];
 
+/** Keys offered as suggestions, for Songs and Beats; any text is allowed. */
+export const commonKeys: readonly string[] = ['C', 'Cm', 'D', 'Dm', 'E', 'Em', 'F', 'F#m', 'G', 'Gm', 'A', 'Am', 'Bb', 'B', 'Bm'];
+
 /** A partial update: only the fields present change; "" or null clears one. */
 export type SongChanges = Partial<
   Pick<Song, 'title' | 'status' | 'key' | 'bpm' | 'capo' | 'tuning' | 'notes' | 'showChords'>
@@ -108,6 +111,48 @@ export interface SongSummary {
   title: string;
   status: Status;
   updatedAt: string;
+}
+
+/** Details the user enters about a Beat. "" and null mean "not set"; only the title is required. */
+export interface BeatDetails {
+  title: string;
+  producer: string;
+  /** A web address, e.g. where the Beat was bought or downloaded. */
+  sourceLink: string;
+  bpm: number | null;
+  key: string;
+  notes: string;
+}
+
+/** An audio file in the Beat Library, with its credit. */
+export interface Beat extends BeatDetails {
+  id: number;
+  /** The file as uploaded, which is kept unchanged. */
+  fileName: string;
+  contentType: string;
+  /** In bytes. */
+  size: number;
+  /** In seconds. */
+  duration: number;
+  /** The waveform, 100 per second, from 0 to 1. Only when reading one Beat, not in the list. */
+  peaks?: number[];
+  /** Songs using the Beat. While there are any, it can't be deleted or have its file replaced. */
+  songs: { id: number; title: string }[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** What the browser worked out by decoding an audio file, sent with it. */
+export interface DecodedAudio {
+  /** In seconds. */
+  duration: number;
+  peaks: number[];
+}
+
+/** Limits the server enforces, to check before sending anything. */
+export interface ServerConfig {
+  /** The largest audio file accepted, in bytes. */
+  maxUploadBytes: number;
 }
 
 /** A failed request, carrying the server's readable message. */
@@ -129,14 +174,16 @@ export class ApiError extends Error {
 
 async function request<T>(method: string, path: string, body?: unknown, at?: SongAt): Promise<T> {
   const headers: Record<string, string> = {};
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  // The browser sets a form's Content-Type itself, with its boundary.
+  const form = body instanceof FormData;
+  if (body !== undefined && !form) headers['Content-Type'] = 'application/json';
   if (at) headers['If-Match'] = `"${at.version}"`;
   let res: Response;
   try {
     res = await fetch(`/api${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : form ? body : JSON.stringify(body),
     });
   } catch {
     throw new ApiError(0, "Can't reach Bandmate. Check your connection.");
@@ -148,7 +195,32 @@ async function request<T>(method: string, path: string, body?: unknown, at?: Son
   return data as T;
 }
 
+/** An audio file with its details as a JSON part, as the server expects uploads. */
+function audioForm(file: File, details: object): FormData {
+  const form = new FormData();
+  form.append('details', JSON.stringify(details));
+  form.append('file', file);
+  return form;
+}
+
 export const api = {
+  getConfig: () => request<ServerConfig>('GET', '/config'),
+  /** The Beat Library, newest first; q matches titles and producers. */
+  listBeats: (q = '') => request<Beat[]>('GET', q.trim() ? `/beats?q=${encodeURIComponent(q.trim())}` : '/beats'),
+  /** One Beat, with its peaks. */
+  getBeat: (id: number) => request<Beat>('GET', `/beats/${id}`),
+  addBeat: (file: File, details: BeatDetails, decoded: DecodedAudio) =>
+    request<Beat>('POST', '/beats', audioForm(file, { ...details, ...decoded })),
+  updateBeat: (id: number, changes: Partial<BeatDetails>) => request<Beat>('PATCH', `/beats/${id}`, changes),
+  /** Swaps an unused Beat's file, keeping its details. */
+  replaceBeatFile: (id: number, file: File, decoded: DecodedAudio) =>
+    request<Beat>('PUT', `/beats/${id}/file`, audioForm(file, decoded)),
+  /** Deletes an unused Beat and its file. */
+  deleteBeat: (id: number) => request<null>('DELETE', `/beats/${id}`),
+  /** Where a Beat's audio streams from, with seeking. The address changes when the file is replaced. */
+  beatAudioUrl: (beat: Pick<Beat, 'id' | 'size' | 'duration'>) =>
+    `/api/beats/${beat.id}/audio?v=${beat.size}-${beat.duration}`,
+
   listSongs: (filter: SongFilter = {}) => {
     const params = new URLSearchParams();
     if (filter.status) params.set('status', filter.status);

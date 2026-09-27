@@ -3,7 +3,8 @@
 // Configuration comes from environment variables:
 //
 //	BANDMATE_ADDR      listen address (default ":8080")
-//	BANDMATE_DATA_DIR  directory holding the database (default "./data")
+//	BANDMATE_DATA_DIR  directory holding the database and audio files (default "./data")
+//	BANDMATE_MAX_UPLOAD_MB  largest audio file accepted, in megabytes (default 500)
 //
 // "bandmate healthcheck" asks a running server whether it is healthy and exits
 // non-zero if not, for container healthchecks in images without curl.
@@ -18,6 +19,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -36,13 +38,17 @@ func main() {
 		return
 	}
 
-	if err := run(addr, env("BANDMATE_DATA_DIR", "./data")); err != nil {
+	maxUploadMB, err := strconv.ParseInt(env("BANDMATE_MAX_UPLOAD_MB", "500"), 10, 64)
+	if err != nil || maxUploadMB < 1 {
+		log.Fatalf("BANDMATE_MAX_UPLOAD_MB must be a whole number of megabytes, 1 or more")
+	}
+	if err := run(addr, env("BANDMATE_DATA_DIR", "./data"), maxUploadMB<<20); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(addr, dataDir string) error {
-	a, err := app.New(app.Config{DataDir: dataDir, SPA: web.Dist()})
+func run(addr, dataDir string, maxUploadBytes int64) error {
+	a, err := app.New(app.Config{DataDir: dataDir, SPA: web.Dist(), MaxUploadBytes: maxUploadBytes})
 	if err != nil {
 		return err
 	}

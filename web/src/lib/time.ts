@@ -17,3 +17,9 @@ export function timeAgo(iso: string, now = Date.now()): string {
   }
   return 'just now';
 }
+
+/** "3:07" */
+export function formatDuration(seconds: number): string {
+  const whole = Math.round(seconds);
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
+}

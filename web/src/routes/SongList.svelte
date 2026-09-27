@@ -1,5 +1,6 @@
 <script lang="ts">
   import { api, statuses, type SongSummary, type Status } from '../lib/api';
+  import MainNav from '../lib/MainNav.svelte';
   import StatusBadge from '../lib/StatusBadge.svelte';
   import { timeAgo } from '../lib/time';
 
@@ -41,7 +42,7 @@
 </script>
 
 <header class="bar">
-  <h1>Songs</h1>
+  <MainNav current="songs" />
   <div class="actions">
     <a class="button" href="/songs/import">Import</a>
     <a class="button primary" href="/songs/new">New Song</a>

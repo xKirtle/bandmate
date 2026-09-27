@@ -6,10 +6,11 @@ It is one Go binary. The server exposes a JSON API under `/api`, stores data in 
 
 ## Configuration
 
-| Variable            | Default  | Purpose                                             |
-| ------------------- | -------- | --------------------------------------------------- |
-| `BANDMATE_ADDR`     | `:8080`  | Listen address                                      |
-| `BANDMATE_DATA_DIR` | `./data` | Directory holding the SQLite database (`bandmate.db`) |
+| Variable                 | Default  | Purpose                                                                           |
+| ------------------------ | -------- | --------------------------------------------------------------------------------- |
+| `BANDMATE_ADDR`          | `:8080`  | Listen address                                                                    |
+| `BANDMATE_DATA_DIR`      | `./data` | Directory holding the SQLite database (`bandmate.db`) and audio files (`audio/`) |
+| `BANDMATE_MAX_UPLOAD_MB` | `500`    | Largest audio file accepted for upload, in megabytes                              |
 
 Schema migrations are built into the binary and run automatically on startup. To upgrade, run the new version.
 
@@ -67,9 +68,12 @@ This serves Bandmate on http://localhost:8080 with data in `./data`. `compose.ya
 ```sh
 go test ./...                  # API tests: real handler, fresh SQLite per test
 (cd web && npm run check)      # type-check the SPA
+(cd web && npm test)           # unit tests for plain TypeScript modules in the SPA
 ```
 
 The tests go through the HTTP API only. `internal/app/helpers_test.go` starts the real handler in-process against a fresh SQLite database in a temporary directory, sends requests, and checks the responses. New tests should use it too.
+
+Vitest covers plain TypeScript modules in `web/src/lib` that don't touch the DOM or Web Audio, e.g. reducing decoded audio to waveform peaks. Their tests sit next to them as `*.test.ts`. Components and audio playback are tested by hand.
 
 ## Deploying
 
@@ -79,7 +83,7 @@ Back it up by copying `data/`.
 
 ### Release flow
 
-1. Open a pull request. The [CI workflow](.github/workflows/ci.yml) type-checks and builds the SPA, runs `go vet` and `go test`, and builds the Docker image. Pushes to other branches don't run CI, so open a draft PR for early feedback.
+1. Open a pull request. The [CI workflow](.github/workflows/ci.yml) type-checks, unit-tests and builds the SPA, runs `go vet` and `go test`, and builds the Docker image. Pushes to other branches don't run CI, so open a draft PR for early feedback.
 2. Merge to `main`. CI runs again and, if it passes, publishes the image to `ghcr.io/xkirtle/bandmate` tagged `latest` and with the commit SHA.
 3. Redeploy the stack in Dockhand, which pulls the new `latest`. Migrations run on startup.
 

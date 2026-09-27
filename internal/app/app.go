@@ -9,25 +9,37 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"path/filepath"
 
+	"github.com/xKirtle/bandmate/internal/audio"
+	"github.com/xKirtle/bandmate/internal/beats"
 	"github.com/xKirtle/bandmate/internal/db"
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
 )
 
 // Config is everything needed to build the app.
 type Config struct {
-	// DataDir holds the SQLite database (and, later, audio files).
+	// DataDir holds the SQLite database and, under audio/, the audio files.
 	DataDir string
 	// SPA is the built single-page app, with index.html at its root.
 	SPA fs.FS
+	// MaxUploadBytes caps the size of an uploaded audio file. Zero means
+	// DefaultMaxUploadBytes.
+	MaxUploadBytes int64
 }
+
+// DefaultMaxUploadBytes is the upload cap unless configured otherwise.
+const DefaultMaxUploadBytes = 500 << 20
 
 // App is a running Bandmate instance.
 type App struct {
-	db      *sql.DB
-	songs   *lyricsheet.Store
-	spa     fs.FS
-	handler http.Handler
+	db        *sql.DB
+	songs     *lyricsheet.Store
+	beats     *beats.Store
+	files     *audio.Files
+	maxUpload int64
+	spa       fs.FS
+	handler   http.Handler
 }
 
 // New opens the database in cfg.DataDir, migrates it, and builds the HTTP
@@ -37,7 +49,22 @@ func New(cfg Config) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	a := &App{db: conn, songs: lyricsheet.NewStore(conn), spa: cfg.SPA}
+	beatFiles, err := audio.Open(filepath.Join(cfg.DataDir, "audio", "beats"))
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+	a := &App{
+		db:        conn,
+		songs:     lyricsheet.NewStore(conn),
+		beats:     beats.NewStore(conn, beatFiles),
+		files:     beatFiles,
+		maxUpload: cfg.MaxUploadBytes,
+		spa:       cfg.SPA,
+	}
+	if a.maxUpload <= 0 {
+		a.maxUpload = DefaultMaxUploadBytes
+	}
 	a.handler = a.routes()
 	return a, nil
 }
@@ -70,6 +97,14 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("DELETE /api/songs/{id}/alternates/{alternateID}", a.deleteAlternate)
 	mux.HandleFunc("POST /api/songs/{id}/alternates/{alternateID}/activate", a.activateAlternate)
 	mux.HandleFunc("PUT /api/songs/{id}/alternates/{alternateID}/text", a.replaceAlternateText)
+	mux.HandleFunc("GET /api/config", a.config)
+	mux.HandleFunc("GET /api/beats", a.listBeats)
+	mux.HandleFunc("POST /api/beats", a.addBeat)
+	mux.HandleFunc("GET /api/beats/{id}", a.getBeat)
+	mux.HandleFunc("PATCH /api/beats/{id}", a.updateBeat)
+	mux.HandleFunc("DELETE /api/beats/{id}", a.deleteBeat)
+	mux.HandleFunc("PUT /api/beats/{id}/file", a.replaceBeatFile)
+	mux.HandleFunc("GET /api/beats/{id}/audio", a.beatAudio)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not found")
 	})
@@ -83,6 +118,11 @@ func (a *App) health(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// config tells the SPA the limits it should check before sending anything.
+func (a *App) config(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]int64{"maxUploadBytes": a.maxUpload})
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
