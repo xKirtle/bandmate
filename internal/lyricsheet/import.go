@@ -40,9 +40,9 @@ func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error
 	if err != nil {
 		return Song{}, err
 	}
-	sections, arrangement := arrange(sections)
-	sectionIDs := make([]int64, len(sections))
-	for i, sec := range sections {
+	distinct, arrangement := arrange(sections)
+	sectionIDs := make([]int64, len(distinct))
+	for i, sec := range distinct {
 		sectionID, alternateID, err := insertSection(ctx, tx, songID, sec.label)
 		if err != nil {
 			return Song{}, err
@@ -55,8 +55,8 @@ func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error
 			}
 		}
 	}
-	for pos, i := range arrangement {
-		if err := insertOccurrence(ctx, tx, songID, sectionIDs[i], pos); err != nil {
+	for pos, section := range arrangement {
+		if err := insertOccurrence(ctx, tx, songID, sectionIDs[section], pos); err != nil {
 			return Song{}, err
 		}
 	}
@@ -72,19 +72,18 @@ type importedSection struct {
 	lines []string
 }
 
-// sectionDirectives maps the ChordPro directives that start a Section to the
-// Label it gets when the directive doesn't name one.
-var sectionDirectives = map[string]string{
-	"start_of_chorus": "Chorus", "soc": "Chorus",
-	"start_of_verse": "Verse", "sov": "Verse",
-	"start_of_bridge": "Bridge", "sob": "Bridge",
+// sectionDirective is what a ChordPro section directive does: start a
+// Section, with label unless the directive names one, or end it.
+type sectionDirective struct {
+	starts bool
+	label  string
 }
 
-// endDirectives are the ChordPro directives that end a Section.
-var endDirectives = map[string]bool{
-	"end_of_chorus": true, "eoc": true,
-	"end_of_verse": true, "eov": true,
-	"end_of_bridge": true, "eob": true,
+// sectionDirectives are the ChordPro directives that start or end a Section.
+var sectionDirectives = map[string]sectionDirective{
+	"start_of_chorus": {true, "Chorus"}, "soc": {true, "Chorus"}, "end_of_chorus": {}, "eoc": {},
+	"start_of_verse": {true, "Verse"}, "sov": {true, "Verse"}, "end_of_verse": {}, "eov": {},
+	"start_of_bridge": {true, "Bridge"}, "sob": {true, "Bridge"}, "end_of_bridge": {}, "eob": {},
 }
 
 // parseImport reads pasted text into the Song title, if a directive gives
@@ -106,14 +105,14 @@ func parseImport(text string) (title string, sections []importedSection) {
 			continue
 		}
 		if name, value, ok := directive(line); ok {
-			switch {
-			case name == "title" || name == "t":
+			if name == "title" || name == "t" {
 				title = value
-			case sectionDirectives[name] != "":
+			}
+			if d, ok := sectionDirectives[name]; ok {
 				end()
-				cur = importedSection{label: cmp.Or(value, sectionDirectives[name])}
-			case endDirectives[name]:
-				end()
+				if d.starts {
+					cur = importedSection{label: cmp.Or(value, d.label)}
+				}
 			}
 			continue
 		}
@@ -160,11 +159,11 @@ func arrange(imported []importedSection) (sections []importedSection, arrangemen
 	return sections, arrangement
 }
 
-// sameAs reports whether two imported Sections with Lines are the same
-// Section: their Lines match once trimmed at both ends, and they don't have
-// different Labels.
+// sameAs reports whether two imported Sections are the same Section: they
+// have Lines, their Lines match once trimmed at both ends, and they don't
+// have different Labels.
 func (a importedSection) sameAs(b importedSection) bool {
-	if len(a.lines) == 0 {
+	if len(a.lines) == 0 || len(b.lines) == 0 {
 		return false
 	}
 	if a.label != "" && b.label != "" && !strings.EqualFold(a.label, b.label) {

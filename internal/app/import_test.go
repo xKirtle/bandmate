@@ -13,6 +13,20 @@ func (ts *testServer) importSong(title, text string) response {
 	return ts.Do(http.MethodPost, "/api/songs/import", map[string]any{"title": title, "text": text})
 }
 
+// importSheet pastes text into a new Song titled Midnight Drive, expects it
+// to be created and to read back the same, and returns it.
+func (ts *testServer) importSheet(text string) song {
+	ts.t.Helper()
+	res := ts.importSong("Midnight Drive", text)
+	expectStatus(ts.t, res, http.StatusCreated)
+	var s song
+	res.JSON(ts.t, &s)
+	if read := ts.getSong(s.ID); !reflect.DeepEqual(read, s) {
+		ts.t.Errorf("song read back = %+v, want %+v", read, s)
+	}
+	return s
+}
+
 // shownSection is one Occurrence of a Song as the user reads it: its
 // Section's Label and the texts of its active Lines.
 type shownSection struct {
@@ -160,16 +174,10 @@ func TestImportSplitsPastedTextIntoSections(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ts := newTestServer(t)
 
-			res := ts.importSong("Midnight Drive", c.text)
+			s := ts.importSheet(c.text)
 
-			expectStatus(t, res, http.StatusCreated)
-			var s song
-			res.JSON(t, &s)
 			if got := readSheet(s); !reflect.DeepEqual(got, c.want) {
 				t.Errorf("sheet = %+v, want %+v", got, c.want)
-			}
-			if read := ts.getSong(s.ID); !reflect.DeepEqual(read, s) {
-				t.Errorf("song read back = %+v, want %+v", read, s)
 			}
 		})
 	}
@@ -177,7 +185,7 @@ func TestImportSplitsPastedTextIntoSections(t *testing.T) {
 
 // sharing numbers each Occurrence of a Song by its Section, in order of first
 // appearance, so Occurrences of one shared Section get the same number.
-func sharing(s song) []int {
+func sectionNumbers(s song) []int {
 	number := map[int64]int{}
 	out := []int{}
 	for _, o := range s.Arrangement {
@@ -290,15 +298,12 @@ func TestImportMergesRepeatedSections(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ts := newTestServer(t)
 
-			res := ts.importSong("Midnight Drive", c.text)
+			s := ts.importSheet(c.text)
 
-			expectStatus(t, res, http.StatusCreated)
-			var s song
-			res.JSON(t, &s)
 			if got := readSheet(s); !reflect.DeepEqual(got, c.want) {
 				t.Errorf("sheet = %+v, want %+v", got, c.want)
 			}
-			if got := sharing(s); !reflect.DeepEqual(got, c.sections) {
+			if got := sectionNumbers(s); !reflect.DeepEqual(got, c.sections) {
 				t.Errorf("sections by occurrence = %v, want %v", got, c.sections)
 			}
 		})
@@ -307,16 +312,13 @@ func TestImportMergesRepeatedSections(t *testing.T) {
 
 func TestAWronglyMergedOccurrenceCanBeDetached(t *testing.T) {
 	ts := newTestServer(t)
-	imported := ts.importSong("Midnight Drive", "[Chorus]\nMe home\n\n[Verse]\nCity lights\n\n[Chorus]\nMe home")
-	expectStatus(t, imported, http.StatusCreated)
-	var s song
-	imported.JSON(t, &s)
+	s := ts.importSheet("[Chorus]\nMe home\n\n[Verse]\nCity lights\n\n[Chorus]\nMe home")
 	last := s.Arrangement[2]
 
 	got := ts.lyricSheetChange(http.MethodPost, detachPath(s.ID, last.ID), nil)
 
-	if sharing(got)[2] != 2 {
-		t.Fatalf("sections by occurrence = %v, want the last one on its own", sharing(got))
+	if sectionNumbers(got)[2] != 2 {
+		t.Fatalf("sections by occurrence = %v, want the last one on its own", sectionNumbers(got))
 	}
 	copied := sectionOf(t, got, got.Arrangement[2])
 	ts.setText(got.ID, copied.Alternates[0].ID, "Me home again")
