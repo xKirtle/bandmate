@@ -47,16 +47,19 @@ If the SPA hasn't been built, the binary still runs, but non-API pages show a "w
 
 ### Docker
 
+`compose.yaml` runs the image CI publishes to GHCR. To run a local build instead, build it under a separate tag and point `BANDMATE_IMAGE` at it:
+
 ```sh
-docker compose up --build
+docker build -t bandmate:dev .
+BANDMATE_IMAGE=bandmate:dev docker compose up
 ```
 
-This builds the image and serves Bandmate on http://localhost:8080 with data in `./data`. `compose.yaml` reads these variables (put them in a `.env` next to it):
+This serves Bandmate on http://localhost:8080 with data in `./data`. `compose.yaml` reads these variables (put them in a `.env` next to it):
 
-| Variable         | Default                           | Purpose                                     |
-| ---------------- | --------------------------------- | ------------------------------------------- |
-| `BANDMATE_PORT`  | `8080`                            | Host port                                   |
-| `BANDMATE_IMAGE` | `ghcr.io/xkirtle/bandmate:latest` | Image to run (or tag, with `--build`)       |
+| Variable         | Default                           | Purpose                                          |
+| ---------------- | --------------------------------- | ------------------------------------------------ |
+| `BANDMATE_PORT`  | `8080`                            | Host port                                        |
+| `BANDMATE_IMAGE` | `ghcr.io/xkirtle/bandmate:latest` | Image to run                                     |
 | `PUID` / `PGID`  | `1000`                            | User the container runs as. It must own `./data` |
 
 ## Tests
@@ -70,12 +73,28 @@ The tests go through the HTTP API only. `internal/app/helpers_test.go` starts th
 
 ## Deploying
 
-Bandmate runs as its own compose stack on the MiniPC. Create the `data` folder owned by `PUID:PGID`, then either:
-
-- run `docker compose up -d --build` from a checkout of this repo, which builds the image on the MiniPC, or
-- copy `compose.yaml` alone and run `docker compose up -d`, which pulls `ghcr.io/xkirtle/bandmate:latest`. This only works once CI publishes that image.
+Bandmate runs as its own compose stack on the MiniPC, managed by Dockhand. The stack only needs `compose.yaml` (and a `.env` if the defaults don't fit) plus a `data` folder owned by `PUID:PGID`. It pulls `ghcr.io/xkirtle/bandmate:latest`.
 
 Back it up by copying `data/`.
+
+### Release flow
+
+1. Open a pull request. The [CI workflow](.github/workflows/ci.yml) type-checks and builds the SPA, runs `go vet` and `go test`, and builds the Docker image. Pushes to other branches don't run CI, so open a draft PR for early feedback.
+2. Merge to `main`. CI runs again and, if it passes, publishes the image to `ghcr.io/xkirtle/bandmate` tagged `latest` and with the commit SHA.
+3. Redeploy the stack in Dockhand, which pulls the new `latest`. Migrations run on startup.
+
+To roll back, set `BANDMATE_IMAGE=ghcr.io/xkirtle/bandmate:<older-sha>` in the stack's `.env` and redeploy.
+
+### One-time setup
+
+- **Block failing changes.** In the repo's settings, add a branch protection rule (or ruleset) for `main` that requires the `test` and `image` checks to pass before merging.
+- **Package visibility.** The first publish creates the `bandmate` package under the account's GitHub packages. Check its visibility there. If it's public, nothing else is needed. If it's private, log the MiniPC in to the registry with a personal access token (classic) that has the `read:packages` scope:
+
+  ```sh
+  echo <token> | docker login ghcr.io -u xKirtle --password-stdin
+  ```
+
+  If Dockhand pulls with its own registry settings rather than the Docker daemon's, add `ghcr.io` there with the same token.
 
 **Manual step:** add a site block for `bandmate.kirtle.net` to the Pi's Caddyfile, then reload Caddy. Replace the upstream with the MiniPC's address and `BANDMATE_PORT`:
 

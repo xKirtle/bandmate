@@ -1,7 +1,6 @@
 services:
   bandmate:
     image: ${BANDMATE_IMAGE:-ghcr.io/xkirtle/bandmate:latest}
-    build: .
     container_name: bandmate
     restart: unless-stopped
     # Run as the owner of ./data so the bind-mounted folder stays writable.

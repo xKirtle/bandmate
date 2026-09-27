@@ -1,0 +1,89 @@
+name: CI
+
+# Pull requests test every change; pushes to main test again and publish.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer run on the same branch or PR replaces an older one. Runs on main
+# are never cancelled, so every merged commit gets its SHA-tagged image.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ghcr.io/xkirtle/bandmate
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Type-check the SPA
+        working-directory: web
+        run: npm run check
+
+      # The Go binary embeds web/dist, so build it before the Go steps.
+      - name: Build the SPA
+        working-directory: web
+        run: npm run build
+
+      # Caches the module and build caches, keyed on go.sum.
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test ./...
+
+  image:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      PUBLISH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        if: env.PUBLISH == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Builds from the Git context, so no checkout is needed. Layers
+      # (including npm ci and go mod download) are cached in the GitHub
+      # Actions cache.
+      - uses: docker/build-push-action@v7
+        with:
+          push: ${{ env.PUBLISH == 'true' }}
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+          # Links the GHCR package to this repository.
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
