@@ -23,14 +23,18 @@ export interface View {
  */
 export const maxScale = peaksPerSecond * barWidth;
 
+/** How many pixels a second fit a Timeline span seconds long in width pixels. */
+export function fitScale(span: number, width: number): number {
+  return span > 0 ? width / span : 0;
+}
+
 /**
  * The view as it can be: zoomed out no further than the whole Timeline
  * fitting the width, in no further than maxScale unless that's what
  * fits, and scrolled no further than its ends.
  */
 export function view(v: View): View {
-  const fit = v.span > 0 ? v.width / v.span : 0;
-  const scale = Math.max(Math.min(v.scale, maxScale), fit);
+  const scale = Math.max(Math.min(v.scale, maxScale), fitScale(v.span, v.width));
   const most = Math.max(0, v.span * scale - v.width);
   return { ...v, scale, scroll: Math.min(Math.max(v.scroll, 0), most) };
 }

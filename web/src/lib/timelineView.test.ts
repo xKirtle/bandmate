@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { follow, maxScale, ticks, timeAt, view, waveWindow, xAt, zoom } from './timelineView';
+import { fitScale, follow, maxScale, ticks, timeAt, view, waveWindow, xAt, zoom } from './timelineView';
 
 // A 100s Timeline shown 500px wide: fitted, that's 5px a second.
 const fitted = view({ span: 100, width: 500, scale: 0, scroll: 0 });
+
+describe('fitScale', () => {
+  it('is how many pixels a second fit the whole Timeline in the width', () => {
+    expect(fitScale(100, 500)).toBe(5);
+  });
+
+  it('is 0 without a Timeline to fit', () => {
+    expect(fitScale(0, 500)).toBe(0);
+  });
+});
 
 describe('view', () => {
   it('fits the whole Timeline when not zoomed in', () => {

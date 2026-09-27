@@ -22,6 +22,7 @@
   import { formatDuration } from './time';
   import { TimelinePlayer, type PlayableClip, type PlayerState } from './timelinePlayer';
   import {
+    fitScale,
     follow,
     ticks as rulerTicks,
     timeAt as viewTimeAt,
@@ -295,7 +296,7 @@
   // unless going round the Loop.
   $effect(() => {
     if (playerState !== 'playing') return;
-    let frame = requestAnimationFrame(function track() {
+    let frame = requestAnimationFrame(function step() {
       if (!dragging) position = player.position();
       if (position >= length && !player.repeating) {
         player.stop();
@@ -303,8 +304,9 @@
         position = length;
         return;
       }
-      if (following && !dragging) reveal(position);
-      frame = requestAnimationFrame(track);
+      // Not while something's dragged, which would jump with the page.
+      if (following && !dragging && !edit && !loopEdit) reveal(position);
+      frame = requestAnimationFrame(step);
     });
     return () => cancelAnimationFrame(frame);
   });
@@ -350,6 +352,8 @@
   }
 
   function pointerDown(event: PointerEvent) {
+    // A second finger is pinching.
+    if (!event.isPrimary) return;
     dragging = true;
     // Clicking the playhead back into view follows it again.
     following = true;
@@ -476,7 +480,7 @@
   }
 
   function editDown(event: PointerEvent, clip: Clip, mode: Edit['mode']) {
-    if (!editable.current || event.button !== 0 || edit) return;
+    if (!editable.current || !event.isPrimary || event.button !== 0 || edit) return;
     event.stopPropagation();
     // Clicking a Clip still focuses it, for its keys and buttons.
     (event.currentTarget as HTMLElement).closest<HTMLElement>('.clip')?.focus();
@@ -588,7 +592,7 @@
   }
 
   function loopDown(event: PointerEvent) {
-    if (!editable.current || event.button !== 0 || loopEdit) return;
+    if (!editable.current || !event.isPrimary || event.button !== 0 || loopEdit) return;
     const edge = (event.target as HTMLElement).dataset.edge as 'start' | 'end' | undefined;
     const current = timeline.loop;
     const t = loopTimeAt(event.clientX);
@@ -658,13 +662,15 @@
   const view = $derived(timelineView({ span, width, scale, scroll }));
   // Whether the view follows the playhead while playing: until scrolled
   // away from by hand, then again once playing starts or the ruler's clicked.
+  // Only read each frame while playing, so it needn't be state.
   let following = true;
   // Where the lanes were last scrolled to from here, to tell scrolling by hand.
   let scrolledTo = 0;
 
   /** Shows the Timeline zoomed and scrolled as v has it. */
   async function show(v: View) {
-    scale = v.scale > timelineView({ ...v, scale: 0 }).scale ? v.scale : 0;
+    // Zoomed all the way out, it keeps fitting as the Timeline or window changes.
+    scale = v.scale > fitScale(v.span, v.width) ? v.scale : 0;
     scroll = scrolledTo = v.scroll;
     // Once the lanes are as wide as zoomed to.
     await tick();
@@ -673,6 +679,8 @@
 
   /** Scrolls the playhead into view, if it isn't. */
   function reveal(time: number) {
+    // Not while the Timeline's hidden, with no view to scroll.
+    if (width === 0) return;
     const next = follow(view, time);
     if (next.scroll !== view.scroll) show(next);
   }
@@ -681,7 +689,21 @@
     scroll = lanesElement!.scrollLeft;
     // Scrolled by hand, rather than to where it was shown.
     if (Math.abs(scroll - timelineView({ ...view, scroll: scrolledTo }).scroll) > 1) following = false;
+    scrolledTo = scroll;
   }
+
+  // Hidden or shown again, the lanes lose where they were scrolled to.
+  // Resized, they may need to go back within the Timeline.
+  $effect(() => {
+    if (!lanesElement || width === 0) return;
+    untrack(() => show(view));
+  });
+
+  // Once the Timeline fits without zooming out, e.g. after deleting a long
+  // Clip, it stays fitted rather than zooming back in as it grows again.
+  $effect(() => {
+    if (scale > 0 && scale <= fitScale(span, width)) scale = 0;
+  });
 
   function zoomAt(factor: number, clientX: number) {
     show(zoom(view, factor, xIn(clientX)));
@@ -696,6 +718,9 @@
       // A trackpad's pinch comes as Ctrl+wheel too.
       if (!event.ctrlKey) return;
       event.preventDefault();
+      // A mouse wheel's notch is about 100px, or 3 lines of about 33px:
+      // zoomed 1.65x each, however hard it's flicked. A trackpad's pinch
+      // comes as many small steps.
       const pixels = event.deltaMode === WheelEvent.DOM_DELTA_PIXEL ? event.deltaY : event.deltaY * 33;
       zoomAt(Math.exp(-Math.max(-100, Math.min(100, pixels)) * 0.005), event.clientX);
     };
@@ -707,8 +732,9 @@
     const touchStart = (event: TouchEvent) => {
       if (event.touches.length !== 2) return;
       pinch = pinchOf(event);
-      // The first finger may have started dragging the playhead.
+      // The first finger may have started dragging the playhead or the Loop.
       dragging = false;
+      loopCancel();
     };
     const touchMove = (event: TouchEvent) => {
       if (!pinch || event.touches.length !== 2) return;
@@ -743,10 +769,17 @@
     return span > 0 ? (time / span) * 100 : 0;
   }
 
-  /** A stretch of a Beat's waveform, from offset seconds in, as count bars. */
-  function clipShape(beatId: number, offset: number, clipLength: number, count: number): number[] {
+  /**
+   * A stretch of a Beat's waveform, from offset seconds in, as count bars
+   * over drawn seconds. Past heard seconds in, trimmed off the Clip, it's
+   * silent.
+   */
+  function clipShape(beatId: number, offset: number, heard: number, drawn: number, count: number): number[] {
     const all = peaks[beatId] ?? [];
-    return bars(all.slice(Math.floor(offset * peaksPerSecond), Math.ceil((offset + clipLength) * peaksPerSecond)), count);
+    const from = Math.floor(offset * peaksPerSecond);
+    const kept = all.slice(from, Math.ceil((offset + heard) * peaksPerSecond));
+    const silent = Math.max(0, Math.ceil((offset + drawn) * peaksPerSecond) - from - kept.length);
+    return bars([...kept, ...new Array<number>(silent).fill(0)], count);
   }
 </script>
 
@@ -1001,7 +1034,7 @@
                           preserveAspectRatio="none"
                           aria-hidden="true"
                         >
-                          {#each clipShape(clip.beatId, at.offset + wave.from, (wave.bars * barWidth) / view.scale, wave.bars) as peak, i (i)}
+                          {#each clipShape(clip.beatId, at.offset + wave.from, wave.to - wave.from, (wave.bars * barWidth) / view.scale, wave.bars) as peak, i (i)}
                             {@const height = Math.max(2, peak * 100)}
                             <rect x={i + 0.15} y={(100 - height) / 2} width="0.7" {height} />
                           {/each}
