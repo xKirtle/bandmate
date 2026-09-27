@@ -101,6 +101,10 @@ _Avoid_: Cycle, repeat, region
 A link from an Occurrence, or from one Line within an Occurrence, to a time on the Timeline. A Line's Cue lies dormant while its Alternate is inactive.
 _Avoid_: Timestamp, sync point, marker
 
+**Tap mode**:
+A way of syncing a Song by tapping along: each tap cues the next Line at the playhead. Clicking a Line picks it as the next one. Tap mode and the Loop are never on together.
+_Avoid_: Record mode, sync mode
+
 **Latency Offset**:
 The delay between what the user heard and what the mic captured, measured once by calibration and adjustable per Take.
 _Avoid_: Delay, lag

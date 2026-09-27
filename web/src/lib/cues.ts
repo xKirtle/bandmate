@@ -85,22 +85,24 @@ export function nextLine(
   { current, picked = null, showChords }: { current: Position | null; picked?: TappedLine | null; showChords: boolean },
 ): TappedLine | null {
   const sections = new Map(song.sections.map((s) => [s.id, s]));
-  const sheet = song.arrangement.flatMap((o, at) =>
+  const sheet = song.arrangement.flatMap((o, place) =>
     (sections.get(o.sectionId)?.alternates.find((a) => a.active)?.lines ?? []).map((l) => ({
-      at,
+      place,
       occurrence: o.id,
       line: l.id,
       tappable: !isBlank(l) && (showChords || !l.chordLine),
     })),
   );
   const index = (p: Position) => sheet.findIndex((q) => q.occurrence === p.occurrence && q.line === p.line);
+  const pickedAt = picked === null ? -1 : index(picked);
+  const currentAt = current === null ? -1 : index(current);
   let from = 0;
-  if (picked !== null && index(picked) >= 0) from = index(picked);
-  else if (current !== null && index(current) >= 0) from = index(current) + 1;
+  if (pickedAt >= 0) from = pickedAt;
+  else if (currentAt >= 0) from = currentAt + 1;
   else if (current !== null) {
     // The whole Section: from its first Line, or the next Section's if it has none.
-    const at = song.arrangement.findIndex((o) => o.id === current.occurrence);
-    from = sheet.findIndex((p) => p.at >= at);
+    const place = song.arrangement.findIndex((o) => o.id === current.occurrence);
+    from = sheet.findIndex((p) => p.place >= place);
     if (from < 0) return null;
   }
   const next = sheet.slice(from).find((p) => p.tappable);
