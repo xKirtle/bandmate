@@ -18,7 +18,7 @@
   import { History, sendEdit, type Edit as TimelineEdit } from './history';
   import { formatVolume, maxVolume, silence, trackGains, type Levels } from './mixer';
   import { peaksPerSecond } from './peaks';
-  import { repeats, timelineEnd, type Loop, type Placed } from './schedule';
+  import { keptInLoop, outsideLoop, repeats, timelineEnd, type Loop, type Placed } from './schedule';
   import { formatDuration } from './time';
   import { TimelinePlayer, type PlayableClip, type PlayerState } from './timelinePlayer';
   import {
@@ -39,8 +39,9 @@
   // (adding Beats, adding, renaming, reordering and deleting Tracks, moving,
   // trimming, duplicating and deleting Clips, setting and clearing the Loop,
   // and undoing and redoing all of it along with mixing) is only offered on
-  // wider screens; on a phone it only plays and mixes. On both it zooms and
-  // scrolls, and follows the playhead while playing.
+  // wider screens; on a phone it only plays, mixes and switches the Loop on
+  // and off. On both it zooms and scrolls, and follows the playhead while
+  // playing. While the Loop is on, the playhead stays inside it.
   let {
     song,
     timeline,
@@ -85,9 +86,13 @@
   // and the Loop later on the Timeline.
   const reach = $derived(length > 0 ? Math.max(length, timeline.loop?.end ?? 0) : 0);
   const span = $derived(reach > 0 ? reach + Math.max(10, reach / 4) : 0);
+  // Seeking outside the Loop switches it off, and until that's saved,
+  // playback already goes on without it.
+  let switchingOff = $state(false);
+  const loopOn = $derived((timeline.loop?.on ?? false) && !switchingOff);
   // The Loop playback repeats: the saved one, while it's on.
   const playingLoop = $derived<Loop | null>(
-    timeline.loop?.on ? { start: timeline.loop.start, end: timeline.loop.end } : null,
+    loopOn ? { start: timeline.loop!.start, end: timeline.loop!.end } : null,
   );
   const empty = $derived(clips.length === 0);
   // Matches the phone layout below, which hides editing.
@@ -282,14 +287,19 @@
 
   // A change to what plays is heard right away. The Timeline is replaced
   // after every change to it, so compare what would play, not the objects,
-  // and in an order reordering Tracks doesn't change.
+  // and in an order reordering Tracks doesn't change. A Loop switched on,
+  // set, adjusted or undone that leaves the playhead outside it takes the
+  // playhead to its start, as does opening a Song whose Loop is on.
   const playKey = $derived(
     JSON.stringify([[...playable].sort((a, b) => a.trackId - b.trackId || a.start - b.start), playingLoop]),
   );
   $effect(() => {
     void playKey;
     untrack(() => {
-      if (playerState !== 'stopped') play(player.position());
+      const from = playerState === 'stopped' ? position : player.position();
+      const to = keptInLoop(from, playingLoop);
+      if (playerState !== 'stopped') play(to);
+      else if (to !== from) seek(to);
     });
   });
 
@@ -328,21 +338,40 @@
     play(position >= length && !repeats(position, playingLoop) ? 0 : position);
   }
 
+  /** A time on the Timeline, kept between its start and end. */
+  function clamp(t: number): number {
+    return Math.max(0, Math.min(length, t));
+  }
+
   function seek(to: number) {
-    position = Math.max(0, Math.min(length, to));
+    position = clamp(to);
     if (playerState === 'stopped') player.seek(position);
     else play(position);
   }
 
+  /** Seeks where asked by hand, switching the Loop off if that's outside it. */
+  function seekByHand(to: number) {
+    if (outsideLoop(clamp(to), playingLoop)) switchLoopOff();
+    seek(to);
+  }
+
+  async function switchLoopOff() {
+    switchingOff = true;
+    // If it fails, the Loop is on again, and takes the playhead back inside.
+    await perform({ kind: 'switchLoop', on: false });
+    switchingOff = false;
+  }
+
   // Clicking on the ruler seeks. Dragging moves the playhead, and while
   // playing, playback only jumps there on release, so it doesn't stutter.
+  // Whether it's outside the Loop is only told on release, too.
   let dragging = false;
 
   /** Where a pointer is on the page. */
   type Point = Pick<PointerEvent, 'clientX' | 'clientY'>;
 
   function timeAt(event: Point): number {
-    return Math.max(0, Math.min(length, spanTimeAt(event.clientX)));
+    return clamp(spanTimeAt(event.clientX));
   }
 
   /** The time under a point across the lanes, which may be past the end. */
@@ -408,7 +437,19 @@
     if (!dragging) return;
     dragging = false;
     dragDone();
-    seek(timeAt(event));
+    seekByHand(timeAt(event));
+  }
+
+  // A drag given up, e.g. for a pinch, isn't a seek. While playing, playback
+  // never left where it was; while stopped, a playhead dragged out of the
+  // Loop goes back inside it.
+  function pointerCancel() {
+    if (!dragging) return;
+    dragging = false;
+    dragDone();
+    if (playerState !== 'stopped') return;
+    const to = keptInLoop(position, playingLoop);
+    if (to !== position) seek(to);
   }
 
   function rulerKey(event: KeyboardEvent) {
@@ -424,7 +465,7 @@
     if (to === undefined) return;
     event.preventDefault();
     following = true;
-    seek(to);
+    seekByHand(to);
     reveal(position);
   }
 
@@ -683,8 +724,8 @@
 
   function switchLoop() {
     if (!timeline.loop) return;
-    const on = !timeline.loop.on;
-    perform({ kind: 'switchLoop', on });
+    // Switched off by a seek that's still saving, it's shown off already.
+    perform({ kind: 'switchLoop', on: !loopOn });
   }
 
   function clearLoop() {
@@ -872,8 +913,9 @@
         <span class="time muted">{formatDuration(position)} / {formatDuration(length)}</span>
         <button
           type="button"
-          class="toggle loop-toggle edit-only"
-          aria-pressed={timeline.loop?.on ?? false}
+          class="toggle loop-toggle"
+          class:edit-only={!timeline.loop}
+          aria-pressed={loopOn}
           disabled={!timeline.loop}
           onclick={switchLoop}
           title={timeline.loop
@@ -1022,10 +1064,7 @@
               onpointerdown={pointerDown}
               onpointermove={pointerMove}
               onpointerup={pointerUp}
-              onpointercancel={() => {
-                dragging = false;
-                dragDone();
-              }}
+              onpointercancel={pointerCancel}
               onkeydown={rulerKey}
             >
               {#each ticks as t (t)}
