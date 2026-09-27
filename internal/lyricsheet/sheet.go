@@ -237,12 +237,7 @@ func (s *Store) AddOccurrence(ctx context.Context, songID, sectionID int64, posi
 // the Scrapbook.
 func (s *Store) RemoveOccurrence(ctx context.Context, songID, occurrenceID int64) (Song, error) {
 	return s.change(ctx, songID, func(tx *sql.Tx) error {
-		var pos int
-		err := tx.QueryRowContext(ctx, `SELECT position FROM occurrences WHERE id = ? AND song_id = ?`,
-			occurrenceID, songID).Scan(&pos)
-		if errors.Is(err, sql.ErrNoRows) {
-			return ErrNotFound
-		}
+		_, pos, err := findOccurrence(ctx, tx, songID, occurrenceID)
 		if err != nil {
 			return err
 		}
@@ -259,16 +254,10 @@ func (s *Store) RemoveOccurrence(ctx context.Context, songID, occurrenceID int64
 }
 
 // Detach points an Occurrence of a shared Section at a new copy of that
-// Section: its Label, all its Alternates (the same one active) and all their
-// Lines. The other Occurrences keep the original.
+// Section. The other Occurrences keep the original.
 func (s *Store) Detach(ctx context.Context, songID, occurrenceID int64) (Song, error) {
 	return s.change(ctx, songID, func(tx *sql.Tx) error {
-		var sectionID int64
-		err := tx.QueryRowContext(ctx, `SELECT section_id FROM occurrences WHERE id = ? AND song_id = ?`,
-			occurrenceID, songID).Scan(&sectionID)
-		if errors.Is(err, sql.ErrNoRows) {
-			return ErrNotFound
-		}
+		sectionID, _, err := findOccurrence(ctx, tx, songID, occurrenceID)
 		if err != nil {
 			return err
 		}
@@ -280,34 +269,9 @@ func (s *Store) Detach(ctx context.Context, songID, occurrenceID int64) (Song, e
 		if uses < 2 {
 			return invalid("only an Occurrence of a shared Section can be Detached")
 		}
-
-		copyID, err := insert(ctx, tx,
-			`INSERT INTO sections (song_id, label) SELECT song_id, label FROM sections WHERE id = ?`, sectionID)
+		copyID, err := copySection(ctx, tx, sectionID)
 		if err != nil {
-			return fmt.Errorf("copying section: %w", err)
-		}
-		var alternates []int64
-		err = query(ctx, tx, `SELECT id FROM alternates WHERE section_id = ? ORDER BY id`,
-			[]any{sectionID}, func(rows *sql.Rows) error {
-				var id int64
-				err := rows.Scan(&id)
-				alternates = append(alternates, id)
-				return err
-			})
-		if err != nil {
-			return fmt.Errorf("reading alternates: %w", err)
-		}
-		for _, altID := range alternates {
-			copyAltID, err := insert(ctx, tx, `INSERT INTO alternates (section_id, name, active)
-				SELECT ?, name, active FROM alternates WHERE id = ?`, copyID, altID)
-			if err != nil {
-				return fmt.Errorf("copying alternate: %w", err)
-			}
-			if _, err := tx.ExecContext(ctx, `INSERT INTO lines (alternate_id, position, text)
-				SELECT ?, position, text FROM lines WHERE alternate_id = ? ORDER BY position`,
-				copyAltID, altID); err != nil {
-				return fmt.Errorf("copying lines: %w", err)
-			}
+			return err
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE occurrences SET section_id = ? WHERE id = ?`,
 			copyID, occurrenceID); err != nil {
@@ -315,6 +279,51 @@ func (s *Store) Detach(ctx context.Context, songID, occurrenceID int64) (Song, e
 		}
 		return nil
 	})
+}
+
+// findOccurrence returns the Section and position of one of a Song's
+// Occurrences.
+func findOccurrence(ctx context.Context, tx *sql.Tx, songID, occurrenceID int64) (sectionID int64, pos int, err error) {
+	err = tx.QueryRowContext(ctx, `SELECT section_id, position FROM occurrences WHERE id = ? AND song_id = ?`,
+		occurrenceID, songID).Scan(&sectionID, &pos)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, 0, ErrNotFound
+	}
+	return sectionID, pos, err
+}
+
+// copySection creates a new Section with a Section's Label, all its
+// Alternates (the same one active) and all their Lines, and returns its id.
+func copySection(ctx context.Context, tx *sql.Tx, sectionID int64) (int64, error) {
+	copyID, err := insert(ctx, tx,
+		`INSERT INTO sections (song_id, label) SELECT song_id, label FROM sections WHERE id = ?`, sectionID)
+	if err != nil {
+		return 0, fmt.Errorf("copying section: %w", err)
+	}
+	var alternates []int64
+	err = query(ctx, tx, `SELECT id FROM alternates WHERE section_id = ? ORDER BY id`,
+		[]any{sectionID}, func(rows *sql.Rows) error {
+			var id int64
+			err := rows.Scan(&id)
+			alternates = append(alternates, id)
+			return err
+		})
+	if err != nil {
+		return 0, fmt.Errorf("reading alternates: %w", err)
+	}
+	for _, altID := range alternates {
+		copyAltID, err := insert(ctx, tx, `INSERT INTO alternates (section_id, name, active)
+			SELECT ?, name, active FROM alternates WHERE id = ?`, copyID, altID)
+		if err != nil {
+			return 0, fmt.Errorf("copying alternate: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO lines (alternate_id, position, text)
+			SELECT ?, position, text FROM lines WHERE alternate_id = ? ORDER BY position`,
+			copyAltID, altID); err != nil {
+			return 0, fmt.Errorf("copying lines: %w", err)
+		}
+	}
+	return copyID, nil
 }
 
 // arrangementPosition checks a position to insert at in a Song's

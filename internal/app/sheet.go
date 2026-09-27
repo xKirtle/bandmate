@@ -29,11 +29,14 @@ func (a *App) addSection(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) addOccurrence(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		SectionID int64 `json:"sectionId"`
-		Position  *int  `json:"position"`
+		SectionID *int64 `json:"sectionId"`
+		Position  *int   `json:"position"`
 	}
 	a.changeSheet(w, r, &req, func(id int64) (lyricsheet.Song, error) {
-		return a.songs.AddOccurrence(r.Context(), id, req.SectionID, req.Position)
+		if req.SectionID == nil {
+			return lyricsheet.Song{}, &lyricsheet.InvalidError{Msg: "sectionId is required"}
+		}
+		return a.songs.AddOccurrence(r.Context(), id, *req.SectionID, req.Position)
 	})
 }
 

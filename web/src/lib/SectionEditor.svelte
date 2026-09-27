@@ -7,7 +7,6 @@
     occurrenceId,
     section,
     shared,
-    uses,
     autofocus = false,
     change,
     onUnsaved,
@@ -19,8 +18,6 @@
     section: Section;
     /** Other Occurrences show this Section too. */
     shared: boolean;
-    /** How many Occurrences show this Section. */
-    uses: number;
     /** Focus the Label when this becomes true, e.g. for a Section just added. */
     autofocus?: boolean;
     /** Sends a Lyric Sheet change; resolves to whether it succeeded. */
@@ -149,8 +146,8 @@
       {@attach focusWhen(autofocus)}
     />
     {#if shared}
-      <span class="shared" title="This Section appears {uses} times. Editing it changes every Occurrence.">
-        Shared ×{uses}
+      <span class="shared" title="This Section appears more than once. Editing it changes every Occurrence.">
+        Shared
       </span>
     {/if}
     <div class="actions">{@render actions()}</div>

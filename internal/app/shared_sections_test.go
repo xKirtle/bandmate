@@ -69,6 +69,18 @@ func TestAddingAnOccurrenceOfASectionOfAnotherSongIsNotFound(t *testing.T) {
 	}
 }
 
+func TestAddingAnOccurrenceWithoutASectionIsRejected(t *testing.T) {
+	ts := newTestServer(t)
+	before := ts.songWithSections("Verse")
+
+	res := ts.Do(http.MethodPost, fmt.Sprintf("/api/songs/%d/occurrences", before.ID), map[string]any{})
+
+	expectError(t, res, http.StatusBadRequest, "sectionId is required")
+	if got := ts.getSong(before.ID); !reflect.DeepEqual(got, before) {
+		t.Errorf("song after rejected add = %+v, want it unchanged %+v", got, before)
+	}
+}
+
 // sharedFlags lists whether each Occurrence of the Arrangement is shared.
 func sharedFlags(s song) []bool {
 	out := []bool{}
@@ -122,8 +134,7 @@ func TestEditingASharedSectionShowsInEveryOccurrence(t *testing.T) {
 	s = ts.addOccurrence(s.ID, chorus.ID, nil)
 
 	ts.setText(s.ID, chorus.Alternates[0].ID, "Drive, drive\nall [Am]night")
-	ts.lyricSheetChange(http.MethodPatch, fmt.Sprintf("/api/songs/%d/sections/%d", s.ID, chorus.ID),
-		map[string]any{"label": "Hook"})
+	ts.setLabel(s.ID, chorus.ID, "Hook")
 	got := ts.getSong(s.ID)
 
 	for _, i := range []int{0, 2} {
@@ -223,8 +234,7 @@ func TestEditsDoNotLeakBetweenADetachedCopyAndItsOriginal(t *testing.T) {
 	original, copied := sectionOf(t, s, s.Arrangement[0]), sectionOf(t, s, s.Arrangement[3])
 
 	ts.setText(s.ID, copied.Alternates[0].ID, "One last time")
-	ts.lyricSheetChange(http.MethodPatch, fmt.Sprintf("/api/songs/%d/sections/%d", s.ID, copied.ID),
-		map[string]any{"label": "Last Chorus"})
+	ts.setLabel(s.ID, copied.ID, "Last Chorus")
 	got := ts.getSong(s.ID)
 
 	if sec := sectionOf(t, got, got.Arrangement[0]); !reflect.DeepEqual(sec, original) {
@@ -232,8 +242,7 @@ func TestEditsDoNotLeakBetweenADetachedCopyAndItsOriginal(t *testing.T) {
 	}
 
 	ts.setText(s.ID, original.Alternates[0].ID, "Drive, drive")
-	ts.lyricSheetChange(http.MethodPatch, fmt.Sprintf("/api/songs/%d/sections/%d", s.ID, original.ID),
-		map[string]any{"label": "Hook"})
+	ts.setLabel(s.ID, original.ID, "Hook")
 	got = ts.getSong(s.ID)
 
 	copiedNow := sectionOf(t, got, got.Arrangement[3])

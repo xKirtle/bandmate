@@ -17,12 +17,9 @@
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
-  // How many Occurrences show each Section.
-  const uses = $derived(
-    song.arrangement.reduce((m, o) => m.set(o.sectionId, (m.get(o.sectionId) ?? 0) + 1), new Map<number, number>()),
-  );
-  // The Sections in the Arrangement, once each, in the order they first appear.
-  const repeatable = $derived(
+  // The Sections in the Arrangement, once each, in the order they first
+  // appear: the ones another Occurrence can be added of.
+  const inArrangement = $derived(
     [...new Set(song.arrangement.map((o) => o.sectionId))].flatMap((id) => sections.get(id) ?? []),
   );
   // The Occurrence just added, whose Label gets focus.
@@ -47,14 +44,14 @@
     }
   }
 
-  function repeat(sectionId: number, position?: number) {
+  function addOccurrence(sectionId: number, position?: number) {
     change(() => api.addOccurrence(song.id, sectionId, position));
   }
 
-  function repeatAtEnd(e: Event & { currentTarget: HTMLSelectElement }) {
+  function addOccurrenceAtEnd(e: Event & { currentTarget: HTMLSelectElement }) {
     const id = Number(e.currentTarget.value);
     e.currentTarget.value = '';
-    if (id) repeat(id);
+    if (id) addOccurrence(id);
   }
 
   // How a Section is named in lists: its Label, else its first Line.
@@ -103,7 +100,6 @@
               occurrenceId={occurrence.id}
               {section}
               shared={occurrence.shared}
-              uses={uses.get(occurrence.sectionId) ?? 1}
               autofocus={added === occurrence.id}
               {change}
               {onUnsaved}
@@ -127,7 +123,7 @@
                 <button
                   type="button"
                   class="icon"
-                  onclick={() => repeat(section.id, i + 1)}
+                  onclick={() => addOccurrence(section.id, i + 1)}
                   aria-label="Repeat this Section below"
                   title="Repeat this Section below"
                 >
@@ -162,11 +158,11 @@
 
     <div class="add-row">
       <button type="button" class="button add" onclick={() => add(song.arrangement.length)}>Add Section</button>
-      {#if repeatable.length > 0}
+      {#if inArrangement.length > 0}
         <label class="visually-hidden" for="repeat-section">Repeat a Section at the end</label>
-        <select id="repeat-section" class="repeat" onchange={repeatAtEnd}>
+        <select id="repeat-section" class="repeat" onchange={addOccurrenceAtEnd}>
           <option value="">Repeat a Section…</option>
-          {#each repeatable as section (section.id)}
+          {#each inArrangement as section (section.id)}
             <option value={section.id}>{describe(section)}</option>
           {/each}
         </select>
