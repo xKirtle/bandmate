@@ -97,9 +97,10 @@ func TestNewSongHasNoMetadata(t *testing.T) {
 
 	got := ts.createSong("Bare")
 
-	want := song{ID: got.ID, Title: "Bare", Status: "idea", CreatedAt: got.CreatedAt, UpdatedAt: got.UpdatedAt}
+	want := song{ID: got.ID, Title: "Bare", Status: "idea", CreatedAt: got.CreatedAt, UpdatedAt: got.UpdatedAt,
+		Arrangement: []occurrence{}, Sections: []section{}, Scrapbook: []int64{}}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("new song = %+v, want no key, BPM, capo, tuning or notes", got)
+		t.Errorf("new song = %+v, want no key, BPM, capo, tuning, notes or Sections", got)
 	}
 }
 
@@ -169,6 +170,8 @@ func TestDeletedSongIsGone(t *testing.T) {
 	kept := ts.createSong("Keeper")
 	doomed := ts.createSong("Scrap This")
 	ts.updateSong(doomed.ID, map[string]any{"notes": "Owned by the Song", "bpm": 120})
+	withVerse := ts.addSection(doomed.ID, map[string]any{"label": "Verse"})
+	ts.setText(doomed.ID, withVerse.Sections[0].Alternates[0].ID, "Owned by the Song too")
 
 	res := ts.Do(http.MethodDelete, fmt.Sprintf("/api/songs/%d", doomed.ID), nil)
 

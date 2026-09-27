@@ -131,16 +131,47 @@ func expectStatus(t *testing.T, r response, want int) {
 
 // song is the Song aggregate as the API returns it. Later tickets extend it.
 type song struct {
-	ID        int64  `json:"id"`
-	Title     string `json:"title"`
-	Status    string `json:"status"`
-	Key       string `json:"key"`
-	BPM       *int   `json:"bpm"`
-	Capo      *int   `json:"capo"`
-	Tuning    string `json:"tuning"`
-	Notes     string `json:"notes"`
-	CreatedAt string `json:"createdAt"`
-	UpdatedAt string `json:"updatedAt"`
+	ID          int64        `json:"id"`
+	Title       string       `json:"title"`
+	Status      string       `json:"status"`
+	Key         string       `json:"key"`
+	BPM         *int         `json:"bpm"`
+	Capo        *int         `json:"capo"`
+	Tuning      string       `json:"tuning"`
+	Notes       string       `json:"notes"`
+	CreatedAt   string       `json:"createdAt"`
+	UpdatedAt   string       `json:"updatedAt"`
+	Arrangement []occurrence `json:"arrangement"`
+	Sections    []section    `json:"sections"`
+	Scrapbook   []int64      `json:"scrapbook"`
+}
+
+// occurrence is one appearance of a Section in the Arrangement.
+type occurrence struct {
+	ID        int64 `json:"id"`
+	SectionID int64 `json:"sectionId"`
+	Shared    bool  `json:"shared"`
+}
+
+// section is a Section with all its Alternates.
+type section struct {
+	ID         int64       `json:"id"`
+	Label      string      `json:"label"`
+	Alternates []alternate `json:"alternates"`
+}
+
+// alternate is one version of a Section's Lines.
+type alternate struct {
+	ID     int64  `json:"id"`
+	Name   string `json:"name"`
+	Active bool   `json:"active"`
+	Lines  []line `json:"lines"`
+}
+
+// line is one Line, as raw text.
+type line struct {
+	ID   int64  `json:"id"`
+	Text string `json:"text"`
 }
 
 // songSummary is one entry of the Song list.
@@ -200,6 +231,31 @@ func (ts *testServer) updateSong(id int64, changes map[string]any) song {
 	var s song
 	res.JSON(ts.t, &s)
 	return s
+}
+
+// lyricSheetChange sends a Lyric Sheet change, expects it to succeed and
+// returns the updated Song aggregate.
+func (ts *testServer) lyricSheetChange(method, path string, body any) song {
+	ts.t.Helper()
+	res := ts.Do(method, path, body)
+	expectStatus(ts.t, res, http.StatusOK)
+	var s song
+	res.JSON(ts.t, &s)
+	return s
+}
+
+// addSection adds a Section to a Song's Arrangement and returns the Song.
+// body may set "label" and "position".
+func (ts *testServer) addSection(songID int64, body map[string]any) song {
+	ts.t.Helper()
+	return ts.lyricSheetChange(http.MethodPost, fmt.Sprintf("/api/songs/%d/sections", songID), body)
+}
+
+// setText replaces an Alternate's text and returns the Song.
+func (ts *testServer) setText(songID, alternateID int64, text string) song {
+	ts.t.Helper()
+	return ts.lyricSheetChange(http.MethodPut,
+		fmt.Sprintf("/api/songs/%d/alternates/%d/text", songID, alternateID), map[string]any{"text": text})
 }
 
 // titles lists the Song titles in order.
