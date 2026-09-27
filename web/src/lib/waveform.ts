@@ -1,5 +1,8 @@
 // Drawing a waveform: an audio file's peaks reduced to as many bars as fit.
 
+/** How wide a bar is drawn, in pixels, with its gap. */
+export const barWidth = 3;
+
 /**
  * Reduces peaks to count bars, each the loudest peak of its stretch. With
  * fewer peaks than bars, peaks are repeated.
