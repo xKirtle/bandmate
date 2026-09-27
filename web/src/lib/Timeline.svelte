@@ -3,6 +3,7 @@
   import { MediaQuery } from 'svelte/reactivity';
   import {
     api,
+    ApiError,
     type Beat,
     type Clip,
     type Song,
@@ -14,6 +15,7 @@
   } from './api';
   import BeatPicker from './BeatPicker.svelte';
   import { clampMove, clampTrimEnd, clampTrimStart } from './clipEdit';
+  import { History, sendEdit, type Edit as TimelineEdit } from './history';
   import { formatVolume, maxVolume, silence, trackGains, type Levels } from './mixer';
   import { peaksPerSecond } from './peaks';
   import { repeats, timelineEnd, type Loop, type Placed } from './schedule';
@@ -24,8 +26,9 @@
   // The Timeline, docked under the Lyric Sheet: its Tracks and Clips, and
   // playback with each Track's volume, mute and solo, and the Loop. Editing
   // (adding Beats, adding, renaming, reordering and deleting Tracks, moving,
-  // trimming, duplicating and deleting Clips, setting and clearing the Loop)
-  // is only offered on wider screens; on a phone it only plays and mixes.
+  // trimming, duplicating and deleting Clips, setting and clearing the Loop,
+  // and undoing and redoing all of it along with mixing) is only offered on
+  // wider screens; on a phone it only plays and mixes.
   let {
     song,
     timeline,
@@ -95,6 +98,95 @@
     }
   });
 
+  // Every edit made here is kept to undo, for as long as the page is open.
+  // The Timeline is only ever the one the latest edit left, unless a
+  // refresh brought in changes made elsewhere: then the edits kept would no
+  // longer undo what they did, so they're forgotten.
+  const history = new History();
+  let undoable = $state(false);
+  let redoable = $state(false);
+  let known = untrack(() => timeline.version);
+
+  $effect(() => {
+    if (timeline.version === known) return;
+    known = timeline.version;
+    history.clear();
+    showHistory();
+  });
+
+  function showHistory() {
+    undoable = history.nextUndo() !== null;
+    redoable = history.nextRedo() !== null;
+  }
+
+  /** Sends an edit, based on the Timeline as it is when its turn comes. */
+  async function send(at: SongAt, e: TimelineEdit): Promise<Timeline> {
+    try {
+      return await sendEdit(at, e);
+    } catch (err) {
+      // Refused because the Song changed elsewhere.
+      if (err instanceof ApiError && err.stale) {
+        history.clear();
+        showHistory();
+      }
+      throw err;
+    }
+  }
+
+  /** Queues an edit, to undo later; resolves to whether it succeeded. */
+  function perform(e: TimelineEdit): Promise<boolean> {
+    e = $state.snapshot(e) as TimelineEdit;
+    return change(async (at) => {
+      const before = timeline;
+      const after = await send(at, e);
+      history.record(e, before, after);
+      known = after.version;
+      showHistory();
+      return after;
+    });
+  }
+
+  /** Undoes or redoes the latest edit, once the edits queued before it are saved. */
+  function travel(back: boolean) {
+    if (!(back ? undoable : redoable)) return;
+    change(async (at) => {
+      const e = back ? history.nextUndo() : history.nextRedo();
+      // Undone meanwhile, e.g. by pressing the key twice quickly.
+      if (!e) {
+        const current = await api.getTimeline(at.id);
+        known = current.version;
+        return current;
+      }
+      const before = timeline;
+      const after = await send(at, e);
+      if (back) history.undone(before, after);
+      else history.redone(before, after);
+      known = after.version;
+      showHistory();
+      return after;
+    });
+  }
+
+  /** Whether typing there is text, which has the browser's own undo. */
+  function inTextField(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false;
+    if (target.isContentEditable || target instanceof HTMLTextAreaElement) return true;
+    const notText = ['range', 'checkbox', 'radio', 'button', 'submit', 'reset', 'color', 'file'];
+    return target instanceof HTMLInputElement && !notText.includes(target.type);
+  }
+
+  function undoKeys(event: KeyboardEvent) {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== 'z') return;
+    if (event.defaultPrevented || !editable.current || picking || inTextField(event.target)) return;
+    event.preventDefault();
+    travel(!event.shiftKey);
+  }
+
+  function keydown(event: KeyboardEvent) {
+    spaceBar(event);
+    undoKeys(event);
+  }
+
   // Changes to a Track's levels are shown and heard right away, before
   // they're saved, so a fader follows the hand. Once saved, the Timeline has
   // them.
@@ -113,7 +205,7 @@
   async function setLevels(track: Track, levelChanges: LevelChanges) {
     preview(track, levelChanges);
     // If it fails, the Track goes back to how it's saved.
-    await change((at) => api.updateTrack(at, track.id, levelChanges));
+    await perform({ kind: 'updateTrack', trackId: track.id, changes: levelChanges });
     // Each value stops being shown over the Timeline's once saved, unless
     // it's been changed again since, e.g. by a fader still being dragged.
     const shown = adjusting[track.id];
@@ -140,7 +232,7 @@
       return;
     }
     // A Track needs a name, so a blank one goes back to what it was.
-    if (!name || !(await change((at) => api.updateTrack(at, track.id, { name })))) input.value = track.name;
+    if (!name || !(await perform({ kind: 'updateTrack', trackId: track.id, changes: { name } }))) input.value = track.name;
   }
 
   function nameKey(track: Track, event: KeyboardEvent) {
@@ -156,13 +248,12 @@
   function shift(index: number, by: -1 | 1) {
     const order = timeline.tracks.map((t) => t.id);
     [order[index], order[index + by]] = [order[index + by], order[index]];
-    change((at) => api.reorderTracks(at, order));
+    perform({ kind: 'reorderTracks', order });
   }
 
-  // Deleting a Track doesn't ask first either: its Beats stay in the Beat
-  // Library, and undo arrives later.
+  // Deleting a Track doesn't ask first either: it can be undone.
   function removeTrack(track: Track) {
-    change((at) => api.deleteTrack(at, track.id));
+    perform({ kind: 'deleteTrack', trackId: track.id });
   }
 
   // A change to what plays is heard right away. The Timeline is replaced
@@ -282,7 +373,7 @@
 
   async function addBeat(beat: Beat) {
     picking = false;
-    const ok = await change((at) => api.addBeatToTimeline(at, beat.id));
+    const ok = await perform({ kind: 'addBeat', beatId: beat.id });
     // Never copied without asking.
     if (ok && song.bpm === null && beat.bpm !== null) offerBpm = { bpm: beat.bpm, title: beat.title };
   }
@@ -293,7 +384,7 @@
   }
 
   function addTrack() {
-    change((at) => api.addTrack(at, `Track ${timeline.tracks.length + 1}`));
+    perform({ kind: 'addTrack', track: { name: `Track ${timeline.tracks.length + 1}` } });
   }
 
   // Editing a Clip: dragging its body moves it, along its Track or onto
@@ -402,8 +493,10 @@
       return;
     }
     edit.saving = true;
-    await change((at) =>
-      mode === 'move' ? api.moveClip(at, clip.id, trackId, to.start) : api.trimClip(at, clip.id, to.offset, to.length),
+    await perform(
+      mode === 'move'
+        ? { kind: 'moveClip', clipId: clip.id, trackId, start: to.start }
+        : { kind: 'trimClip', clipId: clip.id, offset: to.offset, length: to.length },
     );
     edit = null;
   }
@@ -421,13 +514,13 @@
   onDestroy(stopListening);
 
   function duplicate(clip: Clip) {
-    change((at) => api.duplicateClip(at, clip.id));
+    perform({ kind: 'duplicateClip', clipId: clip.id });
   }
 
-  // Deleting doesn't ask first: no file is lost, and the Beat stays in the
-  // Beat Library to add again.
+  // Deleting doesn't ask first: it can be undone, and the Beat stays in the
+  // Beat Library.
   function remove(clip: Clip) {
-    change((at) => api.deleteClip(at, clip.id));
+    perform({ kind: 'deleteClip', clipId: clip.id });
   }
 
   function clipKey(event: KeyboardEvent, clip: Clip) {
@@ -501,7 +594,7 @@
       return;
     }
     loopEdit.saving = true;
-    await change((at) => api.setLoop(at, to));
+    await perform({ kind: 'setLoop', loop: to });
     loopEdit = null;
   }
 
@@ -512,11 +605,11 @@
   function switchLoop() {
     if (!timeline.loop) return;
     const on = !timeline.loop.on;
-    change((at) => api.switchLoop(at, on));
+    perform({ kind: 'switchLoop', on });
   }
 
   function clearLoop() {
-    change((at) => api.clearLoop(at));
+    perform({ kind: 'clearLoop' });
   }
 
   /** A stretch of the Timeline's position and width across it, cut off at its end. */
@@ -542,13 +635,31 @@
   }
 </script>
 
-<svelte:window onkeydown={spaceBar} />
+<svelte:window onkeydown={keydown} />
+
+{#snippet undoRedo()}
+  <span class="history edit-only">
+    <button type="button" class="icon" onclick={() => travel(true)} disabled={!undoable} aria-label="Undo" title="Undo (Ctrl+Z)"
+      >↶</button
+    >
+    <button
+      type="button"
+      class="icon"
+      onclick={() => travel(false)}
+      disabled={!redoable}
+      aria-label="Redo"
+      title="Redo (Ctrl+Shift+Z)">↷</button
+    >
+  </span>
+{/snippet}
 
 <section class="timeline" aria-label="Timeline">
   <div class="inner">
     {#if empty}
       <div class="empty">
         <span class="muted">No beat on the Timeline yet.</span>
+        <span class="spacer"></span>
+        {#if undoable || redoable}{@render undoRedo()}{/if}
         <button type="button" class="button edit-only" onclick={() => (picking = true)}>Add a beat</button>
       </div>
     {:else}
@@ -581,6 +692,7 @@
           <span class="muted" role="status">Loading audio…</span>
         {/if}
         <span class="spacer"></span>
+        {@render undoRedo()}
         <button type="button" class="button edit-only" onclick={() => (picking = true)}>Add a beat</button>
         <button type="button" class="button edit-only" onclick={addTrack}>Add a track</button>
         <button
@@ -833,8 +945,12 @@
     align-items: center;
     gap: 0.5rem 0.75rem;
   }
-  .empty {
-    justify-content: space-between;
+  .history {
+    display: flex;
+  }
+  .history button:disabled {
+    opacity: 0.35;
+    cursor: default;
   }
   .spacer {
     flex: 1;

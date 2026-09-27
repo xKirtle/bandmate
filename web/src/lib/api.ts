@@ -218,6 +218,23 @@ export interface Clip {
   length: number;
 }
 
+/** A stretch of a Beat to place on a Track, e.g. a deleted Clip brought back. */
+export type NewClip = Omit<Clip, 'id'>;
+
+/**
+ * A Track to add: by default empty, at the bottom, at 0 dB and neither muted
+ * nor soloed. Undo uses the rest to bring a deleted Track back as it was.
+ */
+export interface NewTrack {
+  name: string;
+  /** From 0 (the top) to the number of Tracks (the bottom). */
+  position?: number;
+  volume?: number;
+  muted?: boolean;
+  soloed?: boolean;
+  clips?: NewClip[];
+}
+
 /** What playing a Clip needs to know about its Beat. */
 export type ClipBeat = Pick<Beat, 'id' | 'title' | 'bpm' | 'fileName' | 'size' | 'duration'>;
 
@@ -377,8 +394,8 @@ export const api = {
    */
   addBeatToTimeline: (at: SongAt, beatId: number) =>
     request<Timeline>('POST', `/songs/${at.id}/timeline/beats`, { beatId }, at),
-  /** Adds an empty Track at the bottom of the Timeline. */
-  addTrack: (at: SongAt, name: string) => request<Timeline>('POST', `/songs/${at.id}/timeline/tracks`, { name }, at),
+  /** Adds a Track, by default empty at the bottom of the Timeline. */
+  addTrack: (at: SongAt, track: NewTrack) => request<Timeline>('POST', `/songs/${at.id}/timeline/tracks`, track, at),
   /** Renames a Track or sets its volume, mute or solo. */
   updateTrack: (at: SongAt, trackId: number, changes: TrackChanges) =>
     request<Timeline>('PATCH', `/songs/${at.id}/timeline/tracks/${trackId}`, changes, at),
@@ -397,6 +414,9 @@ export const api = {
    */
   trimClip: (at: SongAt, clipId: number, offset: number, length: number) =>
     request<Timeline>('POST', `/songs/${at.id}/timeline/clips/${clipId}/trim`, { offset, length }, at),
+  /** Places a stretch of a Beat on a Track. Refused if it would overlap a Clip there. */
+  placeClip: (at: SongAt, trackId: number, clip: NewClip) =>
+    request<Timeline>('POST', `/songs/${at.id}/timeline/clips`, { trackId, ...clip }, at),
   /** Copies a Clip right after itself, or after its Track's last Clip if that's taken. */
   duplicateClip: (at: SongAt, clipId: number) =>
     request<Timeline>('POST', `/songs/${at.id}/timeline/clips/${clipId}/duplicate`, undefined, at),
