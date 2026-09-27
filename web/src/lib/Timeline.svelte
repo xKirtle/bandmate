@@ -20,6 +20,7 @@
   import { formatVolume, maxVolume, silence, trackGains, type Levels } from './mixer';
   import { peaksPerSecond } from './peaks';
   import { keptInLoop, outsideLoop, repeats, timelineEnd, type Loop, type Placed } from './schedule';
+  import { inTextField } from './textField';
   import { formatDuration } from './time';
   import { clampHeight, defaultHeight, deviceStorage, heightBounds, readHeight, storeHeight } from './timelineHeight';
   import { TimelinePlayer, type PlayableClip, type PlayerState } from './timelinePlayer';
@@ -200,13 +201,6 @@
     return { ...timeline, version: at.version, updatedAt: song.updatedAt };
   }
 
-  /** Whether typing there is text, which has the browser's own undo. */
-  function inTextField(target: EventTarget | null): boolean {
-    if (!(target instanceof HTMLElement)) return false;
-    if (target.isContentEditable || target instanceof HTMLTextAreaElement) return true;
-    const notText = ['range', 'checkbox', 'radio', 'button', 'submit', 'reset', 'color', 'file'];
-    return target instanceof HTMLInputElement && !notText.includes(target.type);
-  }
 
   function undoKeys(event: KeyboardEvent) {
     if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== 'z') return;

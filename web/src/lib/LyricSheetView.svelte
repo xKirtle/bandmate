@@ -2,17 +2,18 @@
   import type { Occurrence, Song } from './api';
   import { layoutLine } from './chords';
   import CueField from './CueField.svelte';
+  import { inTextField } from './textField';
 
   let {
     song,
     showChords,
-    current = null,
+    currentOccurrence = null,
     setCue,
   }: {
     song: Song;
     showChords: boolean;
     /** The Occurrence playback is in, highlighted and kept in view. */
-    current?: number | null;
+    currentOccurrence?: number | null;
     /** Given, each Section's header row shows its Occurrence's Cue, to change it with. */
     setCue?: (occurrence: Occurrence, cue: number | null) => void;
   } = $props();
@@ -23,9 +24,9 @@
   // Follow playback, unless that would pull the page away from something
   // being typed.
   $effect(() => {
-    if (current === null) return;
-    const typing = document.activeElement?.matches('input, textarea, select, [contenteditable]');
-    if (!typing) shown.get(current)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    if (currentOccurrence === null) return;
+    if (inTextField(document.activeElement)) return;
+    shown.get(currentOccurrence)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   });
 
   /** Keeps track of each Occurrence's element, to scroll to. */
@@ -43,9 +44,9 @@
       {@const lines = all.filter((l) => showChords || !l.chordLine)}
       <section
         class="section"
-        class:current={occurrence.id === current}
+        class:current={occurrence.id === currentOccurrence}
         aria-label={section.label || 'Section without a Label'}
-        aria-current={occurrence.id === current ? 'true' : undefined}
+        aria-current={occurrence.id === currentOccurrence ? 'true' : undefined}
         {@attach (el) => track(el, occurrence.id)}
       >
         {#if section.label || setCue}

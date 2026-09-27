@@ -136,6 +136,8 @@ func TestInvalidOccurrenceCuesAreRejected(t *testing.T) {
 		msg  string
 	}{
 		{"negative", map[string]any{"cue": -0.5}, "a Cue can't be before the start of the Timeline"},
+		{"negative below a millisecond", map[string]any{"cue": -0.0004}, "a Cue can't be before the start of the Timeline"},
+		{"absurdly late", map[string]any{"cue": 1e17}, "a Cue can't be more than 24 hours into the Timeline"},
 		{"missing", map[string]any{}, "cue is required"},
 		{"null", map[string]any{"cue": nil}, "cue is required"},
 	}

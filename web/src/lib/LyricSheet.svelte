@@ -106,7 +106,7 @@
         Show chords
       </label>
     {/if}
-    <LyricSheetView {song} showChords={showChords && songHasChords} {current} setCue={showCues ? setCue : undefined} />
+    <LyricSheetView {song} showChords={showChords && songHasChords} currentOccurrence={current} setCue={showCues ? setCue : undefined} />
   {:else}
     <ol class="arrangement">
       {#each song.arrangement as occurrence, i (occurrence.id)}
