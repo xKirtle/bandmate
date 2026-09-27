@@ -49,11 +49,9 @@ func (a *App) updateTrack(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) addTrack(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Name string `json:"name"`
-	}
+	var req timeline.NewTrack
 	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
-		return a.timelines.AddTrack(r.Context(), id, based, req.Name)
+		return a.timelines.AddTrack(r.Context(), id, based, req)
 	})
 }
 
@@ -131,6 +129,23 @@ func (a *App) trimClip(w http.ResponseWriter, r *http.Request) {
 			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "offset and length are required"}
 		}
 		return a.timelines.TrimClip(ctx, id, based, clipID, *req.Offset, *req.Length)
+	})
+}
+
+func (a *App) placeClip(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		TrackID *int64   `json:"trackId"`
+		BeatID  *int64   `json:"beatId"`
+		Start   *float64 `json:"start"`
+		Offset  *float64 `json:"offset"`
+		Length  *float64 `json:"length"`
+	}
+	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+		if req.TrackID == nil || req.BeatID == nil || req.Start == nil || req.Offset == nil || req.Length == nil {
+			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "trackId, beatId, start, offset and length are required"}
+		}
+		return a.timelines.PlaceClip(r.Context(), id, based, *req.TrackID,
+			timeline.NewClip{BeatID: *req.BeatID, Start: *req.Start, Offset: *req.Offset, Length: *req.Length})
 	})
 }
 
