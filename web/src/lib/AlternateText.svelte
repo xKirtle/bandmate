@@ -1,23 +1,21 @@
 <script lang="ts">
   import { onDestroy, untrack } from 'svelte';
-  import { api, type Alternate, type Song } from './api';
+  import { api, type Alternate, type Song, type SongAt } from './api';
 
   let {
-    songId,
     uid,
     alternate,
     label,
     change,
     onUnsaved,
   }: {
-    songId: number;
     /** Makes the element id unique. */
     uid: string;
     alternate: Alternate;
     /** Names the text box for screen readers. */
     label: string;
     /** Sends a Lyric Sheet change; resolves to whether it succeeded. */
-    change: (op: () => Promise<Song>) => Promise<boolean>;
+    change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
     /** Tells the page whether this text box holds edits not yet saved. */
     onUnsaved: (editor: object, unsaved: boolean) => void;
   } = $props();
@@ -64,7 +62,7 @@
       const previous = sent;
       sent = t;
       inFlight++;
-      failed = !(await change(() => api.replaceAlternateText(songId, alternateId, t)));
+      failed = !(await change((at) => api.replaceAlternateText(at, alternateId, t)));
       inFlight--;
       if (failed) sent = previous;
     }

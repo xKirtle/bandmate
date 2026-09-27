@@ -11,8 +11,8 @@ import (
 // one per line. Lines keep their identity where they can: unchanged Lines and
 // Lines edited in place keep their ids, removed Lines are deleted, and only
 // Lines that are really new get new ids.
-func (s *Store) ReplaceAlternateText(ctx context.Context, songID, alternateID int64, text string) (Song, error) {
-	return s.change(ctx, songID, func(tx *sql.Tx) error {
+func (s *Store) ReplaceAlternateText(ctx context.Context, songID int64, based Version, alternateID int64, text string) (Song, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		if _, _, err := findAlternate(ctx, tx, songID, alternateID); err != nil {
 			return err
 		}

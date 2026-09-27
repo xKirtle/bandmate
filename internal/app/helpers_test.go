@@ -82,6 +82,17 @@ func (r response) JSON(t *testing.T, v any) {
 // Do sends a request with an optional JSON body and returns the response.
 func (ts *testServer) Do(method, path string, body any) response {
 	ts.t.Helper()
+	return ts.do(method, path, nil, body)
+}
+
+// DoAt sends a write based on a given version of the Song, as the SPA does.
+func (ts *testServer) DoAt(version int64, method, path string, body any) response {
+	ts.t.Helper()
+	return ts.do(method, path, http.Header{"If-Match": {fmt.Sprintf("%q", fmt.Sprint(version))}}, body)
+}
+
+func (ts *testServer) do(method, path string, header http.Header, body any) response {
+	ts.t.Helper()
 	var reader io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
@@ -93,6 +104,9 @@ func (ts *testServer) Do(method, path string, body any) response {
 	req, err := http.NewRequest(method, ts.srv.URL+path, reader)
 	if err != nil {
 		ts.t.Fatalf("building request: %v", err)
+	}
+	for name, values := range header {
+		req.Header[name] = values
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
@@ -132,6 +146,7 @@ func expectStatus(t *testing.T, r response, want int) {
 // song is the Song aggregate as the API returns it. Later tickets extend it.
 type song struct {
 	ID          int64        `json:"id"`
+	Version     int64        `json:"version"`
 	Title       string       `json:"title"`
 	Status      string       `json:"status"`
 	Key         string       `json:"key"`
@@ -192,6 +207,11 @@ type songSummary struct {
 	UpdatedAt string `json:"updatedAt"`
 }
 
+// songPath is where a Song lives.
+func songPath(id int64) string {
+	return fmt.Sprintf("/api/songs/%d", id)
+}
+
 // createSong creates a Song with the given title and returns its aggregate.
 func (ts *testServer) createSong(title string) song {
 	ts.t.Helper()
@@ -205,7 +225,7 @@ func (ts *testServer) createSong(title string) song {
 // getSong reads a Song's aggregate.
 func (ts *testServer) getSong(id int64) song {
 	ts.t.Helper()
-	res := ts.Do(http.MethodGet, fmt.Sprintf("/api/songs/%d", id), nil)
+	res := ts.Do(http.MethodGet, songPath(id), nil)
 	expectStatus(ts.t, res, http.StatusOK)
 	var s song
 	res.JSON(ts.t, &s)
@@ -230,7 +250,7 @@ func (ts *testServer) listSongs(query ...string) []songSummary {
 // patchSong sends changes to a Song without checking the response.
 func (ts *testServer) patchSong(id int64, changes map[string]any) response {
 	ts.t.Helper()
-	return ts.Do(http.MethodPatch, fmt.Sprintf("/api/songs/%d", id), changes)
+	return ts.Do(http.MethodPatch, songPath(id), changes)
 }
 
 // updateSong applies changes to a Song and returns its aggregate.

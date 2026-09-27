@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { api, suggestedLabels, type Song } from './api';
+  import { api, suggestedLabels, type Song, type SongAt } from './api';
   import { hasChords } from './chords';
   import LyricSheetView from './LyricSheetView.svelte';
   import SectionEditor from './SectionEditor.svelte';
@@ -13,7 +13,7 @@
   }: {
     song: Song;
     /** Sends a Lyric Sheet change; resolves to whether it succeeded. */
-    change: (op: () => Promise<Song>) => Promise<boolean>;
+    change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
     onUnsaved: (editor: object, unsaved: boolean) => void;
   } = $props();
 
@@ -36,17 +36,17 @@
 
   async function toggleChords() {
     const next = showChords;
-    if (!(await change(() => api.updateSong(song.id, { showChords: next })))) showChords = song.showChords;
+    if (!(await change((at) => api.updateSong(at, { showChords: next })))) showChords = song.showChords;
   }
 
   async function add(position: number) {
-    if (await change(() => api.addSection(song.id, { position }))) {
+    if (await change((at) => api.addSection(at, { position }))) {
       added = song.arrangement[position]?.id ?? null;
     }
   }
 
   function addOccurrence(sectionId: number, position?: number) {
-    change(() => api.addOccurrence(song.id, sectionId, position));
+    change((at) => api.addOccurrence(at, sectionId, position));
   }
 
   function addOccurrenceAtEnd(e: Event & { currentTarget: HTMLSelectElement }) {
@@ -58,7 +58,7 @@
   function move(index: number, by: -1 | 1) {
     const order = song.arrangement.map((o) => o.id);
     [order[index], order[index + by]] = [order[index + by], order[index]];
-    change(() => api.reorderArrangement(song.id, order));
+    change((at) => api.reorderArrangement(at, order));
   }
 </script>
 
@@ -93,7 +93,6 @@
         {#if section}
           <li>
             <SectionEditor
-              songId={song.id}
               uid="o{occurrence.id}"
               {section}
               shared={occurrence.shared}
@@ -130,7 +129,7 @@
                   <button
                     type="button"
                     class="icon"
-                    onclick={() => change(() => api.detach(song.id, occurrence.id))}
+                    onclick={() => change((at) => api.detach(at, occurrence.id))}
                     aria-label="Detach into its own copy"
                     title="Detach: give this Occurrence its own copy, so it can differ"
                   >
@@ -140,7 +139,7 @@
                 <button
                   type="button"
                   class="icon"
-                  onclick={() => change(() => api.removeOccurrence(song.id, occurrence.id))}
+                  onclick={() => change((at) => api.removeOccurrence(at, occurrence.id))}
                   aria-label={occurrence.shared ? 'Remove this Occurrence' : 'Move to the Scrapbook'}
                   title={occurrence.shared
                     ? 'Remove this Occurrence; the others stay'

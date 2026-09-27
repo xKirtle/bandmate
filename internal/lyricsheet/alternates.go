@@ -10,8 +10,8 @@ import (
 
 // AddAlternate creates a new, inactive Alternate of a Section with the given
 // name, starting as a copy of the active Alternate's Lines.
-func (s *Store) AddAlternate(ctx context.Context, songID, sectionID int64, name string) (Song, error) {
-	return s.change(ctx, songID, func(tx *sql.Tx) error {
+func (s *Store) AddAlternate(ctx context.Context, songID int64, based Version, sectionID int64, name string) (Song, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		if _, err := findSection(ctx, tx, songID, sectionID); err != nil {
 			return err
 		}
@@ -31,8 +31,8 @@ func (s *Store) AddAlternate(ctx context.Context, songID, sectionID int64, name 
 }
 
 // RenameAlternate changes an Alternate's name. A blank name removes it.
-func (s *Store) RenameAlternate(ctx context.Context, songID, alternateID int64, name string) (Song, error) {
-	return s.change(ctx, songID, func(tx *sql.Tx) error {
+func (s *Store) RenameAlternate(ctx context.Context, songID int64, based Version, alternateID int64, name string) (Song, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		if _, _, err := findAlternate(ctx, tx, songID, alternateID); err != nil {
 			return err
 		}
@@ -46,8 +46,8 @@ func (s *Store) RenameAlternate(ctx context.Context, songID, alternateID int64, 
 
 // ActivateAlternate makes an Alternate the only active one of its Section, so
 // every Occurrence of the Section shows it.
-func (s *Store) ActivateAlternate(ctx context.Context, songID, alternateID int64) (Song, error) {
-	return s.change(ctx, songID, func(tx *sql.Tx) error {
+func (s *Store) ActivateAlternate(ctx context.Context, songID int64, based Version, alternateID int64) (Song, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		sectionID, _, err := findAlternate(ctx, tx, songID, alternateID)
 		if err != nil {
 			return err
@@ -68,8 +68,8 @@ func (s *Store) ActivateAlternate(ctx context.Context, songID, alternateID int64
 
 // DeleteAlternate permanently deletes an inactive Alternate and its Lines.
 // The active Alternate, and so a Section's last one, can't be deleted.
-func (s *Store) DeleteAlternate(ctx context.Context, songID, alternateID int64) (Song, error) {
-	return s.change(ctx, songID, func(tx *sql.Tx) error {
+func (s *Store) DeleteAlternate(ctx context.Context, songID int64, based Version, alternateID int64) (Song, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		sectionID, active, err := findAlternate(ctx, tx, songID, alternateID)
 		if err != nil {
 			return err

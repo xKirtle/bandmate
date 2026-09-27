@@ -148,6 +148,7 @@ func (s *Store) loadLyricSheet(ctx context.Context, songID int64) (LyricSheet, e
 // queryer is what both *sql.DB and *sql.Tx offer for reading.
 type queryer interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
 // query runs a query and calls row for each result row.
@@ -165,20 +166,22 @@ func query(ctx context.Context, q queryer, stmt string, args []any, row func(*sq
 	return rows.Err()
 }
 
-// change runs one Lyric Sheet change on a Song in a transaction, marks the
-// Song as edited, and returns the updated Song. If fn fails, nothing changes.
-func (s *Store) change(ctx context.Context, songID int64, fn func(tx *sql.Tx) error) (Song, error) {
+// change runs one change on a Song in a transaction, marks the Song as edited
+// with a new version, and returns the updated Song. If the Song is no longer
+// at the version the change was based on, or fn fails, nothing changes.
+func (s *Store) change(ctx context.Context, songID int64, based Version, fn func(tx *sql.Tx) error) (Song, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Song{}, err
 	}
 	defer tx.Rollback()
-	res, err := tx.ExecContext(ctx, `UPDATE songs SET updated_at = ? WHERE id = ?`,
-		time.Now().UTC().Format(timeFormat), songID)
+	res, err := tx.ExecContext(ctx,
+		`UPDATE songs SET updated_at = ?, version = version + 1 WHERE id = ? AND (?3 = 0 OR version = ?3)`,
+		time.Now().UTC().Format(timeFormat), songID, based)
 	if err != nil {
 		return Song{}, fmt.Errorf("touching song: %w", err)
 	}
-	if err := expectOneRow(res); err != nil {
+	if err := expectCurrent(ctx, tx, res, songID); err != nil {
 		return Song{}, err
 	}
 	if err := fn(tx); err != nil {
@@ -193,8 +196,8 @@ func (s *Store) change(ctx context.Context, songID int64, fn func(tx *sql.Tx) er
 // AddSection creates a Section with the given Label, its first (active)
 // Alternate, and an Occurrence of it at position in the Arrangement. A nil
 // position adds it at the end.
-func (s *Store) AddSection(ctx context.Context, songID int64, label string, position *int) (Song, error) {
-	return s.change(ctx, songID, func(tx *sql.Tx) error {
+func (s *Store) AddSection(ctx context.Context, songID int64, based Version, label string, position *int) (Song, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		pos, err := arrangementPosition(ctx, tx, songID, position)
 		if err != nil {
 			return err
@@ -209,8 +212,8 @@ func (s *Store) AddSection(ctx context.Context, songID int64, label string, posi
 
 // AddToScrapbook creates a Section with the given Label and its first
 // (active) Alternate, with no Occurrence, so it starts in the Scrapbook.
-func (s *Store) AddToScrapbook(ctx context.Context, songID int64, label string) (Song, error) {
-	return s.change(ctx, songID, func(tx *sql.Tx) error {
+func (s *Store) AddToScrapbook(ctx context.Context, songID int64, based Version, label string) (Song, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		_, _, err := insertSection(ctx, tx, songID, label)
 		return err
 	})
@@ -218,8 +221,8 @@ func (s *Store) AddToScrapbook(ctx context.Context, songID int64, label string) 
 
 // DeleteSection permanently deletes a Section in the Scrapbook, with its
 // Alternates and Lines. A Section still in the Arrangement can't be deleted.
-func (s *Store) DeleteSection(ctx context.Context, songID, sectionID int64) (Song, error) {
-	return s.change(ctx, songID, func(tx *sql.Tx) error {
+func (s *Store) DeleteSection(ctx context.Context, songID int64, based Version, sectionID int64) (Song, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		uses, err := findSection(ctx, tx, songID, sectionID)
 		if err != nil {
 			return err
@@ -252,8 +255,8 @@ func insertSection(ctx context.Context, tx *sql.Tx, songID int64, label string) 
 
 // AddOccurrence adds another Occurrence of one of the Song's Sections at
 // position in the Arrangement. A nil position adds it at the end.
-func (s *Store) AddOccurrence(ctx context.Context, songID, sectionID int64, position *int) (Song, error) {
-	return s.change(ctx, songID, func(tx *sql.Tx) error {
+func (s *Store) AddOccurrence(ctx context.Context, songID int64, based Version, sectionID int64, position *int) (Song, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		if _, err := findSection(ctx, tx, songID, sectionID); err != nil {
 			return err
 		}
@@ -268,8 +271,8 @@ func (s *Store) AddOccurrence(ctx context.Context, songID, sectionID int64, posi
 // RemoveOccurrence takes an Occurrence out of the Arrangement. Its Section is
 // never deleted: other Occurrences keep showing it, and without any it is in
 // the Scrapbook.
-func (s *Store) RemoveOccurrence(ctx context.Context, songID, occurrenceID int64) (Song, error) {
-	return s.change(ctx, songID, func(tx *sql.Tx) error {
+func (s *Store) RemoveOccurrence(ctx context.Context, songID int64, based Version, occurrenceID int64) (Song, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		_, pos, err := findOccurrence(ctx, tx, songID, occurrenceID)
 		if err != nil {
 			return err
@@ -288,8 +291,8 @@ func (s *Store) RemoveOccurrence(ctx context.Context, songID, occurrenceID int64
 
 // Detach points an Occurrence of a shared Section at a new copy of that
 // Section. The other Occurrences keep the original.
-func (s *Store) Detach(ctx context.Context, songID, occurrenceID int64) (Song, error) {
-	return s.change(ctx, songID, func(tx *sql.Tx) error {
+func (s *Store) Detach(ctx context.Context, songID int64, based Version, occurrenceID int64) (Song, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		sectionID, _, err := findOccurrence(ctx, tx, songID, occurrenceID)
 		if err != nil {
 			return err
@@ -404,8 +407,8 @@ func insertOccurrence(ctx context.Context, tx *sql.Tx, songID, sectionID int64, 
 }
 
 // SetSectionLabel changes a Section's Label. A blank Label removes it.
-func (s *Store) SetSectionLabel(ctx context.Context, songID, sectionID int64, label string) (Song, error) {
-	return s.change(ctx, songID, func(tx *sql.Tx) error {
+func (s *Store) SetSectionLabel(ctx context.Context, songID int64, based Version, sectionID int64, label string) (Song, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx, `UPDATE sections SET label = ? WHERE id = ? AND song_id = ?`,
 			cleanLabel(label), sectionID, songID)
 		if err != nil {
@@ -417,8 +420,8 @@ func (s *Store) SetSectionLabel(ctx context.Context, songID, sectionID int64, la
 
 // ReorderArrangement puts a Song's Occurrences in the given order, which must
 // list every one of them exactly once.
-func (s *Store) ReorderArrangement(ctx context.Context, songID int64, order []int64) (Song, error) {
-	return s.change(ctx, songID, func(tx *sql.Tx) error {
+func (s *Store) ReorderArrangement(ctx context.Context, songID int64, based Version, order []int64) (Song, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		current := map[int64]bool{}
 		err := query(ctx, tx, `SELECT id FROM occurrences WHERE song_id = ?`, []any{songID},
 			func(rows *sql.Rows) error {

@@ -74,11 +74,15 @@ func (a *App) updateSong(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	based, ok := basedOn(w, r)
+	if !ok {
+		return
+	}
 	var changes lyricsheet.SongChanges
 	if !readJSON(w, r, &changes) {
 		return
 	}
-	song, err := a.songs.UpdateSong(r.Context(), id, changes)
+	song, err := a.songs.UpdateSong(r.Context(), id, based, changes)
 	if err != nil {
 		writeDomainError(w, err)
 		return
@@ -91,7 +95,11 @@ func (a *App) deleteSong(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := a.songs.DeleteSong(r.Context(), id); err != nil {
+	based, ok := basedOn(w, r)
+	if !ok {
+		return
+	}
+	if err := a.songs.DeleteSong(r.Context(), id, based); err != nil {
 		writeDomainError(w, err)
 		return
 	}
@@ -112,6 +120,24 @@ func readJSON(w http.ResponseWriter, r *http.Request, v any) bool {
 		return false
 	}
 	return true
+}
+
+// basedOn reads the Song version a write was based on from the If-Match
+// header, as an entity tag like "3". Without the header, the write applies
+// to whatever version the Song is at.
+func basedOn(w http.ResponseWriter, r *http.Request) (lyricsheet.Version, bool) {
+	header := r.Header.Get("If-Match")
+	if header == "" || header == "*" {
+		return lyricsheet.AnyVersion, true
+	}
+	digits, opened := strings.CutPrefix(header, `"`)
+	digits, closed := strings.CutSuffix(digits, `"`)
+	version, err := strconv.ParseInt(digits, 10, 64)
+	if !opened || !closed || err != nil || version < 1 {
+		writeError(w, http.StatusBadRequest, `If-Match must be a Song version, like "3"`)
+		return 0, false
+	}
+	return lyricsheet.Version(version), true
 }
 
 // songID parses the {id} path parameter, answering 404 if it isn't a number.
@@ -138,6 +164,10 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusBadRequest, invalid.Msg)
 	case errors.As(err, &conflict):
 		writeError(w, http.StatusConflict, conflict.Msg)
+	case errors.Is(err, lyricsheet.ErrStale):
+		// The code tells a stale tab apart from other conflicts, so the SPA
+		// can offer to reload the Song.
+		writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error(), "code": "stale"})
 	case errors.Is(err, lyricsheet.ErrNotFound):
 		writeError(w, http.StatusNotFound, "not found")
 	default:

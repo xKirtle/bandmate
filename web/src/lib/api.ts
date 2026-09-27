@@ -8,6 +8,8 @@ export const statuses: readonly Status[] = ['idea', 'drafting', 'finished'];
 /** The full Song aggregate. Every Lyric Sheet change returns one. */
 export interface Song {
   id: number;
+  /** Changes with every change to the Song; writes send the one they were based on. */
+  version: number;
   title: string;
   status: Status;
   /** How to play the Song. "" and null mean "not set". */
@@ -70,6 +72,9 @@ export interface Chord {
   name: string;
 }
 
+/** The Song a write goes to, at the version it was based on. */
+export type SongAt = Pick<Song, 'id' | 'version'>;
+
 /** Labels offered as suggestions; any text is allowed. */
 export const suggestedLabels: readonly string[] = [
   'Intro',
@@ -110,17 +115,27 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** Tells apart failures of the same status, e.g. "stale". */
+    readonly code = '',
   ) {
     super(message);
   }
+
+  /** The write was based on an old version: the Song changed elsewhere, e.g. in another tab. */
+  get stale(): boolean {
+    return this.status === 409 && this.code === 'stale';
+  }
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, at?: SongAt): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  if (at) headers['If-Match'] = `"${at.version}"`;
   let res: Response;
   try {
     res = await fetch(`/api${path}`, {
       method,
-      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      headers,
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
@@ -128,7 +143,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   }
   const data = res.status === 204 ? null : await res.json().catch(() => null);
   if (!res.ok) {
-    throw new ApiError(res.status, data?.error ?? `Request failed (${res.status})`);
+    throw new ApiError(res.status, data?.error ?? `Request failed (${res.status})`, data?.code);
   }
   return data as T;
 }
@@ -145,43 +160,43 @@ export const api = {
   createSong: (title: string) => request<Song>('POST', '/songs', { title }),
   /** Creates a new Song from pasted lyrics; a {title: …} line in the text wins over title. */
   importSong: (text: string, title = '') => request<Song>('POST', '/songs/import', { text, title }),
-  updateSong: (id: number, changes: SongChanges) => request<Song>('PATCH', `/songs/${id}`, changes),
-  deleteSong: (id: number) => request<null>('DELETE', `/songs/${id}`),
+  updateSong: (at: SongAt, changes: SongChanges) => request<Song>('PATCH', `/songs/${at.id}`, changes, at),
+  deleteSong: (at: SongAt) => request<null>('DELETE', `/songs/${at.id}`, undefined, at),
   /** Adds a Section at position in the Arrangement, or at the end. */
-  addSection: (songId: number, section: { label?: string; position?: number }) =>
-    request<Song>('POST', `/songs/${songId}/sections`, section),
+  addSection: (at: SongAt, section: { label?: string; position?: number }) =>
+    request<Song>('POST', `/songs/${at.id}/sections`, section, at),
   /** Adds an Occurrence of an existing Section (e.g. one from the Scrapbook) at position, or at the end. */
-  addOccurrence: (songId: number, sectionId: number, position?: number) =>
-    request<Song>('POST', `/songs/${songId}/occurrences`, { sectionId, position }),
+  addOccurrence: (at: SongAt, sectionId: number, position?: number) =>
+    request<Song>('POST', `/songs/${at.id}/occurrences`, { sectionId, position }, at),
   /** Creates a Section in the Scrapbook, with no Occurrence. */
-  addToScrapbook: (songId: number, label = '') => request<Song>('POST', `/songs/${songId}/scrapbook`, { label }),
+  addToScrapbook: (at: SongAt, label = '') => request<Song>('POST', `/songs/${at.id}/scrapbook`, { label }, at),
   /** Permanently deletes a Section; only one in the Scrapbook can be. */
-  deleteSection: (songId: number, sectionId: number) =>
-    request<Song>('DELETE', `/songs/${songId}/sections/${sectionId}`),
+  deleteSection: (at: SongAt, sectionId: number) =>
+    request<Song>('DELETE', `/songs/${at.id}/sections/${sectionId}`, undefined, at),
   /** Takes an Occurrence out of the Arrangement; its Section is never deleted. Without Occurrences, it's in the Scrapbook. */
-  removeOccurrence: (songId: number, occurrenceId: number) =>
-    request<Song>('DELETE', `/songs/${songId}/occurrences/${occurrenceId}`),
+  removeOccurrence: (at: SongAt, occurrenceId: number) =>
+    request<Song>('DELETE', `/songs/${at.id}/occurrences/${occurrenceId}`, undefined, at),
   /** Gives an Occurrence of a shared Section its own copy of the Section. */
-  detach: (songId: number, occurrenceId: number) =>
-    request<Song>('POST', `/songs/${songId}/occurrences/${occurrenceId}/detach`),
-  setSectionLabel: (songId: number, sectionId: number, label: string) =>
-    request<Song>('PATCH', `/songs/${songId}/sections/${sectionId}`, { label }),
+  detach: (at: SongAt, occurrenceId: number) =>
+    request<Song>('POST', `/songs/${at.id}/occurrences/${occurrenceId}/detach`, undefined, at),
+  setSectionLabel: (at: SongAt, sectionId: number, label: string) =>
+    request<Song>('PATCH', `/songs/${at.id}/sections/${sectionId}`, { label }, at),
   /** Replaces an Alternate's Lines with the lines of text. */
-  replaceAlternateText: (songId: number, alternateId: number, text: string) =>
-    request<Song>('PUT', `/songs/${songId}/alternates/${alternateId}/text`, { text }),
+  replaceAlternateText: (at: SongAt, alternateId: number, text: string) =>
+    request<Song>('PUT', `/songs/${at.id}/alternates/${alternateId}/text`, { text }, at),
   /** Creates an inactive Alternate of a Section, starting as a copy of the active one's Lines. */
-  addAlternate: (songId: number, sectionId: number, name = '') =>
-    request<Song>('POST', `/songs/${songId}/sections/${sectionId}/alternates`, { name }),
+  addAlternate: (at: SongAt, sectionId: number, name = '') =>
+    request<Song>('POST', `/songs/${at.id}/sections/${sectionId}/alternates`, { name }, at),
   /** Names an Alternate; "" removes its name. */
-  renameAlternate: (songId: number, alternateId: number, name: string) =>
-    request<Song>('PATCH', `/songs/${songId}/alternates/${alternateId}`, { name }),
+  renameAlternate: (at: SongAt, alternateId: number, name: string) =>
+    request<Song>('PATCH', `/songs/${at.id}/alternates/${alternateId}`, { name }, at),
   /** Makes an Alternate the only active one of its Section, in every Occurrence. */
-  activateAlternate: (songId: number, alternateId: number) =>
-    request<Song>('POST', `/songs/${songId}/alternates/${alternateId}/activate`),
+  activateAlternate: (at: SongAt, alternateId: number) =>
+    request<Song>('POST', `/songs/${at.id}/alternates/${alternateId}/activate`, undefined, at),
   /** Permanently deletes an inactive Alternate. */
-  deleteAlternate: (songId: number, alternateId: number) =>
-    request<Song>('DELETE', `/songs/${songId}/alternates/${alternateId}`),
+  deleteAlternate: (at: SongAt, alternateId: number) =>
+    request<Song>('DELETE', `/songs/${at.id}/alternates/${alternateId}`, undefined, at),
   /** Puts the Arrangement in this order of Occurrence ids. */
-  reorderArrangement: (songId: number, occurrences: number[]) =>
-    request<Song>('PUT', `/songs/${songId}/arrangement`, { occurrences }),
+  reorderArrangement: (at: SongAt, occurrences: number[]) =>
+    request<Song>('PUT', `/songs/${at.id}/arrangement`, { occurrences }, at),
 };
