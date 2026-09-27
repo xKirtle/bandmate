@@ -33,10 +33,32 @@ Decisions made while designing, recorded so later spec sessions start from them.
 
 ### 3. Sync
 
-- Cues point to Occurrences and Lines (ADR 0005). They're created by tapping along during playback (each key press cues the next Line in the Arrangement) or by clicking/dragging. An Occurrence gets its Cue from the Cue of its first Line.
+Cues:
+
+- Cues point to Occurrences and Lines (ADR 0005). They're created in Tap mode or typed into the Cue gutter. They never go into the Line text: that text is shared by every Occurrence of a Section, and each Occurrence is sung at its own time.
+- Any non-blank Line can take a Cue, Chord Lines included.
+- An Occurrence's Cue is stored in its own right. Cueing its first Line sets it, and while both exist they show and change together. It stays when that Line's Cue goes away, and can be set on its own to give a Section a rough start without syncing its Lines.
+- Switching a Section's Alternate leaves the inactive Alternate's line-level Cues dormant, not cleared (ADR 0007). Switching back brings them back.
+- Removing an Occurrence (deleting it or moving its Section to the Scrapbook) drops its Cues. Bringing the Section back makes a new Occurrence with none.
+- Cues are Timeline times and don't follow Clips on their own. After a Clip is moved with Cues inside its span, a prompt offers to move those Cues with it; ignoring it leaves them in place. Before Takes, Cues usually belong with the Beat; after, with the vocal, so no automatic rule would be right.
+- Cue edits (tapping, typing in the gutter, moving with a Clip, clearing) join the Timeline's undo history. "Clear this Occurrence's Cues" sits in the Occurrence's actions, "Clear all Cues" beside the Tap toggle; neither asks for confirmation.
+
+Editing:
+
+- **Cue gutter**: a narrow column beside each Occurrence's Lines, in Read and Write mode, shows each Line's Cue; the Occurrence's own Cue sits on its Section's header row. Click a time to type one, clear it to remove it, Alt+↑/↓ nudges it by 0.1 s. Enter saves and moves to the next Line, Esc cancels. There's no Cue lane on the Timeline.
+- The gutter appears once the Timeline has a Clip or the Song has any Cue. Read mode has a "Show Cues" checkbox beside "Show chords" (the highlight works either way); Write mode always shows it; phone never does.
+- Cue times read `m:ss.s` and are stored to the millisecond. Typing accepts `45`, `0:45`, `0:45.25` or `1:02`; negative times are rejected, times past the last Clip are fine.
+- **Tap mode**: while it's on, Enter (or an on-screen Tap button) cues the next Line at the playhead, playing or paused. The next Line is the one after the current highlight, in on-screen order, or the first Line of the Arrangement; clicking a Line makes it the next one. It skips Chord Lines while Read mode hides Chords. Re-tapping a Line replaces its Cue and leaves later Cues alone. Each Occurrence of a shared Section is tapped separately. Remapping the key can come later if Enter is awkward.
+- Tap mode and the Loop are exclusive: switching one on switches the other off.
+
+Playback:
+
 - During playback the current Line is highlighted. Chords never carry a time: they're visible on the highlighted Line, nothing more.
+- The current Line is the one whose active Cue is the latest at or before the playhead. If that Cue is an Occurrence's and its Lines have none, the whole Section is highlighted. The highlight follows time, not the Arrangement, so reordering after syncing can make it jump. A Line stays highlighted until the next Cue; instrumental breaks are written as Lines of their own (e.g. "♪ ♪ ♪") and cued like any other. Nothing is highlighted before the first Cue.
+- The highlight shows in both Read and Write mode, per Line (in Write mode, behind the text box). The Lyric Sheet scrolls to follow it, except while the cursor is in a text box. This is the least certain decision here and may change during implementation.
+- Outside Tap mode, clicking a cued Line in Read mode seeks the playhead to it; in Write mode a click only places the cursor. On phone there's the highlight and click-to-seek, but no Cue editing.
 - Songs without audio have no playback clock. Their Chords are purely positional.
-- Reconsider undo/redo for Lyric Sheet structure (delete Section, Detach, reorder, switch Alternate, move to or from the Scrapbook). Step 2 only has undo for the Timeline, and in-field text relies on the browser's native undo. Undoing an Alternate switch would have to restore the line-level Cues it drops (ADR 0005), so this needs deciding alongside Cues, and weighed against Snapshots in step 5.
+- Undo for Lyric Sheet structure (delete Section, Detach, reorder, switch Alternate, move to or from the Scrapbook) is not part of Sync. With dormant Cues (ADR 0007) an Alternate switch is undone by switching back; whether Snapshots cover the rest is decided in step 5.
 
 ### 4. Record
 

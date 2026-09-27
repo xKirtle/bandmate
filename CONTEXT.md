@@ -95,7 +95,7 @@ A stretch of the Timeline that playback repeats, e.g. the hook of a Beat while w
 _Avoid_: Cycle, repeat, region
 
 **Cue**:
-A link from an Occurrence, or from one Line within an Occurrence, to a time on the Timeline.
+A link from an Occurrence, or from one Line within an Occurrence, to a time on the Timeline. A Line's Cue lies dormant while its Alternate is inactive.
 _Avoid_: Timestamp, sync point, marker
 
 **Latency Offset**:
