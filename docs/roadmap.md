@@ -4,8 +4,8 @@ Each step is usable on its own. Terms are defined in [CONTEXT.md](../CONTEXT.md)
 
 1. **Write**: Songs and Status, Lyric Sheet (Sections, Labels, Occurrences, Detach, Alternates, Chords, Chord Lines), Scrapbook, paste-import (plain text or ChordPro; blank lines split Sections, identical Sections merge into one shared Section), phone-friendly layout for writing lyrics. Deployed at `bandmate.kirtle.net`.
 2. **Listen**: Masters, Beat Library, Timeline with Tracks and Clips, playback, per-Track volume and mute.
-3. **Record**: lossless WAV Takes stacked in Clips, Latency Offset calibration and per-Take nudge.
-4. **Sync**: Cues via tap-to-sync and dragging, current Line highlighted during playback.
+3. **Sync**: Cues via tap-to-sync and dragging, current Line highlighted during playback.
+4. **Record**: lossless WAV Takes stacked in Clips, Latency Offset calibration and per-Take nudge.
 5. **Keep**: Snapshots and restore, Mixdown to MP3, ChordPro export.
 
 ## Decided so far
@@ -31,20 +31,22 @@ Decisions made while designing, recorded so later spec sessions start from them.
 - Timeline edits and new Masters count as editing the Song (they move it up the Song list). Deleting a Song deletes its Masters and Timeline but never Beats.
 - Stale tabs are guarded against: a tab refetches the Song when it becomes visible again, and every Song carries a version so a write based on an old version is rejected instead of silently overwriting newer work.
 
-### 3. Record
+### 3. Sync
+
+- Cues point to Occurrences and Lines (ADR 0005). They're created by tapping along during playback (each key press cues the next Line in the Arrangement) or by clicking/dragging. An Occurrence gets its Cue from the Cue of its first Line.
+- During playback the current Line is highlighted. Chords never carry a time: they're visible on the highlighted Line, nothing more.
+- Songs without audio have no playback clock. Their Chords are purely positional.
+- Reconsider undo/redo for Lyric Sheet structure (delete Section, Detach, reorder, switch Alternate, move to or from the Scrapbook). Step 2 only has undo for the Timeline, and in-field text relies on the browser's native undo. Undoing an Alternate switch would have to restore the line-level Cues it drops (ADR 0005), so this needs deciding alongside Cues, and weighed against Snapshots in step 5.
+
+### 4. Record
 
 - The browser mic requires HTTPS, which `bandmate.kirtle.net` already has. The user records through an audio interface, with headphones.
 - Takes are lossless WAV (ADR 0003) and keep a frozen copy of their lyrics (ADR 0004).
 - Recording starts at the playhead while the Timeline plays. If a Clip on the Track covers the playhead, the new Take stacks into it and becomes the active Take, and the Clip grows to fit the longest Take. Otherwise a new Clip is created there. For a separate idea at the same spot, use another Track.
 - There's no comping: switching the active Take is the only way to choose between Takes. Inactive Takes are kept until deleted by hand, with a "clear inactive Takes" action per Clip. Nothing is deleted automatically.
 - **Latency Offset**: a one-time calibration (play a click, record it, measure the delay) sets a global offset applied to every new Take. Each Take can then be nudged by hand.
-
-### 4. Sync
-
-- Cues point to Occurrences and Lines (ADR 0005). They're created by tapping along during playback (each key press cues the next Line in the Arrangement) or by clicking/dragging. An Occurrence gets its Cue from the Cue of its first Line.
-- During playback the current Line is highlighted. Chords never carry a time: they're visible on the highlighted Line, nothing more.
-- Songs without audio have no playback clock. Their Chords are purely positional.
-- Reconsider undo/redo for Lyric Sheet structure (delete Section, Detach, reorder, switch Alternate, move to or from the Scrapbook). Step 2 only has undo for the Timeline, and in-field text relies on the browser's native undo. Undoing an Alternate switch would have to restore the line-level Cues it drops (ADR 0005), so this needs deciding alongside Cues, and weighed against Snapshots in step 5.
+- The highlighted Line from Sync prompts the user while recording. Cues can be tapped roughly against the Beat first and refined once a real vocal exists.
+- A Take freezes its lyrics but not Cues. The highlight always follows the current Lyric Sheet and Cues, so a Take recorded before the lyrics changed simply goes out of date.
 
 ### 5. Keep
 
