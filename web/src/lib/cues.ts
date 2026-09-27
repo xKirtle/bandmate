@@ -13,9 +13,9 @@ export interface CuedOccurrence {
 }
 
 /** A Section, as far as its Lines take Cues. */
-export interface CuedSection {
+export interface CuedSection<L extends CuedLine = CuedLine> {
   id: number;
-  alternates: readonly { active: boolean; lines: readonly CuedLine[] }[];
+  alternates: readonly { active: boolean; lines: readonly L[] }[];
 }
 
 /** A Line, as far as it takes a Cue. */
@@ -25,9 +25,9 @@ export interface CuedLine {
 }
 
 /** A Song, as far as its Cues go. */
-export interface CuedSong {
+export interface CuedSong<L extends CuedLine = CuedLine> {
   arrangement: readonly CuedOccurrence[];
-  sections: readonly CuedSection[];
+  sections: readonly CuedSection<L>[];
 }
 
 /** Where playback is in the Lyric Sheet: an Occurrence, and one of its Lines or null for the whole Section. */
@@ -45,7 +45,7 @@ export function isBlank(line: { text: string }): boolean {
  * Gives each Occurrence's Lines whose Cues are in effect: those of its
  * Section's active Alternate. The others' Cues are dormant (ADR 0007).
  */
-function activeLines(song: CuedSong): (o: CuedOccurrence) => readonly CuedLine[] {
+function activeLines<L extends CuedLine>(song: CuedSong<L>): (o: CuedOccurrence) => readonly L[] {
   const sections = new Map(song.sections.map((s) => [s.id, s]));
   return (o) => sections.get(o.sectionId)?.alternates.find((a) => a.active)?.lines ?? [];
 }
@@ -88,6 +88,51 @@ export function currentPosition(song: CuedSong, t: number): Position | null {
 export function hasCues(song: CuedSong): boolean {
   const linesOf = activeLines(song);
   return song.arrangement.some((o) => o.cue !== null || hasLineCue(o, linesOf(o)));
+}
+
+/** A Line, as far as Tap mode steps onto it: a Chord Line is hidden along with Chords. */
+export interface ShownLine extends CuedLine {
+  chordLine: boolean;
+}
+
+/** A Line within one Occurrence, as Tap mode cues it. */
+export type TapLine = Position & { line: number };
+
+/**
+ * The Line Tap mode cues next, in the order down the sheet: a Line picked
+ * by clicking it, or else the one after the current Line, the first of a
+ * Section highlighted as a whole, or with nothing highlighted the first of
+ * the Arrangement. Each Occurrence of a shared Section is stepped through
+ * on its own. Only Lines on screen take a tap: never blank ones, nor Chord
+ * Lines while Chords are hidden. Null once there are no more.
+ */
+export function nextLine(
+  song: CuedSong<ShownLine>,
+  { current, picked = null, showChords }: { current: Position | null; picked?: TapLine | null; showChords: boolean },
+): TapLine | null {
+  const linesOf = activeLines(song);
+  const sheet = song.arrangement.flatMap((o, place) =>
+    linesOf(o).map((l) => ({
+      place,
+      occurrence: o.id,
+      line: l.id,
+      tappable: !isBlank(l) && (showChords || !l.chordLine),
+    })),
+  );
+  const at = (p: Position) => sheet.findIndex((q) => q.occurrence === p.occurrence && q.line === p.line);
+  const pickedAt = picked === null ? -1 : at(picked);
+  const currentAt = current === null ? -1 : at(current);
+  let from = 0;
+  if (pickedAt >= 0) from = pickedAt;
+  else if (currentAt >= 0) from = currentAt + 1;
+  else if (current !== null) {
+    // The whole Section: from its first Line, or the next Section's if it has none.
+    const place = song.arrangement.findIndex((o) => o.id === current.occurrence);
+    from = sheet.findIndex((p) => p.place >= place);
+    if (from < 0) return null;
+  }
+  const next = sheet.slice(from).find((p) => p.tappable);
+  return next ? { occurrence: next.occurrence, line: next.line } : null;
 }
 
 /** Moves a Cue a tenth of a second later (1) or earlier (-1), no earlier than 0. */

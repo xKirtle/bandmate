@@ -2,7 +2,7 @@
   import type { Line, Occurrence, Song } from './api';
   import { layoutLine } from './chords';
   import CueField from './CueField.svelte';
-  import { isBlank, type Position } from './cues';
+  import { isBlank, type Position, type TapLine } from './cues';
   import { inTextField } from './textField';
 
   let {
@@ -12,6 +12,8 @@
     setCue,
     setLineCue,
     seek,
+    picked = null,
+    pick,
   }: {
     song: Song;
     showChords: boolean;
@@ -23,6 +25,10 @@
     setLineCue?: (occurrence: Occurrence, line: Line, cue: number | null) => void;
     /** Given, clicking a cued Line seeks the Timeline to its Cue. */
     seek?: (to: number) => void;
+    /** The Line picked to tap next in Tap mode, marked. */
+    picked?: TapLine | null;
+    /** Given, as in Tap mode, clicking a Line picks it to tap next instead of seeking. */
+    pick?: (line: TapLine) => void;
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
@@ -79,10 +85,17 @@
     return () => shown.delete(k);
   }
 
-  /** Seeks to a cued Line's Cue, unless the click was to select its text. */
-  function seekTo(cue: number) {
+  /** What clicking a Line does: pick it in Tap mode, or else seek to its Cue. Null for nothing. */
+  function clickLine(occurrence: Occurrence, line: Line, cue: number | null): (() => void) | null {
+    if (pick) return isBlank(line) ? null : () => pick({ occurrence: occurrence.id, line: line.id });
+    if (cue !== null && seek) return () => seek(cue);
+    return null;
+  }
+
+  /** Does what clicking a Line does, unless the click was to select its text. */
+  function click(action: () => void) {
     if (!window.getSelection()?.isCollapsed) return;
-    seek?.(cue);
+    action();
   }
 </script>
 
@@ -120,20 +133,24 @@
           {@const cue = occurrence.lineCues[line.id] ?? null}
           {@const k = key(occurrence.id, line.id)}
           {@const lineCurrent = currentKey === k}
+          {@const onClick = clickLine(occurrence, line, cue)}
+          {@const isPicked = picked?.occurrence === occurrence.id && picked.line === line.id}
           <div
             class="line-box"
             class:current={lineCurrent}
+            class:picked={isPicked}
             class:with-gutter={setLineCue}
             aria-current={lineCurrent ? 'true' : undefined}
             {@attach (el) => track(el, k)}
           >
-            <!-- Seeking is also on the Timeline's ruler, so a click here is a shortcut. -->
+            <!-- Seeking is also on the Timeline's ruler, and Tap mode goes on down the
+                 Lines by itself, so a click here is a shortcut. -->
             <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
             <div
               class="text"
-              class:seeks={cue !== null && seek}
-              title={cue !== null && seek ? 'Play from here' : undefined}
-              onclick={cue !== null && seek ? () => seekTo(cue) : undefined}
+              class:clickable={onClick}
+              title={onClick ? (pick ? 'Tap this Line next' : 'Play from here') : undefined}
+              onclick={onClick ? () => click(onClick) : undefined}
             >
               {#if showChords && line.chords.length > 0}
                 <div class="line" class:chord-line={line.chordLine}>
@@ -226,8 +243,13 @@
     background: var(--surface-1);
     box-shadow: inset 3px 0 0 var(--accent);
   }
-  .seeks {
+  .clickable {
     cursor: pointer;
+  }
+  /* Picked to tap next: outlined, so it doesn't look like the current Line. */
+  .line-box.picked {
+    outline: 2px dashed var(--accent);
+    outline-offset: -2px;
   }
   .line {
     font-size: 1.0625rem;

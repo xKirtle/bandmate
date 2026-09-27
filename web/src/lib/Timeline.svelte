@@ -44,13 +44,16 @@
   // and undoing and redoing all of it along with mixing) is only offered on
   // wider screens; on a phone it only plays, mixes and switches the Loop on
   // and off. On both it zooms and scrolls, and follows the playhead while
-  // playing. While the Loop is on, the playhead stays inside it.
+  // playing. While the Loop is on, the playhead stays inside it. Tap mode,
+  // also only on wider screens, cues the next Line at the playhead.
   let {
     song,
     timeline,
     change,
     setBpm,
     onPlayhead,
+    tapping = $bindable(false),
+    onTap,
   }: {
     song: Song;
     timeline: Timeline;
@@ -60,6 +63,10 @@
     setBpm: (bpm: number) => void;
     /** Hears where playback is, in seconds, every frame while playing, then null once it stops. */
     onPlayhead?: (at: number | null) => void;
+    /** Whether Tap mode is on. */
+    tapping?: boolean;
+    /** Hears a tap in Tap mode, with where the playhead is, in seconds. */
+    onTap?: (at: number) => void;
   } = $props();
 
   let playerState = $state<PlayerState>('stopped');
@@ -213,6 +220,7 @@
   function keydown(event: KeyboardEvent) {
     spaceBar(event);
     undoKeys(event);
+    tapKey(event);
   }
 
   // Changes to a Track's levels are shown and heard right away, before
@@ -493,6 +501,34 @@
     event.preventDefault();
     toggle();
   }
+
+  // In Tap mode, Enter taps anywhere but a text field, even on a button:
+  // tapping along shouldn't depend on where focus was left.
+  function tapKey(event: KeyboardEvent) {
+    if (event.key !== 'Enter' || event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+    if (!tapping || event.defaultPrevented || picking || inTextField(event.target)) return;
+    event.preventDefault();
+    tap();
+  }
+
+  /** Cues the next Line where the playhead is, playing or paused. */
+  function tap() {
+    const at = playerState === 'stopped' ? position : player.position();
+    onTap?.(Math.round(at * 1000) / 1000);
+  }
+
+  // Tap mode and the Loop are exclusive, so going round the Loop mid-pass
+  // can't cue Lines out of order: switching Tap mode on switches the Loop
+  // off, and the Loop coming on, however it does, switches Tap mode off. On
+  // a phone there's no Tap mode, nor without a Clip to cue along to.
+  function switchTapping() {
+    tapping = !tapping;
+    if (tapping && loopOn) switchLoopOff();
+  }
+
+  $effect(() => {
+    if (loopOn || empty || !editable.current) untrack(() => (tapping = false));
+  });
 
   async function addBeat(beat: Beat) {
     picking = false;
@@ -1003,6 +1039,24 @@
             ? `Loop ${formatDuration(timeline.loop.start)} to ${formatDuration(timeline.loop.end)}`
             : 'Drag along the top of the ruler to set a Loop'}>Loop</button
         >
+        <button
+          type="button"
+          class="toggle tap-toggle edit-only"
+          aria-pressed={tapping}
+          disabled={empty}
+          onclick={switchTapping}
+          title="Tap mode: cue the next Line at the playhead with Enter or the Tap button">Tap mode</button
+        >
+        {#if tapping}
+          <!-- Clicked, it keeps focus where it was, so Space still plays and pauses. -->
+          <button
+            type="button"
+            class="button primary tap edit-only"
+            onpointerdown={(e) => e.preventDefault()}
+            onclick={tap}
+            title="Cue the next Line here (Enter)">Tap</button
+          >
+        {/if}
         {#if playerState === 'loading'}
           <span class="muted" role="status">Loading audio…</span>
         {/if}
@@ -1516,11 +1570,13 @@
     opacity: 0.08;
     pointer-events: none;
   }
-  .toggle.loop-toggle {
+  .toggle.loop-toggle,
+  .toggle.tap-toggle {
     width: auto;
     padding: 0 0.375rem;
   }
-  .toggle.loop-toggle:disabled {
+  .toggle.loop-toggle:disabled,
+  .toggle.tap-toggle:disabled {
     opacity: 0.5;
     cursor: default;
   }
