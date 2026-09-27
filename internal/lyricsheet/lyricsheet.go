@@ -59,6 +59,7 @@ type Song struct {
 	Notes     string    `json:"notes"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
+	LyricSheet
 }
 
 // SongSummary is a Song as shown in the Song list.
@@ -123,6 +124,9 @@ func (s *Store) GetSong(ctx context.Context, id int64) (Song, error) {
 		return Song{}, err
 	}
 	if song.UpdatedAt, err = parseTime(updated); err != nil {
+		return Song{}, err
+	}
+	if song.LyricSheet, err = s.loadLyricSheet(ctx, id); err != nil {
 		return Song{}, err
 	}
 	return song, nil

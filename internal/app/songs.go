@@ -100,7 +100,12 @@ func readJSON(w http.ResponseWriter, r *http.Request, v any) bool {
 
 // songID parses the {id} path parameter, answering 404 if it isn't a number.
 func songID(w http.ResponseWriter, r *http.Request) (int64, bool) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	return pathID(w, r, "id")
+}
+
+// pathID parses a numeric path parameter, answering 404 if it isn't a number.
+func pathID(w http.ResponseWriter, r *http.Request, name string) (int64, bool) {
+	id, err := strconv.ParseInt(r.PathValue(name), 10, 64)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "not found")
 		return 0, false

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import { api, statuses, type Song, type SongChanges, type Status } from '../lib/api';
+  import LyricSheet from '../lib/LyricSheet.svelte';
   import { navigate } from '../lib/router.svelte';
   import { timeAgo } from '../lib/time';
 
@@ -52,20 +53,40 @@
   // Saves run one after another so they land in the order they were made.
   let queue = Promise.resolve();
 
-  function save(changes: SongChanges, fields: (keyof Draft)[]) {
+  /** Queues a change and shows the Song it returns. Resolves to whether it succeeded. */
+  function send(op: () => Promise<Song>): Promise<boolean> {
+    // Once the Song is being deleted, a late save would only fail.
+    if (deleting) return Promise.resolve(false);
     pending++;
-    queue = queue.then(async () => {
+    const done = queue.then(async () => {
       try {
-        song = await api.updateSong(id, changes);
+        song = await op();
         saveError = null;
+        return true;
       } catch (e) {
         saveError = (e as Error).message;
-        // Put back what the server has for the fields that failed.
-        for (const f of fields) revert(f);
+        return false;
       } finally {
         pending--;
       }
     });
+    queue = done.then(() => {});
+    return done;
+  }
+
+  async function save(changes: SongChanges, fields: (keyof Draft)[]) {
+    if (!(await send(() => api.updateSong(id, changes)))) {
+      // Put back what the server has for the fields that failed.
+      for (const f of fields) revert(f);
+    }
+  }
+
+  // Lyric Sheet editors holding edits that aren't saved yet.
+  const unsavedEditors = new Set<object>();
+
+  function setUnsaved(editor: object, unsaved: boolean) {
+    if (unsaved) unsavedEditors.add(editor);
+    else unsavedEditors.delete(editor);
   }
 
   /** Shows what the server has for one field again. */
@@ -111,7 +132,7 @@
 
   function hasUnsavedEdits() {
     if (!song) return false;
-    if (pending > 0) return true;
+    if (pending > 0 || unsavedEditors.size > 0) return true;
     const saved = toDraft(song);
     return (Object.keys(saved) as (keyof Draft)[]).some(
       (f) => (f === 'notes' ? draft[f] : draft[f].trim()) !== saved[f],
@@ -194,6 +215,8 @@
         </label>
       {/each}
     </fieldset>
+
+    <LyricSheet {song} change={send} onUnsaved={setUnsaved} />
 
     <section class="details" aria-labelledby="details-heading">
       <h2 id="details-heading">Details</h2>

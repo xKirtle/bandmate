@@ -18,10 +18,62 @@ export interface Song {
   notes: string;
   createdAt: string;
   updatedAt: string;
+  /** The Lyric Sheet: Occurrences of Sections, in order. */
+  arrangement: Occurrence[];
+  /** Every Section of the Song, in the Arrangement or not. */
+  sections: Section[];
+  /** Ids of the Sections with no Occurrence. */
+  scrapbook: number[];
 }
 
+/** One appearance of a Section in the Arrangement. */
+export interface Occurrence {
+  id: number;
+  sectionId: number;
+  /** Other Occurrences show the same Section, so editing it changes them too. */
+  shared: boolean;
+}
+
+export interface Section {
+  id: number;
+  /** Free text; "" means no Label. */
+  label: string;
+  /** Exactly one is active. */
+  alternates: Alternate[];
+}
+
+export interface Alternate {
+  id: number;
+  name: string;
+  active: boolean;
+  lines: Line[];
+}
+
+export interface Line {
+  /** Stays the same while the Line is edited. */
+  id: number;
+  text: string;
+}
+
+/** Labels offered as suggestions; any text is allowed. */
+export const suggestedLabels: readonly string[] = [
+  'Intro',
+  'Verse',
+  'Pre-Chorus',
+  'Chorus',
+  'Post-Chorus',
+  'Hook',
+  'Bridge',
+  'Breakdown',
+  'Interlude',
+  'Solo',
+  'Outro',
+];
+
 /** A partial update: only the fields present change; "" or null clears one. */
-export type SongChanges = Partial<Omit<Song, 'id' | 'createdAt' | 'updatedAt'>>;
+export type SongChanges = Partial<
+  Pick<Song, 'title' | 'status' | 'key' | 'bpm' | 'capo' | 'tuning' | 'notes'>
+>;
 
 /** Narrows the Song list. */
 export interface SongFilter {
@@ -78,4 +130,15 @@ export const api = {
   createSong: (title: string) => request<Song>('POST', '/songs', { title }),
   updateSong: (id: number, changes: SongChanges) => request<Song>('PATCH', `/songs/${id}`, changes),
   deleteSong: (id: number) => request<null>('DELETE', `/songs/${id}`),
+  /** Adds a Section at position in the Arrangement, or at the end. */
+  addSection: (songId: number, section: { label?: string; position?: number }) =>
+    request<Song>('POST', `/songs/${songId}/sections`, section),
+  setSectionLabel: (songId: number, sectionId: number, label: string) =>
+    request<Song>('PATCH', `/songs/${songId}/sections/${sectionId}`, { label }),
+  /** Replaces an Alternate's Lines with the lines of text. */
+  replaceAlternateText: (songId: number, alternateId: number, text: string) =>
+    request<Song>('PUT', `/songs/${songId}/alternates/${alternateId}/text`, { text }),
+  /** Puts the Arrangement in this order of Occurrence ids. */
+  reorderArrangement: (songId: number, occurrences: number[]) =>
+    request<Song>('PUT', `/songs/${songId}/arrangement`, { occurrences }),
 };
