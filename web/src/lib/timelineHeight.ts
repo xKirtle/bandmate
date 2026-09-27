@@ -5,26 +5,33 @@
 /** Where the chosen height is kept on this device. */
 export const heightKey = 'bandmate.timelineHeight';
 
+/** How much of the window the Tracks area takes until one's chosen. */
+export const defaultShare = 0.4;
+
+/** The most of the window the Tracks area can take, leaving room for the page header. */
+export const mostShare = 0.85;
+
 /** The least and most the Tracks area can be, in pixels. */
 export interface HeightBounds {
   min: number;
   max: number;
 }
 
-/** How tall the Tracks area is until one's chosen: 40% of the window. */
+/** How tall the Tracks area is until one's chosen. */
 export function defaultHeight(windowHeight: number): number {
-  return windowHeight * 0.4;
+  return windowHeight * defaultShare;
 }
 
 /**
- * From least, one Track and the ruler, to 85% of the window, leaving room for
- * the page header, but no taller than the Tracks need once that's known (not 0).
+ * From one Track and the ruler to mostShare of the window, but no taller
+ * than the Tracks need once that's known (not 0).
  */
-export function heightBounds(windowHeight: number, least: number, needed: number): HeightBounds {
-  const most = needed > 0 ? Math.min(windowHeight * 0.85, needed) : windowHeight * 0.85;
-  return { min: least, max: Math.max(least, most) };
+export function heightBounds(windowHeight: number, oneTrack: number, needed: number): HeightBounds {
+  const most = windowHeight * mostShare;
+  return { min: oneTrack, max: Math.max(oneTrack, needed > 0 ? Math.min(most, needed) : most) };
 }
 
+/** A height kept within the bounds. */
 export function clampHeight(height: number, bounds: HeightBounds): number {
   return Math.min(Math.max(height, bounds.min), bounds.max);
 }
