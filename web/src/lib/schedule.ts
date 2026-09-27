@@ -36,6 +36,19 @@ export function repeats(t: number, loop: Loop | null): boolean {
   return loop !== null && t < loop.end;
 }
 
+/** Where the playhead at time t goes, so it's inside the Loop while the Loop is on. */
+export function keptInLoop(t: number, loop: Loop | null): number {
+  return outsideLoop(t, loop) ? loop!.start : t;
+}
+
+/**
+ * Whether time t is outside a Loop that's on. Its end counts as outside:
+ * playing from there never repeats it.
+ */
+export function outsideLoop(t: number, loop: Loop | null): boolean {
+  return loop !== null && (t < loop.start || t >= loop.end);
+}
+
 /**
  * The Clips to play when playback starts at time t, each from the part of
  * its source that's reached then. Clips that have finished by t are left out.
