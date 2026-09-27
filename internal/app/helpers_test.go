@@ -190,6 +190,8 @@ type occurrence struct {
 	ID        int64 `json:"id"`
 	SectionID int64 `json:"sectionId"`
 	Shared    bool  `json:"shared"`
+	// Cue is the Occurrence's time on the Timeline in seconds, or nil.
+	Cue *float64 `json:"cue"`
 }
 
 // section is a Section with all its Alternates.

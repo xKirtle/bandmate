@@ -25,7 +25,7 @@ type versionedWrite struct {
 }
 
 // versionedWrites covers each kind of change: metadata, Status, Lyric Sheet
-// structure and Alternate text.
+// structure, Alternate text and Cues.
 var versionedWrites = []versionedWrite{
 	{"metadata", func(ts *testServer, s song, v int64) response {
 		return ts.DoAt(v, http.MethodPatch, songPath(s.ID), map[string]any{"key": "Am", "bpm": 92})
@@ -39,6 +39,9 @@ var versionedWrites = []versionedWrite{
 	{"alternate text", func(ts *testServer, s song, v int64) response {
 		return ts.DoAt(v, http.MethodPut, alternatePath(s.ID, s.Sections[0].Alternates[0].ID)+"/text",
 			map[string]any{"text": "New words"})
+	}},
+	{"occurrence cue", func(ts *testServer, s song, v int64) response {
+		return ts.DoAt(v, http.MethodPut, cuePath(s.ID, s.Arrangement[0].ID), map[string]any{"cue": 12.5})
 	}},
 }
 

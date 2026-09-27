@@ -1,7 +1,9 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { api, suggestedLabels, type Song, type SongAt } from './api';
+  import { MediaQuery } from 'svelte/reactivity';
+  import { api, suggestedLabels, type Occurrence, type Song, type SongAt } from './api';
   import { hasChords } from './chords';
+  import { currentOccurrence } from './cues';
   import LyricSheetView from './LyricSheetView.svelte';
   import SectionEditor from './SectionEditor.svelte';
   import { describe } from './sections';
@@ -10,11 +12,17 @@
     song,
     change,
     onUnsaved,
+    playhead = null,
+    hasClips = false,
   }: {
     song: Song;
     /** Sends a Lyric Sheet change; resolves to whether it succeeded. */
     change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
     onUnsaved: (editor: object, unsaved: boolean) => void;
+    /** Where the Timeline is playing, in seconds; null while it isn't. */
+    playhead?: number | null;
+    /** Whether the Timeline has any Clip, so there's something to cue to. */
+    hasClips?: boolean;
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
@@ -23,6 +31,19 @@
   const inArrangement = $derived(
     [...new Set(song.arrangement.map((o) => o.sectionId))].flatMap((id) => sections.get(id) ?? []),
   );
+  // The Occurrence playback is in.
+  const current = $derived(playhead === null ? null : currentOccurrence(song.arrangement, playhead));
+  // Cues are edited on wider screens only, and only once there's something
+  // to cue to or a Cue already set.
+  const wide = new MediaQuery('min-width: 40.0625rem');
+  const showCues = $derived(wide.current && (hasClips || song.arrangement.some((o) => o.cue !== null)));
+
+  function setCue(occurrence: Occurrence, cue: number | null) {
+    change((at) =>
+      cue === null ? api.clearOccurrenceCue(at, occurrence.id) : api.setOccurrenceCue(at, occurrence.id, cue),
+    );
+  }
+
   // The Occurrence just added, whose Label gets focus.
   let added = $state<number | null>(null);
   // Write edits the raw text; Read shows Chords above the lyrics.
@@ -85,7 +106,7 @@
         Show chords
       </label>
     {/if}
-    <LyricSheetView {song} showChords={showChords && songHasChords} />
+    <LyricSheetView {song} showChords={showChords && songHasChords} {current} setCue={showCues ? setCue : undefined} />
   {:else}
     <ol class="arrangement">
       {#each song.arrangement as occurrence, i (occurrence.id)}

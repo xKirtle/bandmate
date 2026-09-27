@@ -26,6 +26,9 @@ type Occurrence struct {
 	// Shared means other Occurrences show the same Section, so editing it
 	// changes them too.
 	Shared bool `json:"shared"`
+	// Cue is when the Occurrence starts on the Timeline, in seconds to the
+	// millisecond, or nil if it has no Cue.
+	Cue *float64 `json:"cue"`
 }
 
 // Section is a block of Lines with an optional Label.
@@ -121,12 +124,14 @@ func (s *Store) loadLyricSheet(ctx context.Context, songID int64) (LyricSheet, e
 	}
 
 	uses := map[int64]int{}
-	err = query(ctx, s.db, `SELECT id, section_id FROM occurrences WHERE song_id = ? ORDER BY position, id`,
+	err = query(ctx, s.db, `SELECT id, section_id, cue_ms FROM occurrences WHERE song_id = ? ORDER BY position, id`,
 		[]any{songID}, func(rows *sql.Rows) error {
 			var o Occurrence
-			if err := rows.Scan(&o.ID, &o.SectionID); err != nil {
+			var cue sql.NullInt64
+			if err := rows.Scan(&o.ID, &o.SectionID, &cue); err != nil {
 				return err
 			}
+			o.Cue = cueSeconds(cue)
 			uses[o.SectionID]++
 			sheet.Arrangement = append(sheet.Arrangement, o)
 			return nil

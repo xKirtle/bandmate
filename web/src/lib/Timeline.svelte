@@ -49,6 +49,7 @@
     timeline,
     change,
     setBpm,
+    onPlayhead,
   }: {
     song: Song;
     timeline: Timeline;
@@ -56,6 +57,8 @@
     change: (op: (at: SongAt) => Promise<Timeline>) => Promise<boolean>;
     /** Sets the Song's BPM. */
     setBpm: (bpm: number) => void;
+    /** Hears where playback is, in seconds, every frame while playing, then null once it stops. */
+    onPlayhead?: (at: number | null) => void;
   } = $props();
 
   let playerState = $state<PlayerState>('stopped');
@@ -308,9 +311,13 @@
   // Follow the playhead every frame while playing, and stop at the end,
   // unless going round the Loop.
   $effect(() => {
+    // Only stopping lets go of the playhead: starting over from elsewhere
+    // (e.g. after an edit) loads for a moment, and keeps it.
+    if (playerState === 'stopped') untrack(() => onPlayhead?.(null));
     if (playerState !== 'playing') return;
     let frame = requestAnimationFrame(function step() {
       if (!dragging) position = player.position();
+      onPlayhead?.(position);
       if (position >= length && !player.repeating) {
         player.stop();
         player.seek(length);

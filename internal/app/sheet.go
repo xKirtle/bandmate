@@ -80,6 +80,32 @@ func (a *App) detach(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *App) setOccurrenceCue(w http.ResponseWriter, r *http.Request) {
+	occurrenceID, ok := pathID(w, r, "occurrenceID")
+	if !ok {
+		return
+	}
+	var req struct {
+		Cue *float64 `json:"cue"`
+	}
+	a.changeSheet(w, r, &req, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
+		if req.Cue == nil {
+			return lyricsheet.Song{}, &lyricsheet.InvalidError{Msg: "cue is required"}
+		}
+		return a.songs.SetOccurrenceCue(r.Context(), id, based, occurrenceID, *req.Cue)
+	})
+}
+
+func (a *App) clearOccurrenceCue(w http.ResponseWriter, r *http.Request) {
+	occurrenceID, ok := pathID(w, r, "occurrenceID")
+	if !ok {
+		return
+	}
+	a.changeSheet(w, r, nil, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
+		return a.songs.ClearOccurrenceCue(r.Context(), id, based, occurrenceID)
+	})
+}
+
 func (a *App) setSectionLabel(w http.ResponseWriter, r *http.Request) {
 	sectionID, ok := pathID(w, r, "sectionID")
 	if !ok {
