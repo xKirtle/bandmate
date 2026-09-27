@@ -220,12 +220,7 @@ func (s *Store) AddToScrapbook(ctx context.Context, songID int64, label string) 
 // Alternates and Lines. A Section still in the Arrangement can't be deleted.
 func (s *Store) DeleteSection(ctx context.Context, songID, sectionID int64) (Song, error) {
 	return s.change(ctx, songID, func(tx *sql.Tx) error {
-		var uses int
-		err := tx.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM occurrences WHERE section_id = s.id)
-			FROM sections s WHERE s.id = ? AND s.song_id = ?`, sectionID, songID).Scan(&uses)
-		if errors.Is(err, sql.ErrNoRows) {
-			return ErrNotFound
-		}
+		uses, err := findSection(ctx, tx, songID, sectionID)
 		if err != nil {
 			return err
 		}
@@ -258,13 +253,8 @@ func insertSection(ctx context.Context, tx *sql.Tx, songID int64, label string) 
 // position in the Arrangement. A nil position adds it at the end.
 func (s *Store) AddOccurrence(ctx context.Context, songID, sectionID int64, position *int) (Song, error) {
 	return s.change(ctx, songID, func(tx *sql.Tx) error {
-		var found int
-		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM sections WHERE id = ? AND song_id = ?`,
-			sectionID, songID).Scan(&found); err != nil {
+		if _, err := findSection(ctx, tx, songID, sectionID); err != nil {
 			return err
-		}
-		if found == 0 {
-			return ErrNotFound
 		}
 		pos, err := arrangementPosition(ctx, tx, songID, position)
 		if err != nil {
@@ -321,6 +311,17 @@ func (s *Store) Detach(ctx context.Context, songID, occurrenceID int64) (Song, e
 		}
 		return nil
 	})
+}
+
+// findSection checks a Section belongs to a Song and returns how many
+// Occurrences it has.
+func findSection(ctx context.Context, tx *sql.Tx, songID, sectionID int64) (uses int, err error) {
+	err = tx.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM occurrences WHERE section_id = s.id)
+		FROM sections s WHERE s.id = ? AND s.song_id = ?`, sectionID, songID).Scan(&uses)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrNotFound
+	}
+	return uses, err
 }
 
 // findOccurrence returns the Section and position of one of a Song's

@@ -73,7 +73,9 @@
   </div>
 
   {#if song.arrangement.length === 0}
-    <p class="muted">No Sections yet. Add one to start writing.</p>
+    <p class="muted">
+      No Sections here yet. Add one to start writing{song.scrapbook.length > 0 ? ', or put one back from the Scrapbook' : ''}.
+    </p>
   {/if}
 
   {#if mode === 'read'}

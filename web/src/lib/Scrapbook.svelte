@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import { api, type Song } from './api';
   import SectionEditor from './SectionEditor.svelte';
   import { describe } from './sections';
@@ -28,7 +29,12 @@
   let added = $state<number | null>(null);
 
   async function add() {
-    if (await change(() => api.addToScrapbook(song.id))) added = song.scrapbook.at(-1) ?? null;
+    if (!(await change(() => api.addToScrapbook(song.id)))) return;
+    // The newest Section has the highest id, so it comes last.
+    added = song.scrapbook.at(-1) ?? null;
+    // Focus it once, not again if it later comes back to the Scrapbook.
+    await tick();
+    added = null;
   }
 
   function putBack(sectionId: number, e: Event & { currentTarget: HTMLSelectElement }) {
@@ -88,7 +94,7 @@
     </ul>
   {/if}
 
-  <button type="button" class="button add" onclick={add}>Add an idea</button>
+  <button type="button" class="button add" onclick={add}>Add a Section</button>
 </section>
 
 <style>

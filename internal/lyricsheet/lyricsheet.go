@@ -13,7 +13,8 @@ import (
 	"time"
 )
 
-// ErrNotFound means the requested Song doesn't exist.
+// ErrNotFound means the requested Song, or the part of it asked for, doesn't
+// exist.
 var ErrNotFound = errors.New("not found")
 
 // InvalidError is a rejected operation. Its message is safe to show the user.
