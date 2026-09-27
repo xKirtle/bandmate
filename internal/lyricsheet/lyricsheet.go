@@ -117,13 +117,13 @@ func insertSong(ctx context.Context, db execer, title string) (int64, error) {
 		return 0, errTitleRequired
 	}
 	now := time.Now().UTC().Format(timeFormat)
-	res, err := db.ExecContext(ctx,
+	id, err := insert(ctx, db,
 		`INSERT INTO songs (title, status, created_at, updated_at) VALUES (?, ?, ?, ?)`,
 		title, StatusIdea, now, now)
 	if err != nil {
 		return 0, fmt.Errorf("creating song: %w", err)
 	}
-	return res.LastInsertId()
+	return id, nil
 }
 
 // GetSong returns a Song's full aggregate.

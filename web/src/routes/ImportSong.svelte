@@ -6,7 +6,8 @@
   let text = $state('');
   let title = $state('');
   // The title is only asked for once the server says the text doesn't name
-  // the Song, so the parsing stays on the server.
+  // the Song, so the parsing stays on the server. The API tests pin that
+  // message.
   let askTitle = $state(false);
   let titleInput = $state<HTMLInputElement>();
   let error = $state<string | null>(null);

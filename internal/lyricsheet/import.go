@@ -6,10 +6,14 @@ import (
 	"strings"
 )
 
-var errImportTitleRequired = invalid("title is required: add a {title: ...} line or give one")
+var (
+	// The import screen asks for a title when it sees this message.
+	errImportTitleRequired = invalid("title is required: add a {title: ...} line or give one")
+	errNothingToImport     = invalid("there are no lyrics to import")
+)
 
 // ImportSong creates a new Song from pasted lyrics, plain text or ChordPro,
-// with one Section and Occurrence per block of Lines in the text. A title
+// with one Section and Occurrence per group of Lines in the text. A title
 // directive in the text names the Song; without one, title does.
 func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error) {
 	directiveTitle, sections := parseImport(text)
@@ -20,9 +24,10 @@ func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error
 		return Song{}, errImportTitleRequired
 	}
 	if len(sections) == 0 {
-		return Song{}, invalid("there are no lyrics to import")
+		return Song{}, errNothingToImport
 	}
 
+	// Not s.change: that changes a Song that already exists.
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Song{}, err
@@ -33,7 +38,7 @@ func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error
 		return Song{}, err
 	}
 	for pos, sec := range sections {
-		sectionID, err := insertSection(ctx, tx, songID, sec.label)
+		sectionID, alternateID, err := insertSection(ctx, tx, songID, sec.label)
 		if err != nil {
 			return Song{}, err
 		}
@@ -41,8 +46,8 @@ func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error
 			return Song{}, err
 		}
 		for i, line := range sec.lines {
-			if _, err := tx.ExecContext(ctx, `INSERT INTO lines (alternate_id, position, text)
-				SELECT id, ?, ? FROM alternates WHERE section_id = ?`, i, line, sectionID); err != nil {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO lines (alternate_id, position, text) VALUES (?, ?, ?)`,
+				alternateID, i, line); err != nil {
 				return Song{}, fmt.Errorf("adding line: %w", err)
 			}
 		}
@@ -71,7 +76,7 @@ func parseImport(text string) (title string, sections []importedSection) {
 		}
 		cur = importedSection{}
 	}
-	for _, line := range strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n") {
+	for _, line := range splitLines(text) {
 		if strings.TrimSpace(line) == "" {
 			end()
 			continue
@@ -113,18 +118,20 @@ func directive(line string) (name, value string, ok bool) {
 func heading(line string) (label string, ok bool) {
 	line = strings.TrimSpace(line)
 	if label, ok := strings.CutSuffix(line, ":"); ok {
-		if _, chords := parseLine(label); len(chords) == 0 && strings.TrimSpace(label) != "" {
-			return strings.TrimSpace(label), true
+		label = strings.TrimSpace(label)
+		if _, chords := parseLine(label); label == "" || len(chords) > 0 {
+			return "", false
 		}
-		return "", false
+		return label, true
 	}
 	inner, ok := strings.CutPrefix(line, "[")
 	if !ok {
 		return "", false
 	}
 	inner, ok = strings.CutSuffix(inner, "]")
-	if !ok || strings.ContainsAny(inner, "[]") || strings.TrimSpace(inner) == "" || chordName.MatchString(inner) {
+	inner = strings.TrimSpace(inner)
+	if !ok || inner == "" || strings.ContainsAny(inner, "[]") || chordName.MatchString(inner) {
 		return "", false
 	}
-	return strings.TrimSpace(inner), true
+	return inner, true
 }

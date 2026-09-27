@@ -199,7 +199,7 @@ func (s *Store) AddSection(ctx context.Context, songID int64, label string, posi
 		if err != nil {
 			return err
 		}
-		sectionID, err := insertSection(ctx, tx, songID, label)
+		sectionID, _, err := insertSection(ctx, tx, songID, label)
 		if err != nil {
 			return err
 		}
@@ -211,7 +211,7 @@ func (s *Store) AddSection(ctx context.Context, songID int64, label string, posi
 // (active) Alternate, with no Occurrence, so it starts in the Scrapbook.
 func (s *Store) AddToScrapbook(ctx context.Context, songID int64, label string) (Song, error) {
 	return s.change(ctx, songID, func(tx *sql.Tx) error {
-		_, err := insertSection(ctx, tx, songID, label)
+		_, _, err := insertSection(ctx, tx, songID, label)
 		return err
 	})
 }
@@ -235,18 +235,19 @@ func (s *Store) DeleteSection(ctx context.Context, songID, sectionID int64) (Son
 }
 
 // insertSection creates a Section with its first (active) Alternate and
-// returns its id.
-func insertSection(ctx context.Context, tx *sql.Tx, songID int64, label string) (int64, error) {
-	sectionID, err := insert(ctx, tx, `INSERT INTO sections (song_id, label) VALUES (?, ?)`,
+// returns both their ids.
+func insertSection(ctx context.Context, tx *sql.Tx, songID int64, label string) (sectionID, alternateID int64, err error) {
+	sectionID, err = insert(ctx, tx, `INSERT INTO sections (song_id, label) VALUES (?, ?)`,
 		songID, cleanLabel(label))
 	if err != nil {
-		return 0, fmt.Errorf("adding section: %w", err)
+		return 0, 0, fmt.Errorf("adding section: %w", err)
 	}
-	if _, err := insert(ctx, tx, `INSERT INTO alternates (section_id, active) VALUES (?, 1)`,
-		sectionID); err != nil {
-		return 0, fmt.Errorf("adding alternate: %w", err)
+	alternateID, err = insert(ctx, tx, `INSERT INTO alternates (section_id, active) VALUES (?, 1)`,
+		sectionID)
+	if err != nil {
+		return 0, 0, fmt.Errorf("adding alternate: %w", err)
 	}
-	return sectionID, nil
+	return sectionID, alternateID, nil
 }
 
 // AddOccurrence adds another Occurrence of one of the Song's Sections at
@@ -455,8 +456,8 @@ func cleanLabel(label string) string {
 }
 
 // insert runs an INSERT and returns the new row's id.
-func insert(ctx context.Context, tx *sql.Tx, stmt string, args ...any) (int64, error) {
-	res, err := tx.ExecContext(ctx, stmt, args...)
+func insert(ctx context.Context, db execer, stmt string, args ...any) (int64, error) {
+	res, err := db.ExecContext(ctx, stmt, args...)
 	if err != nil {
 		return 0, err
 	}
