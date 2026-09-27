@@ -73,7 +73,7 @@ func TestCueingTheOccurrenceLeavesDormantCuesAlone(t *testing.T) {
 	}
 }
 
-func TestDetachingAnOccurrenceCarriesItsCuesOverToTheCopy(t *testing.T) {
+func TestDetachingAnOccurrenceCarriesItsCuesOverToItsNewSection(t *testing.T) {
 	ts := newTestServer(t)
 	s := ts.chorusWithACuedAlternate()
 	drive, night, _, chords := chorusLines(s)
