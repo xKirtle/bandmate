@@ -3,7 +3,7 @@
   import { MediaQuery } from 'svelte/reactivity';
   import { api, suggestedLabels, type Line, type Occurrence, type Song, type SongAt } from './api';
   import { hasChords } from './chords';
-  import { currentPosition, hasCues, nextLine, type TappedLine } from './cues';
+  import { currentPosition, hasCues, nextLine, type TapLine } from './cues';
   import LyricSheetView from './LyricSheetView.svelte';
   import SectionEditor from './SectionEditor.svelte';
   import { describe } from './sections';
@@ -57,7 +57,7 @@
   }
 
   // The Line picked by clicking it in Tap mode, to tap next.
-  let picked = $state<TappedLine | null>(null);
+  let picked = $state<TapLine | null>(null);
   // A Line is picked in Read mode only, where it's marked.
   $effect(() => {
     if (!tapping || mode === 'write') picked = null;
@@ -65,18 +65,18 @@
   // The latest tap, while the Cue it set is being saved: the Song doesn't
   // have that Cue yet, so the next tap goes on from it rather than from
   // what's current.
-  let saving: TappedLine | null = null;
+  let pendingTap: TapLine | null = null;
 
   /** Cues the next Line in Tap mode at a time, in seconds. */
   export async function tap(time: number) {
-    const current = saving ?? currentPosition(song, time);
+    const current = pendingTap ?? currentPosition(song, time);
     const line = nextLine(song, { current, picked, showChords: chordsShown });
     if (!line) return;
     picked = null;
-    saving = line;
+    pendingTap = line;
     await change((at) => api.setLineCue(at, line.occurrence, line.line, time));
     // Saved, the Song has the Cue; failed, the Line is still to tap.
-    if (saving === line) saving = null;
+    if (pendingTap === line) pendingTap = null;
   }
 
   // The Occurrence just added, whose Label gets focus.

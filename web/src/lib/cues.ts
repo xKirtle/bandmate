@@ -13,9 +13,9 @@ export interface CuedOccurrence {
 }
 
 /** A Section, as far as its Lines take Cues. */
-export interface CuedSection {
+export interface CuedSection<L extends CuedLine = CuedLine> {
   id: number;
-  alternates: readonly { active: boolean; lines: readonly CuedLine[] }[];
+  alternates: readonly { active: boolean; lines: readonly L[] }[];
 }
 
 /** A Line, as far as it takes a Cue. */
@@ -25,9 +25,9 @@ export interface CuedLine {
 }
 
 /** A Song, as far as its Cues go. */
-export interface CuedSong {
+export interface CuedSong<L extends CuedLine = CuedLine> {
   arrangement: readonly CuedOccurrence[];
-  sections: readonly CuedSection[];
+  sections: readonly CuedSection<L>[];
 }
 
 /** Where playback is in the Lyric Sheet: an Occurrence, and one of its Lines or null for the whole Section. */
@@ -45,7 +45,7 @@ export function isBlank(line: { text: string }): boolean {
  * Gives each Occurrence's Lines whose Cues are in effect: those of its
  * Section's active Alternate. The others' Cues are dormant (ADR 0007).
  */
-function activeLines(song: CuedSong): (o: CuedOccurrence) => readonly CuedLine[] {
+function activeLines<L extends CuedLine>(song: CuedSong<L>): (o: CuedOccurrence) => readonly L[] {
   const sections = new Map(song.sections.map((s) => [s.id, s]));
   return (o) => sections.get(o.sectionId)?.alternates.find((a) => a.active)?.lines ?? [];
 }
@@ -90,22 +90,13 @@ export function hasCues(song: CuedSong): boolean {
   return song.arrangement.some((o) => o.cue !== null || hasLineCue(o, linesOf(o)));
 }
 
-/** A Line as Tap mode steps onto it: whether it holds only Chords, hidden with them. */
-export interface TappedLineText extends CuedLine {
+/** A Line, as far as Tap mode steps onto it: a Chord Line is hidden along with Chords. */
+export interface ShownLine extends CuedLine {
   chordLine: boolean;
 }
 
-/** A Song, as far as Tap mode steps through its Lines. */
-export interface TappedSong {
-  arrangement: readonly CuedOccurrence[];
-  sections: readonly { id: number; alternates: readonly { active: boolean; lines: readonly TappedLineText[] }[] }[];
-}
-
 /** A Line within one Occurrence, as Tap mode cues it. */
-export interface TappedLine {
-  occurrence: number;
-  line: number;
-}
+export type TapLine = Position & { line: number };
 
 /**
  * The Line Tap mode cues next, in the order down the sheet: a Line picked
@@ -116,12 +107,12 @@ export interface TappedLine {
  * Lines while Chords are hidden. Null once there are no more.
  */
 export function nextLine(
-  song: TappedSong,
-  { current, picked = null, showChords }: { current: Position | null; picked?: TappedLine | null; showChords: boolean },
-): TappedLine | null {
-  const sections = new Map(song.sections.map((s) => [s.id, s]));
+  song: CuedSong<ShownLine>,
+  { current, picked = null, showChords }: { current: Position | null; picked?: TapLine | null; showChords: boolean },
+): TapLine | null {
+  const linesOf = activeLines(song);
   const sheet = song.arrangement.flatMap((o, place) =>
-    (sections.get(o.sectionId)?.alternates.find((a) => a.active)?.lines ?? []).map((l) => ({
+    linesOf(o).map((l) => ({
       place,
       occurrence: o.id,
       line: l.id,

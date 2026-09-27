@@ -2,7 +2,7 @@
   import type { Line, Occurrence, Song } from './api';
   import { layoutLine } from './chords';
   import CueField from './CueField.svelte';
-  import { isBlank, type Position, type TappedLine } from './cues';
+  import { isBlank, type Position, type TapLine } from './cues';
   import { inTextField } from './textField';
 
   let {
@@ -26,9 +26,9 @@
     /** Given, clicking a cued Line seeks the Timeline to its Cue. */
     seek?: (to: number) => void;
     /** The Line picked to tap next in Tap mode, marked. */
-    picked?: TappedLine | null;
+    picked?: TapLine | null;
     /** Given, as in Tap mode, clicking a Line picks it to tap next instead of seeking. */
-    pick?: (line: TappedLine) => void;
+    pick?: (line: TapLine) => void;
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));

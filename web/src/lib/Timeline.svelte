@@ -520,14 +520,14 @@
   // Tap mode and the Loop are exclusive, so going round the Loop mid-pass
   // can't cue Lines out of order: switching Tap mode on switches the Loop
   // off, and the Loop coming on, however it does, switches Tap mode off. On
-  // a phone there's no Tap mode.
+  // a phone there's no Tap mode, nor without a Clip to cue along to.
   function switchTapping() {
     tapping = !tapping;
     if (tapping && loopOn) switchLoopOff();
   }
 
   $effect(() => {
-    if (loopOn || !editable.current) untrack(() => (tapping = false));
+    if (loopOn || empty || !editable.current) untrack(() => (tapping = false));
   });
 
   async function addBeat(beat: Beat) {
@@ -1043,12 +1043,18 @@
           type="button"
           class="toggle tap-toggle edit-only"
           aria-pressed={tapping}
+          disabled={empty}
           onclick={switchTapping}
           title="Tap mode: cue the next Line at the playhead with Enter or the Tap button">Tap mode</button
         >
         {#if tapping}
-          <button type="button" class="button primary tap edit-only" onclick={tap} title="Cue the next Line here (Enter)"
-            >Tap</button
+          <!-- Clicked, it keeps focus where it was, so Space still plays and pauses. -->
+          <button
+            type="button"
+            class="button primary tap edit-only"
+            onpointerdown={(e) => e.preventDefault()}
+            onclick={tap}
+            title="Cue the next Line here (Enter)">Tap</button
           >
         {/if}
         {#if playerState === 'loading'}
@@ -1569,7 +1575,8 @@
     width: auto;
     padding: 0 0.375rem;
   }
-  .toggle.loop-toggle:disabled {
+  .toggle.loop-toggle:disabled,
+  .toggle.tap-toggle:disabled {
     opacity: 0.5;
     cursor: default;
   }
