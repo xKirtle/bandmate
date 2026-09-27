@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { api, suggestedLabels, type Song } from './api';
+  import { api, suggestedLabels, type Section, type Song } from './api';
   import { hasChords } from './chords';
   import LyricSheetView from './LyricSheetView.svelte';
   import SectionEditor from './SectionEditor.svelte';
@@ -17,6 +17,14 @@
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
+  // How many Occurrences show each Section.
+  const uses = $derived(
+    song.arrangement.reduce((m, o) => m.set(o.sectionId, (m.get(o.sectionId) ?? 0) + 1), new Map<number, number>()),
+  );
+  // The Sections in the Arrangement, once each, in the order they first appear.
+  const repeatable = $derived(
+    [...new Set(song.arrangement.map((o) => o.sectionId))].flatMap((id) => sections.get(id) ?? []),
+  );
   // The Occurrence just added, whose Label gets focus.
   let added = $state<number | null>(null);
   // Write edits the raw text; Read shows Chords above the lyrics.
@@ -37,6 +45,22 @@
     if (await change(() => api.addSection(song.id, { position }))) {
       added = song.arrangement[position]?.id ?? null;
     }
+  }
+
+  function repeat(sectionId: number, position?: number) {
+    change(() => api.addOccurrence(song.id, sectionId, position));
+  }
+
+  function repeatAtEnd(e: Event & { currentTarget: HTMLSelectElement }) {
+    const id = Number(e.currentTarget.value);
+    e.currentTarget.value = '';
+    if (id) repeat(id);
+  }
+
+  // How a Section is named in lists: its Label, else its first Line.
+  function describe(section: Section) {
+    const first = section.alternates.find((a) => a.active)?.lines.find((l) => l.lyrics.trim())?.lyrics.trim();
+    return section.label || (first ? `“${first}”` : 'Section without a Label');
   }
 
   function move(index: number, by: -1 | 1) {
@@ -79,6 +103,7 @@
               occurrenceId={occurrence.id}
               {section}
               shared={occurrence.shared}
+              uses={uses.get(occurrence.sectionId) ?? 1}
               autofocus={added === occurrence.id}
               {change}
               {onUnsaved}
@@ -99,6 +124,35 @@
                 <button type="button" class="icon" onclick={() => add(i + 1)} aria-label="Add a Section below">
                   +
                 </button>
+                <button
+                  type="button"
+                  class="icon"
+                  onclick={() => repeat(section.id, i + 1)}
+                  aria-label="Repeat this Section below"
+                  title="Repeat this Section below"
+                >
+                  ⧉
+                </button>
+                {#if occurrence.shared}
+                  <button
+                    type="button"
+                    class="icon"
+                    onclick={() => change(() => api.detach(song.id, occurrence.id))}
+                    aria-label="Detach into its own copy"
+                    title="Detach: give this Occurrence its own copy, so it can differ"
+                  >
+                    ⑂
+                  </button>
+                  <button
+                    type="button"
+                    class="icon"
+                    onclick={() => change(() => api.removeOccurrence(song.id, occurrence.id))}
+                    aria-label="Remove this Occurrence"
+                    title="Remove this Occurrence; the others stay"
+                  >
+                    ×
+                  </button>
+                {/if}
               {/snippet}
             </SectionEditor>
           </li>
@@ -106,7 +160,18 @@
       {/each}
     </ol>
 
-    <button type="button" class="button add" onclick={() => add(song.arrangement.length)}>Add Section</button>
+    <div class="add-row">
+      <button type="button" class="button add" onclick={() => add(song.arrangement.length)}>Add Section</button>
+      {#if repeatable.length > 0}
+        <label class="visually-hidden" for="repeat-section">Repeat a Section at the end</label>
+        <select id="repeat-section" class="repeat" onchange={repeatAtEnd}>
+          <option value="">Repeat a Section…</option>
+          {#each repeatable as section (section.id)}
+            <option value={section.id}>{describe(section)}</option>
+          {/each}
+        </select>
+      {/if}
+    </div>
     <p class="hint muted">Put Chords in brackets where they fall: <code>Hel[Am]lo</code>.</p>
   {/if}
 
@@ -191,8 +256,18 @@
     padding: 0;
     list-style: none;
   }
-  .add {
-    width: 100%;
+  .add-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .add,
+  .repeat {
+    flex: 1 1 12rem;
+    width: auto;
+  }
+  .repeat {
+    font-weight: 600;
   }
   .icon {
     display: inline-flex;

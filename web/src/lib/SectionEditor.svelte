@@ -7,6 +7,7 @@
     occurrenceId,
     section,
     shared,
+    uses,
     autofocus = false,
     change,
     onUnsaved,
@@ -18,6 +19,8 @@
     section: Section;
     /** Other Occurrences show this Section too. */
     shared: boolean;
+    /** How many Occurrences show this Section. */
+    uses: number;
     /** Focus the Label when this becomes true, e.g. for a Section just added. */
     autofocus?: boolean;
     /** Sends a Lyric Sheet change; resolves to whether it succeeded. */
@@ -128,7 +131,7 @@
   }
 </script>
 
-<article class="section" aria-label={section.label || 'Section without a Label'}>
+<article class="section" class:is-shared={shared} aria-label={section.label || 'Section without a Label'}>
   <div class="head">
     <label class="visually-hidden" for="label-{occurrenceId}">Label</label>
     <input
@@ -146,8 +149,8 @@
       {@attach focusWhen(autofocus)}
     />
     {#if shared}
-      <span class="shared" title="This Section appears more than once. Editing it changes every Occurrence.">
-        Shared
+      <span class="shared" title="This Section appears {uses} times. Editing it changes every Occurrence.">
+        Shared ×{uses}
       </span>
     {/if}
     <div class="actions">{@render actions()}</div>
@@ -194,11 +197,14 @@
     border-color: var(--border);
     background: var(--bg);
   }
+  .section.is-shared {
+    border-left: 4px solid var(--accent);
+  }
   .shared {
     padding: 0.125rem 0.5rem;
     border-radius: 999px;
-    background: var(--surface-2);
-    color: var(--text-muted);
+    background: var(--accent);
+    color: var(--accent-text);
     font-size: 0.75rem;
     font-weight: 600;
   }

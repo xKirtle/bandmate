@@ -27,6 +27,36 @@ func (a *App) addSection(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *App) addOccurrence(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		SectionID int64 `json:"sectionId"`
+		Position  *int  `json:"position"`
+	}
+	a.changeSheet(w, r, &req, func(id int64) (lyricsheet.Song, error) {
+		return a.songs.AddOccurrence(r.Context(), id, req.SectionID, req.Position)
+	})
+}
+
+func (a *App) removeOccurrence(w http.ResponseWriter, r *http.Request) {
+	occurrenceID, ok := pathID(w, r, "occurrenceID")
+	if !ok {
+		return
+	}
+	a.changeSheet(w, r, nil, func(id int64) (lyricsheet.Song, error) {
+		return a.songs.RemoveOccurrence(r.Context(), id, occurrenceID)
+	})
+}
+
+func (a *App) detach(w http.ResponseWriter, r *http.Request) {
+	occurrenceID, ok := pathID(w, r, "occurrenceID")
+	if !ok {
+		return
+	}
+	a.changeSheet(w, r, nil, func(id int64) (lyricsheet.Song, error) {
+		return a.songs.Detach(r.Context(), id, occurrenceID)
+	})
+}
+
 func (a *App) setSectionLabel(w http.ResponseWriter, r *http.Request) {
 	sectionID, ok := pathID(w, r, "sectionID")
 	if !ok {
@@ -53,12 +83,13 @@ func (a *App) replaceAlternateText(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// changeSheet reads the Song id and the request body into req, runs the
-// change and writes the resulting Song.
+// changeSheet reads the Song id and the request body into req (unless req is
+// nil, for changes that take no body), runs the change and writes the
+// resulting Song.
 func (a *App) changeSheet(w http.ResponseWriter, r *http.Request, req any,
 	change func(songID int64) (lyricsheet.Song, error)) {
 	id, ok := songID(w, r)
-	if !ok || !readJSON(w, r, req) {
+	if !ok || (req != nil && !readJSON(w, r, req)) {
 		return
 	}
 	song, err := change(id)
