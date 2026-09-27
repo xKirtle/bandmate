@@ -1,12 +1,14 @@
 // Plays the Timeline: every Clip's audio is fetched, decoded into memory and
 // scheduled on one AudioContext, so Tracks stay sample-accurate with each
-// other (ADR 0006).
+// other (ADR 0006). Each Track plays through its own gain, which follows its
+// volume, mute and solo live.
 import { playAlone, release } from './playback';
 import { schedule, type Placed } from './schedule';
 
-/** A Clip to play, with where its source's audio is fetched from. */
+/** A Clip to play, with where its source's audio is fetched from and the Track it's on. */
 export interface PlayableClip extends Placed {
   source: string;
+  trackId: number;
 }
 
 export type PlayerState = 'stopped' | 'loading' | 'playing';
@@ -22,6 +24,9 @@ function audioContext(): AudioContext {
 export class TimelinePlayer {
   #buffers = new Map<string, Promise<AudioBuffer>>();
   #nodes: AudioBufferSourceNode[] = [];
+  // Each Track's gain by id, and the nodes applying it while playing.
+  #gains = new Map<number, number>();
+  #trackNodes = new Map<number, GainNode>();
   #state: PlayerState = 'stopped';
   // The Timeline position at context time #startedAt; while stopped, the
   // position playback resumes from.
@@ -90,12 +95,21 @@ export class TimelinePlayer {
     for (const s of schedule(clips, from)) {
       const node = context.createBufferSource();
       node.buffer = buffers[clipIndex.get(s.clip)!];
-      node.connect(context.destination);
+      node.connect(this.#trackNode(context, s.clip.trackId));
       node.start(at + s.delay, s.from, s.duration);
       this.#nodes.push(node);
     }
     this.#startedAt = at;
     this.#setState('playing');
+  }
+
+  /** Sets each Track's gain by id, heard right away if playing. A Track left out plays as is. */
+  setGains(gains: Map<number, number>) {
+    this.#gains = gains;
+    for (const [trackId, node] of this.#trackNodes) {
+      // Eased over a few milliseconds, so the change doesn't click.
+      node.gain.setTargetAtTime(this.#gain(trackId), node.context.currentTime, 0.01);
+    }
   }
 
   /** Stops playing, keeping the position to resume from. */
@@ -124,6 +138,24 @@ export class TimelinePlayer {
       node.disconnect();
     }
     this.#nodes = [];
+    for (const node of this.#trackNodes.values()) node.disconnect();
+    this.#trackNodes.clear();
+  }
+
+  /** The node a Track's Clips play through, created on first use. */
+  #trackNode(context: AudioContext, trackId: number): GainNode {
+    let node = this.#trackNodes.get(trackId);
+    if (!node) {
+      node = context.createGain();
+      node.gain.value = this.#gain(trackId);
+      node.connect(context.destination);
+      this.#trackNodes.set(trackId, node);
+    }
+    return node;
+  }
+
+  #gain(trackId: number): number {
+    return this.#gains.get(trackId) ?? 1;
   }
 
   #setState(state: PlayerState) {

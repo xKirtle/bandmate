@@ -71,7 +71,7 @@ A Song's audio space, measured in seconds, where Tracks play together.
 _Avoid_: Session, project, mix
 
 **Track**:
-A named lane on the Timeline (e.g. "Beat", "Lead vox", "Adlibs") holding Clips, with its own volume and mute.
+A named lane on the Timeline (e.g. "Beat", "Lead vox", "Adlibs") holding Clips, with its own volume, mute and solo.
 _Avoid_: Channel, layer
 
 **Beat**:

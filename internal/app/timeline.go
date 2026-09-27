@@ -37,16 +37,14 @@ func (a *App) addBeatToTimeline(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (a *App) renameTrack(w http.ResponseWriter, r *http.Request) {
+func (a *App) updateTrack(w http.ResponseWriter, r *http.Request) {
 	trackID, ok := pathID(w, r, "trackID")
 	if !ok {
 		return
 	}
-	var req struct {
-		Name string `json:"name"`
-	}
-	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
-		return a.timelines.RenameTrack(r.Context(), id, based, trackID, req.Name)
+	var changes timeline.TrackChanges
+	a.changeTimeline(w, r, &changes, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+		return a.timelines.UpdateTrack(r.Context(), id, based, trackID, changes)
 	})
 }
 
@@ -56,6 +54,25 @@ func (a *App) addTrack(w http.ResponseWriter, r *http.Request) {
 	}
 	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
 		return a.timelines.AddTrack(r.Context(), id, based, req.Name)
+	})
+}
+
+func (a *App) deleteTrack(w http.ResponseWriter, r *http.Request) {
+	trackID, ok := pathID(w, r, "trackID")
+	if !ok {
+		return
+	}
+	a.changeTimeline(w, r, nil, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+		return a.timelines.DeleteTrack(r.Context(), id, based, trackID)
+	})
+}
+
+func (a *App) reorderTracks(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Tracks []int64 `json:"tracks"`
+	}
+	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+		return a.timelines.ReorderTracks(r.Context(), id, based, req.Tracks)
 	})
 }
 

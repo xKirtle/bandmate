@@ -28,10 +28,16 @@ type Timeline struct {
 	Beats []Beat `json:"beats"`
 }
 
-// Track is a named lane on the Timeline holding Clips.
+// Track is a named lane on the Timeline holding Clips, with its own volume,
+// mute and solo.
 type Track struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
+	// Volume is in dB, from Silence to MaxVolume.
+	Volume float64 `json:"volume"`
+	Muted  bool    `json:"muted"`
+	// Soloed Tracks are the only ones heard, when there are any.
+	Soloed bool `json:"soloed"`
 	// Clips are in the order they start, and never overlap.
 	Clips []Clip `json:"clips"`
 }
@@ -59,6 +65,13 @@ type Beat struct {
 	Size     int64   `json:"size"`
 	Duration float64 `json:"duration"`
 }
+
+// Silence is a Track's lowest volume, in dB, at which it isn't heard at all.
+// MaxVolume is its highest.
+const (
+	Silence   = -60.0
+	MaxVolume = 6.0
+)
 
 // timeFormat is how songs.updated_at is stored.
 const timeFormat = "2006-01-02T15:04:05.000000000Z"
@@ -104,10 +117,11 @@ func read(ctx context.Context, tx *sql.Tx, songID int64) (Timeline, error) {
 	}
 
 	trackAt := map[int64]int{}
-	err = query(ctx, tx, `SELECT id, name FROM tracks WHERE song_id = ? ORDER BY position, id`, []any{songID},
+	err = query(ctx, tx, `SELECT id, name, volume, muted, soloed FROM tracks
+		WHERE song_id = ? ORDER BY position, id`, []any{songID},
 		func(rows *sql.Rows) error {
 			t := Track{Clips: []Clip{}}
-			if err := rows.Scan(&t.ID, &t.Name); err != nil {
+			if err := rows.Scan(&t.ID, &t.Name, &t.Volume, &t.Muted, &t.Soloed); err != nil {
 				return err
 			}
 			trackAt[t.ID] = len(tl.Tracks)
@@ -209,26 +223,79 @@ func beatTrack(ctx context.Context, tx *sql.Tx, songID int64) (int64, error) {
 	return res.LastInsertId()
 }
 
-// RenameTrack changes a Track's name, which can't be blank.
-func (s *Store) RenameTrack(ctx context.Context, songID int64, based lyricsheet.Version, trackID int64, name string) (Timeline, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return Timeline{}, &lyricsheet.InvalidError{Msg: "a Track's name is required"}
+// TrackChanges is a partial update to a Track's name and mixer values.
+// Fields not Set are unchanged.
+type TrackChanges struct {
+	Name   lyricsheet.Change[string]  `json:"name"`
+	Volume lyricsheet.Change[float64] `json:"volume"`
+	Muted  lyricsheet.Change[bool]    `json:"muted"`
+	Soloed lyricsheet.Change[bool]    `json:"soloed"`
+}
+
+// UpdateTrack renames a Track or sets its volume, mute or solo. Its name
+// can't be blank, and its volume must be from Silence to MaxVolume.
+func (s *Store) UpdateTrack(ctx context.Context, songID int64, based lyricsheet.Version, trackID int64, changes TrackChanges) (Timeline, error) {
+	var sets []string
+	var args []any
+	if c := changes.Name; c.Set {
+		name := strings.TrimSpace(c.Value)
+		if name == "" {
+			return Timeline{}, errTrackNameRequired
+		}
+		sets, args = append(sets, "name = ?"), append(args, name)
+	}
+	if c := changes.Volume; c.Set {
+		if c.Value < Silence || c.Value > MaxVolume {
+			return Timeline{}, &lyricsheet.InvalidError{
+				Msg: fmt.Sprintf("a Track's volume goes from %g dB (silence) to +%g dB", Silence, MaxVolume)}
+		}
+		sets, args = append(sets, "volume = ?"), append(args, c.Value)
+	}
+	if c := changes.Muted; c.Set {
+		sets, args = append(sets, "muted = ?"), append(args, c.Value)
+	}
+	if c := changes.Soloed; c.Set {
+		sets, args = append(sets, "soloed = ?"), append(args, c.Value)
 	}
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		res, err := tx.ExecContext(ctx, `UPDATE tracks SET name = ? WHERE id = ? AND song_id = ?`, name, trackID, songID)
+		if len(sets) == 0 {
+			return findTrack(ctx, tx, songID, trackID)
+		}
+		res, err := tx.ExecContext(ctx, `UPDATE tracks SET `+strings.Join(sets, ", ")+` WHERE id = ? AND song_id = ?`,
+			append(args, trackID, songID)...)
 		if err != nil {
-			return fmt.Errorf("renaming track: %w", err)
+			return fmt.Errorf("updating track: %w", err)
 		}
-		n, err := res.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if n == 0 {
-			return lyricsheet.ErrNotFound
-		}
-		return nil
+		return expectOneRow(res)
 	})
+}
+
+// errTrackNameRequired is refusing a Track without a name.
+var errTrackNameRequired = &lyricsheet.InvalidError{Msg: "a Track's name is required"}
+
+// findTrack checks that a Track is on the Song's Timeline.
+func findTrack(ctx context.Context, tx *sql.Tx, songID, trackID int64) error {
+	var found int
+	err := tx.QueryRowContext(ctx, `SELECT 1 FROM tracks WHERE id = ? AND song_id = ?`, trackID, songID).Scan(&found)
+	if errors.Is(err, sql.ErrNoRows) {
+		return lyricsheet.ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("reading track: %w", err)
+	}
+	return nil
+}
+
+// expectOneRow turns a change that touched no row into ErrNotFound.
+func expectOneRow(res sql.Result) error {
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return lyricsheet.ErrNotFound
+	}
+	return nil
 }
 
 // AddTrack adds an empty Track at the bottom of the Timeline. Its name
@@ -236,7 +303,7 @@ func (s *Store) RenameTrack(ctx context.Context, songID int64, based lyricsheet.
 func (s *Store) AddTrack(ctx context.Context, songID int64, based lyricsheet.Version, name string) (Timeline, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return Timeline{}, &lyricsheet.InvalidError{Msg: "a Track's name is required"}
+		return Timeline{}, errTrackNameRequired
 	}
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO tracks (song_id, name, position)
@@ -245,6 +312,53 @@ func (s *Store) AddTrack(ctx context.Context, songID int64, based lyricsheet.Ver
 			return fmt.Errorf("adding track: %w", err)
 		}
 		return nil
+	})
+}
+
+// ReorderTracks puts a Song's Tracks in the given order, top to bottom,
+// which must list every one of them exactly once. Their Clips go with them.
+func (s *Store) ReorderTracks(ctx context.Context, songID int64, based lyricsheet.Version, order []int64) (Timeline, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		current := map[int64]bool{}
+		err := query(ctx, tx, `SELECT id FROM tracks WHERE song_id = ?`, []any{songID},
+			func(rows *sql.Rows) error {
+				var id int64
+				err := rows.Scan(&id)
+				current[id] = true
+				return err
+			})
+		if err != nil {
+			return fmt.Errorf("reading tracks: %w", err)
+		}
+		errOrder := &lyricsheet.InvalidError{Msg: "the new order must list every Track exactly once"}
+		if len(order) != len(current) {
+			return errOrder
+		}
+		for _, id := range order {
+			if !current[id] {
+				return errOrder
+			}
+			delete(current, id)
+		}
+		for pos, id := range order {
+			if _, err := tx.ExecContext(ctx, `UPDATE tracks SET position = ? WHERE id = ?`, pos, id); err != nil {
+				return fmt.Errorf("reordering tracks: %w", err)
+			}
+		}
+		return nil
+	})
+}
+
+// DeleteTrack removes a Track and its Clips from the Timeline. Their Beats
+// stay in the Beat Library.
+func (s *Store) DeleteTrack(ctx context.Context, songID int64, based lyricsheet.Version, trackID int64) (Timeline, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		// Its Clips go with it, by the foreign key.
+		res, err := tx.ExecContext(ctx, `DELETE FROM tracks WHERE id = ? AND song_id = ?`, trackID, songID)
+		if err != nil {
+			return fmt.Errorf("deleting track: %w", err)
+		}
+		return expectOneRow(res)
 	})
 }
 
@@ -348,14 +462,7 @@ func (s *Store) DeleteClip(ctx context.Context, songID int64, based lyricsheet.V
 		if err != nil {
 			return fmt.Errorf("deleting clip: %w", err)
 		}
-		n, err := res.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if n == 0 {
-			return lyricsheet.ErrNotFound
-		}
-		return nil
+		return expectOneRow(res)
 	})
 }
 

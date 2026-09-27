@@ -181,13 +181,21 @@ export interface Timeline {
   beats: ClipBeat[];
 }
 
-/** A named lane on the Timeline. */
+/** A named lane on the Timeline, with its own volume, mute and solo. */
 export interface Track {
   id: number;
   name: string;
+  /** In dB, from -60 (silence) to +6. */
+  volume: number;
+  muted: boolean;
+  /** When any Track is soloed, only the soloed ones are heard. */
+  soloed: boolean;
   /** In the order they start; they never overlap. */
   clips: Clip[];
 }
+
+/** Changes to a Track's name or mixer; fields left out stay as they are. */
+export type TrackChanges = Partial<Pick<Track, 'name' | 'volume' | 'muted' | 'soloed'>>;
 
 /** A stretch of a Beat placed on a Track, in seconds. */
 export interface Clip {
@@ -362,6 +370,15 @@ export const api = {
     request<Timeline>('POST', `/songs/${at.id}/timeline/beats`, { beatId }, at),
   /** Adds an empty Track at the bottom of the Timeline. */
   addTrack: (at: SongAt, name: string) => request<Timeline>('POST', `/songs/${at.id}/timeline/tracks`, { name }, at),
+  /** Renames a Track or sets its volume, mute or solo. */
+  updateTrack: (at: SongAt, trackId: number, changes: TrackChanges) =>
+    request<Timeline>('PATCH', `/songs/${at.id}/timeline/tracks/${trackId}`, changes, at),
+  /** Puts the Tracks in this order of ids, top to bottom; their Clips go with them. */
+  reorderTracks: (at: SongAt, tracks: number[]) =>
+    request<Timeline>('PUT', `/songs/${at.id}/timeline/tracks`, { tracks }, at),
+  /** Removes a Track and its Clips; their Beats stay in the Beat Library. */
+  deleteTrack: (at: SongAt, trackId: number) =>
+    request<Timeline>('DELETE', `/songs/${at.id}/timeline/tracks/${trackId}`, undefined, at),
   /** Moves a Clip to start at a time on a Track, keeping its trim. Refused if it would overlap a Clip there. */
   moveClip: (at: SongAt, clipId: number, trackId: number, start: number) =>
     request<Timeline>('POST', `/songs/${at.id}/timeline/clips/${clipId}/move`, { trackId, start }, at),
