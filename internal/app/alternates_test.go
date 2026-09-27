@@ -52,10 +52,7 @@ func (ts *testServer) chorusWithTwoAlternates() (song, section) {
 
 func TestANewAlternateStartsAsAnInactiveCopyOfTheActiveOne(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.songWithSections("Verse", "Chorus")
-	chorus := s.Sections[1]
-	ts.setText(s.ID, chorus.Alternates[0].ID, "Drive, [Am]drive\nall [F]night")
-	s = ts.addAlternate(s.ID, chorus.ID, nil)
+	s, chorus := ts.chorusWithTwoAlternates()
 	// A third Alternate copies the active first one, not the newest.
 	ts.setText(s.ID, s.Sections[1].Alternates[1].ID, "Something else")
 	before := ts.getSong(s.ID)

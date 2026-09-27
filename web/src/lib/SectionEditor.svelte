@@ -58,11 +58,11 @@
     return alt.name || `Alternate ${section.alternates.indexOf(alt) + 1}`;
   }
 
-  /** A hint at how an Alternate differs: its first Line that isn't the same in the one in use. */
+  /** A hint at how an Alternate differs: its first Line that isn't the same in the active one. */
   function preview(alt: Alternate): string {
     if (alt.lines.length === 0) return 'No Lines yet';
     const i = alt.lines.findIndex((l, j) => l.text !== active.lines[j]?.text);
-    if (i === -1) return alt.lines.length === active.lines.length ? 'Same as in use' : 'Fewer Lines';
+    if (i === -1) return alt.lines.length === active.lines.length ? 'Same as the active one' : 'Fewer Lines';
     return `“${alt.lines[i].lyrics.trim() || '(blank Line)'}”`;
   }
 
@@ -96,7 +96,7 @@
     if (ok) change(() => api.deleteAlternate(songId, alt.id));
   }
 
-  function toggled(alt: Alternate, e: Event & { currentTarget: HTMLDetailsElement }) {
+  function syncExpanded(alt: Alternate, e: Event & { currentTarget: HTMLDetailsElement }) {
     if (e.currentTarget.open) expanded.add(alt.id);
     else expanded.delete(alt.id);
   }
@@ -147,9 +147,9 @@
   </div>
 
   {#if inactive.length > 0}
-    <div class="in-use">
-      <span class="badge">In use</span>
-      <label class="visually-hidden" for="name-{uid}-{active.id}">Name of the Alternate in use</label>
+    <div class="active-name">
+      <span class="badge">Active</span>
+      <label class="visually-hidden" for="name-{uid}-{active.id}">Name of the active Alternate</label>
       <input
         id="name-{uid}-{active.id}"
         class="name"
@@ -169,7 +169,7 @@
     <ul class="alternates" aria-label="Other Alternates">
       {#each inactive as alt (alt.id)}
         <li>
-          <details open={expanded.has(alt.id)} ontoggle={(e) => toggled(alt, e)}>
+          <details open={expanded.has(alt.id)} ontoggle={(e) => syncExpanded(alt, e)}>
             <summary>
               <span class="alt-name">{nameOf(alt)}</span>
               <span class="preview muted">{preview(alt)}</span>
@@ -198,8 +198,8 @@
                   />
                 </div>
                 <div class="pane">
-                  <p class="pane-title muted">In use: {nameOf(active)}</p>
-                  <div class="lines-in-use">
+                  <p class="pane-title muted">Active: {nameOf(active)}</p>
+                  <div class="active-lines">
                     {#each active.lines as line (line.id)}
                       <p>{line.text || ' '}</p>
                     {:else}
@@ -209,7 +209,7 @@
                 </div>
               </div>
               <div class="alt-actions">
-                <button type="button" class="button primary" onclick={() => activate(alt)}>Use this one</button>
+                <button type="button" class="button primary" onclick={() => activate(alt)}>Make active</button>
                 <button type="button" class="button danger" onclick={() => remove(alt)}>Delete</button>
               </div>
             </div>
@@ -266,7 +266,7 @@
     gap: 0.25rem;
     margin-left: auto;
   }
-  .in-use {
+  .active-name {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -336,7 +336,7 @@
     font-size: 0.8125rem;
     font-weight: 600;
   }
-  .lines-in-use {
+  .active-lines {
     padding: 0.5rem 0.75rem;
     border: 1px solid var(--border);
     border-radius: 0.5rem;
@@ -344,7 +344,7 @@
     line-height: 1.6;
     overflow-wrap: anywhere;
   }
-  .lines-in-use p {
+  .active-lines p {
     margin: 0;
     white-space: pre-wrap;
   }
