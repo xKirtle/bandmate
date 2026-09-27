@@ -1,9 +1,9 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
-  import { api, suggestedLabels, type Occurrence, type Song, type SongAt } from './api';
+  import { api, suggestedLabels, type Line, type Occurrence, type Song, type SongAt } from './api';
   import { hasChords } from './chords';
-  import { currentOccurrence } from './cues';
+  import { currentPosition } from './cues';
   import LyricSheetView from './LyricSheetView.svelte';
   import SectionEditor from './SectionEditor.svelte';
   import { describe } from './sections';
@@ -14,6 +14,7 @@
     onUnsaved,
     playhead = null,
     hasClips = false,
+    seek,
   }: {
     song: Song;
     /** Sends a Lyric Sheet change; resolves to whether it succeeded. */
@@ -23,6 +24,8 @@
     playhead?: number | null;
     /** Whether the Timeline has any Clip, so there's something to cue to. */
     hasClips?: boolean;
+    /** Seeks the Timeline, e.g. to a cued Line. */
+    seek?: (to: number) => void;
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
@@ -31,16 +34,24 @@
   const inArrangement = $derived(
     [...new Set(song.arrangement.map((o) => o.sectionId))].flatMap((id) => sections.get(id) ?? []),
   );
-  // The Occurrence playback is in.
-  const current = $derived(playhead === null ? null : currentOccurrence(song.arrangement, playhead));
+  // Where playback is in the Lyric Sheet.
+  const current = $derived(playhead === null ? null : currentPosition(song, playhead));
   // Cues are edited on wider screens only, and only once there's something
   // to cue to or a Cue already set.
   const wide = new MediaQuery('min-width: 40.0625rem');
-  const showCues = $derived(wide.current && (hasClips || song.arrangement.some((o) => o.cue !== null)));
+  const canCue = $derived(
+    wide.current && (hasClips || song.arrangement.some((o) => o.cue !== null || Object.keys(o.lineCues).length > 0)),
+  );
 
   function setCue(occurrence: Occurrence, cue: number | null) {
     change((at) =>
       cue === null ? api.clearOccurrenceCue(at, occurrence.id) : api.setOccurrenceCue(at, occurrence.id, cue),
+    );
+  }
+
+  function setLineCue(occurrence: Occurrence, line: Line, cue: number | null) {
+    change((at) =>
+      cue === null ? api.clearLineCue(at, occurrence.id, line.id) : api.setLineCue(at, occurrence.id, line.id, cue),
     );
   }
 
@@ -58,6 +69,17 @@
   async function toggleChords() {
     const next = showChords;
     if (!(await change((at) => api.updateSong(at, { showChords: next })))) showChords = song.showChords;
+  }
+
+  // Kept the same way as showChords.
+  let showCues = $state(untrack(() => song.showCues));
+  $effect(() => {
+    showCues = song.showCues;
+  });
+
+  async function toggleCues() {
+    const next = showCues;
+    if (!(await change((at) => api.updateSong(at, { showCues: next })))) showCues = song.showCues;
   }
 
   async function add(position: number) {
@@ -100,13 +122,30 @@
   {/if}
 
   {#if mode === 'read'}
-    {#if songHasChords}
-      <label class="show-chords">
-        <input type="checkbox" bind:checked={showChords} onchange={toggleChords} />
-        Show chords
-      </label>
+    {#if songHasChords || canCue}
+      <div class="toggles">
+        {#if songHasChords}
+          <label class="toggle">
+            <input type="checkbox" bind:checked={showChords} onchange={toggleChords} />
+            Show chords
+          </label>
+        {/if}
+        {#if canCue}
+          <label class="toggle">
+            <input type="checkbox" bind:checked={showCues} onchange={toggleCues} />
+            Show Cues
+          </label>
+        {/if}
+      </div>
     {/if}
-    <LyricSheetView {song} showChords={showChords && songHasChords} currentOccurrence={current} setCue={showCues ? setCue : undefined} />
+    <LyricSheetView
+      {song}
+      showChords={showChords && songHasChords}
+      {current}
+      setCue={canCue && showCues ? setCue : undefined}
+      setLineCue={canCue && showCues ? setLineCue : undefined}
+      {seek}
+    />
   {:else}
     <ol class="arrangement">
       {#each song.arrangement as occurrence, i (occurrence.id)}
@@ -244,15 +283,20 @@
     outline: 2px solid var(--accent);
     outline-offset: -2px;
   }
-  .show-chords {
+  .toggles {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 1.25rem;
+    margin-bottom: 0.5rem;
+  }
+  .toggle {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     min-height: 2.75rem;
-    margin-bottom: 0.5rem;
     cursor: pointer;
   }
-  .show-chords input {
+  .toggle input {
     width: 1.25rem;
     height: 1.25rem;
     min-height: 0;

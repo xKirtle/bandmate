@@ -1,38 +1,81 @@
 <script lang="ts">
-  import type { Occurrence, Song } from './api';
+  import type { Line, Occurrence, Song } from './api';
   import { layoutLine } from './chords';
   import CueField from './CueField.svelte';
+  import { isBlank, type Position } from './cues';
   import { inTextField } from './textField';
 
   let {
     song,
     showChords,
-    currentOccurrence = null,
+    current = null,
     setCue,
+    setLineCue,
+    seek,
   }: {
     song: Song;
     showChords: boolean;
-    /** The Occurrence playback is in, highlighted and kept in view. */
-    currentOccurrence?: number | null;
+    /** Where playback is: highlighted and kept in view. */
+    current?: Position | null;
     /** Given, each Section's header row shows its Occurrence's Cue, to change it with. */
     setCue?: (occurrence: Occurrence, cue: number | null) => void;
+    /** Given, a gutter beside each Line shows its Cue in that Occurrence, to change it with. */
+    setLineCue?: (occurrence: Occurrence, line: Line, cue: number | null) => void;
+    /** Given, clicking a cued Line seeks the Timeline to its Cue. */
+    seek?: (to: number) => void;
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
-  const shown = new Map<number, HTMLElement>();
+  const shown = new Map<string, HTMLElement>();
+
+  // The Lines shown for an Occurrence: its active Alternate's, less Chord
+  // Lines while Chords are hidden.
+  function linesOf(occurrence: Occurrence) {
+    const all = sections.get(occurrence.sectionId)?.alternates.find((a) => a.active)?.lines ?? [];
+    return { all, lines: all.filter((l) => showChords || !l.chordLine) };
+  }
+
+  // The gutter's fields in order down the page, so Enter can go on to the next.
+  const gutter = $derived(
+    song.arrangement.flatMap((o) =>
+      linesOf(o)
+        .lines.filter((l) => !isBlank(l))
+        .map((l) => key(o.id, l.id)),
+    ),
+  );
+  const fields: Record<string, { edit: () => void } | null> = {};
+
+  function editAfter(k: string): boolean {
+    const next = fields[gutter[gutter.indexOf(k) + 1]];
+    next?.edit();
+    return !!next;
+  }
+
+  function key(occurrence: number, line: number | null = null): string {
+    return line === null ? `${occurrence}` : `${occurrence}:${line}`;
+  }
 
   // Follow playback, unless that would pull the page away from something
-  // being typed.
+  // being typed. Keyed, so it only scrolls once playback moves on, not on
+  // every frame.
+  const currentKey = $derived(current && key(current.occurrence, current.line));
   $effect(() => {
-    if (currentOccurrence === null) return;
+    if (currentKey === null) return;
     if (inTextField(document.activeElement)) return;
-    shown.get(currentOccurrence)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    const block = currentKey.includes(':') ? 'center' : 'start';
+    shown.get(currentKey)?.scrollIntoView({ block, behavior: 'smooth' });
   });
 
-  /** Keeps track of each Occurrence's element, to scroll to. */
-  function track(el: HTMLElement, id: number) {
-    shown.set(id, el);
-    return () => shown.delete(id);
+  /** Keeps track of each Occurrence's and Line's element, to scroll to. */
+  function track(el: HTMLElement, k: string) {
+    shown.set(k, el);
+    return () => shown.delete(k);
+  }
+
+  /** Seeks to a cued Line's Cue, unless the click was to select its text. */
+  function seekTo(cue: number) {
+    if (!window.getSelection()?.isCollapsed) return;
+    seek?.(cue);
   }
 </script>
 
@@ -40,14 +83,14 @@
   {#each song.arrangement as occurrence (occurrence.id)}
     {@const section = sections.get(occurrence.sectionId)}
     {#if section}
-      {@const all = section.alternates.find((a) => a.active)!.lines}
-      {@const lines = all.filter((l) => showChords || !l.chordLine)}
+      {@const { all, lines } = linesOf(occurrence)}
+      {@const isCurrent = current?.occurrence === occurrence.id && current.line === null}
       <section
         class="section"
-        class:current={occurrence.id === currentOccurrence}
+        class:current={isCurrent}
         aria-label={section.label || 'Section without a Label'}
-        aria-current={occurrence.id === currentOccurrence ? 'true' : undefined}
-        {@attach (el) => track(el, occurrence.id)}
+        aria-current={isCurrent ? 'true' : undefined}
+        {@attach (el) => track(el, key(occurrence.id))}
       >
         {#if section.label || setCue}
           <div class="header">
@@ -66,23 +109,53 @@
         {:else if lines.length === 0}
           <p class="muted">Only Chords, which are hidden.</p>
         {/if}
-        {#each lines as line (line.id)}
-          {#if showChords && line.chords.length > 0}
-            <div class="line" class:chord-line={line.chordLine}>
-              {#each layoutLine(line) as word, w (w)}
-                <span class="word">
-                  {#each word as piece, p (p)}
-                    <span class="piece">
-                      <span class="chord">{piece.chord}</span>
-                      <span class="lyric">{piece.text || ' '}</span>
+        {#each lines as line, n (line.id)}
+          {@const cue = occurrence.lineCues[line.id] ?? null}
+          {@const k = key(occurrence.id, line.id)}
+          {@const lineCurrent = current?.occurrence === occurrence.id && current.line === line.id}
+          <div
+            class="row"
+            class:current={lineCurrent}
+            class:with-gutter={setLineCue}
+            aria-current={lineCurrent ? 'true' : undefined}
+            {@attach (el) => track(el, k)}
+          >
+            <!-- Seeking is also on the Timeline's ruler, so a click here is a shortcut. -->
+            <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+            <div
+              class="text"
+              class:seeks={cue !== null && seek}
+              title={cue !== null && seek ? 'Play from here' : undefined}
+              onclick={cue !== null && seek ? () => seekTo(cue) : undefined}
+            >
+              {#if showChords && line.chords.length > 0}
+                <div class="line" class:chord-line={line.chordLine}>
+                  {#each layoutLine(line) as word, w (w)}
+                    <span class="word">
+                      {#each word as piece, p (p)}
+                        <span class="piece">
+                          <span class="chord">{piece.chord}</span>
+                          <span class="lyric">{piece.text || ' '}</span>
+                        </span>
+                      {/each}
                     </span>
                   {/each}
-                </span>
-              {/each}
+                </div>
+              {:else}
+                <p class="line plain">{line.lyrics || ' '}</p>
+              {/if}
             </div>
-          {:else}
-            <p class="line plain">{line.lyrics || ' '}</p>
-          {/if}
+            {#if setLineCue && !isBlank(line)}
+              <CueField
+                bind:this={fields[k]}
+                gutter
+                {cue}
+                label="Line {n + 1}{section.label ? ` of ${section.label}` : ''}"
+                save={(cue) => setLineCue(occurrence, line, cue)}
+                next={() => editAfter(k)}
+              />
+            {/if}
+          </div>
         {/each}
       </section>
     {/if}
@@ -126,6 +199,28 @@
   }
   .section p {
     margin: 0;
+  }
+  /* A Line with its Cue beside it. The highlight bleeds past the text like
+     the Section's, taking in its Chords. */
+  .row {
+    margin: 0 -0.75rem;
+    padding: 0 0.75rem;
+    border-radius: 0.375rem;
+    scroll-margin: 5rem 0;
+    transition: background-color 0.2s;
+  }
+  .row.with-gutter {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 0.5rem;
+  }
+  .row.current {
+    background: var(--surface-1);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+  .seeks {
+    cursor: pointer;
   }
   .line {
     font-size: 1.0625rem;

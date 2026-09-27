@@ -1,14 +1,16 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import { formatCue, parseCue } from './cues';
+  import { formatCue, nudgeCue, parseCue } from './cues';
 
   // A Cue's time, shown as m:ss.s. Clicking it lets the time be typed:
   // Enter or leaving the field saves, Esc cancels, and an empty field clears
-  // the Cue.
+  // the Cue. Alt+↑/↓ nudges it by a tenth of a second.
   let {
     cue,
     label,
     save,
+    next,
+    gutter = false,
   }: {
     /** In seconds, or null without a Cue. */
     cue: number | null;
@@ -16,6 +18,10 @@
     label: string;
     /** Saves the new Cue, or null to clear it. */
     save: (cue: number | null) => void;
+    /** Given, Enter goes on to the next field; it answers whether there was one. */
+    next?: () => boolean;
+    /** Beside a Line, so kept as short as the Line. */
+    gutter?: boolean;
   } = $props();
 
   let editing = $state(false);
@@ -24,7 +30,8 @@
   let input = $state<HTMLInputElement>();
   let button = $state<HTMLButtonElement>();
 
-  async function start() {
+  /** Opens the field to type a time. */
+  export async function edit() {
     text = cue === null ? '' : formatCue(cue);
     invalid = false;
     editing = true;
@@ -50,9 +57,11 @@
   }
 
   async function onkeydown(e: KeyboardEvent) {
+    if (nudge(e)) return;
     if (e.key === 'Enter') {
       e.preventDefault();
       commit();
+      if (!editing && next?.()) return;
     } else if (e.key === 'Escape') {
       e.preventDefault();
       cancel();
@@ -62,6 +71,22 @@
       await tick();
       button?.focus();
     }
+  }
+
+  /** Alt+↑/↓ saves the Cue, or the time typed, a tenth of a second later or earlier. */
+  function nudge(e: KeyboardEvent): boolean {
+    const by = e.altKey && !e.ctrlKey && !e.metaKey ? ({ ArrowUp: 1, ArrowDown: -1 } as const)[e.key] : undefined;
+    if (by === undefined) return false;
+    const from = editing ? (parseCue(text) ?? cue) : cue;
+    if (from === null) return false;
+    e.preventDefault();
+    const to = nudgeCue(from, by);
+    if (editing) {
+      editing = false;
+      tick().then(() => button?.focus());
+    }
+    if (to !== cue) save(to);
+    return true;
   }
 
   // Leaving saves, unless what's typed isn't a time: then it's dropped
@@ -77,10 +102,13 @@
     bind:this={input}
     bind:value={text}
     class="cue editing"
+    class:gutter
     class:invalid
     aria-label="Cue for {label}"
     aria-invalid={invalid}
-    title={invalid ? 'Type a time like 45, 0:45, 0:45.25 or 1:02' : 'Enter saves, Esc cancels, empty clears'}
+    title={invalid
+      ? 'Type a time like 45, 0:45, 0:45.25 or 1:02'
+      : 'Enter saves, Esc cancels, empty clears, Alt+↑/↓ nudges'}
     placeholder="0:00.0"
     autocomplete="off"
     spellcheck="false"
@@ -95,10 +123,14 @@
     bind:this={button}
     type="button"
     class="cue"
+    class:gutter
     class:unset={cue === null}
-    onclick={start}
+    onclick={edit}
+    onkeydown={nudge}
     aria-label={cue === null ? `Set a Cue for ${label}` : `Cue for ${label}: ${formatCue(cue)}. Change it`}
-    title={cue === null ? 'Set when this starts on the Timeline' : 'Change when this starts on the Timeline'}
+    title={cue === null
+      ? 'Set when this starts on the Timeline'
+      : 'Change when this starts on the Timeline; Alt+↑/↓ nudges it'}
   >
     {cue === null ? '–:––.–' : formatCue(cue)}
   </button>
@@ -125,6 +157,10 @@
     border-color: var(--border);
     background: var(--surface-1);
     color: var(--text);
+  }
+  .cue.gutter {
+    min-height: 1.5rem;
+    padding-block: 0;
   }
   .cue.unset {
     opacity: 0.6;
