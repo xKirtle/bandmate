@@ -3,7 +3,8 @@ import {
   canShiftCuesEarlier,
   cuesInSpan,
   currentPosition,
-  everyCueSpan,
+  everyCue,
+  maxCue,
   formatCue,
   hasCues,
   linesByRow,
@@ -567,15 +568,14 @@ describe('shifting every Cue', () => {
   };
   const uncued: CuedSong = { arrangement: [{ id: 1, sectionId: 9, cue: null, lineCues: {} }], sections };
 
-  describe('everyCueSpan', () => {
-    it('runs from 0:00 to past the latest Cue, taking them all', () => {
-      const span = everyCueSpan(song)!;
-      expect(span.start).toBe(0);
-      expect(cuesInSpan(song, span.start, span.end)).toHaveLength(4);
+  describe('everyCue', () => {
+    it('takes every Cue, dormant ones included', () => {
+      expect(cuesInSpan(song, everyCue.start, everyCue.end)).toHaveLength(4);
     });
 
-    it('is null without Cues', () => {
-      expect(everyCueSpan(uncued)).toBeNull();
+    it('takes a Cue from 0:00 up to the latest a Cue can be', () => {
+      const edges: CuedSong = { arrangement: [{ id: 1, sectionId: 9, cue: 0, lineCues: { 60: maxCue } }], sections };
+      expect(cuesInSpan(edges, everyCue.start, everyCue.end)).toHaveLength(2);
     });
   });
 

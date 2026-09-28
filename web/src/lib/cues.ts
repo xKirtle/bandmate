@@ -111,18 +111,18 @@ export function cuesInSpan(song: CuedSong, start: number, end: number): FoundCue
   });
 }
 
-/** A span of the Timeline, in seconds, from start up to end. */
-export interface Span {
-  start: number;
-  end: number;
-}
+/**
+ * The latest a Cue can be, in seconds, as the server keeps them: 24 hours
+ * into the Timeline.
+ */
+export const maxCue = 24 * 60 * 60;
 
-/** The span from 0:00 to past the latest Cue, dormant ones included: shifting it shifts every Cue. Null without Cues. */
-export function everyCueSpan(song: CuedSong): Span | null {
-  const all = cuesInSpan(song, 0, Infinity);
-  if (all.length === 0) return null;
-  return { start: 0, end: Math.max(...all.map((c) => c.cue)) + 1 };
-}
+/**
+ * A span that takes every Cue there is or could be, dormant ones included:
+ * shifting it shifts them all. It's fixed rather than worked out from the
+ * Song, so a shift queued behind another still takes the latest Cue.
+ */
+export const everyCue = { start: 0, end: maxCue + 1 } as const;
 
 /**
  * Whether every Cue can shift earlier by step without any going before
@@ -130,7 +130,7 @@ export function everyCueSpan(song: CuedSong): Span | null {
  * Compared in milliseconds, as Cues are kept.
  */
 export function canShiftCuesEarlier(song: CuedSong, step: number): boolean {
-  const all = cuesInSpan(song, 0, Infinity);
+  const all = cuesInSpan(song, everyCue.start, everyCue.end);
   if (all.length === 0) return false;
   const earliest = Math.min(...all.map((c) => c.cue));
   return Math.round(earliest * 1000) >= Math.round(step * 1000);

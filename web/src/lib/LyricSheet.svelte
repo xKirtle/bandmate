@@ -7,7 +7,7 @@
   import {
     canShiftCuesEarlier,
     currentPosition,
-    everyCueSpan,
+    everyCue,
     hasCues,
     isBlank,
     nextLine,
@@ -92,8 +92,7 @@
   }
 
   function shiftEveryCue(by: number) {
-    const span = everyCueSpan(song);
-    if (span) editCues((at) => api.shiftCues(at, span.start, span.end, by));
+    editCues((at) => api.shiftCues(at, everyCue.start, everyCue.end, by));
   }
 
   function setLineCue(occurrence: Occurrence, line: Line, cue: number | null) {
