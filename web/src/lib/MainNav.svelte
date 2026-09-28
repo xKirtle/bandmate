@@ -1,16 +1,24 @@
 <script lang="ts">
   // Switches between the top-level pages, the same at every width: a nav rail
   // down the left of wide windows, a tab bar along the bottom of narrow ones.
-  import { currentPage, pages } from './nav';
+  import { currentPage, listAt, pages, type LibraryPage } from './nav';
   import { router } from './router.svelte';
 
   const current = $derived(currentPage(router.path));
+
+  // Each list's query string as it was last left, so going back to it
+  // restores its search, filters and sort.
+  let left = $state<Partial<Record<LibraryPage, string>>>({});
+  $effect.pre(() => {
+    const list = listAt(router.path);
+    if (list) left[list] = router.search;
+  });
 </script>
 
 <nav aria-label="Library">
   <span class="brand" aria-hidden="true">B</span>
   {#each pages as page (page.id)}
-    <a href={page.href} aria-current={page.id === current ? 'page' : undefined}>
+    <a href={page.href + (left[page.id] ?? '')} aria-current={page.id === current ? 'page' : undefined}>
       <span class="glyph" aria-hidden="true">{page.icon}</span>
       {page.label}
     </a>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { currentPage } from './nav';
+import { currentPage, listAt } from './nav';
 
 describe('currentPage', () => {
   it('marks Songs on the Song list and every page of a Song', () => {
@@ -17,5 +17,18 @@ describe('currentPage', () => {
     expect(currentPage('/nowhere')).toBeUndefined();
     expect(currentPage('/beatsx')).toBeUndefined();
     expect(currentPage('/songsx')).toBeUndefined();
+  });
+});
+
+describe('listAt', () => {
+  it('is the page whose list is at the path', () => {
+    expect(listAt('/')).toBe('songs');
+    expect(listAt('/beats')).toBe('beats');
+  });
+
+  it('is neither on a page within one, or outside them', () => {
+    expect(listAt('/songs/12')).toBeUndefined();
+    expect(listAt('/songs/new')).toBeUndefined();
+    expect(listAt('/nowhere')).toBeUndefined();
   });
 });

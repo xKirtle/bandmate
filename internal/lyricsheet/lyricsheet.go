@@ -96,9 +96,13 @@ type Song struct {
 
 // SongSummary is a Song as shown in the Song list.
 type SongSummary struct {
-	ID        int64     `json:"id"`
-	Title     string    `json:"title"`
-	Status    Status    `json:"status"`
+	ID     int64  `json:"id"`
+	Title  string `json:"title"`
+	Status Status `json:"status"`
+	// Key and BPM are as on the Song: "" and nil when not set.
+	Key       string    `json:"key"`
+	BPM       *int      `json:"bpm"`
+	HasMaster bool      `json:"hasMaster"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
@@ -201,11 +205,12 @@ func (s *Store) ListSongs(ctx context.Context, filter SongFilter) ([]SongSummary
 		conditions, args = append(conditions, "status = ?"), append(args, filter.Status)
 	}
 	if filter.HasMaster != nil {
-		conditions, args = append(conditions,
-			"EXISTS (SELECT 1 FROM masters WHERE masters.song_id = songs.id) = ?"), append(args, *filter.HasMaster)
+		conditions, args = append(conditions, "has_master = ?"), append(args, *filter.HasMaster)
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, title, status, updated_at FROM songs WHERE `+strings.Join(conditions, " AND ")+`
+		`SELECT id, title, status, song_key, bpm, has_master, updated_at FROM (
+		   SELECT *, EXISTS (SELECT 1 FROM masters WHERE masters.song_id = songs.id) AS has_master FROM songs
+		 ) WHERE `+strings.Join(conditions, " AND ")+`
 		 ORDER BY updated_at DESC, id DESC`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("listing songs: %w", err)
@@ -217,10 +222,12 @@ func (s *Store) ListSongs(ctx context.Context, filter SongFilter) ([]SongSummary
 	list := []SongSummary{}
 	for rows.Next() {
 		var sum SongSummary
+		var bpm sql.NullInt64
 		var updated string
-		if err := rows.Scan(&sum.ID, &sum.Title, &sum.Status, &updated); err != nil {
+		if err := rows.Scan(&sum.ID, &sum.Title, &sum.Status, &sum.Key, &bpm, &sum.HasMaster, &updated); err != nil {
 			return nil, err
 		}
+		sum.BPM = intOrNil(bpm)
 		if !strings.Contains(strings.ToLower(sum.Title), needle) {
 			continue
 		}

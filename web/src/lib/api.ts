@@ -148,6 +148,10 @@ export interface SongSummary {
   id: number;
   title: string;
   status: Status;
+  /** "" and null when not set. */
+  key: string;
+  bpm: number | null;
+  hasMaster: boolean;
   updatedAt: string;
 }
 

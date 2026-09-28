@@ -113,3 +113,43 @@ func TestSongListRejectsAnUnknownMasterFilter(t *testing.T) {
 	expectError(t, ts.Do(http.MethodGet, "/api/songs?hasMaster=maybe", nil),
 		http.StatusBadRequest, "hasMaster must be true or false")
 }
+
+func TestSongListShowsEachSongsKeyBPMAndWhetherItHasAMaster(t *testing.T) {
+	ts := newTestServer(t)
+	ts.createSong("Bare")
+	ts.updateSong(ts.createSong("Keyed").ID, map[string]any{"key": "Am", "bpm": 92, "status": "drafting"})
+	ts.uploadMaster(ts.createSong("Mastered").ID, fakeAudio("a.wav"))
+	gone := ts.uploadMaster(ts.createSong("Master Deleted").ID, fakeAudio("b.wav"))
+	ts.lyricSheetChange(http.MethodDelete, masterPath(gone.ID, gone.Masters[0].ID), nil)
+
+	type row struct {
+		Title     string
+		Key       string
+		BPM       *int
+		HasMaster bool
+	}
+	bpm := 92
+	rows := func(list []songSummary) []row {
+		out := []row{}
+		for _, s := range list {
+			out = append(out, row{s.Title, s.Key, s.BPM, s.HasMaster})
+		}
+		return out
+	}
+
+	want := []row{
+		{"Master Deleted", "", nil, false},
+		{"Mastered", "", nil, true},
+		{"Keyed", "Am", &bpm, false},
+		{"Bare", "", nil, false},
+	}
+	if got := rows(ts.listSongs()); !reflect.DeepEqual(got, want) {
+		t.Errorf("song list = %+v, want %+v", got, want)
+	}
+	if got, want := rows(ts.listSongs("hasMaster=true")), want[1:2]; !reflect.DeepEqual(got, want) {
+		t.Errorf("song list with a Master = %+v, want %+v", got, want)
+	}
+	if got, want := rows(ts.listSongs("status=drafting&q=key")), want[2:3]; !reflect.DeepEqual(got, want) {
+		t.Errorf("drafting song list = %+v, want %+v", got, want)
+	}
+}

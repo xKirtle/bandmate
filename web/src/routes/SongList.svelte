@@ -1,14 +1,48 @@
 <script lang="ts">
-  import { api, statuses, type SongSummary, type Status } from '../lib/api';
+  import { api, statuses, type SongSummary } from '../lib/api';
+  import {
+    songListViewFromParams,
+    songListViewToParams,
+    sortSongs,
+    toggleSort,
+    type SongColumn,
+  } from '../lib/listViews';
+  import { navigate, replaceSearch, router } from '../lib/router.svelte';
   import StatusBadge from '../lib/StatusBadge.svelte';
   import { timeAgo } from '../lib/time';
 
   let songs = $state<SongSummary[] | null>(null);
   let error = $state<string | null>(null);
-  let status = $state<Status | undefined>();
-  let q = $state('');
+  // The search, filters and sort start as the URL has them, and are kept in
+  // it so going back to the list restores them.
+  const initial = songListViewFromParams(new URLSearchParams(router.search));
+  let status = $state(initial.status);
+  let q = $state(initial.q);
   // Only Songs with a Master; combines with the Status filter.
-  let hasMaster = $state(false);
+  let hasMaster = $state(initial.hasMaster);
+  let sort = $state(initial.sort);
+
+  const sorted = $derived(songs && sortSongs(songs, sort));
+
+  $effect(() => {
+    replaceSearch(songListViewToParams({ q, status, hasMaster, sort }));
+  });
+
+  const columns: { id: SongColumn; label: string; num?: boolean }[] = [
+    { id: 'title', label: 'Title' },
+    { id: 'status', label: 'Status' },
+    { id: 'key', label: 'Key' },
+    { id: 'bpm', label: 'BPM', num: true },
+    { id: 'master', label: 'Master' },
+    { id: 'edited', label: 'Edited' },
+  ];
+
+  // A click anywhere on a row opens its Song, as its title link does.
+  function openRow(event: MouseEvent, song: SongSummary) {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if ((event.target as Element).closest('a')) return;
+    navigate(`/songs/${song.id}`);
+  }
 
   const filtering = $derived(status !== undefined || hasMaster || q.trim() !== '');
   // Not reactive: the first load shouldn't wait, later ones debounce typing.
@@ -90,9 +124,42 @@
       <a class="button primary" href="/songs/new">Write your first Song</a>
       <a class="button" href="/songs/import">Import one</a>
     </div>
-  {:else}
+  {:else if sorted}
+    <table class="songs-table">
+      <thead>
+        <tr>
+          {#each columns as column (column.id)}
+            <th
+              class:num={column.num}
+              aria-sort={sort.column === column.id ? (sort.direction === 'asc' ? 'ascending' : 'descending') : undefined}
+            >
+              <button type="button" onclick={() => (sort = toggleSort(sort, column.id))}>
+                {column.label}<span class="arrow" aria-hidden="true"
+                  >{sort.column === column.id ? (sort.direction === 'asc' ? '↑' : '↓') : ''}</span
+                >
+              </button>
+            </th>
+          {/each}
+        </tr>
+      </thead>
+      <tbody>
+        {#each sorted as song (song.id)}
+          <tr onclick={(event) => openRow(event, song)}>
+            <td class="title"><a href="/songs/{song.id}">{song.title}</a></td>
+            <td><StatusBadge status={song.status} /></td>
+            <td>{song.key || '—'}</td>
+            <td class="num">{song.bpm ?? '—'}</td>
+            <td>
+              {#if song.hasMaster}<span aria-hidden="true">✓</span><span class="visually-hidden">Has a Master</span
+                >{:else}—{/if}
+            </td>
+            <td class="muted"><time datetime={song.updatedAt}>{timeAgo(song.updatedAt)}</time></td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
     <ul class="songs">
-      {#each songs as song (song.id)}
+      {#each sorted as song (song.id)}
         <li>
           <a href="/songs/{song.id}">
             <span class="title">{song.title}</span>
@@ -182,6 +249,80 @@
   .empty {
     text-align: center;
     padding: 3rem 0;
+  }
+
+  /* Desktop shows a table, narrower windows the list. */
+  .songs-table {
+    display: none;
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+  th {
+    padding: 0;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    white-space: nowrap;
+  }
+  th button {
+    width: 100%;
+    min-height: var(--control);
+    padding: 0 0.5rem;
+    border: none;
+    border-radius: 0.25rem;
+    background: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-align: inherit;
+    cursor: pointer;
+  }
+  th button:hover,
+  th[aria-sort] button {
+    color: var(--text);
+  }
+  .arrow {
+    display: inline-block;
+    width: 1em;
+    margin-left: 0.25rem;
+  }
+  td {
+    height: calc(var(--control) + 0.5rem);
+    padding: 0 0.5rem;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td.title {
+    width: 100%;
+    max-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 600;
+  }
+  td.title a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  tbody tr {
+    cursor: pointer;
+  }
+  tbody tr:hover,
+  tbody tr:focus-within {
+    background: var(--surface-1);
+  }
+
+  @media (min-width: 80rem) {
+    .songs-table {
+      display: table;
+    }
+    .songs {
+      display: none;
+    }
   }
 
   @media (min-width: 36rem) {
