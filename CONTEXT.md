@@ -48,7 +48,7 @@ Turning an Occurrence of a shared Section into its own independent Section, so i
 _Avoid_: Unlink, fork
 
 **Scrapbook**:
-A Song's collection of Sections that aren't in the Arrangement: leftovers and loose ideas kept for later. A Section taken out of the Arrangement with nothing written in any Alternate (no Lines, or only blank ones) is deleted instead, as there's nothing to keep; a Section made in the Scrapbook stays there even while it's still empty.
+A Song's collection of Sections that aren't in the Arrangement: leftovers and loose ideas kept for later. A Section taken out of the Arrangement with nothing written in any Alternate (no Lines, or only blank ones) is deleted instead, as there's nothing to keep; a Section made in the Scrapbook stays there even while it's still empty. An inactive Alternate can also be moved out of its Section into the Scrapbook, becoming a Section of its own; a Scrapbook Section can in turn be added to a Section in the Arrangement, its Alternates joining that Section's.
 _Avoid_: Trash, drafts, unused
 
 **Alternate**:
@@ -105,7 +105,7 @@ A stretch of the Timeline that playback repeats, e.g. the hook of a Beat while w
 _Avoid_: Cycle, repeat, region
 
 **Cue**:
-A link from one Line within an Occurrence to a time on the Timeline. An Occurrence has no Cue of its own: it starts where its first Line is cued. A Line's Cue lies dormant while its Alternate is inactive. Playing from a Cue starts a second before it, to lead into it. Cues are expected to run in order down the Arrangement (equal times are fine); a Cue earlier than a Line above it or later than one below it is **out of order**, which is allowed but marked.
+A link from one Line within an Occurrence to a time on the Timeline. An Occurrence has no Cue of its own: it starts where its first Line is cued. A Line's Cue lies dormant while its Alternate is inactive. A new Alternate starts with a copy of the Cues of the Alternate it was copied from; from then on, each keeps its own. Playing from a Cue starts a second before it, to lead into it. Cues are expected to run in order down the Arrangement (equal times are fine); a Cue earlier than a Line above it or later than one below it is **out of order**, which is allowed but marked.
 _Avoid_: Timestamp, sync point, marker
 
 **Sync mode**:
