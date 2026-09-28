@@ -199,9 +199,12 @@
   }
   /* One grid row per row of text, between rows as tall as the text box's
      top and bottom border and padding. The text box spans them all, and the
-     last takes whatever the text box's minimum height adds. */
+     last takes whatever the text box's minimum height adds. Its own stacking
+     context keeps the text box's and rows' z-index inside it, so they never
+     draw over the sticky header or Timeline. */
   .field.cued {
     --inset-block: calc(0.5rem + 1px);
+    isolation: isolate;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: var(--inset-block) repeat(var(--rows), auto) minmax(var(--inset-block), 1fr);
