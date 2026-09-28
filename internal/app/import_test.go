@@ -3,6 +3,7 @@ package app_test
 import (
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -752,6 +753,92 @@ func TestImportWithABadTimestampIsRejected(t *testing.T) {
 			"[Verse]\nCity lights\n\n[0:30][Chorus]\n\n[0:31]Me home",
 			"line 6: its timestamp differs from the heading's on line 4",
 		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			newTestServer(t).expectImportRejected(c.text, c.want)
+		})
+	}
+}
+
+func TestImportOffsetShiftsEveryCue(t *testing.T) {
+	cases := map[string]struct {
+		text string
+		cues []shownCues
+	}{
+		"later in seconds": {
+			"{offset: 1.5}\n[0:30][Chorus]\nMe home\n[0:34]tonight\n\n[Verse]\n[0:40]City lights",
+			[]shownCues{{cueAt(31.5), map[int]float64{1: 35.5}}, {cueAt(41.5), map[int]float64{0: 41.5}}},
+		},
+		"earlier in minutes and seconds": {
+			"{offset: -0:02}\n[0:30][Chorus]\nMe home\n[0:34]tonight\n\n[Verse]\n[0:40]City lights",
+			[]shownCues{{cueAt(28), map[int]float64{1: 32}}, {cueAt(38), map[int]float64{0: 38}}},
+		},
+		"among the timestamps": {
+			"[0:30][Chorus]\nMe home\n{offset: -0:02}\n[0:34]tonight\n\n[Verse]\n[0:40]City lights",
+			[]shownCues{{cueAt(28), map[int]float64{1: 32}}, {cueAt(38), map[int]float64{0: 38}}},
+		},
+		"after the timestamps": {
+			"[0:30][Chorus]\nMe home\n[0:34]tonight\n\n[Verse]\n[0:40]City lights\n{offset: -0:02}",
+			[]shownCues{{cueAt(28), map[int]float64{1: 32}}, {cueAt(38), map[int]float64{0: 38}}},
+		},
+		"to 0:00": {
+			"{offset: -5}\n[0:05]City lights",
+			[]shownCues{{cueAt(0), map[int]float64{0: 0}}},
+		},
+		"kept to the millisecond": {
+			"{Offset: +0:00.001}\n[0:01.2345]City lights",
+			[]shownCues{{cueAt(1.236), map[int]float64{0: 1.236}}},
+		},
+		"without timestamps": {
+			"{offset: 3}\nCity lights",
+			[]shownCues{{nil, map[int]float64{}}},
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			ts := newTestServer(t)
+
+			s := ts.importSheet(c.text)
+
+			if got := readCues(s); !reflect.DeepEqual(got, c.cues) {
+				t.Errorf("cues = %+v, want %+v", got, c.cues)
+			}
+			for _, sec := range readSheet(s) {
+				for _, line := range sec.Lines {
+					if strings.HasPrefix(strings.ToLower(line), "{offset") {
+						t.Errorf("sheet = %+v, want the offset directive dropped", readSheet(s))
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestImportWithABadOffsetIsRejected(t *testing.T) {
+	cases := map[string]struct{ text, want string }{
+		"before 0:00": {
+			"[0:30][Chorus]\nMe home\n\n[Verse]\n[0:01]City lights\n{offset: -2}",
+			"line 5: a Cue can't be before the start of the Timeline",
+		},
+		"a heading's cue before 0:00": {
+			"{offset: -0:02}\n[0:01][Chorus]\nMe home",
+			"line 2: a Cue can't be before the start of the Timeline",
+		},
+		"past a day": {
+			"{offset: 1}\n[1440:00]City lights",
+			"line 2: a Cue can't be more than 24 hours into the Timeline",
+		},
+		"repeated": {
+			"{offset: 1}\nCity lights\n{offset: 1}",
+			"line 3: the offset is already given on line 1",
+		},
+		"not a time":        {"City lights\n{offset: soon}", "line 2: the offset must be a time in seconds, like 1.5 or -0:02"},
+		"empty":             {"{offset:}\nCity lights", "line 1: the offset must be a time in seconds, like 1.5 or -0:02"},
+		"a timestamp":       {"{offset: [0:02]}\nCity lights", "line 1: the offset must be a time in seconds, like 1.5 or -0:02"},
+		"one-digit seconds": {"{offset: 0:2}\nCity lights", "line 1: the offset must be a time in seconds, like 1.5 or -0:02"},
+		"comma decimals":    {"{offset: 1,5}\nCity lights", "line 1: the offset must be a time in seconds, like 1.5 or -0:02"},
+		"over a day":        {"{offset: 86401}\nCity lights", "line 1: the offset can't be more than 24 hours"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

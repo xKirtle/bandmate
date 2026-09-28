@@ -56,7 +56,9 @@
     <p id="timestamps-hint" class="muted">
       A timestamp like <code>[1:02]</code> or <code>[1:02.34]</code> at the start of a line cues
       it, and cues that appearance of its Section too when it's on the heading or first line. A
-      timestamp alone on a line is a blank line.
+      timestamp alone on a line is a blank line. One <code>{'{offset:}'}</code> anywhere, like
+      <code>{'{offset: 1.5}'}</code> or <code>{'{offset: -0:02}'}</code>, shifts every Cue that
+      many seconds later, or earlier if negative.
     </p>
     <!-- svelte-ignore a11y_autofocus -->
     <textarea

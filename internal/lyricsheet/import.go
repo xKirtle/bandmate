@@ -119,7 +119,8 @@ type importedSection struct {
 	// cue is the Occurrence's Cue in milliseconds, from a timestamp on its
 	// heading or first Line, or nil for none.
 	cue *int64
-	// cuePasteLine is the paste line of the heading that gave cue, or 0.
+	// cuePasteLine is the paste line of the heading or Line that gave cue,
+	// or 0.
 	cuePasteLine int
 }
 
@@ -161,7 +162,7 @@ var detailDirectives = map[string]string{
 func recognised(name string) bool {
 	_, detail := detailDirectives[name]
 	_, section := sectionDirectives[name]
-	return detail || section || name == "notes"
+	return detail || section || name == "notes" || name == "offset"
 }
 
 // parseImport reads pasted text into the Song's title and Details, as far
@@ -179,10 +180,13 @@ func recognised(name string) bool {
 // its Occurrence and, on its first Line, the Occurrence too. On a heading,
 // it cues only the Occurrence, and must agree with its first Line's. A
 // timestamp alone is a blank line, with no Cue, and a directive can't have
-// one.
+// one. An offset directive, which may appear once, anywhere, shifts every
+// Cue by its time (see shiftCues).
 func parseImport(text string) (importedSheet, error) {
 	var sheet importedSheet
 	given := map[string]int{} // the paste line that gave each Detail
+	var offset int64          // in milliseconds
+	offsetGiven := 0          // the paste line that gave the offset, or 0
 	var cur importedSection
 	end := func() {
 		for len(cur.lines) > 0 && blank(cur.lines[len(cur.lines)-1].text) {
@@ -233,6 +237,15 @@ func parseImport(text string) (importedSheet, error) {
 			if name == "notes" {
 				sheet.notes = append(sheet.notes, value)
 			}
+			if name == "offset" {
+				if offsetGiven != 0 {
+					return importedSheet{}, invalidPasteLine(i+1, "the offset is already given on line %d", offsetGiven)
+				}
+				offsetGiven = i + 1
+				if offset, err = offsetMillis(value); err != nil {
+					return importedSheet{}, invalidPasteLine(i+1, "%s", err)
+				}
+			}
 			if d, ok := sectionDirectives[name]; ok {
 				end()
 				if d.starts {
@@ -254,12 +267,80 @@ func parseImport(text string) (importedSheet, error) {
 			if cur.cue != nil && *cur.cue != *cue {
 				return importedSheet{}, invalidPasteLine(i+1, "its timestamp differs from the heading's on line %d", cur.cuePasteLine)
 			}
+			if cur.cue == nil {
+				cur.cuePasteLine = i + 1
+			}
 			cur.cue = cue
 		}
 		cur.lines = append(cur.lines, importedLine{text: line, pasteLine: i + 1, cue: cue})
 	}
 	end()
+	if err := sheet.shiftCues(offset); err != nil {
+		return importedSheet{}, err
+	}
 	return sheet, nil
+}
+
+// shiftCues moves every Cue in the sheet by ms, as the offset directive
+// does, or rejects the first that would stop being a Cue, naming its
+// paste line.
+func (sheet *importedSheet) shiftCues(ms int64) error {
+	if ms == 0 {
+		return nil
+	}
+	// Each shifted Cue is new, as an Occurrence's Cue may be its first
+	// Line's too, and must move only once.
+	shift := func(cue **int64, pasteLine int) error {
+		if *cue == nil {
+			return nil
+		}
+		shifted, err := cueMillis(float64(**cue+ms) / 1000)
+		if err != nil {
+			return invalidPasteLine(pasteLine, "%s", err)
+		}
+		*cue = &shifted
+		return nil
+	}
+	for i := range sheet.sections {
+		sec := &sheet.sections[i]
+		if err := shift(&sec.cue, sec.cuePasteLine); err != nil {
+			return err
+		}
+		for j := range sec.lines {
+			if err := shift(&sec.lines[j].cue, sec.lines[j].pasteLine); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// offsetText is a time as a Cue is typed, seconds ("1.5") or minutes and
+// two digits of seconds ("0:02"), with an optional sign.
+var offsetText = regexp.MustCompile(`^([+-]?)(?:(\d+):([0-5]\d(?:\.\d+)?)|(\d+(?:\.\d+)?))$`)
+
+// offsetMillis reads an offset directive's value into milliseconds,
+// positive for later, rounded as a typed Cue is.
+func offsetMillis(value string) (int64, error) {
+	m := offsetText.FindStringSubmatch(value)
+	if m == nil {
+		return 0, invalid("the offset must be a time in seconds, like 1.5 or -0:02")
+	}
+	var seconds float64
+	if m[4] != "" {
+		seconds, _ = strconv.ParseFloat(m[4], 64)
+	} else {
+		minutes, _ := strconv.ParseFloat(m[2], 64)
+		secs, _ := strconv.ParseFloat(m[3], 64)
+		seconds = minutes*60 + secs
+	}
+	if seconds > maxCue {
+		return 0, invalid("the offset can't be more than 24 hours")
+	}
+	if m[1] == "-" {
+		seconds = -seconds
+	}
+	return millis(seconds), nil
 }
 
 var (
