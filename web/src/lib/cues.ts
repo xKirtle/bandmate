@@ -62,16 +62,19 @@ function hasLineCue(o: CuedOccurrence, lines: readonly CuedLine[]): boolean {
  * Cues are dormant. An Occurrence's own Cue is the whole Section while
  * none of its Lines has a Cue, and otherwise its first Line. Null before
  * the first Cue. Of two cued at the same time, the later on the sheet.
+ * Given, a Line being retaken in Sync mode has its Cue ignored, so it only
+ * becomes current once it's cued again.
  */
-export function currentPosition(song: CuedSong, t: number): Position | null {
+export function currentPosition(song: CuedSong, t: number, retaking: NextLine | null = null): Position | null {
   const linesOf = activeLines(song);
   type Latest = { at: number; o: CuedOccurrence; line: number | null; lines: readonly CuedLine[] };
   let latest: Latest | null = null;
   for (const o of song.arrangement) {
     const lines = linesOf(o);
+    const retaken = retaking?.occurrence === o.id ? retaking.line : null;
     const cues: [number | null | undefined, number | null][] = [
       [o.cue, null],
-      ...lines.map((l) => [o.lineCues[l.id], l.id] as [number | undefined, number]),
+      ...lines.map((l) => [l.id === retaken ? undefined : o.lineCues[l.id], l.id] as [number | undefined, number]),
     ];
     for (const [at, line] of cues) {
       if (at === null || at === undefined || at > t) continue;
@@ -160,39 +163,42 @@ export type NextLine = Position & { line: number };
 
 /**
  * The Line Sync mode cues next, in the order down the sheet: a Line picked
- * by clicking it, or else the one after the current Line, the first of a
- * Section highlighted as a whole, or with nothing highlighted the first of
- * the Arrangement. Each Occurrence of a shared Section is stepped through
- * on its own. Only Lines with words are cued: never blank ones, nor Chord
- * Lines. Null once there are no more.
+ * by clicking it, or else the one after the Line just cued, cued or not, so
+ * a run of Lines can be retaken. With neither, or after the last Line, it's
+ * the first Line without a Cue, or the first of the Arrangement once every
+ * Line is cued; the Line just cued counts as cued, its Cue perhaps not saved
+ * yet. It never depends on where playback is. Each Occurrence of a shared
+ * Section is stepped through on its own. Only Lines with words are cued:
+ * never blank ones, nor Chord Lines. Null only without any such Line.
  */
 export function nextLine(
   song: CuedSong<ChordedLine>,
-  { current, picked = null }: { current: Position | null; picked?: NextLine | null },
+  { cued = null, picked = null }: { cued?: NextLine | null; picked?: NextLine | null },
 ): NextLine | null {
   const linesOf = activeLines(song);
-  const sheet = song.arrangement.flatMap((o, place) =>
-    linesOf(o).map((l) => ({
-      place,
-      occurrence: o.id,
-      line: l.id,
-      cueable: !isBlank(l) && !l.chordLine,
-    })),
+  const sheet = song.arrangement.flatMap((o) =>
+    linesOf(o)
+      .filter((l) => !isBlank(l) && !l.chordLine)
+      .map((l) => ({ occurrence: o.id, line: l.id, hasCue: o.lineCues[l.id] !== undefined })),
   );
-  const at = (p: Position) => sheet.findIndex((q) => q.occurrence === p.occurrence && q.line === p.line);
-  const pickedAt = picked === null ? -1 : at(picked);
-  const currentAt = current === null ? -1 : at(current);
-  let from = 0;
-  if (pickedAt >= 0) from = pickedAt;
-  else if (currentAt >= 0) from = currentAt + 1;
-  else if (current !== null) {
-    // The whole Section: from its first Line, or the next Section's if it has none.
-    const place = song.arrangement.findIndex((o) => o.id === current.occurrence);
-    from = sheet.findIndex((p) => p.place >= place);
-    if (from < 0) return null;
-  }
-  const next = sheet.slice(from).find((p) => p.cueable);
+  const at = (p: NextLine | null) =>
+    p === null ? -1 : sheet.findIndex((q) => q.occurrence === p.occurrence && q.line === p.line);
+  const pickedAt = at(picked);
+  const cuedAt = at(cued);
+  const next =
+    sheet[pickedAt] ??
+    (cuedAt >= 0 ? sheet[cuedAt + 1] : undefined) ??
+    sheet.find((p, i) => !p.hasCue && i !== cuedAt) ??
+    sheet[0];
   return next ? { occurrence: next.occurrence, line: next.line } : null;
+}
+
+/**
+ * Where playing from a Cue starts, in seconds: a second before it, to lead
+ * into it, but never before 0:00.
+ */
+export function leadIn(cue: number): number {
+  return Math.max(0, Math.round((cue - 1) * 1000) / 1000);
 }
 
 /**

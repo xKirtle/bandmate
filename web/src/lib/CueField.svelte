@@ -26,7 +26,7 @@
     next?: () => boolean;
     /** Beside a Line, so kept as short as the Line. */
     gutter?: boolean;
-    /** Given, a ▶ before the time seeks the Timeline to the Cue. */
+    /** Given, a ▶ before the time plays from the Cue. */
     play?: (to: number) => void;
     /** Whether playback is on what the Cue is for, so its ▶ isn't muted. */
     current?: boolean;

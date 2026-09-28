@@ -35,7 +35,7 @@
     cue?: {
       at: number | null;
       save: (cue: number | null) => void;
-      /** Given, a ▶ beside the Cue seeks the Timeline to it. */
+      /** Given, a ▶ beside the Cue plays from it. */
       play?: (to: number) => void;
       /** Whether playback is in the Occurrence. */
       current?: boolean;

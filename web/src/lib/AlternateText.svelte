@@ -18,13 +18,12 @@
       field: (line: number, field: GutterField | null | undefined) => void;
       /** Opens the next Line's field; answers whether there was one. */
       next: (line: number) => boolean;
-      /** Given, a ▶ beside each Cue seeks the Timeline to it. */
+      /** Given, a ▶ beside each Cue plays from it. */
       play?: (to: number) => void;
     };
     /**
-     * Given, as in Sync mode, the text is read-only, the Line up next is
-     * outlined with a Now button in its gutter slot, and clicking a Line
-     * makes it next.
+     * Given, as in Sync mode, the text is read-only, the Line up next has a
+     * Now button in its gutter slot, and clicking a Line makes it next.
      */
     sync?: {
       /** The Line up next, if it's in this Occurrence. */
@@ -174,7 +173,6 @@
         <div
           class="row"
           class:current={line.id === cueing.current}
-          class:next={line.id === sync?.next}
           class:pickable={sync}
           style:grid-row={gridRow}
           aria-hidden="true"
@@ -292,14 +290,10 @@
     scroll-margin: 5rem 0;
     transition: background-color 0.2s;
   }
+  /* Highlighted as in Read mode. */
   .row.current {
-    background: var(--surface-2);
+    background: var(--surface-1);
     box-shadow: inset 3px 0 0 var(--accent);
-  }
-  /* Up next in Sync mode: outlined, so it doesn't look like the current Line. */
-  .row.next {
-    outline: 2px dashed var(--accent);
-    outline-offset: -2px;
   }
   .syncing .text {
     pointer-events: none;
