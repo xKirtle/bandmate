@@ -30,9 +30,6 @@
     onRowClick?: (event: MouseEvent, beat: Beat) => void;
   } = $props();
 
-  // Title fills the spare width up to 28rem and Producer up to its cap, and both
-  // cut off with an ellipsis; BPM, Key, Duration and Added take their content's
-  // width, and Used by takes whatever is left.
   const columns: { id: BeatColumn; label: string; num?: boolean }[] = [
     { id: 'title', label: 'Title' },
     { id: 'producer', label: 'Producer' },
@@ -78,14 +75,14 @@
         {#if lead}
           <td class="lead">{@render lead.cell(beat)}</td>
         {/if}
-        <td class="title"><span class="clip" title={beat.title}>{@render title(beat)}</span></td>
+        <td class="title"><span class="ellipsis" title={beat.title}>{@render title(beat)}</span></td>
         <td class="producer">
-          <span class="clip" title={beat.producer || undefined}>{beat.producer || '—'}</span>
+          <span class="ellipsis" title={beat.producer || undefined}>{beat.producer || '—'}</span>
         </td>
         <td class="num fit">{beat.bpm ?? '—'}</td>
         <td class="fit">{beat.key || '—'}</td>
         <td class="num fit">{formatDuration(beat.duration)}</td>
-        <td><span class="clip" title={usedBy || undefined}>{usedBy || '—'}</span></td>
+        <td><span class="ellipsis" title={usedBy || undefined}>{usedBy || '—'}</span></td>
         <td class="muted fit"><time datetime={beat.createdAt}>{timeAgo(beat.createdAt)}</time></td>
         {#if trail}
           <td class="trail">{@render trail.cell(beat)}</td>
@@ -136,10 +133,11 @@
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
   }
-  /* A clipped cell's content adds nothing to its column's width, so the column
-     is as wide as its own width says when there's room and shrinks when there
-     isn't, rather than growing to fit a long title. */
-  .clip {
+  /* Title and Producer take the width set below when there's room and shrink
+     when there isn't; BPM, Key, Duration and Added fit their content; Used by
+     takes whatever is left. Text in .ellipsis adds nothing to its column's
+     width, so a long title doesn't grow its column. */
+  .ellipsis {
     display: block;
     width: 0;
     min-width: 100%;
