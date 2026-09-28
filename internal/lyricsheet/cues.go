@@ -200,6 +200,54 @@ func (s *Store) RestoreCues(ctx context.Context, songID int64, based Version, va
 	})
 }
 
+// ShiftCues moves every Cue in a Song that lies in [start, end), in
+// seconds, by the seconds given: Occurrences' own and their Lines',
+// dormant ones included. It's how Cues follow a Clip that was moved. None
+// may end up before the start of the Timeline, or the shift is refused.
+func (s *Store) ShiftCues(ctx context.Context, songID int64, based Version, start, end, by float64) (Song, error) {
+	if end <= start {
+		return Song{}, invalid("the span must end after it starts")
+	}
+	from, to := millis(start), millis(end)
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		var low, high sql.NullInt64
+		err := tx.QueryRowContext(ctx, `SELECT MIN(cue_ms), MAX(cue_ms) FROM (
+				SELECT cue_ms FROM occurrences WHERE song_id = ?
+				UNION ALL
+				SELECT lc.cue_ms FROM line_cues lc JOIN occurrences o ON o.id = lc.occurrence_id WHERE o.song_id = ?
+			) WHERE cue_ms >= ? AND cue_ms < ?`, songID, songID, from, to).Scan(&low, &high)
+		if err != nil {
+			return fmt.Errorf("finding cues to shift: %w", err)
+		}
+		if !low.Valid {
+			return nil
+		}
+		// Checked in seconds, as a shift far out of range overflows milliseconds.
+		for _, ms := range []int64{low.Int64, high.Int64} {
+			if _, err := cueMillis(float64(ms)/1000 + by); err != nil {
+				return err
+			}
+		}
+		delta := millis(by)
+		if _, err := tx.ExecContext(ctx, `UPDATE occurrences SET cue_ms = cue_ms + ?
+			WHERE song_id = ? AND cue_ms >= ? AND cue_ms < ?`, delta, songID, from, to); err != nil {
+			return fmt.Errorf("shifting occurrence cues: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE line_cues SET cue_ms = cue_ms + ?
+			WHERE occurrence_id IN (SELECT id FROM occurrences WHERE song_id = ?) AND cue_ms >= ? AND cue_ms < ?`,
+			delta, songID, from, to); err != nil {
+			return fmt.Errorf("shifting line cues: %w", err)
+		}
+		return nil
+	})
+}
+
+// millis turns seconds into whole milliseconds, as Cues are kept, without
+// checking they make a Cue.
+func millis(seconds float64) int64 {
+	return int64(math.Round(seconds * 1000))
+}
+
 // findOccurrenceLine checks an Occurrence belongs to a Song and a Line to
 // any Alternate of its Section, and returns the Line's text.
 func findOccurrenceLine(ctx context.Context, tx *sql.Tx, songID, occurrenceID, lineID int64) (string, error) {

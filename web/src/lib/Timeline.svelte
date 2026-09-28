@@ -16,7 +16,7 @@
   } from './api';
   import BeatPicker from './BeatPicker.svelte';
   import { clampMove, clampTrimEnd, clampTrimStart } from './clipEdit';
-  import { hasCues } from './cues';
+  import { cuesInSpan, formatCue, hasCues } from './cues';
   import {
     History,
     restorable,
@@ -204,6 +204,7 @@
   /** Queues an edit, to undo later; resolves to whether it succeeded. */
   function perform(e: TimelineEdit): Promise<boolean> {
     e = $state.snapshot(e) as TimelineEdit;
+    offerCues = null;
     queued++;
     return change((at) => send(at, e, (before, after) => history.record(e, before, after))).finally(() => queued--);
   }
@@ -214,6 +215,7 @@
    * succeeded.
    */
   export function editCues(op: (at: SongAt) => Promise<Song>): Promise<boolean> {
+    offerCues = null;
     queued++;
     return change(async (at) => {
       const before = song;
@@ -226,6 +228,7 @@
 
   function undo() {
     if (!undoable && queued === 0) return;
+    offerCues = null;
     change((at) => {
       const e = history.nextUndo();
       return e ? send(at, e, (before, after) => history.undone(before, after)) : unchanged(at);
@@ -234,6 +237,7 @@
 
   function redo() {
     if (!redoable) return;
+    offerCues = null;
     change((at) => {
       const e = history.nextRedo();
       return e ? send(at, e, (before, after) => history.redone(before, after)) : unchanged(at);
@@ -746,12 +750,49 @@
       return;
     }
     edit.saving = true;
-    await perform(
-      mode === 'move'
-        ? { kind: 'moveClip', clipId: clip.id, trackId, start: to.start }
-        : { kind: 'trimClip', clipId: clip.id, offset: to.offset, length: to.length },
-    );
+    if (mode !== 'move') {
+      await perform({ kind: 'trimClip', clipId: clip.id, offset: to.offset, length: to.length });
+      edit = null;
+      return;
+    }
+    // Cues are Timeline times and stay put, but those the Clip spanned may
+    // belong with it, so moving them along is offered, as a step of its own.
+    const found = cuesInSpan(song, clip.start, clip.start + clip.length).length;
+    const ok = await perform({ kind: 'moveClip', clipId: clip.id, trackId, start: to.start });
     edit = null;
+    if (ok && found > 0 && to.start !== clip.start) {
+      offerMove({ start: clip.start, end: clip.start + clip.length, by: to.start - clip.start, count: found });
+    }
+  }
+
+  // After a Clip is moved, moving the Cues it spanned along with it is
+  // offered for a few seconds, or until the next edit. Ignoring it leaves
+  // them where they were: after recording, they usually belong to the vocal
+  // rather than the Beat.
+  interface CueOffer {
+    start: number;
+    end: number;
+    by: number;
+    count: number;
+  }
+  // Raw, so the timer can tell whether the offer shown is still its own.
+  let offerCues = $state.raw<CueOffer | null>(null);
+  let offerTimer: ReturnType<typeof setTimeout> | undefined;
+  const offerFor = 8000;
+
+  function offerMove(offer: CueOffer) {
+    offerCues = offer;
+    clearTimeout(offerTimer);
+    offerTimer = setTimeout(() => {
+      if (offerCues === offer) offerCues = null;
+    }, offerFor);
+  }
+  onDestroy(() => clearTimeout(offerTimer));
+
+  function moveCues() {
+    if (!offerCues) return;
+    const { start, end, by } = offerCues;
+    editCues((at) => api.shiftCues(at, start, end, by));
   }
 
   function editCancel() {
@@ -1345,6 +1386,15 @@
       </div>
     {/if}
 
+    {#if offerCues}
+      <div class="offer" role="status">
+        <span>The Clip moved {formatCue(Math.abs(offerCues.by))} {offerCues.by > 0 ? 'later' : 'earlier'}.</span>
+        <button type="button" class="button" onclick={moveCues}
+          >Move {offerCues.count} {offerCues.count === 1 ? 'Cue' : 'Cues'} with it</button
+        >
+        <button type="button" class="button" onclick={() => (offerCues = null)}>Leave them</button>
+      </div>
+    {/if}
     {#if offerBpm}
       <div class="offer" role="status">
         <span>This Song has no BPM. Use {offerBpm.bpm} BPM from “{offerBpm.title}”?</span>

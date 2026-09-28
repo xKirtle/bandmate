@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { currentPosition, formatCue, hasCues, linesByRow, nextLine, nudgeCue, parseCue } from './cues';
+import { cuesInSpan, currentPosition, formatCue, hasCues, linesByRow, nextLine, nudgeCue, parseCue, type CuedSong } from './cues';
 
 describe('parseCue', () => {
   it('reads plain seconds', () => {
@@ -263,6 +263,54 @@ describe('hasCues', () => {
 
   it('ignores dormant Cues', () => {
     expect(hasCues({ arrangement: [{ id: 1, sectionId: 9, cue: null, lineCues: { 50: 3 } }], sections })).toBe(false);
+  });
+});
+
+describe('cuesInSpan', () => {
+  const sections = [
+    {
+      id: 9,
+      alternates: [
+        { active: false, lines: [{ id: 50, text: 'Old' }] },
+        {
+          active: true,
+          lines: [
+            { id: 60, text: 'New' },
+            { id: 61, text: 'Newer' },
+          ],
+        },
+      ],
+    },
+  ];
+  const song: CuedSong = {
+    arrangement: [
+      { id: 1, sectionId: 9, cue: 10, lineCues: { 60: 10, 61: 14, 50: 12 } },
+      { id: 2, sectionId: 9, cue: 20, lineCues: { 61: 25 } },
+      { id: 3, sectionId: 9, cue: null, lineCues: {} },
+    ],
+    sections,
+  };
+
+  it('finds the Occurrence and Line Cues from the start of the span up to its end', () => {
+    expect(cuesInSpan(song, 14, 25)).toEqual([
+      { occurrence: 1, line: 61, cue: 14 },
+      { occurrence: 2, line: null, cue: 20 },
+    ]);
+  });
+
+  it('finds an Occurrence Cue and its first Line Cue both', () => {
+    expect(cuesInSpan(song, 0, 11)).toEqual([
+      { occurrence: 1, line: null, cue: 10 },
+      { occurrence: 1, line: 60, cue: 10 },
+    ]);
+  });
+
+  it('leaves out dormant Cues, which are not shown', () => {
+    expect(cuesInSpan(song, 11, 13)).toEqual([]);
+  });
+
+  it('finds nothing in an empty span', () => {
+    expect(cuesInSpan(song, 10, 10)).toEqual([]);
   });
 });
 

@@ -384,6 +384,9 @@ export const api = {
   clearCues: (at: SongAt) => request<Song>('DELETE', `/songs/${at.id}/cues`, undefined, at),
   /** Sets each Cue given to its value, or clears it, as they were before another Cue edit; the first Line and its Occurrence don't follow each other. */
   restoreCues: (at: SongAt, cues: CueValue[]) => request<Song>('PATCH', `/songs/${at.id}/cues`, { cues }, at),
+  /** Moves every Cue from start up to end, in seconds, dormant ones included, by the seconds given; refused if any would go below zero. */
+  shiftCues: (at: SongAt, start: number, end: number, by: number) =>
+    request<Song>('POST', `/songs/${at.id}/cues/shift`, { start, end, by }, at),
   setSectionLabel: (at: SongAt, sectionId: number, label: string) =>
     request<Song>('PATCH', `/songs/${at.id}/sections/${sectionId}`, { label }, at),
   /** Replaces an Alternate's Lines with the lines of text. */

@@ -90,6 +90,28 @@ export function hasCues(song: CuedSong): boolean {
   return song.arrangement.some((o) => o.cue !== null || hasLineCue(o, linesOf(o)));
 }
 
+/** A Cue as it's shown: an Occurrence's own (line null), or one of its Lines'. */
+export type ShownCue = Position & { cue: number };
+
+/**
+ * The Cues in effect from start up to end, in seconds, in order down the
+ * sheet: each Occurrence's own, then its active Alternate's Lines'.
+ * Dormant Cues aren't shown, so aren't found.
+ */
+export function cuesInSpan(song: CuedSong, start: number, end: number): ShownCue[] {
+  const linesOf = activeLines(song);
+  const inSpan = (cue: number | null | undefined): cue is number =>
+    cue !== null && cue !== undefined && cue >= start && cue < end;
+  return song.arrangement.flatMap((o) => {
+    const own: ShownCue[] = inSpan(o.cue) ? [{ occurrence: o.id, line: null, cue: o.cue }] : [];
+    const lines = linesOf(o).flatMap((l) => {
+      const cue = o.lineCues[l.id];
+      return inSpan(cue) ? [{ occurrence: o.id, line: l.id, cue }] : [];
+    });
+    return [...own, ...lines];
+  });
+}
+
 /** A Line, as far as Tap mode steps onto it: a Chord Line is hidden along with Chords. */
 export interface ShownLine extends CuedLine {
   chordLine: boolean;

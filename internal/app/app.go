@@ -113,6 +113,7 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("DELETE /api/songs/{id}/occurrences/{occurrenceID}/cues", a.clearOccurrenceCues)
 	mux.HandleFunc("DELETE /api/songs/{id}/cues", a.clearCues)
 	mux.HandleFunc("PATCH /api/songs/{id}/cues", a.restoreCues)
+	mux.HandleFunc("POST /api/songs/{id}/cues/shift", a.shiftCues)
 	mux.HandleFunc("POST /api/songs/{id}/sections/{sectionID}/alternates", a.addAlternate)
 	mux.HandleFunc("PATCH /api/songs/{id}/alternates/{alternateID}", a.renameAlternate)
 	mux.HandleFunc("DELETE /api/songs/{id}/alternates/{alternateID}", a.deleteAlternate)
