@@ -74,7 +74,7 @@ _Avoid_: Version, revision, backup
 ### Timeline
 
 **Timeline**:
-A Song's audio space, measured in seconds, where Tracks play together.
+A Song's audio space, measured in seconds, where Tracks play together. It runs to its last Clip or last Cue, whichever is later, so a Timeline with Cues but no Clips still plays.
 _Avoid_: Session, project, mix
 
 **Track**:
@@ -109,7 +109,7 @@ A link from an Occurrence, or from one Line within an Occurrence, to a time on t
 _Avoid_: Timestamp, sync point, marker
 
 **Sync mode**:
-A way of syncing a Song's Lines while the Timeline plays: as each Line starts, marking it "Now" cues it at the playhead, and the next Line comes up. Clicking a Line makes it the next one. Sync mode and the Loop are never on together.
+A way of syncing a Song's Lines while the Timeline plays: as each Line starts, marking it "Now" cues it at the playhead, and the next Line comes up. Clicking a Line makes it the next one. Sync mode needs a Clip on the Timeline, and Sync mode and the Loop are never on together.
 _Avoid_: Tap mode, record mode
 
 **Latency Offset**:
