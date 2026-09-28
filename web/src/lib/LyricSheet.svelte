@@ -263,7 +263,8 @@
   function cueKey(event: KeyboardEvent) {
     if (event.key !== 'Enter' || event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
     if (!syncing || event.defaultPrevented || inTextField(event.target)) return;
-    if (event.target instanceof Element && event.target.closest('dialog')) return;
+    // Enter in a dialog or a ⋯ menu is for what's in it.
+    if (event.target instanceof Element && event.target.closest('dialog, [role="menu"]')) return;
     event.preventDefault();
     cueNext();
   }

@@ -2,7 +2,7 @@
   import { tick } from 'svelte';
   import { menuKey, type MenuAction } from './menu';
 
-  let { entries, label = 'More actions' }: { entries: MenuAction[]; label?: string } = $props();
+  let { entries }: { entries: MenuAction[] } = $props();
 
   let open = $state(false);
   let root: HTMLElement;
@@ -63,13 +63,20 @@
   function onWindowPointer(e: PointerEvent) {
     if (open && !root.contains(e.target as Node)) open = false;
   }
+
+  // Closes it without losing focus with it.
+  function dismiss() {
+    if (!open) return;
+    if (menu?.contains(document.activeElement)) close();
+    else open = false;
+  }
 </script>
 
 <!-- It's placed once, when it opens: scrolling or resizing would leave it behind. -->
 <svelte:window
   onpointerdown={onWindowPointer}
-  onscroll={() => (open = false)}
-  onresize={() => (open = false)}
+  onscroll={dismiss}
+  onresize={dismiss}
 />
 
 <div class="menu-root" bind:this={root}>
@@ -77,8 +84,8 @@
     type="button"
     class="icon"
     bind:this={trigger}
-    aria-label={label}
-    title={label}
+    aria-label="More actions"
+    title="More actions"
     aria-haspopup="menu"
     aria-expanded={open}
     onclick={() => (open ? close() : show())}
@@ -90,7 +97,7 @@
     <div
       class="menu"
       role="menu"
-      aria-label={label}
+      aria-label="More actions"
       tabindex="-1"
       popover="manual"
       bind:this={menu}

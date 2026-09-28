@@ -130,8 +130,8 @@
   }
 </script>
 
-<!-- On phones there's no room for every action beside the Label: these fold into ⋯. -->
-{#snippet button(action: MenuAction)}
+<!-- An action as a button beside the Label, where there's room for it. -->
+{#snippet inlineAction(action: MenuAction)}
   <button
     type="button"
     class="icon wide"
@@ -171,11 +171,12 @@
       </span>
     {/if}
     <div class="actions">
-      {@render button(newAlternate)}
+      {@render inlineAction(newAlternate)}
       {@render actions()}
       {#each more as action (action.label)}
-        {@render button(action)}
+        {@render inlineAction(action)}
       {/each}
+      <!-- On phones there's no room for every action beside the Label: they fold into ⋯. -->
       <div class="narrow">
         <ActionsMenu entries={[newAlternate, ...more]} />
       </div>

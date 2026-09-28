@@ -21,7 +21,7 @@ export function menuKey(key: string, current: number, count: number): number | '
   }
 }
 
-/** An action a ⋯ menu can hold: shown as its icon beside the Label on wider screens. */
+/** An entry in a ⋯ menu, also shown as an icon button where there's room for one. */
 export type MenuAction = {
   icon: string;
   /** Names it in the menu, and to screen readers as a button. */
