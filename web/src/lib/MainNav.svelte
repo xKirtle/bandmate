@@ -26,7 +26,7 @@
     left: 0;
     z-index: 2;
     display: flex;
-    height: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
+    height: var(--tabbar-space);
     padding: 0.25rem max(0.5rem, env(safe-area-inset-right)) env(safe-area-inset-bottom)
       max(0.5rem, env(safe-area-inset-left));
     border-top: 1px solid var(--border);

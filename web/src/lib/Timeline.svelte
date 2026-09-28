@@ -1505,9 +1505,9 @@
   }
   /* Docked directly above the tab bar, which keeps clear of the home
      indicator itself. */
-  @media (max-width: 65.4375rem) {
+  @media (width < 65.5rem) {
     .timeline {
-      bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
+      bottom: var(--tabbar-space);
     }
     .inner {
       padding-bottom: calc(0.5 * var(--timeline-rem));
@@ -1721,13 +1721,10 @@
     bottom: calc(0.0625 * var(--timeline-rem));
     background: var(--text-muted);
   }
-  /* Not on touch screens, where a tap leaves it hovered. */
-  @media (hover: hover) {
-    .scrollbar:hover .scroll-thumb {
-      top: calc(0.0625 * var(--timeline-rem));
-      bottom: calc(0.0625 * var(--timeline-rem));
-      background: var(--text-muted);
-    }
+  .scrollbar:hover .scroll-thumb {
+    top: calc(0.0625 * var(--timeline-rem));
+    bottom: calc(0.0625 * var(--timeline-rem));
+    background: var(--text-muted);
   }
   .scroll-thumb.dragging {
     cursor: grabbing;
