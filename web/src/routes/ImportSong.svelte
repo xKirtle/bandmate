@@ -53,6 +53,11 @@
       <code>{'{capo:}'}</code> and <code>{'{tuning:}'}</code> set its Details, once each, and each
       <code>{'{notes:}'}</code> adds a line to its notes. Other directives stay as Lines.
     </p>
+    <p id="timestamps-hint" class="muted">
+      A timestamp like <code>[1:02]</code> or <code>[1:02.34]</code> at the start of a line cues
+      it, and cues that appearance of its Section too when it's on the heading or first line. A
+      timestamp alone on a line is a blank line.
+    </p>
     <!-- svelte-ignore a11y_autofocus -->
     <textarea
       id="lyrics"
@@ -61,7 +66,7 @@
       autofocus
       rows="16"
       spellcheck="false"
-      aria-describedby="lyrics-hint directives-hint"
+      aria-describedby="lyrics-hint directives-hint timestamps-hint"
       placeholder={'{title: Midnight Drive}\n\n[Verse]\n[Am]City lights are [F]calling\n\n[Am]Me home [F]tonight\n\n[Chorus]\n…'}
     ></textarea>
     {#if askTitle}
