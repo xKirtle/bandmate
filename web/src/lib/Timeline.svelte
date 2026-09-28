@@ -85,6 +85,20 @@
   let picking = $state(false);
   // A Beat just added whose BPM could become the Song's.
   let offerBpm = $state<{ bpm: number; title: string } | null>(null);
+  // After a Clip is moved, moving the Cues it spanned along with it is
+  // offered for a few seconds, or until the next edit. Ignoring it leaves
+  // them where they were: after recording, they usually belong to the vocal
+  // rather than the Beat.
+  interface CueOffer {
+    start: number;
+    end: number;
+    by: number;
+    count: number;
+  }
+  // Raw, so the timer can tell whether the offer shown is still its own.
+  let offerCues = $state.raw<CueOffer | null>(null);
+  let offerTimer: ReturnType<typeof setTimeout> | undefined;
+  const offerFor = 8000;
   // Peaks by Beat id, fetched once each, so waveforms show before the audio
   // is decoded.
   let peaks = $state<Record<number, number[]>>({});
@@ -764,21 +778,6 @@
       offerMove({ start: clip.start, end: clip.start + clip.length, by: to.start - clip.start, count: found });
     }
   }
-
-  // After a Clip is moved, moving the Cues it spanned along with it is
-  // offered for a few seconds, or until the next edit. Ignoring it leaves
-  // them where they were: after recording, they usually belong to the vocal
-  // rather than the Beat.
-  interface CueOffer {
-    start: number;
-    end: number;
-    by: number;
-    count: number;
-  }
-  // Raw, so the timer can tell whether the offer shown is still its own.
-  let offerCues = $state.raw<CueOffer | null>(null);
-  let offerTimer: ReturnType<typeof setTimeout> | undefined;
-  const offerFor = 8000;
 
   function offerMove(offer: CueOffer) {
     offerCues = offer;

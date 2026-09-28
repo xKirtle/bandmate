@@ -305,8 +305,8 @@ describe('cuesInSpan', () => {
     ]);
   });
 
-  it('leaves out dormant Cues, which are not shown', () => {
-    expect(cuesInSpan(song, 11, 13)).toEqual([]);
+  it('finds dormant Cues too, which move along with the rest', () => {
+    expect(cuesInSpan(song, 11, 13)).toEqual([{ occurrence: 1, line: 50, cue: 12 }]);
   });
 
   it('finds nothing in an empty span', () => {

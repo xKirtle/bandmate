@@ -90,24 +90,23 @@ export function hasCues(song: CuedSong): boolean {
   return song.arrangement.some((o) => o.cue !== null || hasLineCue(o, linesOf(o)));
 }
 
-/** A Cue as it's shown: an Occurrence's own (line null), or one of its Lines'. */
-export type ShownCue = Position & { cue: number };
+/** A Cue and what it links: an Occurrence (line null), or one of its Lines. */
+export type FoundCue = Position & { cue: number };
 
 /**
- * The Cues in effect from start up to end, in seconds, in order down the
- * sheet: each Occurrence's own, then its active Alternate's Lines'.
- * Dormant Cues aren't shown, so aren't found.
+ * The Cues from start up to end, in seconds, as shifting that span moves
+ * them: each Occurrence's own, then its Lines' by id, dormant ones
+ * included, since they're Timeline times too and should keep in step for
+ * when their Alternate is switched back.
  */
-export function cuesInSpan(song: CuedSong, start: number, end: number): ShownCue[] {
-  const linesOf = activeLines(song);
-  const inSpan = (cue: number | null | undefined): cue is number =>
-    cue !== null && cue !== undefined && cue >= start && cue < end;
+export function cuesInSpan(song: CuedSong, start: number, end: number): FoundCue[] {
+  const inSpan = (cue: number | null): cue is number => cue !== null && cue >= start && cue < end;
   return song.arrangement.flatMap((o) => {
-    const own: ShownCue[] = inSpan(o.cue) ? [{ occurrence: o.id, line: null, cue: o.cue }] : [];
-    const lines = linesOf(o).flatMap((l) => {
-      const cue = o.lineCues[l.id];
-      return inSpan(cue) ? [{ occurrence: o.id, line: l.id, cue }] : [];
-    });
+    const own: FoundCue[] = inSpan(o.cue) ? [{ occurrence: o.id, line: null, cue: o.cue }] : [];
+    const lines = Object.keys(o.lineCues)
+      .map(Number)
+      .sort((a, b) => a - b)
+      .flatMap((line) => (inSpan(o.lineCues[line]) ? [{ occurrence: o.id, line, cue: o.lineCues[line] }] : []));
     return [...own, ...lines];
   });
 }

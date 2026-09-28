@@ -23,7 +23,7 @@ func cueMillis(seconds float64) (int64, error) {
 	case seconds > maxCue:
 		return 0, invalid("a Cue can't be more than 24 hours into the Timeline")
 	}
-	return int64(math.Round(seconds * 1000)), nil
+	return millis(seconds), nil
 }
 
 // cueSeconds turns a stored Cue back into seconds, or nil for none.
@@ -208,14 +208,14 @@ func (s *Store) ShiftCues(ctx context.Context, songID int64, based Version, star
 	if end <= start {
 		return Song{}, invalid("the span must end after it starts")
 	}
-	from, to := millis(start), millis(end)
+	startMs, endMs := millis(start), millis(end)
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		var low, high sql.NullInt64
 		err := tx.QueryRowContext(ctx, `SELECT MIN(cue_ms), MAX(cue_ms) FROM (
 				SELECT cue_ms FROM occurrences WHERE song_id = ?
 				UNION ALL
 				SELECT lc.cue_ms FROM line_cues lc JOIN occurrences o ON o.id = lc.occurrence_id WHERE o.song_id = ?
-			) WHERE cue_ms >= ? AND cue_ms < ?`, songID, songID, from, to).Scan(&low, &high)
+			) WHERE cue_ms >= ? AND cue_ms < ?`, songID, songID, startMs, endMs).Scan(&low, &high)
 		if err != nil {
 			return fmt.Errorf("finding cues to shift: %w", err)
 		}
@@ -230,12 +230,12 @@ func (s *Store) ShiftCues(ctx context.Context, songID int64, based Version, star
 		}
 		delta := millis(by)
 		if _, err := tx.ExecContext(ctx, `UPDATE occurrences SET cue_ms = cue_ms + ?
-			WHERE song_id = ? AND cue_ms >= ? AND cue_ms < ?`, delta, songID, from, to); err != nil {
+			WHERE song_id = ? AND cue_ms >= ? AND cue_ms < ?`, delta, songID, startMs, endMs); err != nil {
 			return fmt.Errorf("shifting occurrence cues: %w", err)
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE line_cues SET cue_ms = cue_ms + ?
 			WHERE occurrence_id IN (SELECT id FROM occurrences WHERE song_id = ?) AND cue_ms >= ? AND cue_ms < ?`,
-			delta, songID, from, to); err != nil {
+			delta, songID, startMs, endMs); err != nil {
 			return fmt.Errorf("shifting line cues: %w", err)
 		}
 		return nil
