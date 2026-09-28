@@ -37,7 +37,7 @@
     onUnsaved,
     playhead = null,
     hasClips = false,
-    seek,
+    playFrom,
     playheadAt,
     loopOn = false,
     stopLoop,
@@ -54,8 +54,8 @@
     playhead?: number | null;
     /** Whether the Timeline has any Clip, so there's something to cue to. */
     hasClips?: boolean;
-    /** Seeks the Timeline, e.g. to lead into a Cue from its ▶. */
-    seek?: (to: number) => void;
+    /** Plays the Timeline from a time, or jumps there if it's playing, e.g. to lead into a Cue from its ▶. */
+    playFrom?: (at: number) => void;
     /** Where the Timeline's playhead is, playing or paused, in seconds: where Sync mode cues a Line. */
     playheadAt?: () => number;
     /** Whether the Timeline's Loop is on, which switches Sync mode off: the two are exclusive. */
@@ -85,7 +85,7 @@
   const wide = new MediaQuery('min-width: 40.0625rem');
   const canCue = $derived(wide.current && (hasClips || hasCues(song)));
   // Playing from a Cue's ▶, or a cued Line in Read mode, leads into it.
-  const playFrom = $derived(seek && ((cue: number) => seek(leadIn(cue))));
+  const leadInto = $derived(playFrom && ((cue: number) => playFrom(leadIn(cue))));
 
   // Shifting every Cue, dormant ones included, by a step: each click is one
   // shift, saved at once and undone like any Cue edit. The step is
@@ -152,7 +152,7 @@
             save: (line, cue) => setLineCue(occurrence, line, cue),
             field: (line, field) => writeFields.set(key(occurrence.id, line), field),
             next: (line) => writeFields.editAfter(writeFieldOrder, key(occurrence.id, line)),
-            play: playFrom,
+            play: leadInto,
             outOfOrder: (line) => {
               const mark = outOfOrder.get(key(occurrence.id, line));
               return mark ? outOfOrderReason(mark, lineName) : null;
@@ -435,7 +435,7 @@
         </label>
       </div>
     {/if}
-    <LyricSheetView {song} showChords={chordsShown} {current} play={playFrom} />
+    <LyricSheetView {song} showChords={chordsShown} {current} play={leadInto} />
   {:else}
     <ol class="arrangement">
       {#each song.arrangement as occurrence, i (occurrence.id)}

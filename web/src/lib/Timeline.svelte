@@ -555,11 +555,20 @@
     seekTo(to);
   }
 
-  /** Seeks as asked by hand, bringing the playhead into view, e.g. for a cued Line. */
-  export function seekTo(to: number) {
+  /** Seeks as asked by hand, bringing the playhead into view. */
+  function seekTo(to: number) {
     following = true;
     seekByHand(to);
     reveal(position);
+  }
+
+  /**
+   * Plays from a time asked by hand, e.g. leading into a Cue: starts playback
+   * there, or jumps there if it's playing already, never pausing it.
+   */
+  export function playFrom(at: number) {
+    seekTo(at);
+    if (playerState === 'stopped') play(position);
   }
 
   /**
