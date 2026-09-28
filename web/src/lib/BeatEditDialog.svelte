@@ -130,18 +130,21 @@
       </div>
     {/if}
     <BeatFields bind:draft idPrefix="beat-edit" />
-    <div class="actions">
-      <button type="submit" class="button primary" disabled={busy !== null}>Save</button>
-      <button type="button" class="button" onclick={close} disabled={busy !== null}>Cancel</button>
-      <span class="spacer"></span>
+    <div class="footer">
+      <div class="pair">
+        <button type="submit" class="button primary" disabled={busy !== null}>Save</button>
+        <button type="button" class="button" onclick={close} disabled={busy !== null}>Cancel</button>
+      </div>
       {#if inUse}
         <p class="muted hint">Used by a Song, so its file can't be replaced or the Beat deleted.</p>
       {:else}
-        <label class="button" class:disabled={busy !== null}>
-          Replace file
-          <input class="visually-hidden" type="file" accept="audio/*" onchange={replaceFile} disabled={busy !== null} />
-        </label>
-        <button type="button" class="button danger" onclick={remove} disabled={busy !== null}>Delete</button>
+        <div class="pair">
+          <label class="button" class:disabled={busy !== null}>
+            Replace file
+            <input class="visually-hidden" type="file" accept="audio/*" onchange={replaceFile} disabled={busy !== null} />
+          </label>
+          <button type="button" class="button danger" onclick={remove} disabled={busy !== null}>Delete</button>
+        </div>
       {/if}
     </div>
   </form>
@@ -220,8 +223,27 @@
     align-items: center;
     gap: 0.5rem;
   }
-  .spacer {
-    flex: 1;
+  /* Saving on the left, the file and deletion on the right. Each pair wraps
+     as one, so a narrow dialog never leaves a button on a row of its own. */
+  .footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .pair {
+    display: flex;
+    gap: 0.5rem;
+  }
+  /* On a phone, each pair takes a row, its two buttons sharing it evenly. */
+  @media (width < 40rem) {
+    .pair {
+      flex: 1 1 100%;
+    }
+    .pair > * {
+      flex: 1;
+    }
   }
   .offer {
     display: flex;
