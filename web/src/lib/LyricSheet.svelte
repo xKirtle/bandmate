@@ -4,13 +4,15 @@
   import type { Cueing } from './AlternateText.svelte';
   import { api, suggestedLabels, type Line, type Occurrence, type Song, type SongAt } from './api';
   import { hasChords } from './chords';
-  import { currentPosition, hasCues, isBlank, nextLine, type NextLine } from './cues';
+  import { currentPosition, hasCues, isBlank, nextLine, type NextLine, type Position } from './cues';
   import { follower, key } from './follow';
   import { gutterFields } from './gutter';
   import LyricSheetView from './LyricSheetView.svelte';
   import SectionEditor from './SectionEditor.svelte';
   import { describe } from './sections';
+  import { markSyncHintSeen, sawSyncHint } from './syncHint';
   import { inTextField } from './textField';
+  import { deviceStorage } from './timelineHeight';
 
   let {
     song,
@@ -87,9 +89,6 @@
   // Write mode shows every Line, Chord Lines included, so whatever is
   // current is on screen.
   const writeKey = $derived(mode === 'write' && current ? key(current.occurrence, current.line) : null);
-  $effect(() => {
-    follow(writeKey);
-  });
 
   /** How an Occurrence's Cues show on its Section's text box in Write mode. */
   function cueingFor(occurrence: Occurrence, label: string): Cueing {
@@ -104,6 +103,13 @@
             field: (line, field) => writeFields.set(key(occurrence.id, line), field),
             next: (line) => writeFields.editAfter(writeFieldOrder, key(occurrence.id, line)),
             play: seek,
+          }
+        : undefined,
+      sync: syncing
+        ? {
+            next: upNext?.occurrence === occurrence.id ? upNext.line : null,
+            now: cueNext,
+            pick: (line) => (syncFrom = { current: null, picked: { occurrence: occurrence.id, line } }),
           }
         : undefined,
     };
@@ -121,28 +127,45 @@
     if (!canSync || loopOn) untrack(() => (syncing = false));
   });
 
+  // What the Line up next is worked out from: where playback was as Sync
+  // mode came on, then the Line last cued, or a Line picked by clicking it.
+  // It doesn't follow playback, so the Line up next only moves on as Lines
+  // are cued, whether or not their Cues are saved yet.
+  let syncFrom = $state.raw<{ current: Position | null; picked: NextLine | null }>({ current: null, picked: null });
+  // Outlined, with a Now button in its gutter slot; none after the last Line.
+  const upNext = $derived(syncing ? nextLine(song, syncFrom) : null);
+
+  // The first time Sync mode comes on on this device, a hint says how to use it.
+  let hinting = $state(false);
+
   function switchSyncing() {
     syncing = !syncing;
-    if (syncing) stopLoop?.();
+    hinting = syncing && !sawSyncHint(deviceStorage());
+    if (!syncing) return;
+    stopLoop?.();
+    markSyncHintSeen(deviceStorage());
+    syncFrom = { current: playheadAt ? currentPosition(song, playheadAt()) : null, picked: null };
   }
 
-  // The latest cue, while the Cue it set is being saved: the Song doesn't
-  // have that Cue yet, so the next cue goes on from it rather than from
-  // what's current.
-  let pendingCue: NextLine | null = null;
-
-  /** Cues the next Line at the playhead. */
+  /** Cues the Line up next at the playhead. */
   async function cueNext() {
-    if (!playheadAt) return;
+    const line = upNext;
+    if (!playheadAt || !line) return;
     const time = playheadAt();
-    const current = pendingCue ?? currentPosition(song, time);
-    const line = nextLine(song, { current });
-    if (!line) return;
-    pendingCue = line;
-    await editCues((at) => api.setLineCue(at, line.occurrence, line.line, time));
-    // Saved, the Song has the Cue; failed, the Line is still to cue.
-    if (pendingCue === line) pendingCue = null;
+    const from = { current: line, picked: null };
+    syncFrom = from;
+    const saved = await editCues((at) => api.setLineCue(at, line.occurrence, line.line, time));
+    // Failed, the Line is still to cue, unless another has been picked since.
+    if (!saved && syncFrom === from) syncFrom = { current: null, picked: line };
   }
+
+  // Playback is followed down the Lyric Sheet in Write mode, but in Sync
+  // mode it's the Line up next that's kept in view instead: following both
+  // would pull the page two ways at once.
+  const followKey = $derived(syncing ? upNext && key(upNext.occurrence, upNext.line) : writeKey);
+  $effect(() => {
+    follow(followKey);
+  });
 
   // In Sync mode, Enter cues anywhere but a text field or a dialog, even on
   // a button: syncing along shouldn't depend on where focus was left.
@@ -210,14 +233,16 @@
       >
     {/if}
     {#if mode === 'write' && wide.current}
+      <!-- Clicked, it keeps focus where it was, so Space then plays rather than switching it back off. -->
       <button
         type="button"
         class="button sync-toggle"
         aria-pressed={syncing}
         disabled={!canSync}
+        onpointerdown={(e) => e.preventDefault()}
         onclick={switchSyncing}
         title={canSync
-          ? 'Sync lyrics: press Enter as each Line starts to cue it at the playhead'
+          ? 'Sync lyrics: press Enter or Now as each Line starts to cue it at the playhead'
           : 'Add a beat to the Timeline to sync lyrics to it'}>Sync lyrics</button
       >
     {/if}
@@ -226,6 +251,9 @@
       <label class="mode"><input type="radio" name="sheet-mode" value="write" bind:group={mode} />Write</label>
       <label class="mode"><input type="radio" name="sheet-mode" value="read" bind:group={mode} />Read</label>
     </fieldset>
+    {#if syncing && hinting}
+      <p class="sync-hint muted">Play, then press Enter or Now as each Line starts. Click a Line to start from it.</p>
+    {/if}
   </div>
 
   {#if song.arrangement.length === 0}
@@ -379,6 +407,11 @@
     border-color: var(--accent);
     background: var(--accent);
     color: var(--accent-text);
+  }
+  .sync-hint {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: 0.8125rem;
   }
   .modes {
     display: flex;
