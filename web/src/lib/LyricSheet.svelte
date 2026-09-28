@@ -55,7 +55,7 @@
     /** Whether the Timeline has any Clip, so there's something to cue to. */
     hasClips?: boolean;
     /** Plays the Timeline from a time, or jumps there if it's playing, e.g. to lead into a Cue from its ▶. */
-    playFrom?: (to: number) => void;
+    playFrom?: (at: number) => void;
     /** Where the Timeline's playhead is, playing or paused, in seconds: where Sync mode cues a Line. */
     playheadAt?: () => number;
     /** Whether the Timeline's Loop is on, which switches Sync mode off: the two are exclusive. */

@@ -566,9 +566,9 @@
    * Plays from a time asked by hand, e.g. leading into a Cue: starts playback
    * there, or jumps there if it's playing already, never pausing it.
    */
-  export function playFrom(to: number) {
-    seekTo(to);
-    if (playerState === 'stopped' && !empty) play(position);
+  export function playFrom(at: number) {
+    seekTo(at);
+    if (playerState === 'stopped') play(position);
   }
 
   /**
