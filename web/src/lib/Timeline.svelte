@@ -1937,27 +1937,25 @@
     margin-top: calc(0.5 * var(--timeline-rem));
   }
 
-  /* On a phone, the Timeline only plays. */
+  /*
+   * On a phone, the Timeline only plays: the transport row alone. The Tracks
+   * are hidden as when collapsed, so they come back as they were on widening
+   * the window, and playback goes on with their saved levels and Loop.
+   */
   @media (max-width: 40rem) {
     /* Already sized for a phone, and there's no room to spare. */
     .timeline {
       --timeline-scale: 1;
     }
-    .edit-only {
+    .edit-only,
+    .resize,
+    .tracks {
       display: none;
     }
-    .heads {
-      width: calc(8 * var(--timeline-rem));
-    }
-    /* Easier to hit with a thumb. */
+    /* The Loop toggle, easier to hit with a thumb. */
     .toggle {
       width: calc(1.75 * var(--timeline-rem));
       height: calc(1.5 * var(--timeline-rem));
-    }
-    /* .clip-actions and .loop-clear show on hover, so they need hiding here too. */
-    .clip .clip-actions,
-    .loop .loop-clear {
-      display: none;
     }
   }
 </style>
