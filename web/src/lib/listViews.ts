@@ -215,6 +215,10 @@ export const beatProducers = (beats: readonly Beat[]) => distinct(beats, (b) => 
 /** The keys in the Library, to pick one to filter by. */
 export const beatKeys = (beats: readonly Beat[]) => distinct(beats, (b) => b.key);
 
+function textFromParam(param: string | null): string | undefined {
+  return param?.trim() ? param : undefined;
+}
+
 function bpmFromParam(param: string | null): number | undefined {
   if (param === null || param.trim() === '') return undefined;
   const bpm = Number(param);
@@ -243,10 +247,10 @@ export function beatListViewFromParams(params: URLSearchParams): BeatListView {
   const use = params.get('use');
   return {
     q: params.get('q') ?? defaultBeatListView.q,
-    producer: params.get('producer')?.trim() ? params.get('producer')! : undefined,
+    producer: textFromParam(params.get('producer')),
     bpmMin: bpmFromParam(params.get('bpmMin')),
     bpmMax: bpmFromParam(params.get('bpmMax')),
-    key: params.get('key')?.trim() ? params.get('key')! : undefined,
+    key: textFromParam(params.get('key')),
     use: beatUses.find((u) => u === use),
     sort: sortFromParam(params.get('sort'), beatColumns) ?? defaultBeatListView.sort,
   };

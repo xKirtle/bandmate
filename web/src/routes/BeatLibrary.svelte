@@ -141,7 +141,8 @@
     }
     preview.src = api.beatAudioUrl(beat);
     previewing = beat.id;
-    preview.play().catch(() => (previewing = null));
+    // A later Beat's play() cuts this one short, and that Beat is previewing now.
+    preview.play().catch(() => previewing === beat.id && (previewing = null));
   }
 
   async function pick(event: Event) {
@@ -228,6 +229,8 @@
   {#if addError}
     <p class="error add-error" role="alert">{addError}</p>
   {/if}
+
+  <audio bind:this={preview} onplay={playMediaAlone} onpause={() => (previewing = null)} hidden></audio>
 
   <search class="filters">
     <div class="search-row">
@@ -320,7 +323,6 @@
       <button type="button" class="button" onclick={clearFilters}>Clear filters</button>
     </div>
   {:else if desktop.current}
-    <audio bind:this={preview} onplay={playMediaAlone} onpause={() => (previewing = null)} hidden></audio>
     <table class="beats-table">
       <thead>
         <tr>
@@ -329,7 +331,7 @@
             <th class:num={column.num} aria-sort={sortState(column.id)}>
               <button type="button" onclick={() => (view.sort = toggleSort(view.sort, column.id))}>
                 {column.label}<span class="arrow" aria-hidden="true"
-                  >{view.sort.column === column.id ? (view.sort.direction === 'asc' ? '↑' : '↓') : ''}</span
+                  >{{ ascending: '↑', descending: '↓', none: '' }[sortState(column.id) ?? 'none']}</span
                 >
               </button>
             </th>
