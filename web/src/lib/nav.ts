@@ -19,3 +19,11 @@ export function currentPage(path: string): LibraryPage | undefined {
   if (path === '/beats') return 'beats';
   return undefined;
 }
+
+/**
+ * The page whose list is at a path, e.g. Songs for the Song list but not for
+ * a Song. The navigation returns to a list as it was left there.
+ */
+export function listAt(path: string): LibraryPage | undefined {
+  return pages.find((page) => page.href === path)?.id;
+}

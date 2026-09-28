@@ -1,23 +1,53 @@
 <script lang="ts">
-  import { api, statuses, type SongSummary, type Status } from '../lib/api';
+  import { api, statuses, type SongSummary } from '../lib/api';
+  import {
+    defaultSongListView,
+    songListViewFromParams,
+    songListViewToParams,
+    sortSongs,
+    toggleSort,
+    type SongColumn,
+  } from '../lib/listViews';
+  import { navigate, replaceSearch, router } from '../lib/router.svelte';
   import StatusBadge from '../lib/StatusBadge.svelte';
   import { timeAgo } from '../lib/time';
 
   let songs = $state<SongSummary[] | null>(null);
   let error = $state<string | null>(null);
-  let status = $state<Status | undefined>();
-  let q = $state('');
-  // Only Songs with a Master; combines with the Status filter.
-  let hasMaster = $state(false);
+  // The search, filters and sort start as the URL has them, and are kept in
+  // it so going back to the list restores them. The filters combine.
+  let view = $state(songListViewFromParams(new URLSearchParams(router.search)));
 
-  const filtering = $derived(status !== undefined || hasMaster || q.trim() !== '');
+  const sorted = $derived(songs && sortSongs(songs, view.sort));
+
+  $effect(() => {
+    replaceSearch(songListViewToParams(view));
+  });
+
+  const columns: { id: SongColumn; label: string; num?: boolean }[] = [
+    { id: 'title', label: 'Title' },
+    { id: 'status', label: 'Status' },
+    { id: 'key', label: 'Key' },
+    { id: 'bpm', label: 'BPM', num: true },
+    { id: 'master', label: 'Master' },
+    { id: 'edited', label: 'Edited' },
+  ];
+
+  // A click anywhere on a row opens its Song, as its title link does.
+  function openRow(event: MouseEvent, song: SongSummary) {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if ((event.target as Element).closest('a')) return;
+    navigate(`/songs/${song.id}`);
+  }
+
+  const filtering = $derived(view.status !== undefined || view.hasMaster || view.q.trim() !== '');
   // Not reactive: the first load shouldn't wait, later ones debounce typing.
   let loaded = false;
 
   // Reloads whenever the filters change, waiting for a pause in typing. Only
   // the latest request's answer is shown.
   $effect(() => {
-    const filter = { status, q, hasMaster: hasMaster || undefined };
+    const filter = { status: view.status, q: view.q, hasMaster: view.hasMaster || undefined };
     let current = true;
     const timer = setTimeout(() => {
       api.listSongs(filter).then(
@@ -37,9 +67,7 @@
   });
 
   function clearFilters() {
-    status = undefined;
-    hasMaster = false;
-    q = '';
+    view = { ...defaultSongListView, sort: view.sort };
   }
 </script>
 
@@ -57,19 +85,19 @@
     <input
       id="song-search"
       type="search"
-      bind:value={q}
+      bind:value={view.q}
       placeholder="Search titles"
       autocomplete="off"
       enterkeyhint="search"
     />
     <div class="chips" role="group" aria-label="Filter Songs">
-      <button type="button" class="chip" aria-pressed={status === undefined} onclick={() => (status = undefined)}>
+      <button type="button" class="chip" aria-pressed={view.status === undefined} onclick={() => (view.status = undefined)}>
         All
       </button>
       {#each statuses as s (s)}
-        <button type="button" class="chip" aria-pressed={status === s} onclick={() => (status = s)}>{s}</button>
+        <button type="button" class="chip" aria-pressed={view.status === s} onclick={() => (view.status = s)}>{s}</button>
       {/each}
-      <button type="button" class="chip master" aria-pressed={hasMaster} onclick={() => (hasMaster = !hasMaster)}>
+      <button type="button" class="chip master" aria-pressed={view.hasMaster} onclick={() => (view.hasMaster = !view.hasMaster)}>
         Has a Master
       </button>
     </div>
@@ -90,9 +118,42 @@
       <a class="button primary" href="/songs/new">Write your first Song</a>
       <a class="button" href="/songs/import">Import one</a>
     </div>
-  {:else}
+  {:else if sorted}
+    <table class="songs-table">
+      <thead>
+        <tr>
+          {#each columns as column (column.id)}
+            <th
+              class:num={column.num}
+              aria-sort={view.sort.column === column.id ? (view.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined}
+            >
+              <button type="button" onclick={() => (view.sort = toggleSort(view.sort, column.id))}>
+                {column.label}<span class="arrow" aria-hidden="true"
+                  >{view.sort.column === column.id ? (view.sort.direction === 'asc' ? '↑' : '↓') : ''}</span
+                >
+              </button>
+            </th>
+          {/each}
+        </tr>
+      </thead>
+      <tbody>
+        {#each sorted as song (song.id)}
+          <tr onclick={(event) => openRow(event, song)}>
+            <td class="title"><a href="/songs/{song.id}">{song.title}</a></td>
+            <td><StatusBadge status={song.status} /></td>
+            <td>{song.key || '—'}</td>
+            <td class="num">{song.bpm ?? '—'}</td>
+            <td>
+              {#if song.hasMaster}<span aria-hidden="true">✓</span><span class="visually-hidden">Has a Master</span
+                >{:else}—{/if}
+            </td>
+            <td class="muted"><time datetime={song.updatedAt}>{timeAgo(song.updatedAt)}</time></td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
     <ul class="songs">
-      {#each songs as song (song.id)}
+      {#each sorted as song (song.id)}
         <li>
           <a href="/songs/{song.id}">
             <span class="title">{song.title}</span>
@@ -182,6 +243,80 @@
   .empty {
     text-align: center;
     padding: 3rem 0;
+  }
+
+  /* Desktop shows a table, narrower windows the list. */
+  .songs-table {
+    display: none;
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+  th {
+    padding: 0;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    white-space: nowrap;
+  }
+  th button {
+    width: 100%;
+    min-height: var(--control);
+    padding: 0 0.5rem;
+    border: none;
+    border-radius: 0.25rem;
+    background: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-align: inherit;
+    cursor: pointer;
+  }
+  th button:hover,
+  th[aria-sort] button {
+    color: var(--text);
+  }
+  .arrow {
+    display: inline-block;
+    width: 1em;
+    margin-left: 0.25rem;
+  }
+  td {
+    height: calc(var(--control) + 0.5rem);
+    padding: 0 0.5rem;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td.title {
+    width: 100%;
+    max-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 600;
+  }
+  td.title a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  tbody tr {
+    cursor: pointer;
+  }
+  tbody tr:hover,
+  tbody tr:focus-within {
+    background: var(--surface-1);
+  }
+
+  @media (min-width: 80rem) {
+    .songs-table {
+      display: table;
+    }
+    .songs {
+      display: none;
+    }
   }
 
   @media (min-width: 36rem) {

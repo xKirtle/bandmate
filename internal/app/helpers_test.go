@@ -231,6 +231,9 @@ type songSummary struct {
 	ID        int64  `json:"id"`
 	Title     string `json:"title"`
 	Status    string `json:"status"`
+	Key       string `json:"key"`
+	BPM       *int   `json:"bpm"`
+	HasMaster bool   `json:"hasMaster"`
 	UpdatedAt string `json:"updatedAt"`
 }
 
