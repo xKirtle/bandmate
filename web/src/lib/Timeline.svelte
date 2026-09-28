@@ -1456,7 +1456,7 @@
 </section>
 
 {#if picking}
-  <BeatPicker onPick={addBeat} onClose={() => (picking = false)} />
+  <BeatPicker {song} onPick={addBeat} onClose={() => (picking = false)} />
 {/if}
 
 <style>

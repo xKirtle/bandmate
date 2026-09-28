@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Beat, SongSummary } from './api';
 import {
+  beatDrawerFilterCount,
   beatKeys,
   beatListViewFromParams,
   beatListViewToParams,
@@ -9,6 +10,7 @@ import {
   defaultSongListView,
   filterBeats,
   isBeatListFiltered,
+  songBeatHint,
   sortBeats,
   songListViewFromParams,
   songListViewToParams,
@@ -409,5 +411,32 @@ describe('isBeatListFiltered', () => {
     expect(isBeatListFiltered({ ...defaultBeatListView, bpmMin: 0 })).toBe(true);
     expect(isBeatListFiltered({ ...defaultBeatListView, use: 'unused' })).toBe(true);
     expect(isBeatListFiltered({ ...defaultBeatListView, q: 'x' })).toBe(true);
+  });
+});
+
+describe('beatDrawerFilterCount', () => {
+  it('counts the set filters other than the search, a BPM range as one', () => {
+    expect(beatDrawerFilterCount({ ...defaultBeatListView, q: 'x' })).toBe(0);
+    expect(beatDrawerFilterCount({ ...defaultBeatListView, bpmMin: 80, bpmMax: 100 })).toBe(1);
+    expect(beatDrawerFilterCount({ ...defaultBeatListView, producer: 'Nox', key: 'Am', use: 'used', bpmMax: 0 })).toBe(4);
+  });
+
+  it('ignores blank text', () => {
+    expect(beatDrawerFilterCount({ ...defaultBeatListView, producer: '  ', key: '' })).toBe(0);
+  });
+});
+
+describe('songBeatHint', () => {
+  it("shows the Song's BPM and key", () => {
+    expect(songBeatHint({ bpm: 92, key: 'Am' })).toBe('92 BPM · Am');
+  });
+
+  it('shows only what is set', () => {
+    expect(songBeatHint({ bpm: 92, key: ' ' })).toBe('92 BPM');
+    expect(songBeatHint({ bpm: null, key: ' C#m ' })).toBe('C#m');
+  });
+
+  it('is nothing when neither is set', () => {
+    expect(songBeatHint({ bpm: null, key: '' })).toBeUndefined();
   });
 });

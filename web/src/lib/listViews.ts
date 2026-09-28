@@ -166,6 +166,28 @@ export function isBeatListFiltered(view: BeatListView): boolean {
   );
 }
 
+/**
+ * How many filters other than the search are set, a BPM range counting as
+ * one. Below 80rem these sit in a drawer, which shows the count.
+ */
+export function beatDrawerFilterCount(view: BeatListView): number {
+  return [
+    view.producer?.trim(),
+    view.bpmMin !== undefined || view.bpmMax !== undefined,
+    view.key?.trim(),
+    view.use,
+  ].filter(Boolean).length;
+}
+
+/**
+ * A Song's BPM and key, whichever are set, shown beside the Beat picker's
+ * filters as a hint; undefined when neither is.
+ */
+export function songBeatHint(song: { bpm: number | null; key: string }): string | undefined {
+  const hint = [song.bpm !== null ? `${song.bpm} BPM` : '', song.key.trim()].filter(Boolean).join(' · ');
+  return hint || undefined;
+}
+
 /** The Beats the view's search and filters keep, in the order given. */
 export function filterBeats(beats: readonly Beat[], view: BeatListView): Beat[] {
   const q = folded(view.q);
