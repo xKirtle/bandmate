@@ -266,7 +266,7 @@
     margin-bottom: 0.5rem;
   }
   .label {
-    flex: 1 1 8rem;
+    flex: 1 1 5rem;
     width: auto;
     min-width: 0;
     border-color: transparent;
