@@ -35,7 +35,7 @@
       /** Given, a ▶ beside the Cue seeks the Timeline to it. */
       play?: (to: number) => void;
       /** Whether playback is in the Occurrence. */
-      current: boolean;
+      current?: boolean;
     };
     /** Given, the active Alternate's Lines are highlighted and cued as playback goes. */
     cueing?: Cueing;

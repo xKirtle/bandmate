@@ -1,7 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import { formatCue, nudgeCue, parseCue } from './cues';
-  import { playLabel } from './gutter';
+  import { formatCue, nudgeCue, parseCue, playLabel } from './cues';
 
   // A Cue's time, shown as m:ss.s. Clicking it lets the time be typed:
   // Enter or leaving the field saves, Esc cancels, and an empty field clears
@@ -107,6 +106,7 @@
 <span class="slot" class:current>
   {#if play}
     {#if cue === null}
+      <!-- Holds the ▶'s room, so the times still line up down the gutter. -->
       <span class="play" class:gutter aria-hidden="true"></span>
     {:else}
       {@const at = cue}
@@ -214,7 +214,7 @@
     color: var(--text-muted);
     font: inherit;
     font-size: 0.625rem;
-    opacity: 0.4;
+    opacity: 0.5;
     cursor: pointer;
   }
   .play.gutter {

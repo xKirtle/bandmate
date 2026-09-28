@@ -1,5 +1,3 @@
-import { formatCue } from './cues';
-
 /** A Line's Cue field in the gutter, as far as Enter in another goes on to it. */
 export interface GutterField {
   edit: () => void;
@@ -28,9 +26,4 @@ export function gutterFields() {
       return !!next;
     },
   };
-}
-
-/** Names a Cue's ▶ for screen readers, e.g. "Play from Line 3 of Verse 1 at 0:38.5". */
-export function playLabel(label: string, cue: number): string {
-  return `Play from ${label} at ${formatCue(cue)}`;
 }
