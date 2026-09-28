@@ -21,6 +21,19 @@
       /** Given, a ▶ beside each Cue seeks the Timeline to it. */
       play?: (to: number) => void;
     };
+    /**
+     * Given, as in Sync mode, the text is read-only, the Line up next is
+     * outlined with a Now button in its gutter slot, and clicking a Line
+     * makes it next.
+     */
+    sync?: {
+      /** The Line up next, if it's in this Occurrence. */
+      next: number | null;
+      /** Cues the Line up next at the playhead. */
+      now: () => void;
+      /** Makes a Line the next one. */
+      pick: (line: number) => void;
+    };
   }
 </script>
 
@@ -139,19 +152,33 @@
 <label class="visually-hidden" for="text-{uid}">{label}</label>
 <!-- The backdrop renders the rows again behind the text box, wrapping them
      the same way, so each row's highlight and Cue line up with its text. The
-     text box sits on top and takes every click, so it never seeks. -->
-<div class="field" class:cued={cueing} class:with-gutter={cueing?.gutter} style:--rows={rows.length}>
+     text box sits on top and takes every click, so it never seeks, except
+     in Sync mode, where clicks go through it to the rows to pick them. -->
+<div
+  class="field"
+  class:cued={cueing}
+  class:with-gutter={cueing?.gutter}
+  class:syncing={cueing?.sync}
+  style:--rows={rows.length}
+>
   {#if cueing}
     <div class="backdrop"></div>
     {#each rows as row, i (i)}
       {@const line = rowLines[i]}
       {@const gridRow = i + 2}
       {#if line}
+        {@const sync = cueing.sync && !isBlank(line) ? cueing.sync : undefined}
+        <!-- Picking a Line is also in its gutter slot, which takes the keyboard. -->
+        <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
         <div
           class="row"
           class:current={line.id === cueing.current}
+          class:next={line.id === sync?.next}
+          class:pickable={sync}
           style:grid-row={gridRow}
           aria-hidden="true"
+          title={sync ? 'Cue this Line next' : undefined}
+          onclick={sync ? () => sync.pick(line.id) : undefined}
           {@attach (el) => cueing.track(el, line.id)}
         >
           {row || ' '}
@@ -161,17 +188,32 @@
       {/if}
       {#if cueing.gutter && line && !isBlank(line)}
         {@const gutter = cueing.gutter}
+        {@const sync = cueing.sync}
+        {@const lineLabel = `Line ${alternate.lines.indexOf(line) + 1}${gutter.labelSuffix}`}
         <div class="gutter" style:grid-row={gridRow}>
-          <CueField
-            bind:this={() => undefined, (field) => gutter.field(line.id, field)}
-            gutter
-            cue={cueing.cues[line.id] ?? null}
-            label="Line {alternate.lines.indexOf(line) + 1}{gutter.labelSuffix}"
-            save={(cue) => gutter.save(line, cue)}
-            next={() => gutter.next(line.id)}
-            play={gutter.play}
-            current={line.id === cueing.current}
-          />
+          {#if sync && line.id === sync.next}
+            <!-- Clicked, it keeps focus where it was, so Space still plays and pauses. -->
+            <button
+              type="button"
+              class="now"
+              onpointerdown={(e) => e.preventDefault()}
+              onclick={sync.now}
+              aria-label="Cue {lineLabel} now"
+              title="Cue this Line at the playhead (Enter)">Now <span aria-hidden="true">⏎</span></button
+            >
+          {:else}
+            <CueField
+              bind:this={() => undefined, (field) => gutter.field(line.id, field)}
+              gutter
+              cue={cueing.cues[line.id] ?? null}
+              label={lineLabel}
+              save={(cue) => gutter.save(line, cue)}
+              next={() => gutter.next(line.id)}
+              play={gutter.play}
+              current={line.id === cueing.current}
+              pick={sync ? () => sync.pick(line.id) : undefined}
+            />
+          {/if}
         </div>
       {/if}
     {/each}
@@ -180,6 +222,7 @@
     id="text-{uid}"
     class="text"
     bind:value={text}
+    readonly={!!cueing?.sync}
     oninput={typed}
     onfocus={() => (editingText = true)}
     onblur={textBlurred}
@@ -251,6 +294,32 @@
   .row.current {
     background: var(--surface-2);
     box-shadow: inset 3px 0 0 var(--accent);
+  }
+  /* Up next in Sync mode: outlined, so it doesn't look like the current Line. */
+  .row.next {
+    outline: 2px dashed var(--accent);
+    outline-offset: -2px;
+  }
+  .syncing .text {
+    pointer-events: none;
+  }
+  .row.pickable {
+    pointer-events: auto;
+    cursor: pointer;
+  }
+  /* As wide as a Cue's ▶ and time, so the gutter doesn't shift as it moves on. */
+  .now {
+    width: 5.5rem;
+    min-height: 1.5rem;
+    padding: 0 0.375rem;
+    border: 1px solid var(--accent);
+    border-radius: 0.375rem;
+    background: var(--accent);
+    color: var(--accent-text);
+    font: inherit;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    cursor: pointer;
   }
   /* Takes no height, so however tall its field, the rows stay as tall as
      their text. */

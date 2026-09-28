@@ -4,7 +4,8 @@
 
   // A Cue's time, shown as m:ss.s. Clicking it lets the time be typed:
   // Enter or leaving the field saves, Esc cancels, and an empty field clears
-  // the Cue. Alt+↑/↓ nudges it by a tenth of a second.
+  // the Cue. Alt+↑/↓ nudges it by a tenth of a second. In Sync mode,
+  // clicking it makes what it's for the next to cue instead.
   let {
     cue,
     label,
@@ -13,6 +14,7 @@
     gutter = false,
     play,
     current = false,
+    pick,
   }: {
     /** In seconds, or null without a Cue. */
     cue: number | null;
@@ -28,6 +30,8 @@
     play?: (to: number) => void;
     /** Whether playback is on what the Cue is for, so its ▶ isn't muted. */
     current?: boolean;
+    /** Given, as in Sync mode, clicking the time or ▶ makes what the Cue is for the next to cue; the time isn't opened. */
+    pick?: () => void;
   } = $props();
 
   let editing = $state(false);
@@ -117,7 +121,10 @@
         class="play"
         class:gutter
         onpointerdown={(e) => e.preventDefault()}
-        onclick={() => play(at)}
+        onclick={() => {
+          play(at);
+          pick?.();
+        }}
         aria-label={playLabel(label, at)}
         title="Play from here">▶</button
       >
@@ -151,12 +158,18 @@
       class="cue"
       class:gutter
       class:unset={cue === null}
-      onclick={edit}
+      onclick={pick ?? edit}
       onkeydown={nudge}
-      aria-label={cue === null ? `Set a Cue for ${label}` : `Cue for ${label}: ${formatCue(cue)}. Change it`}
-      title={cue === null
-        ? 'Set when this starts on the Timeline'
-        : 'Change when this starts on the Timeline; Alt+↑/↓ nudges it'}
+      aria-label={pick
+        ? `Cue ${label} next${cue === null ? '' : `, cued at ${formatCue(cue)}`}`
+        : cue === null
+          ? `Set a Cue for ${label}`
+          : `Cue for ${label}: ${formatCue(cue)}. Change it`}
+      title={pick
+        ? 'Cue this next'
+        : cue === null
+          ? 'Set when this starts on the Timeline'
+          : 'Change when this starts on the Timeline; Alt+↑/↓ nudges it'}
     >
       {cue === null ? '–:––.–' : formatCue(cue)}
     </button>
