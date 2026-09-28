@@ -65,13 +65,13 @@ function hasLineCue(o: CuedOccurrence, lines: readonly CuedLine[]): boolean {
  * Given, a Line being retaken in Sync mode has its Cue ignored, so it only
  * becomes current once it's cued again.
  */
-export function currentPosition(song: CuedSong, t: number, ignoring: NextLine | null = null): Position | null {
+export function currentPosition(song: CuedSong, t: number, retaking: NextLine | null = null): Position | null {
   const linesOf = activeLines(song);
   type Latest = { at: number; o: CuedOccurrence; line: number | null; lines: readonly CuedLine[] };
   let latest: Latest | null = null;
   for (const o of song.arrangement) {
     const lines = linesOf(o);
-    const retaken = ignoring?.occurrence === o.id ? ignoring.line : null;
+    const retaken = retaking?.occurrence === o.id ? retaking.line : null;
     const cues: [number | null | undefined, number | null][] = [
       [o.cue, null],
       ...lines.map((l) => [l.id === retaken ? undefined : o.lineCues[l.id], l.id] as [number | undefined, number]),

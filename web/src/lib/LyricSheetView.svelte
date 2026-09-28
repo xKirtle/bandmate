@@ -8,14 +8,14 @@
     song,
     showChords,
     current = null,
-    seek,
+    play,
   }: {
     song: Song;
     showChords: boolean;
     /** Where playback is: highlighted and kept in view. */
     current?: Position | null;
     /** Given, clicking a cued Line plays from its Cue. */
-    seek?: (to: number) => void;
+    play?: (cue: number) => void;
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
@@ -45,7 +45,7 @@
 
   /** What clicking a Line does: play from its Cue. Null for nothing. */
   function clickLine(cue: number | null): (() => void) | null {
-    return cue !== null && seek ? () => seek(cue) : null;
+    return cue !== null && play ? () => play(cue) : null;
   }
 
   /** Does what clicking a Line does, unless the click was to select its text. */
@@ -87,7 +87,7 @@
             aria-current={lineCurrent ? 'true' : undefined}
             {@attach (el) => track(el, k)}
           >
-            <!-- Seeking is also on the Timeline's ruler, so a click here is a shortcut. -->
+            <!-- Like a Cue's ▶ in Write mode, so a click here is a shortcut. -->
             <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
             <div
               class="text"

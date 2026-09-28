@@ -416,7 +416,7 @@
         </label>
       </div>
     {/if}
-    <LyricSheetView {song} showChords={chordsShown} {current} seek={playFrom} />
+    <LyricSheetView {song} showChords={chordsShown} {current} play={playFrom} />
   {:else}
     <ol class="arrangement">
       {#each song.arrangement as occurrence, i (occurrence.id)}
