@@ -141,17 +141,6 @@
     if (!(await change((at) => api.updateSong(at, { showChords: next })))) showChords = song.showChords;
   }
 
-  // Kept the same way as showChords.
-  let showCues = $state(untrack(() => song.showCues));
-  $effect(() => {
-    showCues = song.showCues;
-  });
-
-  async function toggleCues() {
-    const next = showCues;
-    if (!(await change((at) => api.updateSong(at, { showCues: next })))) showCues = song.showCues;
-  }
-
   async function add(position: number) {
     if (await change((at) => api.addSection(at, { position }))) {
       added = song.arrangement[position]?.id ?? null;
@@ -192,28 +181,20 @@
   {/if}
 
   {#if mode === 'read'}
-    {#if songHasChords || canCue}
+    {#if songHasChords}
       <div class="toggles">
-        {#if songHasChords}
-          <label class="toggle">
-            <input type="checkbox" bind:checked={showChords} onchange={toggleChords} />
-            Show chords
-          </label>
-        {/if}
-        {#if canCue}
-          <label class="toggle">
-            <input type="checkbox" bind:checked={showCues} onchange={toggleCues} />
-            Show Cues
-          </label>
-        {/if}
+        <label class="toggle">
+          <input type="checkbox" bind:checked={showChords} onchange={toggleChords} />
+          Show chords
+        </label>
       </div>
     {/if}
     <LyricSheetView
       {song}
       showChords={chordsShown}
       {current}
-      setCue={canCue && showCues ? setCue : undefined}
-      setLineCue={canCue && showCues ? setLineCue : undefined}
+      setCue={canCue ? setCue : undefined}
+      setLineCue={canCue ? setLineCue : undefined}
       {seek}
       {picked}
       pick={tapping ? (line) => (picked = line) : undefined}

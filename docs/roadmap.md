@@ -46,7 +46,7 @@ Cues:
 Editing:
 
 - **Cue gutter**: a narrow column beside each Occurrence's Lines, in Read and Write mode, shows each Line's Cue; the Occurrence's own Cue sits on its Section's header row. Click a time to type one, clear it to remove it, Alt+↑/↓ nudges it by 0.1 s. Enter saves and moves to the next Line, Esc cancels. There's no Cue lane on the Timeline.
-- The gutter appears once the Timeline has a Clip or the Song has any Cue. Read mode has a "Show Cues" checkbox beside "Show chords" (the highlight works either way); Write mode always shows it; phone never does.
+- The gutter appears once the Timeline has a Clip or the Song has any Cue. It shows the same way in Read and Write mode; phone never shows it.
 - Cue times read `m:ss.s` and are stored to the millisecond. Typing accepts `45`, `0:45`, `0:45.25` or `1:02`; negative times are rejected, times past the last Clip are fine.
 - **Tap mode**: while it's on, Enter (or an on-screen Tap button) cues the next Line at the playhead, playing or paused. The next Line is the one after the current highlight, in on-screen order, or the first Line of the Arrangement; clicking a Line makes it the next one. It skips Chord Lines while Read mode hides Chords. Re-tapping a Line replaces its Cue and leaves later Cues alone. Each Occurrence of a shared Section is tapped separately. Remapping the key can come later if Enter is awkward.
 - Tap mode and the Loop are exclusive: switching one on switches the other off.
