@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hintKey, markHintSeen, sawHint } from './syncHint';
+import { markSyncHintSeen, sawSyncHint, syncHintKey } from './syncHint';
 
 /** A Storage holding some values, or one that throws like a blocked one. */
 function storage(values: Record<string, string> = {}, blocked = false): Storage {
@@ -13,30 +13,30 @@ function storage(values: Record<string, string> = {}, blocked = false): Storage 
   } as Storage;
 }
 
-describe('sawHint', () => {
+describe('sawSyncHint', () => {
   it('is false until the hint has been seen', () => {
-    expect(sawHint(storage())).toBe(false);
+    expect(sawSyncHint(storage())).toBe(false);
   });
 
   it('is true once it has been seen', () => {
-    expect(sawHint(storage({ [hintKey]: '1' }))).toBe(true);
+    expect(sawSyncHint(storage({ [syncHintKey]: '1' }))).toBe(true);
   });
 
   it('is false without storage, or when it is blocked', () => {
-    expect(sawHint(undefined)).toBe(false);
-    expect(sawHint(storage({ [hintKey]: '1' }, true))).toBe(false);
+    expect(sawSyncHint(undefined)).toBe(false);
+    expect(sawSyncHint(storage({ [syncHintKey]: '1' }, true))).toBe(false);
   });
 });
 
-describe('markHintSeen', () => {
+describe('markSyncHintSeen', () => {
   it('remembers the hint was seen', () => {
     const s = storage();
-    markHintSeen(s);
-    expect(sawHint(s)).toBe(true);
+    markSyncHintSeen(s);
+    expect(sawSyncHint(s)).toBe(true);
   });
 
   it('does nothing without storage, or when it is blocked', () => {
-    expect(() => markHintSeen(undefined)).not.toThrow();
-    expect(() => markHintSeen(storage({}, true))).not.toThrow();
+    expect(() => markSyncHintSeen(undefined)).not.toThrow();
+    expect(() => markSyncHintSeen(storage({}, true))).not.toThrow();
   });
 });

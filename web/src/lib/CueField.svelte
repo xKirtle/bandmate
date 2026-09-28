@@ -30,7 +30,10 @@
     play?: (to: number) => void;
     /** Whether playback is on what the Cue is for, so its ▶ isn't muted. */
     current?: boolean;
-    /** Given, as in Sync mode, clicking the time or ▶ makes what the Cue is for the next to cue; the time isn't opened. */
+    /**
+     * Given, as in Sync mode, clicking the time or ▶ makes what the Cue is
+     * for the next to cue, rather than opening the time.
+     */
     pick?: () => void;
   } = $props();
 

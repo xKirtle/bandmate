@@ -10,7 +10,7 @@
   import LyricSheetView from './LyricSheetView.svelte';
   import SectionEditor from './SectionEditor.svelte';
   import { describe } from './sections';
-  import { markHintSeen, sawHint } from './syncHint';
+  import { markSyncHintSeen, sawSyncHint } from './syncHint';
   import { inTextField } from './textField';
   import { deviceStorage } from './timelineHeight';
 
@@ -140,10 +140,10 @@
 
   function switchSyncing() {
     syncing = !syncing;
-    hinting = syncing && !sawHint(deviceStorage());
+    hinting = syncing && !sawSyncHint(deviceStorage());
     if (!syncing) return;
     stopLoop?.();
-    markHintSeen(deviceStorage());
+    markSyncHintSeen(deviceStorage());
     syncFrom = { current: playheadAt ? currentPosition(song, playheadAt()) : null, picked: null };
   }
 

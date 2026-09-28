@@ -167,7 +167,8 @@
       {@const line = rowLines[i]}
       {@const gridRow = i + 2}
       {#if line}
-        {@const sync = cueing.sync && !isBlank(line) ? cueing.sync : undefined}
+        <!-- Sync mode skips Chord Lines, so only Lines with words are picked. -->
+        {@const sync = cueing.sync && !isBlank(line) && !line.chordLine ? cueing.sync : undefined}
         <!-- Picking a Line is also in its gutter slot, which takes the keyboard. -->
         <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
         <div
@@ -211,7 +212,7 @@
               next={() => gutter.next(line.id)}
               play={gutter.play}
               current={line.id === cueing.current}
-              pick={sync ? () => sync.pick(line.id) : undefined}
+              pick={sync && !line.chordLine ? () => sync.pick(line.id) : undefined}
             />
           {/if}
         </div>
