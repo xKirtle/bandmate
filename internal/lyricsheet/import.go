@@ -75,7 +75,8 @@ type importedSheet struct {
 	sections []importedSection
 }
 
-// importedSection is one Section read from pasted text.
+// importedSection is one Section read from pasted text, as it appears
+// there: one Occurrence, until arrange finds the Sections it shares.
 type importedSection struct {
 	label string
 	lines []importedLine
@@ -83,14 +84,14 @@ type importedSection struct {
 
 // importedLine is one Line read from pasted text, with where it came from.
 type importedLine struct {
-	text string
-	at   int // its line number in the paste, from 1
+	text      string
+	pasteLine int // its line number in the paste, from 1
 }
 
-// invalid rejects the paste over this line, naming it so the user can find
-// it.
-func (l importedLine) invalid(format string, args ...any) error {
-	return invalid(fmt.Sprintf("line %d: ", l.at) + fmt.Sprintf(format, args...))
+// invalidPasteLine rejects a paste over one of its lines, counted from 1,
+// naming it so the user can find it.
+func invalidPasteLine(pasteLine int, format string, args ...any) error {
+	return invalid(fmt.Sprintf("line %d: ", pasteLine) + fmt.Sprintf(format, args...))
 }
 
 // sectionDirective is what a ChordPro section directive does: start a
@@ -109,10 +110,10 @@ var sectionDirectives = map[string]sectionDirective{
 
 // parseImport reads pasted text into the Song title, if a directive gives
 // one, and Sections, one per group of Lines in the text, or rejects it with
-// an error naming the line at fault. Blank lines and end
-// directives end a Section, and a heading or start directive starts one with
-// that Label. A heading with no Lines under it is a Section with no Lines.
-// Other directives never become Lines.
+// an error naming the line at fault (see invalidPasteLine). Blank lines and
+// end directives end a Section, and a heading or start directive starts one
+// with that Label. A heading with no Lines under it is a Section with no
+// Lines. Other directives never become Lines.
 func parseImport(text string) (importedSheet, error) {
 	var sheet importedSheet
 	var cur importedSection
@@ -144,7 +145,7 @@ func parseImport(text string) (importedSheet, error) {
 			cur = importedSection{label: label}
 			continue
 		}
-		cur.lines = append(cur.lines, importedLine{text: line, at: i + 1})
+		cur.lines = append(cur.lines, importedLine{text: line, pasteLine: i + 1})
 	}
 	end()
 	return sheet, nil
