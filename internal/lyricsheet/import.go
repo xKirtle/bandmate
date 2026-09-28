@@ -15,8 +15,8 @@ var (
 )
 
 // ImportSong creates a new Song from pasted lyrics, plain text or ChordPro,
-// with one Occurrence per group of Lines in the text. Repeated groups share
-// one Section (see arrange). A title directive in the text names the Song;
+// with one Occurrence per Section the text marks (see parseImport).
+// Repeated Sections share one Section (see arrange). A title directive in the text names the Song;
 // without one, title does.
 func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error) {
 	sheet, err := parseImport(text)
@@ -109,15 +109,20 @@ var sectionDirectives = map[string]sectionDirective{
 }
 
 // parseImport reads pasted text into the Song title, if a directive gives
-// one, and Sections, one per group of Lines in the text, or rejects it with
-// an error naming the line at fault (see invalidPasteLine). Blank lines and
-// end directives end a Section, and a heading or start directive starts one
-// with that Label. A heading with no Lines under it is a Section with no
+// one, and Sections, or rejects it with an error naming the line at fault
+// (see invalidPasteLine). Only what the text says starts a Section: a
+// heading or start directive starts one with that Label, and an end
+// directive ends one, so the Lines after it start one without a Label.
+// Blank lines are blank Lines, except at a Section's start or end, where
+// they're dropped. A heading with no Lines under it is a Section with no
 // Lines. Other directives never become Lines.
 func parseImport(text string) (importedSheet, error) {
 	var sheet importedSheet
 	var cur importedSection
 	end := func() {
+		for len(cur.lines) > 0 && strings.TrimSpace(cur.lines[len(cur.lines)-1].text) == "" {
+			cur.lines = cur.lines[:len(cur.lines)-1]
+		}
 		if cur.label != "" || len(cur.lines) > 0 {
 			sheet.sections = append(sheet.sections, cur)
 		}
@@ -125,7 +130,9 @@ func parseImport(text string) (importedSheet, error) {
 	}
 	for i, line := range splitLines(text) {
 		if strings.TrimSpace(line) == "" {
-			end()
+			if len(cur.lines) > 0 {
+				cur.lines = append(cur.lines, importedLine{text: line, pasteLine: i + 1})
+			}
 			continue
 		}
 		if name, value, ok := directive(line); ok {

@@ -69,17 +69,17 @@ func TestImportSplitsPastedTextIntoSections(t *testing.T) {
 			"City lights\nare calling",
 			[]shownSection{{"", []string{"City lights", "are calling"}}},
 		},
-		"a blank line ends a section": {
+		"a blank line is a blank line, not a new section": {
 			"City lights\nare calling\n\nMe home\ntonight",
-			[]shownSection{{"", []string{"City lights", "are calling"}}, {"", []string{"Me home", "tonight"}}},
+			[]shownSection{{"", []string{"City lights", "are calling", "", "Me home", "tonight"}}},
 		},
-		"several blank lines are one break": {
+		"several blank lines are several blank lines": {
 			"\n\nCity lights\n\n\n  \n\t\nMe home\n\n\n",
-			[]shownSection{{"", []string{"City lights"}}, {"", []string{"Me home"}}},
+			[]shownSection{{"", []string{"City lights", "", "", "  ", "\t", "Me home"}}},
 		},
 		"windows line endings": {
 			"City lights\r\nare calling\r\n\r\nMe home",
-			[]shownSection{{"", []string{"City lights", "are calling"}}, {"", []string{"Me home"}}},
+			[]shownSection{{"", []string{"City lights", "are calling", "", "Me home"}}},
 		},
 		"lines kept as written": {
 			"  City lights  \nare calling",
@@ -98,8 +98,12 @@ func TestImportSplitsPastedTextIntoSections(t *testing.T) {
 			[]shownSection{{"Verse", []string{"City lights"}}, {"Chorus", []string{"Me home"}}},
 		},
 		"heading with no lines is an empty section": {
-			"Intro:\n[Verse]\nCity lights\n\n[Chorus]\n\nMe home",
-			[]shownSection{{"Intro", []string{}}, {"Verse", []string{"City lights"}}, {"Chorus", []string{}}, {"", []string{"Me home"}}},
+			"Intro:\n[Verse]\nCity lights\n\n[Outro]\n\n",
+			[]shownSection{{"Intro", []string{}}, {"Verse", []string{"City lights"}}, {"Outro", []string{}}},
+		},
+		"blank lines at a section's start and end are trimmed": {
+			"[Verse]\n\n  \nCity lights\n\nare calling\n\n\n[Chorus]\n\nMe home\n \n",
+			[]shownSection{{"Verse", []string{"City lights", "", "are calling"}}, {"Chorus", []string{"Me home"}}},
 		},
 		"text after the colon is a line": {
 			"She said: come home\nand I did",
@@ -161,6 +165,18 @@ func TestImportSplitsPastedTextIntoSections(t *testing.T) {
 			"{soc}\nMe home\n{eoc}\nCity lights",
 			[]shownSection{{"Chorus", []string{"Me home"}}, {"", []string{"City lights"}}},
 		},
+		"lines after an end directive are one unlabelled section": {
+			"{soc}\nMe home\n{eoc}\n\nCity lights\n\nare calling\n\n{sov}\nSo far\n{eov}",
+			[]shownSection{{"Chorus", []string{"Me home"}}, {"", []string{"City lights", "", "are calling"}}, {"Verse", []string{"So far"}}},
+		},
+		"blank lines between an end and a start directive are no section": {
+			"{soc}\nMe home\n{eoc}\n\n \n{sov}\nCity lights\n{eov}\n\n",
+			[]shownSection{{"Chorus", []string{"Me home"}}, {"Verse", []string{"City lights"}}},
+		},
+		"a blank line inside a chordpro section is a blank line": {
+			"{sov}\n\nCity lights\n\nare calling\n\n{eov}",
+			[]shownSection{{"Verse", []string{"City lights", "", "are calling"}}},
+		},
 		"a section directive closes the one before": {
 			"City lights\n{soc}\nMe home",
 			[]shownSection{{"", []string{"City lights"}}, {"Chorus", []string{"Me home"}}},
@@ -212,26 +228,44 @@ func TestImportMergesRepeatedSections(t *testing.T) {
 			},
 			[]int{0, 1, 0, 2, 0},
 		},
+		"identical stanzas without headings are one section": {
+			"Me home\ntonight\n\nMe home\ntonight",
+			[]shownSection{{"", []string{"Me home", "tonight", "", "Me home", "tonight"}}},
+			[]int{0},
+		},
 		"whitespace at line ends is ignored": {
-			"Me home\ntonight\n\n  Me home \ntonight\t",
-			[]shownSection{{"", []string{"Me home", "tonight"}}, {"", []string{"Me home", "tonight"}}},
+			"[Chorus]\nMe home\ntonight\n\n[Chorus]\n  Me home \ntonight\t",
+			[]shownSection{{"Chorus", []string{"Me home", "tonight"}}, {"Chorus", []string{"Me home", "tonight"}}},
 			[]int{0, 0},
 		},
-		"sections that differ slightly do not merge": {
-			"Me home\ntonight\n\nMe home\ntonight!\n\nMe home\n\nMe  home\ntonight\n\nMe home\ntonight\nagain",
+		"blank lines inside merge like any line": {
+			"[Chorus]\nMe home\n\ntonight\n\n[Verse]\nCity lights\n\n[Chorus]\nMe home\n  \ntonight",
 			[]shownSection{
-				{"", []string{"Me home", "tonight"}}, {"", []string{"Me home", "tonight!"}}, {"", []string{"Me home"}},
-				{"", []string{"Me  home", "tonight"}}, {"", []string{"Me home", "tonight", "again"}},
+				{"Chorus", []string{"Me home", "", "tonight"}}, {"Verse", []string{"City lights"}},
+				{"Chorus", []string{"Me home", "", "tonight"}},
+			},
+			[]int{0, 1, 0},
+		},
+		"a blank line more does not merge": {
+			"[Chorus]\nMe home\ntonight\n\n[Chorus]\nMe home\n\ntonight",
+			[]shownSection{{"Chorus", []string{"Me home", "tonight"}}, {"Chorus", []string{"Me home", "", "tonight"}}},
+			[]int{0, 1},
+		},
+		"sections that differ slightly do not merge": {
+			"[Chorus]\nMe home\ntonight\n[Chorus]\nMe home\ntonight!\n[Chorus]\nMe home\n[Chorus]\nMe  home\ntonight\n[Chorus]\nMe home\ntonight\nagain",
+			[]shownSection{
+				{"Chorus", []string{"Me home", "tonight"}}, {"Chorus", []string{"Me home", "tonight!"}}, {"Chorus", []string{"Me home"}},
+				{"Chorus", []string{"Me  home", "tonight"}}, {"Chorus", []string{"Me home", "tonight", "again"}},
 			},
 			[]int{0, 1, 2, 3, 4},
 		},
 		"different chords do not merge": {
-			"Me [Am]home\n\nMe [F]home",
-			[]shownSection{{"", []string{"Me [Am]home"}}, {"", []string{"Me [F]home"}}},
+			"[Chorus]\nMe [Am]home\n\n[Chorus]\nMe [F]home",
+			[]shownSection{{"Chorus", []string{"Me [Am]home"}}, {"Chorus", []string{"Me [F]home"}}},
 			[]int{0, 1},
 		},
 		"a label on the first one is kept": {
-			"Chorus:\nMe home\n\nMe home",
+			"{soc}\nMe home\n{eoc}\n\nMe home",
 			[]shownSection{{"Chorus", []string{"Me home"}}, {"Chorus", []string{"Me home"}}},
 			[]int{0, 0},
 		},
