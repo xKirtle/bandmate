@@ -15,6 +15,7 @@
   import Masters from '../lib/Masters.svelte';
   import Scrapbook from '../lib/Scrapbook.svelte';
   import Timeline from '../lib/Timeline.svelte';
+  import type { Saved } from '../lib/history';
   import { navigate } from '../lib/router.svelte';
   import { timeAgo } from '../lib/time';
 
@@ -84,13 +85,25 @@
     return enqueue(op, (s) => (song = s));
   }
 
-  /** Queues a Timeline change like send, and shows the Timeline it returns. */
-  function changeTimeline(op: (at: SongAt) => Promise<TimelineData>): Promise<boolean> {
-    return enqueue(op, (tl) => {
-      timeline = tl;
+  /**
+   * Queues a Timeline change like send, and shows the Timeline it returns,
+   * or for a Cue edit, which the Timeline keeps to undo, the Song.
+   */
+  function changeTimeline(op: (at: SongAt) => Promise<Saved>): Promise<boolean> {
+    return enqueue(op, (saved) => {
+      if ('song' in saved) {
+        song = saved.song;
+        return;
+      }
+      timeline = saved.timeline;
       // The change moved the Song on too.
-      song = { ...song!, version: tl.version, updatedAt: tl.updatedAt };
+      song = { ...song!, version: timeline.version, updatedAt: timeline.updatedAt };
     });
+  }
+
+  /** Queues a Cue edit through the Timeline, so it can be undone with the Timeline's edits. */
+  function editCues(op: (at: SongAt) => Promise<Song>): Promise<boolean> {
+    return timelinePanel ? timelinePanel.editCues(op) : send(op);
   }
 
   function enqueue<T>(op: (at: SongAt) => Promise<T>, show: (result: T) => void): Promise<boolean> {
@@ -335,6 +348,7 @@
           bind:this={lyricSheet}
           {song}
           change={send}
+          {editCues}
           onUnsaved={setUnsaved}
           {playhead}
           seek={(to) => timelinePanel?.seekTo(to)}

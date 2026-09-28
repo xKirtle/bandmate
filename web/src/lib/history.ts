@@ -1,20 +1,28 @@
 import {
   api,
+  type CueValue,
   type NewClip,
   type NewTrack,
   type SongAt,
+  type Song,
   type Timeline,
   type TimelineLoop,
   type TrackChanges,
 } from './api';
+import { isBlank, type CuedSong } from './cues';
 
-// Undo and redo for Timeline edits, kept in the browser while the page is open.
-// Each edit is kept as data, with the edit that undoes it, worked out from
-// the Timeline before and after it. Undoing and redoing send those through
-// the API like any other edit.
+// Undo and redo for Timeline edits and Cue edits, kept in the browser while
+// the page is open, in one history. Each edit is kept as data, with the
+// edit that undoes it, worked out from the Timeline, or for a Cue edit the
+// Song, before and after it. Undoing and redoing send those through the API
+// like any other edit.
 //
 // An edit that brings back a deleted Clip or Track gets it a new id. The
 // edits kept that name the old id are then changed to name the new one.
+//
+// However a Cue edit was made (typed, nudged, tapped or cleared), it's
+// undone and redone by restoring the Cues it changed to what they were
+// before or after it.
 
 /** A change to the Timeline, as the intent sent to the API. */
 export type Edit =
@@ -32,6 +40,15 @@ export type Edit =
   | { kind: 'switchLoop'; on: boolean }
   | { kind: 'clearLoop' };
 
+/** Cues set back to given values, to undo or redo a Cue edit. */
+export interface CueEdit {
+  kind: 'restoreCues';
+  cues: CueValue[];
+}
+
+/** An edit kept to undo or redo: to the Timeline, or to the Cues. */
+export type HistoryEdit = Edit | CueEdit;
+
 /** Ids of Tracks and Clips, each in Timeline order. */
 interface Ids {
   tracks: number[];
@@ -40,7 +57,7 @@ interface Ids {
 
 /** An edit to send, and the ids it's known to give what it adds. */
 interface Step {
-  edit: Edit;
+  edit: HistoryEdit;
   adds: Ids;
 }
 
@@ -60,17 +77,37 @@ export class History {
     this.#redo = [];
   }
 
+  /** Keeps a Cue edit that turned before into after, to undo, unless it changed no Cue. */
+  recordCues(before: CuedSong, after: CuedSong): void {
+    const was = cueValues(before);
+    const now = cueValues(after);
+    // A Cue there on one side only is none on the other.
+    const changed = [...new Map([...was, ...now]).values()]
+      .map((c) => ({ was: was.get(key(c)) ?? { ...c, cue: null }, now: now.get(key(c)) ?? { ...c, cue: null } }))
+      .filter((c) => c.was.cue !== c.now.cue);
+    if (changed.length === 0) return;
+    const none: Ids = { tracks: [], clips: [] };
+    this.#undo.push({
+      undo: { edit: { kind: 'restoreCues', cues: changed.map((c) => c.was) }, adds: none },
+      redo: { edit: { kind: 'restoreCues', cues: changed.map((c) => c.now) }, adds: none },
+    });
+    this.#redo = [];
+  }
+
   /** The edit that would undo the latest one, or null if there's none. */
-  nextUndo(): Edit | null {
+  nextUndo(): HistoryEdit | null {
     return this.#undo.at(-1)?.undo.edit ?? null;
   }
 
   /** The edit that would redo the latest one undone, or null if there's none. */
-  nextRedo(): Edit | null {
+  nextRedo(): HistoryEdit | null {
     return this.#redo.at(-1)?.redo.edit ?? null;
   }
 
-  /** Notes that nextUndo's edit was sent, turning before into after. */
+  /**
+   * Notes that nextUndo's edit was sent, turning before into after. A Cue
+   * edit leaves the Timeline as it was, so is given it as both.
+   */
   undone(before: Timeline, after: Timeline): void {
     const entry = this.#undo.pop();
     if (!entry) return;
@@ -78,7 +115,7 @@ export class History {
     this.#follow(entry.undo, before, after);
   }
 
-  /** Notes that nextRedo's edit was sent, turning before into after. */
+  /** Notes that nextRedo's edit was sent, turning before into after, like undone. */
   redone(before: Timeline, after: Timeline): void {
     const entry = this.#redo.pop();
     if (!entry) return;
@@ -159,6 +196,47 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
   }
 }
 
+/**
+ * Every Cue a Song could have, set or not, by Occurrence and Line: each
+ * Occurrence's own and those of its Lines that have one, dormant ones
+ * included. Each Occurrence's own comes first, then its Lines' by id.
+ */
+function cueValues(song: CuedSong): Map<string, CueValue> {
+  const values: CueValue[] = song.arrangement.flatMap((o) => [
+    { occurrenceId: o.id, cue: o.cue },
+    ...Object.keys(o.lineCues)
+      .map(Number)
+      .map((lineId) => ({ occurrenceId: o.id, lineId, cue: o.lineCues[lineId] })),
+  ]);
+  return new Map(values.map((c) => [key(c), c]));
+}
+
+/** Which Cue a value is for. */
+function key(c: CueValue): string {
+  return c.lineId === undefined ? `${c.occurrenceId}` : `${c.occurrenceId}:${c.lineId}`;
+}
+
+/**
+ * The Cues that can still be restored in a Song: those whose Occurrence is
+ * still in it and, for a Line's, whose Line is still in its Section and,
+ * to be given a Cue, isn't blank. The rest went with a Lyric Sheet change
+ * since, which can't be undone, so they're left out rather than stop undo.
+ */
+export function restorable(cues: readonly CueValue[], song: CuedSong): CueValue[] {
+  const occurrences = new Map(song.arrangement.map((o) => [o.id, o]));
+  const sections = new Map(song.sections.map((s) => [s.id, s]));
+  return cues.filter((c) => {
+    const o = occurrences.get(c.occurrenceId);
+    if (!o) return false;
+    if (c.lineId === undefined) return true;
+    const line = sections
+      .get(o.sectionId)
+      ?.alternates.flatMap((a) => a.lines)
+      .find((l) => l.id === c.lineId);
+    return line !== undefined && (c.cue === null || !isBlank(line));
+  });
+}
+
 /** What an edit can change on a Timeline, to compare. */
 function content(tl: Timeline): string {
   return JSON.stringify([tl.tracks, tl.loop]);
@@ -187,8 +265,9 @@ function remapStep(step: Step, ids: IdMaps): Step {
 }
 
 /** An edit naming Tracks and Clips by the ids given. */
-function remap(edit: Edit, ids: IdMaps): Edit {
+function remap(edit: HistoryEdit, ids: IdMaps): HistoryEdit {
   switch (edit.kind) {
+    case 'restoreCues':
     case 'addBeat':
     case 'addTrack':
     case 'setLoop':
@@ -219,6 +298,9 @@ function findClip(tl: Timeline, clipId: number) {
   }
   throw new Error(`Clip ${clipId} isn't on the Timeline`);
 }
+
+/** What a change saved: the Timeline, or for a Cue edit, the Song. */
+export type Saved = { timeline: Timeline } | { song: Song };
 
 /** Sends an edit to the Song's Timeline, returning the Timeline it leaves. */
 export function sendEdit(at: SongAt, edit: Edit): Promise<Timeline> {
