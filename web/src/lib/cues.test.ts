@@ -7,6 +7,7 @@ import {
   maxCue,
   formatCue,
   hasCues,
+  lastCue,
   linesByRow,
   nextLine,
   nudgeCue,
@@ -277,6 +278,43 @@ describe('hasCues', () => {
 
   it('ignores dormant Cues', () => {
     expect(hasCues({ arrangement: [{ id: 1, sectionId: 9, cue: null, lineCues: { 50: 3 } }], sections })).toBe(false);
+  });
+});
+
+describe('lastCue', () => {
+  const sections = [
+    {
+      id: 9,
+      alternates: [
+        { active: false, lines: [{ id: 50, text: 'Old' }] },
+        { active: true, lines: [{ id: 60, text: 'New' }] },
+      ],
+    },
+  ];
+
+  it('is null without any Cues', () => {
+    expect(lastCue({ arrangement: [{ id: 1, sectionId: 9, cue: null, lineCues: {} }], sections })).toBeNull();
+  });
+
+  it('is the latest of Occurrence Cues and Line Cues of the active Alternate', () => {
+    const song: CuedSong = {
+      arrangement: [
+        { id: 1, sectionId: 9, cue: 5, lineCues: { 60: 8 } },
+        { id: 2, sectionId: 9, cue: 20, lineCues: {} },
+      ],
+      sections,
+    };
+    expect(lastCue(song)).toBe(20);
+    expect(lastCue({ ...song, arrangement: [{ id: 1, sectionId: 9, cue: 5, lineCues: { 60: 30 } }] })).toBe(30);
+  });
+
+  it('counts a Cue at 0:00', () => {
+    expect(lastCue({ arrangement: [{ id: 1, sectionId: 9, cue: 0, lineCues: {} }], sections })).toBe(0);
+  });
+
+  it('ignores dormant Cues', () => {
+    expect(lastCue({ arrangement: [{ id: 1, sectionId: 9, cue: 5, lineCues: { 50: 40 } }], sections })).toBe(5);
+    expect(lastCue({ arrangement: [{ id: 1, sectionId: 9, cue: null, lineCues: { 50: 40 } }], sections })).toBeNull();
   });
 });
 

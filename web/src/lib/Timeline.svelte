@@ -16,7 +16,7 @@
   } from './api';
   import BeatPicker from './BeatPicker.svelte';
   import { clampMove, clampTrimEnd, clampTrimStart } from './clipEdit';
-  import { cuesInSpan, formatCue } from './cues';
+  import { cuesInSpan, formatCue, hasCues } from './cues';
   import {
     History,
     restorable,
@@ -118,9 +118,9 @@
       t.clips.map((c) => ({ ...c, source: api.beatAudioUrl(beats.get(c.beatId)!), trackId: t.id })),
     ),
   );
-  const length = $derived(timelineEnd(clips));
-  // Room after the last Clip, or the Loop if it ends later, to drag Clips
-  // and the Loop later on the Timeline.
+  const length = $derived(timelineEnd(clips, song));
+  // Room after the end, or the Loop if it ends later, to drag Clips and the
+  // Loop later on the Timeline.
   const reach = $derived(length > 0 ? Math.max(length, timeline.loop?.end ?? 0) : 0);
   const span = $derived(reach > 0 ? reach + Math.max(10, reach / 4) : 0);
   // Seeking outside the Loop switches it off, and until that's saved,
@@ -131,7 +131,9 @@
   const playingLoop = $derived<Loop | null>(
     loopOn ? { start: timeline.loop!.start, end: timeline.loop!.end } : null,
   );
-  const empty = $derived(clips.length === 0);
+  // With Cues but no Clips, it still plays, in silence, for the Lyric Sheet
+  // to follow.
+  const empty = $derived(clips.length === 0 && !hasCues(song));
   // Matches the phone layout below, which hides editing.
   const editable = new MediaQuery('min-width: 40.0625rem');
 
@@ -370,20 +372,33 @@
     });
   });
 
+  // Whether playback stopped by reaching the end, keeping the playhead.
+  let ended = false;
+
+  /** Lets go of the playhead kept at the end, once it's moved from there. */
+  function releaseEnded() {
+    if (!ended) return;
+    ended = false;
+    if (playerState === 'stopped') onPlayhead?.(null);
+  }
+
   // Follow the playhead every frame while playing, and stop at the end,
   // unless going round the Loop.
   $effect(() => {
     // Only stopping lets go of the playhead: starting over from elsewhere
-    // (e.g. after an edit) loads for a moment, and keeps it.
-    if (playerState === 'stopped') untrack(() => onPlayhead?.(null));
+    // (e.g. after an edit) loads for a moment, and keeps it. So does
+    // reaching the end, so the last Line stays highlighted, until it's moved.
+    if (playerState === 'stopped' && !ended) untrack(() => onPlayhead?.(null));
     if (playerState !== 'playing') return;
     let frame = requestAnimationFrame(function step() {
       if (!dragging) position = player.position();
       onPlayhead?.(position);
       if (position >= length && !player.repeating) {
+        ended = true;
         player.stop();
         player.seek(length);
         position = length;
+        onPlayhead?.(length);
         return;
       }
       // Not while something's dragged, which would jump with the page.
@@ -394,6 +409,7 @@
   });
 
   function play(from: number) {
+    ended = false;
     error = null;
     player.play(playable, from, playingLoop).catch((e: Error) => (error = e.message));
   }
@@ -416,6 +432,7 @@
 
   function seek(to: number) {
     position = clamp(to);
+    releaseEnded();
     if (playerState === 'stopped') player.seek(position);
     else play(position);
   }
