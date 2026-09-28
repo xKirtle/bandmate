@@ -48,7 +48,7 @@ Turning an Occurrence of a shared Section into its own independent Section, so i
 _Avoid_: Unlink, fork
 
 **Scrapbook**:
-A Song's collection of Sections that aren't in the Arrangement: leftovers and loose ideas kept for later.
+A Song's collection of Sections that aren't in the Arrangement: leftovers and loose ideas kept for later. A Section taken out of the Arrangement with nothing written in any Alternate (no Lines, or only blank ones) is deleted instead, as there's nothing to keep; a Section made in the Scrapbook stays there even while it's still empty.
 _Avoid_: Trash, drafts, unused
 
 **Alternate**:
@@ -105,11 +105,11 @@ A stretch of the Timeline that playback repeats, e.g. the hook of a Beat while w
 _Avoid_: Cycle, repeat, region
 
 **Cue**:
-A link from an Occurrence, or from one Line within an Occurrence, to a time on the Timeline. A Line's Cue lies dormant while its Alternate is inactive.
+A link from an Occurrence, or from one Line within an Occurrence, to a time on the Timeline. A Line's Cue lies dormant while its Alternate is inactive. Playing from a Cue starts a second before it, to lead into it.
 _Avoid_: Timestamp, sync point, marker
 
 **Sync mode**:
-A way of syncing a Song's Lines while the Timeline plays: as each Line starts, marking it "Now" cues it at the playhead, and the next Line comes up. Clicking a Line makes it the next one. Sync mode needs a Clip on the Timeline, and Sync mode and the Loop are never on together.
+A way of syncing a Song's Lines while the Timeline plays: as each Line starts, marking it "Now" cues it at the playhead, and the Line after it comes up next, cued or not, so a run of Lines can be retaken. Clicking a Line makes it the next one; with none clicked or just cued, the next one is the first Line without a Cue, or the first Line once every Line is cued. There's always a next Line. The Line playing is followed as usual, except that the next Line's own Cue is ignored until it's cued again, so the Line being retaken only becomes the one playing when it's marked "Now". Which Line is next never depends on where playback is, so playback can start anywhere. Sync mode needs a Clip on the Timeline, and Sync mode and the Loop are never on together.
 _Avoid_: Tap mode, record mode
 
 **Latency Offset**:
