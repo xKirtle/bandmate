@@ -69,6 +69,8 @@ Playback:
 - **Latency Offset**: a one-time calibration (play a click, record it, measure the delay) sets a global offset applied to every new Take. Each Take can then be nudged by hand.
 - The highlighted Line from Sync prompts the user while recording. Cues can be synced roughly against the Beat first and refined once a real vocal exists.
 - A Take freezes its lyrics but not Cues. The highlight always follows the current Lyric Sheet and Cues, so a Take recorded before the lyrics changed simply goes out of date.
+- Recording never needs a Beat: a reference vocal can be recorded on an empty Timeline. Step 2's empty Timeline only offers "add a beat". This step adds "record" next to it, as the Step 2 decisions above already describe.
+- Still open for this step's spec: what an empty Timeline shows (the slim bar whose Record button opens the Timeline, or the full Timeline always), how far the playhead runs when there's no audio or it's recording past the last Clip (today playback stops at the Timeline's end), and which Track a first recording lands on when the Song has none.
 
 ### 5. Keep
 
@@ -82,4 +84,5 @@ Playback:
 - Clip fx: fade in/out, gain, silence.
 - Cues on Masters (lyrics highlighting along with a studio recording).
 - Detecting a Beat's BPM and key from the audio itself.
+- A count-in or click from the Song's BPM, for recording without a Beat so a Beat added later can line up.
 - Real-time sync between open tabs or devices.
