@@ -63,6 +63,7 @@
     setBpm,
     onPlayhead,
     onLoop,
+    height = $bindable(0),
   }: {
     song: Song;
     timeline: Timeline;
@@ -74,6 +75,8 @@
     onPlayhead?: (at: number | null) => void;
     /** Hears whether the Loop is on, whenever that changes, e.g. to keep Sync mode off while it is. */
     onLoop?: (on: boolean) => void;
+    /** How tall the docked Timeline is, in pixels, e.g. for the page to keep clear of it. */
+    height?: number;
   } = $props();
 
   let playerState = $state<PlayerState>('stopped');
@@ -1111,7 +1114,7 @@
   </span>
 {/snippet}
 
-<section class="timeline" aria-label="Timeline">
+<section class="timeline" aria-label="Timeline" bind:offsetHeight={height}>
   {#if !empty && !collapsed}
     <!-- A focusable separator with a value is a widget, resized with Up and Down. -->
     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->

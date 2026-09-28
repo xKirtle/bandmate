@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
+  import { MediaQuery } from 'svelte/reactivity';
   import {
     api,
     ApiError,
@@ -54,6 +55,17 @@
   const writing = $derived(mode === 'write');
   // The Details as Read mode shows them.
   const summary = $derived(detailsSummary(draft));
+
+  // Desktop puts the Song's details in a column beside the Lyric Sheet, as
+  // sections that open and close. Each visit starts with them all open.
+  const desktop = new MediaQuery('min-width: 80rem');
+  let open = $state({ details: true, masters: true, scrapbook: true });
+  // Narrower windows show every section, with nothing to open them by.
+  $effect(() => {
+    if (!desktop.current) open = { details: true, masters: true, scrapbook: true };
+  });
+  // How tall the docked Timeline is, which the details column stops above.
+  let timelineHeight = $state(0);
 
   const commonTunings = ['Standard', 'Drop D', 'Half step down', 'DADGAD', 'Open G', 'Open D'];
 
@@ -285,46 +297,35 @@
 <svelte:window onbeforeunload={warnBeforeUnload} />
 <svelte:document onvisibilitychange={refresh} />
 
-<header class="bar">
-  <a class="back" href="/">← Songs</a>
-  {#if song}
-    <div class="actions">
-      {#if writing}
-        <button type="button" class="button danger" onclick={remove} disabled={deleting}>
-          {deleting ? 'Deleting…' : 'Delete'}
-        </button>
-      {/if}
-      <fieldset class="modes" disabled={deleting}>
-        <legend class="visually-hidden">Mode</legend>
-        <label class="mode"><input type="radio" name="song-mode" value="write" bind:group={mode} />Write</label>
-        <label class="mode"><input type="radio" name="song-mode" value="read" bind:group={mode} />Read</label>
-      </fieldset>
-    </div>
-  {/if}
-</header>
-
 <main class="page">
   {#if loadError}
     <p class="error" role="alert">{loadError}</p>
   {:else if song === null}
     <p class="muted">Loading…</p>
   {:else}
-    <div class="song">
+    <div class="song" style:--timeline-height="{timelineHeight}px">
       <div class="top">
-        {#if writing}
-          <label class="visually-hidden" for="song-title">Title</label>
-          <input
-            id="song-title"
-            class="title"
-            bind:value={draft.title}
-            onchange={() => commitText('title')}
-            required
-            autocomplete="off"
-            enterkeyhint="done"
-          />
-        {:else}
-          <h1 class="title">{draft.title}</h1>
-        {/if}
+        <div class="title-row">
+          {#if writing}
+            <label class="visually-hidden" for="song-title">Title</label>
+            <input
+              id="song-title"
+              class="title"
+              bind:value={draft.title}
+              onchange={() => commitText('title')}
+              required
+              autocomplete="off"
+              enterkeyhint="done"
+            />
+          {:else}
+            <h1 class="title">{draft.title}</h1>
+          {/if}
+          <fieldset class="modes" disabled={deleting}>
+            <legend class="visually-hidden">Mode</legend>
+            <label class="mode"><input type="radio" name="song-mode" value="write" bind:group={mode} />Write</label>
+            <label class="mode"><input type="radio" name="song-mode" value="read" bind:group={mode} />Read</label>
+          </fieldset>
+        </div>
 
         <div class="meta">
           <StatusBadge status={draft.status} onChange={writing ? setStatus : undefined} />
@@ -367,76 +368,90 @@
         />
       </div>
 
-      {#if writing}
-        <aside class="side">
-          <Scrapbook {song} change={send} onUnsaved={setUnsaved} />
-        </aside>
-      {/if}
-
-      <div class="about">
-        <Masters {song} {mode} change={send} onUnsaved={setUnsaved} {setStatus} />
-
-        <section class="details" aria-labelledby="details-heading">
-          <h2 id="details-heading">Details</h2>
-          {#if writing}
-            <div class="grid">
+      <!-- On desktop, a column beside the Lyric Sheet whose sections are
+           named by their toggles. Narrower, its parts follow the Lyric Sheet
+           in their own order, always open. -->
+      <div class="side">
+        <details class="part details-part" bind:open={open.details}>
+          <summary>Details</summary>
+          <section class="details" aria-labelledby="details-heading">
+            <h2 id="details-heading">Details</h2>
+            {#if writing}
+              <div class="grid">
+                <label>
+                  Key
+                  <input
+                    bind:value={draft.key}
+                    onchange={() => commitText('key')}
+                    list="common-keys"
+                    autocomplete="off"
+                    autocapitalize="characters"
+                    enterkeyhint="done"
+                    placeholder="—"
+                  />
+                </label>
+                <label>
+                  BPM
+                  <input
+                    bind:value={draft.bpm}
+                    onchange={() => commitNumber('bpm', 'BPM')}
+                    inputmode="numeric"
+                    autocomplete="off"
+                    enterkeyhint="done"
+                    placeholder="—"
+                  />
+                </label>
+                <label>
+                  Capo
+                  <input
+                    bind:value={draft.capo}
+                    onchange={() => commitNumber('capo', 'Capo')}
+                    inputmode="numeric"
+                    autocomplete="off"
+                    enterkeyhint="done"
+                    placeholder="—"
+                  />
+                </label>
+                <label>
+                  Tuning
+                  <input
+                    bind:value={draft.tuning}
+                    onchange={() => commitText('tuning')}
+                    list="common-tunings"
+                    autocomplete="off"
+                    enterkeyhint="done"
+                    placeholder="—"
+                  />
+                </label>
+              </div>
               <label>
-                Key
-                <input
-                  bind:value={draft.key}
-                  onchange={() => commitText('key')}
-                  list="common-keys"
-                  autocomplete="off"
-                  autocapitalize="characters"
-                  enterkeyhint="done"
-                  placeholder="—"
-                />
+                Notes
+                <textarea bind:value={draft.notes} onchange={() => commitText('notes')} rows="5"></textarea>
               </label>
-              <label>
-                BPM
-                <input
-                  bind:value={draft.bpm}
-                  onchange={() => commitNumber('bpm', 'BPM')}
-                  inputmode="numeric"
-                  autocomplete="off"
-                  enterkeyhint="done"
-                  placeholder="—"
-                />
-              </label>
-              <label>
-                Capo
-                <input
-                  bind:value={draft.capo}
-                  onchange={() => commitNumber('capo', 'Capo')}
-                  inputmode="numeric"
-                  autocomplete="off"
-                  enterkeyhint="done"
-                  placeholder="—"
-                />
-              </label>
-              <label>
-                Tuning
-                <input
-                  bind:value={draft.tuning}
-                  onchange={() => commitText('tuning')}
-                  list="common-tunings"
-                  autocomplete="off"
-                  enterkeyhint="done"
-                  placeholder="—"
-                />
-              </label>
-            </div>
-            <label>
-              Notes
-              <textarea bind:value={draft.notes} onchange={() => commitText('notes')} rows="5"></textarea>
-            </label>
-          {:else}
-            <p class="summary" class:muted={!summary}>{summary || 'No Details yet.'}</p>
-            {#if draft.notes.trim()}
-              <p class="read-notes">{draft.notes}</p>
+            {:else}
+              <p class="summary" class:muted={!summary}>{summary || 'No Details yet.'}</p>
+              {#if draft.notes.trim()}
+                <p class="read-notes">{draft.notes}</p>
+              {/if}
             {/if}
-          {/if}
-        </section>
+          </section>
+        </details>
+
+        <details class="part masters-part" bind:open={open.masters}>
+          <summary>{song.masters.length > 1 ? 'Masters' : 'Master'}</summary>
+          <Masters {song} {mode} change={send} onUnsaved={setUnsaved} {setStatus} />
+        </details>
+
+        {#if writing}
+          <details class="part scrapbook-part" bind:open={open.scrapbook}>
+            <summary>Scrapbook</summary>
+            <Scrapbook {song} change={send} onUnsaved={setUnsaved} />
+          </details>
+
+          <button type="button" class="button danger delete" onclick={remove} disabled={deleting}>
+            {deleting ? 'Deleting…' : 'Delete Song'}
+          </button>
+        {/if}
       </div>
     </div>
 
@@ -452,6 +467,7 @@
 {#if song && timeline}
   <Timeline
     bind:this={timelinePanel}
+    bind:height={timelineHeight}
     {song}
     {timeline}
     change={changeTimeline}
@@ -486,13 +502,22 @@
     border-color: var(--border);
     background: var(--surface-1);
   }
-  .actions {
+  /* With no header row, the page keeps clear of a notch itself. */
+  .page {
+    padding-top: max(var(--gutter), env(safe-area-inset-top));
+  }
+  .title-row {
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  .title-row .title {
+    flex: 1;
+    min-width: 0;
   }
   .modes {
     display: flex;
+    flex: none;
     margin: 0;
     padding: 0;
     border: 1px solid var(--border);
@@ -588,13 +613,141 @@
     margin-bottom: 0.75rem;
   }
 
-  .side {
-    margin-bottom: 2rem;
-  }
-
   @media (min-width: 36rem) {
     .grid {
       grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  /* One column: the title, the Lyric Sheet, then the Scrapbook, the
+     Masters, the Details and Delete, all open. */
+  .song {
+    display: flex;
+    flex-direction: column;
+  }
+  .side {
+    display: contents;
+  }
+  .sheet {
+    order: 1;
+  }
+  .scrapbook-part {
+    order: 2;
+    margin-bottom: 2rem;
+  }
+  .masters-part {
+    order: 3;
+  }
+  .details-part {
+    order: 4;
+  }
+  .delete {
+    order: 5;
+    align-self: flex-start;
+    margin-top: 1rem;
+  }
+  .part > summary {
+    display: none;
+  }
+
+  /* Desktop: two columns sitting together on the left, spare width going to
+     the right. The details column sticks, scrolls on its own and stops above
+     the docked Timeline. */
+  @media (min-width: 80rem) {
+    .song {
+      display: grid;
+      grid-template-columns: minmax(0, 55rem) 22rem;
+      grid-template-rows: auto 1fr;
+      grid-template-areas:
+        'top side'
+        'sheet side';
+      justify-content: start;
+      align-items: start;
+      column-gap: var(--gutter);
+    }
+    .top {
+      grid-area: top;
+    }
+    .sheet {
+      grid-area: sheet;
+    }
+    .side {
+      grid-area: side;
+      position: sticky;
+      top: var(--gutter);
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      max-height: calc(100dvh - var(--timeline-height) - 2 * var(--gutter));
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+    .side > * {
+      order: 0;
+      flex: none;
+    }
+    .scrapbook-part {
+      margin-bottom: 0;
+    }
+    .delete {
+      margin-top: 0.5rem;
+    }
+    .title {
+      min-height: 2.5rem;
+      font-size: 1.25rem;
+    }
+    .grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .part {
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      background: var(--surface-1);
+    }
+    .part[open] {
+      padding: 0 0.75rem 0.75rem;
+    }
+    .part > summary {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      min-height: var(--control);
+      padding: 0 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+    }
+    .part[open] > summary {
+      margin: 0 -0.75rem 0.25rem;
+    }
+    .part > summary::-webkit-details-marker {
+      display: none;
+    }
+    .part > summary::before {
+      content: '›';
+      width: 0.75rem;
+      color: var(--text-muted);
+      transition: transform 0.15s;
+    }
+    .part[open] > summary::before {
+      transform: rotate(90deg);
+    }
+    .part > summary:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+      border-radius: 0.5rem;
+    }
+    /* The toggle names each section, so their own headings go. */
+    .part :global(:is(#details-heading, #masters-heading, #scrapbook-heading)) {
+      display: none;
+    }
+    /* The section's box draws the edges. */
+    .part > :global(section) {
+      margin: 0;
+      padding: 0;
+      border: 0;
     }
   }
 </style>
