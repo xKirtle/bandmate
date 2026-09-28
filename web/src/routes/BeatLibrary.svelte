@@ -1,9 +1,12 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { api, type Beat, type DecodedAudio } from '../lib/api';
   import BeatFields from '../lib/BeatFields.svelte';
   import BeatFilters from '../lib/BeatFilters.svelte';
+  import BeatEditDialog from '../lib/BeatEditDialog.svelte';
   import BeatItem from '../lib/BeatItem.svelte';
+  import BeatPlayerBar from '../lib/BeatPlayerBar.svelte';
   import BeatTable from '../lib/BeatTable.svelte';
   import { fromDraft, toDraft, type BeatDraft } from '../lib/beatDraft';
   import {
@@ -14,13 +17,10 @@
     isBeatListFiltered,
     sortBeats,
   } from '../lib/listViews';
-  import { playMediaAlone } from '../lib/playback';
-  import { canSetVolume, playerVolume } from '../lib/playerVolume.svelte';
   import { replaceSearch, router } from '../lib/router.svelte';
   import { formatDuration } from '../lib/time';
   import { suggestForFile } from '../lib/beatTags';
   import { prepareUpload } from '../lib/upload';
-  import { gain } from '../lib/volume';
 
   // The whole Library, loaded once and narrowed down here.
   let beats = $state<Beat[] | null>(null);
@@ -77,28 +77,39 @@
 
   const desktop = new MediaQuery('min-width: 80rem');
 
-  // The table previews Beats through one player, which follows the volume
-  // every Master and Beat preview shares and stops whatever else plays.
-  let preview = $state<HTMLAudioElement>();
-  let previewing = $state<number | null>(null);
-  const volume = $derived(playerVolume.value);
+  // On desktop, the table previews Beats through the bar at the bottom, which
+  // keeps the last Beat previewed until closed.
+  let previewId = $state<number | null>(null);
+  const previewBeat = $derived((desktop.current && beats?.find((b) => b.id === previewId)) || null);
+  let previewPlaying = $state(false);
+  let playerBar = $state<BeatPlayerBar>();
+  let playerBarHeight = $state(0);
+  // The header's size, unrounded, so the page with the bar fits the window exactly.
+  let headerBox = $state<ResizeObserverSize[]>();
+  const headerHeight = $derived(headerBox?.[0].blockSize ?? 0);
 
-  $effect(() => {
-    if (!preview) return;
-    preview.muted = volume.muted;
-    if (canSetVolume()) preview.volume = gain(volume.level);
-  });
-
-  function togglePreview(beat: Beat) {
-    if (!preview) return;
-    if (previewing === beat.id) {
-      preview.pause();
+  async function togglePreview(beat: Beat) {
+    if (previewId === beat.id && playerBar) {
+      playerBar.toggle();
       return;
     }
-    preview.src = api.beatAudioUrl(beat);
-    previewing = beat.id;
-    // A later Beat's play() cuts this one short, and that Beat is previewing now.
-    preview.play().catch(() => previewing === beat.id && (previewing = null));
+    // A new Beat starts playing once the bar has loaded it.
+    previewId = beat.id;
+    await tick();
+    playerBar?.play();
+  }
+
+  // The bar is desktop's: narrowing the window stops the preview for good,
+  // rather than bringing it back when the window widens again.
+  $effect(() => {
+    if (!desktop.current) closePreview();
+  });
+
+  const playingNow = (beat: Beat) => previewId === beat.id && previewPlaying;
+
+  function closePreview() {
+    previewId = null;
+    previewPlaying = false;
   }
 
   async function pick(event: Event) {
@@ -145,61 +156,56 @@
     addError = null;
   }
 
-  // On desktop, the Beat open in the pane beside the table. It stays open
-  // while filters hide its row, so editing a credit doesn't close it.
-  let openId = $state<number | null>(null);
-  const openBeat = $derived((desktop.current && beats?.find((b) => b.id === openId)) || null);
-  // The sticky header's height, which the sticky pane stays below.
-  let barHeight = $state(0);
-
-  function openRow(event: MouseEvent, beat: Beat) {
-    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    if ((event.target as Element).closest('button, a')) return;
-    toggleOpen(beat);
-  }
-
-  function toggleOpen(beat: Beat) {
-    openId = openId === beat.id ? null : beat.id;
-  }
-
-  /** Closes the pane, handing focus back to its row. */
-  function closePane() {
-    const id = openId;
-    openId = null;
-    document.getElementById(`beat-row-${id}`)?.focus();
-  }
-
-  function closeOnEscape(event: KeyboardEvent) {
-    if (event.key !== 'Escape' || !openBeat || event.defaultPrevented) return;
-    // Esc in a field is the field's, e.g. clearing the search.
-    if ((event.target as Element).closest('input, textarea, select')) return;
-    closePane();
-  }
+  // The Beat being edited in the dialog the table opens. The cards below
+  // 80rem open their own; this one stays open across a resize, keeping its
+  // unsaved changes.
+  let editingId = $state<number | null>(null);
+  const editingBeat = $derived(beats?.find((b) => b.id === editingId) ?? null);
 
   function showChanged(beat: Beat) {
     beats = beats?.map((b) => (b.id === beat.id ? beat : b)) ?? null;
   }
 
-  function dropDeleted(id: number) {
+  async function dropDeleted(id: number) {
+    // Focus goes to the next Beat's Edit, or the one before if it was last,
+    // rather than being lost with the deleted Beat's.
+    const at = shown?.findIndex((b) => b.id === id) ?? -1;
+    const neighbour = shown?.[at + 1] ?? shown?.[at - 1];
     beats = beats?.filter((b) => b.id !== id) ?? null;
-    if (openId === id) openId = null;
+    if (editingId === id) editingId = null;
+    if (previewId === id) closePreview();
+    await tick();
+    if (neighbour) document.getElementById(`edit-beat-${neighbour.id}`)?.focus();
   }
 </script>
 
-<svelte:window onkeydown={closeOnEscape} />
+{#snippet editCell(beat: Beat)}
+  <button
+    type="button"
+    id="edit-beat-{beat.id}"
+    class="icon edit"
+    aria-label="Edit {beat.title}"
+    onclick={() => (editingId = beat.id)}
+  >
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 20h4L19 9l-4-4L4 16z" />
+      <path d="M13.5 6.5l4 4" />
+    </svg>
+  </button>
+{/snippet}
 
 {#snippet previewCell(beat: Beat)}
   <button
     type="button"
     class="icon"
-    aria-label="{previewing === beat.id ? 'Pause' : 'Preview'} {beat.title}"
+    aria-label="{playingNow(beat) ? 'Pause' : 'Preview'} {beat.title}"
     onclick={() => togglePreview(beat)}
   >
-    {previewing === beat.id ? '❚❚' : '▶'}
+    {playingNow(beat) ? '❚❚' : '▶'}
   </button>
 {/snippet}
 
-<header class="bar" bind:clientHeight={barHeight}>
+<header class="bar" bind:borderBoxSize={headerBox}>
   <h1>Beats</h1>
   <label class="button primary" class:disabled={addBusy !== null}>
     Add Beat
@@ -207,7 +213,12 @@
   </label>
 </header>
 
-<main class="page" style:--bar-height="{barHeight}px">
+<main
+  class="page"
+  class:with-player={previewBeat}
+  style:--header-height="{headerHeight}px"
+  style:--player-height="{playerBarHeight}px"
+>
   {#if adding}
     <form class="adding" onsubmit={add} aria-labelledby="adding-heading">
       <h2 id="adding-heading">
@@ -228,8 +239,6 @@
     <p class="error add-error" role="alert">{addError}</p>
   {/if}
 
-  <audio bind:this={preview} onplay={playMediaAlone} onpause={() => (previewing = null)} hidden></audio>
-
   <BeatFilters bind:view beats={beats ?? []} idPrefix="beat" />
 
   {#if loadError}
@@ -246,33 +255,17 @@
       <button type="button" class="button" onclick={clearFilters}>Clear filters</button>
     </div>
   {:else if desktop.current}
-    <div class="table-and-pane" class:with-pane={openBeat}>
-      <BeatTable
-        beats={shown}
-        bind:sort={view.sort}
-        lead={{ label: 'Preview', cell: previewCell }}
-        {openId}
-        onRowClick={openRow}
-      >
-        {#snippet title(beat)}
-          <button
-            type="button"
-            id="beat-row-{beat.id}"
-            aria-expanded={beat.id === openId}
-            aria-controls={beat.id === openId ? 'beat-pane' : undefined}
-            onclick={() => toggleOpen(beat)}>{beat.title}</button
-          >
-        {/snippet}
-      </BeatTable>
-      {#if openBeat}
-        <aside id="beat-pane" class="pane" aria-label="Beat details">
-          <button type="button" class="icon close" aria-label="Close Beat details" onclick={closePane}>×</button>
-          {#key openBeat.id}
-            <BeatItem beat={openBeat} {maxUploadBytes} onChange={showChanged} onDelete={dropDeleted} />
-          {/key}
-        </aside>
-      {/if}
-    </div>
+    <BeatTable
+      beats={shown}
+      bind:sort={view.sort}
+      lead={{ label: 'Preview', cell: previewCell }}
+      trail={{ label: 'Edit', cell: editCell }}
+      openId={editingBeat?.id ?? null}
+    >
+      {#snippet title(beat)}
+        {beat.title}
+      {/snippet}
+    </BeatTable>
   {:else}
     <div class="beats">
       {#each shown as beat (beat.id)}
@@ -281,6 +274,26 @@
     </div>
   {/if}
 </main>
+
+{#if editingBeat}
+  <BeatEditDialog
+    beat={editingBeat}
+    {maxUploadBytes}
+    onChange={showChanged}
+    onDelete={dropDeleted}
+    onClose={() => (editingId = null)}
+  />
+{/if}
+
+{#if previewBeat}
+  <BeatPlayerBar
+    bind:this={playerBar}
+    bind:playing={previewPlaying}
+    bind:height={playerBarHeight}
+    beat={previewBeat}
+    onClose={closePreview}
+  />
+{/if}
 
 <style>
   .bar label.disabled {
@@ -316,35 +329,19 @@
   .add-error {
     margin-bottom: 1rem;
   }
-  /* The open Beat's pane sits beside the table, as wide as the Song page's
-     details column. It sticks below the header, scrolling on its own, while the
-     table scrolls. */
-  .table-and-pane {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    align-items: start;
-    gap: var(--gutter);
+  /* With the player docked below, the page reaches at least to it, so the bar
+     sits at the bottom of the window even under a short list. */
+  .page.with-player {
+    min-height: calc(100dvh - var(--header-height) - var(--player-height));
   }
-  .table-and-pane.with-pane {
-    grid-template-columns: minmax(0, 1fr) var(--side-width);
-  }
-  .pane {
-    position: sticky;
-    top: var(--bar-height);
-    max-height: calc(100dvh - var(--bar-height) - var(--gutter));
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding: 0.5rem 1rem 0;
-    border: 1px solid var(--border);
-    border-radius: 0.5rem;
-    background: var(--surface-1);
-  }
-  .close {
-    float: right;
-    margin-left: 0.5rem;
-  }
-  .pane :global(.beat) {
-    border-bottom: none;
+  .edit svg {
+    width: 1.125rem;
+    height: 1.125rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
   .beats {
     border-top: 1px solid var(--border);

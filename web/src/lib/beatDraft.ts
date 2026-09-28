@@ -60,3 +60,15 @@ export function offeredChanges(draft: BeatDraft, suggestion: BeatSuggestion): Pa
   }
   return changes;
 }
+
+/** An offer of changes in a line, e.g. “Night Drive” · by Pryme · 140 BPM · Am. */
+export function describeOffer(changes: Partial<BeatDraft>): string {
+  return [
+    changes.title && `“${changes.title}”`,
+    changes.producer && `by ${changes.producer}`,
+    changes.bpm && `${changes.bpm} BPM`,
+    changes.key,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}

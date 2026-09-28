@@ -12,18 +12,20 @@
     src,
     duration,
     peaks,
+    playing = $bindable(false),
   }: {
     src: string;
     /** In seconds. */
     duration: number;
     /** The waveform; flat while empty, and the audio still plays. */
     peaks: number[];
+    /** Whether the audio is playing, e.g. for a button elsewhere that shows it. */
+    playing?: boolean;
   } = $props();
 
   const barCount = 160;
 
   let audio = $state<HTMLAudioElement>();
-  let playing = $state(false);
   let time = $state(0);
 
   const volume = $derived(playerVolume.value);
@@ -50,9 +52,19 @@
     return () => cancelAnimationFrame(frame);
   });
 
-  function toggle() {
+  // A new file starts from its beginning.
+  $effect(() => {
+    void src;
+    time = 0;
+  });
+
+  export function play() {
+    audio?.play().catch(() => (playing = false));
+  }
+
+  export function toggle() {
     if (!audio) return;
-    if (audio.paused) audio.play().catch(() => (playing = false));
+    if (audio.paused) play();
     else audio.pause();
   }
 

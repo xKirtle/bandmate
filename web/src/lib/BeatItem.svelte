@@ -1,14 +1,12 @@
 <script lang="ts">
   import { api, type Beat } from './api';
   import AudioPlayer from './AudioPlayer.svelte';
-  import BeatFields from './BeatFields.svelte';
-  import { changedDetails, fromDraft, offeredChanges, toDraft, type BeatDraft } from './beatDraft';
-  import { suggestForFile } from './beatTags';
-  import { formatDuration } from './time';
-  import { prepareUpload } from './upload';
+  import BeatCredit from './BeatCredit.svelte';
+  import BeatEditDialog from './BeatEditDialog.svelte';
+  import { loadBeatPeaks } from './beatPeaks';
 
-  // One Beat in the Beat Library: its credit and a preview player, and, once
-  // opened for editing, its details, file and deletion.
+  // One Beat in the Beat Library's card list: its credit and a preview player.
+  // Its details, file and deletion are edited in a dialog.
   let {
     beat,
     maxUploadBytes,
@@ -22,11 +20,6 @@
   } = $props();
 
   let editing = $state(false);
-  let draft = $state(toDraft(null));
-  let busy = $state<string | null>(null);
-  let error = $state<string | null>(null);
-  // Details a replaced file suggests, offered rather than applied.
-  let offer = $state<{ fileName: string; changes: Partial<BeatDraft> } | null>(null);
 
   const inUse = $derived(beat.songs.length > 0);
   // Changes when the Beat's file is replaced, not when its details are edited.
@@ -53,125 +46,19 @@
 
   $effect(() => {
     if (!seen) return;
-    const id = beatId;
     void src;
-    let current = true;
     peaks = [];
-    api.getBeat(id).then(
-      (b) => current && (peaks = b.peaks ?? []),
-      // Without peaks the waveform stays flat; the audio still plays.
-      () => {},
-    );
-    return () => {
-      current = false;
-    };
+    return loadBeatPeaks(beatId, (p) => (peaks = p));
   });
-  const facts = $derived(
-    [beat.bpm ? `${beat.bpm} BPM` : '', beat.key, formatDuration(beat.duration)].filter(Boolean).join(' · '),
-  );
-
-  function edit() {
-    draft = toDraft(beat);
-    error = null;
-    offer = null;
-    editing = true;
-  }
-
-  function stopEditing() {
-    editing = false;
-    offer = null;
-  }
-
-  function describeOffer(changes: Partial<BeatDraft>): string {
-    return [
-      changes.title && `“${changes.title}”`,
-      changes.producer && `by ${changes.producer}`,
-      changes.bpm && `${changes.bpm} BPM`,
-      changes.key,
-    ]
-      .filter(Boolean)
-      .join(' · ');
-  }
-
-  function useOffer() {
-    if (offer) Object.assign(draft, offer.changes);
-    offer = null;
-  }
-
-  async function run(label: string, work: () => Promise<void>) {
-    busy = label;
-    error = null;
-    try {
-      await work();
-    } catch (e) {
-      error = (e as Error).message;
-    } finally {
-      busy = null;
-    }
-  }
-
-  function save(event: SubmitEvent) {
-    event.preventDefault();
-    const details = fromDraft(draft);
-    if (typeof details === 'string') {
-      error = details;
-      return;
-    }
-    const changes = changedDetails(beat, details);
-    if (Object.keys(changes).length === 0) {
-      stopEditing();
-      return;
-    }
-    run('Saving…', async () => {
-      onChange(await api.updateBeat(beat.id, changes));
-      stopEditing();
-    });
-  }
-
-  function replaceFile(event: Event) {
-    const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = '';
-    if (!file) return;
-    offer = null;
-    run('Reading file…', async () => {
-      const [decoded, suggestion] = await Promise.all([prepareUpload(file, maxUploadBytes), suggestForFile(file)]);
-      busy = 'Uploading…';
-      onChange(await api.replaceBeatFile(beat.id, file, decoded));
-      const changes = offeredChanges(draft, suggestion);
-      if (Object.keys(changes).length > 0) offer = { fileName: file.name, changes };
-    });
-  }
-
-  function remove() {
-    if (!confirm(`Delete “${beat.title}” and its file?\n\nThis can't be undone.`)) return;
-    run('Deleting…', async () => {
-      await api.deleteBeat(beat.id);
-      onDelete(beat.id);
-    });
-  }
 </script>
 
 <article bind:this={article} class="beat" aria-labelledby="beat-{beat.id}-title">
   <div class="head">
     <div class="credit">
       <h2 id="beat-{beat.id}-title">{beat.title}</h2>
-      <p class="muted">
-        {#if beat.producer && beat.sourceLink}
-          <a href={beat.sourceLink} target="_blank" rel="noopener noreferrer">{beat.producer}</a>
-        {:else if beat.sourceLink}
-          <a href={beat.sourceLink} target="_blank" rel="noopener noreferrer">Source</a>
-        {:else if beat.producer}
-          {beat.producer}
-        {:else}
-          No producer credited
-        {/if}
-        · {facts}
-      </p>
+      <BeatCredit {beat} />
     </div>
-    {#if !editing}
-      <button type="button" class="button" onclick={edit}>Edit</button>
-    {/if}
+    <button type="button" id="edit-beat-{beat.id}" class="button" onclick={() => (editing = true)}>Edit</button>
   </div>
 
   <AudioPlayer {src} duration={beat.duration} {peaks} />
@@ -180,50 +67,14 @@
     <p class="songs muted">Used in {beat.songs.map((s) => s.title).join(', ')}</p>
   {/if}
 
-  {#if editing}
-    <form onsubmit={save}>
-      {#if offer}
-        <div class="offer" role="status">
-          <p>“{offer.fileName}” suggests {describeOffer(offer.changes)}</p>
-          <div class="actions">
-            <button type="button" class="button" onclick={useOffer}>Use these</button>
-            <button type="button" class="button" onclick={() => (offer = null)}>Keep current</button>
-          </div>
-        </div>
-      {/if}
-      <BeatFields bind:draft idPrefix="beat-{beat.id}" />
-      <div class="actions">
-        <button type="submit" class="button primary" disabled={busy !== null}>Save</button>
-        <button type="button" class="button" onclick={stopEditing} disabled={busy !== null}>Cancel</button>
-        <span class="spacer"></span>
-        {#if inUse}
-          <p class="muted hint">Used by a Song, so its file can't be replaced or the Beat deleted.</p>
-        {:else}
-          <label class="button">
-            Replace file
-            <input
-              class="visually-hidden"
-              type="file"
-              accept="audio/*"
-              onchange={replaceFile}
-              disabled={busy !== null}
-            />
-          </label>
-          <button type="button" class="button danger" onclick={remove} disabled={busy !== null}>Delete</button>
-        {/if}
-      </div>
-    </form>
-  {:else if beat.notes}
+  {#if beat.notes}
     <p class="notes">{beat.notes}</p>
   {/if}
-
-  {#if busy}
-    <p class="muted" role="status">{busy}</p>
-  {/if}
-  {#if error}
-    <p class="error" role="alert">{error}</p>
-  {/if}
 </article>
+
+{#if editing}
+  <BeatEditDialog {beat} {maxUploadBytes} {onChange} {onDelete} onClose={() => (editing = false)} />
+{/if}
 
 <style>
   .beat {
@@ -247,7 +98,6 @@
     font-size: 1.0625rem;
     overflow-wrap: anywhere;
   }
-  .credit p,
   .songs,
   .notes {
     margin: 0;
@@ -256,41 +106,5 @@
   }
   .notes {
     white-space: pre-wrap;
-  }
-  form {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-  .actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  .spacer {
-    flex: 1;
-  }
-  .offer {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    padding: 0.75rem;
-    border: 1px solid var(--border);
-    border-radius: 0.5rem;
-    background: var(--surface-1);
-  }
-  .offer p {
-    margin: 0;
-    font-size: 0.875rem;
-    overflow-wrap: anywhere;
-  }
-  .hint {
-    margin: 0;
-    font-size: 0.8125rem;
-  }
-  label.button:has(input:focus-visible) {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
   }
 </style>
