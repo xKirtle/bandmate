@@ -111,6 +111,31 @@ export function cuesInSpan(song: CuedSong, start: number, end: number): FoundCue
   });
 }
 
+/** A span of the Timeline, in seconds, from start up to end. */
+export interface Span {
+  start: number;
+  end: number;
+}
+
+/** The span from 0:00 to past the latest Cue, dormant ones included: shifting it shifts every Cue. Null without Cues. */
+export function everyCueSpan(song: CuedSong): Span | null {
+  const all = cuesInSpan(song, 0, Infinity);
+  if (all.length === 0) return null;
+  return { start: 0, end: Math.max(...all.map((c) => c.cue)) + 1 };
+}
+
+/**
+ * Whether every Cue can shift earlier by step without any going before
+ * 0:00, as the server refuses: dormant ones included, since they move too.
+ * Compared in milliseconds, as Cues are kept.
+ */
+export function canShiftCuesEarlier(song: CuedSong, step: number): boolean {
+  const all = cuesInSpan(song, 0, Infinity);
+  if (all.length === 0) return false;
+  const earliest = Math.min(...all.map((c) => c.cue));
+  return Math.round(earliest * 1000) >= Math.round(step * 1000);
+}
+
 /** A Line, as far as Sync mode steps onto it: it skips Chord Lines. */
 export interface ChordedLine extends CuedLine {
   chordLine: boolean;
