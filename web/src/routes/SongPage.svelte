@@ -4,7 +4,6 @@
     api,
     ApiError,
     commonKeys,
-    statuses,
     type Song,
     type SongAt,
     type SongChanges,
@@ -14,6 +13,7 @@
   import LyricSheet from '../lib/LyricSheet.svelte';
   import Masters from '../lib/Masters.svelte';
   import Scrapbook from '../lib/Scrapbook.svelte';
+  import StatusBadge from '../lib/StatusBadge.svelte';
   import Timeline from '../lib/Timeline.svelte';
   import type { Saved } from '../lib/history';
   import { navigate } from '../lib/router.svelte';
@@ -306,13 +306,17 @@
           enterkeyhint="done"
         />
 
-        <p class="save-state muted" role="status">
-          {#if pending > 0}
-            Saving…
-          {:else}
-            Edited <time datetime={song.updatedAt}>{timeAgo(song.updatedAt)}</time>
-          {/if}
-        </p>
+        <div class="meta">
+          <StatusBadge status={draft.status} onChange={setStatus} />
+          <span class="muted" aria-hidden="true">·</span>
+          <p class="save-state muted" role="status">
+            {#if pending > 0}
+              Saving…
+            {:else}
+              Edited <time datetime={song.updatedAt}>{timeAgo(song.updatedAt)}</time>
+            {/if}
+          </p>
+        </div>
         {#if stale}
           <div class="stale" role="alert">
             <p>
@@ -325,22 +329,6 @@
         {#if saveError}
           <p class="error" role="alert">{saveError}</p>
         {/if}
-
-        <fieldset class="status">
-          <legend class="visually-hidden">Status</legend>
-          {#each statuses as s (s)}
-            <label class="segment segment-{s}">
-              <input
-                type="radio"
-                name="status"
-                value={s}
-                bind:group={draft.status}
-                onchange={() => setStatus(s)}
-              />
-              {s}
-            </label>
-          {/each}
-        </fieldset>
       </div>
 
       <div class="sheet">
@@ -461,9 +449,16 @@
     border-color: var(--border);
     background: var(--surface-1);
   }
-  .save-state {
-    margin: 0 0 1rem;
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 0.5rem;
+    margin: 0 0 0.75rem;
     font-size: 0.8125rem;
+  }
+  .save-state {
+    margin: 0;
   }
   .error {
     margin-bottom: 1rem;
@@ -482,50 +477,6 @@
   .stale p {
     flex: 1 1 16rem;
     margin: 0;
-  }
-  .status {
-    display: flex;
-    margin: 0 0 1.5rem;
-    padding: 0;
-    border: 1px solid var(--border);
-    border-radius: 0.5rem;
-    overflow: hidden;
-  }
-  .segment {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 2.75rem;
-    background: var(--surface-1);
-    font-weight: 600;
-    text-transform: capitalize;
-    cursor: pointer;
-  }
-  .segment + .segment {
-    border-left: 1px solid var(--border);
-  }
-  .segment input {
-    position: absolute;
-    opacity: 0;
-    width: 1px;
-    height: 1px;
-    min-height: 0;
-  }
-  .segment:has(input:checked) {
-    background: var(--surface-2);
-  }
-  .segment-drafting:has(input:checked) {
-    background: var(--drafting-bg);
-    color: var(--drafting-fg);
-  }
-  .segment-finished:has(input:checked) {
-    background: var(--finished-bg);
-    color: var(--finished-fg);
-  }
-  .segment:has(input:focus-visible) {
-    outline: 2px solid var(--accent);
-    outline-offset: -2px;
   }
   .details h2 {
     font-size: 1rem;
