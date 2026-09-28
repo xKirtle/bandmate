@@ -178,6 +178,22 @@ func (a *App) restoreCues(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// shiftCues moves every Cue in [start, end), in seconds, by the seconds
+// given, e.g. along with a Clip that was moved.
+func (a *App) shiftCues(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Start *float64 `json:"start"`
+		End   *float64 `json:"end"`
+		By    *float64 `json:"by"`
+	}
+	a.changeSheet(w, r, &req, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
+		if req.Start == nil || req.End == nil || req.By == nil {
+			return lyricsheet.Song{}, &lyricsheet.InvalidError{Msg: "start, end and by are required"}
+		}
+		return a.songs.ShiftCues(r.Context(), id, based, *req.Start, *req.End, *req.By)
+	})
+}
+
 func (a *App) setSectionLabel(w http.ResponseWriter, r *http.Request) {
 	sectionID, ok := pathID(w, r, "sectionID")
 	if !ok {

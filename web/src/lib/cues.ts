@@ -90,6 +90,27 @@ export function hasCues(song: CuedSong): boolean {
   return song.arrangement.some((o) => o.cue !== null || hasLineCue(o, linesOf(o)));
 }
 
+/** A Cue and what it links: an Occurrence (line null), or one of its Lines. */
+export type FoundCue = Position & { cue: number };
+
+/**
+ * The Cues from start up to end, in seconds, as shifting that span moves
+ * them: each Occurrence's own, then its Lines' by id, dormant ones
+ * included, since they're Timeline times too and should keep in step for
+ * when their Alternate is switched back.
+ */
+export function cuesInSpan(song: CuedSong, start: number, end: number): FoundCue[] {
+  const inSpan = (cue: number | null): cue is number => cue !== null && cue >= start && cue < end;
+  return song.arrangement.flatMap((o) => {
+    const own: FoundCue[] = inSpan(o.cue) ? [{ occurrence: o.id, line: null, cue: o.cue }] : [];
+    const lines = Object.keys(o.lineCues)
+      .map(Number)
+      .sort((a, b) => a - b)
+      .flatMap((line) => (inSpan(o.lineCues[line]) ? [{ occurrence: o.id, line, cue: o.lineCues[line] }] : []));
+    return [...own, ...lines];
+  });
+}
+
 /** A Line, as far as Tap mode steps onto it: a Chord Line is hidden along with Chords. */
 export interface ShownLine extends CuedLine {
   chordLine: boolean;
