@@ -294,7 +294,7 @@
           {deleting ? 'Deleting…' : 'Delete'}
         </button>
       {/if}
-      <fieldset class="modes">
+      <fieldset class="modes" disabled={deleting}>
         <legend class="visually-hidden">Mode</legend>
         <label class="mode"><input type="radio" name="song-mode" value="write" bind:group={mode} />Write</label>
         <label class="mode"><input type="radio" name="song-mode" value="read" bind:group={mode} />Read</label>

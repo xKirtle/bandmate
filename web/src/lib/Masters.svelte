@@ -146,27 +146,26 @@
 
   {#each song.masters as m (m.id)}
     <article class="master" aria-label={several ? m.name : 'Master'}>
-      {#if several && !writing}
+      {#if several}
         <div class="name-row">
-          <h3 class="name">{m.name}</h3>
-          {#if m.main}<span class="main-badge">Main</span>{/if}
-        </div>
-      {:else if several}
-        <div class="name-row">
-          <label class="visually-hidden" for="master-{m.id}-name">Name</label>
-          <input
-            id="master-{m.id}-name"
-            class="name"
-            value={m.name}
-            oninput={() => onUnsaved(editor(m, 'name'), true)}
-            onchange={(e) => rename(m, e.currentTarget)}
-            onblur={() => onUnsaved(editor(m, 'name'), false)}
-            autocomplete="off"
-            enterkeyhint="done"
-          />
+          {#if writing}
+            <label class="visually-hidden" for="master-{m.id}-name">Name</label>
+            <input
+              id="master-{m.id}-name"
+              class="name"
+              value={m.name}
+              oninput={() => onUnsaved(editor(m, 'name'), true)}
+              onchange={(e) => rename(m, e.currentTarget)}
+              onblur={() => onUnsaved(editor(m, 'name'), false)}
+              autocomplete="off"
+              enterkeyhint="done"
+            />
+          {:else}
+            <h3 class="name">{m.name}</h3>
+          {/if}
           {#if m.main}
             <span class="main-badge">Main</span>
-          {:else}
+          {:else if writing}
             <button type="button" class="button" onclick={() => change((at) => api.makeMainMaster(at, m.id))}>
               Make main
             </button>

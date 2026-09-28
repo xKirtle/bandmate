@@ -255,11 +255,8 @@
 
   {#if song.arrangement.length === 0}
     <p class="muted">
-      {#if mode === 'read'}
-        No Sections here yet.
-      {:else}
-        No Sections here yet. Add one to start writing{song.scrapbook.length > 0 ? ', or put one back from the Scrapbook' : ''}.
-      {/if}
+      No Sections here yet.{#if mode === 'write'}
+        Add one to start writing{song.scrapbook.length > 0 ? ', or put one back from the Scrapbook' : ''}.{/if}
     </p>
   {/if}
 
