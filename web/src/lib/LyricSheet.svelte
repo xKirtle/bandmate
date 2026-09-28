@@ -214,8 +214,11 @@
   }
 
   function move(index: number, by: -1 | 1) {
-    const order = song.arrangement.map((o) => o.id);
-    [order[index], order[index + by]] = [order[index + by], order[index]];
+    const order = moveTo(
+      song.arrangement.map((o) => o.id),
+      index,
+      index + by,
+    );
     change((at) => api.reorderArrangement(at, order));
   }
 
@@ -246,10 +249,10 @@
     drag = { ...drag, gap: dropGap(y, middles), y };
   }
 
-  function startDrag(e: PointerEvent, from: number) {
+  function startDrag(e: PointerEvent & { currentTarget: HTMLElement }, from: number) {
     if (e.button !== 0) return;
     e.preventDefault();
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    e.currentTarget.setPointerCapture(e.pointerId);
     drag = { from, gap: from, y: e.clientY };
   }
 
@@ -282,6 +285,12 @@
   $effect(() => {
     void arrangementOrder;
     untrack(() => (drag = null));
+  });
+  // So does the grip going mid-drag, e.g. the window narrowing or Read
+  // mode coming on: the pointer's release would never reach it.
+  const canDrag = $derived(desktop.current && mode === 'write' && song.arrangement.length > 1);
+  $effect(() => {
+    if (!canDrag) untrack(() => (drag = null));
   });
 </script>
 
@@ -368,7 +377,7 @@
               cueing={cueingFor(occurrence, section.label)}
             >
               {#snippet grip()}
-                {#if desktop.current && song.arrangement.length > 1}
+                {#if canDrag}
                   <!-- Pointer only: ↑ and ↓ move it from the keyboard. -->
                   <span
                     class="grip"
