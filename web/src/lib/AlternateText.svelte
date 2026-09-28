@@ -203,7 +203,6 @@
           {:else}
             <CueField
               bind:this={() => undefined, (field) => gutter.field(line.id, field)}
-              gutter
               cue={cueing.cues[line.id] ?? null}
               label={lineLabel}
               save={(cue) => gutter.save(line, cue)}

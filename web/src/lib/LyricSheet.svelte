@@ -84,12 +84,6 @@
   // Playing from a Cue's ▶, or a cued Line in Read mode, leads into it.
   const playFrom = $derived(seek && ((cue: number) => seek(leadIn(cue))));
 
-  function setCue(occurrence: Occurrence, cue: number | null) {
-    editCues((at) =>
-      cue === null ? api.clearOccurrenceCue(at, occurrence.id) : api.setOccurrenceCue(at, occurrence.id, cue),
-    );
-  }
-
   // Shifting every Cue, dormant ones included, by a step: each click is one
   // shift, saved at once and undone like any Cue edit. The step is
   // remembered on this device.
@@ -111,9 +105,9 @@
     );
   }
 
-  // In Write mode, each Occurrence's Lines and whole Section are tracked, to
-  // follow playback to, and each Line's Cue field, to go on to with Enter.
-  // Read mode follows playback in LyricSheetView, and has no Cue fields.
+  // In Write mode, each Occurrence's Lines are tracked, to follow playback
+  // to, and each Line's Cue field, to go on to with Enter. Read mode follows
+  // playback in LyricSheetView, and has no Cue fields.
   const { track, follow } = follower();
   const writeFields = gutterFields();
   // The Line Cue fields in order down the page.
@@ -423,12 +417,9 @@
         {@const section = sections.get(occurrence.sectionId)}
         {#if section}
           <li
-            class:current={writeKey === key(occurrence.id)}
             class:dragged={drag?.from === i}
             class:drop-above={dropAt === i}
             class:drop-below={dropAt === song.arrangement.length && i === song.arrangement.length - 1}
-            aria-current={writeKey === key(occurrence.id) ? 'true' : undefined}
-            {@attach (el) => track(el, key(occurrence.id))}
             {@attach (el) => placeOccurrence(el, i)}
           >
             <SectionEditor
@@ -438,14 +429,6 @@
               autofocus={added === occurrence.id}
               {change}
               {onUnsaved}
-              cue={canCue
-                ? {
-                    at: occurrence.cue,
-                    save: (cue) => setCue(occurrence, cue),
-                    play: playFrom,
-                    current: current?.occurrence === occurrence.id,
-                  }
-                : undefined}
               cueing={cueingFor(occurrence, section.label)}
             >
               {#snippet grip()}
@@ -619,12 +602,6 @@
     margin: 0 0 0.75rem;
     padding: 0;
     list-style: none;
-  }
-  /* Playback is on the Section as a whole, before its Lines are cued. */
-  .arrangement > .current {
-    border-radius: 0.75rem;
-    box-shadow: 0 0 0 2px var(--accent);
-    scroll-margin-top: 5rem;
   }
   .grip {
     display: grid;

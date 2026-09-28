@@ -40,9 +40,6 @@ var versionedWrites = []versionedWrite{
 		return ts.DoAt(v, http.MethodPut, alternatePath(s.ID, s.Sections[0].Alternates[0].ID)+"/text",
 			map[string]any{"text": "New words"})
 	}},
-	{"occurrence cue", func(ts *testServer, s song, v int64) response {
-		return ts.DoAt(v, http.MethodPut, cuePath(s.ID, s.Arrangement[0].ID), map[string]any{"cue": 12.5})
-	}},
 	{"line cue", func(ts *testServer, s song, v int64) response {
 		return ts.DoAt(v, http.MethodPut,
 			lineCuePath(s.ID, s.Arrangement[0].ID, s.Sections[0].Alternates[0].Lines[0].ID), map[string]any{"cue": 3})

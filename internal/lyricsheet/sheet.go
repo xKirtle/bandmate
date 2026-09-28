@@ -26,12 +26,11 @@ type Occurrence struct {
 	// Shared means other Occurrences show the same Section, so editing it
 	// changes them too.
 	Shared bool `json:"shared"`
-	// Cue is when the Occurrence starts on the Timeline, in seconds to the
-	// millisecond, or nil if it has no Cue.
-	Cue *float64 `json:"cue"`
 	// LineCues maps Line ids to when each is sung in this Occurrence, in
-	// seconds. It holds the Cues of Lines in every Alternate of the Section:
-	// those of inactive Alternates lie dormant (ADR 0007).
+	// seconds to the millisecond. An Occurrence has no Cue of its own: it
+	// starts where its first Line is cued (ADR 0009). It holds the Cues of
+	// Lines in every Alternate of the Section: those of inactive Alternates
+	// lie dormant (ADR 0007).
 	LineCues map[int64]float64 `json:"lineCues"`
 }
 
@@ -128,14 +127,12 @@ func (s *Store) loadLyricSheet(ctx context.Context, songID int64) (LyricSheet, e
 	}
 
 	uses := map[int64]int{}
-	err = query(ctx, s.db, `SELECT id, section_id, cue_ms FROM occurrences WHERE song_id = ? ORDER BY position, id`,
+	err = query(ctx, s.db, `SELECT id, section_id FROM occurrences WHERE song_id = ? ORDER BY position, id`,
 		[]any{songID}, func(rows *sql.Rows) error {
 			var o Occurrence
-			var cue sql.NullInt64
-			if err := rows.Scan(&o.ID, &o.SectionID, &cue); err != nil {
+			if err := rows.Scan(&o.ID, &o.SectionID); err != nil {
 				return err
 			}
-			o.Cue = cueSeconds(cue)
 			o.LineCues = map[int64]float64{}
 			uses[o.SectionID]++
 			sheet.Arrangement = append(sheet.Arrangement, o)
@@ -386,7 +383,7 @@ func (s *Store) Detach(ctx context.Context, songID int64, based Version, occurre
 			return fmt.Errorf("pointing occurrence at copy: %w", err)
 		}
 		// The Occurrence's Line Cues, dormant ones included, go over to the
-		// copy's Lines. Its own Cue stays with it anyway.
+		// copy's Lines.
 		for lineID, copyLineID := range lineCopies {
 			if _, err := tx.ExecContext(ctx, `UPDATE line_cues SET line_id = ? WHERE occurrence_id = ? AND line_id = ?`,
 				copyLineID, occurrenceID, lineID); err != nil {

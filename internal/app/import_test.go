@@ -578,12 +578,9 @@ func TestImportKeepsBracketTagsAsLabels(t *testing.T) {
 	}
 }
 
-// shownCues is one Occurrence's Cues as imported: its own and, by the
-// position of each Line in its active Alternate, its Lines'.
-type shownCues struct {
-	Cue   *float64
-	Lines map[int]float64
-}
+// shownCues is one Occurrence's Line Cues as imported, by the position of
+// each Line in its active Alternate.
+type shownCues map[int]float64
 
 // readCues lists a Song's Cues by Occurrence, in order.
 func readCues(s song) []shownCues {
@@ -601,13 +598,10 @@ func readCues(s song) []shownCues {
 				}
 			}
 		}
-		out = append(out, shownCues{Cue: o.Cue, Lines: lines})
+		out = append(out, lines)
 	}
 	return out
 }
-
-// cueAt is a Cue at seconds, for comparing with shownCues.
-func cueAt(seconds float64) *float64 { return &seconds }
 
 func TestImportTimestampsCueTheirLines(t *testing.T) {
 	cases := map[string]struct {
@@ -631,7 +625,7 @@ func TestImportTimestampsCueTheirLines(t *testing.T) {
 			if got, want := readSheet(s), []shownSection{{"", []string{"City lights", "are calling"}}}; !reflect.DeepEqual(got, want) {
 				t.Errorf("sheet = %+v, want %+v", got, want)
 			}
-			if got, want := readCues(s), []shownCues{{nil, map[int]float64{1: c.want}}}; !reflect.DeepEqual(got, want) {
+			if got, want := readCues(s), []shownCues{{1: c.want}}; !reflect.DeepEqual(got, want) {
 				t.Errorf("cues = %+v, want %+v", got, want)
 			}
 		})
@@ -645,74 +639,74 @@ func TestImportTimestamps(t *testing.T) {
 		cues     []shownCues
 		sections []int
 	}{
-		"a timestamped first line cues its occurrence too": {
+		"timestamped lines are cued": {
 			"[Verse]\n[0:05]City lights\n[0:08]are calling",
 			[]shownSection{{"Verse", []string{"City lights", "are calling"}}},
-			[]shownCues{{cueAt(5), map[int]float64{0: 5, 1: 8}}},
+			[]shownCues{{0: 5, 1: 8}},
 			[]int{0},
 		},
-		"the first line after blank lines cues its occurrence": {
+		"blank lines at a section's start take no cue": {
 			"[Verse]\n\n[0:01]\n[0:05]City lights",
 			[]shownSection{{"Verse", []string{"City lights"}}},
-			[]shownCues{{cueAt(5), map[int]float64{0: 5}}},
+			[]shownCues{{0: 5}},
 			[]int{0},
 		},
-		"a timestamp in front of a bracketed heading cues its occurrence only": {
+		"a timestamp in front of a bracketed heading cues its first line": {
 			"[0:30][Chorus]\nMe home\n[0:34]tonight",
 			[]shownSection{{"Chorus", []string{"Me home", "tonight"}}},
-			[]shownCues{{cueAt(30), map[int]float64{1: 34}}},
+			[]shownCues{{0: 30, 1: 34}},
 			[]int{0},
 		},
-		"a timestamp in front of a colon heading cues its occurrence only": {
+		"a timestamp in front of a colon heading cues its first line": {
 			"[00:30.0]Chorus:\nMe home",
 			[]shownSection{{"Chorus", []string{"Me home"}}},
-			[]shownCues{{cueAt(30), map[int]float64{}}},
+			[]shownCues{{0: 30}},
 			[]int{0},
 		},
 		"a heading and its first line can give the same time": {
-			"[00:30.0][Chorus]\n[0:30]Me home",
+			"[00:30.0][Chorus]\n\n[0:30]Me home",
 			[]shownSection{{"Chorus", []string{"Me home"}}},
-			[]shownCues{{cueAt(30), map[int]float64{0: 30}}},
+			[]shownCues{{0: 30}},
 			[]int{0},
 		},
-		"a timestamped heading on its own cues the repeat": {
-			"[0:10][Chorus]\n[0:10]Me home\n\n[Verse]\nCity lights\n\n[1:10][Chorus]",
+		"a heading's timestamp cues only its own occurrence": {
+			"[0:10][Chorus]\nMe home\n\n[Verse]\nCity lights\n\n[Chorus]\n[1:10]Me home",
 			[]shownSection{{"Chorus", []string{"Me home"}}, {"Verse", []string{"City lights"}}, {"Chorus", []string{"Me home"}}},
-			[]shownCues{{cueAt(10), map[int]float64{0: 10}}, {nil, map[int]float64{}}, {cueAt(70), map[int]float64{}}},
+			[]shownCues{{0: 10}, {}, {0: 70}},
 			[]int{0, 1, 0},
 		},
 		"identical choruses at different times share a section and keep their cues": {
 			"[Chorus]\n[0:10]Me home\n[0:14]tonight\n\n[Verse]\n[0:20]City lights\n\n[Chorus]\n[0:40]Me home\n[0:44] tonight",
 			[]shownSection{{"Chorus", []string{"Me home", "tonight"}}, {"Verse", []string{"City lights"}}, {"Chorus", []string{"Me home", "tonight"}}},
 			[]shownCues{
-				{cueAt(10), map[int]float64{0: 10, 1: 14}},
-				{cueAt(20), map[int]float64{0: 20}},
-				{cueAt(40), map[int]float64{0: 40, 1: 44}},
+				{0: 10, 1: 14},
+				{0: 20},
+				{0: 40, 1: 44},
 			},
 			[]int{0, 1, 0},
 		},
 		"timestamps out of order are kept as given": {
 			"[0:50]City lights\n[0:20]are calling\n[0:30]Me home",
 			[]shownSection{{"", []string{"City lights", "are calling", "Me home"}}},
-			[]shownCues{{cueAt(50), map[int]float64{0: 50, 1: 20, 2: 30}}},
+			[]shownCues{{0: 50, 1: 20, 2: 30}},
 			[]int{0},
 		},
 		"a timestamp alone is a blank line": {
 			"[0:01]\n[Verse]\n[0:02]\n[0:05]City lights\n[0:09]\n[0:10]are calling\n[0:14]\n\n[0:20]",
 			[]shownSection{{"Verse", []string{"City lights", "", "are calling"}}},
-			[]shownCues{{cueAt(5), map[int]float64{0: 5, 2: 10}}},
+			[]shownCues{{0: 5, 2: 10}},
 			[]int{0},
 		},
 		"a timestamp alone keeps a section going": {
 			"[Chorus]\nMe home\n[0:09]\ntonight",
 			[]shownSection{{"Chorus", []string{"Me home", "", "tonight"}}},
-			[]shownCues{{nil, map[int]float64{}}},
+			[]shownCues{{}},
 			[]int{0},
 		},
 		"chord lines take timestamps": {
 			"[Intro]\n[0:00][Am] [F]\n[0:04.5]  [C] [G]",
 			[]shownSection{{"Intro", []string{"[Am] [F]", "[C] [G]"}}},
-			[]shownCues{{cueAt(0), map[int]float64{0: 0, 1: 4.5}}},
+			[]shownCues{{0: 0, 1: 4.5}},
 			[]int{0},
 		},
 	}
@@ -753,6 +747,18 @@ func TestImportWithABadTimestampIsRejected(t *testing.T) {
 			"[Verse]\nCity lights\n\n[0:30][Chorus]\n\n[0:31]Me home",
 			"line 6: its timestamp differs from the heading's on line 4",
 		},
+		"heading with no lines under it": {
+			"[Chorus]\nMe home\n\n[1:10][Chorus]\n\n[Verse]\nCity lights",
+			"line 4: a timestamp on a heading needs a Line under it to cue",
+		},
+		"heading at the end with no lines under it": {
+			"[Chorus]\nMe home\n\n[1:10][Chorus]",
+			"line 4: a timestamp on a heading needs a Line under it to cue",
+		},
+		"heading ended with no lines under it": {
+			"City lights\n[1:10][Chorus]\n{eoc}\nMe home",
+			"line 2: a timestamp on a heading needs a Line under it to cue",
+		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -768,31 +774,31 @@ func TestImportOffsetShiftsEveryCue(t *testing.T) {
 	}{
 		"later in seconds": {
 			"{offset: 1.5}\n[0:30][Chorus]\nMe home\n[0:34]tonight\n\n[Verse]\n[0:40]City lights",
-			[]shownCues{{cueAt(31.5), map[int]float64{1: 35.5}}, {cueAt(41.5), map[int]float64{0: 41.5}}},
+			[]shownCues{{0: 31.5, 1: 35.5}, {0: 41.5}},
 		},
 		"earlier in minutes and seconds": {
 			"{offset: -0:02}\n[0:30][Chorus]\nMe home\n[0:34]tonight\n\n[Verse]\n[0:40]City lights",
-			[]shownCues{{cueAt(28), map[int]float64{1: 32}}, {cueAt(38), map[int]float64{0: 38}}},
+			[]shownCues{{0: 28, 1: 32}, {0: 38}},
 		},
 		"among the timestamps": {
 			"[0:30][Chorus]\nMe home\n{offset: -0:02}\n[0:34]tonight\n\n[Verse]\n[0:40]City lights",
-			[]shownCues{{cueAt(28), map[int]float64{1: 32}}, {cueAt(38), map[int]float64{0: 38}}},
+			[]shownCues{{0: 28, 1: 32}, {0: 38}},
 		},
 		"after the timestamps": {
 			"[0:30][Chorus]\nMe home\n[0:34]tonight\n\n[Verse]\n[0:40]City lights\n{offset: -0:02}",
-			[]shownCues{{cueAt(28), map[int]float64{1: 32}}, {cueAt(38), map[int]float64{0: 38}}},
+			[]shownCues{{0: 28, 1: 32}, {0: 38}},
 		},
 		"to 0:00": {
 			"{offset: -5}\n[0:05]City lights",
-			[]shownCues{{cueAt(0), map[int]float64{0: 0}}},
+			[]shownCues{{0: 0}},
 		},
 		"kept to the millisecond": {
 			"{Offset: +0:00.001}\n[0:01.2345]City lights",
-			[]shownCues{{cueAt(1.236), map[int]float64{0: 1.236}}},
+			[]shownCues{{0: 1.236}},
 		},
 		"without timestamps": {
 			"{offset: 3}\nCity lights",
-			[]shownCues{{nil, map[int]float64{}}},
+			[]shownCues{{}},
 		},
 	}
 	for name, c := range cases {

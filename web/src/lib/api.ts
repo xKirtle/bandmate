@@ -61,9 +61,10 @@ export interface Occurrence {
   sectionId: number;
   /** Other Occurrences show the same Section, so editing it changes them too. */
   shared: boolean;
-  /** When it starts on the Timeline, in seconds to the millisecond; null without a Cue. */
-  cue: number | null;
-  /** Line ids to when each is sung in this Occurrence, in seconds. Lines of inactive Alternates keep theirs, dormant. */
+  /**
+   * Line ids to when each is sung in this Occurrence, in seconds to the millisecond. Lines of inactive Alternates
+   * keep theirs, dormant. The Occurrence has no Cue of its own: it starts where its first Line is cued.
+   */
   lineCues: Record<number, number>;
 }
 
@@ -101,10 +102,10 @@ export interface Chord {
   name: string;
 }
 
-/** One Cue's value: an Occurrence's own or, with a lineId, a Line's within it; null for none. */
+/** One Cue's value: a Line's within an Occurrence; null for none. */
 export interface CueValue {
   occurrenceId: number;
-  lineId?: number;
+  lineId: number;
   cue: number | null;
 }
 
@@ -367,24 +368,18 @@ export const api = {
   /** Gives an Occurrence of a shared Section its own copy of the Section. */
   detach: (at: SongAt, occurrenceId: number) =>
     request<Song>('POST', `/songs/${at.id}/occurrences/${occurrenceId}/detach`, undefined, at),
-  /** Gives an Occurrence a Cue, in seconds; it may lie past the last Clip. */
-  setOccurrenceCue: (at: SongAt, occurrenceId: number, cue: number) =>
-    request<Song>('PUT', `/songs/${at.id}/occurrences/${occurrenceId}/cue`, { cue }, at),
-  /** Removes an Occurrence's Cue. */
-  clearOccurrenceCue: (at: SongAt, occurrenceId: number) =>
-    request<Song>('DELETE', `/songs/${at.id}/occurrences/${occurrenceId}/cue`, undefined, at),
-  /** Gives a Line a Cue within an Occurrence, in seconds; cueing its first Line cues the Occurrence too. */
+  /** Gives a Line a Cue within an Occurrence, in seconds; it may lie past the last Clip. */
   setLineCue: (at: SongAt, occurrenceId: number, lineId: number, cue: number) =>
     request<Song>('PUT', `/songs/${at.id}/occurrences/${occurrenceId}/lines/${lineId}/cue`, { cue }, at),
   /** Removes a Line's Cue within an Occurrence. */
   clearLineCue: (at: SongAt, occurrenceId: number, lineId: number) =>
     request<Song>('DELETE', `/songs/${at.id}/occurrences/${occurrenceId}/lines/${lineId}/cue`, undefined, at),
-  /** Removes an Occurrence's Cue and all its Lines' Cues, dormant ones included. */
+  /** Removes all an Occurrence's Line Cues, dormant ones included. */
   clearOccurrenceCues: (at: SongAt, occurrenceId: number) =>
     request<Song>('DELETE', `/songs/${at.id}/occurrences/${occurrenceId}/cues`, undefined, at),
   /** Removes every Cue in the Song. */
   clearCues: (at: SongAt) => request<Song>('DELETE', `/songs/${at.id}/cues`, undefined, at),
-  /** Sets each Cue given to its value, or clears it, as they were before another Cue edit; the first Line and its Occurrence don't follow each other. */
+  /** Sets each Cue given to its value, or clears it, as they were before another Cue edit. */
   restoreCues: (at: SongAt, cues: CueValue[]) => request<Song>('PATCH', `/songs/${at.id}/cues`, { cues }, at),
   /** Moves every Cue from start up to end, in seconds, dormant ones included, by the seconds given; refused if any would go below zero. */
   shiftCues: (at: SongAt, start: number, end: number, by: number) =>

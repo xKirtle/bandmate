@@ -45,6 +45,13 @@ func Open(ctx context.Context, dataDir string) (*sql.DB, error) {
 // migrate applies every embedded migration not yet recorded in
 // schema_migrations, in file name order, each in its own transaction.
 func migrate(ctx context.Context, conn *sql.DB) error {
+	return migrateBefore(ctx, conn, "")
+}
+
+// migrateBefore is migrate, stopping short of the migration named stop and
+// those after it, or applying them all if stop is "". It lets a test put
+// data in an older schema and see a migration carry it over.
+func migrateBefore(ctx context.Context, conn *sql.DB, stop string) error {
 	if _, err := conn.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
 		name TEXT PRIMARY KEY,
 		applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
@@ -60,6 +67,9 @@ func migrate(ctx context.Context, conn *sql.DB) error {
 
 	for _, path := range names {
 		name := strings.TrimSuffix(filepath.Base(path), ".sql")
+		if stop != "" && name >= stop {
+			break
+		}
 		var applied int
 		if err := conn.QueryRowContext(ctx,
 			`SELECT COUNT(*) FROM schema_migrations WHERE name = ?`, name).Scan(&applied); err != nil {
