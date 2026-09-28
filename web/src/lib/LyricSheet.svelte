@@ -12,7 +12,10 @@
     isBlank,
     leadIn,
     nextLine,
+    outOfOrderCues,
+    outOfOrderReason,
     type NextLine,
+    type Position,
   } from './cues';
   import { follower, key } from './follow';
   import { gutterFields } from './gutter';
@@ -119,6 +122,16 @@
     ),
   );
 
+  // Cues out of order are marked in the gutter, each naming the Line it's
+  // out of order with as the gutter names Lines, e.g. "Line 6 of Chorus".
+  const outOfOrder = $derived(outOfOrderCues(song));
+
+  function lineName({ occurrence, line }: Position): string {
+    const section = sections.get(song.arrangement.find((o) => o.id === occurrence)?.sectionId ?? -1);
+    const lines = section?.alternates.find((a) => a.active)?.lines ?? [];
+    return `Line ${lines.findIndex((l) => l.id === line) + 1}${section?.label ? ` of ${section.label}` : ''}`;
+  }
+
   /** How an Occurrence's Cues show on its Section's text box in Write mode. */
   function cueingFor(occurrence: Occurrence, label: string): Cueing {
     return {
@@ -132,6 +145,10 @@
             field: (line, field) => writeFields.set(key(occurrence.id, line), field),
             next: (line) => writeFields.editAfter(writeFieldOrder, key(occurrence.id, line)),
             play: playFrom,
+            outOfOrder: (line) => {
+              const mark = outOfOrder.get(key(occurrence.id, line));
+              return mark ? outOfOrderReason(mark, lineName) : null;
+            },
           }
         : undefined,
       sync: syncing

@@ -1,7 +1,9 @@
 // Cues link a Line within an Occurrence to a time on the Timeline (ADR
 // 0005). An Occurrence has no Cue of its own: it starts where its first Line
-// is cued (ADR 0009). This works out where playback is, and reads and writes
-// the times as typed.
+// is cued (ADR 0009). This works out where playback is and which Cues are
+// out of order, and reads and writes the times as typed.
+
+import { key } from './follow';
 
 /** What the current position is worked out from: an Occurrence and its Line Cues. */
 export interface CuedOccurrence {
@@ -94,6 +96,58 @@ export function lastCue(song: CuedSong): number | null {
 
 /** A Cue and the Line within an Occurrence it links. */
 export type FoundCue = Position & { cue: number };
+
+/** Why a Cue is out of order: the cued Lines either side it's out of order with. */
+export interface OutOfOrder {
+  /** The nearest cued Line above, when this Cue is earlier than it. */
+  earlierThan: FoundCue | null;
+  /** The nearest cued Line below, when this Cue is later than it. */
+  laterThan: FoundCue | null;
+}
+
+/**
+ * The Cues out of order, by key(occurrence, line): each is compared with the
+ * nearest cued Line above and below it, down the whole Arrangement, skipping
+ * Lines without a Cue. Both Cues of a pair out of order are marked, as it
+ * can't be known which is wrong. Equal times are in order. Only Cues in
+ * effect count, Chord Lines' included; dormant ones are neither marked nor
+ * compared, nor are blank Lines', which the gutter doesn't show.
+ */
+export function outOfOrderCues(song: CuedSong): Map<string, OutOfOrder> {
+  const linesOf = activeLines(song);
+  const cued = song.arrangement.flatMap((o) =>
+    linesOf(o)
+      .filter((l) => !isBlank(l) && o.lineCues[l.id] !== undefined)
+      .map((l) => ({ occurrence: o.id, line: l.id, cue: o.lineCues[l.id] })),
+  );
+  const marks = new Map<string, OutOfOrder>();
+  const mark = (c: FoundCue) => {
+    const k = key(c.occurrence, c.line);
+    const m = marks.get(k) ?? { earlierThan: null, laterThan: null };
+    marks.set(k, m);
+    return m;
+  };
+  for (let i = 1; i < cued.length; i++) {
+    const [above, below] = [cued[i - 1], cued[i]];
+    if (above.cue <= below.cue) continue;
+    mark(above).laterThan = below;
+    mark(below).earlierThan = above;
+  }
+  return marks;
+}
+
+/**
+ * Says why a Cue is out of order, e.g. "Later than Line 6 of Chorus (0:55.0)",
+ * naming the Lines with name.
+ */
+export function outOfOrderReason({ earlierThan, laterThan }: OutOfOrder, name: (p: Position) => string): string {
+  const reasons = [
+    earlierThan && `earlier than ${name(earlierThan)} (${formatCue(earlierThan.cue)})`,
+    laterThan && `later than ${name(laterThan)} (${formatCue(laterThan.cue)})`,
+  ].filter((r) => r !== null);
+  const text = reasons.join('; ');
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
 /**
  * The Cues from start up to end, in seconds, as shifting that span moves

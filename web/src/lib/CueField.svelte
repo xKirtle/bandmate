@@ -7,7 +7,9 @@
   // and an empty field clears the Cue. Alt+↑/↓ nudges it by a tenth of a
   // second. A ✕ after it, shown while its Line is hovered or the keyboard is
   // in its slot, clears the Cue. With `pick`, as in Sync mode, clicking it
-  // makes its Line the next to cue instead, and there's no ✕.
+  // makes its Line the next to cue instead, and there's no ✕. A Cue out of
+  // order is marked with a ⚠ and a warning colour, and says why on hover and
+  // to screen readers.
   let {
     cue,
     label,
@@ -17,6 +19,7 @@
     current = false,
     hovered = false,
     pick,
+    outOfOrder = null,
   }: {
     /** In seconds, or null without a Cue. */
     cue: number | null;
@@ -37,6 +40,8 @@
      * to cue, rather than opening the time.
      */
     pick?: () => void;
+    /** Given, the Cue is out of order, for this reason, e.g. "Later than Line 6 of Chorus (0:55.0)". */
+    outOfOrder?: string | null;
   } = $props();
 
   let editing = $state(false);
@@ -45,6 +50,10 @@
   let input = $state<HTMLInputElement>();
   let button = $state<HTMLButtonElement>();
   let clearButton = $state<HTMLButtonElement>();
+
+  // Only a Cue can be out of order.
+  const marked = $derived(cue !== null && !!outOfOrder);
+  const outOfOrderNote = $derived(marked ? `. Out of order. ${outOfOrder}` : '');
 
   /** Opens the field to type a time. */
   export async function edit() {
@@ -169,20 +178,23 @@
       type="button"
       class="cue"
       class:unset={cue === null}
+      class:out-of-order={marked}
       onclick={pick ?? edit}
       onkeydown={nudge}
       aria-label={pick
-        ? `Cue ${label} next${cue === null ? '' : `, cued at ${formatCue(cue)}`}`
+        ? `Cue ${label} next${cue === null ? '' : `, cued at ${formatCue(cue)}${outOfOrderNote}`}`
         : cue === null
           ? `Set a Cue for ${label}`
-          : `Cue for ${label}: ${formatCue(cue)}. Change it`}
-      title={pick
-        ? 'Cue this next'
-        : cue === null
-          ? 'Set when this starts on the Timeline'
-          : 'Change when this starts on the Timeline; Alt+↑/↓ nudges it'}
+          : `Cue for ${label}: ${formatCue(cue)}${outOfOrderNote}. Change it`}
+      title={`${marked ? `Out of order. ${outOfOrder}. ` : ''}${
+        pick
+          ? 'Cue this next'
+          : cue === null
+            ? 'Set when this starts on the Timeline'
+            : 'Change when this starts on the Timeline; Alt+↑/↓ nudges it'
+      }`}
     >
-      {cue === null ? '–:––.–' : formatCue(cue)}
+      {#if marked}<span class="warning" aria-hidden="true">⚠</span>{/if}{cue === null ? '–:––.–' : formatCue(cue)}
     </button>
   {/if}
   {#if cue !== null && !pick && !editing}
@@ -231,6 +243,16 @@
   }
   .cue.unset {
     opacity: 0.6;
+  }
+  .cue.out-of-order,
+  .cue.out-of-order:hover,
+  .cue.out-of-order:focus-visible {
+    color: var(--warning);
+  }
+  /* Small, so the time beside it still fits the gutter. */
+  .warning {
+    margin-right: 0.125rem;
+    font-size: 0.6875rem;
   }
   .cue.editing {
     cursor: text;

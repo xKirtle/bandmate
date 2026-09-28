@@ -9,6 +9,7 @@
   --accent: #b4432c;
   --accent-text: #ffffff;
   --danger: #b3261e;
+  --warning: #8a5a00;
   --drafting-bg: #fdf0d5;
   --drafting-fg: #7a4f00;
   --finished-bg: #dcefe0;
@@ -52,6 +53,7 @@
     --accent: #e0765c;
     --accent-text: #16161a;
     --danger: #f2877e;
+    --warning: #f3cf7a;
     --drafting-bg: #3b2f14;
     --drafting-fg: #f3cf7a;
     --finished-bg: #173222;
