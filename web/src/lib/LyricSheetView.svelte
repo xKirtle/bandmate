@@ -161,8 +161,8 @@
   .section p {
     margin: 0;
   }
-  /* A Line. The highlight bleeds past the text like the Section's, taking in
-     its Chords. */
+  /* A Line, whose highlight bleeds past the text like the Section's, taking
+     in its Chords. */
   .line-box {
     margin: 0 -0.75rem;
     padding: 0 0.75rem;
