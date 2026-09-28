@@ -71,16 +71,9 @@ describe('formatCue', () => {
 
 describe('currentPosition', () => {
   // One Section per Occurrence, with the active Alternate's Lines given.
-  function sheet(
-    occurrences: { id: number; cue: number | null; lineCues?: Record<number, number>; lines?: string[] }[],
-  ) {
+  function sheet(occurrences: { id: number; lineCues?: Record<number, number>; lines?: string[] }[]) {
     let lineId = 100;
-    const arrangement = occurrences.map((o) => ({
-      id: o.id,
-      sectionId: o.id,
-      cue: o.cue,
-      lineCues: o.lineCues ?? {},
-    }));
+    const arrangement = occurrences.map((o) => ({ id: o.id, sectionId: o.id, lineCues: o.lineCues ?? {} }));
     const sections = occurrences.map((o) => ({
       id: o.id,
       alternates: [{ active: true, lines: (o.lines ?? []).map((text) => ({ id: lineId++, text })) }],
@@ -88,126 +81,89 @@ describe('currentPosition', () => {
     return { arrangement, sections };
   }
 
-  describe('with only Occurrence Cues', () => {
-    // Intro (no Cue), Verse at 0:10, Chorus at 0:30, Verse 2 at 0:50.
-    const song = sheet([
-      { id: 1, cue: null },
-      { id: 2, cue: 10 },
-      { id: 3, cue: 30 },
-      { id: 4, cue: 50 },
-    ]);
+  // A Verse whose Lines (100–103) are sung at 10, 14 and 18, with a blank
+  // Line between; then a Chorus (104) at 0:30; then an Outro (105) uncued.
+  const song = sheet([
+    { id: 1, lines: ['One', 'Two', '', 'Three'], lineCues: { 100: 10, 101: 14, 103: 18 } },
+    { id: 2, lines: ['Hook'], lineCues: { 104: 30 } },
+    { id: 3, lines: ['Fade'] },
+  ]);
 
-    it('is nothing before the first Cue', () => {
-      expect(currentPosition(song, 0)).toBeNull();
-      expect(currentPosition(song, 9.999)).toBeNull();
-    });
-
-    it('is the whole Section whose Cue has most recently passed', () => {
-      expect(currentPosition(song, 10)).toEqual({ occurrence: 2, line: null });
-      expect(currentPosition(song, 29.9)).toEqual({ occurrence: 2, line: null });
-      expect(currentPosition(song, 30)).toEqual({ occurrence: 3, line: null });
-      expect(currentPosition(song, 400)).toEqual({ occurrence: 4, line: null });
-    });
-
-    it('follows time rather than the Arrangement', () => {
-      const outOfOrder = sheet([
-        { id: 1, cue: 40 },
-        { id: 2, cue: 5 },
-        { id: 3, cue: 20 },
-      ]);
-      expect(currentPosition(outOfOrder, 6)?.occurrence).toBe(2);
-      expect(currentPosition(outOfOrder, 25)?.occurrence).toBe(3);
-      expect(currentPosition(outOfOrder, 45)?.occurrence).toBe(1);
-    });
-
-    it('is nothing without any Cues', () => {
-      expect(currentPosition(sheet([{ id: 1, cue: null }]), 12)).toBeNull();
-      expect(currentPosition(sheet([]), 12)).toBeNull();
-    });
-
-    it('picks the later Occurrence of two cued at the same time', () => {
-      const tied = sheet([
-        { id: 1, cue: 5 },
-        { id: 2, cue: 5 },
-      ]);
-      expect(currentPosition(tied, 6)?.occurrence).toBe(2);
-    });
+  it('is nothing before the first Line Cue', () => {
+    expect(currentPosition(song, 0)).toBeNull();
+    expect(currentPosition(song, 9.999)).toBeNull();
   });
 
-  describe('with Line Cues', () => {
-    // A Verse at 0:10 whose Lines (100–103) are sung at 10, 14 and 18, with
-    // a blank Line between; then a Chorus at 0:30 with no Line Cues.
-    const song = sheet([
-      {
-        id: 1,
-        cue: 10,
-        lines: ['One', 'Two', '', 'Three'],
-        lineCues: { 100: 10, 101: 14, 103: 18 },
-      },
-      { id: 2, cue: 30, lines: ['Hook'] },
+  it('is the Line whose Cue has most recently passed', () => {
+    expect(currentPosition(song, 10)).toEqual({ occurrence: 1, line: 100 });
+    expect(currentPosition(song, 14.5)).toEqual({ occurrence: 1, line: 101 });
+    expect(currentPosition(song, 30)).toEqual({ occurrence: 2, line: 104 });
+  });
+
+  it('keeps a Line current until the next Cue', () => {
+    expect(currentPosition(song, 17.99)).toEqual({ occurrence: 1, line: 101 });
+    expect(currentPosition(song, 29)).toEqual({ occurrence: 1, line: 103 });
+    expect(currentPosition(song, 400)).toEqual({ occurrence: 2, line: 104 });
+  });
+
+  it('is only ever a Line, never a whole Section', () => {
+    for (const t of [10, 20, 31, 400]) expect(currentPosition(song, t)?.line).not.toBeNull();
+  });
+
+  it('follows time rather than the Arrangement', () => {
+    const outOfOrder = sheet([
+      { id: 1, lines: ['A'], lineCues: { 100: 40 } },
+      { id: 2, lines: ['B'], lineCues: { 101: 5 } },
+      { id: 3, lines: ['C'], lineCues: { 102: 20 } },
     ]);
+    expect(currentPosition(outOfOrder, 6)?.occurrence).toBe(2);
+    expect(currentPosition(outOfOrder, 25)?.occurrence).toBe(3);
+    expect(currentPosition(outOfOrder, 45)?.occurrence).toBe(1);
+  });
 
-    it('is the Line whose Cue has most recently passed', () => {
-      expect(currentPosition(song, 10)).toEqual({ occurrence: 1, line: 100 });
-      expect(currentPosition(song, 14.5)).toEqual({ occurrence: 1, line: 101 });
-    });
+  it('is nothing without any Cues', () => {
+    expect(currentPosition(sheet([{ id: 1, lines: ['One'] }]), 12)).toBeNull();
+    expect(currentPosition(sheet([]), 12)).toBeNull();
+  });
 
-    it('keeps a Line current until the next Cue', () => {
-      expect(currentPosition(song, 17.99)).toEqual({ occurrence: 1, line: 101 });
-      expect(currentPosition(song, 29)).toEqual({ occurrence: 1, line: 103 });
-    });
+  it('picks the later Line of two cued at the same time', () => {
+    const tied = sheet([
+      { id: 1, lines: ['A'], lineCues: { 100: 5 } },
+      { id: 2, lines: ['B'], lineCues: { 101: 5 } },
+    ]);
+    expect(currentPosition(tied, 6)).toEqual({ occurrence: 2, line: 101 });
+  });
 
-    it('is the whole Section once an Occurrence Cue without Line Cues passes', () => {
-      expect(currentPosition(song, 31)).toEqual({ occurrence: 2, line: null });
-    });
-
-    it('is the first Line when the Occurrence Cue passes before its Lines are cued', () => {
-      const partly = sheet([{ id: 1, cue: 10, lines: ['', 'One', 'Two'], lineCues: { 102: 15 } }]);
-      expect(currentPosition(partly, 12)).toEqual({ occurrence: 1, line: 101 });
-      expect(currentPosition(partly, 15)).toEqual({ occurrence: 1, line: 102 });
-    });
-
-    it('is a cued Line even when its Occurrence has no Cue of its own', () => {
-      const lineOnly = sheet([{ id: 1, cue: null, lines: ['One', 'Two'], lineCues: { 101: 4 } }]);
-      expect(currentPosition(lineOnly, 3)).toBeNull();
-      expect(currentPosition(lineOnly, 4)).toEqual({ occurrence: 1, line: 101 });
-    });
-
-    it('picks the Line over its Occurrence when both are cued at the same time', () => {
-      expect(currentPosition(song, 10.5)).toEqual({ occurrence: 1, line: 100 });
-    });
-
-    it('follows time across the Line Cues of shared Sections', () => {
-      // The same Section in two Occurrences, its second Line cued in each.
-      const shared = {
-        arrangement: [
-          { id: 1, sectionId: 9, cue: 0, lineCues: { 51: 4 } },
-          { id: 2, sectionId: 9, cue: 20, lineCues: { 51: 24 } },
-        ],
-        sections: [
-          {
-            id: 9,
-            alternates: [
-              {
-                active: true,
-                lines: [
-                  { id: 50, text: 'A' },
-                  { id: 51, text: 'B' },
-                ],
-              },
-            ],
-          },
-        ],
-      };
-      expect(currentPosition(shared, 5)).toEqual({ occurrence: 1, line: 51 });
-      expect(currentPosition(shared, 21)).toEqual({ occurrence: 2, line: 50 });
-      expect(currentPosition(shared, 25)).toEqual({ occurrence: 2, line: 51 });
-    });
+  it('follows time across the Line Cues of shared Sections', () => {
+    // The same Section in two Occurrences, its Lines cued in each.
+    const shared = {
+      arrangement: [
+        { id: 1, sectionId: 9, lineCues: { 50: 0, 51: 4 } },
+        { id: 2, sectionId: 9, lineCues: { 50: 20, 51: 24 } },
+      ],
+      sections: [
+        {
+          id: 9,
+          alternates: [
+            {
+              active: true,
+              lines: [
+                { id: 50, text: 'A' },
+                { id: 51, text: 'B' },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    expect(currentPosition(shared, 5)).toEqual({ occurrence: 1, line: 51 });
+    expect(currentPosition(shared, 21)).toEqual({ occurrence: 2, line: 50 });
+    expect(currentPosition(shared, 25)).toEqual({ occurrence: 2, line: 51 });
   });
 
   describe('ignoring a Line being retaken', () => {
     // A Verse whose Lines (100–102) are sung at 10, 14 and 18.
-    const song = sheet([{ id: 1, cue: null, lines: ['One', 'Two', 'Three'], lineCues: { 100: 10, 101: 14, 102: 18 } }]);
+    const song = sheet([{ id: 1, lines: ['One', 'Two', 'Three'], lineCues: { 100: 10, 101: 14, 102: 18 } }]);
     const retaking = { occurrence: 1, line: 101 };
 
     it("keeps the Line before it current past its old Cue", () => {
@@ -228,10 +184,10 @@ describe('currentPosition', () => {
   });
 
   describe('with dormant Line Cues', () => {
-    // A Verse at 0:10 whose inactive Alternate A (Lines 50–51) was cued at
-    // 12 and 16; its active Alternate B (Lines 60–61) has only 60 cued, at 20.
+    // A Verse whose inactive Alternate A (Lines 50–51) was cued at 12 and
+    // 16; its active Alternate B (Lines 60–61) has only 60 cued, at 20.
     const song = {
-      arrangement: [{ id: 1, sectionId: 9, cue: 10, lineCues: { 50: 12, 51: 16, 60: 20 } }],
+      arrangement: [{ id: 1, sectionId: 9, lineCues: { 50: 12, 51: 16, 60: 20 } }],
       sections: [
         {
           id: 9,
@@ -256,22 +212,11 @@ describe('currentPosition', () => {
     };
 
     it('ignores them, keeping the active Line current', () => {
-      expect(currentPosition(song, 17)).toEqual({ occurrence: 1, line: 60 });
       expect(currentPosition(song, 21)).toEqual({ occurrence: 1, line: 60 });
     });
 
-    it('falls back to the Occurrence Cue when only dormant Cues are past', () => {
-      expect(currentPosition(song, 13)).toEqual({ occurrence: 1, line: 60 });
-    });
-
-    it('is the whole Section when all its Line Cues are dormant', () => {
-      const allDormant = { ...song, arrangement: [{ id: 1, sectionId: 9, cue: 10, lineCues: { 50: 12, 51: 16 } }] };
-      expect(currentPosition(allDormant, 17)).toEqual({ occurrence: 1, line: null });
-    });
-
     it('is nothing when only dormant Cues are past', () => {
-      const noCue = { ...song, arrangement: [{ id: 1, sectionId: 9, cue: null, lineCues: { 50: 12 } }] };
-      expect(currentPosition(noCue, 13)).toBeNull();
+      expect(currentPosition(song, 17)).toBeNull();
     });
   });
 });
@@ -288,19 +233,15 @@ describe('hasCues', () => {
   ];
 
   it('is false without any Cues', () => {
-    expect(hasCues({ arrangement: [{ id: 1, sectionId: 9, cue: null, lineCues: {} }], sections })).toBe(false);
-  });
-
-  it('counts an Occurrence Cue', () => {
-    expect(hasCues({ arrangement: [{ id: 1, sectionId: 9, cue: 0, lineCues: {} }], sections })).toBe(true);
+    expect(hasCues({ arrangement: [{ id: 1, sectionId: 9, lineCues: {} }], sections })).toBe(false);
   });
 
   it('counts a Line Cue of the active Alternate', () => {
-    expect(hasCues({ arrangement: [{ id: 1, sectionId: 9, cue: null, lineCues: { 60: 3 } }], sections })).toBe(true);
+    expect(hasCues({ arrangement: [{ id: 1, sectionId: 9, lineCues: { 60: 3 } }], sections })).toBe(true);
   });
 
   it('ignores dormant Cues', () => {
-    expect(hasCues({ arrangement: [{ id: 1, sectionId: 9, cue: null, lineCues: { 50: 3 } }], sections })).toBe(false);
+    expect(hasCues({ arrangement: [{ id: 1, sectionId: 9, lineCues: { 50: 3 } }], sections })).toBe(false);
   });
 });
 
@@ -316,28 +257,27 @@ describe('lastCue', () => {
   ];
 
   it('is null without any Cues', () => {
-    expect(lastCue({ arrangement: [{ id: 1, sectionId: 9, cue: null, lineCues: {} }], sections })).toBeNull();
+    expect(lastCue({ arrangement: [{ id: 1, sectionId: 9, lineCues: {} }], sections })).toBeNull();
   });
 
-  it('is the latest of Occurrence Cues and Line Cues of the active Alternate', () => {
+  it('is the latest Line Cue of the active Alternate', () => {
     const song: CuedSong = {
       arrangement: [
-        { id: 1, sectionId: 9, cue: 5, lineCues: { 60: 8 } },
-        { id: 2, sectionId: 9, cue: 20, lineCues: {} },
+        { id: 1, sectionId: 9, lineCues: { 60: 8 } },
+        { id: 2, sectionId: 9, lineCues: { 60: 20 } },
       ],
       sections,
     };
     expect(lastCue(song)).toBe(20);
-    expect(lastCue({ ...song, arrangement: [{ id: 1, sectionId: 9, cue: 5, lineCues: { 60: 30 } }] })).toBe(30);
   });
 
   it('counts a Cue at 0:00', () => {
-    expect(lastCue({ arrangement: [{ id: 1, sectionId: 9, cue: 0, lineCues: {} }], sections })).toBe(0);
+    expect(lastCue({ arrangement: [{ id: 1, sectionId: 9, lineCues: { 60: 0 } }], sections })).toBe(0);
   });
 
   it('ignores dormant Cues', () => {
-    expect(lastCue({ arrangement: [{ id: 1, sectionId: 9, cue: 5, lineCues: { 50: 40 } }], sections })).toBe(5);
-    expect(lastCue({ arrangement: [{ id: 1, sectionId: 9, cue: null, lineCues: { 50: 40 } }], sections })).toBeNull();
+    expect(lastCue({ arrangement: [{ id: 1, sectionId: 9, lineCues: { 60: 5, 50: 40 } }], sections })).toBe(5);
+    expect(lastCue({ arrangement: [{ id: 1, sectionId: 9, lineCues: { 50: 40 } }], sections })).toBeNull();
   });
 });
 
@@ -359,24 +299,17 @@ describe('cuesInSpan', () => {
   ];
   const song: CuedSong = {
     arrangement: [
-      { id: 1, sectionId: 9, cue: 10, lineCues: { 60: 10, 61: 14, 50: 12 } },
-      { id: 2, sectionId: 9, cue: 20, lineCues: { 61: 25 } },
-      { id: 3, sectionId: 9, cue: null, lineCues: {} },
+      { id: 1, sectionId: 9, lineCues: { 60: 10, 61: 14, 50: 12 } },
+      { id: 2, sectionId: 9, lineCues: { 60: 20, 61: 25 } },
+      { id: 3, sectionId: 9, lineCues: {} },
     ],
     sections,
   };
 
-  it('finds the Occurrence and Line Cues from the start of the span up to its end', () => {
+  it('finds the Line Cues from the start of the span up to its end', () => {
     expect(cuesInSpan(song, 14, 25)).toEqual([
       { occurrence: 1, line: 61, cue: 14 },
-      { occurrence: 2, line: null, cue: 20 },
-    ]);
-  });
-
-  it('finds an Occurrence Cue and its first Line Cue both', () => {
-    expect(cuesInSpan(song, 0, 11)).toEqual([
-      { occurrence: 1, line: null, cue: 10 },
-      { occurrence: 1, line: 60, cue: 10 },
+      { occurrence: 2, line: 60, cue: 20 },
     ]);
   });
 
@@ -412,7 +345,7 @@ describe('nextLine', () => {
     cues: Record<number, Record<number, number>> = {},
   ) {
     return {
-      arrangement: order.map((sectionId, i) => ({ id: i + 1, sectionId, cue: null, lineCues: cues[i + 1] ?? {} })),
+      arrangement: order.map((sectionId, i) => ({ id: i + 1, sectionId, lineCues: cues[i + 1] ?? {} })),
       sections: Object.entries(sections).map(([id, lines]) => ({
         id: Number(id),
         alternates: [
@@ -609,23 +542,23 @@ describe('shifting every Cue', () => {
       ],
     },
   ];
-  // Occurrence 1's own Cue is at 2.5, its active Line's at 3, and a dormant Line's at 0.3.
+  // Occurrence 1's active Line is cued at 3, and a dormant Line at 0.3.
   const song: CuedSong = {
     arrangement: [
-      { id: 1, sectionId: 9, cue: 2.5, lineCues: { 60: 3, 50: 0.3 } },
-      { id: 2, sectionId: 9, cue: 40, lineCues: {} },
+      { id: 1, sectionId: 9, lineCues: { 60: 3, 50: 0.3 } },
+      { id: 2, sectionId: 9, lineCues: { 60: 40 } },
     ],
     sections,
   };
-  const uncued: CuedSong = { arrangement: [{ id: 1, sectionId: 9, cue: null, lineCues: {} }], sections };
+  const uncued: CuedSong = { arrangement: [{ id: 1, sectionId: 9, lineCues: {} }], sections };
 
   describe('everyCue', () => {
     it('takes every Cue, dormant ones included', () => {
-      expect(cuesInSpan(song, everyCue.start, everyCue.end)).toHaveLength(4);
+      expect(cuesInSpan(song, everyCue.start, everyCue.end)).toHaveLength(3);
     });
 
     it('takes a Cue from 0:00 up to the latest a Cue can be', () => {
-      const edges: CuedSong = { arrangement: [{ id: 1, sectionId: 9, cue: 0, lineCues: { 60: maxCue } }], sections };
+      const edges: CuedSong = { arrangement: [{ id: 1, sectionId: 9, lineCues: { 60: maxCue, 50: 0 } }], sections };
       expect(cuesInSpan(edges, everyCue.start, everyCue.end)).toHaveLength(2);
     });
   });
@@ -637,7 +570,7 @@ describe('shifting every Cue', () => {
 
     it('allows a step that takes the earliest Cue exactly to 0:00', () => {
       expect(canShiftCuesEarlier(song, 0.3)).toBe(true);
-      const tenths: CuedSong = { arrangement: [{ id: 1, sectionId: 9, cue: 0.7, lineCues: {} }], sections };
+      const tenths: CuedSong = { arrangement: [{ id: 1, sectionId: 9, lineCues: { 60: 0.7 } }], sections };
       expect(canShiftCuesEarlier(tenths, 0.7)).toBe(true);
     });
 
@@ -647,7 +580,7 @@ describe('shifting every Cue', () => {
     });
 
     it('refuses any step with a Cue at 0:00', () => {
-      const atZero: CuedSong = { arrangement: [{ id: 1, sectionId: 9, cue: 0, lineCues: {} }], sections };
+      const atZero: CuedSong = { arrangement: [{ id: 1, sectionId: 9, lineCues: { 60: 0 } }], sections };
       expect(canShiftCuesEarlier(atZero, 0.1)).toBe(false);
     });
 

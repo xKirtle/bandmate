@@ -26,14 +26,11 @@ func TestShiftingCuesMovesThoseInTheSpanDormantOnesIncluded(t *testing.T) {
 	drive, night, _, _ := chorusLines(before)
 	dormant := before.Sections[0].Alternates[1].Lines[1].ID
 
-	// The Cues are 1 (the first Occurrence and its first Line), 3, then 20
-	// (the third Occurrence), 22 and 23 (dormant).
+	// The Cues are 1, 3, then 20 (the third Occurrence's first Line), 22
+	// and 23 (dormant).
 	got := ts.shiftCues(before.ID, 3, 23, 1.5)
 
-	if want := []float64{1, -1, 21.5, -1}; !reflect.DeepEqual(cues(got), want) {
-		t.Errorf("cues = %v, want %v", cues(got), want)
-	}
-	want := []map[int64]float64{{drive: 1, night: 4.5}, {}, {night: 23.5, dormant: 23}, {}}
+	want := []map[int64]float64{{drive: 1, night: 4.5}, {}, {drive: 21.5, night: 23.5, dormant: 23}, {}}
 	if !reflect.DeepEqual(lineCues(got), want) {
 		t.Errorf("lineCues = %v, want %v", lineCues(got), want)
 	}
@@ -56,10 +53,7 @@ func TestShiftingCuesTakesTheSpansStartButNotItsEnd(t *testing.T) {
 
 	got := ts.shiftCues(before.ID, 20, 22, 10)
 
-	if want := []float64{1, -1, 30, -1}; !reflect.DeepEqual(cues(got), want) {
-		t.Errorf("cues = %v, want %v", cues(got), want)
-	}
-	want := []map[int64]float64{{drive: 1, night: 3}, {}, {night: 22, dormant: 23}, {}}
+	want := []map[int64]float64{{drive: 1, night: 3}, {}, {drive: 30, night: 22, dormant: 23}, {}}
 	if !reflect.DeepEqual(lineCues(got), want) {
 		t.Errorf("lineCues = %v, want %v", lineCues(got), want)
 	}
@@ -73,10 +67,7 @@ func TestShiftingCuesEarlierMayTakeThemToZero(t *testing.T) {
 
 	got := ts.shiftCues(before.ID, 0, 10, -1)
 
-	if want := []float64{0, -1, 20, -1}; !reflect.DeepEqual(cues(got), want) {
-		t.Errorf("cues = %v, want %v", cues(got), want)
-	}
-	want := []map[int64]float64{{drive: 0, night: 2}, {}, {night: 22, dormant: 23}, {}}
+	want := []map[int64]float64{{drive: 0, night: 2}, {}, {drive: 20, night: 22, dormant: 23}, {}}
 	if !reflect.DeepEqual(lineCues(got), want) {
 		t.Errorf("lineCues = %v, want %v", lineCues(got), want)
 	}
@@ -96,10 +87,7 @@ func TestShiftingEveryCueMovesThemAllDormantOnesIncluded(t *testing.T) {
 
 	later := ts.shiftCues(before.ID, 0, everyCueEnd, 0.5)
 
-	if want := []float64{1.5, -1, 20.5, -1}; !reflect.DeepEqual(cues(later), want) {
-		t.Errorf("cues = %v, want %v", cues(later), want)
-	}
-	want := []map[int64]float64{{drive: 1.5, night: 3.5}, {}, {night: 22.5, dormant: 23.5}, {}}
+	want := []map[int64]float64{{drive: 1.5, night: 3.5}, {}, {drive: 20.5, night: 22.5, dormant: 23.5}, {}}
 	if !reflect.DeepEqual(lineCues(later), want) {
 		t.Errorf("lineCues = %v, want %v", lineCues(later), want)
 	}
@@ -107,10 +95,7 @@ func TestShiftingEveryCueMovesThemAllDormantOnesIncluded(t *testing.T) {
 	// Earlier, as far as the earliest Cue reaching 0:00.
 	got := ts.shiftCues(before.ID, 0, everyCueEnd, -1.5)
 
-	if want := []float64{0, -1, 19, -1}; !reflect.DeepEqual(cues(got), want) {
-		t.Errorf("cues = %v, want %v", cues(got), want)
-	}
-	want = []map[int64]float64{{drive: 0, night: 2}, {}, {night: 21, dormant: 22}, {}}
+	want = []map[int64]float64{{drive: 0, night: 2}, {}, {drive: 19, night: 21, dormant: 22}, {}}
 	if !reflect.DeepEqual(lineCues(got), want) {
 		t.Errorf("lineCues = %v, want %v", lineCues(got), want)
 	}

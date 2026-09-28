@@ -10,8 +10,7 @@ import (
 // with the Lines and Occurrences that are removed.
 
 // chorusWithACuedAlternate returns sharedChorus with its first Occurrence's
-// Lines cued ("Drive, drive" at 2, so the Occurrence too, and "all night" at
-// 6) and a second, inactive Alternate copied from the first.
+// Lines cued ("Drive, drive" at 2 and "all night" at 6) and a second, inactive Alternate copied from the first.
 func (ts *testServer) chorusWithACuedAlternate() song {
 	ts.t.Helper()
 	s := ts.sharedChorus()
@@ -38,39 +37,6 @@ func TestSwitchingAlternatesLeavesLineCuesDormantAndSwitchingBackRestoresThem(t 
 	if !reflect.DeepEqual(got.Arrangement[0].LineCues, want) {
 		t.Errorf("lineCues switched back = %v, want %v", got.Arrangement[0].LineCues, want)
 	}
-	if want := []float64{2, -1, -1, -1}; !reflect.DeepEqual(cues(got), want) {
-		t.Errorf("cues = %v, want %v", cues(got), want)
-	}
-}
-
-func TestAFreshlyActivatedAlternateFallsBackToTheOccurrenceCue(t *testing.T) {
-	ts := newTestServer(t)
-	s := ts.chorusWithACuedAlternate()
-	b := s.Sections[0].Alternates[1]
-
-	got := ts.activate(s.ID, b.ID)
-
-	if want := []float64{2, -1, -1, -1}; !reflect.DeepEqual(cues(got), want) {
-		t.Errorf("cues = %v, want the Occurrence's Cue unaffected: %v", cues(got), want)
-	}
-	for _, l := range b.Lines {
-		if cue, ok := got.Arrangement[0].LineCues[l.ID]; ok {
-			t.Errorf("line %d of the new Alternate has Cue %v, want none", l.ID, cue)
-		}
-	}
-}
-
-func TestCueingTheOccurrenceLeavesDormantCuesAlone(t *testing.T) {
-	ts := newTestServer(t)
-	s := ts.chorusWithACuedAlternate()
-	drive, night, _, _ := chorusLines(s)
-	ts.activate(s.ID, s.Sections[0].Alternates[1].ID)
-
-	got := ts.setCue(s.ID, s.Arrangement[0].ID, 3)
-
-	if want := map[int64]float64{drive: 2, night: 6}; !reflect.DeepEqual(got.Arrangement[0].LineCues, want) {
-		t.Errorf("lineCues = %v, want the dormant ones unmoved: %v", got.Arrangement[0].LineCues, want)
-	}
 }
 
 func TestDetachingAnOccurrenceCarriesItsCuesOverToItsNewSection(t *testing.T) {
@@ -90,9 +56,6 @@ func TestDetachingAnOccurrenceCarriesItsCuesOverToItsNewSection(t *testing.T) {
 	want := map[int64]float64{a[0].ID: 90, a[3].ID: 99, b[1].ID: 95}
 	if !reflect.DeepEqual(got.Arrangement[3].LineCues, want) {
 		t.Errorf("detached lineCues = %v, want %v on the copy's Lines", got.Arrangement[3].LineCues, want)
-	}
-	if want := []float64{2, -1, -1, 90}; !reflect.DeepEqual(cues(got), want) {
-		t.Errorf("cues = %v, want %v", cues(got), want)
 	}
 	if want := map[int64]float64{drive: 2, night: 6}; !reflect.DeepEqual(got.Arrangement[0].LineCues, want) {
 		t.Errorf("original's lineCues = %v, want %v", got.Arrangement[0].LineCues, want)
@@ -161,14 +124,10 @@ func TestRemovingAnOccurrenceDropsOnlyItsCues(t *testing.T) {
 	_, night, _, _ := chorusLines(s)
 	ids := occurrenceIDs(s)
 	ts.setLineCue(s.ID, ids[0], night, 6)
-	ts.setCue(s.ID, ids[2], 50)
 	ts.setLineCue(s.ID, ids[2], night, 56)
 
 	got := ts.lyricSheetChange(http.MethodDelete, occurrencePath(s.ID, ids[2]), nil)
 
-	if want := []float64{-1, -1, -1}; !reflect.DeepEqual(cues(got), want) {
-		t.Errorf("cues = %v, want %v", cues(got), want)
-	}
 	want := []map[int64]float64{{night: 6}, {}, {}}
 	for i, o := range got.Arrangement {
 		if !reflect.DeepEqual(o.LineCues, want[i]) {
@@ -193,8 +152,8 @@ func TestASectionBroughtBackFromTheScrapbookHasNoCues(t *testing.T) {
 	got := ts.addOccurrence(s.ID, verse.ID, nil)
 
 	back := got.Arrangement[1]
-	if back.Cue != nil || len(back.LineCues) != 0 {
-		t.Errorf("returned Occurrence has cue %v and lineCues %v, want none", back.Cue, back.LineCues)
+	if len(back.LineCues) != 0 {
+		t.Errorf("returned Occurrence has lineCues %v, want none", back.LineCues)
 	}
 }
 

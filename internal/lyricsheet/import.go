@@ -3,7 +3,6 @@ package lyricsheet
 import (
 	"cmp"
 	"context"
-	"database/sql"
 	"fmt"
 	"regexp"
 	"slices"
@@ -23,7 +22,7 @@ var (
 // Section repeated in the text is one Section (see arrange). A title
 // directive in the text names the Song; without one, title does. Other
 // directives fill in the Song's Details. Timestamps in the text become
-// Cues, each Occurrence keeping its own.
+// Line Cues, each Occurrence keeping its own.
 func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error) {
 	sheet, err := parseImport(text)
 	if err != nil {
@@ -79,13 +78,7 @@ func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error
 		// The Occurrence's own Lines match its Section's one for one (see
 		// sameAs), but have their own Cues. They're written directly, as
 		// parseImport already gave blank Lines none (see writeLineCue).
-		occ := sheet.sections[pos]
-		if occ.cue != nil {
-			if err := writeOccurrenceCue(ctx, tx, songID, occurrenceID, sql.NullInt64{Int64: *occ.cue, Valid: true}); err != nil {
-				return Song{}, err
-			}
-		}
-		for i, line := range occ.lines {
+		for i, line := range sheet.sections[pos].lines {
 			if line.cue == nil {
 				continue
 			}
@@ -116,19 +109,23 @@ type importedSheet struct {
 type importedSection struct {
 	label string
 	lines []importedLine
-	// cue is the Occurrence's Cue in milliseconds, from a timestamp on its
-	// heading or first Line, or nil for none.
-	cue *int64
-	// cuePasteLine is the paste line of the heading or Line that gave cue,
-	// or 0.
-	cuePasteLine int
+	// headingCue is the time in milliseconds from a timestamp on the
+	// Section's heading, or nil for none. It goes to the first Line.
+	headingCue *int64
+	// headingPasteLine is the paste line of the heading, or 0 if the
+	// Section has none.
+	headingPasteLine int
 }
 
 // importedLine is one Line read from pasted text, with where it came from.
 type importedLine struct {
 	text      string // without its timestamp
 	pasteLine int    // its line number in the paste, from 1
-	cue       *int64 // its Cue in milliseconds, from its timestamp, or nil
+	// cue is the Line's Cue in milliseconds, from its timestamp or its
+	// heading's, or nil.
+	cue *int64
+	// cuePasteLine is the paste line of the timestamp that gave cue, or 0.
+	cuePasteLine int
 }
 
 // invalidPasteLine rejects a paste over one of its lines, counted from 1,
@@ -177,8 +174,8 @@ func recognised(name string) bool {
 // as written.
 //
 // A timestamp at the start of a line (see cutTimestamp) cues the Line in
-// its Occurrence and, on its first Line, the Occurrence too. On a heading,
-// it cues only the Occurrence, and must agree with its first Line's. A
+// its Occurrence. On a heading, it cues the Section's first Line, which
+// must be there and agree with it, as only Lines are cued (ADR 0009). A
 // timestamp alone is a blank line, with no Cue, and a directive can't have
 // one. An offset directive, which may appear once, anywhere, shifts every
 // Cue by its time (see shiftCues).
@@ -188,14 +185,18 @@ func parseImport(text string) (importedSheet, error) {
 	var offset int64          // in milliseconds
 	offsetGiven := 0          // the paste line that gave the offset, or 0
 	var cur importedSection
-	end := func() {
+	end := func() error {
 		for len(cur.lines) > 0 && blank(cur.lines[len(cur.lines)-1].text) {
 			cur.lines = cur.lines[:len(cur.lines)-1]
+		}
+		if cur.headingCue != nil && len(cur.lines) == 0 {
+			return invalidPasteLine(cur.headingPasteLine, "a timestamp on a heading needs a Line under it to cue")
 		}
 		if cur.label != "" || len(cur.lines) > 0 {
 			sheet.sections = append(sheet.sections, cur)
 		}
 		cur = importedSection{}
+		return nil
 	}
 	for i, line := range splitLines(text) {
 		line, cue, err := cutTimestamp(line, i+1)
@@ -247,7 +248,9 @@ func parseImport(text string) (importedSheet, error) {
 				}
 			}
 			if d, ok := sectionDirectives[name]; ok {
-				end()
+				if err := end(); err != nil {
+					return importedSheet{}, err
+				}
 				if d.starts {
 					cur = importedSection{label: cmp.Or(value, d.label)}
 				}
@@ -255,26 +258,28 @@ func parseImport(text string) (importedSheet, error) {
 			continue
 		}
 		if label, ok := heading(line); ok {
-			end()
-			cur = importedSection{label: label, cue: cue}
-			if cue != nil {
-				cur.cuePasteLine = i + 1
+			if err := end(); err != nil {
+				return importedSheet{}, err
 			}
+			cur = importedSection{label: label, headingCue: cue, headingPasteLine: i + 1}
 			continue
 		}
-		// Blank lines are dropped at a Section's start, so this is its first Line.
-		if len(cur.lines) == 0 && cue != nil {
-			if cur.cue != nil && *cur.cue != *cue {
-				return importedSheet{}, invalidPasteLine(i+1, "its timestamp differs from the heading's on line %d", cur.cuePasteLine)
-			}
-			if cur.cue == nil {
-				cur.cuePasteLine = i + 1
-			}
-			cur.cue = cue
+		imported := importedLine{text: line, pasteLine: i + 1, cue: cue}
+		if cue != nil {
+			imported.cuePasteLine = i + 1
 		}
-		cur.lines = append(cur.lines, importedLine{text: line, pasteLine: i + 1, cue: cue})
+		// Blank lines are dropped at a Section's start, so this is its first Line.
+		if len(cur.lines) == 0 && cur.headingCue != nil {
+			if cue != nil && *cue != *cur.headingCue {
+				return importedSheet{}, invalidPasteLine(i+1, "its timestamp differs from the heading's on line %d", cur.headingPasteLine)
+			}
+			imported.cue, imported.cuePasteLine = cur.headingCue, cur.headingPasteLine
+		}
+		cur.lines = append(cur.lines, imported)
 	}
-	end()
+	if err := end(); err != nil {
+		return importedSheet{}, err
+	}
 	if err := sheet.shiftCues(offset); err != nil {
 		return importedSheet{}, err
 	}
@@ -288,8 +293,8 @@ func (sheet *importedSheet) shiftCues(ms int64) error {
 	if ms == 0 {
 		return nil
 	}
-	// Each shifted Cue is new, as an Occurrence's Cue may be its first
-	// Line's too, and must move only once.
+	// Each shifted Cue is new, as a heading's Cue is its first Line's too,
+	// and must move only once.
 	shift := func(cue **int64, pasteLine int) error {
 		if *cue == nil {
 			return nil
@@ -303,11 +308,8 @@ func (sheet *importedSheet) shiftCues(ms int64) error {
 	}
 	for i := range sheet.sections {
 		sec := &sheet.sections[i]
-		if err := shift(&sec.cue, sec.cuePasteLine); err != nil {
-			return err
-		}
 		for j := range sec.lines {
-			if err := shift(&sec.lines[j].cue, sec.lines[j].pasteLine); err != nil {
+			if err := shift(&sec.lines[j].cue, sec.lines[j].cuePasteLine); err != nil {
 				return err
 			}
 		}

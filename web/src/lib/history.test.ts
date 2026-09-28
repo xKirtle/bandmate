@@ -32,10 +32,9 @@ const timeline = (tracks: Track[], loop: TimelineLoop | null = null): Timeline =
   loop,
 });
 
-const occurrence = (id: number, cue: number | null, lineCues: Record<number, number> = {}): CuedOccurrence => ({
+const occurrence = (id: number, lineCues: Record<number, number> = {}): CuedOccurrence => ({
   id,
   sectionId: 1,
-  cue,
   lineCues,
 });
 
@@ -278,15 +277,14 @@ describe('History', () => {
 
     it('undoes a Cue edit by restoring the Cues it changed, and redoes it the same way', () => {
       const h = new History();
-      const before = song(occurrence(1, null), occurrence(2, 30, { 10: 30 }));
-      const after = song(occurrence(1, 4, { 10: 4 }), occurrence(2, 30, { 10: 30 }));
+      const before = song(occurrence(1), occurrence(2, { 10: 30 }));
+      const after = song(occurrence(1, { 10: 4 }), occurrence(2, { 10: 30 }));
 
       h.recordCues(before, after);
 
       expect(h.nextUndo()).toEqual({
         kind: 'restoreCues',
         cues: [
-          { occurrenceId: 1, cue: null },
           { occurrenceId: 1, lineId: 10, cue: null },
         ],
       });
@@ -295,7 +293,6 @@ describe('History', () => {
       expect(h.nextRedo()).toEqual({
         kind: 'restoreCues',
         cues: [
-          { occurrenceId: 1, cue: 4 },
           { occurrenceId: 1, lineId: 10, cue: 4 },
         ],
       });
@@ -306,15 +303,14 @@ describe('History', () => {
 
     it("undoes clearing an Occurrence's Cues by putting back each of them, dormant ones included", () => {
       const h = new History();
-      const before = song(occurrence(1, 4, { 10: 4, 11: 6, 12: 5 }), occurrence(2, 30, { 11: 32 }));
-      const after = song(occurrence(1, null), occurrence(2, 30, { 11: 32 }));
+      const before = song(occurrence(1, { 10: 4, 11: 6, 12: 5 }), occurrence(2, { 11: 32 }));
+      const after = song(occurrence(1), occurrence(2, { 11: 32 }));
 
       h.recordCues(before, after);
 
       expect(h.nextUndo()).toEqual({
         kind: 'restoreCues',
         cues: [
-          { occurrenceId: 1, cue: 4 },
           { occurrenceId: 1, lineId: 10, cue: 4 },
           { occurrenceId: 1, lineId: 11, cue: 6 },
           { occurrenceId: 1, lineId: 12, cue: 5 },
@@ -324,16 +320,14 @@ describe('History', () => {
 
     it('undoes clearing all Cues by putting back every one, and redoes it by clearing them again', () => {
       const h = new History();
-      const before = song(occurrence(1, 4, { 11: 6 }), occurrence(2, 30, { 12: 32 }));
-      const after = song(occurrence(1, null), occurrence(2, null));
+      const before = song(occurrence(1, { 11: 6 }), occurrence(2, { 12: 32 }));
+      const after = song(occurrence(1), occurrence(2));
 
       h.recordCues(before, after);
       expect(h.nextUndo()).toEqual({
         kind: 'restoreCues',
         cues: [
-          { occurrenceId: 1, cue: 4 },
           { occurrenceId: 1, lineId: 11, cue: 6 },
-          { occurrenceId: 2, cue: 30 },
           { occurrenceId: 2, lineId: 12, cue: 32 },
         ],
       });
@@ -342,9 +336,7 @@ describe('History', () => {
       expect(h.nextRedo()).toEqual({
         kind: 'restoreCues',
         cues: [
-          { occurrenceId: 1, cue: null },
           { occurrenceId: 1, lineId: 11, cue: null },
-          { occurrenceId: 2, cue: null },
           { occurrenceId: 2, lineId: 12, cue: null },
         ],
       });
@@ -352,9 +344,9 @@ describe('History', () => {
 
     it("doesn't keep a Cue edit that changed nothing", () => {
       const h = new History();
-      const cued = song(occurrence(1, 4, { 10: 4 }));
+      const cued = song(occurrence(1, { 10: 4 }));
 
-      h.recordCues(cued, song(occurrence(1, 4, { 10: 4 })));
+      h.recordCues(cued, song(occurrence(1, { 10: 4 })));
 
       expect(h.nextUndo()).toBeNull();
     });
@@ -364,8 +356,8 @@ describe('History', () => {
       const t0 = timeline([track(1, [clip(5, 0)])]);
       const t1 = timeline([track(1, [clip(5, 12)])]);
       const t2 = timeline([track(1)]);
-      const s0 = song(occurrence(1, null));
-      const s1 = song(occurrence(1, 2, { 10: 2 }));
+      const s0 = song(occurrence(1));
+      const s1 = song(occurrence(1, { 10: 2 }));
       h.record({ kind: 'moveClip', clipId: 5, trackId: 1, start: 12 }, t0, t1);
       h.recordCues(s0, s1);
       h.record({ kind: 'deleteClip', clipId: 5 }, t1, t2);
@@ -373,7 +365,7 @@ describe('History', () => {
       expect(h.nextUndo()).toMatchObject({ kind: 'placeClip', trackId: 1 });
       const t3 = timeline([track(1, [clip(9, 12)])]);
       h.undone(t2, t3);
-      expect(h.nextUndo()).toMatchObject({ kind: 'restoreCues', cues: [{ occurrenceId: 1, cue: null }, {}] });
+      expect(h.nextUndo()).toMatchObject({ kind: 'restoreCues', cues: [{ occurrenceId: 1, lineId: 10, cue: null }] });
       h.undone(t3, t3);
       expect(h.nextUndo()).toEqual({ kind: 'moveClip', clipId: 9, trackId: 1, start: 0 });
       h.undone(t3, timeline([track(1, [clip(9, 0)])]));
@@ -381,7 +373,7 @@ describe('History', () => {
 
       expect(h.nextRedo()).toEqual({ kind: 'moveClip', clipId: 9, trackId: 1, start: 12 });
       h.redone(t3, t3);
-      expect(h.nextRedo()).toMatchObject({ kind: 'restoreCues', cues: [{ occurrenceId: 1, cue: 2 }, {}] });
+      expect(h.nextRedo()).toMatchObject({ kind: 'restoreCues', cues: [{ occurrenceId: 1, lineId: 10, cue: 2 }] });
       h.redone(t3, t3);
       expect(h.nextRedo()).toEqual({ kind: 'deleteClip', clipId: 9 });
     });
@@ -393,7 +385,7 @@ describe('History', () => {
       h.record({ kind: 'moveClip', clipId: 5, trackId: 1, start: 12 }, t0, t1);
       h.undone(t1, t0);
 
-      h.recordCues(song(occurrence(1, null)), song(occurrence(1, 3)));
+      h.recordCues(song(occurrence(1)), song(occurrence(1, { 10: 3 })));
 
       expect(h.nextRedo()).toBeNull();
       expect(h.nextUndo()).toMatchObject({ kind: 'restoreCues' });
@@ -404,33 +396,30 @@ describe('History', () => {
 describe('restorable', () => {
   it('keeps the Cues whose Occurrence and Line are still there', () => {
     const cues = [
-      { occurrenceId: 1, cue: 4 },
       { occurrenceId: 1, lineId: 10, cue: null },
       { occurrenceId: 2, lineId: 12, cue: 7 },
     ];
 
-    expect(restorable(cues, song(occurrence(1, null), occurrence(2, null)))).toEqual(cues);
+    expect(restorable(cues, song(occurrence(1), occurrence(2)))).toEqual(cues);
   });
 
   it("leaves out Cues whose Occurrence or Line is gone, or whose Line can't take one any more", () => {
     const now: CuedSong = {
-      arrangement: [occurrence(1, null)],
+      arrangement: [occurrence(1)],
       sections: [{ id: 1, alternates: [{ active: true, lines: [{ id: 10, text: '  ' }] }] }],
     };
 
     expect(
       restorable(
         [
-          { occurrenceId: 1, cue: 4 },
           { occurrenceId: 1, lineId: 10, cue: 4 },
           { occurrenceId: 1, lineId: 10, cue: null },
           { occurrenceId: 1, lineId: 11, cue: 6 },
-          { occurrenceId: 2, cue: 30 },
+          { occurrenceId: 2, lineId: 10, cue: 30 },
         ],
         now,
       ),
     ).toEqual([
-      { occurrenceId: 1, cue: 4 },
       { occurrenceId: 1, lineId: 10, cue: null },
     ]);
   });

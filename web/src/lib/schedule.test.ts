@@ -46,32 +46,31 @@ describe('timelineEnd', () => {
       ],
     },
   ];
-  const cued = (cue: number | null, lineCues: Record<number, number> = {}) => ({
-    arrangement: [{ id: 1, sectionId: 9, cue, lineCues }],
+  const cued = (lineCues: Record<number, number> = {}) => ({
+    arrangement: [{ id: 1, sectionId: 9, lineCues }],
     sections,
   });
-  const uncued = cued(null);
+  const uncued = cued();
 
   it('is where the last Clip ends', () => {
     expect(timelineEnd([next, trimmed], uncued)).toBe(19);
   });
 
   it('is the latest Cue without Clips', () => {
-    expect(timelineEnd([], cued(4, { 60: 12 }))).toBe(12);
-    expect(timelineEnd([], cued(30, { 60: 12 }))).toBe(30);
+    expect(timelineEnd([], cued({ 60: 12 }))).toBe(12);
   });
 
   it('is the latest Cue when that is past the last Clip', () => {
-    expect(timelineEnd([next, trimmed], cued(10, { 60: 25.5 }))).toBe(25.5);
+    expect(timelineEnd([next, trimmed], cued({ 60: 25.5 }))).toBe(25.5);
   });
 
   it('is still where the last Clip ends with Cues before it', () => {
-    expect(timelineEnd([next, trimmed], cued(10, { 60: 12 }))).toBe(19);
+    expect(timelineEnd([next, trimmed], cued({ 60: 12 }))).toBe(19);
   });
 
   it('ignores dormant Cues', () => {
-    expect(timelineEnd([next, trimmed], cued(10, { 50: 40 }))).toBe(19);
-    expect(timelineEnd([], cued(null, { 50: 40 }))).toBe(0);
+    expect(timelineEnd([next, trimmed], cued({ 50: 40 }))).toBe(19);
+    expect(timelineEnd([], cued({ 50: 40 }))).toBe(0);
   });
 
   it('is 0:00 without Clips or Cues', () => {

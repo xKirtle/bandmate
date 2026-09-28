@@ -2,16 +2,15 @@
   import { tick } from 'svelte';
   import { formatCue, nudgeCue, parseCue, playLabel } from './cues';
 
-  // A Cue's time, shown as m:ss.s. Clicking it lets the time be typed:
-  // Enter or leaving the field saves, Esc cancels, and an empty field clears
-  // the Cue. Alt+↑/↓ nudges it by a tenth of a second. In Sync mode,
-  // clicking it makes what it's for the next to cue instead.
+  // A Line's Cue time, shown as m:ss.s in the gutter beside it. Clicking it
+  // lets the time be typed: Enter or leaving the field saves, Esc cancels,
+  // and an empty field clears the Cue. Alt+↑/↓ nudges it by a tenth of a
+  // second. In Sync mode, clicking it makes its Line the next to cue instead.
   let {
     cue,
     label,
     save,
     next,
-    gutter = false,
     play,
     current = false,
     pick,
@@ -24,8 +23,6 @@
     save: (cue: number | null) => void;
     /** Given, Enter goes on to the next field; it answers whether there was one. */
     next?: () => boolean;
-    /** Beside a Line, so kept as short as the Line. */
-    gutter?: boolean;
     /** Given, a ▶ before the time plays from the Cue. */
     play?: (to: number) => void;
     /** Whether playback is on what the Cue is for, so its ▶ isn't muted. */
@@ -114,7 +111,7 @@
   {#if play}
     {#if cue === null}
       <!-- Holds the ▶'s room, so the times still line up down the gutter. -->
-      <span class="play" class:gutter aria-hidden="true"></span>
+      <span class="play" aria-hidden="true"></span>
     {:else}
       {@const at = cue}
       <!-- Clicked, it keeps focus where it was, so the cursor stays put and
@@ -122,7 +119,6 @@
       <button
         type="button"
         class="play"
-        class:gutter
         onpointerdown={(e) => e.preventDefault()}
         onclick={() => {
           play(at);
@@ -138,7 +134,6 @@
       bind:this={input}
       bind:value={text}
       class="cue editing"
-      class:gutter
       class:invalid
       aria-label="Cue for {label}"
       aria-invalid={invalid}
@@ -159,7 +154,6 @@
       bind:this={button}
       type="button"
       class="cue"
-      class:gutter
       class:unset={cue === null}
       onclick={pick ?? edit}
       onkeydown={nudge}
@@ -184,10 +178,11 @@
     display: inline-flex;
     align-items: center;
   }
+  /* Kept as short as the Line beside it. */
   .cue {
     width: 5.5rem;
-    min-height: 2rem;
-    padding: 0.125rem 0.375rem;
+    min-height: 1.5rem;
+    padding: 0 0.375rem;
     border: 1px solid transparent;
     border-radius: 0.375rem;
     background: transparent;
@@ -205,10 +200,6 @@
     background: var(--surface-1);
     color: var(--text);
   }
-  .cue.gutter {
-    min-height: 1.5rem;
-    padding-block: 0;
-  }
   .cue.unset {
     opacity: 0.6;
   }
@@ -222,7 +213,7 @@
     justify-content: center;
     flex: none;
     width: 1.25rem;
-    min-height: 2rem;
+    min-height: 1.5rem;
     padding: 0;
     border: 0;
     border-radius: 0.375rem;
@@ -232,9 +223,6 @@
     font-size: 0.625rem;
     opacity: 0.5;
     cursor: pointer;
-  }
-  .play.gutter {
-    min-height: 1.5rem;
   }
   .slot:hover .play,
   .play:focus-visible,

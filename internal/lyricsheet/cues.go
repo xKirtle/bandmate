@@ -26,80 +26,21 @@ func cueMillis(seconds float64) (int64, error) {
 	return millis(seconds), nil
 }
 
-// cueSeconds turns a stored Cue back into seconds, or nil for none.
-func cueSeconds(ms sql.NullInt64) *float64 {
-	if !ms.Valid {
-		return nil
-	}
-	s := float64(ms.Int64) / 1000
-	return &s
-}
-
-// SetOccurrenceCue gives an Occurrence a Cue: the time, in seconds, where it
-// starts on the Timeline. It may lie past the last Clip. If the
-// Occurrence's first Line has a Cue, it moves to the same time.
-func (s *Store) SetOccurrenceCue(ctx context.Context, songID int64, based Version, occurrenceID int64, seconds float64) (Song, error) {
-	ms, err := cueMillis(seconds)
-	if err != nil {
-		return Song{}, err
-	}
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		if err := writeOccurrenceCue(ctx, tx, songID, occurrenceID, sql.NullInt64{Int64: ms, Valid: true}); err != nil {
-			return err
-		}
-		first, err := firstLine(ctx, tx, occurrenceID)
-		if err != nil || first == 0 {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `UPDATE line_cues SET cue_ms = ? WHERE occurrence_id = ? AND line_id = ?`,
-			ms, occurrenceID, first); err != nil {
-			return fmt.Errorf("moving first line's cue: %w", err)
-		}
-		return nil
-	})
-}
-
-// ClearOccurrenceCue removes an Occurrence's Cue.
-func (s *Store) ClearOccurrenceCue(ctx context.Context, songID int64, based Version, occurrenceID int64) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		return writeOccurrenceCue(ctx, tx, songID, occurrenceID, sql.NullInt64{})
-	})
-}
-
-// writeOccurrenceCue sets or, with a null ms, clears one of a Song's
-// Occurrence Cues.
-func writeOccurrenceCue(ctx context.Context, tx *sql.Tx, songID, occurrenceID int64, ms sql.NullInt64) error {
-	res, err := tx.ExecContext(ctx, `UPDATE occurrences SET cue_ms = ? WHERE id = ? AND song_id = ?`,
-		ms, occurrenceID, songID)
-	if err != nil {
-		return fmt.Errorf("setting occurrence cue: %w", err)
-	}
-	return expectOneRow(res)
-}
-
 // SetLineCue gives a Line a Cue within one Occurrence: the time, in seconds,
 // where it's sung there. The Line may be in any of the Section's Alternates,
-// but can't be blank. Cueing the Occurrence's first Line cues the
-// Occurrence too, so the two always agree.
+// but can't be blank. An Occurrence has no Cue of its own: it starts where
+// its first Line is cued (ADR 0009).
 func (s *Store) SetLineCue(ctx context.Context, songID int64, based Version, occurrenceID, lineID int64, seconds float64) (Song, error) {
 	ms, err := cueMillis(seconds)
 	if err != nil {
 		return Song{}, err
 	}
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		if err := writeLineCue(ctx, tx, songID, occurrenceID, lineID, sql.NullInt64{Int64: ms, Valid: true}); err != nil {
-			return err
-		}
-		first, err := firstLine(ctx, tx, occurrenceID)
-		if err != nil || first != lineID {
-			return err
-		}
-		return writeOccurrenceCue(ctx, tx, songID, occurrenceID, sql.NullInt64{Int64: ms, Valid: true})
+		return writeLineCue(ctx, tx, songID, occurrenceID, lineID, sql.NullInt64{Int64: ms, Valid: true})
 	})
 }
 
-// ClearLineCue removes a Line's Cue within one Occurrence. The Occurrence's
-// own Cue stays, even when it's the first Line's.
+// ClearLineCue removes a Line's Cue within one Occurrence.
 func (s *Store) ClearLineCue(ctx context.Context, songID int64, based Version, occurrenceID, lineID int64) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		return writeLineCue(ctx, tx, songID, occurrenceID, lineID, sql.NullInt64{})
@@ -132,11 +73,11 @@ func writeLineCue(ctx context.Context, tx *sql.Tx, songID, occurrenceID, lineID 
 	return nil
 }
 
-// ClearOccurrenceCues removes an Occurrence's Cue and all its Lines' Cues,
-// dormant ones included.
+// ClearOccurrenceCues removes all an Occurrence's Line Cues, dormant ones
+// included.
 func (s *Store) ClearOccurrenceCues(ctx context.Context, songID int64, based Version, occurrenceID int64) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		if err := writeOccurrenceCue(ctx, tx, songID, occurrenceID, sql.NullInt64{}); err != nil {
+		if _, _, err := findOccurrence(ctx, tx, songID, occurrenceID); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM line_cues WHERE occurrence_id = ?`, occurrenceID); err != nil {
@@ -149,9 +90,6 @@ func (s *Store) ClearOccurrenceCues(ctx context.Context, songID int64, based Ver
 // ClearCues removes every Cue in a Song, dormant ones included.
 func (s *Store) ClearCues(ctx context.Context, songID int64, based Version) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `UPDATE occurrences SET cue_ms = NULL WHERE song_id = ?`, songID); err != nil {
-			return fmt.Errorf("clearing occurrence cues: %w", err)
-		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM line_cues
 			WHERE occurrence_id IN (SELECT id FROM occurrences WHERE song_id = ?)`, songID); err != nil {
 			return fmt.Errorf("clearing line cues: %w", err)
@@ -160,18 +98,17 @@ func (s *Store) ClearCues(ctx context.Context, songID int64, based Version) (Son
 	})
 }
 
-// CueValue is one Cue to restore: an Occurrence's own Cue or, with a
-// LineID, a Line's Cue within it. A nil Cue means none.
+// CueValue is one Cue to restore: a Line's Cue within an Occurrence. A nil
+// Cue means none.
 type CueValue struct {
 	OccurrenceID int64
-	LineID       *int64
+	LineID       int64
 	Cue          *float64
 }
 
 // RestoreCues sets each Cue given to its value, in seconds, or clears it,
 // and leaves every other Cue alone. It puts back what another Cue edit
-// changed, e.g. to undo it, so unlike setting a Cue, the first Line and its
-// Occurrence don't follow each other: each is given its own value.
+// changed, e.g. to undo it.
 func (s *Store) RestoreCues(ctx context.Context, songID int64, based Version, values []CueValue) (Song, error) {
 	ms := make([]sql.NullInt64, len(values))
 	for i, v := range values {
@@ -186,13 +123,7 @@ func (s *Store) RestoreCues(ctx context.Context, songID int64, based Version, va
 	}
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		for i, v := range values {
-			var err error
-			if v.LineID == nil {
-				err = writeOccurrenceCue(ctx, tx, songID, v.OccurrenceID, ms[i])
-			} else {
-				err = writeLineCue(ctx, tx, songID, v.OccurrenceID, *v.LineID, ms[i])
-			}
-			if err != nil {
+			if err := writeLineCue(ctx, tx, songID, v.OccurrenceID, v.LineID, ms[i]); err != nil {
 				return err
 			}
 		}
@@ -201,8 +132,7 @@ func (s *Store) RestoreCues(ctx context.Context, songID int64, based Version, va
 }
 
 // ShiftCues moves every Cue in a Song that lies in [start, end), in
-// seconds, by the seconds given: Occurrences' own and their Lines',
-// dormant ones included. It's how Cues follow a Clip that was moved. None
+// seconds, by the seconds given, dormant ones included. It's how Cues follow a Clip that was moved. None
 // may end up before the start of the Timeline, or the shift is refused.
 func (s *Store) ShiftCues(ctx context.Context, songID int64, based Version, start, end, by float64) (Song, error) {
 	if end <= start {
@@ -211,11 +141,9 @@ func (s *Store) ShiftCues(ctx context.Context, songID int64, based Version, star
 	startMs, endMs := millis(start), millis(end)
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		var low, high sql.NullInt64
-		err := tx.QueryRowContext(ctx, `SELECT MIN(cue_ms), MAX(cue_ms) FROM (
-				SELECT cue_ms FROM occurrences WHERE song_id = ?
-				UNION ALL
-				SELECT lc.cue_ms FROM line_cues lc JOIN occurrences o ON o.id = lc.occurrence_id WHERE o.song_id = ?
-			) WHERE cue_ms >= ? AND cue_ms < ?`, songID, songID, startMs, endMs).Scan(&low, &high)
+		err := tx.QueryRowContext(ctx, `SELECT MIN(lc.cue_ms), MAX(lc.cue_ms)
+			FROM line_cues lc JOIN occurrences o ON o.id = lc.occurrence_id
+			WHERE o.song_id = ? AND lc.cue_ms >= ? AND lc.cue_ms < ?`, songID, startMs, endMs).Scan(&low, &high)
 		if err != nil {
 			return fmt.Errorf("finding cues to shift: %w", err)
 		}
@@ -229,10 +157,6 @@ func (s *Store) ShiftCues(ctx context.Context, songID int64, based Version, star
 			}
 		}
 		delta := millis(by)
-		if _, err := tx.ExecContext(ctx, `UPDATE occurrences SET cue_ms = cue_ms + ?
-			WHERE song_id = ? AND cue_ms >= ? AND cue_ms < ?`, delta, songID, startMs, endMs); err != nil {
-			return fmt.Errorf("shifting occurrence cues: %w", err)
-		}
 		if _, err := tx.ExecContext(ctx, `UPDATE line_cues SET cue_ms = cue_ms + ?
 			WHERE occurrence_id IN (SELECT id FROM occurrences WHERE song_id = ?) AND cue_ms >= ? AND cue_ms < ?`,
 			delta, songID, startMs, endMs); err != nil {
@@ -262,31 +186,6 @@ func findOccurrenceLine(ctx context.Context, tx *sql.Tx, songID, occurrenceID, l
 		return "", invalid("that Line isn't in this Occurrence's Section")
 	}
 	return text, err
-}
-
-// firstLine returns the id of an Occurrence's first Line: the first of its
-// active Alternate that can take a Cue, or 0 if there's none.
-func firstLine(ctx context.Context, tx *sql.Tx, occurrenceID int64) (int64, error) {
-	var first int64
-	err := query(ctx, tx, `SELECT l.id, l.text FROM lines l
-		JOIN alternates a ON a.id = l.alternate_id AND a.active = 1
-		JOIN occurrences o ON o.section_id = a.section_id
-		WHERE o.id = ? ORDER BY l.position`,
-		[]any{occurrenceID}, func(rows *sql.Rows) error {
-			var id int64
-			var text string
-			if err := rows.Scan(&id, &text); err != nil {
-				return err
-			}
-			if first == 0 && !blank(text) {
-				first = id
-			}
-			return nil
-		})
-	if err != nil {
-		return 0, fmt.Errorf("finding first line: %w", err)
-	}
-	return first, nil
 }
 
 // blank is whether a Line's text is empty or only spaces, so has nothing to

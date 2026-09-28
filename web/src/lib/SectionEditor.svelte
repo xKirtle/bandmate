@@ -3,7 +3,6 @@
   import { SvelteSet } from 'svelte/reactivity';
   import AlternateText, { type Cueing } from './AlternateText.svelte';
   import { api, type Alternate, type Section, type Song, type SongAt } from './api';
-  import CueField from './CueField.svelte';
 
   let {
     uid,
@@ -14,7 +13,6 @@
     onUnsaved,
     grip,
     actions,
-    cue,
     cueing,
   }: {
     /** Makes element ids unique, e.g. when a shared Section shows more than once. */
@@ -31,15 +29,6 @@
     /** Given, shows first in the header, e.g. a handle to drag the Section by. */
     grip?: Snippet;
     actions: Snippet;
-    /** Given, the Occurrence's Cue shows beside the Label, to change it with. */
-    cue?: {
-      at: number | null;
-      save: (cue: number | null) => void;
-      /** Given, a ▶ beside the Cue plays from it. */
-      play?: (to: number) => void;
-      /** Whether playback is in the Occurrence. */
-      current?: boolean;
-    };
     /** Given, the active Alternate's Lines are highlighted and cued as playback goes. */
     cueing?: Cueing;
   } = $props();
@@ -154,15 +143,6 @@
       <span class="shared" title="This Section appears more than once. Editing it changes every Occurrence.">
         Shared
       </span>
-    {/if}
-    {#if cue}
-      <CueField
-        cue={cue.at}
-        label={section.label || 'this Section'}
-        save={cue.save}
-        play={cue.play}
-        current={cue.current}
-      />
     {/if}
     <div class="actions">
       <button

@@ -17,8 +17,8 @@ func songCuesPath(songID int64) string {
 	return fmt.Sprintf("/api/songs/%d/cues", songID)
 }
 
-// cueValue is one Cue to restore: an Occurrence's own, or with a Line, the
-// Line's within it; a nil Cue means none.
+// cueValue is one Cue to restore: a Line's within an Occurrence; a nil Cue
+// means none.
 type cueValue struct {
 	OccurrenceID int64    `json:"occurrenceId"`
 	LineID       *int64   `json:"lineId,omitempty"`
@@ -41,7 +41,7 @@ func lineCues(s song) []map[int64]float64 {
 }
 
 // cuedChorus returns a sharedChorus with a second, inactive Alternate on
-// the chorus, and Cues on the first and second Occurrences: the second
+// the chorus, and Cues on the first and third Occurrences: the third
 // Occurrence's include a dormant one.
 func (ts *testServer) cuedChorus() song {
 	ts.t.Helper()
@@ -52,23 +52,20 @@ func (ts *testServer) cuedChorus() song {
 	dormant := s.Sections[0].Alternates[1].Lines[1].ID
 	ts.setLineCue(s.ID, s.Arrangement[0].ID, drive, 1)
 	ts.setLineCue(s.ID, s.Arrangement[0].ID, night, 3)
-	ts.setCue(s.ID, s.Arrangement[2].ID, 20)
+	ts.setLineCue(s.ID, s.Arrangement[2].ID, drive, 20)
 	ts.setLineCue(s.ID, s.Arrangement[2].ID, night, 22)
 	return ts.setLineCue(s.ID, s.Arrangement[2].ID, dormant, 23)
 }
 
 func ptr[T any](v T) *T { return &v }
 
-func TestClearingAnOccurrencesCuesClearsItsOwnAndAllItsLines(t *testing.T) {
+func TestClearingAnOccurrencesCuesClearsAllItsLines(t *testing.T) {
 	ts := newTestServer(t)
 	before := ts.cuedChorus()
 	drive, night, _, _ := chorusLines(before)
 
 	got := ts.lyricSheetChange(http.MethodDelete, occurrenceCuesPath(before.ID, before.Arrangement[2].ID), nil)
 
-	if want := []float64{1, -1, -1, -1}; !reflect.DeepEqual(cues(got), want) {
-		t.Errorf("cues = %v, want %v", cues(got), want)
-	}
 	want := []map[int64]float64{{drive: 1, night: 3}, {}, {}, {}}
 	if !reflect.DeepEqual(lineCues(got), want) {
 		t.Errorf("lineCues = %v, want %v", lineCues(got), want)
@@ -91,9 +88,6 @@ func TestClearingAllCuesLeavesOtherSongsAlone(t *testing.T) {
 
 	got := ts.lyricSheetChange(http.MethodDelete, songCuesPath(before.ID), nil)
 
-	if want := []float64{-1, -1, -1, -1}; !reflect.DeepEqual(cues(got), want) {
-		t.Errorf("cues = %v, want %v", cues(got), want)
-	}
 	if want := []map[int64]float64{{}, {}, {}, {}}; !reflect.DeepEqual(lineCues(got), want) {
 		t.Errorf("lineCues = %v, want %v", lineCues(got), want)
 	}
@@ -128,19 +122,17 @@ func TestRestoringCuesSetsAndClearsExactlyThoseGiven(t *testing.T) {
 	first, third := before.Arrangement[0].ID, before.Arrangement[2].ID
 
 	got := ts.restoreCues(before.ID,
-		// The first Line moves without the Occurrence following it.
 		cueValue{OccurrenceID: first, LineID: &drive, Cue: ptr(2.5)},
 		cueValue{OccurrenceID: first, LineID: &night, Cue: nil},
 		cueValue{OccurrenceID: first, LineID: &chords, Cue: ptr(4.25)},
-		cueValue{OccurrenceID: third, Cue: nil},
-		cueValue{OccurrenceID: before.Arrangement[3].ID, Cue: ptr(40.0)},
+		cueValue{OccurrenceID: third, LineID: &drive, Cue: nil},
+		cueValue{OccurrenceID: before.Arrangement[3].ID, LineID: &drive, Cue: ptr(40.0)},
 	)
 
-	if want := []float64{1, -1, -1, 40}; !reflect.DeepEqual(cues(got), want) {
-		t.Errorf("cues = %v, want %v", cues(got), want)
-	}
 	want := lineCues(before)
 	want[0] = map[int64]float64{drive: 2.5, chords: 4.25}
+	delete(want[2], drive)
+	want[3] = map[int64]float64{drive: 40}
 	if !reflect.DeepEqual(lineCues(got), want) {
 		t.Errorf("lineCues = %v, want %v", lineCues(got), want)
 	}
@@ -162,15 +154,14 @@ func TestRestoringCuesPutsBackWhatAClearTook(t *testing.T) {
 
 	var values []cueValue
 	for _, o := range before.Arrangement {
-		values = append(values, cueValue{OccurrenceID: o.ID, Cue: o.Cue})
 		for line, cue := range o.LineCues {
 			values = append(values, cueValue{OccurrenceID: o.ID, LineID: ptr(line), Cue: ptr(cue)})
 		}
 	}
 	got := ts.restoreCues(cleared.ID, values...)
 
-	if !reflect.DeepEqual(cues(got), cues(before)) || !reflect.DeepEqual(lineCues(got), lineCues(before)) {
-		t.Errorf("cues = %v %v, want them back as %v %v", cues(got), lineCues(got), cues(before), lineCues(before))
+	if !reflect.DeepEqual(lineCues(got), lineCues(before)) {
+		t.Errorf("lineCues = %v, want them back as %v", lineCues(got), lineCues(before))
 	}
 }
 
@@ -182,8 +173,12 @@ func TestInvalidCueRestoresAreRejected(t *testing.T) {
 		msg    string
 	}{
 		{"no cues", func(s song) any { return map[string]any{} }, http.StatusBadRequest, "cues is required"},
+		{"no Line", func(s song) any {
+			return []cueValue{{OccurrenceID: s.Arrangement[1].ID, Cue: ptr(3.0)}}
+		}, http.StatusBadRequest, "each Cue needs a lineId"},
 		{"negative", func(s song) any {
-			return []cueValue{{OccurrenceID: s.Arrangement[1].ID, Cue: ptr(-1.0)}}
+			drive, _, _, _ := chorusLines(s)
+			return []cueValue{{OccurrenceID: s.Arrangement[2].ID, LineID: &drive, Cue: ptr(-1.0)}}
 		}, http.StatusBadRequest, "a Cue can't be before the start of the Timeline"},
 		{"blank Line", func(s song) any {
 			_, _, blank, _ := chorusLines(s)
@@ -193,7 +188,8 @@ func TestInvalidCueRestoresAreRejected(t *testing.T) {
 			return []cueValue{{OccurrenceID: s.Arrangement[0].ID, LineID: &s.Sections[1].Alternates[0].Lines[0].ID, Cue: ptr(3.0)}}
 		}, http.StatusBadRequest, "that Line isn't in this Occurrence's Section"},
 		{"Occurrence of another Song", func(s song) any {
-			return []cueValue{{OccurrenceID: 999999, Cue: ptr(3.0)}}
+			drive, _, _, _ := chorusLines(s)
+			return []cueValue{{OccurrenceID: 999999, LineID: &drive, Cue: ptr(3.0)}}
 		}, http.StatusNotFound, "not found"},
 	}
 	for _, c := range cases {
@@ -206,7 +202,9 @@ func TestInvalidCueRestoresAreRejected(t *testing.T) {
 			body := c.values(before)
 			if values, ok := body.([]cueValue); ok {
 				// A valid Cue before the invalid one isn't kept either.
-				body = map[string]any{"cues": append([]cueValue{{OccurrenceID: s.Arrangement[1].ID, Cue: ptr(9.0)}}, values...)}
+				drive, _, _, _ := chorusLines(before)
+				valid := cueValue{OccurrenceID: s.Arrangement[2].ID, LineID: &drive, Cue: ptr(9.0)}
+				body = map[string]any{"cues": append([]cueValue{valid}, values...)}
 			}
 
 			res := ts.Do(http.MethodPatch, songCuesPath(s.ID), body)
@@ -228,7 +226,7 @@ func TestCueClearsAndRestoresBasedOnAnOldVersionAreRejected(t *testing.T) {
 		ts.DoAt(old.Version, http.MethodDelete, occurrenceCuesPath(old.ID, old.Arrangement[0].ID), nil),
 		ts.DoAt(old.Version, http.MethodDelete, songCuesPath(old.ID), nil),
 		ts.DoAt(old.Version, http.MethodPatch, songCuesPath(old.ID),
-			map[string]any{"cues": []cueValue{{OccurrenceID: old.Arrangement[0].ID, Cue: nil}}}),
+			map[string]any{"cues": []cueValue{{OccurrenceID: old.Arrangement[0].ID, LineID: &old.Sections[0].Alternates[0].Lines[0].ID, Cue: nil}}}),
 	} {
 		expectStale(t, res)
 	}

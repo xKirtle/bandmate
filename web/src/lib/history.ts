@@ -197,29 +197,27 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
 }
 
 /**
- * Every Cue a Song could have, set or not, by Occurrence and Line: each
- * Occurrence's own and those of its Lines that have one, dormant ones
- * included. Each Occurrence's own comes first, then its Lines' by id.
+ * A Song's Cues by Occurrence and Line, dormant ones included: each
+ * Occurrence's in turn, its Lines' by id.
  */
 function cueValues(song: CuedSong): Map<string, CueValue> {
-  const values: CueValue[] = song.arrangement.flatMap((o) => [
-    { occurrenceId: o.id, cue: o.cue },
-    ...Object.keys(o.lineCues)
+  const values: CueValue[] = song.arrangement.flatMap((o) =>
+    Object.keys(o.lineCues)
       .map(Number)
       .map((lineId) => ({ occurrenceId: o.id, lineId, cue: o.lineCues[lineId] })),
-  ]);
+  );
   return new Map(values.map((c) => [key(c), c]));
 }
 
 /** Which Cue a value is for. */
 function key(c: CueValue): string {
-  return c.lineId === undefined ? `${c.occurrenceId}` : `${c.occurrenceId}:${c.lineId}`;
+  return `${c.occurrenceId}:${c.lineId}`;
 }
 
 /**
  * The Cues that can still be restored in a Song: those whose Occurrence is
- * still in it and, for a Line's, whose Line is still in its Section and,
- * to be given a Cue, isn't blank. The rest went with a Lyric Sheet change
+ * still in it and whose Line is still in its Section and, to be given a
+ * Cue, isn't blank. The rest went with a Lyric Sheet change
  * since, which can't be undone, so they're left out rather than stop undo.
  */
 export function restorable(cues: readonly CueValue[], song: CuedSong): CueValue[] {
@@ -228,7 +226,6 @@ export function restorable(cues: readonly CueValue[], song: CuedSong): CueValue[
   return cues.filter((c) => {
     const o = occurrences.get(c.occurrenceId);
     if (!o) return false;
-    if (c.lineId === undefined) return true;
     const line = sections
       .get(o.sectionId)
       ?.alternates.flatMap((a) => a.lines)
