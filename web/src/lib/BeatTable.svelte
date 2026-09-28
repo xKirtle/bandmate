@@ -66,6 +66,7 @@
   </thead>
   <tbody>
     {#each beats as beat (beat.id)}
+      {@const usedBy = beat.songs.map((s) => s.title).join(', ')}
       <tr
         class:open={beat.id === openId}
         class:clickable={onRowClick}
@@ -74,13 +75,15 @@
         {#if lead}
           <td class="lead">{@render lead.cell(beat)}</td>
         {/if}
-        <td class="title">{@render title(beat)}</td>
-        <td>{beat.producer || '—'}</td>
-        <td class="num">{beat.bpm ?? '—'}</td>
-        <td>{beat.key || '—'}</td>
-        <td class="num">{formatDuration(beat.duration)}</td>
-        <td class="used-by">{beat.songs.map((s) => s.title).join(', ') || '—'}</td>
-        <td class="muted"><time datetime={beat.createdAt}>{timeAgo(beat.createdAt)}</time></td>
+        <td class="title"><span class="ellipsis" title={beat.title}>{@render title(beat)}</span></td>
+        <td class="producer">
+          <span class="ellipsis" title={beat.producer || undefined}>{beat.producer || '—'}</span>
+        </td>
+        <td class="num fit">{beat.bpm ?? '—'}</td>
+        <td class="fit">{beat.key || '—'}</td>
+        <td class="num fit">{formatDuration(beat.duration)}</td>
+        <td><span class="ellipsis" title={usedBy || undefined}>{usedBy || '—'}</span></td>
+        <td class="muted fit"><time datetime={beat.createdAt}>{timeAgo(beat.createdAt)}</time></td>
         {#if trail}
           <td class="trail">{@render trail.cell(beat)}</td>
         {/if}
@@ -130,25 +133,41 @@
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
   }
-  td.title {
-    width: 100%;
-    max-width: 0;
-    overflow: hidden;
+  /* Title and Producer take the width set below when there's room and shrink
+     when there isn't; BPM, Key, Duration and Added fit their content; Used by
+     takes whatever is left. Text in .ellipsis adds nothing to its column's
+     width, so a long title doesn't grow its column. */
+  .ellipsis {
+    display: block;
+    width: 0;
+    min-width: 100%;
+    overflow: clip;
+    /* Room for a focused title button's outline. */
+    overflow-clip-margin: 0.25rem;
     text-overflow: ellipsis;
+  }
+  td.title {
+    width: 28rem;
     font-weight: 600;
+  }
+  td.producer {
+    width: 12rem;
+  }
+  td.fit {
+    width: 0;
   }
   td.title :global(button) {
     all: unset;
+    /* A button stays one box on the line, so it cuts off its own title. */
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: top;
     cursor: pointer;
   }
   td.title :global(button:focus-visible) {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
-  }
-  td.used-by {
-    max-width: 16rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
   .lead {
     width: calc(var(--control) + 0.5rem);
