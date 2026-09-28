@@ -4,7 +4,16 @@
   import type { Cueing } from './AlternateText.svelte';
   import { api, suggestedLabels, type Line, type Occurrence, type Song, type SongAt } from './api';
   import { hasChords } from './chords';
-  import { currentPosition, hasCues, isBlank, nextLine, type NextLine, type Position } from './cues';
+  import {
+    canShiftCuesEarlier,
+    currentPosition,
+    everyCue,
+    hasCues,
+    isBlank,
+    nextLine,
+    type NextLine,
+    type Position,
+  } from './cues';
   import { follower, key } from './follow';
   import { gutterFields } from './gutter';
   import LyricSheetView from './LyricSheetView.svelte';
@@ -12,6 +21,7 @@
   import { dropGap, moveTo, targetIndex } from './sectionDrag';
   import { describe } from './sections';
   import type { Mode } from './songMode';
+  import { readShiftStep, shiftSteps, storeShiftStep, type ShiftStep } from './shiftStep';
   import { markSyncHintSeen, sawSyncHint } from './syncHint';
   import { inTextField } from './textField';
   import { deviceStorage } from './timelineHeight';
@@ -68,6 +78,21 @@
     editCues((at) =>
       cue === null ? api.clearOccurrenceCue(at, occurrence.id) : api.setOccurrenceCue(at, occurrence.id, cue),
     );
+  }
+
+  // Shifting every Cue, dormant ones included, by a step: each click is one
+  // shift, saved at once and undone like any Cue edit. The step is
+  // remembered on this device.
+  let shiftStep = $state<ShiftStep>(readShiftStep(deviceStorage()));
+  const canShiftEarlier = $derived(canShiftCuesEarlier(song, shiftStep));
+
+  function chooseShiftStep(step: ShiftStep) {
+    shiftStep = step;
+    storeShiftStep(deviceStorage(), step);
+  }
+
+  function shiftEveryCue(by: number) {
+    editCues((at) => api.shiftCues(at, everyCue.start, everyCue.end, by));
   }
 
   function setLineCue(occurrence: Occurrence, line: Line, cue: number | null) {
@@ -323,6 +348,39 @@
           : 'Add a beat to the Timeline to sync lyrics to it'}>Sync lyrics</button
       >
     {/if}
+    {#if mode === 'write' && canCue && hasCues(song)}
+      <div class="shift" role="group" aria-labelledby="shift-label">
+        <span id="shift-label">Shift Cues</span>
+        <select
+          class="shift-step"
+          aria-label="Step"
+          title="How far each click shifts every Cue"
+          value={shiftStep}
+          onchange={(e) => chooseShiftStep(Number(e.currentTarget.value) as ShiftStep)}
+        >
+          {#each shiftSteps as step (step)}
+            <option value={step}>{step} s</option>
+          {/each}
+        </select>
+        <button
+          type="button"
+          class="button shift-by"
+          disabled={!canShiftEarlier}
+          onclick={() => shiftEveryCue(-shiftStep)}
+          aria-label="Shift every Cue {shiftStep} s earlier"
+          title={canShiftEarlier
+            ? `Shift every Cue ${shiftStep} s earlier`
+            : `A Cue is closer to 0:00 than ${shiftStep} s`}>−</button
+        >
+        <button
+          type="button"
+          class="button shift-by"
+          onclick={() => shiftEveryCue(shiftStep)}
+          aria-label="Shift every Cue {shiftStep} s later"
+          title="Shift every Cue {shiftStep} s later">+</button
+        >
+      </div>
+    {/if}
     {#if syncing && hinting}
       <p class="sync-hint muted">Play, then press Enter or Now as each Line starts. Click a Line to start from it.</p>
     {/if}
@@ -493,6 +551,20 @@
   }
   .spacer {
     flex: 1;
+  }
+  .shift {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: 0.5rem;
+  }
+  .shift-step {
+    width: auto;
+    margin-left: 0.25rem;
+  }
+  .shift-by {
+    min-width: var(--control);
+    padding: 0;
   }
   .sync-toggle[aria-pressed='true'] {
     border-color: var(--accent);

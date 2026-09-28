@@ -82,6 +82,40 @@ func TestShiftingCuesEarlierMayTakeThemToZero(t *testing.T) {
 	}
 }
 
+// everyCueEnd ends the span the Lyric Sheet's Shift Cues controls shift: from
+// 0:00 to past the latest a Cue can be, 24 hours in.
+const everyCueEnd = 24*60*60 + 1
+
+// Shifting a span from 0:00 to past the latest Cue shifts the whole Song's
+// Cues.
+func TestShiftingEveryCueMovesThemAllDormantOnesIncluded(t *testing.T) {
+	ts := newTestServer(t)
+	before := ts.cuedChorus()
+	drive, night, _, _ := chorusLines(before)
+	dormant := before.Sections[0].Alternates[1].Lines[1].ID
+
+	later := ts.shiftCues(before.ID, 0, everyCueEnd, 0.5)
+
+	if want := []float64{1.5, -1, 20.5, -1}; !reflect.DeepEqual(cues(later), want) {
+		t.Errorf("cues = %v, want %v", cues(later), want)
+	}
+	want := []map[int64]float64{{drive: 1.5, night: 3.5}, {}, {night: 22.5, dormant: 23.5}, {}}
+	if !reflect.DeepEqual(lineCues(later), want) {
+		t.Errorf("lineCues = %v, want %v", lineCues(later), want)
+	}
+
+	// Earlier, as far as the earliest Cue reaching 0:00.
+	got := ts.shiftCues(before.ID, 0, everyCueEnd, -1.5)
+
+	if want := []float64{0, -1, 19, -1}; !reflect.DeepEqual(cues(got), want) {
+		t.Errorf("cues = %v, want %v", cues(got), want)
+	}
+	want = []map[int64]float64{{drive: 0, night: 2}, {}, {night: 21, dormant: 22}, {}}
+	if !reflect.DeepEqual(lineCues(got), want) {
+		t.Errorf("lineCues = %v, want %v", lineCues(got), want)
+	}
+}
+
 func TestShiftingCuesLeavesOtherSongsAlone(t *testing.T) {
 	ts := newTestServer(t)
 	other := ts.cuedChorus()
@@ -101,6 +135,8 @@ func TestInvalidCueShiftsAreRejected(t *testing.T) {
 		msg  string
 	}{
 		{"below zero", map[string]any{"start": 0, "end": 10, "by": -1.5},
+			"a Cue can't be before the start of the Timeline"},
+		{"every Cue, one of them below zero", map[string]any{"start": 0, "end": everyCueEnd, "by": -1.1},
 			"a Cue can't be before the start of the Timeline"},
 		{"a dormant one below zero", map[string]any{"start": 21, "end": 24, "by": -22.5},
 			"a Cue can't be before the start of the Timeline"},

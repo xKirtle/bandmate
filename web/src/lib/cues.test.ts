@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { cuesInSpan, currentPosition, formatCue, hasCues, linesByRow, nextLine, nudgeCue, parseCue, playLabel, type CuedSong } from './cues';
+import {
+  canShiftCuesEarlier,
+  cuesInSpan,
+  currentPosition,
+  everyCue,
+  maxCue,
+  formatCue,
+  hasCues,
+  linesByRow,
+  nextLine,
+  nudgeCue,
+  parseCue,
+  playLabel,
+  type CuedSong,
+} from './cues';
 
 describe('parseCue', () => {
   it('reads plain seconds', () => {
@@ -531,5 +545,63 @@ describe('linesByRow', () => {
 describe('playLabel', () => {
   it('names what plays from where', () => {
     expect(playLabel('Line 3 of Verse 1', 38.5)).toBe('Play from Line 3 of Verse 1 at 0:38.5');
+  });
+});
+
+describe('shifting every Cue', () => {
+  const sections = [
+    {
+      id: 9,
+      alternates: [
+        { active: false, lines: [{ id: 50, text: 'Old' }] },
+        { active: true, lines: [{ id: 60, text: 'New' }] },
+      ],
+    },
+  ];
+  // Occurrence 1's own Cue is at 2.5, its active Line's at 3, and a dormant Line's at 0.3.
+  const song: CuedSong = {
+    arrangement: [
+      { id: 1, sectionId: 9, cue: 2.5, lineCues: { 60: 3, 50: 0.3 } },
+      { id: 2, sectionId: 9, cue: 40, lineCues: {} },
+    ],
+    sections,
+  };
+  const uncued: CuedSong = { arrangement: [{ id: 1, sectionId: 9, cue: null, lineCues: {} }], sections };
+
+  describe('everyCue', () => {
+    it('takes every Cue, dormant ones included', () => {
+      expect(cuesInSpan(song, everyCue.start, everyCue.end)).toHaveLength(4);
+    });
+
+    it('takes a Cue from 0:00 up to the latest a Cue can be', () => {
+      const edges: CuedSong = { arrangement: [{ id: 1, sectionId: 9, cue: 0, lineCues: { 60: maxCue } }], sections };
+      expect(cuesInSpan(edges, everyCue.start, everyCue.end)).toHaveLength(2);
+    });
+  });
+
+  describe('canShiftCuesEarlier', () => {
+    it('allows a step no bigger than the earliest Cue, dormant ones included', () => {
+      expect(canShiftCuesEarlier(song, 0.1)).toBe(true);
+    });
+
+    it('allows a step that takes the earliest Cue exactly to 0:00', () => {
+      expect(canShiftCuesEarlier(song, 0.3)).toBe(true);
+      const tenths: CuedSong = { arrangement: [{ id: 1, sectionId: 9, cue: 0.7, lineCues: {} }], sections };
+      expect(canShiftCuesEarlier(tenths, 0.7)).toBe(true);
+    });
+
+    it('refuses a step that would take a dormant Cue before 0:00', () => {
+      expect(canShiftCuesEarlier(song, 0.5)).toBe(false);
+      expect(canShiftCuesEarlier(song, 1)).toBe(false);
+    });
+
+    it('refuses any step with a Cue at 0:00', () => {
+      const atZero: CuedSong = { arrangement: [{ id: 1, sectionId: 9, cue: 0, lineCues: {} }], sections };
+      expect(canShiftCuesEarlier(atZero, 0.1)).toBe(false);
+    });
+
+    it('refuses without Cues, having none to shift', () => {
+      expect(canShiftCuesEarlier(uncued, 0.1)).toBe(false);
+    });
   });
 });

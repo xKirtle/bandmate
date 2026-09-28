@@ -111,6 +111,31 @@ export function cuesInSpan(song: CuedSong, start: number, end: number): FoundCue
   });
 }
 
+/**
+ * The latest a Cue can be, in seconds, as the server keeps them: 24 hours
+ * into the Timeline.
+ */
+export const maxCue = 24 * 60 * 60;
+
+/**
+ * A span that takes every Cue there is or could be, dormant ones included:
+ * shifting it shifts them all. It's fixed rather than worked out from the
+ * Song, so a shift queued behind another still takes the latest Cue.
+ */
+export const everyCue = { start: 0, end: maxCue + 1 } as const;
+
+/**
+ * Whether every Cue can shift earlier by step without any going before
+ * 0:00, as the server refuses: dormant ones included, since they move too.
+ * Compared in milliseconds, as Cues are kept.
+ */
+export function canShiftCuesEarlier(song: CuedSong, step: number): boolean {
+  const all = cuesInSpan(song, everyCue.start, everyCue.end);
+  if (all.length === 0) return false;
+  const earliest = Math.min(...all.map((c) => c.cue));
+  return Math.round(earliest * 1000) >= Math.round(step * 1000);
+}
+
 /** A Line, as far as Sync mode steps onto it: it skips Chord Lines. */
 export interface ChordedLine extends CuedLine {
   chordLine: boolean;
