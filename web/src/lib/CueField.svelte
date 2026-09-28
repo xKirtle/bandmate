@@ -1,6 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { formatCue, nudgeCue, parseCue } from './cues';
+  import { playLabel } from './gutter';
 
   // A Cue's time, shown as m:ss.s. Clicking it lets the time be typed:
   // Enter or leaving the field saves, Esc cancels, and an empty field clears
@@ -11,6 +12,8 @@
     save,
     next,
     gutter = false,
+    play,
+    current = false,
   }: {
     /** In seconds, or null without a Cue. */
     cue: number | null;
@@ -22,6 +25,10 @@
     next?: () => boolean;
     /** Beside a Line, so kept as short as the Line. */
     gutter?: boolean;
+    /** Given, a ▶ before the time seeks the Timeline to the Cue. */
+    play?: (to: number) => void;
+    /** Whether playback is on what the Cue is for, so its ▶ isn't muted. */
+    current?: boolean;
   } = $props();
 
   let editing = $state(false);
@@ -97,46 +104,70 @@
   }
 </script>
 
-{#if editing}
-  <input
-    bind:this={input}
-    bind:value={text}
-    class="cue editing"
-    class:gutter
-    class:invalid
-    aria-label="Cue for {label}"
-    aria-invalid={invalid}
-    title={invalid
-      ? 'Type a time like 45, 0:45, 0:45.25 or 1:02'
-      : 'Enter saves, Esc cancels, empty clears, Alt+↑/↓ nudges'}
-    placeholder="0:00.0"
-    autocomplete="off"
-    spellcheck="false"
-    inputmode="decimal"
-    enterkeyhint="done"
-    oninput={() => (invalid = false)}
-    {onkeydown}
-    {onblur}
-  />
-{:else}
-  <button
-    bind:this={button}
-    type="button"
-    class="cue"
-    class:gutter
-    class:unset={cue === null}
-    onclick={edit}
-    onkeydown={nudge}
-    aria-label={cue === null ? `Set a Cue for ${label}` : `Cue for ${label}: ${formatCue(cue)}. Change it`}
-    title={cue === null
-      ? 'Set when this starts on the Timeline'
-      : 'Change when this starts on the Timeline; Alt+↑/↓ nudges it'}
-  >
-    {cue === null ? '–:––.–' : formatCue(cue)}
-  </button>
-{/if}
+<span class="slot" class:current>
+  {#if play}
+    {#if cue === null}
+      <span class="play" class:gutter aria-hidden="true"></span>
+    {:else}
+      {@const at = cue}
+      <!-- Clicked, it keeps focus where it was, so the cursor stays put and
+           Space still plays and pauses. -->
+      <button
+        type="button"
+        class="play"
+        class:gutter
+        onpointerdown={(e) => e.preventDefault()}
+        onclick={() => play(at)}
+        aria-label={playLabel(label, at)}
+        title="Play from here">▶</button
+      >
+    {/if}
+  {/if}
+  {#if editing}
+    <input
+      bind:this={input}
+      bind:value={text}
+      class="cue editing"
+      class:gutter
+      class:invalid
+      aria-label="Cue for {label}"
+      aria-invalid={invalid}
+      title={invalid
+        ? 'Type a time like 45, 0:45, 0:45.25 or 1:02'
+        : 'Enter saves, Esc cancels, empty clears, Alt+↑/↓ nudges'}
+      placeholder="0:00.0"
+      autocomplete="off"
+      spellcheck="false"
+      inputmode="decimal"
+      enterkeyhint="done"
+      oninput={() => (invalid = false)}
+      {onkeydown}
+      {onblur}
+    />
+  {:else}
+    <button
+      bind:this={button}
+      type="button"
+      class="cue"
+      class:gutter
+      class:unset={cue === null}
+      onclick={edit}
+      onkeydown={nudge}
+      aria-label={cue === null ? `Set a Cue for ${label}` : `Cue for ${label}: ${formatCue(cue)}. Change it`}
+      title={cue === null
+        ? 'Set when this starts on the Timeline'
+        : 'Change when this starts on the Timeline; Alt+↑/↓ nudges it'}
+    >
+      {cue === null ? '–:––.–' : formatCue(cue)}
+    </button>
+  {/if}
+</span>
 
 <style>
+  .slot {
+    display: inline-flex;
+    align-items: center;
+  }
   .cue {
     width: 5.5rem;
     min-height: 2rem;
@@ -167,6 +198,37 @@
   }
   .cue.editing {
     cursor: text;
+  }
+  /* Muted, so a column of them down the gutter isn't noisy. */
+  .play {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 1.25rem;
+    min-height: 2rem;
+    padding: 0;
+    border: 0;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 0.625rem;
+    opacity: 0.4;
+    cursor: pointer;
+  }
+  .play.gutter {
+    min-height: 1.5rem;
+  }
+  .slot:hover .play,
+  .play:focus-visible,
+  .slot.current .play {
+    color: var(--accent);
+    opacity: 1;
+  }
+  /* Beside a ▶, the time gives up the room it takes. */
+  .play + .cue {
+    width: 4.25rem;
   }
   .cue.invalid {
     border-color: var(--accent);

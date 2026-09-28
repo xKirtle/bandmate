@@ -29,7 +29,14 @@
     onUnsaved: (editor: object, unsaved: boolean) => void;
     actions: Snippet;
     /** Given, the Occurrence's Cue shows beside the Label, to change it with. */
-    cue?: { at: number | null; save: (cue: number | null) => void };
+    cue?: {
+      at: number | null;
+      save: (cue: number | null) => void;
+      /** Given, a ▶ beside the Cue seeks the Timeline to it. */
+      play?: (to: number) => void;
+      /** Whether playback is in the Occurrence. */
+      current: boolean;
+    };
     /** Given, the active Alternate's Lines are highlighted and cued as playback goes. */
     cueing?: Cueing;
   } = $props();
@@ -145,7 +152,13 @@
       </span>
     {/if}
     {#if cue}
-      <CueField cue={cue.at} label={section.label || 'this Section'} save={cue.save} />
+      <CueField
+        cue={cue.at}
+        label={section.label || 'this Section'}
+        save={cue.save}
+        play={cue.play}
+        current={cue.current}
+      />
     {/if}
     <div class="actions">
       <button

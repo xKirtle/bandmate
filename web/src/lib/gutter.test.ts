@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { gutterFields } from './gutter';
+import { gutterFields, playLabel } from './gutter';
 
 describe('gutterFields', () => {
   const setUp = (keys: string[]) => {
@@ -32,5 +32,11 @@ describe('gutterFields', () => {
     fields.set('1:2', null);
     expect(fields.editAfter(['1:1', '1:2'], '1:1')).toBe(false);
     expect(opened).toEqual([]);
+  });
+});
+
+describe('playLabel', () => {
+  it('names what plays from where', () => {
+    expect(playLabel('Line 3 of Verse 1', 38.5)).toBe('Play from Line 3 of Verse 1 at 0:38.5');
   });
 });
