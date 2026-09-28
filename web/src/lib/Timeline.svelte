@@ -563,14 +563,12 @@
     return Math.round(at * 1000) / 1000;
   }
 
-  /** Switches the Loop off, if it's on, e.g. as Sync mode comes on: the two are exclusive. */
+  /** Switches the Loop off, if it's on, e.g. as Sync mode comes on. */
   export function stopLoop() {
     if (loopOn) switchLoopOff();
   }
 
-  // Sync mode and the Loop are exclusive, so going round the Loop mid-pass
-  // can't cue Lines out of order: the Lyric Sheet switches Sync mode off
-  // whenever the Loop comes on, however it does.
+  // Sync mode and the Loop are exclusive: see the Lyric Sheet.
   $effect(() => {
     onLoop?.(loopOn);
   });
