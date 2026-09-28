@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { edgeSpeed, fitScale, follow, maxScale, ticks, timeAt, view, waveWindow, xAt, zoom } from './timelineView';
+import {
+  barCentre,
+  edgeSpeed,
+  fitScale,
+  follow,
+  maxScale,
+  thumb,
+  thumbScroll,
+  ticks,
+  timeAt,
+  view,
+  waveWindow,
+  xAt,
+  zoom,
+} from './timelineView';
 
 // A 100s Timeline shown 500px wide: fitted, that's 5px a second.
 const fitted = view({ span: 100, width: 500, scale: 0, scroll: 0 });
@@ -181,5 +195,69 @@ describe('edgeSpeed', () => {
     expect(edgeSpeed(fitted, 490)).toBe(0);
     expect(edgeSpeed(view({ ...zoomed, scroll: 0 }), 10)).toBe(0);
     expect(edgeSpeed(view({ ...zoomed, scroll: 1500 }), 490)).toBe(0);
+  });
+});
+
+describe('thumb', () => {
+  // 20px a second, showing 20s to 45s of 100s: a quarter of it, a fifth along.
+  const zoomed = view({ span: 100, width: 500, scale: 20, scroll: 400 });
+
+  it('is the share of the Timeline in view, along the bar', () => {
+    expect(thumb(zoomed, 24)).toEqual({ left: 100, width: 125 });
+  });
+
+  it('runs from one end of the bar to the other', () => {
+    expect(thumb(view({ ...zoomed, scroll: 0 }), 24)).toEqual({ left: 0, width: 125 });
+    expect(thumb(view({ ...zoomed, scroll: 1500 }), 24)).toEqual({ left: 375, width: 125 });
+  });
+
+  it('is never narrower than least, still reaching the end', () => {
+    // 300px a second: 500px of 30000px would be about 8px wide.
+    const closest = view({ span: 100, width: 500, scale: 300, scroll: 29500 });
+    expect(thumb(closest, 24)).toEqual({ left: 476, width: 24 });
+  });
+
+  it('is gone when the whole Timeline fits', () => {
+    expect(thumb(fitted, 24)).toBeNull();
+    expect(thumb(view({ span: 0, width: 500, scale: 0, scroll: 0 }), 24)).toBeNull();
+  });
+});
+
+describe('thumbScroll', () => {
+  const zoomed = view({ span: 100, width: 500, scale: 20, scroll: 400 });
+
+  it('scrolls to where the thumb is dragged', () => {
+    expect(thumbScroll(zoomed, 24, 200).scroll).toBe(800);
+    expect(thumb(thumbScroll(zoomed, 24, 200), 24)?.left).toBe(200);
+  });
+
+  it('keeps to the Timeline’s ends when dragged past them', () => {
+    expect(thumbScroll(zoomed, 24, -50).scroll).toBe(0);
+    expect(thumbScroll(zoomed, 24, 900).scroll).toBe(1500);
+  });
+
+  it('counts a thumb held wider than its share', () => {
+    const closest = view({ span: 100, width: 500, scale: 300, scroll: 0 });
+    expect(thumbScroll(closest, 24, 238).scroll).toBe(14750);
+  });
+
+  it('leaves a fitted view as it is', () => {
+    expect(thumbScroll(fitted, 24, 200)).toEqual(fitted);
+  });
+});
+
+describe('barCentre', () => {
+  const zoomed = view({ span: 100, width: 500, scale: 20, scroll: 400 });
+
+  it('centres the view on the time that far along the bar', () => {
+    // 350px along 500px is 70s, 1400px in: 1150px scrolled puts it mid-window.
+    const centred = barCentre(zoomed, 350);
+    expect(centred.scroll).toBe(1150);
+    expect(xAt(centred, 70)).toBe(250);
+  });
+
+  it('keeps to the Timeline’s ends', () => {
+    expect(barCentre(zoomed, 10).scroll).toBe(0);
+    expect(barCentre(zoomed, 495).scroll).toBe(1500);
   });
 });

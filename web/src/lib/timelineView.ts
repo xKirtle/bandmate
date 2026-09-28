@@ -125,3 +125,37 @@ export function edgeSpeed(v: View, x: number): number {
   if (toward === 0 || (toward < 0 && v.scroll <= 0) || (toward > 0 && v.scroll >= most)) return 0;
   return toward * v.width;
 }
+
+// The scroll bar laid over the lanes' bottom edge, as wide as the window:
+// its thumb is the stretch of the Timeline in view, along the whole of it.
+
+/** How far there is to scroll, in pixels. */
+function scrollRoom(v: View): number {
+  return Math.max(0, v.span * v.scale - v.width);
+}
+
+/**
+ * Where the scroll bar's thumb is and how wide, in pixels along the bar:
+ * the share of the Timeline in view, but never narrower than least, so
+ * it can be grabbed. Null when the whole Timeline fits, with no bar.
+ */
+export function thumb(v: View, least: number): { left: number; width: number } | null {
+  const room = scrollRoom(v);
+  // Less than a pixel over is the fitted Timeline rounded, not zoomed in.
+  if (room < 1) return null;
+  const width = Math.min(v.width, Math.max(least, (v.width * v.width) / (v.span * v.scale)));
+  return { left: (v.scroll / room) * (v.width - width), width };
+}
+
+/** The view scrolled so the thumb, least pixels wide or more, starts left pixels along the bar. */
+export function thumbScroll(v: View, least: number, left: number): View {
+  const t = thumb(v, least);
+  if (!t) return v;
+  const along = v.width - t.width;
+  return view({ ...v, scroll: along > 0 ? (left / along) * scrollRoom(v) : 0 });
+}
+
+/** The view centred on the time x pixels along the bar. */
+export function barCentre(v: View, x: number): View {
+  return view({ ...v, scroll: (x / v.width) * v.span * v.scale - v.width / 2 });
+}
