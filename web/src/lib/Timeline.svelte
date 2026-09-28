@@ -119,8 +119,8 @@
     ),
   );
   const length = $derived(timelineEnd(clips, song));
-  // Room after the last Clip, or the Loop if it ends later, to drag Clips
-  // and the Loop later on the Timeline.
+  // Room after the end, or the Loop if it ends later, to drag Clips and the
+  // Loop later on the Timeline.
   const reach = $derived(length > 0 ? Math.max(length, timeline.loop?.end ?? 0) : 0);
   const span = $derived(reach > 0 ? reach + Math.max(10, reach / 4) : 0);
   // Seeking outside the Loop switches it off, and until that's saved,
@@ -376,7 +376,7 @@
   let ended = false;
 
   /** Lets go of the playhead kept at the end, once it's moved from there. */
-  function letGoOfEnd() {
+  function releaseEnded() {
     if (!ended) return;
     ended = false;
     if (playerState === 'stopped') onPlayhead?.(null);
@@ -432,7 +432,7 @@
 
   function seek(to: number) {
     position = clamp(to);
-    letGoOfEnd();
+    releaseEnded();
     if (playerState === 'stopped') player.seek(position);
     else play(position);
   }

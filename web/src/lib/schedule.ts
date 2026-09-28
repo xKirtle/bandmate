@@ -104,7 +104,7 @@ export function positionAt(t: number, loop: Loop | null, elapsed: number): numbe
 /**
  * Where the Timeline ends, in seconds: where its last Clip ends or at its
  * latest Cue in effect, whichever is later, so playback runs through every
- * Cue even past the Beat. 0 without either.
+ * Cue even past the last Clip. 0 without either.
  */
 export function timelineEnd(clips: readonly Placed[], song: CuedSong): number {
   return clips.reduce((end, c) => Math.max(end, c.start + c.length), lastCue(song) ?? 0);

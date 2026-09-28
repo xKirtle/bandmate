@@ -86,8 +86,7 @@ export function currentPosition(song: CuedSong, t: number): Position | null {
 
 /** Whether any Occurrence has a Cue in effect: its own, or one on a Line of its active Alternate. Dormant Cues don't count. */
 export function hasCues(song: CuedSong): boolean {
-  const linesOf = activeLines(song);
-  return song.arrangement.some((o) => o.cue !== null || hasLineCue(o, linesOf(o)));
+  return lastCue(song) !== null;
 }
 
 /**
