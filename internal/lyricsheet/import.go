@@ -19,14 +19,17 @@ var (
 // one Section (see arrange). A title directive in the text names the Song;
 // without one, title does.
 func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error) {
-	directiveTitle, sections := parseImport(text)
-	if directiveTitle != "" {
-		title = directiveTitle
+	sheet, err := parseImport(text)
+	if err != nil {
+		return Song{}, err
+	}
+	if sheet.title != "" {
+		title = sheet.title
 	}
 	if strings.TrimSpace(title) == "" {
 		return Song{}, errImportTitleRequired
 	}
-	if len(sections) == 0 {
+	if len(sheet.sections) == 0 {
 		return Song{}, errNothingToImport
 	}
 
@@ -40,7 +43,7 @@ func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error
 	if err != nil {
 		return Song{}, err
 	}
-	distinct, arrangement := arrange(sections)
+	distinct, arrangement := arrange(sheet.sections)
 	sectionIDs := make([]int64, len(distinct))
 	for i, sec := range distinct {
 		sectionID, alternateID, err := insertSection(ctx, tx, songID, sec.label)
@@ -50,7 +53,7 @@ func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error
 		sectionIDs[i] = sectionID
 		for pos, line := range sec.lines {
 			if _, err := tx.ExecContext(ctx, `INSERT INTO lines (alternate_id, position, text) VALUES (?, ?, ?)`,
-				alternateID, pos, line); err != nil {
+				alternateID, pos, line.text); err != nil {
 				return Song{}, fmt.Errorf("adding line: %w", err)
 			}
 		}
@@ -66,10 +69,29 @@ func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error
 	return s.GetSong(ctx, songID)
 }
 
-// importedSection is one Section read from pasted text.
+// importedSheet is what pasted text says about the Song to create.
+type importedSheet struct {
+	title    string // from a title directive, if any
+	sections []importedSection
+}
+
+// importedSection is one Section read from pasted text, as it appears
+// there: one Occurrence, until arrange finds the Sections it shares.
 type importedSection struct {
 	label string
-	lines []string
+	lines []importedLine
+}
+
+// importedLine is one Line read from pasted text, with where it came from.
+type importedLine struct {
+	text      string
+	pasteLine int // its line number in the paste, from 1
+}
+
+// invalidPasteLine rejects a paste over one of its lines, counted from 1,
+// naming it so the user can find it.
+func invalidPasteLine(pasteLine int, format string, args ...any) error {
+	return invalid(fmt.Sprintf("line %d: ", pasteLine) + fmt.Sprintf(format, args...))
 }
 
 // sectionDirective is what a ChordPro section directive does: start a
@@ -87,26 +109,28 @@ var sectionDirectives = map[string]sectionDirective{
 }
 
 // parseImport reads pasted text into the Song title, if a directive gives
-// one, and Sections, one per group of Lines in the text. Blank lines and end
-// directives end a Section, and a heading or start directive starts one with
-// that Label. A heading with no Lines under it is a Section with no Lines.
-// Other directives never become Lines.
-func parseImport(text string) (title string, sections []importedSection) {
+// one, and Sections, one per group of Lines in the text, or rejects it with
+// an error naming the line at fault (see invalidPasteLine). Blank lines and
+// end directives end a Section, and a heading or start directive starts one
+// with that Label. A heading with no Lines under it is a Section with no
+// Lines. Other directives never become Lines.
+func parseImport(text string) (importedSheet, error) {
+	var sheet importedSheet
 	var cur importedSection
 	end := func() {
 		if cur.label != "" || len(cur.lines) > 0 {
-			sections = append(sections, cur)
+			sheet.sections = append(sheet.sections, cur)
 		}
 		cur = importedSection{}
 	}
-	for _, line := range splitLines(text) {
+	for i, line := range splitLines(text) {
 		if strings.TrimSpace(line) == "" {
 			end()
 			continue
 		}
 		if name, value, ok := directive(line); ok {
 			if name == "title" || name == "t" {
-				title = value
+				sheet.title = value
 			}
 			if d, ok := sectionDirectives[name]; ok {
 				end()
@@ -121,10 +145,10 @@ func parseImport(text string) (title string, sections []importedSection) {
 			cur = importedSection{label: label}
 			continue
 		}
-		cur.lines = append(cur.lines, line)
+		cur.lines = append(cur.lines, importedLine{text: line, pasteLine: i + 1})
 	}
 	end()
-	return title, sections
+	return sheet, nil
 }
 
 // arrange lays imported Sections out as a Song. It returns the distinct
@@ -169,8 +193,8 @@ func (a importedSection) sameAs(b importedSection) bool {
 	if a.label != "" && b.label != "" && !strings.EqualFold(a.label, b.label) {
 		return false
 	}
-	return slices.EqualFunc(a.lines, b.lines, func(x, y string) bool {
-		return strings.TrimSpace(x) == strings.TrimSpace(y)
+	return slices.EqualFunc(a.lines, b.lines, func(x, y importedLine) bool {
+		return strings.TrimSpace(x.text) == strings.TrimSpace(y.text)
 	})
 }
 
