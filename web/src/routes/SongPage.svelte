@@ -369,7 +369,7 @@
           {editCues}
           onUnsaved={setUnsaved}
           {playhead}
-          seek={(to) => timelinePanel?.seekTo(to)}
+          playFrom={(to) => timelinePanel?.playFrom(to)}
           playheadAt={() => timelinePanel?.playheadAt() ?? 0}
           {loopOn}
           stopLoop={() => timelinePanel?.stopLoop()}

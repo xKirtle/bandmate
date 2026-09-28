@@ -36,8 +36,9 @@
     /** Whether the pointer is over the Line, so its ✕ shows. */
     hovered?: boolean;
     /**
-     * Given, as in Sync mode, clicking the time or ▶ makes the Line the next
-     * to cue, rather than opening the time.
+     * Given, as in Sync mode, clicking the time makes the Line the next to
+     * cue, rather than opening the time. The ▶ only plays, leaving the Line
+     * up next where it is.
      */
     pick?: () => void;
     /** Given, the Cue is out of order, for this reason, e.g. "Later than Line 6 of Chorus (0:55.0)". */
@@ -142,10 +143,7 @@
         type="button"
         class="play"
         onpointerdown={(e) => e.preventDefault()}
-        onclick={() => {
-          play(at);
-          pick?.();
-        }}
+        onclick={() => play(at)}
         aria-label={playLabel(label, at)}
         title="Play from here">▶</button
       >
