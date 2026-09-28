@@ -5,6 +5,7 @@ Each step is usable on its own. Terms are defined in [CONTEXT.md](../CONTEXT.md)
 1. **Write**: Songs and Status, Lyric Sheet (Sections, Labels, Occurrences, Detach, Alternates, Chords, Chord Lines), Scrapbook, paste-import (plain text or ChordPro; blank lines split Sections, identical Sections merge into one shared Section), phone-friendly layout for writing lyrics.
 2. **Listen**: Masters, Beat Library, Timeline with Tracks and Clips, playback, per-Track volume and mute.
 3. **Sync**: Cues via Sync mode and the Cue gutter, current Line highlighted during playback.
+   - **Desktop layout** (between Sync and Record): a full-width shell, a three-pane Song page, and sortable, filterable Song and Beat lists. Spec: issue #97.
 4. **Record**: lossless WAV Takes stacked in Clips, Latency Offset calibration and per-Take nudge.
 5. **Keep**: Snapshots and restore, Mixdown to MP3, ChordPro export.
 
@@ -59,6 +60,14 @@ Playback:
 - Clicking a cued Line in Read mode seeks the playhead to it; in Write mode a click only places the cursor, and the gutter's ▶ seeks instead. On phone there's the highlight and click-to-seek, but no Cue editing.
 - Songs without audio have no playback clock. Their Chords are purely positional.
 - Undo for Lyric Sheet structure (delete Section, Detach, reorder, switch Alternate, move to or from the Scrapbook) is not part of Sync. With dormant Cues (ADR 0007) an Alternate switch is undone by switching back; whether Snapshots cover the rest is decided in step 5.
+
+### Desktop layout
+
+- Desktop is a window at least 80rem (1280px) wide. Width alone decides layout and sizing: touch-sized below, compact above. Phones and tablets keep today's layout.
+- On desktop the app fills the window, with a nav rail for Songs and Beats, instead of a centered column.
+- The Song page has three panes: the Song's details, Notes and Masters on the left, the Lyric Sheet at a readable width in the centre, the Scrapbook on the right. The Timeline dock spans all three.
+- The Song list and Beat Library are sortable tables on desktop. Beats can be filtered by producer, BPM range, key and used/unused, in the Library and the Beat picker. List filters and sorting live in the URL.
+- The exact look is settled by prototyping before implementation (issue #97).
 
 ### 4. Record
 
