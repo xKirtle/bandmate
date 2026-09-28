@@ -16,7 +16,7 @@
   } from './api';
   import BeatPicker from './BeatPicker.svelte';
   import { clampMove, clampTrimEnd, clampTrimStart } from './clipEdit';
-  import { cuesInSpan, formatCue, hasCues } from './cues';
+  import { cuesInSpan, formatCue } from './cues';
   import {
     History,
     restorable,
@@ -53,16 +53,14 @@
   // only offered on wider screens; on a phone it only plays, mixes and
   // switches the Loop on and off. On both it zooms and scrolls, and follows
   // the playhead while playing. While the Loop is on, the playhead stays
-  // inside it. Tap mode, also only on wider screens, cues the next Line at
-  // the playhead.
+  // inside it.
   let {
     song,
     timeline,
     change,
     setBpm,
     onPlayhead,
-    tapping = $bindable(false),
-    onTap,
+    onLoop,
   }: {
     song: Song;
     timeline: Timeline;
@@ -72,10 +70,8 @@
     setBpm: (bpm: number) => void;
     /** Hears where playback is, in seconds, every frame while playing, then null once it stops. */
     onPlayhead?: (at: number | null) => void;
-    /** Whether Tap mode is on. */
-    tapping?: boolean;
-    /** Hears a tap in Tap mode, with where the playhead is, in seconds. */
-    onTap?: (at: number) => void;
+    /** Hears whether the Loop is on, whenever that changes, e.g. to keep Sync mode off while it is. */
+    onLoop?: (on: boolean) => void;
   } = $props();
 
   let playerState = $state<PlayerState>('stopped');
@@ -280,7 +276,6 @@
   function keydown(event: KeyboardEvent) {
     spaceBar(event);
     undoKeys(event);
-    tapKey(event);
   }
 
   // Changes to a Track's levels are shown and heard right away, before
@@ -562,32 +557,22 @@
     toggle();
   }
 
-  // In Tap mode, Enter taps anywhere but a text field, even on a button:
-  // tapping along shouldn't depend on where focus was left.
-  function tapKey(event: KeyboardEvent) {
-    if (event.key !== 'Enter' || event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
-    if (!tapping || event.defaultPrevented || picking || inTextField(event.target)) return;
-    event.preventDefault();
-    tap();
-  }
-
-  /** Cues the next Line where the playhead is, playing or paused. */
-  function tap() {
+  /** Where the playhead is, playing or paused, in seconds to the millisecond, e.g. to cue a Line at. */
+  export function playheadAt(): number {
     const at = playerState === 'stopped' ? position : player.position();
-    onTap?.(Math.round(at * 1000) / 1000);
+    return Math.round(at * 1000) / 1000;
   }
 
-  // Tap mode and the Loop are exclusive, so going round the Loop mid-pass
-  // can't cue Lines out of order: switching Tap mode on switches the Loop
-  // off, and the Loop coming on, however it does, switches Tap mode off. On
-  // a phone there's no Tap mode, nor without a Clip to cue along to.
-  function switchTapping() {
-    tapping = !tapping;
-    if (tapping && loopOn) switchLoopOff();
+  /** Switches the Loop off, if it's on, e.g. as Sync mode comes on: the two are exclusive. */
+  export function stopLoop() {
+    if (loopOn) switchLoopOff();
   }
 
+  // Sync mode and the Loop are exclusive, so going round the Loop mid-pass
+  // can't cue Lines out of order: the Lyric Sheet switches Sync mode off
+  // whenever the Loop comes on, however it does.
   $effect(() => {
-    if (loopOn || empty || !editable.current) untrack(() => (tapping = false));
+    onLoop?.(loopOn);
   });
 
   async function addBeat(beat: Beat) {
@@ -1122,33 +1107,6 @@
             ? `Loop ${formatDuration(timeline.loop.start)} to ${formatDuration(timeline.loop.end)}`
             : 'Drag along the top of the ruler to set a Loop'}>Loop</button
         >
-        <button
-          type="button"
-          class="toggle tap-toggle edit-only"
-          aria-pressed={tapping}
-          disabled={empty}
-          onclick={switchTapping}
-          title="Tap mode: cue the next Line at the playhead with Enter or the Tap button">Tap mode</button
-        >
-        {#if tapping}
-          <!-- Clicked, it keeps focus where it was, so Space still plays and pauses. -->
-          <button
-            type="button"
-            class="button primary tap edit-only"
-            onpointerdown={(e) => e.preventDefault()}
-            onclick={tap}
-            title="Cue the next Line here (Enter)">Tap</button
-          >
-        {/if}
-        {#if hasCues(song)}
-          <!-- Doesn't ask first: it can be undone. -->
-          <button
-            type="button"
-            class="button edit-only"
-            onclick={() => editCues((at) => api.clearCues(at))}
-            title="Clear every Cue in the Song">Clear all Cues</button
-          >
-        {/if}
         {#if playerState === 'loading'}
           <span class="muted" role="status">Loading audio…</span>
         {/if}
@@ -1694,13 +1652,11 @@
     opacity: 0.08;
     pointer-events: none;
   }
-  .toggle.loop-toggle,
-  .toggle.tap-toggle {
+  .toggle.loop-toggle {
     width: auto;
     padding: 0 calc(0.375 * var(--timeline-rem));
   }
-  .toggle.loop-toggle:disabled,
-  .toggle.tap-toggle:disabled {
+  .toggle.loop-toggle:disabled {
     opacity: 0.5;
     cursor: default;
   }

@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { Line, Occurrence, Song } from './api';
+  import type { Occurrence, Song } from './api';
   import { layoutLine } from './chords';
-  import { isBlank, type Position, type TapLine } from './cues';
+  import type { Position } from './cues';
   import { follower, key } from './follow';
 
   let {
@@ -9,8 +9,6 @@
     showChords,
     current = null,
     seek,
-    picked = null,
-    pick,
   }: {
     song: Song;
     showChords: boolean;
@@ -18,10 +16,6 @@
     current?: Position | null;
     /** Given, clicking a cued Line seeks the Timeline to its Cue. */
     seek?: (to: number) => void;
-    /** The Line picked to tap next in Tap mode, marked. */
-    picked?: TapLine | null;
-    /** Given, as in Tap mode, clicking a Line picks it to tap next instead of seeking. */
-    pick?: (line: TapLine) => void;
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
@@ -49,11 +43,9 @@
     follow(currentKey);
   });
 
-  /** What clicking a Line does: pick it in Tap mode, or else seek to its Cue. Null for nothing. */
-  function clickLine(occurrence: Occurrence, line: Line, cue: number | null): (() => void) | null {
-    if (pick) return isBlank(line) ? null : () => pick({ occurrence: occurrence.id, line: line.id });
-    if (cue !== null && seek) return () => seek(cue);
-    return null;
+  /** What clicking a Line does: seek to its Cue. Null for nothing. */
+  function clickLine(cue: number | null): (() => void) | null {
+    return cue !== null && seek ? () => seek(cue) : null;
   }
 
   /** Does what clicking a Line does, unless the click was to select its text. */
@@ -88,22 +80,19 @@
           {@const cue = occurrence.lineCues[line.id] ?? null}
           {@const k = key(occurrence.id, line.id)}
           {@const lineCurrent = currentKey === k}
-          {@const onClick = clickLine(occurrence, line, cue)}
-          {@const isPicked = picked?.occurrence === occurrence.id && picked.line === line.id}
+          {@const onClick = clickLine(cue)}
           <div
             class="line-box"
             class:current={lineCurrent}
-            class:picked={isPicked}
             aria-current={lineCurrent ? 'true' : undefined}
             {@attach (el) => track(el, k)}
           >
-            <!-- Seeking is also on the Timeline's ruler, and Tap mode goes on down the
-                 Lines by itself, so a click here is a shortcut. -->
+            <!-- Seeking is also on the Timeline's ruler, so a click here is a shortcut. -->
             <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
             <div
               class="text"
               class:clickable={onClick}
-              title={onClick ? (pick ? 'Tap this Line next' : 'Play from here') : undefined}
+              title={onClick ? 'Play from here' : undefined}
               onclick={onClick ? () => click(onClick) : undefined}
             >
               {#if showChords && line.chords.length > 0}
@@ -176,11 +165,6 @@
   }
   .clickable {
     cursor: pointer;
-  }
-  /* Picked to tap next: outlined, so it doesn't look like the current Line. */
-  .line-box.picked {
-    outline: 2px dashed var(--accent);
-    outline-offset: -2px;
   }
   .line {
     font-size: 1.0625rem;

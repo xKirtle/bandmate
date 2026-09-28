@@ -20,7 +20,7 @@ import { isBlank, type CuedSong } from './cues';
 // An edit that brings back a deleted Clip or Track gets it a new id. The
 // edits kept that name the old id are then changed to name the new one.
 //
-// However a Cue edit was made (typed, nudged, tapped or cleared), it's
+// However a Cue edit was made (typed, nudged, synced or cleared), it's
 // undone and redone by restoring the Cues it changed to what they were
 // before or after it.
 
