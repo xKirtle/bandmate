@@ -105,7 +105,7 @@ A stretch of the Timeline that playback repeats, e.g. the hook of a Beat while w
 _Avoid_: Cycle, repeat, region
 
 **Cue**:
-A link from an Occurrence, or from one Line within an Occurrence, to a time on the Timeline. A Line's Cue lies dormant while its Alternate is inactive. Playing from a Cue starts a second before it, to lead into it.
+A link from one Line within an Occurrence to a time on the Timeline. An Occurrence has no Cue of its own: it starts where its first Line is cued. A Line's Cue lies dormant while its Alternate is inactive. Playing from a Cue starts a second before it, to lead into it. Cues are expected to run in order down the Arrangement (equal times are fine); a Cue earlier than a Line above it or later than one below it is **out of order**, which is allowed but marked.
 _Avoid_: Timestamp, sync point, marker
 
 **Sync mode**:
