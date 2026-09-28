@@ -3,10 +3,13 @@ package lyricsheet
 import (
 	"cmp"
 	"context"
+	"database/sql"
 	"fmt"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 var (
@@ -19,7 +22,8 @@ var (
 // with one Occurrence per Section the text marks (see parseImport). A
 // Section repeated in the text is one Section (see arrange). A title
 // directive in the text names the Song; without one, title does. Other
-// directives fill in the Song's Details.
+// directives fill in the Song's Details. Timestamps in the text become
+// Cues, each Occurrence keeping its own.
 func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error) {
 	sheet, err := parseImport(text)
 	if err != nil {
@@ -51,6 +55,7 @@ func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error
 	}
 	distinct, arrangement := arrange(sheet.sections)
 	sectionIDs := make([]int64, len(distinct))
+	lineIDs := make([][]int64, len(distinct))
 	for i, sec := range distinct {
 		sectionID, alternateID, err := insertSection(ctx, tx, songID, sec.label)
 		if err != nil {
@@ -58,15 +63,35 @@ func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error
 		}
 		sectionIDs[i] = sectionID
 		for pos, line := range sec.lines {
-			if _, err := tx.ExecContext(ctx, `INSERT INTO lines (alternate_id, position, text) VALUES (?, ?, ?)`,
-				alternateID, pos, line.text); err != nil {
+			lineID, err := insert(ctx, tx, `INSERT INTO lines (alternate_id, position, text) VALUES (?, ?, ?)`,
+				alternateID, pos, line.text)
+			if err != nil {
 				return Song{}, fmt.Errorf("adding line: %w", err)
 			}
+			lineIDs[i] = append(lineIDs[i], lineID)
 		}
 	}
 	for pos, section := range arrangement {
-		if err := insertOccurrence(ctx, tx, songID, sectionIDs[section], pos); err != nil {
+		occurrenceID, err := insertOccurrence(ctx, tx, songID, sectionIDs[section], pos)
+		if err != nil {
 			return Song{}, err
+		}
+		// The Occurrence's own Lines match its Section's one for one (see
+		// sameAs), but have their own Cues.
+		occ := sheet.sections[pos]
+		if occ.cue != nil {
+			if err := writeOccurrenceCue(ctx, tx, songID, occurrenceID, sql.NullInt64{Int64: *occ.cue, Valid: true}); err != nil {
+				return Song{}, err
+			}
+		}
+		for i, line := range occ.lines {
+			if line.cue == nil {
+				continue
+			}
+			if _, err := tx.ExecContext(ctx, `INSERT INTO line_cues (occurrence_id, line_id, cue_ms) VALUES (?, ?, ?)`,
+				occurrenceID, lineIDs[section][i], *line.cue); err != nil {
+				return Song{}, fmt.Errorf("adding line cue: %w", err)
+			}
 		}
 	}
 	if err := tx.Commit(); err != nil {
@@ -90,12 +115,18 @@ type importedSheet struct {
 type importedSection struct {
 	label string
 	lines []importedLine
+	// cue is the Occurrence's Cue in milliseconds, from a timestamp on its
+	// heading or first Line, or nil for none.
+	cue *int64
+	// cueLine is the paste line of the heading that gave cue, or 0.
+	cueLine int
 }
 
 // importedLine is one Line read from pasted text, with where it came from.
 type importedLine struct {
-	text      string
-	pasteLine int // its line number in the paste, from 1
+	text      string // without its timestamp
+	pasteLine int    // its line number in the paste, from 1
+	cue       *int64 // its Cue in milliseconds, from its timestamp, or nil
 }
 
 // invalidPasteLine rejects a paste over one of its lines, counted from 1,
@@ -142,6 +173,12 @@ func recognised(name string) bool {
 // Lines. Each Detail's directive may appear once, and each notes directive
 // adds a line to the notes. Directives import doesn't recognise are Lines
 // as written.
+//
+// A timestamp at the start of a line (see cutTimestamp) cues the Line in
+// its Occurrence and, on its first Line, the Occurrence too. On a heading,
+// it cues only the Occurrence, and must agree with its first Line's. A
+// timestamp alone is a blank line, with no Cue, and a directive can't have
+// one.
 func parseImport(text string) (importedSheet, error) {
 	var sheet importedSheet
 	given := map[string]int{} // the paste line that gave each Detail
@@ -156,6 +193,16 @@ func parseImport(text string) (importedSheet, error) {
 		cur = importedSection{}
 	}
 	for i, line := range splitLines(text) {
+		line, cue, err := cutTimestamp(line, i+1)
+		if err != nil {
+			return importedSheet{}, err
+		}
+		if blank(line) {
+			cue = nil
+		}
+		if _, _, ok := directive(line); ok && cue != nil {
+			return importedSheet{}, invalidPasteLine(i+1, "a directive can't have a timestamp")
+		}
 		if blank(line) && len(cur.lines) == 0 {
 			continue
 		}
@@ -195,13 +242,75 @@ func parseImport(text string) (importedSheet, error) {
 		}
 		if label, ok := heading(line); ok {
 			end()
-			cur = importedSection{label: label}
+			cur = importedSection{label: label, cue: cue}
+			if cue != nil {
+				cur.cueLine = i + 1
+			}
 			continue
 		}
-		cur.lines = append(cur.lines, importedLine{text: line, pasteLine: i + 1})
+		// Blank lines are dropped at a Section's start, so this is its first Line.
+		if len(cur.lines) == 0 && cue != nil {
+			if cur.cue != nil && *cur.cue != *cue {
+				return importedSheet{}, invalidPasteLine(i+1, "its timestamp differs from the heading's on line %d", cur.cueLine)
+			}
+			cur.cue = cue
+		}
+		cur.lines = append(cur.lines, importedLine{text: line, pasteLine: i + 1, cue: cue})
 	}
 	end()
 	return sheet, nil
+}
+
+var (
+	// timestamp is an LRC timestamp: minutes, two digits of seconds and
+	// any decimals, in brackets.
+	timestamp = regexp.MustCompile(`^\[(\d+):([0-5]\d)(?:\.(\d+))?\]`)
+	// timestampLike is anything in brackets that looks meant as one: digits
+	// and dots around a colon.
+	timestampLike = regexp.MustCompile(`^\[[\d.]*:[\d:.]*\]`)
+)
+
+// cutTimestamp cuts a timestamp such as "[1:02.34]" off the start of a
+// line, with the spaces around it, and returns the rest of the line and
+// the time in milliseconds, rounded as a typed Cue is. A line without one
+// comes back as it is, with no time. Something meant as a timestamp that
+// isn't one, one past the Timeline's end, or a second timestamp rejects
+// the line, counted from 1.
+func cutTimestamp(line string, pasteLine int) (rest string, ms *int64, err error) {
+	trimmed := strings.TrimLeftFunc(line, unicode.IsSpace)
+	m := timestamp.FindStringSubmatch(trimmed)
+	if m == nil {
+		if timestampLike.MatchString(trimmed) {
+			return "", nil, invalidPasteLine(pasteLine, "a timestamp must be [m:ss] or [m:ss.xx]")
+		}
+		return line, nil, nil
+	}
+	rest = strings.TrimLeftFunc(trimmed[len(m[0]):], unicode.IsSpace)
+	if timestampLike.MatchString(rest) {
+		return "", nil, invalidPasteLine(pasteLine, "a line can have only one timestamp")
+	}
+	minutes, err := strconv.ParseInt(m[1], 10, 64)
+	if err != nil || minutes > maxCue/60 {
+		return "", nil, errTimestampTooLate(pasteLine)
+	}
+	seconds, _ := strconv.ParseInt(m[2], 10, 64)
+	// The decimals are rounded to the millisecond as written, not as a
+	// float, which can land just under a half.
+	decimals := (m[3] + "0000")[:4]
+	fraction, _ := strconv.ParseInt(decimals[:3], 10, 64)
+	if decimals[3] >= '5' {
+		fraction++
+	}
+	total := (minutes*60+seconds)*1000 + fraction
+	if total > maxCue*1000 {
+		return "", nil, errTimestampTooLate(pasteLine)
+	}
+	return rest, &total, nil
+}
+
+// errTimestampTooLate rejects a timestamp past where a Cue can be.
+func errTimestampTooLate(pasteLine int) error {
+	return invalidPasteLine(pasteLine, "a timestamp can't be more than 24 hours into the Timeline")
 }
 
 // wholeNumber reads value as a whole number from lo to hi, as the Details

@@ -245,7 +245,8 @@ func (s *Store) AddSection(ctx context.Context, songID int64, based Version, lab
 		if err != nil {
 			return err
 		}
-		return insertOccurrence(ctx, tx, songID, sectionID, pos)
+		_, err = insertOccurrence(ctx, tx, songID, sectionID, pos)
+		return err
 	})
 }
 
@@ -303,7 +304,8 @@ func (s *Store) AddOccurrence(ctx context.Context, songID int64, based Version, 
 		if err != nil {
 			return err
 		}
-		return insertOccurrence(ctx, tx, songID, sectionID, pos)
+		_, err = insertOccurrence(ctx, tx, songID, sectionID, pos)
+		return err
 	})
 }
 
@@ -453,19 +455,20 @@ func arrangementPosition(ctx context.Context, tx *sql.Tx, songID int64, position
 }
 
 // insertOccurrence puts an Occurrence of a Section at pos in the
-// Arrangement, moving the ones from pos on down by one.
-func insertOccurrence(ctx context.Context, tx *sql.Tx, songID, sectionID int64, pos int) error {
+// Arrangement, moving the ones from pos on down by one, and returns its id.
+func insertOccurrence(ctx context.Context, tx *sql.Tx, songID, sectionID int64, pos int) (int64, error) {
 	if _, err := tx.ExecContext(ctx,
 		`UPDATE occurrences SET position = position + 1 WHERE song_id = ? AND position >= ?`,
 		songID, pos); err != nil {
-		return fmt.Errorf("making room in arrangement: %w", err)
+		return 0, fmt.Errorf("making room in arrangement: %w", err)
 	}
-	if _, err := insert(ctx, tx,
+	id, err := insert(ctx, tx,
 		`INSERT INTO occurrences (song_id, section_id, position) VALUES (?, ?, ?)`,
-		songID, sectionID, pos); err != nil {
-		return fmt.Errorf("adding occurrence: %w", err)
+		songID, sectionID, pos)
+	if err != nil {
+		return 0, fmt.Errorf("adding occurrence: %w", err)
 	}
-	return nil
+	return id, nil
 }
 
 // SetSectionLabel changes a Section's Label. A blank Label removes it.
