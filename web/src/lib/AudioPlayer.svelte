@@ -12,18 +12,23 @@
     src,
     duration,
     peaks,
+    playing = $bindable(false),
+    autoplay = false,
   }: {
     src: string;
     /** In seconds. */
     duration: number;
     /** The waveform; flat while empty, and the audio still plays. */
     peaks: number[];
+    /** Whether the audio is playing, e.g. for a button elsewhere that shows it. */
+    playing?: boolean;
+    /** Starts playing as soon as the player appears. */
+    autoplay?: boolean;
   } = $props();
 
   const barCount = 160;
 
   let audio = $state<HTMLAudioElement>();
-  let playing = $state(false);
   let time = $state(0);
 
   const volume = $derived(playerVolume.value);
@@ -50,7 +55,7 @@
     return () => cancelAnimationFrame(frame);
   });
 
-  function toggle() {
+  export function toggle() {
     if (!audio) return;
     if (audio.paused) audio.play().catch(() => (playing = false));
     else audio.pause();
@@ -102,6 +107,7 @@
       bind:this={audio}
       {src}
       preload="none"
+      {autoplay}
       onplay={(e) => {
         playMediaAlone(e);
         playing = true;

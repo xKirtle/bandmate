@@ -6,12 +6,13 @@
 
   // Beats as the Library's desktop table, sorted by picking a column's header.
   // The Beat Library and the Beat picker share it; each says what its title
-  // cell does and what clicking a row does.
+  // cell does, and what clicking a row does, if anything.
   let {
     beats,
     sort = $bindable(),
     title,
     lead,
+    trail,
     openId = null,
     onRowClick,
   }: {
@@ -22,9 +23,11 @@
     title: Snippet<[Beat]>;
     /** A narrow first column, with its hidden header label, e.g. a preview button. */
     lead?: { label: string; cell: Snippet<[Beat]> };
+    /** A last column, with its hidden header label, e.g. an Edit button. */
+    trail?: { label: string; cell: Snippet<[Beat]> };
     /** The Beat whose row shows as open. */
     openId?: number | null;
-    onRowClick: (event: MouseEvent, beat: Beat) => void;
+    onRowClick?: (event: MouseEvent, beat: Beat) => void;
   } = $props();
 
   const columns: { id: BeatColumn; label: string; num?: boolean }[] = [
@@ -56,11 +59,18 @@
           </button>
         </th>
       {/each}
+      {#if trail}
+        <th class="trail"><span class="visually-hidden">{trail.label}</span></th>
+      {/if}
     </tr>
   </thead>
   <tbody>
     {#each beats as beat (beat.id)}
-      <tr class:open={beat.id === openId} onclick={(event) => onRowClick(event, beat)}>
+      <tr
+        class:open={beat.id === openId}
+        class:clickable={onRowClick}
+        onclick={onRowClick && ((event) => onRowClick(event, beat))}
+      >
         {#if lead}
           <td class="lead">{@render lead.cell(beat)}</td>
         {/if}
@@ -71,6 +81,9 @@
         <td class="num">{formatDuration(beat.duration)}</td>
         <td class="used-by">{beat.songs.map((s) => s.title).join(', ') || '—'}</td>
         <td class="muted"><time datetime={beat.createdAt}>{timeAgo(beat.createdAt)}</time></td>
+        {#if trail}
+          <td class="trail">{@render trail.cell(beat)}</td>
+        {/if}
       </tr>
     {/each}
   </tbody>
@@ -145,7 +158,11 @@
     text-align: right;
     font-variant-numeric: tabular-nums;
   }
-  tbody tr {
+  .trail {
+    width: calc(var(--control) + 0.5rem);
+    padding: 0 0.25rem;
+  }
+  tbody tr.clickable {
     cursor: pointer;
   }
   tbody tr:hover,
