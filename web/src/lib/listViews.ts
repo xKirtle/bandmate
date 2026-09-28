@@ -1,7 +1,7 @@
 // What a list page shows: its search, filters and sort, how it sorts, and how
 // that is kept in the URL so going back to the list restores it.
 
-import { statuses, type Beat, type SongSummary, type Status } from './api';
+import { statuses, type Beat, type Song, type SongSummary, type Status } from './api';
 
 export type SortDirection = 'asc' | 'desc';
 
@@ -183,7 +183,7 @@ export function beatDrawerFilterCount(view: BeatListView): number {
  * A Song's BPM and key, whichever are set, shown beside the Beat picker's
  * filters as a hint; undefined when neither is.
  */
-export function songBeatHint(song: { bpm: number | null; key: string }): string | undefined {
+export function songBeatHint(song: Pick<Song, 'bpm' | 'key'>): string | undefined {
   const hint = [song.bpm !== null ? `${song.bpm} BPM` : '', song.key.trim()].filter(Boolean).join(' · ');
   return hint || undefined;
 }

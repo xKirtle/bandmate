@@ -4,6 +4,7 @@
   import { api, type Beat, type DecodedAudio, type Song } from './api';
   import BeatFields from './BeatFields.svelte';
   import BeatFilters from './BeatFilters.svelte';
+  import BeatTable from './BeatTable.svelte';
   import { fromDraft, toDraft, type BeatDraft } from './beatDraft';
   import {
     defaultBeatListView,
@@ -11,10 +12,8 @@
     isBeatListFiltered,
     songBeatHint,
     sortBeats,
-    toggleSort,
-    type BeatColumn,
   } from './listViews';
-  import { formatDuration, timeAgo } from './time';
+  import { formatDuration } from './time';
   import { suggestForFile } from './beatTags';
   import { prepareUpload } from './upload';
 
@@ -63,19 +62,6 @@
   }
 
   const desktop = new MediaQuery('min-width: 80rem');
-
-  const columns: { id: BeatColumn; label: string; num?: boolean }[] = [
-    { id: 'title', label: 'Title' },
-    { id: 'producer', label: 'Producer' },
-    { id: 'bpm', label: 'BPM', num: true },
-    { id: 'key', label: 'Key' },
-    { id: 'duration', label: 'Duration', num: true },
-    { id: 'usedBy', label: 'Used by' },
-    { id: 'added', label: 'Added' },
-  ];
-
-  const sortState = (column: BeatColumn) =>
-    view.sort.column === column ? (view.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined;
 
   function pickRow(event: MouseEvent, beat: Beat) {
     // The title's button picks on its own.
@@ -166,36 +152,11 @@
         <button type="button" class="button" onclick={clearFilters}>Clear filters</button>
       </div>
     {:else if desktop.current}
-      <table class="beats-table">
-        <thead>
-          <tr>
-            {#each columns as column (column.id)}
-              <th class:num={column.num} aria-sort={sortState(column.id)}>
-                <button type="button" onclick={() => (view.sort = toggleSort(view.sort, column.id))}>
-                  {column.label}<span class="arrow" aria-hidden="true"
-                    >{{ ascending: '↑', descending: '↓', none: '' }[sortState(column.id) ?? 'none']}</span
-                  >
-                </button>
-              </th>
-            {/each}
-          </tr>
-        </thead>
-        <tbody>
-          {#each shown as beat (beat.id)}
-            <tr onclick={(event) => pickRow(event, beat)}>
-              <td class="title">
-                <button type="button" onclick={() => onPick(beat)}>{beat.title}</button>
-              </td>
-              <td>{beat.producer || '—'}</td>
-              <td class="num">{beat.bpm ?? '—'}</td>
-              <td>{beat.key || '—'}</td>
-              <td class="num">{formatDuration(beat.duration)}</td>
-              <td class="used-by">{beat.songs.map((s) => s.title).join(', ') || '—'}</td>
-              <td class="muted"><time datetime={beat.createdAt}>{timeAgo(beat.createdAt)}</time></td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
+      <BeatTable beats={shown} bind:sort={view.sort} onRowClick={pickRow}>
+        {#snippet title(beat)}
+          <button type="button" onclick={() => onPick(beat)}>{beat.title}</button>
+        {/snippet}
+      </BeatTable>
     {:else}
       <ul class="beats">
         {#each shown as beat (beat.id)}
@@ -318,76 +279,5 @@
       height: min(48rem, calc(100vh - 4rem));
       max-height: none;
     }
-  }
-  .beats-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.875rem;
-  }
-  th {
-    padding: 0;
-    border-bottom: 1px solid var(--border);
-    text-align: left;
-    white-space: nowrap;
-  }
-  th button {
-    width: 100%;
-    min-height: var(--control);
-    padding: 0 0.5rem;
-    border: none;
-    border-radius: 0.25rem;
-    background: none;
-    color: var(--text-muted);
-    font: inherit;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    text-align: inherit;
-    cursor: pointer;
-  }
-  th button:hover,
-  th[aria-sort] button {
-    color: var(--text);
-  }
-  .arrow {
-    display: inline-block;
-    width: 1em;
-    margin-left: 0.25rem;
-  }
-  td {
-    height: calc(var(--control) + 0.5rem);
-    padding: 0 0.5rem;
-    border-bottom: 1px solid var(--border);
-    white-space: nowrap;
-  }
-  td.title {
-    width: 100%;
-    max-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-weight: 600;
-  }
-  td.title button {
-    all: unset;
-    cursor: pointer;
-  }
-  td.title button:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-  td.used-by {
-    max-width: 12rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .num {
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-  }
-  tbody tr {
-    cursor: pointer;
-  }
-  tbody tr:hover,
-  tbody tr:focus-within {
-    background: var(--surface-1);
   }
 </style>

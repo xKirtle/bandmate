@@ -4,6 +4,7 @@
   import BeatFields from '../lib/BeatFields.svelte';
   import BeatFilters from '../lib/BeatFilters.svelte';
   import BeatItem from '../lib/BeatItem.svelte';
+  import BeatTable from '../lib/BeatTable.svelte';
   import { fromDraft, toDraft, type BeatDraft } from '../lib/beatDraft';
   import {
     beatListViewFromParams,
@@ -12,13 +13,11 @@
     filterBeats,
     isBeatListFiltered,
     sortBeats,
-    toggleSort,
-    type BeatColumn,
   } from '../lib/listViews';
   import { playMediaAlone } from '../lib/playback';
   import { canSetVolume, playerVolume } from '../lib/playerVolume.svelte';
   import { replaceSearch, router } from '../lib/router.svelte';
-  import { formatDuration, timeAgo } from '../lib/time';
+  import { formatDuration } from '../lib/time';
   import { suggestForFile } from '../lib/beatTags';
   import { prepareUpload } from '../lib/upload';
   import { gain } from '../lib/volume';
@@ -77,16 +76,6 @@
   }
 
   const desktop = new MediaQuery('min-width: 80rem');
-
-  const columns: { id: BeatColumn; label: string; num?: boolean }[] = [
-    { id: 'title', label: 'Title' },
-    { id: 'producer', label: 'Producer' },
-    { id: 'bpm', label: 'BPM', num: true },
-    { id: 'key', label: 'Key' },
-    { id: 'duration', label: 'Duration', num: true },
-    { id: 'usedBy', label: 'Used by' },
-    { id: 'added', label: 'Added' },
-  ];
 
   // The table previews Beats through one player, which follows the volume
   // every Master and Beat preview shares and stops whatever else plays.
@@ -195,12 +184,20 @@
     beats = beats?.filter((b) => b.id !== id) ?? null;
     if (openId === id) openId = null;
   }
-
-  const sortState = (column: BeatColumn) =>
-    view.sort.column === column ? (view.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined;
 </script>
 
 <svelte:window onkeydown={closeOnEscape} />
+
+{#snippet previewCell(beat: Beat)}
+  <button
+    type="button"
+    class="icon"
+    aria-label="{previewing === beat.id ? 'Pause' : 'Preview'} {beat.title}"
+    onclick={() => togglePreview(beat)}
+  >
+    {previewing === beat.id ? '❚❚' : '▶'}
+  </button>
+{/snippet}
 
 <header class="bar" bind:clientHeight={barHeight}>
   <h1>Beats</h1>
@@ -250,53 +247,23 @@
     </div>
   {:else if desktop.current}
     <div class="table-and-pane" class:with-pane={openBeat}>
-      <table class="beats-table">
-        <thead>
-          <tr>
-            <th class="play"><span class="visually-hidden">Preview</span></th>
-            {#each columns as column (column.id)}
-              <th class:num={column.num} aria-sort={sortState(column.id)}>
-                <button type="button" onclick={() => (view.sort = toggleSort(view.sort, column.id))}>
-                  {column.label}<span class="arrow" aria-hidden="true"
-                    >{{ ascending: '↑', descending: '↓', none: '' }[sortState(column.id) ?? 'none']}</span
-                  >
-                </button>
-              </th>
-            {/each}
-          </tr>
-        </thead>
-        <tbody>
-          {#each shown as beat (beat.id)}
-            <tr class:open={beat.id === openId} onclick={(event) => openRow(event, beat)}>
-              <td class="play">
-                <button
-                  type="button"
-                  class="icon"
-                  aria-label="{previewing === beat.id ? 'Pause' : 'Preview'} {beat.title}"
-                  onclick={() => togglePreview(beat)}
-                >
-                  {previewing === beat.id ? '❚❚' : '▶'}
-                </button>
-              </td>
-              <td class="title">
-                <button
-                  type="button"
-                  id="beat-row-{beat.id}"
-                  aria-expanded={beat.id === openId}
-                  aria-controls={beat.id === openId ? 'beat-pane' : undefined}
-                  onclick={() => toggleOpen(beat)}>{beat.title}</button
-                >
-              </td>
-              <td>{beat.producer || '—'}</td>
-              <td class="num">{beat.bpm ?? '—'}</td>
-              <td>{beat.key || '—'}</td>
-              <td class="num">{formatDuration(beat.duration)}</td>
-              <td class="used-by">{beat.songs.map((s) => s.title).join(', ') || '—'}</td>
-              <td class="muted"><time datetime={beat.createdAt}>{timeAgo(beat.createdAt)}</time></td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
+      <BeatTable
+        beats={shown}
+        bind:sort={view.sort}
+        lead={{ label: 'Preview', cell: previewCell }}
+        {openId}
+        onRowClick={openRow}
+      >
+        {#snippet title(beat)}
+          <button
+            type="button"
+            id="beat-row-{beat.id}"
+            aria-expanded={beat.id === openId}
+            aria-controls={beat.id === openId ? 'beat-pane' : undefined}
+            onclick={() => toggleOpen(beat)}>{beat.title}</button
+          >
+        {/snippet}
+      </BeatTable>
       {#if openBeat}
         <aside id="beat-pane" class="pane" aria-label="Beat details">
           <button type="button" class="icon close" aria-label="Close Beat details" onclick={closePane}>×</button>
@@ -349,86 +316,6 @@
   .add-error {
     margin-bottom: 1rem;
   }
-  .beats-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.875rem;
-  }
-  th {
-    padding: 0;
-    border-bottom: 1px solid var(--border);
-    text-align: left;
-    white-space: nowrap;
-  }
-  th button {
-    width: 100%;
-    min-height: var(--control);
-    padding: 0 0.5rem;
-    border: none;
-    border-radius: 0.25rem;
-    background: none;
-    color: var(--text-muted);
-    font: inherit;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    text-align: inherit;
-    cursor: pointer;
-  }
-  th button:hover,
-  th[aria-sort] button {
-    color: var(--text);
-  }
-  .arrow {
-    display: inline-block;
-    width: 1em;
-    margin-left: 0.25rem;
-  }
-  td {
-    height: calc(var(--control) + 0.5rem);
-    padding: 0 0.5rem;
-    border-bottom: 1px solid var(--border);
-    white-space: nowrap;
-  }
-  td.title {
-    width: 100%;
-    max-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-weight: 600;
-  }
-  td.title button {
-    all: unset;
-    cursor: pointer;
-  }
-  td.title button:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-  td.used-by {
-    max-width: 16rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .play {
-    width: calc(var(--control) + 0.5rem);
-    padding: 0 0.25rem;
-  }
-  .num {
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-  }
-  tbody tr {
-    cursor: pointer;
-  }
-  tbody tr:hover,
-  tbody tr:focus-within {
-    background: var(--surface-1);
-  }
-  tbody tr.open {
-    background: var(--surface-2);
-    box-shadow: inset 3px 0 0 var(--accent);
-  }
-
   /* The open Beat's pane sits beside the table, as wide as the Song page's
      details column. It sticks below the header, scrolling on its own, while the
      table scrolls. */
