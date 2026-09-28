@@ -249,13 +249,27 @@
     gap: 0.25rem 0.5rem;
     margin-bottom: 0.5rem;
   }
+  /* Sized to its text, so the actions keep the rest of the row. Browsers
+     without field-sizing get a fixed width instead. */
   .label {
-    flex: 1 1 5rem;
-    width: auto;
-    min-width: 0;
+    flex: none;
+    width: 8rem;
     border-color: transparent;
     background: transparent;
     font-weight: 700;
+    text-overflow: ellipsis;
+  }
+  @supports (field-sizing: content) {
+    .label {
+      field-sizing: content;
+      width: auto;
+      min-width: 4rem;
+      max-width: 12rem;
+    }
+    /* A long Label is cut off at rest but reads in full while it's edited. */
+    .label:focus {
+      max-width: 100%;
+    }
   }
   .label:hover,
   .label:focus {
