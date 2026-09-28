@@ -254,7 +254,6 @@
   .label {
     flex: none;
     width: 8rem;
-    min-width: 0;
     border-color: transparent;
     background: transparent;
     font-weight: 700;
