@@ -142,14 +142,14 @@ func TestInvalidMetadataIsRejected(t *testing.T) {
 		change map[string]any
 		error  string
 	}{
-		"zero BPM":        {map[string]any{"bpm": 0}, "bpm must be between 1 and 999"},
-		"huge BPM":        {map[string]any{"bpm": 1000}, "bpm must be between 1 and 999"},
-		"negative capo":   {map[string]any{"capo": -1}, "capo must be between 0 and 24"},
-		"capo off neck":   {map[string]any{"capo": 25}, "capo must be between 0 and 24"},
-		"fractional BPM":  {map[string]any{"bpm": 92.5}, "request body must be valid JSON"},
-		"BPM as a string": {map[string]any{"bpm": "fast"}, "request body must be valid JSON"},
-		"misspelt field":  {map[string]any{"stauts": "finished"}, `unknown field "stauts"`},
-		"removed field":   {map[string]any{"showCues": false}, `unknown field "showCues"`},
+		"zero BPM":         {map[string]any{"bpm": 0}, "bpm must be between 1 and 999"},
+		"huge BPM":         {map[string]any{"bpm": 1000}, "bpm must be between 1 and 999"},
+		"negative capo":    {map[string]any{"capo": -1}, "capo must be between 0 and 24"},
+		"capo off neck":    {map[string]any{"capo": 25}, "capo must be between 0 and 24"},
+		"fractional BPM":   {map[string]any{"bpm": 92.5}, "request body must be valid JSON"},
+		"BPM as a string":  {map[string]any{"bpm": "fast"}, "request body must be valid JSON"},
+		"misspelt field":   {map[string]any{"stauts": "finished"}, `unknown field "stauts"`},
+		"dropped showCues": {map[string]any{"showCues": false}, `unknown field "showCues"`},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
