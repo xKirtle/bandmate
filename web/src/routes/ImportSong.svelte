@@ -55,7 +55,7 @@
     </p>
     <p id="timestamps-hint" class="muted">
       A timestamp like <code>[1:02]</code> or <code>[1:02.34]</code> at the start of a line cues
-      it, and cues its Section there too when it's on the Section's heading or first line. A
+      it, and cues that appearance of its Section too when it's on the heading or first line. A
       timestamp alone on a line is a blank line.
     </p>
     <!-- svelte-ignore a11y_autofocus -->

@@ -77,7 +77,8 @@ func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error
 			return Song{}, err
 		}
 		// The Occurrence's own Lines match its Section's one for one (see
-		// sameAs), but have their own Cues.
+		// sameAs), but have their own Cues. They're written directly, as
+		// parseImport already gave blank Lines none (see writeLineCue).
 		occ := sheet.sections[pos]
 		if occ.cue != nil {
 			if err := writeOccurrenceCue(ctx, tx, songID, occurrenceID, sql.NullInt64{Int64: *occ.cue, Valid: true}); err != nil {
@@ -118,8 +119,8 @@ type importedSection struct {
 	// cue is the Occurrence's Cue in milliseconds, from a timestamp on its
 	// heading or first Line, or nil for none.
 	cue *int64
-	// cueLine is the paste line of the heading that gave cue, or 0.
-	cueLine int
+	// cuePasteLine is the paste line of the heading that gave cue, or 0.
+	cuePasteLine int
 }
 
 // importedLine is one Line read from pasted text, with where it came from.
@@ -244,14 +245,14 @@ func parseImport(text string) (importedSheet, error) {
 			end()
 			cur = importedSection{label: label, cue: cue}
 			if cue != nil {
-				cur.cueLine = i + 1
+				cur.cuePasteLine = i + 1
 			}
 			continue
 		}
 		// Blank lines are dropped at a Section's start, so this is its first Line.
 		if len(cur.lines) == 0 && cue != nil {
 			if cur.cue != nil && *cur.cue != *cue {
-				return importedSheet{}, invalidPasteLine(i+1, "its timestamp differs from the heading's on line %d", cur.cueLine)
+				return importedSheet{}, invalidPasteLine(i+1, "its timestamp differs from the heading's on line %d", cur.cuePasteLine)
 			}
 			cur.cue = cue
 		}
@@ -264,24 +265,24 @@ func parseImport(text string) (importedSheet, error) {
 var (
 	// timestamp is an LRC timestamp: minutes, two digits of seconds and
 	// any decimals, in brackets.
-	timestamp = regexp.MustCompile(`^\[(\d+):([0-5]\d)(?:\.(\d+))?\]`)
-	// timestampLike is anything in brackets that looks meant as one: digits
-	// and dots around a colon.
-	timestampLike = regexp.MustCompile(`^\[[\d.]*:[\d:.]*\]`)
+	timestamp = regexp.MustCompile(`^\[(\d+):([0-5]\d(?:\.\d+)?)\]`)
+	// timestampLike is anything in brackets that looks meant as one: digits,
+	// dots and commas around a colon.
+	timestampLike = regexp.MustCompile(`^\[[\d.,]*:[\d:.,]*\]`)
 )
 
 // cutTimestamp cuts a timestamp such as "[1:02.34]" off the start of a
 // line, with the spaces around it, and returns the rest of the line and
 // the time in milliseconds, rounded as a typed Cue is. A line without one
 // comes back as it is, with no time. Something meant as a timestamp that
-// isn't one, one past the Timeline's end, or a second timestamp rejects
-// the line, counted from 1.
+// isn't one, one that isn't a Cue, or a second timestamp rejects the line,
+// counted from 1.
 func cutTimestamp(line string, pasteLine int) (rest string, ms *int64, err error) {
 	trimmed := strings.TrimLeftFunc(line, unicode.IsSpace)
 	m := timestamp.FindStringSubmatch(trimmed)
 	if m == nil {
 		if timestampLike.MatchString(trimmed) {
-			return "", nil, invalidPasteLine(pasteLine, "a timestamp must be [m:ss] or [m:ss.xx]")
+			return "", nil, invalidPasteLine(pasteLine, "a timestamp must be minutes and two digits of seconds, like [1:02] or [1:02.34]")
 		}
 		return line, nil, nil
 	}
@@ -289,28 +290,13 @@ func cutTimestamp(line string, pasteLine int) (rest string, ms *int64, err error
 	if timestampLike.MatchString(rest) {
 		return "", nil, invalidPasteLine(pasteLine, "a line can have only one timestamp")
 	}
-	minutes, err := strconv.ParseInt(m[1], 10, 64)
-	if err != nil || minutes > maxCue/60 {
-		return "", nil, errTimestampTooLate(pasteLine)
+	minutes, _ := strconv.ParseFloat(m[1], 64)
+	seconds, _ := strconv.ParseFloat(m[2], 64)
+	cue, err := cueMillis(minutes*60 + seconds)
+	if err != nil {
+		return "", nil, invalidPasteLine(pasteLine, "%s", err)
 	}
-	seconds, _ := strconv.ParseInt(m[2], 10, 64)
-	// The decimals are rounded to the millisecond as written, not as a
-	// float, which can land just under a half.
-	decimals := (m[3] + "0000")[:4]
-	fraction, _ := strconv.ParseInt(decimals[:3], 10, 64)
-	if decimals[3] >= '5' {
-		fraction++
-	}
-	total := (minutes*60+seconds)*1000 + fraction
-	if total > maxCue*1000 {
-		return "", nil, errTimestampTooLate(pasteLine)
-	}
-	return rest, &total, nil
-}
-
-// errTimestampTooLate rejects a timestamp past where a Cue can be.
-func errTimestampTooLate(pasteLine int) error {
-	return invalidPasteLine(pasteLine, "a timestamp can't be more than 24 hours into the Timeline")
+	return rest, &cue, nil
 }
 
 // wholeNumber reads value as a whole number from lo to hi, as the Details

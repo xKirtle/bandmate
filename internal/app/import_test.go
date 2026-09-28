@@ -605,8 +605,8 @@ func readCues(s song) []shownCues {
 	return out
 }
 
-// at is a Cue at seconds, for comparing with shownCues.
-func at(seconds float64) *float64 { return &seconds }
+// cueAt is a Cue at seconds, for comparing with shownCues.
+func cueAt(seconds float64) *float64 { return &seconds }
 
 func TestImportTimestampsCueTheirLines(t *testing.T) {
 	cases := map[string]struct {
@@ -647,59 +647,59 @@ func TestImportTimestamps(t *testing.T) {
 		"a timestamped first line cues its occurrence too": {
 			"[Verse]\n[0:05]City lights\n[0:08]are calling",
 			[]shownSection{{"Verse", []string{"City lights", "are calling"}}},
-			[]shownCues{{at(5), map[int]float64{0: 5, 1: 8}}},
+			[]shownCues{{cueAt(5), map[int]float64{0: 5, 1: 8}}},
 			[]int{0},
 		},
 		"the first line after blank lines cues its occurrence": {
 			"[Verse]\n\n[0:01]\n[0:05]City lights",
 			[]shownSection{{"Verse", []string{"City lights"}}},
-			[]shownCues{{at(5), map[int]float64{0: 5}}},
+			[]shownCues{{cueAt(5), map[int]float64{0: 5}}},
 			[]int{0},
 		},
 		"a timestamp in front of a bracketed heading cues its occurrence only": {
 			"[0:30][Chorus]\nMe home\n[0:34]tonight",
 			[]shownSection{{"Chorus", []string{"Me home", "tonight"}}},
-			[]shownCues{{at(30), map[int]float64{1: 34}}},
+			[]shownCues{{cueAt(30), map[int]float64{1: 34}}},
 			[]int{0},
 		},
 		"a timestamp in front of a colon heading cues its occurrence only": {
 			"[00:30.0]Chorus:\nMe home",
 			[]shownSection{{"Chorus", []string{"Me home"}}},
-			[]shownCues{{at(30), map[int]float64{}}},
+			[]shownCues{{cueAt(30), map[int]float64{}}},
 			[]int{0},
 		},
 		"a heading and its first line can give the same time": {
 			"[00:30.0][Chorus]\n[0:30]Me home",
 			[]shownSection{{"Chorus", []string{"Me home"}}},
-			[]shownCues{{at(30), map[int]float64{0: 30}}},
+			[]shownCues{{cueAt(30), map[int]float64{0: 30}}},
 			[]int{0},
 		},
 		"a timestamped heading on its own cues the repeat": {
 			"[0:10][Chorus]\n[0:10]Me home\n\n[Verse]\nCity lights\n\n[1:10][Chorus]",
 			[]shownSection{{"Chorus", []string{"Me home"}}, {"Verse", []string{"City lights"}}, {"Chorus", []string{"Me home"}}},
-			[]shownCues{{at(10), map[int]float64{0: 10}}, {nil, map[int]float64{}}, {at(70), map[int]float64{}}},
+			[]shownCues{{cueAt(10), map[int]float64{0: 10}}, {nil, map[int]float64{}}, {cueAt(70), map[int]float64{}}},
 			[]int{0, 1, 0},
 		},
 		"identical choruses at different times share a section and keep their cues": {
 			"[Chorus]\n[0:10]Me home\n[0:14]tonight\n\n[Verse]\n[0:20]City lights\n\n[Chorus]\n[0:40]Me home\n[0:44] tonight",
 			[]shownSection{{"Chorus", []string{"Me home", "tonight"}}, {"Verse", []string{"City lights"}}, {"Chorus", []string{"Me home", "tonight"}}},
 			[]shownCues{
-				{at(10), map[int]float64{0: 10, 1: 14}},
-				{at(20), map[int]float64{0: 20}},
-				{at(40), map[int]float64{0: 40, 1: 44}},
+				{cueAt(10), map[int]float64{0: 10, 1: 14}},
+				{cueAt(20), map[int]float64{0: 20}},
+				{cueAt(40), map[int]float64{0: 40, 1: 44}},
 			},
 			[]int{0, 1, 0},
 		},
 		"timestamps out of order are kept as given": {
 			"[0:50]City lights\n[0:20]are calling\n[0:30]Me home",
 			[]shownSection{{"", []string{"City lights", "are calling", "Me home"}}},
-			[]shownCues{{at(50), map[int]float64{0: 50, 1: 20, 2: 30}}},
+			[]shownCues{{cueAt(50), map[int]float64{0: 50, 1: 20, 2: 30}}},
 			[]int{0},
 		},
 		"a timestamp alone is a blank line": {
 			"[0:01]\n[Verse]\n[0:02]\n[0:05]City lights\n[0:09]\n[0:10]are calling\n[0:14]\n\n[0:20]",
 			[]shownSection{{"Verse", []string{"City lights", "", "are calling"}}},
-			[]shownCues{{at(5), map[int]float64{0: 5, 2: 10}}},
+			[]shownCues{{cueAt(5), map[int]float64{0: 5, 2: 10}}},
 			[]int{0},
 		},
 		"a timestamp alone keeps a section going": {
@@ -711,7 +711,7 @@ func TestImportTimestamps(t *testing.T) {
 		"chord lines take timestamps": {
 			"[Intro]\n[0:00][Am] [F]\n[0:04.5]  [C] [G]",
 			[]shownSection{{"Intro", []string{"[Am] [F]", "[C] [G]"}}},
-			[]shownCues{{at(0), map[int]float64{0: 0, 1: 4.5}}},
+			[]shownCues{{cueAt(0), map[int]float64{0: 0, 1: 4.5}}},
 			[]int{0},
 		},
 	}
@@ -736,13 +736,14 @@ func TestImportTimestamps(t *testing.T) {
 
 func TestImportWithABadTimestampIsRejected(t *testing.T) {
 	cases := map[string]struct{ text, want string }{
-		"one-digit seconds":     {"City lights\n[1:2]are calling", "line 2: a timestamp must be [m:ss] or [m:ss.xx]"},
-		"alone":                 {"[1:2]\nCity lights", "line 1: a timestamp must be [m:ss] or [m:ss.xx]"},
-		"no minutes":            {"[:30]City lights", "line 1: a timestamp must be [m:ss] or [m:ss.xx]"},
-		"no decimals":           {"[0:30.]City lights", "line 1: a timestamp must be [m:ss] or [m:ss.xx]"},
-		"hours":                 {"[1:00:30]City lights", "line 1: a timestamp must be [m:ss] or [m:ss.xx]"},
-		"sixty seconds":         {"[0:60]City lights", "line 1: a timestamp must be [m:ss] or [m:ss.xx]"},
-		"over a day":            {"[1440:01]City lights", "line 1: a timestamp can't be more than 24 hours into the Timeline"},
+		"one-digit seconds":     {"City lights\n[1:2]are calling", "line 2: a timestamp must be minutes and two digits of seconds, like [1:02] or [1:02.34]"},
+		"alone":                 {"[1:2]\nCity lights", "line 1: a timestamp must be minutes and two digits of seconds, like [1:02] or [1:02.34]"},
+		"no minutes":            {"[:30]City lights", "line 1: a timestamp must be minutes and two digits of seconds, like [1:02] or [1:02.34]"},
+		"no decimals":           {"[0:30.]City lights", "line 1: a timestamp must be minutes and two digits of seconds, like [1:02] or [1:02.34]"},
+		"hours":                 {"[1:00:30]City lights", "line 1: a timestamp must be minutes and two digits of seconds, like [1:02] or [1:02.34]"},
+		"sixty seconds":         {"[0:60]City lights", "line 1: a timestamp must be minutes and two digits of seconds, like [1:02] or [1:02.34]"},
+		"comma decimals":        {"[01:02,50]City lights", "line 1: a timestamp must be minutes and two digits of seconds, like [1:02] or [1:02.34]"},
+		"over a day":            {"[1440:01]City lights", "line 1: a Cue can't be more than 24 hours into the Timeline"},
 		"several timestamps":    {"City lights\n\n[00:45.0][01:50.0]Take me home", "line 3: a line can have only one timestamp"},
 		"a bad second one":      {"[00:45.0][1:5]Take me home", "line 1: a line can have only one timestamp"},
 		"in front of directive": {"City lights\n[00:10.0]{comment: x}", "line 2: a directive can't have a timestamp"},
