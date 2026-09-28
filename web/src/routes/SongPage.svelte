@@ -520,13 +520,7 @@
      goes above the Timeline rather than below it. */
   .page {
     padding-top: max(var(--gutter), env(safe-area-inset-top));
-    min-height: calc(100dvh - var(--tabbar-space) - var(--timeline-height));
-  }
-  /* No tab bar under the Timeline beside the nav rail. */
-  @media (min-width: 65.5rem) {
-    .page {
-      min-height: calc(100dvh - var(--timeline-height));
-    }
+    min-height: calc(100dvh - var(--nav-bottom-space) - var(--timeline-height));
   }
   .title-row {
     display: flex;

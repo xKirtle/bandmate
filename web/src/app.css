@@ -22,6 +22,9 @@
   --tabbar-height: 3.5rem;
   /* What the tab bar takes from the bottom of the window. */
   --tabbar-space: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
+  /* What the navigation takes from the bottom of the window: the tab bar, or
+     nothing beside the nav rail. */
+  --nav-bottom-space: var(--tabbar-space);
   /* A desktop side column: the Song page's details, the Beat Library's pane. */
   --side-width: 22rem;
 
@@ -82,12 +85,12 @@ a {
 /* The page leaves room for the tab bar, which the nav rail replaces on wide
    windows. */
 body {
-  padding-bottom: var(--tabbar-space);
+  padding-bottom: var(--nav-bottom-space);
 }
 
 @media (min-width: 65.5rem) {
-  body {
-    padding-bottom: 0;
+  :root {
+    --nav-bottom-space: 0px;
   }
   .app {
     display: grid;

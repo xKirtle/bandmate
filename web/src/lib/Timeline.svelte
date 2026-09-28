@@ -1470,8 +1470,9 @@
     --timeline-rem: calc(var(--timeline-scale) * 1rem);
     /* The page's control size, scaled, and never smaller than it. */
     --touch: max(var(--control), calc(var(--timeline-scale) * var(--control)));
+    /* Docked at the bottom of the window, directly above the tab bar if there is one. */
     position: sticky;
-    bottom: 0;
+    bottom: var(--nav-bottom-space);
     z-index: 1;
     border-top: 1px solid var(--border);
     background: var(--bg);
@@ -1506,12 +1507,8 @@
     padding: calc(0.5 * var(--timeline-rem)) max(var(--gutter), env(safe-area-inset-right))
       max(calc(0.5 * var(--timeline-rem)), env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
   }
-  /* Docked directly above the tab bar, which keeps clear of the home
-     indicator itself. */
+  /* The tab bar below keeps clear of the home indicator itself. */
   @media (width < 65.5rem) {
-    .timeline {
-      bottom: var(--tabbar-space);
-    }
     .inner {
       padding-bottom: calc(0.5 * var(--timeline-rem));
     }
