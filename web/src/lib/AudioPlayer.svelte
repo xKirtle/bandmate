@@ -24,6 +24,10 @@
   } = $props();
 
   const barCount = 160;
+  // Names this player's clip paths apart from any other player's on the page.
+  const uid = $props.id();
+  const playedArea = `played-${uid}`;
+  const unplayedArea = `unplayed-${uid}`;
 
   let audio = $state<HTMLAudioElement>();
   let time = $state(0);
@@ -146,17 +150,25 @@
       onpointercancel={() => (dragging = false)}
       onkeydown={keydown}
     >
-      <svg viewBox="0 0 {barCount} 100" preserveAspectRatio="none" aria-hidden="true">
+      <!-- The bars are drawn twice, each copy clipped to its side of the played
+           width, so the played colour fills smoothly, partway through a bar. -->
+      {#snippet waveBars()}
         {#each shape as peak, i (i)}
           {@const height = Math.max(2, peak * 100)}
-          <rect
-            class:played={i < played * barCount}
-            x={i + 0.15}
-            y={(100 - height) / 2}
-            width="0.7"
-            {height}
-          />
+          <rect x={i + 0.15} y={(100 - height) / 2} width="0.7" {height} />
         {/each}
+      {/snippet}
+      <svg viewBox="0 0 {barCount} 100" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <clipPath id={playedArea}>
+            <rect width={played * barCount} height="100" />
+          </clipPath>
+          <clipPath id={unplayedArea}>
+            <rect x={played * barCount} width={(1 - played) * barCount} height="100" />
+          </clipPath>
+        </defs>
+        <g clip-path="url(#{unplayedArea})">{@render waveBars()}</g>
+        <g class="played" clip-path="url(#{playedArea})">{@render waveBars()}</g>
       </svg>
     </div>
 
@@ -257,11 +269,11 @@
     width: 100%;
     height: 100%;
   }
-  rect {
+  g {
     fill: var(--text-muted);
     opacity: 0.4;
   }
-  rect.played {
+  g.played {
     fill: var(--accent);
     opacity: 1;
   }
