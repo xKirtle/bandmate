@@ -68,6 +68,7 @@
             autofocus={added === section.id}
             {change}
             {onUnsaved}
+            more={[{ icon: '🗑', label: 'Delete for good', run: () => remove(section.id) }]}
           >
             {#snippet actions()}
               <label class="visually-hidden" for="put-back-{section.id}">Put back into the Lyric Sheet</label>
@@ -77,15 +78,6 @@
                   <option value={place.position}>{place.name}</option>
                 {/each}
               </select>
-              <button
-                type="button"
-                class="icon"
-                onclick={() => remove(section.id)}
-                aria-label="Delete for good"
-                title="Delete for good"
-              >
-                🗑
-              </button>
             {/snippet}
           </SectionEditor>
         </li>
@@ -121,6 +113,13 @@
   .put-back {
     width: auto;
     font-weight: 600;
+  }
+  /* Sized to its longest place, it would push ⋯ off a phone's header row. It
+     only ever shows "Put back…" at rest. */
+  @media (max-width: 40rem) {
+    .put-back {
+      max-width: 8rem;
+    }
   }
   .add {
     width: 100%;
