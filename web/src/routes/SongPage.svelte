@@ -56,14 +56,23 @@
   // The Details as Read mode shows them.
   const summary = $derived(detailsSummary(draft));
 
-  // Desktop puts the Song's details in a column beside the Lyric Sheet, as
-  // sections that open and close. Each visit starts with them all open.
+  // Desktop puts Details, Masters and the Scrapbook in a column beside the
+  // Lyric Sheet, as sections that open and close, all open on each visit.
+  // Narrower windows show them after the Lyric Sheet in the opposite order,
+  // always open. Keyed by name, switching moves them rather than rebuilding
+  // them, so what's on screen and the reading order stay the same.
+  type Part = 'details' | 'masters' | 'scrapbook';
   const desktop = new MediaQuery('min-width: 80rem');
-  let open = $state({ details: true, masters: true, scrapbook: true });
-  // Narrower windows show every section, with nothing to open them by.
-  $effect(() => {
-    if (!desktop.current) open = { details: true, masters: true, scrapbook: true };
-  });
+  const parts = $derived(
+    (desktop.current ? (['details', 'masters', 'scrapbook'] as const) : (['scrapbook', 'masters', 'details'] as const))
+      // Read mode leaves the Scrapbook out.
+      .filter((part: Part) => writing || part !== 'scrapbook'),
+  );
+  let closedParts = $state<Part[]>([]);
+
+  function toggled(part: Part, open: boolean) {
+    closedParts = open ? closedParts.filter((p) => p !== part) : [...closedParts, part];
+  }
   // How tall the docked Timeline is, which the details column stops above.
   let timelineHeight = $state(0);
 
@@ -372,82 +381,86 @@
            named by their toggles. Narrower, its parts follow the Lyric Sheet
            in their own order, always open. -->
       <div class="side">
-        <details class="part details-part" bind:open={open.details}>
-          <summary>Details</summary>
-          <section class="details" aria-labelledby="details-heading">
-            <h2 id="details-heading">Details</h2>
-            {#if writing}
-              <div class="grid">
-                <label>
-                  Key
-                  <input
-                    bind:value={draft.key}
-                    onchange={() => commitText('key')}
-                    list="common-keys"
-                    autocomplete="off"
-                    autocapitalize="characters"
-                    enterkeyhint="done"
-                    placeholder="—"
-                  />
-                </label>
-                <label>
-                  BPM
-                  <input
-                    bind:value={draft.bpm}
-                    onchange={() => commitNumber('bpm', 'BPM')}
-                    inputmode="numeric"
-                    autocomplete="off"
-                    enterkeyhint="done"
-                    placeholder="—"
-                  />
-                </label>
-                <label>
-                  Capo
-                  <input
-                    bind:value={draft.capo}
-                    onchange={() => commitNumber('capo', 'Capo')}
-                    inputmode="numeric"
-                    autocomplete="off"
-                    enterkeyhint="done"
-                    placeholder="—"
-                  />
-                </label>
-                <label>
-                  Tuning
-                  <input
-                    bind:value={draft.tuning}
-                    onchange={() => commitText('tuning')}
-                    list="common-tunings"
-                    autocomplete="off"
-                    enterkeyhint="done"
-                    placeholder="—"
-                  />
-                </label>
-              </div>
-              <label>
-                Notes
-                <textarea bind:value={draft.notes} onchange={() => commitText('notes')} rows="5"></textarea>
-              </label>
+        {#each parts as part (part)}
+          <details
+            class="part {part}-part"
+            open={!desktop.current || !closedParts.includes(part)}
+            ontoggle={(e) => toggled(part, e.currentTarget.open)}
+          >
+            {#if part === 'details'}
+              <summary>Details</summary>
+              <section class="details" aria-labelledby="details-heading">
+                <h2 id="details-heading">Details</h2>
+                {#if writing}
+                  <div class="grid">
+                    <label>
+                      Key
+                      <input
+                        bind:value={draft.key}
+                        onchange={() => commitText('key')}
+                        list="common-keys"
+                        autocomplete="off"
+                        autocapitalize="characters"
+                        enterkeyhint="done"
+                        placeholder="—"
+                      />
+                    </label>
+                    <label>
+                      BPM
+                      <input
+                        bind:value={draft.bpm}
+                        onchange={() => commitNumber('bpm', 'BPM')}
+                        inputmode="numeric"
+                        autocomplete="off"
+                        enterkeyhint="done"
+                        placeholder="—"
+                      />
+                    </label>
+                    <label>
+                      Capo
+                      <input
+                        bind:value={draft.capo}
+                        onchange={() => commitNumber('capo', 'Capo')}
+                        inputmode="numeric"
+                        autocomplete="off"
+                        enterkeyhint="done"
+                        placeholder="—"
+                      />
+                    </label>
+                    <label>
+                      Tuning
+                      <input
+                        bind:value={draft.tuning}
+                        onchange={() => commitText('tuning')}
+                        list="common-tunings"
+                        autocomplete="off"
+                        enterkeyhint="done"
+                        placeholder="—"
+                      />
+                    </label>
+                  </div>
+                  <label>
+                    Notes
+                    <textarea bind:value={draft.notes} onchange={() => commitText('notes')} rows="5"></textarea>
+                  </label>
+                {:else}
+                  <p class="summary" class:muted={!summary}>{summary || 'No Details yet.'}</p>
+                  {#if draft.notes.trim()}
+                    <p class="read-notes">{draft.notes}</p>
+                  {/if}
+                {/if}
+              </section>
+            {:else if part === 'masters'}
+              <summary>{song.masters.length > 1 ? 'Masters' : 'Master'}</summary>
+              <Masters {song} {mode} change={send} onUnsaved={setUnsaved} {setStatus} />
             {:else}
-              <p class="summary" class:muted={!summary}>{summary || 'No Details yet.'}</p>
-              {#if draft.notes.trim()}
-                <p class="read-notes">{draft.notes}</p>
-              {/if}
+              <summary>Scrapbook</summary>
+              <Scrapbook {song} change={send} onUnsaved={setUnsaved} />
             {/if}
-          </section>
-        </details>
-
-        <details class="part masters-part" bind:open={open.masters}>
-          <summary>{song.masters.length > 1 ? 'Masters' : 'Master'}</summary>
-          <Masters {song} {mode} change={send} onUnsaved={setUnsaved} {setStatus} />
-        </details>
+          </details>
+        {/each}
 
         {#if writing}
-          <details class="part scrapbook-part" bind:open={open.scrapbook}>
-            <summary>Scrapbook</summary>
-            <Scrapbook {song} change={send} onUnsaved={setUnsaved} />
-          </details>
-
           <button type="button" class="button danger delete" onclick={remove} disabled={deleting}>
             {deleting ? 'Deleting…' : 'Delete Song'}
           </button>
@@ -621,28 +634,14 @@
 
   /* One column: the title, the Lyric Sheet, then the Scrapbook, the
      Masters, the Details and Delete, all open. */
-  .song {
+  .side {
     display: flex;
     flex-direction: column;
   }
-  .side {
-    display: contents;
-  }
-  .sheet {
-    order: 1;
-  }
   .scrapbook-part {
-    order: 2;
     margin-bottom: 2rem;
   }
-  .masters-part {
-    order: 3;
-  }
-  .details-part {
-    order: 4;
-  }
   .delete {
-    order: 5;
     align-self: flex-start;
     margin-top: 1rem;
   }
@@ -675,15 +674,12 @@
       grid-area: side;
       position: sticky;
       top: var(--gutter);
-      display: flex;
-      flex-direction: column;
       gap: 0.5rem;
       max-height: calc(100dvh - var(--timeline-height) - 2 * var(--gutter));
       overflow-y: auto;
       overscroll-behavior: contain;
     }
     .side > * {
-      order: 0;
       flex: none;
     }
     .scrapbook-part {
