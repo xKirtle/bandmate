@@ -306,13 +306,13 @@
 <svelte:window onbeforeunload={warnBeforeUnload} />
 <svelte:document onvisibilitychange={refresh} />
 
-<main class="page">
+<main class="page" style:--timeline-height="{timelineHeight}px">
   {#if loadError}
     <p class="error" role="alert">{loadError}</p>
   {:else if song === null}
     <p class="muted">Loading…</p>
   {:else}
-    <div class="song" style:--timeline-height="{timelineHeight}px">
+    <div class="song">
       <div class="top">
         <div class="title-row">
           {#if writing}
@@ -515,9 +515,12 @@
     border-color: var(--border);
     background: var(--surface-1);
   }
-  /* With no header row, the page keeps clear of a notch itself. */
+  /* With no header row, the page keeps clear of a notch itself. It fills the
+     window down to the docked Timeline, so on a short Song the spare space
+     goes above the Timeline rather than below it. */
   .page {
     padding-top: max(var(--gutter), env(safe-area-inset-top));
+    min-height: calc(100dvh - var(--nav-bottom-space) - var(--timeline-height));
   }
   .title-row {
     display: flex;
