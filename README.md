@@ -2,7 +2,7 @@
 
 A personal songwriting companion: write and structure lyrics with chords, and later record takes over beats. Domain terms are in [CONTEXT.md](CONTEXT.md), the plan is in [docs/roadmap.md](docs/roadmap.md), and decisions are in [docs/adr/](docs/adr/).
 
-It is one Go binary. The server exposes a JSON API under `/api`, stores data in SQLite, and serves the Svelte SPA from files built into the binary ([ADR 0001](docs/adr/0001-go-backend-svelte-spa.md)). It has no login. Authentication happens at the reverse proxy ([ADR 0002](docs/adr/0002-single-user-auth-at-proxy.md)).
+It is one Go binary. The server exposes a JSON API under `/api`, stores data in SQLite, and serves the Svelte SPA from files built into the binary. It has no login. Authentication happens at the reverse proxy.
 
 ## Configuration
 
@@ -60,7 +60,7 @@ docker run -d --name bandmate --restart unless-stopped \
 
 Bandmate is then on http://localhost:8080. The image has its own healthcheck. Migrations run on startup, so upgrading means pulling the new image and recreating the container. To roll back, run an older SHA tag instead of `latest`. Back it up by copying `data/`.
 
-Bandmate has no login, so anything that can reach it can read and change every Song. Anywhere beyond your own machine, put it behind a reverse proxy that handles HTTPS and authentication ([ADR 0002](docs/adr/0002-single-user-auth-at-proxy.md)). Browsers also only allow the microphone over HTTPS or on localhost.
+Bandmate has no login, so anything that can reach it can read and change every Song. Anywhere beyond your own machine, put it behind a reverse proxy that handles HTTPS and authentication. Browsers also only allow the microphone over HTTPS or on localhost.
 
 ## Development
 
