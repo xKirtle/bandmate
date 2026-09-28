@@ -5,7 +5,9 @@
   // A Line's Cue time, shown as m:ss.s in the gutter beside it. Clicking it
   // lets the time be typed: Enter or leaving the field saves, Esc cancels,
   // and an empty field clears the Cue. Alt+↑/↓ nudges it by a tenth of a
-  // second. In Sync mode, clicking it makes its Line the next to cue instead.
+  // second. A ✕ after it, shown while its Line is hovered or the keyboard is
+  // in its slot, clears the Cue. In Sync mode, clicking it makes its Line the
+  // next to cue instead, and there's no ✕.
   let {
     cue,
     label,
@@ -13,6 +15,7 @@
     next,
     play,
     current = false,
+    hovered = false,
     pick,
   }: {
     /** In seconds, or null without a Cue. */
@@ -27,6 +30,8 @@
     play?: (to: number) => void;
     /** Whether playback is on the Line, so its ▶ isn't muted. */
     current?: boolean;
+    /** Whether the pointer is over the Line, so its ✕ shows. */
+    hovered?: boolean;
     /**
      * Given, as in Sync mode, clicking the time or ▶ makes the Line the next
      * to cue, rather than opening the time.
@@ -39,6 +44,7 @@
   let invalid = $state(false);
   let input = $state<HTMLInputElement>();
   let button = $state<HTMLButtonElement>();
+  let clearButton = $state<HTMLButtonElement>();
 
   /** Opens the field to type a time. */
   export async function edit() {
@@ -99,6 +105,14 @@
     return true;
   }
 
+  // Clearing doesn't ask first: it can be undone. From the keyboard, the
+  // focus goes on to the time, as the ✕ goes with the Cue.
+  function clear() {
+    const focused = document.activeElement === clearButton;
+    save(null);
+    if (focused) button?.focus();
+  }
+
   // Leaving saves, unless what's typed isn't a time: then it's dropped
   // rather than kept open behind the user's back.
   function onblur() {
@@ -107,7 +121,7 @@
   }
 </script>
 
-<span class="slot" class:current>
+<span class="slot" class:current class:hovered>
   {#if play}
     {#if cue === null}
       <!-- Holds the ▶'s room, so the times still line up down the gutter. -->
@@ -171,6 +185,21 @@
       {cue === null ? '–:––.–' : formatCue(cue)}
     </button>
   {/if}
+  {#if cue !== null && !pick && !editing}
+    <!-- Clicked, it keeps focus where it was, as the ▶ does. -->
+    <button
+      bind:this={clearButton}
+      type="button"
+      class="clear"
+      onpointerdown={(e) => e.preventDefault()}
+      onclick={clear}
+      aria-label="Clear the Cue of {label}"
+      title="Clear this Cue">✕</button
+    >
+  {:else}
+    <!-- Holds the ✕'s room, so the gutter never shifts. -->
+    <span class="clear" aria-hidden="true"></span>
+  {/if}
 </span>
 
 <style>
@@ -233,6 +262,34 @@
   /* Beside a ▶, the time gives up the room it takes. */
   .play + .cue {
     width: 4.25rem;
+  }
+  /* Out of sight, but still reachable by Tab, until its Line is hovered or
+     the keyboard is in its slot. */
+  .clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 1.25rem;
+    min-height: 1.5rem;
+    padding: 0;
+    border: 0;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 0.6875rem;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .slot:hover .clear,
+  .slot.hovered .clear,
+  .slot:focus-within .clear {
+    opacity: 1;
+  }
+  .clear:hover,
+  .clear:focus-visible {
+    color: var(--text);
   }
   .cue.invalid {
     border-color: var(--accent);
