@@ -1,17 +1,21 @@
 <script lang="ts">
   import { api, type Master, type Song, type SongAt, type Status } from './api';
   import AudioPlayer from './AudioPlayer.svelte';
+  import type { Mode } from './songMode';
   import { prepareUpload } from './upload';
 
   // A Song's Masters: finished recordings made elsewhere. The page is made
   // for one; names and the main marker only show once there's a second.
   let {
     song,
+    mode,
     change,
     onUnsaved,
     setStatus,
   }: {
     song: Song;
+    /** The Song page's mode: in Read mode the Masters only play. */
+    mode: Mode;
     /** Sends a change to the Song; resolves to whether it succeeded. */
     change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
     onUnsaved: (editor: object, unsaved: boolean) => void;
@@ -49,6 +53,7 @@
   });
 
   const several = $derived(song.masters.length > 1);
+  const writing = $derived(mode === 'write');
   // Identifies each Master's name and notes being typed to onUnsaved.
   const editors = new Map<string, object>();
 
@@ -117,17 +122,21 @@
 <section class="masters" aria-labelledby="masters-heading">
   <div class="head">
     <h2 id="masters-heading">{several ? 'Masters' : 'Master'}</h2>
-    <label class="button" class:disabled={busy !== null}>
-      {song.masters.length > 0 ? 'Add another' : 'Add Master'}
-      <input class="visually-hidden" type="file" accept="audio/*" onchange={pick} disabled={busy !== null} />
-    </label>
+    {#if writing}
+      <label class="button" class:disabled={busy !== null}>
+        {song.masters.length > 0 ? 'Add another' : 'Add Master'}
+        <input class="visually-hidden" type="file" accept="audio/*" onchange={pick} disabled={busy !== null} />
+      </label>
+    {/if}
   </div>
 
   {#if song.masters.length === 0 && !busy}
-    <p class="hint muted">The finished recording, once it's made: a studio mix, a demo, a live recording.</p>
+    <p class="hint muted">
+      {writing ? "The finished recording, once it's made: a studio mix, a demo, a live recording." : 'No Master yet.'}
+    </p>
   {/if}
 
-  {#if suggestFinished}
+  {#if suggestFinished && writing}
     <div class="suggest" role="status">
       <p>Is this Song finished?</p>
       <button type="button" class="button primary" onclick={markFinished}>Mark as finished</button>
@@ -137,7 +146,12 @@
 
   {#each song.masters as m (m.id)}
     <article class="master" aria-label={several ? m.name : 'Master'}>
-      {#if several}
+      {#if several && !writing}
+        <div class="name-row">
+          <h3 class="name">{m.name}</h3>
+          {#if m.main}<span class="main-badge">Main</span>{/if}
+        </div>
+      {:else if several}
         <div class="name-row">
           <label class="visually-hidden" for="master-{m.id}-name">Name</label>
           <input
@@ -162,22 +176,28 @@
 
       <AudioPlayer src={api.masterAudioUrl(song.id, m.id)} duration={m.duration} peaks={peaks[m.id] ?? []} />
 
-      <label class="notes">
-        Notes
-        <textarea
-          value={m.notes}
-          oninput={() => onUnsaved(editor(m, 'notes'), true)}
-          onchange={(e) => saveNotes(m, e.currentTarget)}
-          onblur={() => onUnsaved(editor(m, 'notes'), false)}
-          rows="2"
-        ></textarea>
-      </label>
+      {#if writing}
+        <label class="notes">
+          Notes
+          <textarea
+            value={m.notes}
+            oninput={() => onUnsaved(editor(m, 'notes'), true)}
+            onchange={(e) => saveNotes(m, e.currentTarget)}
+            onblur={() => onUnsaved(editor(m, 'notes'), false)}
+            rows="2"
+          ></textarea>
+        </label>
+      {:else if m.notes.trim()}
+        <p class="read-notes">{m.notes}</p>
+      {/if}
 
       <div class="facts">
         <span class="muted">Added <time datetime={m.addedAt}>{dateFormat.format(new Date(m.addedAt))}</time></span>
         <span class="spacer"></span>
         <a class="button" href={api.masterDownloadUrl(song.id, m.id)} download={m.fileName}>Download</a>
-        <button type="button" class="button danger" onclick={() => remove(m)}>Delete</button>
+        {#if writing}
+          <button type="button" class="button danger" onclick={() => remove(m)}>Delete</button>
+        {/if}
       </div>
     </article>
   {/each}
@@ -243,6 +263,16 @@
     flex: 1;
     min-width: 0;
     font-weight: 600;
+  }
+  h3.name {
+    margin: 0;
+    font-size: 1rem;
+    overflow-wrap: anywhere;
+  }
+  .read-notes {
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
   }
   .main-badge {
     flex-shrink: 0;

@@ -10,12 +10,14 @@
   import LyricSheetView from './LyricSheetView.svelte';
   import SectionEditor from './SectionEditor.svelte';
   import { describe } from './sections';
+  import type { Mode } from './songMode';
   import { markSyncHintSeen, sawSyncHint } from './syncHint';
   import { inTextField } from './textField';
   import { deviceStorage } from './timelineHeight';
 
   let {
     song,
+    mode,
     change,
     editCues,
     onUnsaved,
@@ -27,6 +29,8 @@
     stopLoop,
   }: {
     song: Song;
+    /** The Song page's mode: Write edits the raw text; Read shows Chords above the lyrics. */
+    mode: Mode;
     /** Sends a Lyric Sheet change; resolves to whether it succeeded. */
     change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
     /** Sends a Cue edit, to undo with the Timeline's edits; resolves to whether it succeeded. */
@@ -52,8 +56,6 @@
   const inArrangement = $derived(
     [...new Set(song.arrangement.map((o) => o.sectionId))].flatMap((id) => sections.get(id) ?? []),
   );
-  // Write edits the raw text; Read shows Chords above the lyrics.
-  let mode = $state<'write' | 'read'>('write');
   // Where playback is in the Lyric Sheet.
   const current = $derived(playhead === null ? null : currentPosition(song, playhead));
   // Cues are edited in Write mode, on wider screens only, and only once
@@ -246,11 +248,6 @@
           : 'Add a beat to the Timeline to sync lyrics to it'}>Sync lyrics</button
       >
     {/if}
-    <fieldset class="modes">
-      <legend class="visually-hidden">Mode</legend>
-      <label class="mode"><input type="radio" name="sheet-mode" value="write" bind:group={mode} />Write</label>
-      <label class="mode"><input type="radio" name="sheet-mode" value="read" bind:group={mode} />Read</label>
-    </fieldset>
     {#if syncing && hinting}
       <p class="sync-hint muted">Play, then press Enter or Now as each Line starts. Click a Line to start from it.</p>
     {/if}
@@ -258,7 +255,11 @@
 
   {#if song.arrangement.length === 0}
     <p class="muted">
-      No Sections here yet. Add one to start writing{song.scrapbook.length > 0 ? ', or put one back from the Scrapbook' : ''}.
+      {#if mode === 'read'}
+        No Sections here yet.
+      {:else}
+        No Sections here yet. Add one to start writing{song.scrapbook.length > 0 ? ', or put one back from the Scrapbook' : ''}.
+      {/if}
     </p>
   {/if}
 
@@ -412,40 +413,6 @@
     flex-basis: 100%;
     margin: 0;
     font-size: 0.8125rem;
-  }
-  .modes {
-    display: flex;
-    margin: 0;
-    padding: 0;
-    border: 1px solid var(--border);
-    border-radius: 0.5rem;
-    overflow: hidden;
-  }
-  .mode {
-    display: flex;
-    align-items: center;
-    min-height: 2.75rem;
-    padding: 0 0.875rem;
-    background: var(--surface-1);
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .mode + .mode {
-    border-left: 1px solid var(--border);
-  }
-  .mode input {
-    position: absolute;
-    opacity: 0;
-    width: 1px;
-    height: 1px;
-    min-height: 0;
-  }
-  .mode:has(input:checked) {
-    background: var(--surface-2);
-  }
-  .mode:has(input:focus-visible) {
-    outline: 2px solid var(--accent);
-    outline-offset: -2px;
   }
   .toggles {
     display: flex;

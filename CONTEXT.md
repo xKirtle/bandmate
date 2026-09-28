@@ -14,6 +14,10 @@ _Avoid_: Project, track (a Track is something else)
 Where a Song stands in its lifecycle: idea, drafting, or finished.
 _Avoid_: Stage, state
 
+**Read mode**:
+The Song page for playing from: the Song shows and its Masters play, but nothing outside the Timeline can be edited. Finished Songs open in it; the other mode, Write mode, offers editing.
+_Avoid_: View mode, locked, preview
+
 ### Lyric Sheet
 
 **Lyric Sheet**:

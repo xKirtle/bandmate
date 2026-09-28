@@ -17,6 +17,7 @@
   import Timeline from '../lib/Timeline.svelte';
   import type { Saved } from '../lib/history';
   import { navigate } from '../lib/router.svelte';
+  import { detailsSummary, openingMode, type Mode } from '../lib/songMode';
   import { timeAgo } from '../lib/time';
 
   let { id }: { id: number } = $props();
@@ -47,6 +48,12 @@
   let stale = $state(false);
   let pending = $state(0);
   let deleting = $state(false);
+  // Read mode offers no editing anywhere on the page but the Timeline. It's
+  // never saved: each visit starts from the Song's Status.
+  let mode = $state<Mode>('write');
+  const writing = $derived(mode === 'write');
+  // The Details as Read mode shows them.
+  const summary = $derived(detailsSummary(draft));
 
   const commonTunings = ['Standard', 'Drop D', 'Half step down', 'DADGAD', 'Open G', 'Open D'];
 
@@ -56,6 +63,7 @@
         song = s;
         timeline = tl;
         draft = toDraft(s);
+        mode = openingMode(s.status);
       },
       (e: Error) => (loadError = e.message),
     );
@@ -280,9 +288,18 @@
 <header class="bar wide">
   <a class="back" href="/">← Songs</a>
   {#if song}
-    <button type="button" class="button danger" onclick={remove} disabled={deleting}>
-      {deleting ? 'Deleting…' : 'Delete'}
-    </button>
+    <div class="actions">
+      {#if writing}
+        <button type="button" class="button danger" onclick={remove} disabled={deleting}>
+          {deleting ? 'Deleting…' : 'Delete'}
+        </button>
+      {/if}
+      <fieldset class="modes">
+        <legend class="visually-hidden">Mode</legend>
+        <label class="mode"><input type="radio" name="song-mode" value="write" bind:group={mode} />Write</label>
+        <label class="mode"><input type="radio" name="song-mode" value="read" bind:group={mode} />Read</label>
+      </fieldset>
+    </div>
   {/if}
 </header>
 
@@ -292,21 +309,25 @@
   {:else if song === null}
     <p class="muted">Loading…</p>
   {:else}
-    <div class="song">
+    <div class="song" class:reading={!writing}>
       <div class="top">
-        <label class="visually-hidden" for="song-title">Title</label>
-        <input
-          id="song-title"
-          class="title"
-          bind:value={draft.title}
-          onchange={() => commitText('title')}
-          required
-          autocomplete="off"
-          enterkeyhint="done"
-        />
+        {#if writing}
+          <label class="visually-hidden" for="song-title">Title</label>
+          <input
+            id="song-title"
+            class="title"
+            bind:value={draft.title}
+            onchange={() => commitText('title')}
+            required
+            autocomplete="off"
+            enterkeyhint="done"
+          />
+        {:else}
+          <h1 class="title">{draft.title}</h1>
+        {/if}
 
         <div class="meta">
-          <StatusBadge status={draft.status} onChange={setStatus} />
+          <StatusBadge status={draft.status} onChange={writing ? setStatus : undefined} />
           <span class="muted" aria-hidden="true">·</span>
           <p class="save-state muted" role="status">
             {#if pending > 0}
@@ -333,6 +354,7 @@
       <div class="sheet">
         <LyricSheet
           {song}
+          {mode}
           change={send}
           {editCues}
           onUnsaved={setUnsaved}
@@ -345,66 +367,75 @@
         />
       </div>
 
-      <aside class="side">
-        <Scrapbook {song} change={send} onUnsaved={setUnsaved} />
-      </aside>
+      {#if writing}
+        <aside class="side">
+          <Scrapbook {song} change={send} onUnsaved={setUnsaved} />
+        </aside>
+      {/if}
 
       <div class="about">
-        <Masters {song} change={send} onUnsaved={setUnsaved} {setStatus} />
+        <Masters {song} {mode} change={send} onUnsaved={setUnsaved} {setStatus} />
 
         <section class="details" aria-labelledby="details-heading">
           <h2 id="details-heading">Details</h2>
-          <div class="grid">
+          {#if writing}
+            <div class="grid">
+              <label>
+                Key
+                <input
+                  bind:value={draft.key}
+                  onchange={() => commitText('key')}
+                  list="common-keys"
+                  autocomplete="off"
+                  autocapitalize="characters"
+                  enterkeyhint="done"
+                  placeholder="—"
+                />
+              </label>
+              <label>
+                BPM
+                <input
+                  bind:value={draft.bpm}
+                  onchange={() => commitNumber('bpm', 'BPM')}
+                  inputmode="numeric"
+                  autocomplete="off"
+                  enterkeyhint="done"
+                  placeholder="—"
+                />
+              </label>
+              <label>
+                Capo
+                <input
+                  bind:value={draft.capo}
+                  onchange={() => commitNumber('capo', 'Capo')}
+                  inputmode="numeric"
+                  autocomplete="off"
+                  enterkeyhint="done"
+                  placeholder="—"
+                />
+              </label>
+              <label>
+                Tuning
+                <input
+                  bind:value={draft.tuning}
+                  onchange={() => commitText('tuning')}
+                  list="common-tunings"
+                  autocomplete="off"
+                  enterkeyhint="done"
+                  placeholder="—"
+                />
+              </label>
+            </div>
             <label>
-              Key
-              <input
-                bind:value={draft.key}
-                onchange={() => commitText('key')}
-                list="common-keys"
-                autocomplete="off"
-                autocapitalize="characters"
-                enterkeyhint="done"
-                placeholder="—"
-              />
+              Notes
+              <textarea bind:value={draft.notes} onchange={() => commitText('notes')} rows="5"></textarea>
             </label>
-            <label>
-              BPM
-              <input
-                bind:value={draft.bpm}
-                onchange={() => commitNumber('bpm', 'BPM')}
-                inputmode="numeric"
-                autocomplete="off"
-                enterkeyhint="done"
-                placeholder="—"
-              />
-            </label>
-            <label>
-              Capo
-              <input
-                bind:value={draft.capo}
-                onchange={() => commitNumber('capo', 'Capo')}
-                inputmode="numeric"
-                autocomplete="off"
-                enterkeyhint="done"
-                placeholder="—"
-              />
-            </label>
-            <label>
-              Tuning
-              <input
-                bind:value={draft.tuning}
-                onchange={() => commitText('tuning')}
-                list="common-tunings"
-                autocomplete="off"
-                enterkeyhint="done"
-                placeholder="—"
-              />
-            </label>
-          </div>
-          <label>
-            Notes
-            <textarea bind:value={draft.notes} onchange={() => commitText('notes')} rows="5"></textarea>
-          </label>
+          {:else}
+            <p class="summary" class:muted={!summary}>{summary || 'No Details yet.'}</p>
+            {#if draft.notes.trim()}
+              <p class="read-notes">{draft.notes}</p>
+            {/if}
+          {/if}
         </section>
       </div>
     </div>
@@ -443,15 +474,63 @@
     font-weight: 700;
     line-height: 1.2;
   }
-  .title:hover,
-  .title:focus {
+  /* As tall as the input it replaces, so switching mode doesn't shift the page. */
+  h1.title {
+    display: flex;
+    align-items: center;
+    border: 1px solid transparent;
+    overflow-wrap: anywhere;
+  }
+  input.title:hover,
+  input.title:focus {
     border-color: var(--border);
     background: var(--surface-1);
+  }
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .modes {
+    display: flex;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    overflow: hidden;
+  }
+  .mode {
+    display: flex;
+    align-items: center;
+    min-height: 2.75rem;
+    padding: 0 0.875rem;
+    background: var(--surface-1);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .mode + .mode {
+    border-left: 1px solid var(--border);
+  }
+  .mode input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    min-height: 0;
+  }
+  .mode:has(input:checked) {
+    background: var(--surface-2);
+  }
+  .mode:has(input:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
   }
   .meta {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
+    /* As tall as the Status picker, which Read mode shows as a plain badge. */
+    min-height: 2.75rem;
     gap: 0 0.5rem;
     margin: 0 0 0.75rem;
     font-size: 0.8125rem;
@@ -494,6 +573,14 @@
     color: var(--text);
     font-weight: 400;
   }
+  .summary,
+  .read-notes {
+    margin: 0 0 0.75rem;
+  }
+  .read-notes {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
   .grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -534,6 +621,14 @@
     .about {
       grid-area: about;
       align-self: start;
+    }
+    /* Read mode has no Scrapbook, so no side column. */
+    .song.reading {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas:
+        'top'
+        'sheet'
+        'about';
     }
     .side {
       grid-area: side;
