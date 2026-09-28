@@ -41,7 +41,7 @@
   import { api, type Alternate, type Song, type SongAt } from './api';
   import CueField from './CueField.svelte';
   import { isBlank, linesByRow } from './cues';
-  import type { GutterField } from './gutter';
+  import { rowAt, type GutterField } from './gutter';
 
   let {
     uid,
@@ -146,6 +146,16 @@
   // matches them for real.
   const rows = $derived(cueing ? text.split('\n') : []);
   const rowLines = $derived(cueing ? linesByRow(text, alternate.lines) : []);
+
+  // The row under the pointer, so its Line's gutter shows its ✕. The text box
+  // takes the pointer over the rows, so it's found by height.
+  const rowEls: (HTMLElement | null | undefined)[] = [];
+  let hoveredRow = $state<number | null>(null);
+
+  function pointed(e: PointerEvent) {
+    const rects = rowEls.slice(0, rows.length).map((el) => el?.getBoundingClientRect() ?? { top: 0, bottom: 0 });
+    hoveredRow = rowAt(rects, e.clientY);
+  }
 </script>
 
 <label class="visually-hidden" for="text-{uid}">{label}</label>
@@ -153,12 +163,16 @@
      the same way, so each row's highlight and Cue line up with its text. The
      text box sits on top and takes every click, so it never seeks, except
      in Sync mode, where clicks go through it to the rows to pick them. -->
+<!-- Hovering only shows a Line's ✕; the keyboard reaches it in the gutter slot. -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="field"
   class:cued={cueing}
   class:with-gutter={cueing?.gutter}
   class:syncing={cueing?.sync}
   style:--rows={rows.length}
+  onpointermove={cueing?.gutter ? pointed : undefined}
+  onpointerleave={() => (hoveredRow = null)}
 >
   {#if cueing}
     <div class="backdrop"></div>
@@ -171,6 +185,7 @@
         <!-- Picking a Line is also in its gutter slot, which takes the keyboard. -->
         <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
         <div
+          bind:this={rowEls[i]}
           class="row"
           class:current={line.id === cueing.current}
           class:pickable={sync}
@@ -183,7 +198,7 @@
           {row || ' '}
         </div>
       {:else}
-        <div class="row" style:grid-row={gridRow} aria-hidden="true">{row || ' '}</div>
+        <div bind:this={rowEls[i]} class="row" style:grid-row={gridRow} aria-hidden="true">{row || ' '}</div>
       {/if}
       {#if cueing.gutter && line && !isBlank(line)}
         {@const gutter = cueing.gutter}
@@ -209,6 +224,7 @@
               next={() => gutter.next(line.id)}
               play={gutter.play}
               current={line.id === cueing.current}
+              hovered={i === hoveredRow}
               pick={sync && !line.chordLine ? () => sync.pick(line.id) : undefined}
             />
           {/if}
@@ -301,9 +317,9 @@
     pointer-events: auto;
     cursor: pointer;
   }
-  /* As wide as a Cue's ▶ and time, so the gutter doesn't shift as it moves on. */
+  /* As wide as a Cue's ▶, time and ✕, so the gutter doesn't shift as it moves on. */
   .now {
-    width: 5.5rem;
+    width: 6.75rem;
     min-height: 1.5rem;
     padding: 0 0.375rem;
     border: 1px solid var(--accent);
