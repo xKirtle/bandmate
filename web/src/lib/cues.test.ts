@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cuesInSpan, currentPosition, formatCue, hasCues, linesByRow, nextLine, nudgeCue, parseCue, type CuedSong } from './cues';
+import { cuesInSpan, currentPosition, formatCue, hasCues, linesByRow, nextLine, nudgeCue, parseCue, playLabel, type CuedSong } from './cues';
 
 describe('parseCue', () => {
   it('reads plain seconds', () => {
@@ -533,5 +533,11 @@ describe('linesByRow', () => {
   it('gives an empty text box one row', () => {
     expect(linesByRow('', [])).toEqual([null]);
     expect(ids('')).toEqual([1]);
+  });
+});
+
+describe('playLabel', () => {
+  it('names what plays from where', () => {
+    expect(playLabel('Line 3 of Verse 1', 38.5)).toBe('Play from Line 3 of Verse 1 at 0:38.5');
   });
 });

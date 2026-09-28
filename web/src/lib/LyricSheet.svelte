@@ -31,7 +31,7 @@
     playhead?: number | null;
     /** Whether the Timeline has any Clip, so there's something to cue to. */
     hasClips?: boolean;
-    /** Seeks the Timeline, e.g. to a cued Line. */
+    /** Seeks the Timeline, e.g. to a cued Line or from a Cue's ▶. */
     seek?: (to: number) => void;
     /** Whether Tap mode is on, so tap can be called, and clicking a Line in Read mode picks it to tap next. */
     tapping?: boolean;
@@ -96,6 +96,7 @@
             save: (line, cue) => setLineCue(occurrence, line, cue),
             field: (line, field) => writeFields.set(key(occurrence.id, line), field),
             next: (line) => writeFields.editAfter(writeFieldOrder, key(occurrence.id, line)),
+            play: seek,
           }
         : undefined,
     };
@@ -214,7 +215,14 @@
               autofocus={added === occurrence.id}
               {change}
               {onUnsaved}
-              cue={canCue ? { at: occurrence.cue, save: (cue) => setCue(occurrence, cue) } : undefined}
+              cue={canCue
+                ? {
+                    at: occurrence.cue,
+                    save: (cue) => setCue(occurrence, cue),
+                    play: seek,
+                    current: current?.occurrence === occurrence.id,
+                  }
+                : undefined}
               cueing={cueingFor(occurrence, section.label)}
             >
               {#snippet actions()}

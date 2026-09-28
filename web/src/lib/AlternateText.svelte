@@ -18,6 +18,8 @@
       field: (line: number, field: GutterField | null | undefined) => void;
       /** Opens the next Line's field; answers whether there was one. */
       next: (line: number) => boolean;
+      /** Given, a ▶ beside each Cue seeks the Timeline to it. */
+      play?: (to: number) => void;
     };
   }
 </script>
@@ -167,6 +169,8 @@
             label="Line {alternate.lines.indexOf(line) + 1}{gutter.labelSuffix}"
             save={(cue) => gutter.save(line, cue)}
             next={() => gutter.next(line.id)}
+            play={gutter.play}
+            current={line.id === cueing.current}
           />
         </div>
       {/if}

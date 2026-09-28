@@ -205,3 +205,8 @@ export function formatCue(seconds: number): string {
   const rest = (tenths % 600) / 10;
   return `${minutes}:${rest.toFixed(1).padStart(4, '0')}`;
 }
+
+/** Names a Cue's ▶ for screen readers, e.g. "Play from Line 3 of Verse 1 at 0:38.5". */
+export function playLabel(label: string, cue: number): string {
+  return `Play from ${label} at ${formatCue(cue)}`;
+}
