@@ -17,8 +17,9 @@ var (
 
 // ImportSong creates a new Song from pasted lyrics, plain text or ChordPro,
 // with one Occurrence per Section the text marks (see parseImport). A
-// Section repeated in the text is one Section (see arrange). A title directive in the text names the Song;
-// without one, title does. Other directives fill in the Song's Details.
+// Section repeated in the text is one Section (see arrange). A title
+// directive in the text names the Song; without one, title does. Other
+// directives fill in the Song's Details.
 func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error) {
 	sheet, err := parseImport(text)
 	if err != nil {
@@ -164,23 +165,24 @@ func parseImport(text string) (importedSheet, error) {
 					return importedSheet{}, invalidPasteLine(i+1, "the %s is already given on line %d", detail, earlier)
 				}
 				given[detail] = i + 1
+				switch detail {
+				case "title":
+					sheet.title = value
+				case "key":
+					sheet.key = value
+				case "tuning":
+					sheet.tuning = value
+				case "bpm":
+					if sheet.bpm, ok = wholeNumber(value, 1, 999); !ok {
+						return importedSheet{}, invalidPasteLine(i+1, "%s must be a whole number between 1 and 999", name)
+					}
+				case "capo":
+					if sheet.capo, ok = wholeNumber(value, 0, 24); !ok {
+						return importedSheet{}, invalidPasteLine(i+1, "capo must be a whole number between 0 and 24")
+					}
+				}
 			}
-			switch name {
-			case "title", "t":
-				sheet.title = value
-			case "key":
-				sheet.key = value
-			case "tuning":
-				sheet.tuning = value
-			case "bpm", "tempo":
-				if sheet.bpm, ok = wholeNumber(value, 1, 999); !ok {
-					return importedSheet{}, invalidPasteLine(i+1, "%s must be a whole number between 1 and 999", name)
-				}
-			case "capo":
-				if sheet.capo, ok = wholeNumber(value, 0, 24); !ok {
-					return importedSheet{}, invalidPasteLine(i+1, "capo must be a whole number between 0 and 24")
-				}
-			case "notes":
+			if name == "notes" {
 				sheet.notes = append(sheet.notes, value)
 			}
 			if d, ok := sectionDirectives[name]; ok {

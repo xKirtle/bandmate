@@ -499,6 +499,16 @@ func TestImportNotesDirectivesBecomeTheNotesLines(t *testing.T) {
 	}
 }
 
+// expectImportRejected pastes text into a new Song titled Midnight Drive and
+// expects it to be rejected with msg, creating no Song.
+func (ts *testServer) expectImportRejected(text, msg string) {
+	ts.t.Helper()
+	expectError(ts.t, ts.importSong("Midnight Drive", text), http.StatusBadRequest, msg)
+	if list := ts.listSongs(); len(list) != 0 {
+		ts.t.Errorf("songs = %+v, want none created", list)
+	}
+}
+
 func TestImportWithABadBPMOrCapoIsRejected(t *testing.T) {
 	cases := map[string]struct{ text, want string }{
 		"bpm not a number":   {"City lights\n{bpm: fast}", "line 2: bpm must be a whole number between 1 and 999"},
@@ -513,14 +523,7 @@ func TestImportWithABadBPMOrCapoIsRejected(t *testing.T) {
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			ts := newTestServer(t)
-
-			res := ts.importSong("Midnight Drive", c.text)
-
-			expectError(t, res, http.StatusBadRequest, c.want)
-			if list := ts.listSongs(); len(list) != 0 {
-				t.Errorf("songs = %+v, want none created", list)
-			}
+			newTestServer(t).expectImportRejected(c.text, c.want)
 		})
 	}
 }
@@ -531,8 +534,13 @@ func TestImportTakesTheEdgesOfTheBPMAndCapoRanges(t *testing.T) {
 	low := ts.importSheet("{bpm: 1}\n{capo: 0}\nCity lights")
 	high := ts.importSheet("{bpm: 999}\n{capo: 24}\nCity lights")
 
-	if *low.BPM != 1 || *low.Capo != 0 || *high.BPM != 999 || *high.Capo != 24 {
-		t.Errorf("bpm, capo = %d, %d and %d, %d; want 1, 0 and 999, 24", *low.BPM, *low.Capo, *high.BPM, *high.Capo)
+	for _, c := range []struct {
+		s         song
+		bpm, capo int
+	}{{low, 1, 0}, {high, 999, 24}} {
+		if c.s.BPM == nil || *c.s.BPM != c.bpm || c.s.Capo == nil || *c.s.Capo != c.capo {
+			t.Errorf("bpm, capo = %v, %v; want %d, %d", c.s.BPM, c.s.Capo, c.bpm, c.capo)
+		}
 	}
 }
 
@@ -550,14 +558,7 @@ func TestImportWithARepeatedDirectiveIsRejected(t *testing.T) {
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			ts := newTestServer(t)
-
-			res := ts.importSong("Midnight Drive", c.text)
-
-			expectError(t, res, http.StatusBadRequest, c.want)
-			if list := ts.listSongs(); len(list) != 0 {
-				t.Errorf("songs = %+v, want none created", list)
-			}
+			newTestServer(t).expectImportRejected(c.text, c.want)
 		})
 	}
 }
