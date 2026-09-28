@@ -20,8 +20,6 @@ export interface Song {
   notes: string;
   /** Whether the Lyric Sheet shows Chords; off hides them without removing them. */
   showChords: boolean;
-  /** Whether Read mode shows the Cue gutter. */
-  showCues: boolean;
   createdAt: string;
   updatedAt: string;
   /** The Lyric Sheet: Occurrences of Sections, in order. */
@@ -133,7 +131,7 @@ export const commonKeys: readonly string[] = ['C', 'Cm', 'D', 'Dm', 'E', 'Em', '
 
 /** A partial update: only the fields present change; "" or null clears one. */
 export type SongChanges = Partial<
-  Pick<Song, 'title' | 'status' | 'key' | 'bpm' | 'capo' | 'tuning' | 'notes' | 'showChords' | 'showCues'>
+  Pick<Song, 'title' | 'status' | 'key' | 'bpm' | 'capo' | 'tuning' | 'notes' | 'showChords'>
 >;
 
 /** Narrows the Song list. */

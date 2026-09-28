@@ -97,7 +97,7 @@ func TestNewSongHasNoMetadata(t *testing.T) {
 
 	got := ts.createSong("Bare")
 
-	want := song{ID: got.ID, Version: got.Version, Title: "Bare", Status: "idea", ShowChords: true, ShowCues: true, CreatedAt: got.CreatedAt, UpdatedAt: got.UpdatedAt,
+	want := song{ID: got.ID, Version: got.Version, Title: "Bare", Status: "idea", ShowChords: true, CreatedAt: got.CreatedAt, UpdatedAt: got.UpdatedAt,
 		Arrangement: []occurrence{}, Sections: []section{}, Scrapbook: []int64{}, Masters: []master{}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("new song = %+v, want no key, BPM, capo, tuning, notes, Sections or Masters", got)
@@ -149,6 +149,7 @@ func TestInvalidMetadataIsRejected(t *testing.T) {
 		"fractional BPM":  {map[string]any{"bpm": 92.5}, "request body must be valid JSON"},
 		"BPM as a string": {map[string]any{"bpm": "fast"}, "request body must be valid JSON"},
 		"misspelt field":  {map[string]any{"stauts": "finished"}, `unknown field "stauts"`},
+		"removed field":   {map[string]any{"showCues": false}, `unknown field "showCues"`},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

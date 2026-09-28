@@ -86,12 +86,9 @@ type Song struct {
 	Notes  string `json:"notes"`
 	// ShowChords is whether the Lyric Sheet shows Chords; it hides them on
 	// purpose, without removing them from the Lines.
-	ShowChords bool `json:"showChords"`
-	// ShowCues is whether Read mode shows the Cue gutter; the Cues are kept
-	// and followed either way.
-	ShowCues  bool      `json:"showCues"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ShowChords bool      `json:"showChords"`
+	CreatedAt  time.Time `json:"createdAt"`
+	UpdatedAt  time.Time `json:"updatedAt"`
 	LyricSheet
 	// Masters are in the order they were added.
 	Masters []Master `json:"masters"`
@@ -157,10 +154,10 @@ func (s *Store) GetSong(ctx context.Context, id int64) (Song, error) {
 	var bpm, capo sql.NullInt64
 	var created, updated string
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, version, title, status, song_key, bpm, capo, tuning, notes, show_chords, show_cues, created_at, updated_at
+		`SELECT id, version, title, status, song_key, bpm, capo, tuning, notes, show_chords, created_at, updated_at
 		 FROM songs WHERE id = ?`, id).
 		Scan(&song.ID, &song.Version, &song.Title, &song.Status, &song.Key, &bpm, &capo, &song.Tuning, &song.Notes,
-			&song.ShowChords, &song.ShowCues, &created, &updated)
+			&song.ShowChords, &created, &updated)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Song{}, ErrNotFound
 	}
@@ -258,8 +255,6 @@ type SongChanges struct {
 	Notes  Change[string] `json:"notes"`
 	// ShowChords can't be null: it is either on or off.
 	ShowChords Change[*bool] `json:"showChords"`
-	// ShowCues can't be null either.
-	ShowCues Change[*bool] `json:"showCues"`
 }
 
 // UpdateSong applies changes to a Song. Every change is validated before
@@ -309,12 +304,6 @@ func (s *Store) UpdateSong(ctx context.Context, id int64, based Version, changes
 			return Song{}, invalid("showChords must be true or false")
 		}
 		set("show_chords", *c.Value)
-	}
-	if c := changes.ShowCues; c.Set {
-		if c.Value == nil {
-			return Song{}, invalid("showCues must be true or false")
-		}
-		set("show_cues", *c.Value)
 	}
 	if len(sets) == 0 {
 		song, err := s.GetSong(ctx, id)

@@ -177,7 +177,6 @@ type song struct {
 	Tuning      string       `json:"tuning"`
 	Notes       string       `json:"notes"`
 	ShowChords  bool         `json:"showChords"`
-	ShowCues    bool         `json:"showCues"`
 	CreatedAt   string       `json:"createdAt"`
 	UpdatedAt   string       `json:"updatedAt"`
 	Arrangement []occurrence `json:"arrangement"`
