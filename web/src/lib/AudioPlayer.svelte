@@ -194,8 +194,8 @@
     flex-shrink: 0;
     display: grid;
     place-items: center;
-    width: 2.75rem;
-    height: 2.75rem;
+    width: var(--control);
+    height: var(--control);
     padding: 0;
     border: none;
     border-radius: 50%;

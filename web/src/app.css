@@ -14,9 +14,26 @@
   --finished-bg: #dcefe0;
   --finished-fg: #1f5e2e;
 
+  /* Density: touch-sized controls and narrow gutters, compact on desktop. */
+  --control: 2.75rem;
+  --gutter: 1rem;
+  /* The navigation: a nav rail on wide windows, a bottom tab bar on narrow ones. */
+  --rail-width: 5rem;
+  --tabbar-height: 3.5rem;
+  /* What the tab bar takes from the bottom of the window. */
+  --tabbar-space: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
+
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.5;
   -webkit-text-size-adjust: 100%;
+}
+
+/* Desktop: compact controls and wider gutters. */
+@media (min-width: 80rem) {
+  :root {
+    --control: 2.25rem;
+    --gutter: 2rem;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -60,6 +77,22 @@ a {
   color: var(--accent);
 }
 
+/* The page leaves room for the tab bar, which the nav rail replaces on wide
+   windows. */
+body {
+  padding-bottom: var(--tabbar-space);
+}
+
+@media (min-width: 65.5rem) {
+  body {
+    padding-bottom: 0;
+  }
+  .app {
+    display: grid;
+    grid-template-columns: var(--rail-width) minmax(0, 1fr);
+  }
+}
+
 .bar {
   position: sticky;
   top: 0;
@@ -70,7 +103,7 @@ a {
   gap: 1rem;
   max-width: 48rem;
   margin: 0 auto;
-  padding: 0.75rem max(1rem, env(safe-area-inset-left)) 0.75rem max(1rem, env(safe-area-inset-right));
+  padding: 0.75rem max(var(--gutter), env(safe-area-inset-right)) 0.75rem max(var(--gutter), env(safe-area-inset-left));
   padding-top: max(0.75rem, env(safe-area-inset-top));
   background: var(--bg);
 }
@@ -82,22 +115,15 @@ a {
 .page {
   max-width: 48rem;
   margin: 0 auto;
-  padding: 0.5rem max(1rem, env(safe-area-inset-left)) max(2rem, env(safe-area-inset-bottom))
-    max(1rem, env(safe-area-inset-right));
+  padding: 0.5rem max(var(--gutter), env(safe-area-inset-right)) max(2rem, env(safe-area-inset-bottom))
+    max(var(--gutter), env(safe-area-inset-left));
 }
 
-/* A page with a side column on wide screens, e.g. a Song with its Scrapbook. */
-@media (min-width: 64rem) {
-  .bar.wide,
-  .page.wide {
-    max-width: 72rem;
-  }
-}
 
 .back {
   display: inline-flex;
   align-items: center;
-  min-height: 2.75rem;
+  min-height: var(--control);
   text-decoration: none;
   font-weight: 600;
 }
@@ -106,7 +132,7 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.75rem;
+  min-height: var(--control);
   padding: 0 1rem;
   border: 1px solid var(--border);
   border-radius: 0.5rem;
@@ -137,7 +163,7 @@ input,
 textarea,
 select {
   width: 100%;
-  min-height: 2.75rem;
+  min-height: var(--control);
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--border);
   border-radius: 0.5rem;
@@ -146,6 +172,13 @@ select {
   /* 16px or more stops iOS from zooming in on focus. */
   font: inherit;
   font-size: max(1rem, 16px);
+}
+
+/* Single-line fields take their height from min-height alone, so a 16px
+   line still fits the compact size. */
+input,
+select {
+  padding-block: 0;
 }
 
 textarea {
@@ -186,8 +219,8 @@ a:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: var(--control);
+  height: var(--control);
   padding: 0;
   border: 1px solid transparent;
   border-radius: 0.5rem;
@@ -205,4 +238,16 @@ a:focus-visible {
 .icon:disabled {
   opacity: 0.35;
   cursor: default;
+}
+
+/* Desktop fills the window beside the nav rail, with no centred column, and
+   its icons are as compact as its controls. */
+@media (min-width: 80rem) {
+  .bar,
+  .page {
+    max-width: none;
+  }
+  .icon {
+    font-size: 1rem;
+  }
 }

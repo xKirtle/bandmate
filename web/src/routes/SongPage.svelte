@@ -285,7 +285,7 @@
 <svelte:window onbeforeunload={warnBeforeUnload} />
 <svelte:document onvisibilitychange={refresh} />
 
-<header class="bar wide">
+<header class="bar">
   <a class="back" href="/">← Songs</a>
   {#if song}
     <div class="actions">
@@ -303,13 +303,13 @@
   {/if}
 </header>
 
-<main class="page wide">
+<main class="page">
   {#if loadError}
     <p class="error" role="alert">{loadError}</p>
   {:else if song === null}
     <p class="muted">Loading…</p>
   {:else}
-    <div class="song" class:reading={!writing}>
+    <div class="song">
       <div class="top">
         {#if writing}
           <label class="visually-hidden" for="song-title">Title</label>
@@ -502,7 +502,7 @@
   .mode {
     display: flex;
     align-items: center;
-    min-height: 2.75rem;
+    min-height: var(--control);
     padding: 0 0.875rem;
     background: var(--surface-1);
     font-weight: 600;
@@ -530,7 +530,7 @@
     flex-wrap: wrap;
     align-items: center;
     /* As tall as the Status picker, which Read mode shows as a plain badge. */
-    min-height: 2.75rem;
+    min-height: var(--control);
     gap: 0 0.5rem;
     margin: 0 0 0.75rem;
     font-size: 0.8125rem;
@@ -595,48 +595,6 @@
   @media (min-width: 36rem) {
     .grid {
       grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-  }
-
-  /* On wide screens the Scrapbook sits beside the rest of the Song, and
-     stays in view while the Lyric Sheet scrolls. On phones it follows the
-     Lyric Sheet in one column. */
-  @media (min-width: 64rem) {
-    .song {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 22rem;
-      grid-template-rows: auto auto 1fr;
-      grid-template-areas:
-        'top side'
-        'sheet side'
-        'about side';
-      column-gap: 2rem;
-    }
-    .top {
-      grid-area: top;
-    }
-    .sheet {
-      grid-area: sheet;
-    }
-    .about {
-      grid-area: about;
-      align-self: start;
-    }
-    /* Read mode has no Scrapbook, so no side column. */
-    .song.reading {
-      grid-template-columns: minmax(0, 1fr);
-      grid-template-areas:
-        'top'
-        'sheet'
-        'about';
-    }
-    .side {
-      grid-area: side;
-      align-self: start;
-      position: sticky;
-      top: 4.5rem;
-      max-height: calc(100vh - 5.5rem);
-      overflow-y: auto;
     }
   }
 </style>

@@ -323,7 +323,7 @@
     display: flex;
     align-items: baseline;
     gap: 0.5rem;
-    min-height: 2.75rem;
+    min-height: var(--control);
     padding: 0.625rem 0.75rem;
     cursor: pointer;
   }
