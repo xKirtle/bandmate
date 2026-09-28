@@ -97,101 +97,121 @@
 </script>
 
 <div class="player">
-  <audio
-    bind:this={audio}
-    {src}
-    preload="none"
-    onplay={(e) => {
-      playMediaAlone(e);
-      playing = true;
-    }}
-    onpause={() => (playing = false)}
-    onended={() => (playing = false)}
-    ontimeupdate={() => audio && (time = audio.currentTime)}
-  ></audio>
+  <div class="controls">
+    <audio
+      bind:this={audio}
+      {src}
+      preload="none"
+      onplay={(e) => {
+        playMediaAlone(e);
+        playing = true;
+      }}
+      onpause={() => (playing = false)}
+      onended={() => (playing = false)}
+      ontimeupdate={() => audio && (time = audio.currentTime)}
+    ></audio>
 
-  <button type="button" class="play" onclick={toggle} aria-label={playing ? 'Pause' : 'Play'}>
-    {#if playing}
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /></svg>
-    {:else}
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
-    {/if}
-  </button>
-
-  <div
-    class="wave"
-    role="slider"
-    tabindex="0"
-    aria-label="Position"
-    aria-valuemin={0}
-    aria-valuemax={Math.round(duration)}
-    aria-valuenow={Math.round(time)}
-    aria-valuetext="{formatDuration(time)} of {formatDuration(duration)}"
-    onpointerdown={pointerDown}
-    onpointermove={pointerMove}
-    onpointerup={() => (dragging = false)}
-    onpointercancel={() => (dragging = false)}
-    onkeydown={keydown}
-  >
-    <svg viewBox="0 0 {barCount} 100" preserveAspectRatio="none" aria-hidden="true">
-      {#each shape as peak, i (i)}
-        {@const height = Math.max(2, peak * 100)}
-        <rect
-          class:played={i < played * barCount}
-          x={i + 0.15}
-          y={(100 - height) / 2}
-          width="0.7"
-          {height}
-        />
-      {/each}
-    </svg>
-  </div>
-
-  <span class="time muted">{formatDuration(time)} / {formatDuration(duration)}</span>
-
-  <div class="volume">
-    <button
-      type="button"
-      class="speaker"
-      onclick={playerVolume.toggleMute}
-      aria-label={volume.muted ? 'Unmute' : 'Mute'}
-      aria-pressed={volume.muted}
-    >
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path class="cone" d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z" />
-        {#if loudness(volume) === 'muted'}
-          <path d="M15.5 9.5l5 5M20.5 9.5l-5 5" />
-        {:else}
-          <path d="M15 9a4 4 0 0 1 0 6" />
-          {#if loudness(volume) === 'high'}
-            <path d="M17.5 6.5a7.5 7.5 0 0 1 0 11" />
-          {/if}
-        {/if}
-      </svg>
+    <button type="button" class="play" onclick={toggle} aria-label={playing ? 'Pause' : 'Play'}>
+      {#if playing}
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /></svg>
+      {:else}
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
+      {/if}
     </button>
-    {#if slider}
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.01"
-        value={volume.muted ? 0 : volume.level}
-        oninput={(e) => playerVolume.setLevel(e.currentTarget.valueAsNumber)}
-        aria-label="Volume"
-        aria-valuetext={volume.muted ? 'Muted' : `${Math.round(volume.level * 100)}%`}
-      />
-    {/if}
+
+    <div
+      class="wave"
+      role="slider"
+      tabindex="0"
+      aria-label="Position"
+      aria-valuemin={0}
+      aria-valuemax={Math.round(duration)}
+      aria-valuenow={Math.round(time)}
+      aria-valuetext="{formatDuration(time)} of {formatDuration(duration)}"
+      onpointerdown={pointerDown}
+      onpointermove={pointerMove}
+      onpointerup={() => (dragging = false)}
+      onpointercancel={() => (dragging = false)}
+      onkeydown={keydown}
+    >
+      <svg viewBox="0 0 {barCount} 100" preserveAspectRatio="none" aria-hidden="true">
+        {#each shape as peak, i (i)}
+          {@const height = Math.max(2, peak * 100)}
+          <rect
+            class:played={i < played * barCount}
+            x={i + 0.15}
+            y={(100 - height) / 2}
+            width="0.7"
+            {height}
+          />
+        {/each}
+      </svg>
+    </div>
+
+    <span class="time muted">{formatDuration(time)} / {formatDuration(duration)}</span>
+
+    <div class="volume">
+      <button
+        type="button"
+        class="speaker"
+        onclick={playerVolume.toggleMute}
+        aria-label={volume.muted ? 'Unmute' : 'Mute'}
+        aria-pressed={volume.muted}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path class="cone" d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z" />
+          {#if loudness(volume) === 'muted'}
+            <path d="M15.5 9.5l5 5M20.5 9.5l-5 5" />
+          {:else}
+            <path d="M15 9a4 4 0 0 1 0 6" />
+            {#if loudness(volume) === 'high'}
+              <path d="M17.5 6.5a7.5 7.5 0 0 1 0 11" />
+            {/if}
+          {/if}
+        </svg>
+      </button>
+      {#if slider}
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          value={volume.muted ? 0 : volume.level}
+          oninput={(e) => playerVolume.setLevel(e.currentTarget.valueAsNumber)}
+          aria-label="Volume"
+          aria-valuetext={volume.muted ? 'Muted' : `${Math.round(volume.level * 100)}%`}
+        />
+      {/if}
+    </div>
   </div>
 </div>
 
 <style>
+  /* The layout follows the player's own width, wherever it is placed. */
   .player {
-    display: flex;
+    container-type: inline-size;
+  }
+  .controls {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas: 'play wave time volume';
     align-items: center;
     gap: 0.75rem;
   }
+  /* Narrow, the waveform takes the whole top row after play, and the time and
+     volume move under it, starting at its left edge. The volume slider shows
+     either way: wrapped, it no longer takes width from the waveform. */
+  @container (max-width: 32rem) {
+    .controls {
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      grid-template-areas:
+        'play wave wave'
+        '. time volume';
+      row-gap: 0.25rem;
+    }
+  }
   .play {
-    flex-shrink: 0;
+    grid-area: play;
     display: grid;
     place-items: center;
     width: var(--control);
@@ -209,8 +229,7 @@
     fill: currentColor;
   }
   .wave {
-    flex: 1;
-    min-width: 0;
+    grid-area: wave;
     height: 3rem;
     cursor: pointer;
     touch-action: none;
@@ -234,12 +253,13 @@
     opacity: 1;
   }
   .time {
-    flex-shrink: 0;
+    grid-area: time;
     font-size: 0.8125rem;
     font-variant-numeric: tabular-nums;
   }
   .volume {
-    flex-shrink: 0;
+    grid-area: volume;
+    justify-self: end;
     display: flex;
     align-items: center;
     gap: 0.25rem;
@@ -276,16 +296,9 @@
     fill: currentColor;
   }
   input[type='range'] {
-    display: none;
     width: 5rem;
     min-height: 0;
     padding: 0;
     accent-color: var(--accent);
-  }
-  /* On narrow screens only mute shows, keeping the waveform wide. */
-  @media (min-width: 36rem) {
-    input[type='range'] {
-      display: block;
-    }
   }
 </style>
