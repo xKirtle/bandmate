@@ -668,7 +668,6 @@
   let headsHeight = $state(0);
   let lanesHeight = $state(0);
   let resizing: { y: number; height: number } | null = null;
-  const heightStep = 32;
 
   const bounds = $derived.by(() => {
     // One Track and the ruler above it.
@@ -701,7 +700,9 @@
   }
 
   function resizeKey(event: KeyboardEvent) {
-    const by = { ArrowUp: heightStep, ArrowDown: -heightStep }[event.key];
+    // A Track at a time, however tall the Tracks are drawn.
+    const step = laneElements[0]?.offsetHeight ?? 0;
+    const by = { ArrowUp: step, ArrowDown: -step }[event.key];
     if (by === undefined) return;
     event.preventDefault();
     resize(tracksHeight + by);
@@ -1414,28 +1415,29 @@
 <style>
   .timeline {
     /*
-     * How big the Timeline is next to the rest of the page. Every size in it
-     * is in --rem, which follows this, so this is the one place to change it.
+     * How big the Timeline is next to the rest of the page, the one place to
+     * change it: sizes are in --timeline-rem, which follows it. Hairline
+     * borders stay 1px, and the side gutters stay level with the page's.
      */
     --timeline-scale: 1.25;
-    --rem: calc(var(--timeline-scale) * 1rem);
+    --timeline-rem: calc(var(--timeline-scale) * 1rem);
     /* Never less than a finger's width, whatever the scale. */
-    --touch: max(2.75rem, calc(2.75 * var(--rem)));
+    --touch: max(2.75rem, calc(2.75 * var(--timeline-rem)));
     position: sticky;
     bottom: 0;
     z-index: 1;
     border-top: 1px solid var(--border);
     background: var(--bg);
-    font-size: var(--rem);
+    font-size: var(--timeline-rem);
   }
   /* A few pixels either side of the top border, to be easy to grab. */
   .resize {
     position: absolute;
-    top: calc(-0.3125 * var(--rem));
+    top: calc(-0.3125 * var(--timeline-rem));
     right: 0;
     left: 0;
     z-index: 1;
-    height: calc(0.5625 * var(--rem));
+    height: calc(0.5625 * var(--timeline-rem));
     cursor: row-resize;
     touch-action: none;
   }
@@ -1443,10 +1445,10 @@
   .resize:focus-visible::after {
     content: '';
     position: absolute;
-    top: calc(0.1875 * var(--rem));
+    top: calc(0.1875 * var(--timeline-rem));
     right: 0;
     left: 0;
-    height: calc(0.1875 * var(--rem));
+    height: calc(0.1875 * var(--timeline-rem));
     background: var(--accent);
   }
   .resize:focus-visible {
@@ -1454,20 +1456,20 @@
   }
   /* The full width of the window, for as much of the lanes as fits. */
   .inner {
-    padding: calc(0.5 * var(--rem)) max(1rem, env(safe-area-inset-right))
-      max(calc(0.5 * var(--rem)), env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+    padding: calc(0.5 * var(--timeline-rem)) max(1rem, env(safe-area-inset-right))
+      max(calc(0.5 * var(--timeline-rem)), env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
   }
   /* The page's buttons, sized for the Timeline. */
   .button {
     min-height: var(--touch);
-    padding: 0 var(--rem);
-    border-radius: calc(0.5 * var(--rem));
+    padding: 0 var(--timeline-rem);
+    border-radius: calc(0.5 * var(--timeline-rem));
   }
   .icon {
     width: var(--touch);
     height: var(--touch);
-    border-radius: calc(0.5 * var(--rem));
-    font-size: calc(1.125 * var(--rem));
+    border-radius: calc(0.5 * var(--timeline-rem));
+    font-size: calc(1.125 * var(--timeline-rem));
   }
   .empty,
   .transport,
@@ -1475,7 +1477,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: calc(0.5 * var(--rem)) calc(0.75 * var(--rem));
+    gap: calc(0.5 * var(--timeline-rem)) calc(0.75 * var(--timeline-rem));
   }
   .history {
     display: flex;
@@ -1501,21 +1503,21 @@
     cursor: pointer;
   }
   .play svg {
-    width: calc(1.25 * var(--rem));
-    height: calc(1.25 * var(--rem));
+    width: calc(1.25 * var(--timeline-rem));
+    height: calc(1.25 * var(--timeline-rem));
     fill: currentColor;
   }
   .time {
-    font-size: calc(0.8125 * var(--rem));
+    font-size: calc(0.8125 * var(--timeline-rem));
     font-variant-numeric: tabular-nums;
   }
   .tracks {
     /* Shared by the headers and the lanes, so they stay level. */
-    --track-height: calc(3.5 * var(--rem));
+    --track-height: calc(3.5 * var(--timeline-rem));
     display: flex;
     /* Stretched to the height cap, the headers would squash and the lanes be cut off. */
     align-items: flex-start;
-    margin-top: calc(0.5 * var(--rem));
+    margin-top: calc(0.5 * var(--timeline-rem));
     overflow-y: auto;
   }
   .tracks[hidden] {
@@ -1525,44 +1527,44 @@
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    width: calc(11 * var(--rem));
-    padding-right: calc(0.5 * var(--rem));
+    width: calc(11 * var(--timeline-rem));
+    padding-right: calc(0.5 * var(--timeline-rem));
   }
   .ruler-gap,
   .ruler {
-    height: calc(1.5 * var(--rem));
+    height: calc(1.5 * var(--timeline-rem));
     flex-shrink: 0;
   }
   /* Beside the loop bar and the ruler. */
   .ruler-gap {
-    height: calc(2.25 * var(--rem));
+    height: calc(2.25 * var(--timeline-rem));
   }
   .head {
     display: flex;
     flex-direction: column;
     justify-content: center;
     flex-shrink: 0;
-    gap: calc(0.25 * var(--rem));
+    gap: calc(0.25 * var(--timeline-rem));
     height: var(--track-height);
     border-bottom: 1px solid var(--border);
   }
   .head-row {
     display: flex;
     align-items: center;
-    gap: calc(0.25 * var(--rem));
+    gap: calc(0.25 * var(--timeline-rem));
     min-width: 0;
   }
   .name {
     flex: 1;
     min-width: 0;
     min-height: 0;
-    padding: 0 calc(0.125 * var(--rem));
+    padding: 0 calc(0.125 * var(--timeline-rem));
     border: 1px solid transparent;
-    border-radius: calc(0.25 * var(--rem));
+    border-radius: calc(0.25 * var(--timeline-rem));
     background: none;
     color: var(--text);
     font: inherit;
-    font-size: calc(0.8125 * var(--rem));
+    font-size: calc(0.8125 * var(--timeline-rem));
     font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1577,11 +1579,11 @@
     flex-shrink: 0;
   }
   .track-actions button {
-    padding: 0 calc(0.25 * var(--rem));
+    padding: 0 calc(0.25 * var(--timeline-rem));
     border: none;
     background: none;
     color: var(--text-muted);
-    font-size: calc(0.75 * var(--rem));
+    font-size: calc(0.75 * var(--timeline-rem));
     cursor: pointer;
   }
   .track-actions button:hover:not(:disabled),
@@ -1594,14 +1596,14 @@
   }
   .toggle {
     flex-shrink: 0;
-    width: calc(1.5 * var(--rem));
-    height: calc(1.25 * var(--rem));
+    width: calc(1.5 * var(--timeline-rem));
+    height: calc(1.25 * var(--timeline-rem));
     padding: 0;
     border: 1px solid var(--border);
-    border-radius: calc(0.25 * var(--rem));
+    border-radius: calc(0.25 * var(--timeline-rem));
     background: none;
     color: var(--text-muted);
-    font-size: calc(0.6875 * var(--rem));
+    font-size: calc(0.6875 * var(--timeline-rem));
     font-weight: 700;
     cursor: pointer;
   }
@@ -1632,7 +1634,7 @@
   }
   .loop-bar {
     position: relative;
-    height: calc(0.75 * var(--rem));
+    height: calc(0.75 * var(--timeline-rem));
     overflow: hidden;
     background: var(--surface-1);
     touch-action: none;
@@ -1646,7 +1648,7 @@
     bottom: 0;
     display: flex;
     justify-content: center;
-    border-radius: calc(0.125 * var(--rem));
+    border-radius: calc(0.125 * var(--timeline-rem));
     background: var(--border);
   }
   .loop.on {
@@ -1657,7 +1659,7 @@
     position: absolute;
     top: 0;
     bottom: 0;
-    width: calc(0.375 * var(--rem));
+    width: calc(0.375 * var(--timeline-rem));
     cursor: ew-resize;
   }
   .loop-edge.start {
@@ -1672,12 +1674,12 @@
   }
   .loop-clear {
     display: none;
-    padding: 0 calc(0.25 * var(--rem));
+    padding: 0 calc(0.25 * var(--timeline-rem));
     border: none;
     background: none;
     color: inherit;
-    font-size: calc(0.75 * var(--rem));
-    line-height: calc(0.75 * var(--rem));
+    font-size: calc(0.75 * var(--timeline-rem));
+    line-height: calc(0.75 * var(--timeline-rem));
     cursor: pointer;
   }
   .loop:hover .loop-clear,
@@ -1686,7 +1688,7 @@
   }
   .loop-shade {
     position: absolute;
-    top: calc(0.75 * var(--rem));
+    top: calc(0.75 * var(--timeline-rem));
     bottom: 0;
     background: var(--accent);
     opacity: 0.08;
@@ -1695,7 +1697,7 @@
   .toggle.loop-toggle,
   .toggle.tap-toggle {
     width: auto;
-    padding: 0 calc(0.375 * var(--rem));
+    padding: 0 calc(0.375 * var(--timeline-rem));
   }
   .toggle.loop-toggle:disabled,
   .toggle.tap-toggle:disabled {
@@ -1715,10 +1717,10 @@
   .tick {
     position: absolute;
     top: 0;
-    padding-left: calc(0.25 * var(--rem));
+    padding-left: calc(0.25 * var(--timeline-rem));
     border-left: 1px solid var(--border);
     color: var(--text-muted);
-    font-size: calc(0.75 * var(--rem));
+    font-size: calc(0.75 * var(--timeline-rem));
     font-variant-numeric: tabular-nums;
     pointer-events: none;
   }
@@ -1729,13 +1731,13 @@
   }
   .clip {
     position: absolute;
-    top: calc(0.25 * var(--rem));
-    bottom: calc(0.25 * var(--rem));
+    top: calc(0.25 * var(--timeline-rem));
+    bottom: calc(0.25 * var(--timeline-rem));
     display: flex;
     flex-direction: column;
     overflow: hidden;
     border: 1px solid var(--accent);
-    border-radius: calc(0.25 * var(--rem));
+    border-radius: calc(0.25 * var(--timeline-rem));
     background: var(--surface-1);
   }
   @media (min-width: 40.0625rem) {
@@ -1763,8 +1765,8 @@
   .clip-title {
     flex: 1;
     min-width: 0;
-    padding: 0 calc(0.25 * var(--rem));
-    font-size: calc(0.6875 * var(--rem));
+    padding: 0 calc(0.25 * var(--timeline-rem));
+    font-size: calc(0.6875 * var(--timeline-rem));
     font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
@@ -1779,11 +1781,11 @@
     display: flex;
   }
   .clip-actions button {
-    padding: 0 calc(0.25 * var(--rem));
+    padding: 0 calc(0.25 * var(--timeline-rem));
     border: none;
     background: none;
     color: var(--text);
-    font-size: calc(0.75 * var(--rem));
+    font-size: calc(0.75 * var(--timeline-rem));
     line-height: 1.25;
     cursor: pointer;
   }
@@ -1795,7 +1797,7 @@
     position: absolute;
     top: 0;
     bottom: 0;
-    width: calc(0.375 * var(--rem));
+    width: calc(0.375 * var(--timeline-rem));
     cursor: ew-resize;
   }
   .trim.start {
@@ -1826,17 +1828,18 @@
     position: absolute;
     top: 0;
     bottom: 0;
-    width: calc(0.125 * var(--rem));
-    margin-left: calc(-0.0625 * var(--rem));
+    /* In whole pixels, so it stays sharp. */
+    width: round(calc(0.125 * var(--timeline-rem)), 1px);
+    margin-left: round(calc(-0.0625 * var(--timeline-rem)), 1px);
     background: var(--text);
     pointer-events: none;
   }
   .offer {
-    margin-top: calc(0.5 * var(--rem));
-    font-size: calc(0.875 * var(--rem));
+    margin-top: calc(0.5 * var(--timeline-rem));
+    font-size: calc(0.875 * var(--timeline-rem));
   }
   .error {
-    margin-top: calc(0.5 * var(--rem));
+    margin-top: calc(0.5 * var(--timeline-rem));
   }
 
   /* On a phone, the Timeline only plays. */
@@ -1849,12 +1852,12 @@
       display: none;
     }
     .heads {
-      width: calc(8 * var(--rem));
+      width: calc(8 * var(--timeline-rem));
     }
     /* Easier to hit with a thumb. */
     .toggle {
-      width: calc(1.75 * var(--rem));
-      height: calc(1.5 * var(--rem));
+      width: calc(1.75 * var(--timeline-rem));
+      height: calc(1.5 * var(--timeline-rem));
     }
     /* .clip-actions and .loop-clear show on hover, so they need hiding here too. */
     .clip .clip-actions,
