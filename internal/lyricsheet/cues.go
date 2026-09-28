@@ -132,8 +132,9 @@ func (s *Store) RestoreCues(ctx context.Context, songID int64, based Version, va
 }
 
 // ShiftCues moves every Cue in a Song that lies in [start, end), in
-// seconds, by the seconds given, dormant ones included. It's how Cues follow a Clip that was moved. None
-// may end up before the start of the Timeline, or the shift is refused.
+// seconds, by the seconds given, dormant ones included. It's how Cues
+// follow a Clip that was moved. None may end up before the start of the
+// Timeline, or the shift is refused.
 func (s *Store) ShiftCues(ctx context.Context, songID int64, based Version, start, end, by float64) (Song, error) {
 	if end <= start {
 		return Song{}, invalid("the span must end after it starts")

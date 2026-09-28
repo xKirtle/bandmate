@@ -217,8 +217,8 @@ function key(c: CueValue): string {
 /**
  * The Cues that can still be restored in a Song: those whose Occurrence is
  * still in it and whose Line is still in its Section and, to be given a
- * Cue, isn't blank. The rest went with a Lyric Sheet change
- * since, which can't be undone, so they're left out rather than stop undo.
+ * Cue, isn't blank. The rest went with a Lyric Sheet change since, which
+ * can't be undone, so they're left out rather than stop undo.
  */
 export function restorable(cues: readonly CueValue[], song: CuedSong): CueValue[] {
   const occurrences = new Map(song.arrangement.map((o) => [o.id, o]));

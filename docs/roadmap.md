@@ -36,7 +36,7 @@ Decisions made while designing, recorded so later spec sessions start from them.
 
 Cues:
 
-- Cues point to Occurrences and Lines (ADR 0005). They're created in Sync mode or typed into the Cue gutter. They never go into the Line text: that text is shared by every Occurrence of a Section, and each Occurrence is sung at its own time.
+- Cues point to a Line within an Occurrence (ADRs 0005 and 0009). They're created in Sync mode or typed into the Cue gutter. They never go into the Line text: that text is shared by every Occurrence of a Section, and each Occurrence is sung at its own time.
 - Any non-blank Line can take a Cue, Chord Lines included.
 - Only Lines are cued: an Occurrence has no Cue of its own, and starts where its first Line is cued (ADR 0009). A placeholder Line such as `[Intro]` places a Section with no words.
 - Switching a Section's Alternate leaves the inactive Alternate's line-level Cues dormant, not cleared (ADR 0007). Switching back brings them back.

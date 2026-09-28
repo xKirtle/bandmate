@@ -1,12 +1,14 @@
 -- Only Lines are cued: an Occurrence starts where its first Line is cued
 -- (ADR 0009). An Occurrence's own Cue moves to its first Line (the first
 -- non-blank Line of its active Alternate) when that Line has none, and is
--- dropped otherwise, as is the Cue of an Occurrence with no Lines.
+-- dropped otherwise, as is the Cue of an Occurrence with no Lines. Blank
+-- is as Go's strings.TrimSpace has it, Unicode spaces included.
 INSERT OR IGNORE INTO line_cues (occurrence_id, line_id, cue_ms)
 SELECT id, first_line, cue_ms FROM (
 	SELECT o.id, o.cue_ms, (
 		SELECT l.id FROM lines l JOIN alternates a ON a.id = l.alternate_id AND a.active = 1
-		WHERE a.section_id = o.section_id AND trim(l.text, ' ' || char(9, 10, 11, 12, 13)) <> ''
+		WHERE a.section_id = o.section_id AND trim(l.text, char(9, 10, 11, 12, 13, 32, 133, 160, 5760, 8192, 8193, 8194, 8195, 8196, 8197, 8198, 8199,
+			8200, 8201, 8202, 8232, 8233, 8239, 8287, 12288)) <> ''
 		ORDER BY l.position LIMIT 1
 	) AS first_line
 	FROM occurrences o WHERE o.cue_ms IS NOT NULL

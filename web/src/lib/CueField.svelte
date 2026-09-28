@@ -17,7 +17,7 @@
   }: {
     /** In seconds, or null without a Cue. */
     cue: number | null;
-    /** What the Cue is for, e.g. "Chorus", for screen readers. */
+    /** Names the Line, e.g. "Line 3 of Chorus", for screen readers. */
     label: string;
     /** Saves the new Cue, or null to clear it. */
     save: (cue: number | null) => void;
@@ -25,11 +25,11 @@
     next?: () => boolean;
     /** Given, a ▶ before the time plays from the Cue. */
     play?: (to: number) => void;
-    /** Whether playback is on what the Cue is for, so its ▶ isn't muted. */
+    /** Whether playback is on the Line, so its ▶ isn't muted. */
     current?: boolean;
     /**
-     * Given, as in Sync mode, clicking the time or ▶ makes what the Cue is
-     * for the next to cue, rather than opening the time.
+     * Given, as in Sync mode, clicking the time or ▶ makes the Line the next
+     * to cue, rather than opening the time.
      */
     pick?: () => void;
   } = $props();

@@ -28,8 +28,9 @@ type Occurrence struct {
 	Shared bool `json:"shared"`
 	// LineCues maps Line ids to when each is sung in this Occurrence, in
 	// seconds to the millisecond. An Occurrence has no Cue of its own: it
-	// starts where its first Line is cued (ADR 0009). It holds the Cues of Lines in every Alternate of the Section:
-	// those of inactive Alternates lie dormant (ADR 0007).
+	// starts where its first Line is cued (ADR 0009). It holds the Cues of
+	// Lines in every Alternate of the Section: those of inactive Alternates
+	// lie dormant (ADR 0007).
 	LineCues map[int64]float64 `json:"lineCues"`
 }
 

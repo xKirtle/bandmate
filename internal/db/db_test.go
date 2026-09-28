@@ -44,7 +44,7 @@ func TestOccurrenceCuesMoveToTheirFirstLines(t *testing.T) {
 		`INSERT INTO alternates (id, section_id, active) VALUES (1, 1, 0), (2, 1, 1), (3, 2, 1), (4, 3, 1)`,
 		`INSERT INTO lines (id, alternate_id, position, text) VALUES
 			(1, 1, 0, 'Old words'),
-			(2, 2, 0, '  '), (3, 2, 1, 'Drive, drive'), (4, 2, 2, 'all night'),
+			(2, 2, 0, ' ' || char(160)), (3, 2, 1, 'Drive, drive'), (4, 2, 2, 'all night'),
 			(5, 3, 0, 'City lights')`,
 		// Occurrence 1: cued, its first Line not. Occurrence 2: its first
 		// Line cued already. Occurrence 3: the Verse, uncued. Occurrence 4:

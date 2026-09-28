@@ -30,7 +30,7 @@
 
   /** The current Line if it's shown, or null for its whole Section, e.g. a Chord Line while Chords are hidden. */
   function shownLine(position: Position): number | null {
-    if (position.line === null || showChords) return position.line;
+    if (showChords) return position.line;
     const o = song.arrangement.find((o) => o.id === position.occurrence);
     return o && linesOf(o).lines.some((l) => l.id === position.line) ? position.line : null;
   }
