@@ -459,13 +459,15 @@
             {/if}
           </details>
         {/each}
-
-        {#if writing}
-          <button type="button" class="button danger delete" onclick={remove} disabled={deleting}>
-            {deleting ? 'Deleting…' : 'Delete Song'}
-          </button>
-        {/if}
       </div>
+
+      <!-- Last in the markup so it's reached last, though desktop shows it
+           beside the title. -->
+      {#if writing}
+        <button type="button" class="button danger delete" onclick={remove} disabled={deleting}>
+          {deleting ? 'Deleting…' : 'Delete Song'}
+        </button>
+      {/if}
     </div>
 
     <datalist id="common-keys">
@@ -645,7 +647,6 @@
     margin-bottom: 2rem;
   }
   .delete {
-    align-self: flex-start;
     margin-top: 1rem;
   }
   .part > summary {
@@ -653,15 +654,16 @@
   }
 
   /* Desktop: two columns sitting together on the left, spare width going to
-     the right. The details column sticks, scrolls on its own and stops above
-     the docked Timeline. */
+     the right, with Delete beside the title. The details column starts level
+     with the Lyric Sheet, sticks, scrolls on its own and stops above the
+     docked Timeline. */
   @media (min-width: 80rem) {
     .song {
       display: grid;
       grid-template-columns: minmax(0, 55rem) var(--side-width);
       grid-template-rows: auto 1fr;
       grid-template-areas:
-        'top side'
+        'top delete'
         'sheet side';
       justify-content: start;
       align-items: start;
@@ -689,7 +691,9 @@
       margin-bottom: 0;
     }
     .delete {
-      margin-top: 0.5rem;
+      grid-area: delete;
+      justify-self: end;
+      margin-top: 0;
     }
     .title {
       min-height: 2.5rem;
