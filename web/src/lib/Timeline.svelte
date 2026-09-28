@@ -1660,6 +1660,10 @@
   }
   .ruler {
     position: relative;
+    /* A label near the end would stick out past the lanes, giving them a
+       horizontal scrollbar that pushes the Tracks area into scrolling, whose
+       scrollbar narrows the lanes and moves the ticks: an endless flicker. */
+    overflow: hidden;
     border-bottom: 1px solid var(--border);
     cursor: pointer;
     touch-action: none;
