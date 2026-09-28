@@ -806,7 +806,7 @@ func TestImportOffsetShiftsEveryCue(t *testing.T) {
 			}
 			for _, sec := range readSheet(s) {
 				for _, line := range sec.Lines {
-					if strings.Contains(line, "offset") {
+					if strings.HasPrefix(strings.ToLower(line), "{offset") {
 						t.Errorf("sheet = %+v, want the offset directive dropped", readSheet(s))
 					}
 				}

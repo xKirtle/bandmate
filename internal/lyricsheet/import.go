@@ -184,8 +184,9 @@ func recognised(name string) bool {
 // Cue by its time (see shiftCues).
 func parseImport(text string) (importedSheet, error) {
 	var sheet importedSheet
-	given := map[string]int{} // the paste line that gave each Detail, and the offset
+	given := map[string]int{} // the paste line that gave each Detail
 	var offset int64          // in milliseconds
+	offsetGiven := 0          // the paste line that gave the offset, or 0
 	var cur importedSection
 	end := func() {
 		for len(cur.lines) > 0 && blank(cur.lines[len(cur.lines)-1].text) {
@@ -237,10 +238,10 @@ func parseImport(text string) (importedSheet, error) {
 				sheet.notes = append(sheet.notes, value)
 			}
 			if name == "offset" {
-				if earlier, ok := given[name]; ok {
-					return importedSheet{}, invalidPasteLine(i+1, "the offset is already given on line %d", earlier)
+				if offsetGiven != 0 {
+					return importedSheet{}, invalidPasteLine(i+1, "the offset is already given on line %d", offsetGiven)
 				}
-				given[name] = i + 1
+				offsetGiven = i + 1
 				if offset, err = offsetMillis(value); err != nil {
 					return importedSheet{}, invalidPasteLine(i+1, "%s", err)
 				}
@@ -319,7 +320,7 @@ func (sheet *importedSheet) shiftCues(ms int64) error {
 var offsetText = regexp.MustCompile(`^([+-]?)(?:(\d+):([0-5]\d(?:\.\d+)?)|(\d+(?:\.\d+)?))$`)
 
 // offsetMillis reads an offset directive's value into milliseconds,
-// positive for later.
+// positive for later, rounded as a typed Cue is.
 func offsetMillis(value string) (int64, error) {
 	m := offsetText.FindStringSubmatch(value)
 	if m == nil {
