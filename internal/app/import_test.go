@@ -133,17 +133,13 @@ func TestImportSplitsPastedTextIntoSections(t *testing.T) {
 			"Come [Am]home:\nnow",
 			[]shownSection{{"", []string{"Come [Am]home:", "now"}}},
 		},
-		"comment directives are dropped": {
-			"{comment: capo 2}\nCity lights\n{c:slowly}\nare calling",
-			[]shownSection{{"", []string{"City lights", "are calling"}}},
+		"unrecognised directives are lines as written": {
+			"{comment: Play softly}\nCity lights\n{c:slowly}\n{artist: Someone}\n  {unknown}  \nare calling",
+			[]shownSection{{"", []string{"{comment: Play softly}", "City lights", "{c:slowly}", "{artist: Someone}", "  {unknown}  ", "are calling"}}},
 		},
-		"unknown directives are ignored": {
-			"{artist: Someone}\n{key: Am}\nCity lights\n  {unknown}  \nare calling",
-			[]shownSection{{"", []string{"City lights", "are calling"}}},
-		},
-		"title directives are not lines": {
-			"{title: Other Name}\n{t: Other}\nCity lights",
-			[]shownSection{{"", []string{"City lights"}}},
+		"details directives are not lines": {
+			"{title: Other Name}\n{key: Am}\n{bpm: 92}\n{tempo_x: 3}\n{capo: 2}\n{tuning: Drop D}\n{notes: low}\nCity lights",
+			[]shownSection{{"", []string{"{tempo_x: 3}", "City lights"}}},
 		},
 		"chordpro section directives": {
 			"{start_of_verse}\nCity lights\n{end_of_verse}\n{start_of_chorus}\nMe home\n{end_of_chorus}\n{start_of_bridge}\nSo far\n{end_of_bridge}",
@@ -455,7 +451,7 @@ func TestImportWithNothingToImportIsRejected(t *testing.T) {
 	for name, text := range map[string]string{
 		"empty":           "",
 		"blank lines":     "\n  \n\n",
-		"only directives": "{title: Midnight Drive}\n{c: capo 2}",
+		"only directives": "{title: Midnight Drive}\n{key: Am}\n{notes: low}",
 	} {
 		t.Run(name, func(t *testing.T) {
 			ts := newTestServer(t)
@@ -467,5 +463,115 @@ func TestImportWithNothingToImportIsRejected(t *testing.T) {
 				t.Errorf("songs = %+v, want none created", list)
 			}
 		})
+	}
+}
+
+func TestImportDirectivesSetTheSongsDetails(t *testing.T) {
+	ts := newTestServer(t)
+
+	s := ts.importSheet("{key: Am}\n{bpm: 92}\n{capo:2}\n{tuning: Drop D}\nCity lights")
+
+	if s.Key != "Am" || s.BPM == nil || *s.BPM != 92 || s.Capo == nil || *s.Capo != 2 || s.Tuning != "Drop D" {
+		t.Errorf("details = key %q, bpm %v, capo %v, tuning %q; want Am, 92, 2, Drop D", s.Key, s.BPM, s.Capo, s.Tuning)
+	}
+	if sheet := readSheet(s); !reflect.DeepEqual(sheet, []shownSection{{"", []string{"City lights"}}}) {
+		t.Errorf("sheet = %+v, want the directives left out", sheet)
+	}
+}
+
+func TestImportTakesTheTempoAsTheBPM(t *testing.T) {
+	ts := newTestServer(t)
+
+	s := ts.importSheet("{tempo: 120}\nCity lights")
+
+	if s.BPM == nil || *s.BPM != 120 {
+		t.Errorf("bpm = %v, want 120", s.BPM)
+	}
+}
+
+func TestImportNotesDirectivesBecomeTheNotesLines(t *testing.T) {
+	ts := newTestServer(t)
+
+	s := ts.importSheet("{notes: Sing it low}\nCity lights\n{notes:Half time in the bridge}\n{Notes: }\n{notes: Fade out}")
+
+	if want := "Sing it low\nHalf time in the bridge\n\nFade out"; s.Notes != want {
+		t.Errorf("notes = %q, want %q", s.Notes, want)
+	}
+}
+
+func TestImportWithABadBPMOrCapoIsRejected(t *testing.T) {
+	cases := map[string]struct{ text, want string }{
+		"bpm not a number":   {"City lights\n{bpm: fast}", "line 2: bpm must be a whole number between 1 and 999"},
+		"bpm not whole":      {"{bpm: 92.5}\nCity lights", "line 1: bpm must be a whole number between 1 and 999"},
+		"bpm too low":        {"{bpm: 0}\nCity lights", "line 1: bpm must be a whole number between 1 and 999"},
+		"bpm too high":       {"{bpm: 1000}\nCity lights", "line 1: bpm must be a whole number between 1 and 999"},
+		"bpm empty":          {"{bpm:}\nCity lights", "line 1: bpm must be a whole number between 1 and 999"},
+		"tempo out of range": {"\n\n{tempo: -4}\nCity lights", "line 3: tempo must be a whole number between 1 and 999"},
+		"capo not a number":  {"{capo: two}\nCity lights", "line 1: capo must be a whole number between 0 and 24"},
+		"capo too low":       {"{capo: -1}\nCity lights", "line 1: capo must be a whole number between 0 and 24"},
+		"capo too high":      {"[Verse]\nCity lights\n{capo: 25}", "line 3: capo must be a whole number between 0 and 24"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			ts := newTestServer(t)
+
+			res := ts.importSong("Midnight Drive", c.text)
+
+			expectError(t, res, http.StatusBadRequest, c.want)
+			if list := ts.listSongs(); len(list) != 0 {
+				t.Errorf("songs = %+v, want none created", list)
+			}
+		})
+	}
+}
+
+func TestImportTakesTheEdgesOfTheBPMAndCapoRanges(t *testing.T) {
+	ts := newTestServer(t)
+
+	low := ts.importSheet("{bpm: 1}\n{capo: 0}\nCity lights")
+	high := ts.importSheet("{bpm: 999}\n{capo: 24}\nCity lights")
+
+	if *low.BPM != 1 || *low.Capo != 0 || *high.BPM != 999 || *high.Capo != 24 {
+		t.Errorf("bpm, capo = %d, %d and %d, %d; want 1, 0 and 999, 24", *low.BPM, *low.Capo, *high.BPM, *high.Capo)
+	}
+}
+
+func TestImportWithARepeatedDirectiveIsRejected(t *testing.T) {
+	cases := map[string]struct{ text, want string }{
+		"title":         {"{title: Midnight Drive}\nCity lights\n{title: Other}", "line 3: the title is already given on line 1"},
+		"title and t":   {"{t: Midnight Drive}\n{Title: Other}\nCity lights", "line 2: the title is already given on line 1"},
+		"empty title":   {"{title:}\n{title: Midnight Drive}\nCity lights", "line 2: the title is already given on line 1"},
+		"key":           {"{key: Am}\n{key: C}\nCity lights", "line 2: the key is already given on line 1"},
+		"bpm":           {"{bpm: 92}\nCity lights\n\n{bpm: 92}", "line 4: the bpm is already given on line 1"},
+		"bpm and tempo": {"{tempo: 92}\n{bpm: 100}\nCity lights", "line 2: the bpm is already given on line 1"},
+		"capo":          {"{capo: 2}\n{capo: 3}\nCity lights", "line 2: the capo is already given on line 1"},
+		"tuning":        {"{tuning: Standard}\n{tuning: Drop D}\nCity lights", "line 2: the tuning is already given on line 1"},
+		"bad repeat":    {"{capo: 2}\n{capo: x}\nCity lights", "line 2: the capo is already given on line 1"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			ts := newTestServer(t)
+
+			res := ts.importSong("Midnight Drive", c.text)
+
+			expectError(t, res, http.StatusBadRequest, c.want)
+			if list := ts.listSongs(); len(list) != 0 {
+				t.Errorf("songs = %+v, want none created", list)
+			}
+		})
+	}
+}
+
+func TestImportKeepsBracketTagsAsLabels(t *testing.T) {
+	ts := newTestServer(t)
+
+	s := ts.importSheet("[title: Other Name]\nCity lights\n\n[ti: Other]\nMe home\n[ar: Someone]")
+
+	if s.Title != "Midnight Drive" {
+		t.Errorf("title = %q, want the one given, Midnight Drive", s.Title)
+	}
+	want := []shownSection{{"title: Other Name", []string{"City lights"}}, {"ti: Other", []string{"Me home"}}, {"ar: Someone", []string{}}}
+	if sheet := readSheet(s); !reflect.DeepEqual(sheet, want) {
+		t.Errorf("sheet = %+v, want %+v", sheet, want)
 	}
 }

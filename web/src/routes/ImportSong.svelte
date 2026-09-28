@@ -47,6 +47,12 @@
       <code>[Am]</code> becomes a Chord. Repeated Sections with the same Label are shared, and a
       Label on its own repeats the last Section with that Label.
     </p>
+    <p id="directives-hint" class="muted">
+      ChordPro directives fill in the Song: <code>{'{title:}'}</code> or <code>{'{t:}'}</code>
+      names it, <code>{'{key:}'}</code>, <code>{'{bpm:}'}</code> or <code>{'{tempo:}'}</code>,
+      <code>{'{capo:}'}</code> and <code>{'{tuning:}'}</code> set its Details, once each, and each
+      <code>{'{notes:}'}</code> adds a line to its notes. Other directives stay as Lines.
+    </p>
     <!-- svelte-ignore a11y_autofocus -->
     <textarea
       id="lyrics"
@@ -55,7 +61,7 @@
       autofocus
       rows="16"
       spellcheck="false"
-      aria-describedby="lyrics-hint"
+      aria-describedby="lyrics-hint directives-hint"
       placeholder={'{title: Midnight Drive}\n\n[Verse]\n[Am]City lights are [F]calling\n\n[Am]Me home [F]tonight\n\n[Chorus]\n…'}
     ></textarea>
     {#if askTitle}

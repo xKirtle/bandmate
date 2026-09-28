@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -17,7 +18,7 @@ var (
 // ImportSong creates a new Song from pasted lyrics, plain text or ChordPro,
 // with one Occurrence per Section the text marks (see parseImport). A
 // Section repeated in the text is one Section (see arrange). A title directive in the text names the Song;
-// without one, title does.
+// without one, title does. Other directives fill in the Song's Details.
 func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error) {
 	sheet, err := parseImport(text)
 	if err != nil {
@@ -42,6 +43,10 @@ func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error
 	songID, err := insertSong(ctx, tx, title)
 	if err != nil {
 		return Song{}, err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE songs SET song_key = ?, bpm = ?, capo = ?, tuning = ?, notes = ? WHERE id = ?`,
+		sheet.key, sheet.bpm, sheet.capo, sheet.tuning, strings.Join(sheet.notes, "\n"), songID); err != nil {
+		return Song{}, fmt.Errorf("setting details: %w", err)
 	}
 	distinct, arrangement := arrange(sheet.sections)
 	sectionIDs := make([]int64, len(distinct))
@@ -71,8 +76,12 @@ func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error
 
 // importedSheet is what pasted text says about the Song to create.
 type importedSheet struct {
-	title    string // from a title directive, if any
-	sections []importedSection
+	title string // from a title directive, if any
+	// The Song's Details, from their directives; unset if there are none.
+	key, tuning string
+	bpm, capo   *int
+	notes       []string // one line per notes directive, in order
+	sections    []importedSection
 }
 
 // importedSection is one Section read from pasted text, as it appears
@@ -108,16 +117,33 @@ var sectionDirectives = map[string]sectionDirective{
 	"start_of_bridge": {true, "Bridge"}, "sob": {true, "Bridge"}, "end_of_bridge": {}, "eob": {},
 }
 
-// parseImport reads pasted text into the Song title, if a directive gives
-// one, and Sections, or rejects it with an error naming the line at fault
+// detailDirectives are the ChordPro directives that each give one Detail
+// of the Song, the title among them, so a paste may give it only once.
+var detailDirectives = map[string]string{
+	"title": "title", "t": "title", "key": "key", "bpm": "bpm", "tempo": "bpm", "capo": "capo", "tuning": "tuning",
+}
+
+// recognised reports whether import understands the directive name. It
+// keeps any other directive as a Line, as written.
+func recognised(name string) bool {
+	_, detail := detailDirectives[name]
+	_, section := sectionDirectives[name]
+	return detail || section || name == "notes"
+}
+
+// parseImport reads pasted text into the Song's title and Details, as far
+// as directives give them, and Sections, or rejects it with an error naming the line at fault
 // (see invalidPasteLine). Only what the text says starts a Section: a
 // heading or start directive starts one with that Label, and an end
 // directive ends one, so the Lines after it start one without a Label.
 // Blank lines are blank Lines, except at a Section's start or end, where
 // they're dropped. A heading with no Lines under it is a Section with no
-// Lines. Other directives never become Lines.
+// Lines. Each Detail's directive may appear once, and each notes directive
+// adds a line to the notes. Directives import doesn't recognise are Lines
+// as written.
 func parseImport(text string) (importedSheet, error) {
 	var sheet importedSheet
+	given := map[string]int{} // the paste line that gave each Detail
 	var cur importedSection
 	end := func() {
 		for len(cur.lines) > 0 && blank(cur.lines[len(cur.lines)-1].text) {
@@ -132,9 +158,30 @@ func parseImport(text string) (importedSheet, error) {
 		if blank(line) && len(cur.lines) == 0 {
 			continue
 		}
-		if name, value, ok := directive(line); ok {
-			if name == "title" || name == "t" {
+		if name, value, ok := directive(line); ok && recognised(name) {
+			if detail, ok := detailDirectives[name]; ok {
+				if earlier, ok := given[detail]; ok {
+					return importedSheet{}, invalidPasteLine(i+1, "the %s is already given on line %d", detail, earlier)
+				}
+				given[detail] = i + 1
+			}
+			switch name {
+			case "title", "t":
 				sheet.title = value
+			case "key":
+				sheet.key = value
+			case "tuning":
+				sheet.tuning = value
+			case "bpm", "tempo":
+				if sheet.bpm, ok = wholeNumber(value, 1, 999); !ok {
+					return importedSheet{}, invalidPasteLine(i+1, "%s must be a whole number between 1 and 999", name)
+				}
+			case "capo":
+				if sheet.capo, ok = wholeNumber(value, 0, 24); !ok {
+					return importedSheet{}, invalidPasteLine(i+1, "capo must be a whole number between 0 and 24")
+				}
+			case "notes":
+				sheet.notes = append(sheet.notes, value)
 			}
 			if d, ok := sectionDirectives[name]; ok {
 				end()
@@ -153,6 +200,16 @@ func parseImport(text string) (importedSheet, error) {
 	}
 	end()
 	return sheet, nil
+}
+
+// wholeNumber reads value as a whole number from lo to hi, as the Details
+// form takes BPM and capo.
+func wholeNumber(value string, lo, hi int) (*int, bool) {
+	n, err := strconv.Atoi(value)
+	if err != nil || n < lo || n > hi {
+		return nil, false
+	}
+	return &n, true
 }
 
 // arrange lays imported Sections out as a Song. It returns the distinct
