@@ -163,6 +163,7 @@
      the same way, so each row's highlight and Cue line up with its text. The
      text box sits on top and takes every click, so it never seeks, except
      in Sync mode, where clicks go through it to the rows to pick them. -->
+<!-- Hovering only shows a Line's ✕; the keyboard reaches it in the gutter slot. -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="field"

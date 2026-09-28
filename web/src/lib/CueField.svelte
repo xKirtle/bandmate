@@ -6,8 +6,8 @@
   // lets the time be typed: Enter or leaving the field saves, Esc cancels,
   // and an empty field clears the Cue. Alt+↑/↓ nudges it by a tenth of a
   // second. A ✕ after it, shown while its Line is hovered or the keyboard is
-  // in its slot, clears the Cue. In Sync mode, clicking it makes its Line the
-  // next to cue instead, and there's no ✕.
+  // in its slot, clears the Cue. With `pick`, as in Sync mode, clicking it
+  // makes its Line the next to cue instead, and there's no ✕.
   let {
     cue,
     label,
@@ -280,12 +280,15 @@
     font: inherit;
     font-size: 0.6875rem;
     opacity: 0;
+    pointer-events: none;
     cursor: pointer;
   }
+  /* Only clickable once it shows, so a tap on nothing can't clear a Cue. */
   .slot:hover .clear,
   .slot.hovered .clear,
   .slot:focus-within .clear {
     opacity: 1;
+    pointer-events: auto;
   }
   .clear:hover,
   .clear:focus-visible {
