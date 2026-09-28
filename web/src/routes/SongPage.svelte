@@ -655,7 +655,7 @@
   @media (min-width: 80rem) {
     .song {
       display: grid;
-      grid-template-columns: minmax(0, 55rem) 22rem;
+      grid-template-columns: minmax(0, 55rem) var(--side-width);
       grid-template-rows: auto 1fr;
       grid-template-areas:
         'top side'

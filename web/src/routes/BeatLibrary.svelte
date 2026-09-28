@@ -655,8 +655,8 @@
     box-shadow: inset 3px 0 0 var(--accent);
   }
 
-  /* The open Beat's pane sits beside the table, the width of the Song page's
-     right column. It sticks below the header, scrolling on its own, while the
+  /* The open Beat's pane sits beside the table, as wide as the Song page's
+     details column. It sticks below the header, scrolling on its own, while the
      table scrolls. */
   .table-and-pane {
     display: grid;
@@ -665,7 +665,7 @@
     gap: var(--gutter);
   }
   .table-and-pane.with-pane {
-    grid-template-columns: minmax(0, 1fr) 22rem;
+    grid-template-columns: minmax(0, 1fr) var(--side-width);
   }
   .pane {
     position: sticky;

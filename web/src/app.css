@@ -22,6 +22,8 @@
   --tabbar-height: 3.5rem;
   /* What the tab bar takes from the bottom of the window. */
   --tabbar-space: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
+  /* A desktop side column: the Song page's details, the Beat Library's pane. */
+  --side-width: 22rem;
 
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.5;
