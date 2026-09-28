@@ -9,6 +9,7 @@
   import { gutterFields } from './gutter';
   import LyricSheetView from './LyricSheetView.svelte';
   import SectionEditor from './SectionEditor.svelte';
+  import { dropGap, moveTo, targetIndex } from './sectionDrag';
   import { describe } from './sections';
   import type { Mode } from './songMode';
   import { markSyncHintSeen, sawSyncHint } from './syncHint';
@@ -213,13 +214,87 @@
   }
 
   function move(index: number, by: -1 | 1) {
-    const order = song.arrangement.map((o) => o.id);
-    [order[index], order[index + by]] = [order[index + by], order[index]];
+    const order = moveTo(
+      song.arrangement.map((o) => o.id),
+      index,
+      index + by,
+    );
     change((at) => api.reorderArrangement(at, order));
   }
+
+  // On desktop, a Section is also dragged by the grip on its header. A drop
+  // saves the same order as pressing ↑ or ↓ that many times, so Cues go with
+  // their Occurrences. Pointer events rather than HTML5 drag and drop, so the
+  // drop shows between Sections and Esc cancels.
+  const desktop = new MediaQuery('min-width: 80rem');
+  // Each Occurrence's place on the page, in Arrangement order.
+  const occurrenceEls: HTMLElement[] = [];
+  let drag = $state<{ from: number; gap: number; y: number } | null>(null);
+  // Where the dragged Section would end up, if it moves at all.
+  const dropAt = $derived(drag && targetIndex(drag.from, drag.gap) !== drag.from ? drag.gap : null);
+
+  function placeOccurrence(el: HTMLElement, index: number) {
+    occurrenceEls[index] = el;
+    return () => {
+      if (occurrenceEls[index] === el) delete occurrenceEls[index];
+    };
+  }
+
+  function aim(y: number) {
+    if (!drag) return;
+    const middles = song.arrangement.map((_, i) => {
+      const box = occurrenceEls[i]?.getBoundingClientRect();
+      return box ? box.top + box.height / 2 : -Infinity;
+    });
+    drag = { ...drag, gap: dropGap(y, middles), y };
+  }
+
+  function startDrag(e: PointerEvent & { currentTarget: HTMLElement }, from: number) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    drag = { from, gap: from, y: e.clientY };
+  }
+
+  function drop() {
+    if (!drag) return;
+    const { from, gap } = drag;
+    drag = null;
+    const to = targetIndex(from, gap);
+    if (to === from) return;
+    const order = moveTo(
+      song.arrangement.map((o) => o.id),
+      from,
+      to,
+    );
+    change((at) => api.reorderArrangement(at, order));
+  }
+
+  function onKey(event: KeyboardEvent) {
+    if (drag && event.key === 'Escape') {
+      event.preventDefault();
+      drag = null;
+      return;
+    }
+    cueKey(event);
+  }
+
+  // The Arrangement changing mid-drag, e.g. from another tab, would move
+  // what's being dragged: that cancels it.
+  const arrangementOrder = $derived(song.arrangement.map((o) => o.id).join());
+  $effect(() => {
+    void arrangementOrder;
+    untrack(() => (drag = null));
+  });
+  // So does the grip going mid-drag, e.g. the window narrowing or Read
+  // mode coming on: the pointer's release would never reach it.
+  const canDrag = $derived(desktop.current && mode === 'write' && song.arrangement.length > 1);
+  $effect(() => {
+    if (!canDrag) untrack(() => (drag = null));
+  });
 </script>
 
-<svelte:window onkeydown={cueKey} />
+<svelte:window onkeydown={onKey} onscroll={() => drag && aim(drag.y)} />
 
 <section class="sheet" aria-labelledby="sheet-heading">
   <div class="head">
@@ -277,8 +352,12 @@
         {#if section}
           <li
             class:current={writeKey === key(occurrence.id)}
+            class:dragged={drag?.from === i}
+            class:drop-above={dropAt === i}
+            class:drop-below={dropAt === song.arrangement.length && i === song.arrangement.length - 1}
             aria-current={writeKey === key(occurrence.id) ? 'true' : undefined}
             {@attach (el) => track(el, key(occurrence.id))}
+            {@attach (el) => placeOccurrence(el, i)}
           >
             <SectionEditor
               uid="o{occurrence.id}"
@@ -297,6 +376,20 @@
                 : undefined}
               cueing={cueingFor(occurrence, section.label)}
             >
+              {#snippet grip()}
+                {#if canDrag}
+                  <!-- Pointer only: ↑ and ↓ move it from the keyboard. -->
+                  <span
+                    class="grip"
+                    aria-hidden="true"
+                    title="Drag to move; Esc cancels"
+                    onpointerdown={(e) => startDrag(e, i)}
+                    onpointermove={(e) => aim(e.clientY)}
+                    onpointerup={drop}
+                    onpointercancel={() => (drag = null)}>⠿</span
+                  >
+                {/if}
+              {/snippet}
               {#snippet actions()}
                 <button type="button" class="icon" onclick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">
                   ↑
@@ -448,6 +541,45 @@
     border-radius: 0.75rem;
     box-shadow: 0 0 0 2px var(--accent);
     scroll-margin-top: 5rem;
+  }
+  .grip {
+    display: grid;
+    place-items: center;
+    width: 1.25rem;
+    min-height: var(--control);
+    color: var(--text-muted);
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+  }
+  .grip:hover {
+    color: var(--text);
+  }
+  .arrangement > li {
+    position: relative;
+  }
+  .arrangement > .dragged {
+    opacity: 0.5;
+  }
+  .arrangement > .dragged .grip {
+    cursor: grabbing;
+  }
+  /* The drop shows in the gap the dragged Section would land in. */
+  .arrangement > .drop-above::before,
+  .arrangement > .drop-below::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--accent);
+  }
+  .arrangement > .drop-above::before {
+    top: calc(-0.375rem - 1.5px);
+  }
+  .arrangement > .drop-below::after {
+    bottom: calc(-0.375rem - 1.5px);
   }
   .add-row {
     display: flex;

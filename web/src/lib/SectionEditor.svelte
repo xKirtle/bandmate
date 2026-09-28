@@ -12,6 +12,7 @@
     autofocus = false,
     change,
     onUnsaved,
+    grip,
     actions,
     cue,
     cueing,
@@ -27,6 +28,8 @@
     change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
     /** Tells the page whether this editor holds edits not yet saved. */
     onUnsaved: (editor: object, unsaved: boolean) => void;
+    /** Given, shows first in the header, e.g. a handle to drag the Section by. */
+    grip?: Snippet;
     actions: Snippet;
     /** Given, the Occurrence's Cue shows beside the Label, to change it with. */
     cue?: {
@@ -127,6 +130,7 @@
 
 <article class="section" class:is-shared={shared} aria-label={section.label || 'Section without a Label'}>
   <div class="head">
+    {@render grip?.()}
     <label class="visually-hidden" for="label-{uid}">Label</label>
     <input
       id="label-{uid}"
