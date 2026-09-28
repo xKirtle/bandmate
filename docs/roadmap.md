@@ -68,6 +68,8 @@ Playback:
 - The Song page has three panes: the Song's details, Notes and Masters on the left, the Lyric Sheet at a readable width in the centre, the Scrapbook on the right. The Timeline dock spans all three.
 - The Song list and Beat Library are sortable tables on desktop. Beats can be filtered by producer, BPM range, key and used/unused, in the Library and the Beat picker. List filters and sorting live in the URL.
 - The exact look is settled by prototyping before implementation (issue #97).
+- **Read mode** covers the whole Song page, with one Read/Write toggle for it, not just the Lyric Sheet. In Read mode nothing can be edited: the title and Status only show, the Details show as one line of text (e.g. "C#m · 92 BPM · Capo 2 · Standard") with the Notes under them, and Masters only play. The Scrapbook and Delete aren't shown. The Timeline is unchanged. Saving stays automatic; Read mode is about when editing is offered, and Snapshots are the way back from unwanted edits.
+- Finished Songs open in Read mode, Idea and Drafting Songs in Write mode. Switching lasts for the visit only and is never saved. Marking a Song Finished doesn't switch the page to Read; it opens in Read from the next visit. To reopen a Finished Song, switch to Write, then change its Status.
 
 ### 4. Record
 
