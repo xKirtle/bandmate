@@ -20,6 +20,7 @@
   import { follower, key } from './follow';
   import { gutterFields } from './gutter';
   import LyricSheetView from './LyricSheetView.svelte';
+  import type { MenuAction } from './menu';
   import SectionEditor from './SectionEditor.svelte';
   import { dropGap, moveTo, targetIndex } from './sectionDrag';
   import { describe, isEmpty } from './sections';
@@ -74,6 +75,35 @@
       return { label: 'Delete this Section', title: "Delete this Section: nothing is written in it, so it isn't kept" };
     }
     return { label: 'Move to the Scrapbook', title: 'Move to the Scrapbook: take it out of the Lyric Sheet but keep it' };
+  }
+  // An Occurrence's actions after ↑ and ↓, folded into ⋯ on phones.
+  function occurrenceActions(occurrence: Occurrence, section: Section, i: number): MenuAction[] {
+    const actions: MenuAction[] = [
+      { icon: '+', label: 'Add a Section below', run: () => add(i + 1) },
+      { icon: '⧉', label: 'Repeat this Section below', run: () => addOccurrence(section.id, i + 1) },
+    ];
+    if (canCue && hasCues({ arrangement: [occurrence], sections: song.sections })) {
+      // Doesn't ask first: it can be undone. It clears dormant Cues too.
+      actions.push({
+        icon: '⌀',
+        label: "Clear this Occurrence's Cues",
+        run: () => editCues((at) => api.clearOccurrenceCues(at, occurrence.id)),
+      });
+    }
+    if (occurrence.shared) {
+      actions.push({
+        icon: '⑂',
+        label: 'Detach into its own copy',
+        title: 'Detach: give this Occurrence its own copy, so it can differ',
+        run: () => change((at) => api.detach(at, occurrence.id)),
+      });
+    }
+    actions.push({
+      icon: '×',
+      ...removal(occurrence, section),
+      run: () => change((at) => api.removeOccurrence(at, occurrence.id)),
+    });
+    return actions;
   }
   // The Sections in the Arrangement, once each, in the order they first
   // appear: the ones another Occurrence can be added of.
@@ -233,7 +263,8 @@
   function cueKey(event: KeyboardEvent) {
     if (event.key !== 'Enter' || event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
     if (!syncing || event.defaultPrevented || inTextField(event.target)) return;
-    if (event.target instanceof Element && event.target.closest('dialog')) return;
+    // Enter in a dialog or a ⋯ menu is for what's in it.
+    if (event.target instanceof Element && event.target.closest('dialog, [role="menu"]')) return;
     event.preventDefault();
     cueNext();
   }
@@ -455,6 +486,7 @@
               {change}
               {onUnsaved}
               cueing={cueingFor(occurrence, section.label)}
+              more={occurrenceActions(occurrence, section, i)}
             >
               {#snippet grip()}
                 {#if canDrag}
@@ -482,50 +514,6 @@
                   aria-label="Move down"
                 >
                   ↓
-                </button>
-                <button type="button" class="icon" onclick={() => add(i + 1)} aria-label="Add a Section below">
-                  +
-                </button>
-                <button
-                  type="button"
-                  class="icon"
-                  onclick={() => addOccurrence(section.id, i + 1)}
-                  aria-label="Repeat this Section below"
-                  title="Repeat this Section below"
-                >
-                  ⧉
-                </button>
-                {#if canCue && hasCues({ arrangement: [occurrence], sections: song.sections })}
-                  <!-- Doesn't ask first: it can be undone. It clears dormant Cues too. -->
-                  <button
-                    type="button"
-                    class="icon"
-                    onclick={() => editCues((at) => api.clearOccurrenceCues(at, occurrence.id))}
-                    aria-label="Clear this Occurrence's Cues"
-                    title="Clear this Occurrence's Cues"
-                  >
-                    ⌀
-                  </button>
-                {/if}
-                {#if occurrence.shared}
-                  <button
-                    type="button"
-                    class="icon"
-                    onclick={() => change((at) => api.detach(at, occurrence.id))}
-                    aria-label="Detach into its own copy"
-                    title="Detach: give this Occurrence its own copy, so it can differ"
-                  >
-                    ⑂
-                  </button>
-                {/if}
-                <button
-                  type="button"
-                  class="icon"
-                  onclick={() => change((at) => api.removeOccurrence(at, occurrence.id))}
-                  aria-label={removal(occurrence, section).label}
-                  title={removal(occurrence, section).title}
-                >
-                  ×
                 </button>
               {/snippet}
             </SectionEditor>

@@ -1,8 +1,10 @@
 <script lang="ts">
   import { untrack, type Snippet } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
+  import ActionsMenu from './ActionsMenu.svelte';
   import AlternateText, { type Cueing } from './AlternateText.svelte';
   import { api, type Alternate, type Section, type Song, type SongAt } from './api';
+  import type { MenuAction } from './menu';
 
   let {
     uid,
@@ -13,6 +15,7 @@
     onUnsaved,
     grip,
     actions,
+    more,
     cueing,
   }: {
     /** Makes element ids unique, e.g. when a shared Section shows more than once. */
@@ -28,7 +31,10 @@
     onUnsaved: (editor: object, unsaved: boolean) => void;
     /** Given, shows first in the header, e.g. a handle to drag the Section by. */
     grip?: Snippet;
+    /** The actions that always show. */
     actions: Snippet;
+    /** The actions after them, folded into a ⋯ menu on phones. */
+    more: MenuAction[];
     /** Given, the active Alternate's Lines are highlighted and cued as playback goes. */
     cueing?: Cueing;
   } = $props();
@@ -72,6 +78,13 @@
     if (i === -1) return alt.lines.length === active.lines.length ? 'Same as the active one' : 'Fewer Lines';
     return `“${alt.lines[i].lyrics.trim() || '(blank Line)'}”`;
   }
+
+  const newAlternate: MenuAction = {
+    icon: '⇄',
+    label: 'New Alternate',
+    title: 'New Alternate: try another version of these Lines without losing this one',
+    run: addAlternate,
+  };
 
   async function addAlternate() {
     if (!(await change((at) => api.addAlternate(at, section.id)))) return;
@@ -117,6 +130,19 @@
   }
 </script>
 
+<!-- An action as a button beside the Label, where there's room for it. -->
+{#snippet inlineAction(action: MenuAction)}
+  <button
+    type="button"
+    class="icon wide"
+    onclick={action.run}
+    aria-label={action.label}
+    title={action.title ?? action.label}
+  >
+    {action.icon}
+  </button>
+{/snippet}
+
 <article class="section" class:is-shared={shared} aria-label={section.label || 'Section without a Label'}>
   <div class="head">
     {@render grip?.()}
@@ -145,16 +171,15 @@
       </span>
     {/if}
     <div class="actions">
-      <button
-        type="button"
-        class="icon"
-        onclick={addAlternate}
-        aria-label="New Alternate"
-        title="New Alternate: try another version of these Lines without losing this one"
-      >
-        ⇄
-      </button>
+      {@render inlineAction(newAlternate)}
       {@render actions()}
+      {#each more as action (action.label)}
+        {@render inlineAction(action)}
+      {/each}
+      <!-- On phones there's no room for every action beside the Label: they fold into ⋯. -->
+      <div class="narrow">
+        <ActionsMenu entries={[newAlternate, ...more]} />
+      </div>
     </div>
   </div>
 
@@ -294,6 +319,33 @@
     flex-wrap: wrap;
     gap: 0.25rem;
     margin-left: auto;
+  }
+  /* A phone keeps the header on one row: the Label gives way, cut off, before
+     the actions do. */
+  @media (max-width: 40rem) {
+    .head,
+    .actions {
+      flex-wrap: nowrap;
+    }
+    .head {
+      column-gap: 0.25rem;
+    }
+    .label {
+      flex-shrink: 1;
+      min-width: 3rem;
+      padding-inline: 0.5rem;
+    }
+    .actions {
+      flex-shrink: 0;
+    }
+    .wide {
+      display: none;
+    }
+  }
+  @media (min-width: 40.0625rem) {
+    .narrow {
+      display: none;
+    }
   }
   .active-name {
     display: flex;
