@@ -32,10 +32,6 @@
   }
 </script>
 
-<header class="bar">
-  <a class="back" href="/">← Songs</a>
-</header>
-
 <main class="page">
   <h1>Import a Song</h1>
   <form onsubmit={importSong}>
@@ -95,6 +91,10 @@
 </main>
 
 <style>
+  /* With no header row, the page keeps clear of a notch itself. */
+  .page {
+    padding-top: max(var(--gutter), env(safe-area-inset-top));
+  }
   form {
     display: flex;
     flex-direction: column;
