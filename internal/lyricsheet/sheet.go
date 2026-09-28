@@ -309,12 +309,13 @@ func (s *Store) AddOccurrence(ctx context.Context, songID int64, based Version, 
 	})
 }
 
-// RemoveOccurrence takes an Occurrence out of the Arrangement. Its Section is
-// never deleted: other Occurrences keep showing it, and without any it is in
-// the Scrapbook.
+// RemoveOccurrence takes an Occurrence out of the Arrangement. Other
+// Occurrences of its Section keep showing it, and without any it is in the
+// Scrapbook, unless nothing is written in it: then it is deleted, as there's
+// nothing to keep.
 func (s *Store) RemoveOccurrence(ctx context.Context, songID int64, based Version, occurrenceID int64) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		_, pos, err := findOccurrence(ctx, tx, songID, occurrenceID)
+		sectionID, pos, err := findOccurrence(ctx, tx, songID, occurrenceID)
 		if err != nil {
 			return err
 		}
@@ -326,8 +327,38 @@ func (s *Store) RemoveOccurrence(ctx context.Context, songID int64, based Versio
 			songID, pos); err != nil {
 			return fmt.Errorf("closing gap in arrangement: %w", err)
 		}
+		uses, err := findSection(ctx, tx, songID, sectionID)
+		if err != nil || uses > 0 {
+			return err
+		}
+		empty, err := sectionEmpty(ctx, tx, sectionID)
+		if err != nil || !empty {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM sections WHERE id = ?`, sectionID); err != nil {
+			return fmt.Errorf("deleting empty section: %w", err)
+		}
 		return nil
 	})
+}
+
+// sectionEmpty reports whether nothing is written in any of a Section's
+// Alternates: they have no Lines, or only blank ones.
+func sectionEmpty(ctx context.Context, tx *sql.Tx, sectionID int64) (bool, error) {
+	empty := true
+	err := query(ctx, tx, `SELECT l.text FROM lines l JOIN alternates a ON a.id = l.alternate_id
+		WHERE a.section_id = ?`, []any{sectionID}, func(rows *sql.Rows) error {
+		var text string
+		if err := rows.Scan(&text); err != nil {
+			return err
+		}
+		empty = empty && blank(text)
+		return nil
+	})
+	if err != nil {
+		return false, fmt.Errorf("reading section lines: %w", err)
+	}
+	return empty, nil
 }
 
 // Detach points an Occurrence of a shared Section at a new copy of that
