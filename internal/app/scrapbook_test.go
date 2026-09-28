@@ -1,10 +1,14 @@
 package app_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"reflect"
+	"slices"
 	"testing"
+
+	"github.com/xKirtle/bandmate/internal/db"
 )
 
 // addToScrapbook creates a Section straight in a Song's Scrapbook and returns
@@ -179,4 +183,154 @@ func TestDeletingASectionOfAnotherSongIsNotFound(t *testing.T) {
 	// Whether it's in its own Song's Arrangement or not.
 	res = ts.Do(http.MethodDelete, sectionPath(before.ID, other.Sections[0].ID), nil)
 	expectStatus(t, res, http.StatusNotFound)
+}
+
+// writeLines puts Lines straight into an Alternate in the database, for text
+// the editor can't save, like an Alternate of only blank Lines.
+func (ts *testServer) writeLines(alternateID int64, texts ...string) {
+	ts.t.Helper()
+	conn, err := db.Open(context.Background(), ts.DataDir)
+	if err != nil {
+		ts.t.Fatalf("opening database: %v", err)
+	}
+	defer conn.Close()
+	for i, text := range texts {
+		if _, err := conn.Exec(`INSERT INTO lines (alternate_id, position, text) VALUES (?, ?, ?)`,
+			alternateID, i, text); err != nil {
+			ts.t.Fatalf("writing line: %v", err)
+		}
+	}
+}
+
+// expectSectionDeleted checks a Song no longer has a Section, in its
+// Sections or its Scrapbook.
+func expectSectionDeleted(t *testing.T, s song, sectionID int64) {
+	t.Helper()
+	for _, sec := range s.Sections {
+		if sec.ID == sectionID {
+			t.Errorf("sections = %+v, want Section %d deleted", s.Sections, sectionID)
+		}
+	}
+	if slices.Contains(s.Scrapbook, sectionID) {
+		t.Errorf("scrapbook = %v, want Section %d not in it", s.Scrapbook, sectionID)
+	}
+}
+
+func TestRemovingTheOnlyOccurrenceOfASectionWithNoLinesDeletesIt(t *testing.T) {
+	ts := newTestServer(t)
+	before := ts.songWithSections("Verse", "Chorus")
+	before = ts.setText(before.ID, before.Sections[0].Alternates[0].ID, "Down the [G]road")
+	chorus := before.Sections[1]
+
+	got := ts.lyricSheetChange(http.MethodDelete, occurrencePath(before.ID, before.Arrangement[1].ID), nil)
+
+	expectSectionDeleted(t, got, chorus.ID)
+	if want := before.Sections[:1]; !reflect.DeepEqual(got.Sections, want) {
+		t.Errorf("sections = %+v, want %+v", got.Sections, want)
+	}
+	if len(got.Scrapbook) != 0 {
+		t.Errorf("scrapbook = %v, want it empty", got.Scrapbook)
+	}
+	if want := []string{"Verse"}; !reflect.DeepEqual(arrangementLabels(got), want) {
+		t.Errorf("arrangement = %q, want %q", arrangementLabels(got), want)
+	}
+	if read := ts.getSong(before.ID); !reflect.DeepEqual(read, got) {
+		t.Errorf("song read back = %+v, want %+v", read, got)
+	}
+
+	// Its text was cleared: that's as empty as never written in.
+	s := ts.addSection(got.ID, map[string]any{"label": "Bridge"})
+	bridge := s.Sections[1]
+	ts.setText(s.ID, bridge.Alternates[0].ID, "gone")
+	s = ts.setText(s.ID, bridge.Alternates[0].ID, "  \n\t\n")
+	got = ts.lyricSheetChange(http.MethodDelete, occurrencePath(s.ID, s.Arrangement[1].ID), nil)
+	expectSectionDeleted(t, got, bridge.ID)
+}
+
+func TestRemovingTheOnlyOccurrenceOfASectionOfBlankLinesDeletesIt(t *testing.T) {
+	ts := newTestServer(t)
+	s, chorus := ts.chorusWithTwoAlternates()
+	for _, alt := range chorus.Alternates {
+		ts.setText(s.ID, alt.ID, "")
+		ts.writeLines(alt.ID, "", "   ", "\t")
+	}
+	s = ts.getSong(s.ID)
+
+	got := ts.lyricSheetChange(http.MethodDelete, occurrencePath(s.ID, s.Arrangement[1].ID), nil)
+
+	expectSectionDeleted(t, got, chorus.ID)
+	if read := ts.getSong(s.ID); !reflect.DeepEqual(read, got) {
+		t.Errorf("song read back = %+v, want %+v", read, got)
+	}
+}
+
+func TestASectionOfOnlyAChordLineGoesToTheScrapbook(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.songWithSections("Verse", "Intro")
+	intro := s.Sections[1]
+	s = ts.setText(s.ID, intro.Alternates[0].ID, "[G] [C] [D]")
+
+	got := ts.lyricSheetChange(http.MethodDelete, occurrencePath(s.ID, s.Arrangement[1].ID), nil)
+
+	if want := []int64{intro.ID}; !reflect.DeepEqual(got.Scrapbook, want) {
+		t.Errorf("scrapbook = %v, want %v", got.Scrapbook, want)
+	}
+	if !reflect.DeepEqual(got.Sections, s.Sections) {
+		t.Errorf("sections = %+v, want them unchanged %+v", got.Sections, s.Sections)
+	}
+}
+
+func TestASectionWithLinesOnlyInAnInactiveAlternateGoesToTheScrapbook(t *testing.T) {
+	ts := newTestServer(t)
+	s, chorus := ts.chorusWithTwoAlternates()
+	s = ts.setText(s.ID, chorus.Alternates[0].ID, "")
+
+	got := ts.lyricSheetChange(http.MethodDelete, occurrencePath(s.ID, s.Arrangement[1].ID), nil)
+
+	if want := []int64{chorus.ID}; !reflect.DeepEqual(got.Scrapbook, want) {
+		t.Errorf("scrapbook = %v, want %v", got.Scrapbook, want)
+	}
+	if !reflect.DeepEqual(got.Sections, s.Sections) {
+		t.Errorf("sections = %+v, want them unchanged %+v", got.Sections, s.Sections)
+	}
+}
+
+func TestRemovingOneOccurrenceOfAnEmptySharedSectionKeepsIt(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.songWithSections("Verse", "Chorus")
+	chorus := s.Sections[1]
+	s = ts.addOccurrence(s.ID, chorus.ID, nil)
+
+	got := ts.lyricSheetChange(http.MethodDelete, occurrencePath(s.ID, s.Arrangement[1].ID), nil)
+
+	if want := []string{"Verse", "Chorus"}; !reflect.DeepEqual(arrangementLabels(got), want) {
+		t.Errorf("arrangement = %q, want %q", arrangementLabels(got), want)
+	}
+	if !reflect.DeepEqual(got.Sections, s.Sections) {
+		t.Errorf("sections = %+v, want them unchanged %+v", got.Sections, s.Sections)
+	}
+	if len(got.Scrapbook) != 0 {
+		t.Errorf("scrapbook = %v, want it empty", got.Scrapbook)
+	}
+
+	// Removing its last Occurrence deletes it.
+	got = ts.lyricSheetChange(http.MethodDelete, occurrencePath(s.ID, got.Arrangement[1].ID), nil)
+	expectSectionDeleted(t, got, chorus.ID)
+}
+
+func TestAnEmptySectionMadeInTheScrapbookStaysThere(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.songWithSections("Verse", "Chorus")
+	s = ts.addToScrapbook(s.ID, "Idea")
+	idea := s.Sections[2]
+
+	// Another empty Section leaving the Arrangement doesn't take it along.
+	got := ts.lyricSheetChange(http.MethodDelete, occurrencePath(s.ID, s.Arrangement[1].ID), nil)
+
+	if want := []int64{idea.ID}; !reflect.DeepEqual(got.Scrapbook, want) {
+		t.Errorf("scrapbook = %v, want %v", got.Scrapbook, want)
+	}
+	if want := []section{s.Sections[0], idea}; !reflect.DeepEqual(got.Sections, want) {
+		t.Errorf("sections = %+v, want %+v", got.Sections, want)
+	}
 }

@@ -361,7 +361,7 @@ export const api = {
   /** Permanently deletes a Section; only one in the Scrapbook can be. */
   deleteSection: (at: SongAt, sectionId: number) =>
     request<Song>('DELETE', `/songs/${at.id}/sections/${sectionId}`, undefined, at),
-  /** Takes an Occurrence out of the Arrangement; its Section is never deleted. Without Occurrences, it's in the Scrapbook. */
+  /** Takes an Occurrence out of the Arrangement. Without Occurrences, its Section is in the Scrapbook, or deleted if nothing is written in it. */
   removeOccurrence: (at: SongAt, occurrenceId: number) =>
     request<Song>('DELETE', `/songs/${at.id}/occurrences/${occurrenceId}`, undefined, at),
   /** Gives an Occurrence of a shared Section its own copy of the Section. */

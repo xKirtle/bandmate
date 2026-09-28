@@ -19,7 +19,7 @@
   import LyricSheetView from './LyricSheetView.svelte';
   import SectionEditor from './SectionEditor.svelte';
   import { dropGap, moveTo, targetIndex } from './sectionDrag';
-  import { describe } from './sections';
+  import { describe, isEmpty } from './sections';
   import type { Mode } from './songMode';
   import { readShiftStep, shiftSteps, storeShiftStep, type ShiftStep } from './shiftStep';
   import { markSyncHintSeen, sawSyncHint } from './syncHint';
@@ -500,10 +500,16 @@
                   type="button"
                   class="icon"
                   onclick={() => change((at) => api.removeOccurrence(at, occurrence.id))}
-                  aria-label={occurrence.shared ? 'Remove this Occurrence' : 'Move to the Scrapbook'}
+                  aria-label={occurrence.shared
+                    ? 'Remove this Occurrence'
+                    : isEmpty(section)
+                      ? 'Remove this Section'
+                      : 'Move to the Scrapbook'}
                   title={occurrence.shared
                     ? 'Remove this Occurrence; the others stay'
-                    : 'Move to the Scrapbook: take it out of the Lyric Sheet but keep it'}
+                    : isEmpty(section)
+                      ? 'Remove this Section: nothing is written in it, so it isn\'t kept'
+                      : 'Move to the Scrapbook: take it out of the Lyric Sheet but keep it'}
                 >
                   ×
                 </button>
