@@ -41,9 +41,11 @@
   <form onsubmit={importSong}>
     <label for="lyrics">Lyrics</label>
     <p id="lyrics-hint" class="muted">
-      Paste plain text or ChordPro. Blank lines split Sections, lines like <code>Chorus:</code> or
-      <code>[Chorus]</code> become Labels, and <code>[Am]</code> becomes a Chord. Repeated Sections are
-      shared, and a Label on its own repeats the last Section with that Label.
+      Paste plain text or ChordPro. A line like <code>Chorus:</code> or <code>[Chorus]</code>, or a
+      ChordPro start directive, starts a Section with that Label, and a ChordPro end directive ends
+      it; without them the paste is one Section. Blank lines stay as blank Lines, and
+      <code>[Am]</code> becomes a Chord. Repeated Sections with the same Label are shared, and a
+      Label on its own repeats the last Section with that Label.
     </p>
     <!-- svelte-ignore a11y_autofocus -->
     <textarea
@@ -54,7 +56,7 @@
       rows="16"
       spellcheck="false"
       aria-describedby="lyrics-hint"
-      placeholder={'{title: Midnight Drive}\n\n[Verse]\n[Am]City lights are [F]calling\n\n[Chorus]\n…'}
+      placeholder={'{title: Midnight Drive}\n\n[Verse]\n[Am]City lights are [F]calling\n\n[Am]Me home [F]tonight\n\n[Chorus]\n…'}
     ></textarea>
     {#if askTitle}
       <label for="title">Title</label>

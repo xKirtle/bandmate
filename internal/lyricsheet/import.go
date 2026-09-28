@@ -15,8 +15,8 @@ var (
 )
 
 // ImportSong creates a new Song from pasted lyrics, plain text or ChordPro,
-// with one Occurrence per group of Lines in the text. Repeated groups share
-// one Section (see arrange). A title directive in the text names the Song;
+// with one Occurrence per Section the text marks (see parseImport). A
+// Section repeated in the text is one Section (see arrange). A title directive in the text names the Song;
 // without one, title does.
 func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error) {
 	sheet, err := parseImport(text)
@@ -109,23 +109,27 @@ var sectionDirectives = map[string]sectionDirective{
 }
 
 // parseImport reads pasted text into the Song title, if a directive gives
-// one, and Sections, one per group of Lines in the text, or rejects it with
-// an error naming the line at fault (see invalidPasteLine). Blank lines and
-// end directives end a Section, and a heading or start directive starts one
-// with that Label. A heading with no Lines under it is a Section with no
+// one, and Sections, or rejects it with an error naming the line at fault
+// (see invalidPasteLine). Only what the text says starts a Section: a
+// heading or start directive starts one with that Label, and an end
+// directive ends one, so the Lines after it start one without a Label.
+// Blank lines are blank Lines, except at a Section's start or end, where
+// they're dropped. A heading with no Lines under it is a Section with no
 // Lines. Other directives never become Lines.
 func parseImport(text string) (importedSheet, error) {
 	var sheet importedSheet
 	var cur importedSection
 	end := func() {
+		for len(cur.lines) > 0 && blank(cur.lines[len(cur.lines)-1].text) {
+			cur.lines = cur.lines[:len(cur.lines)-1]
+		}
 		if cur.label != "" || len(cur.lines) > 0 {
 			sheet.sections = append(sheet.sections, cur)
 		}
 		cur = importedSection{}
 	}
 	for i, line := range splitLines(text) {
-		if strings.TrimSpace(line) == "" {
-			end()
+		if blank(line) && len(cur.lines) == 0 {
 			continue
 		}
 		if name, value, ok := directive(line); ok {
@@ -155,8 +159,7 @@ func parseImport(text string) (importedSheet, error) {
 // Sections and, for each Occurrence in order, the index of its Section.
 //
 // A Section with Lines is an Occurrence of the most recent earlier Section
-// with the same Lines (see sameAs), which takes its Label if it had none.
-// A heading with no Lines is an Occurrence of the most recent earlier
+// with the same Label and Lines (see sameAs). A heading with no Lines is an Occurrence of the most recent earlier
 // Section with that Label, ignoring case, or of a new Section without Lines
 // if there is none.
 func arrange(imported []importedSection) (sections []importedSection, arrangement []int) {
@@ -175,8 +178,6 @@ func arrange(imported []importedSection) (sections []importedSection, arrangemen
 		if i < 0 {
 			i = len(sections)
 			sections = append(sections, sec)
-		} else if sections[i].label == "" {
-			sections[i].label = sec.label
 		}
 		arrangement = append(arrangement, i)
 	}
@@ -184,13 +185,11 @@ func arrange(imported []importedSection) (sections []importedSection, arrangemen
 }
 
 // sameAs reports whether two imported Sections are the same Section: they
-// have Lines, their Lines match once trimmed at both ends, and they don't
-// have different Labels.
+// have Lines, the same Label, ignoring case, and Lines that match once
+// trimmed at both ends. Sections without a Label are never the same, as the
+// text didn't mark them as one.
 func (a importedSection) sameAs(b importedSection) bool {
-	if len(a.lines) == 0 || len(b.lines) == 0 {
-		return false
-	}
-	if a.label != "" && b.label != "" && !strings.EqualFold(a.label, b.label) {
+	if len(a.lines) == 0 || len(b.lines) == 0 || a.label == "" || !strings.EqualFold(a.label, b.label) {
 		return false
 	}
 	return slices.EqualFunc(a.lines, b.lines, func(x, y importedLine) bool {
