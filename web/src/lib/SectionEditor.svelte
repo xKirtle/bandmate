@@ -297,14 +297,14 @@
     gap: 0.25rem;
     margin-left: auto;
   }
-  /* On desktop the actions wait for the Section to be hovered or focused, so
+  /* Desktop: the actions wait for the Section to be hovered or focused, so
      the Lyric Sheet reads as lyrics. Transparent, not hidden, so they stay in
      the tab order and tabbing to one shows them. Wide touch screens, which
      can't hover, keep them showing. */
   @media (min-width: 80rem) and (hover: hover) {
     .actions {
       opacity: 0;
-      transition: opacity 0.12s;
+      transition: opacity 0.2s;
     }
     .section:hover .actions,
     .section:focus-within .actions {
