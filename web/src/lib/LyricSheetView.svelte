@@ -1,17 +1,13 @@
 <script lang="ts">
   import type { Line, Occurrence, Song } from './api';
   import { layoutLine } from './chords';
-  import CueField from './CueField.svelte';
   import { isBlank, type Position, type TapLine } from './cues';
   import { follower, key } from './follow';
-  import { gutterFields } from './gutter';
 
   let {
     song,
     showChords,
     current = null,
-    setCue,
-    setLineCue,
     seek,
     picked = null,
     pick,
@@ -20,10 +16,6 @@
     showChords: boolean;
     /** Where playback is: highlighted and kept in view. */
     current?: Position | null;
-    /** Given, each Section's header row shows its Occurrence's Cue, to change it with. */
-    setCue?: (occurrence: Occurrence, cue: number | null) => void;
-    /** Given, a gutter beside each Line shows its Cue in that Occurrence, to change it with. */
-    setLineCue?: (occurrence: Occurrence, line: Line, cue: number | null) => void;
     /** Given, clicking a cued Line seeks the Timeline to its Cue. */
     seek?: (to: number) => void;
     /** The Line picked to tap next in Tap mode, marked. */
@@ -41,16 +33,6 @@
     const all = sections.get(occurrence.sectionId)?.alternates.find((a) => a.active)?.lines ?? [];
     return { all, lines: all.filter((l) => showChords || !l.chordLine) };
   }
-
-  // The gutter's fields in order down the page, so Enter can go on to the next.
-  const fieldOrder = $derived(
-    song.arrangement.flatMap((o) =>
-      linesOf(o)
-        .lines.filter((l) => !isBlank(l))
-        .map((l) => key(o.id, l.id)),
-    ),
-  );
-  const fields = gutterFields();
 
   /** The current Line if it's shown, or null for its whole Section, e.g. a Chord Line while Chords are hidden. */
   function shownLine(position: Position): number | null {
@@ -94,24 +76,15 @@
         aria-current={isCurrent ? 'true' : undefined}
         {@attach (el) => track(el, key(occurrence.id))}
       >
-        {#if section.label || setCue}
-          <div class="header">
-            {#if section.label}<h3>{section.label}</h3>{/if}
-            {#if setCue}
-              <CueField
-                cue={occurrence.cue}
-                label={section.label || 'this Section'}
-                save={(cue) => setCue(occurrence, cue)}
-              />
-            {/if}
-          </div>
+        {#if section.label}
+          <h3>{section.label}</h3>
         {/if}
         {#if all.length === 0}
           <p class="muted">No Lines yet.</p>
         {:else if lines.length === 0}
           <p class="muted">Only Chords, which are hidden.</p>
         {/if}
-        {#each lines as line, n (line.id)}
+        {#each lines as line (line.id)}
           {@const cue = occurrence.lineCues[line.id] ?? null}
           {@const k = key(occurrence.id, line.id)}
           {@const lineCurrent = currentKey === k}
@@ -121,7 +94,6 @@
             class="line-box"
             class:current={lineCurrent}
             class:picked={isPicked}
-            class:with-gutter={setLineCue}
             aria-current={lineCurrent ? 'true' : undefined}
             {@attach (el) => track(el, k)}
           >
@@ -151,16 +123,6 @@
                 <p class="line plain">{line.lyrics || ' '}</p>
               {/if}
             </div>
-            {#if setLineCue && !isBlank(line)}
-              <CueField
-                bind:this={() => undefined, (field) => fields.set(k, field)}
-                gutter
-                {cue}
-                label="Line {n + 1}{section.label ? ` of ${section.label}` : ''}"
-                save={(cue) => setLineCue(occurrence, line, cue)}
-                next={() => fields.editAfter(fieldOrder, k)}
-              />
-            {/if}
           </div>
         {/each}
       </section>
@@ -188,15 +150,8 @@
     background: var(--surface-1);
     box-shadow: inset 3px 0 0 var(--accent);
   }
-  .header {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.5rem;
-    margin: 0 0 0.25rem;
-  }
   h3 {
-    margin: 0 auto 0 0;
+    margin: 0 0 0.25rem;
     color: var(--text-muted);
     font-size: 0.8125rem;
     font-weight: 700;
@@ -206,20 +161,14 @@
   .section p {
     margin: 0;
   }
-  /* A Line with its Cue beside it. The highlight bleeds past the text like
-     the Section's, taking in its Chords. */
+  /* A Line, whose highlight bleeds past the text like the Section's, taking
+     in its Chords. */
   .line-box {
     margin: 0 -0.75rem;
     padding: 0 0.75rem;
     border-radius: 0.375rem;
     scroll-margin: 5rem 0;
     transition: background-color 0.2s;
-  }
-  .line-box.with-gutter {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: end;
-    gap: 0.5rem;
   }
   .line-box.current {
     background: var(--surface-1);

@@ -47,8 +47,8 @@
   let mode = $state<'write' | 'read'>('write');
   // Where playback is in the Lyric Sheet.
   const current = $derived(playhead === null ? null : currentPosition(song, playhead));
-  // Cues are edited on wider screens only, and only once there's something
-  // to cue to or a Cue already set.
+  // Cues are edited in Write mode, on wider screens only, and only once
+  // there's something to cue to or a Cue already set.
   const wide = new MediaQuery('min-width: 40.0625rem');
   const canCue = $derived(wide.current && (hasClips || hasCues(song)));
 
@@ -66,7 +66,7 @@
 
   // In Write mode, each Occurrence's Lines and whole Section are tracked, to
   // follow playback to, and each Line's Cue field, to go on to with Enter.
-  // Read mode does the same in LyricSheetView.
+  // Read mode follows playback in LyricSheetView, and has no Cue fields.
   const { track, follow } = follower();
   const writeFields = gutterFields();
   // The Line Cue fields in order down the page.
@@ -193,8 +193,6 @@
       {song}
       showChords={chordsShown}
       {current}
-      setCue={canCue ? setCue : undefined}
-      setLineCue={canCue ? setLineCue : undefined}
       {seek}
       {picked}
       pick={tapping ? (line) => (picked = line) : undefined}
