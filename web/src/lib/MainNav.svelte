@@ -8,17 +8,17 @@
 
   // Each list's query string as it was last left, so going back to it
   // restores its search, filters and sort.
-  let left = $state<Partial<Record<LibraryPage, string>>>({});
+  let lastSearch = $state<Partial<Record<LibraryPage, string>>>({});
   $effect.pre(() => {
     const list = listAt(router.path);
-    if (list) left[list] = router.search;
+    if (list) lastSearch[list] = router.search;
   });
 </script>
 
 <nav aria-label="Library">
   <span class="brand" aria-hidden="true">B</span>
   {#each pages as page (page.id)}
-    <a href={page.href + (left[page.id] ?? '')} aria-current={page.id === current ? 'page' : undefined}>
+    <a href={page.href + (lastSearch[page.id] ?? '')} aria-current={page.id === current ? 'page' : undefined}>
       <span class="glyph" aria-hidden="true">{page.icon}</span>
       {page.label}
     </a>

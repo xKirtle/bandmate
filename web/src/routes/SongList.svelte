@@ -1,6 +1,7 @@
 <script lang="ts">
   import { api, statuses, type SongSummary } from '../lib/api';
   import {
+    defaultSongListView,
     songListViewFromParams,
     songListViewToParams,
     sortSongs,
@@ -14,18 +15,13 @@
   let songs = $state<SongSummary[] | null>(null);
   let error = $state<string | null>(null);
   // The search, filters and sort start as the URL has them, and are kept in
-  // it so going back to the list restores them.
-  const initial = songListViewFromParams(new URLSearchParams(router.search));
-  let status = $state(initial.status);
-  let q = $state(initial.q);
-  // Only Songs with a Master; combines with the Status filter.
-  let hasMaster = $state(initial.hasMaster);
-  let sort = $state(initial.sort);
+  // it so going back to the list restores them. The filters combine.
+  let view = $state(songListViewFromParams(new URLSearchParams(router.search)));
 
-  const sorted = $derived(songs && sortSongs(songs, sort));
+  const sorted = $derived(songs && sortSongs(songs, view.sort));
 
   $effect(() => {
-    replaceSearch(songListViewToParams({ q, status, hasMaster, sort }));
+    replaceSearch(songListViewToParams(view));
   });
 
   const columns: { id: SongColumn; label: string; num?: boolean }[] = [
@@ -44,14 +40,14 @@
     navigate(`/songs/${song.id}`);
   }
 
-  const filtering = $derived(status !== undefined || hasMaster || q.trim() !== '');
+  const filtering = $derived(view.status !== undefined || view.hasMaster || view.q.trim() !== '');
   // Not reactive: the first load shouldn't wait, later ones debounce typing.
   let loaded = false;
 
   // Reloads whenever the filters change, waiting for a pause in typing. Only
   // the latest request's answer is shown.
   $effect(() => {
-    const filter = { status, q, hasMaster: hasMaster || undefined };
+    const filter = { status: view.status, q: view.q, hasMaster: view.hasMaster || undefined };
     let current = true;
     const timer = setTimeout(() => {
       api.listSongs(filter).then(
@@ -71,9 +67,7 @@
   });
 
   function clearFilters() {
-    status = undefined;
-    hasMaster = false;
-    q = '';
+    view = { ...defaultSongListView, sort: view.sort };
   }
 </script>
 
@@ -91,19 +85,19 @@
     <input
       id="song-search"
       type="search"
-      bind:value={q}
+      bind:value={view.q}
       placeholder="Search titles"
       autocomplete="off"
       enterkeyhint="search"
     />
     <div class="chips" role="group" aria-label="Filter Songs">
-      <button type="button" class="chip" aria-pressed={status === undefined} onclick={() => (status = undefined)}>
+      <button type="button" class="chip" aria-pressed={view.status === undefined} onclick={() => (view.status = undefined)}>
         All
       </button>
       {#each statuses as s (s)}
-        <button type="button" class="chip" aria-pressed={status === s} onclick={() => (status = s)}>{s}</button>
+        <button type="button" class="chip" aria-pressed={view.status === s} onclick={() => (view.status = s)}>{s}</button>
       {/each}
-      <button type="button" class="chip master" aria-pressed={hasMaster} onclick={() => (hasMaster = !hasMaster)}>
+      <button type="button" class="chip master" aria-pressed={view.hasMaster} onclick={() => (view.hasMaster = !view.hasMaster)}>
         Has a Master
       </button>
     </div>
@@ -131,11 +125,11 @@
           {#each columns as column (column.id)}
             <th
               class:num={column.num}
-              aria-sort={sort.column === column.id ? (sort.direction === 'asc' ? 'ascending' : 'descending') : undefined}
+              aria-sort={view.sort.column === column.id ? (view.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined}
             >
-              <button type="button" onclick={() => (sort = toggleSort(sort, column.id))}>
+              <button type="button" onclick={() => (view.sort = toggleSort(view.sort, column.id))}>
                 {column.label}<span class="arrow" aria-hidden="true"
-                  >{sort.column === column.id ? (sort.direction === 'asc' ? '↑' : '↓') : ''}</span
+                  >{view.sort.column === column.id ? (view.sort.direction === 'asc' ? '↑' : '↓') : ''}</span
                 >
               </button>
             </th>

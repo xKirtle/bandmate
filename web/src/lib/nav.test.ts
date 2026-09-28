@@ -26,7 +26,7 @@ describe('listAt', () => {
     expect(listAt('/beats')).toBe('beats');
   });
 
-  it('is neither on a page within one, or outside them', () => {
+  it('is none on a page within a list, such as a Song, or outside them', () => {
     expect(listAt('/songs/12')).toBeUndefined();
     expect(listAt('/songs/new')).toBeUndefined();
     expect(listAt('/nowhere')).toBeUndefined();

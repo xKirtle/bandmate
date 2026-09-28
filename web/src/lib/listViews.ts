@@ -57,7 +57,7 @@ function sortBy<T>(items: readonly T[], key: (item: T) => SortKey, direction: So
 const songSortKeys: Record<SongColumn, (song: SongSummary) => SortKey> = {
   title: (s) => s.title,
   status: (s) => statuses.indexOf(s.status),
-  key: (s) => s.key.trim() || undefined,
+  key: (s) => s.key || undefined,
   bpm: (s) => s.bpm ?? undefined,
   // Songs with a Master come first, as the column is about having one.
   master: (s) => (s.hasMaster ? 0 : 1),
