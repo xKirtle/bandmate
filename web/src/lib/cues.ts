@@ -3,8 +3,6 @@
 // is cued (ADR 0009). This works out where playback is and which Cues are
 // out of order, and reads and writes the times as typed.
 
-import { key } from './follow';
-
 /** What the current position is worked out from: an Occurrence and its Line Cues. */
 export interface CuedOccurrence {
   id: number;
@@ -105,35 +103,31 @@ export interface OutOfOrder {
   laterThan: FoundCue | null;
 }
 
+/** A Cue out of order, and why. */
+export type OutOfOrderCue = FoundCue & OutOfOrder;
+
 /**
- * The Cues out of order, by key(occurrence, line): each is compared with the
- * nearest cued Line above and below it, down the whole Arrangement, skipping
- * Lines without a Cue. Both Cues of a pair out of order are marked, as it
- * can't be known which is wrong. Equal times are in order. Only Cues in
- * effect count, Chord Lines' included; dormant ones are neither marked nor
- * compared, nor are blank Lines', which the gutter doesn't show.
+ * The Cues out of order, in the order down the sheet: each is compared with
+ * the nearest cued Line above and below it, down the whole Arrangement,
+ * skipping Lines without a Cue. Both Cues of a pair out of order are
+ * marked, as it can't be known which is wrong. Equal times are in order.
+ * Only Cues in effect count, Chord Lines' included; dormant ones are neither
+ * marked nor compared, nor are blank Lines', which the gutter doesn't show.
  */
-export function outOfOrderCues(song: CuedSong): Map<string, OutOfOrder> {
+export function outOfOrderCues(song: CuedSong): OutOfOrderCue[] {
   const linesOf = activeLines(song);
-  const cued = song.arrangement.flatMap((o) =>
+  const cued: OutOfOrderCue[] = song.arrangement.flatMap((o) =>
     linesOf(o)
       .filter((l) => !isBlank(l) && o.lineCues[l.id] !== undefined)
-      .map((l) => ({ occurrence: o.id, line: l.id, cue: o.lineCues[l.id] })),
+      .map((l) => ({ occurrence: o.id, line: l.id, cue: o.lineCues[l.id], earlierThan: null, laterThan: null })),
   );
-  const marks = new Map<string, OutOfOrder>();
-  const mark = (c: FoundCue) => {
-    const k = key(c.occurrence, c.line);
-    const m = marks.get(k) ?? { earlierThan: null, laterThan: null };
-    marks.set(k, m);
-    return m;
-  };
   for (let i = 1; i < cued.length; i++) {
     const [above, below] = [cued[i - 1], cued[i]];
     if (above.cue <= below.cue) continue;
-    mark(above).laterThan = below;
-    mark(below).earlierThan = above;
+    above.laterThan = { occurrence: below.occurrence, line: below.line, cue: below.cue };
+    below.earlierThan = { occurrence: above.occurrence, line: above.line, cue: above.cue };
   }
-  return marks;
+  return cued.filter((c) => c.earlierThan || c.laterThan);
 }
 
 /**
@@ -141,10 +135,9 @@ export function outOfOrderCues(song: CuedSong): Map<string, OutOfOrder> {
  * naming the Lines with name.
  */
 export function outOfOrderReason({ earlierThan, laterThan }: OutOfOrder, name: (p: Position) => string): string {
-  const reasons = [
-    earlierThan && `earlier than ${name(earlierThan)} (${formatCue(earlierThan.cue)})`,
-    laterThan && `later than ${name(laterThan)} (${formatCue(laterThan.cue)})`,
-  ].filter((r) => r !== null);
+  const reasons: string[] = [];
+  if (earlierThan) reasons.push(`earlier than ${name(earlierThan)} (${formatCue(earlierThan.cue)})`);
+  if (laterThan) reasons.push(`later than ${name(laterThan)} (${formatCue(laterThan.cue)})`);
   const text = reasons.join('; ');
   return text.charAt(0).toUpperCase() + text.slice(1);
 }

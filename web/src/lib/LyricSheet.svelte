@@ -113,10 +113,18 @@
   // playback in LyricSheetView, and has no Cue fields.
   const { track, follow } = follower();
   const writeFields = gutterFields();
+  /** The Lines of an Occurrence's Section's active Alternate: those whose Cues are in effect. */
+  function activeLines(occurrence: Occurrence | undefined): Line[] {
+    return sections.get(occurrence?.sectionId ?? -1)?.alternates.find((a) => a.active)?.lines ?? [];
+  }
+  /** Ends a Line's name with its Section's Label, e.g. " of Chorus", as the gutter names Lines. */
+  function ofSection(label: string | undefined): string {
+    return label ? ` of ${label}` : '';
+  }
   // The Line Cue fields in order down the page.
   const writeFieldOrder = $derived(
     song.arrangement.flatMap((o) =>
-      (sections.get(o.sectionId)?.alternates.find((a) => a.active)?.lines ?? [])
+      activeLines(o)
         .filter((l) => !isBlank(l))
         .map((l) => key(o.id, l.id)),
     ),
@@ -124,12 +132,12 @@
 
   // Cues out of order are marked in the gutter, each naming the Line it's
   // out of order with as the gutter names Lines, e.g. "Line 6 of Chorus".
-  const outOfOrder = $derived(outOfOrderCues(song));
+  const outOfOrder = $derived(new Map(outOfOrderCues(song).map((c) => [key(c.occurrence, c.line), c])));
 
   function lineName({ occurrence, line }: Position): string {
-    const section = sections.get(song.arrangement.find((o) => o.id === occurrence)?.sectionId ?? -1);
-    const lines = section?.alternates.find((a) => a.active)?.lines ?? [];
-    return `Line ${lines.findIndex((l) => l.id === line) + 1}${section?.label ? ` of ${section.label}` : ''}`;
+    const o = song.arrangement.find((o) => o.id === occurrence);
+    const n = activeLines(o).findIndex((l) => l.id === line) + 1;
+    return `Line ${n}${ofSection(sections.get(o?.sectionId ?? -1)?.label)}`;
   }
 
   /** How an Occurrence's Cues show on its Section's text box in Write mode. */
@@ -140,7 +148,7 @@
       track: (el, line) => track(el, key(occurrence.id, line)),
       gutter: canCue
         ? {
-            labelSuffix: label ? ` of ${label}` : '',
+            labelSuffix: ofSection(label),
             save: (line, cue) => setLineCue(occurrence, line, cue),
             field: (line, field) => writeFields.set(key(occurrence.id, line), field),
             next: (line) => writeFields.editAfter(writeFieldOrder, key(occurrence.id, line)),

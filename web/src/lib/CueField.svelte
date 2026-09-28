@@ -51,9 +51,8 @@
   let button = $state<HTMLButtonElement>();
   let clearButton = $state<HTMLButtonElement>();
 
-  // Only a Cue can be out of order.
-  const marked = $derived(cue !== null && !!outOfOrder);
-  const outOfOrderNote = $derived(marked ? `. Out of order. ${outOfOrder}` : '');
+  // Said first on hover, and after the time to screen readers.
+  const outOfOrderNote = $derived(outOfOrder ? `Out of order. ${outOfOrder}.` : '');
 
   /** Opens the field to type a time. */
   export async function edit() {
@@ -178,15 +177,15 @@
       type="button"
       class="cue"
       class:unset={cue === null}
-      class:out-of-order={marked}
+      class:out-of-order={outOfOrder}
       onclick={pick ?? edit}
       onkeydown={nudge}
       aria-label={pick
-        ? `Cue ${label} next${cue === null ? '' : `, cued at ${formatCue(cue)}${outOfOrderNote}`}`
+        ? `Cue ${label} next${cue === null ? '' : `, cued at ${formatCue(cue)}${outOfOrder ? `. ${outOfOrderNote}` : ''}`}`
         : cue === null
           ? `Set a Cue for ${label}`
-          : `Cue for ${label}: ${formatCue(cue)}${outOfOrderNote}. Change it`}
-      title={`${marked ? `Out of order. ${outOfOrder}. ` : ''}${
+          : `Cue for ${label}: ${formatCue(cue)}.${outOfOrder ? ` ${outOfOrderNote}` : ''} Change it`}
+      title={`${outOfOrder ? `${outOfOrderNote} ` : ''}${
         pick
           ? 'Cue this next'
           : cue === null
@@ -194,7 +193,7 @@
             : 'Change when this starts on the Timeline; Alt+↑/↓ nudges it'
       }`}
     >
-      {#if marked}<span class="warning" aria-hidden="true">⚠</span>{/if}{cue === null ? '–:––.–' : formatCue(cue)}
+      {#if outOfOrder}<span class="warning" aria-hidden="true">⚠</span>{/if}{cue === null ? '–:––.–' : formatCue(cue)}
     </button>
   {/if}
   {#if cue !== null && !pick && !editing}

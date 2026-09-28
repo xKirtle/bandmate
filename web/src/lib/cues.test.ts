@@ -609,10 +609,20 @@ describe('outOfOrderCues', () => {
     return { arrangement, sections };
   }
 
+  // The Cues out of order, by "occurrence:line", each with why.
+  function marked(song: CuedSong) {
+    return new Map(
+      outOfOrderCues(song).map(({ occurrence, line, earlierThan, laterThan }) => [
+        `${occurrence}:${line}`,
+        { earlierThan, laterThan },
+      ]),
+    );
+  }
+
   it('marks both Cues of a pair out of order, each naming the other', () => {
     // Lines 4, 5 and 6 of a Chorus at 0:50, 1:00 and 0:55.
     const song = sheet([{ id: 1, lines: ['1', '2', '3', '4', '5', '6'], lineCues: { 103: 50, 104: 60, 105: 55 } }]);
-    const marks = outOfOrderCues(song);
+    const marks = marked(song);
     expect([...marks.keys()].sort()).toEqual(['1:104', '1:105']);
     expect(marks.get('1:104')).toEqual({ earlierThan: null, laterThan: { occurrence: 1, line: 105, cue: 55 } });
     expect(marks.get('1:105')).toEqual({ earlierThan: { occurrence: 1, line: 104, cue: 60 }, laterThan: null });
@@ -624,7 +634,7 @@ describe('outOfOrderCues', () => {
       { id: 1, lines: ['One', 'Two'], lineCues: { 100: 10, 101: 40 } },
       { id: 2, lines: ['Hook', 'Line'], lineCues: { 102: 30, 103: 50 } },
     ]);
-    const marks = outOfOrderCues(song);
+    const marks = marked(song);
     expect([...marks.keys()].sort()).toEqual(['1:101', '2:102']);
     expect(marks.get('1:101')?.laterThan).toEqual({ occurrence: 2, line: 102, cue: 30 });
     expect(marks.get('2:102')?.earlierThan).toEqual({ occurrence: 1, line: 101, cue: 40 });
@@ -635,12 +645,12 @@ describe('outOfOrderCues', () => {
       { id: 1, lines: ['One', 'Two'], lineCues: { 100: 20 } },
       { id: 2, lines: ['Three', 'Four'], lineCues: { 103: 10 } },
     ]);
-    expect([...outOfOrderCues(song).keys()].sort()).toEqual(['1:100', '2:103']);
+    expect([...marked(song).keys()].sort()).toEqual(['1:100', '2:103']);
   });
 
   it('takes Cues at the same time as in order', () => {
     const song = sheet([{ id: 1, lines: ['One', 'Two', 'Three'], lineCues: { 100: 10, 101: 10, 102: 10 } }]);
-    expect(outOfOrderCues(song).size).toBe(0);
+    expect(marked(song).size).toBe(0);
   });
 
   it('never marks or compares dormant Cues', () => {
@@ -649,7 +659,7 @@ describe('outOfOrderCues', () => {
       { id: 1, lines: ['One'], lineCues: { 100: 10, 901: 99 } },
       { id: 2, lines: ['Two'], lineCues: { 101: 20, 902: 1 } },
     ]);
-    expect(outOfOrderCues(song).size).toBe(0);
+    expect(marked(song).size).toBe(0);
   });
 
   it("checks a Chord Line's Cue like any other", () => {
@@ -670,19 +680,19 @@ describe('outOfOrderCues', () => {
         },
       ],
     };
-    expect([...outOfOrderCues(song).keys()].sort()).toEqual(['1:1', '1:2']);
+    expect([...marked(song).keys()].sort()).toEqual(['1:1', '1:2']);
   });
 
   it('clears both marks once either Cue of the pair is fixed', () => {
     const lines = ['1', '2', '3'];
-    expect(outOfOrderCues(sheet([{ id: 1, lines, lineCues: { 100: 50, 101: 60, 102: 55 } }])).size).toBe(2);
-    expect(outOfOrderCues(sheet([{ id: 1, lines, lineCues: { 100: 50, 101: 52, 102: 55 } }])).size).toBe(0);
-    expect(outOfOrderCues(sheet([{ id: 1, lines, lineCues: { 100: 50, 101: 60, 102: 65 } }])).size).toBe(0);
+    expect(marked(sheet([{ id: 1, lines, lineCues: { 100: 50, 101: 60, 102: 55 } }])).size).toBe(2);
+    expect(marked(sheet([{ id: 1, lines, lineCues: { 100: 50, 101: 52, 102: 55 } }])).size).toBe(0);
+    expect(marked(sheet([{ id: 1, lines, lineCues: { 100: 50, 101: 60, 102: 65 } }])).size).toBe(0);
   });
 
   it('can mark a Cue out of order with the Lines either side', () => {
     const song = sheet([{ id: 1, lines: ['1', '2', '3'], lineCues: { 100: 50, 101: 10, 102: 5 } }]);
-    const marks = outOfOrderCues(song);
+    const marks = marked(song);
     expect(marks.get('1:101')).toEqual({
       earlierThan: { occurrence: 1, line: 100, cue: 50 },
       laterThan: { occurrence: 1, line: 102, cue: 5 },
