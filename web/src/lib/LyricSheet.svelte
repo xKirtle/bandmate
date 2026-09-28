@@ -2,7 +2,7 @@
   import { untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import type { Cueing } from './AlternateText.svelte';
-  import { api, suggestedLabels, type Line, type Occurrence, type Song, type SongAt } from './api';
+  import { api, suggestedLabels, type Line, type Occurrence, type Section, type Song, type SongAt } from './api';
   import { hasChords } from './chords';
   import {
     canShiftCuesEarlier,
@@ -62,6 +62,16 @@
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
+  // What taking an Occurrence out of the Arrangement does to its Section:
+  // the others keep it, else it goes to the Scrapbook, or is deleted if
+  // nothing is written in it.
+  function removal(occurrence: Occurrence, section: Section): { label: string; title: string } {
+    if (occurrence.shared) return { label: 'Remove this Occurrence', title: 'Remove this Occurrence; the others stay' };
+    if (isEmpty(section)) {
+      return { label: 'Delete this Section', title: "Delete this Section: nothing is written in it, so it isn't kept" };
+    }
+    return { label: 'Move to the Scrapbook', title: 'Move to the Scrapbook: take it out of the Lyric Sheet but keep it' };
+  }
   // The Sections in the Arrangement, once each, in the order they first
   // appear: the ones another Occurrence can be added of.
   const inArrangement = $derived(
@@ -500,16 +510,8 @@
                   type="button"
                   class="icon"
                   onclick={() => change((at) => api.removeOccurrence(at, occurrence.id))}
-                  aria-label={occurrence.shared
-                    ? 'Remove this Occurrence'
-                    : isEmpty(section)
-                      ? 'Remove this Section'
-                      : 'Move to the Scrapbook'}
-                  title={occurrence.shared
-                    ? 'Remove this Occurrence; the others stay'
-                    : isEmpty(section)
-                      ? 'Remove this Section: nothing is written in it, so it isn\'t kept'
-                      : 'Move to the Scrapbook: take it out of the Lyric Sheet but keep it'}
+                  aria-label={removal(occurrence, section).label}
+                  title={removal(occurrence, section).title}
                 >
                   ×
                 </button>

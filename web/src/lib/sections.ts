@@ -1,4 +1,5 @@
 import type { Section } from './api';
+import { isBlank } from './cues';
 
 /** How a Section is named in lists: its Label, else its first Line. */
 export function describe(section: Section): string {
@@ -12,5 +13,5 @@ export function describe(section: Section): string {
  * rather than kept in the Scrapbook.
  */
 export function isEmpty(section: Section): boolean {
-  return section.alternates.every((a) => a.lines.every((l) => !l.text.trim()));
+  return section.alternates.every((a) => a.lines.every(isBlank));
 }
