@@ -109,7 +109,7 @@ A link from one Line within an Occurrence to a time on the Timeline. An Occurren
 _Avoid_: Timestamp, sync point, marker
 
 **Sync mode**:
-A way of syncing a Song's Lines while the Timeline plays: as each Line starts, marking it "Now" cues it at the playhead, and the Line after it comes up next, cued or not, so a run of Lines can be retaken. Clicking a Line makes it the next one; with none clicked or just cued, the next one is the first Line without a Cue, or the first Line once every Line is cued. There's always a next Line. The Line playing is followed as usual, except that the next Line's own Cue is ignored until it's cued again, so the Line being retaken only becomes the one playing when it's marked "Now". Which Line is next never depends on where playback is, so playback can start anywhere. Sync mode needs a Clip on the Timeline, and Sync mode and the Loop are never on together.
+A way of syncing a Song's Lines while the Timeline plays: as each Line starts, marking it "Now" cues it at the playhead, and the Line after it comes up next, cued or not, so a run of Lines can be retaken. Clicking a Line makes it the next one; with none clicked or just cued, the next one is the first Line without a Cue, or the first Line once every Line is cued. There's always a next Line. The Line playing is followed as usual, except that the next Line's own Cue is ignored until it's cued again, so the Line being retaken only becomes the one playing when it's marked "Now". Which Line is next never depends on where playback is, so playback can start anywhere, and playing from a Cue leaves the next Line where it is. Sync mode needs a Clip on the Timeline, and Sync mode and the Loop are never on together.
 _Avoid_: Tap mode, record mode
 
 **Latency Offset**:
