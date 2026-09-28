@@ -187,7 +187,8 @@
 </div>
 
 <style>
-  /* The layout follows the player's own width, wherever it is placed. */
+  /* The layout follows the player's own width, wherever it is placed. As a
+     container it takes that width from its parent, not from its contents. */
   .player {
     container-type: inline-size;
   }
@@ -198,9 +199,9 @@
     align-items: center;
     gap: 0.75rem;
   }
-  /* Narrow, the waveform takes the whole top row after play, and the time and
-     volume move under it, starting at its left edge. The volume slider shows
-     either way: wrapped, it no longer takes width from the waveform. */
+  /* Narrow, the waveform takes the whole top row after play. Under it, the time
+     starts at its left edge and the volume sits at the right. The volume slider
+     shows either way: wrapped, it no longer takes width from the waveform. */
   @container (max-width: 32rem) {
     .controls {
       grid-template-columns: auto minmax(0, 1fr) auto;
@@ -259,7 +260,6 @@
   }
   .volume {
     grid-area: volume;
-    justify-self: end;
     display: flex;
     align-items: center;
     gap: 0.25rem;
