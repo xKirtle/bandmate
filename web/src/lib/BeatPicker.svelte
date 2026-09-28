@@ -90,6 +90,11 @@
     audio?.play().catch(() => (previewPlaying = false));
   }
 
+  // A Beat stops once its button goes, filtered out or behind an upload.
+  $effect(() => {
+    if (previewId !== null && (adding || !shown?.some((b) => b.id === previewId))) audio?.pause();
+  });
+
   // Closing the picker ends its preview.
   $effect(() => {
     const player = audio;
