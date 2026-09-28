@@ -20,6 +20,8 @@
       next: (line: number) => boolean;
       /** Given, a ▶ beside each Cue plays from it. */
       play?: (to: number) => void;
+      /** Why a Line's Cue is out of order, or null if it isn't. */
+      outOfOrder: (line: number) => string | null;
     };
     /**
      * Given, as in Sync mode, the text is read-only, the Line up next has a
@@ -226,6 +228,7 @@
               current={line.id === cueing.current}
               hovered={i === hoveredRow}
               pick={sync && !line.chordLine ? () => sync.pick(line.id) : undefined}
+              outOfOrder={gutter.outOfOrder(line.id)}
             />
           {/if}
         </div>
