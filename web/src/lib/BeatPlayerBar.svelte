@@ -1,6 +1,7 @@
 <script lang="ts">
   import { api, type Beat } from './api';
   import AudioPlayer from './AudioPlayer.svelte';
+  import { loadBeatPeaks } from './beatPeaks';
 
   // The Beat Library's desktop player: the last Beat previewed, docked at the
   // bottom of the window across the content.
@@ -27,21 +28,16 @@
   const src = $derived(api.beatAudioUrl(beat));
   const beatId = $derived(beat.id);
 
-  // The list leaves out peaks: fetch the waveform for the Beat loaded here.
+  // The waveform of the Beat loaded here, and again for a replaced file.
   $effect(() => {
-    const id = beatId;
     void src;
-    let current = true;
     peaks = [];
-    api.getBeat(id).then(
-      (b) => current && (peaks = b.peaks ?? []),
-      // Without peaks the waveform stays flat; the audio still plays.
-      () => {},
-    );
-    return () => {
-      current = false;
-    };
+    return loadBeatPeaks(beatId, (p) => (peaks = p));
   });
+
+  export function play() {
+    player?.play();
+  }
 
   export function toggle() {
     player?.toggle();
@@ -54,10 +50,7 @@
     <span class="muted">{beat.producer || 'No producer credited'}</span>
   </div>
   <div class="player">
-    <!-- A new Beat starts playing as it loads; a replaced file waits to be played. -->
-    {#key beatId}
-      <AudioPlayer bind:this={player} bind:playing {src} duration={beat.duration} {peaks} autoplay />
-    {/key}
+    <AudioPlayer bind:this={player} bind:playing {src} duration={beat.duration} {peaks} />
   </div>
   <button type="button" class="icon" aria-label="Close the preview" onclick={onClose}>×</button>
 </section>

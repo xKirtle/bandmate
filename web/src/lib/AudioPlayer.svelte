@@ -13,7 +13,6 @@
     duration,
     peaks,
     playing = $bindable(false),
-    autoplay = false,
   }: {
     src: string;
     /** In seconds. */
@@ -22,8 +21,6 @@
     peaks: number[];
     /** Whether the audio is playing, e.g. for a button elsewhere that shows it. */
     playing?: boolean;
-    /** Starts playing as soon as the player appears. */
-    autoplay?: boolean;
   } = $props();
 
   const barCount = 160;
@@ -55,9 +52,19 @@
     return () => cancelAnimationFrame(frame);
   });
 
+  // A new file starts from its beginning.
+  $effect(() => {
+    void src;
+    time = 0;
+  });
+
+  export function play() {
+    audio?.play().catch(() => (playing = false));
+  }
+
   export function toggle() {
     if (!audio) return;
-    if (audio.paused) audio.play().catch(() => (playing = false));
+    if (audio.paused) play();
     else audio.pause();
   }
 
@@ -107,7 +114,6 @@
       bind:this={audio}
       {src}
       preload="none"
-      {autoplay}
       onplay={(e) => {
         playMediaAlone(e);
         playing = true;

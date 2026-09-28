@@ -40,7 +40,9 @@
     dialog?.close();
   }
 
-  // Esc can't close it halfway through saving, uploading or deleting.
+  // Esc doesn't close it halfway through saving, uploading or deleting. (A
+  // browser may still let a repeated Esc through; the work then finishes
+  // unseen.)
   function cancel(event: Event) {
     if (busy !== null) event.preventDefault();
   }
@@ -99,7 +101,6 @@
     if (!confirm(`Delete “${beat.title}” and its file?\n\nThis can't be undone.`)) return;
     run('Deleting…', async () => {
       await api.deleteBeat(beat.id);
-      // Closed first, so the dialog hands focus back before the Beat goes.
       close();
       onDelete(beat.id);
     });

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { api, type Beat, type DecodedAudio } from '../lib/api';
   import BeatFields from '../lib/BeatFields.svelte';
@@ -87,11 +88,22 @@
   let headerBox = $state<ResizeObserverSize[]>();
   const headerHeight = $derived(headerBox?.[0].blockSize ?? 0);
 
-  function togglePreview(beat: Beat) {
-    // A new Beat starts playing as the bar loads it.
-    if (previewId === beat.id && playerBar) playerBar.toggle();
-    else previewId = beat.id;
+  async function togglePreview(beat: Beat) {
+    if (previewId === beat.id && playerBar) {
+      playerBar.toggle();
+      return;
+    }
+    // A new Beat starts playing once the bar has loaded it.
+    previewId = beat.id;
+    await tick();
+    playerBar?.play();
   }
+
+  // The bar is desktop's: narrowing the window stops the preview for good,
+  // rather than bringing it back when the window widens again.
+  $effect(() => {
+    if (!desktop.current) closePreview();
+  });
 
   const playingNow = (beat: Beat) => previewId === beat.id && previewPlaying;
 
@@ -144,24 +156,37 @@
     addError = null;
   }
 
-  // On desktop, the Beat being edited in the dialog. The cards below 80rem
-  // open their own.
+  // The Beat being edited in the dialog the table opens. The cards below
+  // 80rem open their own; this one stays open across a resize, keeping its
+  // unsaved changes.
   let editingId = $state<number | null>(null);
-  const editingBeat = $derived((desktop.current && beats?.find((b) => b.id === editingId)) || null);
+  const editingBeat = $derived(beats?.find((b) => b.id === editingId) ?? null);
 
   function showChanged(beat: Beat) {
     beats = beats?.map((b) => (b.id === beat.id ? beat : b)) ?? null;
   }
 
-  function dropDeleted(id: number) {
+  async function dropDeleted(id: number) {
+    // Focus goes to the next Beat's Edit, or the one before if it was last,
+    // rather than being lost with the deleted Beat's.
+    const at = shown?.findIndex((b) => b.id === id) ?? -1;
+    const neighbour = shown?.[at + 1] ?? shown?.[at - 1];
     beats = beats?.filter((b) => b.id !== id) ?? null;
     if (editingId === id) editingId = null;
     if (previewId === id) closePreview();
+    await tick();
+    if (neighbour) document.getElementById(`edit-beat-${neighbour.id}`)?.focus();
   }
 </script>
 
 {#snippet editCell(beat: Beat)}
-  <button type="button" class="icon edit" aria-label="Edit {beat.title}" onclick={() => (editingId = beat.id)}>
+  <button
+    type="button"
+    id="edit-beat-{beat.id}"
+    class="icon edit"
+    aria-label="Edit {beat.title}"
+    onclick={() => (editingId = beat.id)}
+  >
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M4 20h4L19 9l-4-4L4 16z" />
       <path d="M13.5 6.5l4 4" />

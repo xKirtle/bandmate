@@ -3,6 +3,7 @@
   import AudioPlayer from './AudioPlayer.svelte';
   import BeatCredit from './BeatCredit.svelte';
   import BeatEditDialog from './BeatEditDialog.svelte';
+  import { loadBeatPeaks } from './beatPeaks';
 
   // One Beat in the Beat Library's card list: its credit and a preview player.
   // Its details, file and deletion are edited in a dialog.
@@ -45,18 +46,9 @@
 
   $effect(() => {
     if (!seen) return;
-    const id = beatId;
     void src;
-    let current = true;
     peaks = [];
-    api.getBeat(id).then(
-      (b) => current && (peaks = b.peaks ?? []),
-      // Without peaks the waveform stays flat; the audio still plays.
-      () => {},
-    );
-    return () => {
-      current = false;
-    };
+    return loadBeatPeaks(beatId, (p) => (peaks = p));
   });
 </script>
 
@@ -66,7 +58,7 @@
       <h2 id="beat-{beat.id}-title">{beat.title}</h2>
       <BeatCredit {beat} />
     </div>
-    <button type="button" class="button" onclick={() => (editing = true)}>Edit</button>
+    <button type="button" id="edit-beat-{beat.id}" class="button" onclick={() => (editing = true)}>Edit</button>
   </div>
 
   <AudioPlayer {src} duration={beat.duration} {peaks} />
