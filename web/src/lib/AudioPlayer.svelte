@@ -24,6 +24,9 @@
   } = $props();
 
   const barCount = 160;
+  // Names this player's clip apart from any other player's on the page.
+  const uid = $props.id();
+  const clipId = `played-${uid}`;
 
   let audio = $state<HTMLAudioElement>();
   let time = $state(0);
@@ -146,16 +149,21 @@
       onpointercancel={() => (dragging = false)}
       onkeydown={keydown}
     >
+      <!-- The bars are drawn twice: the played copy over the rest, clipped to
+           the played width, so it fills smoothly, partway through a bar. -->
       <svg viewBox="0 0 {barCount} 100" preserveAspectRatio="none" aria-hidden="true">
-        {#each shape as peak, i (i)}
-          {@const height = Math.max(2, peak * 100)}
-          <rect
-            class:played={i < played * barCount}
-            x={i + 0.15}
-            y={(100 - height) / 2}
-            width="0.7"
-            {height}
-          />
+        <defs>
+          <clipPath id={clipId}>
+            <rect width={played * barCount} height="100" />
+          </clipPath>
+        </defs>
+        {#each [false, true] as isPlayed (isPlayed)}
+          <g class:played={isPlayed} clip-path={isPlayed ? `url(#${clipId})` : undefined}>
+            {#each shape as peak, i (i)}
+              {@const height = Math.max(2, peak * 100)}
+              <rect x={i + 0.15} y={(100 - height) / 2} width="0.7" {height} />
+            {/each}
+          </g>
         {/each}
       </svg>
     </div>
@@ -257,11 +265,11 @@
     width: 100%;
     height: 100%;
   }
-  rect {
+  g {
     fill: var(--text-muted);
     opacity: 0.4;
   }
-  rect.played {
+  g.played {
     fill: var(--accent);
     opacity: 1;
   }
