@@ -246,7 +246,7 @@ func TestImportMergesRepeatedSections(t *testing.T) {
 			},
 			[]int{0, 1, 0},
 		},
-		"a blank line more does not merge": {
+		"an extra blank line stops a merge": {
 			"[Chorus]\nMe home\ntonight\n\n[Chorus]\nMe home\n\ntonight",
 			[]shownSection{{"Chorus", []string{"Me home", "tonight"}}, {"Chorus", []string{"Me home", "", "tonight"}}},
 			[]int{0, 1},
@@ -264,15 +264,20 @@ func TestImportMergesRepeatedSections(t *testing.T) {
 			[]shownSection{{"Chorus", []string{"Me [Am]home"}}, {"Chorus", []string{"Me [F]home"}}},
 			[]int{0, 1},
 		},
-		"a label on the first one is kept": {
+		"lines after an end directive do not merge into a labelled section": {
 			"{soc}\nMe home\n{eoc}\n\nMe home",
-			[]shownSection{{"Chorus", []string{"Me home"}}, {"Chorus", []string{"Me home"}}},
-			[]int{0, 0},
+			[]shownSection{{"Chorus", []string{"Me home"}}, {"", []string{"Me home"}}},
+			[]int{0, 1},
 		},
-		"a label on a later one is kept": {
+		"lines before the first heading do not merge into a labelled section": {
 			"Me home\n\nChorus:\nMe home",
-			[]shownSection{{"Chorus", []string{"Me home"}}, {"Chorus", []string{"Me home"}}},
-			[]int{0, 0},
+			[]shownSection{{"", []string{"Me home"}}, {"Chorus", []string{"Me home"}}},
+			[]int{0, 1},
+		},
+		"unlabelled sections do not merge": {
+			"{soc}\nMe home\n{eoc}\nCity lights\n{soc}\nMe home\n{eoc}\nCity lights",
+			[]shownSection{{"Chorus", []string{"Me home"}}, {"", []string{"City lights"}}, {"Chorus", []string{"Me home"}}, {"", []string{"City lights"}}},
+			[]int{0, 1, 0, 2},
 		},
 		"labels differing only in case merge": {
 			"[Chorus]\nMe home\n\n[chorus]\nMe home",
@@ -299,13 +304,10 @@ func TestImportMergesRepeatedSections(t *testing.T) {
 			[]shownSection{{"Chorus", []string{"Me home"}}, {"Chorus", []string{"City lights"}}, {"Chorus", []string{"City lights"}}},
 			[]int{0, 1, 1},
 		},
-		"a repeat heading matches a label kept on merge": {
-			"Me home\n\n[Chorus]\nMe home\n\n[Verse]\nCity lights\n\n[Chorus]",
-			[]shownSection{
-				{"Chorus", []string{"Me home"}}, {"Chorus", []string{"Me home"}},
-				{"Verse", []string{"City lights"}}, {"Chorus", []string{"Me home"}},
-			},
-			[]int{0, 0, 1, 0},
+		"a repeat heading does not match an unlabelled section": {
+			"Me home\n\n[Verse]\nCity lights\n\n[Chorus]",
+			[]shownSection{{"", []string{"Me home"}}, {"Verse", []string{"City lights"}}, {"Chorus", []string{}}},
+			[]int{0, 1, 2},
 		},
 		"a repeat heading without an earlier match is an empty section": {
 			"[Verse]\nCity lights\n\n[Chorus]\n\n[Chorus]",
