@@ -73,7 +73,7 @@
   function toggled(part: Part, open: boolean) {
     closedParts = open ? closedParts.filter((p) => p !== part) : [...closedParts, part];
   }
-  // How tall the docked Timeline is, which the details column stops above.
+  // How tall the docked Timeline is, which the side column stops above.
   let timelineHeight = $state(0);
 
   const commonTunings = ['Standard', 'Drop D', 'Half step down', 'DADGAD', 'Open G', 'Open D'];
@@ -654,7 +654,7 @@
   }
 
   /* Desktop: two columns sitting together on the left, spare width going to
-     the right, with Delete beside the title. The details column starts level
+     the right, with Delete beside the title. The side column starts level
      with the Lyric Sheet, sticks, scrolls on its own and stops above the
      docked Timeline. */
   @media (min-width: 80rem) {
