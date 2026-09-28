@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { api, type Beat, type DecodedAudio, type Song } from './api';
   import BeatFields from './BeatFields.svelte';
@@ -13,6 +13,7 @@
     songBeatHint,
     sortBeats,
   } from './listViews';
+  import { playMediaAlone, release } from './playback';
   import { formatDuration } from './time';
   import { suggestForFile } from './beatTags';
   import { prepareUpload } from './upload';
@@ -69,6 +70,36 @@
     onPick(beat);
   }
 
+  // Each Beat previews through one audio element, so only one plays at a
+  // time, and it takes turns with the Timeline like any other player.
+  let audio = $state<HTMLAudioElement>();
+  let previewId = $state<number | null>(null);
+  let previewPlaying = $state(false);
+  const previewBeat = $derived(beats?.find((b) => b.id === previewId) ?? null);
+
+  const playingNow = (beat: Beat) => previewId === beat.id && previewPlaying;
+
+  async function togglePreview(beat: Beat) {
+    if (previewId !== beat.id) {
+      previewId = beat.id;
+      await tick();
+    } else if (!audio?.paused) {
+      audio?.pause();
+      return;
+    }
+    audio?.play().catch(() => (previewPlaying = false));
+  }
+
+  // Closing the picker ends its preview.
+  $effect(() => {
+    const player = audio;
+    return () => {
+      if (!player) return;
+      player.pause();
+      release(player);
+    };
+  });
+
   function facts(beat: Beat): string {
     return [beat.producer, beat.bpm ? `${beat.bpm} BPM` : '', beat.key, formatDuration(beat.duration)]
       .filter(Boolean)
@@ -113,6 +144,17 @@
   }
 </script>
 
+{#snippet previewButton(beat: Beat)}
+  <button
+    type="button"
+    class="icon preview"
+    aria-label="{playingNow(beat) ? 'Pause' : 'Preview'} {beat.title}"
+    onclick={() => togglePreview(beat)}
+  >
+    {playingNow(beat) ? '❚❚' : '▶'}
+  </button>
+{/snippet}
+
 <dialog bind:this={dialog} onclose={onClose} aria-labelledby="beat-picker-heading">
   <header>
     <h2 id="beat-picker-heading">Add a beat</h2>
@@ -152,7 +194,12 @@
         <button type="button" class="button" onclick={clearFilters}>Clear filters</button>
       </div>
     {:else if desktop.current}
-      <BeatTable beats={shown} bind:sort={view.sort} onRowClick={pickRow}>
+      <BeatTable
+        beats={shown}
+        bind:sort={view.sort}
+        lead={{ label: 'Preview', cell: previewButton }}
+        onRowClick={pickRow}
+      >
         {#snippet title(beat)}
           <button type="button" onclick={() => onPick(beat)}>{beat.title}</button>
         {/snippet}
@@ -161,7 +208,8 @@
       <ul class="beats">
         {#each shown as beat (beat.id)}
           <li>
-            <button type="button" onclick={() => onPick(beat)}>
+            {@render previewButton(beat)}
+            <button type="button" class="pick" onclick={() => onPick(beat)}>
               <span class="title">{beat.title}</span>
               <span class="muted">{facts(beat)}</span>
             </button>
@@ -170,6 +218,18 @@
       </ul>
     {/if}
   {/if}
+
+  <audio
+    bind:this={audio}
+    src={previewBeat ? api.beatAudioUrl(previewBeat) : undefined}
+    preload="none"
+    onplay={(e) => {
+      playMediaAlone(e);
+      previewPlaying = true;
+    }}
+    onpause={() => (previewPlaying = false)}
+    onended={() => (previewPlaying = false)}
+  ></audio>
 
   {#if busy}
     <p class="muted" role="status">{busy}</p>
@@ -220,12 +280,23 @@
     border-top: 1px solid var(--border);
   }
   .beats li {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
     border-bottom: 1px solid var(--border);
   }
-  .beats button {
+  .preview {
+    flex-shrink: 0;
+    color: var(--accent);
+  }
+  .preview:hover:not(:disabled) {
+    color: var(--accent);
+  }
+  .beats .pick {
     display: flex;
     flex-direction: column;
-    width: 100%;
+    flex: 1;
+    min-width: 0;
     min-height: var(--control);
     padding: 0.5rem 0.25rem;
     border: none;
@@ -235,7 +306,7 @@
     text-align: left;
     cursor: pointer;
   }
-  .beats button:hover {
+  .beats .pick:hover {
     background: var(--surface-1);
   }
   .title {
