@@ -90,6 +90,21 @@ export function hasCues(song: CuedSong): boolean {
   return song.arrangement.some((o) => o.cue !== null || hasLineCue(o, linesOf(o)));
 }
 
+/**
+ * The latest Cue in effect, in seconds: an Occurrence's own, or one on a
+ * Line of its active Alternate. Dormant Cues don't count. Null without any.
+ */
+export function lastCue(song: CuedSong): number | null {
+  const linesOf = activeLines(song);
+  let last: number | null = null;
+  for (const o of song.arrangement) {
+    for (const cue of [o.cue, ...linesOf(o).map((l) => o.lineCues[l.id])]) {
+      if (cue !== null && cue !== undefined && (last === null || cue > last)) last = cue;
+    }
+  }
+  return last;
+}
+
 /** A Cue and what it links: an Occurrence (line null), or one of its Lines. */
 export type FoundCue = Position & { cue: number };
 

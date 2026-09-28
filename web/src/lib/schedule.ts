@@ -1,6 +1,8 @@
 // What the Timeline plays from a given time: which Clip plays which part of
 // its source, and when. Plain arithmetic, so playback only has to follow it.
 
+import { lastCue, type CuedSong } from './cues';
+
 /** Where a Clip sits on the Timeline and which part of its source it plays, in seconds. */
 export interface Placed {
   start: number;
@@ -99,7 +101,11 @@ export function positionAt(t: number, loop: Loop | null, elapsed: number): numbe
   return elapsed < first ? t + elapsed : start + ((elapsed - first) % (end - start));
 }
 
-/** Where the last Clip ends, in seconds: 0 without Clips. */
-export function timelineEnd(clips: readonly Placed[]): number {
-  return clips.reduce((end, c) => Math.max(end, c.start + c.length), 0);
+/**
+ * Where the Timeline ends, in seconds: where its last Clip ends or at its
+ * latest Cue in effect, whichever is later, so playback runs through every
+ * Cue even past the Beat. 0 without either.
+ */
+export function timelineEnd(clips: readonly Placed[], song: CuedSong): number {
+  return clips.reduce((end, c) => Math.max(end, c.start + c.length), lastCue(song) ?? 0);
 }
