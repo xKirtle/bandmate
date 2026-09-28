@@ -1939,8 +1939,8 @@
 
   /*
    * On a phone, the Timeline only plays: the transport row alone. The Tracks
-   * are hidden as when collapsed, so they come back as they were on widening
-   * the window, and playback goes on with their saved levels and Loop.
+   * are hidden much as when collapsed, so they come back as they were on
+   * widening the window, and playback goes on with their saved levels and Loop.
    */
   @media (max-width: 40rem) {
     /* Already sized for a phone, and there's no room to spare. */
@@ -1952,9 +1952,8 @@
     .tracks {
       display: none;
     }
-    /* The Loop toggle, easier to hit with a thumb. */
-    .toggle {
-      width: calc(1.75 * var(--timeline-rem));
+    /* Easier to hit with a thumb. */
+    .toggle.loop-toggle {
       height: calc(1.5 * var(--timeline-rem));
     }
   }
