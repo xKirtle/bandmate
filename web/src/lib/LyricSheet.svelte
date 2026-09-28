@@ -10,9 +10,9 @@
     everyCue,
     hasCues,
     isBlank,
+    leadIn,
     nextLine,
     type NextLine,
-    type Position,
   } from './cues';
   import { follower, key } from './follow';
   import { gutterFields } from './gutter';
@@ -51,7 +51,7 @@
     playhead?: number | null;
     /** Whether the Timeline has any Clip, so there's something to cue to. */
     hasClips?: boolean;
-    /** Seeks the Timeline, e.g. to a cued Line or from a Cue's ▶. */
+    /** Seeks the Timeline, e.g. to lead into a Cue from its ▶. */
     seek?: (to: number) => void;
     /** Where the Timeline's playhead is, playing or paused, in seconds: where Sync mode cues a Line. */
     playheadAt?: () => number;
@@ -77,12 +77,12 @@
   const inArrangement = $derived(
     [...new Set(song.arrangement.map((o) => o.sectionId))].flatMap((id) => sections.get(id) ?? []),
   );
-  // Where playback is in the Lyric Sheet.
-  const current = $derived(playhead === null ? null : currentPosition(song, playhead));
   // Cues are edited in Write mode, on wider screens only, and only once
   // there's something to cue to or a Cue already set.
   const wide = new MediaQuery('min-width: 40.0625rem');
   const canCue = $derived(wide.current && (hasClips || hasCues(song)));
+  // Playing from a Cue's ▶, or a cued Line in Read mode, leads into it.
+  const playFrom = $derived(seek && ((cue: number) => seek(leadIn(cue))));
 
   function setCue(occurrence: Occurrence, cue: number | null) {
     editCues((at) =>
@@ -124,9 +124,6 @@
         .map((l) => key(o.id, l.id)),
     ),
   );
-  // Write mode shows every Line, Chord Lines included, so whatever is
-  // current is on screen.
-  const writeKey = $derived(mode === 'write' && current ? key(current.occurrence, current.line) : null);
 
   /** How an Occurrence's Cues show on its Section's text box in Write mode. */
   function cueingFor(occurrence: Occurrence, label: string): Cueing {
@@ -140,14 +137,14 @@
             save: (line, cue) => setLineCue(occurrence, line, cue),
             field: (line, field) => writeFields.set(key(occurrence.id, line), field),
             next: (line) => writeFields.editAfter(writeFieldOrder, key(occurrence.id, line)),
-            play: seek,
+            play: playFrom,
           }
         : undefined,
       sync: syncing
         ? {
             next: upNext?.occurrence === occurrence.id ? upNext.line : null,
             now: cueNext,
-            pick: (line) => (syncFrom = { current: null, picked: { occurrence: occurrence.id, line } }),
+            pick: (line) => (syncFrom = { cued: null, picked: { occurrence: occurrence.id, line } }),
           }
         : undefined,
     };
@@ -165,13 +162,20 @@
     if (!canSync || loopOn) untrack(() => (syncing = false));
   });
 
-  // What the Line up next is worked out from: where playback was as Sync
-  // mode came on, then the Line last cued, or a Line picked by clicking it.
-  // It doesn't follow playback, so the Line up next only moves on as Lines
-  // are cued, whether or not their Cues are saved yet.
-  let syncFrom = $state.raw<{ current: Position | null; picked: NextLine | null }>({ current: null, picked: null });
-  // Outlined, with a Now button in its gutter slot; none after the last Line.
+  // What the Line up next is worked out from: the Line last cued, or a Line
+  // picked by clicking it. It doesn't follow playback, so playback can start
+  // anywhere, and the Line up next only moves on as Lines are cued, whether
+  // or not their Cues are saved yet.
+  let syncFrom = $state.raw<{ cued: NextLine | null; picked: NextLine | null }>({ cued: null, picked: null });
+  // Marked by a Now button in its gutter slot.
   const upNext = $derived(syncing ? nextLine(song, syncFrom) : null);
+
+  // Where playback is in the Lyric Sheet. In Sync mode, the Line up next is
+  // being retaken, so its old Cue is ignored until it's cued again.
+  const current = $derived(playhead === null ? null : currentPosition(song, playhead, upNext));
+  // Write mode shows every Line, Chord Lines included, so whatever is
+  // current is on screen.
+  const writeKey = $derived(mode === 'write' && current ? key(current.occurrence, current.line) : null);
 
   // The first time Sync mode comes on on this device, a hint says how to use it.
   let hinting = $state(false);
@@ -182,7 +186,7 @@
     if (!syncing) return;
     stopLoop?.();
     markSyncHintSeen(deviceStorage());
-    syncFrom = { current: playheadAt ? currentPosition(song, playheadAt()) : null, picked: null };
+    syncFrom = { cued: null, picked: null };
   }
 
   /** Cues the Line up next at the playhead. */
@@ -190,11 +194,11 @@
     const line = upNext;
     if (!playheadAt || !line) return;
     const time = playheadAt();
-    const from = { current: line, picked: null };
+    const from = { cued: line, picked: null };
     syncFrom = from;
     const saved = await editCues((at) => api.setLineCue(at, line.occurrence, line.line, time));
     // Failed, the Line is still to cue, unless another has been picked since.
-    if (!saved && syncFrom === from) syncFrom = { current: null, picked: line };
+    if (!saved && syncFrom === from) syncFrom = { cued: null, picked: line };
   }
 
   // Playback is followed down the Lyric Sheet in Write mode, but in Sync
@@ -412,7 +416,7 @@
         </label>
       </div>
     {/if}
-    <LyricSheetView {song} showChords={chordsShown} {current} {seek} />
+    <LyricSheetView {song} showChords={chordsShown} {current} seek={playFrom} />
   {:else}
     <ol class="arrangement">
       {#each song.arrangement as occurrence, i (occurrence.id)}
@@ -438,7 +442,7 @@
                 ? {
                     at: occurrence.cue,
                     save: (cue) => setCue(occurrence, cue),
-                    play: seek,
+                    play: playFrom,
                     current: current?.occurrence === occurrence.id,
                   }
                 : undefined}

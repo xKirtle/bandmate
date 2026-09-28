@@ -14,7 +14,7 @@
     showChords: boolean;
     /** Where playback is: highlighted and kept in view. */
     current?: Position | null;
-    /** Given, clicking a cued Line seeks the Timeline to its Cue. */
+    /** Given, clicking a cued Line plays from its Cue. */
     seek?: (to: number) => void;
   } = $props();
 
@@ -43,7 +43,7 @@
     follow(currentKey);
   });
 
-  /** What clicking a Line does: seek to its Cue. Null for nothing. */
+  /** What clicking a Line does: play from its Cue. Null for nothing. */
   function clickLine(cue: number | null): (() => void) | null {
     return cue !== null && seek ? () => seek(cue) : null;
   }
