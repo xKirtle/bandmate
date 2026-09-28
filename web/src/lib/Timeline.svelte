@@ -33,11 +33,10 @@
   import { clampHeight, defaultHeight, deviceStorage, heightBounds, readHeight, storeHeight } from './timelineHeight';
   import { TimelinePlayer, type PlayableClip, type PlayerState } from './timelinePlayer';
   import {
-    barCentre,
     edgeSpeed,
     fitScale,
     follow,
-    thumb as scrollThumb,
+    scrollThumb,
     thumbScroll,
     ticks as rulerTicks,
     timeAt as viewTimeAt,
@@ -611,6 +610,7 @@
   }
   let edit = $state<Edit | null>(null);
   let lanesElement = $state<HTMLElement>();
+  let lanesWrapElement = $state<HTMLElement>();
   let laneElements = $state<HTMLElement[]>([]);
 
   /** Each Track's Clips as shown, with the one being edited where it's been dragged to. */
@@ -935,46 +935,61 @@
 
   // The browser's own scroll bar is hidden, as it took height on zooming
   // in and shifted the Timeline. This one lies over the lanes' bottom edge
-  // instead, taking none: where the view is along the Timeline, dragged to
-  // scroll and clicked beside the thumb to centre there. Either scrolls the
-  // lanes by hand, so the playhead stops being followed, as scrolled() tells.
+  // instead, taking none, and shows where the view is along the Timeline.
+  // Dragging the thumb or clicking beside it scrolls the lanes by hand, so
+  // the playhead stops being followed, as scrolled() tells.
   /** The narrowest the thumb gets, in pixels, to stay easy to grab. */
   const leastThumb = 32;
   const thumb = $derived(scrollThumb(view, leastThumb));
   let barElement = $state<HTMLElement>();
-  // How far into the thumb it was grabbed, in pixels, while it's dragged.
-  let thumbGrip = $state<number | null>(null);
+  /** The pointer dragging the thumb, and how far into it it grabbed, in pixels. */
+  let thumbDrag = $state<{ pointerId: number; grip: number } | null>(null);
 
   /** How far a point is from the left of the scroll bar, in pixels. */
   function xInBar(clientX: number): number {
     return clientX - barElement!.getBoundingClientRect().left;
   }
 
+  /** Scrolls the lanes so the thumb starts left pixels along the bar. */
+  function scrollThumbTo(left: number) {
+    lanesElement!.scrollLeft = thumbScroll(view, leastThumb, left).scroll;
+  }
+
   function thumbDown(event: PointerEvent) {
-    if (event.button !== 0 || !thumb) return;
+    // One finger at a time: a second is pinching.
+    if (event.button !== 0 || !event.isPrimary || !thumb) return;
     // Not a click on the bar beside it.
     event.stopPropagation();
-    (event.currentTarget as Element).setPointerCapture(event.pointerId);
-    thumbGrip = xInBar(event.clientX) - thumb.left;
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    thumbDrag = { pointerId: event.pointerId, grip: xInBar(event.clientX) - thumb.left };
   }
 
   function thumbMove(event: PointerEvent) {
-    if (thumbGrip === null) return;
-    lanesElement!.scrollLeft = thumbScroll(view, leastThumb, xInBar(event.clientX) - thumbGrip).scroll;
+    if (event.pointerId !== thumbDrag?.pointerId) return;
+    scrollThumbTo(xInBar(event.clientX) - thumbDrag.grip);
   }
 
   function thumbUp() {
-    thumbGrip = null;
+    thumbDrag = null;
   }
 
   // Zoomed out while dragging, e.g. by pinching, the bar goes and the drag with it.
   $effect(() => {
-    if (!thumb) thumbGrip = null;
+    if (!thumb) thumbDrag = null;
   });
 
+  /** A click beside the thumb centres it there, and so the view. */
   function barDown(event: PointerEvent) {
-    if (event.button !== 0) return;
-    lanesElement!.scrollLeft = barCentre(view, xInBar(event.clientX)).scroll;
+    if (event.button !== 0 || !event.isPrimary || !thumb) return;
+    scrollThumbTo(xInBar(event.clientX) - thumb.width / 2);
+  }
+
+  // Over the bar, the wheel scrolls the lanes as it would over them: the
+  // bar isn't in them, so the browser wouldn't. Ctrl+wheel zooms, below.
+  function barWheel(event: WheelEvent) {
+    if (event.ctrlKey) return;
+    const along = event.deltaX || (event.shiftKey ? event.deltaY : 0);
+    lanesElement!.scrollLeft += event.deltaMode === WheelEvent.DOM_DELTA_PIXEL ? along : along * 33;
   }
 
   function scrolled() {
@@ -1002,9 +1017,10 @@
   }
 
   // Listened to directly: Svelte's own wheel and touch listeners are
-  // passive, so they can't stop the browser zooming the page instead.
+  // passive, so they can't stop the browser zooming the page instead. On
+  // the lanes and the scroll bar over them both.
   $effect(() => {
-    const lanes = lanesElement;
+    const lanes = lanesWrapElement;
     if (!lanes) return;
     const wheel = (event: WheelEvent) => {
       // A trackpad's pinch comes as Ctrl+wheel too.
@@ -1024,7 +1040,8 @@
     const touchStart = (event: TouchEvent) => {
       if (event.touches.length !== 2) return;
       pinch = pinchOf(event);
-      // The first finger may have started dragging the playhead or the Loop.
+      // The first finger may have started dragging the playhead, the Loop or the thumb.
+      thumbDrag = null;
       dragging = false;
       dragDone();
       loopCancel();
@@ -1247,7 +1264,7 @@
             </div>
           {/each}
         </div>
-        <div class="lanes-wrap">
+        <div class="lanes-wrap" bind:this={lanesWrapElement}>
           <div
             class="lanes"
             bind:this={lanesElement}
@@ -1390,10 +1407,16 @@
           {#if thumb}
             <!-- Pointer only: the ruler is the keyboard's slider for the position. -->
             <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div class="scrollbar" bind:this={barElement} onpointerdown={barDown} aria-hidden="true">
+            <div
+              class="scrollbar"
+              bind:this={barElement}
+              onpointerdown={barDown}
+              onwheel={barWheel}
+              aria-hidden="true"
+            >
               <div
                 class="scroll-thumb"
-                class:dragging={thumbGrip !== null}
+                class:dragging={thumbDrag !== null}
                 style:left="{thumb.left}px"
                 style:width="{thumb.width}px"
                 onpointerdown={thumbDown}
@@ -1683,11 +1706,18 @@
       top 0.1s,
       bottom 0.1s;
   }
-  .scrollbar:hover .scroll-thumb,
   .scroll-thumb.dragging {
     top: calc(0.0625 * var(--timeline-rem));
     bottom: calc(0.0625 * var(--timeline-rem));
     background: var(--text-muted);
+  }
+  /* Not on touch screens, where a tap leaves it hovered. */
+  @media (hover: hover) {
+    .scrollbar:hover .scroll-thumb {
+      top: calc(0.0625 * var(--timeline-rem));
+      bottom: calc(0.0625 * var(--timeline-rem));
+      background: var(--text-muted);
+    }
   }
   .scroll-thumb.dragging {
     cursor: grabbing;
