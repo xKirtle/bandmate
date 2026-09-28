@@ -75,38 +75,41 @@ The tests go through the HTTP API only. `internal/app/helpers_test.go` starts th
 
 Vitest covers plain TypeScript modules in `web/src/lib` that don't touch the DOM or Web Audio, e.g. reducing decoded audio to waveform peaks. Their tests sit next to them as `*.test.ts`. Components and audio playback are tested by hand.
 
-## Deploying
+## Running it yourself
 
-Bandmate runs as its own compose stack on the MiniPC, managed by Dockhand. The stack only needs `compose.yaml` (and a `.env` if the defaults don't fit) plus a `data` folder owned by `PUID:PGID`. It pulls `ghcr.io/xkirtle/bandmate:latest`.
+CI publishes the image to `ghcr.io/xkirtle/bandmate`, tagged `latest` and with each commit's SHA. Create a `data` folder owned by the user the container runs as, then start it with Docker Compose:
 
-Back it up by copying `data/`.
+```yaml
+services:
+  bandmate:
+    image: ghcr.io/xkirtle/bandmate:latest
+    container_name: bandmate
+    restart: unless-stopped
+    # Run as the owner of ./data so the bind-mounted folder stays writable.
+    user: "1000:1000"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+```
 
-### Release flow
+Or with `docker run`:
+
+```sh
+docker run -d --name bandmate --restart unless-stopped \
+  --user 1000:1000 \
+  -p 8080:8080 \
+  -v "$PWD/data:/data" \
+  ghcr.io/xkirtle/bandmate:latest
+```
+
+Bandmate is then on http://localhost:8080. The image has its own healthcheck. Migrations run on startup, so upgrading means pulling the new image and recreating the container. To roll back, run an older SHA tag instead of `latest`. Back it up by copying `data/`.
+
+Bandmate has no login, so anything that can reach it can read and change every Song. Anywhere beyond your own machine, put it behind a reverse proxy that handles HTTPS and authentication ([ADR 0002](docs/adr/0002-single-user-auth-at-proxy.md)). Browsers also only allow the microphone over HTTPS or on localhost.
+
+## Releasing
 
 1. Open a pull request. The [CI workflow](.github/workflows/ci.yml) type-checks, unit-tests and builds the SPA, and runs `go vet` and `go test`. Pushes to other branches don't run CI, so open a draft PR for early feedback.
 2. Merge to `main`. CI runs again and, if it passes, builds and publishes the image to `ghcr.io/xkirtle/bandmate` tagged `latest` and with the commit SHA.
-3. Redeploy the stack in Dockhand, which pulls the new `latest`. Migrations run on startup.
 
-To roll back, set `BANDMATE_IMAGE=ghcr.io/xkirtle/bandmate:<older-sha>` in the stack's `.env` and redeploy.
-
-### One-time setup
-
-- **Block failing changes.** In the repo's settings, add a branch protection rule (or ruleset) for `main` that requires the `test` check to pass before merging. (`image` only runs on `main`, so pull requests show it as skipped.)
-- **Package visibility.** The first publish creates the `bandmate` package under the account's GitHub packages. Check its visibility there. If it's public, nothing else is needed. If it's private, log the MiniPC in to the registry with a personal access token (classic) that has the `read:packages` scope:
-
-  ```sh
-  echo <token> | docker login ghcr.io -u xKirtle --password-stdin
-  ```
-
-  If Dockhand pulls with its own registry settings rather than the Docker daemon's, add `ghcr.io` there with the same token.
-
-**Manual step:** add a site block for `bandmate.kirtle.net` to the Pi's Caddyfile, then reload Caddy. Replace the upstream with the MiniPC's address and `BANDMATE_PORT`:
-
-```caddyfile
-bandmate.kirtle.net {
-	crowdsec
-	import geoblock
-	import tinyauth
-	reverse_proxy <minipc-address>:8080
-}
-```
+`main` requires the `test` check to pass before merging. (`image` only runs on `main`, so pull requests show it as skipped.)
