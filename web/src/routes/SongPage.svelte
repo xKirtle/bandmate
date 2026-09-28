@@ -37,9 +37,8 @@
   // Where the Timeline is playing, in seconds; null while it isn't.
   let playhead = $state<number | null>(null);
   let timelinePanel = $state<Timeline>();
-  let lyricSheet = $state<LyricSheet>();
-  // Whether Tap mode is on: switched on the Timeline, and cueing Lines in the Lyric Sheet.
-  let tapping = $state(false);
+  // Whether the Timeline's Loop is on, which keeps Sync mode in the Lyric Sheet off.
+  let loopOn = $state(false);
   let draft = $state<Draft>(toDraft(null));
   let loadError = $state<string | null>(null);
   let saveError = $state<string | null>(null);
@@ -333,14 +332,15 @@
 
       <div class="sheet">
         <LyricSheet
-          bind:this={lyricSheet}
           {song}
           change={send}
           {editCues}
           onUnsaved={setUnsaved}
           {playhead}
           seek={(to) => timelinePanel?.seekTo(to)}
-          {tapping}
+          playheadAt={() => timelinePanel?.playheadAt() ?? 0}
+          {loopOn}
+          stopLoop={() => timelinePanel?.stopLoop()}
           hasClips={timeline?.tracks.some((t) => t.clips.length > 0) ?? false}
         />
       </div>
@@ -421,13 +421,12 @@
 {#if song && timeline}
   <Timeline
     bind:this={timelinePanel}
-    bind:tapping
     {song}
     {timeline}
     change={changeTimeline}
     {setBpm}
     onPlayhead={(at) => (playhead = at)}
-    onTap={(at) => lyricSheet?.tap(at)}
+    onLoop={(on) => (loopOn = on)}
   />
 {/if}
 

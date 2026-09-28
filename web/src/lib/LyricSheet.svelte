@@ -4,12 +4,13 @@
   import type { Cueing } from './AlternateText.svelte';
   import { api, suggestedLabels, type Line, type Occurrence, type Song, type SongAt } from './api';
   import { hasChords } from './chords';
-  import { currentPosition, hasCues, isBlank, nextLine, type TapLine } from './cues';
+  import { currentPosition, hasCues, isBlank, nextLine, type NextLine } from './cues';
   import { follower, key } from './follow';
   import { gutterFields } from './gutter';
   import LyricSheetView from './LyricSheetView.svelte';
   import SectionEditor from './SectionEditor.svelte';
   import { describe } from './sections';
+  import { inTextField } from './textField';
 
   let {
     song,
@@ -19,7 +20,9 @@
     playhead = null,
     hasClips = false,
     seek,
-    tapping = false,
+    playheadAt,
+    loopOn = false,
+    stopLoop,
   }: {
     song: Song;
     /** Sends a Lyric Sheet change; resolves to whether it succeeded. */
@@ -33,8 +36,12 @@
     hasClips?: boolean;
     /** Seeks the Timeline, e.g. to a cued Line or from a Cue's ▶. */
     seek?: (to: number) => void;
-    /** Whether Tap mode is on, so tap can be called, and clicking a Line in Read mode picks it to tap next. */
-    tapping?: boolean;
+    /** Where the Timeline's playhead is, playing or paused, in seconds: where Sync mode cues a Line. */
+    playheadAt?: () => number;
+    /** Whether the Timeline's Loop is on, which switches Sync mode off: the two are exclusive. */
+    loopOn?: boolean;
+    /** Switches the Timeline's Loop off, as Sync mode comes on. */
+    stopLoop?: () => void;
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
@@ -102,27 +109,49 @@
     };
   }
 
-  // The Line picked by clicking it in Tap mode, to tap next.
-  let picked = $state<TapLine | null>(null);
-  // A Line is picked in Read mode only, where it's marked.
+  // Sync mode cues the next Line at the playhead with Enter. Like the Cue
+  // gutter, it's in Write mode on wider screens only, and only once there's
+  // a Clip to cue along to. It and the Loop are exclusive, so going round
+  // the Loop mid-pass can't cue Lines out of order: switching Sync mode on
+  // switches the Loop off, and the Loop coming on, however it does,
+  // switches Sync mode off.
+  let syncing = $state(false);
+  const canSync = $derived(mode === 'write' && wide.current && hasClips);
   $effect(() => {
-    if (!tapping || mode === 'write') picked = null;
+    if (!canSync || loopOn) untrack(() => (syncing = false));
   });
-  // The latest tap, while the Cue it set is being saved: the Song doesn't
-  // have that Cue yet, so the next tap goes on from it rather than from
-  // what's current.
-  let pendingTap: TapLine | null = null;
 
-  /** Cues the next Line in Tap mode at a time, in seconds. */
-  export async function tap(time: number) {
-    const current = pendingTap ?? currentPosition(song, time);
-    const line = nextLine(song, { current, picked, showChords: chordsShown });
+  function switchSyncing() {
+    syncing = !syncing;
+    if (syncing) stopLoop?.();
+  }
+
+  // The latest cue, while the Cue it set is being saved: the Song doesn't
+  // have that Cue yet, so the next cue goes on from it rather than from
+  // what's current.
+  let pendingCue: NextLine | null = null;
+
+  /** Cues the next Line at the playhead. */
+  async function cueNext() {
+    if (!playheadAt) return;
+    const time = playheadAt();
+    const current = pendingCue ?? currentPosition(song, time);
+    const line = nextLine(song, { current });
     if (!line) return;
-    picked = null;
-    pendingTap = line;
+    pendingCue = line;
     await editCues((at) => api.setLineCue(at, line.occurrence, line.line, time));
-    // Saved, the Song has the Cue; failed, the Line is still to tap.
-    if (pendingTap === line) pendingTap = null;
+    // Saved, the Song has the Cue; failed, the Line is still to cue.
+    if (pendingCue === line) pendingCue = null;
+  }
+
+  // In Sync mode, Enter cues anywhere but a text field or a dialog, even on
+  // a button: syncing along shouldn't depend on where focus was left.
+  function cueKey(event: KeyboardEvent) {
+    if (event.key !== 'Enter' || event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+    if (!syncing || event.defaultPrevented || inTextField(event.target)) return;
+    if (event.target instanceof Element && event.target.closest('dialog')) return;
+    event.preventDefault();
+    cueNext();
   }
 
   // The Occurrence just added, whose Label gets focus.
@@ -165,9 +194,33 @@
   }
 </script>
 
+<svelte:window onkeydown={cueKey} />
+
 <section class="sheet" aria-labelledby="sheet-heading">
   <div class="head">
     <h2 id="sheet-heading">Lyric Sheet</h2>
+    <span class="spacer"></span>
+    {#if mode === 'write' && canCue && hasCues(song)}
+      <!-- Doesn't ask first: it can be undone. -->
+      <button
+        type="button"
+        class="button"
+        onclick={() => editCues((at) => api.clearCues(at))}
+        title="Clear every Cue in the Song">Clear all Cues</button
+      >
+    {/if}
+    {#if mode === 'write' && wide.current}
+      <button
+        type="button"
+        class="button sync-toggle"
+        aria-pressed={syncing}
+        disabled={!canSync}
+        onclick={switchSyncing}
+        title={canSync
+          ? 'Sync lyrics: press Enter as each Line starts to cue it at the playhead'
+          : 'Add a beat to the Timeline to sync lyrics to it'}>Sync lyrics</button
+      >
+    {/if}
     <fieldset class="modes">
       <legend class="visually-hidden">Mode</legend>
       <label class="mode"><input type="radio" name="sheet-mode" value="write" bind:group={mode} />Write</label>
@@ -190,14 +243,7 @@
         </label>
       </div>
     {/if}
-    <LyricSheetView
-      {song}
-      showChords={chordsShown}
-      {current}
-      {seek}
-      {picked}
-      pick={tapping ? (line) => (picked = line) : undefined}
-    />
+    <LyricSheetView {song} showChords={chordsShown} {current} {seek} />
   {:else}
     <ol class="arrangement">
       {#each song.arrangement as occurrence, i (occurrence.id)}
@@ -317,14 +363,22 @@
   }
   .head {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
     gap: 0.5rem;
     margin-bottom: 0.75rem;
   }
   h2 {
     font-size: 1rem;
     margin: 0;
+  }
+  .spacer {
+    flex: 1;
+  }
+  .sync-toggle[aria-pressed='true'] {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--accent-text);
   }
   .modes {
     display: flex;

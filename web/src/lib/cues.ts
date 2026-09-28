@@ -111,33 +111,33 @@ export function cuesInSpan(song: CuedSong, start: number, end: number): FoundCue
   });
 }
 
-/** A Line, as far as Tap mode steps onto it: a Chord Line is hidden along with Chords. */
-export interface ShownLine extends CuedLine {
+/** A Line, as far as Sync mode steps onto it: it skips Chord Lines. */
+export interface ChordedLine extends CuedLine {
   chordLine: boolean;
 }
 
-/** A Line within one Occurrence, as Tap mode cues it. */
-export type TapLine = Position & { line: number };
+/** A Line within one Occurrence, as Sync mode cues it. */
+export type NextLine = Position & { line: number };
 
 /**
- * The Line Tap mode cues next, in the order down the sheet: a Line picked
+ * The Line Sync mode cues next, in the order down the sheet: a Line picked
  * by clicking it, or else the one after the current Line, the first of a
  * Section highlighted as a whole, or with nothing highlighted the first of
  * the Arrangement. Each Occurrence of a shared Section is stepped through
- * on its own. Only Lines on screen take a tap: never blank ones, nor Chord
- * Lines while Chords are hidden. Null once there are no more.
+ * on its own. Only Lines with words are cued: never blank ones, nor Chord
+ * Lines. Null once there are no more.
  */
 export function nextLine(
-  song: CuedSong<ShownLine>,
-  { current, picked = null, showChords }: { current: Position | null; picked?: TapLine | null; showChords: boolean },
-): TapLine | null {
+  song: CuedSong<ChordedLine>,
+  { current, picked = null }: { current: Position | null; picked?: NextLine | null },
+): NextLine | null {
   const linesOf = activeLines(song);
   const sheet = song.arrangement.flatMap((o, place) =>
     linesOf(o).map((l) => ({
       place,
       occurrence: o.id,
       line: l.id,
-      tappable: !isBlank(l) && (showChords || !l.chordLine),
+      cueable: !isBlank(l) && !l.chordLine,
     })),
   );
   const at = (p: Position) => sheet.findIndex((q) => q.occurrence === p.occurrence && q.line === p.line);
@@ -152,7 +152,7 @@ export function nextLine(
     from = sheet.findIndex((p) => p.place >= place);
     if (from < 0) return null;
   }
-  const next = sheet.slice(from).find((p) => p.tappable);
+  const next = sheet.slice(from).find((p) => p.cueable);
   return next ? { occurrence: next.occurrence, line: next.line } : null;
 }
 

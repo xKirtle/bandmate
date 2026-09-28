@@ -359,25 +359,25 @@ describe('nextLine', () => {
   );
 
   it('is the first Line of the Arrangement before anything is highlighted', () => {
-    expect(nextLine(song, { current: null, showChords: true })).toEqual({ occurrence: 1, line: 10 });
+    expect(nextLine(song, { current: null })).toEqual({ occurrence: 1, line: 10 });
   });
 
   it('is the Line after the highlighted one', () => {
-    expect(nextLine(song, { current: { occurrence: 1, line: 10 }, showChords: true })).toEqual({
+    expect(nextLine(song, { current: { occurrence: 1, line: 10 } })).toEqual({
       occurrence: 1,
       line: 11,
     });
   });
 
   it('goes on into the next Occurrence after its last Line', () => {
-    expect(nextLine(song, { current: { occurrence: 1, line: 11 }, showChords: true })).toEqual({
+    expect(nextLine(song, { current: { occurrence: 1, line: 11 } })).toEqual({
       occurrence: 2,
       line: 20,
     });
   });
 
   it('is nothing after the last Line of the Arrangement', () => {
-    expect(nextLine(song, { current: { occurrence: 2, line: 21 }, showChords: true })).toBeNull();
+    expect(nextLine(song, { current: { occurrence: 2, line: 21 } })).toBeNull();
   });
 
   it('skips blank Lines', () => {
@@ -392,8 +392,8 @@ describe('nextLine', () => {
       },
       [1],
     );
-    expect(nextLine(spaced, { current: null, showChords: true })).toEqual({ occurrence: 1, line: 11 });
-    expect(nextLine(spaced, { current: { occurrence: 1, line: 11 }, showChords: true })).toEqual({
+    expect(nextLine(spaced, { current: null })).toEqual({ occurrence: 1, line: 11 });
+    expect(nextLine(spaced, { current: { occurrence: 1, line: 11 } })).toEqual({
       occurrence: 1,
       line: 13,
     });
@@ -412,24 +412,16 @@ describe('nextLine', () => {
       [1],
     );
 
-    it('steps onto it while Chords are shown', () => {
-      expect(nextLine(intro, { current: null, showChords: true })).toEqual({ occurrence: 1, line: 10 });
-      expect(nextLine(intro, { current: { occurrence: 1, line: 11 }, showChords: true })).toEqual({
-        occurrence: 1,
-        line: 12,
-      });
-    });
-
-    it('skips it while Chords are hidden', () => {
-      expect(nextLine(intro, { current: null, showChords: false })).toEqual({ occurrence: 1, line: 11 });
-      expect(nextLine(intro, { current: { occurrence: 1, line: 11 }, showChords: false })).toEqual({
+    it('skips it', () => {
+      expect(nextLine(intro, { current: null })).toEqual({ occurrence: 1, line: 11 });
+      expect(nextLine(intro, { current: { occurrence: 1, line: 11 } })).toEqual({
         occurrence: 1,
         line: 13,
       });
     });
 
-    it('goes on from where a hidden one is highlighted', () => {
-      expect(nextLine(intro, { current: { occurrence: 1, line: 12 }, showChords: false })).toEqual({
+    it('goes on from where one is highlighted', () => {
+      expect(nextLine(intro, { current: { occurrence: 1, line: 12 } })).toEqual({
         occurrence: 1,
         line: 13,
       });
@@ -437,7 +429,7 @@ describe('nextLine', () => {
   });
 
   it('is the first Line of a Section highlighted as a whole', () => {
-    expect(nextLine(song, { current: { occurrence: 2, line: null }, showChords: true })).toEqual({
+    expect(nextLine(song, { current: { occurrence: 2, line: null } })).toEqual({
       occurrence: 2,
       line: 20,
     });
@@ -455,7 +447,7 @@ describe('nextLine', () => {
       },
       [1, 2, 3],
     );
-    expect(nextLine(withBreak, { current: { occurrence: 2, line: null }, showChords: true })).toEqual({
+    expect(nextLine(withBreak, { current: { occurrence: 2, line: null } })).toEqual({
       occurrence: 3,
       line: 30,
     });
@@ -463,9 +455,9 @@ describe('nextLine', () => {
 
   it('is a clicked Line, whatever is highlighted', () => {
     const picked = { occurrence: 1, line: 11 };
-    expect(nextLine(song, { current: null, picked, showChords: true })).toEqual(picked);
-    expect(nextLine(song, { current: { occurrence: 2, line: 21 }, picked, showChords: true })).toEqual(picked);
-    expect(nextLine(song, { current: picked, picked, showChords: true })).toEqual(picked);
+    expect(nextLine(song, { current: null, picked })).toEqual(picked);
+    expect(nextLine(song, { current: { occurrence: 2, line: 21 }, picked })).toEqual(picked);
+    expect(nextLine(song, { current: picked, picked })).toEqual(picked);
   });
 
   it('steps through each Occurrence of a shared Section separately', () => {
@@ -480,19 +472,19 @@ describe('nextLine', () => {
       },
       [1, 2, 1],
     );
-    expect(nextLine(shared, { current: { occurrence: 1, line: 11 }, showChords: true })).toEqual({
+    expect(nextLine(shared, { current: { occurrence: 1, line: 11 } })).toEqual({
       occurrence: 2,
       line: 20,
     });
-    expect(nextLine(shared, { current: { occurrence: 2, line: 20 }, showChords: true })).toEqual({
+    expect(nextLine(shared, { current: { occurrence: 2, line: 20 } })).toEqual({
       occurrence: 3,
       line: 10,
     });
-    expect(nextLine(shared, { current: { occurrence: 3, line: 10 }, showChords: true })).toEqual({
+    expect(nextLine(shared, { current: { occurrence: 3, line: 10 } })).toEqual({
       occurrence: 3,
       line: 11,
     });
-    expect(nextLine(shared, { current: null, picked: { occurrence: 3, line: 11 }, showChords: true })).toEqual({
+    expect(nextLine(shared, { current: null, picked: { occurrence: 3, line: 11 } })).toEqual({
       occurrence: 3,
       line: 11,
     });
