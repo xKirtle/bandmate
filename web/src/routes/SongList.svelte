@@ -1,6 +1,5 @@
 <script lang="ts">
   import { api, statuses, type SongSummary, type Status } from '../lib/api';
-  import MainNav from '../lib/MainNav.svelte';
   import StatusBadge from '../lib/StatusBadge.svelte';
   import { timeAgo } from '../lib/time';
 
@@ -45,7 +44,7 @@
 </script>
 
 <header class="bar">
-  <MainNav current="songs" />
+  <h1>Songs</h1>
   <div class="actions">
     <a class="button" href="/songs/import">Import</a>
     <a class="button primary" href="/songs/new">New Song</a>
@@ -126,7 +125,7 @@
   }
   .chip {
     flex-shrink: 0;
-    min-height: 2.75rem;
+    min-height: var(--control);
     padding: 0 1rem;
     border: 1px solid var(--border);
     border-radius: 999px;

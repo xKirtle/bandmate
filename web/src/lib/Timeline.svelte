@@ -1465,8 +1465,8 @@
      */
     --timeline-scale: 1.25;
     --timeline-rem: calc(var(--timeline-scale) * 1rem);
-    /* Never less than a finger's width, whatever the scale. */
-    --touch: max(2.75rem, calc(2.75 * var(--timeline-rem)));
+    /* The page's control size, scaled, and never smaller than it. */
+    --touch: max(var(--control), calc(var(--timeline-scale) * var(--control)));
     position: sticky;
     bottom: 0;
     z-index: 1;
@@ -1500,8 +1500,18 @@
   }
   /* The full width of the window, for as much of the lanes as fits. */
   .inner {
-    padding: calc(0.5 * var(--timeline-rem)) max(1rem, env(safe-area-inset-right))
-      max(calc(0.5 * var(--timeline-rem)), env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+    padding: calc(0.5 * var(--timeline-rem)) max(var(--gutter), env(safe-area-inset-right))
+      max(calc(0.5 * var(--timeline-rem)), env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
+  }
+  /* Docked directly above the tab bar, which keeps clear of the home
+     indicator itself. */
+  @media (max-width: 65.4375rem) {
+    .timeline {
+      bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
+    }
+    .inner {
+      padding-bottom: calc(0.5 * var(--timeline-rem));
+    }
   }
   /* The page's buttons, sized for the Timeline. */
   .button {

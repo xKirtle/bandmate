@@ -217,7 +217,7 @@
     display: flex;
     flex-direction: column;
     width: 100%;
-    min-height: 2.75rem;
+    min-height: var(--control);
     padding: 0.5rem 0.25rem;
     border: none;
     background: transparent;

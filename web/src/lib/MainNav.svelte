@@ -1,47 +1,94 @@
 <script lang="ts">
-  // Switches between the top-level pages. The current one is the page's
-  // heading.
-  let { current }: { current: 'songs' | 'beats' } = $props();
+  // Switches between the top-level pages, the same at every width: a nav rail
+  // down the left of wide windows, a tab bar along the bottom of narrow ones.
+  import { currentPage, pages } from './nav';
+  import { router } from './router.svelte';
 
-  const pages = [
-    { id: 'songs', href: '/', label: 'Songs' },
-    { id: 'beats', href: '/beats', label: 'Beats' },
-  ] as const;
+  const current = $derived(currentPage(router.path));
 </script>
 
 <nav aria-label="Library">
+  <span class="brand" aria-hidden="true">B</span>
   {#each pages as page (page.id)}
-    {#if page.id === current}
-      <h1><a href={page.href} aria-current="page">{page.label}</a></h1>
-    {:else}
-      <a href={page.href}>{page.label}</a>
-    {/if}
+    <a href={page.href} aria-current={page.id === current ? 'page' : undefined}>
+      <span class="glyph" aria-hidden="true">{page.icon}</span>
+      {page.label}
+    </a>
   {/each}
 </nav>
 
 <style>
+  /* The tab bar, kept clear of the home indicator. */
   nav {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 2;
     display: flex;
-    align-items: baseline;
-    gap: 1rem;
+    height: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
+    padding: 0.25rem max(0.5rem, env(safe-area-inset-right)) env(safe-area-inset-bottom)
+      max(0.5rem, env(safe-area-inset-left));
+    border-top: 1px solid var(--border);
+    background: var(--surface-1);
   }
-  h1 {
-    margin: 0;
+  .brand {
+    display: none;
   }
   a {
-    display: inline-flex;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    min-height: 2.75rem;
+    justify-content: center;
+    gap: 0.125rem;
+    padding: 0.25rem;
+    border-radius: 0.5rem;
     color: var(--text-muted);
-    font-size: 1.5rem;
-    font-weight: 700;
-    line-height: 1.2;
+    font-size: 0.6875rem;
+    font-weight: 600;
     text-decoration: none;
+  }
+  .glyph {
+    font-size: 1.25rem;
+    line-height: 1;
   }
   a:hover {
     color: var(--text);
   }
   a[aria-current='page'] {
-    color: var(--text);
+    background: var(--surface-2);
+    color: var(--accent);
+  }
+
+  /* The nav rail, in view however far the page scrolls. */
+  @media (min-width: 65.5rem) {
+    nav {
+      position: sticky;
+      top: 0;
+      flex-direction: column;
+      gap: 0.25rem;
+      height: 100vh;
+      height: 100dvh;
+      padding: 0.75rem 0.375rem;
+      border-top: none;
+      border-right: 1px solid var(--border);
+    }
+    .brand {
+      display: grid;
+      place-items: center;
+      height: 2.25rem;
+      margin-bottom: 0.75rem;
+      color: var(--accent);
+      font-size: 1.25rem;
+      font-weight: 800;
+    }
+    a {
+      flex: none;
+      padding: 0.5rem 0.25rem;
+    }
+    a:hover {
+      background: var(--surface-2);
+    }
   }
 </style>

@@ -421,7 +421,7 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    min-height: 2.75rem;
+    min-height: var(--control);
     cursor: pointer;
   }
   .toggle input {

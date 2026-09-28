@@ -46,7 +46,7 @@
     position: relative;
     display: inline-flex;
     align-items: center;
-    min-height: 2.75rem;
+    min-height: var(--control);
   }
   .picker select {
     position: absolute;

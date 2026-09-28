@@ -3,7 +3,6 @@
   import BeatFields from '../lib/BeatFields.svelte';
   import BeatItem from '../lib/BeatItem.svelte';
   import { fromDraft, toDraft, type BeatDraft } from '../lib/beatDraft';
-  import MainNav from '../lib/MainNav.svelte';
   import { formatDuration } from '../lib/time';
   import { suggestForFile } from '../lib/beatTags';
   import { prepareUpload } from '../lib/upload';
@@ -114,7 +113,7 @@
 </script>
 
 <header class="bar">
-  <MainNav current="beats" />
+  <h1>Beats</h1>
   <label class="button primary" class:disabled={addBusy !== null}>
     Add Beat
     <input class="visually-hidden" type="file" accept="audio/*" onchange={pick} disabled={addBusy !== null} />
