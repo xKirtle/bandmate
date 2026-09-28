@@ -2,7 +2,7 @@
 
 Each step is usable on its own. Terms are defined in [CONTEXT.md](../CONTEXT.md).
 
-1. **Write**: Songs and Status, Lyric Sheet (Sections, Labels, Occurrences, Detach, Alternates, Chords, Chord Lines), Scrapbook, paste-import (plain text or ChordPro; blank lines split Sections, identical Sections merge into one shared Section), phone-friendly layout for writing lyrics. Deployed at `bandmate.kirtle.net`.
+1. **Write**: Songs and Status, Lyric Sheet (Sections, Labels, Occurrences, Detach, Alternates, Chords, Chord Lines), Scrapbook, paste-import (plain text or ChordPro; blank lines split Sections, identical Sections merge into one shared Section), phone-friendly layout for writing lyrics.
 2. **Listen**: Masters, Beat Library, Timeline with Tracks and Clips, playback, per-Track volume and mute.
 3. **Sync**: Cues via Sync mode and the Cue gutter, current Line highlighted during playback.
 4. **Record**: lossless WAV Takes stacked in Clips, Latency Offset calibration and per-Take nudge.
@@ -62,7 +62,7 @@ Playback:
 
 ### 4. Record
 
-- The browser mic requires HTTPS, which `bandmate.kirtle.net` already has. The user records through an audio interface, with headphones.
+- The browser mic requires HTTPS, which the reverse proxy already provides (ADR 0002). The user records through an audio interface, with headphones.
 - Takes are lossless WAV (ADR 0003) and keep a frozen copy of their lyrics (ADR 0004).
 - Recording starts at the playhead while the Timeline plays. If a Clip on the Track covers the playhead, the new Take stacks into it and becomes the active Take, and the Clip grows to fit the longest Take. Otherwise a new Clip is created there. For a separate idea at the same spot, use another Track.
 - There's no comping: switching the active Take is the only way to choose between Takes. Inactive Takes are kept until deleted by hand, with a "clear inactive Takes" action per Clip. Nothing is deleted automatically.
