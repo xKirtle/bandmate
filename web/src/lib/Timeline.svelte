@@ -14,6 +14,7 @@
     type Track,
     type TrackChanges,
   } from './api';
+  import ActionsMenu from './ActionsMenu.svelte';
   import BeatPicker from './BeatPicker.svelte';
   import { clampMove, clampTrimEnd, clampTrimStart } from './clipEdit';
   import { clipSources } from './clipSource';
@@ -27,6 +28,8 @@
     type Saved,
   } from './history';
   import { formatVolume, maxVolume, silence, trackGains, type Levels } from './mixer';
+  import { longPressDelay, pastSlop } from './longPress';
+  import { type MenuAction } from './menu';
   import { peaksPerSecond } from './peaks';
   import { keptInLoop, outsideLoop, repeats, timelineEnd, type Loop, type Placed } from './schedule';
   import { inTextField } from './textField';
@@ -626,8 +629,8 @@
   interface Edit {
     clip: Clip;
     mode: 'move' | 'start' | 'end';
-    /** Where the pointer went down, to tell a click from a drag. */
-    fromX: number;
+    /** Where the pointer went down, to tell a click or a long press from a drag. */
+    from: Point;
     /** How far into the Clip it was grabbed, in seconds. */
     grab: number;
     moved: boolean;
@@ -729,15 +732,18 @@
   }
 
   function editDown(event: PointerEvent, clip: Clip, mode: Edit['mode']) {
-    if (!editable.current || !event.isPrimary || event.button !== 0 || edit) return;
+    if (!editable.current || !event.isPrimary || event.button !== 0 || edit || inClipMenu(event.target)) return;
     event.stopPropagation();
-    // Clicking a Clip still focuses it, for its keys and buttons.
-    (event.currentTarget as HTMLElement).closest<HTMLElement>('.clip')?.focus();
+    // Clicking a Clip still focuses it, for its keys and its menu.
+    const element = (event.currentTarget as HTMLElement).closest<HTMLElement>('.clip')!;
+    element.focus();
     event.preventDefault();
+    // A finger held still opens the Clip's menu, as there's no right-click on touch.
+    if (event.pointerType === 'touch') press = setTimeout(() => openClipMenu(clip, element), longPressDelay);
     edit = {
       clip,
       mode,
-      fromX: event.clientX,
+      from: { clientX: event.clientX, clientY: event.clientY },
       grab: spanTimeAt(event.clientX) - clip.start,
       moved: false,
       trackId: trackOf(clip).id,
@@ -751,9 +757,10 @@
 
   function editMove(event: Point) {
     if (!edit || edit.saving) return;
-    // A small wobble while clicking isn't a drag.
-    if (!edit.moved && Math.abs(event.clientX - edit.fromX) < 4) return;
+    // A small wobble while clicking or holding still isn't a drag.
+    if (!edit.moved && !pastSlop(edit.from, event)) return;
     edit.moved = true;
+    clearTimeout(press);
     const t = spanTimeAt(event.clientX);
     const { clip } = edit;
     if (edit.mode === 'move') {
@@ -815,6 +822,7 @@
   }
 
   function stopListening() {
+    clearTimeout(press);
     dragDone();
     window.removeEventListener('pointermove', editMove);
     window.removeEventListener('pointerup', editUp);
@@ -837,7 +845,43 @@
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault();
       remove(clip);
+    } else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+      event.preventDefault();
+      openClipMenu(clip, event.currentTarget as HTMLElement);
     }
+  }
+
+  // Each Clip's menu, opened by its ⋯, right-click, the Menu key, Shift+F10
+  // or a long press.
+  const clipMenus: Record<number, ActionsMenu> = {};
+  // Waiting to open a Clip's menu, until the finger moves or lifts.
+  let press: ReturnType<typeof setTimeout> | undefined;
+
+  function clipActions(clip: Clip): MenuAction[] {
+    return [
+      { icon: '⧉', label: 'Duplicate', run: () => duplicate(clip) },
+      { icon: '×', label: 'Delete', run: () => remove(clip) },
+    ];
+  }
+
+  /** Whether an event came from a Clip's ⋯ or its open menu, which a Clip's own handlers leave be. */
+  function inClipMenu(target: EventTarget | null): boolean {
+    return target instanceof Element && target.closest('.clip-menu') !== null;
+  }
+
+  function openClipMenu(clip: Clip, element: HTMLElement) {
+    // A press that opens the menu isn't a drag.
+    if (edit && !edit.saving) editCancel();
+    // So its ⋯, which the menu lines up with, shows, and focus comes back to the Clip.
+    element.focus();
+    clipMenus[clip.id]?.openMenu();
+  }
+
+  function clipContextMenu(event: MouseEvent, clip: Clip) {
+    // The Clip has a menu of its own, in place of the browser's.
+    event.preventDefault();
+    if (!editable.current || edit?.moved || inClipMenu(event.target)) return;
+    openClipMenu(clip, event.currentTarget as HTMLElement);
   }
 
   // Setting the Loop: dragging along the top of the ruler marks a new one,
@@ -1358,7 +1402,7 @@
                   {#each placed as { clip, at, editing } (clip.id)}
                     {@const wave = waveWindow(view, at.start, at.length)}
                     {@const title = sources.of(clip).title}
-                    <!-- Focusable for its Delete key; pointer dragging has no key equivalent yet, and its actions are buttons. -->
+                    <!-- Focusable for its Delete and menu keys; pointer dragging has no key equivalent yet, and its actions are in its menu. -->
                     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
                     <div
                       class="clip"
@@ -1372,24 +1416,18 @@
                       tabindex={editable.current ? 0 : undefined}
                       onpointerdown={(e) => editDown(e, clip, 'move')}
                       onkeydown={(e) => clipKey(e, clip)}
+                      oncontextmenu={(e) => clipContextMenu(e, clip)}
                     >
                       <span class="clip-head">
                         <span class="clip-title">{title}</span>
-                        <span class="clip-actions edit-only">
-                          <button
-                            type="button"
-                            onpointerdown={(e) => e.stopPropagation()}
-                            onclick={() => duplicate(clip)}
-                            aria-label="Duplicate {title}"
-                            title="Duplicate">⧉</button
+                        <span class="clip-actions clip-menu edit-only">
+                          <ActionsMenu
+                            bind:this={clipMenus[clip.id]}
+                            label="More actions for {title}"
+                            entries={clipActions(clip)}
                           >
-                          <button
-                            type="button"
-                            onpointerdown={(e) => e.stopPropagation()}
-                            onclick={() => remove(clip)}
-                            aria-label="Delete {title}"
-                            title="Delete (Del)">×</button
-                          >
+                            {#snippet trigger()}<span class="clip-more">⋯</span>{/snippet}
+                          </ActionsMenu>
                         </span>
                       </span>
                       <span class="wave">
@@ -1866,6 +1904,9 @@
     border: 1px solid var(--accent);
     border-radius: calc(0.25 * var(--timeline-rem));
     background: var(--surface-1);
+    /* A long press opens the Clip's menu, not the browser's text selection or callout. */
+    user-select: none;
+    -webkit-touch-callout: none;
   }
   @media (min-width: 40.0625rem) {
     .clip {
@@ -1903,21 +1944,20 @@
     display: none;
     flex-shrink: 0;
   }
+  /* And while its menu is open, which, with focus moving into it, would otherwise hide with it. */
   .clip:hover .clip-actions,
-  .clip:focus-within .clip-actions {
+  .clip:focus-within .clip-actions,
+  .clip-actions:has(:global([aria-expanded='true'])) {
     display: flex;
   }
-  .clip-actions button {
+  .clip-more {
+    display: block;
     padding: 0 calc(0.25 * var(--timeline-rem));
-    border: none;
-    background: none;
-    color: var(--text);
     font-size: calc(0.75 * var(--timeline-rem));
     line-height: 1.25;
-    cursor: pointer;
   }
-  .clip-actions button:hover,
-  .clip-actions button:focus-visible {
+  .clip-more:hover,
+  :global(:focus-visible) > .clip-more {
     color: var(--accent);
   }
   .trim {
