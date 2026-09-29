@@ -28,8 +28,9 @@
   // The inputs connected, apart from the browser's own stand-ins for the default.
   let devices = $state<{ deviceId: string; label: string }[]>([]);
   let level = $state.raw<InputLevel | null>(null);
-  // How many channels the input open has, once it's open.
+  // How many channels the input open has, and which is metered, once it's open.
   let channels = $state(0);
+  let channel = $state(0);
   // The device chosen when it isn't connected, so the default is metered instead.
   let gone = $state<string | null>(null);
   let problem = $state<string | null>(null);
@@ -40,7 +41,10 @@
   let clippedUntil = $state(0);
   let now = $state(0);
   const clipHold = 2000;
+  // How fast it falls back, in fill per ms, so a peak can be read.
+  const fallRate = 1 / 1500;
   let frame = 0;
+  let lastFrame = 0;
 
   // Each opening of the input, so a slower one opened before is let go.
   let generation = 0;
@@ -63,7 +67,9 @@
     opening = true;
     problem = null;
     // Resumed while the click that opened the panel still counts.
-    audioContext().resume();
+    audioContext()
+      .resume()
+      .catch(() => {});
     try {
       const opened = await InputLevel.open(audioContext(), $state.snapshot(choice));
       if (mine !== generation) {
@@ -72,22 +78,27 @@
       }
       level = opened;
       channels = opened.channels;
+      channel = opened.channel;
       gone = opened.gone;
-      await listDevices();
+      lastFrame = performance.now();
       frame = requestAnimationFrame(step);
     } catch (e) {
       if (mine !== generation) return;
-      problem = e instanceof CaptureError ? e.message : `Couldn't open the microphone (${(e as Error).message}).`;
+      problem = e instanceof CaptureError ? e.message : `Couldn't open the input (${(e as Error).message}).`;
     } finally {
-      if (mine === generation) opening = false;
+      // Listed either way, so another input can be chosen in place of one that failed.
+      if (mine === generation) {
+        opening = false;
+        await listDevices();
+      }
     }
   }
 
   function step(time: number) {
     if (!level) return;
     const read = meterLevel(level.samples());
-    // Falls back slowly, so a peak can be read.
-    fill = Math.max(read.fill, fill - 0.02);
+    fill = Math.max(read.fill, fill - (time - lastFrame) * fallRate);
+    lastFrame = time;
     if (read.clipped) clippedUntil = time + clipHold;
     now = time;
     frame = requestAnimationFrame(step);
@@ -117,8 +128,6 @@
   const pickedLabel = $derived(
     devices.find((d) => d.deviceId === picked)?.label ?? (picked ? choice.label : 'Default input'),
   );
-  // The channel used: the one chosen, or the first where the input hasn't it.
-  const channel = $derived(gone || choice.channel >= channels ? 0 : choice.channel);
   const clipping = $derived(clippedUntil > now);
 
   async function show() {
@@ -153,10 +162,11 @@
   }
 
   // An input plugged in or out: listed again, and the one chosen opened
-  // again, since it may be the one that went or came back.
-  function onDeviceChange() {
-    listDevices();
-    meter();
+  // again if it's the one that went or came back, or if opening it failed.
+  async function onDeviceChange() {
+    await listDevices();
+    const present = choice.deviceId === '' || devices.some((d) => d.deviceId === choice.deviceId);
+    if (problem || (gone !== null) === present) meter();
   }
 
   function onPanelKey(e: KeyboardEvent) {
@@ -210,7 +220,7 @@
     >
       <label>
         <span>Input</span>
-        <select value={picked} onchange={(e) => chooseDevice(e.currentTarget.value)} disabled={devices.length === 0}>
+        <select value={picked} onchange={(e) => chooseDevice(e.currentTarget.value)}>
           <option value="">Default input</option>
           {#each devices as device (device.deviceId)}
             <option value={device.deviceId}>{deviceName(device.label)}</option>
@@ -221,8 +231,9 @@
         <span>Channel</span>
         <select
           value={channel}
-          onchange={(e) => choose({ ...choice, deviceId: picked, label: pickedLabel, channel: Number(e.currentTarget.value) })}
-          disabled={channels < 2}
+          onchange={(e) => choose({ ...choice, channel: Number(e.currentTarget.value) })}
+          disabled={channels < 2 || gone !== null}
+          title={gone ? `The default input's first channel is used while ${gone} isn't connected` : undefined}
         >
           {#each { length: Math.max(1, channels) } as _, i (i)}
             <option value={i}>{channelName(pickedLabel, i)}</option>

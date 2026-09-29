@@ -45,7 +45,7 @@ describe('readInput and storeInput', () => {
 
 describe('resolveInput', () => {
   it('is the remembered input while it is connected', () => {
-    expect(resolveInput([laptop, scarlett], { deviceId: 'abc', label: 'Scarlett 2i2', channel: 1 })).toEqual({
+    expect(resolveInput([laptop, scarlett], { deviceId: 'abc', label: 'Scarlett 2i2', channel: 1 }, 2)).toEqual({
       deviceId: 'abc',
       channel: 1,
       gone: null,
@@ -53,7 +53,7 @@ describe('resolveInput', () => {
   });
 
   it('is the default input without one chosen', () => {
-    expect(resolveInput([laptop], { deviceId: '', label: '', channel: 0 })).toEqual({
+    expect(resolveInput([laptop], { deviceId: '', label: '', channel: 0 }, 1)).toEqual({
       deviceId: '',
       channel: 0,
       gone: null,
@@ -61,7 +61,7 @@ describe('resolveInput', () => {
   });
 
   it('falls back to the default input, and names the one gone', () => {
-    expect(resolveInput([laptop], { deviceId: 'abc', label: 'Scarlett 2i2 USB (1235:8210)', channel: 1 })).toEqual({
+    expect(resolveInput([laptop], { deviceId: 'abc', label: 'Scarlett 2i2 USB (1235:8210)', channel: 1 }, 2)).toEqual({
       deviceId: '',
       channel: 0,
       gone: 'Scarlett 2i2 USB',

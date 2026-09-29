@@ -712,12 +712,12 @@
 
   // Why Record can't work, where that's known before trying, e.g. no inputs:
   // checked again as inputs come and go.
-  let problem = $state<string | null>(null);
+  let recordProblem = $state<string | null>(null);
   // Said of the input a recording used, e.g. that the one chosen is gone.
   let inputNote = $state<string | null>(null);
 
   function checkInput() {
-    inputProblem().then((p) => (problem = p));
+    inputProblem().then((p) => (recordProblem = p));
   }
 
   $effect(() => {
@@ -749,7 +749,9 @@
     if (!canRecord) return;
     error = null;
     // Resumed right away, while the key press or click still counts.
-    audioContext().resume();
+    audioContext()
+      .resume()
+      .catch(() => {});
     const starting: RecordingState = {
       phase: 'starting',
       trackId: null,
@@ -762,8 +764,8 @@
     inputNote = null;
     try {
       // Said up front where it can be, in place of a recording that fails.
-      const problem = await inputProblem();
-      if (problem) throw new CaptureError(problem);
+      const trouble = await inputProblem();
+      if (trouble) throw new CaptureError(trouble);
       const capture = await Capture.open(audioContext(), readInput(deviceStorage()));
       recording = { ...starting, capture };
       if (capture.gone) inputNote = `${capture.gone} isn't connected, so recording from the default input.`;
@@ -1543,18 +1545,18 @@
               ? 'Leave Sync mode to record'
               : playerState !== 'stopped'
                 ? 'Stop playback to record'
-                : problem
-                  ? problem
+                : recordProblem
+                  ? recordProblem
                   : `Record a Take on ${timeline.tracks.find((t) => t.id === chosen)?.name ?? 'a new Track'} (R)`}
           ><span class="record-dot" aria-hidden="true"></span>{capturing ? 'Stop' : 'Record'}</button
         >
         <span class="edit-only"><InputSettings disabled={recording !== null} /></span>
         {#if recording?.phase === 'starting'}
           <span class="muted" role="status">Opening the microphone…</span>
-        {:else if inputNote}
-          <span class="input-note" role="status">{inputNote}</span>
         {:else if recording?.phase === 'saving'}
           <span class="muted" role="status">Saving the Take…</span>
+        {:else if recording && inputNote}
+          <span class="input-note" role="status">{inputNote}</span>
         {:else if playerState === 'loading'}
           <span class="muted" role="status">Loading audio…</span>
         {/if}

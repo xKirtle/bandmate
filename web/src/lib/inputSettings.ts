@@ -53,12 +53,12 @@ export interface ResolvedInput {
 export function resolveInput(
   devices: readonly { deviceId: string }[],
   choice: InputChoice,
-  channels?: number,
+  channels: number,
 ): ResolvedInput {
   if (choice.deviceId !== '' && !devices.some((d) => d.deviceId === choice.deviceId)) {
     return { deviceId: '', channel: 0, gone: deviceName(choice.label) };
   }
-  const channel = channels !== undefined && choice.channel >= channels ? 0 : choice.channel;
+  const channel = choice.channel >= channels ? 0 : choice.channel;
   return { deviceId: choice.deviceId, channel, gone: null };
 }
 

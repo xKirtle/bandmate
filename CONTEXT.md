@@ -124,6 +124,10 @@ _Avoid_: Tap mode, record mode
 The delay between what the user heard and what the mic captured, measured by calibration once per device, since it belongs to the hardware chain; each Take keeps the offset it was recorded with and can be nudged by hand.
 _Avoid_: Delay, lag
 
+**Input**:
+What a Take is recorded from: an audio device and one of its channels (e.g. "Scarlett 2i2 · Input 1"), since Takes are mono. Chosen once per device, like the Latency Offset; where the device chosen isn't connected, the default input is used, and said so. A device's channels are its inputs, never Tracks.
+_Avoid_: Mic (unless it is one), source
+
 **Master**:
 A finished recording of a Song made elsewhere (e.g. in a studio), attached to the Song as a result rather than placed on the Timeline. When a Song has several, each has a free-text name (e.g. "Radio edit", "Acoustic") and one is the **main Master**.
 _Avoid_: Final, release, finished track, alternate master (an Alternate is something else)

@@ -87,9 +87,7 @@ export interface OpenInput {
  * with a CaptureError to show.
  */
 export async function openInput(choice: InputChoice): Promise<OpenInput> {
-  if (!navigator.mediaDevices?.getUserMedia) {
-    throw new CaptureError('Recording needs a secure connection: open Bandmate over https or on localhost.');
-  }
+  if (!navigator.mediaDevices?.getUserMedia) throw new CaptureError(insecure);
   const open = (deviceId: string) =>
     navigator.mediaDevices.getUserMedia({
       audio: {
@@ -101,6 +99,8 @@ export async function openInput(choice: InputChoice): Promise<OpenInput> {
       },
     });
   let stream: MediaStream;
+  // Whether the device chosen couldn't be opened, so the default was.
+  let fellBack = false;
   try {
     try {
       stream = await open(choice.deviceId);
@@ -108,13 +108,16 @@ export async function openInput(choice: InputChoice): Promise<OpenInput> {
       // Gone, most likely: the default is tried, and said so below.
       if (!choice.deviceId || (e as DOMException).name !== 'OverconstrainedError') throw e;
       stream = await open('');
+      fellBack = true;
     }
   } catch (e) {
     throw new CaptureError(inputError(e as Error));
   }
-  // Only once allowed does the browser tell the inputs apart.
-  const devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput');
   const channels = stream.getAudioTracks()[0]?.getSettings().channelCount || 1;
+  // Only once allowed does the browser tell the inputs apart.
+  const devices = fellBack
+    ? []
+    : (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput');
   const { channel, gone } = resolveInput(devices, choice, channels);
   return { stream, channels, channel, gone };
 }
@@ -128,6 +131,7 @@ function inputError(e: Error): string {
   return `Couldn't open the microphone (${e.message}).`;
 }
 
+const insecure = 'Recording needs a secure connection: open Bandmate over https or on localhost.';
 const blocked = "Bandmate isn't allowed to use the microphone. Allow it in the browser's site settings.";
 const noInput = "There's no microphone or audio input to record from. Connect one to record.";
 
@@ -137,9 +141,7 @@ const noInput = "There's no microphone or audio input to record from. Connect on
  * Null when it may well work.
  */
 export async function inputProblem(): Promise<string | null> {
-  if (!navigator.mediaDevices?.getUserMedia) {
-    return 'Recording needs a secure connection: open Bandmate over https or on localhost.';
-  }
+  if (!navigator.mediaDevices?.getUserMedia) return insecure;
   try {
     const devices = await navigator.mediaDevices.enumerateDevices();
     if (!devices.some((d) => d.kind === 'audioinput')) return noInput;
@@ -189,8 +191,13 @@ export class InputLevel {
     return new InputLevel(input, connectChannel(context, input, analyser), analyser);
   }
 
+  /** How many channels the input has, and which of them is metered. */
   get channels(): number {
     return this.input.channels;
+  }
+
+  get channel(): number {
+    return this.input.channel;
   }
 
   /** The name of the device chosen when it isn't connected, or null. */
