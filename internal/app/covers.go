@@ -8,8 +8,8 @@ import (
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
 )
 
-// A Cover is part of the Song, like a Master: adding, replacing or removing
-// one answers with the full, updated Song, and is based on the Song version
+// A Cover is part of the Song, like a Master: adding, replacing, re-cropping
+// or removing one answers with the full, updated Song, and is based on the Song version
 // in If-Match, if any.
 
 func (a *App) addCover(w http.ResponseWriter, r *http.Request) {
@@ -50,17 +50,53 @@ func (a *App) putCover(w http.ResponseWriter, r *http.Request, put coverPut) {
 	if !ok {
 		return
 	}
-	pictures := map[lyricsheet.CoverPicture]lyricsheet.UploadedPicture{}
-	for _, p := range lyricsheet.CoverPictures {
-		f := files[string(p)]
-		pictures[p] = lyricsheet.UploadedPicture{File: f.Received, ContentType: f.contentType}
-	}
-	song, err := put(r.Context(), id, based, details, pictures)
+	song, err := put(r.Context(), id, based, details, uploadedPictures(files, lyricsheet.CoverPictures))
 	if err != nil {
 		writeDomainError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, song)
+}
+
+// adjustCoverCrop reads a Cover's new crop square and the list and header
+// pictures made from it.
+func (a *App) adjustCoverCrop(w http.ResponseWriter, r *http.Request) {
+	id, ok := songID(w, r)
+	if !ok {
+		return
+	}
+	based, ok := basedOn(w, r)
+	if !ok {
+		return
+	}
+	var parts []filePart
+	for _, p := range lyricsheet.CropPictures {
+		parts = append(parts, filePart{string(p), a.coverFiles[p]})
+	}
+	tooLarge := fmt.Sprintf("the pictures are larger than the Cover limit of %s", formatSize(a.maxCover))
+	var details struct {
+		Crop lyricsheet.CoverCrop `json:"crop"`
+	}
+	files, ok := readFiles(w, r, a.maxCover, tooLarge, parts, &details)
+	if !ok {
+		return
+	}
+	song, err := a.songs.AdjustCoverCrop(r.Context(), id, based, details.Crop, uploadedPictures(files, lyricsheet.CropPictures))
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, song)
+}
+
+// uploadedPictures are the given pictures of a Cover, as read by readFiles.
+func uploadedPictures(files map[string]uploadedFile, pictures []lyricsheet.CoverPicture) map[lyricsheet.CoverPicture]lyricsheet.UploadedPicture {
+	uploaded := map[lyricsheet.CoverPicture]lyricsheet.UploadedPicture{}
+	for _, p := range pictures {
+		f := files[string(p)]
+		uploaded[p] = lyricsheet.UploadedPicture{File: f.Received, ContentType: f.contentType}
+	}
+	return uploaded
 }
 
 // coverPicture serves one of a Song's Cover's pictures.

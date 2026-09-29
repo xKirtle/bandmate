@@ -73,6 +73,9 @@ const (
 // CoverPictures lists a Cover's pictures.
 var CoverPictures = []CoverPicture{CoverOriginal, CoverList, CoverHeader}
 
+// CropPictures lists the pictures made from a Cover's crop square.
+var CropPictures = []CoverPicture{CoverList, CoverHeader}
+
 // CoverFiles is where Covers' pictures are kept: one directory for each
 // picture, each file named by its Cover's id.
 type CoverFiles map[CoverPicture]*audio.Files
@@ -109,23 +112,16 @@ func (s *Store) putCover(ctx context.Context, songID int64, based Version, detai
 	for _, p := range CoverPictures {
 		defer pictures[p].File.Discard()
 	}
-	types := map[CoverPicture]string{}
-	for _, p := range CoverPictures {
-		t, _, err := mime.ParseMediaType(pictures[p].ContentType)
-		if err != nil || !pictureTypes[t] {
-			return Song{}, invalid("a Cover's pictures must be JPEG, PNG or WebP")
-		}
-		if pictures[p].File.Size == 0 {
-			return Song{}, invalid("a Cover's pictures can't be empty")
-		}
-		types[p] = t
+	types, err := typesOf(pictures)
+	if err != nil {
+		return Song{}, err
 	}
 	if msg := details.problem(); msg != "" {
 		return Song{}, invalid(msg)
 	}
 	var kept []CoverPicture
 	var id, old int64
-	err := s.changeTx(ctx, songID, based, func(tx *sql.Tx) error {
+	err = s.changeTx(ctx, songID, based, func(tx *sql.Tx) error {
 		var err error
 		if old, err = coverID(ctx, tx, songID); err != nil {
 			return err
@@ -168,6 +164,89 @@ func (s *Store) putCover(ctx context.Context, songID int64, based Version, detai
 		s.removeCoverFiles(old)
 	}
 	return s.GetSong(ctx, songID)
+}
+
+// AdjustCoverCrop shows a new square of a Song's Cover's original, from the
+// list and header pictures the browser made of it, which are kept if the
+// crop is adjusted and discarded otherwise. The original is kept as it is,
+// and the Cover gets a new id, so its pictures' addresses change.
+func (s *Store) AdjustCoverCrop(ctx context.Context, songID int64, based Version, crop CoverCrop, pictures map[CoverPicture]UploadedPicture) (Song, error) {
+	for _, p := range CropPictures {
+		defer pictures[p].File.Discard()
+	}
+	types, err := typesOf(pictures)
+	if err != nil {
+		return Song{}, err
+	}
+	var kept []CoverPicture
+	var id, old int64
+	err = s.changeTx(ctx, songID, based, func(tx *sql.Tx) error {
+		c, err := loadCover(ctx, tx, songID)
+		if err != nil {
+			return err
+		}
+		if c == nil {
+			return conflict("this Song has no Cover")
+		}
+		old = c.ID
+		if msg := (CoverDetails{Width: c.Width, Height: c.Height, Crop: crop}).problem(); msg != "" {
+			return invalid(msg)
+		}
+		var originalType string
+		if err := tx.QueryRowContext(ctx, `SELECT original_type FROM covers WHERE id = ?`, old).
+			Scan(&originalType); err != nil {
+			return fmt.Errorf("reading cover: %w", err)
+		}
+		if err := deleteCover(ctx, tx, old); err != nil {
+			return err
+		}
+		id, err = insert(ctx, tx,
+			`INSERT INTO covers (song_id, width, height, crop_x, crop_y, crop_size,
+			   original_type, list_type, header_type, added_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			songID, c.Width, c.Height, crop.X, crop.Y, crop.Size,
+			originalType, types[CoverList], types[CoverHeader], c.AddedAt.Format(timeFormat))
+		if err != nil {
+			return fmt.Errorf("adjusting cover crop: %w", err)
+		}
+		// Kept last, so nothing after them can fail but the commit.
+		if err := s.coverFiles[CoverOriginal].Link(old, id); err != nil {
+			return err
+		}
+		kept = append(kept, CoverOriginal)
+		for _, p := range CropPictures {
+			if err := pictures[p].File.Keep(id); err != nil {
+				return err
+			}
+			kept = append(kept, p)
+		}
+		return nil
+	})
+	if err != nil {
+		if len(kept) > 0 {
+			s.removeCoverFiles(id)
+		}
+		return Song{}, err
+	}
+	s.removeCoverFiles(old)
+	return s.GetSong(ctx, songID)
+}
+
+// typesOf checks the pictures uploaded for a Cover and says what type each
+// is.
+func typesOf(pictures map[CoverPicture]UploadedPicture) (map[CoverPicture]string, error) {
+	types := map[CoverPicture]string{}
+	for p, picture := range pictures {
+		t, _, err := mime.ParseMediaType(picture.ContentType)
+		if err != nil || !pictureTypes[t] {
+			return nil, invalid("a Cover's pictures must be JPEG, PNG or WebP")
+		}
+		if picture.File.Size == 0 {
+			return nil, invalid("a Cover's pictures can't be empty")
+		}
+		types[p] = t
+	}
+	return types, nil
 }
 
 // RemoveCover deletes a Song's Cover and its files.

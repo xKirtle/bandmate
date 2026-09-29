@@ -42,6 +42,25 @@ export async function openCover(file: File, maxBytes: number): Promise<CoverToCr
   }
 }
 
+/**
+ * Opens a Cover's stored original to crop it again. It's already been made
+ * so any browser can open it, at the size given.
+ */
+export async function reopenCover(url: string, size: Size): Promise<CoverToCrop> {
+  const res = await fetch(url).catch(() => null);
+  if (!res?.ok) throw new Error("The Cover's picture couldn't be loaded");
+  const blob = await res.blob();
+  const picture = await open(blob);
+  try {
+    const type = await pictureType();
+    const original = canvas(size, type);
+    original.getContext('2d')!.drawImage(picture.source, 0, 0, size.width, size.height);
+    return { blob, canvas: original, type, ...size };
+  } finally {
+    picture.close();
+  }
+}
+
 /** Makes a Cover of a picture's crop square, a square of its original in whole pixels. */
 export async function cropCover(picture: CoverToCrop, crop: Square): Promise<PreparedCover> {
   const square = (side: number) => {
@@ -65,7 +84,7 @@ interface Opened {
  * Opens a picture, turned the way its camera says. An image element opens
  * some pictures a bitmap can't, like SVGs in Chrome.
  */
-async function open(file: File): Promise<Opened> {
+async function open(file: Blob): Promise<Opened> {
   try {
     const bitmap = await createImageBitmap(file);
     return { source: bitmap, width: bitmap.width, height: bitmap.height, close: () => bitmap.close() };

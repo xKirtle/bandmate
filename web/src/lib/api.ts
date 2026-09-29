@@ -54,6 +54,12 @@ export type CoverPicture = (typeof coverPictures)[number];
 /** A Cover the browser made from a picture, ready to upload. */
 export type PreparedCover = Record<CoverPicture, Blob> & Pick<Cover, 'width' | 'height' | 'crop'>;
 
+/** The pictures made from a Cover's crop square. */
+const cropPictures = ['list', 'header'] as const;
+
+/** A new crop square of a Cover's original and the pictures the browser made from it, ready to upload. */
+export type CroppedCover = Pick<PreparedCover, (typeof cropPictures)[number] | 'crop'>;
+
 /** A finished recording of a Song made elsewhere, never on the Timeline. */
 export interface Master {
   id: number;
@@ -332,6 +338,14 @@ function coverForm(cover: PreparedCover): FormData {
   return form;
 }
 
+/** A Cover's new crop square and the pictures made from it, as the server takes them. */
+function cropForm(cover: CroppedCover): FormData {
+  const form = new FormData();
+  form.append('details', JSON.stringify({ crop: cover.crop }));
+  for (const picture of cropPictures) form.append(picture, cover[picture], picture);
+  return form;
+}
+
 /** An audio file with its details as a JSON part, as the server expects uploads. */
 function audioForm(file: File, details: object): FormData {
   const form = new FormData();
@@ -475,6 +489,9 @@ export const api = {
   /** Replaces a Song's Cover with the one the browser prepared, deleting the old one's files. */
   replaceCover: (at: SongAt, cover: PreparedCover) =>
     request<Song>('PUT', `/songs/${at.id}/cover`, coverForm(cover), at),
+  /** Shows a new square of a Song's Cover's original; the original isn't uploaded again. */
+  adjustCoverCrop: (at: SongAt, cover: CroppedCover) =>
+    request<Song>('PUT', `/songs/${at.id}/cover/crop`, cropForm(cover), at),
   /** Deletes a Song's Cover and its files. */
   removeCover: (at: SongAt) => request<Song>('DELETE', `/songs/${at.id}/cover`, undefined, at),
   /** Where one of a Song's Cover's pictures is. */

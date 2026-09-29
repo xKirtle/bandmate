@@ -358,6 +358,9 @@ func TestChangingACoverOnAStaleSongVersionIsRefused(t *testing.T) {
 		"remove": func(ts *testServer, version, songID int64) response {
 			return ts.DoAt(version, http.MethodDelete, songPath(songID)+"/cover", nil)
 		},
+		"adjust crop": func(ts *testServer, version, songID int64) response {
+			return ts.adjustCropAt(version, songID, recrop())
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			ts := newTestServer(t)
@@ -374,6 +377,111 @@ func TestChangingACoverOnAStaleSongVersionIsRefused(t *testing.T) {
 				t.Errorf("cover files on disk = %q, want the old Cover's: %q", files, before)
 			}
 		})
+	}
+}
+
+func TestAdjustingACoversCropKeepsItsOriginal(t *testing.T) {
+	ts := newTestServer(t)
+	upload := fakeCover()
+	before := ts.addCover(ts.createSong("Night Drive").ID, upload)
+	kept := ts.addCover(ts.createSong("Kept").ID, fakeCover())
+	crop := recrop()
+
+	res := ts.adjustCropAt(before.Version, before.ID, crop)
+
+	expectStatus(t, res, http.StatusOK)
+	var got song
+	res.JSON(t, &got)
+	if got.Cover == nil {
+		t.Fatalf("cover = nil, want the adjusted one")
+	}
+	if got.Cover.ID == before.Cover.ID {
+		t.Errorf("cover id = %d, want a new one, so its pictures' addresses change", got.Cover.ID)
+	}
+	want := cover{ID: got.Cover.ID, Width: 1600, Height: 1200, Crop: coverCrop{X: 0, Y: 100, Size: 1000},
+		AddedAt: before.Cover.AddedAt}
+	if !reflect.DeepEqual(*got.Cover, want) {
+		t.Errorf("cover = %+v, want %+v", *got.Cover, want)
+	}
+	if got.Version == before.Version {
+		t.Errorf("version = %d, want it changed", got.Version)
+	}
+	if !parseTime(t, got.UpdatedAt).After(parseTime(t, before.UpdatedAt)) {
+		t.Errorf("updatedAt = %s, want it after %s", got.UpdatedAt, before.UpdatedAt)
+	}
+	if read := ts.getSong(before.ID); !reflect.DeepEqual(read, got) {
+		t.Errorf("song read back = %+v, want %+v", read, got)
+	}
+	if id := ts.listSongs()[0].CoverID; id == nil || *id != got.Cover.ID {
+		t.Errorf("coverId in the Song list = %v, want %d", id, got.Cover.ID)
+	}
+	for picture, served := range map[string]struct {
+		data        []byte
+		contentType string
+	}{
+		"original": {upload.Original, "image/webp"},
+		"list":     {crop.List, "image/jpeg"},
+		"header":   {crop.Header, "image/jpeg"},
+	} {
+		res := ts.Do(http.MethodGet, songPath(before.ID)+"/cover/"+picture, nil)
+		expectStatus(t, res, http.StatusOK)
+		if !bytes.Equal(res.Body, served.data) {
+			t.Errorf("%s = %q, want %q", picture, res.Body, served.data)
+		}
+		if got := res.Header.Get("Content-Type"); got != served.contentType {
+			t.Errorf("%s Content-Type = %q, want %s", picture, got, served.contentType)
+		}
+	}
+	if files, want := coverFiles(t, ts), coverFileNames(got.Cover.ID, kept.Cover.ID); !reflect.DeepEqual(files, want) {
+		t.Errorf("cover files on disk = %q, want only the adjusted Cover's and the other Song's: %q", files, want)
+	}
+}
+
+func TestAnAdjustedCropIsChecked(t *testing.T) {
+	cases := map[string]struct {
+		upload coverUpload
+		status int
+		msg    string
+	}{
+		"crop outside": {recrop().withDetails(map[string]any{"crop": map[string]any{"x": 500, "y": 0, "size": 1200}}),
+			http.StatusBadRequest, "the crop must be a square inside the original"},
+		"no crop": {recrop().withDetails(nil), http.StatusBadRequest, "details are required"},
+		"size in details": {recrop().withDetails(map[string]any{"width": 1600, "crop": map[string]any{"x": 0, "y": 0, "size": 1}}),
+			http.StatusBadRequest, "details must be valid JSON with known fields"},
+		"no header":     {recrop().without("header"), http.StatusBadRequest, "header is required"},
+		"empty picture": {recrop().withData("list", nil), http.StatusBadRequest, "a Cover's pictures can't be empty"},
+		"not a picture": {recrop().withType("list", "text/html"), http.StatusBadRequest,
+			"a Cover's pictures must be JPEG, PNG or WebP"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			ts := newTestServer(t)
+			s := ts.addCover(ts.createSong("Night Drive").ID, fakeCover())
+			before := coverFiles(t, ts)
+
+			expectError(t, ts.adjustCropAt(s.Version, s.ID, c.upload), c.status, c.msg)
+
+			if read := ts.getSong(s.ID); !reflect.DeepEqual(read, s) {
+				t.Errorf("song = %+v, want it unchanged: %+v", read, s)
+			}
+			if files := coverFiles(t, ts); !reflect.DeepEqual(files, before) {
+				t.Errorf("cover files on disk = %q, want the old Cover's: %q", files, before)
+			}
+		})
+	}
+}
+
+func TestOnlyASongWithACoverCanHaveItsCropAdjusted(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.createSong("Night Drive")
+
+	expectError(t, ts.adjustCropAt(s.Version, s.ID, recrop()), http.StatusConflict, "this Song has no Cover")
+
+	if read := ts.getSong(s.ID); !reflect.DeepEqual(read, s) {
+		t.Errorf("song = %+v, want it unchanged: %+v", read, s)
+	}
+	if files := coverFiles(t, ts); len(files) != 0 {
+		t.Errorf("cover files on disk = %q, want none", files)
 	}
 }
 
@@ -434,8 +542,24 @@ func otherCover() coverUpload {
 	}
 }
 
+// recrop is what the browser sends to adjust fakeCover's crop: the new
+// square, and the list and header sizes made from it, as JPEGs.
+func recrop() coverUpload {
+	return coverUpload{
+		List:    []byte("not really a jpeg: recropped list"),
+		Header:  []byte("not really a jpeg: recropped header"),
+		Types:   map[string]string{"list": "image/jpeg", "header": "image/jpeg"},
+		Missing: map[string]bool{"original": true},
+		Details: map[string]any{"crop": map[string]any{"x": 0, "y": 100, "size": 1000}},
+	}
+}
+
 func (u coverUpload) without(part string) coverUpload {
-	u.Missing = map[string]bool{part: true}
+	missing := map[string]bool{part: true}
+	for k, v := range u.Missing {
+		missing[k] = v
+	}
+	u.Missing = missing
 	return u
 }
 
@@ -480,8 +604,22 @@ func (ts *testServer) replaceCoverAt(version, songID int64, u coverUpload) respo
 	return ts.uploadCoverAt(http.MethodPut, version, songID, u)
 }
 
+// adjustCropAt adjusts a Song's Cover's crop based on a given version of
+// it, as the SPA does.
+func (ts *testServer) adjustCropAt(version, songID int64, u coverUpload) response {
+	ts.t.Helper()
+	return ts.uploadCoverTo(http.MethodPut, "/cover/crop", version, songID, u)
+}
+
 // uploadCoverAt sends a Cover's pictures with the given method.
 func (ts *testServer) uploadCoverAt(method string, version, songID int64, u coverUpload) response {
+	ts.t.Helper()
+	return ts.uploadCoverTo(method, "/cover", version, songID, u)
+}
+
+// uploadCoverTo sends a Cover's pictures with the given method, to the
+// given path under the Song.
+func (ts *testServer) uploadCoverTo(method, path string, version, songID int64, u coverUpload) response {
 	ts.t.Helper()
 	var body bytes.Buffer
 	form := multipart.NewWriter(&body)
@@ -519,7 +657,7 @@ func (ts *testServer) uploadCoverAt(method string, version, songID int64, u cove
 		"Content-Type": {form.FormDataContentType()},
 		"If-Match":     {fmt.Sprintf("%q", fmt.Sprint(version))},
 	}
-	return ts.DoRaw(method, songPath(songID)+"/cover", header, &body)
+	return ts.DoRaw(method, songPath(songID)+path, header, &body)
 }
 
 // addCover adds a Cover to a Song at its current version and returns the

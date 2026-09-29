@@ -112,6 +112,18 @@ func (f *Files) Serve(w http.ResponseWriter, r *http.Request, id int64, contentT
 	return nil
 }
 
+// Link stores the file kept under from under to as well, replacing any file
+// already there, without copying it. Removing either leaves the other.
+func (f *Files) Link(from, to int64) error {
+	if err := f.Remove(to); err != nil {
+		return err
+	}
+	if err := os.Link(f.path(from), f.path(to)); err != nil {
+		return fmt.Errorf("linking file: %w", err)
+	}
+	return nil
+}
+
 // Remove deletes the file stored under id, if there is one.
 func (f *Files) Remove(id int64) error {
 	if err := os.Remove(f.path(id)); err != nil && !errors.Is(err, os.ErrNotExist) {
