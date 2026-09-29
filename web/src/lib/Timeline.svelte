@@ -16,6 +16,7 @@
   } from './api';
   import ActionsMenu from './ActionsMenu.svelte';
   import BeatPicker from './BeatPicker.svelte';
+  import { addedTrack, chosenTrack, readChosen, storeChosen, type ChoiceEvent } from './chosenTrack';
   import { clampMove, clampTrimEnd, clampTrimStart } from './clipEdit';
   import { clipSources } from './clipSource';
   import { cuesInSpan, formatCue, hasCues } from './cues';
@@ -220,12 +221,20 @@
     return { timeline: after };
   }
 
-  /** Queues an edit, to undo later; resolves to whether it succeeded. */
-  function perform(e: TimelineEdit): Promise<boolean> {
+  /**
+   * Queues an edit, to undo later, telling done what it did once saved;
+   * resolves to whether it succeeded.
+   */
+  function perform(e: TimelineEdit, done?: (before: Timeline, after: Timeline) => void): Promise<boolean> {
     e = $state.snapshot(e) as TimelineEdit;
     offerCues = null;
     queued++;
-    return change((at) => send(at, e, (before, after) => history.record(e, before, after))).finally(() => queued--);
+    return change((at) =>
+      send(at, e, (before, after) => {
+        history.record(e, before, after);
+        done?.(before, after);
+      }),
+    ).finally(() => queued--);
   }
 
   /**
@@ -324,24 +333,38 @@
     setLevels(track, { volume: Number((event.currentTarget as HTMLInputElement).value) });
   }
 
-  async function rename(track: Track, event: Event) {
-    const input = event.currentTarget as HTMLInputElement;
-    const name = input.value.trim();
-    if (name === track.name) {
-      input.value = name;
-      return;
-    }
-    // A Track needs a name, so a blank one goes back to what it was.
-    if (!name || !(await perform({ kind: 'updateTrack', trackId: track.id, changes: { name } }))) input.value = track.name;
+  // A Track's name shows as a button that chooses it; its pencil swaps it
+  // for a field to rename it in. Until a new name is saved, it's shown.
+  let renaming = $state<number | null>(null);
+  let naming = $state<Record<number, string>>({});
+
+  function focusField(input: HTMLInputElement) {
+    input.focus();
+    input.select();
+  }
+
+  /** Stops renaming a Track, saving the name typed unless asked not to. */
+  function endRename(track: Track, input: HTMLInputElement, save: boolean) {
+    if (renaming !== track.id) return;
+    renaming = null;
+    if (save) rename(track, input.value.trim());
+  }
+
+  async function rename(track: Track, name: string) {
+    // A Track needs a name, so a blank one leaves it as it was.
+    if (!name || name === track.name) return;
+    naming[track.id] = name;
+    // If it fails, the name goes back to how it's saved.
+    await perform({ kind: 'updateTrack', trackId: track.id, changes: { name } });
+    if (naming[track.id] === name) delete naming[track.id];
   }
 
   function nameKey(track: Track, event: KeyboardEvent) {
-    const input = event.currentTarget as HTMLInputElement;
-    if (event.key === 'Enter') input.blur();
-    else if (event.key === 'Escape') {
-      input.value = track.name;
-      input.blur();
-    }
+    if (event.key !== 'Enter' && event.key !== 'Escape') return;
+    event.preventDefault();
+    endRename(track, event.currentTarget as HTMLInputElement, event.key === 'Enter');
+    // Back to the pencil, where renaming started.
+    tick().then(() => document.getElementById(`rename-track-${track.id}`)?.focus());
   }
 
   /** Moves a Track up or down by one, with its Clips. */
@@ -615,9 +638,45 @@
     offerBpm = null;
   }
 
-  function addTrack() {
-    perform({ kind: 'addTrack', track: { name: `Track ${timeline.tracks.length + 1}` } });
+  async function addTrack() {
+    let added: number | null = null;
+    const ok = await perform({ kind: 'addTrack', track: { name: `Track ${timeline.tracks.length + 1}` } }, (before, after) => {
+      added = addedTrack(before.tracks, after.tracks);
+    });
+    // Once the Timeline shows it: until then, it isn't there to choose.
+    if (ok && added !== null) choose({ kind: 'add', trackId: added });
   }
+
+  // The chosen Track, which a recording goes to, kept on this device for
+  // each Song. Choosing isn't an edit, so it's never saved with the Song.
+  // Read again only for another Song: the Song is replaced after every edit.
+  const songId = $derived(song.id);
+  let remembered = $derived(readChosen(deviceStorage(), songId));
+  const chosen = $derived(chosenTrack(timeline.tracks, remembered));
+
+  function choose(event: ChoiceEvent) {
+    remembered = chosenTrack(timeline.tracks, remembered, event);
+  }
+
+  /**
+   * Chooses a Track clicked in its header, but not by its controls (its
+   * name, levels, and moving or deleting it), which only do their own thing.
+   */
+  function headClick(event: MouseEvent, track: Track) {
+    if (event.target instanceof Element && event.target.closest('input, button')) return;
+    choose({ kind: 'choose', trackId: track.id });
+  }
+
+  // Also the first time, or once the one remembered is gone, so a Beat
+  // Track added below later doesn't become the bottom one chosen.
+  $effect(() => {
+    if (chosen === null || chosen === untrack(() => remembered)) return;
+    remembered = chosen;
+  });
+
+  $effect(() => {
+    if (remembered !== null) storeChosen(deviceStorage(), songId, remembered);
+  });
 
   // Editing a Clip: dragging its body moves it, along its Track or onto
   // another; dragging an edge trims it. It stops at its neighbours, the
@@ -729,6 +788,7 @@
   }
 
   function editDown(event: PointerEvent, clip: Clip, mode: Edit['mode']) {
+    if (event.isPrimary && event.button === 0) choose({ kind: 'choose', trackId: trackOf(clip).id });
     if (!editable.current || !event.isPrimary || event.button !== 0 || edit || inClipMenu(event.target)) return;
     event.stopPropagation();
     // Clicking a Clip still focuses it, for its keys and its menu.
@@ -1265,17 +1325,50 @@
           <span class="ruler-gap"></span>
           {#each timeline.tracks as track, i (track.id)}
             {@const trackLevels = levels[i]}
-            <div class="head" role="group" aria-label="Track {track.name}">
+            <!-- Clicking it outside its controls chooses the Track, pointer only for now, like dragging Clips. -->
+            <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+            <div
+              class="head"
+              class:chosen={track.id === chosen}
+              role="group"
+              aria-label="Track {track.name}"
+              aria-current={track.id === chosen ? 'true' : undefined}
+              onclick={(e) => headClick(e, track)}
+            >
               <div class="head-row">
-                {#if editable.current}
+                {#if editable.current && renaming === track.id}
                   <input
                     class="name"
-                    value={track.name}
+                    value={naming[track.id] ?? track.name}
                     aria-label="Name of Track {track.name}"
-                    onchange={(e) => rename(track, e)}
                     onkeydown={(e) => nameKey(track, e)}
+                    onblur={(e) => endRename(track, e.currentTarget, true)}
+                    {@attach focusField}
                   />
+                {:else}
+                  <button
+                    type="button"
+                    class="name"
+                    aria-label="Choose {track.name}"
+                    onclick={() => choose({ kind: 'choose', trackId: track.id })}
+                    ondblclick={() => editable.current && (renaming = track.id)}>{naming[track.id] ?? track.name}</button
+                  >
+                {/if}
+                {#if editable.current}
                   <span class="track-actions">
+                    <button
+                      type="button"
+                      id="rename-track-{track.id}"
+                      class="rename"
+                      onclick={() => (renaming = track.id)}
+                      aria-label="Rename {track.name}"
+                      title="Rename"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 20h4L19 9l-4-4L4 16z" />
+                        <path d="M13.5 6.5l4 4" />
+                      </svg>
+                    </button>
                     <button
                       type="button"
                       onclick={() => shift(i, -1)}
@@ -1297,8 +1390,6 @@
                       title="Delete the Track and its Clips">×</button
                     >
                   </span>
-                {:else}
-                  <span class="name">{track.name}</span>
                 {/if}
               </div>
               <div class="head-row">
@@ -1663,7 +1754,14 @@
     flex-shrink: 0;
     gap: calc(0.25 * var(--timeline-rem));
     height: var(--track-height);
+    padding-left: calc(0.375 * var(--timeline-rem));
     border-bottom: 1px solid var(--border);
+    cursor: pointer;
+  }
+  /* Marked along its left edge, in the room left for it. */
+  .head.chosen {
+    box-shadow: inset calc(0.1875 * var(--timeline-rem)) 0 0 var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
   }
   .head-row {
     display: flex;
@@ -1687,8 +1785,15 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  input.name:hover,
-  input.name:focus {
+  button.name {
+    text-align: left;
+    cursor: pointer;
+  }
+  button.name:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+  input.name {
     border-color: var(--border);
   }
   .track-actions {
@@ -1706,6 +1811,17 @@
   .track-actions button:hover:not(:disabled),
   .track-actions button:focus-visible {
     color: var(--accent);
+  }
+  /* As big as the arrows and cross beside it. */
+  .rename svg {
+    width: calc(0.625 * var(--timeline-rem));
+    height: calc(0.625 * var(--timeline-rem));
+    vertical-align: -0.0625em;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.25;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
   .track-actions button:disabled {
     opacity: 0.35;
