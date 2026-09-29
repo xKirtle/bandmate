@@ -31,6 +31,9 @@
      of a Lyric Sheet Section without its Cue gutter. */
   --side-width: 22rem;
   --side-max-width: 48rem;
+  /* A Song's Cover: small in lists, larger in the Song page header. */
+  --cover-list: 2.75rem;
+  --cover-header: 8rem;
 
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.5;
