@@ -28,27 +28,23 @@ The written side of a Song: its Sections laid out in order by the Arrangement.
 _Avoid_: Lyrics document, text
 
 **Section**:
-A block of Lines with an optional free-text Label; the same Section may appear multiple times in a Song.
-_Avoid_: Block, part, stanza
+A block of Lines with an optional free-text Label; each Section appears at most once in a Song, so a chorus sung three times is three Sections.
+_Avoid_: Block, part, stanza, Occurrence
 
 **Label**:
 The free-text name of a Section (e.g. "Chorus", "Verse 2", "Hook"); common labels are suggested but never enforced.
 _Avoid_: Tag, section type
 
 **Arrangement**:
-The ordered list of Occurrences that makes up a Song's Lyric Sheet.
+The ordered list of Sections that makes up a Song's Lyric Sheet.
 _Avoid_: Structure, layout
 
-**Occurrence**:
-One appearance of a Section in the Arrangement; several Occurrences can share one Section, so editing it changes all of them.
-_Avoid_: Instance, copy
-
-**Detach**:
-Turning an Occurrence of a shared Section into its own independent Section, so it can diverge.
-_Avoid_: Unlink, fork
+**Duplicate**:
+Making an independent copy of a Section, with all its Alternates and the same one active, but none of its Cues, since the copy is sung at another time. Editing one never changes the other.
+_Avoid_: Repeat, share, Detach
 
 **Scrapbook**:
-A Song's collection of Sections that aren't in the Arrangement: leftovers and loose ideas kept for later, in the order they came into it. A Section taken out of the Arrangement goes to its end; an Occurrence of a shared Section taken out to it is Detached first, so its own copy goes there and the others stay. A Section taken out of the Arrangement with nothing written in any Alternate (no Lines, or only blank ones) is deleted instead, as there's nothing to keep; a Section made in the Scrapbook stays there even while it's still empty. An inactive Alternate can also be moved out of its Section into the Scrapbook, becoming a Section of its own; a Scrapbook Section can in turn be added to a Section in the Arrangement, its Alternates joining that Section's.
+A Song's collection of Sections that aren't in the Arrangement: leftovers and loose ideas kept for later, in the order they came into it. A Section taken out of the Arrangement goes to its end, unless it has nothing written in any Alternate (no Lines, or only blank ones), in which case it's deleted instead, as there's nothing to keep; a Section made in the Scrapbook stays there even while it's still empty. An inactive Alternate can also be moved out of its Section into the Scrapbook, becoming a Section of its own; a Scrapbook Section, or a Section in the Arrangement, can in turn be added to another Section in the Arrangement, its Alternates joining that Section's, inactive. Cues go wherever their Lines go: into the Scrapbook, back out of it, and into another Section.
 _Avoid_: Trash, drafts, unused
 
 **Alternate**:
@@ -109,7 +105,7 @@ A stretch of the Timeline that playback repeats, e.g. the hook of a Beat while w
 _Avoid_: Cycle, repeat, region
 
 **Cue**:
-A link from one Line within an Occurrence to a time on the Timeline. An Occurrence has no Cue of its own: it starts where its first Line is cued. A Line's Cue lies dormant while its Alternate is inactive, and is dropped if that Alternate is moved to the Scrapbook. A new Alternate starts with a copy of the Cues of the Alternate it was copied from; from then on, each keeps its own. Playing from a Cue starts a second before it, to lead into it. Cues are expected to run in order down the Arrangement (equal times are fine); a Cue earlier than a Line above it or later than one below it is **out of order**, which is allowed but marked.
+A link from one Line to a time on the Timeline; a Line has at most one. A Section has no Cue of its own: it starts where its first Line is cued. A Line's Cue lies dormant while its Alternate is inactive, and stays with the Line wherever it goes: into the Scrapbook and back, or into another Section as an Alternate, where it's dormant until that Alternate is made active (and may then be out of order). A new Alternate starts with a copy of the Cues of the Alternate it was copied from; from then on, each keeps its own. A Duplicate starts with none. Playing from a Cue starts a second before it, to lead into it. Cues are expected to run in order down the Arrangement (equal times are fine); a Cue earlier than a Line above it or later than one below it is **out of order**, which is allowed but marked.
 _Avoid_: Timestamp, sync point, marker
 
 **Sync mode**:
