@@ -5,7 +5,7 @@
   import type { Drop } from './sectionDrag';
   import type { SectionDragging } from './sectionDragging.svelte';
   import SectionEditor from './SectionEditor.svelte';
-  import { card, describe, labelOf, sectionsInArrangement } from './sections';
+  import { card, describe, labelOf, places, sectionsInArrangement } from './sections';
 
   let {
     song,
@@ -26,12 +26,8 @@
   // The Sections in the Lyric Sheet, in order: the ones a Section can be
   // added to as Alternates.
   const inArrangement = $derived(sectionsInArrangement(song, sections));
-  // Where a Section can be put back: at the start, or after any Section in
-  // the Lyric Sheet.
-  const places = $derived([
-    { position: 0, name: 'At the start' },
-    ...inArrangement.map((s, i) => ({ position: i + 1, name: `After ${i + 1}. ${describe(s)}` })),
-  ]);
+  // Where a Section can be put back.
+  const placesBack = $derived(places(inArrangement));
   // The Section just added, whose Label gets focus.
   let added = $state<number | null>(null);
   // The one Section shown in full, in its editor; the rest show as cards.
@@ -145,6 +141,8 @@
               {change}
               onUnsaved={track}
               more={[{ icon: '🗑', label: 'Delete for good', run: () => remove(section.id) }]}
+              {drag}
+              places={placesBack}
             >
               {#snippet grip()}
                 {@render dragGrip(section.id)}
@@ -156,7 +154,7 @@
                 <select id="put-back-{section.id}" class="put-back" onchange={(e) => putBack(section.id, e)}>
                   <option value="">Put back…</option>
                   <optgroup label="Put back into the Lyric Sheet">
-                    {#each places as place (place.position)}
+                    {#each placesBack as place (place.position)}
                       <option value="at:{place.position}">{place.name}</option>
                     {/each}
                   </optgroup>

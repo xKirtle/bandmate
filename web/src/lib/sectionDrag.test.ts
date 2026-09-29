@@ -189,8 +189,22 @@ describe('dropFor', () => {
     expect(dropFor({ arrangementAt: 2 }, { onto: 2 })).toBeNull();
   });
 
+  it('moves an Alternate dropped into a gap there, as a Section of its own', () => {
+    expect(dropFor({ alternate: 9 }, { gap: 0 })).toEqual({ alternateOut: 9, gap: 0 });
+    expect(dropFor({ alternate: 9 }, { gap: 3 })).toEqual({ alternateOut: 9, gap: 3 });
+  });
+
+  it('moves an Alternate dropped on the Scrapbook there', () => {
+    expect(dropFor({ alternate: 9 }, { scrapbook: true })).toEqual({ alternateToScrapbook: 9 });
+  });
+
+  it('does nothing with an Alternate dropped onto a Section', () => {
+    expect(dropFor({ alternate: 9 }, { onto: 1 })).toBeNull();
+  });
+
   it('does nothing dropped nowhere', () => {
     expect(dropFor({ arrangementAt: 2 }, null)).toBeNull();
     expect(dropFor({ section: 7 }, null)).toBeNull();
+    expect(dropFor({ alternate: 9 }, null)).toBeNull();
   });
 });

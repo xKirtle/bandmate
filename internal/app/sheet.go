@@ -253,6 +253,19 @@ func (a *App) moveAlternateToScrapbook(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *App) moveAlternateToArrangement(w http.ResponseWriter, r *http.Request) {
+	alternateID, ok := pathID(w, r, "alternateID")
+	if !ok {
+		return
+	}
+	var req struct {
+		Position *int `json:"position"`
+	}
+	a.changeSheet(w, r, &req, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
+		return a.songs.MoveAlternateToArrangement(r.Context(), id, based, alternateID, req.Position)
+	})
+}
+
 func (a *App) replaceAlternateText(w http.ResponseWriter, r *http.Request) {
 	alternateID, ok := pathID(w, r, "alternateID")
 	if !ok {

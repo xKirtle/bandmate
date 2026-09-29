@@ -114,6 +114,27 @@ func TestAnInactiveAlternateMovedToTheScrapbookKeepsItsCuesLiveOnceItsSectionIsP
 	}
 }
 
+func TestAnInactiveAlternateMovedIntoTheLyricSheetHasItsCuesLive(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.duplicatedChorus()
+	drive, _, _, _ := chorusLines(s)
+	s = ts.addAlternate(s.ID, s.Sections[0].ID, nil)
+	s = ts.activate(s.ID, s.Sections[0].Alternates[0].ID)
+	moved := s.Sections[0].Alternates[1]
+	ts.setLineCue(s.ID, drive, 2)
+	ts.setLineCue(s.ID, moved.Lines[1].ID, 7)
+
+	got := ts.moveToArrangement(s.ID, moved.ID, map[string]any{"position": 1})
+
+	want := []map[int64]float64{{drive: 2}, {moved.Lines[1].ID: 7}, {}, {}, {}}
+	if cues := lineCues(got); !reflect.DeepEqual(cues, want) {
+		t.Errorf("lineCues = %v, want the moved Alternate's live in its new Section %v", cues, want)
+	}
+	if read := ts.getSong(s.ID); !reflect.DeepEqual(read, got) {
+		t.Errorf("song read back = %+v, want %+v", read, got)
+	}
+}
+
 func TestAScrapbookSectionAddedToASectionBringsItsCuesDormant(t *testing.T) {
 	ts := newTestServer(t)
 	s, first, second := ts.cuedVerse()

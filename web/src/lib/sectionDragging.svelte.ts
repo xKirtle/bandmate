@@ -3,7 +3,9 @@ import { dropFor, dropTarget, type Box, type Drop, type Dragged, type Target } f
 
 // On desktop in Write mode, a Section is dragged by the grip on its header:
 // within the Arrangement, from it to the Scrapbook or onto another Section in
-// it, or from the Scrapbook back into it or onto a Section in it. Pointer
+// it, or from the Scrapbook back into it or onto a Section in it; and an
+// inactive Alternate by the grip on its card, out of its Section into either
+// as a Section of its own. Pointer
 // events rather than HTML5 drag and drop, so the drop shows between Sections
 // and Esc cancels. One drag is shared by the Lyric Sheet and the Scrapbook,
 // as a drag goes from one to the other.
@@ -23,6 +25,12 @@ export class SectionDragging {
   readonly section: number | null = $derived.by(() => {
     const dragged = this.current?.dragged;
     return dragged && 'section' in dragged ? dragged.section : null;
+  });
+
+  /** The id of the Alternate being dragged, if one is. */
+  readonly alternate: number | null = $derived.by(() => {
+    const dragged = this.current?.dragged;
+    return dragged && 'alternate' in dragged ? dragged.alternate : null;
   });
 
   #enabled: () => boolean;
@@ -96,8 +104,10 @@ export class SectionDragging {
       return box ? { top: box.top, bottom: box.bottom } : { top: -Infinity, bottom: -Infinity };
     });
     // A Section drops onto any Section in the Arrangement but itself: over
-    // itself, it's still in the gaps either side.
-    const canDropOnto = (at: number) => 'section' in dragged || at !== dragged.arrangementAt;
+    // itself, it's still in the gaps either side. An Alternate only drops
+    // between Sections, to be one of its own.
+    const canDropOnto = (at: number) =>
+      'section' in dragged || ('arrangementAt' in dragged && at !== dragged.arrangementAt);
     return dropTarget({ x, y }, this.#scrapbookBox(), arrangement, spans, canDropOnto);
   }
 

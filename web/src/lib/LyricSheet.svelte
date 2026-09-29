@@ -24,7 +24,7 @@
   import SectionEditor from './SectionEditor.svelte';
   import { moveTo, type Drop } from './sectionDrag';
   import type { SectionDragging } from './sectionDragging.svelte';
-  import { activeAlternate, addedNotice, describe, isEmpty, sectionsInArrangement } from './sections';
+  import { activeAlternate, addedNotice, describe, isEmpty, places, sectionsInArrangement } from './sections';
   import type { Mode } from './songMode';
   import { readShiftStep, shiftSteps, storeShiftStep, type ShiftStep } from './shiftStep';
   import { markSyncHintSeen, sawSyncHint } from './syncHint';
@@ -111,6 +111,8 @@
   // The Sections in the Arrangement, in order: the ones a Duplicate can be
   // made of.
   const inArrangement = $derived(sectionsInArrangement(song, sections));
+  // Where an Alternate can be moved out to, as a Section of its own.
+  const placesOut = $derived(places(inArrangement));
   // Cues are edited in Write mode, on wider screens only, and only once
   // there's something to cue to or a Cue already set.
   const wide = new MediaQuery('min-width: 40.0625rem');
@@ -480,6 +482,8 @@
               {onUnsaved}
               cueing={cueingFor(section)}
               more={sectionActions(section, i)}
+              {drag}
+              places={placesOut}
             >
               {#snippet grip()}
                 {#if drag.on}

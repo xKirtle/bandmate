@@ -82,7 +82,8 @@
     if (desktop.current && open !== partOpen(part, startsOpen)) toggledParts[`${mode}-${part}`] = open;
   }
   // A Section is dragged within the Lyric Sheet, or between it and the
-  // Scrapbook, on desktop in Write mode. The Arrangement or the Scrapbook
+  // Scrapbook, and an Alternate out of its Section into either, on desktop
+  // in Write mode. The Arrangement or the Scrapbook
   // changing mid-drag cancels it.
   const drag = new SectionDragging(
     () => desktop.current && writing,
@@ -489,7 +490,7 @@
         {#each parts as { part, open: startsOpen } (part)}
           <details
             class="part {part}-part"
-            class:drop-target={part === 'scrapbook' && drag.drop !== null && 'toScrapbook' in drag.drop}
+            class:drop-target={part === 'scrapbook' && drag.drop !== null && ('toScrapbook' in drag.drop || 'alternateToScrapbook' in drag.drop)}
             {@attach (el) => (part === 'scrapbook' ? drag.placeScrapbook(el) : undefined)}
             open={partOpen(part, startsOpen)}
             ontoggle={(e) => toggled(part, startsOpen, e.currentTarget.open)}
