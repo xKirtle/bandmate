@@ -1,8 +1,8 @@
 <script lang="ts" generics="T">
   import { tick, type Snippet } from 'svelte';
   import type { HTMLAttributes } from 'svelte/elements';
-  import { pickerKey, typeahead } from './picker';
-  import { placeUnder } from './popover';
+  import { pickerKey, typeaheadIndex } from './picker';
+  import { placeUnder, revealSelected } from './popover';
 
   // Picks a value from a list it draws itself, in place of a native select,
   // whose OS-drawn list looks nothing like the app. Follows the ARIA
@@ -11,7 +11,7 @@
     id,
     options,
     value,
-    label = String,
+    text = String,
     onpick,
     trigger,
     option,
@@ -23,7 +23,7 @@
     /** The option picked now: shown by the trigger, ✓-marked in the list. */
     value: T;
     /** An option's text, which typing jumps by, and drawn unless `option` is given. */
-    label?: (option: T) => string;
+    text?: (option: T) => string;
     onpick: (option: T) => void;
     /** Draws the closed picker, in place of a field showing the value and ▾. */
     trigger?: Snippet<[T]>;
@@ -67,14 +67,8 @@
     if (list) placeUnder(list, field, gap);
   }
 
-  // Scrolls the highlighted option into the list's view.
   function reveal() {
-    const item = list?.querySelector<HTMLElement>('[aria-selected="true"]');
-    if (!list || !item) return;
-    if (item.offsetTop < list.scrollTop) list.scrollTop = item.offsetTop;
-    else if (item.offsetTop + item.offsetHeight > list.scrollTop + list.clientHeight) {
-      list.scrollTop = item.offsetTop + item.offsetHeight - list.clientHeight;
-    }
+    if (list) revealSelected(list);
   }
 
   function pick(index: number) {
@@ -94,7 +88,7 @@
     clearTimeout(typedTimer);
     typed += key;
     typedTimer = setTimeout(() => (typed = ''), 500);
-    const at = typeahead(options.map(label), typed, open ? active : current);
+    const at = typeaheadIndex(options.map(text), typed, open ? active : current);
     if (at < 0) return;
     if (open) highlight(at);
     else if (at !== current) onpick(options[at]);
@@ -110,7 +104,7 @@
     }
     const action = pickerKey(e.key, e.altKey, { open, active, count: options.length });
     if (!action) return;
-    // Tab closes the list and still moves focus on.
+    // Tab picks and still moves focus on.
     if (e.key !== 'Tab') e.preventDefault();
     e.stopPropagation();
     switch (action.kind) {
@@ -153,7 +147,7 @@
     {#if trigger}
       {@render trigger(value)}
     {:else}
-      <span class="value">{current >= 0 ? label(value) : ''}</span>
+      <span class="value">{current >= 0 ? text(value) : ''}</span>
       <span class="chevron" aria-hidden="true">▾</span>
     {/if}
   </div>
@@ -169,7 +163,7 @@
       bind:this={list}
       onmousedown={(e) => e.preventDefault()}
     >
-      {#each options as o, i (o)}
+      {#each options as o, i (i)}
         <!-- The trigger takes the keyboard, through aria-activedescendant. -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
@@ -181,7 +175,7 @@
           onclick={() => pick(i)}
         >
           <span class="option-list-check" aria-hidden="true">{i === current ? '✓' : ''}</span>
-          {#if option}{@render option(o)}{:else}{label(o)}{/if}
+          {#if option}{@render option(o)}{:else}{text(o)}{/if}
           {#if i === current}<span class="visually-hidden">(current)</span>{/if}
         </div>
       {/each}

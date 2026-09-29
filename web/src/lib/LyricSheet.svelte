@@ -413,7 +413,7 @@
           title="How far each click shifts every Cue"
           options={shiftSteps}
           value={shiftStep}
-          label={(step) => `${step} s`}
+          text={(step) => `${step} s`}
           onpick={chooseShiftStep}
         />
         <button

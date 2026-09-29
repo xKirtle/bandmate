@@ -43,9 +43,9 @@ export function pickerKey(
       return { kind: 'highlight', index: count - 1 };
     case 'Enter':
     case ' ':
+    case 'Tab':
       return active >= 0 ? { kind: 'pick', index: active } : { kind: 'close' };
     case 'Escape':
-    case 'Tab':
       return { kind: 'close' };
     default:
       return null;
@@ -58,7 +58,7 @@ export function pickerKey(
  * through the options starting with it; more letters narrow it down, keeping
  * `active` while it still matches.
  */
-export function typeahead(labels: readonly string[], typed: string, active: number): number {
+export function typeaheadIndex(labels: readonly string[], typed: string, active: number): number {
   const t = typed.toLowerCase();
   const sameLetter = [...t].every((c) => c === t[0]);
   const prefix = sameLetter ? t[0] : t;

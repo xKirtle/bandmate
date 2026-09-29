@@ -27,3 +27,13 @@ export function placeUnder(list: HTMLElement, anchor: HTMLElement, gap: number) 
   const room = document.documentElement.clientWidth - gap;
   list.style.left = `${Math.max(gap, Math.min(at.left, room - width))}px`;
 }
+
+/** Scrolls the highlighted option (aria-selected) into `list`'s view. */
+export function revealSelected(list: HTMLElement) {
+  const option = list.querySelector<HTMLElement>('[aria-selected="true"]');
+  if (!option) return;
+  if (option.offsetTop < list.scrollTop) list.scrollTop = option.offsetTop;
+  else if (option.offsetTop + option.offsetHeight > list.scrollTop + list.clientHeight) {
+    list.scrollTop = option.offsetTop + option.offsetHeight - list.clientHeight;
+  }
+}

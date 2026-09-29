@@ -4,10 +4,11 @@
 
   // Given onChange, the badge is a Picker, whose options are badges too.
   let { status, onChange }: { status: Status; onChange?: (status: Status) => void } = $props();
+  const id = $props.id();
 </script>
 
 {#if onChange}
-  <Picker id="status" aria-label="Status" options={statuses} value={status} onpick={onChange}>
+  <Picker {id} aria-label="Status" options={statuses} value={status} onpick={onChange}>
     {#snippet trigger(s)}
       <span class="badge badge-{s}">{s} <span aria-hidden="true">▾</span></span>
     {/snippet}

@@ -2,7 +2,7 @@
   import { tick } from 'svelte';
   import type { HTMLInputAttributes } from 'svelte/elements';
   import { comboboxKey, filterOptions, optionIndex } from './combobox';
-  import { placeUnder } from './popover';
+  import { placeUnder, revealSelected } from './popover';
 
   let {
     id,
@@ -62,14 +62,8 @@
     if (list) placeUnder(list, input, gap);
   }
 
-  // Scrolls the highlighted option into the list's view.
   function reveal() {
-    const option = list?.querySelector<HTMLElement>('[aria-selected="true"]');
-    if (!list || !option) return;
-    if (option.offsetTop < list.scrollTop) list.scrollTop = option.offsetTop;
-    else if (option.offsetTop + option.offsetHeight > list.scrollTop + list.clientHeight) {
-      list.scrollTop = option.offsetTop + option.offsetHeight - list.clientHeight;
-    }
+    if (list) revealSelected(list);
   }
 
   function pick(option: string) {

@@ -36,7 +36,7 @@
   }
 
   // A filter's choices start with "Any", which clears it.
-  const anyOr = (choice: string) => choice || 'Any';
+  const anyOr = (choice: string | undefined) => choice ?? 'Any';
 
   const drawerCount = $derived(beatDrawerFilterCount(view));
   let drawerOpen = $state(untrack(() => drawerCount > 0));
@@ -81,10 +81,10 @@
       <Picker
         id="{idPrefix}-producer"
         aria-labelledby="{idPrefix}-producer-label"
-        options={['', ...producers]}
-        value={view.producer ?? ''}
-        label={anyOr}
-        onpick={(v) => (view.producer = v || undefined)}
+        options={[undefined, ...producers]}
+        value={view.producer}
+        text={anyOr}
+        onpick={(v) => (view.producer = v)}
       />
     </div>
     <fieldset class="field bpm">
@@ -116,10 +116,10 @@
       <Picker
         id="{idPrefix}-key"
         aria-labelledby="{idPrefix}-key-label"
-        options={['', ...keys]}
-        value={view.key ?? ''}
-        label={anyOr}
-        onpick={(v) => (view.key = v || undefined)}
+        options={[undefined, ...keys]}
+        value={view.key}
+        text={anyOr}
+        onpick={(v) => (view.key = v)}
       />
     </div>
     <div class="chips" role="group" aria-label="Used in a Song">
