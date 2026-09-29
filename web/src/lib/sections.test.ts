@@ -1,6 +1,16 @@
 import { describe as group, expect, it } from 'vitest';
 import type { Alternate, Section } from './api';
-import { activeAlternate, addedNotice, alternateName, alternatesLabel, card, isEmpty, labelOf, places } from './sections';
+import {
+  activeAlternate,
+  addedNotice,
+  alternateName,
+  alternatesLabel,
+  card,
+  isEmpty,
+  labelOf,
+  places,
+  putBackActions,
+} from './sections';
 
 function alternate(active: boolean, ...texts: string[]): Alternate {
   return {
@@ -126,5 +136,33 @@ group('places', () => {
 
   it('is only the start in an empty Lyric Sheet', () => {
     expect(places([])).toEqual([{ position: 0, name: 'At the start' }]);
+  });
+});
+
+group('putBackActions', () => {
+  const verse = { ...section('Verse 1', alternate(true, 'Night')), id: 3 };
+  const idea = { ...section('', alternate(true, 'Drive')), id: 7 };
+
+  it('puts it back at each place, or adds it to each Section in the Lyric Sheet', () => {
+    const ran: string[] = [];
+    const actions = putBackActions(
+      [verse, idea],
+      (position) => ran.push(`at:${position}`),
+      (target) => ran.push(`to:${target}`),
+    );
+    expect(actions.map((a) => a.label)).toEqual(['Put back into the Lyric Sheet…', 'Add as an Alternate of…']);
+    const choices = actions.map((a) => ('choices' in a ? a.choices : []));
+    expect(choices.map((c) => c.map((choice) => choice.label))).toEqual([
+      ['At the start', 'After 1. Verse 1', 'After 2. “Drive”'],
+      ['Verse 1', '“Drive”'],
+    ]);
+    choices.flat().forEach((choice) => choice.run());
+    expect(ran).toEqual(['at:0', 'at:1', 'at:2', 'to:3', 'to:7']);
+  });
+
+  it('only puts it back, at the start, in an empty Lyric Sheet', () => {
+    const actions = putBackActions([], () => {}, () => {});
+    expect(actions.map((a) => a.label)).toEqual(['Put back into the Lyric Sheet…']);
+    expect('choices' in actions[0] && actions[0].choices.map((c) => c.label)).toEqual(['At the start']);
   });
 });

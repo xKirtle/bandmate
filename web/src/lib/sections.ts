@@ -1,5 +1,6 @@
 import type { Alternate, Section, Song } from './api';
 import { isBlank } from './cues';
+import type { MenuAction } from './menu';
 
 /** The Alternate whose Lines are sung. The server guarantees exactly one. */
 export function activeAlternate(section: Section | undefined): Alternate | undefined {
@@ -40,6 +41,33 @@ export function places(inArrangement: Section[]): Place[] {
     { position: 0, name: 'At the start' },
     ...inArrangement.map((s, i) => ({ position: i + 1, name: `After ${i + 1}. ${describe(s)}` })),
   ];
+}
+
+/**
+ * What a Scrapbook Section's "Put back…" menu offers: putting it back at a
+ * place in the Lyric Sheet, or, when the Lyric Sheet has Sections, adding it
+ * to one of them as Alternates.
+ */
+export function putBackActions(
+  inArrangement: Section[],
+  putAt: (position: number) => void,
+  addTo: (targetId: number) => void,
+): MenuAction[] {
+  const actions: MenuAction[] = [
+    {
+      icon: '↦',
+      label: 'Put back into the Lyric Sheet…',
+      choices: places(inArrangement).map((place) => ({ label: place.name, run: () => putAt(place.position) })),
+    },
+  ];
+  if (inArrangement.length > 0) {
+    actions.push({
+      icon: '⇄',
+      label: 'Add as an Alternate of…',
+      choices: inArrangement.map((target) => ({ label: describe(target), run: () => addTo(target.id) })),
+    });
+  }
+  return actions;
 }
 
 /** How a Section is named where it's shown in full: its Label, if it has one. */

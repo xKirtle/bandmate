@@ -4,8 +4,9 @@
   import { api, type Song, type SongAt } from './api';
   import type { Drop } from './sectionDrag';
   import type { SectionDragging } from './sectionDragging.svelte';
+  import ActionsMenu from './ActionsMenu.svelte';
   import SectionEditor from './SectionEditor.svelte';
-  import { card, describe, labelOf, places, sectionsInArrangement } from './sections';
+  import { card, describe, labelOf, places, putBackActions, sectionsInArrangement } from './sections';
 
   let {
     song,
@@ -75,13 +76,14 @@
     added = null;
   }
 
-  // "Put back…" puts a Section back at a place in the Lyric Sheet ("at:2"),
-  // or adds it to a Section there as Alternates ("to:7").
-  function putBack(sectionId: number, e: Event & { currentTarget: HTMLSelectElement }) {
-    const [kind, value] = e.currentTarget.value.split(':');
-    e.currentTarget.value = '';
-    if (kind === 'at') change((at) => api.addToArrangement(at, sectionId, Number(value))).then(closed(sectionId));
-    if (kind === 'to') addTo(sectionId, Number(value));
+  // "Put back…" puts a Section back at a place in the Lyric Sheet, or adds
+  // it to a Section there as Alternates.
+  function putBack(sectionId: number) {
+    return putBackActions(
+      inArrangement,
+      (position) => change((at) => api.addToArrangement(at, sectionId, position)).then(closed(sectionId)),
+      (targetId) => addTo(sectionId, targetId),
+    );
   }
 
   function addTo(sectionId: number, targetId: number) {
@@ -148,24 +150,11 @@
                 {@render dragGrip(section.id)}
               {/snippet}
               {#snippet actions()}
-                <label class="visually-hidden" for="put-back-{section.id}"
-                  >Put back into the Lyric Sheet, or add as an Alternate of a Section</label
-                >
-                <select id="put-back-{section.id}" class="put-back" onchange={(e) => putBack(section.id, e)}>
-                  <option value="">Put back…</option>
-                  <optgroup label="Put back into the Lyric Sheet">
-                    {#each placesBack as place (place.position)}
-                      <option value="at:{place.position}">{place.name}</option>
-                    {/each}
-                  </optgroup>
-                  {#if inArrangement.length > 0}
-                    <optgroup label="Add as an Alternate of">
-                      {#each inArrangement as target (target.id)}
-                        <option value="to:{target.id}">{describe(target)}</option>
-                      {/each}
-                    </optgroup>
-                  {/if}
-                </select>
+                <ActionsMenu
+                  label="Put back into the Lyric Sheet, or add as an Alternate of a Section"
+                  text="Put back…"
+                  entries={putBack(section.id)}
+                />
               {/snippet}
             </SectionEditor>
             <button type="button" class="button done" onclick={() => done(section.id)}>Done</button>
@@ -255,17 +244,6 @@
   }
   .list > .dragged .grip {
     cursor: grabbing;
-  }
-  .put-back {
-    width: auto;
-    font-weight: 600;
-  }
-  /* Sized to its longest place, it would push ⋯ off a phone's header row. It
-     only ever shows "Put back…" at rest. */
-  @media (max-width: 40rem) {
-    .put-back {
-      max-width: 8rem;
-    }
   }
   .add {
     width: 100%;
