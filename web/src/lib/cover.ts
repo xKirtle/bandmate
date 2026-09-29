@@ -37,3 +37,54 @@ export function centredSquare(width: number, height: number): Square {
   const size = Math.min(width, height);
   return { x: Math.floor((width - size) / 2), y: Math.floor((height - size) / 2), size };
 }
+
+/** How far a Cover's crop square zooms in on the largest square. */
+export const maxCoverZoom = 8;
+
+/** A point in a picture, in its pixels. */
+export interface Point {
+  x: number;
+  y: number;
+}
+
+/**
+ * A square made to fit a picture: no larger than its largest square, so it
+ * never shows bars, no smaller than zoomed all the way in, and inside it.
+ */
+export function clampSquare(square: Square, { width, height }: Size): Square {
+  const largest = Math.min(width, height);
+  const size = Math.min(largest, Math.max(square.size, largest / maxCoverZoom, 1));
+  return {
+    x: Math.min(Math.max(square.x, 0), width - size),
+    y: Math.min(Math.max(square.y, 0), height - size),
+    size,
+  };
+}
+
+/** A square moved by the given pixels, stopping at the picture's edges. */
+export function moveSquare(square: Square, dx: number, dy: number, picture: Size): Square {
+  return clampSquare({ ...square, x: square.x + dx, y: square.y + dy }, picture);
+}
+
+/**
+ * A square zoomed to a size, keeping the point zoomed on where it was in the
+ * square, as far as the picture's edges let it.
+ */
+export function zoomSquare(square: Square, size: number, on: Point, picture: Size): Square {
+  const nextSize = clampSquare({ ...square, size }, picture).size;
+  const scale = nextSize / square.size;
+  return clampSquare(
+    { x: on.x - (on.x - square.x) * scale, y: on.y - (on.y - square.y) * scale, size: nextSize },
+    picture,
+  );
+}
+
+/** A square rounded to whole pixels, still inside the picture. */
+export function wholeSquare(square: Square, { width, height }: Size): Square {
+  const size = Math.max(1, Math.min(Math.round(square.size), width, height));
+  return {
+    x: Math.max(0, Math.min(Math.round(square.x), width - size)),
+    y: Math.max(0, Math.min(Math.round(square.y), height - size)),
+    size,
+  };
+}

@@ -265,6 +265,27 @@
     save({ [field]: value }, [field]);
   }
 
+  // The title wraps in Write mode as it does in Read mode, so switching
+  // doesn't move the page: its box grows to fit, again as its width changes.
+  function fitTitle(el: HTMLTextAreaElement) {
+    const fit = () => {
+      el.style.height = 'auto';
+      el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
+    };
+    const resized = new ResizeObserver(fit);
+    resized.observe(el);
+    $effect(() => {
+      void draft.title;
+      fit();
+    });
+    return () => resized.disconnect();
+  }
+
+  // A title is one line: Enter saves it, and a pasted line break is a space.
+  function oneLine(event: Event & { currentTarget: HTMLTextAreaElement }) {
+    if (/[\r\n]/.test(event.currentTarget.value)) draft.title = event.currentTarget.value.replace(/\s*[\r\n]+\s*/g, ' ');
+  }
+
   function commitNumber(field: 'bpm' | 'capo', label: string) {
     if (!song) return;
     const text = draft[field].trim();
@@ -359,39 +380,42 @@
             />
           {/if}
           <div class="head-main">
-            <div class="title-row">
+            <div class="title-block">
               {#if writing}
                 <label class="visually-hidden" for="song-title">Title</label>
-                <input
+                <textarea
                   id="song-title"
                   class="title"
+                  rows="1"
                   bind:value={draft.title}
+                  {@attach fitTitle}
+                  oninput={oneLine}
+                  onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), e.currentTarget.blur())}
                   onchange={() => commitText('title')}
                   required
                   autocomplete="off"
                   enterkeyhint="done"
-                />
+                ></textarea>
               {:else}
                 <h1 class="title">{draft.title}</h1>
               {/if}
-              <fieldset class="modes" disabled={deleting}>
-                <legend class="visually-hidden">Mode</legend>
-                <label class="mode"><input type="radio" name="song-mode" value="write" bind:group={mode} />Write</label>
-                <label class="mode"><input type="radio" name="song-mode" value="read" bind:group={mode} />Read</label>
-              </fieldset>
+              <div class="meta">
+                <StatusBadge status={draft.status} onChange={writing ? setStatus : undefined} />
+                <span class="muted" aria-hidden="true">·</span>
+                <p class="save-state muted" role="status">
+                  {#if pending > 0}
+                    Saving…
+                  {:else}
+                    Edited <time datetime={song.updatedAt}>{timeAgo(song.updatedAt)}</time>
+                  {/if}
+                </p>
+              </div>
             </div>
-
-            <div class="meta">
-              <StatusBadge status={draft.status} onChange={writing ? setStatus : undefined} />
-              <span class="muted" aria-hidden="true">·</span>
-              <p class="save-state muted" role="status">
-                {#if pending > 0}
-                  Saving…
-                {:else}
-                  Edited <time datetime={song.updatedAt}>{timeAgo(song.updatedAt)}</time>
-                {/if}
-              </p>
-            </div>
+            <fieldset class="modes" disabled={deleting}>
+              <legend class="visually-hidden">Mode</legend>
+              <label class="mode"><input type="radio" name="song-mode" value="write" bind:group={mode} />Write</label>
+              <label class="mode"><input type="radio" name="song-mode" value="read" bind:group={mode} />Read</label>
+            </fieldset>
           </div>
         </div>
 
@@ -549,10 +573,13 @@
 {/if}
 
 <style>
+  /* The title and its heading wrap alike and are as tall as each other,
+     one line being 3rem, so switching mode doesn't shift the page. */
   .title {
+    display: block;
     min-height: 3rem;
     margin: 0 0 0.25rem;
-    padding: 0.25rem 0.5rem;
+    padding: calc((3rem - 1.2em - 2px) / 2) 0.5rem;
     margin-left: -0.5rem;
     width: calc(100% + 0.5rem);
     border-color: transparent;
@@ -561,15 +588,17 @@
     font-weight: 700;
     line-height: 1.2;
   }
-  /* As tall as the input it replaces, so switching mode doesn't shift the page. */
-  h1.title {
-    display: flex;
-    align-items: center;
+  h1.title,
+  textarea.title {
     border: 1px solid transparent;
     overflow-wrap: anywhere;
   }
-  input.title:hover,
-  input.title:focus {
+  textarea.title {
+    overflow: hidden;
+    resize: none;
+  }
+  textarea.title:hover,
+  textarea.title:focus {
     border-color: var(--border);
     background: var(--surface-1);
   }
@@ -580,8 +609,8 @@
     padding-top: max(var(--gutter), env(safe-area-inset-top));
     min-height: calc(100dvh - var(--nav-bottom-space) - var(--timeline-height));
   }
-  /* The Cover beside the title, mode switch and Status. Where the title
-     would be squeezed, the mode switch moves under it. */
+  /* The Cover beside the title and Status, with the mode switch at the end
+     of the title's line. */
   .head {
     display: flex;
     align-items: flex-start;
@@ -589,17 +618,14 @@
     margin-bottom: 0.5rem;
   }
   .head-main {
+    display: flex;
     flex: 1;
+    align-items: flex-start;
+    gap: 0.75rem;
     min-width: 0;
   }
-  .title-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    column-gap: 0.75rem;
-  }
-  .title-row .title {
-    flex: 1 1 10rem;
+  .title-block {
+    flex: 1;
     min-width: 0;
   }
   .modes {
@@ -729,6 +755,58 @@
     margin-top: 0.5rem;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+  }
+
+  /* A phone: the Cover beside just the title and Status, the mode switch
+     on a row of its own across the page, and the Details filling the width
+     in two even rows, Tuning and the Notes toggle on the second. */
+  @media (width < 40rem) {
+    .head {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      grid-template-areas:
+        'cover title'
+        'modes modes';
+      gap: 0 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .head > :global(:first-child) {
+      grid-area: cover;
+    }
+    .head-main {
+      display: contents;
+    }
+    .title-block {
+      grid-area: title;
+    }
+    .title {
+      font-size: 1.25rem;
+    }
+    .meta {
+      margin: 0;
+    }
+    .modes {
+      grid-area: modes;
+      margin-top: 1rem;
+    }
+    .mode {
+      flex: 1;
+      justify-content: center;
+    }
+    .fields:has(> .field) {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      row-gap: 0.875rem;
+    }
+    .tuning {
+      grid-column: span 2;
+      min-width: 0;
+    }
+    .key :global(input),
+    .bpm input,
+    .capo input {
+      width: 100%;
+    }
   }
 
   /* One column: the title and Details, the Lyric Sheet, then the Scrapbook,

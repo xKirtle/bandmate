@@ -1,9 +1,9 @@
 // Prepares a picture to become a Song's Cover. The browser does all the
 // picture work, and the server keeps what it makes as sent: the original,
-// normalized so any browser can open it again, and the crop square in the
-// sizes the Song list and header show.
+// normalized so any browser can open it again, and the crop square chosen from
+// it in the sizes the Song list and header show.
 import type { PreparedCover } from './api';
-import { centredSquare, fitWithin, type Size } from './cover';
+import { fitWithin, type Size, type Square } from './cover';
 import { formatSize } from './upload';
 
 /** The most pixels on each side of a Cover's original. */
@@ -14,11 +14,19 @@ const coverSides = { list: 132, header: 384 } as const;
 
 const unopenable = "This picture can't be opened in this browser";
 
+/** A picture being made a Cover: its original, normalized and scaled down, ready to crop. */
+export interface CoverToCrop extends Size {
+  /** The original to upload, which the crop step shows too. */
+  blob: Blob;
+  canvas: HTMLCanvasElement;
+  type: PictureType;
+}
+
 /**
- * Checks a picture is small enough and makes its Cover, cropped to its
- * largest centred square. Fails with a message to show if it can't.
+ * Checks a picture is small enough and makes its original, ready to crop.
+ * Fails with a message to show if it can't.
  */
-export async function prepareCover(file: File, maxBytes: number): Promise<PreparedCover> {
+export async function openCover(file: File, maxBytes: number): Promise<CoverToCrop> {
   if (file.size > maxBytes) {
     throw new Error(`“${file.name}” is ${formatSize(file.size)}, over the Cover limit of ${formatSize(maxBytes)}.`);
   }
@@ -28,21 +36,21 @@ export async function prepareCover(file: File, maxBytes: number): Promise<Prepar
     const size = fitWithin(picture.width, picture.height, originalSide);
     const original = canvas(size, type);
     original.getContext('2d')!.drawImage(picture.source, 0, 0, size.width, size.height);
-    const crop = centredSquare(size.width, size.height);
-    const square = (side: number) => {
-      const c = canvas({ width: side, height: side }, type);
-      c.getContext('2d')!.drawImage(original, crop.x, crop.y, crop.size, crop.size, 0, 0, side, side);
-      return encode(c, type);
-    };
-    const [originalBlob, list, header] = await Promise.all([
-      encode(original, type),
-      square(coverSides.list),
-      square(coverSides.header),
-    ]);
-    return { original: originalBlob, list, header, ...size, crop };
+    return { blob: await encode(original, type), canvas: original, type, ...size };
   } finally {
     picture.close();
   }
+}
+
+/** Makes a Cover of a picture's crop square, a square of its original in whole pixels. */
+export async function cropCover(picture: CoverToCrop, crop: Square): Promise<PreparedCover> {
+  const square = (side: number) => {
+    const c = canvas({ width: side, height: side }, picture.type);
+    c.getContext('2d')!.drawImage(picture.canvas, crop.x, crop.y, crop.size, crop.size, 0, 0, side, side);
+    return encode(c, picture.type);
+  };
+  const [list, header] = await Promise.all([square(coverSides.list), square(coverSides.header)]);
+  return { original: picture.blob, list, header, width: picture.width, height: picture.height, crop };
 }
 
 /** A picture opened by the browser, ready to draw. */
