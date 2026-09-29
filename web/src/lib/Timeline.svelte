@@ -757,7 +757,7 @@
   /** Adds a Beat to the chosen Track, after its last Clip or at 0:00. */
   async function addBeat(beat: Beat) {
     picking = false;
-    if (chosen === null) return;
+    if (chosen === null) return; // Never: a Song always has a Track.
     const ok = await perform({ kind: 'addBeat', trackId: chosen, beatId: beat.id });
     // Never copied without asking.
     if (ok && song.bpm === null && beat.bpm !== null) offerBpm = { bpm: beat.bpm, title: beat.title };
@@ -1070,8 +1070,9 @@
     switchRecording();
   }
 
-  // The chosen Track, which a recording goes to, kept on this device for
-  // each Song. Choosing isn't an edit, so it's never saved with the Song.
+  // The chosen Track, which a recording or a Beat goes to, kept on this
+  // device for each Song. Choosing isn't an edit, so it's never saved with
+  // the Song.
   // Read again only for another Song: the Song is replaced after every edit.
   const songId = $derived(song.id);
   let remembered = $derived(readChosen(deviceStorage(), songId));

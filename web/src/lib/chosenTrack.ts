@@ -1,6 +1,6 @@
-// The chosen Track: the Track a recording or "+ Beat" goes to. While the Timeline has
-// any Tracks, exactly one is chosen. Choosing isn't an edit: it's kept on
-// this device, for each Song, rather than saved with it.
+// The chosen Track: the Track a recording or "+ Beat" goes to. While the
+// Timeline has any Tracks, exactly one is chosen. Choosing isn't an edit:
+// it's kept on this device, for each Song, rather than saved with it.
 
 /** Something that happened to the Tracks that can choose one. */
 export type ChoiceEvent =
