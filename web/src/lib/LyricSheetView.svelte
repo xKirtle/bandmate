@@ -3,6 +3,7 @@
   import { layoutLine } from './chords';
   import type { Position } from './cues';
   import { follower, key } from './follow';
+  import { activeAlternate, labelOf } from './sections';
 
   let {
     song,
@@ -24,7 +25,7 @@
   // The Lines shown for an Occurrence: its active Alternate's, less Chord
   // Lines while Chords are hidden.
   function linesOf(occurrence: Occurrence) {
-    const all = sections.get(occurrence.sectionId)?.alternates.find((a) => a.active)?.lines ?? [];
+    const all = activeAlternate(sections.get(occurrence.sectionId))?.lines ?? [];
     return { all, lines: all.filter((l) => showChords || !l.chordLine) };
   }
 
@@ -64,7 +65,7 @@
       <section
         class="section"
         class:current={isCurrent}
-        aria-label={section.label || 'Section without a Label'}
+        aria-label={labelOf(section)}
         aria-current={isCurrent ? 'true' : undefined}
         {@attach (el) => track(el, key(occurrence.id))}
       >

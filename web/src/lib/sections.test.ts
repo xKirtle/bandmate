@@ -1,6 +1,6 @@
 import { describe as group, expect, it } from 'vitest';
 import type { Alternate, Section } from './api';
-import { isEmpty } from './sections';
+import { activeAlternate, card, isEmpty, labelOf } from './sections';
 
 function alternate(active: boolean, ...texts: string[]): Alternate {
   return {
@@ -30,5 +30,38 @@ group('isEmpty', () => {
 
   it('is false when only an inactive Alternate has Lines', () => {
     expect(isEmpty(section('', alternate(true), alternate(false, 'Drive')))).toBe(false);
+  });
+});
+
+group('card', () => {
+  it('shows every Line of the active Alternate when there are at most 4', () => {
+    const c = card(section('Verse', alternate(false, 'Old'), alternate(true, 'A', 'B', 'C', 'D')));
+    expect(c).toEqual({ lines: ['A', 'B', 'C', 'D'], more: 0, alternates: 2 });
+  });
+
+  it('shows the first 4 Lines and counts the rest', () => {
+    const c = card(section('', alternate(true, 'A', 'B', 'C', 'D', 'E', 'F')));
+    expect(c).toEqual({ lines: ['A', 'B', 'C', 'D'], more: 2, alternates: 1 });
+  });
+
+  it('shows Lines with their Chords, as written', () => {
+    expect(card(section('', alternate(true, 'Hel[Am]lo'))).lines).toEqual(['Hel[Am]lo']);
+  });
+});
+
+group('labelOf', () => {
+  it('is the Label', () => {
+    expect(labelOf(section('Chorus', alternate(true, 'La')))).toBe('Chorus');
+  });
+
+  it('says so when there is no Label, whatever the Lines', () => {
+    expect(labelOf(section('', alternate(true, 'La')))).toBe('Section without a Label');
+  });
+});
+
+group('activeAlternate', () => {
+  it('is the active one, wherever it is', () => {
+    const active = alternate(true, 'New');
+    expect(activeAlternate(section('', alternate(false, 'Old'), active))).toBe(active);
   });
 });

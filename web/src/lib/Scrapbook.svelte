@@ -1,8 +1,9 @@
 <script lang="ts">
   import { tick } from 'svelte';
+  import { SvelteSet } from 'svelte/reactivity';
   import { api, type Song, type SongAt } from './api';
   import SectionEditor from './SectionEditor.svelte';
-  import { describe } from './sections';
+  import { card, describe, labelOf } from './sections';
 
   let {
     song,
@@ -27,11 +28,46 @@
   ]);
   // The Section just added, whose Label gets focus.
   let added = $state<number | null>(null);
+  // The one Section shown in full, in its editor; the rest show as cards.
+  let open = $state<number | null>(null);
+  // Where to go once the open editor's edits are saved: another Section, or
+  // null to close it. Closing sooner would throw away edits that failed to save.
+  let next = $state<number | null | undefined>(undefined);
+  // The open editor's text boxes holding edits not yet saved.
+  const unsaved = new SvelteSet<object>();
+
+  $effect(() => {
+    if (next === undefined || unsaved.size > 0) return;
+    open = next;
+    next = undefined;
+  });
+
+  function track(editor: object, isUnsaved: boolean) {
+    if (isUnsaved) {
+      unsaved.add(editor);
+      // Typing again after a failed save stays in this editor.
+      next = undefined;
+    } else unsaved.delete(editor);
+    onUnsaved(editor, isUnsaved);
+  }
+
+  function show(sectionId: number | null) {
+    next = sectionId;
+  }
+
+  async function done(sectionId: number) {
+    show(null);
+    await tick();
+    // Back to the card, so the keyboard keeps its place.
+    if (open === null) document.getElementById(`card-${sectionId}`)?.focus();
+  }
 
   async function add() {
     if (!(await change((at) => api.addToScrapbook(at)))) return;
     // The newest Section has the highest id, so it comes last.
     added = song.scrapbook.at(-1) ?? null;
+    open = added;
+    next = undefined;
     // Focus it once, not again if it later comes back to the Scrapbook.
     await tick();
     added = null;
@@ -40,14 +76,24 @@
   function putBack(sectionId: number, e: Event & { currentTarget: HTMLSelectElement }) {
     const value = e.currentTarget.value;
     e.currentTarget.value = '';
-    if (value !== '') change((at) => api.addOccurrence(at, sectionId, Number(value)));
+    if (value !== '') change((at) => api.addOccurrence(at, sectionId, Number(value))).then(closed(sectionId));
+  }
+
+  /** After a Section leaves the Scrapbook: should it come back, it does so as a card. */
+  function closed(sectionId: number) {
+    return (ok: boolean) => {
+      if (!ok || open !== sectionId) return;
+      open = null;
+      // Its editor is gone, and whatever it held with it.
+      unsaved.clear();
+    };
   }
 
   function remove(sectionId: number) {
     const section = sections.get(sectionId);
     if (!section) return;
     const ok = confirm(`Delete ${describe(section)} for good?\n\nIts Lines go with it. It can't be undone.`);
-    if (ok) change((at) => api.deleteSection(at, sectionId));
+    if (ok) change((at) => api.deleteSection(at, sectionId)).then(closed(sectionId));
   }
 </script>
 
@@ -61,25 +107,46 @@
     <ul class="list">
       {#each scrapbook as section (section.id)}
         <li>
-          <SectionEditor
-            uid="s{section.id}"
-            {section}
-            shared={false}
-            autofocus={added === section.id}
-            {change}
-            {onUnsaved}
-            more={[{ icon: '🗑', label: 'Delete for good', run: () => remove(section.id) }]}
-          >
-            {#snippet actions()}
-              <label class="visually-hidden" for="put-back-{section.id}">Put back into the Lyric Sheet</label>
-              <select id="put-back-{section.id}" class="put-back" onchange={(e) => putBack(section.id, e)}>
-                <option value="">Put back…</option>
-                {#each places as place (place.position)}
-                  <option value={place.position}>{place.name}</option>
-                {/each}
-              </select>
-            {/snippet}
-          </SectionEditor>
+          {#if open === section.id}
+            <SectionEditor
+              uid="s{section.id}"
+              {section}
+              shared={false}
+              autofocus={added === section.id}
+              {change}
+              onUnsaved={track}
+              more={[{ icon: '🗑', label: 'Delete for good', run: () => remove(section.id) }]}
+            >
+              {#snippet actions()}
+                <label class="visually-hidden" for="put-back-{section.id}">Put back into the Lyric Sheet</label>
+                <select id="put-back-{section.id}" class="put-back" onchange={(e) => putBack(section.id, e)}>
+                  <option value="">Put back…</option>
+                  {#each places as place (place.position)}
+                    <option value={place.position}>{place.name}</option>
+                  {/each}
+                </select>
+              {/snippet}
+            </SectionEditor>
+            <button type="button" class="button done" onclick={() => done(section.id)}>Done</button>
+          {:else}
+            {@const shown = card(section)}
+            <button type="button" id="card-{section.id}" class="card" onclick={() => show(section.id)}>
+              <span class="card-head">
+                <span class="card-label" class:muted={!section.label}>{labelOf(section)}</span>
+                {#if shown.alternates > 1}
+                  <span class="count">{shown.alternates} Alternates</span>
+                {/if}
+              </span>
+              {#each shown.lines as line, i (i)}
+                <span class="line">{line || ' '}</span>
+              {:else}
+                <span class="line muted">No Lines yet.</span>
+              {/each}
+              {#if shown.more > 0}
+                <span class="more muted">+{shown.more} more {shown.more === 1 ? 'Line' : 'Lines'}</span>
+              {/if}
+            </button>
+          {/if}
         </li>
       {/each}
     </ul>
@@ -123,5 +190,57 @@
   }
   .add {
     width: 100%;
+  }
+  .card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: var(--surface-1);
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .card:hover {
+    background: var(--surface-2);
+  }
+  .card-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-bottom: 0.125rem;
+  }
+  .card-label {
+    min-width: 0;
+    overflow: hidden;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .count {
+    flex: none;
+    margin-left: auto;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    background: var(--surface-2);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  /* One row each, cut off, so a card stays short however long its Lines. */
+  .line {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: pre;
+  }
+  .more {
+    font-size: 0.8125rem;
+  }
+  .done {
+    width: 100%;
+    margin-top: 0.5rem;
   }
 </style>

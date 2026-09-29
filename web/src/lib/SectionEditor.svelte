@@ -5,6 +5,7 @@
   import AlternateText, { type Cueing } from './AlternateText.svelte';
   import { api, type Alternate, type Section, type Song, type SongAt } from './api';
   import type { MenuAction } from './menu';
+  import { activeAlternate, labelOf } from './sections';
 
   let {
     uid,
@@ -40,7 +41,7 @@
   } = $props();
 
   // The server guarantees exactly one active Alternate.
-  const active = $derived(section.alternates.find((a) => a.active)!);
+  const active = $derived(activeAlternate(section)!);
   const inactive = $derived(section.alternates.filter((a) => !a.active));
 
   let label = $state(untrack(() => section.label));
@@ -143,7 +144,7 @@
   </button>
 {/snippet}
 
-<article class="section" class:is-shared={shared} aria-label={section.label || 'Section without a Label'}>
+<article class="section" class:is-shared={shared} aria-label={labelOf(section)}>
   <div class="head">
     {@render grip?.()}
     <label class="visually-hidden" for="label-{uid}">Label</label>
