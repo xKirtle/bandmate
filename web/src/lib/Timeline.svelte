@@ -635,11 +635,19 @@
 
   // The chosen Track, which a recording goes to, kept on this device for
   // each Song. Choosing isn't an edit, so it's never saved with the Song.
-  let remembered = $derived(readChosen(deviceStorage(), song.id));
+  // Read again only for another Song: the Song is replaced after every edit.
+  const songId = $derived(song.id);
+  let remembered = $derived(readChosen(deviceStorage(), songId));
   const chosen = $derived(chosenTrack(timeline.tracks, remembered));
 
   function choose(event: ChoiceEvent) {
     remembered = chosenTrack(timeline.tracks, remembered, event);
+  }
+
+  /** Chooses a Track clicked in its header, unless it's moved or deleted, which leave the choice be. */
+  function headClick(event: MouseEvent, track: Track) {
+    if (event.target instanceof Element && event.target.closest('.track-actions')) return;
+    choose({ kind: 'choose', trackId: track.id });
   }
 
   // Also the first time, or once the one remembered is gone, so a Beat
@@ -650,7 +658,7 @@
   });
 
   $effect(() => {
-    if (remembered !== null) storeChosen(deviceStorage(), song.id, remembered);
+    if (remembered !== null) storeChosen(deviceStorage(), songId, remembered);
   });
 
   // Editing a Clip: dragging its body moves it, along its Track or onto
@@ -1300,7 +1308,7 @@
           <span class="ruler-gap"></span>
           {#each timeline.tracks as track, i (track.id)}
             {@const trackLevels = levels[i]}
-            <!-- Clicking anywhere on it, including its controls, chooses the Track. -->
+            <!-- Clicking anywhere on it, including its name and levels, chooses the Track. -->
             <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
             <div
               class="head"
@@ -1309,7 +1317,7 @@
               aria-label="Track {track.name}"
               aria-current={track.id === chosen ? 'true' : undefined}
               title={track.id === chosen ? 'Chosen: recordings go to this Track' : 'Click to choose this Track'}
-              onclick={() => choose({ kind: 'choose', trackId: track.id })}
+              onclick={(e) => headClick(e, track)}
             >
               <div class="head-row">
                 {#if editable.current}

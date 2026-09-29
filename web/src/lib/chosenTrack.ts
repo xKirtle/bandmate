@@ -13,16 +13,17 @@ export type ChoiceEvent =
  * The chosen Track's id, or null without Tracks: the one an event chooses,
  * or else the one remembered, or else, the first time or once the one
  * remembered is gone (e.g. deleted), the bottom Track. Any other change,
- * such as a first Beat adding a "Beat" Track, keeps the one remembered.
+ * such as a first Beat adding a "Beat" Track, keeps the one remembered, so
+ * whichever is chosen should be remembered, the bottom one included.
  */
 export function chosenTrack(
   tracks: readonly { id: number }[],
   remembered: number | null,
   event?: ChoiceEvent,
 ): number | null {
-  const there = (id: number | null | undefined) => id != null && tracks.some((t) => t.id === id);
-  if (there(event?.trackId)) return event!.trackId;
-  if (there(remembered)) return remembered;
+  const present = (id: number | null) => id !== null && tracks.some((t) => t.id === id);
+  if (event && present(event.trackId)) return event.trackId;
+  if (present(remembered)) return remembered;
   return tracks.at(-1)?.id ?? null;
 }
 
