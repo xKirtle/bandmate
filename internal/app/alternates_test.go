@@ -47,10 +47,11 @@ func (ts *testServer) chorusWithTwoAlternates() (song, section) {
 	chorus := s.Sections[1]
 	ts.setText(s.ID, chorus.Alternates[0].ID, "Drive, [Am]drive\nall [F]night")
 	s = ts.addAlternate(s.ID, chorus.ID, nil)
+	s = ts.activate(s.ID, s.Sections[1].Alternates[0].ID)
 	return s, s.Sections[1]
 }
 
-func TestANewAlternateStartsAsAnInactiveCopyOfTheActiveOne(t *testing.T) {
+func TestANewAlternateIsAnActiveCopyOfTheActiveOne(t *testing.T) {
 	ts := newTestServer(t)
 	s, chorus := ts.chorusWithTwoAlternates()
 	// A third Alternate copies the active first one, not the newest.
@@ -64,12 +65,21 @@ func TestANewAlternateStartsAsAnInactiveCopyOfTheActiveOne(t *testing.T) {
 	if len(alts) != 3 {
 		t.Fatalf("alternates = %+v, want three", alts)
 	}
-	if !reflect.DeepEqual(alts[:2], before.Sections[1].Alternates) {
-		t.Errorf("existing alternates = %+v, want them unchanged %+v", alts[:2], before.Sections[1].Alternates)
+	if alts[0].Active {
+		t.Errorf("the copied alternate is still active, want only the new one")
+	}
+	if !reflect.DeepEqual(alts[0].Lines, first.Lines) || alts[0].Name != first.Name {
+		t.Errorf("copied alternate = %+v, want it unchanged %+v", alts[0], first)
+	}
+	if !reflect.DeepEqual(alts[1], before.Sections[1].Alternates[1]) {
+		t.Errorf("other alternate = %+v, want it unchanged %+v", alts[1], before.Sections[1].Alternates[1])
 	}
 	added := alts[2]
-	if added.Active {
-		t.Errorf("new alternate is active, want it inactive")
+	if !added.Active {
+		t.Errorf("new alternate is inactive, want it active")
+	}
+	if want := lineTexts(first); !reflect.DeepEqual(activeLines(got.Sections[1]), want) {
+		t.Errorf("lyric sheet lines = %q, want the copy's %q", activeLines(got.Sections[1]), want)
 	}
 	if added.Name != "" {
 		t.Errorf("new alternate name = %q, want none", added.Name)
