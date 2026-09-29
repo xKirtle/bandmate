@@ -28,7 +28,7 @@ Decisions made while designing, recorded so later spec sessions start from them.
 - A Song starts with no Tracks. A new Beat is appended after the last Clip on the topmost Track that already holds a Beat, or on a new "Beat" Track. Tracks carry no kind.
 - Each Track has a volume from silence to +6 dB, mute and solo. Each Song keeps one **Loop**, saved with the Song.
 - Timeline edits have session-scoped undo/redo (buttons and Ctrl+Z / Ctrl+Shift+Z), so deleting a Clip or Track needs no confirmation. Keyboard shortcuts (space, undo) only apply outside text fields.
-- On desktop the Timeline is a collapsible panel docked at the bottom of the Song page, under the Lyric Sheet. On phone it's playback only: just the transport row (Play/Pause, the time, the collapse toggle, and the Loop toggle once there's a Loop), with no ruler, Tracks or Track controls. Playback still uses each Track's saved volume, mute and solo, and a saved Loop.
+- On desktop the Timeline is a collapsible panel docked at the bottom of the Song page, under the Lyric Sheet. On phone it's playback only: just the transport row (Play/Pause, the time, and the Loop toggle once there's a Loop), with no ruler, Tracks or Track controls. Playback still uses each Track's saved volume, mute and solo, and a saved Loop.
 - Timeline edits and new Masters count as editing the Song (they move it up the Song list). Deleting a Song deletes its Masters and Timeline but never Beats.
 - Stale tabs are guarded against: a tab refetches the Song when it becomes visible again, and every Song carries a version so a write based on an old version is rejected instead of silently overwriting newer work.
 

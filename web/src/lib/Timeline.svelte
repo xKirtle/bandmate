@@ -1207,7 +1207,7 @@
         <button type="button" class="button edit-only" onclick={addTrack}>Add a track</button>
         <button
           type="button"
-          class="icon"
+          class="icon collapse-toggle"
           onclick={() => (collapsed = !collapsed)}
           aria-expanded={!collapsed}
           aria-controls="timeline-tracks"
@@ -1980,8 +1980,10 @@
     .timeline {
       --timeline-scale: 1;
     }
+    /* The Tracks can't open here, so there's nothing for the toggle to do. */
     .edit-only,
     .resize,
+    .collapse-toggle,
     .tracks {
       display: none;
     }
