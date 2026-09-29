@@ -644,9 +644,12 @@
     remembered = chosenTrack(timeline.tracks, remembered, event);
   }
 
-  /** Chooses a Track clicked in its header, unless it's moved or deleted, which leave the choice be. */
+  /**
+   * Chooses a Track clicked in its header, but not by its controls (its
+   * name, levels, and moving or deleting it), which only do their own thing.
+   */
   function headClick(event: MouseEvent, track: Track) {
-    if (event.target instanceof Element && event.target.closest('.track-actions')) return;
+    if (event.target instanceof Element && event.target.closest('input, button')) return;
     choose({ kind: 'choose', trackId: track.id });
   }
 
@@ -1308,7 +1311,7 @@
           <span class="ruler-gap"></span>
           {#each timeline.tracks as track, i (track.id)}
             {@const trackLevels = levels[i]}
-            <!-- Clicking anywhere on it, including its name and levels, chooses the Track. -->
+            <!-- Clicking it outside its controls chooses the Track, pointer only for now, like dragging Clips. -->
             <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
             <div
               class="head"
@@ -1316,7 +1319,6 @@
               role="group"
               aria-label="Track {track.name}"
               aria-current={track.id === chosen ? 'true' : undefined}
-              title={track.id === chosen ? 'Chosen: recordings go to this Track' : 'Click to choose this Track'}
               onclick={(e) => headClick(e, track)}
             >
               <div class="head-row">
