@@ -4,7 +4,7 @@
   import AlternateText, { type Cueing } from './AlternateText.svelte';
   import { api, type Alternate, type Section, type Song, type SongAt } from './api';
   import type { MenuAction } from './menu';
-  import { activeAlternate, alternateName, alternatesEntry, labelOf } from './sections';
+  import { activeAlternate, alternateName, alternatesLabel, labelOf } from './sections';
 
   let {
     uid,
@@ -41,10 +41,6 @@
 
   // The server guarantees exactly one active Alternate.
   const active = $derived(activeAlternate(section)!);
-  const entry = $derived(alternatesEntry(section));
-  // The entry stays while choosing, even once the others are deleted.
-  const entryName = $derived(entry?.name ?? alternateName(section, active));
-  const entryPlace = $derived(entry?.place ?? '1 of 1');
 
   let label = $state(untrack(() => section.label));
   let editingLabel = false;
@@ -52,7 +48,7 @@
   // save on change, which comes just before blur.
   const naming = {};
   // In the Alternates mode, the Alternates show as cards to choose the active
-  // one from, in place of its Lines.
+  // one from, in place of its Lines. ⇄ opens and closes it.
   let choosing = $state(false);
   let entryButton = $state<HTMLButtonElement>();
 
@@ -71,19 +67,13 @@
     if (!(await change((at) => api.setSectionLabel(at, section.id, next)))) label = section.label;
   }
 
-  const newAlternate: MenuAction = {
-    icon: '⇄',
-    label: 'New Alternate',
-    title: 'New Alternate: try another version of these Lines without losing this one',
-    run: addAlternate,
-  };
-
   async function addAlternate() {
     if (!(await change((at) => api.addAlternate(at, section.id)))) return;
-    // The copy is active now: go on writing in it.
-    choosing = false;
+    // The copy is active now, as the last card: ready to be renamed.
     await tick();
-    document.getElementById(`text-${uid}-${active.id}`)?.focus();
+    const name = document.getElementById(`name-${uid}-${active.id}`);
+    name?.focus();
+    name?.scrollIntoView({ block: 'nearest' });
   }
 
   async function startChoosing() {
@@ -93,15 +83,10 @@
     radio(active.id)?.focus();
   }
 
-  async function leaveChoosing() {
+  function leaveChoosing() {
     // Focus goes first, so a name being typed is saved as its field blurs.
     entryButton?.focus();
     choosing = false;
-    // With one Alternate left, the entry goes with the mode: on to its Lines.
-    if (entry === null) {
-      await tick();
-      document.getElementById(`text-${uid}-${active.id}`)?.focus();
-    }
   }
 
   function onChoosingKey(e: KeyboardEvent) {
@@ -198,35 +183,32 @@
       enterkeyhint="next"
       {@attach focusWhen(autofocus)}
     />
-    {#if entry !== null || choosing}
-      <button
-        type="button"
-        class="entry"
-        bind:this={entryButton}
-        onclick={() => (choosing ? leaveChoosing() : startChoosing())}
-        aria-expanded={choosing}
-        aria-label="Alternates: {entryName} · {entryPlace}"
-        title="Choose which Alternate is active"
-      >
-        <!-- A phone has room for only the place; the mode shows the names. -->
-        <span class="entry-name">{entryName} ·</span>
-        {entryPlace}
-      </button>
-    {/if}
     {#if shared}
       <span class="shared" title="This Section appears more than once. Editing it changes every Occurrence.">
         Shared
       </span>
     {/if}
     <div class="actions">
-      {@render inlineAction(newAlternate)}
+      <!-- Shows at every width. The dot tells there are Alternates to choose from. -->
+      <button
+        type="button"
+        class="icon entry"
+        class:has-others={section.alternates.length > 1}
+        bind:this={entryButton}
+        onclick={() => (choosing ? leaveChoosing() : startChoosing())}
+        aria-expanded={choosing}
+        aria-label={alternatesLabel(section)}
+        title="Choose, make or rename this Section's Alternates"
+      >
+        ⇄
+      </button>
       {@render actions()}
       {#each more as action (action.label)}
         {@render inlineAction(action)}
       {/each}
       <!-- On phones there's no room for every action beside the Label: they fold into ⋯. -->
       <div class="narrow">
-        <ActionsMenu entries={[newAlternate, ...more]} />
+        <ActionsMenu entries={more} />
       </div>
     </div>
   </div>
@@ -293,7 +275,17 @@
           </div>
         {/each}
       </div>
-      <button type="button" class="button primary done" onclick={leaveChoosing}>Done</button>
+      <div class="choosing-actions">
+        <button
+          type="button"
+          class="button"
+          onclick={addAlternate}
+          title="New Alternate: try another version of these Lines without losing this one"
+        >
+          New Alternate
+        </button>
+        <button type="button" class="button primary" onclick={leaveChoosing}>Done</button>
+      </div>
     </div>
   {:else}
     {#key active.id}
@@ -388,34 +380,23 @@
       display: none;
     }
   }
-  /* Gives way, cut off, before the actions do. */
   .entry {
-    min-width: 0;
-    min-height: 1.75rem;
-    overflow: hidden;
-    padding: 0.125rem 0.625rem;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: var(--bg);
-    color: var(--text);
-    font: inherit;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    cursor: pointer;
+    position: relative;
   }
-  .entry:hover,
-  .entry[aria-expanded='true'] {
+  .entry[aria-expanded='true'],
+  .entry[aria-expanded='true']:hover {
     border-color: var(--accent);
   }
-  @media (max-width: 40rem) {
-    .entry {
-      flex: none;
-    }
-    .entry-name {
-      display: none;
-    }
+  /* Like a notification badge, on the top-right corner. */
+  .entry.has-others::after {
+    content: '';
+    position: absolute;
+    top: 0.125rem;
+    right: 0.125rem;
+    width: 0.4375rem;
+    height: 0.4375rem;
+    border-radius: 50%;
+    background: var(--accent);
   }
   .choosing {
     display: flex;
@@ -466,13 +447,18 @@
     margin: 0;
     white-space: pre-wrap;
   }
-  .done {
-    align-self: flex-end;
+  .choosing-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+  .choosing-actions .button {
     min-width: 8rem;
   }
   @media (max-width: 40rem) {
-    .done {
-      align-self: stretch;
+    .choosing-actions .button {
+      flex: 1;
+      min-width: 0;
     }
   }
 </style>

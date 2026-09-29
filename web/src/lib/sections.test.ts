@@ -1,6 +1,6 @@
 import { describe as group, expect, it } from 'vitest';
 import type { Alternate, Section } from './api';
-import { activeAlternate, alternateName, alternatesEntry, card, isEmpty, labelOf } from './sections';
+import { activeAlternate, alternateName, alternatesLabel, card, isEmpty, labelOf } from './sections';
 
 function alternate(active: boolean, ...texts: string[]): Alternate {
   return {
@@ -78,17 +78,17 @@ group('alternateName', () => {
   });
 });
 
-group('alternatesEntry', () => {
-  it("names the active Alternate and its place among the Section's", () => {
+group('alternatesLabel', () => {
+  it("adds the active Alternate's name and place among the Section's", () => {
     const darker = { ...alternate(true, 'La'), name: 'Darker' };
-    expect(alternatesEntry(section('', darker, alternate(false), alternate(false)))).toEqual({ name: 'Darker', place: '1 of 3' });
+    expect(alternatesLabel(section('', darker, alternate(false), alternate(false)))).toBe('Alternates · Darker · 1 of 3');
   });
 
   it('calls an unnamed active Alternate by its place', () => {
-    expect(alternatesEntry(section('', alternate(false), alternate(true)))).toEqual({ name: 'Alternate 2', place: '2 of 2' });
+    expect(alternatesLabel(section('', alternate(false), alternate(true)))).toBe('Alternates · Alternate 2 · 2 of 2');
   });
 
-  it("doesn't show for a Section with one Alternate", () => {
-    expect(alternatesEntry(section('', alternate(true, 'La')))).toBeNull();
+  it('is just "Alternates" for a Section with one Alternate', () => {
+    expect(alternatesLabel(section('', alternate(true, 'La')))).toBe('Alternates');
   });
 });
