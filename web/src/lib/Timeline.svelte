@@ -688,13 +688,14 @@
   }
 
   /**
-   * Whether a space pressed there is its own: typed into a text field, or
-   * opening a select. Anywhere else it plays or pauses, even on a button,
-   * which a click leaves focused: playing along shouldn't depend on where
-   * focus was left.
+   * Whether a space pressed there is its own: typed into a text field,
+   * opening a select, or ticking a checkbox or radio, which have no other
+   * key. Anywhere else it plays or pauses, even on a button, which a click
+   * leaves focused: playing along shouldn't depend on where focus was left.
    */
   function ownsSpace(target: EventTarget | null): boolean {
     if (inTextField(target) || target instanceof HTMLSelectElement) return true;
+    if (target instanceof HTMLInputElement && (target.type === 'checkbox' || target.type === 'radio')) return true;
     // Space in a dialog or a ⋯ menu is for what's in it.
     return target instanceof Element && target.closest('dialog, [role="menu"]') !== null;
   }
@@ -2464,6 +2465,7 @@
     overflow: hidden;
     background: var(--surface-1);
     touch-action: none;
+    /* Dragging along it sets a Loop, never selecting what it passes. */
     user-select: none;
   }
   .loop-bar.editable {
