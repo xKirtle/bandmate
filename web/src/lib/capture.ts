@@ -1,6 +1,7 @@
-// Captures the default input on the Timeline's own AudioContext (ADR 0006),
+// Captures the chosen input on the Timeline's own AudioContext (ADR 0006),
 // through an AudioWorklet, so every sample has an exact time on the same
-// clock as playback. The browser's echo cancellation, noise suppression and
+// clock as playback. Of an input with several channels, one is kept, since
+// Takes are mono. The browser's echo cancellation, noise suppression and
 // auto gain are off, so what's kept is what the input delivered, and the
 // input is never played back: it goes nowhere but the worklet.
 
@@ -47,6 +48,8 @@ class Capture extends AudioWorkletProcessor {
 registerProcessor('bandmate-capture', Capture);
 `;
 
+import { resolveInput, type InputChoice } from './inputSettings';
+
 // Added to a context once.
 const loaded = new WeakMap<BaseAudioContext, Promise<void>>();
 
@@ -64,6 +67,156 @@ function loadWorklet(context: AudioContext): Promise<void> {
 /** Why recording couldn't start, in words to show. */
 export class CaptureError extends Error {}
 
+// How many channels to ask an input for: as many as it has, up to this.
+const wantedChannels = 8;
+
+/** An input opened, with which of its channels is used. */
+export interface OpenInput {
+  stream: MediaStream;
+  /** How many channels the input has. */
+  channels: number;
+  /** The channel used, from 0. */
+  channel: number;
+  /** The name of the device chosen when it isn't connected, so the default is used instead; null otherwise. */
+  gone: string | null;
+}
+
+/**
+ * Opens the input chosen, or the default one where it's gone, untouched by
+ * the browser's echo cancellation, noise suppression and auto gain. Fails
+ * with a CaptureError to show.
+ */
+export async function openInput(choice: InputChoice): Promise<OpenInput> {
+  if (!navigator.mediaDevices?.getUserMedia) throw new CaptureError(insecure);
+  const open = (deviceId: string) =>
+    navigator.mediaDevices.getUserMedia({
+      audio: {
+        deviceId: deviceId ? { exact: deviceId } : undefined,
+        channelCount: { ideal: wantedChannels },
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+      },
+    });
+  let stream: MediaStream;
+  // Whether the device chosen couldn't be opened, so the default was.
+  let fellBack = false;
+  try {
+    try {
+      stream = await open(choice.deviceId);
+    } catch (e) {
+      // Gone, most likely: the default is tried, and said so below.
+      if (!choice.deviceId || (e as DOMException).name !== 'OverconstrainedError') throw e;
+      stream = await open('');
+      fellBack = true;
+    }
+  } catch (e) {
+    throw new CaptureError(inputError(e as Error));
+  }
+  const channels = stream.getAudioTracks()[0]?.getSettings().channelCount || 1;
+  // Only once allowed does the browser tell the inputs apart.
+  const devices = fellBack
+    ? []
+    : (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput');
+  const { channel, gone } = resolveInput(devices, choice, channels);
+  return { stream, channels, channel, gone };
+}
+
+/** Why an input couldn't be opened, in words to show. */
+function inputError(e: Error): string {
+  const name = e.name;
+  if (name === 'NotAllowedError' || name === 'SecurityError') return blocked;
+  if (name === 'NotFoundError' || name === 'OverconstrainedError') return noInput;
+  if (name === 'NotReadableError') return "The audio input is busy or unavailable. Check it isn't in use by another app.";
+  return `Couldn't open the microphone (${e.message}).`;
+}
+
+const insecure = 'Recording needs a secure connection: open Bandmate over https or on localhost.';
+const blocked = "Bandmate isn't allowed to use the microphone. Allow it in the browser's site settings.";
+const noInput = "There's no microphone or audio input to record from. Connect one to record.";
+
+/**
+ * Why Record can't work, as far as can be told without asking for the
+ * microphone: no secure connection, no inputs, or the microphone blocked.
+ * Null when it may well work.
+ */
+export async function inputProblem(): Promise<string | null> {
+  if (!navigator.mediaDevices?.getUserMedia) return insecure;
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    if (!devices.some((d) => d.kind === 'audioinput')) return noInput;
+  } catch {
+    // Can't tell.
+  }
+  try {
+    const status = await navigator.permissions?.query({ name: 'microphone' as PermissionName });
+    if (status?.state === 'denied') return blocked;
+  } catch {
+    // Not every browser can say.
+  }
+  return null;
+}
+
+/** Connects the channel used of an input to a node, through a splitter, and returns what to disconnect. */
+function connectChannel(context: AudioContext, input: OpenInput, node: AudioNode): AudioNode[] {
+  const source = context.createMediaStreamSource(input.stream);
+  const splitter = context.createChannelSplitter(input.channels);
+  source.connect(splitter);
+  splitter.connect(node, input.channel);
+  return [source, splitter];
+}
+
+/** Lets go of an input. */
+function release(stream: MediaStream) {
+  for (const track of stream.getTracks()) track.stop();
+}
+
+/** The chosen input's level, from when it's opened until it's closed, e.g. for a meter. */
+export class InputLevel {
+  #samples: Float32Array<ArrayBuffer>;
+
+  private constructor(
+    private input: OpenInput,
+    private nodes: AudioNode[],
+    private analyser: AnalyserNode,
+  ) {
+    this.#samples = new Float32Array(analyser.fftSize);
+  }
+
+  /** Opens the input chosen. Fails with a CaptureError to show. */
+  static async open(context: AudioContext, choice: InputChoice): Promise<InputLevel> {
+    const input = await openInput(choice);
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 2048;
+    return new InputLevel(input, connectChannel(context, input, analyser), analyser);
+  }
+
+  /** How many channels the input has, and which of them is metered. */
+  get channels(): number {
+    return this.input.channels;
+  }
+
+  get channel(): number {
+    return this.input.channel;
+  }
+
+  /** The name of the device chosen when it isn't connected, or null. */
+  get gone(): string | null {
+    return this.input.gone;
+  }
+
+  /** The latest samples of the channel used. */
+  samples(): Float32Array {
+    this.analyser.getFloatTimeDomainData(this.#samples);
+    return this.#samples;
+  }
+
+  close() {
+    for (const node of this.nodes) node.disconnect();
+    release(this.input.stream);
+  }
+}
+
 /** The input being captured, from when it's opened until it's stopped. */
 export class Capture {
   // The samples received so far, each batch with the frame it starts at.
@@ -72,8 +225,8 @@ export class Capture {
 
   private constructor(
     private context: AudioContext,
-    private stream: MediaStream,
-    private source: MediaStreamAudioSourceNode,
+    private input: OpenInput,
+    private nodes: AudioNode[],
     private node: AudioWorkletNode,
   ) {
     this.#stopped = new Promise((resolve) => {
@@ -84,43 +237,30 @@ export class Capture {
     });
   }
 
-  /** Opens the default input and starts capturing it. Fails with a CaptureError to show. */
-  static async open(context: AudioContext): Promise<Capture> {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      throw new CaptureError('Recording needs a secure connection: open Bandmate over https or on localhost.');
-    }
-    let stream: MediaStream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-      });
-    } catch (e) {
-      const name = (e as DOMException).name;
-      if (name === 'NotAllowedError' || name === 'SecurityError') {
-        throw new CaptureError("Bandmate isn't allowed to use the microphone. Allow it in the browser's site settings.");
-      }
-      if (name === 'NotFoundError' || name === 'OverconstrainedError') {
-        throw new CaptureError("There's no microphone or audio input to record from.");
-      }
-      throw new CaptureError(`Couldn't open the microphone (${(e as Error).message}).`);
-    }
+  /** Opens the input chosen and starts capturing it. Fails with a CaptureError to show. */
+  static async open(context: AudioContext, choice: InputChoice): Promise<Capture> {
+    const input = await openInput(choice);
     try {
       await loadWorklet(context);
-      const source = context.createMediaStreamSource(stream);
       const node = new AudioWorkletNode(context, 'bandmate-capture', {
         numberOfInputs: 1,
         numberOfOutputs: 1,
         channelCount: 1,
         channelCountMode: 'explicit',
       });
-      source.connect(node);
+      const nodes = connectChannel(context, input, node);
       // Connected so the browser keeps running it; its output is silent.
       node.connect(context.destination);
-      return new Capture(context, stream, source, node);
+      return new Capture(context, input, nodes, node);
     } catch (e) {
-      for (const track of stream.getTracks()) track.stop();
+      release(input.stream);
       throw new CaptureError(`Couldn't start recording (${(e as Error).message}).`);
     }
+  }
+
+  /** The name of the device chosen when it isn't connected, so the default is captured instead; null otherwise. */
+  get gone(): string | null {
+    return this.input.gone;
   }
 
   /** The rate samples are captured at: the context's, which is the device's. */
@@ -134,7 +274,7 @@ export class Capture {
    * input's if it says. Calibration will replace this.
    */
   get latency(): number {
-    const input = this.stream.getAudioTracks()[0]?.getSettings() as MediaTrackSettings & { latency?: number };
+    const input = this.input.stream.getAudioTracks()[0]?.getSettings() as MediaTrackSettings & { latency?: number };
     return (this.context.outputLatency || 0) + (input?.latency || 0);
   }
 
@@ -161,8 +301,8 @@ export class Capture {
   /** Stops capturing without keeping anything, and lets go of the input. */
   close() {
     this.node.port.onmessage = null;
-    this.source.disconnect();
+    for (const node of this.nodes) node.disconnect();
     this.node.disconnect();
-    for (const track of this.stream.getTracks()) track.stop();
+    release(this.input.stream);
   }
 }
