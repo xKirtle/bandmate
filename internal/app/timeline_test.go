@@ -84,18 +84,18 @@ func (ts *testServer) getTimeline(songID int64) timeline {
 	return tl
 }
 
-// addBeatToSong sends a request to add a Beat to a Song's Timeline.
-func (ts *testServer) addBeatToSong(songID, beatID int64) response {
+// addBeatToTrack sends a request to add a Beat to a Track of a Song's
+// Timeline.
+func (ts *testServer) addBeatToTrack(songID, trackID, beatID int64) response {
 	ts.t.Helper()
-	return ts.Do(http.MethodPost, timelinePath(songID)+"/beats", map[string]any{"beatId": beatID})
+	return ts.Do(http.MethodPost, timelinePath(songID)+"/beats", map[string]any{"trackId": trackID, "beatId": beatID})
 }
 
-// addOnlyBeat adds a Beat to a Song and deletes the "Track 1" it started
-// with, leaving the beat Track as its only Track.
-func (ts *testServer) addOnlyBeat(songID, beatID int64) timeline {
+// addBeatToSong sends a request to add a Beat to the top Track of a Song's
+// Timeline.
+func (ts *testServer) addBeatToSong(songID, beatID int64) response {
 	ts.t.Helper()
-	tl := timelineChange(ts.t, ts.addBeatToSong(songID, beatID))
-	return timelineChange(ts.t, ts.deleteTrack(songID, tl.Tracks[0].ID))
+	return ts.addBeatToTrack(songID, ts.getTimeline(songID).Tracks[0].ID, beatID)
 }
 
 // timelineChange expects a Timeline change to succeed and returns the
@@ -144,23 +144,24 @@ func firstTrackID(tl timeline) int64 {
 	return tl.Tracks[0].ID
 }
 
-func TestTheFirstBeatLandsAtTheStartOfANewBeatTrack(t *testing.T) {
+func TestABeatOnAnEmptyTrackStartsAt0(t *testing.T) {
 	ts := newTestServer(t)
 	s := ts.createSong("Night Drive")
 	b := ts.uploadBeat(fakeAudio("dark_trap.mp3").with(map[string]any{"title": "Dark Trap", "bpm": 140, "duration": 95.5}))
+	lead := timelineChange(t, ts.addTrack(s.ID, "Lead vox")).Tracks[1].ID
 
-	got := timelineChange(t, ts.addBeatToSong(s.ID, b.ID))
+	got := timelineChange(t, ts.addBeatToTrack(s.ID, lead, b.ID))
 
-	if want := []string{"Track 1", "Beat"}; !reflect.DeepEqual(trackNames(got), want) {
-		t.Fatalf("tracks = %q, want %q", trackNames(got), want)
+	if want := []string{"Track 1", "Lead vox"}; !reflect.DeepEqual(trackNames(got), want) {
+		t.Fatalf("tracks = %q, want %q, no Track added", trackNames(got), want)
 	}
 	tr := got.Tracks[1]
-	if tr.Name != "Beat" {
-		t.Errorf("track name = %q, want %q", tr.Name, "Beat")
-	}
 	wantClips := []clip{{ID: firstClipID(tr), BeatID: b.ID, Takes: []take{}, Start: 0, Offset: 0, Length: 95.5}}
 	if !reflect.DeepEqual(tr.Clips, wantClips) {
 		t.Errorf("clips = %+v, want %+v", tr.Clips, wantClips)
+	}
+	if len(got.Tracks[0].Clips) != 0 {
+		t.Errorf("track 1 clips = %+v, want none", got.Tracks[0].Clips)
 	}
 	wantBeats := []clipSource{{ID: b.ID, Title: "Dark Trap", BPM: intPtr(140), FileName: "dark_trap.mp3", Size: b.Size, Duration: 95.5}}
 	if !reflect.DeepEqual(got.Beats, wantBeats) {
@@ -187,7 +188,7 @@ func clipsOf(tl timeline, trackIndex int) []string {
 	return out
 }
 
-func TestTheNextBeatIsAppendedAfterTheBeatTracksLastClip(t *testing.T) {
+func TestABeatIsAppendedAfterItsTracksLastClip(t *testing.T) {
 	ts := newTestServer(t)
 	s := ts.createSong("Night Drive")
 	intro := ts.beatOfLength("Intro", 10)
@@ -197,15 +198,15 @@ func TestTheNextBeatIsAppendedAfterTheBeatTracksLastClip(t *testing.T) {
 
 	got := timelineChange(t, ts.addBeatToSong(s.ID, intro.ID))
 
-	if len(got.Tracks) != 2 || len(got.Tracks[0].Clips) != 0 {
-		t.Fatalf("tracks = %+v, want every Beat on the one beat Track", got.Tracks)
+	if len(got.Tracks) != 1 {
+		t.Fatalf("tracks = %+v, want every Beat on Track 1", got.Tracks)
 	}
 	want := []string{
 		fmt.Sprintf("%d@0+10", intro.ID),
 		fmt.Sprintf("%d@10+30.5", loop.ID),
 		fmt.Sprintf("%d@40.5+10", intro.ID),
 	}
-	if clips := clipsOf(got, 1); !reflect.DeepEqual(clips, want) {
+	if clips := clipsOf(got, 0); !reflect.DeepEqual(clips, want) {
 		t.Errorf("clips = %q, want %q", clips, want)
 	}
 	if len(got.Beats) != 2 {
@@ -213,23 +214,42 @@ func TestTheNextBeatIsAppendedAfterTheBeatTracksLastClip(t *testing.T) {
 	}
 }
 
-func TestARenamedBeatTrackIsStillWhereBeatsGo(t *testing.T) {
+func TestABeatGoesOnTheTrackGivenEvenIfAnotherHoldsABeat(t *testing.T) {
 	ts := newTestServer(t)
 	s := ts.createSong("Night Drive")
 	first := ts.beatOfLength("First", 10)
-	tl := ts.addOnlyBeat(s.ID, first.ID)
-	trackID := tl.Tracks[0].ID
+	second := ts.beatOfLength("Second", 5)
+	timelineChange(t, ts.addBeatToSong(s.ID, first.ID))
+	tl := timelineChange(t, ts.addTrack(s.ID, "Track 2"))
+	timelineChange(t, ts.recordTake(s.ID, takeRecording(tl.Tracks[1].ID, 10, 8, 0, 3)))
 
-	renamed := timelineChange(t, ts.Do(http.MethodPatch, fmt.Sprintf("%s/tracks/%d", timelinePath(s.ID), trackID),
-		map[string]any{"name": "  Instrumental "}))
-	if renamed.Tracks[0].Name != "Instrumental" {
-		t.Errorf("track name = %q, want %q", renamed.Tracks[0].Name, "Instrumental")
+	got := timelineChange(t, ts.addBeatToTrack(s.ID, tl.Tracks[1].ID, second.ID))
+
+	if want := []string{"Track 1", "Track 2"}; !reflect.DeepEqual(trackNames(got), want) {
+		t.Fatalf("tracks = %q, want %q, no Track added", trackNames(got), want)
 	}
+	if want := []string{fmt.Sprintf("%d@0+10", first.ID)}; !reflect.DeepEqual(clipsOf(got, 0), want) {
+		t.Errorf("track 1 clips = %q, want %q", clipsOf(got, 0), want)
+	}
+	clips := got.Tracks[1].Clips
+	if len(clips) != 2 || clips[1].BeatID != second.ID || clips[1].Start != clips[0].Start+clips[0].Length {
+		t.Errorf("track 2 clips = %+v, want the Beat right after the Take", clips)
+	}
+}
 
-	got := timelineChange(t, ts.addBeatToSong(s.ID, ts.beatOfLength("Second", 5).ID))
+func TestABeatNeedsATrackOfTheSong(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.createSong("Night Drive")
+	other := ts.createSong("Other")
+	b := ts.beatOfLength("Beat", 10)
 
-	if len(got.Tracks) != 1 || got.Tracks[0].ID != trackID || len(got.Tracks[0].Clips) != 2 {
-		t.Errorf("tracks = %+v, want the second Beat on the renamed Track", got.Tracks)
+	expectError(t, ts.Do(http.MethodPost, timelinePath(s.ID)+"/beats", map[string]any{"beatId": b.ID}),
+		http.StatusBadRequest, "trackId and beatId are required")
+	expectStatus(t, ts.addBeatToTrack(s.ID, ts.getTimeline(other.ID).Tracks[0].ID, b.ID), http.StatusNotFound)
+	expectStatus(t, ts.addBeatToTrack(s.ID, 999, b.ID), http.StatusNotFound)
+
+	if got := ts.getSong(s.ID); got.Version != s.Version {
+		t.Errorf("version = %d, want it unchanged at %d", got.Version, s.Version)
 	}
 }
 
@@ -252,8 +272,8 @@ func TestAddingAnUnknownBeatIsRejected(t *testing.T) {
 	s := ts.createSong("Night Drive")
 
 	expectError(t, ts.addBeatToSong(s.ID, 999), http.StatusBadRequest, "there's no such Beat in the Beat Library")
-	expectError(t, ts.Do(http.MethodPost, timelinePath(s.ID)+"/beats", map[string]any{}),
-		http.StatusBadRequest, "beatId is required")
+	expectError(t, ts.Do(http.MethodPost, timelinePath(s.ID)+"/beats", map[string]any{"trackId": ts.getTimeline(s.ID).Tracks[0].ID}),
+		http.StatusBadRequest, "trackId and beatId are required")
 
 	if got := ts.getSong(s.ID); got.Version != s.Version {
 		t.Errorf("version = %d, want it unchanged at %d", got.Version, s.Version)
@@ -265,7 +285,7 @@ func TestTheTimelineOfAnUnknownSongIsNotFound(t *testing.T) {
 	b := ts.beatOfLength("Beat", 10)
 
 	expectStatus(t, ts.Do(http.MethodGet, timelinePath(999), nil), http.StatusNotFound)
-	expectStatus(t, ts.addBeatToSong(999, b.ID), http.StatusNotFound)
+	expectStatus(t, ts.addBeatToTrack(999, 1, b.ID), http.StatusNotFound)
 	expectStatus(t, ts.Do(http.MethodPatch, timelinePath(ts.createSong("Other").ID)+"/tracks/999",
 		map[string]any{"name": "Beat"}), http.StatusNotFound)
 }
@@ -278,7 +298,8 @@ var timelineChanges = []struct {
 	send func(ts *testServer, songID int64, tl timeline, version int64) response
 }{
 	{"add a beat", func(ts *testServer, songID int64, tl timeline, v int64) response {
-		return ts.DoAt(v, http.MethodPost, timelinePath(songID)+"/beats", map[string]any{"beatId": tl.Beats[0].ID})
+		return ts.DoAt(v, http.MethodPost, timelinePath(songID)+"/beats",
+			map[string]any{"trackId": tl.Tracks[1].ID, "beatId": tl.Beats[0].ID})
 	}},
 	{"add a track", func(ts *testServer, songID int64, tl timeline, v int64) response {
 		return ts.DoAt(v, http.MethodPost, timelinePath(songID)+"/tracks", map[string]any{"name": "Adlibs"})
@@ -333,7 +354,7 @@ var timelineChanges = []struct {
 func timelineToChange(t *testing.T, ts *testServer) (song, timeline) {
 	t.Helper()
 	s := ts.createSong("Night Drive")
-	ts.addOnlyBeat(s.ID, ts.beatOfLength("Beat", 10).ID)
+	timelineChange(t, ts.addBeatToSong(s.ID, ts.beatOfLength("Beat", 10).ID))
 	timelineChange(t, ts.addTrack(s.ID, "Lead vox"))
 	return s, timelineChange(t, ts.setLoop(s.ID, map[string]any{"start": 1, "end": 5}))
 }
@@ -487,7 +508,7 @@ func clipAt(tl timeline, clipID int64) string {
 	return "nowhere"
 }
 
-// twoClips is a Song with a 10-second Beat at 0:00 on its beat Track and a
+// twoClips is a Song with a 10-second Beat at 0:00 on Track 1 and a
 // 20-second one at 0:30 after it, and an empty second Track.
 type twoClips struct {
 	song        song
@@ -500,7 +521,7 @@ type twoClips struct {
 func placeTwoClips(t *testing.T, ts *testServer) twoClips {
 	t.Helper()
 	p := twoClips{song: ts.createSong("Night Drive"), short: ts.beatOfLength("Short", 10), long: ts.beatOfLength("Long", 20)}
-	ts.addOnlyBeat(p.song.ID, p.short.ID)
+	timelineChange(t, ts.addBeatToSong(p.song.ID, p.short.ID))
 	tl := timelineChange(t, ts.addBeatToSong(p.song.ID, p.long.ID))
 	p.first, p.second = tl.Tracks[0].Clips[0].ID, tl.Tracks[0].Clips[1].ID
 	tl = timelineChange(t, ts.moveClip(p.song.ID, p.second, tl.Tracks[0].ID, 30))
@@ -511,7 +532,7 @@ func placeTwoClips(t *testing.T, ts *testServer) twoClips {
 func TestATrackCanBeAddedAtTheBottom(t *testing.T) {
 	ts := newTestServer(t)
 	s := ts.createSong("Night Drive")
-	ts.addOnlyBeat(s.ID, ts.beatOfLength("Beat", 10).ID)
+	timelineChange(t, ts.addBeatToSong(s.ID, ts.beatOfLength("Beat", 10).ID))
 
 	got := timelineChange(t, ts.addTrack(s.ID, "  Lead vox "))
 
@@ -520,7 +541,7 @@ func TestATrackCanBeAddedAtTheBottom(t *testing.T) {
 	}
 	want := track{ID: got.Tracks[1].ID, Name: "Lead vox", Volume: 0, Clips: []clip{}}
 	if !reflect.DeepEqual(got.Tracks[1], want) {
-		t.Errorf("tracks = %+v, want an empty \"Lead vox\" Track at 0 dB, neither muted nor soloed, below the beat Track", got.Tracks)
+		t.Errorf("tracks = %+v, want an empty \"Lead vox\" Track at 0 dB, neither muted nor soloed, below Track 1", got.Tracks)
 	}
 	expectError(t, ts.addTrack(s.ID, " "), http.StatusBadRequest, "a Track's name is required")
 }
@@ -567,7 +588,7 @@ func TestMovingAClipIntoANeighbourIsRejected(t *testing.T) {
 	timelineChange(t, ts.moveClip(p.song.ID, p.first, p.tl.Tracks[1].ID, 0))
 	before := ts.getTimeline(p.song.ID)
 
-	// The second Clip is at 0:30-0:50 on the beat Track, the first at
+	// The second Clip is at 0:30-0:50 on Track 1, the first at
 	// 0:00-0:10 on the other one.
 	for name, send := range map[string]func() response{
 		"overlapping its start": func() response { return ts.moveClip(p.song.ID, p.first, beatTrack, 25) },
@@ -771,7 +792,7 @@ func TestATracksVolumeMuteAndSoloAreSavedWithTheSong(t *testing.T) {
 	timelineChange(t, ts.updateTrack(p.song.ID, beat.ID, map[string]any{"volume": -12.5, "muted": true}))
 	got := timelineChange(t, ts.updateTrack(p.song.ID, adlibs.ID, map[string]any{"soloed": true}))
 
-	wantBeat := track{ID: beat.ID, Name: "Beat", Volume: -12.5, Muted: true, Clips: beat.Clips}
+	wantBeat := track{ID: beat.ID, Name: "Track 1", Volume: -12.5, Muted: true, Clips: beat.Clips}
 	wantAdlibs := track{ID: adlibs.ID, Name: "Adlibs", Soloed: true, Clips: []clip{}}
 	if !reflect.DeepEqual(got.Tracks, []track{wantBeat, wantAdlibs}) {
 		t.Errorf("tracks = %+v, want %+v", got.Tracks, []track{wantBeat, wantAdlibs})
@@ -835,7 +856,7 @@ func TestTracksCanBeReordered(t *testing.T) {
 
 	got := timelineChange(t, ts.reorderTracks(p.song.ID, []int64{lead, beat, adlibs}))
 
-	if want := []string{"Lead vox", "Beat", "Adlibs"}; !reflect.DeepEqual(trackNames(got), want) {
+	if want := []string{"Lead vox", "Track 1", "Adlibs"}; !reflect.DeepEqual(trackNames(got), want) {
 		t.Errorf("tracks = %q, want %q", trackNames(got), want)
 	}
 	if len(got.Tracks[1].Clips) != 2 {
@@ -845,7 +866,7 @@ func TestTracksCanBeReordered(t *testing.T) {
 		t.Errorf("read timeline = %+v, want %+v", read, got)
 	}
 	added := timelineChange(t, ts.addTrack(p.song.ID, "Harmony"))
-	if want := []string{"Lead vox", "Beat", "Adlibs", "Harmony"}; !reflect.DeepEqual(trackNames(added), want) {
+	if want := []string{"Lead vox", "Track 1", "Adlibs", "Harmony"}; !reflect.DeepEqual(trackNames(added), want) {
 		t.Errorf("tracks = %q, want a new Track still added at the bottom: %q", trackNames(added), want)
 	}
 }
@@ -902,21 +923,6 @@ func TestDeletingATrackRemovesItsClipsButKeepsTheirBeats(t *testing.T) {
 	// No Clip plays the short Beat any more, so it can go.
 	expectStatus(t, ts.Do(http.MethodDelete, beatPath(p.short.ID), nil), http.StatusNoContent)
 	expectStatus(t, ts.deleteTrack(p.song.ID, beatTrack), http.StatusNotFound)
-}
-
-func TestANewBeatAfterTheBeatTrackIsDeletedGoesOnANewBeatTrack(t *testing.T) {
-	ts := newTestServer(t)
-	p := placeTwoClips(t, ts)
-
-	timelineChange(t, ts.deleteTrack(p.song.ID, p.tl.Tracks[0].ID))
-	got := timelineChange(t, ts.addBeatToSong(p.song.ID, p.short.ID))
-
-	if want := []string{"Adlibs", "Beat"}; !reflect.DeepEqual(trackNames(got), want) {
-		t.Errorf("tracks = %q, want %q", trackNames(got), want)
-	}
-	if want := []string{fmt.Sprintf("%d@0+10", p.short.ID)}; !reflect.DeepEqual(clipsOf(got, 1), want) {
-		t.Errorf("clips = %q, want %q", clipsOf(got, 1), want)
-	}
 }
 
 func TestTheLastTrackCantBeDeleted(t *testing.T) {

@@ -407,7 +407,7 @@
           ? 'Stop recording to sync lyrics'
           : canSync
             ? 'Sync lyrics: press Enter or Now as each Line starts to cue it at the playhead'
-            : 'Add a beat to the Timeline to sync lyrics to it'}>Sync lyrics</button
+            : 'Add a Beat to the Timeline to sync lyrics to it'}>Sync lyrics</button
       >
     {/if}
     {#if mode === 'write' && canCue && hasCues(song)}

@@ -125,9 +125,6 @@ const (
 // timeFormat is how songs.updated_at is stored.
 const timeFormat = "2006-01-02T15:04:05.000000000Z"
 
-// beatTrackName is the name of the Track a Song's first Beat goes on.
-const beatTrackName = "Beat"
-
 // Store reads and changes Timelines.
 type Store struct {
 	db *sql.DB
@@ -254,16 +251,14 @@ func read(ctx context.Context, tx *sql.Tx, songID int64) (Timeline, error) {
 	return tl, nil
 }
 
-// AddBeat places the whole of a Beat on the Song's beat Track: the topmost
-// Track already holding a Clip of a Beat, or else a new Track named "Beat"
-// at the bottom. The Clip goes after the Track's last Clip, or at 0:00.
-func (s *Store) AddBeat(ctx context.Context, songID int64, based lyricsheet.Version, beatID int64) (Timeline, error) {
+// AddBeat places the whole of a Beat on a Track of the Song, after its last
+// Clip, or at 0:00 if it has none.
+func (s *Store) AddBeat(ctx context.Context, songID int64, based lyricsheet.Version, trackID, beatID int64) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		duration, err := source{beatID: sql.NullInt64{Int64: beatID, Valid: true}}.duration(ctx, tx)
-		if err != nil {
+		if err := findTrack(ctx, tx, songID, trackID); err != nil {
 			return err
 		}
-		trackID, err := beatTrack(ctx, tx, songID)
+		duration, err := source{beatID: sql.NullInt64{Int64: beatID, Valid: true}}.duration(ctx, tx)
 		if err != nil {
 			return err
 		}
@@ -274,27 +269,6 @@ func (s *Store) AddBeat(ctx context.Context, songID int64, based lyricsheet.Vers
 		}
 		return addClip(ctx, tx, songID, trackID, NewClip{BeatID: &beatID, Start: start, Length: duration})
 	})
-}
-
-// beatTrack returns the Song's beat Track, creating it if there is none.
-func beatTrack(ctx context.Context, tx *sql.Tx, songID int64) (int64, error) {
-	var id int64
-	err := tx.QueryRowContext(ctx, `SELECT t.id FROM tracks t
-		WHERE t.song_id = ? AND EXISTS (SELECT 1 FROM clips c WHERE c.track_id = t.id AND c.beat_id IS NOT NULL)
-		ORDER BY t.position, t.id LIMIT 1`, songID).Scan(&id)
-	if err == nil {
-		return id, nil
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
-		return 0, fmt.Errorf("finding the beat track: %w", err)
-	}
-	res, err := tx.ExecContext(ctx, `INSERT INTO tracks (song_id, name, position)
-		VALUES (?1, ?2, (SELECT COALESCE(MAX(position) + 1, 0) FROM tracks WHERE song_id = ?1))`,
-		songID, beatTrackName)
-	if err != nil {
-		return 0, fmt.Errorf("adding the beat track: %w", err)
-	}
-	return res.LastInsertId()
 }
 
 // TrackChanges is a partial update to a Track's name and levels.

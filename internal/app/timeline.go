@@ -27,13 +27,14 @@ func (a *App) getTimeline(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) addBeatToTimeline(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		BeatID *int64 `json:"beatId"`
+		TrackID *int64 `json:"trackId"`
+		BeatID  *int64 `json:"beatId"`
 	}
 	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
-		if req.BeatID == nil {
-			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "beatId is required"}
+		if req.TrackID == nil || req.BeatID == nil {
+			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "trackId and beatId are required"}
 		}
-		return a.timelines.AddBeat(r.Context(), id, based, *req.BeatID)
+		return a.timelines.AddBeat(r.Context(), id, based, *req.TrackID, *req.BeatID)
 	})
 }
 
