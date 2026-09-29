@@ -20,6 +20,7 @@
   let dialog = $state<HTMLDialogElement>();
   let stage = $state<HTMLElement>();
   let stageSide = $state(0);
+  // Opens on the picture the step opened with.
   // svelte-ignore state_referenced_locally
   let crop = $state<Square>(centredSquare(picture.width, picture.height));
   let chosen: Square | null = null;
@@ -38,11 +39,11 @@
   });
 
   function move(dx: number, dy: number) {
-    crop = moveSquare(crop, dx, dy, picture.width, picture.height);
+    crop = moveSquare(crop, dx, dy, picture);
   }
 
   function zoom(size: number, on: Point = { x: crop.x + crop.size / 2, y: crop.y + crop.size / 2 }) {
-    crop = zoomSquare(crop, size, on, picture.width, picture.height);
+    crop = zoomSquare(crop, size, on, picture);
   }
 
   /** The point of the picture under a point on the screen. */
@@ -55,7 +56,7 @@
   const pointers = new Map<number, Point>();
 
   function pointerDown(event: PointerEvent) {
-    if (pointers.size >= 2) return;
+    if (pointers.size >= 2 || event.button !== 0) return;
     stage!.setPointerCapture(event.pointerId);
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   }
@@ -65,34 +66,34 @@
     const before = [...pointers.values()];
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     const after = [...pointers.values()];
-    if (after.length === 1) {
-      move((before[0].x - after[0].x) / scale, (before[0].y - after[0].y) / scale);
-      return;
-    }
+    // The picture follows the pointers' middle, and two also zoom it.
     const [from, to] = [middle(before), middle(after)];
     move((from.x - to.x) / scale, (from.y - to.y) / scale);
-    zoom((crop.size * distance(before)) / distance(after), pictureAt(to.x, to.y));
+    if (after.length === 2) zoom((crop.size * distance(before)) / distance(after), pictureAt(to.x, to.y));
   }
 
   function pointerUp(event: PointerEvent) {
     pointers.delete(event.pointerId);
   }
 
-  const middle = ([a, b]: Point[]): Point => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  const middle = (points: Point[]): Point => ({
+    x: points.reduce((sum, p) => sum + p.x, 0) / points.length,
+    y: points.reduce((sum, p) => sum + p.y, 0) / points.length,
+  });
   const distance = ([a, b]: Point[]) => Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
 
   // Added by hand, as it must stop the page scrolling.
-  function wheel(node: HTMLElement) {
+  function wheelZoom(node: HTMLElement) {
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
-      const lines = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : 1;
-      zoom(crop.size * Math.exp(event.deltaY * lines * 0.002), pictureAt(event.clientX, event.clientY));
+      const pixels = [1, 16, stageSide][event.deltaMode] ?? 1;
+      zoom(crop.size * Math.exp(event.deltaY * pixels * 0.002), pictureAt(event.clientX, event.clientY));
     };
     node.addEventListener('wheel', onWheel, { passive: false });
     return () => node.removeEventListener('wheel', onWheel);
   }
 
-  function key(event: KeyboardEvent) {
+  function onKeydown(event: KeyboardEvent) {
     const step = crop.size * 0.05;
     const moves: Record<string, [number, number]> = {
       ArrowLeft: [-step, 0],
@@ -108,17 +109,17 @@
   }
 
   function confirm() {
-    chosen = wholeSquare(crop, picture.width, picture.height);
+    chosen = wholeSquare(crop, picture);
     dialog?.close();
   }
 
-  function closed() {
+  function onClose() {
     if (chosen) onConfirm(chosen);
     else onCancel();
   }
 </script>
 
-<dialog bind:this={dialog} onclose={closed} aria-labelledby="cover-crop-heading">
+<dialog bind:this={dialog} onclose={onClose} aria-labelledby="cover-crop-heading">
   <h2 id="cover-crop-heading">Choose the Cover</h2>
   <p class="muted hint">Drag to move the picture in the square. Pinch, scroll or use the slider to zoom.</p>
 
@@ -127,12 +128,13 @@
     class="stage"
     bind:this={stage}
     bind:clientWidth={stageSide}
-    {@attach wheel}
+    {@attach wheelZoom}
     onpointerdown={pointerDown}
     onpointermove={pointerMove}
     onpointerup={pointerUp}
     onpointercancel={pointerUp}
-    onkeydown={key}
+    onlostpointercapture={pointerUp}
+    onkeydown={onKeydown}
     tabindex="0"
     role="application"
     aria-label="Cover square: arrow keys move it, plus and minus zoom"

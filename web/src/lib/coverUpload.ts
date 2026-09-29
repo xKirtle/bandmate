@@ -16,7 +16,7 @@ const unopenable = "This picture can't be opened in this browser";
 
 /** A picture being made a Cover: its original, normalized and scaled down, ready to crop. */
 export interface CoverToCrop extends Size {
-  /** The original as uploaded, which the crop step shows too. */
+  /** The original to upload, which the crop step shows too. */
   blob: Blob;
   canvas: HTMLCanvasElement;
   type: PictureType;
