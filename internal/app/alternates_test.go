@@ -456,3 +456,142 @@ func TestMovingAnAlternateOfAnotherSongToTheScrapbookIsNotFound(t *testing.T) {
 		t.Errorf("other song = %+v, want it unchanged %+v", got, other)
 	}
 }
+
+// addToSectionPath is where a Scrapbook Section is added to a Section.
+func addToSectionPath(songID, sectionID int64) string {
+	return fmt.Sprintf("/api/songs/%d/sections/%d/add-to-section", songID, sectionID)
+}
+
+// addToSection adds a Scrapbook Section to a Section, its Alternates joining
+// that Section's, and returns the Song.
+func (ts *testServer) addToSection(songID, scrapID, sectionID int64) song {
+	ts.t.Helper()
+	return ts.lyricSheetChange(http.MethodPost, addToSectionPath(songID, scrapID), map[string]any{"sectionId": sectionID})
+}
+
+// scrapWithTwoAlternates adds a Section to a Song's Scrapbook with Lines in
+// an unnamed active Alternate and an inactive one named "Darker", and
+// returns the Song and the Section.
+func (ts *testServer) scrapWithTwoAlternates(songID int64, label string) (song, section) {
+	ts.t.Helper()
+	s := ts.addToScrapbook(songID, label)
+	scrap := s.Sections[len(s.Sections)-1]
+	ts.setText(songID, scrap.Alternates[0].ID, "Headlights [Em]on")
+	s = ts.addAlternate(songID, scrap.ID, map[string]any{"name": "Darker"})
+	scrap = s.Sections[len(s.Sections)-1]
+	s = ts.setText(songID, scrap.Alternates[1].ID, "Headlights [Dm]off")
+	s = ts.activate(songID, scrap.Alternates[0].ID)
+	return s, s.Sections[len(s.Sections)-1]
+}
+
+func TestAScrapbookSectionAddedToASectionJoinsItsAlternatesInactive(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.sharedChorus()
+	drive, night, _, _ := chorusLines(s)
+	ts.setLineCue(s.ID, s.Arrangement[0].ID, drive, 2)
+	ts.setLineCue(s.ID, s.Arrangement[2].ID, night, 40)
+	before, scrap := ts.scrapWithTwoAlternates(s.ID, "Idea")
+	chorus := before.Sections[0]
+
+	got := ts.addToSection(before.ID, scrap.ID, chorus.ID)
+
+	expectSectionDeleted(t, got, scrap.ID)
+	if !reflect.DeepEqual(got.Arrangement, before.Arrangement) {
+		t.Errorf("arrangement = %+v, want it and its Cues unchanged %+v", got.Arrangement, before.Arrangement)
+	}
+	alternates := got.Sections[0].Alternates
+	if len(alternates) != 3 || !reflect.DeepEqual(alternates[0], chorus.Alternates[0]) {
+		t.Fatalf("chorus alternates = %+v, want its own active one then the scrap's two", alternates)
+	}
+	for i, want := range []alternate{
+		{Name: "Idea", Lines: scrap.Alternates[0].Lines},
+		{Name: "Darker", Lines: scrap.Alternates[1].Lines},
+	} {
+		added := alternates[i+1]
+		added.ID = 0
+		if !reflect.DeepEqual(added, want) {
+			t.Errorf("added alternate %d = %+v, want %+v, inactive", i, added, want)
+		}
+	}
+	if read := ts.getSong(s.ID); !reflect.DeepEqual(read, got) {
+		t.Errorf("song read back = %+v, want %+v", read, got)
+	}
+}
+
+func TestAnUnnamedAlternateAddedToASectionTakesTheScrapsLabel(t *testing.T) {
+	for _, tc := range []struct{ label, name, want string }{
+		{"Idea", "", "Idea"},
+		{"Idea", "Darker", "Darker"},
+		{"", "Darker", "Darker"},
+		{"", "", ""},
+	} {
+		ts := newTestServer(t)
+		s := ts.songWithSections("Verse", "Chorus")
+		s = ts.addToScrapbook(s.ID, tc.label)
+		scrap := s.Sections[2]
+		ts.renameAlternate(s.ID, scrap.Alternates[0].ID, tc.name)
+
+		got := ts.addToSection(s.ID, scrap.ID, s.Sections[1].ID)
+
+		if name := got.Sections[1].Alternates[1].Name; name != tc.want {
+			t.Errorf("label %q, name %q: added alternate's name = %q, want %q", tc.label, tc.name, name, tc.want)
+		}
+	}
+}
+
+func TestAddingASectionStillInTheArrangementToASectionIsRejected(t *testing.T) {
+	ts := newTestServer(t)
+	before := ts.songWithSections("Verse", "Hook")
+
+	res := ts.Do(http.MethodPost, addToSectionPath(before.ID, before.Sections[1].ID),
+		map[string]any{"sectionId": before.Sections[0].ID})
+
+	expectError(t, res, http.StatusConflict, "only a Scrapbook Section can be added to a Section")
+	if got := ts.getSong(before.ID); !reflect.DeepEqual(got, before) {
+		t.Errorf("song after rejected add = %+v, want it unchanged %+v", got, before)
+	}
+}
+
+func TestAddingAScrapbookSectionToAnotherInTheScrapbookIsRejected(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.songWithSections("Verse")
+	s = ts.addToScrapbook(s.ID, "Idea")
+	before := ts.addToScrapbook(s.ID, "Another")
+
+	for _, target := range []int64{before.Sections[2].ID, before.Sections[1].ID} {
+		res := ts.Do(http.MethodPost, addToSectionPath(before.ID, before.Sections[1].ID),
+			map[string]any{"sectionId": target})
+
+		expectError(t, res, http.StatusConflict, "a Scrapbook Section can only be added to a Section in the Lyric Sheet")
+	}
+	if got := ts.getSong(before.ID); !reflect.DeepEqual(got, before) {
+		t.Errorf("song after rejected add = %+v, want it unchanged %+v", got, before)
+	}
+}
+
+func TestAddingToASectionWithoutASectionIsRejected(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.songWithSections("Verse")
+	s = ts.addToScrapbook(s.ID, "Idea")
+
+	res := ts.Do(http.MethodPost, addToSectionPath(s.ID, s.Sections[1].ID), map[string]any{})
+
+	expectError(t, res, http.StatusBadRequest, "sectionId is required")
+}
+
+func TestAddingToASectionAcrossSongsIsNotFound(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.songWithSections("Verse")
+	s = ts.addToScrapbook(s.ID, "Idea")
+	other := ts.songWithSections("Chorus")
+	other = ts.addToScrapbook(other.ID, "Other idea")
+
+	for _, tc := range []struct{ scrap, target int64 }{
+		{other.Sections[1].ID, s.Sections[0].ID},
+		{s.Sections[1].ID, other.Sections[0].ID},
+	} {
+		res := ts.Do(http.MethodPost, addToSectionPath(s.ID, tc.scrap), map[string]any{"sectionId": tc.target})
+
+		expectStatus(t, res, http.StatusNotFound)
+	}
+}

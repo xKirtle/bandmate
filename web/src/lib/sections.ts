@@ -1,4 +1,4 @@
-import type { Alternate, Section } from './api';
+import type { Alternate, Section, Song } from './api';
 import { isBlank } from './cues';
 
 /** The Alternate whose Lines are sung. The server guarantees exactly one. */
@@ -20,6 +20,15 @@ export function alternatesEntry(section: Section): { name: string; place: string
   const active = activeAlternate(section);
   if (n < 2 || !active) return null;
   return { name: alternateName(section, active), place: `${section.alternates.indexOf(active) + 1} of ${n}` };
+}
+
+/**
+ * The Sections in a Song's Arrangement, once each however many Occurrences
+ * share one, in the order they first appear. `sections` holds the Song's
+ * Sections by id.
+ */
+export function sectionsInArrangement(song: Song, sections: Map<number, Section>): Section[] {
+  return [...new Set(song.arrangement.map((o) => o.sectionId))].flatMap((id) => sections.get(id) ?? []);
 }
 
 /** How a Section is named where it's shown in full: its Label, if it has one. */

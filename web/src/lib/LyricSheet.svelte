@@ -24,7 +24,7 @@
   import SectionEditor from './SectionEditor.svelte';
   import { moveTo, type Drop } from './sectionDrag';
   import type { SectionDragging } from './sectionDragging.svelte';
-  import { activeAlternate, describe, isEmpty } from './sections';
+  import { activeAlternate, describe, isEmpty, sectionsInArrangement } from './sections';
   import type { Mode } from './songMode';
   import { readShiftStep, shiftSteps, storeShiftStep, type ShiftStep } from './shiftStep';
   import { markSyncHintSeen, sawSyncHint } from './syncHint';
@@ -111,9 +111,7 @@
   }
   // The Sections in the Arrangement, once each, in the order they first
   // appear: the ones another Occurrence can be added of.
-  const inArrangement = $derived(
-    [...new Set(song.arrangement.map((o) => o.sectionId))].flatMap((id) => sections.get(id) ?? []),
-  );
+  const inArrangement = $derived(sectionsInArrangement(song, sections));
   // Cues are edited in Write mode, on wider screens only, and only once
   // there's something to cue to or a Cue already set.
   const wide = new MediaQuery('min-width: 40.0625rem');
@@ -321,6 +319,8 @@
   // Occurrences.
   // The gap the dragged Section would land in, if it moves at all.
   const dropAt = $derived(drag.drop && 'gap' in drag.drop ? drag.drop.gap : null);
+  // The Occurrence whose Section a Scrapbook Section would be added to.
+  const dropOnto = $derived(drag.drop && 'addTo' in drag.drop ? drag.drop.addTo.occurrenceAt : null);
 
   function dropOccurrence(drop: Drop) {
     if ('reorder' in drop) {
@@ -465,6 +465,7 @@
             class:dragged={drag.occurrenceAt === i}
             class:drop-above={dropAt === i}
             class:drop-below={dropAt === song.arrangement.length && i === song.arrangement.length - 1}
+            class:drop-onto={dropOnto !== null && song.arrangement[dropOnto]?.sectionId === occurrence.sectionId}
             {@attach (el) => drag.placeOccurrence(el, i)}
           >
             <SectionEditor
@@ -645,6 +646,27 @@
   }
   .arrangement > .drop-below::after {
     bottom: calc(-0.375rem - 1.5px);
+  }
+  /* A Scrapbook Section dropped onto a Section joins its Alternates: the
+     Section is outlined, every Occurrence of it if it's shared, unlike the
+     line a drop into a gap shows. */
+  .arrangement > .drop-onto {
+    outline: 2px dashed var(--accent);
+    outline-offset: 0.25rem;
+    border-radius: 0.75rem;
+  }
+  .arrangement > .drop-onto::after {
+    content: 'Add as Alternates';
+    position: absolute;
+    top: -0.625rem;
+    right: 0.75rem;
+    padding: 0 0.5rem;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--accent-text);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.25rem;
   }
   /* An empty Arrangement shows where a Section put back from the Scrapbook lands. */
   .arrangement {

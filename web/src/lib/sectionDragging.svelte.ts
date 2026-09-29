@@ -3,9 +3,10 @@ import { dropFor, dropTarget, type Box, type Drop, type Dragged, type Target } f
 
 // On desktop in Write mode, a Section is dragged by the grip on its header:
 // within the Arrangement, from it to the Scrapbook, or from the Scrapbook
-// back into it. Pointer events rather than HTML5 drag and drop, so the drop
-// shows between Sections and Esc cancels. One drag is shared by the Lyric
-// Sheet and the Scrapbook, as a drag goes from one to the other.
+// back into it or onto a Section in it. Pointer events rather than HTML5
+// drag and drop, so the drop shows between Sections and Esc cancels. One
+// drag is shared by the Lyric Sheet and the Scrapbook, as a drag goes from
+// one to the other.
 export class SectionDragging {
   /** The drag under way: what's dragged, where it would drop, and where the pointer is. */
   current = $state<{ dragged: Dragged; target: Target | null; x: number; y: number } | null>(null);
@@ -82,19 +83,21 @@ export class SectionDragging {
 
   /** Aims the drag at where the pointer is, e.g. again as the page scrolls under it. */
   aim(x: number, y: number) {
-    if (this.current) this.current = { ...this.current, target: this.#targetAt(x, y), x, y };
+    if (this.current) this.current = { ...this.current, target: this.#targetAt(this.current.dragged, x, y), x, y };
   }
 
-  #targetAt(x: number, y: number): Target | null {
+  #targetAt(dragged: Dragged, x: number, y: number): Target | null {
     const arrangement = this.#arrangement?.getBoundingClientRect();
     if (!arrangement) return null;
     // An Occurrence not on the page has its gaps counted above the pointer.
     const count = Math.max(-1, ...this.#occurrences.keys()) + 1;
-    const middles = Array.from({ length: count }, (_, i) => {
+    const spans = Array.from({ length: count }, (_, i) => {
       const box = this.#occurrences.get(i)?.getBoundingClientRect();
-      return box ? box.top + box.height / 2 : -Infinity;
+      return box ? { top: box.top, bottom: box.bottom } : { top: -Infinity, bottom: -Infinity };
     });
-    return dropTarget({ x, y }, this.#scrapbookBox(), arrangement, middles);
+    // Only a Scrapbook Section drops onto a Section: an Occurrence dropped
+    // onto another would make a hook an Alternate of a verse by accident.
+    return dropTarget({ x, y }, this.#scrapbookBox(), arrangement, spans, 'section' in dragged);
   }
 
   // Only the part of the Scrapbook in view in its column can be dropped on.
@@ -120,7 +123,7 @@ export class SectionDragging {
         if (e.button !== 0) return;
         e.preventDefault();
         e.currentTarget.setPointerCapture(e.pointerId);
-        this.current = { dragged, target: this.#targetAt(e.clientX, e.clientY), x: e.clientX, y: e.clientY };
+        this.current = { dragged, target: this.#targetAt(dragged, e.clientX, e.clientY), x: e.clientX, y: e.clientY };
       },
       onpointermove: (e: PointerEvent) => this.aim(e.clientX, e.clientY),
       onpointerup: () => {

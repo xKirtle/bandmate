@@ -5,7 +5,7 @@
   import type { Drop } from './sectionDrag';
   import type { SectionDragging } from './sectionDragging.svelte';
   import SectionEditor from './SectionEditor.svelte';
-  import { card, describe, labelOf } from './sections';
+  import { card, describe, labelOf, sectionsInArrangement } from './sections';
 
   let {
     song,
@@ -31,6 +31,9 @@
       name: `After ${i + 1}. ${describe(sections.get(o.sectionId)!)}`,
     })),
   ]);
+  // The Sections a Section can be added to as Alternates: each in the Lyric
+  // Sheet once, however many Occurrences share it.
+  const inArrangement = $derived(sectionsInArrangement(song, sections));
   // The Section just added, whose Label gets focus.
   let added = $state<number | null>(null);
   // The one Section shown in full, in its editor; the rest show as cards.
@@ -78,18 +81,35 @@
     added = null;
   }
 
+  // "Put back…" puts a Section back at a place in the Lyric Sheet ("at:2"),
+  // or adds it to a Section there as Alternates ("to:7").
   function putBack(sectionId: number, e: Event & { currentTarget: HTMLSelectElement }) {
-    const value = e.currentTarget.value;
+    const [kind, value] = e.currentTarget.value.split(':');
     e.currentTarget.value = '';
-    if (value !== '') change((at) => api.addOccurrence(at, sectionId, Number(value))).then(closed(sectionId));
+    if (kind === 'at') change((at) => api.addOccurrence(at, sectionId, Number(value))).then(closed(sectionId));
+    if (kind === 'to') addTo(sectionId, Number(value));
+  }
+
+  function addTo(sectionId: number, targetId: number) {
+    // Its Alternates are made anew in the Section they join, so edits still
+    // waiting in its open editor are saved first, while they can be: a drag
+    // doesn't blur the text box.
+    if (open === sectionId && document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    change((at) => api.addToSection(at, sectionId, targetId)).then(closed(sectionId));
   }
 
   // On desktop, a Section is also dragged by its grip into a gap in the Lyric
-  // Sheet, putting it back there as "Put back…" does.
+  // Sheet, putting it back there, or onto a Section in it, adding it there,
+  // as "Put back…" does.
   function dropSection(drop: Drop) {
-    if (!('putBack' in drop)) return;
-    const section = drop.putBack;
-    change((at) => api.addOccurrence(at, section, drop.gap)).then(closed(section));
+    if ('putBack' in drop) {
+      const section = drop.putBack;
+      change((at) => api.addOccurrence(at, section, drop.gap)).then(closed(section));
+    } else if ('addTo' in drop) {
+      const { section, occurrenceAt } = drop.addTo;
+      const target = song.arrangement[occurrenceAt];
+      if (target) addTo(section, target.sectionId);
+    }
   }
 
   /** After a Section leaves the Scrapbook: should it come back, it does so as a card. */
@@ -134,12 +154,23 @@
                 {@render dragGrip(section.id)}
               {/snippet}
               {#snippet actions()}
-                <label class="visually-hidden" for="put-back-{section.id}">Put back into the Lyric Sheet</label>
+                <label class="visually-hidden" for="put-back-{section.id}"
+                  >Put back into the Lyric Sheet, or add as an Alternate of a Section</label
+                >
                 <select id="put-back-{section.id}" class="put-back" onchange={(e) => putBack(section.id, e)}>
                   <option value="">Put back…</option>
-                  {#each places as place (place.position)}
-                    <option value={place.position}>{place.name}</option>
-                  {/each}
+                  <optgroup label="Put back into the Lyric Sheet">
+                    {#each places as place (place.position)}
+                      <option value="at:{place.position}">{place.name}</option>
+                    {/each}
+                  </optgroup>
+                  {#if inArrangement.length > 0}
+                    <optgroup label="Add as an Alternate of">
+                      {#each inArrangement as target (target.id)}
+                        <option value="to:{target.id}">{describe(target)}</option>
+                      {/each}
+                    </optgroup>
+                  {/if}
                 </select>
               {/snippet}
             </SectionEditor>
@@ -180,7 +211,7 @@
     <span
       class="grip"
       aria-hidden="true"
-      title="Drag into the Lyric Sheet to put it back; Esc cancels"
+      title="Drag between Sections in the Lyric Sheet to put it back, or onto one to add it as Alternates; Esc cancels"
       {...drag.grip({ section: sectionId }, dropSection)}>⠿</span
     >
   {/if}
