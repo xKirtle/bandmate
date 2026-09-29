@@ -119,9 +119,9 @@ func New(cfg Config) (*App, error) {
 	if cfg.Now != nil {
 		now = cfg.Now
 	}
+	// Only tidying, so it never stops the app starting.
 	if err := a.timelines.SweepDetachedTakes(context.Background(), now().Add(-DetachedTakesKept)); err != nil {
-		conn.Close()
-		return nil, err
+		log.Printf("sweeping detached takes: %v", err)
 	}
 	a.handler = a.routes()
 	return a, nil

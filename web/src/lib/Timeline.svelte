@@ -792,8 +792,8 @@
   function calibrationClosed(record: boolean) {
     const { retaking, newTrack } = calibrating ?? {};
     calibrating = null;
-    if (record) startRecording(retaking, newTrack);
-    else if (newTrack) opened = false;
+    if (newTrack) recordOnNewTrack(record);
+    else if (record) startRecording(retaking);
   }
 
   const canRecord = $derived(
@@ -844,7 +844,6 @@
       if ((newTrack || timeline.tracks.length === 0) && !(await addTrack())) {
         recording?.capture?.close();
         recording = null;
-        if (newTrack) opened = false;
         return;
       }
       // Placed once the input's open, in case the Timeline changed meanwhile.
@@ -878,7 +877,6 @@
     } catch (e) {
       recording?.capture?.close();
       recording = null;
-      if (newTrack) opened = false;
       error = e instanceof CaptureError ? e.message : `Couldn't start recording (${(e as Error).message}).`;
     }
   }
@@ -1026,9 +1024,20 @@
   /** Opens the empty Timeline and records onto a Track added for it, as "Add a track" adds one. */
   function recordOnEmpty() {
     if (!canRecord) return;
-    opened = true;
     collapsed = false;
-    startRecording(undefined, true);
+    recordOnNewTrack(true);
+  }
+
+  /**
+   * Keeps the Timeline open while recording onto a Track added for it, or
+   * with record false, as calibration is dismissed. It closes again if
+   * nothing came of it: no recording, and no Track added.
+   */
+  async function recordOnNewTrack(record: boolean) {
+    const tracks = timeline.tracks.length;
+    opened = true;
+    if (record) await startRecording(undefined, true);
+    if (!recording && !calibrating && timeline.tracks.length === tracks) opened = false;
   }
 
   function recordKey(event: KeyboardEvent) {
