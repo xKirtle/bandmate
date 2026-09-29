@@ -21,7 +21,7 @@ import (
 // Config is everything needed to build the app.
 type Config struct {
 	// DataDir holds the SQLite database and, under audio/ and covers/, the
-	// uploaded files.
+	// uploaded and recorded files.
 	DataDir string
 	// SPA is the built single-page app, with index.html at its root.
 	SPA fs.FS
@@ -47,10 +47,11 @@ type App struct {
 	// timelines owns Songs' Timelines, which are kept apart from the Song
 	// aggregate: most changes to a Song don't need them sent back.
 	timelines *timeline.Store
-	// beatFiles and masterFiles are where uploads are received, next to
-	// the files they will be kept with.
+	// beatFiles, masterFiles and takeFiles are where uploads are received,
+	// next to the files they will be kept with.
 	beatFiles   *audio.Files
 	masterFiles *audio.Files
+	takeFiles   *audio.Files
 	coverFiles  lyricsheet.CoverFiles
 	maxUpload   int64
 	maxCover    int64
@@ -75,6 +76,11 @@ func New(cfg Config) (*App, error) {
 		conn.Close()
 		return nil, err
 	}
+	takeFiles, err := audio.Open(filepath.Join(cfg.DataDir, "audio", "takes"))
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
 	coverFiles := lyricsheet.CoverFiles{}
 	for _, p := range lyricsheet.CoverPictures {
 		if coverFiles[p], err = audio.Open(filepath.Join(cfg.DataDir, "covers", string(p))); err != nil {
@@ -84,11 +90,12 @@ func New(cfg Config) (*App, error) {
 	}
 	a := &App{
 		db:          conn,
-		songs:       lyricsheet.NewStore(conn, masterFiles, coverFiles),
+		songs:       lyricsheet.NewStore(conn, masterFiles, coverFiles, takeFiles),
 		beats:       beats.NewStore(conn, beatFiles),
-		timelines:   timeline.NewStore(conn),
+		timelines:   timeline.NewStore(conn, takeFiles),
 		beatFiles:   beatFiles,
 		masterFiles: masterFiles,
+		takeFiles:   takeFiles,
 		coverFiles:  coverFiles,
 		maxUpload:   cfg.MaxUploadBytes,
 		maxCover:    cfg.MaxCoverBytes,
@@ -166,6 +173,9 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("POST /api/songs/{id}/timeline/clips/{clipID}/trim", a.trimClip)
 	mux.HandleFunc("POST /api/songs/{id}/timeline/clips/{clipID}/duplicate", a.duplicateClip)
 	mux.HandleFunc("DELETE /api/songs/{id}/timeline/clips/{clipID}", a.deleteClip)
+	mux.HandleFunc("POST /api/songs/{id}/timeline/takes", a.recordTake)
+	mux.HandleFunc("GET /api/songs/{id}/takes/{takeID}", a.getTake)
+	mux.HandleFunc("GET /api/songs/{id}/takes/{takeID}/audio", a.takeAudio)
 	mux.HandleFunc("GET /api/config", a.config)
 	mux.HandleFunc("GET /api/beats", a.listBeats)
 	mux.HandleFunc("POST /api/beats", a.addBeat)

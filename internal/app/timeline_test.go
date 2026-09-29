@@ -35,13 +35,28 @@ type track struct {
 	Clips  []clip  `json:"clips"`
 }
 
-// clip is a stretch of a Beat placed on a Track.
+// clip is a stretch of a Beat, or of Takes, placed on a Track.
 type clip struct {
-	ID     int64   `json:"id"`
-	BeatID int64   `json:"beatId"`
-	Start  float64 `json:"start"`
-	Offset float64 `json:"offset"`
-	Length float64 `json:"length"`
+	ID           int64   `json:"id"`
+	BeatID       int64   `json:"beatId"`
+	Takes        []take  `json:"takes"`
+	ActiveTakeID *int64  `json:"activeTakeId"`
+	Start        float64 `json:"start"`
+	Offset       float64 `json:"offset"`
+	Length       float64 `json:"length"`
+}
+
+// take is a recording in a Clip, without its peaks unless read on its own.
+type take struct {
+	ID            int64     `json:"id"`
+	Number        int       `json:"number"`
+	Size          int64     `json:"size"`
+	Duration      float64   `json:"duration"`
+	SampleRate    int       `json:"sampleRate"`
+	LatencyOffset float64   `json:"latencyOffset"`
+	Position      float64   `json:"position"`
+	RecordedAt    string    `json:"recordedAt"`
+	Peaks         []float64 `json:"peaks"`
 }
 
 // clipSource is a Beat the Timeline's Clips play, without its peaks.
@@ -116,7 +131,7 @@ func TestTheFirstBeatLandsAtTheStartOfANewBeatTrack(t *testing.T) {
 	if tr.Name != "Beat" {
 		t.Errorf("track name = %q, want %q", tr.Name, "Beat")
 	}
-	wantClips := []clip{{ID: firstClipID(tr), BeatID: b.ID, Start: 0, Offset: 0, Length: 95.5}}
+	wantClips := []clip{{ID: firstClipID(tr), BeatID: b.ID, Takes: []take{}, Start: 0, Offset: 0, Length: 95.5}}
 	if !reflect.DeepEqual(tr.Clips, wantClips) {
 		t.Errorf("clips = %+v, want %+v", tr.Clips, wantClips)
 	}
@@ -278,6 +293,10 @@ var timelineChanges = []struct {
 	}},
 	{"clear the loop", func(ts *testServer, songID int64, tl timeline, v int64) response {
 		return ts.DoAt(v, http.MethodDelete, loopPath(songID), nil)
+	}},
+	{"record a take", func(ts *testServer, songID int64, tl timeline, v int64) response {
+		return ts.SendUploadAt(v, http.MethodPost, timelinePath(songID)+"/takes",
+			takeRecording(tl.Tracks[0].ID, 10, 8, 0, 3))
 	}},
 }
 

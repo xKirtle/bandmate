@@ -222,3 +222,53 @@ func TestOccurrencesCollapseIntoSections(t *testing.T) {
 		t.Errorf("occurrences and line_cues still exist")
 	}
 }
+
+func TestClipsKeepTheirIdsAsTheyMayPlayTakes(t *testing.T) {
+	conn := openBefore(t, "0019_takes")
+	exec(t, conn,
+		`INSERT INTO songs (id, title, created_at, updated_at) VALUES (1, 'Midnight Drive', '', '')`,
+		`INSERT INTO beats (id, title, file_name, content_type, size, duration, peaks, created_at, updated_at)
+			VALUES (1, 'Beat', 'beat.mp3', 'audio/mpeg', 10, 30, '[]', '', '')`,
+		`INSERT INTO tracks (id, song_id, name, position) VALUES (1, 1, 'Beat', 0)`,
+		`INSERT INTO clips (track_id, beat_id, start, source_offset, length) VALUES
+			(1, 1, 0, 0, 30), (1, 1, 30, 5, 10), (1, 1, 40, 0, 30)`,
+		// The latest Clip, deleted: its id is never given out again.
+		`DELETE FROM clips WHERE id = 3`,
+	)
+
+	if err := migrate(context.Background(), conn); err != nil {
+		t.Fatalf("migrating: %v", err)
+	}
+
+	type clip struct {
+		id, beat    int64
+		start, trim float64
+	}
+	var clips []clip
+	rows, err := conn.Query(`SELECT id, beat_id, start, source_offset FROM clips ORDER BY id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var c clip
+		if err := rows.Scan(&c.id, &c.beat, &c.start, &c.trim); err != nil {
+			t.Fatal(err)
+		}
+		clips = append(clips, c)
+	}
+	if want := []clip{{1, 1, 0, 0}, {2, 1, 30, 5}}; !reflect.DeepEqual(clips, want) {
+		t.Errorf("clips = %v, want %v", clips, want)
+	}
+
+	res, err := conn.Exec(`INSERT INTO clips (track_id, beat_id, start, source_offset, length) VALUES (1, 1, 70, 0, 1)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id, _ := res.LastInsertId(); id != 4 {
+		t.Errorf("next clip id = %d, want 4", id)
+	}
+	if _, err := conn.Exec(`INSERT INTO clips (track_id, start, source_offset, length) VALUES (1, 80, 0, 1)`); err == nil {
+		t.Errorf("a Clip playing neither a Beat nor Takes was stored")
+	}
+}
