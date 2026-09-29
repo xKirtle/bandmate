@@ -5,8 +5,9 @@
 // here too.
 //
 // A Clip of Takes plays its active Take. Its source is the span its Takes
-// are laid out in: each Take starts at its position in it, and the span
-// starts the Clip's offset before the Clip does.
+// are laid out in, up to where the last of them ends: each Take starts at
+// its position in it, and the span starts the Clip's offset before the Clip
+// does.
 import { api, type Clip, type NewClip, type Take, type Timeline } from './api';
 import { peaksPerSecond } from './peaks';
 import type { Placed } from './schedule';
@@ -57,7 +58,7 @@ export function clipSources(timeline: Timeline): ClipSources {
       key,
       title: `Take ${take.number}`,
       audio: api.takeAudioUrl(timeline.songId, take.id),
-      duration: take.position + take.duration,
+      duration: Math.max(...clip.takes.map((t) => t.position + t.duration)),
       loadPeaks: () =>
         api
           .getTake(timeline.songId, take.id)

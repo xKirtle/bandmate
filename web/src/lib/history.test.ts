@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Clip, Take, Timeline, TimelineLoop, Track } from './api';
 import type { CuedSong } from './cues';
-import { History, recorded, restorable } from './history';
+import { History, placingAdded, restorable } from './history';
 
 const clip = (id: number, start: number, more: Partial<Clip> = {}): Clip => ({
   id,
@@ -461,7 +461,7 @@ describe('History of Takes', () => {
     const t0 = timeline([track(1, [clip(5, 0)]), track(2)]);
     const t1 = timeline([track(1, [clip(5, 0)]), track(2, [takeClip(6, 10, [take(40)])])]);
 
-    const edit = recorded(t0, t1);
+    const edit = placingAdded(t0, t1);
     h.record(edit, t0, t1);
 
     expect(edit).toEqual({
@@ -516,5 +516,24 @@ describe('History of Takes', () => {
     });
     h.undone(t1, timeline([track(1, [clip(5, 0)]), track(3, [takeClip(7, 10, [take(40)])], { name: 'Lead vox' })]));
     expect(h.nextRedo()).toEqual({ kind: 'deleteTrack', trackId: 3 });
+  });
+
+  it('undoes duplicating a Clip of Takes by deleting the copy, and redoes it by placing its Takes back', () => {
+    const h = new History();
+    const t0 = timeline([track(2, [takeClip(6, 10, [take(40)])])]);
+    const t1 = timeline([track(2, [takeClip(6, 10, [take(40)]), takeClip(7, 20, [take(41)])])]);
+
+    h.record({ kind: 'duplicateClip', clipId: 6 }, t0, t1);
+    expect(h.nextUndo()).toEqual({ kind: 'deleteClip', clipId: 7 });
+
+    // Deleting the copy detaches its Takes, so redoing never copies them again.
+    h.undone(t1, t0);
+    expect(h.nextRedo()).toEqual({
+      kind: 'placeClip',
+      trackId: 2,
+      clip: { takeIds: [41], activeTakeId: 41, start: 20, offset: 2, length: 10 },
+    });
+    h.redone(t0, timeline([track(2, [takeClip(6, 10, [take(40)]), takeClip(9, 20, [take(41)])])]));
+    expect(h.nextUndo()).toEqual({ kind: 'deleteClip', clipId: 9 });
   });
 });

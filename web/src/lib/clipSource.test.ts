@@ -80,6 +80,11 @@ describe('clipSources of Takes', () => {
     expect(source.duration).toBe(21.5);
   });
 
+  it("spans all of a Take Clip's Takes, whichever is active", () => {
+    const c = takeClip(1, [take(3, { duration: 30 }), take(4, { position: 1.5, duration: 20 })], 4);
+    expect(clipSources(timeline([c], [])).of(c).duration).toBe(30);
+  });
+
   it('tells Takes apart from each other and from Beats', () => {
     const a = takeClip(1, [take(3)]);
     const b = takeClip(2, [take(4)]);

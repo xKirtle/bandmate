@@ -23,7 +23,7 @@
   import { cuesInSpan, formatCue, hasCues } from './cues';
   import {
     History,
-    recorded,
+    placingAdded,
     restorable,
     sendEdit,
     type Edit as TimelineEdit,
@@ -774,7 +774,7 @@
     await change(async (at) => {
       const before = timeline;
       const after = await saved(api.recordTake(at, wav, details));
-      history.record(recorded(before, after), before, after);
+      history.record(placingAdded(before, after), before, after);
       editedAt = after.version;
       showHistory();
       return { timeline: after };
