@@ -11,12 +11,13 @@
     disabled = false,
   }: {
     entries: MenuAction[];
-    /** Names ⋯ to screen readers, e.g. to tell apart several on one page. */
+    /** Names the trigger to screen readers, e.g. to tell apart several on one page. */
     label?: string;
     /** What opens the menu, in place of ⋯, e.g. the Cover. */
     trigger?: Snippet;
     /** Which of the trigger's edges the menu lines up with: its end, or, near the page's start, its start. */
     align?: 'start' | 'end';
+    /** Keeps the menu from opening, e.g. while what it acts on is busy. */
     disabled?: boolean;
   } = $props();
 
@@ -26,7 +27,7 @@
   let root: HTMLElement;
   let triggerButton: HTMLButtonElement;
   let menu = $state<HTMLElement>();
-  // Between ⋯ and the menu, in px.
+  // Between the trigger and the menu, in px.
   const gap = 4;
 
   function items(): HTMLElement[] {
@@ -180,9 +181,6 @@
     color: inherit;
     font: inherit;
     cursor: pointer;
-  }
-  .bare:disabled {
-    cursor: progress;
   }
   .menu {
     position: fixed;

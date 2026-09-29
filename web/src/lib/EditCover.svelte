@@ -61,7 +61,7 @@
   }
 
   async function remove() {
-    if (!confirm('Remove this Cover?')) return;
+    if (!confirm("Remove this Cover?\n\nIts pictures are deleted. This can't be undone.")) return;
     await run('Removing…', async () => {
       await change((at) => api.removeCover(at));
     });
@@ -138,7 +138,8 @@
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
-  .busy {
+  .busy,
+  .busy :global(button:disabled) {
     cursor: progress;
   }
   /* Along the bottom of the Cover, over its initial's lower edge. */

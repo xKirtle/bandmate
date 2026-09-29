@@ -136,8 +136,8 @@ func (s *Store) putCover(ctx context.Context, songID int64, based Version, detai
 		case old == 0 && replace:
 			return conflict("this Song has no Cover")
 		case old != 0:
-			if _, err := tx.ExecContext(ctx, `DELETE FROM covers WHERE id = ?`, old); err != nil {
-				return fmt.Errorf("deleting cover: %w", err)
+			if err := deleteCover(ctx, tx, old); err != nil {
+				return err
 			}
 		}
 		id, err = insert(ctx, tx,
@@ -181,10 +181,7 @@ func (s *Store) RemoveCover(ctx context.Context, songID int64, based Version) (S
 		if id == 0 {
 			return conflict("this Song has no Cover")
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM covers WHERE id = ?`, id); err != nil {
-			return fmt.Errorf("deleting cover: %w", err)
-		}
-		return nil
+		return deleteCover(ctx, tx, id)
 	})
 	if err != nil {
 		return Song{}, err
@@ -243,6 +240,15 @@ func coverID(ctx context.Context, q queryer, songID int64) (int64, error) {
 		return 0, fmt.Errorf("finding cover: %w", err)
 	}
 	return id, nil
+}
+
+// deleteCover deletes a Cover's row, leaving its files for once the change
+// is committed.
+func deleteCover(ctx context.Context, tx *sql.Tx, id int64) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM covers WHERE id = ?`, id); err != nil {
+		return fmt.Errorf("deleting cover: %w", err)
+	}
+	return nil
 }
 
 // removeCoverFiles deletes the pictures of a Cover already gone from the

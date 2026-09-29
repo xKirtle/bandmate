@@ -26,10 +26,12 @@ func (a *App) removeCover(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// coverPut gives a Song a Cover: Store.AddCover or Store.ReplaceCover.
+type coverPut func(ctx context.Context, songID int64, based lyricsheet.Version, details lyricsheet.CoverDetails,
+	pictures map[lyricsheet.CoverPicture]lyricsheet.UploadedPicture) (lyricsheet.Song, error)
+
 // putCover reads a Cover's pictures and details and gives them to put.
-func (a *App) putCover(w http.ResponseWriter, r *http.Request,
-	put func(ctx context.Context, songID int64, based lyricsheet.Version, details lyricsheet.CoverDetails,
-		pictures map[lyricsheet.CoverPicture]lyricsheet.UploadedPicture) (lyricsheet.Song, error)) {
+func (a *App) putCover(w http.ResponseWriter, r *http.Request, put coverPut) {
 	id, ok := songID(w, r)
 	if !ok {
 		return
