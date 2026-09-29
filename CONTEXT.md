@@ -82,11 +82,11 @@ A Song's audio space, measured in seconds, where Tracks play together. It runs t
 _Avoid_: Session, project, mix
 
 **Track**:
-A named lane on the Timeline (e.g. "Beat", "Lead vox", "Adlibs") holding Clips, with its own volume, mute and solo.
+A named lane on the Timeline (e.g. "Beat", "Lead vox", "Adlibs") holding Clips, with its own volume, mute and solo. A Timeline always has at least one Track: a Song starts with one, and the last Track can't be deleted.
 _Avoid_: Channel, layer
 
 **Chosen Track**:
-The Track a recording goes to. While the Timeline has any Tracks, exactly one is chosen.
+The Track a recording, or a Beat being added, goes to. Exactly one Track is always chosen.
 _Avoid_: Selected track (selecting is for Clips), armed track
 
 **Beat**:
