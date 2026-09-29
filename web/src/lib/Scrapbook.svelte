@@ -1,5 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte';
+  import { SvelteSet } from 'svelte/reactivity';
   import { api, type Song, type SongAt } from './api';
   import SectionEditor from './SectionEditor.svelte';
   import { card, describe } from './sections';
@@ -29,12 +30,44 @@
   let added = $state<number | null>(null);
   // The one Section shown in full, in its editor; the rest show as cards.
   let open = $state<number | null>(null);
+  // Where to go once the open editor's edits are saved: another Section, or
+  // null to close it. Closing sooner would throw away edits that failed to save.
+  let next = $state<number | null | undefined>(undefined);
+  // The open editor's text boxes holding edits not yet saved.
+  const unsaved = new SvelteSet<object>();
+
+  $effect(() => {
+    if (next === undefined || unsaved.size > 0) return;
+    open = next;
+    next = undefined;
+  });
+
+  function track(editor: object, isUnsaved: boolean) {
+    if (isUnsaved) {
+      unsaved.add(editor);
+      // Typing again after a failed save stays in this editor.
+      next = undefined;
+    } else unsaved.delete(editor);
+    onUnsaved(editor, isUnsaved);
+  }
+
+  function show(sectionId: number | null) {
+    next = sectionId;
+  }
+
+  async function done(sectionId: number) {
+    show(null);
+    await tick();
+    // Back to the card, so the keyboard keeps its place.
+    if (open === null) document.getElementById(`card-${sectionId}`)?.focus();
+  }
 
   async function add() {
     if (!(await change((at) => api.addToScrapbook(at)))) return;
     // The newest Section has the highest id, so it comes last.
     added = song.scrapbook.at(-1) ?? null;
     open = added;
+    next = undefined;
     // Focus it once, not again if it later comes back to the Scrapbook.
     await tick();
     added = null;
@@ -43,17 +76,24 @@
   function putBack(sectionId: number, e: Event & { currentTarget: HTMLSelectElement }) {
     const value = e.currentTarget.value;
     e.currentTarget.value = '';
-    if (value === '') return;
-    // It leaves the Scrapbook; should it come back, it does so as a card.
-    open = null;
-    change((at) => api.addOccurrence(at, sectionId, Number(value)));
+    if (value !== '') change((at) => api.addOccurrence(at, sectionId, Number(value))).then(closed(sectionId));
+  }
+
+  /** After a Section leaves the Scrapbook: should it come back, it does so as a card. */
+  function closed(sectionId: number) {
+    return (ok: boolean) => {
+      if (!ok || open !== sectionId) return;
+      open = null;
+      // Its editor is gone, and whatever it held with it.
+      unsaved.clear();
+    };
   }
 
   function remove(sectionId: number) {
     const section = sections.get(sectionId);
     if (!section) return;
     const ok = confirm(`Delete ${describe(section)} for good?\n\nIts Lines go with it. It can't be undone.`);
-    if (ok) change((at) => api.deleteSection(at, sectionId));
+    if (ok) change((at) => api.deleteSection(at, sectionId)).then(closed(sectionId));
   }
 </script>
 
@@ -74,7 +114,7 @@
               shared={false}
               autofocus={added === section.id}
               {change}
-              {onUnsaved}
+              onUnsaved={track}
               more={[{ icon: '🗑', label: 'Delete for good', run: () => remove(section.id) }]}
             >
               {#snippet actions()}
@@ -87,23 +127,23 @@
                 </select>
               {/snippet}
             </SectionEditor>
-            <button type="button" class="button done" onclick={() => (open = null)}>Done</button>
+            <button type="button" class="button done" onclick={() => done(section.id)}>Done</button>
           {:else}
-            {@const c = card(section)}
-            <button type="button" class="card" onclick={() => (open = section.id)}>
+            {@const shown = card(section)}
+            <button type="button" id="card-{section.id}" class="card" onclick={() => show(section.id)}>
               <span class="card-head">
                 <span class="card-label" class:muted={!section.label}>{section.label || 'Section without a Label'}</span>
-                {#if c.alternates > 1}
-                  <span class="count">{c.alternates} Alternates</span>
+                {#if shown.alternates > 1}
+                  <span class="count">{shown.alternates} Alternates</span>
                 {/if}
               </span>
-              {#each c.lines as line, i (i)}
+              {#each shown.lines as line, i (i)}
                 <span class="line">{line || ' '}</span>
               {:else}
                 <span class="line muted">No Lines yet.</span>
               {/each}
-              {#if c.more > 0}
-                <span class="more muted">+{c.more} more {c.more === 1 ? 'Line' : 'Lines'}</span>
+              {#if shown.more > 0}
+                <span class="more muted">+{shown.more} more {shown.more === 1 ? 'Line' : 'Lines'}</span>
               {/if}
             </button>
           {/if}

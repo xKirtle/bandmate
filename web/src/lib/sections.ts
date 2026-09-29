@@ -17,7 +17,7 @@ export function isEmpty(section: Section): boolean {
 }
 
 /** How many Lines a Scrapbook card shows before "+N more Lines". */
-export const CARD_LINES = 4;
+const CARD_LINES = 4;
 
 /**
  * What a Scrapbook Section's card shows at rest: the first Lines of its active
