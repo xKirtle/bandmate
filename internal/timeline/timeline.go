@@ -196,13 +196,9 @@ func read(ctx context.Context, tx *sql.Tx, songID int64) (Timeline, error) {
 // at the bottom. The Clip goes after the Track's last Clip, or at 0:00.
 func (s *Store) AddBeat(ctx context.Context, songID int64, based lyricsheet.Version, beatID int64) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		var duration float64
-		err := tx.QueryRowContext(ctx, `SELECT duration FROM beats WHERE id = ?`, beatID).Scan(&duration)
-		if errors.Is(err, sql.ErrNoRows) {
-			return &lyricsheet.InvalidError{Msg: "there's no such Beat in the Beat Library"}
-		}
+		duration, err := source{beatID: beatID}.length(ctx, tx)
 		if err != nil {
-			return fmt.Errorf("reading beat: %w", err)
+			return err
 		}
 		trackID, err := beatTrack(ctx, tx, songID)
 		if err != nil {
@@ -496,12 +492,30 @@ var errOverlap = &lyricsheet.ConflictError{Msg: "Clips can't overlap on a Track"
 
 // placement is where a Clip is and what it plays, as stored.
 type placement struct {
-	trackID  int64
-	beatID   int64
-	start    float64
-	offset   float64
-	length   float64
-	duration float64 // the source's
+	trackID int64
+	source  source
+	start   float64
+	offset  float64
+	length  float64
+}
+
+// source is what a Clip plays. The Timeline's rules ask it how long it is
+// rather than reaching for a Clip's Beat.
+type source struct {
+	beatID int64
+}
+
+// length reads how long the source is, in seconds, however a Clip trims it.
+func (src source) length(ctx context.Context, tx *sql.Tx) (float64, error) {
+	var duration float64
+	err := tx.QueryRowContext(ctx, `SELECT duration FROM beats WHERE id = ?`, src.beatID).Scan(&duration)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, &lyricsheet.InvalidError{Msg: "there's no such Beat in the Beat Library"}
+	}
+	if err != nil {
+		return 0, fmt.Errorf("reading beat: %w", err)
+	}
+	return duration, nil
 }
 
 // MoveClip moves a Clip to start at a time on a Track of the same Timeline,
@@ -535,7 +549,11 @@ func (s *Store) TrimClip(ctx context.Context, songID int64, based lyricsheet.Ver
 		if err != nil {
 			return err
 		}
-		if err := checkTrim(offset, length, p.duration); err != nil {
+		duration, err := p.source.length(ctx, tx)
+		if err != nil {
+			return err
+		}
+		if err := checkTrim(offset, length, duration); err != nil {
 			return err
 		}
 		offset = max(offset, 0)
@@ -589,13 +607,10 @@ func (s *Store) PlaceClip(ctx context.Context, songID int64, based lyricsheet.Ve
 // addClip adds a new Clip to a Track of the Song, if it stays within its
 // Beat, starts on the Timeline and is clear of the Clips already there.
 func addClip(ctx context.Context, tx *sql.Tx, trackID int64, c NewClip) error {
-	var duration float64
-	err := tx.QueryRowContext(ctx, `SELECT duration FROM beats WHERE id = ?`, c.BeatID).Scan(&duration)
-	if errors.Is(err, sql.ErrNoRows) {
-		return &lyricsheet.InvalidError{Msg: "there's no such Beat in the Beat Library"}
-	}
+	src := source{beatID: c.BeatID}
+	duration, err := src.length(ctx, tx)
 	if err != nil {
-		return fmt.Errorf("reading beat: %w", err)
+		return err
 	}
 	if err := checkTrim(c.Offset, c.Length, duration); err != nil {
 		return err
@@ -603,7 +618,7 @@ func addClip(ctx context.Context, tx *sql.Tx, trackID int64, c NewClip) error {
 	if c.Start < -tolerance {
 		return &lyricsheet.InvalidError{Msg: "a Clip can't start before 0:00"}
 	}
-	p := placement{trackID: trackID, beatID: c.BeatID, start: max(c.Start, 0), offset: max(c.Offset, 0), length: c.Length}
+	p := placement{trackID: trackID, source: src, start: max(c.Start, 0), offset: max(c.Offset, 0), length: c.Length}
 	free, err := isFree(ctx, tx, 0, p)
 	if err != nil {
 		return err
@@ -611,9 +626,14 @@ func addClip(ctx context.Context, tx *sql.Tx, trackID int64, c NewClip) error {
 	if !free {
 		return errOverlap
 	}
+	return insertClip(ctx, tx, p)
+}
+
+// insertClip stores a new Clip as placed, without checking where.
+func insertClip(ctx context.Context, tx *sql.Tx, p placement) error {
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO clips (track_id, beat_id, start, source_offset, length) VALUES (?, ?, ?, ?, ?)`,
-		p.trackID, p.beatID, p.start, p.offset, p.length); err != nil {
+		p.trackID, p.source.beatID, p.start, p.offset, p.length); err != nil {
 		return fmt.Errorf("adding clip: %w", err)
 	}
 	return nil
@@ -638,12 +658,7 @@ func (s *Store) DuplicateClip(ctx context.Context, songID int64, based lyricshee
 				return fmt.Errorf("finding the end of the track: %w", err)
 			}
 		}
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO clips (track_id, beat_id, start, source_offset, length) VALUES (?, ?, ?, ?, ?)`,
-			p.trackID, p.beatID, p.start, p.offset, p.length); err != nil {
-			return fmt.Errorf("adding clip: %w", err)
-		}
-		return nil
+		return insertClip(ctx, tx, p)
 	})
 }
 
@@ -663,10 +678,10 @@ func (s *Store) DeleteClip(ctx context.Context, songID int64, based lyricsheet.V
 // clipPlacement reads where one of the Song's Clips is and what it plays.
 func clipPlacement(ctx context.Context, tx *sql.Tx, songID, clipID int64) (placement, error) {
 	var p placement
-	err := tx.QueryRowContext(ctx, `SELECT c.track_id, c.beat_id, c.start, c.source_offset, c.length, b.duration
-		FROM clips c JOIN tracks t ON t.id = c.track_id JOIN beats b ON b.id = c.beat_id
+	err := tx.QueryRowContext(ctx, `SELECT c.track_id, c.beat_id, c.start, c.source_offset, c.length
+		FROM clips c JOIN tracks t ON t.id = c.track_id
 		WHERE c.id = ? AND t.song_id = ?`, clipID, songID).
-		Scan(&p.trackID, &p.beatID, &p.start, &p.offset, &p.length, &p.duration)
+		Scan(&p.trackID, &p.source.beatID, &p.start, &p.offset, &p.length)
 	if errors.Is(err, sql.ErrNoRows) {
 		return placement{}, lyricsheet.ErrNotFound
 	}
