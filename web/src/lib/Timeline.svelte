@@ -145,7 +145,7 @@
     for (const s of sources.all()) {
       if (untrack(() => s.key in peaks)) continue;
       peaks[s.key] = [];
-      s.peaks().then(
+      s.loadPeaks().then(
         (p) => (peaks[s.key] = p),
         // Without peaks the Clip stays flat; it still plays.
         () => {},
@@ -1402,7 +1402,7 @@
                             preserveAspectRatio="none"
                             aria-hidden="true"
                           >
-                            {#each clipShape(clip,at.offset + wave.from, wave.to - wave.from, (wave.bars * barWidth) / view.scale, wave.bars) as peak, i (i)}
+                            {#each clipShape(clip, at.offset + wave.from, wave.to - wave.from, (wave.bars * barWidth) / view.scale, wave.bars) as peak, i (i)}
                               {@const height = Math.max(2, peak * 100)}
                               <rect x={i + 0.15} y={(100 - height) / 2} width="0.7" {height} />
                             {/each}

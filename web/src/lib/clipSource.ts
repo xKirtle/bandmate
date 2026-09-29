@@ -1,6 +1,7 @@
 // What a Clip plays: its source's audio, how long the source is, and its
 // waveform. The Timeline asks here rather than reaching for a Clip's Beat,
-// so playing, drawing, trimming and undo work the same for any source.
+// so playing, drawing, trimming and undo work the same for any source. Undo
+// re-places a Clip by naming its source, so that's worked out here too.
 import { api, type Clip, type NewClip, type Timeline } from './api';
 
 /** What one or more Clips play. */
@@ -13,7 +14,7 @@ export interface ClipSource {
   /** How long the whole source is, in seconds, however a Clip trims it. */
   duration: number;
   /** Fetches its waveform, which the Timeline leaves out. */
-  peaks: () => Promise<number[]>;
+  loadPeaks: () => Promise<number[]>;
 }
 
 /** The sources a Timeline's Clips play. */
@@ -36,7 +37,7 @@ export function clipSources(timeline: Timeline): ClipSources {
           title: b.title,
           audio: api.beatAudioUrl(b),
           duration: b.duration,
-          peaks: () => api.getBeat(b.id).then((full) => full.peaks ?? []),
+          loadPeaks: () => api.getBeat(b.id).then((full) => full.peaks ?? []),
         },
       ];
     }),
@@ -47,6 +48,7 @@ export function clipSources(timeline: Timeline): ClipSources {
   };
 }
 
+/** The key of the source a Beat's Clips play. */
 function beatKey(id: number): string {
   return `beat:${id}`;
 }

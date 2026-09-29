@@ -196,7 +196,7 @@ func read(ctx context.Context, tx *sql.Tx, songID int64) (Timeline, error) {
 // at the bottom. The Clip goes after the Track's last Clip, or at 0:00.
 func (s *Store) AddBeat(ctx context.Context, songID int64, based lyricsheet.Version, beatID int64) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		duration, err := source{beatID: beatID}.length(ctx, tx)
+		duration, err := source{beatID: beatID}.duration(ctx, tx)
 		if err != nil {
 			return err
 		}
@@ -505,8 +505,8 @@ type source struct {
 	beatID int64
 }
 
-// length reads how long the source is, in seconds, however a Clip trims it.
-func (src source) length(ctx context.Context, tx *sql.Tx) (float64, error) {
+// duration reads how long the source is, in seconds, however a Clip trims it.
+func (src source) duration(ctx context.Context, tx *sql.Tx) (float64, error) {
 	var duration float64
 	err := tx.QueryRowContext(ctx, `SELECT duration FROM beats WHERE id = ?`, src.beatID).Scan(&duration)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -549,7 +549,7 @@ func (s *Store) TrimClip(ctx context.Context, songID int64, based lyricsheet.Ver
 		if err != nil {
 			return err
 		}
-		duration, err := p.source.length(ctx, tx)
+		duration, err := p.source.duration(ctx, tx)
 		if err != nil {
 			return err
 		}
@@ -608,7 +608,7 @@ func (s *Store) PlaceClip(ctx context.Context, songID int64, based lyricsheet.Ve
 // Beat, starts on the Timeline and is clear of the Clips already there.
 func addClip(ctx context.Context, tx *sql.Tx, trackID int64, c NewClip) error {
 	src := source{beatID: c.BeatID}
-	duration, err := src.length(ctx, tx)
+	duration, err := src.duration(ctx, tx)
 	if err != nil {
 		return err
 	}

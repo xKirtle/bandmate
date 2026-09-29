@@ -184,8 +184,10 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
     }
     case 'deleteClip': {
       const { track, clip } = findClip(before, edit.clipId);
-      const placed = placementOf(clip);
-      return { edit: { kind: 'placeClip', trackId: track.id, clip: placed }, adds: { tracks: [], clips: [clip.id] } };
+      return {
+        edit: { kind: 'placeClip', trackId: track.id, clip: placementOf(clip) },
+        adds: { tracks: [], clips: [clip.id] },
+      };
     }
     case 'switchLoop':
       return { edit: { kind: 'switchLoop', on: !edit.on }, adds: none };
