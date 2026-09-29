@@ -243,20 +243,63 @@ export interface Track {
 /** Changes to a Track's name or levels; fields left out stay as they are. */
 export type TrackChanges = Partial<Pick<Track, 'name' | 'volume' | 'muted' | 'soloed'>>;
 
-/** A stretch of a Beat placed on a Track, in seconds. */
+/** A stretch of a Beat, or of a set of Takes, placed on a Track, in seconds. */
 export interface Clip {
   id: number;
-  beatId: number;
+  /** The Beat it plays, or null for a Clip of Takes. */
+  beatId: number | null;
+  /** A Clip of Takes' Takes, by number; none for a Clip of a Beat. */
+  takes: Take[];
+  /** The Take a Clip of Takes plays, or null for a Clip of a Beat. */
+  activeTakeId: number | null;
   /** Where the Clip starts on the Timeline. */
   start: number;
-  /** Where in the Beat it starts playing. */
+  /**
+   * Where in its source it starts playing: a Beat's file, or the span its
+   * Takes are laid out in, which starts this long before the Clip does.
+   */
   offset: number;
   /** How long it plays. */
   length: number;
 }
 
-/** A stretch of a Beat to place on a Track, e.g. a deleted Clip brought back. */
-export type NewClip = Omit<Clip, 'id'>;
+/** One recording made in the app: a mono 24-bit WAV at the rate it was recorded at. */
+export interface Take {
+  id: number;
+  /** Tells a Clip's Takes apart: "Take 3". */
+  number: number;
+  /** The file's size in bytes. */
+  size: number;
+  /** In seconds. */
+  duration: number;
+  sampleRate: number;
+  /** The delay taken off where it was captured to place it, in seconds. */
+  latencyOffset: number;
+  /** Where it starts in its Clip's source span, in seconds. */
+  position: number;
+  recordedAt: string;
+  /** The waveform, 100 per second, from 0 to 1. Only when reading one Take, not in the Timeline. */
+  peaks?: number[];
+}
+
+/**
+ * A stretch of a Beat, or of detached Takes, to place on a Track, e.g. a
+ * deleted Clip brought back, or a recording redone.
+ */
+export type NewClip = Pick<Clip, 'start' | 'offset' | 'length'> &
+  ({ beatId: number } | { takeIds: number[]; activeTakeId: number });
+
+/** Where a Take was recorded, sent with its file. */
+export interface Recording {
+  trackId: number;
+  /** Where its new Clip starts: the Track's append point. */
+  start: number;
+  /** The Timeline time capture began, lead-in included, in seconds. */
+  captureStart: number;
+  /** The delay to take off where it was captured, in seconds. */
+  latencyOffset: number;
+  peaks: number[];
+}
 
 /**
  * A Track to add: by default empty, at the bottom, at 0 dB and neither muted
@@ -532,15 +575,29 @@ export const api = {
    */
   trimClip: (at: SongAt, clipId: number, offset: number, length: number) =>
     request<Timeline>('POST', `/songs/${at.id}/timeline/clips/${clipId}/trim`, { offset, length }, at),
-  /** Places a stretch of a Beat on a Track. Refused if it would overlap a Clip there. */
+  /** Places a stretch of a Beat, or detached Takes, on a Track. Refused if it would overlap a Clip there. */
   placeClip: (at: SongAt, trackId: number, clip: NewClip) =>
     request<Timeline>('POST', `/songs/${at.id}/timeline/clips`, { trackId, ...clip }, at),
   /** Copies a Clip right after itself, or after its Track's last Clip if that's taken. */
   duplicateClip: (at: SongAt, clipId: number) =>
     request<Timeline>('POST', `/songs/${at.id}/timeline/clips/${clipId}/duplicate`, undefined, at),
-  /** Removes a Clip from the Timeline; its Beat stays in the Beat Library. */
+  /** Removes a Clip from the Timeline; its Beat stays in the Beat Library, and its Takes are detached. */
   deleteClip: (at: SongAt, clipId: number) =>
     request<Timeline>('DELETE', `/songs/${at.id}/timeline/clips/${clipId}`, undefined, at),
+  /**
+   * Places a Take just recorded, a mono 24-bit WAV, in a new Clip at start.
+   * Refused if it would overlap a Clip there.
+   */
+  recordTake: (at: SongAt, wav: Blob, recording: Recording) => {
+    const form = new FormData();
+    form.append('details', JSON.stringify(recording));
+    form.append('file', wav, 'take.wav');
+    return request<Timeline>('POST', `/songs/${at.id}/timeline/takes`, form, at);
+  },
+  /** One of a Song's Takes, with its peaks. */
+  getTake: (songId: number, takeId: number) => request<Take>('GET', `/songs/${songId}/takes/${takeId}`),
+  /** Where a Take's audio streams from, exactly as recorded. A Take's file never changes. */
+  takeAudioUrl: (songId: number, takeId: number) => `/api/songs/${songId}/takes/${takeId}/audio`,
   /** Sets the Song's Loop, replacing any it had. */
   setLoop: (at: SongAt, loop: TimelineLoop) => request<Timeline>('PUT', `/songs/${at.id}/timeline/loop`, loop, at),
   /** Switches the Song's Loop on or off, keeping its stretch. */

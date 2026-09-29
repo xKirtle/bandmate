@@ -1,8 +1,15 @@
 // What a Clip plays: its source's audio, how long the source is, and its
-// waveform. The Timeline asks here rather than reaching for a Clip's Beat,
-// so playing, drawing, trimming and undo work the same for any source. Undo
-// re-places a Clip by naming its source, so that's worked out here too.
-import { api, type Clip, type NewClip, type Timeline } from './api';
+// waveform. The Timeline asks here rather than reaching for a Clip's Beat or
+// Takes, so playing, drawing, trimming and undo work the same for any
+// source. Undo re-places a Clip by naming its source, so that's worked out
+// here too.
+//
+// A Clip of Takes plays its active Take. Its source is the span its Takes
+// are laid out in: each Take starts at its position in it, and the span
+// starts the Clip's offset before the Clip does.
+import { api, type Clip, type NewClip, type Take, type Timeline } from './api';
+import { peaksPerSecond } from './peaks';
+import type { Placed } from './schedule';
 
 /** What one or more Clips play. */
 export interface ClipSource {
@@ -13,7 +20,7 @@ export interface ClipSource {
   audio: string;
   /** How long the whole source is, in seconds, however a Clip trims it. */
   duration: number;
-  /** Fetches its waveform, which the Timeline leaves out. */
+  /** Fetches its waveform, which the Timeline leaves out, laid out from the start of the source. */
   loadPeaks: () => Promise<number[]>;
 }
 
@@ -42,8 +49,23 @@ export function clipSources(timeline: Timeline): ClipSources {
       ];
     }),
   );
+  for (const clip of timeline.tracks.flatMap((t) => t.clips)) {
+    const take = activeTake(clip);
+    if (!take) continue;
+    const key = takeKey(take.id);
+    byKey.set(key, {
+      key,
+      title: `Take ${take.number}`,
+      audio: api.takeAudioUrl(timeline.songId, take.id),
+      duration: take.position + take.duration,
+      loadPeaks: () =>
+        api
+          .getTake(timeline.songId, take.id)
+          .then((full) => [...new Array<number>(Math.round(take.position * peaksPerSecond)).fill(0), ...(full.peaks ?? [])]),
+    });
+  }
   return {
-    of: (clip) => byKey.get(beatKey(clip.beatId))!,
+    of: (clip) => byKey.get(clip.beatId !== null ? beatKey(clip.beatId) : takeKey(clip.activeTakeId!))!,
     all: () => [...byKey.values()],
   };
 }
@@ -53,7 +75,35 @@ function beatKey(id: number): string {
   return `beat:${id}`;
 }
 
+/** The key of the source a Take's Clip plays. */
+function takeKey(id: number): string {
+  return `take:${id}`;
+}
+
+/** The Take a Clip of Takes plays, or undefined for a Clip of a Beat. */
+function activeTake(clip: Clip): Take | undefined {
+  return clip.takes.find((t) => t.id === clip.activeTakeId);
+}
+
+/**
+ * What of its audio file a Clip plays, and when: all of its window for a
+ * Beat, and for a Take, only where the Take has audio within it. Null if
+ * none of it does.
+ */
+export function heard(clip: Clip): Placed | null {
+  const take = activeTake(clip);
+  if (!take) return { start: clip.start, offset: clip.offset, length: clip.length };
+  // Where the span starts, and the Take in it, on the Timeline.
+  const origin = clip.start - clip.offset;
+  const start = Math.max(clip.start, origin + take.position);
+  const end = Math.min(clip.start + clip.length, origin + take.position + take.duration);
+  if (end <= start) return null;
+  return { start, offset: start - origin - take.position, length: end - start };
+}
+
 /** What places a Clip back as it is: its source and trim, without its id. */
 export function placementOf(clip: Clip): NewClip {
-  return { beatId: clip.beatId, start: clip.start, offset: clip.offset, length: clip.length };
+  const { start, offset, length } = clip;
+  if (clip.beatId !== null) return { beatId: clip.beatId, start, offset, length };
+  return { takeIds: clip.takes.map((t) => t.id), activeTakeId: clip.activeTakeId!, start, offset, length };
 }

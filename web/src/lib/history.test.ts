@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import type { Clip, Timeline, TimelineLoop, Track } from './api';
+import type { Clip, Take, Timeline, TimelineLoop, Track } from './api';
 import type { CuedSong } from './cues';
-import { History, restorable } from './history';
+import { History, recorded, restorable } from './history';
 
 const clip = (id: number, start: number, more: Partial<Clip> = {}): Clip => ({
   id,
   beatId: 100,
+  takes: [],
+  activeTakeId: null,
   start,
   offset: 0,
   length: 10,
@@ -51,6 +53,21 @@ const song = (cues: Record<number, number> = {}): CuedSong => {
     ],
   };
 };
+
+const take = (id: number): Take => ({
+  id,
+  number: 1,
+  size: 1000,
+  duration: 12,
+  sampleRate: 48000,
+  latencyOffset: 0.01,
+  position: 0,
+  recordedAt: '',
+});
+
+/** A Clip of Takes, playing the first of them. */
+const takeClip = (id: number, start: number, takes: Take[]): Clip =>
+  clip(id, start, { beatId: null, takes, activeTakeId: takes[0].id, offset: 2 });
 
 describe('History', () => {
   it('has nothing to undo or redo at first', () => {
@@ -435,5 +452,69 @@ describe('restorable', () => {
     ];
 
     expect(restorable(cues, now)).toEqual(cues);
+  });
+});
+
+describe('History of Takes', () => {
+  it('undoes a recording by deleting its Clip, and redoes it by placing its Take back', () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0)]), track(2)]);
+    const t1 = timeline([track(1, [clip(5, 0)]), track(2, [takeClip(6, 10, [take(40)])])]);
+
+    const edit = recorded(t0, t1);
+    h.record(edit, t0, t1);
+
+    expect(edit).toEqual({
+      kind: 'placeClip',
+      trackId: 2,
+      clip: { takeIds: [40], activeTakeId: 40, start: 10, offset: 2, length: 10 },
+    });
+    expect(h.nextUndo()).toEqual({ kind: 'deleteClip', clipId: 6 });
+
+    h.undone(t1, t0);
+    expect(h.nextRedo()).toEqual(edit);
+
+    // Placed back, the Take is in a new Clip.
+    h.redone(t0, timeline([track(1, [clip(5, 0)]), track(2, [takeClip(9, 10, [take(40)])])]));
+    expect(h.nextUndo()).toEqual({ kind: 'deleteClip', clipId: 9 });
+  });
+
+  it('undoes deleting a Clip of Takes by placing its Takes back, the same one active', () => {
+    const h = new History();
+    const c = clip(6, 10, { beatId: null, takes: [take(40), take(41)], activeTakeId: 41 });
+    const t0 = timeline([track(2, [c])]);
+    const t1 = timeline([track(2)]);
+
+    h.record({ kind: 'deleteClip', clipId: 6 }, t0, t1);
+
+    expect(h.nextUndo()).toEqual({
+      kind: 'placeClip',
+      trackId: 2,
+      clip: { takeIds: [40, 41], activeTakeId: 41, start: 10, offset: 0, length: 10 },
+    });
+    h.undone(t1, timeline([track(2, [{ ...c, id: 8 }])]));
+    expect(h.nextRedo()).toEqual({ kind: 'deleteClip', clipId: 8 });
+  });
+
+  it("undoes deleting a Track by adding it back with its Clips' Takes", () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0)]), track(2, [takeClip(6, 10, [take(40)])], { name: 'Lead vox' })]);
+    const t1 = timeline([track(1, [clip(5, 0)])]);
+
+    h.record({ kind: 'deleteTrack', trackId: 2 }, t0, t1);
+
+    expect(h.nextUndo()).toEqual({
+      kind: 'addTrack',
+      track: {
+        name: 'Lead vox',
+        position: 1,
+        volume: 0,
+        muted: false,
+        soloed: false,
+        clips: [{ takeIds: [40], activeTakeId: 40, start: 10, offset: 2, length: 10 }],
+      },
+    });
+    h.undone(t1, timeline([track(1, [clip(5, 0)]), track(3, [takeClip(7, 10, [take(40)])], { name: 'Lead vox' })]));
+    expect(h.nextRedo()).toEqual({ kind: 'deleteTrack', trackId: 3 });
   });
 });
