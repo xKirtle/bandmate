@@ -18,11 +18,10 @@ var (
 )
 
 // ImportSong creates a new Song from pasted lyrics, plain text or ChordPro,
-// with one Occurrence per Section the text marks (see parseImport). A
-// Section repeated in the text is one Section (see arrange). A title
-// directive in the text names the Song; without one, title does. Other
-// directives fill in the Song's Details. Timestamps in the text become
-// Line Cues, each Occurrence keeping its own.
+// with one Section per heading or ChordPro block the text marks (see
+// parseImport), each appearing once (ADR 0010). A title directive in the
+// text names the Song; without one, title does. Other directives fill in
+// the Song's Details. Timestamps in the text become Line Cues.
 func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error) {
 	sheet, err := parseImport(text)
 	if err != nil {
@@ -52,38 +51,28 @@ func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error
 		sheet.key, sheet.bpm, sheet.capo, sheet.tuning, strings.Join(sheet.notes, "\n"), songID); err != nil {
 		return Song{}, fmt.Errorf("setting details: %w", err)
 	}
-	distinct, arrangement := arrange(sheet.sections)
-	sectionIDs := make([]int64, len(distinct))
-	lineIDs := make([][]int64, len(distinct))
-	for i, sec := range distinct {
+	for pos, sec := range sheet.sections {
 		sectionID, alternateID, err := insertSection(ctx, tx, songID, sec.label)
 		if err != nil {
 			return Song{}, err
 		}
-		sectionIDs[i] = sectionID
-		for pos, line := range sec.lines {
-			lineID, err := insert(ctx, tx, `INSERT INTO lines (alternate_id, position, text) VALUES (?, ?, ?)`,
-				alternateID, pos, line.text)
-			if err != nil {
-				return Song{}, fmt.Errorf("adding line: %w", err)
-			}
-			lineIDs[i] = append(lineIDs[i], lineID)
-		}
-	}
-	for pos, section := range arrangement {
-		occurrenceID, err := insertOccurrence(ctx, tx, songID, sectionIDs[section], pos)
+		occurrenceID, err := insertOccurrence(ctx, tx, songID, sectionID, pos)
 		if err != nil {
 			return Song{}, err
 		}
-		// The Occurrence's own Lines match its Section's one for one (see
-		// sameAs), but have their own Cues. They're written directly, as
-		// parseImport already gave blank Lines none (see writeLineCue).
-		for i, line := range sheet.sections[pos].lines {
+		for i, line := range sec.lines {
+			lineID, err := insert(ctx, tx, `INSERT INTO lines (alternate_id, position, text) VALUES (?, ?, ?)`,
+				alternateID, i, line.text)
+			if err != nil {
+				return Song{}, fmt.Errorf("adding line: %w", err)
+			}
+			// Written directly, as parseImport already gave blank Lines no
+			// Cue (see writeLineCue).
 			if line.cue == nil {
 				continue
 			}
 			if _, err := tx.ExecContext(ctx, `INSERT INTO line_cues (occurrence_id, line_id, cue_ms) VALUES (?, ?, ?)`,
-				occurrenceID, lineIDs[section][i], *line.cue); err != nil {
+				occurrenceID, lineID, *line.cue); err != nil {
 				return Song{}, fmt.Errorf("adding line cue: %w", err)
 			}
 		}
@@ -104,8 +93,7 @@ type importedSheet struct {
 	sections    []importedSection
 }
 
-// importedSection is one Section read from pasted text, as it appears
-// there: one Occurrence, until arrange finds the Sections it shares.
+// importedSection is one Section read from pasted text.
 type importedSection struct {
 	label string
 	lines []importedLine
@@ -169,12 +157,14 @@ func recognised(name string) bool {
 // directive ends one, so the Lines after it start one without a Label.
 // Blank lines are blank Lines, except at a Section's start or end, where
 // they're dropped. A heading with no Lines under it is a Section with no
-// Lines. Each Detail's directive may appear once, and each notes directive
-// adds a line to the notes. Directives import doesn't recognise are Lines
-// as written.
+// Lines, unless an earlier Section has its Label, ignoring case: then it's
+// a Duplicate of the most recent one, with a copy of its Lines but not
+// their Cues (ADR 0010). Each Detail's directive may appear once, and each
+// notes directive adds a line to the notes. Directives import doesn't
+// recognise are Lines as written.
 //
-// A timestamp at the start of a line (see cutTimestamp) cues the Line in
-// its Occurrence. On a heading, it cues the Section's first Line, which
+// A timestamp at the start of a line (see cutTimestamp) cues the Line. On
+// a heading, it cues the Section's first Line, a Duplicate's too, which
 // must be there and agree with it, as only Lines are cued (ADR 0009). A
 // timestamp alone is a blank line, with no Cue, and a directive can't have
 // one. An offset directive, which may appear once, anywhere, shifts every
@@ -188,6 +178,12 @@ func parseImport(text string) (importedSheet, error) {
 	end := func() error {
 		for len(cur.lines) > 0 && blank(cur.lines[len(cur.lines)-1].text) {
 			cur.lines = cur.lines[:len(cur.lines)-1]
+		}
+		if len(cur.lines) == 0 && cur.label != "" {
+			cur.lines = duplicateLines(sheet.sections, cur.label)
+			if len(cur.lines) > 0 && cur.headingCue != nil {
+				cur.lines[0].cue, cur.lines[0].cuePasteLine = cur.headingCue, cur.headingPasteLine
+			}
 		}
 		if cur.headingCue != nil && len(cur.lines) == 0 {
 			return invalidPasteLine(cur.headingPasteLine, "a timestamp on a heading needs a Line under it to cue")
@@ -392,46 +388,21 @@ func wholeNumber(value string, lo, hi int) (*int, bool) {
 	return &n, true
 }
 
-// arrange lays imported Sections out as a Song. It returns the distinct
-// Sections and, for each Occurrence in order, the index of its Section.
-//
-// A Section with Lines is an Occurrence of the most recent earlier Section
-// with the same Label and Lines (see sameAs). A heading with no Lines is an Occurrence of the most recent earlier
-// Section with that Label, ignoring case, or of a new Section without Lines
-// if there is none.
-func arrange(imported []importedSection) (sections []importedSection, arrangement []int) {
-	for _, sec := range imported {
-		match := func(earlier importedSection) bool { return earlier.sameAs(sec) }
-		if len(sec.lines) == 0 {
-			match = func(earlier importedSection) bool { return strings.EqualFold(earlier.label, sec.label) }
+// duplicateLines copies the Lines of the most recent of sections with
+// label, ignoring case, without their Cues, as a Duplicate's (ADR 0010).
+// It's nil if there's none.
+func duplicateLines(sections []importedSection, label string) []importedLine {
+	for _, earlier := range slices.Backward(sections) {
+		if !strings.EqualFold(earlier.label, label) {
+			continue
 		}
-		i := -1
-		for _, earlier := range slices.Backward(arrangement) {
-			if match(sections[earlier]) {
-				i = earlier
-				break
-			}
+		var lines []importedLine
+		for _, line := range earlier.lines {
+			lines = append(lines, importedLine{text: line.text, pasteLine: line.pasteLine})
 		}
-		if i < 0 {
-			i = len(sections)
-			sections = append(sections, sec)
-		}
-		arrangement = append(arrangement, i)
+		return lines
 	}
-	return sections, arrangement
-}
-
-// sameAs reports whether two imported Sections are the same Section: they
-// have Lines, the same Label, ignoring case, and Lines that match once
-// trimmed at both ends. Sections without a Label are never the same, as the
-// text didn't mark them as one.
-func (a importedSection) sameAs(b importedSection) bool {
-	if len(a.lines) == 0 || len(b.lines) == 0 || a.label == "" || !strings.EqualFold(a.label, b.label) {
-		return false
-	}
-	return slices.EqualFunc(a.lines, b.lines, func(x, y importedLine) bool {
-		return strings.TrimSpace(x.text) == strings.TrimSpace(y.text)
-	})
+	return nil
 }
 
 // directive reads a ChordPro directive line such as "{title: Midnight Drive}"

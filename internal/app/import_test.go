@@ -25,10 +25,24 @@ func (ts *testServer) importSheet(text string) song {
 	if read := ts.getSong(s.ID); !reflect.DeepEqual(read, s) {
 		ts.t.Errorf("song read back = %+v, want %+v", read, s)
 	}
+	expectNoSectionRepeated(ts.t, s)
 	return s
 }
 
-// shownSection is one Occurrence of a Song as the user reads it: its
+// expectNoSectionRepeated checks that each Section appears at most once in
+// the Song's Arrangement (ADR 0010).
+func expectNoSectionRepeated(t *testing.T, s song) {
+	t.Helper()
+	seen := map[int64]bool{}
+	for _, o := range s.Arrangement {
+		if seen[o.SectionID] {
+			t.Errorf("section %d appears more than once in arrangement %+v", o.SectionID, s.Arrangement)
+		}
+		seen[o.SectionID] = true
+	}
+}
+
+// shownSection is one Section of a Song as the user reads it: its
 // Section's Label and the texts of its active Lines.
 type shownSection struct {
 	Label string
@@ -196,135 +210,62 @@ func TestImportSplitsPastedTextIntoSections(t *testing.T) {
 	}
 }
 
-// sharing numbers each Occurrence of a Song by its Section, in order of first
-// appearance, so Occurrences of one shared Section get the same number.
-func sectionNumbers(s song) []int {
-	number := map[int64]int{}
-	out := []int{}
-	for _, o := range s.Arrangement {
-		if _, ok := number[o.SectionID]; !ok {
-			number[o.SectionID] = len(number)
-		}
-		out = append(out, number[o.SectionID])
-	}
-	return out
-}
-
-func TestImportMergesRepeatedSections(t *testing.T) {
+func TestImportRepeatedSectionsAreSeparate(t *testing.T) {
 	cases := map[string]struct {
-		text     string
-		want     []shownSection
-		sections []int
+		text string
+		want []shownSection
 	}{
-		"an identical chorus three times is one section": {
+		"an identical chorus three times is three sections": {
 			"[Chorus]\nMe home\ntonight\n\n[Verse]\nCity lights\n\n[Chorus]\nMe home\ntonight\n\n[Verse]\nSo far\n\n[Chorus]\nMe home\ntonight",
 			[]shownSection{
 				{"Chorus", []string{"Me home", "tonight"}}, {"Verse", []string{"City lights"}},
 				{"Chorus", []string{"Me home", "tonight"}}, {"Verse", []string{"So far"}},
 				{"Chorus", []string{"Me home", "tonight"}},
 			},
-			[]int{0, 1, 0, 2, 0},
 		},
 		"identical stanzas without headings are one section": {
 			"Me home\ntonight\n\nMe home\ntonight",
 			[]shownSection{{"", []string{"Me home", "tonight", "", "Me home", "tonight"}}},
-			[]int{0},
 		},
-		"whitespace at line ends is ignored": {
+		"repeated sections keep their lines as written": {
 			"[Chorus]\nMe home\ntonight\n\n[Chorus]\n  Me home \ntonight\t",
-			[]shownSection{{"Chorus", []string{"Me home", "tonight"}}, {"Chorus", []string{"Me home", "tonight"}}},
-			[]int{0, 0},
+			[]shownSection{{"Chorus", []string{"Me home", "tonight"}}, {"Chorus", []string{"  Me home ", "tonight\t"}}},
 		},
-		"blank lines inside merge like any line": {
-			"[Chorus]\nMe home\n\ntonight\n\n[Verse]\nCity lights\n\n[Chorus]\nMe home\n  \ntonight",
-			[]shownSection{
-				{"Chorus", []string{"Me home", "", "tonight"}}, {"Verse", []string{"City lights"}},
-				{"Chorus", []string{"Me home", "", "tonight"}},
-			},
-			[]int{0, 1, 0},
-		},
-		"an extra blank line stops a merge": {
-			"[Chorus]\nMe home\ntonight\n\n[Chorus]\nMe home\n\ntonight",
-			[]shownSection{{"Chorus", []string{"Me home", "tonight"}}, {"Chorus", []string{"Me home", "", "tonight"}}},
-			[]int{0, 1},
-		},
-		"sections that differ slightly do not merge": {
-			"[Chorus]\nMe home\ntonight\n[Chorus]\nMe home\ntonight!\n[Chorus]\nMe home\n[Chorus]\nMe  home\ntonight\n[Chorus]\nMe home\ntonight\nagain",
-			[]shownSection{
-				{"Chorus", []string{"Me home", "tonight"}}, {"Chorus", []string{"Me home", "tonight!"}}, {"Chorus", []string{"Me home"}},
-				{"Chorus", []string{"Me  home", "tonight"}}, {"Chorus", []string{"Me home", "tonight", "again"}},
-			},
-			[]int{0, 1, 2, 3, 4},
-		},
-		"different chords do not merge": {
-			"[Chorus]\nMe [Am]home\n\n[Chorus]\nMe [F]home",
-			[]shownSection{{"Chorus", []string{"Me [Am]home"}}, {"Chorus", []string{"Me [F]home"}}},
-			[]int{0, 1},
-		},
-		"lines after an end directive do not merge into a labelled section": {
-			"{soc}\nMe home\n{eoc}\n\nMe home",
-			[]shownSection{{"Chorus", []string{"Me home"}}, {"", []string{"Me home"}}},
-			[]int{0, 1},
-		},
-		"lines before the first heading do not merge into a labelled section": {
-			"Me home\n\nChorus:\nMe home",
-			[]shownSection{{"", []string{"Me home"}}, {"Chorus", []string{"Me home"}}},
-			[]int{0, 1},
-		},
-		"unlabelled sections do not merge": {
-			"{soc}\nMe home\n{eoc}\nCity lights\n{soc}\nMe home\n{eoc}\nCity lights",
-			[]shownSection{{"Chorus", []string{"Me home"}}, {"", []string{"City lights"}}, {"Chorus", []string{"Me home"}}, {"", []string{"City lights"}}},
-			[]int{0, 1, 0, 2},
-		},
-		"labels differing only in case merge": {
-			"[Chorus]\nMe home\n\n[chorus]\nMe home",
-			[]shownSection{{"Chorus", []string{"Me home"}}, {"Chorus", []string{"Me home"}}},
-			[]int{0, 0},
-		},
-		"different labels do not merge": {
-			"[Intro]\n[Am] [F]\n\n[Outro]\n[Am] [F]",
-			[]shownSection{{"Intro", []string{"[Am] [F]"}}, {"Outro", []string{"[Am] [F]"}}},
-			[]int{0, 1},
-		},
-		"a heading on its own repeats the section with that label": {
-			"[Chorus]\nMe home\n\n[Verse]\nCity lights\n\n[Chorus]",
-			[]shownSection{{"Chorus", []string{"Me home"}}, {"Verse", []string{"City lights"}}, {"Chorus", []string{"Me home"}}},
-			[]int{0, 1, 0},
-		},
-		"a repeat heading ignores case": {
-			"Chorus:\nMe home\n\nCHORUS:",
-			[]shownSection{{"Chorus", []string{"Me home"}}, {"Chorus", []string{"Me home"}}},
-			[]int{0, 0},
-		},
-		"a repeat heading picks the most recent match": {
-			"[Chorus]\nMe home\n\n[Chorus]\nCity lights\n\n[Chorus]",
-			[]shownSection{{"Chorus", []string{"Me home"}}, {"Chorus", []string{"City lights"}}, {"Chorus", []string{"City lights"}}},
-			[]int{0, 1, 1},
-		},
-		"a repeat heading does not match an unlabelled section": {
-			"Me home\n\n[Verse]\nCity lights\n\n[Chorus]",
-			[]shownSection{{"", []string{"Me home"}}, {"Verse", []string{"City lights"}}, {"Chorus", []string{}}},
-			[]int{0, 1, 2},
-		},
-		"a repeat heading without an earlier match is an empty section": {
-			"[Verse]\nCity lights\n\n[Chorus]\n\n[Chorus]",
-			[]shownSection{{"Verse", []string{"City lights"}}, {"Chorus", []string{}}, {"Chorus", []string{}}},
-			[]int{0, 1, 1},
-		},
-		"a heading does not repeat a later section": {
-			"[Chorus]\n[Verse]\nCity lights\n\n[Chorus]\nMe home",
-			[]shownSection{{"Chorus", []string{}}, {"Verse", []string{"City lights"}}, {"Chorus", []string{"Me home"}}},
-			[]int{0, 1, 2},
-		},
-		"an empty chordpro section repeats the chorus": {
-			"{soc}\nMe home\n{eoc}\n{sov}\nCity lights\n{eov}\n{soc}\n{eoc}",
-			[]shownSection{{"Chorus", []string{"Me home"}}, {"Verse", []string{"City lights"}}, {"Chorus", []string{"Me home"}}},
-			[]int{0, 1, 0},
-		},
-		"a repeated chordpro chorus merges": {
+		"a repeated chordpro chorus is its own section": {
 			"{soc}\nMe home\n{eoc}\n\n{soc}\nMe home\n{eoc}",
 			[]shownSection{{"Chorus", []string{"Me home"}}, {"Chorus", []string{"Me home"}}},
-			[]int{0, 0},
+		},
+		"a heading on its own duplicates the section with that label": {
+			"[Chorus]\nMe home\n\ntonight\n\n[Verse]\nCity lights\n\n[Chorus]",
+			[]shownSection{{"Chorus", []string{"Me home", "", "tonight"}}, {"Verse", []string{"City lights"}}, {"Chorus", []string{"Me home", "", "tonight"}}},
+		},
+		"a duplicate heading keeps its own label": {
+			"Chorus:\nMe home\n\nCHORUS:",
+			[]shownSection{{"Chorus", []string{"Me home"}}, {"CHORUS", []string{"Me home"}}},
+		},
+		"a duplicate heading picks the most recent match": {
+			"[Chorus]\nMe home\n\n[Chorus]\nCity lights\n\n[Chorus]",
+			[]shownSection{{"Chorus", []string{"Me home"}}, {"Chorus", []string{"City lights"}}, {"Chorus", []string{"City lights"}}},
+		},
+		"a duplicate heading can duplicate a duplicate": {
+			"[Chorus]\nMe home\n\n[Chorus]\n[Chorus]",
+			[]shownSection{{"Chorus", []string{"Me home"}}, {"Chorus", []string{"Me home"}}, {"Chorus", []string{"Me home"}}},
+		},
+		"a duplicate heading does not match an unlabelled section": {
+			"Me home\n\n[Verse]\nCity lights\n\n[Chorus]",
+			[]shownSection{{"", []string{"Me home"}}, {"Verse", []string{"City lights"}}, {"Chorus", []string{}}},
+		},
+		"a heading on its own without an earlier match stays empty": {
+			"[Verse]\nCity lights\n\n[Chorus]\n\n[Chorus]",
+			[]shownSection{{"Verse", []string{"City lights"}}, {"Chorus", []string{}}, {"Chorus", []string{}}},
+		},
+		"a heading does not duplicate a later section": {
+			"[Chorus]\n[Verse]\nCity lights\n\n[Chorus]\nMe home",
+			[]shownSection{{"Chorus", []string{}}, {"Verse", []string{"City lights"}}, {"Chorus", []string{"Me home"}}},
+		},
+		"an empty chordpro section duplicates the chorus": {
+			"{soc}\nMe home\n{eoc}\n{sov}\nCity lights\n{eov}\n{soc}\n{eoc}",
+			[]shownSection{{"Chorus", []string{"Me home"}}, {"Verse", []string{"City lights"}}, {"Chorus", []string{"Me home"}}},
 		},
 	}
 	for name, c := range cases {
@@ -336,8 +277,8 @@ func TestImportMergesRepeatedSections(t *testing.T) {
 			if got := readSheet(s); !reflect.DeepEqual(got, c.want) {
 				t.Errorf("sheet = %+v, want %+v", got, c.want)
 			}
-			if got := sectionNumbers(s); !reflect.DeepEqual(got, c.sections) {
-				t.Errorf("sections by occurrence = %v, want %v", got, c.sections)
+			if got, want := len(s.Sections), len(c.want); got != want {
+				t.Errorf("%d sections, want %d, one per Section in the arrangement", got, want)
 			}
 		})
 	}
@@ -353,7 +294,7 @@ func TestImportedChordsAreParsed(t *testing.T) {
 	res.JSON(t, &s)
 	sections := sectionsByID(s)
 	if len(s.Arrangement) != 2 {
-		t.Fatalf("arrangement = %+v, want two Occurrences", s.Arrangement)
+		t.Fatalf("arrangement = %+v, want two Sections", s.Arrangement)
 	}
 	intro := sections[s.Arrangement[0].SectionID].Alternates[0].Lines[0]
 	if !intro.ChordLine || !reflect.DeepEqual(intro.Chords, []chord{{0, "Am"}, {1, "F"}}) {
@@ -560,11 +501,11 @@ func TestImportKeepsBracketTagsAsLabels(t *testing.T) {
 	}
 }
 
-// shownCues is one Occurrence's Line Cues as imported, by the position of
+// shownCues is one Section's Line Cues as imported, by the position of
 // each Line in its active Alternate.
 type shownCues map[int]float64
 
-// readCues lists a Song's Cues by Occurrence, in order.
+// readCues lists a Song's Cues by Section, in Arrangement order.
 func readCues(s song) []shownCues {
 	sections := sectionsByID(s)
 	out := []shownCues{}
@@ -616,48 +557,41 @@ func TestImportTimestampsCueTheirLines(t *testing.T) {
 
 func TestImportTimestamps(t *testing.T) {
 	cases := map[string]struct {
-		text     string
-		want     []shownSection
-		cues     []shownCues
-		sections []int
+		text string
+		want []shownSection
+		cues []shownCues
 	}{
 		"timestamped lines are cued": {
 			"[Verse]\n[0:05]City lights\n[0:08]are calling",
 			[]shownSection{{"Verse", []string{"City lights", "are calling"}}},
 			[]shownCues{{0: 5, 1: 8}},
-			[]int{0},
 		},
 		"blank lines at a section's start take no cue": {
 			"[Verse]\n\n[0:01]\n[0:05]City lights",
 			[]shownSection{{"Verse", []string{"City lights"}}},
 			[]shownCues{{0: 5}},
-			[]int{0},
 		},
 		"a timestamp in front of a bracketed heading cues its first line": {
 			"[0:30][Chorus]\nMe home\n[0:34]tonight",
 			[]shownSection{{"Chorus", []string{"Me home", "tonight"}}},
 			[]shownCues{{0: 30, 1: 34}},
-			[]int{0},
 		},
 		"a timestamp in front of a colon heading cues its first line": {
 			"[00:30.0]Chorus:\nMe home",
 			[]shownSection{{"Chorus", []string{"Me home"}}},
 			[]shownCues{{0: 30}},
-			[]int{0},
 		},
 		"a heading and its first line can give the same time": {
 			"[00:30.0][Chorus]\n\n[0:30]Me home",
 			[]shownSection{{"Chorus", []string{"Me home"}}},
 			[]shownCues{{0: 30}},
-			[]int{0},
 		},
-		"a heading's timestamp cues only its own occurrence": {
+		"a heading's timestamp cues only its own section": {
 			"[0:10][Chorus]\nMe home\n\n[Verse]\nCity lights\n\n[Chorus]\n[1:10]Me home",
 			[]shownSection{{"Chorus", []string{"Me home"}}, {"Verse", []string{"City lights"}}, {"Chorus", []string{"Me home"}}},
 			[]shownCues{{0: 10}, {}, {0: 70}},
-			[]int{0, 1, 0},
 		},
-		"identical choruses at different times share a section and keep their cues": {
+		"identical choruses at different times keep their own cues": {
 			"[Chorus]\n[0:10]Me home\n[0:14]tonight\n\n[Verse]\n[0:20]City lights\n\n[Chorus]\n[0:40]Me home\n[0:44] tonight",
 			[]shownSection{{"Chorus", []string{"Me home", "tonight"}}, {"Verse", []string{"City lights"}}, {"Chorus", []string{"Me home", "tonight"}}},
 			[]shownCues{
@@ -665,31 +599,36 @@ func TestImportTimestamps(t *testing.T) {
 				{0: 20},
 				{0: 40, 1: 44},
 			},
-			[]int{0, 1, 0},
+		},
+		"a timestamp on a duplicate heading cues the duplicate's first line": {
+			"[Chorus]\n[0:10]Me home\n[0:14]tonight\n\n[Verse]\n[0:20]City lights\n\n[0:40][Chorus]",
+			[]shownSection{{"Chorus", []string{"Me home", "tonight"}}, {"Verse", []string{"City lights"}}, {"Chorus", []string{"Me home", "tonight"}}},
+			[]shownCues{{0: 10, 1: 14}, {0: 20}, {0: 40}},
+		},
+		"a duplicate heading without a timestamp copies no cues": {
+			"[0:10][Chorus]\nMe home\n[0:14]tonight\n\n[Chorus]",
+			[]shownSection{{"Chorus", []string{"Me home", "tonight"}}, {"Chorus", []string{"Me home", "tonight"}}},
+			[]shownCues{{0: 10, 1: 14}, {}},
 		},
 		"timestamps out of order are kept as given": {
 			"[0:50]City lights\n[0:20]are calling\n[0:30]Me home",
 			[]shownSection{{"", []string{"City lights", "are calling", "Me home"}}},
 			[]shownCues{{0: 50, 1: 20, 2: 30}},
-			[]int{0},
 		},
 		"a timestamp alone is a blank line": {
 			"[0:01]\n[Verse]\n[0:02]\n[0:05]City lights\n[0:09]\n[0:10]are calling\n[0:14]\n\n[0:20]",
 			[]shownSection{{"Verse", []string{"City lights", "", "are calling"}}},
 			[]shownCues{{0: 5, 2: 10}},
-			[]int{0},
 		},
 		"a timestamp alone keeps a section going": {
 			"[Chorus]\nMe home\n[0:09]\ntonight",
 			[]shownSection{{"Chorus", []string{"Me home", "", "tonight"}}},
 			[]shownCues{{}},
-			[]int{0},
 		},
 		"chord lines take timestamps": {
 			"[Intro]\n[0:00][Am] [F]\n[0:04.5]  [C] [G]",
 			[]shownSection{{"Intro", []string{"[Am] [F]", "[C] [G]"}}},
 			[]shownCues{{0: 0, 1: 4.5}},
-			[]int{0},
 		},
 	}
 	for name, c := range cases {
@@ -703,9 +642,6 @@ func TestImportTimestamps(t *testing.T) {
 			}
 			if got := readCues(s); !reflect.DeepEqual(got, c.cues) {
 				t.Errorf("cues = %+v, want %+v", got, c.cues)
-			}
-			if got := sectionNumbers(s); !reflect.DeepEqual(got, c.sections) {
-				t.Errorf("sections by occurrence = %v, want %v", got, c.sections)
 			}
 		})
 	}
@@ -730,12 +666,16 @@ func TestImportWithABadTimestampIsRejected(t *testing.T) {
 			"line 6: its timestamp differs from the heading's on line 4",
 		},
 		"heading with no lines under it": {
-			"[Chorus]\nMe home\n\n[1:10][Chorus]\n\n[Verse]\nCity lights",
+			"[Chorus]\nMe home\n\n[1:10][Verse]\n\n[Bridge]\nCity lights",
 			"line 4: a timestamp on a heading needs a Line under it to cue",
 		},
 		"heading at the end with no lines under it": {
-			"[Chorus]\nMe home\n\n[1:10][Chorus]",
+			"[Chorus]\nMe home\n\n[1:10][Verse]",
 			"line 4: a timestamp on a heading needs a Line under it to cue",
+		},
+		"heading duplicating a section with no lines": {
+			"[Chorus]\n[Verse]\nCity lights\n\n[1:10][Chorus]",
+			"line 5: a timestamp on a heading needs a Line under it to cue",
 		},
 		"heading ended with no lines under it": {
 			"City lights\n[1:10][Chorus]\n{eoc}\nMe home",
@@ -807,6 +747,10 @@ func TestImportWithABadOffsetIsRejected(t *testing.T) {
 	cases := map[string]struct{ text, want string }{
 		"before 0:00": {
 			"[0:30][Chorus]\nMe home\n\n[Verse]\n[0:01]City lights\n{offset: -2}",
+			"line 5: a Cue can't be before the start of the Timeline",
+		},
+		"a duplicate heading's cue before 0:00": {
+			"[Chorus]\n[0:05]Me home\n\n{offset: -0:02}\n[0:01][Chorus]",
 			"line 5: a Cue can't be before the start of the Timeline",
 		},
 		"a heading's cue before 0:00": {

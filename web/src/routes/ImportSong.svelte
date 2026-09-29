@@ -40,8 +40,9 @@
       Paste plain text or ChordPro. A line like <code>Chorus:</code> or <code>[Chorus]</code>, or a
       ChordPro start directive, starts a Section with that Label, and a ChordPro end directive ends
       it; without them the paste is one Section. Blank lines stay as blank Lines, and
-      <code>[Am]</code> becomes a Chord. Repeated Sections with the same Label are shared, and a
-      Label on its own repeats the last Section with that Label.
+      <code>[Am]</code> becomes a Chord. Each Section is its own, even when its Lines match an
+      earlier one, and a Label on its own is a Duplicate of the last Section with that Label: a
+      copy of its Lines.
     </p>
     <p id="directives-hint" class="muted">
       ChordPro directives fill in the Song: <code>{'{title:}'}</code> or <code>{'{t:}'}</code>
@@ -51,8 +52,8 @@
     </p>
     <p id="timestamps-hint" class="muted">
       A timestamp like <code>[1:02]</code> or <code>[1:02.34]</code> at the start of a line cues
-      it, and cues that appearance of its Section too when it's on the heading or first line. A
-      timestamp alone on a line is a blank line. One <code>{'{offset:}'}</code> anywhere, like
+      it, and a timestamp on a heading cues the Section's first Line. A timestamp alone on a line
+      is a blank line. One <code>{'{offset:}'}</code> anywhere, like
       <code>{'{offset: 1.5}'}</code> or <code>{'{offset: -0:02}'}</code>, shifts every Cue that
       many seconds later, or earlier if negative.
     </p>
