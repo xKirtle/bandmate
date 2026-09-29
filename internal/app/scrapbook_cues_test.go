@@ -143,6 +143,34 @@ func TestAScrapbookSectionAddedToASectionBringsItsCuesDormant(t *testing.T) {
 	}
 }
 
+func TestALyricSheetSectionAddedToASectionBringsItsCuesDormant(t *testing.T) {
+	ts := newTestServer(t)
+	s, first, second := ts.cuedVerse()
+	verse := s.Sections[1].ID
+	chorus := s.Sections[0]
+
+	got := ts.addToSection(s.ID, verse, chorus.ID)
+
+	alts := got.Sections[0].Alternates
+	if len(alts) != 2 || !alts[0].Active || alts[1].Active {
+		t.Fatalf("chorus alternates = %+v, want its own active and the Verse's inactive", alts)
+	}
+	want := map[int64]float64{first: 10, second: 14}
+	if cues := lineCues(got); !reflect.DeepEqual(cues, []map[int64]float64{want}) {
+		t.Errorf("lineCues = %v, want only the Chorus, with the Verse's dormant %v", cues, want)
+	}
+
+	// Made active, they come back into effect.
+	got = ts.activate(s.ID, alts[1].ID)
+
+	if cues := lineCues(got)[0]; !reflect.DeepEqual(cues, want) {
+		t.Errorf("chorus lineCues once active = %v, want %v", cues, want)
+	}
+	if read := ts.getSong(s.ID); !reflect.DeepEqual(read, got) {
+		t.Errorf("song read back = %+v, want %+v", read, got)
+	}
+}
+
 func TestDeletingAScrapbookSectionDropsItsCues(t *testing.T) {
 	ts := newTestServer(t)
 	s, _, _ := ts.cuedVerse()

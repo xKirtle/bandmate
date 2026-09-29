@@ -2,11 +2,11 @@ import { untrack } from 'svelte';
 import { dropFor, dropTarget, type Box, type Drop, type Dragged, type Target } from './sectionDrag';
 
 // On desktop in Write mode, a Section is dragged by the grip on its header:
-// within the Arrangement, from it to the Scrapbook, or from the Scrapbook
-// back into it or onto a Section in it. Pointer events rather than HTML5
-// drag and drop, so the drop shows between Sections and Esc cancels. One
-// drag is shared by the Lyric Sheet and the Scrapbook, as a drag goes from
-// one to the other.
+// within the Arrangement, from it to the Scrapbook or onto another Section in
+// it, or from the Scrapbook back into it or onto a Section in it. Pointer
+// events rather than HTML5 drag and drop, so the drop shows between Sections
+// and Esc cancels. One drag is shared by the Lyric Sheet and the Scrapbook,
+// as a drag goes from one to the other.
 export class SectionDragging {
   /** The drag under way: what's dragged, where it would drop, and where the pointer is. */
   current = $state<{ dragged: Dragged; target: Target | null; x: number; y: number } | null>(null);
@@ -95,9 +95,10 @@ export class SectionDragging {
       const box = this.#sections.get(i)?.getBoundingClientRect();
       return box ? { top: box.top, bottom: box.bottom } : { top: -Infinity, bottom: -Infinity };
     });
-    // Only a Scrapbook Section drops onto a Section: a Lyric Sheet Section dropped
-    // onto another would make a hook an Alternate of a verse by accident.
-    return dropTarget({ x, y }, this.#scrapbookBox(), arrangement, spans, 'section' in dragged);
+    // A Section drops onto any Section in the Arrangement but itself: over
+    // itself, it's still in the gaps either side.
+    const canDropOnto = (at: number) => 'section' in dragged || at !== dragged.arrangementAt;
+    return dropTarget({ x, y }, this.#scrapbookBox(), arrangement, spans, canDropOnto);
   }
 
   // Only the part of the Scrapbook in view in its column can be dropped on.

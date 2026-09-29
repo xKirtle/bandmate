@@ -360,13 +360,14 @@ export const api = {
   /** Creates a Section in the Scrapbook, outside the Arrangement. */
   addToScrapbook: (at: SongAt, label = '') => request<Song>('POST', `/songs/${at.id}/scrapbook`, { label }, at),
   /**
-   * Adds a Scrapbook Section to a Section in the Lyric Sheet: its Alternates
-   * join that Section's, inactive, an unnamed one taking its Label as its
-   * name, their Lines' Cues coming along dormant, and it leaves the
-   * Scrapbook.
+   * Adds a Section, from the Scrapbook or the Lyric Sheet, to another Section
+   * in the Lyric Sheet: its Alternates join that Section's, inactive, an
+   * unnamed one taking its Label as its name, their Lines' Cues coming along
+   * dormant, and it's gone from wherever it was. Adding one to itself is
+   * refused.
    */
-  addToSection: (at: SongAt, scrapId: number, sectionId: number) =>
-    request<Song>('POST', `/songs/${at.id}/sections/${scrapId}/add-to-section`, { sectionId }, at),
+  addToSection: (at: SongAt, addedId: number, sectionId: number) =>
+    request<Song>('POST', `/songs/${at.id}/sections/${addedId}/add-to-section`, { sectionId }, at),
   /** Permanently deletes a Section; only one in the Scrapbook can be. */
   deleteSection: (at: SongAt, sectionId: number) =>
     request<Song>('DELETE', `/songs/${at.id}/sections/${sectionId}`, undefined, at),

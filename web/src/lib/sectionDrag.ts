@@ -1,6 +1,6 @@
 // Dragging a Section to a new place in the Arrangement, or between the
-// Arrangement and the Scrapbook, or a Scrapbook Section onto a Section to add
-// its Alternates to it: from where the pointer is to what it would drop
+// Arrangement and the Scrapbook, or onto another Section to add its
+// Alternates to it: from where the pointer is to what it would drop
 // into, to what the drop does. A move within the Arrangement saves the
 // same order pressing ↑ or ↓ that many times gives, as those presses would.
 
@@ -16,14 +16,14 @@ export type Target = { gap: number } | { onto: number } | { scrapbook: true };
 /**
  * What a drop does, with the gap it shows in if it lands in the Arrangement:
  * a Section moved within it or to the Scrapbook, a Scrapbook Section put
- * back into it, or a Scrapbook Section, by its id, added to the Section at a
- * place in it.
+ * back into it, or a Section, from either, added to the Section at a place
+ * in it.
  */
 export type Drop =
   | { reorder: { from: number; to: number }; gap: number }
   | { toScrapbook: number }
   | { putBack: number; gap: number }
-  | { addTo: { section: number; arrangementAt: number } };
+  | { addTo: { dragged: Dragged; arrangementAt: number } };
 
 /** A box on the page, as getBoundingClientRect gives it. */
 export type Box = { left: number; right: number; top: number; bottom: number };
@@ -60,29 +60,27 @@ export function moveTo<T>(order: T[], from: number, to: number): T[] {
  * it's over it, else the gap in the Arrangement it's at while it's in the
  * Arrangement's column, above or below it too; null anywhere else.
  * `scrapbook` is null without one to drop on. `sections` are where each
- * Section in it runs down the page. With `canDropOnto`, the middle half of a
- * Section drops onto it instead, leaving a quarter at its top and bottom for
- * the gaps either side.
+ * Section in it runs down the page. The middle half of a Section that
+ * `canDropOnto` allows, by its place, drops onto it instead, leaving a
+ * quarter at its top and bottom for the gaps either side.
  */
 export function dropTarget(
   pointer: { x: number; y: number },
   scrapbook: Box | null,
   arrangement: Box,
   sections: Span[],
-  canDropOnto = false,
+  canDropOnto: (at: number) => boolean = () => false,
 ): Target | null {
   const { x, y } = pointer;
   if (scrapbook && x >= scrapbook.left && x <= scrapbook.right && y >= scrapbook.top && y <= scrapbook.bottom) {
     return { scrapbook: true };
   }
   if (x < arrangement.left || x > arrangement.right) return null;
-  if (canDropOnto) {
-    const at = sections.findIndex(({ top, bottom }) => {
-      const quarter = (bottom - top) / 4;
-      return y > top + quarter && y < bottom - quarter;
-    });
-    if (at !== -1) return { onto: at };
-  }
+  const at = sections.findIndex(({ top, bottom }) => {
+    const quarter = (bottom - top) / 4;
+    return y > top + quarter && y < bottom - quarter;
+  });
+  if (at !== -1 && canDropOnto(at)) return { onto: at };
   return { gap: dropGap(y, sections.map(({ top, bottom }) => (top + bottom) / 2)) };
 }
 
@@ -90,7 +88,10 @@ export function dropTarget(
 export function dropFor(dragged: Dragged, target: Target | null): Drop | null {
   if (!target) return null;
   if ('scrapbook' in target) return 'arrangementAt' in dragged ? { toScrapbook: dragged.arrangementAt } : null;
-  if ('onto' in target) return 'section' in dragged ? { addTo: { section: dragged.section, arrangementAt: target.onto } } : null;
+  if ('onto' in target) {
+    const onItself = 'arrangementAt' in dragged && dragged.arrangementAt === target.onto;
+    return onItself ? null : { addTo: { dragged, arrangementAt: target.onto } };
+  }
   const { gap } = target;
   if ('section' in dragged) return { putBack: dragged.section, gap };
   const from = dragged.arrangementAt;

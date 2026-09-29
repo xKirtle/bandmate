@@ -103,10 +103,10 @@
     if ('putBack' in drop) {
       const section = drop.putBack;
       change((at) => api.addToArrangement(at, section, drop.gap)).then(closed(section));
-    } else if ('addTo' in drop) {
-      const { section, arrangementAt } = drop.addTo;
+    } else if ('addTo' in drop && 'section' in drop.addTo.dragged) {
+      const { dragged, arrangementAt } = drop.addTo;
       const target = song.arrangement[arrangementAt];
-      if (target !== undefined) addTo(section, target);
+      if (target !== undefined) addTo(dragged.section, target);
     }
   }
 

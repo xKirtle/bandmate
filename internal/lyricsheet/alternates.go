@@ -141,15 +141,16 @@ func (s *Store) MoveAlternateToScrapbook(ctx context.Context, songID int64, base
 	})
 }
 
-// AddToSection adds a Section in the Scrapbook to a Section in the Lyric
-// Sheet: every Alternate of the Scrapbook Section joins the Section,
-// inactive, after its own, so the Lyric Sheet is unchanged, and the
-// Scrapbook Section is gone. An unnamed Alternate takes the Scrapbook
-// Section's Label as its name. Their Lines keep their ids and their Cues,
-// dormant until their Alternate is made active (ADR 0010).
-func (s *Store) AddToSection(ctx context.Context, songID int64, based Version, scrapID, sectionID int64) (Song, error) {
+// AddToSection adds a Section, from the Scrapbook or the Lyric Sheet, to
+// another Section in the Lyric Sheet: every Alternate of the added Section
+// joins the Section, inactive, after its own, so what the Section shows is
+// unchanged, and the added Section is gone, from the Arrangement too. An
+// unnamed Alternate takes the added Section's Label as its name. Their Lines
+// keep their ids and their Cues, dormant until their Alternate is made
+// active (ADR 0010).
+func (s *Store) AddToSection(ctx context.Context, songID int64, based Version, addedID, sectionID int64) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		scrapAt, err := findSection(ctx, tx, songID, scrapID)
+		addedAt, err := findSection(ctx, tx, songID, addedID)
 		if err != nil {
 			return err
 		}
@@ -157,13 +158,18 @@ func (s *Store) AddToSection(ctx context.Context, songID int64, based Version, s
 		if err != nil {
 			return err
 		}
-		if scrapAt.Valid {
-			return conflict("only a Scrapbook Section can be added to a Section")
+		if addedID == sectionID {
+			return conflict("a Section can't be added to itself")
 		}
 		if !at.Valid {
-			return conflict("a Scrapbook Section can only be added to a Section in the Lyric Sheet")
+			return conflict("a Section can only be added to a Section in the Lyric Sheet")
 		}
-		alternates, err := alternatesOf(ctx, tx, scrapID)
+		if addedAt.Valid {
+			if err := leaveArrangement(ctx, tx, songID, addedID, addedAt.Int64); err != nil {
+				return err
+			}
+		}
+		alternates, err := alternatesOf(ctx, tx, addedID)
 		if err != nil {
 			return err
 		}
@@ -181,8 +187,8 @@ func (s *Store) AddToSection(ctx context.Context, songID int64, based Version, s
 				return fmt.Errorf("moving lines: %w", err)
 			}
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM sections WHERE id = ?`, scrapID); err != nil {
-			return fmt.Errorf("deleting scrapbook section: %w", err)
+		if _, err := tx.ExecContext(ctx, `DELETE FROM sections WHERE id = ?`, addedID); err != nil {
+			return fmt.Errorf("deleting added section: %w", err)
 		}
 		return nil
 	})
