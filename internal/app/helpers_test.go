@@ -189,7 +189,6 @@ type song struct {
 type occurrence struct {
 	ID        int64 `json:"id"`
 	SectionID int64 `json:"sectionId"`
-	Shared    bool  `json:"shared"`
 	// LineCues maps Line ids to their Cues in this Occurrence, in seconds.
 	LineCues map[int64]float64 `json:"lineCues"`
 }

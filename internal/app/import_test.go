@@ -343,24 +343,6 @@ func TestImportMergesRepeatedSections(t *testing.T) {
 	}
 }
 
-func TestAWronglyMergedOccurrenceCanBeDetached(t *testing.T) {
-	ts := newTestServer(t)
-	s := ts.importSheet("[Chorus]\nMe home\n\n[Verse]\nCity lights\n\n[Chorus]\nMe home")
-	last := s.Arrangement[2]
-
-	got := ts.lyricSheetChange(http.MethodPost, detachPath(s.ID, last.ID), nil)
-
-	if sectionNumbers(got)[2] != 2 {
-		t.Fatalf("sections by occurrence = %v, want the last one on its own", sectionNumbers(got))
-	}
-	copied := sectionOf(t, got, got.Arrangement[2])
-	ts.setText(got.ID, copied.Alternates[0].ID, "Me home again")
-	want := []shownSection{{"Chorus", []string{"Me home"}}, {"Verse", []string{"City lights"}}, {"Chorus", []string{"Me home again"}}}
-	if sheet := readSheet(ts.getSong(s.ID)); !reflect.DeepEqual(sheet, want) {
-		t.Errorf("sheet = %+v, want %+v", sheet, want)
-	}
-}
-
 func TestImportedChordsAreParsed(t *testing.T) {
 	ts := newTestServer(t)
 

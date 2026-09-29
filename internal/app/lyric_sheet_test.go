@@ -23,7 +23,7 @@ func TestAddingASectionCreatesItWithOneActiveAlternateAndOneOccurrence(t *testin
 	if len(sec.Alternates) != 1 || !sec.Alternates[0].Active || len(sec.Alternates[0].Lines) != 0 {
 		t.Errorf("alternates = %+v, want one active, empty Alternate", sec.Alternates)
 	}
-	wantArrangement := []occurrence{{ID: got.Arrangement[0].ID, SectionID: sec.ID, Shared: false, LineCues: map[int64]float64{}}}
+	wantArrangement := []occurrence{{ID: got.Arrangement[0].ID, SectionID: sec.ID, LineCues: map[int64]float64{}}}
 	if !reflect.DeepEqual(got.Arrangement, wantArrangement) {
 		t.Errorf("arrangement = %+v, want %+v", got.Arrangement, wantArrangement)
 	}
