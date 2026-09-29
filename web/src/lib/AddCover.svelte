@@ -1,10 +1,12 @@
 <script lang="ts">
   import { api, type Song, type SongAt, type Status } from './api';
+  import type { Square } from './cover';
+  import CoverCrop from './CoverCrop.svelte';
   import CoverPlaceholder from './CoverPlaceholder.svelte';
-  import { prepareCover } from './coverUpload';
+  import { cropCover, openCover, type CoverToCrop } from './coverUpload';
 
   // The header's Cover placeholder in Write mode, as a button to pick a
-  // picture for the Song's Cover.
+  // picture for the Song's Cover, which then opens the crop step.
   let {
     title,
     status,
@@ -19,7 +21,8 @@
     onError: (message: string) => void;
   } = $props();
 
-  let busy = $state(false);
+  let busy = $state<string | null>(null);
+  let toCrop = $state<CoverToCrop | null>(null);
 
   // The limit is checked on the picture chosen, before it's scaled down, so
   // it's waited for. Without it, the server still enforces its own.
@@ -33,23 +36,41 @@
     const file = input.files?.[0];
     input.value = '';
     if (!file) return;
-    busy = true;
-    try {
-      const cover = await prepareCover(file, await maxCoverBytes);
+    await run('Opening…', async () => {
+      toCrop = await openCover(file, await maxCoverBytes);
+    });
+  }
+
+  async function add(picture: CoverToCrop, crop: Square) {
+    toCrop = null;
+    await run('Adding…', async () => {
+      const cover = await cropCover(picture, crop);
       await change((at) => api.addCover(at, cover));
+    });
+  }
+
+  async function run(label: string, work: () => Promise<void>) {
+    busy = label;
+    try {
+      await work();
     } catch (e) {
       onError((e as Error).message);
     } finally {
-      busy = false;
+      busy = null;
     }
   }
 </script>
 
-<label class="add" class:busy aria-busy={busy}>
+<label class="add" class:busy={busy !== null} aria-busy={busy !== null}>
   <CoverPlaceholder {title} {status} size="header" />
-  <span class="caption">{busy ? 'Adding…' : 'Add Cover'}</span>
-  <input class="visually-hidden" type="file" accept="image/*" onchange={pick} disabled={busy} />
+  <span class="caption">{busy ?? 'Add Cover'}</span>
+  <input class="visually-hidden" type="file" accept="image/*" onchange={pick} disabled={busy !== null || toCrop !== null} />
 </label>
+
+{#if toCrop}
+  {@const picture = toCrop}
+  <CoverCrop {picture} onConfirm={(crop) => add(picture, crop)} onCancel={() => (toCrop = null)} />
+{/if}
 
 <style>
   .add {
