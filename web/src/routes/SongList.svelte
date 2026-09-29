@@ -9,7 +9,7 @@
     type SongColumn,
   } from '../lib/listViews';
   import { navigate, replaceSearch, router } from '../lib/router.svelte';
-  import CoverPlaceholder from '../lib/CoverPlaceholder.svelte';
+  import SongCover from '../lib/SongCover.svelte';
   import StatusBadge from '../lib/StatusBadge.svelte';
   import { timeAgo } from '../lib/time';
 
@@ -142,7 +142,7 @@
           <tr onclick={(event) => openRow(event, song)}>
             <td class="title">
               <span class="with-cover">
-                <CoverPlaceholder title={song.title} status={song.status} />
+                <SongCover songId={song.id} coverId={song.coverId} title={song.title} status={song.status} />
                 <a href="/songs/{song.id}">{song.title}</a>
               </span>
             </td>
@@ -162,7 +162,7 @@
       {#each sorted as song (song.id)}
         <li>
           <a href="/songs/{song.id}">
-            <CoverPlaceholder title={song.title} status={song.status} />
+            <SongCover songId={song.id} coverId={song.coverId} title={song.title} status={song.status} />
             <span class="title">{song.title}</span>
             <span class="meta">
               <StatusBadge status={song.status} />

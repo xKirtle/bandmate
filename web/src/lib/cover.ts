@@ -12,3 +12,28 @@ export function coverInitial(title: string): string {
   // Some letters capitalise to two (ß to SS); those stay as they are.
   return [...graphemes.segment(upper)].length === 1 ? upper : first;
 }
+
+/** A size in pixels. */
+export interface Size {
+  width: number;
+  height: number;
+}
+
+/** A square of a picture, in its pixels. */
+export interface Square {
+  x: number;
+  y: number;
+  size: number;
+}
+
+/** A picture's size scaled down, keeping its shape, so neither side is over max. */
+export function fitWithin(width: number, height: number, max: number): Size {
+  const scale = Math.min(1, max / Math.max(width, height));
+  return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
+}
+
+/** The largest square of a picture, centred. */
+export function centredSquare(width: number, height: number): Square {
+  const size = Math.min(width, height);
+  return { x: Math.floor((width - size) / 2), y: Math.floor((height - size) / 2), size };
+}

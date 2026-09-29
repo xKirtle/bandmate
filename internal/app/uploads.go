@@ -12,7 +12,8 @@ import (
 )
 
 // Beats and Masters are uploaded the same way: the audio file as uploaded,
-// with what the browser worked out by decoding it.
+// with what the browser worked out by decoding it. Covers are uploaded
+// likewise, as the pictures the browser made.
 
 // maxDetailsSize caps the JSON sent alongside an audio file. The waveform
 // peaks make up most of it: 100 per second is under 1 MB for half an hour.
@@ -43,67 +44,97 @@ type uploadedFile struct {
 // nothing and returns false; on success the caller keeps or discards the
 // file.
 func (a *App) readUpload(w http.ResponseWriter, r *http.Request, files *audio.Files, details any) (uploadedFile, bool) {
-	fail := func(file uploadedFile, status int, msg string) (uploadedFile, bool) {
-		if file.Received != nil {
-			file.Discard()
+	tooLarge := fmt.Sprintf("the file is larger than the upload limit of %s", formatSize(a.maxUpload))
+	got, ok := readFiles(w, r, a.maxUpload, tooLarge, []filePart{{"file", files}}, details)
+	return got["file"], ok
+}
+
+// filePart is a file expected in an upload: the name of its part, and
+// where it's received.
+type filePart struct {
+	name  string
+	files *audio.Files
+}
+
+// readFiles reads a multipart upload of one file for each of parts and a
+// JSON object ("details") decoded into details. Each file is streamed into
+// its part's files, and all of them together are capped at limit, beyond
+// which tooLarge is the answer. On failure it answers the request, keeps
+// nothing and returns false; on success the caller keeps or discards the
+// files, by part name.
+func readFiles(w http.ResponseWriter, r *http.Request, limit int64, tooLarge string, parts []filePart, details any) (map[string]uploadedFile, bool) {
+	got := map[string]uploadedFile{}
+	fail := func(status int, msg string) (map[string]uploadedFile, bool) {
+		for _, f := range got {
+			f.Discard()
 		}
 		writeError(w, status, msg)
-		return uploadedFile{}, false
+		return nil, false
 	}
-	tooLarge := fmt.Sprintf("the file is larger than the upload limit of %s", formatSize(a.maxUpload))
-	limit := a.maxUpload + maxDetailsSize
-	if r.ContentLength > limit {
-		return fail(uploadedFile{}, http.StatusRequestEntityTooLarge, tooLarge)
+	bodyLimit := limit + maxDetailsSize
+	if r.ContentLength > bodyLimit {
+		return fail(http.StatusRequestEntityTooLarge, tooLarge)
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, limit)
-	parts, err := r.MultipartReader()
+	r.Body = http.MaxBytesReader(w, r.Body, bodyLimit)
+	form, err := r.MultipartReader()
 	if err != nil {
-		return fail(uploadedFile{}, http.StatusBadRequest, "the upload must be a multipart form")
+		return fail(http.StatusBadRequest, "the upload must be a multipart form")
 	}
-	var file uploadedFile
+	filesFor := map[string]*audio.Files{}
+	for _, p := range parts {
+		filesFor[p.name] = p.files
+	}
+	var received int64
 	sawDetails := false
 	for {
-		part, err := parts.NextPart()
+		part, err := form.NextPart()
 		if errors.Is(err, io.EOF) {
 			break
 		}
 		var maxBytes *http.MaxBytesError
 		if errors.As(err, &maxBytes) {
-			return fail(file, http.StatusRequestEntityTooLarge, tooLarge)
+			return fail(http.StatusRequestEntityTooLarge, tooLarge)
 		}
 		if err != nil {
-			return fail(file, http.StatusBadRequest, "the upload must be a multipart form")
+			return fail(http.StatusBadRequest, "the upload must be a multipart form")
 		}
-		switch part.FormName() {
-		case "details":
+		name := part.FormName()
+		if name == "details" {
 			dec := json.NewDecoder(io.LimitReader(part, maxDetailsSize))
 			dec.DisallowUnknownFields()
 			if err := dec.Decode(details); err != nil {
-				return fail(file, http.StatusBadRequest, "details must be valid JSON with known fields")
+				return fail(http.StatusBadRequest, "details must be valid JSON with known fields")
 			}
 			sawDetails = true
-		case "file":
-			if file.Received != nil {
-				return fail(file, http.StatusBadRequest, "send one file")
-			}
-			received, err := files.Receive(part, a.maxUpload)
-			if errors.Is(err, audio.ErrTooLarge) || errors.As(err, &maxBytes) {
-				return fail(file, http.StatusRequestEntityTooLarge, tooLarge)
-			}
-			if err != nil {
-				log.Printf("receiving upload: %v", err)
-				return fail(file, http.StatusInternalServerError, "something went wrong")
-			}
-			file = uploadedFile{Received: received, name: part.FileName(), contentType: part.Header.Get("Content-Type")}
+			continue
+		}
+		files, ok := filesFor[name]
+		if !ok {
+			continue
+		}
+		if _, dup := got[name]; dup {
+			return fail(http.StatusBadRequest, "send one "+name)
+		}
+		file, err := files.Receive(part, limit-received)
+		if errors.Is(err, audio.ErrTooLarge) || errors.As(err, &maxBytes) {
+			return fail(http.StatusRequestEntityTooLarge, tooLarge)
+		}
+		if err != nil {
+			log.Printf("receiving upload: %v", err)
+			return fail(http.StatusInternalServerError, "something went wrong")
+		}
+		received += file.Size
+		got[name] = uploadedFile{Received: file, name: part.FileName(), contentType: part.Header.Get("Content-Type")}
+	}
+	for _, p := range parts {
+		if _, ok := got[p.name]; !ok {
+			return fail(http.StatusBadRequest, p.name+" is required")
 		}
 	}
-	if file.Received == nil {
-		return fail(file, http.StatusBadRequest, "file is required")
-	}
 	if !sawDetails {
-		return fail(file, http.StatusBadRequest, "details are required")
+		return fail(http.StatusBadRequest, "details are required")
 	}
-	return file, true
+	return got, true
 }
 
 // formatSize writes a byte count for people, e.g. "500 MB".

@@ -1,5 +1,6 @@
 // The SPA's only way to talk to the server. It renders what the API returns
 // and sends user intents back; domain rules live on the server.
+import type { PreparedCover } from './coverUpload';
 
 export type Status = 'idea' | 'drafting' | 'finished';
 
@@ -30,7 +31,24 @@ export interface Song {
   scrapbook: number[];
   /** Finished recordings, in the order they were added. */
   masters: Master[];
+  /** The Song's picture; null when it has none. */
+  cover: Cover | null;
 }
+
+/** A Song's picture, shown as a square chosen from it. */
+export interface Cover {
+  /** Changes whenever the Cover does, so its pictures' addresses do too. */
+  id: number;
+  /** The original's size, in pixels. */
+  width: number;
+  height: number;
+  /** The square of the original the Cover shows, in its pixels. */
+  crop: { x: number; y: number; size: number };
+  addedAt: string;
+}
+
+/** One of a Cover's pictures: the original, or the crop square at the list's or the header's size. */
+export type CoverPicture = 'original' | 'list' | 'header';
 
 /** A finished recording of a Song made elsewhere, never on the Timeline. */
 export interface Master {
@@ -144,6 +162,8 @@ export interface SongSummary {
   key: string;
   bpm: number | null;
   hasMaster: boolean;
+  /** The Song's Cover's id; null when it has none. */
+  coverId: number | null;
   updatedAt: string;
 }
 
@@ -256,6 +276,8 @@ export interface DecodedAudio {
 export interface ServerConfig {
   /** The largest audio file accepted, in bytes. */
   maxUploadBytes: number;
+  /** The largest picture accepted for a Cover, in bytes. */
+  maxCoverBytes: number;
 }
 
 /** A failed request, carrying the server's readable message. */
@@ -436,6 +458,16 @@ export const api = {
   /** Deletes a Master and its file; if it was main, the earliest added of the others becomes main. */
   deleteMaster: (at: SongAt, masterId: number) =>
     request<Song>('DELETE', `/songs/${at.id}/masters/${masterId}`, undefined, at),
+  /** Gives a Song without a Cover the one the browser prepared. */
+  addCover: (at: SongAt, cover: PreparedCover) => {
+    const form = new FormData();
+    form.append('details', JSON.stringify({ width: cover.width, height: cover.height, crop: cover.crop }));
+    for (const picture of ['original', 'list', 'header'] as const) form.append(picture, cover[picture], picture);
+    return request<Song>('POST', `/songs/${at.id}/cover`, form, at);
+  },
+  /** Where one of a Song's Cover's pictures is. */
+  coverUrl: (songId: number, coverId: number, picture: CoverPicture) =>
+    `/api/songs/${songId}/cover/${picture}?v=${coverId}`,
   /** Where a Master's audio streams from, with seeking. */
   masterAudioUrl: (songId: number, masterId: number) => `/api/songs/${songId}/masters/${masterId}/audio`,
   /** Downloads a Master's original file under its uploaded name. */

@@ -1,4 +1,4 @@
-// Package lyricsheet owns a Song, with its Lyric Sheet and Masters, as one
+// Package lyricsheet owns a Song, with its Lyric Sheet, Masters and Cover, as one
 // aggregate and exposes intent-level operations on it. All domain rules
 // live here; the HTTP layer only maps requests onto these operations.
 package lyricsheet
@@ -92,6 +92,8 @@ type Song struct {
 	LyricSheet
 	// Masters are in the order they were added.
 	Masters []Master `json:"masters"`
+	// Cover is nil when the Song has none.
+	Cover *Cover `json:"cover"`
 }
 
 // SongSummary is a Song as shown in the Song list.
@@ -100,9 +102,11 @@ type SongSummary struct {
 	Title  string `json:"title"`
 	Status Status `json:"status"`
 	// Key and BPM are as on the Song: "" and nil when not set.
-	Key       string    `json:"key"`
-	BPM       *int      `json:"bpm"`
-	HasMaster bool      `json:"hasMaster"`
+	Key       string `json:"key"`
+	BPM       *int   `json:"bpm"`
+	HasMaster bool   `json:"hasMaster"`
+	// CoverID is the Song's Cover's, or nil when it has none.
+	CoverID   *int64    `json:"coverId"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
@@ -110,12 +114,13 @@ type SongSummary struct {
 type Store struct {
 	db          *sql.DB
 	masterFiles *audio.Files
+	coverFiles  CoverFiles
 }
 
 // NewStore returns a Store backed by db, keeping Masters' audio in
-// masterFiles.
-func NewStore(db *sql.DB, masterFiles *audio.Files) *Store {
-	return &Store{db: db, masterFiles: masterFiles}
+// masterFiles and Covers' pictures in coverFiles.
+func NewStore(db *sql.DB, masterFiles *audio.Files, coverFiles CoverFiles) *Store {
+	return &Store{db: db, masterFiles: masterFiles, coverFiles: coverFiles}
 }
 
 // timeFormat keeps sub-second precision and sorts correctly as text.
@@ -181,6 +186,9 @@ func (s *Store) GetSong(ctx context.Context, id int64) (Song, error) {
 	if song.Masters, err = loadMasters(ctx, s.db, id); err != nil {
 		return Song{}, err
 	}
+	if song.Cover, err = loadCover(ctx, s.db, id); err != nil {
+		return Song{}, err
+	}
 	return song, nil
 }
 
@@ -208,8 +216,10 @@ func (s *Store) ListSongs(ctx context.Context, filter SongFilter) ([]SongSummary
 		conditions, args = append(conditions, "has_master = ?"), append(args, *filter.HasMaster)
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, title, status, song_key, bpm, has_master, updated_at FROM (
-		   SELECT *, EXISTS (SELECT 1 FROM masters WHERE masters.song_id = songs.id) AS has_master FROM songs
+		`SELECT id, title, status, song_key, bpm, has_master, cover_id, updated_at FROM (
+		   SELECT *, EXISTS (SELECT 1 FROM masters WHERE masters.song_id = songs.id) AS has_master,
+		     (SELECT id FROM covers WHERE covers.song_id = songs.id) AS cover_id
+		   FROM songs
 		 ) WHERE `+strings.Join(conditions, " AND ")+`
 		 ORDER BY updated_at DESC, id DESC`, args...)
 	if err != nil {
@@ -222,12 +232,15 @@ func (s *Store) ListSongs(ctx context.Context, filter SongFilter) ([]SongSummary
 	list := []SongSummary{}
 	for rows.Next() {
 		var sum SongSummary
-		var bpm sql.NullInt64
+		var bpm, cover sql.NullInt64
 		var updated string
-		if err := rows.Scan(&sum.ID, &sum.Title, &sum.Status, &sum.Key, &bpm, &sum.HasMaster, &updated); err != nil {
+		if err := rows.Scan(&sum.ID, &sum.Title, &sum.Status, &sum.Key, &bpm, &sum.HasMaster, &cover, &updated); err != nil {
 			return nil, err
 		}
 		sum.BPM = intOrNil(bpm)
+		if cover.Valid {
+			sum.CoverID = &cover.Int64
+		}
 		if !strings.Contains(strings.ToLower(sum.Title), needle) {
 			continue
 		}
@@ -330,7 +343,8 @@ func (s *Store) UpdateSong(ctx context.Context, id int64, based Version, changes
 }
 
 // DeleteSong removes a Song. Everything the Song owns references it with
-// ON DELETE CASCADE, so it goes too, and so do its Masters' files.
+// ON DELETE CASCADE, so it goes too, and so do its Masters' and Cover's
+// files.
 func (s *Store) DeleteSong(ctx context.Context, id int64, based Version) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -338,6 +352,10 @@ func (s *Store) DeleteSong(ctx context.Context, id int64, based Version) error {
 	}
 	defer tx.Rollback()
 	masters, err := masterIDs(ctx, tx, id)
+	if err != nil {
+		return err
+	}
+	cover, err := coverID(ctx, tx, id)
 	if err != nil {
 		return err
 	}
@@ -352,6 +370,9 @@ func (s *Store) DeleteSong(ctx context.Context, id int64, based Version) error {
 		return err
 	}
 	s.removeMasterFiles(masters)
+	if cover != 0 {
+		s.removeCoverFiles(cover)
+	}
 	return nil
 }
 

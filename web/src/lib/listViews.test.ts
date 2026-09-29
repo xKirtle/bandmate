@@ -23,7 +23,7 @@ import {
 } from './listViews';
 
 function song(title: string, fields: Partial<SongSummary> = {}): SongSummary {
-  return { id: 0, title, status: 'idea', key: '', bpm: null, hasMaster: false, updatedAt: '', ...fields };
+  return { id: 0, title, status: 'idea', key: '', bpm: null, hasMaster: false, coverId: null, updatedAt: '', ...fields };
 }
 
 // As the API sends them: most recently edited first.
