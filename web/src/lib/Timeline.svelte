@@ -452,8 +452,10 @@
 
   // Deleting a Track doesn't ask first either: it can be undone. A Song
   // always has a Track, so its last one can't go.
+  const lastTrack = $derived(timeline.tracks.length === 1);
+
   function removeTrack(track: Track) {
-    if (timeline.tracks.length === 1) return;
+    if (lastTrack) return;
     perform({ kind: 'deleteTrack', trackId: track.id });
   }
 
@@ -1883,9 +1885,9 @@
                   <button
                     type="button"
                     onclick={() => removeTrack(track)}
-                    disabled={timeline.tracks.length === 1}
+                    disabled={lastTrack}
                     aria-label="Delete {track.name} and its Clips"
-                    title={timeline.tracks.length === 1
+                    title={lastTrack
                       ? "A Song always has a Track, so its last one can't be deleted"
                       : 'Delete the Track and its Clips'}>×</button
                   >
@@ -1975,7 +1977,7 @@
               tabindex="0"
               aria-label="Position"
               aria-valuemin={0}
-              aria-valuemax={Math.round(length)}
+              aria-valuemax={Math.round(span)}
               aria-valuenow={Math.round(position)}
               aria-valuetext="{formatDuration(position)} of {formatDuration(length)}"
               onpointerdown={pointerDown}
