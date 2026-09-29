@@ -148,16 +148,16 @@ describe('dropTarget', () => {
 
 describe('dropFor', () => {
   it('moves a Lyric Sheet Section dropped into another gap in the Arrangement', () => {
-    expect(dropFor({ sectionAt: 1 }, { gap: 4 })).toEqual({ reorder: { from: 1, to: 3 }, gap: 4 });
+    expect(dropFor({ arrangementAt: 1 }, { gap: 4 })).toEqual({ reorder: { from: 1, to: 3 }, gap: 4 });
   });
 
   it('does nothing with a Lyric Sheet Section dropped just above or below itself', () => {
-    expect(dropFor({ sectionAt: 2 }, { gap: 2 })).toBeNull();
-    expect(dropFor({ sectionAt: 2 }, { gap: 3 })).toBeNull();
+    expect(dropFor({ arrangementAt: 2 }, { gap: 2 })).toBeNull();
+    expect(dropFor({ arrangementAt: 2 }, { gap: 3 })).toBeNull();
   });
 
   it('moves a Lyric Sheet Section dropped on the Scrapbook there', () => {
-    expect(dropFor({ sectionAt: 2 }, { scrapbook: true })).toEqual({ toScrapbook: 2 });
+    expect(dropFor({ arrangementAt: 2 }, { scrapbook: true })).toEqual({ toScrapbook: 2 });
   });
 
   it('puts a Scrapbook Section dropped into a gap back there', () => {
@@ -170,15 +170,15 @@ describe('dropFor', () => {
   });
 
   it('adds a Scrapbook Section dropped onto a Section to it', () => {
-    expect(dropFor({ section: 7 }, { onto: 2 })).toEqual({ addTo: { section: 7, sectionAt: 2 } });
+    expect(dropFor({ section: 7 }, { onto: 2 })).toEqual({ addTo: { section: 7, arrangementAt: 2 } });
   });
 
   it('does nothing with a Lyric Sheet Section dropped onto a Section', () => {
-    expect(dropFor({ sectionAt: 1 }, { onto: 2 })).toBeNull();
+    expect(dropFor({ arrangementAt: 1 }, { onto: 2 })).toBeNull();
   });
 
   it('does nothing dropped nowhere', () => {
-    expect(dropFor({ sectionAt: 2 }, null)).toBeNull();
+    expect(dropFor({ arrangementAt: 2 }, null)).toBeNull();
     expect(dropFor({ section: 7 }, null)).toBeNull();
   });
 });

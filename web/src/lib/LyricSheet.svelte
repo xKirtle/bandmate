@@ -304,7 +304,7 @@
   const dropAt = $derived(drag.drop && 'gap' in drag.drop ? drag.drop.gap : null);
   // The place in the Arrangement of the Section a Scrapbook Section would be
   // added to.
-  const dropOnto = $derived(drag.drop && 'addTo' in drag.drop ? drag.drop.addTo.sectionAt : null);
+  const dropOnto = $derived(drag.drop && 'addTo' in drag.drop ? drag.drop.addTo.arrangementAt : null);
 
   function dropSection(drop: Drop) {
     if ('reorder' in drop) {
@@ -440,7 +440,7 @@
         {@const section = sections.get(sectionId)}
         {#if section}
           <li
-            class:dragged={drag.sectionAt === i}
+            class:dragged={drag.arrangementAt === i}
             class:drop-above={dropAt === i}
             class:drop-below={dropAt === song.arrangement.length && i === song.arrangement.length - 1}
             class:drop-onto={dropOnto === i}
@@ -461,7 +461,7 @@
                     class="grip"
                     aria-hidden="true"
                     title="Drag to move, or onto the Scrapbook; Esc cancels"
-                    {...drag.grip({ sectionAt: i }, dropSection)}>⠿</span
+                    {...drag.grip({ arrangementAt: i }, dropSection)}>⠿</span
                   >
                 {/if}
               {/snippet}

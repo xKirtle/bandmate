@@ -15,9 +15,9 @@ export class SectionDragging {
   /** Whether Sections can be dragged at all. */
   readonly on: boolean = $derived.by(() => this.#enabled());
   /** The place in the Arrangement of the Lyric Sheet Section being dragged, if one is. */
-  readonly sectionAt: number | null = $derived.by(() => {
+  readonly arrangementAt: number | null = $derived.by(() => {
     const dragged = this.current?.dragged;
-    return dragged && 'sectionAt' in dragged ? dragged.sectionAt : null;
+    return dragged && 'arrangementAt' in dragged ? dragged.arrangementAt : null;
   });
   /** The id of the Scrapbook Section being dragged, if one is. */
   readonly section: number | null = $derived.by(() => {

@@ -5,7 +5,7 @@
 // same order pressing ↑ or ↓ that many times gives, as those presses would.
 
 /** What's being dragged: a Lyric Sheet Section, by its place in the Arrangement, or a Scrapbook Section, by its id. */
-export type Dragged = { sectionAt: number } | { section: number };
+export type Dragged = { arrangementAt: number } | { section: number };
 
 /**
  * Where a drag would drop: a gap in the Arrangement, onto the Section at a
@@ -23,7 +23,7 @@ export type Drop =
   | { reorder: { from: number; to: number }; gap: number }
   | { toScrapbook: number }
   | { putBack: number; gap: number }
-  | { addTo: { section: number; sectionAt: number } };
+  | { addTo: { section: number; arrangementAt: number } };
 
 /** A box on the page, as getBoundingClientRect gives it. */
 export type Box = { left: number; right: number; top: number; bottom: number };
@@ -89,11 +89,11 @@ export function dropTarget(
 /** What dropping `dragged` on `target` does; null if nothing. */
 export function dropFor(dragged: Dragged, target: Target | null): Drop | null {
   if (!target) return null;
-  if ('scrapbook' in target) return 'sectionAt' in dragged ? { toScrapbook: dragged.sectionAt } : null;
-  if ('onto' in target) return 'section' in dragged ? { addTo: { section: dragged.section, sectionAt: target.onto } } : null;
+  if ('scrapbook' in target) return 'arrangementAt' in dragged ? { toScrapbook: dragged.arrangementAt } : null;
+  if ('onto' in target) return 'section' in dragged ? { addTo: { section: dragged.section, arrangementAt: target.onto } } : null;
   const { gap } = target;
   if ('section' in dragged) return { putBack: dragged.section, gap };
-  const from = dragged.sectionAt;
+  const from = dragged.arrangementAt;
   const to = targetIndex(from, gap);
   return to === from ? null : { reorder: { from, to }, gap };
 }
