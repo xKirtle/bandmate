@@ -45,7 +45,7 @@ func TestASectionSentToTheScrapbookAndPutBackHasTheSameCues(t *testing.T) {
 	}
 }
 
-func TestASectionPutBackWhereItsCuesDontFitKeepsThem(t *testing.T) {
+func TestASectionPutBackWhereItsCuesAreOutOfOrderKeepsThem(t *testing.T) {
 	ts := newTestServer(t)
 	s, first, second := ts.cuedVerse()
 	verse := s.Sections[1].ID
@@ -69,10 +69,10 @@ func TestASectionSentToTheScrapbookKeepsItsDormantCues(t *testing.T) {
 	ts := newTestServer(t)
 	s := ts.chorusWithACuedAlternate()
 	drive, night, _, _ := chorusLines(s)
-	b := s.Sections[0].Alternates[1].Lines[0].ID
-	ts.setLineCue(s.ID, b, 30)
+	dormantDrive := s.Sections[0].Alternates[1].Lines[0].ID
+	ts.setLineCue(s.ID, dormantDrive, 30)
 	chorus := s.Sections[0].ID
-	want := map[int64]float64{drive: 2, night: 6, b: 30}
+	want := map[int64]float64{drive: 2, night: 6, dormantDrive: 30}
 
 	s = ts.lyricSheetChange(http.MethodDelete, sectionInArrangementPath(s.ID, chorus), nil)
 	got := ts.putBack(s.ID, chorus, map[string]any{"position": 0})

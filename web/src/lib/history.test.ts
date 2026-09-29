@@ -421,7 +421,7 @@ describe('restorable', () => {
     ).toEqual([{ lineId: 10, cue: null }]);
   });
 
-  it('keeps the Cues of Lines in the Scrapbook, which keeps them', () => {
+  it('keeps the Cues of Lines in the Scrapbook', () => {
     const now: CuedSong = {
       arrangement: [1],
       sections: [

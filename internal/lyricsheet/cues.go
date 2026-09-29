@@ -36,31 +36,35 @@ func (s *Store) SetLineCue(ctx context.Context, songID int64, based Version, lin
 		return Song{}, err
 	}
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		return writeLineCue(ctx, tx, songID, lineID, sql.NullInt64{Int64: ms, Valid: true}, false)
+		// A Line in the Scrapbook keeps the Cue it had (ADR 0010), but isn't
+		// given a new one there.
+		_, inArrangement, err := findLine(ctx, tx, songID, lineID)
+		if err != nil {
+			return err
+		}
+		if !inArrangement {
+			return conflict("a Line in the Scrapbook can't be given a Cue")
+		}
+		return writeLineCue(ctx, tx, songID, lineID, sql.NullInt64{Int64: ms, Valid: true})
 	})
 }
 
 // ClearLineCue removes a Line's Cue.
 func (s *Store) ClearLineCue(ctx context.Context, songID int64, based Version, lineID int64) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		return writeLineCue(ctx, tx, songID, lineID, sql.NullInt64{}, false)
+		return writeLineCue(ctx, tx, songID, lineID, sql.NullInt64{})
 	})
 }
 
 // writeLineCue sets or, with a null ms, clears the Cue of one of a Song's
-// Lines. To be given a Cue, the Line can't be blank and its Section must be
-// in the Arrangement, unless restoring: a Line in the Scrapbook keeps its
-// Cue (ADR 0010), so may have one put back.
-func writeLineCue(ctx context.Context, tx *sql.Tx, songID, lineID int64, ms sql.NullInt64, restoring bool) error {
-	text, inArrangement, err := findLine(ctx, tx, songID, lineID)
+// Lines, wherever it is. To be given a Cue, the Line can't be blank.
+func writeLineCue(ctx context.Context, tx *sql.Tx, songID, lineID int64, ms sql.NullInt64) error {
+	text, _, err := findLine(ctx, tx, songID, lineID)
 	if err != nil {
 		return err
 	}
 	if ms.Valid && blank(text) {
 		return invalid("a blank Line can't have a Cue")
-	}
-	if ms.Valid && !inArrangement && !restoring {
-		return conflict("a Line in the Scrapbook can't have a Cue")
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE lines SET cue_ms = ? WHERE id = ?`, ms, lineID); err != nil {
 		return fmt.Errorf("writing line cue: %w", err)
@@ -75,18 +79,12 @@ func (s *Store) ClearSectionCues(ctx context.Context, songID int64, based Versio
 		if _, err := findSection(ctx, tx, songID, sectionID); err != nil {
 			return err
 		}
-		return clearSectionCues(ctx, tx, sectionID)
+		if _, err := tx.ExecContext(ctx, `UPDATE lines SET cue_ms = NULL WHERE cue_ms IS NOT NULL AND alternate_id IN
+			(SELECT id FROM alternates WHERE section_id = ?)`, sectionID); err != nil {
+			return fmt.Errorf("clearing line cues: %w", err)
+		}
+		return nil
 	})
-}
-
-// clearSectionCues removes the Cues of the Lines in every Alternate of a
-// Section.
-func clearSectionCues(ctx context.Context, tx *sql.Tx, sectionID int64) error {
-	if _, err := tx.ExecContext(ctx, `UPDATE lines SET cue_ms = NULL WHERE cue_ms IS NOT NULL AND alternate_id IN
-		(SELECT id FROM alternates WHERE section_id = ?)`, sectionID); err != nil {
-		return fmt.Errorf("clearing line cues: %w", err)
-	}
-	return nil
 }
 
 // ClearCues removes every Cue in a Song, dormant ones included.
@@ -128,7 +126,7 @@ func (s *Store) RestoreCues(ctx context.Context, songID int64, based Version, va
 	}
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		for i, v := range values {
-			if err := writeLineCue(ctx, tx, songID, v.LineID, ms[i], true); err != nil {
+			if err := writeLineCue(ctx, tx, songID, v.LineID, ms[i]); err != nil {
 				return err
 			}
 		}
