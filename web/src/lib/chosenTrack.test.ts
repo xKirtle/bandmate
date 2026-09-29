@@ -45,14 +45,10 @@ describe('chosenTrack', () => {
     expect(chosenTrack(tracks(1, 2, 3), 1, { kind: 'add', trackId: 3 })).toBe(3);
   });
 
-  it("isn't a Beat Track a first Beat adds below the others", () => {
-    // Track 1 was the bottom one, chosen and remembered; Beat Track 4 now is.
+  it("isn't a Track that comes back below the others, as when its deletion is undone", () => {
+    // Track 1 was the bottom one, chosen and remembered; Track 4 now is.
     expect(chosenTrack(tracks(1), null)).toBe(1);
     expect(chosenTrack(tracks(1, 4), 1)).toBe(1);
-  });
-
-  it('is a Beat Track a first Beat adds as the only Track', () => {
-    expect(chosenTrack(tracks(4), null)).toBe(4);
   });
 
   it('is the bottom Track once the chosen one is deleted', () => {

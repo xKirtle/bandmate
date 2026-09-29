@@ -754,9 +754,11 @@
     onLoop?.(loopOn);
   });
 
+  /** Adds a Beat to the chosen Track, after its last Clip or at 0:00. */
   async function addBeat(beat: Beat) {
     picking = false;
-    const ok = await perform({ kind: 'addBeat', beatId: beat.id });
+    if (chosen === null) return;
+    const ok = await perform({ kind: 'addBeat', trackId: chosen, beatId: beat.id });
     // Never copied without asking.
     if (ok && song.bpm === null && beat.bpm !== null) offerBpm = { bpm: beat.bpm, title: beat.title };
   }
@@ -1089,8 +1091,8 @@
     choose({ kind: 'choose', trackId: track.id });
   }
 
-  // Also the first time, or once the one remembered is gone, so a Beat
-  // Track added below later doesn't become the bottom one chosen.
+  // Also the first time, or once the one remembered is gone, so a Track
+  // restored below later doesn't become the bottom one chosen.
   $effect(() => {
     if (chosen === null || chosen === untrack(() => remembered)) return;
     remembered = chosen;
@@ -1850,7 +1852,12 @@
       {/if}
       <span class="spacer"></span>
       {@render undoRedo()}
-      <button type="button" class="button edit-only" onclick={() => (picking = true)}>Add a beat</button>
+      <button
+        type="button"
+        class="button edit-only"
+        onclick={() => (picking = true)}
+        title="Add a Beat to {timeline.tracks.find((t) => t.id === chosen)?.name ?? 'the chosen Track'}">+ Beat</button
+      >
       <button
         type="button"
         class="icon collapse-toggle"

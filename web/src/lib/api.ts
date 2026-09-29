@@ -566,12 +566,9 @@ export const api = {
   masterDownloadUrl: (songId: number, masterId: number) =>
     `/api/songs/${songId}/masters/${masterId}/audio?download`,
   getTimeline: (songId: number) => request<Timeline>('GET', `/songs/${songId}/timeline`),
-  /**
-   * Places a whole Beat on the Song's beat Track (the topmost Track holding a
-   * Beat, or a new one named "Beat"), after its last Clip or at 0:00.
-   */
-  addBeatToTimeline: (at: SongAt, beatId: number) =>
-    request<Timeline>('POST', `/songs/${at.id}/timeline/beats`, { beatId }, at),
+  /** Places a whole Beat on a Track, after its last Clip or at 0:00. */
+  addBeatToTimeline: (at: SongAt, trackId: number, beatId: number) =>
+    request<Timeline>('POST', `/songs/${at.id}/timeline/beats`, { trackId, beatId }, at),
   /** Adds a Track, by default empty at the bottom of the Timeline. */
   addTrack: (at: SongAt, track: NewTrack) => request<Timeline>('POST', `/songs/${at.id}/timeline/tracks`, track, at),
   /** Renames a Track or sets its volume, mute or solo. */

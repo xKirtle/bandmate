@@ -162,7 +162,7 @@
 
 <dialog bind:this={dialog} onclose={onClose} aria-labelledby="beat-picker-heading">
   <header>
-    <h2 id="beat-picker-heading">Add a beat</h2>
+    <h2 id="beat-picker-heading">Add a Beat</h2>
     <button type="button" class="icon" onclick={() => dialog?.close()} aria-label="Close">✕</button>
   </header>
 

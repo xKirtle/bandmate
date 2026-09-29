@@ -40,7 +40,7 @@ import { isBlank, type CuedSong } from './cues';
 
 /** A change to the Timeline, as the intent sent to the API. */
 export type Edit =
-  | { kind: 'addBeat'; beatId: number }
+  | { kind: 'addBeat'; trackId: number; beatId: number }
   | { kind: 'addTrack'; track: NewTrack }
   | { kind: 'updateTrack'; trackId: number; changes: TrackChanges }
   | { kind: 'reorderTracks'; order: number[] }
@@ -319,12 +319,12 @@ function remapStep(step: Step, ids: IdMaps): Step {
 function remap(edit: HistoryEdit, ids: IdMaps): HistoryEdit {
   switch (edit.kind) {
     case 'restoreCues':
-    case 'addBeat':
     case 'addTrack':
     case 'setLoop':
     case 'switchLoop':
     case 'clearLoop':
       return edit;
+    case 'addBeat':
     case 'updateTrack':
       return { ...edit, trackId: ids.track(edit.trackId) };
     case 'reorderTracks':
@@ -362,7 +362,7 @@ export type Saved = { timeline: Timeline } | { song: Song };
 export function sendEdit(at: SongAt, edit: Edit): Promise<Timeline> {
   switch (edit.kind) {
     case 'addBeat':
-      return api.addBeatToTimeline(at, edit.beatId);
+      return api.addBeatToTimeline(at, edit.trackId, edit.beatId);
     case 'addTrack':
       return api.addTrack(at, edit.track);
     case 'updateTrack':

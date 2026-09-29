@@ -138,33 +138,43 @@ describe('History', () => {
     expect(h.nextUndo()).toEqual({ kind: 'trimClip', clipId: 9, offset: 0, length: 10 });
   });
 
-  it('undoes adding a Beat by deleting its Clip, or the Track it made for it', () => {
+  it('undoes adding a Beat by deleting its Clip', () => {
     const h = new History();
     const t0 = timeline([track(1, [clip(5, 0)])]);
     const t1 = timeline([track(1, [clip(5, 0), clip(6, 10)])]);
-    h.record({ kind: 'addBeat', beatId: 100 }, t0, t1);
+    h.record({ kind: 'addBeat', trackId: 1, beatId: 100 }, t0, t1);
     expect(h.nextUndo()).toEqual({ kind: 'deleteClip', clipId: 6 });
-
-    const empty = timeline([]);
-    h.record({ kind: 'addBeat', beatId: 100 }, empty, timeline([track(3, [clip(7, 0)])]));
-    expect(h.nextUndo()).toEqual({ kind: 'deleteTrack', trackId: 3 });
   });
 
   it('redoes adding a Beat, and follows what it added to its new ids', () => {
     const h = new History();
-    const t0 = timeline([]);
+    const t0 = timeline([track(3)]);
     const t1 = timeline([track(3, [clip(7, 0)])]);
     const t2 = timeline([track(3, [clip(7, 20)])]);
-    h.record({ kind: 'addBeat', beatId: 100 }, t0, t1);
+    h.record({ kind: 'addBeat', trackId: 3, beatId: 100 }, t0, t1);
     h.record({ kind: 'moveClip', clipId: 7, trackId: 3, start: 20 }, t1, t2);
     h.undone(t2, t1);
     h.undone(t1, t0);
 
-    expect(h.nextRedo()).toEqual({ kind: 'addBeat', beatId: 100 });
-    h.redone(t0, timeline([track(4, [clip(8, 0)])]));
+    expect(h.nextRedo()).toEqual({ kind: 'addBeat', trackId: 3, beatId: 100 });
+    h.redone(t0, timeline([track(3, [clip(8, 0)])]));
 
-    expect(h.nextRedo()).toEqual({ kind: 'moveClip', clipId: 8, trackId: 4, start: 20 });
-    expect(h.nextUndo()).toEqual({ kind: 'deleteTrack', trackId: 4 });
+    expect(h.nextRedo()).toEqual({ kind: 'moveClip', clipId: 8, trackId: 3, start: 20 });
+    expect(h.nextUndo()).toEqual({ kind: 'deleteClip', clipId: 8 });
+  });
+
+  it('redoes adding a Beat on its Track when the Track comes back with a new id', () => {
+    const h = new History();
+    const t0 = timeline([track(1), track(3)]);
+    const t1 = timeline([track(1), track(3, [clip(7, 0)])]);
+    const t2 = timeline([track(1)]);
+    h.record({ kind: 'addBeat', trackId: 3, beatId: 100 }, t0, t1);
+    h.record({ kind: 'deleteTrack', trackId: 3 }, t1, t2);
+    const t3 = timeline([track(1), track(4, [clip(8, 0)])]);
+    h.undone(t2, t3);
+    h.undone(t3, timeline([track(1), track(4)]));
+
+    expect(h.nextRedo()).toEqual({ kind: 'addBeat', trackId: 4, beatId: 100 });
   });
 
   it('undoes adding, duplicating and placing by deleting what was added', () => {

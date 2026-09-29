@@ -87,12 +87,12 @@ func takeFiles(t *testing.T, ts *testServer) []string {
 	return names
 }
 
-// songWithVocalTrack is a Song with a 30-second Beat on its beat Track and
+// songWithVocalTrack is a Song with a 30-second Beat on Track 1 and
 // an empty "Lead vox" Track below it.
 func songWithVocalTrack(t *testing.T, ts *testServer) (song, timeline) {
 	t.Helper()
 	s := ts.createSong("Night Drive")
-	ts.addOnlyBeat(s.ID, ts.beatOfLength("Beat", 30).ID)
+	timelineChange(t, ts.addBeatToSong(s.ID, ts.beatOfLength("Beat", 30).ID))
 	return s, timelineChange(t, ts.addTrack(s.ID, "Lead vox"))
 }
 
@@ -321,12 +321,12 @@ func TestAClipOfTakesMovesWithItsTakesAlongAndAcrossTracks(t *testing.T) {
 	if at := clipAt(got, r.clip.ID); at != "1:7.5+3@0.5" {
 		t.Errorf("clip = %s, want it moved to 0:07.5 with its trim", at)
 	}
-	// The Beat plays 0:00 to 0:30 on the beat Track.
+	// The Beat plays 0:00 to 0:30 on Track 1.
 	expectError(t, ts.moveClip(r.song.ID, r.clip.ID, beatTrack, 28), http.StatusConflict, "Clips can't overlap on a Track")
 	got = timelineChange(t, ts.moveClip(r.song.ID, r.clip.ID, beatTrack, 30))
 
 	if at := clipAt(got, r.clip.ID); at != "0:30+3@0.5" {
-		t.Errorf("clip = %s, want it on the beat Track at 0:30 with its trim", at)
+		t.Errorf("clip = %s, want it on Track 1 at 0:30 with its trim", at)
 	}
 	moved := got.Tracks[0].Clips[1]
 	if !reflect.DeepEqual(moved.Takes, []take{r.take}) || *moved.ActiveTakeID != r.take.ID {
