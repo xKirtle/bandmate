@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -115,12 +116,15 @@ type Store struct {
 	db          *sql.DB
 	masterFiles *audio.Files
 	coverFiles  CoverFiles
+	// takeFiles holds the audio of the Takes on Songs' Timelines, which
+	// go when their Song does.
+	takeFiles *audio.Files
 }
 
 // NewStore returns a Store backed by db, keeping Masters' audio in
-// masterFiles and Covers' pictures in coverFiles.
-func NewStore(db *sql.DB, masterFiles *audio.Files, coverFiles CoverFiles) *Store {
-	return &Store{db: db, masterFiles: masterFiles, coverFiles: coverFiles}
+// masterFiles, Covers' pictures in coverFiles and Takes' audio in takeFiles.
+func NewStore(db *sql.DB, masterFiles *audio.Files, coverFiles CoverFiles, takeFiles *audio.Files) *Store {
+	return &Store{db: db, masterFiles: masterFiles, coverFiles: coverFiles, takeFiles: takeFiles}
 }
 
 // timeFormat keeps sub-second precision and sorts correctly as text.
@@ -343,8 +347,8 @@ func (s *Store) UpdateSong(ctx context.Context, id int64, based Version, changes
 }
 
 // DeleteSong removes a Song. Everything the Song owns references it with
-// ON DELETE CASCADE, so it goes too, and so do its Masters' and Cover's
-// files.
+// ON DELETE CASCADE, so it goes too, and so do its Masters', Cover's and
+// Takes' files, detached Takes included.
 func (s *Store) DeleteSong(ctx context.Context, id int64, based Version) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -359,6 +363,18 @@ func (s *Store) DeleteSong(ctx context.Context, id int64, based Version) error {
 	if err != nil {
 		return err
 	}
+	var takes []int64
+	err = query(ctx, tx, `SELECT id FROM takes WHERE song_id = ?`, []any{id}, func(rows *sql.Rows) error {
+		var take int64
+		if err := rows.Scan(&take); err != nil {
+			return err
+		}
+		takes = append(takes, take)
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("listing takes: %w", err)
+	}
 	res, err := tx.ExecContext(ctx, `DELETE FROM songs WHERE id = ? AND (?2 = 0 OR version = ?2)`, id, based)
 	if err != nil {
 		return fmt.Errorf("deleting song: %w", err)
@@ -372,6 +388,11 @@ func (s *Store) DeleteSong(ctx context.Context, id int64, based Version) error {
 	s.removeMasterFiles(masters)
 	if cover != 0 {
 		s.removeCoverFiles(cover)
+	}
+	for _, take := range takes {
+		if err := s.takeFiles.Remove(take); err != nil {
+			log.Printf("deleting take %d: %v", take, err)
+		}
 	}
 	return nil
 }

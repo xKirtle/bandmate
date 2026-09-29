@@ -46,6 +46,9 @@
   let timelinePanel = $state<Timeline>();
   // Whether the Timeline's Loop is on, which keeps Sync mode in the Lyric Sheet off.
   let loopOn = $state(false);
+  // Sync mode and recording are exclusive: neither starts while the other's on.
+  let syncing = $state(false);
+  let recording = $state(false);
   let draft = $state<Draft>(toDraft(null));
   let loadError = $state<string | null>(null);
   let saveError = $state<string | null>(null);
@@ -528,6 +531,8 @@
           playheadAt={() => timelinePanel?.playheadAt() ?? 0}
           {loopOn}
           stopLoop={() => timelinePanel?.stopLoop()}
+          {recording}
+          onSyncing={(on) => (syncing = on)}
           hasClips={timeline?.tracks.some((t) => t.clips.length > 0) ?? false}
         />
       </div>
@@ -576,6 +581,8 @@
     {setBpm}
     onPlayhead={(at) => (playhead = at)}
     onLoop={(on) => (loopOn = on)}
+    {syncing}
+    onRecording={(on) => (recording = on)}
   />
 {/if}
 

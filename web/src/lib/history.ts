@@ -24,6 +24,10 @@ import { isBlank, type CuedSong } from './cues';
 // However a Cue edit was made (typed, nudged, synced or cleared), it's
 // undone and redone by restoring the Cues it changed to what they were
 // before or after it.
+//
+// Deleting a Clip of Takes, or its Track, only detaches its Takes, so
+// placing a Clip from their ids brings them back. A recording is kept as
+// that too, so redoing it never uploads it again.
 
 /** A change to the Timeline, as the intent sent to the API. */
 export type Edit =
@@ -197,6 +201,18 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
       return { edit: loop ? { kind: 'setLoop', loop: { ...loop } } : { kind: 'clearLoop' }, adds: none };
     }
   }
+}
+
+/**
+ * The edit a recording made, which turned before into after, to keep in the
+ * history: placing its new Clip of Takes, as a redo does without uploading
+ * again. It's undone like any placed Clip, by deleting the Clip, which
+ * detaches its Take.
+ */
+export function recorded(before: Timeline, after: Timeline): Edit {
+  const [clipId] = added(before, after).clips;
+  const { track, clip } = findClip(after, clipId);
+  return { kind: 'placeClip', trackId: track.id, clip: placementOf(clip) };
 }
 
 /** A Song's Cues by Line id, dormant ones included. */

@@ -14,11 +14,12 @@ export interface PlayableClip extends Placed {
 
 export type PlayerState = 'stopped' | 'loading' | 'playing';
 
-// One clock for the whole app. Created on first use: browsers let it decode
-// right away, and only need a user gesture before it plays.
+// One clock for the whole app, which recording captures on too. Created on
+// first use: browsers let it decode right away, and only need a user
+// gesture before it plays.
 let shared: AudioContext | null = null;
 
-function audioContext(): AudioContext {
+export function audioContext(): AudioContext {
   return (shared ??= new AudioContext());
 }
 
@@ -76,6 +77,14 @@ export class TimelinePlayer {
     if (this.#state !== 'playing') return this.#from;
     const elapsed = Math.max(0, audioContext().currentTime - this.#startedAt);
     return positionAt(this.#from, this.#playing?.loop ?? null, elapsed);
+  }
+
+  /**
+   * The context time at which playback is, or was, at the position it
+   * started from, e.g. to line up what's recorded along with it.
+   */
+  get startedAt(): number {
+    return this.#startedAt;
   }
 
   /** Whether playing goes round a Loop for ever, rather than stopping at the end. */

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import type { Clip } from './api';
+import { heard } from './clipSource';
 import { keptInLoop, outsideLoop, positionAt, repeats, schedule, timelineEnd } from './schedule';
 
 // A 10-second Clip at 0:05 playing a Beat from 2s in, and a 4-second one
@@ -192,5 +194,27 @@ describe('outsideLoop', () => {
     expect(outsideLoop(150, hook)).toBe(false);
     expect(outsideLoop(155, hook)).toBe(false);
     expect(outsideLoop(90, null)).toBe(false);
+  });
+});
+
+describe('schedule of a Take Clip', () => {
+  // A Clip of Takes at 0:30 for 10s, 2s into its span, whose Take starts
+  // 1s into the span (so 1s into its file at the Clip's start).
+  const clip: Clip = {
+    id: 1,
+    beatId: null,
+    takes: [
+      { id: 7, number: 1, size: 1, duration: 20, sampleRate: 48000, latencyOffset: 0, position: 1, recordedAt: '' },
+    ],
+    activeTakeId: 7,
+    start: 30,
+    offset: 2,
+    length: 10,
+  };
+
+  it('plays its active Take from where the Clip is in it', () => {
+    const played = heard(clip)!;
+    expect(schedule([played], 25)).toEqual([{ clip: played, delay: 5, from: 1, duration: 10 }]);
+    expect(schedule([played], 34)).toEqual([{ clip: played, delay: 0, from: 5, duration: 6 }]);
   });
 });

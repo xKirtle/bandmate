@@ -16,12 +16,14 @@
   } from './api';
   import ActionsMenu from './ActionsMenu.svelte';
   import BeatPicker from './BeatPicker.svelte';
+  import { Capture, CaptureError } from './capture';
   import { addedTrack, chosenTrack, readChosen, storeChosen, type ChoiceEvent } from './chosenTrack';
   import { clampMove, clampTrimEnd, clampTrimStart } from './clipEdit';
-  import { clipSources } from './clipSource';
+  import { clipSources, heard } from './clipSource';
   import { cuesInSpan, formatCue, hasCues } from './cues';
   import {
     History,
+    recorded,
     restorable,
     sendEdit,
     type Edit as TimelineEdit,
@@ -30,13 +32,14 @@
   } from './history';
   import { formatVolume, maxVolume, silence, trackGains, type Levels } from './mixer';
   import { type MenuAction } from './menu';
-  import { peaksPerSecond } from './peaks';
+  import { peaks as peaksOf, peaksPerSecond } from './peaks';
   import { longPressDelay, pastSlop, type Point } from './press';
+  import { recordingPlan, type RecordingPlan } from './recording';
   import { keptInLoop, outsideLoop, repeats, timelineEnd, type Loop, type Placed } from './schedule';
   import { inTextField } from './textField';
   import { formatDuration } from './time';
   import { clampHeight, defaultHeight, deviceStorage, heightBounds, readHeight, storeHeight } from './timelineHeight';
-  import { TimelinePlayer, type PlayableClip, type PlayerState } from './timelinePlayer';
+  import { audioContext, TimelinePlayer, type PlayableClip, type PlayerState } from './timelinePlayer';
   import {
     edgeSpeed,
     fitScale,
@@ -50,6 +53,7 @@
     zoom,
     type View,
   } from './timelineView';
+  import { encodeWav } from './wav';
   import { barWidth, bars } from './waveform';
 
   // The Timeline, docked under the Lyric Sheet: its Tracks and Clips, and
@@ -60,7 +64,8 @@
   // only offered on wider screens; on a phone it only plays, mixes and
   // switches the Loop on and off. On both it zooms and scrolls, and follows
   // the playhead while playing. While the Loop is on, the playhead stays
-  // inside it.
+  // inside it. Recording a Take onto the chosen Track is offered where
+  // editing is.
   let {
     song,
     timeline,
@@ -68,6 +73,8 @@
     setBpm,
     onPlayhead,
     onLoop,
+    syncing = false,
+    onRecording,
     height = $bindable(0),
   }: {
     song: Song;
@@ -80,6 +87,10 @@
     onPlayhead?: (at: number | null) => void;
     /** Hears whether the Loop is on, whenever that changes, e.g. to keep Sync mode off while it is. */
     onLoop?: (on: boolean) => void;
+    /** Whether the Lyric Sheet is in Sync mode, which recording can't start in. */
+    syncing?: boolean;
+    /** Hears whether a recording is on, whenever that changes, e.g. to keep Sync mode off while it is. */
+    onRecording?: (on: boolean) => void;
     /** How tall the docked Timeline is, in pixels, e.g. for the page to keep clear of it. */
     height?: number;
   } = $props();
@@ -105,26 +116,61 @@
   let offerCues = $state.raw<CueOffer | null>(null);
   let offerTimer: ReturnType<typeof setTimeout> | undefined;
   const offerFor = 8000;
+
+  // Recording a Take onto the chosen Track, at its append point. Playback
+  // leads in from a little before it, everything playing as mixed but
+  // ignoring the Loop, and runs on until stopped, capturing all along. The
+  // lead-in is kept in the Take, hidden behind its Clip's start. Only
+  // offered while stopped, and never along with Sync mode.
+  interface RecordingState {
+    phase: 'starting' | 'recording' | 'saving';
+    trackId: number | null;
+    plan: RecordingPlan | null;
+    capture: Capture | null;
+    /** The context time playback was at plan.from. */
+    startedAt: number;
+  }
+  let recording = $state.raw<RecordingState | null>(null);
+  // Whether a recording is capturing, rather than starting or saving.
+  const capturing = $derived(recording?.phase === 'recording');
+  // Once gone, an input still opening is let go as soon as it opens.
+  let destroyed = false;
+
   // Peaks by source key, fetched once each, so waveforms show before the
   // audio is decoded.
   let peaks = $state<Record<string, number[]>>({});
 
   const player = new TimelinePlayer((s) => {
     playerState = s;
-    // Also when something else playing stopped it.
+    // Also when something else playing stopped it, which stops a recording too.
     if (s === 'stopped') position = player.position();
+    if (s === 'stopped' && capturing) stopRecording();
   });
-  onDestroy(() => player.dispose());
+  onDestroy(() => {
+    destroyed = true;
+    recording?.capture?.close();
+    player.dispose();
+  });
 
   const sources = $derived(clipSources(timeline));
   const clips = $derived(timeline.tracks.flatMap((t) => t.clips));
+  // Each Clip plays the part of its audio file that it holds: a Take's only
+  // where it has audio in the Clip.
   const playable = $derived<PlayableClip[]>(
-    timeline.tracks.flatMap((t) => t.clips.map((c) => ({ ...c, source: sources.of(c).audio, trackId: t.id }))),
+    timeline.tracks.flatMap((t) =>
+      t.clips.flatMap((c) => {
+        const h = heard(c);
+        return h ? [{ ...h, source: sources.of(c).audio, trackId: t.id }] : [];
+      }),
+    ),
   );
   const length = $derived(timelineEnd(clips, song));
   // Room after the end, or the Loop if it ends later, to drag Clips and the
-  // Loop later on the Timeline.
-  const reach = $derived(length > 0 ? Math.max(length, timeline.loop?.end ?? 0) : 0);
+  // Loop later on the Timeline. A recording running past the end takes the
+  // room it needs, ten seconds at a time, so the view isn't redrawn every
+  // frame.
+  const recordingTo = $derived(capturing ? Math.ceil(position / 10) * 10 : 0);
+  const reach = $derived(length > 0 ? Math.max(length, timeline.loop?.end ?? 0, recordingTo) : 0);
   const span = $derived(reach > 0 ? reach + Math.max(10, reach / 4) : 0);
   // Seeking outside the Loop switches it off, and until that's saved,
   // playback already goes on without it.
@@ -286,6 +332,8 @@
   function undoKeys(event: KeyboardEvent) {
     if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== 'z') return;
     if (event.defaultPrevented || !editable.current || picking || inTextField(event.target)) return;
+    // Not while recording, which undo would take the place of.
+    if (recording) return;
     event.preventDefault();
     if (event.shiftKey) redo();
     else undo();
@@ -294,6 +342,7 @@
   function keydown(event: KeyboardEvent) {
     spaceBar(event);
     undoKeys(event);
+    recordKey(event);
   }
 
   // Changes to a Track's levels are shown and heard right away, before
@@ -390,6 +439,8 @@
   $effect(() => {
     void playKey;
     untrack(() => {
+      // A recording plays on as it started, in time with what it captures.
+      if (capturing) return;
       const from = playerState === 'stopped' ? position : player.position();
       const to = keptInLoop(from, playingLoop);
       if (playerState !== 'stopped') play(to);
@@ -418,7 +469,8 @@
     let frame = requestAnimationFrame(function step() {
       if (!dragging) position = player.position();
       onPlayhead?.(position);
-      if (position >= length && !player.repeating) {
+      // A recording runs on past the end until it's stopped.
+      if (position >= length && !player.repeating && !capturing) {
         ended = true;
         player.stop();
         player.seek(length);
@@ -440,6 +492,11 @@
   }
 
   function toggle() {
+    // Space stops a recording, and does nothing while one starts or saves.
+    if (recording) {
+      if (capturing) stopRecording();
+      return;
+    }
     if (playerState !== 'stopped') {
       player.stop();
       position = player.position();
@@ -456,6 +513,8 @@
   }
 
   function seek(to: number) {
+    // A recording plays from where it starts, in time with what it captures.
+    if (recording) return;
     position = clamp(to);
     releaseEnded();
     if (playerState === 'stopped') player.seek(position);
@@ -464,6 +523,7 @@
 
   /** Seeks where asked by hand, switching the Loop off if that's outside it. */
   function seekByHand(to: number) {
+    if (recording) return;
     if (outsideLoop(clamp(to), playingLoop)) switchLoopOff();
     seek(to);
   }
@@ -638,13 +698,101 @@
     offerBpm = null;
   }
 
-  async function addTrack() {
+  /** Adds a Track at the bottom and chooses it; resolves to whether it was added. */
+  async function addTrack(): Promise<boolean> {
     let added: number | null = null;
     const ok = await perform({ kind: 'addTrack', track: { name: `Track ${timeline.tracks.length + 1}` } }, (before, after) => {
       added = addedTrack(before.tracks, after.tracks);
     });
     // Once the Timeline shows it: until then, it isn't there to choose.
     if (ok && added !== null) choose({ kind: 'add', trackId: added });
+    return ok && added !== null;
+  }
+
+  const canRecord = $derived(recording === null && playerState === 'stopped' && !syncing && editable.current);
+
+  $effect(() => {
+    onRecording?.(recording !== null && recording.phase !== 'saving');
+  });
+
+  async function startRecording() {
+    if (!canRecord) return;
+    error = null;
+    // Resumed right away, while the key press or click still counts.
+    audioContext().resume();
+    const starting: RecordingState = { phase: 'starting', trackId: null, plan: null, capture: null, startedAt: 0 };
+    recording = starting;
+    try {
+      if (timeline.tracks.length === 0 && !(await addTrack())) {
+        recording = null;
+        return;
+      }
+      const capture = await Capture.open(audioContext());
+      recording = { ...starting, capture };
+      if (destroyed) throw new CaptureError('The Timeline closed before recording started.');
+      // Placed once the input's open, in case the Timeline changed meanwhile.
+      const track = timeline.tracks.find((t) => t.id === chosen) ?? timeline.tracks.at(-1)!;
+      const plan = recordingPlan(track.clips);
+      following = true;
+      ended = false;
+      position = plan.from;
+      await player.play(playable, plan.from, null);
+      if (player.state !== 'playing') throw new CaptureError('Recording stopped before it started.');
+      recording = { phase: 'recording', trackId: track.id, plan, capture, startedAt: player.startedAt };
+    } catch (e) {
+      recording?.capture?.close();
+      recording = null;
+      error = e instanceof CaptureError ? e.message : `Couldn't start recording (${(e as Error).message}).`;
+    }
+  }
+
+  async function stopRecording() {
+    const r = recording;
+    if (r?.phase !== 'recording' || !r.capture || !r.plan || r.trackId === null) return;
+    recording = { ...r, phase: 'saving' };
+    if (playerState !== 'stopped') player.stop();
+    position = player.position();
+    const samples = await r.capture.stop(r.startedAt);
+    const rate = r.capture.sampleRate;
+    const latency = r.capture.latency;
+    // What was sung after the lead-in, placed where it was heard.
+    if (r.plan.from + samples.length / rate - latency <= r.plan.start) {
+      recording = null;
+      error = 'Recording stopped during the lead-in, so there was nothing to keep.';
+      return;
+    }
+    const wav = new Blob([encodeWav(samples, rate)], { type: 'audio/wav' });
+    const details = {
+      trackId: r.trackId,
+      start: r.plan.start,
+      captureStart: r.plan.from,
+      latencyOffset: latency,
+      peaks: peaksOf([samples], rate),
+    };
+    offerCues = null;
+    queued++;
+    await change(async (at) => {
+      const before = timeline;
+      const after = await saved(api.recordTake(at, wav, details));
+      history.record(recorded(before, after), before, after);
+      editedAt = after.version;
+      showHistory();
+      return { timeline: after };
+    }).finally(() => queued--);
+    recording = null;
+  }
+
+  function switchRecording() {
+    if (capturing) stopRecording();
+    else startRecording();
+  }
+
+  function recordKey(event: KeyboardEvent) {
+    if (event.key.toLowerCase() !== 'r' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.defaultPrevented || picking || inTextField(event.target)) return;
+    if (!capturing && !canRecord) return;
+    event.preventDefault();
+    switchRecording();
   }
 
   // The chosen Track, which a recording goes to, kept on this device for
@@ -1301,7 +1449,26 @@
             ? `Loop ${formatDuration(timeline.loop.start)} to ${formatDuration(timeline.loop.end)}`
             : 'Drag along the top of the ruler to set a Loop'}>Loop</button
         >
-        {#if playerState === 'loading'}
+        <button
+          type="button"
+          class="toggle record edit-only"
+          aria-pressed={capturing}
+          disabled={!capturing && !canRecord}
+          onclick={switchRecording}
+          title={capturing
+            ? 'Stop recording (R or Space)'
+            : syncing
+              ? 'Leave Sync mode to record'
+              : playerState !== 'stopped'
+                ? 'Stop playback to record'
+                : `Record a Take on ${timeline.tracks.find((t) => t.id === chosen)?.name ?? 'a new Track'} (R)`}
+          ><span class="record-dot" aria-hidden="true"></span>{capturing ? 'Stop' : 'Record'}</button
+        >
+        {#if recording?.phase === 'starting'}
+          <span class="muted" role="status">Opening the microphone…</span>
+        {:else if recording?.phase === 'saving'}
+          <span class="muted" role="status">Saving the Take…</span>
+        {:else if playerState === 'loading'}
           <span class="muted" role="status">Loading audio…</span>
         {/if}
         <span class="spacer"></span>
@@ -1552,6 +1719,16 @@
                       ></span>
                     </div>
                   {/each}
+                  {#if capturing && recording?.trackId === track.id && recording.plan && position > recording.plan.start}
+                    <div
+                      class="clip taking"
+                      style:left="{percent(recording.plan.start)}%"
+                      style:width="{percent(position - recording.plan.start)}%"
+                      aria-label="Recording from {formatDuration(recording.plan.start)}"
+                    >
+                      <span class="clip-head"><span class="clip-title">Recording…</span></span>
+                    </div>
+                  {/if}
                 </div>
               {/each}
               {#if loop?.on}
@@ -1603,10 +1780,14 @@
         <button type="button" class="button" onclick={() => (offerBpm = null)}>No thanks</button>
       </div>
     {/if}
-    {#if error}
-      <p class="error" role="alert">{error}</p>
-    {/if}
   </div>
+  {#if error}
+    <!-- Over the page just above the Timeline, so showing it never moves anything. -->
+    <div class="error-bar" role="alert">
+      <span class="error">{error}</span>
+      <button type="button" class="dismiss" onclick={() => (error = null)} aria-label="Dismiss" title="Dismiss">×</button>
+    </div>
+  {/if}
 </section>
 
 {#if picking}
@@ -1981,6 +2162,33 @@
     opacity: 0.5;
     cursor: default;
   }
+  .toggle.record {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(0.3125 * var(--timeline-rem));
+    width: auto;
+    padding: 0 calc(0.375 * var(--timeline-rem));
+  }
+  .record-dot {
+    width: calc(0.5 * var(--timeline-rem));
+    height: calc(0.5 * var(--timeline-rem));
+    border-radius: 50%;
+    background: var(--danger);
+  }
+  .toggle.record[aria-pressed='true'] {
+    border-color: var(--danger);
+    background: var(--danger);
+    color: var(--bg);
+  }
+  /* Stop is a square. */
+  .toggle.record[aria-pressed='true'] .record-dot {
+    border-radius: 1px;
+    background: currentColor;
+  }
+  .toggle.record:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
   .ruler {
     position: relative;
     /* A label near the end would stick out past the lanes, giving them a
@@ -2040,6 +2248,12 @@
   .clip.moving {
     cursor: grabbing;
     opacity: 0.85;
+  }
+  /* The Take being recorded, growing as it goes. */
+  .clip.taking {
+    border-color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 15%, var(--surface-1));
+    cursor: default;
   }
   .clip-head {
     display: flex;
@@ -2121,8 +2335,32 @@
     margin-top: calc(0.5 * var(--timeline-rem));
     font-size: calc(0.875 * var(--timeline-rem));
   }
-  .error {
-    margin-top: calc(0.5 * var(--timeline-rem));
+  .error-bar {
+    position: absolute;
+    bottom: calc(100% + 0.5 * var(--timeline-rem));
+    left: max(var(--gutter), env(safe-area-inset-left));
+    right: max(var(--gutter), env(safe-area-inset-right));
+    display: flex;
+    align-items: center;
+    gap: calc(0.5 * var(--timeline-rem));
+    padding: calc(0.375 * var(--timeline-rem)) calc(0.75 * var(--timeline-rem));
+    border: 1px solid var(--danger);
+    border-radius: calc(0.5 * var(--timeline-rem));
+    background: var(--bg);
+    box-shadow: 0 calc(0.25 * var(--timeline-rem)) var(--timeline-rem) rgb(0 0 0 / 0.2);
+  }
+  .error-bar .error {
+    flex: 1;
+    min-width: 0;
+  }
+  .dismiss {
+    flex-shrink: 0;
+    padding: 0 calc(0.25 * var(--timeline-rem));
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    font-size: calc(1.125 * var(--timeline-rem));
+    cursor: pointer;
   }
 
   /*

@@ -46,6 +46,8 @@
     playheadAt,
     loopOn = false,
     stopLoop,
+    recording = false,
+    onSyncing,
   }: {
     song: Song;
     /** The Song page's mode: Write edits the raw text; Read shows Chords above the lyrics. */
@@ -67,6 +69,10 @@
     playheadAt?: () => number;
     /** Whether the Timeline's Loop is on, which switches Sync mode off: the two are exclusive. */
     loopOn?: boolean;
+    /** Whether the Timeline is recording, which keeps Sync mode off: the two are exclusive. */
+    recording?: boolean;
+    /** Hears whether Sync mode is on, whenever that changes, e.g. to keep recording from starting. */
+    onSyncing?: (on: boolean) => void;
     /** Switches the Timeline's Loop off, as Sync mode comes on. */
     stopLoop?: () => void;
   } = $props();
@@ -207,10 +213,14 @@
   // the Loop mid-pass can't cue Lines out of order: switching Sync mode on
   // switches the Loop off, and the Loop coming on, however it does,
   // switches Sync mode off.
+  // Nor does it come on while recording, which only starts while it's off.
   let syncing = $state(false);
-  const canSync = $derived(mode === 'write' && wide.current && hasClips);
+  const canSync = $derived(mode === 'write' && wide.current && hasClips && !recording);
   $effect(() => {
     if (!canSync || loopOn) untrack(() => (syncing = false));
+  });
+  $effect(() => {
+    onSyncing?.(syncing);
   });
 
   // What the Line up next is worked out from: the Line last cued, or a Line
@@ -393,9 +403,11 @@
         disabled={!canSync}
         onpointerdown={(e) => e.preventDefault()}
         onclick={switchSyncing}
-        title={canSync
-          ? 'Sync lyrics: press Enter or Now as each Line starts to cue it at the playhead'
-          : 'Add a beat to the Timeline to sync lyrics to it'}>Sync lyrics</button
+        title={recording
+          ? 'Stop recording to sync lyrics'
+          : canSync
+            ? 'Sync lyrics: press Enter or Now as each Line starts to cue it at the playhead'
+            : 'Add a beat to the Timeline to sync lyrics to it'}>Sync lyrics</button
       >
     {/if}
     {#if mode === 'write' && canCue && hasCues(song)}
