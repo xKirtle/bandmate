@@ -16,14 +16,14 @@ export type Target = { gap: number } | { onto: number } | { scrapbook: true };
 /**
  * What a drop does, with the gap it shows in if it lands in the Arrangement:
  * an Occurrence moved within it or to the Scrapbook, a Scrapbook Section put
- * back into it, or a Scrapbook Section added to the Section of the
- * Occurrence at `addTo`.
+ * back into it, or a Scrapbook Section, by its id, added to the Section of
+ * the Occurrence at a place in it.
  */
 export type Drop =
   | { reorder: { from: number; to: number }; gap: number }
   | { toScrapbook: number }
   | { putBack: number; gap: number }
-  | { addTo: number; section: number };
+  | { addTo: { section: number; occurrenceAt: number } };
 
 /** A box on the page, as getBoundingClientRect gives it. */
 export type Box = { left: number; right: number; top: number; bottom: number };
@@ -60,7 +60,7 @@ export function moveTo<T>(order: T[], from: number, to: number): T[] {
  * it's over it, else the gap in the Arrangement it's at while it's in the
  * Arrangement's column, above or below it too; null anywhere else.
  * `scrapbook` is null without one to drop on. `occurrences` are where each
- * Occurrence runs down the page. With `onto`, the middle half of an
+ * Occurrence runs down the page. With `canDropOnto`, the middle half of an
  * Occurrence drops onto it instead, leaving a quarter at its top and bottom
  * for the gaps either side.
  */
@@ -69,14 +69,14 @@ export function dropTarget(
   scrapbook: Box | null,
   arrangement: Box,
   occurrences: Span[],
-  onto = false,
+  canDropOnto = false,
 ): Target | null {
   const { x, y } = pointer;
   if (scrapbook && x >= scrapbook.left && x <= scrapbook.right && y >= scrapbook.top && y <= scrapbook.bottom) {
     return { scrapbook: true };
   }
   if (x < arrangement.left || x > arrangement.right) return null;
-  if (onto) {
+  if (canDropOnto) {
     const at = occurrences.findIndex(({ top, bottom }) => {
       const quarter = (bottom - top) / 4;
       return y > top + quarter && y < bottom - quarter;
@@ -90,7 +90,7 @@ export function dropTarget(
 export function dropFor(dragged: Dragged, target: Target | null): Drop | null {
   if (!target) return null;
   if ('scrapbook' in target) return 'occurrenceAt' in dragged ? { toScrapbook: dragged.occurrenceAt } : null;
-  if ('onto' in target) return 'section' in dragged ? { addTo: target.onto, section: dragged.section } : null;
+  if ('onto' in target) return 'section' in dragged ? { addTo: { section: dragged.section, occurrenceAt: target.onto } } : null;
   const { gap } = target;
   if ('section' in dragged) return { putBack: dragged.section, gap };
   const from = dragged.occurrenceAt;

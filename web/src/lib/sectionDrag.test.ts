@@ -170,7 +170,7 @@ describe('dropFor', () => {
   });
 
   it('adds a Scrapbook Section dropped onto a Section to it', () => {
-    expect(dropFor({ section: 7 }, { onto: 2 })).toEqual({ addTo: 2, section: 7 });
+    expect(dropFor({ section: 7 }, { onto: 2 })).toEqual({ addTo: { section: 7, occurrenceAt: 2 } });
   });
 
   it('does nothing with an Occurrence dropped onto a Section', () => {

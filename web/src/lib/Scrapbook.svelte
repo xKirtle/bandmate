@@ -5,7 +5,7 @@
   import type { Drop } from './sectionDrag';
   import type { SectionDragging } from './sectionDragging.svelte';
   import SectionEditor from './SectionEditor.svelte';
-  import { card, describe, labelOf } from './sections';
+  import { card, describe, labelOf, sectionsInArrangement } from './sections';
 
   let {
     song,
@@ -33,9 +33,7 @@
   ]);
   // The Sections a Section can be added to as Alternates: each in the Lyric
   // Sheet once, however many Occurrences share it.
-  const inArrangement = $derived(
-    [...new Set(song.arrangement.map((o) => o.sectionId))].flatMap((id) => sections.get(id) ?? []),
-  );
+  const inArrangement = $derived(sectionsInArrangement(song, sections));
   // The Section just added, whose Label gets focus.
   let added = $state<number | null>(null);
   // The one Section shown in full, in its editor; the rest show as cards.
@@ -93,6 +91,10 @@
   }
 
   function addTo(sectionId: number, targetId: number) {
+    // Its Alternates are made anew in the Section they join, so edits still
+    // waiting in its open editor are saved first, while they can be: a drag
+    // doesn't blur the text box.
+    if (open === sectionId && document.activeElement instanceof HTMLElement) document.activeElement.blur();
     change((at) => api.addToSection(at, sectionId, targetId)).then(closed(sectionId));
   }
 
@@ -104,8 +106,9 @@
       const section = drop.putBack;
       change((at) => api.addOccurrence(at, section, drop.gap)).then(closed(section));
     } else if ('addTo' in drop) {
-      const target = song.arrangement[drop.addTo];
-      if (target) addTo(drop.section, target.sectionId);
+      const { section, occurrenceAt } = drop.addTo;
+      const target = song.arrangement[occurrenceAt];
+      if (target) addTo(section, target.sectionId);
     }
   }
 

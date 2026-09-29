@@ -490,16 +490,9 @@ func copySection(ctx context.Context, tx *sql.Tx, sectionID int64) (int64, map[i
 	if err != nil {
 		return 0, nil, fmt.Errorf("copying section: %w", err)
 	}
-	var alternates []int64
-	err = query(ctx, tx, `SELECT id FROM alternates WHERE section_id = ? ORDER BY id`,
-		[]any{sectionID}, func(rows *sql.Rows) error {
-			var id int64
-			err := rows.Scan(&id)
-			alternates = append(alternates, id)
-			return err
-		})
+	alternates, err := alternatesOf(ctx, tx, sectionID)
 	if err != nil {
-		return 0, nil, fmt.Errorf("reading alternates: %w", err)
+		return 0, nil, err
 	}
 	lineCopies := map[int64]int64{}
 	for _, altID := range alternates {
@@ -515,6 +508,23 @@ func copySection(ctx context.Context, tx *sql.Tx, sectionID int64) (int64, map[i
 		maps.Copy(lineCopies, copies)
 	}
 	return copyID, lineCopies, nil
+}
+
+// alternatesOf returns the ids of a Section's Alternates, in the order they
+// were created.
+func alternatesOf(ctx context.Context, tx *sql.Tx, sectionID int64) ([]int64, error) {
+	var alternates []int64
+	err := query(ctx, tx, `SELECT id FROM alternates WHERE section_id = ? ORDER BY id`,
+		[]any{sectionID}, func(rows *sql.Rows) error {
+			var id int64
+			err := rows.Scan(&id)
+			alternates = append(alternates, id)
+			return err
+		})
+	if err != nil {
+		return nil, fmt.Errorf("reading alternates: %w", err)
+	}
+	return alternates, nil
 }
 
 // copyLines copies all of an Alternate's Lines into another Alternate, and

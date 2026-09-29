@@ -147,9 +147,10 @@ func (s *Store) MoveAlternateToScrapbook(ctx context.Context, songID int64, base
 }
 
 // AddToSection adds a Section in the Scrapbook to a Section in the Lyric
-// Sheet: every Alternate of the scrap joins the Section, inactive, after its
-// own, so the Lyric Sheet is unchanged, and the scrap leaves the Scrapbook.
-// An unnamed Alternate takes the scrap's Label as its name. Their Lines keep
+// Sheet: every Alternate of the Scrapbook Section joins the Section,
+// inactive, after its own, so the Lyric Sheet is unchanged, and the
+// Scrapbook Section is gone. An unnamed Alternate takes the Scrapbook
+// Section's Label as its name. Their Lines keep
 // their ids, and have no Cues: a Scrapbook Section has no Occurrences.
 func (s *Store) AddToSection(ctx context.Context, songID int64, based Version, scrapID, sectionID int64) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
@@ -167,16 +168,9 @@ func (s *Store) AddToSection(ctx context.Context, songID int64, based Version, s
 		if uses == 0 {
 			return conflict("a Scrapbook Section can only be added to a Section in the Lyric Sheet")
 		}
-		var alternates []int64
-		err = query(ctx, tx, `SELECT id FROM alternates WHERE section_id = ? ORDER BY id`,
-			[]any{scrapID}, func(rows *sql.Rows) error {
-				var id int64
-				err := rows.Scan(&id)
-				alternates = append(alternates, id)
-				return err
-			})
+		alternates, err := alternatesOf(ctx, tx, scrapID)
 		if err != nil {
-			return fmt.Errorf("reading alternates: %w", err)
+			return err
 		}
 		// Each is made anew, so it comes after the Section's own Alternates.
 		for _, altID := range alternates {

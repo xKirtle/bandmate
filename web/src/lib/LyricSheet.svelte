@@ -24,7 +24,7 @@
   import SectionEditor from './SectionEditor.svelte';
   import { moveTo, type Drop } from './sectionDrag';
   import type { SectionDragging } from './sectionDragging.svelte';
-  import { activeAlternate, describe, isEmpty } from './sections';
+  import { activeAlternate, describe, isEmpty, sectionsInArrangement } from './sections';
   import type { Mode } from './songMode';
   import { readShiftStep, shiftSteps, storeShiftStep, type ShiftStep } from './shiftStep';
   import { markSyncHintSeen, sawSyncHint } from './syncHint';
@@ -111,9 +111,7 @@
   }
   // The Sections in the Arrangement, once each, in the order they first
   // appear: the ones another Occurrence can be added of.
-  const inArrangement = $derived(
-    [...new Set(song.arrangement.map((o) => o.sectionId))].flatMap((id) => sections.get(id) ?? []),
-  );
+  const inArrangement = $derived(sectionsInArrangement(song, sections));
   // Cues are edited in Write mode, on wider screens only, and only once
   // there's something to cue to or a Cue already set.
   const wide = new MediaQuery('min-width: 40.0625rem');
@@ -321,8 +319,8 @@
   // Occurrences.
   // The gap the dragged Section would land in, if it moves at all.
   const dropAt = $derived(drag.drop && 'gap' in drag.drop ? drag.drop.gap : null);
-  // The Occurrence a Scrapbook Section would be added to the Section of.
-  const dropOnto = $derived(drag.drop && 'addTo' in drag.drop ? drag.drop.addTo : null);
+  // The Occurrence whose Section a Scrapbook Section would be added to.
+  const dropOnto = $derived(drag.drop && 'addTo' in drag.drop ? drag.drop.addTo.occurrenceAt : null);
 
   function dropOccurrence(drop: Drop) {
     if ('reorder' in drop) {
