@@ -334,7 +334,7 @@
 
   function undoKeys(event: KeyboardEvent) {
     if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== 'z') return;
-    if (event.defaultPrevented || !editable.current || picking || inTextField(event.target)) return;
+    if (event.defaultPrevented || !editable.current || picking || calibrating || inTextField(event.target)) return;
     // Not while recording, which undo would take the place of.
     if (recording) return;
     event.preventDefault();
@@ -667,7 +667,7 @@
 
   function spaceBar(event: KeyboardEvent) {
     if (event.key !== ' ' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
-    if (event.defaultPrevented || empty || picking || ownsSpace(event.target)) return;
+    if (event.defaultPrevented || empty || picking || calibrating || ownsSpace(event.target)) return;
     // Otherwise the page would scroll.
     event.preventDefault();
     toggle();
@@ -748,13 +748,13 @@
   // Whether calibration was just skipped, to say where to run it later.
   let skipped = $state(false);
 
-  function calibrated(offset: number) {
+  function storeCalibrated(offset: number) {
     storeOffset(deviceStorage(), offset);
     // Applied even where storage can't keep it, until reload.
     calibration = { offset, offered: true };
   }
 
-  function skip() {
+  function skipOffer() {
     skipCalibration(deviceStorage());
     calibration = { ...calibration, offered: true };
     skipped = true;
@@ -766,7 +766,9 @@
     if (record) startRecording(retaking);
   }
 
-  const canRecord = $derived(recording === null && playerState === 'stopped' && !syncing && editable.current);
+  const canRecord = $derived(
+    recording === null && playerState === 'stopped' && !syncing && !calibrating && editable.current,
+  );
 
   $effect(() => {
     onRecording?.(recording !== null && recording.phase !== 'saving');
@@ -795,7 +797,6 @@
     };
     recording = starting;
     inputNote = null;
-    if (calibration.offset !== null) skipped = false;
     try {
       // Said up front where it can be, in place of a recording that fails.
       const trouble = await inputProblem();
@@ -840,6 +841,7 @@
     // What was sung after the lead-in, placed where it was heard.
     if (r.plan.from + samples.length / rate - latency <= r.plan.start) {
       recording = null;
+      skipped = false;
       error = 'Recording stopped during the lead-in, so there was nothing to keep.';
       return;
     }
@@ -860,6 +862,8 @@
       return { timeline: after };
     }).finally(() => queued--);
     recording = null;
+    // Said once, for the recording right after skipping.
+    skipped = false;
   }
 
   function switchRecording() {
@@ -869,7 +873,7 @@
 
   function recordKey(event: KeyboardEvent) {
     if (event.key.toLowerCase() !== 'r' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
-    if (event.defaultPrevented || picking || inTextField(event.target)) return;
+    if (event.defaultPrevented || picking || calibrating || inTextField(event.target)) return;
     if (!capturing && !canRecord) return;
     event.preventDefault();
     switchRecording();
@@ -1937,8 +1941,8 @@
 {#if calibrating}
   <CalibrationDialog
     offer={calibrating.offer}
-    onCalibrated={calibrated}
-    onSkip={skip}
+    onCalibrated={storeCalibrated}
+    onSkip={skipOffer}
     onClose={calibrationClosed}
   />
 {/if}

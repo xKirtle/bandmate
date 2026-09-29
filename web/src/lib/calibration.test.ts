@@ -80,6 +80,14 @@ describe('measureOffset', () => {
     expect(found.ok && found.offset).toBeCloseTo(0.03, 3);
   });
 
+  it('measures quiet hits past a loud bump between clicks', () => {
+    const quiet = recording(length, heard(0.03), 0.1);
+    const bump = recording(length, [clicks[4] + 0.5], 1);
+    for (let i = 0; i < quiet.length; i++) quiet[i] += bump[i];
+    const found = measureOffset(quiet, rate, clicks);
+    expect(found.ok && found.offset).toBeCloseTo(0.03, 3);
+  });
+
   it('fails with too few hits', () => {
     const claps = heard(0.05).slice(0, minHits - 1);
     expect(measureOffset(recording(length, claps), rate, clicks)).toEqual({ ok: false, hits: minHits - 1 });

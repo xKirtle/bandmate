@@ -7,7 +7,7 @@
 // Song. Until it's calibrated, the latency the browser reports stands in.
 
 /** How many clicks a calibration plays. */
-export const clicks = 12;
+export const clickCount = 12;
 /** How many hits it takes to measure: fewer and it fails. */
 export const minHits = 6;
 
@@ -16,7 +16,7 @@ const readyTime = 1.5;
 const clickEvery = 0.75;
 
 /** When each of count clicks plays, in seconds from when capture starts. */
-export function clickTimes(count = clicks): number[] {
+export function clickTimes(count = clickCount): number[] {
   return Array.from({ length: count }, (_, i) => readyTime + i * clickEvery);
 }
 
@@ -31,10 +31,11 @@ const refractory = 0.1;
 // How far a hit can be from the others' median and still count, in seconds.
 const agreement = 0.03;
 // The quietest a hit can be, and how far above the input's hiss, and how
-// near the loudest hit's level, it must reach.
+// near a typical hit's level, it must reach. Typical is the median of the
+// loudest moment around each click, so one loud bump can't drown the rest.
 const quietest = 0.01;
 const aboveHiss = 10;
-const ofLoudest = 0.25;
+const ofTypical = 0.25;
 
 /**
  * Measures the delay from each click to the hit it was heard as, in a
@@ -44,13 +45,18 @@ const ofLoudest = 0.25;
  * dropped. Fails with fewer than minHits left. Never less than no delay.
  */
 export function measureOffset(samples: Float32Array, sampleRate: number, times: readonly number[]): Measurement {
-  const onsets = findOnsets(samples, sampleRate);
+  const windows = times.map((click, i) => ({
+    click,
+    from: click - earliest,
+    until: Math.min(click + latest, (times[i + 1] ?? Infinity) - earliest),
+  }));
+  const typical = median(windows.map(({ from, until }) => peak(samples, from * sampleRate, until * sampleRate)));
+  const onsets = findOnsets(samples, sampleRate, typical);
   const delays: number[] = [];
-  times.forEach((click, i) => {
-    const until = Math.min(click + latest, (times[i + 1] ?? Infinity) - earliest);
-    const hit = onsets.find((at) => at >= click - earliest && at < until);
+  for (const { click, from, until } of windows) {
+    const hit = onsets.find((at) => at >= from && at < until);
     if (hit !== undefined) delays.push(hit - click);
-  });
+  }
   if (delays.length === 0) return { ok: false, hits: 0 };
   const middle = median(delays);
   const kept = delays.filter((d) => Math.abs(d - middle) <= agreement);
@@ -59,16 +65,20 @@ export function measureOffset(samples: Float32Array, sampleRate: number, times: 
   return { ok: true, offset: Math.max(0, average), hits: kept.length };
 }
 
-/** When each hit starts, in seconds: where the signal first rises well above the hiss. */
-function findOnsets(samples: Float32Array, sampleRate: number): number[] {
-  let peak = 0;
-  const levels = new Float32Array(samples.length);
-  for (let i = 0; i < samples.length; i++) {
-    levels[i] = Math.abs(samples[i]);
-    peak = Math.max(peak, levels[i]);
+/** The loudest a stretch of samples gets, from one index until another. */
+function peak(samples: Float32Array, from: number, until: number): number {
+  let loudest = 0;
+  for (let i = Math.max(0, Math.round(from)); i < Math.min(samples.length, until); i++) {
+    loudest = Math.max(loudest, Math.abs(samples[i]));
   }
+  return loudest;
+}
+
+/** When each hit starts, in seconds: where the signal first rises well above the hiss, near a typical hit's level. */
+function findOnsets(samples: Float32Array, sampleRate: number, typical: number): number[] {
+  const levels = samples.map(Math.abs);
   const hiss = median(levels);
-  const threshold = Math.max(quietest, hiss * aboveHiss, peak * ofLoudest);
+  const threshold = Math.max(quietest, hiss * aboveHiss, typical * ofTypical);
   const onsets: number[] = [];
   const gap = Math.round(refractory * sampleRate);
   let next = 0;

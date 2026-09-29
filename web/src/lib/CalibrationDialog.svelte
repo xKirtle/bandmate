@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
-  import { clickTimes, clicks, formatOffset, measureOffset, type Measurement } from './calibration';
+  import { clickCount, clickTimes, formatOffset, measureOffset, type Measurement } from './calibration';
   import { Capture, CaptureError } from './capture';
   import { readInput } from './inputSettings';
   import { deviceStorage } from './timelineHeight';
@@ -29,7 +29,7 @@
   let dialog = $state<HTMLDialogElement>();
   let phase = $state<'ready' | 'measuring' | 'done'>('ready');
   // Which click is playing, from 1, while measuring.
-  let click = $state(0);
+  let currentClick = $state(0);
   let result = $state<Measurement | null>(null);
   let error = $state<string | null>(null);
   let record = false;
@@ -57,12 +57,13 @@
   }
 
   async function measure() {
-    const mine = ++generation;
     const context = audioContext();
     // Resumed while the click that started it still counts.
     const resumed = context.resume().catch(() => {});
+    stopMeasuring();
+    const mine = generation;
     phase = 'measuring';
-    click = 0;
+    currentClick = 0;
     result = null;
     error = null;
     try {
@@ -76,7 +77,7 @@
       for (const t of times) playClick(context, from + t);
       timer = window.setInterval(() => {
         const played = times.filter((t) => from + t <= context.currentTime).length;
-        click = Math.max(1, played);
+        currentClick = Math.max(1, played);
       }, 50);
       // Until the last click's hit has had time to be heard.
       const end = from + times.at(-1)! + 0.6;
@@ -136,18 +137,18 @@
       after the Beat plays, so Takes line up with it.
     </p>
     <p>
-      With the headphones or speakers you record with, tap or clap on the mic along with {clicks} clicks. It takes about
+      With the headphones or speakers you record with, tap or clap on the mic along with {clickCount} clicks. It takes about
       ten seconds.
     </p>
   {:else if phase === 'measuring'}
     <p class="count" role="status" aria-live="polite">
-      {click === 0 ? 'Get ready…' : `Click ${click} of ${clicks}: tap along`}
+      {currentClick === 0 ? 'Get ready…' : `Click ${currentClick} of ${clickCount}: tap along`}
     </p>
   {:else if error}
     <p class="problem" role="alert">{error}</p>
   {:else if measured}
     <p role="status">
-      The Latency Offset is <strong>{formatOffset(measured.offset)}</strong>, from {measured.hits} of {clicks} taps. New
+      The Latency Offset is <strong>{formatOffset(measured.offset)}</strong>, from {measured.hits} of {clickCount} taps. New
       Takes are placed earlier by it; Takes already recorded stay where they are.
     </p>
   {:else if result}
