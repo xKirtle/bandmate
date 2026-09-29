@@ -76,9 +76,9 @@
     added = null;
   }
 
-  // "Put back…" puts a Section back at a place in the Lyric Sheet, or adds
-  // it to a Section there as Alternates.
-  function putBack(sectionId: number) {
+  // What "Put back…" offers: putting a Section back at a place in the Lyric
+  // Sheet, or adding it to a Section there as Alternates.
+  function putBackMenu(sectionId: number) {
     return putBackActions(
       inArrangement,
       (position) => change((at) => api.addToArrangement(at, sectionId, position)).then(closed(sectionId)),
@@ -153,7 +153,7 @@
                 <ActionsMenu
                   label="Put back into the Lyric Sheet, or add as an Alternate of a Section"
                   text="Put back…"
-                  entries={putBack(section.id)}
+                  entries={putBackMenu(section.id)}
                 />
               {/snippet}
             </SectionEditor>

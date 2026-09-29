@@ -159,7 +159,8 @@
           </button>
         {/each}
       {:else}
-        {#each entries as entry (entry.label)}
+        <!-- By place: a list of Sections can name two alike. -->
+        {#each entries as entry, i (i)}
           <button
             type="button"
             role="menuitem"
