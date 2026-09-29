@@ -78,7 +78,8 @@
   const desktop = new MediaQuery('min-width: 80rem');
 
   // On desktop, the table previews Beats through the bar at the bottom, which
-  // keeps the last Beat previewed until closed.
+  // keeps the last Beat previewed until the Beat is deleted, the window narrows
+  // or the page is left.
   let previewId = $state<number | null>(null);
   const previewBeat = $derived((desktop.current && beats?.find((b) => b.id === previewId)) || null);
   let previewPlaying = $state(false);
@@ -291,7 +292,6 @@
     bind:playing={previewPlaying}
     bind:height={playerBarHeight}
     beat={previewBeat}
-    onClose={closePreview}
   />
 {/if}
 
