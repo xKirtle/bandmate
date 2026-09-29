@@ -1,24 +1,33 @@
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { tick, type Snippet } from 'svelte';
   import { menuKey, type MenuAction, type MenuChoice } from './menu';
   import { popoverTop } from './popover';
 
   let {
     entries,
     label = 'More actions',
+    trigger,
+    align = 'end',
+    disabled = false,
   }: {
     entries: MenuAction[];
-    /** Names ⋯ to screen readers, e.g. to tell apart several on one page. */
+    /** Names the trigger to screen readers, e.g. to tell apart several on one page. */
     label?: string;
+    /** What opens the menu, in place of ⋯, e.g. the Cover. */
+    trigger?: Snippet;
+    /** Which of the trigger's edges the menu lines up with: its end, or, near the page's start, its start. */
+    align?: 'start' | 'end';
+    /** Keeps the menu from opening, e.g. while what it acts on is busy. */
+    disabled?: boolean;
   } = $props();
 
   let open = $state(false);
   // The entry whose choices the menu shows in place of the entries, if any.
   let picking = $state<(MenuAction & { choices: MenuChoice[] }) | null>(null);
   let root: HTMLElement;
-  let trigger: HTMLButtonElement;
+  let triggerButton: HTMLButtonElement;
   let menu = $state<HTMLElement>();
-  // Between ⋯ and the menu, in px.
+  // Between the trigger and the menu, in px.
   const gap = 4;
 
   function items(): HTMLElement[] {
@@ -42,15 +51,16 @@
   // changes height.
   function place() {
     if (!menu) return;
-    const at = trigger.getBoundingClientRect();
+    const at = triggerButton.getBoundingClientRect();
     const { height } = menu.getBoundingClientRect();
     menu.style.top = `${popoverTop(at, height, window.innerHeight, gap)}px`;
-    menu.style.right = `${document.documentElement.clientWidth - at.right}px`;
+    if (align === 'start') menu.style.left = `${at.left}px`;
+    else menu.style.right = `${document.documentElement.clientWidth - at.right}px`;
   }
 
   function close() {
     open = false;
-    trigger.focus();
+    triggerButton.focus();
   }
 
   function choose(entry: MenuAction | MenuChoice) {
@@ -111,16 +121,17 @@
 <div class="menu-root" bind:this={root}>
   <button
     type="button"
-    class="icon"
-    bind:this={trigger}
+    class={trigger ? 'bare' : 'icon'}
+    bind:this={triggerButton}
     aria-label={label}
     title={label}
     aria-haspopup="menu"
     aria-expanded={open}
+    {disabled}
     onclick={() => (open ? close() : show())}
     onkeydown={onTriggerKey}
   >
-    ⋯
+    {#if trigger}{@render trigger()}{:else}⋯{/if}
   </button>
   {#if open}
     <div
@@ -161,6 +172,16 @@
 </div>
 
 <style>
+  .bare {
+    display: block;
+    padding: 0;
+    border: 0;
+    border-radius: var(--trigger-radius, 0.5rem);
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
   .menu {
     position: fixed;
     inset: auto;
