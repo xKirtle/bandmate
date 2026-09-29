@@ -177,6 +177,7 @@
         // Focus stays in the field, to carry on typing.
         editingLabel = true;
       }}
+      onrevert={() => onUnsaved(naming, false)}
       onfocus={() => (editingLabel = true)}
       oninput={() => onUnsaved(naming, true)}
       onchange={commitLabel}

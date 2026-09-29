@@ -1,5 +1,5 @@
 import { describe as group, expect, it } from 'vitest';
-import { comboboxKey, filterOptions, optionIndex, popoverTop } from './combobox';
+import { comboboxKey, filterOptions, optionIndex } from './combobox';
 
 const labels = ['Intro', 'Verse', 'Pre-Chorus', 'Chorus', 'Post-Chorus', 'Hook'];
 
@@ -84,21 +84,5 @@ group('comboboxKey', () => {
   it('leaves typing to the field', () => {
     expect(comboboxKey('a', false, { open: true, active: 1, count: 3 })).toBeNull();
     expect(comboboxKey('Home', false, { open: true, active: 1, count: 3 })).toBeNull();
-  });
-});
-
-group('popoverTop', () => {
-  const field = { top: 500, bottom: 536 };
-
-  it('places the list under the field when there is room', () => {
-    expect(popoverTop(field, 200, 800, 4)).toBe(540);
-  });
-
-  it('flips it over the field when there is no room below', () => {
-    expect(popoverTop(field, 200, 600, 4)).toBe(296);
-  });
-
-  it('keeps it on screen when there is no room either way', () => {
-    expect(popoverTop({ top: 100, bottom: 136 }, 200, 300, 4)).toBe(4);
   });
 });

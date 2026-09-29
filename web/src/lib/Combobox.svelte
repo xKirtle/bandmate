@@ -1,7 +1,8 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import type { HTMLInputAttributes } from 'svelte/elements';
-  import { comboboxKey, filterOptions, optionIndex, popoverTop } from './combobox';
+  import { comboboxKey, filterOptions, optionIndex } from './combobox';
+  import { popoverTop } from './popover';
 
   let {
     id,
@@ -9,6 +10,7 @@
     options,
     saved,
     onpick,
+    onrevert,
     oninput,
     onblur,
     onkeydown,
@@ -23,6 +25,8 @@
     saved: string;
     /** An option was picked: `value` is it now. */
     onpick: (value: string) => void;
+    /** Escape took back what was typed: `value` is `saved` again. */
+    onrevert?: () => void;
   } = $props();
 
   let open = $state(false);
@@ -37,6 +41,7 @@
   const gap = 4;
 
   async function show() {
+    if (!options.length) return;
     query = null;
     active = optionIndex(options, value);
     open = true;
@@ -58,7 +63,9 @@
     const at = input.getBoundingClientRect();
     list.style.minWidth = `${at.width}px`;
     const { width, height } = list.getBoundingClientRect();
-    list.style.top = `${popoverTop(at, height, window.innerHeight, gap)}px`;
+    // On a phone, what the on-screen keyboard leaves visible.
+    const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+    list.style.top = `${popoverTop(at, height, viewportHeight, gap)}px`;
     const room = document.documentElement.clientWidth - gap;
     list.style.left = `${Math.max(gap, Math.min(at.left, room - width))}px`;
   }
@@ -79,23 +86,24 @@
     onpick(option);
   }
 
-  async function typed(e: Event & { currentTarget: HTMLInputElement }) {
+  async function onFieldInput(e: Event & { currentTarget: HTMLInputElement }) {
     oninput?.(e as Parameters<NonNullable<typeof oninput>>[0]);
     query = value;
     active = -1;
-    const was = open;
+    const wasOpen = open;
     // Nothing matching closes it: free text is fine too.
     open = shown.length > 0;
     await tick();
     if (!open) return;
-    if (!was) list?.showPopover();
+    if (!wasOpen) list?.showPopover();
     place();
   }
 
-  async function key(e: KeyboardEvent & { currentTarget: HTMLInputElement }) {
+  async function onFieldKey(e: KeyboardEvent & { currentTarget: HTMLInputElement }) {
     onkeydown?.(e);
     const action = comboboxKey(e.key, e.altKey, { open, active, count: shown.length });
-    if (!action) return;
+    // With nothing to take back, Escape is left to whatever else handles it.
+    if (!action || (action.kind === 'revert' && value === saved)) return;
     // Enter with nothing highlighted goes on to save the typed text.
     if (!(e.key === 'Enter' && action.kind === 'close')) e.preventDefault();
     e.stopPropagation();
@@ -108,6 +116,7 @@
         break;
       case 'revert':
         value = saved;
+        onrevert?.();
         break;
       case 'highlight':
         active = action.index;
@@ -127,7 +136,7 @@
   }
 </script>
 
-<!-- It's placed when it opens, so it follows the field as the page scrolls or resizes. -->
+<!-- Placed again as the page scrolls or resizes, so it stays with the field. -->
 <svelte:window onresize={() => open && place()} />
 <svelte:document onscrollcapture={() => open && place()} />
 
@@ -140,10 +149,10 @@
     role="combobox"
     aria-autocomplete="list"
     aria-expanded={open}
-    aria-controls="{id}-list"
+    aria-controls={open ? `${id}-list` : undefined}
     aria-activedescendant={open && active >= 0 ? `${id}-option-${active}` : undefined}
-    oninput={typed}
-    onkeydown={key}
+    oninput={onFieldInput}
+    onkeydown={onFieldKey}
     onclick={(e) => {
       onclick?.(e);
       if (!open) show();
@@ -160,7 +169,7 @@
     tabindex="-1"
     aria-label="Suggestions"
     aria-expanded={open}
-    aria-controls="{id}-list"
+    aria-controls={open ? `${id}-list` : undefined}
     onmousedown={(e) => e.preventDefault()}
     onclick={toggle}
   >
@@ -191,6 +200,7 @@
         >
           <span class="check" aria-hidden="true">{i === savedAt ? '✓' : ''}</span>
           {option}
+          {#if i === savedAt}<span class="visually-hidden">(saved)</span>{/if}
         </div>
       {/each}
     </div>

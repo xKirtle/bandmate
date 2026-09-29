@@ -51,17 +51,3 @@ export function comboboxKey(
       return null;
   }
 }
-
-/**
- * The top of a list `height` px tall, `gap` px from a field: under it, or
- * over it when there's no room below, but never off the top of the window.
- */
-export function popoverTop(
-  field: { top: number; bottom: number },
-  height: number,
-  viewportHeight: number,
-  gap: number,
-): number {
-  if (field.bottom + gap + height <= viewportHeight) return field.bottom + gap;
-  return Math.max(gap, field.top - gap - height);
-}
