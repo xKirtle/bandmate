@@ -1094,7 +1094,9 @@
         choices: takes.map((t) => ({
           label: `Take ${t.number}`,
           checked: t.id === activeTakeId,
-          run: () => t.id !== activeTakeId && perform({ kind: 'chooseTake', clipId, takeId: t.id }),
+          run: () => {
+            if (t.id !== activeTakeId) perform({ kind: 'chooseTake', clipId, takeId: t.id });
+          },
         })),
       },
       {
