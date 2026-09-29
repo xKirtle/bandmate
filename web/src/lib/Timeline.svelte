@@ -40,6 +40,8 @@
   import { keptInLoop, outsideLoop, repeats, timelineEnd, type Loop, type Placed } from './schedule';
   import { inTextField } from './textField';
   import { formatDuration } from './time';
+  import { tracksDropped, type TrackDrop } from './trackDrag';
+  import { TrackDragging } from './trackDragging.svelte';
   import InputSettings from './InputSettings.svelte';
   import CalibrationDialog from './CalibrationDialog.svelte';
   import { appliedOffset, readCalibration, skipCalibration, storeOffset } from './calibration';
@@ -376,6 +378,11 @@
   }
 
   function keydown(event: KeyboardEvent) {
+    if (trackDrag.current && event.key === 'Escape') {
+      event.preventDefault();
+      trackDrag.cancel();
+      return;
+    }
     spaceBar(event);
     undoKeys(event);
     recordKey(event);
@@ -457,6 +464,19 @@
     const order = timeline.tracks.map((t) => t.id);
     [order[index], order[index + by]] = [order[index + by], order[index]];
     perform({ kind: 'reorderTracks', order });
+  }
+
+  // Dragging a Track by its grip, on desktop and not while recording. A drop
+  // saves what as many presses of ↑ or ↓ would, as one edit.
+  const trackDrag = new TrackDragging(
+    () => editable.current && recording === null,
+    () => timeline.tracks.map((t) => t.id).join(),
+  );
+  // The gap between Tracks the dragged one would drop into, if it moves at all.
+  const trackGap = $derived(trackDrag.current?.drop?.gap ?? null);
+
+  function dropTrack(drop: TrackDrop) {
+    perform({ kind: 'reorderTracks', order: tracksDropped(timeline.tracks.map((t) => t.id), drop) });
   }
 
   // Deleting a Track doesn't ask first either: it can be undone. A Song
@@ -1060,10 +1080,11 @@
 
   /**
    * Chooses a Track clicked in its header, but not by its controls (its
-   * name, levels, and moving or deleting it), which only do their own thing.
+   * name, levels, and moving or deleting it) or its grip, which only do
+   * their own thing.
    */
   function headClick(event: MouseEvent, track: Track) {
-    if (event.target instanceof Element && event.target.closest('input, button')) return;
+    if (event.target instanceof Element && event.target.closest('input, button, .grip')) return;
     choose({ kind: 'choose', trackId: track.id });
   }
 
@@ -1842,7 +1863,7 @@
     </div>
 
     <div class="tracks" id="timeline-tracks" hidden={collapsed} style:max-height="{tracksHeight}px">
-      <div class="heads" bind:offsetHeight={headsHeight}>
+      <div class="heads" class:gripped={editable.current} bind:offsetHeight={headsHeight}>
         <div class="ruler-gap">
           <button type="button" class="button add-track edit-only" aria-label="Add a Track" onclick={addTrack}
             >+ Track</button
@@ -1855,11 +1876,24 @@
           <div
             class="head"
             class:chosen={track.id === chosen}
+            class:dragged={trackDrag.current?.from === i}
+            class:drop-above={trackGap === i}
+            class:drop-below={trackGap === timeline.tracks.length && i === timeline.tracks.length - 1}
             role="group"
             aria-label="Track {track.name}"
             aria-current={track.id === chosen ? 'true' : undefined}
             onclick={(e) => headClick(e, track)}
+            {@attach (el) => trackDrag.placeHead(el, i)}
           >
+            {#if editable.current}
+              <!-- Pointer only: ↑ and ↓ move it from the keyboard. Its room stays while recording, so the lanes don't shift. -->
+              <span
+                class="grip"
+                aria-hidden="true"
+                title={trackDrag.on ? 'Drag to move; Esc cancels' : undefined}
+                {...trackDrag.on ? trackDrag.grip(i, dropTrack) : {}}>{trackDrag.on ? '⠿' : ''}</span
+              >
+            {/if}
             <div class="head-row">
               {#if editable.current && renaming === track.id}
                 <input
@@ -2017,7 +2051,13 @@
               {/each}
             </div>
             {#each shown as { track, clips: placed }, t (track.id)}
-              <div class="lane" bind:this={laneElements[t]}>
+              <div
+                class="lane"
+                class:dragged={trackDrag.current?.from === t}
+                class:drop-above={trackGap === t}
+                class:drop-below={trackGap === shown.length && t === shown.length - 1}
+                bind:this={laneElements[t]}
+              >
                 {#each placed as { clip, at, editing } (clip.id)}
                   {@const wave = waveWindow(view, at.start, at.length)}
                   {@const title = sources.of(clip).title}
@@ -2374,6 +2414,63 @@
     user-select: none;
   }
   /* Marked along its left edge, in the room left for it. */
+  /* The grip's strip along each header's left edge widens the column, not squeezing the controls. */
+  .heads.gripped {
+    width: calc(12.25 * var(--timeline-rem));
+  }
+  .heads.gripped .head {
+    position: relative;
+    padding-left: calc(1.625 * var(--timeline-rem));
+  }
+  .grip {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    display: grid;
+    place-items: center;
+    width: calc(1.25 * var(--timeline-rem));
+    color: var(--text-muted);
+    font-size: calc(0.875 * var(--timeline-rem));
+    cursor: grab;
+    touch-action: none;
+  }
+  .grip:empty {
+    cursor: default;
+  }
+  .grip:hover {
+    color: var(--text);
+  }
+  .head.dragged,
+  .lane.dragged {
+    opacity: 0.5;
+  }
+  .head.dragged .grip {
+    cursor: grabbing;
+  }
+  /* The drop shows in the gap the dragged Track would land in, across its header and lane. */
+  .head.drop-above::before,
+  .head.drop-below::after,
+  .lane.drop-above::before,
+  .lane.drop-below::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 2;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--accent);
+    pointer-events: none;
+  }
+  .head.drop-above::before,
+  .lane.drop-above::before {
+    top: -2px;
+  }
+  .head.drop-below::after,
+  .lane.drop-below::after {
+    bottom: -2px;
+  }
   .head.chosen {
     box-shadow: inset calc(0.1875 * var(--timeline-rem)) 0 0 var(--accent);
     background: color-mix(in srgb, var(--accent) 8%, transparent);
