@@ -19,7 +19,7 @@ describe('recordingPlan', () => {
     expect(recordingPlan(clips, 90)).toEqual({ start: 50, from: 50 - leadIn });
   });
 
-  it('never leads in from before 0:00', () => {
+  it('never leads in from before 0:00 after a Clip', () => {
     expect(recordingPlan([{ start: 0, offset: 0, length: 1.5 }], 0)).toEqual({ start: 1.5, from: 0 });
   });
 });

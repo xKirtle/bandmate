@@ -45,6 +45,10 @@ describe('recoveredPlacement', () => {
     expect(recoveredPlacement(gone, recorded, duration, 11)).toEqual({ target: { trackId: 11, start: 15 }, captureStart: 13 });
   });
 
+  it('puts it where it was recorded on the chosen Track once its own is gone, if that one is empty', () => {
+    expect(recoveredPlacement([{ id: 11, clips: [] }], recorded, duration, 11)).toEqual({ target: { trackId: 11, start: 30 }, captureStart: 28 });
+  });
+
   it('leaves adding a Track to the caller when there are none left', () => {
     expect(recoveredPlacement([], recorded, duration, null)).toEqual({ target: null, captureStart: -2 });
   });
@@ -86,8 +90,8 @@ describe('recoveredPlacement', () => {
     expect(recoveredPlacement(gone, retaken, duration, 10)).toEqual({ target: { trackId: 10, start: 10 }, captureStart: 8 });
   });
 
-  it('appends a Retake to the chosen Track once its Clip and its Track are gone', () => {
-    expect(recoveredPlacement([{ id: 11, clips: [] }], retaken, duration, 11)).toEqual({ target: { trackId: 11, start: 0 }, captureStart: -2 });
+  it('puts a Retake where it was recorded on the empty chosen Track once its Clip and its Track are gone', () => {
+    expect(recoveredPlacement([{ id: 11, clips: [] }], retaken, duration, 11)).toEqual({ target: { trackId: 11, start: 20 }, captureStart: 18 });
   });
 
   it('keeps nothing that stopped during the lead-in', () => {
