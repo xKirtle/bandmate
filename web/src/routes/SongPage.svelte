@@ -55,6 +55,7 @@
   const writing = $derived(mode === 'write');
   // The Details as Read mode shows them.
   const summary = $derived(detailsSummary(draft));
+  const hasNotes = $derived(draft.notes.trim() !== '');
 
   // Whether the Notes under the Details are showing. They start hidden.
   let notesOpen = $state(false);
@@ -67,7 +68,7 @@
   const desktop = new MediaQuery('min-width: 80rem');
   const parts = $derived(sideParts(mode));
   // Parts opened or closed by hand, per mode.
-  let toggledParts = $state<Record<string, boolean>>({});
+  let toggledParts = $state<Partial<Record<`${Mode}-${SidePart}`, boolean>>>({});
 
   function partOpen(part: SidePart, startsOpen: boolean): boolean {
     return !desktop.current || (toggledParts[`${mode}-${part}`] ?? startsOpen);
@@ -312,7 +313,7 @@
   <button
     type="button"
     class="button notes-toggle"
-    class:has-notes={draft.notes.trim() !== ''}
+    class:has-notes={hasNotes}
     aria-expanded={notesOpen}
     aria-controls={notesOpen ? 'song-notes' : undefined}
     onclick={() => (notesOpen = !notesOpen)}
@@ -424,12 +425,12 @@
                 ></textarea>
               </label>
             {/if}
-          {:else if summary || draft.notes.trim()}
+          {:else}
             <div class="fields">
-              {#if summary}<p class="summary">{summary}</p>{/if}
-              {#if draft.notes.trim()}{@render notesToggle()}{/if}
+              <p class="summary" class:muted={!summary}>{summary || 'No Details yet.'}</p>
+              {#if hasNotes}{@render notesToggle()}{/if}
             </div>
-            {#if notesOpen && draft.notes.trim()}
+            {#if notesOpen && hasNotes}
               <p id="song-notes" class="read-notes">{draft.notes}</p>
             {/if}
           {/if}
@@ -469,11 +470,11 @@
            named by their toggles. Narrower, its parts follow the Lyric Sheet,
            always open. -->
       <div class="side">
-        {#each parts as { part, open } (part)}
+        {#each parts as { part, open: startsOpen } (part)}
           <details
             class="part {part}-part"
-            open={partOpen(part, open)}
-            ontoggle={(e) => toggled(part, open, e.currentTarget.open)}
+            open={partOpen(part, startsOpen)}
+            ontoggle={(e) => toggled(part, startsOpen, e.currentTarget.open)}
           >
             {#if part === 'masters'}
               <summary>{song.masters.length > 1 ? 'Masters' : 'Master'}</summary>
