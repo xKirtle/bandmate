@@ -16,6 +16,7 @@
   } from './api';
   import ActionsMenu from './ActionsMenu.svelte';
   import BeatPicker from './BeatPicker.svelte';
+  import { addedTrack, chosenTrack, readChosen, storeChosen, type ChoiceEvent } from './chosenTrack';
   import { clampMove, clampTrimEnd, clampTrimStart } from './clipEdit';
   import { clipSources } from './clipSource';
   import { cuesInSpan, formatCue, hasCues } from './cues';
@@ -220,12 +221,20 @@
     return { timeline: after };
   }
 
-  /** Queues an edit, to undo later; resolves to whether it succeeded. */
-  function perform(e: TimelineEdit): Promise<boolean> {
+  /**
+   * Queues an edit, to undo later, telling done what it did once saved;
+   * resolves to whether it succeeded.
+   */
+  function perform(e: TimelineEdit, done?: (before: Timeline, after: Timeline) => void): Promise<boolean> {
     e = $state.snapshot(e) as TimelineEdit;
     offerCues = null;
     queued++;
-    return change((at) => send(at, e, (before, after) => history.record(e, before, after))).finally(() => queued--);
+    return change((at) =>
+      send(at, e, (before, after) => {
+        history.record(e, before, after);
+        done?.(before, after);
+      }),
+    ).finally(() => queued--);
   }
 
   /**
@@ -615,9 +624,34 @@
     offerBpm = null;
   }
 
-  function addTrack() {
-    perform({ kind: 'addTrack', track: { name: `Track ${timeline.tracks.length + 1}` } });
+  async function addTrack() {
+    let added: number | null = null;
+    const ok = await perform({ kind: 'addTrack', track: { name: `Track ${timeline.tracks.length + 1}` } }, (before, after) => {
+      added = addedTrack(before.tracks, after.tracks);
+    });
+    // Once the Timeline shows it: until then, it isn't there to choose.
+    if (ok && added !== null) choose({ kind: 'add', trackId: added });
   }
+
+  // The chosen Track, which a recording goes to, kept on this device for
+  // each Song. Choosing isn't an edit, so it's never saved with the Song.
+  let remembered = $derived(readChosen(deviceStorage(), song.id));
+  const chosen = $derived(chosenTrack(timeline.tracks, remembered));
+
+  function choose(event: ChoiceEvent) {
+    remembered = chosenTrack(timeline.tracks, remembered, event);
+  }
+
+  // Also the first time, or once the one remembered is gone, so a Beat
+  // Track added below later doesn't become the bottom one chosen.
+  $effect(() => {
+    if (chosen === null || chosen === untrack(() => remembered)) return;
+    remembered = chosen;
+  });
+
+  $effect(() => {
+    if (remembered !== null) storeChosen(deviceStorage(), song.id, remembered);
+  });
 
   // Editing a Clip: dragging its body moves it, along its Track or onto
   // another; dragging an edge trims it. It stops at its neighbours, the
@@ -729,6 +763,7 @@
   }
 
   function editDown(event: PointerEvent, clip: Clip, mode: Edit['mode']) {
+    if (event.isPrimary && event.button === 0) choose({ kind: 'choose', trackId: trackOf(clip).id });
     if (!editable.current || !event.isPrimary || event.button !== 0 || edit || inClipMenu(event.target)) return;
     event.stopPropagation();
     // Clicking a Clip still focuses it, for its keys and its menu.
@@ -1265,7 +1300,17 @@
           <span class="ruler-gap"></span>
           {#each timeline.tracks as track, i (track.id)}
             {@const trackLevels = levels[i]}
-            <div class="head" role="group" aria-label="Track {track.name}">
+            <!-- Clicking anywhere on it, including its controls, chooses the Track. -->
+            <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+            <div
+              class="head"
+              class:chosen={track.id === chosen}
+              role="group"
+              aria-label="Track {track.name}"
+              aria-current={track.id === chosen ? 'true' : undefined}
+              title={track.id === chosen ? 'Chosen: recordings go to this Track' : 'Click to choose this Track'}
+              onclick={() => choose({ kind: 'choose', trackId: track.id })}
+            >
               <div class="head-row">
                 {#if editable.current}
                   <input
@@ -1663,7 +1708,14 @@
     flex-shrink: 0;
     gap: calc(0.25 * var(--timeline-rem));
     height: var(--track-height);
+    padding-left: calc(0.375 * var(--timeline-rem));
     border-bottom: 1px solid var(--border);
+    cursor: pointer;
+  }
+  /* Marked along its left edge, in the room left for it. */
+  .head.chosen {
+    box-shadow: inset calc(0.1875 * var(--timeline-rem)) 0 0 var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
   }
   .head-row {
     display: flex;
