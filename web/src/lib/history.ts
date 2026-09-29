@@ -31,7 +31,9 @@ import { isBlank, type CuedSong } from './cues';
 // Clip, are redone as that too, so redoing never uploads a Take again or
 // copies it again. A Retake is undone and redone by setting its Clip's
 // Takes, and where they are, as they were before or after it, which
-// detaches the new Take or brings it back.
+// detaches the new Take or brings it back. Deleting Takes, or clearing a
+// Clip's inactive ones, is undone the same way, as they're only detached,
+// or, if it deleted the Clip with its last Take, by placing the Clip back.
 
 /** A change to the Timeline, as the intent sent to the API. */
 export type Edit =
@@ -46,6 +48,9 @@ export type Edit =
   | { kind: 'trimClip'; clipId: number; offset: number; length: number }
   | { kind: 'deleteClip'; clipId: number }
   | { kind: 'setTakes'; clipId: number; takes: ClipTakes }
+  | { kind: 'chooseTake'; clipId: number; takeId: number }
+  | { kind: 'deleteTake'; clipId: number; takeId: number }
+  | { kind: 'clearInactiveTakes'; clipId: number }
   | { kind: 'setLoop'; loop: TimelineLoop }
   | { kind: 'switchLoop'; on: boolean }
   | { kind: 'clearLoop' };
@@ -192,15 +197,20 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
       const { clip } = findClip(before, edit.clipId);
       return { edit: { kind: 'trimClip', clipId: clip.id, offset: clip.offset, length: clip.length }, adds: none };
     }
-    case 'deleteClip': {
-      const { track, clip } = findClip(before, edit.clipId);
-      return {
-        edit: { kind: 'placeClip', trackId: track.id, clip: placementOf(clip) },
-        adds: { tracks: [], clips: [clip.id] },
-      };
-    }
+    case 'deleteClip':
+      return placingBack(before, edit.clipId);
     case 'setTakes':
+    case 'clearInactiveTakes':
       return { edit: settingTakes(before, edit.clipId), adds: none };
+    case 'deleteTake':
+      // Its last Take deletes the Clip.
+      return clipIds(after).has(edit.clipId)
+        ? { edit: settingTakes(before, edit.clipId), adds: none }
+        : placingBack(before, edit.clipId);
+    case 'chooseTake': {
+      const { clip } = findClip(before, edit.clipId);
+      return { edit: { kind: 'chooseTake', clipId: clip.id, takeId: clip.activeTakeId! }, adds: none };
+    }
     case 'switchLoop':
       return { edit: { kind: 'switchLoop', on: !edit.on }, adds: none };
     case 'setLoop':
@@ -209,6 +219,15 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
       return { edit: loop ? { kind: 'setLoop', loop: { ...loop } } : { kind: 'clearLoop' }, adds: none };
     }
   }
+}
+
+/** The step that places a Clip of before back as it was, after it's deleted. */
+function placingBack(before: Timeline, clipId: number): Step {
+  const { track, clip } = findClip(before, clipId);
+  return {
+    edit: { kind: 'placeClip', trackId: track.id, clip: placementOf(clip) },
+    adds: { tracks: [], clips: [clip.id] },
+  };
 }
 
 /**
@@ -264,10 +283,15 @@ function content(tl: Timeline): string {
   return JSON.stringify([tl.tracks, tl.loop]);
 }
 
+/** The ids of a Timeline's Clips. */
+function clipIds(tl: Timeline): Set<number> {
+  return new Set(tl.tracks.flatMap((t) => t.clips.map((c) => c.id)));
+}
+
 /** The Tracks and Clips in after that weren't in before. */
 function added(before: Timeline, after: Timeline): Ids {
   const tracks = new Set(before.tracks.map((t) => t.id));
-  const clips = new Set(before.tracks.flatMap((t) => t.clips.map((c) => c.id)));
+  const clips = clipIds(before);
   return {
     tracks: after.tracks.map((t) => t.id).filter((id) => !tracks.has(id)),
     clips: after.tracks.flatMap((t) => t.clips.map((c) => c.id)).filter((id) => !clips.has(id)),
@@ -310,6 +334,9 @@ function remap(edit: HistoryEdit, ids: IdMaps): HistoryEdit {
     case 'duplicateClip':
     case 'deleteClip':
     case 'setTakes':
+    case 'chooseTake':
+    case 'deleteTake':
+    case 'clearInactiveTakes':
       return { ...edit, clipId: ids.clip(edit.clipId) };
   }
 }
@@ -350,6 +377,12 @@ export function sendEdit(at: SongAt, edit: Edit): Promise<Timeline> {
       return api.deleteClip(at, edit.clipId);
     case 'setTakes':
       return api.setTakes(at, edit.clipId, edit.takes);
+    case 'chooseTake':
+      return api.chooseTake(at, edit.clipId, edit.takeId);
+    case 'deleteTake':
+      return api.deleteTake(at, edit.clipId, edit.takeId);
+    case 'clearInactiveTakes':
+      return api.clearInactiveTakes(at, edit.clipId);
     case 'setLoop':
       return api.setLoop(at, edit.loop);
     case 'switchLoop':

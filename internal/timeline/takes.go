@@ -265,12 +265,9 @@ func (s *Store) SetTakes(ctx context.Context, songID int64, based lyricsheet.Ver
 		return Timeline{}, &lyricsheet.InvalidError{Msg: "a Clip of Takes plays one of them"}
 	}
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		p, err := clipPlacement(ctx, tx, songID, clipID)
+		p, err := takeClip(ctx, tx, songID, clipID)
 		if err != nil {
 			return err
-		}
-		if !p.source.activeTakeID.Valid {
-			return &lyricsheet.InvalidError{Msg: "only a Clip of Takes has Takes"}
 		}
 		last, err := checkTakes(ctx, tx, songID, clipID, ids)
 		if err != nil {
@@ -304,6 +301,113 @@ func (s *Store) SetTakes(ctx context.Context, songID int64, based lyricsheet.Ver
 		p.start, p.offset, p.length = ct.Start, max(ct.Offset, 0), ct.Length
 		return place(ctx, tx, clipID, p)
 	})
+}
+
+// takeClip reads where one of the Song's Clips of Takes is and what it
+// plays.
+func takeClip(ctx context.Context, tx *sql.Tx, songID, clipID int64) (placement, error) {
+	p, err := clipPlacement(ctx, tx, songID, clipID)
+	if err != nil {
+		return placement{}, err
+	}
+	if !p.source.activeTakeID.Valid {
+		return placement{}, &lyricsheet.InvalidError{Msg: "only a Clip of Takes has Takes"}
+	}
+	return p, nil
+}
+
+// ChooseTake makes one of a Clip's Takes the one it plays, through the same
+// window.
+func (s *Store) ChooseTake(ctx context.Context, songID int64, based lyricsheet.Version, clipID, takeID int64) (Timeline, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		p, err := takeClip(ctx, tx, songID, clipID)
+		if err != nil {
+			return err
+		}
+		if !slices.Contains(p.source.takeIDs, takeID) {
+			return &lyricsheet.InvalidError{Msg: "a Clip of Takes plays one of them"}
+		}
+		return setActiveTake(ctx, tx, clipID, takeID)
+	})
+}
+
+// setActiveTake makes a Take the one its Clip plays.
+func setActiveTake(ctx context.Context, tx *sql.Tx, clipID, takeID int64) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE clips SET active_take_id = ? WHERE id = ?`, takeID, clipID); err != nil {
+		return fmt.Errorf("choosing take: %w", err)
+	}
+	return nil
+}
+
+// DeleteTake detaches one of a Clip's Takes, to be brought back by setting
+// the Clip's Takes. Deleting the active Take makes the most recent one left
+// active, and deleting the last deletes the Clip. The Clip's window shrinks
+// to the Takes left, as for keepTakes.
+func (s *Store) DeleteTake(ctx context.Context, songID int64, based lyricsheet.Version, clipID, takeID int64) (Timeline, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		p, err := takeClip(ctx, tx, songID, clipID)
+		if err != nil {
+			return err
+		}
+		if !slices.Contains(p.source.takeIDs, takeID) {
+			return lyricsheet.ErrNotFound
+		}
+		if len(p.source.takeIDs) == 1 {
+			return deleteClip(ctx, tx, songID, clipID)
+		}
+		keep := slices.DeleteFunc(slices.Clone(p.source.takeIDs), func(id int64) bool { return id == takeID })
+		return keepTakes(ctx, tx, songID, clipID, p, keep)
+	})
+}
+
+// ClearInactiveTakes detaches all of a Clip's Takes but the active one, to
+// be brought back by setting the Clip's Takes. The Clip's window shrinks to
+// the Take left, as for keepTakes.
+func (s *Store) ClearInactiveTakes(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64) (Timeline, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		p, err := takeClip(ctx, tx, songID, clipID)
+		if err != nil {
+			return err
+		}
+		return keepTakes(ctx, tx, songID, clipID, p, []int64{p.source.activeTakeID.Int64})
+	})
+}
+
+// keepTakes detaches the Takes of a Clip, placed at p, but those in keep,
+// ids of some of them in the order of their numbers. If its active Take
+// goes, the most recent one kept is active. The Clip's window shrinks to end
+// where the Takes kept do, and if they all end before it starts, it moves
+// back to end there, its audio staying where it is on the Timeline.
+func keepTakes(ctx context.Context, tx *sql.Tx, songID, clipID int64, p placement, keep []int64) error {
+	for _, id := range p.source.takeIDs {
+		if slices.Contains(keep, id) {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE takes SET clip_id = NULL WHERE id = ?`, id); err != nil {
+			return fmt.Errorf("detaching take: %w", err)
+		}
+	}
+	if err := markDetached(ctx, tx, songID); err != nil {
+		return err
+	}
+	p.source.takeIDs = keep
+	if !slices.Contains(keep, p.source.activeTakeID.Int64) {
+		p.source.activeTakeID.Int64 = keep[len(keep)-1]
+	}
+	end, err := p.source.duration(ctx, tx)
+	if err != nil {
+		return err
+	}
+	if end <= p.offset+tolerance {
+		back := p.offset - max(0, end-p.length)
+		p.start -= back
+		p.offset -= back
+	}
+	p.length = min(p.length, end-p.offset)
+	if err := setActiveTake(ctx, tx, clipID, p.source.activeTakeID.Int64); err != nil {
+		return err
+	}
+	return place(ctx, tx, clipID, p)
 }
 
 // takeColumns are the takes columns scanTake reads, in its order.

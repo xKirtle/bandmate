@@ -106,3 +106,30 @@ func (a *App) setTakes(w http.ResponseWriter, r *http.Request) {
 		return a.timelines.SetTakes(ctx, id, based, clipID, req)
 	})
 }
+
+// chooseTake makes one of a Clip's Takes the one it plays.
+func (a *App) chooseTake(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		TakeID int64 `json:"takeId"`
+	}
+	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based lyricsheet.Version, clipID int64) (timeline.Timeline, error) {
+		return a.timelines.ChooseTake(ctx, id, based, clipID, req.TakeID)
+	})
+}
+
+// deleteTake detaches one of a Clip's Takes, deleting the Clip with its
+// last.
+func (a *App) deleteTake(w http.ResponseWriter, r *http.Request) {
+	takeID, ok := pathID(w, r, "takeID")
+	if !ok {
+		return
+	}
+	a.changeClip(w, r, nil, func(ctx context.Context, id int64, based lyricsheet.Version, clipID int64) (timeline.Timeline, error) {
+		return a.timelines.DeleteTake(ctx, id, based, clipID, takeID)
+	})
+}
+
+// clearInactiveTakes detaches all of a Clip's Takes but the active one.
+func (a *App) clearInactiveTakes(w http.ResponseWriter, r *http.Request) {
+	a.changeClip(w, r, nil, a.timelines.ClearInactiveTakes)
+}

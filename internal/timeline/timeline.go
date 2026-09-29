@@ -896,17 +896,22 @@ func (s *Store) removeTakeFiles(ids []int64) {
 // Library, and its Takes are detached, to be placed again.
 func (s *Store) DeleteClip(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		// Its Takes leave it by the foreign key.
-		res, err := tx.ExecContext(ctx, `DELETE FROM clips
-			WHERE id = ? AND track_id IN (SELECT id FROM tracks WHERE song_id = ?)`, clipID, songID)
-		if err != nil {
-			return fmt.Errorf("deleting clip: %w", err)
-		}
-		if err := expectOneRow(res); err != nil {
-			return err
-		}
-		return markDetached(ctx, tx, songID)
+		return deleteClip(ctx, tx, songID, clipID)
 	})
+}
+
+// deleteClip removes one of the Song's Clips, detaching its Takes.
+func deleteClip(ctx context.Context, tx *sql.Tx, songID, clipID int64) error {
+	// Its Takes leave it by the foreign key.
+	res, err := tx.ExecContext(ctx, `DELETE FROM clips
+		WHERE id = ? AND track_id IN (SELECT id FROM tracks WHERE song_id = ?)`, clipID, songID)
+	if err != nil {
+		return fmt.Errorf("deleting clip: %w", err)
+	}
+	if err := expectOneRow(res); err != nil {
+		return err
+	}
+	return markDetached(ctx, tx, songID)
 }
 
 // clipPlacement reads where one of the Song's Clips is and what it plays.
