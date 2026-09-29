@@ -1,6 +1,8 @@
 // Where a recording goes on the chosen Track, and where playback and
 // capture start for it. The playhead never decides: a Take always goes at
-// the Track's append point, so it never lands on an older one.
+// the Track's append point, so it never lands on an older one. A Retake
+// goes into its Clip instead, from the Clip's start as trimmed, and grows
+// it, but never into the next Clip.
 import type { Placed } from './schedule';
 
 /** How long playback leads in before a Take, in seconds, so the Beat is heard coming in. */
@@ -21,4 +23,21 @@ export interface RecordingPlan {
 export function recordingPlan(clips: readonly Placed[]): RecordingPlan {
   const start = clips.reduce((end, c) => Math.max(end, c.start + c.length), 0);
   return { start, from: Math.max(0, start - leadIn) };
+}
+
+/** Plans a Retake into a Clip: from its start as trimmed, with the same lead-in. */
+export function retakePlan(clip: Placed): RecordingPlan {
+  return { start: clip.start, from: Math.max(0, clip.start - leadIn) };
+}
+
+/**
+ * How long a Clip is after a Retake into it that ends at end: grown to fit
+ * it, but never past the start of the next of its Track's clips, and never
+ * shrunk. What's past that is kept, hidden, to trim into view later.
+ */
+export function retakeLength(clip: Placed, clips: readonly Placed[], end: number): number {
+  // With the server's tolerance, so a neighbour placed right at its end counts as next.
+  const after = clip.start + clip.length - 1e-6;
+  const next = clips.reduce((at, c) => (c.start >= after ? Math.min(at, c.start) : at), Infinity);
+  return Math.max(clip.length, Math.min(end, next) - clip.start);
 }

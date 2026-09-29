@@ -174,6 +174,8 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("POST /api/songs/{id}/timeline/clips/{clipID}/duplicate", a.duplicateClip)
 	mux.HandleFunc("DELETE /api/songs/{id}/timeline/clips/{clipID}", a.deleteClip)
 	mux.HandleFunc("POST /api/songs/{id}/timeline/takes", a.recordTake)
+	mux.HandleFunc("POST /api/songs/{id}/timeline/clips/{clipID}/takes", a.retake)
+	mux.HandleFunc("PUT /api/songs/{id}/timeline/clips/{clipID}/takes", a.setTakes)
 	mux.HandleFunc("GET /api/songs/{id}/takes/{takeID}", a.getTake)
 	mux.HandleFunc("GET /api/songs/{id}/takes/{takeID}/audio", a.takeAudio)
 	mux.HandleFunc("GET /api/config", a.config)

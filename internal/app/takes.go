@@ -1,8 +1,10 @@
 package app
 
 import (
+	"context"
 	"net/http"
 
+	"github.com/xKirtle/bandmate/internal/lyricsheet"
 	"github.com/xKirtle/bandmate/internal/timeline"
 )
 
@@ -66,4 +68,41 @@ func takePathIDs(w http.ResponseWriter, r *http.Request) (songID, takeID int64, 
 	}
 	takeID, ok = pathID(w, r, "takeID")
 	return songID, takeID, ok
+}
+
+// retake takes a WAV recorded in the browser into a Clip of Takes, with how
+// it was captured as "details", as the Clip's next Take.
+func (a *App) retake(w http.ResponseWriter, r *http.Request) {
+	id, ok := songID(w, r)
+	if !ok {
+		return
+	}
+	clipID, ok := pathID(w, r, "clipID")
+	if !ok {
+		return
+	}
+	based, ok := basedOn(w, r)
+	if !ok {
+		return
+	}
+	var c timeline.Captured
+	file, ok := a.readUpload(w, r, a.takeFiles, &c)
+	if !ok {
+		return
+	}
+	tl, err := a.timelines.Retake(r.Context(), id, based, clipID, c, file.Received)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, tl)
+}
+
+// setTakes sets a Clip of Takes' Takes, its active Take and its placement,
+// e.g. to undo or redo a Retake.
+func (a *App) setTakes(w http.ResponseWriter, r *http.Request) {
+	var req timeline.ClipTakes
+	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based lyricsheet.Version, clipID int64) (timeline.Timeline, error) {
+		return a.timelines.SetTakes(ctx, id, based, clipID, req)
+	})
 }

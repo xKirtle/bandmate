@@ -1,5 +1,6 @@
 import {
   api,
+  type ClipTakes,
   type CueValue,
   type NewClip,
   type NewTrack,
@@ -28,7 +29,9 @@ import { isBlank, type CuedSong } from './cues';
 // Deleting a Clip of Takes, or its Track, only detaches its Takes, so
 // placing a Clip from their ids brings them back. A new Take, and a copied
 // Clip, are redone as that too, so redoing never uploads a Take again or
-// copies it again.
+// copies it again. A Retake is undone and redone by setting its Clip's
+// Takes, and where they are, as they were before or after it, which
+// detaches the new Take or brings it back.
 
 /** A change to the Timeline, as the intent sent to the API. */
 export type Edit =
@@ -42,6 +45,7 @@ export type Edit =
   | { kind: 'moveClip'; clipId: number; trackId: number; start: number }
   | { kind: 'trimClip'; clipId: number; offset: number; length: number }
   | { kind: 'deleteClip'; clipId: number }
+  | { kind: 'setTakes'; clipId: number; takes: ClipTakes }
   | { kind: 'setLoop'; loop: TimelineLoop }
   | { kind: 'switchLoop'; on: boolean }
   | { kind: 'clearLoop' };
@@ -195,6 +199,8 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
         adds: { tracks: [], clips: [clip.id] },
       };
     }
+    case 'setTakes':
+      return { edit: settingTakes(before, edit.clipId), adds: none };
     case 'switchLoop':
       return { edit: { kind: 'switchLoop', on: !edit.on }, adds: none };
     case 'setLoop':
@@ -216,6 +222,18 @@ export function placingAdded(before: Timeline, after: Timeline): Edit {
   const [clipId] = added(before, after).clips;
   const { track, clip } = findClip(after, clipId);
   return { kind: 'placeClip', trackId: track.id, clip: placementOf(clip) };
+}
+
+/**
+ * The edit that sets a Clip of Takes as it is in tl: its Takes and where
+ * they are in its span, its active Take and its placement. A Retake is kept
+ * in the history as that, so redoing it never uploads its Take again.
+ */
+export function settingTakes(tl: Timeline, clipId: number): Edit {
+  const { clip } = findClip(tl, clipId);
+  const { activeTakeId, start, offset, length } = clip;
+  const takes = clip.takes.map(({ id, position }) => ({ id, position }));
+  return { kind: 'setTakes', clipId, takes: { takes, activeTakeId, start, offset, length } };
 }
 
 /** A Song's Cues by Line id, dormant ones included. */
@@ -291,6 +309,7 @@ function remap(edit: HistoryEdit, ids: IdMaps): HistoryEdit {
     case 'trimClip':
     case 'duplicateClip':
     case 'deleteClip':
+    case 'setTakes':
       return { ...edit, clipId: ids.clip(edit.clipId) };
   }
 }
@@ -329,6 +348,8 @@ export function sendEdit(at: SongAt, edit: Edit): Promise<Timeline> {
       return api.duplicateClip(at, edit.clipId);
     case 'deleteClip':
       return api.deleteClip(at, edit.clipId);
+    case 'setTakes':
+      return api.setTakes(at, edit.clipId, edit.takes);
     case 'setLoop':
       return api.setLoop(at, edit.loop);
     case 'switchLoop':
