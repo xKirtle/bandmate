@@ -21,6 +21,7 @@
   import { gutterFields } from './gutter';
   import LyricSheetView from './LyricSheetView.svelte';
   import type { MenuAction } from './menu';
+  import Picker from './Picker.svelte';
   import SectionEditor from './SectionEditor.svelte';
   import { moveTo, type Drop } from './sectionDrag';
   import type { SectionDragging } from './sectionDragging.svelte';
@@ -405,17 +406,16 @@
     {#if mode === 'write' && canCue && hasCues(song)}
       <div class="shift" role="group" aria-labelledby="shift-label">
         <span id="shift-label">Shift Cues</span>
-        <select
+        <Picker
+          id="shift-step"
           class="shift-step"
           aria-label="Step"
           title="How far each click shifts every Cue"
+          options={shiftSteps}
           value={shiftStep}
-          onchange={(e) => chooseShiftStep(Number(e.currentTarget.value) as ShiftStep)}
-        >
-          {#each shiftSteps as step (step)}
-            <option value={step}>{step} s</option>
-          {/each}
-        </select>
+          label={(step) => `${step} s`}
+          onpick={chooseShiftStep}
+        />
         <button
           type="button"
           class="button shift-by"
@@ -556,8 +556,7 @@
     gap: 0.25rem;
     margin-left: 0.5rem;
   }
-  .shift-step {
-    width: auto;
+  .shift :global(.shift-step) {
     margin-left: 0.25rem;
   }
   .shift-by {
