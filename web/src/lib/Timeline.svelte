@@ -16,6 +16,7 @@
   } from './api';
   import BeatPicker from './BeatPicker.svelte';
   import { clampMove, clampTrimEnd, clampTrimStart } from './clipEdit';
+  import { clipSources } from './clipSource';
   import { cuesInSpan, formatCue, hasCues } from './cues';
   import {
     History,
@@ -100,9 +101,9 @@
   let offerCues = $state.raw<CueOffer | null>(null);
   let offerTimer: ReturnType<typeof setTimeout> | undefined;
   const offerFor = 8000;
-  // Peaks by Beat id, fetched once each, so waveforms show before the audio
-  // is decoded.
-  let peaks = $state<Record<number, number[]>>({});
+  // Peaks by source key, fetched once each, so waveforms show before the
+  // audio is decoded.
+  let peaks = $state<Record<string, number[]>>({});
 
   const player = new TimelinePlayer((s) => {
     playerState = s;
@@ -111,12 +112,10 @@
   });
   onDestroy(() => player.dispose());
 
-  const beats = $derived(new Map(timeline.beats.map((b) => [b.id, b])));
+  const sources = $derived(clipSources(timeline));
   const clips = $derived(timeline.tracks.flatMap((t) => t.clips));
   const playable = $derived<PlayableClip[]>(
-    timeline.tracks.flatMap((t) =>
-      t.clips.map((c) => ({ ...c, source: api.beatAudioUrl(beats.get(c.beatId)!), trackId: t.id })),
-    ),
+    timeline.tracks.flatMap((t) => t.clips.map((c) => ({ ...c, source: sources.of(c).audio, trackId: t.id }))),
   );
   const length = $derived(timelineEnd(clips, song));
   // Room after the end, or the Loop if it ends later, to drag Clips and the
@@ -143,11 +142,11 @@
   });
 
   $effect(() => {
-    for (const b of timeline.beats) {
-      if (untrack(() => b.id in peaks)) continue;
-      peaks[b.id] = [];
-      api.getBeat(b.id).then(
-        (full) => (peaks[b.id] = full.peaks ?? []),
+    for (const s of sources.all()) {
+      if (untrack(() => s.key in peaks)) continue;
+      peaks[s.key] = [];
+      s.loadPeaks().then(
+        (p) => (peaks[s.key] = p),
         // Without peaks the Clip stays flat; it still plays.
         () => {},
       );
@@ -764,7 +763,7 @@
     } else if (edit.mode === 'start') {
       edit.placement = clampTrimStart(clip, othersOn(edit.trackId, clip), t);
     } else {
-      edit.placement = clampTrimEnd(clip, othersOn(edit.trackId, clip), beats.get(clip.beatId)!.duration, t);
+      edit.placement = clampTrimEnd(clip, othersOn(edit.trackId, clip), sources.of(clip).duration, t);
     }
     dragAt(event, editMove);
   }
@@ -1109,12 +1108,12 @@
   }
 
   /**
-   * A stretch of a Beat's waveform, from offset seconds in, as count bars
-   * over drawn seconds. Past heard seconds in, trimmed off the Clip, it's
-   * silent.
+   * A stretch of the waveform of what a Clip plays, from offset seconds in,
+   * as count bars over drawn seconds. Past heard seconds in, trimmed off
+   * the Clip, it's silent.
    */
-  function clipShape(beatId: number, offset: number, heard: number, drawn: number, count: number): number[] {
-    const all = peaks[beatId] ?? [];
+  function clipShape(clip: Clip, offset: number, heard: number, drawn: number, count: number): number[] {
+    const all = peaks[sources.of(clip).key] ?? [];
     const from = Math.floor(offset * peaksPerSecond);
     const kept = all.slice(from, Math.ceil((offset + heard) * peaksPerSecond));
     const silent = Math.max(0, Math.ceil((offset + drawn) * peaksPerSecond) - from - kept.length);
@@ -1358,7 +1357,7 @@
                 <div class="lane" bind:this={laneElements[t]}>
                   {#each placed as { clip, at, editing } (clip.id)}
                     {@const wave = waveWindow(view, at.start, at.length)}
-                    {@const title = beats.get(clip.beatId)?.title}
+                    {@const title = sources.of(clip).title}
                     <!-- Focusable for its Delete key; pointer dragging has no key equivalent yet, and its actions are buttons. -->
                     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
                     <div
@@ -1403,7 +1402,7 @@
                             preserveAspectRatio="none"
                             aria-hidden="true"
                           >
-                            {#each clipShape(clip.beatId, at.offset + wave.from, wave.to - wave.from, (wave.bars * barWidth) / view.scale, wave.bars) as peak, i (i)}
+                            {#each clipShape(clip, at.offset + wave.from, wave.to - wave.from, (wave.bars * barWidth) / view.scale, wave.bars) as peak, i (i)}
                               {@const height = Math.max(2, peak * 100)}
                               <rect x={i + 0.15} y={(100 - height) / 2} width="0.7" {height} />
                             {/each}

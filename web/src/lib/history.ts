@@ -9,6 +9,7 @@ import {
   type TimelineLoop,
   type TrackChanges,
 } from './api';
+import { placementOf } from './clipSource';
 import { isBlank, type CuedSong } from './cues';
 
 // Undo and redo for Timeline edits and Cue edits, kept in the browser while
@@ -170,7 +171,7 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
     case 'deleteTrack': {
       const position = before.tracks.findIndex((t) => t.id === edit.trackId);
       const { id, name, volume, muted, soloed, clips } = before.tracks[position];
-      const track = { name, position, volume, muted, soloed, clips: clips.map(({ id: _, ...placed }) => placed) };
+      const track = { name, position, volume, muted, soloed, clips: clips.map(placementOf) };
       return { edit: { kind: 'addTrack', track }, adds: { tracks: [id], clips: clips.map((c) => c.id) } };
     }
     case 'moveClip': {
@@ -183,8 +184,10 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
     }
     case 'deleteClip': {
       const { track, clip } = findClip(before, edit.clipId);
-      const { id, ...placed } = clip;
-      return { edit: { kind: 'placeClip', trackId: track.id, clip: placed }, adds: { tracks: [], clips: [id] } };
+      return {
+        edit: { kind: 'placeClip', trackId: track.id, clip: placementOf(clip) },
+        adds: { tracks: [], clips: [clip.id] },
+      };
     }
     case 'switchLoop':
       return { edit: { kind: 'switchLoop', on: !edit.on }, adds: none };
