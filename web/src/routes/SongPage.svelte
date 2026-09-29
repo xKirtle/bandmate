@@ -11,6 +11,7 @@
     type Status,
     type Timeline as TimelineData,
   } from '../lib/api';
+  import Combobox from '../lib/Combobox.svelte';
   import LyricSheet from '../lib/LyricSheet.svelte';
   import Masters from '../lib/Masters.svelte';
   import Scrapbook from '../lib/Scrapbook.svelte';
@@ -379,12 +380,15 @@
         <section class="details" aria-label="Details">
           {#if writing}
             <div class="fields">
-              <label class="field key">
+              <label class="field key" for="song-key">
                 Key
-                <input
+                <Combobox
+                  id="song-key"
                   bind:value={draft.key}
+                  options={commonKeys}
+                  saved={song.key}
+                  onpick={() => commitText('key')}
                   onchange={() => commitText('key')}
-                  list="common-keys"
                   autocomplete="off"
                   autocapitalize="characters"
                   enterkeyhint="done"
@@ -413,12 +417,15 @@
                   placeholder="—"
                 />
               </label>
-              <label class="field tuning">
+              <label class="field tuning" for="song-tuning">
                 Tuning
-                <input
+                <Combobox
+                  id="song-tuning"
                   bind:value={draft.tuning}
+                  options={commonTunings}
+                  saved={song.tuning}
+                  onpick={() => commitText('tuning')}
                   onchange={() => commitText('tuning')}
-                  list="common-tunings"
                   autocomplete="off"
                   enterkeyhint="done"
                   placeholder="—"
@@ -506,13 +513,6 @@
         </button>
       {/if}
     </div>
-
-    <datalist id="common-keys">
-      {#each commonKeys as k (k)}<option value={k}></option>{/each}
-    </datalist>
-    <datalist id="common-tunings">
-      {#each commonTunings as t (t)}<option value={t}></option>{/each}
-    </datalist>
   {/if}
 </main>
 
@@ -655,12 +655,12 @@
     font-weight: 600;
     color: var(--text-muted);
   }
-  .field input {
+  .field :global(input) {
     color: var(--text);
     font-weight: 400;
   }
-  /* Room for a key like "C#m" beside the suggestions' arrow. */
-  .key input {
+  /* Room for a key like "C#m" beside the suggestions' ▾. */
+  .key :global(input) {
     width: 5.5rem;
   }
   .bpm input,
