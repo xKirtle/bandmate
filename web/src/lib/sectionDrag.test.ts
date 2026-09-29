@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dropGap, moveTo, targetIndex } from './sectionDrag';
+import { dropFor, dropGap, dropTarget, moveTo, targetIndex } from './sectionDrag';
 
 /** What pressing ↑ or ↓ on the Section at `from` gives, `times` times over. */
 function pressed(order: number[], from: number, by: -1 | 1, times: number): number[] {
@@ -78,5 +78,53 @@ describe('moveTo', () => {
     const given = [...order];
     moveTo(given, 0, 3);
     expect(given).toEqual(order);
+  });
+});
+
+describe('dropTarget', () => {
+  const middles = [50, 150, 250];
+  // The Scrapbook, in a column to the right of the Lyric Sheet.
+  const scrapbook = { left: 900, right: 1200, top: 0, bottom: 400 };
+
+  it('is the Scrapbook with the pointer over it', () => {
+    expect(dropTarget({ x: 1000, y: 120 }, scrapbook, middles)).toEqual({ scrapbook: true });
+    expect(dropTarget({ x: 900, y: 400 }, scrapbook, middles)).toEqual({ scrapbook: true });
+  });
+
+  it('is the gap in the Arrangement the pointer is at anywhere else', () => {
+    expect(dropTarget({ x: 400, y: 120 }, scrapbook, middles)).toEqual({ gap: 1 });
+    expect(dropTarget({ x: 1000, y: 500 }, scrapbook, middles)).toEqual({ gap: 3 });
+  });
+
+  it('is a gap without a Scrapbook to drop on, e.g. in Read mode', () => {
+    expect(dropTarget({ x: 1000, y: 120 }, null, middles)).toEqual({ gap: 1 });
+  });
+
+  it('is the only gap in an empty Arrangement', () => {
+    expect(dropTarget({ x: 400, y: 120 }, scrapbook, [])).toEqual({ gap: 0 });
+  });
+});
+
+describe('dropFor', () => {
+  it('moves an Occurrence dropped into another gap in the Arrangement', () => {
+    expect(dropFor({ occurrence: 1 }, { gap: 4 })).toEqual({ reorder: { from: 1, to: 3 }, gap: 4 });
+  });
+
+  it('does nothing with an Occurrence dropped just above or below itself', () => {
+    expect(dropFor({ occurrence: 2 }, { gap: 2 })).toBeNull();
+    expect(dropFor({ occurrence: 2 }, { gap: 3 })).toBeNull();
+  });
+
+  it('moves an Occurrence dropped on the Scrapbook there', () => {
+    expect(dropFor({ occurrence: 2 }, { scrapbook: true })).toEqual({ toScrapbook: 2 });
+  });
+
+  it('puts a Scrapbook Section dropped into a gap back there', () => {
+    expect(dropFor({ section: 7 }, { gap: 0 })).toEqual({ putBack: { section: 7, position: 0 }, gap: 0 });
+    expect(dropFor({ section: 7 }, { gap: 3 })).toEqual({ putBack: { section: 7, position: 3 }, gap: 3 });
+  });
+
+  it('does nothing with a Scrapbook Section dropped on the Scrapbook', () => {
+    expect(dropFor({ section: 7 }, { scrapbook: true })).toBeNull();
   });
 });

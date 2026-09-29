@@ -142,7 +142,7 @@ func (s *Store) MoveAlternateToScrapbook(ctx context.Context, songID int64, base
 			newID, alternateID); err != nil {
 			return fmt.Errorf("moving alternate: %w", err)
 		}
-		return nil
+		return toScrapbookEnd(ctx, tx, songID, newID)
 	})
 }
 

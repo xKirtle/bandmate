@@ -334,3 +334,122 @@ func TestAnEmptySectionMadeInTheScrapbookStaysThere(t *testing.T) {
 		t.Errorf("sections = %+v, want %+v", got.Sections, want)
 	}
 }
+
+func TestASectionTakenOutOfTheArrangementGoesToTheEndOfTheScrapbook(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.songWithSections("Verse", "Chorus")
+	verse := s.Sections[0]
+	s = ts.setText(s.ID, verse.Alternates[0].ID, "Out on the road")
+	s = ts.addToScrapbook(s.ID, "Idea")
+	idea := s.Sections[2]
+
+	got := ts.lyricSheetChange(http.MethodDelete, occurrencePath(s.ID, s.Arrangement[0].ID), nil)
+
+	if want := []int64{idea.ID, verse.ID}; !reflect.DeepEqual(got.Scrapbook, want) {
+		t.Errorf("scrapbook = %v, want the Verse after the Idea already there %v", got.Scrapbook, want)
+	}
+	if read := ts.getSong(s.ID); !reflect.DeepEqual(read.Scrapbook, got.Scrapbook) {
+		t.Errorf("scrapbook read back = %v, want %v", read.Scrapbook, got.Scrapbook)
+	}
+
+	// One made in the Scrapbook afterwards comes after it.
+	got = ts.addToScrapbook(s.ID, "Another")
+	if want := []int64{idea.ID, verse.ID, got.Sections[len(got.Sections)-1].ID}; !reflect.DeepEqual(got.Scrapbook, want) {
+		t.Errorf("scrapbook = %v, want the new one last %v", got.Scrapbook, want)
+	}
+}
+
+// occurrenceToScrapbookPath is where an Occurrence is moved to the Scrapbook.
+func occurrenceToScrapbookPath(songID, occurrenceID int64) string {
+	return occurrencePath(songID, occurrenceID) + "/scrapbook"
+}
+
+func TestMovingAnUnsharedOccurrenceToTheScrapbookMovesItsSectionToTheEnd(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.songWithSections("Verse", "Chorus")
+	verse := s.Sections[0]
+	s = ts.setText(s.ID, verse.Alternates[0].ID, "Out on the road")
+	s = ts.addToScrapbook(s.ID, "Idea")
+	idea := s.Sections[2]
+
+	got := ts.lyricSheetChange(http.MethodPost, occurrenceToScrapbookPath(s.ID, s.Arrangement[0].ID), nil)
+
+	if want := []string{"Chorus"}; !reflect.DeepEqual(arrangementLabels(got), want) {
+		t.Errorf("arrangement = %q, want %q", arrangementLabels(got), want)
+	}
+	if want := []int64{idea.ID, verse.ID}; !reflect.DeepEqual(got.Scrapbook, want) {
+		t.Errorf("scrapbook = %v, want the Verse at its end %v", got.Scrapbook, want)
+	}
+	if !reflect.DeepEqual(got.Sections, s.Sections) {
+		t.Errorf("sections = %+v, want them all kept unchanged %+v", got.Sections, s.Sections)
+	}
+	if read := ts.getSong(s.ID); !reflect.DeepEqual(read, got) {
+		t.Errorf("song read back = %+v, want %+v", read, got)
+	}
+}
+
+func TestMovingAnOccurrenceOfASharedSectionToTheScrapbookMovesADetachedCopy(t *testing.T) {
+	ts := newTestServer(t)
+	before := ts.sharedChorus()
+	before = ts.addToScrapbook(before.ID, "Idea")
+	idea := before.Sections[2]
+	chorus := sectionOf(t, before, before.Arrangement[3])
+
+	got := ts.lyricSheetChange(http.MethodPost, occurrenceToScrapbookPath(before.ID, before.Arrangement[3].ID), nil)
+
+	if want := before.Arrangement[:3]; !reflect.DeepEqual(got.Arrangement, want) {
+		t.Errorf("arrangement = %+v, want the others untouched %+v", got.Arrangement, want)
+	}
+	if len(got.Scrapbook) != 2 || got.Scrapbook[0] != idea.ID {
+		t.Fatalf("scrapbook = %v, want the Idea then a copy of the Chorus", got.Scrapbook)
+	}
+	copied := got.Sections[len(got.Sections)-1]
+	if copied.ID != got.Scrapbook[1] || copied.ID == chorus.ID {
+		t.Fatalf("scrapbook = %v, want the copy %d at its end", got.Scrapbook, copied.ID)
+	}
+	if !reflect.DeepEqual(withoutIDs(copied), withoutIDs(chorus)) {
+		t.Errorf("copy = %+v, want the Chorus's content %+v", withoutIDs(copied), withoutIDs(chorus))
+	}
+	if kept := sectionOf(t, got, got.Arrangement[0]); !reflect.DeepEqual(kept, chorus) {
+		t.Errorf("chorus = %+v, want it unchanged %+v", kept, chorus)
+	}
+}
+
+func TestMovingAnOccurrenceOfAnEmptySectionToTheScrapbookDeletesIt(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.songWithSections("Verse", "Chorus")
+	verse := s.Sections[0]
+
+	got := ts.lyricSheetChange(http.MethodPost, occurrenceToScrapbookPath(s.ID, s.Arrangement[0].ID), nil)
+
+	expectSectionDeleted(t, got, verse.ID)
+	if want := []string{"Chorus"}; !reflect.DeepEqual(arrangementLabels(got), want) {
+		t.Errorf("arrangement = %q, want %q", arrangementLabels(got), want)
+	}
+}
+
+func TestMovingAnOccurrenceOfAnEmptySharedSectionToTheScrapbookKeepsNoCopy(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.songWithSections("Chorus")
+	chorus := s.Sections[0]
+	s = ts.addOccurrence(s.ID, chorus.ID, nil)
+
+	got := ts.lyricSheetChange(http.MethodPost, occurrenceToScrapbookPath(s.ID, s.Arrangement[1].ID), nil)
+
+	if want := s.Arrangement[:1]; len(got.Arrangement) != 1 || got.Arrangement[0].ID != want[0].ID {
+		t.Errorf("arrangement = %+v, want only the first Chorus %+v", got.Arrangement, want)
+	}
+	if len(got.Scrapbook) != 0 || len(got.Sections) != 1 {
+		t.Errorf("scrapbook = %v, sections = %+v, want nothing kept", got.Scrapbook, got.Sections)
+	}
+}
+
+func TestMovingAnOccurrenceOfAnotherSongToTheScrapbookIsNotFound(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.songWithSections("Verse")
+	other := ts.createSong("Other")
+
+	res := ts.DoAt(other.Version, http.MethodPost, occurrenceToScrapbookPath(other.ID, s.Arrangement[0].ID), nil)
+
+	expectStatus(t, res, http.StatusNotFound)
+}

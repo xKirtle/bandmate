@@ -48,7 +48,7 @@ Turning an Occurrence of a shared Section into its own independent Section, so i
 _Avoid_: Unlink, fork
 
 **Scrapbook**:
-A Song's collection of Sections that aren't in the Arrangement: leftovers and loose ideas kept for later. A Section taken out of the Arrangement with nothing written in any Alternate (no Lines, or only blank ones) is deleted instead, as there's nothing to keep; a Section made in the Scrapbook stays there even while it's still empty. An inactive Alternate can also be moved out of its Section into the Scrapbook, becoming a Section of its own; a Scrapbook Section can in turn be added to a Section in the Arrangement, its Alternates joining that Section's.
+A Song's collection of Sections that aren't in the Arrangement: leftovers and loose ideas kept for later, in the order they came into it. A Section taken out of the Arrangement goes to its end; an Occurrence of a shared Section taken out to it is Detached first, so its own copy goes there and the others stay. A Section taken out of the Arrangement with nothing written in any Alternate (no Lines, or only blank ones) is deleted instead, as there's nothing to keep; a Section made in the Scrapbook stays there even while it's still empty. An inactive Alternate can also be moved out of its Section into the Scrapbook, becoming a Section of its own; a Scrapbook Section can in turn be added to a Section in the Arrangement, its Alternates joining that Section's.
 _Avoid_: Trash, drafts, unused
 
 **Alternate**:
