@@ -403,13 +403,10 @@ describe('restorable', () => {
   });
 
   it("leaves out Cues whose Line is gone, or can't take one any more", () => {
-    // Line 10 is now blank, and Line 30 in a Section in the Scrapbook.
+    // Line 10 is now blank.
     const now: CuedSong = {
       arrangement: [1],
-      sections: [
-        { id: 1, alternates: [{ active: true, lines: [{ id: 10, text: '  ', cue: null }] }] },
-        { id: 3, alternates: [{ active: true, lines: [{ id: 30, text: 'Set aside', cue: null }] }] },
-      ],
+      sections: [{ id: 1, alternates: [{ active: true, lines: [{ id: 10, text: '  ', cue: null }] }] }],
     };
 
     expect(
@@ -418,14 +415,25 @@ describe('restorable', () => {
           { lineId: 10, cue: 4 },
           { lineId: 10, cue: null },
           { lineId: 11, cue: 6 },
-          { lineId: 30, cue: 5 },
-          { lineId: 30, cue: null },
         ],
         now,
       ),
-    ).toEqual([
-      { lineId: 10, cue: null },
-      { lineId: 30, cue: null },
-    ]);
+    ).toEqual([{ lineId: 10, cue: null }]);
+  });
+
+  it('keeps the Cues of Lines in the Scrapbook, which keeps them', () => {
+    const now: CuedSong = {
+      arrangement: [1],
+      sections: [
+        { id: 1, alternates: [{ active: true, lines: [{ id: 10, text: 'Drive', cue: null }] }] },
+        { id: 3, alternates: [{ active: true, lines: [{ id: 30, text: 'Set aside', cue: null }] }] },
+      ],
+    };
+    const cues = [
+      { lineId: 30, cue: 5 },
+      { lineId: 10, cue: 2 },
+    ];
+
+    expect(restorable(cues, now)).toEqual(cues);
   });
 });

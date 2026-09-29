@@ -206,19 +206,16 @@ function cueValues(song: CuedSong): Map<number, CueValue> {
 
 /**
  * The Cues that can still be restored in a Song: those whose Line is still
- * in it and, to be given a Cue, isn't blank and is in a Section in the
- * Arrangement. The rest went with a Lyric Sheet change since, which can't
- * be undone, so they're left out rather than stop undo.
+ * in it, wherever it is, as the Scrapbook keeps Cues too (ADR 0010), and, to
+ * be given a Cue, isn't blank. The rest went with a Lyric Sheet change
+ * since, which can't be undone, so they're left out rather than stop undo.
  */
 export function restorable(cues: readonly CueValue[], song: CuedSong): CueValue[] {
-  const arranged = new Set(song.arrangement);
-  const lines = new Map(
-    song.sections.flatMap((s) => s.alternates.flatMap((a) => a.lines.map((l) => [l.id, { line: l, section: s.id }]))),
-  );
+  const lines = new Map(song.sections.flatMap((s) => s.alternates.flatMap((a) => a.lines.map((l) => [l.id, l]))));
   return cues.filter((c) => {
-    const found = lines.get(c.lineId);
-    if (!found) return false;
-    return c.cue === null || (!isBlank(found.line) && arranged.has(found.section));
+    const line = lines.get(c.lineId);
+    if (!line) return false;
+    return c.cue === null || !isBlank(line);
   });
 }
 

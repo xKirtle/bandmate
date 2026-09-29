@@ -362,7 +362,8 @@ export const api = {
   /**
    * Adds a Scrapbook Section to a Section in the Lyric Sheet: its Alternates
    * join that Section's, inactive, an unnamed one taking its Label as its
-   * name, and it leaves the Scrapbook.
+   * name, their Lines' Cues coming along dormant, and it leaves the
+   * Scrapbook.
    */
   addToSection: (at: SongAt, scrapId: number, sectionId: number) =>
     request<Song>('POST', `/songs/${at.id}/sections/${scrapId}/add-to-section`, { sectionId }, at),

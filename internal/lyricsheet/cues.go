@@ -36,21 +36,22 @@ func (s *Store) SetLineCue(ctx context.Context, songID int64, based Version, lin
 		return Song{}, err
 	}
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		return writeLineCue(ctx, tx, songID, lineID, sql.NullInt64{Int64: ms, Valid: true})
+		return writeLineCue(ctx, tx, songID, lineID, sql.NullInt64{Int64: ms, Valid: true}, false)
 	})
 }
 
 // ClearLineCue removes a Line's Cue.
 func (s *Store) ClearLineCue(ctx context.Context, songID int64, based Version, lineID int64) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		return writeLineCue(ctx, tx, songID, lineID, sql.NullInt64{})
+		return writeLineCue(ctx, tx, songID, lineID, sql.NullInt64{}, false)
 	})
 }
 
 // writeLineCue sets or, with a null ms, clears the Cue of one of a Song's
 // Lines. To be given a Cue, the Line can't be blank and its Section must be
-// in the Arrangement.
-func writeLineCue(ctx context.Context, tx *sql.Tx, songID, lineID int64, ms sql.NullInt64) error {
+// in the Arrangement, unless restoring: a Line in the Scrapbook keeps its
+// Cue (ADR 0010), so may have one put back.
+func writeLineCue(ctx context.Context, tx *sql.Tx, songID, lineID int64, ms sql.NullInt64, restoring bool) error {
 	text, inArrangement, err := findLine(ctx, tx, songID, lineID)
 	if err != nil {
 		return err
@@ -58,7 +59,7 @@ func writeLineCue(ctx context.Context, tx *sql.Tx, songID, lineID int64, ms sql.
 	if ms.Valid && blank(text) {
 		return invalid("a blank Line can't have a Cue")
 	}
-	if ms.Valid && !inArrangement {
+	if ms.Valid && !inArrangement && !restoring {
 		return conflict("a Line in the Scrapbook can't have a Cue")
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE lines SET cue_ms = ? WHERE id = ?`, ms, lineID); err != nil {
@@ -111,7 +112,8 @@ type CueValue struct {
 
 // RestoreCues sets each Cue given to its value, in seconds, or clears it,
 // and leaves every other Cue alone. It puts back what another Cue edit
-// changed, e.g. to undo it.
+// changed, e.g. to undo it, so a Line in the Scrapbook may be given back
+// the Cue it kept there.
 func (s *Store) RestoreCues(ctx context.Context, songID int64, based Version, values []CueValue) (Song, error) {
 	ms := make([]sql.NullInt64, len(values))
 	for i, v := range values {
@@ -126,7 +128,7 @@ func (s *Store) RestoreCues(ctx context.Context, songID int64, based Version, va
 	}
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		for i, v := range values {
-			if err := writeLineCue(ctx, tx, songID, v.LineID, ms[i]); err != nil {
+			if err := writeLineCue(ctx, tx, songID, v.LineID, ms[i], true); err != nil {
 				return err
 			}
 		}

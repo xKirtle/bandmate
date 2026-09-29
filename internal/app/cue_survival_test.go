@@ -128,7 +128,7 @@ func TestDeletingAnInactiveAlternateDropsItsDormantCues(t *testing.T) {
 	}
 }
 
-func TestTakingOutASectionDropsOnlyItsCues(t *testing.T) {
+func TestTakingOutASectionTakesItsCuesWithIt(t *testing.T) {
 	ts := newTestServer(t)
 	s := ts.duplicatedChorus()
 	_, night, _, _ := chorusLines(s)
@@ -143,25 +143,8 @@ func TestTakingOutASectionDropsOnlyItsCues(t *testing.T) {
 	if !reflect.DeepEqual(lineCues(got), want) {
 		t.Errorf("lineCues = %v, want %v", lineCues(got), want)
 	}
-}
-
-func TestASectionBroughtBackFromTheScrapbookHasNoCues(t *testing.T) {
-	ts := newTestServer(t)
-	s := ts.songWithSections("Chorus", "Verse")
-	verse := s.Sections[1]
-	s = ts.setText(s.ID, verse.Alternates[0].ID, "First words\nSecond words")
-	lines := s.Sections[1].Alternates[0].Lines
-	ts.setLineCue(s.ID, lines[0].ID, 10)
-	ts.setLineCue(s.ID, lines[1].ID, 14)
-
-	s = ts.lyricSheetChange(http.MethodDelete, sectionInArrangementPath(s.ID, s.Arrangement[1]), nil)
-	if !reflect.DeepEqual(s.Scrapbook, []int64{verse.ID}) {
-		t.Fatalf("scrapbook = %v, want the Verse", s.Scrapbook)
-	}
-	got := ts.putBack(s.ID, verse.ID, nil)
-
-	if cues := lineCues(got)[1]; len(cues) != 0 {
-		t.Errorf("returned Section has cues %v, want none", cues)
+	if cues := cuesOf(sectionOf(t, got, ids[2])); !reflect.DeepEqual(cues, map[int64]float64{secondNight: 56}) {
+		t.Errorf("Scrapbook Section's cues = %v, want its own kept", cues)
 	}
 }
 
