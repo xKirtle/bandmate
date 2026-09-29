@@ -2,17 +2,22 @@
   import { tick } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import { api, type Song, type SongAt } from './api';
+  import type { Drop } from './sectionDrag';
+  import type { SectionDragging } from './sectionDragging.svelte';
   import SectionEditor from './SectionEditor.svelte';
   import { card, describe, labelOf } from './sections';
 
   let {
     song,
     change,
+    drag,
     onUnsaved,
   }: {
     song: Song;
     /** Sends a Lyric Sheet change; resolves to whether it succeeded. */
     change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
+    /** The drag of a Section, shared with the Lyric Sheet. */
+    drag: SectionDragging;
     onUnsaved: (editor: object, unsaved: boolean) => void;
   } = $props();
 
@@ -79,6 +84,14 @@
     if (value !== '') change((at) => api.addOccurrence(at, sectionId, Number(value))).then(closed(sectionId));
   }
 
+  // On desktop, a Section is also dragged by its grip into a gap in the Lyric
+  // Sheet, putting it back there as "Put back…" does.
+  function dropSection(drop: Drop) {
+    if (!('putBack' in drop)) return;
+    const section = drop.putBack;
+    change((at) => api.addOccurrence(at, section, drop.gap)).then(closed(section));
+  }
+
   /** After a Section leaves the Scrapbook: should it come back, it does so as a card. */
   function closed(sectionId: number) {
     return (ok: boolean) => {
@@ -106,7 +119,7 @@
   {#if scrapbook.length > 0}
     <ul class="list">
       {#each scrapbook as section (section.id)}
-        <li>
+        <li class:dragged={drag.section === section.id}>
           {#if open === section.id}
             <SectionEditor
               uid="s{section.id}"
@@ -117,6 +130,9 @@
               onUnsaved={track}
               more={[{ icon: '🗑', label: 'Delete for good', run: () => remove(section.id) }]}
             >
+              {#snippet grip()}
+                {@render dragGrip(section.id)}
+              {/snippet}
               {#snippet actions()}
                 <label class="visually-hidden" for="put-back-{section.id}">Put back into the Lyric Sheet</label>
                 <select id="put-back-{section.id}" class="put-back" onchange={(e) => putBack(section.id, e)}>
@@ -130,22 +146,25 @@
             <button type="button" class="button done" onclick={() => done(section.id)}>Done</button>
           {:else}
             {@const shown = card(section)}
-            <button type="button" id="card-{section.id}" class="card" onclick={() => show(section.id)}>
-              <span class="card-head">
-                <span class="card-label" class:muted={!section.label}>{labelOf(section)}</span>
-                {#if shown.alternates > 1}
-                  <span class="count">{shown.alternates} Alternates</span>
+            <div class="card-row">
+              {@render dragGrip(section.id)}
+              <button type="button" id="card-{section.id}" class="card" onclick={() => show(section.id)}>
+                <span class="card-head">
+                  <span class="card-label" class:muted={!section.label}>{labelOf(section)}</span>
+                  {#if shown.alternates > 1}
+                    <span class="count">{shown.alternates} Alternates</span>
+                  {/if}
+                </span>
+                {#each shown.lines as line, i (i)}
+                  <span class="line">{line || ' '}</span>
+                {:else}
+                  <span class="line muted">No Lines yet.</span>
+                {/each}
+                {#if shown.more > 0}
+                  <span class="more muted">+{shown.more} more {shown.more === 1 ? 'Line' : 'Lines'}</span>
                 {/if}
-              </span>
-              {#each shown.lines as line, i (i)}
-                <span class="line">{line || ' '}</span>
-              {:else}
-                <span class="line muted">No Lines yet.</span>
-              {/each}
-              {#if shown.more > 0}
-                <span class="more muted">+{shown.more} more {shown.more === 1 ? 'Line' : 'Lines'}</span>
-              {/if}
-            </button>
+              </button>
+            </div>
           {/if}
         </li>
       {/each}
@@ -154,6 +173,18 @@
 
   <button type="button" class="button add" onclick={add}>Add a Section</button>
 </section>
+
+{#snippet dragGrip(sectionId: number)}
+  {#if drag.on}
+    <!-- Pointer only: "Put back…" puts it back from the keyboard. -->
+    <span
+      class="grip"
+      aria-hidden="true"
+      title="Drag into the Lyric Sheet to put it back; Esc cancels"
+      {...drag.grip({ section: sectionId }, dropSection)}>⠿</span
+    >
+  {/if}
+{/snippet}
 
 <style>
   .scrapbook {
@@ -177,6 +208,29 @@
     padding: 0;
     list-style: none;
   }
+  .card-row {
+    display: flex;
+    align-items: flex-start;
+  }
+  .list > .dragged {
+    opacity: 0.5;
+  }
+  .grip {
+    display: grid;
+    place-items: center;
+    width: 1.25rem;
+    min-height: var(--control);
+    color: var(--text-muted);
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+  }
+  .grip:hover {
+    color: var(--text);
+  }
+  .list > .dragged .grip {
+    cursor: grabbing;
+  }
   .put-back {
     width: auto;
     font-weight: 600;
@@ -193,9 +247,11 @@
   }
   .card {
     display: flex;
+    flex: 1;
     flex-direction: column;
     gap: 0.125rem;
     width: 100%;
+    min-width: 0;
     padding: 0.5rem 0.75rem;
     border: 1px solid var(--border);
     border-radius: 0.75rem;

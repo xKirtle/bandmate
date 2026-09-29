@@ -1,11 +1,13 @@
 package lyricsheet
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 	"time"
 )
@@ -77,12 +79,16 @@ func (s *Store) loadLyricSheet(ctx context.Context, songID int64) (LyricSheet, e
 	type place struct{ section, alternate int }
 	alternateAt := map[int64]place{}
 
-	err := query(ctx, s.db, `SELECT id, label FROM sections WHERE song_id = ? ORDER BY id`,
+	// Where each Section is in the Scrapbook, should it have no Occurrence.
+	scrapbookAt := map[int64]int64{}
+	err := query(ctx, s.db, `SELECT id, label, scrapbook_position FROM sections WHERE song_id = ? ORDER BY id`,
 		[]any{songID}, func(rows *sql.Rows) error {
 			sec := Section{Alternates: []Alternate{}}
-			if err := rows.Scan(&sec.ID, &sec.Label); err != nil {
+			var at int64
+			if err := rows.Scan(&sec.ID, &sec.Label, &at); err != nil {
 				return err
 			}
+			scrapbookAt[sec.ID] = at
 			sectionAt[sec.ID] = len(sheet.Sections)
 			sheet.Sections = append(sheet.Sections, sec)
 			return nil
@@ -165,6 +171,9 @@ func (s *Store) loadLyricSheet(ctx context.Context, songID int64) (LyricSheet, e
 			sheet.Scrapbook = append(sheet.Scrapbook, sec.ID)
 		}
 	}
+	slices.SortStableFunc(sheet.Scrapbook, func(a, b int64) int {
+		return cmp.Compare(scrapbookAt[a], scrapbookAt[b])
+	})
 	return sheet, nil
 }
 
@@ -252,9 +261,22 @@ func (s *Store) AddSection(ctx context.Context, songID int64, based Version, lab
 // (active) Alternate, with no Occurrence, so it starts in the Scrapbook.
 func (s *Store) AddToScrapbook(ctx context.Context, songID int64, based Version, label string) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		_, _, err := insertSection(ctx, tx, songID, label)
-		return err
+		sectionID, _, err := insertSection(ctx, tx, songID, label)
+		if err != nil {
+			return err
+		}
+		return toScrapbookEnd(ctx, tx, songID, sectionID)
 	})
+}
+
+// toScrapbookEnd puts a Section coming into the Scrapbook at its end.
+func toScrapbookEnd(ctx context.Context, tx *sql.Tx, songID, sectionID int64) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE sections SET scrapbook_position =
+		(SELECT COALESCE(MAX(scrapbook_position), 0) + 1 FROM sections WHERE song_id = ?) WHERE id = ?`,
+		songID, sectionID); err != nil {
+		return fmt.Errorf("putting section at end of scrapbook: %w", err)
+	}
+	return nil
 }
 
 // DeleteSection permanently deletes a Section in the Scrapbook, with its
@@ -308,36 +330,78 @@ func (s *Store) AddOccurrence(ctx context.Context, songID int64, based Version, 
 }
 
 // RemoveOccurrence takes an Occurrence out of the Arrangement. Other
-// Occurrences of its Section keep showing it, and without any it is in the
-// Scrapbook, unless nothing is written in it: then it is deleted, as there's
-// nothing to keep.
+// Occurrences of its Section keep showing it, and without any it goes to the
+// end of the Scrapbook, unless nothing is written in it: then it is deleted,
+// as there's nothing to keep.
 func (s *Store) RemoveOccurrence(ctx context.Context, songID int64, based Version, occurrenceID int64) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		sectionID, pos, err := findOccurrence(ctx, tx, songID, occurrenceID)
 		if err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM occurrences WHERE id = ?`, occurrenceID); err != nil {
-			return fmt.Errorf("removing occurrence: %w", err)
-		}
-		if _, err := tx.ExecContext(ctx,
-			`UPDATE occurrences SET position = position - 1 WHERE song_id = ? AND position > ?`,
-			songID, pos); err != nil {
-			return fmt.Errorf("closing gap in arrangement: %w", err)
+		return removeOccurrence(ctx, tx, songID, occurrenceID, sectionID, pos)
+	})
+}
+
+// MoveOccurrenceToScrapbook takes an Occurrence out of the Arrangement and
+// puts its Section at the end of the Scrapbook. A shared Section is Detached
+// first, so a copy goes to the Scrapbook and the other Occurrences keep the
+// original. Nothing is kept if nothing is written in it.
+func (s *Store) MoveOccurrenceToScrapbook(ctx context.Context, songID int64, based Version, occurrenceID int64) (Song, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		sectionID, pos, err := findOccurrence(ctx, tx, songID, occurrenceID)
+		if err != nil {
+			return err
 		}
 		uses, err := findSection(ctx, tx, songID, sectionID)
-		if err != nil || uses > 0 {
+		if err != nil {
 			return err
 		}
 		empty, err := sectionEmpty(ctx, tx, sectionID)
-		if err != nil || !empty {
+		if err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM sections WHERE id = ?`, sectionID); err != nil {
-			return fmt.Errorf("deleting empty section: %w", err)
+		if uses > 1 && !empty {
+			// Its Cues belong to the Occurrence, which goes, so the copy has none.
+			copyID, _, err := copySection(ctx, tx, sectionID)
+			if err != nil {
+				return err
+			}
+			if err := toScrapbookEnd(ctx, tx, songID, copyID); err != nil {
+				return err
+			}
 		}
-		return nil
+		return removeOccurrence(ctx, tx, songID, occurrenceID, sectionID, pos)
 	})
+}
+
+// removeOccurrence deletes an Occurrence at pos in the Arrangement. Without
+// any other Occurrence, its Section goes to the end of the Scrapbook, or is
+// deleted if nothing is written in it.
+func removeOccurrence(ctx context.Context, tx *sql.Tx, songID, occurrenceID, sectionID int64, pos int) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM occurrences WHERE id = ?`, occurrenceID); err != nil {
+		return fmt.Errorf("removing occurrence: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE occurrences SET position = position - 1 WHERE song_id = ? AND position > ?`,
+		songID, pos); err != nil {
+		return fmt.Errorf("closing gap in arrangement: %w", err)
+	}
+	uses, err := findSection(ctx, tx, songID, sectionID)
+	if err != nil || uses > 0 {
+		return err
+	}
+	empty, err := sectionEmpty(ctx, tx, sectionID)
+	if err != nil {
+		return err
+	}
+	if !empty {
+		return toScrapbookEnd(ctx, tx, songID, sectionID)
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM sections WHERE id = ?`, sectionID); err != nil {
+		return fmt.Errorf("deleting empty section: %w", err)
+	}
+	return nil
 }
 
 // sectionEmpty reports whether nothing is written in any of a Section's

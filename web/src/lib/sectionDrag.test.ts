@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dropGap, moveTo, targetIndex } from './sectionDrag';
+import { dropFor, dropGap, dropTarget, moveTo, targetIndex } from './sectionDrag';
 
 /** What pressing ↑ or ↓ on the Section at `from` gives, `times` times over. */
 function pressed(order: number[], from: number, by: -1 | 1, times: number): number[] {
@@ -78,5 +78,68 @@ describe('moveTo', () => {
     const given = [...order];
     moveTo(given, 0, 3);
     expect(given).toEqual(order);
+  });
+});
+
+describe('dropTarget', () => {
+  const middles = [50, 150, 250];
+  // The Arrangement, and the Scrapbook in a column to the right of it.
+  const sheet = { left: 100, right: 800, top: 0, bottom: 300 };
+  const scrapbook = { left: 900, right: 1200, top: 0, bottom: 400 };
+
+  it('is the Scrapbook with the pointer over it', () => {
+    expect(dropTarget({ x: 1000, y: 120 }, scrapbook, sheet, middles)).toEqual({ scrapbook: true });
+    expect(dropTarget({ x: 900, y: 400 }, scrapbook, sheet, middles)).toEqual({ scrapbook: true });
+  });
+
+  it('is the gap in the Arrangement the pointer is at in its column', () => {
+    expect(dropTarget({ x: 400, y: 120 }, scrapbook, sheet, middles)).toEqual({ gap: 1 });
+  });
+
+  it('is the first or last gap with the pointer above or below the Arrangement', () => {
+    expect(dropTarget({ x: 400, y: -80 }, scrapbook, sheet, middles)).toEqual({ gap: 0 });
+    expect(dropTarget({ x: 400, y: 900 }, scrapbook, sheet, middles)).toEqual({ gap: 3 });
+  });
+
+  it('is nowhere beside both, e.g. over the Masters below the Scrapbook', () => {
+    expect(dropTarget({ x: 1000, y: 500 }, scrapbook, sheet, middles)).toBeNull();
+    expect(dropTarget({ x: 20, y: 120 }, scrapbook, sheet, middles)).toBeNull();
+  });
+
+  it('is a gap without a Scrapbook to drop on', () => {
+    expect(dropTarget({ x: 400, y: 120 }, null, sheet, middles)).toEqual({ gap: 1 });
+  });
+
+  it('is the only gap in an empty Arrangement', () => {
+    expect(dropTarget({ x: 400, y: 120 }, scrapbook, sheet, [])).toEqual({ gap: 0 });
+  });
+});
+
+describe('dropFor', () => {
+  it('moves an Occurrence dropped into another gap in the Arrangement', () => {
+    expect(dropFor({ occurrenceAt: 1 }, { gap: 4 })).toEqual({ reorder: { from: 1, to: 3 }, gap: 4 });
+  });
+
+  it('does nothing with an Occurrence dropped just above or below itself', () => {
+    expect(dropFor({ occurrenceAt: 2 }, { gap: 2 })).toBeNull();
+    expect(dropFor({ occurrenceAt: 2 }, { gap: 3 })).toBeNull();
+  });
+
+  it('moves an Occurrence dropped on the Scrapbook there', () => {
+    expect(dropFor({ occurrenceAt: 2 }, { scrapbook: true })).toEqual({ toScrapbook: 2 });
+  });
+
+  it('puts a Scrapbook Section dropped into a gap back there', () => {
+    expect(dropFor({ section: 7 }, { gap: 0 })).toEqual({ putBack: 7, gap: 0 });
+    expect(dropFor({ section: 7 }, { gap: 3 })).toEqual({ putBack: 7, gap: 3 });
+  });
+
+  it('does nothing with a Scrapbook Section dropped on the Scrapbook', () => {
+    expect(dropFor({ section: 7 }, { scrapbook: true })).toBeNull();
+  });
+
+  it('does nothing dropped nowhere', () => {
+    expect(dropFor({ occurrenceAt: 2 }, null)).toBeNull();
+    expect(dropFor({ section: 7 }, null)).toBeNull();
   });
 });

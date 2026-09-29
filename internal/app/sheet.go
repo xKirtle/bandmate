@@ -70,6 +70,16 @@ func (a *App) removeOccurrence(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *App) moveOccurrenceToScrapbook(w http.ResponseWriter, r *http.Request) {
+	occurrenceID, ok := pathID(w, r, "occurrenceID")
+	if !ok {
+		return
+	}
+	a.changeSheet(w, r, nil, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
+		return a.songs.MoveOccurrenceToScrapbook(r.Context(), id, based, occurrenceID)
+	})
+}
+
 func (a *App) detach(w http.ResponseWriter, r *http.Request) {
 	occurrenceID, ok := pathID(w, r, "occurrenceID")
 	if !ok {

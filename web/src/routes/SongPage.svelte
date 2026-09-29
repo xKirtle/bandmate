@@ -14,6 +14,7 @@
   import LyricSheet from '../lib/LyricSheet.svelte';
   import Masters from '../lib/Masters.svelte';
   import Scrapbook from '../lib/Scrapbook.svelte';
+  import { SectionDragging } from '../lib/sectionDragging.svelte';
   import StatusBadge from '../lib/StatusBadge.svelte';
   import Timeline from '../lib/Timeline.svelte';
   import type { Saved } from '../lib/history';
@@ -79,6 +80,13 @@
   function toggled(part: SidePart, startsOpen: boolean, open: boolean) {
     if (desktop.current && open !== partOpen(part, startsOpen)) toggledParts[`${mode}-${part}`] = open;
   }
+  // A Section is dragged within the Lyric Sheet, or between it and the
+  // Scrapbook, on desktop in Write mode. The Arrangement or the Scrapbook
+  // changing mid-drag cancels it.
+  const drag = new SectionDragging(
+    () => desktop.current && writing,
+    () => (song ? `${song.arrangement.map((o) => o.id)}|${song.scrapbook}` : ''),
+  );
   // How tall the docked Timeline is, which the side column stops above.
   let timelineHeight = $state(0);
 
@@ -455,6 +463,7 @@
           {song}
           {mode}
           change={send}
+          {drag}
           {editCues}
           onUnsaved={setUnsaved}
           {playhead}
@@ -473,6 +482,8 @@
         {#each parts as { part, open: startsOpen } (part)}
           <details
             class="part {part}-part"
+            class:drop-target={part === 'scrapbook' && drag.drop !== null && 'toScrapbook' in drag.drop}
+            {@attach (el) => (part === 'scrapbook' ? drag.placeScrapbook(el) : undefined)}
             open={partOpen(part, startsOpen)}
             ontoggle={(e) => toggled(part, startsOpen, e.currentTarget.open)}
           >
@@ -481,7 +492,7 @@
               <Masters {song} {mode} change={send} onUnsaved={setUnsaved} {setStatus} />
             {:else}
               <summary>Scrapbook</summary>
-              <Scrapbook {song} change={send} onUnsaved={setUnsaved} />
+              <Scrapbook {song} change={send} {drag} onUnsaved={setUnsaved} />
             {/if}
           </details>
         {/each}
@@ -774,6 +785,11 @@
     }
     .part[open] > summary {
       margin: 0 -0.75rem 0.25rem;
+    }
+    /* An Occurrence dragged over the Scrapbook would drop into it. */
+    .part.drop-target {
+      outline: 3px solid var(--accent);
+      outline-offset: -3px;
     }
     .part > summary::-webkit-details-marker {
       display: none;
