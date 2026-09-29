@@ -18,7 +18,7 @@
   import Timeline from '../lib/Timeline.svelte';
   import type { Saved } from '../lib/history';
   import { navigate } from '../lib/router.svelte';
-  import { detailsSummary, openingMode, type Mode } from '../lib/songMode';
+  import { detailsSummary, openingMode, sideParts, type Mode, type SidePart } from '../lib/songMode';
   import { timeAgo } from '../lib/time';
 
   let { id }: { id: number } = $props();
@@ -56,22 +56,27 @@
   // The Details as Read mode shows them.
   const summary = $derived(detailsSummary(draft));
 
-  // Desktop puts Details, Masters and the Scrapbook in a column beside the
-  // Lyric Sheet, as sections that open and close, all open on each visit.
-  // Narrower windows show them after the Lyric Sheet in the opposite order,
-  // always open. Keyed by name, switching moves them rather than rebuilding
-  // them, so what's on screen and the reading order stay the same.
-  type Part = 'details' | 'masters' | 'scrapbook';
-  const desktop = new MediaQuery('min-width: 80rem');
-  const parts = $derived(
-    (desktop.current ? (['details', 'masters', 'scrapbook'] as const) : (['scrapbook', 'masters', 'details'] as const))
-      // Read mode leaves the Scrapbook out.
-      .filter((part: Part) => writing || part !== 'scrapbook'),
-  );
-  let closedParts = $state<Part[]>([]);
+  // Whether the Notes under the Details are showing. They start hidden.
+  let notesOpen = $state(false);
 
-  function toggled(part: Part, open: boolean) {
-    closedParts = open ? closedParts.filter((p) => p !== part) : [...closedParts, part];
+  // Desktop puts the Scrapbook and Masters in a column beside the Lyric
+  // Sheet, as sections that open and close, each as sideParts starts it on
+  // each visit until it's toggled. Narrower windows show them after the
+  // Lyric Sheet, always open. Keyed by name, switching moves them rather
+  // than rebuilding them.
+  const desktop = new MediaQuery('min-width: 80rem');
+  const parts = $derived(sideParts(mode));
+  // Parts opened or closed by hand, per mode.
+  let toggledParts = $state<Record<string, boolean>>({});
+
+  function partOpen(part: SidePart, startsOpen: boolean): boolean {
+    return !desktop.current || (toggledParts[`${mode}-${part}`] ?? startsOpen);
+  }
+
+  // Setting open also fires toggle, so only a change to what's shown was a
+  // hand's.
+  function toggled(part: SidePart, startsOpen: boolean, open: boolean) {
+    if (desktop.current && open !== partOpen(part, startsOpen)) toggledParts[`${mode}-${part}`] = open;
   }
   // How tall the docked Timeline is, which the side column stops above.
   let timelineHeight = $state(0);
@@ -303,6 +308,19 @@
   }
 </script>
 
+{#snippet notesToggle()}
+  <button
+    type="button"
+    class="button notes-toggle"
+    class:has-notes={draft.notes.trim() !== ''}
+    aria-expanded={notesOpen}
+    aria-controls={notesOpen ? 'song-notes' : undefined}
+    onclick={() => (notesOpen = !notesOpen)}
+  >
+    Notes
+  </button>
+{/snippet}
+
 <svelte:window onbeforeunload={warnBeforeUnload} />
 <svelte:document onvisibilitychange={refresh} />
 
@@ -347,6 +365,76 @@
             {/if}
           </p>
         </div>
+
+        <!-- The Details, small enough to sit under the Status at any width. -->
+        <section class="details" aria-label="Details">
+          {#if writing}
+            <div class="fields">
+              <label class="field key">
+                Key
+                <input
+                  bind:value={draft.key}
+                  onchange={() => commitText('key')}
+                  list="common-keys"
+                  autocomplete="off"
+                  autocapitalize="characters"
+                  enterkeyhint="done"
+                  placeholder="—"
+                />
+              </label>
+              <label class="field bpm">
+                BPM
+                <input
+                  bind:value={draft.bpm}
+                  onchange={() => commitNumber('bpm', 'BPM')}
+                  inputmode="numeric"
+                  autocomplete="off"
+                  enterkeyhint="done"
+                  placeholder="—"
+                />
+              </label>
+              <label class="field capo">
+                Capo
+                <input
+                  bind:value={draft.capo}
+                  onchange={() => commitNumber('capo', 'Capo')}
+                  inputmode="numeric"
+                  autocomplete="off"
+                  enterkeyhint="done"
+                  placeholder="—"
+                />
+              </label>
+              <label class="field tuning">
+                Tuning
+                <input
+                  bind:value={draft.tuning}
+                  onchange={() => commitText('tuning')}
+                  list="common-tunings"
+                  autocomplete="off"
+                  enterkeyhint="done"
+                  placeholder="—"
+                />
+              </label>
+              {@render notesToggle()}
+            </div>
+            {#if notesOpen}
+              <label class="notes">
+                <span class="visually-hidden">Notes</span>
+                <textarea id="song-notes" bind:value={draft.notes} onchange={() => commitText('notes')} rows="4"
+                ></textarea>
+              </label>
+            {/if}
+          {:else if summary || draft.notes.trim()}
+            <div class="fields">
+              {#if summary}<p class="summary">{summary}</p>{/if}
+              {#if draft.notes.trim()}{@render notesToggle()}{/if}
+            </div>
+            {#if notesOpen && draft.notes.trim()}
+              <p id="song-notes" class="read-notes">{draft.notes}</p>
+            {/if}
+          {/if}
+        </section>
+
         {#if stale}
           <div class="stale" role="alert">
             <p>
@@ -378,79 +466,16 @@
       </div>
 
       <!-- On desktop, a column beside the Lyric Sheet whose sections are
-           named by their toggles. Narrower, its parts follow the Lyric Sheet
-           in their own order, always open. -->
+           named by their toggles. Narrower, its parts follow the Lyric Sheet,
+           always open. -->
       <div class="side">
-        {#each parts as part (part)}
+        {#each parts as { part, open } (part)}
           <details
             class="part {part}-part"
-            open={!desktop.current || !closedParts.includes(part)}
-            ontoggle={(e) => toggled(part, e.currentTarget.open)}
+            open={partOpen(part, open)}
+            ontoggle={(e) => toggled(part, open, e.currentTarget.open)}
           >
-            {#if part === 'details'}
-              <summary>Details</summary>
-              <section class="details" aria-labelledby="details-heading">
-                <h2 id="details-heading">Details</h2>
-                {#if writing}
-                  <div class="grid">
-                    <label>
-                      Key
-                      <input
-                        bind:value={draft.key}
-                        onchange={() => commitText('key')}
-                        list="common-keys"
-                        autocomplete="off"
-                        autocapitalize="characters"
-                        enterkeyhint="done"
-                        placeholder="—"
-                      />
-                    </label>
-                    <label>
-                      BPM
-                      <input
-                        bind:value={draft.bpm}
-                        onchange={() => commitNumber('bpm', 'BPM')}
-                        inputmode="numeric"
-                        autocomplete="off"
-                        enterkeyhint="done"
-                        placeholder="—"
-                      />
-                    </label>
-                    <label>
-                      Capo
-                      <input
-                        bind:value={draft.capo}
-                        onchange={() => commitNumber('capo', 'Capo')}
-                        inputmode="numeric"
-                        autocomplete="off"
-                        enterkeyhint="done"
-                        placeholder="—"
-                      />
-                    </label>
-                    <label>
-                      Tuning
-                      <input
-                        bind:value={draft.tuning}
-                        onchange={() => commitText('tuning')}
-                        list="common-tunings"
-                        autocomplete="off"
-                        enterkeyhint="done"
-                        placeholder="—"
-                      />
-                    </label>
-                  </div>
-                  <label>
-                    Notes
-                    <textarea bind:value={draft.notes} onchange={() => commitText('notes')} rows="5"></textarea>
-                  </label>
-                {:else}
-                  <p class="summary" class:muted={!summary}>{summary || 'No Details yet.'}</p>
-                  {#if draft.notes.trim()}
-                    <p class="read-notes">{draft.notes}</p>
-                  {/if}
-                {/if}
-              </section>
-            {:else if part === 'masters'}
+            {#if part === 'masters'}
               <summary>{song.masters.length > 1 ? 'Masters' : 'Master'}</summary>
               <Masters {song} {mode} change={send} onUnsaved={setUnsaved} {setStatus} />
             {:else}
@@ -599,46 +624,71 @@
     flex: 1 1 16rem;
     margin: 0;
   }
-  .details h2 {
-    font-size: 1rem;
+  /* The Details: small labelled fields in a row that wraps, the Notes
+     toggle last. */
+  .details {
     margin: 0 0 0.75rem;
   }
-  .details label {
+  .fields {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.5rem 0.75rem;
+  }
+  .field {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-    font-size: 0.8125rem;
+    gap: 0.125rem;
+    font-size: 0.75rem;
     font-weight: 600;
     color: var(--text-muted);
   }
-  .details input,
-  .details textarea {
+  .field input {
     color: var(--text);
     font-weight: 400;
   }
+  /* Room for a key like "C#m" beside the suggestions' arrow. */
+  .key input {
+    width: 5.5rem;
+  }
+  .bpm input,
+  .capo input {
+    width: 3.75rem;
+  }
+  .tuning {
+    flex: 0 1 9rem;
+    min-width: 6rem;
+  }
+  .notes-toggle {
+    gap: 0.375rem;
+  }
+  /* A dot says there are Notes behind the toggle. */
+  .notes-toggle.has-notes::after {
+    content: '';
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .notes {
+    display: block;
+    margin-top: 0.5rem;
+  }
   .summary,
   .read-notes {
-    margin: 0 0 0.75rem;
+    margin: 0;
+  }
+  .summary {
+    font-size: 0.875rem;
   }
   .read-notes {
+    margin-top: 0.5rem;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
-  }
 
-  @media (min-width: 36rem) {
-    .grid {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-  }
-
-  /* One column: the title, the Lyric Sheet, then the Scrapbook, the
-     Masters, the Details and Delete, all open. */
+  /* One column: the title and Details, the Lyric Sheet, then the Scrapbook,
+     the Masters and Delete, all open. */
   .side {
     display: flex;
     flex-direction: column;
@@ -653,14 +703,17 @@
     display: none;
   }
 
-  /* Desktop: two columns sitting together on the left, spare width going to
-     the right, with Delete beside the title. The side column starts level
-     with the Lyric Sheet, sticks, scrolls on its own and stops above the
-     docked Timeline. */
+  /* Desktop: two columns sitting together on the left, with Delete beside
+     the title. The Lyric Sheet takes its width first; the side column grows
+     into what's left, up to about a Section's width, and any spare width
+     goes to the right. The side column starts level with the Lyric Sheet,
+     sticks, scrolls on its own and stops above the docked Timeline. */
   @media (min-width: 80rem) {
     .song {
       display: grid;
-      grid-template-columns: minmax(0, 55rem) var(--side-width);
+      grid-template-columns:
+        minmax(0, 55rem)
+        clamp(var(--side-width), 100% - 55rem - var(--gutter), var(--side-max-width));
       grid-template-rows: auto 1fr;
       grid-template-areas:
         'top delete'
@@ -699,10 +752,6 @@
       min-height: 2.5rem;
       font-size: 1.25rem;
     }
-    .grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
     .part {
       border: 1px solid var(--border);
       border-radius: 0.5rem;
@@ -743,7 +792,7 @@
       border-radius: 0.5rem;
     }
     /* The toggle names each section, so their own headings go. */
-    .part :global(:is(#details-heading, #masters-heading, #scrapbook-heading)) {
+    .part :global(:is(#masters-heading, #scrapbook-heading)) {
       display: none;
     }
     /* The section's box draws the edges. */

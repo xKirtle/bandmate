@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detailsSummary, openingMode } from './songMode';
+import { detailsSummary, openingMode, sideParts } from './songMode';
 
 describe('openingMode', () => {
   it('opens a Finished Song in Read mode', () => {
@@ -28,5 +28,18 @@ describe('detailsSummary', () => {
 
   it('is empty when none are set', () => {
     expect(detailsSummary(none)).toBe('');
+  });
+});
+
+describe('sideParts', () => {
+  it('shows the Scrapbook, then the Masters starting closed, in Write mode', () => {
+    expect(sideParts('write')).toEqual([
+      { part: 'scrapbook', open: true },
+      { part: 'masters', open: false },
+    ]);
+  });
+
+  it('shows only the Masters, open, in Read mode', () => {
+    expect(sideParts('read')).toEqual([{ part: 'masters', open: true }]);
   });
 });

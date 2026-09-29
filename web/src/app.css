@@ -26,8 +26,11 @@
   /* What the navigation takes from the bottom of the window: the tab bar, or
      nothing beside the nav rail. */
   --nav-bottom-space: var(--tabbar-space);
-  /* A desktop side column: the Song page's details. */
+  /* A desktop side column, e.g. the Song page's Scrapbook: never narrower
+     than --side-width, and growing into spare width up to about the width
+     of a Lyric Sheet Section without its Cue gutter. */
   --side-width: 22rem;
+  --side-max-width: 48rem;
 
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.5;
