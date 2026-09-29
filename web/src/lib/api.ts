@@ -414,10 +414,11 @@ export const api = {
   moveAlternateToScrapbook: (at: SongAt, alternateId: number) =>
     request<Song>('POST', `/songs/${at.id}/alternates/${alternateId}/scrapbook`, undefined, at),
   /**
-   * Moves an inactive Alternate out of its Section into a Section of its own at position in the Arrangement, or at
-   * the end, labelled as moving it to the Scrapbook does, with its Cues, now live.
+   * Moves an inactive Alternate out of its Section into a Section of its own
+   * at position in the Arrangement, labelled as moving it to the Scrapbook
+   * does, with its Cues, now live.
    */
-  moveAlternateToArrangement: (at: SongAt, alternateId: number, position?: number) =>
+  moveAlternateToArrangement: (at: SongAt, alternateId: number, position: number) =>
     request<Song>('POST', `/songs/${at.id}/alternates/${alternateId}/arrangement`, { position }, at),
   /** Permanently deletes an inactive Alternate. */
   deleteAlternate: (at: SongAt, alternateId: number) =>

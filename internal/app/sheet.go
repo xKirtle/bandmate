@@ -262,7 +262,10 @@ func (a *App) moveAlternateToArrangement(w http.ResponseWriter, r *http.Request)
 		Position *int `json:"position"`
 	}
 	a.changeSheet(w, r, &req, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
-		return a.songs.MoveAlternateToArrangement(r.Context(), id, based, alternateID, req.Position)
+		if req.Position == nil {
+			return lyricsheet.Song{}, &lyricsheet.InvalidError{Msg: "position is required"}
+		}
+		return a.songs.MoveAlternateToArrangement(r.Context(), id, based, alternateID, *req.Position)
 	})
 }
 

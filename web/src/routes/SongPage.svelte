@@ -15,6 +15,7 @@
   import LyricSheet from '../lib/LyricSheet.svelte';
   import Masters from '../lib/Masters.svelte';
   import Scrapbook from '../lib/Scrapbook.svelte';
+  import { dropsOnScrapbook } from '../lib/sectionDrag';
   import { SectionDragging } from '../lib/sectionDragging.svelte';
   import StatusBadge from '../lib/StatusBadge.svelte';
   import Timeline from '../lib/Timeline.svelte';
@@ -83,8 +84,8 @@
   }
   // A Section is dragged within the Lyric Sheet, or between it and the
   // Scrapbook, and an Alternate out of its Section into either, on desktop
-  // in Write mode. The Arrangement or the Scrapbook
-  // changing mid-drag cancels it.
+  // in Write mode. The Arrangement or the Scrapbook changing mid-drag
+  // cancels it.
   const drag = new SectionDragging(
     () => desktop.current && writing,
     () => (song ? `${song.arrangement}|${song.scrapbook}` : ''),
@@ -490,7 +491,7 @@
         {#each parts as { part, open: startsOpen } (part)}
           <details
             class="part {part}-part"
-            class:drop-target={part === 'scrapbook' && drag.drop !== null && ('toScrapbook' in drag.drop || 'alternateToScrapbook' in drag.drop)}
+            class:drop-target={part === 'scrapbook' && dropsOnScrapbook(drag.drop)}
             {@attach (el) => (part === 'scrapbook' ? drag.placeScrapbook(el) : undefined)}
             open={partOpen(part, startsOpen)}
             ontoggle={(e) => toggled(part, startsOpen, e.currentTarget.open)}

@@ -405,7 +405,7 @@ func toArrangementPath(songID, alternateID int64) string {
 }
 
 // moveToArrangement moves an Alternate out of its Section into a Section of
-// its own in the Lyric Sheet and returns the Song. body may set "position".
+// its own in the Lyric Sheet and returns the Song. body sets "position".
 func (ts *testServer) moveToArrangement(songID, alternateID int64, body map[string]any) song {
 	ts.t.Helper()
 	return ts.lyricSheetChange(http.MethodPost, toArrangementPath(songID, alternateID), body)
@@ -444,14 +444,16 @@ func TestAnInactiveAlternateCanBeMovedIntoTheLyricSheetAsASectionOfItsOwn(t *tes
 	}
 }
 
-func TestAnAlternateMovedIntoTheLyricSheetWithoutAPositionGoesAtTheEnd(t *testing.T) {
+func TestMovingAnAlternateIntoTheLyricSheetWithoutAPositionIsRejected(t *testing.T) {
 	ts := newTestServer(t)
-	s, chorus := ts.chorusWithTwoAlternates()
+	before, chorus := ts.chorusWithTwoAlternates()
 
-	got := ts.moveToArrangement(s.ID, chorus.Alternates[1].ID, map[string]any{})
+	// Without a place, an Alternate moved out goes to the Scrapbook instead.
+	res := ts.Do(http.MethodPost, toArrangementPath(before.ID, chorus.Alternates[1].ID), map[string]any{})
 
-	if len(got.Arrangement) != 3 || !reflect.DeepEqual(got.Arrangement[:2], s.Arrangement) {
-		t.Errorf("arrangement = %v, want the new Section after %v", got.Arrangement, s.Arrangement)
+	expectError(t, res, http.StatusBadRequest, "position is required")
+	if got := ts.getSong(before.ID); !reflect.DeepEqual(got, before) {
+		t.Errorf("song after rejected move = %+v, want it unchanged %+v", got, before)
 	}
 }
 
@@ -467,7 +469,7 @@ func TestMovingTheActiveAlternateIntoTheLyricSheetIsRejected(t *testing.T) {
 	}
 }
 
-func TestMovingAnAlternateOutsideTheArrangementIsRejected(t *testing.T) {
+func TestMovingAnAlternateIntoTheLyricSheetOutsideItIsRejected(t *testing.T) {
 	ts := newTestServer(t)
 	before, chorus := ts.chorusWithTwoAlternates()
 
@@ -487,7 +489,7 @@ func TestMovingAnAlternateOfAnotherSongIntoTheLyricSheetIsNotFound(t *testing.T)
 	_, chorus := ts.chorusWithTwoAlternates()
 	before := ts.songWithSections("Verse")
 
-	res := ts.Do(http.MethodPost, toArrangementPath(before.ID, chorus.Alternates[1].ID), map[string]any{})
+	res := ts.Do(http.MethodPost, toArrangementPath(before.ID, chorus.Alternates[1].ID), map[string]any{"position": 9})
 
 	expectStatus(t, res, http.StatusNotFound)
 }

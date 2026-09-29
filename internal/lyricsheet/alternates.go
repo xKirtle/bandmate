@@ -124,16 +124,17 @@ func (s *Store) MoveAlternateToScrapbook(ctx context.Context, songID int64, base
 
 // MoveAlternateToArrangement moves an inactive Alternate out of its Section
 // into a new Section of its own at position in the Arrangement, labelled as
-// MoveAlternateToScrapbook labels it. A nil position puts it at the end. Its
-// Cues go with it, live at once, as it's now the Section's active Alternate
-// (ADR 0010). The active Alternate can't be moved.
-func (s *Store) MoveAlternateToArrangement(ctx context.Context, songID int64, based Version, alternateID int64, position *int) (Song, error) {
+// MoveAlternateToScrapbook labels it. Its Cues go with it, live at once, as
+// it's now the Section's active Alternate (ADR 0010). The active Alternate
+// can't be moved.
+func (s *Store) MoveAlternateToArrangement(ctx context.Context, songID int64, based Version, alternateID int64, position int) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		pos, err := arrangementPosition(ctx, tx, songID, position)
+		newID, err := moveAlternateOut(ctx, tx, songID, alternateID)
 		if err != nil {
 			return err
 		}
-		newID, err := moveAlternateOut(ctx, tx, songID, alternateID)
+		// The new Section isn't in the Arrangement yet, so it doesn't count.
+		pos, err := arrangementPosition(ctx, tx, songID, &position)
 		if err != nil {
 			return err
 		}

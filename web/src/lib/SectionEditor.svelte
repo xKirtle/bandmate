@@ -151,7 +151,7 @@
   // Lyric Sheet or onto the Scrapbook, as a Section of its own.
   function dropAlternate(alt: Alternate) {
     return (drop: Drop) => {
-      if ('alternateOut' in drop) moveToArrangement(alt, drop.gap);
+      if ('alternateToArrangement' in drop) moveToArrangement(alt, drop.gap);
       else if ('alternateToScrapbook' in drop) moveToScrapbook(alt);
     };
   }
