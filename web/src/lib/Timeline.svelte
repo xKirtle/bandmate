@@ -1825,7 +1825,9 @@
     <div class="tracks" id="timeline-tracks" hidden={collapsed} style:max-height="{tracksHeight}px">
       <div class="heads" bind:offsetHeight={headsHeight}>
         <div class="ruler-gap">
-          <button type="button" class="button add-track edit-only" onclick={addTrack}>+ Track</button>
+          <button type="button" class="button add-track edit-only" aria-label="Add a Track" onclick={addTrack}
+            >+ Track</button
+          >
         </div>
         {#each timeline.tracks as track, i (track.id)}
           {@const trackLevels = levels[i]}
