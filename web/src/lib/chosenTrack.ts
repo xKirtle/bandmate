@@ -6,7 +6,7 @@
 export type ChoiceEvent =
   /** A Track's header, or a Clip on it, was clicked. */
   | { kind: 'choose'; trackId: number }
-  /** A Track was added with "Add a track". */
+  /** A Track was added with "+ Track". */
   | { kind: 'add'; trackId: number };
 
 /**

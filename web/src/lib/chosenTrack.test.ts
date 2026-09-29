@@ -41,7 +41,7 @@ describe('chosenTrack', () => {
     expect(chosenTrack(tracks(1, 2, 3), 1, { kind: 'choose', trackId: 9 })).toBe(1);
   });
 
-  it('is a Track just added with "Add a track"', () => {
+  it('is a Track just added with "+ Track"', () => {
     expect(chosenTrack(tracks(1, 2, 3), 1, { kind: 'add', trackId: 3 })).toBe(3);
   });
 

@@ -1810,7 +1810,6 @@
       <span class="spacer"></span>
       {@render undoRedo()}
       <button type="button" class="button edit-only" onclick={() => (picking = true)}>Add a beat</button>
-      <button type="button" class="button edit-only" onclick={addTrack}>Add a track</button>
       <button
         type="button"
         class="icon collapse-toggle"
@@ -1825,7 +1824,11 @@
 
     <div class="tracks" id="timeline-tracks" hidden={collapsed} style:max-height="{tracksHeight}px">
       <div class="heads" bind:offsetHeight={headsHeight}>
-        <span class="ruler-gap"></span>
+        <div class="ruler-gap">
+          <button type="button" class="button add-track edit-only" aria-label="Add a Track" onclick={addTrack}
+            >+ Track</button
+          >
+        </div>
         {#each timeline.tracks as track, i (track.id)}
           {@const trackLevels = levels[i]}
           <!-- Clicking it outside its controls chooses the Track, pointer only for now, like dragging Clips. -->
@@ -2289,9 +2292,17 @@
     height: calc(1.5 * var(--timeline-rem));
     flex-shrink: 0;
   }
-  /* Beside the loop bar and the ruler. */
+  /* Beside the loop bar and the ruler, and where a Track is added, like a DAW's. */
   .ruler-gap {
+    display: flex;
+    align-items: center;
     height: calc(2.25 * var(--timeline-rem));
+  }
+  /* Small enough for the corner; the corner can't grow without moving the lanes. */
+  .add-track {
+    min-height: calc(1.75 * var(--timeline-rem));
+    padding: 0 calc(0.625 * var(--timeline-rem));
+    font-size: calc(0.875 * var(--timeline-rem));
   }
   .head {
     display: flex;
