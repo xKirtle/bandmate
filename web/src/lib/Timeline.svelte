@@ -1812,13 +1812,14 @@
   .track-actions button:focus-visible {
     color: var(--accent);
   }
+  /* As big as the arrows and cross beside it. */
   .rename svg {
-    width: calc(0.8125 * var(--timeline-rem));
-    height: calc(0.8125 * var(--timeline-rem));
-    vertical-align: -0.125em;
+    width: calc(0.625 * var(--timeline-rem));
+    height: calc(0.625 * var(--timeline-rem));
+    vertical-align: -0.0625em;
     fill: none;
     stroke: currentColor;
-    stroke-width: 2;
+    stroke-width: 2.25;
     stroke-linecap: round;
     stroke-linejoin: round;
   }
