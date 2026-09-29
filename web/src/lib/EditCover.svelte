@@ -30,9 +30,15 @@
   } = $props();
 
   let busy = $state<string | null>(null);
-  // What the crop step is open on: a picture picked, or the Cover's
-  // original to adjust its crop.
-  let toCrop = $state<{ picture: CoverToCrop; adjusting: boolean } | null>(null);
+  // The crop step, open on a picture picked or on the Cover's original to
+  // adjust its crop: the square it opens on, what confirming is called and
+  // what it does.
+  let toCrop = $state<{
+    picture: CoverToCrop;
+    initial?: Square;
+    confirmLabel: string;
+    confirm: (crop: Square) => void;
+  } | null>(null);
   let changeInput = $state<HTMLInputElement>();
 
   // The limit is checked on the picture chosen, before it's scaled down, so
@@ -48,7 +54,12 @@
     input.value = '';
     if (!file) return;
     await run('Opening…', async () => {
-      toCrop = { picture: await openCover(file, await maxCoverBytes), adjusting: false };
+      const picture = await openCover(file, await maxCoverBytes);
+      toCrop = {
+        picture,
+        confirmLabel: cover ? 'Change Cover' : 'Add Cover',
+        confirm: (crop) => put(picture, crop),
+      };
     });
   }
 
@@ -63,19 +74,22 @@
     });
   }
 
+  // Opens the crop step on the Cover's original, at its current square.
   async function reopen() {
     if (!cover) return;
-    const { id, width, height } = cover;
+    const { id, width, height, crop } = cover;
     await run('Opening…', async () => {
-      toCrop = { picture: await reopenCover(api.coverUrl(songId, id, 'original'), { width, height }), adjusting: true };
+      const picture = await reopenCover(api.coverUrl(songId, id, 'original'), { width, height });
+      toCrop = { picture, initial: crop, confirmLabel: 'Save crop', confirm: (crop) => adjust(id, picture, crop) };
     });
   }
 
-  async function adjust(picture: CoverToCrop, crop: Square) {
+  // Shows a new square of the Cover's original, the one with id from.
+  async function adjust(from: number, picture: CoverToCrop, crop: Square) {
     toCrop = null;
     await run('Saving…', async () => {
       const { list, header } = await cropCover(picture, crop);
-      await change((at) => api.adjustCoverCrop(at, { list, header, crop }));
+      await change((at) => api.adjustCoverCrop(at, from, { list, header, crop }));
     });
   }
 
@@ -133,12 +147,11 @@
 {/if}
 
 {#if toCrop}
-  {@const { picture, adjusting } = toCrop}
   <CoverCrop
-    {picture}
-    initial={adjusting ? cover?.crop : undefined}
-    confirmLabel={adjusting ? 'Save crop' : cover ? 'Change Cover' : 'Add Cover'}
-    onConfirm={(crop) => (adjusting ? adjust : put)(picture, crop)}
+    picture={toCrop.picture}
+    initial={toCrop.initial}
+    confirmLabel={toCrop.confirmLabel}
+    onConfirm={toCrop.confirm}
     onCancel={() => (toCrop = null)}
   />
 {/if}

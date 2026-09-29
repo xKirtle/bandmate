@@ -385,7 +385,7 @@ func TestAdjustingACoversCropKeepsItsOriginal(t *testing.T) {
 	upload := fakeCover()
 	before := ts.addCover(ts.createSong("Night Drive").ID, upload)
 	kept := ts.addCover(ts.createSong("Kept").ID, fakeCover())
-	crop := recrop()
+	crop := recrop().of(before.Cover.ID)
 
 	res := ts.adjustCropAt(before.Version, before.ID, crop)
 
@@ -443,10 +443,10 @@ func TestAnAdjustedCropIsChecked(t *testing.T) {
 		status int
 		msg    string
 	}{
-		"crop outside": {recrop().withDetails(map[string]any{"crop": map[string]any{"x": 500, "y": 0, "size": 1200}}),
+		"crop outside": {recrop().withDetails(map[string]any{"cover": 1, "crop": map[string]any{"x": 500, "y": 0, "size": 1200}}),
 			http.StatusBadRequest, "the crop must be a square inside the original"},
 		"no crop": {recrop().withDetails(nil), http.StatusBadRequest, "details are required"},
-		"size in details": {recrop().withDetails(map[string]any{"width": 1600, "crop": map[string]any{"x": 0, "y": 0, "size": 1}}),
+		"size in details": {recrop().withDetails(map[string]any{"width": 1600, "cover": 1, "crop": map[string]any{"x": 0, "y": 0, "size": 1}}),
 			http.StatusBadRequest, "details must be valid JSON with known fields"},
 		"no header":     {recrop().without("header"), http.StatusBadRequest, "header is required"},
 		"empty picture": {recrop().withData("list", nil), http.StatusBadRequest, "a Cover's pictures can't be empty"},
@@ -468,6 +468,27 @@ func TestAnAdjustedCropIsChecked(t *testing.T) {
 				t.Errorf("cover files on disk = %q, want the old Cover's: %q", files, before)
 			}
 		})
+	}
+}
+
+func TestACropMadeFromAReplacedCoverIsRefused(t *testing.T) {
+	ts := newTestServer(t)
+	old := ts.addCover(ts.createSong("Night Drive").ID, fakeCover())
+	res := ts.replaceCoverAt(old.Version, old.ID, otherCover())
+	expectStatus(t, res, http.StatusOK)
+	var current song
+	res.JSON(t, &current)
+	before := coverFiles(t, ts)
+
+	// Based on the current version, as after a refresh while cropping.
+	expectError(t, ts.adjustCropAt(current.Version, old.ID, recrop().of(old.Cover.ID)),
+		http.StatusConflict, "this Song's Cover has changed")
+
+	if read := ts.getSong(old.ID); !reflect.DeepEqual(read, current) {
+		t.Errorf("song = %+v, want it unchanged: %+v", read, current)
+	}
+	if files := coverFiles(t, ts); !reflect.DeepEqual(files, before) {
+		t.Errorf("cover files on disk = %q, want the current Cover's: %q", files, before)
 	}
 }
 
@@ -543,15 +564,27 @@ func otherCover() coverUpload {
 }
 
 // recrop is what the browser sends to adjust fakeCover's crop: the new
-// square, and the list and header sizes made from it, as JPEGs.
+// square, and the list and header sizes made from it, as JPEGs. It's made
+// from the first Cover added, unless of says otherwise.
 func recrop() coverUpload {
 	return coverUpload{
 		List:    []byte("not really a jpeg: recropped list"),
 		Header:  []byte("not really a jpeg: recropped header"),
 		Types:   map[string]string{"list": "image/jpeg", "header": "image/jpeg"},
 		Missing: map[string]bool{"original": true},
-		Details: map[string]any{"crop": map[string]any{"x": 0, "y": 100, "size": 1000}},
+		Details: map[string]any{"cover": 1, "crop": map[string]any{"x": 0, "y": 100, "size": 1000}},
 	}
+}
+
+// of says the crop was made from the given Cover.
+func (u coverUpload) of(coverID int64) coverUpload {
+	details := map[string]any{}
+	for k, v := range u.Details {
+		details[k] = v
+	}
+	details["cover"] = coverID
+	u.Details = details
+	return u
 }
 
 func (u coverUpload) without(part string) coverUpload {

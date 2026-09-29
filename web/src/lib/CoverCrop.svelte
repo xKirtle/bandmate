@@ -3,9 +3,9 @@
   import { centredSquare, maxCoverZoom, moveSquare, wholeSquare, zoomSquare, type Point, type Square } from './cover';
   import type { CoverToCrop } from './coverUpload';
 
-  // The crop step of adding a Cover or adjusting its crop: a square frame over the picture, which
-  // is dragged under it and zoomed by pinching, scrolling or the slider.
-  // Full-screen on a phone.
+  // The crop step of adding a Cover or adjusting its crop: a square frame
+  // over the picture, which is dragged under it and zoomed by pinching,
+  // scrolling or the slider. Full-screen on a phone.
   let {
     picture,
     initial,
