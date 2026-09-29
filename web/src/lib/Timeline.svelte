@@ -16,7 +16,7 @@
   } from './api';
   import ActionsMenu from './ActionsMenu.svelte';
   import BeatPicker from './BeatPicker.svelte';
-  import { Capture, CaptureError } from './capture';
+  import { Capture, CaptureError, inputProblem } from './capture';
   import { addedTrack, chosenTrack, readChosen, storeChosen, type ChoiceEvent } from './chosenTrack';
   import { clampMove, clampTrimEnd, clampTrimStart } from './clipEdit';
   import { clipSources, playing } from './clipSource';
@@ -39,6 +39,8 @@
   import { keptInLoop, outsideLoop, repeats, timelineEnd, type Loop, type Placed } from './schedule';
   import { inTextField } from './textField';
   import { formatDuration } from './time';
+  import InputSettings from './InputSettings.svelte';
+  import { readInput } from './inputSettings';
   import { clampHeight, defaultHeight, deviceStorage, heightBounds, readHeight, storeHeight } from './timelineHeight';
   import { audioContext, TimelinePlayer, type PlayableClip, type PlayerState } from './timelinePlayer';
   import {
@@ -708,6 +710,34 @@
     return ok && added !== null;
   }
 
+  // Why Record can't work, where that's known before trying, e.g. no inputs:
+  // checked again as inputs come and go.
+  let problem = $state<string | null>(null);
+  // Said of the input a recording used, e.g. that the one chosen is gone.
+  let inputNote = $state<string | null>(null);
+
+  function checkInput() {
+    inputProblem().then((p) => (problem = p));
+  }
+
+  $effect(() => {
+    checkInput();
+    const devices = navigator.mediaDevices;
+    devices?.addEventListener('devicechange', checkInput);
+    let permission: PermissionStatus | undefined;
+    navigator.permissions
+      ?.query({ name: 'microphone' as PermissionName })
+      .then((status) => {
+        permission = status;
+        status.addEventListener('change', checkInput);
+      })
+      .catch(() => {});
+    return () => {
+      devices?.removeEventListener('devicechange', checkInput);
+      permission?.removeEventListener('change', checkInput);
+    };
+  });
+
   const canRecord = $derived(recording === null && playerState === 'stopped' && !syncing && editable.current);
 
   $effect(() => {
@@ -729,14 +759,21 @@
       startedAt: 0,
     };
     recording = starting;
+    inputNote = null;
     try {
+      // Said up front where it can be, in place of a recording that fails.
+      const problem = await inputProblem();
+      if (problem) throw new CaptureError(problem);
+      const capture = await Capture.open(audioContext(), readInput(deviceStorage()));
+      recording = { ...starting, capture };
+      if (capture.gone) inputNote = `${capture.gone} isn't connected, so recording from the default input.`;
+      if (destroyed) throw new CaptureError('The Timeline closed before recording started.');
+      // Only once the input's open, so one that can't be adds no Track.
       if (timeline.tracks.length === 0 && !(await addTrack())) {
+        recording?.capture?.close();
         recording = null;
         return;
       }
-      const capture = await Capture.open(audioContext());
-      recording = { ...starting, capture };
-      if (destroyed) throw new CaptureError('The Timeline closed before recording started.');
       // Placed once the input's open, in case the Timeline changed meanwhile.
       const target = retaking && timeline.tracks.find((t) => t.clips.some((c) => c.id === retaking.id));
       if (retaking && !target) throw new CaptureError('The Clip to retake is gone.');
@@ -1506,11 +1543,16 @@
               ? 'Leave Sync mode to record'
               : playerState !== 'stopped'
                 ? 'Stop playback to record'
-                : `Record a Take on ${timeline.tracks.find((t) => t.id === chosen)?.name ?? 'a new Track'} (R)`}
+                : problem
+                  ? problem
+                  : `Record a Take on ${timeline.tracks.find((t) => t.id === chosen)?.name ?? 'a new Track'} (R)`}
           ><span class="record-dot" aria-hidden="true"></span>{capturing ? 'Stop' : 'Record'}</button
         >
+        <span class="edit-only"><InputSettings disabled={recording !== null} /></span>
         {#if recording?.phase === 'starting'}
           <span class="muted" role="status">Opening the microphone…</span>
+        {:else if inputNote}
+          <span class="input-note" role="status">{inputNote}</span>
         {:else if recording?.phase === 'saving'}
           <span class="muted" role="status">Saving the Take…</span>
         {:else if playerState === 'loading'}
@@ -2233,6 +2275,9 @@
   .toggle.record[aria-pressed='true'] .record-dot {
     border-radius: 1px;
     background: currentColor;
+  }
+  .input-note {
+    color: var(--warning);
   }
   .toggle.record:disabled {
     opacity: 0.5;
