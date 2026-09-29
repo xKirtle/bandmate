@@ -580,7 +580,7 @@ export const api = {
   /** Puts the Tracks in this order of ids, top to bottom; their Clips go with them. */
   reorderTracks: (at: SongAt, tracks: number[]) =>
     request<Timeline>('PUT', `/songs/${at.id}/timeline/tracks`, { tracks }, at),
-  /** Removes a Track and its Clips; their Beats stay in the Beat Library. */
+  /** Removes a Track and its Clips; their Beats stay in the Beat Library. Refused for the last Track. */
   deleteTrack: (at: SongAt, trackId: number) =>
     request<Timeline>('DELETE', `/songs/${at.id}/timeline/tracks/${trackId}`, undefined, at),
   /** Moves a Clip to start at a time on a Track, keeping its trim. Refused if it would overlap a Clip there. */

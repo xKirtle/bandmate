@@ -492,7 +492,7 @@ func (s *Store) ReorderTracks(ctx context.Context, songID int64, based lyricshee
 
 // DeleteTrack removes a Track and its Clips from the Timeline. Their Beats
 // stay in the Beat Library, and their Takes are detached, to be placed
-// again.
+// again. A Song always has a Track, so its last one can't be deleted.
 func (s *Store) DeleteTrack(ctx context.Context, songID int64, based lyricsheet.Version, trackID int64) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		// Its Clips go with it, by the foreign key, and their Takes leave them.
@@ -503,9 +503,19 @@ func (s *Store) DeleteTrack(ctx context.Context, songID int64, based lyricsheet.
 		if err := expectOneRow(res); err != nil {
 			return err
 		}
+		var left int
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM tracks WHERE song_id = ?`, songID).Scan(&left); err != nil {
+			return fmt.Errorf("counting tracks: %w", err)
+		}
+		if left == 0 {
+			return errLastTrack
+		}
 		return markDetached(ctx, tx, songID)
 	})
 }
+
+// errLastTrack refuses deleting a Song's only Track.
+var errLastTrack = &lyricsheet.ConflictError{Msg: "a Song always has a Track, so its last one can't be deleted"}
 
 // markDetached notes when the Song's Takes that just left their Clips, by
 // the foreign key, were detached.

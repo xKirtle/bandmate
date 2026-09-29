@@ -308,3 +308,37 @@ func TestAClipOfTakesKnowsTheHighestNumberItsTakesHave(t *testing.T) {
 		t.Errorf("last take numbers = %v, want %v", numbers, want)
 	}
 }
+
+func TestEverySongWithoutATrackGetsTrack1(t *testing.T) {
+	conn := openBefore(t, "0022_default_track")
+	exec(t, conn,
+		`INSERT INTO songs (id, title, created_at, updated_at) VALUES (1, 'Midnight Drive', '', ''), (2, 'Neon', '', '')`,
+		`INSERT INTO tracks (id, song_id, name, position) VALUES (1, 2, 'Vox', 0)`,
+	)
+
+	if err := migrate(context.Background(), conn); err != nil {
+		t.Fatalf("migrating: %v", err)
+	}
+
+	type row struct {
+		song     int64
+		name     string
+		position int
+	}
+	var tracks []row
+	rows, err := conn.Query(`SELECT song_id, name, position FROM tracks ORDER BY song_id, position`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var r row
+		if err := rows.Scan(&r.song, &r.name, &r.position); err != nil {
+			t.Fatal(err)
+		}
+		tracks = append(tracks, r)
+	}
+	if want := []row{{1, "Track 1", 0}, {2, "Vox", 0}}; !reflect.DeepEqual(tracks, want) {
+		t.Errorf("tracks = %+v, want %+v", tracks, want)
+	}
+}

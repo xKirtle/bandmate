@@ -4,7 +4,9 @@ import {
   fitScale,
   follow,
   maxScale,
+  minSpan,
   scrollThumb,
+  shownSpan,
   thumbScroll,
   ticks,
   timeAt,
@@ -16,6 +18,31 @@ import {
 
 // A 100s Timeline shown 500px wide: fitted, that's 5px a second.
 const fitted = view({ span: 100, width: 500, scale: 0, scroll: 0 });
+
+describe('shownSpan', () => {
+  it('shows room after the end of the Timeline, at least ten seconds', () => {
+    expect(shownSpan({ end: 40 })).toBe(50);
+    expect(shownSpan({ end: 200 })).toBe(250);
+  });
+
+  it('still fills the view with nothing on the Timeline', () => {
+    expect(shownSpan({ end: 0 })).toBe(minSpan);
+  });
+
+  it('is never shorter than the empty Timeline', () => {
+    expect(shownSpan({ end: 5 })).toBe(minSpan);
+  });
+
+  it('reaches past a Loop that ends after the Timeline', () => {
+    expect(shownSpan({ end: 40, loopEnd: 80 })).toBe(100);
+  });
+
+  it('grows with a recording running past the end, ten seconds at a time', () => {
+    expect(shownSpan({ end: 40, recordingAt: 41 })).toBe(shownSpan({ end: 50 }));
+    expect(shownSpan({ end: 0, recordingAt: 95 })).toBe(shownSpan({ end: 100 }));
+    expect(shownSpan({ end: 40, recordingAt: 12 })).toBe(shownSpan({ end: 40 }));
+  });
+});
 
 describe('fitScale', () => {
   it('is how many pixels a second fit the whole Timeline in the width', () => {

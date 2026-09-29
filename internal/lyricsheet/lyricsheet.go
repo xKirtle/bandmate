@@ -144,8 +144,12 @@ type execer interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }
 
-// insertSong creates a Song with the given title and Status idea, and
-// returns its id.
+// firstTrackName names the Track a Song starts with, as a Song always has
+// at least one.
+const firstTrackName = "Track 1"
+
+// insertSong creates a Song with the given title and Status idea, and its
+// first Track, and returns its id.
 func insertSong(ctx context.Context, db execer, title string) (int64, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
@@ -157,6 +161,10 @@ func insertSong(ctx context.Context, db execer, title string) (int64, error) {
 		title, StatusIdea, now, now)
 	if err != nil {
 		return 0, fmt.Errorf("creating song: %w", err)
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO tracks (song_id, name, position) VALUES (?, ?, 0)`,
+		id, firstTrackName); err != nil {
+		return 0, fmt.Errorf("adding the first track: %w", err)
 	}
 	return id, nil
 }
