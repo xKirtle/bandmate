@@ -63,6 +63,11 @@
     menu.style.left = `${popoverLeft(at, width, document.documentElement.clientWidth, gap, align)}px`;
   }
 
+  /** Opens it from elsewhere, e.g. right-clicking what it acts on; it's placed by its trigger all the same. */
+  export function openMenu() {
+    if (!open && !disabled) show();
+  }
+
   function close() {
     open = false;
     triggerButton.focus();
@@ -103,7 +108,9 @@
     else all[next].focus();
   }
 
-  // A tap outside closes it, leaving focus to wherever the tap puts it.
+  // A tap outside closes it, leaving focus to wherever the tap puts it. It's
+  // caught on the way down, since some of what's tapped, e.g. a Clip, stops
+  // it going further.
   function onWindowPointer(e: PointerEvent) {
     if (open && !root.contains(e.target as Node)) open = false;
   }
@@ -118,7 +125,7 @@
 
 <!-- It's placed once, when it opens: scrolling or resizing would leave it behind. -->
 <svelte:window
-  onpointerdown={onWindowPointer}
+  onpointerdowncapture={onWindowPointer}
   onscroll={dismiss}
   onresize={dismiss}
 />
