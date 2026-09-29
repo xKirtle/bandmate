@@ -1773,10 +1773,14 @@
         <button type="button" class="button" onclick={() => (offerBpm = null)}>No thanks</button>
       </div>
     {/if}
-    {#if error}
-      <p class="error" role="alert">{error}</p>
-    {/if}
   </div>
+  {#if error}
+    <!-- Over the page just above the Timeline, so showing it never moves anything. -->
+    <div class="error-bar" role="alert">
+      <span class="error">{error}</span>
+      <button type="button" class="dismiss" onclick={() => (error = null)} aria-label="Dismiss" title="Dismiss">×</button>
+    </div>
+  {/if}
 </section>
 
 {#if picking}
@@ -2324,8 +2328,32 @@
     margin-top: calc(0.5 * var(--timeline-rem));
     font-size: calc(0.875 * var(--timeline-rem));
   }
-  .error {
-    margin-top: calc(0.5 * var(--timeline-rem));
+  .error-bar {
+    position: absolute;
+    bottom: calc(100% + 0.5 * var(--timeline-rem));
+    left: max(var(--gutter), env(safe-area-inset-left));
+    right: max(var(--gutter), env(safe-area-inset-right));
+    display: flex;
+    align-items: center;
+    gap: calc(0.5 * var(--timeline-rem));
+    padding: calc(0.375 * var(--timeline-rem)) calc(0.75 * var(--timeline-rem));
+    border: 1px solid var(--danger);
+    border-radius: calc(0.5 * var(--timeline-rem));
+    background: var(--bg);
+    box-shadow: 0 calc(0.25 * var(--timeline-rem)) var(--timeline-rem) rgb(0 0 0 / 0.2);
+  }
+  .error-bar .error {
+    flex: 1;
+    min-width: 0;
+  }
+  .dismiss {
+    flex-shrink: 0;
+    padding: 0 calc(0.25 * var(--timeline-rem));
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    font-size: calc(1.125 * var(--timeline-rem));
+    cursor: pointer;
   }
 
   /*
