@@ -6,7 +6,7 @@ import { dropFor, dropTarget, type Box, type Drop, type Dragged, type Target } f
 // back into it. Pointer events rather than HTML5 drag and drop, so the drop
 // shows between Sections and Esc cancels. One drag is shared by the Lyric
 // Sheet and the Scrapbook, as a drag goes from one to the other.
-export class SectionDrag {
+export class SectionDragging {
   /** The drag under way: what's dragged, where it would drop, and where the pointer is. */
   current = $state<{ dragged: Dragged; target: Target | null; x: number; y: number } | null>(null);
   /** What letting go now would do, if anything. */

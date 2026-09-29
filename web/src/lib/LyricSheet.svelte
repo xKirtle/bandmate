@@ -23,7 +23,7 @@
   import type { MenuAction } from './menu';
   import SectionEditor from './SectionEditor.svelte';
   import { moveTo, type Drop } from './sectionDrag';
-  import type { SectionDrag } from './sectionDragging.svelte';
+  import type { SectionDragging } from './sectionDragging.svelte';
   import { activeAlternate, describe, isEmpty } from './sections';
   import type { Mode } from './songMode';
   import { readShiftStep, shiftSteps, storeShiftStep, type ShiftStep } from './shiftStep';
@@ -51,7 +51,7 @@
     /** Sends a Lyric Sheet change; resolves to whether it succeeded. */
     change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
     /** The drag of a Section, shared with the Scrapbook. */
-    drag: SectionDrag;
+    drag: SectionDragging;
     /** Sends a Cue edit, to undo with the Timeline's edits; resolves to whether it succeeded. */
     editCues: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
     onUnsaved: (editor: object, unsaved: boolean) => void;

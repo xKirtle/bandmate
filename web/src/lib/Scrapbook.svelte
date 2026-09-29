@@ -3,7 +3,7 @@
   import { SvelteSet } from 'svelte/reactivity';
   import { api, type Song, type SongAt } from './api';
   import type { Drop } from './sectionDrag';
-  import type { SectionDrag } from './sectionDragging.svelte';
+  import type { SectionDragging } from './sectionDragging.svelte';
   import SectionEditor from './SectionEditor.svelte';
   import { card, describe, labelOf } from './sections';
 
@@ -17,7 +17,7 @@
     /** Sends a Lyric Sheet change; resolves to whether it succeeded. */
     change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
     /** The drag of a Section, shared with the Lyric Sheet. */
-    drag: SectionDrag;
+    drag: SectionDragging;
     onUnsaved: (editor: object, unsaved: boolean) => void;
   } = $props();
 

@@ -14,7 +14,7 @@
   import LyricSheet from '../lib/LyricSheet.svelte';
   import Masters from '../lib/Masters.svelte';
   import Scrapbook from '../lib/Scrapbook.svelte';
-  import { SectionDrag } from '../lib/sectionDragging.svelte';
+  import { SectionDragging } from '../lib/sectionDragging.svelte';
   import StatusBadge from '../lib/StatusBadge.svelte';
   import Timeline from '../lib/Timeline.svelte';
   import type { Saved } from '../lib/history';
@@ -83,7 +83,7 @@
   // A Section is dragged within the Lyric Sheet, or between it and the
   // Scrapbook, on desktop in Write mode. The Arrangement or the Scrapbook
   // changing mid-drag cancels it.
-  const drag = new SectionDrag(
+  const drag = new SectionDragging(
     () => desktop.current && writing,
     () => (song ? `${song.arrangement.map((o) => o.id)}|${song.scrapbook}` : ''),
   );
