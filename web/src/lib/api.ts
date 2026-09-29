@@ -252,6 +252,8 @@ export interface Clip {
   takes: Take[];
   /** The Take a Clip of Takes plays, or null for a Clip of a Beat. */
   activeTakeId: number | null;
+  /** The highest number its Takes ever had, so none is used twice; 0 for a Clip of a Beat. */
+  lastTakeNumber: number;
   /** Where the Clip starts on the Timeline. */
   start: number;
   /**
@@ -287,19 +289,31 @@ export interface Take {
  * deleted Clip brought back, or a recording redone.
  */
 export type NewClip = Pick<Clip, 'start' | 'offset' | 'length'> &
-  ({ beatId: number } | { takeIds: number[]; activeTakeId: number });
+  ({ beatId: number } | { takeIds: number[]; activeTakeId: number; lastTakeNumber: number });
 
-/** Where a Take was recorded, sent with its file. */
-export interface TakePlacement {
-  trackId: number;
-  /** Where its new Clip starts: the Track's append point. */
-  start: number;
+/** How a Take was captured, sent with its file. */
+export interface Captured {
   /** The Timeline time capture began, lead-in included, in seconds. */
   captureStart: number;
   /** The delay to take off where it was captured, in seconds. */
   latencyOffset: number;
   peaks: number[];
 }
+
+/** Where a Take was recorded, sent with its file. */
+export interface TakePlacement extends Captured {
+  trackId: number;
+  /** Where its new Clip starts: the Track's append point. */
+  start: number;
+}
+
+/**
+ * How a Clip of Takes is to be, e.g. to undo or redo a Retake: its Takes,
+ * each where it starts in its source span, the one it plays, and its placement.
+ */
+export type ClipTakes = Pick<Clip, 'activeTakeId' | 'start' | 'offset' | 'length'> & {
+  takes: Pick<Take, 'id' | 'position'>[];
+};
 
 /**
  * A Track to add: by default empty, at the bottom, at 0 dB and neither muted
@@ -594,6 +608,19 @@ export const api = {
     form.append('file', wav, 'take.wav');
     return request<Timeline>('POST', `/songs/${at.id}/timeline/takes`, form, at);
   },
+  /**
+   * Records a Take just recorded, a mono 24-bit WAV, into a Clip of Takes, as
+   * its active Take. The Clip grows to fit it, up to the next Clip.
+   */
+  retake: (at: SongAt, clipId: number, wav: Blob, captured: Captured) => {
+    const form = new FormData();
+    form.append('details', JSON.stringify(captured));
+    form.append('file', wav, 'take.wav');
+    return request<Timeline>('POST', `/songs/${at.id}/timeline/clips/${clipId}/takes`, form, at);
+  },
+  /** Sets a Clip's Takes, active Take and placement, detaching the Takes it no longer holds. */
+  setTakes: (at: SongAt, clipId: number, takes: ClipTakes) =>
+    request<Timeline>('PUT', `/songs/${at.id}/timeline/clips/${clipId}/takes`, takes, at),
   /** One of a Song's Takes, with its peaks. */
   getTake: (songId: number, takeId: number) => request<Take>('GET', `/songs/${songId}/takes/${takeId}`),
   /** Where a Take's audio streams from, exactly as recorded. A Take's file never changes. */

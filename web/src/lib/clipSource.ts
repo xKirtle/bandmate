@@ -11,6 +11,7 @@
 import { api, type Clip, type NewClip, type Take, type Timeline } from './api';
 import { peaksPerSecond } from './peaks';
 import type { Placed } from './schedule';
+import type { PlayableClip } from './timelinePlayer';
 
 /** What one or more Clips play. */
 export interface ClipSource {
@@ -102,9 +103,30 @@ export function heard(clip: Clip): Placed | null {
   return { start, offset: start - origin - take.position, length: end - start };
 }
 
+/**
+ * What each Clip of a Timeline plays, from its audio, on its Track: a
+ * Take's only where it has audio in its Clip. The Clip being retaken, if
+ * any, is left silent, so the old Take isn't heard while singing the new.
+ */
+export function playing(timeline: Timeline, sources: ClipSources, silent: number | null = null): PlayableClip[] {
+  return timeline.tracks.flatMap((t) =>
+    t.clips.flatMap((c) => {
+      const h = c.id === silent ? null : heard(c);
+      return h ? [{ ...h, source: sources.of(c).audio, trackId: t.id }] : [];
+    }),
+  );
+}
+
 /** What places a Clip back as it is: its source and trim, without its id. */
 export function placementOf(clip: Clip): NewClip {
   const { start, offset, length } = clip;
   if (clip.beatId !== null) return { beatId: clip.beatId, start, offset, length };
-  return { takeIds: clip.takes.map((t) => t.id), activeTakeId: clip.activeTakeId!, start, offset, length };
+  return {
+    takeIds: clip.takes.map((t) => t.id),
+    activeTakeId: clip.activeTakeId!,
+    lastTakeNumber: clip.lastTakeNumber,
+    start,
+    offset,
+    length,
+  };
 }

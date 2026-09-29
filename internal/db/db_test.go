@@ -272,3 +272,39 @@ func TestClipsKeepTheirIdsAsTheyMayPlayTakes(t *testing.T) {
 		t.Errorf("a Clip playing neither a Beat nor Takes was stored")
 	}
 }
+
+func TestAClipOfTakesKnowsTheHighestNumberItsTakesHave(t *testing.T) {
+	conn := openBefore(t, "0020_last_take_number")
+	exec(t, conn,
+		`INSERT INTO songs (id, title, created_at, updated_at) VALUES (1, 'Midnight Drive', '', '')`,
+		`INSERT INTO beats (id, title, file_name, content_type, size, duration, peaks, created_at, updated_at)
+			VALUES (1, 'Beat', 'beat.mp3', 'audio/mpeg', 10, 30, '[]', '', '')`,
+		`INSERT INTO tracks (id, song_id, name, position) VALUES (1, 1, 'Vox', 0)`,
+		`INSERT INTO takes (id, song_id, number, size, duration, sample_rate, peaks, latency_offset, position, recorded_at)
+			VALUES (1, 1, 1, 10, 4, 48000, '[]', 0, 0, ''), (2, 1, 3, 10, 4, 48000, '[]', 0, 0, '')`,
+		`INSERT INTO clips (id, track_id, beat_id, active_take_id, start, source_offset, length) VALUES
+			(1, 1, NULL, 2, 0, 0, 4), (2, 1, 1, NULL, 10, 0, 30)`,
+		`UPDATE takes SET clip_id = 1`,
+	)
+
+	if err := migrate(context.Background(), conn); err != nil {
+		t.Fatalf("migrating: %v", err)
+	}
+
+	var numbers []int
+	rows, err := conn.Query(`SELECT last_take_number FROM clips ORDER BY id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var n int
+		if err := rows.Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		numbers = append(numbers, n)
+	}
+	if want := []int{3, 0}; !reflect.DeepEqual(numbers, want) {
+		t.Errorf("last take numbers = %v, want %v", numbers, want)
+	}
+}

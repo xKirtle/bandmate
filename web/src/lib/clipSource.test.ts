@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { api, type Clip, type ClipBeat, type Take, type Timeline } from './api';
-import { clipSources, heard, placementOf } from './clipSource';
+import { clipSources, heard, placementOf, playing } from './clipSource';
 
 const beat = (id: number, more: Partial<ClipBeat> = {}): ClipBeat => ({
   id,
@@ -17,6 +17,7 @@ const clip = (id: number, beatId: number): Clip => ({
   beatId,
   takes: [],
   activeTakeId: null,
+  lastTakeNumber: 0,
   start: 5,
   offset: 2,
   length: 10,
@@ -40,6 +41,7 @@ const takeClip = (id: number, takes: Take[], active = takes[0].id): Clip => ({
   beatId: null,
   takes,
   activeTakeId: active,
+  lastTakeNumber: takes.length,
   start: 30,
   offset: 2,
   length: 10,
@@ -126,15 +128,41 @@ describe('heard', () => {
   });
 });
 
+describe('playing', () => {
+  const beatClip = clip(1, 7);
+  const vocal = takeClip(2, [take(3, { duration: 12 })]);
+  const tl = timeline([beatClip, vocal], [beat(7)]);
+  const played = (silent?: number) => playing(tl, clipSources(tl), silent).map((c) => [c.source, c.start]);
+
+  it('plays what every Clip holds, from its audio, on its Track', () => {
+    expect(playing(tl, clipSources(tl))).toEqual([
+      { start: 5, offset: 2, length: 10, source: '/api/beats/7/audio?v=beat-7.mp3-1000-90', trackId: 1 },
+      { start: 30, offset: 2, length: 10, source: '/api/songs/1/takes/3/audio', trackId: 1 },
+    ]);
+  });
+
+  it('keeps the Clip being retaken silent, and plays the rest', () => {
+    expect(played(2)).toEqual([['/api/beats/7/audio?v=beat-7.mp3-1000-90', 5]]);
+    expect(played(1)).toEqual([['/api/songs/1/takes/3/audio', 30]]);
+  });
+
+  it('leaves out a Clip with nothing of its Take in it', () => {
+    const empty = takeClip(3, [take(4, { duration: 1 })]);
+    const t = timeline([empty], []);
+    expect(playing(t, clipSources(t))).toEqual([]);
+  });
+});
+
 describe('placementOf', () => {
   it('is what re-places a Clip as it was: its source and trim, without its id', () => {
     expect(placementOf(clip(1, 7))).toEqual({ beatId: 7, start: 5, offset: 2, length: 10 });
   });
 
-  it('places a Clip of Takes back with its Takes, the same one active', () => {
+  it('places a Clip of Takes back with its Takes, the same one active, numbering on', () => {
     expect(placementOf(takeClip(1, [take(3), take(4)], 4))).toEqual({
       takeIds: [3, 4],
       activeTakeId: 4,
+      lastTakeNumber: 2,
       start: 30,
       offset: 2,
       length: 10,

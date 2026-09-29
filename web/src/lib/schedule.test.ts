@@ -207,6 +207,7 @@ describe('schedule of a Take Clip', () => {
       { id: 7, number: 1, size: 1, duration: 20, sampleRate: 48000, latencyOffset: 0, position: 1, recordedAt: '' },
     ],
     activeTakeId: 7,
+    lastTakeNumber: 1,
     start: 30,
     offset: 2,
     length: 10,

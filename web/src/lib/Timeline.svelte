@@ -19,13 +19,14 @@
   import { Capture, CaptureError } from './capture';
   import { addedTrack, chosenTrack, readChosen, storeChosen, type ChoiceEvent } from './chosenTrack';
   import { clampMove, clampTrimEnd, clampTrimStart } from './clipEdit';
-  import { clipSources, heard } from './clipSource';
+  import { clipSources, playing } from './clipSource';
   import { cuesInSpan, formatCue, hasCues } from './cues';
   import {
     History,
     placingAdded,
     restorable,
     sendEdit,
+    settingTakes,
     type Edit as TimelineEdit,
     type HistoryEdit,
     type Saved,
@@ -34,7 +35,7 @@
   import { type MenuAction } from './menu';
   import { peaks as peaksOf, peaksPerSecond } from './peaks';
   import { longPressDelay, pastSlop, type Point } from './press';
-  import { recordingPlan, type RecordingPlan } from './recording';
+  import { recordingPlan, retakeLength, retakePlan, type RecordingPlan } from './recording';
   import { keptInLoop, outsideLoop, repeats, timelineEnd, type Loop, type Placed } from './schedule';
   import { inTextField } from './textField';
   import { formatDuration } from './time';
@@ -122,9 +123,14 @@
   // ignoring the Loop, and runs on until stopped, capturing all along. The
   // lead-in is kept in the Take, hidden behind its Clip's start. Only
   // offered while stopped, and never along with Sync mode.
+  //
+  // A Retake records the same way into a Clip of Takes, from its start as
+  // trimmed, with that Clip kept silent so the old Take isn't sung against.
   interface RecordingState {
     phase: 'starting' | 'recording' | 'saving';
     trackId: number | null;
+    /** The Clip retaken, or null for a new one. */
+    clipId: number | null;
     plan: RecordingPlan | null;
     capture: Capture | null;
     /** The context time playback was at plan.from. */
@@ -155,15 +161,8 @@
   const sources = $derived(clipSources(timeline));
   const clips = $derived(timeline.tracks.flatMap((t) => t.clips));
   // Each Clip plays the part of its audio file that it holds: a Take's only
-  // where it has audio in the Clip.
-  const playable = $derived<PlayableClip[]>(
-    timeline.tracks.flatMap((t) =>
-      t.clips.flatMap((c) => {
-        const h = heard(c);
-        return h ? [{ ...h, source: sources.of(c).audio, trackId: t.id }] : [];
-      }),
-    ),
-  );
+  // where it has audio in the Clip. Not the Clip being retaken.
+  const playable = $derived<PlayableClip[]>(playing(timeline, sources, recording?.clipId));
   const length = $derived(timelineEnd(clips, song));
   // Room after the end, or the Loop if it ends later, to drag Clips and the
   // Loop later on the Timeline. A recording running past the end takes the
@@ -715,12 +714,20 @@
     onRecording?.(recording !== null && recording.phase !== 'saving');
   });
 
-  async function startRecording() {
+  /** Records a Take onto the chosen Track, or with retaking, into that Clip of Takes. */
+  async function startRecording(retaking?: Clip) {
     if (!canRecord) return;
     error = null;
     // Resumed right away, while the key press or click still counts.
     audioContext().resume();
-    const starting: RecordingState = { phase: 'starting', trackId: null, plan: null, capture: null, startedAt: 0 };
+    const starting: RecordingState = {
+      phase: 'starting',
+      trackId: null,
+      clipId: retaking?.id ?? null,
+      plan: null,
+      capture: null,
+      startedAt: 0,
+    };
     recording = starting;
     try {
       if (timeline.tracks.length === 0 && !(await addTrack())) {
@@ -731,14 +738,16 @@
       recording = { ...starting, capture };
       if (destroyed) throw new CaptureError('The Timeline closed before recording started.');
       // Placed once the input's open, in case the Timeline changed meanwhile.
-      const track = timeline.tracks.find((t) => t.id === chosen) ?? timeline.tracks.at(-1)!;
-      const plan = recordingPlan(track.clips);
+      const target = retaking && timeline.tracks.find((t) => t.clips.some((c) => c.id === retaking.id));
+      if (retaking && !target) throw new CaptureError('The Clip to retake is gone.');
+      const track = target || (timeline.tracks.find((t) => t.id === chosen) ?? timeline.tracks.at(-1)!);
+      const plan = retaking ? retakePlan(track.clips.find((c) => c.id === retaking.id)!) : recordingPlan(track.clips);
       following = true;
       ended = false;
       position = plan.from;
       await player.play(playable, plan.from, null);
       if (player.state !== 'playing') throw new CaptureError('Recording stopped before it started.');
-      recording = { phase: 'recording', trackId: track.id, plan, capture, startedAt: player.startedAt };
+      recording = { ...starting, phase: 'recording', trackId: track.id, plan, capture, startedAt: player.startedAt };
     } catch (e) {
       recording?.capture?.close();
       recording = null;
@@ -762,19 +771,17 @@
       return;
     }
     const wav = new Blob([encodeWav(samples, rate)], { type: 'audio/wav' });
-    const details = {
-      trackId: r.trackId,
-      start: r.plan.start,
-      captureStart: r.plan.from,
-      latencyOffset: latency,
-      peaks: peaksOf([samples], rate),
-    };
+    const captured = { captureStart: r.plan.from, latencyOffset: latency, peaks: peaksOf([samples], rate) };
+    const { clipId, trackId, plan } = r;
     offerCues = null;
     queued++;
     await change(async (at) => {
       const before = timeline;
-      const after = await saved(api.recordTake(at, wav, details));
-      history.record(placingAdded(before, after), before, after);
+      const after =
+        clipId === null
+          ? await saved(api.recordTake(at, wav, { trackId, start: plan.start, ...captured }))
+          : await saved(api.retake(at, clipId, wav, captured));
+      history.record(clipId === null ? placingAdded(before, after) : settingTakes(after, clipId), before, after);
       editedAt = after.version;
       showHistory();
       return { timeline: after };
@@ -1046,7 +1053,7 @@
   }
 
   function clipKey(event: KeyboardEvent, clip: Clip) {
-    if (event.target !== event.currentTarget || !editable.current) return;
+    if (event.target !== event.currentTarget || !editable.current || clip.id === recording?.clipId) return;
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault();
       remove(clip);
@@ -1064,6 +1071,10 @@
 
   function clipActions(clip: Clip): MenuAction[] {
     return [
+      // Only while it could start: stopped, and out of Sync mode.
+      ...(clip.activeTakeId !== null && canRecord
+        ? [{ icon: '●', label: 'Retake', title: 'Record another Take into this Clip', run: () => startRecording(clip) }]
+        : []),
       { icon: '⧉', label: 'Duplicate', run: () => duplicate(clip) },
       { icon: '×', label: 'Delete', run: () => remove(clip) },
     ];
@@ -1666,6 +1677,7 @@
                       class="clip"
                       class:editing
                       class:moving={editing && edit?.mode === 'move'}
+                      class:retaking={clip.id === recording?.clipId}
                       style:left="{percent(at.start)}%"
                       style:width="{percent(at.length)}%"
                       title={title}
@@ -1720,10 +1732,13 @@
                     </div>
                   {/each}
                   {#if capturing && recording?.trackId === track.id && recording.plan && position > recording.plan.start}
+                    {@const retaken = track.clips.find((c) => c.id === recording?.clipId)}
+                    {@const taken = position - recording.plan.start}
+                    <!-- A Retake shows growing over its Clip, and stops at the next Clip, as it will be saved. -->
                     <div
                       class="clip taking"
                       style:left="{percent(recording.plan.start)}%"
-                      style:width="{percent(position - recording.plan.start)}%"
+                      style:width="{percent(retaken ? Math.min(taken, retakeLength(retaken, track.clips, position)) : taken)}%"
                       aria-label="Recording from {formatDuration(recording.plan.start)}"
                     >
                       <span class="clip-head"><span class="clip-title">Recording…</span></span>
@@ -2250,6 +2265,11 @@
     opacity: 0.85;
   }
   /* The Take being recorded, growing as it goes. */
+  /* The Clip being retaken, silent and left be until the Retake is saved. */
+  .clip.retaking {
+    opacity: 0.5;
+    pointer-events: none;
+  }
   .clip.taking {
     border-color: var(--danger);
     background: color-mix(in srgb, var(--danger) 15%, var(--surface-1));
