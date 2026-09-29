@@ -26,7 +26,7 @@ function batched(samples: Float32Array, frame: number, sizes: number[]): Batch[]
 }
 
 describe('LiveWave', () => {
-  it('builds the same peaks from batches as from the whole recording', () => {
+  it('builds the same peaks from batches as from the whole Take', () => {
     const rate = 44100;
     // The capture starts before the first frame kept, as the worklet's does.
     const batches = batched(noise(rate * 3 + 123, 1), 1000, [128, 4096, 4224, 77]);
@@ -89,6 +89,14 @@ describe('LiveWave', () => {
 
     // A bar every 0.02 seconds, so every 2 peaks, the last with only one.
     expect(wave.tiles(0.02)).toEqual([[0.5, 0.3, 0.4]]);
+  });
+
+  it('skips whole peaks before the Clip, as a saved Clip does from its offset', () => {
+    const wave = new LiveWave(0, 100, 0.0199);
+
+    wave.add({ frame: 0, samples: new Float32Array([0.9, 0.1, 0.2]) });
+
+    expect(wave.tiles(0.01)).toEqual([[0.1, 0.2]]);
   });
 
   it('groups the bars in tiles, keeping the full ones as they are as more comes', () => {

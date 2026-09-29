@@ -25,7 +25,12 @@ export function peaks(channels: Float32Array[], sampleRate: number, perSecond = 
         if (v > loudest) loudest = v;
       }
     }
-    result[i] = Math.round(Math.min(loudest, 1) * 1000) / 1000;
+    result[i] = rounded(loudest);
   }
   return result;
+}
+
+/** A peak as it's kept: the loudest sample, at most 1, to 3 decimals. */
+export function rounded(loudest: number): number {
+  return Math.round(Math.min(loudest, 1) * 1000) / 1000;
 }

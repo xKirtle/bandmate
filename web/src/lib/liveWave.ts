@@ -1,9 +1,9 @@
 // The waveform of a Take while it records: its peaks built from each batch
-// the capture sends, as peaks.ts builds them from the whole recording, so
+// the capture sends, as peaks.ts builds them from the whole Take, so
 // the waveform doesn't change once it's saved. They're drawn as bars in
 // tiles, so only the last tile changes as it grows.
 import type { Batch } from './capture';
-import { peaksPerSecond } from './peaks';
+import { peaksPerSecond, rounded } from './peaks';
 
 /** How loud a peak is at or above which it clipped: −0.5 dBFS, rounded as peaks are. */
 export const clipping = Math.round(10 ** (-0.5 / 20) * 1000) / 1000;
@@ -22,12 +22,7 @@ export class LiveWave {
   // Of the peaks, how many come before the Clip's start.
   #skip: number;
   // The tiles last drawn, at a bar every perBar peaks, as of end frames in.
-  #tiles: {
-    perBar: number;
-    end: number;
-    bars: number;
-    tiles: number[][];
-  } | null = null;
+  #tiles: { perBar: number; end: number; bars: number; tiles: number[][] } | null = null;
 
   /**
    * A Take captured from frame first, at rate, whose Clip starts skip
@@ -37,11 +32,11 @@ export class LiveWave {
     private first: number,
     rate: number,
     skip: number,
-    private perSecond = peaksPerSecond,
   ) {
-    this.#stretch = rate / perSecond;
+    this.#stretch = rate / peaksPerSecond;
     this.#next = Math.floor(this.#stretch);
-    this.#skip = Math.round(skip * perSecond);
+    // Floored, as a saved Clip's waveform is from its offset.
+    this.#skip = Math.floor(skip * peaksPerSecond);
   }
 
   /** Adds a batch captured, after those before it; what's missing between them is silence. */
@@ -56,7 +51,7 @@ export class LiveWave {
   }
 
   #finish() {
-    this.#peaks.push(round(this.#loudest));
+    this.#peaks.push(rounded(this.#loudest));
     this.#loudest = 0;
     this.#next = Math.floor((this.#peaks.length + 1) * this.#stretch);
   }
@@ -67,7 +62,7 @@ export class LiveWave {
   }
 
   #peak(i: number): number {
-    return i < this.#peaks.length ? this.#peaks[i] : round(this.#loudest);
+    return i < this.#peaks.length ? this.#peaks[i] : rounded(this.#loudest);
   }
 
   /** The peaks so far, as peaks.ts would compute them from what's been added. */
@@ -82,22 +77,22 @@ export class LiveWave {
    * does.
    */
   tiles(secondsPerBar: number): readonly (readonly number[])[] {
-    const perBar = secondsPerBar * this.perSecond;
+    const perBar = secondsPerBar * peaksPerSecond;
     const count = Math.max(0, Math.ceil((this.#count - this.#skip) / perBar));
-    let t = this.#tiles;
-    if (t?.perBar !== perBar) t = this.#tiles = { perBar, end: 0, bars: 0, tiles: [] };
-    else if (t.end === this.#end) return t.tiles;
+    let drawn = this.#tiles;
+    if (drawn?.perBar !== perBar) drawn = this.#tiles = { perBar, end: 0, bars: 0, tiles: [] };
+    else if (drawn.end === this.#end) return drawn.tiles;
     // From the last bar drawn, which may have grown.
-    const from = Math.max(0, t.bars - 1);
-    const tiles = t.tiles.slice();
+    const from = Math.max(0, drawn.bars - 1);
+    const tiles = drawn.tiles.slice();
     for (let k = from; k < count; k++) {
       const tile = Math.floor(k / tileBars);
-      if (tiles[tile] === t.tiles[tile]) tiles[tile] = tiles[tile]?.slice() ?? [];
+      if (tiles[tile] === drawn.tiles[tile]) tiles[tile] = tiles[tile]?.slice() ?? [];
       tiles[tile][k % tileBars] = this.#bar(k, perBar);
     }
-    t.end = this.#end;
-    t.bars = count;
-    t.tiles = tiles;
+    drawn.end = this.#end;
+    drawn.bars = count;
+    drawn.tiles = tiles;
     return tiles;
   }
 
@@ -115,9 +110,4 @@ export class LiveWave {
     }
     return loudest;
   }
-}
-
-/** A peak as peaks.ts keeps it: at most 1, to 3 decimals. */
-function round(loudest: number): number {
-  return Math.round(Math.min(loudest, 1) * 1000) / 1000;
 }

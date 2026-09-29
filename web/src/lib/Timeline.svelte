@@ -154,9 +154,9 @@
   }
   let recording = $state.raw<RecordingState | null>(null);
   // Counts the batches the recording's waveform has had, to draw each.
-  let waveBatches = $state(0);
+  let waveVersion = $state(0);
   const liveTiles = $derived.by(() => {
-    void waveBatches;
+    void waveVersion;
     return recording?.wave?.tiles(barWidth / view.scale) ?? [];
   });
   // Whether a recording is capturing, rather than starting or saving.
@@ -874,26 +874,24 @@
         plan,
         latencyOffset: appliedOffset(calibration, capture.latency),
       };
+      const first = frameAt(startedAt, capture.sampleRate);
       const keeper = new Keeper({
         ...unsaved,
         songId: song.id,
         sampleRate: capture.sampleRate,
-        first: frameAt(startedAt, capture.sampleRate),
+        first,
         recordedAt: new Date().toISOString(),
       });
-      // Drawn from where the Take will be placed: the Clip's start, heard latencyOffset after it was captured.
-      const wave = new LiveWave(
-        frameAt(startedAt, capture.sampleRate),
-        capture.sampleRate,
-        plan.start - plan.from + unsaved.latencyOffset,
-      );
-      waveBatches = 0;
+      // Drawn from where the Take will be placed: its Clip's start, heard its Latency Offset after it was captured.
+      const wave = new LiveWave(first, capture.sampleRate, plan.start - plan.from + unsaved.latencyOffset);
+      waveVersion = 0;
       capture.keep((batch) => {
         keeper.add(batch);
         wave.add(batch);
-        waveBatches++;
+        waveVersion++;
       });
-      recording = { ...starting, phase: 'recording', trackId: track.id, plan, capture, startedAt, unsaved, keeper, wave };
+      const { id: trackId } = track;
+      recording = { ...starting, phase: 'recording', trackId, plan, capture, startedAt, unsaved, keeper, wave };
     } catch (e) {
       recording?.capture?.close();
       recording = null;
@@ -2065,7 +2063,14 @@
                         >
                           {#each clipShape(clip, at.offset + wave.from, wave.to - wave.from, (wave.bars * barWidth) / view.scale, wave.bars) as peak, i (i)}
                             {@const height = Math.max(2, peak * 100)}
-                            <rect x={i + 0.15} y={(100 - height) / 2} width="0.7" {height} />
+                            <!-- A Take's clipping stays marked once it's saved; a Beat's isn't, being mastered loud. -->
+                            <rect
+                              class:clipped={clip.beatId === null && peak >= clipping}
+                              x={i + 0.15}
+                              y={(100 - height) / 2}
+                              width="0.7"
+                              {height}
+                            />
                           {/each}
                         </svg>
                       {/if}
@@ -2778,7 +2783,7 @@
     fill: var(--accent);
     opacity: 0.7;
   }
-  /* A peak that clipped, as it's recorded. */
+  /* A peak of a Take that clipped. */
   rect.clipped {
     fill: var(--danger);
     opacity: 1;
