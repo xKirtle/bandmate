@@ -2,7 +2,7 @@
   import { untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import type { Cueing } from './AlternateText.svelte';
-  import { api, suggestedLabels, type Line, type Occurrence, type Section, type Song, type SongAt } from './api';
+  import { api, type Line, type Occurrence, type Section, type Song, type SongAt } from './api';
   import { hasChords } from './chords';
   import {
     canShiftCuesEarlier,
@@ -523,10 +523,6 @@
     </div>
     <p class="hint muted">Put Chords in brackets where they fall: <code>Hel[Am]lo</code>.</p>
   {/if}
-
-  <datalist id="label-suggestions">
-    {#each suggestedLabels as l (l)}<option value={l}></option>{/each}
-  </datalist>
 </section>
 
 <style>

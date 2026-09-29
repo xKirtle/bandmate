@@ -2,7 +2,8 @@
   import { tick, untrack, type Snippet } from 'svelte';
   import ActionsMenu from './ActionsMenu.svelte';
   import AlternateText, { type Cueing } from './AlternateText.svelte';
-  import { api, type Alternate, type Section, type Song, type SongAt } from './api';
+  import { api, suggestedLabels, type Alternate, type Section, type Song, type SongAt } from './api';
+  import Combobox from './Combobox.svelte';
   import type { MenuAction } from './menu';
   import { activeAlternate, alternateName, alternatesLabel, labelOf } from './sections';
 
@@ -165,10 +166,18 @@
   <div class="head">
     {@render grip?.()}
     <label class="visually-hidden" for="label-{uid}">Label</label>
-    <input
+    <Combobox
       id="label-{uid}"
       class="label"
       bind:value={label}
+      options={suggestedLabels}
+      saved={section.label}
+      onpick={() => {
+        commitLabel();
+        // Focus stays in the field, to carry on typing.
+        editingLabel = true;
+      }}
+      onrevert={() => onUnsaved(naming, false)}
       onfocus={() => (editingLabel = true)}
       oninput={() => onUnsaved(naming, true)}
       onchange={commitLabel}
@@ -176,7 +185,6 @@
         editingLabel = false;
         onUnsaved(naming, false);
       }}
-      list="label-suggestions"
       placeholder="Label"
       autocomplete="off"
       autocapitalize="words"
@@ -308,10 +316,14 @@
     gap: 0.25rem 0.5rem;
     margin-bottom: 0.5rem;
   }
-  /* Sized to its text, so the actions keep the rest of the row. Browsers
-     without field-sizing get a fixed width instead. */
-  .label {
+  /* Sized to its text, so the actions keep the rest of the row, with room
+     at the end for ▾. Browsers without field-sizing get a fixed width
+     instead. */
+  .head > :global(.combobox) {
     flex: none;
+    max-width: 100%;
+  }
+  .head :global(.label) {
     width: 8rem;
     border-color: transparent;
     background: transparent;
@@ -319,19 +331,20 @@
     text-overflow: ellipsis;
   }
   @supports (field-sizing: content) {
-    .label {
+    .head :global(.label) {
       field-sizing: content;
       width: auto;
-      min-width: 4rem;
+      /* Fits the placeholder. */
+      min-width: 6rem;
       max-width: 12rem;
     }
     /* A long Label is cut off at rest but reads in full while it's edited. */
-    .label:focus {
+    .head :global(.label:focus) {
       max-width: 100%;
     }
   }
-  .label:hover,
-  .label:focus {
+  .head :global(.combobox:hover .label),
+  .head :global(.label:focus) {
     border-color: var(--border);
     background: var(--bg);
   }
@@ -363,10 +376,13 @@
     .head {
       column-gap: 0.25rem;
     }
-    .label {
+    .head > :global(.combobox) {
       flex-shrink: 1;
-      min-width: 3rem;
-      padding-inline: 0.5rem;
+      --combobox-end: 1rem;
+    }
+    .head :global(.label) {
+      min-width: 4rem;
+      padding-inline-start: 0.5rem;
     }
     .actions {
       flex-shrink: 0;

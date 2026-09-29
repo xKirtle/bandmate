@@ -1,6 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { menuKey, type MenuAction } from './menu';
+  import { popoverTop } from './popover';
 
   let {
     entries,
@@ -31,8 +32,7 @@
     menu.showPopover();
     const at = trigger.getBoundingClientRect();
     const { height } = menu.getBoundingClientRect();
-    const below = at.bottom + gap + height <= window.innerHeight;
-    menu.style.top = `${below ? at.bottom + gap : Math.max(gap, at.top - gap - height)}px`;
+    menu.style.top = `${popoverTop(at, height, window.innerHeight, gap)}px`;
     menu.style.right = `${document.documentElement.clientWidth - at.right}px`;
     const all = items();
     all[focus === 'first' ? 0 : all.length - 1]?.focus();
