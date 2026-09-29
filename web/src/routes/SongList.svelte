@@ -9,6 +9,7 @@
     type SongColumn,
   } from '../lib/listViews';
   import { navigate, replaceSearch, router } from '../lib/router.svelte';
+  import CoverPlaceholder from '../lib/CoverPlaceholder.svelte';
   import StatusBadge from '../lib/StatusBadge.svelte';
   import { timeAgo } from '../lib/time';
 
@@ -139,7 +140,12 @@
       <tbody>
         {#each sorted as song (song.id)}
           <tr onclick={(event) => openRow(event, song)}>
-            <td class="title"><a href="/songs/{song.id}">{song.title}</a></td>
+            <td class="title">
+              <span class="with-cover">
+                <CoverPlaceholder title={song.title} status={song.status} />
+                <a href="/songs/{song.id}">{song.title}</a>
+              </span>
+            </td>
             <td><StatusBadge status={song.status} /></td>
             <td>{song.key || '—'}</td>
             <td class="num">{song.bpm ?? '—'}</td>
@@ -156,6 +162,7 @@
       {#each sorted as song (song.id)}
         <li>
           <a href="/songs/{song.id}">
+            <CoverPlaceholder title={song.title} status={song.status} />
             <span class="title">{song.title}</span>
             <span class="meta">
               <StatusBadge status={song.status} />
@@ -215,10 +222,8 @@
   .songs a {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 0.75rem;
-    min-height: 3.5rem;
-    padding: 0.75rem 0.25rem;
+    padding: 0.5rem 0.25rem;
     border-bottom: 1px solid var(--border);
     color: inherit;
     text-decoration: none;
@@ -231,6 +236,9 @@
     font-weight: 600;
     min-width: 0;
     overflow-wrap: anywhere;
+  }
+  .songs .title {
+    flex: 1;
   }
   .meta {
     display: flex;
@@ -281,8 +289,9 @@
     width: 1em;
     margin-left: 0.25rem;
   }
+  /* Rows fit the Cover with some room around it. */
   td {
-    height: calc(var(--control) + 0.5rem);
+    height: calc(var(--cover-thumb) + 0.75rem);
     padding: 0 0.5rem;
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
@@ -291,10 +300,17 @@
     width: 100%;
     max-width: 0;
     overflow: hidden;
-    text-overflow: ellipsis;
     font-weight: 600;
   }
+  .with-cover {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
   td.title a {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     color: inherit;
     text-decoration: none;
   }

@@ -17,6 +17,7 @@
   import Scrapbook from '../lib/Scrapbook.svelte';
   import { dropsOnScrapbook } from '../lib/sectionDrag';
   import { SectionDragging } from '../lib/sectionDragging.svelte';
+  import CoverPlaceholder from '../lib/CoverPlaceholder.svelte';
   import StatusBadge from '../lib/StatusBadge.svelte';
   import Timeline from '../lib/Timeline.svelte';
   import type { Saved } from '../lib/history';
@@ -344,38 +345,43 @@
   {:else}
     <div class="song">
       <div class="top">
-        <div class="title-row">
-          {#if writing}
-            <label class="visually-hidden" for="song-title">Title</label>
-            <input
-              id="song-title"
-              class="title"
-              bind:value={draft.title}
-              onchange={() => commitText('title')}
-              required
-              autocomplete="off"
-              enterkeyhint="done"
-            />
-          {:else}
-            <h1 class="title">{draft.title}</h1>
-          {/if}
-          <fieldset class="modes" disabled={deleting}>
-            <legend class="visually-hidden">Mode</legend>
-            <label class="mode"><input type="radio" name="song-mode" value="write" bind:group={mode} />Write</label>
-            <label class="mode"><input type="radio" name="song-mode" value="read" bind:group={mode} />Read</label>
-          </fieldset>
-        </div>
+        <div class="head">
+          <CoverPlaceholder title={draft.title} status={draft.status} size="header" />
+          <div class="head-main">
+            <div class="title-row">
+              {#if writing}
+                <label class="visually-hidden" for="song-title">Title</label>
+                <input
+                  id="song-title"
+                  class="title"
+                  bind:value={draft.title}
+                  onchange={() => commitText('title')}
+                  required
+                  autocomplete="off"
+                  enterkeyhint="done"
+                />
+              {:else}
+                <h1 class="title">{draft.title}</h1>
+              {/if}
+              <fieldset class="modes" disabled={deleting}>
+                <legend class="visually-hidden">Mode</legend>
+                <label class="mode"><input type="radio" name="song-mode" value="write" bind:group={mode} />Write</label>
+                <label class="mode"><input type="radio" name="song-mode" value="read" bind:group={mode} />Read</label>
+              </fieldset>
+            </div>
 
-        <div class="meta">
-          <StatusBadge status={draft.status} onChange={writing ? setStatus : undefined} />
-          <span class="muted" aria-hidden="true">·</span>
-          <p class="save-state muted" role="status">
-            {#if pending > 0}
-              Saving…
-            {:else}
-              Edited <time datetime={song.updatedAt}>{timeAgo(song.updatedAt)}</time>
-            {/if}
-          </p>
+            <div class="meta">
+              <StatusBadge status={draft.status} onChange={writing ? setStatus : undefined} />
+              <span class="muted" aria-hidden="true">·</span>
+              <p class="save-state muted" role="status">
+                {#if pending > 0}
+                  Saving…
+                {:else}
+                  Edited <time datetime={song.updatedAt}>{timeAgo(song.updatedAt)}</time>
+                {/if}
+              </p>
+            </div>
+          </div>
         </div>
 
         <!-- The Details, small enough to sit under the Status at any width. -->
@@ -563,13 +569,26 @@
     padding-top: max(var(--gutter), env(safe-area-inset-top));
     min-height: calc(100dvh - var(--nav-bottom-space) - var(--timeline-height));
   }
-  .title-row {
+  /* The Cover beside the title, mode switch and Status. Where the title
+     would be squeezed, the mode switch moves under it. */
+  .head {
     display: flex;
     align-items: flex-start;
     gap: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+  .head-main {
+    flex: 1;
+    min-width: 0;
+  }
+  .title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    column-gap: 0.75rem;
   }
   .title-row .title {
-    flex: 1;
+    flex: 1 1 10rem;
     min-width: 0;
   }
   .modes {
