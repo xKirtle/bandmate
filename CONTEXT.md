@@ -56,7 +56,7 @@ One of several competing versions of a Section's Lines; exactly one Alternate is
 _Avoid_: Variant, option, draft
 
 **Alternates mode**:
-A way of choosing a Section's active Alternate, in Write mode: the Section shows every Alternate in full, read-only, to make one active, rename it, or move an inactive one to the Scrapbook or delete it. Outside it, a Section shows only its active Alternate, and another can only be changed once it's made active.
+A way of choosing a Section's active Alternate, in Write mode: the Section shows every Alternate in full, read-only, to make one active, rename it, make a new one (an active copy of the active one), or move an inactive one to the Scrapbook or delete it. It's where new Alternates are made, so it opens even when a Section has only one. Outside it, a Section shows only its active Alternate, and another can only be changed once it's made active.
 _Avoid_: Compare view, picker
 
 **Line**:
