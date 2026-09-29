@@ -254,7 +254,7 @@
                     {
                       icon: '×',
                       label: 'Move to the Scrapbook',
-                      title: 'Move to the Scrapbook: keep it as a Section of its own, without its Cues',
+                      title: 'Move to the Scrapbook: keep it as a Section of its own, with its Cues',
                       run: () => moveToScrapbook(alt),
                     },
                     { icon: '🗑', label: 'Delete', run: () => remove(alt) },

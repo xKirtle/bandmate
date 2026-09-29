@@ -184,7 +184,7 @@ func TestCueingALineInTheScrapbookIsRefused(t *testing.T) {
 
 	res := ts.Do(http.MethodPut, lineCuePath(s.ID, before.Sections[1].Alternates[0].Lines[0].ID), map[string]any{"cue": 3})
 
-	expectError(t, res, http.StatusConflict, "a Line in the Scrapbook can't have a Cue")
+	expectError(t, res, http.StatusConflict, "a Line in the Scrapbook can't be given a Cue")
 	if read := ts.getSong(s.ID); !reflect.DeepEqual(read, before) {
 		t.Errorf("song = %+v, want it unchanged: %+v", read, before)
 	}

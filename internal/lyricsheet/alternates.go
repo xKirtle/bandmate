@@ -109,8 +109,9 @@ func (s *Store) DeleteAlternate(ctx context.Context, songID int64, based Version
 
 // MoveAlternateToScrapbook moves an inactive Alternate out of its Section
 // into a new Section of its own in the Scrapbook, labelled with the Section's
-// Label and the Alternate's name. Its dormant Cues are dropped, as the
-// Scrapbook keeps none. The active Alternate can't be moved.
+// Label and the Alternate's name. Its Cues go with it, and are live once
+// the new Section is put back (ADR 0010). The active Alternate can't be
+// moved.
 func (s *Store) MoveAlternateToScrapbook(ctx context.Context, songID int64, based Version, alternateID int64) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		var label, name string
@@ -132,10 +133,6 @@ func (s *Store) MoveAlternateToScrapbook(ctx context.Context, songID int64, base
 		if err != nil {
 			return fmt.Errorf("adding section: %w", err)
 		}
-		if _, err := tx.ExecContext(ctx, `UPDATE lines SET cue_ms = NULL WHERE alternate_id = ?`,
-			alternateID); err != nil {
-			return fmt.Errorf("dropping line cues: %w", err)
-		}
 		if _, err := tx.ExecContext(ctx, `UPDATE alternates SET section_id = ?, active = 1 WHERE id = ?`,
 			newID, alternateID); err != nil {
 			return fmt.Errorf("moving alternate: %w", err)
@@ -148,8 +145,8 @@ func (s *Store) MoveAlternateToScrapbook(ctx context.Context, songID int64, base
 // Sheet: every Alternate of the Scrapbook Section joins the Section,
 // inactive, after its own, so the Lyric Sheet is unchanged, and the
 // Scrapbook Section is gone. An unnamed Alternate takes the Scrapbook
-// Section's Label as its name. Their Lines keep their ids, and have no
-// Cues, as the Scrapbook keeps none.
+// Section's Label as its name. Their Lines keep their ids and their Cues,
+// dormant until their Alternate is made active (ADR 0010).
 func (s *Store) AddToSection(ctx context.Context, songID int64, based Version, scrapID, sectionID int64) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		scrapAt, err := findSection(ctx, tx, songID, scrapID)

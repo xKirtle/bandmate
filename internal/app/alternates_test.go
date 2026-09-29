@@ -371,31 +371,6 @@ func TestAnAlternateMovedToTheScrapbookIsLabelledByWhatHasANameOrLabel(t *testin
 	}
 }
 
-func TestAnAlternateMovedToTheScrapbookLeavesItsCuesBehindAndTheOthersKeepTheirs(t *testing.T) {
-	ts := newTestServer(t)
-	s := ts.duplicatedChorus()
-	drive, night, _, _ := chorusLines(s)
-	_, _, _, lastChords := chorusLinesAt(s, 3)
-	ts.setLineCue(s.ID, drive, 2)
-	ts.setLineCue(s.ID, night, 6)
-	ts.setLineCue(s.ID, lastChords, 99)
-	// The copy carries the Cues, then goes dormant with them.
-	s = ts.addAlternate(s.ID, s.Sections[0].ID, nil)
-	s = ts.activate(s.ID, s.Sections[0].Alternates[0].ID)
-
-	got := ts.moveToScrapbook(s.ID, s.Sections[0].Alternates[1].ID)
-
-	want := []map[int64]float64{{drive: 2, night: 6}, {}, {}, {lastChords: 99}}
-	if !reflect.DeepEqual(lineCues(got), want) {
-		t.Errorf("lineCues = %v, want %v", lineCues(got), want)
-	}
-	// Put back, the new Section starts with no Cues.
-	got = ts.putBack(s.ID, got.Scrapbook[0], nil)
-	if cues := lineCues(got)[4]; len(cues) != 0 {
-		t.Errorf("put back lineCues = %v, want none", cues)
-	}
-}
-
 func TestAnAlternateMovedToTheScrapbookLeavesItsSection(t *testing.T) {
 	ts := newTestServer(t)
 	s := ts.duplicatedChorus()

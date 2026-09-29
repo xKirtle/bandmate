@@ -36,6 +36,15 @@ func (s *Store) SetLineCue(ctx context.Context, songID int64, based Version, lin
 		return Song{}, err
 	}
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		// A Line in the Scrapbook keeps the Cue it had (ADR 0010), but isn't
+		// given a new one there.
+		_, inArrangement, err := findLine(ctx, tx, songID, lineID)
+		if err != nil {
+			return err
+		}
+		if !inArrangement {
+			return conflict("a Line in the Scrapbook can't be given a Cue")
+		}
 		return writeLineCue(ctx, tx, songID, lineID, sql.NullInt64{Int64: ms, Valid: true})
 	})
 }
@@ -48,18 +57,14 @@ func (s *Store) ClearLineCue(ctx context.Context, songID int64, based Version, l
 }
 
 // writeLineCue sets or, with a null ms, clears the Cue of one of a Song's
-// Lines. To be given a Cue, the Line can't be blank and its Section must be
-// in the Arrangement.
+// Lines, wherever it is. To be given a Cue, the Line can't be blank.
 func writeLineCue(ctx context.Context, tx *sql.Tx, songID, lineID int64, ms sql.NullInt64) error {
-	text, inArrangement, err := findLine(ctx, tx, songID, lineID)
+	text, _, err := findLine(ctx, tx, songID, lineID)
 	if err != nil {
 		return err
 	}
 	if ms.Valid && blank(text) {
 		return invalid("a blank Line can't have a Cue")
-	}
-	if ms.Valid && !inArrangement {
-		return conflict("a Line in the Scrapbook can't have a Cue")
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE lines SET cue_ms = ? WHERE id = ?`, ms, lineID); err != nil {
 		return fmt.Errorf("writing line cue: %w", err)
@@ -74,18 +79,12 @@ func (s *Store) ClearSectionCues(ctx context.Context, songID int64, based Versio
 		if _, err := findSection(ctx, tx, songID, sectionID); err != nil {
 			return err
 		}
-		return clearSectionCues(ctx, tx, sectionID)
+		if _, err := tx.ExecContext(ctx, `UPDATE lines SET cue_ms = NULL WHERE cue_ms IS NOT NULL AND alternate_id IN
+			(SELECT id FROM alternates WHERE section_id = ?)`, sectionID); err != nil {
+			return fmt.Errorf("clearing line cues: %w", err)
+		}
+		return nil
 	})
-}
-
-// clearSectionCues removes the Cues of the Lines in every Alternate of a
-// Section.
-func clearSectionCues(ctx context.Context, tx *sql.Tx, sectionID int64) error {
-	if _, err := tx.ExecContext(ctx, `UPDATE lines SET cue_ms = NULL WHERE cue_ms IS NOT NULL AND alternate_id IN
-		(SELECT id FROM alternates WHERE section_id = ?)`, sectionID); err != nil {
-		return fmt.Errorf("clearing line cues: %w", err)
-	}
-	return nil
 }
 
 // ClearCues removes every Cue in a Song, dormant ones included.
@@ -111,7 +110,8 @@ type CueValue struct {
 
 // RestoreCues sets each Cue given to its value, in seconds, or clears it,
 // and leaves every other Cue alone. It puts back what another Cue edit
-// changed, e.g. to undo it.
+// changed, e.g. to undo it, so a Line in the Scrapbook may be given back
+// the Cue it kept there.
 func (s *Store) RestoreCues(ctx context.Context, songID int64, based Version, values []CueValue) (Song, error) {
 	ms := make([]sql.NullInt64, len(values))
 	for i, v := range values {

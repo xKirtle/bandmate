@@ -327,7 +327,8 @@ func (s *Store) DuplicateSection(ctx context.Context, songID int64, based Versio
 // RemoveFromArrangement takes a Section out of the Arrangement, both from its
 // actions and by dropping it on the Scrapbook. It goes to the end of the
 // Scrapbook, unless nothing is written in it: then it is deleted, as there's
-// nothing to keep. Its Cues, dormant ones included, are dropped.
+// nothing to keep. It keeps its Cues, dormant ones included, for when it's
+// put back (ADR 0010).
 func (s *Store) RemoveFromArrangement(ctx context.Context, songID int64, based Version, sectionID int64) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		pos, err := findSection(ctx, tx, songID, sectionID)
@@ -344,9 +345,6 @@ func (s *Store) RemoveFromArrangement(ctx context.Context, songID int64, based V
 			`UPDATE sections SET position = position - 1 WHERE song_id = ? AND position > ?`,
 			songID, pos.Int64); err != nil {
 			return fmt.Errorf("closing gap in arrangement: %w", err)
-		}
-		if err := clearSectionCues(ctx, tx, sectionID); err != nil {
-			return err
 		}
 		empty, err := sectionEmpty(ctx, tx, sectionID)
 		if err != nil {
