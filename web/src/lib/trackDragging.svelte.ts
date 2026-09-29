@@ -6,8 +6,8 @@ import { trackDrop, type TrackDrop } from './trackDrag';
 // rather than HTML5 drag and drop, like dragging Sections, so the drop
 // shows between Tracks and Esc cancels.
 export class TrackDragging {
-  /** The drag under way: the place of the Track dragged, and where it would drop. */
-  current = $state<{ from: number; drop: TrackDrop | null } | null>(null);
+  /** The drag under way: the place of the Track dragged, where it would drop, and how far down the pointer is. */
+  current = $state<{ from: number; drop: TrackDrop | null; y: number } | null>(null);
   /** Whether Tracks can be dragged at all. */
   readonly on: boolean = $derived.by(() => this.#enabled());
 
@@ -47,6 +47,11 @@ export class TrackDragging {
     };
   }
 
+  /** Aims the drag at where the pointer is, e.g. again as the Tracks scroll under it. */
+  aim(y = this.current?.y) {
+    if (this.current && y !== undefined) this.current = { ...this.current, drop: this.#dropAt(this.current.from, y), y };
+  }
+
   #dropAt(from: number, y: number): TrackDrop | null {
     const count = Math.max(-1, ...this.#heads.keys()) + 1;
     const middles = Array.from({ length: count }, (_, i) => {
@@ -60,14 +65,12 @@ export class TrackDragging {
   grip(index: number, onDrop: (drop: TrackDrop) => void) {
     return {
       onpointerdown: (e: PointerEvent & { currentTarget: HTMLElement }) => {
-        if (e.button !== 0 || !this.on) return;
+        if (e.button !== 0) return;
         e.preventDefault();
         e.currentTarget.setPointerCapture(e.pointerId);
-        this.current = { from: index, drop: null };
+        this.current = { from: index, drop: null, y: e.clientY };
       },
-      onpointermove: (e: PointerEvent) => {
-        if (this.current) this.current = { ...this.current, drop: this.#dropAt(this.current.from, e.clientY) };
-      },
+      onpointermove: (e: PointerEvent) => this.aim(e.clientY),
       onpointerup: () => {
         const drop = this.current?.drop;
         this.cancel();

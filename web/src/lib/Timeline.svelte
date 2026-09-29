@@ -468,15 +468,16 @@
 
   // Dragging a Track by its grip, on desktop and not while recording. A drop
   // saves what as many presses of ↑ or ↓ would, as one edit.
+  const trackIds = $derived(timeline.tracks.map((t) => t.id));
   const trackDrag = new TrackDragging(
     () => editable.current && recording === null,
-    () => timeline.tracks.map((t) => t.id).join(),
+    () => trackIds.join(),
   );
   // The gap between Tracks the dragged one would drop into, if it moves at all.
   const trackGap = $derived(trackDrag.current?.drop?.gap ?? null);
 
   function dropTrack(drop: TrackDrop) {
-    perform({ kind: 'reorderTracks', order: tracksDropped(timeline.tracks.map((t) => t.id), drop) });
+    perform({ kind: 'reorderTracks', order: tracksDropped(trackIds, drop) });
   }
 
   // Deleting a Track doesn't ask first either: it can be undone. A Song
@@ -1084,7 +1085,7 @@
    * their own thing.
    */
   function headClick(event: MouseEvent, track: Track) {
-    if (event.target instanceof Element && event.target.closest('input, button, .grip')) return;
+    if (event.target instanceof Element && event.target.closest('input, button, .grip:not(:empty)')) return;
     choose({ kind: 'choose', trackId: track.id });
   }
 
@@ -1862,7 +1863,13 @@
       </button>
     </div>
 
-    <div class="tracks" id="timeline-tracks" hidden={collapsed} style:max-height="{tracksHeight}px">
+    <div
+      class="tracks"
+      id="timeline-tracks"
+      hidden={collapsed}
+      style:max-height="{tracksHeight}px"
+      onscroll={() => trackDrag.aim()}
+    >
       <div class="heads" class:gripped={editable.current} bind:offsetHeight={headsHeight}>
         <div class="ruler-gap">
           <button type="button" class="button add-track edit-only" aria-label="Add a Track" onclick={addTrack}
@@ -2413,7 +2420,6 @@
     /* Clicking it chooses the Track; its rename field is still selectable. */
     user-select: none;
   }
-  /* Marked along its left edge, in the room left for it. */
   /* The grip's strip along each header's left edge widens the column, not squeezing the controls. */
   .heads.gripped {
     width: calc(12.25 * var(--timeline-rem));
@@ -2428,7 +2434,9 @@
     bottom: 0;
     left: 0;
     display: grid;
-    place-items: center;
+    /* At the top, level with the Track's name. */
+    place-content: start;
+    padding: calc(0.5 * var(--timeline-rem)) 0 0 calc(0.25 * var(--timeline-rem));
     width: calc(1.25 * var(--timeline-rem));
     color: var(--text-muted);
     font-size: calc(0.875 * var(--timeline-rem));
@@ -2471,6 +2479,7 @@
   .lane.drop-below::after {
     bottom: -2px;
   }
+  /* Marked along its left edge, in the room left for it. */
   .head.chosen {
     box-shadow: inset calc(0.1875 * var(--timeline-rem)) 0 0 var(--accent);
     background: color-mix(in srgb, var(--accent) 8%, transparent);
