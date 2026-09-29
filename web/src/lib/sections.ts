@@ -12,14 +12,15 @@ export function alternateName(section: Section, alt: Alternate): string {
 }
 
 /**
- * What a Section's header shows of its Alternates, e.g. "Darker · 1 of 3": the
- * active one's name and its place. Null with only one, as there's nothing to choose.
+ * How ⇄, the way into a Section's Alternates mode, is named, e.g.
+ * "Alternates · Darker · 1 of 3": with two or more, the active one's name and
+ * its place.
  */
-export function alternatesEntry(section: Section): { name: string; place: string } | null {
+export function alternatesLabel(section: Section): string {
   const n = section.alternates.length;
   const active = activeAlternate(section);
-  if (n < 2 || !active) return null;
-  return { name: alternateName(section, active), place: `${section.alternates.indexOf(active) + 1} of ${n}` };
+  if (n < 2 || !active) return 'Alternates';
+  return `Alternates · ${alternateName(section, active)} · ${section.alternates.indexOf(active) + 1} of ${n}`;
 }
 
 /**
