@@ -6,6 +6,22 @@ export function activeAlternate(section: Section | undefined): Alternate | undef
   return section?.alternates.find((a) => a.active);
 }
 
+/** How an Alternate is called: its name, else its place among its Section's Alternates. */
+export function alternateName(section: Section, alt: Alternate): string {
+  return alt.name || `Alternate ${section.alternates.indexOf(alt) + 1}`;
+}
+
+/**
+ * What a Section's header shows of its Alternates, e.g. "Darker · 1 of 3": the
+ * active one's name and its place. Null with only one, as there's nothing to choose.
+ */
+export function alternatesEntry(section: Section): { name: string; place: string } | null {
+  const n = section.alternates.length;
+  const active = activeAlternate(section);
+  if (n < 2 || !active) return null;
+  return { name: alternateName(section, active), place: `${section.alternates.indexOf(active) + 1} of ${n}` };
+}
+
 /** How a Section is named where it's shown in full: its Label, if it has one. */
 export function labelOf(section: Section): string {
   return section.label || 'Section without a Label';

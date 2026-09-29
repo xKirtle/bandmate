@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 )
@@ -443,26 +444,38 @@ func copySection(ctx context.Context, tx *sql.Tx, sectionID int64) (int64, map[i
 		if err != nil {
 			return 0, nil, fmt.Errorf("copying alternate: %w", err)
 		}
-		var lines []int64
-		err = query(ctx, tx, `SELECT id FROM lines WHERE alternate_id = ? ORDER BY position`,
-			[]any{altID}, func(rows *sql.Rows) error {
-				var id int64
-				err := rows.Scan(&id)
-				lines = append(lines, id)
-				return err
-			})
+		copies, err := copyLines(ctx, tx, altID, copyAltID)
 		if err != nil {
-			return 0, nil, fmt.Errorf("reading lines: %w", err)
+			return 0, nil, err
 		}
-		for _, lineID := range lines {
-			lineCopies[lineID], err = insert(ctx, tx, `INSERT INTO lines (alternate_id, position, text)
-				SELECT ?, position, text FROM lines WHERE id = ?`, copyAltID, lineID)
-			if err != nil {
-				return 0, nil, fmt.Errorf("copying line: %w", err)
-			}
-		}
+		maps.Copy(lineCopies, copies)
 	}
 	return copyID, lineCopies, nil
+}
+
+// copyLines copies all of an Alternate's Lines into another Alternate, and
+// returns the id of each Line's copy by the id of the Line.
+func copyLines(ctx context.Context, tx *sql.Tx, fromID, toID int64) (map[int64]int64, error) {
+	var lines []int64
+	err := query(ctx, tx, `SELECT id FROM lines WHERE alternate_id = ? ORDER BY position`,
+		[]any{fromID}, func(rows *sql.Rows) error {
+			var id int64
+			err := rows.Scan(&id)
+			lines = append(lines, id)
+			return err
+		})
+	if err != nil {
+		return nil, fmt.Errorf("reading lines: %w", err)
+	}
+	copies := make(map[int64]int64, len(lines))
+	for _, lineID := range lines {
+		copies[lineID], err = insert(ctx, tx, `INSERT INTO lines (alternate_id, position, text)
+			SELECT ?, position, text FROM lines WHERE id = ?`, toID, lineID)
+		if err != nil {
+			return nil, fmt.Errorf("copying line: %w", err)
+		}
+	}
+	return copies, nil
 }
 
 // arrangementPosition checks a position to insert at in a Song's

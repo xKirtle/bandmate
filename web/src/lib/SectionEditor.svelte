@@ -1,11 +1,10 @@
 <script lang="ts">
-  import { untrack, type Snippet } from 'svelte';
-  import { SvelteSet } from 'svelte/reactivity';
+  import { tick, untrack, type Snippet } from 'svelte';
   import ActionsMenu from './ActionsMenu.svelte';
   import AlternateText, { type Cueing } from './AlternateText.svelte';
   import { api, type Alternate, type Section, type Song, type SongAt } from './api';
   import type { MenuAction } from './menu';
-  import { activeAlternate, labelOf } from './sections';
+  import { activeAlternate, alternateName, alternatesEntry, labelOf } from './sections';
 
   let {
     uid,
@@ -42,15 +41,20 @@
 
   // The server guarantees exactly one active Alternate.
   const active = $derived(activeAlternate(section)!);
-  const inactive = $derived(section.alternates.filter((a) => !a.active));
+  const entry = $derived(alternatesEntry(section));
+  // The entry stays while choosing, even once the others are deleted.
+  const entryName = $derived(entry?.name ?? alternateName(section, active));
+  const entryPlace = $derived(entry?.place ?? '1 of 1');
 
   let label = $state(untrack(() => section.label));
   let editingLabel = false;
   // Identifies the Label or Alternate name being typed to onUnsaved. They
   // save on change, which comes just before blur.
   const naming = {};
-  // The inactive Alternates shown expanded.
-  const expanded = new SvelteSet<number>();
+  // In the Alternates mode, the Alternates show as cards to choose the active
+  // one from, in place of its Lines.
+  let choosing = $state(false);
+  let entryButton = $state<HTMLButtonElement>();
 
   $effect(() => {
     const l = section.label;
@@ -67,19 +71,6 @@
     if (!(await change((at) => api.setSectionLabel(at, section.id, next)))) label = section.label;
   }
 
-  /** How an Alternate is called: its name, else its place among the Section's Alternates. */
-  function nameOf(alt: Alternate): string {
-    return alt.name || `Alternate ${section.alternates.indexOf(alt) + 1}`;
-  }
-
-  /** A hint at how an Alternate differs: its first Line that isn't the same in the active one. */
-  function preview(alt: Alternate): string {
-    if (alt.lines.length === 0) return 'No Lines yet';
-    const i = alt.lines.findIndex((l, j) => l.text !== active.lines[j]?.text);
-    if (i === -1) return alt.lines.length === active.lines.length ? 'Same as the active one' : 'Fewer Lines';
-    return `“${alt.lines[i].lyrics.trim() || '(blank Line)'}”`;
-  }
-
   const newAlternate: MenuAction = {
     icon: '⇄',
     label: 'New Alternate',
@@ -89,9 +80,34 @@
 
   async function addAlternate() {
     if (!(await change((at) => api.addAlternate(at, section.id)))) return;
-    // The newest Alternate comes last; show it open, ready to change.
-    const added = section.alternates.at(-1);
-    if (added && !added.active) expanded.add(added.id);
+    // The copy is active now: go on writing in it.
+    choosing = false;
+    await tick();
+    document.getElementById(`text-${uid}-${active.id}`)?.focus();
+  }
+
+  async function startChoosing() {
+    choosing = true;
+    await tick();
+    // Straight to the choice, where the arrow keys go through the Alternates.
+    radio(active.id)?.focus();
+  }
+
+  async function leaveChoosing() {
+    // Focus goes first, so a name being typed is saved as its field blurs.
+    entryButton?.focus();
+    choosing = false;
+    // With one Alternate left, the entry goes with the mode: on to its Lines.
+    if (entry === null) {
+      await tick();
+      document.getElementById(`text-${uid}-${active.id}`)?.focus();
+    }
+  }
+
+  function onChoosingKey(e: KeyboardEvent) {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    leaveChoosing();
   }
 
   async function rename(alt: Alternate, e: Event & { currentTarget: HTMLInputElement }) {
@@ -104,22 +120,33 @@
     if (!(await change((at) => api.renameAlternate(at, alt.id, next)))) input.value = alt.name;
   }
 
-  async function activate(alt: Alternate) {
+  async function choose(alt: Alternate) {
+    if (alt.active) return;
     const previous = active.id;
-    if (await change((at) => api.activateAlternate(at, alt.id))) {
-      expanded.delete(alt.id);
-      expanded.delete(previous);
-    }
+    if (await change((at) => api.activateAlternate(at, alt.id))) return;
+    // Put the choice back as the server has it.
+    const picked = radio(alt.id);
+    const kept = radio(previous);
+    if (picked) picked.checked = false;
+    if (kept) kept.checked = true;
   }
 
-  function remove(alt: Alternate) {
-    const ok = confirm(`Delete ${nameOf(alt)} for good?\n\nIts Lines go with it. It can't be undone.`);
-    if (ok) change((at) => api.deleteAlternate(at, alt.id));
+  function radio(altId: number) {
+    return document.getElementById(`pick-${uid}-${altId}`) as HTMLInputElement | null;
   }
 
-  function syncExpanded(alt: Alternate, e: Event & { currentTarget: HTMLDetailsElement }) {
-    if (e.currentTarget.open) expanded.add(alt.id);
-    else expanded.delete(alt.id);
+  /** A click anywhere on a card chooses it, but typing its name or opening its ⋯ doesn't. */
+  function cardClicked(alt: Alternate, e: MouseEvent) {
+    if ((e.target as Element).closest('input, button, [role="menu"]')) return;
+    radio(alt.id)?.focus();
+    choose(alt);
+  }
+
+  async function remove(alt: Alternate) {
+    const ok = confirm(`Delete ${alternateName(section, alt)} for good?\n\nIts Lines go with it. It can't be undone.`);
+    if (!ok) return;
+    // Its ⋯ goes with it: the keyboard carries on from the active card.
+    if (await change((at) => api.deleteAlternate(at, alt.id))) radio(active.id)?.focus();
   }
 
   function focusWhen(on: boolean) {
@@ -166,6 +193,21 @@
       enterkeyhint="next"
       {@attach focusWhen(autofocus)}
     />
+    {#if entry !== null || choosing}
+      <button
+        type="button"
+        class="entry"
+        bind:this={entryButton}
+        onclick={() => (choosing ? leaveChoosing() : startChoosing())}
+        aria-expanded={choosing}
+        aria-label="Alternates: {entryName} · {entryPlace}"
+        title="Choose which Alternate is active"
+      >
+        <!-- A phone has room for only the place; the mode shows the names. -->
+        <span class="entry-name">{entryName} ·</span>
+        {entryPlace}
+      </button>
+    {/if}
     {#if shared}
       <span class="shared" title="This Section appears more than once. Editing it changes every Occurrence.">
         Shared
@@ -184,80 +226,66 @@
     </div>
   </div>
 
-  {#if inactive.length > 0}
-    <div class="active-name">
-      <span class="badge">Active</span>
-      <label class="visually-hidden" for="name-{uid}-{active.id}">Name of the active Alternate</label>
-      <input
-        id="name-{uid}-{active.id}"
-        class="name"
-        value={active.name}
-        oninput={() => onUnsaved(naming, true)}
-        onchange={(e) => rename(active, e)}
-        onblur={() => onUnsaved(naming, false)}
-        placeholder={nameOf(active)}
-        autocomplete="off"
-        enterkeyhint="done"
-      />
-    </div>
-  {/if}
-  {#key active.id}
-    <AlternateText uid="{uid}-{active.id}" alternate={active} label="Lines" {change} {onUnsaved} {cueing} />
-  {/key}
-
-  {#if inactive.length > 0}
-    <ul class="alternates" aria-label="Other Alternates">
-      {#each inactive as alt (alt.id)}
-        <li>
-          <details open={expanded.has(alt.id)} ontoggle={(e) => syncExpanded(alt, e)}>
-            <summary>
-              <span class="alt-name">{nameOf(alt)}</span>
-              <span class="preview muted">{preview(alt)}</span>
-            </summary>
-            <div class="alt-body">
-              <label class="visually-hidden" for="name-{uid}-{alt.id}">Name of {nameOf(alt)}</label>
+  {#if choosing}
+    <!-- Escape leaves the mode from anywhere in it; an open ⋯ menu takes it first. -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="choosing" onkeydown={onChoosingKey}>
+      <div class="cards" role="radiogroup" aria-label="Alternates of {labelOf(section)}">
+        {#each section.alternates as alt (alt.id)}
+          {@const name = alternateName(section, alt)}
+          <!-- The radio takes the keyboard; a click anywhere else on the card is a shortcut to it. -->
+          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+          <div class="card" class:chosen={alt.active} onclick={(e) => cardClicked(alt, e)}>
+            <div class="card-head">
+              <input
+                type="radio"
+                id="pick-{uid}-{alt.id}"
+                name="alternate-{uid}"
+                checked={alt.active}
+                onchange={() => choose(alt)}
+                aria-label={name}
+                aria-describedby="lines-{uid}-{alt.id}"
+              />
+              <label class="visually-hidden" for="name-{uid}-{alt.id}">Name of {name}</label>
               <input
                 id="name-{uid}-{alt.id}"
                 class="name"
                 value={alt.name}
                 oninput={() => onUnsaved(naming, true)}
                 onchange={(e) => rename(alt, e)}
+                onkeydown={(e) => {
+                  // Escape takes back what was typed, then leaves the mode as anywhere in it.
+                  if (e.key === 'Escape') e.currentTarget.value = alt.name;
+                }}
                 onblur={() => onUnsaved(naming, false)}
-                placeholder="Name it (optional)"
+                placeholder={name}
                 autocomplete="off"
                 enterkeyhint="done"
               />
-              <div class="compare">
-                <div class="pane">
-                  <p class="pane-title muted">{nameOf(alt)}</p>
-                  <AlternateText
-                    uid="{uid}-{alt.id}"
-                    alternate={alt}
-                    label="Lines of {nameOf(alt)}"
-                    {change}
-                    {onUnsaved}
-                  />
-                </div>
-                <div class="pane">
-                  <p class="pane-title muted">Active: {nameOf(active)}</p>
-                  <div class="active-lines">
-                    {#each active.lines as line (line.id)}
-                      <p>{line.text || ' '}</p>
-                    {:else}
-                      <p class="muted">No Lines yet.</p>
-                    {/each}
-                  </div>
-                </div>
-              </div>
-              <div class="alt-actions">
-                <button type="button" class="button primary" onclick={() => activate(alt)}>Make active</button>
-                <button type="button" class="button danger" onclick={() => remove(alt)}>Delete</button>
-              </div>
+              <!-- The active one can't be deleted. -->
+              {#if !alt.active}
+                <ActionsMenu
+                  label="More actions for {name}"
+                  entries={[{ icon: '🗑', label: 'Delete', run: () => remove(alt) }]}
+                />
+              {/if}
             </div>
-          </details>
-        </li>
-      {/each}
-    </ul>
+            <div class="lines" id="lines-{uid}-{alt.id}">
+              {#each alt.lines as line (line.id)}
+                <p>{line.text || ' '}</p>
+              {:else}
+                <p class="muted">No Lines yet.</p>
+              {/each}
+            </div>
+          </div>
+        {/each}
+      </div>
+      <button type="button" class="button primary done" onclick={leaveChoosing}>Done</button>
+    </div>
+  {:else}
+    {#key active.id}
+      <AlternateText uid="{uid}-{active.id}" alternate={active} label="Lines" {change} {onUnsaved} {cueing} />
+    {/key}
   {/if}
 </article>
 
@@ -305,8 +333,7 @@
   .section.is-shared {
     border-left: 4px solid var(--accent);
   }
-  .shared,
-  .badge {
+  .shared {
     padding: 0.125rem 0.5rem;
     border-radius: 999px;
     background: var(--accent);
@@ -348,94 +375,91 @@
       display: none;
     }
   }
-  .active-name {
+  /* Gives way, cut off, before the actions do. */
+  .entry {
+    min-width: 0;
+    min-height: 1.75rem;
+    overflow: hidden;
+    padding: 0.125rem 0.625rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .entry:hover,
+  .entry[aria-expanded='true'] {
+    border-color: var(--accent);
+  }
+  @media (max-width: 40rem) {
+    .entry {
+      flex: none;
+    }
+    .entry-name {
+      display: none;
+    }
+  }
+  .choosing {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    border: 1px dashed var(--border);
+    border-radius: 0.5rem;
+    cursor: pointer;
+  }
+  .card.chosen {
+    border: 2px solid var(--accent);
+    background: var(--bg);
+  }
+  .card-head {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    margin-bottom: 0.5rem;
+  }
+  .card-head input[type='radio'] {
+    flex: none;
+    width: 1.25rem;
+    height: 1.25rem;
+    margin: 0;
+    accent-color: var(--accent);
   }
   .name {
     flex: 1;
     min-width: 0;
   }
-  .alternates {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    margin: 0.5rem 0 0;
-    padding: 0;
-    list-style: none;
-  }
-  details {
-    border: 1px dashed var(--border);
-    border-radius: 0.5rem;
-  }
-  summary {
-    display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
-    min-height: var(--control);
-    padding: 0.625rem 0.75rem;
-    cursor: pointer;
-  }
-  summary::marker {
-    content: '';
-  }
-  summary::before {
-    content: '▸';
-    color: var(--text-muted);
-  }
-  details[open] > summary::before {
-    content: '▾';
-  }
-  .alt-name {
-    font-weight: 600;
-    white-space: nowrap;
-  }
-  .preview {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .alt-body {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    padding: 0 0.5rem 0.5rem;
-  }
-  /* Side by side where there's room, one above the other on a phone. */
-  .compare {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-    gap: 0.5rem;
-  }
-  .pane {
-    min-width: 0;
-  }
-  .pane-title {
-    margin: 0 0 0.25rem;
-    font-size: 0.8125rem;
-    font-weight: 600;
-  }
-  .active-lines {
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--border);
-    border-radius: 0.5rem;
+  .lines {
+    padding: 0 0.25rem;
     font-size: max(1rem, 16px);
     line-height: 1.6;
     overflow-wrap: anywhere;
   }
-  .active-lines p {
+  .lines p {
     margin: 0;
     white-space: pre-wrap;
   }
-  .alt-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
+  .done {
+    align-self: flex-end;
+    min-width: 8rem;
   }
-  .alt-actions .button {
-    flex: 1 1 8rem;
+  @media (max-width: 40rem) {
+    .done {
+      align-self: stretch;
+    }
   }
 </style>

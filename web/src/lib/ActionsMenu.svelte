@@ -2,7 +2,14 @@
   import { tick } from 'svelte';
   import { menuKey, type MenuAction } from './menu';
 
-  let { entries }: { entries: MenuAction[] } = $props();
+  let {
+    entries,
+    label = 'More actions',
+  }: {
+    entries: MenuAction[];
+    /** Names ⋯ to screen readers, e.g. to tell apart several on one page. */
+    label?: string;
+  } = $props();
 
   let open = $state(false);
   let root: HTMLElement;
@@ -84,8 +91,8 @@
     type="button"
     class="icon"
     bind:this={trigger}
-    aria-label="More actions"
-    title="More actions"
+    aria-label={label}
+    title={label}
     aria-haspopup="menu"
     aria-expanded={open}
     onclick={() => (open ? close() : show())}
@@ -97,7 +104,7 @@
     <div
       class="menu"
       role="menu"
-      aria-label="More actions"
+      aria-label={label}
       tabindex="-1"
       popover="manual"
       bind:this={menu}

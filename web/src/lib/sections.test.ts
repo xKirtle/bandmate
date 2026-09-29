@@ -1,6 +1,6 @@
 import { describe as group, expect, it } from 'vitest';
 import type { Alternate, Section } from './api';
-import { activeAlternate, card, isEmpty, labelOf } from './sections';
+import { activeAlternate, alternateName, alternatesEntry, card, isEmpty, labelOf } from './sections';
 
 function alternate(active: boolean, ...texts: string[]): Alternate {
   return {
@@ -63,5 +63,32 @@ group('activeAlternate', () => {
   it('is the active one, wherever it is', () => {
     const active = alternate(true, 'New');
     expect(activeAlternate(section('', alternate(false, 'Old'), active))).toBe(active);
+  });
+});
+
+group('alternateName', () => {
+  it('is its name', () => {
+    const named = { ...alternate(false, 'La'), name: 'Darker' };
+    expect(alternateName(section('', alternate(true), named), named)).toBe('Darker');
+  });
+
+  it('is its place among the Alternates when it has no name', () => {
+    const second = alternate(false, 'La');
+    expect(alternateName(section('', alternate(true), second), second)).toBe('Alternate 2');
+  });
+});
+
+group('alternatesEntry', () => {
+  it("names the active Alternate and its place among the Section's", () => {
+    const darker = { ...alternate(true, 'La'), name: 'Darker' };
+    expect(alternatesEntry(section('', darker, alternate(false), alternate(false)))).toEqual({ name: 'Darker', place: '1 of 3' });
+  });
+
+  it('calls an unnamed active Alternate by its place', () => {
+    expect(alternatesEntry(section('', alternate(false), alternate(true)))).toEqual({ name: 'Alternate 2', place: '2 of 2' });
+  });
+
+  it("doesn't show for a Section with one Alternate", () => {
+    expect(alternatesEntry(section('', alternate(true, 'La')))).toBeNull();
   });
 });

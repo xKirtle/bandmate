@@ -10,14 +10,16 @@ import (
 // with the Lines and Occurrences that are removed.
 
 // chorusWithACuedAlternate returns sharedChorus with its first Occurrence's
-// Lines cued ("Drive, drive" at 2 and "all night" at 6) and a second, inactive Alternate copied from the first.
+// Lines cued ("Drive, drive" at 2 and "all night" at 6) and a second,
+// inactive Alternate copied from the first before it was cued.
 func (ts *testServer) chorusWithACuedAlternate() song {
 	ts.t.Helper()
 	s := ts.sharedChorus()
+	s = ts.addAlternate(s.ID, s.Sections[0].ID, map[string]any{"name": "B"})
+	s = ts.activate(s.ID, s.Sections[0].Alternates[0].ID)
 	drive, night, _, _ := chorusLines(s)
 	ts.setLineCue(s.ID, s.Arrangement[0].ID, drive, 2)
-	ts.setLineCue(s.ID, s.Arrangement[0].ID, night, 6)
-	return ts.addAlternate(s.ID, s.Sections[0].ID, map[string]any{"name": "B"})
+	return ts.setLineCue(s.ID, s.Arrangement[0].ID, night, 6)
 }
 
 func TestSwitchingAlternatesLeavesLineCuesDormantAndSwitchingBackRestoresThem(t *testing.T) {
@@ -36,6 +38,45 @@ func TestSwitchingAlternatesLeavesLineCuesDormantAndSwitchingBackRestoresThem(t 
 
 	if !reflect.DeepEqual(got.Arrangement[0].LineCues, want) {
 		t.Errorf("lineCues switched back = %v, want %v", got.Arrangement[0].LineCues, want)
+	}
+}
+
+func TestANewAlternateCarriesTheCuesOfTheOneItCopiesWhichStayDormant(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.sharedChorus()
+	drive, night, _, chords := chorusLines(s)
+	ids := occurrenceIDs(s)
+	ts.setLineCue(s.ID, ids[0], drive, 2)
+	ts.setLineCue(s.ID, ids[0], night, 6)
+	ts.setLineCue(s.ID, ids[3], chords, 99)
+
+	got := ts.addAlternate(s.ID, s.Sections[0].ID, nil)
+
+	alts := got.Sections[0].Alternates
+	if alts[0].Active || !alts[1].Active {
+		t.Fatalf("active = %v, %v; want the copy active", alts[0].Active, alts[1].Active)
+	}
+	c := alts[1].Lines
+	want := []map[int64]float64{
+		{drive: 2, night: 6, c[0].ID: 2, c[1].ID: 6},
+		{},
+		{},
+		{chords: 99, c[3].ID: 99},
+	}
+	for i, o := range got.Arrangement {
+		if !reflect.DeepEqual(o.LineCues, want[i]) {
+			t.Errorf("occurrence %d lineCues = %v, want %v", i, o.LineCues, want[i])
+		}
+	}
+
+	// From then on, each keeps its own.
+	ts.setLineCue(s.ID, ids[0], c[1].ID, 7)
+	got = ts.activate(s.ID, alts[0].ID)
+	if want := map[int64]float64{drive: 2, night: 6, c[0].ID: 2, c[1].ID: 7}; !reflect.DeepEqual(got.Arrangement[0].LineCues, want) {
+		t.Errorf("lineCues after recueing the copy = %v, want %v", got.Arrangement[0].LineCues, want)
+	}
+	if read := ts.getSong(s.ID); !reflect.DeepEqual(read, got) {
+		t.Errorf("song read back = %+v, want %+v", read, got)
 	}
 }
 

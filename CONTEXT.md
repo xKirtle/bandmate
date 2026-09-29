@@ -55,6 +55,10 @@ _Avoid_: Trash, drafts, unused
 One of several competing versions of a Section's Lines; exactly one Alternate is active at a time.
 _Avoid_: Variant, option, draft
 
+**Alternates mode**:
+A way of choosing a Section's active Alternate, in Write mode: the Section shows every Alternate in full, read-only, to make one active, rename it, or delete an inactive one. Outside it, a Section shows only its active Alternate, and another can only be changed once it's made active.
+_Avoid_: Compare view, picker
+
 **Line**:
 A single line of lyrics within an Alternate.
 _Avoid_: Row, verse (a verse is a Label)

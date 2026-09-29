@@ -8,25 +8,36 @@ import (
 	"strings"
 )
 
-// AddAlternate creates a new, inactive Alternate of a Section with the given
-// name, starting as a copy of the active Alternate's Lines.
+// AddAlternate creates a new Alternate of a Section with the given name, as a
+// copy of the active Alternate's Lines and their Cues, and makes it the active
+// one. The one it copied keeps its own Cues, dormant (ADR 0007).
 func (s *Store) AddAlternate(ctx context.Context, songID int64, based Version, sectionID int64, name string) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		if _, err := findSection(ctx, tx, songID, sectionID); err != nil {
 			return err
+		}
+		var activeID int64
+		if err := tx.QueryRowContext(ctx, `SELECT id FROM alternates WHERE section_id = ? AND active = 1`,
+			sectionID).Scan(&activeID); err != nil {
+			return fmt.Errorf("finding active alternate: %w", err)
 		}
 		altID, err := insert(ctx, tx, `INSERT INTO alternates (section_id, name) VALUES (?, ?)`,
 			sectionID, cleanName(name))
 		if err != nil {
 			return fmt.Errorf("adding alternate: %w", err)
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO lines (alternate_id, position, text)
-			SELECT ?, l.position, l.text FROM lines l JOIN alternates a ON a.id = l.alternate_id
-			WHERE a.section_id = ? AND a.active = 1 ORDER BY l.position`,
-			altID, sectionID); err != nil {
-			return fmt.Errorf("copying lines: %w", err)
+		lineCopies, err := copyLines(ctx, tx, activeID, altID)
+		if err != nil {
+			return err
 		}
-		return nil
+		for lineID, copyLineID := range lineCopies {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO line_cues (occurrence_id, line_id, cue_ms)
+				SELECT occurrence_id, ?, cue_ms FROM line_cues WHERE line_id = ?`,
+				copyLineID, lineID); err != nil {
+				return fmt.Errorf("copying line cues: %w", err)
+			}
+		}
+		return activate(ctx, tx, sectionID, altID)
 	})
 }
 
@@ -52,18 +63,23 @@ func (s *Store) ActivateAlternate(ctx context.Context, songID int64, based Versi
 		if err != nil {
 			return err
 		}
-		// The old one goes first: only one Alternate of a Section may be
-		// active at any moment.
-		if _, err := tx.ExecContext(ctx, `UPDATE alternates SET active = 0 WHERE section_id = ? AND id != ?`,
-			sectionID, alternateID); err != nil {
-			return fmt.Errorf("deactivating alternate: %w", err)
-		}
-		if _, err := tx.ExecContext(ctx, `UPDATE alternates SET active = 1 WHERE id = ?`,
-			alternateID); err != nil {
-			return fmt.Errorf("activating alternate: %w", err)
-		}
-		return nil
+		return activate(ctx, tx, sectionID, alternateID)
 	})
+}
+
+// activate makes one of a Section's Alternates its only active one.
+func activate(ctx context.Context, tx *sql.Tx, sectionID, alternateID int64) error {
+	// The old one goes first: only one Alternate of a Section may be active
+	// at any moment.
+	if _, err := tx.ExecContext(ctx, `UPDATE alternates SET active = 0 WHERE section_id = ? AND id != ?`,
+		sectionID, alternateID); err != nil {
+		return fmt.Errorf("deactivating alternate: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE alternates SET active = 1 WHERE id = ?`,
+		alternateID); err != nil {
+		return fmt.Errorf("activating alternate: %w", err)
+	}
+	return nil
 }
 
 // DeleteAlternate permanently deletes an inactive Alternate and its Lines.
