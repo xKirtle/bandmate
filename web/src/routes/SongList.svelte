@@ -291,7 +291,7 @@
   }
   /* Rows fit the Cover with some room around it. */
   td {
-    height: calc(var(--cover-thumb) + 0.75rem);
+    height: calc(var(--cover-list) + 0.75rem);
     padding: 0 0.5rem;
     border-bottom: 1px solid var(--border);
     white-space: nowrap;

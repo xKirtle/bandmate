@@ -4,14 +4,14 @@
 
   // Stands in for a Song's Cover: a square tinted by its Status, with the
   // title's first letter. Decorative, as the title is always beside it.
-  let { title, status, size = 'thumb' }: { title: string; status: Status; size?: 'thumb' | 'header' } = $props();
+  let { title, status, size = 'list' }: { title: string; status: Status; size?: 'list' | 'header' } = $props();
 </script>
 
 <span class="cover cover-{status} {size}" aria-hidden="true">{coverInitial(title)}</span>
 
 <style>
   .cover {
-    --size: var(--cover-thumb);
+    --size: var(--cover-list);
     display: inline-flex;
     flex: none;
     align-items: center;

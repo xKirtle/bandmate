@@ -20,7 +20,7 @@ describe('coverInitial', () => {
 
   it('handles non-Latin letters and accents', () => {
     expect(coverInitial('ómega')).toBe('Ó');
-    expect(coverInitial('ómega')).toBe('Ó');
+    expect(coverInitial('o\u0301mega')).toBe('Ó'); // decomposed
     expect(coverInitial('ωμέγα')).toBe('Ω');
     expect(coverInitial('夜に駆ける')).toBe('夜');
     expect(coverInitial('ßig')).toBe('ß');
