@@ -230,6 +230,16 @@ func (a *App) deleteAlternate(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *App) moveAlternateToScrapbook(w http.ResponseWriter, r *http.Request) {
+	alternateID, ok := pathID(w, r, "alternateID")
+	if !ok {
+		return
+	}
+	a.changeSheet(w, r, nil, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
+		return a.songs.MoveAlternateToScrapbook(r.Context(), id, based, alternateID)
+	})
+}
+
 func (a *App) replaceAlternateText(w http.ResponseWriter, r *http.Request) {
 	alternateID, ok := pathID(w, r, "alternateID")
 	if !ok {

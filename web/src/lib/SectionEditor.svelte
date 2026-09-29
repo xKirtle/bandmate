@@ -149,6 +149,11 @@
     if (await change((at) => api.deleteAlternate(at, alt.id))) radio(active.id)?.focus();
   }
 
+  async function moveToScrapbook(alt: Alternate) {
+    // Its ⋯ goes with it: the keyboard carries on from the active card.
+    if (await change((at) => api.moveAlternateToScrapbook(at, alt.id))) radio(active.id)?.focus();
+  }
+
   function focusWhen(on: boolean) {
     return (el: HTMLElement) => {
       if (!on) return;
@@ -262,11 +267,19 @@
                 autocomplete="off"
                 enterkeyhint="done"
               />
-              <!-- The active one can't be deleted. -->
+              <!-- The active one can't be moved or deleted. -->
               {#if !alt.active}
                 <ActionsMenu
                   label="More actions for {name}"
-                  entries={[{ icon: '🗑', label: 'Delete', run: () => remove(alt) }]}
+                  entries={[
+                    {
+                      icon: '×',
+                      label: 'Move to the Scrapbook',
+                      title: 'Move to the Scrapbook: keep it as a Section of its own, without its Cues',
+                      run: () => moveToScrapbook(alt),
+                    },
+                    { icon: '🗑', label: 'Delete', run: () => remove(alt) },
+                  ]}
                 />
               {/if}
             </div>

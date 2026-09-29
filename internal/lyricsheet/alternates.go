@@ -108,6 +108,54 @@ func (s *Store) DeleteAlternate(ctx context.Context, songID int64, based Version
 	})
 }
 
+// MoveAlternateToScrapbook moves an inactive Alternate out of its Section,
+// and so out of every Occurrence of it, into a new Section of its own in the
+// Scrapbook, labelled with the Section's Label and the Alternate's name. Its
+// dormant Cues are dropped: the new Section has no Occurrences for them to
+// belong to. The active Alternate can't be moved.
+func (s *Store) MoveAlternateToScrapbook(ctx context.Context, songID int64, based Version, alternateID int64) (Song, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		var label, name string
+		var active bool
+		err := tx.QueryRowContext(ctx, `SELECT s.label, a.name, a.active FROM alternates a
+			JOIN sections s ON s.id = a.section_id WHERE a.id = ? AND s.song_id = ?`,
+			alternateID, songID).Scan(&label, &name, &active)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("reading alternate: %w", err)
+		}
+		if active {
+			return conflict("the active Alternate can't be moved to the Scrapbook; activate another one first")
+		}
+		newID, err := insert(ctx, tx, `INSERT INTO sections (song_id, label) VALUES (?, ?)`,
+			songID, scrapbookLabel(label, name))
+		if err != nil {
+			return fmt.Errorf("adding section: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM line_cues WHERE line_id IN
+			(SELECT id FROM lines WHERE alternate_id = ?)`, alternateID); err != nil {
+			return fmt.Errorf("dropping line cues: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE alternates SET section_id = ?, active = 1 WHERE id = ?`,
+			newID, alternateID); err != nil {
+			return fmt.Errorf("moving alternate: %w", err)
+		}
+		return nil
+	})
+}
+
+// scrapbookLabel is the Label of a Section made from an Alternate moved to
+// the Scrapbook: its Section's Label and its name, e.g. "Verse 1 · Darker",
+// whichever of them it has.
+func scrapbookLabel(label, name string) string {
+	if label == "" || name == "" {
+		return label + name
+	}
+	return label + " · " + name
+}
+
 // findAlternate returns the Section of one of a Song's Alternates and whether
 // it is the active one.
 func findAlternate(ctx context.Context, tx *sql.Tx, songID, alternateID int64) (sectionID int64, active bool, err error) {

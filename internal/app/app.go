@@ -116,6 +116,7 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("PATCH /api/songs/{id}/alternates/{alternateID}", a.renameAlternate)
 	mux.HandleFunc("DELETE /api/songs/{id}/alternates/{alternateID}", a.deleteAlternate)
 	mux.HandleFunc("POST /api/songs/{id}/alternates/{alternateID}/activate", a.activateAlternate)
+	mux.HandleFunc("POST /api/songs/{id}/alternates/{alternateID}/scrapbook", a.moveAlternateToScrapbook)
 	mux.HandleFunc("PUT /api/songs/{id}/alternates/{alternateID}/text", a.replaceAlternateText)
 	mux.HandleFunc("POST /api/songs/{id}/masters", a.addMaster)
 	mux.HandleFunc("GET /api/songs/{id}/masters/{masterID}", a.getMaster)
