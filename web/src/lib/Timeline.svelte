@@ -63,6 +63,7 @@
   } from './timelineView';
   import { encodeWav } from './wav';
   import { barWidth, bars } from './waveform';
+  import { clipping, LiveWave, tileBars } from './liveWave';
 
   // The Timeline, docked under the Lyric Sheet: its Tracks and Clips, and
   // playback with each Track's volume, mute and solo, and the Loop. Editing
@@ -148,8 +149,16 @@
     /** Where it was going, as kept in the browser. */
     unsaved: Unsaved | null;
     keeper: Keeper | null;
+    /** Its waveform so far, from its Clip's start. */
+    wave: LiveWave | null;
   }
   let recording = $state.raw<RecordingState | null>(null);
+  // Counts the batches the recording's waveform has had, to draw each.
+  let waveVersion = $state(0);
+  const liveTiles = $derived.by(() => {
+    void waveVersion;
+    return recording?.wave?.tiles(barWidth / view.scale) ?? [];
+  });
   // Whether a recording is capturing, rather than starting or saving.
   const capturing = $derived(recording?.phase === 'recording');
   // Once gone, an input still opening is let go as soon as it opens.
@@ -834,6 +843,7 @@
       startedAt: 0,
       unsaved: null,
       keeper: null,
+      wave: null,
     };
     recording = starting;
     inputNote = null;
@@ -864,15 +874,24 @@
         plan,
         latencyOffset: appliedOffset(calibration, capture.latency),
       };
+      const first = frameAt(startedAt, capture.sampleRate);
       const keeper = new Keeper({
         ...unsaved,
         songId: song.id,
         sampleRate: capture.sampleRate,
-        first: frameAt(startedAt, capture.sampleRate),
+        first,
         recordedAt: new Date().toISOString(),
       });
-      capture.keep((batch) => keeper.add(batch));
-      recording = { ...starting, phase: 'recording', trackId: track.id, plan, capture, startedAt, unsaved, keeper };
+      // Drawn from where the Take will be placed: its Clip's start, heard its Latency Offset after it was captured.
+      const wave = new LiveWave(first, capture.sampleRate, plan.start - plan.from + unsaved.latencyOffset);
+      waveVersion = 0;
+      capture.keep((batch) => {
+        keeper.add(batch);
+        wave.add(batch);
+        waveVersion++;
+      });
+      const { id: trackId } = track;
+      recording = { ...starting, phase: 'recording', trackId, plan, capture, startedAt, unsaved, keeper, wave };
     } catch (e) {
       recording?.capture?.close();
       recording = null;
@@ -2044,7 +2063,14 @@
                         >
                           {#each clipShape(clip, at.offset + wave.from, wave.to - wave.from, (wave.bars * barWidth) / view.scale, wave.bars) as peak, i (i)}
                             {@const height = Math.max(2, peak * 100)}
-                            <rect x={i + 0.15} y={(100 - height) / 2} width="0.7" {height} />
+                            <!-- A Take's clipping stays marked once it's saved; a Beat's isn't, being mastered loud. -->
+                            <rect
+                              class:clipped={clip.beatId === null && peak >= clipping}
+                              x={i + 0.15}
+                              y={(100 - height) / 2}
+                              width="0.7"
+                              {height}
+                            />
                           {/each}
                         </svg>
                       {/if}
@@ -2066,14 +2092,44 @@
                 {#if capturing && recording?.trackId === track.id && recording.plan && position > recording.plan.start}
                   {@const retaken = track.clips.find((c) => c.id === recording?.clipId)}
                   {@const taken = position - recording.plan.start}
+                  {@const length = retaken ? Math.min(taken, retakeLength(retaken, track.clips, position)) : taken}
+                  {@const shown = waveWindow(view, recording.plan.start, length)}
                   <!-- A Retake shows growing over its Clip, and stops at the next Clip, as it will be saved. -->
                   <div
                     class="clip taking"
                     style:left="{percent(recording.plan.start)}%"
-                    style:width="{percent(retaken ? Math.min(taken, retakeLength(retaken, track.clips, position)) : taken)}%"
+                    style:width="{percent(length)}%"
                     aria-label="Recording from {formatDuration(recording.plan.start)}"
                   >
                     <span class="clip-head"><span class="clip-title">Recording…</span></span>
+                    <span class="wave">
+                      {#if shown}
+                        <!-- In tiles, so only the last one changes as it grows, and only those in view. -->
+                        {@const tileSeconds = (tileBars * barWidth) / view.scale}
+                        {#each liveTiles as tile, k (k)}
+                          {#if (k + 1) * tileSeconds > shown.from && k * tileSeconds < shown.to}
+                            <svg
+                              style:left="{k * tileBars * barWidth}px"
+                              style:width="{tile.length * barWidth}px"
+                              viewBox="0 0 {tile.length} 100"
+                              preserveAspectRatio="none"
+                              aria-hidden="true"
+                            >
+                              {#each tile as peak, i (i)}
+                                {@const height = Math.max(2, peak * 100)}
+                                <rect
+                                  class:clipped={peak >= clipping}
+                                  x={i + 0.15}
+                                  y={(100 - height) / 2}
+                                  width="0.7"
+                                  {height}
+                                />
+                              {/each}
+                            </svg>
+                          {/if}
+                        {/each}
+                      {/if}
+                    </span>
                   </div>
                 {/if}
               </div>
@@ -2726,6 +2782,11 @@
   rect {
     fill: var(--accent);
     opacity: 0.7;
+  }
+  /* A peak of a Take that clipped. */
+  rect.clipped {
+    fill: var(--danger);
+    opacity: 1;
   }
   .playhead {
     position: absolute;
