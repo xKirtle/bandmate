@@ -92,7 +92,7 @@ func takeFiles(t *testing.T, ts *testServer) []string {
 func songWithVocalTrack(t *testing.T, ts *testServer) (song, timeline) {
 	t.Helper()
 	s := ts.createSong("Night Drive")
-	timelineChange(t, ts.addBeatToSong(s.ID, ts.beatOfLength("Beat", 30).ID))
+	ts.addOnlyBeat(s.ID, ts.beatOfLength("Beat", 30).ID)
 	return s, timelineChange(t, ts.addTrack(s.ID, "Lead vox"))
 }
 

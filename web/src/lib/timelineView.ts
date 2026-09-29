@@ -17,6 +17,31 @@ export interface View {
   scroll: number;
 }
 
+/** How long the Timeline shown is at least, in seconds, e.g. with nothing on it. */
+export const minSpan = 30;
+
+/**
+ * How long the Timeline shown is, in seconds: past its end, or the Loop's
+ * if that ends later, with room after to drag Clips and the Loop later on,
+ * and never less than minSpan, so the ruler fills the view even with
+ * nothing on it. A recording running past the end takes the room it
+ * needs, ten seconds at a time, so the view isn't redrawn every frame.
+ * Only what's shown: the Timeline's length, where playback stops, is end.
+ */
+export function shownSpan({
+  end,
+  loopEnd = 0,
+  recordingAt,
+}: {
+  end: number;
+  loopEnd?: number;
+  recordingAt?: number;
+}): number {
+  const recordingTo = recordingAt === undefined ? 0 : Math.ceil(recordingAt / 10) * 10;
+  const reach = Math.max(end, loopEnd, recordingTo);
+  return Math.max(minSpan, reach + Math.max(10, reach / 4));
+}
+
 /**
  * The most pixels a second can take: one waveform bar per stored peak, as
  * sharp as the waveform gets.

@@ -20,7 +20,7 @@
   import { addedTrack, chosenTrack, readChosen, storeChosen, type ChoiceEvent } from './chosenTrack';
   import { clampMove, clampTrimEnd, clampTrimStart, draggedNudge, nudged } from './clipEdit';
   import { activeTake, clipSources, fileStart, playing } from './clipSource';
-  import { cuesInSpan, formatCue, hasCues } from './cues';
+  import { cuesInSpan, formatCue } from './cues';
   import {
     History,
     placingAdded,
@@ -52,6 +52,7 @@
     fitScale,
     follow,
     scrollThumb,
+    shownSpan,
     thumbScroll,
     ticks as rulerTicks,
     timeAt as viewTimeAt,
@@ -194,14 +195,13 @@
   // Each Clip plays the part of its audio file that it holds: a Take's only
   // where it has audio in the Clip. Not the Clip being retaken.
   const playable = $derived<PlayableClip[]>(playing(timeline, sources, recording?.clipId));
+  // With Cues but no Clips, it still plays, in silence, for the Lyric Sheet
+  // to follow.
   const length = $derived(timelineEnd(clips, song));
-  // Room after the end, or the Loop if it ends later, to drag Clips and the
-  // Loop later on the Timeline. A recording running past the end takes the
-  // room it needs, ten seconds at a time, so the view isn't redrawn every
-  // frame.
-  const recordingTo = $derived(capturing ? Math.ceil(position / 10) * 10 : 0);
-  const reach = $derived(length > 0 ? Math.max(length, timeline.loop?.end ?? 0, recordingTo) : 0);
-  const span = $derived(reach > 0 ? reach + Math.max(10, reach / 4) : 0);
+  // It shows in full even with nothing on it, and grows while recording.
+  const span = $derived(
+    shownSpan({ end: length, loopEnd: timeline.loop?.end, recordingAt: capturing ? position : undefined }),
+  );
   // Seeking outside the Loop switches it off, and until that's saved,
   // playback already goes on without it.
   let switchingOff = $state(false);
@@ -210,11 +210,6 @@
   const playingLoop = $derived<Loop | null>(
     loopOn ? { start: timeline.loop!.start, end: timeline.loop!.end } : null,
   );
-  // With Cues but no Clips, it still plays, in silence, for the Lyric Sheet
-  // to follow. Recording from the empty Timeline opens it, to watch the Take
-  // come in.
-  let opened = $state(false);
-  const empty = $derived(clips.length === 0 && !hasCues(song) && !opened);
   // Matches the phone layout below, which hides editing.
   const editable = new MediaQuery('min-width: 40.0625rem');
 
@@ -455,8 +450,12 @@
     perform({ kind: 'reorderTracks', order });
   }
 
-  // Deleting a Track doesn't ask first either: it can be undone.
+  // Deleting a Track doesn't ask first either: it can be undone. A Song
+  // always has a Track, so its last one can't go.
+  const lastTrack = $derived(timeline.tracks.length === 1);
+
   function removeTrack(track: Track) {
+    if (lastTrack) return;
     perform({ kind: 'deleteTrack', trackId: track.id });
   }
 
@@ -539,9 +538,12 @@
     play(position >= length && !repeats(position, playingLoop) ? 0 : position);
   }
 
-  /** A time on the Timeline, kept between its start and end. */
+  /**
+   * A time on the Timeline shown, kept on its ruler: past the end too, e.g.
+   * to record there, though playback still stops at the end.
+   */
   function clamp(t: number): number {
-    return Math.max(0, Math.min(length, t));
+    return Math.max(0, Math.min(span, t));
   }
 
   function seek(to: number) {
@@ -696,7 +698,7 @@
 
   function spaceBar(event: KeyboardEvent) {
     if (event.key !== ' ' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
-    if (event.defaultPrevented || empty || picking || calibrating || ownsSpace(event.target)) return;
+    if (event.defaultPrevented || picking || calibrating || ownsSpace(event.target)) return;
     // Otherwise the page would scroll.
     event.preventDefault();
     toggle();
@@ -773,7 +775,7 @@
   // runs: offered before the first recording here, where the Clip to retake
   // waits for it, or run from the recording settings.
   let calibration = $state(readCalibration(deviceStorage()));
-  let calibrating = $state<{ offer: boolean; retaking?: Clip; newTrack?: boolean } | null>(null);
+  let calibrating = $state<{ offer: boolean; retaking?: Clip } | null>(null);
   // Whether calibration was just skipped, to say where to run it later.
   let skipped = $state(false);
 
@@ -790,10 +792,9 @@
   }
 
   function calibrationClosed(record: boolean) {
-    const { retaking, newTrack } = calibrating ?? {};
+    const { retaking } = calibrating ?? {};
     calibrating = null;
-    if (newTrack) recordOnNewTrack(record);
-    else if (record) startRecording(retaking);
+    if (record) startRecording(retaking);
   }
 
   const canRecord = $derived(
@@ -806,13 +807,13 @@
 
   /**
    * Records a Take onto the chosen Track, or with retaking, into that Clip
-   * of Takes, or with newTrack, onto a Track added for it.
+   * of Takes.
    */
-  async function startRecording(retaking?: Clip, newTrack = false) {
+  async function startRecording(retaking?: Clip) {
     if (!canRecord) return;
     // Calibration is offered first, the first time on this device.
     if (!calibration.offered && calibration.offset === null) {
-      calibrating = { offer: true, retaking, newTrack };
+      calibrating = { offer: true, retaking };
       return;
     }
     error = null;
@@ -840,12 +841,6 @@
       recording = { ...starting, capture };
       if (capture.gone) inputNote = `${capture.gone} isn't connected, so recording from the default input.`;
       if (destroyed) throw new CaptureError('The Timeline closed before recording started.');
-      // Only once the input's open, so one that can't be adds no Track.
-      if ((newTrack || timeline.tracks.length === 0) && !(await addTrack())) {
-        recording?.capture?.close();
-        recording = null;
-        return;
-      }
       // Placed once the input's open, in case the Timeline changed meanwhile.
       const target = retaking && timeline.tracks.find((t) => t.clips.some((c) => c.id === retaking.id));
       if (retaking && !target) throw new CaptureError('The Clip to retake is gone.');
@@ -1021,32 +1016,12 @@
     else startRecording();
   }
 
-  /** Opens the empty Timeline and records onto a Track added for it, as "Add a track" adds one. */
-  function recordOnEmpty() {
-    if (!canRecord) return;
-    collapsed = false;
-    recordOnNewTrack(true);
-  }
-
-  /**
-   * Keeps the Timeline open while recording onto a Track added for it, or
-   * with record false, as calibration is dismissed. It closes again if
-   * nothing came of it: no recording, and no Track added.
-   */
-  async function recordOnNewTrack(record: boolean) {
-    const tracks = timeline.tracks.length;
-    opened = true;
-    if (record) await startRecording(undefined, true);
-    if (!recording && !calibrating && timeline.tracks.length === tracks) opened = false;
-  }
-
   function recordKey(event: KeyboardEvent) {
     if (event.key.toLowerCase() !== 'r' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.defaultPrevented || picking || calibrating || inTextField(event.target)) return;
     if (!capturing && !canRecord) return;
     event.preventDefault();
-    if (empty) recordOnEmpty();
-    else switchRecording();
+    switchRecording();
   }
 
   // The chosen Track, which a recording goes to, kept on this device for
@@ -1735,7 +1710,7 @@
 {/snippet}
 
 <section class="timeline" aria-label="Timeline" bind:offsetHeight={height}>
-  {#if !empty && !collapsed}
+  {#if !collapsed}
     <!-- A focusable separator with a value is a widget, resized with Up and Down. -->
     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
     <div
@@ -1758,391 +1733,375 @@
     ></div>
   {/if}
   <div class="inner">
-    {#if empty}
-      <div class="empty">
-        <span class="muted">No beat on the Timeline yet.</span>
-        <span class="spacer"></span>
-        {#if undoable || redoable}{@render undoRedo()}{/if}
-        <button type="button" class="button edit-only" onclick={() => (picking = true)}>Add a beat</button>
+    <div class="transport">
+      <button
+        type="button"
+        class="play"
+        onclick={toggle}
+        aria-label={playerState === 'stopped' ? 'Play' : 'Pause'}
+        title="Play or pause (Space)"
+      >
+        {#if playerState === 'stopped'}
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
+        {:else}
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /></svg>
+        {/if}
+      </button>
+      <span class="time muted">{formatDuration(position)} / {formatDuration(length)}</span>
+      <button
+        type="button"
+        class="toggle loop-toggle"
+        class:edit-only={!timeline.loop}
+        aria-pressed={loopOn}
+        disabled={!timeline.loop}
+        onclick={switchLoop}
+        title={timeline.loop
+          ? `Loop ${formatDuration(timeline.loop.start)} to ${formatDuration(timeline.loop.end)}`
+          : 'Drag along the top of the ruler to set a Loop'}>Loop</button
+      >
+      <button
+        type="button"
+        class="toggle record edit-only"
+        aria-pressed={capturing}
+        disabled={!capturing && !canRecord}
+        onclick={switchRecording}
+        title={capturing
+          ? 'Stop recording (R or Space)'
+          : syncing
+            ? 'Leave Sync mode to record'
+            : playerState !== 'stopped'
+              ? 'Stop playback to record'
+              : recordProblem
+                ? recordProblem
+                : `Record a Take on ${timeline.tracks.find((t) => t.id === chosen)?.name ?? 'a new Track'} (R)`}
+        ><span class="record-dot" aria-hidden="true"></span>{capturing ? 'Stop' : 'Record'}</button
+      >
+      <span class="edit-only"
+        ><InputSettings
+          disabled={recording !== null}
+          offset={calibration.offset}
+          onCalibrate={() => (calibrating = { offer: false })}
+        /></span
+      >
+      {#if calibration.offset === null && !recording}
         <button
           type="button"
-          class="button record edit-only"
+          class="not-calibrated edit-only"
           disabled={!canRecord}
-          onclick={recordOnEmpty}
-          title={playerState !== 'stopped'
-            ? 'Stop playback to record'
-            : (recordProblem ?? 'Record a Take on a new Track (R)')}
-          ><span class="record-dot" aria-hidden="true"></span>Record</button
+          title="Takes are placed by the latency the browser reports until it's calibrated. Calibrate it now, or any time in the recording settings."
+          onclick={() => (calibrating = { offer: false })}>Not calibrated</button
         >
-      </div>
-    {:else}
-      <div class="transport">
-        <button
-          type="button"
-          class="play"
-          onclick={toggle}
-          aria-label={playerState === 'stopped' ? 'Play' : 'Pause'}
-          title="Play or pause (Space)"
-        >
-          {#if playerState === 'stopped'}
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
-          {:else}
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /></svg>
-          {/if}
-        </button>
-        <span class="time muted">{formatDuration(position)} / {formatDuration(length)}</span>
-        <button
-          type="button"
-          class="toggle loop-toggle"
-          class:edit-only={!timeline.loop}
-          aria-pressed={loopOn}
-          disabled={!timeline.loop}
-          onclick={switchLoop}
-          title={timeline.loop
-            ? `Loop ${formatDuration(timeline.loop.start)} to ${formatDuration(timeline.loop.end)}`
-            : 'Drag along the top of the ruler to set a Loop'}>Loop</button
-        >
-        <button
-          type="button"
-          class="toggle record edit-only"
-          aria-pressed={capturing}
-          disabled={!capturing && !canRecord}
-          onclick={switchRecording}
-          title={capturing
-            ? 'Stop recording (R or Space)'
-            : syncing
-              ? 'Leave Sync mode to record'
-              : playerState !== 'stopped'
-                ? 'Stop playback to record'
-                : recordProblem
-                  ? recordProblem
-                  : `Record a Take on ${timeline.tracks.find((t) => t.id === chosen)?.name ?? 'a new Track'} (R)`}
-          ><span class="record-dot" aria-hidden="true"></span>{capturing ? 'Stop' : 'Record'}</button
-        >
-        <span class="edit-only"
-          ><InputSettings
-            disabled={recording !== null}
-            offset={calibration.offset}
-            onCalibrate={() => (calibrating = { offer: false })}
-          /></span
-        >
-        {#if calibration.offset === null && !recording}
-          <button
-            type="button"
-            class="not-calibrated edit-only"
-            disabled={!canRecord}
-            title="Takes are placed by the latency the browser reports until it's calibrated. Calibrate it now, or any time in the recording settings."
-            onclick={() => (calibrating = { offer: false })}>Not calibrated</button
-          >
-        {/if}
-        {#if recording?.phase === 'starting'}
-          <span class="muted" role="status">Opening the microphone…</span>
-        {:else if recording?.phase === 'saving'}
-          <span class="muted" role="status">Saving the Take…</span>
-        {:else if recording && inputNote}
-          <span class="input-note" role="status">{inputNote}</span>
-        {:else if recording && skipped}
-          <span class="muted" role="status">Calibrate the latency any time in the recording settings.</span>
-        {:else if playerState === 'loading'}
-          <span class="muted" role="status">Loading audio…</span>
-        {/if}
-        <span class="spacer"></span>
-        {@render undoRedo()}
-        <button type="button" class="button edit-only" onclick={() => (picking = true)}>Add a beat</button>
-        <button type="button" class="button edit-only" onclick={addTrack}>Add a track</button>
-        <button
-          type="button"
-          class="icon collapse-toggle"
-          onclick={() => (collapsed = !collapsed)}
-          aria-expanded={!collapsed}
-          aria-controls="timeline-tracks"
-          aria-label={collapsed ? 'Show the Timeline' : 'Hide the Timeline'}
-        >
-          {collapsed ? '▴' : '▾'}
-        </button>
-      </div>
+      {/if}
+      {#if recording?.phase === 'starting'}
+        <span class="muted" role="status">Opening the microphone…</span>
+      {:else if recording?.phase === 'saving'}
+        <span class="muted" role="status">Saving the Take…</span>
+      {:else if recording && inputNote}
+        <span class="input-note" role="status">{inputNote}</span>
+      {:else if recording && skipped}
+        <span class="muted" role="status">Calibrate the latency any time in the recording settings.</span>
+      {:else if playerState === 'loading'}
+        <span class="muted" role="status">Loading audio…</span>
+      {/if}
+      <span class="spacer"></span>
+      {@render undoRedo()}
+      <button type="button" class="button edit-only" onclick={() => (picking = true)}>Add a beat</button>
+      <button type="button" class="button edit-only" onclick={addTrack}>Add a track</button>
+      <button
+        type="button"
+        class="icon collapse-toggle"
+        onclick={() => (collapsed = !collapsed)}
+        aria-expanded={!collapsed}
+        aria-controls="timeline-tracks"
+        aria-label={collapsed ? 'Show the Timeline' : 'Hide the Timeline'}
+      >
+        {collapsed ? '▴' : '▾'}
+      </button>
+    </div>
 
-      <div class="tracks" id="timeline-tracks" hidden={collapsed} style:max-height="{tracksHeight}px">
-        <div class="heads" bind:offsetHeight={headsHeight}>
-          <span class="ruler-gap"></span>
-          {#each timeline.tracks as track, i (track.id)}
-            {@const trackLevels = levels[i]}
-            <!-- Clicking it outside its controls chooses the Track, pointer only for now, like dragging Clips. -->
-            <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
-            <div
-              class="head"
-              class:chosen={track.id === chosen}
-              role="group"
-              aria-label="Track {track.name}"
-              aria-current={track.id === chosen ? 'true' : undefined}
-              onclick={(e) => headClick(e, track)}
-            >
-              <div class="head-row">
-                {#if editable.current && renaming === track.id}
-                  <input
-                    class="name"
-                    value={naming[track.id] ?? track.name}
-                    aria-label="Name of Track {track.name}"
-                    onkeydown={(e) => nameKey(track, e)}
-                    onblur={(e) => endRename(track, e.currentTarget, true)}
-                    {@attach focusField}
-                  />
-                {:else}
+    <div class="tracks" id="timeline-tracks" hidden={collapsed} style:max-height="{tracksHeight}px">
+      <div class="heads" bind:offsetHeight={headsHeight}>
+        <span class="ruler-gap"></span>
+        {#each timeline.tracks as track, i (track.id)}
+          {@const trackLevels = levels[i]}
+          <!-- Clicking it outside its controls chooses the Track, pointer only for now, like dragging Clips. -->
+          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+          <div
+            class="head"
+            class:chosen={track.id === chosen}
+            role="group"
+            aria-label="Track {track.name}"
+            aria-current={track.id === chosen ? 'true' : undefined}
+            onclick={(e) => headClick(e, track)}
+          >
+            <div class="head-row">
+              {#if editable.current && renaming === track.id}
+                <input
+                  class="name"
+                  value={naming[track.id] ?? track.name}
+                  aria-label="Name of Track {track.name}"
+                  onkeydown={(e) => nameKey(track, e)}
+                  onblur={(e) => endRename(track, e.currentTarget, true)}
+                  {@attach focusField}
+                />
+              {:else}
+                <button
+                  type="button"
+                  class="name"
+                  aria-label="Choose {track.name}"
+                  onclick={() => choose({ kind: 'choose', trackId: track.id })}
+                  ondblclick={() => editable.current && (renaming = track.id)}>{naming[track.id] ?? track.name}</button
+                >
+              {/if}
+              {#if editable.current}
+                <span class="track-actions">
                   <button
                     type="button"
-                    class="name"
-                    aria-label="Choose {track.name}"
-                    onclick={() => choose({ kind: 'choose', trackId: track.id })}
-                    ondblclick={() => editable.current && (renaming = track.id)}>{naming[track.id] ?? track.name}</button
+                    id="rename-track-{track.id}"
+                    class="rename"
+                    onclick={() => (renaming = track.id)}
+                    aria-label="Rename {track.name}"
+                    title="Rename"
                   >
-                {/if}
-                {#if editable.current}
-                  <span class="track-actions">
-                    <button
-                      type="button"
-                      id="rename-track-{track.id}"
-                      class="rename"
-                      onclick={() => (renaming = track.id)}
-                      aria-label="Rename {track.name}"
-                      title="Rename"
-                    >
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M4 20h4L19 9l-4-4L4 16z" />
-                        <path d="M13.5 6.5l4 4" />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      onclick={() => shift(i, -1)}
-                      disabled={i === 0}
-                      aria-label="Move {track.name} up"
-                      title="Move up">↑</button
-                    >
-                    <button
-                      type="button"
-                      onclick={() => shift(i, 1)}
-                      disabled={i === timeline.tracks.length - 1}
-                      aria-label="Move {track.name} down"
-                      title="Move down">↓</button
-                    >
-                    <button
-                      type="button"
-                      onclick={() => removeTrack(track)}
-                      aria-label="Delete {track.name} and its Clips"
-                      title="Delete the Track and its Clips">×</button
-                    >
-                  </span>
-                {/if}
-              </div>
-              <div class="head-row">
-                <button
-                  type="button"
-                  class="toggle mute"
-                  aria-pressed={trackLevels.muted}
-                  onclick={() => setLevels(track, { muted: !trackLevels.muted })}
-                  aria-label="Mute {track.name}"
-                  title="Mute">M</button
-                >
-                <button
-                  type="button"
-                  class="toggle solo"
-                  aria-pressed={trackLevels.soloed}
-                  onclick={() => setLevels(track, { soloed: !trackLevels.soloed })}
-                  aria-label="Solo {track.name}"
-                  title="Solo">S</button
-                >
-                <input
-                  class="volume"
-                  type="range"
-                  min={silence}
-                  max={maxVolume}
-                  step="0.5"
-                  value={trackLevels.volume}
-                  aria-label="Volume of {track.name}"
-                  aria-valuetext={formatVolume(trackLevels.volume)}
-                  title="{formatVolume(trackLevels.volume)} (double-click for 0 dB)"
-                  oninput={(e) => volumeInput(track, e)}
-                  onchange={(e) => volumeChange(track, e)}
-                  ondblclick={() => setLevels(track, { volume: 0 })}
-                />
-              </div>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M4 20h4L19 9l-4-4L4 16z" />
+                      <path d="M13.5 6.5l4 4" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    onclick={() => shift(i, -1)}
+                    disabled={i === 0}
+                    aria-label="Move {track.name} up"
+                    title="Move up">↑</button
+                  >
+                  <button
+                    type="button"
+                    onclick={() => shift(i, 1)}
+                    disabled={i === timeline.tracks.length - 1}
+                    aria-label="Move {track.name} down"
+                    title="Move down">↓</button
+                  >
+                  <button
+                    type="button"
+                    onclick={() => removeTrack(track)}
+                    disabled={lastTrack}
+                    aria-label="Delete {track.name} and its Clips"
+                    title={lastTrack
+                      ? "A Song always has a Track, so its last one can't be deleted"
+                      : 'Delete the Track and its Clips'}>×</button
+                  >
+                </span>
+              {/if}
             </div>
-          {/each}
-        </div>
-        <div class="lanes-wrap" bind:this={lanesWrapElement}>
-          <div
-            class="lanes"
-            bind:this={lanesElement}
-            bind:clientWidth={width}
-            bind:offsetHeight={lanesHeight}
-            onscroll={scrolled}
-          >
-            <div class="content" style:width="{span * view.scale}px">
-              <!-- Pointer only, like dragging Clips; the Loop is switched on and off with its button. -->
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <div
-                class="loop-bar"
-                class:editable={editable.current}
-                title={editable.current ? 'Drag to set a Loop' : undefined}
-                onpointerdown={loopDown}
-                onpointermove={loopMove}
-                onpointerup={loopUp}
-                onpointercancel={loopCancel}
+            <div class="head-row">
+              <button
+                type="button"
+                class="toggle mute"
+                aria-pressed={trackLevels.muted}
+                onclick={() => setLevels(track, { muted: !trackLevels.muted })}
+                aria-label="Mute {track.name}"
+                title="Mute">M</button
               >
-                {#if loop}
-                  {@const at = spanStyle(loop.start, loop.end)}
-                  <div
-                    class="loop"
-                    class:on={loop.on}
-                    style:left={at.left}
-                    style:width={at.width}
-                    title="Loop {formatDuration(loop.start)} to {formatDuration(loop.end)}"
+              <button
+                type="button"
+                class="toggle solo"
+                aria-pressed={trackLevels.soloed}
+                onclick={() => setLevels(track, { soloed: !trackLevels.soloed })}
+                aria-label="Solo {track.name}"
+                title="Solo">S</button
+              >
+              <input
+                class="volume"
+                type="range"
+                min={silence}
+                max={maxVolume}
+                step="0.5"
+                value={trackLevels.volume}
+                aria-label="Volume of {track.name}"
+                aria-valuetext={formatVolume(trackLevels.volume)}
+                title="{formatVolume(trackLevels.volume)} (double-click for 0 dB)"
+                oninput={(e) => volumeInput(track, e)}
+                onchange={(e) => volumeChange(track, e)}
+                ondblclick={() => setLevels(track, { volume: 0 })}
+              />
+            </div>
+          </div>
+        {/each}
+      </div>
+      <div class="lanes-wrap" bind:this={lanesWrapElement}>
+        <div
+          class="lanes"
+          bind:this={lanesElement}
+          bind:clientWidth={width}
+          bind:offsetHeight={lanesHeight}
+          onscroll={scrolled}
+        >
+          <div class="content" style:width="{span * view.scale}px">
+            <!-- Pointer only, like dragging Clips; the Loop is switched on and off with its button. -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div
+              class="loop-bar"
+              class:editable={editable.current}
+              title={editable.current ? 'Drag to set a Loop' : undefined}
+              onpointerdown={loopDown}
+              onpointermove={loopMove}
+              onpointerup={loopUp}
+              onpointercancel={loopCancel}
+            >
+              {#if loop}
+                {@const at = spanStyle(loop.start, loop.end)}
+                <div
+                  class="loop"
+                  class:on={loop.on}
+                  style:left={at.left}
+                  style:width={at.width}
+                  title="Loop {formatDuration(loop.start)} to {formatDuration(loop.end)}"
+                >
+                  <span class="loop-edge start edit-only" data-edge="start" title="Drag to move the Loop's start"></span>
+                  <button
+                    type="button"
+                    class="loop-clear edit-only"
+                    onpointerdown={(e) => e.stopPropagation()}
+                    onclick={clearLoop}
+                    aria-label="Clear the Loop"
+                    title="Clear the Loop">×</button
                   >
-                    <span class="loop-edge start edit-only" data-edge="start" title="Drag to move the Loop's start"></span>
-                    <button
-                      type="button"
-                      class="loop-clear edit-only"
-                      onpointerdown={(e) => e.stopPropagation()}
-                      onclick={clearLoop}
-                      aria-label="Clear the Loop"
-                      title="Clear the Loop">×</button
-                    >
-                    <span class="loop-edge end edit-only" data-edge="end" title="Drag to move the Loop's end"></span>
+                  <span class="loop-edge end edit-only" data-edge="end" title="Drag to move the Loop's end"></span>
+                </div>
+              {/if}
+            </div>
+            <div
+              class="ruler"
+              role="slider"
+              tabindex="0"
+              aria-label="Position"
+              aria-valuemin={0}
+              aria-valuemax={Math.round(span)}
+              aria-valuenow={Math.round(position)}
+              aria-valuetext="{formatDuration(position)} of {formatDuration(length)}"
+              onpointerdown={pointerDown}
+              onpointermove={pointerMove}
+              onpointerup={pointerUp}
+              onpointercancel={pointerCancel}
+              onkeydown={rulerKey}
+            >
+              {#each ticks as t (t)}
+                <span class="tick" style:left="{percent(t)}%">{formatDuration(t)}</span>
+              {/each}
+            </div>
+            {#each shown as { track, clips: placed }, t (track.id)}
+              <div class="lane" bind:this={laneElements[t]}>
+                {#each placed as { clip, at, editing } (clip.id)}
+                  {@const wave = waveWindow(view, at.start, at.length)}
+                  {@const title = sources.of(clip).title}
+                  <!-- Focusable for its Delete and menu keys; pointer dragging has no key equivalent yet, and its actions are in its menu. -->
+                  <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+                  <div
+                    class="clip"
+                    class:editing
+                    class:moving={editing && edit?.mode === 'move'}
+                    class:nudging={editing && edit?.mode === 'nudge'}
+                    class:retaking={clip.id === recording?.clipId}
+                    style:left="{percent(at.start)}%"
+                    style:width="{percent(at.length)}%"
+                    title={title}
+                    role="group"
+                    aria-label="{title}, {formatDuration(at.start)} to {formatDuration(at.start + at.length)}"
+                    tabindex={editable.current ? 0 : undefined}
+                    onpointerdown={(e) => editDown(e, clip, 'move')}
+                    onkeydown={(e) => clipKey(e, clip)}
+                    oncontextmenu={(e) => clipContextMenu(e, clip)}
+                  >
+                    <span class="clip-head">
+                      <span class="clip-title">{title}</span>
+                      <span class="clip-actions clip-menu edit-only">
+                        <ActionsMenu
+                          bind:this={clipMenus[clip.id]}
+                          label="More actions for {title}"
+                          entries={clipActions(clip)}
+                        >
+                          {#snippet trigger()}<span class="clip-more">⋯</span>{/snippet}
+                        </ActionsMenu>
+                      </span>
+                    </span>
+                    <span class="wave">
+                      {#if wave}
+                        <!-- Only around what's in view, a bar every barWidth pixels. -->
+                        <svg
+                          style:left="{wave.from * view.scale}px"
+                          style:width="{wave.bars * barWidth}px"
+                          viewBox="0 0 {wave.bars} 100"
+                          preserveAspectRatio="none"
+                          aria-hidden="true"
+                        >
+                          {#each clipShape(clip, at.offset + wave.from, wave.to - wave.from, (wave.bars * barWidth) / view.scale, wave.bars) as peak, i (i)}
+                            {@const height = Math.max(2, peak * 100)}
+                            <rect x={i + 0.15} y={(100 - height) / 2} width="0.7" {height} />
+                          {/each}
+                        </svg>
+                      {/if}
+                    </span>
+                    <span
+                      class="trim start edit-only"
+                      aria-hidden="true"
+                      title="Drag to trim the start"
+                      onpointerdown={(e) => editDown(e, clip, 'start')}
+                    ></span>
+                    <span
+                      class="trim end edit-only"
+                      aria-hidden="true"
+                      title="Drag to trim the end"
+                      onpointerdown={(e) => editDown(e, clip, 'end')}
+                    ></span>
+                  </div>
+                {/each}
+                {#if capturing && recording?.trackId === track.id && recording.plan && position > recording.plan.start}
+                  {@const retaken = track.clips.find((c) => c.id === recording?.clipId)}
+                  {@const taken = position - recording.plan.start}
+                  <!-- A Retake shows growing over its Clip, and stops at the next Clip, as it will be saved. -->
+                  <div
+                    class="clip taking"
+                    style:left="{percent(recording.plan.start)}%"
+                    style:width="{percent(retaken ? Math.min(taken, retakeLength(retaken, track.clips, position)) : taken)}%"
+                    aria-label="Recording from {formatDuration(recording.plan.start)}"
+                  >
+                    <span class="clip-head"><span class="clip-title">Recording…</span></span>
                   </div>
                 {/if}
               </div>
-              <div
-                class="ruler"
-                role="slider"
-                tabindex="0"
-                aria-label="Position"
-                aria-valuemin={0}
-                aria-valuemax={Math.round(length)}
-                aria-valuenow={Math.round(position)}
-                aria-valuetext="{formatDuration(position)} of {formatDuration(length)}"
-                onpointerdown={pointerDown}
-                onpointermove={pointerMove}
-                onpointerup={pointerUp}
-                onpointercancel={pointerCancel}
-                onkeydown={rulerKey}
-              >
-                {#each ticks as t (t)}
-                  <span class="tick" style:left="{percent(t)}%">{formatDuration(t)}</span>
-                {/each}
-              </div>
-              {#each shown as { track, clips: placed }, t (track.id)}
-                <div class="lane" bind:this={laneElements[t]}>
-                  {#each placed as { clip, at, editing } (clip.id)}
-                    {@const wave = waveWindow(view, at.start, at.length)}
-                    {@const title = sources.of(clip).title}
-                    <!-- Focusable for its Delete and menu keys; pointer dragging has no key equivalent yet, and its actions are in its menu. -->
-                    <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
-                    <div
-                      class="clip"
-                      class:editing
-                      class:moving={editing && edit?.mode === 'move'}
-                      class:nudging={editing && edit?.mode === 'nudge'}
-                      class:retaking={clip.id === recording?.clipId}
-                      style:left="{percent(at.start)}%"
-                      style:width="{percent(at.length)}%"
-                      title={title}
-                      role="group"
-                      aria-label="{title}, {formatDuration(at.start)} to {formatDuration(at.start + at.length)}"
-                      tabindex={editable.current ? 0 : undefined}
-                      onpointerdown={(e) => editDown(e, clip, 'move')}
-                      onkeydown={(e) => clipKey(e, clip)}
-                      oncontextmenu={(e) => clipContextMenu(e, clip)}
-                    >
-                      <span class="clip-head">
-                        <span class="clip-title">{title}</span>
-                        <span class="clip-actions clip-menu edit-only">
-                          <ActionsMenu
-                            bind:this={clipMenus[clip.id]}
-                            label="More actions for {title}"
-                            entries={clipActions(clip)}
-                          >
-                            {#snippet trigger()}<span class="clip-more">⋯</span>{/snippet}
-                          </ActionsMenu>
-                        </span>
-                      </span>
-                      <span class="wave">
-                        {#if wave}
-                          <!-- Only around what's in view, a bar every barWidth pixels. -->
-                          <svg
-                            style:left="{wave.from * view.scale}px"
-                            style:width="{wave.bars * barWidth}px"
-                            viewBox="0 0 {wave.bars} 100"
-                            preserveAspectRatio="none"
-                            aria-hidden="true"
-                          >
-                            {#each clipShape(clip, at.offset + wave.from, wave.to - wave.from, (wave.bars * barWidth) / view.scale, wave.bars) as peak, i (i)}
-                              {@const height = Math.max(2, peak * 100)}
-                              <rect x={i + 0.15} y={(100 - height) / 2} width="0.7" {height} />
-                            {/each}
-                          </svg>
-                        {/if}
-                      </span>
-                      <span
-                        class="trim start edit-only"
-                        aria-hidden="true"
-                        title="Drag to trim the start"
-                        onpointerdown={(e) => editDown(e, clip, 'start')}
-                      ></span>
-                      <span
-                        class="trim end edit-only"
-                        aria-hidden="true"
-                        title="Drag to trim the end"
-                        onpointerdown={(e) => editDown(e, clip, 'end')}
-                      ></span>
-                    </div>
-                  {/each}
-                  {#if capturing && recording?.trackId === track.id && recording.plan && position > recording.plan.start}
-                    {@const retaken = track.clips.find((c) => c.id === recording?.clipId)}
-                    {@const taken = position - recording.plan.start}
-                    <!-- A Retake shows growing over its Clip, and stops at the next Clip, as it will be saved. -->
-                    <div
-                      class="clip taking"
-                      style:left="{percent(recording.plan.start)}%"
-                      style:width="{percent(retaken ? Math.min(taken, retakeLength(retaken, track.clips, position)) : taken)}%"
-                      aria-label="Recording from {formatDuration(recording.plan.start)}"
-                    >
-                      <span class="clip-head"><span class="clip-title">Recording…</span></span>
-                    </div>
-                  {/if}
-                </div>
-              {/each}
-              {#if loop?.on}
-                {@const at = spanStyle(loop.start, loop.end)}
-                <span class="loop-shade" style:left={at.left} style:width={at.width} aria-hidden="true"></span>
-              {/if}
-              <span class="playhead" style:left="{percent(position)}%" aria-hidden="true"></span>
-            </div>
+            {/each}
+            {#if loop?.on}
+              {@const at = spanStyle(loop.start, loop.end)}
+              <span class="loop-shade" style:left={at.left} style:width={at.width} aria-hidden="true"></span>
+            {/if}
+            <span class="playhead" style:left="{percent(position)}%" aria-hidden="true"></span>
           </div>
-          {#if thumb}
-            <!-- Pointer only: the ruler is the keyboard's slider for the position. -->
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div
-              class="scrollbar"
-              bind:this={barElement}
-              onpointerdown={barDown}
-              onwheel={barWheel}
-              aria-hidden="true"
-            >
-              <div
-                class="scroll-thumb"
-                class:dragging={thumbDrag !== null}
-                style:left="{thumb.left}px"
-                style:width="{thumb.width}px"
-                onpointerdown={thumbDown}
-                onpointermove={thumbMove}
-                onpointerup={thumbUp}
-                onpointercancel={thumbUp}
-              ></div>
-            </div>
-          {/if}
         </div>
+        {#if thumb}
+          <!-- Pointer only: the ruler is the keyboard's slider for the position. -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div
+            class="scrollbar"
+            bind:this={barElement}
+            onpointerdown={barDown}
+            onwheel={barWheel}
+            aria-hidden="true"
+          >
+            <div
+              class="scroll-thumb"
+              class:dragging={thumbDrag !== null}
+              style:left="{thumb.left}px"
+              style:width="{thumb.width}px"
+              onpointerdown={thumbDown}
+              onpointermove={thumbMove}
+              onpointerup={thumbUp}
+              onpointercancel={thumbUp}
+            ></div>
+          </div>
+        {/if}
       </div>
-    {/if}
+    </div>
 
     {#if offerCues}
       <div class="offer" role="status">
@@ -2263,7 +2222,6 @@
     border-radius: calc(0.5 * var(--timeline-rem));
     font-size: calc(1.125 * var(--timeline-rem));
   }
-  .empty,
   .transport,
   .offer {
     display: flex;
@@ -2572,9 +2530,6 @@
     width: auto;
     padding: 0 calc(0.375 * var(--timeline-rem));
   }
-  .button.record {
-    gap: calc(0.5 * var(--timeline-rem));
-  }
   .record-dot {
     width: calc(0.5 * var(--timeline-rem));
     height: calc(0.5 * var(--timeline-rem));
@@ -2607,8 +2562,7 @@
   .input-note {
     color: var(--warning);
   }
-  .toggle.record:disabled,
-  .button.record:disabled {
+  .toggle.record:disabled {
     opacity: 0.5;
     cursor: default;
   }
