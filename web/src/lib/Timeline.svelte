@@ -28,9 +28,9 @@
     type Saved,
   } from './history';
   import { formatVolume, maxVolume, silence, trackGains, type Levels } from './mixer';
-  import { longPressDelay, pastSlop } from './longPress';
   import { type MenuAction } from './menu';
   import { peaksPerSecond } from './peaks';
+  import { longPressDelay, pastSlop, type Point } from './press';
   import { keptInLoop, outsideLoop, repeats, timelineEnd, type Loop, type Placed } from './schedule';
   import { inTextField } from './textField';
   import { formatDuration } from './time';
@@ -457,9 +457,6 @@
   // Whether it's outside the Loop is only told on release, too.
   let dragging = false;
 
-  /** Where a pointer is on the page. */
-  type Point = Pick<PointerEvent, 'clientX' | 'clientY'>;
-
   function timeAt(event: Point): number {
     return clamp(spanTimeAt(event.clientX));
   }
@@ -739,7 +736,7 @@
     element.focus();
     event.preventDefault();
     // A finger held still opens the Clip's menu, as there's no right-click on touch.
-    if (event.pointerType === 'touch') press = setTimeout(() => openClipMenu(clip, element), longPressDelay);
+    if (event.pointerType === 'touch') pressTimer = setTimeout(() => openClipMenu(clip, element), longPressDelay);
     edit = {
       clip,
       mode,
@@ -760,7 +757,7 @@
     // A small wobble while clicking or holding still isn't a drag.
     if (!edit.moved && !pastSlop(edit.from, event)) return;
     edit.moved = true;
-    clearTimeout(press);
+    clearTimeout(pressTimer);
     const t = spanTimeAt(event.clientX);
     const { clip } = edit;
     if (edit.mode === 'move') {
@@ -822,7 +819,7 @@
   }
 
   function stopListening() {
-    clearTimeout(press);
+    clearTimeout(pressTimer);
     dragDone();
     window.removeEventListener('pointermove', editMove);
     window.removeEventListener('pointerup', editUp);
@@ -855,7 +852,7 @@
   // or a long press.
   const clipMenus: Record<number, ActionsMenu> = {};
   // Waiting to open a Clip's menu, until the finger moves or lifts.
-  let press: ReturnType<typeof setTimeout> | undefined;
+  let pressTimer: ReturnType<typeof setTimeout> | undefined;
 
   function clipActions(clip: Clip): MenuAction[] {
     return [
@@ -870,8 +867,11 @@
   }
 
   function openClipMenu(clip: Clip, element: HTMLElement) {
+    // Not while a Clip's edit is saving: it's then put back in its place,
+    // which would take the menu out of the page under it.
+    if (edit?.saving) return;
     // A press that opens the menu isn't a drag.
-    if (edit && !edit.saving) editCancel();
+    if (edit) editCancel();
     // So its ⋯, which the menu lines up with, shows, and focus comes back to the Clip.
     element.focus();
     clipMenus[clip.id]?.openMenu();

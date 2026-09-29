@@ -108,8 +108,9 @@
     else all[next].focus();
   }
 
-  // A tap outside closes it, leaving focus to wherever the tap puts it: seen
-  // on its way down, as what's tapped may keep it to itself, e.g. a Clip.
+  // A tap outside closes it, leaving focus to wherever the tap puts it. It's
+  // caught on the way down, since some of what's tapped, e.g. a Clip, stops
+  // it going further.
   function onWindowPointer(e: PointerEvent) {
     if (open && !root.contains(e.target as Node)) open = false;
   }

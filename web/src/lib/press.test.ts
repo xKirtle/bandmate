@@ -1,5 +1,5 @@
 import { describe as group, expect, it } from 'vitest';
-import { pastSlop } from './longPress';
+import { pastSlop } from './press';
 
 group('pastSlop', () => {
   const from = { clientX: 100, clientY: 100 };
