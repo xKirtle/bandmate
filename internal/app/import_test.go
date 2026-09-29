@@ -42,7 +42,7 @@ func expectNoSectionRepeated(t *testing.T, s song) {
 	}
 }
 
-// shownSection is one Occurrence of a Song as the user reads it: its
+// shownSection is one Section of a Song as the user reads it: its
 // Section's Label and the texts of its active Lines.
 type shownSection struct {
 	Label string
@@ -278,7 +278,7 @@ func TestImportRepeatedSectionsAreSeparate(t *testing.T) {
 				t.Errorf("sheet = %+v, want %+v", got, c.want)
 			}
 			if got, want := len(s.Sections), len(c.want); got != want {
-				t.Errorf("%d sections, want %d, one per heading", got, want)
+				t.Errorf("%d sections, want %d, one per Section in the arrangement", got, want)
 			}
 		})
 	}
@@ -294,7 +294,7 @@ func TestImportedChordsAreParsed(t *testing.T) {
 	res.JSON(t, &s)
 	sections := sectionsByID(s)
 	if len(s.Arrangement) != 2 {
-		t.Fatalf("arrangement = %+v, want two Occurrences", s.Arrangement)
+		t.Fatalf("arrangement = %+v, want two Sections", s.Arrangement)
 	}
 	intro := sections[s.Arrangement[0].SectionID].Alternates[0].Lines[0]
 	if !intro.ChordLine || !reflect.DeepEqual(intro.Chords, []chord{{0, "Am"}, {1, "F"}}) {

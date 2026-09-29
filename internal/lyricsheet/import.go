@@ -18,10 +18,10 @@ var (
 )
 
 // ImportSong creates a new Song from pasted lyrics, plain text or ChordPro,
-// with one Section per Section the text marks (see parseImport), each
-// appearing once (ADR 0010). A title directive in the text names the Song;
-// without one, title does. Other directives fill in the Song's Details.
-// Timestamps in the text become Line Cues.
+// with one Section per heading or ChordPro block the text marks (see
+// parseImport), each appearing once (ADR 0010). A title directive in the
+// text names the Song; without one, title does. Other directives fill in
+// the Song's Details. Timestamps in the text become Line Cues.
 func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error) {
 	sheet, err := parseImport(text)
 	if err != nil {
