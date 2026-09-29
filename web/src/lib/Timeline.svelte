@@ -846,7 +846,7 @@
       if (retaking && !target) throw new CaptureError('The Clip to retake is gone.');
       const track = target || (timeline.tracks.find((t) => t.id === chosen) ?? timeline.tracks.at(-1)!);
       const clip = retaking && track.clips.find((c) => c.id === retaking.id)!;
-      const plan = clip ? retakePlan(clip) : recordingPlan(track.clips);
+      const plan = clip ? retakePlan(clip) : recordingPlan(track.clips, position);
       following = true;
       ended = false;
       position = plan.from;

@@ -80,6 +80,6 @@ export function recoveredPlacement(
     if (free) return { target: { trackId: own.id, start: plan.start }, captureStart: plan.from };
   }
   const track = own ?? tracks.find((t) => t.id === chosen) ?? tracks.at(-1);
-  const start = track ? recordingPlan(track.clips).start : 0;
+  const start = track ? recordingPlan(track.clips, 0).start : 0;
   return { target: track ? { trackId: track.id, start } : null, captureStart: shifted(start - plan.start) };
 }
