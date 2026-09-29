@@ -1,18 +1,21 @@
 <script lang="ts">
   import { playMediaAlone } from './playback';
+  import PlayerVolume from './PlayerVolume.svelte';
   import { canSetVolume, playerVolume } from './playerVolume.svelte';
   import { formatDuration } from './time';
-  import { gain, loudness } from './volume';
+  import { gain } from './volume';
   import { bars } from './waveform';
 
   // A player for a Master or a Beat preview: its waveform, which seeks when
-  // clicked, play/pause and the volume every such player shares. The audio
-  // streams through an <audio> element, fetching only the parts played.
+  // clicked, play/pause and, unless hidden, the volume every such player
+  // shares. The audio streams through an <audio> element, fetching only the
+  // parts played.
   let {
     src,
     duration,
     peaks,
     playing = $bindable(false),
+    showVolume = true,
   }: {
     src: string;
     /** In seconds. */
@@ -21,6 +24,8 @@
     peaks: number[];
     /** Whether the audio is playing, e.g. for a button elsewhere that shows it. */
     playing?: boolean;
+    /** Off where the shared volume shows beside the player instead. */
+    showVolume?: boolean;
   } = $props();
 
   const barCount = 160;
@@ -113,7 +118,7 @@
 </script>
 
 <div class="player">
-  <div class="controls">
+  <div class="controls" class:solo={!showVolume}>
     <audio
       bind:this={audio}
       {src}
@@ -134,6 +139,8 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
       {/if}
     </button>
+
+    <span class="elapsed time muted">{formatDuration(time)}</span>
 
     <div
       class="wave"
@@ -172,41 +179,14 @@
       </svg>
     </div>
 
-    <span class="time muted">{formatDuration(time)} / {formatDuration(duration)}</span>
+    <!-- In one row, the times sit either side of the waveform; wrapped, they
+         share one readout under it. -->
+    <span class="total time muted">{formatDuration(duration)}</span>
+    <span class="both time muted">{formatDuration(time)} / {formatDuration(duration)}</span>
 
-    <div class="volume">
-      <button
-        type="button"
-        class="speaker"
-        onclick={playerVolume.toggleMute}
-        aria-label={volume.muted ? 'Unmute' : 'Mute'}
-        aria-pressed={volume.muted}
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path class="cone" d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z" />
-          {#if loudness(volume) === 'muted'}
-            <path d="M15.5 9.5l5 5M20.5 9.5l-5 5" />
-          {:else}
-            <path d="M15 9a4 4 0 0 1 0 6" />
-            {#if loudness(volume) === 'high'}
-              <path d="M17.5 6.5a7.5 7.5 0 0 1 0 11" />
-            {/if}
-          {/if}
-        </svg>
-      </button>
-      {#if slider}
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.01"
-          value={volume.muted ? 0 : volume.level}
-          oninput={(e) => playerVolume.setLevel(e.currentTarget.valueAsNumber)}
-          aria-label="Volume"
-          aria-valuetext={volume.muted ? 'Muted' : `${Math.round(volume.level * 100)}%`}
-        />
-      {/if}
-    </div>
+    {#if showVolume}
+      <div class="volume"><PlayerVolume /></div>
+    {/if}
   </div>
 </div>
 
@@ -216,23 +196,52 @@
   .player {
     container-type: inline-size;
   }
+  /* In one row, play, the times and the waveform form one group, centred once
+     the waveform reaches its widest (about 5px a bar). Both times reserve room
+     for "00:00" and hug the waveform, so it doesn't shift as they count. */
   .controls {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
-    grid-template-areas: 'play wave time volume';
+    grid-template-columns: auto 5ch minmax(0, 48rem) 5ch auto;
+    grid-template-areas: 'play elapsed wave total volume';
+    justify-content: center;
     align-items: center;
     gap: 0.75rem;
+  }
+  /* Without the volume, no empty column takes the group off centre. */
+  .controls.solo {
+    grid-template-columns: auto 5ch minmax(0, 48rem) 5ch;
+    grid-template-areas: 'play elapsed wave total';
+  }
+  .elapsed {
+    grid-area: elapsed;
+    text-align: right;
+  }
+  .total {
+    grid-area: total;
+  }
+  .both {
+    display: none;
   }
   /* Narrow, the waveform takes the whole top row after play. Under it, the time
      starts at its left edge and the volume sits at the right. The volume slider
      shows either way: wrapped, it no longer takes width from the waveform. */
   @container (max-width: 32rem) {
-    .controls {
+    .controls,
+    .controls.solo {
       grid-template-columns: auto minmax(0, 1fr) auto;
       grid-template-areas:
         'play wave wave'
-        '. time volume';
+        '. both volume';
+      justify-content: stretch;
       row-gap: 0.25rem;
+    }
+    .elapsed,
+    .total {
+      display: none;
+    }
+    .both {
+      display: inline;
+      grid-area: both;
     }
   }
   .play {
@@ -278,51 +287,10 @@
     opacity: 1;
   }
   .time {
-    grid-area: time;
     font-size: 0.8125rem;
     font-variant-numeric: tabular-nums;
   }
   .volume {
     grid-area: volume;
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-  }
-  .speaker {
-    display: grid;
-    place-items: center;
-    width: 2rem;
-    height: 2rem;
-    padding: 0;
-    border: none;
-    border-radius: 50%;
-    background: none;
-    color: var(--text-muted);
-    cursor: pointer;
-  }
-  .speaker:hover {
-    color: var(--text);
-  }
-  .speaker:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-  .speaker svg {
-    width: 1.25rem;
-    height: 1.25rem;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.75;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-  .speaker .cone {
-    fill: currentColor;
-  }
-  input[type='range'] {
-    width: 5rem;
-    min-height: 0;
-    padding: 0;
-    accent-color: var(--accent);
   }
 </style>
