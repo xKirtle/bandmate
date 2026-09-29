@@ -1980,11 +1980,13 @@
     .timeline {
       --timeline-scale: 1;
     }
-    /* The Tracks can't open here, so there's nothing for the toggle to do. */
     .edit-only,
     .resize,
-    .collapse-toggle,
     .tracks {
+      display: none;
+    }
+    /* The Tracks can't open here, so the collapse toggle has nothing to do. */
+    .collapse-toggle {
       display: none;
     }
     /* Easier to hit with a thumb. */
