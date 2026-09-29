@@ -21,7 +21,7 @@ func (a *App) recordTake(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var rec timeline.Recording
+	var rec timeline.TakePlacement
 	file, ok := a.readUpload(w, r, a.takeFiles, &rec)
 	if !ok {
 		return

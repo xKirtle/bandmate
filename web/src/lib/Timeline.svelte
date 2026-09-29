@@ -131,6 +131,10 @@
     startedAt: number;
   }
   let recording = $state.raw<RecordingState | null>(null);
+  // Whether a recording is capturing, rather than starting or saving.
+  const capturing = $derived(recording?.phase === 'recording');
+  // Once gone, an input still opening is let go as soon as it opens.
+  let destroyed = false;
 
   // Peaks by source key, fetched once each, so waveforms show before the
   // audio is decoded.
@@ -140,9 +144,10 @@
     playerState = s;
     // Also when something else playing stopped it, which stops a recording too.
     if (s === 'stopped') position = player.position();
-    if (s === 'stopped' && recording?.phase === 'recording') stopRecording();
+    if (s === 'stopped' && capturing) stopRecording();
   });
   onDestroy(() => {
+    destroyed = true;
     recording?.capture?.close();
     player.dispose();
   });
@@ -164,7 +169,7 @@
   // Loop later on the Timeline. A recording running past the end takes the
   // room it needs, ten seconds at a time, so the view isn't redrawn every
   // frame.
-  const recordingTo = $derived(recording?.phase === 'recording' ? Math.ceil(position / 10) * 10 : 0);
+  const recordingTo = $derived(capturing ? Math.ceil(position / 10) * 10 : 0);
   const reach = $derived(length > 0 ? Math.max(length, timeline.loop?.end ?? 0, recordingTo) : 0);
   const span = $derived(reach > 0 ? reach + Math.max(10, reach / 4) : 0);
   // Seeking outside the Loop switches it off, and until that's saved,
@@ -435,7 +440,7 @@
     void playKey;
     untrack(() => {
       // A recording plays on as it started, in time with what it captures.
-      if (recording?.phase === 'recording') return;
+      if (capturing) return;
       const from = playerState === 'stopped' ? position : player.position();
       const to = keptInLoop(from, playingLoop);
       if (playerState !== 'stopped') play(to);
@@ -465,7 +470,7 @@
       if (!dragging) position = player.position();
       onPlayhead?.(position);
       // A recording runs on past the end until it's stopped.
-      if (position >= length && !player.repeating && recording?.phase !== 'recording') {
+      if (position >= length && !player.repeating && !capturing) {
         ended = true;
         player.stop();
         player.seek(length);
@@ -487,8 +492,9 @@
   }
 
   function toggle() {
-    if (recording?.phase === 'recording') {
-      stopRecording();
+    // Space stops a recording, and does nothing while one starts or saves.
+    if (recording) {
+      if (capturing) stopRecording();
       return;
     }
     if (playerState !== 'stopped') {
@@ -507,8 +513,8 @@
   }
 
   function seek(to: number) {
-    // A recording plays on from where it started, in time with what it captures.
-    if (recording?.phase === 'recording') return;
+    // A recording plays from where it starts, in time with what it captures.
+    if (recording) return;
     position = clamp(to);
     releaseEnded();
     if (playerState === 'stopped') player.seek(position);
@@ -517,7 +523,7 @@
 
   /** Seeks where asked by hand, switching the Loop off if that's outside it. */
   function seekByHand(to: number) {
-    if (recording?.phase === 'recording') return;
+    if (recording) return;
     if (outsideLoop(clamp(to), playingLoop)) switchLoopOff();
     seek(to);
   }
@@ -723,6 +729,7 @@
       }
       const capture = await Capture.open(audioContext());
       recording = { ...starting, capture };
+      if (destroyed) throw new CaptureError('The Timeline closed before recording started.');
       // Placed once the input's open, in case the Timeline changed meanwhile.
       const track = timeline.tracks.find((t) => t.id === chosen) ?? timeline.tracks.at(-1)!;
       const plan = recordingPlan(track.clips);
@@ -776,14 +783,14 @@
   }
 
   function switchRecording() {
-    if (recording?.phase === 'recording') stopRecording();
+    if (capturing) stopRecording();
     else startRecording();
   }
 
   function recordKey(event: KeyboardEvent) {
     if (event.key.toLowerCase() !== 'r' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.defaultPrevented || picking || inTextField(event.target)) return;
-    if (recording?.phase !== 'recording' && !canRecord) return;
+    if (!capturing && !canRecord) return;
     event.preventDefault();
     switchRecording();
   }
@@ -1445,17 +1452,17 @@
         <button
           type="button"
           class="toggle record edit-only"
-          aria-pressed={recording?.phase === 'recording'}
-          disabled={recording?.phase !== 'recording' && !canRecord}
+          aria-pressed={capturing}
+          disabled={!capturing && !canRecord}
           onclick={switchRecording}
-          title={recording?.phase === 'recording'
+          title={capturing
             ? 'Stop recording (R or Space)'
             : syncing
               ? 'Leave Sync mode to record'
               : playerState !== 'stopped'
                 ? 'Stop playback to record'
                 : `Record a Take on ${timeline.tracks.find((t) => t.id === chosen)?.name ?? 'a new Track'} (R)`}
-          ><span class="record-dot" aria-hidden="true"></span>{recording?.phase === 'recording' ? 'Stop' : 'Record'}</button
+          ><span class="record-dot" aria-hidden="true"></span>{capturing ? 'Stop' : 'Record'}</button
         >
         {#if recording?.phase === 'starting'}
           <span class="muted" role="status">Opening the microphone…</span>
@@ -1712,7 +1719,7 @@
                       ></span>
                     </div>
                   {/each}
-                  {#if recording?.phase === 'recording' && recording.trackId === track.id && recording.plan && position > recording.plan.start}
+                  {#if capturing && recording?.trackId === track.id && recording.plan && position > recording.plan.start}
                     <div
                       class="clip taking"
                       style:left="{percent(recording.plan.start)}%"

@@ -14,9 +14,9 @@ import (
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
 )
 
-// Recording is where a Take was recorded, as the browser sends it with the
+// TakePlacement is where a Take was recorded, as the browser sends it with the
 // file.
-type Recording struct {
+type TakePlacement struct {
 	TrackID int64 `json:"trackId"`
 	// Start is where its new Clip starts on the Timeline: the Track's
 	// append point, where its last Clip ends.
@@ -44,7 +44,7 @@ const (
 // is kept, hidden behind it, so the Clip plays from its start to the
 // Take's end. It can't overlap a Clip already there. The file is kept if
 // the Take is added, and discarded otherwise.
-func (s *Store) RecordTake(ctx context.Context, songID int64, based lyricsheet.Version, rec Recording, file *audio.Received) (Timeline, error) {
+func (s *Store) RecordTake(ctx context.Context, songID int64, based lyricsheet.Version, rec TakePlacement, file *audio.Received) (Timeline, error) {
 	defer file.Discard()
 	wav, err := file.ReadWAV()
 	if errors.Is(err, audio.ErrNotWAV) || (err == nil &&

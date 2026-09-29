@@ -290,7 +290,7 @@ export type NewClip = Pick<Clip, 'start' | 'offset' | 'length'> &
   ({ beatId: number } | { takeIds: number[]; activeTakeId: number });
 
 /** Where a Take was recorded, sent with its file. */
-export interface Recording {
+export interface TakePlacement {
   trackId: number;
   /** Where its new Clip starts: the Track's append point. */
   start: number;
@@ -588,9 +588,9 @@ export const api = {
    * Places a Take just recorded, a mono 24-bit WAV, in a new Clip at start.
    * Refused if it would overlap a Clip there.
    */
-  recordTake: (at: SongAt, wav: Blob, recording: Recording) => {
+  recordTake: (at: SongAt, wav: Blob, placement: TakePlacement) => {
     const form = new FormData();
-    form.append('details', JSON.stringify(recording));
+    form.append('details', JSON.stringify(placement));
     form.append('file', wav, 'take.wav');
     return request<Timeline>('POST', `/songs/${at.id}/timeline/takes`, form, at);
   },
