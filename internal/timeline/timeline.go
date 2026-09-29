@@ -573,18 +573,24 @@ type placement struct {
 // reaching for a Clip's Beat or Takes.
 type source struct {
 	beatID sql.NullInt64
-	// activeTakeID is set for a Clip of Takes.
+	// activeTakeID is set for a Clip of Takes, and takeIDs are all of them.
 	activeTakeID sql.NullInt64
+	takeIDs      []int64
 }
 
 // duration reads how long the source is, in seconds, however a Clip trims
-// it: a Beat's file, or the span up to where the active Take ends.
+// it: a Beat's file, or the span up to where the last of the Takes ends,
+// whichever is active.
 func (src source) duration(ctx context.Context, tx *sql.Tx) (float64, error) {
 	if src.activeTakeID.Valid {
 		var end float64
-		if err := tx.QueryRowContext(ctx, `SELECT position + duration FROM takes WHERE id = ?`,
-			src.activeTakeID.Int64).Scan(&end); err != nil {
-			return 0, fmt.Errorf("reading take: %w", err)
+		for _, id := range src.takeIDs {
+			var e float64
+			if err := tx.QueryRowContext(ctx, `SELECT position + duration FROM takes WHERE id = ?`, id).
+				Scan(&e); err != nil {
+				return 0, fmt.Errorf("reading take: %w", err)
+			}
+			end = max(end, e)
 		}
 		return end, nil
 	}
@@ -752,7 +758,7 @@ func newSource(ctx context.Context, tx *sql.Tx, songID int64, c NewClip) (source
 			return source{}, &lyricsheet.ConflictError{Msg: "a Take can only be in one Clip"}
 		}
 	}
-	return source{activeTakeID: sql.NullInt64{Int64: *c.ActiveTakeID, Valid: true}}, nil
+	return source{activeTakeID: sql.NullInt64{Int64: *c.ActiveTakeID, Valid: true}, takeIDs: c.TakeIDs}, nil
 }
 
 // attachTakes puts Takes in a Clip.
@@ -803,7 +809,7 @@ func (s *Store) DuplicateClip(ctx context.Context, songID int64, based lyricshee
 			_, err := insertClip(ctx, tx, p)
 			return err
 		}
-		copies, err := s.copyTakes(ctx, tx, clipID, &linked)
+		copies, err := s.copyTakes(ctx, tx, p.source.takeIDs, &linked)
 		if err != nil {
 			return err
 		}
@@ -813,8 +819,8 @@ func (s *Store) DuplicateClip(ctx context.Context, songID int64, based lyricshee
 			return err
 		}
 		ids := make([]int64, 0, len(copies))
-		for _, id := range copies {
-			ids = append(ids, id)
+		for _, id := range p.source.takeIDs {
+			ids = append(ids, copies[id])
 		}
 		return attachTakes(ctx, tx, copyID, ids)
 	})
@@ -824,22 +830,10 @@ func (s *Store) DuplicateClip(ctx context.Context, songID int64, based lyricshee
 	return tl, err
 }
 
-// copyTakes adds a detached copy of each of a Clip's Takes, sharing its
-// file, noting each file linked in linked. It returns the copies' ids by
-// the ids of the Takes copied.
-func (s *Store) copyTakes(ctx context.Context, tx *sql.Tx, clipID int64, linked *[]int64) (map[int64]int64, error) {
-	var ids []int64
-	err := query(ctx, tx, `SELECT id FROM takes WHERE clip_id = ?`, []any{clipID}, func(rows *sql.Rows) error {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
-			return err
-		}
-		ids = append(ids, id)
-		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("reading takes: %w", err)
-	}
+// copyTakes adds a detached copy of each of the Takes, sharing its file,
+// noting each file linked in linked. It returns the copies' ids by the ids
+// of the Takes copied.
+func (s *Store) copyTakes(ctx context.Context, tx *sql.Tx, ids []int64, linked *[]int64) (map[int64]int64, error) {
 	copies := map[int64]int64{}
 	for _, id := range ids {
 		res, err := tx.ExecContext(ctx, `INSERT INTO takes (song_id, number, size, duration, sample_rate, peaks,
@@ -901,6 +895,18 @@ func clipPlacement(ctx context.Context, tx *sql.Tx, songID, clipID int64) (place
 	}
 	if err != nil {
 		return placement{}, fmt.Errorf("reading clip: %w", err)
+	}
+	err = query(ctx, tx, `SELECT id FROM takes WHERE clip_id = ? ORDER BY number, id`, []any{clipID},
+		func(rows *sql.Rows) error {
+			var id int64
+			if err := rows.Scan(&id); err != nil {
+				return err
+			}
+			p.source.takeIDs = append(p.source.takeIDs, id)
+			return nil
+		})
+	if err != nil {
+		return placement{}, fmt.Errorf("reading takes: %w", err)
 	}
 	return p, nil
 }

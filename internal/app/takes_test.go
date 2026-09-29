@@ -258,15 +258,96 @@ func recordATake(t *testing.T, ts *testServer) recordedTake {
 	return recordedTake{song: s, tl: tl, vox: tl.Tracks[1], clip: c, take: c.Takes[0], audio: upload.Data}
 }
 
-func TestAClipOfTakesMovesAndTrimsWithinItsActiveTake(t *testing.T) {
+func TestAClipOfTakesTrimsBackToItsLeadInAndOverrunButNoFurther(t *testing.T) {
 	ts := newTestServer(t)
 	r := recordATake(t, ts)
 
 	if c := r.clip; c.Start != 2 || c.Offset != 0.5 || c.Length != 3 {
 		t.Errorf("clip = %+v, want it at 0:02 for 3s, 0.5s into its source", c)
 	}
-	expectError(t, ts.trimClip(r.song.ID, r.clip.ID, 0.5, 3.6), http.StatusBadRequest,
+	// The Take's first 0.5s and last 0.5s are hidden; trimming back reveals
+	// both, and the Take stays where it was on the Timeline.
+	got := timelineChange(t, ts.trimClip(r.song.ID, r.clip.ID, 0, 4))
+	if at := clipAt(got, r.clip.ID); at != "1:1.5+4@0" {
+		t.Errorf("clip = %s, want the whole Take showing, 0:01.5 to 0:05.5", at)
+	}
+	if takes := got.Tracks[1].Clips[0].Takes; !reflect.DeepEqual(takes, []take{r.take}) {
+		t.Errorf("takes = %+v, want the Take unchanged: %+v", takes, r.take)
+	}
+	for name, c := range map[string]struct {
+		offset, length float64
+		msg            string
+	}{
+		"before the Take's start": {-0.5, 4, "a Clip can't start before its source does"},
+		"past the Take's end":     {0, 4.5, "a Clip can't play past the end of its source"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			expectError(t, ts.trimClip(r.song.ID, r.clip.ID, c.offset, c.length), http.StatusBadRequest, c.msg)
+		})
+	}
+}
+
+func TestAClipOfTakesTrimsWithinTheSpanOfAllItsTakes(t *testing.T) {
+	ts := newTestServer(t)
+	s, tl := songWithVocalTrack(t, ts)
+	vox := tl.Tracks[1].ID
+	short := timelineChange(t, ts.recordTake(s.ID, takeRecording(vox, 0, 0, 0, 4))).Tracks[1].Clips[0]
+	long := timelineChange(t, ts.recordTake(s.ID, takeRecording(vox, 10, 10, 0, 6))).Tracks[1].Clips[1]
+	timelineChange(t, ts.deleteClip(s.ID, short.ID))
+	timelineChange(t, ts.deleteClip(s.ID, long.ID))
+	ids := []int64{short.Takes[0].ID, long.Takes[0].ID}
+
+	// Playing the shorter Take, the Clip still spans the longer one.
+	expectError(t, ts.placeTakes(s.ID, vox, ids, ids[0], 0, 0, 6.5), http.StatusBadRequest,
 		"a Clip can't play past the end of its source")
+	got := timelineChange(t, ts.placeTakes(s.ID, vox, ids, ids[0], 0, 0, 5))
+	c := got.Tracks[1].Clips[0]
+	got = timelineChange(t, ts.trimClip(s.ID, c.ID, 0, 6))
+	if at := clipAt(got, c.ID); at != "1:0+6@0" {
+		t.Errorf("clip = %s, want it trimmed out to the longer Take's end", at)
+	}
+	expectError(t, ts.trimClip(s.ID, c.ID, 0, 6.5), http.StatusBadRequest, "a Clip can't play past the end of its source")
+}
+
+func TestAClipOfTakesMovesWithItsTakesAlongAndAcrossTracks(t *testing.T) {
+	ts := newTestServer(t)
+	r := recordATake(t, ts)
+	beatTrack := r.tl.Tracks[0].ID
+
+	got := timelineChange(t, ts.moveClip(r.song.ID, r.clip.ID, r.vox.ID, 7.5))
+	if at := clipAt(got, r.clip.ID); at != "1:7.5+3@0.5" {
+		t.Errorf("clip = %s, want it moved to 0:07.5 with its trim", at)
+	}
+	// The Beat plays 0:00 to 0:30 on the beat Track.
+	expectError(t, ts.moveClip(r.song.ID, r.clip.ID, beatTrack, 28), http.StatusConflict, "Clips can't overlap on a Track")
+	got = timelineChange(t, ts.moveClip(r.song.ID, r.clip.ID, beatTrack, 30))
+
+	if at := clipAt(got, r.clip.ID); at != "0:30+3@0.5" {
+		t.Errorf("clip = %s, want it on the beat Track at 0:30 with its trim", at)
+	}
+	moved := got.Tracks[0].Clips[1]
+	if !reflect.DeepEqual(moved.Takes, []take{r.take}) || *moved.ActiveTakeID != r.take.ID {
+		t.Errorf("takes = %+v, want the same Take, active: %+v", moved.Takes, r.take)
+	}
+	served := ts.Do(http.MethodGet, takePath(r.song.ID, r.take.ID)+"/audio", nil)
+	if !bytes.Equal(served.Body, r.audio) {
+		t.Errorf("audio after moving differs from the recording")
+	}
+}
+
+func TestTrimmingAClipOfTakesIntoANeighbourIsRejected(t *testing.T) {
+	ts := newTestServer(t)
+	r := recordATake(t, ts)
+	// The copy plays at 0:05 to 0:08, touching the Clip.
+	before := timelineChange(t, ts.duplicateClip(r.song.ID, r.clip.ID))
+	dup := before.Tracks[1].Clips[1]
+
+	expectError(t, ts.trimClip(r.song.ID, r.clip.ID, 0.5, 3.5), http.StatusConflict, "Clips can't overlap on a Track")
+	expectError(t, ts.trimClip(r.song.ID, dup.ID, 0, 3.5), http.StatusConflict, "Clips can't overlap on a Track")
+
+	if read := ts.getTimeline(r.song.ID); !reflect.DeepEqual(read, before) {
+		t.Errorf("timeline = %+v, want it unchanged: %+v", read, before)
+	}
 }
 
 // placeTakes sends a request to place a Clip of detached Takes on a Track.
@@ -372,9 +453,17 @@ func TestADuplicatedClipOfTakesHasCopiesOfThem(t *testing.T) {
 	if !bytes.Equal(served.Body, r.audio) {
 		t.Errorf("the copy's audio differs from the recording")
 	}
-	// Deleting the original keeps the copy's file.
+	// Deleting either keeps the other's file.
+	timelineChange(t, ts.deleteClip(r.song.ID, clips[1].ID))
+	if served := ts.Do(http.MethodGet, takePath(r.song.ID, r.take.ID)+"/audio", nil); !bytes.Equal(served.Body, r.audio) {
+		t.Errorf("the original's audio after deleting the copy differs from the recording")
+	}
+	back := timelineChange(t, ts.placeTakes(r.song.ID, r.vox.ID, []int64{copied[0].ID}, copied[0].ID, 5, 0.5, 3))
 	timelineChange(t, ts.deleteClip(r.song.ID, r.clip.ID))
-	expectStatus(t, ts.Do(http.MethodGet, takePath(r.song.ID, copied[0].ID)+"/audio", nil), http.StatusOK)
+	served = ts.Do(http.MethodGet, takePath(r.song.ID, back.Tracks[1].Clips[1].Takes[0].ID)+"/audio", nil)
+	if !bytes.Equal(served.Body, r.audio) {
+		t.Errorf("the copy's audio after deleting the original differs from the recording")
+	}
 }
 
 func TestDeletingASongDeletesItsTakesAndTheirFiles(t *testing.T) {
