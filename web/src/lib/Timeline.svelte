@@ -688,12 +688,16 @@
   }
 
   /**
-   * Whether a space pressed there is its own: typed into a text field, or
-   * pressing a focused button or checkbox, rather than playing or pausing.
+   * Whether a space pressed there is its own: typed into a text field,
+   * opening a select, or ticking a checkbox or radio, which have no other
+   * key. Anywhere else it plays or pauses, even on a button, which a click
+   * leaves focused: playing along shouldn't depend on where focus was left.
    */
   function ownsSpace(target: EventTarget | null): boolean {
-    if (!(target instanceof HTMLElement)) return false;
-    return target.isContentEditable || target.closest('input, textarea, select, button, a[href], summary, label') !== null;
+    if (inTextField(target) || target instanceof HTMLSelectElement) return true;
+    if (target instanceof HTMLInputElement && (target.type === 'checkbox' || target.type === 'radio')) return true;
+    // Space in a dialog or a ⋯ menu is for what's in it.
+    return target instanceof Element && target.closest('dialog, [role="menu"]') !== null;
   }
 
   function spaceBar(event: KeyboardEvent) {
@@ -2299,6 +2303,8 @@
     padding-left: calc(0.375 * var(--timeline-rem));
     border-bottom: 1px solid var(--border);
     cursor: pointer;
+    /* Clicking it chooses the Track; its rename field is still selectable. */
+    user-select: none;
   }
   /* Marked along its left edge, in the room left for it. */
   .head.chosen {
@@ -2459,6 +2465,8 @@
     overflow: hidden;
     background: var(--surface-1);
     touch-action: none;
+    /* Dragging along it sets a Loop, never selecting what it passes. */
+    user-select: none;
   }
   .loop-bar.editable {
     cursor: crosshair;
@@ -2575,6 +2583,8 @@
     border-bottom: 1px solid var(--border);
     cursor: pointer;
     touch-action: none;
+    /* Clicking or dragging along it seeks, never selecting its labels. */
+    user-select: none;
   }
   .ruler:focus-visible {
     outline: 2px solid var(--accent);
