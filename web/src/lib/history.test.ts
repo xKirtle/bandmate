@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Clip, Take, Timeline, TimelineLoop, Track } from './api';
 import type { CuedSong } from './cues';
-import { History, placed, restorable } from './history';
+import { History, placingAdded, restorable } from './history';
 
 const clip = (id: number, start: number, more: Partial<Clip> = {}): Clip => ({
   id,
@@ -461,7 +461,7 @@ describe('History of Takes', () => {
     const t0 = timeline([track(1, [clip(5, 0)]), track(2)]);
     const t1 = timeline([track(1, [clip(5, 0)]), track(2, [takeClip(6, 10, [take(40)])])]);
 
-    const edit = placed(t0, t1);
+    const edit = placingAdded(t0, t1);
     h.record(edit, t0, t1);
 
     expect(edit).toEqual({

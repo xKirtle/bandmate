@@ -26,9 +26,9 @@ import { isBlank, type CuedSong } from './cues';
 // before or after it.
 //
 // Deleting a Clip of Takes, or its Track, only detaches its Takes, so
-// placing a Clip from their ids brings them back. A recording, and a
-// duplicate, are redone as that too, so redoing never uploads a Take again
-// or copies it again.
+// placing a Clip from their ids brings them back. A new Take, and a copied
+// Clip, are redone as that too, so redoing never uploads a Take again or
+// copies it again.
 
 /** A change to the Timeline, as the intent sent to the API. */
 export type Edit =
@@ -79,7 +79,7 @@ export class History {
   /** Keeps an edit that turned before into after, to undo, unless it changed nothing. */
   record(edit: Edit, before: Timeline, after: Timeline): void {
     if (content(before) === content(after)) return;
-    const redo = edit.kind === 'duplicateClip' ? placed(before, after) : edit;
+    const redo = edit.kind === 'duplicateClip' ? placingAdded(before, after) : edit;
     this.#undo.push({ undo: inverse(edit, before, after), redo: { edit: redo, adds: added(before, after) } });
     this.#redo = [];
   }
@@ -207,12 +207,12 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
 
 /**
  * The edit that places the one Clip added when before turned into after, as
- * it is: to keep a recording or a duplicate in the history, as redoing them
+ * it is: to keep a new Take or a copied Clip in the history, as redoing them
  * places their Clip back without uploading or copying Takes again. It's
  * undone like any placed Clip, by deleting the Clip, which detaches its
  * Takes.
  */
-export function placed(before: Timeline, after: Timeline): Edit {
+export function placingAdded(before: Timeline, after: Timeline): Edit {
   const [clipId] = added(before, after).clips;
   const { track, clip } = findClip(after, clipId);
   return { kind: 'placeClip', trackId: track.id, clip: placementOf(clip) };
