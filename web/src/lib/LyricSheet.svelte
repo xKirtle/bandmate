@@ -313,12 +313,7 @@
   const dropAt = $derived(drag.drop && 'gap' in drag.drop ? drag.drop.gap : null);
   // The place in the Arrangement of the Section the dragged one would be
   // added to.
-  const dropOnto = $derived.by(() => {
-    const drop = drag.drop;
-    if (drop && 'addTo' in drop) return drop.addTo.arrangementAt;
-    if (drop && 'merge' in drop) return drop.merge.into;
-    return null;
-  });
+  const dropOnto = $derived(drag.drop && 'addTo' in drag.drop ? drag.drop.addTo.arrangementAt : null);
 
   function dropSection(drop: Drop) {
     if ('reorder' in drop) {
@@ -327,10 +322,10 @@
       change((at) => api.reorderArrangement(at, order));
     } else if ('toScrapbook' in drop) {
       toScrapbook(drop.toScrapbook);
-    } else if ('merge' in drop) {
-      const from = sections.get(song.arrangement[drop.merge.from]);
-      const into = sections.get(song.arrangement[drop.merge.into]);
-      if (from && into) addTo(from, into);
+    } else if ('addTo' in drop && 'arrangementAt' in drop.addTo.dragged) {
+      const from = sections.get(song.arrangement[drop.addTo.dragged.arrangementAt]);
+      const to = sections.get(song.arrangement[drop.addTo.arrangementAt]);
+      if (from && to) addTo(from, to);
     }
   }
 

@@ -494,6 +494,25 @@ func TestAnUnnamedAlternateAddedToASectionTakesTheScrapsLabel(t *testing.T) {
 	}
 }
 
+func TestAnUnnamedAlternateAddedToASectionTakesTheLyricSheetSectionsLabel(t *testing.T) {
+	for _, tc := range []struct{ label, name, want string }{
+		{"Hook", "", "Hook"},
+		{"Hook", "Darker", "Darker"},
+		{"", "", ""},
+	} {
+		ts := newTestServer(t)
+		s := ts.songWithSections("Verse", tc.label)
+		hook := s.Sections[1]
+		ts.renameAlternate(s.ID, hook.Alternates[0].ID, tc.name)
+
+		got := ts.addToSection(s.ID, hook.ID, s.Sections[0].ID)
+
+		if name := got.Sections[0].Alternates[1].Name; name != tc.want {
+			t.Errorf("label %q, name %q: added alternate's name = %q, want %q", tc.label, tc.name, name, tc.want)
+		}
+	}
+}
+
 func TestALyricSheetSectionAddedToASectionLeavesTheArrangement(t *testing.T) {
 	ts := newTestServer(t)
 	s := ts.songWithSections("Verse 1", "Chorus", "Hook", "Outro")

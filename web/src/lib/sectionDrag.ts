@@ -16,15 +16,14 @@ export type Target = { gap: number } | { onto: number } | { scrapbook: true };
 /**
  * What a drop does, with the gap it shows in if it lands in the Arrangement:
  * a Section moved within it or to the Scrapbook, a Scrapbook Section put
- * back into it, a Scrapbook Section, by its id, added to the Section at a
- * place in it, or a Section in it added to another, both by their places.
+ * back into it, or a Section, from either, added to the Section at a place
+ * in it.
  */
 export type Drop =
   | { reorder: { from: number; to: number }; gap: number }
   | { toScrapbook: number }
   | { putBack: number; gap: number }
-  | { addTo: { section: number; arrangementAt: number } }
-  | { merge: { from: number; into: number } };
+  | { addTo: { dragged: Dragged; arrangementAt: number } };
 
 /** A box on the page, as getBoundingClientRect gives it. */
 export type Box = { left: number; right: number; top: number; bottom: number };
@@ -90,8 +89,8 @@ export function dropFor(dragged: Dragged, target: Target | null): Drop | null {
   if (!target) return null;
   if ('scrapbook' in target) return 'arrangementAt' in dragged ? { toScrapbook: dragged.arrangementAt } : null;
   if ('onto' in target) {
-    if ('section' in dragged) return { addTo: { section: dragged.section, arrangementAt: target.onto } };
-    return target.onto === dragged.arrangementAt ? null : { merge: { from: dragged.arrangementAt, into: target.onto } };
+    const onItself = 'arrangementAt' in dragged && dragged.arrangementAt === target.onto;
+    return onItself ? null : { addTo: { dragged, arrangementAt: target.onto } };
   }
   const { gap } = target;
   if ('section' in dragged) return { putBack: dragged.section, gap };

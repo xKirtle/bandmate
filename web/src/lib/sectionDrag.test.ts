@@ -177,12 +177,12 @@ describe('dropFor', () => {
   });
 
   it('adds a Scrapbook Section dropped onto a Section to it', () => {
-    expect(dropFor({ section: 7 }, { onto: 2 })).toEqual({ addTo: { section: 7, arrangementAt: 2 } });
+    expect(dropFor({ section: 7 }, { onto: 2 })).toEqual({ addTo: { dragged: { section: 7 }, arrangementAt: 2 } });
   });
 
   it('adds a Lyric Sheet Section dropped onto another Section to it', () => {
-    expect(dropFor({ arrangementAt: 1 }, { onto: 2 })).toEqual({ merge: { from: 1, into: 2 } });
-    expect(dropFor({ arrangementAt: 3 }, { onto: 0 })).toEqual({ merge: { from: 3, into: 0 } });
+    expect(dropFor({ arrangementAt: 1 }, { onto: 2 })).toEqual({ addTo: { dragged: { arrangementAt: 1 }, arrangementAt: 2 } });
+    expect(dropFor({ arrangementAt: 3 }, { onto: 0 })).toEqual({ addTo: { dragged: { arrangementAt: 3 }, arrangementAt: 0 } });
   });
 
   it('does nothing with a Lyric Sheet Section dropped onto itself', () => {
