@@ -3,7 +3,7 @@
   import { SvelteSet } from 'svelte/reactivity';
   import { api, type Song, type SongAt } from './api';
   import SectionEditor from './SectionEditor.svelte';
-  import { card, describe } from './sections';
+  import { card, describe, labelOf } from './sections';
 
   let {
     song,
@@ -132,7 +132,7 @@
             {@const shown = card(section)}
             <button type="button" id="card-{section.id}" class="card" onclick={() => show(section.id)}>
               <span class="card-head">
-                <span class="card-label" class:muted={!section.label}>{section.label || 'Section without a Label'}</span>
+                <span class="card-label" class:muted={!section.label}>{labelOf(section)}</span>
                 {#if shown.alternates > 1}
                   <span class="count">{shown.alternates} Alternates</span>
                 {/if}

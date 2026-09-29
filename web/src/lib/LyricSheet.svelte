@@ -23,7 +23,7 @@
   import type { MenuAction } from './menu';
   import SectionEditor from './SectionEditor.svelte';
   import { dropGap, moveTo, targetIndex } from './sectionDrag';
-  import { describe, isEmpty } from './sections';
+  import { activeAlternate, describe, isEmpty } from './sections';
   import type { Mode } from './songMode';
   import { readShiftStep, shiftSteps, storeShiftStep, type ShiftStep } from './shiftStep';
   import { markSyncHintSeen, sawSyncHint } from './syncHint';
@@ -145,7 +145,7 @@
   const writeFields = gutterFields();
   /** The Lines of an Occurrence's Section's active Alternate: those whose Cues are in effect. */
   function activeLines(occurrence: Occurrence | undefined): Line[] {
-    return sections.get(occurrence?.sectionId ?? -1)?.alternates.find((a) => a.active)?.lines ?? [];
+    return activeAlternate(sections.get(occurrence?.sectionId ?? -1))?.lines ?? [];
   }
   /** Ends a Line's name with its Section's Label, e.g. " of Chorus", as the gutter names Lines. */
   function ofSection(label: string | undefined): string {

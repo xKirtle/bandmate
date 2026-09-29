@@ -1,6 +1,6 @@
 import { describe as group, expect, it } from 'vitest';
 import type { Alternate, Section } from './api';
-import { card, isEmpty } from './sections';
+import { activeAlternate, card, isEmpty, labelOf } from './sections';
 
 function alternate(active: boolean, ...texts: string[]): Alternate {
   return {
@@ -46,5 +46,22 @@ group('card', () => {
 
   it('shows Lines with their Chords, as written', () => {
     expect(card(section('', alternate(true, 'Hel[Am]lo'))).lines).toEqual(['Hel[Am]lo']);
+  });
+});
+
+group('labelOf', () => {
+  it('is the Label', () => {
+    expect(labelOf(section('Chorus', alternate(true, 'La')))).toBe('Chorus');
+  });
+
+  it('says so when there is no Label, whatever the Lines', () => {
+    expect(labelOf(section('', alternate(true, 'La')))).toBe('Section without a Label');
+  });
+});
+
+group('activeAlternate', () => {
+  it('is the active one, wherever it is', () => {
+    const active = alternate(true, 'New');
+    expect(activeAlternate(section('', alternate(false, 'Old'), active))).toBe(active);
   });
 });
