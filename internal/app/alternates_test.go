@@ -392,10 +392,106 @@ func TestMovingTheActiveAlternateToTheScrapbookIsRejected(t *testing.T) {
 
 	res := ts.Do(http.MethodPost, toScrapbookPath(before.ID, chorus.Alternates[0].ID), nil)
 
-	expectError(t, res, http.StatusConflict, "the active Alternate can't be moved to the Scrapbook; activate another one first")
+	expectError(t, res, http.StatusConflict, "the active Alternate can't be moved out of its Section; activate another one first")
 	if got := ts.getSong(before.ID); !reflect.DeepEqual(got, before) {
 		t.Errorf("song after rejected move = %+v, want it unchanged %+v", got, before)
 	}
+}
+
+// toArrangementPath is where an Alternate is moved out of its Section into
+// the Lyric Sheet.
+func toArrangementPath(songID, alternateID int64) string {
+	return alternatePath(songID, alternateID) + "/arrangement"
+}
+
+// moveToArrangement moves an Alternate out of its Section into a Section of
+// its own in the Lyric Sheet and returns the Song. body sets "position".
+func (ts *testServer) moveToArrangement(songID, alternateID int64, body map[string]any) song {
+	ts.t.Helper()
+	return ts.lyricSheetChange(http.MethodPost, toArrangementPath(songID, alternateID), body)
+}
+
+func TestAnInactiveAlternateCanBeMovedIntoTheLyricSheetAsASectionOfItsOwn(t *testing.T) {
+	ts := newTestServer(t)
+	s, chorus := ts.chorusWithTwoAlternates()
+	ts.renameAlternate(s.ID, chorus.Alternates[1].ID, "Darker")
+	before := ts.setText(s.ID, chorus.Alternates[1].ID, "Slow it [Dm]down")
+	moved := before.Sections[1].Alternates[1]
+
+	got := ts.moveToArrangement(s.ID, moved.ID, map[string]any{"position": 1})
+
+	if want := []alternate{chorus.Alternates[0]}; !reflect.DeepEqual(sectionOf(t, got, chorus.ID).Alternates, want) {
+		t.Errorf("chorus alternates = %+v, want only the active one %+v", sectionOf(t, got, chorus.ID).Alternates, want)
+	}
+	if len(got.Arrangement) != 3 || got.Arrangement[0] != before.Arrangement[0] || got.Arrangement[2] != chorus.ID {
+		t.Fatalf("arrangement = %v, want a new Section between %v", got.Arrangement, before.Arrangement)
+	}
+	if len(got.Scrapbook) != 0 {
+		t.Errorf("scrapbook = %v, want it still empty", got.Scrapbook)
+	}
+	added := sectionOf(t, got, got.Arrangement[1])
+	if added.Label != "Chorus · Darker" {
+		t.Errorf("label = %q, want %q", added.Label, "Chorus · Darker")
+	}
+	if len(added.Alternates) != 1 {
+		t.Fatalf("new section alternates = %+v, want one", added.Alternates)
+	}
+	if alt := added.Alternates[0]; !alt.Active || alt.ID != moved.ID || !reflect.DeepEqual(alt.Lines, moved.Lines) {
+		t.Errorf("new section alternate = %+v, want the moved one %+v, active", alt, moved)
+	}
+	if read := ts.getSong(s.ID); !reflect.DeepEqual(read, got) {
+		t.Errorf("song read back = %+v, want %+v", read, got)
+	}
+}
+
+func TestMovingAnAlternateIntoTheLyricSheetWithoutAPositionIsRejected(t *testing.T) {
+	ts := newTestServer(t)
+	before, chorus := ts.chorusWithTwoAlternates()
+
+	// Without a place, an Alternate moved out goes to the Scrapbook instead.
+	res := ts.Do(http.MethodPost, toArrangementPath(before.ID, chorus.Alternates[1].ID), map[string]any{})
+
+	expectError(t, res, http.StatusBadRequest, "position is required")
+	if got := ts.getSong(before.ID); !reflect.DeepEqual(got, before) {
+		t.Errorf("song after rejected move = %+v, want it unchanged %+v", got, before)
+	}
+}
+
+func TestMovingTheActiveAlternateIntoTheLyricSheetIsRejected(t *testing.T) {
+	ts := newTestServer(t)
+	before, chorus := ts.chorusWithTwoAlternates()
+
+	res := ts.Do(http.MethodPost, toArrangementPath(before.ID, chorus.Alternates[0].ID), map[string]any{"position": 0})
+
+	expectError(t, res, http.StatusConflict, "the active Alternate can't be moved out of its Section; activate another one first")
+	if got := ts.getSong(before.ID); !reflect.DeepEqual(got, before) {
+		t.Errorf("song after rejected move = %+v, want it unchanged %+v", got, before)
+	}
+}
+
+func TestMovingAnAlternateIntoTheLyricSheetOutsideItIsRejected(t *testing.T) {
+	ts := newTestServer(t)
+	before, chorus := ts.chorusWithTwoAlternates()
+
+	for _, position := range []int{-1, 3} {
+		res := ts.Do(http.MethodPost, toArrangementPath(before.ID, chorus.Alternates[1].ID),
+			map[string]any{"position": position})
+
+		expectError(t, res, http.StatusBadRequest, "position must be between 0 and 2")
+	}
+	if got := ts.getSong(before.ID); !reflect.DeepEqual(got, before) {
+		t.Errorf("song after rejected move = %+v, want it unchanged %+v", got, before)
+	}
+}
+
+func TestMovingAnAlternateOfAnotherSongIntoTheLyricSheetIsNotFound(t *testing.T) {
+	ts := newTestServer(t)
+	_, chorus := ts.chorusWithTwoAlternates()
+	before := ts.songWithSections("Verse")
+
+	res := ts.Do(http.MethodPost, toArrangementPath(before.ID, chorus.Alternates[1].ID), map[string]any{"position": 9})
+
+	expectStatus(t, res, http.StatusNotFound)
 }
 
 func TestMovingAnAlternateOfAnotherSongToTheScrapbookIsNotFound(t *testing.T) {

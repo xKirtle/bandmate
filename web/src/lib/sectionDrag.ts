@@ -1,11 +1,20 @@
 // Dragging a Section to a new place in the Arrangement, or between the
 // Arrangement and the Scrapbook, or onto another Section to add its
-// Alternates to it: from where the pointer is to what it would drop
-// into, to what the drop does. A move within the Arrangement saves the
-// same order pressing ↑ or ↓ that many times gives, as those presses would.
+// Alternates to it; or an inactive Alternate out of its Section, into the
+// Arrangement or the Scrapbook as a Section of its own: from where the
+// pointer is to what it would drop into, to what the drop does. A move
+// within the Arrangement saves the same order pressing ↑ or ↓ that many
+// times gives, as those presses would.
 
-/** What's being dragged: a Lyric Sheet Section, by its place in the Arrangement, or a Scrapbook Section, by its id. */
-export type Dragged = { arrangementAt: number } | { section: number };
+/**
+ * What's being dragged: a Lyric Sheet Section, by its place in the
+ * Arrangement, a Scrapbook Section, by its id, or an inactive Alternate, by
+ * its id.
+ */
+export type Dragged = DraggedSection | { alternate: number };
+
+/** A Section being dragged, from the Lyric Sheet or the Scrapbook. */
+export type DraggedSection = { arrangementAt: number } | { section: number };
 
 /**
  * Where a drag would drop: a gap in the Arrangement, onto the Section at a
@@ -16,14 +25,17 @@ export type Target = { gap: number } | { onto: number } | { scrapbook: true };
 /**
  * What a drop does, with the gap it shows in if it lands in the Arrangement:
  * a Section moved within it or to the Scrapbook, a Scrapbook Section put
- * back into it, or a Section, from either, added to the Section at a place
- * in it.
+ * back into it, a Section, from either, added to the Section at a place
+ * in it, or an Alternate, by its id, moved out of its Section into it or the
+ * Scrapbook.
  */
 export type Drop =
   | { reorder: { from: number; to: number }; gap: number }
   | { toScrapbook: number }
   | { putBack: number; gap: number }
-  | { addTo: { dragged: Dragged; arrangementAt: number } };
+  | { addTo: { dragged: DraggedSection; arrangementAt: number } }
+  | { alternateToArrangement: number; gap: number }
+  | { alternateToScrapbook: number };
 
 /** A box on the page, as getBoundingClientRect gives it. */
 export type Box = { left: number; right: number; top: number; bottom: number };
@@ -87,6 +99,10 @@ export function dropTarget(
 /** What dropping `dragged` on `target` does; null if nothing. */
 export function dropFor(dragged: Dragged, target: Target | null): Drop | null {
   if (!target) return null;
+  if ('alternate' in dragged) {
+    if ('scrapbook' in target) return { alternateToScrapbook: dragged.alternate };
+    return 'gap' in target ? { alternateToArrangement: dragged.alternate, gap: target.gap } : null;
+  }
   if ('scrapbook' in target) return 'arrangementAt' in dragged ? { toScrapbook: dragged.arrangementAt } : null;
   if ('onto' in target) {
     const onItself = 'arrangementAt' in dragged && dragged.arrangementAt === target.onto;
@@ -97,4 +113,9 @@ export function dropFor(dragged: Dragged, target: Target | null): Drop | null {
   const from = dragged.arrangementAt;
   const to = targetIndex(from, gap);
   return to === from ? null : { reorder: { from, to }, gap };
+}
+
+/** Whether a drop lands on the Scrapbook, of a Section or an Alternate. */
+export function dropsOnScrapbook(drop: Drop | null): boolean {
+  return drop !== null && ('toScrapbook' in drop || 'alternateToScrapbook' in drop);
 }

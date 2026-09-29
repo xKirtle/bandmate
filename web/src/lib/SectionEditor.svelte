@@ -5,7 +5,9 @@
   import { api, suggestedLabels, type Alternate, type Section, type Song, type SongAt } from './api';
   import Combobox from './Combobox.svelte';
   import type { MenuAction } from './menu';
-  import { activeAlternate, alternateName, alternatesLabel, labelOf } from './sections';
+  import type { Drop } from './sectionDrag';
+  import type { SectionDragging } from './sectionDragging.svelte';
+  import { activeAlternate, alternateName, alternatesLabel, labelOf, type Place } from './sections';
 
   let {
     section,
@@ -16,6 +18,8 @@
     actions,
     more,
     cueing,
+    drag,
+    places = [],
   }: {
     section: Section;
     /** Focus the Label when this becomes true, e.g. for a Section just added. */
@@ -32,6 +36,10 @@
     more: MenuAction[];
     /** Given, the active Alternate's Lines are highlighted and cued as playback goes. */
     cueing?: Cueing;
+    /** The drag of a Section, shared with the page: given, an inactive Alternate is dragged out by its card. */
+    drag?: SectionDragging;
+    /** Where in the Lyric Sheet an inactive Alternate can be moved to, as a Section of its own. */
+    places?: Place[];
   } = $props();
 
   // The server guarantees exactly one active Alternate.
@@ -115,9 +123,9 @@
     return document.getElementById(`pick-${section.id}-${altId}`) as HTMLInputElement | null;
   }
 
-  /** A click anywhere on a card chooses it, but typing its name or opening its ⋯ doesn't. */
+  /** A click anywhere on a card chooses it, but typing its name, opening its ⋯ or dragging it by its grip doesn't. */
   function cardClicked(alt: Alternate, e: MouseEvent) {
-    if ((e.target as Element).closest('input, button, [role="menu"]')) return;
+    if ((e.target as Element).closest('input, button, [role="menu"], .grip')) return;
     radio(alt.id)?.focus();
     choose(alt);
   }
@@ -132,6 +140,41 @@
   async function moveToScrapbook(alt: Alternate) {
     // Its ⋯ goes with it: the keyboard carries on from the active card.
     if (await change((at) => api.moveAlternateToScrapbook(at, alt.id))) radio(active.id)?.focus();
+  }
+
+  async function moveToArrangement(alt: Alternate, position: number) {
+    // Its ⋯ goes with it: the keyboard carries on from the active card.
+    if (await change((at) => api.moveAlternateToArrangement(at, alt.id, position))) radio(active.id)?.focus();
+  }
+
+  // Dragged by its card's grip, an inactive Alternate goes into a gap in the
+  // Lyric Sheet or onto the Scrapbook, as a Section of its own.
+  function dropAlternate(alt: Alternate) {
+    return (drop: Drop) => {
+      if ('alternateToArrangement' in drop) moveToArrangement(alt, drop.gap);
+      else if ('alternateToScrapbook' in drop) moveToScrapbook(alt);
+    };
+  }
+
+  // What an inactive Alternate's ⋯ does.
+  function alternateActions(alt: Alternate): MenuAction[] {
+    const actions: MenuAction[] = [
+      {
+        icon: '×',
+        label: 'Move to the Scrapbook',
+        title: 'Move to the Scrapbook: keep it as a Section of its own, with its Cues',
+        run: () => moveToScrapbook(alt),
+      },
+    ];
+    if (places.length > 0) {
+      actions.push({
+        icon: '↦',
+        label: 'Move to the Lyric Sheet…',
+        choices: places.map((place) => ({ label: place.name, run: () => moveToArrangement(alt, place.position) })),
+      });
+    }
+    actions.push({ icon: '🗑', label: 'Delete', run: () => remove(alt) });
+    return actions;
   }
 
   function focusWhen(on: boolean) {
@@ -222,8 +265,22 @@
           {@const name = alternateName(section, alt)}
           <!-- The radio takes the keyboard; a click anywhere else on the card is a shortcut to it. -->
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-          <div class="card" class:chosen={alt.active} onclick={(e) => cardClicked(alt, e)}>
+          <div
+            class="card"
+            class:chosen={alt.active}
+            class:dragged={drag?.alternate === alt.id}
+            onclick={(e) => cardClicked(alt, e)}
+          >
             <div class="card-head">
+              <!-- The active one stays: a Section always has one. Pointer only: ⋯ moves it from the keyboard. -->
+              {#if drag?.on && !alt.active}
+                <span
+                  class="grip"
+                  aria-hidden="true"
+                  title="Drag into the Lyric Sheet or onto the Scrapbook, as a Section of its own; Esc cancels"
+                  {...drag.grip({ alternate: alt.id }, dropAlternate(alt))}>⠿</span
+                >
+              {/if}
               <input
                 type="radio"
                 id="pick-{section.id}-{alt.id}"
@@ -251,18 +308,7 @@
               />
               <!-- The active one can't be moved or deleted. -->
               {#if !alt.active}
-                <ActionsMenu
-                  label="More actions for {name}"
-                  entries={[
-                    {
-                      icon: '×',
-                      label: 'Move to the Scrapbook',
-                      title: 'Move to the Scrapbook: keep it as a Section of its own, with its Cues',
-                      run: () => moveToScrapbook(alt),
-                    },
-                    { icon: '🗑', label: 'Delete', run: () => remove(alt) },
-                  ]}
-                />
+                <ActionsMenu label="More actions for {name}" entries={alternateActions(alt)} />
               {/if}
             </div>
             <div class="lines" id="lines-{section.id}-{alt.id}">
@@ -422,6 +468,24 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+  }
+  .card.dragged {
+    opacity: 0.5;
+  }
+  .grip {
+    display: grid;
+    place-items: center;
+    width: 1.25rem;
+    color: var(--text-muted);
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+  }
+  .grip:hover {
+    color: var(--text);
+  }
+  .card.dragged .grip {
+    cursor: grabbing;
   }
   .card-head input[type='radio'] {
     flex: none;

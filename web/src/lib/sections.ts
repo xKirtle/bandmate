@@ -28,6 +28,20 @@ export function sectionsInArrangement(song: Song, sections: Map<number, Section>
   return song.arrangement.flatMap((id) => sections.get(id) ?? []);
 }
 
+/** A place in the Lyric Sheet a Section can go, and how it's named in lists. */
+export type Place = { position: number; name: string };
+
+/**
+ * Where a Section can go in the Lyric Sheet, e.g. one put back from the
+ * Scrapbook: at the start, or after any of the Sections in it, `inArrangement`.
+ */
+export function places(inArrangement: Section[]): Place[] {
+  return [
+    { position: 0, name: 'At the start' },
+    ...inArrangement.map((s, i) => ({ position: i + 1, name: `After ${i + 1}. ${describe(s)}` })),
+  ];
+}
+
 /** How a Section is named where it's shown in full: its Label, if it has one. */
 export function labelOf(section: Section): string {
   return section.label || 'Section without a Label';

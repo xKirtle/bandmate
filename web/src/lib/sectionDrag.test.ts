@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dropFor, dropGap, dropTarget, moveTo, targetIndex } from './sectionDrag';
+import { dropFor, dropGap, dropsOnScrapbook, dropTarget, moveTo, targetIndex } from './sectionDrag';
 
 /** What pressing ↑ or ↓ on the Section at `from` gives, `times` times over. */
 function pressed(order: number[], from: number, by: -1 | 1, times: number): number[] {
@@ -189,8 +189,35 @@ describe('dropFor', () => {
     expect(dropFor({ arrangementAt: 2 }, { onto: 2 })).toBeNull();
   });
 
+  it('moves an Alternate dropped into a gap there, as a Section of its own', () => {
+    expect(dropFor({ alternate: 9 }, { gap: 0 })).toEqual({ alternateToArrangement: 9, gap: 0 });
+    expect(dropFor({ alternate: 9 }, { gap: 3 })).toEqual({ alternateToArrangement: 9, gap: 3 });
+  });
+
+  it('moves an Alternate dropped on the Scrapbook there', () => {
+    expect(dropFor({ alternate: 9 }, { scrapbook: true })).toEqual({ alternateToScrapbook: 9 });
+  });
+
+  it('does nothing with an Alternate dropped onto a Section', () => {
+    expect(dropFor({ alternate: 9 }, { onto: 1 })).toBeNull();
+  });
+
   it('does nothing dropped nowhere', () => {
     expect(dropFor({ arrangementAt: 2 }, null)).toBeNull();
     expect(dropFor({ section: 7 }, null)).toBeNull();
+    expect(dropFor({ alternate: 9 }, null)).toBeNull();
+  });
+});
+
+describe('dropsOnScrapbook', () => {
+  it('is true for a Section or an Alternate dropped on the Scrapbook', () => {
+    expect(dropsOnScrapbook({ toScrapbook: 2 })).toBe(true);
+    expect(dropsOnScrapbook({ alternateToScrapbook: 9 })).toBe(true);
+  });
+
+  it('is false for a drop in the Lyric Sheet, or none', () => {
+    expect(dropsOnScrapbook({ putBack: 7, gap: 0 })).toBe(false);
+    expect(dropsOnScrapbook({ alternateToArrangement: 9, gap: 0 })).toBe(false);
+    expect(dropsOnScrapbook(null)).toBe(false);
   });
 });

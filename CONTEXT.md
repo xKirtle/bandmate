@@ -44,7 +44,7 @@ Making an independent copy of a Section, with all its Alternates and the same on
 _Avoid_: Repeat, share, Detach
 
 **Scrapbook**:
-A Song's collection of Sections that aren't in the Arrangement: leftovers and loose ideas kept for later, in the order they came into it. A Section taken out of the Arrangement goes to its end, unless it has nothing written in any Alternate (no Lines, or only blank ones), in which case it's deleted instead, as there's nothing to keep; a Section made in the Scrapbook stays there even while it's still empty. An inactive Alternate can also be moved out of its Section into the Scrapbook, becoming a Section of its own; a Scrapbook Section, or a Section in the Arrangement, can in turn be added to another Section in the Arrangement, its Alternates joining that Section's, inactive. Cues go wherever their Lines go: into the Scrapbook, back out of it, and into another Section.
+A Song's collection of Sections that aren't in the Arrangement: leftovers and loose ideas kept for later, in the order they came into it. A Section taken out of the Arrangement goes to its end, unless it has nothing written in any Alternate (no Lines, or only blank ones), in which case it's deleted instead, as there's nothing to keep; a Section made in the Scrapbook stays there even while it's still empty. An inactive Alternate can also be moved out of its Section, becoming a Section of its own, into the Scrapbook or straight into the Arrangement; a Scrapbook Section, or a Section in the Arrangement, can in turn be added to another Section in the Arrangement, its Alternates joining that Section's, inactive. Cues go wherever their Lines go: into the Scrapbook, back out of it, and into another Section.
 _Avoid_: Trash, drafts, unused
 
 **Alternate**:
@@ -52,7 +52,7 @@ One of several competing versions of a Section's Lines; exactly one Alternate is
 _Avoid_: Variant, option, draft
 
 **Alternates mode**:
-A way of choosing a Section's active Alternate, in Write mode: the Section shows every Alternate in full, read-only, to make one active, rename it, make a new one (an active copy of the active one), or move an inactive one to the Scrapbook or delete it. It's where new Alternates are made, so it opens even when a Section has only one. Outside it, a Section shows only its active Alternate, and another can only be changed once it's made active.
+A way of choosing a Section's active Alternate, in Write mode: the Section shows every Alternate in full, read-only, to make one active, rename it, make a new one (an active copy of the active one), or move an inactive one out, to the Scrapbook or the Lyric Sheet, as a Section of its own, or delete it. It's where new Alternates are made, so it opens even when a Section has only one. Outside it, a Section shows only its active Alternate, and another can only be changed once it's made active.
 _Avoid_: Compare view, picker
 
 **Line**:

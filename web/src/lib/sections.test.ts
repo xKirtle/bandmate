@@ -1,6 +1,6 @@
 import { describe as group, expect, it } from 'vitest';
 import type { Alternate, Section } from './api';
-import { activeAlternate, addedNotice, alternateName, alternatesLabel, card, isEmpty, labelOf } from './sections';
+import { activeAlternate, addedNotice, alternateName, alternatesLabel, card, isEmpty, labelOf, places } from './sections';
 
 function alternate(active: boolean, ...texts: string[]): Alternate {
   return {
@@ -110,5 +110,21 @@ group('addedNotice', () => {
     const idea = section('', alternate(true, 'Drive'));
     const verse = section('', alternate(true, 'Night'));
     expect(addedNotice(idea, verse)).toBe('“Drive” added to “Night” as an Alternate');
+  });
+});
+
+group('places', () => {
+  it('is the start, then after each Section in the Lyric Sheet, numbered', () => {
+    const verse = section('Verse 1', alternate(true, 'Night'));
+    const idea = section('', alternate(true, 'Drive'));
+    expect(places([verse, idea])).toEqual([
+      { position: 0, name: 'At the start' },
+      { position: 1, name: 'After 1. Verse 1' },
+      { position: 2, name: 'After 2. “Drive”' },
+    ]);
+  });
+
+  it('is only the start in an empty Lyric Sheet', () => {
+    expect(places([])).toEqual([{ position: 0, name: 'At the start' }]);
   });
 });

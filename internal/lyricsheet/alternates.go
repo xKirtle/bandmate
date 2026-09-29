@@ -114,31 +114,62 @@ func (s *Store) DeleteAlternate(ctx context.Context, songID int64, based Version
 // moved.
 func (s *Store) MoveAlternateToScrapbook(ctx context.Context, songID int64, based Version, alternateID int64) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		var label, name string
-		var active bool
-		err := tx.QueryRowContext(ctx, `SELECT s.label, a.name, a.active FROM alternates a
-			JOIN sections s ON s.id = a.section_id WHERE a.id = ? AND s.song_id = ?`,
-			alternateID, songID).Scan(&label, &name, &active)
-		if errors.Is(err, sql.ErrNoRows) {
-			return ErrNotFound
-		}
+		newID, err := moveAlternateOut(ctx, tx, songID, alternateID)
 		if err != nil {
-			return fmt.Errorf("reading alternate: %w", err)
-		}
-		if active {
-			return conflict("the active Alternate can't be moved to the Scrapbook; activate another one first")
-		}
-		newID, err := insert(ctx, tx, `INSERT INTO sections (song_id, label) VALUES (?, ?)`,
-			songID, scrapbookLabel(label, name))
-		if err != nil {
-			return fmt.Errorf("adding section: %w", err)
-		}
-		if _, err := tx.ExecContext(ctx, `UPDATE alternates SET section_id = ?, active = 1 WHERE id = ?`,
-			newID, alternateID); err != nil {
-			return fmt.Errorf("moving alternate: %w", err)
+			return err
 		}
 		return toScrapbookEnd(ctx, tx, songID, newID)
 	})
+}
+
+// MoveAlternateToArrangement moves an inactive Alternate out of its Section
+// into a new Section of its own at position in the Arrangement, labelled as
+// MoveAlternateToScrapbook labels it. Its Cues go with it, live at once, as
+// it's now the Section's active Alternate (ADR 0010). The active Alternate
+// can't be moved.
+func (s *Store) MoveAlternateToArrangement(ctx context.Context, songID int64, based Version, alternateID int64, position int) (Song, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		newID, err := moveAlternateOut(ctx, tx, songID, alternateID)
+		if err != nil {
+			return err
+		}
+		// The new Section isn't in the Arrangement yet, so it doesn't count.
+		pos, err := arrangementPosition(ctx, tx, songID, &position)
+		if err != nil {
+			return err
+		}
+		return placeSection(ctx, tx, songID, newID, pos)
+	})
+}
+
+// moveAlternateOut moves an inactive Alternate out of its Section into a new
+// Section of its own, not yet placed anywhere, and returns its id. The new
+// Section is labelled with the old one's Label and the Alternate's name.
+func moveAlternateOut(ctx context.Context, tx *sql.Tx, songID, alternateID int64) (int64, error) {
+	var label, name string
+	var active bool
+	err := tx.QueryRowContext(ctx, `SELECT s.label, a.name, a.active FROM alternates a
+		JOIN sections s ON s.id = a.section_id WHERE a.id = ? AND s.song_id = ?`,
+		alternateID, songID).Scan(&label, &name, &active)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrNotFound
+	}
+	if err != nil {
+		return 0, fmt.Errorf("reading alternate: %w", err)
+	}
+	if active {
+		return 0, conflict("the active Alternate can't be moved out of its Section; activate another one first")
+	}
+	newID, err := insert(ctx, tx, `INSERT INTO sections (song_id, label) VALUES (?, ?)`,
+		songID, movedOutLabel(label, name))
+	if err != nil {
+		return 0, fmt.Errorf("adding section: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE alternates SET section_id = ?, active = 1 WHERE id = ?`,
+		newID, alternateID); err != nil {
+		return 0, fmt.Errorf("moving alternate: %w", err)
+	}
+	return newID, nil
 }
 
 // AddToSection adds a Section, from the Scrapbook or the Lyric Sheet, to
@@ -194,10 +225,10 @@ func (s *Store) AddToSection(ctx context.Context, songID int64, based Version, a
 	})
 }
 
-// scrapbookLabel is the Label of a Section made from an Alternate moved to
-// the Scrapbook: its Section's Label and its name, e.g. "Verse 1 · Darker",
+// movedOutLabel is the Label of a Section made from an Alternate moved out
+// of its Section: that Section's Label and its name, e.g. "Verse 1 · Darker",
 // whichever of them it has.
-func scrapbookLabel(label, name string) string {
+func movedOutLabel(label, name string) string {
 	if label == "" || name == "" {
 		return label + name
 	}
