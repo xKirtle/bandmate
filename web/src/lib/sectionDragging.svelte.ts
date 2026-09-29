@@ -14,10 +14,10 @@ export class SectionDragging {
   readonly drop: Drop | null = $derived(this.current && dropFor(this.current.dragged, this.current.target));
   /** Whether Sections can be dragged at all. */
   readonly on: boolean = $derived.by(() => this.#enabled());
-  /** The place in the Arrangement of the Occurrence being dragged, if one is. */
-  readonly occurrenceAt: number | null = $derived.by(() => {
+  /** The place in the Arrangement of the Lyric Sheet Section being dragged, if one is. */
+  readonly sectionAt: number | null = $derived.by(() => {
     const dragged = this.current?.dragged;
-    return dragged && 'occurrenceAt' in dragged ? dragged.occurrenceAt : null;
+    return dragged && 'sectionAt' in dragged ? dragged.sectionAt : null;
   });
   /** The id of the Scrapbook Section being dragged, if one is. */
   readonly section: number | null = $derived.by(() => {
@@ -28,8 +28,8 @@ export class SectionDragging {
   #enabled: () => boolean;
   #order: string = $derived.by(() => this.#orderOf());
   #orderOf: () => string;
-  // Each Occurrence's place on the page, by its place in the Arrangement.
-  #occurrences = new Map<number, HTMLElement>();
+  // Each Lyric Sheet Section's place on the page, by its place in the Arrangement.
+  #sections = new Map<number, HTMLElement>();
   #arrangement: HTMLElement | null = null;
   #scrapbook: HTMLElement | null = null;
 
@@ -57,11 +57,11 @@ export class SectionDragging {
     this.current = null;
   }
 
-  /** Attaches an Occurrence's place on the page, at `index` in the Arrangement. */
-  placeOccurrence(el: HTMLElement, index: number) {
-    this.#occurrences.set(index, el);
+  /** Attaches a Lyric Sheet Section's place on the page, at `index` in the Arrangement. */
+  placeSection(el: HTMLElement, index: number) {
+    this.#sections.set(index, el);
     return () => {
-      if (this.#occurrences.get(index) === el) this.#occurrences.delete(index);
+      if (this.#sections.get(index) === el) this.#sections.delete(index);
     };
   }
 
@@ -73,7 +73,7 @@ export class SectionDragging {
     };
   };
 
-  /** Attaches the Scrapbook's place on the page, where an Occurrence can be dropped. */
+  /** Attaches the Scrapbook's place on the page, where a Lyric Sheet Section can be dropped. */
   placeScrapbook = (el: HTMLElement) => {
     this.#scrapbook = el;
     return () => {
@@ -89,13 +89,13 @@ export class SectionDragging {
   #targetAt(dragged: Dragged, x: number, y: number): Target | null {
     const arrangement = this.#arrangement?.getBoundingClientRect();
     if (!arrangement) return null;
-    // An Occurrence not on the page has its gaps counted above the pointer.
-    const count = Math.max(-1, ...this.#occurrences.keys()) + 1;
+    // A Section not on the page has its gaps counted above the pointer.
+    const count = Math.max(-1, ...this.#sections.keys()) + 1;
     const spans = Array.from({ length: count }, (_, i) => {
-      const box = this.#occurrences.get(i)?.getBoundingClientRect();
+      const box = this.#sections.get(i)?.getBoundingClientRect();
       return box ? { top: box.top, bottom: box.bottom } : { top: -Infinity, bottom: -Infinity };
     });
-    // Only a Scrapbook Section drops onto a Section: an Occurrence dropped
+    // Only a Scrapbook Section drops onto a Section: a Lyric Sheet Section dropped
     // onto another would make a hook an Alternate of a verse by accident.
     return dropTarget({ x, y }, this.#scrapbookBox(), arrangement, spans, 'section' in dragged);
   }

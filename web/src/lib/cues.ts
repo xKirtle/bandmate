@@ -1,15 +1,7 @@
-// Cues link a Line within an Occurrence to a time on the Timeline (ADR
-// 0005). An Occurrence has no Cue of its own: it starts where its first Line
-// is cued (ADR 0009). This works out where playback is and which Cues are
-// out of order, and reads and writes the times as typed.
-
-/** What the current position is worked out from: an Occurrence and its Line Cues. */
-export interface CuedOccurrence {
-  id: number;
-  sectionId: number;
-  /** Line ids to their Cues in this Occurrence, in seconds, dormant ones included. */
-  lineCues: Readonly<Record<number, number>>;
-}
+// Cues link a Line to a time on the Timeline; a Line has at most one. A
+// Section has no Cue of its own: it starts where its first Line is cued (ADR
+// 0009). This works out where playback is and which Cues are out of order,
+// and reads and writes the times as typed.
 
 /** A Section, as far as its Lines take Cues. */
 export interface CuedSection<L extends CuedLine = CuedLine> {
@@ -21,17 +13,20 @@ export interface CuedSection<L extends CuedLine = CuedLine> {
 export interface CuedLine {
   id: number;
   text: string;
+  /** In seconds; null for none. Dormant while its Alternate is inactive. */
+  cue: number | null;
 }
 
 /** A Song, as far as its Cues go. */
 export interface CuedSong<L extends CuedLine = CuedLine> {
-  arrangement: readonly CuedOccurrence[];
+  /** Ids of the Sections in the Arrangement, in order. */
+  arrangement: readonly number[];
   sections: readonly CuedSection<L>[];
 }
 
-/** Where playback is in the Lyric Sheet: one Line within an Occurrence. */
+/** Where playback is in the Lyric Sheet: a Line, and the Section it's in to name it by. */
 export interface Position {
-  occurrence: number;
+  section: number;
   line: number;
 }
 
@@ -41,12 +36,15 @@ export function isBlank(line: { text: string }): boolean {
 }
 
 /**
- * Gives each Occurrence's Lines whose Cues are in effect: those of its
- * Section's active Alternate. The others' Cues are dormant (ADR 0007).
+ * The Lines whose Cues are in effect, in the order down the sheet, each with
+ * its Section: those of the active Alternate of each Section in the
+ * Arrangement. The others' Cues are dormant (ADR 0007).
  */
-function activeLines<L extends CuedLine>(song: CuedSong<L>): (o: CuedOccurrence) => readonly L[] {
+function activeLines<L extends CuedLine>(song: CuedSong<L>): { section: number; line: L }[] {
   const sections = new Map(song.sections.map((s) => [s.id, s]));
-  return (o) => sections.get(o.sectionId)?.alternates.find((a) => a.active)?.lines ?? [];
+  return song.arrangement.flatMap((id) =>
+    (sections.get(id)?.alternates.find((a) => a.active)?.lines ?? []).map((line) => ({ section: id, line })),
+  );
 }
 
 /**
@@ -58,17 +56,13 @@ function activeLines<L extends CuedLine>(song: CuedSong<L>): (o: CuedOccurrence)
  * ignored, so it only becomes current once it's cued again.
  */
 export function currentPosition(song: CuedSong, t: number, retaking: NextLine | null = null): Position | null {
-  const linesOf = activeLines(song);
   let latest: (Position & { at: number }) | null = null;
-  for (const o of song.arrangement) {
-    const retaken = retaking?.occurrence === o.id ? retaking.line : null;
-    for (const l of linesOf(o)) {
-      const at = l.id === retaken ? undefined : o.lineCues[l.id];
-      if (at === undefined || at > t) continue;
-      if (latest === null || at >= latest.at) latest = { at, occurrence: o.id, line: l.id };
-    }
+  for (const { section, line } of activeLines(song)) {
+    const at = line.id === retaking?.line ? null : line.cue;
+    if (at === null || at > t) continue;
+    if (latest === null || at >= latest.at) latest = { at, section, line: line.id };
   }
-  return latest && { occurrence: latest.occurrence, line: latest.line };
+  return latest && { section: latest.section, line: latest.line };
 }
 
 /** Whether any Line of an active Alternate has a Cue. Dormant Cues don't count. */
@@ -81,18 +75,14 @@ export function hasCues(song: CuedSong): boolean {
  * Alternate. Dormant Cues don't count. Null without any.
  */
 export function lastCue(song: CuedSong): number | null {
-  const linesOf = activeLines(song);
   let last: number | null = null;
-  for (const o of song.arrangement) {
-    for (const l of linesOf(o)) {
-      const cue = o.lineCues[l.id];
-      if (cue !== undefined && (last === null || cue > last)) last = cue;
-    }
+  for (const { line } of activeLines(song)) {
+    if (line.cue !== null && (last === null || line.cue > last)) last = line.cue;
   }
   return last;
 }
 
-/** A Cue and the Line within an Occurrence it links. */
+/** A Cue and the Line it links. */
 export type FoundCue = Position & { cue: number };
 
 /** Why a Cue is out of order: the cued Lines either side it's out of order with. */
@@ -115,17 +105,16 @@ export type OutOfOrderCue = FoundCue & OutOfOrder;
  * marked nor compared, nor are blank Lines', which the gutter doesn't show.
  */
 export function outOfOrderCues(song: CuedSong): OutOfOrderCue[] {
-  const linesOf = activeLines(song);
-  const cued: OutOfOrderCue[] = song.arrangement.flatMap((o) =>
-    linesOf(o)
-      .filter((l) => !isBlank(l) && o.lineCues[l.id] !== undefined)
-      .map((l) => ({ occurrence: o.id, line: l.id, cue: o.lineCues[l.id], earlierThan: null, laterThan: null })),
+  const cued: OutOfOrderCue[] = activeLines(song).flatMap(({ section, line }) =>
+    isBlank(line) || line.cue === null
+      ? []
+      : [{ section, line: line.id, cue: line.cue, earlierThan: null, laterThan: null }],
   );
   for (let i = 1; i < cued.length; i++) {
     const [above, below] = [cued[i - 1], cued[i]];
     if (above.cue <= below.cue) continue;
-    above.laterThan = { occurrence: below.occurrence, line: below.line, cue: below.cue };
-    below.earlierThan = { occurrence: above.occurrence, line: above.line, cue: above.cue };
+    above.laterThan = { section: below.section, line: below.line, cue: below.cue };
+    below.earlierThan = { section: above.section, line: above.line, cue: above.cue };
   }
   return cued.filter((c) => c.earlierThan || c.laterThan);
 }
@@ -144,17 +133,17 @@ export function outOfOrderReason({ earlierThan, laterThan }: OutOfOrder, name: (
 
 /**
  * The Cues from start up to end, in seconds, as shifting that span moves
- * them: each Occurrence's Lines' by id, dormant ones included, since
- * they're Timeline times too and should keep in step for when their
+ * them: each Section's Lines', in every Alternate, dormant ones included,
+ * since they're Timeline times too and should keep in step for when their
  * Alternate is switched back.
  */
 export function cuesInSpan(song: CuedSong, start: number, end: number): FoundCue[] {
-  return song.arrangement.flatMap((o) =>
-    Object.keys(o.lineCues)
-      .map(Number)
-      .sort((a, b) => a - b)
-      .filter((line) => o.lineCues[line] >= start && o.lineCues[line] < end)
-      .map((line) => ({ occurrence: o.id, line, cue: o.lineCues[line] })),
+  return song.sections.flatMap((s) =>
+    s.alternates.flatMap((a) =>
+      a.lines.flatMap((l) =>
+        l.cue !== null && l.cue >= start && l.cue < end ? [{ section: s.id, line: l.id, cue: l.cue }] : [],
+      ),
+    ),
   );
 }
 
@@ -188,7 +177,7 @@ export interface ChordedLine extends CuedLine {
   chordLine: boolean;
 }
 
-/** A Line within one Occurrence, as Sync mode cues it. */
+/** A Line, as Sync mode cues it, with its Section to name it by. */
 export type NextLine = Position;
 
 /**
@@ -204,14 +193,10 @@ export function nextLine(
   song: CuedSong<ChordedLine>,
   { cued = null, picked = null }: { cued?: NextLine | null; picked?: NextLine | null },
 ): NextLine | null {
-  const linesOf = activeLines(song);
-  const sheet = song.arrangement.flatMap((o) =>
-    linesOf(o)
-      .filter((l) => !isBlank(l) && !l.chordLine)
-      .map((l) => ({ occurrence: o.id, line: l.id, hasCue: o.lineCues[l.id] !== undefined })),
-  );
-  const at = (p: NextLine | null) =>
-    p === null ? -1 : sheet.findIndex((q) => q.occurrence === p.occurrence && q.line === p.line);
+  const sheet = activeLines(song)
+    .filter(({ line }) => !isBlank(line) && !line.chordLine)
+    .map(({ section, line }) => ({ section, line: line.id, hasCue: line.cue !== null }));
+  const at = (p: NextLine | null) => (p === null ? -1 : sheet.findIndex((q) => q.line === p.line));
   const pickedAt = at(picked);
   const cuedAt = at(cued);
   const next =
@@ -219,7 +204,7 @@ export function nextLine(
     (cuedAt >= 0 ? sheet[cuedAt + 1] : undefined) ??
     sheet.find((p, i) => !p.hasCue && i !== cuedAt) ??
     sheet[0];
-  return next ? { occurrence: next.occurrence, line: next.line } : null;
+  return next ? { section: next.section, line: next.line } : null;
 }
 
 /**

@@ -34,11 +34,11 @@ func (ts *testServer) importSheet(text string) song {
 func expectNoSectionRepeated(t *testing.T, s song) {
 	t.Helper()
 	seen := map[int64]bool{}
-	for _, o := range s.Arrangement {
-		if seen[o.SectionID] {
-			t.Errorf("section %d appears more than once in arrangement %+v", o.SectionID, s.Arrangement)
+	for _, id := range s.Arrangement {
+		if seen[id] {
+			t.Errorf("section %d appears more than once in arrangement %+v", id, s.Arrangement)
 		}
-		seen[o.SectionID] = true
+		seen[id] = true
 	}
 }
 
@@ -53,8 +53,8 @@ type shownSection struct {
 func readSheet(s song) []shownSection {
 	sections := sectionsByID(s)
 	out := []shownSection{}
-	for _, o := range s.Arrangement {
-		sec := sections[o.SectionID]
+	for _, id := range s.Arrangement {
+		sec := sections[id]
 		lines := []string{}
 		for _, alt := range sec.Alternates {
 			if alt.Active {
@@ -296,11 +296,11 @@ func TestImportedChordsAreParsed(t *testing.T) {
 	if len(s.Arrangement) != 2 {
 		t.Fatalf("arrangement = %+v, want two Sections", s.Arrangement)
 	}
-	intro := sections[s.Arrangement[0].SectionID].Alternates[0].Lines[0]
+	intro := sections[s.Arrangement[0]].Alternates[0].Lines[0]
 	if !intro.ChordLine || !reflect.DeepEqual(intro.Chords, []chord{{0, "Am"}, {1, "F"}}) {
 		t.Errorf("intro line = %+v, want a Chord Line with Am and F", intro)
 	}
-	verse := sections[s.Arrangement[1].SectionID].Alternates[0].Lines[0]
+	verse := sections[s.Arrangement[1]].Alternates[0].Lines[0]
 	if verse.ChordLine || verse.Lyrics != "Hello there" || !reflect.DeepEqual(verse.Chords, []chord{{3, "Am"}, {6, "G"}}) {
 		t.Errorf("verse line = %+v, want lyrics %q with Am at 3 and G at 6", verse, "Hello there")
 	}
@@ -509,15 +509,15 @@ type shownCues map[int]float64
 func readCues(s song) []shownCues {
 	sections := sectionsByID(s)
 	out := []shownCues{}
-	for _, o := range s.Arrangement {
+	for _, id := range s.Arrangement {
 		lines := map[int]float64{}
-		for _, alt := range sections[o.SectionID].Alternates {
+		for _, alt := range sections[id].Alternates {
 			if !alt.Active {
 				continue
 			}
 			for pos, l := range alt.Lines {
-				if cue, ok := o.LineCues[l.ID]; ok {
-					lines[pos] = cue
+				if l.Cue != nil {
+					lines[pos] = *l.Cue
 				}
 			}
 		}

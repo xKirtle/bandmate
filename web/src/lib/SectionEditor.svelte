@@ -8,7 +8,6 @@
   import { activeAlternate, alternateName, alternatesLabel, labelOf } from './sections';
 
   let {
-    uid,
     section,
     autofocus = false,
     change,
@@ -18,8 +17,6 @@
     more,
     cueing,
   }: {
-    /** Makes element ids unique on the page. */
-    uid: string;
     section: Section;
     /** Focus the Label when this becomes true, e.g. for a Section just added. */
     autofocus?: boolean;
@@ -69,7 +66,7 @@
     if (!(await change((at) => api.addAlternate(at, section.id)))) return;
     // The copy is active now, as the last card: ready to be renamed.
     await tick();
-    const name = document.getElementById(`name-${uid}-${active.id}`);
+    const name = document.getElementById(`name-${section.id}-${active.id}`);
     name?.focus();
     name?.scrollIntoView({ block: 'nearest' });
   }
@@ -115,7 +112,7 @@
   }
 
   function radio(altId: number) {
-    return document.getElementById(`pick-${uid}-${altId}`) as HTMLInputElement | null;
+    return document.getElementById(`pick-${section.id}-${altId}`) as HTMLInputElement | null;
   }
 
   /** A click anywhere on a card chooses it, but typing its name or opening its ⋯ doesn't. */
@@ -162,9 +159,9 @@
 <article class="section" aria-label={labelOf(section)}>
   <div class="head">
     {@render grip?.()}
-    <label class="visually-hidden" for="label-{uid}">Label</label>
+    <label class="visually-hidden" for="label-{section.id}">Label</label>
     <Combobox
-      id="label-{uid}"
+      id="label-{section.id}"
       class="label"
       bind:value={label}
       options={suggestedLabels}
@@ -226,16 +223,16 @@
             <div class="card-head">
               <input
                 type="radio"
-                id="pick-{uid}-{alt.id}"
-                name="alternate-{uid}"
+                id="pick-{section.id}-{alt.id}"
+                name="alternate-{section.id}"
                 checked={alt.active}
                 onchange={() => choose(alt)}
                 aria-label={name}
-                aria-describedby="lines-{uid}-{alt.id}"
+                aria-describedby="lines-{section.id}-{alt.id}"
               />
-              <label class="visually-hidden" for="name-{uid}-{alt.id}">Name of {name}</label>
+              <label class="visually-hidden" for="name-{section.id}-{alt.id}">Name of {name}</label>
               <input
-                id="name-{uid}-{alt.id}"
+                id="name-{section.id}-{alt.id}"
                 class="name"
                 value={alt.name}
                 oninput={() => onUnsaved(naming, true)}
@@ -265,7 +262,7 @@
                 />
               {/if}
             </div>
-            <div class="lines" id="lines-{uid}-{alt.id}">
+            <div class="lines" id="lines-{section.id}-{alt.id}">
               {#each alt.lines as line (line.id)}
                 <p>{line.text || ' '}</p>
               {:else}
@@ -289,7 +286,7 @@
     </div>
   {:else}
     {#key active.id}
-      <AlternateText uid="{uid}-{active.id}" alternate={active} label="Lines" {change} {onUnsaved} {cueing} />
+      <AlternateText alternate={active} label="Lines" {change} {onUnsaved} {cueing} />
     {/key}
   {/if}
 </article>

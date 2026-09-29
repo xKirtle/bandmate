@@ -86,7 +86,7 @@
   // changing mid-drag cancels it.
   const drag = new SectionDragging(
     () => desktop.current && writing,
-    () => (song ? `${song.arrangement.map((o) => o.id)}|${song.scrapbook}` : ''),
+    () => (song ? `${song.arrangement}|${song.scrapbook}` : ''),
   );
   // How tall the docked Timeline is, which the side column stops above.
   let timelineHeight = $state(0);
@@ -786,7 +786,7 @@
     .part[open] > summary {
       margin: 0 -0.75rem 0.25rem;
     }
-    /* An Occurrence dragged over the Scrapbook would drop into it. */
+    /* A Lyric Sheet Section dragged over the Scrapbook would drop into it. */
     .part.drop-target {
       outline: 3px solid var(--accent);
       outline-offset: -3px;

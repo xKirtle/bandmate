@@ -83,7 +83,7 @@ export class History {
     const now = cueValues(after);
     // A Cue there on one side only is none on the other.
     const changed = [...new Map([...was, ...now]).values()]
-      .map((c) => ({ was: was.get(key(c)) ?? { ...c, cue: null }, now: now.get(key(c)) ?? { ...c, cue: null } }))
+      .map((c) => ({ was: was.get(c.lineId) ?? { ...c, cue: null }, now: now.get(c.lineId) ?? { ...c, cue: null } }))
       .filter((c) => c.was.cue !== c.now.cue);
     if (changed.length === 0) return;
     const none: Ids = { tracks: [], clips: [] };
@@ -196,41 +196,29 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
   }
 }
 
-/**
- * A Song's Cues by Occurrence and Line, dormant ones included: each
- * Occurrence's in turn, its Lines' by id.
- */
-function cueValues(song: CuedSong): Map<string, CueValue> {
-  const values: CueValue[] = song.arrangement.flatMap((o) =>
-    Object.keys(o.lineCues)
-      .map(Number)
-      .map((lineId) => ({ occurrenceId: o.id, lineId, cue: o.lineCues[lineId] })),
+/** A Song's Cues by Line id, dormant ones included. */
+function cueValues(song: CuedSong): Map<number, CueValue> {
+  const values: CueValue[] = song.sections.flatMap((s) =>
+    s.alternates.flatMap((a) => a.lines.flatMap((l) => (l.cue === null ? [] : [{ lineId: l.id, cue: l.cue }]))),
   );
-  return new Map(values.map((c) => [key(c), c]));
-}
-
-/** Which Cue a value is for. */
-function key(c: CueValue): string {
-  return `${c.occurrenceId}:${c.lineId}`;
+  return new Map(values.map((c) => [c.lineId, c]));
 }
 
 /**
- * The Cues that can still be restored in a Song: those whose Occurrence is
- * still in it and whose Line is still in its Section and, to be given a
- * Cue, isn't blank. The rest went with a Lyric Sheet change since, which
- * can't be undone, so they're left out rather than stop undo.
+ * The Cues that can still be restored in a Song: those whose Line is still
+ * in it and, to be given a Cue, isn't blank and is in a Section in the
+ * Arrangement. The rest went with a Lyric Sheet change since, which can't
+ * be undone, so they're left out rather than stop undo.
  */
 export function restorable(cues: readonly CueValue[], song: CuedSong): CueValue[] {
-  const occurrences = new Map(song.arrangement.map((o) => [o.id, o]));
-  const sections = new Map(song.sections.map((s) => [s.id, s]));
+  const arranged = new Set(song.arrangement);
+  const lines = new Map(
+    song.sections.flatMap((s) => s.alternates.flatMap((a) => a.lines.map((l) => [l.id, { line: l, section: s.id }]))),
+  );
   return cues.filter((c) => {
-    const o = occurrences.get(c.occurrenceId);
-    if (!o) return false;
-    const line = sections
-      .get(o.sectionId)
-      ?.alternates.flatMap((a) => a.lines)
-      .find((l) => l.id === c.lineId);
-    return line !== undefined && (c.cue === null || !isBlank(line));
+    const found = lines.get(c.lineId);
+    if (!found) return false;
+    return c.cue === null || (!isBlank(found.line) && arranged.has(found.section));
   });
 }
 

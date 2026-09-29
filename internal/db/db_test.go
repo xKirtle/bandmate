@@ -111,7 +111,7 @@ func TestSharedSectionsKeepOnlyTheirFirstAppearance(t *testing.T) {
 			(3, 1, 10000), (3, 2, 14000), (5, 1, 60000), (1, 2, 90000)`,
 	)
 
-	if err := migrate(context.Background(), conn); err != nil {
+	if err := migrateBefore(context.Background(), conn, "0017_sections_in_arrangement"); err != nil {
 		t.Fatalf("migrating: %v", err)
 	}
 
@@ -145,5 +145,80 @@ func TestSharedSectionsKeepOnlyTheirFirstAppearance(t *testing.T) {
 	}
 	if lines != 3 {
 		t.Errorf("lines = %d, want all 3 kept", lines)
+	}
+}
+
+func TestOccurrencesCollapseIntoSections(t *testing.T) {
+	conn := openBefore(t, "0017_sections_in_arrangement")
+	exec(t, conn,
+		`INSERT INTO songs (id, title, created_at, updated_at) VALUES (1, 'Midnight Drive', '', '')`,
+		// The Verse and Chorus are in the Arrangement, the Bridge in the
+		// Scrapbook. The Chorus has an inactive Alternate with a dormant Cue.
+		`INSERT INTO sections (id, song_id, label) VALUES (1, 1, 'Chorus'), (2, 1, 'Verse'), (3, 1, 'Bridge')`,
+		`INSERT INTO alternates (id, section_id, active) VALUES (1, 1, 1), (2, 1, 0), (3, 2, 1), (4, 3, 1)`,
+		`INSERT INTO lines (id, alternate_id, position, text) VALUES
+			(1, 1, 0, 'Drive, drive'), (2, 1, 1, 'all night'), (3, 2, 0, 'Old words'),
+			(4, 3, 0, 'City lights'), (5, 4, 0, 'Somewhere else')`,
+		`INSERT INTO occurrences (id, song_id, section_id, position) VALUES (10, 1, 2, 0), (11, 1, 1, 1)`,
+		`INSERT INTO line_cues (occurrence_id, line_id, cue_ms) VALUES
+			(10, 4, 5000), (11, 1, 30000), (11, 3, 31000)`,
+	)
+
+	if err := migrate(context.Background(), conn); err != nil {
+		t.Fatalf("migrating: %v", err)
+	}
+
+	type section struct {
+		id       int64
+		position sql.NullInt64
+	}
+	var sections []section
+	rows, err := conn.Query(`SELECT id, position FROM sections ORDER BY id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var s section
+		if err := rows.Scan(&s.id, &s.position); err != nil {
+			t.Fatal(err)
+		}
+		sections = append(sections, s)
+	}
+	wantSections := []section{{1, sql.NullInt64{Int64: 1, Valid: true}}, {2, sql.NullInt64{Int64: 0, Valid: true}}, {3, sql.NullInt64{}}}
+	if !reflect.DeepEqual(sections, wantSections) {
+		t.Errorf("sections = %v, want %v", sections, wantSections)
+	}
+
+	type lineCue struct {
+		line int64
+		ms   sql.NullInt64
+	}
+	var cues []lineCue
+	rows, err = conn.Query(`SELECT id, cue_ms FROM lines ORDER BY id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var c lineCue
+		if err := rows.Scan(&c.line, &c.ms); err != nil {
+			t.Fatal(err)
+		}
+		cues = append(cues, c)
+	}
+	ms := func(v int64) sql.NullInt64 { return sql.NullInt64{Int64: v, Valid: true} }
+	wantCues := []lineCue{{1, ms(30000)}, {2, sql.NullInt64{}}, {3, ms(31000)}, {4, ms(5000)}, {5, sql.NullInt64{}}}
+	if !reflect.DeepEqual(cues, wantCues) {
+		t.Errorf("line cues = %v, want %v", cues, wantCues)
+	}
+
+	var tables int
+	if err := conn.QueryRow(`SELECT COUNT(*) FROM sqlite_master
+		WHERE type = 'table' AND name IN ('occurrences', 'line_cues')`).Scan(&tables); err != nil {
+		t.Fatal(err)
+	}
+	if tables != 0 {
+		t.Errorf("occurrences and line_cues still exist")
 	}
 }

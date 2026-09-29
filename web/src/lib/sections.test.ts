@@ -7,7 +7,7 @@ function alternate(active: boolean, ...texts: string[]): Alternate {
     id: 1,
     name: '',
     active,
-    lines: texts.map((text, i) => ({ id: i + 1, text, lyrics: text, chords: [], chordLine: false })),
+    lines: texts.map((text, i) => ({ id: i + 1, text, lyrics: text, chords: [], chordLine: false, cue: null })),
   };
 }
 

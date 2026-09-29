@@ -167,30 +167,22 @@ func expectStatus(t *testing.T, r response, want int) {
 
 // song is the Song aggregate as the API returns it. Later tickets extend it.
 type song struct {
-	ID          int64        `json:"id"`
-	Version     int64        `json:"version"`
-	Title       string       `json:"title"`
-	Status      string       `json:"status"`
-	Key         string       `json:"key"`
-	BPM         *int         `json:"bpm"`
-	Capo        *int         `json:"capo"`
-	Tuning      string       `json:"tuning"`
-	Notes       string       `json:"notes"`
-	ShowChords  bool         `json:"showChords"`
-	CreatedAt   string       `json:"createdAt"`
-	UpdatedAt   string       `json:"updatedAt"`
-	Arrangement []occurrence `json:"arrangement"`
-	Sections    []section    `json:"sections"`
-	Scrapbook   []int64      `json:"scrapbook"`
-	Masters     []master     `json:"masters"`
-}
-
-// occurrence is one appearance of a Section in the Arrangement.
-type occurrence struct {
-	ID        int64 `json:"id"`
-	SectionID int64 `json:"sectionId"`
-	// LineCues maps Line ids to their Cues in this Occurrence, in seconds.
-	LineCues map[int64]float64 `json:"lineCues"`
+	ID          int64     `json:"id"`
+	Version     int64     `json:"version"`
+	Title       string    `json:"title"`
+	Status      string    `json:"status"`
+	Key         string    `json:"key"`
+	BPM         *int      `json:"bpm"`
+	Capo        *int      `json:"capo"`
+	Tuning      string    `json:"tuning"`
+	Notes       string    `json:"notes"`
+	ShowChords  bool      `json:"showChords"`
+	CreatedAt   string    `json:"createdAt"`
+	UpdatedAt   string    `json:"updatedAt"`
+	Arrangement []int64   `json:"arrangement"`
+	Sections    []section `json:"sections"`
+	Scrapbook   []int64   `json:"scrapbook"`
+	Masters     []master  `json:"masters"`
 }
 
 // section is a Section with all its Alternates.
@@ -215,12 +207,51 @@ type line struct {
 	Lyrics    string  `json:"lyrics"`
 	Chords    []chord `json:"chords"`
 	ChordLine bool    `json:"chordLine"`
+	// Cue is when the Line is sung, in seconds; nil means none.
+	Cue *float64 `json:"cue"`
 }
 
 // chord is a Chord anchored at a character offset into a Line's lyrics.
 type chord struct {
 	Offset int    `json:"offset"`
 	Name   string `json:"name"`
+}
+
+// cuesOf maps the ids of a Section's cued Lines, in every Alternate, to
+// their Cues.
+func cuesOf(sec section) map[int64]float64 {
+	cues := map[int64]float64{}
+	for _, a := range sec.Alternates {
+		for _, l := range a.Lines {
+			if l.Cue != nil {
+				cues[l.ID] = *l.Cue
+			}
+		}
+	}
+	return cues
+}
+
+// lineCues lists the Cues of each Section in the Arrangement, in order, by
+// Line id, dormant ones included.
+func lineCues(s song) []map[int64]float64 {
+	sections := sectionsByID(s)
+	out := []map[int64]float64{}
+	for _, id := range s.Arrangement {
+		out = append(out, cuesOf(sections[id]))
+	}
+	return out
+}
+
+// songCues maps the ids of all a Song's cued Lines, wherever they are, to
+// their Cues.
+func songCues(s song) map[int64]float64 {
+	cues := map[int64]float64{}
+	for _, sec := range s.Sections {
+		for id, cue := range cuesOf(sec) {
+			cues[id] = cue
+		}
+	}
+	return cues
 }
 
 // songSummary is one entry of the Song list.

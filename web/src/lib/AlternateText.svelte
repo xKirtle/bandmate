@@ -1,10 +1,8 @@
 <script lang="ts" module>
   import type { Line } from './api';
 
-  /** How an Occurrence's Cues show on the text box of its active Alternate. */
+  /** How a Section's Cues show on the text box of its active Alternate. */
   export interface Cueing {
-    /** Line ids to their Cues in the Occurrence, in seconds. */
-    cues: Readonly<Record<number, number>>;
     /** The Line playback is on, highlighted. */
     current: number | null;
     /** Keeps track of a Line's row, to follow playback to. */
@@ -28,7 +26,7 @@
      * Now button in its gutter slot, and clicking a Line makes it next.
      */
     sync?: {
-      /** The Line up next, if it's in this Occurrence. */
+      /** The Line up next, wherever it is: only one of this Alternate's is marked. */
       next: number | null;
       /** Cues the Line up next at the playhead. */
       now: () => void;
@@ -46,15 +44,12 @@
   import { rowAt, type GutterField } from './gutter';
 
   let {
-    uid,
     alternate,
     label,
     change,
     onUnsaved,
     cueing,
   }: {
-    /** Makes the element id unique. */
-    uid: string;
     alternate: Alternate;
     /** Names the text box for screen readers. */
     label: string;
@@ -160,7 +155,7 @@
   }
 </script>
 
-<label class="visually-hidden" for="text-{uid}">{label}</label>
+<label class="visually-hidden" for="text-{alternate.id}">{label}</label>
 <!-- The backdrop renders the rows again behind the text box, wrapping them
      the same way, so each row's highlight and Cue line up with its text. The
      text box sits on top and takes every click, so it never plays, except
@@ -220,7 +215,7 @@
           {:else}
             <CueField
               bind:this={() => undefined, (field) => gutter.field(line.id, field)}
-              cue={cueing.cues[line.id] ?? null}
+              cue={line.cue}
               label={lineLabel}
               save={(cue) => gutter.save(line, cue)}
               next={() => gutter.next(line.id)}
@@ -236,7 +231,7 @@
     {/each}
   {/if}
   <textarea
-    id="text-{uid}"
+    id="text-{alternate.id}"
     class="text"
     bind:value={text}
     readonly={!!cueing?.sync}

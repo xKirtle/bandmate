@@ -26,84 +26,87 @@ func cueMillis(seconds float64) (int64, error) {
 	return millis(seconds), nil
 }
 
-// SetLineCue gives a Line a Cue within one Occurrence: the time, in seconds,
-// where it's sung there. The Line may be in any of the Section's Alternates,
-// but can't be blank. An Occurrence has no Cue of its own: it starts where
-// its first Line is cued (ADR 0009).
-func (s *Store) SetLineCue(ctx context.Context, songID int64, based Version, occurrenceID, lineID int64, seconds float64) (Song, error) {
+// SetLineCue gives a Line a Cue: the time, in seconds, where it's sung. The
+// Line may be in any of its Section's Alternates, but can't be blank, and
+// its Section must be in the Arrangement. A Section has no Cue of its own:
+// it starts where its first Line is cued (ADR 0009).
+func (s *Store) SetLineCue(ctx context.Context, songID int64, based Version, lineID int64, seconds float64) (Song, error) {
 	ms, err := cueMillis(seconds)
 	if err != nil {
 		return Song{}, err
 	}
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		return writeLineCue(ctx, tx, songID, occurrenceID, lineID, sql.NullInt64{Int64: ms, Valid: true})
+		return writeLineCue(ctx, tx, songID, lineID, sql.NullInt64{Int64: ms, Valid: true})
 	})
 }
 
-// ClearLineCue removes a Line's Cue within one Occurrence.
-func (s *Store) ClearLineCue(ctx context.Context, songID int64, based Version, occurrenceID, lineID int64) (Song, error) {
+// ClearLineCue removes a Line's Cue.
+func (s *Store) ClearLineCue(ctx context.Context, songID int64, based Version, lineID int64) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		return writeLineCue(ctx, tx, songID, occurrenceID, lineID, sql.NullInt64{})
+		return writeLineCue(ctx, tx, songID, lineID, sql.NullInt64{})
 	})
 }
 
-// writeLineCue sets or, with a null ms, clears a Line's Cue within one of a
-// Song's Occurrences. The Line must be in the Occurrence's Section, and
-// can't be blank to be given a Cue.
-func writeLineCue(ctx context.Context, tx *sql.Tx, songID, occurrenceID, lineID int64, ms sql.NullInt64) error {
-	text, err := findOccurrenceLine(ctx, tx, songID, occurrenceID, lineID)
+// writeLineCue sets or, with a null ms, clears the Cue of one of a Song's
+// Lines. To be given a Cue, the Line can't be blank and its Section must be
+// in the Arrangement.
+func writeLineCue(ctx context.Context, tx *sql.Tx, songID, lineID int64, ms sql.NullInt64) error {
+	text, inArrangement, err := findLine(ctx, tx, songID, lineID)
 	if err != nil {
 		return err
 	}
-	if !ms.Valid {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM line_cues WHERE occurrence_id = ? AND line_id = ?`,
-			occurrenceID, lineID); err != nil {
-			return fmt.Errorf("clearing line cue: %w", err)
-		}
-		return nil
-	}
-	if blank(text) {
+	if ms.Valid && blank(text) {
 		return invalid("a blank Line can't have a Cue")
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO line_cues (occurrence_id, line_id, cue_ms) VALUES (?, ?, ?)
-		ON CONFLICT (occurrence_id, line_id) DO UPDATE SET cue_ms = excluded.cue_ms`,
-		occurrenceID, lineID, ms); err != nil {
-		return fmt.Errorf("setting line cue: %w", err)
+	if ms.Valid && !inArrangement {
+		return conflict("a Line in the Scrapbook can't have a Cue")
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE lines SET cue_ms = ? WHERE id = ?`, ms, lineID); err != nil {
+		return fmt.Errorf("writing line cue: %w", err)
 	}
 	return nil
 }
 
-// ClearOccurrenceCues removes all an Occurrence's Line Cues, dormant ones
+// ClearSectionCues removes the Cues of all a Section's Lines, dormant ones
 // included.
-func (s *Store) ClearOccurrenceCues(ctx context.Context, songID int64, based Version, occurrenceID int64) (Song, error) {
+func (s *Store) ClearSectionCues(ctx context.Context, songID int64, based Version, sectionID int64) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		if _, _, err := findOccurrence(ctx, tx, songID, occurrenceID); err != nil {
+		if _, err := findSection(ctx, tx, songID, sectionID); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM line_cues WHERE occurrence_id = ?`, occurrenceID); err != nil {
-			return fmt.Errorf("clearing line cues: %w", err)
-		}
-		return nil
+		return clearSectionCues(ctx, tx, sectionID)
 	})
+}
+
+// clearSectionCues removes the Cues of the Lines in every Alternate of a
+// Section.
+func clearSectionCues(ctx context.Context, tx *sql.Tx, sectionID int64) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE lines SET cue_ms = NULL WHERE cue_ms IS NOT NULL AND alternate_id IN
+		(SELECT id FROM alternates WHERE section_id = ?)`, sectionID); err != nil {
+		return fmt.Errorf("clearing line cues: %w", err)
+	}
+	return nil
 }
 
 // ClearCues removes every Cue in a Song, dormant ones included.
 func (s *Store) ClearCues(ctx context.Context, songID int64, based Version) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM line_cues
-			WHERE occurrence_id IN (SELECT id FROM occurrences WHERE song_id = ?)`, songID); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE lines SET cue_ms = NULL
+			WHERE cue_ms IS NOT NULL AND id IN (`+songLines+`)`, songID); err != nil {
 			return fmt.Errorf("clearing line cues: %w", err)
 		}
 		return nil
 	})
 }
 
-// CueValue is one Cue to restore: a Line's Cue within an Occurrence. A nil
-// Cue means none.
+// songLines selects the ids of all a Song's Lines, given the Song's id.
+const songLines = `SELECT l.id FROM lines l JOIN alternates a ON a.id = l.alternate_id
+	JOIN sections s ON s.id = a.section_id WHERE s.song_id = ?`
+
+// CueValue is one Cue to restore: a Line's. A nil Cue means none.
 type CueValue struct {
-	OccurrenceID int64
-	LineID       int64
-	Cue          *float64
+	LineID int64
+	Cue    *float64
 }
 
 // RestoreCues sets each Cue given to its value, in seconds, or clears it,
@@ -123,7 +126,7 @@ func (s *Store) RestoreCues(ctx context.Context, songID int64, based Version, va
 	}
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		for i, v := range values {
-			if err := writeLineCue(ctx, tx, songID, v.OccurrenceID, v.LineID, ms[i]); err != nil {
+			if err := writeLineCue(ctx, tx, songID, v.LineID, ms[i]); err != nil {
 				return err
 			}
 		}
@@ -142,9 +145,8 @@ func (s *Store) ShiftCues(ctx context.Context, songID int64, based Version, star
 	startMs, endMs := millis(start), millis(end)
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		var low, high sql.NullInt64
-		err := tx.QueryRowContext(ctx, `SELECT MIN(lc.cue_ms), MAX(lc.cue_ms)
-			FROM line_cues lc JOIN occurrences o ON o.id = lc.occurrence_id
-			WHERE o.song_id = ? AND lc.cue_ms >= ? AND lc.cue_ms < ?`, songID, startMs, endMs).Scan(&low, &high)
+		err := tx.QueryRowContext(ctx, `SELECT MIN(cue_ms), MAX(cue_ms) FROM lines
+			WHERE id IN (`+songLines+`) AND cue_ms >= ? AND cue_ms < ?`, songID, startMs, endMs).Scan(&low, &high)
 		if err != nil {
 			return fmt.Errorf("finding cues to shift: %w", err)
 		}
@@ -158,8 +160,8 @@ func (s *Store) ShiftCues(ctx context.Context, songID int64, based Version, star
 			}
 		}
 		delta := millis(by)
-		if _, err := tx.ExecContext(ctx, `UPDATE line_cues SET cue_ms = cue_ms + ?
-			WHERE occurrence_id IN (SELECT id FROM occurrences WHERE song_id = ?) AND cue_ms >= ? AND cue_ms < ?`,
+		if _, err := tx.ExecContext(ctx, `UPDATE lines SET cue_ms = cue_ms + ?
+			WHERE id IN (`+songLines+`) AND cue_ms >= ? AND cue_ms < ?`,
 			delta, songID, startMs, endMs); err != nil {
 			return fmt.Errorf("shifting line cues: %w", err)
 		}
@@ -173,20 +175,16 @@ func millis(seconds float64) int64 {
 	return int64(math.Round(seconds * 1000))
 }
 
-// findOccurrenceLine checks an Occurrence belongs to a Song and a Line to
-// any Alternate of its Section, and returns the Line's text.
-func findOccurrenceLine(ctx context.Context, tx *sql.Tx, songID, occurrenceID, lineID int64) (string, error) {
-	sectionID, _, err := findOccurrence(ctx, tx, songID, occurrenceID)
-	if err != nil {
-		return "", err
-	}
-	var text string
-	err = tx.QueryRowContext(ctx, `SELECT l.text FROM lines l JOIN alternates a ON a.id = l.alternate_id
-		WHERE l.id = ? AND a.section_id = ?`, lineID, sectionID).Scan(&text)
+// findLine checks a Line belongs to one of a Song's Sections, and returns
+// its text and whether its Section is in the Arrangement.
+func findLine(ctx context.Context, tx *sql.Tx, songID, lineID int64) (text string, inArrangement bool, err error) {
+	err = tx.QueryRowContext(ctx, `SELECT l.text, s.position IS NOT NULL
+		FROM lines l JOIN alternates a ON a.id = l.alternate_id JOIN sections s ON s.id = a.section_id
+		WHERE l.id = ? AND s.song_id = ?`, lineID, songID).Scan(&text, &inArrangement)
 	if errors.Is(err, sql.ErrNoRows) {
-		return "", invalid("that Line isn't in this Occurrence's Section")
+		return "", false, ErrNotFound
 	}
-	return text, err
+	return text, inArrangement, err
 }
 
 // blank is whether a Line's text is empty or only spaces, so has nothing to

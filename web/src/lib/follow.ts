@@ -1,13 +1,18 @@
 import { inTextField } from './textField';
 
-/** Names an Occurrence, or one of its Lines, among the tracked elements and Cue fields. */
-export function key(occurrence: number, line: number | null = null): string {
-  return line === null ? `${occurrence}` : `${occurrence}:${line}`;
+/** Names a Section among the tracked elements. */
+export function sectionKey(section: number): string {
+  return `section:${section}`;
+}
+
+/** Names a Line among the tracked elements and Cue fields. */
+export function lineKey(line: number): string {
+  return `line:${line}`;
 }
 
 /**
- * Keeps track of the Lyric Sheet's elements by key, e.g. an Occurrence or
- * one of its Lines, to scroll the current one into view as playback moves on.
+ * Keeps track of the Lyric Sheet's elements by key, a Section or a Line, to
+ * scroll the current one into view as playback moves on.
  */
 export function follower() {
   const shown = new Map<string, HTMLElement>();
@@ -26,7 +31,7 @@ export function follower() {
      */
     follow(key: string | null) {
       if (key === null || inTextField(document.activeElement)) return;
-      shown.get(key)?.scrollIntoView({ block: key.includes(':') ? 'center' : 'start', behavior: 'smooth' });
+      shown.get(key)?.scrollIntoView({ block: key.startsWith('line:') ? 'center' : 'start', behavior: 'smooth' });
     },
   };
 }
