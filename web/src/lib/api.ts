@@ -1,6 +1,5 @@
 // The SPA's only way to talk to the server. It renders what the API returns
 // and sends user intents back; domain rules live on the server.
-import type { PreparedCover } from './coverUpload';
 
 export type Status = 'idea' | 'drafting' | 'finished';
 
@@ -47,8 +46,13 @@ export interface Cover {
   addedAt: string;
 }
 
-/** One of a Cover's pictures: the original, or the crop square at the list's or the header's size. */
-export type CoverPicture = 'original' | 'list' | 'header';
+/** A Cover's pictures: the original, and the crop square at the list's and the header's sizes. */
+export const coverPictures = ['original', 'list', 'header'] as const;
+
+export type CoverPicture = (typeof coverPictures)[number];
+
+/** A Cover the browser made from a picture, ready to upload. */
+export type PreparedCover = Record<CoverPicture, Blob> & Pick<Cover, 'width' | 'height' | 'crop'>;
 
 /** A finished recording of a Song made elsewhere, never on the Timeline. */
 export interface Master {
@@ -462,7 +466,7 @@ export const api = {
   addCover: (at: SongAt, cover: PreparedCover) => {
     const form = new FormData();
     form.append('details', JSON.stringify({ width: cover.width, height: cover.height, crop: cover.crop }));
-    for (const picture of ['original', 'list', 'header'] as const) form.append(picture, cover[picture], picture);
+    for (const picture of coverPictures) form.append(picture, cover[picture], picture);
     return request<Song>('POST', `/songs/${at.id}/cover`, form, at);
   },
   /** Where one of a Song's Cover's pictures is. */

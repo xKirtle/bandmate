@@ -1,34 +1,18 @@
 // Prepares a picture to become a Song's Cover. The browser does all the
-// image work, and the server keeps what it makes as sent: the original,
+// picture work, and the server keeps what it makes as sent: the original,
 // normalized so any browser can open it again, and the crop square in the
 // sizes the Song list and header show.
-import { centredSquare, fitWithin, type Size, type Square } from './cover';
+import type { PreparedCover } from './api';
+import { centredSquare, fitWithin, type Size } from './cover';
 import { formatSize } from './upload';
 
 /** The most pixels on each side of a Cover's original. */
 const originalSide = 2048;
 
 /** The crop square's sizes, in pixels: 44px in the list and 128px in the header, at 3×. */
-export const coverSides = { list: 132, header: 384 } as const;
+const coverSides = { list: 132, header: 384 } as const;
 
-/** Thrown when the browser can't open a picture. */
-export class UnopenablePictureError extends Error {
-  constructor() {
-    super("This picture can't be opened in this browser");
-  }
-}
-
-/** The pictures of a Cover, ready to upload. */
-export interface PreparedCover {
-  original: Blob;
-  list: Blob;
-  header: Blob;
-  /** The original's size, in pixels. */
-  width: number;
-  height: number;
-  /** The square of the original the Cover shows, in its pixels. */
-  crop: Square;
-}
+const unopenable = "This picture can't be opened in this browser";
 
 /**
  * Checks a picture is small enough and makes its Cover, cropped to its
@@ -87,11 +71,11 @@ async function open(file: File): Promise<Opened> {
     await img.decode();
   } catch {
     URL.revokeObjectURL(url);
-    throw new UnopenablePictureError();
+    throw new Error(unopenable);
   }
   if (!(img.naturalWidth > 0 && img.naturalHeight > 0)) {
     URL.revokeObjectURL(url);
-    throw new UnopenablePictureError();
+    throw new Error(unopenable);
   }
   return { source: img, width: img.naturalWidth, height: img.naturalHeight, close: () => URL.revokeObjectURL(url) };
 }
@@ -100,10 +84,13 @@ type PictureType = 'image/webp' | 'image/jpeg';
 
 let supported: Promise<PictureType> | undefined;
 
-/** WebP, or JPEG where the browser can't encode WebP: it then makes a PNG instead. */
+/**
+ * WebP, or JPEG where the browser can't encode WebP. Asked for a type it
+ * can't encode, a browser makes a PNG, so the type it made tells.
+ */
 function pictureType(): Promise<PictureType> {
   supported ??= new Promise((resolve) =>
-    canvas({ width: 1, height: 1 }, 'image/jpeg').toBlob(
+    document.createElement('canvas').toBlob(
       (blob) => resolve(blob?.type === 'image/webp' ? 'image/webp' : 'image/jpeg'),
       'image/webp',
     ),

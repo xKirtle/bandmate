@@ -138,6 +138,7 @@ func TestACoverNeedsItsPicturesAndACropInsideTheOriginal(t *testing.T) {
 		"empty crop": {fakeCover().withDetails(map[string]any{
 			"width": 1600, "height": 1200, "crop": map[string]any{"x": 0, "y": 0, "size": 0},
 		}), "the crop must be a square inside the original"},
+		"empty picture": {fakeCover().withData("list", nil), "a Cover's pictures can't be empty"},
 		"not a picture": {fakeCover().withType("list", "text/html"), "a Cover's pictures must be JPEG, PNG or WebP"},
 	}
 	for name, c := range cases {
@@ -276,6 +277,18 @@ func (u coverUpload) without(part string) coverUpload {
 
 func (u coverUpload) withDetails(details map[string]any) coverUpload {
 	u.Details = details
+	return u
+}
+
+func (u coverUpload) withData(part string, data []byte) coverUpload {
+	switch part {
+	case "original":
+		u.Original = data
+	case "list":
+		u.List = data
+	case "header":
+		u.Header = data
+	}
 	return u
 }
 

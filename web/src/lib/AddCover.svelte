@@ -15,17 +15,17 @@
     status: Status;
     /** Sends a change to the Song; resolves to whether it succeeded. */
     change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
-    /** Shows why a picture couldn't be used, or null to clear it. */
-    onError: (message: string | null) => void;
+    /** Shows why a picture couldn't be used. */
+    onError: (message: string) => void;
   } = $props();
 
-  let maxCoverBytes = $state(Infinity);
   let busy = $state(false);
 
-  api.getConfig().then(
-    (c) => (maxCoverBytes = c.maxCoverBytes),
-    // The server still enforces its limit.
-    () => {},
+  // The limit is checked on the picture chosen, before it's scaled down, so
+  // it's waited for. Without it, the server still enforces its own.
+  const maxCoverBytes = api.getConfig().then(
+    (c) => c.maxCoverBytes,
+    () => Infinity,
   );
 
   async function pick(event: Event) {
@@ -33,10 +33,9 @@
     const file = input.files?.[0];
     input.value = '';
     if (!file) return;
-    onError(null);
     busy = true;
     try {
-      const cover = await prepareCover(file, maxCoverBytes);
+      const cover = await prepareCover(file, await maxCoverBytes);
       await change((at) => api.addCover(at, cover));
     } catch (e) {
       onError((e as Error).message);

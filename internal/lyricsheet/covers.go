@@ -84,9 +84,9 @@ type UploadedPicture struct {
 	ContentType string
 }
 
-// imageTypes are the picture formats a Cover is kept in: what browsers
+// pictureTypes are the picture formats a Cover is kept in: what browsers
 // encode to, and nothing a browser could treat as a page.
-var imageTypes = map[string]bool{"image/jpeg": true, "image/png": true, "image/webp": true}
+var pictureTypes = map[string]bool{"image/jpeg": true, "image/png": true, "image/webp": true}
 
 // AddCover gives a Song its Cover from the pictures the browser made, one
 // UploadedPicture for each of CoverPictures. The pictures are kept if the Cover is
@@ -99,8 +99,11 @@ func (s *Store) AddCover(ctx context.Context, songID int64, based Version, detai
 	types := map[CoverPicture]string{}
 	for _, p := range CoverPictures {
 		t, _, err := mime.ParseMediaType(pictures[p].ContentType)
-		if err != nil || !imageTypes[t] {
+		if err != nil || !pictureTypes[t] {
 			return Song{}, invalid("a Cover's pictures must be JPEG, PNG or WebP")
+		}
+		if pictures[p].File.Size == 0 {
+			return Song{}, invalid("a Cover's pictures can't be empty")
 		}
 		types[p] = t
 	}
@@ -138,8 +141,8 @@ func (s *Store) AddCover(ctx context.Context, songID int64, based Version, detai
 		return nil
 	})
 	if err != nil {
-		for _, p := range kept {
-			s.coverFiles[p].Remove(id)
+		if len(kept) > 0 {
+			s.removeCoverFiles(id)
 		}
 		return Song{}, err
 	}
