@@ -115,23 +115,22 @@ func (s *Store) DeleteAlternate(ctx context.Context, songID int64, based Version
 // belong to. The active Alternate can't be moved.
 func (s *Store) MoveAlternateToScrapbook(ctx context.Context, songID int64, based Version, alternateID int64) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		_, active, err := findAlternate(ctx, tx, songID, alternateID)
+		var label, name string
+		var active bool
+		err := tx.QueryRowContext(ctx, `SELECT s.label, a.name, a.active FROM alternates a
+			JOIN sections s ON s.id = a.section_id WHERE a.id = ? AND s.song_id = ?`,
+			alternateID, songID).Scan(&label, &name, &active)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
 		if err != nil {
-			return err
+			return fmt.Errorf("reading alternate: %w", err)
 		}
 		if active {
 			return conflict("the active Alternate can't be moved to the Scrapbook; activate another one first")
 		}
-		var label, name string
-		if err := tx.QueryRowContext(ctx, `SELECT s.label, a.name FROM alternates a
-			JOIN sections s ON s.id = a.section_id WHERE a.id = ?`, alternateID).Scan(&label, &name); err != nil {
-			return fmt.Errorf("reading alternate: %w", err)
-		}
-		if label != "" && name != "" {
-			label += " · "
-		}
 		newID, err := insert(ctx, tx, `INSERT INTO sections (song_id, label) VALUES (?, ?)`,
-			songID, label+name)
+			songID, scrapbookLabel(label, name))
 		if err != nil {
 			return fmt.Errorf("adding section: %w", err)
 		}
@@ -145,6 +144,16 @@ func (s *Store) MoveAlternateToScrapbook(ctx context.Context, songID int64, base
 		}
 		return nil
 	})
+}
+
+// scrapbookLabel is the Label of a Section made from an Alternate moved to
+// the Scrapbook: its Section's Label and its name, e.g. "Verse 1 · Darker",
+// whichever of them it has.
+func scrapbookLabel(label, name string) string {
+	if label == "" || name == "" {
+		return label + name
+	}
+	return label + " · " + name
 }
 
 // findAlternate returns the Section of one of a Song's Alternates and whether

@@ -56,7 +56,7 @@ One of several competing versions of a Section's Lines; exactly one Alternate is
 _Avoid_: Variant, option, draft
 
 **Alternates mode**:
-A way of choosing a Section's active Alternate, in Write mode: the Section shows every Alternate in full, read-only, to make one active, rename it, or delete an inactive one. Outside it, a Section shows only its active Alternate, and another can only be changed once it's made active.
+A way of choosing a Section's active Alternate, in Write mode: the Section shows every Alternate in full, read-only, to make one active, rename it, or move an inactive one to the Scrapbook or delete it. Outside it, a Section shows only its active Alternate, and another can only be changed once it's made active.
 _Avoid_: Compare view, picker
 
 **Line**:
@@ -109,7 +109,7 @@ A stretch of the Timeline that playback repeats, e.g. the hook of a Beat while w
 _Avoid_: Cycle, repeat, region
 
 **Cue**:
-A link from one Line within an Occurrence to a time on the Timeline. An Occurrence has no Cue of its own: it starts where its first Line is cued. A Line's Cue lies dormant while its Alternate is inactive. A new Alternate starts with a copy of the Cues of the Alternate it was copied from; from then on, each keeps its own. Playing from a Cue starts a second before it, to lead into it. Cues are expected to run in order down the Arrangement (equal times are fine); a Cue earlier than a Line above it or later than one below it is **out of order**, which is allowed but marked.
+A link from one Line within an Occurrence to a time on the Timeline. An Occurrence has no Cue of its own: it starts where its first Line is cued. A Line's Cue lies dormant while its Alternate is inactive, and is dropped if that Alternate is moved to the Scrapbook. A new Alternate starts with a copy of the Cues of the Alternate it was copied from; from then on, each keeps its own. Playing from a Cue starts a second before it, to lead into it. Cues are expected to run in order down the Arrangement (equal times are fine); a Cue earlier than a Line above it or later than one below it is **out of order**, which is allowed but marked.
 _Avoid_: Timestamp, sync point, marker
 
 **Sync mode**:
