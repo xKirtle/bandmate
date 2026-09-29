@@ -7,3 +7,5 @@ A Cue links a time on the Timeline ~~to an Occurrence, or~~ to one Line within a
 - ~~Switching a Section's active Alternate clears the line-level Cues on its Occurrences and keeps the Occurrence-level ones.~~ Superseded by ADR 0007: those Cues go dormant instead.
 - Detaching an Occurrence carries its Cues over to the copy.
 - Restoring a Snapshot drops Cues whose Lines no longer exist.
+
+_(Superseded by ADR 0010: Sections are no longer shared, so a Line is sung at one time and a Cue lives on the Line itself. That Cues never attach to Section text still holds.)_
