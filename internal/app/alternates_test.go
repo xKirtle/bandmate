@@ -39,6 +39,12 @@ func (ts *testServer) activate(songID, alternateID int64) song {
 	return ts.lyricSheetChange(http.MethodPost, activatePath(songID, alternateID), nil)
 }
 
+// renameAlternate names an Alternate and returns the Song.
+func (ts *testServer) renameAlternate(songID, alternateID int64, name string) song {
+	ts.t.Helper()
+	return ts.lyricSheetChange(http.MethodPatch, alternatePath(songID, alternateID), map[string]any{"name": name})
+}
+
 // chorusWithTwoAlternates returns a Song with a Verse and a Chorus whose
 // Section has an active Alternate with Lines and an inactive copy of it.
 func (ts *testServer) chorusWithTwoAlternates() (song, section) {
@@ -308,6 +314,142 @@ func TestDeletingAnAlternateOfAnotherSongIsNotFound(t *testing.T) {
 	before := ts.songWithSections("Verse")
 
 	res := ts.Do(http.MethodDelete, alternatePath(before.ID, chorus.Alternates[1].ID), nil)
+
+	expectStatus(t, res, http.StatusNotFound)
+	if got := ts.getSong(other.ID); !reflect.DeepEqual(got, other) {
+		t.Errorf("other song = %+v, want it unchanged %+v", got, other)
+	}
+}
+
+// toScrapbookPath is where an Alternate is moved to the Scrapbook.
+func toScrapbookPath(songID, alternateID int64) string {
+	return alternatePath(songID, alternateID) + "/scrapbook"
+}
+
+// moveToScrapbook moves an Alternate out of its Section into the Scrapbook
+// and returns the Song.
+func (ts *testServer) moveToScrapbook(songID, alternateID int64) song {
+	ts.t.Helper()
+	return ts.lyricSheetChange(http.MethodPost, toScrapbookPath(songID, alternateID), nil)
+}
+
+func TestAnInactiveAlternateCanBeMovedToTheScrapbookAsASectionOfItsOwn(t *testing.T) {
+	ts := newTestServer(t)
+	s, chorus := ts.chorusWithTwoAlternates()
+	ts.renameAlternate(s.ID, chorus.Alternates[1].ID, "Darker")
+	before := ts.setText(s.ID, chorus.Alternates[1].ID, "Slow it [Dm]down")
+	moved := before.Sections[1].Alternates[1]
+
+	got := ts.moveToScrapbook(s.ID, moved.ID)
+
+	if want := []alternate{chorus.Alternates[0]}; !reflect.DeepEqual(got.Sections[1].Alternates, want) {
+		t.Errorf("chorus alternates = %+v, want only the active one %+v", got.Sections[1].Alternates, want)
+	}
+	if !reflect.DeepEqual(got.Arrangement, before.Arrangement) {
+		t.Errorf("arrangement = %+v, want it unchanged %+v", got.Arrangement, before.Arrangement)
+	}
+	if len(got.Sections) != 3 || len(got.Scrapbook) != 1 || got.Scrapbook[0] != got.Sections[2].ID {
+		t.Fatalf("sections = %+v, scrapbook = %v; want a new Section in the Scrapbook", got.Sections, got.Scrapbook)
+	}
+	added := got.Sections[2]
+	if added.Label != "Chorus · Darker" {
+		t.Errorf("label = %q, want %q", added.Label, "Chorus · Darker")
+	}
+	if len(added.Alternates) != 1 {
+		t.Fatalf("new section alternates = %+v, want one", added.Alternates)
+	}
+	if alt := added.Alternates[0]; !alt.Active || !reflect.DeepEqual(alt.Lines, moved.Lines) {
+		t.Errorf("new section alternate = %+v, want the moved Lines %+v, active", alt, moved.Lines)
+	}
+	if !parseTime(t, got.UpdatedAt).After(parseTime(t, before.UpdatedAt)) {
+		t.Errorf("updatedAt = %s, want later than %s", got.UpdatedAt, before.UpdatedAt)
+	}
+	if read := ts.getSong(s.ID); !reflect.DeepEqual(read, got) {
+		t.Errorf("song read back = %+v, want %+v", read, got)
+	}
+}
+
+func TestAnAlternateMovedToTheScrapbookIsLabelledByWhatHasANameOrLabel(t *testing.T) {
+	for _, tc := range []struct{ label, name, want string }{
+		{"Chorus", "", "Chorus"},
+		{"", "Darker", "Darker"},
+		{"", "", ""},
+	} {
+		ts := newTestServer(t)
+		s, chorus := ts.chorusWithTwoAlternates()
+		ts.setLabel(s.ID, chorus.ID, tc.label)
+		ts.renameAlternate(s.ID, chorus.Alternates[1].ID, tc.name)
+
+		got := ts.moveToScrapbook(s.ID, chorus.Alternates[1].ID)
+
+		if label := got.Sections[2].Label; label != tc.want {
+			t.Errorf("label %q, name %q: new label = %q, want %q", tc.label, tc.name, label, tc.want)
+		}
+	}
+}
+
+func TestAnAlternateMovedToTheScrapbookLeavesItsCuesBehindAndTheOthersKeepTheirs(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.sharedChorus()
+	drive, night, _, chords := chorusLines(s)
+	ids := occurrenceIDs(s)
+	ts.setLineCue(s.ID, ids[0], drive, 2)
+	ts.setLineCue(s.ID, ids[0], night, 6)
+	ts.setLineCue(s.ID, ids[3], chords, 99)
+	// The copy carries the Cues, then goes dormant with them.
+	s = ts.addAlternate(s.ID, s.Sections[0].ID, nil)
+	s = ts.activate(s.ID, s.Sections[0].Alternates[0].ID)
+
+	got := ts.moveToScrapbook(s.ID, s.Sections[0].Alternates[1].ID)
+
+	want := []map[int64]float64{{drive: 2, night: 6}, {}, {}, {chords: 99}}
+	for i, o := range got.Arrangement {
+		if !reflect.DeepEqual(o.LineCues, want[i]) {
+			t.Errorf("occurrence %d lineCues = %v, want %v", i, o.LineCues, want[i])
+		}
+	}
+	// Put back, the new Section starts with no Cues.
+	got = ts.addOccurrence(s.ID, got.Sections[2].ID, nil)
+	if cues := got.Arrangement[4].LineCues; len(cues) != 0 {
+		t.Errorf("put back lineCues = %v, want none", cues)
+	}
+}
+
+func TestAnAlternateMovedToTheScrapbookLeavesEveryOccurrenceOfItsSection(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.sharedChorus()
+	s = ts.addAlternate(s.ID, s.Sections[0].ID, nil)
+	moved := s.Sections[0].Alternates[1]
+	s = ts.activate(s.ID, s.Sections[0].Alternates[0].ID)
+
+	got := ts.moveToScrapbook(s.ID, moved.ID)
+
+	for _, i := range []int{0, 2, 3} {
+		sec := sectionOf(t, got, got.Arrangement[i])
+		if len(sec.Alternates) != 1 || sec.Alternates[0].ID == moved.ID {
+			t.Errorf("occurrence %d alternates = %+v, want the moved one gone", i, sec.Alternates)
+		}
+	}
+}
+
+func TestMovingTheActiveAlternateToTheScrapbookIsRejected(t *testing.T) {
+	ts := newTestServer(t)
+	before, chorus := ts.chorusWithTwoAlternates()
+
+	res := ts.Do(http.MethodPost, toScrapbookPath(before.ID, chorus.Alternates[0].ID), nil)
+
+	expectError(t, res, http.StatusConflict, "the active Alternate can't be moved to the Scrapbook; activate another one first")
+	if got := ts.getSong(before.ID); !reflect.DeepEqual(got, before) {
+		t.Errorf("song after rejected move = %+v, want it unchanged %+v", got, before)
+	}
+}
+
+func TestMovingAnAlternateOfAnotherSongToTheScrapbookIsNotFound(t *testing.T) {
+	ts := newTestServer(t)
+	other, chorus := ts.chorusWithTwoAlternates()
+	before := ts.songWithSections("Verse")
+
+	res := ts.Do(http.MethodPost, toScrapbookPath(before.ID, chorus.Alternates[1].ID), nil)
 
 	expectStatus(t, res, http.StatusNotFound)
 	if got := ts.getSong(other.ID); !reflect.DeepEqual(got, other) {

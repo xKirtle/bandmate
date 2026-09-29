@@ -398,6 +398,12 @@ export const api = {
   /** Makes an Alternate the only active one of its Section, in every Occurrence. */
   activateAlternate: (at: SongAt, alternateId: number) =>
     request<Song>('POST', `/songs/${at.id}/alternates/${alternateId}/activate`, undefined, at),
+  /**
+   * Moves an inactive Alternate out of its Section into a new Scrapbook Section
+   * of its own, leaving its Cues behind.
+   */
+  moveAlternateToScrapbook: (at: SongAt, alternateId: number) =>
+    request<Song>('POST', `/songs/${at.id}/alternates/${alternateId}/scrapbook`, undefined, at),
   /** Permanently deletes an inactive Alternate. */
   deleteAlternate: (at: SongAt, alternateId: number) =>
     request<Song>('DELETE', `/songs/${at.id}/alternates/${alternateId}`, undefined, at),
