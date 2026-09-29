@@ -118,7 +118,7 @@
 </script>
 
 <div class="player">
-  <div class="controls" class:solo={!showVolume}>
+  <div class="controls" class:without-volume={!showVolume}>
     <audio
       bind:this={audio}
       {src}
@@ -198,7 +198,9 @@
   }
   /* In one row, play, the times and the waveform form one group, centred once
      the waveform reaches its widest (about 5px a bar). Both times reserve room
-     for "00:00" and hug the waveform, so it doesn't shift as they count. */
+     for "00:00" and hug the waveform, so it doesn't shift as they count: 5ch
+     at this size leaves room to spare at the times' smaller size. The Beat
+     preview bar's player column is sized to fit this group at its widest. */
   .controls {
     display: grid;
     grid-template-columns: auto 5ch minmax(0, 48rem) 5ch auto;
@@ -208,7 +210,7 @@
     gap: 0.75rem;
   }
   /* Without the volume, no empty column takes the group off centre. */
-  .controls.solo {
+  .controls.without-volume {
     grid-template-columns: auto 5ch minmax(0, 48rem) 5ch;
     grid-template-areas: 'play elapsed wave total';
   }
@@ -227,7 +229,7 @@
      shows either way: wrapped, it no longer takes width from the waveform. */
   @container (max-width: 32rem) {
     .controls,
-    .controls.solo {
+    .controls.without-volume {
       grid-template-columns: auto minmax(0, 1fr) auto;
       grid-template-areas:
         'play wave wave'

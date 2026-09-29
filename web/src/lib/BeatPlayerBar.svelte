@@ -61,7 +61,8 @@
     z-index: 1;
     display: grid;
     /* Equal sides keep the player at the window's centre, whatever the title.
-       The player takes the width first, up to about its waveform's cap, so
+       The player takes the width first, up to about its group at its widest
+       (the waveform's 48rem cap plus play, times and gaps, in AudioPlayer), so
        narrower it shrinks while both sides keep room to read. */
     grid-template-columns: minmax(10rem, 1fr) minmax(0, 60rem) minmax(10rem, 1fr);
     align-items: center;
