@@ -121,27 +121,34 @@ describe('dropTarget', () => {
 
   describe('where a Section can be dropped onto another', () => {
     it('is the Section with the pointer over the middle of it', () => {
-      expect(dropTarget({ x: 400, y: 150 }, scrapbook, sheet, spans, true)).toEqual({ onto: 1 });
-      expect(dropTarget({ x: 400, y: 126 }, scrapbook, sheet, spans, true)).toEqual({ onto: 1 });
-      expect(dropTarget({ x: 400, y: 174 }, scrapbook, sheet, spans, true)).toEqual({ onto: 1 });
+      expect(dropTarget({ x: 400, y: 150 }, scrapbook, sheet, spans, () => true)).toEqual({ onto: 1 });
+      expect(dropTarget({ x: 400, y: 126 }, scrapbook, sheet, spans, () => true)).toEqual({ onto: 1 });
+      expect(dropTarget({ x: 400, y: 174 }, scrapbook, sheet, spans, () => true)).toEqual({ onto: 1 });
     });
 
     it('is the gap with the pointer near the top or bottom of a Section', () => {
-      expect(dropTarget({ x: 400, y: 110 }, scrapbook, sheet, spans, true)).toEqual({ gap: 1 });
-      expect(dropTarget({ x: 400, y: 190 }, scrapbook, sheet, spans, true)).toEqual({ gap: 2 });
-      expect(dropTarget({ x: 400, y: 10 }, scrapbook, sheet, spans, true)).toEqual({ gap: 0 });
-      expect(dropTarget({ x: 400, y: 290 }, scrapbook, sheet, spans, true)).toEqual({ gap: 3 });
+      expect(dropTarget({ x: 400, y: 110 }, scrapbook, sheet, spans, () => true)).toEqual({ gap: 1 });
+      expect(dropTarget({ x: 400, y: 190 }, scrapbook, sheet, spans, () => true)).toEqual({ gap: 2 });
+      expect(dropTarget({ x: 400, y: 10 }, scrapbook, sheet, spans, () => true)).toEqual({ gap: 0 });
+      expect(dropTarget({ x: 400, y: 290 }, scrapbook, sheet, spans, () => true)).toEqual({ gap: 3 });
     });
 
     it('is still the gap above or below the Arrangement, or nowhere beside it', () => {
-      expect(dropTarget({ x: 400, y: -80 }, scrapbook, sheet, spans, true)).toEqual({ gap: 0 });
-      expect(dropTarget({ x: 400, y: 900 }, scrapbook, sheet, spans, true)).toEqual({ gap: 3 });
-      expect(dropTarget({ x: 20, y: 150 }, scrapbook, sheet, spans, true)).toBeNull();
+      expect(dropTarget({ x: 400, y: -80 }, scrapbook, sheet, spans, () => true)).toEqual({ gap: 0 });
+      expect(dropTarget({ x: 400, y: 900 }, scrapbook, sheet, spans, () => true)).toEqual({ gap: 3 });
+      expect(dropTarget({ x: 20, y: 150 }, scrapbook, sheet, spans, () => true)).toBeNull();
+    });
+
+    it('is the gap over a Section that can’t be dropped onto, e.g. the one being dragged', () => {
+      const notSecond = (at: number) => at !== 1;
+      expect(dropTarget({ x: 400, y: 150 }, scrapbook, sheet, spans, notSecond)).toEqual({ gap: 1 });
+      expect(dropTarget({ x: 400, y: 160 }, scrapbook, sheet, spans, notSecond)).toEqual({ gap: 2 });
+      expect(dropTarget({ x: 400, y: 250 }, scrapbook, sheet, spans, notSecond)).toEqual({ onto: 2 });
     });
 
     it('is never a Section not on the page', () => {
       const offPage = [{ top: -Infinity, bottom: -Infinity }, ...spans];
-      expect(dropTarget({ x: 400, y: 50 }, scrapbook, sheet, offPage, true)).toEqual({ onto: 1 });
+      expect(dropTarget({ x: 400, y: 50 }, scrapbook, sheet, offPage, () => true)).toEqual({ onto: 1 });
     });
   });
 });
@@ -173,8 +180,13 @@ describe('dropFor', () => {
     expect(dropFor({ section: 7 }, { onto: 2 })).toEqual({ addTo: { section: 7, arrangementAt: 2 } });
   });
 
-  it('does nothing with a Lyric Sheet Section dropped onto a Section', () => {
-    expect(dropFor({ arrangementAt: 1 }, { onto: 2 })).toBeNull();
+  it('adds a Lyric Sheet Section dropped onto another Section to it', () => {
+    expect(dropFor({ arrangementAt: 1 }, { onto: 2 })).toEqual({ merge: { from: 1, into: 2 } });
+    expect(dropFor({ arrangementAt: 3 }, { onto: 0 })).toEqual({ merge: { from: 3, into: 0 } });
+  });
+
+  it('does nothing with a Lyric Sheet Section dropped onto itself', () => {
+    expect(dropFor({ arrangementAt: 2 }, { onto: 2 })).toBeNull();
   });
 
   it('does nothing dropped nowhere', () => {

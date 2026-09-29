@@ -1,6 +1,6 @@
 import { describe as group, expect, it } from 'vitest';
 import type { Alternate, Section } from './api';
-import { activeAlternate, alternateName, alternatesLabel, card, isEmpty, labelOf } from './sections';
+import { activeAlternate, addedNotice, alternateName, alternatesLabel, card, isEmpty, labelOf } from './sections';
 
 function alternate(active: boolean, ...texts: string[]): Alternate {
   return {
@@ -90,5 +90,25 @@ group('alternatesLabel', () => {
 
   it('is just "Alternates" for a Section with one Alternate', () => {
     expect(alternatesLabel(section('', alternate(true, 'La')))).toBe('Alternates');
+  });
+});
+
+group('addedNotice', () => {
+  it('names the Section added and the one it joined', () => {
+    const hook = section('Hook', alternate(true, 'Drive'));
+    const verse = section('Verse 1', alternate(true, 'Night'));
+    expect(addedNotice(hook, verse)).toBe('Hook added to Verse 1 as an Alternate');
+  });
+
+  it('says Alternates when it brought several', () => {
+    const hook = section('Hook', alternate(true, 'Drive'), alternate(false, 'Park'));
+    const verse = section('Verse 1', alternate(true, 'Night'));
+    expect(addedNotice(hook, verse)).toBe('Hook added to Verse 1 as Alternates');
+  });
+
+  it('names a Section without a Label by its first Line', () => {
+    const idea = section('', alternate(true, 'Drive'));
+    const verse = section('', alternate(true, 'Night'));
+    expect(addedNotice(idea, verse)).toBe('“Drive” added to “Night” as an Alternate');
   });
 });

@@ -39,6 +39,12 @@ export function describe(section: Section): string {
   return section.label || (first ? `“${first}”` : labelOf(section));
 }
 
+/** The notice a Section added to another as Alternates leaves, e.g. "Hook added to Verse 1 as an Alternate". */
+export function addedNotice(added: Section, to: Section): string {
+  const as = added.alternates.length === 1 ? 'an Alternate' : 'Alternates';
+  return `${describe(added)} added to ${describe(to)} as ${as}`;
+}
+
 /**
  * Whether nothing is written in any of a Section's Alternates: no Lines, or
  * only blank ones. Taken out of the Arrangement, such a Section is deleted

@@ -338,13 +338,8 @@ func (s *Store) RemoveFromArrangement(ctx context.Context, songID int64, based V
 		if !pos.Valid {
 			return conflict("that Section isn't in the Lyric Sheet")
 		}
-		if _, err := tx.ExecContext(ctx, `UPDATE sections SET position = NULL WHERE id = ?`, sectionID); err != nil {
-			return fmt.Errorf("removing section from arrangement: %w", err)
-		}
-		if _, err := tx.ExecContext(ctx,
-			`UPDATE sections SET position = position - 1 WHERE song_id = ? AND position > ?`,
-			songID, pos.Int64); err != nil {
-			return fmt.Errorf("closing gap in arrangement: %w", err)
+		if err := leaveArrangement(ctx, tx, songID, sectionID, pos.Int64); err != nil {
+			return err
 		}
 		empty, err := sectionEmpty(ctx, tx, sectionID)
 		if err != nil {
@@ -358,6 +353,20 @@ func (s *Store) RemoveFromArrangement(ctx context.Context, songID int64, based V
 		}
 		return nil
 	})
+}
+
+// leaveArrangement takes the Section at pos out of the Arrangement, closing
+// the gap it leaves.
+func leaveArrangement(ctx context.Context, tx *sql.Tx, songID, sectionID, pos int64) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE sections SET position = NULL WHERE id = ?`, sectionID); err != nil {
+		return fmt.Errorf("removing section from arrangement: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE sections SET position = position - 1 WHERE song_id = ? AND position > ?`,
+		songID, pos); err != nil {
+		return fmt.Errorf("closing gap in arrangement: %w", err)
+	}
+	return nil
 }
 
 // sectionEmpty reports whether nothing is written in any of a Section's

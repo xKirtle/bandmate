@@ -21,12 +21,18 @@ export function menuKey(key: string, current: number, count: number): number | '
   }
 }
 
-/** An entry in a ⋯ menu, also shown as an icon button where there's room for one. */
+/**
+ * An entry in a ⋯ menu, also shown as an icon button where there's room for
+ * one. It runs at once, or, with `choices`, opens a list to pick one from
+ * in the menu, e.g. which Section to add to; such an entry shows only in ⋯.
+ */
 export type MenuAction = {
   icon: string;
   /** Names it in the menu, and to screen readers as a button. */
   label: string;
   /** The button's tooltip, when it has more to say than the label. */
   title?: string;
-  run: () => void;
-};
+} & ({ run: () => void } | { choices: MenuChoice[] });
+
+/** One of a menu entry's choices. */
+export type MenuChoice = { label: string; run: () => void };

@@ -87,7 +87,7 @@ func (a *App) removeFromArrangement(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) addToSection(w http.ResponseWriter, r *http.Request) {
-	scrapID, ok := pathID(w, r, "sectionID")
+	addedID, ok := pathID(w, r, "sectionID")
 	if !ok {
 		return
 	}
@@ -98,7 +98,7 @@ func (a *App) addToSection(w http.ResponseWriter, r *http.Request) {
 		if req.SectionID == nil {
 			return lyricsheet.Song{}, &lyricsheet.InvalidError{Msg: "sectionId is required"}
 		}
-		return a.songs.AddToSection(r.Context(), id, based, scrapID, *req.SectionID)
+		return a.songs.AddToSection(r.Context(), id, based, addedID, *req.SectionID)
 	})
 }
 

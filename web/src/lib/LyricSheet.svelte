@@ -24,7 +24,7 @@
   import SectionEditor from './SectionEditor.svelte';
   import { moveTo, type Drop } from './sectionDrag';
   import type { SectionDragging } from './sectionDragging.svelte';
-  import { activeAlternate, describe, isEmpty, sectionsInArrangement } from './sections';
+  import { activeAlternate, addedNotice, describe, isEmpty, sectionsInArrangement } from './sections';
   import type { Mode } from './songMode';
   import { readShiftStep, shiftSteps, storeShiftStep, type ShiftStep } from './shiftStep';
   import { markSyncHintSeen, sawSyncHint } from './syncHint';
@@ -90,6 +90,15 @@
         icon: '⌀',
         label: "Clear this Section's Cues",
         run: () => editCues((at) => api.clearSectionCues(at, section.id)),
+      });
+    }
+    const others = inArrangement.filter((other) => other.id !== section.id);
+    if (others.length > 0) {
+      // Where there's room, it's dragged onto the Section instead.
+      actions.push({
+        icon: '⇄',
+        label: 'Add as an Alternate of…',
+        choices: others.map((other) => ({ label: describe(other), run: () => addTo(section, other) })),
       });
     }
     actions.push({
@@ -302,9 +311,14 @@
   // Sections.
   // The gap the dragged Section would land in, if it moves at all.
   const dropAt = $derived(drag.drop && 'gap' in drag.drop ? drag.drop.gap : null);
-  // The place in the Arrangement of the Section a Scrapbook Section would be
+  // The place in the Arrangement of the Section the dragged one would be
   // added to.
-  const dropOnto = $derived(drag.drop && 'addTo' in drag.drop ? drag.drop.addTo.arrangementAt : null);
+  const dropOnto = $derived.by(() => {
+    const drop = drag.drop;
+    if (drop && 'addTo' in drop) return drop.addTo.arrangementAt;
+    if (drop && 'merge' in drop) return drop.merge.into;
+    return null;
+  });
 
   function dropSection(drop: Drop) {
     if ('reorder' in drop) {
@@ -313,7 +327,24 @@
       change((at) => api.reorderArrangement(at, order));
     } else if ('toScrapbook' in drop) {
       toScrapbook(drop.toScrapbook);
+    } else if ('merge' in drop) {
+      const from = sections.get(song.arrangement[drop.merge.from]);
+      const into = sections.get(song.arrangement[drop.merge.into]);
+      if (from && into) addTo(from, into);
     }
+  }
+
+  // A Section added to another leaves the Lyric Sheet, its Alternates joining
+  // the other's, inactive, which a notice says: it isn't asked first, and
+  // it's undone by moving them to the Scrapbook and back.
+  async function addTo(section: Section, to: Section) {
+    // Its Alternates are made anew in the Section they join, so edits still
+    // waiting in its editor are saved first, while they can be: a drag
+    // doesn't blur the text box.
+    const focused = document.activeElement;
+    if (focused instanceof HTMLElement && focused.closest(`[data-section="${section.id}"]`)) focused.blur();
+    const said = addedNotice(section, to);
+    if (await change((at) => api.addToSection(at, section.id, to.id))) notice = said;
   }
 
   // Dropped on the Scrapbook, a Section goes to its end, or isn't kept if
@@ -444,6 +475,7 @@
             class:drop-above={dropAt === i}
             class:drop-below={dropAt === song.arrangement.length && i === song.arrangement.length - 1}
             class:drop-onto={dropOnto === i}
+            data-section={sectionId}
             {@attach (el) => drag.placeSection(el, i)}
           >
             <SectionEditor
@@ -456,11 +488,11 @@
             >
               {#snippet grip()}
                 {#if drag.on}
-                  <!-- Pointer only: ↑ and ↓ move it from the keyboard, and × to the Scrapbook. -->
+                  <!-- Pointer only: ↑ and ↓ move it from the keyboard, × to the Scrapbook, and ⋯ onto a Section. -->
                   <span
                     class="grip"
                     aria-hidden="true"
-                    title="Drag to move, or onto the Scrapbook; Esc cancels"
+                    title="Drag to move, onto the Scrapbook, or onto another Section to add it as Alternates; Esc cancels"
                     {...drag.grip({ arrangementAt: i }, dropSection)}>⠿</span
                   >
                 {/if}
@@ -619,7 +651,7 @@
   .arrangement > .drop-below::after {
     bottom: calc(-0.375rem - 1.5px);
   }
-  /* A Scrapbook Section dropped onto a Section joins its Alternates: the
+  /* A Section dropped onto another joins its Alternates: the
      Section is outlined, unlike the line a drop into a gap shows. */
   .arrangement > .drop-onto {
     outline: 2px dashed var(--accent);

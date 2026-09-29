@@ -144,7 +144,8 @@
 </script>
 
 <!-- An action as a button beside the Label, where there's room for it. -->
-{#snippet inlineAction(action: MenuAction)}
+<!-- An action with choices has no icon button: it shows only in ⋯. -->
+{#snippet inlineAction(action: MenuAction & { run: () => void })}
   <button
     type="button"
     class="icon wide"
@@ -201,7 +202,9 @@
       </button>
       {@render actions()}
       {#each more as action (action.label)}
-        {@render inlineAction(action)}
+        {#if 'run' in action}
+          {@render inlineAction(action)}
+        {/if}
       {/each}
       <!-- On phones there's no room for every action beside the Label: they fold into ⋯. -->
       <div class="narrow">
