@@ -40,6 +40,8 @@
   import { inTextField } from './textField';
   import { formatDuration } from './time';
   import InputSettings from './InputSettings.svelte';
+  import CalibrationDialog from './CalibrationDialog.svelte';
+  import { appliedOffset, readCalibration, skipCalibration, storeOffset } from './calibration';
   import { readInput } from './inputSettings';
   import { clampHeight, defaultHeight, deviceStorage, heightBounds, readHeight, storeHeight } from './timelineHeight';
   import { audioContext, TimelinePlayer, type PlayableClip, type PlayerState } from './timelinePlayer';
@@ -332,7 +334,7 @@
 
   function undoKeys(event: KeyboardEvent) {
     if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== 'z') return;
-    if (event.defaultPrevented || !editable.current || picking || inTextField(event.target)) return;
+    if (event.defaultPrevented || !editable.current || picking || calibrating || inTextField(event.target)) return;
     // Not while recording, which undo would take the place of.
     if (recording) return;
     event.preventDefault();
@@ -665,7 +667,7 @@
 
   function spaceBar(event: KeyboardEvent) {
     if (event.key !== ' ' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
-    if (event.defaultPrevented || empty || picking || ownsSpace(event.target)) return;
+    if (event.defaultPrevented || empty || picking || calibrating || ownsSpace(event.target)) return;
     // Otherwise the page would scroll.
     event.preventDefault();
     toggle();
@@ -738,7 +740,35 @@
     };
   });
 
-  const canRecord = $derived(recording === null && playerState === 'stopped' && !syncing && editable.current);
+  // The Latency Offset calibrated on this device, and calibration while it
+  // runs: offered before the first recording here, where the Clip to retake
+  // waits for it, or run from the recording settings.
+  let calibration = $state(readCalibration(deviceStorage()));
+  let calibrating = $state<{ offer: boolean; retaking?: Clip } | null>(null);
+  // Whether calibration was just skipped, to say where to run it later.
+  let skipped = $state(false);
+
+  function storeCalibrated(offset: number) {
+    storeOffset(deviceStorage(), offset);
+    // Applied even where storage can't keep it, until reload.
+    calibration = { offset, offered: true };
+  }
+
+  function skipOffer() {
+    skipCalibration(deviceStorage());
+    calibration = { ...calibration, offered: true };
+    skipped = true;
+  }
+
+  function calibrationClosed(record: boolean) {
+    const retaking = calibrating?.retaking;
+    calibrating = null;
+    if (record) startRecording(retaking);
+  }
+
+  const canRecord = $derived(
+    recording === null && playerState === 'stopped' && !syncing && !calibrating && editable.current,
+  );
 
   $effect(() => {
     onRecording?.(recording !== null && recording.phase !== 'saving');
@@ -747,6 +777,11 @@
   /** Records a Take onto the chosen Track, or with retaking, into that Clip of Takes. */
   async function startRecording(retaking?: Clip) {
     if (!canRecord) return;
+    // Calibration is offered first, the first time on this device.
+    if (!calibration.offered && calibration.offset === null) {
+      calibrating = { offer: true, retaking };
+      return;
+    }
     error = null;
     // Resumed right away, while the key press or click still counts.
     audioContext()
@@ -802,10 +837,11 @@
     position = player.position();
     const samples = await r.capture.stop(r.startedAt);
     const rate = r.capture.sampleRate;
-    const latency = r.capture.latency;
+    const latency = appliedOffset(calibration, r.capture.latency);
     // What was sung after the lead-in, placed where it was heard.
     if (r.plan.from + samples.length / rate - latency <= r.plan.start) {
       recording = null;
+      skipped = false;
       error = 'Recording stopped during the lead-in, so there was nothing to keep.';
       return;
     }
@@ -826,6 +862,8 @@
       return { timeline: after };
     }).finally(() => queued--);
     recording = null;
+    // Said once, for the recording right after skipping.
+    skipped = false;
   }
 
   function switchRecording() {
@@ -835,7 +873,7 @@
 
   function recordKey(event: KeyboardEvent) {
     if (event.key.toLowerCase() !== 'r' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
-    if (event.defaultPrevented || picking || inTextField(event.target)) return;
+    if (event.defaultPrevented || picking || calibrating || inTextField(event.target)) return;
     if (!capturing && !canRecord) return;
     event.preventDefault();
     switchRecording();
@@ -1550,13 +1588,30 @@
                   : `Record a Take on ${timeline.tracks.find((t) => t.id === chosen)?.name ?? 'a new Track'} (R)`}
           ><span class="record-dot" aria-hidden="true"></span>{capturing ? 'Stop' : 'Record'}</button
         >
-        <span class="edit-only"><InputSettings disabled={recording !== null} /></span>
+        <span class="edit-only"
+          ><InputSettings
+            disabled={recording !== null}
+            offset={calibration.offset}
+            onCalibrate={() => (calibrating = { offer: false })}
+          /></span
+        >
+        {#if calibration.offset === null && !recording}
+          <button
+            type="button"
+            class="not-calibrated edit-only"
+            disabled={!canRecord}
+            title="Takes are placed by the latency the browser reports until it's calibrated. Calibrate it now, or any time in the recording settings."
+            onclick={() => (calibrating = { offer: false })}>Not calibrated</button
+          >
+        {/if}
         {#if recording?.phase === 'starting'}
           <span class="muted" role="status">Opening the microphone…</span>
         {:else if recording?.phase === 'saving'}
           <span class="muted" role="status">Saving the Take…</span>
         {:else if recording && inputNote}
           <span class="input-note" role="status">{inputNote}</span>
+        {:else if recording && skipped}
+          <span class="muted" role="status">Calibrate the latency any time in the recording settings.</span>
         {:else if playerState === 'loading'}
           <span class="muted" role="status">Loading audio…</span>
         {/if}
@@ -1883,6 +1938,14 @@
   {/if}
 </section>
 
+{#if calibrating}
+  <CalibrationDialog
+    offer={calibrating.offer}
+    onCalibrated={storeCalibrated}
+    onSkip={skipOffer}
+    onClose={calibrationClosed}
+  />
+{/if}
 {#if picking}
   <BeatPicker {song} onPick={addBeat} onClose={() => (picking = false)} />
 {/if}
@@ -2277,6 +2340,19 @@
   .toggle.record[aria-pressed='true'] .record-dot {
     border-radius: 1px;
     background: currentColor;
+  }
+  .not-calibrated {
+    padding: 0.125rem 0.375rem;
+    border: 1px dashed var(--warning);
+    border-radius: 0.25rem;
+    background: none;
+    color: var(--warning);
+    font-size: 0.8125rem;
+    cursor: pointer;
+  }
+  .not-calibrated:disabled {
+    opacity: 0.5;
+    cursor: default;
   }
   .input-note {
     color: var(--warning);

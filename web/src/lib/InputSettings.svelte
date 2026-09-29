@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy, tick } from 'svelte';
+  import { formatOffset } from './calibration';
   import { CaptureError, InputLevel } from './capture';
   import { channelName, deviceName, meterLevel, readInput, storeInput, type InputChoice } from './inputSettings';
   import { popoverLeft, popoverTop } from './popover';
@@ -8,13 +9,20 @@
 
   // The recording settings, beside Record: the input to record from, a
   // device and one of its channels, kept on this device, and a live level
-  // meter of it while they're open, to set the interface's gain by.
+  // meter of it while they're open, to set the interface's gain by; and the
+  // Latency Offset, calibrated or not, with calibration to run again.
 
   let {
     disabled = false,
+    offset,
+    onCalibrate,
   }: {
     /** Keeps them from opening, e.g. while recording. */
     disabled?: boolean;
+    /** The Latency Offset calibrated on this device, in seconds, or null. */
+    offset: number | null;
+    /** Asks for calibration to run. */
+    onCalibrate: () => void;
   } = $props();
 
   let open = $state(false);
@@ -33,6 +41,8 @@
   let channel = $state(0);
   // The device chosen when it isn't connected, so the default is metered instead.
   let gone = $state<string | null>(null);
+  // The latency the browser reports for the input open, in seconds.
+  let reported = $state<number | null>(null);
   let problem = $state<string | null>(null);
   let opening = $state(false);
 
@@ -80,6 +90,7 @@
       channels = opened.channels;
       channel = opened.channel;
       gone = opened.gone;
+      reported = opened.latency;
       lastFrame = performance.now();
       frame = requestAnimationFrame(step);
     } catch (e) {
@@ -266,6 +277,24 @@
       {:else}
         <p class="muted">Set your interface's gain so the loudest part stays out of the red.</p>
       {/if}
+      <div class="latency">
+        <p>
+          <span>Latency Offset</span>
+          {#if offset !== null}
+            {formatOffset(offset)}
+          {:else}
+            Not calibrated{reported !== null ? `: the browser's ${formatOffset(reported)} is used` : ''}
+          {/if}
+        </p>
+        <button
+          type="button"
+          class="button"
+          onclick={() => {
+            hide(false);
+            onCalibrate();
+          }}>{offset !== null ? 'Calibrate again' : 'Calibrate'}</button
+        >
+      </div>
     </div>
   {/if}
 </div>
@@ -346,6 +375,17 @@
   }
   .problem {
     color: var(--danger);
+  }
+  .latency {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .latency span {
+    display: block;
+    color: var(--text-muted);
   }
   .notice {
     color: var(--warning);

@@ -166,6 +166,16 @@ function connectChannel(context: AudioContext, input: OpenInput, node: AudioNode
   return [source, splitter];
 }
 
+/**
+ * How much later an input captures what's heard than it's played, in
+ * seconds, as the browser reports it: its output latency, plus the input's
+ * if it says.
+ */
+function reportedLatency(context: AudioContext, input: OpenInput): number {
+  const settings = input.stream.getAudioTracks()[0]?.getSettings() as MediaTrackSettings & { latency?: number };
+  return (context.outputLatency || 0) + (settings?.latency || 0);
+}
+
 /** Lets go of an input. */
 function release(stream: MediaStream) {
   for (const track of stream.getTracks()) track.stop();
@@ -176,6 +186,7 @@ export class InputLevel {
   #samples: Float32Array<ArrayBuffer>;
 
   private constructor(
+    private context: AudioContext,
     private input: OpenInput,
     private nodes: AudioNode[],
     private analyser: AnalyserNode,
@@ -188,7 +199,7 @@ export class InputLevel {
     const input = await openInput(choice);
     const analyser = context.createAnalyser();
     analyser.fftSize = 2048;
-    return new InputLevel(input, connectChannel(context, input, analyser), analyser);
+    return new InputLevel(context, input, connectChannel(context, input, analyser), analyser);
   }
 
   /** How many channels the input has, and which of them is metered. */
@@ -203,6 +214,11 @@ export class InputLevel {
   /** The name of the device chosen when it isn't connected, or null. */
   get gone(): string | null {
     return this.input.gone;
+  }
+
+  /** The latency the browser reports for the input, in seconds. */
+  get latency(): number {
+    return reportedLatency(this.context, this.input);
   }
 
   /** The latest samples of the channel used. */
@@ -268,14 +284,9 @@ export class Capture {
     return this.context.sampleRate;
   }
 
-  /**
-   * How much later the input captures what's heard than it's played, in
-   * seconds, as the browser reports it: its output latency, plus the
-   * input's if it says. Calibration will replace this.
-   */
+  /** The latency the browser reports for the input, in seconds; a calibrated Latency Offset replaces it. */
   get latency(): number {
-    const input = this.input.stream.getAudioTracks()[0]?.getSettings() as MediaTrackSettings & { latency?: number };
-    return (this.context.outputLatency || 0) + (input?.latency || 0);
+    return reportedLatency(this.context, this.input);
   }
 
   /**
