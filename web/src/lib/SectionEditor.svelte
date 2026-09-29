@@ -50,7 +50,7 @@
   // In the Alternates mode, the Alternates show as cards to choose the active
   // one from, in place of its Lines. ⇄ opens and closes it.
   let choosing = $state(false);
-  let entryButton = $state<HTMLButtonElement>();
+  let toggle = $state<HTMLButtonElement>();
 
   $effect(() => {
     const l = section.label;
@@ -85,7 +85,7 @@
 
   function leaveChoosing() {
     // Focus goes first, so a name being typed is saved as its field blurs.
-    entryButton?.focus();
+    toggle?.focus();
     choosing = false;
   }
 
@@ -189,12 +189,12 @@
       </span>
     {/if}
     <div class="actions">
-      <!-- Shows at every width. The dot tells there are Alternates to choose from. -->
+      <!-- Shows at every width. -->
       <button
         type="button"
-        class="icon entry"
+        class="icon alternates-toggle"
         class:has-others={section.alternates.length > 1}
-        bind:this={entryButton}
+        bind:this={toggle}
         onclick={() => (choosing ? leaveChoosing() : startChoosing())}
         aria-expanded={choosing}
         aria-label={alternatesLabel(section)}
@@ -380,21 +380,22 @@
       display: none;
     }
   }
-  .entry {
+  .alternates-toggle {
     position: relative;
   }
-  .entry[aria-expanded='true'],
-  .entry[aria-expanded='true']:hover {
+  /* Hovered too, over .icon's own hover border. */
+  .alternates-toggle[aria-expanded='true'],
+  .alternates-toggle[aria-expanded='true']:hover {
     border-color: var(--accent);
   }
-  /* Like a notification badge, on the top-right corner. */
-  .entry.has-others::after {
+  /* A dot on the corner says there are Alternates to choose from. */
+  .alternates-toggle.has-others::after {
     content: '';
     position: absolute;
-    top: 0.125rem;
-    right: 0.125rem;
-    width: 0.4375rem;
-    height: 0.4375rem;
+    top: 0.1875rem;
+    right: 0.1875rem;
+    width: 0.375rem;
+    height: 0.375rem;
     border-radius: 50%;
     background: var(--accent);
   }
