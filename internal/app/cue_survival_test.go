@@ -70,7 +70,7 @@ func TestANewAlternateCarriesTheCuesOfTheOneItCopiesWhichStayDormant(t *testing.
 	}
 
 	// From then on, each keeps its own.
-	got = ts.setLineCue(s.ID, ids[0], c[1].ID, 7)
+	ts.setLineCue(s.ID, ids[0], c[1].ID, 7)
 	got = ts.activate(s.ID, alts[0].ID)
 	if want := map[int64]float64{drive: 2, night: 6, c[0].ID: 2, c[1].ID: 7}; !reflect.DeepEqual(got.Arrangement[0].LineCues, want) {
 		t.Errorf("lineCues after recueing the copy = %v, want %v", got.Arrangement[0].LineCues, want)

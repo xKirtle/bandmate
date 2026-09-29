@@ -37,15 +37,7 @@ func (s *Store) AddAlternate(ctx context.Context, songID int64, based Version, s
 				return fmt.Errorf("copying line cues: %w", err)
 			}
 		}
-		// The old one goes first: only one Alternate of a Section may be
-		// active at any moment.
-		if _, err := tx.ExecContext(ctx, `UPDATE alternates SET active = 0 WHERE id = ?`, activeID); err != nil {
-			return fmt.Errorf("deactivating alternate: %w", err)
-		}
-		if _, err := tx.ExecContext(ctx, `UPDATE alternates SET active = 1 WHERE id = ?`, altID); err != nil {
-			return fmt.Errorf("activating alternate: %w", err)
-		}
-		return nil
+		return activate(ctx, tx, sectionID, altID)
 	})
 }
 
@@ -71,18 +63,23 @@ func (s *Store) ActivateAlternate(ctx context.Context, songID int64, based Versi
 		if err != nil {
 			return err
 		}
-		// The old one goes first: only one Alternate of a Section may be
-		// active at any moment.
-		if _, err := tx.ExecContext(ctx, `UPDATE alternates SET active = 0 WHERE section_id = ? AND id != ?`,
-			sectionID, alternateID); err != nil {
-			return fmt.Errorf("deactivating alternate: %w", err)
-		}
-		if _, err := tx.ExecContext(ctx, `UPDATE alternates SET active = 1 WHERE id = ?`,
-			alternateID); err != nil {
-			return fmt.Errorf("activating alternate: %w", err)
-		}
-		return nil
+		return activate(ctx, tx, sectionID, alternateID)
 	})
+}
+
+// activate makes one of a Section's Alternates its only active one.
+func activate(ctx context.Context, tx *sql.Tx, sectionID, alternateID int64) error {
+	// The old one goes first: only one Alternate of a Section may be active
+	// at any moment.
+	if _, err := tx.ExecContext(ctx, `UPDATE alternates SET active = 0 WHERE section_id = ? AND id != ?`,
+		sectionID, alternateID); err != nil {
+		return fmt.Errorf("deactivating alternate: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE alternates SET active = 1 WHERE id = ?`,
+		alternateID); err != nil {
+		return fmt.Errorf("activating alternate: %w", err)
+	}
+	return nil
 }
 
 // DeleteAlternate permanently deletes an inactive Alternate and its Lines.

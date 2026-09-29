@@ -93,10 +93,15 @@
     radio(active.id)?.focus();
   }
 
-  function leaveChoosing() {
+  async function leaveChoosing() {
     // Focus goes first, so a name being typed is saved as its field blurs.
     entryButton?.focus();
     choosing = false;
+    // With one Alternate left, the entry goes with the mode: on to its Lines.
+    if (entry === null) {
+      await tick();
+      document.getElementById(`text-${uid}-${active.id}`)?.focus();
+    }
   }
 
   function onChoosingKey(e: KeyboardEvent) {
@@ -137,9 +142,11 @@
     choose(alt);
   }
 
-  function remove(alt: Alternate) {
+  async function remove(alt: Alternate) {
     const ok = confirm(`Delete ${alternateName(section, alt)} for good?\n\nIts Lines go with it. It can't be undone.`);
-    if (ok) change((at) => api.deleteAlternate(at, alt.id));
+    if (!ok) return;
+    // Its ⋯ goes with it: the keyboard carries on from the active card.
+    if (await change((at) => api.deleteAlternate(at, alt.id))) radio(active.id)?.focus();
   }
 
   function focusWhen(on: boolean) {
