@@ -359,6 +359,13 @@ export const api = {
     request<Song>('POST', `/songs/${at.id}/occurrences`, { sectionId, position }, at),
   /** Creates a Section in the Scrapbook, with no Occurrence. */
   addToScrapbook: (at: SongAt, label = '') => request<Song>('POST', `/songs/${at.id}/scrapbook`, { label }, at),
+  /**
+   * Adds a Scrapbook Section to a Section in the Lyric Sheet: its Alternates
+   * join that Section's, inactive, an unnamed one taking its Label as its
+   * name, and it leaves the Scrapbook.
+   */
+  addToSection: (at: SongAt, scrapId: number, sectionId: number) =>
+    request<Song>('POST', `/songs/${at.id}/sections/${scrapId}/add-to-section`, { sectionId }, at),
   /** Permanently deletes a Section; only one in the Scrapbook can be. */
   deleteSection: (at: SongAt, sectionId: number) =>
     request<Song>('DELETE', `/songs/${at.id}/sections/${sectionId}`, undefined, at),

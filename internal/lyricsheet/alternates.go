@@ -146,6 +146,59 @@ func (s *Store) MoveAlternateToScrapbook(ctx context.Context, songID int64, base
 	})
 }
 
+// AddToSection adds a Section in the Scrapbook to a Section in the Lyric
+// Sheet: every Alternate of the scrap joins the Section, inactive, after its
+// own, so the Lyric Sheet is unchanged, and the scrap leaves the Scrapbook.
+// An unnamed Alternate takes the scrap's Label as its name. Their Lines keep
+// their ids, and have no Cues: a Scrapbook Section has no Occurrences.
+func (s *Store) AddToSection(ctx context.Context, songID int64, based Version, scrapID, sectionID int64) (Song, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		scrapUses, err := findSection(ctx, tx, songID, scrapID)
+		if err != nil {
+			return err
+		}
+		uses, err := findSection(ctx, tx, songID, sectionID)
+		if err != nil {
+			return err
+		}
+		if scrapUses > 0 {
+			return conflict("only a Scrapbook Section can be added to a Section")
+		}
+		if uses == 0 {
+			return conflict("a Scrapbook Section can only be added to a Section in the Lyric Sheet")
+		}
+		var alternates []int64
+		err = query(ctx, tx, `SELECT id FROM alternates WHERE section_id = ? ORDER BY id`,
+			[]any{scrapID}, func(rows *sql.Rows) error {
+				var id int64
+				err := rows.Scan(&id)
+				alternates = append(alternates, id)
+				return err
+			})
+		if err != nil {
+			return fmt.Errorf("reading alternates: %w", err)
+		}
+		// Each is made anew, so it comes after the Section's own Alternates.
+		for _, altID := range alternates {
+			newID, err := insert(ctx, tx, `INSERT INTO alternates (section_id, name)
+				SELECT ?, CASE a.name WHEN '' THEN s.label ELSE a.name END
+				FROM alternates a JOIN sections s ON s.id = a.section_id WHERE a.id = ?`,
+				sectionID, altID)
+			if err != nil {
+				return fmt.Errorf("adding alternate: %w", err)
+			}
+			if _, err := tx.ExecContext(ctx, `UPDATE lines SET alternate_id = ? WHERE alternate_id = ?`,
+				newID, altID); err != nil {
+				return fmt.Errorf("moving lines: %w", err)
+			}
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM sections WHERE id = ?`, scrapID); err != nil {
+			return fmt.Errorf("deleting scrapbook section: %w", err)
+		}
+		return nil
+	})
+}
+
 // scrapbookLabel is the Label of a Section made from an Alternate moved to
 // the Scrapbook: its Section's Label and its name, e.g. "Verse 1 · Darker",
 // whichever of them it has.

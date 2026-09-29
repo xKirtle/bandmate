@@ -80,6 +80,22 @@ func (a *App) moveOccurrenceToScrapbook(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
+func (a *App) addToSection(w http.ResponseWriter, r *http.Request) {
+	scrapID, ok := pathID(w, r, "sectionID")
+	if !ok {
+		return
+	}
+	var req struct {
+		SectionID *int64 `json:"sectionId"`
+	}
+	a.changeSheet(w, r, &req, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
+		if req.SectionID == nil {
+			return lyricsheet.Song{}, &lyricsheet.InvalidError{Msg: "sectionId is required"}
+		}
+		return a.songs.AddToSection(r.Context(), id, based, scrapID, *req.SectionID)
+	})
+}
+
 func (a *App) detach(w http.ResponseWriter, r *http.Request) {
 	occurrenceID, ok := pathID(w, r, "occurrenceID")
 	if !ok {
