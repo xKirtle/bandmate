@@ -85,7 +85,7 @@
   // changing mid-drag cancels it.
   const drag = new SectionDrag(
     () => desktop.current && writing,
-    () => song && `${song.arrangement.map((o) => o.id)}|${song.scrapbook}`,
+    () => (song ? `${song.arrangement.map((o) => o.id)}|${song.scrapbook}` : ''),
   );
   // How tall the docked Timeline is, which the side column stops above.
   let timelineHeight = $state(0);

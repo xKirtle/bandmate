@@ -319,9 +319,6 @@
   // the Arrangement, or out of it to the Scrapbook. A drop within it saves
   // the same order as pressing ↑ or ↓ that many times, so Cues go with their
   // Occurrences.
-  const dragged = $derived(
-    drag.current && 'occurrence' in drag.current.dragged ? drag.current.dragged.occurrence : null,
-  );
   // The gap the dragged Section would land in, if it moves at all.
   const dropAt = $derived(drag.drop && 'gap' in drag.drop ? drag.drop.gap : null);
 
@@ -456,12 +453,16 @@
     {/if}
     <LyricSheetView {song} showChords={chordsShown} {current} play={leadInto} />
   {:else}
-    <ol class="arrangement" class:drop-into={dropAt === 0 && song.arrangement.length === 0}>
+    <ol
+      class="arrangement"
+      class:drop-into={dropAt === 0 && song.arrangement.length === 0}
+      {@attach drag.placeArrangement}
+    >
       {#each song.arrangement as occurrence, i (occurrence.id)}
         {@const section = sections.get(occurrence.sectionId)}
         {#if section}
           <li
-            class:dragged={dragged === i}
+            class:dragged={drag.occurrenceAt === i}
             class:drop-above={dropAt === i}
             class:drop-below={dropAt === song.arrangement.length && i === song.arrangement.length - 1}
             {@attach (el) => drag.placeOccurrence(el, i)}
@@ -483,7 +484,7 @@
                     class="grip"
                     aria-hidden="true"
                     title="Drag to move, or onto the Scrapbook; Esc cancels"
-                    {...drag.grip({ occurrence: i }, dropOccurrence)}>⠿</span
+                    {...drag.grip({ occurrenceAt: i }, dropOccurrence)}>⠿</span
                   >
                 {/if}
               {/snippet}

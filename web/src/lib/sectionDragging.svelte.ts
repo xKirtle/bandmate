@@ -8,31 +8,46 @@ import { dropFor, dropTarget, type Box, type Drop, type Dragged, type Target } f
 // Sheet and the Scrapbook, as a drag goes from one to the other.
 export class SectionDrag {
   /** The drag under way: what's dragged, where it would drop, and where the pointer is. */
-  current = $state<{ dragged: Dragged; target: Target; x: number; y: number } | null>(null);
+  current = $state<{ dragged: Dragged; target: Target | null; x: number; y: number } | null>(null);
   /** What letting go now would do, if anything. */
   readonly drop: Drop | null = $derived(this.current && dropFor(this.current.dragged, this.current.target));
   /** Whether Sections can be dragged at all. */
   readonly on: boolean = $derived.by(() => this.#enabled());
+  /** The place in the Arrangement of the Occurrence being dragged, if one is. */
+  readonly occurrenceAt: number | null = $derived.by(() => {
+    const dragged = this.current?.dragged;
+    return dragged && 'occurrenceAt' in dragged ? dragged.occurrenceAt : null;
+  });
+  /** The id of the Scrapbook Section being dragged, if one is. */
+  readonly section: number | null = $derived.by(() => {
+    const dragged = this.current?.dragged;
+    return dragged && 'section' in dragged ? dragged.section : null;
+  });
 
   #enabled: () => boolean;
+  #order: string = $derived.by(() => this.#orderOf());
+  #orderOf: () => string;
   // Each Occurrence's place on the page, by its place in the Arrangement.
   #occurrences = new Map<number, HTMLElement>();
+  #arrangement: HTMLElement | null = null;
   #scrapbook: HTMLElement | null = null;
 
   /**
    * `enabled` says whether Sections can be dragged; it turning false
    * mid-drag, e.g. the window narrowing or Read mode coming on, cancels the
    * drag, as the pointer's release would never reach the grip. So does
-   * `layout` changing: it names the Arrangement and Scrapbook, whose changing
-   * mid-drag, e.g. from another tab, would move what's being dragged.
+   * `order` changing: it names the order of the Arrangement and the
+   * Scrapbook, whose changing mid-drag, e.g. from another tab, would move
+   * what's being dragged. Other changes to the Song leave the drag be.
    */
-  constructor(enabled: () => boolean, layout: () => unknown) {
+  constructor(enabled: () => boolean, order: () => string) {
     this.#enabled = enabled;
+    this.#orderOf = order;
     $effect(() => {
       if (!this.on) untrack(() => this.cancel());
     });
     $effect(() => {
-      void layout();
+      void this.#order;
       untrack(() => this.cancel());
     });
   }
@@ -49,6 +64,14 @@ export class SectionDrag {
     };
   }
 
+  /** Attaches the Arrangement's place on the page: its column is where a Section drops into it. */
+  placeArrangement = (el: HTMLElement) => {
+    this.#arrangement = el;
+    return () => {
+      if (this.#arrangement === el) this.#arrangement = null;
+    };
+  };
+
   /** Attaches the Scrapbook's place on the page, where an Occurrence can be dropped. */
   placeScrapbook = (el: HTMLElement) => {
     this.#scrapbook = el;
@@ -62,13 +85,16 @@ export class SectionDrag {
     if (this.current) this.current = { ...this.current, target: this.#targetAt(x, y), x, y };
   }
 
-  #targetAt(x: number, y: number): Target {
-    const middles: number[] = [];
-    for (let i = 0, el; (el = this.#occurrences.get(i)); i++) {
-      const box = el.getBoundingClientRect();
-      middles.push(box.top + box.height / 2);
-    }
-    return dropTarget({ x, y }, this.#scrapbookBox(), middles);
+  #targetAt(x: number, y: number): Target | null {
+    const arrangement = this.#arrangement?.getBoundingClientRect();
+    if (!arrangement) return null;
+    // An Occurrence not on the page has its gaps counted above the pointer.
+    const count = Math.max(-1, ...this.#occurrences.keys()) + 1;
+    const middles = Array.from({ length: count }, (_, i) => {
+      const box = this.#occurrences.get(i)?.getBoundingClientRect();
+      return box ? box.top + box.height / 2 : -Infinity;
+    });
+    return dropTarget({ x, y }, this.#scrapbookBox(), arrangement, middles);
   }
 
   // Only the part of the Scrapbook in view in its column can be dropped on.

@@ -83,48 +83,63 @@ describe('moveTo', () => {
 
 describe('dropTarget', () => {
   const middles = [50, 150, 250];
-  // The Scrapbook, in a column to the right of the Lyric Sheet.
+  // The Arrangement, and the Scrapbook in a column to the right of it.
+  const sheet = { left: 100, right: 800, top: 0, bottom: 300 };
   const scrapbook = { left: 900, right: 1200, top: 0, bottom: 400 };
 
   it('is the Scrapbook with the pointer over it', () => {
-    expect(dropTarget({ x: 1000, y: 120 }, scrapbook, middles)).toEqual({ scrapbook: true });
-    expect(dropTarget({ x: 900, y: 400 }, scrapbook, middles)).toEqual({ scrapbook: true });
+    expect(dropTarget({ x: 1000, y: 120 }, scrapbook, sheet, middles)).toEqual({ scrapbook: true });
+    expect(dropTarget({ x: 900, y: 400 }, scrapbook, sheet, middles)).toEqual({ scrapbook: true });
   });
 
-  it('is the gap in the Arrangement the pointer is at anywhere else', () => {
-    expect(dropTarget({ x: 400, y: 120 }, scrapbook, middles)).toEqual({ gap: 1 });
-    expect(dropTarget({ x: 1000, y: 500 }, scrapbook, middles)).toEqual({ gap: 3 });
+  it('is the gap in the Arrangement the pointer is at in its column', () => {
+    expect(dropTarget({ x: 400, y: 120 }, scrapbook, sheet, middles)).toEqual({ gap: 1 });
   });
 
-  it('is a gap without a Scrapbook to drop on, e.g. in Read mode', () => {
-    expect(dropTarget({ x: 1000, y: 120 }, null, middles)).toEqual({ gap: 1 });
+  it('is the first or last gap with the pointer above or below the Arrangement', () => {
+    expect(dropTarget({ x: 400, y: -80 }, scrapbook, sheet, middles)).toEqual({ gap: 0 });
+    expect(dropTarget({ x: 400, y: 900 }, scrapbook, sheet, middles)).toEqual({ gap: 3 });
+  });
+
+  it('is nowhere beside both, e.g. over the Masters below the Scrapbook', () => {
+    expect(dropTarget({ x: 1000, y: 500 }, scrapbook, sheet, middles)).toBeNull();
+    expect(dropTarget({ x: 20, y: 120 }, scrapbook, sheet, middles)).toBeNull();
+  });
+
+  it('is a gap without a Scrapbook to drop on', () => {
+    expect(dropTarget({ x: 400, y: 120 }, null, sheet, middles)).toEqual({ gap: 1 });
   });
 
   it('is the only gap in an empty Arrangement', () => {
-    expect(dropTarget({ x: 400, y: 120 }, scrapbook, [])).toEqual({ gap: 0 });
+    expect(dropTarget({ x: 400, y: 120 }, scrapbook, sheet, [])).toEqual({ gap: 0 });
   });
 });
 
 describe('dropFor', () => {
   it('moves an Occurrence dropped into another gap in the Arrangement', () => {
-    expect(dropFor({ occurrence: 1 }, { gap: 4 })).toEqual({ reorder: { from: 1, to: 3 }, gap: 4 });
+    expect(dropFor({ occurrenceAt: 1 }, { gap: 4 })).toEqual({ reorder: { from: 1, to: 3 }, gap: 4 });
   });
 
   it('does nothing with an Occurrence dropped just above or below itself', () => {
-    expect(dropFor({ occurrence: 2 }, { gap: 2 })).toBeNull();
-    expect(dropFor({ occurrence: 2 }, { gap: 3 })).toBeNull();
+    expect(dropFor({ occurrenceAt: 2 }, { gap: 2 })).toBeNull();
+    expect(dropFor({ occurrenceAt: 2 }, { gap: 3 })).toBeNull();
   });
 
   it('moves an Occurrence dropped on the Scrapbook there', () => {
-    expect(dropFor({ occurrence: 2 }, { scrapbook: true })).toEqual({ toScrapbook: 2 });
+    expect(dropFor({ occurrenceAt: 2 }, { scrapbook: true })).toEqual({ toScrapbook: 2 });
   });
 
   it('puts a Scrapbook Section dropped into a gap back there', () => {
-    expect(dropFor({ section: 7 }, { gap: 0 })).toEqual({ putBack: { section: 7, position: 0 }, gap: 0 });
-    expect(dropFor({ section: 7 }, { gap: 3 })).toEqual({ putBack: { section: 7, position: 3 }, gap: 3 });
+    expect(dropFor({ section: 7 }, { gap: 0 })).toEqual({ putBack: 7, gap: 0 });
+    expect(dropFor({ section: 7 }, { gap: 3 })).toEqual({ putBack: 7, gap: 3 });
   });
 
   it('does nothing with a Scrapbook Section dropped on the Scrapbook', () => {
     expect(dropFor({ section: 7 }, { scrapbook: true })).toBeNull();
+  });
+
+  it('does nothing dropped nowhere', () => {
+    expect(dropFor({ occurrenceAt: 2 }, null)).toBeNull();
+    expect(dropFor({ section: 7 }, null)).toBeNull();
   });
 });

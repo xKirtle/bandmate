@@ -86,12 +86,10 @@
 
   // On desktop, a Section is also dragged by its grip into a gap in the Lyric
   // Sheet, putting it back there as "Put back…" does.
-  const dragged = $derived(drag.current && 'section' in drag.current.dragged ? drag.current.dragged.section : null);
-
   function dropSection(drop: Drop) {
     if (!('putBack' in drop)) return;
-    const { section, position } = drop.putBack;
-    change((at) => api.addOccurrence(at, section, position)).then(closed(section));
+    const section = drop.putBack;
+    change((at) => api.addOccurrence(at, section, drop.gap)).then(closed(section));
   }
 
   /** After a Section leaves the Scrapbook: should it come back, it does so as a card. */
@@ -121,7 +119,7 @@
   {#if scrapbook.length > 0}
     <ul class="list">
       {#each scrapbook as section (section.id)}
-        <li class:dragged={dragged === section.id}>
+        <li class:dragged={drag.section === section.id}>
           {#if open === section.id}
             <SectionEditor
               uid="s{section.id}"
