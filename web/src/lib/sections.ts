@@ -15,3 +15,19 @@ export function describe(section: Section): string {
 export function isEmpty(section: Section): boolean {
   return section.alternates.every((a) => a.lines.every(isBlank));
 }
+
+/** How many Lines a Scrapbook card shows before "+N more Lines". */
+export const CARD_LINES = 4;
+
+/**
+ * What a Scrapbook Section's card shows at rest: the first Lines of its active
+ * Alternate as written, how many more there are, and how many Alternates it has.
+ */
+export function card(section: Section): { lines: string[]; more: number; alternates: number } {
+  const lines = section.alternates.find((a) => a.active)?.lines ?? [];
+  return {
+    lines: lines.slice(0, CARD_LINES).map((l) => l.text),
+    more: Math.max(0, lines.length - CARD_LINES),
+    alternates: section.alternates.length,
+  };
+}
