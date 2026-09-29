@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { leadIn, recordingPlan, retakeLength, retakePlan } from './recording';
+import { leadIn, recordingPlan, retakeLength, retakePlan, sungPastStart } from './recording';
 
 describe('recordingPlan', () => {
   it('puts a Take on an empty Track at 0:00, with no lead-in before it', () => {
@@ -53,5 +53,19 @@ describe('retakeLength', () => {
 
   it('grows as far as it likes when no Clip comes after it', () => {
     expect(retakeLength(clip, [clip], 60)).toBe(50);
+  });
+});
+
+describe('sungPastStart', () => {
+  // Captured from 0:28 for a Take at 0:30, placed 0.1 s earlier.
+  const plan = { start: 30, from: 28 };
+
+  it('keeps a recording that runs on past its Clip start', () => {
+    expect(sungPastStart(plan, 2.2, 0.1)).toBe(true);
+  });
+
+  it('keeps nothing that stopped during the lead-in, the Latency Offset taken off', () => {
+    expect(sungPastStart(plan, 2.1, 0.1)).toBe(false);
+    expect(sungPastStart(plan, 1.5, 0)).toBe(false);
   });
 });

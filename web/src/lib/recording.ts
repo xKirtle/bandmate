@@ -41,3 +41,15 @@ export function retakeLength(clip: Placed, clips: readonly Placed[], end: number
   const next = clips.reduce((at, c) => (c.start >= after ? Math.min(at, c.start) : at), Infinity);
   return Math.max(clip.length, Math.min(end, next) - clip.start);
 }
+
+// As the server's, so a Take ending right at its Clip's start counts as none.
+const tolerance = 1e-6;
+
+/**
+ * Whether a recording planned so, lasting duration seconds and placed
+ * latencyOffset earlier, has anything past its Clip's start, rather than
+ * stopping during the lead-in with nothing to keep.
+ */
+export function sungPastStart(plan: RecordingPlan, duration: number, latencyOffset: number): boolean {
+  return plan.from + duration - latencyOffset > plan.start + tolerance;
+}

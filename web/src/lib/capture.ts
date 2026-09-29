@@ -233,10 +233,36 @@ export class InputLevel {
   }
 }
 
+/** Samples captured in a batch, with the frame the first was captured at. */
+export interface Batch {
+  frame: number;
+  samples: Float32Array;
+}
+
+/** The frame captured at a context time, at a rate. */
+export function frameAt(time: number, rate: number): number {
+  return Math.round(time * rate);
+}
+
+/**
+ * The samples captured from a frame on, from batches in any order, with
+ * silence wherever none were kept.
+ */
+export function samplesFrom(batches: readonly Batch[], first: number): Float32Array<ArrayBuffer> {
+  const last = batches.reduce((end, b) => Math.max(end, b.frame + b.samples.length), first);
+  const samples = new Float32Array(last - first);
+  for (const { frame, samples: batch } of batches) {
+    const skip = Math.max(0, first - frame);
+    if (skip < batch.length) samples.set(batch.subarray(skip), frame + skip - first);
+  }
+  return samples;
+}
+
 /** The input being captured, from when it's opened until it's stopped. */
 export class Capture {
   // The samples received so far, each batch with the frame it starts at.
-  #batches: { frame: number; samples: Float32Array }[] = [];
+  #batches: Batch[] = [];
+  #sink: ((batch: Batch) => void) | null = null;
   #stopped: Promise<void>;
 
   private constructor(
@@ -248,7 +274,10 @@ export class Capture {
     this.#stopped = new Promise((resolve) => {
       node.port.onmessage = ({ data }) => {
         if (data.done) resolve();
-        else this.#batches.push(data);
+        else {
+          this.#batches.push(data);
+          this.#sink?.(data);
+        }
       };
     });
   }
@@ -289,6 +318,12 @@ export class Capture {
     return reportedLatency(this.context, this.input);
   }
 
+  /** Hands sink every batch captured, those so far and each one after, e.g. to keep a copy. */
+  keep(sink: (batch: Batch) => void) {
+    for (const batch of this.#batches) sink(batch);
+    this.#sink = sink;
+  }
+
   /**
    * Stops capturing, and returns what was captured from context time from
    * on. Lets go of the input.
@@ -298,13 +333,7 @@ export class Capture {
     // A stuck worklet shouldn't keep the recording from being saved.
     await Promise.race([this.#stopped, new Promise((resolve) => setTimeout(resolve, 500))]);
     this.close();
-    const first = Math.round(from * this.context.sampleRate);
-    const last = this.#batches.reduce((end, b) => Math.max(end, b.frame + b.samples.length), first);
-    const samples = new Float32Array(last - first);
-    for (const { frame, samples: batch } of this.#batches) {
-      const skip = Math.max(0, first - frame);
-      if (skip < batch.length) samples.set(batch.subarray(skip), frame + skip - first);
-    }
+    const samples = samplesFrom(this.#batches, frameAt(from, this.context.sampleRate));
     this.#batches = [];
     return samples;
   }
@@ -312,6 +341,7 @@ export class Capture {
   /** Stops capturing without keeping anything, and lets go of the input. */
   close() {
     this.node.port.onmessage = null;
+    this.#sink = null;
     for (const node of this.nodes) node.disconnect();
     this.node.disconnect();
     release(this.input.stream);
