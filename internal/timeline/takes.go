@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"mime"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/xKirtle/bandmate/internal/audio"
@@ -198,12 +200,8 @@ func (s *Store) Retake(ctx context.Context, songID int64, based lyricsheet.Versi
 		if take.end() <= p.start+tolerance {
 			return 0, errTakeTooEarly
 		}
-		if earlier := (p.start - p.offset) - take.start; earlier > 0 {
-			if _, err := tx.ExecContext(ctx, `UPDATE takes SET position = position + ? WHERE clip_id = ?`,
-				earlier, clipID); err != nil {
-				return 0, fmt.Errorf("moving takes: %w", err)
-			}
-			p.offset += earlier
+		if err := takeSpanBack(ctx, tx, clipID, &p, (p.start-p.offset)-take.start); err != nil {
+			return 0, err
 		}
 		var next sql.NullFloat64
 		if err := tx.QueryRowContext(ctx, `SELECT MIN(start) FROM clips WHERE track_id = ? AND id != ? AND start >= ?`,
@@ -231,6 +229,21 @@ func (s *Store) Retake(ctx context.Context, songID int64, based lyricsheet.Versi
 	})
 }
 
+// takeSpanBack has a Clip of Takes' source span start earlier by some
+// seconds, if any, its Takes and its window staying where they are on the
+// Timeline.
+func takeSpanBack(ctx context.Context, tx *sql.Tx, clipID int64, p *placement, earlier float64) error {
+	if earlier <= 0 {
+		return nil
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE takes SET position = position + ? WHERE clip_id = ?`,
+		earlier, clipID); err != nil {
+		return fmt.Errorf("moving takes: %w", err)
+	}
+	p.offset += earlier
+	return nil
+}
+
 // ClipTakes is how a Clip of Takes is to be: its Takes, each where it
 // starts in the Clip's source span, the one it plays, and where it is and
 // what of the span it plays, as for NewClip.
@@ -242,11 +255,12 @@ type ClipTakes struct {
 	Length       float64  `json:"length"`
 }
 
-// TakeAt is a Take, and where it starts in its Clip's source span, in
-// seconds.
+// TakeAt is a Take, where it starts in its Clip's source span, and how far
+// it's nudged, in seconds.
 type TakeAt struct {
 	ID       int64   `json:"id"`
 	Position float64 `json:"position"`
+	Nudge    float64 `json:"nudge"`
 }
 
 // SetTakes sets a Clip of Takes as it's to be, e.g. to undo or redo a
@@ -259,6 +273,9 @@ func (s *Store) SetTakes(ctx context.Context, songID int64, based lyricsheet.Ver
 		ids[i] = t.ID
 		if math.IsNaN(t.Position) || math.IsInf(t.Position, 0) || t.Position < -tolerance {
 			return Timeline{}, &lyricsheet.InvalidError{Msg: "a Take can't start before its Clip's source"}
+		}
+		if err := checkNudge(t.Nudge); err != nil {
+			return Timeline{}, err
 		}
 	}
 	if ct.ActiveTakeID == nil || !slices.Contains(ids, *ct.ActiveTakeID) {
@@ -277,8 +294,8 @@ func (s *Store) SetTakes(ctx context.Context, songID int64, based lyricsheet.Ver
 			return fmt.Errorf("detaching takes: %w", err)
 		}
 		for _, t := range ct.Takes {
-			if _, err := tx.ExecContext(ctx, `UPDATE takes SET clip_id = ?, position = ?, detached_at = NULL
-				WHERE id = ?`, clipID, max(t.Position, 0), t.ID); err != nil {
+			if _, err := tx.ExecContext(ctx, `UPDATE takes SET clip_id = ?, position = ?, nudge = ?, detached_at = NULL
+				WHERE id = ?`, clipID, max(t.Position, 0), t.Nudge, t.ID); err != nil {
 				return fmt.Errorf("attaching take: %w", err)
 			}
 		}
@@ -301,6 +318,56 @@ func (s *Store) SetTakes(ctx context.Context, songID int64, based lyricsheet.Ver
 		p.start, p.offset, p.length = ct.Start, max(ct.Offset, 0), ct.Length
 		return place(ctx, tx, clipID, p)
 	})
+}
+
+// NudgeTake moves one of a Clip's Takes by hand, to be nudge seconds from
+// where it was recorded, later if positive. Only the Take moves: the Clip's
+// window stays where it is, and where the Take goes before the Clip's source
+// span, the span is taken back to where it starts, as for a Retake. It's
+// refused if the Clip would then play past where its Takes end, which only
+// a Clip trimmed out to a Take nudged later can.
+func (s *Store) NudgeTake(ctx context.Context, songID int64, based lyricsheet.Version, clipID, takeID int64, nudge float64) (Timeline, error) {
+	if err := checkNudge(nudge); err != nil {
+		return Timeline{}, err
+	}
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		p, err := takeClip(ctx, tx, songID, clipID)
+		if err != nil {
+			return err
+		}
+		if !slices.Contains(p.source.takeIDs, takeID) {
+			return lyricsheet.ErrNotFound
+		}
+		var position, was float64
+		if err := tx.QueryRowContext(ctx, `SELECT position, nudge FROM takes WHERE id = ?`, takeID).
+			Scan(&position, &was); err != nil {
+			return fmt.Errorf("reading take: %w", err)
+		}
+		position += nudge - was
+		if err := takeSpanBack(ctx, tx, clipID, &p, -position); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE takes SET position = MAX(0, ?), nudge = ? WHERE id = ?`,
+			position, nudge, takeID); err != nil {
+			return fmt.Errorf("nudging take: %w", err)
+		}
+		end, err := p.source.duration(ctx, tx)
+		if err != nil {
+			return err
+		}
+		if p.offset+p.length > end+tolerance {
+			return &lyricsheet.InvalidError{Msg: "the Clip would play past where its Takes end; trim it first"}
+		}
+		return place(ctx, tx, clipID, p)
+	})
+}
+
+// checkNudge checks how far a Take is nudged.
+func checkNudge(nudge float64) error {
+	if math.IsNaN(nudge) || math.IsInf(nudge, 0) {
+		return &lyricsheet.InvalidError{Msg: "a nudge must be a number"}
+	}
+	return nil
 }
 
 // takeClip reads where one of the Song's Clips of Takes is and what it
@@ -411,7 +478,7 @@ func keepTakes(ctx context.Context, tx *sql.Tx, songID, clipID int64, p placemen
 }
 
 // takeColumns are the takes columns scanTake reads, in its order.
-const takeColumns = `id, number, size, duration, sample_rate, latency_offset, position, recorded_at`
+const takeColumns = `id, number, size, duration, sample_rate, latency_offset, position, nudge, recorded_at`
 
 // scanTake reads one row of takeColumns. Columns selected after them are
 // read into extra.
@@ -419,7 +486,7 @@ func scanTake(row interface{ Scan(...any) error }, extra ...any) (Take, error) {
 	var t Take
 	var recorded string
 	err := row.Scan(append([]any{&t.ID, &t.Number, &t.Size, &t.Duration, &t.SampleRate, &t.LatencyOffset,
-		&t.Position, &recorded}, extra...)...)
+		&t.Position, &t.Nudge, &recorded}, extra...)...)
 	if err != nil {
 		return Take{}, err
 	}
@@ -448,16 +515,29 @@ func (s *Store) GetTake(ctx context.Context, songID, takeID int64) (Take, error)
 }
 
 // ServeTake answers a request for one of a Song's Takes' audio file,
-// exactly as recorded, with Range support.
-func (s *Store) ServeTake(w http.ResponseWriter, r *http.Request, songID, takeID int64) error {
-	var found int
-	err := s.db.QueryRowContext(r.Context(), `SELECT 1 FROM takes WHERE id = ? AND song_id = ?`, takeID, songID).
-		Scan(&found)
+// exactly as recorded, with Range support. A download is offered to save
+// under the Song's title and the Take's number, e.g. "Night Drive - Take
+// 3.wav", rather than played.
+func (s *Store) ServeTake(w http.ResponseWriter, r *http.Request, songID, takeID int64, download bool) error {
+	var title string
+	var number int
+	err := s.db.QueryRowContext(r.Context(), `SELECT songs.title, takes.number FROM takes
+		JOIN songs ON songs.id = takes.song_id WHERE takes.id = ? AND takes.song_id = ?`, takeID, songID).
+		Scan(&title, &number)
 	if errors.Is(err, sql.ErrNoRows) {
 		return lyricsheet.ErrNotFound
 	}
 	if err != nil {
 		return fmt.Errorf("reading take: %w", err)
+	}
+	if download {
+		// A title's slashes would read as folders.
+		name := fmt.Sprintf("%s - Take %d.wav", strings.NewReplacer("/", "-", `\`, "-").Replace(title), number)
+		disposition := mime.FormatMediaType("attachment", map[string]string{"filename": name})
+		if disposition == "" {
+			disposition = "attachment"
+		}
+		w.Header().Set("Content-Disposition", disposition)
 	}
 	return s.takeFiles.Serve(w, r, takeID, takeMediaType)
 }

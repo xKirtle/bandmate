@@ -24,7 +24,8 @@ export function menuKey(key: string, current: number, count: number): number | '
 /**
  * An entry in an Actions menu, e.g. a ⋯ one, also shown as an icon button
  * where there's room for one. It runs at once, or, with `choices`, opens a list to pick one from
- * in the menu, e.g. which Section to add to; such an entry shows only in ⋯.
+ * in the menu, e.g. which Section to add to, or with `field`, a number to set, e.g. a nudge;
+ * such an entry shows only in ⋯.
  */
 export type MenuAction = {
   icon: string;
@@ -32,10 +33,39 @@ export type MenuAction = {
   label: string;
   /** The button's tooltip, when it has more to say than the label. */
   title?: string;
-} & ({ run: () => void } | { choices: MenuChoice[] });
+} & ({ run: () => void } | { choices: MenuChoice[] } | { field: MenuField });
 
 /**
  * One of a menu entry's choices. With `checked`, the choices are a set of
  * which one is on, e.g. a Clip's active Take, marked as such.
  */
 export type MenuChoice = { label: string; run: () => void; checked?: boolean };
+
+/**
+ * A number an entry sets from the menu, typed, or stepped with Alt+←/→, by
+ * more with Shift. Each step is set at once.
+ */
+export type MenuField = {
+  value: number;
+  /** What it's counted in, e.g. "ms". */
+  unit: string;
+  step: number;
+  shiftStep: number;
+  set: (value: number) => void;
+};
+
+/**
+ * What a key does to a menu's field at `value`: the value it steps it to,
+ * or null to leave the key alone.
+ */
+export function fieldStep(
+  e: Pick<KeyboardEvent, 'key' | 'altKey' | 'shiftKey' | 'ctrlKey' | 'metaKey'>,
+  value: number,
+  field: Pick<MenuField, 'step' | 'shiftStep'>,
+): number | null {
+  if (!e.altKey || e.ctrlKey || e.metaKey) return null;
+  const by = e.shiftKey ? field.shiftStep : field.step;
+  if (e.key === 'ArrowLeft') return value - by;
+  if (e.key === 'ArrowRight') return value + by;
+  return null;
+}

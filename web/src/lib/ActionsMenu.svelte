@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick, type Snippet } from 'svelte';
-  import { menuKey, type MenuAction, type MenuChoice } from './menu';
+  import { fieldStep, menuKey, type MenuAction, type MenuChoice, type MenuField } from './menu';
   import { popoverLeft, popoverTop } from './popover';
 
   let {
@@ -26,8 +26,23 @@
   } = $props();
 
   let open = $state(false);
-  // The entry whose choices the menu shows in place of the entries, if any.
-  let picking = $state<(MenuAction & { choices: MenuChoice[] }) | null>(null);
+  // The entry whose choices, or field, the menu shows in place of the entries, if any.
+  let picking = $state<(MenuAction & ({ choices: MenuChoice[] } | { field: MenuField })) | null>(null);
+  // The field shown, as it is in the entries now, since setting it changes them.
+  const field = $derived.by(() => {
+    if (!picking || !('field' in picking)) return null;
+    const label = picking.label;
+    const now = entries.find((e): e is MenuAction & { field: MenuField } => 'field' in e && e.label === label);
+    return (now ?? picking).field;
+  });
+  // What's typed in the field, null while it's empty, following what it's
+  // set to.
+  const fieldValue = $derived(field?.value);
+  let draft = $state<number | null>(0);
+  $effect(() => {
+    if (fieldValue !== undefined) draft = fieldValue;
+  });
+  let input = $state<HTMLInputElement>();
   let root: HTMLElement;
   let triggerButton: HTMLButtonElement;
   let menu = $state<HTMLElement>();
@@ -74,7 +89,7 @@
   }
 
   function choose(entry: MenuAction | MenuChoice) {
-    if ('choices' in entry) {
+    if ('choices' in entry || 'field' in entry) {
       pick(entry);
       return;
     }
@@ -82,12 +97,37 @@
     entry.run();
   }
 
-  // Shows an entry's choices, or the entries again, with focus on the first.
-  async function pick(entry: (MenuAction & { choices: MenuChoice[] }) | null) {
+  // Shows an entry's choices, with focus on the first, or its field, with
+  // focus in it, or the entries again.
+  async function pick(entry: typeof picking) {
     picking = entry;
     await tick();
     place();
-    items()[0]?.focus();
+    if (input) {
+      input.focus();
+      input.select();
+    } else items()[0]?.focus();
+  }
+
+  function setField(value: number | null) {
+    if (!field || value === null || !Number.isFinite(value)) return;
+    draft = value;
+    if (value !== field.value) field.set(value);
+  }
+
+  // The field keeps its keys, but for Escape and Tab, which leave the menu.
+  function onFieldKey(e: KeyboardEvent) {
+    if (!field) return;
+    if (e.key === 'Escape' || e.key === 'Tab') return;
+    e.stopPropagation();
+    const stepped = fieldStep(e, draft ?? field.value, field);
+    if (stepped !== null) {
+      e.preventDefault();
+      setField(stepped);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      setField(draft);
+    }
   }
 
   function onTriggerKey(e: KeyboardEvent) {
@@ -160,7 +200,20 @@
           <span class="glyph" aria-hidden="true">‹</span>
           {picking.label}
         </button>
-        {#each picking.choices as choice, i (i)}
+        {#if field}
+          <label class="field" title="Alt+← and Alt+→ step it by {field.step} {field.unit}, or {field.shiftStep} with Shift">
+            <input
+              type="number"
+              step={field.step}
+              bind:value={draft}
+              bind:this={input}
+              onkeydown={onFieldKey}
+              onchange={() => setField(draft)}
+            />
+            {field.unit}
+          </label>
+        {/if}
+        {#each 'choices' in picking ? picking.choices : [] as choice, i (i)}
           <button
             type="button"
             role={choice.checked === undefined ? 'menuitem' : 'menuitemradio'}
@@ -180,7 +233,7 @@
             type="button"
             role="menuitem"
             tabindex="-1"
-            aria-haspopup={'choices' in entry ? 'menu' : undefined}
+            aria-haspopup={'choices' in entry ? 'menu' : 'field' in entry ? 'dialog' : undefined}
             onclick={() => choose(entry)}
           >
             {#if 'icon' in entry}
@@ -248,6 +301,18 @@
   .check {
     width: 1.25rem;
     text-align: center;
+  }
+  /* A field sits under the entry it's for, like a choice. */
+  .field {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: var(--control);
+    padding: 0 0.75rem 0 2.75rem;
+    color: var(--text-muted);
+  }
+  .field input {
+    width: 6rem;
   }
   .glyph {
     width: 1.25rem;

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { api, type Clip, type ClipBeat, type Take, type Timeline } from './api';
-import { clipSources, heard, placementOf, playing } from './clipSource';
+import { clipSources, fileStart, heard, placementOf, playing } from './clipSource';
 
 const beat = (id: number, more: Partial<ClipBeat> = {}): ClipBeat => ({
   id,
@@ -31,6 +31,7 @@ const take = (id: number, more: Partial<Take> = {}): Take => ({
   sampleRate: 48000,
   latencyOffset: 0.01,
   position: 0,
+  nudge: 0,
   recordedAt: '',
   ...more,
 });
@@ -95,11 +96,23 @@ describe('clipSources of Takes', () => {
     expect(sources.all()).toHaveLength(3);
   });
 
-  it("lays a Take's peaks out in its span, silent before its position", async () => {
+  it("reaches where a Take nudged earlier ended before its nudge", () => {
+    const c = takeClip(1, [take(3, { duration: 30, nudge: -0.5 }), take(4, { position: 1, duration: 20, nudge: 0.5 })]);
+    expect(clipSources(timeline([c], [])).of(c).duration).toBe(30.5);
+  });
+
+  it("fetches a Take's own peaks", async () => {
     vi.spyOn(api, 'getTake').mockResolvedValue(take(3, { position: 0.02, peaks: [0.5, 1] }));
     const c = takeClip(1, [take(3, { position: 0.02 })]);
-    expect(await clipSources(timeline([c], [])).of(c).loadPeaks()).toEqual([0, 0, 0.5, 1]);
+    expect(await clipSources(timeline([c], [])).of(c).loadPeaks()).toEqual([0.5, 1]);
     expect(api.getTake).toHaveBeenCalledWith(1, 3);
+  });
+});
+
+describe('fileStart', () => {
+  it("is where a Clip's active Take is in its span, or the start for a Beat", () => {
+    expect(fileStart(takeClip(1, [take(3), take(4, { position: 1.5 })], 4))).toBe(1.5);
+    expect(fileStart(clip(1, 7))).toBe(0);
   });
 });
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { clampMove, clampTrimEnd, clampTrimStart, minClipLength } from './clipEdit';
+import type { Clip, Take } from './api';
+import { clampMove, clampTrimEnd, clampTrimStart, minClipLength, nudgeBy, nudged } from './clipEdit';
 
 // On a Track: a Clip at 0:10-0:20 and one at 0:40-0:50, with a 30s gap
 // between them.
@@ -100,5 +101,43 @@ describe('clampTrimEnd', () => {
 
   it('keeps some of the Clip', () => {
     expect(clampTrimEnd(clip, neighbours, 20, 10)).toEqual({ start: 22, offset: 5, length: minClipLength });
+  });
+});
+
+describe('nudging', () => {
+  const take = (id: number, more: Partial<Take> = {}): Take => ({
+    id,
+    number: id,
+    size: 1,
+    duration: 8,
+    sampleRate: 48000,
+    latencyOffset: 0,
+    position: 0.5,
+    nudge: 0,
+    recordedAt: '',
+    ...more,
+  });
+  const clip: Clip = {
+    id: 1,
+    beatId: null,
+    takes: [take(3), take(4, { nudge: 0.02 })],
+    activeTakeId: 4,
+    lastTakeNumber: 2,
+    start: 10,
+    offset: 2,
+    length: 5,
+  };
+
+  it('moves only the active Take, to be the nudge from where it was recorded', () => {
+    const got = nudged(clip, -0.03);
+    expect(got.takes[0]).toEqual(take(3));
+    expect(got.takes[1]).toEqual(take(4, { position: got.takes[1].position, nudge: -0.03 }));
+    expect(got.takes[1].position).toBeCloseTo(0.45);
+    expect({ start: got.start, offset: got.offset, length: got.length }).toEqual({ start: 10, offset: 2, length: 5 });
+  });
+
+  it('nudges by how far the Clip is dragged, in whole milliseconds', () => {
+    expect(nudgeBy(clip, 0.1234)).toBe(0.143);
+    expect(nudgeBy(clip, -0.02)).toBe(0);
   });
 });

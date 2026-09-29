@@ -63,6 +63,7 @@ const take = (id: number): Take => ({
   sampleRate: 48000,
   latencyOffset: 0.01,
   position: 0,
+  nudge: 0,
   recordedAt: '',
 });
 
@@ -569,7 +570,7 @@ describe('History of Retakes', () => {
     expect(h.nextUndo()).toEqual({
       kind: 'setTakes',
       clipId: 6,
-      takes: { takes: [{ id: 40, position: 0 }], activeTakeId: 40, start: 10, offset: 2, length: 10 },
+      takes: { takes: [{ id: 40, position: 0, nudge: 0 }], activeTakeId: 40, start: 10, offset: 2, length: 10 },
     });
     h.undone(t1, before());
     expect(h.nextRedo()).toEqual({
@@ -577,8 +578,8 @@ describe('History of Retakes', () => {
       clipId: 6,
       takes: {
         takes: [
-          { id: 40, position: 1.5 },
-          { id: 41, position: 0 },
+          { id: 40, position: 1.5, nudge: 0 },
+          { id: 41, position: 0, nudge: 0 },
         ],
         activeTakeId: 41,
         start: 10,
@@ -590,7 +591,7 @@ describe('History of Retakes', () => {
     expect(h.nextUndo()).toEqual({
       kind: 'setTakes',
       clipId: 6,
-      takes: { takes: [{ id: 40, position: 0 }], activeTakeId: 40, start: 10, offset: 2, length: 10 },
+      takes: { takes: [{ id: 40, position: 0, nudge: 0 }], activeTakeId: 40, start: 10, offset: 2, length: 10 },
     });
   });
 
@@ -621,9 +622,9 @@ describe('History of choosing and deleting Takes', () => {
     clipId: 6,
     takes: {
       takes: [
-        { id: 40, position: 0 },
-        { id: 41, position: 0 },
-        { id: 42, position: 0 },
+        { id: 40, position: 0, nudge: 0 },
+        { id: 41, position: 0, nudge: 0 },
+        { id: 42, position: 0, nudge: 0 },
       ],
       activeTakeId: 42,
       start: 10,
@@ -695,5 +696,58 @@ describe('History of choosing and deleting Takes', () => {
     h.undone(gone, timeline([track(2, [{ ...t1.tracks[0].clips[0], id: 9 }])]));
 
     expect(h.nextUndo()).toEqual({ kind: 'chooseTake', clipId: 9, takeId: 42 });
+  });
+});
+
+describe('History of nudging Takes', () => {
+  // A Clip at 0:10 of two Takes, Take 2 active, and after nudging Take 2
+  // 0.25s earlier than its span's start: the span starts 0.25s earlier with
+  // the Clip's window where it was, and Take 1 is 0.25s further into it.
+  const takes = () => [take(40), { ...take(41), number: 2, position: 0.1 }];
+  const two = (more: Partial<Clip> = {}) =>
+    timeline([
+      track(2, [clip(6, 10, { beatId: null, takes: takes(), activeTakeId: 41, lastTakeNumber: 2, offset: 2, ...more })]),
+    ]);
+  const nudged = () =>
+    two({ takes: [{ ...take(40), position: 0.15 }, { ...takes()[1], position: 0, nudge: -0.35 }], offset: 2.15 });
+
+  it("undoes a nudge by setting the Clip's Takes back as they were, nudges included, and redoes it as a nudge", () => {
+    const h = new History();
+    const t0 = two({ takes: [take(40), { ...takes()[1], nudge: 0.05 }] });
+    const t1 = nudged();
+
+    h.record({ kind: 'nudgeTake', clipId: 6, takeId: 41, nudge: -0.35 }, t0, t1);
+
+    expect(h.nextUndo()).toEqual({
+      kind: 'setTakes',
+      clipId: 6,
+      takes: {
+        takes: [
+          { id: 40, position: 0, nudge: 0 },
+          { id: 41, position: 0.1, nudge: 0.05 },
+        ],
+        activeTakeId: 41,
+        start: 10,
+        offset: 2,
+        length: 10,
+      },
+    });
+    h.undone(t1, t0);
+    expect(h.nextRedo()).toEqual({ kind: 'nudgeTake', clipId: 6, takeId: 41, nudge: -0.35 });
+    h.redone(t0, nudged());
+    expect(h.nextUndo()).toMatchObject({ kind: 'setTakes', clipId: 6 });
+  });
+
+  it('follows a Clip whose Take was nudged when it comes back with a new id', () => {
+    const h = new History();
+    const t1 = nudged();
+    h.record({ kind: 'nudgeTake', clipId: 6, takeId: 41, nudge: -0.35 }, two(), t1);
+    const gone = timeline([track(2)]);
+    h.record({ kind: 'deleteClip', clipId: 6 }, t1, gone);
+
+    h.undone(gone, timeline([track(2, [{ ...t1.tracks[0].clips[0], id: 9 }])]));
+    h.undone(timeline([track(2, [{ ...t1.tracks[0].clips[0], id: 9 }])]), two({ id: 9 }));
+
+    expect(h.nextRedo()).toEqual({ kind: 'nudgeTake', clipId: 9, takeId: 41, nudge: -0.35 });
   });
 });

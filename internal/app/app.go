@@ -177,6 +177,7 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("POST /api/songs/{id}/timeline/clips/{clipID}/takes", a.retake)
 	mux.HandleFunc("PUT /api/songs/{id}/timeline/clips/{clipID}/takes", a.setTakes)
 	mux.HandleFunc("DELETE /api/songs/{id}/timeline/clips/{clipID}/takes/{takeID}", a.deleteTake)
+	mux.HandleFunc("PUT /api/songs/{id}/timeline/clips/{clipID}/takes/{takeID}/nudge", a.nudgeTake)
 	mux.HandleFunc("PUT /api/songs/{id}/timeline/clips/{clipID}/active-take", a.chooseTake)
 	mux.HandleFunc("DELETE /api/songs/{id}/timeline/clips/{clipID}/inactive-takes", a.clearInactiveTakes)
 	mux.HandleFunc("GET /api/songs/{id}/takes/{takeID}", a.getTake)

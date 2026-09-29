@@ -18,8 +18,8 @@
   import BeatPicker from './BeatPicker.svelte';
   import { Capture, CaptureError, inputProblem } from './capture';
   import { addedTrack, chosenTrack, readChosen, storeChosen, type ChoiceEvent } from './chosenTrack';
-  import { clampMove, clampTrimEnd, clampTrimStart } from './clipEdit';
-  import { clipSources, playing } from './clipSource';
+  import { clampMove, clampTrimEnd, clampTrimStart, nudgeBy, nudged } from './clipEdit';
+  import { clipSources, fileStart, playing } from './clipSource';
   import { cuesInSpan, formatCue, hasCues } from './cues';
   import {
     History,
@@ -916,7 +916,8 @@
   // saved Timeline comes back, the Clip is shown where it was dropped.
   interface Edit {
     clip: Clip;
-    mode: 'move' | 'start' | 'end';
+    /** Moving the Clip, trimming either edge, or, Alt+dragged, sliding its active Take within it. */
+    mode: 'move' | 'start' | 'end' | 'nudge';
     /** Where the pointer went down, to tell a click or a long press from a drag. */
     from: Point;
     /** How far into the Clip it was grabbed, in seconds. */
@@ -925,6 +926,8 @@
     /** Where the Clip is shown now. */
     trackId: number;
     placement: Placed;
+    /** Where its active Take is nudged to, for a nudge. */
+    nudge: number;
     saving: boolean;
   }
   let edit = $state<Edit | null>(null);
@@ -938,7 +941,10 @@
       const placed = track.clips
         .filter((c) => c.id !== edit?.clip.id)
         .map((clip) => ({ clip, at: clip as Placed, editing: false }));
-      if (edit?.trackId === track.id) placed.push({ clip: edit.clip, at: edit.placement, editing: true });
+      if (edit?.trackId === track.id) {
+        const clip = edit.mode === 'nudge' ? nudged(edit.clip, edit.nudge) : edit.clip;
+        placed.push({ clip, at: edit.placement, editing: true });
+      }
       return { track, clips: placed };
     }),
   );
@@ -1029,14 +1035,17 @@
     event.preventDefault();
     // A finger held still opens the Clip's menu, as there's no right-click on touch.
     if (event.pointerType === 'touch') pressTimer = setTimeout(() => openClipMenu(clip, element), longPressDelay);
+    // Alt+dragging a Clip of Takes slides its active Take, the Clip staying put.
+    const take = clip.takes.find((t) => t.id === clip.activeTakeId);
     edit = {
       clip,
-      mode,
+      mode: mode === 'move' && event.altKey && take ? 'nudge' : mode,
       from: { clientX: event.clientX, clientY: event.clientY },
       grab: spanTimeAt(event.clientX) - clip.start,
       moved: false,
       trackId: trackOf(clip).id,
       placement: clip,
+      nudge: take?.nudge ?? 0,
       saving: false,
     };
     window.addEventListener('pointermove', editMove);
@@ -1052,7 +1061,9 @@
     clearTimeout(pressTimer);
     const t = spanTimeAt(event.clientX);
     const { clip } = edit;
-    if (edit.mode === 'move') {
+    if (edit.mode === 'nudge') {
+      edit.nudge = nudgeBy(clip, t - edit.grab - clip.start);
+    } else if (edit.mode === 'move') {
       edit.trackId = trackAt(event.clientY);
       const start = clampMove(othersOn(edit.trackId, clip), clip.length, t - edit.grab);
       edit.placement = { ...clip, start };
@@ -1068,6 +1079,15 @@
     stopListening();
     if (!edit) return;
     const { clip, trackId, placement: to, mode } = edit;
+    if (mode === 'nudge') {
+      const takeId = clip.activeTakeId!;
+      if (edit.moved && edit.nudge !== clip.takes.find((t) => t.id === takeId)!.nudge) {
+        edit.saving = true;
+        await perform({ kind: 'nudgeTake', clipId: clip.id, takeId, nudge: edit.nudge });
+      }
+      edit = null;
+      return;
+    }
     const unchanged =
       trackId === trackOf(clip).id && to.start === clip.start && to.offset === clip.offset && to.length === clip.length;
     if (!edit.moved || unchanged) {
@@ -1158,11 +1178,12 @@
     ];
   }
 
-  // Choosing, deleting and clearing Takes don't ask first: they can be
-  // undone, and a deleted Take is only detached.
+  // Choosing, nudging, deleting and clearing Takes don't ask first: they can
+  // be undone, and a deleted Take is only detached.
   function takeActions(clip: Clip): MenuAction[] {
     if (clip.activeTakeId === null) return [];
     const { id: clipId, activeTakeId, takes } = clip;
+    const active = takes.find((t) => t.id === activeTakeId)!;
     return [
       {
         icon: '♪',
@@ -1185,10 +1206,36 @@
           run: () => perform({ kind: 'deleteTake', clipId, takeId: t.id }),
         })),
       },
+      {
+        icon: '↔',
+        label: 'Nudge',
+        title: `Move Take ${active.number} within the Clip, in milliseconds, later if positive; or Alt+drag the Clip`,
+        field: {
+          value: Math.round(active.nudge * 1000),
+          unit: 'ms',
+          step: 1,
+          shiftStep: 10,
+          set: (ms) => perform({ kind: 'nudgeTake', clipId, takeId: activeTakeId, nudge: ms / 1000 }),
+        },
+      },
       ...(takes.length > 1
         ? [{ icon: '⊘', label: 'Clear inactive Takes', run: () => perform({ kind: 'clearInactiveTakes', clipId }) }]
         : []),
+      {
+        icon: '⤓',
+        label: 'Download Take',
+        title: `Save Take ${active.number}'s WAV as it was recorded, lead-in and all`,
+        run: () => download(api.takeDownloadUrl(timeline.songId, activeTakeId)),
+      },
     ];
+  }
+
+  /** Saves what a URL serves as a file, as the server names it. */
+  function download(url: string) {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = '';
+    link.click();
   }
 
   /** Whether an event came from a Clip's ⋯ or its open menu, which a Clip's own handlers leave be. */
@@ -1488,9 +1535,12 @@
    */
   function clipShape(clip: Clip, offset: number, heard: number, drawn: number, count: number): number[] {
     const all = peaks[sources.of(clip).key] ?? [];
+    // The audio file starts this far into the source, silent before it.
+    const lead = Math.round(fileStart(clip) * peaksPerSecond);
     const from = Math.floor(offset * peaksPerSecond);
-    const kept = all.slice(from, Math.ceil((offset + heard) * peaksPerSecond));
-    const silent = Math.max(0, Math.ceil((offset + drawn) * peaksPerSecond) - from - kept.length);
+    const to = Math.max(from, Math.min(Math.ceil((offset + heard) * peaksPerSecond), lead + all.length));
+    const kept = Array.from({ length: to - from }, (_, i) => all[from + i - lead] ?? 0);
+    const silent = Math.max(0, Math.ceil((offset + drawn) * peaksPerSecond) - to);
     return bars([...kept, ...new Array<number>(silent).fill(0)], count);
   }
 </script>
@@ -1810,6 +1860,7 @@
                       class="clip"
                       class:editing
                       class:moving={editing && edit?.mode === 'move'}
+                      class:nudging={editing && edit?.mode === 'nudge'}
                       class:retaking={clip.id === recording?.clipId}
                       style:left="{percent(at.start)}%"
                       style:width="{percent(at.length)}%"
@@ -2420,6 +2471,9 @@
   .clip.moving {
     cursor: grabbing;
     opacity: 0.85;
+  }
+  .clip.nudging {
+    cursor: ew-resize;
   }
   /* The Take being recorded, growing as it goes. */
   /* The Clip being retaken, silent and left be until the Retake is saved. */

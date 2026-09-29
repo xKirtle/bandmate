@@ -34,6 +34,9 @@ import { isBlank, type CuedSong } from './cues';
 // detaches the new Take or brings it back. Deleting Takes, or clearing a
 // Clip's inactive ones, is undone the same way, as they're only detached,
 // or, if it deleted the Clip with its last Take, by placing the Clip back.
+// A nudge is undone the same way, since nudging before the Clip's span
+// moves the other Takes in it too, and redone as the nudge, which says
+// where the Take goes rather than how far it moves.
 
 /** A change to the Timeline, as the intent sent to the API. */
 export type Edit =
@@ -49,6 +52,7 @@ export type Edit =
   | { kind: 'deleteClip'; clipId: number }
   | { kind: 'setTakes'; clipId: number; takes: ClipTakes }
   | { kind: 'chooseTake'; clipId: number; takeId: number }
+  | { kind: 'nudgeTake'; clipId: number; takeId: number; nudge: number }
   | { kind: 'deleteTake'; clipId: number; takeId: number }
   | { kind: 'clearInactiveTakes'; clipId: number }
   | { kind: 'setLoop'; loop: TimelineLoop }
@@ -200,6 +204,7 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
     case 'deleteClip':
       return placingBack(before, edit.clipId);
     case 'setTakes':
+    case 'nudgeTake':
     case 'clearInactiveTakes':
       return { edit: settingTakes(before, edit.clipId), adds: none };
     case 'deleteTake':
@@ -251,7 +256,7 @@ export function placingAdded(before: Timeline, after: Timeline): Edit {
 export function settingTakes(tl: Timeline, clipId: number): Edit {
   const { clip } = findClip(tl, clipId);
   const { activeTakeId, start, offset, length } = clip;
-  const takes = clip.takes.map(({ id, position }) => ({ id, position }));
+  const takes = clip.takes.map(({ id, position, nudge }) => ({ id, position, nudge }));
   return { kind: 'setTakes', clipId, takes: { takes, activeTakeId, start, offset, length } };
 }
 
@@ -335,6 +340,7 @@ function remap(edit: HistoryEdit, ids: IdMaps): HistoryEdit {
     case 'deleteClip':
     case 'setTakes':
     case 'chooseTake':
+    case 'nudgeTake':
     case 'deleteTake':
     case 'clearInactiveTakes':
       return { ...edit, clipId: ids.clip(edit.clipId) };
@@ -379,6 +385,8 @@ export function sendEdit(at: SongAt, edit: Edit): Promise<Timeline> {
       return api.setTakes(at, edit.clipId, edit.takes);
     case 'chooseTake':
       return api.chooseTake(at, edit.clipId, edit.takeId);
+    case 'nudgeTake':
+      return api.nudgeTake(at, edit.clipId, edit.takeId, edit.nudge);
     case 'deleteTake':
       return api.deleteTake(at, edit.clipId, edit.takeId);
     case 'clearInactiveTakes':
