@@ -1,13 +1,19 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
   import { commonKeys } from './api';
   import type { BeatDraft } from './beatDraft';
   import Combobox from './Combobox.svelte';
 
   // The inputs for a Beat's details, bound to a draft the caller saves.
-  let { draft = $bindable(), idPrefix }: { draft: BeatDraft; idPrefix: string } = $props();
-  // The Key as the form opened: what Escape takes the Key back to.
-  const openingKey = untrack(() => draft.key);
+  let {
+    draft = $bindable(),
+    idPrefix,
+    savedKey = '',
+  }: {
+    draft: BeatDraft;
+    idPrefix: string;
+    /** The Beat's Key as saved; a new Beat has none. */
+    savedKey?: string;
+  } = $props();
 </script>
 
 <div class="fields">
@@ -40,7 +46,7 @@
       id="{idPrefix}-key"
       bind:value={draft.key}
       options={commonKeys}
-      saved={openingKey}
+      saved={savedKey}
       autocomplete="off"
       autocapitalize="characters"
       enterkeyhint="next"

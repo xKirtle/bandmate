@@ -129,7 +129,7 @@
         </div>
       </div>
     {/if}
-    <BeatFields bind:draft idPrefix="beat-edit" />
+    <BeatFields bind:draft idPrefix="beat-edit" savedKey={beat.key} />
     <div class="footer">
       <div class="pair">
         <button type="submit" class="button primary" disabled={busy !== null}>Save</button>
