@@ -197,8 +197,7 @@ export type NextLine = Position;
  * a run of Lines can be retaken. With neither, or after the last Line, it's
  * the first Line without a Cue, or the first of the Arrangement once every
  * Line is cued; the Line just cued counts as cued, its Cue perhaps not saved
- * yet. It never depends on where playback is. Each Occurrence of a shared
- * Section is stepped through on its own. Only Lines with words are cued:
+ * yet. It never depends on where playback is. Only Lines with words are cued:
  * never blank ones, nor Chord Lines. Null only without any such Line.
  */
 export function nextLine(

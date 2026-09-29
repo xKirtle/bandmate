@@ -144,7 +144,6 @@
             <SectionEditor
               uid="s{section.id}"
               {section}
-              shared={false}
               autofocus={added === section.id}
               {change}
               onUnsaved={track}

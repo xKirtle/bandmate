@@ -137,33 +137,6 @@ describe('currentPosition', () => {
     expect(currentPosition(tied, 6)).toEqual({ occurrence: 2, line: 101 });
   });
 
-  it('follows time across the Line Cues of shared Sections', () => {
-    // The same Section in two Occurrences, its Lines cued in each.
-    const shared = {
-      arrangement: [
-        { id: 1, sectionId: 9, lineCues: { 50: 0, 51: 4 } },
-        { id: 2, sectionId: 9, lineCues: { 50: 20, 51: 24 } },
-      ],
-      sections: [
-        {
-          id: 9,
-          alternates: [
-            {
-              active: true,
-              lines: [
-                { id: 50, text: 'A' },
-                { id: 51, text: 'B' },
-              ],
-            },
-          ],
-        },
-      ],
-    };
-    expect(currentPosition(shared, 5)).toEqual({ occurrence: 1, line: 51 });
-    expect(currentPosition(shared, 21)).toEqual({ occurrence: 2, line: 50 });
-    expect(currentPosition(shared, 25)).toEqual({ occurrence: 2, line: 51 });
-  });
-
   describe('ignoring a Line being retaken', () => {
     // A Verse whose Lines (100–102) are sung at 10, 14 and 18.
     const song = sheet([{ id: 1, lines: ['One', 'Two', 'Three'], lineCues: { 100: 10, 101: 14, 102: 18 } }]);
@@ -460,24 +433,6 @@ describe('nextLine', () => {
     expect(nextLine(cued, { cued: { occurrence: 2, line: 20 }, picked })).toEqual(picked);
   });
 
-  it('steps through each Occurrence of a shared Section separately', () => {
-    // Chorus, Verse, Chorus: the same Chorus twice.
-    const shared = sheet(
-      {
-        1: [
-          [10, 'Hook'],
-          [11, 'Line'],
-        ],
-        2: [[20, 'Verse']],
-      },
-      [1, 2, 1],
-      { 1: { 10: 1, 11: 2 } },
-    );
-    expect(nextLine(shared, {})).toEqual({ occurrence: 2, line: 20 });
-    expect(nextLine(shared, { cued: { occurrence: 2, line: 20 } })).toEqual({ occurrence: 3, line: 10 });
-    expect(nextLine(shared, { cued: { occurrence: 3, line: 10 } })).toEqual({ occurrence: 3, line: 11 });
-    expect(nextLine(shared, { picked: { occurrence: 3, line: 11 } })).toEqual({ occurrence: 3, line: 11 });
-  });
 });
 
 describe('leadIn', () => {
