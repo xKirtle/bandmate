@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
+
+	"github.com/xKirtle/bandmate/internal/app"
 )
 
 // Takes are recorded in the browser and uploaded as WAV files, each in a new
@@ -480,4 +483,55 @@ func TestDeletingASongDeletesItsTakesAndTheirFiles(t *testing.T) {
 		t.Errorf("take files on disk = %q, want only the kept Song's", files)
 	}
 	expectStatus(t, ts.Do(http.MethodGet, takePath(gone.song.ID, gone.take.ID), nil), http.StatusNotFound)
+}
+
+// startAt restarts the server on the same data directory as if it were now
+// plus some time, as a later startup.
+func (ts *testServer) startAt(later time.Duration) *testServer {
+	ts.t.Helper()
+	ts.Stop()
+	return startTestServer(ts.t, ts.DataDir, func(c *app.Config) {
+		c.Now = func() time.Time { return time.Now().Add(later) }
+	})
+}
+
+func TestStartupSweepsTakesDetachedForMoreThanADay(t *testing.T) {
+	ts := newTestServer(t)
+	placed := recordATake(t, ts)
+	// A second Take in the Clip, detached by deleting it.
+	retaken := timelineChange(t, ts.retake(placed.song.ID, placed.clip.ID, retakeUpload(0, 0, 4)))
+	deleted := retaken.Tracks[1].Clips[0].Takes[1]
+	timelineChange(t, ts.deleteTake(placed.song.ID, placed.clip.ID, deleted.ID))
+	// A copy of the Take left, sharing its file, detached with its Clip.
+	dup := timelineChange(t, ts.duplicateClip(placed.song.ID, placed.clip.ID))
+	timelineChange(t, ts.deleteClip(placed.song.ID, dup.Tracks[1].Clips[1].ID))
+	copied := dup.Tracks[1].Clips[1].Takes[0]
+	// A Take detached with its Track.
+	other := recordATake(t, ts)
+	timelineChange(t, ts.deleteTrack(other.song.ID, other.vox.ID))
+
+	ts = ts.startAt(23 * time.Hour)
+	for _, tk := range []struct{ song, take int64 }{
+		{placed.song.ID, placed.take.ID}, {placed.song.ID, deleted.ID}, {placed.song.ID, copied.ID},
+		{other.song.ID, other.take.ID},
+	} {
+		expectStatus(t, ts.Do(http.MethodGet, takePath(tk.song, tk.take), nil), http.StatusOK)
+	}
+	if files := takeFiles(t, ts); len(files) != 4 {
+		t.Errorf("take files on disk = %q, want all four kept within a day", files)
+	}
+
+	ts = ts.startAt(25 * time.Hour)
+	expectStatus(t, ts.Do(http.MethodGet, takePath(placed.song.ID, deleted.ID), nil), http.StatusNotFound)
+	expectStatus(t, ts.Do(http.MethodGet, takePath(placed.song.ID, copied.ID), nil), http.StatusNotFound)
+	expectStatus(t, ts.Do(http.MethodGet, takePath(other.song.ID, other.take.ID), nil), http.StatusNotFound)
+	if files := takeFiles(t, ts); !reflect.DeepEqual(files, []string{fmt.Sprint(placed.take.ID)}) {
+		t.Errorf("take files on disk = %q, want only the one still in a Clip", files)
+	}
+	if takes := ts.getTimeline(placed.song.ID).Tracks[1].Clips[0].Takes; len(takes) != 1 || takes[0].ID != placed.take.ID {
+		t.Errorf("takes = %+v, want the Take still in its Clip", takes)
+	}
+	if served := ts.Do(http.MethodGet, takePath(placed.song.ID, placed.take.ID)+"/audio", nil); !bytes.Equal(served.Body, placed.audio) {
+		t.Errorf("the kept Take's audio differs from the recording, after its copy was swept")
+	}
 }

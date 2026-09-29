@@ -211,8 +211,10 @@
     loopOn ? { start: timeline.loop!.start, end: timeline.loop!.end } : null,
   );
   // With Cues but no Clips, it still plays, in silence, for the Lyric Sheet
-  // to follow.
-  const empty = $derived(clips.length === 0 && !hasCues(song));
+  // to follow. Recording from the empty Timeline opens it, to watch the Take
+  // come in.
+  let opened = $state(false);
+  const empty = $derived(clips.length === 0 && !hasCues(song) && !opened);
   // Matches the phone layout below, which hides editing.
   const editable = new MediaQuery('min-width: 40.0625rem');
 
@@ -771,7 +773,7 @@
   // runs: offered before the first recording here, where the Clip to retake
   // waits for it, or run from the recording settings.
   let calibration = $state(readCalibration(deviceStorage()));
-  let calibrating = $state<{ offer: boolean; retaking?: Clip } | null>(null);
+  let calibrating = $state<{ offer: boolean; retaking?: Clip; newTrack?: boolean } | null>(null);
   // Whether calibration was just skipped, to say where to run it later.
   let skipped = $state(false);
 
@@ -788,9 +790,10 @@
   }
 
   function calibrationClosed(record: boolean) {
-    const retaking = calibrating?.retaking;
+    const { retaking, newTrack } = calibrating ?? {};
     calibrating = null;
-    if (record) startRecording(retaking);
+    if (newTrack) recordOnNewTrack(record);
+    else if (record) startRecording(retaking);
   }
 
   const canRecord = $derived(
@@ -801,12 +804,15 @@
     onRecording?.(recording !== null && recording.phase !== 'saving');
   });
 
-  /** Records a Take onto the chosen Track, or with retaking, into that Clip of Takes. */
-  async function startRecording(retaking?: Clip) {
+  /**
+   * Records a Take onto the chosen Track, or with retaking, into that Clip
+   * of Takes, or with newTrack, onto a Track added for it.
+   */
+  async function startRecording(retaking?: Clip, newTrack = false) {
     if (!canRecord) return;
     // Calibration is offered first, the first time on this device.
     if (!calibration.offered && calibration.offset === null) {
-      calibrating = { offer: true, retaking };
+      calibrating = { offer: true, retaking, newTrack };
       return;
     }
     error = null;
@@ -835,7 +841,7 @@
       if (capture.gone) inputNote = `${capture.gone} isn't connected, so recording from the default input.`;
       if (destroyed) throw new CaptureError('The Timeline closed before recording started.');
       // Only once the input's open, so one that can't be adds no Track.
-      if (timeline.tracks.length === 0 && !(await addTrack())) {
+      if ((newTrack || timeline.tracks.length === 0) && !(await addTrack())) {
         recording?.capture?.close();
         recording = null;
         return;
@@ -1015,12 +1021,32 @@
     else startRecording();
   }
 
+  /** Opens the empty Timeline and records onto a Track added for it, as "Add a track" adds one. */
+  function recordOnEmpty() {
+    if (!canRecord) return;
+    collapsed = false;
+    recordOnNewTrack(true);
+  }
+
+  /**
+   * Keeps the Timeline open while recording onto a Track added for it, or
+   * with record false, as calibration is dismissed. It closes again if
+   * nothing came of it: no recording, and no Track added.
+   */
+  async function recordOnNewTrack(record: boolean) {
+    const tracks = timeline.tracks.length;
+    opened = true;
+    if (record) await startRecording(undefined, true);
+    if (!recording && !calibrating && timeline.tracks.length === tracks) opened = false;
+  }
+
   function recordKey(event: KeyboardEvent) {
     if (event.key.toLowerCase() !== 'r' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.defaultPrevented || picking || calibrating || inTextField(event.target)) return;
     if (!capturing && !canRecord) return;
     event.preventDefault();
-    switchRecording();
+    if (empty) recordOnEmpty();
+    else switchRecording();
   }
 
   // The chosen Track, which a recording goes to, kept on this device for
@@ -1738,6 +1764,16 @@
         <span class="spacer"></span>
         {#if undoable || redoable}{@render undoRedo()}{/if}
         <button type="button" class="button edit-only" onclick={() => (picking = true)}>Add a beat</button>
+        <button
+          type="button"
+          class="button record edit-only"
+          disabled={!canRecord}
+          onclick={recordOnEmpty}
+          title={playerState !== 'stopped'
+            ? 'Stop playback to record'
+            : (recordProblem ?? 'Record a Take on a new Track (R)')}
+          ><span class="record-dot" aria-hidden="true"></span>Record</button
+        >
       </div>
     {:else}
       <div class="transport">
@@ -2536,6 +2572,9 @@
     width: auto;
     padding: 0 calc(0.375 * var(--timeline-rem));
   }
+  .button.record {
+    gap: calc(0.5 * var(--timeline-rem));
+  }
   .record-dot {
     width: calc(0.5 * var(--timeline-rem));
     height: calc(0.5 * var(--timeline-rem));
@@ -2568,7 +2607,8 @@
   .input-note {
     color: var(--warning);
   }
-  .toggle.record:disabled {
+  .toggle.record:disabled,
+  .button.record:disabled {
     opacity: 0.5;
     cursor: default;
   }
