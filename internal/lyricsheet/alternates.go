@@ -109,9 +109,10 @@ func (s *Store) DeleteAlternate(ctx context.Context, songID int64, based Version
 }
 
 // MoveAlternateToScrapbook moves an inactive Alternate out of its Section
-// into a new Section of its own in the Scrapbook, labelled with the Section's Label and the Alternate's name. Its
-// dormant Cues are dropped: the new Section has no Occurrences for them to
-// belong to. The active Alternate can't be moved.
+// into a new Section of its own in the Scrapbook, labelled with the Section's
+// Label and the Alternate's name. Its dormant Cues are dropped: the new
+// Section has no Occurrences for them to belong to. The active Alternate
+// can't be moved.
 func (s *Store) MoveAlternateToScrapbook(ctx context.Context, songID int64, based Version, alternateID int64) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		var label, name string

@@ -48,7 +48,7 @@ func TestRemovingASectionsLastOccurrenceMovesItToTheScrapbook(t *testing.T) {
 
 func TestRemovingADuplicateSendsItToTheScrapbookAndLeavesTheOriginal(t *testing.T) {
 	ts := newTestServer(t)
-	before := ts.repeatedChorus()
+	before := ts.duplicatedChorus()
 	original := before.Arrangement[0]
 	duplicate := before.Arrangement[2]
 
@@ -160,7 +160,7 @@ func TestAScrapbookSectionCanBeDeletedPermanently(t *testing.T) {
 
 func TestDeletingASectionStillInTheArrangementIsRejected(t *testing.T) {
 	ts := newTestServer(t)
-	before := ts.repeatedChorus()
+	before := ts.duplicatedChorus()
 
 	res := ts.Do(http.MethodDelete, sectionPath(before.ID, before.Arrangement[0].SectionID), nil)
 
@@ -371,7 +371,7 @@ func TestMovingAnOccurrenceToTheScrapbookMovesItsSectionToTheEnd(t *testing.T) {
 
 func TestMovingADuplicateToTheScrapbookMovesItAndLeavesTheOriginal(t *testing.T) {
 	ts := newTestServer(t)
-	before := ts.repeatedChorus()
+	before := ts.duplicatedChorus()
 	before = ts.addToScrapbook(before.ID, "Idea")
 	idea := before.Sections[len(before.Sections)-1]
 	original := sectionOf(t, before, before.Arrangement[0])

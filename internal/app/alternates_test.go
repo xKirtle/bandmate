@@ -373,7 +373,7 @@ func TestAnAlternateMovedToTheScrapbookIsLabelledByWhatHasANameOrLabel(t *testin
 
 func TestAnAlternateMovedToTheScrapbookLeavesItsCuesBehindAndTheOthersKeepTheirs(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.repeatedChorus()
+	s := ts.duplicatedChorus()
 	drive, night, _, _ := chorusLines(s)
 	_, _, _, lastChords := chorusLinesAt(s, 3)
 	ids := occurrenceIDs(s)
@@ -401,7 +401,7 @@ func TestAnAlternateMovedToTheScrapbookLeavesItsCuesBehindAndTheOthersKeepTheirs
 
 func TestAnAlternateMovedToTheScrapbookLeavesItsSection(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.repeatedChorus()
+	s := ts.duplicatedChorus()
 	s = ts.addAlternate(s.ID, s.Sections[0].ID, nil)
 	moved := s.Sections[0].Alternates[1]
 	s = ts.activate(s.ID, s.Sections[0].Alternates[0].ID)
@@ -468,7 +468,7 @@ func (ts *testServer) scrapWithTwoAlternates(songID int64, label string) (song, 
 
 func TestAScrapbookSectionAddedToASectionJoinsItsAlternatesInactive(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.repeatedChorus()
+	s := ts.duplicatedChorus()
 	drive, _, _, _ := chorusLines(s)
 	_, secondNight, _, _ := chorusLinesAt(s, 2)
 	ts.setLineCue(s.ID, s.Arrangement[0].ID, drive, 2)

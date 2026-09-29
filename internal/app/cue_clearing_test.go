@@ -40,7 +40,7 @@ func lineCues(s song) []map[int64]float64 {
 	return out
 }
 
-// cuedChorus returns a Song like repeatedChorus whose chorus got a second
+// cuedChorus returns a Song like duplicatedChorus whose chorus got a second
 // Alternate before it was Duplicated, with Cues on the first and third
 // Occurrences: the third Occurrence's include one on its second Alternate.
 func (ts *testServer) cuedChorus() song {

@@ -7,8 +7,8 @@ import (
 	"testing"
 )
 
-// A Section appears at most once in the Arrangement (ADR 0010): repeating
-// one makes a Duplicate, an independent copy.
+// A Section appears at most once in the Arrangement (ADR 0010): a chorus
+// sung twice is a Section and its Duplicate, an independent copy.
 
 // addOccurrence puts a Section into the Arrangement and returns the Song.
 // body may set "position".
@@ -93,9 +93,9 @@ func sharesIDs(a, b section) bool {
 	return a.ID == b.ID
 }
 
-// repeatedChorus returns a Song whose Arrangement is Chorus, Verse, Chorus,
+// duplicatedChorus returns a Song whose Arrangement is Chorus, Verse, Chorus,
 // Chorus: one chorus with Lines and Chords, and two Duplicates of it.
-func (ts *testServer) repeatedChorus() song {
+func (ts *testServer) duplicatedChorus() song {
 	ts.t.Helper()
 	s := ts.songWithSections("Chorus", "Verse")
 	chorus := s.Sections[0]
@@ -305,13 +305,11 @@ func TestPuttingASectionIntoTheArrangementWithoutASectionIsRejected(t *testing.T
 
 func TestTheDetachEndpointIsGone(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.repeatedChorus()
+	s := ts.duplicatedChorus()
 
 	res := ts.Do(http.MethodPost, fmt.Sprintf("/api/songs/%d/occurrences/%d/detach", s.ID, s.Arrangement[3].ID), nil)
 
-	if res.Status < 400 {
-		t.Errorf("status = %d, want the request refused", res.Status)
-	}
+	expectStatus(t, res, http.StatusNotFound)
 }
 
 // occurrencePath is where one Occurrence of the Arrangement lives.
@@ -321,7 +319,7 @@ func occurrencePath(songID, occurrenceID int64) string {
 
 func TestRemovingAnOccurrenceOfAnotherSongIsNotFound(t *testing.T) {
 	ts := newTestServer(t)
-	other := ts.repeatedChorus()
+	other := ts.duplicatedChorus()
 	before := ts.songWithSections("Verse")
 
 	res := ts.Do(http.MethodDelete, occurrencePath(before.ID, other.Arrangement[0].ID), nil)

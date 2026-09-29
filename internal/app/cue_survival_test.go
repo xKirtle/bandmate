@@ -9,12 +9,12 @@ import (
 // Cues survive the Lyric Sheet changes that keep what they point at, and go
 // with the Lines and Occurrences that are removed.
 
-// chorusWithACuedAlternate returns repeatedChorus with its first Occurrence's
+// chorusWithACuedAlternate returns duplicatedChorus with its first Occurrence's
 // Lines cued ("Drive, drive" at 2 and "all night" at 6) and a second,
 // inactive Alternate copied from the first before it was cued.
 func (ts *testServer) chorusWithACuedAlternate() song {
 	ts.t.Helper()
-	s := ts.repeatedChorus()
+	s := ts.duplicatedChorus()
 	s = ts.addAlternate(s.ID, s.Sections[0].ID, map[string]any{"name": "B"})
 	s = ts.activate(s.ID, s.Sections[0].Alternates[0].ID)
 	drive, night, _, _ := chorusLines(s)
@@ -43,7 +43,7 @@ func TestSwitchingAlternatesLeavesLineCuesDormantAndSwitchingBackRestoresThem(t 
 
 func TestANewAlternateCarriesTheCuesOfTheOneItCopiesWhichStayDormant(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.repeatedChorus()
+	s := ts.duplicatedChorus()
 	drive, night, _, _ := chorusLines(s)
 	_, _, _, lastChords := chorusLinesAt(s, 3)
 	ids := occurrenceIDs(s)
@@ -83,7 +83,7 @@ func TestANewAlternateCarriesTheCuesOfTheOneItCopiesWhichStayDormant(t *testing.
 
 func TestEditingALinesTextKeepsItsCue(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.repeatedChorus()
+	s := ts.duplicatedChorus()
 	_, night, _, _ := chorusLines(s)
 	ts.setLineCue(s.ID, s.Arrangement[0].ID, night, 6)
 
@@ -99,7 +99,7 @@ func TestEditingALinesTextKeepsItsCue(t *testing.T) {
 
 func TestDeletingALineDropsItsCue(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.repeatedChorus()
+	s := ts.duplicatedChorus()
 	drive, night, _, _ := chorusLines(s)
 	_, lastNight, _, _ := chorusLinesAt(s, 3)
 	ts.setLineCue(s.ID, s.Arrangement[0].ID, drive, 2)
@@ -133,7 +133,7 @@ func TestDeletingAnInactiveAlternateDropsItsDormantCues(t *testing.T) {
 
 func TestRemovingAnOccurrenceDropsOnlyItsCues(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.repeatedChorus()
+	s := ts.duplicatedChorus()
 	_, night, _, _ := chorusLines(s)
 	_, secondNight, _, _ := chorusLinesAt(s, 2)
 	ids := occurrenceIDs(s)
@@ -173,7 +173,7 @@ func TestASectionBroughtBackFromTheScrapbookHasNoCues(t *testing.T) {
 
 func TestReorderingOccurrencesKeepsTheirLineCues(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.repeatedChorus()
+	s := ts.duplicatedChorus()
 	_, night, _, _ := chorusLines(s)
 	drive, _, _, _ := chorusLinesAt(s, 2)
 	ids := occurrenceIDs(s)

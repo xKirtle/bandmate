@@ -34,6 +34,28 @@ func exec(t *testing.T, conn *sql.DB, stmts ...string) {
 	}
 }
 
+// cue is one row of line_cues.
+type cue struct{ occurrence, line, ms int64 }
+
+// lineCues reads every Line Cue, by Occurrence then Line.
+func lineCues(t *testing.T, conn *sql.DB) []cue {
+	t.Helper()
+	var cues []cue
+	rows, err := conn.Query(`SELECT occurrence_id, line_id, cue_ms FROM line_cues ORDER BY occurrence_id, line_id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var c cue
+		if err := rows.Scan(&c.occurrence, &c.line, &c.ms); err != nil {
+			t.Fatal(err)
+		}
+		cues = append(cues, c)
+	}
+	return cues
+}
+
 func TestOccurrenceCuesMoveToTheirFirstLines(t *testing.T) {
 	conn := openBefore(t, "0014_line_cues_only")
 	exec(t, conn,
@@ -58,20 +80,7 @@ func TestOccurrenceCuesMoveToTheirFirstLines(t *testing.T) {
 		t.Fatalf("migrating: %v", err)
 	}
 
-	type cue struct{ occurrence, line, ms int64 }
-	var got []cue
-	rows, err := conn.Query(`SELECT occurrence_id, line_id, cue_ms FROM line_cues ORDER BY occurrence_id, line_id`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var c cue
-		if err := rows.Scan(&c.occurrence, &c.line, &c.ms); err != nil {
-			t.Fatal(err)
-		}
-		got = append(got, c)
-	}
+	got := lineCues(t, conn)
 	want := []cue{{1, 3, 30000}, {1, 4, 34000}, {2, 3, 91000}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("line cues = %v, want %v", got, want)
@@ -125,20 +134,7 @@ func TestSharedSectionsKeepOnlyTheirFirstAppearance(t *testing.T) {
 		t.Errorf("arrangement = %v, want %v", arrangement, wantArrangement)
 	}
 
-	type cue struct{ occurrence, line, ms int64 }
-	var cues []cue
-	cueRows, err := conn.Query(`SELECT occurrence_id, line_id, cue_ms FROM line_cues ORDER BY occurrence_id, line_id`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cueRows.Close()
-	for cueRows.Next() {
-		var c cue
-		if err := cueRows.Scan(&c.occurrence, &c.line, &c.ms); err != nil {
-			t.Fatal(err)
-		}
-		cues = append(cues, c)
-	}
+	cues := lineCues(t, conn)
 	if want := []cue{{3, 1, 10000}, {3, 2, 14000}}; !reflect.DeepEqual(cues, want) {
 		t.Errorf("line cues = %v, want %v", cues, want)
 	}
