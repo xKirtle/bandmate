@@ -183,6 +183,7 @@ type song struct {
 	Sections    []section `json:"sections"`
 	Scrapbook   []int64   `json:"scrapbook"`
 	Masters     []master  `json:"masters"`
+	Cover       *cover    `json:"cover"`
 }
 
 // section is a Section with all its Alternates.
@@ -262,6 +263,7 @@ type songSummary struct {
 	Key       string `json:"key"`
 	BPM       *int   `json:"bpm"`
 	HasMaster bool   `json:"hasMaster"`
+	CoverID   *int64 `json:"coverId"`
 	UpdatedAt string `json:"updatedAt"`
 }
 

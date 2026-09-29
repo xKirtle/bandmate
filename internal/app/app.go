@@ -20,17 +20,24 @@ import (
 
 // Config is everything needed to build the app.
 type Config struct {
-	// DataDir holds the SQLite database and, under audio/, the audio files.
+	// DataDir holds the SQLite database and, under audio/ and covers/, the
+	// uploaded files.
 	DataDir string
 	// SPA is the built single-page app, with index.html at its root.
 	SPA fs.FS
 	// MaxUploadBytes caps the size of an uploaded audio file. Zero means
 	// DefaultMaxUploadBytes.
 	MaxUploadBytes int64
+	// MaxCoverBytes caps the size of a Cover's pictures, together. Zero
+	// means DefaultMaxCoverBytes.
+	MaxCoverBytes int64
 }
 
 // DefaultMaxUploadBytes is the upload cap unless configured otherwise.
 const DefaultMaxUploadBytes = 500 << 20
+
+// DefaultMaxCoverBytes is the Cover cap unless configured otherwise.
+const DefaultMaxCoverBytes = 25 << 20
 
 // App is a running Bandmate instance.
 type App struct {
@@ -44,7 +51,9 @@ type App struct {
 	// the files they will be kept with.
 	beatFiles   *audio.Files
 	masterFiles *audio.Files
+	coverFiles  lyricsheet.CoverFiles
 	maxUpload   int64
+	maxCover    int64
 	spa         fs.FS
 	handler     http.Handler
 }
@@ -66,18 +75,30 @@ func New(cfg Config) (*App, error) {
 		conn.Close()
 		return nil, err
 	}
+	coverFiles := lyricsheet.CoverFiles{}
+	for _, p := range lyricsheet.CoverPictures {
+		if coverFiles[p], err = audio.Open(filepath.Join(cfg.DataDir, "covers", string(p))); err != nil {
+			conn.Close()
+			return nil, err
+		}
+	}
 	a := &App{
 		db:          conn,
-		songs:       lyricsheet.NewStore(conn, masterFiles),
+		songs:       lyricsheet.NewStore(conn, masterFiles, coverFiles),
 		beats:       beats.NewStore(conn, beatFiles),
 		timelines:   timeline.NewStore(conn),
 		beatFiles:   beatFiles,
 		masterFiles: masterFiles,
+		coverFiles:  coverFiles,
 		maxUpload:   cfg.MaxUploadBytes,
+		maxCover:    cfg.MaxCoverBytes,
 		spa:         cfg.SPA,
 	}
 	if a.maxUpload <= 0 {
 		a.maxUpload = DefaultMaxUploadBytes
+	}
+	if a.maxCover <= 0 {
+		a.maxCover = DefaultMaxCoverBytes
 	}
 	a.handler = a.routes()
 	return a, nil
@@ -126,6 +147,8 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("DELETE /api/songs/{id}/masters/{masterID}", a.deleteMaster)
 	mux.HandleFunc("POST /api/songs/{id}/masters/{masterID}/main", a.makeMainMaster)
 	mux.HandleFunc("GET /api/songs/{id}/masters/{masterID}/audio", a.masterAudio)
+	mux.HandleFunc("POST /api/songs/{id}/cover", a.addCover)
+	mux.HandleFunc("GET /api/songs/{id}/cover/{picture}", a.coverPicture)
 	mux.HandleFunc("GET /api/songs/{id}/timeline", a.getTimeline)
 	mux.HandleFunc("POST /api/songs/{id}/timeline/beats", a.addBeatToTimeline)
 	mux.HandleFunc("POST /api/songs/{id}/timeline/tracks", a.addTrack)
@@ -165,7 +188,7 @@ func (a *App) health(w http.ResponseWriter, r *http.Request) {
 
 // config tells the SPA the limits it should check before sending anything.
 func (a *App) config(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]int64{"maxUploadBytes": a.maxUpload})
+	writeJSON(w, http.StatusOK, map[string]int64{"maxUploadBytes": a.maxUpload, "maxCoverBytes": a.maxCover})
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

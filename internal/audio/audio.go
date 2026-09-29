@@ -1,6 +1,6 @@
-// Package audio keeps uploaded audio files on disk exactly as uploaded,
-// named by id rather than by the uploaded file name. Their metadata lives in
-// the database, with whatever owns them.
+// Package audio keeps uploaded files on disk exactly as uploaded, named by
+// id rather than by the uploaded file name: audio files, and also Covers'
+// pictures. Their metadata lives in the database, with whatever owns them.
 package audio
 
 import (
