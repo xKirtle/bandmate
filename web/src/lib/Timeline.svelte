@@ -36,6 +36,7 @@
   import { peaks as peaksOf, peaksPerSecond } from './peaks';
   import { longPressDelay, pastSlop, type Point } from './press';
   import { recordingPlan, retakeLength, retakePlan, type RecordingPlan } from './recording';
+  import { recoveredPlacement, type Unsaved } from './recovery';
   import { keptInLoop, outsideLoop, repeats, timelineEnd, type Loop, type Placed } from './schedule';
   import { inTextField } from './textField';
   import { formatDuration } from './time';
@@ -45,6 +46,7 @@
   import { readInput } from './inputSettings';
   import { clampHeight, defaultHeight, deviceStorage, heightBounds, readHeight, storeHeight } from './timelineHeight';
   import { audioContext, TimelinePlayer, type PlayableClip, type PlayerState } from './timelinePlayer';
+  import { forget, Keeper, unsavedSamples, unsavedTakes, whileHeld } from './unsavedTakes';
   import {
     edgeSpeed,
     fitScale,
@@ -130,6 +132,9 @@
   //
   // A Retake records the same way into a Clip of Takes, from its start as
   // trimmed, with that Clip kept silent so the old Take isn't sung against.
+  //
+  // What's captured is kept in the browser as it comes, until the server
+  // confirms the upload (see unsavedTakes.ts).
   interface RecordingState {
     phase: 'starting' | 'recording' | 'saving';
     trackId: number | null;
@@ -139,12 +144,30 @@
     capture: Capture | null;
     /** The context time playback was at plan.from. */
     startedAt: number;
+    /** Where it was going, as kept in the browser. */
+    unsaved: Unsaved | null;
+    keeper: Keeper | null;
   }
   let recording = $state.raw<RecordingState | null>(null);
   // Whether a recording is capturing, rather than starting or saving.
   const capturing = $derived(recording?.phase === 'recording');
   // Once gone, an input still opening is let go as soon as it opens.
   let destroyed = false;
+
+  // Recordings that never reached the server: left from an earlier visit to
+  // this Song, e.g. by a crashed tab, or whose upload just failed. Each is
+  // offered back, to keep, placed as it would have been (see recovery.ts),
+  // or to discard.
+  interface UnsavedOffer {
+    /** Its key in the browser, or null where the browser couldn't keep it. */
+    id: number | null;
+    unsaved: Unsaved;
+    sampleRate: number;
+    /** Reads back what it captured. */
+    samples: () => Promise<Float32Array>;
+  }
+  let unsaved = $state.raw<UnsavedOffer[]>([]);
+  let recovering = $state(false);
 
   // Peaks by source key, fetched once each, so waveforms show before the
   // audio is decoded.
@@ -159,6 +182,10 @@
   onDestroy(() => {
     destroyed = true;
     recording?.capture?.close();
+    // What was captured so far is offered back on the next visit. One saving
+    // is let go of once saved, or not.
+    const keeper = recording?.phase === 'recording' ? recording.keeper : null;
+    keeper?.finish().then(() => keeper.release());
     player.dispose();
   });
 
@@ -767,7 +794,7 @@
   }
 
   const canRecord = $derived(
-    recording === null && playerState === 'stopped' && !syncing && !calibrating && editable.current,
+    recording === null && playerState === 'stopped' && !syncing && !calibrating && !recovering && editable.current,
   );
 
   $effect(() => {
@@ -794,6 +821,8 @@
       plan: null,
       capture: null,
       startedAt: 0,
+      unsaved: null,
+      keeper: null,
     };
     recording = starting;
     inputNote = null;
@@ -815,13 +844,30 @@
       const target = retaking && timeline.tracks.find((t) => t.clips.some((c) => c.id === retaking.id));
       if (retaking && !target) throw new CaptureError('The Clip to retake is gone.');
       const track = target || (timeline.tracks.find((t) => t.id === chosen) ?? timeline.tracks.at(-1)!);
-      const plan = retaking ? retakePlan(track.clips.find((c) => c.id === retaking.id)!) : recordingPlan(track.clips);
+      const clip = retaking && track.clips.find((c) => c.id === retaking.id)!;
+      const plan = clip ? retakePlan(clip) : recordingPlan(track.clips);
       following = true;
       ended = false;
       position = plan.from;
       await player.play(playable, plan.from, null);
       if (player.state !== 'playing') throw new CaptureError('Recording stopped before it started.');
-      recording = { ...starting, phase: 'recording', trackId: track.id, plan, capture, startedAt: player.startedAt };
+      const { startedAt } = player;
+      const unsaved: Unsaved = {
+        trackId: track.id,
+        clipId: starting.clipId,
+        origin: clip ? clip.start - clip.offset : 0,
+        plan,
+        latencyOffset: appliedOffset(calibration, capture.latency),
+      };
+      const keeper = new Keeper({
+        ...unsaved,
+        songId: song.id,
+        sampleRate: capture.sampleRate,
+        first: Math.round(startedAt * capture.sampleRate),
+        recordedAt: new Date().toISOString(),
+      });
+      capture.keep((batch) => keeper.add(batch));
+      recording = { ...starting, phase: 'recording', trackId: track.id, plan, capture, startedAt, unsaved, keeper };
     } catch (e) {
       recording?.capture?.close();
       recording = null;
@@ -831,39 +877,135 @@
 
   async function stopRecording() {
     const r = recording;
-    if (r?.phase !== 'recording' || !r.capture || !r.plan || r.trackId === null) return;
+    if (r?.phase !== 'recording' || !r.capture || !r.plan || r.trackId === null || !r.unsaved || !r.keeper) return;
     recording = { ...r, phase: 'saving' };
     if (playerState !== 'stopped') player.stop();
     position = player.position();
     const samples = await r.capture.stop(r.startedAt);
     const rate = r.capture.sampleRate;
-    const latency = appliedOffset(calibration, r.capture.latency);
+    const { latencyOffset } = r.unsaved;
     // What was sung after the lead-in, placed where it was heard.
-    if (r.plan.from + samples.length / rate - latency <= r.plan.start) {
+    if (r.plan.from + samples.length / rate - latencyOffset <= r.plan.start) {
+      r.keeper.forget();
       recording = null;
       skipped = false;
       error = 'Recording stopped during the lead-in, so there was nothing to keep.';
       return;
     }
-    const wav = new Blob([encodeWav(samples, rate)], { type: 'audio/wav' });
-    const captured = { captureStart: r.plan.from, latencyOffset: latency, peaks: peaksOf([samples], rate) };
     const { clipId, trackId, plan } = r;
+    const target = clipId === null ? { trackId, start: plan.start } : { clipId };
+    const ok = await saveTake(target, samples, rate, { captureStart: plan.from, latencyOffset });
+    if (ok) r.keeper.forget();
+    else {
+      // Offered back, to try again or discard.
+      const id = await r.keeper.finish();
+      r.keeper.release();
+      unsaved = [...unsaved, { id, unsaved: r.unsaved, sampleRate: rate, samples: async () => samples }];
+    }
+    recording = null;
+    // Said once, for the recording right after skipping.
+    skipped = false;
+  }
+
+  /**
+   * Uploads a Take recorded, into a Clip of Takes, or in a new Clip on a
+   * Track, noting it in the history; resolves to whether it was saved.
+   */
+  function saveTake(
+    target: { clipId: number } | { trackId: number; start: number },
+    samples: Float32Array,
+    rate: number,
+    captured: { captureStart: number; latencyOffset: number },
+  ): Promise<boolean> {
+    const wav = new Blob([encodeWav(samples, rate)], { type: 'audio/wav' });
+    const details = { ...captured, peaks: peaksOf([samples], rate) };
     offerCues = null;
     queued++;
-    await change(async (at) => {
+    return change(async (at) => {
       const before = timeline;
       const after =
-        clipId === null
-          ? await saved(api.recordTake(at, wav, { trackId, start: plan.start, ...captured }))
-          : await saved(api.retake(at, clipId, wav, captured));
-      history.record(clipId === null ? placingAdded(before, after) : settingTakes(after, clipId), before, after);
+        'clipId' in target
+          ? await saved(api.retake(at, target.clipId, wav, details))
+          : await saved(api.recordTake(at, wav, { ...target, ...details }));
+      history.record('clipId' in target ? settingTakes(after, target.clipId) : placingAdded(before, after), before, after);
       editedAt = after.version;
       showHistory();
       return { timeline: after };
     }).finally(() => queued--);
-    recording = null;
-    // Said once, for the recording right after skipping.
-    skipped = false;
+  }
+
+  $effect(() => {
+    const id = songId;
+    unsaved = [];
+    unsavedTakes(id).then((kept) => {
+      if (id !== songId || kept.length === 0) return;
+      const offered = kept.map((t) => ({
+        id: t.id,
+        unsaved: t,
+        sampleRate: t.sampleRate,
+        samples: () => unsavedSamples(t),
+      }));
+      // Along with any that failed to upload meanwhile.
+      unsaved = [...offered, ...unsaved.filter((o) => !kept.some((t) => t.id === o.id))];
+    });
+  });
+
+  /** Keeps the unsaved Takes offered, one after another, until one can't be. */
+  async function keepUnsaved() {
+    if (recovering || recording) return;
+    recovering = true;
+    error = null;
+    try {
+      for (const offer of unsaved) {
+        if (!(await keepOne(offer))) break;
+      }
+    } finally {
+      recovering = false;
+    }
+  }
+
+  /** Keeps an unsaved Take; resolves to whether it's no longer offered. */
+  async function keepOne(offer: UnsavedOffer): Promise<boolean> {
+    let samples: Float32Array;
+    try {
+      samples = await offer.samples();
+    } catch {
+      error = "Couldn't read the unsaved Take back from this browser.";
+      return false;
+    }
+    const duration = samples.length / offer.sampleRate;
+    let placement = recoveredPlacement(timeline.tracks, offer.unsaved, duration, chosen);
+    // Without Tracks, one's added first, as Record does.
+    if (placement?.kind === 'record' && placement.trackId === null) {
+      if (!(await addTrack())) return false;
+      placement = recoveredPlacement(timeline.tracks, offer.unsaved, duration, chosen);
+    }
+    // Stopped during the lead-in: there's nothing to keep.
+    if (placement === null) {
+      await dropUnsaved(offer);
+      return true;
+    }
+    if (placement.kind === 'record' && placement.trackId === null) return false;
+    const target =
+      placement.kind === 'retake' ? { clipId: placement.clipId } : { trackId: placement.trackId!, start: placement.start };
+    const captured = { captureStart: placement.captureStart, latencyOffset: offer.unsaved.latencyOffset };
+    const upload = () => saveTake(target, samples, offer.sampleRate, captured);
+    const ok = offer.id === null ? await upload() : await whileHeld(offer.id, upload);
+    if (ok === false) return false;
+    // Null where another tab is uploading it already, which drops it once it's done.
+    if (ok === null) unsaved = unsaved.filter((o) => o !== offer);
+    else await dropUnsaved(offer);
+    return true;
+  }
+
+  /** Stops offering an unsaved Take, and drops it from the browser. */
+  async function dropUnsaved(offer: UnsavedOffer) {
+    unsaved = unsaved.filter((o) => o !== offer);
+    if (offer.id !== null) await forget(offer.id);
+  }
+
+  function discardUnsaved() {
+    for (const offer of unsaved) dropUnsaved(offer);
   }
 
   function switchRecording() {
@@ -1970,6 +2112,21 @@
           >Move {offerCues.count} {offerCues.count === 1 ? 'Cue' : 'Cues'} with it</button
         >
         <button type="button" class="button" onclick={() => (offerCues = null)}>Leave them</button>
+      </div>
+    {/if}
+    {#if unsaved.length > 0}
+      <div class="offer" role="status">
+        <span>Recovered {unsaved.length} unsaved {unsaved.length === 1 ? 'Take' : 'Takes'}.</span>
+        <button
+          type="button"
+          class="button"
+          onclick={keepUnsaved}
+          disabled={recovering || recording !== null}
+          title="Upload {unsaved.length === 1 ? 'it' : 'them'} where {unsaved.length === 1
+            ? 'it'
+            : 'they'} would have gone, or after the last Clip on the Track if that spot's taken">Keep</button
+        >
+        <button type="button" class="button" onclick={discardUnsaved} disabled={recovering}>Discard</button>
       </div>
     {/if}
     {#if offerBpm}
