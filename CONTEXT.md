@@ -121,7 +121,7 @@ A way of syncing a Song's Lines while the Timeline plays: as each Line starts, m
 _Avoid_: Tap mode, record mode
 
 **Latency Offset**:
-The delay between what the user heard and what the mic captured, measured by calibration once per device, since it belongs to the hardware chain; each Take keeps the offset it was recorded with and can be nudged by hand.
+The delay between what the user heard and what the mic captured, the full round trip, measured by calibration once per device, since it belongs to the hardware chain: a click plays, the user taps or claps on the mic along with it, and the delays are averaged. Calibration is offered before a device's first recording, and can be skipped and run later from the recording settings; until then, the latency the browser reports stands in. Each Take is placed earlier by the offset it was recorded with and keeps it, so recalibrating never moves it, and it can be nudged by hand.
 _Avoid_: Delay, lag
 
 **Input**:
