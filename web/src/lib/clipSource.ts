@@ -80,7 +80,7 @@ function takeKey(id: number): string {
 }
 
 /** The Take a Clip of Takes plays, or undefined for a Clip of a Beat. */
-function activeTake(clip: Clip): Take | undefined {
+export function activeTake(clip: Clip): Take | undefined {
   return clip.takes.find((t) => t.id === clip.activeTakeId);
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Clip, Take } from './api';
-import { clampMove, clampTrimEnd, clampTrimStart, minClipLength, nudgeBy, nudged } from './clipEdit';
+import { clampMove, clampTrimEnd, clampTrimStart, minClipLength, draggedNudge, nudged } from './clipEdit';
 
 // On a Track: a Clip at 0:10-0:20 and one at 0:40-0:50, with a 30s gap
 // between them.
@@ -137,7 +137,7 @@ describe('nudging', () => {
   });
 
   it('nudges by how far the Clip is dragged, in whole milliseconds', () => {
-    expect(nudgeBy(clip, 0.1234)).toBe(0.143);
-    expect(nudgeBy(clip, -0.02)).toBe(0);
+    expect(draggedNudge(clip, 0.1234)).toBe(0.143);
+    expect(draggedNudge(clip, -0.02)).toBe(0);
   });
 });

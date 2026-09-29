@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"mime"
 	"net/http"
 	"slices"
 	"strings"
@@ -200,7 +199,7 @@ func (s *Store) Retake(ctx context.Context, songID int64, based lyricsheet.Versi
 		if take.end() <= p.start+tolerance {
 			return 0, errTakeTooEarly
 		}
-		if err := takeSpanBack(ctx, tx, clipID, &p, (p.start-p.offset)-take.start); err != nil {
+		if err := startSpanEarlier(ctx, tx, clipID, &p, (p.start-p.offset)-take.start); err != nil {
 			return 0, err
 		}
 		var next sql.NullFloat64
@@ -229,10 +228,10 @@ func (s *Store) Retake(ctx context.Context, songID int64, based lyricsheet.Versi
 	})
 }
 
-// takeSpanBack has a Clip of Takes' source span start earlier by some
+// startSpanEarlier has a Clip of Takes' source span start earlier by some
 // seconds, if any, its Takes and its window staying where they are on the
 // Timeline.
-func takeSpanBack(ctx context.Context, tx *sql.Tx, clipID int64, p *placement, earlier float64) error {
+func startSpanEarlier(ctx context.Context, tx *sql.Tx, clipID int64, p *placement, earlier float64) error {
 	if earlier <= 0 {
 		return nil
 	}
@@ -338,13 +337,13 @@ func (s *Store) NudgeTake(ctx context.Context, songID int64, based lyricsheet.Ve
 		if !slices.Contains(p.source.takeIDs, takeID) {
 			return lyricsheet.ErrNotFound
 		}
-		var position, was float64
+		var position, previous float64
 		if err := tx.QueryRowContext(ctx, `SELECT position, nudge FROM takes WHERE id = ?`, takeID).
-			Scan(&position, &was); err != nil {
+			Scan(&position, &previous); err != nil {
 			return fmt.Errorf("reading take: %w", err)
 		}
-		position += nudge - was
-		if err := takeSpanBack(ctx, tx, clipID, &p, -position); err != nil {
+		position += nudge - previous
+		if err := startSpanEarlier(ctx, tx, clipID, &p, -position); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE takes SET position = MAX(0, ?), nudge = ? WHERE id = ?`,
@@ -532,12 +531,7 @@ func (s *Store) ServeTake(w http.ResponseWriter, r *http.Request, songID, takeID
 	}
 	if download {
 		// A title's slashes would read as folders.
-		name := fmt.Sprintf("%s - Take %d.wav", strings.NewReplacer("/", "-", `\`, "-").Replace(title), number)
-		disposition := mime.FormatMediaType("attachment", map[string]string{"filename": name})
-		if disposition == "" {
-			disposition = "attachment"
-		}
-		w.Header().Set("Content-Disposition", disposition)
+		audio.OfferToSave(w, fmt.Sprintf("%s - Take %d.wav", strings.NewReplacer("/", "-", `\`, "-").Replace(title), number))
 	}
 	return s.takeFiles.Serve(w, r, takeID, takeMediaType)
 }

@@ -233,7 +233,7 @@
             type="button"
             role="menuitem"
             tabindex="-1"
-            aria-haspopup={'choices' in entry ? 'menu' : 'field' in entry ? 'dialog' : undefined}
+            aria-haspopup={'choices' in entry ? 'menu' : undefined}
             onclick={() => choose(entry)}
           >
             {#if 'icon' in entry}

@@ -18,8 +18,8 @@
   import BeatPicker from './BeatPicker.svelte';
   import { Capture, CaptureError, inputProblem } from './capture';
   import { addedTrack, chosenTrack, readChosen, storeChosen, type ChoiceEvent } from './chosenTrack';
-  import { clampMove, clampTrimEnd, clampTrimStart, nudgeBy, nudged } from './clipEdit';
-  import { clipSources, fileStart, playing } from './clipSource';
+  import { clampMove, clampTrimEnd, clampTrimStart, draggedNudge, nudged } from './clipEdit';
+  import { activeTake, clipSources, fileStart, playing } from './clipSource';
   import { cuesInSpan, formatCue, hasCues } from './cues';
   import {
     History,
@@ -1036,7 +1036,7 @@
     // A finger held still opens the Clip's menu, as there's no right-click on touch.
     if (event.pointerType === 'touch') pressTimer = setTimeout(() => openClipMenu(clip, element), longPressDelay);
     // Alt+dragging a Clip of Takes slides its active Take, the Clip staying put.
-    const take = clip.takes.find((t) => t.id === clip.activeTakeId);
+    const take = activeTake(clip);
     edit = {
       clip,
       mode: mode === 'move' && event.altKey && take ? 'nudge' : mode,
@@ -1062,7 +1062,7 @@
     const t = spanTimeAt(event.clientX);
     const { clip } = edit;
     if (edit.mode === 'nudge') {
-      edit.nudge = nudgeBy(clip, t - edit.grab - clip.start);
+      edit.nudge = draggedNudge(clip, t - edit.grab - clip.start);
     } else if (edit.mode === 'move') {
       edit.trackId = trackAt(event.clientY);
       const start = clampMove(othersOn(edit.trackId, clip), clip.length, t - edit.grab);
@@ -1081,7 +1081,7 @@
     const { clip, trackId, placement: to, mode } = edit;
     if (mode === 'nudge') {
       const takeId = clip.activeTakeId!;
-      if (edit.moved && edit.nudge !== clip.takes.find((t) => t.id === takeId)!.nudge) {
+      if (edit.moved && edit.nudge !== activeTake(clip)!.nudge) {
         edit.saving = true;
         await perform({ kind: 'nudgeTake', clipId: clip.id, takeId, nudge: edit.nudge });
       }
@@ -1183,7 +1183,7 @@
   function takeActions(clip: Clip): MenuAction[] {
     if (clip.activeTakeId === null) return [];
     const { id: clipId, activeTakeId, takes } = clip;
-    const active = takes.find((t) => t.id === activeTakeId)!;
+    const active = activeTake(clip)!;
     return [
       {
         icon: '♪',

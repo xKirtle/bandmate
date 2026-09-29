@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"mime"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -249,11 +248,7 @@ func (s *Store) ServeMaster(w http.ResponseWriter, r *http.Request, songID, mast
 		return fmt.Errorf("reading master: %w", err)
 	}
 	if download {
-		disposition := mime.FormatMediaType("attachment", map[string]string{"filename": fileName})
-		if disposition == "" {
-			disposition = "attachment"
-		}
-		w.Header().Set("Content-Disposition", disposition)
+		audio.OfferToSave(w, fileName)
 	}
 	return s.masterFiles.Serve(w, r, masterID, contentType)
 }
