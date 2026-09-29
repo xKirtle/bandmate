@@ -8,9 +8,9 @@ import (
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
 )
 
-// A Cover is part of the Song, like a Master: adding, replacing or removing
-// one answers with the full, updated Song, and is based on the Song version
-// in If-Match, if any.
+// A Cover is part of the Song, like a Master: adding, replacing, adjusting
+// the crop of or removing one answers with the full, updated Song, and is
+// based on the Song version in If-Match, if any.
 
 func (a *App) addCover(w http.ResponseWriter, r *http.Request) {
 	a.putCover(w, r, a.songs.AddCover)
@@ -32,6 +32,28 @@ type coverPut func(ctx context.Context, songID int64, based lyricsheet.Version, 
 
 // putCover reads a Cover's pictures and details and gives them to put.
 func (a *App) putCover(w http.ResponseWriter, r *http.Request, put coverPut) {
+	var details lyricsheet.CoverDetails
+	a.readCover(w, r, lyricsheet.CoverPictures, &details, func(id int64, based lyricsheet.Version, pictures map[lyricsheet.CoverPicture]lyricsheet.UploadedPicture) (lyricsheet.Song, error) {
+		return put(r.Context(), id, based, details, pictures)
+	})
+}
+
+// adjustCoverCrop reads a Cover's new crop square, which Cover it was made
+// from, and the list and header pictures made from it.
+func (a *App) adjustCoverCrop(w http.ResponseWriter, r *http.Request) {
+	var details struct {
+		Cover int64                `json:"cover"`
+		Crop  lyricsheet.CoverCrop `json:"crop"`
+	}
+	a.readCover(w, r, lyricsheet.SquarePictures, &details, func(id int64, based lyricsheet.Version, pictures map[lyricsheet.CoverPicture]lyricsheet.UploadedPicture) (lyricsheet.Song, error) {
+		return a.songs.AdjustCoverCrop(r.Context(), id, based, details.Cover, details.Crop, pictures)
+	})
+}
+
+// readCover reads the given pictures of a Cover and its details, decoded
+// into details, and answers with the Song change makes with them.
+func (a *App) readCover(w http.ResponseWriter, r *http.Request, pictures []lyricsheet.CoverPicture, details any,
+	change func(id int64, based lyricsheet.Version, pictures map[lyricsheet.CoverPicture]lyricsheet.UploadedPicture) (lyricsheet.Song, error)) {
 	id, ok := songID(w, r)
 	if !ok {
 		return
@@ -41,21 +63,20 @@ func (a *App) putCover(w http.ResponseWriter, r *http.Request, put coverPut) {
 		return
 	}
 	var parts []filePart
-	for _, p := range lyricsheet.CoverPictures {
+	for _, p := range pictures {
 		parts = append(parts, filePart{string(p), a.coverFiles[p]})
 	}
 	tooLarge := fmt.Sprintf("the pictures are larger than the Cover limit of %s", formatSize(a.maxCover))
-	var details lyricsheet.CoverDetails
-	files, ok := readFiles(w, r, a.maxCover, tooLarge, parts, &details)
+	files, ok := readFiles(w, r, a.maxCover, tooLarge, parts, details)
 	if !ok {
 		return
 	}
-	pictures := map[lyricsheet.CoverPicture]lyricsheet.UploadedPicture{}
-	for _, p := range lyricsheet.CoverPictures {
+	uploaded := map[lyricsheet.CoverPicture]lyricsheet.UploadedPicture{}
+	for _, p := range pictures {
 		f := files[string(p)]
-		pictures[p] = lyricsheet.UploadedPicture{File: f.Received, ContentType: f.contentType}
+		uploaded[p] = lyricsheet.UploadedPicture{File: f.Received, ContentType: f.contentType}
 	}
-	song, err := put(r.Context(), id, based, details, pictures)
+	song, err := change(id, based, uploaded)
 	if err != nil {
 		writeDomainError(w, err)
 		return

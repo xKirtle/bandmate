@@ -3,16 +3,19 @@
   import { centredSquare, maxCoverZoom, moveSquare, wholeSquare, zoomSquare, type Point, type Square } from './cover';
   import type { CoverToCrop } from './coverUpload';
 
-  // The crop step of adding a Cover: a square frame over the picture, which
-  // is dragged under it and zoomed by pinching, scrolling or the slider.
-  // Full-screen on a phone.
+  // The crop step of adding a Cover or adjusting its crop: a square frame
+  // over the picture, which is dragged under it and zoomed by pinching,
+  // scrolling or the slider. Full-screen on a phone.
   let {
     picture,
+    initial,
     confirmLabel,
     onConfirm,
     onCancel,
   }: {
     picture: CoverToCrop;
+    /** The square it opens on; the largest one, centred, if not given. */
+    initial?: Square;
     /** Names what confirming does, e.g. "Add Cover". */
     confirmLabel: string;
     /** The square chosen, in whole pixels of the original. */
@@ -23,9 +26,9 @@
   let dialog = $state<HTMLDialogElement>();
   let stage = $state<HTMLElement>();
   let stageSide = $state(0);
-  // Opens on the picture the step opened with.
+  // Opens on the picture and square the step opened with.
   // svelte-ignore state_referenced_locally
-  let crop = $state<Square>(centredSquare(picture.width, picture.height));
+  let crop = $state<Square>(initial ?? centredSquare(picture.width, picture.height));
   let chosen: Square | null = null;
 
   // The picture is the one the step opened with.

@@ -4,12 +4,13 @@
   import type { Square } from './cover';
   import CoverCrop from './CoverCrop.svelte';
   import CoverPlaceholder from './CoverPlaceholder.svelte';
-  import { cropCover, openCover, type CoverToCrop } from './coverUpload';
+  import { cropCover, openCover, reopenCover, type CoverToCrop } from './coverUpload';
   import SongCover from './SongCover.svelte';
 
   // The header's Cover in Write mode. Without one, the placeholder is a
   // button to pick a picture for it; with one, the Cover opens a menu to
-  // change its picture or remove it. A picture picked opens the crop step.
+  // adjust its crop, change its picture or remove it. A picture picked opens
+  // the crop step, as does adjusting the crop, on the Cover's original.
   let {
     songId,
     cover,
@@ -29,7 +30,15 @@
   } = $props();
 
   let busy = $state<string | null>(null);
-  let toCrop = $state<CoverToCrop | null>(null);
+  // The crop step, open on a picture picked or on the Cover's original to
+  // adjust its crop: the square it opens on, what confirming is called and
+  // what it does.
+  let toCrop = $state<{
+    picture: CoverToCrop;
+    initial?: Square;
+    confirmLabel: string;
+    confirm: (crop: Square) => void;
+  } | null>(null);
   let changeInput = $state<HTMLInputElement>();
 
   // The limit is checked on the picture chosen, before it's scaled down, so
@@ -45,7 +54,12 @@
     input.value = '';
     if (!file) return;
     await run('Opening…', async () => {
-      toCrop = await openCover(file, await maxCoverBytes);
+      const picture = await openCover(file, await maxCoverBytes);
+      toCrop = {
+        picture,
+        confirmLabel: cover ? 'Change Cover' : 'Add Cover',
+        confirm: (crop) => put(picture, crop),
+      };
     });
   }
 
@@ -57,6 +71,25 @@
       const prepared = await cropCover(picture, crop);
       const send = replacing ? api.replaceCover : api.addCover;
       await change((at) => send(at, prepared));
+    });
+  }
+
+  // Opens the crop step on the Cover's original, at its current square.
+  async function reopen() {
+    if (!cover) return;
+    const { id, width, height, crop } = cover;
+    await run('Opening…', async () => {
+      const picture = await reopenCover(api.coverUrl(songId, id, 'original'), { width, height });
+      toCrop = { picture, initial: crop, confirmLabel: 'Save crop', confirm: (crop) => adjust(id, picture, crop) };
+    });
+  }
+
+  // Shows a new square of the Cover's original, the one with id from.
+  async function adjust(from: number, picture: CoverToCrop, crop: Square) {
+    toCrop = null;
+    await run('Saving…', async () => {
+      const { list, header } = await cropCover(picture, crop);
+      await change((at) => api.adjustCoverCrop(at, from, { list, header, crop }));
     });
   }
 
@@ -79,6 +112,7 @@
   }
 
   const entries = [
+    { icon: '⛶', label: 'Adjust crop', run: reopen },
     { icon: '↻', label: 'Change picture', run: () => changeInput?.click() },
     { icon: '🗑', label: 'Remove', run: remove },
   ];
@@ -113,11 +147,11 @@
 {/if}
 
 {#if toCrop}
-  {@const picture = toCrop}
   <CoverCrop
-    {picture}
-    confirmLabel={cover ? 'Change Cover' : 'Add Cover'}
-    onConfirm={(crop) => put(picture, crop)}
+    picture={toCrop.picture}
+    initial={toCrop.initial}
+    confirmLabel={toCrop.confirmLabel}
+    onConfirm={toCrop.confirm}
     onCancel={() => (toCrop = null)}
   />
 {/if}

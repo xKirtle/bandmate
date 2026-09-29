@@ -73,6 +73,9 @@ const (
 // CoverPictures lists a Cover's pictures.
 var CoverPictures = []CoverPicture{CoverOriginal, CoverList, CoverHeader}
 
+// SquarePictures lists the pictures made from a Cover's crop square.
+var SquarePictures = []CoverPicture{CoverList, CoverHeader}
+
 // CoverFiles is where Covers' pictures are kept: one directory for each
 // picture, each file named by its Cover's id.
 type CoverFiles map[CoverPicture]*audio.Files
@@ -103,55 +106,116 @@ func (s *Store) ReplaceCover(ctx context.Context, songID int64, based Version, d
 }
 
 // putCover adds a Cover to a Song, replacing the one it has if replace is
-// set, and refusing to otherwise. The new Cover always gets a new id, so its
-// pictures' addresses change.
+// set, and refusing to otherwise.
 func (s *Store) putCover(ctx context.Context, songID int64, based Version, details CoverDetails, pictures map[CoverPicture]UploadedPicture, replace bool) (Song, error) {
-	for _, p := range CoverPictures {
-		defer pictures[p].File.Discard()
-	}
-	types := map[CoverPicture]string{}
-	for _, p := range CoverPictures {
-		t, _, err := mime.ParseMediaType(pictures[p].ContentType)
-		if err != nil || !pictureTypes[t] {
-			return Song{}, invalid("a Cover's pictures must be JPEG, PNG or WebP")
+	return s.swapCover(ctx, songID, based, CoverPictures, pictures, func(tx *sql.Tx) (int64, newCover, error) {
+		if msg := details.problem(); msg != "" {
+			return 0, newCover{}, invalid(msg)
 		}
-		if pictures[p].File.Size == 0 {
-			return Song{}, invalid("a Cover's pictures can't be empty")
-		}
-		types[p] = t
-	}
-	if msg := details.problem(); msg != "" {
-		return Song{}, invalid(msg)
-	}
-	var kept []CoverPicture
-	var id, old int64
-	err := s.changeTx(ctx, songID, based, func(tx *sql.Tx) error {
-		var err error
-		if old, err = coverID(ctx, tx, songID); err != nil {
-			return err
+		old, err := coverID(ctx, tx, songID)
+		if err != nil {
+			return 0, newCover{}, err
 		}
 		switch {
 		case old != 0 && !replace:
-			return conflict("this Song already has a Cover")
+			return 0, newCover{}, conflict("this Song already has a Cover")
 		case old == 0 && replace:
-			return conflict("this Song has no Cover")
-		case old != 0:
+			return 0, newCover{}, conflict("this Song has no Cover")
+		}
+		return old, newCover{details: details, addedAt: time.Now().UTC()}, nil
+	})
+}
+
+// AdjustCoverCrop shows a new square of a Song's Cover's original, from the
+// list and header pictures the browser made of it, one UploadedPicture for
+// each of SquarePictures, which are kept if the crop is adjusted and
+// discarded otherwise. The browser made them from the Cover with id from, so
+// they're refused if the Song's Cover is another by now. The original is
+// kept as it is.
+func (s *Store) AdjustCoverCrop(ctx context.Context, songID int64, based Version, from int64, crop CoverCrop, pictures map[CoverPicture]UploadedPicture) (Song, error) {
+	return s.swapCover(ctx, songID, based, SquarePictures, pictures, func(tx *sql.Tx) (int64, newCover, error) {
+		var c newCover
+		var old int64
+		var added string
+		err := tx.QueryRowContext(ctx,
+			`SELECT id, width, height, original_type, added_at FROM covers WHERE song_id = ?`, songID).
+			Scan(&old, &c.details.Width, &c.details.Height, &c.originalType, &added)
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, c, conflict("this Song has no Cover")
+		}
+		if err != nil {
+			return 0, c, fmt.Errorf("reading cover: %w", err)
+		}
+		if old != from {
+			return 0, c, conflict("this Song's Cover has changed")
+		}
+		c.details.Crop = crop
+		if msg := c.details.problem(); msg != "" {
+			return 0, c, invalid(msg)
+		}
+		if c.addedAt, err = parseTime(added); err != nil {
+			return 0, c, err
+		}
+		return old, c, nil
+	})
+}
+
+// newCover is a Cover about to take a Song's old one's place.
+type newCover struct {
+	details CoverDetails
+	addedAt time.Time
+	// originalType is the old Cover's original's, when it keeps it.
+	originalType string
+}
+
+// swapCover gives a Song a new Cover, from the given pictures, uploaded,
+// and the old Cover's original if that isn't among them. find says which
+// Cover the Song has, or 0 for none, and what the new one is. The uploaded
+// pictures are kept if the Cover is, and discarded otherwise, and the old
+// Cover's files are deleted. The new Cover always gets a new id, so its
+// pictures' addresses change.
+func (s *Store) swapCover(ctx context.Context, songID int64, based Version, uploaded []CoverPicture,
+	pictures map[CoverPicture]UploadedPicture, find func(tx *sql.Tx) (int64, newCover, error)) (Song, error) {
+	for _, p := range uploaded {
+		defer pictures[p].File.Discard()
+	}
+	types, err := typesOf(uploaded, pictures)
+	if err != nil {
+		return Song{}, err
+	}
+	var kept []CoverPicture
+	var id, old int64
+	err = s.changeTx(ctx, songID, based, func(tx *sql.Tx) error {
+		var c newCover
+		var err error
+		if old, c, err = find(tx); err != nil {
+			return err
+		}
+		if old != 0 {
 			if err := deleteCover(ctx, tx, old); err != nil {
 				return err
 			}
+		}
+		if _, ok := types[CoverOriginal]; !ok {
+			types[CoverOriginal] = c.originalType
 		}
 		id, err = insert(ctx, tx,
 			`INSERT INTO covers (song_id, width, height, crop_x, crop_y, crop_size,
 			   original_type, list_type, header_type, added_at)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			songID, details.Width, details.Height, details.Crop.X, details.Crop.Y, details.Crop.Size,
-			types[CoverOriginal], types[CoverList], types[CoverHeader], time.Now().UTC().Format(timeFormat))
+			songID, c.details.Width, c.details.Height, c.details.Crop.X, c.details.Crop.Y, c.details.Crop.Size,
+			types[CoverOriginal], types[CoverList], types[CoverHeader], c.addedAt.Format(timeFormat))
 		if err != nil {
 			return fmt.Errorf("adding cover: %w", err)
 		}
 		// Kept last, so nothing after them can fail but the commit.
 		for _, p := range CoverPictures {
-			if err := pictures[p].File.Keep(id); err != nil {
+			if _, ok := pictures[p]; ok {
+				err = pictures[p].File.Keep(id)
+			} else {
+				err = s.coverFiles[p].Link(old, id)
+			}
+			if err != nil {
 				return err
 			}
 			kept = append(kept, p)
@@ -168,6 +232,23 @@ func (s *Store) putCover(ctx context.Context, songID int64, based Version, detai
 		s.removeCoverFiles(old)
 	}
 	return s.GetSong(ctx, songID)
+}
+
+// typesOf checks the given pictures uploaded for a Cover and says what type
+// each is.
+func typesOf(uploaded []CoverPicture, pictures map[CoverPicture]UploadedPicture) (map[CoverPicture]string, error) {
+	types := map[CoverPicture]string{}
+	for _, p := range uploaded {
+		t, _, err := mime.ParseMediaType(pictures[p].ContentType)
+		if err != nil || !pictureTypes[t] {
+			return nil, invalid("a Cover's pictures must be JPEG, PNG or WebP")
+		}
+		if pictures[p].File.Size == 0 {
+			return nil, invalid("a Cover's pictures can't be empty")
+		}
+		types[p] = t
+	}
+	return types, nil
 }
 
 // RemoveCover deletes a Song's Cover and its files.

@@ -150,6 +150,7 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("POST /api/songs/{id}/cover", a.addCover)
 	mux.HandleFunc("PUT /api/songs/{id}/cover", a.replaceCover)
 	mux.HandleFunc("DELETE /api/songs/{id}/cover", a.removeCover)
+	mux.HandleFunc("PUT /api/songs/{id}/cover/crop", a.adjustCoverCrop)
 	mux.HandleFunc("GET /api/songs/{id}/cover/{picture}", a.coverPicture)
 	mux.HandleFunc("GET /api/songs/{id}/timeline", a.getTimeline)
 	mux.HandleFunc("POST /api/songs/{id}/timeline/beats", a.addBeatToTimeline)

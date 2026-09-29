@@ -30,13 +30,30 @@ export async function openCover(file: File, maxBytes: number): Promise<CoverToCr
   if (file.size > maxBytes) {
     throw new Error(`“${file.name}” is ${formatSize(file.size)}, over the Cover limit of ${formatSize(maxBytes)}.`);
   }
+  const { canvas: original, type, ...size } = await draw(file, (p) => fitWithin(p.width, p.height, originalSide));
+  return { blob: await encode(original, type), canvas: original, type, ...size };
+}
+
+/**
+ * Opens a Cover's stored original to crop it again. It's already been made
+ * so any browser can open it, at the size given.
+ */
+export async function reopenCover(url: string, size: Size): Promise<CoverToCrop> {
+  const res = await fetch(url).catch(() => null);
+  if (!res?.ok) throw new Error("The Cover's picture couldn't be loaded");
+  const blob = await res.blob();
+  return { blob, ...(await draw(blob, () => size)) };
+}
+
+/** Opens a picture and draws it on a canvas at the size it's given. */
+async function draw(file: Blob, sizeOf: (opened: Size) => Size): Promise<Omit<CoverToCrop, 'blob'>> {
   const picture = await open(file);
   try {
     const type = await pictureType();
-    const size = fitWithin(picture.width, picture.height, originalSide);
-    const original = canvas(size, type);
-    original.getContext('2d')!.drawImage(picture.source, 0, 0, size.width, size.height);
-    return { blob: await encode(original, type), canvas: original, type, ...size };
+    const size = sizeOf(picture);
+    const c = canvas(size, type);
+    c.getContext('2d')!.drawImage(picture.source, 0, 0, size.width, size.height);
+    return { canvas: c, type, ...size };
   } finally {
     picture.close();
   }
@@ -65,7 +82,7 @@ interface Opened {
  * Opens a picture, turned the way its camera says. An image element opens
  * some pictures a bitmap can't, like SVGs in Chrome.
  */
-async function open(file: File): Promise<Opened> {
+async function open(file: Blob): Promise<Opened> {
   try {
     const bitmap = await createImageBitmap(file);
     return { source: bitmap, width: bitmap.width, height: bitmap.height, close: () => bitmap.close() };
