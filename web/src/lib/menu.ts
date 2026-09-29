@@ -34,5 +34,8 @@ export type MenuAction = {
   title?: string;
 } & ({ run: () => void } | { choices: MenuChoice[] });
 
-/** One of a menu entry's choices. */
-export type MenuChoice = { label: string; run: () => void };
+/**
+ * One of a menu entry's choices. With `checked`, the choices are a set of
+ * which one is on, e.g. a Clip's active Take, marked as such.
+ */
+export type MenuChoice = { label: string; run: () => void; checked?: boolean };

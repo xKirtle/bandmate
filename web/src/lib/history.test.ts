@@ -607,3 +607,93 @@ describe('History of Retakes', () => {
     expect(h.nextUndo()).toMatchObject({ kind: 'setTakes', clipId: 9 });
   });
 });
+
+describe('History of choosing and deleting Takes', () => {
+  // A Clip at 0:10 of three Takes, Take 3 active, and the Clip ending where
+  // Take 3 does.
+  const takes = () => [take(40), { ...take(41), number: 2 }, { ...take(42), number: 3, duration: 14 }];
+  const three = (more: Partial<Clip> = {}) =>
+    timeline([
+      track(2, [clip(6, 10, { beatId: null, takes: takes(), activeTakeId: 42, lastTakeNumber: 3, offset: 2, length: 12, ...more })]),
+    ]);
+  const asBefore = {
+    kind: 'setTakes',
+    clipId: 6,
+    takes: {
+      takes: [
+        { id: 40, position: 0 },
+        { id: 41, position: 0 },
+        { id: 42, position: 0 },
+      ],
+      activeTakeId: 42,
+      start: 10,
+      offset: 2,
+      length: 12,
+    },
+  };
+
+  it('undoes choosing a Take by choosing the one active before', () => {
+    const h = new History();
+    const t0 = three();
+    const t1 = three({ activeTakeId: 40 });
+
+    h.record({ kind: 'chooseTake', clipId: 6, takeId: 40 }, t0, t1);
+
+    expect(h.nextUndo()).toEqual({ kind: 'chooseTake', clipId: 6, takeId: 42 });
+    h.undone(t1, three());
+    expect(h.nextRedo()).toEqual({ kind: 'chooseTake', clipId: 6, takeId: 40 });
+  });
+
+  it("undoes deleting the active Take by setting the Clip's Takes back as they were", () => {
+    const h = new History();
+    const t0 = three();
+    // Take 2 is active now, and the Clip ends where Take 1 does.
+    const t1 = three({ takes: takes().slice(0, 2), activeTakeId: 41, length: 8 });
+
+    h.record({ kind: 'deleteTake', clipId: 6, takeId: 42 }, t0, t1);
+
+    expect(h.nextUndo()).toEqual(asBefore);
+    h.undone(t1, three());
+    expect(h.nextRedo()).toEqual({ kind: 'deleteTake', clipId: 6, takeId: 42 });
+  });
+
+  it("undoes clearing inactive Takes by setting the Clip's Takes back as they were", () => {
+    const h = new History();
+    const t0 = three();
+    const t1 = three({ takes: takes().slice(2) });
+
+    h.record({ kind: 'clearInactiveTakes', clipId: 6 }, t0, t1);
+
+    expect(h.nextUndo()).toEqual(asBefore);
+    h.undone(t1, three());
+    expect(h.nextRedo()).toEqual({ kind: 'clearInactiveTakes', clipId: 6 });
+  });
+
+  it('undoes deleting the last Take by placing its Clip back, and redoes it on the Clip placed', () => {
+    const h = new History();
+    const t0 = timeline([track(2, [takeClip(6, 10, [take(40)])])]);
+    const t1 = timeline([track(2)]);
+
+    h.record({ kind: 'deleteTake', clipId: 6, takeId: 40 }, t0, t1);
+
+    expect(h.nextUndo()).toEqual({
+      kind: 'placeClip',
+      trackId: 2,
+      clip: { takeIds: [40], activeTakeId: 40, lastTakeNumber: 1, start: 10, offset: 2, length: 10 },
+    });
+    h.undone(t1, timeline([track(2, [takeClip(9, 10, [take(40)])])]));
+    expect(h.nextRedo()).toEqual({ kind: 'deleteTake', clipId: 9, takeId: 40 });
+  });
+
+  it('follows a Clip whose Take was chosen when it comes back with a new id', () => {
+    const h = new History();
+    const t1 = three({ activeTakeId: 40 });
+    h.record({ kind: 'chooseTake', clipId: 6, takeId: 40 }, three(), t1);
+    const gone = timeline([track(2)]);
+    h.record({ kind: 'deleteClip', clipId: 6 }, t1, gone);
+
+    h.undone(gone, timeline([track(2, [{ ...t1.tracks[0].clips[0], id: 9 }])]));
+
+    expect(h.nextUndo()).toEqual({ kind: 'chooseTake', clipId: 9, takeId: 42 });
+  });
+});

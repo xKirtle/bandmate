@@ -35,7 +35,7 @@
   const gap = 4;
 
   function items(): HTMLElement[] {
-    return menu ? [...menu.querySelectorAll<HTMLElement>('[role="menuitem"]')] : [];
+    return menu ? [...menu.querySelectorAll<HTMLElement>('[role^="menuitem"]')] : [];
   }
 
   async function show(focus: 'first' | 'last' = 'first') {
@@ -161,7 +161,15 @@
           {picking.label}
         </button>
         {#each picking.choices as choice, i (i)}
-          <button type="button" role="menuitem" tabindex="-1" class="choice" onclick={() => choose(choice)}>
+          <button
+            type="button"
+            role={choice.checked === undefined ? 'menuitem' : 'menuitemradio'}
+            aria-checked={choice.checked}
+            tabindex="-1"
+            class="choice"
+            onclick={() => choose(choice)}
+          >
+            {#if choice.checked}<span class="check" aria-hidden="true">✓</span>{/if}
             {choice.label}
           </button>
         {/each}
@@ -210,7 +218,7 @@
     background: var(--bg);
     box-shadow: 0 0.5rem 1.5rem color-mix(in srgb, var(--text) 18%, transparent);
   }
-  [role='menuitem'] {
+  [role^='menuitem'] {
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -225,13 +233,21 @@
     white-space: nowrap;
     cursor: pointer;
   }
-  [role='menuitem']:hover,
-  [role='menuitem']:focus-visible {
+  [role^='menuitem']:hover,
+  [role^='menuitem']:focus-visible {
     background: var(--surface-2);
   }
   /* A choice sits under the entry it's for, past where the glyphs line up. */
   .choice {
     padding-inline-start: 2.75rem;
+  }
+  /* The choice that's on is ticked in the glyphs' column. */
+  .choice:has(.check) {
+    padding-inline-start: 0.75rem;
+  }
+  .check {
+    width: 1.25rem;
+    text-align: center;
   }
   .glyph {
     width: 1.25rem;

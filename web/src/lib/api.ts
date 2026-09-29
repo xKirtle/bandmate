@@ -621,6 +621,18 @@ export const api = {
   /** Sets a Clip's Takes, active Take and placement, detaching the Takes it no longer holds. */
   setTakes: (at: SongAt, clipId: number, takes: ClipTakes) =>
     request<Timeline>('PUT', `/songs/${at.id}/timeline/clips/${clipId}/takes`, takes, at),
+  /** Makes one of a Clip's Takes the one it plays. */
+  chooseTake: (at: SongAt, clipId: number, takeId: number) =>
+    request<Timeline>('PUT', `/songs/${at.id}/timeline/clips/${clipId}/active-take`, { takeId }, at),
+  /**
+   * Detaches one of a Clip's Takes. If it was active, the most recent one left
+   * is; if it was the last, the Clip is deleted.
+   */
+  deleteTake: (at: SongAt, clipId: number, takeId: number) =>
+    request<Timeline>('DELETE', `/songs/${at.id}/timeline/clips/${clipId}/takes/${takeId}`, undefined, at),
+  /** Detaches all of a Clip's Takes but the active one. */
+  clearInactiveTakes: (at: SongAt, clipId: number) =>
+    request<Timeline>('DELETE', `/songs/${at.id}/timeline/clips/${clipId}/inactive-takes`, undefined, at),
   /** One of a Song's Takes, with its peaks. */
   getTake: (songId: number, takeId: number) => request<Take>('GET', `/songs/${songId}/takes/${takeId}`),
   /** Where a Take's audio streams from, exactly as recorded. A Take's file never changes. */

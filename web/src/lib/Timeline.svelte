@@ -1075,8 +1075,40 @@
       ...(clip.activeTakeId !== null && canRecord
         ? [{ icon: '●', label: 'Retake', title: 'Record another Take into this Clip', run: () => startRecording(clip) }]
         : []),
+      ...takeActions(clip),
       { icon: '⧉', label: 'Duplicate', run: () => duplicate(clip) },
       { icon: '×', label: 'Delete', run: () => remove(clip) },
+    ];
+  }
+
+  // Choosing, deleting and clearing Takes don't ask first: they can be
+  // undone, and a deleted Take is only detached.
+  function takeActions(clip: Clip): MenuAction[] {
+    if (clip.activeTakeId === null) return [];
+    const { id: clipId, activeTakeId, takes } = clip;
+    return [
+      {
+        icon: '♪',
+        label: 'Takes',
+        title: 'Choose the Take this Clip plays',
+        choices: takes.map((t) => ({
+          label: `Take ${t.number}`,
+          checked: t.id === activeTakeId,
+          run: () => t.id !== activeTakeId && perform({ kind: 'chooseTake', clipId, takeId: t.id }),
+        })),
+      },
+      {
+        icon: '⌫',
+        label: 'Delete Take',
+        title: takes.length === 1 ? 'Deleting its only Take deletes the Clip' : undefined,
+        choices: takes.map((t) => ({
+          label: `Take ${t.number}${t.id === activeTakeId ? ' (active)' : ''}`,
+          run: () => perform({ kind: 'deleteTake', clipId, takeId: t.id }),
+        })),
+      },
+      ...(takes.length > 1
+        ? [{ icon: '⊘', label: 'Clear inactive Takes', run: () => perform({ kind: 'clearInactiveTakes', clipId }) }]
+        : []),
     ];
   }
 
