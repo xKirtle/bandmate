@@ -47,6 +47,10 @@ describe('retakeLength', () => {
     expect(retakeLength(clip, clips, 26)).toBe(10);
   });
 
+  it('counts a Clip placed right at its end, give or take rounding, as the next', () => {
+    expect(retakeLength(clip, [clip, { start: 15 - 1e-9, offset: 0, length: 5 }], 26)).toBe(5);
+  });
+
   it('grows as far as it likes when no Clip comes after it', () => {
     expect(retakeLength(clip, [clip], 60)).toBe(50);
   });

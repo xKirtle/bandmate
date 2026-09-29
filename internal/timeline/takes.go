@@ -42,7 +42,7 @@ const (
 func (s *Store) RecordTake(ctx context.Context, songID int64, based lyricsheet.Version, rec TakePlacement, file *audio.Received) (Timeline, error) {
 	defer file.Discard()
 	if math.IsNaN(rec.Start) || math.IsInf(rec.Start, 0) {
-		return Timeline{}, &lyricsheet.InvalidError{Msg: "start, captureStart and latencyOffset must be numbers"}
+		return Timeline{}, &lyricsheet.InvalidError{Msg: "start must be a number"}
 	}
 	if rec.Start < -tolerance {
 		return Timeline{}, &lyricsheet.InvalidError{Msg: "a Clip can't start before 0:00"}
@@ -122,7 +122,7 @@ func readTake(file *audio.Received, c Captured) (newTake, error) {
 	}
 	for _, v := range []float64{c.CaptureStart, c.LatencyOffset} {
 		if math.IsNaN(v) || math.IsInf(v, 0) {
-			return newTake{}, &lyricsheet.InvalidError{Msg: "start, captureStart and latencyOffset must be numbers"}
+			return newTake{}, &lyricsheet.InvalidError{Msg: "captureStart and latencyOffset must be numbers"}
 		}
 	}
 	if c.LatencyOffset < 0 {

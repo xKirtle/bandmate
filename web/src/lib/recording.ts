@@ -36,6 +36,8 @@ export function retakePlan(clip: Placed): RecordingPlan {
  * shrunk. What's past that is kept, hidden, to trim into view later.
  */
 export function retakeLength(clip: Placed, clips: readonly Placed[], end: number): number {
-  const next = clips.reduce((at, c) => (c.start >= clip.start + clip.length ? Math.min(at, c.start) : at), Infinity);
+  // With the server's tolerance, so a neighbour placed right at its end counts as next.
+  const after = clip.start + clip.length - 1e-6;
+  const next = clips.reduce((at, c) => (c.start >= after ? Math.min(at, c.start) : at), Infinity);
   return Math.max(clip.length, Math.min(end, next) - clip.start);
 }

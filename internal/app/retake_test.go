@@ -12,9 +12,9 @@ import (
 // active Take, and the Clip grows to fit it, up to the next Clip. Setting a
 // Clip's Takes back as they were is how undo and redo work.
 
-// retakeRecording is a Take lasting seconds recorded into a Clip, with
+// retakeUpload is a Take lasting seconds, sung into a Clip, with
 // capture from captureStart and the latency offset taken off.
-func retakeRecording(captureStart, latency, seconds float64) audioUpload {
+func retakeUpload(captureStart, latency, seconds float64) audioUpload {
 	return audioUpload{
 		FileName:    "take.wav",
 		ContentType: "audio/wav",
@@ -84,7 +84,7 @@ func TestARetakeAddsTheNextTakeActiveAndGrowsTheClipToFitIt(t *testing.T) {
 	// The Clip shows 0:02 to 0:05 of a Take from 0:01.5 to 0:05.5. The
 	// Retake leads in from 0:00, and was sung 0.25s before the mic heard it,
 	// so it runs from -0:00.25 to 0:06.75.
-	upload := retakeRecording(0, 0.25, 7)
+	upload := retakeUpload(0, 0.25, 7)
 
 	got := timelineChange(t, ts.retake(r.song.ID, r.clip.ID, upload))
 
@@ -112,7 +112,7 @@ func TestARetakeAddsTheNextTakeActiveAndGrowsTheClipToFitIt(t *testing.T) {
 	served := ts.Do(http.MethodGet, takePath(r.song.ID, tk.ID)+"/audio", nil)
 	expectStatus(t, served, http.StatusOK)
 	if string(served.Body) != string(upload.Data) {
-		t.Errorf("the Retake's audio differs from the recording")
+		t.Errorf("the Retake's audio differs from what was uploaded")
 	}
 }
 
@@ -120,7 +120,7 @@ func TestAShortRetakeLeavesTheClipsLengthAlone(t *testing.T) {
 	ts := newTestServer(t)
 	r := recordATake(t, ts)
 
-	got := timelineChange(t, ts.retake(r.song.ID, r.clip.ID, retakeRecording(0, 0, 3)))
+	got := timelineChange(t, ts.retake(r.song.ID, r.clip.ID, retakeUpload(0, 0, 3)))
 
 	if at := clipAt(got, r.clip.ID); at != "1:2+3@2" {
 		t.Errorf("clip = %s, want it still at 0:02 to 0:05", at)
@@ -133,7 +133,7 @@ func TestARetakeGrowsItsClipOnlyUpToTheNextClip(t *testing.T) {
 	dup := timelineChange(t, ts.duplicateClip(r.song.ID, r.clip.ID)).Tracks[1].Clips[1]
 	timelineChange(t, ts.moveClip(r.song.ID, dup.ID, r.vox.ID, 6))
 
-	got := timelineChange(t, ts.retake(r.song.ID, r.clip.ID, retakeRecording(0, 0, 10)))
+	got := timelineChange(t, ts.retake(r.song.ID, r.clip.ID, retakeUpload(0, 0, 10)))
 
 	// The Retake runs to 0:10, but the next Clip starts at 0:06.
 	if at := clipAt(got, r.clip.ID); at != "1:2+4@2" {
@@ -153,7 +153,7 @@ func TestTakeNumbersAreNeverReused(t *testing.T) {
 	id := r.clip.ID
 	retakeOnce := func() clip {
 		t.Helper()
-		return timelineChange(t, ts.retake(r.song.ID, id, retakeRecording(0, 0, 3))).Tracks[1].Clips[0]
+		return timelineChange(t, ts.retake(r.song.ID, id, retakeUpload(0, 0, 3))).Tracks[1].Clips[0]
 	}
 	retakeOnce()
 	c := retakeOnce()
@@ -183,7 +183,7 @@ func TestTakeNumbersAreNeverReused(t *testing.T) {
 
 	// And a copy of the Clip.
 	dup := timelineChange(t, ts.duplicateClip(r.song.ID, id)).Tracks[1].Clips[1]
-	got := timelineChange(t, ts.retake(r.song.ID, dup.ID, retakeRecording(dup.Start-2, 0, 3)))
+	got := timelineChange(t, ts.retake(r.song.ID, dup.ID, retakeUpload(dup.Start-2, 0, 3)))
 	if got := numbers(got.Tracks[1].Clips[1]); got != "1 5 6* " {
 		t.Errorf("copy's takes = %s, want the next Take numbered 6", got)
 	}
@@ -192,7 +192,7 @@ func TestTakeNumbersAreNeverReused(t *testing.T) {
 func TestARetakeIsUndoneAndRedoneBySettingTheClipsTakes(t *testing.T) {
 	ts := newTestServer(t)
 	r := recordATake(t, ts)
-	after := timelineChange(t, ts.retake(r.song.ID, r.clip.ID, retakeRecording(0, 0.25, 7)))
+	after := timelineChange(t, ts.retake(r.song.ID, r.clip.ID, retakeUpload(0, 0.25, 7)))
 	retaken := after.Tracks[1].Clips[0]
 
 	undone := timelineChange(t, ts.setTakes(r.song.ID, r.clip.ID, takesAsIn(r.clip)))
@@ -210,7 +210,7 @@ func TestARetakeFollowsItsRulesAndKeepsNothingWhenRefused(t *testing.T) {
 	ts := newTestServer(t)
 	r := recordATake(t, ts)
 	beatClip := r.tl.Tracks[0].Clips[0].ID
-	timelineChange(t, ts.retake(r.song.ID, r.clip.ID, retakeRecording(0, 0, 3)))
+	timelineChange(t, ts.retake(r.song.ID, r.clip.ID, retakeUpload(0, 0, 3)))
 	before := ts.getTimeline(r.song.ID)
 	files := takeFiles(t, ts)
 
@@ -219,23 +219,23 @@ func TestARetakeFollowsItsRulesAndKeepsNothingWhenRefused(t *testing.T) {
 		status int
 		msg    string
 	}{
-		"into a Clip of a Beat": {ts.retake(r.song.ID, beatClip, retakeRecording(0, 0, 3)),
+		"into a Clip of a Beat": {ts.retake(r.song.ID, beatClip, retakeUpload(0, 0, 3)),
 			http.StatusBadRequest, "only a Clip of Takes can be retaken"},
-		"ending before the Clip starts": {ts.retake(r.song.ID, r.clip.ID, retakeRecording(0, 0, 1.5)),
+		"ending before the Clip starts": {ts.retake(r.song.ID, r.clip.ID, retakeUpload(0, 0, 1.5)),
 			http.StatusBadRequest, "the Take ended before its Clip's start"},
-		"with a negative latency offset": {ts.retake(r.song.ID, r.clip.ID, retakeRecording(0, -1, 3)),
+		"with a negative latency offset": {ts.retake(r.song.ID, r.clip.ID, retakeUpload(0, -1, 3)),
 			http.StatusBadRequest, "a latency offset can't be negative"},
 		"in stereo": {ts.retake(r.song.ID, r.clip.ID, audioUpload{FileName: "take.wav", ContentType: "audio/wav",
-			Data: wavFile(3, 2, 24), Details: retakeRecording(0, 0, 3).Details}),
+			Data: wavFile(3, 2, 24), Details: retakeUpload(0, 0, 3).Details}),
 			http.StatusBadRequest, "a Take must be a mono 24-bit WAV file"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			expectError(t, c.res, c.status, c.msg)
 		})
 	}
-	expectStatus(t, ts.retake(r.song.ID, 999, retakeRecording(0, 0, 3)), http.StatusNotFound)
+	expectStatus(t, ts.retake(r.song.ID, 999, retakeUpload(0, 0, 3)), http.StatusNotFound)
 	expectStale(t, ts.SendUploadAt(r.tl.Version, http.MethodPost, clipTakesPath(r.song.ID, r.clip.ID),
-		retakeRecording(0, 0, 3)))
+		retakeUpload(0, 0, 3)))
 
 	if read := ts.getTimeline(r.song.ID); !reflect.DeepEqual(read, before) {
 		t.Errorf("timeline = %+v, want it unchanged: %+v", read, before)

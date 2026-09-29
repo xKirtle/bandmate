@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Clip } from './api';
-import { heard } from './clipSource';
+import type { Clip, Timeline } from './api';
+import { clipSources, heard, playing } from './clipSource';
 import { keptInLoop, outsideLoop, positionAt, repeats, schedule, timelineEnd } from './schedule';
 
 // A 10-second Clip at 0:05 playing a Beat from 2s in, and a 4-second one
@@ -217,5 +217,22 @@ describe('schedule of a Take Clip', () => {
     const played = heard(clip)!;
     expect(schedule([played], 25)).toEqual([{ clip: played, delay: 5, from: 1, duration: 10 }]);
     expect(schedule([played], 34)).toEqual([{ clip: played, delay: 0, from: 5, duration: 6 }]);
+  });
+
+  it('leaves the Clip being retaken out, and schedules the rest as usual', () => {
+    const beat: Clip = { ...clip, id: 2, beatId: 5, takes: [], activeTakeId: null, lastTakeNumber: 0, start: 0, offset: 0, length: 60 };
+    const tl: Timeline = {
+      songId: 1,
+      version: 1,
+      updatedAt: '',
+      tracks: [
+        { id: 1, name: 'Beat', volume: 0, muted: false, soloed: false, clips: [beat] },
+        { id: 2, name: 'Vox', volume: 0, muted: false, soloed: false, clips: [clip] },
+      ],
+      beats: [{ id: 5, title: 'Beat', bpm: null, fileName: 'b.mp3', size: 1, duration: 60 }],
+      loop: null,
+    };
+    const scheduled = schedule(playing(tl, clipSources(tl), clip.id), 28);
+    expect(scheduled.map((s) => [s.clip.trackId, s.delay, s.from])).toEqual([[1, 0, 28]]);
   });
 });
