@@ -85,6 +85,10 @@ _Avoid_: Session, project, mix
 A named lane on the Timeline (e.g. "Beat", "Lead vox", "Adlibs") holding Clips, with its own volume, mute and solo.
 _Avoid_: Channel, layer
 
+**Chosen Track**:
+The Track a recording goes to. While the Timeline has any Tracks, exactly one is chosen.
+_Avoid_: Selected track (selecting is for Clips), armed track
+
 **Beat**:
 An audio file in the user's Beat Library, carrying its own credit (producer, source link); a Song uses a Beat by placing it in a Clip.
 _Avoid_: Instrumental, backing track, sample
@@ -97,7 +101,7 @@ _Avoid_: Beat store, uploads
 Listening to a Beat from the Beat Library, outside any Song's Timeline.
 
 **Take**:
-One recording made in the app, keeping a frozen copy of the lyrics that were active when it was recorded.
+One recording made in the app, placed in a Clip on the Timeline. Like a Beat, it's tied to the lyrics only through Cues, so what it sings is whatever Lines are cued over its span.
 _Avoid_: Recording, attempt
 
 **Clip**:
@@ -117,7 +121,7 @@ A way of syncing a Song's Lines while the Timeline plays: as each Line starts, m
 _Avoid_: Tap mode, record mode
 
 **Latency Offset**:
-The delay between what the user heard and what the mic captured, measured once by calibration and adjustable per Take.
+The delay between what the user heard and what the mic captured, measured by calibration once per device, since it belongs to the hardware chain; each Take keeps the offset it was recorded with and can be nudged by hand.
 _Avoid_: Delay, lag
 
 **Master**:
@@ -125,5 +129,5 @@ A finished recording of a Song made elsewhere (e.g. in a studio), attached to th
 _Avoid_: Final, release, finished track, alternate master (an Alternate is something else)
 
 **Mixdown**:
-The Timeline rendered into a single audio file.
+The Timeline, or a part of it (one Track, one Clip, or the Loop's stretch), rendered into a single audio file.
 _Avoid_: Bounce, export, render

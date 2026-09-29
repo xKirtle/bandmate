@@ -7,7 +7,8 @@ Each step is usable on its own. Terms are defined in [CONTEXT.md](../CONTEXT.md)
 3. **Sync**: Cues via Sync mode and the Cue gutter, current Line highlighted during playback.
    - **Desktop layout** (between Sync and Record): a full-width shell, a two-column Song page, and sortable, filterable Song and Beat lists. Spec: issue #97.
 4. **Record**: lossless WAV Takes stacked in Clips, Latency Offset calibration and per-Take nudge.
-5. **Keep**: Snapshots and restore, Mixdown to MP3, ChordPro export.
+5. **Mix**: Mixdowns of the whole Timeline, a Track, a Clip or the Loop's stretch, as WAV or MP3.
+6. **Keep**: Snapshots and restore, ChordPro export.
 
 ## Decided so far
 
@@ -61,7 +62,7 @@ Playback:
 - The highlight shows in both Read and Write mode, per Line (in Write mode, behind the text box). The Lyric Sheet scrolls to follow it, except while the cursor is in a text box. This is the least certain decision here and may change during implementation.
 - Clicking a cued Line in Read mode plays from it, leading in like the gutter's ▶; in Write mode a click only places the cursor, and the gutter's ▶ plays instead. On phone there's the highlight and click-to-play, but no Cue editing.
 - Songs without audio have no playback clock. Their Chords are purely positional.
-- Undo for Lyric Sheet structure (delete Section, reorder, switch Alternate, move to or from the Scrapbook) is not part of Sync. With dormant Cues (ADR 0007) an Alternate switch is undone by switching back; whether Snapshots cover the rest is decided in step 5.
+- Undo for Lyric Sheet structure (delete Section, reorder, switch Alternate, move to or from the Scrapbook) is not part of Sync. With dormant Cues (ADR 0007) an Alternate switch is undone by switching back; whether Snapshots cover the rest is decided in step 6.
 
 ### Desktop layout
 
@@ -77,19 +78,37 @@ Playback:
 ### 4. Record
 
 - The browser mic requires HTTPS, which the reverse proxy already provides (ADR 0002). The user records through an audio interface, with headphones.
-- Takes are lossless WAV (ADR 0003) and keep a frozen copy of their lyrics (ADR 0004).
-- Recording starts at the playhead while the Timeline plays. If a Clip on the Track covers the playhead, the new Take stacks into it and becomes the active Take, and the Clip grows to fit the longest Take. Otherwise a new Clip is created there. For a separate idea at the same spot, use another Track.
+- Takes are lossless WAV (ADR 0003). They hold no lyrics (ADR 0011): a Take is audio on the Timeline, and Cues are the only link to the Lyric Sheet.
+- **Record appends**, as in Audacity: the new Take starts a new Clip where the chosen Track's last Clip ends (Beat Clips included), or at 0:00 on an empty Track, so it never runs into another Clip. The playhead doesn't decide where a Take goes. Recording with the Beat's Track chosen puts the Take after the Beat, over silence; that's left as is, since it teaches adding a Track of your own.
+- **Retake**, on a Clip of Takes, records a new Take into it from the Clip's start. It becomes the active Take, and the Clip grows to fit its longest Take, up to the next Clip's start (audio past that is kept, hidden). Retake is the only way Takes stack. There's no punch-in mid-Clip: to fix one Line, retake the Clip or record it on another Track.
+- Both lead in: playback starts 2 s before the Take (never before 0:00), and what's sung then is kept, hidden behind the Clip's start.
+- Recording and playback are exclusive: Record and Retake are only offered while the Timeline is stopped. A recording always plays whatever the Timeline holds, even nothing, and runs on past its end until Record is pressed again or Space; plain playback still stops at the end.
+- A Take goes to the **chosen Track**. As in Audacity, while the Timeline has Tracks exactly one is chosen: clicking a Track's header or any Clip on it chooses it. The browser remembers the choice per Song; the first time, it's the bottom Track. A Track added with "Add a track" becomes the chosen one; the "Beat" Track a first Beat creates doesn't, unless it's the only Track. Deleting the chosen Track chooses the bottom one. With no Tracks at all, Record first adds one the same way "Add a track" does. A Take never moves to another Track on its own.
+- Clips still never overlap, recording included. Tracks are heard summed, honouring volume, mute and solo, as in step 2. To hear two recordings at once, put them on separate Tracks.
 - There's no comping: switching the active Take is the only way to choose between Takes. Inactive Takes are kept until deleted by hand, with a "clear inactive Takes" action per Clip. Nothing is deleted automatically.
-- **Latency Offset**: a one-time calibration (play a click, record it, measure the delay) sets a global offset applied to every new Take. Each Take can then be nudged by hand.
+- **Latency Offset**: the full round trip (the Beat reaching the ears, then the voice reaching the file). A calibration sets it per device: the user taps or claps on the mic along with a click some 8–16 times, and the hits are found in the recording, stray ones dropped and the rest averaged. Tapping a key wouldn't do, as it skips the mic's half. The offset is kept in the browser, since it belongs to the hardware chain. It's applied to every new Take recorded there, and each Take keeps the offset it got, so recalibrating never moves old Takes. Each Take can then be nudged by hand: typed in milliseconds in the Take's menu (Alt+←/→ steps 1 ms, with Shift 10 ms), or by Alt+dragging the Clip, which slides its active Take while the Clip stays put.
+- Calibration is offered before a device's first recording and can be skipped, saying where to run it again later. Until it's done, the offset is whatever latency the browser reports, and a "not calibrated" note shows beside Record.
+- **Takes in a Clip** are numbered ("Take 3") in recording order, never reusing a number. The Clip's menu lists them, the active one marked, and choosing one makes it active. Deleting the active Take makes the most recent remaining one active; deleting the last Take deletes the Clip. Retake starts at the Clip's start as trimmed.
+- **Input**: a device and input channel picker (e.g. "Scarlett 2i2 · Input 1") with a live level meter, remembered per device. The browser's echo cancellation, noise suppression and auto gain are always off.
+- **What's heard**: the app never plays the mic back (the interface monitors directly; a browser would add delay). During a Retake, the Clip being retaken is silent.
+- The Loop is for playback: a recording ignores it, and it stays on. Sync mode and recording are exclusive.
+- A Take is kept in the browser's storage while recording and until the server confirms its upload, so a crashed tab or failed upload is offered back on the next visit.
+- Recording, Retake, deleting a Take, "clear inactive Takes" and nudging all join the Timeline's undo history, so none asks for confirmation. A removed Take's file is swept from disk later, once no undo could bring it back.
 - The highlighted Line from Sync prompts the user while recording. Cues can be synced roughly against the Beat first and refined once a real vocal exists.
-- A Take freezes its lyrics but not Cues. The highlight always follows the current Lyric Sheet and Cues, so a Take recorded before the lyrics changed simply goes out of date.
+- The highlight always follows the current Lyric Sheet and Cues, so a Take recorded before the lyrics changed simply goes out of date.
 - Recording never needs a Beat: a reference vocal can be recorded on an empty Timeline. Step 2's empty Timeline only offers "add a beat". This step adds "record" next to it, as the Step 2 decisions above already describe.
-- Still open for this step's spec: what an empty Timeline shows (the slim bar whose Record button opens the Timeline, or the full Timeline always), how far the playhead runs when there's no audio or it's recording past the last Clip (today playback stops at the Timeline's end), and which Track a first recording lands on when the Song has none.
+- Record and Retake show wherever the full Timeline does, at any width above the transport-only one (so a phone held sideways can record too). There's nothing phone-specific: the browser APIs are the same, and a Take that comes out of sync is what the Latency Offset and nudge are for.
+- A Clip's actions are in its menu, opened by right-click, the Menu key or Shift+F10, the ⋯ in its header (which replaces today's ⧉ and ×), or on touch a long press (a finger held still; one that moves drags as before). A Clip of Takes adds Retake, its Takes to choose from, Nudge, Clear inactive Takes and Download Take, which gives the active Take's original WAV, untouched.
+- The empty Timeline stays the slim bar, with "Record" beside "Add a beat". Record there opens the Timeline, adds a Track and starts recording at once, after any first-time setup.
 
-### 5. Keep
+### 5. Mix
+
+- The **Mixdown** is rendered in the browser, as WAV or MP3, of the whole Timeline, one Track, one Clip (from its menu) or the Loop's stretch. It ignores Masters, and a Clip's Mixdown is what it plays: trimmed, nudged, the active Take. Downloading a Take's original file is step 4's.
+- Still open for this step's spec: whether a Mixdown honours Track volume, mute and solo (and a Clip's, its Track's volume), and whether the Loop's stretch can be mixed down while the Loop is off.
+
+### 6. Keep
 
 - **Snapshots** cover the whole Lyric Sheet. They're taken automatically (e.g. after a pause in editing, thinned out over time) and can be named by hand. Restoring one first snapshots the current Lyric Sheet, so a restore can always be undone.
-- The **Mixdown** is rendered in the browser and exported as MP3. It ignores Masters and Scrapbook Sections.
 - ChordPro export covers the Arrangement's active Alternates. Scrapbook Sections are excluded.
 - Backups of the data folder are handled outside Bandmate by the homelab.
 
@@ -100,3 +119,4 @@ Playback:
 - Detecting a Beat's BPM and key from the audio itself.
 - A count-in or click from the Song's BPM, for recording without a Beat so a Beat added later can line up.
 - Real-time sync between open tabs or devices.
+- Show the playhead, the Line highlight and Sync mode's "Now" where the audio is heard, by the output latency the browser reports. Unnoticeable through an interface, but 150–250 ms late over Bluetooth. A tap test to correct it only if the reported figure proves off.
