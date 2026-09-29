@@ -14,6 +14,21 @@ export function popoverTop(
 }
 
 /**
+ * The left of a popover `width` px wide, lined up with the start or end of
+ * the field or button it opens from, but kept `gap` px inside the window.
+ */
+export function popoverLeft(
+  anchor: { left: number; right: number },
+  width: number,
+  viewportWidth: number,
+  gap: number,
+  align: 'start' | 'end',
+): number {
+  const left = align === 'start' ? anchor.left : anchor.right - width;
+  return Math.max(gap, Math.min(left, viewportWidth - gap - width));
+}
+
+/**
  * Places `list`, a popover in the top layer, `gap` px under `anchor`, or over
  * it when there's no room below: at least as wide as it, and inside the window.
  */
@@ -24,8 +39,7 @@ export function placeUnder(list: HTMLElement, anchor: HTMLElement, gap: number) 
   // On a phone, what the on-screen keyboard leaves visible.
   const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
   list.style.top = `${popoverTop(at, height, viewportHeight, gap)}px`;
-  const room = document.documentElement.clientWidth - gap;
-  list.style.left = `${Math.max(gap, Math.min(at.left, room - width))}px`;
+  list.style.left = `${popoverLeft(at, width, document.documentElement.clientWidth, gap, 'start')}px`;
 }
 
 /** Scrolls the highlighted option (aria-selected) into `list`'s view. */

@@ -20,6 +20,7 @@
   import { follower, lineKey } from './follow';
   import { gutterFields } from './gutter';
   import LyricSheetView from './LyricSheetView.svelte';
+  import ActionsMenu from './ActionsMenu.svelte';
   import type { MenuAction } from './menu';
   import Picker from './Picker.svelte';
   import SectionEditor from './SectionEditor.svelte';
@@ -297,12 +298,6 @@
     change((at) => api.duplicateSection(at, sectionId, position));
   }
 
-  function duplicateAtEnd(e: Event & { currentTarget: HTMLSelectElement }) {
-    const id = Number(e.currentTarget.value);
-    e.currentTarget.value = '';
-    if (id) duplicate(id);
-  }
-
   function move(index: number, by: -1 | 1) {
     const order = moveTo(song.arrangement, index, index + by);
     change((at) => api.reorderArrangement(at, order));
@@ -519,13 +514,14 @@
     <div class="add-row">
       <button type="button" class="button add" onclick={() => add(song.arrangement.length)}>Add Section</button>
       {#if inArrangement.length > 0}
-        <label class="visually-hidden" for="duplicate-section">Duplicate a Section at the end</label>
-        <select id="duplicate-section" class="duplicate" onchange={duplicateAtEnd}>
-          <option value="">Duplicate a Section…</option>
-          {#each inArrangement as section (section.id)}
-            <option value={section.id}>{describe(section)}</option>
-          {/each}
-        </select>
+        <div class="duplicate">
+          <ActionsMenu
+            label="Duplicate a Section at the end"
+            text="Duplicate a Section…"
+            align="start"
+            entries={inArrangement.map((section) => ({ label: describe(section), run: () => duplicate(section.id) }))}
+          />
+        </div>
       {/if}
     </div>
     <p class="hint muted">Put Chords in brackets where they fall: <code>Hel[Am]lo</code>.</p>
@@ -689,7 +685,7 @@
     flex: 1 1 12rem;
     width: auto;
   }
-  .duplicate {
-    font-weight: 600;
+  .duplicate :global(.button) {
+    width: 100%;
   }
 </style>

@@ -22,8 +22,8 @@ export function menuKey(key: string, current: number, count: number): number | '
 }
 
 /**
- * An entry in a ⋯ menu, also shown as an icon button where there's room for
- * one. It runs at once, or, with `choices`, opens a list to pick one from
+ * An entry in an Actions menu, e.g. a ⋯ one, also shown as an icon button
+ * where there's room for one. It runs at once, or, with `choices`, opens a list to pick one from
  * in the menu, e.g. which Section to add to; such an entry shows only in ⋯.
  */
 export type MenuAction = {

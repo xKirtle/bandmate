@@ -1,18 +1,22 @@
 <script lang="ts">
   import { tick, type Snippet } from 'svelte';
   import { menuKey, type MenuAction, type MenuChoice } from './menu';
-  import { popoverTop } from './popover';
+  import { popoverLeft, popoverTop } from './popover';
 
   let {
     entries,
     label = 'More actions',
+    text,
     trigger,
     align = 'end',
     disabled = false,
   }: {
-    entries: MenuAction[];
+    /** What it offers: actions, or, for a menu that's a list to pick from, just the choices. */
+    entries: (MenuAction | MenuChoice)[];
     /** Names the trigger to screen readers, e.g. to tell apart several on one page. */
     label?: string;
+    /** What the trigger says, as a button, in place of ⋯, e.g. "Put back…". */
+    text?: string;
     /** What opens the menu, in place of ⋯, e.g. the Cover. */
     trigger?: Snippet;
     /** Which of the trigger's edges the menu lines up with: its end, or, near the page's start, its start. */
@@ -47,15 +51,16 @@
     all[focus === 'first' ? 0 : all.length - 1]?.focus();
   }
 
-  // Under ⋯, or over it when there's no room below: again as what it shows
-  // changes height.
+  // Under ⋯, or over it when there's no room below, and inside the window:
+  // again as what it shows changes size.
   function place() {
     if (!menu) return;
     const at = triggerButton.getBoundingClientRect();
-    const { height } = menu.getBoundingClientRect();
+    // Measured at the window's left, where nothing squeezes it.
+    menu.style.left = '0px';
+    const { width, height } = menu.getBoundingClientRect();
     menu.style.top = `${popoverTop(at, height, window.innerHeight, gap)}px`;
-    if (align === 'start') menu.style.left = `${at.left}px`;
-    else menu.style.right = `${document.documentElement.clientWidth - at.right}px`;
+    menu.style.left = `${popoverLeft(at, width, document.documentElement.clientWidth, gap, align)}px`;
   }
 
   function close() {
@@ -121,7 +126,7 @@
 <div class="menu-root" bind:this={root}>
   <button
     type="button"
-    class={trigger ? 'bare' : 'icon'}
+    class={trigger ? 'bare' : text ? 'button' : 'icon'}
     bind:this={triggerButton}
     aria-label={label}
     title={label}
@@ -131,7 +136,7 @@
     onclick={() => (open ? close() : show())}
     onkeydown={onTriggerKey}
   >
-    {#if trigger}{@render trigger()}{:else}⋯{/if}
+    {#if trigger}{@render trigger()}{:else if text}{text}{:else}⋯{/if}
   </button>
   {#if open}
     <div
@@ -154,7 +159,8 @@
           </button>
         {/each}
       {:else}
-        {#each entries as entry (entry.label)}
+        <!-- By place: a list of Sections can name two alike. -->
+        {#each entries as entry, i (i)}
           <button
             type="button"
             role="menuitem"
@@ -162,7 +168,9 @@
             aria-haspopup={'choices' in entry ? 'menu' : undefined}
             onclick={() => choose(entry)}
           >
-            <span class="glyph" aria-hidden="true">{entry.icon}</span>
+            {#if 'icon' in entry}
+              <span class="glyph" aria-hidden="true">{entry.icon}</span>
+            {/if}
             {entry.label}
           </button>
         {/each}
