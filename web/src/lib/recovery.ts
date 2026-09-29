@@ -4,8 +4,8 @@
 // into its Clip for a Retake, in step with the Takes already there even if
 // the Clip moved, or at its Clip's start for a new Take. Where that's no
 // longer possible, it's appended to its Track, or to the chosen Track once
-// its own is gone, what it captured staying in step with where its Clip
-// starts.
+// its own is gone (where it was recorded, if that Track is empty), what it
+// captured staying in step with where its Clip starts.
 import type { Take } from './api';
 import { recordingPlan, sungPastStart, type RecordingPlan } from './recording';
 import type { Placed } from './schedule';
@@ -80,6 +80,6 @@ export function recoveredPlacement(
     if (free) return { target: { trackId: own.id, start: plan.start }, captureStart: plan.from };
   }
   const track = own ?? tracks.find((t) => t.id === chosen) ?? tracks.at(-1);
-  const start = track ? recordingPlan(track.clips).start : 0;
+  const start = track ? recordingPlan(track.clips, plan.start).start : 0;
   return { target: track ? { trackId: track.id, start } : null, captureStart: shifted(start - plan.start) };
 }

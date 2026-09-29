@@ -1,6 +1,7 @@
 // Where a recording goes on the chosen Track, and where playback and
-// capture start for it. The playhead never decides: a Take always goes at
-// the Track's append point, so it never lands on an older one. A Retake
+// capture start for it. On a Track with Clips the playhead doesn't decide: a
+// Take goes at the Track's append point, so it never lands on an older one.
+// On an empty Track it goes at the playhead, even past the end. A Retake
 // goes into its Clip instead, from the Clip's start as trimmed, and grows
 // it, but never into the next Clip.
 import type { Placed } from './schedule';
@@ -10,7 +11,7 @@ export const leadIn = 2;
 
 /** Where a recording goes, and where playing and capturing start for it, in seconds. */
 export interface RecordingPlan {
-  /** Where the Take's Clip starts: the append point. */
+  /** Where the Take's Clip starts: the append point, or the playhead on an empty Track. */
   start: number;
   /** Where playback and capture start: leadIn before, but never before 0:00. */
   from: number;
@@ -18,10 +19,10 @@ export interface RecordingPlan {
 
 /**
  * Plans a recording on a Track holding clips: its Take goes where the last
- * of them ends, or at 0:00 on an empty Track.
+ * of them ends, or at the playhead on an empty Track.
  */
-export function recordingPlan(clips: readonly Placed[]): RecordingPlan {
-  const start = clips.reduce((end, c) => Math.max(end, c.start + c.length), 0);
+export function recordingPlan(clips: readonly Placed[], playhead: number): RecordingPlan {
+  const start = clips.length ? Math.max(...clips.map((c) => c.start + c.length)) : playhead;
   return { start, from: Math.max(0, start - leadIn) };
 }
 
