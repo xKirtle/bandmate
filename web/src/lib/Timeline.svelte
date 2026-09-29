@@ -333,24 +333,38 @@
     setLevels(track, { volume: Number((event.currentTarget as HTMLInputElement).value) });
   }
 
-  async function rename(track: Track, event: Event) {
-    const input = event.currentTarget as HTMLInputElement;
-    const name = input.value.trim();
-    if (name === track.name) {
-      input.value = name;
-      return;
-    }
-    // A Track needs a name, so a blank one goes back to what it was.
-    if (!name || !(await perform({ kind: 'updateTrack', trackId: track.id, changes: { name } }))) input.value = track.name;
+  // A Track's name shows as a button that chooses it; its pencil swaps it
+  // for a field to rename it in. Until a new name is saved, it's shown.
+  let renaming = $state<number | null>(null);
+  let naming = $state<Record<number, string>>({});
+
+  function focusField(input: HTMLInputElement) {
+    input.focus();
+    input.select();
+  }
+
+  /** Stops renaming a Track, saving the name typed unless asked not to. */
+  function endRename(track: Track, input: HTMLInputElement, save: boolean) {
+    if (renaming !== track.id) return;
+    renaming = null;
+    if (save) rename(track, input.value.trim());
+  }
+
+  async function rename(track: Track, name: string) {
+    // A Track needs a name, so a blank one leaves it as it was.
+    if (!name || name === track.name) return;
+    naming[track.id] = name;
+    // If it fails, the name goes back to how it's saved.
+    await perform({ kind: 'updateTrack', trackId: track.id, changes: { name } });
+    if (naming[track.id] === name) delete naming[track.id];
   }
 
   function nameKey(track: Track, event: KeyboardEvent) {
-    const input = event.currentTarget as HTMLInputElement;
-    if (event.key === 'Enter') input.blur();
-    else if (event.key === 'Escape') {
-      input.value = track.name;
-      input.blur();
-    }
+    if (event.key !== 'Enter' && event.key !== 'Escape') return;
+    event.preventDefault();
+    endRename(track, event.currentTarget as HTMLInputElement, event.key === 'Enter');
+    // Back to the pencil, where renaming started.
+    tick().then(() => document.getElementById(`rename-track-${track.id}`)?.focus());
   }
 
   /** Moves a Track up or down by one, with its Clips. */
@@ -1322,15 +1336,39 @@
               onclick={(e) => headClick(e, track)}
             >
               <div class="head-row">
-                {#if editable.current}
+                {#if editable.current && renaming === track.id}
                   <input
                     class="name"
-                    value={track.name}
+                    value={naming[track.id] ?? track.name}
                     aria-label="Name of Track {track.name}"
-                    onchange={(e) => rename(track, e)}
                     onkeydown={(e) => nameKey(track, e)}
+                    onblur={(e) => endRename(track, e.currentTarget, true)}
+                    {@attach focusField}
                   />
+                {:else}
+                  <button
+                    type="button"
+                    class="name"
+                    aria-label="Choose {track.name}"
+                    onclick={() => choose({ kind: 'choose', trackId: track.id })}
+                    ondblclick={() => editable.current && (renaming = track.id)}>{naming[track.id] ?? track.name}</button
+                  >
+                {/if}
+                {#if editable.current}
                   <span class="track-actions">
+                    <button
+                      type="button"
+                      id="rename-track-{track.id}"
+                      class="rename"
+                      onclick={() => (renaming = track.id)}
+                      aria-label="Rename {track.name}"
+                      title="Rename"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 20h4L19 9l-4-4L4 16z" />
+                        <path d="M13.5 6.5l4 4" />
+                      </svg>
+                    </button>
                     <button
                       type="button"
                       onclick={() => shift(i, -1)}
@@ -1352,8 +1390,6 @@
                       title="Delete the Track and its Clips">×</button
                     >
                   </span>
-                {:else}
-                  <span class="name">{track.name}</span>
                 {/if}
               </div>
               <div class="head-row">
@@ -1749,8 +1785,15 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  input.name:hover,
-  input.name:focus {
+  button.name {
+    text-align: left;
+    cursor: pointer;
+  }
+  button.name:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+  input.name {
     border-color: var(--border);
   }
   .track-actions {
@@ -1768,6 +1811,16 @@
   .track-actions button:hover:not(:disabled),
   .track-actions button:focus-visible {
     color: var(--accent);
+  }
+  .rename svg {
+    width: calc(0.8125 * var(--timeline-rem));
+    height: calc(0.8125 * var(--timeline-rem));
+    vertical-align: -0.125em;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
   .track-actions button:disabled {
     opacity: 0.35;
