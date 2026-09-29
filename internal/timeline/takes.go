@@ -476,6 +476,40 @@ func keepTakes(ctx context.Context, tx *sql.Tx, songID, clipID int64, p placemen
 	return place(ctx, tx, clipID, p)
 }
 
+// SweepDetachedTakes removes the Takes detached before a time, of every
+// Song, with their files. Undo can only bring a Take back within the session
+// it was detached in, so one detached long enough ago is gone for good.
+func (s *Store) SweepDetachedTakes(ctx context.Context, before time.Time) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var ids []int64
+	err = query(ctx, tx, `SELECT id FROM takes WHERE clip_id IS NULL AND detached_at < ?`,
+		[]any{before.UTC().Format(timeFormat)}, func(rows *sql.Rows) error {
+			var id int64
+			if err := rows.Scan(&id); err != nil {
+				return err
+			}
+			ids = append(ids, id)
+			return nil
+		})
+	if err != nil {
+		return fmt.Errorf("listing detached takes: %w", err)
+	}
+	for _, id := range ids {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM takes WHERE id = ?`, id); err != nil {
+			return fmt.Errorf("sweeping take: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	s.removeTakeFiles(ids)
+	return nil
+}
+
 // takeColumns are the takes columns scanTake reads, in its order.
 const takeColumns = `id, number, size, duration, sample_rate, latency_offset, position, nudge, recorded_at`
 

@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+	"time"
 
 	"github.com/xKirtle/bandmate/internal/audio"
 	"github.com/xKirtle/bandmate/internal/beats"
@@ -31,7 +32,14 @@ type Config struct {
 	// MaxCoverBytes caps the size of a Cover's pictures, together. Zero
 	// means DefaultMaxCoverBytes.
 	MaxCoverBytes int64
+	// Now tells the time at startup, when Takes detached for more than
+	// DetachedTakesKept are removed. Nil means time.Now.
+	Now func() time.Time
 }
+
+// DetachedTakesKept is how long a Take is kept once detached, well past
+// the session its undo history lasts for.
+const DetachedTakesKept = 24 * time.Hour
 
 // DefaultMaxUploadBytes is the upload cap unless configured otherwise.
 const DefaultMaxUploadBytes = 500 << 20
@@ -106,6 +114,14 @@ func New(cfg Config) (*App, error) {
 	}
 	if a.maxCover <= 0 {
 		a.maxCover = DefaultMaxCoverBytes
+	}
+	now := time.Now
+	if cfg.Now != nil {
+		now = cfg.Now
+	}
+	if err := a.timelines.SweepDetachedTakes(context.Background(), now().Add(-DetachedTakesKept)); err != nil {
+		conn.Close()
+		return nil, err
 	}
 	a.handler = a.routes()
 	return a, nil
