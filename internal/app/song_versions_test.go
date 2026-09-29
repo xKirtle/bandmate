@@ -42,7 +42,7 @@ var versionedWrites = []versionedWrite{
 	}},
 	{"line cue", func(ts *testServer, s song, v int64) response {
 		return ts.DoAt(v, http.MethodPut,
-			lineCuePath(s.ID, s.Arrangement[0].ID, s.Sections[0].Alternates[0].Lines[0].ID), map[string]any{"cue": 3})
+			lineCuePath(s.ID, s.Sections[0].Alternates[0].Lines[0].ID), map[string]any{"cue": 3})
 	}},
 }
 

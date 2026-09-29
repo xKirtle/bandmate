@@ -23,17 +23,15 @@
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
   const scrapbook = $derived(song.scrapbook.flatMap((id) => sections.get(id) ?? []));
-  // Where a Section can be put back: at the start, or after any Occurrence.
+  // The Sections in the Lyric Sheet, in order: the ones a Section can be
+  // added to as Alternates.
+  const inArrangement = $derived(sectionsInArrangement(song, sections));
+  // Where a Section can be put back: at the start, or after any Section in
+  // the Lyric Sheet.
   const places = $derived([
     { position: 0, name: 'At the start' },
-    ...song.arrangement.map((o, i) => ({
-      position: i + 1,
-      name: `After ${i + 1}. ${describe(sections.get(o.sectionId)!)}`,
-    })),
+    ...inArrangement.map((s, i) => ({ position: i + 1, name: `After ${i + 1}. ${describe(s)}` })),
   ]);
-  // The Sections a Section can be added to as Alternates: each in the Lyric
-  // Sheet once, however many Occurrences share it.
-  const inArrangement = $derived(sectionsInArrangement(song, sections));
   // The Section just added, whose Label gets focus.
   let added = $state<number | null>(null);
   // The one Section shown in full, in its editor; the rest show as cards.
@@ -86,7 +84,7 @@
   function putBack(sectionId: number, e: Event & { currentTarget: HTMLSelectElement }) {
     const [kind, value] = e.currentTarget.value.split(':');
     e.currentTarget.value = '';
-    if (kind === 'at') change((at) => api.addOccurrence(at, sectionId, Number(value))).then(closed(sectionId));
+    if (kind === 'at') change((at) => api.addToArrangement(at, sectionId, Number(value))).then(closed(sectionId));
     if (kind === 'to') addTo(sectionId, Number(value));
   }
 
@@ -104,11 +102,11 @@
   function dropSection(drop: Drop) {
     if ('putBack' in drop) {
       const section = drop.putBack;
-      change((at) => api.addOccurrence(at, section, drop.gap)).then(closed(section));
+      change((at) => api.addToArrangement(at, section, drop.gap)).then(closed(section));
     } else if ('addTo' in drop) {
-      const { section, occurrenceAt } = drop.addTo;
-      const target = song.arrangement[occurrenceAt];
-      if (target) addTo(section, target.sectionId);
+      const { section, arrangementAt } = drop.addTo;
+      const target = song.arrangement[arrangementAt];
+      if (target !== undefined) addTo(section, target);
     }
   }
 
@@ -142,7 +140,6 @@
         <li class:dragged={drag.section === section.id}>
           {#if open === section.id}
             <SectionEditor
-              uid="s{section.id}"
               {section}
               autofocus={added === section.id}
               {change}

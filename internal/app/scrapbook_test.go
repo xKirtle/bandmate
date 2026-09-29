@@ -24,13 +24,13 @@ func sectionPath(songID, sectionID int64) string {
 	return fmt.Sprintf("/api/songs/%d/sections/%d", songID, sectionID)
 }
 
-func TestRemovingASectionsLastOccurrenceMovesItToTheScrapbook(t *testing.T) {
+func TestTakingASectionOutOfTheArrangementMovesItToTheScrapbook(t *testing.T) {
 	ts := newTestServer(t)
 	before := ts.songWithSections("Verse", "Chorus")
 	chorus := before.Sections[1]
 	before = ts.setText(before.ID, chorus.Alternates[0].ID, "Drive, [Am]drive")
 
-	got := ts.lyricSheetChange(http.MethodDelete, occurrencePath(before.ID, before.Arrangement[1].ID), nil)
+	got := ts.lyricSheetChange(http.MethodDelete, sectionInArrangementPath(before.ID, before.Arrangement[1]), nil)
 
 	if want := []string{"Verse"}; !reflect.DeepEqual(arrangementLabels(got), want) {
 		t.Errorf("arrangement = %q, want %q", arrangementLabels(got), want)
@@ -52,16 +52,16 @@ func TestRemovingADuplicateSendsItToTheScrapbookAndLeavesTheOriginal(t *testing.
 	original := before.Arrangement[0]
 	duplicate := before.Arrangement[2]
 
-	got := ts.lyricSheetChange(http.MethodDelete, occurrencePath(before.ID, duplicate.ID), nil)
+	got := ts.lyricSheetChange(http.MethodDelete, sectionInArrangementPath(before.ID, duplicate), nil)
 
-	if want := []int64{duplicate.SectionID}; !reflect.DeepEqual(got.Scrapbook, want) {
+	if want := []int64{duplicate}; !reflect.DeepEqual(got.Scrapbook, want) {
 		t.Errorf("scrapbook = %v, want the Duplicate %v", got.Scrapbook, want)
 	}
 	if want := []string{"Chorus", "Verse", "Chorus"}; !reflect.DeepEqual(arrangementLabels(got), want) {
 		t.Errorf("arrangement = %q, want %q", arrangementLabels(got), want)
 	}
-	if got.Arrangement[0].SectionID != original.SectionID {
-		t.Errorf("first occurrence shows section %d, want the original %d", got.Arrangement[0].SectionID, original.SectionID)
+	if got.Arrangement[0] != original {
+		t.Errorf("first section = %d, want the original %d", got.Arrangement[0], original)
 	}
 }
 
@@ -115,7 +115,7 @@ func TestAScrapbookSectionCanBeMovedBackIntoTheArrangementAtAPosition(t *testing
 	s = ts.addToScrapbook(s.ID, "Bridge")
 	bridge := s.Sections[2]
 
-	got := ts.addOccurrence(s.ID, bridge.ID, map[string]any{"position": 1})
+	got := ts.putBack(s.ID, bridge.ID, map[string]any{"position": 1})
 
 	if want := []string{"Verse", "Bridge", "Chorus"}; !reflect.DeepEqual(arrangementLabels(got), want) {
 		t.Errorf("arrangement = %q, want %q", arrangementLabels(got), want)
@@ -162,7 +162,7 @@ func TestDeletingASectionStillInTheArrangementIsRejected(t *testing.T) {
 	ts := newTestServer(t)
 	before := ts.duplicatedChorus()
 
-	res := ts.Do(http.MethodDelete, sectionPath(before.ID, before.Arrangement[0].SectionID), nil)
+	res := ts.Do(http.MethodDelete, sectionPath(before.ID, before.Arrangement[0]), nil)
 
 	expectError(t, res, http.StatusConflict,
 		"only a Section in the Scrapbook can be deleted; remove it from the Arrangement first")
@@ -220,13 +220,13 @@ func expectSectionDeleted(t *testing.T, s song, sectionID int64) {
 	}
 }
 
-func TestRemovingTheOnlyOccurrenceOfASectionWithNoLinesDeletesIt(t *testing.T) {
+func TestTakingOutASectionWithNoLinesDeletesIt(t *testing.T) {
 	ts := newTestServer(t)
 	before := ts.songWithSections("Verse", "Chorus")
 	before = ts.setText(before.ID, before.Sections[0].Alternates[0].ID, "Down the [G]road")
 	chorus := before.Sections[1]
 
-	got := ts.lyricSheetChange(http.MethodDelete, occurrencePath(before.ID, before.Arrangement[1].ID), nil)
+	got := ts.lyricSheetChange(http.MethodDelete, sectionInArrangementPath(before.ID, before.Arrangement[1]), nil)
 
 	expectSectionDeleted(t, got, chorus.ID)
 	if want := before.Sections[:1]; !reflect.DeepEqual(got.Sections, want) {
@@ -247,11 +247,11 @@ func TestRemovingTheOnlyOccurrenceOfASectionWithNoLinesDeletesIt(t *testing.T) {
 	bridge := s.Sections[1]
 	ts.setText(s.ID, bridge.Alternates[0].ID, "gone")
 	s = ts.setText(s.ID, bridge.Alternates[0].ID, "  \n\t\n")
-	got = ts.lyricSheetChange(http.MethodDelete, occurrencePath(s.ID, s.Arrangement[1].ID), nil)
+	got = ts.lyricSheetChange(http.MethodDelete, sectionInArrangementPath(s.ID, s.Arrangement[1]), nil)
 	expectSectionDeleted(t, got, bridge.ID)
 }
 
-func TestRemovingTheOnlyOccurrenceOfASectionOfBlankLinesDeletesIt(t *testing.T) {
+func TestTakingOutASectionOfBlankLinesDeletesIt(t *testing.T) {
 	ts := newTestServer(t)
 	s, chorus := ts.chorusWithTwoAlternates()
 	for _, alt := range chorus.Alternates {
@@ -260,7 +260,7 @@ func TestRemovingTheOnlyOccurrenceOfASectionOfBlankLinesDeletesIt(t *testing.T) 
 	}
 	s = ts.getSong(s.ID)
 
-	got := ts.lyricSheetChange(http.MethodDelete, occurrencePath(s.ID, s.Arrangement[1].ID), nil)
+	got := ts.lyricSheetChange(http.MethodDelete, sectionInArrangementPath(s.ID, s.Arrangement[1]), nil)
 
 	expectSectionDeleted(t, got, chorus.ID)
 	if read := ts.getSong(s.ID); !reflect.DeepEqual(read, got) {
@@ -274,7 +274,7 @@ func TestASectionOfOnlyAChordLineGoesToTheScrapbook(t *testing.T) {
 	intro := s.Sections[1]
 	s = ts.setText(s.ID, intro.Alternates[0].ID, "[G] [C] [D]")
 
-	got := ts.lyricSheetChange(http.MethodDelete, occurrencePath(s.ID, s.Arrangement[1].ID), nil)
+	got := ts.lyricSheetChange(http.MethodDelete, sectionInArrangementPath(s.ID, s.Arrangement[1]), nil)
 
 	if want := []int64{intro.ID}; !reflect.DeepEqual(got.Scrapbook, want) {
 		t.Errorf("scrapbook = %v, want %v", got.Scrapbook, want)
@@ -289,7 +289,7 @@ func TestASectionWithLinesOnlyInAnInactiveAlternateGoesToTheScrapbook(t *testing
 	s, chorus := ts.chorusWithTwoAlternates()
 	s = ts.setText(s.ID, chorus.Alternates[0].ID, "")
 
-	got := ts.lyricSheetChange(http.MethodDelete, occurrencePath(s.ID, s.Arrangement[1].ID), nil)
+	got := ts.lyricSheetChange(http.MethodDelete, sectionInArrangementPath(s.ID, s.Arrangement[1]), nil)
 
 	if want := []int64{chorus.ID}; !reflect.DeepEqual(got.Scrapbook, want) {
 		t.Errorf("scrapbook = %v, want %v", got.Scrapbook, want)
@@ -306,7 +306,7 @@ func TestAnEmptySectionMadeInTheScrapbookStaysThere(t *testing.T) {
 	idea := s.Sections[2]
 
 	// Another empty Section leaving the Arrangement doesn't take it along.
-	got := ts.lyricSheetChange(http.MethodDelete, occurrencePath(s.ID, s.Arrangement[1].ID), nil)
+	got := ts.lyricSheetChange(http.MethodDelete, sectionInArrangementPath(s.ID, s.Arrangement[1]), nil)
 
 	if want := []int64{idea.ID}; !reflect.DeepEqual(got.Scrapbook, want) {
 		t.Errorf("scrapbook = %v, want %v", got.Scrapbook, want)
@@ -324,7 +324,7 @@ func TestASectionTakenOutOfTheArrangementGoesToTheEndOfTheScrapbook(t *testing.T
 	s = ts.addToScrapbook(s.ID, "Idea")
 	idea := s.Sections[2]
 
-	got := ts.lyricSheetChange(http.MethodDelete, occurrencePath(s.ID, s.Arrangement[0].ID), nil)
+	got := ts.lyricSheetChange(http.MethodDelete, sectionInArrangementPath(s.ID, s.Arrangement[0]), nil)
 
 	if want := []int64{idea.ID, verse.ID}; !reflect.DeepEqual(got.Scrapbook, want) {
 		t.Errorf("scrapbook = %v, want the Verse after the Idea already there %v", got.Scrapbook, want)
@@ -340,12 +340,7 @@ func TestASectionTakenOutOfTheArrangementGoesToTheEndOfTheScrapbook(t *testing.T
 	}
 }
 
-// occurrenceToScrapbookPath is where an Occurrence is moved to the Scrapbook.
-func occurrenceToScrapbookPath(songID, occurrenceID int64) string {
-	return occurrencePath(songID, occurrenceID) + "/scrapbook"
-}
-
-func TestMovingAnOccurrenceToTheScrapbookMovesItsSectionToTheEnd(t *testing.T) {
+func TestASectionTakenOutGoesToTheEndOfTheScrapbook(t *testing.T) {
 	ts := newTestServer(t)
 	s := ts.songWithSections("Verse", "Chorus")
 	verse := s.Sections[0]
@@ -353,7 +348,7 @@ func TestMovingAnOccurrenceToTheScrapbookMovesItsSectionToTheEnd(t *testing.T) {
 	s = ts.addToScrapbook(s.ID, "Idea")
 	idea := s.Sections[2]
 
-	got := ts.lyricSheetChange(http.MethodPost, occurrenceToScrapbookPath(s.ID, s.Arrangement[0].ID), nil)
+	got := ts.lyricSheetChange(http.MethodDelete, sectionInArrangementPath(s.ID, s.Arrangement[0]), nil)
 
 	if want := []string{"Chorus"}; !reflect.DeepEqual(arrangementLabels(got), want) {
 		t.Errorf("arrangement = %q, want %q", arrangementLabels(got), want)
@@ -377,7 +372,7 @@ func TestMovingADuplicateToTheScrapbookMovesItAndLeavesTheOriginal(t *testing.T)
 	original := sectionOf(t, before, before.Arrangement[0])
 	duplicate := sectionOf(t, before, before.Arrangement[3])
 
-	got := ts.lyricSheetChange(http.MethodPost, occurrenceToScrapbookPath(before.ID, before.Arrangement[3].ID), nil)
+	got := ts.lyricSheetChange(http.MethodDelete, sectionInArrangementPath(before.ID, before.Arrangement[3]), nil)
 
 	if want := before.Arrangement[:3]; !reflect.DeepEqual(got.Arrangement, want) {
 		t.Errorf("arrangement = %+v, want the others untouched %+v", got.Arrangement, want)
@@ -393,12 +388,12 @@ func TestMovingADuplicateToTheScrapbookMovesItAndLeavesTheOriginal(t *testing.T)
 	}
 }
 
-func TestMovingAnOccurrenceOfAnEmptySectionToTheScrapbookDeletesIt(t *testing.T) {
+func TestTakingOutAnEmptySectionDeletesItRatherThanKeepIt(t *testing.T) {
 	ts := newTestServer(t)
 	s := ts.songWithSections("Verse", "Chorus")
 	verse := s.Sections[0]
 
-	got := ts.lyricSheetChange(http.MethodPost, occurrenceToScrapbookPath(s.ID, s.Arrangement[0].ID), nil)
+	got := ts.lyricSheetChange(http.MethodDelete, sectionInArrangementPath(s.ID, s.Arrangement[0]), nil)
 
 	expectSectionDeleted(t, got, verse.ID)
 	if want := []string{"Chorus"}; !reflect.DeepEqual(arrangementLabels(got), want) {
@@ -406,12 +401,16 @@ func TestMovingAnOccurrenceOfAnEmptySectionToTheScrapbookDeletesIt(t *testing.T)
 	}
 }
 
-func TestMovingAnOccurrenceOfAnotherSongToTheScrapbookIsNotFound(t *testing.T) {
+func TestTakingOutASectionThatIsInTheScrapbookIsRefused(t *testing.T) {
 	ts := newTestServer(t)
 	s := ts.songWithSections("Verse")
-	other := ts.createSong("Other")
+	s = ts.addToScrapbook(s.ID, "Idea")
+	before := ts.setText(s.ID, s.Sections[1].Alternates[0].ID, "a loose line")
 
-	res := ts.DoAt(other.Version, http.MethodPost, occurrenceToScrapbookPath(other.ID, s.Arrangement[0].ID), nil)
+	res := ts.Do(http.MethodDelete, sectionInArrangementPath(s.ID, before.Sections[1].ID), nil)
 
-	expectStatus(t, res, http.StatusNotFound)
+	expectError(t, res, http.StatusConflict, "that Section isn't in the Lyric Sheet")
+	if got := ts.getSong(s.ID); !reflect.DeepEqual(got, before) {
+		t.Errorf("song after refused removal = %+v, want it unchanged %+v", got, before)
+	}
 }

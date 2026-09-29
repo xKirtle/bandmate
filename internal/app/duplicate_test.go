@@ -10,15 +10,26 @@ import (
 // A Section appears at most once in the Arrangement (ADR 0010): a chorus
 // sung twice is a Section and its Duplicate, an independent copy.
 
-// addOccurrence puts a Section into the Arrangement and returns the Song.
-// body may set "position".
-func (ts *testServer) addOccurrence(songID, sectionID int64, body map[string]any) song {
+// arrangementPath is where a Song's Arrangement lives.
+func arrangementPath(songID int64) string {
+	return fmt.Sprintf("/api/songs/%d/arrangement", songID)
+}
+
+// sectionInArrangementPath is where a Section in a Song's Arrangement is
+// taken out of it.
+func sectionInArrangementPath(songID, sectionID int64) string {
+	return fmt.Sprintf("%s/%d", arrangementPath(songID), sectionID)
+}
+
+// putBack puts a Scrapbook Section into the Arrangement and returns the
+// Song. body may set "position".
+func (ts *testServer) putBack(songID, sectionID int64, body map[string]any) song {
 	ts.t.Helper()
 	if body == nil {
 		body = map[string]any{}
 	}
 	body["sectionId"] = sectionID
-	return ts.lyricSheetChange(http.MethodPost, fmt.Sprintf("/api/songs/%d/occurrences", songID), body)
+	return ts.lyricSheetChange(http.MethodPost, arrangementPath(songID), body)
 }
 
 // duplicatePath is where a Section is Duplicated.
@@ -33,15 +44,15 @@ func (ts *testServer) duplicate(songID, sectionID int64, body map[string]any) so
 	return ts.lyricSheetChange(http.MethodPost, duplicatePath(songID, sectionID), body)
 }
 
-// sectionOf returns the Section an Occurrence shows.
-func sectionOf(t *testing.T, s song, o occurrence) section {
+// sectionOf returns the Section with an id, e.g. one in the Arrangement.
+func sectionOf(t *testing.T, s song, id int64) section {
 	t.Helper()
 	for _, sec := range s.Sections {
-		if sec.ID == o.SectionID {
+		if sec.ID == id {
 			return sec
 		}
 	}
-	t.Fatalf("occurrence %d points at unknown section %d", o.ID, o.SectionID)
+	t.Fatalf("arrangement lists unknown section %d", id)
 	return section{}
 }
 
@@ -56,13 +67,13 @@ func activeLines(sec section) []string {
 }
 
 // withoutIDs is a Section's content: its Label, and its Alternates' names,
-// active flags and Lines, with every id left out.
+// active flags and Lines, with every id and Cue left out.
 func withoutIDs(sec section) section {
 	out := section{Label: sec.Label, Alternates: []alternate{}}
 	for _, a := range sec.Alternates {
 		lines := []line{}
 		for _, l := range a.Lines {
-			l.ID = 0
+			l.ID, l.Cue = 0, nil
 			lines = append(lines, l)
 		}
 		out.Alternates = append(out.Alternates, alternate{Name: a.Name, Active: a.Active, Lines: lines})
@@ -116,8 +127,8 @@ func (ts *testServer) cuedChorusWithTwoAlternates() song {
 	darker := s.Sections[0].Alternates[1]
 	s = ts.setText(s.ID, darker.ID, "Drive, [Dm]drive\nall [Bb]night\nlonger")
 	first := s.Sections[0].Alternates[0]
-	ts.setLineCue(s.ID, s.Arrangement[0].ID, first.Lines[0].ID, 4)
-	return ts.setLineCue(s.ID, s.Arrangement[0].ID, s.Sections[0].Alternates[1].Lines[2].ID, 12)
+	ts.setLineCue(s.ID, first.Lines[0].ID, 4)
+	return ts.setLineCue(s.ID, s.Sections[0].Alternates[1].Lines[2].ID, 12)
 }
 
 func TestDuplicatingASectionAddsAnIndependentCopyBelowIt(t *testing.T) {
@@ -137,14 +148,11 @@ func TestDuplicatingASectionAddsAnIndependentCopyBelowIt(t *testing.T) {
 	if sharesIDs(copied, chorus) {
 		t.Errorf("duplicate %+v shares a Section, Alternate or Line with the original %+v", copied, chorus)
 	}
-	if len(got.Arrangement[1].LineCues) != 0 {
-		t.Errorf("duplicate lineCues = %v, want none", got.Arrangement[1].LineCues)
-	}
-	if !reflect.DeepEqual(got.Arrangement[0], before.Arrangement[0]) {
-		t.Errorf("original occurrence = %+v, want it unchanged, Cues and all: %+v", got.Arrangement[0], before.Arrangement[0])
+	if cues := cuesOf(copied); len(cues) != 0 {
+		t.Errorf("duplicate cues = %v, want none", cues)
 	}
 	if !reflect.DeepEqual(sectionOf(t, got, got.Arrangement[0]), chorus) {
-		t.Errorf("original = %+v, want it unchanged %+v", sectionOf(t, got, got.Arrangement[0]), chorus)
+		t.Errorf("original = %+v, want it unchanged, Cues and all: %+v", sectionOf(t, got, got.Arrangement[0]), chorus)
 	}
 	if len(got.Scrapbook) != 0 {
 		t.Errorf("scrapbook = %v, want it empty", got.Scrapbook)
@@ -168,14 +176,15 @@ func TestDuplicatingASectionWithoutAPositionAddsItAtTheEnd(t *testing.T) {
 		t.Fatalf("arrangement = %q, want %q", arrangementLabels(got), want)
 	}
 	last := got.Arrangement[2]
-	if last.SectionID == chorus.ID {
-		t.Fatalf("last occurrence shows the original section %d, want a Duplicate", chorus.ID)
+	if last == chorus.ID {
+		t.Fatalf("last section is the original %d, want a Duplicate", chorus.ID)
 	}
-	if copied := sectionOf(t, got, last); !reflect.DeepEqual(withoutIDs(copied), withoutIDs(chorus)) {
+	copied := sectionOf(t, got, last)
+	if !reflect.DeepEqual(withoutIDs(copied), withoutIDs(chorus)) {
 		t.Errorf("duplicate = %+v, want the same content as %+v", withoutIDs(copied), withoutIDs(chorus))
 	}
-	if len(last.LineCues) != 0 {
-		t.Errorf("duplicate lineCues = %v, want none", last.LineCues)
+	if cues := cuesOf(copied); len(cues) != 0 {
+		t.Errorf("duplicate cues = %v, want none", cues)
 	}
 }
 
@@ -254,7 +263,7 @@ func TestPuttingASectionIntoTheArrangementTwiceIsRefused(t *testing.T) {
 	ts := newTestServer(t)
 	before := ts.songWithSections("Verse", "Chorus")
 
-	res := ts.Do(http.MethodPost, fmt.Sprintf("/api/songs/%d/occurrences", before.ID),
+	res := ts.Do(http.MethodPost, arrangementPath(before.ID),
 		map[string]any{"sectionId": before.Sections[1].ID, "position": 0})
 
 	expectError(t, res, http.StatusConflict, "that Section is already in the Lyric Sheet; Duplicate it instead")
@@ -268,7 +277,7 @@ func TestPuttingAScrapbookSectionBackOutsideTheArrangementIsRejected(t *testing.
 	before := ts.songWithSections("Verse", "Chorus")
 	before = ts.addToScrapbook(before.ID, "Bridge")
 
-	res := ts.Do(http.MethodPost, fmt.Sprintf("/api/songs/%d/occurrences", before.ID),
+	res := ts.Do(http.MethodPost, arrangementPath(before.ID),
 		map[string]any{"sectionId": before.Sections[2].ID, "position": 3})
 
 	expectError(t, res, http.StatusBadRequest, "position must be between 0 and 2")
@@ -282,7 +291,7 @@ func TestPuttingASectionOfAnotherSongIntoTheArrangementIsNotFound(t *testing.T) 
 	other := ts.songWithSections("Elsewhere")
 	before := ts.songWithSections("Verse")
 
-	res := ts.Do(http.MethodPost, fmt.Sprintf("/api/songs/%d/occurrences", before.ID),
+	res := ts.Do(http.MethodPost, arrangementPath(before.ID),
 		map[string]any{"sectionId": other.Sections[0].ID})
 
 	expectStatus(t, res, http.StatusNotFound)
@@ -295,7 +304,7 @@ func TestPuttingASectionIntoTheArrangementWithoutASectionIsRejected(t *testing.T
 	ts := newTestServer(t)
 	before := ts.songWithSections("Verse")
 
-	res := ts.Do(http.MethodPost, fmt.Sprintf("/api/songs/%d/occurrences", before.ID), map[string]any{})
+	res := ts.Do(http.MethodPost, arrangementPath(before.ID), map[string]any{})
 
 	expectError(t, res, http.StatusBadRequest, "sectionId is required")
 	if got := ts.getSong(before.ID); !reflect.DeepEqual(got, before) {
@@ -303,26 +312,12 @@ func TestPuttingASectionIntoTheArrangementWithoutASectionIsRejected(t *testing.T
 	}
 }
 
-func TestTheDetachEndpointIsGone(t *testing.T) {
-	ts := newTestServer(t)
-	s := ts.duplicatedChorus()
-
-	res := ts.Do(http.MethodPost, fmt.Sprintf("/api/songs/%d/occurrences/%d/detach", s.ID, s.Arrangement[3].ID), nil)
-
-	expectStatus(t, res, http.StatusNotFound)
-}
-
-// occurrencePath is where one Occurrence of the Arrangement lives.
-func occurrencePath(songID, occurrenceID int64) string {
-	return fmt.Sprintf("/api/songs/%d/occurrences/%d", songID, occurrenceID)
-}
-
-func TestRemovingAnOccurrenceOfAnotherSongIsNotFound(t *testing.T) {
+func TestTakingOutASectionOfAnotherSongIsNotFound(t *testing.T) {
 	ts := newTestServer(t)
 	other := ts.duplicatedChorus()
 	before := ts.songWithSections("Verse")
 
-	res := ts.Do(http.MethodDelete, occurrencePath(before.ID, other.Arrangement[0].ID), nil)
+	res := ts.Do(http.MethodDelete, sectionInArrangementPath(before.ID, other.Arrangement[0]), nil)
 
 	expectStatus(t, res, http.StatusNotFound)
 	if got := ts.getSong(other.ID); !reflect.DeepEqual(got, other) {

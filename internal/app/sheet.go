@@ -11,10 +11,10 @@ import (
 
 func (a *App) reorderArrangement(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Occurrences []int64 `json:"occurrences"`
+		Sections []int64 `json:"sections"`
 	}
 	a.changeSheet(w, r, &req, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
-		return a.songs.ReorderArrangement(r.Context(), id, based, req.Occurrences)
+		return a.songs.ReorderArrangement(r.Context(), id, based, req.Sections)
 	})
 }
 
@@ -47,7 +47,7 @@ func (a *App) deleteSection(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (a *App) addOccurrence(w http.ResponseWriter, r *http.Request) {
+func (a *App) addToArrangement(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		SectionID *int64 `json:"sectionId"`
 		Position  *int   `json:"position"`
@@ -56,7 +56,7 @@ func (a *App) addOccurrence(w http.ResponseWriter, r *http.Request) {
 		if req.SectionID == nil {
 			return lyricsheet.Song{}, &lyricsheet.InvalidError{Msg: "sectionId is required"}
 		}
-		return a.songs.AddOccurrence(r.Context(), id, based, *req.SectionID, req.Position)
+		return a.songs.AddToArrangement(r.Context(), id, based, *req.SectionID, req.Position)
 	})
 }
 
@@ -73,26 +73,16 @@ func (a *App) duplicateSection(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (a *App) removeOccurrence(w http.ResponseWriter, r *http.Request) {
-	occurrenceID, ok := pathID(w, r, "occurrenceID")
+// removeFromArrangement takes a Section out of the Arrangement, from its
+// actions or dropped on the Scrapbook. It goes to the Scrapbook, or is
+// deleted if nothing is written in it.
+func (a *App) removeFromArrangement(w http.ResponseWriter, r *http.Request) {
+	sectionID, ok := pathID(w, r, "sectionID")
 	if !ok {
 		return
 	}
 	a.changeSheet(w, r, nil, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
-		return a.songs.RemoveOccurrence(r.Context(), id, based, occurrenceID)
-	})
-}
-
-// moveOccurrenceToScrapbook is removeOccurrence: taking a Section out of the
-// Arrangement always sends it to the Scrapbook, or deletes it if nothing is
-// written in it.
-func (a *App) moveOccurrenceToScrapbook(w http.ResponseWriter, r *http.Request) {
-	occurrenceID, ok := pathID(w, r, "occurrenceID")
-	if !ok {
-		return
-	}
-	a.changeSheet(w, r, nil, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
-		return a.songs.RemoveOccurrence(r.Context(), id, based, occurrenceID)
+		return a.songs.RemoveFromArrangement(r.Context(), id, based, sectionID)
 	})
 }
 
@@ -113,10 +103,6 @@ func (a *App) addToSection(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) setLineCue(w http.ResponseWriter, r *http.Request) {
-	occurrenceID, ok := pathID(w, r, "occurrenceID")
-	if !ok {
-		return
-	}
 	lineID, ok := pathID(w, r, "lineID")
 	if !ok {
 		return
@@ -128,31 +114,27 @@ func (a *App) setLineCue(w http.ResponseWriter, r *http.Request) {
 		if req.Cue == nil {
 			return lyricsheet.Song{}, &lyricsheet.InvalidError{Msg: "cue is required"}
 		}
-		return a.songs.SetLineCue(r.Context(), id, based, occurrenceID, lineID, *req.Cue)
+		return a.songs.SetLineCue(r.Context(), id, based, lineID, *req.Cue)
 	})
 }
 
 func (a *App) clearLineCue(w http.ResponseWriter, r *http.Request) {
-	occurrenceID, ok := pathID(w, r, "occurrenceID")
-	if !ok {
-		return
-	}
 	lineID, ok := pathID(w, r, "lineID")
 	if !ok {
 		return
 	}
 	a.changeSheet(w, r, nil, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
-		return a.songs.ClearLineCue(r.Context(), id, based, occurrenceID, lineID)
+		return a.songs.ClearLineCue(r.Context(), id, based, lineID)
 	})
 }
 
-func (a *App) clearOccurrenceCues(w http.ResponseWriter, r *http.Request) {
-	occurrenceID, ok := pathID(w, r, "occurrenceID")
+func (a *App) clearSectionCues(w http.ResponseWriter, r *http.Request) {
+	sectionID, ok := pathID(w, r, "sectionID")
 	if !ok {
 		return
 	}
 	a.changeSheet(w, r, nil, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
-		return a.songs.ClearOccurrenceCues(r.Context(), id, based, occurrenceID)
+		return a.songs.ClearSectionCues(r.Context(), id, based, sectionID)
 	})
 }
 
@@ -167,9 +149,8 @@ func (a *App) clearCues(w http.ResponseWriter, r *http.Request) {
 func (a *App) restoreCues(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Cues *[]struct {
-			OccurrenceID int64    `json:"occurrenceId"`
-			LineID       *int64   `json:"lineId"`
-			Cue          *float64 `json:"cue"`
+			LineID *int64   `json:"lineId"`
+			Cue    *float64 `json:"cue"`
 		} `json:"cues"`
 	}
 	a.changeSheet(w, r, &req, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
@@ -181,7 +162,7 @@ func (a *App) restoreCues(w http.ResponseWriter, r *http.Request) {
 			if c.LineID == nil {
 				return lyricsheet.Song{}, &lyricsheet.InvalidError{Msg: "each Cue needs a lineId"}
 			}
-			values[i] = lyricsheet.CueValue{OccurrenceID: c.OccurrenceID, LineID: *c.LineID, Cue: c.Cue}
+			values[i] = lyricsheet.CueValue{LineID: *c.LineID, Cue: c.Cue}
 		}
 		return a.songs.RestoreCues(r.Context(), id, based, values)
 	})

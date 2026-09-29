@@ -4,26 +4,26 @@
 // into, to what the drop does. A move within the Arrangement saves the
 // same order pressing ↑ or ↓ that many times gives, as those presses would.
 
-/** What's being dragged: an Occurrence, by its place in the Arrangement, or a Scrapbook Section, by its id. */
-export type Dragged = { occurrenceAt: number } | { section: number };
+/** What's being dragged: a Lyric Sheet Section, by its place in the Arrangement, or a Scrapbook Section, by its id. */
+export type Dragged = { arrangementAt: number } | { section: number };
 
 /**
- * Where a drag would drop: a gap in the Arrangement, onto the Occurrence at
- * a place in it, or the Scrapbook.
+ * Where a drag would drop: a gap in the Arrangement, onto the Section at a
+ * place in it, or the Scrapbook.
  */
 export type Target = { gap: number } | { onto: number } | { scrapbook: true };
 
 /**
  * What a drop does, with the gap it shows in if it lands in the Arrangement:
- * an Occurrence moved within it or to the Scrapbook, a Scrapbook Section put
- * back into it, or a Scrapbook Section, by its id, added to the Section of
- * the Occurrence at a place in it.
+ * a Section moved within it or to the Scrapbook, a Scrapbook Section put
+ * back into it, or a Scrapbook Section, by its id, added to the Section at a
+ * place in it.
  */
 export type Drop =
   | { reorder: { from: number; to: number }; gap: number }
   | { toScrapbook: number }
   | { putBack: number; gap: number }
-  | { addTo: { section: number; occurrenceAt: number } };
+  | { addTo: { section: number; arrangementAt: number } };
 
 /** A box on the page, as getBoundingClientRect gives it. */
 export type Box = { left: number; right: number; top: number; bottom: number };
@@ -59,16 +59,16 @@ export function moveTo<T>(order: T[], from: number, to: number): T[] {
  * Where a drag would drop with the pointer at `pointer`: the Scrapbook while
  * it's over it, else the gap in the Arrangement it's at while it's in the
  * Arrangement's column, above or below it too; null anywhere else.
- * `scrapbook` is null without one to drop on. `occurrences` are where each
- * Occurrence runs down the page. With `canDropOnto`, the middle half of an
- * Occurrence drops onto it instead, leaving a quarter at its top and bottom
- * for the gaps either side.
+ * `scrapbook` is null without one to drop on. `sections` are where each
+ * Section in it runs down the page. With `canDropOnto`, the middle half of a
+ * Section drops onto it instead, leaving a quarter at its top and bottom for
+ * the gaps either side.
  */
 export function dropTarget(
   pointer: { x: number; y: number },
   scrapbook: Box | null,
   arrangement: Box,
-  occurrences: Span[],
+  sections: Span[],
   canDropOnto = false,
 ): Target | null {
   const { x, y } = pointer;
@@ -77,23 +77,23 @@ export function dropTarget(
   }
   if (x < arrangement.left || x > arrangement.right) return null;
   if (canDropOnto) {
-    const at = occurrences.findIndex(({ top, bottom }) => {
+    const at = sections.findIndex(({ top, bottom }) => {
       const quarter = (bottom - top) / 4;
       return y > top + quarter && y < bottom - quarter;
     });
     if (at !== -1) return { onto: at };
   }
-  return { gap: dropGap(y, occurrences.map(({ top, bottom }) => (top + bottom) / 2)) };
+  return { gap: dropGap(y, sections.map(({ top, bottom }) => (top + bottom) / 2)) };
 }
 
 /** What dropping `dragged` on `target` does; null if nothing. */
 export function dropFor(dragged: Dragged, target: Target | null): Drop | null {
   if (!target) return null;
-  if ('scrapbook' in target) return 'occurrenceAt' in dragged ? { toScrapbook: dragged.occurrenceAt } : null;
-  if ('onto' in target) return 'section' in dragged ? { addTo: { section: dragged.section, occurrenceAt: target.onto } } : null;
+  if ('scrapbook' in target) return 'arrangementAt' in dragged ? { toScrapbook: dragged.arrangementAt } : null;
+  if ('onto' in target) return 'section' in dragged ? { addTo: { section: dragged.section, arrangementAt: target.onto } } : null;
   const { gap } = target;
   if ('section' in dragged) return { putBack: dragged.section, gap };
-  const from = dragged.occurrenceAt;
+  const from = dragged.arrangementAt;
   const to = targetIndex(from, gap);
   return to === from ? null : { reorder: { from, to }, gap };
 }

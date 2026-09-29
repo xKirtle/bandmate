@@ -376,10 +376,9 @@ func TestAnAlternateMovedToTheScrapbookLeavesItsCuesBehindAndTheOthersKeepTheirs
 	s := ts.duplicatedChorus()
 	drive, night, _, _ := chorusLines(s)
 	_, _, _, lastChords := chorusLinesAt(s, 3)
-	ids := occurrenceIDs(s)
-	ts.setLineCue(s.ID, ids[0], drive, 2)
-	ts.setLineCue(s.ID, ids[0], night, 6)
-	ts.setLineCue(s.ID, ids[3], lastChords, 99)
+	ts.setLineCue(s.ID, drive, 2)
+	ts.setLineCue(s.ID, night, 6)
+	ts.setLineCue(s.ID, lastChords, 99)
 	// The copy carries the Cues, then goes dormant with them.
 	s = ts.addAlternate(s.ID, s.Sections[0].ID, nil)
 	s = ts.activate(s.ID, s.Sections[0].Alternates[0].ID)
@@ -387,14 +386,12 @@ func TestAnAlternateMovedToTheScrapbookLeavesItsCuesBehindAndTheOthersKeepTheirs
 	got := ts.moveToScrapbook(s.ID, s.Sections[0].Alternates[1].ID)
 
 	want := []map[int64]float64{{drive: 2, night: 6}, {}, {}, {lastChords: 99}}
-	for i, o := range got.Arrangement {
-		if !reflect.DeepEqual(o.LineCues, want[i]) {
-			t.Errorf("occurrence %d lineCues = %v, want %v", i, o.LineCues, want[i])
-		}
+	if !reflect.DeepEqual(lineCues(got), want) {
+		t.Errorf("lineCues = %v, want %v", lineCues(got), want)
 	}
 	// Put back, the new Section starts with no Cues.
-	got = ts.addOccurrence(s.ID, got.Scrapbook[0], nil)
-	if cues := got.Arrangement[4].LineCues; len(cues) != 0 {
+	got = ts.putBack(s.ID, got.Scrapbook[0], nil)
+	if cues := lineCues(got)[4]; len(cues) != 0 {
 		t.Errorf("put back lineCues = %v, want none", cues)
 	}
 }
@@ -471,8 +468,8 @@ func TestAScrapbookSectionAddedToASectionJoinsItsAlternatesInactive(t *testing.T
 	s := ts.duplicatedChorus()
 	drive, _, _, _ := chorusLines(s)
 	_, secondNight, _, _ := chorusLinesAt(s, 2)
-	ts.setLineCue(s.ID, s.Arrangement[0].ID, drive, 2)
-	ts.setLineCue(s.ID, s.Arrangement[2].ID, secondNight, 40)
+	ts.setLineCue(s.ID, drive, 2)
+	ts.setLineCue(s.ID, secondNight, 40)
 	before, scrap := ts.scrapWithTwoAlternates(s.ID, "Idea")
 	chorus := before.Sections[0]
 

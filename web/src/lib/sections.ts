@@ -23,13 +23,9 @@ export function alternatesLabel(section: Section): string {
   return `Alternates · ${alternateName(section, active)} · ${section.alternates.indexOf(active) + 1} of ${n}`;
 }
 
-/**
- * The Sections in a Song's Arrangement, once each however many Occurrences
- * share one, in the order they first appear. `sections` holds the Song's
- * Sections by id.
- */
+/** The Sections in a Song's Arrangement, in order. `sections` holds the Song's Sections by id. */
 export function sectionsInArrangement(song: Song, sections: Map<number, Section>): Section[] {
-  return [...new Set(song.arrangement.map((o) => o.sectionId))].flatMap((id) => sections.get(id) ?? []);
+  return song.arrangement.flatMap((id) => sections.get(id) ?? []);
 }
 
 /** How a Section is named where it's shown in full: its Label, if it has one. */

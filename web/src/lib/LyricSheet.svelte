@@ -2,7 +2,7 @@
   import { untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import type { Cueing } from './AlternateText.svelte';
-  import { api, type Line, type Occurrence, type Section, type Song, type SongAt } from './api';
+  import { api, type Line, type Section, type Song, type SongAt } from './api';
   import { hasChords } from './chords';
   import {
     canShiftCuesEarlier,
@@ -17,7 +17,7 @@
     type NextLine,
     type Position,
   } from './cues';
-  import { follower, key } from './follow';
+  import { follower, lineKey } from './follow';
   import { gutterFields } from './gutter';
   import LyricSheetView from './LyricSheetView.svelte';
   import type { MenuAction } from './menu';
@@ -78,24 +78,24 @@
     }
     return { label: 'Move to the Scrapbook', title: 'Move to the Scrapbook: take it out of the Lyric Sheet but keep it' };
   }
-  // An Occurrence's actions after ↑ and ↓, folded into ⋯ on phones.
-  function occurrenceActions(occurrence: Occurrence, section: Section, i: number): MenuAction[] {
+  // A Section's actions after ↑ and ↓, folded into ⋯ on phones.
+  function sectionActions(section: Section, i: number): MenuAction[] {
     const actions: MenuAction[] = [
       { icon: '+', label: 'Add a Section below', run: () => add(i + 1) },
       { icon: '⧉', label: 'Duplicate this Section below', run: () => duplicate(section.id, i + 1) },
     ];
-    if (canCue && hasCues({ arrangement: [occurrence], sections: song.sections })) {
+    if (canCue && hasCues({ arrangement: [section.id], sections: song.sections })) {
       // Doesn't ask first: it can be undone. It clears dormant Cues too.
       actions.push({
         icon: '⌀',
-        label: "Clear this Occurrence's Cues",
-        run: () => editCues((at) => api.clearOccurrenceCues(at, occurrence.id)),
+        label: "Clear this Section's Cues",
+        run: () => editCues((at) => api.clearSectionCues(at, section.id)),
       });
     }
     actions.push({
       icon: '×',
       ...removal(section),
-      run: () => change((at) => api.removeOccurrence(at, occurrence.id)),
+      run: () => change((at) => api.removeFromArrangement(at, section.id)),
     });
     return actions;
   }
@@ -124,20 +124,18 @@
     editCues((at) => api.shiftCues(at, everyCue.start, everyCue.end, by));
   }
 
-  function setLineCue(occurrence: Occurrence, line: Line, cue: number | null) {
-    editCues((at) =>
-      cue === null ? api.clearLineCue(at, occurrence.id, line.id) : api.setLineCue(at, occurrence.id, line.id, cue),
-    );
+  function setLineCue(line: Line, cue: number | null) {
+    editCues((at) => (cue === null ? api.clearLineCue(at, line.id) : api.setLineCue(at, line.id, cue)));
   }
 
-  // In Write mode, each Occurrence's Lines are tracked, to follow playback
-  // to, and each Line's Cue field, to go on to with Enter. Read mode follows
-  // playback in LyricSheetView, and has no Cue fields.
+  // In Write mode, each Line is tracked, to follow playback to, and each
+  // Line's Cue field, to go on to with Enter. Read mode follows playback in
+  // LyricSheetView, and has no Cue fields.
   const { track, follow } = follower();
   const writeFields = gutterFields();
-  /** The Lines of an Occurrence's Section's active Alternate: those whose Cues are in effect. */
-  function activeLines(occurrence: Occurrence | undefined): Line[] {
-    return activeAlternate(sections.get(occurrence?.sectionId ?? -1))?.lines ?? [];
+  /** The Lines of a Section's active Alternate: those whose Cues are in effect. */
+  function activeLines(section: Section | undefined): Line[] {
+    return activeAlternate(section)?.lines ?? [];
   }
   /** Ends a Line's name with its Section's Label, e.g. " of Chorus", as the gutter names Lines. */
   function ofSection(label: string | undefined): string {
@@ -145,47 +143,46 @@
   }
   // The Line Cue fields in order down the page.
   const writeFieldOrder = $derived(
-    song.arrangement.flatMap((o) =>
-      activeLines(o)
+    inArrangement.flatMap((s) =>
+      activeLines(s)
         .filter((l) => !isBlank(l))
-        .map((l) => key(o.id, l.id)),
+        .map((l) => lineKey(l.id)),
     ),
   );
 
   // Cues out of order are marked in the gutter, each naming the Line it's
   // out of order with as the gutter names Lines, e.g. "Line 6 of Chorus".
-  const outOfOrder = $derived(new Map(outOfOrderCues(song).map((c) => [key(c.occurrence, c.line), c])));
+  const outOfOrder = $derived(new Map(outOfOrderCues(song).map((c) => [c.line, c])));
 
-  function lineName({ occurrence, line }: Position): string {
-    const o = song.arrangement.find((o) => o.id === occurrence);
-    const n = activeLines(o).findIndex((l) => l.id === line) + 1;
-    return `Line ${n}${ofSection(sections.get(o?.sectionId ?? -1)?.label)}`;
+  function lineName({ section, line }: Position): string {
+    const s = sections.get(section);
+    const n = activeLines(s).findIndex((l) => l.id === line) + 1;
+    return `Line ${n}${ofSection(s?.label)}`;
   }
 
-  /** How an Occurrence's Cues show on its Section's text box in Write mode. */
-  function cueingFor(occurrence: Occurrence, label: string): Cueing {
+  /** How a Section's Cues show on its text box in Write mode. */
+  function cueingFor(section: Section): Cueing {
     return {
-      cues: occurrence.lineCues,
-      current: current?.occurrence === occurrence.id ? current.line : null,
-      track: (el, line) => track(el, key(occurrence.id, line)),
+      current: current?.line ?? null,
+      track: (el, line) => track(el, lineKey(line)),
       gutter: canCue
         ? {
-            labelSuffix: ofSection(label),
-            save: (line, cue) => setLineCue(occurrence, line, cue),
-            field: (line, field) => writeFields.set(key(occurrence.id, line), field),
-            next: (line) => writeFields.editAfter(writeFieldOrder, key(occurrence.id, line)),
+            labelSuffix: ofSection(section.label),
+            save: setLineCue,
+            field: (line, field) => writeFields.set(lineKey(line), field),
+            next: (line) => writeFields.editAfter(writeFieldOrder, lineKey(line)),
             play: leadInto,
             outOfOrder: (line) => {
-              const mark = outOfOrder.get(key(occurrence.id, line));
+              const mark = outOfOrder.get(line);
               return mark ? outOfOrderReason(mark, lineName) : null;
             },
           }
         : undefined,
       sync: syncing
         ? {
-            next: upNext?.occurrence === occurrence.id ? upNext.line : null,
+            next: upNext?.line ?? null,
             now: cueNext,
-            pick: (line) => (syncFrom = { cued: null, picked: { occurrence: occurrence.id, line } }),
+            pick: (line) => (syncFrom = { cued: null, picked: { section: section.id, line } }),
           }
         : undefined,
     };
@@ -216,7 +213,7 @@
   const current = $derived(playhead === null ? null : currentPosition(song, playhead, upNext));
   // Write mode shows every Line, Chord Lines included, so whatever is
   // current is on screen.
-  const writeKey = $derived(mode === 'write' && current ? key(current.occurrence, current.line) : null);
+  const writeKey = $derived(mode === 'write' && current ? lineKey(current.line) : null);
 
   // The first time Sync mode comes on on this device, a hint says how to use it.
   let hinting = $state(false);
@@ -237,7 +234,7 @@
     const time = playheadAt();
     const from = { cued: line, picked: null };
     syncFrom = from;
-    const saved = await editCues((at) => api.setLineCue(at, line.occurrence, line.line, time));
+    const saved = await editCues((at) => api.setLineCue(at, line.line, time));
     // Failed, the Line is still to cue, unless another has been picked since.
     if (!saved && syncFrom === from) syncFrom = { cued: null, picked: line };
   }
@@ -245,7 +242,7 @@
   // Playback is followed down the Lyric Sheet in Write mode, but in Sync
   // mode it's the Line up next that's kept in view instead: following both
   // would pull the page two ways at once.
-  const followKey = $derived(syncing ? upNext && key(upNext.occurrence, upNext.line) : writeKey);
+  const followKey = $derived(syncing ? upNext && lineKey(upNext.line) : writeKey);
   $effect(() => {
     follow(followKey);
   });
@@ -261,7 +258,7 @@
     cueNext();
   }
 
-  // The Occurrence just added, whose Label gets focus.
+  // The Section just added, whose Label gets focus.
   let added = $state<number | null>(null);
   const songHasChords = $derived(hasChords(song));
   // Follows the server, except while a change to it is being sent.
@@ -280,7 +277,7 @@
 
   async function add(position: number) {
     if (await change((at) => api.addSection(at, { position }))) {
-      added = song.arrangement[position]?.id ?? null;
+      added = song.arrangement[position] ?? null;
     }
   }
 
@@ -295,46 +292,38 @@
   }
 
   function move(index: number, by: -1 | 1) {
-    const order = moveTo(
-      song.arrangement.map((o) => o.id),
-      index,
-      index + by,
-    );
+    const order = moveTo(song.arrangement, index, index + by);
     change((at) => api.reorderArrangement(at, order));
   }
 
   // On desktop, a Section is also dragged by the grip on its header: within
   // the Arrangement, or out of it to the Scrapbook. A drop within it saves
   // the same order as pressing ↑ or ↓ that many times, so Cues go with their
-  // Occurrences.
+  // Sections.
   // The gap the dragged Section would land in, if it moves at all.
   const dropAt = $derived(drag.drop && 'gap' in drag.drop ? drag.drop.gap : null);
-  // The Occurrence whose Section a Scrapbook Section would be added to.
-  const dropOnto = $derived(drag.drop && 'addTo' in drag.drop ? drag.drop.addTo.occurrenceAt : null);
+  // The place in the Arrangement of the Section a Scrapbook Section would be
+  // added to.
+  const dropOnto = $derived(drag.drop && 'addTo' in drag.drop ? drag.drop.addTo.arrangementAt : null);
 
-  function dropOccurrence(drop: Drop) {
+  function dropSection(drop: Drop) {
     if ('reorder' in drop) {
       const { from, to } = drop.reorder;
-      const order = moveTo(
-        song.arrangement.map((o) => o.id),
-        from,
-        to,
-      );
+      const order = moveTo(song.arrangement, from, to);
       change((at) => api.reorderArrangement(at, order));
     } else if ('toScrapbook' in drop) {
       toScrapbook(drop.toScrapbook);
     }
   }
 
-  // Dropped on the Scrapbook, an Occurrence's Section goes to its end, or
-  // isn't kept if nothing is written in it, which a notice says.
+  // Dropped on the Scrapbook, a Section goes to its end, or isn't kept if
+  // nothing is written in it, which a notice says.
   async function toScrapbook(index: number) {
-    const occurrence = song.arrangement[index];
-    const section = occurrence && sections.get(occurrence.sectionId);
+    const section = sections.get(song.arrangement[index]);
     if (!section) return;
     const empty = isEmpty(section);
     const name = describe(section);
-    if ((await change((at) => api.moveOccurrenceToScrapbook(at, occurrence.id))) && empty) {
+    if ((await change((at) => api.removeFromArrangement(at, section.id))) && empty) {
       notice = `Nothing was written in ${name}, so it wasn't kept.`;
     }
   }
@@ -447,24 +436,23 @@
       class:drop-into={dropAt === 0 && song.arrangement.length === 0}
       {@attach drag.placeArrangement}
     >
-      {#each song.arrangement as occurrence, i (occurrence.id)}
-        {@const section = sections.get(occurrence.sectionId)}
+      {#each song.arrangement as sectionId, i (sectionId)}
+        {@const section = sections.get(sectionId)}
         {#if section}
           <li
-            class:dragged={drag.occurrenceAt === i}
+            class:dragged={drag.arrangementAt === i}
             class:drop-above={dropAt === i}
             class:drop-below={dropAt === song.arrangement.length && i === song.arrangement.length - 1}
-            class:drop-onto={dropOnto !== null && song.arrangement[dropOnto]?.sectionId === occurrence.sectionId}
-            {@attach (el) => drag.placeOccurrence(el, i)}
+            class:drop-onto={dropOnto === i}
+            {@attach (el) => drag.placeSection(el, i)}
           >
             <SectionEditor
-              uid="o{occurrence.id}"
               {section}
-              autofocus={added === occurrence.id}
+              autofocus={added === section.id}
               {change}
               {onUnsaved}
-              cueing={cueingFor(occurrence, section.label)}
-              more={occurrenceActions(occurrence, section, i)}
+              cueing={cueingFor(section)}
+              more={sectionActions(section, i)}
             >
               {#snippet grip()}
                 {#if drag.on}
@@ -473,7 +461,7 @@
                     class="grip"
                     aria-hidden="true"
                     title="Drag to move, or onto the Scrapbook; Esc cancels"
-                    {...drag.grip({ occurrenceAt: i }, dropOccurrence)}>⠿</span
+                    {...drag.grip({ arrangementAt: i }, dropSection)}>⠿</span
                   >
                 {/if}
               {/snippet}

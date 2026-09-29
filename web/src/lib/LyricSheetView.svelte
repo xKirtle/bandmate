@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { Occurrence, Song } from './api';
+  import type { Section, Song } from './api';
   import { layoutLine } from './chords';
   import type { Position } from './cues';
-  import { follower, key } from './follow';
+  import { follower, lineKey, sectionKey } from './follow';
   import { activeAlternate, labelOf } from './sections';
 
   let {
@@ -22,24 +22,23 @@
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
   const { track, follow } = follower();
 
-  // The Lines shown for an Occurrence: its active Alternate's, less Chord
-  // Lines while Chords are hidden.
-  function linesOf(occurrence: Occurrence) {
-    const all = activeAlternate(sections.get(occurrence.sectionId))?.lines ?? [];
+  // The Lines shown for a Section: its active Alternate's, less Chord Lines
+  // while Chords are hidden.
+  function linesOf(section: Section | undefined) {
+    const all = activeAlternate(section)?.lines ?? [];
     return { all, lines: all.filter((l) => showChords || !l.chordLine) };
   }
 
-  /** The current Line if it's shown, or null for its whole Section, e.g. a Chord Line while Chords are hidden. */
-  function shownLine(position: Position): number | null {
-    if (showChords) return position.line;
-    const o = song.arrangement.find((o) => o.id === position.occurrence);
-    return o && linesOf(o).lines.some((l) => l.id === position.line) ? position.line : null;
+  /** The key of the current Line if it's shown, or else of its whole Section, e.g. a Chord Line while Chords are hidden. */
+  function shownKey(position: Position): string {
+    const shown = showChords || linesOf(sections.get(position.section)).lines.some((l) => l.id === position.line);
+    return shown ? lineKey(position.line) : sectionKey(position.section);
   }
 
   // Follow playback, unless that would pull the page away from something
   // being typed. Keyed, so it only scrolls once playback moves on, not on
   // every frame.
-  const currentKey = $derived(current && key(current.occurrence, shownLine(current)));
+  const currentKey = $derived(current && shownKey(current));
   $effect(() => {
     follow(currentKey);
   });
@@ -57,17 +56,17 @@
 </script>
 
 <div class="view">
-  {#each song.arrangement as occurrence (occurrence.id)}
-    {@const section = sections.get(occurrence.sectionId)}
+  {#each song.arrangement as sectionId (sectionId)}
+    {@const section = sections.get(sectionId)}
     {#if section}
-      {@const { all, lines } = linesOf(occurrence)}
-      {@const isCurrent = currentKey === key(occurrence.id)}
+      {@const { all, lines } = linesOf(section)}
+      {@const isCurrent = currentKey === sectionKey(section.id)}
       <section
         class="section"
         class:current={isCurrent}
         aria-label={labelOf(section)}
         aria-current={isCurrent ? 'true' : undefined}
-        {@attach (el) => track(el, key(occurrence.id))}
+        {@attach (el) => track(el, sectionKey(section.id))}
       >
         {#if section.label}
           <h3>{section.label}</h3>
@@ -78,8 +77,8 @@
           <p class="muted">Only Chords, which are hidden.</p>
         {/if}
         {#each lines as line (line.id)}
-          {@const cue = occurrence.lineCues[line.id] ?? null}
-          {@const k = key(occurrence.id, line.id)}
+          {@const cue = line.cue}
+          {@const k = lineKey(line.id)}
           {@const lineCurrent = currentKey === k}
           {@const onClick = clickLine(cue)}
           <div

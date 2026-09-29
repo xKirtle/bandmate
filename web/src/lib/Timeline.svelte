@@ -202,7 +202,7 @@
     note: (before: Timeline, after: Timeline) => void,
   ): Promise<Saved> {
     if (e.kind === 'restoreCues') {
-      // Cues whose Line or Occurrence is gone since can't come back. With
+      // Cues whose Line is gone since, or can't take one, can't come back. With
       // none left, there's nothing to send, and the step is passed over.
       const cues = restorable(e.cues, song);
       const after = cues.length > 0 ? await saved(api.restoreCues(at, cues)) : song;

@@ -26,7 +26,7 @@ func TestShiftingCuesMovesThoseInTheSpanDormantOnesIncluded(t *testing.T) {
 	drive, night, _, _ := chorusLines(before)
 	thirdDrive, thirdNight, thirdB := thirdChorusLines(before)
 
-	// The Cues are 1, 3, then 20 (the third Occurrence's first Line), 22
+	// The Cues are 1, 3, then 20 (the third chorus's first Line), 22
 	// and 23 (dormant).
 	got := ts.shiftCues(before.ID, 3, 23, 1.5)
 

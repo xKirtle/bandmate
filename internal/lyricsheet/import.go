@@ -56,24 +56,15 @@ func (s *Store) ImportSong(ctx context.Context, title, text string) (Song, error
 		if err != nil {
 			return Song{}, err
 		}
-		occurrenceID, err := insertOccurrence(ctx, tx, songID, sectionID, pos)
-		if err != nil {
+		if err := placeSection(ctx, tx, songID, sectionID, pos); err != nil {
 			return Song{}, err
 		}
 		for i, line := range sec.lines {
-			lineID, err := insert(ctx, tx, `INSERT INTO lines (alternate_id, position, text) VALUES (?, ?, ?)`,
-				alternateID, i, line.text)
-			if err != nil {
+			// The Cue is written directly, as parseImport already gave blank
+			// Lines none (see writeLineCue).
+			if _, err := tx.ExecContext(ctx, `INSERT INTO lines (alternate_id, position, text, cue_ms) VALUES (?, ?, ?, ?)`,
+				alternateID, i, line.text, line.cue); err != nil {
 				return Song{}, fmt.Errorf("adding line: %w", err)
-			}
-			// Written directly, as parseImport already gave blank Lines no
-			// Cue (see writeLineCue).
-			if line.cue == nil {
-				continue
-			}
-			if _, err := tx.ExecContext(ctx, `INSERT INTO line_cues (occurrence_id, line_id, cue_ms) VALUES (?, ?, ?)`,
-				occurrenceID, lineID, *line.cue); err != nil {
-				return Song{}, fmt.Errorf("adding line cue: %w", err)
 			}
 		}
 	}

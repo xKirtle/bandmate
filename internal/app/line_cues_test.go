@@ -7,22 +7,21 @@ import (
 	"testing"
 )
 
-// lineCuePath is where a Line's Cue within an Occurrence lives.
-func lineCuePath(songID, occurrenceID, lineID int64) string {
-	return fmt.Sprintf("/api/songs/%d/occurrences/%d/lines/%d/cue", songID, occurrenceID, lineID)
+// lineCuePath is where a Line's Cue lives.
+func lineCuePath(songID, lineID int64) string {
+	return fmt.Sprintf("/api/songs/%d/lines/%d/cue", songID, lineID)
 }
 
-// setLineCue gives a Line a Cue within an Occurrence, in seconds, and
-// returns the Song.
-func (ts *testServer) setLineCue(songID, occurrenceID, lineID int64, seconds float64) song {
+// setLineCue gives a Line a Cue, in seconds, and returns the Song.
+func (ts *testServer) setLineCue(songID, lineID int64, seconds float64) song {
 	ts.t.Helper()
-	return ts.lyricSheetChange(http.MethodPut, lineCuePath(songID, occurrenceID, lineID), map[string]any{"cue": seconds})
+	return ts.lyricSheetChange(http.MethodPut, lineCuePath(songID, lineID), map[string]any{"cue": seconds})
 }
 
-// clearLineCue removes a Line's Cue within an Occurrence and returns the Song.
-func (ts *testServer) clearLineCue(songID, occurrenceID, lineID int64) song {
+// clearLineCue removes a Line's Cue and returns the Song.
+func (ts *testServer) clearLineCue(songID, lineID int64) song {
 	ts.t.Helper()
-	return ts.lyricSheetChange(http.MethodDelete, lineCuePath(songID, occurrenceID, lineID), nil)
+	return ts.lyricSheetChange(http.MethodDelete, lineCuePath(songID, lineID), nil)
 }
 
 // chorusLines returns the ids of the first chorus's Lines in
@@ -33,22 +32,20 @@ func chorusLines(s song) (drive, night, blank, chords int64) {
 	return lines[0].ID, lines[1].ID, lines[2].ID, lines[3].ID
 }
 
-// chorusLinesAt is chorusLines for the chorus the i-th Occurrence of
-// duplicatedChorus shows, e.g. one of its Duplicates.
+// chorusLinesAt is chorusLines for the chorus at place i in the Arrangement
+// of duplicatedChorus, e.g. one of its Duplicates.
 func chorusLinesAt(s song, i int) (drive, night, blank, chords int64) {
-	lines := sectionsByID(s)[s.Arrangement[i].SectionID].Alternates[0].Lines
+	lines := sectionsByID(s)[s.Arrangement[i]].Alternates[0].Lines
 	return lines[0].ID, lines[1].ID, lines[2].ID, lines[3].ID
 }
 
-func TestAnOccurrenceStartsWithoutLineCues(t *testing.T) {
+func TestLinesStartWithoutCues(t *testing.T) {
 	ts := newTestServer(t)
 
 	s := ts.duplicatedChorus()
 
-	for _, o := range s.Arrangement {
-		if o.LineCues == nil || len(o.LineCues) != 0 {
-			t.Errorf("occurrence %d lineCues = %v, want an empty map", o.ID, o.LineCues)
-		}
+	if cues := songCues(s); len(cues) != 0 {
+		t.Errorf("cues = %v, want none", cues)
 	}
 }
 
@@ -57,10 +54,10 @@ func TestALineCueCanBeSetToTheMillisecond(t *testing.T) {
 	before := ts.duplicatedChorus()
 	_, night, _, _ := chorusLines(before)
 
-	got := ts.setLineCue(before.ID, before.Arrangement[0].ID, night, 12.3456)
+	got := ts.setLineCue(before.ID, night, 12.3456)
 
-	if want := map[int64]float64{night: 12.346}; !reflect.DeepEqual(got.Arrangement[0].LineCues, want) {
-		t.Errorf("lineCues = %v, want %v", got.Arrangement[0].LineCues, want)
+	if want := map[int64]float64{night: 12.346}; !reflect.DeepEqual(songCues(got), want) {
+		t.Errorf("cues = %v, want %v", songCues(got), want)
 	}
 	if got.Version == before.Version {
 		t.Errorf("version = %d, want it changed", got.Version)
@@ -77,12 +74,12 @@ func TestSettingALineCueAgainReplacesIt(t *testing.T) {
 	ts := newTestServer(t)
 	s := ts.duplicatedChorus()
 	_, night, _, _ := chorusLines(s)
-	ts.setLineCue(s.ID, s.Arrangement[0].ID, night, 12)
+	ts.setLineCue(s.ID, night, 12)
 
-	got := ts.setLineCue(s.ID, s.Arrangement[0].ID, night, 13.5)
+	got := ts.setLineCue(s.ID, night, 13.5)
 
-	if want := map[int64]float64{night: 13.5}; !reflect.DeepEqual(got.Arrangement[0].LineCues, want) {
-		t.Errorf("lineCues = %v, want %v", got.Arrangement[0].LineCues, want)
+	if want := map[int64]float64{night: 13.5}; !reflect.DeepEqual(songCues(got), want) {
+		t.Errorf("cues = %v, want %v", songCues(got), want)
 	}
 }
 
@@ -90,13 +87,13 @@ func TestALineCueCanBeCleared(t *testing.T) {
 	ts := newTestServer(t)
 	s := ts.duplicatedChorus()
 	_, night, _, chords := chorusLines(s)
-	ts.setLineCue(s.ID, s.Arrangement[0].ID, night, 12)
-	before := ts.setLineCue(s.ID, s.Arrangement[0].ID, chords, 16)
+	ts.setLineCue(s.ID, night, 12)
+	before := ts.setLineCue(s.ID, chords, 16)
 
-	got := ts.clearLineCue(s.ID, s.Arrangement[0].ID, night)
+	got := ts.clearLineCue(s.ID, night)
 
-	if want := map[int64]float64{chords: 16}; !reflect.DeepEqual(got.Arrangement[0].LineCues, want) {
-		t.Errorf("lineCues = %v, want %v", got.Arrangement[0].LineCues, want)
+	if want := map[int64]float64{chords: 16}; !reflect.DeepEqual(songCues(got), want) {
+		t.Errorf("cues = %v, want %v", songCues(got), want)
 	}
 	if got.Version == before.Version {
 		t.Errorf("version = %d, want it changed", got.Version)
@@ -108,10 +105,10 @@ func TestAChordLineCanHaveACue(t *testing.T) {
 	s := ts.duplicatedChorus()
 	_, _, _, chords := chorusLines(s)
 
-	got := ts.setLineCue(s.ID, s.Arrangement[0].ID, chords, 20)
+	got := ts.setLineCue(s.ID, chords, 20)
 
-	if want := map[int64]float64{chords: 20}; !reflect.DeepEqual(got.Arrangement[0].LineCues, want) {
-		t.Errorf("lineCues = %v, want %v", got.Arrangement[0].LineCues, want)
+	if want := map[int64]float64{chords: 20}; !reflect.DeepEqual(songCues(got), want) {
+		t.Errorf("cues = %v, want %v", songCues(got), want)
 	}
 }
 
@@ -120,16 +117,13 @@ func TestADuplicatesLinesHaveTheirOwnCues(t *testing.T) {
 	s := ts.duplicatedChorus()
 	_, night, _, _ := chorusLines(s)
 	_, lastNight, _, _ := chorusLinesAt(s, 3)
-	ids := occurrenceIDs(s)
 
-	ts.setLineCue(s.ID, ids[0], night, 4)
-	got := ts.setLineCue(s.ID, ids[3], lastNight, 94)
+	ts.setLineCue(s.ID, night, 4)
+	got := ts.setLineCue(s.ID, lastNight, 94)
 
 	want := []map[int64]float64{{night: 4}, {}, {}, {lastNight: 94}}
-	for i, o := range got.Arrangement {
-		if !reflect.DeepEqual(o.LineCues, want[i]) {
-			t.Errorf("occurrence %d lineCues = %v, want %v", i, o.LineCues, want[i])
-		}
+	if !reflect.DeepEqual(lineCues(got), want) {
+		t.Errorf("lineCues = %v, want %v", lineCues(got), want)
 	}
 }
 
@@ -146,10 +140,6 @@ func TestInvalidLineCuesAreRejected(t *testing.T) {
 			"cue is required"},
 		{"blank Line", func(s song) int64 { _, _, b, _ := chorusLines(s); return b }, map[string]any{"cue": 3},
 			"a blank Line can't have a Cue"},
-		{"Line of another Section", func(s song) int64 { return s.Sections[1].Alternates[0].Lines[0].ID },
-			map[string]any{"cue": 3}, "that Line isn't in this Occurrence's Section"},
-		{"no such Line", func(s song) int64 { return 999999 }, map[string]any{"cue": 3},
-			"that Line isn't in this Occurrence's Section"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -158,7 +148,7 @@ func TestInvalidLineCuesAreRejected(t *testing.T) {
 			ts.setText(s.ID, s.Sections[1].Alternates[0].ID, "A verse Line")
 			before := ts.getSong(s.ID)
 
-			res := ts.Do(http.MethodPut, lineCuePath(s.ID, s.Arrangement[0].ID, c.line(before)), c.body)
+			res := ts.Do(http.MethodPut, lineCuePath(s.ID, c.line(before)), c.body)
 
 			expectError(t, res, http.StatusBadRequest, c.msg)
 			if read := ts.getSong(s.ID); !reflect.DeepEqual(read, before) {
@@ -168,17 +158,35 @@ func TestInvalidLineCuesAreRejected(t *testing.T) {
 	}
 }
 
-func TestCueingALineInAnOccurrenceOfAnotherSongIsNotFound(t *testing.T) {
+func TestCueingALineOfAnotherSongIsNotFound(t *testing.T) {
 	ts := newTestServer(t)
 	other := ts.duplicatedChorus()
 	s := ts.songWithSections("Verse")
 	_, night, _, _ := chorusLines(other)
 
 	for _, res := range []response{
-		ts.Do(http.MethodPut, lineCuePath(s.ID, other.Arrangement[0].ID, night), map[string]any{"cue": 1}),
-		ts.Do(http.MethodDelete, lineCuePath(s.ID, other.Arrangement[0].ID, night), nil),
+		ts.Do(http.MethodPut, lineCuePath(s.ID, night), map[string]any{"cue": 1}),
+		ts.Do(http.MethodDelete, lineCuePath(s.ID, night), nil),
+		ts.Do(http.MethodPut, lineCuePath(s.ID, 999999), map[string]any{"cue": 1}),
 	} {
 		expectError(t, res, http.StatusNotFound, "not found")
+	}
+	if read := ts.getSong(other.ID); !reflect.DeepEqual(read, other) {
+		t.Errorf("other song = %+v, want it unchanged: %+v", read, other)
+	}
+}
+
+func TestCueingALineInTheScrapbookIsRefused(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.songWithSections("Verse")
+	s = ts.addToScrapbook(s.ID, "Bridge")
+	before := ts.setText(s.ID, s.Sections[1].Alternates[0].ID, "Somewhere")
+
+	res := ts.Do(http.MethodPut, lineCuePath(s.ID, before.Sections[1].Alternates[0].Lines[0].ID), map[string]any{"cue": 3})
+
+	expectError(t, res, http.StatusConflict, "a Line in the Scrapbook can't have a Cue")
+	if read := ts.getSong(s.ID); !reflect.DeepEqual(read, before) {
+		t.Errorf("song = %+v, want it unchanged: %+v", read, before)
 	}
 }
 
@@ -189,10 +197,10 @@ func TestALineOfAnInactiveAlternateCanHaveACue(t *testing.T) {
 		fmt.Sprintf("/api/songs/%d/sections/%d/alternates", s.ID, s.Sections[0].ID), map[string]any{"name": "B"})
 	dormant := s.Sections[0].Alternates[1].Lines[1].ID
 
-	got := ts.setLineCue(s.ID, s.Arrangement[0].ID, dormant, 9)
+	got := ts.setLineCue(s.ID, dormant, 9)
 
-	if want := map[int64]float64{dormant: 9}; !reflect.DeepEqual(got.Arrangement[0].LineCues, want) {
-		t.Errorf("lineCues = %v, want %v", got.Arrangement[0].LineCues, want)
+	if want := map[int64]float64{dormant: 9}; !reflect.DeepEqual(songCues(got), want) {
+		t.Errorf("cues = %v, want %v", songCues(got), want)
 	}
 }
 
@@ -200,10 +208,10 @@ func TestClearingALineCueBasedOnAnOldVersionIsRejected(t *testing.T) {
 	ts := newTestServer(t)
 	s := ts.duplicatedChorus()
 	_, night, _, _ := chorusLines(s)
-	old := ts.setLineCue(s.ID, s.Arrangement[0].ID, night, 3)
+	old := ts.setLineCue(s.ID, night, 3)
 	current := ts.setLabel(s.ID, s.Sections[0].ID, "Hook")
 
-	expectStale(t, ts.DoAt(old.Version, http.MethodDelete, lineCuePath(s.ID, s.Arrangement[0].ID, night), nil))
+	expectStale(t, ts.DoAt(old.Version, http.MethodDelete, lineCuePath(s.ID, night), nil))
 
 	if read := ts.getSong(s.ID); !reflect.DeepEqual(read, current) {
 		t.Errorf("song = %+v, want it unchanged: %+v", read, current)

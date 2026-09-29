@@ -37,18 +37,18 @@ describe('schedule', () => {
 
 describe('timelineEnd', () => {
   // A Verse whose inactive Alternate has Line 50 and active one Line 60.
-  const sections = [
-    {
-      id: 9,
-      alternates: [
-        { active: false, lines: [{ id: 50, text: 'Old' }] },
-        { active: true, lines: [{ id: 60, text: 'New' }] },
-      ],
-    },
-  ];
-  const cued = (lineCues: Record<number, number> = {}) => ({
-    arrangement: [{ id: 1, sectionId: 9, lineCues }],
-    sections,
+  // Its Lines have the Cues given, by Line id.
+  const cued = (cues: Record<number, number> = {}) => ({
+    arrangement: [9],
+    sections: [
+      {
+        id: 9,
+        alternates: [
+          { active: false, lines: [{ id: 50, text: 'Old', cue: cues[50] ?? null }] },
+          { active: true, lines: [{ id: 60, text: 'New', cue: cues[60] ?? null }] },
+        ],
+      },
+    ],
   });
   const uncued = cued();
 

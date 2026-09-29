@@ -22,11 +22,11 @@ export interface Song {
   showChords: boolean;
   createdAt: string;
   updatedAt: string;
-  /** The Lyric Sheet: Occurrences of Sections, in order. */
-  arrangement: Occurrence[];
+  /** The Lyric Sheet: ids of its Sections, in order, each at most once. */
+  arrangement: number[];
   /** Every Section of the Song, in the Arrangement or not. */
   sections: Section[];
-  /** Ids of the Sections with no Occurrence. */
+  /** Ids of the Sections not in the Arrangement. */
   scrapbook: number[];
   /** Finished recordings, in the order they were added. */
   masters: Master[];
@@ -55,17 +55,6 @@ export interface Master {
 /** A partial update to a Master's name or notes. */
 export type MasterChanges = Partial<Pick<Master, 'name' | 'notes'>>;
 
-/** One appearance of a Section in the Arrangement. */
-export interface Occurrence {
-  id: number;
-  sectionId: number;
-  /**
-   * Line ids to when each is sung in this Occurrence, in seconds to the millisecond. Lines of inactive Alternates
-   * keep theirs, dormant. The Occurrence has no Cue of its own: it starts where its first Line is cued.
-   */
-  lineCues: Record<number, number>;
-}
-
 export interface Section {
   id: number;
   /** Free text; "" means no Label. */
@@ -92,6 +81,11 @@ export interface Line {
   chords: Chord[];
   /** The Line holds only Chords, e.g. for an intro or solo. */
   chordLine: boolean;
+  /**
+   * When the Line is sung, in seconds to the millisecond; null for none. A Line of an inactive Alternate keeps its
+   * Cue, dormant. A Section has no Cue of its own: it starts where its first Line is cued.
+   */
+  cue: number | null;
 }
 
 export interface Chord {
@@ -100,9 +94,8 @@ export interface Chord {
   name: string;
 }
 
-/** One Cue's value: a Line's within an Occurrence; null for none. */
+/** One Cue's value: a Line's; null for none. */
 export interface CueValue {
-  occurrenceId: number;
   lineId: number;
   cue: number | null;
 }
@@ -356,15 +349,15 @@ export const api = {
    * Puts a Scrapbook Section back into the Arrangement at position, or at the end. A Section already in the
    * Arrangement is refused: it appears at most once, so Duplicate it instead.
    */
-  addOccurrence: (at: SongAt, sectionId: number, position?: number) =>
-    request<Song>('POST', `/songs/${at.id}/occurrences`, { sectionId, position }, at),
+  addToArrangement: (at: SongAt, sectionId: number, position?: number) =>
+    request<Song>('POST', `/songs/${at.id}/arrangement`, { sectionId, position }, at),
   /**
    * Puts a Duplicate of a Section at position in the Arrangement, or at the end: an independent copy with every
    * Alternate, the same one active, but none of its Cues.
    */
   duplicateSection: (at: SongAt, sectionId: number, position?: number) =>
     request<Song>('POST', `/songs/${at.id}/sections/${sectionId}/duplicate`, { position }, at),
-  /** Creates a Section in the Scrapbook, with no Occurrence. */
+  /** Creates a Section in the Scrapbook, outside the Arrangement. */
   addToScrapbook: (at: SongAt, label = '') => request<Song>('POST', `/songs/${at.id}/scrapbook`, { label }, at),
   /**
    * Adds a Scrapbook Section to a Section in the Lyric Sheet: its Alternates
@@ -377,23 +370,20 @@ export const api = {
   deleteSection: (at: SongAt, sectionId: number) =>
     request<Song>('DELETE', `/songs/${at.id}/sections/${sectionId}`, undefined, at),
   /**
-   * Takes an Occurrence out of the Arrangement. Its Section goes to the end of
-   * the Scrapbook, or is deleted if nothing is written in it.
+   * Takes a Section out of the Arrangement, from its actions or dropped on the Scrapbook, with its Cues. It goes to
+   * the end of the Scrapbook, or is deleted if nothing is written in it.
    */
-  removeOccurrence: (at: SongAt, occurrenceId: number) =>
-    request<Song>('DELETE', `/songs/${at.id}/occurrences/${occurrenceId}`, undefined, at),
-  /** The same as removeOccurrence, for a Section dropped on the Scrapbook. */
-  moveOccurrenceToScrapbook: (at: SongAt, occurrenceId: number) =>
-    request<Song>('POST', `/songs/${at.id}/occurrences/${occurrenceId}/scrapbook`, undefined, at),
-  /** Gives a Line a Cue within an Occurrence, in seconds; it may lie past the last Clip. */
-  setLineCue: (at: SongAt, occurrenceId: number, lineId: number, cue: number) =>
-    request<Song>('PUT', `/songs/${at.id}/occurrences/${occurrenceId}/lines/${lineId}/cue`, { cue }, at),
-  /** Removes a Line's Cue within an Occurrence. */
-  clearLineCue: (at: SongAt, occurrenceId: number, lineId: number) =>
-    request<Song>('DELETE', `/songs/${at.id}/occurrences/${occurrenceId}/lines/${lineId}/cue`, undefined, at),
-  /** Removes all an Occurrence's Line Cues, dormant ones included. */
-  clearOccurrenceCues: (at: SongAt, occurrenceId: number) =>
-    request<Song>('DELETE', `/songs/${at.id}/occurrences/${occurrenceId}/cues`, undefined, at),
+  removeFromArrangement: (at: SongAt, sectionId: number) =>
+    request<Song>('DELETE', `/songs/${at.id}/arrangement/${sectionId}`, undefined, at),
+  /** Gives a Line a Cue, in seconds; it may lie past the last Clip. */
+  setLineCue: (at: SongAt, lineId: number, cue: number) =>
+    request<Song>('PUT', `/songs/${at.id}/lines/${lineId}/cue`, { cue }, at),
+  /** Removes a Line's Cue. */
+  clearLineCue: (at: SongAt, lineId: number) =>
+    request<Song>('DELETE', `/songs/${at.id}/lines/${lineId}/cue`, undefined, at),
+  /** Removes the Cues of all a Section's Lines, dormant ones included. */
+  clearSectionCues: (at: SongAt, sectionId: number) =>
+    request<Song>('DELETE', `/songs/${at.id}/sections/${sectionId}/cues`, undefined, at),
   /** Removes every Cue in the Song. */
   clearCues: (at: SongAt) => request<Song>('DELETE', `/songs/${at.id}/cues`, undefined, at),
   /** Sets each Cue given to its value, or clears it, as they were before another Cue edit. */
@@ -412,7 +402,7 @@ export const api = {
   /** Names an Alternate; "" removes its name. */
   renameAlternate: (at: SongAt, alternateId: number, name: string) =>
     request<Song>('PATCH', `/songs/${at.id}/alternates/${alternateId}`, { name }, at),
-  /** Makes an Alternate the only active one of its Section, in every Occurrence. */
+  /** Makes an Alternate the only active one of its Section. */
   activateAlternate: (at: SongAt, alternateId: number) =>
     request<Song>('POST', `/songs/${at.id}/alternates/${alternateId}/activate`, undefined, at),
   /**
@@ -484,7 +474,7 @@ export const api = {
   switchLoop: (at: SongAt, on: boolean) => request<Timeline>('PATCH', `/songs/${at.id}/timeline/loop`, { on }, at),
   /** Removes the Song's Loop. */
   clearLoop: (at: SongAt) => request<Timeline>('DELETE', `/songs/${at.id}/timeline/loop`, undefined, at),
-  /** Puts the Arrangement in this order of Occurrence ids. */
-  reorderArrangement: (at: SongAt, occurrences: number[]) =>
-    request<Song>('PUT', `/songs/${at.id}/arrangement`, { occurrences }, at),
+  /** Puts the Arrangement in this order of Section ids. */
+  reorderArrangement: (at: SongAt, sections: number[]) =>
+    request<Song>('PUT', `/songs/${at.id}/arrangement`, { sections }, at),
 };

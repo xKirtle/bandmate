@@ -147,17 +147,17 @@ describe('dropTarget', () => {
 });
 
 describe('dropFor', () => {
-  it('moves an Occurrence dropped into another gap in the Arrangement', () => {
-    expect(dropFor({ occurrenceAt: 1 }, { gap: 4 })).toEqual({ reorder: { from: 1, to: 3 }, gap: 4 });
+  it('moves a Lyric Sheet Section dropped into another gap in the Arrangement', () => {
+    expect(dropFor({ arrangementAt: 1 }, { gap: 4 })).toEqual({ reorder: { from: 1, to: 3 }, gap: 4 });
   });
 
-  it('does nothing with an Occurrence dropped just above or below itself', () => {
-    expect(dropFor({ occurrenceAt: 2 }, { gap: 2 })).toBeNull();
-    expect(dropFor({ occurrenceAt: 2 }, { gap: 3 })).toBeNull();
+  it('does nothing with a Lyric Sheet Section dropped just above or below itself', () => {
+    expect(dropFor({ arrangementAt: 2 }, { gap: 2 })).toBeNull();
+    expect(dropFor({ arrangementAt: 2 }, { gap: 3 })).toBeNull();
   });
 
-  it('moves an Occurrence dropped on the Scrapbook there', () => {
-    expect(dropFor({ occurrenceAt: 2 }, { scrapbook: true })).toEqual({ toScrapbook: 2 });
+  it('moves a Lyric Sheet Section dropped on the Scrapbook there', () => {
+    expect(dropFor({ arrangementAt: 2 }, { scrapbook: true })).toEqual({ toScrapbook: 2 });
   });
 
   it('puts a Scrapbook Section dropped into a gap back there', () => {
@@ -170,15 +170,15 @@ describe('dropFor', () => {
   });
 
   it('adds a Scrapbook Section dropped onto a Section to it', () => {
-    expect(dropFor({ section: 7 }, { onto: 2 })).toEqual({ addTo: { section: 7, occurrenceAt: 2 } });
+    expect(dropFor({ section: 7 }, { onto: 2 })).toEqual({ addTo: { section: 7, arrangementAt: 2 } });
   });
 
-  it('does nothing with an Occurrence dropped onto a Section', () => {
-    expect(dropFor({ occurrenceAt: 1 }, { onto: 2 })).toBeNull();
+  it('does nothing with a Lyric Sheet Section dropped onto a Section', () => {
+    expect(dropFor({ arrangementAt: 1 }, { onto: 2 })).toBeNull();
   });
 
   it('does nothing dropped nowhere', () => {
-    expect(dropFor({ occurrenceAt: 2 }, null)).toBeNull();
+    expect(dropFor({ arrangementAt: 2 }, null)).toBeNull();
     expect(dropFor({ section: 7 }, null)).toBeNull();
   });
 });

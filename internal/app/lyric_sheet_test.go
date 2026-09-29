@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestAddingASectionCreatesItWithOneActiveAlternateAndOneOccurrence(t *testing.T) {
+func TestAddingASectionCreatesItWithOneActiveAlternateInTheArrangement(t *testing.T) {
 	ts := newTestServer(t)
 	created := ts.createSong("Midnight Drive")
 
@@ -23,7 +23,7 @@ func TestAddingASectionCreatesItWithOneActiveAlternateAndOneOccurrence(t *testin
 	if len(sec.Alternates) != 1 || !sec.Alternates[0].Active || len(sec.Alternates[0].Lines) != 0 {
 		t.Errorf("alternates = %+v, want one active, empty Alternate", sec.Alternates)
 	}
-	wantArrangement := []occurrence{{ID: got.Arrangement[0].ID, SectionID: sec.ID, LineCues: map[int64]float64{}}}
+	wantArrangement := []int64{sec.ID}
 	if !reflect.DeepEqual(got.Arrangement, wantArrangement) {
 		t.Errorf("arrangement = %+v, want %+v", got.Arrangement, wantArrangement)
 	}
@@ -45,8 +45,8 @@ func arrangementLabels(s song) []string {
 		labels[sec.ID] = sec.Label
 	}
 	out := []string{}
-	for _, o := range s.Arrangement {
-		out = append(out, labels[o.SectionID])
+	for _, id := range s.Arrangement {
+		out = append(out, labels[id])
 	}
 	return out
 }
@@ -297,15 +297,6 @@ func reorderPath(songID int64) string {
 	return fmt.Sprintf("/api/songs/%d/arrangement", songID)
 }
 
-// occurrenceIDs lists the Arrangement's Occurrence ids in order.
-func occurrenceIDs(s song) []int64 {
-	out := []int64{}
-	for _, o := range s.Arrangement {
-		out = append(out, o.ID)
-	}
-	return out
-}
-
 // songWithSections creates a Song with one Section per Label, in order.
 func (ts *testServer) songWithSections(labels ...string) song {
 	ts.t.Helper()
@@ -319,13 +310,13 @@ func (ts *testServer) songWithSections(labels ...string) song {
 func TestArrangementCanBeReorderedInOneOperation(t *testing.T) {
 	ts := newTestServer(t)
 	before := ts.songWithSections("Verse", "Chorus", "Bridge", "Outro")
-	ids := occurrenceIDs(before)
+	ids := before.Arrangement
 	order := []int64{ids[3], ids[1], ids[0], ids[2]}
 
-	got := ts.lyricSheetChange(http.MethodPut, reorderPath(before.ID), map[string]any{"occurrences": order})
+	got := ts.lyricSheetChange(http.MethodPut, reorderPath(before.ID), map[string]any{"sections": order})
 
-	if !reflect.DeepEqual(occurrenceIDs(got), order) {
-		t.Errorf("occurrences = %v, want %v", occurrenceIDs(got), order)
+	if !reflect.DeepEqual(got.Arrangement, order) {
+		t.Errorf("arrangement = %v, want %v", got.Arrangement, order)
 	}
 	want := []string{"Outro", "Chorus", "Verse", "Bridge"}
 	if labels := arrangementLabels(ts.getSong(before.ID)); !reflect.DeepEqual(labels, want) {
@@ -339,27 +330,29 @@ func TestArrangementCanBeReorderedInOneOperation(t *testing.T) {
 	}
 }
 
-func TestReorderingMustListEveryOccurrenceOnce(t *testing.T) {
-	// Each case builds the new order from the Song's Occurrence ids and an
-	// Occurrence id from another Song.
-	cases := map[string]func(ids []int64, elsewhere int64) []int64{
-		"one missing":            func(ids []int64, _ int64) []int64 { return []int64{ids[1], ids[0]} },
-		"one twice":              func(ids []int64, _ int64) []int64 { return []int64{ids[0], ids[1], ids[2], ids[1]} },
-		"one instead of another": func(ids []int64, _ int64) []int64 { return []int64{ids[0], ids[0], ids[2]} },
-		"unknown one":            func(ids []int64, _ int64) []int64 { return []int64{ids[0], ids[1], 999} },
-		"another song's one":     func(ids []int64, elsewhere int64) []int64 { return []int64{ids[0], ids[1], elsewhere} },
-		"none":                   func([]int64, int64) []int64 { return []int64{} },
+func TestReorderingMustListEverySectionInTheArrangementOnce(t *testing.T) {
+	// Each case builds the new order from the ids of the Song's Sections in
+	// the Arrangement, one in its Scrapbook, and one from another Song.
+	cases := map[string]func(ids []int64, scrap, elsewhere int64) []int64{
+		"one missing":            func(ids []int64, _, _ int64) []int64 { return []int64{ids[1], ids[0]} },
+		"one twice":              func(ids []int64, _, _ int64) []int64 { return []int64{ids[0], ids[1], ids[2], ids[1]} },
+		"one instead of another": func(ids []int64, _, _ int64) []int64 { return []int64{ids[0], ids[0], ids[2]} },
+		"unknown one":            func(ids []int64, _, _ int64) []int64 { return []int64{ids[0], ids[1], 999} },
+		"another song's one":     func(ids []int64, _, elsewhere int64) []int64 { return []int64{ids[0], ids[1], elsewhere} },
+		"a Scrapbook one":        func(ids []int64, scrap, _ int64) []int64 { return []int64{ids[0], ids[1], ids[2], scrap} },
+		"none":                   func([]int64, int64, int64) []int64 { return []int64{} },
 	}
 	for name, reorder := range cases {
 		t.Run(name, func(t *testing.T) {
 			ts := newTestServer(t)
 			other := ts.songWithSections("Elsewhere")
 			before := ts.songWithSections("Verse", "Chorus", "Bridge")
-			order := reorder(occurrenceIDs(before), occurrenceIDs(other)[0])
+			before = ts.addToScrapbook(before.ID, "Idea")
+			order := reorder(before.Arrangement, before.Scrapbook[0], other.Arrangement[0])
 
-			res := ts.Do(http.MethodPut, reorderPath(before.ID), map[string]any{"occurrences": order})
+			res := ts.Do(http.MethodPut, reorderPath(before.ID), map[string]any{"sections": order})
 
-			expectError(t, res, http.StatusBadRequest, "the new order must list every Occurrence exactly once")
+			expectError(t, res, http.StatusBadRequest, "the new order must list every Section in the Lyric Sheet exactly once")
 			if got := ts.getSong(before.ID); !reflect.DeepEqual(got, before) {
 				t.Errorf("song after rejected reorder = %+v, want it unchanged %+v", got, before)
 			}
