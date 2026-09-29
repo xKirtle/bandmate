@@ -7,8 +7,12 @@ A personal songwriting companion: write and structure lyrics with chords, then r
 ### Songs
 
 **Song**:
-The unit of work: one piece of music being written, with its Lyric Sheet, Timeline and metadata (key, BPM, capo, tuning, notes).
+The unit of work: one piece of music being written, with its Lyric Sheet, Timeline, Cover and metadata (key, BPM, capo, tuning, notes).
 _Avoid_: Project, track (a Track is something else)
+
+**Cover**:
+A Song's picture, like a release's cover art: at most one per Song, shown wherever the Song is as a square the user chooses from the picture. It belongs to the Song, not to any Master.
+_Avoid_: Artwork, image, album art, thumbnail
 
 **Status**:
 Where a Song stands in its lifecycle: idea, drafting, or finished.
