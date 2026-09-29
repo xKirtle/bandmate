@@ -1,9 +1,19 @@
 <script lang="ts">
   import { commonKeys } from './api';
   import type { BeatDraft } from './beatDraft';
+  import Combobox from './Combobox.svelte';
 
   // The inputs for a Beat's details, bound to a draft the caller saves.
-  let { draft = $bindable(), idPrefix }: { draft: BeatDraft; idPrefix: string } = $props();
+  let {
+    draft = $bindable(),
+    idPrefix,
+    savedKey = '',
+  }: {
+    draft: BeatDraft;
+    idPrefix: string;
+    /** The Beat's Key as saved; a new Beat has none. */
+    savedKey?: string;
+  } = $props();
 </script>
 
 <div class="fields">
@@ -30,11 +40,13 @@
     BPM
     <input bind:value={draft.bpm} inputmode="numeric" autocomplete="off" enterkeyhint="next" placeholder="—" />
   </label>
-  <label>
+  <label for="{idPrefix}-key">
     Key
-    <input
+    <Combobox
+      id="{idPrefix}-key"
       bind:value={draft.key}
-      list="{idPrefix}-keys"
+      options={commonKeys}
+      saved={savedKey}
       autocomplete="off"
       autocapitalize="characters"
       enterkeyhint="next"
@@ -46,10 +58,6 @@
     <textarea bind:value={draft.notes} rows="3" placeholder="License, where it's from…"></textarea>
   </label>
 </div>
-
-<datalist id="{idPrefix}-keys">
-  {#each commonKeys as k (k)}<option value={k}></option>{/each}
-</datalist>
 
 <style>
   .fields {
@@ -65,7 +73,7 @@
     font-weight: 600;
     color: var(--text-muted);
   }
-  input,
+  label :global(input),
   textarea {
     color: var(--text);
     font-weight: 400;

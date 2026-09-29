@@ -24,7 +24,7 @@
     /** The value as saved: ✓-marked in the list, and what a second Escape goes back to. */
     saved: string;
     /** An option was picked: `value` is it now. */
-    onpick: (value: string) => void;
+    onpick?: (value: string) => void;
     /** Escape took back what was typed: `value` is `saved` again. */
     onrevert?: () => void;
   } = $props();
@@ -83,7 +83,7 @@
   function pick(option: string) {
     value = option;
     close();
-    onpick(option);
+    onpick?.(option);
   }
 
   async function onFieldInput(e: Event & { currentTarget: HTMLInputElement }) {
