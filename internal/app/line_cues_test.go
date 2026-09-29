@@ -25,17 +25,25 @@ func (ts *testServer) clearLineCue(songID, occurrenceID, lineID int64) song {
 	return ts.lyricSheetChange(http.MethodDelete, lineCuePath(songID, occurrenceID, lineID), nil)
 }
 
-// chorusLines returns the ids of sharedChorus's Lines: "Drive, drive",
-// "all night", the blank Line and the Chord Line.
+// chorusLines returns the ids of the first chorus's Lines in
+// duplicatedChorus: "Drive, drive", "all night", the blank Line and the Chord
+// Line.
 func chorusLines(s song) (drive, night, blank, chords int64) {
 	lines := s.Sections[0].Alternates[0].Lines
+	return lines[0].ID, lines[1].ID, lines[2].ID, lines[3].ID
+}
+
+// chorusLinesAt is chorusLines for the chorus the i-th Occurrence of
+// duplicatedChorus shows, e.g. one of its Duplicates.
+func chorusLinesAt(s song, i int) (drive, night, blank, chords int64) {
+	lines := sectionsByID(s)[s.Arrangement[i].SectionID].Alternates[0].Lines
 	return lines[0].ID, lines[1].ID, lines[2].ID, lines[3].ID
 }
 
 func TestAnOccurrenceStartsWithoutLineCues(t *testing.T) {
 	ts := newTestServer(t)
 
-	s := ts.sharedChorus()
+	s := ts.duplicatedChorus()
 
 	for _, o := range s.Arrangement {
 		if o.LineCues == nil || len(o.LineCues) != 0 {
@@ -46,7 +54,7 @@ func TestAnOccurrenceStartsWithoutLineCues(t *testing.T) {
 
 func TestALineCueCanBeSetToTheMillisecond(t *testing.T) {
 	ts := newTestServer(t)
-	before := ts.sharedChorus()
+	before := ts.duplicatedChorus()
 	_, night, _, _ := chorusLines(before)
 
 	got := ts.setLineCue(before.ID, before.Arrangement[0].ID, night, 12.3456)
@@ -67,7 +75,7 @@ func TestALineCueCanBeSetToTheMillisecond(t *testing.T) {
 
 func TestSettingALineCueAgainReplacesIt(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.sharedChorus()
+	s := ts.duplicatedChorus()
 	_, night, _, _ := chorusLines(s)
 	ts.setLineCue(s.ID, s.Arrangement[0].ID, night, 12)
 
@@ -80,7 +88,7 @@ func TestSettingALineCueAgainReplacesIt(t *testing.T) {
 
 func TestALineCueCanBeCleared(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.sharedChorus()
+	s := ts.duplicatedChorus()
 	_, night, _, chords := chorusLines(s)
 	ts.setLineCue(s.ID, s.Arrangement[0].ID, night, 12)
 	before := ts.setLineCue(s.ID, s.Arrangement[0].ID, chords, 16)
@@ -97,7 +105,7 @@ func TestALineCueCanBeCleared(t *testing.T) {
 
 func TestAChordLineCanHaveACue(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.sharedChorus()
+	s := ts.duplicatedChorus()
 	_, _, _, chords := chorusLines(s)
 
 	got := ts.setLineCue(s.ID, s.Arrangement[0].ID, chords, 20)
@@ -107,16 +115,17 @@ func TestAChordLineCanHaveACue(t *testing.T) {
 	}
 }
 
-func TestALineOfASharedSectionHasItsOwnCueInEachOccurrence(t *testing.T) {
+func TestADuplicatesLinesHaveTheirOwnCues(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.sharedChorus()
+	s := ts.duplicatedChorus()
 	_, night, _, _ := chorusLines(s)
+	_, lastNight, _, _ := chorusLinesAt(s, 3)
 	ids := occurrenceIDs(s)
 
 	ts.setLineCue(s.ID, ids[0], night, 4)
-	got := ts.setLineCue(s.ID, ids[3], night, 94)
+	got := ts.setLineCue(s.ID, ids[3], lastNight, 94)
 
-	want := []map[int64]float64{{night: 4}, {}, {}, {night: 94}}
+	want := []map[int64]float64{{night: 4}, {}, {}, {lastNight: 94}}
 	for i, o := range got.Arrangement {
 		if !reflect.DeepEqual(o.LineCues, want[i]) {
 			t.Errorf("occurrence %d lineCues = %v, want %v", i, o.LineCues, want[i])
@@ -145,7 +154,7 @@ func TestInvalidLineCuesAreRejected(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			ts := newTestServer(t)
-			s := ts.sharedChorus()
+			s := ts.duplicatedChorus()
 			ts.setText(s.ID, s.Sections[1].Alternates[0].ID, "A verse Line")
 			before := ts.getSong(s.ID)
 
@@ -161,7 +170,7 @@ func TestInvalidLineCuesAreRejected(t *testing.T) {
 
 func TestCueingALineInAnOccurrenceOfAnotherSongIsNotFound(t *testing.T) {
 	ts := newTestServer(t)
-	other := ts.sharedChorus()
+	other := ts.duplicatedChorus()
 	s := ts.songWithSections("Verse")
 	_, night, _, _ := chorusLines(other)
 
@@ -175,7 +184,7 @@ func TestCueingALineInAnOccurrenceOfAnotherSongIsNotFound(t *testing.T) {
 
 func TestALineOfAnInactiveAlternateCanHaveACue(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.sharedChorus()
+	s := ts.duplicatedChorus()
 	s = ts.lyricSheetChange(http.MethodPost,
 		fmt.Sprintf("/api/songs/%d/sections/%d/alternates", s.ID, s.Sections[0].ID), map[string]any{"name": "B"})
 	dormant := s.Sections[0].Alternates[1].Lines[1].ID
@@ -189,7 +198,7 @@ func TestALineOfAnInactiveAlternateCanHaveACue(t *testing.T) {
 
 func TestClearingALineCueBasedOnAnOldVersionIsRejected(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.sharedChorus()
+	s := ts.duplicatedChorus()
 	_, night, _, _ := chorusLines(s)
 	old := ts.setLineCue(s.ID, s.Arrangement[0].ID, night, 3)
 	current := ts.setLabel(s.ID, s.Sections[0].ID, "Hook")

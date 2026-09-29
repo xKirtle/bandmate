@@ -9,12 +9,12 @@ import (
 // Cues survive the Lyric Sheet changes that keep what they point at, and go
 // with the Lines and Occurrences that are removed.
 
-// chorusWithACuedAlternate returns sharedChorus with its first Occurrence's
+// chorusWithACuedAlternate returns duplicatedChorus with its first Occurrence's
 // Lines cued ("Drive, drive" at 2 and "all night" at 6) and a second,
 // inactive Alternate copied from the first before it was cued.
 func (ts *testServer) chorusWithACuedAlternate() song {
 	ts.t.Helper()
-	s := ts.sharedChorus()
+	s := ts.duplicatedChorus()
 	s = ts.addAlternate(s.ID, s.Sections[0].ID, map[string]any{"name": "B"})
 	s = ts.activate(s.ID, s.Sections[0].Alternates[0].ID)
 	drive, night, _, _ := chorusLines(s)
@@ -43,12 +43,13 @@ func TestSwitchingAlternatesLeavesLineCuesDormantAndSwitchingBackRestoresThem(t 
 
 func TestANewAlternateCarriesTheCuesOfTheOneItCopiesWhichStayDormant(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.sharedChorus()
-	drive, night, _, chords := chorusLines(s)
+	s := ts.duplicatedChorus()
+	drive, night, _, _ := chorusLines(s)
+	_, _, _, lastChords := chorusLinesAt(s, 3)
 	ids := occurrenceIDs(s)
 	ts.setLineCue(s.ID, ids[0], drive, 2)
 	ts.setLineCue(s.ID, ids[0], night, 6)
-	ts.setLineCue(s.ID, ids[3], chords, 99)
+	ts.setLineCue(s.ID, ids[3], lastChords, 99)
 
 	got := ts.addAlternate(s.ID, s.Sections[0].ID, nil)
 
@@ -61,7 +62,7 @@ func TestANewAlternateCarriesTheCuesOfTheOneItCopiesWhichStayDormant(t *testing.
 		{drive: 2, night: 6, c[0].ID: 2, c[1].ID: 6},
 		{},
 		{},
-		{chords: 99, c[3].ID: 99},
+		{lastChords: 99},
 	}
 	for i, o := range got.Arrangement {
 		if !reflect.DeepEqual(o.LineCues, want[i]) {
@@ -80,38 +81,11 @@ func TestANewAlternateCarriesTheCuesOfTheOneItCopiesWhichStayDormant(t *testing.
 	}
 }
 
-func TestDetachingAnOccurrenceCarriesItsCuesOverToItsNewSection(t *testing.T) {
-	ts := newTestServer(t)
-	s := ts.chorusWithACuedAlternate()
-	drive, night, _, chords := chorusLines(s)
-	ids := occurrenceIDs(s)
-	dormant := s.Sections[0].Alternates[1].Lines[1].ID
-	ts.setLineCue(s.ID, ids[3], drive, 90)
-	ts.setLineCue(s.ID, ids[3], chords, 99)
-	ts.setLineCue(s.ID, ids[3], dormant, 95)
-
-	got := ts.lyricSheetChange(http.MethodPost, detachPath(s.ID, ids[3]), nil)
-
-	copied := sectionOf(t, got, got.Arrangement[3])
-	a, b := copied.Alternates[0].Lines, copied.Alternates[1].Lines
-	want := map[int64]float64{a[0].ID: 90, a[3].ID: 99, b[1].ID: 95}
-	if !reflect.DeepEqual(got.Arrangement[3].LineCues, want) {
-		t.Errorf("detached lineCues = %v, want %v on the copy's Lines", got.Arrangement[3].LineCues, want)
-	}
-	if want := map[int64]float64{drive: 2, night: 6}; !reflect.DeepEqual(got.Arrangement[0].LineCues, want) {
-		t.Errorf("original's lineCues = %v, want %v", got.Arrangement[0].LineCues, want)
-	}
-	if read := ts.getSong(s.ID); !reflect.DeepEqual(read, got) {
-		t.Errorf("song read back = %+v, want %+v", read, got)
-	}
-}
-
 func TestEditingALinesTextKeepsItsCue(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.sharedChorus()
+	s := ts.duplicatedChorus()
 	_, night, _, _ := chorusLines(s)
 	ts.setLineCue(s.ID, s.Arrangement[0].ID, night, 6)
-	ts.setLineCue(s.ID, s.Arrangement[3].ID, night, 96)
 
 	got := ts.setText(s.ID, s.Sections[0].Alternates[0].ID, "Drive, [Am]drive\nall [F]night long\n\n[C] [G]")
 
@@ -121,26 +95,24 @@ func TestEditingALinesTextKeepsItsCue(t *testing.T) {
 	if want := map[int64]float64{night: 6}; !reflect.DeepEqual(got.Arrangement[0].LineCues, want) {
 		t.Errorf("lineCues = %v, want %v", got.Arrangement[0].LineCues, want)
 	}
-	if want := map[int64]float64{night: 96}; !reflect.DeepEqual(got.Arrangement[3].LineCues, want) {
-		t.Errorf("last lineCues = %v, want %v", got.Arrangement[3].LineCues, want)
-	}
 }
 
-func TestDeletingALineDropsItsCuesInEveryOccurrence(t *testing.T) {
+func TestDeletingALineDropsItsCue(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.sharedChorus()
+	s := ts.duplicatedChorus()
 	drive, night, _, _ := chorusLines(s)
+	_, lastNight, _, _ := chorusLinesAt(s, 3)
 	ts.setLineCue(s.ID, s.Arrangement[0].ID, drive, 2)
 	ts.setLineCue(s.ID, s.Arrangement[0].ID, night, 6)
-	ts.setLineCue(s.ID, s.Arrangement[3].ID, night, 96)
+	ts.setLineCue(s.ID, s.Arrangement[3].ID, lastNight, 96)
 
 	got := ts.setText(s.ID, s.Sections[0].Alternates[0].ID, "Drive, [Am]drive\n\n[C] [G]")
 
 	if want := map[int64]float64{drive: 2}; !reflect.DeepEqual(got.Arrangement[0].LineCues, want) {
 		t.Errorf("lineCues = %v, want %v", got.Arrangement[0].LineCues, want)
 	}
-	if len(got.Arrangement[3].LineCues) != 0 {
-		t.Errorf("last lineCues = %v, want none", got.Arrangement[3].LineCues)
+	if want := map[int64]float64{lastNight: 96}; !reflect.DeepEqual(got.Arrangement[3].LineCues, want) {
+		t.Errorf("Duplicate's lineCues = %v, want %v", got.Arrangement[3].LineCues, want)
 	}
 }
 
@@ -161,11 +133,12 @@ func TestDeletingAnInactiveAlternateDropsItsDormantCues(t *testing.T) {
 
 func TestRemovingAnOccurrenceDropsOnlyItsCues(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.sharedChorus()
+	s := ts.duplicatedChorus()
 	_, night, _, _ := chorusLines(s)
+	_, secondNight, _, _ := chorusLinesAt(s, 2)
 	ids := occurrenceIDs(s)
 	ts.setLineCue(s.ID, ids[0], night, 6)
-	ts.setLineCue(s.ID, ids[2], night, 56)
+	ts.setLineCue(s.ID, ids[2], secondNight, 56)
 
 	got := ts.lyricSheetChange(http.MethodDelete, occurrencePath(s.ID, ids[2]), nil)
 
@@ -200,8 +173,9 @@ func TestASectionBroughtBackFromTheScrapbookHasNoCues(t *testing.T) {
 
 func TestReorderingOccurrencesKeepsTheirLineCues(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.sharedChorus()
-	drive, night, _, _ := chorusLines(s)
+	s := ts.duplicatedChorus()
+	_, night, _, _ := chorusLines(s)
+	drive, _, _, _ := chorusLinesAt(s, 2)
 	ids := occurrenceIDs(s)
 	ts.setLineCue(s.ID, ids[0], night, 6)
 	ts.setLineCue(s.ID, ids[2], drive, 40)

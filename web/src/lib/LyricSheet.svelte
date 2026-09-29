@@ -70,11 +70,9 @@
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
-  // What taking an Occurrence out of the Arrangement does to its Section:
-  // the others keep it, else it goes to the Scrapbook, or is deleted if
-  // nothing is written in it.
-  function removal(occurrence: Occurrence, section: Section): { label: string; title: string } {
-    if (occurrence.shared) return { label: 'Remove this Occurrence', title: 'Remove this Occurrence; the others stay' };
+  // What taking a Section out of the Arrangement does to it: it goes to the
+  // Scrapbook, or is deleted if nothing is written in it.
+  function removal(section: Section): { label: string; title: string } {
     if (isEmpty(section)) {
       return { label: 'Delete this Section', title: "Delete this Section: nothing is written in it, so it isn't kept" };
     }
@@ -84,7 +82,7 @@
   function occurrenceActions(occurrence: Occurrence, section: Section, i: number): MenuAction[] {
     const actions: MenuAction[] = [
       { icon: '+', label: 'Add a Section below', run: () => add(i + 1) },
-      { icon: '⧉', label: 'Repeat this Section below', run: () => addOccurrence(section.id, i + 1) },
+      { icon: '⧉', label: 'Duplicate this Section below', run: () => duplicate(section.id, i + 1) },
     ];
     if (canCue && hasCues({ arrangement: [occurrence], sections: song.sections })) {
       // Doesn't ask first: it can be undone. It clears dormant Cues too.
@@ -94,23 +92,15 @@
         run: () => editCues((at) => api.clearOccurrenceCues(at, occurrence.id)),
       });
     }
-    if (occurrence.shared) {
-      actions.push({
-        icon: '⑂',
-        label: 'Detach into its own copy',
-        title: 'Detach: give this Occurrence its own copy, so it can differ',
-        run: () => change((at) => api.detach(at, occurrence.id)),
-      });
-    }
     actions.push({
       icon: '×',
-      ...removal(occurrence, section),
+      ...removal(section),
       run: () => change((at) => api.removeOccurrence(at, occurrence.id)),
     });
     return actions;
   }
-  // The Sections in the Arrangement, once each, in the order they first
-  // appear: the ones another Occurrence can be added of.
+  // The Sections in the Arrangement, in order: the ones a Duplicate can be
+  // made of.
   const inArrangement = $derived(sectionsInArrangement(song, sections));
   // Cues are edited in Write mode, on wider screens only, and only once
   // there's something to cue to or a Cue already set.
@@ -294,14 +284,14 @@
     }
   }
 
-  function addOccurrence(sectionId: number, position?: number) {
-    change((at) => api.addOccurrence(at, sectionId, position));
+  function duplicate(sectionId: number, position?: number) {
+    change((at) => api.duplicateSection(at, sectionId, position));
   }
 
-  function addOccurrenceAtEnd(e: Event & { currentTarget: HTMLSelectElement }) {
+  function duplicateAtEnd(e: Event & { currentTarget: HTMLSelectElement }) {
     const id = Number(e.currentTarget.value);
     e.currentTarget.value = '';
-    if (id) addOccurrence(id);
+    if (id) duplicate(id);
   }
 
   function move(index: number, by: -1 | 1) {
@@ -336,9 +326,8 @@
     }
   }
 
-  // Dropped on the Scrapbook, an Occurrence's Section goes to its end, a
-  // Detached copy if it's shared, or isn't kept if nothing is written in it,
-  // which a notice says.
+  // Dropped on the Scrapbook, an Occurrence's Section goes to its end, or
+  // isn't kept if nothing is written in it, which a notice says.
   async function toScrapbook(index: number) {
     const occurrence = song.arrangement[index];
     const section = occurrence && sections.get(occurrence.sectionId);
@@ -471,7 +460,6 @@
             <SectionEditor
               uid="o{occurrence.id}"
               {section}
-              shared={occurrence.shared}
               autofocus={added === occurrence.id}
               {change}
               {onUnsaved}
@@ -512,9 +500,9 @@
     <div class="add-row">
       <button type="button" class="button add" onclick={() => add(song.arrangement.length)}>Add Section</button>
       {#if inArrangement.length > 0}
-        <label class="visually-hidden" for="repeat-section">Repeat a Section at the end</label>
-        <select id="repeat-section" class="repeat" onchange={addOccurrenceAtEnd}>
-          <option value="">Repeat a Section…</option>
+        <label class="visually-hidden" for="duplicate-section">Duplicate a Section at the end</label>
+        <select id="duplicate-section" class="duplicate" onchange={duplicateAtEnd}>
+          <option value="">Duplicate a Section…</option>
           {#each inArrangement as section (section.id)}
             <option value={section.id}>{describe(section)}</option>
           {/each}
@@ -644,8 +632,7 @@
     bottom: calc(-0.375rem - 1.5px);
   }
   /* A Scrapbook Section dropped onto a Section joins its Alternates: the
-     Section is outlined, every Occurrence of it if it's shared, unlike the
-     line a drop into a gap shows. */
+     Section is outlined, unlike the line a drop into a gap shows. */
   .arrangement > .drop-onto {
     outline: 2px dashed var(--accent);
     outline-offset: 0.25rem;
@@ -680,11 +667,11 @@
     gap: 0.5rem;
   }
   .add,
-  .repeat {
+  .duplicate {
     flex: 1 1 12rem;
     width: auto;
   }
-  .repeat {
+  .duplicate {
     font-weight: 600;
   }
 </style>

@@ -18,7 +18,7 @@ func cuePath(songID, occurrenceID int64) string {
 
 func TestAnOccurrenceHasNoCueOfItsOwn(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.sharedChorus()
+	s := ts.duplicatedChorus()
 	drive, _, _, _ := chorusLines(s)
 	ts.setLineCue(s.ID, s.Arrangement[0].ID, drive, 2)
 
@@ -39,7 +39,7 @@ func TestAnOccurrenceHasNoCueOfItsOwn(t *testing.T) {
 
 func TestAnOccurrenceCantBeCuedOrClearedOnItsOwn(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.sharedChorus()
+	s := ts.duplicatedChorus()
 	drive, _, _, _ := chorusLines(s)
 	before := ts.setLineCue(s.ID, s.Arrangement[0].ID, drive, 2)
 

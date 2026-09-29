@@ -59,8 +59,6 @@ export type MasterChanges = Partial<Pick<Master, 'name' | 'notes'>>;
 export interface Occurrence {
   id: number;
   sectionId: number;
-  /** Other Occurrences show the same Section, so editing it changes them too. */
-  shared: boolean;
   /**
    * Line ids to when each is sung in this Occurrence, in seconds to the millisecond. Lines of inactive Alternates
    * keep theirs, dormant. The Occurrence has no Cue of its own: it starts where its first Line is cued.
@@ -354,9 +352,18 @@ export const api = {
   /** Adds a Section at position in the Arrangement, or at the end. */
   addSection: (at: SongAt, section: { label?: string; position?: number }) =>
     request<Song>('POST', `/songs/${at.id}/sections`, section, at),
-  /** Adds an Occurrence of an existing Section (e.g. one from the Scrapbook) at position, or at the end. */
+  /**
+   * Puts a Scrapbook Section back into the Arrangement at position, or at the end. A Section already in the
+   * Arrangement is refused: it appears at most once, so Duplicate it instead.
+   */
   addOccurrence: (at: SongAt, sectionId: number, position?: number) =>
     request<Song>('POST', `/songs/${at.id}/occurrences`, { sectionId, position }, at),
+  /**
+   * Puts a Duplicate of a Section at position in the Arrangement, or at the end: an independent copy with every
+   * Alternate, the same one active, but none of its Cues.
+   */
+  duplicateSection: (at: SongAt, sectionId: number, position?: number) =>
+    request<Song>('POST', `/songs/${at.id}/sections/${sectionId}/duplicate`, { position }, at),
   /** Creates a Section in the Scrapbook, with no Occurrence. */
   addToScrapbook: (at: SongAt, label = '') => request<Song>('POST', `/songs/${at.id}/scrapbook`, { label }, at),
   /**
@@ -370,21 +377,14 @@ export const api = {
   deleteSection: (at: SongAt, sectionId: number) =>
     request<Song>('DELETE', `/songs/${at.id}/sections/${sectionId}`, undefined, at),
   /**
-   * Takes an Occurrence out of the Arrangement. Without Occurrences, its Section
-   * goes to the end of the Scrapbook, or is deleted if nothing is written in it.
+   * Takes an Occurrence out of the Arrangement. Its Section goes to the end of
+   * the Scrapbook, or is deleted if nothing is written in it.
    */
   removeOccurrence: (at: SongAt, occurrenceId: number) =>
     request<Song>('DELETE', `/songs/${at.id}/occurrences/${occurrenceId}`, undefined, at),
-  /**
-   * Takes an Occurrence out of the Arrangement and puts its Section at the end
-   * of the Scrapbook: a Detached copy, if it's shared. Nothing is kept if
-   * nothing is written in it.
-   */
+  /** The same as removeOccurrence, for a Section dropped on the Scrapbook. */
   moveOccurrenceToScrapbook: (at: SongAt, occurrenceId: number) =>
     request<Song>('POST', `/songs/${at.id}/occurrences/${occurrenceId}/scrapbook`, undefined, at),
-  /** Gives an Occurrence of a shared Section its own copy of the Section. */
-  detach: (at: SongAt, occurrenceId: number) =>
-    request<Song>('POST', `/songs/${at.id}/occurrences/${occurrenceId}/detach`, undefined, at),
   /** Gives a Line a Cue within an Occurrence, in seconds; it may lie past the last Clip. */
   setLineCue: (at: SongAt, occurrenceId: number, lineId: number, cue: number) =>
     request<Song>('PUT', `/songs/${at.id}/occurrences/${occurrenceId}/lines/${lineId}/cue`, { cue }, at),

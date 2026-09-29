@@ -60,6 +60,19 @@ func (a *App) addOccurrence(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *App) duplicateSection(w http.ResponseWriter, r *http.Request) {
+	sectionID, ok := pathID(w, r, "sectionID")
+	if !ok {
+		return
+	}
+	var req struct {
+		Position *int `json:"position"`
+	}
+	a.changeSheet(w, r, &req, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
+		return a.songs.DuplicateSection(r.Context(), id, based, sectionID, req.Position)
+	})
+}
+
 func (a *App) removeOccurrence(w http.ResponseWriter, r *http.Request) {
 	occurrenceID, ok := pathID(w, r, "occurrenceID")
 	if !ok {
@@ -70,13 +83,16 @@ func (a *App) removeOccurrence(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// moveOccurrenceToScrapbook is removeOccurrence: taking a Section out of the
+// Arrangement always sends it to the Scrapbook, or deletes it if nothing is
+// written in it.
 func (a *App) moveOccurrenceToScrapbook(w http.ResponseWriter, r *http.Request) {
 	occurrenceID, ok := pathID(w, r, "occurrenceID")
 	if !ok {
 		return
 	}
 	a.changeSheet(w, r, nil, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
-		return a.songs.MoveOccurrenceToScrapbook(r.Context(), id, based, occurrenceID)
+		return a.songs.RemoveOccurrence(r.Context(), id, based, occurrenceID)
 	})
 }
 
@@ -93,16 +109,6 @@ func (a *App) addToSection(w http.ResponseWriter, r *http.Request) {
 			return lyricsheet.Song{}, &lyricsheet.InvalidError{Msg: "sectionId is required"}
 		}
 		return a.songs.AddToSection(r.Context(), id, based, scrapID, *req.SectionID)
-	})
-}
-
-func (a *App) detach(w http.ResponseWriter, r *http.Request) {
-	occurrenceID, ok := pathID(w, r, "occurrenceID")
-	if !ok {
-		return
-	}
-	a.changeSheet(w, r, nil, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
-		return a.songs.Detach(r.Context(), id, based, occurrenceID)
 	})
 }
 

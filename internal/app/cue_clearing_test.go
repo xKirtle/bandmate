@@ -40,21 +40,32 @@ func lineCues(s song) []map[int64]float64 {
 	return out
 }
 
-// cuedChorus returns a sharedChorus with a second, inactive Alternate on
-// the chorus, and Cues on the first and third Occurrences: the third
-// Occurrence's include a dormant one.
+// cuedChorus returns a Song like duplicatedChorus whose chorus got a second
+// Alternate before it was Duplicated, with Cues on the first and third
+// Occurrences: the third Occurrence's include one on its second Alternate.
 func (ts *testServer) cuedChorus() song {
 	ts.t.Helper()
-	s := ts.sharedChorus()
-	s = ts.lyricSheetChange(http.MethodPost,
-		fmt.Sprintf("/api/songs/%d/sections/%d/alternates", s.ID, s.Sections[0].ID), map[string]any{"name": "B"})
+	s := ts.songWithSections("Chorus", "Verse")
+	chorus := s.Sections[0]
+	ts.setText(s.ID, chorus.Alternates[0].ID, "Drive, [Am]drive\nall [F]night\n\n[C] [G]")
+	ts.addAlternate(s.ID, chorus.ID, map[string]any{"name": "B"})
+	ts.duplicate(s.ID, chorus.ID, nil)
+	s = ts.duplicate(s.ID, chorus.ID, nil)
 	drive, night, _, _ := chorusLines(s)
-	dormant := s.Sections[0].Alternates[1].Lines[1].ID
+	thirdDrive, thirdNight, thirdB := thirdChorusLines(s)
 	ts.setLineCue(s.ID, s.Arrangement[0].ID, drive, 1)
 	ts.setLineCue(s.ID, s.Arrangement[0].ID, night, 3)
-	ts.setLineCue(s.ID, s.Arrangement[2].ID, drive, 20)
-	ts.setLineCue(s.ID, s.Arrangement[2].ID, night, 22)
-	return ts.setLineCue(s.ID, s.Arrangement[2].ID, dormant, 23)
+	ts.setLineCue(s.ID, s.Arrangement[2].ID, thirdDrive, 20)
+	ts.setLineCue(s.ID, s.Arrangement[2].ID, thirdNight, 22)
+	return ts.setLineCue(s.ID, s.Arrangement[2].ID, thirdB, 23)
+}
+
+// thirdChorusLines returns the ids of the Lines cuedChorus cues in its third
+// Occurrence: "Drive, drive" and "all night" in its first Alternate, and
+// "all night" in its second.
+func thirdChorusLines(s song) (drive, night, b int64) {
+	sec := sectionsByID(s)[s.Arrangement[2].SectionID]
+	return sec.Alternates[0].Lines[0].ID, sec.Alternates[0].Lines[1].ID, sec.Alternates[1].Lines[1].ID
 }
 
 func ptr[T any](v T) *T { return &v }
@@ -119,20 +130,22 @@ func TestRestoringCuesSetsAndClearsExactlyThoseGiven(t *testing.T) {
 	ts := newTestServer(t)
 	before := ts.cuedChorus()
 	drive, night, _, chords := chorusLines(before)
+	thirdDrive, _, _, _ := chorusLinesAt(before, 2)
+	lastDrive, _, _, _ := chorusLinesAt(before, 3)
 	first, third := before.Arrangement[0].ID, before.Arrangement[2].ID
 
 	got := ts.restoreCues(before.ID,
 		cueValue{OccurrenceID: first, LineID: &drive, Cue: ptr(2.5)},
 		cueValue{OccurrenceID: first, LineID: &night, Cue: nil},
 		cueValue{OccurrenceID: first, LineID: &chords, Cue: ptr(4.25)},
-		cueValue{OccurrenceID: third, LineID: &drive, Cue: nil},
-		cueValue{OccurrenceID: before.Arrangement[3].ID, LineID: &drive, Cue: ptr(40.0)},
+		cueValue{OccurrenceID: third, LineID: &thirdDrive, Cue: nil},
+		cueValue{OccurrenceID: before.Arrangement[3].ID, LineID: &lastDrive, Cue: ptr(40.0)},
 	)
 
 	want := lineCues(before)
 	want[0] = map[int64]float64{drive: 2.5, chords: 4.25}
-	delete(want[2], drive)
-	want[3] = map[int64]float64{drive: 40}
+	delete(want[2], thirdDrive)
+	want[3] = map[int64]float64{lastDrive: 40}
 	if !reflect.DeepEqual(lineCues(got), want) {
 		t.Errorf("lineCues = %v, want %v", lineCues(got), want)
 	}
@@ -177,7 +190,7 @@ func TestInvalidCueRestoresAreRejected(t *testing.T) {
 			return []cueValue{{OccurrenceID: s.Arrangement[1].ID, Cue: ptr(3.0)}}
 		}, http.StatusBadRequest, "each Cue needs a lineId"},
 		{"negative", func(s song) any {
-			drive, _, _, _ := chorusLines(s)
+			drive, _, _, _ := chorusLinesAt(s, 2)
 			return []cueValue{{OccurrenceID: s.Arrangement[2].ID, LineID: &drive, Cue: ptr(-1.0)}}
 		}, http.StatusBadRequest, "a Cue can't be before the start of the Timeline"},
 		{"blank Line", func(s song) any {
@@ -202,7 +215,7 @@ func TestInvalidCueRestoresAreRejected(t *testing.T) {
 			body := c.values(before)
 			if values, ok := body.([]cueValue); ok {
 				// A valid Cue before the invalid one isn't kept either.
-				drive, _, _, _ := chorusLines(before)
+				drive, _, _, _ := chorusLinesAt(before, 2)
 				valid := cueValue{OccurrenceID: s.Arrangement[2].ID, LineID: &drive, Cue: ptr(9.0)}
 				body = map[string]any{"cues": append([]cueValue{valid}, values...)}
 			}

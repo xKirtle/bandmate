@@ -10,7 +10,6 @@
   let {
     uid,
     section,
-    shared,
     autofocus = false,
     change,
     onUnsaved,
@@ -19,11 +18,9 @@
     more,
     cueing,
   }: {
-    /** Makes element ids unique, e.g. when a shared Section shows more than once. */
+    /** Makes element ids unique on the page. */
     uid: string;
     section: Section;
-    /** Other Occurrences show this Section too. */
-    shared: boolean;
     /** Focus the Label when this becomes true, e.g. for a Section just added. */
     autofocus?: boolean;
     /** Sends a Lyric Sheet change; resolves to whether it succeeded. */
@@ -162,7 +159,7 @@
   </button>
 {/snippet}
 
-<article class="section" class:is-shared={shared} aria-label={labelOf(section)}>
+<article class="section" aria-label={labelOf(section)}>
   <div class="head">
     {@render grip?.()}
     <label class="visually-hidden" for="label-{uid}">Label</label>
@@ -191,11 +188,6 @@
       enterkeyhint="next"
       {@attach focusWhen(autofocus)}
     />
-    {#if shared}
-      <span class="shared" title="This Section appears more than once. Editing it changes every Occurrence.">
-        Shared
-      </span>
-    {/if}
     <div class="actions">
       <!-- Shows at every width. -->
       <button
@@ -347,18 +339,6 @@
   .head :global(.label:focus) {
     border-color: var(--border);
     background: var(--bg);
-  }
-  .section.is-shared {
-    border-left: 4px solid var(--accent);
-  }
-  .shared {
-    padding: 0.125rem 0.5rem;
-    border-radius: 999px;
-    background: var(--accent);
-    color: var(--accent-text);
-    font-size: 0.75rem;
-    font-weight: 600;
-    white-space: nowrap;
   }
   .actions {
     display: flex;

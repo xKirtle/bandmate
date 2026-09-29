@@ -210,23 +210,6 @@ func TestActivatingAnAlternateMakesItTheOnlyActiveOne(t *testing.T) {
 	}
 }
 
-func TestActivatingAnAlternateOfASharedSectionAppliesToEveryOccurrence(t *testing.T) {
-	ts := newTestServer(t)
-	s := ts.sharedChorus()
-	chorus := sectionOf(t, s, s.Arrangement[0])
-	s = ts.addAlternate(s.ID, chorus.ID, nil)
-	alt := sectionOf(t, s, s.Arrangement[0]).Alternates[1]
-	ts.setText(s.ID, alt.ID, "One more time")
-
-	got := ts.activate(s.ID, alt.ID)
-
-	for _, i := range []int{0, 2, 3} {
-		if lines := activeLines(sectionOf(t, got, got.Arrangement[i])); !reflect.DeepEqual(lines, []string{"One more time"}) {
-			t.Errorf("occurrence %d lines = %q, want the activated Alternate's", i, lines)
-		}
-	}
-}
-
 func TestActivatingAnAlternateOfAnotherSongIsNotFound(t *testing.T) {
 	ts := newTestServer(t)
 	other, chorus := ts.chorusWithTwoAlternates()
@@ -390,45 +373,44 @@ func TestAnAlternateMovedToTheScrapbookIsLabelledByWhatHasANameOrLabel(t *testin
 
 func TestAnAlternateMovedToTheScrapbookLeavesItsCuesBehindAndTheOthersKeepTheirs(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.sharedChorus()
-	drive, night, _, chords := chorusLines(s)
+	s := ts.duplicatedChorus()
+	drive, night, _, _ := chorusLines(s)
+	_, _, _, lastChords := chorusLinesAt(s, 3)
 	ids := occurrenceIDs(s)
 	ts.setLineCue(s.ID, ids[0], drive, 2)
 	ts.setLineCue(s.ID, ids[0], night, 6)
-	ts.setLineCue(s.ID, ids[3], chords, 99)
+	ts.setLineCue(s.ID, ids[3], lastChords, 99)
 	// The copy carries the Cues, then goes dormant with them.
 	s = ts.addAlternate(s.ID, s.Sections[0].ID, nil)
 	s = ts.activate(s.ID, s.Sections[0].Alternates[0].ID)
 
 	got := ts.moveToScrapbook(s.ID, s.Sections[0].Alternates[1].ID)
 
-	want := []map[int64]float64{{drive: 2, night: 6}, {}, {}, {chords: 99}}
+	want := []map[int64]float64{{drive: 2, night: 6}, {}, {}, {lastChords: 99}}
 	for i, o := range got.Arrangement {
 		if !reflect.DeepEqual(o.LineCues, want[i]) {
 			t.Errorf("occurrence %d lineCues = %v, want %v", i, o.LineCues, want[i])
 		}
 	}
 	// Put back, the new Section starts with no Cues.
-	got = ts.addOccurrence(s.ID, got.Sections[2].ID, nil)
+	got = ts.addOccurrence(s.ID, got.Scrapbook[0], nil)
 	if cues := got.Arrangement[4].LineCues; len(cues) != 0 {
 		t.Errorf("put back lineCues = %v, want none", cues)
 	}
 }
 
-func TestAnAlternateMovedToTheScrapbookLeavesEveryOccurrenceOfItsSection(t *testing.T) {
+func TestAnAlternateMovedToTheScrapbookLeavesItsSection(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.sharedChorus()
+	s := ts.duplicatedChorus()
 	s = ts.addAlternate(s.ID, s.Sections[0].ID, nil)
 	moved := s.Sections[0].Alternates[1]
 	s = ts.activate(s.ID, s.Sections[0].Alternates[0].ID)
 
 	got := ts.moveToScrapbook(s.ID, moved.ID)
 
-	for _, i := range []int{0, 2, 3} {
-		sec := sectionOf(t, got, got.Arrangement[i])
-		if len(sec.Alternates) != 1 || sec.Alternates[0].ID == moved.ID {
-			t.Errorf("occurrence %d alternates = %+v, want the moved one gone", i, sec.Alternates)
-		}
+	sec := sectionOf(t, got, got.Arrangement[0])
+	if len(sec.Alternates) != 1 || sec.Alternates[0].ID == moved.ID {
+		t.Errorf("alternates = %+v, want the moved one gone", sec.Alternates)
 	}
 }
 
@@ -486,10 +468,11 @@ func (ts *testServer) scrapWithTwoAlternates(songID int64, label string) (song, 
 
 func TestAScrapbookSectionAddedToASectionJoinsItsAlternatesInactive(t *testing.T) {
 	ts := newTestServer(t)
-	s := ts.sharedChorus()
-	drive, night, _, _ := chorusLines(s)
+	s := ts.duplicatedChorus()
+	drive, _, _, _ := chorusLines(s)
+	_, secondNight, _, _ := chorusLinesAt(s, 2)
 	ts.setLineCue(s.ID, s.Arrangement[0].ID, drive, 2)
-	ts.setLineCue(s.ID, s.Arrangement[2].ID, night, 40)
+	ts.setLineCue(s.ID, s.Arrangement[2].ID, secondNight, 40)
 	before, scrap := ts.scrapWithTwoAlternates(s.ID, "Idea")
 	chorus := before.Sections[0]
 

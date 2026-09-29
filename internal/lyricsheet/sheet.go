@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -26,9 +25,6 @@ type LyricSheet struct {
 type Occurrence struct {
 	ID        int64 `json:"id"`
 	SectionID int64 `json:"sectionId"`
-	// Shared means other Occurrences show the same Section, so editing it
-	// changes them too.
-	Shared bool `json:"shared"`
 	// LineCues maps Line ids to when each is sung in this Occurrence, in
 	// seconds to the millisecond. An Occurrence has no Cue of its own: it
 	// starts where its first Line is cued (ADR 0009). It holds the Cues of
@@ -150,7 +146,6 @@ func (s *Store) loadLyricSheet(ctx context.Context, songID int64) (LyricSheet, e
 	}
 	occurrenceAt := map[int64]int{}
 	for i := range sheet.Arrangement {
-		sheet.Arrangement[i].Shared = uses[sheet.Arrangement[i].SectionID] > 1
 		occurrenceAt[sheet.Arrangement[i].ID] = i
 	}
 	err = query(ctx, s.db, `SELECT c.occurrence_id, c.line_id, c.cue_ms
@@ -313,12 +308,18 @@ func insertSection(ctx context.Context, tx *sql.Tx, songID int64, label string) 
 	return sectionID, alternateID, nil
 }
 
-// AddOccurrence adds another Occurrence of one of the Song's Sections at
-// position in the Arrangement. A nil position adds it at the end.
+// AddOccurrence puts one of the Song's Sections in the Scrapbook into the
+// Arrangement at position. A nil position adds it at the end. A Section
+// appears at most once (ADR 0010), so one already in the Arrangement is
+// refused: a Duplicate of it can be added instead.
 func (s *Store) AddOccurrence(ctx context.Context, songID int64, based Version, sectionID int64, position *int) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		if _, err := findSection(ctx, tx, songID, sectionID); err != nil {
+		uses, err := findSection(ctx, tx, songID, sectionID)
+		if err != nil {
 			return err
+		}
+		if uses > 0 {
+			return conflict("that Section is already in the Lyric Sheet; Duplicate it instead")
 		}
 		pos, err := arrangementPosition(ctx, tx, songID, position)
 		if err != nil {
@@ -329,10 +330,32 @@ func (s *Store) AddOccurrence(ctx context.Context, songID int64, based Version, 
 	})
 }
 
-// RemoveOccurrence takes an Occurrence out of the Arrangement. Other
-// Occurrences of its Section keep showing it, and without any it goes to the
-// end of the Scrapbook, unless nothing is written in it: then it is deleted,
-// as there's nothing to keep.
+// DuplicateSection puts a Duplicate of one of the Song's Sections at position
+// in the Arrangement: an independent copy with its Label and every Alternate
+// (names, Lines and Chords, the same one active), but none of its Cues, as
+// the copy is sung at another time. A nil position adds it at the end.
+func (s *Store) DuplicateSection(ctx context.Context, songID int64, based Version, sectionID int64, position *int) (Song, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		if _, err := findSection(ctx, tx, songID, sectionID); err != nil {
+			return err
+		}
+		pos, err := arrangementPosition(ctx, tx, songID, position)
+		if err != nil {
+			return err
+		}
+		copyID, err := copySection(ctx, tx, sectionID)
+		if err != nil {
+			return err
+		}
+		_, err = insertOccurrence(ctx, tx, songID, copyID, pos)
+		return err
+	})
+}
+
+// RemoveOccurrence takes an Occurrence out of the Arrangement, both from the
+// Section's actions and by dropping it on the Scrapbook. Its Section goes to
+// the end of the Scrapbook, unless nothing is written in it: then it is
+// deleted, as there's nothing to keep.
 func (s *Store) RemoveOccurrence(ctx context.Context, songID int64, based Version, occurrenceID int64) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		sectionID, pos, err := findOccurrence(ctx, tx, songID, occurrenceID)
@@ -343,41 +366,10 @@ func (s *Store) RemoveOccurrence(ctx context.Context, songID int64, based Versio
 	})
 }
 
-// MoveOccurrenceToScrapbook takes an Occurrence out of the Arrangement and
-// puts its Section at the end of the Scrapbook. A shared Section is Detached
-// first, so a copy goes to the Scrapbook and the other Occurrences keep the
-// original. Nothing is kept if nothing is written in it.
-func (s *Store) MoveOccurrenceToScrapbook(ctx context.Context, songID int64, based Version, occurrenceID int64) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		sectionID, pos, err := findOccurrence(ctx, tx, songID, occurrenceID)
-		if err != nil {
-			return err
-		}
-		uses, err := findSection(ctx, tx, songID, sectionID)
-		if err != nil {
-			return err
-		}
-		empty, err := sectionEmpty(ctx, tx, sectionID)
-		if err != nil {
-			return err
-		}
-		if uses > 1 && !empty {
-			// Its Cues belong to the Occurrence, which goes, so the copy has none.
-			copyID, _, err := copySection(ctx, tx, sectionID)
-			if err != nil {
-				return err
-			}
-			if err := toScrapbookEnd(ctx, tx, songID, copyID); err != nil {
-				return err
-			}
-		}
-		return removeOccurrence(ctx, tx, songID, occurrenceID, sectionID, pos)
-	})
-}
-
-// removeOccurrence deletes an Occurrence at pos in the Arrangement. Without
-// any other Occurrence, its Section goes to the end of the Scrapbook, or is
-// deleted if nothing is written in it.
+// removeOccurrence deletes an Occurrence at pos in the Arrangement. Its
+// Section goes to the end of the Scrapbook, or is deleted if nothing is
+// written in it. Until paste-import stops sharing Sections, another
+// Occurrence may still show it: then it stays where it is.
 func removeOccurrence(ctx context.Context, tx *sql.Tx, songID, occurrenceID, sectionID int64, pos int) error {
 	if _, err := tx.ExecContext(ctx, `DELETE FROM occurrences WHERE id = ?`, occurrenceID); err != nil {
 		return fmt.Errorf("removing occurrence: %w", err)
@@ -423,42 +415,6 @@ func sectionEmpty(ctx context.Context, tx *sql.Tx, sectionID int64) (bool, error
 	return empty, nil
 }
 
-// Detach points an Occurrence of a shared Section at a new copy of that
-// Section. The other Occurrences keep the original. Its Cues go with it.
-func (s *Store) Detach(ctx context.Context, songID int64, based Version, occurrenceID int64) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		sectionID, _, err := findOccurrence(ctx, tx, songID, occurrenceID)
-		if err != nil {
-			return err
-		}
-		var uses int
-		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM occurrences WHERE section_id = ?`,
-			sectionID).Scan(&uses); err != nil {
-			return err
-		}
-		if uses < 2 {
-			return invalid("only an Occurrence of a shared Section can be Detached")
-		}
-		copyID, lineCopies, err := copySection(ctx, tx, sectionID)
-		if err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `UPDATE occurrences SET section_id = ? WHERE id = ?`,
-			copyID, occurrenceID); err != nil {
-			return fmt.Errorf("pointing occurrence at copy: %w", err)
-		}
-		// The Occurrence's Line Cues, dormant ones included, go over to the
-		// copy's Lines.
-		for lineID, copyLineID := range lineCopies {
-			if _, err := tx.ExecContext(ctx, `UPDATE line_cues SET line_id = ? WHERE occurrence_id = ? AND line_id = ?`,
-				copyLineID, occurrenceID, lineID); err != nil {
-				return fmt.Errorf("moving line cues to copy: %w", err)
-			}
-		}
-		return nil
-	})
-}
-
 // findSection checks a Section belongs to a Song and returns how many
 // Occurrences it has.
 func findSection(ctx context.Context, tx *sql.Tx, songID, sectionID int64) (uses int, err error) {
@@ -482,32 +438,29 @@ func findOccurrence(ctx context.Context, tx *sql.Tx, songID, occurrenceID int64)
 }
 
 // copySection creates a new Section with a Section's Label, all its
-// Alternates (the same one active) and all their Lines. It returns the new
-// Section's id, and the id of each Line's copy by the id of the Line.
-func copySection(ctx context.Context, tx *sql.Tx, sectionID int64) (int64, map[int64]int64, error) {
+// Alternates (the same one active) and all their Lines, without Cues, and
+// returns the new Section's id.
+func copySection(ctx context.Context, tx *sql.Tx, sectionID int64) (int64, error) {
 	copyID, err := insert(ctx, tx,
 		`INSERT INTO sections (song_id, label) SELECT song_id, label FROM sections WHERE id = ?`, sectionID)
 	if err != nil {
-		return 0, nil, fmt.Errorf("copying section: %w", err)
+		return 0, fmt.Errorf("copying section: %w", err)
 	}
 	alternates, err := alternatesOf(ctx, tx, sectionID)
 	if err != nil {
-		return 0, nil, err
+		return 0, err
 	}
-	lineCopies := map[int64]int64{}
 	for _, altID := range alternates {
 		copyAltID, err := insert(ctx, tx, `INSERT INTO alternates (section_id, name, active)
 			SELECT ?, name, active FROM alternates WHERE id = ?`, copyID, altID)
 		if err != nil {
-			return 0, nil, fmt.Errorf("copying alternate: %w", err)
+			return 0, fmt.Errorf("copying alternate: %w", err)
 		}
-		copies, err := copyLines(ctx, tx, altID, copyAltID)
-		if err != nil {
-			return 0, nil, err
+		if _, err := copyLines(ctx, tx, altID, copyAltID); err != nil {
+			return 0, err
 		}
-		maps.Copy(lineCopies, copies)
 	}
-	return copyID, lineCopies, nil
+	return copyID, nil
 }
 
 // alternatesOf returns the ids of a Section's Alternates, in the order they
