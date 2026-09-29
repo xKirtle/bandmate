@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack, type Snippet } from 'svelte';
   import type { Beat } from './api';
+  import Picker from './Picker.svelte';
   import { beatDrawerFilterCount, beatKeys, beatProducers, type BeatListView, type BeatUse } from './listViews';
 
   // The Beat Library's search and filters, which the Beat picker shares.
@@ -33,6 +34,9 @@
       ? [chosen, ...choices]
       : choices;
   }
+
+  // A filter's choices start with "Any", which clears it.
+  const anyOr = (choice: string | undefined) => choice ?? 'Any';
 
   const drawerCount = $derived(beatDrawerFilterCount(view));
   let drawerOpen = $state(untrack(() => drawerCount > 0));
@@ -72,15 +76,17 @@
     {@render actions?.()}
   </div>
   <div id="{idPrefix}-filters" class="drawer" class:open={drawerOpen}>
-    <label class="field">
-      <span>Producer</span>
-      <select value={view.producer ?? ''} onchange={(e) => (view.producer = e.currentTarget.value || undefined)}>
-        <option value="">Any</option>
-        {#each producers as p (p)}
-          <option value={p}>{p}</option>
-        {/each}
-      </select>
-    </label>
+    <div class="field">
+      <span id="{idPrefix}-producer-label">Producer</span>
+      <Picker
+        id="{idPrefix}-producer"
+        aria-labelledby="{idPrefix}-producer-label"
+        options={[undefined, ...producers]}
+        value={view.producer}
+        text={anyOr}
+        onpick={(v) => (view.producer = v)}
+      />
+    </div>
     <fieldset class="field bpm">
       <legend>BPM</legend>
       <label class="visually-hidden" for="{idPrefix}-bpm-min">Lowest BPM</label>
@@ -105,15 +111,17 @@
         oninput={(e) => setBpm('bpmMax', e)}
       />
     </fieldset>
-    <label class="field">
-      <span>Key</span>
-      <select value={view.key ?? ''} onchange={(e) => (view.key = e.currentTarget.value || undefined)}>
-        <option value="">Any</option>
-        {#each keys as k (k)}
-          <option value={k}>{k}</option>
-        {/each}
-      </select>
-    </label>
+    <div class="field">
+      <span id="{idPrefix}-key-label">Key</span>
+      <Picker
+        id="{idPrefix}-key"
+        aria-labelledby="{idPrefix}-key-label"
+        options={[undefined, ...keys]}
+        value={view.key}
+        text={anyOr}
+        onpick={(v) => (view.key = v)}
+      />
+    </div>
     <div class="chips" role="group" aria-label="Used in a Song">
       {#each uses as u (u.label)}
         <button type="button" class="chip" aria-pressed={view.use === u.id} onclick={() => (view.use = u.id)}>
@@ -179,10 +187,6 @@
     color: var(--text-muted);
     font-size: 0.8125rem;
     font-weight: 600;
-  }
-  .field select {
-    color: var(--text);
-    font-weight: 400;
   }
   .bpm {
     flex-direction: row;

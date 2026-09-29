@@ -2,7 +2,7 @@
   import { tick } from 'svelte';
   import type { HTMLInputAttributes } from 'svelte/elements';
   import { comboboxKey, filterOptions, optionIndex } from './combobox';
-  import { popoverTop } from './popover';
+  import { placeUnder, revealSelected } from './popover';
 
   let {
     id,
@@ -59,25 +59,11 @@
   // In the top layer, so no card or bar hides it; placed under the field, or
   // over it when there's no room below.
   function place() {
-    if (!list) return;
-    const at = input.getBoundingClientRect();
-    list.style.minWidth = `${at.width}px`;
-    const { width, height } = list.getBoundingClientRect();
-    // On a phone, what the on-screen keyboard leaves visible.
-    const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-    list.style.top = `${popoverTop(at, height, viewportHeight, gap)}px`;
-    const room = document.documentElement.clientWidth - gap;
-    list.style.left = `${Math.max(gap, Math.min(at.left, room - width))}px`;
+    if (list) placeUnder(list, input, gap);
   }
 
-  // Scrolls the highlighted option into the list's view.
   function reveal() {
-    const option = list?.querySelector<HTMLElement>('[aria-selected="true"]');
-    if (!list || !option) return;
-    if (option.offsetTop < list.scrollTop) list.scrollTop = option.offsetTop;
-    else if (option.offsetTop + option.offsetHeight > list.scrollTop + list.clientHeight) {
-      list.scrollTop = option.offsetTop + option.offsetHeight - list.clientHeight;
-    }
+    if (list) revealSelected(list);
   }
 
   function pick(option: string) {
@@ -179,7 +165,7 @@
     <!-- Pressing an option keeps focus in the field. -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-      class="list"
+      class="option-list"
       id="{id}-list"
       role="listbox"
       tabindex="-1"
@@ -192,13 +178,13 @@
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
           id="{id}-option-{i}"
-          class="option"
+          class="option-list-item"
           role="option"
           tabindex="-1"
           aria-selected={i === active}
           onclick={() => pick(option)}
         >
-          <span class="check" aria-hidden="true">{i === savedAt ? '✓' : ''}</span>
+          <span class="option-list-check" aria-hidden="true">{i === savedAt ? '✓' : ''}</span>
           {option}
           {#if i === savedAt}<span class="visually-hidden">(saved)</span>{/if}
         </div>
@@ -239,39 +225,5 @@
     .combobox:hover .chevron {
       opacity: 1;
     }
-  }
-  .list {
-    position: fixed;
-    inset: auto;
-    /* About six options, then it scrolls. */
-    max-height: calc(6 * var(--control) + 0.5rem + 2px);
-    max-width: calc(100vw - 2rem);
-    overflow-y: auto;
-    margin: 0;
-    padding: 0.25rem;
-    border: 1px solid var(--border);
-    border-radius: 0.5rem;
-    background: var(--bg);
-    color: var(--text);
-    box-shadow: 0 0.5rem 1.5rem color-mix(in srgb, var(--text) 18%, transparent);
-  }
-  .option {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-height: var(--control);
-    padding: 0 0.75rem 0 0.5rem;
-    border-radius: 0.375rem;
-    white-space: nowrap;
-    cursor: pointer;
-  }
-  .option:hover,
-  .option[aria-selected='true'] {
-    background: var(--surface-2);
-  }
-  .check {
-    width: 1rem;
-    color: var(--accent);
-    text-align: center;
   }
 </style>
