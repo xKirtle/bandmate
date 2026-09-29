@@ -19,3 +19,20 @@ export function detailsSummary(details: { key: string; bpm: string; capo: string
   const tuning = details.tuning.trim();
   return [key, bpm && `${bpm} BPM`, capo && `Capo ${capo}`, tuning].filter(Boolean).join(' · ');
 }
+
+/** A part of the Song page kept beside the Lyric Sheet on desktop, and after it on narrower windows. */
+export type SidePart = 'scrapbook' | 'masters';
+
+/**
+ * The side column's parts in order, and whether each starts open on desktop.
+ * Write mode gives the Scrapbook the room, with the Masters folded away
+ * beneath it; Read mode has no Scrapbook, so the Masters show.
+ */
+export function sideParts(mode: Mode): { part: SidePart; open: boolean }[] {
+  return mode === 'write'
+    ? [
+        { part: 'scrapbook', open: true },
+        { part: 'masters', open: false },
+      ]
+    : [{ part: 'masters', open: true }];
+}
