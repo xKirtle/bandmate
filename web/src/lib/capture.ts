@@ -49,7 +49,6 @@ registerProcessor('bandmate-capture', Capture);
 `;
 
 import { resolveInput, type InputChoice } from './inputSettings';
-import { samplesFrom, type Batch } from './recovery';
 
 // Added to a context once.
 const loaded = new WeakMap<BaseAudioContext, Promise<void>>();
@@ -234,6 +233,31 @@ export class InputLevel {
   }
 }
 
+/** Samples captured in a batch, with the frame the first was captured at. */
+export interface Batch {
+  frame: number;
+  samples: Float32Array;
+}
+
+/** The frame captured at a context time, at a rate. */
+export function frameAt(time: number, rate: number): number {
+  return Math.round(time * rate);
+}
+
+/**
+ * The samples captured from a frame on, from batches in any order, with
+ * silence wherever none were kept.
+ */
+export function samplesFrom(batches: readonly Batch[], first: number): Float32Array<ArrayBuffer> {
+  const last = batches.reduce((end, b) => Math.max(end, b.frame + b.samples.length), first);
+  const samples = new Float32Array(last - first);
+  for (const { frame, samples: batch } of batches) {
+    const skip = Math.max(0, first - frame);
+    if (skip < batch.length) samples.set(batch.subarray(skip), frame + skip - first);
+  }
+  return samples;
+}
+
 /** The input being captured, from when it's opened until it's stopped. */
 export class Capture {
   // The samples received so far, each batch with the frame it starts at.
@@ -309,7 +333,7 @@ export class Capture {
     // A stuck worklet shouldn't keep the recording from being saved.
     await Promise.race([this.#stopped, new Promise((resolve) => setTimeout(resolve, 500))]);
     this.close();
-    const samples = samplesFrom(this.#batches, Math.round(from * this.context.sampleRate));
+    const samples = samplesFrom(this.#batches, frameAt(from, this.context.sampleRate));
     this.#batches = [];
     return samples;
   }

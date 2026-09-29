@@ -16,7 +16,7 @@
   } from './api';
   import ActionsMenu from './ActionsMenu.svelte';
   import BeatPicker from './BeatPicker.svelte';
-  import { Capture, CaptureError, inputProblem } from './capture';
+  import { Capture, CaptureError, frameAt, inputProblem } from './capture';
   import { addedTrack, chosenTrack, readChosen, storeChosen, type ChoiceEvent } from './chosenTrack';
   import { clampMove, clampTrimEnd, clampTrimStart, draggedNudge, nudged } from './clipEdit';
   import { activeTake, clipSources, fileStart, playing } from './clipSource';
@@ -35,8 +35,8 @@
   import { type MenuAction } from './menu';
   import { peaks as peaksOf, peaksPerSecond } from './peaks';
   import { longPressDelay, pastSlop, type Point } from './press';
-  import { recordingPlan, retakeLength, retakePlan, type RecordingPlan } from './recording';
-  import { recoveredPlacement, type Unsaved } from './recovery';
+  import { recordingPlan, retakeLength, retakePlan, sungPastStart, type RecordingPlan } from './recording';
+  import { recoveredPlacement, takesAt, type TakeTarget, type Unsaved } from './recovery';
   import { keptInLoop, outsideLoop, repeats, timelineEnd, type Loop, type Placed } from './schedule';
   import { inTextField } from './textField';
   import { formatDuration } from './time';
@@ -46,7 +46,7 @@
   import { readInput } from './inputSettings';
   import { clampHeight, defaultHeight, deviceStorage, heightBounds, readHeight, storeHeight } from './timelineHeight';
   import { audioContext, TimelinePlayer, type PlayableClip, type PlayerState } from './timelinePlayer';
-  import { forget, Keeper, unsavedSamples, unsavedTakes, whileHeld } from './unsavedTakes';
+  import { forgetUnsaved, Keeper, unsavedSamples, unsavedTakes, whileHeld } from './unsavedTakes';
   import {
     edgeSpeed,
     fitScale,
@@ -160,7 +160,7 @@
   // or to discard.
   interface UnsavedOffer {
     /** Its key in the browser, or null where the browser couldn't keep it. */
-    id: number | null;
+    id: string | null;
     unsaved: Unsaved;
     sampleRate: number;
     /** Reads back what it captured. */
@@ -855,7 +855,7 @@
       const unsaved: Unsaved = {
         trackId: track.id,
         clipId: starting.clipId,
-        origin: clip ? clip.start - clip.offset : 0,
+        takes: clip ? takesAt(clip) : [],
         plan,
         latencyOffset: appliedOffset(calibration, capture.latency),
       };
@@ -863,7 +863,7 @@
         ...unsaved,
         songId: song.id,
         sampleRate: capture.sampleRate,
-        first: Math.round(startedAt * capture.sampleRate),
+        first: frameAt(startedAt, capture.sampleRate),
         recordedAt: new Date().toISOString(),
       });
       capture.keep((batch) => keeper.add(batch));
@@ -885,7 +885,7 @@
     const rate = r.capture.sampleRate;
     const { latencyOffset } = r.unsaved;
     // What was sung after the lead-in, placed where it was heard.
-    if (r.plan.from + samples.length / rate - latencyOffset <= r.plan.start) {
+    if (!sungPastStart(r.plan, samples.length / rate, latencyOffset)) {
       r.keeper.forget();
       recording = null;
       skipped = false;
@@ -893,8 +893,8 @@
       return;
     }
     const { clipId, trackId, plan } = r;
-    const target = clipId === null ? { trackId, start: plan.start } : { clipId };
-    const ok = await saveTake(target, samples, rate, { captureStart: plan.from, latencyOffset });
+    const target: TakeTarget = clipId === null ? { trackId, start: plan.start } : { clipId };
+    const ok = await saveTake(() => ({ target, captureStart: plan.from }), samples, rate, latencyOffset);
     if (ok) r.keeper.forget();
     else {
       // Offered back, to try again or discard.
@@ -910,24 +910,32 @@
   /**
    * Uploads a Take recorded, into a Clip of Takes, or in a new Clip on a
    * Track, noting it in the history; resolves to whether it was saved.
+   * Where it goes is decided when its turn comes, on the Timeline as it is
+   * then.
    */
   function saveTake(
-    target: { clipId: number } | { trackId: number; start: number },
+    place: () => { target: TakeTarget | null; captureStart: number },
     samples: Float32Array,
     rate: number,
-    captured: { captureStart: number; latencyOffset: number },
+    latencyOffset: number,
   ): Promise<boolean> {
     const wav = new Blob([encodeWav(samples, rate)], { type: 'audio/wav' });
-    const details = { ...captured, peaks: peaksOf([samples], rate) };
+    const peaks = peaksOf([samples], rate);
     offerCues = null;
     queued++;
     return change(async (at) => {
+      const { target, captureStart } = place();
+      if (!target) throw new Error("There's no Track to put the Take on.");
+      const details = { captureStart, latencyOffset, peaks };
       const before = timeline;
-      const after =
-        'clipId' in target
-          ? await saved(api.retake(at, target.clipId, wav, details))
-          : await saved(api.recordTake(at, wav, { ...target, ...details }));
-      history.record('clipId' in target ? settingTakes(after, target.clipId) : placingAdded(before, after), before, after);
+      let after: Timeline;
+      if ('clipId' in target) {
+        after = await saved(api.retake(at, target.clipId, wav, details));
+        history.record(settingTakes(after, target.clipId), before, after);
+      } else {
+        after = await saved(api.recordTake(at, wav, { ...target, ...details }));
+        history.record(placingAdded(before, after), before, after);
+      }
       editedAt = after.version;
       showHistory();
       return { timeline: after };
@@ -974,22 +982,16 @@
       return false;
     }
     const duration = samples.length / offer.sampleRate;
-    let placement = recoveredPlacement(timeline.tracks, offer.unsaved, duration, chosen);
-    // Without Tracks, one's added first, as Record does.
-    if (placement?.kind === 'record' && placement.trackId === null) {
-      if (!(await addTrack())) return false;
-      placement = recoveredPlacement(timeline.tracks, offer.unsaved, duration, chosen);
-    }
+    const place = () => recoveredPlacement(timeline.tracks, offer.unsaved, duration, chosen);
+    const placement = place();
     // Stopped during the lead-in: there's nothing to keep.
     if (placement === null) {
       await dropUnsaved(offer);
       return true;
     }
-    if (placement.kind === 'record' && placement.trackId === null) return false;
-    const target =
-      placement.kind === 'retake' ? { clipId: placement.clipId } : { trackId: placement.trackId!, start: placement.start };
-    const captured = { captureStart: placement.captureStart, latencyOffset: offer.unsaved.latencyOffset };
-    const upload = () => saveTake(target, samples, offer.sampleRate, captured);
+    // Without Tracks, one's added first, as Record does.
+    if (placement.target === null && !(await addTrack())) return false;
+    const upload = () => saveTake(() => place()!, samples, offer.sampleRate, offer.unsaved.latencyOffset);
     const ok = offer.id === null ? await upload() : await whileHeld(offer.id, upload);
     if (ok === false) return false;
     // Null where another tab is uploading it already, which drops it once it's done.
@@ -1001,7 +1003,7 @@
   /** Stops offering an unsaved Take, and drops it from the browser. */
   async function dropUnsaved(offer: UnsavedOffer) {
     unsaved = unsaved.filter((o) => o !== offer);
-    if (offer.id !== null) await forget(offer.id);
+    if (offer.id !== null) await forgetUnsaved(offer.id);
   }
 
   function discardUnsaved() {
@@ -1687,7 +1689,8 @@
   }
 </script>
 
-<svelte:window onkeydown={keydown} />
+<!-- A tab closing mid-recording writes what it hasn't yet, to offer it back. -->
+<svelte:window onkeydown={keydown} onpagehide={() => recording?.keeper?.finish()} />
 
 {#snippet undoRedo()}
   <span class="history edit-only">

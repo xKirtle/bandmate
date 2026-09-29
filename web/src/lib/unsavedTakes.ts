@@ -7,12 +7,13 @@
 //
 // While a tab records or uploads one, it holds a lock named after it, so
 // another tab open on the same Song doesn't offer it back meanwhile.
-import { samplesFrom, type Batch, type Unsaved } from './recovery';
+import { samplesFrom, type Batch } from './capture';
+import type { Unsaved } from './recovery';
 
 /** A recording kept in the browser, and where it was going. */
 export interface UnsavedTake extends Unsaved {
-  /** Its key in the browser's store. */
-  id: number;
+  /** Its key in the browser's store, chosen before it's written, so it's locked from the start. */
+  id: string;
   songId: number;
   sampleRate: number;
   /** The frame its capture began at, lead-in included: what came before is dropped. */
@@ -32,7 +33,7 @@ function open(): Promise<IDBDatabase> {
     const request = indexedDB.open(dbName, 1);
     request.onupgradeneeded = () => {
       const db = request.result;
-      db.createObjectStore(takesStore, { keyPath: 'id', autoIncrement: true }).createIndex('songId', 'songId');
+      db.createObjectStore(takesStore, { keyPath: 'id' }).createIndex('songId', 'songId');
       db.createObjectStore(chunksStore, { autoIncrement: true }).createIndex('takeId', 'takeId');
     };
     request.onsuccess = () => resolve(request.result);
@@ -59,7 +60,7 @@ function done<T>(r: IDBRequest<T> | IDBTransaction): Promise<T | void> {
   });
 }
 
-function lockName(id: number): string {
+function lockName(id: string): string {
   return `bandmate.unsavedTake.${id}`;
 }
 
@@ -82,7 +83,7 @@ const chunkSeconds = 0.5;
  * does fails: where the browser can't keep it, it keeps nothing.
  */
 export class Keeper {
-  #id: Promise<number | null>;
+  #id: Promise<string | null>;
   // Each write waits for the one before, so they're in order.
   #writes: Promise<unknown>;
   #pending: Batch[] = [];
@@ -94,21 +95,29 @@ export class Keeper {
   /** Starts keeping a recording for a Song. */
   constructor(details: Omit<UnsavedTake, 'id'>) {
     this.#id = (async () => {
-      const db = await open();
-      const tx = db.transaction(takesStore, 'readwrite');
-      const id = (await done(tx.objectStore(takesStore).add(details))) as number;
+      const id = crypto.randomUUID();
+      await this.#lock(id);
+      const tx = (await open()).transaction(takesStore, 'readwrite');
+      tx.objectStore(takesStore).add({ ...details, id });
       await done(tx);
-      this.#lock(id);
       return id;
     })().catch(() => null);
     this.#writes = this.#id;
     this.#chunk = details.sampleRate * chunkSeconds;
   }
 
-  /** Keeps the id's lock until released, where the browser has locks. */
-  #lock(id: number) {
+  /** Takes the id's lock, where the browser has locks, and keeps it until released; resolves once taken. */
+  #lock(id: string): Promise<void> {
     const held = new Promise<void>((resolve) => (this.#release = resolve));
-    navigator.locks?.request(lockName(id), () => held).catch(() => {});
+    return new Promise((taken) => {
+      if (!navigator.locks) return taken();
+      navigator.locks
+        .request(lockName(id), () => {
+          taken();
+          return held;
+        })
+        .catch(() => taken());
+    });
   }
 
   /** Keeps a batch, with the others once there's a chunk's worth. */
@@ -133,7 +142,7 @@ export class Keeper {
   }
 
   /** Writes what's left, and resolves to the recording's id, or null if it couldn't be kept. */
-  async finish(): Promise<number | null> {
+  async finish(): Promise<string | null> {
     this.#flush();
     await this.#writes;
     return this.#id;
@@ -148,7 +157,7 @@ export class Keeper {
   async forget() {
     const id = await this.finish();
     this.release();
-    if (id !== null) await forget(id);
+    if (id !== null) await forgetUnsaved(id);
   }
 }
 
@@ -161,7 +170,9 @@ export async function unsavedTakes(songId: number): Promise<UnsavedTake[]> {
     const db = await open();
     const all = await done(db.transaction(takesStore).objectStore(takesStore).index('songId').getAll(songId));
     const held = await busy();
-    return (all as UnsavedTake[]).filter((t) => !held.has(lockName(t.id))).sort((a, b) => a.id - b.id);
+    return (all as UnsavedTake[])
+      .filter((t) => !held.has(lockName(t.id)))
+      .sort((a, b) => a.recordedAt.localeCompare(b.recordedAt));
   } catch {
     return [];
   }
@@ -182,13 +193,13 @@ export async function unsavedSamples(take: UnsavedTake): Promise<Float32Array<Ar
  * meanwhile; resolves to what upload does, or null without uploading if
  * another tab holds it.
  */
-export async function whileHeld<T>(id: number, upload: () => Promise<T>): Promise<T | null> {
+export async function whileHeld<T>(id: string, upload: () => Promise<T>): Promise<T | null> {
   if (!navigator.locks) return upload();
   return navigator.locks.request(lockName(id), { ifAvailable: true }, (lock) => (lock ? upload() : null));
 }
 
 /** Drops a recording kept, and what it captured. */
-export async function forget(id: number) {
+export async function forgetUnsaved(id: string) {
   try {
     const db = await open();
     const tx = db.transaction([takesStore, chunksStore], 'readwrite');
