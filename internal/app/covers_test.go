@@ -227,6 +227,156 @@ func TestCoversSurviveARestart(t *testing.T) {
 	}
 }
 
+func TestReplacingACoverKeepsOnlyTheNewOne(t *testing.T) {
+	ts := newTestServer(t)
+	before := ts.addCover(ts.createSong("Night Drive").ID, fakeCover())
+	kept := ts.addCover(ts.createSong("Kept").ID, fakeCover())
+	upload := otherCover()
+
+	res := ts.replaceCoverAt(before.Version, before.ID, upload)
+
+	expectStatus(t, res, http.StatusOK)
+	var got song
+	res.JSON(t, &got)
+	if got.Cover == nil {
+		t.Fatalf("cover = nil, want the new one")
+	}
+	if got.Cover.ID == before.Cover.ID {
+		t.Errorf("cover id = %d, want a new one, so its pictures' addresses change", got.Cover.ID)
+	}
+	want := cover{ID: got.Cover.ID, Width: 900, Height: 1600, Crop: coverCrop{X: 0, Y: 300, Size: 900}, AddedAt: got.Cover.AddedAt}
+	if !reflect.DeepEqual(*got.Cover, want) {
+		t.Errorf("cover = %+v, want %+v", *got.Cover, want)
+	}
+	if got.Version == before.Version {
+		t.Errorf("version = %d, want it changed", got.Version)
+	}
+	if !parseTime(t, got.UpdatedAt).After(parseTime(t, before.UpdatedAt)) {
+		t.Errorf("updatedAt = %s, want it after %s", got.UpdatedAt, before.UpdatedAt)
+	}
+	if read := ts.getSong(before.ID); !reflect.DeepEqual(read, got) {
+		t.Errorf("song read back = %+v, want %+v", read, got)
+	}
+	if id := ts.listSongs()[0].CoverID; id == nil || *id != got.Cover.ID {
+		t.Errorf("coverId in the Song list = %v, want %d", id, got.Cover.ID)
+	}
+	for picture, data := range map[string][]byte{
+		"original": upload.Original, "list": upload.List, "header": upload.Header,
+	} {
+		served := ts.Do(http.MethodGet, songPath(before.ID)+"/cover/"+picture, nil)
+		expectStatus(t, served, http.StatusOK)
+		if !bytes.Equal(served.Body, data) {
+			t.Errorf("%s = %q, want the new one: %q", picture, served.Body, data)
+		}
+		if got := served.Header.Get("Content-Type"); got != "image/jpeg" {
+			t.Errorf("%s Content-Type = %q, want image/jpeg", picture, got)
+		}
+	}
+	if files, want := coverFiles(t, ts), coverFileNames(got.Cover.ID, kept.Cover.ID); !reflect.DeepEqual(files, want) {
+		t.Errorf("cover files on disk = %q, want only the new Cover's and the other Song's: %q", files, want)
+	}
+}
+
+func TestOnlyASongWithACoverCanHaveItReplaced(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.createSong("Night Drive")
+
+	expectError(t, ts.replaceCoverAt(s.Version, s.ID, fakeCover()), http.StatusConflict, "this Song has no Cover")
+
+	if read := ts.getSong(s.ID); !reflect.DeepEqual(read, s) {
+		t.Errorf("song = %+v, want it unchanged: %+v", read, s)
+	}
+	if files := coverFiles(t, ts); len(files) != 0 {
+		t.Errorf("cover files on disk = %q, want none", files)
+	}
+}
+
+func TestAReplacementCoverIsCheckedLikeANewOne(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.addCover(ts.createSong("Night Drive").ID, fakeCover())
+	before := coverFiles(t, ts)
+
+	expectError(t, ts.replaceCoverAt(s.Version, s.ID, otherCover().withType("list", "text/html")),
+		http.StatusBadRequest, "a Cover's pictures must be JPEG, PNG or WebP")
+
+	if read := ts.getSong(s.ID); !reflect.DeepEqual(read, s) {
+		t.Errorf("song = %+v, want it unchanged: %+v", read, s)
+	}
+	if files := coverFiles(t, ts); !reflect.DeepEqual(files, before) {
+		t.Errorf("cover files on disk = %q, want the old Cover's: %q", files, before)
+	}
+}
+
+func TestRemovingACoverDeletesItAndItsFiles(t *testing.T) {
+	ts := newTestServer(t)
+	before := ts.addCover(ts.createSong("Night Drive").ID, fakeCover())
+	kept := ts.addCover(ts.createSong("Kept").ID, fakeCover())
+
+	res := ts.DoAt(before.Version, http.MethodDelete, songPath(before.ID)+"/cover", nil)
+
+	expectStatus(t, res, http.StatusOK)
+	var got song
+	res.JSON(t, &got)
+	if got.Cover != nil {
+		t.Errorf("cover = %+v, want none", *got.Cover)
+	}
+	if got.Version == before.Version {
+		t.Errorf("version = %d, want it changed", got.Version)
+	}
+	if !parseTime(t, got.UpdatedAt).After(parseTime(t, before.UpdatedAt)) {
+		t.Errorf("updatedAt = %s, want it after %s", got.UpdatedAt, before.UpdatedAt)
+	}
+	if read := ts.getSong(before.ID); !reflect.DeepEqual(read, got) {
+		t.Errorf("song read back = %+v, want %+v", read, got)
+	}
+	if id := ts.listSongs()[0].CoverID; id != nil {
+		t.Errorf("coverId in the Song list = %d, want none", *id)
+	}
+	expectStatus(t, ts.Do(http.MethodGet, songPath(before.ID)+"/cover/list", nil), http.StatusNotFound)
+	if files, want := coverFiles(t, ts), coverFileNames(kept.Cover.ID); !reflect.DeepEqual(files, want) {
+		t.Errorf("cover files on disk = %q, want only the other Song's: %q", files, want)
+	}
+}
+
+func TestOnlyASongWithACoverCanHaveItRemoved(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.createSong("Night Drive")
+
+	expectError(t, ts.DoAt(s.Version, http.MethodDelete, songPath(s.ID)+"/cover", nil),
+		http.StatusConflict, "this Song has no Cover")
+
+	if read := ts.getSong(s.ID); !reflect.DeepEqual(read, s) {
+		t.Errorf("song = %+v, want it unchanged: %+v", read, s)
+	}
+}
+
+func TestChangingACoverOnAStaleSongVersionIsRefused(t *testing.T) {
+	for name, send := range map[string]func(ts *testServer, version, songID int64) response{
+		"replace": func(ts *testServer, version, songID int64) response {
+			return ts.replaceCoverAt(version, songID, otherCover())
+		},
+		"remove": func(ts *testServer, version, songID int64) response {
+			return ts.DoAt(version, http.MethodDelete, songPath(songID)+"/cover", nil)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			ts := newTestServer(t)
+			old := ts.addCover(ts.createSong("Night Drive").ID, fakeCover())
+			current := ts.updateSong(old.ID, map[string]any{"notes": "Edited in another tab"})
+			before := coverFiles(t, ts)
+
+			expectStale(t, send(ts, old.Version, old.ID))
+
+			if read := ts.getSong(old.ID); !reflect.DeepEqual(read, current) {
+				t.Errorf("song = %+v, want it unchanged: %+v", read, current)
+			}
+			if files := coverFiles(t, ts); !reflect.DeepEqual(files, before) {
+				t.Errorf("cover files on disk = %q, want the old Cover's: %q", files, before)
+			}
+		})
+	}
+}
+
 // cover is a Song's Cover as the API returns it.
 type cover struct {
 	ID int64 `json:"id"`
@@ -270,6 +420,20 @@ func fakeCover() coverUpload {
 	}
 }
 
+// otherCover is a stand-in for a 900×1600 JPEG, centre-cropped, unlike
+// fakeCover in every way.
+func otherCover() coverUpload {
+	return coverUpload{
+		Original: []byte("not really a jpeg: another original"),
+		List:     []byte("not really a jpeg: another list"),
+		Header:   []byte("not really a jpeg: another header"),
+		Types:    map[string]string{"original": "image/jpeg", "list": "image/jpeg", "header": "image/jpeg"},
+		Details: map[string]any{
+			"width": 900, "height": 1600, "crop": map[string]any{"x": 0, "y": 300, "size": 900},
+		},
+	}
+}
+
 func (u coverUpload) without(part string) coverUpload {
 	u.Missing = map[string]bool{part: true}
 	return u
@@ -305,6 +469,19 @@ func (u coverUpload) withType(part, contentType string) coverUpload {
 // sendCoverAt adds a Cover to a Song based on a given version of it, as the
 // SPA does.
 func (ts *testServer) sendCoverAt(version, songID int64, u coverUpload) response {
+	ts.t.Helper()
+	return ts.uploadCoverAt(http.MethodPost, version, songID, u)
+}
+
+// replaceCoverAt replaces a Song's Cover based on a given version of it, as
+// the SPA does.
+func (ts *testServer) replaceCoverAt(version, songID int64, u coverUpload) response {
+	ts.t.Helper()
+	return ts.uploadCoverAt(http.MethodPut, version, songID, u)
+}
+
+// uploadCoverAt sends a Cover's pictures with the given method.
+func (ts *testServer) uploadCoverAt(method string, version, songID int64, u coverUpload) response {
 	ts.t.Helper()
 	var body bytes.Buffer
 	form := multipart.NewWriter(&body)
@@ -342,7 +519,7 @@ func (ts *testServer) sendCoverAt(version, songID int64, u coverUpload) response
 		"Content-Type": {form.FormDataContentType()},
 		"If-Match":     {fmt.Sprintf("%q", fmt.Sprint(version))},
 	}
-	return ts.DoRaw(http.MethodPost, songPath(songID)+"/cover", header, &body)
+	return ts.DoRaw(method, songPath(songID)+"/cover", header, &body)
 }
 
 // addCover adds a Cover to a Song at its current version and returns the
@@ -354,6 +531,19 @@ func (ts *testServer) addCover(songID int64, u coverUpload) song {
 	var s song
 	res.JSON(ts.t, &s)
 	return s
+}
+
+// coverFileNames are the files kept for the given Covers, as coverFiles
+// lists them.
+func coverFileNames(ids ...int64) []string {
+	names := []string{}
+	for _, picture := range []string{"original", "list", "header"} {
+		for _, id := range ids {
+			names = append(names, fmt.Sprintf("%s/%d", picture, id))
+		}
+	}
+	sort.Strings(names)
+	return names
 }
 
 // coverFiles lists the files stored for Covers in the data directory, as

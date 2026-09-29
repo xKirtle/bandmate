@@ -17,7 +17,7 @@
   import Scrapbook from '../lib/Scrapbook.svelte';
   import { dropsOnScrapbook } from '../lib/sectionDrag';
   import { SectionDragging } from '../lib/sectionDragging.svelte';
-  import AddCover from '../lib/AddCover.svelte';
+  import EditCover from '../lib/EditCover.svelte';
   import SongCover from '../lib/SongCover.svelte';
   import StatusBadge from '../lib/StatusBadge.svelte';
   import Timeline from '../lib/Timeline.svelte';
@@ -368,8 +368,15 @@
     <div class="song">
       <div class="top">
         <div class="head">
-          {#if writing && !song.cover}
-            <AddCover title={draft.title} status={draft.status} change={send} onError={(m) => (saveError = m)} />
+          {#if writing}
+            <EditCover
+              songId={song.id}
+              cover={song.cover}
+              title={draft.title}
+              status={draft.status}
+              change={send}
+              onError={(m) => (saveError = m)}
+            />
           {:else}
             <SongCover
               songId={song.id}

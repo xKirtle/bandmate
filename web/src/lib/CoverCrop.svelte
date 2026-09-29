@@ -8,10 +8,13 @@
   // Full-screen on a phone.
   let {
     picture,
+    confirmLabel,
     onConfirm,
     onCancel,
   }: {
     picture: CoverToCrop;
+    /** Names what confirming does, e.g. "Add Cover". */
+    confirmLabel: string;
     /** The square chosen, in whole pixels of the original. */
     onConfirm: (crop: Square) => void;
     onCancel: () => void;
@@ -164,7 +167,7 @@
   </label>
 
   <div class="footer">
-    <button type="button" class="button primary" onclick={confirm}>Add Cover</button>
+    <button type="button" class="button primary" onclick={confirm}>{confirmLabel}</button>
     <button type="button" class="button" onclick={() => dialog?.close()}>Cancel</button>
   </div>
 </dialog>

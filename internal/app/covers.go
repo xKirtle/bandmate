@@ -1,16 +1,35 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
 )
 
-// A Cover is part of the Song, like a Master: adding one answers with the
-// full, updated Song, and is based on the Song version in If-Match, if any.
+// A Cover is part of the Song, like a Master: adding, replacing or removing
+// one answers with the full, updated Song, and is based on the Song version
+// in If-Match, if any.
 
 func (a *App) addCover(w http.ResponseWriter, r *http.Request) {
+	a.putCover(w, r, a.songs.AddCover)
+}
+
+func (a *App) replaceCover(w http.ResponseWriter, r *http.Request) {
+	a.putCover(w, r, a.songs.ReplaceCover)
+}
+
+func (a *App) removeCover(w http.ResponseWriter, r *http.Request) {
+	a.changeSheet(w, r, nil, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
+		return a.songs.RemoveCover(r.Context(), id, based)
+	})
+}
+
+// putCover reads a Cover's pictures and details and gives them to put.
+func (a *App) putCover(w http.ResponseWriter, r *http.Request,
+	put func(ctx context.Context, songID int64, based lyricsheet.Version, details lyricsheet.CoverDetails,
+		pictures map[lyricsheet.CoverPicture]lyricsheet.UploadedPicture) (lyricsheet.Song, error)) {
 	id, ok := songID(w, r)
 	if !ok {
 		return
@@ -34,7 +53,7 @@ func (a *App) addCover(w http.ResponseWriter, r *http.Request) {
 		f := files[string(p)]
 		pictures[p] = lyricsheet.UploadedPicture{File: f.Received, ContentType: f.contentType}
 	}
-	song, err := a.songs.AddCover(r.Context(), id, based, details, pictures)
+	song, err := put(r.Context(), id, based, details, pictures)
 	if err != nil {
 		writeDomainError(w, err)
 		return

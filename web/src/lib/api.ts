@@ -324,6 +324,14 @@ async function request<T>(method: string, path: string, body?: unknown, at?: Son
   return data as T;
 }
 
+/** A Cover's pictures and details, as the server takes them. */
+function coverForm(cover: PreparedCover): FormData {
+  const form = new FormData();
+  form.append('details', JSON.stringify({ width: cover.width, height: cover.height, crop: cover.crop }));
+  for (const picture of coverPictures) form.append(picture, cover[picture], picture);
+  return form;
+}
+
 /** An audio file with its details as a JSON part, as the server expects uploads. */
 function audioForm(file: File, details: object): FormData {
   const form = new FormData();
@@ -463,12 +471,12 @@ export const api = {
   deleteMaster: (at: SongAt, masterId: number) =>
     request<Song>('DELETE', `/songs/${at.id}/masters/${masterId}`, undefined, at),
   /** Gives a Song without a Cover the one the browser prepared. */
-  addCover: (at: SongAt, cover: PreparedCover) => {
-    const form = new FormData();
-    form.append('details', JSON.stringify({ width: cover.width, height: cover.height, crop: cover.crop }));
-    for (const picture of coverPictures) form.append(picture, cover[picture], picture);
-    return request<Song>('POST', `/songs/${at.id}/cover`, form, at);
-  },
+  addCover: (at: SongAt, cover: PreparedCover) => request<Song>('POST', `/songs/${at.id}/cover`, coverForm(cover), at),
+  /** Replaces a Song's Cover with the one the browser prepared, deleting the old one's files. */
+  replaceCover: (at: SongAt, cover: PreparedCover) =>
+    request<Song>('PUT', `/songs/${at.id}/cover`, coverForm(cover), at),
+  /** Deletes a Song's Cover and its files. */
+  removeCover: (at: SongAt) => request<Song>('DELETE', `/songs/${at.id}/cover`, undefined, at),
   /** Where one of a Song's Cover's pictures is. */
   coverUrl: (songId: number, coverId: number, picture: CoverPicture) =>
     `/api/songs/${songId}/cover/${picture}?v=${coverId}`,
