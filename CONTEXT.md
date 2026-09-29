@@ -124,6 +124,10 @@ _Avoid_: Tap mode, record mode
 The delay between what the user heard and what the mic captured, the full round trip, measured by calibration once per device, since it belongs to the hardware chain: a click plays, the user taps or claps on the mic along with it, and the delays are averaged. Calibration is offered before a device's first recording, and can be skipped and run later from the recording settings; until then, the latency the browser reports stands in. Each Take is placed earlier by the offset it was recorded with and keeps it, so recalibrating never moves it, and it can be nudged by hand.
 _Avoid_: Delay, lag
 
+**Nudge**:
+How far a Take has been moved by hand from where it was recorded, on top of its Latency Offset: typed in milliseconds in its Clip's menu, stepped with Alt+←/→, or set by Alt+dragging the Clip. Only the Take moves; its Clip stays where it is on the Timeline. A Take nudged earlier still reaches where it ended before, so its Clip can be trimmed out as far as before.
+_Avoid_: Shift, offset (the Latency Offset is something else)
+
 **Input**:
 What a Take is recorded from: an audio device and one of its channels (e.g. "Scarlett 2i2 · Input 1"), since Takes are mono. Chosen once per device, like the Latency Offset; where the device chosen isn't connected, the default input is used, and said so. A device's channels are its inputs, never Tracks.
 _Avoid_: Mic (unless it is one), source

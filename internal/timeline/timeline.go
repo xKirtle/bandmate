@@ -93,7 +93,10 @@ type Take struct {
 	// captured to place it.
 	LatencyOffset float64 `json:"latencyOffset"`
 	// Position is where it starts in its Clip's source span, in seconds.
-	Position   float64   `json:"position"`
+	Position float64 `json:"position"`
+	// Nudge is how far it's been moved by hand from where it was recorded,
+	// in seconds, later if positive. Position includes it.
+	Nudge      float64   `json:"nudge"`
 	RecordedAt time.Time `json:"recordedAt"`
 	// Peaks is the waveform, as the browser computed it. The Timeline
 	// leaves them out; GetTake includes them.
@@ -594,7 +597,8 @@ func (src source) duration(ctx context.Context, tx *sql.Tx) (float64, error) {
 		var end float64
 		for _, id := range src.takeIDs {
 			var e float64
-			if err := tx.QueryRowContext(ctx, `SELECT position + duration FROM takes WHERE id = ?`, id).
+			// A Take nudged earlier still reaches where it ended before.
+			if err := tx.QueryRowContext(ctx, `SELECT position + duration + MAX(0, -nudge) FROM takes WHERE id = ?`, id).
 				Scan(&e); err != nil {
 				return 0, fmt.Errorf("reading take: %w", err)
 			}
@@ -863,8 +867,8 @@ func (s *Store) copyTakes(ctx context.Context, tx *sql.Tx, ids []int64, linked *
 	copies := map[int64]int64{}
 	for _, id := range ids {
 		res, err := tx.ExecContext(ctx, `INSERT INTO takes (song_id, number, size, duration, sample_rate, peaks,
-				latency_offset, position, recorded_at)
-			SELECT song_id, number, size, duration, sample_rate, peaks, latency_offset, position, recorded_at
+				latency_offset, position, nudge, recorded_at)
+			SELECT song_id, number, size, duration, sample_rate, peaks, latency_offset, position, nudge, recorded_at
 			FROM takes WHERE id = ?`, id)
 		if err != nil {
 			return nil, fmt.Errorf("copying take: %w", err)

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -110,6 +111,16 @@ func (f *Files) Serve(w http.ResponseWriter, r *http.Request, id int64, contentT
 	w.Header().Set("Cache-Control", "no-cache")
 	http.ServeContent(w, r, "", info.ModTime(), file)
 	return nil
+}
+
+// OfferToSave has the file served next offered as a download, saved under
+// name, rather than played.
+func OfferToSave(w http.ResponseWriter, name string) {
+	disposition := mime.FormatMediaType("attachment", map[string]string{"filename": name})
+	if disposition == "" {
+		disposition = "attachment"
+	}
+	w.Header().Set("Content-Disposition", disposition)
 }
 
 // Link stores the file kept under from under to as well, replacing any file

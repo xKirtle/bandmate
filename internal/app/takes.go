@@ -50,13 +50,14 @@ func (a *App) getTake(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, t)
 }
 
-// takeAudio streams a Take's file, exactly as recorded.
+// takeAudio streams a Take's file, exactly as recorded, or with ?download
+// offers it to save.
 func (a *App) takeAudio(w http.ResponseWriter, r *http.Request) {
 	id, takeID, ok := takePathIDs(w, r)
 	if !ok {
 		return
 	}
-	if err := a.timelines.ServeTake(w, r, id, takeID); err != nil {
+	if err := a.timelines.ServeTake(w, r, id, takeID, r.URL.Query().Has("download")); err != nil {
 		writeDomainError(w, err)
 	}
 }
@@ -132,4 +133,18 @@ func (a *App) deleteTake(w http.ResponseWriter, r *http.Request) {
 // clearInactiveTakes detaches all of a Clip's Takes but the active one.
 func (a *App) clearInactiveTakes(w http.ResponseWriter, r *http.Request) {
 	a.changeClip(w, r, nil, a.timelines.ClearInactiveTakes)
+}
+
+// nudgeTake moves one of a Clip's Takes by hand, its Clip staying put.
+func (a *App) nudgeTake(w http.ResponseWriter, r *http.Request) {
+	takeID, ok := pathID(w, r, "takeID")
+	if !ok {
+		return
+	}
+	var req struct {
+		Nudge float64 `json:"nudge"`
+	}
+	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based lyricsheet.Version, clipID int64) (timeline.Timeline, error) {
+		return a.timelines.NudgeTake(ctx, id, based, clipID, takeID, req.Nudge)
+	})
 }

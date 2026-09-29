@@ -3,6 +3,8 @@
 // arithmetic, so the Timeline only has to follow it. The server enforces
 // the same rules and rejects anything else.
 
+import type { Clip } from './api';
+import { activeTake } from './clipSource';
 import type { Placed } from './schedule';
 
 /** The shortest a Clip can be trimmed to, in seconds. */
@@ -67,4 +69,26 @@ function gaps(clips: readonly Placed[]): [number, number][] {
   }
   result.push([from, Infinity]);
   return result;
+}
+
+/**
+ * The nudge its active Take gets when a Clip of Takes is Alt+dragged by
+ * seconds, from the nudge it has, in whole milliseconds.
+ */
+export function draggedNudge(clip: Clip, seconds: number): number {
+  const take = activeTake(clip)!;
+  return Math.round((take.nudge + seconds) * 1000) / 1000;
+}
+
+/**
+ * A Clip of Takes with its active Take nudged, as it's shown while
+ * dragged: only the Take moves, never the Clip's window. Nudged before the
+ * Clip's span, it's shown there, where the server takes the span back
+ * instead: the Take is heard in the same place either way.
+ */
+export function nudged(clip: Clip, nudge: number): Clip {
+  return {
+    ...clip,
+    takes: clip.takes.map((t) => (t.id === clip.activeTakeId ? { ...t, position: t.position + nudge - t.nudge, nudge } : t)),
+  };
 }

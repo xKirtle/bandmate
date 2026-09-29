@@ -279,6 +279,8 @@ export interface Take {
   latencyOffset: number;
   /** Where it starts in its Clip's source span, in seconds. */
   position: number;
+  /** How far it's been nudged by hand from where it was recorded, in seconds, later if positive. Position includes it. */
+  nudge: number;
   recordedAt: string;
   /** The waveform, 100 per second, from 0 to 1. Only when reading one Take, not in the Timeline. */
   peaks?: number[];
@@ -309,10 +311,11 @@ export interface TakePlacement extends Captured {
 
 /**
  * How a Clip of Takes is to be, e.g. to undo or redo a Retake: its Takes,
- * each where it starts in its source span, the one it plays, and its placement.
+ * each where it starts in its source span and how far it's nudged, the one
+ * it plays, and its placement.
  */
 export type ClipTakes = Pick<Clip, 'activeTakeId' | 'start' | 'offset' | 'length'> & {
-  takes: Pick<Take, 'id' | 'position'>[];
+  takes: Pick<Take, 'id' | 'position' | 'nudge'>[];
 };
 
 /**
@@ -633,10 +636,18 @@ export const api = {
   /** Detaches all of a Clip's Takes but the active one. */
   clearInactiveTakes: (at: SongAt, clipId: number) =>
     request<Timeline>('DELETE', `/songs/${at.id}/timeline/clips/${clipId}/inactive-takes`, undefined, at),
+  /**
+   * Nudges one of a Clip's Takes to be nudge seconds from where it was
+   * recorded, later if positive. The Clip's window stays where it is.
+   */
+  nudgeTake: (at: SongAt, clipId: number, takeId: number, nudge: number) =>
+    request<Timeline>('PUT', `/songs/${at.id}/timeline/clips/${clipId}/takes/${takeId}/nudge`, { nudge }, at),
   /** One of a Song's Takes, with its peaks. */
   getTake: (songId: number, takeId: number) => request<Take>('GET', `/songs/${songId}/takes/${takeId}`),
   /** Where a Take's audio streams from, exactly as recorded. A Take's file never changes. */
   takeAudioUrl: (songId: number, takeId: number) => `/api/songs/${songId}/takes/${takeId}/audio`,
+  /** Where a Take's file downloads from, as recorded, named after the Song and the Take. */
+  takeDownloadUrl: (songId: number, takeId: number) => `/api/songs/${songId}/takes/${takeId}/audio?download`,
   /** Sets the Song's Loop, replacing any it had. */
   setLoop: (at: SongAt, loop: TimelineLoop) => request<Timeline>('PUT', `/songs/${at.id}/timeline/loop`, loop, at),
   /** Switches the Song's Loop on or off, keeping its stretch. */

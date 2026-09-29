@@ -55,6 +55,7 @@ type take struct {
 	SampleRate    int       `json:"sampleRate"`
 	LatencyOffset float64   `json:"latencyOffset"`
 	Position      float64   `json:"position"`
+	Nudge         float64   `json:"nudge"`
 	RecordedAt    string    `json:"recordedAt"`
 	Peaks         []float64 `json:"peaks"`
 }

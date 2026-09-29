@@ -7,9 +7,9 @@
 // A Clip of Takes plays its active Take. Its source is the span its Takes
 // are laid out in, up to where the last of them ends: each Take starts at
 // its position in it, and the span starts the Clip's offset before the Clip
-// does.
+// does. A Take nudged earlier still reaches where it ended before, so a
+// nudge never leaves its Clip playing past its source.
 import { api, type Clip, type NewClip, type Take, type Timeline } from './api';
-import { peaksPerSecond } from './peaks';
 import type { Placed } from './schedule';
 import type { PlayableClip } from './timelinePlayer';
 
@@ -22,7 +22,7 @@ export interface ClipSource {
   audio: string;
   /** How long the whole source is, in seconds, however a Clip trims it. */
   duration: number;
-  /** Fetches its waveform, which the Timeline leaves out, laid out from the start of the source. */
+  /** Fetches its audio file's waveform, which the Timeline leaves out; see fileStart for where it's laid out. */
   loadPeaks: () => Promise<number[]>;
 }
 
@@ -59,11 +59,8 @@ export function clipSources(timeline: Timeline): ClipSources {
       key,
       title: `Take ${take.number}`,
       audio: api.takeAudioUrl(timeline.songId, take.id),
-      duration: Math.max(...clip.takes.map((t) => t.position + t.duration)),
-      loadPeaks: () =>
-        api
-          .getTake(timeline.songId, take.id)
-          .then((full) => [...new Array<number>(Math.round(take.position * peaksPerSecond)).fill(0), ...(full.peaks ?? [])]),
+      duration: Math.max(...clip.takes.map((t) => t.position + t.duration + Math.max(0, -t.nudge))),
+      loadPeaks: () => api.getTake(timeline.songId, take.id).then((full) => full.peaks ?? []),
     });
   }
   return {
@@ -83,8 +80,16 @@ function takeKey(id: number): string {
 }
 
 /** The Take a Clip of Takes plays, or undefined for a Clip of a Beat. */
-function activeTake(clip: Clip): Take | undefined {
+export function activeTake(clip: Clip): Take | undefined {
   return clip.takes.find((t) => t.id === clip.activeTakeId);
+}
+
+/**
+ * Where in its source a Clip's audio file starts, in seconds: 0 for a Beat,
+ * and for a Take, its position in its span, which a nudge moves.
+ */
+export function fileStart(clip: Clip): number {
+  return activeTake(clip)?.position ?? 0;
 }
 
 /**

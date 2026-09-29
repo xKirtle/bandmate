@@ -48,13 +48,14 @@ type takesOf struct {
 type takeAt struct {
 	ID       int64   `json:"id"`
 	Position float64 `json:"position"`
+	Nudge    float64 `json:"nudge"`
 }
 
 // takesAsIn is how a Clip's Takes are set in c.
 func takesAsIn(c clip) takesOf {
 	s := takesOf{ActiveTakeID: *c.ActiveTakeID, Start: c.Start, Offset: c.Offset, Length: c.Length}
 	for _, tk := range c.Takes {
-		s.Takes = append(s.Takes, takeAt{tk.ID, tk.Position})
+		s.Takes = append(s.Takes, takeAt{tk.ID, tk.Position, tk.Nudge})
 	}
 	return s
 }
@@ -269,9 +270,9 @@ func TestSettingAClipsTakesFollowsTheirRules(t *testing.T) {
 		"a Take twice": {ts.setTakes(r.song.ID, r.clip.ID, with(func(s *takesOf) { s.Takes = append(s.Takes, s.Takes[0]) })),
 			http.StatusBadRequest, "a Take can only be in a Clip once"},
 		"another Clip's Take": {ts.setTakes(r.song.ID, r.clip.ID, with(func(s *takesOf) {
-			s.Takes = append(s.Takes, takeAt{other.Takes[0].ID, 0})
+			s.Takes = append(s.Takes, takeAt{ID: other.Takes[0].ID})
 		})), http.StatusConflict, "a Take can only be in one Clip"},
-		"an unknown Take": {ts.setTakes(r.song.ID, r.clip.ID, with(func(s *takesOf) { s.Takes = append(s.Takes, takeAt{999, 0}) })),
+		"an unknown Take": {ts.setTakes(r.song.ID, r.clip.ID, with(func(s *takesOf) { s.Takes = append(s.Takes, takeAt{ID: 999}) })),
 			http.StatusBadRequest, "there's no such Take in this Song"},
 		"a Take before the span": {ts.setTakes(r.song.ID, r.clip.ID, with(func(s *takesOf) { s.Takes[0].Position = -1 })),
 			http.StatusBadRequest, "a Take can't start before its Clip's source"},
