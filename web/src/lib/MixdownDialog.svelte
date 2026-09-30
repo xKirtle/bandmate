@@ -4,20 +4,25 @@
   import { closeOnBackdrop } from './backdrop';
   import {
     levelsOf,
+    mixdownFormats,
     mixdownName,
     mixdownRanges,
     mixdownRate,
     mixDown,
+    readMixdownFormat,
+    storeMixdownFormat,
+    type MixdownFormat,
     type MixdownLevels,
     type MixdownPlan,
     type MixdownProgress,
     type MixdownRange,
   } from './mixdown';
   import { formatDuration } from './time';
+  import { deviceStorage } from './timelineHeight';
   import { encodeWav } from './wav';
 
-  // Mixes the whole Timeline, or the Loop's stretch of it, down to a WAV
-  // file and downloads it, in a modal dialog: while it's mixing, nothing else
+  // Mixes the whole Timeline, or the Loop's stretch of it, down to a file in
+  // the format picked and downloads it, in a modal dialog: while it's mixing, nothing else
   // on the page can be used, and closing the dialog, or leaving the Song
   // page, cancels it.
   let {
@@ -52,7 +57,12 @@
   const offered = untrack(() => mixdownRanges(end, loop));
   const ranges = offered.ranges;
   let chosen = $state.raw<MixdownRange>(offered.chosen);
-  const name = $derived(mixdownName(songTitle, chosen));
+  // The formats it can encode, and the one picked, which this browser
+  // remembers. MP3 joins them once it has an encoder (#335).
+  const formats: readonly MixdownFormat[] = mixdownFormats.filter((f) => f.of === 'wav');
+  const remembered = readMixdownFormat(deviceStorage());
+  let format = $state.raw<MixdownFormat>(formats.includes(remembered) ? remembered : formats[0]);
+  const name = $derived(mixdownName(songTitle, chosen, format));
   const span = (range: MixdownRange) => `${formatDuration(range.start)}–${formatDuration(range.end)}`;
 
   onMount(() => dialog?.showModal());
@@ -75,8 +85,9 @@
       });
       if (cancel.signal.aborted) return;
       const channels = [audio.getChannelData(0), audio.getChannelData(1)];
-      levels = levelsOf(channels);
-      save(new Blob([encodeWav(channels, mixdownRate)], { type: 'audio/wav' }));
+      if (format.of !== 'wav') throw new Error(`${format.label} can't be encoded yet`);
+      levels = levelsOf(channels, format.bits);
+      save(new Blob([encodeWav(channels, mixdownRate, format.bits)], { type: 'audio/wav' }));
       phase = 'done';
     } catch (e) {
       if (cancel.signal.aborted) return;
@@ -96,6 +107,11 @@
     link.click();
     // Once the download has had it.
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
+
+  function pick(picked: MixdownFormat) {
+    format = picked;
+    storeMixdownFormat(deviceStorage(), picked);
   }
 
   function onclose() {
@@ -136,7 +152,16 @@
         as they are.
       </p>
     {/if}
-    <p class="muted">A stereo 24-bit WAV at 48 kHz, downloaded as “{name}”.</p>
+    <fieldset>
+      <legend>Format</legend>
+      {#each formats as f (f.id)}
+        <label>
+          <input type="radio" name="mixdown-format" checked={format === f} onchange={() => pick(f)} />
+          <span>{f.label}</span>
+        </label>
+      {/each}
+    </fieldset>
+    <p class="muted">Stereo at 48 kHz, downloaded as “{name}”.</p>
     {#if error}
       <p class="problem" role="alert">{error}</p>
     {/if}
