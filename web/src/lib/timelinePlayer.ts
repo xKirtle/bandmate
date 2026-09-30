@@ -1,8 +1,10 @@
 // Plays the Timeline: every Clip's audio is fetched, decoded into memory and
 // scheduled on one AudioContext, so Tracks stay sample-accurate with each
 // other (ADR 0006). Each Track plays through its own gain, which follows its
-// volume, mute and solo live. A Loop's repeats are scheduled a little ahead
-// as they come round, each starting exactly as the one before ends.
+// volume, mute and solo live: wired by TrackMix, which a Mixdown builds its
+// graph with too, so it sounds as playback would. A Loop's repeats are
+// scheduled a little ahead as they come round, each starting exactly as the
+// one before ends.
 import { playAlone, release } from './playback';
 import { positionAt, repeats, schedule, type Loop, type Placed } from './schedule';
 
@@ -23,6 +25,67 @@ export function audioContext(): AudioContext {
   return (shared ??= new AudioContext());
 }
 
+/**
+ * The Clip → Track wiring on an audio context, live or offline: each Clip
+ * plays through its Track's gain, which follows the Track's volume, mute
+ * and solo, into the context's output. Playback and a Mixdown both build
+ * their graph with it.
+ */
+export class TrackMix {
+  #context: BaseAudioContext;
+  #gains: Map<number, number>;
+  // Each Track's node, created as its first Clip plays.
+  #nodes = new Map<number, GainNode>();
+
+  /** Mixes on context, with each Track's gain by id. A Track left out plays as is. */
+  constructor(context: BaseAudioContext, gains: Map<number, number>) {
+    this.#context = context;
+    this.#gains = gains;
+  }
+
+  /**
+   * Plays part of a Clip's audio on its Track: duration seconds of buffer,
+   * from `from` seconds into it, starting at context time `at`.
+   */
+  play(buffer: AudioBuffer, trackId: number, at: number, from: number, duration: number): AudioBufferSourceNode {
+    const node = this.#context.createBufferSource();
+    node.buffer = buffer;
+    node.connect(this.#track(trackId));
+    node.start(at, from, duration);
+    return node;
+  }
+
+  /** Sets each Track's gain by id, heard right away. A Track left out plays as is. */
+  setGains(gains: Map<number, number>) {
+    this.#gains = gains;
+    for (const [trackId, node] of this.#nodes) {
+      // Eased over a few milliseconds, so the change doesn't click.
+      node.gain.setTargetAtTime(this.#gain(trackId), this.#context.currentTime, 0.01);
+    }
+  }
+
+  /** Takes each Track's node out of the graph. */
+  disconnect() {
+    for (const node of this.#nodes.values()) node.disconnect();
+    this.#nodes.clear();
+  }
+
+  #track(trackId: number): GainNode {
+    let node = this.#nodes.get(trackId);
+    if (!node) {
+      node = this.#context.createGain();
+      node.gain.value = this.#gain(trackId);
+      node.connect(this.#context.destination);
+      this.#nodes.set(trackId, node);
+    }
+    return node;
+  }
+
+  #gain(trackId: number): number {
+    return this.#gains.get(trackId) ?? 1;
+  }
+}
+
 // How far ahead a Loop's repeats are scheduled, and how often, in seconds and
 // milliseconds: well clear of timers running late in a busy or hidden tab.
 const lookahead = 2;
@@ -31,9 +94,9 @@ const scheduleEvery = 500;
 export class TimelinePlayer {
   #buffers = new Map<string, Promise<AudioBuffer>>();
   #nodes = new Set<AudioBufferSourceNode>();
-  // Each Track's gain by id, and the nodes applying it while playing.
+  // Each Track's gain by id, and what applies it while playing.
   #gains = new Map<number, number>();
-  #trackNodes = new Map<number, GainNode>();
+  #mix: TrackMix | null = null;
   #state: PlayerState = 'stopped';
   // The Timeline position at context time #startedAt; while stopped, the
   // position playback resumes from.
@@ -118,6 +181,7 @@ export class TimelinePlayer {
     if (generation !== this.#generation) return;
 
     this.#playing = { clips, buffers, loop };
+    this.#mix = new TrackMix(context, this.#gains);
     // A moment ahead, so every Clip is scheduled before the first sounds.
     this.#startedAt = context.currentTime + 0.05;
     this.#scheduledUntil = 0;
@@ -128,7 +192,7 @@ export class TimelinePlayer {
 
   /** Schedules what plays next: everything, or a Loop's repeats up to the lookahead. */
   #scheduleAhead() {
-    if (!this.#playing) return;
+    if (!this.#playing || !this.#mix) return;
     const { clips, buffers, loop } = this.#playing;
     const context = audioContext();
     const until = repeats(this.#from, loop) ? context.currentTime - this.#startedAt + lookahead : Infinity;
@@ -138,10 +202,9 @@ export class TimelinePlayer {
       // where it would be by now, so it stays in time with the clock.
       const late = Math.max(0, context.currentTime - (this.#startedAt + s.delay));
       if (late >= s.duration) continue;
-      const node = context.createBufferSource();
-      node.buffer = buffers[clipIndex.get(s.clip)!];
-      node.connect(this.#trackNode(context, s.clip.trackId));
-      node.start(this.#startedAt + s.delay + late, s.from + late, s.duration - late);
+      const buffer = buffers[clipIndex.get(s.clip)!];
+      const at = this.#startedAt + s.delay + late;
+      const node = this.#mix.play(buffer, s.clip.trackId, at, s.from + late, s.duration - late);
       // Let go of each once it's played, as a Loop keeps adding more.
       node.onended = () => {
         node.disconnect();
@@ -155,10 +218,7 @@ export class TimelinePlayer {
   /** Sets each Track's gain by id, heard right away if playing. A Track left out plays as is. */
   setGains(gains: Map<number, number>) {
     this.#gains = gains;
-    for (const [trackId, node] of this.#trackNodes) {
-      // Eased over a few milliseconds, so the change doesn't click.
-      node.gain.setTargetAtTime(this.#gain(trackId), node.context.currentTime, 0.01);
-    }
+    this.#mix?.setGains(gains);
   }
 
   /** Stops playing, keeping the position to resume from. */
@@ -190,24 +250,8 @@ export class TimelinePlayer {
       node.disconnect();
     }
     this.#nodes.clear();
-    for (const node of this.#trackNodes.values()) node.disconnect();
-    this.#trackNodes.clear();
-  }
-
-  /** The node a Track's Clips play through, created on first use. */
-  #trackNode(context: AudioContext, trackId: number): GainNode {
-    let node = this.#trackNodes.get(trackId);
-    if (!node) {
-      node = context.createGain();
-      node.gain.value = this.#gain(trackId);
-      node.connect(context.destination);
-      this.#trackNodes.set(trackId, node);
-    }
-    return node;
-  }
-
-  #gain(trackId: number): number {
-    return this.#gains.get(trackId) ?? 1;
+    this.#mix?.disconnect();
+    this.#mix = null;
   }
 
   #setState(state: PlayerState) {

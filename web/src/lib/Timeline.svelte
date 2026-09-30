@@ -49,6 +49,8 @@
   import { TrackDragging } from './trackDragging.svelte';
   import InputSettings from './InputSettings.svelte';
   import CalibrationDialog from './CalibrationDialog.svelte';
+  import MixdownDialog from './MixdownDialog.svelte';
+  import { mixdownEnd } from './mixdown';
   import { appliedOffset, readCalibration, skipCalibration, storeOffset } from './calibration';
   import { readInput } from './inputSettings';
   import {
@@ -89,7 +91,8 @@
   // it only plays, mixes and switches the Loop on and off. On both it zooms
   // and scrolls, and follows the playhead while playing. While the Loop is
   // on, playback that reaches its end goes back to its start. Recording a
-  // Take onto the chosen Track is offered where editing is.
+  // Take onto the chosen Track is offered where editing is, and mixing it
+  // down to a file on both.
   let {
     song,
     timeline,
@@ -375,7 +378,8 @@
 
   function undoKeys(event: KeyboardEvent) {
     if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== 'z') return;
-    if (event.defaultPrevented || !editable.current || picking || calibrating || inTextField(event.target)) return;
+    if (event.defaultPrevented || !editable.current || picking || calibrating || mixingDown) return;
+    if (inTextField(event.target)) return;
     // Not while recording, which undo would take the place of.
     if (recording) return;
     event.preventDefault();
@@ -725,7 +729,7 @@
 
   function spaceBar(event: KeyboardEvent) {
     if (event.key !== ' ' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
-    if (event.defaultPrevented || picking || calibrating || ownsSpace(event.target)) return;
+    if (event.defaultPrevented || picking || calibrating || mixingDown || ownsSpace(event.target)) return;
     // Otherwise the page would scroll.
     event.preventDefault();
     keyActedOnPage();
@@ -836,11 +840,12 @@
   }
 
   // The transport row's ⋯, for its occasional actions, and what they open:
-  // the file picker for Import audio…, and the recording settings, placed
-  // by the ⋯.
+  // the file picker for Import audio…, the Mixdown dialog, and the
+  // recording settings, placed by the ⋯.
   let importInput: HTMLInputElement;
   let inputSettings: InputSettings;
   let transportMore = $state<HTMLElement>();
+  let mixingDown = $state(false);
   const transportMenu = $derived(
     transportActions(
       {
@@ -849,9 +854,11 @@
         importing: importing !== null,
         recording: recording !== null,
         chosenTrack: timeline.tracks.find((t) => t.id === chosen)?.name ?? 'the Chosen Track',
+        hasClips: clips.length > 0,
       },
       {
         importAudio: () => importInput.click(),
+        mixDown: () => (mixingDown = true),
         // Chosen from the ⋯, so it's there to place them by.
         recordingSettings: () => {
           if (transportMore) inputSettings.openSettings(transportMore);
@@ -872,7 +879,7 @@
 
   /** Whether files dropped now can be imported. */
   function takesFiles(): boolean {
-    return editable.current && recording === null && !picking && !calibrating && !collapsed;
+    return editable.current && recording === null && !picking && !calibrating && !mixingDown && !collapsed;
   }
 
   /** The files a drag carries, or null for a drag of anything else, e.g. text. */
@@ -1117,7 +1124,7 @@
     rate: number,
     latencyOffset: number,
   ): Promise<boolean> {
-    const wav = new Blob([encodeWav(samples, rate)], { type: 'audio/wav' });
+    const wav = new Blob([encodeWav([samples], rate)], { type: 'audio/wav' });
     const peaks = peaksOf([samples], rate);
     offerCues = null;
     queued++;
@@ -1215,7 +1222,7 @@
 
   function recordKey(event: KeyboardEvent) {
     if (event.key.toLowerCase() !== 'r' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
-    if (event.defaultPrevented || picking || calibrating || inTextField(event.target)) return;
+    if (event.defaultPrevented || picking || calibrating || mixingDown || inTextField(event.target)) return;
     if (!capturing && !canRecord) return;
     event.preventDefault();
     switchRecording();
@@ -2133,11 +2140,9 @@
       {/if}
       <span class="spacer"></span>
       {@render undoRedo()}
-      {#if transportMenu.length > 0}
-        <span class="transport-more" bind:this={transportMore}>
-          <ActionsMenu label="More Timeline actions" entries={transportMenu} />
-        </span>
-      {/if}
+      <span class="transport-more" bind:this={transportMore}>
+        <ActionsMenu label="More Timeline actions" entries={transportMenu} />
+      </span>
       <button
         type="button"
         class="icon collapse-toggle"
@@ -2569,6 +2574,20 @@
     onCalibrated={storeCalibrated}
     onSkip={skipOffer}
     onClose={calibrationClosed}
+  />
+{/if}
+{#if mixingDown}
+  <!-- Mixed as playback would play it now, which starting it stops. Sync mode stays as it is. -->
+  <MixdownDialog
+    songTitle={song.title}
+    end={mixdownEnd(clips)}
+    plan={() => ({ clips: playable, gains: trackGains(levels), load: (source) => player.load(source) })}
+    onStart={() => {
+      if (playerState === 'stopped') return;
+      player.stop();
+      position = player.position();
+    }}
+    onClose={() => (mixingDown = false)}
   />
 {/if}
 {#if picking}
