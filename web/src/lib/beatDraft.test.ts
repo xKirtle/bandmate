@@ -21,7 +21,7 @@ describe('describeOffer', () => {
 describe('sameDraft', () => {
   const opened = toDraft({ title: 'Echo Room', producer: 'Pryme', bpm: 140, key: 'Am', notes: '' });
 
-  it('holds a draft as it opened the same', () => {
+  it('holds an unchanged draft the same', () => {
     expect(sameDraft({ ...opened }, opened)).toBe(true);
   });
 

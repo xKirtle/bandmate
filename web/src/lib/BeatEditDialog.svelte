@@ -37,7 +37,8 @@
   // svelte-ignore state_referenced_locally
   const opened = toDraft(beat);
   let draft = $state({ ...opened });
-  // Whether its file has been replaced since it opened.
+  // Whether its file has been replaced since it opened. Read only on a
+  // click outside, so not state.
   let replaced = false;
   let busy = $state<string | null>(null);
   let error = $state<string | null>(null);
@@ -61,7 +62,7 @@
 
   // A click outside closes it only while nothing has been changed, and
   // nothing is being saved, uploaded or deleted.
-  const untouched = () => busy === null && !replaced && sameDraft(draft, opened);
+  const nothingToLose = () => busy === null && !replaced && sameDraft(draft, opened);
 
   function useOffer() {
     if (offer) Object.assign(draft, offer.changes);
@@ -126,7 +127,7 @@
 
 <dialog
   bind:this={dialog}
-  {@attach closeOnBackdrop(untouched)}
+  {@attach closeOnBackdrop(nothingToLose)}
   onclose={onClose}
   oncancel={cancel}
   aria-labelledby="beat-edit-heading"

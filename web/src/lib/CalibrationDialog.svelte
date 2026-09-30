@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
-  import { clickCount, clickTimes, formatOffset, measureOffset, type Measurement } from './calibration';
   import { closeOnBackdrop } from './backdrop';
+  import { clickCount, clickTimes, formatOffset, measureOffset, type Measurement } from './calibration';
   import { Capture, CaptureError } from './capture';
   import { readInput } from './inputSettings';
   import { deviceStorage } from './timelineHeight';
