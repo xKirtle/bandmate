@@ -1,3 +1,5 @@
+import { matches, shortcuts } from './shortcuts';
+
 /** The Song-wide Shortcuts, which work wherever focus is on the Song page. */
 export type SongKey = 'playPause' | 'record' | 'undo' | 'redo';
 
@@ -31,17 +33,18 @@ export type SongKeyContext = {
  * now: null leaves the key to the page.
  */
 export function songKey(e: SongKeyPress, at: SongKeyContext): SongKey | null {
-  if (e.defaultPrevented || at.busy) return null;
-  if (e.key === ' ' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
-    return at.ownsSpace ? null : 'playPause';
+  // A dialog's keys are for what's in it, e.g. the shortcuts dialog.
+  if (e.defaultPrevented || at.busy || at.dialogOpen) return null;
+  if (matches(e, shortcuts.playPause.keys)) {
+    return e.repeat || at.ownsSpace ? null : 'playPause';
   }
-  if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'z') {
+  if (matches(e, shortcuts.undo.keys) || matches(e, shortcuts.redo.keys)) {
     // Not while recording, which undo would take the place of.
     if (!at.editable || at.inTextField || at.recording) return null;
-    return e.shiftKey ? 'redo' : 'undo';
+    return matches(e, shortcuts.undo.keys) ? 'undo' : 'redo';
   }
-  if (e.key.toLowerCase() === 'r' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
-    if (at.inTextField || (!at.capturing && !at.canRecord)) return null;
+  if (matches(e, shortcuts.record.keys)) {
+    if (e.repeat || at.inTextField || (!at.capturing && !at.canRecord)) return null;
     return 'record';
   }
   return null;

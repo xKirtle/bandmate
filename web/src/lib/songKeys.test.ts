@@ -113,9 +113,30 @@ group('Undo and redo', () => {
   });
 });
 
-group("Today's loose modifiers, to be made exact", () => {
-  it('Shift+Space plays and Shift+R records', () => {
-    expect(songKey(press(' ', { shiftKey: true }), idle)).toBe('playPause');
-    expect(songKey(press('R', { shiftKey: true }), idle)).toBe('record');
+group('Exact modifiers', () => {
+  it("Shift+Space doesn't play and Shift+R doesn't record", () => {
+    expect(songKey(press(' ', { shiftKey: true }), idle)).toBeNull();
+    expect(songKey(press('R', { shiftKey: true }), idle)).toBeNull();
+  });
+
+  it('Ctrl+Y redoes, as does ⌘Y', () => {
+    expect(songKey(press('y', { ctrlKey: true }), idle)).toBe('redo');
+    expect(songKey(press('y', { metaKey: true }), idle)).toBe('redo');
+  });
+
+  it("Ctrl+Shift+Y and Ctrl+⌘Z don't", () => {
+    expect(songKey(press('Y', { ctrlKey: true, shiftKey: true }), idle)).toBeNull();
+    expect(songKey(press('z', { ctrlKey: true, metaKey: true }), idle)).toBeNull();
+  });
+});
+
+group('An open dialog', () => {
+  it('stops Space, R, undo and redo', () => {
+    const open = { ...idle, dialogOpen: true };
+    expect(songKey(press(' '), open)).toBeNull();
+    expect(songKey(press('r'), open)).toBeNull();
+    expect(songKey(press('z', { ctrlKey: true }), open)).toBeNull();
+    expect(songKey(press('Z', { ctrlKey: true, shiftKey: true }), open)).toBeNull();
+    expect(songKey(press('y', { ctrlKey: true }), open)).toBeNull();
   });
 });

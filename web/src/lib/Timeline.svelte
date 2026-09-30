@@ -56,6 +56,7 @@
   import { nameSound } from './soundName';
   import { inTextField } from './textField';
   import { songKey } from './songKeys';
+  import { ariaKeyShortcuts, keysLabel, platform, shortcuts, type Key } from './shortcuts';
   import { prepareUpload } from './upload';
   import { formatDuration } from './time';
   import { tracksDropped, type TrackDrop } from './trackDrag';
@@ -390,6 +391,11 @@
     editedAt = at.version;
     return { timeline: { ...timeline, version: at.version, updatedAt: song.updatedAt } };
   }
+
+  // Tooltips name a Shortcut's keys as this platform does, e.g. ⌘Z on a Mac.
+  const on = platform();
+  const keysOf = (shortcut: { keys: readonly Key[] }) => keysLabel(shortcut.keys, on);
+  const ariaOf = (shortcut: { keys: readonly Key[] }) => ariaKeyShortcuts(shortcut.keys, on);
 
   function keydown(event: KeyboardEvent) {
     if (trackDrag.current && event.key === 'Escape') {
@@ -2124,11 +2130,23 @@
 
 {#snippet undoRedo()}
   <span class="history edit-only">
-    <button type="button" class="icon" onclick={undo} disabled={!undoable} aria-label="Undo" title="Undo (Ctrl+Z)"
-      >↶</button
+    <button
+      type="button"
+      class="icon"
+      onclick={undo}
+      disabled={!undoable}
+      aria-label="Undo"
+      aria-keyshortcuts={ariaOf(shortcuts.undo)}
+      title="Undo ({keysOf(shortcuts.undo)})">↶</button
     >
-    <button type="button" class="icon" onclick={redo} disabled={!redoable} aria-label="Redo" title="Redo (Ctrl+Shift+Z)"
-      >↷</button
+    <button
+      type="button"
+      class="icon"
+      onclick={redo}
+      disabled={!redoable}
+      aria-label="Redo"
+      aria-keyshortcuts={ariaOf(shortcuts.redo)}
+      title="Redo ({keysOf(shortcuts.redo)})">↷</button
     >
   </span>
 {/snippet}
@@ -2171,7 +2189,8 @@
         class="play"
         onclick={toggle}
         aria-label={playerState === 'stopped' ? 'Play' : 'Pause'}
-        title="Play or pause (Space)"
+        aria-keyshortcuts={ariaOf(shortcuts.playPause)}
+        title="Play or pause ({keysOf(shortcuts.playPause)})"
       >
         {#if playerState === 'stopped'}
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
@@ -2197,15 +2216,16 @@
         aria-pressed={capturing}
         disabled={!capturing && !canRecord}
         onclick={switchRecording}
+        aria-keyshortcuts={ariaOf(shortcuts.record)}
         title={capturing
-          ? 'Stop recording (R or Space)'
+          ? `Stop recording (${keysOf(shortcuts.record)} or ${keysOf(shortcuts.playPause)})`
           : syncing
             ? 'Leave Sync mode to record'
             : playerState !== 'stopped'
               ? 'Stop playback to record'
               : recordProblem
                 ? recordProblem
-                : `Record a Take on ${timeline.tracks.find((t) => t.id === chosen)?.name ?? 'a new Track'} (R)`}
+                : `Record a Take on ${timeline.tracks.find((t) => t.id === chosen)?.name ?? 'a new Track'} (${keysOf(shortcuts.record)})`}
         ><span class="record-dot" aria-hidden="true"></span>{capturing ? 'Stop' : 'Record'}</button
       >
       <input
