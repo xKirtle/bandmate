@@ -14,4 +14,4 @@ Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/do
 
 ## Formatting
 
-Before committing web app changes, run `npm run format` in `web/`. CI fails a PR whose web code isn't formatted. Go is formatted with `gofmt`.
+Before committing web app changes, run `npm run format` in `web/`. CI fails a PR whose web code isn't formatted. Format Go with `gofmt` (CI doesn't check it).

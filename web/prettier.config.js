@@ -1,6 +1,6 @@
 // Prettier's defaults, except single quotes and the width the code already
-// follows. Go is formatted by gofmt; the repo's Markdown, YAML and JSON are
-// out of scope (see .prettierignore).
+// follows. Only web/ is formatted: the repo's Markdown and YAML are left as
+// written, and Go is formatted by gofmt.
 export default {
   singleQuote: true,
   printWidth: 120,

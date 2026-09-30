@@ -1,3 +1,4 @@
-# Build output, and the lockfile npm writes.
+# Build output, the lockfile npm writes, and prose (Markdown is wrapped by hand).
 dist/
 package-lock.json
+*.md
