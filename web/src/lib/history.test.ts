@@ -10,7 +10,6 @@ const clip = (id: number, start: number, more: Partial<Clip> = {}): Clip => ({
   name: null,
   takes: [],
   activeTakeId: null,
-  lastTakeNumber: 0,
   start,
   offset: 0,
   length: 10,
@@ -72,7 +71,7 @@ const take = (id: number): Take => ({
 
 /** A Clip of Takes, playing the first of them. */
 const takeClip = (id: number, start: number, takes: Take[]): Clip =>
-  clip(id, start, { beatId: null, takes, activeTakeId: takes[0].id, lastTakeNumber: takes.length, offset: 2 });
+  clip(id, start, { beatId: null, takes, activeTakeId: takes[0].id, offset: 2 });
 
 describe('History', () => {
   it('has nothing to undo or redo at first', () => {
@@ -573,7 +572,7 @@ describe('History of Takes', () => {
     expect(edit).toEqual({
       kind: 'placeClip',
       trackId: 2,
-      clip: { takeIds: [40], activeTakeId: 40, lastTakeNumber: 1, start: 10, offset: 2, length: 10 },
+      clip: { takeIds: [40], activeTakeId: 40, start: 10, offset: 2, length: 10 },
     });
     expect(h.nextUndo()).toEqual({ kind: 'deleteClip', clipId: 6 });
 
@@ -585,10 +584,9 @@ describe('History of Takes', () => {
     expect(h.nextUndo()).toEqual({ kind: 'deleteClip', clipId: 9 });
   });
 
-  it('undoes deleting a Clip of Takes by placing its Takes back, the same one active, numbering on', () => {
+  it('undoes deleting a Clip of Takes by placing its Takes back, the same one active', () => {
     const h = new History();
-    // Take 3 was deleted before, but its number stays used.
-    const c = clip(6, 10, { beatId: null, takes: [take(40), take(41)], activeTakeId: 41, lastTakeNumber: 3 });
+    const c = clip(6, 10, { beatId: null, takes: [take(40), take(41)], activeTakeId: 41 });
     const t0 = timeline([track(2, [c])]);
     const t1 = timeline([track(2)]);
 
@@ -597,7 +595,7 @@ describe('History of Takes', () => {
     expect(h.nextUndo()).toEqual({
       kind: 'placeClip',
       trackId: 2,
-      clip: { takeIds: [40, 41], activeTakeId: 41, lastTakeNumber: 3, start: 10, offset: 0, length: 10 },
+      clip: { takeIds: [40, 41], activeTakeId: 41, start: 10, offset: 0, length: 10 },
     });
     h.undone(t1, timeline([track(2, [{ ...c, id: 8 }])]));
     expect(h.nextRedo()).toEqual({ kind: 'deleteClip', clipId: 8 });
@@ -618,7 +616,7 @@ describe('History of Takes', () => {
         volume: 0,
         muted: false,
         soloed: false,
-        clips: [{ takeIds: [40], activeTakeId: 40, lastTakeNumber: 1, start: 10, offset: 2, length: 10 }],
+        clips: [{ takeIds: [40], activeTakeId: 40, start: 10, offset: 2, length: 10 }],
       },
     });
     h.undone(t1, timeline([track(1, [clip(5, 0)]), track(3, [takeClip(7, 10, [take(40)])], { name: 'Lead vox' })]));
@@ -638,7 +636,7 @@ describe('History of Takes', () => {
     expect(h.nextRedo()).toEqual({
       kind: 'placeClip',
       trackId: 2,
-      clip: { takeIds: [41], activeTakeId: 41, lastTakeNumber: 1, start: 20, offset: 2, length: 10 },
+      clip: { takeIds: [41], activeTakeId: 41, start: 20, offset: 2, length: 10 },
     });
     h.redone(t0, timeline([track(2, [takeClip(6, 10, [take(40)]), takeClip(9, 20, [take(41)])])]));
     expect(h.nextUndo()).toEqual({ kind: 'deleteClip', clipId: 9 });
@@ -660,7 +658,6 @@ describe('History of Retakes', () => {
             { ...take(41), number: 2 },
           ],
           activeTakeId: 41,
-          lastTakeNumber: 2,
           offset: 3.5,
           length: 14,
         }),
@@ -727,7 +724,6 @@ describe('History of choosing and deleting Takes', () => {
           beatId: null,
           takes: takes(),
           activeTakeId: 42,
-          lastTakeNumber: 3,
           offset: 2,
           length: 12,
           ...more,
@@ -797,7 +793,7 @@ describe('History of choosing and deleting Takes', () => {
     expect(h.nextUndo()).toEqual({
       kind: 'placeClip',
       trackId: 2,
-      clip: { takeIds: [40], activeTakeId: 40, lastTakeNumber: 1, start: 10, offset: 2, length: 10 },
+      clip: { takeIds: [40], activeTakeId: 40, start: 10, offset: 2, length: 10 },
     });
     h.undone(t1, timeline([track(2, [takeClip(9, 10, [take(40)])])]));
     expect(h.nextRedo()).toEqual({ kind: 'deleteTake', clipId: 9, takeId: 40 });
@@ -822,11 +818,7 @@ describe('History of nudging Takes', () => {
   // the Clip's window where it was, and Take 1 is 0.25s further into it.
   const takes = () => [take(40), { ...take(41), number: 2, position: 0.1 }];
   const two = (more: Partial<Clip> = {}) =>
-    timeline([
-      track(2, [
-        clip(6, 10, { beatId: null, takes: takes(), activeTakeId: 41, lastTakeNumber: 2, offset: 2, ...more }),
-      ]),
-    ]);
+    timeline([track(2, [clip(6, 10, { beatId: null, takes: takes(), activeTakeId: 41, offset: 2, ...more })])]);
   const nudged = () =>
     two({
       takes: [

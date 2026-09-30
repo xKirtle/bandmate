@@ -175,13 +175,14 @@ func (s *Store) addTake(ctx context.Context, songID int64, based lyricsheet.Vers
 	return tl, err
 }
 
-// Retake records another Take into a Clip of Takes, as its next number and
-// its active Take. It leads in from before the Clip's start like the first,
-// and where it starts before the Clip's source span, the span is taken back
-// to where it starts, the Takes already there staying where they are on the
-// Timeline. The Clip grows to where it ends, but never past the next Clip
-// on its Track: the rest is kept, hidden, to trim into view once there's
-// room. The file is kept if the Take is added, and discarded otherwise.
+// Retake records another Take into a Clip of Takes, numbered after the
+// highest still in it, as its active Take. It leads in from before the
+// Clip's start like the first, and where it starts before the Clip's source
+// span, the span is taken back to where it starts, the Takes already there
+// staying where they are on the Timeline. The Clip grows to where it ends,
+// but never past the next Clip on its Track: the rest is kept, hidden, to
+// trim into view once there's room. The file is kept if the Take is added,
+// and discarded otherwise.
 func (s *Store) Retake(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64, c Captured, file *audio.Received) (Timeline, error) {
 	defer file.Discard()
 	take, err := readTake(file, c)
@@ -212,7 +213,10 @@ func (s *Store) Retake(ctx context.Context, songID int64, based lyricsheet.Versi
 			end = min(end, next.Float64)
 		}
 		p.length = max(p.length, end-p.start)
-		number := p.source.lastTakeNumber + 1
+		number, err := nextTakeNumber(ctx, tx, clipID)
+		if err != nil {
+			return 0, err
+		}
 		takeID, err := take.insert(ctx, tx, songID, number, take.start-(p.start-p.offset))
 		if err != nil {
 			return 0, err
@@ -220,12 +224,24 @@ func (s *Store) Retake(ctx context.Context, songID int64, based lyricsheet.Versi
 		if err := attachTakes(ctx, tx, clipID, []int64{takeID}); err != nil {
 			return 0, err
 		}
-		if _, err := tx.ExecContext(ctx, `UPDATE clips SET active_take_id = ?, last_take_number = ? WHERE id = ?`,
-			takeID, number, clipID); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE clips SET active_take_id = ? WHERE id = ?`,
+			takeID, clipID); err != nil {
 			return 0, fmt.Errorf("retaking clip: %w", err)
 		}
 		return takeID, place(ctx, tx, clipID, p)
 	})
+}
+
+// nextTakeNumber is the number a new Take in a Clip gets: the one after
+// the highest still in it, so deleting the latest Take frees its number,
+// while a gap left lower down stays.
+func nextTakeNumber(ctx context.Context, tx *sql.Tx, clipID int64) (int, error) {
+	var number int
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(number), 0) + 1 FROM takes WHERE clip_id = ?`,
+		clipID).Scan(&number); err != nil {
+		return 0, fmt.Errorf("numbering the take: %w", err)
+	}
+	return number, nil
 }
 
 // startSpanEarlier has a Clip of Takes' source span start earlier by some
@@ -285,8 +301,7 @@ func (s *Store) SetTakes(ctx context.Context, songID int64, based lyricsheet.Ver
 		if err != nil {
 			return err
 		}
-		last, err := checkTakes(ctx, tx, songID, clipID, ids)
-		if err != nil {
+		if err := checkTakes(ctx, tx, songID, clipID, ids); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE takes SET clip_id = NULL WHERE clip_id = ?`, clipID); err != nil {
@@ -309,9 +324,8 @@ func (s *Store) SetTakes(ctx context.Context, songID int64, based lyricsheet.Ver
 		if err := checkTrim(ct.Offset, ct.Length, duration); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `UPDATE clips SET active_take_id = ?,
-				last_take_number = MAX(last_take_number, ?) WHERE id = ?`,
-			*ct.ActiveTakeID, last, clipID); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE clips SET active_take_id = ? WHERE id = ?`,
+			*ct.ActiveTakeID, clipID); err != nil {
 			return fmt.Errorf("setting takes: %w", err)
 		}
 		p.start, p.offset, p.length = ct.Start, max(ct.Offset, 0), ct.Length

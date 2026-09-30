@@ -288,7 +288,8 @@ func TestAClipOfTakesKnowsTheHighestNumberItsTakesHave(t *testing.T) {
 		`UPDATE takes SET clip_id = 1`,
 	)
 
-	if err := migrate(context.Background(), conn); err != nil {
+	// Before the column goes, in 0026.
+	if err := migrateBefore(context.Background(), conn, "0026_no_last_take_number"); err != nil {
 		t.Fatalf("migrating: %v", err)
 	}
 
@@ -389,7 +390,8 @@ func TestExistingBeatAndTakeClipsAreCarriedOverUntouchedBySounds(t *testing.T) {
 		`DELETE FROM clips WHERE id = 3`,
 	)
 
-	if err := migrate(context.Background(), conn); err != nil {
+	// Before the column goes, in 0026.
+	if err := migrateBefore(context.Background(), conn, "0026_no_last_take_number"); err != nil {
 		t.Fatalf("migrating: %v", err)
 	}
 
@@ -494,5 +496,35 @@ func TestExistingSoundsNoClipUsesAreUnusedFromTheMigration(t *testing.T) {
 	since, err := time.Parse("2006-01-02T15:04:05.000000000Z", unused.String)
 	if err != nil || since.Before(before) || since.After(time.Now()) {
 		t.Errorf("unused_since of the Sound no Clip uses = %q, want the time it was migrated at", unused.String)
+	}
+}
+
+func TestClipsNoLongerKeepTheLastTakeNumber(t *testing.T) {
+	conn := openBefore(t, "0026_no_last_take_number")
+	exec(t, conn,
+		`INSERT INTO songs (id, title, created_at, updated_at) VALUES (1, 'Midnight Drive', '', '')`,
+		`INSERT INTO tracks (id, song_id, name, position) VALUES (1, 1, 'Vox', 0)`,
+		`INSERT INTO takes (id, song_id, number, size, duration, sample_rate, peaks, latency_offset, position, recorded_at)
+			VALUES (1, 1, 2, 10, 4, 48000, '[]', 0, 0, '')`,
+		`INSERT INTO clips (id, track_id, active_take_id, last_take_number, name, start, source_offset, length)
+			VALUES (1, 1, 1, 5, 'Hook', 2, 0, 4)`,
+		`UPDATE takes SET clip_id = 1`,
+	)
+
+	if err := migrate(context.Background(), conn); err != nil {
+		t.Fatalf("migrating: %v", err)
+	}
+
+	if _, err := conn.Exec(`SELECT last_take_number FROM clips`); err == nil {
+		t.Errorf("clips still has last_take_number")
+	}
+	var clip, take int64
+	var name string
+	if err := conn.QueryRow(`SELECT c.id, c.active_take_id, c.name FROM clips c JOIN takes t ON t.clip_id = c.id`).
+		Scan(&clip, &take, &name); err != nil {
+		t.Fatalf("reading the clip and its take: %v", err)
+	}
+	if clip != 1 || take != 1 || name != "Hook" {
+		t.Errorf("clip %d playing take %d named %q, want clip 1 playing take 1 named Hook", clip, take, name)
 	}
 }
