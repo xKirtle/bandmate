@@ -116,15 +116,18 @@ type Store struct {
 	db          *sql.DB
 	masterFiles *audio.Files
 	coverFiles  CoverFiles
-	// takeFiles holds the audio of the Takes on Songs' Timelines, which
-	// go when their Song does.
-	takeFiles *audio.Files
+	// takeFiles and soundFiles hold the audio of the Takes and Sounds on
+	// Songs' Timelines, which go when their Song does.
+	takeFiles  *audio.Files
+	soundFiles *audio.Files
 }
 
 // NewStore returns a Store backed by db, keeping Masters' audio in
-// masterFiles, Covers' pictures in coverFiles and Takes' audio in takeFiles.
-func NewStore(db *sql.DB, masterFiles *audio.Files, coverFiles CoverFiles, takeFiles *audio.Files) *Store {
-	return &Store{db: db, masterFiles: masterFiles, coverFiles: coverFiles, takeFiles: takeFiles}
+// masterFiles, Covers' pictures in coverFiles, Takes' audio in takeFiles
+// and Sounds' in soundFiles.
+func NewStore(db *sql.DB, masterFiles *audio.Files, coverFiles CoverFiles, takeFiles, soundFiles *audio.Files) *Store {
+	return &Store{db: db, masterFiles: masterFiles, coverFiles: coverFiles, takeFiles: takeFiles,
+		soundFiles: soundFiles}
 }
 
 // timeFormat keeps sub-second precision and sorts correctly as text.
@@ -365,8 +368,8 @@ func (s *Store) UpdateSong(ctx context.Context, id int64, based Version, changes
 }
 
 // DeleteSong removes a Song. Everything the Song owns references it with
-// ON DELETE CASCADE, so it goes too, and so do its Masters', Cover's and
-// Takes' files, detached Takes included.
+// ON DELETE CASCADE, so it goes too, and so do its Masters', Cover's,
+// Takes' and Sounds' files, detached Takes and unused Sounds included.
 func (s *Store) DeleteSong(ctx context.Context, id int64, based Version) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -381,17 +384,13 @@ func (s *Store) DeleteSong(ctx context.Context, id int64, based Version) error {
 	if err != nil {
 		return err
 	}
-	var takes []int64
-	err = query(ctx, tx, `SELECT id FROM takes WHERE song_id = ?`, []any{id}, func(rows *sql.Rows) error {
-		var take int64
-		if err := rows.Scan(&take); err != nil {
-			return err
-		}
-		takes = append(takes, take)
-		return nil
-	})
+	takes, err := songOwned(ctx, tx, "takes", id)
 	if err != nil {
-		return fmt.Errorf("listing takes: %w", err)
+		return err
+	}
+	sounds, err := songOwned(ctx, tx, "sounds", id)
+	if err != nil {
+		return err
 	}
 	res, err := tx.ExecContext(ctx, `DELETE FROM songs WHERE id = ? AND (?2 = 0 OR version = ?2)`, id, based)
 	if err != nil {
@@ -412,7 +411,30 @@ func (s *Store) DeleteSong(ctx context.Context, id int64, based Version) error {
 			log.Printf("deleting take %d: %v", take, err)
 		}
 	}
+	for _, sound := range sounds {
+		if err := s.soundFiles.Remove(sound); err != nil {
+			log.Printf("deleting sound %d: %v", sound, err)
+		}
+	}
 	return nil
+}
+
+// songOwned lists the ids of a Song's rows in table, one that has a
+// song_id.
+func songOwned(ctx context.Context, tx *sql.Tx, table string, songID int64) ([]int64, error) {
+	var ids []int64
+	err := query(ctx, tx, `SELECT id FROM `+table+` WHERE song_id = ?`, []any{songID}, func(rows *sql.Rows) error {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+		ids = append(ids, id)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("listing %s: %w", table, err)
+	}
+	return ids, nil
 }
 
 // expectCurrent checks that a write to a Song, guarded by the version it

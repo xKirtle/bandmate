@@ -32,13 +32,15 @@ type Config struct {
 	// MaxCoverBytes caps the size of a Cover's pictures, together. Zero
 	// means DefaultMaxCoverBytes.
 	MaxCoverBytes int64
-	// Now tells the time at startup, when Takes detached for more than
-	// DetachedTakesKept are removed. Nil means time.Now.
+	// Now tells the time at startup, when Takes detached, and Sounds no
+	// Clip has used, for more than DetachedTakesKept are removed. Nil means
+	// time.Now.
 	Now func() time.Time
 }
 
 // DetachedTakesKept is how long a Take is kept once detached, well past
-// the session its undo history lasts for.
+// the session its undo history lasts for. A Sound no Clip uses is kept as
+// long.
 const DetachedTakesKept = 24 * time.Hour
 
 // DefaultMaxUploadBytes is the upload cap unless configured otherwise.
@@ -104,7 +106,7 @@ func New(cfg Config) (*App, error) {
 	}
 	a := &App{
 		db:          conn,
-		songs:       lyricsheet.NewStore(conn, masterFiles, coverFiles, takeFiles),
+		songs:       lyricsheet.NewStore(conn, masterFiles, coverFiles, takeFiles, soundFiles),
 		beats:       beats.NewStore(conn, beatFiles),
 		timelines:   timeline.NewStore(conn, takeFiles, soundFiles),
 		beatFiles:   beatFiles,
@@ -129,6 +131,9 @@ func New(cfg Config) (*App, error) {
 	// Only tidying, so it never stops the app starting.
 	if err := a.timelines.SweepDetachedTakes(context.Background(), now().Add(-DetachedTakesKept)); err != nil {
 		log.Printf("sweeping detached takes: %v", err)
+	}
+	if err := a.timelines.SweepUnusedSounds(context.Background(), now().Add(-DetachedTakesKept)); err != nil {
+		log.Printf("sweeping unused sounds: %v", err)
 	}
 	a.handler = a.routes()
 	return a, nil
