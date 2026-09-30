@@ -7,7 +7,7 @@
 // its own is gone (where it was recorded, if that Track is empty), what it
 // captured staying in step with where its Clip starts.
 import type { Take } from './api';
-import { recordingPlan, sungPastStart, type RecordingPlan } from './recording';
+import { lastClipEnd, sungPastStart, type RecordingPlan } from './recording';
 import type { Placed } from './schedule';
 
 /** Where a recording was going, as kept with it. */
@@ -80,6 +80,8 @@ export function recoveredPlacement(
     if (free) return { target: { trackId: own.id, start: plan.start }, captureStart: plan.from };
   }
   const track = own ?? tracks.find((t) => t.id === chosen) ?? tracks.at(-1);
-  const start = track ? recordingPlan(track.clips, plan.start).start : 0;
+  // Appended after the Track's last Clip, as a Take goes with its Clip, not
+  // a time on the Timeline; where it was recorded only counts on an empty one.
+  const start = !track ? 0 : track.clips.length ? lastClipEnd(track.clips) : plan.start;
   return { target: track ? { trackId: track.id, start } : null, captureStart: shifted(start - plan.start) };
 }

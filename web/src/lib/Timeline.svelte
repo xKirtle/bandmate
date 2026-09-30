@@ -144,8 +144,9 @@
   let offerTimer: ReturnType<typeof setTimeout> | undefined;
   const offerFor = 8000;
 
-  // Recording a Take onto the chosen Track, at its append point. Playback
-  // leads in from a little before it, everything playing as mixed but
+  // Recording a Take onto the chosen Track, at the playhead, or where the
+  // Track's last Clip ends if the playhead is before that. Playback leads
+  // in from a little before it, everything playing as mixed but
   // ignoring the Loop, and runs on until stopped, capturing all along. The
   // lead-in is kept in the Take, hidden behind its Clip's start. Only
   // offered while stopped, and never along with Sync mode.

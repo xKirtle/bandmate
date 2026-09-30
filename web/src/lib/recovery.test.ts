@@ -11,7 +11,7 @@ const tracks = [
   { id: 11, clips: [] },
 ];
 
-// A new Take recorded at the first Track's append point, 0:30, from 0:28,
+// A new Take recorded where the first Track's last Clip ends, 0:30, from 0:28,
 // 5 s long with a 0.1 s offset, so it ends at 0:32.9.
 const recorded: Unsaved = {
   trackId: 10,
