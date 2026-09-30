@@ -3302,7 +3302,10 @@
     .timeline {
       --timeline-scale: 1;
     }
-    .edit-only,
+    /* Important, so no element's own display, however specific, shows it here. */
+    .edit-only {
+      display: none !important;
+    }
     .resize,
     .tracks {
       display: none;
