@@ -98,8 +98,29 @@ Versions follow the [roadmap](docs/roadmap.md): v0.N is the release that ships s
 
 ### Cutting a release
 
-```sh
-gh release create vX.Y.Z --generate-notes
-```
+Tag first, and publish the GitHub Release only once CI has published the image. Every running Bandmate checks GitHub's latest release, so a release published before its image exists tells people to update to an image they can't pull.
 
-This tags `main` as `vX.Y.Z` and publishes the release, with notes generated from the pull requests merged since the last one and grouped by their labels ([.github/release.yml](.github/release.yml)). The tag triggers CI, which tests it and publishes the image tagged `X.Y.Z`, `X.Y` and `latest`.
+1. Tag `main` and push the tag:
+
+   ```sh
+   git switch main && git pull
+   git tag -a vX.Y.Z -m "vX.Y.Z"
+   git push origin vX.Y.Z
+   ```
+
+   The tag triggers CI, which tests it and publishes the image tagged `X.Y.Z`, `X.Y` and `latest`.
+
+2. Watch the run with `gh run watch`. If it fails, nothing public has changed: delete the tag (`git push origin :vX.Y.Z && git tag -d vX.Y.Z`), fix the cause on `main`, and tag again.
+3. Check that `X.Y.Z`, `X.Y` and `latest` show the same digest:
+
+   ```sh
+   docker buildx imagetools inspect ghcr.io/xkirtle/bandmate:X.Y.Z
+   ```
+
+4. Publish the release on the existing tag:
+
+   ```sh
+   gh release create vX.Y.Z --verify-tag --generate-notes
+   ```
+
+   The notes list the pull requests merged since the last release, grouped by their labels ([.github/release.yml](.github/release.yml)). Read them before publishing, because the About page shows them. Where they read poorly, write the notes by hand and pass `--notes-file` instead. v0.4.0 is one of those: it's the first release, and most earlier pull requests have no label.
