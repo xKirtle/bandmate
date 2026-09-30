@@ -20,6 +20,14 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 
 ## Wishlist
 
+### Snapping
+
+- Found in real use: lining two Clips up exactly by hand is hard.
+- Moving or trimming a Clip snaps to every Clip's start and end, on every Track, to the playhead, and to the Loop's start and end, whether it's on or off. A moved Clip snaps by whichever of its edges is closer; a trimmed one by the edge being dragged. A Nudge never snaps: it lines a Take up with the sound itself.
+- The Loop snaps to the same things: both ends as a new one is marked, and either edge as it's dragged. The shortest Loop still holds.
+- "Close enough" is measured on screen (about 8 px), so it feels the same at any zoom. With several targets in reach, the closest wins. Holding Shift skips snapping for that drag; on touch it's always on.
+- While snapped, a guide line runs from the lane being dragged in (or the ruler, for the Loop) through every Clip aligned at that point. There's no guide for the playhead, which already is one.
+
 ### Snapshots
 
 - **Snapshots** cover the whole Lyric Sheet. They're taken automatically (e.g. after a pause in editing, thinned out over time) and can be named by hand. Restoring one first snapshots the current Lyric Sheet, so a restore can always be undone.
