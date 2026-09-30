@@ -202,7 +202,7 @@ func TestANewTakeIsNumberedAfterTheHighestStillInItsClip(t *testing.T) {
 	}
 }
 
-func TestAClipIsNoLongerToldTheLastTakeNumber(t *testing.T) {
+func TestPlacingAClipRefusesALastTakeNumber(t *testing.T) {
 	ts := newTestServer(t)
 	r := recordATake(t, ts)
 	timelineChange(t, ts.deleteClip(r.song.ID, r.clip.ID))

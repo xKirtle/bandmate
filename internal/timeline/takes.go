@@ -176,12 +176,13 @@ func (s *Store) addTake(ctx context.Context, songID int64, based lyricsheet.Vers
 }
 
 // Retake records another Take into a Clip of Takes, numbered after the
-// highest still in it, as its active Take. It leads in from before the Clip's start like the first,
-// and where it starts before the Clip's source span, the span is taken back
-// to where it starts, the Takes already there staying where they are on the
-// Timeline. The Clip grows to where it ends, but never past the next Clip
-// on its Track: the rest is kept, hidden, to trim into view once there's
-// room. The file is kept if the Take is added, and discarded otherwise.
+// highest still in it, as its active Take. It leads in from before the
+// Clip's start like the first, and where it starts before the Clip's source
+// span, the span is taken back to where it starts, the Takes already there
+// staying where they are on the Timeline. The Clip grows to where it ends,
+// but never past the next Clip on its Track: the rest is kept, hidden, to
+// trim into view once there's room. The file is kept if the Take is added,
+// and discarded otherwise.
 func (s *Store) Retake(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64, c Captured, file *audio.Received) (Timeline, error) {
 	defer file.Discard()
 	take, err := readTake(file, c)
@@ -212,10 +213,9 @@ func (s *Store) Retake(ctx context.Context, songID int64, based lyricsheet.Versi
 			end = min(end, next.Float64)
 		}
 		p.length = max(p.length, end-p.start)
-		var number int
-		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(number), 0) + 1 FROM takes WHERE clip_id = ?`,
-			clipID).Scan(&number); err != nil {
-			return 0, fmt.Errorf("numbering the take: %w", err)
+		number, err := nextTakeNumber(ctx, tx, clipID)
+		if err != nil {
+			return 0, err
 		}
 		takeID, err := take.insert(ctx, tx, songID, number, take.start-(p.start-p.offset))
 		if err != nil {
@@ -230,6 +230,18 @@ func (s *Store) Retake(ctx context.Context, songID int64, based lyricsheet.Versi
 		}
 		return takeID, place(ctx, tx, clipID, p)
 	})
+}
+
+// nextTakeNumber is the number a new Take in a Clip gets: the one after
+// the highest still in it, so deleting the latest Take frees its number,
+// while a gap left lower down stays.
+func nextTakeNumber(ctx context.Context, tx *sql.Tx, clipID int64) (int, error) {
+	var number int
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(number), 0) + 1 FROM takes WHERE clip_id = ?`,
+		clipID).Scan(&number); err != nil {
+		return 0, fmt.Errorf("numbering the take: %w", err)
+	}
+	return number, nil
 }
 
 // startSpanEarlier has a Clip of Takes' source span start earlier by some
