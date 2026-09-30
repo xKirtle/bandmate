@@ -128,6 +128,7 @@ describe('nudging', () => {
   const clip: Clip = {
     id: 1,
     beatId: null,
+    name: null,
     takes: [take(3), take(4, { nudge: 0.02 })],
     activeTakeId: 4,
     lastTakeNumber: 2,

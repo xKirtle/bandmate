@@ -2,7 +2,7 @@
 // waveform. The Timeline asks here rather than reaching for a Clip's Beat or
 // Takes, so playing, drawing, trimming and undo work the same for any
 // source. Undo re-places a Clip by naming its source, so that's worked out
-// here too.
+// here too, as is what a Clip goes by until it has a name of its own.
 //
 // A Clip of Takes plays its active Take. Its source is the span its Takes
 // are laid out in, up to where the last of them ends: each Take starts at
@@ -122,11 +122,24 @@ export function playing(timeline: Timeline, sources: ClipSources, silent: number
   );
 }
 
-/** What places a Clip back as it is: its source and trim, without its id. */
+/**
+ * What a Clip goes by: its own name, or until it's named, its source's (a
+ * Beat's title, or its active Take's number). A named Clip of Takes still
+ * shows which Take it plays, e.g. "Hook idea · Take 2".
+ */
+export function clipTitle(clip: Clip, source: ClipSource): string {
+  if (clip.name === null) return source.title;
+  const take = activeTake(clip);
+  return take ? `${clip.name} · Take ${take.number}` : clip.name;
+}
+
+/** What places a Clip back as it is: its source, trim and name, without its id. */
 export function placementOf(clip: Clip): NewClip {
   const { start, offset, length } = clip;
-  if (clip.beatId !== null) return { beatId: clip.beatId, start, offset, length };
+  const name = clip.name !== null ? { name: clip.name } : {};
+  if (clip.beatId !== null) return { beatId: clip.beatId, ...name, start, offset, length };
   return {
+    ...name,
     takeIds: clip.takes.map((t) => t.id),
     activeTakeId: clip.activeTakeId!,
     lastTakeNumber: clip.lastTakeNumber,

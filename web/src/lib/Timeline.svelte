@@ -19,7 +19,7 @@
   import { Capture, CaptureError, frameAt, inputProblem } from './capture';
   import { addedTrack, chosenTrack, readChosen, storeChosen, type ChoiceEvent } from './chosenTrack';
   import { clampMove, clampTrimEnd, clampTrimStart, draggedNudge, nudged } from './clipEdit';
-  import { activeTake, clipSources, fileStart, playing } from './clipSource';
+  import { activeTake, clipSources, clipTitle, fileStart, playing } from './clipSource';
   import { cuesInSpan, formatCue } from './cues';
   import {
     History,
@@ -79,7 +79,7 @@
   // The Timeline, docked under the Lyric Sheet: its Tracks and Clips, and
   // playback with each Track's volume, mute and solo, and the Loop. Editing
   // (adding Beats, adding, renaming, reordering and deleting Tracks, moving,
-  // trimming, duplicating and deleting Clips, setting and clearing the Loop,
+  // trimming, renaming, duplicating and deleting Clips, setting and clearing the Loop,
   // and undoing and redoing all of it along with mixing and Cue edits) is
   // only offered on wider screens; on a phone it only plays, mixes and
   // switches the Loop on and off. On both it zooms and scrolls, and follows
@@ -1139,12 +1139,15 @@
   /** Each Track's Clips as shown, with the one being edited where it's been dragged to. */
   const shown = $derived(
     timeline.tracks.map((track) => {
+      // Until it's dragged, the Clip pressed stays where it is among the
+      // others: moved in the page, it would never get its click, or double-click.
+      const dragged = edit?.moved ? edit : null;
       const placed = track.clips
-        .filter((c) => c.id !== edit?.clip.id)
-        .map((clip) => ({ clip, at: clip as Placed, editing: false }));
-      if (edit?.trackId === track.id) {
-        const clip = edit.mode === 'nudge' ? nudged(edit.clip, edit.nudge) : edit.clip;
-        placed.push({ clip, at: edit.placement, editing: true });
+        .filter((c) => c.id !== dragged?.clip.id)
+        .map((clip) => ({ clip, at: clip as Placed, editing: clip.id === edit?.clip.id }));
+      if (dragged?.trackId === track.id) {
+        const clip = dragged.mode === 'nudge' ? nudged(dragged.clip, dragged.nudge) : dragged.clip;
+        placed.push({ clip, at: dragged.placement, editing: true });
       }
       return { track, clips: placed };
     }),
@@ -1370,6 +1373,63 @@
     perform({ kind: 'duplicateClip', clipId: clip.id });
   }
 
+  // A Clip is renamed in place, like a Track: double-clicked, or from its
+  // menu. A blank name clears its own, so it goes by its source's again.
+  // Until a new name is saved, it's shown.
+  let renamingClip = $state<number | null>(null);
+  let clipNaming = $state<Record<number, string | null>>({});
+
+  /** A Clip's name, as saved or being saved; null if it has none. */
+  function nameOf(clip: Clip): string | null {
+    return clip.id in clipNaming ? clipNaming[clip.id] : clip.name;
+  }
+
+  /** What a Clip goes by, as shown. */
+  function titleOf(clip: Clip): string {
+    return clipTitle({ ...clip, name: nameOf(clip) }, sources.of(clip));
+  }
+
+  function startClipRename(clip: Clip) {
+    if (!editable.current || clip.id === recording?.clipId) return;
+    renamingClip = clip.id;
+  }
+
+  /** Stops renaming a Clip, saving the name typed unless asked not to. */
+  function endClipRename(clip: Clip, input: HTMLInputElement, save: boolean) {
+    if (renamingClip !== clip.id) return;
+    renamingClip = null;
+    if (save) renameClip(clip, input.value.trim());
+  }
+
+  async function renameClip(clip: Clip, typed: string) {
+    const name = typed || null;
+    if (name === clip.name) return;
+    clipNaming[clip.id] = name;
+    // If it fails, the name goes back to how it's saved.
+    await perform({ kind: 'renameClip', clipId: clip.id, name: typed });
+    if (clipNaming[clip.id] === name) delete clipNaming[clip.id];
+  }
+
+  function clipNameKey(clip: Clip, event: KeyboardEvent) {
+    if (event.key !== 'Enter' && event.key !== 'Escape') return;
+    event.preventDefault();
+    endClipRename(clip, event.currentTarget as HTMLInputElement, event.key === 'Enter');
+    // Back to the Clip, where renaming started.
+    tick().then(() => document.getElementById(`clip-${clip.id}`)?.focus());
+  }
+
+  function clipDoubleClick(event: MouseEvent, clip: Clip) {
+    // Not on its ⋯ or menu, its trim edges, or its name being typed.
+    if (inClipMenu(event.target) || inClipName(event.target)) return;
+    if (event.target instanceof Element && event.target.closest('.trim')) return;
+    startClipRename(clip);
+  }
+
+  /** Whether an event came from the field a Clip's name is typed in. */
+  function inClipName(target: EventTarget | null): boolean {
+    return target instanceof Element && target.closest('.clip-name') !== null;
+  }
+
   // Deleting doesn't ask first: it can be undone, and the Beat stays in the
   // Beat Library.
   function remove(clip: Clip) {
@@ -1400,6 +1460,7 @@
         ? [{ icon: '●', label: 'Retake', title: 'Record another Take into this Clip', run: () => startRecording(clip) }]
         : []),
       ...takeActions(clip),
+      { icon: '✎', label: 'Rename', title: 'Or double-click the Clip', run: () => startClipRename(clip) },
       { icon: '⧉', label: 'Duplicate', run: () => duplicate(clip) },
       { icon: '×', label: 'Delete', run: () => remove(clip) },
     ];
@@ -1489,6 +1550,8 @@
   }
 
   function clipContextMenu(event: MouseEvent, clip: Clip) {
+    // Its name's field keeps the browser's, to cut, copy and paste.
+    if (inClipName(event.target)) return;
     // The Clip has a menu of its own, in place of the browser's.
     event.preventDefault();
     // Right-clicking its ⋯ opens it there too, but not right-clicking in it.
@@ -2113,10 +2176,11 @@
               >
                 {#each placed as { clip, at, editing } (clip.id)}
                   {@const wave = waveWindow(view, at.start, at.length)}
-                  {@const title = sources.of(clip).title}
+                  {@const title = titleOf(clip)}
                   <!-- Focusable for its Delete and menu keys; pointer dragging has no key equivalent yet, and its actions are in its menu. -->
                   <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
                   <div
+                    id="clip-{clip.id}"
                     class="clip"
                     class:editing
                     class:moving={editing && edit?.mode === 'move'}
@@ -2131,9 +2195,24 @@
                     onpointerdown={(e) => editDown(e, clip, 'move')}
                     onkeydown={(e) => clipKey(e, clip)}
                     oncontextmenu={(e) => clipContextMenu(e, clip)}
+                    ondblclick={(e) => clipDoubleClick(e, clip)}
                   >
                     <span class="clip-head">
-                      <span class="clip-title">{title}</span>
+                      {#if editable.current && renamingClip === clip.id}
+                        <!-- Pressed, it's typed in, so the Clip doesn't move. -->
+                        <input
+                          class="clip-name"
+                          value={nameOf(clip) ?? ''}
+                          placeholder={sources.of(clip).title}
+                          aria-label="Name of {title}"
+                          onpointerdown={(e) => e.stopPropagation()}
+                          onkeydown={(e) => clipNameKey(clip, e)}
+                          onblur={(e) => endClipRename(clip, e.currentTarget, true)}
+                          {@attach focusField}
+                        />
+                      {:else}
+                        <span class="clip-title">{title}</span>
+                      {/if}
                       <span class="clip-actions clip-menu edit-only">
                         <ActionsMenu
                           bind:this={clipMenus[clip.id]}
@@ -2880,6 +2959,23 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .clip-name {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    margin: calc(0.0625 * var(--timeline-rem));
+    padding: 0 calc(0.1875 * var(--timeline-rem));
+    border: 1px solid var(--border);
+    border-radius: calc(0.25 * var(--timeline-rem));
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+    font-size: calc(0.6875 * var(--timeline-rem));
+    font-weight: 600;
+    line-height: 1.25;
+    user-select: text;
+    cursor: text;
   }
   .clip-actions {
     display: none;

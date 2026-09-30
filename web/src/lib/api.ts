@@ -264,6 +264,8 @@ export interface Clip {
   id: number;
   /** The Beat it plays, or null for a Clip of Takes. */
   beatId: number | null;
+  /** Its own name, or null until it's named, when it goes by its source's (see clipTitle). */
+  name: string | null;
   /** A Clip of Takes' Takes, by number; none for a Clip of a Beat. */
   takes: Take[];
   /** The Take a Clip of Takes plays, or null for a Clip of a Beat. */
@@ -304,10 +306,12 @@ export interface Take {
 
 /**
  * A stretch of a Beat, or of detached Takes, to place on a Track, e.g. a
- * deleted Clip brought back, or a recording redone.
+ * deleted Clip brought back, or a recording redone, with its name if it has
+ * one.
  */
-export type NewClip = Pick<Clip, 'start' | 'offset' | 'length'> &
-  ({ beatId: number } | { takeIds: number[]; activeTakeId: number; lastTakeNumber: number });
+export type NewClip = Pick<Clip, 'start' | 'offset' | 'length'> & { name?: string } & (
+    { beatId: number } | { takeIds: number[]; activeTakeId: number; lastTakeNumber: number }
+  );
 
 /** How a Take was captured, sent with its file. */
 export interface Captured {
@@ -608,7 +612,10 @@ export const api = {
   /** Places a stretch of a Beat, or detached Takes, on a Track. Refused if it would overlap a Clip there. */
   placeClip: (at: SongAt, trackId: number, clip: NewClip) =>
     request<Timeline>('POST', `/songs/${at.id}/timeline/clips`, { trackId, ...clip }, at),
-  /** Copies a Clip right after itself, or after its Track's last Clip if that's taken. */
+  /** Gives a Clip a name of its own; a blank one clears it, and the Clip goes by its source's name again. */
+  renameClip: (at: SongAt, clipId: number, name: string) =>
+    request<Timeline>('PUT', `/songs/${at.id}/timeline/clips/${clipId}/name`, { name }, at),
+  /** Copies a Clip, name and all, right after itself, or after its Track's last Clip if that's taken. */
   duplicateClip: (at: SongAt, clipId: number) =>
     request<Timeline>('POST', `/songs/${at.id}/timeline/clips/${clipId}/duplicate`, undefined, at),
   /** Removes a Clip from the Timeline; its Beat stays in the Beat Library, and its Takes are detached. */
