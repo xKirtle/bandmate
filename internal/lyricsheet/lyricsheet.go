@@ -126,8 +126,13 @@ type Store struct {
 // masterFiles, Covers' pictures in coverFiles, Takes' audio in takeFiles
 // and Sounds' in soundFiles.
 func NewStore(db *sql.DB, masterFiles *audio.Files, coverFiles CoverFiles, takeFiles, soundFiles *audio.Files) *Store {
-	return &Store{db: db, masterFiles: masterFiles, coverFiles: coverFiles, takeFiles: takeFiles,
-		soundFiles: soundFiles}
+	return &Store{
+		db:          db,
+		masterFiles: masterFiles,
+		coverFiles:  coverFiles,
+		takeFiles:   takeFiles,
+		soundFiles:  soundFiles,
+	}
 }
 
 // timeFormat keeps sub-second precision and sorts correctly as text.
@@ -384,11 +389,11 @@ func (s *Store) DeleteSong(ctx context.Context, id int64, based Version) error {
 	if err != nil {
 		return err
 	}
-	takes, err := songOwned(ctx, tx, "takes", id)
+	takes, err := songOwnedIDs(ctx, tx, "takes", id)
 	if err != nil {
 		return err
 	}
-	sounds, err := songOwned(ctx, tx, "sounds", id)
+	sounds, err := songOwnedIDs(ctx, tx, "sounds", id)
 	if err != nil {
 		return err
 	}
@@ -419,9 +424,9 @@ func (s *Store) DeleteSong(ctx context.Context, id int64, based Version) error {
 	return nil
 }
 
-// songOwned lists the ids of a Song's rows in table, one that has a
+// songOwnedIDs lists the ids of a Song's rows in table, one that has a
 // song_id.
-func songOwned(ctx context.Context, tx *sql.Tx, table string, songID int64) ([]int64, error) {
+func songOwnedIDs(ctx context.Context, tx *sql.Tx, table string, songID int64) ([]int64, error) {
 	var ids []int64
 	err := query(ctx, tx, `SELECT id FROM `+table+` WHERE song_id = ?`, []any{songID}, func(rows *sql.Rows) error {
 		var id int64
