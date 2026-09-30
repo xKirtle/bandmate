@@ -9,9 +9,9 @@
     describeOffer,
     fromDraft,
     offeredChanges,
-    sameDraft,
     toDraft,
     type BeatDraft,
+    wouldLoseEdits,
   } from './beatDraft';
   import { suggestForFile } from './beatTags';
   import { prepareUpload } from './upload';
@@ -33,13 +33,13 @@
   } = $props();
 
   let dialog = $state<HTMLDialogElement>();
-  // Taken from the Beat as the dialog opens, and not followed after.
+  // The details as last saved: taken from the Beat as the dialog opens, and
+  // again once its file is replaced. Read only on a click outside, so not
+  // state.
   // svelte-ignore state_referenced_locally
-  const opened = toDraft(beat);
-  let draft = $state({ ...opened });
-  // Whether its file has been replaced since it opened. Read only on a
-  // click outside, so not state.
-  let replaced = false;
+  let saved = toDraft(beat);
+  // Taken from the Beat as the dialog opens, and not followed after.
+  let draft = $state({ ...saved });
   let busy = $state<string | null>(null);
   let error = $state<string | null>(null);
   // Details a replaced file suggests, offered rather than applied.
@@ -60,9 +60,10 @@
     if (busy !== null) event.preventDefault();
   }
 
-  // A click outside closes it only while nothing has been changed, and
+  // A click outside closes it only while nothing has been changed since it
+  // opened or its file was replaced, no suggested details are waiting, and
   // nothing is being saved, uploaded or deleted.
-  const nothingToLose = () => busy === null && !replaced && sameDraft(draft, opened);
+  const nothingToLose = () => busy === null && !wouldLoseEdits(draft, saved, offer?.changes ?? null);
 
   function useOffer() {
     if (offer) Object.assign(draft, offer.changes);
@@ -108,8 +109,10 @@
     run('Reading file…', async () => {
       const [decoded, suggestion] = await Promise.all([prepareUpload(file, maxUploadBytes), suggestForFile(file)]);
       busy = 'Uploading…';
-      onChange(await api.replaceBeatFile(beat.id, file, decoded));
-      replaced = true;
+      const updated = await api.replaceBeatFile(beat.id, file, decoded);
+      onChange(updated);
+      // As if it had just opened on the new file.
+      saved = toDraft(updated);
       const changes = offeredChanges(draft, suggestion);
       if (Object.keys(changes).length > 0) offer = { fileName: file.name, changes };
     });
