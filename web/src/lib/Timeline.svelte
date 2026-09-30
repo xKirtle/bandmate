@@ -1316,9 +1316,9 @@
   );
 
   /**
-   * The guide for what a moved or trimmed Clip is snapped to: a line at that time, from
-   * its lane through every lane with a Clip aligned there, in pixels down
-   * the lanes.
+   * The guide for what a moved or trimmed Clip is snapped to: a line at
+   * that time, from its lane through every lane with a Clip aligned there,
+   * in pixels down the lanes.
    */
   const guide = $derived.by(() => {
     if (!edit?.snap) return null;
@@ -1508,11 +1508,11 @@
         const trimmed = trim(at);
         return trimStart ? trimmed.start : trimmed.start + trimmed.length;
       };
-      const trimmed = edit.free
+      const snapped = edit.free
         ? { at: t, snap: null }
         : snapEdge(clipTargets(timeline.tracks, clip.id), t, reachAt(view.scale), edge);
-      edit.placement = trim(trimmed.at);
-      edit.snap = trimmed.snap;
+      edit.placement = trim(snapped.at);
+      edit.snap = snapped.snap;
     }
     dragAt(event, editMove);
   }
