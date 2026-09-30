@@ -16,6 +16,10 @@ Every PR gets exactly one of `enhancement`, `bug` or `documentation`, since the 
 
 Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
+### Releases
+
+To cut a release, follow CONTRIBUTING's "Cutting a release": push the tag, wait for CI to publish the image, and only then create the GitHub Release.
+
 ## Formatting
 
 Before committing web app changes, run `npm run format` in `web/`. CI fails a PR whose web code isn't formatted. Format Go with `gofmt` (CI doesn't check it).
