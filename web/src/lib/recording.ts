@@ -1,9 +1,9 @@
 // Where a recording goes on the chosen Track, and where playback and
-// capture start for it. A Take goes at the playhead, or where the Track's
-// last Clip ends if the playhead is before that, so it never lands on an
-// older one, even past the Timeline's end. A Retake
-// goes into its Clip instead, from the Clip's start as trimmed, and grows
-// it, but never into the next Clip.
+// capture start for it. A Take goes at the playhead, even past the
+// Timeline's end, or where the Track's last Clip ends if the playhead is
+// before that, so it never lands on an older one. A Retake goes into its
+// Clip instead, from the Clip's start as trimmed, and grows it, but never
+// into the next Clip.
 import type { Placed } from './schedule';
 
 /** How long playback leads in before a Take, in seconds, so the Beat is heard coming in. */

@@ -351,7 +351,7 @@ export interface Captured {
 /** Where a Take was recorded, sent with its file. */
 export interface TakePlacement extends Captured {
   trackId: number;
-  /** Where its new Clip starts: the playhead, or where the Track's last Clip ends if later. */
+  /** Where its new Clip starts, as planned by recordingPlan. */
   start: number;
 }
 

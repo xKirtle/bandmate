@@ -80,8 +80,10 @@ export function recoveredPlacement(
     if (free) return { target: { trackId: own.id, start: plan.start }, captureStart: plan.from };
   }
   const track = own ?? tracks.find((t) => t.id === chosen) ?? tracks.at(-1);
-  // Appended after the Track's last Clip, as a Take goes with its Clip, not
-  // a time on the Timeline; where it was recorded only counts on an empty one.
-  const start = !track ? 0 : track.clips.length ? lastClipEnd(track.clips) : plan.start;
-  return { target: track ? { trackId: track.id, start } : null, captureStart: shifted(start - plan.start) };
+  if (!track) return { target: null, captureStart: shifted(-plan.start) };
+  // Not at the playhead as a new recording would be: with its Clip or Track
+  // gone, the time it was recorded at no longer places it, as a Take goes
+  // with its Clip. It's appended after the last Clip, unless there's none.
+  const start = track.clips.length ? lastClipEnd(track.clips) : plan.start;
+  return { target: { trackId: track.id, start }, captureStart: shifted(start - plan.start) };
 }

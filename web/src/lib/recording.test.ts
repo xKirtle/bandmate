@@ -10,23 +10,24 @@ describe('recordingPlan', () => {
     expect(recordingPlan([], 1)).toEqual({ start: 1, from: 0 });
   });
 
-  // Verse 1 at 0:00 to 0:30, and a Sound at 0:40 to 0:50.
+  // A Take's Clip at 0:00 to 0:30, and a Sound's at 0:40 to 0:50.
   const clips = [
     { start: 40, offset: 0, length: 10 },
     { start: 0, offset: 3, length: 30 },
   ];
 
   it("puts a Take at the playhead once it's past the Track's last Clip, leading in before it", () => {
-    expect(recordingPlan(clips, 90)).toEqual({ start: 90, from: 88 });
+    expect(recordingPlan(clips, 90)).toEqual({ start: 90, from: 90 - leadIn });
   });
 
   it("puts a Take right at the Track's last Clip's end with the playhead there", () => {
-    expect(recordingPlan(clips, 50)).toEqual({ start: 50, from: 48 });
+    expect(recordingPlan(clips, 50)).toEqual({ start: 50, from: 50 - leadIn });
   });
 
   it("puts a Take where the Track's last Clip ends with the playhead before that", () => {
     // Before the first Clip, on one, and in the gap between them.
-    for (const playhead of [0, 5, 35, 45]) expect(recordingPlan(clips, playhead)).toEqual({ start: 50, from: 48 });
+    for (const playhead of [0, 5, 35, 45])
+      expect(recordingPlan(clips, playhead)).toEqual({ start: 50, from: 50 - leadIn });
   });
 
   it('never leads in from before 0:00 after a Clip', () => {
