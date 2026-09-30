@@ -1,6 +1,6 @@
 // What a Clip plays: its source's audio, how long the source is, and its
-// waveform. The Timeline asks here rather than reaching for a Clip's Beat or
-// Takes, so playing, drawing, trimming and undo work the same for any
+// waveform. The Timeline asks here rather than reaching for a Clip's Beat,
+// Sound or Takes, so playing, drawing, trimming and undo work the same for any
 // source. Undo re-places a Clip by naming its source, so that's worked out
 // here too, as is what a Clip goes by until it has a name of its own.
 //
@@ -51,6 +51,16 @@ export function clipSources(timeline: Timeline): ClipSources {
       ];
     }),
   );
+  for (const s of timeline.sounds) {
+    const key = soundKey(s.id);
+    byKey.set(key, {
+      key,
+      title: s.name,
+      audio: api.soundAudioUrl(timeline.songId, s.id),
+      duration: s.duration,
+      loadPeaks: () => api.getSound(timeline.songId, s.id).then((full) => full.peaks ?? []),
+    });
+  }
   for (const clip of timeline.tracks.flatMap((t) => t.clips)) {
     const take = activeTake(clip);
     if (!take) continue;
@@ -64,9 +74,16 @@ export function clipSources(timeline: Timeline): ClipSources {
     });
   }
   return {
-    of: (clip) => byKey.get(clip.beatId !== null ? beatKey(clip.beatId) : takeKey(clip.activeTakeId!))!,
+    of: (clip) => byKey.get(sourceKey(clip))!,
     all: () => [...byKey.values()],
   };
+}
+
+/** The key of the source a Clip plays. */
+function sourceKey(clip: Clip): string {
+  if (clip.beatId !== null) return beatKey(clip.beatId);
+  if (clip.soundId !== null) return soundKey(clip.soundId);
+  return takeKey(clip.activeTakeId!);
 }
 
 /** The key of the source a Beat's Clips play. */
@@ -74,19 +91,24 @@ function beatKey(id: number): string {
   return `beat:${id}`;
 }
 
+/** The key of the source a Sound's Clips play. */
+function soundKey(id: number): string {
+  return `sound:${id}`;
+}
+
 /** The key of the source a Take's Clip plays. */
 function takeKey(id: number): string {
   return `take:${id}`;
 }
 
-/** The Take a Clip of Takes plays, or undefined for a Clip of a Beat. */
+/** The Take a Clip of Takes plays, or undefined for a Clip of a Beat or a Sound. */
 export function activeTake(clip: Clip): Take | undefined {
   return clip.takes.find((t) => t.id === clip.activeTakeId);
 }
 
 /**
- * Where in its source a Clip's audio file starts, in seconds: 0 for a Beat,
- * and for a Take, its position in its span, which a nudge moves.
+ * Where in its source a Clip's audio file starts, in seconds: 0 for a Beat
+ * or a Sound, and for a Take, its position in its span, which a nudge moves.
  */
 export function fileStart(clip: Clip): number {
   return activeTake(clip)?.position ?? 0;
@@ -94,8 +116,8 @@ export function fileStart(clip: Clip): number {
 
 /**
  * What of its audio file a Clip plays, and when: all of its window for a
- * Beat, and for a Take, only where the Take has audio within it. Null if
- * none of it does.
+ * Beat or a Sound, and for a Take, only where the Take has audio within it.
+ * Null if none of it does.
  */
 export function heard(clip: Clip): Placed | null {
   const take = activeTake(clip);
@@ -124,8 +146,8 @@ export function playing(timeline: Timeline, sources: ClipSources, silent: number
 
 /**
  * What a Clip goes by: its own name, or until it's named, its source's (a
- * Beat's title, or its active Take's number). A named Clip of Takes still
- * shows which Take it plays, e.g. "Hook idea · Take 2".
+ * Beat's title, a Sound's name, or its active Take's number). A named Clip
+ * of Takes still shows which Take it plays, e.g. "Hook idea · Take 2".
  */
 export function clipTitle(clip: Clip, source: ClipSource): string {
   if (clip.name === null) return source.title;
@@ -138,6 +160,7 @@ export function placementOf(clip: Clip): NewClip {
   const { start, offset, length } = clip;
   const name = clip.name !== null ? { name: clip.name } : {};
   if (clip.beatId !== null) return { beatId: clip.beatId, ...name, start, offset, length };
+  if (clip.soundId !== null) return { soundId: clip.soundId, ...name, start, offset, length };
   return {
     ...name,
     takeIds: clip.takes.map((t) => t.id),

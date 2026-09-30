@@ -55,11 +55,12 @@ type App struct {
 	// timelines owns Songs' Timelines, which are kept apart from the Song
 	// aggregate: most changes to a Song don't need them sent back.
 	timelines *timeline.Store
-	// beatFiles, masterFiles and takeFiles are where uploads are received,
-	// next to the files they will be kept with.
+	// beatFiles, masterFiles, takeFiles and soundFiles are where uploads are
+	// received, next to the files they will be kept with.
 	beatFiles   *audio.Files
 	masterFiles *audio.Files
 	takeFiles   *audio.Files
+	soundFiles  *audio.Files
 	coverFiles  lyricsheet.CoverFiles
 	maxUpload   int64
 	maxCover    int64
@@ -89,6 +90,11 @@ func New(cfg Config) (*App, error) {
 		conn.Close()
 		return nil, err
 	}
+	soundFiles, err := audio.Open(filepath.Join(cfg.DataDir, "audio", "sounds"))
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
 	coverFiles := lyricsheet.CoverFiles{}
 	for _, p := range lyricsheet.CoverPictures {
 		if coverFiles[p], err = audio.Open(filepath.Join(cfg.DataDir, "covers", string(p))); err != nil {
@@ -100,10 +106,11 @@ func New(cfg Config) (*App, error) {
 		db:          conn,
 		songs:       lyricsheet.NewStore(conn, masterFiles, coverFiles, takeFiles),
 		beats:       beats.NewStore(conn, beatFiles),
-		timelines:   timeline.NewStore(conn, takeFiles),
+		timelines:   timeline.NewStore(conn, takeFiles, soundFiles),
 		beatFiles:   beatFiles,
 		masterFiles: masterFiles,
 		takeFiles:   takeFiles,
+		soundFiles:  soundFiles,
 		coverFiles:  coverFiles,
 		maxUpload:   cfg.MaxUploadBytes,
 		maxCover:    cfg.MaxCoverBytes,
@@ -199,6 +206,9 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("DELETE /api/songs/{id}/timeline/clips/{clipID}/inactive-takes", a.clearInactiveTakes)
 	mux.HandleFunc("GET /api/songs/{id}/takes/{takeID}", a.getTake)
 	mux.HandleFunc("GET /api/songs/{id}/takes/{takeID}/audio", a.takeAudio)
+	mux.HandleFunc("POST /api/songs/{id}/timeline/sounds", a.importSound)
+	mux.HandleFunc("GET /api/songs/{id}/sounds/{soundID}", a.getSound)
+	mux.HandleFunc("GET /api/songs/{id}/sounds/{soundID}/audio", a.soundAudio)
 	mux.HandleFunc("GET /api/config", a.config)
 	mux.HandleFunc("GET /api/beats", a.listBeats)
 	mux.HandleFunc("POST /api/beats", a.addBeat)

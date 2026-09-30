@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { api, type Clip, type ClipBeat, type Take, type Timeline } from './api';
+import { api, type Clip, type ClipBeat, type Sound, type Take, type Timeline } from './api';
 import { clipSources, clipTitle, fileStart, heard, placementOf, playing } from './clipSource';
 
 const beat = (id: number, more: Partial<ClipBeat> = {}): ClipBeat => ({
@@ -15,6 +15,7 @@ const beat = (id: number, more: Partial<ClipBeat> = {}): ClipBeat => ({
 const clip = (id: number, beatId: number, name: string | null = null): Clip => ({
   id,
   beatId,
+  soundId: null,
   name,
   takes: [],
   activeTakeId: null,
@@ -41,6 +42,7 @@ const take = (id: number, more: Partial<Take> = {}): Take => ({
 const takeClip = (id: number, takes: Take[], active = takes[0].id, name: string | null = null): Clip => ({
   id,
   beatId: null,
+  soundId: null,
   name,
   takes,
   activeTakeId: active,
@@ -50,12 +52,36 @@ const takeClip = (id: number, takes: Take[], active = takes[0].id, name: string 
   length: 10,
 });
 
-const timeline = (clips: Clip[], beats: ClipBeat[]): Timeline => ({
+const sound = (id: number, more: Partial<Sound> = {}): Sound => ({
+  id,
+  name: `Sound ${id}`,
+  fileName: `sound-${id}.m4a`,
+  size: 1000,
+  duration: 12,
+  ...more,
+});
+
+/** A Clip of a Sound at 0:50, playing 4s of it from 1s in. */
+const soundClip = (id: number, soundId: number, name: string | null = null): Clip => ({
+  id,
+  beatId: null,
+  soundId,
+  name,
+  takes: [],
+  activeTakeId: null,
+  lastTakeNumber: 0,
+  start: 50,
+  offset: 1,
+  length: 4,
+});
+
+const timeline = (clips: Clip[], beats: ClipBeat[], sounds: Sound[] = []): Timeline => ({
   songId: 1,
   version: 1,
   updatedAt: '',
   tracks: [{ id: 1, name: 'Beat', volume: 0, muted: false, soloed: false, clips }],
   beats,
+  sounds,
   loop: null,
 });
 
@@ -73,6 +99,45 @@ describe('clipSources', () => {
     expect(sources.of(clip(1, 7)).key).toBe(sources.of(clip(3, 7)).key);
     expect(sources.of(clip(1, 7)).key).not.toBe(sources.of(clip(2, 8)).key);
     expect(sources.all().map((s) => s.title)).toEqual(['Beat 7', 'Beat 8']);
+  });
+});
+
+describe('clipSources of Sounds', () => {
+  it("gives a Sound Clip its Sound's name, audio and length", () => {
+    const c = soundClip(1, 4);
+    const source = clipSources(timeline([c], [], [sound(4, { name: 'Hum idea', duration: 12.5 })])).of(c);
+    expect(source.title).toBe('Hum idea');
+    expect(source.duration).toBe(12.5);
+    expect(source.audio).toBe('/api/songs/1/sounds/4/audio');
+  });
+
+  it('tells Sounds apart from each other and from Beats with the same id, and Clips of one Sound play one source', () => {
+    const clips = [soundClip(1, 7), soundClip(2, 8), soundClip(3, 7), clip(4, 7)];
+    const sources = clipSources(timeline(clips, [beat(7)], [sound(7), sound(8)]));
+    expect(sources.of(clips[0]).key).toBe(sources.of(clips[2]).key);
+    expect(sources.of(clips[0]).key).not.toBe(sources.of(clips[1]).key);
+    expect(sources.of(clips[0]).key).not.toBe(sources.of(clips[3]).key);
+    expect(sources.all().map((s) => s.title)).toEqual(['Beat 7', 'Sound 7', 'Sound 8']);
+  });
+
+  it("fetches a Sound's own peaks", async () => {
+    vi.spyOn(api, 'getSound').mockResolvedValue(sound(4, { peaks: [0.25, 1] }));
+    const c = soundClip(1, 4);
+    expect(
+      await clipSources(timeline([c], [], [sound(4)]))
+        .of(c)
+        .loadPeaks(),
+    ).toEqual([0.25, 1]);
+    expect(api.getSound).toHaveBeenCalledWith(1, 4);
+  });
+
+  it("plays a Sound Clip's placement as it is, from the start of its file", () => {
+    const c = soundClip(1, 4);
+    const tl = timeline([c], [], [sound(4)]);
+    expect(fileStart(c)).toBe(0);
+    expect(playing(tl, clipSources(tl))).toEqual([
+      { start: 50, offset: 1, length: 4, source: '/api/songs/1/sounds/4/audio', trackId: 1 },
+    ]);
   });
 });
 
@@ -180,6 +245,13 @@ describe('clipTitle', () => {
     expect(titled(takeClip(1, [take(3, { number: 1 }), take(4, { number: 2 })], 4))).toBe('Take 2');
   });
 
+  it("goes by its Sound's name until it's named", () => {
+    const c = soundClip(1, 4);
+    expect(clipTitle(c, clipSources(timeline([c], [], [sound(4, { name: 'Hum idea' })])).of(c))).toBe('Hum idea');
+    const named = soundClip(1, 4, 'Verse hum');
+    expect(clipTitle(named, clipSources(timeline([named], [], [sound(4)])).of(named))).toBe('Verse hum');
+  });
+
   it('goes by its own name once named', () => {
     expect(titled(clip(1, 7, 'Chorus 1'), [beat(7, { title: 'Night drive' })])).toBe('Chorus 1');
   });
@@ -205,6 +277,17 @@ describe('placementOf', () => {
       length: 10,
     });
     expect(placementOf(takeClip(1, [take(3)], 3, 'Hook idea'))).toMatchObject({ takeIds: [3], name: 'Hook idea' });
+  });
+
+  it('places a Clip of a Sound back playing the same Sound, with its name', () => {
+    expect(placementOf(soundClip(1, 4))).toEqual({ soundId: 4, start: 50, offset: 1, length: 4 });
+    expect(placementOf(soundClip(1, 4, 'Verse hum'))).toEqual({
+      soundId: 4,
+      name: 'Verse hum',
+      start: 50,
+      offset: 1,
+      length: 4,
+    });
   });
 
   it('places a Clip of Takes back with its Takes, the same one active, numbering on', () => {

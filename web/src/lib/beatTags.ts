@@ -1,9 +1,10 @@
 // Reads an audio file's tags in the browser (e.g. ID3 in mp3, Vorbis comments
-// in flac and ogg) to suggest a Beat's details before it's uploaded.
+// in flac and ogg) to suggest a Beat's details, or name a Sound, before it's
+// uploaded.
 import { suggestBeatDetails, type BeatSuggestion, type BeatTags } from './beatSuggestion';
 
 /** The tags a file carries; none if its format has none or they can't be read. */
-async function readTags(file: File): Promise<BeatTags> {
+export async function readTags(file: File): Promise<BeatTags> {
   try {
     // Loaded on first use: only uploading needs it.
     const { parseBlob } = await import('music-metadata');

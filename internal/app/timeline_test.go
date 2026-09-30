@@ -14,6 +14,7 @@ type timeline struct {
 	UpdatedAt string       `json:"updatedAt"`
 	Tracks    []track      `json:"tracks"`
 	Beats     []clipSource `json:"beats"`
+	Sounds    []sound      `json:"sounds"`
 	// Loop is null until one is set.
 	Loop *loop `json:"loop"`
 }
@@ -39,6 +40,8 @@ type track struct {
 type clip struct {
 	ID     int64 `json:"id"`
 	BeatID int64 `json:"beatId"`
+	// SoundID is the Sound a Clip of a Sound plays.
+	SoundID *int64 `json:"soundId"`
 	// Name is null until the Clip is named.
 	Name         *string `json:"name"`
 	Takes        []take  `json:"takes"`
@@ -123,7 +126,7 @@ func TestANewSongStartsWithTrack1(t *testing.T) {
 	got := ts.getTimeline(s.ID)
 
 	want := timeline{SongID: s.ID, Version: s.Version, UpdatedAt: s.UpdatedAt,
-		Tracks: []track{{ID: firstTrackID(got), Name: "Track 1", Clips: []clip{}}}, Beats: []clipSource{}}
+		Tracks: []track{{ID: firstTrackID(got), Name: "Track 1", Clips: []clip{}}}, Beats: []clipSource{}, Sounds: []sound{}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("timeline = %+v, want %+v", got, want)
 	}
@@ -351,6 +354,10 @@ var timelineChanges = []struct {
 	{"record a take", func(ts *testServer, songID int64, tl timeline, v int64) response {
 		return ts.SendUploadAt(v, http.MethodPost, timelinePath(songID)+"/takes",
 			takeRecording(tl.Tracks[0].ID, 10, 8, 0, 3))
+	}},
+	{"import a sound", func(ts *testServer, songID int64, tl timeline, v int64) response {
+		return ts.SendUploadAt(v, http.MethodPost, timelinePath(songID)+"/sounds",
+			soundFile("hum.m4a", "Hum", tl.Tracks[1].ID, 4))
 	}},
 }
 

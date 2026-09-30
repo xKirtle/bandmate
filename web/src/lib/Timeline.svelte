@@ -39,7 +39,9 @@
   import { recordingPlan, retakeLength, retakePlan, sungPastStart, type RecordingPlan } from './recording';
   import { recoveredPlacement, takesAt, type TakeTarget, type Unsaved } from './recovery';
   import { keptInLoop, outsideLoop, repeats, timelineEnd, type Loop, type Placed } from './schedule';
+  import { nameSound } from './soundName';
   import { inTextField } from './textField';
+  import { prepareUpload } from './upload';
   import { formatDuration } from './time';
   import { tracksDropped, type TrackDrop } from './trackDrag';
   import { TrackDragging } from './trackDragging.svelte';
@@ -78,14 +80,14 @@
 
   // The Timeline, docked under the Lyric Sheet: its Tracks and Clips, and
   // playback with each Track's volume, mute and solo, and the Loop. Editing
-  // (adding Beats, adding, renaming, reordering and deleting Tracks, moving,
-  // trimming, renaming, duplicating and deleting Clips, setting and clearing
-  // the Loop, and undoing and redoing all of it along with mixing and Cue
-  // edits) is only offered on wider screens; on a phone it only plays, mixes
-  // and switches the Loop on and off. On both it zooms and scrolls, and
-  // follows the playhead while playing. While the Loop is on, the playhead
-  // stays inside it. Recording a Take onto the chosen Track is offered where
-  // editing is.
+  // (adding Beats and Sounds, adding, renaming, reordering and deleting
+  // Tracks, moving, trimming, renaming, duplicating and deleting Clips,
+  // setting and clearing the Loop, and undoing and redoing all of it along
+  // with mixing and Cue edits) is only offered on wider screens; on a phone
+  // it only plays, mixes and switches the Loop on and off. On both it zooms
+  // and scrolls, and follows the playhead while playing. While the Loop is
+  // on, the playhead stays inside it. Recording a Take onto the chosen Track
+  // is offered where editing is.
   let {
     song,
     timeline,
@@ -787,6 +789,49 @@
     return ok && added !== null;
   }
 
+  // The largest audio file the server takes, checked before importing one.
+  let maxUploadBytes = $state(Infinity);
+  api.getConfig().then(
+    (c) => (maxUploadBytes = c.maxUploadBytes),
+    // The server still enforces its limit.
+    () => {},
+  );
+  // What importing an audio file is doing, while it is.
+  let importing = $state<string | null>(null);
+
+  /**
+   * Imports an audio file as a Sound, in a new Clip after the Chosen Track's
+   * last Clip, or at 0:00. It's kept in the history as placing that Clip, so
+   * redoing it never uploads the file again.
+   */
+  async function importAudio(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    const trackId = chosen;
+    if (!file || trackId === null) return;
+    error = null;
+    importing = `Reading “${file.name}”…`;
+    try {
+      const [decoded, name] = await Promise.all([prepareUpload(file, maxUploadBytes), nameSound(file)]);
+      importing = `Importing “${name}”…`;
+      offerCues = null;
+      queued++;
+      await change(async (at) => {
+        const before = timeline;
+        const after = await saved(api.importSound(at, file, { trackId, name, ...decoded }));
+        history.record(placingAdded(before, after), before, after);
+        editedAt = after.version;
+        showHistory();
+        return { timeline: after };
+      }).finally(() => queued--);
+    } catch (e) {
+      error = (e as Error).message;
+    } finally {
+      importing = null;
+    }
+  }
+
   // Why Record can't work, where that's known before trying, e.g. no inputs:
   // checked again as inputs come and go.
   let recordProblem = $state<string | null>(null);
@@ -1462,7 +1507,21 @@
       ...takeActions(clip),
       { icon: '✎', label: 'Rename', title: 'Or double-click the Clip', run: () => startClipRename(clip) },
       { icon: '⧉', label: 'Duplicate', run: () => duplicate(clip) },
+      ...soundActions(clip),
       { icon: '×', label: 'Delete', run: () => remove(clip) },
+    ];
+  }
+
+  function soundActions(clip: Clip): MenuAction[] {
+    if (clip.soundId === null) return [];
+    const soundId = clip.soundId;
+    return [
+      {
+        icon: '⤓',
+        label: 'Download Sound',
+        title: `Save “${sources.of(clip).title}” as it was imported`,
+        run: () => download(api.soundDownloadUrl(timeline.songId, soundId)),
+      },
     ];
   }
 
@@ -1924,6 +1983,19 @@
                 : `Record a Take on ${timeline.tracks.find((t) => t.id === chosen)?.name ?? 'a new Track'} (R)`}
         ><span class="record-dot" aria-hidden="true"></span>{capturing ? 'Stop' : 'Record'}</button
       >
+      <label
+        class="toggle import edit-only"
+        class:disabled={importing !== null || recording !== null}
+        title="Import an audio file as a Sound onto {timeline.tracks.find((t) => t.id === chosen)?.name ??
+          'the Chosen Track'}"
+        >Import audio…<input
+          class="visually-hidden"
+          type="file"
+          accept="audio/*"
+          onchange={importAudio}
+          disabled={importing !== null || recording !== null}
+        /></label
+      >
       <span class="edit-only"
         ><InputSettings
           disabled={recording !== null}
@@ -1948,6 +2020,8 @@
         <span class="input-note" role="status">{inputNote}</span>
       {:else if recording && skipped}
         <span class="muted" role="status">Calibrate the latency any time in the recording settings.</span>
+      {:else if importing}
+        <span class="muted" role="status">{importing}</span>
       {:else if playerState === 'loading'}
         <span class="muted" role="status">Loading audio…</span>
       {/if}
@@ -2235,9 +2309,9 @@
                         >
                           {#each clipShape(clip, at.offset + wave.from, wave.to - wave.from, (wave.bars * barWidth) / view.scale, wave.bars) as peak, i (i)}
                             {@const height = Math.max(2, peak * 100)}
-                            <!-- A Take's clipping stays marked once it's saved; a Beat's isn't, being mastered loud. -->
+                            <!-- A Take's clipping stays marked once it's saved; a Beat's or a Sound's isn't, often being mastered loud. -->
                             <rect
-                              class:clipped={clip.beatId === null && peak >= clipping}
+                              class:clipped={clip.activeTakeId !== null && peak >= clipping}
                               x={i + 0.15}
                               y={(100 - height) / 2}
                               width="0.7"
@@ -2868,6 +2942,21 @@
   .toggle.record:disabled {
     opacity: 0.5;
     cursor: default;
+  }
+  .toggle.import {
+    display: inline-flex;
+    align-items: center;
+    width: auto;
+    padding: 0 calc(0.375 * var(--timeline-rem));
+    white-space: nowrap;
+  }
+  .toggle.import.disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .toggle.import:has(input:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
   .ruler {
     position: relative;
