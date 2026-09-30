@@ -19,7 +19,19 @@
   import { Capture, CaptureError, frameAt, inputProblem } from './capture';
   import { addedTrack, chosenTrack, readChosen, storeChosen, type ChoiceEvent } from './chosenTrack';
   import { clampMove, clampTrimEnd, clampTrimStart, draggedNudge, nudged } from './clipEdit';
-  import { editTargets, guideLanes, reachAt, snapEdge, snapMove, type Aligned, type Snap } from './snapping';
+  import {
+    editTargets,
+    guideLanes,
+    loopMark,
+    loopTargets,
+    reachAt,
+    snapEdge,
+    snapLoop,
+    snapMove,
+    type Aligned,
+    type LoopDrag,
+    type Snap,
+  } from './snapping';
   import { activeTake, clipSources, clipTitle, fileStart, playing } from './clipSource';
   import { cuesInSpan, formatCue } from './cues';
   import { carriesFiles, fileDropTrack, importEach, type TrackRow } from './fileDrop';
@@ -1318,20 +1330,22 @@
   );
 
   /**
-   * The guide for what a moved or trimmed Clip is snapped to: a line at
-   * that time, from its lane through every lane with a Clip aligned there,
-   * and up through the ruler for a Loop edge, in pixels down the lanes.
-   * None for the playhead, which already is a line.
+   * The guide for what a moved or trimmed Clip, or the Loop being set, is
+   * snapped to: a line at that time, from the Clip's lane through every
+   * lane with a Clip aligned there, and up through the ruler for a Loop
+   * edge or the Loop, in pixels down the lanes. None for the playhead,
+   * which already is a line.
    */
   const guide = $derived.by(() => {
-    if (!edit?.snap) return null;
-    const dragged = timeline.tracks.findIndex((t) => t.id === edit!.trackId);
-    const lanes = guideLanes(dragged, edit.snap.aligned);
+    const snapped = edit?.snap ?? loopEdit?.snap;
+    if (!snapped) return null;
+    const dragged = edit?.snap ? timeline.tracks.findIndex((t) => t.id === edit!.trackId) : 'ruler';
+    const lanes = guideLanes(dragged, snapped.aligned);
     if (!lanes) return null;
     const top = lanes.from === 'ruler' ? rulerElement : laneElements[lanes.from];
     const bottom = laneElements[lanes.to];
     if (!top || !bottom) return null;
-    return { at: edit.snap.at, top: top.offsetTop, height: bottom.offsetTop + bottom.offsetHeight - top.offsetTop };
+    return { at: snapped.at, top: top.offsetTop, height: bottom.offsetTop + bottom.offsetHeight - top.offsetTop };
   });
 
   /** What a Clip moved or trimmed snaps to: the other Clips' edges, the playhead and the Loop's edges. */
@@ -1798,14 +1812,20 @@
   // Setting the Loop: dragging along the top of the ruler marks a new one,
   // switched on, and dragging its edges adjusts it. It's saved on release,
   // and until the saved Timeline comes back, shown where it was dropped.
+  // Marked or adjusted, it snaps to Clips' edges and the playhead, unless
+  // Shift is held: a new one both where it's pressed and where it's dragged to.
   interface LoopEdit {
-    mode: 'new' | 'start' | 'end';
-    /** The time the Loop is marked from: where a new one was started, or its edge that isn't dragged. */
+    mode: LoopDrag;
+    /** The time the Loop is marked from: where a new one was pressed, before snapping, or its edge that isn't dragged. */
     anchor: number;
     /** Where the pointer went down, to tell a click from a drag. */
     fromX: number;
     moved: boolean;
     loop: TimelineLoop;
+    /** Whether Shift is held, to set the Loop without snapping. */
+    free: boolean;
+    /** What the edge dragged is snapped to, with the lanes of what's there, while it is. */
+    snap: Snap<Aligned> | null;
     saving: boolean;
   }
   let loopEdit = $state<LoopEdit | null>(null);
@@ -1826,11 +1846,24 @@
     const t = loopTimeAt(event.clientX);
     event.preventDefault();
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-    const common = { fromX: event.clientX, moved: false, saving: false };
+    const common = { fromX: event.clientX, moved: false, free: event.shiftKey, snap: null, saving: false };
     loopEdit =
       edge && current
         ? { ...common, mode: edge, anchor: edge === 'start' ? current.end : current.start, loop: current }
         : { ...common, mode: 'new', anchor: t, loop: { start: t, end: t, on: true } };
+    window.addEventListener('keydown', loopShift);
+    window.addEventListener('keyup', loopShift);
+  }
+
+  /** Where the pointer last dragged the Loop to. */
+  let loopAt: Point = { clientX: 0, clientY: 0 };
+
+  // Shift pressed or let go mid-drag snaps or frees the Loop there and then,
+  // without waiting for the pointer to move.
+  function loopShift(event: KeyboardEvent) {
+    if (event.key !== 'Shift' || !loopEdit?.moved || loopEdit.saving) return;
+    loopEdit.free = event.type === 'keydown';
+    loopMove(loopAt);
   }
 
   function loopMove(event: Point) {
@@ -1838,20 +1871,33 @@
     // A small wobble while clicking isn't a drag.
     if (!loopEdit.moved && Math.abs(event.clientX - loopEdit.fromX) < 4) return;
     loopEdit.moved = true;
+    loopAt = { clientX: event.clientX, clientY: event.clientY };
+    // Scrolling along at an edge, or Shift pressed, moves it too, with no keys to go by.
+    if ('shiftKey' in event) loopEdit.free = event.shiftKey === true;
     const t = loopTimeAt(event.clientX);
     const { mode, anchor, loop: shown } = loopEdit;
-    loopEdit.loop =
-      mode === 'start'
-        ? { ...shown, start: Math.max(0, Math.min(t, anchor - minLoop)) }
-        : mode === 'end'
-          ? { ...shown, end: Math.max(t, anchor + minLoop) }
-          : { ...shown, start: Math.min(anchor, t), end: Math.max(anchor, t) };
+    const targets = loopEdit.free ? [] : loopTargets(timeline.tracks, position);
+    const reach = reachAt(view.scale);
+    // Where a new one was pressed snaps too, so both its ends can go onto something.
+    const from = mode === 'new' ? loopMark(targets, anchor, reach) : anchor;
+    const placed = snapLoop(targets, mode, from, t, reach, minLoop);
+    loopEdit.loop = { ...shown, start: placed.start, end: placed.end };
+    loopEdit.snap = placed.snap;
     dragAt(event, loopMove);
   }
 
-  async function loopUp() {
+  function stopLoopListening() {
     dragDone();
-    if (!loopEdit || loopEdit.saving) return;
+    window.removeEventListener('keydown', loopShift);
+    window.removeEventListener('keyup', loopShift);
+  }
+  onDestroy(stopLoopListening);
+
+  async function loopUp() {
+    stopLoopListening();
+    if (!loopEdit) return;
+    loopEdit.snap = null;
+    if (loopEdit.saving) return;
     const { moved, loop: to } = loopEdit;
     const current = timeline.loop;
     const unchanged = current && to.start === current.start && to.end === current.end && to.on === current.on;
@@ -1865,7 +1911,7 @@
   }
 
   function loopCancel() {
-    dragDone();
+    stopLoopListening();
     if (!loopEdit?.saving) loopEdit = null;
   }
 
@@ -3333,7 +3379,7 @@
     fill: var(--danger);
     opacity: 1;
   }
-  /* What a moved or trimmed Clip is snapped to, through the lanes aligned there, and up through the ruler for a Loop edge. */
+  /* What a moved or trimmed Clip, or the Loop being set, is snapped to, through the lanes aligned there, and up through the ruler for a Loop edge or the Loop. */
   .snap-guide {
     position: absolute;
     width: round(calc(0.125 * var(--timeline-rem)), 1px);

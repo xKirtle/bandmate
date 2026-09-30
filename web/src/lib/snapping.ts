@@ -3,6 +3,9 @@
 // only has to follow it: it says what can be snapped to, which edges are
 // dragged and how near is near enough, and keeps its own limits after.
 
+/** A Timeline's Tracks, top to bottom, as far as snapping goes: where each Clip on them is. */
+export type Tracks = readonly { clips: readonly { id: number; start: number; length: number }[] }[];
+
 /** Somewhere an edge can snap to: a time, and what's there, e.g. a Clip's Track. */
 export interface Target<T> {
   at: number;
@@ -87,6 +90,48 @@ export function snapEdge<T>(
   return { at: clamp(desired), snap: null };
 }
 
+/** How the Loop is being set: marking a new one, or dragging its start or end. */
+export type LoopDrag = 'new' | 'start' | 'end';
+
+/** Where a new Loop pressed at desired is marked from: onto a target in reach, if there is one. */
+export function loopMark<T>(targets: readonly Target<T>[], desired: number, reach: number): number {
+  return snap(targets, [desired], reach)?.at ?? desired;
+}
+
+/**
+ * Where the Loop goes as an edge of it is dragged to desired, the other
+ * staying at anchor: onto a target in reach, then kept from 0:00 and
+ * from being shorter than shortest seconds. A limit that keeps it off the
+ * target leaves it unsnapped, where it would go without snapping.
+ *
+ * A new Loop, marked from anchor, runs to desired either side of it. It's
+ * never snapped shorter than shortest, or to the other side of anchor,
+ * but goes as short as it's dragged unsnapped, as one that short isn't
+ * set at all.
+ */
+export function snapLoop<T>(
+  targets: readonly Target<T>[],
+  mode: LoopDrag,
+  anchor: number,
+  desired: number,
+  reach: number,
+  shortest: number,
+): { start: number; end: number; snap: Snap<T> | null } {
+  if (mode === 'new') {
+    const found = snap(targets, [desired], reach);
+    const sameSide = found && (found.at - anchor) * (desired - anchor) > 0;
+    const snapped = found && sameSide && Math.abs(found.at - anchor) >= shortest ? found : null;
+    const to = snapped ? snapped.at : desired;
+    return { start: Math.min(anchor, to), end: Math.max(anchor, to), snap: snapped };
+  }
+  if (mode === 'start') {
+    const moved = snapEdge(targets, desired, reach, (at) => Math.max(0, Math.min(at, anchor - shortest)));
+    return { start: moved.at, end: anchor, snap: moved.snap };
+  }
+  const moved = snapEdge(targets, desired, reach, (at) => Math.max(at, anchor + shortest));
+  return { start: anchor, end: moved.at, snap: moved.snap };
+}
+
 /**
  * What's aligned at a target: a Clip's edge, in the lane it's in counted
  * from the top; one of the Loop's edges; or the playhead.
@@ -96,31 +141,30 @@ export type Aligned = number | 'loop' | 'playhead';
 /**
  * The lanes a snap's guide runs across: from the lane being dragged in to
  * the furthest lane holding a Clip aligned, either way, and up to the
- * ruler for a Loop edge, the Loop being drawn above it. The playhead is
- * already a line, so it's left out, and with nothing else aligned there's
- * no guide.
+ * ruler for a Loop edge, or for the Loop being dragged, the Loop being
+ * drawn above it. The playhead is already a line, so it's left out, and
+ * with nothing else aligned there's no guide.
  */
 export function guideLanes(
-  draggedLane: number,
+  dragged: number | 'ruler',
   aligned: readonly Aligned[],
 ): { from: number | 'ruler'; to: number } | null {
   const rest = aligned.filter((a) => a !== 'playhead');
   if (rest.length === 0) return null;
   const lanes = rest.filter((a) => a !== 'loop');
+  if (dragged !== 'ruler') lanes.push(dragged);
   return {
-    from: rest.includes('loop') ? 'ruler' : Math.min(draggedLane, ...lanes),
-    to: Math.max(draggedLane, ...lanes),
+    from: dragged === 'ruler' || rest.includes('loop') ? 'ruler' : Math.min(...lanes),
+    to: Math.max(...lanes),
   };
 }
 
 /**
- * The start and end of every Clip but the one being dragged, on every
- * Track, as targets, each with the lane it's in, counted from the top.
+ * The start and end of every Clip but the one being dragged, if one is,
+ * on every Track, as targets, each with the lane it's in, counted from
+ * the top.
  */
-export function clipTargets(
-  tracks: readonly { clips: readonly { id: number; start: number; length: number }[] }[],
-  draggedClip: number,
-): Target<number>[] {
+export function clipTargets(tracks: Tracks, draggedClip?: number): Target<number>[] {
   return tracks.flatMap((track, lane) =>
     track.clips
       .filter((c) => c.id !== draggedClip)
@@ -137,7 +181,7 @@ export function clipTargets(
  * there is one.
  */
 export function editTargets(
-  tracks: readonly { clips: readonly { id: number; start: number; length: number }[] }[],
+  tracks: Tracks,
   draggedClip: number,
   playhead: number,
   loop: { start: number; end: number } | null,
@@ -149,4 +193,12 @@ export function editTargets(
       ]
     : [];
   return [...clipTargets(tracks, draggedClip), { at: playhead, of: 'playhead' }, ...loopEdges];
+}
+
+/**
+ * Everything the Loop snaps to, as it's marked or an edge of it dragged:
+ * every Clip's start and end, on every Track, and the playhead.
+ */
+export function loopTargets(tracks: Tracks, playhead: number): Target<Aligned>[] {
+  return [...clipTargets(tracks), { at: playhead, of: 'playhead' }];
 }
