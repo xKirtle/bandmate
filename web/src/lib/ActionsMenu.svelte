@@ -1,7 +1,8 @@
 <script lang="ts">
   import { tick, type Snippet } from 'svelte';
   import { fieldStep, menuKey, type MenuAction, type MenuChoice, type MenuField } from './menu';
-  import { popoverLeft, popoverTop } from './popover';
+  import { popoverLeft, popoverSide, popoverTop, type PopoverAlign } from './popover';
+  import type { Point } from './press';
 
   let {
     entries,
@@ -48,39 +49,74 @@
   let menu = $state<HTMLElement>();
   // Between the trigger and the menu, in px.
   const gap = 4;
+  // Where it was opened at, e.g. a right-click, which it stays pinned to, or
+  // null when it's placed by its trigger; and which way it opens from there,
+  // chosen as it opens.
+  let point: Point | null = null;
+  let sides: { x: PopoverAlign; y: PopoverAlign } | null = null;
 
   function items(): HTMLElement[] {
     return menu ? [...menu.querySelectorAll<HTMLElement>('[role^="menuitem"]')] : [];
   }
 
-  async function show(focus: 'first' | 'last' = 'first') {
+  // Opened by keyboard, it focuses its first or last entry. Opened by
+  // pointer, it takes focus itself, with no entry highlighted, so a stray
+  // Space, e.g. to play, runs none; the arrow keys move into the entries.
+  // Opened again while it's open, e.g. by another right-click, it moves.
+  async function show(focus: 'first' | 'last' | 'menu', at: Point | null = null) {
     open = true;
     picking = null;
+    point = at;
+    sides = null;
     await tick();
     if (!menu) return;
-    // In the top layer, so no card or bar hides it; placed under ⋯, or over
-    // it when there's no room below.
-    menu.showPopover();
+    // In the top layer, so no card or bar hides it.
+    if (!menu.matches(':popover-open')) menu.showPopover();
     place();
-    const all = items();
-    all[focus === 'first' ? 0 : all.length - 1]?.focus();
+    if (focus === 'menu') menu.focus();
+    else {
+      const all = items();
+      all[focus === 'first' ? 0 : all.length - 1]?.focus();
+    }
   }
 
-  // Under ⋯, or over it when there's no room below, and inside the window:
-  // again as what it shows changes size.
+  // At its point, opening away from the window's nearer edges as a desktop's
+  // context menu does, or else under ⋯, or over it when there's no room
+  // below; and inside the window: again as what it shows changes size, when
+  // it stays at its point, shifted only as far as it takes to fit.
   function place() {
     if (!menu) return;
-    const at = triggerButton.getBoundingClientRect();
     // Measured at the window's left, where nothing squeezes it.
     menu.style.left = '0px';
     const { width, height } = menu.getBoundingClientRect();
+    const viewportWidth = document.documentElement.clientWidth;
+    if (point) {
+      sides ??= {
+        x: popoverSide(point.clientX, width, viewportWidth, gap),
+        y: popoverSide(point.clientY, height, window.innerHeight, gap),
+      };
+      // Lined up with the point as with a trigger of no size, on either axis.
+      const x = { left: point.clientX, right: point.clientX };
+      const y = { left: point.clientY, right: point.clientY };
+      menu.style.top = `${popoverLeft(y, height, window.innerHeight, gap, sides.y)}px`;
+      menu.style.left = `${popoverLeft(x, width, viewportWidth, gap, sides.x)}px`;
+      return;
+    }
+    const at = triggerButton.getBoundingClientRect();
     menu.style.top = `${popoverTop(at, height, window.innerHeight, gap)}px`;
-    menu.style.left = `${popoverLeft(at, width, document.documentElement.clientWidth, gap, align)}px`;
+    menu.style.left = `${popoverLeft(at, width, viewportWidth, gap, align)}px`;
   }
 
-  /** Opens it from elsewhere, e.g. right-clicking what it acts on; it's placed by its trigger all the same. */
-  export function openMenu() {
-    if (!open && !disabled) show();
+  /**
+   * Opens it from elsewhere: at a point by pointer, e.g. where what it acts
+   * on is right-clicked or long-pressed, moving it there if it's open; or,
+   * with no point, by keyboard, e.g. the Menu key, by its trigger with its
+   * first entry focused.
+   */
+  export function openMenu(at?: Point) {
+    if (disabled) return;
+    if (at) show('menu', at);
+    else if (!open) show('first');
   }
 
   function close() {
@@ -88,25 +124,28 @@
     triggerButton.focus();
   }
 
-  function choose(entry: MenuAction | MenuChoice) {
+  // `byKeyboard` when it's chosen with Enter or Space rather than clicked.
+  function choose(entry: MenuAction | MenuChoice, byKeyboard: boolean) {
     if ('choices' in entry || 'field' in entry) {
-      pick(entry);
+      pick(entry, byKeyboard);
       return;
     }
     close();
     entry.run();
   }
 
-  // Shows an entry's choices, with focus on the first, or its field, with
-  // focus in it, or the entries again.
-  async function pick(entry: typeof picking) {
+  // Shows an entry's choices, or its field, with focus in it, or the entries
+  // again, in place, where the menu is. Focus goes to the first, by keyboard,
+  // or, by pointer, to the menu, as when it opens.
+  async function pick(entry: typeof picking, byKeyboard: boolean) {
     picking = entry;
     await tick();
     place();
     if (input) {
       input.focus();
       input.select();
-    } else items()[0]?.focus();
+    } else if (byKeyboard) items()[0]?.focus();
+    else menu?.focus();
   }
 
   function setField(value: number | null) {
@@ -137,7 +176,16 @@
     }
   }
 
+  // A click by keyboard, Enter or Space, has no count of presses.
+  const keyboardClick = (e: MouseEvent) => e.detail === 0;
+
   function onMenuKey(e: KeyboardEvent) {
+    // Space on the menu itself, with no entry focused, does nothing: not
+    // even scroll the page, which would close it.
+    if (e.key === ' ' && e.target === menu) {
+      e.preventDefault();
+      return;
+    }
     const all = items();
     const next = menuKey(e.key, all.indexOf(document.activeElement as HTMLElement), all.length);
     if (next === null) return;
@@ -176,7 +224,7 @@
     aria-haspopup="menu"
     aria-expanded={open}
     {disabled}
-    onclick={() => (open ? close() : show())}
+    onclick={(e) => (open ? close() : show(keyboardClick(e) ? 'first' : 'menu'))}
     onkeydown={onTriggerKey}
   >
     {#if trigger}{@render trigger()}{:else if text}{text}{:else}⋯{/if}
@@ -192,7 +240,7 @@
       onkeydown={onMenuKey}
     >
       {#if picking}
-        <button type="button" role="menuitem" tabindex="-1" onclick={() => pick(null)}>
+        <button type="button" role="menuitem" tabindex="-1" onclick={(e) => pick(null, keyboardClick(e))}>
           <span class="glyph" aria-hidden="true">‹</span>
           {picking.label}
         </button>
@@ -219,7 +267,7 @@
             aria-checked={choice.checked}
             tabindex="-1"
             class="choice"
-            onclick={() => choose(choice)}
+            onclick={(e) => choose(choice, keyboardClick(e))}
           >
             {#if choice.checked}<span class="check" aria-hidden="true">✓</span>{/if}
             {choice.label}
@@ -233,7 +281,7 @@
             role="menuitem"
             tabindex="-1"
             aria-haspopup={'choices' in entry ? 'menu' : undefined}
-            onclick={() => choose(entry)}
+            onclick={(e) => choose(entry, keyboardClick(e))}
           >
             {#if 'icon' in entry}
               <span class="glyph" aria-hidden="true">{entry.icon}</span>
@@ -269,6 +317,11 @@
     border-radius: 0.5rem;
     background: var(--bg);
     box-shadow: 0 0.5rem 1.5rem color-mix(in srgb, var(--text) 18%, transparent);
+  }
+  /* Focused itself only when opened by pointer, where a ring round it all
+     would be stray: that it's open shows it has focus. */
+  .menu:focus {
+    outline: none;
   }
   [role^='menuitem'] {
     display: flex;

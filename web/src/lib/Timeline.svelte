@@ -1254,7 +1254,10 @@
     element.focus();
     event.preventDefault();
     // A finger held still opens the Clip's menu, as there's no right-click on touch.
-    if (event.pointerType === 'touch') pressTimer = setTimeout(() => openClipMenu(clip, element), longPressDelay);
+    if (event.pointerType === 'touch') {
+      const finger = { clientX: event.clientX, clientY: event.clientY };
+      pressTimer = setTimeout(() => openClipMenu(clip, element, finger), longPressDelay);
+    }
     // Alt+dragging a Clip of Takes slides its active Take, the Clip staying put.
     const take = activeTake(clip);
     edit = {
@@ -1463,22 +1466,30 @@
     return target instanceof Element && target.closest('.clip-menu') !== null;
   }
 
-  function openClipMenu(clip: Clip, element: HTMLElement) {
+  /** Whether an event came from inside a Clip's open menu, rather than its ⋯. */
+  function inOpenMenu(target: EventTarget | null): boolean {
+    return target instanceof Element && target.closest('.clip-menu [role="menu"]') !== null;
+  }
+
+  // At `point` by pointer, e.g. where it's right-clicked; else by its ⋯, by keyboard.
+  function openClipMenu(clip: Clip, element: HTMLElement, point?: Point) {
     // Not while a Clip's edit is saving: it's then put back in its place,
     // which would take the menu out of the page under it.
     if (edit?.saving) return;
     // A press that opens the menu isn't a drag.
     if (edit) editCancel();
-    // So its ⋯, which the menu lines up with, shows, and focus comes back to the Clip.
+    // So its ⋯, which a menu opened by keyboard lines up with, shows, and
+    // focus comes back to the Clip.
     element.focus();
-    clipMenus[clip.id]?.openMenu();
+    clipMenus[clip.id]?.openMenu(point);
   }
 
   function clipContextMenu(event: MouseEvent, clip: Clip) {
     // The Clip has a menu of its own, in place of the browser's.
     event.preventDefault();
-    if (!editable.current || edit?.moved || inClipMenu(event.target)) return;
-    openClipMenu(clip, event.currentTarget as HTMLElement);
+    // Right-clicking its ⋯ opens it there too, but not right-clicking in it.
+    if (!editable.current || edit?.moved || inOpenMenu(event.target)) return;
+    openClipMenu(clip, event.currentTarget as HTMLElement, event);
   }
 
   // Setting the Loop: dragging along the top of the ruler marks a new one,
