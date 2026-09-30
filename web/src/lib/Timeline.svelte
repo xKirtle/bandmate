@@ -1466,6 +1466,11 @@
     return target instanceof Element && target.closest('.clip-menu') !== null;
   }
 
+  /** Whether an event came from inside a Clip's open menu, rather than its ⋯. */
+  function inOpenMenu(target: EventTarget | null): boolean {
+    return target instanceof Element && target.closest('.clip-menu [role="menu"]') !== null;
+  }
+
   // At `point` by pointer, e.g. where it's right-clicked; else by its ⋯, by keyboard.
   function openClipMenu(clip: Clip, element: HTMLElement, point?: Point) {
     // Not while a Clip's edit is saving: it's then put back in its place,
@@ -1483,8 +1488,7 @@
     // The Clip has a menu of its own, in place of the browser's.
     event.preventDefault();
     // Right-clicking its ⋯ opens it there too, but not right-clicking in it.
-    const inMenu = event.target instanceof Element && event.target.closest('[role="menu"]') !== null;
-    if (!editable.current || edit?.moved || inMenu) return;
+    if (!editable.current || edit?.moved || inOpenMenu(event.target)) return;
     openClipMenu(clip, event.currentTarget as HTMLElement, event);
   }
 

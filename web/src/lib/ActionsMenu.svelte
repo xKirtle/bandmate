@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tick, type Snippet } from 'svelte';
   import { fieldStep, menuKey, type MenuAction, type MenuChoice, type MenuField } from './menu';
-  import { popoverFrom, popoverLeft, popoverSide, popoverTop, type PopoverSide } from './popover';
+  import { popoverLeft, popoverSide, popoverTop, type PopoverAlign } from './popover';
   import type { Point } from './press';
 
   let {
@@ -53,7 +53,7 @@
   // null when it's placed by its trigger; and which way it opens from there,
   // chosen as it opens.
   let point: Point | null = null;
-  let sides: { x: PopoverSide; y: PopoverSide } | null = null;
+  let sides: { x: PopoverAlign; y: PopoverAlign } | null = null;
 
   function items(): HTMLElement[] {
     return menu ? [...menu.querySelectorAll<HTMLElement>('[role^="menuitem"]')] : [];
@@ -95,8 +95,11 @@
         x: popoverSide(point.clientX, width, viewportWidth, gap),
         y: popoverSide(point.clientY, height, window.innerHeight, gap),
       };
-      menu.style.top = `${popoverFrom(point.clientY, height, window.innerHeight, gap, sides.y)}px`;
-      menu.style.left = `${popoverFrom(point.clientX, width, viewportWidth, gap, sides.x)}px`;
+      // Lined up with the point as with a trigger of no size, on either axis.
+      const x = { left: point.clientX, right: point.clientX };
+      const y = { left: point.clientY, right: point.clientY };
+      menu.style.top = `${popoverLeft(y, height, window.innerHeight, gap, sides.y)}px`;
+      menu.style.left = `${popoverLeft(x, width, viewportWidth, gap, sides.x)}px`;
       return;
     }
     const at = triggerButton.getBoundingClientRect();

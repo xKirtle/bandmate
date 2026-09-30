@@ -13,6 +13,9 @@ export function popoverTop(
   return Math.max(gap, anchor.top - gap - height);
 }
 
+/** Which edge of what a popover opens from it lines up with: its start, or its end. */
+export type PopoverAlign = 'start' | 'end';
+
 /**
  * The left of a popover `width` px wide, lined up with the start or end of
  * the field or button it opens from, but kept `gap` px inside the window.
@@ -22,32 +25,19 @@ export function popoverLeft(
   width: number,
   viewportWidth: number,
   gap: number,
-  align: 'start' | 'end',
+  align: PopoverAlign,
 ): number {
   const left = align === 'start' ? anchor.left : anchor.right - width;
   return Math.max(gap, Math.min(left, viewportWidth - gap - width));
 }
 
-/** Which way a popover opens from a point along one axis: after it, e.g. rightward, or before it. */
-export type PopoverSide = 'after' | 'before';
-
 /**
  * Which way a popover `size` px long opens from a point along one axis of the
- * window, e.g. a right-click's x: after it, or before it when there's no room
- * after it, as a desktop's context menu does.
+ * window, e.g. a right-click's x: its start at the point, or, when there's no
+ * room after it, its end, as a desktop's context menu does.
  */
-export function popoverSide(point: number, size: number, viewport: number, gap: number): PopoverSide {
-  return point + size <= viewport - gap ? 'after' : 'before';
-}
-
-/**
- * The start, left or top, of a popover `size` px long pinned at a point on
- * the `side` it opens to, but kept `gap` px inside the window: shifted only
- * as far as that takes, e.g. once what it shows grows.
- */
-export function popoverFrom(point: number, size: number, viewport: number, gap: number, side: PopoverSide): number {
-  const start = side === 'after' ? point : point - size;
-  return Math.max(gap, Math.min(start, viewport - gap - size));
+export function popoverSide(point: number, size: number, viewport: number, gap: number): PopoverAlign {
+  return point + size <= viewport - gap ? 'start' : 'end';
 }
 
 /**
