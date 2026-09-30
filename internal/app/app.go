@@ -46,6 +46,9 @@ type Config struct {
 	// GitHubAPI is GitHub's REST API base URL, which the About page's
 	// releases come from. Empty means releases.DefaultAPI.
 	GitHubAPI string
+	// GoModules is the Go modules the About page lists. Nil means
+	// build.GoModules().
+	GoModules []build.Dependency
 }
 
 // DetachedTakesKept is how long a Take is kept once detached, well past
@@ -81,8 +84,10 @@ type App struct {
 	startedAt time.Time
 	// releases checks GitHub for the About page's releases.
 	releases *releases.Checker
-	spa      fs.FS
-	handler  http.Handler
+	// dependencies is what ships in Bandmate, for the About page.
+	dependencies dependencies
+	spa          fs.FS
+	handler      http.Handler
 }
 
 // New opens the database in cfg.DataDir, migrates it, and builds the HTTP
@@ -148,6 +153,7 @@ func New(cfg Config) (*App, error) {
 		now = cfg.Now
 	}
 	a.startedAt = now()
+	a.dependencies = shipped(cfg.GoModules, cfg.SPA)
 	a.releases = releases.New(releases.Options{Off: cfg.UpdateCheckOff, API: cfg.GitHubAPI, Now: now})
 	// Only tidying, so it never stops the app starting.
 	if err := a.timelines.SweepDetachedTakes(context.Background(), now().Add(-DetachedTakesKept)); err != nil {

@@ -36,6 +36,19 @@
   /** How many releases the Release notes tab lists, once checked. */
   const releaseCount = $derived(releases?.check === 'ok' ? ` (${releases.releases.length})` : '');
 
+  /** The Dependencies tab's lists, Go's first. */
+  const dependencyLists = $derived(
+    about
+      ? [
+          { id: 'go', label: 'Go', items: about.dependencies.go },
+          { id: 'web', label: 'Web', items: about.dependencies.web },
+        ]
+      : [],
+  );
+  /** How many dependencies the Dependencies tab lists, once loaded. */
+  const dependencyCount = $derived(about ? ` (${about.dependencies.go.length + about.dependencies.web.length})` : '');
+  const counts = $derived({ 'release-notes': releaseCount, dependencies: dependencyCount });
+
   // The uptime counts on while the page is open.
   let now = $state(Date.now());
   $effect(() => {
@@ -192,7 +205,7 @@
             onclick={() => (tab = t.id)}
             onkeydown={(e) => tabKey(e, i)}
           >
-            {t.label}{t.id === 'release-notes' ? releaseCount : ''}
+            {t.label}{counts[t.id]}
           </button>
         {/each}
       </div>
@@ -258,8 +271,35 @@
                 See what's new in each release on <a href={releasesUrl}>Bandmate's releases page</a>.
               </p>
             {/if}
-          {:else}
-            <p class="muted">The libraries that ship with Bandmate, and their licenses, will be listed here.</p>
+          {:else if aboutError}
+            <p class="error" role="alert">Couldn't load the dependencies: {aboutError}</p>
+          {:else if about}
+            <p class="muted">The third-party packages that ship in Bandmate, with their licenses.</p>
+            <!-- Like the release notes, each list folds away; both start open. -->
+            {#each dependencyLists as list (list.id)}
+              <details class="dependencies" open>
+                <summary>
+                  <span class="chevron" aria-hidden="true">▸</span>
+                  <span class="group-name">{list.label}</span>
+                  <span class="muted">({list.items.length})</span>
+                </summary>
+                {#if list.items.length > 0}
+                  <ul class="dependency-list">
+                    {#each list.items as d (d.name + '@' + d.version)}
+                      <li>
+                        <span class="dependency-name">{d.name}</span>
+                        <span class="muted dependency-version">{d.version}</span>
+                        <span class="dependency-license">
+                          {#if d.url}<a href={d.url}>{d.license}</a>{:else}{d.license}{/if}
+                        </span>
+                      </li>
+                    {/each}
+                  </ul>
+                {:else}
+                  <p class="muted dependency-none">None recorded in this build.</p>
+                {/if}
+              </details>
+            {/each}
           {/if}
         </div>
       {/each}
@@ -490,6 +530,53 @@
   }
   .card .more {
     margin-top: 1.5rem;
+  }
+
+  .dependencies + .dependencies {
+    border-top: 1px solid var(--border);
+  }
+  .panel > p + .dependencies {
+    margin-top: 0.5rem;
+  }
+  .group-name {
+    font-weight: 600;
+    font-size: 1.0625rem;
+  }
+  /* The name and version on the left, the license on the right; on a phone,
+     a long name pushes the rest onto the next line. */
+  .dependency-list {
+    margin: 0;
+    padding: 0 0 1rem 1.5rem;
+    list-style: none;
+  }
+  .dependency-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 0.5rem;
+    padding: 0.25rem 0;
+  }
+  .dependency-name {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .dependency-version {
+    font-size: 0.875rem;
+    overflow-wrap: anywhere;
+  }
+  .dependency-license {
+    margin-left: auto;
+    white-space: nowrap;
+  }
+  .card .dependency-none {
+    padding: 0 0 1rem 1.5rem;
+  }
+  /* A phone can't spare the width. */
+  @media (max-width: 24rem) {
+    .dependency-list,
+    .card .dependency-none {
+      padding-left: 0;
+    }
   }
 
   /* Like the Status badges: New, Fix and Docs mark a change's kind, and
