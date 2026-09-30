@@ -29,6 +29,31 @@ export function popoverLeft(
 }
 
 /**
+ * Which way a popover `size` px long opens from a point along one axis of the
+ * window, e.g. a right-click's x: after it, or before it when there's no room
+ * after it, as a desktop's context menu does.
+ */
+export function pointSide(point: number, size: number, viewport: number, gap: number): 'after' | 'before' {
+  return point + size <= viewport - gap ? 'after' : 'before';
+}
+
+/**
+ * The start, left or top, of a popover `size` px long pinned at a point on
+ * the `side` it opens to, but kept `gap` px inside the window: shifted only
+ * as far as that takes, e.g. once what it shows grows.
+ */
+export function popoverFrom(
+  point: number,
+  size: number,
+  viewport: number,
+  gap: number,
+  side: 'after' | 'before',
+): number {
+  const start = side === 'after' ? point : point - size;
+  return Math.max(gap, Math.min(start, viewport - gap - size));
+}
+
+/**
  * Places `list`, a popover in the top layer, `gap` px under `anchor`, or over
  * it when there's no room below: at least as wide as it, and inside the window.
  */

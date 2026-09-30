@@ -1,5 +1,29 @@
 import { describe as group, expect, it } from 'vitest';
-import { popoverLeft, popoverTop } from './popover';
+import { pointSide, popoverFrom, popoverLeft, popoverTop } from './popover';
+
+group('pointSide', () => {
+  it('opens it after the point when there is room', () => {
+    expect(pointSide(500, 200, 1000, 4)).toBe('after');
+  });
+
+  it('flips it before the point near the window edge', () => {
+    expect(pointSide(900, 200, 1000, 4)).toBe('before');
+  });
+});
+
+group('popoverFrom', () => {
+  it('puts its near corner at the point on the side it opens to', () => {
+    expect(popoverFrom(500, 200, 1000, 4, 'after')).toBe(500);
+    expect(popoverFrom(900, 200, 1000, 4, 'before')).toBe(700);
+  });
+
+  it('shifts it only as far as it takes to stay inside the window', () => {
+    // Opened after 700 at 200 long, then grown to 400 long.
+    expect(popoverFrom(700, 400, 1000, 4, 'after')).toBe(596);
+    // Opened before 300, then grown to 400 long.
+    expect(popoverFrom(300, 400, 1000, 4, 'before')).toBe(4);
+  });
+});
 
 group('popoverTop', () => {
   const field = { top: 500, bottom: 536 };
