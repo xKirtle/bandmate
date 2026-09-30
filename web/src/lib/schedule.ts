@@ -46,7 +46,7 @@ export function repeats(t: number, loop: Loop | null): boolean {
  * The Clips to play when playback starts at time t, each from the part of
  * its source that's reached then. Clips that have finished by t are left out.
  *
- * With a Loop the playhead reaches, playback goes to the Loop's end and then
+ * Starting before a Loop's end, playback goes to the Loop's end and then
  * repeats it from its start, for ever. So only the passes through the
  * Timeline that start within a window of time after playback started are
  * scheduled, to be called again for the next window as playback goes on.

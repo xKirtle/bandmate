@@ -87,8 +87,8 @@
   // with mixing and Cue edits) is only offered on wider screens; on a phone
   // it only plays, mixes and switches the Loop on and off. On both it zooms
   // and scrolls, and follows the playhead while playing. While the Loop is
-  // on, playback that reaches its end goes back to its start. Recording a Take onto the chosen Track
-  // is offered where editing is.
+  // on, playback that reaches its end goes back to its start. Recording a
+  // Take onto the chosen Track is offered where editing is.
   let {
     song,
     timeline,
