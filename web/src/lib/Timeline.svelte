@@ -1323,7 +1323,7 @@
   const guide = $derived.by(() => {
     if (!edit?.snap) return null;
     const dragged = timeline.tracks.findIndex((t) => t.id === edit!.trackId);
-    const { from, to } = guideLanes(dragged, edit.snap.to);
+    const { from, to } = guideLanes(dragged, edit.snap.aligned);
     const top = laneElements[from];
     const bottom = laneElements[to];
     if (!top || !bottom) return null;
@@ -1460,6 +1460,19 @@
     window.addEventListener('pointermove', editMove);
     window.addEventListener('pointerup', editUp);
     window.addEventListener('pointercancel', editCancel);
+    window.addEventListener('keydown', editShift);
+    window.addEventListener('keyup', editShift);
+  }
+
+  /** Where the pointer last dragged a Clip to. */
+  let editAt: Point = { clientX: 0, clientY: 0 };
+
+  // Shift pressed or let go mid-move snaps or frees the Clip there and then,
+  // without waiting for the pointer to move.
+  function editShift(event: KeyboardEvent) {
+    if (event.key !== 'Shift' || !edit?.moved || edit.mode !== 'move' || edit.saving) return;
+    edit.free = event.type === 'keydown';
+    editMove(editAt);
   }
 
   function editMove(event: Point) {
@@ -1468,7 +1481,8 @@
     if (!edit.moved && !pastSlop(edit.from, event)) return;
     edit.moved = true;
     clearTimeout(pressTimer);
-    // Scrolling along at an edge moves it too, with no keys to go by.
+    editAt = { clientX: event.clientX, clientY: event.clientY };
+    // Scrolling along at an edge, or Shift pressed, moves it too, with no keys to go by.
     if ('shiftKey' in event) edit.free = event.shiftKey === true;
     const t = spanTimeAt(event.clientX);
     const { clip } = edit;
@@ -1554,6 +1568,8 @@
     window.removeEventListener('pointermove', editMove);
     window.removeEventListener('pointerup', editUp);
     window.removeEventListener('pointercancel', editCancel);
+    window.removeEventListener('keydown', editShift);
+    window.removeEventListener('keyup', editShift);
   }
   onDestroy(stopListening);
 

@@ -9,18 +9,22 @@ export interface Target<T> {
   of: T;
 }
 
-/** A snap: which of the dragged edges went onto a target, by how far, the time it went to and what's there. */
+/** A snap: which of the dragged edges went onto a target, by how far, the time it went to and what's aligned there. */
 export interface Snap<T> {
   edge: number;
   by: number;
   at: number;
-  to: T[];
+  aligned: T[];
 }
+
+// Times this close are the same time, as rounding leaves a Clip's end a
+// hair off a start it was lined up with. As the server has it.
+const tolerance = 1e-6;
 
 /**
  * Where the edges dragged would snap: onto the target nearest any of them,
- * within reach seconds, or null with none in reach. Its to is everything
- * at that time, e.g. for a guide through them all.
+ * within reach seconds, or null with none in reach. It gives back
+ * everything aligned at that time, e.g. for a guide through them all.
  */
 export function snap<T>(targets: readonly Target<T>[], edges: readonly number[], reach: number): Snap<T> | null {
   let best: { edge: number; by: number; at: number } | null = null;
@@ -32,11 +36,11 @@ export function snap<T>(targets: readonly Target<T>[], edges: readonly number[],
   }
   if (!best) return null;
   const { at } = best;
-  return { ...best, to: targets.filter((t) => t.at === at).map((t) => t.of) };
+  return { ...best, aligned: targets.filter((t) => Math.abs(t.at - at) <= tolerance).map((t) => t.of) };
 }
 
 /** How near a target an edge snaps to it, on screen, in pixels. */
-export const snapPixels = 8;
+const snapPixels = 8;
 
 /** How near a target an edge snaps to it, in seconds, at scale pixels a second. */
 export function reachAt(scale: number): number {
@@ -69,21 +73,21 @@ export function snapMove<T>(
  * The lanes a snap's guide runs across: from the lane being dragged in to
  * the furthest lane holding something aligned, either way.
  */
-export function guideLanes(dragged: number, aligned: readonly number[]): { from: number; to: number } {
-  return { from: Math.min(dragged, ...aligned), to: Math.max(dragged, ...aligned) };
+export function guideLanes(draggedLane: number, alignedLanes: readonly number[]): { from: number; to: number } {
+  return { from: Math.min(draggedLane, ...alignedLanes), to: Math.max(draggedLane, ...alignedLanes) };
 }
 
 /**
- * Every Clip's start and end as targets, on every Track but for the one
- * being dragged, each with the lane it's in, counted from the top.
+ * The start and end of every Clip but the one being dragged, on every
+ * Track, as targets, each with the lane it's in, counted from the top.
  */
 export function clipTargets(
   tracks: readonly { clips: readonly { id: number; start: number; length: number }[] }[],
-  dragged: number,
+  draggedClip: number,
 ): Target<number>[] {
   return tracks.flatMap((track, lane) =>
     track.clips
-      .filter((c) => c.id !== dragged)
+      .filter((c) => c.id !== draggedClip)
       .flatMap((c) => [
         { at: c.start, of: lane },
         { at: c.start + c.length, of: lane },

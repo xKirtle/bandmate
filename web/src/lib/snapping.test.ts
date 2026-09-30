@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { clampMove } from './clipEdit';
-import { clipTargets, guideLanes, reachAt, snap, snapMove, snapPixels } from './snapping';
+import { clipTargets, guideLanes, reachAt, snap, snapMove } from './snapping';
 
 describe('snap', () => {
   it('snaps an edge within reach onto a target', () => {
     // A Clip at 0:09.75-0:14.75, a target at 0:10, reach 0.5s.
-    expect(snap([{ at: 10, of: 'a' }], [9.75, 14.75], 0.5)).toEqual({ edge: 0, by: 0.25, at: 10, to: ['a'] });
+    expect(snap([{ at: 10, of: 'a' }], [9.75, 14.75], 0.5)).toEqual({ edge: 0, by: 0.25, at: 10, aligned: ['a'] });
   });
 
   it('snaps by whichever edge is nearer a target', () => {
@@ -14,9 +14,9 @@ describe('snap', () => {
       { at: 9.5, of: 'before' },
       { at: 15.25, of: 'after' },
     ];
-    expect(snap(targets, [10, 15], 1)).toEqual({ edge: 1, by: 0.25, at: 15.25, to: ['after'] });
+    expect(snap(targets, [10, 15], 1)).toEqual({ edge: 1, by: 0.25, at: 15.25, aligned: ['after'] });
     // Moved along a little, the start is nearer.
-    expect(snap(targets, [9.75, 14.75], 1)).toEqual({ edge: 0, by: -0.25, at: 9.5, to: ['before'] });
+    expect(snap(targets, [9.75, 14.75], 1)).toEqual({ edge: 0, by: -0.25, at: 9.5, aligned: ['before'] });
   });
 
   it('snaps nowhere with no target in reach', () => {
@@ -25,7 +25,7 @@ describe('snap', () => {
   });
 
   it('snaps to a target exactly at the reach', () => {
-    expect(snap([{ at: 10, of: 'a' }], [10.5, 15.5], 0.5)).toEqual({ edge: 0, by: -0.5, at: 10, to: ['a'] });
+    expect(snap([{ at: 10, of: 'a' }], [10.5, 15.5], 0.5)).toEqual({ edge: 0, by: -0.5, at: 10, aligned: ['a'] });
   });
 
   it('snaps to the closest of several targets in reach', () => {
@@ -34,7 +34,7 @@ describe('snap', () => {
       { at: 10.25, of: 'near' },
       { at: 10.75, of: 'farther' },
     ];
-    expect(snap(targets, [10, 20], 1)).toEqual({ edge: 0, by: 0.25, at: 10.25, to: ['near'] });
+    expect(snap(targets, [10, 20], 1)).toEqual({ edge: 0, by: 0.25, at: 10.25, aligned: ['near'] });
   });
 
   it('gives back everything at the time it snaps to', () => {
@@ -43,13 +43,21 @@ describe('snap', () => {
       { at: 12, of: 2 },
       { at: 10, of: 3 },
     ];
-    expect(snap(targets, [10.25], 1)).toEqual({ edge: 0, by: -0.25, at: 10, to: [1, 3] });
+    expect(snap(targets, [10.25], 1)).toEqual({ edge: 0, by: -0.25, at: 10, aligned: [1, 3] });
+  });
+
+  it('counts a target a rounding hair off as at the same time', () => {
+    // A Clip at 1.1 lasting 2.2 ends a hair past another's start at 3.3.
+    const targets = [
+      { at: 3.3, of: 1 },
+      { at: 1.1 + 2.2, of: 2 },
+    ];
+    expect(snap(targets, [3.4], 1)?.aligned).toEqual([1, 2]);
   });
 });
 
 describe('reachAt', () => {
   it('is the same few pixels at any zoom', () => {
-    expect(snapPixels).toBe(8);
     expect(reachAt(8)).toBe(1);
     expect(reachAt(80)).toBe(0.1);
   });
@@ -68,12 +76,12 @@ describe('snapMove', () => {
   it('moves the Clip onto a target in reach', () => {
     expect(snapMove(targets, 5, 39.75, 0.5, clamp)).toEqual({
       start: 40,
-      snap: { edge: 0, by: 0.25, at: 40, to: [1] },
+      snap: { edge: 0, by: 0.25, at: 40, aligned: [1] },
     });
     // Its end meeting the neighbour's start.
     expect(snapMove(targets, 5, 14.75, 0.5, clamp)).toEqual({
       start: 15,
-      snap: { edge: 1, by: 0.25, at: 20, to: [0] },
+      snap: { edge: 1, by: 0.25, at: 20, aligned: [0] },
     });
   });
 
