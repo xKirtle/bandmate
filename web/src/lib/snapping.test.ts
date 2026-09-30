@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { clampMove, clampTrimEnd, clampTrimStart } from './clipEdit';
 import type { Placed } from './schedule';
-import { clipTargets, guideLanes, reachAt, snap, snapEdge, snapMove, editTargets } from './snapping';
+import {
+  clipTargets,
+  guideLanes,
+  loopTargets,
+  reachAt,
+  snap,
+  snapEdge,
+  snapLoop,
+  snapMove,
+  editTargets,
+} from './snapping';
 
 describe('snap', () => {
   it('snaps an edge within reach onto a target', () => {
@@ -207,6 +217,12 @@ describe('guideLanes', () => {
     expect(guideLanes(0, ['playhead', 2])).toEqual({ from: 0, to: 2 });
     expect(guideLanes(1, [3, 'playhead', 'loop'])).toEqual({ from: 'ruler', to: 3 });
   });
+
+  it('runs from the ruler to the furthest aligned lane for the Loop being dragged', () => {
+    expect(guideLanes('ruler', [2])).toEqual({ from: 'ruler', to: 2 });
+    expect(guideLanes('ruler', [3, 1, 'playhead'])).toEqual({ from: 'ruler', to: 3 });
+    expect(guideLanes('ruler', ['playhead'])).toBeNull();
+  });
 });
 
 describe('clipTargets', () => {
@@ -278,5 +294,95 @@ describe('snapping to the playhead and the Loop', () => {
       at: 9,
       snap: { edge: 0, by: 0.25, at: 9, aligned: ['loop'] },
     });
+  });
+});
+
+describe('snapLoop', () => {
+  // A Clip at 0:10-0:12 on the second lane, the playhead at 0:07, reach 0.5s,
+  // and a shortest Loop of 0.25s.
+  const targets = loopTargets([{ clips: [] }, { clips: [{ id: 1, start: 10, length: 2 }] }], 7);
+
+  it("snaps the Loop's start, dragged, onto a Clip edge or the playhead", () => {
+    // The Loop's end at 0:20.
+    expect(snapLoop(targets, 'start', 20, 9.75, 0.5, 0.25)).toEqual({
+      start: 10,
+      end: 20,
+      snap: { edge: 0, by: 0.25, at: 10, aligned: [1] },
+    });
+    expect(snapLoop(targets, 'start', 20, 7.25, 0.5, 0.25)).toEqual({
+      start: 7,
+      end: 20,
+      snap: { edge: 0, by: -0.25, at: 7, aligned: ['playhead'] },
+    });
+  });
+
+  it("snaps the Loop's end, dragged, onto a Clip edge", () => {
+    // The Loop's start at 0:05.
+    expect(snapLoop(targets, 'end', 5, 12.25, 0.5, 0.25)).toEqual({
+      start: 5,
+      end: 12,
+      snap: { edge: 0, by: -0.25, at: 12, aligned: [1] },
+    });
+  });
+
+  it('drags an edge freely with nothing in reach, down to 0:00 and the shortest Loop', () => {
+    expect(snapLoop(targets, 'start', 20, 15, 0.5, 0.25)).toEqual({ start: 15, end: 20, snap: null });
+    expect(snapLoop(targets, 'start', 3, -1, 0.5, 0.25)).toEqual({ start: 0, end: 3, snap: null });
+    expect(snapLoop(targets, 'start', 3, 2.9, 0.5, 0.25)).toEqual({ start: 2.75, end: 3, snap: null });
+    expect(snapLoop(targets, 'end', 3, 3.1, 0.5, 0.25)).toEqual({ start: 3, end: 3.25, snap: null });
+  });
+
+  it('keeps the shortest Loop over a snap that would make it shorter', () => {
+    // The end at 0:10.125: the start snapping to the Clip's start at 0:10
+    // would leave 0.125s, so it stops at the shortest Loop, unsnapped.
+    expect(snapLoop(targets, 'start', 10.125, 9.75, 0.5, 0.25)).toEqual({ start: 9.75, end: 10.125, snap: null });
+    // The start at 0:11.875, the end snapping to the Clip's end at 0:12.
+    expect(snapLoop(targets, 'end', 11.875, 12.25, 0.5, 0.25)).toEqual({ start: 11.875, end: 12.25, snap: null });
+    // Exactly the shortest Loop still snaps.
+    expect(snapLoop(targets, 'end', 11.75, 11.875, 0.5, 0.25).snap?.at).toBe(12);
+  });
+
+  it('snaps where a new Loop is dragged to, either side of where it was marked from', () => {
+    // Marked from 0:03, dragged on to near the Clip's start.
+    expect(snapLoop(targets, 'new', 3, 10.25, 0.5, 0.25)).toEqual({
+      start: 3,
+      end: 10,
+      snap: { edge: 0, by: -0.25, at: 10, aligned: [1] },
+    });
+    // Marked from 0:15, dragged back to near the Clip's end.
+    expect(snapLoop(targets, 'new', 15, 11.75, 0.5, 0.25)).toEqual({
+      start: 12,
+      end: 15,
+      snap: { edge: 0, by: 0.25, at: 12, aligned: [1] },
+    });
+  });
+
+  it('marks a new Loop freely with nothing in reach, however short, as a stray click sets none', () => {
+    expect(snapLoop(targets, 'new', 3, 5, 0.5, 0.25)).toEqual({ start: 3, end: 5, snap: null });
+    expect(snapLoop(targets, 'new', 3, 2, 0.5, 0.25)).toEqual({ start: 2, end: 3, snap: null });
+    expect(snapLoop(targets, 'new', 3, 3.1, 0.5, 0.25)).toEqual({ start: 3, end: 3.1, snap: null });
+  });
+
+  it("doesn't snap a new Loop to shorter than the shortest", () => {
+    // Marked from the Clip's start, dragged back towards the playhead with
+    // the Clip's start in reach: snapping there would make it nothing.
+    expect(snapLoop(targets, 'new', 10, 9.875, 0.5, 0.25)).toEqual({ start: 9.875, end: 10, snap: null });
+    // Marked from 0:11.875, the Clip's end 0.125s on.
+    expect(snapLoop(targets, 'new', 11.875, 12.25, 0.5, 0.25)).toEqual({ start: 11.875, end: 12.25, snap: null });
+    // Marked from 0:11.75, the Clip's end is just the shortest Loop on.
+    expect(snapLoop(targets, 'new', 11.75, 12.25, 0.5, 0.25).snap?.at).toBe(12);
+  });
+});
+
+describe('loopTargets', () => {
+  it("is every Clip's start and end, on every Track, and the playhead", () => {
+    const tracks = [{ clips: [{ id: 1, start: 0, length: 5 }] }, { clips: [{ id: 2, start: 10, length: 2 }] }];
+    expect(loopTargets(tracks, 7)).toEqual([
+      { at: 0, of: 0 },
+      { at: 5, of: 0 },
+      { at: 10, of: 1 },
+      { at: 12, of: 1 },
+      { at: 7, of: 'playhead' },
+    ]);
   });
 });
