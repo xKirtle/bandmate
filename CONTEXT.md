@@ -105,7 +105,7 @@ _Avoid_: Beat dialog, Beat modal
 Listening to a Beat from the Beat Library, outside any Song's Timeline.
 
 **Sound**:
-An audio file imported into one Song, placed on the Timeline in Clips like a Beat, but without a credit or a library: it belongs to that Song alone, and several of its Clips can use it. It takes its name from the file when imported, and keeps it; only its Clips are renamed. Once no Clip uses it, it's gone.
+An audio file imported into one Song, placed on the Timeline in Clips like a Beat, but without a credit or a library: it belongs to that Song alone, and several of its Clips can use it. It takes its name from the file when imported, and keeps it; only its Clips are renamed. Once no Clip has used it for a day (long enough for undo to bring a Clip back), it's gone, and deleting its Song deletes it at once.
 _Avoid_: Sample, stem, audio file, import
 
 **Take**:
