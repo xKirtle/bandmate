@@ -112,6 +112,10 @@ _Avoid_: Sample, stem, audio file, import
 One recording made in the app, placed in a Clip on the Timeline. Like a Beat, it's tied to the lyrics only through Cues, so what it sings is whatever Lines are cued over its span. A Clip's Takes are numbered in the order they're recorded: a new one takes the number after the highest still in the Clip, so deleting the latest Take frees its number, while a gap left lower down stays.
 _Avoid_: Recording, attempt
 
+**Retake**:
+Recording another Take into a Clip that already holds Takes, rather than into a new Clip: it records from the Clip's start as trimmed, with the Clip kept silent meanwhile, and the new Take becomes the one it plays. The Clip grows to fit it, but never into the next Clip on its Track; whatever's past that is kept, hidden, to trim into view later.
+_Avoid_: Re-record, overdub
+
 **Clip**:
 A stretch of a Beat or a Sound, or a set of Takes, placed at a position on a Track; the same Beat or Sound can be used by several Clips, and trimming a Clip never changes the audio file; a Clip with several Takes plays exactly one active Take. A Clip can be given a name of its own, so two Clips of the same audio can be told apart; until then, it goes by its source's name (the Beat's title, the Sound's name, or its active Take's number), and a named Take Clip still shows which Take is active.
 _Avoid_: Region, segment
