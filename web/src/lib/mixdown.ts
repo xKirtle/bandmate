@@ -19,7 +19,8 @@ export type MixdownProgress = { step: 'loading' } | { step: 'mixing'; done: numb
 export interface MixdownPlan {
   /** What each Clip plays, as playback would. */
   clips: readonly PlayableClip[];
-  /** Where the Mixdown ends, in seconds from 0:00. */
+  /** Where on the Timeline the Mixdown starts and ends, in seconds from 0:00. */
+  start: number;
   end: number;
   /** Each Track's gain by id, from its volume, mute and solo. */
   gains: Map<number, number>;
@@ -37,32 +38,36 @@ const minProgressStep = 0.5;
 
 /** Mixes a Mixdown down, resolving to its audio, stereo at mixdownRate. */
 export async function mixDown(plan: MixdownPlan): Promise<AudioBuffer> {
-  const { clips, end, gains, load, signal, onProgress } = plan;
+  const { clips, start, gains, load, signal, onProgress } = plan;
+  // It plays its stretch once, never going round the Loop, silent wherever
+  // no Clip is; the Clips it doesn't reach aren't even loaded.
+  const length = plan.end - start;
+  const playing = schedule(clips, start).filter((s) => s.delay < length);
   signal.throwIfAborted();
   onProgress({ step: 'loading' });
-  const sources = [...new Set(clips.map((c) => c.source))];
+  const sources = [...new Set(playing.map((s) => s.clip.source))];
   const loaded = await untilCancelled(Promise.all(sources.map(load)), signal);
   const buffers = new Map(sources.map((source, i) => [source, loaded[i]]));
 
   const context = new OfflineAudioContext({
     numberOfChannels: channels,
-    length: Math.max(1, Math.ceil(end * mixdownRate)),
+    length: Math.max(1, Math.ceil(length * mixdownRate)),
     sampleRate: mixdownRate,
   });
   const mix = new TrackMix(context, gains);
-  for (const s of schedule(clips, 0)) {
-    mix.play(buffers.get(s.clip.source)!, s.clip.trackId, s.delay, s.from, s.duration);
+  for (const s of playing) {
+    mix.play(buffers.get(s.clip.source)!, s.clip.trackId, s.delay, s.from, Math.min(s.duration, length - s.delay));
   }
 
   // It pauses at each step to say how far it's got, and only carries on if
   // it hasn't been cancelled meanwhile: left paused, it's let go of.
-  const every = Math.max(end / progressSteps, minProgressStep);
-  for (let t = every; t < end; t += every) {
+  const every = Math.max(length / progressSteps, minProgressStep);
+  for (let t = every; t < length; t += every) {
     context
       .suspend(t)
       .then(() => {
         if (signal.aborted) return;
-        onProgress({ step: 'mixing', done: t / end });
+        onProgress({ step: 'mixing', done: t / length });
         return context.resume();
       })
       .catch(() => {});
@@ -86,9 +91,38 @@ export function mixdownEnd(clips: readonly Placed[]): number {
   return clips.reduce((end, c) => Math.max(end, c.start + c.length), 0);
 }
 
-/** The file a Song's Mixdown downloads as. */
-export function mixdownName(songTitle: string): string {
-  return `${songTitle} - Mixdown.wav`;
+/** What a Mixdown covers, in seconds: the whole Timeline, or the Loop's stretch of it. */
+export interface MixdownRange {
+  of: 'timeline' | 'loop';
+  start: number;
+  end: number;
+}
+
+/**
+ * What a Song's Mixdown can cover, and which of it to offer first: the whole
+ * Timeline, which ends at end, and the Loop's stretch when the Song has a
+ * Loop, chosen first while the Loop is on.
+ */
+export function mixdownRanges(
+  end: number,
+  loop: { start: number; end: number; on: boolean } | null,
+): { ranges: MixdownRange[]; chosen: MixdownRange } {
+  const whole: MixdownRange = { of: 'timeline', start: 0, end };
+  if (!loop) return { ranges: [whole], chosen: whole };
+  const stretch: MixdownRange = { of: 'loop', start: loop.start, end: loop.end };
+  return { ranges: [whole, stretch], chosen: loop.on ? stretch : whole };
+}
+
+/** The file a Song's Mixdown downloads as, with the Loop's times for its stretch, e.g. "(0m32s-0m48s)". */
+export function mixdownName(songTitle: string, range: MixdownRange): string {
+  if (range.of === 'timeline') return `${songTitle} - Mixdown.wav`;
+  return `${songTitle} - Mixdown (${minutesSeconds(range.start)}-${minutesSeconds(range.end)}).wav`;
+}
+
+/** A time to the second, as a file name can hold it, e.g. "1m05s". */
+function minutesSeconds(seconds: number): string {
+  const whole = Math.round(seconds);
+  return `${Math.floor(whole / 60)}m${String(whole % 60).padStart(2, '0')}s`;
 }
 
 /** What a Mixdown's levels come to: whether any sample reached full scale, and whether every one is silent. */
