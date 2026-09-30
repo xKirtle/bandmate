@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { clampMove } from './clipEdit';
-import { clipTargets, guideLanes, reachAt, snap, snapMove } from './snapping';
+import { clampMove, clampTrimEnd, clampTrimStart } from './clipEdit';
+import { clipTargets, guideLanes, reachAt, snap, snapEdge, snapMove } from './snapping';
 
 describe('snap', () => {
   it('snaps an edge within reach onto a target', () => {
@@ -100,6 +100,73 @@ describe('snapMove', () => {
     // Its end snapped to a Clip ending at 0:04.5, it would start before 0:00.
     const early = [{ at: 4.5, of: 1 }];
     expect(snapMove(early, 5, 0.25, 1, clamp)).toEqual({ start: 0.25, snap: null });
+  });
+});
+
+describe('snapEdge', () => {
+  // A Clip at 0:10-0:15 trimmed; targets at 0:08, 0:16 and 0:17.
+  const clip = { start: 10, offset: 2, length: 5 };
+  const endOf = (at: number) => {
+    const c = clampTrimEnd(clip, [], 20, at);
+    return c.start + c.length;
+  };
+  const targets = [
+    { at: 8, of: 0 },
+    { at: 16, of: 1 },
+    { at: 17, of: 2 },
+  ];
+
+  it('snaps the edge dragged onto a target in reach', () => {
+    expect(snapEdge(targets, 16.25, 0.5, endOf)).toEqual({
+      at: 16,
+      snap: { edge: 0, by: -0.25, at: 16, aligned: [1] },
+    });
+  });
+
+  it("snaps by the edge dragged alone, however near the Clip's other edge is to a target", () => {
+    // The Clip's start at 0:10 is 0.125 from 0:10.125, the end dragged 0.375 from 0:16.
+    const near = [{ at: 10.125, of: 3 }, ...targets];
+    expect(snapEdge(near, 16.375, 0.5, endOf)).toEqual({ at: 16, snap: { edge: 0, by: -0.375, at: 16, aligned: [1] } });
+  });
+
+  it('trims freely with no target in reach', () => {
+    expect(snapEdge(targets, 19, 0.5, endOf)).toEqual({ at: 19, snap: null });
+  });
+
+  it('snaps onto a neighbour the trim stops at', () => {
+    // Another Clip on the Track ends at 0:09, and the start is trimmed to 0:09.125.
+    const before = [{ start: 5, offset: 0, length: 4 }];
+    const startOf = (at: number) => clampTrimStart(clip, before, at).start;
+    expect(snapEdge([{ at: 9, of: 0 }], 9.125, 0.5, startOf)).toEqual({
+      at: 9,
+      snap: { edge: 0, by: -0.125, at: 9, aligned: [0] },
+    });
+  });
+
+  it('is not snapped when its limits keep it off the target', () => {
+    // A neighbour ending at 0:09 stops the start there, short of 0:08.875.
+    const before = [{ start: 5, offset: 0, length: 4 }];
+    const startOf = (at: number) => clampTrimStart(clip, before, at).start;
+    expect(snapEdge([{ at: 8.875, of: 1 }], 9.125, 0.5, startOf)).toEqual({ at: 9.125, snap: null });
+    // The source's start, 2s before the Clip's, stops it at 0:08, short of 0:07.75.
+    const alone = (at: number) => clampTrimStart(clip, [], at).start;
+    expect(snapEdge([{ at: 7.75, of: 1 }], 8.125, 0.5, alone)).toEqual({ at: 8.125, snap: null });
+    // The source's end stops the end at 0:28, short of 0:28.25.
+    expect(snapEdge([{ at: 28.25, of: 1 }], 27.875, 0.5, endOf)).toEqual({ at: 27.875, snap: null });
+    // 0:00 stops a start trimmed out of a Clip at 0:01 with 3s before it in its source.
+    const early = { start: 1, offset: 3, length: 2 };
+    const fromZero = (at: number) => clampTrimStart(early, [], at).start;
+    expect(snapEdge([{ at: -0.25, of: 1 }], 0.125, 0.5, fromZero)).toEqual({ at: 0.125, snap: null });
+  });
+
+  it('snaps a trimmed end onto a target however its times round', () => {
+    // A Clip at 0:02.3 ending at 0:12.1 comes out a hair off, as 2.3 + (12.1 - 2.3).
+    const odd = { start: 2.3, offset: 0, length: 9 };
+    const oddEnd = (at: number) => {
+      const c = clampTrimEnd(odd, [], 20, at);
+      return c.start + c.length;
+    };
+    expect(snapEdge([{ at: 12.1, of: 1 }], 12, 0.5, oddEnd).snap?.at).toBe(12.1);
   });
 });
 

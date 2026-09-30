@@ -94,3 +94,21 @@ export function clipTargets(
       ]),
   );
 }
+
+/**
+ * Where one edge dragged to desired goes: onto a target in reach, then
+ * kept within its limits by clamp, e.g. a trimmed Clip's edge. A limit
+ * that keeps it off the target leaves it unsnapped, where it would go
+ * without snapping.
+ */
+export function snapEdge<T>(
+  targets: readonly Target<T>[],
+  desired: number,
+  reach: number,
+  clamp: (at: number) => number,
+): { at: number; snap: Snap<T> | null } {
+  const found = snap(targets, [desired], reach);
+  // A hair off is still on it, as a trimmed end is worked out from a length.
+  if (found && Math.abs(clamp(found.at) - found.at) <= tolerance) return { at: found.at, snap: found };
+  return { at: clamp(desired), snap: null };
+}
