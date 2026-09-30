@@ -39,7 +39,7 @@
   import { longPressDelay, pastSlop, type Point } from './press';
   import { recordingPlan, retakeLength, retakePlan, sungPastStart, type RecordingPlan } from './recording';
   import { recoveredPlacement, takesAt, type TakeTarget, type Unsaved } from './recovery';
-  import { keptInLoop, outsideLoop, repeats, timelineEnd, type Loop, type Placed } from './schedule';
+  import { repeats, timelineEnd, type Loop, type Placed } from './schedule';
   import { nameSound } from './soundName';
   import { inTextField } from './textField';
   import { prepareUpload } from './upload';
@@ -87,8 +87,8 @@
   // with mixing and Cue edits) is only offered on wider screens; on a phone
   // it only plays, mixes and switches the Loop on and off. On both it zooms
   // and scrolls, and follows the playhead while playing. While the Loop is
-  // on, the playhead stays inside it. Recording a Take onto the chosen Track
-  // is offered where editing is.
+  // on, playback that reaches its end goes back to its start. Recording a
+  // Take onto the chosen Track is offered where editing is.
   let {
     song,
     timeline,
@@ -225,7 +225,7 @@
   const span = $derived(
     shownSpan({ end: length, loopEnd: timeline.loop?.end, recordingAt: capturing ? position : undefined }),
   );
-  // Seeking outside the Loop switches it off, and until that's saved,
+  // Sync mode coming on switches the Loop off, and until that's saved,
   // playback already goes on without it.
   let switchingOff = $state(false);
   const loopOn = $derived((timeline.loop?.on ?? false) && !switchingOff);
@@ -496,9 +496,8 @@
 
   // A change to what plays is heard right away. The Timeline is replaced
   // after every change to it, so compare what would play, not the objects,
-  // and in an order reordering Tracks doesn't change. A Loop switched on,
-  // set, adjusted or undone that leaves the playhead outside it takes the
-  // playhead to its start, as does opening a Song whose Loop is on.
+  // and in an order reordering Tracks doesn't change. The Loop never moves
+  // the playhead: playing, it starts over from where it is.
   const playKey = $derived(
     JSON.stringify([[...playable].sort((a, b) => a.trackId - b.trackId || a.start - b.start), playingLoop]),
   );
@@ -507,10 +506,7 @@
     untrack(() => {
       // A recording plays on as it started, in time with what it captures.
       if (capturing) return;
-      const from = playerState === 'stopped' ? position : player.position();
-      const to = keptInLoop(from, playingLoop);
-      if (playerState !== 'stopped') play(to);
-      else if (to !== from) seek(to);
+      if (playerState !== 'stopped') play(player.position());
     });
   });
 
@@ -590,23 +586,15 @@
     else play(position);
   }
 
-  /** Seeks where asked by hand, switching the Loop off if that's outside it. */
-  function seekByHand(to: number) {
-    if (recording) return;
-    if (outsideLoop(clamp(to), playingLoop)) switchLoopOff();
-    seek(to);
-  }
-
   async function switchLoopOff() {
     switchingOff = true;
-    // If it fails, the Loop is on again, and takes the playhead back inside.
+    // If it fails, the Loop is on again.
     await perform({ kind: 'switchLoop', on: false });
     switchingOff = false;
   }
 
   // Clicking on the ruler seeks. Dragging moves the playhead, and while
   // playing, playback only jumps there on release, so it doesn't stutter.
-  // Whether it's outside the Loop is only told on release, too.
   let dragging = false;
 
   function timeAt(event: Point): number {
@@ -676,19 +664,16 @@
     if (!dragging) return;
     dragging = false;
     dragDone();
-    seekByHand(timeAt(event));
+    seek(timeAt(event));
   }
 
-  // A drag given up, e.g. for a pinch, isn't a seek. While playing, playback
-  // never left where it was; while stopped, a playhead dragged out of the
-  // Loop goes back inside it.
+  // A drag given up, e.g. for a pinch, isn't a seek: while playing, playback
+  // never left where it was; while stopped, the playhead stays where it was
+  // dragged to.
   function pointerCancel() {
     if (!dragging) return;
     dragging = false;
     dragDone();
-    if (playerState !== 'stopped') return;
-    const to = keptInLoop(position, playingLoop);
-    if (to !== position) seek(to);
   }
 
   function rulerKey(event: KeyboardEvent) {
@@ -711,7 +696,7 @@
   /** Seeks as asked by hand, bringing the playhead into view. */
   function seekTo(to: number) {
     following = true;
-    seekByHand(to);
+    seek(to);
     reveal(position);
   }
 
@@ -1781,7 +1766,7 @@
 
   function switchLoop() {
     if (!timeline.loop) return;
-    // Switched off by a seek that's still saving, it's shown off already.
+    // Switched off by Sync mode and still saving, it's shown off already.
     perform({ kind: 'switchLoop', on: !loopOn });
   }
 

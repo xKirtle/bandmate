@@ -33,29 +33,20 @@ export interface Window {
   to: number;
 }
 
-/** Whether playing from time t reaches the Loop, and so repeats it for ever. */
+/**
+ * Whether playing from time t reaches the Loop's end, and so repeats it for
+ * ever: from before the Loop or inside it. From its end or past it, playback
+ * plays on as if there were none.
+ */
 export function repeats(t: number, loop: Loop | null): boolean {
   return loop !== null && t < loop.end;
-}
-
-/** Where the playhead at time t goes, so it's inside the Loop while the Loop is on. */
-export function keptInLoop(t: number, loop: Loop | null): number {
-  return outsideLoop(t, loop) ? loop!.start : t;
-}
-
-/**
- * Whether time t is outside a Loop that's on. Its end counts as outside:
- * playing from there never repeats it.
- */
-export function outsideLoop(t: number, loop: Loop | null): boolean {
-  return loop !== null && (t < loop.start || t >= loop.end);
 }
 
 /**
  * The Clips to play when playback starts at time t, each from the part of
  * its source that's reached then. Clips that have finished by t are left out.
  *
- * With a Loop the playhead reaches, playback goes to the Loop's end and then
+ * Starting before a Loop's end, playback goes to the Loop's end and then
  * repeats it from its start, for ever. So only the passes through the
  * Timeline that start within a window of time after playback started are
  * scheduled, to be called again for the next window as playback goes on.
