@@ -3302,7 +3302,7 @@
     .timeline {
       --timeline-scale: 1;
     }
-    /* Important, so no element's own display, however specific, shows it here. */
+    /* Important, so no element's own display, however specific, shows an edit-only one here. */
     .edit-only {
       display: none !important;
     }
