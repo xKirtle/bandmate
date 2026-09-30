@@ -404,6 +404,34 @@ export interface ServerConfig {
   bugReportUrl: string;
 }
 
+/** Everything the About page shows that's known without going online. */
+export interface AboutInfo {
+  /** The running version: the release tag, else the short commit, else "dev". */
+  version: string;
+  /** The full commit it was built from, or "" when unknown. */
+  revision: string;
+  /** When that commit was made, when known. */
+  commitTime?: string;
+  /** A link to exactly this version's source. */
+  sourceUrl: string;
+  /** Where to report a bug. */
+  bugReportUrl: string;
+  /** The releases page of the repository it came from. */
+  releasesUrl: string;
+  /** Go's version, e.g. 1.25.1. */
+  goVersion: string;
+  /** The system it runs on, as Go names it, e.g. linux and amd64. */
+  os: string;
+  arch: string;
+  sqliteVersion: string;
+  /** The latest migration applied, which names the database's schema. */
+  schema: { migration: string; appliedAt: string };
+  /** When the server started. */
+  startedAt: string;
+  /** The block a bug report asks for, without the browser, which the SPA adds. */
+  details: string;
+}
+
 /** A failed request, carrying the server's readable message. */
 export class ApiError extends Error {
   constructor(
@@ -470,6 +498,7 @@ function audioForm(file: File, details: object): FormData {
 
 export const api = {
   getConfig: () => request<ServerConfig>('GET', '/config'),
+  getAbout: () => request<AboutInfo>('GET', '/about'),
   /** The Beat Library, newest first; q matches titles and producers. */
   listBeats: (q = '') => request<Beat[]>('GET', q.trim() ? `/beats?q=${encodeURIComponent(q.trim())}` : '/beats'),
   /** One Beat, with its peaks. */
