@@ -111,11 +111,12 @@ The Compose file reads these variables (put them in a `.env` next to it):
 
 Bandmate itself reads these:
 
-| Variable                 | Default  | Purpose                                                                                              |
-| ------------------------ | -------- | ---------------------------------------------------------------------------------------------------- |
-| `BANDMATE_ADDR`          | `:8080`  | Listen address                                                                                       |
-| `BANDMATE_DATA_DIR`      | `./data` | Directory holding the SQLite database (`bandmate.db`), audio files (`audio/`) and Covers (`covers/`) |
-| `BANDMATE_MAX_UPLOAD_MB` | `500`    | Largest audio file accepted for upload, in megabytes                                                 |
+| Variable                 | Default  | Purpose                                                                                                                   |
+| ------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `BANDMATE_ADDR`          | `:8080`  | Listen address                                                                                                            |
+| `BANDMATE_DATA_DIR`      | `./data` | Directory holding the SQLite database (`bandmate.db`), audio files (`audio/`) and Covers (`covers/`)                      |
+| `BANDMATE_MAX_UPLOAD_MB` | `500`    | Largest audio file accepted for upload, in megabytes                                                                      |
+| `BANDMATE_UPDATE_CHECK`  | `on`     | `off` stops the About page asking GitHub for the latest release and the release notes. It's Bandmate's only outbound call |
 
 The image sets `BANDMATE_DATA_DIR` to `/data`, the folder the examples above mount.
 

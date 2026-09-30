@@ -17,6 +17,7 @@ import (
 	"github.com/xKirtle/bandmate/internal/build"
 	"github.com/xKirtle/bandmate/internal/db"
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
+	"github.com/xKirtle/bandmate/internal/releases"
 	"github.com/xKirtle/bandmate/internal/timeline"
 )
 
@@ -40,6 +41,11 @@ type Config struct {
 	// Clip has used, for more than DetachedTakesKept are removed. Nil means
 	// time.Now.
 	Now func() time.Time
+	// UpdateCheckOff stops the About page asking GitHub for releases.
+	UpdateCheckOff bool
+	// GitHubAPI is GitHub's REST API base URL, which the About page's
+	// releases come from. Empty means releases.DefaultAPI.
+	GitHubAPI string
 }
 
 // DetachedTakesKept is how long a Take is kept once detached, well past
@@ -73,8 +79,10 @@ type App struct {
 	build       build.Info
 	// startedAt is when the app started, for the About page's uptime.
 	startedAt time.Time
-	spa       fs.FS
-	handler   http.Handler
+	// releases checks GitHub for the About page's releases.
+	releases *releases.Checker
+	spa      fs.FS
+	handler  http.Handler
 }
 
 // New opens the database in cfg.DataDir, migrates it, and builds the HTTP
@@ -140,6 +148,7 @@ func New(cfg Config) (*App, error) {
 		now = cfg.Now
 	}
 	a.startedAt = now()
+	a.releases = releases.New(releases.Options{Off: cfg.UpdateCheckOff, API: cfg.GitHubAPI, Now: now})
 	// Only tidying, so it never stops the app starting.
 	if err := a.timelines.SweepDetachedTakes(context.Background(), now().Add(-DetachedTakesKept)); err != nil {
 		log.Printf("sweeping detached takes: %v", err)
@@ -228,6 +237,7 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("GET /api/songs/{id}/sounds/{soundID}/audio", a.soundAudio)
 	mux.HandleFunc("GET /api/config", a.config)
 	mux.HandleFunc("GET /api/about", a.about)
+	mux.HandleFunc("GET /api/about/releases", a.aboutReleases)
 	mux.HandleFunc("GET /api/beats", a.listBeats)
 	mux.HandleFunc("POST /api/beats", a.addBeat)
 	mux.HandleFunc("GET /api/beats/{id}", a.getBeat)
