@@ -1255,7 +1255,7 @@
     event.preventDefault();
     // A finger held still opens the Clip's menu, as there's no right-click on touch.
     if (event.pointerType === 'touch') {
-      const finger = { x: event.clientX, y: event.clientY };
+      const finger = { clientX: event.clientX, clientY: event.clientY };
       pressTimer = setTimeout(() => openClipMenu(clip, element, finger), longPressDelay);
     }
     // Alt+dragging a Clip of Takes slides its active Take, the Clip staying put.
@@ -1467,7 +1467,7 @@
   }
 
   // At `point` by pointer, e.g. where it's right-clicked; else by its ⋯, by keyboard.
-  function openClipMenu(clip: Clip, element: HTMLElement, point?: { x: number; y: number }) {
+  function openClipMenu(clip: Clip, element: HTMLElement, point?: Point) {
     // Not while a Clip's edit is saving: it's then put back in its place,
     // which would take the menu out of the page under it.
     if (edit?.saving) return;
@@ -1482,8 +1482,10 @@
   function clipContextMenu(event: MouseEvent, clip: Clip) {
     // The Clip has a menu of its own, in place of the browser's.
     event.preventDefault();
-    if (!editable.current || edit?.moved || inClipMenu(event.target)) return;
-    openClipMenu(clip, event.currentTarget as HTMLElement, { x: event.clientX, y: event.clientY });
+    // Right-clicking its ⋯ opens it there too, but not right-clicking in it.
+    const inMenu = event.target instanceof Element && event.target.closest('[role="menu"]') !== null;
+    if (!editable.current || edit?.moved || inMenu) return;
+    openClipMenu(clip, event.currentTarget as HTMLElement, event);
   }
 
   // Setting the Loop: dragging along the top of the ruler marks a new one,

@@ -1,13 +1,13 @@
 import { describe as group, expect, it } from 'vitest';
-import { pointSide, popoverFrom, popoverLeft, popoverTop } from './popover';
+import { popoverSide, popoverFrom, popoverLeft, popoverTop } from './popover';
 
-group('pointSide', () => {
+group('popoverSide', () => {
   it('opens it after the point when there is room', () => {
-    expect(pointSide(500, 200, 1000, 4)).toBe('after');
+    expect(popoverSide(500, 200, 1000, 4)).toBe('after');
   });
 
   it('flips it before the point near the window edge', () => {
-    expect(pointSide(900, 200, 1000, 4)).toBe('before');
+    expect(popoverSide(900, 200, 1000, 4)).toBe('before');
   });
 });
 

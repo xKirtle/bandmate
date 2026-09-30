@@ -28,12 +28,15 @@ export function popoverLeft(
   return Math.max(gap, Math.min(left, viewportWidth - gap - width));
 }
 
+/** Which way a popover opens from a point along one axis: after it, e.g. rightward, or before it. */
+export type PopoverSide = 'after' | 'before';
+
 /**
  * Which way a popover `size` px long opens from a point along one axis of the
  * window, e.g. a right-click's x: after it, or before it when there's no room
  * after it, as a desktop's context menu does.
  */
-export function pointSide(point: number, size: number, viewport: number, gap: number): 'after' | 'before' {
+export function popoverSide(point: number, size: number, viewport: number, gap: number): PopoverSide {
   return point + size <= viewport - gap ? 'after' : 'before';
 }
 
@@ -42,13 +45,7 @@ export function pointSide(point: number, size: number, viewport: number, gap: nu
  * the `side` it opens to, but kept `gap` px inside the window: shifted only
  * as far as that takes, e.g. once what it shows grows.
  */
-export function popoverFrom(
-  point: number,
-  size: number,
-  viewport: number,
-  gap: number,
-  side: 'after' | 'before',
-): number {
+export function popoverFrom(point: number, size: number, viewport: number, gap: number, side: PopoverSide): number {
   const start = side === 'after' ? point : point - size;
   return Math.max(gap, Math.min(start, viewport - gap - size));
 }

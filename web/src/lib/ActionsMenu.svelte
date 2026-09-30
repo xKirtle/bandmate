@@ -1,7 +1,8 @@
 <script lang="ts">
   import { tick, type Snippet } from 'svelte';
   import { fieldStep, menuKey, type MenuAction, type MenuChoice, type MenuField } from './menu';
-  import { pointSide, popoverFrom, popoverLeft, popoverTop } from './popover';
+  import { popoverFrom, popoverLeft, popoverSide, popoverTop, type PopoverSide } from './popover';
+  import type { Point } from './press';
 
   let {
     entries,
@@ -51,8 +52,8 @@
   // Where it was opened at, e.g. a right-click, which it stays pinned to, or
   // null when it's placed by its trigger; and which way it opens from there,
   // chosen as it opens.
-  let point: { x: number; y: number } | null = null;
-  let sides: { x: 'after' | 'before'; y: 'after' | 'before' } | null = null;
+  let point: Point | null = null;
+  let sides: { x: PopoverSide; y: PopoverSide } | null = null;
 
   function items(): HTMLElement[] {
     return menu ? [...menu.querySelectorAll<HTMLElement>('[role^="menuitem"]')] : [];
@@ -62,7 +63,7 @@
   // pointer, it takes focus itself, with no entry highlighted, so a stray
   // Space, e.g. to play, runs none; the arrow keys move into the entries.
   // Opened again while it's open, e.g. by another right-click, it moves.
-  async function show(focus: 'first' | 'last' | 'menu', at: { x: number; y: number } | null = null) {
+  async function show(focus: 'first' | 'last' | 'menu', at: Point | null = null) {
     open = true;
     picking = null;
     point = at;
@@ -91,11 +92,11 @@
     const viewportWidth = document.documentElement.clientWidth;
     if (point) {
       sides ??= {
-        x: pointSide(point.x, width, viewportWidth, gap),
-        y: pointSide(point.y, height, window.innerHeight, gap),
+        x: popoverSide(point.clientX, width, viewportWidth, gap),
+        y: popoverSide(point.clientY, height, window.innerHeight, gap),
       };
-      menu.style.top = `${popoverFrom(point.y, height, window.innerHeight, gap, sides.y)}px`;
-      menu.style.left = `${popoverFrom(point.x, width, viewportWidth, gap, sides.x)}px`;
+      menu.style.top = `${popoverFrom(point.clientY, height, window.innerHeight, gap, sides.y)}px`;
+      menu.style.left = `${popoverFrom(point.clientX, width, viewportWidth, gap, sides.x)}px`;
       return;
     }
     const at = triggerButton.getBoundingClientRect();
@@ -109,7 +110,7 @@
    * with no point, by keyboard, e.g. the Menu key, by its trigger with its
    * first entry focused.
    */
-  export function openMenu(at?: { x: number; y: number }) {
+  export function openMenu(at?: Point) {
     if (disabled) return;
     if (at) show('menu', at);
     else if (!open) show('first');
