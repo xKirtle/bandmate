@@ -148,7 +148,7 @@ func TestARetakeGrowsItsClipOnlyUpToTheNextClip(t *testing.T) {
 	}
 }
 
-func TestTakeNumbersAreNeverReused(t *testing.T) {
+func TestANewTakeIsNumberedAfterTheHighestStillInItsClip(t *testing.T) {
 	ts := newTestServer(t)
 	r := recordATake(t, ts)
 	id := r.clip.ID
@@ -162,32 +162,57 @@ func TestTakeNumbersAreNeverReused(t *testing.T) {
 		t.Fatalf("takes = %s, want 1 2 3*", got)
 	}
 
-	// Take 3 leaves the Clip, as undoing it does, but its number stays used.
+	// Take 3 leaves the Clip, as undoing it does, and its number is free.
 	undone := takesAsIn(c)
 	undone.Takes, undone.ActiveTakeID = undone.Takes[:2], c.Takes[0].ID
 	timelineChange(t, ts.setTakes(r.song.ID, id, undone))
-	if got := numbers(retakeOnce()); got != "1 2 4* " {
+	c = retakeOnce()
+	if got := numbers(c); got != "1 2 3* " {
+		t.Errorf("takes = %s, want the next Take numbered 3 again", got)
+	}
+
+	// Deleting the latest Take frees its number too.
+	timelineChange(t, ts.deleteTake(r.song.ID, id, c.Takes[2].ID))
+	c = retakeOnce()
+	if got := numbers(c); got != "1 2 3* " {
+		t.Errorf("takes = %s, want the next Take numbered 3 again", got)
+	}
+
+	// A gap lower down stays: the next Take follows the highest.
+	timelineChange(t, ts.deleteTake(r.song.ID, id, c.Takes[1].ID))
+	c = retakeOnce()
+	if got := numbers(c); got != "1 3 4* " {
 		t.Errorf("takes = %s, want the next Take numbered 4", got)
 	}
 
-	// So does a Clip placed back from its Takes, told the last number used.
-	c = ts.getTimeline(r.song.ID).Tracks[1].Clips[0]
+	// A Clip placed back from its Takes numbers from those it holds.
 	timelineChange(t, ts.deleteClip(r.song.ID, id))
-	back := timelineChange(t, ts.placeClip(r.song.ID, map[string]any{
-		"trackId": r.vox.ID, "takeIds": []int64{c.Takes[0].ID}, "activeTakeId": c.Takes[0].ID,
-		"start": c.Start, "offset": c.Offset, "length": c.Length, "lastTakeNumber": 4,
-	}))
+	back := timelineChange(t, ts.placeTakes(r.song.ID, r.vox.ID, []int64{c.Takes[0].ID}, c.Takes[0].ID,
+		c.Start, c.Offset, c.Length))
 	id = back.Tracks[1].Clips[0].ID
-	if got := numbers(retakeOnce()); got != "1 5* " {
-		t.Errorf("takes = %s, want the next Take numbered 5", got)
+	if got := numbers(retakeOnce()); got != "1 2* " {
+		t.Errorf("takes = %s, want the next Take numbered 2", got)
 	}
 
-	// And a copy of the Clip.
+	// And so does a copy of the Clip.
 	dup := timelineChange(t, ts.duplicateClip(r.song.ID, id)).Tracks[1].Clips[1]
 	got := timelineChange(t, ts.retake(r.song.ID, dup.ID, retakeUpload(dup.Start-2, 0, 3)))
-	if got := numbers(got.Tracks[1].Clips[1]); got != "1 5 6* " {
-		t.Errorf("copy's takes = %s, want the next Take numbered 6", got)
+	if got := numbers(got.Tracks[1].Clips[1]); got != "1 2 3* " {
+		t.Errorf("copy's takes = %s, want the next Take numbered 3", got)
 	}
+}
+
+func TestAClipIsNoLongerToldTheLastTakeNumber(t *testing.T) {
+	ts := newTestServer(t)
+	r := recordATake(t, ts)
+	timelineChange(t, ts.deleteClip(r.song.ID, r.clip.ID))
+
+	res := ts.placeClip(r.song.ID, map[string]any{
+		"trackId": r.vox.ID, "takeIds": []int64{r.take.ID}, "activeTakeId": r.take.ID,
+		"start": 2, "offset": 0.5, "length": 3, "lastTakeNumber": 4,
+	})
+
+	expectStatus(t, res, http.StatusBadRequest)
 }
 
 func TestARetakeIsUndoneAndRedoneBySettingTheClipsTakes(t *testing.T) {

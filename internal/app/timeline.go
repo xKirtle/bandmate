@@ -135,23 +135,22 @@ func (a *App) trimClip(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) placeClip(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		TrackID        *int64   `json:"trackId"`
-		BeatID         *int64   `json:"beatId"`
-		SoundID        *int64   `json:"soundId"`
-		Name           *string  `json:"name"`
-		TakeIDs        []int64  `json:"takeIds"`
-		ActiveTakeID   *int64   `json:"activeTakeId"`
-		LastTakeNumber int      `json:"lastTakeNumber"`
-		Start          *float64 `json:"start"`
-		Offset         *float64 `json:"offset"`
-		Length         *float64 `json:"length"`
+		TrackID      *int64   `json:"trackId"`
+		BeatID       *int64   `json:"beatId"`
+		SoundID      *int64   `json:"soundId"`
+		Name         *string  `json:"name"`
+		TakeIDs      []int64  `json:"takeIds"`
+		ActiveTakeID *int64   `json:"activeTakeId"`
+		Start        *float64 `json:"start"`
+		Offset       *float64 `json:"offset"`
+		Length       *float64 `json:"length"`
 	}
 	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
 		if req.TrackID == nil || req.Start == nil || req.Offset == nil || req.Length == nil {
 			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "trackId, start, offset and length are required"}
 		}
 		return a.timelines.PlaceClip(r.Context(), id, based, *req.TrackID, timeline.NewClip{
-			BeatID: req.BeatID, SoundID: req.SoundID, Name: req.Name, TakeIDs: req.TakeIDs, ActiveTakeID: req.ActiveTakeID, LastTakeNumber: req.LastTakeNumber,
+			BeatID: req.BeatID, SoundID: req.SoundID, Name: req.Name, TakeIDs: req.TakeIDs, ActiveTakeID: req.ActiveTakeID,
 			Start: *req.Start, Offset: *req.Offset, Length: *req.Length,
 		})
 	})

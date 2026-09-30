@@ -169,10 +169,10 @@ func TestClearingInactiveTakesLeavesOnlyTheActiveOne(t *testing.T) {
 	if at := clipAt(got, c.ID); at != "1:2+1@2" {
 		t.Errorf("clip = %s, want it at 0:02 to 0:03, within Take 2", at)
 	}
-	// Numbers aren't reused.
+	// The next Take follows the highest still in the Clip.
 	retaken := timelineChange(t, ts.retake(r.song.ID, c.ID, retakeUpload(0, 0, 3))).Tracks[1].Clips[0]
-	if n := numbers(retaken); n != "2 4* " {
-		t.Errorf("takes = %s, want the next Take numbered 4", n)
+	if n := numbers(retaken); n != "2 3* " {
+		t.Errorf("takes = %s, want the next Take numbered 3", n)
 	}
 }
 

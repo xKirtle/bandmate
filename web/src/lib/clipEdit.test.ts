@@ -132,7 +132,6 @@ describe('nudging', () => {
     name: null,
     takes: [take(3), take(4, { nudge: 0.02 })],
     activeTakeId: 4,
-    lastTakeNumber: 2,
     start: 10,
     offset: 2,
     length: 5,

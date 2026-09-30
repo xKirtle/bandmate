@@ -165,7 +165,6 @@ export function placementOf(clip: Clip): NewClip {
     ...name,
     takeIds: clip.takes.map((t) => t.id),
     activeTakeId: clip.activeTakeId!,
-    lastTakeNumber: clip.lastTakeNumber,
     start,
     offset,
     length,

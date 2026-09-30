@@ -274,8 +274,6 @@ export interface Clip {
   takes: Take[];
   /** The Take a Clip of Takes plays, or null for a Clip of a Beat. */
   activeTakeId: number | null;
-  /** The highest number its Takes ever had, so none is used twice; 0 for a Clip of a Beat. */
-  lastTakeNumber: number;
   /** Where the Clip starts on the Timeline. */
   start: number;
   /**
@@ -314,7 +312,7 @@ export interface Take {
  * name if it has one.
  */
 export type NewClip = Pick<Clip, 'start' | 'offset' | 'length'> & { name?: string } & (
-    { beatId: number } | { soundId: number } | { takeIds: number[]; activeTakeId: number; lastTakeNumber: number }
+    { beatId: number } | { soundId: number } | { takeIds: number[]; activeTakeId: number }
   );
 
 /**
