@@ -1,11 +1,12 @@
-// How tall the Timeline's Tracks area is: dragged by its top edge, kept on
-// this device for every Song, and never taller than the window allows or the
-// Tracks need.
+// How tall the Timeline's Tracks area is: fitting its Tracks up to
+// defaultShare of the window, and dragged by its top edge up to mostShare. A
+// dragged height is kept on this device as the least a Song's area starts at,
+// and never taller than the window allows or the Tracks need.
 
 /** Where the chosen height is kept on this device. */
 export const heightKey = 'bandmate.timelineHeight';
 
-/** How much of the window the Tracks area takes until one's chosen. */
+/** The most of the window the Tracks area grows to fit its Tracks, and takes until one's chosen. */
 export const defaultShare = 0.4;
 
 /** The most of the window the Tracks area can take, leaving room for the page header. */
@@ -20,6 +21,18 @@ export interface HeightBounds {
 /** How tall the Tracks area is until one's chosen. */
 export function defaultHeight(windowHeight: number): number {
   return windowHeight * defaultShare;
+}
+
+/**
+ * The height to keep once the Tracks need `needed` instead of `was` (0 while
+ * unknown). If every Track showed, it grows to show them all, up to
+ * defaultShare of the window; if the area scrolled, it's left as it is.
+ */
+export function grownHeight(height: number, was: number, needed: number, windowHeight: number): number {
+  // What's shown can't go past mostShare, however tall the height kept.
+  const showedAll = Math.min(height, windowHeight * mostShare) >= was;
+  if (needed <= was || !showedAll) return height;
+  return Math.max(height, Math.min(needed, defaultHeight(windowHeight)));
 }
 
 /**

@@ -46,7 +46,15 @@
   import CalibrationDialog from './CalibrationDialog.svelte';
   import { appliedOffset, readCalibration, skipCalibration, storeOffset } from './calibration';
   import { readInput } from './inputSettings';
-  import { clampHeight, defaultHeight, deviceStorage, heightBounds, readHeight, storeHeight } from './timelineHeight';
+  import {
+    clampHeight,
+    defaultHeight,
+    deviceStorage,
+    grownHeight,
+    heightBounds,
+    readHeight,
+    storeHeight,
+  } from './timelineHeight';
   import { audioContext, TimelinePlayer, type PlayableClip, type PlayerState } from './timelinePlayer';
   import { forgetUnsaved, Keeper, unsavedSamples, unsavedTakes, whileHeld } from './unsavedTakes';
   import {
@@ -1163,17 +1171,34 @@
   }
 
   // The Tracks area's height, dragged by the Timeline's top edge. Null is the
-  // default, which follows the window.
+  // default, which follows the window. One dragged on this device is the
+  // least this Song's area starts at.
   let chosenHeight = $state<number | null>(readHeight(deviceStorage()));
   let headsHeight = $state(0);
   let lanesHeight = $state(0);
   let resizing: { y: number; height: number } | null = null;
+  /** How tall the Tracks and the ruler are, or 0 while unknown (e.g. hidden). */
+  const neededHeight = $derived(Math.max(headsHeight, lanesHeight));
 
   const bounds = $derived.by(() => {
     // One Track and the ruler above it.
     const first = laneElements[0];
     const least = first ? first.offsetTop + first.offsetHeight : 0;
-    return heightBounds(innerHeight.current ?? 0, least, Math.max(headsHeight, lanesHeight));
+    return heightBounds(innerHeight.current ?? 0, least, neededHeight);
+  });
+
+  // A chosen height grows to fit the Tracks as they're known, and as they're
+  // added while every one shows. The default already fits them.
+  let neededBefore = 0;
+  $effect(() => {
+    const needed = neededHeight;
+    if (!needed) return;
+    untrack(() => {
+      if (chosenHeight !== null) {
+        chosenHeight = grownHeight(chosenHeight, neededBefore, needed, innerHeight.current ?? 0);
+      }
+    });
+    neededBefore = needed;
   });
   const tracksHeight = $derived(clampHeight(chosenHeight ?? defaultHeight(innerHeight.current ?? 0), bounds));
 
