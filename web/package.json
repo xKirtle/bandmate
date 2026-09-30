@@ -24,6 +24,7 @@
     "vitest": "^5.0.2"
   },
   "dependencies": {
+    "@breezystack/lamejs": "^1.2.7",
     "music-metadata": "^11.16.1"
   }
 }

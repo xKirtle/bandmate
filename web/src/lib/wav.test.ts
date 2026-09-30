@@ -56,4 +56,28 @@ describe('encodeWav', () => {
     expect(view.getUint32(40, true)).toBe(18);
     expect([0, 1, 2, 3, 4, 5].map((i) => sample(view, i))).toEqual([1 << 22, -(1 << 22), 0, 1, -1, 0]);
   });
+
+  it('writes a stereo 16-bit PCM header when asked for 16 bits', () => {
+    const view = new DataView(encodeWav([new Float32Array(3), new Float32Array(3)], 48000, 16));
+    expect(view.byteLength).toBe(44 + 12);
+    expect(view.getUint32(4, true)).toBe(36 + 12);
+    expect(view.getUint16(20, true)).toBe(1);
+    expect(view.getUint16(22, true)).toBe(2);
+    expect(view.getUint32(24, true)).toBe(48000);
+    // Each frame is both channels' 2-byte samples: 4 bytes, 4 × 48000 a second.
+    expect(view.getUint32(28, true)).toBe(48000 * 4);
+    expect(view.getUint16(32, true)).toBe(4);
+    expect(view.getUint16(34, true)).toBe(16);
+    expect(view.getUint32(40, true)).toBe(12);
+  });
+
+  it('packs 16-bit samples into 2 little-endian bytes, interleaved, clipping beyond ±1', () => {
+    const left = new Float32Array([0.5, 1 / (1 << 15), 1.5]);
+    const right = new Float32Array([-0.5, -1, -2]);
+    const view = new DataView(encodeWav([left, right], 48000, 16));
+    const samples = [0, 1, 2, 3, 4, 5].map((i) => view.getInt16(44 + i * 2, true));
+    expect(samples).toEqual([1 << 14, -(1 << 14), 1, -(1 << 15), (1 << 15) - 1, -(1 << 15)]);
+    // 0.5 is 0x4000: its low byte first.
+    expect([44, 45].map((at) => view.getUint8(at))).toEqual([0x00, 0x40]);
+  });
 });

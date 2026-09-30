@@ -7,15 +7,19 @@
 import type { TimelineLoop } from './api';
 import { schedule, type Placed } from './schedule';
 import { toTheSecond } from './time';
+import type { Mp3Kbps } from './mp3';
 import { TrackMix, type PlayableClip } from './timelinePlayer';
-import { atFullScale } from './wav';
+import { atFullScale, type WavBits } from './wav';
 
 /** A Mixdown's sample rate, in Hz. */
 export const mixdownRate = 48000;
 const channels = 2;
 
-/** How far a Mixdown has got: loading its Clips' audio, then mixing, done a fraction of the way. */
-export type MixdownProgress = { step: 'loading' } | { step: 'mixing'; done: number };
+/**
+ * How far a Mixdown has got: loading its Clips' audio, then mixing, then,
+ * for an MP3, encoding it, each done a fraction of the way.
+ */
+export type MixdownProgress = { step: 'loading' } | { step: 'mixing' | 'encoding'; done: number };
 
 /** What a Mixdown mixes, and how. */
 export interface MixdownPlan {
@@ -115,10 +119,54 @@ export function mixdownRanges(
   return { ranges: [whole, stretch], chosen: loop.on ? stretch : whole };
 }
 
+/** A file format a Mixdown can download as, always stereo at mixdownRate. Its `of` is its file's extension. */
+export type MixdownFormat = { id: string; label: string } & (
+  { of: 'wav'; bits: WavBits } | { of: 'mp3'; kbps: Mp3Kbps }
+);
+
+/** The formats a Mixdown can download as, the first picked until another is. */
+export const mixdownFormats: readonly MixdownFormat[] = [
+  { id: 'wav-24', label: 'WAV · 24-bit', of: 'wav', bits: 24 },
+  { id: 'wav-16', label: 'WAV · 16-bit', of: 'wav', bits: 16 },
+  { id: 'mp3-320', label: 'MP3 · 320 kbps', of: 'mp3', kbps: 320 },
+  { id: 'mp3-192', label: 'MP3 · 192 kbps', of: 'mp3', kbps: 192 },
+  { id: 'mp3-128', label: 'MP3 · 128 kbps', of: 'mp3', kbps: 128 },
+];
+
+export const mixdownFormatKey = 'bandmate.mixdownFormat';
+
+/** The format last picked in this browser, or the first one. */
+export function readMixdownFormat(storage: Storage | undefined): MixdownFormat {
+  try {
+    const id = storage?.getItem(mixdownFormatKey);
+    return mixdownFormats.find((f) => f.id === id) ?? mixdownFormats[0];
+  } catch {
+    return mixdownFormats[0];
+  }
+}
+
+/** Remembers the format picked in this browser. */
+export function storeMixdownFormat(storage: Storage | undefined, format: MixdownFormat) {
+  try {
+    storage?.setItem(mixdownFormatKey, format.id);
+  } catch {
+    // Not kept, e.g. in a private window; it's still picked until the dialog closes.
+  }
+}
+
+/**
+ * The bits each of a Mixdown's samples takes on its way into the file, which
+ * is where it clips: a WAV's own, and 16 for an MP3, as LAME encodes from
+ * 16-bit samples.
+ */
+export function sampleBits(format: MixdownFormat): WavBits {
+  return format.of === 'wav' ? format.bits : 16;
+}
+
 /** The file a Song's Mixdown downloads as, with the Loop's times for its stretch, e.g. "(0m32s-0m48s)". */
-export function mixdownName(songTitle: string, range: MixdownRange): string {
-  if (range.of === 'timeline') return `${songTitle} - Mixdown.wav`;
-  return `${songTitle} - Mixdown (${minutesSeconds(range.start)}-${minutesSeconds(range.end)}).wav`;
+export function mixdownName(songTitle: string, range: MixdownRange, format: MixdownFormat): string {
+  const times = range.of === 'loop' ? ` (${minutesSeconds(range.start)}-${minutesSeconds(range.end)})` : '';
+  return `${songTitle} - Mixdown${times}.${format.of}`;
 }
 
 /** A time to the second, as a file name can hold it, e.g. "1m05s". */
@@ -133,14 +181,17 @@ export interface MixdownLevels {
   silent: boolean;
 }
 
-/** Checks a Mixdown's channels, from -1 to 1, for clipping in its file and for silence throughout. */
-export function levelsOf(channels: readonly Float32Array[]): MixdownLevels {
+/**
+ * Checks a Mixdown's channels, from -1 to 1, for clipping in its file, whose
+ * samples take bits each, and for silence throughout.
+ */
+export function levelsOf(channels: readonly Float32Array[], bits: WavBits = 24): MixdownLevels {
   let clips = false;
   let silent = true;
   for (const samples of channels) {
     for (const s of samples) {
       if (s !== 0) silent = false;
-      if (!clips && atFullScale(s)) clips = true;
+      if (!clips && atFullScale(s, bits)) clips = true;
     }
   }
   return { clips, silent };

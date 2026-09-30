@@ -4,22 +4,28 @@
   import { closeOnBackdrop } from './backdrop';
   import {
     levelsOf,
+    mixdownFormats,
     mixdownName,
     mixdownRanges,
     mixdownRate,
     mixDown,
+    readMixdownFormat,
+    sampleBits,
+    storeMixdownFormat,
+    type MixdownFormat,
     type MixdownLevels,
     type MixdownPlan,
     type MixdownProgress,
     type MixdownRange,
   } from './mixdown';
   import { formatDuration } from './time';
+  import { deviceStorage } from './timelineHeight';
   import { encodeWav } from './wav';
 
-  // Mixes the whole Timeline, or the Loop's stretch of it, down to a WAV
-  // file and downloads it, in a modal dialog: while it's mixing, nothing else
-  // on the page can be used, and closing the dialog, or leaving the Song
-  // page, cancels it.
+  // Mixes the whole Timeline, or the Loop's stretch of it, down to a file in
+  // the format picked and downloads it, in a modal dialog: while it's
+  // mixing, nothing else on the page can be used, and closing the dialog, or
+  // leaving the Song page, cancels it.
   let {
     songTitle,
     end,
@@ -52,7 +58,9 @@
   const offered = untrack(() => mixdownRanges(end, loop));
   const ranges = offered.ranges;
   let chosen = $state.raw<MixdownRange>(offered.chosen);
-  const name = $derived(mixdownName(songTitle, chosen));
+  // The format picked, which this browser remembers.
+  let format = $state.raw<MixdownFormat>(readMixdownFormat(deviceStorage()));
+  const name = $derived(mixdownName(songTitle, chosen, format));
   const span = (range: MixdownRange) => `${formatDuration(range.start)}–${formatDuration(range.end)}`;
 
   onMount(() => dialog?.showModal());
@@ -75,8 +83,10 @@
       });
       if (cancel.signal.aborted) return;
       const channels = [audio.getChannelData(0), audio.getChannelData(1)];
-      levels = levelsOf(channels);
-      save(new Blob([encodeWav(channels, mixdownRate)], { type: 'audio/wav' }));
+      levels = levelsOf(channels, sampleBits(format));
+      const file = await encode(channels, cancel.signal);
+      if (cancel.signal.aborted) return;
+      save(file);
       phase = 'done';
     } catch (e) {
       if (cancel.signal.aborted) return;
@@ -85,6 +95,17 @@
     } finally {
       if (mixing === cancel) mixing = null;
     }
+  }
+
+  /** Encodes the Mixdown's file in the format picked, loading the MP3 encoder only once it's needed. */
+  async function encode(channels: Float32Array[], signal: AbortSignal): Promise<Blob> {
+    if (format.of === 'wav') return new Blob([encodeWav(channels, mixdownRate, format.bits)], { type: 'audio/wav' });
+    progress = { step: 'encoding', done: 0 };
+    const { encodeMp3 } = await import('./mp3');
+    return encodeMp3(channels, mixdownRate, format.kbps, {
+      signal,
+      onProgress: (done) => (progress = { step: 'encoding', done }),
+    });
   }
 
   /** Downloads the Mixdown's file. */
@@ -96,6 +117,11 @@
     link.click();
     // Once the download has had it.
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
+
+  function pick(picked: MixdownFormat) {
+    format = picked;
+    storeMixdownFormat(deviceStorage(), picked);
   }
 
   function onclose() {
@@ -136,16 +162,27 @@
         as they are.
       </p>
     {/if}
-    <p class="muted">A stereo 24-bit WAV at 48 kHz, downloaded as “{name}”.</p>
+    <fieldset>
+      <legend>Format</legend>
+      {#each mixdownFormats as f (f.id)}
+        <label>
+          <input type="radio" name="mixdown-format" checked={format === f} onchange={() => pick(f)} />
+          <span>{f.label}</span>
+        </label>
+      {/each}
+    </fieldset>
+    <p class="muted">Stereo at 48 kHz, downloaded as “{name}”.</p>
     {#if error}
       <p class="problem" role="alert">{error}</p>
     {/if}
   {:else if phase === 'mixing'}
     <p role="status" aria-live="polite">
-      {progress.step === 'loading' ? 'Loading the audio…' : `Mixing down… ${Math.floor(progress.done * 100)}%`}
+      {progress.step === 'loading'
+        ? 'Loading the audio…'
+        : `${progress.step === 'mixing' ? 'Mixing down' : 'Encoding the MP3'}… ${Math.floor(progress.done * 100)}%`}
     </p>
     <!-- Without a value while loading: how long that takes isn't known. -->
-    {#if progress.step === 'mixing'}
+    {#if progress.step !== 'loading'}
       <progress max="1" value={progress.done} aria-label="How far the Mixdown has got"></progress>
     {:else}
       <progress aria-label="How far the Mixdown has got"></progress>

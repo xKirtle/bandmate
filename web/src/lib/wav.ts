@@ -1,26 +1,41 @@
-// 24-bit PCM WAV files: Takes are kept as mono ones at the rate they were
+// PCM WAV files: Takes are kept as mono 24-bit ones at the rate they were
 // recorded at, never resampled (ADR 0003), and a Mixdown downloads as a
-// stereo one.
+// stereo 24- or 16-bit one.
 
-const bytesPerSample = 3;
+/** How many bits each sample of a WAV file takes. */
+export type WavBits = 16 | 24;
+
 const headerSize = 44;
-// The largest 24-bit sample, and the smallest is one below its negative.
-const fullScale = (1 << 23) - 1;
+
+/** The largest sample at a bit depth; the smallest is one below its negative. */
+const fullScaleAt = (bits: WavBits) => 2 ** (bits - 1) - 1;
 
 /**
- * Whether a sample, from -1 to 1, is at full scale once encoded: the
- * largest or smallest 24-bit sample, which anything louder is clipped to.
+ * A sample, from -1 to 1, as the integer it's encoded as at a bit depth:
+ * rounded, so a quiet sample doesn't all drift towards zero, and clipped
+ * to full scale.
  */
-export function atFullScale(sample: number): boolean {
+export function pcmSample(sample: number, bits: WavBits): number {
+  const fullScale = fullScaleAt(bits);
+  return Math.max(-fullScale - 1, Math.min(fullScale, Math.round(sample * (fullScale + 1))));
+}
+
+/**
+ * Whether a sample, from -1 to 1, is at full scale once encoded at a bit
+ * depth: the largest or smallest sample, which anything louder is clipped to.
+ */
+export function atFullScale(sample: number, bits: WavBits = 24): boolean {
+  const fullScale = fullScaleAt(bits);
   return Math.round(sample * (fullScale + 1)) >= fullScale || sample <= -1;
 }
 
 /**
- * Encodes channels of samples, from -1 to 1, as a 24-bit PCM WAV file at
- * sampleRate: one channel for mono, two for stereo, each as long as the
- * first. Louder samples are clipped.
+ * Encodes channels of samples, from -1 to 1, as a PCM WAV file at sampleRate
+ * and a bit depth, 24 unless told otherwise: one channel for mono, two for
+ * stereo, each as long as the first. Louder samples are clipped.
  */
-export function encodeWav(channels: readonly Float32Array[], sampleRate: number): ArrayBuffer {
+export function encodeWav(channels: readonly Float32Array[], sampleRate: number, bits: WavBits = 24): ArrayBuffer {
+  const bytesPerSample = bits / 8;
   const frames = channels[0]?.length ?? 0;
   const bytesPerFrame = channels.length * bytesPerSample;
   const dataSize = frames * bytesPerFrame;
@@ -46,13 +61,10 @@ export function encodeWav(channels: readonly Float32Array[], sampleRate: number)
   // Interleaved: each frame holds every channel's sample in turn.
   for (const [c, samples] of channels.entries()) {
     for (let i = 0; i < frames; i++) {
-      const clipped = Math.max(-1, Math.min(1, samples[i]));
-      // Rounded, so a quiet sample doesn't all drift towards zero.
-      const value = Math.max(-fullScale - 1, Math.min(fullScale, Math.round(clipped * (fullScale + 1))));
+      const value = pcmSample(samples[i], bits);
       const at = i * bytesPerFrame + c * bytesPerSample;
-      bytes[at] = value & 0xff;
-      bytes[at + 1] = (value >> 8) & 0xff;
-      bytes[at + 2] = (value >> 16) & 0xff;
+      // Little-endian, in two's complement.
+      for (let b = 0; b < bytesPerSample; b++) bytes[at + b] = (value >> (8 * b)) & 0xff;
     }
   }
   return buffer;
