@@ -19,7 +19,7 @@
   import { Capture, CaptureError, frameAt, inputProblem } from './capture';
   import { addedTrack, chosenTrack, readChosen, storeChosen, type ChoiceEvent } from './chosenTrack';
   import { clampMove, clampTrimEnd, clampTrimStart, draggedNudge, nudged } from './clipEdit';
-  import { guideLanes, reachAt, snapEdge, snapMove, targets, type Mark, type Snap } from './snapping';
+  import { editTargets, guideLanes, reachAt, snapEdge, snapMove, type Aligned, type Snap } from './snapping';
   import { activeTake, clipSources, clipTitle, fileStart, playing } from './clipSource';
   import { cuesInSpan, formatCue } from './cues';
   import { carriesFiles, fileDropTrack, importEach, type TrackRow } from './fileDrop';
@@ -1291,7 +1291,7 @@
     /** Whether Shift is held, to move or trim without snapping. */
     free: boolean;
     /** What a move or trim is snapped to, with the lanes of what's there, while it is. */
-    snap: Snap<Mark> | null;
+    snap: Snap<Aligned> | null;
     saving: boolean;
   }
   let edit = $state<Edit | null>(null);
@@ -1336,7 +1336,7 @@
 
   /** What a Clip moved or trimmed snaps to: the other Clips' edges, the playhead and the Loop's edges. */
   function snapTargets(clip: Clip) {
-    return targets(timeline.tracks, clip.id, position, loop);
+    return editTargets(timeline.tracks, clip.id, position, loop);
   }
 
   function trackOf(clip: Clip) {
@@ -3333,7 +3333,7 @@
     fill: var(--danger);
     opacity: 1;
   }
-  /* What a moved or trimmed Clip is snapped to, through the lanes aligned there, or up to the ruler for a Loop edge. */
+  /* What a moved or trimmed Clip is snapped to, through the lanes aligned there, and up through the ruler for a Loop edge. */
   .snap-guide {
     position: absolute;
     width: round(calc(0.125 * var(--timeline-rem)), 1px);

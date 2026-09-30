@@ -87,29 +87,31 @@ export function snapEdge<T>(
   return { at: clamp(desired), snap: null };
 }
 
-/** Where a guide runs: a lane, counted from the top, or the ruler above them all. */
-export type Lane = number | 'ruler';
+/**
+ * What's aligned at a target: a Clip's edge, in the lane it's in counted
+ * from the top; one of the Loop's edges; or the playhead.
+ */
+export type Aligned = number | 'loop' | 'playhead';
 
 /**
  * The lanes a snap's guide runs across: from the lane being dragged in to
- * the furthest lane holding something aligned, either way, or up to the
- * ruler for a Loop edge. The playhead is already a line, so it's left out,
- * and with nothing else aligned there's no guide.
+ * the furthest lane holding a Clip aligned, either way, and up to the
+ * ruler for a Loop edge, the Loop being drawn above it. The playhead is
+ * already a line, so it's left out, and with nothing else aligned there's
+ * no guide.
  */
-export function guideLanes(draggedLane: number, aligned: readonly Mark[]): { from: Lane; to: number } | null {
-  const lanes = aligned.filter((m) => m !== 'playhead');
-  if (lanes.length === 0) return null;
-  // The ruler, above every lane, as one before the first.
-  const rows = lanes.map((m) => (m === 'ruler' ? -1 : m));
-  const from = Math.min(draggedLane, ...rows);
-  return { from: from === -1 ? 'ruler' : from, to: Math.max(draggedLane, ...rows) };
+export function guideLanes(
+  draggedLane: number,
+  aligned: readonly Aligned[],
+): { from: number | 'ruler'; to: number } | null {
+  const rest = aligned.filter((a) => a !== 'playhead');
+  if (rest.length === 0) return null;
+  const lanes = rest.filter((a) => a !== 'loop');
+  return {
+    from: rest.includes('loop') ? 'ruler' : Math.min(draggedLane, ...lanes),
+    to: Math.max(draggedLane, ...lanes),
+  };
 }
-
-/**
- * What's at a target: a Clip's edge, in the lane it's in counted from the
- * top; one of the Loop's edges, drawn above the ruler; or the playhead.
- */
-export type Mark = number | 'ruler' | 'playhead';
 
 /**
  * The start and end of every Clip but the one being dragged, on every
@@ -134,16 +136,16 @@ export function clipTargets(
  * and end, the playhead, and the Loop's start and end, on or off, if
  * there is one.
  */
-export function targets(
+export function editTargets(
   tracks: readonly { clips: readonly { id: number; start: number; length: number }[] }[],
   draggedClip: number,
   playhead: number,
   loop: { start: number; end: number } | null,
-): Target<Mark>[] {
-  const loopEdges: Target<Mark>[] = loop
+): Target<Aligned>[] {
+  const loopEdges: Target<Aligned>[] = loop
     ? [
-        { at: loop.start, of: 'ruler' },
-        { at: loop.end, of: 'ruler' },
+        { at: loop.start, of: 'loop' },
+        { at: loop.end, of: 'loop' },
       ]
     : [];
   return [...clipTargets(tracks, draggedClip), { at: playhead, of: 'playhead' }, ...loopEdges];
