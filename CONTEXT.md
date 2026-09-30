@@ -117,7 +117,7 @@ A stretch of a Beat or a Sound, or a set of Takes, placed at a position on a Tra
 _Avoid_: Region, segment
 
 **Loop**:
-A stretch of the Timeline that playback repeats, e.g. the hook of a Beat while writing over it; each Song keeps one, which can be switched on or off.
+A stretch of the Timeline that playback repeats, e.g. the hook of a Beat while writing over it: playback that reaches the Loop's end goes back to its start. Playback started or moved anywhere else plays on as usual until it reaches the Loop's end, so after the Loop it runs to the Timeline's end. Each Song keeps one, which can be switched on or off; only the user switches it, and it never moves the playhead.
 _Avoid_: Cycle, repeat, region
 
 **Cue**:
@@ -145,5 +145,5 @@ A finished recording of a Song made elsewhere (e.g. in a studio), attached to th
 _Avoid_: Final, release, finished track, alternate master (an Alternate is something else)
 
 **Mixdown**:
-The Timeline, or a part of it (one Track, one Clip, or the Loop's stretch), rendered into a single audio file.
+The Timeline, or the Loop's stretch of it, rendered into a single audio file that sounds as playback would, with every Track's volume, mute and solo as they are. There's no Mixdown of one Track or one Clip: soloing a Track is how to hear it alone. It covers the audio, never the Cues: the whole Timeline's Mixdown runs from 0:00 to where its last Clip ends. It's downloaded, never kept in Bandmate.
 _Avoid_: Bounce, export, render
