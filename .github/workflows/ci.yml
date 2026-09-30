@@ -1,19 +1,22 @@
 name: CI
 
-# Pull requests test every change to code; pushes to main test again, then
-# build and publish the image. Changes that only touch docs or other files
-# outside the build skip both.
+# Pull requests only test. A push to main tests again, then publishes the
+# image as `:edge` and `:sha-<short>`. A `v*` version tag (e.g. `v0.4.0`)
+# tests, then publishes a release as `:0.4.0`, `:0.4` and `:latest`, so
+# `latest` is the newest release, never the latest merge. Changes to main or a
+# PR that only touch docs or other files outside the build skip both jobs.
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
 
-# A newer run on the same branch or PR replaces an older one. Runs on main
+# A newer run on the same PR replaces an older one. Runs on main and on tags
 # are never cancelled, so every merged commit that changes code gets its
-# SHA-tagged image.
+# image, and every release is published.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -25,6 +28,8 @@ jobs:
   # Whether anything the build or tests read has changed. The workflow itself
   # always runs, so the required `test` check always reports: skipped counts
   # as passing, while a check that never starts leaves the PR waiting.
+  # A tag has no previous commit to diff against, and a release must be
+  # tested whatever changed, so a tag always counts as a code change.
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -41,6 +46,10 @@ jobs:
         env:
           BEFORE: ${{ github.event.before }}
         run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            echo code=true >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           base=$([ "$GITHUB_EVENT_NAME" = pull_request ] && echo "$GITHUB_SHA^1" || echo "$BEFORE")
           if git diff --name-only "$base" "$GITHUB_SHA" -- \
               cmd internal web go.mod go.sum Dockerfile .dockerignore .github/workflows \
@@ -95,18 +104,34 @@ jobs:
       - name: go test
         run: go test ./...
 
-  # Only on main: building the image on pull requests mostly repeats the
-  # test job's builds, and a Dockerfile problem it misses only fails a
-  # publish, leaving the last good image in place. Skipped with `test`.
+  # Only on pushes to main and version tags: building the image on pull
+  # requests mostly repeats the test job's builds, and a Dockerfile problem it
+  # misses only fails a publish, leaving the last good image in place.
+  # Skipped with `test`, and never runs when it fails.
   image:
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: docker/setup-buildx-action@v4
+
+      # Tags a version tag vX.Y.Z as X.Y.Z, X.Y and latest (latest=auto adds
+      # it to semver tags, but not to pre-releases), and main as edge and
+      # sha-<short>. Also makes the OCI labels: version is the first of those
+      # tags (X.Y.Z or edge), with source (which links the GHCR package to
+      # this repository) and revision beside it.
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=edge,branch=main
+            type=sha,enable={{is_default_branch}}
 
       - uses: docker/login-action@v4
         with:
@@ -120,12 +145,7 @@ jobs:
       - uses: docker/build-push-action@v7
         with:
           push: true
-          tags: |
-            ${{ env.IMAGE }}:latest
-            ${{ env.IMAGE }}:${{ github.sha }}
-          # Links the GHCR package to this repository.
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
