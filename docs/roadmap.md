@@ -8,11 +8,15 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 
 ### Mixdowns
 
-- The **Mixdown** is rendered in the browser, as WAV or MP3, of the whole Timeline, one Track, one Clip (from its menu) or the Loop's stretch. It ignores Masters, and a Clip's Mixdown is what it plays: trimmed, nudged, the active Take. Download Take already gives a Take's original file.
-- Still open for its spec:
-  - Does a Mixdown honour Track volume, mute and solo (and does a Clip's honour its Track's volume)?
-  - Can the Loop's stretch be mixed down while the Loop is off?
-  - Should Clip gain and fades (below) come first, or with it? A Mixdown is where a Clip's hard edges are heard, and adding fades later changes what a Mixdown renders.
+- A **Mixdown** is always of the Timeline, rendered in the browser, and sounds as playback would: every Track's volume, mute and solo as they are, and Clip effects once they exist. There's no Mixdown of one Track or one Clip; soloing a Track is how to hear it alone. It ignores Masters.
+- **Range**: the whole Timeline, from 0:00 to where its last Clip ends (Cues don't extend it). When the Song has a Loop, the dialog also offers the Loop's stretch, e.g. "Loop (0:32–0:48)", pre-selected while the Loop is on, and offered while it's off. A Loop running past the last Clip gives silence there, as playback would.
+- **Format**: one picker, remembered by the browser: WAV · 24-bit (the default), WAV · 16-bit, MP3 · 320, 192 or 128 kbps. Always stereo, at 48 kHz. The MP3 encoder is a dependency whose license fits AGPL-3.0.
+- **Where**: a ⋯ menu in the transport row, at every width, holds Import audio…, Mix down… and Recording settings…. Play, the time, Loop, Record and the "Not calibrated" note stay in the row. On a phone, where the row is transport-only, the ⋯ holds just Mix down….
+- Mix down… is disabled while the Timeline has no Clips ("Add a Beat, Sound or Take to mix down"), and while recording.
+- **Rendering**: a modal dialog shows progress and Cancel, and asks not to leave or close the page; nothing else can be used meanwhile. Starting a render stops playback; Sync mode stays on. Leaving the Song page cancels it.
+- **Result**: rendered faithfully, never normalised, and downloaded, never kept in Bandmate. It's named `{Song} - Mixdown.wav` (or `.mp3`), with the Loop's times added for the Loop's stretch. If it clips, or is silent (every Track muted, the Loop over an empty stretch), a note says so, and it downloads anyway.
+- A Mixdown can be uploaded as a Master by hand; there's no "Save as Master".
+- Not part of it: Clip gain and fades (below), and a Mixdown of each Track as stems.
 
 ## Wishlist
 
