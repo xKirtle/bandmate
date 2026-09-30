@@ -42,11 +42,14 @@ type phrase struct {
 func hum(seconds float64, phrases []phrase, level float64) []float64 {
 	samples := make([]float64, int(seconds*sampleRate))
 	const note = 60.0 / heroBPM / 2
+	// How hard each syllable is sung, so the waveform isn't a flat block.
+	accents := []float64{1, 0.7, 0.85, 0.55, 0.95, 0.75, 0.5}
 	for _, p := range phrases {
 		for i, pitch := range p.notes {
+			accent := accents[i%len(accents)]
 			addTone(samples, p.start+float64(i)*note, note, func(t float64) (float64, float64) {
 				swell := math.Sin(math.Pi * t / note)
-				return pitch * (1 + 0.01*math.Sin(2*math.Pi*5.5*t)), level * swell * swell
+				return pitch * (1 + 0.01*math.Sin(2*math.Pi*5.5*t)), level * accent * swell * swell
 			})
 		}
 	}

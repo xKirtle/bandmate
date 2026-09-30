@@ -25,8 +25,9 @@ type alternate struct {
 	Active bool  `json:"active"`
 }
 
-// seed fills the empty Bandmate at base with the demo content: the hero
-// Song, then the other Songs, so the hero Song is the oldest.
+// seed fills the empty Bandmate at base with the demo content: the other
+// Songs, then the hero Song, so it's the latest edited and tops the Song
+// list.
 func seed(ctx context.Context, base string, httpClient *http.Client) error {
 	c := client{base: base, http: httpClient}
 	var songs, beats []struct{}
@@ -39,13 +40,13 @@ func seed(ctx context.Context, base string, httpClient *http.Client) error {
 	if len(songs) > 0 || len(beats) > 0 {
 		return fmt.Errorf("%s already has %d Songs and %d Beats: the seed expects an empty Bandmate", base, len(songs), len(beats))
 	}
-	if err := seedHero(ctx, c); err != nil {
-		return fmt.Errorf("the hero Song: %w", err)
-	}
 	for _, s := range otherSongs {
 		if _, err := importSong(ctx, c, s.chordPro, s.status); err != nil {
 			return fmt.Errorf("a Song: %w", err)
 		}
+	}
+	if err := seedHero(ctx, c); err != nil {
+		return fmt.Errorf("the hero Song: %w", err)
 	}
 	return nil
 }
