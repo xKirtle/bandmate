@@ -19,7 +19,7 @@
   import { Capture, CaptureError, frameAt, inputProblem } from './capture';
   import { addedTrack, chosenTrack, readChosen, storeChosen, type ChoiceEvent } from './chosenTrack';
   import { clampMove, clampTrimEnd, clampTrimStart, draggedNudge, nudged } from './clipEdit';
-  import { clipTargets, guideLanes, reachAt, snapMove, type Snap } from './snapping';
+  import { clipTargets, guideLanes, reachAt, snapEdge, snapMove, type Snap } from './snapping';
   import { activeTake, clipSources, clipTitle, fileStart, playing } from './clipSource';
   import { cuesInSpan, formatCue } from './cues';
   import { carriesFiles, fileDropTrack, importEach, type TrackRow } from './fileDrop';
@@ -1272,7 +1272,7 @@
   // another; dragging an edge trims it. It stops at its neighbours, the
   // source's ends and 0:00 as it goes, and is saved on release. Until the
   // saved Timeline comes back, the Clip is shown where it was dropped.
-  // Moved, it snaps to other Clips' edges, unless Shift is held.
+  // Moved or trimmed, it snaps to other Clips' edges, unless Shift is held.
   interface Edit {
     clip: Clip;
     /** Moving the Clip, trimming either edge, or, Alt+dragged, sliding its active Take within it. */
@@ -1287,9 +1287,9 @@
     placement: Placed;
     /** Where its active Take is nudged to, for a nudge. */
     nudge: number;
-    /** Whether Shift is held, to move without snapping. */
+    /** Whether Shift is held, to move or trim without snapping. */
     free: boolean;
-    /** What a move is snapped to, with the lanes of what's there, while it is. */
+    /** What a move or trim is snapped to, with the lanes of what's there, while it is. */
     snap: Snap<number> | null;
     saving: boolean;
   }
@@ -1316,9 +1316,9 @@
   );
 
   /**
-   * The guide for what a moved Clip is snapped to: a line at that time, from
-   * its lane through every lane with a Clip aligned there, in pixels down
-   * the lanes.
+   * The guide for what a moved or trimmed Clip is snapped to: a line at
+   * that time, from its lane through every lane with a Clip aligned there,
+   * in pixels down the lanes.
    */
   const guide = $derived.by(() => {
     if (!edit?.snap) return null;
@@ -1467,10 +1467,10 @@
   /** Where the pointer last dragged a Clip to. */
   let editAt: Point = { clientX: 0, clientY: 0 };
 
-  // Shift pressed or let go mid-move snaps or frees the Clip there and then,
-  // without waiting for the pointer to move.
+  // Shift pressed or let go mid-move or mid-trim snaps or frees the Clip
+  // there and then, without waiting for the pointer to move.
   function editShift(event: KeyboardEvent) {
-    if (event.key !== 'Shift' || !edit?.moved || edit.mode !== 'move' || edit.saving) return;
+    if (event.key !== 'Shift' || !edit?.moved || edit.mode === 'nudge' || edit.saving) return;
     edit.free = event.type === 'keydown';
     editMove(editAt);
   }
@@ -1498,10 +1498,21 @@
         : snapMove(clipTargets(timeline.tracks, clip.id), clip.length, desired, reachAt(view.scale), clamp);
       edit.placement = { ...clip, start: moved.start };
       edit.snap = moved.snap;
-    } else if (edit.mode === 'start') {
-      edit.placement = clampTrimStart(clip, othersOn(edit.trackId, clip), t);
     } else {
-      edit.placement = clampTrimEnd(clip, othersOn(edit.trackId, clip), sources.of(clip).duration, t);
+      const others = othersOn(edit.trackId, clip);
+      const trimStart = edit.mode === 'start';
+      const trim = (at: number) =>
+        trimStart ? clampTrimStart(clip, others, at) : clampTrimEnd(clip, others, sources.of(clip).duration, at);
+      // Where the edge dragged ends up, trimmed to at.
+      const edge = (at: number) => {
+        const trimmed = trim(at);
+        return trimStart ? trimmed.start : trimmed.start + trimmed.length;
+      };
+      const snapped = edit.free
+        ? { at: t, snap: null }
+        : snapEdge(clipTargets(timeline.tracks, clip.id), t, reachAt(view.scale), edge);
+      edit.placement = trim(snapped.at);
+      edit.snap = snapped.snap;
     }
     dragAt(event, editMove);
   }
@@ -3314,7 +3325,7 @@
     fill: var(--danger);
     opacity: 1;
   }
-  /* What a moved Clip is snapped to, through the lanes aligned there. */
+  /* What a moved or trimmed Clip is snapped to, through the lanes aligned there. */
   .snap-guide {
     position: absolute;
     width: round(calc(0.125 * var(--timeline-rem)), 1px);
