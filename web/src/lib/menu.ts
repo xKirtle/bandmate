@@ -22,6 +22,15 @@ export function menuKey(key: string, current: number, count: number): number | '
 }
 
 /**
+ * Whether a key opens a menu from what has focus, as it would a context
+ * menu: the Menu key, or Shift+F10.
+ */
+export function opensMenu(e: Pick<KeyboardEvent, 'key' | 'shiftKey' | 'ctrlKey' | 'altKey' | 'metaKey'>): boolean {
+  if (e.key === 'ContextMenu') return true;
+  return e.key === 'F10' && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey;
+}
+
+/**
  * An entry in an Actions menu, e.g. a ⋯ one, also shown as an icon button
  * where there's room for one. It runs at once, or, with `choices`, opens a list to pick one from
  * in the menu, e.g. which Section to add to, or with `field`, a number to set, e.g. a nudge;
@@ -33,6 +42,8 @@ export type MenuAction = {
   label: string;
   /** The button's tooltip, when it has more to say than the label. */
   title?: string;
+  /** Shown but unavailable, e.g. while what it does can't be done. */
+  disabled?: boolean;
 } & ({ run: () => void } | { choices: MenuChoice[] } | { field: MenuField });
 
 /**

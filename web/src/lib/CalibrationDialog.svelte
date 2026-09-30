@@ -166,7 +166,7 @@
   {/if}
 
   {#if offer && !measured}
-    <p class="muted">Skipped, it can be run any time from the recording settings, beside Record.</p>
+    <p class="muted">Skipped, it can be run any time from Recording settings… in the Timeline's ⋯ menu.</p>
   {/if}
 
   <div class="actions">

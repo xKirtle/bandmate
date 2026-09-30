@@ -1,5 +1,5 @@
 import { describe as group, expect, it } from 'vitest';
-import { fieldStep, menuKey } from './menu';
+import { fieldStep, menuKey, opensMenu } from './menu';
 
 group('menuKey', () => {
   it('moves down and up through the entries, wrapping round', () => {
@@ -45,5 +45,20 @@ group('fieldStep', () => {
     expect(fieldStep({ ...keys, key: 'ArrowLeft', altKey: false }, 5, field)).toBeNull();
     expect(fieldStep({ ...keys, key: 'ArrowRight', ctrlKey: true }, 5, field)).toBeNull();
     expect(fieldStep({ ...keys, key: 'ArrowUp' }, 5, field)).toBeNull();
+  });
+});
+
+group('opensMenu', () => {
+  const keys = { shiftKey: false, ctrlKey: false, altKey: false, metaKey: false };
+
+  it('opens on the Menu key and Shift+F10, as a context menu does', () => {
+    expect(opensMenu({ ...keys, key: 'ContextMenu' })).toBe(true);
+    expect(opensMenu({ ...keys, key: 'F10', shiftKey: true })).toBe(true);
+  });
+
+  it('leaves F10 alone, and other keys', () => {
+    expect(opensMenu({ ...keys, key: 'F10' })).toBe(false);
+    expect(opensMenu({ ...keys, key: 'F10', shiftKey: true, ctrlKey: true })).toBe(false);
+    expect(opensMenu({ ...keys, key: 'Enter' })).toBe(false);
   });
 });

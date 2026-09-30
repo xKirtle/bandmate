@@ -33,7 +33,7 @@
     type Saved,
   } from './history';
   import { formatVolume, maxVolume, minVolume, trackGains, type Levels } from './mixer';
-  import { type MenuAction } from './menu';
+  import { opensMenu, type MenuAction } from './menu';
   import { peaks as peaksOf, peaksPerSecond } from './peaks';
   import { keyActedOnPage } from './pointerFocus';
   import { longPressDelay, pastSlop, type Point } from './press';
@@ -45,6 +45,7 @@
   import { prepareUpload } from './upload';
   import { formatDuration } from './time';
   import { tracksDropped, type TrackDrop } from './trackDrag';
+  import { transportActions } from './transportMenu';
   import { TrackDragging } from './trackDragging.svelte';
   import InputSettings from './InputSettings.svelte';
   import CalibrationDialog from './CalibrationDialog.svelte';
@@ -834,6 +835,31 @@
     if (file && chosen !== null) importFiles([file], chosen);
   }
 
+  // The transport row's ⋯, for its occasional actions, and what they open:
+  // the file picker for Import audio…, and the recording settings, placed
+  // by the ⋯.
+  let importInput: HTMLInputElement;
+  let inputSettings: InputSettings;
+  let transportMore = $state<HTMLElement>();
+  const transportMenu = $derived(
+    transportActions(
+      {
+        // Only there can the Timeline be edited.
+        fullTimeline: editable.current,
+        importing: importing !== null,
+        recording: recording !== null,
+        chosenTrack: timeline.tracks.find((t) => t.id === chosen)?.name ?? 'the Chosen Track',
+      },
+      {
+        importAudio: () => importInput.click(),
+        // Chosen from the ⋯, so it's there to place them by.
+        recordingSettings: () => {
+          if (transportMore) inputSettings.openSettings(transportMore);
+        },
+      },
+    ),
+  );
+
   // Audio files dragged from outside the page onto a Track are imported
   // onto it, and onto the Chosen Track below the last Track: only which
   // Track, never where on it. Not while the Timeline can't be edited, or
@@ -1558,7 +1584,7 @@
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault();
       remove(clip);
-    } else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+    } else if (opensMenu(event)) {
       event.preventDefault();
       openClipMenu(clip, event.currentTarget as HTMLElement);
     }
@@ -2068,32 +2094,27 @@
                 : `Record a Take on ${timeline.tracks.find((t) => t.id === chosen)?.name ?? 'a new Track'} (R)`}
         ><span class="record-dot" aria-hidden="true"></span>{capturing ? 'Stop' : 'Record'}</button
       >
-      <label
-        class="toggle import edit-only"
-        class:disabled={importing !== null || recording !== null}
-        title="Import an audio file as a Sound onto {timeline.tracks.find((t) => t.id === chosen)?.name ??
-          'the Chosen Track'}"
-        >Import audio…<input
-          class="visually-hidden"
-          type="file"
-          accept="audio/*"
-          onchange={importPicked}
-          disabled={importing !== null || recording !== null}
-        /></label
-      >
-      <span class="edit-only"
-        ><InputSettings
-          disabled={recording !== null}
-          offset={calibration.offset}
-          onCalibrate={() => (calibrating = { offer: false })}
-        /></span
-      >
+      <input
+        class="visually-hidden"
+        type="file"
+        accept="audio/*"
+        tabindex="-1"
+        aria-hidden="true"
+        bind:this={importInput}
+        onchange={importPicked}
+      />
+      <InputSettings
+        bind:this={inputSettings}
+        disabled={recording !== null || !editable.current}
+        offset={calibration.offset}
+        onCalibrate={() => (calibrating = { offer: false })}
+      />
       {#if calibration.offset === null && !recording}
         <button
           type="button"
           class="not-calibrated edit-only"
           disabled={!canRecord}
-          title="Takes are placed by the latency the browser reports until it's calibrated. Calibrate it now, or any time in the recording settings."
+          title="Takes are placed by the latency the browser reports until it's calibrated. Calibrate it now, or any time from Recording settings… in the ⋯ menu."
           onclick={() => (calibrating = { offer: false })}>Not calibrated</button
         >
       {/if}
@@ -2104,7 +2125,7 @@
       {:else if recording && inputNote}
         <span class="input-note" role="status">{inputNote}</span>
       {:else if recording && skipped}
-        <span class="muted" role="status">Calibrate the latency any time in the recording settings.</span>
+        <span class="muted" role="status">Calibrate the latency any time from Recording settings… in the ⋯ menu.</span>
       {:else if importing}
         <span class="muted" role="status">{importing}</span>
       {:else if playerState === 'loading'}
@@ -2112,6 +2133,11 @@
       {/if}
       <span class="spacer"></span>
       {@render undoRedo()}
+      {#if transportMenu.length > 0}
+        <span class="transport-more" bind:this={transportMore}>
+          <ActionsMenu label="More Timeline actions" entries={transportMenu} />
+        </span>
+      {/if}
       <button
         type="button"
         class="icon collapse-toggle"
@@ -3037,20 +3063,8 @@
     opacity: 0.5;
     cursor: default;
   }
-  .toggle.import {
+  .transport-more {
     display: inline-flex;
-    align-items: center;
-    width: auto;
-    padding: 0 calc(0.375 * var(--timeline-rem));
-    white-space: nowrap;
-  }
-  .toggle.import.disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
-  .toggle.import:has(input:focus-visible) {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
   }
   .ruler {
     position: relative;
