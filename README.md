@@ -12,8 +12,6 @@ A personal songwriting companion: write and structure lyrics with chords, then r
 
 Bandmate grows one roadmap step at a time, and each step is usable on its own. The words in bold are defined in the glossary, [CONTEXT.md](CONTEXT.md).
 
-![The Song list on desktop, with each Song's Status, key and BPM](docs/screenshots/song-list.png)
-
 ### Write
 
 - **Songs**, each with a **Status** (idea, drafting or finished), a **Cover**, and Details: key, BPM, capo, tuning and notes.
@@ -24,6 +22,8 @@ Bandmate grows one roadmap step at a time, and each step is usable on its own. T
 - Paste-import of plain text or ChordPro, which never guesses or drops what you paste.
 - **Write mode** for working on a Song and **Read mode** for playing from it. Finished Songs open in Read mode.
 - A two-column Song page on desktop, and a layout for writing lyrics on a phone.
+
+![The Song list on desktop, with each Song's Status, key and BPM](docs/screenshots/song-list.png)
 
 <img src="docs/screenshots/phone-lyric-sheet.png" alt="A Song's Lyric Sheet on a phone" width="300">
 
@@ -56,7 +56,7 @@ Bandmate grows one roadmap step at a time, and each step is usable on its own. T
 
 ✅ Write · ✅ Listen · ✅ Sync · ✅ Record · Mix · Keep
 
-Still to come: **Mix** renders **Mixdowns** of the Timeline, a Track, a Clip or the Loop, as WAV or MP3. **Keep** adds **Snapshots** of the Lyric Sheet, with restore, and ChordPro export. The plan, and what's been decided for each step, is in [docs/roadmap.md](docs/roadmap.md).
+Still to come: **Mix** makes **Mixdowns** of the Timeline, a Track, a Clip or the Loop, as WAV or MP3. **Keep** adds **Snapshots** of the Lyric Sheet, with restore, and ChordPro export. The plan, and what's been decided for each step, is in [docs/roadmap.md](docs/roadmap.md).
 
 ## Quickstart
 
@@ -111,11 +111,11 @@ The Compose file reads these variables (put them in a `.env` next to it):
 
 Bandmate itself reads these:
 
-| Variable                 | Default  | Purpose                                                                           |
-| ------------------------ | -------- | --------------------------------------------------------------------------------- |
-| `BANDMATE_ADDR`          | `:8080`  | Listen address                                                                    |
-| `BANDMATE_DATA_DIR`      | `./data` | Directory holding the SQLite database (`bandmate.db`) and audio files (`audio/`) |
-| `BANDMATE_MAX_UPLOAD_MB` | `500`    | Largest audio file accepted for upload, in megabytes                              |
+| Variable                 | Default  | Purpose                                                                                              |
+| ------------------------ | -------- | ---------------------------------------------------------------------------------------------------- |
+| `BANDMATE_ADDR`          | `:8080`  | Listen address                                                                                       |
+| `BANDMATE_DATA_DIR`      | `./data` | Directory holding the SQLite database (`bandmate.db`), audio files (`audio/`) and Covers (`covers/`) |
+| `BANDMATE_MAX_UPLOAD_MB` | `500`    | Largest audio file accepted for upload, in megabytes                                                 |
 
 The image sets `BANDMATE_DATA_DIR` to `/data`, the folder the examples above mount.
 
@@ -131,15 +131,15 @@ To report a vulnerability, and for what counts as one, see [SECURITY.md](SECURIT
 
 Each release is published under these tags:
 
-| Tag            | What it is                                                                              |
-| -------------- | --------------------------------------------------------------------------------------- |
-| `:X.Y.Z`       | One release, e.g. `:0.4.0`. It never changes.                                           |
-| `:X.Y`         | The newest patch release of that version, e.g. `:0.4`: fixes and small features only.   |
-| `:latest`      | The newest release.                                                                     |
-| `:edge`        | The latest build of `main`, ahead of any release. Expect it to change without notice.   |
-| `:sha-<short>` | One build of `main`, by its commit, e.g. `:sha-1a2b3c4`.                                |
+| Tag            | What it is                                                                            |
+| -------------- | ------------------------------------------------------------------------------------- |
+| `:X.Y.Z`       | One release, e.g. `:0.4.0`. It never changes.                                         |
+| `:X.Y`         | The newest patch release of that version, e.g. `:0.4`: fixes and small features only. |
+| `:latest`      | The newest release.                                                                   |
+| `:edge`        | The latest build of `main`, ahead of any release. Expect it to change without notice. |
+| `:sha-<short>` | One build of `main`, by its commit, e.g. `:sha-1a2b3c4`.                              |
 
-Versions follow the roadmap: v0.N is the release that shipped step N, so v0.4 is Record. Pin `:X.Y` to get fixes without the next step's changes, or `:X.Y.Z` to change only when you choose. Set the tag with `BANDMATE_IMAGE`, e.g. `BANDMATE_IMAGE=ghcr.io/xkirtle/bandmate:0.4`.
+Versions follow the roadmap, one minor version per step, as [CONTRIBUTING.md](CONTRIBUTING.md#versions) describes: `0.4` is Record. Pin `:X.Y` to get fixes without the next step's changes, or `:X.Y.Z` to change only when you choose. Set the tag with `BANDMATE_IMAGE`, e.g. `BANDMATE_IMAGE=ghcr.io/xkirtle/bandmate:0.4`.
 
 **Upgrading:** pull the new image and recreate the container (`docker compose pull && docker compose up -d`). Database migrations are built into the binary and run automatically on startup.
 
@@ -155,7 +155,7 @@ The design is worked out in words before code. [CONTEXT.md](CONTEXT.md) is the g
 
 ## Contributing
 
-Bug reports and ideas are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to contribute, and for building, testing and releasing Bandmate.
+Bug reports and ideas are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to contribute, and for building, testing and releasing Bandmate, and the [Code of Conduct](CODE_OF_CONDUCT.md) for how we treat each other.
 
 ## License
 
