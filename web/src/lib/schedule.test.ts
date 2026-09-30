@@ -203,6 +203,7 @@ describe('schedule of a Take Clip', () => {
   const clip: Clip = {
     id: 1,
     beatId: null,
+    name: null,
     takes: [
       {
         id: 7,

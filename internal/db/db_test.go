@@ -342,3 +342,32 @@ func TestEverySongWithoutATrackGetsTrack1(t *testing.T) {
 		t.Errorf("tracks = %+v, want %+v", tracks, want)
 	}
 }
+
+func TestExistingClipsAreUnnamed(t *testing.T) {
+	conn := openBefore(t, "0023_clip_names")
+	exec(t, conn,
+		`INSERT INTO songs (id, title, created_at, updated_at) VALUES (1, 'Midnight Drive', '', '')`,
+		`INSERT INTO beats (id, title, file_name, content_type, size, duration, peaks, created_at, updated_at)
+			VALUES (1, 'Beat', 'beat.mp3', 'audio/mpeg', 10, 30, '[]', '', '')`,
+		`INSERT INTO tracks (id, song_id, name, position) VALUES (1, 1, 'Beat', 0)`,
+		`INSERT INTO clips (id, track_id, beat_id, start, source_offset, length) VALUES (1, 1, 1, 2, 5, 10)`,
+	)
+
+	if err := migrate(context.Background(), conn); err != nil {
+		t.Fatalf("migrating: %v", err)
+	}
+
+	type clip struct {
+		id, beat              int64
+		start, offset, length float64
+		name                  sql.NullString
+	}
+	var c clip
+	if err := conn.QueryRow(`SELECT id, beat_id, start, source_offset, length, name FROM clips`).
+		Scan(&c.id, &c.beat, &c.start, &c.offset, &c.length, &c.name); err != nil {
+		t.Fatal(err)
+	}
+	if want := (clip{1, 1, 2, 5, 10, sql.NullString{}}); c != want {
+		t.Errorf("clip = %+v, want %+v", c, want)
+	}
+}

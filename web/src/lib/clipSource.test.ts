@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { api, type Clip, type ClipBeat, type Take, type Timeline } from './api';
-import { clipSources, fileStart, heard, placementOf, playing } from './clipSource';
+import { clipSources, clipTitle, fileStart, heard, placementOf, playing } from './clipSource';
 
 const beat = (id: number, more: Partial<ClipBeat> = {}): ClipBeat => ({
   id,
@@ -12,9 +12,10 @@ const beat = (id: number, more: Partial<ClipBeat> = {}): ClipBeat => ({
   ...more,
 });
 
-const clip = (id: number, beatId: number): Clip => ({
+const clip = (id: number, beatId: number, name: string | null = null): Clip => ({
   id,
   beatId,
+  name,
   takes: [],
   activeTakeId: null,
   lastTakeNumber: 0,
@@ -37,9 +38,10 @@ const take = (id: number, more: Partial<Take> = {}): Take => ({
 });
 
 /** A Clip of Takes at 0:30, playing 10s of its span from 2s in. */
-const takeClip = (id: number, takes: Take[], active = takes[0].id): Clip => ({
+const takeClip = (id: number, takes: Take[], active = takes[0].id, name: string | null = null): Clip => ({
   id,
   beatId: null,
+  name,
   takes,
   activeTakeId: active,
   lastTakeNumber: takes.length,
@@ -170,9 +172,39 @@ describe('playing', () => {
   });
 });
 
+describe('clipTitle', () => {
+  const titled = (c: Clip, beats: ClipBeat[] = []) => clipTitle(c, clipSources(timeline([c], beats)).of(c));
+
+  it("goes by its source's name until it's named: the Beat's title, or its active Take's number", () => {
+    expect(titled(clip(1, 7), [beat(7, { title: 'Night drive' })])).toBe('Night drive');
+    expect(titled(takeClip(1, [take(3, { number: 1 }), take(4, { number: 2 })], 4))).toBe('Take 2');
+  });
+
+  it('goes by its own name once named', () => {
+    expect(titled(clip(1, 7, 'Chorus 1'), [beat(7, { title: 'Night drive' })])).toBe('Chorus 1');
+  });
+
+  it('still shows which Take a named Clip of Takes plays', () => {
+    const takes = [take(3, { number: 1 }), take(4, { number: 2 })];
+    expect(titled(takeClip(1, takes, 4, 'Hook idea'))).toBe('Hook idea · Take 2');
+    expect(titled(takeClip(1, takes, 3, 'Hook idea'))).toBe('Hook idea · Take 1');
+  });
+});
+
 describe('placementOf', () => {
   it('is what re-places a Clip as it was: its source and trim, without its id', () => {
     expect(placementOf(clip(1, 7))).toEqual({ beatId: 7, start: 5, offset: 2, length: 10 });
+  });
+
+  it('places a named Clip back with its name', () => {
+    expect(placementOf(clip(1, 7, 'Chorus 1'))).toEqual({
+      beatId: 7,
+      name: 'Chorus 1',
+      start: 5,
+      offset: 2,
+      length: 10,
+    });
+    expect(placementOf(takeClip(1, [take(3)], 3, 'Hook idea'))).toMatchObject({ takeIds: [3], name: 'Hook idea' });
   });
 
   it('places a Clip of Takes back with its Takes, the same one active, numbering on', () => {

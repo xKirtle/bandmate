@@ -6,6 +6,7 @@ import { History, placingAdded, restorable, settingTakes } from './history';
 const clip = (id: number, start: number, more: Partial<Clip> = {}): Clip => ({
   id,
   beatId: 100,
+  name: null,
   takes: [],
   activeTakeId: null,
   lastTakeNumber: 0,
@@ -136,6 +137,64 @@ describe('History', () => {
 
     expect(h.nextRedo()).toEqual({ kind: 'deleteClip', clipId: 9 });
     expect(h.nextUndo()).toEqual({ kind: 'trimClip', clipId: 9, offset: 0, length: 10 });
+  });
+
+  it('undoes renaming a Clip by giving it back its name, or none', () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0)])]);
+    const t1 = timeline([track(1, [clip(5, 0, { name: 'Chorus 1' })])]);
+    const t2 = timeline([track(1, [clip(5, 0, { name: 'Chorus' })])]);
+    h.record({ kind: 'renameClip', clipId: 5, name: 'Chorus 1' }, t0, t1);
+    h.record({ kind: 'renameClip', clipId: 5, name: 'Chorus' }, t1, t2);
+
+    expect(h.nextUndo()).toEqual({ kind: 'renameClip', clipId: 5, name: 'Chorus 1' });
+    h.undone(t2, t1);
+    expect(h.nextUndo()).toEqual({ kind: 'renameClip', clipId: 5, name: '' });
+    h.undone(t1, t0);
+    expect(h.nextRedo()).toEqual({ kind: 'renameClip', clipId: 5, name: 'Chorus 1' });
+  });
+
+  it('keeps no rename that left the name as it was', () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0, { name: 'Chorus 1' })])]);
+    h.record(
+      { kind: 'renameClip', clipId: 5, name: 'Chorus 1' },
+      t0,
+      timeline([track(1, [clip(5, 0, { name: 'Chorus 1' })])]),
+    );
+    expect(h.nextUndo()).toBeNull();
+  });
+
+  it('undoes deleting a named Clip by placing it back with its name, and renames it by its new id', () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0)])]);
+    const t1 = timeline([track(1, [clip(5, 0, { name: 'Chorus 1' })])]);
+    const t2 = timeline([track(1)]);
+    h.record({ kind: 'renameClip', clipId: 5, name: 'Chorus 1' }, t0, t1);
+    h.record({ kind: 'deleteClip', clipId: 5 }, t1, t2);
+
+    expect(h.nextUndo()).toEqual({
+      kind: 'placeClip',
+      trackId: 1,
+      clip: { beatId: 100, name: 'Chorus 1', start: 0, offset: 0, length: 10 },
+    });
+    h.undone(t2, timeline([track(1, [clip(9, 0, { name: 'Chorus 1' })])]));
+
+    expect(h.nextUndo()).toEqual({ kind: 'renameClip', clipId: 9, name: '' });
+  });
+
+  it('redoes duplicating a named Clip by placing its copy, name and all', () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0, { name: 'Chorus 1' })])]);
+    const t1 = timeline([track(1, [clip(5, 0, { name: 'Chorus 1' }), clip(6, 10, { name: 'Chorus 1' })])]);
+    h.record({ kind: 'duplicateClip', clipId: 5 }, t0, t1);
+    h.undone(t1, t0);
+
+    expect(h.nextRedo()).toEqual({
+      kind: 'placeClip',
+      trackId: 1,
+      clip: { beatId: 100, name: 'Chorus 1', start: 10, offset: 0, length: 10 },
+    });
   });
 
   it('undoes adding a Beat by deleting its Clip', () => {
