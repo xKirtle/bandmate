@@ -210,31 +210,42 @@
               <p class="muted">Checking GitHub for releases…</p>
             {:else if releases.check === 'ok' && releases.releases.length > 0}
               <ol class="releases">
-                {#each releases.releases as r (r.tag)}
+                <!-- An accordion, so a long list stays tidy: the newest release
+                     starts open, and the running one too; any can be opened. -->
+                {#each releases.releases as r, i (r.tag)}
                   <li>
-                    <h3>
-                      <a href={r.url}>{r.tag}</a>
-                      {#if r.name && r.name !== r.tag}<span class="release-name">{r.name}</span>{/if}
-                      {#if r.running}<span class="badge badge-running">Running</span>{/if}
-                    </h3>
-                    <p class="muted date">{day(r.publishedAt)}</p>
-                    {#if r.notes.length > 0}
-                      <ul class="notes">
-                        {#each r.notes as n, i (i)}
-                          {#if 'text' in n}
-                            <li class="note-text">{n.text}</li>
-                          {:else}
-                            <li class="change">
-                              <!-- Other has no badge, but keeps its space, so the titles line up. -->
-                              <span class="badge badge-{n.badge ?? 'none'}" aria-hidden={!n.badge}
-                                >{n.badge ? badges[n.badge] : ''}</span
-                              >
-                              <span>{n.title} <a href={n.url}>#{n.number}</a></span>
-                            </li>
-                          {/if}
-                        {/each}
-                      </ul>
-                    {/if}
+                    <details open={i === 0 || r.running}>
+                      <summary>
+                        <span class="chevron" aria-hidden="true">▸</span>
+                        <span class="release-tag">{r.tag}</span>
+                        {#if r.name && r.name !== r.tag}<span class="release-name">{r.name}</span>{/if}
+                        <span class="muted date">{day(r.publishedAt)}</span>
+                        {#if r.running}<span class="badge badge-running">Running</span>{/if}
+                      </summary>
+                      <div class="release-body">
+                        {#if r.notes.length > 0}
+                          <ul class="notes">
+                            {#each r.notes as n, i (i)}
+                              {#if 'text' in n}
+                                <li class="note-text">{n.text}</li>
+                              {:else}
+                                <li class="change">
+                                  <!-- Other has no badge, but keeps its space, so the titles line up. -->
+                                  <span class="badge badge-{n.badge ?? 'none'}" aria-hidden={!n.badge}
+                                    >{n.badge ? badges[n.badge] : ''}</span
+                                  >
+                                  <span>{n.title} <a href={n.url}>#{n.number}</a></span>
+                                </li>
+                              {/if}
+                            {/each}
+                          </ul>
+                        {:else}
+                          <p class="muted">No notes for this release.</p>
+                        {/if}
+                        <!-- The summary toggles, so the link to the release lives here. -->
+                        <p class="release-link"><a href={r.url}>{r.tag} on GitHub</a></p>
+                      </div>
+                    </details>
                   </li>
                 {/each}
               </ol>
@@ -401,20 +412,56 @@
   }
 
   .releases {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
     margin: 0;
     padding: 0;
     list-style: none;
   }
-  h3 {
+  .releases > li + li {
+    border-top: 1px solid var(--border);
+  }
+  summary {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
     gap: 0.25rem 0.5rem;
-    margin: 0;
+    min-height: var(--control);
+    padding: 0.5rem 0;
+    list-style: none;
+    cursor: pointer;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+  summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .chevron {
+    display: inline-block;
+    width: 1rem;
+    color: var(--text-muted);
+    transition: transform 0.15s;
+  }
+  details[open] > summary .chevron {
+    transform: rotate(90deg);
+  }
+  .release-tag {
+    font-weight: 600;
     font-size: 1.0625rem;
+  }
+  /* Under the header's text, past the chevron. */
+  .release-body {
+    padding: 0 0 1rem 1.5rem;
+  }
+  /* A phone can't spare the width. */
+  @media (max-width: 24rem) {
+    .release-body {
+      padding-left: 0;
+    }
+  }
+  .card .release-link {
+    margin-top: 0.75rem;
+    font-size: 0.875rem;
   }
   .release-name {
     font-weight: 400;
@@ -424,7 +471,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.375rem;
-    margin: 0.5rem 0 0;
+    margin: 0;
     padding: 0;
     list-style: none;
   }
