@@ -151,3 +151,9 @@ _Avoid_: Final, release, finished track, alternate master (an Alternate is somet
 **Mixdown**:
 The Timeline, or the Loop's stretch of it, rendered into a single audio file that sounds as playback would, with every Track's volume, mute and solo as they are. There's no Mixdown of one Track or one Clip: soloing a Track is how to hear it alone. It covers the audio, never the Cues: the whole Timeline's Mixdown runs from 0:00 to where its last Clip ends. It's downloaded, never kept in Bandmate.
 _Avoid_: Bounce, export, render
+
+### Around the app
+
+**Shortcut**:
+A key, or a key held with the mouse, that does something on a Song page without reaching for a button, like Space to play or R to record. Shortcuts are for a keyboard and mouse, so phones never show them. A control's usual keys, like arrows in a menu or Esc in a text field, work as they do everywhere and aren't Bandmate's Shortcuts.
+_Avoid_: Keybind, hotkey, key binding
