@@ -330,6 +330,28 @@ func TestTheVerdictComparesTheRunningReleaseWithTheLatest(t *testing.T) {
 	}
 }
 
+func TestTheLatestReleaseIsTheHighestVersionNotTheNewest(t *testing.T) {
+	gh := newFakeGitHub(t,
+		release("v0.4.1", day0, ""),
+		release("v0.5.0", day0.AddDate(0, 0, -1), ""),
+	)
+	got := getReleases(t, releasesServer(t, gh, tagged("v0.4.1")))
+	if got.Latest == nil || got.Latest.Tag != "v0.5.0" || got.Verdict != "updateAvailable" {
+		t.Errorf("latest, verdict = %+v, %q, want v0.5.0, updateAvailable", got.Latest, got.Verdict)
+	}
+	if got.Releases[0].Tag != "v0.4.1" {
+		t.Errorf("first listed = %s, want the newest, v0.4.1", got.Releases[0].Tag)
+	}
+}
+
+func TestALatestReleaseThatIsntAVersionGetsNoVerdict(t *testing.T) {
+	gh := newFakeGitHub(t, release("spring-edition", day0, ""))
+	got := getReleases(t, releasesServer(t, gh, tagged("v0.4.0")))
+	if got.Latest == nil || got.Latest.Tag != "spring-edition" || got.Verdict != "" {
+		t.Errorf("latest, verdict = %+v, %q, want spring-edition, no verdict", got.Latest, got.Verdict)
+	}
+}
+
 func TestTheRecentReleasesAreListedNewestFirstWithoutDraftsOrPreReleases(t *testing.T) {
 	var published []ghRelease
 	// Twelve releases, v0.1.0 to v0.12.0, a week apart, listed oldest first.

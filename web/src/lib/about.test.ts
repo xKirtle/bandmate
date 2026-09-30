@@ -64,7 +64,7 @@ describe('updateStatus', () => {
   it("says a failed check couldn't check, with the releases page to look at instead", () => {
     expect(updateStatus(report({ check: 'failed' }))).toEqual({
       text: "Couldn't check for updates",
-      releasesUrl,
+      seeReleases: true,
     });
   });
 

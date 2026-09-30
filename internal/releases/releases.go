@@ -26,15 +26,15 @@ import (
 // DefaultAPI is GitHub's REST API.
 const DefaultAPI = "https://api.github.com"
 
-// Shown is how many of the recent releases a Report lists.
-const Shown = 10
+// shown is how many of the recent releases a Report lists.
+const shown = 10
 
 // How long an answer from GitHub is remembered: a success for long enough
 // not to ask on every visit, a failure (offline, rate-limited, down) for
 // long enough not to hammer GitHub but short enough to recover soon.
 const (
-	KeepSuccess = time.Hour
-	KeepFailure = 5 * time.Minute
+	keepSuccess = time.Hour
+	keepFailure = 5 * time.Minute
 )
 
 // askTimeout caps how long GitHub is waited for.
@@ -73,9 +73,9 @@ type Report struct {
 	// whatever the Check.
 	ReleasesURL string  `json:"releasesUrl"`
 	Verdict     Verdict `json:"verdict,omitempty"`
-	// Latest is the newest release, when checked and there is one.
+	// Latest is the highest release, when checked and there is one.
 	Latest *Link `json:"latest,omitempty"`
-	// Releases are the recent releases, newest first, at most Shown of them.
+	// Releases are the recent releases, newest first, at most shown of them.
 	Releases []Release `json:"releases"`
 }
 
@@ -102,26 +102,25 @@ type Options struct {
 	Off bool
 	// API is GitHub's REST API base URL. Empty means DefaultAPI.
 	API string
-	// Client asks GitHub. Nil means http.DefaultClient.
-	Client *http.Client
 	// Now tells the time, for how long answers are kept. Nil means time.Now.
 	Now func() time.Time
 }
 
 // Checker asks GitHub for releases, remembering its answer for a while.
 type Checker struct {
-	off    bool
-	api    string
-	client *http.Client
-	now    func() time.Time
+	off bool
+	api string
+	now func() time.Time
 
 	// mu is held while GitHub is asked, so visits at the same time ask once.
-	mu     sync.Mutex
-	cached map[string]answer
+	mu sync.Mutex
+	// cached is GitHub's last answer. The build, and so its repository, is
+	// fixed, so there's only ever one.
+	cached answer
 }
 
-// answer is what GitHub said about a repository's releases, and until when
-// it's kept.
+// answer is what GitHub said about the repository's releases, and until
+// when it's kept. The zero answer has expired.
 type answer struct {
 	releases []ghRelease
 	err      error
@@ -130,12 +129,9 @@ type answer struct {
 
 // New makes a Checker.
 func New(o Options) *Checker {
-	c := &Checker{off: o.Off, api: strings.TrimSuffix(o.API, "/"), client: o.Client, now: o.Now, cached: map[string]answer{}}
+	c := &Checker{off: o.Off, api: strings.TrimSuffix(o.API, "/"), now: o.Now}
 	if c.api == "" {
 		c.api = DefaultAPI
-	}
-	if c.client == nil {
-		c.client = http.DefaultClient
 	}
 	if c.now == nil {
 		c.now = time.Now
@@ -158,34 +154,55 @@ func (c *Checker) Report(ctx context.Context, b build.Info) Report {
 	}
 	r.Check = Checked
 	for i, gr := range published {
-		if i == Shown {
+		if i == shown {
 			break
 		}
 		r.Releases = append(r.Releases, Release{
 			Tag: gr.TagName, Name: gr.Name, URL: gr.HTMLURL, PublishedAt: gr.PublishedAt,
-			Running: gr.TagName == b.Version, Notes: Parse(gr.Body),
+			Running: gr.TagName == b.Version, Notes: parse(gr.Body),
 		})
 	}
-	if len(published) > 0 {
-		latest := published[0]
+	if latest, ok := highest(published); ok {
 		r.Latest = &Link{Tag: latest.TagName, URL: latest.HTMLURL}
 		r.Verdict = verdict(b.Version, latest.TagName)
 	}
 	return r
 }
 
+// highest is the release with the highest version, which isn't always the
+// newest: a fix to an older line may be published after a newer release.
+// published is newest first, so when no tag is a version, the newest is.
+func highest(published []ghRelease) (ghRelease, bool) {
+	if len(published) == 0 {
+		return ghRelease{}, false
+	}
+	best := published[0]
+	bestVersion, bestIsVersion := parseVersion(best.TagName)
+	for _, r := range published[1:] {
+		v, ok := parseVersion(r.TagName)
+		if ok && (!bestIsVersion || compareVersions(v, bestVersion) > 0) {
+			best, bestVersion, bestIsVersion = r, v, true
+		}
+	}
+	return best, true
+}
+
 // verdict compares the running version with the latest release's tag. Only
-// a running version that's a release tag gets one.
+// a running version that's a release tag gets one, and only against a latest
+// release that's one too.
 func verdict(running, latest string) Verdict {
 	ours, ok := parseVersion(running)
 	if !ok {
 		return NoVerdict
 	}
 	theirs, ok := parseVersion(latest)
-	if !ok || compareVersions(theirs, ours) <= 0 {
-		return UpToDate
+	switch {
+	case !ok:
+		return NoVerdict
+	case compareVersions(theirs, ours) > 0:
+		return UpdateAvailable
 	}
-	return UpdateAvailable
+	return UpToDate
 }
 
 // githubRepo is "owner/repo" from a releases page on github.com, e.g.
@@ -219,19 +236,19 @@ type ghRelease struct {
 func (c *Checker) releases(ctx context.Context, repo string) ([]ghRelease, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if a, ok := c.cached[repo]; ok && c.now().Before(a.until) {
-		return a.releases, a.err
+	if c.now().Before(c.cached.until) {
+		return c.cached.releases, c.cached.err
 	}
 	// A visitor leaving the page mustn't make the failure be remembered.
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), askTimeout)
 	defer cancel()
 	published, err := c.ask(ctx, repo)
-	keep := KeepSuccess
+	keep := keepSuccess
 	if err != nil {
 		log.Printf("checking %s's releases on GitHub: %v", repo, err)
-		keep = KeepFailure
+		keep = keepFailure
 	}
-	c.cached[repo] = answer{releases: published, err: err, until: c.now().Add(keep)}
+	c.cached = answer{releases: published, err: err, until: c.now().Add(keep)}
 	return published, err
 }
 
@@ -245,7 +262,7 @@ func (c *Checker) ask(ctx context.Context, repo string) ([]ghRelease, error) {
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 	req.Header.Set("User-Agent", "Bandmate")
-	res, err := c.client.Do(req)
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

@@ -46,11 +46,11 @@ var (
 	firstContribution = regexp.MustCompile(`^\* @\S+ made their first contribution in https://\S+$`)
 )
 
-// Parse reads a release's notes into rows. GitHub's generated notes become a
+// parse reads a release's notes into rows. GitHub's generated notes become a
 // row per pull request; their headings and other boilerplate (the new
 // contributors and the full changelog link) are left out. Any other line,
 // such as a hand-written summary, is kept as Text, so nothing written is lost.
-func Parse(body string) []Note {
+func parse(body string) []Note {
 	notes := []Note{}
 	badge := None
 	for line := range strings.Lines(body) {

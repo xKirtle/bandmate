@@ -45,7 +45,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	updateCheckOff, err := updateCheckOff()
+	updateCheckOff, err := readUpdateCheck()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -140,9 +140,9 @@ func maxUploadBytes() (int64, error) {
 	return mb << 20, nil
 }
 
-// updateCheckOff reads BANDMATE_UPDATE_CHECK: the check is on unless it's
-// "off".
-func updateCheckOff() (bool, error) {
+// readUpdateCheck reads BANDMATE_UPDATE_CHECK, telling whether the check is
+// off: it's on unless it's "off".
+func readUpdateCheck() (off bool, err error) {
 	switch strings.ToLower(os.Getenv("BANDMATE_UPDATE_CHECK")) {
 	case "", "on":
 		return false, nil

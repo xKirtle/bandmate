@@ -117,7 +117,7 @@
         {#if status}
           <p class="update" class:available={releases?.verdict === 'updateAvailable'}>
             {#if status.url}<a href={status.url}>{status.text}</a>{:else}{status.text}{/if}
-            {#if status.releasesUrl !== undefined && releasesUrl}
+            {#if status.seeReleases && releasesUrl}
               · <a href={releasesUrl}>See releases</a>
             {/if}
           </p>

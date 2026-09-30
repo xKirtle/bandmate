@@ -34,14 +34,14 @@ export function bugReportDetails(details: string, userAgent: string): string {
 }
 
 /** The line under the version: the verdict, linking to the release it names
-    (url), or that the check failed, with the releases page to look at
-    instead (releasesUrl). */
-export type UpdateStatus = { text: string; url?: string; releasesUrl?: string };
+    (url), or that the check failed, when the releases page is the place to
+    look instead (seeReleases). */
+export type UpdateStatus = { text: string; url?: string; seeReleases?: true };
 
 /** How the server's releases check reads under the version, or null when
     there's nothing to say: the check is off, or there are no releases yet. */
 export function updateStatus(r: ReleasesReport): UpdateStatus | null {
-  if (r.check === 'failed') return { text: "Couldn't check for updates", releasesUrl: r.releasesUrl };
+  if (r.check === 'failed') return { text: "Couldn't check for updates", seeReleases: true };
   if (r.check !== 'ok' || !r.latest) return null;
   switch (r.verdict) {
     case 'upToDate':
