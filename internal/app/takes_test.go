@@ -423,7 +423,7 @@ func TestPlacingTakesFollowsTheirRules(t *testing.T) {
 			http.StatusBadRequest, "a Clip of Takes plays one of them"},
 		"with a Beat too": {ts.placeClip(r.song.ID, map[string]any{"trackId": r.vox.ID, "beatId": r.tl.Beats[0].ID,
 			"takeIds": []int64{r.take.ID}, "activeTakeId": r.take.ID, "start": 10, "offset": 0, "length": 1}),
-			http.StatusBadRequest, "a Clip plays either a Beat or Takes"},
+			http.StatusBadRequest, "a Clip plays one of a Beat, a Sound or Takes"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			expectError(t, c.res, c.status, c.msg)

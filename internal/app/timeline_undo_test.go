@@ -65,7 +65,7 @@ func TestAPlacedClipFollowsTheTimelinesRules(t *testing.T) {
 		"missing its placement": {map[string]any{"trackId": beatTrack, "beatId": p.short.ID},
 			http.StatusBadRequest, "trackId, start, offset and length are required"},
 		"playing nothing": {map[string]any{"trackId": beatTrack, "start": 60, "offset": 0, "length": 5},
-			http.StatusBadRequest, "a Clip plays either a Beat or Takes"},
+			http.StatusBadRequest, "a Clip plays one of a Beat, a Sound or Takes"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			expectError(t, ts.placeClip(p.song.ID, c.body), c.status, c.msg)

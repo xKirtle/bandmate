@@ -371,3 +371,95 @@ func TestExistingClipsAreUnnamed(t *testing.T) {
 		t.Errorf("clip = %+v, want %+v", c, want)
 	}
 }
+
+func TestExistingBeatAndTakeClipsAreCarriedOverUntouchedBySounds(t *testing.T) {
+	conn := openBefore(t, "0024_sounds")
+	exec(t, conn,
+		`INSERT INTO songs (id, title, created_at, updated_at) VALUES (1, 'Midnight Drive', '', '')`,
+		`INSERT INTO beats (id, title, file_name, content_type, size, duration, peaks, created_at, updated_at)
+			VALUES (1, 'Beat', 'beat.mp3', 'audio/mpeg', 10, 30, '[]', '', '')`,
+		`INSERT INTO tracks (id, song_id, name, position) VALUES (1, 1, 'Beat', 0)`,
+		`INSERT INTO takes (id, song_id, number, size, duration, sample_rate, peaks, latency_offset, position, recorded_at, detached_at)
+			VALUES (1, 1, 2, 10, 4, 48000, '[]', 0, 0, '', NULL), (2, 1, 1, 10, 4, 48000, '[]', 0, 0, '', 'yesterday')`,
+		`INSERT INTO clips (id, track_id, beat_id, active_take_id, last_take_number, name, start, source_offset, length) VALUES
+			(1, 1, 1, NULL, 0, 'Intro', 2, 5, 10), (2, 1, NULL, 1, 3, NULL, 20, 0, 4), (3, 1, 1, NULL, 0, NULL, 40, 0, 1)`,
+		`UPDATE takes SET clip_id = 2 WHERE id = 1`,
+		// The latest Clip, deleted: its id is never given out again.
+		`DELETE FROM clips WHERE id = 3`,
+	)
+
+	if err := migrate(context.Background(), conn); err != nil {
+		t.Fatalf("migrating: %v", err)
+	}
+
+	type clip struct {
+		id, track             int64
+		beat, take, sound     sql.NullInt64
+		last                  int
+		name                  sql.NullString
+		start, offset, length float64
+	}
+	var clips []clip
+	rows, err := conn.Query(`SELECT id, track_id, beat_id, active_take_id, sound_id, last_take_number, name,
+		start, source_offset, length FROM clips ORDER BY id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var c clip
+		if err := rows.Scan(&c.id, &c.track, &c.beat, &c.take, &c.sound, &c.last, &c.name, &c.start, &c.offset, &c.length); err != nil {
+			t.Fatal(err)
+		}
+		clips = append(clips, c)
+	}
+	rows.Close()
+	id := func(n int64) sql.NullInt64 { return sql.NullInt64{Int64: n, Valid: true} }
+	none := sql.NullInt64{}
+	want := []clip{
+		{1, 1, id(1), none, none, 0, sql.NullString{String: "Intro", Valid: true}, 2, 5, 10},
+		{2, 1, none, id(1), none, 3, sql.NullString{}, 20, 0, 4},
+	}
+	if !reflect.DeepEqual(clips, want) {
+		t.Errorf("clips = %+v, want %+v", clips, want)
+	}
+
+	type take struct {
+		id       int64
+		clip     sql.NullInt64
+		detached sql.NullString
+	}
+	var takes []take
+	rows, err = conn.Query(`SELECT id, clip_id, detached_at FROM takes ORDER BY id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var tk take
+		if err := rows.Scan(&tk.id, &tk.clip, &tk.detached); err != nil {
+			t.Fatal(err)
+		}
+		takes = append(takes, tk)
+	}
+	rows.Close()
+	if want := []take{{1, id(2), sql.NullString{}}, {2, none, sql.NullString{String: "yesterday", Valid: true}}}; !reflect.DeepEqual(takes, want) {
+		t.Errorf("takes = %+v, want the Take still in its Clip, and the detached one still detached: %+v", takes, want)
+	}
+
+	exec(t, conn, `INSERT INTO sounds (id, song_id, name, file_name, content_type, size, duration, peaks, added_at)
+		VALUES (1, 1, 'Hum', 'hum.m4a', 'audio/mp4', 10, 8, '[]', '')`)
+	res, err := conn.Exec(`INSERT INTO clips (track_id, sound_id, start, source_offset, length) VALUES (1, 1, 70, 0, 1)`)
+	if err != nil {
+		t.Fatalf("placing a Clip of a Sound: %v", err)
+	}
+	if id, _ := res.LastInsertId(); id != 4 {
+		t.Errorf("next clip id = %d, want 4", id)
+	}
+	for _, stmt := range []string{
+		`INSERT INTO clips (track_id, start, source_offset, length) VALUES (1, 80, 0, 1)`,
+		`INSERT INTO clips (track_id, beat_id, sound_id, start, source_offset, length) VALUES (1, 1, 1, 80, 0, 1)`,
+	} {
+		if _, err := conn.Exec(stmt); err == nil {
+			t.Errorf("%s: stored a Clip that doesn't play exactly one source", stmt)
+		}
+	}
+}

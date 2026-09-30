@@ -137,6 +137,7 @@ func (a *App) placeClip(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		TrackID        *int64   `json:"trackId"`
 		BeatID         *int64   `json:"beatId"`
+		SoundID        *int64   `json:"soundId"`
 		Name           *string  `json:"name"`
 		TakeIDs        []int64  `json:"takeIds"`
 		ActiveTakeID   *int64   `json:"activeTakeId"`
@@ -150,7 +151,7 @@ func (a *App) placeClip(w http.ResponseWriter, r *http.Request) {
 			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "trackId, start, offset and length are required"}
 		}
 		return a.timelines.PlaceClip(r.Context(), id, based, *req.TrackID, timeline.NewClip{
-			BeatID: req.BeatID, Name: req.Name, TakeIDs: req.TakeIDs, ActiveTakeID: req.ActiveTakeID, LastTakeNumber: req.LastTakeNumber,
+			BeatID: req.BeatID, SoundID: req.SoundID, Name: req.Name, TakeIDs: req.TakeIDs, ActiveTakeID: req.ActiveTakeID, LastTakeNumber: req.LastTakeNumber,
 			Start: *req.Start, Offset: *req.Offset, Length: *req.Length,
 		})
 	})
