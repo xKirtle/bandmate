@@ -98,6 +98,17 @@ jobs:
         with:
           go-version-file: go.mod
 
+      # The About page's list of Go modules and their licenses is committed,
+      # so a plain go build has it. It goes stale when go.mod changes.
+      - name: Check the Go license manifest is up to date
+        run: |
+          go generate ./internal/build
+          if ! git diff --quiet -- internal/build/go-modules.json; then
+            git diff -- internal/build/go-modules.json
+            echo "::error file=internal/build/go-modules.json::The Go license manifest is stale. Run 'go generate ./internal/build' and commit internal/build/go-modules.json."
+            exit 1
+          fi
+
       - name: go vet
         run: go vet ./...
 

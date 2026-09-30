@@ -430,6 +430,20 @@ export interface AboutInfo {
   startedAt: string;
   /** The block a bug report asks for, without the browser, which the SPA adds. */
   details: string;
+  /** The third-party packages that ship in Bandmate: the Go modules the
+      server is built from and the web packages in the SPA's bundle. */
+  dependencies: { go: Dependency[]; web: Dependency[] };
+}
+
+/** A third-party package that ships in Bandmate. */
+export interface Dependency {
+  /** A Go module's path, or a web package's name. */
+  name: string;
+  version: string;
+  /** Its SPDX identifier, e.g. MIT, or "Unknown" when it couldn't be identified. */
+  license: string;
+  /** Where to look up a license that couldn't be identified. */
+  url?: string;
 }
 
 /** How the running build stands against its repository's releases on GitHub. */

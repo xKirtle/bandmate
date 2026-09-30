@@ -48,6 +48,16 @@ go build -o bandmate ./cmd/bandmate
 
 If the SPA hasn't been built, the binary still runs, but non-API pages show a "web app hasn't been built" message.
 
+### Dependencies and their licenses
+
+The About page lists every third-party package that ships, with its license. The SPA's build records the web packages in its bundle itself. The Go modules are in `internal/build/go-modules.json`, which is committed: after adding, removing or upgrading a Go module, run
+
+```sh
+go generate ./internal/build   # runs go-licenses, so it needs network access
+```
+
+and commit the result. CI fails a pull request whose manifest is stale, and says to re-run `go generate`.
+
 ### Docker
 
 To try a local build of the image, build it under a separate tag and point `BANDMATE_IMAGE` at it:
@@ -77,7 +87,7 @@ Vitest covers plain TypeScript modules in `web/src/lib` that don't touch the DOM
 
 ### Continuous integration
 
-1. Open a pull request. The [CI workflow](.github/workflows/ci.yml) checks the SPA's formatting, type-checks, unit-tests and builds it, and runs `go vet` and `go test`. Pushes to other branches don't run CI, so open a draft PR for early feedback. A pull request that only changes docs or other files outside the build skips the tests.
+1. Open a pull request. The [CI workflow](.github/workflows/ci.yml) checks the SPA's formatting, type-checks, unit-tests and builds it, checks the Go license manifest is up to date, and runs `go vet` and `go test`. Pushes to other branches don't run CI, so open a draft PR for early feedback. A pull request that only changes docs or other files outside the build skips the tests.
 2. Merge to `main`. CI runs again and, if it passes, builds and publishes the image to `ghcr.io/xkirtle/bandmate` tagged `edge` and `sha-<short>` (the commit's short SHA). A merge never moves `latest`.
 
 `main` requires the `test` check to pass before merging. (`image` only runs on pushes, so pull requests show it as skipped.)
