@@ -10,6 +10,7 @@ const base = process.env.BANDMATE_URL ?? "http://localhost:8080";
 const out = import.meta.dirname;
 
 const songs = await (await fetch(`${base}/api/songs`)).json();
+// The hero Song's title, heroTitle in cmd/demoseed.
 const hero = songs.find((s) => s.title === "Lorem Ipsum");
 if (!hero)
   throw new Error(`${base} has no Song titled Lorem Ipsum: run the seed first`);
@@ -62,7 +63,7 @@ async function scrollToLyricSheet(page) {
   const sheet = await page
     .getByRole("heading", { name: "Lyric Sheet" })
     .boundingBox();
-  await page.evaluate((top) => window.scrollTo(0, top - 16), sheet.y);
+  await page.evaluate((top) => window.scrollTo(0, top - 8), sheet.y);
 }
 
 /** Starts the Timeline playing, from where the playhead is. */
@@ -141,7 +142,7 @@ async function play(page) {
   const playing = Date.now();
   /** When the playhead reaches seconds on the Timeline, as a time on the clock. */
   const at = (seconds) => playing + (seconds - 59) * 1000;
-  await page.waitForTimeout(at(63) - Date.now());
+  await page.waitForTimeout(at(64) - Date.now());
 
   // Frames are shot as fast as they come, each shown until the next.
   const shot = [];
@@ -149,7 +150,7 @@ async function play(page) {
   // the fourth up next: once every Line is cued, the first comes up next,
   // and the Lyric Sheet scrolls back up to it.
   const cues = [65, 67.5, 70].map(at);
-  const end = at(72);
+  const end = at(71.5);
   while (Date.now() < end) {
     if (cues.length && Date.now() >= cues[0]) {
       cues.shift();

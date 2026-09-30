@@ -13,7 +13,8 @@ import (
 )
 
 // seeded runs the seed against a fresh, empty Bandmate running in-process,
-// and returns its address.
+// and returns its address. It starts the real handler as
+// internal/app/helpers_test.go does, whose helpers can't be imported here.
 func seeded(t *testing.T) string {
 	t.Helper()
 	a, err := app.New(app.Config{DataDir: t.TempDir(), SPA: fstest.MapFS{"index.html": {Data: []byte("<!doctype html>")}}})
@@ -47,6 +48,7 @@ func get(t *testing.T, base, path string, v any) {
 	}
 }
 
+// songSummary is a Song as the Song list shows it.
 type songSummary struct {
 	ID     int64  `json:"id"`
 	Title  string `json:"title"`
@@ -100,6 +102,7 @@ func findSong(songs []songSummary, title string) (songSummary, bool) {
 	return songSummary{}, false
 }
 
+// heroSong is as much of the hero Song as the tests check.
 type heroSong struct {
 	Key         string  `json:"key"`
 	BPM         *int    `json:"bpm"`

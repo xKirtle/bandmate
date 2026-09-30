@@ -14,12 +14,14 @@ type song struct {
 	Scrapbook []int64 `json:"scrapbook"`
 }
 
+// section is as much of a Section as the seed needs.
 type section struct {
 	ID         int64       `json:"id"`
 	Label      string      `json:"label"`
 	Alternates []alternate `json:"alternates"`
 }
 
+// alternate is as much of an Alternate as the seed needs.
 type alternate struct {
 	ID     int64 `json:"id"`
 	Active bool  `json:"active"`
@@ -67,33 +69,38 @@ func seedHero(ctx context.Context, c client) error {
 	if !ok {
 		return fmt.Errorf("the import made no Chorus")
 	}
-	first := chorus.Alternates[0].ID
+	firstAlternate := chorus.Alternates[0].ID
 	if err := c.call(ctx, http.MethodPost, fmt.Sprintf("%s/sections/%d/alternates", songPath, chorus.ID),
 		map[string]string{"name": "Softer"}, &s); err != nil {
 		return err
 	}
 	chorus, _ = s.section("Chorus")
-	second := chorus.Alternates[len(chorus.Alternates)-1].ID
-	if err := c.call(ctx, http.MethodPut, fmt.Sprintf("%s/alternates/%d/text", songPath, second),
-		map[string]string{"text": heroChorusAlternate}, nil); err != nil {
+	secondAlternate := chorus.Alternates[len(chorus.Alternates)-1].ID
+	if err := setAlternateText(ctx, c, songPath, secondAlternate, heroChorusAlternate); err != nil {
 		return err
 	}
-	if err := c.call(ctx, http.MethodPost, fmt.Sprintf("%s/alternates/%d/activate", songPath, first), nil, nil); err != nil {
+	if err := c.call(ctx, http.MethodPost, fmt.Sprintf("%s/alternates/%d/activate", songPath, firstAlternate), nil, nil); err != nil {
 		return err
 	}
 
 	if err := c.call(ctx, http.MethodPost, songPath+"/scrapbook", map[string]string{"label": heroScrapbookLabel}, &s); err != nil {
 		return err
 	}
-	idea, ok := s.section(heroScrapbookLabel)
+	scrapbookSection, ok := s.section(heroScrapbookLabel)
 	if !ok {
 		return fmt.Errorf("the Scrapbook Section wasn't made")
 	}
-	if err := c.call(ctx, http.MethodPut, fmt.Sprintf("%s/alternates/%d/text", songPath, idea.Alternates[0].ID),
-		map[string]string{"text": heroScrapbookText}, nil); err != nil {
+	if err := setAlternateText(ctx, c, songPath, scrapbookSection.Alternates[0].ID, heroScrapbookText); err != nil {
 		return err
 	}
 	return seedTimeline(ctx, c, songPath)
+}
+
+// setAlternateText replaces the Lines of the Song's Alternate with text,
+// one Line per line, Chords inline.
+func setAlternateText(ctx context.Context, c client, songPath string, alternateID int64, text string) error {
+	return c.call(ctx, http.MethodPut, fmt.Sprintf("%s/alternates/%d/text", songPath, alternateID),
+		map[string]string{"text": text}, nil)
 }
 
 // timeline is as much of a Timeline as the API answers with as the seed
@@ -112,6 +119,8 @@ type timeline struct {
 const (
 	takeCaptureStart = 4.0
 	takeLength       = 21.0
+	// takeLevel is how loud the Takes are at their loudest, from 0 to 1.
+	takeLevel = 0.7
 )
 
 // Notes in Hz, to hum Verse 1 to.
@@ -172,17 +181,19 @@ func seedTimeline(ctx context.Context, c client, songPath string) error {
 	if err := c.call(ctx, http.MethodPost, songPath+"/timeline/tracks", map[string]string{"name": "Lead vox"}, &tl); err != nil {
 		return err
 	}
-	vox := tl.Tracks[len(tl.Tracks)-1].ID
+	voxTrack := len(tl.Tracks) - 1
 	for i, phrases := range verseTakes {
-		take := hum(takeLength, phrases, 0.7)
-		captured := map[string]any{"captureStart": takeCaptureStart, "latencyOffset": 0, "peaks": peaks(take)}
+		take := hum(takeLength, phrases, takeLevel)
+		takeDetails := map[string]any{"captureStart": takeCaptureStart, "latencyOffset": 0, "peaks": peaks(take)}
+		// The first Take makes the Clip; the next is retaken into it.
 		path := songPath + "/timeline/takes"
 		if i == 0 {
-			captured["trackId"], captured["start"] = vox, takeCaptureStart
+			takeDetails["trackId"], takeDetails["start"] = tl.Tracks[voxTrack].ID, takeCaptureStart
 		} else {
-			path = fmt.Sprintf("%s/timeline/clips/%d/takes", songPath, tl.Tracks[len(tl.Tracks)-1].Clips[0].ID)
+			path = fmt.Sprintf("%s/timeline/clips/%d/takes", songPath, tl.Tracks[voxTrack].Clips[0].ID)
 		}
-		if err := c.upload(ctx, path, "take.wav", wav(take, 24), captured, &tl); err != nil {
+		// Takes are mono 24-bit WAV files (ADR 0003).
+		if err := c.upload(ctx, path, "take.wav", wav(take, 24), takeDetails, &tl); err != nil {
 			return err
 		}
 	}

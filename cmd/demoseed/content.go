@@ -18,7 +18,7 @@ const heroChordPro = `{title: ` + heroTitle + `}
 {bpm: 96}
 {capo: 2}
 {tuning: Standard}
-{notes: Lorem ipsum dolor sit amet, keep the chorus light.}
+{notes: Lorem ipsum dolor sit amet, consectetur adipiscing elit.}
 
 [Intro]
 [0:00.00] [Am] [F] [C] [G]
@@ -69,6 +69,7 @@ type otherSong struct {
 	status   string
 }
 
+// otherSongs are the Songs beside the hero Song, two of each Status.
 var otherSongs = []otherSong{
 	{status: "finished", chordPro: `{title: Dolor Sit Amet}
 {key: G}

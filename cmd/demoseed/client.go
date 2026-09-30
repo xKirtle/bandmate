@@ -34,7 +34,7 @@ func (c client) call(ctx context.Context, method, path string, body, out any) er
 	return c.send(ctx, method, path, header, reader, out)
 }
 
-// upload sends an audio file as the "file" part of a multipart form, with
+// upload sends a file of audio as the "file" part of a multipart form, with
 // details as the "details" part, as the web app uploads Beats and Takes.
 func (c client) upload(ctx context.Context, path, fileName string, file []byte, details, out any) error {
 	var buf bytes.Buffer
@@ -63,6 +63,8 @@ func (c client) upload(ctx context.Context, path, fileName string, file []byte, 
 	return c.send(ctx, http.MethodPost, path, header, &buf, out)
 }
 
+// send sends a request with header and body, and decodes the answer into
+// out, if any. An answer other than 2xx is an error.
 func (c client) send(ctx context.Context, method, path string, header http.Header, body io.Reader, out any) error {
 	req, err := http.NewRequestWithContext(ctx, method, strings.TrimSuffix(c.base, "/")+path, body)
 	if err != nil {
