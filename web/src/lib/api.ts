@@ -461,7 +461,8 @@ export const api = {
     return request<SongSummary[]>('GET', query ? `/songs?${query}` : '/songs');
   },
   getSong: (id: number) => request<Song>('GET', `/songs/${id}`),
-  createSong: (title: string) => request<Song>('POST', '/songs', { title }),
+  /** Creates a Song, titled "Untitled Song" by the server. */
+  createSong: () => request<Song>('POST', '/songs', {}),
   /** Creates a new Song from pasted lyrics; a {title: …} line in the text wins over title. */
   importSong: (text: string, title = '') => request<Song>('POST', '/songs/import', { text, title }),
   updateSong: (at: SongAt, changes: SongChanges) => request<Song>('PATCH', `/songs/${at.id}`, changes, at),

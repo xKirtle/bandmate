@@ -22,11 +22,19 @@
   import StatusBadge from '../lib/StatusBadge.svelte';
   import Timeline from '../lib/Timeline.svelte';
   import type { Saved } from '../lib/history';
-  import { navigate } from '../lib/router.svelte';
+  import { takeNewFlag } from '../lib/newSong';
+  import { navigate, replaceSearch, router } from '../lib/router.svelte';
   import { detailsSummary, openingMode, sideParts, type Mode, type SidePart } from '../lib/songMode';
   import { timeAgo } from '../lib/time';
 
   let { id }: { id: number } = $props();
+
+  // A Song just made with "New Song" opens with its title focused and
+  // selected, ready to type over, just this once: the flag saying so comes
+  // out of the URL straight away, so a reload or Back/Forward doesn't.
+  const { isNew, rest: queryWithoutFlag } = takeNewFlag(router.search);
+  if (isNew) replaceSearch(queryWithoutFlag);
+  let titleAwaitsFocus = isNew;
 
   // What the inputs show. Numbers stay text while typing.
   interface Draft {
@@ -284,6 +292,13 @@
     return () => resized.disconnect();
   }
 
+  function focusNewTitle(el: HTMLTextAreaElement) {
+    if (!titleAwaitsFocus) return;
+    titleAwaitsFocus = false;
+    el.focus();
+    el.select();
+  }
+
   // A title is one line: Enter saves it, and a pasted line break is a space.
   function oneLine(event: Event & { currentTarget: HTMLTextAreaElement }) {
     if (/[\r\n]/.test(event.currentTarget.value))
@@ -400,6 +415,7 @@
                   rows="1"
                   bind:value={draft.title}
                   {@attach fitTitle}
+                  {@attach focusNewTitle}
                   oninput={oneLine}
                   onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), e.currentTarget.blur())}
                   onchange={() => commitText('title')}

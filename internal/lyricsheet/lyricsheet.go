@@ -130,8 +130,16 @@ func NewStore(db *sql.DB, masterFiles *audio.Files, coverFiles CoverFiles, takeF
 // timeFormat keeps sub-second precision and sorts correctly as text.
 const timeFormat = "2006-01-02T15:04:05.000000000Z"
 
-// CreateSong creates a Song with the given title and Status idea.
+// untitledSong names a Song created without a title. Titles needn't be
+// unique, so any number of Songs can have it.
+const untitledSong = "Untitled Song"
+
+// CreateSong creates a Song with the given title, or "Untitled Song"
+// without one, and Status idea.
 func (s *Store) CreateSong(ctx context.Context, title string) (Song, error) {
+	if strings.TrimSpace(title) == "" {
+		title = untitledSong
+	}
 	id, err := insertSong(ctx, s.db, title)
 	if err != nil {
 		return Song{}, err
@@ -149,7 +157,9 @@ type execer interface {
 const firstTrackName = "Track 1"
 
 // insertSong creates a Song with the given title and Status idea, and its
-// first Track, and returns its id.
+// first Track, and returns its id. CreateSong names a Song without a title
+// before it gets here, so a blank title is refused only for callers that
+// don't, such as import.
 func insertSong(ctx context.Context, db execer, title string) (int64, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {

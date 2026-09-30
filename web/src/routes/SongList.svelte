@@ -8,6 +8,7 @@
     toggleSort,
     type SongColumn,
   } from '../lib/listViews';
+  import { newSongPath } from '../lib/newSong';
   import { navigate, replaceSearch, router } from '../lib/router.svelte';
   import SongCover from '../lib/SongCover.svelte';
   import StatusBadge from '../lib/StatusBadge.svelte';
@@ -70,6 +71,23 @@
     };
   });
 
+  // "New Song" makes an "Untitled Song" straight away and opens it, its
+  // title ready to type over. Back returns here.
+  let creating = $state(false);
+  let createError = $state<string | null>(null);
+
+  async function createSong() {
+    creating = true;
+    createError = null;
+    try {
+      const song = await api.createSong();
+      navigate(newSongPath(song.id));
+    } catch (e) {
+      createError = (e as Error).message;
+      creating = false;
+    }
+  }
+
   function clearFilters() {
     view = { ...defaultSongListView, sort: view.sort };
   }
@@ -79,11 +97,16 @@
   <h1>Songs</h1>
   <div class="actions">
     <a class="button" href="/songs/import">Import</a>
-    <a class="button primary" href="/songs/new">New Song</a>
+    <button type="button" class="button primary" disabled={creating} onclick={createSong}>
+      {creating ? 'Creating…' : 'New Song'}
+    </button>
   </div>
 </header>
 
 <main class="page">
+  {#if createError}
+    <p class="error" role="alert">{createError}</p>
+  {/if}
   <search class="filters">
     <label class="visually-hidden" for="song-search">Search Songs by title</label>
     <input
@@ -131,7 +154,9 @@
   {:else if songs.length === 0}
     <div class="empty">
       <p>No Songs yet.</p>
-      <a class="button primary" href="/songs/new">Write your first Song</a>
+      <button type="button" class="button primary" disabled={creating} onclick={createSong}>
+        {creating ? 'Creating…' : 'Write your first Song'}
+      </button>
       <a class="button" href="/songs/import">Import one</a>
     </div>
   {:else if sorted}
