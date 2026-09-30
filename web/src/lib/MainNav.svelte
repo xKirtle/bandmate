@@ -25,7 +25,14 @@
     </a>
   {/each}
   <a class="about" href={about.href} aria-current={current === about.id ? 'page' : undefined}>
-    <span class="glyph" aria-hidden="true">{about.icon}</span>
+    <span class="glyph" aria-hidden="true">
+      <!-- Padded to about the size the font draws the other icons at. -->
+      <svg viewBox="-2 -2 24 24" width="1em" height="1em">
+        <circle cx="10" cy="10" r="8.25" fill="none" stroke="currentColor" stroke-width="1.75" />
+        <circle cx="10" cy="6.1" r="1.2" fill="currentColor" />
+        <path d="M10 9.25v5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+      </svg>
+    </span>
     {about.label}
   </a>
 </nav>
@@ -66,6 +73,10 @@
   .glyph {
     font-size: 1.25rem;
     line-height: 1;
+  }
+  /* A drawn icon takes a glyph's box, without the space below a baseline. */
+  .glyph svg {
+    display: block;
   }
   a:hover {
     color: var(--text);

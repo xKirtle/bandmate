@@ -19,8 +19,12 @@ export const pages = [
   { id: 'beats', href: '/beats', label: 'Beats', icon: '◉' },
 ] as const satisfies readonly NavLink<LibraryPage>[];
 
-/** About, pinned to the bottom of the nav rail, and the last tab of the tab bar. */
-export const about = { id: 'about', href: '/about', label: 'About', icon: 'ⓘ' } as const satisfies NavLink<'about'>;
+/**
+ * About, pinned to the bottom of the nav rail, and the last tab of the tab
+ * bar. Its icon, an "i" in a circle, is drawn by the navigation, since the
+ * app's font draws ⓘ as a tall capsule.
+ */
+export const about = { id: 'about', href: '/about', label: 'About' } as const satisfies Omit<NavLink<'about'>, 'icon'>;
 
 /**
  * The page the navigation marks as current for a path: Songs for the Song

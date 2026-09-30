@@ -39,15 +39,15 @@
 </main>
 
 <style>
-  /* A card of the app's usual panel style, kept narrow so it doesn't float
-     in empty space on a wide window. */
+  /* A card of the app's usual panel style, at the page's left edge like the
+     other pages' content, kept narrow so it doesn't stretch across a wide
+     window. */
   .intro {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 0.5rem;
     max-width: 28rem;
-    margin: 1.5rem auto 0;
     padding: 2rem 1rem 1.5rem;
     border: 1px solid var(--border);
     border-radius: 0.75rem;
