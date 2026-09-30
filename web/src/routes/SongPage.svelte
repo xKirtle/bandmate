@@ -570,7 +570,7 @@
               <Masters {song} {mode} change={send} onUnsaved={setUnsaved} {setStatus} />
             {:else}
               <summary>Scrapbook</summary>
-              <Scrapbook {song} change={send} {drag} onUnsaved={setUnsaved} onEdit={() => (syncing = false)} />
+              <Scrapbook {song} change={send} {drag} onUnsaved={setUnsaved} onEditing={() => (syncing = false)} />
             {/if}
           </details>
         {/each}

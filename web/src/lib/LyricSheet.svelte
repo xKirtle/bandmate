@@ -226,10 +226,9 @@
   });
 
   // Sync mode is only for cueing, so changing the lyrics ends it, playback
-  // carrying on: any change to the Arrangement, relabelling a Section in it,
-  // and opening a Section's Alternates. Cue edits go through editCues, so
-  // never end it, and nor does a Line text edit typed before it came on
-  // being saved.
+  // carrying on: any change to the Arrangement or a Section in it, and
+  // opening a Section's Alternates. Cue edits go through editCues, so never
+  // end it, and nor does saving Line text typed before it came on.
   function endSyncing() {
     syncing = false;
   }
@@ -505,7 +504,7 @@
               {section}
               autofocus={added === section.id}
               {change}
-              onEdit={endSyncing}
+              onEditing={endSyncing}
               {onUnsaved}
               cueing={cueingFor(section)}
               more={sectionActions(section, i)}

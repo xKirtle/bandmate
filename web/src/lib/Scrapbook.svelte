@@ -13,7 +13,7 @@
     change,
     drag,
     onUnsaved,
-    onEdit,
+    onEditing,
   }: {
     song: Song;
     /** Sends a Lyric Sheet change; resolves to whether it succeeded. */
@@ -23,14 +23,14 @@
     onUnsaved: (editor: object, unsaved: boolean) => void;
     /**
      * Hears a Section being opened, added, or moved into the Lyric Sheet, or
-     * its Alternates opening, e.g. to end Sync mode.
+     * an open one being changed, e.g. to end Sync mode.
      */
-    onEdit?: () => void;
+    onEditing?: () => void;
   } = $props();
 
-  // Moving a Section into the Lyric Sheet, as any change here, is heard.
+  // Adding a Section, or moving one into the Lyric Sheet, is heard.
   function edit(op: (at: SongAt) => Promise<Song>): Promise<boolean> {
-    onEdit?.();
+    onEditing?.();
     return change(op);
   }
 
@@ -77,7 +77,7 @@
   }
 
   function show(sectionId: number | null) {
-    if (sectionId !== null) onEdit?.();
+    if (sectionId !== null) onEditing?.();
     next = sectionId;
   }
 
@@ -143,7 +143,7 @@
     const section = sections.get(sectionId);
     if (!section) return;
     const ok = confirm(`Delete ${describe(section)} for good?\n\nIts Lines go with it. It can't be undone.`);
-    if (ok) edit((at) => api.deleteSection(at, sectionId)).then(closed(sectionId));
+    if (ok) change((at) => api.deleteSection(at, sectionId)).then(closed(sectionId));
   }
 </script>
 
@@ -163,7 +163,7 @@
               autofocus={focusing === section.id}
               {change}
               onUnsaved={track}
-              {onEdit}
+              {onEditing}
               more={[{ icon: '🗑', label: 'Delete for good', run: () => remove(section.id) }]}
               {drag}
               places={placesBack}
