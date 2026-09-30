@@ -56,7 +56,7 @@
   import { nameSound } from './soundName';
   import { inTextField } from './textField';
   import { songKey } from './songKeys';
-  import { ariaKeyShortcuts, keysLabel, platform, shortcuts, type Key } from './shortcuts';
+  import { ariaKeyShortcuts, keysLabel, platform, shortcuts, type OneWay } from './shortcuts';
   import { prepareUpload } from './upload';
   import { formatDuration } from './time';
   import { tracksDropped, type TrackDrop } from './trackDrag';
@@ -394,8 +394,8 @@
 
   // Tooltips name a Shortcut's keys as this platform does, e.g. ⌘Z on a Mac.
   const on = platform();
-  const keysOf = (shortcut: { keys: readonly Key[] }) => keysLabel(shortcut.keys, on);
-  const ariaOf = (shortcut: { keys: readonly Key[] }) => ariaKeyShortcuts(shortcut.keys, on);
+  const keysOf = (shortcut: OneWay) => keysLabel(shortcut.keys, on);
+  const ariaOf = (shortcut: OneWay) => ariaKeyShortcuts(shortcut.keys, on);
 
   function keydown(event: KeyboardEvent) {
     if (trackDrag.current && event.key === 'Escape') {

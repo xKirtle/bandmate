@@ -41,7 +41,7 @@ group('Space', () => {
     expect(songKey(press(' '), { ...idle, ownsSpace: true })).toBeNull();
   });
 
-  it('waits while a Beat is picked, the latency calibrated or a mixdown made', () => {
+  it('waits while a Beat is picked, the Latency Offset calibrated or a Mixdown made', () => {
     expect(songKey(press(' '), { ...idle, busy: true })).toBeNull();
   });
 
@@ -77,7 +77,7 @@ group('R', () => {
     expect(songKey(press('r', { altKey: true }), idle)).toBeNull();
   });
 
-  it('waits while a Beat is picked, the latency calibrated or a mixdown made', () => {
+  it('waits while a Beat is picked, the Latency Offset calibrated or a Mixdown made', () => {
     expect(songKey(press('r'), { ...idle, busy: true })).toBeNull();
   });
 });
@@ -104,7 +104,7 @@ group('Undo and redo', () => {
     expect(songKey(press('z', { ctrlKey: true }), { ...idle, recording: true, canRecord: false })).toBeNull();
   });
 
-  it('wait while a Beat is picked, the latency calibrated or a mixdown made', () => {
+  it('wait while a Beat is picked, the Latency Offset calibrated or a Mixdown made', () => {
     expect(songKey(press('z', { ctrlKey: true }), { ...idle, busy: true })).toBeNull();
   });
 
@@ -119,9 +119,12 @@ group('Exact modifiers', () => {
     expect(songKey(press('R', { shiftKey: true }), idle)).toBeNull();
   });
 
-  it('Ctrl+Y redoes, as does ⌘Y', () => {
+  it('Ctrl+Y redoes, on every platform', () => {
     expect(songKey(press('y', { ctrlKey: true }), idle)).toBe('redo');
-    expect(songKey(press('y', { metaKey: true }), idle)).toBe('redo');
+  });
+
+  it("⌘Y doesn't, being a Mac browser's History", () => {
+    expect(songKey(press('y', { metaKey: true }), idle)).toBeNull();
   });
 
   it("Ctrl+Shift+Y and Ctrl+⌘Z don't", () => {

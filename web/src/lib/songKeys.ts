@@ -10,7 +10,7 @@ export type SongKeyPress = Pick<
 
 /** Where a key was pressed, and what the Song page is doing. */
 export type SongKeyContext = {
-  /** Picking a Beat, calibrating the latency or making a mixdown. */
+  /** Picking a Beat, calibrating the Latency Offset or making a Mixdown. */
   busy: boolean;
   /** A dialog is open, e.g. the shortcuts dialog. */
   dialogOpen: boolean;
@@ -18,7 +18,7 @@ export type SongKeyContext = {
   inTextField: boolean;
   /** Space there is the control's own, e.g. a text field, a checkbox or a ⋯ menu. */
   ownsSpace: boolean;
-  /** The Timeline can be edited, i.e. it isn't a phone's read-only one. */
+  /** The Timeline can be edited, i.e. it isn't on a phone, where it only plays. */
   editable: boolean;
   /** A recording is starting, under way or saving. */
   recording: boolean;

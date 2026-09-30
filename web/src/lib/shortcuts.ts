@@ -7,9 +7,10 @@
 /**
  * One of a Shortcut's keys: a `KeyboardEvent.key`, or `drag` or `wheel`
  * for a mouse Shortcut, held with exactly these modifiers. Mod is Ctrl or
- * ⌘, either on any platform.
+ * ⌘, either on any platform, shown as ⌘ on a Mac; Ctrl is the Control key
+ * itself, on a Mac too, e.g. for Ctrl+Y, which a Mac browser keeps ⌘Y from.
  */
-export type Key = { key: string; mod?: boolean; alt?: boolean; shift?: boolean };
+export type Key = { key: string; mod?: boolean; ctrl?: boolean; alt?: boolean; shift?: boolean };
 
 /** Where a Shortcut is listed in the shortcuts dialog. */
 export type ShortcutGroup = 'Playback & recording' | 'Timeline editing' | 'Sync mode' | 'Mouse';
@@ -25,10 +26,13 @@ type Described = {
  * A Shortcut, with its default keys. A two-way one, e.g. seeking, has keys
  * for going back and keys for going forward.
  */
-export type Shortcut = Described & ({ keys: readonly Key[] } | { back: readonly Key[]; forward: readonly Key[] });
+export type Shortcut = Described & (OneWay | TwoWay);
 
-const left = (mods: Omit<Key, 'key'> = {}): Key[] => [{ key: 'ArrowLeft', ...mods }];
-const right = (mods: Omit<Key, 'key'> = {}): Key[] => [{ key: 'ArrowRight', ...mods }];
+/** The keys of a Shortcut that does one thing, e.g. Record. */
+export type OneWay = { keys: readonly Key[] };
+
+/** The keys of a Shortcut that goes back or forward, e.g. seeking. */
+export type TwoWay = { back: readonly Key[]; forward: readonly Key[] };
 
 /** Every Shortcut on the Song page, in the order the shortcuts dialog lists them. */
 export const shortcuts = {
@@ -56,7 +60,7 @@ export const shortcuts = {
     description: 'Redoes the last edit undone.',
     keys: [
       { key: 'z', mod: true, shift: true },
-      { key: 'y', mod: true },
+      { key: 'y', ctrl: true },
     ],
   },
   deleteClip: {
@@ -101,16 +105,16 @@ export const shortcuts = {
   step: {
     name: "Step a menu's number field by its step",
     group: 'Timeline editing',
-    description: 'Steps a number in a ⋯ menu down or up, e.g. a nudge.',
-    back: left({ alt: true }),
-    forward: right({ alt: true }),
+    description: "Steps a number in a ⋯ menu down or up, e.g. a Take's Nudge.",
+    back: [{ key: 'ArrowLeft', alt: true }],
+    forward: [{ key: 'ArrowRight', alt: true }],
   },
   shiftStep: {
     name: "Step a menu's number field by its Shift step",
     group: 'Timeline editing',
     description: 'Steps a number in a ⋯ menu down or up by more.',
-    back: left({ alt: true, shift: true }),
-    forward: right({ alt: true, shift: true }),
+    back: [{ key: 'ArrowLeft', alt: true, shift: true }],
+    forward: [{ key: 'ArrowRight', alt: true, shift: true }],
   },
   cueNextLine: {
     name: 'Cue the next Line',
@@ -141,7 +145,8 @@ export const shortcuts = {
     name: 'Zoom the Timeline',
     group: 'Mouse',
     description: 'Zooms the Timeline in or out around the pointer.',
-    keys: [{ key: 'wheel', mod: true }],
+    // What a trackpad's pinch sends, too.
+    keys: [{ key: 'wheel', ctrl: true }],
   },
 } as const satisfies Record<string, Shortcut>;
 
@@ -157,9 +162,12 @@ function same(pressed: KeyPress, key: Key): boolean {
   if (pressed.key.toLowerCase() !== key.key.toLowerCase()) return false;
   // Mod is one modifier: Ctrl or ⌘, not both.
   if (pressed.ctrlKey && pressed.metaKey) return false;
-  if ((pressed.ctrlKey || pressed.metaKey) !== !!key.mod) return false;
+  if (key.ctrl) {
+    if (!pressed.ctrlKey) return false;
+  } else if ((pressed.ctrlKey || pressed.metaKey) !== !!key.mod) return false;
   if (pressed.altKey !== !!key.alt) return false;
-  // A symbol, e.g. ?, may take Shift to type, which is then part of it.
+  // A symbol, e.g. the ? that opens the shortcuts dialog, may take Shift
+  // to type, which is then part of it.
   return !shiftCounts(key.key) || pressed.shiftKey === !!key.shift;
 }
 
@@ -169,10 +177,7 @@ export function matches(pressed: KeyPress, keys: readonly Key[]): boolean {
 }
 
 /** Which way a key press sends a two-way Shortcut, or null if it isn't one of its keys. */
-export function way(
-  pressed: KeyPress,
-  shortcut: { back: readonly Key[]; forward: readonly Key[] },
-): 'back' | 'forward' | null {
+export function way(pressed: KeyPress, shortcut: TwoWay): 'back' | 'forward' | null {
   if (matches(pressed, shortcut.back)) return 'back';
   return matches(pressed, shortcut.forward) ? 'forward' : null;
 }
@@ -187,8 +192,8 @@ export function platform(): Platform {
   return /mac/i.test(nav.userAgentData?.platform ?? nav.platform) ? 'mac' : 'other';
 }
 
+// Keys shown by a symbol or a shorter name than their own.
 const names: Record<string, string> = {
-  ' ': 'Space',
   ArrowLeft: '←',
   ArrowRight: '→',
   ArrowUp: '↑',
@@ -198,14 +203,20 @@ const names: Record<string, string> = {
 
 const mouse = ['drag', 'wheel'];
 
+/** A key's own name, without its modifiers, e.g. Z, Space or ArrowLeft. */
+function keyName(key: Key): string {
+  if (key.key === ' ') return 'Space';
+  return key.key.length === 1 ? key.key.toUpperCase() : key.key;
+}
+
 function keyLabel(key: Key, on: Platform): string {
-  const name = names[key.key] ?? (key.key.length === 1 ? key.key.toUpperCase() : key.key);
+  const name = names[key.key] ?? keyName(key);
   if (on === 'mac') {
-    const mods = (key.mod ? '⌘' : '') + (key.alt ? '⌥' : '') + (key.shift ? '⇧' : '');
+    const mods = (key.mod ? '⌘' : '') + (key.ctrl ? '⌃' : '') + (key.alt ? '⌥' : '') + (key.shift ? '⇧' : '');
     // "⌥drag" would read as one word.
     return mods && mouse.includes(key.key) ? `${mods}+${name}` : mods + name;
   }
-  return [key.mod && 'Ctrl', key.alt && 'Alt', key.shift && 'Shift', name].filter(Boolean).join('+');
+  return [(key.mod || key.ctrl) && 'Ctrl', key.alt && 'Alt', key.shift && 'Shift', name].filter(Boolean).join('+');
 }
 
 /** Names `keys` for a platform, e.g. "⌘⇧Z or ⌘Y" on a Mac and "Ctrl+Shift+Z or Ctrl+Y" elsewhere. */
@@ -213,15 +224,16 @@ export function keysLabel(keys: readonly Key[], on: Platform): string {
   return keys.map((key) => keyLabel(key, on)).join(' or ');
 }
 
-/** Declares `keys` for `aria-keyshortcuts`, with Mod as the platform's modifier. */
+/** Declares `keys` for `aria-keyshortcuts`, with Mod as the platform's modifier and Ctrl as Control. */
 export function ariaKeyShortcuts(keys: readonly Key[], on: Platform): string {
   return keys
     .map((key) =>
       [
-        key.mod && (on === 'mac' ? 'Meta' : 'Control'),
+        ((key.mod && on === 'other') || key.ctrl) && 'Control',
+        key.mod && on === 'mac' && 'Meta',
         key.alt && 'Alt',
         key.shift && 'Shift',
-        key.key === ' ' ? 'Space' : key.key.length === 1 ? key.key.toUpperCase() : key.key,
+        keyName(key),
       ]
         .filter(Boolean)
         .join('+'),
