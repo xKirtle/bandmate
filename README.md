@@ -10,7 +10,7 @@ A personal songwriting companion: write and structure lyrics with chords, then r
 
 ## Features
 
-Bandmate grows one roadmap step at a time, and each step is usable on its own. The words in bold are defined in the glossary, [CONTEXT.md](CONTEXT.md).
+The words in bold are defined in the glossary, [CONTEXT.md](CONTEXT.md).
 
 ### Write
 
@@ -54,9 +54,7 @@ Bandmate grows one roadmap step at a time, and each step is usable on its own. T
 
 ## Roadmap
 
-✅ Write · ✅ Listen · ✅ Sync · ✅ Record · Mix · Keep
-
-Still to come: **Mix** makes **Mixdowns** of the Timeline, a Track, a Clip or the Loop, as WAV or MP3. **Keep** adds **Snapshots** of the Lyric Sheet, with restore, and ChordPro export. The plan, and what's been decided for each step, is in [docs/roadmap.md](docs/roadmap.md).
+What might come next, from **Mixdowns** of the Timeline to **Snapshots** of the Lyric Sheet, is in [docs/roadmap.md](docs/roadmap.md), along with what's been decided for each. What each version shipped is in its [release notes](https://github.com/xKirtle/bandmate/releases).
 
 ## Quickstart
 
@@ -140,7 +138,7 @@ Each release is published under these tags:
 | `:edge`        | The latest build of `main`, ahead of any release. Expect it to change without notice. |
 | `:sha-<short>` | One build of `main`, by its commit, e.g. `:sha-1a2b3c4`.                              |
 
-Versions follow the roadmap, one minor version per step, as [CONTRIBUTING.md](CONTRIBUTING.md#versions) describes: `0.4` is Record. Pin `:X.Y` to get fixes without the next step's changes, or `:X.Y.Z` to change only when you choose. Set the tag with `BANDMATE_IMAGE`, e.g. `BANDMATE_IMAGE=ghcr.io/xkirtle/bandmate:0.4`.
+A release with new features bumps the minor version, and one with only fixes bumps the patch, as [CONTRIBUTING.md](CONTRIBUTING.md#versions) describes. Pin `:X.Y` to get fixes without new features, or `:X.Y.Z` to change only when you choose. Set the tag with `BANDMATE_IMAGE`, e.g. `BANDMATE_IMAGE=ghcr.io/xkirtle/bandmate:0.4`.
 
 **Upgrading:** pull the new image and recreate the container (`docker compose pull && docker compose up -d`). Database migrations are built into the binary and run automatically on startup.
 
