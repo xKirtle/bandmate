@@ -55,6 +55,7 @@
   import { repeats, timelineEnd, type Loop, type Placed } from './schedule';
   import { nameSound } from './soundName';
   import { inTextField } from './textField';
+  import { songKey } from './songKeys';
   import { prepareUpload } from './upload';
   import { formatDuration } from './time';
   import { tracksDropped, type TrackDrop } from './trackDrag';
@@ -390,26 +391,31 @@
     return { timeline: { ...timeline, version: at.version, updatedAt: song.updatedAt } };
   }
 
-  function undoKeys(event: KeyboardEvent) {
-    if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== 'z') return;
-    if (event.defaultPrevented || !editable.current || picking || calibrating || mixingDown) return;
-    if (inTextField(event.target)) return;
-    // Not while recording, which undo would take the place of.
-    if (recording) return;
-    event.preventDefault();
-    if (event.shiftKey) redo();
-    else undo();
-  }
-
   function keydown(event: KeyboardEvent) {
     if (trackDrag.current && event.key === 'Escape') {
       event.preventDefault();
       trackDrag.cancel();
       return;
     }
-    spaceBar(event);
-    undoKeys(event);
-    recordKey(event);
+    const shortcut = songKey(event, {
+      busy: picking || calibrating !== null || mixingDown,
+      dialogOpen: document.querySelector('dialog[open]') !== null,
+      inTextField: inTextField(event.target),
+      ownsSpace: ownsSpace(event.target),
+      editable: editable.current,
+      recording: recording !== null,
+      capturing,
+      canRecord,
+    });
+    if (!shortcut) return;
+    // Otherwise Space would scroll the page, for one.
+    event.preventDefault();
+    if (shortcut === 'playPause') {
+      keyActedOnPage();
+      toggle();
+    } else if (shortcut === 'record') switchRecording();
+    else if (shortcut === 'undo') undo();
+    else redo();
   }
 
   // Changes to a Track's levels are shown and heard right away, before
@@ -739,15 +745,6 @@
     if (target instanceof HTMLInputElement && (target.type === 'checkbox' || target.type === 'radio')) return true;
     // Space in a dialog or a ⋯ menu is for what's in it.
     return target instanceof Element && target.closest('dialog, [role="menu"]') !== null;
-  }
-
-  function spaceBar(event: KeyboardEvent) {
-    if (event.key !== ' ' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
-    if (event.defaultPrevented || picking || calibrating || mixingDown || ownsSpace(event.target)) return;
-    // Otherwise the page would scroll.
-    event.preventDefault();
-    keyActedOnPage();
-    toggle();
   }
 
   /** Where the playhead is, playing or paused, in seconds to the millisecond, e.g. to cue a Line at. */
@@ -1237,14 +1234,6 @@
   function switchRecording() {
     if (capturing) stopRecording();
     else startRecording();
-  }
-
-  function recordKey(event: KeyboardEvent) {
-    if (event.key.toLowerCase() !== 'r' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
-    if (event.defaultPrevented || picking || calibrating || mixingDown || inTextField(event.target)) return;
-    if (!capturing && !canRecord) return;
-    event.preventDefault();
-    switchRecording();
   }
 
   // The chosen Track, which a recording or a Beat goes to, kept on this
