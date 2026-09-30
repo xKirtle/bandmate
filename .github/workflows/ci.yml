@@ -106,7 +106,8 @@ jobs:
 
   # Only on pushes to main and version tags: building the image on pull
   # requests mostly repeats the test job's builds, and a Dockerfile problem it
-  # misses only fails a publish, leaving the last good image in place.
+  # misses only fails a publish, leaving the last good image in place (for a
+  # tag, that version goes unpublished until the tag is pushed again).
   # Skipped with `test`, and never runs when it fails.
   image:
     needs: test
@@ -119,10 +120,10 @@ jobs:
       - uses: docker/setup-buildx-action@v4
 
       # Tags a version tag vX.Y.Z as X.Y.Z, X.Y and latest (latest=auto adds
-      # it to semver tags, but not to pre-releases), and main as edge and
-      # sha-<short>. Also makes the OCI labels: version is the first of those
-      # tags (X.Y.Z or edge), with source (which links the GHCR package to
-      # this repository) and revision beside it.
+      # it to semver tags, but not to pre-releases), and the default branch,
+      # main, as edge and sha-<short>. Also makes the OCI labels, among them
+      # version (the first of those tags: X.Y.Z or edge), source (which links
+      # the GHCR package to this repository) and revision.
       - id: meta
         uses: docker/metadata-action@v6
         with:
@@ -130,7 +131,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=edge,branch=main
+            type=edge
             type=sha,enable={{is_default_branch}}
 
       - uses: docker/login-action@v4
