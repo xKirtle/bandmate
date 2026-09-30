@@ -2,6 +2,7 @@
   import { onMount, tick } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { api, type Beat, type DecodedAudio, type Song } from './api';
+  import { closeOnBackdrop } from './backdrop';
   import BeatFields from './BeatFields.svelte';
   import BeatFilters from './BeatFilters.svelte';
   import BeatTable from './BeatTable.svelte';
@@ -154,7 +155,13 @@
   </button>
 {/snippet}
 
-<dialog bind:this={dialog} onclose={onClose} aria-labelledby="beat-picker-heading">
+<!-- A click outside closes it while browsing, but never loses a new Beat's file and details. -->
+<dialog
+  bind:this={dialog}
+  {@attach closeOnBackdrop(() => adding === null && busy === null)}
+  onclose={onClose}
+  aria-labelledby="beat-picker-heading"
+>
   <header>
     <h2 id="beat-picker-heading">Add a Beat</h2>
     <button type="button" class="icon" onclick={() => dialog?.close()} aria-label="Close">✕</button>

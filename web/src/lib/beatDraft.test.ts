@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeOffer } from './beatDraft';
+import { describeOffer, sameDraft, toDraft } from './beatDraft';
 
 describe('describeOffer', () => {
   it('lists every offered change in the order the form shows them', () => {
@@ -15,5 +15,19 @@ describe('describeOffer', () => {
 
   it('describes nothing when nothing is offered', () => {
     expect(describeOffer({})).toBe('');
+  });
+});
+
+describe('sameDraft', () => {
+  const opened = toDraft({ title: 'Echo Room', producer: 'Pryme', bpm: 140, key: 'Am', notes: '' });
+
+  it('holds a draft as it opened the same', () => {
+    expect(sameDraft({ ...opened }, opened)).toBe(true);
+  });
+
+  it('tells any field typed in', () => {
+    expect(sameDraft({ ...opened, title: 'Echo Room 2' }, opened)).toBe(false);
+    expect(sameDraft({ ...opened, bpm: '14' }, opened)).toBe(false);
+    expect(sameDraft({ ...opened, notes: ' ' }, opened)).toBe(false);
   });
 });

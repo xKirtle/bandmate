@@ -1,9 +1,18 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api, type Beat } from './api';
+  import { closeOnBackdrop } from './backdrop';
   import BeatCredit from './BeatCredit.svelte';
   import BeatFields from './BeatFields.svelte';
-  import { changedDetails, describeOffer, fromDraft, offeredChanges, toDraft, type BeatDraft } from './beatDraft';
+  import {
+    changedDetails,
+    describeOffer,
+    fromDraft,
+    offeredChanges,
+    sameDraft,
+    toDraft,
+    type BeatDraft,
+  } from './beatDraft';
   import { suggestForFile } from './beatTags';
   import { prepareUpload } from './upload';
 
@@ -26,7 +35,10 @@
   let dialog = $state<HTMLDialogElement>();
   // Taken from the Beat as the dialog opens, and not followed after.
   // svelte-ignore state_referenced_locally
-  let draft = $state(toDraft(beat));
+  const opened = toDraft(beat);
+  let draft = $state({ ...opened });
+  // Whether its file has been replaced since it opened.
+  let replaced = false;
   let busy = $state<string | null>(null);
   let error = $state<string | null>(null);
   // Details a replaced file suggests, offered rather than applied.
@@ -46,6 +58,10 @@
   function cancel(event: Event) {
     if (busy !== null) event.preventDefault();
   }
+
+  // A click outside closes it only while nothing has been changed, and
+  // nothing is being saved, uploaded or deleted.
+  const untouched = () => busy === null && !replaced && sameDraft(draft, opened);
 
   function useOffer() {
     if (offer) Object.assign(draft, offer.changes);
@@ -92,6 +108,7 @@
       const [decoded, suggestion] = await Promise.all([prepareUpload(file, maxUploadBytes), suggestForFile(file)]);
       busy = 'Uploading…';
       onChange(await api.replaceBeatFile(beat.id, file, decoded));
+      replaced = true;
       const changes = offeredChanges(draft, suggestion);
       if (Object.keys(changes).length > 0) offer = { fileName: file.name, changes };
     });
@@ -107,7 +124,13 @@
   }
 </script>
 
-<dialog bind:this={dialog} onclose={onClose} oncancel={cancel} aria-labelledby="beat-edit-heading">
+<dialog
+  bind:this={dialog}
+  {@attach closeOnBackdrop(untouched)}
+  onclose={onClose}
+  oncancel={cancel}
+  aria-labelledby="beat-edit-heading"
+>
   <header>
     <div class="credit">
       <h2 id="beat-edit-heading">Edit “{beat.title}”</h2>

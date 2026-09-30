@@ -24,6 +24,11 @@ export function toDraft(beat: Partial<BeatDetails> | null): BeatDraft {
   };
 }
 
+/** Whether two drafts hold the same text in every field, e.g. nothing typed since a form opened. */
+export function sameDraft(a: BeatDraft, b: BeatDraft): boolean {
+  return (Object.keys(a) as (keyof BeatDraft)[]).every((field) => a[field] === b[field]);
+}
+
 /** The details a draft holds, or a message saying what's wrong with it. */
 export function fromDraft(draft: BeatDraft): BeatDetails | string {
   const bpm = draft.bpm.trim();
