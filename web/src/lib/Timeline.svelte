@@ -39,6 +39,7 @@
   import { recoveredPlacement, takesAt, type TakeTarget, type Unsaved } from './recovery';
   import { keptInLoop, outsideLoop, repeats, timelineEnd, type Loop, type Placed } from './schedule';
   import { inTextField } from './textField';
+  import { keyForPage } from './pointerFocus';
   import { formatDuration } from './time';
   import { tracksDropped, type TrackDrop } from './trackDrag';
   import { TrackDragging } from './trackDragging.svelte';
@@ -699,6 +700,8 @@
     }[event.key];
     if (to === undefined) return;
     event.preventDefault();
+    // It seeks, rather than acting on the ruler a click focused.
+    keyForPage();
     seekTo(to);
   }
 
@@ -736,6 +739,7 @@
     if (event.defaultPrevented || picking || calibrating || ownsSpace(event.target)) return;
     // Otherwise the page would scroll.
     event.preventDefault();
+    keyForPage();
     toggle();
   }
 
@@ -2569,7 +2573,7 @@
     cursor: pointer;
   }
   .track-actions button:hover:not(:disabled),
-  .track-actions button:focus-visible {
+  :global(:root:not([data-pointer-focus])) .track-actions button:focus-visible {
     color: var(--accent);
   }
   /* As big as the arrows and cross beside it. */
@@ -2894,7 +2898,7 @@
     line-height: 1.25;
   }
   .clip-more:hover,
-  :global(:focus-visible) > .clip-more {
+  :global(:root:not([data-pointer-focus]) :focus-visible) > .clip-more {
     color: var(--accent);
   }
   .trim {

@@ -232,7 +232,7 @@
     cursor: pointer;
   }
   .cue:hover,
-  .cue:focus-visible,
+  :global(:root:not([data-pointer-focus])) .cue:focus-visible,
   .cue.editing {
     border-color: var(--border);
     background: var(--surface-1);
