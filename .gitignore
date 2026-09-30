@@ -6,6 +6,7 @@
 
 # Frontend
 web/node_modules/
+docs/screenshots/node_modules/
 web/dist/*
 !web/dist/.gitkeep
 
