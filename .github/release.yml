@@ -1,0 +1,13 @@
+# Groups the auto-generated notes of a GitHub release by the labels on its
+# pull requests. The rule for which label a pull request gets lives in
+# AGENTS.md's "Pull request labels" section.
+changelog:
+  categories:
+    - title: Features
+      labels: [enhancement]
+    - title: Fixes
+      labels: [bug]
+    - title: Docs
+      labels: [documentation]
+    - title: Other
+      labels: ["*"]
