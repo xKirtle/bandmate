@@ -22,11 +22,11 @@ async function firstFrame(mp3: Blob) {
   return { mpeg1: (b1 & 0x18) === 0x18, layer3: (b1 & 0x06) === 0x02, kbps, rate, mono: b3 >> 6 === 3 };
 }
 
-const quiet = { signal: new AbortController().signal, onProgress: () => {} };
+const unwatched = { signal: new AbortController().signal, onProgress: () => {} };
 
 group('encodeMp3', () => {
   it.each([320, 192, 128] as const)('encodes stereo 48 kHz at %i kbps', async (kbps) => {
-    const mp3 = await encodeMp3(tone(1, 48000), 48000, kbps, quiet);
+    const mp3 = await encodeMp3(tone(1, 48000), 48000, kbps, unwatched);
     expect(mp3.type).toBe('audio/mpeg');
     expect(await firstFrame(mp3)).toEqual({ mpeg1: true, layer3: true, kbps, rate: 48000, mono: false });
     // Constant bitrate: about a second's worth of bytes.
@@ -36,7 +36,7 @@ group('encodeMp3', () => {
 
   it('says how far it has got, a chunk at a time, up to all of it', async () => {
     const done: number[] = [];
-    await encodeMp3(tone(3.5, 48000), 48000, 128, { ...quiet, onProgress: (d) => done.push(d) });
+    await encodeMp3(tone(3.5, 48000), 48000, 128, { ...unwatched, onProgress: (d) => done.push(d) });
     expect(done.length).toBeGreaterThan(2);
     expect(done).toEqual([...done].sort((a, b) => a - b));
     expect(done.at(-1)).toBe(1);

@@ -52,7 +52,18 @@ function toInt16(samples: Float32Array): Int16Array {
   return Int16Array.from(samples, (s) => pcmSample(s, 16));
 }
 
-/** Lets the page get on with things, e.g. drawing progress or hearing Cancel, before carrying on. */
+/**
+ * Lets the page get on with things, e.g. drawing progress or hearing Cancel,
+ * before carrying on. A message rather than a timeout, which a browser slows
+ * to once a second while the tab is in the background.
+ */
 function handBack(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    channel.port1.onmessage = () => {
+      channel.port1.close();
+      resolve();
+    };
+    channel.port2.postMessage(null);
+  });
 }

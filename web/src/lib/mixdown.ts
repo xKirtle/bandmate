@@ -7,6 +7,7 @@
 import type { TimelineLoop } from './api';
 import { schedule, type Placed } from './schedule';
 import { toTheSecond } from './time';
+import type { Mp3Kbps } from './mp3';
 import { TrackMix, type PlayableClip } from './timelinePlayer';
 import { atFullScale, type WavBits } from './wav';
 
@@ -118,9 +119,9 @@ export function mixdownRanges(
   return { ranges: [whole, stretch], chosen: loop.on ? stretch : whole };
 }
 
-/** A file format a Mixdown can download as, always stereo at mixdownRate. */
+/** A file format a Mixdown can download as, always stereo at mixdownRate. Its `of` is its file's extension. */
 export type MixdownFormat = { id: string; label: string } & (
-  { of: 'wav'; bits: WavBits } | { of: 'mp3'; kbps: 320 | 192 | 128 }
+  { of: 'wav'; bits: WavBits } | { of: 'mp3'; kbps: Mp3Kbps }
 );
 
 /** The formats a Mixdown can download as, the first picked until another is. */
@@ -132,12 +133,12 @@ export const mixdownFormats: readonly MixdownFormat[] = [
   { id: 'mp3-128', label: 'MP3 · 128 kbps', of: 'mp3', kbps: 128 },
 ];
 
-const formatKey = 'bandmate.mixdownFormat';
+export const mixdownFormatKey = 'bandmate.mixdownFormat';
 
 /** The format last picked in this browser, or the first one. */
 export function readMixdownFormat(storage: Storage | undefined): MixdownFormat {
   try {
-    const id = storage?.getItem(formatKey);
+    const id = storage?.getItem(mixdownFormatKey);
     return mixdownFormats.find((f) => f.id === id) ?? mixdownFormats[0];
   } catch {
     return mixdownFormats[0];
@@ -147,10 +148,19 @@ export function readMixdownFormat(storage: Storage | undefined): MixdownFormat {
 /** Remembers the format picked in this browser. */
 export function storeMixdownFormat(storage: Storage | undefined, format: MixdownFormat) {
   try {
-    storage?.setItem(formatKey, format.id);
+    storage?.setItem(mixdownFormatKey, format.id);
   } catch {
     // Not kept, e.g. in a private window; it's still picked until the dialog closes.
   }
+}
+
+/**
+ * The bits each of a Mixdown's samples takes on its way into the file, which
+ * is where it clips: a WAV's own, and 16 for an MP3, as LAME encodes from
+ * 16-bit samples.
+ */
+export function sampleBits(format: MixdownFormat): WavBits {
+  return format.of === 'wav' ? format.bits : 16;
 }
 
 /** The file a Song's Mixdown downloads as, with the Loop's times for its stretch, e.g. "(0m32s-0m48s)". */

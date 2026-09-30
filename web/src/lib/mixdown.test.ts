@@ -2,10 +2,12 @@ import { describe as group, expect, it } from 'vitest';
 import {
   levelsOf,
   mixdownEnd,
+  mixdownFormatKey,
   mixdownFormats,
   mixdownName,
   mixdownRanges,
   readMixdownFormat,
+  sampleBits,
   storeMixdownFormat,
 } from './mixdown';
 
@@ -116,52 +118,44 @@ group('mixdownFormats', () => {
   });
 });
 
-group('readMixdownFormat and storeMixdownFormat', () => {
-  /** A Storage kept in memory, as localStorage would be. */
-  function memoryStorage(): Storage {
-    const items = new Map<string, string>();
-    return {
-      get length() {
-        return items.size;
-      },
-      clear: () => items.clear(),
-      getItem: (key) => items.get(key) ?? null,
-      key: (i) => [...items.keys()][i] ?? null,
-      removeItem: (key) => void items.delete(key),
-      setItem: (key, value) => void items.set(key, value),
-    };
-  }
+/** A Storage holding some values, or one that throws like a blocked one. */
+function storage(values: Record<string, string> = {}, blocked = false): Storage {
+  const fail = () => {
+    throw new DOMException('Blocked', 'SecurityError');
+  };
+  return {
+    getItem: (key: string) => (blocked ? fail() : (values[key] ?? null)),
+    setItem: (key: string, value: string) => (blocked ? fail() : void (values[key] = value)),
+    removeItem: (key: string) => (blocked ? fail() : void delete values[key]),
+  } as Storage;
+}
 
+group('readMixdownFormat and storeMixdownFormat', () => {
   it('picks WAV · 24-bit until a format has been picked', () => {
-    expect(readMixdownFormat(memoryStorage()).label).toBe('WAV · 24-bit');
-    expect(readMixdownFormat(undefined).label).toBe('WAV · 24-bit');
+    expect(readMixdownFormat(storage()).label).toBe('WAV · 24-bit');
   });
 
   it('remembers the last format picked', () => {
-    const storage = memoryStorage();
-    storeMixdownFormat(storage, mixdownFormats[1]);
-    storeMixdownFormat(storage, mixdownFormats[3]);
-    expect(readMixdownFormat(storage)).toBe(mixdownFormats[3]);
+    const kept = storage();
+    storeMixdownFormat(kept, mixdownFormats[1]);
+    storeMixdownFormat(kept, mixdownFormats[3]);
+    expect(readMixdownFormat(kept)).toBe(mixdownFormats[3]);
   });
 
   it('falls back to WAV · 24-bit for a format it no longer offers', () => {
-    const storage = memoryStorage();
-    storeMixdownFormat(storage, mixdownFormats[4]);
-    storage.setItem(storage.key(0)!, 'ogg-96');
-    expect(readMixdownFormat(storage).label).toBe('WAV · 24-bit');
+    expect(readMixdownFormat(storage({ [mixdownFormatKey]: 'ogg-96' })).label).toBe('WAV · 24-bit');
   });
 
-  it("gets by where the browser won't keep anything", () => {
-    const refusing = {
-      ...memoryStorage(),
-      setItem: () => {
-        throw new DOMException('Quota exceeded');
-      },
-      getItem: () => {
-        throw new DOMException('Denied');
-      },
-    };
-    expect(() => storeMixdownFormat(refusing, mixdownFormats[2])).not.toThrow();
-    expect(readMixdownFormat(refusing).label).toBe('WAV · 24-bit');
+  it('picks WAV · 24-bit without storage, or when it is blocked, and storing then does nothing', () => {
+    expect(readMixdownFormat(undefined).label).toBe('WAV · 24-bit');
+    expect(readMixdownFormat(storage({}, true)).label).toBe('WAV · 24-bit');
+    expect(() => storeMixdownFormat(storage({}, true), mixdownFormats[2])).not.toThrow();
+    expect(() => storeMixdownFormat(undefined, mixdownFormats[2])).not.toThrow();
+  });
+});
+
+group('sampleBits', () => {
+  it("is a WAV's own bit depth, and 16 for an MP3, which is encoded from 16-bit samples", () => {
+    expect(mixdownFormats.map(sampleBits)).toEqual([24, 16, 16, 16, 16]);
   });
 });

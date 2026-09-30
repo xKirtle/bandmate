@@ -10,6 +10,7 @@
     mixdownRate,
     mixDown,
     readMixdownFormat,
+    sampleBits,
     storeMixdownFormat,
     type MixdownFormat,
     type MixdownLevels,
@@ -22,9 +23,9 @@
   import { encodeWav } from './wav';
 
   // Mixes the whole Timeline, or the Loop's stretch of it, down to a file in
-  // the format picked and downloads it, in a modal dialog: while it's mixing, nothing else
-  // on the page can be used, and closing the dialog, or leaving the Song
-  // page, cancels it.
+  // the format picked and downloads it, in a modal dialog: while it's
+  // mixing, nothing else on the page can be used, and closing the dialog, or
+  // leaving the Song page, cancels it.
   let {
     songTitle,
     end,
@@ -82,8 +83,7 @@
       });
       if (cancel.signal.aborted) return;
       const channels = [audio.getChannelData(0), audio.getChannelData(1)];
-      // An MP3 is encoded from 16-bit samples, so it clips where a 16-bit WAV would.
-      levels = levelsOf(channels, format.of === 'wav' ? format.bits : 16);
+      levels = levelsOf(channels, sampleBits(format));
       const file = await encode(channels, cancel.signal);
       if (cancel.signal.aborted) return;
       save(file);
@@ -100,6 +100,7 @@
   /** Encodes the Mixdown's file in the format picked, loading the MP3 encoder only once it's needed. */
   async function encode(channels: Float32Array[], signal: AbortSignal): Promise<Blob> {
     if (format.of === 'wav') return new Blob([encodeWav(channels, mixdownRate, format.bits)], { type: 'audio/wav' });
+    progress = { step: 'encoding', done: 0 };
     const { encodeMp3 } = await import('./mp3');
     return encodeMp3(channels, mixdownRate, format.kbps, {
       signal,
