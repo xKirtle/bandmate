@@ -2,22 +2,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { defineConfig, type Plugin } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-
-/** A package in the bundle, as the About page lists it. */
-type Dependency = { name: string; version: string; license: string };
-
-/** Where a module's package is: the folder under its last node_modules, e.g.
-    node_modules/@scope/name for …/node_modules/@scope/name/lib/x.js. */
-const packageDir = /^(.*[\\/]node_modules[\\/](?:@[^\\/]+[\\/])?[^\\/]+)[\\/]/;
-
-/** A package.json's license: an SPDX expression, or the old object and array
-    forms, else "Unknown". */
-function licenseOf(pkg: { license?: unknown; licenses?: unknown }): string {
-  const named = (l: unknown) => (typeof l === 'string' ? l : (l as { type?: string } | null)?.type);
-  if (pkg.license) return named(pkg.license) ?? 'Unknown';
-  if (Array.isArray(pkg.licenses)) return pkg.licenses.map(named).filter(Boolean).join(' OR ') || 'Unknown';
-  return 'Unknown';
-}
+import type { Dependency } from './src/lib/api';
+import { licenseOf, packageDir } from './src/lib/dependencyManifest';
 
 /** Writes dependencies.json into the build: every node_modules package whose
     code ends up in the bundle, measured from the bundle itself, with its
@@ -32,7 +18,7 @@ function dependencyManifest(): Plugin {
       for (const chunk of Object.values(bundle)) {
         if (chunk.type !== 'chunk') continue;
         for (const [id, module] of Object.entries(chunk.modules)) {
-          const dir = packageDir.exec(id.replace(/^\0/, ''))?.[1];
+          const dir = packageDir(id);
           // Code that was tree-shaken away doesn't ship.
           if (!dir || module.renderedLength === 0) continue;
           const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));

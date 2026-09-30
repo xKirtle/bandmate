@@ -97,7 +97,8 @@ func TestAboutListsTheWebPackagesTheBuiltAppRecorded(t *testing.T) {
 }
 
 func TestAnAppBuiltWithoutItsWebPackagesListsNone(t *testing.T) {
-	// testSPA has no dependencies.json.
+	// testSPA has no dependencies.json. The raw body tells an empty list
+	// apart from null, which decoding wouldn't.
 	res := newTestServer(t).Do(http.MethodGet, "/api/about", nil)
 	if !strings.Contains(string(res.Body), `"web":[]`) {
 		t.Errorf("about = %s, want an empty list of web packages", res.Body)

@@ -21,20 +21,12 @@ type dependencies struct {
 }
 
 // shipped is what ships: goModules, else the binary's own, and the web
-// packages the built SPA recorded, if any. A Go module whose license couldn't
-// be identified links to pkg.go.dev, where it can be looked up.
+// packages the built SPA recorded, if any.
 func shipped(goModules []build.Dependency, spa fs.FS) dependencies {
 	if goModules == nil {
 		goModules = build.GoModules()
 	}
-	d := dependencies{Go: make([]build.Dependency, len(goModules)), Web: []build.Dependency{}}
-	for i, m := range goModules {
-		if m.License == "" || m.License == build.UnknownLicense {
-			m.License = build.UnknownLicense
-			m.URL = "https://pkg.go.dev/" + m.Name + "@" + m.Version
-		}
-		d.Go[i] = m
-	}
+	d := dependencies{Go: listedGoModules(goModules), Web: []build.Dependency{}}
 
 	manifest, err := fs.ReadFile(spa, webDependencies)
 	switch {
@@ -43,10 +35,27 @@ func shipped(goModules []build.Dependency, spa fs.FS) dependencies {
 	case err != nil:
 		log.Printf("reading the web app's dependencies: %v", err)
 	default:
-		if err := json.Unmarshal(manifest, &d.Web); err != nil || d.Web == nil {
+		if err := json.Unmarshal(manifest, &d.Web); err != nil {
 			log.Printf("reading the web app's dependencies: %v", err)
+		}
+		if d.Web == nil {
 			d.Web = []build.Dependency{}
 		}
 	}
 	return d
+}
+
+// listedGoModules is the Go modules as the About page lists them: one whose
+// license couldn't be identified links to pkg.go.dev, where it can be looked
+// up.
+func listedGoModules(recorded []build.Dependency) []build.Dependency {
+	listed := make([]build.Dependency, len(recorded))
+	for i, m := range recorded {
+		if m.License == "" || m.License == build.UnknownLicense {
+			m.License = build.UnknownLicense
+			m.URL = "https://pkg.go.dev/" + m.Name + "@" + m.Version
+		}
+		listed[i] = m
+	}
+	return listed
 }

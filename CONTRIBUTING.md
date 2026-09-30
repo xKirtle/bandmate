@@ -53,7 +53,7 @@ If the SPA hasn't been built, the binary still runs, but non-API pages show a "w
 The About page lists every third-party package that ships, with its license. The SPA's build records the web packages in its bundle itself. The Go modules are in `internal/build/go-modules.json`, which is committed: after adding, removing or upgrading a Go module, run
 
 ```sh
-go generate ./internal/build   # runs go-licenses; needs sh and network access
+go generate ./internal/build   # runs go-licenses, so it needs network access
 ```
 
 and commit the result. CI fails a pull request whose manifest is stale, and says to re-run `go generate`.

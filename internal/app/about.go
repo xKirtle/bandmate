@@ -13,8 +13,8 @@ import (
 
 // about tells the About page everything known without going online: the
 // build, what it runs on, the database, and when the app started. Details is
-// the block a bug report asks for, which the SPA adds the browser to, and
-// Dependencies what ships in Bandmate.
+// the block a bug report asks for, which the SPA adds the browser to.
+// Dependencies lists the third-party packages that ship in Bandmate.
 func (a *App) about(w http.ResponseWriter, r *http.Request) {
 	d, err := db.Describe(r.Context(), a.db)
 	if err != nil {

@@ -1,10 +1,42 @@
 [
-  {"name": "github.com/dustin/go-humanize", "version": "v1.0.1", "license": "MIT"},
-  {"name": "github.com/google/uuid", "version": "v1.6.0", "license": "BSD-3-Clause"},
-  {"name": "github.com/remyoudompheng/bigfft", "version": "v0.0.0-20230129092748-24d4a6f8daec", "license": "BSD-3-Clause"},
-  {"name": "golang.org/x/sys/unix", "version": "v0.47.0", "license": "BSD-3-Clause"},
-  {"name": "modernc.org/libc", "version": "v1.75.7", "license": "BSD-3-Clause"},
-  {"name": "modernc.org/mathutil", "version": "v1.7.1", "license": "BSD-3-Clause"},
-  {"name": "modernc.org/memory", "version": "v1.12.1", "license": "BSD-3-Clause"},
-  {"name": "modernc.org/sqlite", "version": "v1.59.0", "license": "BSD-3-Clause"}
+  {
+    "name": "github.com/dustin/go-humanize",
+    "version": "v1.0.1",
+    "license": "MIT"
+  },
+  {
+    "name": "github.com/google/uuid",
+    "version": "v1.6.0",
+    "license": "BSD-3-Clause"
+  },
+  {
+    "name": "github.com/remyoudompheng/bigfft",
+    "version": "v0.0.0-20230129092748-24d4a6f8daec",
+    "license": "BSD-3-Clause"
+  },
+  {
+    "name": "golang.org/x/sys",
+    "version": "v0.47.0",
+    "license": "BSD-3-Clause"
+  },
+  {
+    "name": "modernc.org/libc",
+    "version": "v1.75.7",
+    "license": "BSD-3-Clause"
+  },
+  {
+    "name": "modernc.org/mathutil",
+    "version": "v1.7.1",
+    "license": "BSD-3-Clause"
+  },
+  {
+    "name": "modernc.org/memory",
+    "version": "v1.12.1",
+    "license": "BSD-3-Clause"
+  },
+  {
+    "name": "modernc.org/sqlite",
+    "version": "v1.59.0",
+    "license": "BSD-3-Clause"
+  }
 ]
