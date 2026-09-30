@@ -582,6 +582,7 @@
     onPlayhead={(at) => (playhead = at)}
     onLoop={(on) => (loopOn = on)}
     {syncing}
+    {writing}
     onRecording={(on) => (recording = on)}
   />
 {/if}
