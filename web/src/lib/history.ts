@@ -33,11 +33,12 @@ import { isBlank, type CuedSong } from './cues';
 // Deleting a Clip of Takes, or its Track, only detaches its Takes, so
 // placing a Clip from their ids brings them back. A new Take, and a copied
 // Clip, are redone as that too, so redoing never uploads a Take again or
-// copies it again. Likewise, deleting a Sound's Clip leaves the Sound in the
-// Song, so an imported Sound is undone by deleting its Clip and redone by
-// placing a Clip of it back, without uploading it again. A Retake is undone and redone by setting its Clip's
-// Takes, and where they are, as they were before or after it, which
-// detaches the new Take or brings it back. Deleting Takes, or clearing a
+// copies it again. Likewise, a Sound outlives its last Clip for as long as
+// undo lasts, so an imported Sound is undone by deleting its Clip and
+// redone by placing a Clip of it back, without uploading it again. A Retake
+// is undone and redone by setting its Clip's Takes, and where they are, as
+// they were before or after it, which detaches the new Take or brings it
+// back. Deleting Takes, or clearing a
 // Clip's inactive ones, is undone the same way, as they're only detached,
 // or, if it deleted the Clip with its last Take, by placing the Clip back.
 // A nudge is undone the same way, since nudging before the Clip's span
@@ -251,9 +252,8 @@ function placingBack(before: Timeline, clipId: number): Step {
  * The edit that places the one Clip added when before turned into after, as
  * it is: to keep a new Take, an imported Sound or a copied Clip in the
  * history, as redoing them places their Clip back without uploading or
- * copying again. It's
- * undone like any placed Clip, by deleting the Clip, which detaches its
- * Takes.
+ * copying again. It's undone like any placed Clip, by deleting the Clip,
+ * which detaches its Takes.
  */
 export function placingAdded(before: Timeline, after: Timeline): Edit {
   const [clipId] = added(before, after).clips;

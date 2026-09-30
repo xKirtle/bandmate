@@ -80,14 +80,14 @@
 
   // The Timeline, docked under the Lyric Sheet: its Tracks and Clips, and
   // playback with each Track's volume, mute and solo, and the Loop. Editing
-  // (adding Beats, importing audio files as Sounds, adding, renaming, reordering and deleting Tracks, moving,
-  // trimming, renaming, duplicating and deleting Clips, setting and clearing
-  // the Loop, and undoing and redoing all of it along with mixing and Cue
-  // edits) is only offered on wider screens; on a phone it only plays, mixes
-  // and switches the Loop on and off. On both it zooms and scrolls, and
-  // follows the playhead while playing. While the Loop is on, the playhead
-  // stays inside it. Recording a Take onto the chosen Track is offered where
-  // editing is.
+  // (adding Beats and Sounds, adding, renaming, reordering and deleting
+  // Tracks, moving, trimming, renaming, duplicating and deleting Clips,
+  // setting and clearing the Loop, and undoing and redoing all of it along
+  // with mixing and Cue edits) is only offered on wider screens; on a phone
+  // it only plays, mixes and switches the Loop on and off. On both it zooms
+  // and scrolls, and follows the playhead while playing. While the Loop is
+  // on, the playhead stays inside it. Recording a Take onto the chosen Track
+  // is offered where editing is.
   let {
     song,
     timeline,
@@ -2309,7 +2309,7 @@
                         >
                           {#each clipShape(clip, at.offset + wave.from, wave.to - wave.from, (wave.bars * barWidth) / view.scale, wave.bars) as peak, i (i)}
                             {@const height = Math.max(2, peak * 100)}
-                            <!-- A Take's clipping stays marked once it's saved; a Beat's isn't, being mastered loud. -->
+                            <!-- A Take's clipping stays marked once it's saved; a Beat's or a Sound's isn't, often being mastered loud. -->
                             <rect
                               class:clipped={clip.activeTakeId !== null && peak >= clipping}
                               x={i + 0.15}

@@ -116,8 +116,8 @@ export function fileStart(clip: Clip): number {
 
 /**
  * What of its audio file a Clip plays, and when: all of its window for a
- * Beat or a Sound, and for a Take, only where the Take has audio within it. Null if
- * none of it does.
+ * Beat or a Sound, and for a Take, only where the Take has audio within it.
+ * Null if none of it does.
  */
 export function heard(clip: Clip): Placed | null {
   const take = activeTake(clip);
@@ -146,8 +146,8 @@ export function playing(timeline: Timeline, sources: ClipSources, silent: number
 
 /**
  * What a Clip goes by: its own name, or until it's named, its source's (a
- * Beat's title, a Sound's name, or its active Take's number). A named Clip of Takes still
- * shows which Take it plays, e.g. "Hook idea · Take 2".
+ * Beat's title, a Sound's name, or its active Take's number). A named Clip
+ * of Takes still shows which Take it plays, e.g. "Hook idea · Take 2".
  */
 export function clipTitle(clip: Clip, source: ClipSource): string {
   if (clip.name === null) return source.title;
