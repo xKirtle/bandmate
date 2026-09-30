@@ -249,7 +249,7 @@ export interface TimelineLoop {
 export interface Track {
   id: number;
   name: string;
-  /** In dB, from silence to maxVolume (see mixer.ts). */
+  /** In dB, from minVolume to maxVolume (see mixer.ts). */
   volume: number;
   muted: boolean;
   /** When any Track is soloed, only the soloed ones are heard. */

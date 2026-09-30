@@ -21,8 +21,10 @@ describe('trackGains', () => {
     expect(gains.get(3)).toBeCloseTo(0.1, 4);
   });
 
-  it('silences a Track at the bottom of its fader', () => {
-    expect(trackGains([track(1, { volume: -60 })]).get(1)).toBe(0);
+  it('still plays a Track at the bottom and top of its fader', () => {
+    const gains = trackGains([track(1, { volume: -36 }), track(2, { volume: 36 })]);
+    expect(gains.get(1)).toBeCloseTo(0.01585, 5);
+    expect(gains.get(2)).toBeCloseTo(63.0957, 4);
   });
 
   it('silences a muted Track', () => {
@@ -49,10 +51,11 @@ describe('trackGains', () => {
 });
 
 describe('formatVolume', () => {
-  it('shows decibels with their sign, and silence', () => {
+  it('shows decibels with their sign, down to the bottom of the fader', () => {
     expect(formatVolume(0)).toBe('0 dB');
     expect(formatVolume(6)).toBe('+6 dB');
+    expect(formatVolume(36)).toBe('+36 dB');
     expect(formatVolume(-12.5)).toBe('−12.5 dB');
-    expect(formatVolume(-60)).toBe('Silent');
+    expect(formatVolume(-36)).toBe('−36 dB');
   });
 });

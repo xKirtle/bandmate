@@ -32,7 +32,7 @@
     type HistoryEdit,
     type Saved,
   } from './history';
-  import { formatVolume, maxVolume, silence, trackGains, type Levels } from './mixer';
+  import { formatVolume, maxVolume, minVolume, trackGains, type Levels } from './mixer';
   import { type MenuAction } from './menu';
   import { peaks as peaksOf, peaksPerSecond } from './peaks';
   import { keyActedOnPage } from './pointerFocus';
@@ -2265,7 +2265,7 @@
               <input
                 class="volume"
                 type="range"
-                min={silence}
+                min={minVolume}
                 max={maxVolume}
                 step="0.5"
                 value={trackLevels.volume}
