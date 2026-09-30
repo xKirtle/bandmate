@@ -9,7 +9,7 @@
 
   api.getConfig().then(
     (c) => (config = c),
-    (e) => (error = e instanceof Error ? e.message : String(e)),
+    (e: Error) => (error = e.message),
   );
 </script>
 
@@ -23,16 +23,13 @@
     <h2>Bandmate</h2>
     {#if config}
       <p class="version">Version <code>{config.version}</code></p>
+      <ul class="links">
+        <li><a href={config.sourceUrl}>Source code</a></li>
+        <li><a href={config.bugReportUrl}>Report a bug</a></li>
+      </ul>
     {:else if error}
       <p class="error" role="alert">Couldn't load the version: {error}</p>
     {/if}
-
-    <ul class="links">
-      {#if config}
-        <li><a href={config.sourceUrl}>Source code</a></li>
-        <li><a href={config.bugReportUrl}>Report a bug</a></li>
-      {/if}
-    </ul>
 
     <p class="muted">
       Bandmate is free software under the
