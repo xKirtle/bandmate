@@ -71,8 +71,10 @@ type App struct {
 	maxUpload   int64
 	maxCover    int64
 	build       build.Info
-	spa         fs.FS
-	handler     http.Handler
+	// startedAt is when the app started, for the About page's uptime.
+	startedAt time.Time
+	spa       fs.FS
+	handler   http.Handler
 }
 
 // New opens the database in cfg.DataDir, migrates it, and builds the HTTP
@@ -137,6 +139,7 @@ func New(cfg Config) (*App, error) {
 	if cfg.Now != nil {
 		now = cfg.Now
 	}
+	a.startedAt = now()
 	// Only tidying, so it never stops the app starting.
 	if err := a.timelines.SweepDetachedTakes(context.Background(), now().Add(-DetachedTakesKept)); err != nil {
 		log.Printf("sweeping detached takes: %v", err)
@@ -224,6 +227,7 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("GET /api/songs/{id}/sounds/{soundID}", a.getSound)
 	mux.HandleFunc("GET /api/songs/{id}/sounds/{soundID}/audio", a.soundAudio)
 	mux.HandleFunc("GET /api/config", a.config)
+	mux.HandleFunc("GET /api/about", a.about)
 	mux.HandleFunc("GET /api/beats", a.listBeats)
 	mux.HandleFunc("POST /api/beats", a.addBeat)
 	mux.HandleFunc("GET /api/beats/{id}", a.getBeat)
@@ -249,11 +253,15 @@ func (a *App) health(w http.ResponseWriter, r *http.Request) {
 // config tells the SPA the limits it should check before sending anything,
 // and which version is running, with a link to its source.
 func (a *App) config(w http.ResponseWriter, r *http.Request) {
+	// The rest of the build is the About page's, from /api/about.
 	writeJSON(w, http.StatusOK, struct {
-		MaxUploadBytes int64 `json:"maxUploadBytes"`
-		MaxCoverBytes  int64 `json:"maxCoverBytes"`
-		build.Info
-	}{a.maxUpload, a.maxCover, a.build})
+		MaxUploadBytes int64  `json:"maxUploadBytes"`
+		MaxCoverBytes  int64  `json:"maxCoverBytes"`
+		Version        string `json:"version"`
+		Revision       string `json:"revision"`
+		SourceURL      string `json:"sourceUrl"`
+		BugReportURL   string `json:"bugReportUrl"`
+	}{a.maxUpload, a.maxCover, a.build.Version, a.build.Revision, a.build.SourceURL, a.build.BugReportURL})
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
