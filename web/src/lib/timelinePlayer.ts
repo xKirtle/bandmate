@@ -2,8 +2,9 @@
 // scheduled on one AudioContext, so Tracks stay sample-accurate with each
 // other (ADR 0006). Each Track plays through its own gain, which follows its
 // volume, mute and solo live: wired by TrackMix, which a Mixdown builds its
-// graph with too, so it sounds as playback would. A Loop's repeats are scheduled a little ahead
-// as they come round, each starting exactly as the one before ends.
+// graph with too, so it sounds as playback would. A Loop's repeats are
+// scheduled a little ahead as they come round, each starting exactly as the
+// one before ends.
 import { playAlone, release } from './playback';
 import { positionAt, repeats, schedule, type Loop, type Placed } from './schedule';
 
@@ -37,7 +38,7 @@ export class TrackMix {
   #nodes = new Map<number, GainNode>();
 
   /** Mixes on context, with each Track's gain by id. A Track left out plays as is. */
-  constructor(context: BaseAudioContext, gains = new Map<number, number>()) {
+  constructor(context: BaseAudioContext, gains: Map<number, number>) {
     this.#context = context;
     this.#gains = gains;
   }

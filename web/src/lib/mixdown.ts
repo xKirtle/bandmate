@@ -1,20 +1,21 @@
 // A Mixdown: the Timeline rendered into one stereo file at 48 kHz, whatever
 // the device's rate, sounding as playback would. It's built with the same
 // pieces playback is (schedule, and TrackMix for the Clip → Track wiring),
-// on an offline context that renders it as fast as it can and resamples each
+// on an offline context that mixes as fast as it can and resamples each
 // Clip's decoded audio itself. It's never normalised: what it clips, the file
 // clips too, and a note says so.
 import { schedule, type Placed } from './schedule';
 import { TrackMix, type PlayableClip } from './timelinePlayer';
+import { atFullScale } from './wav';
 
 /** A Mixdown's sample rate, in Hz. */
 export const mixdownRate = 48000;
 const channels = 2;
 
 /** How far a Mixdown has got: loading its Clips' audio, then mixing, done a fraction of the way. */
-export type MixdownProgress = { stage: 'loading' } | { stage: 'mixing'; done: number };
+export type MixdownProgress = { step: 'loading' } | { step: 'mixing'; done: number };
 
-/** What a Mixdown renders, and how. */
+/** What a Mixdown mixes, and how. */
 export interface MixdownPlan {
   /** What each Clip plays, as playback would. */
   clips: readonly PlayableClip[];
@@ -29,21 +30,19 @@ export interface MixdownPlan {
   onProgress: (progress: MixdownProgress) => void;
 }
 
-// How often a render stops to say how far it's got, as a share of it, but
+// How often mixing stops to say how far it's got, as a share of it, but
 // never more often than every half a second of audio.
 const progressSteps = 50;
 const minProgressStep = 0.5;
 
-/** Renders a Mixdown, resolving to its audio, stereo at mixdownRate. */
-export async function renderMixdown(plan: MixdownPlan): Promise<AudioBuffer> {
+/** Mixes a Mixdown down, resolving to its audio, stereo at mixdownRate. */
+export async function mixDown(plan: MixdownPlan): Promise<AudioBuffer> {
   const { clips, end, gains, load, signal, onProgress } = plan;
   signal.throwIfAborted();
-  onProgress({ stage: 'loading' });
-  const buffers = new Map<string, AudioBuffer>();
-  await Promise.all(
-    [...new Set(clips.map((c) => c.source))].map(async (source) => buffers.set(source, await load(source))),
-  );
-  signal.throwIfAborted();
+  onProgress({ step: 'loading' });
+  const sources = [...new Set(clips.map((c) => c.source))];
+  const loaded = await untilCancelled(Promise.all(sources.map(load)), signal);
+  const buffers = new Map(sources.map((source, i) => [source, loaded[i]]));
 
   const context = new OfflineAudioContext({
     numberOfChannels: channels,
@@ -51,36 +50,34 @@ export async function renderMixdown(plan: MixdownPlan): Promise<AudioBuffer> {
     sampleRate: mixdownRate,
   });
   const mix = new TrackMix(context, gains);
-  for (const s of schedule(clips, 0))
+  for (const s of schedule(clips, 0)) {
     mix.play(buffers.get(s.clip.source)!, s.clip.trackId, s.delay, s.from, s.duration);
+  }
 
   // It pauses at each step to say how far it's got, and only carries on if
   // it hasn't been cancelled meanwhile: left paused, it's let go of.
-  const step = Math.max(end / progressSteps, minProgressStep);
-  for (let t = step; t < end; t += step) {
+  const every = Math.max(end / progressSteps, minProgressStep);
+  for (let t = every; t < end; t += every) {
     context
       .suspend(t)
       .then(() => {
         if (signal.aborted) return;
-        onProgress({ stage: 'mixing', done: t / end });
+        onProgress({ step: 'mixing', done: t / end });
         return context.resume();
       })
       .catch(() => {});
   }
-  onProgress({ stage: 'mixing', done: 0 });
+  onProgress({ step: 'mixing', done: 0 });
+  return untilCancelled(context.startRendering(), signal);
+}
+
+/** Settles as work does, or rejects with the signal's reason as soon as it's cancelled. */
+function untilCancelled<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
   return new Promise((resolve, reject) => {
     const cancelled = () => reject(signal.reason);
+    if (signal.aborted) return cancelled();
     signal.addEventListener('abort', cancelled, { once: true });
-    context.startRendering().then(
-      (audio) => {
-        signal.removeEventListener('abort', cancelled);
-        resolve(audio);
-      },
-      (e) => {
-        signal.removeEventListener('abort', cancelled);
-        reject(e);
-      },
-    );
+    work.then(resolve, reject).finally(() => signal.removeEventListener('abort', cancelled));
   });
 }
 
@@ -100,14 +97,14 @@ export interface MixdownLevels {
   silent: boolean;
 }
 
-/** Checks a Mixdown's channels, from -1 to 1, for clipping and for silence throughout. */
+/** Checks a Mixdown's channels, from -1 to 1, for clipping in its file and for silence throughout. */
 export function levelsOf(channels: readonly Float32Array[]): MixdownLevels {
   let clips = false;
   let silent = true;
   for (const samples of channels) {
     for (const s of samples) {
       if (s !== 0) silent = false;
-      if (s >= 1 || s <= -1) clips = true;
+      if (!clips && atFullScale(s)) clips = true;
     }
   }
   return { clips, silent };

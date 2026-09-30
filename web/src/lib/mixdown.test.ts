@@ -14,6 +14,12 @@ group('levelsOf', () => {
     expect(levelsOf([channel(0, 0, 0), channel(0, 0, 1.7)])).toEqual({ clips: true, silent: false });
   });
 
+  it('finds it clipping where a sample only rounds to full scale in the file', () => {
+    // 24-bit's largest sample is 1 − 2⁻²³: halfway to it rounds up to it.
+    expect(levelsOf([channel(1 - 2 ** -24), channel(0)])).toEqual({ clips: true, silent: false });
+    expect(levelsOf([channel(1 - 2 ** -22), channel(0)])).toEqual({ clips: false, silent: false });
+  });
+
   it('finds it silent where every sample is zero', () => {
     expect(levelsOf([channel(0, 0, 0), channel(0, 0, 0)])).toEqual({ clips: false, silent: true });
   });

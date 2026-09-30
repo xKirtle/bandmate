@@ -8,6 +8,14 @@ const headerSize = 44;
 const fullScale = (1 << 23) - 1;
 
 /**
+ * Whether a sample, from -1 to 1, is at full scale once encoded: the
+ * largest or smallest 24-bit sample, which anything louder is clipped to.
+ */
+export function atFullScale(sample: number): boolean {
+  return Math.round(sample * (fullScale + 1)) >= fullScale || sample <= -1;
+}
+
+/**
  * Encodes channels of samples, from -1 to 1, as a 24-bit PCM WAV file at
  * sampleRate: one channel for mono, two for stereo, each as long as the
  * first. Louder samples are clipped.
@@ -35,7 +43,7 @@ export function encodeWav(channels: readonly Float32Array[], sampleRate: number)
   text(36, 'data');
   view.setUint32(40, dataSize, true);
   const bytes = new Uint8Array(buffer, headerSize);
-  // Frame by frame, each with every channel's sample in turn.
+  // Interleaved: each frame holds every channel's sample in turn.
   for (const [c, samples] of channels.entries()) {
     for (let i = 0; i < frames; i++) {
       const clipped = Math.max(-1, Math.min(1, samples[i]));

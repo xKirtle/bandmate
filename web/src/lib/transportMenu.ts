@@ -24,7 +24,7 @@ export type TransportRun = {
   recordingSettings: () => void;
 };
 
-/** The entries of the transport row's ⋯, or none for no ⋯. */
+/** The entries of the transport row's ⋯: always at least Mix down…. */
 export function transportActions(state: TransportState, run: TransportRun): MenuAction[] {
   const importAudio: MenuAction = {
     icon: '⤒',

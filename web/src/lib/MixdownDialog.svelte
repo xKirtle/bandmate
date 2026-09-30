@@ -5,7 +5,7 @@
     levelsOf,
     mixdownName,
     mixdownRate,
-    renderMixdown,
+    mixDown,
     type MixdownLevels,
     type MixdownPlan,
     type MixdownProgress,
@@ -14,7 +14,7 @@
   import { encodeWav } from './wav';
 
   // Mixes the whole Timeline down to a WAV file and downloads it, in a
-  // modal dialog: while it renders, nothing else on the page can be used,
+  // modal dialog: while it's mixing, nothing else on the page can be used,
   // and closing the dialog, or leaving the Song page, cancels it.
   let {
     songTitle,
@@ -26,41 +26,41 @@
     songTitle: string;
     /** Where the Mixdown ends, in seconds from 0:00. */
     end: number;
-    /** What it renders, as it stands when it starts. */
+    /** What it mixes, as it stands when it starts. */
     plan: () => Pick<MixdownPlan, 'clips' | 'gains' | 'load'>;
-    /** Hears a render start, e.g. to stop playback. */
+    /** Hears the Mixdown start, e.g. to stop playback. */
     onStart: () => void;
     onClose: () => void;
   } = $props();
 
   let dialog = $state<HTMLDialogElement>();
-  let phase = $state<'ready' | 'rendering' | 'done'>('ready');
-  let progress = $state<MixdownProgress>({ stage: 'loading' });
+  let phase = $state<'ready' | 'mixing' | 'done'>('ready');
+  let progress = $state<MixdownProgress>({ step: 'loading' });
   let levels = $state<MixdownLevels | null>(null);
   let error = $state<string | null>(null);
-  let rendering: AbortController | null = null;
+  let mixing: AbortController | null = null;
 
   const name = $derived(mixdownName(songTitle));
 
   onMount(() => dialog?.showModal());
-  onDestroy(() => rendering?.abort());
+  onDestroy(() => mixing?.abort());
 
-  async function mixDown() {
+  async function start() {
     onStart();
     const cancel = new AbortController();
-    rendering = cancel;
-    phase = 'rendering';
-    progress = { stage: 'loading' };
+    mixing = cancel;
+    phase = 'mixing';
+    progress = { step: 'loading' };
     error = null;
     try {
-      const audio = await renderMixdown({
+      const audio = await mixDown({
         ...plan(),
         end,
         signal: cancel.signal,
         onProgress: (p) => (progress = p),
       });
-      const channels = [audio.getChannelData(0), audio.getChannelData(1)];
       if (cancel.signal.aborted) return;
+      const channels = [audio.getChannelData(0), audio.getChannelData(1)];
       levels = levelsOf(channels);
       save(new Blob([encodeWav(channels, mixdownRate)], { type: 'audio/wav' }));
       phase = 'done';
@@ -69,7 +69,7 @@
       error = `Couldn't mix down (${(e as Error).message}).`;
       phase = 'ready';
     } finally {
-      if (rendering === cancel) rendering = null;
+      if (mixing === cancel) mixing = null;
     }
   }
 
@@ -85,21 +85,21 @@
   }
 
   function onclose() {
-    rendering?.abort();
+    mixing?.abort();
     onClose();
   }
 </script>
 
-<!-- A click outside closes it, but never while it renders: Cancel, or Esc, does. -->
+<!-- A click outside closes it, but never while it's mixing: Cancel, or Esc, does. -->
 <dialog
   bind:this={dialog}
-  {@attach closeOnBackdrop(() => phase !== 'rendering')}
+  {@attach closeOnBackdrop(() => phase !== 'mixing')}
   {onclose}
   aria-labelledby="mixdown-heading"
 >
   <header>
     <h2 id="mixdown-heading">Mix down</h2>
-    {#if phase !== 'rendering'}
+    {#if phase !== 'mixing'}
       <button type="button" class="icon" onclick={() => dialog?.close()} aria-label="Close">✕</button>
     {/if}
   </header>
@@ -113,12 +113,12 @@
     {#if error}
       <p class="problem" role="alert">{error}</p>
     {/if}
-  {:else if phase === 'rendering'}
+  {:else if phase === 'mixing'}
     <p role="status" aria-live="polite">
-      {progress.stage === 'loading' ? 'Loading the audio…' : `Mixing down… ${Math.floor(progress.done * 100)}%`}
+      {progress.step === 'loading' ? 'Loading the audio…' : `Mixing down… ${Math.floor(progress.done * 100)}%`}
     </p>
     <!-- Without a value while loading: how long that takes isn't known. -->
-    {#if progress.stage === 'mixing'}
+    {#if progress.step === 'mixing'}
       <progress max="1" value={progress.done} aria-label="How far the Mixdown has got"></progress>
     {:else}
       <progress aria-label="How far the Mixdown has got"></progress>
@@ -135,12 +135,12 @@
 
   <div class="actions">
     {#if phase === 'ready'}
-      <button type="button" class="button primary" onclick={mixDown}>Mix down</button>
-      <button type="button" class="button" onclick={() => dialog?.close()}>Cancel</button>
-    {:else if phase === 'rendering'}
-      <button type="button" class="button" onclick={() => dialog?.close()}>Cancel</button>
-    {:else}
+      <button type="button" class="button primary" onclick={start}>Mix down</button>
+    {/if}
+    {#if phase === 'done'}
       <button type="button" class="button primary" onclick={() => dialog?.close()}>Done</button>
+    {:else}
+      <button type="button" class="button" onclick={() => dialog?.close()}>Cancel</button>
     {/if}
   </div>
 </dialog>

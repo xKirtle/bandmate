@@ -2140,11 +2140,9 @@
       {/if}
       <span class="spacer"></span>
       {@render undoRedo()}
-      {#if transportMenu.length > 0}
-        <span class="transport-more" bind:this={transportMore}>
-          <ActionsMenu label="More Timeline actions" entries={transportMenu} />
-        </span>
-      {/if}
+      <span class="transport-more" bind:this={transportMore}>
+        <ActionsMenu label="More Timeline actions" entries={transportMenu} />
+      </span>
       <button
         type="button"
         class="icon collapse-toggle"
@@ -2579,7 +2577,7 @@
   />
 {/if}
 {#if mixingDown}
-  <!-- Rendered as playback would play it now, which the render stops. Sync mode stays as it is. -->
+  <!-- Mixed as playback would play it now, which starting it stops. Sync mode stays as it is. -->
   <MixdownDialog
     songTitle={song.title}
     end={mixdownEnd(clips)}
