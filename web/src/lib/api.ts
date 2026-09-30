@@ -432,6 +432,36 @@ export interface AboutInfo {
   details: string;
 }
 
+/** How the running build stands against its repository's releases on GitHub. */
+export interface ReleasesReport {
+  /** Whether GitHub was asked: "off" when the check is turned off or the
+      repository isn't on github.com, "failed" when GitHub couldn't be asked. */
+  check: 'ok' | 'off' | 'failed';
+  /** The repository's releases page, to link to whatever the check. */
+  releasesUrl: string;
+  /** A release build compared with the latest release; absent for any other build. */
+  verdict?: 'upToDate' | 'updateAvailable';
+  /** The newest release, when checked and there is one. */
+  latest?: { tag: string; url: string };
+  /** The recent releases, newest first. */
+  releases: Release[];
+}
+
+/** A published release, with its notes. */
+export interface Release {
+  tag: string;
+  name: string;
+  url: string;
+  publishedAt: string;
+  /** Whether it's the running build's release. */
+  running: boolean;
+  notes: ReleaseNote[];
+}
+
+/** One row of a release's notes: a pull request, or a line of text as the author wrote it. */
+export type ReleaseNote =
+  { badge?: 'new' | 'fix' | 'docs'; title: string; url: string; number: number } | { text: string };
+
 /** A failed request, carrying the server's readable message. */
 export class ApiError extends Error {
   constructor(
@@ -499,6 +529,8 @@ function audioForm(file: File, details: object): FormData {
 export const api = {
   getConfig: () => request<ServerConfig>('GET', '/config'),
   getAbout: () => request<AboutInfo>('GET', '/about'),
+  /** Asks GitHub, unless the server recently has, so it's slower than the rest of the About page. */
+  getAboutReleases: () => request<ReleasesReport>('GET', '/about/releases'),
   /** The Beat Library, newest first; q matches titles and producers. */
   listBeats: (q = '') => request<Beat[]>('GET', q.trim() ? `/beats?q=${encodeURIComponent(q.trim())}` : '/beats'),
   /** One Beat, with its peaks. */

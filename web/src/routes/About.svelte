@@ -1,9 +1,9 @@
 <script lang="ts">
   // Which Bandmate is running, with a link to exactly that version's source,
   // as AGPL-3.0 §13 asks of anyone running a modified Bandmate over a network,
-  // and the system facts a bug report needs, ready to copy.
-  import { api, type AboutInfo, type ServerConfig } from '../lib/api';
-  import { bugReportDetails, uptime } from '../lib/about';
+  // the system facts a bug report needs, ready to copy, and what's new.
+  import { api, type AboutInfo, type ReleasesReport, type ServerConfig } from '../lib/api';
+  import { bugReportDetails, updateStatus, uptime } from '../lib/about';
   import BrandMark from '../lib/BrandMark.svelte';
 
   // The version and its source link come from /api/config, which doesn't
@@ -21,6 +21,20 @@
     (a) => (about = a),
     (e: Error) => (aboutError = e.message),
   );
+
+  // Releases come from GitHub, through the server, so they load on their
+  // own: a slow or failing GitHub never holds up the rest of the page.
+  let releases = $state<ReleasesReport | null>(null);
+  api.getAboutReleases().then(
+    (r) => (releases = r),
+    () => (releases = { check: 'failed', releasesUrl: '', releases: [] }),
+  );
+  const status = $derived(releases && updateStatus(releases));
+  /** The releases page, to look at when there's nothing to list here. */
+  const releasesUrl = $derived(releases?.releasesUrl || about?.releasesUrl);
+  const badges = { new: 'New', fix: 'Fix', docs: 'Docs' } as const;
+  /** How many releases the Release notes tab lists, once checked. */
+  const releaseCount = $derived(releases?.check === 'ok' ? ` (${releases.releases.length})` : '');
 
   // The uptime counts on while the page is open.
   let now = $state(Date.now());
@@ -100,6 +114,14 @@
       <h2>Bandmate</h2>
       {#if config}
         <p>Version <code>{config.version}</code></p>
+        {#if status}
+          <p class="update" class:available={releases?.verdict === 'updateAvailable'}>
+            {#if status.url}<a href={status.url}>{status.text}</a>{:else}{status.text}{/if}
+            {#if status.releasesUrl !== undefined && releasesUrl}
+              · <a href={releasesUrl}>See releases</a>
+            {/if}
+          </p>
+        {/if}
         <ul class="links">
           <li><a href={config.sourceUrl}>Source code</a></li>
           <li><a href={config.bugReportUrl}>Report a bug</a></li>
@@ -170,7 +192,7 @@
             onclick={() => (tab = t.id)}
             onkeydown={(e) => tabKey(e, i)}
           >
-            {t.label}
+            {t.label}{t.id === 'release-notes' ? releaseCount : ''}
           </button>
         {/each}
       </div>
@@ -184,8 +206,46 @@
           hidden={tab !== t.id}
         >
           {#if t.id === 'release-notes'}
-            {#if about}
-              <p>See what's new in each release on <a href={about.releasesUrl}>Bandmate's releases page</a>.</p>
+            {#if !releases}
+              <p class="muted">Checking GitHub for releases…</p>
+            {:else if releases.check === 'ok' && releases.releases.length > 0}
+              <ol class="releases">
+                {#each releases.releases as r (r.tag)}
+                  <li>
+                    <h3>
+                      <a href={r.url}>{r.tag}</a>
+                      {#if r.name && r.name !== r.tag}<span class="release-name">{r.name}</span>{/if}
+                      {#if r.running}<span class="badge badge-running">Running</span>{/if}
+                    </h3>
+                    <p class="muted date">{day(r.publishedAt)}</p>
+                    {#if r.notes.length > 0}
+                      <ul class="notes">
+                        {#each r.notes as n, i (i)}
+                          {#if 'text' in n}
+                            <li class="note-text">{n.text}</li>
+                          {:else}
+                            <li class="change">
+                              <!-- Other has no badge, but keeps its space, so the titles line up. -->
+                              <span class="badge badge-{n.badge ?? 'none'}" aria-hidden={!n.badge}
+                                >{n.badge ? badges[n.badge] : ''}</span
+                              >
+                              <span>{n.title} <a href={n.url}>#{n.number}</a></span>
+                            </li>
+                          {/if}
+                        {/each}
+                      </ul>
+                    {/if}
+                  </li>
+                {/each}
+              </ol>
+              {#if releasesUrl}<p class="more"><a href={releasesUrl}>More on GitHub</a></p>{/if}
+            {:else if releasesUrl}
+              <p>
+                {#if releases.check === 'failed'}Couldn't check for updates.
+                {:else if releases.check === 'ok'}No releases yet.
+                {/if}
+                See what's new in each release on <a href={releasesUrl}>Bandmate's releases page</a>.
+              </p>
             {/if}
           {:else}
             <p class="muted">The libraries that ship with Bandmate, and their licenses, will be listed here.</p>
@@ -295,6 +355,8 @@
 
   .tabs {
     display: flex;
+    /* Rather than run off a narrow phone, the tabs wrap. */
+    flex-wrap: wrap;
     gap: 0.25rem;
     padding: 0 0.5rem;
     border-bottom: 1px solid var(--border);
@@ -318,5 +380,101 @@
   }
   .panel {
     padding: 1rem;
+  }
+  /* A phone's tabs are tighter, so their labels, with counts, fit on a line. */
+  @media (max-width: 24rem) {
+    .tabs {
+      padding: 0;
+      gap: 0;
+    }
+    [role='tab'] {
+      padding: 0 0.5rem;
+      font-size: 0.9375rem;
+    }
+  }
+
+  .update {
+    color: var(--text-muted);
+  }
+  .update.available a {
+    font-weight: 600;
+  }
+
+  .releases {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  h3 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.5rem;
+    margin: 0;
+    font-size: 1.0625rem;
+  }
+  .release-name {
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  .notes {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    margin: 0.5rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .change {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+  .change > span:last-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .note-text {
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+  .card .more {
+    margin-top: 1.5rem;
+  }
+
+  /* Like the Status badges: New, Fix and Docs mark a change's kind, and
+     Running the release that's running. */
+  .badge {
+    flex: none;
+    display: inline-block;
+    min-width: 3rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-align: center;
+    white-space: nowrap;
+    background: var(--surface-2);
+    color: var(--text-muted);
+  }
+  .badge-new {
+    background: var(--finished-bg);
+    color: var(--finished-fg);
+  }
+  .badge-fix {
+    background: var(--drafting-bg);
+    color: var(--drafting-fg);
+  }
+  .badge-none {
+    background: none;
+  }
+  .badge-running {
+    min-width: 0;
+    background: var(--accent);
+    color: var(--accent-text);
   }
 </style>

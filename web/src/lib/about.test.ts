@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { bugReportDetails, uptime } from './about';
+import { bugReportDetails, updateStatus, uptime } from './about';
+import type { ReleasesReport } from './api';
 
 describe('uptime', () => {
   const started = '2026-09-30T08:00:00Z';
@@ -32,5 +33,43 @@ describe('bugReportDetails', () => {
         'Go 1.25.1 linux/amd64 · SQLite 3.50.4 · schema 0027_x\n' +
         'Browser: Mozilla/5.0 (X11; Linux x86_64) Firefox/140.0',
     );
+  });
+});
+
+describe('updateStatus', () => {
+  const releasesUrl = 'https://github.com/xKirtle/bandmate/releases';
+  const latest = { tag: 'v0.5.0', url: releasesUrl + '/tag/v0.5.0' };
+  const report = (r: Partial<ReleasesReport>): ReleasesReport => ({
+    check: 'ok',
+    releasesUrl,
+    releases: [],
+    ...r,
+  });
+
+  it('says a release build is up to date', () => {
+    expect(updateStatus(report({ verdict: 'upToDate', latest }))).toEqual({ text: 'Up to date' });
+  });
+
+  it('offers a newer release, linking to it', () => {
+    expect(updateStatus(report({ verdict: 'updateAvailable', latest }))).toEqual({
+      text: 'v0.5.0 available',
+      url: latest.url,
+    });
+  });
+
+  it('names the latest release to a build that is not a release', () => {
+    expect(updateStatus(report({ latest }))).toEqual({ text: 'Latest release: v0.5.0', url: latest.url });
+  });
+
+  it("says a failed check couldn't check, with the releases page to look at instead", () => {
+    expect(updateStatus(report({ check: 'failed' }))).toEqual({
+      text: "Couldn't check for updates",
+      releasesUrl,
+    });
+  });
+
+  it('says nothing when the check is off, or there are no releases yet', () => {
+    expect(updateStatus(report({ check: 'off' }))).toBeNull();
+    expect(updateStatus(report({}))).toBeNull();
   });
 });
