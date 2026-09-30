@@ -97,6 +97,10 @@ _Avoid_: Instrumental, backing track, sample
 The user's collection of uploaded Beats, shared across all Songs.
 _Avoid_: Beat store, uploads
 
+**Beat Picker**:
+Where a Beat is chosen from the Beat Library, or uploaded into it, to place on the Chosen Track.
+_Avoid_: Beat dialog, Beat modal
+
 **Beat preview**:
 Listening to a Beat from the Beat Library, outside any Song's Timeline.
 
