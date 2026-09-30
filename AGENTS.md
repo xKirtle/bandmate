@@ -11,3 +11,7 @@ Default vocabulary: needs-triage, needs-info, ready-for-agent, ready-for-human, 
 ### Domain docs
 
 Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+## Formatting
+
+Before committing web app changes, run `npm run format` in `web/`. CI fails a PR whose web code isn't formatted. Go is formatted with `gofmt`.
