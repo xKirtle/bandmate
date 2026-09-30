@@ -6,7 +6,7 @@ Issues and specs live in GitHub Issues on xKirtle/bandmate, managed with the `gh
 
 ### Triage labels
 
-Default vocabulary: needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix, plus needs-grilling for issues that are wanted but not grilled enough to be ready. See `docs/agents/triage-labels.md`.
+Default vocabulary: needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix. This repo adds needs-grilling. See `docs/agents/triage-labels.md`.
 
 ### Pull request labels
 

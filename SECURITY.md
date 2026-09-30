@@ -18,8 +18,8 @@ What is in scope is anything that goes beyond reading and changing Songs through
 
 - Reading or writing files outside the data directory (`BANDMATE_DATA_DIR`), such as through path traversal
 - Injection, such as SQL injection through the API
-- Upload handling (audio files, Covers) that crashes the server or corrupts the data directory
-- Cross-site scripting (XSS) through Song content, such as lyrics, notes or names
+- Upload handling (Beats, Masters, Takes, Sounds, Covers, imported Songs) that crashes the server or corrupts the data directory
+- Cross-site scripting (XSS) through Song content, such as lyrics, notes, titles or names
 
 ## Supported versions
 

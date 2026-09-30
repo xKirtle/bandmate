@@ -11,7 +11,7 @@ body:
     attributes:
       label: The problem
       description: What are you trying to do, and what gets in the way? When does it come up?
-      placeholder: When I record a take over a long beat, I...
+      placeholder: When I record a Take over a long Beat, I...
     validations:
       required: true
   - type: textarea
