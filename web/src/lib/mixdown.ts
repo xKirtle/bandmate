@@ -6,6 +6,7 @@
 // clips too, and a note says so.
 import type { TimelineLoop } from './api';
 import { schedule, type Placed } from './schedule';
+import { toTheSecond } from './time';
 import { TrackMix, type PlayableClip } from './timelinePlayer';
 import { atFullScale } from './wav';
 
@@ -121,9 +122,9 @@ export function mixdownName(songTitle: string, range: MixdownRange): string {
 }
 
 /** A time to the second, as a file name can hold it, e.g. "1m05s". */
-function minutesSeconds(seconds: number): string {
-  const whole = Math.round(seconds);
-  return `${Math.floor(whole / 60)}m${String(whole % 60).padStart(2, '0')}s`;
+function minutesSeconds(time: number): string {
+  const { minutes, seconds } = toTheSecond(time);
+  return `${minutes}m${seconds}s`;
 }
 
 /** What a Mixdown's levels come to: whether any sample reached full scale, and whether every one is silent. */
