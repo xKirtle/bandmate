@@ -232,6 +232,8 @@ export interface Timeline {
   tracks: Track[];
   /** The Beats the Clips play, each once, without their peaks. */
   beats: ClipBeat[];
+  /** The Sounds the Clips play, each once, without their peaks. */
+  sounds: Sound[];
   /** Null until one is set. */
   loop: TimelineLoop | null;
 }
@@ -259,11 +261,13 @@ export interface Track {
 /** Changes to a Track's name or levels; fields left out stay as they are. */
 export type TrackChanges = Partial<Pick<Track, 'name' | 'volume' | 'muted' | 'soloed'>>;
 
-/** A stretch of a Beat, or of a set of Takes, placed on a Track, in seconds. */
+/** A stretch of a Beat or a Sound, or of a set of Takes, placed on a Track, in seconds. */
 export interface Clip {
   id: number;
-  /** The Beat it plays, or null for a Clip of Takes. */
+  /** The Beat it plays, or null for a Clip of a Sound or of Takes. */
   beatId: number | null;
+  /** The Sound it plays, or null for a Clip of a Beat or of Takes. */
+  soundId: number | null;
   /** Its own name, or null until it's named, when it goes by its source's (see clipTitle). */
   name: string | null;
   /** A Clip of Takes' Takes, by number; none for a Clip of a Beat. */
@@ -275,8 +279,8 @@ export interface Clip {
   /** Where the Clip starts on the Timeline. */
   start: number;
   /**
-   * Where in its source it starts playing: a Beat's file, or the span its
-   * Takes are laid out in, which starts this long before the Clip does.
+   * Where in its source it starts playing: a Beat's or a Sound's file, or the
+   * span its Takes are laid out in, which starts this long before the Clip does.
    */
   offset: number;
   /** How long it plays. */
@@ -305,13 +309,37 @@ export interface Take {
 }
 
 /**
- * A stretch of a Beat, or of detached Takes, to place on a Track, e.g. a
- * deleted Clip brought back, or a recording redone, with its name if it has
- * one.
+ * A stretch of a Beat or a Sound, or of detached Takes, to place on a Track,
+ * e.g. a deleted Clip brought back, or a recording or import redone, with its
+ * name if it has one.
  */
 export type NewClip = Pick<Clip, 'start' | 'offset' | 'length'> & { name?: string } & (
-    { beatId: number } | { takeIds: number[]; activeTakeId: number; lastTakeNumber: number }
+    { beatId: number } | { soundId: number } | { takeIds: number[]; activeTakeId: number; lastTakeNumber: number }
   );
+
+/**
+ * An audio file imported into one Song, placed in Clips like a Beat, but
+ * without a credit or a library. Its file is kept as uploaded.
+ */
+export interface Sound {
+  id: number;
+  /** From the file's title tag, or else its name without its extension; it never changes. */
+  name: string;
+  /** The file's name as uploaded, which a download keeps. */
+  fileName: string;
+  /** The file's size in bytes. */
+  size: number;
+  /** In seconds. */
+  duration: number;
+  /** The waveform, 100 per second, from 0 to 1. Only when reading one Sound, not in the Timeline. */
+  peaks?: number[];
+}
+
+/** Where an imported Sound goes and what it's called, sent with its file. */
+export interface SoundImport extends DecodedAudio {
+  trackId: number;
+  name: string;
+}
 
 /** How a Take was captured, sent with its file. */
 export interface Captured {
@@ -668,6 +696,18 @@ export const api = {
   takeAudioUrl: (songId: number, takeId: number) => `/api/songs/${songId}/takes/${takeId}/audio`,
   /** Where a Take's file downloads from, as recorded, named after the Song and the Take. */
   takeDownloadUrl: (songId: number, takeId: number) => `/api/songs/${songId}/takes/${takeId}/audio?download`,
+  /**
+   * Imports an audio file, unchanged, as one of the Song's Sounds, placed
+   * whole in a new Clip after the Track's last Clip, or at 0:00.
+   */
+  importSound: (at: SongAt, file: File, details: SoundImport) =>
+    request<Timeline>('POST', `/songs/${at.id}/timeline/sounds`, audioForm(file, details), at),
+  /** One of a Song's Sounds, with its peaks. */
+  getSound: (songId: number, soundId: number) => request<Sound>('GET', `/songs/${songId}/sounds/${soundId}`),
+  /** Where a Sound's audio streams from, with seeking. */
+  soundAudioUrl: (songId: number, soundId: number) => `/api/songs/${songId}/sounds/${soundId}/audio`,
+  /** Where a Sound's file downloads from, as uploaded, under its original name. */
+  soundDownloadUrl: (songId: number, soundId: number) => `/api/songs/${songId}/sounds/${soundId}/audio?download`,
   /** Sets the Song's Loop, replacing any it had. */
   setLoop: (at: SongAt, loop: TimelineLoop) => request<Timeline>('PUT', `/songs/${at.id}/timeline/loop`, loop, at),
   /** Switches the Song's Loop on or off, keeping its stretch. */

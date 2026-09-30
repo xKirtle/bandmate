@@ -203,6 +203,7 @@ describe('schedule of a Take Clip', () => {
   const clip: Clip = {
     id: 1,
     beatId: null,
+    soundId: null,
     name: null,
     takes: [
       {
@@ -251,6 +252,7 @@ describe('schedule of a Take Clip', () => {
         { id: 2, name: 'Vox', volume: 0, muted: false, soloed: false, clips: [clip] },
       ],
       beats: [{ id: 5, title: 'Beat', bpm: null, fileName: 'b.mp3', size: 1, duration: 60 }],
+      sounds: [],
       loop: null,
     };
     const scheduled = schedule(playing(tl, clipSources(tl), clip.id), 28);

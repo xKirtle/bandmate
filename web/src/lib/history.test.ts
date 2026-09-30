@@ -6,6 +6,7 @@ import { History, placingAdded, restorable, settingTakes } from './history';
 const clip = (id: number, start: number, more: Partial<Clip> = {}): Clip => ({
   id,
   beatId: 100,
+  soundId: null,
   name: null,
   takes: [],
   activeTakeId: null,
@@ -33,6 +34,7 @@ const timeline = (tracks: Track[], loop: TimelineLoop | null = null): Timeline =
   updatedAt: '',
   tracks,
   beats: [],
+  sounds: [],
   loop,
 });
 
@@ -519,6 +521,43 @@ describe('restorable', () => {
     ];
 
     expect(restorable(cues, now)).toEqual(cues);
+  });
+});
+
+describe('History of Sounds', () => {
+  const soundClip = (id: number, start: number, more: Partial<Clip> = {}) =>
+    clip(id, start, { beatId: null, soundId: 30, length: 8, ...more });
+
+  it('undoes an import by deleting its Clip, and redoes it by placing the same Sound back', () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0)])]);
+    const t1 = timeline([track(1, [clip(5, 0), soundClip(6, 10)])]);
+
+    const edit = placingAdded(t0, t1);
+    h.record(edit, t0, t1);
+
+    expect(edit).toEqual({ kind: 'placeClip', trackId: 1, clip: { soundId: 30, start: 10, offset: 0, length: 8 } });
+    expect(h.nextUndo()).toEqual({ kind: 'deleteClip', clipId: 6 });
+
+    h.undone(t1, t0);
+    expect(h.nextRedo()).toEqual(edit);
+
+    h.redone(t0, timeline([track(1, [clip(5, 0), soundClip(9, 10)])]));
+    expect(h.nextUndo()).toEqual({ kind: 'deleteClip', clipId: 9 });
+  });
+
+  it("undoes deleting a Sound's Clip by placing it back, playing the same Sound, name and all", () => {
+    const h = new History();
+    const t0 = timeline([track(1, [soundClip(6, 10, { name: 'Hum', offset: 1, length: 5 })])]);
+    const t1 = timeline([track(1)]);
+
+    h.record({ kind: 'deleteClip', clipId: 6 }, t0, t1);
+
+    expect(h.nextUndo()).toEqual({
+      kind: 'placeClip',
+      trackId: 1,
+      clip: { soundId: 30, name: 'Hum', start: 10, offset: 1, length: 5 },
+    });
   });
 });
 
