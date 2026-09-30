@@ -1,9 +1,9 @@
 // Where a recording goes on the chosen Track, and where playback and
-// capture start for it. On a Track with Clips the playhead doesn't decide: a
-// Take goes at the Track's append point, so it never lands on an older one.
-// On an empty Track it goes at the playhead, even past the end. A Retake
-// goes into its Clip instead, from the Clip's start as trimmed, and grows
-// it, but never into the next Clip.
+// capture start for it. A Take goes at the playhead, even past the
+// Timeline's end, or where the Track's last Clip ends if the playhead is
+// before that, so it never lands on an older one. A Retake goes into its
+// Clip instead, from the Clip's start as trimmed, and grows it, but never
+// into the next Clip.
 import type { Placed } from './schedule';
 
 /** How long playback leads in before a Take, in seconds, so the Beat is heard coming in. */
@@ -11,18 +11,18 @@ export const leadIn = 2;
 
 /** Where a recording goes, and where playing and capturing start for it, in seconds. */
 export interface RecordingPlan {
-  /** Where the Take's Clip starts: the append point, or the playhead on an empty Track. */
+  /** Where the Take's Clip starts: the playhead, or where the Track's last Clip ends if later. */
   start: number;
   /** Where playback and capture start: leadIn before, but never before 0:00. */
   from: number;
 }
 
 /**
- * Plans a recording on a Track holding clips: its Take goes where the last
- * of them ends, or at the playhead on an empty Track.
+ * Plans a recording on a Track holding clips: its Take goes at the playhead,
+ * or where the last of them ends if the playhead is before that.
  */
 export function recordingPlan(clips: readonly Placed[], playhead: number): RecordingPlan {
-  const start = clips.length ? Math.max(...clips.map((c) => c.start + c.length)) : playhead;
+  const start = Math.max(playhead, ...clips.map((c) => c.start + c.length));
   return { start, from: Math.max(0, start - leadIn) };
 }
 
