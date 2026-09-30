@@ -1,0 +1,23 @@
+name: Idea
+description: Something Bandmate could do better, or doesn't do yet.
+labels: ["needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem you have, not the solution you'd build. Knowing what gets in your way makes it easier to find the fix that fits Bandmate.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do, and what gets in the way? When does it come up?
+      placeholder: When I record a take over a long beat, I...
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: How you deal with it today
+      description: Any workaround you use now, if there is one.
+    validations:
+      required: false
