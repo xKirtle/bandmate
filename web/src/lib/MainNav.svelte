@@ -38,7 +38,10 @@
 </nav>
 
 <style>
-  /* The tab bar, kept clear of the home indicator. */
+  /* The tab bar, kept clear of the home indicator. The tabs have as much
+     space below them as above, on top of the home indicator's inset: with
+     none below, they'd touch the screen's edge, and a rounded corner would
+     cut off a corner tab's highlight. */
   nav {
     position: fixed;
     right: 0;
@@ -47,7 +50,7 @@
     z-index: 2;
     display: flex;
     height: var(--tabbar-space);
-    padding: 0.25rem max(0.5rem, env(safe-area-inset-right)) env(safe-area-inset-bottom)
+    padding: 0.25rem max(0.5rem, env(safe-area-inset-right)) calc(0.25rem + env(safe-area-inset-bottom))
       max(0.5rem, env(safe-area-inset-left));
     border-top: 1px solid var(--border);
     background: var(--surface-1);
