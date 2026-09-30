@@ -33,7 +33,7 @@
     type Saved,
   } from './history';
   import { formatVolume, maxVolume, minVolume, trackGains, type Levels } from './mixer';
-  import { type MenuAction } from './menu';
+  import { opensMenu, type MenuAction } from './menu';
   import { peaks as peaksOf, peaksPerSecond } from './peaks';
   import { keyActedOnPage } from './pointerFocus';
   import { longPressDelay, pastSlop, type Point } from './press';
@@ -843,10 +843,19 @@
   let transportMore = $state<HTMLElement>();
   const transportMenu = $derived(
     transportActions(
-      { fullTimeline: editable.current, importing: importing !== null, recording: recording !== null },
+      {
+        // Only there can the Timeline be edited.
+        fullTimeline: editable.current,
+        importing: importing !== null,
+        recording: recording !== null,
+        chosenTrack: timeline.tracks.find((t) => t.id === chosen)?.name ?? 'the Chosen Track',
+      },
       {
         importAudio: () => importInput.click(),
-        recordingSettings: () => transportMore && inputSettings.openSettings(transportMore),
+        // Chosen from the ⋯, so it's there to place them by.
+        recordingSettings: () => {
+          if (transportMore) inputSettings.openSettings(transportMore);
+        },
       },
     ),
   );
@@ -1575,7 +1584,7 @@
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault();
       remove(clip);
-    } else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+    } else if (opensMenu(event)) {
       event.preventDefault();
       openClipMenu(clip, event.currentTarget as HTMLElement);
     }

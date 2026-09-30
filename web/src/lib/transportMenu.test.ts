@@ -2,7 +2,7 @@ import { describe as group, expect, it } from 'vitest';
 import { transportActions } from './transportMenu';
 
 group('transportActions', () => {
-  const idle = { fullTimeline: true, importing: false, recording: false };
+  const idle = { fullTimeline: true, importing: false, recording: false, chosenTrack: 'Vocals' };
   const run = { importAudio: () => {}, recordingSettings: () => {} };
   const shown = (state: typeof idle) =>
     transportActions(state, run).map(({ label, disabled }) => ({ label, disabled: disabled ?? false }));
@@ -12,6 +12,10 @@ group('transportActions', () => {
       { label: 'Import audio…', disabled: false },
       { label: 'Recording settings…', disabled: false },
     ]);
+  });
+
+  it('says which Track Import audio… imports onto', () => {
+    expect(transportActions(idle, run)[0].title).toBe('Import an audio file as a Sound onto Vocals');
   });
 
   it('runs what each entry names', () => {

@@ -287,6 +287,7 @@
             tabindex="-1"
             aria-haspopup={'choices' in entry ? 'menu' : undefined}
             aria-disabled={('disabled' in entry && entry.disabled) || undefined}
+            title={'title' in entry ? entry.title : undefined}
             onclick={(e) => choose(entry, keyboardClick(e))}
           >
             {#if 'icon' in entry}

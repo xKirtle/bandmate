@@ -32,7 +32,7 @@
   let anchor: HTMLElement | null = null;
   let returnFocus: HTMLElement | null = null;
   let panel = $state<HTMLElement>();
-  // Between the trigger and the panel, in px.
+  // Between what they're placed by and the panel, in px.
   const gap = 4;
 
   let choice = $state<InputChoice>(readInput(deviceStorage()));

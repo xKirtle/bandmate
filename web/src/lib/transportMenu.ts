@@ -11,6 +11,8 @@ export type TransportState = {
   fullTimeline: boolean;
   importing: boolean;
   recording: boolean;
+  /** The Chosen Track's name, which Import audio… imports onto. */
+  chosenTrack: string;
 };
 
 /** What each entry does. */
@@ -26,12 +28,14 @@ export function transportActions(state: TransportState, run: TransportRun): Menu
     {
       icon: '⤒',
       label: 'Import audio…',
+      title: `Import an audio file as a Sound onto ${state.chosenTrack}`,
       disabled: state.importing || state.recording,
       run: run.importAudio,
     },
     {
       icon: '◎',
       label: 'Recording settings…',
+      title: 'The input to record from, its level, and the Latency Offset',
       disabled: state.recording,
       run: run.recordingSettings,
     },
