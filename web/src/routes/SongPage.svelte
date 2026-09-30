@@ -548,7 +548,7 @@
           {loopOn}
           stopLoop={() => timelinePanel?.stopLoop()}
           {recording}
-          onSyncing={(on) => (syncing = on)}
+          bind:syncing
           hasClips={timeline?.tracks.some((t) => t.clips.length > 0) ?? false}
         />
       </div>
@@ -570,7 +570,7 @@
               <Masters {song} {mode} change={send} onUnsaved={setUnsaved} {setStatus} />
             {:else}
               <summary>Scrapbook</summary>
-              <Scrapbook {song} change={send} {drag} onUnsaved={setUnsaved} />
+              <Scrapbook {song} change={send} {drag} onUnsaved={setUnsaved} onEdit={() => (syncing = false)} />
             {/if}
           </details>
         {/each}

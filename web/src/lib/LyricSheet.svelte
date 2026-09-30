@@ -47,7 +47,7 @@
     loopOn = false,
     stopLoop,
     recording = false,
-    onSyncing,
+    syncing = $bindable(false),
   }: {
     song: Song;
     /** The Song page's mode: Write edits the raw text; Read shows Chords above the lyrics. */
@@ -71,8 +71,11 @@
     loopOn?: boolean;
     /** Whether the Timeline is recording, which keeps Sync mode off: the two are exclusive. */
     recording?: boolean;
-    /** Hears whether Sync mode is on, whenever that changes, e.g. to keep recording from starting. */
-    onSyncing?: (on: boolean) => void;
+    /**
+     * Whether Sync mode is on, e.g. to keep recording from starting. Switched
+     * off from outside, it ends, e.g. as a Section in the Scrapbook opens.
+     */
+    syncing?: boolean;
     /** Switches the Timeline's Loop off, as Sync mode comes on. */
     stopLoop?: () => void;
   } = $props();
@@ -115,7 +118,7 @@
     actions.push({
       icon: '×',
       ...removal(section),
-      run: () => change((at) => api.removeFromArrangement(at, section.id)),
+      run: () => edit((at) => api.removeFromArrangement(at, section.id)),
     });
     return actions;
   }
@@ -217,14 +220,23 @@
   // switches the Loop off, and the Loop coming on, however it does,
   // switches Sync mode off.
   // Nor does it come on while recording, which only starts while it's off.
-  let syncing = $state(false);
   const canSync = $derived(mode === 'write' && wide.current && hasClips && !recording);
   $effect(() => {
     if (!canSync || loopOn) untrack(() => (syncing = false));
   });
-  $effect(() => {
-    onSyncing?.(syncing);
-  });
+
+  // Sync mode is only for cueing, so changing the lyrics ends it, playback
+  // carrying on: any change to the Arrangement, relabelling a Section in it,
+  // and opening a Section's Alternates. Cue edits go through editCues, so
+  // never end it, and nor does a Line text edit typed before it came on
+  // being saved.
+  function endSyncing() {
+    syncing = false;
+  }
+  function edit(op: (at: SongAt) => Promise<Song>): Promise<boolean> {
+    endSyncing();
+    return change(op);
+  }
 
   // What the Line up next is worked out from: the Line last cued, or a Line
   // picked by clicking it. It doesn't follow playback, so playback can start
@@ -285,7 +297,7 @@
     cueNext();
   }
 
-  // The Section just added, whose Label gets focus.
+  // The Section just added or duplicated, whose Label gets focus.
   let added = $state<number | null>(null);
   const songHasChords = $derived(hasChords(song));
   // Follows the server, except while a change to it is being sent.
@@ -303,18 +315,21 @@
   }
 
   async function add(position: number) {
-    if (await change((at) => api.addSection(at, { position }))) {
+    if (await edit((at) => api.addSection(at, { position }))) {
       added = song.arrangement[position] ?? null;
     }
   }
 
-  function duplicate(sectionId: number, position?: number) {
-    change((at) => api.duplicateSection(at, sectionId, position));
+  /** Duplicates a Section at position in the Arrangement, or at the end. */
+  async function duplicate(sectionId: number, position?: number) {
+    if (await edit((at) => api.duplicateSection(at, sectionId, position))) {
+      added = (position === undefined ? song.arrangement.at(-1) : song.arrangement[position]) ?? null;
+    }
   }
 
   function move(index: number, by: -1 | 1) {
     const order = moveTo(song.arrangement, index, index + by);
-    change((at) => api.reorderArrangement(at, order));
+    edit((at) => api.reorderArrangement(at, order));
   }
 
   // On desktop, a Section is also dragged by the grip on its header: within
@@ -331,7 +346,7 @@
     if ('reorder' in drop) {
       const { from, to } = drop.reorder;
       const order = moveTo(song.arrangement, from, to);
-      change((at) => api.reorderArrangement(at, order));
+      edit((at) => api.reorderArrangement(at, order));
     } else if ('toScrapbook' in drop) {
       toScrapbook(drop.toScrapbook);
     } else if ('addTo' in drop && 'arrangementAt' in drop.addTo.dragged) {
@@ -351,7 +366,7 @@
     const focused = document.activeElement;
     if (focused instanceof HTMLElement && focused.closest(`[data-section="${section.id}"]`)) focused.blur();
     const said = addedNotice(section, to);
-    if (await change((at) => api.addToSection(at, section.id, to.id))) notice = said;
+    if (await edit((at) => api.addToSection(at, section.id, to.id))) notice = said;
   }
 
   // Dropped on the Scrapbook, a Section goes to its end, or isn't kept if
@@ -361,7 +376,7 @@
     if (!section) return;
     const empty = isEmpty(section);
     const name = describe(section);
-    if ((await change((at) => api.removeFromArrangement(at, section.id))) && empty) {
+    if ((await edit((at) => api.removeFromArrangement(at, section.id))) && empty) {
       notice = `Nothing was written in ${name}, so it wasn't kept.`;
     }
   }
@@ -490,6 +505,7 @@
               {section}
               autofocus={added === section.id}
               {change}
+              onEdit={endSyncing}
               {onUnsaved}
               cueing={cueingFor(section)}
               more={sectionActions(section, i)}

@@ -20,6 +20,7 @@
     cueing,
     drag,
     places = [],
+    onEdit,
   }: {
     section: Section;
     /** Focus the Label when this becomes true, e.g. for a Section just added. */
@@ -40,6 +41,8 @@
     drag?: SectionDragging;
     /** Where in the Lyric Sheet an inactive Alternate can be moved to, as a Section of its own. */
     places?: Place[];
+    /** Hears the Label being changed or the Alternates opening, e.g. to end Sync mode. */
+    onEdit?: () => void;
   } = $props();
 
   // The server guarantees exactly one active Alternate.
@@ -67,6 +70,7 @@
       label = section.label;
       return;
     }
+    onEdit?.();
     if (!(await change((at) => api.setSectionLabel(at, section.id, next)))) label = section.label;
   }
 
@@ -80,6 +84,7 @@
   }
 
   async function startChoosing() {
+    onEdit?.();
     choosing = true;
     await tick();
     // Straight to the choice, where the arrow keys go through the Alternates.
