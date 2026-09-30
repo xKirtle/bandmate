@@ -157,7 +157,9 @@ type execer interface {
 const firstTrackName = "Track 1"
 
 // insertSong creates a Song with the given title and Status idea, and its
-// first Track, and returns its id.
+// first Track, and returns its id. CreateSong names a Song without a title
+// before it gets here, so a blank title is refused only for callers that
+// don't, such as import.
 func insertSong(ctx context.Context, db execer, title string) (int64, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {

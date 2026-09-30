@@ -32,9 +32,9 @@
   // A Song just made with "New Song" opens with its title focused and
   // selected, ready to type over, just this once: the flag saying so comes
   // out of the URL straight away, so a reload or Back/Forward doesn't.
-  const opening = takeNewFlag(router.search);
-  if (opening.isNew) replaceSearch(opening.rest);
-  let focusTitle = opening.isNew;
+  const { isNew, rest: queryWithoutFlag } = takeNewFlag(router.search);
+  if (isNew) replaceSearch(queryWithoutFlag);
+  let titleAwaitsFocus = isNew;
 
   // What the inputs show. Numbers stay text while typing.
   interface Draft {
@@ -293,8 +293,8 @@
   }
 
   function focusNewTitle(el: HTMLTextAreaElement) {
-    if (!focusTitle) return;
-    focusTitle = false;
+    if (!titleAwaitsFocus) return;
+    titleAwaitsFocus = false;
     el.focus();
     el.select();
   }

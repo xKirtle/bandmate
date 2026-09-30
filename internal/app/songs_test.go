@@ -50,6 +50,9 @@ func TestReadingUnknownSongIsNotFound(t *testing.T) {
 	expectStatus(t, res, http.StatusNotFound)
 }
 
+// untitledSong is what the server names a Song created without a title.
+const untitledSong = "Untitled Song"
+
 func TestSongCreatedWithoutTitleIsUntitledSong(t *testing.T) {
 	cases := map[string]any{
 		"missing title": map[string]any{},
@@ -65,14 +68,14 @@ func TestSongCreatedWithoutTitleIsUntitledSong(t *testing.T) {
 			expectStatus(t, res, http.StatusCreated)
 			var created song
 			res.JSON(t, &created)
-			if created.Title != "Untitled Song" {
-				t.Errorf("title = %q, want %q", created.Title, "Untitled Song")
+			if created.Title != untitledSong {
+				t.Errorf("title = %q, want %q", created.Title, untitledSong)
 			}
 			if created.Status != "idea" {
 				t.Errorf("status = %q, want %q", created.Status, "idea")
 			}
-			if got := ts.getSong(created.ID); got.Title != "Untitled Song" {
-				t.Errorf("read title = %q, want %q", got.Title, "Untitled Song")
+			if got := ts.getSong(created.ID); got.Title != untitledSong {
+				t.Errorf("read title = %q, want %q", got.Title, untitledSong)
 			}
 		})
 	}
@@ -92,8 +95,8 @@ func TestSeveralSongsCanBeUntitledSong(t *testing.T) {
 		t.Fatalf("song list has %d songs, want 2: %+v", len(list), list)
 	}
 	for _, s := range list {
-		if s.Title != "Untitled Song" {
-			t.Errorf("song %d title = %q, want %q", s.ID, s.Title, "Untitled Song")
+		if s.Title != untitledSong {
+			t.Errorf("song %d title = %q, want %q", s.ID, s.Title, untitledSong)
 		}
 	}
 }
