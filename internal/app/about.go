@@ -52,3 +52,10 @@ func details(b build.Info, p build.Platform, d db.Description) string {
 	return fmt.Sprintf("%s\nGo %s %s/%s · SQLite %s · schema %s",
 		first, p.GoVersion, p.OS, p.Arch, d.SQLiteVersion, d.Schema.Migration)
 }
+
+// aboutReleases tells the About page whether a newer release exists, and
+// what the recent ones changed, as GitHub knows it. It's apart from about, so
+// a slow or failing GitHub never holds up the rest of the page.
+func (a *App) aboutReleases(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, a.releases.Report(r.Context(), a.build))
+}

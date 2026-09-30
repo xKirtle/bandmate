@@ -1,5 +1,8 @@
 // What the About page works out in the browser: how long the server has been
-// up, and the block Copy details puts on the clipboard.
+// up, the block Copy details puts on the clipboard, and how the server's
+// releases check reads under the version.
+
+import type { ReleasesReport } from './api';
 
 const units: [string, number][] = [
   ['day', 24 * 3600],
@@ -28,4 +31,24 @@ export function uptime(startedAt: string, now = Date.now()): string {
 /** The server's details for a bug report, with the browser's user agent added. */
 export function bugReportDetails(details: string, userAgent: string): string {
   return `${details}\nBrowser: ${userAgent}`;
+}
+
+/** The line under the version: the verdict, linking to the release it names
+    (url), or that the check failed, when the releases page is the place to
+    look instead (seeReleases). */
+export type UpdateStatus = { text: string; url?: string; seeReleases?: true };
+
+/** How the server's releases check reads under the version, or null when
+    there's nothing to say: the check is off, or there are no releases yet. */
+export function updateStatus(r: ReleasesReport): UpdateStatus | null {
+  if (r.check === 'failed') return { text: "Couldn't check for updates", seeReleases: true };
+  if (r.check !== 'ok' || !r.latest) return null;
+  switch (r.verdict) {
+    case 'upToDate':
+      return { text: 'Up to date' };
+    case 'updateAvailable':
+      return { text: `${r.latest.tag} available`, url: r.latest.url };
+    default:
+      return { text: `Latest release: ${r.latest.tag}`, url: r.latest.url };
+  }
 }

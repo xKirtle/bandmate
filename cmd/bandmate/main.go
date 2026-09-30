@@ -5,6 +5,7 @@
 //	BANDMATE_ADDR      listen address (default ":8080")
 //	BANDMATE_DATA_DIR  directory holding the database and audio files (default "./data")
 //	BANDMATE_MAX_UPLOAD_MB  largest audio file accepted, in megabytes (default 500)
+//	BANDMATE_UPDATE_CHECK   "off" stops the About page asking GitHub for releases (default "on")
 //
 // "bandmate healthcheck" asks a running server whether it is healthy and exits
 // non-zero if not, for container healthchecks in images without curl.
@@ -44,14 +45,21 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := run(addr, env("BANDMATE_DATA_DIR", "./data"), maxUpload); err != nil {
+	updateCheckOff, err := readUpdateCheck()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := run(addr, env("BANDMATE_DATA_DIR", "./data"), maxUpload, updateCheckOff); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(addr, dataDir string, maxUploadBytes int64) error {
+func run(addr, dataDir string, maxUploadBytes int64, updateCheckOff bool) error {
 	running := build.Current()
-	a, err := app.New(app.Config{DataDir: dataDir, SPA: web.Dist(), MaxUploadBytes: maxUploadBytes, Build: running})
+	a, err := app.New(app.Config{
+		DataDir: dataDir, SPA: web.Dist(), MaxUploadBytes: maxUploadBytes, Build: running,
+		UpdateCheckOff: updateCheckOff,
+	})
 	if err != nil {
 		return err
 	}
@@ -130,6 +138,18 @@ func maxUploadBytes() (int64, error) {
 		return 0, errors.New("BANDMATE_MAX_UPLOAD_MB must be a whole number of megabytes, 1 or more")
 	}
 	return mb << 20, nil
+}
+
+// readUpdateCheck reads BANDMATE_UPDATE_CHECK, telling whether the check is
+// off: it's on unless it's "off".
+func readUpdateCheck() (off bool, err error) {
+	switch strings.ToLower(os.Getenv("BANDMATE_UPDATE_CHECK")) {
+	case "", "on":
+		return false, nil
+	case "off":
+		return true, nil
+	}
+	return false, errors.New(`BANDMATE_UPDATE_CHECK must be "on" or "off"`)
 }
 
 func env(key, fallback string) string {
