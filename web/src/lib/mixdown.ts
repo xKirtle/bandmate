@@ -14,8 +14,11 @@ import { atFullScale, type WavBits } from './wav';
 export const mixdownRate = 48000;
 const channels = 2;
 
-/** How far a Mixdown has got: loading its Clips' audio, then mixing, done a fraction of the way. */
-export type MixdownProgress = { step: 'loading' } | { step: 'mixing'; done: number };
+/**
+ * How far a Mixdown has got: loading its Clips' audio, then mixing, then,
+ * for an MP3, encoding it, each done a fraction of the way.
+ */
+export type MixdownProgress = { step: 'loading' } | { step: 'mixing' | 'encoding'; done: number };
 
 /** What a Mixdown mixes, and how. */
 export interface MixdownPlan {

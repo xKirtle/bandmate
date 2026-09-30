@@ -11,6 +11,16 @@ const headerSize = 44;
 const fullScaleAt = (bits: WavBits) => 2 ** (bits - 1) - 1;
 
 /**
+ * A sample, from -1 to 1, as the integer it's encoded as at a bit depth:
+ * rounded, so a quiet sample doesn't all drift towards zero, and clipped
+ * to full scale.
+ */
+export function pcmSample(sample: number, bits: WavBits): number {
+  const fullScale = fullScaleAt(bits);
+  return Math.max(-fullScale - 1, Math.min(fullScale, Math.round(sample * (fullScale + 1))));
+}
+
+/**
  * Whether a sample, from -1 to 1, is at full scale once encoded at a bit
  * depth: the largest or smallest sample, which anything louder is clipped to.
  */
@@ -26,7 +36,6 @@ export function atFullScale(sample: number, bits: WavBits = 24): boolean {
  */
 export function encodeWav(channels: readonly Float32Array[], sampleRate: number, bits: WavBits = 24): ArrayBuffer {
   const bytesPerSample = bits / 8;
-  const fullScale = fullScaleAt(bits);
   const frames = channels[0]?.length ?? 0;
   const bytesPerFrame = channels.length * bytesPerSample;
   const dataSize = frames * bytesPerFrame;
@@ -52,9 +61,7 @@ export function encodeWav(channels: readonly Float32Array[], sampleRate: number,
   // Interleaved: each frame holds every channel's sample in turn.
   for (const [c, samples] of channels.entries()) {
     for (let i = 0; i < frames; i++) {
-      const clipped = Math.max(-1, Math.min(1, samples[i]));
-      // Rounded, so a quiet sample doesn't all drift towards zero.
-      const value = Math.max(-fullScale - 1, Math.min(fullScale, Math.round(clipped * (fullScale + 1))));
+      const value = pcmSample(samples[i], bits);
       const at = i * bytesPerFrame + c * bytesPerSample;
       // Little-endian, in two's complement.
       for (let b = 0; b < bytesPerSample; b++) bytes[at + b] = (value >> (8 * b)) & 0xff;

@@ -57,11 +57,8 @@
   const offered = untrack(() => mixdownRanges(end, loop));
   const ranges = offered.ranges;
   let chosen = $state.raw<MixdownRange>(offered.chosen);
-  // The formats it can encode, and the one picked, which this browser
-  // remembers. MP3 joins them once it has an encoder (#335).
-  const formats: readonly MixdownFormat[] = mixdownFormats.filter((f) => f.of === 'wav');
-  const remembered = readMixdownFormat(deviceStorage());
-  let format = $state.raw<MixdownFormat>(formats.includes(remembered) ? remembered : formats[0]);
+  // The format picked, which this browser remembers.
+  let format = $state.raw<MixdownFormat>(readMixdownFormat(deviceStorage()));
   const name = $derived(mixdownName(songTitle, chosen, format));
   const span = (range: MixdownRange) => `${formatDuration(range.start)}–${formatDuration(range.end)}`;
 
@@ -85,9 +82,11 @@
       });
       if (cancel.signal.aborted) return;
       const channels = [audio.getChannelData(0), audio.getChannelData(1)];
-      if (format.of !== 'wav') throw new Error(`${format.label} can't be encoded yet`);
-      levels = levelsOf(channels, format.bits);
-      save(new Blob([encodeWav(channels, mixdownRate, format.bits)], { type: 'audio/wav' }));
+      // An MP3 is encoded from 16-bit samples, so it clips where a 16-bit WAV would.
+      levels = levelsOf(channels, format.of === 'wav' ? format.bits : 16);
+      const file = await encode(channels, cancel.signal);
+      if (cancel.signal.aborted) return;
+      save(file);
       phase = 'done';
     } catch (e) {
       if (cancel.signal.aborted) return;
@@ -96,6 +95,16 @@
     } finally {
       if (mixing === cancel) mixing = null;
     }
+  }
+
+  /** Encodes the Mixdown's file in the format picked, loading the MP3 encoder only once it's needed. */
+  async function encode(channels: Float32Array[], signal: AbortSignal): Promise<Blob> {
+    if (format.of === 'wav') return new Blob([encodeWav(channels, mixdownRate, format.bits)], { type: 'audio/wav' });
+    const { encodeMp3 } = await import('./mp3');
+    return encodeMp3(channels, mixdownRate, format.kbps, {
+      signal,
+      onProgress: (done) => (progress = { step: 'encoding', done }),
+    });
   }
 
   /** Downloads the Mixdown's file. */
@@ -154,7 +163,7 @@
     {/if}
     <fieldset>
       <legend>Format</legend>
-      {#each formats as f (f.id)}
+      {#each mixdownFormats as f (f.id)}
         <label>
           <input type="radio" name="mixdown-format" checked={format === f} onchange={() => pick(f)} />
           <span>{f.label}</span>
@@ -167,10 +176,12 @@
     {/if}
   {:else if phase === 'mixing'}
     <p role="status" aria-live="polite">
-      {progress.step === 'loading' ? 'Loading the audio…' : `Mixing down… ${Math.floor(progress.done * 100)}%`}
+      {progress.step === 'loading'
+        ? 'Loading the audio…'
+        : `${progress.step === 'mixing' ? 'Mixing down' : 'Encoding the MP3'}… ${Math.floor(progress.done * 100)}%`}
     </p>
     <!-- Without a value while loading: how long that takes isn't known. -->
-    {#if progress.step === 'mixing'}
+    {#if progress.step !== 'loading'}
       <progress max="1" value={progress.done} aria-label="How far the Mixdown has got"></progress>
     {:else}
       <progress aria-label="How far the Mixdown has got"></progress>
