@@ -6,13 +6,7 @@
   import BeatFilters from './BeatFilters.svelte';
   import BeatTable from './BeatTable.svelte';
   import { fromDraft, toDraft, type BeatDraft } from './beatDraft';
-  import {
-    defaultBeatListView,
-    filterBeats,
-    isBeatListFiltered,
-    songBeatHint,
-    sortBeats,
-  } from './listViews';
+  import { defaultBeatListView, filterBeats, isBeatListFiltered, songBeatHint, sortBeats } from './listViews';
   import { playMediaAlone, release } from './playback';
   import { formatDuration } from './time';
   import { suggestForFile } from './beatTags';

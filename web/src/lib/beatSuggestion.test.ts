@@ -89,7 +89,12 @@ describe('suggestBeatDetails from tags', () => {
     ['a major key', { key: 'Dbmaj' }, { title: 'Dark Trap', producer: '', bpm: 140, key: 'Db' }],
     ['a plain major key', { key: 'G' }, { title: 'Dark Trap', producer: '', bpm: 140, key: 'G' }],
     ['a lowercase key', { key: 'f#m' }, { title: 'Dark Trap', producer: '', bpm: 140, key: 'F#m' }],
-    ['a producer in the filename', { artist: 'Ana' }, { title: 'Nights', producer: 'Ana', bpm: null, key: '' }, 'Nights (prod. Kofi).mp3'],
+    [
+      'a producer in the filename',
+      { artist: 'Ana' },
+      { title: 'Nights', producer: 'Ana', bpm: null, key: '' },
+      'Nights (prod. Kofi).mp3',
+    ],
     ['a key in another notation', { key: '8A' }, { title: 'Dark Trap', producer: '', bpm: 140, key: '8A' }],
   ])('with %s', (_, tags, suggestion, name = fileName) => {
     expect(suggestBeatDetails(name, tags)).toEqual(suggestion);

@@ -57,15 +57,27 @@ group('comboboxKey', () => {
   });
 
   it('moves the highlight down and up from the current option, wrapping round', () => {
-    expect(comboboxKey('ArrowDown', false, { open: true, active: 5, count: 6 })).toEqual({ kind: 'highlight', index: 0 });
-    expect(comboboxKey('ArrowDown', false, { open: true, active: 1, count: 6 })).toEqual({ kind: 'highlight', index: 2 });
+    expect(comboboxKey('ArrowDown', false, { open: true, active: 5, count: 6 })).toEqual({
+      kind: 'highlight',
+      index: 0,
+    });
+    expect(comboboxKey('ArrowDown', false, { open: true, active: 1, count: 6 })).toEqual({
+      kind: 'highlight',
+      index: 2,
+    });
     expect(comboboxKey('ArrowUp', false, { open: true, active: 0, count: 6 })).toEqual({ kind: 'highlight', index: 5 });
     expect(comboboxKey('ArrowUp', false, { open: true, active: 3, count: 6 })).toEqual({ kind: 'highlight', index: 2 });
   });
 
   it('starts from the first or last option when none is highlighted', () => {
-    expect(comboboxKey('ArrowDown', false, { open: true, active: -1, count: 3 })).toEqual({ kind: 'highlight', index: 0 });
-    expect(comboboxKey('ArrowUp', false, { open: true, active: -1, count: 3 })).toEqual({ kind: 'highlight', index: 2 });
+    expect(comboboxKey('ArrowDown', false, { open: true, active: -1, count: 3 })).toEqual({
+      kind: 'highlight',
+      index: 0,
+    });
+    expect(comboboxKey('ArrowUp', false, { open: true, active: -1, count: 3 })).toEqual({
+      kind: 'highlight',
+      index: 2,
+    });
   });
 
   it('closes on Alt+↑ and Escape', () => {

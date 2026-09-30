@@ -132,13 +132,15 @@ export class Keeper {
     if (batches.length === 0) return;
     this.#pending = [];
     this.#pendingFrames = 0;
-    this.#writes = this.#writes.then(async () => {
-      const takeId = await this.#id;
-      if (takeId === null) return;
-      const tx = (await open()).transaction(chunksStore, 'readwrite');
-      tx.objectStore(chunksStore).add({ takeId, batches });
-      await done(tx);
-    }).catch(() => {});
+    this.#writes = this.#writes
+      .then(async () => {
+        const takeId = await this.#id;
+        if (takeId === null) return;
+        const tx = (await open()).transaction(chunksStore, 'readwrite');
+        tx.objectStore(chunksStore).add({ takeId, batches });
+        await done(tx);
+      })
+      .catch(() => {});
   }
 
   /** Writes what's left, and resolves to the recording's id, or null if it couldn't be kept. */

@@ -218,9 +218,7 @@
   let switchingOff = $state(false);
   const loopOn = $derived((timeline.loop?.on ?? false) && !switchingOff);
   // The Loop playback repeats: the saved one, while it's on.
-  const playingLoop = $derived<Loop | null>(
-    loopOn ? { start: timeline.loop!.start, end: timeline.loop!.end } : null,
-  );
+  const playingLoop = $derived<Loop | null>(loopOn ? { start: timeline.loop!.start, end: timeline.loop!.end } : null);
   // Matches the phone layout below, which hides editing.
   const editable = new MediaQuery('min-width: 40.0625rem');
 
@@ -283,11 +281,7 @@
    * Sends an edit, based on the Timeline or Song as it is when its turn
    * comes, and notes in the history what it did.
    */
-  async function send(
-    at: SongAt,
-    e: HistoryEdit,
-    note: (before: Timeline, after: Timeline) => void,
-  ): Promise<Saved> {
+  async function send(at: SongAt, e: HistoryEdit, note: (before: Timeline, after: Timeline) => void): Promise<Saved> {
     if (e.kind === 'restoreCues') {
       // Cues whose Line is gone since, or can't take one, can't come back. With
       // none left, there's nothing to send, and the step is passed over.
@@ -365,7 +359,6 @@
     editedAt = at.version;
     return { timeline: { ...timeline, version: at.version, updatedAt: song.updatedAt } };
   }
-
 
   function undoKeys(event: KeyboardEvent) {
     if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== 'z') return;
@@ -771,9 +764,12 @@
   /** Adds a Track at the bottom and chooses it; resolves to whether it was added. */
   async function addTrack(): Promise<boolean> {
     let added: number | null = null;
-    const ok = await perform({ kind: 'addTrack', track: { name: `Track ${timeline.tracks.length + 1}` } }, (before, after) => {
-      added = addedTrack(before.tracks, after.tracks);
-    });
+    const ok = await perform(
+      { kind: 'addTrack', track: { name: `Track ${timeline.tracks.length + 1}` } },
+      (before, after) => {
+        added = addedTrack(before.tracks, after.tracks);
+      },
+    );
     // Once the Timeline shows it: until then, it isn't there to choose.
     if (ok && added !== null) choose({ kind: 'add', trackId: added });
     return ok && added !== null;
@@ -1746,13 +1742,8 @@
     <button type="button" class="icon" onclick={undo} disabled={!undoable} aria-label="Undo" title="Undo (Ctrl+Z)"
       >↶</button
     >
-    <button
-      type="button"
-      class="icon"
-      onclick={redo}
-      disabled={!redoable}
-      aria-label="Redo"
-      title="Redo (Ctrl+Shift+Z)">↷</button
+    <button type="button" class="icon" onclick={redo} disabled={!redoable} aria-label="Redo" title="Redo (Ctrl+Shift+Z)"
+      >↷</button
     >
   </span>
 {/snippet}
@@ -2033,7 +2024,8 @@
                   style:width={at.width}
                   title="Loop {formatDuration(loop.start)} to {formatDuration(loop.end)}"
                 >
-                  <span class="loop-edge start edit-only" data-edge="start" title="Drag to move the Loop's start"></span>
+                  <span class="loop-edge start edit-only" data-edge="start" title="Drag to move the Loop's start"
+                  ></span>
                   <button
                     type="button"
                     class="loop-clear edit-only"
@@ -2086,7 +2078,7 @@
                     class:retaking={clip.id === recording?.clipId}
                     style:left="{percent(at.start)}%"
                     style:width="{percent(at.length)}%"
-                    title={title}
+                    {title}
                     role="group"
                     aria-label="{title}, {formatDuration(at.start)} to {formatDuration(at.start + at.length)}"
                     tabindex={editable.current ? 0 : undefined}
@@ -2199,13 +2191,7 @@
         {#if thumb}
           <!-- Pointer only: the ruler is the keyboard's slider for the position. -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div
-            class="scrollbar"
-            bind:this={barElement}
-            onpointerdown={barDown}
-            onwheel={barWheel}
-            aria-hidden="true"
-          >
+          <div class="scrollbar" bind:this={barElement} onpointerdown={barDown} onwheel={barWheel} aria-hidden="true">
             <div
               class="scroll-thumb"
               class:dragging={thumbDrag !== null}
@@ -2257,7 +2243,9 @@
     <!-- Over the page just above the Timeline, so showing it never moves anything. -->
     <div class="error-bar" role="alert">
       <span class="error">{error}</span>
-      <button type="button" class="dismiss" onclick={() => (error = null)} aria-label="Dismiss" title="Dismiss">×</button>
+      <button type="button" class="dismiss" onclick={() => (error = null)} aria-label="Dismiss" title="Dismiss"
+        >×</button
+      >
     </div>
   {/if}
 </section>

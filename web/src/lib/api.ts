@@ -147,7 +147,23 @@ export const suggestedLabels: readonly string[] = [
 ];
 
 /** Keys offered as suggestions, for Songs and Beats; any text is allowed. */
-export const commonKeys: readonly string[] = ['C', 'Cm', 'D', 'Dm', 'E', 'Em', 'F', 'F#m', 'G', 'Gm', 'A', 'Am', 'Bb', 'B', 'Bm'];
+export const commonKeys: readonly string[] = [
+  'C',
+  'Cm',
+  'D',
+  'Dm',
+  'E',
+  'Em',
+  'F',
+  'F#m',
+  'G',
+  'Gm',
+  'A',
+  'Am',
+  'Bb',
+  'B',
+  'Bm',
+];
 
 /** A partial update: only the fields present change; "" or null clears one. */
 export type SongChanges = Partial<
@@ -563,8 +579,7 @@ export const api = {
   /** Where a Master's audio streams from, with seeking. */
   masterAudioUrl: (songId: number, masterId: number) => `/api/songs/${songId}/masters/${masterId}/audio`,
   /** Downloads a Master's original file under its uploaded name. */
-  masterDownloadUrl: (songId: number, masterId: number) =>
-    `/api/songs/${songId}/masters/${masterId}/audio?download`,
+  masterDownloadUrl: (songId: number, masterId: number) => `/api/songs/${songId}/masters/${masterId}/audio?download`,
   getTimeline: (songId: number) => request<Timeline>('GET', `/songs/${songId}/timeline`),
   /** Places a whole Beat on a Track, after its last Clip or at 0:00. */
   addBeatToTimeline: (at: SongAt, trackId: number, beatId: number) =>

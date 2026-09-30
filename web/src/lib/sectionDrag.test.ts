@@ -181,8 +181,12 @@ describe('dropFor', () => {
   });
 
   it('adds a Lyric Sheet Section dropped onto another Section to it', () => {
-    expect(dropFor({ arrangementAt: 1 }, { onto: 2 })).toEqual({ addTo: { dragged: { arrangementAt: 1 }, arrangementAt: 2 } });
-    expect(dropFor({ arrangementAt: 3 }, { onto: 0 })).toEqual({ addTo: { dragged: { arrangementAt: 3 }, arrangementAt: 0 } });
+    expect(dropFor({ arrangementAt: 1 }, { onto: 2 })).toEqual({
+      addTo: { dragged: { arrangementAt: 1 }, arrangementAt: 2 },
+    });
+    expect(dropFor({ arrangementAt: 3 }, { onto: 0 })).toEqual({
+      addTo: { dragged: { arrangementAt: 3 }, arrangementAt: 0 },
+    });
   });
 
   it('does nothing with a Lyric Sheet Section dropped onto itself', () => {

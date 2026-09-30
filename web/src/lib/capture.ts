@@ -127,7 +127,8 @@ function inputError(e: Error): string {
   const name = e.name;
   if (name === 'NotAllowedError' || name === 'SecurityError') return blocked;
   if (name === 'NotFoundError' || name === 'OverconstrainedError') return noInput;
-  if (name === 'NotReadableError') return "The audio input is busy or unavailable. Check it isn't in use by another app.";
+  if (name === 'NotReadableError')
+    return "The audio input is busy or unavailable. Check it isn't in use by another app.";
   return `Couldn't open the microphone (${e.message}).`;
 }
 

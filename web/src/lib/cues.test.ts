@@ -159,11 +159,11 @@ describe('currentPosition', () => {
     const song = sheet([{ id: 1, lines: ['One', 'Two', 'Three'], lineCues: { 100: 10, 101: 14, 102: 18 } }]);
     const retaking = { section: 1, line: 101 };
 
-    it("keeps the Line before it current past its old Cue", () => {
+    it('keeps the Line before it current past its old Cue', () => {
       expect(currentPosition(song, 15, retaking)).toEqual({ section: 1, line: 100 });
     });
 
-    it('goes on to the Line after it at that Line\'s Cue', () => {
+    it("goes on to the Line after it at that Line's Cue", () => {
       expect(currentPosition(song, 18, retaking)).toEqual({ section: 1, line: 102 });
     });
 
@@ -254,10 +254,13 @@ describe('lastCue', () => {
   });
 
   it('is the latest Line Cue of the active Alternate', () => {
-    const song = cuedSong([...sections, { id: 10, alternates: [{ active: true, lines: [{ id: 70, text: 'Later' }] }] }], {
-      60: 20,
-      70: 8,
-    });
+    const song = cuedSong(
+      [...sections, { id: 10, alternates: [{ active: true, lines: [{ id: 70, text: 'Later' }] }] }],
+      {
+        60: 20,
+        70: 8,
+      },
+    );
     expect(lastCue(song)).toBe(20);
   });
 
@@ -456,7 +459,6 @@ describe('nextLine', () => {
     expect(nextLine(cued, { picked })).toEqual(picked);
     expect(nextLine(cued, { cued: { section: 2, line: 20 }, picked })).toEqual(picked);
   });
-
 });
 
 describe('leadIn', () => {

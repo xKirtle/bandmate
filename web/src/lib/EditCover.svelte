@@ -142,7 +142,13 @@
   <label class="cover add" class:busy={busy !== null} aria-busy={busy !== null}>
     <CoverPlaceholder {title} {status} size="header" />
     <span class="caption">{busy ?? 'Add Cover'}</span>
-    <input class="visually-hidden" type="file" accept="image/*" onchange={pick} disabled={busy !== null || toCrop !== null} />
+    <input
+      class="visually-hidden"
+      type="file"
+      accept="image/*"
+      onchange={pick}
+      disabled={busy !== null || toCrop !== null}
+    />
   </label>
 {/if}
 

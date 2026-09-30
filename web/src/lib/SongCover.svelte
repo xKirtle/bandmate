@@ -10,8 +10,7 @@
     title,
     status,
     size = 'list',
-  }: { songId: number; coverId: number | null; title: string; status: Status; size?: 'list' | 'header' } =
-    $props();
+  }: { songId: number; coverId: number | null; title: string; status: Status; size?: 'list' | 'header' } = $props();
 </script>
 
 {#if coverId === null}

@@ -141,7 +141,13 @@
         <div class="pair">
           <label class="button" class:disabled={busy !== null}>
             Replace file
-            <input class="visually-hidden" type="file" accept="audio/*" onchange={replaceFile} disabled={busy !== null} />
+            <input
+              class="visually-hidden"
+              type="file"
+              accept="audio/*"
+              onchange={replaceFile}
+              disabled={busy !== null}
+            />
           </label>
           <button type="button" class="button danger" onclick={remove} disabled={busy !== null}>Delete</button>
         </div>

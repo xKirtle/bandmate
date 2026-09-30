@@ -56,7 +56,11 @@ describe('clampTrimStart', () => {
   });
 
   it('stops at the neighbour before it', () => {
-    expect(clampTrimStart({ ...clip, start: 25, offset: 10 }, neighbours, 12)).toEqual({ start: 20, offset: 5, length: 15 });
+    expect(clampTrimStart({ ...clip, start: 25, offset: 10 }, neighbours, 12)).toEqual({
+      start: 20,
+      offset: 5,
+      length: 15,
+    });
   });
 
   it('stops at the neighbour before it even when rounding leaves them a hair apart', () => {
@@ -74,7 +78,11 @@ describe('clampTrimStart', () => {
   });
 
   it('keeps some of the Clip', () => {
-    expect(clampTrimStart(clip, neighbours, 40)).toEqual({ start: 32 - minClipLength, offset: 15 - minClipLength, length: minClipLength });
+    expect(clampTrimStart(clip, neighbours, 40)).toEqual({
+      start: 32 - minClipLength,
+      offset: 15 - minClipLength,
+      length: minClipLength,
+    });
   });
 });
 

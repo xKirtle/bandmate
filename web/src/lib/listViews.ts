@@ -199,7 +199,7 @@ export function filterBeats(beats: readonly Beat[], view: BeatListView): Beat[] 
     if (view.bpmMin !== undefined && (b.bpm === null || b.bpm < view.bpmMin)) return false;
     if (view.bpmMax !== undefined && (b.bpm === null || b.bpm > view.bpmMax)) return false;
     if (key && folded(b.key) !== key) return false;
-    if (view.use && (b.songs.length > 0) !== (view.use === 'used')) return false;
+    if (view.use && b.songs.length > 0 !== (view.use === 'used')) return false;
     return true;
   });
 }

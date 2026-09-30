@@ -37,16 +37,25 @@ describe('recoveredPlacement', () => {
 
   it("appends it to its Track once a Clip took its spot, keeping what's captured in step", () => {
     const taken = [{ id: 10, clips: [beat, { ...takes, length: 12 }] }];
-    expect(recoveredPlacement(taken, recorded, duration, 10)).toEqual({ target: { trackId: 10, start: 32 }, captureStart: 30 });
+    expect(recoveredPlacement(taken, recorded, duration, 10)).toEqual({
+      target: { trackId: 10, start: 32 },
+      captureStart: 30,
+    });
   });
 
   it('appends it to the chosen Track once its own is gone', () => {
     const gone = [{ id: 11, clips: [{ ...beat, id: 4, start: 5 }] }];
-    expect(recoveredPlacement(gone, recorded, duration, 11)).toEqual({ target: { trackId: 11, start: 15 }, captureStart: 13 });
+    expect(recoveredPlacement(gone, recorded, duration, 11)).toEqual({
+      target: { trackId: 11, start: 15 },
+      captureStart: 13,
+    });
   });
 
   it('puts it where it was recorded on the chosen Track once its own is gone, if that one is empty', () => {
-    expect(recoveredPlacement([{ id: 11, clips: [] }], recorded, duration, 11)).toEqual({ target: { trackId: 11, start: 30 }, captureStart: 28 });
+    expect(recoveredPlacement([{ id: 11, clips: [] }], recorded, duration, 11)).toEqual({
+      target: { trackId: 11, start: 30 },
+      captureStart: 28,
+    });
   });
 
   it('leaves adding a Track to the caller when there are none left', () => {
@@ -81,17 +90,25 @@ describe('recoveredPlacement', () => {
   });
 
   it('keeps a Retake in step with where its Clip starts once its Takes are gone', () => {
-    const replaced = [{ id: 10, clips: [beat, { ...takes, start: 22, activeTakeId: 8, takes: [{ id: 8, position: 0, nudge: 0 }] }] }];
+    const replaced = [
+      { id: 10, clips: [beat, { ...takes, start: 22, activeTakeId: 8, takes: [{ id: 8, position: 0, nudge: 0 }] }] },
+    ];
     expect(recoveredPlacement(replaced, retaken, duration, 10)).toEqual({ target: { clipId: 2 }, captureStart: 20 });
   });
 
   it('appends a Retake to its Track as a new Clip once its Clip is gone', () => {
     const gone = [{ id: 10, clips: [beat] }];
-    expect(recoveredPlacement(gone, retaken, duration, 10)).toEqual({ target: { trackId: 10, start: 10 }, captureStart: 8 });
+    expect(recoveredPlacement(gone, retaken, duration, 10)).toEqual({
+      target: { trackId: 10, start: 10 },
+      captureStart: 8,
+    });
   });
 
   it('puts a Retake where it was recorded on the empty chosen Track once its Clip and its Track are gone', () => {
-    expect(recoveredPlacement([{ id: 11, clips: [] }], retaken, duration, 11)).toEqual({ target: { trackId: 11, start: 20 }, captureStart: 18 });
+    expect(recoveredPlacement([{ id: 11, clips: [] }], retaken, duration, 11)).toEqual({
+      target: { trackId: 11, start: 20 },
+      captureStart: 18,
+    });
   });
 
   it('keeps nothing that stopped during the lead-in', () => {

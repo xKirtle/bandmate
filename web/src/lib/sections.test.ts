@@ -91,7 +91,9 @@ group('alternateName', () => {
 group('alternatesLabel', () => {
   it("adds the active Alternate's name and place among the Section's", () => {
     const darker = { ...alternate(true, 'La'), name: 'Darker' };
-    expect(alternatesLabel(section('', darker, alternate(false), alternate(false)))).toBe('Alternates · Darker · 1 of 3');
+    expect(alternatesLabel(section('', darker, alternate(false), alternate(false)))).toBe(
+      'Alternates · Darker · 1 of 3',
+    );
   });
 
   it('calls an unnamed active Alternate by its place', () => {
@@ -161,7 +163,11 @@ group('putBackActions', () => {
   });
 
   it('only puts it back, at the start, in an empty Lyric Sheet', () => {
-    const actions = putBackActions([], () => {}, () => {});
+    const actions = putBackActions(
+      [],
+      () => {},
+      () => {},
+    );
     expect(actions.map((a) => a.label)).toEqual(['Put back into the Lyric Sheet…']);
     expect('choices' in actions[0] && actions[0].choices.map((c) => c.label)).toEqual(['At the start']);
   });

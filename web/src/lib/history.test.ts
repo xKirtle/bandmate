@@ -312,17 +312,13 @@ describe('History', () => {
 
       expect(h.nextUndo()).toEqual({
         kind: 'restoreCues',
-        cues: [
-          { lineId: 10, cue: null },
-        ],
+        cues: [{ lineId: 10, cue: null }],
       });
       h.undone(tl, tl);
       expect(h.nextUndo()).toBeNull();
       expect(h.nextRedo()).toEqual({
         kind: 'restoreCues',
-        cues: [
-          { lineId: 10, cue: 4 },
-        ],
+        cues: [{ lineId: 10, cue: 4 }],
       });
       h.redone(tl, tl);
       expect(h.nextRedo()).toBeNull();
@@ -561,7 +557,10 @@ describe('History of Retakes', () => {
       track(2, [
         clip(clipId, 10, {
           beatId: null,
-          takes: [{ ...take(40), position: 1.5 }, { ...take(41), number: 2 }],
+          takes: [
+            { ...take(40), position: 1.5 },
+            { ...take(41), number: 2 },
+          ],
           activeTakeId: 41,
           lastTakeNumber: 2,
           offset: 3.5,
@@ -625,7 +624,17 @@ describe('History of choosing and deleting Takes', () => {
   const takes = () => [take(40), { ...take(41), number: 2 }, { ...take(42), number: 3, duration: 14 }];
   const three = (more: Partial<Clip> = {}) =>
     timeline([
-      track(2, [clip(6, 10, { beatId: null, takes: takes(), activeTakeId: 42, lastTakeNumber: 3, offset: 2, length: 12, ...more })]),
+      track(2, [
+        clip(6, 10, {
+          beatId: null,
+          takes: takes(),
+          activeTakeId: 42,
+          lastTakeNumber: 3,
+          offset: 2,
+          length: 12,
+          ...more,
+        }),
+      ]),
     ]);
   const asBefore = {
     kind: 'setTakes',
@@ -716,10 +725,18 @@ describe('History of nudging Takes', () => {
   const takes = () => [take(40), { ...take(41), number: 2, position: 0.1 }];
   const two = (more: Partial<Clip> = {}) =>
     timeline([
-      track(2, [clip(6, 10, { beatId: null, takes: takes(), activeTakeId: 41, lastTakeNumber: 2, offset: 2, ...more })]),
+      track(2, [
+        clip(6, 10, { beatId: null, takes: takes(), activeTakeId: 41, lastTakeNumber: 2, offset: 2, ...more }),
+      ]),
     ]);
   const nudged = () =>
-    two({ takes: [{ ...take(40), position: 0.15 }, { ...takes()[1], position: 0, nudge: -0.35 }], offset: 2.15 });
+    two({
+      takes: [
+        { ...take(40), position: 0.15 },
+        { ...takes()[1], position: 0, nudge: -0.35 },
+      ],
+      offset: 2.15,
+    });
 
   it("undoes a nudge by setting the Clip's Takes back as they were, nudges included, and redoes it as a nudge", () => {
     const h = new History();

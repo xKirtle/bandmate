@@ -61,7 +61,7 @@ describe('chosenTrack', () => {
 });
 
 describe('addedTrack', () => {
-  it('is the Track that wasn\'t there before', () => {
+  it("is the Track that wasn't there before", () => {
     expect(addedTrack(tracks(1, 2), tracks(1, 2, 5))).toBe(5);
   });
 
