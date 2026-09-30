@@ -22,7 +22,7 @@
     <BrandMark size="4rem" />
     <h2>Bandmate</h2>
     {#if config}
-      <p class="version">Version <code>{config.version}</code></p>
+      <p>Version <code>{config.version}</code></p>
       <ul class="links">
         <li><a href={config.sourceUrl}>Source code</a></li>
         <li><a href={config.bugReportUrl}>Report a bug</a></li>
@@ -39,26 +39,33 @@
 </main>
 
 <style>
+  /* A card of the app's usual panel style, kept narrow so it doesn't float
+     in empty space on a wide window. */
   .intro {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 0.5rem;
-    padding-top: 2rem;
+    max-width: 28rem;
+    margin: 1.5rem auto 0;
+    padding: 2rem 1rem 1.5rem;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: var(--surface-1);
     text-align: center;
+  }
+  .intro p {
+    margin: 0;
   }
   h2 {
     margin: 0.5rem 0 0;
-  }
-  .version {
-    margin: 0;
   }
   .links {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     gap: 0.5rem 1.5rem;
-    margin: 1rem 0 0;
+    margin: 0.5rem 0;
     padding: 0;
     list-style: none;
   }
