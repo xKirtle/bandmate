@@ -17,17 +17,12 @@ export interface RecordingPlan {
   from: number;
 }
 
-/** Where the last of a Track's clips ends, or 0:00 with none. */
-export function lastClipEnd(clips: readonly Placed[]): number {
-  return Math.max(0, ...clips.map((c) => c.start + c.length));
-}
-
 /**
  * Plans a recording on a Track holding clips: its Take goes at the playhead,
  * or where the last of them ends if the playhead is before that.
  */
 export function recordingPlan(clips: readonly Placed[], playhead: number): RecordingPlan {
-  const start = Math.max(playhead, lastClipEnd(clips));
+  const start = Math.max(playhead, ...clips.map((c) => c.start + c.length));
   return { start, from: Math.max(0, start - leadIn) };
 }
 

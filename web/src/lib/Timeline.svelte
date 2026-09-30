@@ -768,7 +768,8 @@
   }
 
   /** Adds a Track at the bottom and chooses it; resolves to whether it was added. */
-  async function addTrack(): Promise<boolean> {
+  /** Adds a Track and chooses it; resolves to its id, or null if it wasn't added. */
+  async function addTrack(): Promise<number | null> {
     let added: number | null = null;
     const ok = await perform(
       { kind: 'addTrack', track: { name: `Track ${timeline.tracks.length + 1}` } },
@@ -778,7 +779,7 @@
     );
     // Once the Timeline shows it: until then, it isn't there to choose.
     if (ok && added !== null) choose({ kind: 'add', trackId: added });
-    return ok && added !== null;
+    return ok ? added : null;
   }
 
   // The largest audio file the server takes, checked before importing one.
@@ -1188,15 +1189,19 @@
       return false;
     }
     const duration = samples.length / offer.sampleRate;
-    const place = () => recoveredPlacement(timeline.tracks, offer.unsaved, duration, chosen);
+    let added: number | null = null;
+    const place = () => recoveredPlacement(timeline.tracks, offer.unsaved, duration, added);
     const placement = place();
     // Stopped during the lead-in: there's nothing to keep.
     if (placement === null) {
       await dropUnsaved(offer);
       return true;
     }
-    // Without Tracks, one's added first, as Record does.
-    if (placement.target === null && !(await addTrack())) return false;
+    // Once its own Track is gone, a new one's added for it.
+    if (placement.target === null) {
+      added = await addTrack();
+      if (added === null) return false;
+    }
     const upload = () => saveTake(() => place()!, samples, offer.sampleRate, offer.unsaved.latencyOffset);
     const ok = offer.id === null ? await upload() : await whileHeld(offer.id, upload);
     if (ok === false) return false;
@@ -2545,7 +2550,8 @@
           disabled={recovering || recording !== null}
           title="Upload {unsaved.length === 1 ? 'it' : 'them'} where {unsaved.length === 1
             ? 'it'
-            : 'they'} would have gone, or after the last Clip on the Track if that spot's taken">Keep</button
+            : 'they'} would have gone, or after the last Clip on the Track if that spot's taken, or on a new Track if theirs is gone"
+          >Keep</button
         >
         <button type="button" class="button" onclick={discardUnsaved} disabled={recovering}>Discard</button>
       </div>

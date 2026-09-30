@@ -3,11 +3,13 @@
 // failed upload doesn't lose it. Kept, it goes where it would have gone:
 // into its Clip for a Retake, in step with the Takes already there even if
 // the Clip moved, or at its Clip's start for a new Take. Where that's no
-// longer possible, it's appended to its Track, or to the chosen Track once
-// its own is gone (where it was recorded, if that Track is empty), what it
-// captured staying in step with where its Clip starts.
+// longer possible, it goes on its Track as a recording would with the
+// playhead where it was recorded: there, or after the Track's last Clip if
+// that's later. Once its own Track is gone, it goes on a new Track, where
+// it was recorded, rather than on one holding other things. What it
+// captured stays in step with where its Clip starts.
 import type { Take } from './api';
-import { lastClipEnd, sungPastStart, type RecordingPlan } from './recording';
+import { recordingPlan, sungPastStart, type RecordingPlan } from './recording';
 import type { Placed } from './schedule';
 
 /** Where a recording was going, as kept with it. */
@@ -52,14 +54,15 @@ export function takesAt(clip: PlacedClip): { id: number; at: number }[] {
 
 /**
  * Where a recording lasting duration seconds goes, on the Timeline's Tracks
- * as they are now, with the chosen Track; null if it stopped during the
- * lead-in, so there's nothing to keep.
+ * as they are now, with added the Track added for it once its own is gone;
+ * null if it stopped during the lead-in, so there's nothing to keep. A null
+ * target asks for that Track.
  */
 export function recoveredPlacement(
   tracks: readonly { id: number; clips: readonly PlacedClip[] }[],
   unsaved: Unsaved,
   duration: number,
-  chosen: number | null,
+  added: number | null,
 ): RecoveredPlacement | null {
   const { plan, latencyOffset } = unsaved;
   if (!sungPastStart(plan, duration, latencyOffset)) return null;
@@ -79,11 +82,8 @@ export function recoveredPlacement(
     const free = own.clips.every((c) => c.start + c.length <= plan.start + tolerance || c.start >= end - tolerance);
     if (free) return { target: { trackId: own.id, start: plan.start }, captureStart: plan.from };
   }
-  const track = own ?? tracks.find((t) => t.id === chosen) ?? tracks.at(-1);
-  if (!track) return { target: null, captureStart: shifted(-plan.start) };
-  // Not at the playhead as a new recording would be: with its Clip or Track
-  // gone, the time it was recorded at no longer places it, as a Take goes
-  // with its Clip. It's appended after the last Clip, unless there's none.
-  const start = track.clips.length ? lastClipEnd(track.clips) : plan.start;
+  const track = own ?? tracks.find((t) => t.id === added);
+  if (!track) return { target: null, captureStart: plan.from };
+  const { start } = recordingPlan(track.clips, plan.start);
   return { target: { trackId: track.id, start }, captureStart: shifted(start - plan.start) };
 }
