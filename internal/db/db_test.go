@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 )
 
 // openBefore opens a fresh database migrated up to, but not including, the
@@ -461,5 +462,37 @@ func TestExistingBeatAndTakeClipsAreCarriedOverUntouchedBySounds(t *testing.T) {
 		if _, err := conn.Exec(stmt); err == nil {
 			t.Errorf("%s: stored a Clip that doesn't play exactly one source", stmt)
 		}
+	}
+}
+
+func TestExistingSoundsNoClipUsesAreUnusedFromTheMigration(t *testing.T) {
+	conn := openBefore(t, "0025_unused_sounds")
+	exec(t, conn,
+		`INSERT INTO songs (id, title, created_at, updated_at) VALUES (1, 'Midnight Drive', '', '')`,
+		`INSERT INTO tracks (id, song_id, name, position) VALUES (1, 1, 'Track 1', 0)`,
+		`INSERT INTO sounds (id, song_id, name, file_name, content_type, size, duration, peaks, added_at) VALUES
+			(1, 1, 'Hum', 'hum.m4a', 'audio/mp4', 10, 8, '[]', '2020-01-01T00:00:00.000000000Z'),
+			(2, 1, 'Riff', 'riff.wav', 'audio/wav', 10, 3, '[]', '2020-01-01T00:00:00.000000000Z')`,
+		`INSERT INTO clips (track_id, sound_id, start, source_offset, length) VALUES (1, 1, 0, 0, 8)`,
+	)
+	before := time.Now().UTC().Truncate(time.Second)
+
+	if err := migrate(context.Background(), conn); err != nil {
+		t.Fatalf("migrating: %v", err)
+	}
+
+	var used, unused sql.NullString
+	if err := conn.QueryRow(`SELECT unused_since FROM sounds WHERE id = 1`).Scan(&used); err != nil {
+		t.Fatal(err)
+	}
+	if used.Valid {
+		t.Errorf("unused_since of the Sound in a Clip = %q, want none", used.String)
+	}
+	if err := conn.QueryRow(`SELECT unused_since FROM sounds WHERE id = 2`).Scan(&unused); err != nil {
+		t.Fatal(err)
+	}
+	since, err := time.Parse("2006-01-02T15:04:05.000000000Z", unused.String)
+	if err != nil || since.Before(before) || since.After(time.Now()) {
+		t.Errorf("unused_since of the Sound no Clip uses = %q, want the time it was migrated at", unused.String)
 	}
 }

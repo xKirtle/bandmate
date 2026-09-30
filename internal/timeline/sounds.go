@@ -102,11 +102,73 @@ func (s *Store) ImportSound(ctx context.Context, songID int64, based lyricsheet.
 		return nil
 	})
 	if err != nil && kept != 0 {
-		if err := s.soundFiles.Remove(kept); err != nil {
-			log.Printf("deleting sound %d: %v", kept, err)
-		}
+		s.removeSoundFiles([]int64{kept})
 	}
 	return tl, err
+}
+
+// soundsInUse selects the ids of the Sounds some Clip uses.
+const soundsInUse = `SELECT sound_id FROM clips WHERE sound_id IS NOT NULL`
+
+// markUnusedSounds notes when the Song's Sounds that no Clip uses any more
+// stopped being used, and that those a Clip uses again are in use.
+func markUnusedSounds(ctx context.Context, tx *sql.Tx, songID int64) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE sounds SET unused_since = ?
+		WHERE song_id = ? AND unused_since IS NULL AND id NOT IN (`+soundsInUse+`)`,
+		time.Now().UTC().Format(timeFormat), songID); err != nil {
+		return fmt.Errorf("marking unused sounds: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE sounds SET unused_since = NULL
+		WHERE song_id = ? AND unused_since IS NOT NULL AND id IN (`+soundsInUse+`)`,
+		songID); err != nil {
+		return fmt.Errorf("marking used sounds: %w", err)
+	}
+	return nil
+}
+
+// SweepUnusedSounds removes the Sounds no Clip has used since before a
+// time, of every Song, with their files. Undo can only place a Sound's Clip
+// again within the session it was deleted in, so a Sound unused for long
+// enough is gone for good.
+func (s *Store) SweepUnusedSounds(ctx context.Context, before time.Time) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var ids []int64
+	err = query(ctx, tx, `SELECT id FROM sounds WHERE unused_since < ? AND id NOT IN (`+soundsInUse+`)`,
+		[]any{before.UTC().Format(timeFormat)}, func(rows *sql.Rows) error {
+			var id int64
+			if err := rows.Scan(&id); err != nil {
+				return err
+			}
+			ids = append(ids, id)
+			return nil
+		})
+	if err != nil {
+		return fmt.Errorf("listing unused sounds: %w", err)
+	}
+	for _, id := range ids {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM sounds WHERE id = ?`, id); err != nil {
+			return fmt.Errorf("sweeping sound: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	s.removeSoundFiles(ids)
+	return nil
+}
+
+// removeSoundFiles deletes the files of Sounds that aren't in the database.
+// A file left behind only takes space, so failures are logged.
+func (s *Store) removeSoundFiles(ids []int64) {
+	for _, id := range ids {
+		if err := s.soundFiles.Remove(id); err != nil {
+			log.Printf("deleting sound %d: %v", id, err)
+		}
+	}
 }
 
 // findSound checks that a Sound is one of the Song's.

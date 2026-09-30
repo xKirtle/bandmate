@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/xKirtle/bandmate/internal/app"
 )
@@ -240,13 +241,21 @@ func TestASoundCantBePlacedInAnotherSongsClips(t *testing.T) {
 	}), http.StatusBadRequest, "there's no such Sound in this Song")
 }
 
-func TestASongWithSoundsCanStillBeDeleted(t *testing.T) {
+func TestDeletingASongDeletesItsSoundsAndTheirFiles(t *testing.T) {
 	ts := newTestServer(t)
-	s, _, c := songWithSound(t, ts)
+	s, tl, c := songWithSound(t, ts)
+	// One of its Sounds is unused, and still goes.
+	unused := timelineChange(t, ts.importSound(s.ID, soundFile("riff.wav", "Riff", tl.Tracks[1].ID, 3))).Tracks[1].Clips[0]
+	timelineChange(t, ts.deleteClip(s.ID, unused.ID))
+	_, _, kept := songWithSound(t, ts)
 
 	expectStatus(t, ts.Do(http.MethodDelete, songPath(s.ID), nil), http.StatusNoContent)
 
 	expectStatus(t, ts.Do(http.MethodGet, soundPath(s.ID, *c.SoundID), nil), http.StatusNotFound)
+	expectStatus(t, ts.Do(http.MethodGet, soundPath(s.ID, *unused.SoundID), nil), http.StatusNotFound)
+	if files := soundFiles(t, ts); !reflect.DeepEqual(files, []string{fmt.Sprint(*kept.SoundID)}) {
+		t.Errorf("sound files on disk = %q, want only the kept Song's", files)
+	}
 }
 
 func TestAClipPlaysOnlyOneSource(t *testing.T) {
@@ -256,4 +265,103 @@ func TestAClipPlaysOnlyOneSource(t *testing.T) {
 	expectError(t, ts.placeClip(s.ID, map[string]any{
 		"trackId": tl.Tracks[1].ID, "soundId": *c.SoundID, "beatId": tl.Beats[0].ID, "start": 0, "offset": 0, "length": 8,
 	}), http.StatusBadRequest, "a Clip plays one of a Beat, a Sound or Takes")
+}
+
+// placeBack places a deleted Sound Clip on a Track again as it was, as undo
+// does.
+func (ts *testServer) placeBack(songID, trackID int64, c clip) response {
+	ts.t.Helper()
+	return ts.placeClip(songID, map[string]any{
+		"trackId": trackID, "soundId": *c.SoundID, "start": c.Start, "offset": c.Offset, "length": c.Length,
+	})
+}
+
+func TestStartupSweepsSoundsUnusedForMoreThanADay(t *testing.T) {
+	ts := newTestServer(t)
+	s, tl, c := songWithSound(t, ts)
+	timelineChange(t, ts.deleteClip(s.ID, c.ID))
+	// A Sound left unused with its Track.
+	other, otherTL, otherClip := songWithSound(t, ts)
+	timelineChange(t, ts.deleteTrack(other.ID, otherTL.Tracks[0].ID))
+
+	ts = ts.startAt(23 * time.Hour)
+	expectStatus(t, ts.Do(http.MethodGet, soundPath(s.ID, *c.SoundID), nil), http.StatusOK)
+	expectStatus(t, ts.Do(http.MethodGet, soundPath(other.ID, *otherClip.SoundID), nil), http.StatusOK)
+	if files := soundFiles(t, ts); len(files) != 2 {
+		t.Errorf("sound files = %q, want both Sounds' kept within a day", files)
+	}
+
+	ts = ts.startAt(25 * time.Hour)
+	expectStatus(t, ts.Do(http.MethodGet, soundPath(s.ID, *c.SoundID), nil), http.StatusNotFound)
+	expectStatus(t, ts.Do(http.MethodGet, soundPath(other.ID, *otherClip.SoundID), nil), http.StatusNotFound)
+	if files := soundFiles(t, ts); len(files) != 0 {
+		t.Errorf("sound files = %q, want none once unused for over a day", files)
+	}
+	expectError(t, ts.placeBack(s.ID, tl.Tracks[0].ID, c), http.StatusBadRequest, "there's no such Sound in this Song")
+}
+
+// jamSoundFile puts a directory with something in it where a Sound's file
+// is, so removing it fails.
+func jamSoundFile(t *testing.T, ts *testServer, soundID int64) {
+	t.Helper()
+	path := filepath.Join(ts.DataDir, "audio", "sounds", fmt.Sprint(soundID))
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(path, "stuck"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAFileThatCantBeRemovedStopsNeitherASweepNorASongsDeletion(t *testing.T) {
+	ts := newTestServer(t)
+	swept, _, sweptClip := songWithSound(t, ts)
+	timelineChange(t, ts.deleteClip(swept.ID, sweptClip.ID))
+	jamSoundFile(t, ts, *sweptClip.SoundID)
+	deleted, _, deletedClip := songWithSound(t, ts)
+	jamSoundFile(t, ts, *deletedClip.SoundID)
+
+	ts = ts.startAt(25 * time.Hour)
+	expectStatus(t, ts.Do(http.MethodGet, soundPath(swept.ID, *sweptClip.SoundID), nil), http.StatusNotFound)
+
+	expectStatus(t, ts.Do(http.MethodDelete, songPath(deleted.ID), nil), http.StatusNoContent)
+	expectStatus(t, ts.Do(http.MethodGet, songPath(deleted.ID), nil), http.StatusNotFound)
+}
+
+func TestASoundUnusedForLessThanADaySurvivesARestartAndCanBePlacedBack(t *testing.T) {
+	ts := newTestServer(t)
+	s, tl, c := songWithSound(t, ts)
+	timelineChange(t, ts.deleteClip(s.ID, c.ID))
+
+	ts = ts.startAt(23 * time.Hour)
+	got := timelineChange(t, ts.placeBack(s.ID, tl.Tracks[0].ID, c))
+
+	if back := got.Tracks[0].Clips[1]; back.SoundID == nil || *back.SoundID != *c.SoundID {
+		t.Errorf("clip = %+v, want the Sound's Clip back", back)
+	}
+	played := ts.Do(http.MethodGet, soundPath(s.ID, *c.SoundID)+"/audio", nil)
+	expectStatus(t, played, http.StatusOK)
+	if !bytes.Equal(played.Body, soundFile("hum.m4a", "Hum", 0, 8).Data) {
+		t.Errorf("audio = %q, want the Sound's file as uploaded", played.Body)
+	}
+}
+
+func TestASoundAClipUsesIsNeverSwept(t *testing.T) {
+	ts := newTestServer(t)
+	s, _, c := songWithSound(t, ts)
+	// A copy of its Clip is deleted, but the Clip still uses it.
+	dup := timelineChange(t, ts.duplicateClip(s.ID, c.ID))
+	timelineChange(t, ts.deleteClip(s.ID, dup.Tracks[0].Clips[2].ID))
+	// Another Sound's Clip is deleted, then placed back, as undo does.
+	other, otherTL, otherClip := songWithSound(t, ts)
+	timelineChange(t, ts.deleteClip(other.ID, otherClip.ID))
+	timelineChange(t, ts.placeBack(other.ID, otherTL.Tracks[0].ID, otherClip))
+
+	ts = ts.startAt(365 * 24 * time.Hour)
+
+	expectStatus(t, ts.Do(http.MethodGet, soundPath(s.ID, *c.SoundID)+"/audio", nil), http.StatusOK)
+	expectStatus(t, ts.Do(http.MethodGet, soundPath(other.ID, *otherClip.SoundID)+"/audio", nil), http.StatusOK)
+	if files := soundFiles(t, ts); len(files) != 2 {
+		t.Errorf("sound files = %q, want both Sounds', still in use", files)
+	}
 }

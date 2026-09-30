@@ -500,9 +500,9 @@ func (s *Store) ReorderTracks(ctx context.Context, songID int64, based lyricshee
 }
 
 // DeleteTrack removes a Track and its Clips from the Timeline. Their Beats
-// stay in the Beat Library, their Sounds are kept for undo, and their Takes
-// are detached, to be placed again. A Song always has a Track, so its last
-// one can't be deleted.
+// stay in the Beat Library, their Sounds are kept a while for undo, and
+// their Takes are detached, to be placed again. A Song always has a Track,
+// so its last one can't be deleted.
 func (s *Store) DeleteTrack(ctx context.Context, songID int64, based lyricsheet.Version, trackID int64) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		// Its Clips go with it, by the foreign key, and their Takes leave them.
@@ -968,8 +968,8 @@ func clipName(name *string) sql.NullString {
 }
 
 // DeleteClip removes a Clip from the Timeline. Its Beat stays in the Beat
-// Library, its Sound is kept for undo, and its Takes are detached, to be
-// placed again.
+// Library, its Sound is kept a while for undo, and its Takes are detached,
+// to be placed again.
 func (s *Store) DeleteClip(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		return deleteClip(ctx, tx, songID, clipID)
@@ -1067,6 +1067,10 @@ func (s *Store) change(ctx context.Context, songID int64, based lyricsheet.Versi
 		return Timeline{}, err
 	}
 	if err := fn(tx); err != nil {
+		return Timeline{}, err
+	}
+	// Any change can leave a Sound unused, or, by undo, use it again.
+	if err := markUnusedSounds(ctx, tx, songID); err != nil {
 		return Timeline{}, err
 	}
 	tl, err := read(ctx, tx, songID)
