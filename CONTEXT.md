@@ -86,7 +86,7 @@ A named lane on the Timeline (e.g. "Beat", "Lead vox", "Adlibs") holding Clips, 
 _Avoid_: Channel, layer
 
 **Chosen Track**:
-The Track a recording, or a Beat being added, goes to. Exactly one Track is always chosen.
+The Track a recording, or a Beat or Sound being added, goes to. Exactly one Track is always chosen.
 _Avoid_: Selected track (selecting is for Clips), armed track
 
 **Beat**:
@@ -104,12 +104,16 @@ _Avoid_: Beat dialog, Beat modal
 **Beat preview**:
 Listening to a Beat from the Beat Library, outside any Song's Timeline.
 
+**Sound**:
+An audio file imported into one Song, placed on the Timeline in Clips like a Beat, but without a credit or a library: it belongs to that Song alone, and several of its Clips can use it. It takes its name from the file when imported, and keeps it; only its Clips are renamed. Once no Clip uses it, it's gone.
+_Avoid_: Sample, stem, audio file, import
+
 **Take**:
 One recording made in the app, placed in a Clip on the Timeline. Like a Beat, it's tied to the lyrics only through Cues, so what it sings is whatever Lines are cued over its span.
 _Avoid_: Recording, attempt
 
 **Clip**:
-A stretch of a Beat, or a set of Takes, placed at a position on a Track; the same Beat can be used by several Clips, and trimming a Clip never changes the audio file; a Clip with several Takes plays exactly one active Take.
+A stretch of a Beat or a Sound, or a set of Takes, placed at a position on a Track; the same Beat or Sound can be used by several Clips, and trimming a Clip never changes the audio file; a Clip with several Takes plays exactly one active Take. A Clip can be given a name of its own, so two Clips of the same audio can be told apart; until then, it goes by its source's name (the Beat's title, the Sound's name, or its active Take's number), and a named Take Clip still shows which Take is active.
 _Avoid_: Region, segment
 
 **Loop**:
