@@ -395,29 +395,12 @@
   /* A phone's tabs are tighter, so their labels, with counts, fit on a line. */
   @media (max-width: 24rem) {
     .tabs {
+      padding: 0;
       gap: 0;
     }
     [role='tab'] {
       padding: 0 0.5rem;
       font-size: 0.9375rem;
-    }
-  }
-
-  /* Where the cards stack, the tabbed card runs edge to edge, out through
-     the page's gutters, to give the notes the whole width. Its tabs and body
-     keep their own padding, clear of any notch. */
-  @media (width < 65.5rem) {
-    .tabbed {
-      margin-inline: calc(-1 * max(var(--gutter), env(safe-area-inset-left)))
-        calc(-1 * max(var(--gutter), env(safe-area-inset-right)));
-      border-inline: 0;
-      border-radius: 0;
-    }
-    .tabs {
-      padding-inline: max(0.5rem, env(safe-area-inset-left)) max(0.5rem, env(safe-area-inset-right));
-    }
-    .panel {
-      padding-inline: max(1rem, env(safe-area-inset-left)) max(1rem, env(safe-area-inset-right));
     }
   }
 
