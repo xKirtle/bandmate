@@ -9,8 +9,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: Bandmate version or image tag
-      description: The release you're running, or the image tag you pulled (for example `v0.4.0`, `latest`, `edge` or `sha-1a2b3c4`).
+      label: Bandmate version
+      description: The version shown on Bandmate's About page, for example `v0.4.0` or `1a2b3c4`. The image tag `latest` or `edge` alone isn't enough, since they move to newer builds.
       placeholder: v0.4.0
     validations:
       required: true
