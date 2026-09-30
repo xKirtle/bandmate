@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount, untrack } from 'svelte';
+  import type { TimelineLoop } from './api';
   import { closeOnBackdrop } from './backdrop';
   import {
     levelsOf,
@@ -15,9 +16,10 @@
   import { formatDuration } from './time';
   import { encodeWav } from './wav';
 
-  // Mixes the whole Timeline, or the Loop's stretch of it, down to a WAV file
-  // and downloads it, in a modal dialog: while it's mixing, nothing else on the page can be used,
-  // and closing the dialog, or leaving the Song page, cancels it.
+  // Mixes the whole Timeline, or the Loop's stretch of it, down to a WAV
+  // file and downloads it, in a modal dialog: while it's mixing, nothing else
+  // on the page can be used, and closing the dialog, or leaving the Song
+  // page, cancels it.
   let {
     songTitle,
     end,
@@ -30,7 +32,7 @@
     /** Where the whole Timeline's Mixdown ends, in seconds from 0:00. */
     end: number;
     /** The Song's Loop, if it has one, and whether it's on. */
-    loop: { start: number; end: number; on: boolean } | null;
+    loop: TimelineLoop | null;
     /** What it mixes, as it stands when it starts. */
     plan: () => Pick<MixdownPlan, 'clips' | 'gains' | 'load'>;
     /** Hears the Mixdown start, e.g. to stop playback. */
@@ -47,8 +49,9 @@
 
   // What it can cover. Which is chosen isn't remembered: it follows the
   // Loop each time the dialog opens.
-  const { ranges, chosen: first } = untrack(() => mixdownRanges(end, loop));
-  let chosen = $state.raw<MixdownRange>(first);
+  const offered = untrack(() => mixdownRanges(end, loop));
+  const ranges = offered.ranges;
+  let chosen = $state.raw<MixdownRange>(offered.chosen);
   const name = $derived(mixdownName(songTitle, chosen));
   const span = (range: MixdownRange) => `${formatDuration(range.start)}–${formatDuration(range.end)}`;
 

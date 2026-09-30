@@ -2581,7 +2581,7 @@
   <MixdownDialog
     songTitle={song.title}
     end={mixdownEnd(clips)}
-    loop={timeline.loop && { start: timeline.loop.start, end: timeline.loop.end, on: loopOn }}
+    loop={timeline.loop && { ...timeline.loop, on: loopOn }}
     plan={() => ({ clips: playable, gains: trackGains(levels), load: (source) => player.load(source) })}
     onStart={() => {
       if (playerState === 'stopped') return;

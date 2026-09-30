@@ -4,6 +4,7 @@
 // on an offline context that mixes as fast as it can and resamples each
 // Clip's decoded audio itself. It's never normalised: what it clips, the file
 // clips too, and a note says so.
+import type { TimelineLoop } from './api';
 import { schedule, type Placed } from './schedule';
 import { TrackMix, type PlayableClip } from './timelinePlayer';
 import { atFullScale } from './wav';
@@ -100,14 +101,14 @@ export interface MixdownRange {
 
 /**
  * What a Song's Mixdown can cover, and which of it to offer first: the whole
- * Timeline, which ends at end, and the Loop's stretch when the Song has a
- * Loop, chosen first while the Loop is on.
+ * Timeline, which ends at timelineEnd, and the Loop's stretch when the Song
+ * has a Loop, chosen first while the Loop is on.
  */
 export function mixdownRanges(
-  end: number,
-  loop: { start: number; end: number; on: boolean } | null,
+  timelineEnd: number,
+  loop: TimelineLoop | null,
 ): { ranges: MixdownRange[]; chosen: MixdownRange } {
-  const whole: MixdownRange = { of: 'timeline', start: 0, end };
+  const whole: MixdownRange = { of: 'timeline', start: 0, end: timelineEnd };
   if (!loop) return { ranges: [whole], chosen: whole };
   const stretch: MixdownRange = { of: 'loop', start: loop.start, end: loop.end };
   return { ranges: [whole, stretch], chosen: loop.on ? stretch : whole };
