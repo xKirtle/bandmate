@@ -30,7 +30,10 @@ group('pickerKey', () => {
   });
 
   it('starts from the first or last option when none is highlighted', () => {
-    expect(pickerKey('ArrowDown', false, { open: true, active: -1, count: 3 })).toEqual({ kind: 'highlight', index: 0 });
+    expect(pickerKey('ArrowDown', false, { open: true, active: -1, count: 3 })).toEqual({
+      kind: 'highlight',
+      index: 0,
+    });
     expect(pickerKey('ArrowUp', false, { open: true, active: -1, count: 3 })).toEqual({ kind: 'highlight', index: 2 });
   });
 

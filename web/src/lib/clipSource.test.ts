@@ -96,7 +96,7 @@ describe('clipSources of Takes', () => {
     expect(sources.all()).toHaveLength(3);
   });
 
-  it("reaches where a Take nudged earlier ended before its nudge", () => {
+  it('reaches where a Take nudged earlier ended before its nudge', () => {
     const c = takeClip(1, [take(3, { duration: 30, nudge: -0.5 }), take(4, { position: 1, duration: 20, nudge: 0.5 })]);
     expect(clipSources(timeline([c], [])).of(c).duration).toBe(30.5);
   });
@@ -104,7 +104,11 @@ describe('clipSources of Takes', () => {
   it("fetches a Take's own peaks", async () => {
     vi.spyOn(api, 'getTake').mockResolvedValue(take(3, { position: 0.02, peaks: [0.5, 1] }));
     const c = takeClip(1, [take(3, { position: 0.02 })]);
-    expect(await clipSources(timeline([c], [])).of(c).loadPeaks()).toEqual([0.5, 1]);
+    expect(
+      await clipSources(timeline([c], []))
+        .of(c)
+        .loadPeaks(),
+    ).toEqual([0.5, 1]);
     expect(api.getTake).toHaveBeenCalledWith(1, 3);
   });
 });

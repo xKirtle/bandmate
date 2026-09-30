@@ -183,8 +183,7 @@
             oninput={() => onUnsaved(editor(m, 'notes'), true)}
             onchange={(e) => saveNotes(m, e.currentTarget)}
             onblur={() => onUnsaved(editor(m, 'notes'), false)}
-            rows="2"
-          ></textarea>
+            rows="2"></textarea>
         </label>
       {:else if m.notes.trim()}
         <p class="read-notes">{m.notes}</p>

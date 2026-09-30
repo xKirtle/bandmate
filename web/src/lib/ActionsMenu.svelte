@@ -164,11 +164,7 @@
 </script>
 
 <!-- It's placed once, when it opens: scrolling or resizing would leave it behind. -->
-<svelte:window
-  onpointerdowncapture={onWindowPointer}
-  onscroll={dismiss}
-  onresize={dismiss}
-/>
+<svelte:window onpointerdowncapture={onWindowPointer} onscroll={dismiss} onresize={dismiss} />
 
 <div class="menu-root" bind:this={root}>
   <button
@@ -201,7 +197,10 @@
           {picking.label}
         </button>
         {#if field}
-          <label class="field" title="Alt+← and Alt+→ step it by {field.step} {field.unit}, or {field.shiftStep} with Shift">
+          <label
+            class="field"
+            title="Alt+← and Alt+→ step it by {field.step} {field.unit}, or {field.shiftStep} with Shift"
+          >
             <input
               type="number"
               step={field.step}

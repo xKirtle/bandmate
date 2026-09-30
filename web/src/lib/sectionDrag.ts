@@ -93,7 +93,12 @@ export function dropTarget(
     return y > top + quarter && y < bottom - quarter;
   });
   if (at !== -1 && canDropOnto(at)) return { onto: at };
-  return { gap: dropGap(y, sections.map(({ top, bottom }) => (top + bottom) / 2)) };
+  return {
+    gap: dropGap(
+      y,
+      sections.map(({ top, bottom }) => (top + bottom) / 2),
+    ),
+  };
 }
 
 /** What dropping `dragged` on `target` does; null if nothing. */

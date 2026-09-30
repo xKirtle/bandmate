@@ -50,17 +50,20 @@
   $effect(() => {
     const filter = { status: view.status, q: view.q, hasMaster: view.hasMaster || undefined };
     let current = true;
-    const timer = setTimeout(() => {
-      api.listSongs(filter).then(
-        (list) => {
-          if (!current) return;
-          songs = list;
-          error = null;
-          loaded = true;
-        },
-        (e: Error) => current && (error = e.message),
-      );
-    }, loaded ? 200 : 0);
+    const timer = setTimeout(
+      () => {
+        api.listSongs(filter).then(
+          (list) => {
+            if (!current) return;
+            songs = list;
+            error = null;
+            loaded = true;
+          },
+          (e: Error) => current && (error = e.message),
+        );
+      },
+      loaded ? 200 : 0,
+    );
     return () => {
       current = false;
       clearTimeout(timer);
@@ -92,13 +95,25 @@
       enterkeyhint="search"
     />
     <div class="chips" role="group" aria-label="Filter Songs">
-      <button type="button" class="chip" aria-pressed={view.status === undefined} onclick={() => (view.status = undefined)}>
+      <button
+        type="button"
+        class="chip"
+        aria-pressed={view.status === undefined}
+        onclick={() => (view.status = undefined)}
+      >
         All
       </button>
       {#each statuses as s (s)}
-        <button type="button" class="chip" aria-pressed={view.status === s} onclick={() => (view.status = s)}>{s}</button>
+        <button type="button" class="chip" aria-pressed={view.status === s} onclick={() => (view.status = s)}
+          >{s}</button
+        >
       {/each}
-      <button type="button" class="chip master" aria-pressed={view.hasMaster} onclick={() => (view.hasMaster = !view.hasMaster)}>
+      <button
+        type="button"
+        class="chip master"
+        aria-pressed={view.hasMaster}
+        onclick={() => (view.hasMaster = !view.hasMaster)}
+      >
         Has a Master
       </button>
     </div>
@@ -126,7 +141,11 @@
           {#each columns as column (column.id)}
             <th
               class:num={column.num}
-              aria-sort={view.sort.column === column.id ? (view.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined}
+              aria-sort={view.sort.column === column.id
+                ? view.sort.direction === 'asc'
+                  ? 'ascending'
+                  : 'descending'
+                : undefined}
             >
               <button type="button" onclick={() => (view.sort = toggleSort(view.sort, column.id))}>
                 {column.label}<span class="arrow" aria-hidden="true"

@@ -77,7 +77,9 @@ export function labelOf(section: Section): string {
 
 /** How a Section is named in lists: its Label, else its first Line. */
 export function describe(section: Section): string {
-  const first = activeAlternate(section)?.lines.find((l) => l.lyrics.trim())?.lyrics.trim();
+  const first = activeAlternate(section)
+    ?.lines.find((l) => l.lyrics.trim())
+    ?.lyrics.trim();
   return section.label || (first ? `“${first}”` : labelOf(section));
 }
 

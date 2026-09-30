@@ -241,8 +241,7 @@
     rows="3"
     placeholder="Write the Lines here, one per line"
     autocapitalize="sentences"
-    {@attach fitText}
-  ></textarea>
+    {@attach fitText}></textarea>
 </div>
 
 <style>

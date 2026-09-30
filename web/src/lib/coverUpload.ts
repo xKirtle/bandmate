@@ -115,10 +115,9 @@ let supported: Promise<PictureType> | undefined;
  */
 function pictureType(): Promise<PictureType> {
   supported ??= new Promise((resolve) =>
-    document.createElement('canvas').toBlob(
-      (blob) => resolve(blob?.type === 'image/webp' ? 'image/webp' : 'image/jpeg'),
-      'image/webp',
-    ),
+    document
+      .createElement('canvas')
+      .toBlob((blob) => resolve(blob?.type === 'image/webp' ? 'image/webp' : 'image/jpeg'), 'image/webp'),
   );
   return supported;
 }

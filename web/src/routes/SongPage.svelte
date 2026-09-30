@@ -286,7 +286,8 @@
 
   // A title is one line: Enter saves it, and a pasted line break is a space.
   function oneLine(event: Event & { currentTarget: HTMLTextAreaElement }) {
-    if (/[\r\n]/.test(event.currentTarget.value)) draft.title = event.currentTarget.value.replace(/\s*[\r\n]+\s*/g, ' ');
+    if (/[\r\n]/.test(event.currentTarget.value))
+      draft.title = event.currentTarget.value.replace(/\s*[\r\n]+\s*/g, ' ');
   }
 
   function commitNumber(field: 'bpm' | 'capo', label: string) {
@@ -404,8 +405,7 @@
                   onchange={() => commitText('title')}
                   required
                   autocomplete="off"
-                  enterkeyhint="done"
-                ></textarea>
+                  enterkeyhint="done"></textarea>
               {:else}
                 <h1 class="title">{draft.title}</h1>
               {/if}
@@ -507,8 +507,8 @@
         {#if stale}
           <div class="stale" role="alert">
             <p>
-              This Song changed elsewhere, so edits made here since can’t be saved. Reload to see the latest.
-              Edits that weren’t saved stay where you typed them until then, so copy out anything you want to keep.
+              This Song changed elsewhere, so edits made here since can’t be saved. Reload to see the latest. Edits that
+              weren’t saved stay where you typed them until then, so copy out anything you want to keep.
             </p>
             <button type="button" class="button" onclick={reload}>Reload</button>
           </div>

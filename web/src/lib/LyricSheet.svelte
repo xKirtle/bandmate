@@ -84,7 +84,10 @@
     if (isEmpty(section)) {
       return { label: 'Delete this Section', title: "Delete this Section: nothing is written in it, so it isn't kept" };
     }
-    return { label: 'Move to the Scrapbook', title: 'Move to the Scrapbook: take it out of the Lyric Sheet but keep it' };
+    return {
+      label: 'Move to the Scrapbook',
+      title: 'Move to the Scrapbook: take it out of the Lyric Sheet but keep it',
+    };
   }
   // A Section's actions after ↑ and ↓, folded into ⋯ on phones.
   function sectionActions(section: Section, i: number): MenuAction[] {
@@ -273,7 +276,8 @@
   // In Sync mode, Enter cues anywhere but a text field or a dialog, even on
   // a button: syncing along shouldn't depend on where focus was left.
   function cueKey(event: KeyboardEvent) {
-    if (event.key !== 'Enter' || event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+    if (event.key !== 'Enter' || event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey)
+      return;
     if (!syncing || event.defaultPrevented || inTextField(event.target)) return;
     // Enter in a dialog or a ⋯ menu is for what's in it.
     if (event.target instanceof Element && event.target.closest('dialog, [role="menu"]')) return;

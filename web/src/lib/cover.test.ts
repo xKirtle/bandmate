@@ -79,12 +79,24 @@ describe('centredSquare', () => {
 
 describe('clampSquare', () => {
   it('leaves a square that fits as it is', () => {
-    expect(clampSquare({ x: 100, y: 50, size: 600 }, { width: 1600, height: 1200 })).toEqual({ x: 100, y: 50, size: 600 });
+    expect(clampSquare({ x: 100, y: 50, size: 600 }, { width: 1600, height: 1200 })).toEqual({
+      x: 100,
+      y: 50,
+      size: 600,
+    });
   });
 
   it('keeps the square inside the picture', () => {
-    expect(clampSquare({ x: -40, y: 900, size: 600 }, { width: 1600, height: 1200 })).toEqual({ x: 0, y: 600, size: 600 });
-    expect(clampSquare({ x: 1500, y: -1, size: 600 }, { width: 1600, height: 1200 })).toEqual({ x: 1000, y: 0, size: 600 });
+    expect(clampSquare({ x: -40, y: 900, size: 600 }, { width: 1600, height: 1200 })).toEqual({
+      x: 0,
+      y: 600,
+      size: 600,
+    });
+    expect(clampSquare({ x: 1500, y: -1, size: 600 }, { width: 1600, height: 1200 })).toEqual({
+      x: 1000,
+      y: 0,
+      size: 600,
+    });
   });
 
   it('never grows past the largest square, so there are never bars', () => {
@@ -92,7 +104,11 @@ describe('clampSquare', () => {
   });
 
   it(`never shrinks past ${maxCoverZoom}× in`, () => {
-    expect(clampSquare({ x: 0, y: 0, size: 10 }, { width: 1600, height: 1200 })).toEqual({ x: 0, y: 0, size: 1200 / maxCoverZoom });
+    expect(clampSquare({ x: 0, y: 0, size: 10 }, { width: 1600, height: 1200 })).toEqual({
+      x: 0,
+      y: 0,
+      size: 1200 / maxCoverZoom,
+    });
   });
 
   it('is at least a pixel for a tiny picture', () => {
@@ -102,11 +118,19 @@ describe('clampSquare', () => {
 
 describe('moveSquare', () => {
   it('moves by the given pixels', () => {
-    expect(moveSquare({ x: 200, y: 0, size: 1200 }, -50, 0, { width: 1600, height: 1200 })).toEqual({ x: 150, y: 0, size: 1200 });
+    expect(moveSquare({ x: 200, y: 0, size: 1200 }, -50, 0, { width: 1600, height: 1200 })).toEqual({
+      x: 150,
+      y: 0,
+      size: 1200,
+    });
   });
 
   it('stops at the picture’s edges', () => {
-    expect(moveSquare({ x: 200, y: 0, size: 1200 }, 900, 30, { width: 1600, height: 1200 })).toEqual({ x: 400, y: 0, size: 1200 });
+    expect(moveSquare({ x: 200, y: 0, size: 1200 }, 900, 30, { width: 1600, height: 1200 })).toEqual({
+      x: 400,
+      y: 0,
+      size: 1200,
+    });
   });
 });
 
@@ -129,8 +153,14 @@ describe('zoomSquare', () => {
   });
 
   it('stays inside the picture as it zooms out by an edge', () => {
-    expect(zoomSquare({ x: 0, y: 0, size: 300 }, 600, { x: 0, y: 0 }, { width: 1600, height: 1200 })).toEqual({ x: 0, y: 0, size: 600 });
-    expect(zoomSquare({ x: 1300, y: 900, size: 300 }, 600, { x: 1600, y: 1200 }, { width: 1600, height: 1200 })).toEqual({
+    expect(zoomSquare({ x: 0, y: 0, size: 300 }, 600, { x: 0, y: 0 }, { width: 1600, height: 1200 })).toEqual({
+      x: 0,
+      y: 0,
+      size: 600,
+    });
+    expect(
+      zoomSquare({ x: 1300, y: 900, size: 300 }, 600, { x: 1600, y: 1200 }, { width: 1600, height: 1200 }),
+    ).toEqual({
       x: 1000,
       y: 600,
       size: 600,
@@ -140,12 +170,24 @@ describe('zoomSquare', () => {
 
 describe('wholeSquare', () => {
   it('rounds to whole pixels inside the picture', () => {
-    expect(wholeSquare({ x: 10.4, y: 20.6, size: 300.5 }, { width: 1600, height: 1200 })).toEqual({ x: 10, y: 21, size: 301 });
+    expect(wholeSquare({ x: 10.4, y: 20.6, size: 300.5 }, { width: 1600, height: 1200 })).toEqual({
+      x: 10,
+      y: 21,
+      size: 301,
+    });
   });
 
   it('keeps a square rounded up against an edge inside it', () => {
-    expect(wholeSquare({ x: 1299.6, y: 0, size: 300.4 }, { width: 1600, height: 1200 })).toEqual({ x: 1300, y: 0, size: 300 });
-    expect(wholeSquare({ x: 999.5, y: 0.2, size: 600.5 }, { width: 1600, height: 1200 })).toEqual({ x: 999, y: 0, size: 601 });
+    expect(wholeSquare({ x: 1299.6, y: 0, size: 300.4 }, { width: 1600, height: 1200 })).toEqual({
+      x: 1300,
+      y: 0,
+      size: 300,
+    });
+    expect(wholeSquare({ x: 999.5, y: 0.2, size: 600.5 }, { width: 1600, height: 1200 })).toEqual({
+      x: 999,
+      y: 0,
+      size: 601,
+    });
   });
 
   it('is the whole of a square picture zoomed all the way out', () => {

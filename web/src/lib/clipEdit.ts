@@ -89,6 +89,8 @@ export function draggedNudge(clip: Clip, seconds: number): number {
 export function nudged(clip: Clip, nudge: number): Clip {
   return {
     ...clip,
-    takes: clip.takes.map((t) => (t.id === clip.activeTakeId ? { ...t, position: t.position + nudge - t.nudge, nudge } : t)),
+    takes: clip.takes.map((t) =>
+      t.id === clip.activeTakeId ? { ...t, position: t.position + nudge - t.nudge, nudge } : t,
+    ),
   };
 }

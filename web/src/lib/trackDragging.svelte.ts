@@ -49,7 +49,8 @@ export class TrackDragging {
 
   /** Aims the drag at where the pointer is, e.g. again as the Tracks scroll under it. */
   aim(y = this.current?.y) {
-    if (this.current && y !== undefined) this.current = { ...this.current, drop: this.#dropAt(this.current.from, y), y };
+    if (this.current && y !== undefined)
+      this.current = { ...this.current, drop: this.#dropAt(this.current.from, y), y };
   }
 
   #dropAt(from: number, y: number): TrackDrop | null {

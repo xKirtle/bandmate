@@ -287,12 +287,7 @@
 {/if}
 
 {#if previewBeat}
-  <BeatPlayerBar
-    bind:this={playerBar}
-    bind:playing={previewPlaying}
-    bind:height={playerBarHeight}
-    beat={previewBeat}
-  />
+  <BeatPlayerBar bind:this={playerBar} bind:playing={previewPlaying} bind:height={playerBarHeight} beat={previewBeat} />
 {/if}
 
 <style>

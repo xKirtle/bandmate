@@ -23,7 +23,17 @@ import {
 } from './listViews';
 
 function song(title: string, fields: Partial<SongSummary> = {}): SongSummary {
-  return { id: 0, title, status: 'idea', key: '', bpm: null, hasMaster: false, coverId: null, updatedAt: '', ...fields };
+  return {
+    id: 0,
+    title,
+    status: 'idea',
+    key: '',
+    bpm: null,
+    hasMaster: false,
+    coverId: null,
+    updatedAt: '',
+    ...fields,
+  };
 }
 
 // As the API sends them: most recently edited first.
@@ -166,9 +176,9 @@ describe('the Song list in the URL', () => {
     expect(songListViewToParams({ ...defaultSongListView, status: 'idea', hasMaster: true }).toString()).toBe(
       'status=idea&hasMaster=true',
     );
-    expect(songListViewToParams({ ...defaultSongListView, sort: { column: 'bpm', direction: 'desc' } }).toString()).toBe(
-      'sort=-bpm',
-    );
+    expect(
+      songListViewToParams({ ...defaultSongListView, sort: { column: 'bpm', direction: 'desc' } }).toString(),
+    ).toBe('sort=-bpm');
   });
 
   it('leaves a blank search out', () => {
@@ -407,7 +417,9 @@ describe('the Beat Library in the URL', () => {
 describe('isBeatListFiltered', () => {
   it('is whether any filter is set, whatever the sort', () => {
     expect(isBeatListFiltered(defaultBeatListView)).toBe(false);
-    expect(isBeatListFiltered({ ...defaultBeatListView, q: '  ', sort: { column: 'bpm', direction: 'asc' } })).toBe(false);
+    expect(isBeatListFiltered({ ...defaultBeatListView, q: '  ', sort: { column: 'bpm', direction: 'asc' } })).toBe(
+      false,
+    );
     expect(isBeatListFiltered({ ...defaultBeatListView, bpmMin: 0 })).toBe(true);
     expect(isBeatListFiltered({ ...defaultBeatListView, use: 'unused' })).toBe(true);
     expect(isBeatListFiltered({ ...defaultBeatListView, q: 'x' })).toBe(true);
@@ -418,7 +430,9 @@ describe('beatDrawerFilterCount', () => {
   it('counts the set filters other than the search, a BPM range as one', () => {
     expect(beatDrawerFilterCount({ ...defaultBeatListView, q: 'x' })).toBe(0);
     expect(beatDrawerFilterCount({ ...defaultBeatListView, bpmMin: 80, bpmMax: 100 })).toBe(1);
-    expect(beatDrawerFilterCount({ ...defaultBeatListView, producer: 'Nox', key: 'Am', use: 'used', bpmMax: 0 })).toBe(4);
+    expect(beatDrawerFilterCount({ ...defaultBeatListView, producer: 'Nox', key: 'Am', use: 'used', bpmMax: 0 })).toBe(
+      4,
+    );
   });
 
   it('ignores blank text', () => {

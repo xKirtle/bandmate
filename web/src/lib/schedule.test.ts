@@ -204,7 +204,17 @@ describe('schedule of a Take Clip', () => {
     id: 1,
     beatId: null,
     takes: [
-      { id: 7, number: 1, size: 1, duration: 20, sampleRate: 48000, latencyOffset: 0, position: 1, nudge: 0, recordedAt: '' },
+      {
+        id: 7,
+        number: 1,
+        size: 1,
+        duration: 20,
+        sampleRate: 48000,
+        latencyOffset: 0,
+        position: 1,
+        nudge: 0,
+        recordedAt: '',
+      },
     ],
     activeTakeId: 7,
     lastTakeNumber: 1,
@@ -220,7 +230,17 @@ describe('schedule of a Take Clip', () => {
   });
 
   it('leaves the Clip being retaken out, and schedules the rest as usual', () => {
-    const beat: Clip = { ...clip, id: 2, beatId: 5, takes: [], activeTakeId: null, lastTakeNumber: 0, start: 0, offset: 0, length: 60 };
+    const beat: Clip = {
+      ...clip,
+      id: 2,
+      beatId: 5,
+      takes: [],
+      activeTakeId: null,
+      lastTakeNumber: 0,
+      start: 0,
+      offset: 0,
+      length: 60,
+    };
     const tl: Timeline = {
       songId: 1,
       version: 1,
