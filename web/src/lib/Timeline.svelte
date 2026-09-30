@@ -79,12 +79,12 @@
   // The Timeline, docked under the Lyric Sheet: its Tracks and Clips, and
   // playback with each Track's volume, mute and solo, and the Loop. Editing
   // (adding Beats, adding, renaming, reordering and deleting Tracks, moving,
-  // trimming, renaming, duplicating and deleting Clips, setting and clearing the Loop,
-  // and undoing and redoing all of it along with mixing and Cue edits) is
-  // only offered on wider screens; on a phone it only plays, mixes and
-  // switches the Loop on and off. On both it zooms and scrolls, and follows
-  // the playhead while playing. While the Loop is on, the playhead stays
-  // inside it. Recording a Take onto the chosen Track is offered where
+  // trimming, renaming, duplicating and deleting Clips, setting and clearing
+  // the Loop, and undoing and redoing all of it along with mixing and Cue
+  // edits) is only offered on wider screens; on a phone it only plays, mixes
+  // and switches the Loop on and off. On both it zooms and scrolls, and
+  // follows the playhead while playing. While the Loop is on, the playhead
+  // stays inside it. Recording a Take onto the chosen Track is offered where
   // editing is.
   let {
     song,
