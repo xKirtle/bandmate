@@ -119,7 +119,8 @@ type Beat struct {
 }
 
 // MinVolume and MaxVolume are a Track's lowest and highest volume, in dB.
-// Even at its lowest a Track is heard: muting it is what silences it.
+// Even at its lowest a Track is heard: muting it is what silences it. The
+// fader (web/src/lib/mixer.ts) and the tracks table's CHECK use the same range.
 const (
 	MinVolume = -36.0
 	MaxVolume = 36.0

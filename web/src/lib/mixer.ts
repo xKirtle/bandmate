@@ -9,9 +9,12 @@ export interface Levels {
   soloed: boolean;
 }
 
-/** A Track's lowest volume, in dB. It's still heard there: muting it is what silences it. */
+/**
+ * A Track's lowest volume, in dB. It's still heard there: muting it is what
+ * silences it. The server checks the same range (MinVolume in the timeline package).
+ */
 export const minVolume = -36;
-/** A Track's highest volume, in dB. Clipping up there is left to the user. */
+/** A Track's highest volume, in dB. Nothing stops it distorting up there: that's left to the user. */
 export const maxVolume = 36;
 
 /**
