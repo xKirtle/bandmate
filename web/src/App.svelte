@@ -1,7 +1,6 @@
 <script lang="ts">
   import { interceptLinks, router } from './lib/router.svelte';
   import SongList from './routes/SongList.svelte';
-  import NewSong from './routes/NewSong.svelte';
   import ImportSong from './routes/ImportSong.svelte';
   import SongPage from './routes/SongPage.svelte';
   import BeatLibrary from './routes/BeatLibrary.svelte';
@@ -19,8 +18,6 @@
       <SongList />
     {:else if router.path === '/beats'}
       <BeatLibrary />
-    {:else if router.path === '/songs/new'}
-      <NewSong />
     {:else if router.path === '/songs/import'}
       <ImportSong />
     {:else if songMatch}

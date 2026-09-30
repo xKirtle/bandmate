@@ -50,7 +50,7 @@ func TestReadingUnknownSongIsNotFound(t *testing.T) {
 	expectStatus(t, res, http.StatusNotFound)
 }
 
-func TestCreatingSongWithoutTitleIsRejected(t *testing.T) {
+func TestSongCreatedWithoutTitleIsUntitledSong(t *testing.T) {
 	cases := map[string]any{
 		"missing title": map[string]any{},
 		"empty title":   map[string]any{"title": ""},
@@ -62,16 +62,39 @@ func TestCreatingSongWithoutTitleIsRejected(t *testing.T) {
 
 			res := ts.Do(http.MethodPost, "/api/songs", body)
 
-			expectStatus(t, res, http.StatusBadRequest)
-			var e struct{ Error string }
-			res.JSON(t, &e)
-			if e.Error != "title is required" {
-				t.Errorf("error = %q, want %q", e.Error, "title is required")
+			expectStatus(t, res, http.StatusCreated)
+			var created song
+			res.JSON(t, &created)
+			if created.Title != "Untitled Song" {
+				t.Errorf("title = %q, want %q", created.Title, "Untitled Song")
 			}
-			if list := ts.listSongs(); len(list) != 0 {
-				t.Errorf("song list = %+v, want no Song created", list)
+			if created.Status != "idea" {
+				t.Errorf("status = %q, want %q", created.Status, "idea")
+			}
+			if got := ts.getSong(created.ID); got.Title != "Untitled Song" {
+				t.Errorf("read title = %q, want %q", got.Title, "Untitled Song")
 			}
 		})
+	}
+}
+
+func TestSeveralSongsCanBeUntitledSong(t *testing.T) {
+	ts := newTestServer(t)
+
+	first := ts.createSong("")
+	second := ts.createSong("")
+
+	if first.ID == second.ID {
+		t.Fatalf("both creates returned Song %d, want two Songs", first.ID)
+	}
+	list := ts.listSongs()
+	if len(list) != 2 {
+		t.Fatalf("song list has %d songs, want 2: %+v", len(list), list)
+	}
+	for _, s := range list {
+		if s.Title != "Untitled Song" {
+			t.Errorf("song %d title = %q, want %q", s.ID, s.Title, "Untitled Song")
+		}
 	}
 }
 
