@@ -24,14 +24,14 @@ export function defaultHeight(windowHeight: number): number {
 }
 
 /**
- * The height to keep once the Tracks need `needed` instead of `was` (0 while
- * unknown). If every Track showed, it grows to show them all, up to
+ * The height to keep once the Tracks need `needed` instead of `neededBefore`
+ * (0 while unknown). If every Track showed, it grows to show them all, up to
  * defaultShare of the window; if the area scrolled, it's left as it is.
  */
-export function grownHeight(height: number, was: number, needed: number, windowHeight: number): number {
+export function grownHeight(height: number, neededBefore: number, needed: number, windowHeight: number): number {
   // What's shown can't go past mostShare, however tall the height kept.
-  const showedAll = Math.min(height, windowHeight * mostShare) >= was;
-  if (needed <= was || !showedAll) return height;
+  const showedAll = Math.min(height, windowHeight * mostShare) >= neededBefore;
+  if (needed <= neededBefore || !showedAll) return height;
   return Math.max(height, Math.min(needed, defaultHeight(windowHeight)));
 }
 

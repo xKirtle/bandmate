@@ -1171,12 +1171,13 @@
   }
 
   // The Tracks area's height, dragged by the Timeline's top edge. Null is the
-  // default, which follows the window. One dragged on this device is the
-  // least this Song's area starts at.
+  // default, which follows the window. A height dragged on this device is
+  // the least this Song's area starts at.
   let chosenHeight = $state<number | null>(readHeight(deviceStorage()));
   let headsHeight = $state(0);
   let lanesHeight = $state(0);
-  let resizing: { y: number; height: number } | null = null;
+  let resizing: { y: number; height: number; moved: boolean } | null = null;
+  const windowHeight = $derived(innerHeight.current ?? 0);
   /** How tall the Tracks and the ruler are, or 0 while unknown (e.g. hidden). */
   const neededHeight = $derived(Math.max(headsHeight, lanesHeight));
 
@@ -1184,23 +1185,24 @@
     // One Track and the ruler above it.
     const first = laneElements[0];
     const least = first ? first.offsetTop + first.offsetHeight : 0;
-    return heightBounds(innerHeight.current ?? 0, least, neededHeight);
+    return heightBounds(windowHeight, least, neededHeight);
   });
 
   // A chosen height grows to fit the Tracks as they're known, and as they're
   // added while every one shows. The default already fits them.
+  // Plain, not $state: only remembered from one run to the next.
   let neededBefore = 0;
   $effect(() => {
     const needed = neededHeight;
     if (!needed) return;
     untrack(() => {
       if (chosenHeight !== null) {
-        chosenHeight = grownHeight(chosenHeight, neededBefore, needed, innerHeight.current ?? 0);
+        chosenHeight = grownHeight(chosenHeight, neededBefore, needed, windowHeight);
       }
     });
     neededBefore = needed;
   });
-  const tracksHeight = $derived(clampHeight(chosenHeight ?? defaultHeight(innerHeight.current ?? 0), bounds));
+  const tracksHeight = $derived(clampHeight(chosenHeight ?? defaultHeight(windowHeight), bounds));
 
   function resize(height: number) {
     chosenHeight = clampHeight(height, bounds);
@@ -1210,18 +1212,22 @@
     if (!event.isPrimary || event.button !== 0) return;
     event.preventDefault();
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-    resizing = { y: event.clientY, height: tracksHeight };
+    resizing = { y: event.clientY, height: tracksHeight, moved: false };
   }
 
   function resizeMove(event: PointerEvent) {
     // Dragging up makes it taller.
-    if (resizing) resize(resizing.height + resizing.y - event.clientY);
+    if (!resizing) return;
+    if (event.clientY !== resizing.y) resizing.moved = true;
+    resize(resizing.height + resizing.y - event.clientY);
   }
 
   function resizeUp() {
     if (!resizing) return;
+    // A click that didn't drag keeps what's stored, not a height grown to fit.
+    const { moved } = resizing;
     resizing = null;
-    storeHeight(deviceStorage(), chosenHeight);
+    if (moved) storeHeight(deviceStorage(), chosenHeight);
   }
 
   function resizeKey(event: KeyboardEvent) {
