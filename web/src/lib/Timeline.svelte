@@ -85,7 +85,6 @@
     onPlayhead,
     onLoop,
     syncing = false,
-    writing = true,
     onRecording,
     height = $bindable(0),
   }: {
@@ -101,8 +100,6 @@
     onLoop?: (on: boolean) => void;
     /** Whether the Lyric Sheet is in Sync mode, which recording can't start in. */
     syncing?: boolean;
-    /** Whether the Song page is in Write mode; Read mode offers no "+ Beat" or "+ Track". */
-    writing?: boolean;
     /** Hears whether a recording is on, whenever that changes, e.g. to keep Sync mode off while it is. */
     onRecording?: (on: boolean) => void;
     /** How tall the docked Timeline is, in pixels, e.g. for the page to keep clear of it. */
@@ -1868,18 +1865,15 @@
     >
       <div class="heads" class:gripped={editable.current} bind:offsetHeight={headsHeight}>
         <div class="ruler-gap">
-          {#if writing}
-            <button
-              type="button"
-              class="button add edit-only"
-              onclick={() => (picking = true)}
-              title="Add a Beat to {timeline.tracks.find((t) => t.id === chosen)?.name ?? 'the Chosen Track'}"
-              >+ Beat</button
-            >
-            <button type="button" class="button add edit-only" aria-label="Add a Track" onclick={addTrack}
-              >+ Track</button
-            >
-          {/if}
+          <button
+            type="button"
+            class="button add edit-only"
+            onclick={() => (picking = true)}
+            title="Add a Beat to {timeline.tracks.find((t) => t.id === chosen)?.name ?? 'the Chosen Track'}"
+            >+ Beat</button
+          >
+          <button type="button" class="button add edit-only" aria-label="Add a Track" onclick={addTrack}>+ Track</button
+          >
         </div>
         {#each timeline.tracks as track, i (track.id)}
           {@const trackLevels = levels[i]}
