@@ -1,0 +1,56 @@
+name: Bug report
+description: Something in Bandmate doesn't work the way it should.
+labels: ["needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. If it's a security problem, don't file it here: report it privately instead (see [SECURITY.md](https://github.com/xKirtle/bandmate/blob/main/SECURITY.md)).
+  - type: input
+    id: version
+    attributes:
+      label: Bandmate version or image tag
+      description: The release you're running, or the image tag you pulled (for example `v0.4.0`, `latest`, `edge` or `sha-1a2b3c4`).
+      placeholder: v0.4.0
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser
+      description: The browser and its version, and the operating system it runs on.
+      placeholder: Firefox 140 on Windows 11
+    validations:
+      required: true
+  - type: textarea
+    id: deployment
+    attributes:
+      label: How it's deployed
+      description: How you run Bandmate (Docker, Docker Compose, the binary), and which reverse proxy it's behind, if any.
+      placeholder: Docker Compose behind Caddy, with authentication at the proxy.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: What to do, step by step, to make the bug happen.
+      placeholder: |
+        1. Open a Song
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      description: What you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: What happened instead. Include any error messages, server logs or screenshots.
+    validations:
+      required: true
