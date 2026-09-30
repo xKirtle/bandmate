@@ -1,5 +1,5 @@
 import { describe as group, expect, it } from 'vitest';
-import { levelsOf, mixdownEnd, mixdownName } from './mixdown';
+import { levelsOf, mixdownEnd, mixdownName, mixdownRanges } from './mixdown';
 
 const channel = (...samples: number[]) => new Float32Array(samples);
 
@@ -44,8 +44,35 @@ group('mixdownEnd', () => {
   });
 });
 
+group('mixdownRanges', () => {
+  const whole = { of: 'timeline', start: 0, end: 37.5 };
+
+  it('offers only the whole Timeline without a Loop', () => {
+    expect(mixdownRanges(37.5, null)).toEqual({ ranges: [whole], chosen: whole });
+  });
+
+  it("offers the Loop's stretch too, and chooses it while the Loop is on", () => {
+    const loop = { of: 'loop', start: 32, end: 48 };
+    expect(mixdownRanges(37.5, { start: 32, end: 48, on: true })).toEqual({ ranges: [whole, loop], chosen: loop });
+  });
+
+  it("still offers the Loop's stretch while it's off, choosing the whole Timeline", () => {
+    const loop = { of: 'loop', start: 32, end: 48 };
+    expect(mixdownRanges(37.5, { start: 32, end: 48, on: false })).toEqual({ ranges: [whole, loop], chosen: whole });
+  });
+});
+
 group('mixdownName', () => {
-  it('names the file after the Song', () => {
-    expect(mixdownName('Midnight Drive')).toBe('Midnight Drive - Mixdown.wav');
+  it("names the whole Timeline's file after the Song", () => {
+    expect(mixdownName('Midnight Drive', { of: 'timeline', start: 0, end: 37.5 })).toBe('Midnight Drive - Mixdown.wav');
+  });
+
+  it("adds the Loop's times to the file of its stretch", () => {
+    expect(mixdownName('Midnight Drive', { of: 'loop', start: 32, end: 48 })).toBe(
+      'Midnight Drive - Mixdown (0m32s-0m48s).wav',
+    );
+    expect(mixdownName('Midnight Drive', { of: 'loop', start: 65.4, end: 130.6 })).toBe(
+      'Midnight Drive - Mixdown (1m05s-2m11s).wav',
+    );
   });
 });

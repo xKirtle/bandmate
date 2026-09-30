@@ -36,7 +36,9 @@ export function transportActions(state: TransportState, run: TransportRun): Menu
   const mixDown: MenuAction = {
     icon: '⤓',
     label: 'Mix down…',
-    title: state.hasClips ? 'Download the whole Timeline as one audio file' : 'Add a Beat, Sound or Take to mix down',
+    title: state.hasClips
+      ? 'Download the Timeline, or its Loop, as one audio file'
+      : 'Add a Beat, Sound or Take to mix down',
     disabled: !state.hasClips || state.recording,
     run: run.mixDown,
   };

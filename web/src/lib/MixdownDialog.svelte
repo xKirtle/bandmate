@@ -1,31 +1,38 @@
 <script lang="ts">
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
+  import type { TimelineLoop } from './api';
   import { closeOnBackdrop } from './backdrop';
   import {
     levelsOf,
     mixdownName,
+    mixdownRanges,
     mixdownRate,
     mixDown,
     type MixdownLevels,
     type MixdownPlan,
     type MixdownProgress,
+    type MixdownRange,
   } from './mixdown';
   import { formatDuration } from './time';
   import { encodeWav } from './wav';
 
-  // Mixes the whole Timeline down to a WAV file and downloads it, in a
-  // modal dialog: while it's mixing, nothing else on the page can be used,
-  // and closing the dialog, or leaving the Song page, cancels it.
+  // Mixes the whole Timeline, or the Loop's stretch of it, down to a WAV
+  // file and downloads it, in a modal dialog: while it's mixing, nothing else
+  // on the page can be used, and closing the dialog, or leaving the Song
+  // page, cancels it.
   let {
     songTitle,
     end,
+    loop,
     plan,
     onStart,
     onClose,
   }: {
     songTitle: string;
-    /** Where the Mixdown ends, in seconds from 0:00. */
+    /** Where the whole Timeline's Mixdown ends, in seconds from 0:00. */
     end: number;
+    /** The Song's Loop, if it has one, and whether it's on. */
+    loop: TimelineLoop | null;
     /** What it mixes, as it stands when it starts. */
     plan: () => Pick<MixdownPlan, 'clips' | 'gains' | 'load'>;
     /** Hears the Mixdown start, e.g. to stop playback. */
@@ -40,7 +47,13 @@
   let error = $state<string | null>(null);
   let mixing: AbortController | null = null;
 
-  const name = $derived(mixdownName(songTitle));
+  // What it can cover. Which is chosen isn't remembered: it follows the
+  // Loop each time the dialog opens.
+  const offered = untrack(() => mixdownRanges(end, loop));
+  const ranges = offered.ranges;
+  let chosen = $state.raw<MixdownRange>(offered.chosen);
+  const name = $derived(mixdownName(songTitle, chosen));
+  const span = (range: MixdownRange) => `${formatDuration(range.start)}–${formatDuration(range.end)}`;
 
   onMount(() => dialog?.showModal());
   onDestroy(() => mixing?.abort());
@@ -55,7 +68,8 @@
     try {
       const audio = await mixDown({
         ...plan(),
-        end,
+        start: chosen.start,
+        end: chosen.end,
         signal: cancel.signal,
         onProgress: (p) => (progress = p),
       });
@@ -105,10 +119,23 @@
   </header>
 
   {#if phase === 'ready'}
-    <p>
-      The whole Timeline, 0:00 to {formatDuration(end)}, as it plays now: each Track at its volume, with mute and solo
-      as they are.
-    </p>
+    {#if ranges.length > 1}
+      <fieldset>
+        <legend>What to mix down</legend>
+        {#each ranges as range (range.of)}
+          <label>
+            <input type="radio" name="mixdown-range" checked={chosen === range} onchange={() => (chosen = range)} />
+            <span>{range.of === 'loop' ? 'Loop' : 'Whole Timeline'} <span class="times">({span(range)})</span></span>
+          </label>
+        {/each}
+      </fieldset>
+      <p>As it plays now: each Track at its volume, with mute and solo as they are.</p>
+    {:else}
+      <p>
+        The whole Timeline, 0:00 to {formatDuration(end)}, as it plays now: each Track at its volume, with mute and solo
+        as they are.
+      </p>
+    {/if}
     <p class="muted">A stereo 24-bit WAV at 48 kHz, downloaded as “{name}”.</p>
     {#if error}
       <p class="problem" role="alert">{error}</p>
@@ -129,7 +156,11 @@
     {#if levels?.clips}
       <p class="problem">This Mixdown clips: turn some Tracks down.</p>
     {:else if levels?.silent}
-      <p class="problem">This Mixdown is silent throughout: are all its Tracks muted?</p>
+      <p class="problem">
+        This Mixdown is silent throughout: {chosen.of === 'loop'
+          ? 'is the Loop over no Clips, or are all its Tracks muted?'
+          : 'are all its Tracks muted?'}
+      </p>
     {/if}
   {/if}
 
@@ -174,6 +205,37 @@
   }
   p {
     margin: 0;
+  }
+  fieldset {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  legend {
+    margin-bottom: 0.375rem;
+    padding: 0;
+    font-weight: 600;
+  }
+  label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: var(--control);
+    cursor: pointer;
+  }
+  label input {
+    flex: none;
+    width: 1.25rem;
+    height: 1.25rem;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    accent-color: var(--accent);
+  }
+  .times {
+    white-space: nowrap;
   }
   progress {
     width: 100%;
