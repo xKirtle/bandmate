@@ -21,6 +21,7 @@
   import { clampMove, clampTrimEnd, clampTrimStart, draggedNudge, nudged } from './clipEdit';
   import { activeTake, clipSources, clipTitle, fileStart, playing } from './clipSource';
   import { cuesInSpan, formatCue } from './cues';
+  import { carriesFiles, fileDropTrack, importEach, type TrackRow } from './fileDrop';
   import {
     History,
     placingAdded,
@@ -799,37 +800,123 @@
   // What importing an audio file is doing, while it is.
   let importing = $state<string | null>(null);
 
+  // Imports run one at a time, in the order they were asked for.
+  let imports = Promise.resolve();
+
   /**
-   * Imports an audio file as a Sound, in a new Clip after the Chosen Track's
-   * last Clip, or at 0:00. It's kept in the history as placing that Clip, so
+   * Imports audio files as Sounds onto a Track, each after the last, from
+   * Import audio… or dropped. Each one refused says why as it's refused,
+   * and a new import clears what the last ones said once they're done.
+   */
+  function importFiles(files: File[], trackId: number) {
+    if (importing === null) error = null;
+    imports = imports.then(async () => {
+      await importEach(
+        files,
+        (file) => importSound(file, trackId),
+        (message) => (error = error ? `${error} ${message}` : message),
+      );
+      importing = null;
+    });
+  }
+
+  /**
+   * Imports an audio file as a Sound, in a new Clip after a Track's last
+   * Clip, or at 0:00. It's kept in the history as placing that Clip, so
    * redoing it never uploads the file again.
    */
-  async function importAudio(event: Event) {
+  async function importSound(file: File, trackId: number) {
+    importing = `Reading “${file.name}”…`;
+    const [decoded, name] = await Promise.all([prepareUpload(file, maxUploadBytes), nameSound(file)]);
+    importing = `Importing “${name}”…`;
+    offerCues = null;
+    queued++;
+    await change(async (at) => {
+      const before = timeline;
+      const after = await saved(api.importSound(at, file, { trackId, name, ...decoded }));
+      history.record(placingAdded(before, after), before, after);
+      editedAt = after.version;
+      showHistory();
+      return { timeline: after };
+    }).finally(() => queued--);
+  }
+
+  /** Imports the file picked with Import audio… onto the Chosen Track. */
+  function importPicked(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
     input.value = '';
-    const trackId = chosen;
-    if (!file || trackId === null) return;
-    error = null;
-    importing = `Reading “${file.name}”…`;
-    try {
-      const [decoded, name] = await Promise.all([prepareUpload(file, maxUploadBytes), nameSound(file)]);
-      importing = `Importing “${name}”…`;
-      offerCues = null;
-      queued++;
-      await change(async (at) => {
-        const before = timeline;
-        const after = await saved(api.importSound(at, file, { trackId, name, ...decoded }));
-        history.record(placingAdded(before, after), before, after);
-        editedAt = after.version;
-        showHistory();
-        return { timeline: after };
-      }).finally(() => queued--);
-    } catch (e) {
-      error = (e as Error).message;
-    } finally {
-      importing = null;
+    if (file && chosen !== null) importFiles([file], chosen);
+  }
+
+  // Audio files dragged from outside the page onto a Track are imported
+  // onto it, and onto the Chosen Track below the last Track: only which
+  // Track, never where on it. Not while the Timeline can't be edited, or
+  // while recording, nor while its Tracks are hidden or a dialog is open
+  // over it. Anywhere else, a file dropped is never opened by the browser
+  // in place of the Song.
+  let tracksElement = $state<HTMLElement>();
+  // The Track files dragged over the Timeline would go to.
+  let fileTarget = $state<number | null>(null);
+
+  /** Whether files dropped now can be imported. */
+  function takesFiles(): boolean {
+    return editable.current && recording === null && !picking && !calibrating && !collapsed;
+  }
+
+  /** The files a drag carries, or null for a drag of anything else, e.g. text. */
+  function draggedFiles(event: DragEvent): DataTransfer | null {
+    return event.dataTransfer && carriesFiles(event.dataTransfer.types) ? event.dataTransfer : null;
+  }
+
+  /**
+   * The Track files dropped this far down the page go to, or null where
+   * they'd do nothing. Unlike a Clip dragged, which goes to the nearest
+   * Track, files go nowhere above the first Track.
+   */
+  function fileTrackAt(y: number): number | null {
+    if (!takesFiles() || !tracksElement || chosen === null) return null;
+    const rows: TrackRow[] = [];
+    for (const [i, track] of timeline.tracks.entries()) {
+      const lane = laneElements[i];
+      if (!lane) return null;
+      const { top, bottom } = lane.getBoundingClientRect();
+      rows.push({ trackId: track.id, top, bottom });
     }
+    return fileDropTrack(y, tracksElement.getBoundingClientRect(), rows, chosen);
+  }
+
+  function filesOver(event: DragEvent) {
+    const files = draggedFiles(event);
+    if (!files) return;
+    event.preventDefault();
+    fileTarget = fileTrackAt(event.clientY);
+    files.dropEffect = fileTarget === null ? 'none' : 'copy';
+  }
+
+  // Leaving one of its elements for another fires too, so only once the
+  // pointer is outside the Timeline.
+  function filesLeave(event: DragEvent) {
+    const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const { clientX: x, clientY: y } = event;
+    if (x <= box.left || x >= box.right || y <= box.top || y >= box.bottom) fileTarget = null;
+  }
+
+  function filesDrop(event: DragEvent) {
+    const files = draggedFiles(event);
+    if (!files) return;
+    event.preventDefault();
+    fileTarget = null;
+    const trackId = fileTrackAt(event.clientY);
+    if (trackId !== null && files.files.length > 0) importFiles([...files.files], trackId);
+  }
+
+  /** Stops files dropped outside the Timeline from being opened by the browser. */
+  function refuseFiles(event: DragEvent) {
+    const files = draggedFiles(event);
+    if (event.defaultPrevented || !files) return;
+    event.preventDefault();
+    files.dropEffect = 'none';
   }
 
   // Why Record can't work, where that's known before trying, e.g. no inputs:
@@ -1903,7 +1990,12 @@
 </script>
 
 <!-- A tab closing mid-recording writes what it hasn't yet, to offer it back. -->
-<svelte:window onkeydown={keydown} onpagehide={() => recording?.keeper?.finish()} />
+<svelte:window
+  onkeydown={keydown}
+  onpagehide={() => recording?.keeper?.finish()}
+  ondragover={refuseFiles}
+  ondrop={refuseFiles}
+/>
 
 {#snippet undoRedo()}
   <span class="history edit-only">
@@ -1916,7 +2008,15 @@
   </span>
 {/snippet}
 
-<section class="timeline" aria-label="Timeline" bind:offsetHeight={height}>
+<section
+  class="timeline"
+  aria-label="Timeline"
+  bind:offsetHeight={height}
+  ondragenter={filesOver}
+  ondragover={filesOver}
+  ondragleave={filesLeave}
+  ondrop={filesDrop}
+>
   {#if !collapsed}
     <!-- A focusable separator with a value is a widget, resized with Up and Down. -->
     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
@@ -1992,7 +2092,7 @@
           class="visually-hidden"
           type="file"
           accept="audio/*"
-          onchange={importAudio}
+          onchange={importPicked}
           disabled={importing !== null || recording !== null}
         /></label
       >
@@ -2042,6 +2142,7 @@
     <div
       class="tracks"
       id="timeline-tracks"
+      bind:this={tracksElement}
       hidden={collapsed}
       style:max-height="{tracksHeight}px"
       onscroll={() => trackDrag.aim()}
@@ -2065,6 +2166,7 @@
           <div
             class="head"
             class:chosen={track.id === chosen}
+            class:file-target={track.id === fileTarget}
             class:dragged={trackDrag.current?.from === i}
             class:drop-above={trackGap === i}
             class:drop-below={trackGap === timeline.tracks.length && i === timeline.tracks.length - 1}
@@ -2243,6 +2345,7 @@
             {#each shown as { track, clips: placed }, t (track.id)}
               <div
                 class="lane"
+                class:file-target={track.id === fileTarget}
                 class:dragged={trackDrag.current?.from === t}
                 class:drop-above={trackGap === t}
                 class:drop-below={trackGap === shown.length && t === shown.length - 1}
@@ -2679,6 +2782,12 @@
   .head.chosen {
     box-shadow: inset calc(0.1875 * var(--timeline-rem)) 0 0 var(--accent);
     background: color-mix(in srgb, var(--accent) 8%, transparent);
+  }
+  /* The Track audio files dragged over the Timeline would be imported onto, across its header and lane. */
+  .head.file-target,
+  .lane.file-target {
+    box-shadow: inset 0 0 0 2px var(--accent);
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
   }
   .head-row {
     display: flex;
