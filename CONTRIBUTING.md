@@ -1,6 +1,6 @@
 # Contributing to Bandmate
 
-Bandmate is a personal, single-user tool, and it's grown by designing each step before building it. Bug reports and ideas are welcome, and so are pull requests for issues that have been agreed. Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+Bandmate is a personal, single-user tool, and it's grown by designing each feature before building it. Bug reports and ideas are welcome, and so are pull requests for issues that have been agreed. Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## How to contribute
 
@@ -94,7 +94,7 @@ Vitest covers plain TypeScript modules in `web/src/lib` that don't touch the DOM
 
 ### Versions
 
-Versions follow the [roadmap](docs/roadmap.md): v0.N is the release that ships step N, so Record, step 4, is v0.4.0. Patch releases (v0.4.1, v0.4.2 and so on) carry fixes and small features between steps. v1.0.0 comes when the roadmap is done.
+A release with any new feature bumps the minor version (v0.4.0 to v0.5.0), and one with only fixes bumps the patch (v0.4.0 to v0.4.1). Versions aren't tied to the [roadmap](docs/roadmap.md): whatever has merged since the last release goes out together. v1.0.0 isn't planned yet.
 
 ### Cutting a release
 
