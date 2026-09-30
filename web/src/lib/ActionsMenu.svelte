@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick, type Snippet } from 'svelte';
-  import { fieldStep, menuKey, type MenuAction, type MenuChoice, type MenuField } from './menu';
+  import { fieldStep, menuKey, opensMenu, type MenuAction, type MenuChoice, type MenuField } from './menu';
   import { popoverLeft, popoverSide, popoverTop, type PopoverAlign } from './popover';
   import type { Point } from './press';
 
@@ -126,6 +126,7 @@
 
   // `byKeyboard` when it's chosen with Enter or Space rather than clicked.
   function choose(entry: MenuAction | MenuChoice, byKeyboard: boolean) {
+    if ('disabled' in entry && entry.disabled) return;
     if ('choices' in entry || 'field' in entry) {
       pick(entry, byKeyboard);
       return;
@@ -169,8 +170,12 @@
     }
   }
 
+  // The Menu key and Shift+F10 open it too, as they would a context menu.
   function onTriggerKey(e: KeyboardEvent) {
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    if (opensMenu(e)) {
+      e.preventDefault();
+      if (!open) show('first');
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
       show(e.key === 'ArrowDown' ? 'first' : 'last');
     }
@@ -281,6 +286,7 @@
             role="menuitem"
             tabindex="-1"
             aria-haspopup={'choices' in entry ? 'menu' : undefined}
+            aria-disabled={('disabled' in entry && entry.disabled) || undefined}
             onclick={(e) => choose(entry, keyboardClick(e))}
           >
             {#if 'icon' in entry}
@@ -341,6 +347,14 @@
   [role^='menuitem']:hover,
   [role^='menuitem']:focus-visible {
     background: var(--surface-2);
+  }
+  /* Still focusable, to be read out, but it does nothing. */
+  [role^='menuitem'][aria-disabled='true'] {
+    opacity: 0.5;
+    cursor: default;
+  }
+  [role^='menuitem'][aria-disabled='true']:hover {
+    background: transparent;
   }
   /* A choice sits under the entry it's for, past where the glyphs line up. */
   .choice {

@@ -7,17 +7,18 @@
   import { deviceStorage } from './timelineHeight';
   import { audioContext } from './timelinePlayer';
 
-  // The recording settings, beside Record: the input to record from, a
-  // device and one of its channels, kept on this device, and a live level
-  // meter of it while they're open, to set the interface's gain by; and the
-  // Latency Offset, calibrated or not, with calibration to run again.
+  // The recording settings, opened from the transport row's ⋯: the input
+  // to record from, a device and one of its channels, kept on this device,
+  // and a live level meter of it while they're open, to set the interface's
+  // gain by; and the Latency Offset, calibrated or not, with calibration to
+  // run again.
 
   let {
     disabled = false,
     offset,
     onCalibrate,
   }: {
-    /** Keeps them from opening, e.g. while recording. */
+    /** Keeps them from opening, and closes them, e.g. while recording. */
     disabled?: boolean;
     /** The Latency Offset calibrated on this device, in seconds, or null. */
     offset: number | null;
@@ -26,8 +27,10 @@
   } = $props();
 
   let open = $state(false);
-  let root: HTMLElement;
-  let trigger: HTMLButtonElement;
+  // What they're placed by, e.g. the ⋯ they were opened from, and what had
+  // focus as they opened, to give it back as they close.
+  let anchor: HTMLElement | null = null;
+  let returnFocus: HTMLElement | null = null;
   let panel = $state<HTMLElement>();
   // Between the trigger and the panel, in px.
   const gap = 4;
@@ -141,7 +144,14 @@
   );
   const clipping = $derived(clippedUntil > now);
 
-  async function show() {
+  /**
+   * Opens them by an element, e.g. the ⋯ they're chosen from, under it or
+   * over it where there's no room below, with focus in them.
+   */
+  export async function openSettings(by: HTMLElement) {
+    if (disabled || open) return;
+    anchor = by;
+    returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     open = true;
     choice = readInput(deviceStorage());
     await tick();
@@ -154,12 +164,12 @@
   }
 
   function place() {
-    if (!panel) return;
-    const at = trigger.getBoundingClientRect();
+    if (!panel || !anchor) return;
+    const at = anchor.getBoundingClientRect();
     panel.style.left = '0px';
     const { width, height } = panel.getBoundingClientRect();
     panel.style.top = `${popoverTop(at, height, window.innerHeight, gap)}px`;
-    panel.style.left = `${popoverLeft(at, width, document.documentElement.clientWidth, gap, 'start')}px`;
+    panel.style.left = `${popoverLeft(at, width, document.documentElement.clientWidth, gap, 'end')}px`;
   }
 
   function hide(refocus = true) {
@@ -169,7 +179,8 @@
     closeLevel();
     opening = false;
     navigator.mediaDevices?.removeEventListener('devicechange', onDeviceChange);
-    if (refocus) trigger.focus();
+    if (refocus) returnFocus?.focus();
+    anchor = returnFocus = null;
   }
 
   // An input plugged in or out: listed again, and the one chosen opened
@@ -189,7 +200,7 @@
 
   // A tap outside closes it, leaving focus to wherever the tap puts it.
   function onWindowPointer(e: PointerEvent) {
-    if (open && !root.contains(e.target as Node)) hide(false);
+    if (open && !panel?.contains(e.target as Node)) hide(false);
   }
 
   $effect(() => {
@@ -201,113 +212,86 @@
 
 <svelte:window onpointerdowncapture={onWindowPointer} onresize={() => open && place()} />
 
-<div class="settings-root" bind:this={root}>
-  <button
-    type="button"
-    class="icon"
-    bind:this={trigger}
+{#if open}
+  <div
+    class="panel"
+    role="dialog"
     aria-label="Recording settings"
-    title="Recording settings: input and level"
-    aria-haspopup="dialog"
-    aria-expanded={open}
-    {disabled}
-    onclick={() => (open ? hide() : show())}
+    tabindex="-1"
+    popover="manual"
+    bind:this={panel}
+    onkeydown={onPanelKey}
   >
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M4 7h10M18 7h2M4 17h2M10 17h10" />
-      <circle cx="16" cy="7" r="2" />
-      <circle cx="8" cy="17" r="2" />
-    </svg>
-  </button>
-  {#if open}
-    <div
-      class="panel"
-      role="dialog"
-      aria-label="Recording settings"
-      tabindex="-1"
-      popover="manual"
-      bind:this={panel}
-      onkeydown={onPanelKey}
-    >
-      <label>
-        <span>Input</span>
-        <select value={picked} onchange={(e) => chooseDevice(e.currentTarget.value)}>
-          <option value="">Default input</option>
-          {#each devices as device (device.deviceId)}
-            <option value={device.deviceId}>{deviceName(device.label)}</option>
-          {/each}
-        </select>
-      </label>
-      <label>
-        <span>Channel</span>
-        <select
-          value={channel}
-          onchange={(e) => choose({ ...choice, channel: Number(e.currentTarget.value) })}
-          disabled={channels < 2 || gone !== null}
-          title={gone ? `The default input's first channel is used while ${gone} isn't connected` : undefined}
-        >
-          {#each { length: Math.max(1, channels) } as _, i (i)}
-            <option value={i}>{channelName(pickedLabel, i)}</option>
-          {/each}
-        </select>
-      </label>
-      <div class="level">
-        <span id="input-level-label">Level</span>
-        <div
-          class="meter"
-          role="meter"
-          aria-labelledby="input-level-label"
-          aria-valuemin="0"
-          aria-valuemax="100"
-          aria-valuenow={Math.round(fill * 100)}
-          aria-valuetext={clipping ? 'Clipping' : `${Math.round(fill * 100)}%`}
-        >
-          <div class="meter-fill" class:clipping style:width="{fill * 100}%"></div>
-        </div>
-        <span class="clip" class:on={clipping} aria-hidden={!clipping} title="The input clipped: turn its gain down"
-          >Clip</span
-        >
+    <label>
+      <span>Input</span>
+      <select value={picked} onchange={(e) => chooseDevice(e.currentTarget.value)}>
+        <option value="">Default input</option>
+        {#each devices as device (device.deviceId)}
+          <option value={device.deviceId}>{deviceName(device.label)}</option>
+        {/each}
+      </select>
+    </label>
+    <label>
+      <span>Channel</span>
+      <select
+        value={channel}
+        onchange={(e) => choose({ ...choice, channel: Number(e.currentTarget.value) })}
+        disabled={channels < 2 || gone !== null}
+        title={gone ? `The default input's first channel is used while ${gone} isn't connected` : undefined}
+      >
+        {#each { length: Math.max(1, channels) } as _, i (i)}
+          <option value={i}>{channelName(pickedLabel, i)}</option>
+        {/each}
+      </select>
+    </label>
+    <div class="level">
+      <span id="input-level-label">Level</span>
+      <div
+        class="meter"
+        role="meter"
+        aria-labelledby="input-level-label"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow={Math.round(fill * 100)}
+        aria-valuetext={clipping ? 'Clipping' : `${Math.round(fill * 100)}%`}
+      >
+        <div class="meter-fill" class:clipping style:width="{fill * 100}%"></div>
       </div>
-      {#if opening}
-        <p class="muted" role="status">Opening the input…</p>
-      {:else if problem}
-        <p class="problem" role="alert">{problem}</p>
-      {:else if gone}
-        <p class="notice" role="status">{gone} isn't connected, so the default input is used.</p>
-      {:else}
-        <p class="muted">Set your interface's gain so the loudest part stays out of the red.</p>
-      {/if}
-      <div class="latency">
-        <p>
-          <span>Latency Offset</span>
-          {#if offset !== null}
-            {formatOffset(offset)}
-          {:else}
-            Not calibrated{reported !== null ? `: the browser's ${formatOffset(reported)} is used` : ''}
-          {/if}
-        </p>
-        <button
-          type="button"
-          class="button"
-          onclick={() => {
-            hide(false);
-            onCalibrate();
-          }}>{offset !== null ? 'Calibrate again' : 'Calibrate'}</button
-        >
-      </div>
+      <span class="clip" class:on={clipping} aria-hidden={!clipping} title="The input clipped: turn its gain down"
+        >Clip</span
+      >
     </div>
-  {/if}
-</div>
+    {#if opening}
+      <p class="muted" role="status">Opening the input…</p>
+    {:else if problem}
+      <p class="problem" role="alert">{problem}</p>
+    {:else if gone}
+      <p class="notice" role="status">{gone} isn't connected, so the default input is used.</p>
+    {:else}
+      <p class="muted">Set your interface's gain so the loudest part stays out of the red.</p>
+    {/if}
+    <div class="latency">
+      <p>
+        <span>Latency Offset</span>
+        {#if offset !== null}
+          {formatOffset(offset)}
+        {:else}
+          Not calibrated{reported !== null ? `: the browser's ${formatOffset(reported)} is used` : ''}
+        {/if}
+      </p>
+      <button
+        type="button"
+        class="button"
+        onclick={() => {
+          hide(false);
+          onCalibrate();
+        }}>{offset !== null ? 'Calibrate again' : 'Calibrate'}</button
+      >
+    </div>
+  </div>
+{/if}
 
 <style>
-  svg {
-    width: 1.25rem;
-    height: 1.25rem;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-  }
   .panel {
     position: fixed;
     inset: auto;
