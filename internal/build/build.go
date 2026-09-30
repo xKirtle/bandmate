@@ -12,8 +12,10 @@
 package build
 
 import (
+	"runtime"
 	"runtime/debug"
 	"strings"
+	"time"
 )
 
 // Stamped at build time; empty when not.
@@ -49,6 +51,25 @@ type Info struct {
 	// BugReportURL is where to report a bug: the new-issue page of the
 	// repository the build came from.
 	BugReportURL string `json:"bugReportUrl"`
+	// ReleasesURL is the releases page of the repository the build came from.
+	ReleasesURL string `json:"releasesUrl"`
+	// CommitTime is when the commit was made, as Go's build info records it,
+	// or zero when unknown: a build without its Git checkout doesn't know.
+	CommitTime time.Time `json:"commitTime,omitzero"`
+}
+
+// Platform is the Go the binary was built with and the system it runs on.
+type Platform struct {
+	// GoVersion is Go's version without its "go" prefix, e.g. 1.25.1.
+	GoVersion string `json:"goVersion"`
+	// OS and Arch are as Go names them, e.g. linux and amd64.
+	OS   string `json:"os"`
+	Arch string `json:"arch"`
+}
+
+// CurrentPlatform is the running binary's Platform.
+func CurrentPlatform() Platform {
+	return Platform{GoVersion: strings.TrimPrefix(runtime.Version(), "go"), OS: runtime.GOOS, Arch: runtime.GOARCH}
 }
 
 // Current is the running binary's build.
@@ -67,12 +88,23 @@ func Resolve(s Stamps, bi *debug.BuildInfo) Info {
 	}
 	source = strings.TrimSuffix(source, "/")
 
+	recorded := vcsRecorded(bi)
 	commit, dirty := s.Revision, false
 	if commit == "" {
-		commit, dirty = vcsRevision(bi)
+		commit, dirty = recorded.revision, recorded.modified
 	}
 
-	info := Info{Version: s.Version, Revision: commit, SourceURL: source, BugReportURL: source + "/issues/new/choose"}
+	info := Info{
+		Version:      s.Version,
+		Revision:     commit,
+		SourceURL:    source,
+		BugReportURL: source + "/issues/new/choose",
+		ReleasesURL:  source + "/releases",
+	}
+	// The recorded time is only this commit's when the recorded commit is.
+	if commit != "" && commit == recorded.revision {
+		info.CommitTime = recorded.time
+	}
 	switch {
 	case s.Version != "":
 		info.SourceURL = source + "/tree/" + s.Version
@@ -99,19 +131,31 @@ func short(commit string) string {
 	return commit
 }
 
-// vcsRevision is the commit Go recorded in the build info, and whether the
-// tree it was built from had changes.
-func vcsRevision(bi *debug.BuildInfo) (commit string, modified bool) {
+// vcs is what Go recorded in the build info about the checkout it built.
+type vcs struct {
+	// revision is the commit, or empty when not recorded.
+	revision string
+	// modified tells whether the tree had changes.
+	modified bool
+	// time is when the commit was made, or zero when not recorded.
+	time time.Time
+}
+
+func vcsRecorded(bi *debug.BuildInfo) vcs {
+	var v vcs
 	if bi == nil {
-		return "", false
+		return v
 	}
 	for _, s := range bi.Settings {
 		switch s.Key {
 		case "vcs.revision":
-			commit = s.Value
+			v.revision = s.Value
 		case "vcs.modified":
-			modified = s.Value == "true"
+			v.modified = s.Value == "true"
+		case "vcs.time":
+			// Go records it in RFC 3339, in UTC; anything else is unknown.
+			v.time, _ = time.Parse(time.RFC3339, s.Value)
 		}
 	}
-	return commit, modified
+	return v
 }

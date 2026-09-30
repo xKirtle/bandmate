@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	_ "modernc.org/sqlite" // pure-Go SQLite driver, registered as "sqlite"
 )
@@ -88,6 +89,46 @@ func migrateBefore(ctx context.Context, conn *sql.DB, stop string) error {
 	}
 	return nil
 }
+
+// Description is what a bug report needs to know about the database.
+type Description struct {
+	// SQLiteVersion is the SQLite engine's version, e.g. 3.50.4.
+	SQLiteVersion string `json:"sqliteVersion"`
+	// Schema is the latest migration applied, which names the schema.
+	Schema Schema `json:"schema"`
+}
+
+// Schema is the migration that brought the database to its schema.
+type Schema struct {
+	// Migration is its name, e.g. 0027_track_volume_range.
+	Migration string `json:"migration"`
+	// AppliedAt is when it was applied, in UTC.
+	AppliedAt time.Time `json:"appliedAt"`
+}
+
+// Describe tells which SQLite the database runs on and which schema it has.
+func Describe(ctx context.Context, conn *sql.DB) (Description, error) {
+	var d Description
+	if err := conn.QueryRowContext(ctx, `SELECT sqlite_version()`).Scan(&d.SQLiteVersion); err != nil {
+		return d, fmt.Errorf("reading the SQLite version: %w", err)
+	}
+	// Migrations are applied in name order, so the greatest name is the latest.
+	var appliedAt string
+	if err := conn.QueryRowContext(ctx,
+		`SELECT name, applied_at FROM schema_migrations ORDER BY name DESC LIMIT 1`).Scan(&d.Schema.Migration, &appliedAt); err != nil {
+		return d, fmt.Errorf("reading the schema: %w", err)
+	}
+	t, err := time.Parse(appliedAtLayout, appliedAt)
+	if err != nil {
+		return d, fmt.Errorf("reading when %s was applied: %w", d.Schema.Migration, err)
+	}
+	d.Schema.AppliedAt = t
+	return d, nil
+}
+
+// appliedAtLayout is how schema_migrations records when a migration was
+// applied: strftime('%Y-%m-%dT%H:%M:%fZ').
+const appliedAtLayout = "2006-01-02T15:04:05.000Z"
 
 func apply(ctx context.Context, conn *sql.DB, name, script string) error {
 	tx, err := conn.BeginTx(ctx, nil)

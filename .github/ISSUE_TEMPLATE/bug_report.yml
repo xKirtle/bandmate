@@ -6,12 +6,16 @@ body:
     attributes:
       value: |
         Thanks for reporting a bug. If it's a security problem, don't file it here: report it privately instead (see [SECURITY.md](https://github.com/xKirtle/bandmate/blob/main/SECURITY.md)).
-  - type: input
+  - type: textarea
     id: version
     attributes:
-      label: Bandmate version
-      description: The version shown on Bandmate's About page, for example `v0.4.0` or `1a2b3c4`. The image tag `latest` or `edge` alone isn't enough, since they move to newer builds.
-      placeholder: v0.4.0
+      label: Bandmate details
+      description: Paste the block from Bandmate's About page → Copy details. If you can't reach the About page, give the version or commit instead, for example `v0.4.0` or `1a2b3c4`. The image tag `latest` or `edge` alone isn't enough, since they move to newer builds.
+      placeholder: |
+        Bandmate v0.4.0 (1a2b3c4, 2026-09-29)
+        Go 1.25.1 linux/amd64 · SQLite 3.50.4 · schema 0027_track_volume_range
+        Browser: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0
+      render: text
     validations:
       required: true
   - type: input
