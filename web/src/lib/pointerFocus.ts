@@ -1,8 +1,11 @@
+// Keeping focus rings off what a pointer focused. Chrome shows the ring of
+// what a click focused at the first key pressed, even a key that acts on the
+// page rather than on it, e.g. Space playing.
+
 /** Whether what's focused was focused by a pointer, whose focus rings stay hidden. */
 export class PointerFocus {
   #fromPointer = false;
-  // Whether a pointer had focused it before the last key pressed.
-  #beforeKey = false;
+  #fromPointerBeforeKey = false;
 
   /** Whether focus rings are hidden, as a pointer focused what's focused. */
   get hidesRings(): boolean {
@@ -16,10 +19,12 @@ export class PointerFocus {
 
   /**
    * Hears a key pressed, which acts on what's focused, so shows its ring,
-   * unless it's a shortcut, held with Ctrl, ⌘ or Alt, as Chrome has it.
+   * unless it's a shortcut, held with Ctrl, ⌘ or Alt, as Chrome has it. A
+   * key held down acted when first pressed; its repeats change nothing.
    */
   keyDown(event: KeyPress) {
-    this.#beforeKey = this.#fromPointer;
+    if (event.repeat) return;
+    this.#fromPointerBeforeKey = this.#fromPointer;
     if (!(event.ctrlKey || event.metaKey || event.altKey)) this.#fromPointer = false;
   }
 
@@ -27,38 +32,49 @@ export class PointerFocus {
    * Says the key just pressed acted on the page rather than on what's
    * focused, e.g. Space playing, so rings stay as they were before it.
    */
-  keyForPage() {
-    this.#fromPointer = this.#beforeKey;
+  keyActedOnPage() {
+    this.#fromPointer = this.#fromPointerBeforeKey;
   }
 }
 
 /** The parts of a key press that say whether it shows a ring. */
-export type KeyPress = Pick<KeyboardEvent, 'ctrlKey' | 'metaKey' | 'altKey'>;
+export type KeyPress = Pick<KeyboardEvent, 'ctrlKey' | 'metaKey' | 'altKey' | 'repeat'>;
 
 const focus = new PointerFocus();
-let page: HTMLElement | undefined;
 
 function showOnPage() {
-  page?.toggleAttribute('data-pointer-focus', focus.hidesRings);
+  document.documentElement.toggleAttribute('data-pointer-focus', focus.hidesRings);
 }
 
 /**
  * Marks the page `data-pointer-focus` while what's focused was focused by a
- * pointer, for focus ring styles to leave it be: Chrome shows its ring at
- * the first key pressed, even one that acted on the page instead.
+ * pointer, for focus ring styles to leave it be. Called once, at start.
  */
-export function trackPointerFocus(root: HTMLElement = document.documentElement) {
-  page = root;
-  // Captured, so heard before any handler that says a key was for the page.
-  addEventListener('pointerdown', () => (focus.pointerDown(), showOnPage()), { capture: true });
-  addEventListener('keydown', (event) => (focus.keyDown(event), showOnPage()), { capture: true });
+export function trackPointerFocus() {
+  // Captured, so heard before any handler that says a key acted on the page.
+  addEventListener(
+    'pointerdown',
+    () => {
+      focus.pointerDown();
+      showOnPage();
+    },
+    { capture: true },
+  );
+  addEventListener(
+    'keydown',
+    (event) => {
+      focus.keyDown(event);
+      showOnPage();
+    },
+    { capture: true },
+  );
 }
 
 /**
  * Says the key being handled acted on the page rather than on what's
  * focused, e.g. Space playing, so what a pointer focused shows no ring.
  */
-export function keyForPage() {
-  focus.keyForPage();
+export function keyActedOnPage() {
+  focus.keyActedOnPage();
   showOnPage();
 }

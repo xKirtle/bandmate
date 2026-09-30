@@ -34,12 +34,12 @@
   import { formatVolume, maxVolume, silence, trackGains, type Levels } from './mixer';
   import { type MenuAction } from './menu';
   import { peaks as peaksOf, peaksPerSecond } from './peaks';
+  import { keyActedOnPage } from './pointerFocus';
   import { longPressDelay, pastSlop, type Point } from './press';
   import { recordingPlan, retakeLength, retakePlan, sungPastStart, type RecordingPlan } from './recording';
   import { recoveredPlacement, takesAt, type TakeTarget, type Unsaved } from './recovery';
   import { keptInLoop, outsideLoop, repeats, timelineEnd, type Loop, type Placed } from './schedule';
   import { inTextField } from './textField';
-  import { keyForPage } from './pointerFocus';
   import { formatDuration } from './time';
   import { tracksDropped, type TrackDrop } from './trackDrag';
   import { TrackDragging } from './trackDragging.svelte';
@@ -701,7 +701,7 @@
     if (to === undefined) return;
     event.preventDefault();
     // It seeks, rather than acting on the ruler a click focused.
-    keyForPage();
+    keyActedOnPage();
     seekTo(to);
   }
 
@@ -739,7 +739,7 @@
     if (event.defaultPrevented || picking || calibrating || ownsSpace(event.target)) return;
     // Otherwise the page would scroll.
     event.preventDefault();
-    keyForPage();
+    keyActedOnPage();
     toggle();
   }
 

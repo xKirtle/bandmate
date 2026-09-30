@@ -1,11 +1,12 @@
 import { describe as group, expect, it } from 'vitest';
 import { PointerFocus } from './pointerFocus';
 
-const key = (key: string, mods: Partial<Record<'ctrlKey' | 'metaKey' | 'altKey', boolean>> = {}) => ({
+const key = (key: string, mods: Partial<Record<'ctrlKey' | 'metaKey' | 'altKey' | 'repeat', boolean>> = {}) => ({
   key,
   ctrlKey: false,
   metaKey: false,
   altKey: false,
+  repeat: false,
   ...mods,
 });
 
@@ -31,7 +32,7 @@ group('PointerFocus', () => {
     const focus = new PointerFocus();
     focus.pointerDown();
     focus.keyDown(key(' '));
-    focus.keyForPage();
+    focus.keyActedOnPage();
     expect(focus.hidesRings).toBe(true);
   });
 
@@ -44,11 +45,21 @@ group('PointerFocus', () => {
     expect(focus.hidesRings).toBe(true);
   });
 
+  it('keeps rings hidden while a key that acted on the page is held down', () => {
+    const focus = new PointerFocus();
+    focus.pointerDown();
+    focus.keyDown(key(' '));
+    focus.keyActedOnPage();
+    focus.keyDown(key(' ', { repeat: true }));
+    focus.keyDown(key(' ', { repeat: true }));
+    expect(focus.hidesRings).toBe(true);
+  });
+
   it('leaves a ring the keyboard showed, even for a key that acted on the page', () => {
     const focus = new PointerFocus();
     focus.keyDown(key('Tab'));
     focus.keyDown(key(' '));
-    focus.keyForPage();
+    focus.keyActedOnPage();
     expect(focus.hidesRings).toBe(false);
   });
 });
