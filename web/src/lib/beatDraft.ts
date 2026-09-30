@@ -24,6 +24,20 @@ export function toDraft(beat: Partial<BeatDetails> | null): BeatDraft {
   };
 }
 
+/** Whether two drafts hold the same text in every field, e.g. nothing typed since a form opened. */
+export function sameDraft(a: BeatDraft, b: BeatDraft): boolean {
+  return (Object.keys(a) as (keyof BeatDraft)[]).every((field) => a[field] === b[field]);
+}
+
+/**
+ * Whether closing a Beat's form now would lose anything: details typed since
+ * `saved`, the details as last saved, or suggested ones `offered` and
+ * neither used nor dismissed.
+ */
+export function wouldLoseEdits(draft: BeatDraft, saved: BeatDraft, offered: Partial<BeatDraft> | null): boolean {
+  return offered !== null || !sameDraft(draft, saved);
+}
+
 /** The details a draft holds, or a message saying what's wrong with it. */
 export function fromDraft(draft: BeatDraft): BeatDetails | string {
   const bpm = draft.bpm.trim();

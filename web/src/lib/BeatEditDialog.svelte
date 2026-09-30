@@ -1,9 +1,18 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api, type Beat } from './api';
+  import { closeOnBackdrop } from './backdrop';
   import BeatCredit from './BeatCredit.svelte';
   import BeatFields from './BeatFields.svelte';
-  import { changedDetails, describeOffer, fromDraft, offeredChanges, toDraft, type BeatDraft } from './beatDraft';
+  import {
+    changedDetails,
+    describeOffer,
+    fromDraft,
+    offeredChanges,
+    toDraft,
+    type BeatDraft,
+    wouldLoseEdits,
+  } from './beatDraft';
   import { suggestForFile } from './beatTags';
   import { prepareUpload } from './upload';
 
@@ -24,9 +33,13 @@
   } = $props();
 
   let dialog = $state<HTMLDialogElement>();
-  // Taken from the Beat as the dialog opens, and not followed after.
+  // The details as last saved: taken from the Beat as the dialog opens, and
+  // again once its file is replaced. Read only on a click outside, so not
+  // state.
   // svelte-ignore state_referenced_locally
-  let draft = $state(toDraft(beat));
+  let saved = toDraft(beat);
+  // Taken from the Beat as the dialog opens, and not followed after.
+  let draft = $state({ ...saved });
   let busy = $state<string | null>(null);
   let error = $state<string | null>(null);
   // Details a replaced file suggests, offered rather than applied.
@@ -46,6 +59,11 @@
   function cancel(event: Event) {
     if (busy !== null) event.preventDefault();
   }
+
+  // A click outside closes it only while nothing has been changed since it
+  // opened or its file was replaced, no suggested details are waiting, and
+  // nothing is being saved, uploaded or deleted.
+  const nothingToLose = () => busy === null && !wouldLoseEdits(draft, saved, offer?.changes ?? null);
 
   function useOffer() {
     if (offer) Object.assign(draft, offer.changes);
@@ -91,7 +109,10 @@
     run('Reading file…', async () => {
       const [decoded, suggestion] = await Promise.all([prepareUpload(file, maxUploadBytes), suggestForFile(file)]);
       busy = 'Uploading…';
-      onChange(await api.replaceBeatFile(beat.id, file, decoded));
+      const updated = await api.replaceBeatFile(beat.id, file, decoded);
+      onChange(updated);
+      // As if it had just opened on the new file.
+      saved = toDraft(updated);
       const changes = offeredChanges(draft, suggestion);
       if (Object.keys(changes).length > 0) offer = { fileName: file.name, changes };
     });
@@ -107,7 +128,13 @@
   }
 </script>
 
-<dialog bind:this={dialog} onclose={onClose} oncancel={cancel} aria-labelledby="beat-edit-heading">
+<dialog
+  bind:this={dialog}
+  {@attach closeOnBackdrop(nothingToLose)}
+  onclose={onClose}
+  oncancel={cancel}
+  aria-labelledby="beat-edit-heading"
+>
   <header>
     <div class="credit">
       <h2 id="beat-edit-heading">Edit “{beat.title}”</h2>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
+  import { closeOnBackdrop } from './backdrop';
   import { clickCount, clickTimes, formatOffset, measureOffset, type Measurement } from './calibration';
   import { Capture, CaptureError } from './capture';
   import { readInput } from './inputSettings';
@@ -125,7 +126,13 @@
   const measured = $derived(result?.ok ? result : null);
 </script>
 
-<dialog bind:this={dialog} {onclose} aria-labelledby="calibration-heading">
+<!-- A click outside closes it, but never while measuring. -->
+<dialog
+  bind:this={dialog}
+  {@attach closeOnBackdrop(() => phase !== 'measuring')}
+  {onclose}
+  aria-labelledby="calibration-heading"
+>
   <header>
     <h2 id="calibration-heading">Calibrate the latency</h2>
     <button type="button" class="icon" onclick={() => close()} aria-label="Close">✕</button>

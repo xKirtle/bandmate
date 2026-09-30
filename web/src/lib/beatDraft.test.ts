@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeOffer } from './beatDraft';
+import { describeOffer, sameDraft, toDraft, wouldLoseEdits } from './beatDraft';
 
 describe('describeOffer', () => {
   it('lists every offered change in the order the form shows them', () => {
@@ -15,5 +15,35 @@ describe('describeOffer', () => {
 
   it('describes nothing when nothing is offered', () => {
     expect(describeOffer({})).toBe('');
+  });
+});
+
+describe('sameDraft', () => {
+  const opened = toDraft({ title: 'Echo Room', producer: 'Pryme', bpm: 140, key: 'Am', notes: '' });
+
+  it('holds an unchanged draft the same', () => {
+    expect(sameDraft({ ...opened }, opened)).toBe(true);
+  });
+
+  it('tells any field typed in', () => {
+    expect(sameDraft({ ...opened, title: 'Echo Room 2' }, opened)).toBe(false);
+    expect(sameDraft({ ...opened, bpm: '14' }, opened)).toBe(false);
+    expect(sameDraft({ ...opened, notes: ' ' }, opened)).toBe(false);
+  });
+});
+
+describe('wouldLoseEdits', () => {
+  const saved = toDraft({ title: 'Echo Room', producer: 'Pryme', bpm: 140, key: 'Am', notes: '' });
+
+  it('loses nothing while the details are as saved', () => {
+    expect(wouldLoseEdits({ ...saved }, saved, null)).toBe(false);
+  });
+
+  it('loses details typed since they were saved', () => {
+    expect(wouldLoseEdits({ ...saved, producer: 'Pryme Beats' }, saved, null)).toBe(true);
+  });
+
+  it('loses suggested details neither used nor dismissed', () => {
+    expect(wouldLoseEdits({ ...saved }, saved, { bpm: '92' })).toBe(true);
   });
 });

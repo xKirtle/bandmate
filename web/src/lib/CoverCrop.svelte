@@ -125,6 +125,7 @@
   }
 </script>
 
+<!-- A click outside never closes it, as its framing would be lost. -->
 <dialog bind:this={dialog} onclose={onClose} aria-labelledby="cover-crop-heading">
   <h2 id="cover-crop-heading">Choose the Cover</h2>
   <p class="muted hint">Drag to move the picture in the square. Pinch, scroll or use the slider to zoom.</p>
