@@ -107,7 +107,7 @@ func TestAboutLeavesOutACommitDateItDoesntKnow(t *testing.T) {
 	}
 }
 
-func TestAboutsDetailsAreTheBlockABugReportAsksFor(t *testing.T) {
+func TestTheAboutDetailsAreTheBlockABugReportAsksFor(t *testing.T) {
 	committed := time.Date(2026, 9, 29, 23, 30, 0, 0, time.UTC)
 	cases := map[string]struct {
 		build     build.Info

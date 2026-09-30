@@ -93,9 +93,9 @@ func migrateBefore(ctx context.Context, conn *sql.DB, stop string) error {
 // Description is what a bug report needs to know about the database.
 type Description struct {
 	// SQLiteVersion is the SQLite engine's version, e.g. 3.50.4.
-	SQLiteVersion string
+	SQLiteVersion string `json:"sqliteVersion"`
 	// Schema is the latest migration applied, which names the schema.
-	Schema Schema
+	Schema Schema `json:"schema"`
 }
 
 // Schema is the migration that brought the database to its schema.

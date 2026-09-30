@@ -2,16 +2,24 @@
   // Which Bandmate is running, with a link to exactly that version's source,
   // as AGPL-3.0 §13 asks of anyone running a modified Bandmate over a network,
   // and the system facts a bug report needs, ready to copy.
-  import { api, type AboutInfo } from '../lib/api';
+  import { api, type AboutInfo, type ServerConfig } from '../lib/api';
   import { bugReportDetails, uptime } from '../lib/about';
   import BrandMark from '../lib/BrandMark.svelte';
 
-  let about = $state<AboutInfo | null>(null);
+  // The version and its source link come from /api/config, which doesn't
+  // need the database, so they show even if the system facts can't be read.
+  let config = $state<ServerConfig | null>(null);
   let error = $state<string | null>(null);
+  let about = $state<AboutInfo | null>(null);
+  let aboutError = $state<string | null>(null);
 
+  api.getConfig().then(
+    (c) => (config = c),
+    (e: Error) => (error = e.message),
+  );
   api.getAbout().then(
     (a) => (about = a),
-    (e: Error) => (error = e.message),
+    (e: Error) => (aboutError = e.message),
   );
 
   // The uptime counts on while the page is open.
@@ -24,14 +32,14 @@
   /** "2026-09-29", from an RFC 3339 time. */
   const day = (iso: string) => iso.slice(0, 10);
 
-  let copied = $state<'yes' | 'failed' | null>(null);
-  let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+  let copyStatus = $state<'copied' | 'failed' | null>(null);
+  let copyStatusTimer: ReturnType<typeof setTimeout> | undefined;
 
   async function copyDetails(details: string) {
     const text = bugReportDetails(details, navigator.userAgent);
-    clearTimeout(copiedTimer);
-    copied = (await copy(text)) ? 'yes' : 'failed';
-    if (copied === 'yes') copiedTimer = setTimeout(() => (copied = null), 2000);
+    clearTimeout(copyStatusTimer);
+    copyStatus = (await copy(text)) ? 'copied' : 'failed';
+    if (copyStatus === 'copied') copyStatusTimer = setTimeout(() => (copyStatus = null), 2000);
   }
 
   /** Puts text on the clipboard, falling back to the old way where the
@@ -65,19 +73,16 @@
   let tab = $state<(typeof tabs)[number]['id']>('release-notes');
   let tabButtons: HTMLButtonElement[] = $state([]);
 
-  // Arrow keys move between the tabs, as a tab list's do.
+  // Arrow keys, Home and End move between the tabs, as a tab list's do.
   function tabKey(e: KeyboardEvent, i: number) {
-    const to =
-      e.key === 'ArrowRight'
-        ? (i + 1) % tabs.length
-        : e.key === 'ArrowLeft'
-          ? (i - 1 + tabs.length) % tabs.length
-          : e.key === 'Home'
-            ? 0
-            : e.key === 'End'
-              ? tabs.length - 1
-              : -1;
-    if (to < 0) return;
+    const moves: Record<string, number> = {
+      ArrowRight: (i + 1) % tabs.length,
+      ArrowLeft: (i - 1 + tabs.length) % tabs.length,
+      Home: 0,
+      End: tabs.length - 1,
+    };
+    const to = moves[e.key];
+    if (to === undefined) return;
     e.preventDefault();
     tab = tabs[to].id;
     tabButtons[to]?.focus();
@@ -93,11 +98,11 @@
     <section class="card intro">
       <BrandMark size="4rem" />
       <h2>Bandmate</h2>
-      {#if about}
-        <p>Version <code>{about.version}</code></p>
+      {#if config}
+        <p>Version <code>{config.version}</code></p>
         <ul class="links">
-          <li><a href={about.sourceUrl}>Source code</a></li>
-          <li><a href={about.bugReportUrl}>Report a bug</a></li>
+          <li><a href={config.sourceUrl}>Source code</a></li>
+          <li><a href={config.bugReportUrl}>Report a bug</a></li>
         </ul>
       {:else if error}
         <p class="error" role="alert">Couldn't load the version: {error}</p>
@@ -109,9 +114,11 @@
       </p>
     </section>
 
-    {#if about}
-      <section class="card system" aria-labelledby="system-heading">
-        <h2 id="system-heading">System information</h2>
+    <section class="card system" aria-labelledby="system-heading">
+      <h2 id="system-heading">System information</h2>
+      {#if aboutError}
+        <p class="error" role="alert">Couldn't load the system information: {aboutError}</p>
+      {:else if about}
         <dl>
           <dt>Commit</dt>
           <dd>
@@ -141,48 +148,51 @@
             Copy details
           </button>
           <span class="copy-status" role="status">
-            {#if copied === 'yes'}Copied{:else if copied === 'failed'}Couldn't copy: your browser didn't allow it{/if}
+            {#if copyStatus === 'copied'}Copied{:else if copyStatus === 'failed'}Couldn't copy: your browser didn't
+              allow it{/if}
           </span>
         </div>
         <p class="muted hint">Paste them into your bug report.</p>
-      </section>
+      {/if}
+    </section>
 
-      <section class="card tabbed">
-        <div class="tabs" role="tablist" aria-label="More about Bandmate">
-          {#each tabs as t, i (t.id)}
-            <button
-              bind:this={tabButtons[i]}
-              id="tab-{t.id}"
-              type="button"
-              role="tab"
-              aria-selected={tab === t.id}
-              aria-controls="panel-{t.id}"
-              tabindex={tab === t.id ? 0 : -1}
-              onclick={() => (tab = t.id)}
-              onkeydown={(e) => tabKey(e, i)}
-            >
-              {t.label}
-            </button>
-          {/each}
-        </div>
-        {#each tabs as t (t.id)}
-          <div
-            class="panel"
-            id="panel-{t.id}"
-            role="tabpanel"
-            aria-labelledby="tab-{t.id}"
-            tabindex="0"
-            hidden={tab !== t.id}
+    <section class="card tabbed">
+      <div class="tabs" role="tablist" aria-label="More about Bandmate">
+        {#each tabs as t, i (t.id)}
+          <button
+            bind:this={tabButtons[i]}
+            id="tab-{t.id}"
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            aria-controls="panel-{t.id}"
+            tabindex={tab === t.id ? 0 : -1}
+            onclick={() => (tab = t.id)}
+            onkeydown={(e) => tabKey(e, i)}
           >
-            {#if t.id === 'release-notes'}
-              <p>See what's new in each release on <a href={about.releasesUrl}>Bandmate's releases page</a>.</p>
-            {:else}
-              <p class="muted">The libraries that ship with Bandmate, and their licenses, will be listed here.</p>
-            {/if}
-          </div>
+            {t.label}
+          </button>
         {/each}
-      </section>
-    {/if}
+      </div>
+      {#each tabs as t (t.id)}
+        <div
+          class="panel"
+          id="panel-{t.id}"
+          role="tabpanel"
+          aria-labelledby="tab-{t.id}"
+          tabindex="0"
+          hidden={tab !== t.id}
+        >
+          {#if t.id === 'release-notes'}
+            {#if about}
+              <p>See what's new in each release on <a href={about.releasesUrl}>Bandmate's releases page</a>.</p>
+            {/if}
+          {:else}
+            <p class="muted">The libraries that ship with Bandmate, and their licenses, will be listed here.</p>
+          {/if}
+        </div>
+      {/each}
+    </section>
   </div>
 </main>
 

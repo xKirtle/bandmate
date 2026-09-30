@@ -25,18 +25,10 @@ func (a *App) about(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, struct {
 		build.Info
 		build.Platform
-		SQLiteVersion string    `json:"sqliteVersion"`
-		Schema        db.Schema `json:"schema"`
-		StartedAt     time.Time `json:"startedAt"`
-		Details       string    `json:"details"`
-	}{
-		Info:          a.build,
-		Platform:      platform,
-		SQLiteVersion: d.SQLiteVersion,
-		Schema:        d.Schema,
-		StartedAt:     a.startedAt,
-		Details:       details(a.build, platform, d),
-	})
+		db.Description
+		StartedAt time.Time `json:"startedAt"`
+		Details   string    `json:"details"`
+	}{a.build, platform, d, a.startedAt, details(a.build, platform, d)})
 }
 
 // details is the block a bug report asks for, e.g.

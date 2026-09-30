@@ -13,17 +13,16 @@ function count(n: number, unit: string): string {
 
 /** How long the server has been up since startedAt: "2 hours 5 minutes", "3 days 4 hours". */
 export function uptime(startedAt: string, now = Date.now()): string {
-  let seconds = Math.max(0, Math.floor((now - Date.parse(startedAt)) / 1000));
-  const parts: string[] = [];
-  for (const [unit, size] of units) {
-    const n = Math.floor(seconds / size);
-    seconds -= n * size;
-    // The largest unit, and the one after it.
-    if (parts.length > 0 || n > 0) parts.push(n > 0 ? count(n, unit) : '');
-    if (parts.length === 2) break;
-  }
-  const shown = parts.filter(Boolean);
-  return shown.length > 0 ? shown.join(' ') : 'less than a minute';
+  const seconds = Math.max(0, Math.floor((now - Date.parse(startedAt)) / 1000));
+  // The largest unit there's one of, and the next one down, unless none.
+  const largest = units.findIndex(([, size]) => seconds >= size);
+  if (largest < 0) return 'less than a minute';
+  const [unit, size] = units[largest];
+  const shown = [count(Math.floor(seconds / size), unit)];
+  const next = units[largest + 1];
+  const rest = next ? Math.floor((seconds % size) / next[1]) : 0;
+  if (rest > 0) shown.push(count(rest, next[0]));
+  return shown.join(' ');
 }
 
 /** The server's details for a bug report, with the browser's user agent added. */
