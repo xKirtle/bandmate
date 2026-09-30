@@ -82,7 +82,7 @@ A Song's audio space, measured in seconds, where Tracks play together. It runs t
 _Avoid_: Session, project, mix
 
 **Track**:
-A named lane on the Timeline (e.g. "Beat", "Lead vox", "Adlibs") holding Clips, with its own volume, mute and solo. A Timeline always has at least one Track: a Song starts with one, and the last Track can't be deleted.
+A named lane on the Timeline (e.g. "Beat", "Lead vox", "Adlibs") holding Clips, with its own volume, mute and solo. Turning its volume all the way down makes it quiet, never silent: silencing a Track is what muting it is for. A Timeline always has at least one Track: a Song starts with one, and the last Track can't be deleted.
 _Avoid_: Channel, layer
 
 **Chosen Track**:
@@ -109,7 +109,7 @@ An audio file imported into one Song, placed on the Timeline in Clips like a Bea
 _Avoid_: Sample, stem, audio file, import
 
 **Take**:
-One recording made in the app, placed in a Clip on the Timeline. Like a Beat, it's tied to the lyrics only through Cues, so what it sings is whatever Lines are cued over its span.
+One recording made in the app, placed in a Clip on the Timeline. Like a Beat, it's tied to the lyrics only through Cues, so what it sings is whatever Lines are cued over its span. A Clip's Takes are numbered in the order they're recorded: a new one takes the number after the highest still in the Clip, so deleting the latest Take frees its number, while a gap left lower down stays.
 _Avoid_: Recording, attempt
 
 **Clip**:
@@ -125,7 +125,7 @@ A link from one Line to a time on the Timeline; a Line has at most one. A Sectio
 _Avoid_: Timestamp, sync point, marker
 
 **Sync mode**:
-A way of syncing a Song's Lines while the Timeline plays: as each Line starts, marking it "Now" cues it at the playhead, and the Line after it comes up next, cued or not, so a run of Lines can be retaken. Clicking a Line makes it the next one; with none clicked or just cued, the next one is the first Line without a Cue, or the first Line once every Line is cued. There's always a next Line. The Line playing is followed as usual, except that the next Line's own Cue is ignored until it's cued again, so the Line being retaken only becomes the one playing when it's marked "Now". Which Line is next never depends on where playback is, so playback can start anywhere, and playing from a Cue leaves the next Line where it is. Sync mode needs a Clip on the Timeline, and Sync mode and the Loop are never on together.
+A way of syncing a Song's Lines while the Timeline plays: as each Line starts, marking it "Now" cues it at the playhead, and the Line after it comes up next, cued or not, so a run of Lines can be retaken. Clicking a Line makes it the next one; with none clicked or just cued, the next one is the first Line without a Cue, or the first Line once every Line is cued. There's always a next Line. The Line playing is followed as usual, except that the next Line's own Cue is ignored until it's cued again, so the Line being retaken only becomes the one playing when it's marked "Now". Which Line is next never depends on where playback is, so playback can start anywhere, and playing from a Cue leaves the next Line where it is. Sync mode needs a Clip on the Timeline, and Sync mode and the Loop are never on together. Sync mode is only for cueing, so changing the lyrics ends it, playback carrying on: changing the Arrangement or a Section in it, moving a Section between the Scrapbook and the Arrangement, opening or adding a Section in the Scrapbook, or opening a Section's Alternates. Working with Cues never does, whether one Line's, a Section's or every one.
 _Avoid_: Tap mode, record mode
 
 **Latency Offset**:
