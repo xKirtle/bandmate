@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { clampHeight, defaultHeight, heightBounds, heightKey, readHeight, storeHeight } from './timelineHeight';
+import {
+  clampHeight,
+  defaultHeight,
+  grownHeight,
+  heightBounds,
+  heightKey,
+  readHeight,
+  storeHeight,
+} from './timelineHeight';
 
 /** A Storage holding some values, or one that throws like a blocked one. */
 function storage(values: Record<string, string> = {}, blocked = false): Storage {
@@ -14,8 +22,53 @@ function storage(values: Record<string, string> = {}, blocked = false): Storage 
 }
 
 describe('defaultHeight', () => {
-  it('is 40% of the window', () => {
+  it('is 40% of the window, the most the area grows to fit its Tracks', () => {
     expect(defaultHeight(1000)).toBe(400);
+  });
+});
+
+describe('grownHeight', () => {
+  // A 1000px window: the area grows to fit its Tracks up to 400px, and is
+  // dragged up to 850px. Each Track here is 80px tall.
+
+  it('fits the Tracks once they are known, from a height dragged one Track tall', () => {
+    expect(grownHeight(80, 0, 240, 1000)).toBe(240);
+  });
+
+  it('fits the Tracks only up to 40% of the window', () => {
+    expect(grownHeight(80, 0, 800, 1000)).toBe(400);
+  });
+
+  it('keeps a dragged height taller than the Tracks need to fit', () => {
+    expect(grownHeight(600, 0, 240, 1000)).toBe(600);
+  });
+
+  it('grows with an added Track while every Track shows', () => {
+    expect(grownHeight(160, 160, 240, 1000)).toBe(240);
+  });
+
+  it('grows with an added Track only up to 40% of the window', () => {
+    expect(grownHeight(400, 400, 480, 1000)).toBe(400);
+  });
+
+  it('keeps a height taller than the Tracks, dragged when there were more, as it grows', () => {
+    expect(grownHeight(320, 160, 240, 1000)).toBe(320);
+  });
+
+  it('leaves the height as it is when an added Track joins a scrolling area', () => {
+    expect(grownHeight(80, 240, 320, 1000)).toBe(80);
+  });
+
+  it('leaves the height as it is when the Tracks outgrew the most it can be', () => {
+    expect(grownHeight(900, 1200, 1280, 1000)).toBe(900);
+  });
+
+  it('leaves the height as it is when a Track is removed', () => {
+    expect(grownHeight(240, 240, 160, 1000)).toBe(240);
+  });
+
+  it('leaves the height as it is while the Tracks are unknown, e.g. hidden', () => {
+    expect(grownHeight(80, 240, 0, 1000)).toBe(80);
   });
 });
 
