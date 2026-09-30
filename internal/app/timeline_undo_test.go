@@ -132,8 +132,8 @@ func TestATrackAddedBackFollowsTheTimelinesRules(t *testing.T) {
 		"with a Clip past its source": {map[string]any{"name": "Beat", "clips": []map[string]any{
 			{"beatId": p.short.ID, "start": 0, "offset": 2, "length": 10},
 		}}, http.StatusBadRequest, "a Clip can't play past the end of its source"},
-		"too loud": {map[string]any{"name": "Beat", "volume": 7},
-			http.StatusBadRequest, "a Track's volume goes from -60 dB (silence) to +6 dB"},
+		"too loud": {map[string]any{"name": "Beat", "volume": 37},
+			http.StatusBadRequest, "a Track's volume goes from -36 dB to +36 dB"},
 		"out of place": {map[string]any{"name": "Beat", "position": 3},
 			http.StatusBadRequest, "a Track's position must be from 0 to the number of Tracks"},
 	} {

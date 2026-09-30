@@ -816,21 +816,21 @@ func TestATracksVolumeMuteAndSoloAreSavedWithTheSong(t *testing.T) {
 	}
 }
 
-func TestATracksVolumeGoesFromSilenceToPlusSixDecibels(t *testing.T) {
+func TestATracksVolumeGoesFromMinus36ToPlus36Decibels(t *testing.T) {
 	ts := newTestServer(t)
 	p := placeTwoClips(t, ts)
 	trackID := p.tl.Tracks[0].ID
 
-	for _, v := range []float64{-60, 6, 0} {
+	for _, v := range []float64{-36, 36, 0} {
 		got := timelineChange(t, ts.updateTrack(p.song.ID, trackID, map[string]any{"volume": v}))
 		if got.Tracks[0].Volume != v {
 			t.Errorf("volume = %g, want %g", got.Tracks[0].Volume, v)
 		}
 	}
 	before := ts.getTimeline(p.song.ID)
-	for _, v := range []float64{-60.5, 6.01, 12} {
+	for _, v := range []float64{-36.5, -60, 36.01, 40} {
 		expectError(t, ts.updateTrack(p.song.ID, trackID, map[string]any{"volume": v}),
-			http.StatusBadRequest, "a Track's volume goes from -60 dB (silence) to +6 dB")
+			http.StatusBadRequest, "a Track's volume goes from -36 dB to +36 dB")
 	}
 	if got := ts.getTimeline(p.song.ID); !reflect.DeepEqual(got, before) {
 		t.Errorf("timeline = %+v, want it unchanged: %+v", got, before)

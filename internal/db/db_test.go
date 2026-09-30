@@ -528,3 +528,64 @@ func TestClipsNoLongerKeepTheLastTakeNumber(t *testing.T) {
 		t.Errorf("clip %d playing take %d named %q, want clip 1 playing take 1 named Hook", clip, take, name)
 	}
 }
+
+func TestTracksBelowMinus36DecibelsComeUpToItAndSilentOnesAreMuted(t *testing.T) {
+	conn := openBefore(t, "0027_track_volume_range")
+	exec(t, conn,
+		`INSERT INTO songs (id, title, created_at, updated_at) VALUES (1, 'Midnight Drive', '', '')`,
+		`INSERT INTO beats (id, title, file_name, content_type, size, duration, peaks, created_at, updated_at)
+			VALUES (1, 'Beat', 'beat.mp3', 'audio/mpeg', 10, 30, '[]', '', '')`,
+		`INSERT INTO tracks (id, song_id, name, position, volume, muted, soloed) VALUES
+			(1, 1, 'Silent', 0, -60, 0, 1),
+			(2, 1, 'Quiet', 1, -48.5, 0, 0),
+			(3, 1, 'Muted quiet', 2, -40, 1, 0),
+			(4, 1, 'Bottom', 3, -36, 0, 0),
+			(5, 1, 'Loud', 4, 6, 0, 1)`,
+		`INSERT INTO clips (id, track_id, beat_id, start, source_offset, length) VALUES (1, 1, 1, 0, 0, 30)`,
+	)
+
+	if err := migrate(context.Background(), conn); err != nil {
+		t.Fatalf("migrating: %v", err)
+	}
+
+	type row struct {
+		name          string
+		volume        float64
+		muted, soloed bool
+	}
+	var tracks []row
+	rows, err := conn.Query(`SELECT name, volume, muted, soloed FROM tracks ORDER BY position`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var r row
+		if err := rows.Scan(&r.name, &r.volume, &r.muted, &r.soloed); err != nil {
+			t.Fatal(err)
+		}
+		tracks = append(tracks, r)
+	}
+	want := []row{
+		{"Silent", -36, true, true},
+		{"Quiet", -36, false, false},
+		{"Muted quiet", -36, true, false},
+		{"Bottom", -36, false, false},
+		{"Loud", 6, false, true},
+	}
+	if !reflect.DeepEqual(tracks, want) {
+		t.Errorf("tracks = %+v, want %+v", tracks, want)
+	}
+	var clips int
+	if err := conn.QueryRow(`SELECT COUNT(*) FROM clips WHERE track_id = 1`).Scan(&clips); err != nil || clips != 1 {
+		t.Errorf("clips on the Silent Track = %d (%v), want its Clip kept", clips, err)
+	}
+	if _, err := conn.Exec(`UPDATE tracks SET volume = 36 WHERE id = 5`); err != nil {
+		t.Errorf("setting +36 dB: %v", err)
+	}
+	for _, v := range []string{"-36.5", "36.5"} {
+		if _, err := conn.Exec(`UPDATE tracks SET volume = ` + v + ` WHERE id = 5`); err == nil {
+			t.Errorf("setting %s dB succeeded, want the constraint to refuse it", v)
+		}
+	}
+}

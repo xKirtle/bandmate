@@ -48,7 +48,7 @@ type Loop struct {
 type Track struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
-	// Volume is in dB, from Silence to MaxVolume.
+	// Volume is in dB, from MinVolume to MaxVolume.
 	Volume float64 `json:"volume"`
 	Muted  bool    `json:"muted"`
 	// Soloed Tracks are the only ones heard, when there are any.
@@ -118,11 +118,11 @@ type Beat struct {
 	Duration float64 `json:"duration"`
 }
 
-// Silence is a Track's lowest volume, in dB, at which it isn't heard at all.
-// MaxVolume is its highest.
+// MinVolume and MaxVolume are a Track's lowest and highest volume, in dB.
+// Even at its lowest a Track is heard: muting it is what silences it.
 const (
-	Silence   = -60.0
-	MaxVolume = 6.0
+	MinVolume = -36.0
+	MaxVolume = 36.0
 )
 
 // timeFormat is how songs.updated_at is stored.
@@ -312,7 +312,7 @@ type TrackChanges struct {
 }
 
 // UpdateTrack renames a Track or sets its volume, mute or solo. Its name
-// can't be blank, and its volume must be from Silence to MaxVolume.
+// can't be blank, and its volume must be from MinVolume to MaxVolume.
 func (s *Store) UpdateTrack(ctx context.Context, songID int64, based lyricsheet.Version, trackID int64, changes TrackChanges) (Timeline, error) {
 	var sets []string
 	var args []any
@@ -348,11 +348,11 @@ func (s *Store) UpdateTrack(ctx context.Context, songID int64, based lyricsheet.
 	})
 }
 
-// checkVolume checks that a Track's volume is from Silence to MaxVolume.
+// checkVolume checks that a Track's volume is from MinVolume to MaxVolume.
 func checkVolume(volume float64) error {
-	if volume < Silence || volume > MaxVolume {
+	if volume < MinVolume || volume > MaxVolume {
 		return &lyricsheet.InvalidError{
-			Msg: fmt.Sprintf("a Track's volume goes from %g dB (silence) to +%g dB", Silence, MaxVolume)}
+			Msg: fmt.Sprintf("a Track's volume goes from %g dB to +%g dB", MinVolume, MaxVolume)}
 	}
 	return nil
 }
@@ -400,7 +400,7 @@ type NewTrack struct {
 }
 
 // AddTrack adds a Track to the Timeline. Its name can't be blank, its
-// volume must be from Silence to MaxVolume, and its Clips follow the same
+// volume must be from MinVolume to MaxVolume, and its Clips follow the same
 // rules as placing a Clip.
 func (s *Store) AddTrack(ctx context.Context, songID int64, based lyricsheet.Version, t NewTrack) (Timeline, error) {
 	name := strings.TrimSpace(t.Name)
