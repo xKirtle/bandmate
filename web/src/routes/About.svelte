@@ -18,7 +18,7 @@
 </header>
 
 <main class="page">
-  <section class="about">
+  <section class="intro">
     <BrandMark size="4rem" />
     <h2>Bandmate</h2>
     {#if config}
@@ -30,6 +30,7 @@
     <ul class="links">
       {#if config}
         <li><a href={config.sourceUrl}>Source code</a></li>
+        <li><a href={config.bugReportUrl}>Report a bug</a></li>
       {/if}
     </ul>
 
@@ -41,7 +42,7 @@
 </main>
 
 <style>
-  .about {
+  .intro {
     display: flex;
     flex-direction: column;
     align-items: center;

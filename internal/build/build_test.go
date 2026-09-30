@@ -34,37 +34,42 @@ func TestResolve(t *testing.T) {
 		{
 			name:   "a tagged release shows its tag and links to it",
 			stamps: build.Stamps{Version: "v0.4.0", Revision: sha, SourceURL: "https://github.com/someone/fork"},
-			want:   build.Info{Version: "v0.4.0", Revision: sha, SourceURL: "https://github.com/someone/fork/tree/v0.4.0"},
+			want:   build.Info{Version: "v0.4.0", Revision: sha, SourceURL: "https://github.com/someone/fork/tree/v0.4.0", BugReportURL: "https://github.com/someone/fork/issues/new/choose"},
 		},
 		{
 			name:   "an untagged image shows its short commit and links to the full one",
 			stamps: build.Stamps{Revision: sha, SourceURL: "https://github.com/someone/fork"},
-			want:   build.Info{Version: "1a2b3c4", Revision: sha, SourceURL: "https://github.com/someone/fork/tree/" + sha},
+			want:   build.Info{Version: "1a2b3c4", Revision: sha, SourceURL: "https://github.com/someone/fork/tree/" + sha, BugReportURL: "https://github.com/someone/fork/issues/new/choose"},
+		},
+		{
+			name:   "a source URL ending in a slash still makes clean links",
+			stamps: build.Stamps{Version: "v0.4.0", SourceURL: "https://github.com/someone/fork/"},
+			want:   build.Info{Version: "v0.4.0", SourceURL: "https://github.com/someone/fork/tree/v0.4.0", BugReportURL: "https://github.com/someone/fork/issues/new/choose"},
 		},
 		{
 			name: "a plain go build takes the commit from Go's build info",
 			info: fromCheckout(sha, false),
-			want: build.Info{Version: "1a2b3c4", Revision: sha, SourceURL: home + "/tree/" + sha},
+			want: build.Info{Version: "1a2b3c4", Revision: sha, SourceURL: home + "/tree/" + sha, BugReportURL: home + "/issues/new/choose"},
 		},
 		{
 			name: "a build from a modified tree is marked dirty",
 			info: fromCheckout(sha, true),
-			want: build.Info{Version: "1a2b3c4-dirty", Revision: sha, SourceURL: home + "/tree/" + sha},
+			want: build.Info{Version: "1a2b3c4-dirty", Revision: sha, SourceURL: home + "/tree/" + sha, BugReportURL: home + "/issues/new/choose"},
 		},
 		{
 			name:   "a stamped commit wins over Go's build info",
 			stamps: build.Stamps{Revision: sha},
 			info:   fromCheckout("ffffffffffffffffffffffffffffffffffffffff", true),
-			want:   build.Info{Version: "1a2b3c4", Revision: sha, SourceURL: home + "/tree/" + sha},
+			want:   build.Info{Version: "1a2b3c4", Revision: sha, SourceURL: home + "/tree/" + sha, BugReportURL: home + "/issues/new/choose"},
 		},
 		{
 			name: "nothing known is dev, linking to the repository's home page",
 			info: &debug.BuildInfo{},
-			want: build.Info{Version: "dev", SourceURL: home},
+			want: build.Info{Version: "dev", SourceURL: home, BugReportURL: home + "/issues/new/choose"},
 		},
 		{
 			name: "no build info at all is dev too",
-			want: build.Info{Version: "dev", SourceURL: home},
+			want: build.Info{Version: "dev", SourceURL: home, BugReportURL: home + "/issues/new/choose"},
 		},
 	}
 	for _, c := range cases {

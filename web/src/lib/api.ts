@@ -400,6 +400,8 @@ export interface ServerConfig {
   revision: string;
   /** A link to exactly this version's source. */
   sourceUrl: string;
+  /** Where to report a bug: the new-issue page of the repository it came from. */
+  bugReportUrl: string;
 }
 
 /** A failed request, carrying the server's readable message. */

@@ -13,6 +13,8 @@ func TestConfigTellsTheRunningVersionAndItsSourceAlongsideTheLimits(t *testing.T
 		Version:   "v0.4.0",
 		Revision:  "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d",
 		SourceURL: "https://github.com/xKirtle/bandmate/tree/v0.4.0",
+		// The link the About page's "Report a bug" follows.
+		BugReportURL: "https://github.com/xKirtle/bandmate/issues/new/choose",
 	}
 	ts := newTestServerWith(t, func(c *app.Config) {
 		c.Build = release
@@ -26,13 +28,15 @@ func TestConfigTellsTheRunningVersionAndItsSourceAlongsideTheLimits(t *testing.T
 		Version        string `json:"version"`
 		Revision       string `json:"revision"`
 		SourceURL      string `json:"sourceUrl"`
+		BugReportURL   string `json:"bugReportUrl"`
 	}
 	res := ts.Do(http.MethodGet, "/api/config", nil)
 	expectStatus(t, res, http.StatusOK)
 	res.JSON(t, &config)
 
-	if config.Version != release.Version || config.Revision != release.Revision || config.SourceURL != release.SourceURL {
-		t.Errorf("config build = %q, %q, %q; want %+v", config.Version, config.Revision, config.SourceURL, release)
+	got := build.Info{Version: config.Version, Revision: config.Revision, SourceURL: config.SourceURL, BugReportURL: config.BugReportURL}
+	if got != release {
+		t.Errorf("config build = %+v, want %+v", got, release)
 	}
 	if config.MaxUploadBytes != 1<<20 || config.MaxCoverBytes != 2<<20 {
 		t.Errorf("config limits = %d, %d; want %d, %d", config.MaxUploadBytes, config.MaxCoverBytes, 1<<20, 2<<20)

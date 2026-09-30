@@ -46,6 +46,9 @@ type Info struct {
 	// SourceURL links to exactly this version's source: the tag's tree, else
 	// the commit's, else the repository's home page.
 	SourceURL string `json:"sourceUrl"`
+	// BugReportURL is where to report a bug: the new-issue page of the
+	// repository the build came from.
+	BugReportURL string `json:"bugReportUrl"`
 }
 
 // Current is the running binary's build.
@@ -69,7 +72,7 @@ func Resolve(s Stamps, bi *debug.BuildInfo) Info {
 		commit, dirty = vcsRevision(bi)
 	}
 
-	info := Info{Version: s.Version, Revision: commit, SourceURL: source}
+	info := Info{Version: s.Version, Revision: commit, SourceURL: source, BugReportURL: source + "/issues/new/choose"}
 	switch {
 	case s.Version != "":
 		info.SourceURL = source + "/tree/" + s.Version
