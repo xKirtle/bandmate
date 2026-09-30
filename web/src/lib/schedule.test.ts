@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Clip, Timeline } from './api';
 import { clipSources, heard, playing } from './clipSource';
-import { keptInLoop, outsideLoop, positionAt, repeats, schedule, timelineEnd } from './schedule';
+import { positionAt, repeats, schedule, timelineEnd } from './schedule';
 
 // A 10-second Clip at 0:05 playing a Beat from 2s in, and a 4-second one
 // right after it playing its source from the start.
@@ -85,7 +85,7 @@ describe('schedule with a Loop', () => {
   // first second of the next.
   const loop = { start: 8, end: 16 };
 
-  it('plays up to the end of the Loop, then repeats it from its start', () => {
+  it('starting before the Loop, plays into it, then repeats it from its start', () => {
     expect(schedule([trimmed, next], 0, loop, { from: 0, to: 20 })).toEqual([
       // To the Loop's end.
       { clip: trimmed, delay: 5, from: 2, duration: 10 },
@@ -114,7 +114,7 @@ describe('schedule with a Loop', () => {
     ]);
   });
 
-  it('plays straight on from past the Loop, which the playhead never enters', () => {
+  it('starting past the Loop, plays straight on to the end, never going back to it', () => {
     expect(schedule([trimmed, next], 16, loop, { from: 0, to: 100 })).toEqual([
       { clip: next, delay: 0, from: 1, duration: 3 },
     ]);
@@ -134,14 +134,24 @@ describe('positionAt', () => {
 
   it('moves on with the time played', () => {
     expect(positionAt(3, null, 10)).toBe(13);
-    expect(positionAt(16, loop, 10)).toBe(26);
   });
 
-  it('goes back to the start of the Loop each time it reaches its end', () => {
+  it('starting before the Loop, plays into it and goes back to its start at its end', () => {
+    expect(positionAt(0, loop, 7)).toBe(7);
     expect(positionAt(0, loop, 15)).toBe(15);
     expect(positionAt(0, loop, 16)).toBe(8);
     expect(positionAt(0, loop, 21)).toBe(13);
+  });
+
+  it('starting inside the Loop, stays where it is and goes back to its start at its end', () => {
+    expect(positionAt(12, loop, 0)).toBe(12);
+    expect(positionAt(12, loop, 3)).toBe(15);
     expect(positionAt(12, loop, 4 + 8 * 3 + 2)).toBe(10);
+  });
+
+  it('starting at or past the end of the Loop, plays on and never goes back to it', () => {
+    expect(positionAt(16, loop, 10)).toBe(26);
+    expect(positionAt(30, loop, 100)).toBe(130);
   });
 });
 
@@ -153,47 +163,6 @@ describe('repeats', () => {
     expect(repeats(15.9, loop)).toBe(true);
     expect(repeats(16, loop)).toBe(false);
     expect(repeats(0, null)).toBe(false);
-  });
-});
-
-// The hook, 2:30 to 2:40.
-const hook = { start: 150, end: 160 };
-
-describe('keptInLoop', () => {
-  it('moves a playhead outside a Loop that is on to its start', () => {
-    expect(keptInLoop(90, hook)).toBe(150);
-    expect(keptInLoop(170, hook)).toBe(150);
-  });
-
-  it('leaves a playhead inside the Loop where it is, up to just before its end', () => {
-    expect(keptInLoop(150, hook)).toBe(150);
-    expect(keptInLoop(159.9, hook)).toBe(159.9);
-  });
-
-  it('counts the Loop end as outside it, since playing from there never repeats', () => {
-    expect(keptInLoop(160, hook)).toBe(150);
-  });
-
-  it("moves a playhead left behind by the Loop's start being dragged past it", () => {
-    expect(keptInLoop(152, { start: 155, end: 160 })).toBe(155);
-  });
-
-  it('leaves the playhead alone without a Loop that is on', () => {
-    expect(keptInLoop(90, null)).toBe(90);
-  });
-});
-
-describe('outsideLoop', () => {
-  it('tells a seek outside a Loop that is on, which switches it off', () => {
-    expect(outsideLoop(90, hook)).toBe(true);
-    expect(outsideLoop(160, hook)).toBe(true);
-    expect(outsideLoop(170, hook)).toBe(true);
-  });
-
-  it('lets a seek inside the Loop, or without a Loop that is on, just seek', () => {
-    expect(outsideLoop(150, hook)).toBe(false);
-    expect(outsideLoop(155, hook)).toBe(false);
-    expect(outsideLoop(90, null)).toBe(false);
   });
 });
 
