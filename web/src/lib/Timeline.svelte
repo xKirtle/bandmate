@@ -19,6 +19,7 @@
   import { Capture, CaptureError, frameAt, inputProblem } from './capture';
   import { addedTrack, chosenTrack, readChosen, storeChosen, type ChoiceEvent } from './chosenTrack';
   import { clampMove, clampTrimEnd, clampTrimStart, draggedNudge, nudged } from './clipEdit';
+  import { clipTargets, guideLanes, reachAt, snapMove, type Snap } from './snapping';
   import { activeTake, clipSources, clipTitle, fileStart, playing } from './clipSource';
   import { cuesInSpan, formatCue } from './cues';
   import { carriesFiles, fileDropTrack, importEach, type TrackRow } from './fileDrop';
@@ -1271,6 +1272,7 @@
   // another; dragging an edge trims it. It stops at its neighbours, the
   // source's ends and 0:00 as it goes, and is saved on release. Until the
   // saved Timeline comes back, the Clip is shown where it was dropped.
+  // Moved, it snaps to other Clips' edges, unless Shift is held.
   interface Edit {
     clip: Clip;
     /** Moving the Clip, trimming either edge, or, Alt+dragged, sliding its active Take within it. */
@@ -1285,6 +1287,10 @@
     placement: Placed;
     /** Where its active Take is nudged to, for a nudge. */
     nudge: number;
+    /** Whether Shift is held, to move without snapping. */
+    free: boolean;
+    /** What a move is snapped to, with the lanes of what's there, while it is. */
+    snap: Snap<number> | null;
     saving: boolean;
   }
   let edit = $state<Edit | null>(null);
@@ -1308,6 +1314,21 @@
       return { track, clips: placed };
     }),
   );
+
+  /**
+   * The guide for what a moved Clip is snapped to: a line at that time, from
+   * its lane through every lane with a Clip aligned there, in pixels down
+   * the lanes.
+   */
+  const guide = $derived.by(() => {
+    if (!edit?.snap) return null;
+    const dragged = timeline.tracks.findIndex((t) => t.id === edit!.trackId);
+    const { from, to } = guideLanes(dragged, edit.snap.aligned);
+    const top = laneElements[from];
+    const bottom = laneElements[to];
+    if (!top || !bottom) return null;
+    return { at: edit.snap.at, top: top.offsetTop, height: bottom.offsetTop + bottom.offsetHeight - top.offsetTop };
+  });
 
   function trackOf(clip: Clip) {
     return timeline.tracks.find((t) => t.clips.some((c) => c.id === clip.id))!;
@@ -1432,11 +1453,26 @@
       trackId: trackOf(clip).id,
       placement: clip,
       nudge: take?.nudge ?? 0,
+      free: event.shiftKey,
+      snap: null,
       saving: false,
     };
     window.addEventListener('pointermove', editMove);
     window.addEventListener('pointerup', editUp);
     window.addEventListener('pointercancel', editCancel);
+    window.addEventListener('keydown', editShift);
+    window.addEventListener('keyup', editShift);
+  }
+
+  /** Where the pointer last dragged a Clip to. */
+  let editAt: Point = { clientX: 0, clientY: 0 };
+
+  // Shift pressed or let go mid-move snaps or frees the Clip there and then,
+  // without waiting for the pointer to move.
+  function editShift(event: KeyboardEvent) {
+    if (event.key !== 'Shift' || !edit?.moved || edit.mode !== 'move' || edit.saving) return;
+    edit.free = event.type === 'keydown';
+    editMove(editAt);
   }
 
   function editMove(event: Point) {
@@ -1445,14 +1481,23 @@
     if (!edit.moved && !pastSlop(edit.from, event)) return;
     edit.moved = true;
     clearTimeout(pressTimer);
+    editAt = { clientX: event.clientX, clientY: event.clientY };
+    // Scrolling along at an edge, or Shift pressed, moves it too, with no keys to go by.
+    if ('shiftKey' in event) edit.free = event.shiftKey === true;
     const t = spanTimeAt(event.clientX);
     const { clip } = edit;
     if (edit.mode === 'nudge') {
       edit.nudge = draggedNudge(clip, t - edit.grab - clip.start);
     } else if (edit.mode === 'move') {
       edit.trackId = trackAt(event.clientY);
-      const start = clampMove(othersOn(edit.trackId, clip), clip.length, t - edit.grab);
-      edit.placement = { ...clip, start };
+      const others = othersOn(edit.trackId, clip);
+      const clamp = (start: number) => clampMove(others, clip.length, start);
+      const desired = t - edit.grab;
+      const moved = edit.free
+        ? { start: clamp(desired), snap: null }
+        : snapMove(clipTargets(timeline.tracks, clip.id), clip.length, desired, reachAt(view.scale), clamp);
+      edit.placement = { ...clip, start: moved.start };
+      edit.snap = moved.snap;
     } else if (edit.mode === 'start') {
       edit.placement = clampTrimStart(clip, othersOn(edit.trackId, clip), t);
     } else {
@@ -1464,6 +1509,7 @@
   async function editUp() {
     stopListening();
     if (!edit) return;
+    edit.snap = null;
     const { clip, trackId, placement: to, mode } = edit;
     if (mode === 'nudge') {
       const takeId = clip.activeTakeId!;
@@ -1522,6 +1568,8 @@
     window.removeEventListener('pointermove', editMove);
     window.removeEventListener('pointerup', editUp);
     window.removeEventListener('pointercancel', editCancel);
+    window.removeEventListener('keydown', editShift);
+    window.removeEventListener('keyup', editShift);
   }
   onDestroy(stopListening);
 
@@ -2509,6 +2557,15 @@
               {@const at = spanStyle(loop.start, loop.end)}
               <span class="loop-shade" style:left={at.left} style:width={at.width} aria-hidden="true"></span>
             {/if}
+            {#if guide}
+              <span
+                class="snap-guide"
+                style:left="{percent(guide.at)}%"
+                style:top="{guide.top}px"
+                style:height="{guide.height}px"
+                aria-hidden="true"
+              ></span>
+            {/if}
             <span class="playhead" style:left="{percent(position)}%" aria-hidden="true"></span>
           </div>
         </div>
@@ -3256,6 +3313,14 @@
   rect.clipped {
     fill: var(--danger);
     opacity: 1;
+  }
+  /* What a moved Clip is snapped to, through the lanes aligned there. */
+  .snap-guide {
+    position: absolute;
+    width: round(calc(0.125 * var(--timeline-rem)), 1px);
+    margin-left: round(calc(-0.0625 * var(--timeline-rem)), 1px);
+    background: var(--accent);
+    pointer-events: none;
   }
   .playhead {
     position: absolute;
