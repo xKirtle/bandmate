@@ -204,6 +204,15 @@ a:focus-visible {
   outline-offset: 2px;
 }
 
+/* What a pointer focused shows no ring, even once a key acts on the page,
+   e.g. Space playing (see pointerFocus.ts). A text field keeps its ring, as
+   what's typed goes to it. A ring drawn other than by an outline checks
+   `:root:not([data-pointer-focus])` itself. Important, to win over every
+   ring, however specific its selector. */
+:root[data-pointer-focus] :focus-visible:not(:read-write) {
+  outline: none !important;
+}
+
 .muted {
   color: var(--text-muted);
 }

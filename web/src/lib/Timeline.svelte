@@ -34,6 +34,7 @@
   import { formatVolume, maxVolume, silence, trackGains, type Levels } from './mixer';
   import { type MenuAction } from './menu';
   import { peaks as peaksOf, peaksPerSecond } from './peaks';
+  import { keyActedOnPage } from './pointerFocus';
   import { longPressDelay, pastSlop, type Point } from './press';
   import { recordingPlan, retakeLength, retakePlan, sungPastStart, type RecordingPlan } from './recording';
   import { recoveredPlacement, takesAt, type TakeTarget, type Unsaved } from './recovery';
@@ -699,6 +700,8 @@
     }[event.key];
     if (to === undefined) return;
     event.preventDefault();
+    // It seeks, rather than acting on the ruler a click focused.
+    keyActedOnPage();
     seekTo(to);
   }
 
@@ -736,6 +739,7 @@
     if (event.defaultPrevented || picking || calibrating || ownsSpace(event.target)) return;
     // Otherwise the page would scroll.
     event.preventDefault();
+    keyActedOnPage();
     toggle();
   }
 
@@ -2569,7 +2573,7 @@
     cursor: pointer;
   }
   .track-actions button:hover:not(:disabled),
-  .track-actions button:focus-visible {
+  :global(:root:not([data-pointer-focus])) .track-actions button:focus-visible {
     color: var(--accent);
   }
   /* As big as the arrows and cross beside it. */
@@ -2894,7 +2898,7 @@
     line-height: 1.25;
   }
   .clip-more:hover,
-  :global(:focus-visible) > .clip-more {
+  :global(:root:not([data-pointer-focus]) :focus-visible) > .clip-more {
     color: var(--accent);
   }
   .trim {
