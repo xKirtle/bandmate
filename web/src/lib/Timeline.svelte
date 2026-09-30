@@ -22,12 +22,14 @@
   import {
     editTargets,
     guideLanes,
+    loopMark,
     loopTargets,
     reachAt,
     snapEdge,
     snapLoop,
     snapMove,
     type Aligned,
+    type LoopDrag,
     type Snap,
   } from './snapping';
   import { activeTake, clipSources, clipTitle, fileStart, playing } from './clipSource';
@@ -1813,8 +1815,8 @@
   // Marked or adjusted, it snaps to Clips' edges and the playhead, unless
   // Shift is held: a new one both where it's pressed and where it's dragged to.
   interface LoopEdit {
-    mode: 'new' | 'start' | 'end';
-    /** The time the Loop is marked from: where a new one was started, or its edge that isn't dragged. */
+    mode: LoopDrag;
+    /** The time the Loop is marked from: where a new one was pressed, before snapping, or its edge that isn't dragged. */
     anchor: number;
     /** Where the pointer went down, to tell a click from a drag. */
     fromX: number;
@@ -1845,15 +1847,10 @@
     event.preventDefault();
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
     const common = { fromX: event.clientX, moved: false, free: event.shiftKey, snap: null, saving: false };
-    if (edge && current) {
-      loopEdit = { ...common, mode: edge, anchor: edge === 'start' ? current.end : current.start, loop: current };
-    } else {
-      // Where it's pressed snaps too, so both its ends can go onto something.
-      const at = event.shiftKey
-        ? t
-        : snapEdge(loopTargets(timeline.tracks, position), t, reachAt(view.scale), (at) => at).at;
-      loopEdit = { ...common, mode: 'new', anchor: at, loop: { start: at, end: at, on: true } };
-    }
+    loopEdit =
+      edge && current
+        ? { ...common, mode: edge, anchor: edge === 'start' ? current.end : current.start, loop: current }
+        : { ...common, mode: 'new', anchor: t, loop: { start: t, end: t, on: true } };
     window.addEventListener('keydown', loopShift);
     window.addEventListener('keyup', loopShift);
   }
@@ -1880,9 +1877,12 @@
     const t = loopTimeAt(event.clientX);
     const { mode, anchor, loop: shown } = loopEdit;
     const targets = loopEdit.free ? [] : loopTargets(timeline.tracks, position);
-    const set = snapLoop(targets, mode, anchor, t, reachAt(view.scale), minLoop);
-    loopEdit.loop = { ...shown, start: set.start, end: set.end };
-    loopEdit.snap = set.snap;
+    const reach = reachAt(view.scale);
+    // Where a new one was pressed snaps too, so both its ends can go onto something.
+    const from = mode === 'new' ? loopMark(targets, anchor, reach) : anchor;
+    const placed = snapLoop(targets, mode, from, t, reach, minLoop);
+    loopEdit.loop = { ...shown, start: placed.start, end: placed.end };
+    loopEdit.snap = placed.snap;
     dragAt(event, loopMove);
   }
 

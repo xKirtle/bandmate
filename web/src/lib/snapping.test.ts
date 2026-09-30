@@ -4,6 +4,7 @@ import type { Placed } from './schedule';
 import {
   clipTargets,
   guideLanes,
+  loopMark,
   loopTargets,
   reachAt,
   snap,
@@ -371,6 +372,21 @@ describe('snapLoop', () => {
     expect(snapLoop(targets, 'new', 11.875, 12.25, 0.5, 0.25)).toEqual({ start: 11.875, end: 12.25, snap: null });
     // Marked from 0:11.75, the Clip's end is just the shortest Loop on.
     expect(snapLoop(targets, 'new', 11.75, 12.25, 0.5, 0.25).snap?.at).toBe(12);
+  });
+
+  it('never snaps a new Loop to the other side of where it was marked from', () => {
+    // Marked from 0:10.375, dragged on to 0:10.625, reach 1s: the Clip's
+    // start at 0:10 is in reach, but behind it, so it stays where it's dragged.
+    expect(snapLoop(targets, 'new', 10.375, 10.625, 1, 0.25)).toEqual({ start: 10.375, end: 10.625, snap: null });
+  });
+});
+
+describe('loopMark', () => {
+  it('snaps where a new Loop is pressed onto a target in reach', () => {
+    const targets = loopTargets([{ clips: [{ id: 1, start: 10, length: 2 }] }], 7);
+    expect(loopMark(targets, 9.75, 0.5)).toBe(10);
+    expect(loopMark(targets, 7.25, 0.5)).toBe(7);
+    expect(loopMark(targets, 4, 0.5)).toBe(4);
   });
 });
 
