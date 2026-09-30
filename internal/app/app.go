@@ -14,6 +14,7 @@ import (
 
 	"github.com/xKirtle/bandmate/internal/audio"
 	"github.com/xKirtle/bandmate/internal/beats"
+	"github.com/xKirtle/bandmate/internal/build"
 	"github.com/xKirtle/bandmate/internal/db"
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
 	"github.com/xKirtle/bandmate/internal/timeline"
@@ -32,6 +33,9 @@ type Config struct {
 	// MaxCoverBytes caps the size of a Cover's pictures, together. Zero
 	// means DefaultMaxCoverBytes.
 	MaxCoverBytes int64
+	// Build is the running version, shown on the About page. Zero means
+	// build.Current().
+	Build build.Info
 	// Now tells the time at startup, when Takes detached, and Sounds no
 	// Clip has used, for more than DetachedTakesKept are removed. Nil means
 	// time.Now.
@@ -66,6 +70,7 @@ type App struct {
 	coverFiles  lyricsheet.CoverFiles
 	maxUpload   int64
 	maxCover    int64
+	build       build.Info
 	spa         fs.FS
 	handler     http.Handler
 }
@@ -116,6 +121,7 @@ func New(cfg Config) (*App, error) {
 		coverFiles:  coverFiles,
 		maxUpload:   cfg.MaxUploadBytes,
 		maxCover:    cfg.MaxCoverBytes,
+		build:       cfg.Build,
 		spa:         cfg.SPA,
 	}
 	if a.maxUpload <= 0 {
@@ -123,6 +129,9 @@ func New(cfg Config) (*App, error) {
 	}
 	if a.maxCover <= 0 {
 		a.maxCover = DefaultMaxCoverBytes
+	}
+	if a.build == (build.Info{}) {
+		a.build = build.Current()
 	}
 	now := time.Now
 	if cfg.Now != nil {
@@ -237,9 +246,14 @@ func (a *App) health(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-// config tells the SPA the limits it should check before sending anything.
+// config tells the SPA the limits it should check before sending anything,
+// and which version is running, with a link to its source.
 func (a *App) config(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]int64{"maxUploadBytes": a.maxUpload, "maxCoverBytes": a.maxCover})
+	writeJSON(w, http.StatusOK, struct {
+		MaxUploadBytes int64 `json:"maxUploadBytes"`
+		MaxCoverBytes  int64 `json:"maxCoverBytes"`
+		build.Info
+	}{a.maxUpload, a.maxCover, a.build})
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

@@ -20,10 +20,12 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/xKirtle/bandmate/internal/app"
+	"github.com/xKirtle/bandmate/internal/build"
 	"github.com/xKirtle/bandmate/web"
 )
 
@@ -48,7 +50,8 @@ func main() {
 }
 
 func run(addr, dataDir string, maxUploadBytes int64) error {
-	a, err := app.New(app.Config{DataDir: dataDir, SPA: web.Dist(), MaxUploadBytes: maxUploadBytes})
+	running := build.Current()
+	a, err := app.New(app.Config{DataDir: dataDir, SPA: web.Dist(), MaxUploadBytes: maxUploadBytes, Build: running})
 	if err != nil {
 		return err
 	}
@@ -65,7 +68,7 @@ func run(addr, dataDir string, maxUploadBytes int64) error {
 
 	errc := make(chan error, 1)
 	go func() {
-		log.Printf("bandmate listening on %s, data in %s", addr, dataDir)
+		log.Printf("bandmate %s listening on %s, data in %s", describe(running), addr, dataDir)
 		errc <- srv.ListenAndServe()
 	}()
 
@@ -82,6 +85,17 @@ func run(addr, dataDir string, maxUploadBytes int64) error {
 		return err
 	}
 	return nil
+}
+
+// describe names the running version for the log, with its commit when the
+// version doesn't already show it: "v0.4.0 (1a2b3c4)", "1a2b3c4-dirty" or
+// "dev".
+func describe(b build.Info) string {
+	commit := b.ShortRevision()
+	if commit == "" || strings.HasPrefix(b.Version, commit) {
+		return b.Version
+	}
+	return fmt.Sprintf("%s (%s)", b.Version, commit)
 }
 
 func healthcheck(addr string) error {

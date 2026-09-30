@@ -4,6 +4,7 @@
   import ImportSong from './routes/ImportSong.svelte';
   import SongPage from './routes/SongPage.svelte';
   import BeatLibrary from './routes/BeatLibrary.svelte';
+  import About from './routes/About.svelte';
   import NotFound from './routes/NotFound.svelte';
   import MainNav from './lib/MainNav.svelte';
 
@@ -18,6 +19,8 @@
       <SongList />
     {:else if router.path === '/beats'}
       <BeatLibrary />
+    {:else if router.path === '/about'}
+      <About />
     {:else if router.path === '/songs/import'}
       <ImportSong />
     {:else if songMatch}

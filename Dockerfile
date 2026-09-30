@@ -15,7 +15,17 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=web /src/web/dist ./web/dist
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/bandmate ./cmd/bandmate \
+# Which build this is, shown on the About page: the release tag (tag builds
+# only), the commit, and the repository it came from. CI passes them; a
+# build without them shows "dev" and links to the upstream repository.
+ARG VERSION=""
+ARG REVISION=""
+ARG SOURCE_URL=""
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w \
+      -X github.com/xKirtle/bandmate/internal/build.version=${VERSION} \
+      -X github.com/xKirtle/bandmate/internal/build.revision=${REVISION} \
+      -X github.com/xKirtle/bandmate/internal/build.sourceURL=${SOURCE_URL}" \
+      -o /out/bandmate ./cmd/bandmate \
  && mkdir -p /out/data
 
 # Minimal runtime image: just the binary.

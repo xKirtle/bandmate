@@ -142,11 +142,17 @@ jobs:
 
       # Builds from the Git context, so no checkout is needed. Layers
       # (including npm ci and go mod download) are cached in the GitHub
-      # Actions cache.
+      # Actions cache. The build args stamp the binary with the version the
+      # About page shows: the release tag on tag builds only, the commit, and
+      # this repository, so a fork's image links to the fork's own source.
       - uses: docker/build-push-action@v7
         with:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ github.ref_type == 'tag' && github.ref_name || '' }}
+            REVISION=${{ github.sha }}
+            SOURCE_URL=${{ github.server_url }}/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

@@ -1,7 +1,8 @@
 <script lang="ts">
   // Switches between the top-level pages, the same at every width: a nav rail
   // down the left of wide windows, a tab bar along the bottom of narrow ones.
-  import { currentPage, listAt, pages, type LibraryPage } from './nav';
+  import BrandMark from './BrandMark.svelte';
+  import { about, currentPage, listAt, pages, type LibraryPage } from './nav';
   import { router } from './router.svelte';
 
   const current = $derived(currentPage(router.path));
@@ -16,13 +17,17 @@
 </script>
 
 <nav aria-label="Library">
-  <span class="brand" aria-hidden="true">B</span>
+  <span class="brand"><BrandMark /></span>
   {#each pages as page (page.id)}
     <a href={page.href + (lastSearch[page.id] ?? '')} aria-current={page.id === current ? 'page' : undefined}>
       <span class="glyph" aria-hidden="true">{page.icon}</span>
       {page.label}
     </a>
   {/each}
+  <a class="about" href={about.href} aria-current={current === about.id ? 'page' : undefined}>
+    <span class="glyph" aria-hidden="true">{about.icon}</span>
+    {about.label}
+  </a>
 </nav>
 
 <style>
@@ -45,6 +50,7 @@
   }
   a {
     flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -69,7 +75,8 @@
     color: var(--accent);
   }
 
-  /* The nav rail, in view however far the page scrolls. */
+  /* The nav rail, in view however far the page scrolls, with About pinned
+     to its bottom, apart from the lists. */
   @media (min-width: 65.5rem) {
     nav {
       position: sticky;
@@ -87,9 +94,6 @@
       place-items: center;
       height: 2.25rem;
       margin-bottom: 0.75rem;
-      color: var(--accent);
-      font-size: 1.25rem;
-      font-weight: 800;
     }
     a {
       flex: none;
@@ -97,6 +101,9 @@
     }
     a:hover {
       background: var(--surface-2);
+    }
+    .about {
+      margin-top: auto;
     }
   }
 </style>

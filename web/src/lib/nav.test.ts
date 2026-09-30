@@ -12,8 +12,13 @@ describe('currentPage', () => {
     expect(currentPage('/beats')).toBe('beats');
   });
 
-  it('marks neither on a page that has no place in them', () => {
+  it('marks About on the About page', () => {
+    expect(currentPage('/about')).toBe('about');
+  });
+
+  it('marks none on a page that has no place in them', () => {
     expect(currentPage('/nowhere')).toBeUndefined();
+    expect(currentPage('/aboutx')).toBeUndefined();
     expect(currentPage('/beatsx')).toBeUndefined();
     expect(currentPage('/songsx')).toBeUndefined();
   });
@@ -29,5 +34,6 @@ describe('listAt', () => {
     expect(listAt('/songs/12')).toBeUndefined();
     expect(listAt('/songs/import')).toBeUndefined();
     expect(listAt('/nowhere')).toBeUndefined();
+    expect(listAt('/about')).toBeUndefined();
   });
 });

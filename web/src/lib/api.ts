@@ -388,12 +388,18 @@ export interface DecodedAudio {
   peaks: number[];
 }
 
-/** Limits the server enforces, to check before sending anything. */
+/** Limits the server enforces, to check before sending anything, and which version it is. */
 export interface ServerConfig {
   /** The largest audio file accepted, in bytes. */
   maxUploadBytes: number;
   /** The largest picture accepted for a Cover, in bytes. */
   maxCoverBytes: number;
+  /** The running version to show: the release tag, else the short commit, else "dev". */
+  version: string;
+  /** The full commit it was built from, or "" when unknown. */
+  revision: string;
+  /** A link to exactly this version's source. */
+  sourceUrl: string;
 }
 
 /** A failed request, carrying the server's readable message. */
