@@ -88,11 +88,29 @@ export function snapEdge<T>(
 }
 
 /**
- * The lanes a snap's guide runs across: from the lane being dragged in to
- * the furthest lane holding something aligned, either way.
+ * What's aligned at a target: a Clip's edge, in the lane it's in counted
+ * from the top; one of the Loop's edges; or the playhead.
  */
-export function guideLanes(draggedLane: number, alignedLanes: readonly number[]): { from: number; to: number } {
-  return { from: Math.min(draggedLane, ...alignedLanes), to: Math.max(draggedLane, ...alignedLanes) };
+export type Aligned = number | 'loop' | 'playhead';
+
+/**
+ * The lanes a snap's guide runs across: from the lane being dragged in to
+ * the furthest lane holding a Clip aligned, either way, and up to the
+ * ruler for a Loop edge, the Loop being drawn above it. The playhead is
+ * already a line, so it's left out, and with nothing else aligned there's
+ * no guide.
+ */
+export function guideLanes(
+  draggedLane: number,
+  aligned: readonly Aligned[],
+): { from: number | 'ruler'; to: number } | null {
+  const rest = aligned.filter((a) => a !== 'playhead');
+  if (rest.length === 0) return null;
+  const lanes = rest.filter((a) => a !== 'loop');
+  return {
+    from: rest.includes('loop') ? 'ruler' : Math.min(draggedLane, ...lanes),
+    to: Math.max(draggedLane, ...lanes),
+  };
 }
 
 /**
@@ -111,4 +129,24 @@ export function clipTargets(
         { at: c.start + c.length, of: lane },
       ]),
   );
+}
+
+/**
+ * Everything a moved or trimmed Clip snaps to: every other Clip's start
+ * and end, the playhead, and the Loop's start and end, on or off, if
+ * there is one.
+ */
+export function editTargets(
+  tracks: readonly { clips: readonly { id: number; start: number; length: number }[] }[],
+  draggedClip: number,
+  playhead: number,
+  loop: { start: number; end: number } | null,
+): Target<Aligned>[] {
+  const loopEdges: Target<Aligned>[] = loop
+    ? [
+        { at: loop.start, of: 'loop' },
+        { at: loop.end, of: 'loop' },
+      ]
+    : [];
+  return [...clipTargets(tracks, draggedClip), { at: playhead, of: 'playhead' }, ...loopEdges];
 }

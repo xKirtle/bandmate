@@ -19,7 +19,7 @@
   import { Capture, CaptureError, frameAt, inputProblem } from './capture';
   import { addedTrack, chosenTrack, readChosen, storeChosen, type ChoiceEvent } from './chosenTrack';
   import { clampMove, clampTrimEnd, clampTrimStart, draggedNudge, nudged } from './clipEdit';
-  import { clipTargets, guideLanes, reachAt, snapEdge, snapMove, type Snap } from './snapping';
+  import { editTargets, guideLanes, reachAt, snapEdge, snapMove, type Aligned, type Snap } from './snapping';
   import { activeTake, clipSources, clipTitle, fileStart, playing } from './clipSource';
   import { cuesInSpan, formatCue } from './cues';
   import { carriesFiles, fileDropTrack, importEach, type TrackRow } from './fileDrop';
@@ -1272,7 +1272,8 @@
   // another; dragging an edge trims it. It stops at its neighbours, the
   // source's ends and 0:00 as it goes, and is saved on release. Until the
   // saved Timeline comes back, the Clip is shown where it was dropped.
-  // Moved or trimmed, it snaps to other Clips' edges, unless Shift is held.
+  // Moved or trimmed, it snaps to other Clips' edges, the playhead and the
+  // Loop's edges, unless Shift is held.
   interface Edit {
     clip: Clip;
     /** Moving the Clip, trimming either edge, or, Alt+dragged, sliding its active Take within it. */
@@ -1290,13 +1291,14 @@
     /** Whether Shift is held, to move or trim without snapping. */
     free: boolean;
     /** What a move or trim is snapped to, with the lanes of what's there, while it is. */
-    snap: Snap<number> | null;
+    snap: Snap<Aligned> | null;
     saving: boolean;
   }
   let edit = $state<Edit | null>(null);
   let lanesElement = $state<HTMLElement>();
   let lanesWrapElement = $state<HTMLElement>();
   let laneElements = $state<HTMLElement[]>([]);
+  let rulerElement = $state<HTMLElement>();
 
   /** Each Track's Clips as shown, with the one being edited where it's been dragged to. */
   const shown = $derived(
@@ -1318,17 +1320,24 @@
   /**
    * The guide for what a moved or trimmed Clip is snapped to: a line at
    * that time, from its lane through every lane with a Clip aligned there,
-   * in pixels down the lanes.
+   * and up through the ruler for a Loop edge, in pixels down the lanes.
+   * None for the playhead, which already is a line.
    */
   const guide = $derived.by(() => {
     if (!edit?.snap) return null;
     const dragged = timeline.tracks.findIndex((t) => t.id === edit!.trackId);
-    const { from, to } = guideLanes(dragged, edit.snap.aligned);
-    const top = laneElements[from];
-    const bottom = laneElements[to];
+    const lanes = guideLanes(dragged, edit.snap.aligned);
+    if (!lanes) return null;
+    const top = lanes.from === 'ruler' ? rulerElement : laneElements[lanes.from];
+    const bottom = laneElements[lanes.to];
     if (!top || !bottom) return null;
     return { at: edit.snap.at, top: top.offsetTop, height: bottom.offsetTop + bottom.offsetHeight - top.offsetTop };
   });
+
+  /** What a Clip moved or trimmed snaps to: the other Clips' edges, the playhead and the Loop's edges. */
+  function snapTargets(clip: Clip) {
+    return editTargets(timeline.tracks, clip.id, position, loop);
+  }
 
   function trackOf(clip: Clip) {
     return timeline.tracks.find((t) => t.clips.some((c) => c.id === clip.id))!;
@@ -1495,7 +1504,7 @@
       const desired = t - edit.grab;
       const moved = edit.free
         ? { start: clamp(desired), snap: null }
-        : snapMove(clipTargets(timeline.tracks, clip.id), clip.length, desired, reachAt(view.scale), clamp);
+        : snapMove(snapTargets(clip), clip.length, desired, reachAt(view.scale), clamp);
       edit.placement = { ...clip, start: moved.start };
       edit.snap = moved.snap;
     } else {
@@ -1508,9 +1517,7 @@
         const trimmed = trim(at);
         return trimStart ? trimmed.start : trimmed.start + trimmed.length;
       };
-      const snapped = edit.free
-        ? { at: t, snap: null }
-        : snapEdge(clipTargets(timeline.tracks, clip.id), t, reachAt(view.scale), edge);
+      const snapped = edit.free ? { at: t, snap: null } : snapEdge(snapTargets(clip), t, reachAt(view.scale), edge);
       edit.placement = trim(snapped.at);
       edit.snap = snapped.snap;
     }
@@ -2406,6 +2413,7 @@
             </div>
             <div
               class="ruler"
+              bind:this={rulerElement}
               role="slider"
               tabindex="0"
               aria-label="Position"
@@ -3325,7 +3333,7 @@
     fill: var(--danger);
     opacity: 1;
   }
-  /* What a moved or trimmed Clip is snapped to, through the lanes aligned there. */
+  /* What a moved or trimmed Clip is snapped to, through the lanes aligned there, and up through the ruler for a Loop edge. */
   .snap-guide {
     position: absolute;
     width: round(calc(0.125 * var(--timeline-rem)), 1px);

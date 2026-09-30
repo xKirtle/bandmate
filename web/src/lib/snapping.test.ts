@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { clampMove, clampTrimEnd, clampTrimStart } from './clipEdit';
 import type { Placed } from './schedule';
-import { clipTargets, guideLanes, reachAt, snap, snapEdge, snapMove } from './snapping';
+import { clipTargets, guideLanes, reachAt, snap, snapEdge, snapMove, editTargets } from './snapping';
 
 describe('snap', () => {
   it('snaps an edge within reach onto a target', () => {
@@ -193,6 +193,20 @@ describe('guideLanes', () => {
     expect(guideLanes(2, [0, 4])).toEqual({ from: 0, to: 4 });
     expect(guideLanes(2, [2])).toEqual({ from: 2, to: 2 });
   });
+
+  it("runs up to the ruler for the Loop's edges, through any lanes aligned too", () => {
+    expect(guideLanes(2, ['loop'])).toEqual({ from: 'ruler', to: 2 });
+    expect(guideLanes(1, ['loop', 3])).toEqual({ from: 'ruler', to: 3 });
+  });
+
+  it('is no guide for the playhead alone, which already is a line', () => {
+    expect(guideLanes(2, ['playhead'])).toBeNull();
+  });
+
+  it('leaves the playhead out of a guide through anything else aligned', () => {
+    expect(guideLanes(0, ['playhead', 2])).toEqual({ from: 0, to: 2 });
+    expect(guideLanes(1, [3, 'playhead', 'loop'])).toEqual({ from: 'ruler', to: 3 });
+  });
 });
 
 describe('clipTargets', () => {
@@ -213,5 +227,56 @@ describe('clipTargets', () => {
       { at: 4, of: 2 },
       { at: 5, of: 2 },
     ]);
+  });
+});
+
+describe('editTargets', () => {
+  const tracks = [{ clips: [{ id: 1, start: 0, length: 5 }] }, { clips: [{ id: 2, start: 10, length: 2 }] }];
+
+  it("is other Clips' edges, the playhead and the Loop's start and end", () => {
+    expect(editTargets(tracks, 2, 7, { start: 3, end: 9 })).toEqual([
+      { at: 0, of: 0 },
+      { at: 5, of: 0 },
+      { at: 7, of: 'playhead' },
+      { at: 3, of: 'loop' },
+      { at: 9, of: 'loop' },
+    ]);
+  });
+
+  it("is only other Clips' edges and the playhead with no Loop", () => {
+    expect(editTargets(tracks, 2, 7, null)).toEqual([
+      { at: 0, of: 0 },
+      { at: 5, of: 0 },
+      { at: 7, of: 'playhead' },
+    ]);
+  });
+});
+
+describe('snapping to the playhead and the Loop', () => {
+  // A Clip on its own, the playhead at 0:07 and a Loop from 0:03 to 0:09.
+  const all = editTargets([{ clips: [{ id: 1, start: 20, length: 2 }] }], 1, 7, { start: 3, end: 9 });
+  const free = (at: number) => at;
+
+  it('moves a Clip onto the playhead or a Loop edge', () => {
+    expect(snapMove(all, 2, 7.25, 0.5, free)).toEqual({
+      start: 7,
+      snap: { edge: 0, by: -0.25, at: 7, aligned: ['playhead'] },
+    });
+    // Its end meeting the Loop's start.
+    expect(snapMove(all, 2, 0.875, 0.5, free)).toEqual({
+      start: 1,
+      snap: { edge: 1, by: 0.125, at: 3, aligned: ['loop'] },
+    });
+  });
+
+  it("trims a Clip's edge onto the playhead or a Loop edge", () => {
+    expect(snapEdge(all, 6.875, 0.5, free)).toEqual({
+      at: 7,
+      snap: { edge: 0, by: 0.125, at: 7, aligned: ['playhead'] },
+    });
+    expect(snapEdge(all, 8.75, 0.5, free)).toEqual({
+      at: 9,
+      snap: { edge: 0, by: 0.25, at: 9, aligned: ['loop'] },
+    });
   });
 });
