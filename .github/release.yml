@@ -1,5 +1,6 @@
 # Groups the auto-generated notes of a GitHub release by the labels on its
-# pull requests. Issues carry triage labels; pull requests carry the type.
+# pull requests. The rule for which label a pull request gets lives in
+# AGENTS.md's "Pull request labels" section.
 changelog:
   categories:
     - title: Features

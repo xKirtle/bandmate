@@ -10,7 +10,7 @@ Default vocabulary: needs-triage, needs-info, ready-for-agent, ready-for-human, 
 
 ### Pull request labels
 
-Every PR gets exactly one of `enhancement`, `bug` or `documentation`, since the release notes are grouped by those labels. Issues carry only triage labels.
+Every PR gets exactly one of `enhancement`, `bug` or `documentation`, since the release notes are grouped by those labels (see `.github/release.yml`). Issues carry only triage labels.
 
 ### Domain docs
 
