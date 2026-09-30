@@ -1846,12 +1846,6 @@
       {@render undoRedo()}
       <button
         type="button"
-        class="button edit-only"
-        onclick={() => (picking = true)}
-        title="Add a Beat to {timeline.tracks.find((t) => t.id === chosen)?.name ?? 'the chosen Track'}">+ Beat</button
-      >
-      <button
-        type="button"
         class="icon collapse-toggle"
         onclick={() => (collapsed = !collapsed)}
         aria-expanded={!collapsed}
@@ -1871,8 +1865,14 @@
     >
       <div class="heads" class:gripped={editable.current} bind:offsetHeight={headsHeight}>
         <div class="ruler-gap">
-          <button type="button" class="button add-track edit-only" aria-label="Add a Track" onclick={addTrack}
-            >+ Track</button
+          <button
+            type="button"
+            class="button add edit-only"
+            onclick={() => (picking = true)}
+            title="Add a Beat to {timeline.tracks.find((t) => t.id === chosen)?.name ?? 'the Chosen Track'}"
+            >+ Beat</button
+          >
+          <button type="button" class="button add edit-only" aria-label="Add a Track" onclick={addTrack}>+ Track</button
           >
         </div>
         {#each timeline.tracks as track, i (track.id)}
@@ -2391,14 +2391,15 @@
     height: calc(1.5 * var(--timeline-rem));
     flex-shrink: 0;
   }
-  /* Beside the loop bar and the ruler, and where a Track is added, like a DAW's. */
+  /* Beside the loop bar and the ruler, and where a Beat or a Track is added, like a DAW's. */
   .ruler-gap {
     display: flex;
     align-items: center;
+    gap: calc(0.375 * var(--timeline-rem));
     height: calc(2.25 * var(--timeline-rem));
   }
-  /* Small enough for the corner; the corner can't grow without moving the lanes. */
-  .add-track {
+  /* Small enough for the corner, both side by side; the corner can't grow without moving the lanes. */
+  .add {
     min-height: calc(1.75 * var(--timeline-rem));
     padding: 0 calc(0.625 * var(--timeline-rem));
     font-size: calc(0.875 * var(--timeline-rem));
