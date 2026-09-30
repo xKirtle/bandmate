@@ -137,6 +137,7 @@ func (a *App) placeClip(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		TrackID        *int64   `json:"trackId"`
 		BeatID         *int64   `json:"beatId"`
+		Name           *string  `json:"name"`
 		TakeIDs        []int64  `json:"takeIds"`
 		ActiveTakeID   *int64   `json:"activeTakeId"`
 		LastTakeNumber int      `json:"lastTakeNumber"`
@@ -149,9 +150,21 @@ func (a *App) placeClip(w http.ResponseWriter, r *http.Request) {
 			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "trackId, start, offset and length are required"}
 		}
 		return a.timelines.PlaceClip(r.Context(), id, based, *req.TrackID, timeline.NewClip{
-			BeatID: req.BeatID, TakeIDs: req.TakeIDs, ActiveTakeID: req.ActiveTakeID, LastTakeNumber: req.LastTakeNumber,
+			BeatID: req.BeatID, Name: req.Name, TakeIDs: req.TakeIDs, ActiveTakeID: req.ActiveTakeID, LastTakeNumber: req.LastTakeNumber,
 			Start: *req.Start, Offset: *req.Offset, Length: *req.Length,
 		})
+	})
+}
+
+func (a *App) renameClip(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Name *string `json:"name"`
+	}
+	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based lyricsheet.Version, clipID int64) (timeline.Timeline, error) {
+		if req.Name == nil {
+			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "name is required"}
+		}
+		return a.timelines.RenameClip(ctx, id, based, clipID, *req.Name)
 	})
 }
 

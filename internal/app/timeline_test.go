@@ -37,8 +37,10 @@ type track struct {
 
 // clip is a stretch of a Beat, or of Takes, placed on a Track.
 type clip struct {
-	ID           int64   `json:"id"`
-	BeatID       int64   `json:"beatId"`
+	ID     int64 `json:"id"`
+	BeatID int64 `json:"beatId"`
+	// Name is null until the Clip is named.
+	Name         *string `json:"name"`
 	Takes        []take  `json:"takes"`
 	ActiveTakeID *int64  `json:"activeTakeId"`
 	Start        float64 `json:"start"`
@@ -318,6 +320,9 @@ var timelineChanges = []struct {
 	{"place a clip", func(ts *testServer, songID int64, tl timeline, v int64) response {
 		return ts.DoAt(v, http.MethodPost, timelinePath(songID)+"/clips",
 			map[string]any{"trackId": tl.Tracks[0].ID, "beatId": tl.Beats[0].ID, "start": 20, "offset": 1, "length": 5})
+	}},
+	{"rename a clip", func(ts *testServer, songID int64, tl timeline, v int64) response {
+		return ts.DoAt(v, http.MethodPut, clipPath(songID, tl.Tracks[0].Clips[0].ID)+"/name", map[string]any{"name": "Chorus 1"})
 	}},
 	{"delete a clip", func(ts *testServer, songID int64, tl timeline, v int64) response {
 		return ts.DoAt(v, http.MethodDelete, clipPath(songID, tl.Tracks[0].Clips[0].ID), nil)

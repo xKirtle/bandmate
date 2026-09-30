@@ -61,6 +61,9 @@ type Clip struct {
 	ID int64 `json:"id"`
 	// BeatID is the Beat the Clip plays, or nil for a Clip of Takes.
 	BeatID *int64 `json:"beatId"`
+	// Name is the Clip's own name, or nil until it's named, when it goes by
+	// its source's.
+	Name *string `json:"name"`
 	// Takes are a Clip of Takes' Takes, by number, and ActiveTakeID the one
 	// it plays. A Clip of a Beat has none.
 	Takes        []Take `json:"takes"`
@@ -182,14 +185,14 @@ func read(ctx context.Context, tx *sql.Tx, songID int64) (Timeline, error) {
 
 	type at struct{ track, clip int }
 	clipAt := map[int64]at{}
-	err = query(ctx, tx, `SELECT c.id, c.track_id, c.beat_id, c.active_take_id, c.last_take_number,
+	err = query(ctx, tx, `SELECT c.id, c.track_id, c.beat_id, c.name, c.active_take_id, c.last_take_number,
 			c.start, c.source_offset, c.length
 		FROM clips c JOIN tracks t ON t.id = c.track_id
 		WHERE t.song_id = ? ORDER BY c.start, c.id`, []any{songID},
 		func(rows *sql.Rows) error {
 			c := Clip{Takes: []Take{}}
 			var trackID int64
-			if err := rows.Scan(&c.ID, &trackID, &c.BeatID, &c.ActiveTakeID, &c.LastTakeNumber,
+			if err := rows.Scan(&c.ID, &trackID, &c.BeatID, &c.Name, &c.ActiveTakeID, &c.LastTakeNumber,
 				&c.Start, &c.Offset, &c.Length); err != nil {
 				return err
 			}
@@ -552,13 +555,16 @@ const tolerance = 1e-6
 // errOverlap is refusing a Clip where another already plays on its Track.
 var errOverlap = &lyricsheet.ConflictError{Msg: "Clips can't overlap on a Track"}
 
-// placement is where a Clip is and what it plays, as stored.
+// placement is where a Clip is, what it plays and what it's named, as
+// stored.
 type placement struct {
 	trackID int64
 	source  source
-	start   float64
-	offset  float64
-	length  float64
+	// name is null for a Clip that isn't named.
+	name   sql.NullString
+	start  float64
+	offset float64
+	length float64
 }
 
 // source is what a Clip plays: a Beat, or Takes, of which it plays the
@@ -667,7 +673,9 @@ type NewClip struct {
 	// BeatID is the Beat it plays, or else TakeIDs are the Takes it gets
 	// back, and ActiveTakeID the one of them it plays. LastTakeNumber is the
 	// highest number its Takes ever had, if higher than theirs now.
-	BeatID         *int64  `json:"beatId"`
+	BeatID *int64 `json:"beatId"`
+	// Name is its own name, if it has one.
+	Name           *string `json:"name"`
 	TakeIDs        []int64 `json:"takeIds"`
 	ActiveTakeID   *int64  `json:"activeTakeId"`
 	LastTakeNumber int     `json:"lastTakeNumber"`
@@ -712,7 +720,8 @@ func addClip(ctx context.Context, tx *sql.Tx, songID, trackID int64, c NewClip) 
 	if c.Start < -tolerance {
 		return &lyricsheet.InvalidError{Msg: "a Clip can't start before 0:00"}
 	}
-	p := placement{trackID: trackID, source: src, start: max(c.Start, 0), offset: max(c.Offset, 0), length: c.Length}
+	p := placement{trackID: trackID, source: src, name: clipName(c.Name),
+		start: max(c.Start, 0), offset: max(c.Offset, 0), length: c.Length}
 	free, err := isFree(ctx, tx, 0, p)
 	if err != nil {
 		return err
@@ -789,18 +798,18 @@ func attachTakes(ctx context.Context, tx *sql.Tx, clipID int64, takeIDs []int64)
 // returns its id.
 func insertClip(ctx context.Context, tx *sql.Tx, p placement) (int64, error) {
 	res, err := tx.ExecContext(ctx,
-		`INSERT INTO clips (track_id, beat_id, active_take_id, last_take_number, start, source_offset, length)
-			VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		p.trackID, p.source.beatID, p.source.activeTakeID, p.source.lastTakeNumber, p.start, p.offset, p.length)
+		`INSERT INTO clips (track_id, beat_id, name, active_take_id, last_take_number, start, source_offset, length)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.trackID, p.source.beatID, p.name, p.source.activeTakeID, p.source.lastTakeNumber, p.start, p.offset, p.length)
 	if err != nil {
 		return 0, fmt.Errorf("adding clip: %w", err)
 	}
 	return res.LastInsertId()
 }
 
-// DuplicateClip adds a copy of a Clip, with the same trim, right after it on
-// its Track, or after the Track's last Clip if something is in the way. A
-// Clip of Takes gets copies of its Takes, sharing their files.
+// DuplicateClip adds a copy of a Clip, with the same trim and name, right
+// after it on its Track, or after the Track's last Clip if something is in
+// the way. A Clip of Takes gets copies of its Takes, sharing their files.
 func (s *Store) DuplicateClip(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64) (Timeline, error) {
 	var linked []int64
 	tl, err := s.change(ctx, songID, based, func(tx *sql.Tx) error {
@@ -880,6 +889,29 @@ func (s *Store) removeTakeFiles(ids []int64) {
 	}
 }
 
+// RenameClip gives a Clip a name of its own, or, given a blank one, clears
+// it, so the Clip goes by its source's name again.
+func (s *Store) RenameClip(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64, name string) (Timeline, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		res, err := tx.ExecContext(ctx, `UPDATE clips SET name = ?
+			WHERE id = ? AND track_id IN (SELECT id FROM tracks WHERE song_id = ?)`, clipName(&name), clipID, songID)
+		if err != nil {
+			return fmt.Errorf("renaming clip: %w", err)
+		}
+		return expectOneRow(res)
+	})
+}
+
+// clipName is a Clip's name as stored: trimmed, and null if it has none or
+// it's blank.
+func clipName(name *string) sql.NullString {
+	if name == nil {
+		return sql.NullString{}
+	}
+	n := strings.TrimSpace(*name)
+	return sql.NullString{String: n, Valid: n != ""}
+}
+
 // DeleteClip removes a Clip from the Timeline. Its Beat stays in the Beat
 // Library, and its Takes are detached, to be placed again.
 func (s *Store) DeleteClip(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64) (Timeline, error) {
@@ -905,11 +937,11 @@ func deleteClip(ctx context.Context, tx *sql.Tx, songID, clipID int64) error {
 // clipPlacement reads where one of the Song's Clips is and what it plays.
 func clipPlacement(ctx context.Context, tx *sql.Tx, songID, clipID int64) (placement, error) {
 	var p placement
-	err := tx.QueryRowContext(ctx, `SELECT c.track_id, c.beat_id, c.active_take_id, c.last_take_number,
+	err := tx.QueryRowContext(ctx, `SELECT c.track_id, c.beat_id, c.name, c.active_take_id, c.last_take_number,
 			c.start, c.source_offset, c.length
 		FROM clips c JOIN tracks t ON t.id = c.track_id
 		WHERE c.id = ? AND t.song_id = ?`, clipID, songID).
-		Scan(&p.trackID, &p.source.beatID, &p.source.activeTakeID, &p.source.lastTakeNumber,
+		Scan(&p.trackID, &p.source.beatID, &p.name, &p.source.activeTakeID, &p.source.lastTakeNumber,
 			&p.start, &p.offset, &p.length)
 	if errors.Is(err, sql.ErrNoRows) {
 		return placement{}, lyricsheet.ErrNotFound
