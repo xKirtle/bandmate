@@ -13,6 +13,7 @@
     change,
     drag,
     onUnsaved,
+    onEditing,
   }: {
     song: Song;
     /** Sends a Lyric Sheet change; resolves to whether it succeeded. */
@@ -20,7 +21,18 @@
     /** The drag of a Section, shared with the Lyric Sheet. */
     drag: SectionDragging;
     onUnsaved: (editor: object, unsaved: boolean) => void;
+    /**
+     * Hears a Section being opened, added, or moved into the Lyric Sheet, or
+     * an open one being changed, e.g. to end Sync mode.
+     */
+    onEditing?: () => void;
   } = $props();
+
+  // Adding a Section, or moving one into the Lyric Sheet, is heard.
+  function edit(op: (at: SongAt) => Promise<Song>): Promise<boolean> {
+    onEditing?.();
+    return change(op);
+  }
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
   const scrapbook = $derived(song.scrapbook.flatMap((id) => sections.get(id) ?? []));
@@ -29,8 +41,8 @@
   const inArrangement = $derived(sectionsInArrangement(song, sections));
   // Where a Section can be put back.
   const placesBack = $derived(places(inArrangement));
-  // The Section just added, whose Label gets focus.
-  let added = $state<number | null>(null);
+  // The Section just added or opened, whose Label gets focus.
+  let focusing = $state<number | null>(null);
   // The one Section shown in full, in its editor; the rest show as cards.
   let open = $state<number | null>(null);
   // Where to go once the open editor's edits are saved: another Section, or
@@ -41,9 +53,19 @@
 
   $effect(() => {
     if (next === undefined || unsaved.size > 0) return;
-    open = next;
+    const opening = next;
+    open = opening;
     next = undefined;
+    if (opening !== null) focusOnce(opening);
   });
+
+  // Focuses a Section's Label as its editor opens, but not again if it later
+  // comes back to the Scrapbook.
+  async function focusOnce(sectionId: number) {
+    focusing = sectionId;
+    await tick();
+    focusing = null;
+  }
 
   function track(editor: object, isUnsaved: boolean) {
     if (isUnsaved) {
@@ -55,6 +77,7 @@
   }
 
   function show(sectionId: number | null) {
+    if (sectionId !== null) onEditing?.();
     next = sectionId;
   }
 
@@ -66,14 +89,12 @@
   }
 
   async function add() {
-    if (!(await change((at) => api.addToScrapbook(at)))) return;
+    if (!(await edit((at) => api.addToScrapbook(at)))) return;
     // The newest Section has the highest id, so it comes last.
-    added = song.scrapbook.at(-1) ?? null;
+    const added = song.scrapbook.at(-1) ?? null;
     open = added;
     next = undefined;
-    // Focus it once, not again if it later comes back to the Scrapbook.
-    await tick();
-    added = null;
+    if (added !== null) focusOnce(added);
   }
 
   // What "Put back…" offers: putting a Section back at a place in the Lyric
@@ -81,7 +102,7 @@
   function putBackMenu(sectionId: number) {
     return putBackActions(
       inArrangement,
-      (position) => change((at) => api.addToArrangement(at, sectionId, position)).then(closed(sectionId)),
+      (position) => edit((at) => api.addToArrangement(at, sectionId, position)).then(closed(sectionId)),
       (targetId) => addTo(sectionId, targetId),
     );
   }
@@ -91,7 +112,7 @@
     // waiting in its open editor are saved first, while they can be: a drag
     // doesn't blur the text box.
     if (open === sectionId && document.activeElement instanceof HTMLElement) document.activeElement.blur();
-    change((at) => api.addToSection(at, sectionId, targetId)).then(closed(sectionId));
+    edit((at) => api.addToSection(at, sectionId, targetId)).then(closed(sectionId));
   }
 
   // On desktop, a Section is also dragged by its grip into a gap in the Lyric
@@ -100,7 +121,7 @@
   function dropSection(drop: Drop) {
     if ('putBack' in drop) {
       const section = drop.putBack;
-      change((at) => api.addToArrangement(at, section, drop.gap)).then(closed(section));
+      edit((at) => api.addToArrangement(at, section, drop.gap)).then(closed(section));
     } else if ('addTo' in drop && 'section' in drop.addTo.dragged) {
       const { dragged, arrangementAt } = drop.addTo;
       const target = song.arrangement[arrangementAt];
@@ -139,9 +160,10 @@
           {#if open === section.id}
             <SectionEditor
               {section}
-              autofocus={added === section.id}
+              autofocus={focusing === section.id}
               {change}
               onUnsaved={track}
+              {onEditing}
               more={[{ icon: '🗑', label: 'Delete for good', run: () => remove(section.id) }]}
               {drag}
               places={placesBack}
