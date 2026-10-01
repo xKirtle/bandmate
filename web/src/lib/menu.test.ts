@@ -1,5 +1,6 @@
 import { describe as group, expect, it } from 'vitest';
-import { fieldStep, menuKey, opensMenu } from './menu';
+import { KeyHints } from './keyHints';
+import { fieldHint, fieldStep, menuKey, opensMenu } from './menu';
 
 group('menuKey', () => {
   it('moves down and up through the entries, wrapping round', () => {
@@ -31,20 +32,44 @@ group('menuKey', () => {
 });
 
 group('fieldStep', () => {
-  const keys = { altKey: true, shiftKey: false, ctrlKey: false, metaKey: false };
+  const keys = { altKey: false, shiftKey: false, ctrlKey: false, metaKey: false };
   const field = { step: 1, shiftStep: 10 };
 
-  it('steps with Alt+Left and Alt+Right, by more with Shift', () => {
-    expect(fieldStep({ ...keys, key: 'ArrowLeft' }, 5, field)).toBe(4);
-    expect(fieldStep({ ...keys, key: 'ArrowRight' }, 5, field)).toBe(6);
-    expect(fieldStep({ ...keys, key: 'ArrowLeft', shiftKey: true }, 5, field)).toBe(-5);
-    expect(fieldStep({ ...keys, key: 'ArrowRight', shiftKey: true }, 5, field)).toBe(15);
+  it('steps with Down and Up, by more with Shift', () => {
+    expect(fieldStep({ ...keys, key: 'ArrowDown' }, 5, field)).toBe(4);
+    expect(fieldStep({ ...keys, key: 'ArrowUp' }, 5, field)).toBe(6);
+    expect(fieldStep({ ...keys, key: 'ArrowDown', shiftKey: true }, 5, field)).toBe(-5);
+    expect(fieldStep({ ...keys, key: 'ArrowUp', shiftKey: true }, 5, field)).toBe(15);
   });
 
-  it('leaves arrows without Alt, or with Ctrl, and other keys, to the field', () => {
-    expect(fieldStep({ ...keys, key: 'ArrowLeft', altKey: false }, 5, field)).toBeNull();
-    expect(fieldStep({ ...keys, key: 'ArrowRight', ctrlKey: true }, 5, field)).toBeNull();
-    expect(fieldStep({ ...keys, key: 'ArrowUp' }, 5, field)).toBeNull();
+  it('leaves Left and Right to move the text cursor, with Shift or Alt too', () => {
+    for (const key of ['ArrowLeft', 'ArrowRight']) {
+      expect(fieldStep({ ...keys, key }, 5, field)).toBeNull();
+      expect(fieldStep({ ...keys, key, shiftKey: true }, 5, field)).toBeNull();
+      expect(fieldStep({ ...keys, key, altKey: true }, 5, field)).toBeNull();
+      expect(fieldStep({ ...keys, key, altKey: true, shiftKey: true }, 5, field)).toBeNull();
+    }
+  });
+
+  it('leaves Down and Up with Alt or Ctrl, and other keys, alone', () => {
+    expect(fieldStep({ ...keys, key: 'ArrowUp', altKey: true }, 5, field)).toBeNull();
+    expect(fieldStep({ ...keys, key: 'ArrowDown', ctrlKey: true }, 5, field)).toBeNull();
+    expect(fieldStep({ ...keys, key: ' ' }, 5, field)).toBeNull();
+  });
+});
+
+group('fieldHint', () => {
+  const field = { step: 1, shiftStep: 10, unit: 'ms' };
+
+  it('names the keys that step a field, as this platform does', () => {
+    expect(fieldHint(field, new KeyHints('other', () => true))).toBe(
+      '↑ or ↓ steps it by 1 ms, or by 10 with Shift+↑ or Shift+↓',
+    );
+    expect(fieldHint(field, new KeyHints('mac', () => true))).toBe('↑ or ↓ steps it by 1 ms, or by 10 with ⇧↑ or ⇧↓');
+  });
+
+  it('gives no hint without a fine pointer', () => {
+    expect(fieldHint(field, new KeyHints('other', () => false))).toBeUndefined();
   });
 });
 

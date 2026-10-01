@@ -16,8 +16,6 @@ group('dialogGroups', () => {
         'Seek back or forward 5 s',
         'Seek back or forward 15 s',
         'Go to the start or end',
-        "Step a menu's number field by its step",
-        "Step a menu's number field by its Shift step",
       ],
       ['Cue the next Line', 'Nudge a Cue by 0.1 s'],
       ['Nudge a Take inside its Clip', 'Skip snapping', 'Zoom the Timeline'],

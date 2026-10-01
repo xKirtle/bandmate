@@ -1,10 +1,9 @@
 <script lang="ts">
   import { tick, type Snippet } from 'svelte';
   import { keyHints } from './keyHints';
-  import { fieldStep, menuKey, opensMenu, type MenuAction, type MenuChoice, type MenuField } from './menu';
+  import { fieldHint, fieldStep, menuKey, opensMenu, type MenuAction, type MenuChoice, type MenuField } from './menu';
   import { popoverLeft, popoverSide, popoverTop, type PopoverAlign } from './popover';
   import type { Point } from './press';
-  import { allKeys, shortcuts } from './shortcuts';
 
   let {
     entries,
@@ -28,15 +27,9 @@
     disabled?: boolean;
   } = $props();
 
-  // The keys that step a field, named as this platform does, e.g. ⌥← on a
-  // Mac, but only with a fine pointer: without one, the field has no hint.
+  // The field's tooltip names the keys that step it, but only with a fine
+  // pointer.
   const hints = keyHints();
-  function stepHint(f: MenuField): string | undefined {
-    const step = hints.twoWay(shortcuts.step);
-    if (!step) return undefined;
-    return `${step} steps it by ${f.step} ${f.unit}, or by ${f.shiftStep} with ${hints.twoWay(shortcuts.shiftStep)}`;
-  }
-  const fieldKeys = allKeys([shortcuts.step, shortcuts.shiftStep]);
 
   let open = $state(false);
   // The entry whose choices, or field, the menu shows in place of the entries, if any.
@@ -262,13 +255,12 @@
           {picking.label}
         </button>
         {#if field}
-          <label class="field" title={stepHint(field)}>
+          <label class="field" title={fieldHint(field, hints)}>
             <input
               type="number"
               step={field.step}
               bind:value={draft}
               bind:this={input}
-              aria-keyshortcuts={hints.aria(fieldKeys)}
               onkeydown={onFieldKey}
               onchange={() => setField(draft)}
             />

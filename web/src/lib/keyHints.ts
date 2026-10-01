@@ -26,8 +26,9 @@ export function finePointer(): boolean {
 /**
  * Names Shortcuts' keys in tooltips and hints, and declares them in
  * `aria-keyshortcuts`, as a platform does, but only with a fine pointer.
- * A control's usual keys, e.g. Enter saving a field, aren't Shortcuts, so
- * their hints are written out as they are.
+ * A control's usual keys aren't Shortcuts. Most are written out in a hint
+ * as they are, e.g. Enter saving a field, but a number box's ↑/↓ are named
+ * here too, so they show as the platform shows them.
  */
 export class KeyHints {
   #on: Platform;
@@ -43,7 +44,7 @@ export class KeyHints {
     return this.#finePointer() ? keysLabel(keys, this.#on) : null;
   }
 
-  /** Names a two-way Shortcut's keys, e.g. "⌥← or ⌥→", back first unless asked otherwise, or null without a fine pointer. */
+  /** Names two-way keys, e.g. a Shortcut's, "⌥↓ or ⌥↑", back first unless asked otherwise, or null without a fine pointer. */
   twoWay(shortcut: TwoWay, first: FirstWay = 'back'): string | null {
     return this.#finePointer() ? twoWayLabel(shortcut, this.#on, first) : null;
   }
