@@ -56,7 +56,8 @@
   import { repeats, timelineEnd, type Loop, type Placed } from './schedule';
   import { nameSound } from './soundName';
   import { inTextField } from './textField';
-  import { keyPlace, songKey } from './songKeys';
+  import { keyPlace } from './keyPlace';
+  import { songKey } from './songKeys';
   import { allKeys, shortcuts } from './shortcuts';
   import { clipAction, isModifier, rulerSeek, skipsSnapping, slips, zooms } from './timelineKeys';
   import { prepareUpload } from './upload';

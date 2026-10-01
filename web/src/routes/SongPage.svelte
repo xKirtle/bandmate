@@ -27,7 +27,8 @@
   import { finePointer, keyHints } from '../lib/keyHints';
   import { shortcutsDialogKeys } from '../lib/shortcuts';
   import ShortcutsDialog from '../lib/ShortcutsDialog.svelte';
-  import { keyPlace, opensShortcuts } from '../lib/songKeys';
+  import { keyPlace } from '../lib/keyPlace';
+  import { opensShortcuts } from '../lib/songKeys';
   import { detailsSummary, openingMode, sideParts, type Mode, type SidePart } from '../lib/songMode';
   import { timeAgo } from '../lib/time';
 

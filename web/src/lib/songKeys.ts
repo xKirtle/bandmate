@@ -1,24 +1,8 @@
 import { matches, shortcuts, shortcutsDialogKeys, type KeyDown } from './shortcuts';
-import { inTextField } from './textField';
+import type { KeyPlace } from './keyPlace';
 
 /** The Song-wide Shortcuts, which work wherever focus is on the Song page. */
 export type SongKey = 'playPause' | 'record' | 'undo' | 'redo';
-
-/** Where a key was pressed. */
-export type KeyPlace = {
-  /** A dialog is open, e.g. the shortcuts dialog. */
-  dialogOpen: boolean;
-  /** It was pressed in a text field, which takes typed keys. */
-  inTextField: boolean;
-};
-
-/** Where a key was pressed on the Song page: whether a dialog is open, and whether in a text field. */
-export function keyPlace(event: Event): KeyPlace {
-  return {
-    dialogOpen: document.querySelector('dialog[open]') !== null,
-    inTextField: inTextField(event.target),
-  };
-}
 
 /** Where a key was pressed, and what the Song page is doing. */
 export type SongKeyContext = KeyPlace & {
