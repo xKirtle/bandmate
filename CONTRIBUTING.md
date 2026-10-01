@@ -16,6 +16,7 @@ Whoever or whatever wrote it: AI-written pull requests are welcome, and held to 
 - **Follow [AGENTS.md](AGENTS.md).** It holds the repo's conventions, for people as much as for coding agents.
 - **Format the code.** Run `npm run format` in `web/` for the web app, and `gofmt` on Go code. CI fails a pull request whose web code isn't formatted.
 - **Add tests through the HTTP API.** See [Tests](#tests).
+- **Title it for the release notes.** The title becomes the pull request's line in them, so it names the change a self-hoster notices, not the code that changed.
 - **Label it** `enhancement`, `bug`, `documentation` or `refactor`, exactly one. The release notes are grouped by these labels, and leave out `refactor`, which is for a change no self-hoster would notice, such as a refactor, tooling or CI.
 
 ## Development
