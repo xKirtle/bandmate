@@ -1,4 +1,4 @@
-import { matches, shortcuts, way, type KeyPress } from './shortcuts';
+import { matches, shortcuts, stepBy, type KeyPress } from './shortcuts';
 
 /**
  * What a key does in an open menu of `count` entries, with entry `current`
@@ -71,9 +71,9 @@ export type MenuField = {
  * or null to leave the key alone.
  */
 export function fieldStep(e: KeyPress, value: number, field: Pick<MenuField, 'step' | 'shiftStep'>): number | null {
-  const near = way(e, shortcuts.step);
-  if (near) return near === 'back' ? value - field.step : value + field.step;
-  const far = way(e, shortcuts.shiftStep);
-  if (far) return far === 'back' ? value - field.shiftStep : value + field.shiftStep;
-  return null;
+  const by = stepBy(e, [
+    [shortcuts.step, field.step],
+    [shortcuts.shiftStep, field.shiftStep],
+  ]);
+  return by === null ? null : value + by;
 }

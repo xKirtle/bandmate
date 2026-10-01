@@ -5,6 +5,7 @@ import {
   keysLabel,
   matches,
   shortcuts,
+  stepBy,
   twoWayLabel,
   way,
   type Key,
@@ -158,6 +159,35 @@ group('way', () => {
     expect(way(press('ArrowUp'), shortcuts.seek)).toBe('forward');
     expect(way(press('ArrowUp', { shiftKey: true }), shortcuts.seek)).toBeNull();
     expect(way(press('ArrowUp', { shiftKey: true }), shortcuts.seekFar)).toBe('forward');
+  });
+});
+
+group('stepBy', () => {
+  const seeks = [
+    [shortcuts.seek, 5],
+    [shortcuts.seekFar, 15],
+  ] as const;
+
+  it('steps by the amount of the two-way Shortcut pressed, back as a negative one', () => {
+    expect(stepBy(press('ArrowLeft'), seeks)).toBe(-5);
+    expect(stepBy(press('ArrowUp'), seeks)).toBe(5);
+    expect(stepBy(press('ArrowDown', { shiftKey: true }), seeks)).toBe(-15);
+    expect(stepBy(press('ArrowRight', { shiftKey: true }), seeks)).toBe(15);
+  });
+
+  it('steps by the first of them whose key was pressed', () => {
+    expect(
+      stepBy(press('ArrowLeft'), [
+        [shortcuts.seek, 5],
+        [shortcuts.seek, 1],
+      ]),
+    ).toBe(-5);
+  });
+
+  it("doesn't step for a key that isn't one of their keys", () => {
+    expect(stepBy(press('Home'), seeks)).toBeNull();
+    expect(stepBy(press('ArrowLeft', { altKey: true }), seeks)).toBeNull();
+    expect(stepBy(press('ArrowLeft'), [])).toBeNull();
   });
 });
 

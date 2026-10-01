@@ -193,6 +193,22 @@ export function way(pressed: KeyPress, shortcut: TwoWay): 'back' | 'forward' | n
   return matches(pressed, shortcut.forward) ? 'forward' : null;
 }
 
+/** A two-way Shortcut and the amount it steps a value by, e.g. seeking and 5 s. */
+export type Step = readonly [shortcut: TwoWay, amount: number];
+
+/**
+ * How far a key press steps a value, given `steps`, e.g. seeking 5 s or
+ * 15 s: the amount of the first whose key it is, negative going back, or
+ * null if the press is none of their keys.
+ */
+export function stepBy(pressed: KeyPress, steps: readonly Step[]): number | null {
+  for (const [shortcut, amount] of steps) {
+    const going = way(pressed, shortcut);
+    if (going) return going === 'back' ? -amount : amount;
+  }
+  return null;
+}
+
 /** Which modifiers a platform's labels show: a Mac's symbols, or words elsewhere. */
 export type Platform = 'mac' | 'other';
 
