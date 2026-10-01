@@ -1,6 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { formatCue, nudgeCue, parseCue, playLabel } from './cues';
+  import { cueNudge } from './syncKeys';
 
   // A Line's Cue time, shown as m:ss.s in the gutter beside it. Clicking it
   // lets the time be typed: Enter or leaving the field saves, Esc cancels,
@@ -100,8 +101,8 @@
 
   /** Alt+↑/↓ saves the Cue, or the time typed, a tenth of a second later or earlier. */
   function nudge(e: KeyboardEvent): boolean {
-    const by = e.altKey && !e.ctrlKey && !e.metaKey ? ({ ArrowUp: 1, ArrowDown: -1 } as const)[e.key] : undefined;
-    if (by === undefined) return false;
+    const by = cueNudge(e);
+    if (by === null) return false;
     const from = editing ? (parseCue(text) ?? cue) : cue;
     if (from === null) return false;
     e.preventDefault();

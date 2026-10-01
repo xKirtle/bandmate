@@ -30,6 +30,7 @@
   import type { Mode } from './songMode';
   import { readShiftStep, shiftSteps, storeShiftStep, type ShiftStep } from './shiftStep';
   import { markSyncHintSeen, sawSyncHint } from './syncHint';
+  import { cuesNextLine } from './syncKeys';
   import { inTextField } from './textField';
   import { deviceStorage } from './timelineHeight';
 
@@ -287,11 +288,12 @@
   // In Sync mode, Enter cues anywhere but a text field or a dialog, even on
   // a button: syncing along shouldn't depend on where focus was left.
   function cueKey(event: KeyboardEvent) {
-    if (event.key !== 'Enter' || event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey)
-      return;
-    if (!syncing || event.defaultPrevented || inTextField(event.target)) return;
-    // Enter in a dialog or a ⋯ menu is for what's in it.
-    if (event.target instanceof Element && event.target.closest('dialog, [role="menu"]')) return;
+    const at = {
+      syncing,
+      inTextField: inTextField(event.target),
+      inDialogOrMenu: event.target instanceof Element && !!event.target.closest('dialog, [role="menu"]'),
+    };
+    if (!cuesNextLine(event, at)) return;
     event.preventDefault();
     cueNext();
   }
