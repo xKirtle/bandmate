@@ -137,7 +137,7 @@ The delay between what the user heard and what the mic captured, the full round 
 _Avoid_: Delay, lag
 
 **Nudge**:
-How far a Take has been moved by hand from where it was recorded, on top of its Latency Offset: typed in milliseconds in its Clip's menu, stepped with Alt+←/→, or set by Alt+dragging the Clip. Only the Take moves; its Clip stays where it is on the Timeline. A Take nudged earlier still reaches where it ended before, so its Clip can be trimmed out as far as before. A Cue can be nudged too, 0.1 s earlier or later with Alt+↓/↑ in Sync mode, so the verb covers both; but a Nudge, the amount, is only ever a Take's.
+How far a Take has been moved by hand from where it was recorded, on top of its Latency Offset: typed in milliseconds in its Clip's menu, or set by Alt+dragging the Clip. Only the Take moves; its Clip stays where it is on the Timeline. A Take nudged earlier still reaches where it ended before, so its Clip can be trimmed out as far as before. A Cue can be nudged too, 0.1 s earlier or later from its time, in Write mode only: nudging is for tidying Cues after syncing, not during it. So the verb covers both; but a Nudge, the amount, is only ever a Take's.
 _Avoid_: Shift, slip, offset (the Latency Offset is something else)
 
 **Input**:
