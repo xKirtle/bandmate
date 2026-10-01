@@ -32,10 +32,9 @@
   // Mac, but only with a fine pointer: without one, the field has no hint.
   const hints = keyHints();
   function stepHint(f: MenuField): string | undefined {
-    const step = hints.label(allKeys([shortcuts.step]));
-    const shiftStep = hints.label(allKeys([shortcuts.shiftStep]));
-    if (!step || !shiftStep) return undefined;
-    return `${step} steps it by ${f.step} ${f.unit}, or by ${f.shiftStep} with ${shiftStep}`;
+    const step = hints.twoWay(shortcuts.step);
+    if (!step) return undefined;
+    return `${step} steps it by ${f.step} ${f.unit}, or by ${f.shiftStep} with ${hints.twoWay(shortcuts.shiftStep)}`;
   }
   const fieldKeys = allKeys([shortcuts.step, shortcuts.shiftStep]);
 

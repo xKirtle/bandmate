@@ -45,6 +45,7 @@
     type HistoryEdit,
     type Saved,
   } from './history';
+  import { keyHints } from './keyHints';
   import { formatVolume, maxVolume, minVolume, trackGains, type Levels } from './mixer';
   import type { MenuAction } from './menu';
   import { peaks as peaksOf, peaksPerSecond } from './peaks';
@@ -57,7 +58,6 @@
   import { inTextField } from './textField';
   import { songKey } from './songKeys';
   import { allKeys, shortcuts } from './shortcuts';
-  import { keyHints } from './keyHints';
   import { clipAction, isModifier, rulerSeek, skipsSnapping, slips, zooms } from './timelineKeys';
   import { prepareUpload } from './upload';
   import { formatDuration } from './time';
@@ -2138,7 +2138,7 @@
       disabled={!undoable}
       aria-label="Undo"
       aria-keyshortcuts={hints.aria(shortcuts.undo.keys)}
-      title={hints.named('Undo', shortcuts.undo.keys)}>↶</button
+      title={hints.withKeys('Undo', shortcuts.undo.keys)}>↶</button
     >
     <button
       type="button"
@@ -2147,7 +2147,7 @@
       disabled={!redoable}
       aria-label="Redo"
       aria-keyshortcuts={hints.aria(shortcuts.redo.keys)}
-      title={hints.named('Redo', shortcuts.redo.keys)}>↷</button
+      title={hints.withKeys('Redo', shortcuts.redo.keys)}>↷</button
     >
   </span>
 {/snippet}
@@ -2191,7 +2191,7 @@
         onclick={toggle}
         aria-label={playerState === 'stopped' ? 'Play' : 'Pause'}
         aria-keyshortcuts={hints.aria(shortcuts.playPause.keys)}
-        title={hints.named('Play or pause', shortcuts.playPause.keys)}
+        title={hints.withKeys('Play or pause', shortcuts.playPause.keys)}
       >
         {#if playerState === 'stopped'}
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
@@ -2219,14 +2219,14 @@
         onclick={switchRecording}
         aria-keyshortcuts={hints.aria(shortcuts.record.keys)}
         title={capturing
-          ? hints.named('Stop recording', [...shortcuts.record.keys, ...shortcuts.playPause.keys])
+          ? hints.withKeys('Stop recording', [...shortcuts.record.keys, ...shortcuts.playPause.keys])
           : syncing
             ? 'Leave Sync mode to record'
             : playerState !== 'stopped'
               ? 'Stop playback to record'
               : recordProblem
                 ? recordProblem
-                : hints.named(
+                : hints.withKeys(
                     `Record a Take on ${timeline.tracks.find((t) => t.id === chosen)?.name ?? 'a new Track'}`,
                     shortcuts.record.keys,
                   )}><span class="record-dot" aria-hidden="true"></span>{capturing ? 'Stop' : 'Record'}</button

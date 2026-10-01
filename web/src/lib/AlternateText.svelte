@@ -218,7 +218,7 @@
               onclick={sync.now}
               aria-label="Cue {lineLabel} now"
               aria-keyshortcuts={hints.aria(cueNextKeys)}
-              title={hints.named('Cue this Line at the playhead', cueNextKeys)}
+              title={hints.withKeys('Cue this Line at the playhead', cueNextKeys)}
               >Now <span aria-hidden="true">⏎</span></button
             >
           {:else}

@@ -58,9 +58,8 @@
   // The keys that nudge the Cue, later then earlier, named as this platform
   // does, but only with a fine pointer.
   const hints = keyHints();
-  const nudgeKeys = allKeys([shortcuts.nudgeCue], 'forward');
-  const nudgeLabel = $derived(hints.label(nudgeKeys));
-  const nudgeAria = $derived(hints.aria(nudgeKeys));
+  const nudgeLabel = $derived(hints.twoWay(shortcuts.nudgeCue, 'forward'));
+  const nudgeAria = $derived(hints.aria(allKeys([shortcuts.nudgeCue], 'forward')));
 
   // Said first on hover, and after the time to screen readers.
   const outOfOrderNote = $derived(outOfOrder ? `Out of order. ${outOfOrder}.` : '');

@@ -7,18 +7,24 @@ const phone = () => new KeyHints('other', () => false);
 
 group('KeyHints', () => {
   it("names a Shortcut's keys after a hint with a fine pointer", () => {
-    expect(desktop('mac').named('Undo', shortcuts.undo.keys)).toBe('Undo (⌘Z)');
-    expect(desktop().named('Redo', shortcuts.redo.keys)).toBe('Redo (Ctrl+Shift+Z or Ctrl+Y)');
+    expect(desktop('mac').withKeys('Undo', shortcuts.undo.keys)).toBe('Undo (⌘Z)');
+    expect(desktop().withKeys('Redo', shortcuts.redo.keys)).toBe('Redo (Ctrl+Shift+Z or Ctrl+Y)');
   });
 
   it('leaves the keys off a hint without a fine pointer', () => {
-    expect(phone().named('Undo', shortcuts.undo.keys)).toBe('Undo');
+    expect(phone().withKeys('Undo', shortcuts.undo.keys)).toBe('Undo');
   });
 
   it("names a Shortcut's keys for a hint of its own only with a fine pointer", () => {
     expect(desktop('mac').label(shortcuts.cueNextLine.keys)).toBe('Enter');
     expect(desktop().label(allKeys([shortcuts.nudgeCue], 'forward'))).toBe('Alt+↑ or Alt+↓');
     expect(phone().label(shortcuts.cueNextLine.keys)).toBeNull();
+  });
+
+  it("names a two-way Shortcut's keys only with a fine pointer", () => {
+    expect(desktop('mac').twoWay(shortcuts.step)).toBe('⌥← or ⌥→');
+    expect(desktop().twoWay(shortcuts.nudgeCue, 'forward')).toBe('Alt+↑ or Alt+↓');
+    expect(phone().twoWay(shortcuts.step)).toBeNull();
   });
 
   it("declares a Shortcut's keys for aria-keyshortcuts only with a fine pointer", () => {

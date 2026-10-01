@@ -1,5 +1,14 @@
 import { MediaQuery } from 'svelte/reactivity';
-import { ariaKeyShortcuts, keysLabel, platform, type Key, type Platform } from './shortcuts';
+import {
+  ariaKeyShortcuts,
+  keysLabel,
+  platform,
+  twoWayLabel,
+  type FirstWay,
+  type Key,
+  type Platform,
+  type TwoWay,
+} from './shortcuts';
 
 // Made when first asked, as only a browser has media queries.
 let query: MediaQuery | undefined;
@@ -34,8 +43,13 @@ export class KeyHints {
     return this.#finePointer() ? keysLabel(keys, this.#on) : null;
   }
 
+  /** Names a two-way Shortcut's keys, e.g. "⌥← or ⌥→", back first unless asked otherwise, or null without a fine pointer. */
+  twoWay(shortcut: TwoWay, first: FirstWay = 'back'): string | null {
+    return this.#finePointer() ? twoWayLabel(shortcut, this.#on, first) : null;
+  }
+
   /** `text` with `keys` named after it, e.g. "Undo (⌘Z)", or just `text` without a fine pointer. */
-  named(text: string, keys: readonly Key[]): string {
+  withKeys(text: string, keys: readonly Key[]): string {
     const label = this.label(keys);
     return label ? `${text} (${label})` : text;
   }

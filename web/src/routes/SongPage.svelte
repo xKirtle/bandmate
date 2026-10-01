@@ -472,7 +472,7 @@
                   aria-label="Keyboard shortcuts"
                   aria-haspopup="dialog"
                   aria-keyshortcuts={hints.aria(shortcutsDialogKeys)}
-                  title={hints.named('Keyboard shortcuts', shortcutsDialogKeys)}>?</button
+                  title={hints.withKeys('Keyboard shortcuts', shortcutsDialogKeys)}>?</button
                 >
               {/if}
             </div>

@@ -19,6 +19,7 @@
   } from './cues';
   import { follower, lineKey } from './follow';
   import { gutterFields } from './gutter';
+  import { keyHints } from './keyHints';
   import LyricSheetView from './LyricSheetView.svelte';
   import ActionsMenu from './ActionsMenu.svelte';
   import type { MenuAction } from './menu';
@@ -29,7 +30,6 @@
   import { activeAlternate, addedNotice, describe, isEmpty, places, sectionsInArrangement } from './sections';
   import type { Mode } from './songMode';
   import { readShiftStep, shiftSteps, storeShiftStep, type ShiftStep } from './shiftStep';
-  import { keyHints } from './keyHints';
   import { shortcuts } from './shortcuts';
   import { markSyncHintSeen, sawSyncHint } from './syncHint';
   import { cuesNextLine } from './syncKeys';
