@@ -44,10 +44,10 @@
             </div>
             <!-- A two-way Shortcut's keys back, then forward, a line each. -->
             <span class="keys">
-              {#each row.keys as way, w (w)}
+              {#each row.keys as labels, w (w)}
                 <span class="way">
                   {#if w > 0}<span class="visually-hidden">, then</span>{/if}
-                  {#each way as key, k (k)}
+                  {#each labels as key, k (k)}
                     {#if k > 0}<span class="muted">or</span>{/if}
                     <kbd>{key}</kbd>
                   {/each}

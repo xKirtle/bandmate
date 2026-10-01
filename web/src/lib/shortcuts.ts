@@ -152,7 +152,8 @@ export const shortcuts = {
 
 /**
  * The key that opens the shortcuts dialog. It's the dialog's own key, so
- * the dialog doesn't list it: its button's tooltip names it.
+ * the dialog doesn't list it: its button's tooltip names it. Rebinding
+ * Shortcuts would need to count it as taken.
  */
 export const shortcutsDialogKeys: readonly Key[] = [{ key: '?' }];
 
