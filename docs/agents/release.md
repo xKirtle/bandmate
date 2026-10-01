@@ -15,11 +15,11 @@ For each PR merged since the tag, note its label and the issue it closes, and ro
 
 ## 3. Pick the version
 
-Apply CONTRIBUTING's "Versions" to the PRs' labels: any `enhancement` bumps the minor, only `bug` and `documentation` bump the patch, and `refactor` doesn't count.
+Apply CONTRIBUTING's "Versions" to the PRs' labels: any `enhancement` bumps the minor, only `bug` and `documentation` bump the patch, and a PR labelled `no-release-notes` doesn't count, whatever else it's labelled.
 
 ## 4. Clear the roadmap
 
-Every shipped feature leaves `docs/roadmap.md`. A wishlist idea that shipped in part keeps only its unshipped bullets. The README's Roadmap section names a few ideas as examples; swap out any that shipped. Open this as a `documentation` PR, merged before the tag so the release carries it.
+Every shipped feature leaves `docs/roadmap.md`. A wishlist idea that shipped in part keeps only its unshipped bullets. The README's Roadmap section names a few ideas as examples; swap out any that shipped. Open this as a PR labelled `documentation` and `no-release-notes`, merged before the tag so the release carries it.
 
 ## 5. Preview the notes
 
@@ -33,7 +33,7 @@ gh api repos/xKirtle/bandmate/releases/generate-notes \
 Every self-hoster reads them on the About page. Check each line reads as a change they'd notice, under the right heading, and note every line that doesn't. Each is fixed on its PR, where the notes come from:
 
 - A line that describes the code rather than what changed for a self-hoster gets a new title (`gh pr edit <number> --title`), which works on merged PRs too.
-- A line with nothing a self-hoster would notice gets the `refactor` label, which drops it from the notes.
+- A line with nothing a self-hoster would notice gets the `no-release-notes` label, which drops it from the notes.
 
 ## 6. Recommend, then stop
 

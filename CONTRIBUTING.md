@@ -17,7 +17,10 @@ Whoever or whatever wrote it: AI-written pull requests are welcome, and held to 
 - **Format the code.** Run `npm run format` in `web/` for the web app, and `gofmt` on Go code. CI fails a pull request whose web code isn't formatted.
 - **Add tests through the HTTP API.** See [Tests](#tests).
 - **Title it for the release notes.** The title becomes the pull request's line in them, so it names the change a self-hoster notices, not the code that changed.
-- **Label it** `enhancement`, `bug`, `documentation` or `refactor`, exactly one. The release notes are grouped by these labels, and leave out `refactor`, which is for a change no self-hoster would notice, such as a refactor, tooling or CI.
+- **Label it** for the release notes, which are grouped by `enhancement`, `bug` and `documentation` and leave out `no-release-notes`, whatever else a pull request is labelled:
+  - A feature gets `enhancement`, a fix `bug`, and a docs change `documentation`.
+  - Add `no-release-notes` to a change no self-hoster would read or notice. Docs describing Bandmate as it is, like the README, this file and the licence, go in the notes; the [roadmap](docs/roadmap.md), AGENTS.md, the agent docs and skills, the glossary and the ADRs get `no-release-notes`.
+  - A refactor, tooling or CI gets `no-release-notes` alone.
 
 ## Development
 
@@ -95,7 +98,7 @@ Vitest covers plain TypeScript modules in `web/src/lib` that don't touch the DOM
 
 ### Versions
 
-A release with any new feature bumps the minor version (v0.4.0 to v0.5.0), and one with only fixes bumps the patch (v0.4.0 to v0.4.1). `refactor` pull requests don't count: a release of only those isn't worth cutting. Versions aren't tied to the [roadmap](docs/roadmap.md): whatever has merged since the last release goes out together. v1.0.0 isn't planned yet.
+A release with any new feature bumps the minor version (v0.4.0 to v0.5.0), and one with only fixes bumps the patch (v0.4.0 to v0.4.1). `no-release-notes` pull requests don't count, whatever else they're labelled: a release of only those isn't worth cutting. Versions aren't tied to the [roadmap](docs/roadmap.md): whatever has merged since the last release goes out together. v1.0.0 isn't planned yet.
 
 ### Cutting a release
 

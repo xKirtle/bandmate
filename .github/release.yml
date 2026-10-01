@@ -1,9 +1,9 @@
 # Groups the auto-generated notes of a GitHub release by the labels on its
-# pull requests. The rule for which label a pull request gets lives in
-# AGENTS.md's "Pull request titles and labels" section.
+# pull requests. The rule for which labels a pull request gets lives in
+# CONTRIBUTING.md's "Label it".
 changelog:
   exclude:
-    labels: [refactor]
+    labels: [no-release-notes]
   categories:
     - title: Features
       labels: [enhancement]
