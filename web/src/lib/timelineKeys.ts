@@ -29,9 +29,13 @@ export function rulerSeek(e: KeyPress, position: number, length: number): number
     [shortcuts.seekFar, 15],
   ]);
   if (by !== null) return position + by;
-  const end = way(e, shortcuts.startOrEnd);
-  if (end) return end === 'back' ? 0 : length;
-  return null;
+  const going = way(e, shortcuts.startOrEnd);
+  return going ? startOrEnd(going, length) : null;
+}
+
+/** The start of a Timeline `length` long, going back, or its end, going forward: where Home and End, and their buttons, go. */
+export function startOrEnd(going: 'back' | 'forward', length: number): number {
+  return going === 'back' ? 0 : length;
 }
 
 /** Whether a key is a modifier, which, pressed or let go mid-drag, may make the drag a Shortcut, or stop it being one. */
