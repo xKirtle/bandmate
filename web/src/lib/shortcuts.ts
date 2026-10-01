@@ -144,7 +144,8 @@ export const shortcuts = {
     name: 'Zoom the Timeline',
     group: 'Mouse',
     description: 'Zooms the Timeline in or out around the pointer.',
-    // A trackpad's pinch zooms too, whatever these are.
+    // A trackpad's pinch zooms too, whatever these are: a browser sends
+    // it as a Ctrl wheel event.
     keys: [{ key: 'wheel', mod: true }],
   },
 } as const satisfies Record<string, Shortcut>;

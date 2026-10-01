@@ -2047,7 +2047,7 @@
     const lanes = lanesWrapElement;
     if (!lanes) return;
     const wheel = (event: WheelEvent) => {
-      // A trackpad's pinch comes as Ctrl+wheel too.
+      // So does a trackpad's pinch, which comes as a Ctrl wheel event.
       if (!zooms(event)) return;
       event.preventDefault();
       // A mouse wheel's notch is about 100px, or 3 lines of about 33px:

@@ -118,7 +118,7 @@ group('zooms', () => {
     expect(zooms(held({ altKey: true }))).toBe(false);
   });
 
-  it('takes Mod only on its own, a pinch aside', () => {
+  it('takes Mod only on its own, though a Ctrl wheel event zooms with any modifiers, as it may be a pinch', () => {
     expect(zooms(held({ metaKey: true, altKey: true }))).toBe(false);
     expect(zooms(held({ metaKey: true, shiftKey: true }))).toBe(false);
   });
