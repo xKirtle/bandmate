@@ -3,6 +3,7 @@
   import { fieldStep, menuKey, opensMenu, type MenuAction, type MenuChoice, type MenuField } from './menu';
   import { popoverLeft, popoverSide, popoverTop, type PopoverAlign } from './popover';
   import type { Point } from './press';
+  import { allKeys, ariaKeyShortcuts, platform, shortcuts, twoWayLabel } from './shortcuts';
 
   let {
     entries,
@@ -25,6 +26,12 @@
     /** Keeps the menu from opening, e.g. while what it acts on is busy. */
     disabled?: boolean;
   } = $props();
+
+  // The keys that step a field, named as this platform does, e.g. ⌥← on a Mac.
+  const on = platform();
+  const stepHint = (f: MenuField) =>
+    `${twoWayLabel(shortcuts.step, on)} steps it by ${f.step} ${f.unit}, or by ${f.shiftStep} with ${twoWayLabel(shortcuts.shiftStep, on)}`;
+  const fieldAria = ariaKeyShortcuts(allKeys([shortcuts.step, shortcuts.shiftStep]), on);
 
   let open = $state(false);
   // The entry whose choices, or field, the menu shows in place of the entries, if any.
@@ -250,15 +257,13 @@
           {picking.label}
         </button>
         {#if field}
-          <label
-            class="field"
-            title="Alt+← and Alt+→ step it by {field.step} {field.unit}, or {field.shiftStep} with Shift"
-          >
+          <label class="field" title={stepHint(field)}>
             <input
               type="number"
               step={field.step}
               bind:value={draft}
               bind:this={input}
+              aria-keyshortcuts={fieldAria}
               onkeydown={onFieldKey}
               onchange={() => setField(draft)}
             />

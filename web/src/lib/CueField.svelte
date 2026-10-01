@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { formatCue, nudgeCue, parseCue, playLabel } from './cues';
-  import { ariaKeyShortcuts, keysLabel, platform, shortcuts } from './shortcuts';
+  import { allKeys, ariaKeyShortcuts, platform, shortcuts, twoWayLabel } from './shortcuts';
   import { cueNudge } from './syncKeys';
 
   // A Line's Cue time, shown as m:ss.s in the gutter beside it. Clicking it
@@ -56,9 +56,8 @@
 
   // The keys that nudge the Cue, later then earlier, named as this platform does.
   const on = platform();
-  const nudgeKeys = [...shortcuts.nudgeCue.forward, ...shortcuts.nudgeCue.back];
-  const nudgeLabel = keysLabel(nudgeKeys, on);
-  const nudgeAria = ariaKeyShortcuts(nudgeKeys, on);
+  const nudgeLabel = twoWayLabel(shortcuts.nudgeCue, on, 'forward');
+  const nudgeAria = ariaKeyShortcuts(allKeys([shortcuts.nudgeCue], 'forward'), on);
 
   // Said first on hover, and after the time to screen readers.
   const outOfOrderNote = $derived(outOfOrder ? `Out of order. ${outOfOrder}.` : '');

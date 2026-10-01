@@ -61,4 +61,9 @@ group('opensMenu', () => {
     expect(opensMenu({ ...keys, key: 'F10', shiftKey: true, ctrlKey: true })).toBe(false);
     expect(opensMenu({ ...keys, key: 'Enter' })).toBe(false);
   });
+
+  it('takes the Menu key only on its own', () => {
+    expect(opensMenu({ ...keys, key: 'ContextMenu', ctrlKey: true })).toBe(false);
+    expect(opensMenu({ ...keys, key: 'ContextMenu', shiftKey: true })).toBe(false);
+  });
 });
