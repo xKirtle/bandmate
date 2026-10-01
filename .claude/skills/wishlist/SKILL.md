@@ -1,11 +1,13 @@
 ---
 name: wishlist
-description: Add ideas to the roadmap's wishlist in docs/roadmap.md and open a PR for them. Use when the user hands over feature ideas to remember, or to grill later.
+description: Add ideas to the roadmap's wishlist in docs/roadmap.md, in its open wishlist PR. Use when the user hands over feature ideas to remember, or to grill later.
 ---
 
 The user is jotting ideas down, not specifying them: record each one as they said it, and leave grilling it for its spec session.
 
-1. Branch from an up-to-date `main` as `docs/wishlist-<short-slug>`.
+Ideas collect in one open **wishlist PR**, labelled `documentation` and `no-release-notes` and titled "Add … to the wishlist". Only the user merges or closes it; until then, every new idea joins it.
+
+1. Find the wishlist PR: `gh pr list --state open --label no-release-notes --json number,title,headRefName` and take the one whose title ends "to the wishlist". With one, check out its branch and pull. With none, branch from an up-to-date `main` as `docs/wishlist-<short-slug>`.
 
 2. Read `CONTEXT.md` and `docs/roadmap.md`. For each idea, append a `## <Name>` section to `docs/roadmap.md`, matching the existing entries:
    - The heading names the feature as a noun phrase ("Merging Clips", "Playback speed").
@@ -17,6 +19,6 @@ The user is jotting ideas down, not specifying them: record each one as they sai
 
    Done when every idea the user gave has its section, each open question you spotted is named in one, and the page still reads in the same voice.
 
-3. Commit as "Add <ideas> to the wishlist". Push, and open a PR with the same title, labelled `documentation` and `no-release-notes`, with no issue: a wishlist entry changes no behaviour, so it skips the issue every other change gets. The body lists each idea in one bullet: its name in bold, what it does, and what's left to the spec.
+3. Commit as "Add <ideas> to the wishlist", and push. Open the wishlist PR if there was none, with no issue: a wishlist entry changes no behaviour, so it skips the issue every other change gets. Either way, its title names every idea it now adds ("Add <ideas> to the wishlist"), and its body lists each in one bullet: its name in bold, what it does, and what's left to the spec.
 
-4. Leave the PR open for the user to merge. Hand back its link, each idea in a line, and any naming choice you made for them, so they can veto it.
+4. Hand back the PR's link, each new idea in a line, and any naming choice you made for them, so the user can veto it.
