@@ -95,6 +95,19 @@ a {
   color: var(--accent);
 }
 
+/* While a modal dialog is open the page behind it stays put, whichever
+   dialog it is. A dialog too tall for the window scrolls itself, and
+   scrolling past its ends stops there rather than carrying on into the page.
+   The scrollbar's room stays, so a long page doesn't shift sideways behind
+   the dialog. */
+:root:has(dialog:modal) {
+  overflow: hidden;
+  scrollbar-gutter: stable;
+}
+dialog {
+  overscroll-behavior: contain;
+}
+
 /* The page leaves room for the tab bar, which the nav rail replaces on wide
    windows. */
 body {
