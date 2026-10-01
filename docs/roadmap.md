@@ -71,7 +71,8 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 
 - Show how to play the Lyric Sheet's Chords on a guitar, as Ultimate Guitar does: a fretboard diagram for each Chord the Song uses.
 - Guitar only for now. Instruments are kept as data (strings, tuning, frets), so a ukulele or a bass can be added later without reworking the diagrams.
-- Diagrams follow the Song's tuning and capo. A Chord name that can't be read gets no diagram rather than a guess. Which voicings are shown, how a diagram is reached (hovering a Chord, a strip above the sheet), and whether it works in Write mode too, are for the spec.
+- Diagrams show and hide with the Chords, through Read mode's "Show chords" (the "Chords" button, once the toggle above is done). Hiding the Chords hides the diagrams too.
+- Diagrams follow the Song's tuning and capo. A Chord name that can't be read gets no diagram rather than a guess. Which voicings are shown, how a diagram is reached (hovering a Chord, a strip above the sheet), and whether Write mode shows them too, are for the spec.
 
 ## A Chord Library
 
