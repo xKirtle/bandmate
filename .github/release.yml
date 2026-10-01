@@ -2,6 +2,8 @@
 # pull requests. The rule for which label a pull request gets lives in
 # AGENTS.md's "Pull request labels" section.
 changelog:
+  exclude:
+    labels: [refactor]
   categories:
     - title: Features
       labels: [enhancement]
