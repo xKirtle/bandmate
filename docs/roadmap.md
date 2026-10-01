@@ -101,3 +101,8 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 
 - Merge two or more Clips into one Clip that runs from the earliest Clip's start to the latest Clip's end, and sounds as playback of those Clips would: where they overlap they play together, and a gap between them is silence.
 - It's not a Mixdown, which is downloaded and never kept: the merged Clip stays on the Timeline. Whether the Clips can be on different Tracks (and whose volume, mute and solo apply), which Track the result lands on, whether the merged audio becomes a Sound, and whether undo brings the original Clips back, are for the spec.
+
+## Moving several Clips at once
+
+- Select several Clips, across Tracks, and drag them together by the same amount, so they keep their places relative to each other. Today a drag moves one Clip, and Snapping only lines Clips up edge to edge, so it can't keep three Clips that start at different times in step.
+- Selecting several Clips is what Merging Clips needs too, so the two may share it. How Clips are picked (Shift or Ctrl+click, a box dragged around them), whether the group snaps by any of its Clips' edges, whether it can move between Tracks together, and what stops it (the Timeline's start, another Clip in the way), are for the spec.
