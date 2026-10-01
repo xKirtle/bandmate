@@ -5,7 +5,7 @@
  */
 
 import { opensMenu } from './menu';
-import { matches, shortcuts, way, type Key, type KeyPress } from './shortcuts';
+import { matches, shortcuts, stepBy, way, type Key, type KeyPress } from './shortcuts';
 
 /** The modifiers held with a pointer or wheel event, or a key press. */
 export type Modifiers = Omit<KeyPress, 'key'>;
@@ -24,10 +24,11 @@ export function clipAction(e: KeyPress): 'delete' | 'menu' | null {
 
 /** Where a key press on the ruler seeks to, from `position` on a Timeline `length` long, or null if it doesn't. */
 export function rulerSeek(e: KeyPress, position: number, length: number): number | null {
-  const near = way(e, shortcuts.seek);
-  if (near) return near === 'back' ? position - 5 : position + 5;
-  const far = way(e, shortcuts.seekFar);
-  if (far) return far === 'back' ? position - 15 : position + 15;
+  const by = stepBy(e, [
+    [shortcuts.seek, 5],
+    [shortcuts.seekFar, 15],
+  ]);
+  if (by !== null) return position + by;
   const end = way(e, shortcuts.startOrEnd);
   if (end) return end === 'back' ? 0 : length;
   return null;
