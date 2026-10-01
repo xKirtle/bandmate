@@ -5,7 +5,7 @@
  */
 
 import { opensMenu } from './menu';
-import { matches, shortcuts, stepBy, way, type Key, type KeyPress } from './shortcuts';
+import { matches, shortcuts, stepBy, way, type Key, type KeyPress, type Way } from './shortcuts';
 
 /** The modifiers held with a pointer or wheel event, or a key press. */
 export type Modifiers = Omit<KeyPress, 'key'>;
@@ -33,8 +33,8 @@ export function rulerSeek(e: KeyPress, position: number, length: number): number
   return going ? startOrEnd(going, length) : null;
 }
 
-/** The start of a Timeline `length` long, going back, or its end, going forward: where Home and End, and their buttons, go. */
-export function startOrEnd(going: 'back' | 'forward', length: number): number {
+/** The start of a Timeline `length` long, going back, or its end, going forward: where its keys and its buttons go. */
+export function startOrEnd(going: Way, length: number): number {
   return going === 'back' ? 0 : length;
 }
 

@@ -58,7 +58,7 @@
   import { inTextField } from './textField';
   import { keyPlace } from './keyPlace';
   import { songKey } from './songKeys';
-  import { allKeys, shortcuts } from './shortcuts';
+  import { allKeys, shortcuts, type Way } from './shortcuts';
   import { clipAction, isModifier, nudges, rulerSeek, skipsSnapping, startOrEnd, zooms } from './timelineKeys';
   import { prepareUpload } from './upload';
   import { formatDuration } from './time';
@@ -2152,7 +2152,7 @@
   </span>
 {/snippet}
 
-{#snippet skip(going: 'back' | 'forward')}
+{#snippet toStartOrEnd(going: Way)}
   {@const keys = shortcuts.startOrEnd[going]}
   {@const text = going === 'back' ? 'Go to the start' : 'Go to the end'}
   <button
@@ -2162,7 +2162,7 @@
     disabled={recording !== null}
     aria-label={text}
     aria-keyshortcuts={hints.aria(keys)}
-    title={recording ? 'Stop recording to move the playhead' : hints.withKeys(text, keys)}
+    title={recording !== null ? 'Stop recording to move the playhead' : hints.withKeys(text, keys)}
   >
     <svg viewBox="0 0 24 24" aria-hidden="true">
       {#if going === 'back'}
@@ -2208,7 +2208,7 @@
   <div class="inner">
     <div class="transport">
       <span class="playback">
-        {@render skip('back')}
+        {@render toStartOrEnd('back')}
         <button
           type="button"
           class="play"
@@ -2223,7 +2223,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /></svg>
           {/if}
         </button>
-        {@render skip('forward')}
+        {@render toStartOrEnd('forward')}
       </span>
       <span class="time muted">{formatDuration(position)} / {formatDuration(length)}</span>
       <button

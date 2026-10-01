@@ -173,8 +173,11 @@ export function matches(pressed: KeyPress, keys: readonly Key[]): boolean {
   return keys.some((key) => same(pressed, key));
 }
 
+/** A way a two-way Shortcut goes. */
+export type Way = 'back' | 'forward';
+
 /** Which way a key press sends a two-way Shortcut, or null if it isn't one of its keys. */
-export function way(pressed: KeyPress, shortcut: TwoWay): 'back' | 'forward' | null {
+export function way(pressed: KeyPress, shortcut: TwoWay): Way | null {
   if (matches(pressed, shortcut.back)) return 'back';
   return matches(pressed, shortcut.forward) ? 'forward' : null;
 }
@@ -238,7 +241,7 @@ export function keysLabel(keys: readonly Key[], on: Platform): string {
 }
 
 /** Which of a two-way Shortcut's ways is named first. */
-export type FirstWay = 'back' | 'forward';
+export type FirstWay = Way;
 
 /** Every key of two-way Shortcuts, e.g. for `aria-keyshortcuts`: each one's back keys then its forward keys, or forward first. */
 export function allKeys(ways: readonly TwoWay[], first: FirstWay = 'back'): Key[] {
