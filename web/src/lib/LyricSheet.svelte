@@ -317,7 +317,7 @@
   let showChords = $derived(readChordsShown(deviceStorage(), songId));
 
   // Whether Chord Lines are on screen: always in Write mode, which shows the raw text.
-  const chordsShown = $derived(mode === 'write' || (showChords && songHasChords));
+  const chordsOnScreen = $derived(mode === 'write' || (showChords && songHasChords));
 
   function toggleChords() {
     showChords = !showChords;
@@ -496,7 +496,7 @@
   {/if}
 
   {#if mode === 'read'}
-    <LyricSheetView {song} showChords={chordsShown} {current} play={leadInto} />
+    <LyricSheetView {song} showChords={chordsOnScreen} {current} play={leadInto} />
   {:else}
     <ol
       class="arrangement"
