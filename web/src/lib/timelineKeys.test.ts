@@ -1,15 +1,6 @@
 import { describe as group, expect, it } from 'vitest';
 import type { KeyPress } from './shortcuts';
-import { clipAction, rulerSeek, skipsSnapping, slips, zooms, type Modifiers } from './timelineKeys';
-
-const press = (key: string, mods: Partial<Modifiers> = {}): KeyPress => ({
-  key,
-  ctrlKey: false,
-  metaKey: false,
-  altKey: false,
-  shiftKey: false,
-  ...mods,
-});
+import { clipAction, isModifier, rulerSeek, skipsSnapping, slips, zooms, type Modifiers } from './timelineKeys';
 
 const held = (mods: Partial<Modifiers> = {}): Modifiers => ({
   ctrlKey: false,
@@ -18,6 +9,8 @@ const held = (mods: Partial<Modifiers> = {}): Modifiers => ({
   shiftKey: false,
   ...mods,
 });
+
+const press = (key: string, mods: Partial<Modifiers> = {}): KeyPress => ({ key, ...held(mods) });
 
 group('clipAction', () => {
   it('deletes the Clip on Delete and Backspace', () => {
@@ -132,5 +125,13 @@ group('zooms', () => {
 
   it('zooms on a pinch, whatever the keys given for it', () => {
     expect(zooms(held({ ctrlKey: true }), [{ key: 'wheel', alt: true }])).toBe(true);
+  });
+});
+
+group('isModifier', () => {
+  it('tells the modifiers from other keys', () => {
+    for (const key of ['Shift', 'Alt', 'Control', 'Meta']) expect(isModifier(key)).toBe(true);
+    expect(isModifier('a')).toBe(false);
+    expect(isModifier('Escape')).toBe(false);
   });
 });

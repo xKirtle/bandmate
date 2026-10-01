@@ -57,7 +57,7 @@
   import { inTextField } from './textField';
   import { songKey } from './songKeys';
   import { ariaKeyShortcuts, keysLabel, platform, shortcuts, type OneWay } from './shortcuts';
-  import { clipAction, rulerSeek, skipsSnapping, slips, zooms } from './timelineKeys';
+  import { clipAction, isModifier, rulerSeek, skipsSnapping, slips, zooms } from './timelineKeys';
   import { prepareUpload } from './upload';
   import { formatDuration } from './time';
   import { tracksDropped, type TrackDrop } from './trackDrag';
@@ -1477,12 +1477,9 @@
     window.addEventListener('pointermove', editMove);
     window.addEventListener('pointerup', editUp);
     window.addEventListener('pointercancel', editCancel);
-    window.addEventListener('keydown', editShift);
-    window.addEventListener('keyup', editShift);
+    window.addEventListener('keydown', editModifier);
+    window.addEventListener('keyup', editModifier);
   }
-
-  // Held with a drag, they may make it a Shortcut, or stop it being one.
-  const modifierKeys = ['Shift', 'Alt', 'Control', 'Meta'];
 
   /** Where the pointer last dragged a Clip to. */
   let editAt: Point = { clientX: 0, clientY: 0 };
@@ -1490,8 +1487,8 @@
   // A modifier pressed or let go mid-move or mid-trim, e.g. the Shift that
   // skips snapping, snaps or frees the Clip there and then, without waiting
   // for the pointer to move.
-  function editShift(event: KeyboardEvent) {
-    if (!modifierKeys.includes(event.key) || !edit?.moved || edit.mode === 'nudge' || edit.saving) return;
+  function editModifier(event: KeyboardEvent) {
+    if (!isModifier(event.key) || !edit?.moved || edit.mode === 'nudge' || edit.saving) return;
     edit.free = skipsSnapping(event);
     editMove(editAt);
   }
@@ -1598,8 +1595,8 @@
     window.removeEventListener('pointermove', editMove);
     window.removeEventListener('pointerup', editUp);
     window.removeEventListener('pointercancel', editCancel);
-    window.removeEventListener('keydown', editShift);
-    window.removeEventListener('keyup', editShift);
+    window.removeEventListener('keydown', editModifier);
+    window.removeEventListener('keyup', editModifier);
   }
   onDestroy(stopListening);
 
@@ -1850,8 +1847,8 @@
       edge && current
         ? { ...common, mode: edge, anchor: edge === 'start' ? current.end : current.start, loop: current }
         : { ...common, mode: 'new', anchor: t, loop: { start: t, end: t, on: true } };
-    window.addEventListener('keydown', loopShift);
-    window.addEventListener('keyup', loopShift);
+    window.addEventListener('keydown', loopModifier);
+    window.addEventListener('keyup', loopModifier);
   }
 
   /** Where the pointer last dragged the Loop to. */
@@ -1860,8 +1857,8 @@
   // A modifier pressed or let go mid-drag, e.g. the Shift that skips
   // snapping, snaps or frees the Loop there and then, without waiting for
   // the pointer to move.
-  function loopShift(event: KeyboardEvent) {
-    if (!modifierKeys.includes(event.key) || !loopEdit?.moved || loopEdit.saving) return;
+  function loopModifier(event: KeyboardEvent) {
+    if (!isModifier(event.key) || !loopEdit?.moved || loopEdit.saving) return;
     loopEdit.free = skipsSnapping(event);
     loopMove(loopAt);
   }
@@ -1888,8 +1885,8 @@
 
   function stopLoopListening() {
     dragDone();
-    window.removeEventListener('keydown', loopShift);
-    window.removeEventListener('keyup', loopShift);
+    window.removeEventListener('keydown', loopModifier);
+    window.removeEventListener('keyup', loopModifier);
   }
   onDestroy(stopLoopListening);
 
@@ -2519,7 +2516,7 @@
                     role="group"
                     aria-label="{title}, {formatDuration(at.start)} to {formatDuration(at.start + at.length)}"
                     tabindex={editable.current ? 0 : undefined}
-                    aria-keyshortcuts={editable.current ? clipAria : undefined}
+                    aria-keyshortcuts={editable.current && clip.id !== recording?.clipId ? clipAria : undefined}
                     onpointerdown={(e) => editDown(e, clip, 'move')}
                     onkeydown={(e) => clipKey(e, clip)}
                     oncontextmenu={(e) => clipContextMenu(e, clip)}
