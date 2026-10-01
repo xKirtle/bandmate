@@ -35,6 +35,12 @@ group('clipAction', () => {
     expect(clipAction(press('Enter'))).toBeNull();
     expect(clipAction(press('d'))).toBeNull();
   });
+
+  it('takes each key only with its exact modifiers', () => {
+    expect(clipAction(press('Backspace', { ctrlKey: true }))).toBeNull();
+    expect(clipAction(press('Delete', { shiftKey: true }))).toBeNull();
+    expect(clipAction(press('ContextMenu', { altKey: true }))).toBeNull();
+  });
 });
 
 group('rulerSeek', () => {
@@ -65,6 +71,14 @@ group('rulerSeek', () => {
     expect(rulerSeek(press(' '), position, length)).toBeNull();
     expect(rulerSeek(press('PageUp'), position, length)).toBeNull();
   });
+
+  it('takes each key only with its exact modifiers', () => {
+    expect(rulerSeek(press('ArrowLeft', { ctrlKey: true }), position, length)).toBeNull();
+    expect(rulerSeek(press('ArrowRight', { altKey: true }), position, length)).toBeNull();
+    expect(rulerSeek(press('ArrowUp', { metaKey: true, shiftKey: true }), position, length)).toBeNull();
+    expect(rulerSeek(press('Home', { shiftKey: true }), position, length)).toBeNull();
+    expect(rulerSeek(press('End', { ctrlKey: true }), position, length)).toBeNull();
+  });
 });
 
 group('slips', () => {
@@ -75,6 +89,11 @@ group('slips', () => {
   it('moves the Clip when dragged without Alt', () => {
     expect(slips(held())).toBe(false);
     expect(slips(held({ shiftKey: true }))).toBe(false);
+  });
+
+  it('takes Alt only on its own', () => {
+    expect(slips(held({ altKey: true, shiftKey: true }))).toBe(false);
+    expect(slips(held({ altKey: true, ctrlKey: true }))).toBe(false);
   });
 });
 
@@ -87,6 +106,11 @@ group('skipsSnapping', () => {
     expect(skipsSnapping(held())).toBe(false);
     expect(skipsSnapping(held({ altKey: true }))).toBe(false);
   });
+
+  it('takes Shift only on its own', () => {
+    expect(skipsSnapping(held({ shiftKey: true, ctrlKey: true }))).toBe(false);
+    expect(skipsSnapping(held({ shiftKey: true, altKey: true }))).toBe(false);
+  });
 });
 
 group('zooms', () => {
@@ -98,5 +122,15 @@ group('zooms', () => {
     expect(zooms(held())).toBe(false);
     expect(zooms(held({ shiftKey: true }))).toBe(false);
     expect(zooms(held({ altKey: true }))).toBe(false);
+  });
+
+  it('zooms on the keys given for it', () => {
+    const altWheel = [{ key: 'wheel', alt: true }];
+    expect(zooms(held({ altKey: true }), altWheel)).toBe(true);
+    expect(zooms(held({ shiftKey: true }), altWheel)).toBe(false);
+  });
+
+  it('zooms on a pinch, whatever the keys given for it', () => {
+    expect(zooms(held({ ctrlKey: true }), [{ key: 'wheel', alt: true }])).toBe(true);
   });
 });

@@ -397,6 +397,12 @@
   const on = platform();
   const keysOf = (shortcut: OneWay) => keysLabel(shortcut.keys, on);
   const ariaOf = (shortcut: OneWay) => ariaKeyShortcuts(shortcut.keys, on);
+  // What a focused Clip and the ruler declare as their keys.
+  const clipAria = ariaKeyShortcuts([...shortcuts.deleteClip.keys, ...shortcuts.clipMenu.keys], on);
+  const rulerAria = ariaKeyShortcuts(
+    [shortcuts.seek, shortcuts.seekFar, shortcuts.startOrEnd].flatMap((s) => [...s.back, ...s.forward]),
+    on,
+  );
 
   function keydown(event: KeyboardEvent) {
     if (trackDrag.current && event.key === 'Escape') {
@@ -1475,14 +1481,18 @@
     window.addEventListener('keyup', editShift);
   }
 
+  // Held with a drag, they may make it a Shortcut, or stop it being one.
+  const modifierKeys = ['Shift', 'Alt', 'Control', 'Meta'];
+
   /** Where the pointer last dragged a Clip to. */
   let editAt: Point = { clientX: 0, clientY: 0 };
 
-  // Shift pressed or let go mid-move or mid-trim snaps or frees the Clip
-  // there and then, without waiting for the pointer to move.
+  // A modifier pressed or let go mid-move or mid-trim, e.g. the Shift that
+  // skips snapping, snaps or frees the Clip there and then, without waiting
+  // for the pointer to move.
   function editShift(event: KeyboardEvent) {
-    if (event.key !== 'Shift' || !edit?.moved || edit.mode === 'nudge' || edit.saving) return;
-    edit.free = event.type === 'keydown';
+    if (!modifierKeys.includes(event.key) || !edit?.moved || edit.mode === 'nudge' || edit.saving) return;
+    edit.free = skipsSnapping(event);
     editMove(editAt);
   }
 
@@ -1736,7 +1746,7 @@
       {
         icon: '↔',
         label: 'Nudge',
-        title: `Move Take ${active.number} within the Clip, in milliseconds, later if positive; or Alt+drag the Clip`,
+        title: `Move Take ${active.number} within the Clip, in milliseconds, later if positive; or ${keysOf(shortcuts.slip)} the Clip`,
         field: {
           value: Math.round(active.nudge * 1000),
           unit: 'ms',
@@ -1847,11 +1857,12 @@
   /** Where the pointer last dragged the Loop to. */
   let loopAt: Point = { clientX: 0, clientY: 0 };
 
-  // Shift pressed or let go mid-drag snaps or frees the Loop there and then,
-  // without waiting for the pointer to move.
+  // A modifier pressed or let go mid-drag, e.g. the Shift that skips
+  // snapping, snaps or frees the Loop there and then, without waiting for
+  // the pointer to move.
   function loopShift(event: KeyboardEvent) {
-    if (event.key !== 'Shift' || !loopEdit?.moved || loopEdit.saving) return;
-    loopEdit.free = event.type === 'keydown';
+    if (!modifierKeys.includes(event.key) || !loopEdit?.moved || loopEdit.saving) return;
+    loopEdit.free = skipsSnapping(event);
     loopMove(loopAt);
   }
 
@@ -2470,6 +2481,7 @@
               aria-valuemax={Math.round(span)}
               aria-valuenow={Math.round(position)}
               aria-valuetext="{formatDuration(position)} of {formatDuration(length)}"
+              aria-keyshortcuts={rulerAria}
               onpointerdown={pointerDown}
               onpointermove={pointerMove}
               onpointerup={pointerUp}
@@ -2507,6 +2519,7 @@
                     role="group"
                     aria-label="{title}, {formatDuration(at.start)} to {formatDuration(at.start + at.length)}"
                     tabindex={editable.current ? 0 : undefined}
+                    aria-keyshortcuts={editable.current ? clipAria : undefined}
                     onpointerdown={(e) => editDown(e, clip, 'move')}
                     onkeydown={(e) => clipKey(e, clip)}
                     oncontextmenu={(e) => clipContextMenu(e, clip)}

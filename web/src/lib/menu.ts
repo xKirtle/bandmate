@@ -1,3 +1,5 @@
+import { matches, shortcuts, way, type KeyPress } from './shortcuts';
+
 /**
  * What a key does in an open menu of `count` entries, with entry `current`
  * focused (-1 for none): the entry to focus next, 'close', or null to leave
@@ -25,9 +27,8 @@ export function menuKey(key: string, current: number, count: number): number | '
  * Whether a key opens a menu from what has focus, as it would a context
  * menu: the Menu key, or Shift+F10.
  */
-export function opensMenu(e: Pick<KeyboardEvent, 'key' | 'shiftKey' | 'ctrlKey' | 'altKey' | 'metaKey'>): boolean {
-  if (e.key === 'ContextMenu') return true;
-  return e.key === 'F10' && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey;
+export function opensMenu(e: KeyPress): boolean {
+  return matches(e, shortcuts.clipMenu.keys);
 }
 
 /**
@@ -69,14 +70,10 @@ export type MenuField = {
  * What a key does to a menu's field at `value`: the value it steps it to,
  * or null to leave the key alone.
  */
-export function fieldStep(
-  e: Pick<KeyboardEvent, 'key' | 'altKey' | 'shiftKey' | 'ctrlKey' | 'metaKey'>,
-  value: number,
-  field: Pick<MenuField, 'step' | 'shiftStep'>,
-): number | null {
-  if (!e.altKey || e.ctrlKey || e.metaKey) return null;
-  const by = e.shiftKey ? field.shiftStep : field.step;
-  if (e.key === 'ArrowLeft') return value - by;
-  if (e.key === 'ArrowRight') return value + by;
+export function fieldStep(e: KeyPress, value: number, field: Pick<MenuField, 'step' | 'shiftStep'>): number | null {
+  const near = way(e, shortcuts.step);
+  if (near) return near === 'back' ? value - field.step : value + field.step;
+  const far = way(e, shortcuts.shiftStep);
+  if (far) return far === 'back' ? value - field.shiftStep : value + field.shiftStep;
   return null;
 }
