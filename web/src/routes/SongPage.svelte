@@ -711,8 +711,8 @@
   }
   /* A keyboard: key dots and a space bar, outlined like the Timeline's Rename. */
   .shortcuts svg {
-    width: 1.375rem;
-    height: 1.375rem;
+    width: calc(0.6 * var(--control));
+    height: calc(0.6 * var(--control));
     fill: none;
     stroke: currentColor;
     stroke-width: 1.75;
