@@ -59,6 +59,7 @@
   import { keyPlace } from './keyPlace';
   import { songKey } from './songKeys';
   import { allKeys, shortcuts, type Way } from './shortcuts';
+  import { clipActions } from './clipMenu';
   import { clipAction, isModifier, nudges, rulerSeek, skipsSnapping, startOrEnd, zooms } from './timelineKeys';
   import { prepareUpload } from './upload';
   import { formatDuration } from './time';
@@ -1682,84 +1683,28 @@
   // Waiting to open a Clip's menu, until the finger moves or lifts.
   let pressTimer: ReturnType<typeof setTimeout> | undefined;
 
-  function clipActions(clip: Clip): MenuAction[] {
-    return [
-      // Only while it could start: stopped, and out of Sync mode.
-      ...(clip.activeTakeId !== null && canRecord
-        ? [{ icon: '●', label: 'Retake', title: 'Record another Take into this Clip', run: () => startRecording(clip) }]
-        : []),
-      ...takeActions(clip),
-      { icon: '✎', label: 'Rename', title: 'Or double-click the Clip', run: () => startClipRename(clip) },
-      { icon: '⧉', label: 'Duplicate', run: () => duplicate(clip) },
-      ...soundActions(clip),
-      { icon: '×', label: 'Delete', run: () => remove(clip) },
-    ];
-  }
-
-  function soundActions(clip: Clip): MenuAction[] {
-    if (clip.soundId === null) return [];
-    const soundId = clip.soundId;
-    return [
+  function clipMenuActions(clip: Clip): MenuAction[] {
+    const clipId = clip.id;
+    return clipActions(
+      clip,
       {
-        icon: '⤓',
-        label: 'Download Sound',
-        title: `Save “${sources.of(clip).title}” as it was imported`,
-        run: () => download(api.soundDownloadUrl(timeline.songId, soundId)),
-      },
-    ];
-  }
-
-  // Choosing, nudging, deleting and clearing Takes don't ask first: they can
-  // be undone, and a deleted Take is only detached.
-  function takeActions(clip: Clip): MenuAction[] {
-    if (clip.activeTakeId === null) return [];
-    const { id: clipId, activeTakeId, takes } = clip;
-    const active = activeTake(clip)!;
-    const nudgeLabel = hints.label(shortcuts.nudgeTake.keys);
-    return [
-      {
-        icon: '♪',
-        label: 'Takes',
-        title: 'Choose the Take this Clip plays',
-        choices: takes.map((t) => ({
-          label: `Take ${t.number}`,
-          checked: t.id === activeTakeId,
-          run: () => {
-            if (t.id !== activeTakeId) perform({ kind: 'chooseTake', clipId, takeId: t.id });
-          },
-        })),
+        canRecord,
+        soundName: clip.soundId === null ? null : sources.of(clip).title,
+        nudgeKeys: hints.label(shortcuts.nudgeTake.keys),
       },
       {
-        icon: '⌫',
-        label: 'Delete Take',
-        title: takes.length === 1 ? 'Deleting its only Take deletes the Clip' : undefined,
-        choices: takes.map((t) => ({
-          label: `Take ${t.number}${t.id === activeTakeId ? ' (active)' : ''}`,
-          run: () => perform({ kind: 'deleteTake', clipId, takeId: t.id }),
-        })),
+        retake: () => startRecording(clip),
+        chooseTake: (takeId) => perform({ kind: 'chooseTake', clipId, takeId }),
+        deleteTake: (takeId) => perform({ kind: 'deleteTake', clipId, takeId }),
+        nudgeTake: (takeId, ms) => perform({ kind: 'nudgeTake', clipId, takeId, nudge: ms / 1000 }),
+        clearInactiveTakes: () => perform({ kind: 'clearInactiveTakes', clipId }),
+        downloadTake: (takeId) => download(api.takeDownloadUrl(timeline.songId, takeId)),
+        rename: () => startClipRename(clip),
+        duplicate: () => duplicate(clip),
+        downloadSound: (soundId) => download(api.soundDownloadUrl(timeline.songId, soundId)),
+        deleteClip: () => remove(clip),
       },
-      {
-        icon: '↔',
-        label: 'Nudge',
-        title: `Move Take ${active.number} within the Clip, in milliseconds, later if positive${nudgeLabel ? `; or ${nudgeLabel} the Clip` : ''}`,
-        field: {
-          value: Math.round(active.nudge * 1000),
-          unit: 'ms',
-          step: 1,
-          shiftStep: 10,
-          set: (ms) => perform({ kind: 'nudgeTake', clipId, takeId: activeTakeId, nudge: ms / 1000 }),
-        },
-      },
-      ...(takes.length > 1
-        ? [{ icon: '⊘', label: 'Clear inactive Takes', run: () => perform({ kind: 'clearInactiveTakes', clipId }) }]
-        : []),
-      {
-        icon: '⤓',
-        label: 'Download Take',
-        title: `Save Take ${active.number}'s WAV as it was recorded, lead-in and all`,
-        run: () => download(api.takeDownloadUrl(timeline.songId, activeTakeId)),
-      },
-    ];
+    );
   }
 
   /** Saves what a URL serves as a file, as the server names it. */
@@ -2571,7 +2516,7 @@
                         <ActionsMenu
                           bind:this={clipMenus[clip.id]}
                           label="More actions for {title}"
-                          entries={clipActions(clip)}
+                          entries={clipMenuActions(clip)}
                         >
                           {#snippet trigger()}<span class="clip-more">⋯</span>{/snippet}
                         </ActionsMenu>
