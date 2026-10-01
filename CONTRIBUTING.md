@@ -16,7 +16,7 @@ Whoever or whatever wrote it: AI-written pull requests are welcome, and held to 
 - **Follow [AGENTS.md](AGENTS.md).** It holds the repo's conventions, for people as much as for coding agents.
 - **Format the code.** Run `npm run format` in `web/` for the web app, and `gofmt` on Go code. CI fails a pull request whose web code isn't formatted.
 - **Add tests through the HTTP API.** See [Tests](#tests).
-- **Label it** `enhancement`, `bug` or `documentation`, exactly one. The release notes are grouped by these labels.
+- **Label it** `enhancement`, `bug`, `documentation` or `refactor`, exactly one. The release notes are grouped by these labels, and leave out `refactor`, which is for a change no self-hoster would notice, such as a refactor, tooling or CI.
 
 ## Development
 
@@ -94,7 +94,7 @@ Vitest covers plain TypeScript modules in `web/src/lib` that don't touch the DOM
 
 ### Versions
 
-A release with any new feature bumps the minor version (v0.4.0 to v0.5.0), and one with only fixes bumps the patch (v0.4.0 to v0.4.1). Versions aren't tied to the [roadmap](docs/roadmap.md): whatever has merged since the last release goes out together. v1.0.0 isn't planned yet.
+A release with any new feature bumps the minor version (v0.4.0 to v0.5.0), and one with only fixes bumps the patch (v0.4.0 to v0.4.1). `refactor` pull requests don't count: a release of only those isn't worth cutting. Versions aren't tied to the [roadmap](docs/roadmap.md): whatever has merged since the last release goes out together. v1.0.0 isn't planned yet.
 
 ### Cutting a release
 
