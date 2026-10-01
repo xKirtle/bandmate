@@ -3,12 +3,7 @@
  * a key press is one, and should act now.
  */
 
-import { matches, shortcuts, way, type KeyPress } from './shortcuts';
-
-export type SyncKeyPress = Pick<
-  KeyboardEvent,
-  'key' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey' | 'repeat' | 'defaultPrevented'
->;
+import { matches, shortcuts, way, type KeyDown, type KeyPress } from './shortcuts';
 
 /** Where a key was pressed, and whether Sync mode is on. */
 export type CueNextContext = {
@@ -23,7 +18,7 @@ export type CueNextContext = {
  * Whether a key press cues the next Line at the playhead: in Sync mode,
  * anywhere but a text field, a dialog or a ⋯ menu, even on a button.
  */
-export function cuesNextLine(e: SyncKeyPress, at: CueNextContext): boolean {
+export function cuesNextLine(e: KeyDown, at: CueNextContext): boolean {
   if (!matches(e, shortcuts.cueNextLine.keys) || e.repeat) return false;
   return at.syncing && !e.defaultPrevented && !at.inTextField && !at.inDialogOrMenu;
 }

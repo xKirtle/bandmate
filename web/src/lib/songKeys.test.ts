@@ -1,7 +1,8 @@
 import { describe as group, expect, it } from 'vitest';
-import { opensShortcuts, songKey, type SongKeyPress, type SongKeyContext } from './songKeys';
+import type { KeyDown } from './shortcuts';
+import { opensShortcuts, songKey, type SongKeyContext } from './songKeys';
 
-const press = (key: string, mods: Partial<Omit<SongKeyPress, 'key'>> = {}): SongKeyPress => ({
+const press = (key: string, mods: Partial<Omit<KeyDown, 'key'>> = {}): KeyDown => ({
   key,
   ctrlKey: false,
   metaKey: false,

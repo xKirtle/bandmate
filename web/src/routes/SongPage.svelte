@@ -27,9 +27,8 @@
   import { finePointer, keyHints } from '../lib/keyHints';
   import { shortcutsDialogKeys } from '../lib/shortcuts';
   import ShortcutsDialog from '../lib/ShortcutsDialog.svelte';
-  import { opensShortcuts } from '../lib/songKeys';
+  import { keyPlace, opensShortcuts } from '../lib/songKeys';
   import { detailsSummary, openingMode, sideParts, type Mode, type SidePart } from '../lib/songMode';
-  import { inTextField } from '../lib/textField';
   import { timeAgo } from '../lib/time';
 
   let { id }: { id: number } = $props();
@@ -115,10 +114,7 @@
   const hints = keyHints();
 
   function openShortcutsOnKey(event: KeyboardEvent) {
-    const opens = opensShortcuts(event, {
-      dialogOpen: document.querySelector('dialog[open]') !== null,
-      inTextField: inTextField(event.target),
-    });
+    const opens = opensShortcuts(event, keyPlace(event));
     if (!opens || !song) return;
     event.preventDefault();
     showingShortcuts = true;
