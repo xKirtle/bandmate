@@ -150,6 +150,13 @@ export const shortcuts = {
   },
 } as const satisfies Record<string, Shortcut>;
 
+/**
+ * The key that opens the shortcuts dialog. It's the dialog's own key, so
+ * the dialog doesn't list it: its button's tooltip names it. Rebinding
+ * Shortcuts would need to count it as taken.
+ */
+export const shortcutsDialogKeys: readonly Key[] = [{ key: '?' }];
+
 /** A key press, or a mouse action given as `drag` or `wheel`. */
 export type KeyPress = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'>;
 
