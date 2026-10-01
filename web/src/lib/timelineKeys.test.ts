@@ -1,6 +1,15 @@
 import { describe as group, expect, it } from 'vitest';
 import type { KeyPress } from './shortcuts';
-import { clipAction, isModifier, nudges, rulerSeek, skipsSnapping, zooms, type Modifiers } from './timelineKeys';
+import {
+  clipAction,
+  isModifier,
+  nudges,
+  rulerSeek,
+  skipsSnapping,
+  startOrEnd,
+  zooms,
+  type Modifiers,
+} from './timelineKeys';
 
 const held = (mods: Partial<Modifiers> = {}): Modifiers => ({
   ctrlKey: false,
@@ -71,6 +80,13 @@ group('rulerSeek', () => {
     expect(rulerSeek(press('ArrowUp', { metaKey: true, shiftKey: true }), position, length)).toBeNull();
     expect(rulerSeek(press('Home', { shiftKey: true }), position, length)).toBeNull();
     expect(rulerSeek(press('End', { ctrlKey: true }), position, length)).toBeNull();
+  });
+});
+
+group('startOrEnd', () => {
+  it('goes back to the start and forward to the end', () => {
+    expect(startOrEnd('back', 200)).toBe(0);
+    expect(startOrEnd('forward', 200)).toBe(200);
   });
 });
 

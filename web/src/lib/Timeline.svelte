@@ -58,8 +58,8 @@
   import { inTextField } from './textField';
   import { keyPlace } from './keyPlace';
   import { songKey } from './songKeys';
-  import { allKeys, shortcuts } from './shortcuts';
-  import { clipAction, isModifier, nudges, rulerSeek, skipsSnapping, zooms } from './timelineKeys';
+  import { allKeys, shortcuts, type Way } from './shortcuts';
+  import { clipAction, isModifier, nudges, rulerSeek, skipsSnapping, startOrEnd, zooms } from './timelineKeys';
   import { prepareUpload } from './upload';
   import { formatDuration } from './time';
   import { tracksDropped, type TrackDrop } from './trackDrag';
@@ -2152,6 +2152,28 @@
   </span>
 {/snippet}
 
+{#snippet toStartOrEnd(going: Way)}
+  {@const keys = shortcuts.startOrEnd[going]}
+  {@const text = going === 'back' ? 'Go to the start' : 'Go to the end'}
+  <button
+    type="button"
+    class="icon skip"
+    onclick={() => seekTo(startOrEnd(going, length))}
+    disabled={recording !== null}
+    aria-label={text}
+    aria-keyshortcuts={hints.aria(keys)}
+    title={recording !== null ? 'Stop recording to move the playhead' : hints.withKeys(text, keys)}
+  >
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      {#if going === 'back'}
+        <path d="M6 5.5h2.5v13H6zM18.5 5.5v13L9.5 12z" />
+      {:else}
+        <path d="M15.5 5.5H18v13h-2.5zM5.5 5.5v13l9-6.5z" />
+      {/if}
+    </svg>
+  </button>
+{/snippet}
+
 <section
   class="timeline"
   aria-label="Timeline"
@@ -2185,20 +2207,24 @@
   {/if}
   <div class="inner">
     <div class="transport">
-      <button
-        type="button"
-        class="play"
-        onclick={toggle}
-        aria-label={playerState === 'stopped' ? 'Play' : 'Pause'}
-        aria-keyshortcuts={hints.aria(shortcuts.playPause.keys)}
-        title={hints.withKeys('Play or pause', shortcuts.playPause.keys)}
-      >
-        {#if playerState === 'stopped'}
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
-        {:else}
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /></svg>
-        {/if}
-      </button>
+      <span class="playback">
+        {@render toStartOrEnd('back')}
+        <button
+          type="button"
+          class="play"
+          onclick={toggle}
+          aria-label={playerState === 'stopped' ? 'Play' : 'Pause'}
+          aria-keyshortcuts={hints.aria(shortcuts.playPause.keys)}
+          title={hints.withKeys('Play or pause', shortcuts.playPause.keys)}
+        >
+          {#if playerState === 'stopped'}
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
+          {:else}
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /></svg>
+          {/if}
+        </button>
+        {@render toStartOrEnd('forward')}
+      </span>
       <span class="time muted">{formatDuration(position)} / {formatDuration(length)}</span>
       <button
         type="button"
@@ -2822,6 +2848,18 @@
   }
   .spacer {
     flex: 1;
+  }
+  /* Play or pause, between going to the start and to the end. */
+  .playback {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: calc(0.25 * var(--timeline-rem));
+  }
+  .skip svg {
+    width: calc(1.125 * var(--timeline-rem));
+    height: calc(1.125 * var(--timeline-rem));
+    fill: currentColor;
   }
   .play {
     flex-shrink: 0;
