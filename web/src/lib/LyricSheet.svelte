@@ -319,7 +319,8 @@
   const chordsShown = $derived(mode === 'write' || (showChords && songHasChords));
 
   async function toggleChords() {
-    const next = showChords;
+    const next = !showChords;
+    showChords = next;
     if (!(await change((at) => api.updateSong(at, { showChords: next })))) showChords = song.showChords;
   }
 
@@ -413,6 +414,15 @@
   <div class="head">
     <h2 id="sheet-heading">Lyric Sheet</h2>
     <span class="spacer"></span>
+    {#if mode === 'read' && songHasChords}
+      <button
+        type="button"
+        class="button toggle"
+        aria-pressed={showChords}
+        onclick={toggleChords}
+        title="Show the Chords above their Lines">Chords</button
+      >
+    {/if}
     {#if mode === 'write' && canCue && hasCues(song)}
       <!-- Doesn't ask first: it can be undone. -->
       <button
@@ -426,7 +436,7 @@
       <!-- Clicked, it keeps focus where it was, so Space then plays rather than switching it back off. -->
       <button
         type="button"
-        class="button sync-toggle"
+        class="button toggle"
         aria-pressed={syncing}
         disabled={!canSync}
         onpointerdown={(e) => e.preventDefault()}
@@ -486,14 +496,6 @@
   {/if}
 
   {#if mode === 'read'}
-    {#if songHasChords}
-      <div class="toggles">
-        <label class="toggle">
-          <input type="checkbox" bind:checked={showChords} onchange={toggleChords} />
-          Show chords
-        </label>
-      </div>
-    {/if}
     <LyricSheetView {song} showChords={chordsShown} {current} play={leadInto} />
   {:else}
     <ol
@@ -602,7 +604,7 @@
     min-width: var(--control);
     padding: 0;
   }
-  .sync-toggle[aria-pressed='true'] {
+  .toggle[aria-pressed='true'] {
     border-color: var(--accent);
     background: var(--accent);
     color: var(--accent-text);
@@ -615,26 +617,6 @@
     flex-basis: 100%;
     margin: 0;
     font-size: 0.8125rem;
-  }
-  .toggles {
-    display: flex;
-    flex-wrap: wrap;
-    column-gap: 1.25rem;
-    margin-bottom: 0.5rem;
-  }
-  .toggle {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-height: var(--control);
-    cursor: pointer;
-  }
-  .toggle input {
-    width: 1.25rem;
-    height: 1.25rem;
-    min-height: 0;
-    margin: 0;
-    padding: 0;
   }
   .hint {
     margin: 0.5rem 0 0;
