@@ -1,9 +1,10 @@
 <script lang="ts">
   import { tick, type Snippet } from 'svelte';
+  import { keyHints } from './keyHints';
   import { fieldStep, menuKey, opensMenu, type MenuAction, type MenuChoice, type MenuField } from './menu';
   import { popoverLeft, popoverSide, popoverTop, type PopoverAlign } from './popover';
   import type { Point } from './press';
-  import { allKeys, ariaKeyShortcuts, platform, shortcuts, twoWayLabel } from './shortcuts';
+  import { allKeys, shortcuts } from './shortcuts';
 
   let {
     entries,
@@ -27,11 +28,16 @@
     disabled?: boolean;
   } = $props();
 
-  // The keys that step a field, named as this platform does, e.g. ⌥← on a Mac.
-  const on = platform();
-  const stepHint = (f: MenuField) =>
-    `${twoWayLabel(shortcuts.step, on)} steps it by ${f.step} ${f.unit}, or by ${f.shiftStep} with ${twoWayLabel(shortcuts.shiftStep, on)}`;
-  const fieldAria = ariaKeyShortcuts(allKeys([shortcuts.step, shortcuts.shiftStep]), on);
+  // The keys that step a field, named as this platform does, e.g. ⌥← on a
+  // Mac, but only with a fine pointer: without one, the field has no hint.
+  const hints = keyHints();
+  function stepHint(f: MenuField): string | undefined {
+    const step = hints.label(allKeys([shortcuts.step]));
+    const shiftStep = hints.label(allKeys([shortcuts.shiftStep]));
+    if (!step || !shiftStep) return undefined;
+    return `${step} steps it by ${f.step} ${f.unit}, or by ${f.shiftStep} with ${shiftStep}`;
+  }
+  const fieldKeys = allKeys([shortcuts.step, shortcuts.shiftStep]);
 
   let open = $state(false);
   // The entry whose choices, or field, the menu shows in place of the entries, if any.
@@ -263,7 +269,7 @@
               step={field.step}
               bind:value={draft}
               bind:this={input}
-              aria-keyshortcuts={fieldAria}
+              aria-keyshortcuts={hints.aria(fieldKeys)}
               onkeydown={onFieldKey}
               onchange={() => setField(draft)}
             />

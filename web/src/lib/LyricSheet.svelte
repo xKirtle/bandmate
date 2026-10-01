@@ -29,7 +29,8 @@
   import { activeAlternate, addedNotice, describe, isEmpty, places, sectionsInArrangement } from './sections';
   import type { Mode } from './songMode';
   import { readShiftStep, shiftSteps, storeShiftStep, type ShiftStep } from './shiftStep';
-  import { keysLabel, platform, shortcuts } from './shortcuts';
+  import { keyHints } from './keyHints';
+  import { shortcuts } from './shortcuts';
   import { markSyncHintSeen, sawSyncHint } from './syncHint';
   import { cuesNextLine } from './syncKeys';
   import { inTextField } from './textField';
@@ -286,8 +287,11 @@
     follow(followKey);
   });
 
-  // The Sync hints name the keys that cue as this platform does.
-  const cueNextLabel = keysLabel(shortcuts.cueNextLine.keys, platform());
+  // The Sync hints name the keys that cue as this platform does, but only
+  // with a fine pointer: without one, Now is the way to cue.
+  const hints = keyHints();
+  const cueNextLabel = $derived(hints.label(shortcuts.cueNextLine.keys));
+  const cueNextWays = $derived(cueNextLabel ? `${cueNextLabel} or Now` : 'Now');
 
   // In Sync mode, Enter cues anywhere but a text field or a dialog, even on
   // a button: syncing along shouldn't depend on where focus was left.
@@ -430,7 +434,7 @@
         title={recording
           ? 'Stop recording to sync lyrics'
           : canSync
-            ? `Sync lyrics: press ${cueNextLabel} or Now as each Line starts to cue it at the playhead`
+            ? `Sync lyrics: press ${cueNextWays} as each Line starts to cue it at the playhead`
             : 'Add a Beat to the Timeline to sync lyrics to it'}>Sync lyrics</button
       >
     {/if}
@@ -469,7 +473,7 @@
     <p class="notice muted" role="status">{notice ?? ''}</p>
     {#if syncing && hinting}
       <p class="sync-hint muted">
-        Play, then press {cueNextLabel} or Now as each Line starts. Click a Line to start from it.
+        Play, then press {cueNextWays} as each Line starts. Click a Line to start from it.
       </p>
     {/if}
   </div>

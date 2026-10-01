@@ -1,7 +1,8 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { formatCue, nudgeCue, parseCue, playLabel } from './cues';
-  import { allKeys, ariaKeyShortcuts, platform, shortcuts, twoWayLabel } from './shortcuts';
+  import { keyHints } from './keyHints';
+  import { allKeys, shortcuts } from './shortcuts';
   import { cueNudge } from './syncKeys';
 
   // A Line's Cue time, shown as m:ss.s in the gutter beside it. Clicking it
@@ -54,10 +55,12 @@
   let button = $state<HTMLButtonElement>();
   let clearButton = $state<HTMLButtonElement>();
 
-  // The keys that nudge the Cue, later then earlier, named as this platform does.
-  const on = platform();
-  const nudgeLabel = twoWayLabel(shortcuts.nudgeCue, on, 'forward');
-  const nudgeAria = ariaKeyShortcuts(allKeys([shortcuts.nudgeCue], 'forward'), on);
+  // The keys that nudge the Cue, later then earlier, named as this platform
+  // does, but only with a fine pointer.
+  const hints = keyHints();
+  const nudgeKeys = allKeys([shortcuts.nudgeCue], 'forward');
+  const nudgeLabel = $derived(hints.label(nudgeKeys));
+  const nudgeAria = $derived(hints.aria(nudgeKeys));
 
   // Said first on hover, and after the time to screen readers.
   const outOfOrderNote = $derived(outOfOrder ? `Out of order. ${outOfOrder}.` : '');
@@ -167,7 +170,7 @@
       aria-keyshortcuts={nudgeAria}
       title={invalid
         ? 'Type a time like 45, 0:45, 0:45.25 or 1:02'
-        : `Enter saves, Esc cancels, empty clears, ${nudgeLabel} nudges`}
+        : `Enter saves, Esc cancels, empty clears${nudgeLabel ? `, ${nudgeLabel} nudges` : ''}`}
       placeholder="0:00.0"
       autocomplete="off"
       spellcheck="false"
@@ -197,7 +200,7 @@
           ? 'Cue this next'
           : cue === null
             ? 'Set when this starts on the Timeline'
-            : `Change when this starts on the Timeline; ${nudgeLabel} nudges it`
+            : `Change when this starts on the Timeline${nudgeLabel ? `; ${nudgeLabel} nudges it` : ''}`
       }`}
     >
       {#if outOfOrder}<span class="warning" aria-hidden="true">⚠</span>{/if}{cue === null ? '–:––.–' : formatCue(cue)}
