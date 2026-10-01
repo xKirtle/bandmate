@@ -24,7 +24,8 @@
   import type { Saved } from '../lib/history';
   import { takeNewFlag } from '../lib/newSong';
   import { navigate, replaceSearch, router } from '../lib/router.svelte';
-  import { ariaKeyShortcuts, keysLabel, platform, shortcutsDialogKeys } from '../lib/shortcuts';
+  import { finePointer, keyHints } from '../lib/keyHints';
+  import { shortcutsDialogKeys } from '../lib/shortcuts';
   import ShortcutsDialog from '../lib/ShortcutsDialog.svelte';
   import { opensShortcuts } from '../lib/songKeys';
   import { detailsSummary, openingMode, sideParts, type Mode, type SidePart } from '../lib/songMode';
@@ -111,9 +112,7 @@
   // keyboard and mouse, so the button only shows with a fine pointer, and
   // never on a phone.
   let showingShortcuts = $state(false);
-  const finePointer = new MediaQuery('any-pointer: fine');
-  const shortcutsKeys = keysLabel(shortcutsDialogKeys, platform());
-  const shortcutsAria = ariaKeyShortcuts(shortcutsDialogKeys, platform());
+  const hints = keyHints();
 
   function openShortcutsOnKey(event: KeyboardEvent) {
     const opens = opensShortcuts(event, {
@@ -465,15 +464,15 @@
                 <label class="mode"><input type="radio" name="song-mode" value="write" bind:group={mode} />Write</label>
                 <label class="mode"><input type="radio" name="song-mode" value="read" bind:group={mode} />Read</label>
               </fieldset>
-              {#if finePointer.current}
+              {#if finePointer()}
                 <button
                   type="button"
                   class="button shortcuts"
                   onclick={() => (showingShortcuts = true)}
                   aria-label="Keyboard shortcuts"
                   aria-haspopup="dialog"
-                  aria-keyshortcuts={shortcutsAria}
-                  title="Keyboard shortcuts ({shortcutsKeys})">?</button
+                  aria-keyshortcuts={hints.aria(shortcutsDialogKeys)}
+                  title={hints.withKeys('Keyboard shortcuts', shortcutsDialogKeys)}>?</button
                 >
               {/if}
             </div>

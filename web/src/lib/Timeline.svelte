@@ -45,6 +45,7 @@
     type HistoryEdit,
     type Saved,
   } from './history';
+  import { keyHints } from './keyHints';
   import { formatVolume, maxVolume, minVolume, trackGains, type Levels } from './mixer';
   import type { MenuAction } from './menu';
   import { peaks as peaksOf, peaksPerSecond } from './peaks';
@@ -56,7 +57,7 @@
   import { nameSound } from './soundName';
   import { inTextField } from './textField';
   import { songKey } from './songKeys';
-  import { allKeys, ariaKeyShortcuts, keysLabel, platform, shortcuts, type OneWay } from './shortcuts';
+  import { allKeys, shortcuts } from './shortcuts';
   import { clipAction, isModifier, rulerSeek, skipsSnapping, slips, zooms } from './timelineKeys';
   import { prepareUpload } from './upload';
   import { formatDuration } from './time';
@@ -393,13 +394,12 @@
     return { timeline: { ...timeline, version: at.version, updatedAt: song.updatedAt } };
   }
 
-  // Tooltips name a Shortcut's keys as this platform does, e.g. ⌘Z on a Mac.
-  const on = platform();
-  const keysOf = (shortcut: OneWay) => keysLabel(shortcut.keys, on);
-  const ariaOf = (shortcut: OneWay) => ariaKeyShortcuts(shortcut.keys, on);
+  // Tooltips name a Shortcut's keys as this platform does, e.g. ⌘Z on a
+  // Mac, but only with a fine pointer.
+  const hints = keyHints();
   // What a focused Clip and the ruler declare as their keys.
-  const clipAria = ariaKeyShortcuts([...shortcuts.deleteClip.keys, ...shortcuts.clipMenu.keys], on);
-  const rulerAria = ariaKeyShortcuts(allKeys([shortcuts.seek, shortcuts.seekFar, shortcuts.startOrEnd]), on);
+  const clipKeys = [...shortcuts.deleteClip.keys, ...shortcuts.clipMenu.keys];
+  const rulerKeys = allKeys([shortcuts.seek, shortcuts.seekFar, shortcuts.startOrEnd]);
 
   function keydown(event: KeyboardEvent) {
     if (trackDrag.current && event.key === 'Escape') {
@@ -1715,6 +1715,7 @@
     if (clip.activeTakeId === null) return [];
     const { id: clipId, activeTakeId, takes } = clip;
     const active = activeTake(clip)!;
+    const slipLabel = hints.label(shortcuts.slip.keys);
     return [
       {
         icon: '♪',
@@ -1740,7 +1741,7 @@
       {
         icon: '↔',
         label: 'Nudge',
-        title: `Move Take ${active.number} within the Clip, in milliseconds, later if positive; or ${keysOf(shortcuts.slip)} the Clip`,
+        title: `Move Take ${active.number} within the Clip, in milliseconds, later if positive${slipLabel ? `; or ${slipLabel} the Clip` : ''}`,
         field: {
           value: Math.round(active.nudge * 1000),
           unit: 'ms',
@@ -2136,8 +2137,8 @@
       onclick={undo}
       disabled={!undoable}
       aria-label="Undo"
-      aria-keyshortcuts={ariaOf(shortcuts.undo)}
-      title="Undo ({keysOf(shortcuts.undo)})">↶</button
+      aria-keyshortcuts={hints.aria(shortcuts.undo.keys)}
+      title={hints.withKeys('Undo', shortcuts.undo.keys)}>↶</button
     >
     <button
       type="button"
@@ -2145,8 +2146,8 @@
       onclick={redo}
       disabled={!redoable}
       aria-label="Redo"
-      aria-keyshortcuts={ariaOf(shortcuts.redo)}
-      title="Redo ({keysOf(shortcuts.redo)})">↷</button
+      aria-keyshortcuts={hints.aria(shortcuts.redo.keys)}
+      title={hints.withKeys('Redo', shortcuts.redo.keys)}>↷</button
     >
   </span>
 {/snippet}
@@ -2189,8 +2190,8 @@
         class="play"
         onclick={toggle}
         aria-label={playerState === 'stopped' ? 'Play' : 'Pause'}
-        aria-keyshortcuts={ariaOf(shortcuts.playPause)}
-        title="Play or pause ({keysOf(shortcuts.playPause)})"
+        aria-keyshortcuts={hints.aria(shortcuts.playPause.keys)}
+        title={hints.withKeys('Play or pause', shortcuts.playPause.keys)}
       >
         {#if playerState === 'stopped'}
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
@@ -2216,17 +2217,19 @@
         aria-pressed={capturing}
         disabled={!capturing && !canRecord}
         onclick={switchRecording}
-        aria-keyshortcuts={ariaOf(shortcuts.record)}
+        aria-keyshortcuts={hints.aria(shortcuts.record.keys)}
         title={capturing
-          ? `Stop recording (${keysOf(shortcuts.record)} or ${keysOf(shortcuts.playPause)})`
+          ? hints.withKeys('Stop recording', [...shortcuts.record.keys, ...shortcuts.playPause.keys])
           : syncing
             ? 'Leave Sync mode to record'
             : playerState !== 'stopped'
               ? 'Stop playback to record'
               : recordProblem
                 ? recordProblem
-                : `Record a Take on ${timeline.tracks.find((t) => t.id === chosen)?.name ?? 'a new Track'} (${keysOf(shortcuts.record)})`}
-        ><span class="record-dot" aria-hidden="true"></span>{capturing ? 'Stop' : 'Record'}</button
+                : hints.withKeys(
+                    `Record a Take on ${timeline.tracks.find((t) => t.id === chosen)?.name ?? 'a new Track'}`,
+                    shortcuts.record.keys,
+                  )}><span class="record-dot" aria-hidden="true"></span>{capturing ? 'Stop' : 'Record'}</button
       >
       <input
         class="visually-hidden"
@@ -2476,7 +2479,7 @@
               aria-valuemax={Math.round(span)}
               aria-valuenow={Math.round(position)}
               aria-valuetext="{formatDuration(position)} of {formatDuration(length)}"
-              aria-keyshortcuts={rulerAria}
+              aria-keyshortcuts={hints.aria(rulerKeys)}
               onpointerdown={pointerDown}
               onpointermove={pointerMove}
               onpointerup={pointerUp}
@@ -2514,7 +2517,9 @@
                     role="group"
                     aria-label="{title}, {formatDuration(at.start)} to {formatDuration(at.start + at.length)}"
                     tabindex={editable.current ? 0 : undefined}
-                    aria-keyshortcuts={editable.current && clip.id !== recording?.clipId ? clipAria : undefined}
+                    aria-keyshortcuts={editable.current && clip.id !== recording?.clipId
+                      ? hints.aria(clipKeys)
+                      : undefined}
                     onpointerdown={(e) => editDown(e, clip, 'move')}
                     onkeydown={(e) => clipKey(e, clip)}
                     oncontextmenu={(e) => clipContextMenu(e, clip)}
