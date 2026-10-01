@@ -232,6 +232,7 @@
               current={line.id === cueing.current}
               hovered={i === hoveredRow}
               pick={sync && !line.chordLine ? () => sync.pick(line.id) : undefined}
+              syncing={!!sync}
               outOfOrder={gutter.outOfOrder(line.id)}
             />
           {/if}

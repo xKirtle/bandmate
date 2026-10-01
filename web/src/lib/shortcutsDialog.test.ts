@@ -16,8 +16,9 @@ group('dialogGroups', () => {
         'Seek back or forward 5 s',
         'Seek back or forward 15 s',
         'Go to the start or end',
+        'Nudge a Cue by 0.1 s',
       ],
-      ['Cue the next Line', 'Nudge a Cue by 0.1 s'],
+      ['Cue the next Line'],
       ['Nudge a Take inside its Clip', 'Skip snapping', 'Zoom the Timeline'],
     ]);
     expect(groups[0].rows[1]).toEqual({
@@ -36,6 +37,16 @@ group('dialogGroups', () => {
       ['→', '↑'],
     ]);
     expect(editing('mac')[6].keys).toEqual([['Home'], ['End']]);
+  });
+
+  it('lists nudging a Cue under Timeline editing, saying it works in Write mode', () => {
+    const editing = dialogGroups(shortcuts, 'other')[1];
+    expect(editing.group).toBe('Timeline editing');
+    expect(editing.rows[7]).toEqual({
+      name: 'Nudge a Cue by 0.1 s',
+      description: 'Moves the focused Cue time 0.1 seconds earlier or later, in Write mode.',
+      keys: [['Alt+↓'], ['Alt+↑']],
+    });
   });
 
   it('lists a Shortcut added to the list, and leaves out a group with none', () => {

@@ -101,18 +101,18 @@ export const shortcuts = {
     back: [{ key: 'Home' }],
     forward: [{ key: 'End' }],
   },
+  nudgeCue: {
+    name: 'Nudge a Cue by 0.1 s',
+    group: 'Timeline editing',
+    description: 'Moves the focused Cue time 0.1 seconds earlier or later, in Write mode.',
+    back: [{ key: 'ArrowDown', alt: true }],
+    forward: [{ key: 'ArrowUp', alt: true }],
+  },
   cueNextLine: {
     name: 'Cue the next Line',
     group: 'Sync mode',
     description: 'Cues the next Line at the playhead.',
     keys: [{ key: 'Enter' }],
-  },
-  nudgeCue: {
-    name: 'Nudge a Cue by 0.1 s',
-    group: 'Sync mode',
-    description: 'Moves the focused Cue 0.1 seconds earlier or later.',
-    back: [{ key: 'ArrowDown', alt: true }],
-    forward: [{ key: 'ArrowUp', alt: true }],
   },
   nudgeTake: {
     name: 'Nudge a Take inside its Clip',

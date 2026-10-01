@@ -1,6 +1,6 @@
 import { describe as group, expect, it } from 'vitest';
 import type { KeyDown } from './shortcuts';
-import { cueNudge, cuesNextLine, type CueNextContext } from './syncKeys';
+import { cuesNextLine, type CueNextContext } from './syncKeys';
 
 const press = (key: string, mods: Partial<Omit<KeyDown, 'key'>> = {}): KeyDown => ({
   key,
@@ -45,32 +45,5 @@ group('Enter', () => {
   it('is the only key that cues', () => {
     expect(cuesNextLine(press(' '), syncing)).toBe(false);
     expect(cuesNextLine(press('n'), syncing)).toBe(false);
-  });
-});
-
-group('Alt+↑/↓', () => {
-  it('nudges a Cue later with ↑ and earlier with ↓', () => {
-    expect(cueNudge(press('ArrowUp', { altKey: true }))).toBe(1);
-    expect(cueNudge(press('ArrowDown', { altKey: true }))).toBe(-1);
-  });
-
-  it('needs Alt', () => {
-    expect(cueNudge(press('ArrowUp'))).toBeNull();
-    expect(cueNudge(press('ArrowDown'))).toBeNull();
-  });
-
-  it('is left alone with Ctrl or ⌘ as well', () => {
-    expect(cueNudge(press('ArrowUp', { altKey: true, ctrlKey: true }))).toBeNull();
-    expect(cueNudge(press('ArrowDown', { altKey: true, metaKey: true }))).toBeNull();
-  });
-
-  it('is left alone with Shift as well, its modifiers being exact', () => {
-    expect(cueNudge(press('ArrowUp', { altKey: true, shiftKey: true }))).toBeNull();
-    expect(cueNudge(press('ArrowDown', { altKey: true, shiftKey: true }))).toBeNull();
-  });
-
-  it('is only ↑ and ↓', () => {
-    expect(cueNudge(press('ArrowLeft', { altKey: true }))).toBeNull();
-    expect(cueNudge(press('ArrowRight', { altKey: true }))).toBeNull();
   });
 });

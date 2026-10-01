@@ -1,9 +1,9 @@
 /**
- * The Sync mode Shortcuts, cueing the next Line and nudging a Cue: whether
- * a key press is one, and should act now.
+ * The Sync mode Shortcut, cueing the next Line: whether a key press is it,
+ * and should act now.
  */
 
-import { matches, shortcuts, way, type KeyDown, type KeyPress } from './shortcuts';
+import { matches, shortcuts, type KeyDown } from './shortcuts';
 
 /** Where a key was pressed, and whether Sync mode is on. */
 export type CueNextContext = {
@@ -21,10 +21,4 @@ export type CueNextContext = {
 export function cuesNextLine(e: KeyDown, at: CueNextContext): boolean {
   if (!matches(e, shortcuts.cueNextLine.keys) || e.repeat) return false;
   return at.syncing && !e.defaultPrevented && !at.inTextField && !at.inDialogOrMenu;
-}
-
-/** Which way a key press nudges a Cue: 1 a tenth of a second later, -1 earlier, or null if it doesn't. */
-export function cueNudge(e: KeyPress): 1 | -1 | null {
-  const to = way(e, shortcuts.nudgeCue);
-  return to === null ? null : to === 'forward' ? 1 : -1;
 }
