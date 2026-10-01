@@ -24,7 +24,11 @@
   import type { Saved } from '../lib/history';
   import { takeNewFlag } from '../lib/newSong';
   import { navigate, replaceSearch, router } from '../lib/router.svelte';
+  import { ariaKeyShortcuts, keysLabel, platform, shortcutsDialogKeys } from '../lib/shortcuts';
+  import ShortcutsDialog from '../lib/ShortcutsDialog.svelte';
+  import { opensShortcuts } from '../lib/songKeys';
   import { detailsSummary, openingMode, sideParts, type Mode, type SidePart } from '../lib/songMode';
+  import { inTextField } from '../lib/textField';
   import { timeAgo } from '../lib/time';
 
   let { id }: { id: number } = $props();
@@ -103,6 +107,24 @@
     () => desktop.current && writing,
     () => (song ? `${song.arrangement}|${song.scrapbook}` : ''),
   );
+  // The shortcuts dialog, opened by its button or ?. Shortcuts are for a
+  // keyboard and mouse, so the button only shows with a fine pointer, and
+  // never on a phone.
+  let showingShortcuts = $state(false);
+  const finePointer = new MediaQuery('any-pointer: fine');
+  const shortcutsKeys = keysLabel(shortcutsDialogKeys, platform());
+  const shortcutsAria = ariaKeyShortcuts(shortcutsDialogKeys, platform());
+
+  function openShortcutsOnKey(event: KeyboardEvent) {
+    const opens = opensShortcuts(event, {
+      dialogOpen: document.querySelector('dialog[open]') !== null,
+      inTextField: inTextField(event.target),
+    });
+    if (!opens || !song) return;
+    event.preventDefault();
+    showingShortcuts = true;
+  }
+
   // How tall the docked Timeline is, which the side column stops above.
   let timelineHeight = $state(0);
 
@@ -375,7 +397,7 @@
   </button>
 {/snippet}
 
-<svelte:window onbeforeunload={warnBeforeUnload} />
+<svelte:window onbeforeunload={warnBeforeUnload} onkeydown={openShortcutsOnKey} />
 <svelte:document onvisibilitychange={refresh} />
 
 <main class="page" style:--timeline-height="{timelineHeight}px">
@@ -437,11 +459,24 @@
                 </p>
               </div>
             </div>
-            <fieldset class="modes" disabled={deleting}>
-              <legend class="visually-hidden">Mode</legend>
-              <label class="mode"><input type="radio" name="song-mode" value="write" bind:group={mode} />Write</label>
-              <label class="mode"><input type="radio" name="song-mode" value="read" bind:group={mode} />Read</label>
-            </fieldset>
+            <div class="head-tools">
+              <fieldset class="modes" disabled={deleting}>
+                <legend class="visually-hidden">Mode</legend>
+                <label class="mode"><input type="radio" name="song-mode" value="write" bind:group={mode} />Write</label>
+                <label class="mode"><input type="radio" name="song-mode" value="read" bind:group={mode} />Read</label>
+              </fieldset>
+              {#if finePointer.current}
+                <button
+                  type="button"
+                  class="button shortcuts"
+                  onclick={() => (showingShortcuts = true)}
+                  aria-label="Keyboard shortcuts"
+                  aria-haspopup="dialog"
+                  aria-keyshortcuts={shortcutsAria}
+                  title="Keyboard shortcuts ({shortcutsKeys})">?</button
+                >
+              {/if}
+            </div>
           </div>
         </div>
 
@@ -602,6 +637,10 @@
   />
 {/if}
 
+{#if showingShortcuts}
+  <ShortcutsDialog onClose={() => (showingShortcuts = false)} />
+{/if}
+
 <style>
   /* The title and its heading wrap alike and are as tall as each other,
      one line being 3rem, so switching mode doesn't shift the page. */
@@ -657,6 +696,16 @@
   .title-block {
     flex: 1;
     min-width: 0;
+  }
+  /* The mode switch, then the shortcuts button. */
+  .head-tools {
+    display: flex;
+    flex: none;
+    gap: 0.5rem;
+  }
+  .shortcuts {
+    width: var(--control);
+    padding: 0;
   }
   .modes {
     display: flex;
@@ -815,9 +864,12 @@
     .meta {
       margin: 0;
     }
-    .modes {
+    .head-tools {
       grid-area: modes;
       margin-top: 1rem;
+    }
+    .modes {
+      flex: 1;
     }
     .mode {
       flex: 1;

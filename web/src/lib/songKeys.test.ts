@@ -1,5 +1,5 @@
 import { describe as group, expect, it } from 'vitest';
-import { songKey, type SongKeyPress, type SongKeyContext } from './songKeys';
+import { opensShortcuts, songKey, type SongKeyPress, type SongKeyContext } from './songKeys';
 
 const press = (key: string, mods: Partial<Omit<SongKeyPress, 'key'>> = {}): SongKeyPress => ({
   key,
@@ -141,5 +141,31 @@ group('An open dialog', () => {
     expect(songKey(press('z', { ctrlKey: true }), open)).toBeNull();
     expect(songKey(press('Z', { ctrlKey: true, shiftKey: true }), open)).toBeNull();
     expect(songKey(press('y', { ctrlKey: true }), open)).toBeNull();
+  });
+});
+
+group('?', () => {
+  const nowhere = { dialogOpen: false, inTextField: false };
+
+  it('opens the shortcuts dialog, typed with Shift or on a key of its own', () => {
+    expect(opensShortcuts(press('?', { shiftKey: true }), nowhere)).toBe(true);
+    expect(opensShortcuts(press('?'), nowhere)).toBe(true);
+  });
+
+  it('is typed in a text field instead', () => {
+    expect(opensShortcuts(press('?', { shiftKey: true }), { ...nowhere, inTextField: true })).toBe(false);
+  });
+
+  it('is left alone while a dialog is open, when held down, or handled already', () => {
+    expect(opensShortcuts(press('?'), { ...nowhere, dialogOpen: true })).toBe(false);
+    expect(opensShortcuts(press('?', { repeat: true }), nowhere)).toBe(false);
+    expect(opensShortcuts(press('?', { defaultPrevented: true }), nowhere)).toBe(false);
+  });
+
+  it('is only ? itself: not /, nor ? with Ctrl, ⌘ or Alt', () => {
+    expect(opensShortcuts(press('/'), nowhere)).toBe(false);
+    expect(opensShortcuts(press('?', { ctrlKey: true }), nowhere)).toBe(false);
+    expect(opensShortcuts(press('?', { metaKey: true }), nowhere)).toBe(false);
+    expect(opensShortcuts(press('?', { altKey: true }), nowhere)).toBe(false);
   });
 });

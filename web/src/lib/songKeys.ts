@@ -1,4 +1,4 @@
-import { matches, shortcuts } from './shortcuts';
+import { matches, shortcuts, shortcutsDialogKeys } from './shortcuts';
 
 /** The Song-wide Shortcuts, which work wherever focus is on the Song page. */
 export type SongKey = 'playPause' | 'record' | 'undo' | 'redo';
@@ -48,4 +48,10 @@ export function songKey(e: SongKeyPress, at: SongKeyContext): SongKey | null {
     return 'record';
   }
   return null;
+}
+
+/** Whether a key press opens the shortcuts dialog: ?, unless it's typed or a dialog is open. */
+export function opensShortcuts(e: SongKeyPress, at: Pick<SongKeyContext, 'dialogOpen' | 'inTextField'>): boolean {
+  if (e.defaultPrevented || e.repeat || at.dialogOpen || at.inTextField) return false;
+  return matches(e, shortcutsDialogKeys);
 }
