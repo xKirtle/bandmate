@@ -1,18 +1,17 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { formatCue, nudgeCue, parseCue, playLabel } from './cues';
+  import { cueNudge, cueNudgeHint } from './cueKeys';
   import { keyHints } from './keyHints';
-  import { allKeys, shortcuts } from './shortcuts';
-  import { cueNudge } from './syncKeys';
 
   // A Line's Cue time, shown as m:ss.s in the gutter beside it. Clicking it
   // lets the time be typed: Enter or leaving the field saves, Esc cancels,
   // and an empty field clears the Cue. Alt+↑/↓ nudges it by a tenth of a
-  // second. A ✕ after it, shown while its Line is hovered or the keyboard is
-  // in its slot, clears the Cue. With `pick`, as in Sync mode, clicking it
-  // makes its Line the next to cue instead, and there's no ✕. A Cue out of
-  // order is marked with a ⚠ and a warning colour, and says why on hover and
-  // to screen readers.
+  // second, but not in Sync mode, which only cues. A ✕ after it, shown while
+  // its Line is hovered or the keyboard is in its slot, clears the Cue. With
+  // `pick`, as in Sync mode, clicking it makes its Line the next to cue
+  // instead, and there's no ✕. A Cue out of order is marked with a ⚠ and a
+  // warning colour, and says why on hover and to screen readers.
   let {
     cue,
     label,
@@ -22,6 +21,7 @@
     current = false,
     hovered = false,
     pick,
+    syncing = false,
     outOfOrder = null,
   }: {
     /** In seconds, or null without a Cue. */
@@ -44,6 +44,8 @@
      * up next where it is.
      */
     pick?: () => void;
+    /** Whether Sync mode is on, where Alt+↑/↓ doesn't nudge the Cue, even a Chord Line's, which isn't picked. */
+    syncing?: boolean;
     /** Given, the Cue is out of order, for this reason, e.g. "Later than Line 6 of Chorus (0:55.0)". */
     outOfOrder?: string | null;
   } = $props();
@@ -56,10 +58,9 @@
   let clearButton = $state<HTMLButtonElement>();
 
   // The keys that nudge the Cue, later then earlier, named as this platform
-  // does, but only with a fine pointer.
+  // does, but only with a fine pointer, and not in Sync mode.
   const hints = keyHints();
-  const nudgeLabel = $derived(hints.twoWay(shortcuts.nudgeCue, 'forward'));
-  const nudgeAria = $derived(hints.aria(allKeys([shortcuts.nudgeCue], 'forward')));
+  const nudgeHint = $derived(cueNudgeHint(hints, syncing));
 
   // Said first on hover, and after the time to screen readers.
   const outOfOrderNote = $derived(outOfOrder ? `Out of order. ${outOfOrder}.` : '');
@@ -107,9 +108,9 @@
     }
   }
 
-  /** Alt+↑/↓, or as the list has it, saves the Cue, or the time typed, a tenth of a second later or earlier. */
+  /** Alt+↑/↓, or as the list has it, saves the Cue, or the time typed, a tenth of a second later or earlier, but not in Sync mode. */
   function nudge(e: KeyboardEvent): boolean {
-    const by = cueNudge(e);
+    const by = cueNudge(e, syncing);
     if (by === null) return false;
     const from = editing ? (parseCue(text) ?? cue) : cue;
     if (from === null) return false;
@@ -166,10 +167,10 @@
       class:invalid
       aria-label="Cue for {label}"
       aria-invalid={invalid}
-      aria-keyshortcuts={nudgeAria}
+      aria-keyshortcuts={nudgeHint.aria}
       title={invalid
         ? 'Type a time like 45, 0:45, 0:45.25 or 1:02'
-        : `Enter saves, Esc cancels, empty clears${nudgeLabel ? `, ${nudgeLabel} nudges` : ''}`}
+        : `Enter saves, Esc cancels, empty clears${nudgeHint.label ? `, ${nudgeHint.label} nudges` : ''}`}
       placeholder="0:00.0"
       autocomplete="off"
       spellcheck="false"
@@ -188,7 +189,7 @@
       class:out-of-order={outOfOrder}
       onclick={pick ?? edit}
       onkeydown={nudge}
-      aria-keyshortcuts={nudgeAria}
+      aria-keyshortcuts={nudgeHint.aria}
       aria-label={pick
         ? `Cue ${label} next${cue === null ? '' : `, cued at ${formatCue(cue)}${outOfOrder ? `. ${outOfOrderNote}` : ''}`}`
         : cue === null
@@ -199,7 +200,7 @@
           ? 'Cue this next'
           : cue === null
             ? 'Set when this starts on the Timeline'
-            : `Change when this starts on the Timeline${nudgeLabel ? `; ${nudgeLabel} nudges it` : ''}`
+            : `Change when this starts on the Timeline${nudgeHint.label ? `; ${nudgeHint.label} nudges it` : ''}`
       }`}
     >
       {#if outOfOrder}<span class="warning" aria-hidden="true">⚠</span>{/if}{cue === null ? '–:––.–' : formatCue(cue)}
