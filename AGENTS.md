@@ -4,6 +4,8 @@
 
 Issues and specs live in GitHub Issues on xKirtle/bandmate, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
 
+Every change gets an issue before its PR, even a quick win whose spec is already a roadmap entry, so the work stays visible. Make issues with the `to-tickets` skill.
+
 ### Triage labels
 
 Default vocabulary: needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix. This repo adds needs-grilling. See `docs/agents/triage-labels.md`.
