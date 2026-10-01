@@ -18,7 +18,7 @@ Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/do
 
 ### Releases
 
-To cut a release, follow CONTRIBUTING's "Cutting a release": push the tag, wait for CI to publish the image, and only then create the GitHub Release.
+To decide whether to release, or to cut one, follow `docs/agents/release.md`. It ends in CONTRIBUTING's "Cutting a release": push the tag, wait for CI to publish the image, and only then create the GitHub Release.
 
 ## Formatting
 
