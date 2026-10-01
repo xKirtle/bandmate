@@ -64,7 +64,7 @@ A single line of lyrics within an Alternate.
 _Avoid_: Row, verse (a verse is a Label)
 
 **Chord**:
-A chord name anchored at a character position within a Line, possibly mid-word.
+A chord name anchored at a character position within a Line, possibly mid-word. In Read mode a Song's Chords can be hidden; that choice is kept on each device, not on the Song.
 _Avoid_: Chord marker
 
 **Chord Line**:

@@ -18,8 +18,6 @@ export interface Song {
   capo: number | null;
   tuning: string;
   notes: string;
-  /** Whether the Lyric Sheet shows Chords; off hides them without removing them. */
-  showChords: boolean;
   createdAt: string;
   updatedAt: string;
   /** The Lyric Sheet: ids of its Sections, in order, each at most once. */
@@ -166,9 +164,7 @@ export const commonKeys: readonly string[] = [
 ];
 
 /** A partial update: only the fields present change; "" or null clears one. */
-export type SongChanges = Partial<
-  Pick<Song, 'title' | 'status' | 'key' | 'bpm' | 'capo' | 'tuning' | 'notes' | 'showChords'>
->;
+export type SongChanges = Partial<Pick<Song, 'title' | 'status' | 'key' | 'bpm' | 'capo' | 'tuning' | 'notes'>>;
 
 /** Narrows the Song list. */
 export interface SongFilter {

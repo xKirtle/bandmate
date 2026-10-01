@@ -136,54 +136,17 @@ func TestALineWithOnlyChordsIsAChordLine(t *testing.T) {
 	}
 }
 
-func TestShowChordsIsOnByDefault(t *testing.T) {
+func TestASongHasNoShowChordsSetting(t *testing.T) {
+	// Whether Read mode shows the Chords is kept on each device, not on the Song.
 	ts := newTestServer(t)
-
 	created := ts.createSong("Midnight Drive")
 
-	if !created.ShowChords || !ts.getSong(created.ID).ShowChords {
-		t.Errorf("showChords = false, want true for a new Song")
-	}
-}
+	res := ts.Do(http.MethodGet, songPath(created.ID), nil)
 
-func TestShowChordsCanBeTurnedOffAndOn(t *testing.T) {
-	ts := newTestServer(t)
-	s, _ := ts.verseWithLines("Hel[Am]lo")
-
-	got := ts.updateSong(s.ID, map[string]any{"showChords": false})
-
-	if got.ShowChords {
-		t.Errorf("showChords = true after turning it off")
-	}
-	if read := ts.getSong(s.ID); read.ShowChords {
-		t.Errorf("showChords read back = true, want false")
-	}
-	if l := got.Sections[0].Alternates[0].Lines[0]; l.Text != "Hel[Am]lo" || len(l.Chords) != 1 {
-		t.Errorf("line = %+v, want its Chords kept while hidden", l)
-	}
-	if !parseTime(t, got.UpdatedAt).After(parseTime(t, s.UpdatedAt)) {
-		t.Errorf("updatedAt = %s, want later than %s", got.UpdatedAt, s.UpdatedAt)
-	}
-
-	got = ts.updateSong(s.ID, map[string]any{"showChords": true})
-
-	if !got.ShowChords || !ts.getSong(s.ID).ShowChords {
-		t.Errorf("showChords = false after turning it back on")
-	}
-}
-
-func TestShowChordsMustBeTrueOrFalse(t *testing.T) {
-	for name, value := range map[string]any{"null": nil, "text": "no"} {
-		t.Run(name, func(t *testing.T) {
-			ts := newTestServer(t)
-			created := ts.createSong("Midnight Drive")
-
-			res := ts.patchSong(created.ID, map[string]any{"showChords": value, "title": "Renamed"})
-
-			expectStatus(t, res, http.StatusBadRequest)
-			if got := ts.getSong(created.ID); !reflect.DeepEqual(got, created) {
-				t.Errorf("song after rejected change = %+v, want it unchanged %+v", got, created)
-			}
-		})
+	expectStatus(t, res, http.StatusOK)
+	var fields map[string]any
+	res.JSON(t, &fields)
+	if _, ok := fields["showChords"]; ok {
+		t.Errorf("song = %s, want no showChords", res.Body)
 	}
 }

@@ -176,7 +176,6 @@ type song struct {
 	Capo        *int      `json:"capo"`
 	Tuning      string    `json:"tuning"`
 	Notes       string    `json:"notes"`
-	ShowChords  bool      `json:"showChords"`
 	CreatedAt   string    `json:"createdAt"`
 	UpdatedAt   string    `json:"updatedAt"`
 	Arrangement []int64   `json:"arrangement"`

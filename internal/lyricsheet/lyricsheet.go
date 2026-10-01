@@ -80,16 +80,13 @@ type Song struct {
 	Status  Status  `json:"status"`
 	// Key, BPM, Capo and Tuning record how to play the Song. Empty text and
 	// nil numbers mean "not set".
-	Key    string `json:"key"`
-	BPM    *int   `json:"bpm"`
-	Capo   *int   `json:"capo"`
-	Tuning string `json:"tuning"`
-	Notes  string `json:"notes"`
-	// ShowChords is whether the Lyric Sheet shows Chords; it hides them on
-	// purpose, without removing them from the Lines.
-	ShowChords bool      `json:"showChords"`
-	CreatedAt  time.Time `json:"createdAt"`
-	UpdatedAt  time.Time `json:"updatedAt"`
+	Key       string    `json:"key"`
+	BPM       *int      `json:"bpm"`
+	Capo      *int      `json:"capo"`
+	Tuning    string    `json:"tuning"`
+	Notes     string    `json:"notes"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 	LyricSheet
 	// Masters are in the order they were added.
 	Masters []Master `json:"masters"`
@@ -193,10 +190,10 @@ func (s *Store) GetSong(ctx context.Context, id int64) (Song, error) {
 	var bpm, capo sql.NullInt64
 	var created, updated string
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, version, title, status, song_key, bpm, capo, tuning, notes, show_chords, created_at, updated_at
+		`SELECT id, version, title, status, song_key, bpm, capo, tuning, notes, created_at, updated_at
 		 FROM songs WHERE id = ?`, id).
 		Scan(&song.ID, &song.Version, &song.Title, &song.Status, &song.Key, &bpm, &capo, &song.Tuning, &song.Notes,
-			&song.ShowChords, &created, &updated)
+			&created, &updated)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Song{}, ErrNotFound
 	}
@@ -303,8 +300,6 @@ type SongChanges struct {
 	Capo   Change[*int]   `json:"capo"`
 	Tuning Change[string] `json:"tuning"`
 	Notes  Change[string] `json:"notes"`
-	// ShowChords can't be null: it is either on or off.
-	ShowChords Change[*bool] `json:"showChords"`
 }
 
 // UpdateSong applies changes to a Song. Every change is validated before
@@ -348,12 +343,6 @@ func (s *Store) UpdateSong(ctx context.Context, id int64, based Version, changes
 	}
 	if c := changes.Notes; c.Set {
 		set("notes", c.Value)
-	}
-	if c := changes.ShowChords; c.Set {
-		if c.Value == nil {
-			return Song{}, invalid("showChords must be true or false")
-		}
-		set("show_chords", *c.Value)
 	}
 	if len(sets) == 0 {
 		song, err := s.GetSong(ctx, id)
