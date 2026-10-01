@@ -91,3 +91,23 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 
 - Back up and restore from the UI, instead of stopping Bandmate and copying the data folder.
 - Finer than the whole folder: a single Song with its Timeline, Takes and Cover, or the Beat Library, as well as everything. A Song's backup also moves it to another install. What can be backed up on its own, and what a restore does when it meets a Song or Beat that already exists, are for the spec.
+
+## Undoing a new Take returns the playhead
+
+- Undoing a new Take, recorded into a new Clip, puts the playhead back where that Clip began, so recording again after a bad Take starts from the same place. Today the playhead stays where recording stopped.
+- Only a new Take's Clip: undoing a Retake leaves the playhead alone. Whether redo moves it too is for the spec.
+
+## Merging Clips
+
+- Merge two or more Clips into one Clip that runs from the earliest Clip's start to the latest Clip's end, and sounds as playback of those Clips would: where they overlap they play together, and a gap between them is silence.
+- It's not a Mixdown, which is downloaded and never kept: the merged Clip stays on the Timeline. Whether the Clips can be on different Tracks (and whose volume, mute and solo apply), which Track the result lands on, whether the merged audio becomes a Sound, and whether undo brings the original Clips back, are for the spec.
+
+## Moving several Clips at once
+
+- Select several Clips, across Tracks, and drag them together by the same amount, so they keep their places relative to each other. Today a drag moves one Clip, and Snapping only lines Clips up edge to edge, so it can't keep three Clips that start at different times in step.
+- Selecting several Clips is what Merging Clips needs too, so the two may share it. How Clips are picked (Shift or Ctrl+click, a box dragged around them), whether the group snaps by any of its Clips' edges, whether it can move between Tracks together, and what stops it (the Timeline's start, another Clip in the way), are for the spec.
+
+## Copying and pasting Clips
+
+- Clicking a Clip leaves it selected, so Ctrl+C and Ctrl+V copy it, as its menu's Duplicate does today without reaching for the menu.
+- It builds on the same selection as Moving several Clips, so several selected Clips could be copied together. Where a pasted Clip lands (at the playhead on the Chosen Track, or right after the original as Duplicate puts it), whether a copied Clip can be pasted into another Song, and what clears the selection, are for the spec.
