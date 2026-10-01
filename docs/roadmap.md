@@ -48,3 +48,21 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 ## Playback in step with what's heard
 
 - Show the playhead, the Line highlight and Sync mode's "Now" where the audio is heard, by the output latency the browser reports. It's unnoticeable through an interface, but 150–250 ms late over Bluetooth. A tap test to correct it, only if the reported figure proves off.
+
+## A tutorial
+
+- A first-time walkthrough of Bandmate. It can be dismissed, and taken again whenever the user wants.
+- It comes with a demo Song and Beat to work through, created when the user asks for them, from audio built into the binary. A migration would add them to every existing install on upgrade, and a Beat's audio is a file in the data directory, not a row, so SQL alone can't ship it. Created on request, a deleted demo can be added again. The Beat's audio needs a licence that allows shipping it.
+
+## A keyboard icon on the shortcuts button
+
+- The Song page's button that opens the shortcuts dialog shows a keyboard instead of "?", which says more plainly what it opens.
+
+## Start and end buttons on the Timeline
+
+- Buttons beside play/pause that move the playhead to the start or end of the Timeline, giving the mouse what Home and End do on the ruler. Their titles name those keys.
+
+## A chords toggle on the Lyric Sheet's heading
+
+- In Read mode, "Show chords" becomes a toggle button styled like the Timeline's Loop and Record, on the same row as the "Lyric Sheet" heading, instead of a checkbox below it.
+- It's labelled "Chords". "ChordPro" would name the format that import reads and export will write, not what the button shows.
