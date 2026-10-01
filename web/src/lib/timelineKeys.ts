@@ -4,6 +4,7 @@
  * Each handler keeps its own guards, e.g. whether the Timeline can be edited.
  */
 
+import { opensMenu } from './menu';
 import { matches, shortcuts, way, type Key, type KeyPress } from './shortcuts';
 
 /** The modifiers held with a pointer or wheel event, or a key press. */
@@ -18,7 +19,7 @@ function mouse(key: 'drag' | 'wheel', e: Modifiers): KeyPress {
 /** What a key press does to a focused Clip: delete it, open its ⋯ menu, or nothing. */
 export function clipAction(e: KeyPress): 'delete' | 'menu' | null {
   if (matches(e, shortcuts.deleteClip.keys)) return 'delete';
-  return matches(e, shortcuts.clipMenu.keys) ? 'menu' : null;
+  return opensMenu(e) ? 'menu' : null;
 }
 
 /** Where a key press on the ruler seeks to, from `position` on a Timeline `length` long, or null if it doesn't. */

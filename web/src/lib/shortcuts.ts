@@ -231,6 +231,19 @@ export function keysLabel(keys: readonly Key[], on: Platform): string {
   return keys.map((key) => keyLabel(key, on)).join(' or ');
 }
 
+/** Which of a two-way Shortcut's ways is named first. */
+export type FirstWay = 'back' | 'forward';
+
+/** Every key of two-way Shortcuts, e.g. for `aria-keyshortcuts`: each one's back keys then its forward keys, or forward first. */
+export function allKeys(ways: readonly TwoWay[], first: FirstWay = 'back'): Key[] {
+  return ways.flatMap((s) => (first === 'back' ? [...s.back, ...s.forward] : [...s.forward, ...s.back]));
+}
+
+/** Names a two-way Shortcut's keys for a platform, e.g. "Alt+← or Alt+→", back first unless asked otherwise. */
+export function twoWayLabel(shortcut: TwoWay, on: Platform, first: FirstWay = 'back'): string {
+  return keysLabel(allKeys([shortcut], first), on);
+}
+
 /** Declares `keys` for `aria-keyshortcuts`, with Mod as the platform's modifier and Ctrl as Control. */
 export function ariaKeyShortcuts(keys: readonly Key[], on: Platform): string {
   return keys

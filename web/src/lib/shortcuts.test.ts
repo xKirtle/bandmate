@@ -1,5 +1,15 @@
 import { describe as group, expect, it } from 'vitest';
-import { ariaKeyShortcuts, keysLabel, matches, shortcuts, way, type Key, type KeyPress } from './shortcuts';
+import {
+  allKeys,
+  ariaKeyShortcuts,
+  keysLabel,
+  matches,
+  shortcuts,
+  twoWayLabel,
+  way,
+  type Key,
+  type KeyPress,
+} from './shortcuts';
 
 const press = (key: string, mods: Partial<Omit<KeyPress, 'key'>> = {}): KeyPress => ({
   key,
@@ -167,5 +177,34 @@ group('ariaKeyShortcuts', () => {
     expect(ariaKeyShortcuts(redo, 'other')).toBe('Control+Shift+Z Control+Y');
     expect(ariaKeyShortcuts([{ key: ' ' }], 'other')).toBe('Space');
     expect(ariaKeyShortcuts([{ key: 'ArrowLeft', alt: true }], 'other')).toBe('Alt+ArrowLeft');
+  });
+});
+
+group('allKeys', () => {
+  it("gives two-way Shortcuts' keys, each one's back keys then its forward keys", () => {
+    expect(allKeys([shortcuts.step, shortcuts.shiftStep])).toEqual([
+      { key: 'ArrowLeft', alt: true },
+      { key: 'ArrowRight', alt: true },
+      { key: 'ArrowLeft', alt: true, shift: true },
+      { key: 'ArrowRight', alt: true, shift: true },
+    ]);
+  });
+
+  it('gives the forward keys first when asked', () => {
+    expect(allKeys([shortcuts.nudgeCue], 'forward')).toEqual([
+      { key: 'ArrowUp', alt: true },
+      { key: 'ArrowDown', alt: true },
+    ]);
+  });
+});
+
+group('twoWayLabel', () => {
+  it("names a two-way Shortcut's keys, back then forward, for a platform", () => {
+    expect(twoWayLabel(shortcuts.step, 'other')).toBe('Alt+← or Alt+→');
+    expect(twoWayLabel(shortcuts.shiftStep, 'mac')).toBe('⌥⇧← or ⌥⇧→');
+  });
+
+  it('names the forward keys first when asked', () => {
+    expect(twoWayLabel(shortcuts.nudgeCue, 'mac', 'forward')).toBe('⌥↑ or ⌥↓');
   });
 });

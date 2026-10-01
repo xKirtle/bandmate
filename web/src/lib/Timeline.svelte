@@ -56,7 +56,7 @@
   import { nameSound } from './soundName';
   import { inTextField } from './textField';
   import { songKey } from './songKeys';
-  import { ariaKeyShortcuts, keysLabel, platform, shortcuts, type OneWay } from './shortcuts';
+  import { allKeys, ariaKeyShortcuts, keysLabel, platform, shortcuts, type OneWay } from './shortcuts';
   import { clipAction, isModifier, rulerSeek, skipsSnapping, slips, zooms } from './timelineKeys';
   import { prepareUpload } from './upload';
   import { formatDuration } from './time';
@@ -399,10 +399,7 @@
   const ariaOf = (shortcut: OneWay) => ariaKeyShortcuts(shortcut.keys, on);
   // What a focused Clip and the ruler declare as their keys.
   const clipAria = ariaKeyShortcuts([...shortcuts.deleteClip.keys, ...shortcuts.clipMenu.keys], on);
-  const rulerAria = ariaKeyShortcuts(
-    [shortcuts.seek, shortcuts.seekFar, shortcuts.startOrEnd].flatMap((s) => [...s.back, ...s.forward]),
-    on,
-  );
+  const rulerAria = ariaKeyShortcuts(allKeys([shortcuts.seek, shortcuts.seekFar, shortcuts.startOrEnd]), on);
 
   function keydown(event: KeyboardEvent) {
     if (trackDrag.current && event.key === 'Escape') {

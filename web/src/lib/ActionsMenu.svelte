@@ -3,7 +3,7 @@
   import { fieldStep, menuKey, opensMenu, type MenuAction, type MenuChoice, type MenuField } from './menu';
   import { popoverLeft, popoverSide, popoverTop, type PopoverAlign } from './popover';
   import type { Point } from './press';
-  import { ariaKeyShortcuts, keysLabel, platform, shortcuts, type TwoWay } from './shortcuts';
+  import { allKeys, ariaKeyShortcuts, platform, shortcuts, twoWayLabel } from './shortcuts';
 
   let {
     entries,
@@ -29,13 +29,9 @@
 
   // The keys that step a field, named as this platform does, e.g. ⌥← on a Mac.
   const on = platform();
-  const stepKeys = (s: TwoWay) => `${keysLabel(s.back, on)} and ${keysLabel(s.forward, on)}`;
   const stepHint = (f: MenuField) =>
-    `${stepKeys(shortcuts.step)} step it by ${f.step} ${f.unit}, or by ${f.shiftStep} with ${stepKeys(shortcuts.shiftStep)}`;
-  const fieldAria = ariaKeyShortcuts(
-    [shortcuts.step, shortcuts.shiftStep].flatMap((s) => [...s.back, ...s.forward]),
-    on,
-  );
+    `${twoWayLabel(shortcuts.step, on)} steps it by ${f.step} ${f.unit}, or by ${f.shiftStep} with ${twoWayLabel(shortcuts.shiftStep, on)}`;
+  const fieldAria = ariaKeyShortcuts(allKeys([shortcuts.step, shortcuts.shiftStep]), on);
 
   let open = $state(false);
   // The entry whose choices, or field, the menu shows in place of the entries, if any.
