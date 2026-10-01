@@ -11,8 +11,8 @@ import type { MenuAction } from './menu';
 export type ClipMenuState = {
   /** A Take could start recording: stopped, and out of Sync mode. */
   canRecord: boolean;
-  /** The title of the Sound a Clip of a Sound plays. */
-  soundTitle: string;
+  /** The name of the Sound a Clip of a Sound plays, or null for another Clip. */
+  soundName: string | null;
   /** The keys that nudge a Take, as shown, or null for none. */
   nudgeKeys: string | null;
 };
@@ -22,32 +22,30 @@ export type ClipRun = {
   retake: () => void;
   chooseTake: (takeId: number) => void;
   deleteTake: (takeId: number) => void;
-  /** Sets the active Take's nudge, in milliseconds. */
-  nudgeTake: (ms: number) => void;
+  /** Sets a Take's nudge, in milliseconds. */
+  nudgeTake: (takeId: number, ms: number) => void;
   clearInactiveTakes: () => void;
-  downloadTake: () => void;
+  downloadTake: (takeId: number) => void;
   rename: () => void;
   duplicate: () => void;
-  downloadSound: () => void;
+  downloadSound: (soundId: number) => void;
   deleteClip: () => void;
 };
 
 /** The entries of a Clip's menu. */
 export function clipActions(clip: Clip, state: ClipMenuState, run: ClipRun): MenuAction[] {
+  const { soundId } = clip;
   return [
-    ...(clip.activeTakeId !== null && state.canRecord
-      ? [{ icon: '●', label: 'Retake', title: 'Record another Take into this Clip', run: run.retake }]
-      : []),
     ...takeActions(clip, state, run),
     { icon: '✎', label: 'Rename', title: 'Or double-click the Clip', run: run.rename },
     { icon: '⧉', label: 'Duplicate', run: run.duplicate },
-    ...(clip.soundId !== null
+    ...(soundId !== null
       ? [
           {
             icon: '⤓',
             label: 'Download Sound',
-            title: `Save “${state.soundTitle}” as it was imported`,
-            run: run.downloadSound,
+            title: `Save “${state.soundName}” as it was imported`,
+            run: () => run.downloadSound(soundId),
           },
         ]
       : []),
@@ -59,11 +57,14 @@ function takeActions(clip: Clip, state: ClipMenuState, run: ClipRun): MenuAction
   if (clip.activeTakeId === null) return [];
   const { activeTakeId, takes } = clip;
   const active = activeTake(clip)!;
-  const { nudgeKeys } = state;
+  const { canRecord, nudgeKeys } = state;
   // With one Take, there's no other to choose, and deleting it is
   // deleting the Clip.
   const several = takes.length > 1;
   return [
+    ...(canRecord
+      ? [{ icon: '●', label: 'Retake', title: 'Record another Take into this Clip', run: run.retake }]
+      : []),
     ...(several
       ? [
           {
@@ -97,7 +98,7 @@ function takeActions(clip: Clip, state: ClipMenuState, run: ClipRun): MenuAction
         unit: 'ms',
         step: 1,
         shiftStep: 10,
-        set: run.nudgeTake,
+        set: (ms) => run.nudgeTake(activeTakeId, ms),
       },
     },
     ...(several ? [{ icon: '⊘', label: 'Clear inactive Takes', run: run.clearInactiveTakes }] : []),
@@ -105,7 +106,7 @@ function takeActions(clip: Clip, state: ClipMenuState, run: ClipRun): MenuAction
       icon: '⤓',
       label: 'Download Take',
       title: `Save Take ${active.number}'s WAV as it was recorded, lead-in and all`,
-      run: run.downloadTake,
+      run: () => run.downloadTake(activeTakeId),
     },
   ];
 }

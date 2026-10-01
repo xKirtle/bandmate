@@ -30,7 +30,7 @@ group('clipActions', () => {
   const soundClip = clip({ soundId: 3 });
   const oneTake = clip({ takes: [take(10, 1)], activeTakeId: 10 });
   const twoTakes = clip({ takes: [take(10, 1), take(11, 2)], activeTakeId: 11 });
-  const state = { canRecord: true, soundTitle: 'Riff', nudgeKeys: 'Alt+←/→' };
+  const state = { canRecord: true, soundName: 'Riff', nudgeKeys: 'Alt+←/→' };
   const run = {
     retake: () => {},
     chooseTake: () => {},
@@ -43,21 +43,19 @@ group('clipActions', () => {
     downloadSound: () => {},
     deleteClip: () => {},
   };
-  const labels = (c: Clip) => clipActions(c, state, run).map((a) => a.label);
+  const labels = (c: Clip, s = state) => clipActions(c, s, run).map((a) => a.label);
 
-  it('labels a Beat Clip’s delete Delete Clip', () => {
+  it('names its delete “Delete Clip”, whatever the Clip plays', () => {
     expect(labels(beatClip)).toEqual(['Rename', 'Duplicate', 'Delete Clip']);
-  });
-
-  it('labels a Sound Clip’s delete Delete Clip', () => {
     expect(labels(soundClip)).toEqual(['Rename', 'Duplicate', 'Download Sound', 'Delete Clip']);
+    expect(labels(oneTake).at(-1)).toBe('Delete Clip');
   });
 
-  it('offers a Clip with one Take no Takes, Delete Take or Clear inactive Takes', () => {
+  it('offers no Take choices on a Clip of one Take', () => {
     expect(labels(oneTake)).toEqual(['Retake', 'Nudge', 'Download Take', 'Rename', 'Duplicate', 'Delete Clip']);
   });
 
-  it('offers a Clip with two Takes Takes, Delete Take and Clear inactive Takes', () => {
+  it('offers Takes, Delete Take and Clear inactive Takes on a Clip of several Takes', () => {
     expect(labels(twoTakes)).toEqual([
       'Retake',
       'Takes',
@@ -77,12 +75,12 @@ group('clipActions', () => {
       retake: () => ran.push('retake'),
       chooseTake: (id) => ran.push(`choose ${id}`),
       deleteTake: (id) => ran.push(`delete take ${id}`),
-      nudgeTake: (ms) => ran.push(`nudge ${ms}`),
+      nudgeTake: (id, ms) => ran.push(`nudge ${id} ${ms}`),
       clearInactiveTakes: () => ran.push('clear'),
-      downloadTake: () => ran.push('download take'),
+      downloadTake: (id) => ran.push(`download take ${id}`),
       rename: () => ran.push('rename'),
       duplicate: () => ran.push('duplicate'),
-      downloadSound: () => ran.push('download sound'),
+      downloadSound: (id) => ran.push(`download sound ${id}`),
       deleteClip: () => ran.push('delete clip'),
     });
     for (const entry of entries) {
@@ -95,9 +93,9 @@ group('clipActions', () => {
       'choose 10',
       'delete take 10',
       'delete take 11',
-      'nudge 5',
+      'nudge 11 5',
       'clear',
-      'download take',
+      'download take 11',
       'rename',
       'duplicate',
       'delete clip',
@@ -106,6 +104,16 @@ group('clipActions', () => {
 
   it('offers no Retake while a Take couldn’t start', () => {
     expect(labels(oneTake)).toContain('Retake');
-    expect(clipActions(oneTake, { ...state, canRecord: false }, run).map((a) => a.label)).not.toContain('Retake');
+    expect(labels(oneTake, { ...state, canRecord: false })).not.toContain('Retake');
+  });
+
+  it('downloads the Sound a Clip of a Sound plays, named in its title', () => {
+    const downloaded: number[] = [];
+    const entry = clipActions(soundClip, state, { ...run, downloadSound: (id) => downloaded.push(id) }).find(
+      (a) => a.label === 'Download Sound',
+    )!;
+    expect(entry.title).toBe('Save “Riff” as it was imported');
+    if ('run' in entry) entry.run();
+    expect(downloaded).toEqual([3]);
   });
 });

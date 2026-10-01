@@ -1684,24 +1684,24 @@
   let pressTimer: ReturnType<typeof setTimeout> | undefined;
 
   function clipMenuActions(clip: Clip): MenuAction[] {
-    const { id: clipId, activeTakeId, soundId } = clip;
+    const clipId = clip.id;
     return clipActions(
       clip,
       {
         canRecord,
-        soundTitle: soundId === null ? '' : sources.of(clip).title,
+        soundName: clip.soundId === null ? null : sources.of(clip).title,
         nudgeKeys: hints.label(shortcuts.nudgeTake.keys),
       },
       {
         retake: () => startRecording(clip),
         chooseTake: (takeId) => perform({ kind: 'chooseTake', clipId, takeId }),
         deleteTake: (takeId) => perform({ kind: 'deleteTake', clipId, takeId }),
-        nudgeTake: (ms) => perform({ kind: 'nudgeTake', clipId, takeId: activeTakeId!, nudge: ms / 1000 }),
+        nudgeTake: (takeId, ms) => perform({ kind: 'nudgeTake', clipId, takeId, nudge: ms / 1000 }),
         clearInactiveTakes: () => perform({ kind: 'clearInactiveTakes', clipId }),
-        downloadTake: () => download(api.takeDownloadUrl(timeline.songId, activeTakeId!)),
+        downloadTake: (takeId) => download(api.takeDownloadUrl(timeline.songId, takeId)),
         rename: () => startClipRename(clip),
         duplicate: () => duplicate(clip),
-        downloadSound: () => download(api.soundDownloadUrl(timeline.songId, soundId!)),
+        downloadSound: (soundId) => download(api.soundDownloadUrl(timeline.songId, soundId)),
         deleteClip: () => remove(clip),
       },
     );
