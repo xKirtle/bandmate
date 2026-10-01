@@ -160,6 +160,12 @@ export const shortcutsDialogKeys: readonly Key[] = [{ key: '?' }];
 /** A key press, or a mouse action given as `drag` or `wheel`. */
 export type KeyPress = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'>;
 
+/**
+ * A key press as a handler hears it: whether it's a held key's repeat, and
+ * whether a handler before it has taken it.
+ */
+export type KeyDown = KeyPress & Pick<KeyboardEvent, 'repeat' | 'defaultPrevented'>;
+
 /** Letters, and keys that name themselves, e.g. Space and ArrowLeft, which Shift doesn't change. */
 function shiftCounts(key: string): boolean {
   return key.length > 1 || key === ' ' || key.toLowerCase() !== key.toUpperCase();

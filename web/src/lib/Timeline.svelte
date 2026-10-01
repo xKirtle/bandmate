@@ -56,6 +56,7 @@
   import { repeats, timelineEnd, type Loop, type Placed } from './schedule';
   import { nameSound } from './soundName';
   import { inTextField } from './textField';
+  import { keyPlace } from './keyPlace';
   import { songKey } from './songKeys';
   import { allKeys, shortcuts } from './shortcuts';
   import { clipAction, isModifier, rulerSeek, skipsSnapping, slips, zooms } from './timelineKeys';
@@ -409,8 +410,7 @@
     }
     const shortcut = songKey(event, {
       busy: picking || calibrating !== null || mixingDown,
-      dialogOpen: document.querySelector('dialog[open]') !== null,
-      inTextField: inTextField(event.target),
+      ...keyPlace(event),
       ownsSpace: ownsSpace(event.target),
       editable: editable.current,
       recording: recording !== null,

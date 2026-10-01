@@ -1,21 +1,13 @@
-import { matches, shortcuts, shortcutsDialogKeys } from './shortcuts';
+import { matches, shortcuts, shortcutsDialogKeys, type KeyDown } from './shortcuts';
+import type { KeyPlace } from './keyPlace';
 
 /** The Song-wide Shortcuts, which work wherever focus is on the Song page. */
 export type SongKey = 'playPause' | 'record' | 'undo' | 'redo';
 
-export type SongKeyPress = Pick<
-  KeyboardEvent,
-  'key' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey' | 'repeat' | 'defaultPrevented'
->;
-
 /** Where a key was pressed, and what the Song page is doing. */
-export type SongKeyContext = {
+export type SongKeyContext = KeyPlace & {
   /** Picking a Beat, calibrating the Latency Offset or making a Mixdown. */
   busy: boolean;
-  /** A dialog is open, e.g. the shortcuts dialog. */
-  dialogOpen: boolean;
-  /** It was pressed in a text field, which takes typed keys. */
-  inTextField: boolean;
   /** Space there is the control's own, e.g. a text field, a checkbox or a ⋯ menu. */
   ownsSpace: boolean;
   /** The Timeline can be edited, i.e. it isn't on a phone, where it only plays. */
@@ -32,7 +24,7 @@ export type SongKeyContext = {
  * Which Song-wide Shortcut a key press is, if any, and if it should act
  * now: null leaves the key to the page.
  */
-export function songKey(e: SongKeyPress, at: SongKeyContext): SongKey | null {
+export function songKey(e: KeyDown, at: SongKeyContext): SongKey | null {
   // A dialog's keys are for what's in it, e.g. the shortcuts dialog.
   if (e.defaultPrevented || at.busy || at.dialogOpen) return null;
   if (matches(e, shortcuts.playPause.keys)) {
@@ -51,7 +43,7 @@ export function songKey(e: SongKeyPress, at: SongKeyContext): SongKey | null {
 }
 
 /** Whether a key press opens the shortcuts dialog: ?, unless it's typed or a dialog is open. */
-export function opensShortcuts(e: SongKeyPress, at: Pick<SongKeyContext, 'dialogOpen' | 'inTextField'>): boolean {
+export function opensShortcuts(e: KeyDown, at: KeyPlace): boolean {
   if (e.defaultPrevented || e.repeat || at.dialogOpen || at.inTextField) return false;
   return matches(e, shortcutsDialogKeys);
 }

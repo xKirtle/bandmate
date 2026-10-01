@@ -1,7 +1,8 @@
 import { describe as group, expect, it } from 'vitest';
-import { cueNudge, cuesNextLine, type CueNextContext, type SyncKeyPress } from './syncKeys';
+import type { KeyDown } from './shortcuts';
+import { cueNudge, cuesNextLine, type CueNextContext } from './syncKeys';
 
-const press = (key: string, mods: Partial<Omit<SyncKeyPress, 'key'>> = {}): SyncKeyPress => ({
+const press = (key: string, mods: Partial<Omit<KeyDown, 'key'>> = {}): KeyDown => ({
   key,
   ctrlKey: false,
   metaKey: false,

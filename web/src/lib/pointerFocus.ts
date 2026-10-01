@@ -22,7 +22,7 @@ export class PointerFocus {
    * unless it's a shortcut, held with Ctrl, ⌘ or Alt, as Chrome has it. A
    * key held down acted when first pressed; its repeats change nothing.
    */
-  keyDown(event: KeyPress) {
+  keyDown(event: RingKeyPress) {
     if (event.repeat) return;
     this.#fromPointerBeforeKey = this.#fromPointer;
     if (!(event.ctrlKey || event.metaKey || event.altKey)) this.#fromPointer = false;
@@ -38,7 +38,7 @@ export class PointerFocus {
 }
 
 /** The parts of a key press that say whether it shows a ring. */
-export type KeyPress = Pick<KeyboardEvent, 'ctrlKey' | 'metaKey' | 'altKey' | 'repeat'>;
+export type RingKeyPress = Pick<KeyboardEvent, 'ctrlKey' | 'metaKey' | 'altKey' | 'repeat'>;
 
 const focus = new PointerFocus();
 
