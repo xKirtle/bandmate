@@ -107,14 +107,20 @@ group('skipsSnapping', () => {
 });
 
 group('zooms', () => {
-  it('zooms on Ctrl+wheel, which is what a trackpad pinch sends', () => {
+  it('zooms on Mod+wheel, as Ctrl+wheel or ⌘+wheel, on every platform', () => {
     expect(zooms(held({ ctrlKey: true }))).toBe(true);
+    expect(zooms(held({ metaKey: true }))).toBe(true);
   });
 
-  it('leaves the wheel without Ctrl to scroll', () => {
+  it('leaves the wheel without Mod to scroll', () => {
     expect(zooms(held())).toBe(false);
     expect(zooms(held({ shiftKey: true }))).toBe(false);
     expect(zooms(held({ altKey: true }))).toBe(false);
+  });
+
+  it('takes Mod only on its own, a pinch aside', () => {
+    expect(zooms(held({ metaKey: true, altKey: true }))).toBe(false);
+    expect(zooms(held({ metaKey: true, shiftKey: true }))).toBe(false);
   });
 
   it('zooms on the keys given for it', () => {
@@ -123,8 +129,9 @@ group('zooms', () => {
     expect(zooms(held({ shiftKey: true }), altWheel)).toBe(false);
   });
 
-  it('zooms on a pinch, whatever the keys given for it', () => {
+  it('zooms on a pinch, which a browser sends as a Ctrl wheel event, whatever the keys given for it', () => {
     expect(zooms(held({ ctrlKey: true }), [{ key: 'wheel', alt: true }])).toBe(true);
+    expect(zooms(held({ ctrlKey: true, altKey: true }))).toBe(true);
   });
 });
 

@@ -42,21 +42,14 @@ group('matches', () => {
     expect(matches(press('z', { ctrlKey: true, metaKey: true }), undo)).toBe(false);
   });
 
-  it('takes Ctrl as the Control key itself, on a Mac too', () => {
-    const ctrlY = [{ key: 'y', ctrl: true }];
-    expect(matches(press('y', { ctrlKey: true }), ctrlY)).toBe(true);
-    expect(matches(press('y', { metaKey: true }), ctrlY)).toBe(false);
-    expect(matches(press('y', { ctrlKey: true, metaKey: true }), ctrlY)).toBe(false);
-    expect(matches(press('y'), ctrlY)).toBe(false);
-  });
-
   it('matches any of several keys', () => {
     const redo = [
       { key: 'z', mod: true, shift: true },
-      { key: 'y', ctrl: true },
+      { key: 'y', mod: true },
     ];
     expect(matches(press('Z', { ctrlKey: true, shiftKey: true }), redo)).toBe(true);
     expect(matches(press('y', { ctrlKey: true }), redo)).toBe(true);
+    expect(matches(press('y', { metaKey: true }), redo)).toBe(true);
     expect(matches(press('z', { ctrlKey: true }), redo)).toBe(false);
     expect(matches(press('Y', { ctrlKey: true, shiftKey: true }), redo)).toBe(false);
   });
@@ -84,12 +77,12 @@ group('matches', () => {
 group('keysLabel', () => {
   const redo = [
     { key: 'z', mod: true, shift: true },
-    { key: 'y', ctrl: true },
+    { key: 'y', mod: true },
   ];
 
   it('names modifiers with symbols on a Mac', () => {
     expect(keysLabel([{ key: 'z', mod: true }], 'mac')).toBe('⌘Z');
-    expect(keysLabel(redo, 'mac')).toBe('⌘⇧Z or ⌃Y');
+    expect(keysLabel(redo, 'mac')).toBe('⌘⇧Z or ⌘Y');
     expect(keysLabel([{ key: 'ArrowLeft', alt: true, shift: true }], 'mac')).toBe('⌥⇧←');
   });
 
@@ -110,7 +103,8 @@ group('keysLabel', () => {
   it('names mouse Shortcuts by their modifier', () => {
     expect(keysLabel([{ key: 'drag', alt: true }], 'other')).toBe('Alt+drag');
     expect(keysLabel([{ key: 'drag', alt: true }], 'mac')).toBe('⌥+drag');
-    expect(keysLabel([{ key: 'wheel', ctrl: true }], 'mac')).toBe('⌃+wheel');
+    expect(keysLabel([{ key: 'wheel', mod: true }], 'mac')).toBe('⌘+wheel');
+    expect(keysLabel([{ key: 'wheel', mod: true }], 'other')).toBe('Ctrl+wheel');
   });
 });
 
@@ -147,10 +141,10 @@ group('The list', () => {
     ]);
   });
 
-  it('names Mod ⌘ on a Mac, and Ctrl, the Control key itself, ⌃', () => {
+  it('names Mod ⌘ on a Mac', () => {
     expect(keysLabel(shortcuts.undo.keys, 'mac')).toBe('⌘Z');
-    expect(keysLabel(shortcuts.redo.keys, 'mac')).toBe('⌘⇧Z or ⌃Y');
-    expect(keysLabel(shortcuts.zoom.keys, 'mac')).toBe('⌃+wheel');
+    expect(keysLabel(shortcuts.redo.keys, 'mac')).toBe('⌘⇧Z or ⌘Y');
+    expect(keysLabel(shortcuts.zoom.keys, 'mac')).toBe('⌘+wheel');
   });
 
   it('describes every Shortcut in one line', () => {
@@ -168,12 +162,12 @@ group('way', () => {
 });
 
 group('ariaKeyShortcuts', () => {
-  it("declares each key with the platform's modifier for Mod, and Control for Ctrl", () => {
+  it("declares each key with the platform's modifier for Mod", () => {
     const redo = [
       { key: 'z', mod: true, shift: true },
-      { key: 'y', ctrl: true },
+      { key: 'y', mod: true },
     ];
-    expect(ariaKeyShortcuts(redo, 'mac')).toBe('Meta+Shift+Z Control+Y');
+    expect(ariaKeyShortcuts(redo, 'mac')).toBe('Meta+Shift+Z Meta+Y');
     expect(ariaKeyShortcuts(redo, 'other')).toBe('Control+Shift+Z Control+Y');
     expect(ariaKeyShortcuts([{ key: ' ' }], 'other')).toBe('Space');
     expect(ariaKeyShortcuts([{ key: 'ArrowLeft', alt: true }], 'other')).toBe('Alt+ArrowLeft');

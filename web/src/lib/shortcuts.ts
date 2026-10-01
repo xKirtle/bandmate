@@ -7,10 +7,9 @@
 /**
  * One of a Shortcut's keys: a `KeyboardEvent.key`, or `drag` or `wheel`
  * for a mouse Shortcut, held with exactly these modifiers. Mod is Ctrl or
- * ⌘, either on any platform, shown as ⌘ on a Mac; Ctrl is the Control key
- * itself, on a Mac too, e.g. for Ctrl+Y, which a Mac browser keeps ⌘Y from.
+ * ⌘, either on any platform, shown as ⌘ on a Mac.
  */
-export type Key = { key: string; mod?: boolean; ctrl?: boolean; alt?: boolean; shift?: boolean };
+export type Key = { key: string; mod?: boolean; alt?: boolean; shift?: boolean };
 
 /** Where a Shortcut is listed in the shortcuts dialog. */
 export type ShortcutGroup = 'Playback & recording' | 'Timeline editing' | 'Sync mode' | 'Mouse';
@@ -60,7 +59,7 @@ export const shortcuts = {
     description: 'Redoes the last edit undone.',
     keys: [
       { key: 'z', mod: true, shift: true },
-      { key: 'y', ctrl: true },
+      { key: 'y', mod: true },
     ],
   },
   deleteClip: {
@@ -145,8 +144,8 @@ export const shortcuts = {
     name: 'Zoom the Timeline',
     group: 'Mouse',
     description: 'Zooms the Timeline in or out around the pointer.',
-    // What a trackpad's pinch sends, too.
-    keys: [{ key: 'wheel', ctrl: true }],
+    // A trackpad's pinch zooms too, whatever these are.
+    keys: [{ key: 'wheel', mod: true }],
   },
 } as const satisfies Record<string, Shortcut>;
 
@@ -169,9 +168,7 @@ function same(pressed: KeyPress, key: Key): boolean {
   if (pressed.key.toLowerCase() !== key.key.toLowerCase()) return false;
   // Mod is one modifier: Ctrl or ⌘, not both.
   if (pressed.ctrlKey && pressed.metaKey) return false;
-  if (key.ctrl) {
-    if (!pressed.ctrlKey) return false;
-  } else if ((pressed.ctrlKey || pressed.metaKey) !== !!key.mod) return false;
+  if ((pressed.ctrlKey || pressed.metaKey) !== !!key.mod) return false;
   if (pressed.altKey !== !!key.alt) return false;
   // A symbol, e.g. the ? that opens the shortcuts dialog, may take Shift
   // to type, which is then part of it.
@@ -219,11 +216,11 @@ function keyName(key: Key): string {
 function keyLabel(key: Key, on: Platform): string {
   const name = names[key.key] ?? keyName(key);
   if (on === 'mac') {
-    const mods = (key.mod ? '⌘' : '') + (key.ctrl ? '⌃' : '') + (key.alt ? '⌥' : '') + (key.shift ? '⇧' : '');
+    const mods = (key.mod ? '⌘' : '') + (key.alt ? '⌥' : '') + (key.shift ? '⇧' : '');
     // "⌥drag" would read as one word.
     return mods && mouse.includes(key.key) ? `${mods}+${name}` : mods + name;
   }
-  return [(key.mod || key.ctrl) && 'Ctrl', key.alt && 'Alt', key.shift && 'Shift', name].filter(Boolean).join('+');
+  return [key.mod && 'Ctrl', key.alt && 'Alt', key.shift && 'Shift', name].filter(Boolean).join('+');
 }
 
 /** Names `keys` for a platform, e.g. "⌘⇧Z or ⌘Y" on a Mac and "Ctrl+Shift+Z or Ctrl+Y" elsewhere. */
@@ -244,17 +241,11 @@ export function twoWayLabel(shortcut: TwoWay, on: Platform, first: FirstWay = 'b
   return keysLabel(allKeys([shortcut], first), on);
 }
 
-/** Declares `keys` for `aria-keyshortcuts`, with Mod as the platform's modifier and Ctrl as Control. */
+/** Declares `keys` for `aria-keyshortcuts`, with Mod as the platform's modifier. */
 export function ariaKeyShortcuts(keys: readonly Key[], on: Platform): string {
   return keys
     .map((key) =>
-      [
-        ((key.mod && on === 'other') || key.ctrl) && 'Control',
-        key.mod && on === 'mac' && 'Meta',
-        key.alt && 'Alt',
-        key.shift && 'Shift',
-        keyName(key),
-      ]
+      [key.mod && (on === 'mac' ? 'Meta' : 'Control'), key.alt && 'Alt', key.shift && 'Shift', keyName(key)]
         .filter(Boolean)
         .join('+'),
     )
