@@ -131,7 +131,7 @@ export const shortcuts = {
   nudgeTake: {
     name: 'Nudge a Take inside its Clip',
     group: 'Mouse',
-    description: 'Nudges the Take inside the Clip being dragged, keeping the Clip where it is.',
+    description: 'Moves the Take inside the Clip being dragged, keeping the Clip where it is.',
     keys: [{ key: 'drag', alt: true }],
   },
   skipSnapping: {
