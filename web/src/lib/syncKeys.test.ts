@@ -63,9 +63,9 @@ group('Alt+↑/↓', () => {
     expect(cueNudge(press('ArrowDown', { altKey: true, metaKey: true }))).toBeNull();
   });
 
-  it('nudges with Shift held too', () => {
-    expect(cueNudge(press('ArrowUp', { altKey: true, shiftKey: true }))).toBe(1);
-    expect(cueNudge(press('ArrowDown', { altKey: true, shiftKey: true }))).toBe(-1);
+  it('is left alone with Shift as well, its modifiers being exact', () => {
+    expect(cueNudge(press('ArrowUp', { altKey: true, shiftKey: true }))).toBeNull();
+    expect(cueNudge(press('ArrowDown', { altKey: true, shiftKey: true }))).toBeNull();
   });
 
   it('is only ↑ and ↓', () => {
