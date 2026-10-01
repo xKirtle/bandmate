@@ -8,7 +8,9 @@ Issues and specs live in GitHub Issues on xKirtle/bandmate, managed with the `gh
 
 Default vocabulary: needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix. This repo adds needs-grilling. See `docs/agents/triage-labels.md`.
 
-### Pull request labels
+### Pull request titles and labels
+
+A PR's title becomes its line in the release notes, so it names the change a self-hoster notices, not the code that changed.
 
 Every PR gets exactly one of `enhancement`, `bug`, `documentation` or `refactor`, since the release notes are grouped by those labels (see `.github/release.yml`). `refactor` is for a change no self-hoster would notice, such as a refactor, tooling or CI, and the notes leave it out. Issues carry only triage labels.
 
