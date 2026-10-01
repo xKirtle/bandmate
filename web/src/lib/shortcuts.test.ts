@@ -175,6 +175,15 @@ group('stepBy', () => {
     expect(stepBy(press('ArrowRight', { shiftKey: true }), seeks)).toBe(15);
   });
 
+  it('steps by the first of them whose key was pressed', () => {
+    expect(
+      stepBy(press('ArrowLeft'), [
+        [shortcuts.seek, 5],
+        [shortcuts.seek, 1],
+      ]),
+    ).toBe(-5);
+  });
+
   it("doesn't step for a key that isn't one of their keys", () => {
     expect(stepBy(press('Home'), seeks)).toBeNull();
     expect(stepBy(press('ArrowLeft', { altKey: true }), seeks)).toBeNull();
