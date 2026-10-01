@@ -54,7 +54,7 @@ The words in bold are defined in the glossary, [CONTEXT.md](CONTEXT.md).
 
 ## Roadmap
 
-What might come next, from **Mixdowns** of the Timeline to **Snapshots** of the Lyric Sheet, is in [docs/roadmap.md](docs/roadmap.md), along with what's been decided for each. What each version shipped is in its [release notes](https://github.com/xKirtle/bandmate/releases).
+What might come next, from **Snapshots** of the Lyric Sheet to rebinding **Shortcuts**, is in [docs/roadmap.md](docs/roadmap.md), along with what's been decided for each. What each version shipped is in its [release notes](https://github.com/xKirtle/bandmate/releases).
 
 ## Quickstart
 
