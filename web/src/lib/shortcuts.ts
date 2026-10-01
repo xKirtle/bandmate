@@ -128,8 +128,8 @@ export const shortcuts = {
     back: [{ key: 'ArrowDown', alt: true }],
     forward: [{ key: 'ArrowUp', alt: true }],
   },
-  slip: {
-    name: 'Slip a Take inside its Clip',
+  nudgeTake: {
+    name: 'Nudge a Take inside its Clip',
     group: 'Mouse',
     description: 'Moves the Take inside the Clip being dragged, keeping the Clip where it is.',
     keys: [{ key: 'drag', alt: true }],

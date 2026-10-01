@@ -1,6 +1,6 @@
 import { describe as group, expect, it } from 'vitest';
 import type { KeyPress } from './shortcuts';
-import { clipAction, isModifier, rulerSeek, skipsSnapping, slips, zooms, type Modifiers } from './timelineKeys';
+import { clipAction, isModifier, nudges, rulerSeek, skipsSnapping, zooms, type Modifiers } from './timelineKeys';
 
 const held = (mods: Partial<Modifiers> = {}): Modifiers => ({
   ctrlKey: false,
@@ -74,19 +74,19 @@ group('rulerSeek', () => {
   });
 });
 
-group('slips', () => {
-  it('slips a Take inside its Clip when dragged with Alt', () => {
-    expect(slips(held({ altKey: true }))).toBe(true);
+group('nudges', () => {
+  it('nudges a Take inside its Clip when dragged with Alt', () => {
+    expect(nudges(held({ altKey: true }))).toBe(true);
   });
 
   it('moves the Clip when dragged without Alt', () => {
-    expect(slips(held())).toBe(false);
-    expect(slips(held({ shiftKey: true }))).toBe(false);
+    expect(nudges(held())).toBe(false);
+    expect(nudges(held({ shiftKey: true }))).toBe(false);
   });
 
   it('takes Alt only on its own', () => {
-    expect(slips(held({ altKey: true, shiftKey: true }))).toBe(false);
-    expect(slips(held({ altKey: true, ctrlKey: true }))).toBe(false);
+    expect(nudges(held({ altKey: true, shiftKey: true }))).toBe(false);
+    expect(nudges(held({ altKey: true, ctrlKey: true }))).toBe(false);
   });
 });
 

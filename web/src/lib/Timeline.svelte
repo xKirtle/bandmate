@@ -59,7 +59,7 @@
   import { keyPlace } from './keyPlace';
   import { songKey } from './songKeys';
   import { allKeys, shortcuts } from './shortcuts';
-  import { clipAction, isModifier, rulerSeek, skipsSnapping, slips, zooms } from './timelineKeys';
+  import { clipAction, isModifier, nudges, rulerSeek, skipsSnapping, zooms } from './timelineKeys';
   import { prepareUpload } from './upload';
   import { formatDuration } from './time';
   import { tracksDropped, type TrackDrop } from './trackDrag';
@@ -1460,7 +1460,7 @@
     const take = activeTake(clip);
     edit = {
       clip,
-      mode: mode === 'move' && slips(event) && take ? 'nudge' : mode,
+      mode: mode === 'move' && nudges(event) && take ? 'nudge' : mode,
       from: { clientX: event.clientX, clientY: event.clientY },
       grab: spanTimeAt(event.clientX) - clip.start,
       moved: false,
@@ -1715,7 +1715,7 @@
     if (clip.activeTakeId === null) return [];
     const { id: clipId, activeTakeId, takes } = clip;
     const active = activeTake(clip)!;
-    const slipLabel = hints.label(shortcuts.slip.keys);
+    const nudgeLabel = hints.label(shortcuts.nudgeTake.keys);
     return [
       {
         icon: '♪',
@@ -1741,7 +1741,7 @@
       {
         icon: '↔',
         label: 'Nudge',
-        title: `Move Take ${active.number} within the Clip, in milliseconds, later if positive${slipLabel ? `; or ${slipLabel} the Clip` : ''}`,
+        title: `Move Take ${active.number} within the Clip, in milliseconds, later if positive${nudgeLabel ? `; or ${nudgeLabel} the Clip` : ''}`,
         field: {
           value: Math.round(active.nudge * 1000),
           unit: 'ms',

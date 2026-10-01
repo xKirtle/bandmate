@@ -20,7 +20,7 @@ group('dialogGroups', () => {
         "Step a menu's number field by its Shift step",
       ],
       ['Cue the next Line', 'Nudge a Cue by 0.1 s'],
-      ['Slip a Take inside its Clip', 'Skip snapping', 'Zoom the Timeline'],
+      ['Nudge a Take inside its Clip', 'Skip snapping', 'Zoom the Timeline'],
     ]);
     expect(groups[0].rows[1]).toEqual({
       name: 'Record',

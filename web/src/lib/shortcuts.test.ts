@@ -136,7 +136,7 @@ group('The list', () => {
       },
       { name: 'Cue the next Line', group: 'Sync mode', keys: 'Enter' },
       { name: 'Nudge a Cue by 0.1 s', group: 'Sync mode', keys: 'Alt+↓ / Alt+↑' },
-      { name: 'Slip a Take inside its Clip', group: 'Mouse', keys: 'Alt+drag' },
+      { name: 'Nudge a Take inside its Clip', group: 'Mouse', keys: 'Alt+drag' },
       { name: 'Skip snapping', group: 'Mouse', keys: 'Shift+drag' },
       { name: 'Zoom the Timeline', group: 'Mouse', keys: 'Ctrl+wheel' },
     ]);
