@@ -35,6 +35,7 @@
   import { cuesNextLine } from './syncKeys';
   import { inTextField } from './textField';
   import { deviceStorage } from './timelineHeight';
+  import { readChordsShown, storeChordsShown } from './chordsShown';
 
   let {
     song,
@@ -309,19 +310,18 @@
   // The Section just added or duplicated, whose Label gets focus.
   let added = $state<number | null>(null);
   const songHasChords = $derived(hasChords(song));
-  // Follows the server, except while a change to it is being sent.
-  let showChords = $state(untrack(() => song.showChords));
-  $effect(() => {
-    showChords = song.showChords;
-  });
+  // Whether Read mode shows the Chords, kept on this device for each Song.
+  // It isn't an edit, so it's never saved with the Song.
+  // Read again only for another Song: the Song is replaced after every edit.
+  const songId = $derived(song.id);
+  let showChords = $derived(readChordsShown(deviceStorage(), songId));
 
   // Whether Chord Lines are on screen: always in Write mode, which shows the raw text.
   const chordsShown = $derived(mode === 'write' || (showChords && songHasChords));
 
-  async function toggleChords() {
-    const next = !showChords;
-    showChords = next;
-    if (!(await change((at) => api.updateSong(at, { showChords: next })))) showChords = song.showChords;
+  function toggleChords() {
+    showChords = !showChords;
+    storeChordsShown(deviceStorage(), songId, showChords);
   }
 
   async function add(position: number) {
