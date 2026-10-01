@@ -39,9 +39,9 @@ export function isModifier(key: string): boolean {
   return key === 'Shift' || key === 'Alt' || key === 'Control' || key === 'Meta';
 }
 
-/** Whether a Clip dragged with these modifiers slips its active Take inside it, rather than moving. */
-export function slips(e: Modifiers): boolean {
-  return matches(mouse('drag', e), shortcuts.slip.keys);
+/** Whether a Clip dragged with these modifiers nudges its active Take inside it, rather than moving. */
+export function nudges(e: Modifiers): boolean {
+  return matches(mouse('drag', e), shortcuts.nudgeTake.keys);
 }
 
 /** Whether a Clip or the Loop dragged with these modifiers goes anywhere, snapping to nothing. */
