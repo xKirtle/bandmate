@@ -1924,8 +1924,9 @@
     return { left: `${percent(from)}%`, width: `${Math.max(0, percent(Math.min(to, span) - from))}%` };
   }
 
-  // Zooming and scrolling: Ctrl+wheel or pinching zooms in and out around
-  // the pointer or the pinch, and the lanes scroll along when zoomed in.
+  // Zooming and scrolling: Mod+wheel (Ctrl or ⌘) or pinching zooms in and
+  // out around the pointer or the pinch, and the lanes scroll along when
+  // zoomed in.
   // Zoomed all the way out (scale 0), the whole Timeline fits, however long.
   let scale = $state(0);
   let scroll = $state(0);
@@ -2008,7 +2009,7 @@
   }
 
   // Over the bar, the wheel scrolls the lanes as it would over them: the
-  // bar isn't in them, so the browser wouldn't. Ctrl+wheel zooms, below.
+  // bar isn't in them, so the browser wouldn't. Mod+wheel zooms, below.
   function barWheel(event: WheelEvent) {
     if (zooms(event)) return;
     const along = event.deltaX || (event.shiftKey ? event.deltaY : 0);
@@ -2046,7 +2047,7 @@
     const lanes = lanesWrapElement;
     if (!lanes) return;
     const wheel = (event: WheelEvent) => {
-      // A trackpad's pinch comes as Ctrl+wheel too.
+      // So does a trackpad's pinch, which comes as a Ctrl wheel event.
       if (!zooms(event)) return;
       event.preventDefault();
       // A mouse wheel's notch is about 100px, or 3 lines of about 33px:

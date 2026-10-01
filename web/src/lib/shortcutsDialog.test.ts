@@ -31,7 +31,7 @@ group('dialogGroups', () => {
 
   it('names each key as this platform does, each way of a two-way Shortcut on its own', () => {
     const editing = (on: 'mac' | 'other') => dialogGroups(shortcuts, on)[1].rows;
-    expect(editing('mac')[1].keys).toEqual([['⌘⇧Z', '⌃Y']]);
+    expect(editing('mac')[1].keys).toEqual([['⌘⇧Z', '⌘Y']]);
     expect(editing('other')[1].keys).toEqual([['Ctrl+Shift+Z', 'Ctrl+Y']]);
     expect(editing('other')[4].keys).toEqual([
       ['←', '↓'],

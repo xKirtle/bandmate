@@ -119,16 +119,15 @@ group('Exact modifiers', () => {
     expect(songKey(press('R', { shiftKey: true }), idle)).toBeNull();
   });
 
-  it('Ctrl+Y redoes, on every platform', () => {
+  it('Mod+Y redoes, as Ctrl+Y or ⌘Y, on every platform', () => {
     expect(songKey(press('y', { ctrlKey: true }), idle)).toBe('redo');
+    expect(songKey(press('y', { metaKey: true }), idle)).toBe('redo');
   });
 
-  it("⌘Y doesn't, being a Mac browser's History", () => {
-    expect(songKey(press('y', { metaKey: true }), idle)).toBeNull();
-  });
-
-  it("Ctrl+Shift+Y and Ctrl+⌘Z don't", () => {
+  it("Mod+Shift+Y, Ctrl+⌘Y and Ctrl+⌘Z don't", () => {
     expect(songKey(press('Y', { ctrlKey: true, shiftKey: true }), idle)).toBeNull();
+    expect(songKey(press('Y', { metaKey: true, shiftKey: true }), idle)).toBeNull();
+    expect(songKey(press('y', { ctrlKey: true, metaKey: true }), idle)).toBeNull();
     expect(songKey(press('z', { ctrlKey: true, metaKey: true }), idle)).toBeNull();
   });
 });
