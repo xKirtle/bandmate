@@ -2909,10 +2909,11 @@
     bottom: 0;
     left: 0;
     display: grid;
-    /* At the top, level with the Track's name. */
-    place-content: start;
-    padding: calc(0.5 * var(--timeline-rem)) 0 0 calc(0.25 * var(--timeline-rem));
-    width: calc(1.25 * var(--timeline-rem));
+    /* At the top, level with the Track's name, and centred between the
+       header's edge and the name, clear of the Chosen Track's line. */
+    place-content: start center;
+    padding-top: calc(0.5 * var(--timeline-rem));
+    width: calc(1.625 * var(--timeline-rem));
     color: var(--text-muted);
     font-size: calc(0.875 * var(--timeline-rem));
     cursor: grab;
