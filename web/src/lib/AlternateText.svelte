@@ -42,6 +42,7 @@
   import CueField from './CueField.svelte';
   import { isBlank, linesByRow } from './cues';
   import { rowAt, type GutterField } from './gutter';
+  import { ariaKeyShortcuts, keysLabel, platform, shortcuts } from './shortcuts';
 
   let {
     alternate,
@@ -153,6 +154,10 @@
     const rects = rowEls.slice(0, rows.length).map((el) => el?.getBoundingClientRect() ?? { top: 0, bottom: 0 });
     hoveredRow = rowAt(rects, e.clientY);
   }
+
+  // The Now button names its keys as this platform does.
+  const on = platform();
+  const cueNextKeys = shortcuts.cueNextLine.keys;
 </script>
 
 <label class="visually-hidden" for="text-{alternate.id}">{label}</label>
@@ -210,7 +215,9 @@
               onpointerdown={(e) => e.preventDefault()}
               onclick={sync.now}
               aria-label="Cue {lineLabel} now"
-              title="Cue this Line at the playhead (Enter)">Now <span aria-hidden="true">⏎</span></button
+              aria-keyshortcuts={ariaKeyShortcuts(cueNextKeys, on)}
+              title="Cue this Line at the playhead ({keysLabel(cueNextKeys, on)})"
+              >Now <span aria-hidden="true">⏎</span></button
             >
           {:else}
             <CueField

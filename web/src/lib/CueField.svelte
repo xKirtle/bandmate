@@ -1,6 +1,8 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { formatCue, nudgeCue, parseCue, playLabel } from './cues';
+  import { ariaKeyShortcuts, keysLabel, platform, shortcuts } from './shortcuts';
+  import { cueNudge } from './syncKeys';
 
   // A Line's Cue time, shown as m:ss.s in the gutter beside it. Clicking it
   // lets the time be typed: Enter or leaving the field saves, Esc cancels,
@@ -52,6 +54,12 @@
   let button = $state<HTMLButtonElement>();
   let clearButton = $state<HTMLButtonElement>();
 
+  // The keys that nudge the Cue, later then earlier, named as this platform does.
+  const on = platform();
+  const nudgeKeys = [...shortcuts.nudgeCue.forward, ...shortcuts.nudgeCue.back];
+  const nudgeLabel = keysLabel(nudgeKeys, on);
+  const nudgeAria = ariaKeyShortcuts(nudgeKeys, on);
+
   // Said first on hover, and after the time to screen readers.
   const outOfOrderNote = $derived(outOfOrder ? `Out of order. ${outOfOrder}.` : '');
 
@@ -98,10 +106,10 @@
     }
   }
 
-  /** Alt+↑/↓ saves the Cue, or the time typed, a tenth of a second later or earlier. */
+  /** Alt+↑/↓, or as the list has it, saves the Cue, or the time typed, a tenth of a second later or earlier. */
   function nudge(e: KeyboardEvent): boolean {
-    const by = e.altKey && !e.ctrlKey && !e.metaKey ? ({ ArrowUp: 1, ArrowDown: -1 } as const)[e.key] : undefined;
-    if (by === undefined) return false;
+    const by = cueNudge(e);
+    if (by === null) return false;
     const from = editing ? (parseCue(text) ?? cue) : cue;
     if (from === null) return false;
     e.preventDefault();
@@ -157,9 +165,10 @@
       class:invalid
       aria-label="Cue for {label}"
       aria-invalid={invalid}
+      aria-keyshortcuts={nudgeAria}
       title={invalid
         ? 'Type a time like 45, 0:45, 0:45.25 or 1:02'
-        : 'Enter saves, Esc cancels, empty clears, Alt+↑/↓ nudges'}
+        : `Enter saves, Esc cancels, empty clears, ${nudgeLabel} nudges`}
       placeholder="0:00.0"
       autocomplete="off"
       spellcheck="false"
@@ -178,6 +187,7 @@
       class:out-of-order={outOfOrder}
       onclick={pick ?? edit}
       onkeydown={nudge}
+      aria-keyshortcuts={nudgeAria}
       aria-label={pick
         ? `Cue ${label} next${cue === null ? '' : `, cued at ${formatCue(cue)}${outOfOrder ? `. ${outOfOrderNote}` : ''}`}`
         : cue === null
@@ -188,7 +198,7 @@
           ? 'Cue this next'
           : cue === null
             ? 'Set when this starts on the Timeline'
-            : 'Change when this starts on the Timeline; Alt+↑/↓ nudges it'
+            : `Change when this starts on the Timeline; ${nudgeLabel} nudges it`
       }`}
     >
       {#if outOfOrder}<span class="warning" aria-hidden="true">⚠</span>{/if}{cue === null ? '–:––.–' : formatCue(cue)}

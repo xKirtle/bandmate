@@ -29,7 +29,9 @@
   import { activeAlternate, addedNotice, describe, isEmpty, places, sectionsInArrangement } from './sections';
   import type { Mode } from './songMode';
   import { readShiftStep, shiftSteps, storeShiftStep, type ShiftStep } from './shiftStep';
+  import { keysLabel, platform, shortcuts } from './shortcuts';
   import { markSyncHintSeen, sawSyncHint } from './syncHint';
+  import { cuesNextLine } from './syncKeys';
   import { inTextField } from './textField';
   import { deviceStorage } from './timelineHeight';
 
@@ -284,14 +286,18 @@
     follow(followKey);
   });
 
+  // The Sync hints name the keys that cue as this platform does.
+  const cueNextLabel = keysLabel(shortcuts.cueNextLine.keys, platform());
+
   // In Sync mode, Enter cues anywhere but a text field or a dialog, even on
   // a button: syncing along shouldn't depend on where focus was left.
   function cueKey(event: KeyboardEvent) {
-    if (event.key !== 'Enter' || event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey)
-      return;
-    if (!syncing || event.defaultPrevented || inTextField(event.target)) return;
-    // Enter in a dialog or a ⋯ menu is for what's in it.
-    if (event.target instanceof Element && event.target.closest('dialog, [role="menu"]')) return;
+    const at = {
+      syncing,
+      inTextField: inTextField(event.target),
+      inDialogOrMenu: event.target instanceof Element && !!event.target.closest('dialog, [role="menu"]'),
+    };
+    if (!cuesNextLine(event, at)) return;
     event.preventDefault();
     cueNext();
   }
@@ -424,7 +430,7 @@
         title={recording
           ? 'Stop recording to sync lyrics'
           : canSync
-            ? 'Sync lyrics: press Enter or Now as each Line starts to cue it at the playhead'
+            ? `Sync lyrics: press ${cueNextLabel} or Now as each Line starts to cue it at the playhead`
             : 'Add a Beat to the Timeline to sync lyrics to it'}>Sync lyrics</button
       >
     {/if}
@@ -462,7 +468,9 @@
     {/if}
     <p class="notice muted" role="status">{notice ?? ''}</p>
     {#if syncing && hinting}
-      <p class="sync-hint muted">Play, then press Enter or Now as each Line starts. Click a Line to start from it.</p>
+      <p class="sync-hint muted">
+        Play, then press {cueNextLabel} or Now as each Line starts. Click a Line to start from it.
+      </p>
     {/if}
   </div>
 
