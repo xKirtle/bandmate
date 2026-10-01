@@ -79,3 +79,17 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 - A rough idea, built on the diagrams above. Pick a root and a quality (C major, D7sus2) and see how to play it, or place fingers on a fretboard and get the Chord's name.
 - It might also suggest Chords that go well with the one picked, or with the Song's key, to help write a progression.
 - What it covers, and where it lives (its own page, or beside the Lyric Sheet), are for the spec.
+
+## Transpose
+
+- Move every Chord in a Song up or down by semitones, with the Chord diagrams following.
+- Whether it's a view in Read mode (the Lyric Sheet unchanged, for playing in another key), an edit in Write mode (rewriting the Chords and the Song's key), or both, is for the spec. An edit has no undo until Snapshots exist.
+
+## Playback speed
+
+- Slow the Timeline down, or speed it up, without changing its pitch, for learning a part, especially over a Loop.
+- Whether Masters and Beat previews get it too is for the spec.
+
+## Printing a Song
+
+- A print layout for the Lyric Sheet, with its Chords, for a music stand.
