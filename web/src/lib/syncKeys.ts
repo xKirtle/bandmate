@@ -3,7 +3,7 @@
  * a key press is one, and should act now.
  */
 
-import { matches, shortcuts, way } from './shortcuts';
+import { matches, shortcuts, way, type KeyPress } from './shortcuts';
 
 export type SyncKeyPress = Pick<
   KeyboardEvent,
@@ -29,7 +29,7 @@ export function cuesNextLine(e: SyncKeyPress, at: CueNextContext): boolean {
 }
 
 /** Which way a key press nudges a Cue: 1 a tenth of a second later, -1 earlier, or null if it doesn't. */
-export function cueNudge(e: SyncKeyPress): 1 | -1 | null {
+export function cueNudge(e: KeyPress): 1 | -1 | null {
   const to = way(e, shortcuts.nudgeCue);
   return to === null ? null : to === 'forward' ? 1 : -1;
 }

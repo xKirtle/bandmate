@@ -54,7 +54,7 @@
   let button = $state<HTMLButtonElement>();
   let clearButton = $state<HTMLButtonElement>();
 
-  // Alt+↑/↓ (⌥↑/↓ on a Mac), named as this platform does: later, then earlier.
+  // The keys that nudge the Cue, later then earlier, named as this platform does.
   const on = platform();
   const nudgeKeys = [...shortcuts.nudgeCue.forward, ...shortcuts.nudgeCue.back];
   const nudgeLabel = keysLabel(nudgeKeys, on);
@@ -106,7 +106,7 @@
     }
   }
 
-  /** Alt+↑/↓ saves the Cue, or the time typed, a tenth of a second later or earlier. */
+  /** Alt+↑/↓, or as the list has it, saves the Cue, or the time typed, a tenth of a second later or earlier. */
   function nudge(e: KeyboardEvent): boolean {
     const by = cueNudge(e);
     if (by === null) return false;

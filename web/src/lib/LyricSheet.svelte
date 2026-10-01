@@ -287,7 +287,7 @@
   });
 
   // The Sync hints name the keys that cue as this platform does.
-  const cueNextKeys = keysLabel(shortcuts.cueNextLine.keys, platform());
+  const cueNextLabel = keysLabel(shortcuts.cueNextLine.keys, platform());
 
   // In Sync mode, Enter cues anywhere but a text field or a dialog, even on
   // a button: syncing along shouldn't depend on where focus was left.
@@ -430,7 +430,7 @@
         title={recording
           ? 'Stop recording to sync lyrics'
           : canSync
-            ? `Sync lyrics: press ${cueNextKeys} or Now as each Line starts to cue it at the playhead`
+            ? `Sync lyrics: press ${cueNextLabel} or Now as each Line starts to cue it at the playhead`
             : 'Add a Beat to the Timeline to sync lyrics to it'}>Sync lyrics</button
       >
     {/if}
@@ -469,7 +469,7 @@
     <p class="notice muted" role="status">{notice ?? ''}</p>
     {#if syncing && hinting}
       <p class="sync-hint muted">
-        Play, then press {cueNextKeys} or Now as each Line starts. Click a Line to start from it.
+        Play, then press {cueNextLabel} or Now as each Line starts. Click a Line to start from it.
       </p>
     {/if}
   </div>
