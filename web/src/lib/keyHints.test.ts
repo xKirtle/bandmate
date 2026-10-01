@@ -22,9 +22,9 @@ group('KeyHints', () => {
   });
 
   it("names a two-way Shortcut's keys only with a fine pointer", () => {
-    expect(desktop('mac').twoWay(shortcuts.step)).toBe('⌥← or ⌥→');
+    expect(desktop('mac').twoWay(shortcuts.nudgeCue)).toBe('⌥↓ or ⌥↑');
     expect(desktop().twoWay(shortcuts.nudgeCue, 'forward')).toBe('Alt+↑ or Alt+↓');
-    expect(phone().twoWay(shortcuts.step)).toBeNull();
+    expect(phone().twoWay(shortcuts.nudgeCue)).toBeNull();
   });
 
   it("declares a Shortcut's keys for aria-keyshortcuts only with a fine pointer", () => {

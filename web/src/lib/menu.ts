@@ -1,4 +1,5 @@
-import { matches, shortcuts, stepBy, type KeyPress } from './shortcuts';
+import type { KeyHints } from './keyHints';
+import { matches, shortcuts, stepBy, type KeyPress, type TwoWay } from './shortcuts';
 
 /**
  * What a key does in an open menu of `count` entries, with entry `current`
@@ -54,8 +55,8 @@ export type MenuAction = {
 export type MenuChoice = { label: string; run: () => void; checked?: boolean };
 
 /**
- * A number an entry sets from the menu, typed, or stepped with Alt+←/→, by
- * more with Shift. Each step is set at once.
+ * A number an entry sets from the menu, typed, or stepped with ↑/↓, by
+ * more with Shift, as a number box steps. Each step is set at once.
  */
 export type MenuField = {
   value: number;
@@ -66,14 +67,29 @@ export type MenuField = {
   set: (value: number) => void;
 };
 
+// A field's keys are a number box's own, not Shortcuts: ←/→ are left to
+// move the text cursor, and Alt+←/→ to the browser.
+const stepKeys: TwoWay = { back: [{ key: 'ArrowDown' }], forward: [{ key: 'ArrowUp' }] };
+const shiftStepKeys: TwoWay = {
+  back: [{ key: 'ArrowDown', shift: true }],
+  forward: [{ key: 'ArrowUp', shift: true }],
+};
+
 /**
  * What a key does to a menu's field at `value`: the value it steps it to,
  * or null to leave the key alone.
  */
 export function fieldStep(e: KeyPress, value: number, field: Pick<MenuField, 'step' | 'shiftStep'>): number | null {
   const by = stepBy(e, [
-    [shortcuts.step, field.step],
-    [shortcuts.shiftStep, field.shiftStep],
+    [stepKeys, field.step],
+    [shiftStepKeys, field.shiftStep],
   ]);
   return by === null ? null : value + by;
+}
+
+/** A field's tooltip, naming the keys that step it, e.g. "↑ or ↓ steps it by 1 ms, …", or undefined without a fine pointer. */
+export function fieldHint(field: Pick<MenuField, 'step' | 'shiftStep' | 'unit'>, hints: KeyHints): string | undefined {
+  const step = hints.twoWay(stepKeys, 'forward');
+  if (!step) return undefined;
+  return `${step} steps it by ${field.step} ${field.unit}, or by ${field.shiftStep} with ${hints.twoWay(shiftStepKeys, 'forward')}`;
 }

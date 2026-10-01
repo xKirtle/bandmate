@@ -128,12 +128,6 @@ group('The list', () => {
       { name: 'Seek back or forward 5 s', group: 'Timeline editing', keys: '← or ↓ / → or ↑' },
       { name: 'Seek back or forward 15 s', group: 'Timeline editing', keys: 'Shift+← or Shift+↓ / Shift+→ or Shift+↑' },
       { name: 'Go to the start or end', group: 'Timeline editing', keys: 'Home / End' },
-      { name: "Step a menu's number field by its step", group: 'Timeline editing', keys: 'Alt+← / Alt+→' },
-      {
-        name: "Step a menu's number field by its Shift step",
-        group: 'Timeline editing',
-        keys: 'Alt+Shift+← / Alt+Shift+→',
-      },
       { name: 'Cue the next Line', group: 'Sync mode', keys: 'Enter' },
       { name: 'Nudge a Cue by 0.1 s', group: 'Sync mode', keys: 'Alt+↓ / Alt+↑' },
       { name: 'Nudge a Take inside its Clip', group: 'Mouse', keys: 'Alt+drag' },
@@ -206,11 +200,11 @@ group('ariaKeyShortcuts', () => {
 
 group('allKeys', () => {
   it("gives two-way Shortcuts' keys, each one's back keys then its forward keys", () => {
-    expect(allKeys([shortcuts.step, shortcuts.shiftStep])).toEqual([
-      { key: 'ArrowLeft', alt: true },
-      { key: 'ArrowRight', alt: true },
-      { key: 'ArrowLeft', alt: true, shift: true },
-      { key: 'ArrowRight', alt: true, shift: true },
+    expect(allKeys([shortcuts.startOrEnd, shortcuts.nudgeCue])).toEqual([
+      { key: 'Home' },
+      { key: 'End' },
+      { key: 'ArrowDown', alt: true },
+      { key: 'ArrowUp', alt: true },
     ]);
   });
 
@@ -224,8 +218,8 @@ group('allKeys', () => {
 
 group('twoWayLabel', () => {
   it("names a two-way Shortcut's keys, back then forward, for a platform", () => {
-    expect(twoWayLabel(shortcuts.step, 'other')).toBe('Alt+← or Alt+→');
-    expect(twoWayLabel(shortcuts.shiftStep, 'mac')).toBe('⌥⇧← or ⌥⇧→');
+    expect(twoWayLabel(shortcuts.nudgeCue, 'other')).toBe('Alt+↓ or Alt+↑');
+    expect(twoWayLabel(shortcuts.seekFar, 'mac')).toBe('⇧← or ⇧↓ or ⇧→ or ⇧↑');
   });
 
   it('names the forward keys first when asked', () => {

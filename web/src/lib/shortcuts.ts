@@ -101,20 +101,6 @@ export const shortcuts = {
     back: [{ key: 'Home' }],
     forward: [{ key: 'End' }],
   },
-  step: {
-    name: "Step a menu's number field by its step",
-    group: 'Timeline editing',
-    description: "Steps a number in a ⋯ menu down or up, e.g. a Take's Nudge.",
-    back: [{ key: 'ArrowLeft', alt: true }],
-    forward: [{ key: 'ArrowRight', alt: true }],
-  },
-  shiftStep: {
-    name: "Step a menu's number field by its Shift step",
-    group: 'Timeline editing',
-    description: 'Steps a number in a ⋯ menu down or up by more.',
-    back: [{ key: 'ArrowLeft', alt: true, shift: true }],
-    forward: [{ key: 'ArrowRight', alt: true, shift: true }],
-  },
   cueNextLine: {
     name: 'Cue the next Line',
     group: 'Sync mode',
