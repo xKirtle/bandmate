@@ -46,7 +46,7 @@
     type Saved,
   } from './history';
   import { formatVolume, maxVolume, minVolume, trackGains, type Levels } from './mixer';
-  import { opensMenu, type MenuAction } from './menu';
+  import type { MenuAction } from './menu';
   import { peaks as peaksOf, peaksPerSecond } from './peaks';
   import { keyActedOnPage } from './pointerFocus';
   import { longPressDelay, pastSlop, type Point } from './press';
@@ -57,6 +57,7 @@
   import { inTextField } from './textField';
   import { songKey } from './songKeys';
   import { ariaKeyShortcuts, keysLabel, platform, shortcuts, type OneWay } from './shortcuts';
+  import { clipAction, rulerSeek, skipsSnapping, slips, zooms } from './timelineKeys';
   import { prepareUpload } from './upload';
   import { formatDuration } from './time';
   import { tracksDropped, type TrackDrop } from './trackDrag';
@@ -708,16 +709,8 @@
   }
 
   function rulerKey(event: KeyboardEvent) {
-    const step = event.shiftKey ? 15 : 5;
-    const to = {
-      ArrowLeft: position - step,
-      ArrowDown: position - step,
-      ArrowRight: position + step,
-      ArrowUp: position + step,
-      Home: 0,
-      End: length,
-    }[event.key];
-    if (to === undefined) return;
+    const to = rulerSeek(event, position, length);
+    if (to === null) return;
     event.preventDefault();
     // It seeks, rather than acting on the ruler a click focused.
     keyActedOnPage();
@@ -1464,14 +1457,14 @@
     const take = activeTake(clip);
     edit = {
       clip,
-      mode: mode === 'move' && event.altKey && take ? 'nudge' : mode,
+      mode: mode === 'move' && slips(event) && take ? 'nudge' : mode,
       from: { clientX: event.clientX, clientY: event.clientY },
       grab: spanTimeAt(event.clientX) - clip.start,
       moved: false,
       trackId: trackOf(clip).id,
       placement: clip,
       nudge: take?.nudge ?? 0,
-      free: event.shiftKey,
+      free: skipsSnapping(event),
       snap: null,
       saving: false,
     };
@@ -1501,7 +1494,7 @@
     clearTimeout(pressTimer);
     editAt = { clientX: event.clientX, clientY: event.clientY };
     // Scrolling along at an edge, or Shift pressed, moves it too, with no keys to go by.
-    if ('shiftKey' in event) edit.free = event.shiftKey === true;
+    if ('shiftKey' in event) edit.free = skipsSnapping(event as PointerEvent);
     const t = spanTimeAt(event.clientX);
     const { clip } = edit;
     if (edit.mode === 'nudge') {
@@ -1669,10 +1662,11 @@
 
   function clipKey(event: KeyboardEvent, clip: Clip) {
     if (event.target !== event.currentTarget || !editable.current || clip.id === recording?.clipId) return;
-    if (event.key === 'Delete' || event.key === 'Backspace') {
+    const action = clipAction(event);
+    if (action === 'delete') {
       event.preventDefault();
       remove(clip);
-    } else if (opensMenu(event)) {
+    } else if (action === 'menu') {
       event.preventDefault();
       openClipMenu(clip, event.currentTarget as HTMLElement);
     }
@@ -1841,7 +1835,7 @@
     const t = loopTimeAt(event.clientX);
     event.preventDefault();
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-    const common = { fromX: event.clientX, moved: false, free: event.shiftKey, snap: null, saving: false };
+    const common = { fromX: event.clientX, moved: false, free: skipsSnapping(event), snap: null, saving: false };
     loopEdit =
       edge && current
         ? { ...common, mode: edge, anchor: edge === 'start' ? current.end : current.start, loop: current }
@@ -1868,7 +1862,7 @@
     loopEdit.moved = true;
     loopAt = { clientX: event.clientX, clientY: event.clientY };
     // Scrolling along at an edge, or Shift pressed, moves it too, with no keys to go by.
-    if ('shiftKey' in event) loopEdit.free = event.shiftKey === true;
+    if ('shiftKey' in event) loopEdit.free = skipsSnapping(event as PointerEvent);
     const t = loopTimeAt(event.clientX);
     const { mode, anchor, loop: shown } = loopEdit;
     const targets = loopEdit.free ? [] : loopTargets(timeline.tracks, position);
@@ -2011,7 +2005,7 @@
   // Over the bar, the wheel scrolls the lanes as it would over them: the
   // bar isn't in them, so the browser wouldn't. Ctrl+wheel zooms, below.
   function barWheel(event: WheelEvent) {
-    if (event.ctrlKey) return;
+    if (zooms(event)) return;
     const along = event.deltaX || (event.shiftKey ? event.deltaY : 0);
     lanesElement!.scrollLeft += event.deltaMode === WheelEvent.DOM_DELTA_PIXEL ? along : along * 33;
   }
@@ -2048,7 +2042,7 @@
     if (!lanes) return;
     const wheel = (event: WheelEvent) => {
       // A trackpad's pinch comes as Ctrl+wheel too.
-      if (!event.ctrlKey) return;
+      if (!zooms(event)) return;
       event.preventDefault();
       // A mouse wheel's notch is about 100px, or 3 lines of about 33px:
       // zoomed 1.65x each, however hard it's flicked. A trackpad's pinch
