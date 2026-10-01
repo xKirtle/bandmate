@@ -12,8 +12,9 @@ const press = (key: string, mods: Partial<Omit<KeyPress, 'key'>> = {}): KeyPress
   ...mods,
 });
 
-// In Write mode, not syncing.
+// In Write mode, or in Sync mode.
 const writing = false;
+const syncing = true;
 
 group('Alt+↑/↓', () => {
   it('nudges a Cue later with ↑ and earlier with ↓ in Write mode', () => {
@@ -22,8 +23,8 @@ group('Alt+↑/↓', () => {
   });
 
   it('does nothing in Sync mode, which only cues', () => {
-    expect(cueNudge(press('ArrowUp', { altKey: true }), true)).toBeNull();
-    expect(cueNudge(press('ArrowDown', { altKey: true }), true)).toBeNull();
+    expect(cueNudge(press('ArrowUp', { altKey: true }), syncing)).toBeNull();
+    expect(cueNudge(press('ArrowDown', { altKey: true }), syncing)).toBeNull();
   });
 
   it('needs Alt', () => {
@@ -56,7 +57,7 @@ group('The nudge hint', () => {
   });
 
   it('names no keys in Sync mode, where they do nothing', () => {
-    expect(cueNudgeHint(desktop(), true)).toEqual({ label: null, aria: undefined });
+    expect(cueNudgeHint(desktop(), syncing)).toEqual({ label: null, aria: undefined });
   });
 
   it('names no keys without a fine pointer', () => {

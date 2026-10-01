@@ -7,11 +7,11 @@
   // A Line's Cue time, shown as m:ss.s in the gutter beside it. Clicking it
   // lets the time be typed: Enter or leaving the field saves, Esc cancels,
   // and an empty field clears the Cue. Alt+↑/↓ nudges it by a tenth of a
-  // second, but not in Sync mode, which only cues. A ✕ after it, shown while its Line is hovered or the keyboard is
-  // in its slot, clears the Cue. With `pick`, as in Sync mode, clicking it
-  // makes its Line the next to cue instead, and there's no ✕. A Cue out of
-  // order is marked with a ⚠ and a warning colour, and says why on hover and
-  // to screen readers.
+  // second, but not in Sync mode, which only cues. A ✕ after it, shown while
+  // its Line is hovered or the keyboard is in its slot, clears the Cue. With
+  // `pick`, as in Sync mode, clicking it makes its Line the next to cue
+  // instead, and there's no ✕. A Cue out of order is marked with a ⚠ and a
+  // warning colour, and says why on hover and to screen readers.
   let {
     cue,
     label,
@@ -61,8 +61,6 @@
   // does, but only with a fine pointer, and not in Sync mode.
   const hints = keyHints();
   const nudgeHint = $derived(cueNudgeHint(hints, syncing));
-  const nudgeLabel = $derived(nudgeHint.label);
-  const nudgeAria = $derived(nudgeHint.aria);
 
   // Said first on hover, and after the time to screen readers.
   const outOfOrderNote = $derived(outOfOrder ? `Out of order. ${outOfOrder}.` : '');
@@ -169,10 +167,10 @@
       class:invalid
       aria-label="Cue for {label}"
       aria-invalid={invalid}
-      aria-keyshortcuts={nudgeAria}
+      aria-keyshortcuts={nudgeHint.aria}
       title={invalid
         ? 'Type a time like 45, 0:45, 0:45.25 or 1:02'
-        : `Enter saves, Esc cancels, empty clears${nudgeLabel ? `, ${nudgeLabel} nudges` : ''}`}
+        : `Enter saves, Esc cancels, empty clears${nudgeHint.label ? `, ${nudgeHint.label} nudges` : ''}`}
       placeholder="0:00.0"
       autocomplete="off"
       spellcheck="false"
@@ -191,7 +189,7 @@
       class:out-of-order={outOfOrder}
       onclick={pick ?? edit}
       onkeydown={nudge}
-      aria-keyshortcuts={nudgeAria}
+      aria-keyshortcuts={nudgeHint.aria}
       aria-label={pick
         ? `Cue ${label} next${cue === null ? '' : `, cued at ${formatCue(cue)}${outOfOrder ? `. ${outOfOrderNote}` : ''}`}`
         : cue === null
@@ -202,7 +200,7 @@
           ? 'Cue this next'
           : cue === null
             ? 'Set when this starts on the Timeline'
-            : `Change when this starts on the Timeline${nudgeLabel ? `; ${nudgeLabel} nudges it` : ''}`
+            : `Change when this starts on the Timeline${nudgeHint.label ? `; ${nudgeHint.label} nudges it` : ''}`
       }`}
     >
       {#if outOfOrder}<span class="warning" aria-hidden="true">⚠</span>{/if}{cue === null ? '–:––.–' : formatCue(cue)}
