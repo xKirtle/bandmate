@@ -469,8 +469,14 @@
                   aria-label="Keyboard shortcuts"
                   aria-haspopup="dialog"
                   aria-keyshortcuts={hints.aria(shortcutsDialogKeys)}
-                  title={hints.withKeys('Keyboard shortcuts', shortcutsDialogKeys)}>?</button
+                  title={hints.withKeys('Keyboard shortcuts', shortcutsDialogKeys)}
                 >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="2" y="5" width="20" height="14" rx="2.5" />
+                    <path d="M6 9.5h.01M10 9.5h.01M14 9.5h.01M18 9.5h.01M8 12.5h.01M12 12.5h.01M16 12.5h.01" />
+                    <path d="M8 15.5h8" />
+                  </svg>
+                </button>
               {/if}
             </div>
           </div>
@@ -702,6 +708,16 @@
   .shortcuts {
     width: var(--control);
     padding: 0;
+  }
+  /* A keyboard: key dots and a space bar, outlined like the Timeline's Rename. */
+  .shortcuts svg {
+    width: calc(0.6 * var(--control));
+    height: calc(0.6 * var(--control));
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
   .modes {
     display: flex;

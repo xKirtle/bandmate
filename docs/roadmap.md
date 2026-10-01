@@ -54,10 +54,6 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 - A first-time walkthrough of Bandmate. It can be dismissed, and taken again whenever the user wants.
 - It comes with a demo Song and Beat to work through, created when the user asks for them, from audio built into the binary. A migration would add them to every existing install on upgrade, and a Beat's audio is a file in the data directory, not a row, so SQL alone can't ship it. Created on request, a deleted demo can be added again. The Beat's audio needs a licence that allows shipping it.
 
-## A keyboard icon on the shortcuts button
-
-- The Song page's button that opens the shortcuts dialog shows a keyboard instead of "?", which says more plainly what it opens.
-
 ## Start and end buttons on the Timeline
 
 - Buttons beside play/pause that move the playhead to the start or end of the Timeline, giving the mouse what Home and End do on the ruler. Their titles name those keys.
