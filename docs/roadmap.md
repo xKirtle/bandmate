@@ -106,3 +106,8 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 
 - Select several Clips, across Tracks, and drag them together by the same amount, so they keep their places relative to each other. Today a drag moves one Clip, and Snapping only lines Clips up edge to edge, so it can't keep three Clips that start at different times in step.
 - Selecting several Clips is what Merging Clips needs too, so the two may share it. How Clips are picked (Shift or Ctrl+click, a box dragged around them), whether the group snaps by any of its Clips' edges, whether it can move between Tracks together, and what stops it (the Timeline's start, another Clip in the way), are for the spec.
+
+## Copying and pasting Clips
+
+- Clicking a Clip leaves it selected, so Ctrl+C and Ctrl+V copy it, as its menu's Duplicate does today without reaching for the menu.
+- It builds on the same selection as Moving several Clips, so several selected Clips could be copied together. Where a pasted Clip lands (at the playhead on the Chosen Track, or right after the original as Duplicate puts it), whether a copied Clip can be pasted into another Song, and what clears the selection, are for the spec.
