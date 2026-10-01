@@ -420,7 +420,7 @@
         class="button toggle"
         aria-pressed={showChords}
         onclick={toggleChords}
-        title="Show the Chords above their Lines">Chords</button
+        title="Show or hide the Chords">Chords</button
       >
     {/if}
     {#if mode === 'write' && canCue && hasCues(song)}
