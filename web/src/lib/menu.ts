@@ -68,7 +68,8 @@ export type MenuField = {
 };
 
 // A field's keys are a number box's own, not Shortcuts: ←/→ are left to
-// move the text cursor, and Alt+←/→ to the browser.
+// move the text cursor, and Alt+←/→ to the browser. They're taken from
+// the box, which would step by `step` alone, to step by more with Shift.
 const stepKeys: TwoWay = { back: [{ key: 'ArrowDown' }], forward: [{ key: 'ArrowUp' }] };
 const shiftStepKeys: TwoWay = {
   back: [{ key: 'ArrowDown', shift: true }],

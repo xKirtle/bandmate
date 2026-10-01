@@ -30,7 +30,7 @@ export type Shortcut = Described & (OneWay | TwoWay);
 /** The keys of a Shortcut that does one thing, e.g. Record. */
 export type OneWay = { keys: readonly Key[] };
 
-/** The keys of a Shortcut that goes back or forward, e.g. seeking. */
+/** The keys of a Shortcut that goes back or forward, e.g. seeking, or of a control's own two-way keys, e.g. a number box's ↓/↑. */
 export type TwoWay = { back: readonly Key[]; forward: readonly Key[] };
 
 /** Every Shortcut on the Song page, in the order the shortcuts dialog lists them. */
@@ -245,7 +245,7 @@ export function allKeys(ways: readonly TwoWay[], first: FirstWay = 'back'): Key[
   return ways.flatMap((s) => (first === 'back' ? [...s.back, ...s.forward] : [...s.forward, ...s.back]));
 }
 
-/** Names a two-way Shortcut's keys for a platform, e.g. "Alt+← or Alt+→", back first unless asked otherwise. */
+/** Names a two-way Shortcut's keys for a platform, e.g. "Alt+↓ or Alt+↑", back first unless asked otherwise. */
 export function twoWayLabel(shortcut: TwoWay, on: Platform, first: FirstWay = 'back'): string {
   return keysLabel(allKeys([shortcut], first), on);
 }
