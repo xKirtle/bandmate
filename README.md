@@ -41,7 +41,7 @@ The words in bold are defined in the glossary, [CONTEXT.md](CONTEXT.md).
 - While the Timeline plays, the Line playing is highlighted and the Lyric Sheet follows it. In Read mode, clicking a cued Line plays from it.
 - Shift every Cue at once, and see which Cues are out of order.
 
-![Sync mode cueing a Section's Lines as the Timeline plays](docs/screenshots/sync-mode.gif)
+![Sync mode cueing a Section's Lines as the Timeline plays](docs/screenshots/sync-mode.webp)
 
 ![A Song in Read mode, with the Line playing highlighted](docs/screenshots/read-mode.png)
 
