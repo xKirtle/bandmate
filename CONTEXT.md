@@ -120,6 +120,10 @@ _Avoid_: Re-record, overdub
 A stretch of a Beat or a Sound, or a set of Takes, placed at a position on a Track; the same Beat or Sound can be used by several Clips, and trimming a Clip never changes the audio file; a Clip with several Takes plays exactly one active Take. A Clip can be given a name of its own, so two Clips of the same audio can be told apart; until then, it goes by its source's name (the Beat's title, the Sound's name, or its active Take's number), and a named Take Clip still shows which Take is active.
 _Avoid_: Region, segment
 
+**Selection**:
+The Clips that the next Clip action applies to: none, one or several, on any Tracks. Clicking a Clip selects it alone, and Clips can be added or taken out one at a time, or picked together by drawing a box over them. Dragging a selected Clip moves the whole Selection by the same amount, so the Clips keep their places relative to each other. Deleting deletes all of them. With several selected, a selected Clip's menu acts on the whole Selection; opening the menu of a Clip outside it makes that Clip the Selection first. Clicking empty space on the Timeline clears the Selection, and it's never kept: leaving the Song drops it.
+_Avoid_: Group, highlight, chosen (choosing is for Tracks)
+
 **Loop**:
 A stretch of the Timeline that playback repeats, e.g. the hook of a Beat while writing over it: playback that reaches the Loop's end goes back to its start. Playback started or moved anywhere else plays on as usual until it reaches the Loop's end, so after the Loop it runs to the Timeline's end. Each Song keeps one, which can be switched on or off; only the user switches it, and it never moves the playhead.
 _Avoid_: Cycle, repeat, region
