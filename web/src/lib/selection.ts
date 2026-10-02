@@ -22,7 +22,12 @@ export type SelectionGesture =
   | { kind: 'box'; start: number; end: number; tracks: readonly [number, number]; adds: boolean }
   /** Every Clip was asked for, with Mod+A. */
   | { kind: 'all' }
-  /** Empty lane space was clicked, or Esc pressed. */
+  /**
+   * Empty lane space was clicked, a press not moving far enough to draw a
+   * box. With Mod held, it was likely the start of a box that `adds`.
+   */
+  | { kind: 'emptyClick'; adds: boolean }
+  /** Esc was pressed. */
   | { kind: 'clear' };
 
 /** The Tracks of a Timeline, for the Clips on them and where they are. */
@@ -41,17 +46,17 @@ function boxed(tracks: Tracks, box: Extract<SelectionGesture, { kind: 'box' }>):
  * The Selection after a gesture, given the Timeline's Tracks: a plain
  * click selects that Clip alone, a Mod+click adds it or takes it out, a
  * box selects the Clips it touches, or adds them with Mod, select-all
- * selects every Clip, and clearing selects none. Clips no longer on the
- * Timeline, e.g. deleted in another tab or taken away by undo, drop out;
- * without a gesture that's all that happens, and `selected` itself is
- * given back if none did.
+ * selects every Clip, and clearing, or clicking empty lane space without
+ * Mod, selects none. Clips no longer on the Timeline, e.g. deleted in
+ * another tab or taken away by undo, drop out; without a gesture, or on a
+ * Mod+click on empty lane space, that's all that happens, and `selected`
+ * itself is given back if none did.
  */
 export function selection(tracks: Tracks, selected: Selection, gesture?: SelectionGesture): Selection {
   const present = new Set(tracks.flatMap((t) => t.clips.map((c) => c.id)));
   const kept = [...selected].filter((id) => present.has(id));
-  if (!gesture || ('clipId' in gesture && !present.has(gesture.clipId))) {
-    return kept.length === selected.size ? selected : new Set(kept);
-  }
+  const pruned = kept.length === selected.size ? selected : new Set(kept);
+  if (!gesture || ('clipId' in gesture && !present.has(gesture.clipId))) return pruned;
   switch (gesture.kind) {
     case 'click':
       return new Set([gesture.clipId]);
@@ -63,6 +68,8 @@ export function selection(tracks: Tracks, selected: Selection, gesture?: Selecti
       return new Set([...(gesture.adds ? kept : []), ...boxed(tracks, gesture)]);
     case 'all':
       return present;
+    case 'emptyClick':
+      return gesture.adds ? pruned : noSelection;
     case 'clear':
       return noSelection;
   }

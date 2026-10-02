@@ -66,6 +66,23 @@ describe('selection', () => {
     expect(selection(timeline, selected(1, 3, 5), { kind: 'clear' })).toEqual(noSelection);
   });
 
+  describe('a click on empty lane space', () => {
+    it('clears it', () => {
+      expect(selection(timeline, selected(1, 3), { kind: 'emptyClick', adds: false })).toEqual(noSelection);
+    });
+
+    it('with Mod, leaves it as it is, being likely the start of a box to add', () => {
+      const s = selected(1, 3);
+      expect(selection(timeline, s, { kind: 'emptyClick', adds: true })).toBe(s);
+    });
+
+    it('with Mod, still drops Clips no longer on the Timeline', () => {
+      expect(selection(tracks([1], [4]), selected(1, 2, 4), { kind: 'emptyClick', adds: true })).toEqual(
+        selected(1, 4),
+      );
+    });
+  });
+
   describe('a box', () => {
     it('selects every Clip it touches on a Track it spans, even partly', () => {
       expect(selection(song, noSelection, { kind: 'box', start: 15, end: 35, tracks: [1, 1], adds: false })).toEqual(

@@ -1311,7 +1311,8 @@
   // Mod held as it's pressed, are added to it. It leaves the Chosen Track
   // be, and scrolls the lanes along near their edges, as a Clip dragged
   // does. A press let go without moving past the slop is a click there
-  // instead, which clears the Selection.
+  // instead, which clears the Selection, unless Mod is held: that was
+  // likely the start of a box to add, so the Selection is left be.
   interface LanePress {
     from: Point;
     moved: boolean;
@@ -1376,7 +1377,7 @@
 
   function laneUp(event: PointerEvent) {
     laneMove(event);
-    if (lanePress && !lanePress.moved) select({ kind: 'clear' });
+    if (lanePress && !lanePress.moved) select({ kind: 'emptyClick', adds: lanePress.adds });
     laneDone();
   }
 
