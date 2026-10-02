@@ -111,7 +111,7 @@ export const shortcuts = {
   clearSelection: {
     name: 'Clear the Selection',
     group: 'Timeline editing',
-    description: 'Deselects every Clip, from the Timeline.',
+    description: 'Clears the Selection, from the Timeline, so no Clip is selected.',
     keys: [{ key: 'Escape' }],
   },
   cueNextLine: {

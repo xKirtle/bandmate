@@ -758,6 +758,11 @@
     if (inTextField(target) || target instanceof HTMLSelectElement) return true;
     if (target instanceof HTMLInputElement && (target.type === 'checkbox' || target.type === 'radio')) return true;
     // Space in a dialog or a ⋯ menu is for what's in it.
+    return inMenuOrDialog(target);
+  }
+
+  /** Whether a key was pressed in a dialog or a ⋯ menu, whose keys are for what's in it. */
+  function inMenuOrDialog(target: EventTarget | null): boolean {
     return target instanceof Element && target.closest('dialog, [role="menu"]') !== null;
   }
 
@@ -1334,8 +1339,7 @@
   // Track is dragged, which Esc cancels.
   function timelineKey(event: KeyboardEvent) {
     if (event.defaultPrevented || !clearsSelection(event) || selected.size === 0 || trackDrag.current) return;
-    if (inTextField(event.target)) return;
-    if (event.target instanceof Element && event.target.closest('[role="menu"], dialog')) return;
+    if (inTextField(event.target) || inMenuOrDialog(event.target)) return;
     event.preventDefault();
     select({ kind: 'clear' });
   }
@@ -2554,6 +2558,8 @@
                 {#each placed as { clip, at, editing } (clip.id)}
                   {@const wave = waveWindow(view, at.start, at.length)}
                   {@const title = titleOf(clip)}
+                  {@const isSelected = selected.has(clip.id)}
+                  {@const extent = `${formatDuration(at.start)} to ${formatDuration(at.start + at.length)}`}
                   <!-- Focusable for its Delete and menu keys; pointer dragging has no key equivalent yet, and its actions are in its menu. -->
                   <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
                   <div
@@ -2563,14 +2569,12 @@
                     class:moving={editing && edit?.mode === 'move'}
                     class:nudging={editing && edit?.mode === 'nudge'}
                     class:retaking={clip.id === recording?.clipId}
-                    class:selected={selected.has(clip.id)}
+                    class:selected={isSelected}
                     style:left="{percent(at.start)}%"
                     style:width="{percent(at.length)}%"
                     {title}
                     role="group"
-                    aria-label="{title}{selected.has(clip.id) ? ', selected' : ''}, {formatDuration(
-                      at.start,
-                    )} to {formatDuration(at.start + at.length)}"
+                    aria-label="{title}{isSelected ? ', selected' : ''}, {extent}"
                     tabindex={editable.current ? 0 : undefined}
                     aria-keyshortcuts={editable.current && clip.id !== recording?.clipId
                       ? hints.aria(clipKeys)
