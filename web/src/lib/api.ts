@@ -351,11 +351,17 @@ export interface TakePlacement extends Captured {
   start: number;
 }
 
+/**
+ * The Track one of several Clips placed or pasted at once goes on: one of
+ * the Timeline's, or, by its index, one of the Tracks added for them.
+ */
+export type OnTrack = { trackId: number } | { newTrack: number };
+
+/** A Track added at the bottom for Clips placed or pasted at once to go on: empty, at 0 dB, neither muted nor soloed. */
+export type TrackToAdd = Pick<NewTrack, 'name'>;
+
 /** A Clip to place, and the Track it goes on. */
-export interface PlacedClip {
-  trackId: number;
-  clip: NewClip;
-}
+export type PlacedClip = OnTrack & { clip: NewClip };
 
 /**
  * A Clip as it was copied, to paste as a new Clip: a stretch of a Beat or a
@@ -369,10 +375,7 @@ export type ClipCopy = Pick<Clip, 'start' | 'offset' | 'length'> & { name?: stri
   );
 
 /** A Clip to paste, and the Track it goes on. */
-export interface PastedClip {
-  trackId: number;
-  clip: ClipCopy;
-}
+export type PastedClip = OnTrack & { clip: ClipCopy };
 
 /** Where one of several Clips moved at once goes: a Track and a start, in seconds. */
 export interface ClipMove {
@@ -566,9 +569,9 @@ function audioForm(file: File, details: object): FormData {
   return form;
 }
 
-/** Clips to place or paste as the API takes them: each with the id of the Track it goes on. */
+/** Clips to place or paste as the API takes them: each with the Track it goes on. */
 function onTracks(clips: readonly (PlacedClip | PastedClip)[]) {
-  return clips.map((c) => ({ trackId: c.trackId, ...c.clip }));
+  return clips.map(({ clip, ...on }) => ({ ...on, ...clip }));
 }
 
 export const api = {
@@ -763,15 +766,16 @@ export const api = {
    * Places several Clips at once, e.g. to bring back Clips deleted together.
    * Refused whole if any would overlap a Clip there, or another of them.
    */
-  placeClips: (at: SongAt, clips: PlacedClip[]) =>
-    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/place`, { clips: onTracks(clips) }, at),
+  placeClips: (at: SongAt, clips: PlacedClip[], newTracks: TrackToAdd[] = []) =>
+    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/place`, { newTracks, clips: onTracks(clips) }, at),
   /**
-   * Pastes Clips as they were copied, each a new Clip: a Clip of Takes gets
+   * Pastes Clips as they were copied, each a new Clip, adding newTracks at
+   * the bottom first for those that go on new Tracks: a Clip of Takes gets
    * copies of its Takes, sharing their audio. Refused whole if any would
    * overlap a Clip there, or another of them.
    */
-  pasteClips: (at: SongAt, clips: PastedClip[]) =>
-    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/paste`, { clips: onTracks(clips) }, at),
+  pasteClips: (at: SongAt, clips: PastedClip[], newTracks: TrackToAdd[]) =>
+    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/paste`, { newTracks, clips: onTracks(clips) }, at),
   /** Gives a Clip a name of its own; a blank one clears it, and the Clip goes by its source's name again. */
   renameClip: (at: SongAt, clipId: number, name: string) =>
     request<Timeline>('PUT', `/songs/${at.id}/timeline/clips/${clipId}/name`, { name }, at),
@@ -781,9 +785,13 @@ export const api = {
   /** Removes a Clip from the Timeline; its Beat stays in the Beat Library, and its Takes are detached. */
   deleteClip: (at: SongAt, clipId: number) =>
     request<Timeline>('DELETE', `/songs/${at.id}/timeline/clips/${clipId}`, undefined, at),
-  /** Removes several Clips at once, as deleteClip does each; refused whole if any isn't on the Timeline. */
-  deleteClips: (at: SongAt, clipIds: number[]) =>
-    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/delete`, { clipIds }, at),
+  /**
+   * Removes several Clips at once, as deleteClip does each, then the Tracks
+   * trackIds with whatever is left on them, e.g. to undo a paste that added
+   * Tracks; refused whole if any isn't on the Timeline.
+   */
+  deleteClips: (at: SongAt, clipIds: number[], trackIds: number[] = []) =>
+    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/delete`, { clipIds, trackIds }, at),
   /**
    * Places a Take just recorded, a mono 24-bit WAV, in a new Clip at start.
    * Refused if it would overlap a Clip there.
