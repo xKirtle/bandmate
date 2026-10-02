@@ -664,6 +664,66 @@ func (s *Store) MoveClip(ctx context.Context, songID int64, based lyricsheet.Ver
 	})
 }
 
+// ClipMove is where one Clip of several moved at once goes: a Track and a
+// start, in seconds.
+type ClipMove struct {
+	ClipID  int64   `json:"clipId"`
+	TrackID int64   `json:"trackId"`
+	Start   float64 `json:"start"`
+}
+
+// MoveClips moves several Clips at once, each to start at a time on a Track
+// of the same Timeline, keeping its trim. Each is checked where it lands
+// against the Timeline as the whole move leaves it, so Clips moved together
+// may pass each other's old places, but none can overlap another Clip.
+// If any can't go where it's moved, none moves.
+func (s *Store) MoveClips(ctx context.Context, songID int64, based lyricsheet.Version, moves []ClipMove) (Timeline, error) {
+	if len(moves) == 0 {
+		return Timeline{}, &lyricsheet.InvalidError{Msg: "clips are required"}
+	}
+	seen := map[int64]bool{}
+	for _, m := range moves {
+		if seen[m.ClipID] {
+			return Timeline{}, &lyricsheet.InvalidError{Msg: "each Clip can only move once"}
+		}
+		seen[m.ClipID] = true
+	}
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		placed := make([]placement, len(moves))
+		for i, m := range moves {
+			p, err := clipPlacement(ctx, tx, songID, m.ClipID)
+			if err != nil {
+				return err
+			}
+			if err := findTrack(ctx, tx, songID, m.TrackID); errors.Is(err, lyricsheet.ErrNotFound) {
+				return &lyricsheet.InvalidError{Msg: "there's no such Track on this Timeline"}
+			} else if err != nil {
+				return err
+			}
+			if m.Start < -tolerance {
+				return &lyricsheet.InvalidError{Msg: "a Clip can't start before 0:00"}
+			}
+			p.trackID, p.start = m.TrackID, max(m.Start, 0)
+			placed[i] = p
+			if _, err := tx.ExecContext(ctx, `UPDATE clips SET track_id = ?, start = ? WHERE id = ?`,
+				p.trackID, p.start, m.ClipID); err != nil {
+				return fmt.Errorf("moving clip: %w", err)
+			}
+		}
+		// Only once every Clip is where it's going.
+		for i, m := range moves {
+			free, err := isFree(ctx, tx, m.ClipID, placed[i])
+			if err != nil {
+				return err
+			}
+			if !free {
+				return errOverlap
+			}
+		}
+		return nil
+	})
+}
+
 // TrimClip has a Clip play length seconds of its source from offset,
 // without touching the source's file. The audio stays where it was on the
 // Timeline, so trimming the start moves where the Clip starts. It can't
