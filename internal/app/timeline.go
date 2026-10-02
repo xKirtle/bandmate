@@ -211,17 +211,22 @@ func (a *App) duplicateClip(w http.ResponseWriter, r *http.Request) {
 }
 
 // clipToPaste is a Clip as it was copied, to paste on a Track, as a request
-// gives it.
+// gives it: as a Clip to place, but with a Clip of Takes' Takes as they
+// were, rather than their ids.
 type clipToPaste struct {
-	TrackID      *int64            `json:"trackId"`
-	BeatID       *int64            `json:"beatId"`
-	SoundID      *int64            `json:"soundId"`
-	Name         *string           `json:"name"`
-	Takes        []timeline.TakeAt `json:"takes"`
-	ActiveTakeID *int64            `json:"activeTakeId"`
-	Start        *float64          `json:"start"`
-	Offset       *float64          `json:"offset"`
-	Length       *float64          `json:"length"`
+	clipToPlace
+	Takes []timeline.TakeAt `json:"takes"`
+}
+
+// copied is the Clip as it was copied and the Track it goes on, if the
+// request gave both.
+func (c clipToPaste) copied() (timeline.ClipCopy, error) {
+	p, err := c.placed()
+	if err != nil {
+		return timeline.ClipCopy{}, err
+	}
+	return timeline.ClipCopy{TrackID: p.TrackID, BeatID: p.BeatID, SoundID: p.SoundID, Name: p.Name,
+		Takes: c.Takes, ActiveTakeID: p.ActiveTakeID, Start: p.Start, Offset: p.Offset, Length: p.Length}, nil
 }
 
 func (a *App) pasteClips(w http.ResponseWriter, r *http.Request) {
@@ -231,11 +236,11 @@ func (a *App) pasteClips(w http.ResponseWriter, r *http.Request) {
 	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
 		clips := make([]timeline.ClipCopy, len(req.Clips))
 		for i, c := range req.Clips {
-			if c.TrackID == nil || c.Start == nil || c.Offset == nil || c.Length == nil {
-				return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "trackId, start, offset and length are required"}
+			copied, err := c.copied()
+			if err != nil {
+				return timeline.Timeline{}, err
 			}
-			clips[i] = timeline.ClipCopy{TrackID: *c.TrackID, BeatID: c.BeatID, SoundID: c.SoundID, Name: c.Name,
-				Takes: c.Takes, ActiveTakeID: c.ActiveTakeID, Start: *c.Start, Offset: *c.Offset, Length: *c.Length}
+			clips[i] = copied
 		}
 		return a.timelines.PasteClips(r.Context(), id, based, clips)
 	})

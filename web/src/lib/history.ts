@@ -38,10 +38,10 @@ import { isBlank, type CuedSong } from './cues';
 // Deleting a Clip of Takes, or its Track, only detaches its Takes, so
 // placing a Clip from their ids brings them back. A new Take, a copied
 // Clip and pasted Clips are redone as that too, so redoing never uploads a
-// Take again or copies it again. Likewise, a Sound outlives its last Clip for as long as
-// undo lasts, so an imported Sound is undone by deleting its Clip and
-// redone by placing a Clip of it back, without uploading it again. A Retake
-// is undone and redone by setting its Clip's Takes, and where they are, as
+// Take again or copies it again. Likewise, a Sound outlives its last Clip
+// for as long as undo lasts, so an imported Sound is undone by deleting
+// its Clip and redone by placing a Clip of it back, without uploading it
+// again. A Retake is undone and redone by setting its Clip's Takes, and where they are, as
 // they were before or after it, which detaches the new Take or brings it
 // back. Deleting Takes, or clearing a
 // Clip's inactive ones, is undone the same way, as they're only detached,
@@ -111,13 +111,10 @@ export class History {
   /** Keeps an edit that turned before into after, to undo, unless it changed nothing. */
   record(edit: Edit, before: Timeline, after: Timeline): void {
     if (content(before) === content(after)) return;
-    const redo =
-      edit.kind === 'duplicateClip'
-        ? placingAdded(before, after)
-        : edit.kind === 'pasteClips'
-          ? placingAllAdded(before, after)
-          : edit;
-    this.#undo.push({ undo: inverse(edit, before, after), redo: { edit: redo, adds: added(before, after) } });
+    this.#undo.push({
+      undo: inverse(edit, before, after),
+      redo: { edit: redoing(edit, before, after), adds: added(before, after) },
+    });
     this.#redo = [];
   }
 
@@ -191,6 +188,22 @@ export class History {
       entry.redo = remapStep(entry.redo, ids);
     }
     return sent.adds.clips.map(ids.clip);
+  }
+}
+
+/**
+ * The edit that redoes edit, which turned before into after: itself, but
+ * for a copy, a Duplicate or a paste, placing what it added, so redoing
+ * never copies again.
+ */
+function redoing(edit: Edit, before: Timeline, after: Timeline): Edit {
+  switch (edit.kind) {
+    case 'duplicateClip':
+      return placingAdded(before, after);
+    case 'pasteClips':
+      return placingAllAdded(before, after);
+    default:
+      return edit;
   }
 }
 
@@ -404,6 +417,7 @@ function remap(edit: HistoryEdit, ids: IdMaps): HistoryEdit {
       return { ...edit, trackId: ids.track(edit.trackId) };
     case 'placeClip':
       return { ...edit, trackId: ids.track(edit.trackId) };
+    // Each its own, as their Clips differ.
     case 'placeClips':
       return { ...edit, clips: edit.clips.map((c) => ({ ...c, trackId: ids.track(c.trackId) })) };
     case 'pasteClips':

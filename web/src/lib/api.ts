@@ -566,6 +566,11 @@ function audioForm(file: File, details: object): FormData {
   return form;
 }
 
+/** Clips to place or paste as the API takes them: each with the id of the Track it goes on. */
+function onTracks(clips: readonly (PlacedClip | PastedClip)[]) {
+  return clips.map((c) => ({ trackId: c.trackId, ...c.clip }));
+}
+
 export const api = {
   getConfig: () => request<ServerConfig>('GET', '/config'),
   getAbout: () => request<AboutInfo>('GET', '/about'),
@@ -759,24 +764,14 @@ export const api = {
    * Refused whole if any would overlap a Clip there, or another of them.
    */
   placeClips: (at: SongAt, clips: PlacedClip[]) =>
-    request<Timeline>(
-      'POST',
-      `/songs/${at.id}/timeline/clips/place`,
-      { clips: clips.map((c) => ({ trackId: c.trackId, ...c.clip })) },
-      at,
-    ),
+    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/place`, { clips: onTracks(clips) }, at),
   /**
    * Pastes Clips as they were copied, each a new Clip: a Clip of Takes gets
    * copies of its Takes, sharing their audio. Refused whole if any would
    * overlap a Clip there, or another of them.
    */
   pasteClips: (at: SongAt, clips: PastedClip[]) =>
-    request<Timeline>(
-      'POST',
-      `/songs/${at.id}/timeline/clips/paste`,
-      { clips: clips.map((c) => ({ trackId: c.trackId, ...c.clip })) },
-      at,
-    ),
+    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/paste`, { clips: onTracks(clips) }, at),
   /** Gives a Clip a name of its own; a blank one clears it, and the Clip goes by its source's name again. */
   renameClip: (at: SongAt, clipId: number, name: string) =>
     request<Timeline>('PUT', `/songs/${at.id}/timeline/clips/${clipId}/name`, { name }, at),

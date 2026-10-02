@@ -127,7 +127,7 @@ export const shortcuts = {
     keys: [{ key: 'c', mod: true }],
   },
   pasteClips: {
-    name: 'Paste',
+    name: 'Paste the Clipboard',
     group: 'Timeline editing',
     description:
       'Pastes the Clips last copied at the playhead on the Chosen Track, or later where they fit, and selects them.',

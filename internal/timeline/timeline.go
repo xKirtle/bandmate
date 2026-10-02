@@ -890,24 +890,36 @@ func newSource(ctx context.Context, tx *sql.Tx, songID int64, c NewClip) (source
 // checkTakes checks that Takes of the Song can go in a Clip (0 for a new
 // one), each once: they must be detached or in it already.
 func checkTakes(ctx context.Context, tx *sql.Tx, songID, clipID int64, ids []int64) error {
-	for i, id := range ids {
-		if slices.Contains(ids[:i], id) {
-			return &lyricsheet.InvalidError{Msg: "a Take can only be in a Clip once"}
-		}
-		var in sql.NullInt64
-		err := tx.QueryRowContext(ctx, `SELECT clip_id FROM takes WHERE id = ? AND song_id = ?`,
-			id, songID).Scan(&in)
-		if errors.Is(err, sql.ErrNoRows) {
-			return &lyricsheet.InvalidError{Msg: "there's no such Take in this Song"}
-		}
-		if err != nil {
-			return fmt.Errorf("reading take: %w", err)
-		}
-		if in.Valid && in.Int64 != clipID {
+	in, err := takesOfSong(ctx, tx, songID, ids)
+	if err != nil {
+		return err
+	}
+	for _, c := range in {
+		if c.Valid && c.Int64 != clipID {
 			return &lyricsheet.ConflictError{Msg: "a Take can only be in one Clip"}
 		}
 	}
 	return nil
+}
+
+// takesOfSong checks that Takes are the Song's, each given once, and
+// returns the Clip each is in, or null for one detached.
+func takesOfSong(ctx context.Context, tx *sql.Tx, songID int64, ids []int64) ([]sql.NullInt64, error) {
+	in := make([]sql.NullInt64, len(ids))
+	for i, id := range ids {
+		if slices.Contains(ids[:i], id) {
+			return nil, &lyricsheet.InvalidError{Msg: "a Take can only be in a Clip once"}
+		}
+		err := tx.QueryRowContext(ctx, `SELECT clip_id FROM takes WHERE id = ? AND song_id = ?`,
+			id, songID).Scan(&in[i])
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, &lyricsheet.InvalidError{Msg: "there's no such Take in this Song"}
+		}
+		if err != nil {
+			return nil, fmt.Errorf("reading take: %w", err)
+		}
+	}
+	return in, nil
 }
 
 // attachTakes puts Takes in a Clip.
@@ -1048,18 +1060,11 @@ func (s *Store) copyTakesAt(ctx context.Context, tx *sql.Tx, songID int64, takes
 	linked *[]int64) ([]int64, int64, error) {
 	ids := make([]int64, len(takes))
 	for i, t := range takes {
-		if slices.Contains(ids[:i], t.ID) {
-			return nil, 0, &lyricsheet.InvalidError{Msg: "a Take can only be in a Clip once"}
-		}
 		ids[i] = t.ID
-		var n int
-		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM takes WHERE id = ? AND song_id = ?`,
-			t.ID, songID).Scan(&n); err != nil {
-			return nil, 0, fmt.Errorf("reading take: %w", err)
-		}
-		if n == 0 {
-			return nil, 0, &lyricsheet.InvalidError{Msg: "there's no such Take in this Song"}
-		}
+	}
+	// In a Clip or detached, as a Clip cut leaves them.
+	if _, err := takesOfSong(ctx, tx, songID, ids); err != nil {
+		return nil, 0, err
 	}
 	copies, err := s.copyTakes(ctx, tx, ids, linked)
 	if err != nil {

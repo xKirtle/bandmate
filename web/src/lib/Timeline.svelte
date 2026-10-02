@@ -1519,8 +1519,8 @@
   // Esc clears the Selection while focus is in the Timeline, Mod+A
   // selects every Clip, and Mod+C and Mod+V copy and paste, but not in a
   // text field, a menu or a dialog, whose keys are their own, nor while a
-  // Track is dragged, which Esc cancels. Copying and pasting are edits,
-  // so not on a phone, nor while recording.
+  // Track is dragged, which Esc cancels. Copying and pasting only go with
+  // editing, so not on a phone, nor while recording.
   function timelineKey(event: KeyboardEvent) {
     if (event.defaultPrevented || trackDrag.current) return;
     if (inTextField(event.target) || inMenuOrDialog(event.target)) return;

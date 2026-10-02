@@ -9,9 +9,9 @@
 import type { Clip, ClipCopy, PastedClip, Track } from './api';
 import type { Selection } from './selection';
 
-/** A Clip as it was copied, and the Track it was on then, by its place from the top. */
+/** A Clip as it was copied, and the index of the Track it was on then, from the top. */
 export interface CopiedClip {
-  track: number;
+  trackIndex: number;
   clip: ClipCopy;
 }
 
@@ -43,8 +43,8 @@ function copyOf(clip: Clip): ClipCopy {
 
 /** The Clipboard after copying the selected Clips as they are, or null with none selected, which leaves it as it was. */
 export function copy(tracks: readonly Track[], selected: Selection): Clipboard | null {
-  const copied = tracks.flatMap((t, track) =>
-    t.clips.filter((c) => selected.has(c.id)).map((c) => ({ track, clip: copyOf(c) })),
+  const copied = tracks.flatMap((t, trackIndex) =>
+    t.clips.filter((c) => selected.has(c.id)).map((c) => ({ trackIndex, clip: copyOf(c) })),
   );
   return copied.length > 0 ? copied : null;
 }
@@ -55,17 +55,17 @@ export function copy(tracks: readonly Track[], selected: Selection): Clipboard |
  * places relative to it. Where that would land any Clip on another, the
  * whole paste goes later, together, to the first place where every Clip
  * fits, so pasting again at the same playhead lays copies end to end.
- * Null if there's nothing to paste, or nowhere to paste it.
+ * Null if there's nothing to paste, or nowhere to paste it: for now, that
+ * includes Clips copied from several Tracks, which don't paste yet.
  */
-// For now, only Clips copied from one Track paste (#431 pastes across Tracks).
 export function paste(
   clipboard: Clipboard,
   tracks: readonly Track[],
   playhead: number,
-  chosen: number,
+  chosenTrackId: number,
 ): PastedClip[] | null {
-  const track = tracks.find((t) => t.id === chosen);
-  if (!track || clipboard.length === 0 || clipboard.some((c) => c.track !== clipboard[0].track)) return null;
+  const track = tracks.find((t) => t.id === chosenTrackId);
+  if (!track || clipboard.length === 0 || clipboard.some((c) => c.trackIndex !== clipboard[0].trackIndex)) return null;
   const earliest = Math.min(...clipboard.map((c) => c.clip.start));
   const laid = clipboard.map(({ clip }) => ({ clip, after: clip.start - earliest }));
   // Each Clip landing on another sends the paste on to where that one
@@ -82,5 +82,5 @@ export function paste(
     if (hit === undefined) break;
     at = hit;
   }
-  return laid.map(({ clip, after }) => ({ trackId: chosen, clip: { ...clip, start: at + after } }));
+  return laid.map(({ clip, after }) => ({ trackId: chosenTrackId, clip: { ...clip, start: at + after } }));
 }

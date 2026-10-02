@@ -55,9 +55,9 @@ describe('copy', () => {
     const tracks = [track(1, [clip(5, 0, 10, { offset: 2 }), clip(7, 40)]), track(2, [takes])];
 
     expect(copy(tracks, new Set([6, 5]))).toEqual([
-      { track: 0, clip: { beatId: 100, start: 0, offset: 2, length: 10 } },
+      { trackIndex: 0, clip: { beatId: 100, start: 0, offset: 2, length: 10 } },
       {
-        track: 1,
+        trackIndex: 1,
         clip: {
           name: 'Hook',
           takes: [
@@ -75,7 +75,7 @@ describe('copy', () => {
 
   it('holds a Sound’s Clip by its Sound', () => {
     expect(copy([track(1, [clip(5, 4, 8, { beatId: null, soundId: 9 })])], new Set([5]))).toEqual([
-      { track: 0, clip: { soundId: 9, start: 4, offset: 0, length: 8 } },
+      { trackIndex: 0, clip: { soundId: 9, start: 4, offset: 0, length: 8 } },
     ]);
   });
 });
