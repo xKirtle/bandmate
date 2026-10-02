@@ -21,27 +21,17 @@ const browser = await chromium.launch({
   // The Timeline plays without a click first.
   args: ["--autoplay-policy=no-user-gesture-required"],
 });
-const desktop = { viewport: { width: 1440, height: 900 }, colorScheme: "dark" };
+// Shot at twice the CSS pixels, so the images stay sharp on HiDPI screens.
+const desktop = {
+  viewport: { width: 1440, height: 900 },
+  deviceScaleFactor: 2,
+  colorScheme: "dark",
+};
 const work = mkdtempSync(join(tmpdir(), "bandmate-screenshots-"));
 
-/** The ffmpeg filter that brings a picture down to palette colours, undithered, to keep it small. */
-const palette = (colors) =>
-  `split[a][b];[a]palettegen=max_colors=${colors}:stats_mode=full[p];[b][p]paletteuse=dither=none`;
-
-/** Screenshots the page as name.png, compressed, with Playwright's screenshot options. */
+/** Screenshots the page as name.png, with Playwright's screenshot options. */
 async function save(page, name, options = {}) {
-  const raw = join(work, `${name}.png`);
-  await page.screenshot({ ...options, path: raw });
-  execFileSync("ffmpeg", [
-    "-y",
-    "-loglevel",
-    "error",
-    "-i",
-    raw,
-    "-vf",
-    palette(256),
-    join(out, `${name}.png`),
-  ]);
+  await page.screenshot({ ...options, path: join(out, `${name}.png`) });
 }
 
 /** Opens a page in a new dark-theme browser context. */
@@ -127,9 +117,9 @@ async function play(page) {
   await page.context().close();
 }
 
-// Sync mode cueing the Bridge's Lines, as a GIF.
+// Sync mode cueing the Bridge's Lines, as an animated WebP.
 {
-  // Narrower than the stills, still laid out for desktop, so the GIF can
+  // Narrower than the stills, still laid out for desktop, so the animation can
   // be small and still readable.
   const page = await open(heroURL, {
     ...desktop,
@@ -142,32 +132,46 @@ async function play(page) {
   const playing = Date.now();
   /** When the playhead reaches seconds on the Timeline, as a time on the clock. */
   const at = (seconds) => playing + (seconds - 59) * 1000;
-  await page.waitForTimeout(at(64) - Date.now());
+  const start = at(64);
+  const end = at(71.5);
 
-  // Frames are shot as fast as they come, each shown until the next.
+  // Chromium's screencast sends a frame each time the page paints, stamped
+  // with when it painted. Each frame shows until the next.
   const shot = [];
+  const cdp = await page.context().newCDPSession(page);
+  cdp.on("Page.screencastFrame", ({ data, metadata, sessionId }) => {
+    const file = join(work, `frame-${shot.length}.png`);
+    writeFileSync(file, Buffer.from(data, "base64"));
+    shot.push({ file, time: metadata.timestamp * 1000 });
+    cdp.send("Page.screencastFrameAck", { sessionId }).catch(() => {});
+  });
+  await page.waitForTimeout(start - 500 - Date.now());
+  await cdp.send("Page.startScreencast", { format: "png" });
+
   // Cue three Bridge Lines a bar (2.5 s) apart, from 1:05, and stop with
   // the fourth up next: once every Line is cued, the first comes up next,
   // and the Lyric Sheet scrolls back up to it.
-  const cues = [65, 67.5, 70].map(at);
-  const end = at(71.5);
-  while (Date.now() < end) {
-    if (cues.length && Date.now() >= cues[0]) {
-      cues.shift();
-      await page.keyboard.press("Enter");
-    }
-    const file = join(work, `frame-${shot.length}.png`);
-    shot.push({ file, time: Date.now() });
-    await page.screenshot({ path: file });
+  for (const cue of [65, 67.5, 70].map(at)) {
+    await page.waitForTimeout(cue - Date.now());
+    await page.keyboard.press("Enter");
   }
+  await page.waitForTimeout(end - Date.now());
+  await cdp.send("Page.stopScreencast");
   await page.context().close();
-  const list = shot.map(
+
+  // From the frame on screen at the start to the last before the end.
+  const first = shot.findLastIndex(({ time }) => time <= start);
+  const frames = shot
+    .slice(Math.max(first, 0))
+    .filter(({ time }) => time < end);
+  frames[0].time = start;
+  const list = frames.map(
     ({ file, time }, i) =>
-      `file '${file}'\nduration ${((shot[i + 1]?.time ?? end) - time) / 1000}\n`,
+      `file '${file}'\nduration ${((frames[i + 1]?.time ?? end) - time) / 1000}\n`,
   );
   writeFileSync(
     join(work, "frames.txt"),
-    list.join("") + `file '${shot.at(-1).file}'\n`,
+    list.join("") + `file '${frames.at(-1).file}'\n`,
   );
   execFileSync("ffmpeg", [
     ...[
@@ -181,8 +185,9 @@ async function play(page) {
       "-i",
       join(work, "frames.txt"),
     ],
-    ...["-vf", `fps=8,scale=800:-1:flags=lanczos,${palette(48)}`],
-    join(out, "sync-mode.gif"),
+    ...["-vf", "fps=30,scale=1400:-1:flags=lanczos"],
+    ...["-c:v", "libwebp_anim", "-lossless", "1", "-compression_level", "6"],
+    ...["-loop", "0", join(out, "sync-mode.webp")],
   ]);
 }
 
