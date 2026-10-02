@@ -127,7 +127,7 @@ group('selectionActions', () => {
     expect(selectionActions(1, { deleteClips: () => {} }).map((a) => a.label)).toEqual(['Delete 1 Clip']);
   });
 
-  it('deletes them when chosen', () => {
+  it('deletes them when picked', () => {
     let deleted = 0;
     const [entry] = selectionActions(2, { deleteClips: () => deleted++ });
     if ('run' in entry) entry.run();

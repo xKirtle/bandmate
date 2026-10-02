@@ -1902,7 +1902,12 @@
    * but never the Clip a Retake is recording into; else the Clip alone.
    */
   function removeWithSelection(clip: Clip) {
-    if (!selected.has(clip.id)) return remove(clip);
+    if (selected.has(clip.id)) removeSelection();
+    else remove(clip);
+  }
+
+  /** Deletes the selected Clips, as one edit, but never the Clip a Retake is recording into. */
+  function removeSelection() {
     perform({ kind: 'deleteClips', clipIds: deletableSelection() });
   }
 
@@ -1937,10 +1942,7 @@
 
   function clipMenuActions(clip: Clip): MenuAction[] {
     if (menuFor(timeline.tracks, selected, clip.id).menu === 'selection') {
-      const clipIds = deletableSelection();
-      return selectionActions(clipIds.length, {
-        deleteClips: () => perform({ kind: 'deleteClips', clipIds }),
-      });
+      return selectionActions(deletableSelection().length, { deleteClips: removeSelection });
     }
     const clipId = clip.id;
     return clipActions(

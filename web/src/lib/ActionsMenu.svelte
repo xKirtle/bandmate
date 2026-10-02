@@ -26,7 +26,10 @@
     align?: 'start' | 'end';
     /** Keeps the menu from opening, e.g. while what it acts on is busy. */
     disabled?: boolean;
-    /** Called as it opens, however it's opened, before its entries are shown, e.g. to change what it acts on. */
+    /**
+     * Called as it opens, however it's opened, and as it moves when opened
+     * again, before its entries are shown, e.g. to change what it acts on.
+     */
     onopen?: () => void;
   } = $props();
 
