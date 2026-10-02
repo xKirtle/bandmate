@@ -1,5 +1,5 @@
 import { describe as group, expect, it } from 'vitest';
-import { laneStep, pressLane, type LaneInput, type LanePress } from './lanePress';
+import { laneStep, pressLane, type LaneInput, type LaneOutcome, type LanePress } from './lanePress';
 
 const from = { clientX: 100, clientY: 100 };
 const wobble = { clientX: 103, clientY: 98 };
@@ -7,10 +7,11 @@ const away = { clientX: 140, clientY: 120 };
 
 /** The outcomes of a press's inputs in turn, and the press left after them. */
 function run(press: LanePress, ...inputs: LaneInput[]) {
-  const outcomes = [];
+  const outcomes: LaneOutcome[] = [];
   let at: LanePress | null = press;
   for (const input of inputs) {
-    const step = laneStep(at!, input);
+    if (!at) break;
+    const step = laneStep(at, input);
     outcomes.push(step.outcome);
     at = step.press;
   }
@@ -18,7 +19,7 @@ function run(press: LanePress, ...inputs: LaneInput[]) {
 }
 
 group('a mouse or pen press on empty lane space', () => {
-  const press = pressLane(from, 'mouse');
+  const press = pressLane(from, false);
 
   it('draws a box once it moves past the slop, and keeps it on lifting', () => {
     expect(run(press, { kind: 'move', at: wobble }, { kind: 'move', at: away }, { kind: 'lift' })).toEqual({
@@ -45,14 +46,10 @@ group('a mouse or pen press on empty lane space', () => {
   it('has no long press', () => {
     expect(run(press, { kind: 'hold' }, { kind: 'lift' }).outcomes).toEqual(['wait', 'click']);
   });
-
-  it('draws a box the same for a pen', () => {
-    expect(run(pressLane(from, 'pen'), { kind: 'move', at: away }).outcomes).toEqual(['box']);
-  });
 });
 
 group('a finger pressing empty lane space', () => {
-  const press = pressLane(from, 'touch');
+  const press = pressLane(from, true);
 
   it('gives up, leaving the Timeline to pan, when it moves past the slop before the hold', () => {
     expect(run(press, { kind: 'move', at: wobble }, { kind: 'move', at: away })).toEqual({

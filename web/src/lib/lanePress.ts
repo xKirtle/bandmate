@@ -5,13 +5,19 @@ import { pastSlop, type Point } from './press';
 /** A press on empty lane space, from where it went down. */
 export interface LanePress {
   from: Point;
+  /** Whether a finger is pressing, rather than a mouse or pen. */
+  touch: boolean;
   /**
    * `pressed`: a mouse or pen, not yet moved past the slop.
    * `holding`: a finger, held still for the long press.
    * `boxing`: drawing a box.
    */
   phase: 'pressed' | 'holding' | 'boxing';
-  /** Whether it's moved past the slop: a box let go before then is a click. */
+  /**
+   * Whether it's moved past the slop. A mouse or pen has by the time it
+   * draws a box; a finger's box, drawn once held, let go before then is a
+   * click.
+   */
   dragged: boolean;
 }
 
@@ -35,11 +41,12 @@ export type LaneInput =
  */
 export type LaneOutcome = 'wait' | 'box' | 'click' | 'keep' | 'restore' | 'giveUp';
 
-/** A press on empty lane space by a pointer of the given type, as PointerEvent's pointerType names it. */
-export function pressLane(from: Point, pointerType: string): LanePress {
+/** A press on empty lane space, by a finger or else a mouse or pen. */
+export function pressLane(from: Point, touch: boolean): LanePress {
   return {
     from: { clientX: from.clientX, clientY: from.clientY },
-    phase: pointerType === 'touch' ? 'holding' : 'pressed',
+    touch,
+    phase: touch ? 'holding' : 'pressed',
     dragged: false,
   };
 }
