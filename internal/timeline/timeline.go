@@ -779,16 +779,42 @@ type NewClip struct {
 // already there.
 func (s *Store) PlaceClip(ctx context.Context, songID int64, based lyricsheet.Version, trackID int64, c NewClip) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		var found int
-		err := tx.QueryRowContext(ctx, `SELECT 1 FROM tracks WHERE id = ? AND song_id = ?`, trackID, songID).Scan(&found)
-		if errors.Is(err, sql.ErrNoRows) {
-			return &lyricsheet.InvalidError{Msg: "there's no such Track on this Timeline"}
-		}
-		if err != nil {
-			return fmt.Errorf("reading track: %w", err)
-		}
-		return addClip(ctx, tx, songID, trackID, c)
+		return placeOnTrack(ctx, tx, songID, PlacedClip{TrackID: trackID, NewClip: c})
 	})
+}
+
+// PlacedClip is a Clip to place, and the Track it goes on.
+type PlacedClip struct {
+	TrackID int64
+	NewClip
+}
+
+// PlaceClips places several Clips at once, each as PlaceClip does, e.g. to
+// bring back Clips deleted together. None may overlap a Clip already there,
+// or another of them. If any can't be placed, none is.
+func (s *Store) PlaceClips(ctx context.Context, songID int64, based lyricsheet.Version, clips []PlacedClip) (Timeline, error) {
+	if len(clips) == 0 {
+		return Timeline{}, &lyricsheet.InvalidError{Msg: "clips are required"}
+	}
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		for _, c := range clips {
+			// Each placed is there for the next to be checked against.
+			if err := placeOnTrack(ctx, tx, songID, c); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// placeOnTrack adds a new Clip to one of the Song's Tracks, as addClip does.
+func placeOnTrack(ctx context.Context, tx *sql.Tx, songID int64, c PlacedClip) error {
+	if err := findTrack(ctx, tx, songID, c.TrackID); errors.Is(err, lyricsheet.ErrNotFound) {
+		return &lyricsheet.InvalidError{Msg: "there's no such Track on this Timeline"}
+	} else if err != nil {
+		return err
+	}
+	return addClip(ctx, tx, songID, c.TrackID, c.NewClip)
 }
 
 // addClip adds a new Clip to a Track of the Song, if it stays within its
@@ -1012,6 +1038,28 @@ func clipName(name *string) sql.NullString {
 func (s *Store) DeleteClip(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		return deleteClip(ctx, tx, songID, clipID)
+	})
+}
+
+// DeleteClips removes several Clips from the Timeline at once, as
+// DeleteClip does each. If any isn't on the Song's Timeline, none is
+// removed.
+func (s *Store) DeleteClips(ctx context.Context, songID int64, based lyricsheet.Version, clipIDs []int64) (Timeline, error) {
+	if len(clipIDs) == 0 {
+		return Timeline{}, &lyricsheet.InvalidError{Msg: "clipIds are required"}
+	}
+	for i, id := range clipIDs {
+		if slices.Contains(clipIDs[:i], id) {
+			return Timeline{}, &lyricsheet.InvalidError{Msg: "each Clip can only be deleted once"}
+		}
+	}
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		for _, id := range clipIDs {
+			if err := deleteClip(ctx, tx, songID, id); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 

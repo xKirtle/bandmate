@@ -352,6 +352,12 @@ export interface TakePlacement extends Captured {
 }
 
 /** Where one of several Clips moved at once goes: a Track and a start, in seconds. */
+/** A Clip to place, and the Track it goes on. */
+export interface PlacedClip {
+  trackId: number;
+  clip: NewClip;
+}
+
 export interface ClipMove {
   clipId: number;
   trackId: number;
@@ -731,6 +737,17 @@ export const api = {
   /** Places a stretch of a Beat, or detached Takes, on a Track. Refused if it would overlap a Clip there. */
   placeClip: (at: SongAt, trackId: number, clip: NewClip) =>
     request<Timeline>('POST', `/songs/${at.id}/timeline/clips`, { trackId, ...clip }, at),
+  /**
+   * Places several Clips at once, e.g. to bring back Clips deleted together.
+   * Refused whole if any would overlap a Clip there, or another of them.
+   */
+  placeClips: (at: SongAt, clips: PlacedClip[]) =>
+    request<Timeline>(
+      'POST',
+      `/songs/${at.id}/timeline/clips/place`,
+      { clips: clips.map((c) => ({ trackId: c.trackId, ...c.clip })) },
+      at,
+    ),
   /** Gives a Clip a name of its own; a blank one clears it, and the Clip goes by its source's name again. */
   renameClip: (at: SongAt, clipId: number, name: string) =>
     request<Timeline>('PUT', `/songs/${at.id}/timeline/clips/${clipId}/name`, { name }, at),
@@ -740,6 +757,9 @@ export const api = {
   /** Removes a Clip from the Timeline; its Beat stays in the Beat Library, and its Takes are detached. */
   deleteClip: (at: SongAt, clipId: number) =>
     request<Timeline>('DELETE', `/songs/${at.id}/timeline/clips/${clipId}`, undefined, at),
+  /** Removes several Clips at once, as deleteClip does each; refused whole if any isn't on the Timeline. */
+  deleteClips: (at: SongAt, clipIds: number[]) =>
+    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/delete`, { clipIds }, at),
   /**
    * Places a Take just recorded, a mono 24-bit WAV, in a new Clip at start.
    * Refused if it would overlap a Clip there.

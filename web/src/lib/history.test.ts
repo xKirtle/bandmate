@@ -223,6 +223,81 @@ describe('History', () => {
     expect(h.nextUndo()).toEqual({ kind: 'trimClip', clipId: 9, offset: 0, length: 10 });
   });
 
+  it('undoes deleting several Clips by placing them all back, as one step, and redoes it as one', () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0), clip(6, 10), clip(7, 30)]), track(2, [clip(8, 4)])]);
+    const t1 = timeline([track(1, [clip(6, 10)]), track(2)]);
+    const remove: Edit = { kind: 'deleteClips', clipIds: [8, 5, 7] };
+
+    h.record(remove, t0, t1);
+
+    // In Timeline order, as they come back.
+    expect(h.nextUndo()).toEqual({
+      kind: 'placeClips',
+      clips: [
+        { trackId: 1, clip: { beatId: 100, start: 0, offset: 0, length: 10 } },
+        { trackId: 1, clip: { beatId: 100, start: 30, offset: 0, length: 10 } },
+        { trackId: 2, clip: { beatId: 100, start: 4, offset: 0, length: 10 } },
+      ],
+    });
+    const back = h.undone(t1, timeline([track(1, [clip(9, 0), clip(6, 10), clip(10, 30)]), track(2, [clip(11, 4)])]));
+
+    expect(back).toEqual([9, 10, 11]);
+    expect(h.nextUndo()).toBeNull();
+    expect(h.nextRedo()).toEqual({ kind: 'deleteClips', clipIds: [11, 9, 10] });
+  });
+
+  it('follows Clips deleted together to their new ids in the edits kept around them', () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0), clip(6, 20)])]);
+    const t1 = timeline([track(1, [clip(5, 3), clip(6, 20)])]);
+    const t2 = timeline([track(1)]);
+    h.record({ kind: 'moveClip', clipId: 5, trackId: 1, start: 3 }, t0, t1);
+    h.record({ kind: 'deleteClips', clipIds: [5, 6] }, t1, t2);
+
+    h.undone(t2, timeline([track(1, [clip(9, 3), clip(10, 20)])]));
+
+    expect(h.nextUndo()).toEqual({ kind: 'moveClip', clipId: 9, trackId: 1, start: 0 });
+  });
+
+  it('undoes placing several Clips by deleting them all', () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0)]), track(2)]);
+    const t1 = timeline([track(1, [clip(5, 0), clip(9, 20)]), track(2, [clip(10, 4)])]);
+
+    h.record(
+      {
+        kind: 'placeClips',
+        clips: [
+          { trackId: 1, clip: { beatId: 100, start: 20, offset: 0, length: 10 } },
+          { trackId: 2, clip: { beatId: 100, start: 4, offset: 0, length: 10 } },
+        ],
+      },
+      t0,
+      t1,
+    );
+
+    expect(h.nextUndo()).toEqual({ kind: 'deleteClips', clipIds: [9, 10] });
+  });
+
+  it('places Clips deleted together back with their Takes and names', () => {
+    const h = new History();
+    const t0 = timeline([
+      track(1, [clip(5, 0, { name: 'Hook' })]),
+      track(2, [clip(6, 2, { beatId: null, takes: [take(40), take(41)], activeTakeId: 41 })]),
+    ]);
+
+    h.record({ kind: 'deleteClips', clipIds: [5, 6] }, t0, timeline([track(1), track(2)]));
+
+    expect(h.nextUndo()).toEqual({
+      kind: 'placeClips',
+      clips: [
+        { trackId: 1, clip: { beatId: 100, name: 'Hook', start: 0, offset: 0, length: 10 } },
+        { trackId: 2, clip: { takeIds: [40, 41], activeTakeId: 41, start: 2, offset: 0, length: 10 } },
+      ],
+    });
+  });
+
   it('undoes renaming a Clip by giving it back its name, or none', () => {
     const h = new History();
     const t0 = timeline([track(1, [clip(5, 0)])]);
