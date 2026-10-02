@@ -62,8 +62,8 @@
   import { keyPlace } from './keyPlace';
   import { songKey } from './songKeys';
   import { allKeys, shortcuts, type Way } from './shortcuts';
-  import { clipActions } from './clipMenu';
-  import { noSelection, selection, type Selection, type SelectionGesture } from './selection';
+  import { clipActions, selectionActions } from './clipMenu';
+  import { menuFor, noSelection, selection, type Selection, type SelectionGesture } from './selection';
   import {
     addsBox,
     clearsSelection,
@@ -394,8 +394,9 @@
       return e
         ? send(at, e, (before, after) => {
             const back = history.undone(before, after);
-            // Clips deleted together come back selected, as they were.
-            if (e.kind === 'placeClips') selected = new Set(back);
+            // Clips deleted together come back selected, as they were,
+            // unless the Selection is locked while recording.
+            if (e.kind === 'placeClips' && !selectionLocked) selected = new Set(back);
           })
         : unchanged(at);
     });
@@ -1048,7 +1049,9 @@
    * of Takes.
    */
   async function startRecording(retaking?: Clip) {
-    if (!canRecord) return;
+    // No Retake while several Clips are selected, e.g. selected while
+    // calibration, offered first, ran.
+    if (!canRecord || (retaking && selected.size > 1)) return;
     // Calibration is offered first, the first time on this device.
     if (!calibration.offered && calibration.offset === null) {
       calibrating = { offer: true, retaking };
@@ -1305,9 +1308,12 @@
   // a Track, selecting isn't an edit, and it's never kept, so leaving the
   // Song drops it. A phone, where Clips can't be edited, has none.
   let selected = $state<Selection>(noSelection);
+  // While recording, a new Take or a Retake, from its start until it's
+  // saved, the Selection is locked: gestures leave it as it was.
+  const selectionLocked = $derived(recording !== null);
 
   function select(gesture: SelectionGesture) {
-    selected = selection(timeline.tracks, selected, gesture);
+    selected = selection(timeline.tracks, selected, gesture, selectionLocked);
   }
 
   // Clips gone from the Timeline, e.g. deleted in another tab or taken away
@@ -1382,7 +1388,9 @@
     const end = spanTimeAt(event.clientX);
     box = { start, end, top, bottom: yIn(event.clientY) };
     const tracks = [trackIndex, trackIndexAt(event.clientY)] as const;
-    selected = selection(timeline.tracks, before, { kind: 'box', start, end, tracks, adds });
+    selected = selectionLocked
+      ? selection(timeline.tracks, selected)
+      : selection(timeline.tracks, before, { kind: 'box', start, end, tracks, adds });
     dragAt(event, laneMove);
   }
 
@@ -1676,7 +1684,8 @@
       // Moving a selected Clip moves the whole Selection; moving another
       // selects it alone. A trim or a nudge leaves the Selection be.
       select({ kind: 'drag', clipId: edit.clip.id });
-      if (selected.size > 1) edit.moves = [];
+      // Another Clip moves alone while the Selection is locked.
+      if (selected.size > 1 && selected.has(edit.clip.id)) edit.moves = [];
     }
     edit.moved = true;
     clearTimeout(pressTimer);
@@ -1902,9 +1911,18 @@
    * but never the Clip a Retake is recording into; else the Clip alone.
    */
   function removeWithSelection(clip: Clip) {
-    if (!selected.has(clip.id)) return remove(clip);
-    const clipIds = [...selected].filter((id) => id !== recording?.clipId);
-    perform({ kind: 'deleteClips', clipIds });
+    if (selected.has(clip.id)) removeSelection();
+    else remove(clip);
+  }
+
+  /** Deletes the selected Clips, as one edit, but never the Clip a Retake is recording into. */
+  function removeSelection() {
+    perform({ kind: 'deleteClips', clipIds: deletableSelection() });
+  }
+
+  /** The selected Clips deleting the Selection deletes: all but the one a Retake is recording into. */
+  function deletableSelection(): number[] {
+    return [...selected].filter((id) => id !== recording?.clipId);
   }
 
   function clipKey(event: KeyboardEvent, clip: Clip) {
@@ -1920,12 +1938,21 @@
   }
 
   // Each Clip's menu, opened by its ⋯, right-click, the Menu key, Shift+F10
-  // or a long press.
+  // or a long press. On a Clip in a Selection of several, it's the
+  // Selection menu, acting on them all; opened on a Clip outside the
+  // Selection, that Clip becomes the Selection first.
   const clipMenus: Record<number, ActionsMenu> = {};
   // Waiting to open a Clip's menu, until the finger moves or lifts.
   let pressTimer: ReturnType<typeof setTimeout> | undefined;
 
+  function clipMenuOpened(clip: Clip) {
+    selected = menuFor(timeline.tracks, selected, clip.id, selectionLocked).selected;
+  }
+
   function clipMenuActions(clip: Clip): MenuAction[] {
+    if (menuFor(timeline.tracks, selected, clip.id, selectionLocked).menu === 'selection') {
+      return selectionActions(deletableSelection().length, { deleteClips: removeSelection });
+    }
     const clipId = clip.id;
     return clipActions(
       clip,
@@ -1933,6 +1960,7 @@
         canRecord,
         soundName: clip.soundId === null ? null : sources.of(clip).title,
         nudgeKeys: hints.label(shortcuts.nudgeTake.keys),
+        selected: selected.size,
       },
       {
         retake: () => startRecording(clip),
@@ -2769,6 +2797,7 @@
                           bind:this={clipMenus[clip.id]}
                           label="More actions for {title}"
                           entries={clipMenuActions(clip)}
+                          onopen={() => clipMenuOpened(clip)}
                         >
                           {#snippet trigger()}<span class="clip-more">⋯</span>{/snippet}
                         </ActionsMenu>

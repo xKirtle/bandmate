@@ -53,13 +53,14 @@ function boxed(tracks: Tracks, box: Extract<SelectionGesture, { kind: 'box' }>):
  * empty lane space without Mod, selects none. Clips no longer on the Timeline, e.g. deleted in
  * another tab or taken away by undo, drop out; without a gesture, or on a
  * Mod+click on empty lane space, that's all that happens, and `selected`
- * itself is given back if none did.
+ * itself is given back if none did. While `locked`, e.g. while recording,
+ * that's all that happens whatever the gesture.
  */
-export function selection(tracks: Tracks, selected: Selection, gesture?: SelectionGesture): Selection {
+export function selection(tracks: Tracks, selected: Selection, gesture?: SelectionGesture, locked = false): Selection {
   const present = new Set(tracks.flatMap((t) => t.clips.map((c) => c.id)));
   const kept = [...selected].filter((id) => present.has(id));
   const pruned = kept.length === selected.size ? selected : new Set(kept);
-  if (!gesture || ('clipId' in gesture && !present.has(gesture.clipId))) return pruned;
+  if (locked || !gesture || ('clipId' in gesture && !present.has(gesture.clipId))) return pruned;
   switch (gesture.kind) {
     case 'click':
       return new Set([gesture.clipId]);
@@ -78,4 +79,27 @@ export function selection(tracks: Tracks, selected: Selection, gesture?: Selecti
     case 'clear':
       return noSelection;
   }
+}
+
+/** Which menu a Clip's menu gesture opens, and what the Selection becomes. */
+export type MenuOpening = {
+  /** The Selection menu, acting on every selected Clip, or the Clip's own menu. */
+  menu: 'selection' | 'clip';
+  selected: Selection;
+};
+
+/**
+ * The menu a Clip's menu gesture opens, by right-click, its ⋯, a long
+ * press or the Menu key, and the Selection after it. On a Clip in a
+ * Selection of several, it's the Selection menu; on a Clip outside it,
+ * that Clip becomes the Selection, and its own menu opens, as it does on
+ * the only selected Clip. While `locked`, e.g. while recording, the
+ * Selection is left as it is, so a Clip outside it opens its own menu
+ * without becoming it.
+ */
+export function menuFor(tracks: Tracks, selected: Selection, clipId: number, locked = false): MenuOpening {
+  // The Selection becomes what dragging the Clip would make it: kept, if
+  // the Clip is in it, else that Clip alone.
+  const after = selection(tracks, selected, { kind: 'drag', clipId }, locked);
+  return { menu: after.size > 1 && after.has(clipId) ? 'selection' : 'clip', selected: after };
 }

@@ -1,6 +1,6 @@
 import { describe as group, expect, it } from 'vitest';
 import type { Clip, Take } from './api';
-import { clipActions } from './clipMenu';
+import { clipActions, selectionActions } from './clipMenu';
 
 group('clipActions', () => {
   const take = (id: number, number: number): Take => ({
@@ -30,7 +30,7 @@ group('clipActions', () => {
   const soundClip = clip({ soundId: 3 });
   const oneTake = clip({ takes: [take(10, 1)], activeTakeId: 10 });
   const twoTakes = clip({ takes: [take(10, 1), take(11, 2)], activeTakeId: 11 });
-  const state = { canRecord: true, soundName: 'Riff', nudgeKeys: 'Alt+←/→' };
+  const state = { canRecord: true, soundName: 'Riff', nudgeKeys: 'Alt+←/→', selected: 0 };
   const run = {
     retake: () => {},
     chooseTake: () => {},
@@ -107,6 +107,11 @@ group('clipActions', () => {
     expect(labels(oneTake, { ...state, canRecord: false })).not.toContain('Retake');
   });
 
+  it('offers no Retake while several Clips are selected', () => {
+    expect(labels(oneTake, { ...state, selected: 1 })).toContain('Retake');
+    expect(labels(oneTake, { ...state, selected: 2 })).not.toContain('Retake');
+  });
+
   it('downloads the Sound a Clip of a Sound plays, named in its title', () => {
     const downloaded: number[] = [];
     const entry = clipActions(soundClip, state, { ...run, downloadSound: (id) => downloaded.push(id) }).find(
@@ -115,5 +120,22 @@ group('clipActions', () => {
     expect(entry.title).toBe('Save “Riff” as it was imported');
     if ('run' in entry) entry.run();
     expect(downloaded).toEqual([3]);
+  });
+});
+
+group('selectionActions', () => {
+  it('offers deleting every selected Clip, naming how many', () => {
+    expect(selectionActions(3, { deleteClips: () => {} }).map((a) => a.label)).toEqual(['Delete 3 Clips']);
+  });
+
+  it('names one Clip as one, e.g. when the other is being retaken', () => {
+    expect(selectionActions(1, { deleteClips: () => {} }).map((a) => a.label)).toEqual(['Delete 1 Clip']);
+  });
+
+  it('deletes them when picked', () => {
+    let deleted = 0;
+    const [entry] = selectionActions(2, { deleteClips: () => deleted++ });
+    if ('run' in entry) entry.run();
+    expect(deleted).toBe(1);
   });
 });

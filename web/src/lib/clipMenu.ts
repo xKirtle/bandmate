@@ -15,6 +15,8 @@ export type ClipMenuState = {
   soundName: string | null;
   /** The keys that nudge a Take, as shown, or null for none. */
   nudgeKeys: string | null;
+  /** How many Clips are selected. With several, no Retake is offered. */
+  selected: number;
 };
 
 /** What each entry does. */
@@ -53,11 +55,25 @@ export function clipActions(clip: Clip, state: ClipMenuState, run: ClipRun): Men
   ];
 }
 
+/** What each entry of the Selection menu does. */
+export type SelectionRun = {
+  deleteClips: () => void;
+};
+
+/**
+ * The entries of the Selection menu, a selected Clip's menu while there are
+ * several selected, acting on all `count` of them.
+ */
+export function selectionActions(count: number, run: SelectionRun): MenuAction[] {
+  return [{ icon: '×', label: `Delete ${count} Clip${count === 1 ? '' : 's'}`, run: run.deleteClips }];
+}
+
 function takeActions(clip: Clip, state: ClipMenuState, run: ClipRun): MenuAction[] {
   if (clip.activeTakeId === null) return [];
   const { activeTakeId, takes } = clip;
   const active = activeTake(clip)!;
-  const { canRecord, nudgeKeys } = state;
+  const { nudgeKeys } = state;
+  const canRecord = state.canRecord && state.selected <= 1;
   // With one Take, there's no other to choose, and deleting it is
   // deleting the Clip.
   const several = takes.length > 1;
