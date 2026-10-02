@@ -62,6 +62,25 @@ describe('selection', () => {
     });
   });
 
+  describe('a press on a Clip that becomes a drag', () => {
+    it('keeps the Selection when the Clip is in it, so the whole Selection moves', () => {
+      const s = selected(1, 3, 4);
+      expect(selection(timeline, s, { kind: 'drag', clipId: 3 })).toBe(s);
+    });
+
+    it('selects the Clip alone when it is not in the Selection', () => {
+      expect(selection(timeline, selected(1, 4), { kind: 'drag', clipId: 3 })).toEqual(selected(3));
+    });
+
+    it('selects the Clip when none is selected', () => {
+      expect(selection(timeline, noSelection, { kind: 'drag', clipId: 5 })).toEqual(selected(5));
+    });
+
+    it('still drops Clips that are gone while keeping the rest', () => {
+      expect(selection(tracks([1], [4]), selected(1, 2, 4), { kind: 'drag', clipId: 4 })).toEqual(selected(1, 4));
+    });
+  });
+
   it('clears it', () => {
     expect(selection(timeline, selected(1, 3, 5), { kind: 'clear' })).toEqual(noSelection);
   });

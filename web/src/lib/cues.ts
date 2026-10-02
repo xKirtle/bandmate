@@ -3,6 +3,8 @@
 // 0009). This works out where playback is and which Cues are out of order,
 // and reads and writes the times as typed.
 
+import type { CueValue } from './api';
+
 /** A Section, as far as its Lines take Cues. */
 export interface CuedSection<L extends CuedLine = CuedLine> {
   id: number;
@@ -143,6 +145,24 @@ export function cuesInSpan(song: CuedSong, start: number, end: number): FoundCue
       a.lines.flatMap((l) =>
         l.cue !== null && l.cue >= start && l.cue < end ? [{ section: s.id, line: l.id, cue: l.cue }] : [],
       ),
+    ),
+  );
+}
+
+/**
+ * The Cues in any of the spans, each from its start up to its end in
+ * seconds, moved by the seconds given, to the millisecond, as Cues follow
+ * several Clips moved together: dormant ones included, as cuesInSpan
+ * finds them, and each moved once, however many of the spans it's in.
+ */
+export function shiftedCues(song: CuedSong, spans: readonly (readonly [number, number])[], by: number): CueValue[] {
+  return song.sections.flatMap((s) =>
+    s.alternates.flatMap((a) =>
+      a.lines.flatMap((l) => {
+        const cue = l.cue;
+        if (cue === null || !spans.some(([start, end]) => cue >= start && cue < end)) return [];
+        return [{ lineId: l.id, cue: Math.round((cue + by) * 1000) / 1000 }];
+      }),
     ),
   );
 }
