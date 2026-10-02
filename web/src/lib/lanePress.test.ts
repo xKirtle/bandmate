@@ -28,11 +28,19 @@ group('a mouse or pen press on empty lane space', () => {
     });
   });
 
-  it('is a click when lifted without moving past the slop', () => {
+  it('places the playhead and chooses the Track when lifted without moving past the slop', () => {
     expect(run(press, { kind: 'move', at: wobble }, { kind: 'lift' })).toEqual({
-      outcomes: ['wait', 'click'],
+      outcomes: ['wait', 'place'],
       press: null,
     });
+  });
+
+  it('never places once it has drawn a box', () => {
+    expect(run(press, { kind: 'move', at: away }, { kind: 'move', at: from }, { kind: 'lift' }).outcomes).toEqual([
+      'box',
+      'box',
+      'keep',
+    ]);
   });
 
   it('restores the Selection when its box is given up', () => {
@@ -44,7 +52,19 @@ group('a mouse or pen press on empty lane space', () => {
   });
 
   it('has no long press', () => {
-    expect(run(press, { kind: 'hold' }, { kind: 'lift' }).outcomes).toEqual(['wait', 'click']);
+    expect(run(press, { kind: 'hold' }, { kind: 'lift' }).outcomes).toEqual(['wait', 'place']);
+  });
+});
+
+group('a mouse or pen press on empty lane space with Mod held', () => {
+  const press = pressLane(from, false, true);
+
+  it('is only a click, leaving the playhead and the Chosen Track be, when lifted without moving past the slop', () => {
+    expect(run(press, { kind: 'move', at: wobble }, { kind: 'lift' }).outcomes).toEqual(['wait', 'click']);
+  });
+
+  it('draws a box once it moves past the slop', () => {
+    expect(run(press, { kind: 'move', at: away }, { kind: 'lift' }).outcomes).toEqual(['box', 'keep']);
   });
 });
 
@@ -58,8 +78,9 @@ group('a finger pressing empty lane space', () => {
     });
   });
 
-  it('is a tap when lifted before the hold', () => {
-    expect(run(press, { kind: 'lift' }).outcomes).toEqual(['click']);
+  it('is a tap, placing the playhead and choosing the Track, when lifted before the hold', () => {
+    expect(run(press, { kind: 'lift' }).outcomes).toEqual(['place']);
+    expect(run(press, { kind: 'move', at: wobble }, { kind: 'lift' }).outcomes).toEqual(['wait', 'place']);
   });
 
   it('draws a box under the finger once held, which grows as it drags and stays on lifting', () => {
@@ -71,7 +92,7 @@ group('a finger pressing empty lane space', () => {
     });
   });
 
-  it('is a click, clearing the Selection, when held and lifted without dragging', () => {
+  it('is only a click, clearing the Selection without placing, when held and lifted without dragging', () => {
     expect(run(press, { kind: 'hold' }, { kind: 'move', at: wobble }, { kind: 'lift' }).outcomes).toEqual([
       'box',
       'box',

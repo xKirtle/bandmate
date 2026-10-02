@@ -1,5 +1,8 @@
 // Telling a press on empty lane space apart: a click, a box drawn over
-// the Clips to select, or, for a finger, the start of a pan.
+// the Clips to select, or, for a finger, the start of a pan. A plain click
+// or tap there places the playhead and chooses the Track, as an insertion
+// point; a Mod+click, likely the start of a box to add, or a finger held
+// for a box and let go, doesn't.
 import { pastSlop, type Point } from './press';
 
 /** A press on empty lane space, from where it went down. */
@@ -7,6 +10,8 @@ export interface LanePress {
   from: Point;
   /** Whether a finger is pressing, rather than a mouse or pen. */
   touch: boolean;
+  /** Whether Mod was held as it was pressed, so its box adds to the Selection. */
+  adds: boolean;
   /**
    * `pressed`: a mouse or pen, not yet moved past the slop.
    * `holding`: a finger, held still for the long press.
@@ -34,18 +39,21 @@ export type LaneInput =
 
 /**
  * What to do after an input: `wait` for more; draw the `box` to where
- * the pointer is, selecting what it touches; or, the press over, treat
- * it as a `click` on empty lane space, `keep` the box's Selection,
- * `restore` the Selection from before the press, or `giveUp`, leaving
- * the Selection be.
+ * the pointer is, selecting what it touches; or, the press over, `place`
+ * the playhead where it was pressed and choose that Track, as a plain
+ * click on empty lane space does, besides clearing the Selection; treat
+ * it as only a `click` there, for the Selection; `keep` the box's
+ * Selection; `restore` the Selection from before the press; or `giveUp`,
+ * leaving the Selection be.
  */
-export type LaneOutcome = 'wait' | 'box' | 'click' | 'keep' | 'restore' | 'giveUp';
+export type LaneOutcome = 'wait' | 'box' | 'place' | 'click' | 'keep' | 'restore' | 'giveUp';
 
-/** A press on empty lane space, by a finger or else a mouse or pen. */
-export function pressLane(from: Point, touch: boolean): LanePress {
+/** A press on empty lane space, by a finger or else a mouse or pen, with Mod held or not. */
+export function pressLane(from: Point, touch: boolean, adds = false): LanePress {
   return {
     from: { clientX: from.clientX, clientY: from.clientY },
     touch,
+    adds,
     phase: touch ? 'holding' : 'pressed',
     dragged: false,
   };
@@ -69,7 +77,8 @@ export function laneStep(press: LanePress, input: LaneInput): { press: LanePress
       if (press.phase !== 'holding') return { press, outcome: 'wait' };
       return { press: { ...press, phase: 'boxing' }, outcome: 'box' };
     case 'lift':
-      return { press: null, outcome: boxing && press.dragged ? 'keep' : 'click' };
+      if (boxing) return { press: null, outcome: press.dragged ? 'keep' : 'click' };
+      return { press: null, outcome: press.adds ? 'click' : 'place' };
     case 'cancel':
       return { press: null, outcome: boxing ? 'restore' : 'giveUp' };
   }

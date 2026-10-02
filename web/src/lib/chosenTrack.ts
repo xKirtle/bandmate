@@ -4,7 +4,7 @@
 
 /** Something that happened to the Tracks that can choose one. */
 export type ChoiceEvent =
-  /** A Track's header, or a Clip on it, was clicked. */
+  /** A Track's header, a Clip on it, or empty space along it was clicked. */
   | { kind: 'choose'; trackId: number }
   /** A Track was added with "+ Track". */
   | { kind: 'add'; trackId: number };
