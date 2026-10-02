@@ -17,10 +17,18 @@ group('dialogGroups', () => {
         'Seek back or forward 15 s',
         'Go to the start or end',
         'Nudge a Cue by 0.1 s',
+        'Select every Clip',
         'Clear the Selection',
       ],
       ['Cue the next Line'],
-      ['Add or remove a Clip', 'Nudge a Take inside its Clip', 'Skip snapping', 'Zoom the Timeline'],
+      [
+        'Add or remove a Clip',
+        'Select Clips with a box',
+        'Add Clips with a box',
+        'Nudge a Take inside its Clip',
+        'Skip snapping',
+        'Zoom the Timeline',
+      ],
     ]);
     expect(groups[0].rows[1]).toEqual({
       name: 'Record',

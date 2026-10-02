@@ -108,6 +108,12 @@ export const shortcuts = {
     back: [{ key: 'ArrowDown', alt: true }],
     forward: [{ key: 'ArrowUp', alt: true }],
   },
+  selectAll: {
+    name: 'Select every Clip',
+    group: 'Timeline editing',
+    description: 'Selects every Clip, from the Timeline, outside a text field.',
+    keys: [{ key: 'a', mod: true }],
+  },
   clearSelection: {
     name: 'Clear the Selection',
     group: 'Timeline editing',
@@ -125,6 +131,18 @@ export const shortcuts = {
     group: 'Mouse',
     description: 'Adds the Clip clicked to the Selection, or takes it out, leaving the Chosen Track as it is.',
     keys: [{ key: 'click', mod: true }],
+  },
+  boxSelect: {
+    name: 'Select Clips with a box',
+    group: 'Mouse',
+    description: 'Selects every Clip the box drawn over empty lane space touches, leaving the Chosen Track as it is.',
+    keys: [{ key: 'drag' }],
+  },
+  addBox: {
+    name: 'Add Clips with a box',
+    group: 'Mouse',
+    description: 'Adds every Clip the box drawn over empty lane space touches to the Selection.',
+    keys: [{ key: 'drag', mod: true }],
   },
   nudgeTake: {
     name: 'Nudge a Take inside its Clip',

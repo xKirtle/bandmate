@@ -1,12 +1,27 @@
 import { describe, expect, it } from 'vitest';
 import { noSelection, selection, type Selection } from './selection';
 
-/** A Timeline's Tracks, each holding Clips with these ids. */
-const tracks = (...lanes: number[][]) => lanes.map((ids) => ({ clips: ids.map((id) => ({ id })) }));
+/** A Timeline's Tracks, each holding Clips with these ids, wherever they are. */
+const tracks = (...lanes: number[][]) =>
+  lanes.map((ids) => ({ clips: ids.map((id) => ({ id, start: 10 * id, length: 5 })) }));
 
 const selected = (...ids: number[]): Selection => new Set(ids);
 
 const timeline = tracks([1, 2], [3], [4, 5]);
+
+/** A Timeline's Tracks, each holding Clips placed at these spans, as [id, start, end]. */
+const placed = (...lanes: [id: number, start: number, end: number][][]) =>
+  lanes.map((clips) => ({ clips: clips.map(([id, start, end]) => ({ id, start, length: end - start })) }));
+
+// Three Tracks: a Beat, a vocal Take in two Clips, and an adlib.
+const song = placed(
+  [[1, 0, 60]],
+  [
+    [2, 10, 20],
+    [3, 30, 40],
+  ],
+  [[4, 25, 28]],
+);
 
 describe('selection', () => {
   it('starts with no Clip selected', () => {
@@ -49,6 +64,60 @@ describe('selection', () => {
 
   it('clears it', () => {
     expect(selection(timeline, selected(1, 3, 5), { kind: 'clear' })).toEqual(noSelection);
+  });
+
+  describe('a box', () => {
+    it('selects every Clip it touches on a Track it spans, even partly', () => {
+      expect(selection(song, noSelection, { kind: 'box', start: 15, end: 35, tracks: [1, 1], adds: false })).toEqual(
+        selected(2, 3),
+      );
+    });
+
+    it('selects a long Clip running past it on both sides', () => {
+      expect(selection(song, noSelection, { kind: 'box', start: 15, end: 35, tracks: [0, 1], adds: false })).toEqual(
+        selected(1, 2, 3),
+      );
+    });
+
+    it('leaves Clips on Tracks it does not span, and Clips it does not reach in time', () => {
+      expect(selection(song, noSelection, { kind: 'box', start: 21, end: 29, tracks: [1, 2], adds: false })).toEqual(
+        selected(4),
+      );
+    });
+
+    it("doesn't touch a Clip it only meets edge to edge", () => {
+      expect(selection(song, noSelection, { kind: 'box', start: 20, end: 25, tracks: [1, 2], adds: false })).toEqual(
+        noSelection,
+      );
+    });
+
+    it('takes its Tracks and times in either order, as drawn from any corner', () => {
+      expect(selection(song, noSelection, { kind: 'box', start: 35, end: 26, tracks: [2, 1], adds: false })).toEqual(
+        selected(3, 4),
+      );
+    });
+
+    it('replaces the Selection', () => {
+      expect(selection(song, selected(1, 4), { kind: 'box', start: 15, end: 16, tracks: [1, 1], adds: false })).toEqual(
+        selected(2),
+      );
+    });
+
+    it('selects none when it touches none', () => {
+      expect(selection(song, selected(1), { kind: 'box', start: 21, end: 24, tracks: [1, 1], adds: false })).toEqual(
+        noSelection,
+      );
+    });
+
+    it('with Mod, adds the Clips it touches to the Selection', () => {
+      expect(selection(song, selected(1, 2), { kind: 'box', start: 26, end: 35, tracks: [1, 2], adds: true })).toEqual(
+        selected(1, 2, 3, 4),
+      );
+    });
+  });
+
+  it('selects every Clip, on every Track', () => {
+    expect(selection(song, selected(2), { kind: 'all' })).toEqual(selected(1, 2, 3, 4));
   });
 
   describe('pruning', () => {

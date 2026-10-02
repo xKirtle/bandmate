@@ -1,11 +1,13 @@
 import { describe as group, expect, it } from 'vitest';
 import type { KeyPress } from './shortcuts';
 import {
+  addsBox,
   clearsSelection,
   clipAction,
   isModifier,
   nudges,
   rulerSeek,
+  selectsAll,
   skipsSnapping,
   startOrEnd,
   togglesSelection,
@@ -192,5 +194,36 @@ group('clearsSelection', () => {
   it('leaves other keys alone', () => {
     expect(clearsSelection(press('Delete'))).toBe(false);
     expect(clearsSelection(press('a', { ctrlKey: true }))).toBe(false);
+  });
+});
+
+group('selectsAll', () => {
+  it('selects every Clip on Ctrl+A or ⌘A', () => {
+    expect(selectsAll(press('a', { ctrlKey: true }))).toBe(true);
+    expect(selectsAll(press('a', { metaKey: true }))).toBe(true);
+    expect(selectsAll(press('A', { ctrlKey: true }))).toBe(true);
+  });
+
+  it('takes it only with Mod alone', () => {
+    expect(selectsAll(press('a'))).toBe(false);
+    expect(selectsAll(press('a', { ctrlKey: true, shiftKey: true }))).toBe(false);
+    expect(selectsAll(press('a', { ctrlKey: true, altKey: true }))).toBe(false);
+  });
+
+  it('leaves other keys alone', () => {
+    expect(selectsAll(press('z', { ctrlKey: true }))).toBe(false);
+  });
+});
+
+group('addsBox', () => {
+  it('adds the Clips a box touches to the Selection when drawn with Ctrl or ⌘', () => {
+    expect(addsBox(held({ ctrlKey: true }))).toBe(true);
+    expect(addsBox(held({ metaKey: true }))).toBe(true);
+  });
+
+  it('replaces the Selection when drawn without Mod', () => {
+    expect(addsBox(held())).toBe(false);
+    expect(addsBox(held({ shiftKey: true }))).toBe(false);
+    expect(addsBox(held({ altKey: true }))).toBe(false);
   });
 });
