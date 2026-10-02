@@ -12,6 +12,7 @@ import {
   type Timeline,
   type TimelineLoop,
   type TrackChanges,
+  type TrackToAdd,
 } from './api';
 import { placementOf } from './clipSource';
 import { isBlank, type CuedSong } from './cues';
@@ -38,10 +39,11 @@ import { isBlank, type CuedSong } from './cues';
 // Deleting a Clip of Takes, or its Track, only detaches its Takes, so
 // placing a Clip from their ids brings them back. A new Take, a copied
 // Clip and pasted Clips are redone as that too, so redoing never uploads a
-// Take again or copies it again. Likewise, a Sound outlives its last Clip
-// for as long as undo lasts, so an imported Sound is undone by deleting
-// its Clip and redone by placing a Clip of it back, without uploading it
-// again. A Retake is undone and redone by setting its Clip's Takes, and where they are, as
+// Take again or copies it again. A paste that added Tracks is undone by
+// deleting them with its Clips, and redone by adding them again with them.
+// Likewise, a Sound outlives its last Clip for as long as undo lasts, so an
+// imported Sound is undone by deleting its Clip and redone by placing a
+// Clip of it back, without uploading it again. A Retake is undone and redone by setting its Clip's Takes, and where they are, as
 // they were before or after it, which detaches the new Take or brings it
 // back. Deleting Takes, or clearing a
 // Clip's inactive ones, is undone the same way, as they're only detached,
@@ -58,17 +60,19 @@ export type Edit =
   | { kind: 'reorderTracks'; order: number[] }
   | { kind: 'deleteTrack'; trackId: number }
   | { kind: 'placeClip'; trackId: number; clip: NewClip }
-  | { kind: 'placeClips'; clips: PlacedClip[] }
+  /** Clips placed at once, some perhaps on Tracks added for them at the bottom. */
+  | { kind: 'placeClips'; clips: PlacedClip[]; newTracks?: TrackToAdd[] }
   | { kind: 'duplicateClip'; clipId: number }
-  /** Clips pasted from the Clipboard, as new Clips. */
-  | { kind: 'pasteClips'; clips: PastedClip[] }
+  /** Clips pasted from the Clipboard, as new Clips, some perhaps on Tracks added for them at the bottom. */
+  | { kind: 'pasteClips'; clips: PastedClip[]; newTracks: TrackToAdd[] }
   | { kind: 'moveClip'; clipId: number; trackId: number; start: number }
   | { kind: 'moveClips'; moves: ClipMove[] }
   | { kind: 'trimClip'; clipId: number; offset: number; length: number }
   /** A blank name clears the Clip's. */
   | { kind: 'renameClip'; clipId: number; name: string }
   | { kind: 'deleteClip'; clipId: number }
-  | { kind: 'deleteClips'; clipIds: number[] }
+  /** Clips deleted at once, and Tracks with them, e.g. those a paste added. */
+  | { kind: 'deleteClips'; clipIds: number[]; trackIds?: number[] }
   | { kind: 'setTakes'; clipId: number; takes: ClipTakes }
   | { kind: 'chooseTake'; clipId: number; takeId: number }
   | { kind: 'nudgeTake'; clipId: number; takeId: number; nudge: number }
@@ -223,8 +227,12 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
       return { edit: undo, adds: none };
     }
     case 'placeClips':
-    case 'pasteClips':
-      return { edit: { kind: 'deleteClips', clipIds: added(before, after).clips }, adds: none };
+    case 'pasteClips': {
+      // With any Tracks it added, as one step.
+      const { tracks, clips } = added(before, after);
+      const trackIds = tracks.length > 0 ? { trackIds: tracks } : {};
+      return { edit: { kind: 'deleteClips', clipIds: clips, ...trackIds }, adds: none };
+    }
     case 'updateTrack': {
       const track = before.tracks.find((t) => t.id === edit.trackId)!;
       const changes = Object.fromEntries(Object.keys(edit.changes).map((k) => [k, track[k as keyof TrackChanges]]));
@@ -318,13 +326,21 @@ export function placingAdded(before: Timeline, after: Timeline): Edit {
   return { kind: 'placeClip', trackId: track.id, clip: placementOf(clip) };
 }
 
-/** The edit that places every Clip added when before turned into after, as it is, as placingAdded does one. */
+/**
+ * The edit that places every Clip added when before turned into after, as
+ * it is, as placingAdded does one, adding back any Tracks added for them,
+ * which a paste adds at the bottom.
+ */
 function placingAllAdded(before: Timeline, after: Timeline): Edit {
-  const clips = added(before, after).clips.map((id) => {
+  const { tracks, clips } = added(before, after);
+  const placed: PlacedClip[] = clips.map((id) => {
     const { track, clip } = findClip(after, id);
-    return { trackId: track.id, clip: placementOf(clip) };
+    const newTrack = tracks.indexOf(track.id);
+    return newTrack < 0 ? { trackId: track.id, clip: placementOf(clip) } : { newTrack, clip: placementOf(clip) };
   });
-  return { kind: 'placeClips', clips };
+  if (tracks.length === 0) return { kind: 'placeClips', clips: placed };
+  const newTracks = tracks.map((id) => ({ name: after.tracks.find((t) => t.id === id)!.name }));
+  return { kind: 'placeClips', clips: placed, newTracks };
 }
 
 /** The ids of the Clips in after that weren't in before, in Timeline order, e.g. the Clips a paste made. */
@@ -419,9 +435,9 @@ function remap(edit: HistoryEdit, ids: IdMaps): HistoryEdit {
       return { ...edit, trackId: ids.track(edit.trackId) };
     // Each its own, as their Clips differ.
     case 'placeClips':
-      return { ...edit, clips: edit.clips.map((c) => ({ ...c, trackId: ids.track(c.trackId) })) };
+      return { ...edit, clips: edit.clips.map((c) => remapOnTrack(c, ids)) };
     case 'pasteClips':
-      return { ...edit, clips: edit.clips.map((c) => ({ ...c, trackId: ids.track(c.trackId) })) };
+      return { ...edit, clips: edit.clips.map((c) => remapOnTrack(c, ids)) };
     case 'moveClip':
       return { ...edit, clipId: ids.clip(edit.clipId), trackId: ids.track(edit.trackId) };
     case 'moveClips':
@@ -430,7 +446,9 @@ function remap(edit: HistoryEdit, ids: IdMaps): HistoryEdit {
         moves: edit.moves.map((m) => ({ clipId: ids.clip(m.clipId), trackId: ids.track(m.trackId), start: m.start })),
       };
     case 'deleteClips':
-      return { ...edit, clipIds: edit.clipIds.map(ids.clip) };
+      return edit.trackIds
+        ? { ...edit, clipIds: edit.clipIds.map(ids.clip), trackIds: edit.trackIds.map(ids.track) }
+        : { ...edit, clipIds: edit.clipIds.map(ids.clip) };
     case 'trimClip':
     case 'renameClip':
     case 'duplicateClip':
@@ -442,6 +460,11 @@ function remap(edit: HistoryEdit, ids: IdMaps): HistoryEdit {
     case 'clearInactiveTakes':
       return { ...edit, clipId: ids.clip(edit.clipId) };
   }
+}
+
+/** A Clip placed or pasted on one of the Timeline's Tracks naming it by the id given; one on a Track added for it, as it was. */
+function remapOnTrack<C extends PlacedClip | PastedClip>(c: C, ids: IdMaps): C {
+  return 'trackId' in c ? { ...c, trackId: ids.track(c.trackId) } : c;
 }
 
 function findClip(tl: Timeline, clipId: number) {
@@ -471,9 +494,9 @@ export function sendEdit(at: SongAt, edit: Edit): Promise<Timeline> {
     case 'placeClip':
       return api.placeClip(at, edit.trackId, edit.clip);
     case 'placeClips':
-      return api.placeClips(at, edit.clips);
+      return api.placeClips(at, edit.clips, edit.newTracks);
     case 'pasteClips':
-      return api.pasteClips(at, edit.clips);
+      return api.pasteClips(at, edit.clips, edit.newTracks);
     case 'moveClip':
       return api.moveClip(at, edit.clipId, edit.trackId, edit.start);
     case 'moveClips':
@@ -487,7 +510,7 @@ export function sendEdit(at: SongAt, edit: Edit): Promise<Timeline> {
     case 'deleteClip':
       return api.deleteClip(at, edit.clipId);
     case 'deleteClips':
-      return api.deleteClips(at, edit.clipIds);
+      return api.deleteClips(at, edit.clipIds, edit.trackIds);
     case 'setTakes':
       return api.setTakes(at, edit.clipId, edit.takes);
     case 'chooseTake':

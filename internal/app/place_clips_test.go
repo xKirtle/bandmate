@@ -66,8 +66,10 @@ func TestAPlacingOfSeveralClipsIsRefusedWhole(t *testing.T) {
 			[]map[string]any{short(adlibs, 0), short(beatTrack, -1)}, http.StatusBadRequest, "a Clip can't start before 0:00"},
 		"without a Track": {
 			[]map[string]any{short(adlibs, 0), {"beatId": p.short.ID, "start": 60, "offset": 0, "length": 10}},
-			http.StatusBadRequest, "trackId, start, offset and length are required"},
+			http.StatusBadRequest, "trackId or newTrack, start, offset and length are required"},
 		"no Clips": {[]map[string]any{}, http.StatusBadRequest, "clips are required"},
+		"onto a new Track not added": {[]map[string]any{{"newTrack": 0, "beatId": p.short.ID, "start": 60,
+			"offset": 0, "length": 10}}, http.StatusBadRequest, "there's no such new Track"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			expectError(t, ts.placeClips(p.song.ID, c.clips...), c.status, c.msg)

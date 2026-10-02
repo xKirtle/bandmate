@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
@@ -118,7 +119,7 @@ func TestAPasteIsRefusedWhole(t *testing.T) {
 			"takes": []map[string]any{{"id": r.take.ID, "position": 0, "nudge": 0}}, "activeTakeId": 999,
 			"start": 20, "offset": 0, "length": 1}}, http.StatusBadRequest, "a Clip of Takes plays one of them"},
 		"without a Track": {[]map[string]any{{"beatId": r.tl.Beats[0].ID, "start": 20, "offset": 0, "length": 1}},
-			http.StatusBadRequest, "trackId, start, offset and length are required"},
+			http.StatusBadRequest, "trackId or newTrack, start, offset and length are required"},
 		"no Clips": {[]map[string]any{}, http.StatusBadRequest, "clips are required"},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -130,5 +131,139 @@ func TestAPasteIsRefusedWhole(t *testing.T) {
 	}
 	if files := takeFiles(t, ts); len(files) != 2 {
 		t.Errorf("take files on disk = %q, want only the two recorded", files)
+	}
+}
+
+// pasteOntoNewTracks sends a request to paste Clips, adding Tracks named
+// names at the bottom first, for Clips to go on by "newTrack", their index.
+func (ts *testServer) pasteOntoNewTracks(songID int64, names []string, clips ...map[string]any) response {
+	ts.t.Helper()
+	return ts.Do(http.MethodPost, timelinePath(songID)+"/clips/paste",
+		map[string]any{"newTracks": newTracks(names), "clips": clips})
+}
+
+// newTracks is Tracks to add at the bottom, by name, as a request gives them.
+func newTracks(names []string) []map[string]any {
+	tracks := make([]map[string]any, len(names))
+	for i, n := range names {
+		tracks[i] = map[string]any{"name": n}
+	}
+	return tracks
+}
+
+func TestAPasteCanAddTracksAtTheBottomForItsClips(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+	adlibs := p.tl.Tracks[1].ID
+
+	got := timelineChange(t, ts.pasteOntoNewTracks(p.song.ID, []string{"Beat", "Adlibs"},
+		map[string]any{"trackId": adlibs, "beatId": p.short.ID, "start": 0, "offset": 0, "length": 10},
+		map[string]any{"newTrack": 1, "beatId": p.long.ID, "start": 5, "offset": 0, "length": 20},
+		map[string]any{"newTrack": 0, "beatId": p.short.ID, "start": 2, "offset": 0, "length": 10}))
+
+	if len(got.Tracks) != 4 {
+		t.Fatalf("tracks = %+v, want two new ones", got.Tracks)
+	}
+	if n := []string{got.Tracks[2].Name, got.Tracks[3].Name}; !reflect.DeepEqual(n, []string{"Beat", "Adlibs"}) {
+		t.Errorf("new Tracks = %q, want Beat then Adlibs at the bottom", n)
+	}
+	for i, want := range [][]string{
+		{fmt.Sprintf("%d@0+10", p.short.ID)},
+		{fmt.Sprintf("%d@2+10", p.short.ID)},
+		{fmt.Sprintf("%d@5+20", p.long.ID)},
+	} {
+		if c := clipsOf(got, i+1); !reflect.DeepEqual(c, want) {
+			t.Errorf("track %d clips = %q, want %q", i+1, c, want)
+		}
+	}
+	if tr := got.Tracks[2]; tr.Volume != 0 || tr.Muted || tr.Soloed {
+		t.Errorf("new Track = %+v, want it at 0 dB, neither muted nor soloed", tr)
+	}
+}
+
+func TestAPasteOntoNewTracksIsUndoneAndRedoneAsOneStep(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+	adlibs := p.tl.Tracks[1].ID
+	pasted := timelineChange(t, ts.pasteOntoNewTracks(p.song.ID, []string{"Beat"},
+		map[string]any{"trackId": adlibs, "beatId": p.short.ID, "start": 0, "offset": 0, "length": 10},
+		map[string]any{"newTrack": 0, "beatId": p.long.ID, "start": 5, "offset": 0, "length": 20}))
+	added := pasted.Tracks[2]
+
+	// Undone: its Clips deleted, with the Track it added.
+	undone := timelineChange(t, ts.Do(http.MethodPost, timelinePath(p.song.ID)+"/clips/delete",
+		map[string]any{"clipIds": []int64{pasted.Tracks[1].Clips[0].ID, added.Clips[0].ID},
+			"trackIds": []int64{added.ID}}))
+	if !reflect.DeepEqual(undone.Tracks, p.tl.Tracks) {
+		t.Errorf("tracks = %+v, want them as before the paste: %+v", undone.Tracks, p.tl.Tracks)
+	}
+	if undone.Version != pasted.Version+1 {
+		t.Errorf("version = %d, want one more than %d", undone.Version, pasted.Version)
+	}
+
+	// Redone: the Clips placed back, on a Track added again.
+	redone := timelineChange(t, ts.Do(http.MethodPost, timelinePath(p.song.ID)+"/clips/place",
+		map[string]any{"newTracks": newTracks([]string{"Beat"}), "clips": []map[string]any{
+			{"trackId": adlibs, "beatId": p.short.ID, "start": 0, "offset": 0, "length": 10},
+			{"newTrack": 0, "beatId": p.long.ID, "start": 5, "offset": 0, "length": 20},
+		}}))
+	if len(redone.Tracks) != 3 || redone.Tracks[2].Name != "Beat" ||
+		!reflect.DeepEqual(clipsOf(redone, 2), []string{fmt.Sprintf("%d@5+20", p.long.ID)}) ||
+		!reflect.DeepEqual(clipsOf(redone, 1), []string{fmt.Sprintf("%d@0+10", p.short.ID)}) {
+		t.Errorf("tracks = %+v, want the paste back, with its Track", redone.Tracks)
+	}
+}
+
+func TestDeletingClipsWithTracksIsRefusedWhole(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+	other := ts.createSong("Other")
+	theirs := timelineChange(t, ts.addBeatToSong(other.ID, p.short.ID))
+	before := ts.getTimeline(p.song.ID)
+	del := func(clipIDs, trackIDs []int64) response {
+		return ts.Do(http.MethodPost, timelinePath(p.song.ID)+"/clips/delete",
+			map[string]any{"clipIds": clipIDs, "trackIds": trackIDs})
+	}
+
+	expectError(t, del([]int64{p.first}, []int64{p.tl.Tracks[0].ID, p.tl.Tracks[1].ID}), http.StatusConflict,
+		"a Song always has a Track, so its last one can't be deleted")
+	expectStatus(t, del([]int64{p.first}, []int64{theirs.Tracks[0].ID}), http.StatusNotFound)
+	if read := ts.getTimeline(p.song.ID); !reflect.DeepEqual(read, before) {
+		t.Errorf("timeline = %+v, want it unchanged: %+v", read, before)
+	}
+}
+
+func TestAPasteOntoNewTracksIsRefusedWhole(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+	before := ts.getTimeline(p.song.ID)
+	short := func(on string, at any, start float64) map[string]any {
+		return map[string]any{on: at, "beatId": p.short.ID, "start": start, "offset": 0, "length": 10}
+	}
+
+	for name, c := range map[string]struct {
+		names  []string
+		clips  []map[string]any
+		status int
+		msg    string
+	}{
+		"onto each other on a new Track": {[]string{"Beat"},
+			[]map[string]any{short("newTrack", 0, 0), short("newTrack", 0, 5)},
+			http.StatusConflict, "Clips can't overlap on a Track"},
+		"onto a new Track not added": {[]string{"Beat"}, []map[string]any{short("newTrack", 1, 0)},
+			http.StatusBadRequest, "there's no such new Track"},
+		"a new Track without a name": {[]string{" "}, []map[string]any{short("newTrack", 0, 0)},
+			http.StatusBadRequest, "a Track's name is required"},
+		"onto a Track and a new Track at once": {[]string{"Beat"},
+			[]map[string]any{{"trackId": p.tl.Tracks[1].ID, "newTrack": 0, "beatId": p.short.ID,
+				"start": 0, "offset": 0, "length": 10}},
+			http.StatusBadRequest, "a Clip goes on a Track or a new Track, not both"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			expectError(t, ts.pasteOntoNewTracks(p.song.ID, c.names, c.clips...), c.status, c.msg)
+			if read := ts.getTimeline(p.song.ID); !reflect.DeepEqual(read, before) {
+				t.Errorf("timeline = %+v, want it unchanged: %+v", read, before)
+			}
+		})
 	}
 }

@@ -404,9 +404,9 @@ type NewTrack struct {
 // volume must be from MinVolume to MaxVolume, and its Clips follow the same
 // rules as placing a Clip.
 func (s *Store) AddTrack(ctx context.Context, songID int64, based lyricsheet.Version, t NewTrack) (Timeline, error) {
-	name := strings.TrimSpace(t.Name)
-	if name == "" {
-		return Timeline{}, errTrackNameRequired
+	name, err := trackName(t.Name)
+	if err != nil {
+		return Timeline{}, err
 	}
 	if err := checkVolume(t.Volume); err != nil {
 		return Timeline{}, err
@@ -432,10 +432,9 @@ func (s *Store) AddTrack(ctx context.Context, songID int64, based lyricsheet.Ver
 			}
 			pos = *t.Position
 		}
-		res, err := tx.ExecContext(ctx, `INSERT INTO tracks (song_id, name, position, volume, muted, soloed)
-			VALUES (?, ?, ?, ?, ?, ?)`, songID, name, pos, t.Volume, t.Muted, t.Soloed)
+		trackID, err := insertTrack(ctx, tx, songID, name, pos, t.Volume, t.Muted, t.Soloed)
 		if err != nil {
-			return fmt.Errorf("adding track: %w", err)
+			return err
 		}
 		// Renumbered around it, as deleting Tracks may have left gaps.
 		for i, id := range order {
@@ -446,10 +445,6 @@ func (s *Store) AddTrack(ctx context.Context, songID int64, based lyricsheet.Ver
 			if _, err := tx.ExecContext(ctx, `UPDATE tracks SET position = ? WHERE id = ?`, at, id); err != nil {
 				return fmt.Errorf("making room for the track: %w", err)
 			}
-		}
-		trackID, err := res.LastInsertId()
-		if err != nil {
-			return err
 		}
 		for _, c := range t.Clips {
 			if err := addClip(ctx, tx, songID, trackID, c); err != nil {
@@ -502,23 +497,29 @@ func (s *Store) ReorderTracks(ctx context.Context, songID int64, based lyricshee
 // so its last one can't be deleted.
 func (s *Store) DeleteTrack(ctx context.Context, songID int64, based lyricsheet.Version, trackID int64) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		// Its Clips go with it, by the foreign key, and their Takes leave them.
-		res, err := tx.ExecContext(ctx, `DELETE FROM tracks WHERE id = ? AND song_id = ?`, trackID, songID)
-		if err != nil {
-			return fmt.Errorf("deleting track: %w", err)
-		}
-		if err := expectOneRow(res); err != nil {
-			return err
-		}
-		var left int
-		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM tracks WHERE song_id = ?`, songID).Scan(&left); err != nil {
-			return fmt.Errorf("counting tracks: %w", err)
-		}
-		if left == 0 {
-			return errLastTrack
-		}
-		return markDetached(ctx, tx, songID)
+		return deleteTrack(ctx, tx, songID, trackID)
 	})
+}
+
+// deleteTrack removes one of the Song's Tracks and its Clips, detaching
+// their Takes, unless it's the Song's last.
+func deleteTrack(ctx context.Context, tx *sql.Tx, songID, trackID int64) error {
+	// Its Clips go with it, by the foreign key, and their Takes leave them.
+	res, err := tx.ExecContext(ctx, `DELETE FROM tracks WHERE id = ? AND song_id = ?`, trackID, songID)
+	if err != nil {
+		return fmt.Errorf("deleting track: %w", err)
+	}
+	if err := expectOneRow(res); err != nil {
+		return err
+	}
+	var left int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM tracks WHERE song_id = ?`, songID).Scan(&left); err != nil {
+		return fmt.Errorf("counting tracks: %w", err)
+	}
+	if left == 0 {
+		return errLastTrack
+	}
+	return markDetached(ctx, tx, songID)
 }
 
 // errLastTrack refuses deleting a Song's only Track.
@@ -777,27 +778,113 @@ type NewClip struct {
 // already there.
 func (s *Store) PlaceClip(ctx context.Context, songID int64, based lyricsheet.Version, trackID int64, c NewClip) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		return placeOnTrack(ctx, tx, songID, PlacedClip{TrackID: trackID, NewClip: c})
+		return placeOnTrack(ctx, tx, songID, trackID, c)
 	})
+}
+
+// OnTrack is the Track one of several Clips placed or pasted at once goes
+// on: one of the Timeline's, or one of the Tracks added for them.
+type OnTrack struct {
+	TrackID int64
+	// NewTrack, if set, is the index of the Track added for it to go on.
+	NewTrack *int
+}
+
+// trackOf is the id of the Track a Clip goes on, given the ids of the
+// Tracks added for the Clips.
+func (o OnTrack) trackOf(added []int64) (int64, error) {
+	if o.NewTrack == nil {
+		return o.TrackID, nil
+	}
+	if *o.NewTrack < 0 || *o.NewTrack >= len(added) {
+		return 0, &lyricsheet.InvalidError{Msg: "there's no such new Track"}
+	}
+	return added[*o.NewTrack], nil
+}
+
+// trackName is a Track's name as given, trimmed, which can't be blank.
+func trackName(name string) (string, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "", errTrackNameRequired
+	}
+	return name, nil
+}
+
+// checkTrackNames checks the names of Tracks to add, returning them trimmed.
+func checkTrackNames(names []string) ([]string, error) {
+	trimmed := make([]string, len(names))
+	for i, n := range names {
+		var err error
+		if trimmed[i], err = trackName(n); err != nil {
+			return nil, err
+		}
+	}
+	return trimmed, nil
+}
+
+// insertTrack adds a Track to the Song at a position, returning its id.
+func insertTrack(ctx context.Context, tx *sql.Tx, songID int64, name string, position int, volume float64,
+	muted, soloed bool) (int64, error) {
+	res, err := tx.ExecContext(ctx, `INSERT INTO tracks (song_id, name, position, volume, muted, soloed)
+		VALUES (?, ?, ?, ?, ?, ?)`, songID, name, position, volume, muted, soloed)
+	if err != nil {
+		return 0, fmt.Errorf("adding track: %w", err)
+	}
+	return res.LastInsertId()
+}
+
+// addTracksAtBottom adds empty Tracks with the names given, which must be
+// checked, at the bottom of the Timeline in order, at 0 dB and neither
+// muted nor soloed, returning their ids.
+func addTracksAtBottom(ctx context.Context, tx *sql.Tx, songID int64, names []string) ([]int64, error) {
+	var bottom int
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(position), -1) + 1 FROM tracks WHERE song_id = ?`,
+		songID).Scan(&bottom); err != nil {
+		return nil, fmt.Errorf("reading tracks: %w", err)
+	}
+	ids := make([]int64, len(names))
+	for i, name := range names {
+		var err error
+		if ids[i], err = insertTrack(ctx, tx, songID, name, bottom+i, 0, false, false); err != nil {
+			return nil, err
+		}
+	}
+	return ids, nil
 }
 
 // PlacedClip is a Clip to place, and the Track it goes on.
 type PlacedClip struct {
-	TrackID int64
+	OnTrack
 	NewClip
 }
 
 // PlaceClips places several Clips at once, each as PlaceClip does, e.g. to
-// bring back Clips deleted together. None may overlap a Clip already there,
-// or another of them. If any can't be placed, none is.
-func (s *Store) PlaceClips(ctx context.Context, songID int64, based lyricsheet.Version, clips []PlacedClip) (Timeline, error) {
+// bring back Clips deleted together, or to redo a paste. Tracks named
+// newTracks are added at the bottom first, in order, for Clips to go on, as
+// a paste adds them. None may overlap a Clip already there, or another of
+// them. If any can't be placed, none is, and no Track is added.
+func (s *Store) PlaceClips(ctx context.Context, songID int64, based lyricsheet.Version, newTracks []string,
+	clips []PlacedClip) (Timeline, error) {
 	if len(clips) == 0 {
 		return Timeline{}, &lyricsheet.InvalidError{Msg: "clips are required"}
 	}
+	names, err := checkTrackNames(newTracks)
+	if err != nil {
+		return Timeline{}, err
+	}
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		added, err := addTracksAtBottom(ctx, tx, songID, names)
+		if err != nil {
+			return err
+		}
 		for _, c := range clips {
+			trackID, err := c.trackOf(added)
+			if err != nil {
+				return err
+			}
 			// Each placed is there for the next to be checked against.
-			if err := placeOnTrack(ctx, tx, songID, c); err != nil {
+			if err := placeOnTrack(ctx, tx, songID, trackID, c.NewClip); err != nil {
 				return err
 			}
 		}
@@ -806,11 +893,11 @@ func (s *Store) PlaceClips(ctx context.Context, songID int64, based lyricsheet.V
 }
 
 // placeOnTrack adds a new Clip to one of the Song's Tracks, as addClip does.
-func placeOnTrack(ctx context.Context, tx *sql.Tx, songID int64, c PlacedClip) error {
-	if err := findTrackToPlaceOn(ctx, tx, songID, c.TrackID); err != nil {
+func placeOnTrack(ctx context.Context, tx *sql.Tx, songID, trackID int64, c NewClip) error {
+	if err := findTrackToPlaceOn(ctx, tx, songID, trackID); err != nil {
 		return err
 	}
-	return addClip(ctx, tx, songID, c.TrackID, c.NewClip)
+	return addClip(ctx, tx, songID, trackID, c)
 }
 
 // findTrackToPlaceOn checks that a Track a Clip is to go on is one of the
@@ -996,7 +1083,7 @@ func (s *Store) DuplicateClip(ctx context.Context, songID int64, based lyricshee
 // a stretch of a Beat or a Sound, or of Takes, given as they were then, each
 // where it started in the Clip's source span and how far it was nudged.
 type ClipCopy struct {
-	TrackID int64
+	OnTrack
 	BeatID  *int64
 	SoundID *int64
 	// Name is its own name, if it had one.
@@ -1010,14 +1097,21 @@ type ClipCopy struct {
 }
 
 // PasteClips adds new Clips copied from others, as they were copied, each
-// on its Track: the Clipboard's, pasted. A Clip of Takes gets copies of the
-// Takes, sharing their files, which may be in a Clip still or detached, as a
-// Clip cut is. Each must stay within its source, start on the Timeline and
-// not overlap a Clip already there, or another of them. If any can't be
-// pasted, none is.
-func (s *Store) PasteClips(ctx context.Context, songID int64, based lyricsheet.Version, clips []ClipCopy) (Timeline, error) {
+// on its Track: the Clipboard's, pasted. Tracks named newTracks are added
+// at the bottom first, in order, for Clips that run past the last Track to
+// go on. A Clip of Takes gets copies of the Takes, sharing their files,
+// which may be in a Clip still or detached, as a Clip cut is. Each must stay
+// within its source, start on the Timeline and not overlap a Clip already
+// there, or another of them. If any can't be pasted, none is, and no Track
+// is added.
+func (s *Store) PasteClips(ctx context.Context, songID int64, based lyricsheet.Version, newTracks []string,
+	clips []ClipCopy) (Timeline, error) {
 	if len(clips) == 0 {
 		return Timeline{}, &lyricsheet.InvalidError{Msg: "clips are required"}
+	}
+	names, err := checkTrackNames(newTracks)
+	if err != nil {
+		return Timeline{}, err
 	}
 	for _, c := range clips {
 		if len(c.Takes) == 0 {
@@ -1029,7 +1123,15 @@ func (s *Store) PasteClips(ctx context.Context, songID int64, based lyricsheet.V
 	}
 	var linked []int64
 	tl, err := s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		added, err := addTracksAtBottom(ctx, tx, songID, names)
+		if err != nil {
+			return err
+		}
 		for _, c := range clips {
+			trackID, err := c.trackOf(added)
+			if err != nil {
+				return err
+			}
 			nc := NewClip{BeatID: c.BeatID, SoundID: c.SoundID, Name: c.Name,
 				Start: c.Start, Offset: c.Offset, Length: c.Length}
 			if len(c.Takes) > 0 {
@@ -1040,7 +1142,7 @@ func (s *Store) PasteClips(ctx context.Context, songID int64, based lyricsheet.V
 				nc.TakeIDs, nc.ActiveTakeID = ids, &active
 			}
 			// Each pasted is there for the next to be checked against.
-			if err := placeOnTrack(ctx, tx, songID, PlacedClip{TrackID: c.TrackID, NewClip: nc}); err != nil {
+			if err := placeOnTrack(ctx, tx, songID, trackID, nc); err != nil {
 				return err
 			}
 		}
@@ -1149,9 +1251,11 @@ func (s *Store) DeleteClip(ctx context.Context, songID int64, based lyricsheet.V
 }
 
 // DeleteClips removes several Clips from the Timeline at once, as
-// DeleteClip does each. If any isn't on the Song's Timeline, none is
-// removed.
-func (s *Store) DeleteClips(ctx context.Context, songID int64, based lyricsheet.Version, clipIDs []int64) (Timeline, error) {
+// DeleteClip does each, and then the Tracks trackIDs with any Clips left on
+// them, as DeleteTrack does each: e.g. to undo a paste that added Tracks.
+// If any isn't on the Song's Timeline, or none of its Tracks would be left,
+// nothing is removed.
+func (s *Store) DeleteClips(ctx context.Context, songID int64, based lyricsheet.Version, clipIDs, trackIDs []int64) (Timeline, error) {
 	if len(clipIDs) == 0 {
 		return Timeline{}, &lyricsheet.InvalidError{Msg: "clipIds are required"}
 	}
@@ -1163,6 +1267,11 @@ func (s *Store) DeleteClips(ctx context.Context, songID int64, based lyricsheet.
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		for _, id := range clipIDs {
 			if err := deleteClip(ctx, tx, songID, id); err != nil {
+				return err
+			}
+		}
+		for _, id := range trackIDs {
+			if err := deleteTrack(ctx, tx, songID, id); err != nil {
 				return err
 			}
 		}

@@ -810,6 +810,7 @@ describe('History of pasting', () => {
     h.record(
       {
         kind: 'pasteClips',
+        newTracks: [],
         clips: [
           { trackId: 2, clip: { beatId: 100, start: 30, offset: 0, length: 10 } },
           {
@@ -834,6 +835,70 @@ describe('History of pasting', () => {
     });
     h.redone(t0, timeline([track(2, [takeClip(6, 10, [take(40)]), clip(9, 30), takeClip(10, 40, [take(41)])])]));
     expect(h.nextUndo()).toEqual({ kind: 'deleteClips', clipIds: [9, 10] });
+  });
+
+  it('undoes a paste that added Tracks by deleting them with its Clips, as one step, and redoes it by adding them back', () => {
+    const h = new History();
+    const t0 = timeline([track(1), track(2, [clip(6, 0)])]);
+    // Pasted from Track 2: one Clip there, and one on a Track added for it.
+    const t1 = timeline([track(1), track(2, [clip(6, 0), clip(7, 30)]), track(3, [clip(8, 35)], { name: 'Adlibs' })]);
+
+    h.record(
+      {
+        kind: 'pasteClips',
+        newTracks: [{ name: 'Adlibs' }],
+        clips: [
+          { trackId: 2, clip: { beatId: 100, start: 30, offset: 0, length: 10 } },
+          { newTrack: 0, clip: { beatId: 100, start: 35, offset: 0, length: 10 } },
+        ],
+      },
+      t0,
+      t1,
+    );
+    expect(h.nextUndo()).toEqual({ kind: 'deleteClips', clipIds: [7, 8], trackIds: [3] });
+
+    h.undone(t1, t0);
+    expect(h.nextRedo()).toEqual({
+      kind: 'placeClips',
+      newTracks: [{ name: 'Adlibs' }],
+      clips: [
+        { trackId: 2, clip: { beatId: 100, start: 30, offset: 0, length: 10 } },
+        { newTrack: 0, clip: { beatId: 100, start: 35, offset: 0, length: 10 } },
+      ],
+    });
+
+    // Redone, the Track and Clips come back with new ids, which undo then names.
+    h.redone(
+      t0,
+      timeline([track(1), track(2, [clip(6, 0), clip(9, 30)]), track(4, [clip(10, 35)], { name: 'Adlibs' })]),
+    );
+    expect(h.nextUndo()).toEqual({ kind: 'deleteClips', clipIds: [9, 10], trackIds: [4] });
+  });
+
+  it('keeps naming a Track a paste added after it’s brought back by undoing its deletion', () => {
+    const h = new History();
+    const t0 = timeline([track(1)]);
+    const t1 = timeline([track(1), track(3, [clip(8, 0)], { name: 'Adlibs' })]);
+    h.record(
+      {
+        kind: 'pasteClips',
+        newTracks: [{ name: 'Adlibs' }],
+        clips: [{ newTrack: 0, clip: { beatId: 100, start: 0, offset: 0, length: 10 } }],
+      },
+      t0,
+      t1,
+    );
+    h.record({ kind: 'updateTrack', trackId: 3, changes: { muted: true } }, t1, {
+      ...t1,
+      tracks: [track(1), track(3, [clip(8, 0)], { name: 'Adlibs', muted: true })],
+    });
+
+    // Undo the mute, then the paste, then redo the paste: the mute's redo
+    // names the Track the paste brings back.
+    h.undone(t1, t1);
+    h.undone(t1, t0);
+    h.redone(t0, timeline([track(1), track(5, [clip(9, 0)], { name: 'Adlibs' })]));
+    expect(h.nextRedo()).toEqual({ kind: 'updateTrack', trackId: 5, changes: { muted: true } });
   });
 });
 

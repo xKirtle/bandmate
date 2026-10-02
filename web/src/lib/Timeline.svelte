@@ -1503,14 +1503,14 @@
 
   /**
    * Pastes the Clipboard at the playhead on the Chosen Track, or later
-   * where it fits, the playhead staying where it is, and selects the Clips
-   * pasted.
+   * where it fits, the playhead staying where it is, adding Tracks at the
+   * bottom for rows that run past the last, and selects the Clips pasted.
    */
   function pasteClipboard() {
     if (chosen === null) return; // Never: a Song always has a Track.
-    const clips = paste(clipboard, timeline.tracks, playheadAt(), chosen);
-    if (!clips) return;
-    perform({ kind: 'pasteClips', clips }, (before, after) => {
+    const pasted = paste(clipboard, timeline.tracks, playheadAt(), chosen);
+    if (!pasted) return;
+    perform({ kind: 'pasteClips', ...pasted }, (before, after) => {
       // Unless the Selection is locked by a recording started since.
       if (!frozen) selected = new Set(addedClips(before, after));
     });
