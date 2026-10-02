@@ -30,7 +30,15 @@ group('clipActions', () => {
   const soundClip = clip({ soundId: 3 });
   const oneTake = clip({ takes: [take(10, 1)], activeTakeId: 10 });
   const twoTakes = clip({ takes: [take(10, 1), take(11, 2)], activeTakeId: 11 });
-  const state = { canRecord: true, soundName: 'Riff', nudgeKeys: 'Alt+←/→', selected: 0, recording: false };
+  const state = {
+    canRecord: true,
+    soundName: 'Riff',
+    nudgeKeys: 'Alt+←/→',
+    copyKeys: 'Ctrl+C',
+    cutKeys: 'Ctrl+X',
+    selected: 0,
+    recording: false,
+  };
   const run = {
     retake: () => {},
     chooseTake: () => {},
@@ -39,6 +47,8 @@ group('clipActions', () => {
     clearInactiveTakes: () => {},
     downloadTake: () => {},
     rename: () => {},
+    copy: () => {},
+    cut: () => {},
     duplicate: () => {},
     downloadSound: () => {},
     deleteClip: () => {},
@@ -46,13 +56,22 @@ group('clipActions', () => {
   const labels = (c: Clip, s = state) => clipActions(c, s, run).map((a) => a.label);
 
   it('names its delete “Delete Clip”, whatever the Clip plays', () => {
-    expect(labels(beatClip)).toEqual(['Rename', 'Duplicate', 'Delete Clip']);
-    expect(labels(soundClip)).toEqual(['Rename', 'Duplicate', 'Download Sound', 'Delete Clip']);
+    expect(labels(beatClip)).toEqual(['Rename', 'Copy', 'Cut', 'Duplicate', 'Delete Clip']);
+    expect(labels(soundClip)).toEqual(['Rename', 'Copy', 'Cut', 'Duplicate', 'Download Sound', 'Delete Clip']);
     expect(labels(oneTake).at(-1)).toBe('Delete Clip');
   });
 
   it('offers no Take choices on a Clip of one Take', () => {
-    expect(labels(oneTake)).toEqual(['Retake', 'Nudge', 'Download Take', 'Rename', 'Duplicate', 'Delete Clip']);
+    expect(labels(oneTake)).toEqual([
+      'Retake',
+      'Nudge',
+      'Download Take',
+      'Rename',
+      'Copy',
+      'Cut',
+      'Duplicate',
+      'Delete Clip',
+    ]);
   });
 
   it('offers Takes, Delete Take and Clear inactive Takes on a Clip of several Takes', () => {
@@ -64,6 +83,8 @@ group('clipActions', () => {
       'Clear inactive Takes',
       'Download Take',
       'Rename',
+      'Copy',
+      'Cut',
       'Duplicate',
       'Delete Clip',
     ]);
@@ -79,6 +100,8 @@ group('clipActions', () => {
       clearInactiveTakes: () => ran.push('clear'),
       downloadTake: (id) => ran.push(`download take ${id}`),
       rename: () => ran.push('rename'),
+      copy: () => ran.push('copy'),
+      cut: () => ran.push('cut'),
       duplicate: () => ran.push('duplicate'),
       downloadSound: (id) => ran.push(`download sound ${id}`),
       deleteClip: () => ran.push('delete clip'),
@@ -97,6 +120,8 @@ group('clipActions', () => {
       'clear',
       'download take 11',
       'rename',
+      'copy',
+      'cut',
       'duplicate',
       'delete clip',
     ]);
@@ -134,13 +159,32 @@ group('clipActions', () => {
       ['Nudge', hint],
       ['Clear inactive Takes', hint],
       ['Rename', hint],
+      ['Copy', hint],
+      ['Cut', hint],
       ['Duplicate', hint],
       ['Delete Clip', hint],
       ['Rename', hint],
+      ['Copy', hint],
+      ['Cut', hint],
       ['Duplicate', hint],
       ['Delete Clip', hint],
     ]);
     expect(on).toEqual(['Download Take', 'Download Sound']);
+  });
+
+  it('names the keys that copy and cut, where there are keys to name', () => {
+    expect(clipActions(beatClip, state, run)).toMatchObject([
+      { label: 'Rename' },
+      { label: 'Copy', title: 'Or Ctrl+C' },
+      { label: 'Cut', title: 'Or Ctrl+X' },
+      { label: 'Duplicate' },
+      { label: 'Delete Clip' },
+    ]);
+    const noKeys = clipActions(beatClip, { ...state, copyKeys: null, cutKeys: null }, run);
+    expect(noKeys.filter((a) => a.label === 'Copy' || a.label === 'Cut').map((a) => a.title)).toEqual([
+      undefined,
+      undefined,
+    ]);
   });
 
   it('leaves every entry on while not recording', () => {
@@ -149,31 +193,53 @@ group('clipActions', () => {
 });
 
 group('selectionActions', () => {
-  const run = { duplicateClips: () => {}, deleteClips: () => {} };
+  const run = { copyClips: () => {}, cutClips: () => {}, duplicateClips: () => {}, deleteClips: () => {} };
+  const state = { recording: false, copyKeys: 'Ctrl+C', cutKeys: 'Ctrl+X' };
+  const labels = (count: number) => selectionActions(count, run, state).map((a) => a.label);
 
-  it('offers duplicating and deleting every selected Clip, naming how many', () => {
-    expect(selectionActions(3, run).map((a) => a.label)).toEqual(['Duplicate 3 Clips', 'Delete 3 Clips']);
+  it('offers copying, cutting, duplicating and deleting every selected Clip, naming how many it duplicates and deletes', () => {
+    expect(labels(3)).toEqual(['Copy', 'Cut', 'Duplicate 3 Clips', 'Delete 3 Clips']);
   });
 
   it('names one Clip as one', () => {
-    expect(selectionActions(1, run).map((a) => a.label)).toEqual(['Duplicate 1 Clip', 'Delete 1 Clip']);
+    expect(labels(1)).toEqual(['Copy', 'Cut', 'Duplicate 1 Clip', 'Delete 1 Clip']);
   });
 
-  it('duplicates or deletes them when picked', () => {
+  it('copies, cuts, duplicates or deletes them when picked', () => {
     const picked: string[] = [];
-    const entries = selectionActions(2, {
-      duplicateClips: () => picked.push('duplicate'),
-      deleteClips: () => picked.push('delete'),
-    });
+    const entries = selectionActions(
+      2,
+      {
+        copyClips: () => picked.push('copy'),
+        cutClips: () => picked.push('cut'),
+        duplicateClips: () => picked.push('duplicate'),
+        deleteClips: () => picked.push('delete'),
+      },
+      state,
+    );
     for (const entry of entries) if ('run' in entry) entry.run();
-    expect(picked).toEqual(['duplicate', 'delete']);
+    expect(picked).toEqual(['copy', 'cut', 'duplicate', 'delete']);
   });
 
-  it('turns duplicating and deleting off while recording, saying why', () => {
-    expect(selectionActions(2, run, true)).toMatchObject([
-      { label: 'Duplicate 2 Clips', disabled: true, title: 'Stop recording to edit' },
-      { label: 'Delete 2 Clips', disabled: true, title: 'Stop recording to edit' },
+  it('names the keys that copy and cut, where there are keys to name', () => {
+    expect(selectionActions(2, run, state)).toMatchObject([
+      { label: 'Copy', title: 'Or Ctrl+C' },
+      { label: 'Cut', title: 'Or Ctrl+X' },
+      { label: 'Duplicate 2 Clips' },
+      { label: 'Delete 2 Clips' },
     ]);
-    expect(selectionActions(2, run).some((a) => a.disabled)).toBe(false);
+    const noKeys = selectionActions(2, run, { ...state, copyKeys: null, cutKeys: null });
+    expect(noKeys.map((a) => a.title)).toEqual([undefined, undefined, undefined, undefined]);
+  });
+
+  it('turns every entry off while recording, saying why', () => {
+    const hint = 'Stop recording to edit';
+    expect(selectionActions(2, run, { ...state, recording: true })).toMatchObject([
+      { label: 'Copy', disabled: true, title: hint },
+      { label: 'Cut', disabled: true, title: hint },
+      { label: 'Duplicate 2 Clips', disabled: true, title: hint },
+      { label: 'Delete 2 Clips', disabled: true, title: hint },
+    ]);
+    expect(selectionActions(2, run, state).some((a) => a.disabled)).toBe(false);
   });
 });

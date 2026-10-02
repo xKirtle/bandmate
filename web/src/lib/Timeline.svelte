@@ -1505,7 +1505,12 @@
 
   /** Copies the Selection to the Clipboard; with none, the Clipboard stays as it was. */
   function copySelection() {
-    clipboard = copy(timeline.tracks, selected) ?? clipboard;
+    copyClips(selected);
+  }
+
+  /** Copies these Clips to the Clipboard; with none, the Clipboard stays as it was. */
+  function copyClips(clipIds: Selection) {
+    clipboard = copy(timeline.tracks, clipIds) ?? clipboard;
   }
 
   /**
@@ -1516,6 +1521,12 @@
   function cutSelection() {
     copySelection();
     removeSelection();
+  }
+
+  /** Cuts a Clip alone, from its menu: copies it, then deletes it, as one edit to undo. */
+  function cutClip(clip: Clip) {
+    copyClips(new Set([clip.id]));
+    remove(clip);
   }
 
   /**
@@ -2091,8 +2102,13 @@
     if (menuFor(timeline.tracks, selected, clip.id, frozen).menu === 'selection') {
       return selectionActions(
         selected.size,
-        { duplicateClips: duplicateSelection, deleteClips: removeSelection },
-        frozen,
+        {
+          copyClips: copySelection,
+          cutClips: cutSelection,
+          duplicateClips: duplicateSelection,
+          deleteClips: removeSelection,
+        },
+        { recording: frozen, ...clipboardKeys() },
       );
     }
     const clipId = clip.id;
@@ -2102,6 +2118,7 @@
         canRecord,
         soundName: clip.soundId === null ? null : sources.of(clip).title,
         nudgeKeys: hints.label(shortcuts.nudgeTake.keys),
+        ...clipboardKeys(),
         selected: selected.size,
         recording: frozen,
       },
@@ -2113,11 +2130,18 @@
         clearInactiveTakes: () => perform({ kind: 'clearInactiveTakes', clipId }),
         downloadTake: (takeId) => download(api.takeDownloadUrl(timeline.songId, takeId)),
         rename: () => startClipRename(clip),
+        copy: () => copyClips(new Set([clip.id])),
+        cut: () => cutClip(clip),
         duplicate: () => duplicate(clip),
         downloadSound: (soundId) => download(api.soundDownloadUrl(timeline.songId, soundId)),
         deleteClip: () => remove(clip),
       },
     );
+  }
+
+  /** The keys that copy and cut, as the Clip and Selection menus name them. */
+  function clipboardKeys() {
+    return { copyKeys: hints.label(shortcuts.copyClips.keys), cutKeys: hints.label(shortcuts.cutClips.keys) };
   }
 
   /** Saves what a URL serves as a file, as the server names it. */
