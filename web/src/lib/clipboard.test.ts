@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Clip, Take, Track } from './api';
-import { copy, cut, emptyClipboard, paste } from './clipboard';
+import { copy, emptyClipboard, paste } from './clipboard';
 
 const clip = (id: number, start: number, length = 10, more: Partial<Clip> = {}): Clip => ({
   id,
@@ -93,53 +93,6 @@ describe('copy', () => {
   });
 });
 
-describe('cut', () => {
-  it('cuts nothing with no Clip selected', () => {
-    expect(cut([track(1, [clip(5, 0)])], new Set())).toBeNull();
-  });
-
-  it('holds the selected Clips as copying them would, and deletes them, in Timeline order', () => {
-    const tracks = [track(1, [clip(5, 0), clip(7, 40)]), track(2, [clip(6, 20)])];
-
-    expect(cut(tracks, new Set([6, 5]))).toEqual({
-      clipboard: copy(tracks, new Set([5, 6])),
-      deletes: [5, 6],
-    });
-  });
-
-  it('pastes a Clip of Takes once it’s cut, with its Takes as they were in it', () => {
-    const hook = clip(6, 20, 3, {
-      beatId: null,
-      name: 'Hook',
-      takes: [take(60, 0, 0), take(61, 0.5, -0.25)],
-      activeTakeId: 61,
-      offset: 0.5,
-    });
-    const { clipboard } = cut([track(1, [hook])], new Set([6]))!;
-
-    // The Timeline as the cut leaves it, without the Clip.
-    expect(paste(clipboard, [track(1)], 4, 1)).toEqual({
-      newTracks: [],
-      clips: [
-        {
-          trackId: 1,
-          clip: {
-            name: 'Hook',
-            takes: [
-              { id: 60, position: 0, nudge: 0 },
-              { id: 61, position: 0.5, nudge: -0.25 },
-            ],
-            activeTakeId: 61,
-            start: 4,
-            offset: 0.5,
-            length: 3,
-          },
-        },
-      ],
-    });
-  });
-});
-
 describe('paste', () => {
   it('pastes nothing from an empty Clipboard', () => {
     expect(paste(emptyClipboard, [track(1)], 0, 1)).toBeNull();
@@ -205,6 +158,37 @@ describe('paste', () => {
     expect(pasted).toEqual({
       newTracks: [],
       clips: [{ trackId: 1, clip: { beatId: 100, name: 'Intro', start: 0, offset: 1, length: 5 } }],
+    });
+  });
+
+  it('pastes a Clip of Takes once it’s deleted, as a cut leaves it, with its Takes as they were in it', () => {
+    const hook = clip(6, 20, 3, {
+      beatId: null,
+      name: 'Hook',
+      takes: [take(60, 0, 0), take(61, 0.5, -0.25)],
+      activeTakeId: 61,
+      offset: 0.5,
+    });
+    const clipboard = copy([track(1, [hook])], new Set([6]))!;
+
+    expect(paste(clipboard, [track(1)], 4, 1)).toEqual({
+      newTracks: [],
+      clips: [
+        {
+          trackId: 1,
+          clip: {
+            name: 'Hook',
+            takes: [
+              { id: 60, position: 0, nudge: 0 },
+              { id: 61, position: 0.5, nudge: -0.25 },
+            ],
+            activeTakeId: 61,
+            start: 4,
+            offset: 0.5,
+            length: 3,
+          },
+        },
+      ],
     });
   });
 

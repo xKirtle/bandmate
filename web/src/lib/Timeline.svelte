@@ -67,7 +67,7 @@
   import { allKeys, shortcuts, type Way } from './shortcuts';
   import { clipActions, selectionActions } from './clipMenu';
   import { menuFor, noSelection, selection, type Selection, type SelectionGesture } from './selection';
-  import { copy, cut, emptyClipboard, paste, type Clipboard } from './clipboard';
+  import { copy, emptyClipboard, paste, type Clipboard } from './clipboard';
   import {
     addsBox,
     clearsSelection,
@@ -1492,8 +1492,8 @@
   onDestroy(laneDone);
 
   // The Clipboard: the Clips last copied or cut from the Selection, as they
-  // were then. Like the Selection, it's never kept, so leaving the Song drops it,
-  // and undo and redo never change it.
+  // were then. Like the Selection, it's never kept, so leaving the Song
+  // drops it, and undo and redo never change it.
   let clipboard = $state.raw<Clipboard>(emptyClipboard);
 
   /** Copies the Selection to the Clipboard; with none, the Clipboard stays as it was. */
@@ -1503,14 +1503,12 @@
 
   /**
    * Cuts the Selection: copies it to the Clipboard, then deletes it, as one
-   * edit to undo. Undoing brings the Clips back, leaving the Clipboard as it
-   * is. With none selected, nothing changes.
+   * edit to undo, which leaves the Clipboard as it is. A cut Clip of Takes
+   * pastes from its Takes, which deleting only detaches.
    */
   function cutSelection() {
-    const made = cut(timeline.tracks, selected);
-    if (!made) return;
-    clipboard = made.clipboard;
-    perform({ kind: 'deleteClips', clipIds: made.deletes });
+    copySelection();
+    removeSelection();
   }
 
   /**

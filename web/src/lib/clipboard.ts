@@ -1,8 +1,8 @@
 // The Clipboard: the Clips last copied or cut from the Selection, as they
-// were then, to paste elsewhere on the same Song's Timeline. It holds copies of
-// what each Clip was, so later changes to the Clips copied, or deleting
-// them, never change it, and a paste makes new Clips from it, so it can be
-// pasted again and again. Like the Selection, it isn't an edit, and it's
+// were then, to paste elsewhere on the same Song's Timeline. It holds
+// copies of what each Clip was, so later changes to the Clips copied, or
+// deleting them, never change it, and a paste makes new Clips from it, so
+// it can be pasted again and again. Like the Selection, it isn't an edit, and it's
 // never kept: it lives in the page while the Song is open, so leaving the
 // Song drops it. The system clipboard is never touched.
 
@@ -67,24 +67,6 @@ export function copy(tracks: readonly Track[], selected: Selection): Clipboard |
     tracks: tracks.slice(top, bottom + 1).map((t) => t.name),
     clips: copied.map(({ trackIndex, clip }) => ({ below: trackIndex - top, clip })),
   };
-}
-
-/** What a cut makes: the Clipboard, as copying the Selection makes it, and the Clips to delete, in Timeline order. */
-export interface Cut {
-  clipboard: Clipboard;
-  deletes: number[];
-}
-
-/**
- * A cut of the selected Clips, or null with none selected, which leaves the
- * Clipboard as it was. The Clipboard holds them as they are, so they paste
- * once deleted: a Clip of Takes' Takes are only detached, and stay to paste
- * for as long as undo could bring them back.
- */
-export function cut(tracks: readonly Track[], selected: Selection): Cut | null {
-  const clipboard = copy(tracks, selected);
-  if (!clipboard) return null;
-  return { clipboard, deletes: tracks.flatMap((t) => t.clips.filter((c) => selected.has(c.id)).map((c) => c.id)) };
 }
 
 /**

@@ -107,7 +107,8 @@ func TestACutClipOfTakesPastesAgainAndAgainWithItsAudio(t *testing.T) {
 	if clips[0].Takes[0].ID == clips[1].Takes[0].ID {
 		t.Errorf("both pastes play Take %d, want a Take each", clips[0].Takes[0].ID)
 	}
-	// Undoing the cut still brings the Clip back, from its Take, detached.
+	// With the pastes undone, undoing the cut still brings the Clip back,
+	// from its Take, detached.
 	timelineChange(t, ts.Do(http.MethodPost, timelinePath(r.song.ID)+"/clips/delete",
 		map[string]any{"clipIds": []int64{clips[0].ID, clips[1].ID}}))
 	back := timelineChange(t, ts.placeTakes(r.song.ID, r.vox.ID, []int64{r.take.ID}, r.take.ID, 2, 0.5, 3))
