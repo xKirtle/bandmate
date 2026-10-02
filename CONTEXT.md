@@ -44,7 +44,7 @@ The ordered list of Sections that makes up a Song's Lyric Sheet.
 _Avoid_: Structure, layout
 
 **Duplicate**:
-Making an independent copy of a Section, with all its Alternates and the same one active, but none of its Cues, since the copy is sung at another time. Editing one never changes the other.
+Making an independent copy of a Section, with all its Alternates and the same one active, but none of its Cues, since the copy is sung at another time; or of a Clip, with its trim, name and active Take, placed right after it on its Track. Duplicating several selected Clips places the copies on the same Tracks right after the Selection ends, going later together where that would land one on another Clip, and the copies become the Selection. A Clip of Takes gets Takes of its own, of the same audio. Editing one never changes the other.
 _Avoid_: Repeat, share, Detach
 
 **Scrapbook**:
@@ -121,8 +121,12 @@ A stretch of a Beat or a Sound, or a set of Takes, placed at a position on a Tra
 _Avoid_: Region, segment
 
 **Selection**:
-The Clips that the next Clip action applies to: none, one or several, on any Tracks. Clicking a Clip selects it alone, and Clips can be added or taken out one at a time, or picked together by drawing a box over them. Dragging a selected Clip moves the whole Selection by the same amount, so the Clips keep their places relative to each other. Deleting deletes all of them. With several selected, a selected Clip's menu acts on the whole Selection; opening the menu of a Clip outside it makes that Clip the Selection first. Clicking empty space on the Timeline clears the Selection, and it's never kept: leaving the Song drops it.
+The Clips that the next Clip action applies to: none, one or several, on any Tracks. Clicking a Clip selects it alone, and Clips can be added or taken out one at a time, or picked together by drawing a box over them. Dragging a selected Clip moves the whole Selection by the same amount, so the Clips keep their places relative to each other. Deleting deletes all of them, and copying, cutting or duplicating takes them all. With several selected, a selected Clip's menu acts on the whole Selection; opening the menu of a Clip outside it makes that Clip the Selection first. Clicking empty space on the Timeline clears the Selection, and it's never kept: leaving the Song drops it.
 _Avoid_: Group, highlight, chosen (choosing is for Tracks)
+
+**Clipboard**:
+The Clips last copied or cut from the Selection, as they were then, to be pasted elsewhere on the same Song's Timeline: later changes to the Clips copied, or deleting them, never change it. A paste makes new Clips from it, as a Duplicate does, so the Clipboard can be pasted again. It lands at the playhead on the Chosen Track: its earliest Clip starts at the playhead, its topmost Clip goes on the Chosen Track, and the rest keep their places relative to those, on new Tracks named after theirs if they run past the last Track. Where that would land a Clip on another, the whole paste goes later, together, to the first place where every Clip fits, so pasting again and again lays copies end to end. The pasted Clips become the Selection. Like the Selection, it's never kept: leaving the Song drops it.
+_Avoid_: Copy buffer
 
 **Loop**:
 A stretch of the Timeline that playback repeats, e.g. the hook of a Beat while writing over it: playback that reaches the Loop's end goes back to its start. Playback started or moved anywhere else plays on as usual until it reaches the Loop's end, so after the Loop it runs to the Timeline's end. Each Song keeps one, which can be switched on or off; only the user switches it, and it never moves the playhead.

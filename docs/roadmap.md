@@ -101,8 +101,3 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 
 - Merge two or more Clips into one Clip that runs from the earliest Clip's start to the latest Clip's end, and sounds as playback of those Clips would: where they overlap they play together, and a gap between them is silence.
 - It's not a Mixdown, which is downloaded and never kept: the merged Clip stays on the Timeline. Whether the Clips can be on different Tracks (and whose volume, mute and solo apply), which Track the result lands on, whether the merged audio becomes a Sound, and whether undo brings the original Clips back, are for the spec.
-
-## Copying and pasting Clips
-
-- Ctrl+C and Ctrl+V copy the Selection, as a Clip's menu's Duplicate does today without reaching for the menu, so several selected Clips can be copied together.
-- Where a pasted Clip lands (at the playhead on the Chosen Track, or right after the original as Duplicate puts it), and whether a copied Clip can be pasted into another Song, are for the spec.
