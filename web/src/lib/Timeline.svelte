@@ -1347,19 +1347,22 @@
   // Dragging from empty lane space draws a box, and the Clips it touches
   // on the Tracks it spans become the Selection as it's drawn, or, with
   // Mod held as it's pressed, are added to it. It leaves the Chosen Track
-  // be, and scrolls the lanes along near their edges, as a Clip dragged
-  // does. A press let go without moving past the slop is a click there
-  // instead, which clears the Selection, unless Mod is held: that was
-  // likely the start of a box to add, so the Selection is left be.
-  // A finger dragging pans the lanes instead: it draws a box only once
-  // held still for a long press, and that box always replaces the
-  // Selection. A second finger, e.g. pinching, gives the box up.
+  // and the playhead be, and scrolls the lanes along near their edges, as
+  // a Clip dragged does. A press let go without moving past the slop is a
+  // click there instead, an insertion point: it clears the Selection,
+  // moves the playhead to exactly where it was pressed, unsnapped, as the
+  // ruler does, and chooses that Track, so a paste, a recording or
+  // "+ Beat" goes there. With Mod held, that was likely the start of a
+  // box to add, so it leaves the Selection, the playhead and the Chosen
+  // Track be. A finger dragging pans the lanes instead: a tap does what a
+  // click does, and it draws a box only once held still for a long press, and that
+  // box always replaces the Selection; let go without dragging, it only
+  // clears the Selection. A second finger, e.g. pinching, gives the box
+  // up.
   interface LaneBox {
     /** The press, telling a click, a box and a pan apart. */
     press: LanePress;
     pointerId: number;
-    /** Whether Mod was held as it was pressed, so the box adds to the Selection. */
-    adds: boolean;
     /** The Selection as it was pressed, which the box replaces or adds to. */
     before: Selection;
     /** Where it was pressed, in seconds: the box's start. */
@@ -1399,9 +1402,8 @@
     lanesElement!.focus({ preventScroll: true });
     const touch = event.pointerType === 'touch';
     laneBox = {
-      press: pressLane(event, touch),
+      press: pressLane(event, touch, addsBox(event)),
       pointerId: event.pointerId,
-      adds: !touch && addsBox(event),
       before: selected,
       start: spanTimeAt(event.clientX),
       trackIndex: trackIndexAt(event.clientY),
@@ -1425,8 +1427,17 @@
       case 'box':
         drawBox(laneBox, at);
         return;
+      case 'insertionPoint': {
+        select({ kind: 'emptyClick', adds: false });
+        // Not even following the playhead again while recording.
+        if (frozen) break;
+        seekTo(laneBox.start);
+        const track = timeline.tracks[laneBox.trackIndex];
+        if (track) choose({ kind: 'choose', trackId: track.id });
+        break;
+      }
       case 'click':
-        select({ kind: 'emptyClick', adds: laneBox.adds });
+        select({ kind: 'emptyClick', adds: laneBox.press.adds });
         break;
       case 'restore':
         selected = selection(timeline.tracks, laneBox.before);
@@ -1438,7 +1449,7 @@
     laneDone();
   }
 
-  function drawBox({ start, trackIndex, top, adds, before }: LaneBox, at: Point) {
+  function drawBox({ start, trackIndex, top, press: { adds }, before }: LaneBox, at: Point) {
     const end = spanTimeAt(at.clientX);
     box = { start, end, top, bottom: yIn(at.clientY) };
     const tracks = [trackIndex, trackIndexAt(at.clientY)] as const;
@@ -2932,7 +2943,7 @@
               {/each}
             </div>
             {#each shown as { track, clips: placed }, t (track.id)}
-              <!-- Pointer only: clicking its empty space clears the Selection, as Esc does. -->
+              <!-- Pointer only: clicking its empty space clears the Selection, as Esc does, and moves the playhead there, as the ruler does, choosing this Track. -->
               <!-- svelte-ignore a11y_no_static_element_interactions -->
               <div
                 class="lane"

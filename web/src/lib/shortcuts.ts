@@ -136,7 +136,7 @@ export const shortcuts = {
     name: 'Paste the Clipboard',
     group: 'Timeline editing',
     description:
-      'Pastes the Clips last copied or cut at the playhead on the Chosen Track, or later where they fit, and selects them.',
+      'Pastes the Clips last copied or cut at the playhead on the Chosen Track, both of which a click on empty lane space sets, or later where they fit, and selects them.',
     keys: [{ key: 'v', mod: true }],
   },
   cueNextLine: {
@@ -154,7 +154,8 @@ export const shortcuts = {
   boxSelect: {
     name: 'Select Clips with a box',
     group: 'Mouse',
-    description: 'Selects every Clip the box drawn over empty lane space touches, leaving the Chosen Track as it is.',
+    description:
+      'Selects every Clip the box drawn over empty lane space touches, leaving the Chosen Track and the playhead as they are.',
     keys: [{ key: 'drag' }],
   },
   addBox: {
