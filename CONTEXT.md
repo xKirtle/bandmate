@@ -109,7 +109,7 @@ An audio file imported into one Song, placed on the Timeline in Clips like a Bea
 _Avoid_: Sample, stem, audio file, import
 
 **Take**:
-One recording made in the app, placed in a Clip on the Timeline. Like a Beat, it's tied to the lyrics only through Cues, so what it sings is whatever Lines are cued over its span. A Clip's Takes are numbered in the order they're recorded: a new one takes the number after the highest still in the Clip, so deleting the latest Take frees its number, while a gap left lower down stays. A new Take goes in a new Clip on the Chosen Track, at the playhead, or where that Track's last Clip ends if the playhead is before that, so it never lands on another Clip.
+One recording made in the app, placed in a Clip on the Timeline. Like a Beat, it's tied to the lyrics only through Cues, so what it sings is whatever Lines are cued over its span. A Clip's Takes are numbered in the order they're recorded: a new one takes the number after the highest still in the Clip, so deleting the latest Take frees its number, while a gap left lower down stays. A new Take goes in a new Clip on the Chosen Track, at the playhead, or where that Track's last Clip ends if the playhead is before that, so it never lands on another Clip. While a Take is being recorded, from pressing Record until it's saved, the Timeline can't be edited.
 _Avoid_: Recording, attempt
 
 **Retake**:

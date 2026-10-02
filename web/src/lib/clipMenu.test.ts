@@ -30,7 +30,7 @@ group('clipActions', () => {
   const soundClip = clip({ soundId: 3 });
   const oneTake = clip({ takes: [take(10, 1)], activeTakeId: 10 });
   const twoTakes = clip({ takes: [take(10, 1), take(11, 2)], activeTakeId: 11 });
-  const state = { canRecord: true, soundName: 'Riff', nudgeKeys: 'Alt+←/→', selected: 0 };
+  const state = { canRecord: true, soundName: 'Riff', nudgeKeys: 'Alt+←/→', selected: 0, recording: false };
   const run = {
     retake: () => {},
     chooseTake: () => {},
@@ -121,6 +121,31 @@ group('clipActions', () => {
     if ('run' in entry) entry.run();
     expect(downloaded).toEqual([3]);
   });
+
+  it('turns off every edit while recording, saying why, but still downloads', () => {
+    const recording = { ...state, canRecord: false, recording: true };
+    const shown = [...clipActions(twoTakes, recording, run), ...clipActions(soundClip, recording, run)];
+    const off = shown.filter((a) => a.disabled).map((a) => [a.label, a.title]);
+    const on = shown.filter((a) => !a.disabled).map((a) => a.label);
+    const hint = 'Stop recording to edit';
+    expect(off).toEqual([
+      ['Takes', hint],
+      ['Delete Take', hint],
+      ['Nudge', hint],
+      ['Clear inactive Takes', hint],
+      ['Rename', hint],
+      ['Duplicate', hint],
+      ['Delete Clip', hint],
+      ['Rename', hint],
+      ['Duplicate', hint],
+      ['Delete Clip', hint],
+    ]);
+    expect(on).toEqual(['Download Take', 'Download Sound']);
+  });
+
+  it('leaves every entry on while not recording', () => {
+    expect(clipActions(twoTakes, state, run).some((a) => a.disabled)).toBe(false);
+  });
 });
 
 group('selectionActions', () => {
@@ -128,7 +153,7 @@ group('selectionActions', () => {
     expect(selectionActions(3, { deleteClips: () => {} }).map((a) => a.label)).toEqual(['Delete 3 Clips']);
   });
 
-  it('names one Clip as one, e.g. when the other is being retaken', () => {
+  it('names one Clip as one', () => {
     expect(selectionActions(1, { deleteClips: () => {} }).map((a) => a.label)).toEqual(['Delete 1 Clip']);
   });
 
@@ -137,5 +162,11 @@ group('selectionActions', () => {
     const [entry] = selectionActions(2, { deleteClips: () => deleted++ });
     if ('run' in entry) entry.run();
     expect(deleted).toBe(1);
+  });
+
+  it('turns deleting off while recording, saying why', () => {
+    const [entry] = selectionActions(2, { deleteClips: () => {} }, true);
+    expect(entry).toMatchObject({ label: 'Delete 2 Clips', disabled: true, title: 'Stop recording to edit' });
+    expect(selectionActions(2, { deleteClips: () => {} })[0].disabled).toBeFalsy();
   });
 });

@@ -37,6 +37,7 @@
   } from './snapping';
   import { activeTake, clipSources, clipTitle, fileStart, playing } from './clipSource';
   import { formatCue, movedCues, type TimeSpan } from './cues';
+  import { editHint, editsWhileRecording } from './freeze';
   import { carriesFiles, fileDropTrack, importEach, type TrackRow } from './fileDrop';
   import {
     History,
@@ -218,6 +219,11 @@
   });
   // Whether a recording is capturing, rather than starting or saving.
   const capturing = $derived(recording?.phase === 'recording');
+  // While recording, a new Take or a Retake, from its start until it's
+  // saved, the Timeline is frozen: nothing on it is edited but a Track's
+  // levels, the playhead stays with the recording, and the Selection is
+  // locked, gestures leaving it as it was (see freeze.ts).
+  const frozen = $derived(recording !== null);
   // Once gone, an input still opening is let go as soon as it opens.
   let destroyed = false;
 
@@ -359,6 +365,7 @@
    * resolves to whether it succeeded.
    */
   function perform(e: TimelineEdit, done?: (before: Timeline, after: Timeline) => void): Promise<boolean> {
+    if (frozen && !editsWhileRecording(e)) return Promise.resolve(false);
     e = $state.snapshot(e) as TimelineEdit;
     offerCues = null;
     queued++;
@@ -388,7 +395,7 @@
   }
 
   function undo() {
-    if (!undoable && queued === 0) return;
+    if (frozen || (!undoable && queued === 0)) return;
     offerCues = null;
     change((at) => {
       const e = history.nextUndo();
@@ -396,15 +403,15 @@
         ? send(at, e, (before, after) => {
             const back = history.undone(before, after);
             // Clips deleted together come back selected, as they were,
-            // unless the Selection is locked while recording.
-            if (e.kind === 'placeClips' && !selectionLocked) selected = new Set(back);
+            // unless the Selection is locked by a recording started since.
+            if (e.kind === 'placeClips' && !frozen) selected = new Set(back);
           })
         : unchanged(at);
     });
   }
 
   function redo() {
-    if (!redoable) return;
+    if (frozen || !redoable) return;
     offerCues = null;
     change((at) => {
       const e = history.nextRedo();
@@ -706,8 +713,8 @@
   onDestroy(dragDone);
 
   function pointerDown(event: PointerEvent) {
-    // A second finger is pinching.
-    if (!event.isPrimary) return;
+    // A second finger is pinching. A recording plays from where it starts.
+    if (!event.isPrimary || frozen) return;
     dragging = true;
     // Clicking the playhead back into view follows it again.
     following = true;
@@ -759,6 +766,8 @@
    * there, or jumps there if it's playing already, never pausing it.
    */
   export function playFrom(at: number) {
+    // Nor while a recording starts or saves, stopped meanwhile.
+    if (frozen) return;
     seekTo(at);
     if (playerState === 'stopped') play(position);
   }
@@ -1042,7 +1051,7 @@
   );
 
   $effect(() => {
-    onRecording?.(recording !== null && recording.phase !== 'saving');
+    onRecording?.(frozen);
   });
 
   /**
@@ -1213,7 +1222,7 @@
 
   /** Keeps the unsaved Takes offered, one after another, until one can't be. */
   async function keepUnsaved() {
-    if (recovering || recording) return;
+    if (recovering || frozen) return;
     recovering = true;
     error = null;
     try {
@@ -1264,6 +1273,7 @@
   }
 
   function discardUnsaved() {
+    if (frozen) return;
     for (const offer of unsaved) dropUnsaved(offer);
   }
 
@@ -1281,6 +1291,8 @@
   const chosen = $derived(chosenTrack(timeline.tracks, remembered));
 
   function choose(event: ChoiceEvent) {
+    // Not while recording, which goes where it was chosen as it started.
+    if (frozen) return;
     remembered = chosenTrack(timeline.tracks, remembered, event);
   }
 
@@ -1309,12 +1321,8 @@
   // a Track, selecting isn't an edit, and it's never kept, so leaving the
   // Song drops it. A phone, where Clips can't be edited, has none.
   let selected = $state<Selection>(noSelection);
-  // While recording, a new Take or a Retake, from its start until it's
-  // saved, the Selection is locked: gestures leave it as it was.
-  const selectionLocked = $derived(recording !== null);
-
   function select(gesture: SelectionGesture) {
-    selected = selection(timeline.tracks, selected, gesture, selectionLocked);
+    selected = selection(timeline.tracks, selected, gesture, frozen);
   }
 
   // Clips gone from the Timeline, e.g. deleted in another tab or taken away
@@ -1422,7 +1430,7 @@
     const end = spanTimeAt(at.clientX);
     box = { start, end, top, bottom: yIn(at.clientY) };
     const tracks = [trackIndex, trackIndexAt(at.clientY)] as const;
-    selected = selectionLocked
+    selected = frozen
       ? selection(timeline.tracks, selected)
       : selection(timeline.tracks, before, { kind: 'box', start, end, tracks, adds });
     dragAt(at, laneMove);
@@ -1432,7 +1440,7 @@
   // device has one. Not while recording, when the Selection is locked.
   function laneHold() {
     if (!laneBox) return;
-    if (selectionLocked) return laneDone();
+    if (frozen) return laneDone();
     navigator.vibrate?.(15);
     laneInput({ kind: 'hold' }, laneBox.press.from);
   }
@@ -1688,6 +1696,8 @@
   }
 
   function editDown(event: PointerEvent, clip: Clip, mode: Edit['mode']) {
+    // Not even choosing its Track while recording.
+    if (frozen) return;
     // Mod+clicking it to gather a Selection leaves the Chosen Track be.
     const toggles = togglesSelection(event);
     if (event.isPrimary && event.button === 0 && !toggles) choose({ kind: 'choose', trackId: trackOf(clip).id });
@@ -1922,7 +1932,7 @@
   }
 
   function startClipRename(clip: Clip) {
-    if (!editable.current || clip.id === recording?.clipId) return;
+    if (!editable.current || frozen) return;
     renamingClip = clip.id;
   }
 
@@ -1968,31 +1978,24 @@
     perform({ kind: 'deleteClip', clipId: clip.id });
   }
 
-  /**
-   * Deletes a Clip with the whole Selection, as one edit, if it's selected,
-   * but never the Clip a Retake is recording into; else the Clip alone.
-   */
+  /** Deletes a Clip with the whole Selection, as one edit, if it's selected; else the Clip alone. */
   function removeWithSelection(clip: Clip) {
     if (selected.has(clip.id)) removeSelection();
     else remove(clip);
   }
 
-  /** Deletes the selected Clips, as one edit, but never the Clip a Retake is recording into. */
+  /** Deletes the selected Clips, as one edit. */
   function removeSelection() {
-    perform({ kind: 'deleteClips', clipIds: deletableSelection() });
-  }
-
-  /** The selected Clips deleting the Selection deletes: all but the one a Retake is recording into. */
-  function deletableSelection(): number[] {
-    return [...selected].filter((id) => id !== recording?.clipId);
+    perform({ kind: 'deleteClips', clipIds: [...selected] });
   }
 
   function clipKey(event: KeyboardEvent, clip: Clip) {
-    if (event.target !== event.currentTarget || !editable.current || clip.id === recording?.clipId) return;
+    if (event.target !== event.currentTarget || !editable.current) return;
     const action = clipAction(event);
+    // While recording, its menu still opens, with its edits off.
     if (action === 'delete') {
       event.preventDefault();
-      removeWithSelection(clip);
+      if (!frozen) removeWithSelection(clip);
     } else if (action === 'menu') {
       event.preventDefault();
       openClipMenu(clip, event.currentTarget as HTMLElement);
@@ -2008,12 +2011,12 @@
   let pressTimer: ReturnType<typeof setTimeout> | undefined;
 
   function clipMenuOpened(clip: Clip) {
-    selected = menuFor(timeline.tracks, selected, clip.id, selectionLocked).selected;
+    selected = menuFor(timeline.tracks, selected, clip.id, frozen).selected;
   }
 
   function clipMenuActions(clip: Clip): MenuAction[] {
-    if (menuFor(timeline.tracks, selected, clip.id, selectionLocked).menu === 'selection') {
-      return selectionActions(deletableSelection().length, { deleteClips: removeSelection });
+    if (menuFor(timeline.tracks, selected, clip.id, frozen).menu === 'selection') {
+      return selectionActions(selected.size, { deleteClips: removeSelection }, frozen);
     }
     const clipId = clip.id;
     return clipActions(
@@ -2023,6 +2026,7 @@
         soundName: clip.soundId === null ? null : sources.of(clip).title,
         nudgeKeys: hints.label(shortcuts.nudgeTake.keys),
         selected: selected.size,
+        recording: frozen,
       },
       {
         retake: () => startRecording(clip),
@@ -2111,7 +2115,7 @@
   }
 
   function loopDown(event: PointerEvent) {
-    if (!editable.current || !event.isPrimary || event.button !== 0 || loopEdit) return;
+    if (!editable.current || frozen || !event.isPrimary || event.button !== 0 || loopEdit) return;
     const edge = (event.target as HTMLElement).dataset.edge as 'start' | 'end' | undefined;
     const current = timeline.loop;
     const t = loopTimeAt(event.clientX);
@@ -2188,7 +2192,7 @@
   }
 
   function switchLoop() {
-    if (!timeline.loop) return;
+    if (!timeline.loop || frozen) return;
     // Switched off by Sync mode and still saving, it's shown off already.
     perform({ kind: 'switchLoop', on: !loopOn });
   }
@@ -2414,19 +2418,19 @@
       type="button"
       class="icon"
       onclick={undo}
-      disabled={!undoable}
+      disabled={!undoable || frozen}
       aria-label="Undo"
       aria-keyshortcuts={hints.aria(shortcuts.undo.keys)}
-      title={hints.withKeys('Undo', shortcuts.undo.keys)}>↶</button
+      title={editHint(frozen, hints.withKeys('Undo', shortcuts.undo.keys))}>↶</button
     >
     <button
       type="button"
       class="icon"
       onclick={redo}
-      disabled={!redoable}
+      disabled={!redoable || frozen}
       aria-label="Redo"
       aria-keyshortcuts={hints.aria(shortcuts.redo.keys)}
-      title={hints.withKeys('Redo', shortcuts.redo.keys)}>↷</button
+      title={editHint(frozen, hints.withKeys('Redo', shortcuts.redo.keys))}>↷</button
     >
   </span>
 {/snippet}
@@ -2513,11 +2517,14 @@
         class="toggle loop-toggle"
         class:edit-only={!timeline.loop}
         aria-pressed={loopOn}
-        disabled={!timeline.loop}
+        disabled={!timeline.loop || frozen}
         onclick={switchLoop}
-        title={timeline.loop
-          ? `Loop ${formatDuration(timeline.loop.start)} to ${formatDuration(timeline.loop.end)}`
-          : 'Drag along the top of the ruler to set a Loop'}>Loop</button
+        title={editHint(
+          frozen,
+          timeline.loop
+            ? `Loop ${formatDuration(timeline.loop.start)} to ${formatDuration(timeline.loop.end)}`
+            : 'Drag along the top of the ruler to set a Loop',
+        )}>Loop</button
       >
       <button
         type="button"
@@ -2597,6 +2604,7 @@
       class="tracks"
       id="timeline-tracks"
       bind:this={tracksElement}
+      class:frozen
       hidden={collapsed}
       style:max-height="{tracksHeight}px"
       onscroll={() => trackDrag.aim()}
@@ -2607,10 +2615,19 @@
             type="button"
             class="button add edit-only"
             onclick={() => (picking = true)}
-            title="Add a Beat to {timeline.tracks.find((t) => t.id === chosen)?.name ?? 'the Chosen Track'}"
-            >+ Beat</button
+            disabled={frozen}
+            title={editHint(
+              frozen,
+              `Add a Beat to ${timeline.tracks.find((t) => t.id === chosen)?.name ?? 'the Chosen Track'}`,
+            )}>+ Beat</button
           >
-          <button type="button" class="button add edit-only" aria-label="Add a Track" onclick={addTrack}>+ Track</button
+          <button
+            type="button"
+            class="button add edit-only"
+            aria-label="Add a Track"
+            onclick={addTrack}
+            disabled={frozen}
+            title={editHint(frozen, undefined)}>+ Track</button
           >
         </div>
         {#each timeline.tracks as track, i (track.id)}
@@ -2654,6 +2671,8 @@
                   type="button"
                   class="name"
                   aria-label="Choose {track.name}"
+                  disabled={frozen}
+                  title={editHint(frozen, undefined)}
                   onclick={() => choose({ kind: 'choose', trackId: track.id })}
                   ondblclick={() => editable.current && (renaming = track.id)}>{naming[track.id] ?? track.name}</button
                 >
@@ -2665,8 +2684,9 @@
                     id="rename-track-{track.id}"
                     class="rename"
                     onclick={() => (renaming = track.id)}
+                    disabled={frozen}
                     aria-label="Rename {track.name}"
-                    title="Rename"
+                    title={editHint(frozen, 'Rename')}
                   >
                     <svg viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M4 20h4L19 9l-4-4L4 16z" />
@@ -2676,25 +2696,28 @@
                   <button
                     type="button"
                     onclick={() => shift(i, -1)}
-                    disabled={i === 0}
+                    disabled={i === 0 || frozen}
                     aria-label="Move {track.name} up"
-                    title="Move up">↑</button
+                    title={editHint(frozen, 'Move up')}>↑</button
                   >
                   <button
                     type="button"
                     onclick={() => shift(i, 1)}
-                    disabled={i === timeline.tracks.length - 1}
+                    disabled={i === timeline.tracks.length - 1 || frozen}
                     aria-label="Move {track.name} down"
-                    title="Move down">↓</button
+                    title={editHint(frozen, 'Move down')}>↓</button
                   >
                   <button
                     type="button"
                     onclick={() => removeTrack(track)}
-                    disabled={lastTrack}
+                    disabled={lastTrack || frozen}
                     aria-label="Delete {track.name} and its Clips"
-                    title={lastTrack
-                      ? "A Song always has a Track, so its last one can't be deleted"
-                      : 'Delete the Track and its Clips'}>×</button
+                    title={editHint(
+                      frozen,
+                      lastTrack
+                        ? "A Song always has a Track, so its last one can't be deleted"
+                        : 'Delete the Track and its Clips',
+                    )}>×</button
                   >
                 </span>
               {/if}
@@ -2748,8 +2771,8 @@
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
               class="loop-bar"
-              class:editable={editable.current}
-              title={editable.current ? 'Drag to set a Loop' : undefined}
+              class:editable={editable.current && !frozen}
+              title={editable.current ? editHint(frozen, 'Drag to set a Loop') : undefined}
               onpointerdown={loopDown}
               onpointermove={loopMove}
               onpointerup={loopUp}
@@ -2764,17 +2787,25 @@
                   style:width={at.width}
                   title="Loop {formatDuration(loop.start)} to {formatDuration(loop.end)}"
                 >
-                  <span class="loop-edge start edit-only" data-edge="start" title="Drag to move the Loop's start"
+                  <span
+                    class="loop-edge start edit-only"
+                    data-edge="start"
+                    title={editHint(frozen, "Drag to move the Loop's start")}
                   ></span>
                   <button
                     type="button"
                     class="loop-clear edit-only"
                     onpointerdown={(e) => e.stopPropagation()}
                     onclick={clearLoop}
+                    disabled={frozen}
                     aria-label="Clear the Loop"
-                    title="Clear the Loop">×</button
+                    title={editHint(frozen, 'Clear the Loop')}>×</button
                   >
-                  <span class="loop-edge end edit-only" data-edge="end" title="Drag to move the Loop's end"></span>
+                  <span
+                    class="loop-edge end edit-only"
+                    data-edge="end"
+                    title={editHint(frozen, "Drag to move the Loop's end")}
+                  ></span>
                 </div>
               {/if}
             </div>
@@ -2833,8 +2864,8 @@
                     role="group"
                     aria-label="{title}{isSelected ? ', selected' : ''}, {extent}"
                     tabindex={editable.current ? 0 : undefined}
-                    aria-keyshortcuts={editable.current && clip.id !== recording?.clipId
-                      ? hints.aria(clipKeys)
+                    aria-keyshortcuts={editable.current
+                      ? hints.aria(frozen ? shortcuts.clipMenu.keys : clipKeys)
                       : undefined}
                     onpointerdown={(e) => editDown(e, clip, 'move')}
                     onkeydown={(e) => clipKey(e, clip)}
@@ -2895,13 +2926,13 @@
                     <span
                       class="trim start edit-only"
                       aria-hidden="true"
-                      title="Drag to trim the start"
+                      title={editHint(frozen, 'Drag to trim the start')}
                       onpointerdown={(e) => editDown(e, clip, 'start')}
                     ></span>
                     <span
                       class="trim end edit-only"
                       aria-hidden="true"
-                      title="Drag to trim the end"
+                      title={editHint(frozen, 'Drag to trim the end')}
                       onpointerdown={(e) => editDown(e, clip, 'end')}
                     ></span>
                   </div>
@@ -3019,13 +3050,19 @@
           type="button"
           class="button"
           onclick={keepUnsaved}
-          disabled={recovering || recording !== null}
-          title="Upload {unsaved.length === 1 ? 'it' : 'them'} where {unsaved.length === 1
-            ? 'it'
-            : 'they'} would have gone, or after the last Clip on the Track if that spot's taken, or on a new Track if theirs is gone"
+          disabled={recovering || frozen}
+          title={frozen
+            ? 'Stop recording to keep or discard them'
+            : `Upload ${unsaved.length === 1 ? 'it' : 'them'} where ${unsaved.length === 1 ? 'it' : 'they'} would have gone, or after the last Clip on the Track if that spot's taken, or on a new Track if theirs is gone`}
           >Keep</button
         >
-        <button type="button" class="button" onclick={discardUnsaved} disabled={recovering}>Discard</button>
+        <button
+          type="button"
+          class="button"
+          onclick={discardUnsaved}
+          disabled={recovering || frozen}
+          title={frozen ? 'Stop recording to keep or discard them' : undefined}>Discard</button
+        >
       </div>
     {/if}
     {#if offerBpm}
@@ -3535,6 +3572,30 @@
   .toggle.loop-toggle:disabled {
     opacity: 0.5;
     cursor: default;
+  }
+  /* While recording, nothing on the Timeline is edited: its Clips stay as
+     they look, but don't take a drag, and the Loop's handles show off. */
+  .frozen .head,
+  .frozen .clip,
+  .frozen .trim {
+    cursor: default;
+  }
+  .frozen .trim:hover {
+    background: none;
+  }
+  .frozen button.name:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+  .frozen .loop-edge {
+    cursor: not-allowed;
+  }
+  .frozen .loop-edge:hover {
+    background: none;
+  }
+  .loop-clear:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   .toggle.record {
     display: inline-flex;

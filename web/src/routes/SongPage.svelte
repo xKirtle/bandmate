@@ -61,6 +61,9 @@
   let loopOn = $state(false);
   // Sync mode and recording are exclusive: neither starts while the other's on.
   let syncing = $state(false);
+  // Whether the Timeline is recording, from pressing Record until the Take
+  // is saved. Meanwhile no Master plays, the Song can't be deleted, leaving
+  // asks first, and changes made elsewhere wait to be shown.
   let recording = $state(false);
   let draft = $state<Draft>(toDraft(null));
   let loadError = $state<string | null>(null);
@@ -228,6 +231,11 @@
   // is marked stale instead.
   function refresh() {
     if (document.visibilityState !== 'visible' || !song || deleting) return;
+    // Not under a recording: the Timeline it's made against stays as it is.
+    if (recording) {
+      refreshAfterRecording = true;
+      return;
+    }
     queue = queue.then(async () => {
       try {
         const latest = await api.getSong(id);
@@ -250,6 +258,14 @@
       }
     });
   }
+
+  // Coming back to the tab while recording, the refresh waits until the Take's saved.
+  let refreshAfterRecording = false;
+  $effect(() => {
+    if (recording || !refreshAfterRecording) return;
+    refreshAfterRecording = false;
+    refresh();
+  });
 
   // Set while reloading on purpose, so leaving doesn't ask again.
   let reloading = false;
@@ -358,13 +374,13 @@
     );
   }
 
-  // Closing or reloading the tab can't wait for a save, so ask first.
+  // Closing or reloading the tab can't wait for a save, or a recording, so ask first.
   function warnBeforeUnload(event: BeforeUnloadEvent) {
-    if (!reloading && hasUnsavedEdits()) event.preventDefault();
+    if (!reloading && (recording || hasUnsavedEdits())) event.preventDefault();
   }
 
   async function remove() {
-    if (!song) return;
+    if (!song || recording) return;
     const ok = confirm(`Delete “${song.title}”?\n\nThis removes the Song and everything in it. It can't be undone.`);
     if (!ok) return;
     deleting = true;
@@ -604,7 +620,7 @@
           >
             {#if part === 'masters'}
               <summary>{song.masters.length > 1 ? 'Masters' : 'Master'}</summary>
-              <Masters {song} {mode} change={send} onUnsaved={setUnsaved} {setStatus} />
+              <Masters {song} {mode} change={send} onUnsaved={setUnsaved} {setStatus} {recording} />
             {:else}
               <summary>Scrapbook</summary>
               <Scrapbook {song} change={send} {drag} onUnsaved={setUnsaved} onEditing={() => (syncing = false)} />
@@ -616,7 +632,13 @@
       <!-- Last in the markup so it's reached last, though desktop shows it
            beside the title. -->
       {#if writing}
-        <button type="button" class="button danger delete" onclick={remove} disabled={deleting}>
+        <button
+          type="button"
+          class="button danger delete"
+          onclick={remove}
+          disabled={deleting || recording}
+          title={recording ? 'Stop recording to delete' : undefined}
+        >
           {deleting ? 'Deleting…' : 'Delete Song'}
         </button>
       {/if}

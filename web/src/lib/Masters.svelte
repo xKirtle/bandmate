@@ -12,6 +12,7 @@
     change,
     onUnsaved,
     setStatus,
+    recording = false,
   }: {
     song: Song;
     /** The Song page's mode: in Read mode the Masters only play. */
@@ -21,6 +22,8 @@
     onUnsaved: (editor: object, unsaved: boolean) => void;
     /** Changes the Song's Status, as its own Status control would. */
     setStatus: (status: Status) => void;
+    /** Whether the Timeline is recording, which no Master plays over. */
+    recording?: boolean;
   } = $props();
 
   let maxUploadBytes = $state(Infinity);
@@ -173,7 +176,12 @@
         </div>
       {/if}
 
-      <AudioPlayer src={api.masterAudioUrl(song.id, m.id)} duration={m.duration} peaks={peaks[m.id] ?? []} />
+      <AudioPlayer
+        src={api.masterAudioUrl(song.id, m.id)}
+        duration={m.duration}
+        peaks={peaks[m.id] ?? []}
+        cantPlay={recording ? 'Stop recording to play' : null}
+      />
 
       {#if writing}
         <label class="notes">

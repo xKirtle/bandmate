@@ -46,6 +46,14 @@ group('transportActions', () => {
     ]);
   });
 
+  it('says to stop recording on each while recording', () => {
+    expect(transportActions({ ...idle, recording: true }, run).map((a) => a.title)).toEqual([
+      'Stop recording to import audio',
+      'Stop recording to mix down',
+      'Stop recording to change the recording settings',
+    ]);
+  });
+
   it('disables Mix down… while the Timeline has no Clips, saying why', () => {
     const mixDown = transportActions({ ...idle, hasClips: false }, run)[1];
     expect(mixDown).toMatchObject({ label: 'Mix down…', disabled: true });
