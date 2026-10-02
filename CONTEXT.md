@@ -86,7 +86,7 @@ A named lane on the Timeline (e.g. "Beat", "Lead vox", "Adlibs") holding Clips, 
 _Avoid_: Channel, layer
 
 **Chosen Track**:
-The Track a recording, or a Beat or Sound being added, goes to. Exactly one Track is always chosen.
+The Track a recording, a Beat or Sound being added, or a paste goes to. Exactly one Track is always chosen: clicking a Track's header, a Clip on it, or empty space along it chooses it.
 _Avoid_: Selected track (selecting is for Clips), armed track
 
 **Beat**:
