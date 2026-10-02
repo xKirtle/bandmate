@@ -224,6 +224,13 @@ group('clipboardAction', () => {
     expect(clipboardAction(press('v', { metaKey: true }))).toBe('paste');
   });
 
+  it('cuts on Ctrl+X or ⌘X', () => {
+    expect(clipboardAction(press('x', { ctrlKey: true }))).toBe('cut');
+    expect(clipboardAction(press('X', { metaKey: true }))).toBe('cut');
+    expect(clipboardAction(press('x'))).toBeNull();
+    expect(clipboardAction(press('x', { ctrlKey: true, shiftKey: true }))).toBeNull();
+  });
+
   it('takes them only with Mod alone, leaving other keys alone', () => {
     expect(clipboardAction(press('c'))).toBeNull();
     expect(clipboardAction(press('v', { ctrlKey: true, shiftKey: true }))).toBeNull();

@@ -1,8 +1,8 @@
-// The Clipboard: the Clips last copied from the Selection, as they were
-// then, to paste elsewhere on the same Song's Timeline. It holds copies of
-// what each Clip was, so later changes to the Clips copied, or deleting
-// them, never change it, and a paste makes new Clips from it, so it can be
-// pasted again and again. Like the Selection, it isn't an edit, and it's
+// The Clipboard: the Clips last copied or cut from the Selection, as they
+// were then, to paste elsewhere on the same Song's Timeline. It holds
+// copies of what each Clip was, so later changes to the Clips copied, or
+// deleting them, never change it, and a paste makes new Clips from it, so
+// it can be pasted again and again. Like the Selection, it isn't an edit, and it's
 // never kept: it lives in the page while the Song is open, so leaving the
 // Song drops it. The system clipboard is never touched.
 

@@ -161,6 +161,37 @@ describe('paste', () => {
     });
   });
 
+  it('pastes a Clip of Takes once it’s deleted, as a cut leaves it, with its Takes as they were in it', () => {
+    const hook = clip(6, 20, 3, {
+      beatId: null,
+      name: 'Hook',
+      takes: [take(60, 0, 0), take(61, 0.5, -0.25)],
+      activeTakeId: 61,
+      offset: 0.5,
+    });
+    const clipboard = copy([track(1, [hook])], new Set([6]))!;
+
+    expect(paste(clipboard, [track(1)], 4, 1)).toEqual({
+      newTracks: [],
+      clips: [
+        {
+          trackId: 1,
+          clip: {
+            name: 'Hook',
+            takes: [
+              { id: 60, position: 0, nudge: 0 },
+              { id: 61, position: 0.5, nudge: -0.25 },
+            ],
+            activeTakeId: 61,
+            start: 4,
+            offset: 0.5,
+            length: 3,
+          },
+        },
+      ],
+    });
+  });
+
   it('pastes nothing onto a Track that isn’t there', () => {
     const clipboard = copy([track(1, [clip(5, 0)])], new Set([5]))!;
 

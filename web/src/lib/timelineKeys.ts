@@ -32,9 +32,13 @@ export function selectsAll(e: KeyPress): boolean {
   return matches(e, shortcuts.selectAll.keys);
 }
 
-/** What a key press does with the Clipboard: copy the Selection to it (Mod+C), paste it (Mod+V), or nothing. */
-export function clipboardAction(e: KeyPress): 'copy' | 'paste' | null {
+/**
+ * What a key press does with the Clipboard: copy the Selection to it
+ * (Mod+C), cut the Selection to it (Mod+X), paste it (Mod+V), or nothing.
+ */
+export function clipboardAction(e: KeyPress): 'copy' | 'cut' | 'paste' | null {
   if (matches(e, shortcuts.copyClips.keys)) return 'copy';
+  if (matches(e, shortcuts.cutClips.keys)) return 'cut';
   return matches(e, shortcuts.pasteClips.keys) ? 'paste' : null;
 }
 

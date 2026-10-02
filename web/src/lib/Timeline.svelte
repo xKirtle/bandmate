@@ -1491,14 +1491,24 @@
   }
   onDestroy(laneDone);
 
-  // The Clipboard: the Clips last copied from the Selection, as they were
-  // then. Like the Selection, it's never kept, so leaving the Song drops it,
-  // and undo and redo never change it.
+  // The Clipboard: the Clips last copied or cut from the Selection, as they
+  // were then. Like the Selection, it's never kept, so leaving the Song
+  // drops it, and undo and redo never change it.
   let clipboard = $state.raw<Clipboard>(emptyClipboard);
 
   /** Copies the Selection to the Clipboard; with none, the Clipboard stays as it was. */
   function copySelection() {
     clipboard = copy(timeline.tracks, selected) ?? clipboard;
+  }
+
+  /**
+   * Cuts the Selection: copies it to the Clipboard, then deletes it, as one
+   * edit to undo, which leaves the Clipboard as it is. A cut Clip of Takes
+   * pastes from its Takes, which deleting only detaches.
+   */
+  function cutSelection() {
+    copySelection();
+    removeSelection();
   }
 
   /**
@@ -1517,10 +1527,10 @@
   }
 
   // Esc clears the Selection while focus is in the Timeline, Mod+A
-  // selects every Clip, and Mod+C and Mod+V copy and paste, but not in a
-  // text field, a menu or a dialog, whose keys are their own, nor while a
-  // Track is dragged, which Esc cancels. Copying and pasting only go with
-  // editing, so not on a phone, nor while recording.
+  // selects every Clip, and Mod+C, Mod+X and Mod+V copy, cut and paste, but
+  // not in a text field, a menu or a dialog, whose keys are their own, nor
+  // while a Track is dragged, which Esc cancels. Copying, cutting and
+  // pasting only go with editing, so not on a phone, nor while recording.
   function timelineKey(event: KeyboardEvent) {
     if (event.defaultPrevented || trackDrag.current) return;
     if (inTextField(event.target) || inMenuOrDialog(event.target)) return;
@@ -1534,6 +1544,9 @@
     } else if (clipboardKey === 'copy' && selected.size > 0 && editable.current && !frozen) {
       event.preventDefault();
       copySelection();
+    } else if (clipboardKey === 'cut' && selected.size > 0 && editable.current && !frozen) {
+      event.preventDefault();
+      cutSelection();
     } else if (clipboardKey === 'paste' && editable.current && !frozen) {
       event.preventDefault();
       pasteClipboard();
