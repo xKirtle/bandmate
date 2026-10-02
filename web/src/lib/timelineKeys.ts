@@ -27,6 +27,16 @@ export function clearsSelection(e: KeyPress): boolean {
   return matches(e, shortcuts.clearSelection.keys);
 }
 
+/** Whether a key press selects every Clip: Mod+A. */
+export function selectsAll(e: KeyPress): boolean {
+  return matches(e, shortcuts.selectAll.keys);
+}
+
+/** Whether a box drawn over empty lane space with these modifiers adds the Clips it touches to the Selection, rather than replacing it. */
+export function addsBox(e: Modifiers): boolean {
+  return matches(mouse('drag', e), shortcuts.addBox.keys);
+}
+
 /** Whether a Clip clicked with these modifiers is added to the Selection or taken out, rather than selected alone. */
 export function togglesSelection(e: Modifiers): boolean {
   return matches(mouse('click', e), shortcuts.toggleClip.keys);

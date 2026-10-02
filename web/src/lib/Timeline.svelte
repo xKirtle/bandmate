@@ -62,11 +62,13 @@
   import { clipActions } from './clipMenu';
   import { noSelection, selection, type Selection, type SelectionGesture } from './selection';
   import {
+    addsBox,
     clearsSelection,
     clipAction,
     isModifier,
     nudges,
     rulerSeek,
+    selectsAll,
     skipsSnapping,
     startOrEnd,
     togglesSelection,
@@ -1304,44 +1306,110 @@
     untrack(() => (selected = selection(tracks, selected)));
   });
 
-  // A press on empty lane space that's let go without moving past the slop
-  // is a click there, which clears the Selection.
-  let lanePress: { from: Point; moved: boolean } | null = null;
+  // Dragging from empty lane space draws a box, and the Clips it touches
+  // on the Tracks it spans become the Selection as it's drawn, or, with
+  // Mod held as it's pressed, are added to it. It leaves the Chosen Track
+  // be, and scrolls the lanes along near their edges, as a Clip dragged
+  // does. A press let go without moving past the slop is a click there
+  // instead, which clears the Selection, unless Mod is held: that was
+  // likely the start of a box to add, so the Selection is left be.
+  interface LanePress {
+    from: Point;
+    moved: boolean;
+    /** Whether Mod was held as it was pressed, so the box adds to the Selection. */
+    adds: boolean;
+    /** The Selection as it was pressed, which the box replaces or adds to. */
+    before: Selection;
+    /** Where it was pressed, in seconds: the box's start. */
+    start: number;
+    /** The index of the Track whose lane was pressed. */
+    trackIndex: number;
+    /** How far down the lanes it was pressed, in pixels. */
+    top: number;
+  }
+  let lanePress: LanePress | null = null;
+  /** The box being drawn, in seconds across and pixels down the lanes, once the press has moved past the slop. */
+  let box = $state<{ start: number; end: number; top: number; bottom: number } | null>(null);
+
+  /** How far a point is down the lanes, in pixels. */
+  function yIn(clientY: number): number {
+    return clientY - lanesElement!.getBoundingClientRect().top;
+  }
+
+  /** The index of the Track whose lane is nearest to a height on the page. */
+  function trackIndexAt(clientY: number): number {
+    const id = trackAt(clientY);
+    return timeline.tracks.findIndex((t) => t.id === id);
+  }
 
   function laneDown(event: PointerEvent) {
     if (event.target !== event.currentTarget || !editable.current || !event.isPrimary || event.button !== 0) return;
-    lanePress = { from: { clientX: event.clientX, clientY: event.clientY }, moved: false };
+    // Not selecting the page's text as it's drawn. Focus goes to the lanes,
+    // so the Timeline's keys, e.g. Esc and Mod+A, work after it.
+    event.preventDefault();
+    lanesElement!.focus({ preventScroll: true });
+    lanePress = {
+      from: { clientX: event.clientX, clientY: event.clientY },
+      moved: false,
+      adds: addsBox(event),
+      before: selected,
+      start: spanTimeAt(event.clientX),
+      trackIndex: trackIndexAt(event.clientY),
+      top: yIn(event.clientY),
+    };
     window.addEventListener('pointermove', laneMove);
     window.addEventListener('pointerup', laneUp);
-    window.addEventListener('pointercancel', laneDone);
+    window.addEventListener('pointercancel', laneCancel);
   }
 
-  function laneMove(event: PointerEvent) {
-    if (lanePress && pastSlop(lanePress.from, event)) lanePress.moved = true;
+  function laneMove(event: Point) {
+    if (!lanePress) return;
+    // A small wobble while clicking isn't a box.
+    if (!lanePress.moved && !pastSlop(lanePress.from, event)) return;
+    lanePress.moved = true;
+    const { start, trackIndex, top, adds, before } = lanePress;
+    const end = spanTimeAt(event.clientX);
+    box = { start, end, top, bottom: yIn(event.clientY) };
+    const tracks = [trackIndex, trackIndexAt(event.clientY)] as const;
+    selected = selection(timeline.tracks, before, { kind: 'box', start, end, tracks, adds });
+    dragAt(event, laneMove);
   }
 
   function laneUp(event: PointerEvent) {
     laneMove(event);
-    if (lanePress && !lanePress.moved) select({ kind: 'clear' });
+    if (lanePress && !lanePress.moved) select({ kind: 'emptyClick', adds: lanePress.adds });
+    laneDone();
+  }
+
+  // A box given up, e.g. for a pinch or a scroll on touch, selects nothing.
+  function laneCancel() {
+    if (lanePress?.moved) selected = selection(timeline.tracks, lanePress.before);
     laneDone();
   }
 
   function laneDone() {
     lanePress = null;
+    box = null;
+    dragDone();
     window.removeEventListener('pointermove', laneMove);
     window.removeEventListener('pointerup', laneUp);
-    window.removeEventListener('pointercancel', laneDone);
+    window.removeEventListener('pointercancel', laneCancel);
   }
   onDestroy(laneDone);
 
-  // Esc clears the Selection while focus is in the Timeline, but not in a
-  // text field, a menu or a dialog, whose Esc is their own, nor while a
-  // Track is dragged, which Esc cancels.
+  // Esc clears the Selection while focus is in the Timeline, and Mod+A
+  // selects every Clip, but not in a text field, a menu or a dialog, whose
+  // keys are their own, nor while a Track is dragged, which Esc cancels.
   function timelineKey(event: KeyboardEvent) {
-    if (event.defaultPrevented || !clearsSelection(event) || selected.size === 0 || trackDrag.current) return;
+    if (event.defaultPrevented || trackDrag.current) return;
     if (inTextField(event.target) || inMenuOrDialog(event.target)) return;
-    event.preventDefault();
-    select({ kind: 'clear' });
+    if (clearsSelection(event) && selected.size > 0) {
+      event.preventDefault();
+      select({ kind: 'clear' });
+    } else if (selectsAll(event) && editable.current) {
+      event.preventDefault();
+      select({ kind: 'all' });
+    }
   }
 
   // Editing a Clip: dragging its body moves it, along its Track or onto
@@ -2483,6 +2551,7 @@
         <div
           class="lanes"
           bind:this={lanesElement}
+          tabindex="-1"
           bind:clientWidth={width}
           bind:offsetHeight={lanesHeight}
           onscroll={scrolled}
@@ -2696,6 +2765,17 @@
             {#if loop?.on}
               {@const at = spanStyle(loop.start, loop.end)}
               <span class="loop-shade" style:left={at.left} style:width={at.width} aria-hidden="true"></span>
+            {/if}
+            {#if box}
+              {@const at = spanStyle(Math.max(0, Math.min(box.start, box.end)), Math.max(box.start, box.end))}
+              <span
+                class="box"
+                style:left={at.left}
+                style:width={at.width}
+                style:top="{Math.min(box.top, box.bottom)}px"
+                style:height="{Math.abs(box.bottom - box.top)}px"
+                aria-hidden="true"
+              ></span>
             {/if}
             {#if guide}
               <span
@@ -3142,6 +3222,10 @@
     /* Pinching zooms the Timeline, not the page. */
     touch-action: pan-x pan-y;
   }
+  /* Focused by a press on empty lane space, for the Timeline's keys, but not a tab stop. */
+  .lanes:focus {
+    outline: none;
+  }
   .lanes::-webkit-scrollbar {
     display: none;
   }
@@ -3471,6 +3555,14 @@
   rect.clipped {
     fill: var(--danger);
     opacity: 1;
+  }
+  /* The box being drawn over empty lane space, selecting the Clips it touches. */
+  .box {
+    position: absolute;
+    z-index: 2;
+    border: 1px solid var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    pointer-events: none;
   }
   /* What a moved or trimmed Clip, or the Loop being set, is snapped to, through the lanes aligned there, and up through the ruler for a Loop edge or the Loop. */
   .snap-guide {
