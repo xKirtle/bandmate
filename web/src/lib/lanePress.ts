@@ -1,0 +1,76 @@
+// Telling a press on empty lane space apart: a click, a box drawn over
+// the Clips to select, or, for a finger, the start of a pan.
+import { pastSlop, type Point } from './press';
+
+/** A press on empty lane space, from where it went down. */
+export interface LanePress {
+  from: Point;
+  /** Whether a finger is pressing, rather than a mouse or pen. */
+  touch: boolean;
+  /**
+   * `pressed`: a mouse or pen, not yet moved past the slop.
+   * `holding`: a finger, held still for the long press.
+   * `boxing`: drawing a box.
+   */
+  phase: 'pressed' | 'holding' | 'boxing';
+  /**
+   * Whether it's moved past the slop. A mouse or pen has by the time it
+   * draws a box; a finger's box, drawn once held, let go before then is a
+   * click.
+   */
+  dragged: boolean;
+}
+
+/** Something the pointer pressing did. */
+export type LaneInput =
+  /** It moved to `at`. */
+  | { kind: 'move'; at: Point }
+  /** A finger was held still for the long press. */
+  | { kind: 'hold' }
+  /** It lifted. */
+  | { kind: 'lift' }
+  /** It was cancelled, e.g. by the browser. */
+  | { kind: 'cancel' };
+
+/**
+ * What to do after an input: `wait` for more; draw the `box` to where
+ * the pointer is, selecting what it touches; or, the press over, treat
+ * it as a `click` on empty lane space, `keep` the box's Selection,
+ * `restore` the Selection from before the press, or `giveUp`, leaving
+ * the Selection be.
+ */
+export type LaneOutcome = 'wait' | 'box' | 'click' | 'keep' | 'restore' | 'giveUp';
+
+/** A press on empty lane space, by a finger or else a mouse or pen. */
+export function pressLane(from: Point, touch: boolean): LanePress {
+  return {
+    from: { clientX: from.clientX, clientY: from.clientY },
+    touch,
+    phase: touch ? 'holding' : 'pressed',
+    dragged: false,
+  };
+}
+
+/** The press after an input, or null once it's over, and what to do. */
+export function laneStep(press: LanePress, input: LaneInput): { press: LanePress | null; outcome: LaneOutcome } {
+  const boxing = press.phase === 'boxing';
+  switch (input.kind) {
+    case 'move': {
+      // A small wobble while clicking or holding still isn't a drag.
+      const dragged = press.dragged || pastSlop(press.from, input.at);
+      if (boxing) return { press: dragged === press.dragged ? press : { ...press, dragged }, outcome: 'box' };
+      if (!dragged) return { press, outcome: 'wait' };
+      // A finger moving before the hold pans the Timeline instead.
+      if (press.phase === 'holding') return { press: null, outcome: 'giveUp' };
+      return { press: { ...press, phase: 'boxing', dragged }, outcome: 'box' };
+    }
+    case 'hold':
+      // The box appears under the finger, from where it was pressed.
+      if (press.phase !== 'holding') return { press, outcome: 'wait' };
+      return { press: { ...press, phase: 'boxing' }, outcome: 'box' };
+    case 'lift':
+      return { press: null, outcome: boxing && press.dragged ? 'keep' : 'click' };
+    case 'cancel':
+      return { press: null, outcome: boxing ? 'restore' : 'giveUp' };
+  }
+}

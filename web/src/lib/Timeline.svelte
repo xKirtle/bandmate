@@ -53,6 +53,7 @@
   import type { MenuAction } from './menu';
   import { peaks as peaksOf, peaksPerSecond } from './peaks';
   import { keyActedOnPage } from './pointerFocus';
+  import { laneStep, pressLane, type LaneInput, type LanePress } from './lanePress';
   import { longPressDelay, pastSlop, type Point } from './press';
   import { recordingPlan, retakeLength, retakePlan, sungPastStart, type RecordingPlan } from './recording';
   import { recoveredPlacement, takesAt, type TakeTarget, type Unsaved } from './recovery';
@@ -1330,9 +1331,13 @@
   // does. A press let go without moving past the slop is a click there
   // instead, which clears the Selection, unless Mod is held: that was
   // likely the start of a box to add, so the Selection is left be.
-  interface LanePress {
-    from: Point;
-    moved: boolean;
+  // A finger dragging pans the lanes instead: it draws a box only once
+  // held still for a long press, and that box always replaces the
+  // Selection. A second finger, e.g. pinching, gives the box up.
+  interface LaneBox {
+    /** The press, telling a click, a box and a pan apart. */
+    press: LanePress;
+    pointerId: number;
     /** Whether Mod was held as it was pressed, so the box adds to the Selection. */
     adds: boolean;
     /** The Selection as it was pressed, which the box replaces or adds to. */
@@ -1344,9 +1349,11 @@
     /** How far down the lanes it was pressed, in pixels. */
     top: number;
   }
-  let lanePress: LanePress | null = null;
-  /** The box being drawn, in seconds across and pixels down the lanes, once the press has moved past the slop. */
+  let laneBox: LaneBox | null = null;
+  /** The box being drawn, in seconds across and pixels down the lanes, once the press has moved past the slop or a finger's been held. */
   let box = $state<{ start: number; end: number; top: number; bottom: number } | null>(null);
+  /** Waiting for a finger on empty lane space to be held still long enough to draw a box. */
+  let laneTimer: ReturnType<typeof setTimeout> | undefined;
 
   /** How far a point is down the lanes, in pixels. */
   function yIn(clientY: number): number {
@@ -1359,57 +1366,112 @@
     return timeline.tracks.findIndex((t) => t.id === id);
   }
 
+  /** Whether a finger is drawing a box, so the lanes mustn't pan under it. */
+  function touchBoxing(): boolean {
+    return laneBox?.press.touch === true && laneBox.press.phase === 'boxing';
+  }
+
   function laneDown(event: PointerEvent) {
     if (event.target !== event.currentTarget || !editable.current || !event.isPrimary || event.button !== 0) return;
     // Not selecting the page's text as it's drawn. Focus goes to the lanes,
     // so the Timeline's keys, e.g. Esc and Mod+A, work after it.
     event.preventDefault();
     lanesElement!.focus({ preventScroll: true });
-    lanePress = {
-      from: { clientX: event.clientX, clientY: event.clientY },
-      moved: false,
-      adds: addsBox(event),
+    const touch = event.pointerType === 'touch';
+    laneBox = {
+      press: pressLane(event, touch),
+      pointerId: event.pointerId,
+      adds: !touch && addsBox(event),
       before: selected,
       start: spanTimeAt(event.clientX),
       trackIndex: trackIndexAt(event.clientY),
       top: yIn(event.clientY),
     };
+    if (laneBox.press.phase === 'holding') laneTimer = setTimeout(laneHold, longPressDelay);
+    window.addEventListener('pointerdown', laneOtherDown);
     window.addEventListener('pointermove', laneMove);
     window.addEventListener('pointerup', laneUp);
     window.addEventListener('pointercancel', laneCancel);
   }
 
-  function laneMove(event: Point) {
-    if (!lanePress) return;
-    // A small wobble while clicking isn't a box.
-    if (!lanePress.moved && !pastSlop(lanePress.from, event)) return;
-    lanePress.moved = true;
-    const { start, trackIndex, top, adds, before } = lanePress;
-    const end = spanTimeAt(event.clientX);
-    box = { start, end, top, bottom: yIn(event.clientY) };
-    const tracks = [trackIndex, trackIndexAt(event.clientY)] as const;
+  /** Steps the press on, drawing the box to `at` or ending the press as it says. */
+  function laneInput(input: LaneInput, at: Point) {
+    if (!laneBox) return;
+    const { press, outcome } = laneStep(laneBox.press, input);
+    if (press) laneBox.press = press;
+    switch (outcome) {
+      case 'wait':
+        return;
+      case 'box':
+        drawBox(laneBox, at);
+        return;
+      case 'click':
+        select({ kind: 'emptyClick', adds: laneBox.adds });
+        break;
+      case 'restore':
+        selected = selection(timeline.tracks, laneBox.before);
+        break;
+      case 'keep':
+      case 'giveUp':
+        break;
+    }
+    laneDone();
+  }
+
+  function drawBox({ start, trackIndex, top, adds, before }: LaneBox, at: Point) {
+    const end = spanTimeAt(at.clientX);
+    box = { start, end, top, bottom: yIn(at.clientY) };
+    const tracks = [trackIndex, trackIndexAt(at.clientY)] as const;
     selected = selectionLocked
       ? selection(timeline.tracks, selected)
       : selection(timeline.tracks, before, { kind: 'box', start, end, tracks, adds });
-    dragAt(event, laneMove);
+    dragAt(at, laneMove);
+  }
+
+  // Held still, a finger draws a box from under it, with a buzz where the
+  // device has one. Not while recording, when the Selection is locked.
+  function laneHold() {
+    if (!laneBox) return;
+    if (selectionLocked) return laneDone();
+    navigator.vibrate?.(15);
+    laneInput({ kind: 'hold' }, laneBox.press.from);
+  }
+
+  function laneMove(event: Point) {
+    if ('pointerId' in event && event.pointerId !== laneBox?.pointerId) return;
+    laneInput({ kind: 'move', at: event }, event);
   }
 
   function laneUp(event: PointerEvent) {
+    if (event.pointerId !== laneBox?.pointerId) return;
     laneMove(event);
-    if (lanePress && !lanePress.moved) select({ kind: 'emptyClick', adds: lanePress.adds });
-    laneDone();
+    laneInput({ kind: 'lift' }, event);
   }
 
-  // A box given up, e.g. for a pinch or a scroll on touch, selects nothing.
-  function laneCancel() {
-    if (lanePress?.moved) selected = selection(timeline.tracks, lanePress.before);
-    laneDone();
+  // A box given up, e.g. for a pinch or a scroll on touch, selects what was
+  // selected before it.
+  function laneCancel(event: PointerEvent) {
+    if (event.pointerId !== laneBox?.pointerId) return;
+    laneInput({ kind: 'cancel' }, event);
+  }
+
+  // A second finger landing, e.g. to pinch, gives a finger's box up.
+  function laneOtherDown(event: PointerEvent) {
+    if (!laneBox?.press.touch || event.pointerId === laneBox.pointerId) return;
+    laneInput({ kind: 'cancel' }, event);
+  }
+
+  // A finger's long press opens no menu of the browser's on empty lane space.
+  function laneContextMenu(event: MouseEvent) {
+    if (laneBox?.press.touch) event.preventDefault();
   }
 
   function laneDone() {
-    lanePress = null;
+    laneBox = null;
     box = null;
+    clearTimeout(laneTimer);
     dragDone();
+    window.removeEventListener('pointerdown', laneOtherDown);
     window.removeEventListener('pointermove', laneMove);
     window.removeEventListener('pointerup', laneUp);
     window.removeEventListener('pointercancel', laneCancel);
@@ -2287,6 +2349,8 @@
       loopCancel();
     };
     const touchMove = (event: TouchEvent) => {
+      // A finger drawing a box draws it, rather than panning the lanes.
+      if (touchBoxing()) event.preventDefault();
       if (!pinch || event.touches.length !== 2) return;
       event.preventDefault();
       const now = pinchOf(event);
@@ -2746,6 +2810,7 @@
                 class:drop-below={trackGap === shown.length && t === shown.length - 1}
                 bind:this={laneElements[t]}
                 onpointerdown={laneDown}
+                oncontextmenu={laneContextMenu}
               >
                 {#each placed as { clip, at, editing } (clip.id)}
                   {@const wave = waveWindow(view, at.start, at.length)}
@@ -3547,6 +3612,9 @@
     position: relative;
     height: var(--track-height);
     border-bottom: 1px solid var(--border);
+    /* A long press draws a box, not the browser's text selection or callout. */
+    user-select: none;
+    -webkit-touch-callout: none;
   }
   .clip {
     position: absolute;
