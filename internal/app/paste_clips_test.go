@@ -1,0 +1,134 @@
+package app_test
+
+import (
+	"bytes"
+	"net/http"
+	"reflect"
+	"testing"
+)
+
+// A paste makes new Clips from the Clipboard, which holds Clips as they
+// were when copied: the browser keeps it, and sends each Clip as it was,
+// with where it's to go.
+
+// pasteClips sends a request to paste Clips, each a Track id and the Clip
+// as it was copied.
+func (ts *testServer) pasteClips(songID int64, clips ...map[string]any) response {
+	ts.t.Helper()
+	return ts.Do(http.MethodPost, timelinePath(songID)+"/clips/paste", map[string]any{"clips": clips})
+}
+
+func TestAPastedClipOfTakesGetsCopiesOfTheTakesAsTheyWereCopied(t *testing.T) {
+	ts := newTestServer(t)
+	r := recordATake(t, ts)
+	// The Clip as copied, before its Take is nudged since.
+	copied := map[string]any{"trackId": r.vox.ID, "name": "Hook",
+		"takes":        []map[string]any{{"id": r.take.ID, "position": r.take.Position, "nudge": 0.25}},
+		"activeTakeId": r.take.ID, "start": 10, "offset": 0.5, "length": 3}
+	timelineChange(t, ts.nudgeTake(r.song.ID, r.clip.ID, r.take.ID, -0.1))
+	before := ts.getTimeline(r.song.ID)
+
+	got := timelineChange(t, ts.pasteClips(r.song.ID, copied))
+
+	clips := got.Tracks[1].Clips
+	if len(clips) != 2 || clips[1].Start != 10 || clips[1].Offset != 0.5 || clips[1].Length != 3 ||
+		nameOf(clips[1]) != "Hook" {
+		t.Fatalf("clips = %+v, want a new Clip named Hook at 0:10", clips)
+	}
+	takes := clips[1].Takes
+	if len(takes) != 1 || takes[0].ID == r.take.ID || *clips[1].ActiveTakeID != takes[0].ID {
+		t.Fatalf("takes = %+v, want a copy of the Take, active", takes)
+	}
+	if want := (take{ID: takes[0].ID, Number: 1, Size: r.take.Size, Duration: 4, SampleRate: wavRate,
+		Position: r.take.Position, Nudge: 0.25, RecordedAt: r.take.RecordedAt}); !reflect.DeepEqual(takes[0], want) {
+		t.Errorf("copy = %+v, want %+v", takes[0], want)
+	}
+	if !reflect.DeepEqual(got.Tracks[1].Clips[0], before.Tracks[1].Clips[0]) {
+		t.Errorf("original = %+v, want it unchanged: %+v", got.Tracks[1].Clips[0], before.Tracks[1].Clips[0])
+	}
+	served := ts.Do(http.MethodGet, takePath(r.song.ID, takes[0].ID)+"/audio", nil)
+	if !bytes.Equal(served.Body, r.audio) {
+		t.Errorf("the copy's audio differs from the recording")
+	}
+	if got.Version != before.Version+1 {
+		t.Errorf("version = %d, want one more than %d", got.Version, before.Version)
+	}
+}
+
+func TestAClipOfTakesStillPastesOnceItsClipIsDeleted(t *testing.T) {
+	ts := newTestServer(t)
+	r := recordATake(t, ts)
+	timelineChange(t, ts.deleteClip(r.song.ID, r.clip.ID))
+
+	got := timelineChange(t, ts.pasteClips(r.song.ID, map[string]any{"trackId": r.vox.ID,
+		"takes":        []map[string]any{{"id": r.take.ID, "position": r.take.Position, "nudge": 0}},
+		"activeTakeId": r.take.ID, "start": 2, "offset": 0.5, "length": 3}))
+
+	clips := got.Tracks[1].Clips
+	if len(clips) != 1 || len(clips[0].Takes) != 1 || clips[0].Takes[0].ID == r.take.ID {
+		t.Fatalf("clips = %+v, want one Clip with a copy of the Take", clips)
+	}
+	// The Take copied stays detached, so undoing the delete still works.
+	back := timelineChange(t, ts.placeTakes(r.song.ID, r.vox.ID, []int64{r.take.ID}, r.take.ID, 10, 0.5, 3))
+	if len(back.Tracks[1].Clips) != 2 {
+		t.Errorf("clips = %+v, want the deleted Clip back beside the paste", back.Tracks[1].Clips)
+	}
+}
+
+func TestClipsOfBeatsAndSoundsPasteAsCopied(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+	tl := timelineChange(t, ts.importSound(p.song.ID, soundFile("hum.m4a", "Hum", p.tl.Tracks[0].ID, 8)))
+	hum := tl.Tracks[0].Clips[2]
+	adlibs := tl.Tracks[1].ID
+
+	got := timelineChange(t, ts.pasteClips(p.song.ID,
+		map[string]any{"trackId": adlibs, "beatId": p.short.ID, "name": "Intro", "start": 0, "offset": 2, "length": 5},
+		map[string]any{"trackId": adlibs, "soundId": *hum.SoundID, "start": 5, "offset": 0, "length": 8}))
+
+	clips := got.Tracks[1].Clips
+	if len(clips) != 2 || clips[0].BeatID != p.short.ID || nameOf(clips[0]) != "Intro" || clips[0].Offset != 2 ||
+		clips[0].Length != 5 || clips[1].SoundID == nil || *clips[1].SoundID != *hum.SoundID || clips[1].Start != 5 {
+		t.Errorf("adlibs clips = %+v, want the Beat's Clip named Intro, then the Sound's", clips)
+	}
+}
+
+func TestAPasteIsRefusedWhole(t *testing.T) {
+	ts := newTestServer(t)
+	r := recordATake(t, ts)
+	other := recordATake(t, ts)
+	before := ts.getTimeline(r.song.ID)
+	takes := func(id int64, start float64) map[string]any {
+		return map[string]any{"trackId": r.vox.ID, "takes": []map[string]any{{"id": id, "position": 0, "nudge": 0}},
+			"activeTakeId": id, "start": start, "offset": 0.5, "length": 3}
+	}
+
+	for name, c := range map[string]struct {
+		clips  []map[string]any
+		status int
+		msg    string
+	}{
+		"onto a Clip there": {[]map[string]any{takes(r.take.ID, 20), takes(r.take.ID, 3)},
+			http.StatusConflict, "Clips can't overlap on a Track"},
+		"onto each other": {[]map[string]any{takes(r.take.ID, 20), takes(r.take.ID, 21)},
+			http.StatusConflict, "Clips can't overlap on a Track"},
+		"a Take of another Song": {[]map[string]any{takes(other.take.ID, 20)},
+			http.StatusBadRequest, "there's no such Take in this Song"},
+		"playing none of its Takes": {[]map[string]any{{"trackId": r.vox.ID,
+			"takes": []map[string]any{{"id": r.take.ID, "position": 0, "nudge": 0}}, "activeTakeId": 999,
+			"start": 20, "offset": 0, "length": 1}}, http.StatusBadRequest, "a Clip of Takes plays one of them"},
+		"without a Track": {[]map[string]any{{"beatId": r.tl.Beats[0].ID, "start": 20, "offset": 0, "length": 1}},
+			http.StatusBadRequest, "trackId, start, offset and length are required"},
+		"no Clips": {[]map[string]any{}, http.StatusBadRequest, "clips are required"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			expectError(t, ts.pasteClips(r.song.ID, c.clips...), c.status, c.msg)
+			if read := ts.getTimeline(r.song.ID); !reflect.DeepEqual(read, before) {
+				t.Errorf("timeline = %+v, want it unchanged: %+v", read, before)
+			}
+		})
+	}
+	if files := takeFiles(t, ts); len(files) != 2 {
+		t.Errorf("take files on disk = %q, want only the two recorded", files)
+	}
+}

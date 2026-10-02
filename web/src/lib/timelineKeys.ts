@@ -32,6 +32,12 @@ export function selectsAll(e: KeyPress): boolean {
   return matches(e, shortcuts.selectAll.keys);
 }
 
+/** What a key press does with the Clipboard: copy the Selection to it (Mod+C), paste it (Mod+V), or nothing. */
+export function clipboardAction(e: KeyPress): 'copy' | 'paste' | null {
+  if (matches(e, shortcuts.copyClips.keys)) return 'copy';
+  return matches(e, shortcuts.pasteClips.keys) ? 'paste' : null;
+}
+
 /** Whether a box drawn over empty lane space with these modifiers adds the Clips it touches to the Selection, rather than replacing it. */
 export function addsBox(e: Modifiers): boolean {
   return matches(mouse('drag', e), shortcuts.addBox.keys);

@@ -801,6 +801,42 @@ describe('History of Takes', () => {
   });
 });
 
+describe('History of pasting', () => {
+  it('undoes a paste by deleting every Clip pasted, as one step, and redoes it by placing them back with their Takes', () => {
+    const h = new History();
+    const t0 = timeline([track(2, [takeClip(6, 10, [take(40)])])]);
+    const t1 = timeline([track(2, [takeClip(6, 10, [take(40)]), clip(7, 30), takeClip(8, 40, [take(41)])])]);
+
+    h.record(
+      {
+        kind: 'pasteClips',
+        clips: [
+          { trackId: 2, clip: { beatId: 100, start: 30, offset: 0, length: 10 } },
+          {
+            trackId: 2,
+            clip: { takes: [{ id: 40, position: 0, nudge: 0 }], activeTakeId: 40, start: 40, offset: 2, length: 10 },
+          },
+        ],
+      },
+      t0,
+      t1,
+    );
+    expect(h.nextUndo()).toEqual({ kind: 'deleteClips', clipIds: [7, 8] });
+
+    // Deleting the pasted Clips detaches their Takes, so redoing never copies them again.
+    h.undone(t1, t0);
+    expect(h.nextRedo()).toEqual({
+      kind: 'placeClips',
+      clips: [
+        { trackId: 2, clip: { beatId: 100, start: 30, offset: 0, length: 10 } },
+        { trackId: 2, clip: { takeIds: [41], activeTakeId: 41, start: 40, offset: 2, length: 10 } },
+      ],
+    });
+    h.redone(t0, timeline([track(2, [takeClip(6, 10, [take(40)]), clip(9, 30), takeClip(10, 40, [take(41)])])]));
+    expect(h.nextUndo()).toEqual({ kind: 'deleteClips', clipIds: [9, 10] });
+  });
+});
+
 describe('History of Retakes', () => {
   // A Clip of one Take at 0:10, and after a Retake that started earlier in
   // its span and ran longer: its span now starts 1.5s earlier, the first

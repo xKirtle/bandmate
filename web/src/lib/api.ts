@@ -357,6 +357,23 @@ export interface PlacedClip {
   clip: NewClip;
 }
 
+/**
+ * A Clip as it was copied, to paste as a new Clip: a stretch of a Beat or a
+ * Sound, or of Takes, given as they were then, each where it started in the
+ * Clip's source span and how far it was nudged.
+ */
+export type ClipCopy = Pick<Clip, 'start' | 'offset' | 'length'> & { name?: string } & (
+    | { beatId: number }
+    | { soundId: number }
+    | { takes: Pick<Take, 'id' | 'position' | 'nudge'>[]; activeTakeId: number }
+  );
+
+/** A Clip to paste, and the Track it goes on. */
+export interface PastedClip {
+  trackId: number;
+  clip: ClipCopy;
+}
+
 /** Where one of several Clips moved at once goes: a Track and a start, in seconds. */
 export interface ClipMove {
   clipId: number;
@@ -547,6 +564,11 @@ function audioForm(file: File, details: object): FormData {
   form.append('details', JSON.stringify(details));
   form.append('file', file);
   return form;
+}
+
+/** Clips to place or paste as the API takes them: each with the id of the Track it goes on. */
+function onTracks(clips: readonly (PlacedClip | PastedClip)[]) {
+  return clips.map((c) => ({ trackId: c.trackId, ...c.clip }));
 }
 
 export const api = {
@@ -742,12 +764,14 @@ export const api = {
    * Refused whole if any would overlap a Clip there, or another of them.
    */
   placeClips: (at: SongAt, clips: PlacedClip[]) =>
-    request<Timeline>(
-      'POST',
-      `/songs/${at.id}/timeline/clips/place`,
-      { clips: clips.map((c) => ({ trackId: c.trackId, ...c.clip })) },
-      at,
-    ),
+    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/place`, { clips: onTracks(clips) }, at),
+  /**
+   * Pastes Clips as they were copied, each a new Clip: a Clip of Takes gets
+   * copies of its Takes, sharing their audio. Refused whole if any would
+   * overlap a Clip there, or another of them.
+   */
+  pasteClips: (at: SongAt, clips: PastedClip[]) =>
+    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/paste`, { clips: onTracks(clips) }, at),
   /** Gives a Clip a name of its own; a blank one clears it, and the Clip goes by its source's name again. */
   renameClip: (at: SongAt, clipId: number, name: string) =>
     request<Timeline>('PUT', `/songs/${at.id}/timeline/clips/${clipId}/name`, { name }, at),
