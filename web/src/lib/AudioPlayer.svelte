@@ -16,6 +16,7 @@
     peaks,
     playing = $bindable(false),
     showVolume = true,
+    playOffHint = null,
   }: {
     src: string;
     /** In seconds. */
@@ -26,6 +27,8 @@
     playing?: boolean;
     /** Off where the shared volume shows beside the player instead. */
     showVolume?: boolean;
+    /** Why it can't play now, e.g. while recording: its play button is off, and says this. */
+    playOffHint?: string | null;
   } = $props();
 
   const barCount = 160;
@@ -132,7 +135,14 @@
       ontimeupdate={() => audio && (time = audio.currentTime)}
     ></audio>
 
-    <button type="button" class="play" onclick={toggle} aria-label={playing ? 'Pause' : 'Play'}>
+    <button
+      type="button"
+      class="play"
+      onclick={toggle}
+      disabled={playOffHint !== null}
+      title={playOffHint ?? undefined}
+      aria-label={playing ? 'Pause' : 'Play'}
+    >
       {#if playing}
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /></svg>
       {:else}
@@ -258,6 +268,10 @@
     background: var(--accent);
     color: var(--accent-text);
     cursor: pointer;
+  }
+  .play:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   .play svg {
     width: 1.25rem;

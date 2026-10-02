@@ -29,23 +29,29 @@ export function transportActions(state: TransportState, run: TransportRun): Menu
   const importAudio: MenuAction = {
     icon: '⤒',
     label: 'Import audio…',
-    title: `Import an audio file as a Sound onto ${state.chosenTrack}`,
+    title: state.recording
+      ? 'Stop recording to import audio'
+      : `Import an audio file as a Sound onto ${state.chosenTrack}`,
     disabled: state.importing || state.recording,
     run: run.importAudio,
   };
   const mixDown: MenuAction = {
     icon: '⤓',
     label: 'Mix down…',
-    title: state.hasClips
-      ? 'Download the Timeline, or its Loop, as one audio file'
-      : 'Add a Beat, Sound or Take to mix down',
+    title: state.recording
+      ? 'Stop recording to mix down'
+      : state.hasClips
+        ? 'Download the Timeline, or its Loop, as one audio file'
+        : 'Add a Beat, Sound or Take to mix down',
     disabled: !state.hasClips || state.recording,
     run: run.mixDown,
   };
   const recordingSettings: MenuAction = {
     icon: '◎',
     label: 'Recording settings…',
-    title: 'The input to record from, its level, and the Latency Offset',
+    title: state.recording
+      ? 'Stop recording to change the recording settings'
+      : 'The input to record from, its level, and the Latency Offset',
     disabled: state.recording,
     run: run.recordingSettings,
   };
