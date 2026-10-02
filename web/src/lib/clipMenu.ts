@@ -17,8 +17,9 @@ export type ClipMenuState = {
   soundName: string | null;
   /** The keys that nudge a Take, as shown, or null for none. */
   nudgeKeys: string | null;
-  /** The keys that copy, and that cut, the Selection, as shown, or null for none. */
+  /** The keys that copy, as shown, or null for none. */
   copyKeys: string | null;
+  /** The keys that cut, as shown, or null for none. */
   cutKeys: string | null;
   /** How many Clips are selected. With several, no Retake is offered. */
   selected: number;
@@ -80,11 +81,11 @@ function clipboardActions(
   copy: () => void,
   cut: () => void,
 ): MenuAction[] {
-  const or = (k: string | null) => (k ? `Or ${k}` : undefined);
+  const orKeys = (shown: string | null) => (shown ? `Or ${shown}` : undefined);
   return [
-    edit({ icon: '⎘', label: 'Copy', title: or(keys.copyKeys), run: copy }),
+    edit({ icon: '⎘', label: 'Copy', title: orKeys(keys.copyKeys), run: copy }),
     // Not ✂, which some fonts only draw as an emoji, unlike the other glyphs.
-    edit({ icon: '✁', label: 'Cut', title: or(keys.cutKeys), run: cut }),
+    edit({ icon: '✁', label: 'Cut', title: orKeys(keys.cutKeys), run: cut }),
   ];
 }
 

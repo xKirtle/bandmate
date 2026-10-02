@@ -1505,7 +1505,12 @@
 
   /** Copies the Selection to the Clipboard; with none, the Clipboard stays as it was. */
   function copySelection() {
-    clipboard = copy(timeline.tracks, selected) ?? clipboard;
+    copyClips(selected);
+  }
+
+  /** Copies these Clips to the Clipboard; with none, the Clipboard stays as it was. */
+  function copyClips(clipIds: Selection) {
+    clipboard = copy(timeline.tracks, clipIds) ?? clipboard;
   }
 
   /**
@@ -1518,14 +1523,9 @@
     removeSelection();
   }
 
-  /** Copies a Clip alone to the Clipboard, from its menu. */
-  function copyClip(clip: Clip) {
-    clipboard = copy(timeline.tracks, new Set([clip.id])) ?? clipboard;
-  }
-
   /** Cuts a Clip alone, from its menu: copies it, then deletes it, as one edit to undo. */
   function cutClip(clip: Clip) {
-    copyClip(clip);
+    copyClips(new Set([clip.id]));
     remove(clip);
   }
 
@@ -2130,7 +2130,7 @@
         clearInactiveTakes: () => perform({ kind: 'clearInactiveTakes', clipId }),
         downloadTake: (takeId) => download(api.takeDownloadUrl(timeline.songId, takeId)),
         rename: () => startClipRename(clip),
-        copy: () => copyClip(clip),
+        copy: () => copyClips(new Set([clip.id])),
         cut: () => cutClip(clip),
         duplicate: () => duplicate(clip),
         downloadSound: (soundId) => download(api.soundDownloadUrl(timeline.songId, soundId)),

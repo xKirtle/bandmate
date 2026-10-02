@@ -197,7 +197,7 @@ group('selectionActions', () => {
   const state = { recording: false, copyKeys: 'Ctrl+C', cutKeys: 'Ctrl+X' };
   const labels = (count: number) => selectionActions(count, run, state).map((a) => a.label);
 
-  it('offers copying, cutting, duplicating and deleting every selected Clip, naming how many', () => {
+  it('offers copying, cutting, duplicating and deleting every selected Clip, naming how many it duplicates and deletes', () => {
     expect(labels(3)).toEqual(['Copy', 'Cut', 'Duplicate 3 Clips', 'Delete 3 Clips']);
   });
 
