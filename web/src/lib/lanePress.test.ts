@@ -30,7 +30,7 @@ group('a mouse or pen press on empty lane space', () => {
 
   it('places the playhead and chooses the Track when lifted without moving past the slop', () => {
     expect(run(press, { kind: 'move', at: wobble }, { kind: 'lift' })).toEqual({
-      outcomes: ['wait', 'place'],
+      outcomes: ['wait', 'insertionPoint'],
       press: null,
     });
   });
@@ -52,7 +52,7 @@ group('a mouse or pen press on empty lane space', () => {
   });
 
   it('has no long press', () => {
-    expect(run(press, { kind: 'hold' }, { kind: 'lift' }).outcomes).toEqual(['wait', 'place']);
+    expect(run(press, { kind: 'hold' }, { kind: 'lift' }).outcomes).toEqual(['wait', 'insertionPoint']);
   });
 });
 
@@ -79,8 +79,8 @@ group('a finger pressing empty lane space', () => {
   });
 
   it('is a tap, placing the playhead and choosing the Track, when lifted before the hold', () => {
-    expect(run(press, { kind: 'lift' }).outcomes).toEqual(['place']);
-    expect(run(press, { kind: 'move', at: wobble }, { kind: 'lift' }).outcomes).toEqual(['wait', 'place']);
+    expect(run(press, { kind: 'lift' }).outcomes).toEqual(['insertionPoint']);
+    expect(run(press, { kind: 'move', at: wobble }, { kind: 'lift' }).outcomes).toEqual(['wait', 'insertionPoint']);
   });
 
   it('draws a box under the finger once held, which grows as it drags and stays on lifting', () => {
@@ -117,5 +117,9 @@ group('a finger pressing empty lane space', () => {
 
   it('gives up leaving the Selection be when cancelled before the hold', () => {
     expect(run(press, { kind: 'cancel' }).outcomes).toEqual(['giveUp']);
+  });
+
+  it('ignores Mod, so a tap still sets an insertion point', () => {
+    expect(run(pressLane(from, true, true), { kind: 'lift' }).outcomes).toEqual(['insertionPoint']);
   });
 });

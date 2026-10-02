@@ -1354,8 +1354,8 @@
   // ruler does, and chooses that Track, so a paste, a recording or
   // "+ Beat" goes there. With Mod held, that was likely the start of a
   // box to add, so it leaves the Selection, the playhead and the Chosen
-  // Track be. A finger dragging pans the lanes instead: a tap is a click,
-  // and it draws a box only once held still for a long press, and that
+  // Track be. A finger dragging pans the lanes instead: a tap does what a
+  // click does, and it draws a box only once held still for a long press, and that
   // box always replaces the Selection; let go without dragging, it only
   // clears the Selection. A second finger, e.g. pinching, gives the box
   // up.
@@ -1402,7 +1402,7 @@
     lanesElement!.focus({ preventScroll: true });
     const touch = event.pointerType === 'touch';
     laneBox = {
-      press: pressLane(event, touch, !touch && addsBox(event)),
+      press: pressLane(event, touch, addsBox(event)),
       pointerId: event.pointerId,
       before: selected,
       start: spanTimeAt(event.clientX),
@@ -1427,12 +1427,11 @@
       case 'box':
         drawBox(laneBox, at);
         return;
-      case 'place': {
+      case 'insertionPoint': {
         select({ kind: 'emptyClick', adds: false });
-        // Neither while recording, which plays from where it started and
-        // goes where it was chosen as it started.
+        // Not even following the playhead again while recording.
         if (frozen) break;
-        seekTo(clamp(laneBox.start));
+        seekTo(laneBox.start);
         const track = timeline.tracks[laneBox.trackIndex];
         if (track) choose({ kind: 'choose', trackId: track.id });
         break;

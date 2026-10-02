@@ -39,21 +39,24 @@ export type LaneInput =
 
 /**
  * What to do after an input: `wait` for more; draw the `box` to where
- * the pointer is, selecting what it touches; or, the press over, `place`
- * the playhead where it was pressed and choose that Track, as a plain
+ * the pointer is, selecting what it touches; or, the press over, set an
+ * `insertionPoint`: move the playhead where it was pressed and choose that Track, as a plain
  * click on empty lane space does, besides clearing the Selection; treat
  * it as only a `click` there, for the Selection; `keep` the box's
  * Selection; `restore` the Selection from before the press; or `giveUp`,
  * leaving the Selection be.
  */
-export type LaneOutcome = 'wait' | 'box' | 'place' | 'click' | 'keep' | 'restore' | 'giveUp';
+export type LaneOutcome = 'wait' | 'box' | 'insertionPoint' | 'click' | 'keep' | 'restore' | 'giveUp';
 
-/** A press on empty lane space, by a finger or else a mouse or pen, with Mod held or not. */
-export function pressLane(from: Point, touch: boolean, adds = false): LanePress {
+/**
+ * A press on empty lane space, by a finger or else a mouse or pen, with
+ * Mod held or not. Only a mouse or pen's box adds.
+ */
+export function pressLane(from: Point, touch: boolean, mod = false): LanePress {
   return {
     from: { clientX: from.clientX, clientY: from.clientY },
     touch,
-    adds,
+    adds: !touch && mod,
     phase: touch ? 'holding' : 'pressed',
     dragged: false,
   };
@@ -78,7 +81,7 @@ export function laneStep(press: LanePress, input: LaneInput): { press: LanePress
       return { press: { ...press, phase: 'boxing' }, outcome: 'box' };
     case 'lift':
       if (boxing) return { press: null, outcome: press.dragged ? 'keep' : 'click' };
-      return { press: null, outcome: press.adds ? 'click' : 'place' };
+      return { press: null, outcome: press.adds ? 'click' : 'insertionPoint' };
     case 'cancel':
       return { press: null, outcome: boxing ? 'restore' : 'giveUp' };
   }

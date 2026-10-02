@@ -136,7 +136,7 @@ export const shortcuts = {
     name: 'Paste the Clipboard',
     group: 'Timeline editing',
     description:
-      'Pastes the Clips last copied or cut at the playhead on the Chosen Track, which clicking empty lane space sets, or later where they fit, and selects them.',
+      'Pastes the Clips last copied or cut at the playhead on the Chosen Track, both of which a click on empty lane space sets, or later where they fit, and selects them.',
     keys: [{ key: 'v', mod: true }],
   },
   cueNextLine: {
