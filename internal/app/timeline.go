@@ -142,9 +142,11 @@ func (a *App) trimClip(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// clipToPlace is a Clip to place on a Track, as a request gives it.
+// clipToPlace is a Clip to place on a Track, as a request gives it: on one
+// of the Timeline's Tracks, or, by its index, on a Track the request adds.
 type clipToPlace struct {
 	TrackID      *int64   `json:"trackId"`
+	NewTrack     *int     `json:"newTrack"`
 	BeatID       *int64   `json:"beatId"`
 	SoundID      *int64   `json:"soundId"`
 	Name         *string  `json:"name"`
@@ -157,10 +159,17 @@ type clipToPlace struct {
 
 // placed is the Clip and the Track it goes on, if the request gave both.
 func (c clipToPlace) placed() (timeline.PlacedClip, error) {
-	if c.TrackID == nil || c.Start == nil || c.Offset == nil || c.Length == nil {
+	if c.TrackID != nil && c.NewTrack != nil {
+		return timeline.PlacedClip{}, &lyricsheet.InvalidError{Msg: "a Clip goes on a Track or a new Track, not both"}
+	}
+	if (c.TrackID == nil && c.NewTrack == nil) || c.Start == nil || c.Offset == nil || c.Length == nil {
 		return timeline.PlacedClip{}, &lyricsheet.InvalidError{Msg: "trackId, start, offset and length are required"}
 	}
-	return timeline.PlacedClip{TrackID: *c.TrackID, NewClip: timeline.NewClip{
+	on := timeline.OnTrack{NewTrack: c.NewTrack}
+	if c.TrackID != nil {
+		on.TrackID = *c.TrackID
+	}
+	return timeline.PlacedClip{OnTrack: on, NewClip: timeline.NewClip{
 		BeatID: c.BeatID, SoundID: c.SoundID, Name: c.Name, TakeIDs: c.TakeIDs, ActiveTakeID: c.ActiveTakeID,
 		Start: *c.Start, Offset: *c.Offset, Length: *c.Length,
 	}}, nil
@@ -173,13 +182,17 @@ func (a *App) placeClip(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return timeline.Timeline{}, err
 		}
+		if p.NewTrack != nil {
+			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "there's no such new Track"}
+		}
 		return a.timelines.PlaceClip(r.Context(), id, based, p.TrackID, p.NewClip)
 	})
 }
 
 func (a *App) placeClips(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Clips []clipToPlace `json:"clips"`
+		NewTracks []newTrack    `json:"newTracks"`
+		Clips     []clipToPlace `json:"clips"`
 	}
 	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
 		clips := make([]timeline.PlacedClip, len(req.Clips))
@@ -190,7 +203,7 @@ func (a *App) placeClips(w http.ResponseWriter, r *http.Request) {
 			}
 			clips[i] = p
 		}
-		return a.timelines.PlaceClips(r.Context(), id, based, clips)
+		return a.timelines.PlaceClips(r.Context(), id, based, trackNames(req.NewTracks), clips)
 	})
 }
 
@@ -210,6 +223,21 @@ func (a *App) duplicateClip(w http.ResponseWriter, r *http.Request) {
 	a.changeClip(w, r, nil, a.timelines.DuplicateClip)
 }
 
+// newTrack is a Track to add at the bottom for Clips placed or pasted at
+// once to go on, as a request gives it.
+type newTrack struct {
+	Name string `json:"name"`
+}
+
+// trackNames is the names of the Tracks to add.
+func trackNames(tracks []newTrack) []string {
+	names := make([]string, len(tracks))
+	for i, t := range tracks {
+		names[i] = t.Name
+	}
+	return names
+}
+
 // clipToPaste is a Clip as it was copied, to paste on a Track, as a request
 // gives it: as a Clip to place, but with a Clip of Takes' Takes as they
 // were, rather than their ids.
@@ -225,13 +253,14 @@ func (c clipToPaste) copied() (timeline.ClipCopy, error) {
 	if err != nil {
 		return timeline.ClipCopy{}, err
 	}
-	return timeline.ClipCopy{TrackID: p.TrackID, BeatID: p.BeatID, SoundID: p.SoundID, Name: p.Name,
+	return timeline.ClipCopy{OnTrack: p.OnTrack, BeatID: p.BeatID, SoundID: p.SoundID, Name: p.Name,
 		Takes: c.Takes, ActiveTakeID: p.ActiveTakeID, Start: p.Start, Offset: p.Offset, Length: p.Length}, nil
 }
 
 func (a *App) pasteClips(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Clips []clipToPaste `json:"clips"`
+		NewTracks []newTrack    `json:"newTracks"`
+		Clips     []clipToPaste `json:"clips"`
 	}
 	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
 		clips := make([]timeline.ClipCopy, len(req.Clips))
@@ -242,16 +271,18 @@ func (a *App) pasteClips(w http.ResponseWriter, r *http.Request) {
 			}
 			clips[i] = copied
 		}
-		return a.timelines.PasteClips(r.Context(), id, based, clips)
+		return a.timelines.PasteClips(r.Context(), id, based, trackNames(req.NewTracks), clips)
 	})
 }
 
 func (a *App) deleteClips(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ClipIDs []int64 `json:"clipIds"`
+		// TrackIDs are Tracks to delete too, e.g. those a paste added.
+		TrackIDs []int64 `json:"trackIds"`
 	}
 	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
-		return a.timelines.DeleteClips(r.Context(), id, based, req.ClipIDs)
+		return a.timelines.DeleteClips(r.Context(), id, based, req.ClipIDs, req.TrackIDs)
 	})
 }
 
