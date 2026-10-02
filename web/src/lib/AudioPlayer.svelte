@@ -16,7 +16,7 @@
     peaks,
     playing = $bindable(false),
     showVolume = true,
-    cantPlay = null,
+    playOffHint = null,
   }: {
     src: string;
     /** In seconds. */
@@ -27,8 +27,8 @@
     playing?: boolean;
     /** Off where the shared volume shows beside the player instead. */
     showVolume?: boolean;
-    /** Why it can't play now, e.g. while recording, said by its play button, which is off meanwhile. */
-    cantPlay?: string | null;
+    /** Why it can't play now, e.g. while recording: its play button is off, and says this. */
+    playOffHint?: string | null;
   } = $props();
 
   const barCount = 160;
@@ -139,8 +139,8 @@
       type="button"
       class="play"
       onclick={toggle}
-      disabled={cantPlay !== null}
-      title={cantPlay ?? undefined}
+      disabled={playOffHint !== null}
+      title={playOffHint ?? undefined}
       aria-label={playing ? 'Pause' : 'Play'}
     >
       {#if playing}

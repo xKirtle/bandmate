@@ -713,11 +713,13 @@
   onDestroy(dragDone);
 
   function pointerDown(event: PointerEvent) {
-    // A second finger is pinching. A recording plays from where it starts.
-    if (!event.isPrimary || frozen) return;
-    dragging = true;
+    // A second finger is pinching.
+    if (!event.isPrimary) return;
     // Clicking the playhead back into view follows it again.
     following = true;
+    // A recording plays from where it starts, so it isn't moved.
+    if (frozen) return;
+    dragging = true;
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
     seek(timeAt(event));
   }

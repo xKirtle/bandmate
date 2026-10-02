@@ -180,7 +180,7 @@
         src={api.masterAudioUrl(song.id, m.id)}
         duration={m.duration}
         peaks={peaks[m.id] ?? []}
-        cantPlay={recording ? 'Stop recording to play' : null}
+        playOffHint={recording ? 'Stop recording to play' : null}
       />
 
       {#if writing}

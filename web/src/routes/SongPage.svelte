@@ -225,6 +225,14 @@
     }
   }
 
+  // Coming back to the tab while recording, the refresh waits until the Take's saved.
+  let refreshAfterRecording = false;
+  $effect(() => {
+    if (recording || !refreshAfterRecording) return;
+    refreshAfterRecording = false;
+    refresh();
+  });
+
   // Coming back to the tab shows what changed meanwhile, e.g. on another
   // device. It waits for saves already on their way, and never replaces
   // edits not saved yet: those are based on the Song as it was, so the Song
@@ -258,14 +266,6 @@
       }
     });
   }
-
-  // Coming back to the tab while recording, the refresh waits until the Take's saved.
-  let refreshAfterRecording = false;
-  $effect(() => {
-    if (recording || !refreshAfterRecording) return;
-    refreshAfterRecording = false;
-    refresh();
-  });
 
   // Set while reloading on purpose, so leaving doesn't ask again.
   let reloading = false;
