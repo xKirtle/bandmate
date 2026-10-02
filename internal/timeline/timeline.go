@@ -662,9 +662,7 @@ func movedTo(ctx context.Context, tx *sql.Tx, songID, clipID, trackID int64, sta
 	if err != nil {
 		return placement{}, err
 	}
-	if err := findTrack(ctx, tx, songID, trackID); errors.Is(err, lyricsheet.ErrNotFound) {
-		return placement{}, &lyricsheet.InvalidError{Msg: "there's no such Track on this Timeline"}
-	} else if err != nil {
+	if err := findTrackToPlaceOn(ctx, tx, songID, trackID); err != nil {
 		return placement{}, err
 	}
 	p.trackID, p.start = trackID, start
@@ -809,12 +807,21 @@ func (s *Store) PlaceClips(ctx context.Context, songID int64, based lyricsheet.V
 
 // placeOnTrack adds a new Clip to one of the Song's Tracks, as addClip does.
 func placeOnTrack(ctx context.Context, tx *sql.Tx, songID int64, c PlacedClip) error {
-	if err := findTrack(ctx, tx, songID, c.TrackID); errors.Is(err, lyricsheet.ErrNotFound) {
+	if err := findTrackToPlaceOn(ctx, tx, songID, c.TrackID); err != nil {
+		return err
+	}
+	return addClip(ctx, tx, songID, c.TrackID, c.NewClip)
+}
+
+// findTrackToPlaceOn checks that a Track a Clip is to go on is one of the
+// Song's, refusing the request if not.
+func findTrackToPlaceOn(ctx context.Context, tx *sql.Tx, songID, trackID int64) error {
+	if err := findTrack(ctx, tx, songID, trackID); errors.Is(err, lyricsheet.ErrNotFound) {
 		return &lyricsheet.InvalidError{Msg: "there's no such Track on this Timeline"}
 	} else if err != nil {
 		return err
 	}
-	return addClip(ctx, tx, songID, c.TrackID, c.NewClip)
+	return nil
 }
 
 // addClip adds a new Clip to a Track of the Song, if it stays within its

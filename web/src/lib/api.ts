@@ -351,13 +351,13 @@ export interface TakePlacement extends Captured {
   start: number;
 }
 
-/** Where one of several Clips moved at once goes: a Track and a start, in seconds. */
 /** A Clip to place, and the Track it goes on. */
 export interface PlacedClip {
   trackId: number;
   clip: NewClip;
 }
 
+/** Where one of several Clips moved at once goes: a Track and a start, in seconds. */
 export interface ClipMove {
   clipId: number;
   trackId: number;

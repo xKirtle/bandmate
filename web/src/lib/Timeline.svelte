@@ -1898,10 +1898,10 @@
   }
 
   /**
-   * Deletes a Clip by its Delete key: with the whole Selection, as one
-   * edit, if it's selected, but never the Clip a Retake is recording into.
+   * Deletes a Clip with the whole Selection, as one edit, if it's selected,
+   * but never the Clip a Retake is recording into; else the Clip alone.
    */
-  function removeByKey(clip: Clip) {
+  function removeWithSelection(clip: Clip) {
     if (!selected.has(clip.id)) return remove(clip);
     const clipIds = [...selected].filter((id) => id !== recording?.clipId);
     perform({ kind: 'deleteClips', clipIds });
@@ -1912,7 +1912,7 @@
     const action = clipAction(event);
     if (action === 'delete') {
       event.preventDefault();
-      removeByKey(clip);
+      removeWithSelection(clip);
     } else if (action === 'menu') {
       event.preventDefault();
       openClipMenu(clip, event.currentTarget as HTMLElement);
