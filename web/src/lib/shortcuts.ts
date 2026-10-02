@@ -126,6 +126,12 @@ export const shortcuts = {
     description: 'Copies every selected Clip, from the Timeline, outside a text field, to paste on this Song.',
     keys: [{ key: 'c', mod: true }],
   },
+  cutClips: {
+    name: 'Cut the Selection',
+    group: 'Timeline editing',
+    description: 'Copies every selected Clip, from the Timeline, outside a text field, then deletes them.',
+    keys: [{ key: 'x', mod: true }],
+  },
   pasteClips: {
     name: 'Paste the Clipboard',
     group: 'Timeline editing',

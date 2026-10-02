@@ -76,6 +76,46 @@ func TestAClipOfTakesStillPastesOnceItsClipIsDeleted(t *testing.T) {
 	}
 }
 
+// A cut copies the Selection to the Clipboard, then deletes it, as Clips
+// deleted together, so a cut Clip of Takes pastes from Takes detached.
+func TestACutClipOfTakesPastesAgainAndAgainWithItsAudio(t *testing.T) {
+	ts := newTestServer(t)
+	r := recordATake(t, ts)
+	cut := map[string]any{"trackId": r.vox.ID, "name": "Hook",
+		"takes":        []map[string]any{{"id": r.take.ID, "position": r.take.Position, "nudge": 0.25}},
+		"activeTakeId": r.take.ID, "start": 2, "offset": 0.5, "length": 3}
+	timelineChange(t, ts.Do(http.MethodPost, timelinePath(r.song.ID)+"/clips/delete",
+		map[string]any{"clipIds": []int64{r.clip.ID}}))
+
+	first := timelineChange(t, ts.pasteClips(r.song.ID, cut))
+	cut["start"] = 5
+	got := timelineChange(t, ts.pasteClips(r.song.ID, cut))
+
+	clips := got.Tracks[1].Clips
+	if len(clips) != 2 || clips[0].ID != first.Tracks[1].Clips[0].ID || clips[1].Start != 5 {
+		t.Fatalf("clips = %+v, want two pasted Clips, at 0:02 and 0:05", clips)
+	}
+	for _, c := range clips {
+		if len(c.Takes) != 1 || c.Takes[0].ID == r.take.ID || c.Takes[0].Nudge != 0.25 || nameOf(c) != "Hook" {
+			t.Fatalf("clip = %+v, want Hook with its own copy of the Take, nudged as cut", c)
+		}
+		served := ts.Do(http.MethodGet, takePath(r.song.ID, c.Takes[0].ID)+"/audio", nil)
+		if !bytes.Equal(served.Body, r.audio) {
+			t.Errorf("Take %d's audio differs from the recording", c.Takes[0].ID)
+		}
+	}
+	if clips[0].Takes[0].ID == clips[1].Takes[0].ID {
+		t.Errorf("both pastes play Take %d, want a Take each", clips[0].Takes[0].ID)
+	}
+	// Undoing the cut still brings the Clip back, from its Take, detached.
+	timelineChange(t, ts.Do(http.MethodPost, timelinePath(r.song.ID)+"/clips/delete",
+		map[string]any{"clipIds": []int64{clips[0].ID, clips[1].ID}}))
+	back := timelineChange(t, ts.placeTakes(r.song.ID, r.vox.ID, []int64{r.take.ID}, r.take.ID, 2, 0.5, 3))
+	if c := back.Tracks[1].Clips; len(c) != 1 || c[0].Takes[0].ID != r.take.ID {
+		t.Errorf("clips = %+v, want the cut Clip back, with its Take", c)
+	}
+}
+
 func TestClipsOfBeatsAndSoundsPasteAsCopied(t *testing.T) {
 	ts := newTestServer(t)
 	p := placeTwoClips(t, ts)

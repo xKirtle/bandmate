@@ -67,7 +67,7 @@
   import { allKeys, shortcuts, type Way } from './shortcuts';
   import { clipActions, selectionActions } from './clipMenu';
   import { menuFor, noSelection, selection, type Selection, type SelectionGesture } from './selection';
-  import { copy, emptyClipboard, paste, type Clipboard } from './clipboard';
+  import { copy, cut, emptyClipboard, paste, type Clipboard } from './clipboard';
   import {
     addsBox,
     clearsSelection,
@@ -1491,14 +1491,26 @@
   }
   onDestroy(laneDone);
 
-  // The Clipboard: the Clips last copied from the Selection, as they were
-  // then. Like the Selection, it's never kept, so leaving the Song drops it,
+  // The Clipboard: the Clips last copied or cut from the Selection, as they
+  // were then. Like the Selection, it's never kept, so leaving the Song drops it,
   // and undo and redo never change it.
   let clipboard = $state.raw<Clipboard>(emptyClipboard);
 
   /** Copies the Selection to the Clipboard; with none, the Clipboard stays as it was. */
   function copySelection() {
     clipboard = copy(timeline.tracks, selected) ?? clipboard;
+  }
+
+  /**
+   * Cuts the Selection: copies it to the Clipboard, then deletes it, as one
+   * edit to undo. Undoing brings the Clips back, leaving the Clipboard as it
+   * is. With none selected, nothing changes.
+   */
+  function cutSelection() {
+    const made = cut(timeline.tracks, selected);
+    if (!made) return;
+    clipboard = made.clipboard;
+    perform({ kind: 'deleteClips', clipIds: made.deletes });
   }
 
   /**
@@ -1517,10 +1529,10 @@
   }
 
   // Esc clears the Selection while focus is in the Timeline, Mod+A
-  // selects every Clip, and Mod+C and Mod+V copy and paste, but not in a
-  // text field, a menu or a dialog, whose keys are their own, nor while a
-  // Track is dragged, which Esc cancels. Copying and pasting only go with
-  // editing, so not on a phone, nor while recording.
+  // selects every Clip, and Mod+C, Mod+X and Mod+V copy, cut and paste, but
+  // not in a text field, a menu or a dialog, whose keys are their own, nor
+  // while a Track is dragged, which Esc cancels. Copying, cutting and
+  // pasting only go with editing, so not on a phone, nor while recording.
   function timelineKey(event: KeyboardEvent) {
     if (event.defaultPrevented || trackDrag.current) return;
     if (inTextField(event.target) || inMenuOrDialog(event.target)) return;
@@ -1534,6 +1546,9 @@
     } else if (clipboardKey === 'copy' && selected.size > 0 && editable.current && !frozen) {
       event.preventDefault();
       copySelection();
+    } else if (clipboardKey === 'cut' && selected.size > 0 && editable.current && !frozen) {
+      event.preventDefault();
+      cutSelection();
     } else if (clipboardKey === 'paste' && editable.current && !frozen) {
       event.preventDefault();
       pasteClipboard();

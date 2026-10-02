@@ -20,6 +20,7 @@ group('dialogGroups', () => {
         'Select every Clip',
         'Clear the Selection',
         'Copy the Selection',
+        'Cut the Selection',
         'Paste the Clipboard',
       ],
       ['Cue the next Line'],
