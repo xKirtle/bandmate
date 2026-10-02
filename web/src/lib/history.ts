@@ -5,6 +5,7 @@ import {
   type CueValue,
   type NewClip,
   type NewTrack,
+  type PlacedClip,
   type SongAt,
   type Song,
   type Timeline,
@@ -23,6 +24,8 @@ import { isBlank, type CuedSong } from './cues';
 // A deleted Clip, or a copied one redone, is placed back with its name, if
 // it has one; a rename is undone by giving the Clip back its old name, or
 // a blank one to clear it.
+//
+// Clips deleted together are placed back together, as one edit.
 //
 // An edit that brings back a deleted Clip or Track gets it a new id. The
 // edits kept that name the old id are then changed to name the new one.
@@ -54,6 +57,7 @@ export type Edit =
   | { kind: 'reorderTracks'; order: number[] }
   | { kind: 'deleteTrack'; trackId: number }
   | { kind: 'placeClip'; trackId: number; clip: NewClip }
+  | { kind: 'placeClips'; clips: PlacedClip[] }
   | { kind: 'duplicateClip'; clipId: number }
   | { kind: 'moveClip'; clipId: number; trackId: number; start: number }
   | { kind: 'moveClips'; moves: ClipMove[] }
@@ -61,6 +65,7 @@ export type Edit =
   /** A blank name clears the Clip's. */
   | { kind: 'renameClip'; clipId: number; name: string }
   | { kind: 'deleteClip'; clipId: number }
+  | { kind: 'deleteClips'; clipIds: number[] }
   | { kind: 'setTakes'; clipId: number; takes: ClipTakes }
   | { kind: 'chooseTake'; clipId: number; takeId: number }
   | { kind: 'nudgeTake'; clipId: number; takeId: number; nudge: number }
@@ -136,14 +141,15 @@ export class History {
   }
 
   /**
-   * Notes that nextUndo's edit was sent, turning before into after. A Cue
-   * edit leaves the Timeline as it was, so is given it as both.
+   * Notes that nextUndo's edit was sent, turning before into after, and
+   * gives the new ids of the Clips it brought back. A Cue edit leaves the
+   * Timeline as it was, so is given it as both.
    */
-  undone(before: Timeline, after: Timeline): void {
+  undone(before: Timeline, after: Timeline): number[] {
     const entry = this.#undo.pop();
-    if (!entry) return;
+    if (!entry) return [];
     this.#redo.push(entry);
-    this.#follow(entry.undo, before, after);
+    return this.#follow(entry.undo, before, after);
   }
 
   /** Notes that nextRedo's edit was sent, turning before into after, like undone. */
@@ -160,8 +166,11 @@ export class History {
     this.#redo = [];
   }
 
-  /** Has every edit kept name the new ids of what a sent step brought back. */
-  #follow(sent: Step, before: Timeline, after: Timeline) {
+  /**
+   * Has every edit kept name the new ids of what a sent step brought back,
+   * giving the new ids of the Clips.
+   */
+  #follow(sent: Step, before: Timeline, after: Timeline): number[] {
     const got = added(before, after);
     const tracks = new Map(sent.adds.tracks.map((id, i) => [id, got.tracks[i]]));
     const clips = new Map(sent.adds.clips.map((id, i) => [id, got.clips[i]]));
@@ -173,6 +182,7 @@ export class History {
       entry.undo = remapStep(entry.undo, ids);
       entry.redo = remapStep(entry.redo, ids);
     }
+    return sent.adds.clips.map(ids.clip);
   }
 }
 
@@ -191,6 +201,8 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
         : { kind: 'deleteClip', clipId: clips[0] };
       return { edit: undo, adds: none };
     }
+    case 'placeClips':
+      return { edit: { kind: 'deleteClips', clipIds: added(before, after).clips }, adds: none };
     case 'updateTrack': {
       const track = before.tracks.find((t) => t.id === edit.trackId)!;
       const changes = Object.fromEntries(Object.keys(edit.changes).map((k) => [k, track[k as keyof TrackChanges]]));
@@ -225,6 +237,20 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
     }
     case 'deleteClip':
       return placingBack(before, edit.clipId);
+    case 'deleteClips': {
+      // In Timeline order, as they come back.
+      const deleted = new Set(edit.clipIds);
+      const back = before.tracks.flatMap((track) =>
+        track.clips.filter((c) => deleted.has(c.id)).map((clip) => ({ track, clip })),
+      );
+      return {
+        edit: {
+          kind: 'placeClips',
+          clips: back.map(({ track, clip }) => ({ trackId: track.id, clip: placementOf(clip) })),
+        },
+        adds: { tracks: [], clips: back.map(({ clip }) => clip.id) },
+      };
+    }
     case 'setTakes':
     case 'nudgeTake':
     case 'clearInactiveTakes':
@@ -355,6 +381,8 @@ function remap(edit: HistoryEdit, ids: IdMaps): HistoryEdit {
       return { ...edit, trackId: ids.track(edit.trackId) };
     case 'placeClip':
       return { ...edit, trackId: ids.track(edit.trackId) };
+    case 'placeClips':
+      return { ...edit, clips: edit.clips.map((c) => ({ ...c, trackId: ids.track(c.trackId) })) };
     case 'moveClip':
       return { ...edit, clipId: ids.clip(edit.clipId), trackId: ids.track(edit.trackId) };
     case 'moveClips':
@@ -362,6 +390,8 @@ function remap(edit: HistoryEdit, ids: IdMaps): HistoryEdit {
         ...edit,
         moves: edit.moves.map((m) => ({ clipId: ids.clip(m.clipId), trackId: ids.track(m.trackId), start: m.start })),
       };
+    case 'deleteClips':
+      return { ...edit, clipIds: edit.clipIds.map(ids.clip) };
     case 'trimClip':
     case 'renameClip':
     case 'duplicateClip':
@@ -401,6 +431,8 @@ export function sendEdit(at: SongAt, edit: Edit): Promise<Timeline> {
       return api.deleteTrack(at, edit.trackId);
     case 'placeClip':
       return api.placeClip(at, edit.trackId, edit.clip);
+    case 'placeClips':
+      return api.placeClips(at, edit.clips);
     case 'moveClip':
       return api.moveClip(at, edit.clipId, edit.trackId, edit.start);
     case 'moveClips':
@@ -413,6 +445,8 @@ export function sendEdit(at: SongAt, edit: Edit): Promise<Timeline> {
       return api.duplicateClip(at, edit.clipId);
     case 'deleteClip':
       return api.deleteClip(at, edit.clipId);
+    case 'deleteClips':
+      return api.deleteClips(at, edit.clipIds);
     case 'setTakes':
       return api.setTakes(at, edit.clipId, edit.takes);
     case 'chooseTake':

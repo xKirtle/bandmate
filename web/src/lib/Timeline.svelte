@@ -391,7 +391,13 @@
     offerCues = null;
     change((at) => {
       const e = history.nextUndo();
-      return e ? send(at, e, (before, after) => history.undone(before, after)) : unchanged(at);
+      return e
+        ? send(at, e, (before, after) => {
+            const back = history.undone(before, after);
+            // Clips deleted together come back selected, as they were.
+            if (e.kind === 'placeClips') selected = new Set(back);
+          })
+        : unchanged(at);
     });
   }
 
@@ -1891,12 +1897,22 @@
     perform({ kind: 'deleteClip', clipId: clip.id });
   }
 
+  /**
+   * Deletes a Clip with the whole Selection, as one edit, if it's selected,
+   * but never the Clip a Retake is recording into; else the Clip alone.
+   */
+  function removeWithSelection(clip: Clip) {
+    if (!selected.has(clip.id)) return remove(clip);
+    const clipIds = [...selected].filter((id) => id !== recording?.clipId);
+    perform({ kind: 'deleteClips', clipIds });
+  }
+
   function clipKey(event: KeyboardEvent, clip: Clip) {
     if (event.target !== event.currentTarget || !editable.current || clip.id === recording?.clipId) return;
     const action = clipAction(event);
     if (action === 'delete') {
       event.preventDefault();
-      remove(clip);
+      removeWithSelection(clip);
     } else if (action === 'menu') {
       event.preventDefault();
       openClipMenu(clip, event.currentTarget as HTMLElement);

@@ -225,6 +225,8 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("DELETE /api/songs/{id}/timeline/loop", a.clearLoop)
 	mux.HandleFunc("POST /api/songs/{id}/timeline/clips", a.placeClip)
 	mux.HandleFunc("POST /api/songs/{id}/timeline/clips/move", a.moveClips)
+	mux.HandleFunc("POST /api/songs/{id}/timeline/clips/place", a.placeClips)
+	mux.HandleFunc("POST /api/songs/{id}/timeline/clips/delete", a.deleteClips)
 	mux.HandleFunc("POST /api/songs/{id}/timeline/clips/{clipID}/move", a.moveClip)
 	mux.HandleFunc("POST /api/songs/{id}/timeline/clips/{clipID}/trim", a.trimClip)
 	mux.HandleFunc("PUT /api/songs/{id}/timeline/clips/{clipID}/name", a.renameClip)
