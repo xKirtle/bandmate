@@ -67,7 +67,7 @@ type Tracks = readonly { id: number; clips: readonly { id: number; start: number
  * block each other. All on one Track, they go to the Track dragged over;
  * on several, each keeps its Track.
  */
-export function moveGroup(
+export function moveSelection(
   tracks: Tracks,
   selected: ReadonlySet<number>,
   clipId: number,
@@ -117,16 +117,16 @@ function nearest(ranges: readonly Range[], wanted: number): number {
   return best;
 }
 
-function endOf(c: Span): number {
+function endOf(c: OnTrack): number {
   return c.start + c.length;
 }
 
 /** Where a Clip is on its Track. */
-type Span = Pick<Placed, 'start' | 'length'>;
+type OnTrack = Pick<Placed, 'start' | 'length'>;
 
 /** The free stretches of a Track between its Clips, the last one endless. */
-function gaps(clips: readonly Span[]): [number, number][] {
-  const result: [number, number][] = [];
+function gaps(clips: readonly OnTrack[]): Range[] {
+  const result: Range[] = [];
   let from = 0;
   for (const c of [...clips].sort((a, b) => a.start - b.start)) {
     if (c.start > from) result.push([from, c.start]);

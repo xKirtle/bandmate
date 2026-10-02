@@ -16,7 +16,7 @@ import {
   outOfOrderReason,
   parseCue,
   playLabel,
-  shiftedCues,
+  movedCues,
   type ChordedLine,
   type CuedSong,
 } from './cues';
@@ -327,7 +327,7 @@ describe('cuesInSpan', () => {
   });
 });
 
-describe('shiftedCues', () => {
+describe('movedCues', () => {
   const song = cuedSong(
     [
       {
@@ -350,11 +350,11 @@ describe('shiftedCues', () => {
 
   it('moves the Cues in any of the spans by the same amount, dormant ones included', () => {
     expect(
-      shiftedCues(
+      movedCues(
         song,
         [
-          [9, 13],
-          [29, 31],
+          { start: 9, end: 13 },
+          { start: 29, end: 31 },
         ],
         1.1,
       ),
@@ -367,11 +367,11 @@ describe('shiftedCues', () => {
 
   it('moves a Cue in two of the spans only once', () => {
     expect(
-      shiftedCues(
+      movedCues(
         song,
         [
-          [14, 20],
-          [10, 15],
+          { start: 14, end: 20 },
+          { start: 10, end: 15 },
         ],
         -2,
       ),
@@ -383,7 +383,7 @@ describe('shiftedCues', () => {
   });
 
   it('moves nothing outside the spans', () => {
-    expect(shiftedCues(song, [[40, 50]], 3)).toEqual([]);
+    expect(movedCues(song, [{ start: 40, end: 50 }], 3)).toEqual([]);
   });
 });
 

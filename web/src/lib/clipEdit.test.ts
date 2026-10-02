@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { Clip, Take } from './api';
-import { clampMove, clampTrimEnd, clampTrimStart, minClipLength, draggedNudge, moveGroup, nudged } from './clipEdit';
+import {
+  clampMove,
+  clampTrimEnd,
+  clampTrimStart,
+  minClipLength,
+  draggedNudge,
+  moveSelection,
+  nudged,
+} from './clipEdit';
 
 // On a Track: a Clip at 0:10-0:20 and one at 0:40-0:50, with a 30s gap
 // between them.
@@ -42,7 +50,7 @@ describe('clampMove', () => {
   });
 });
 
-describe('moveGroup', () => {
+describe('moveSelection', () => {
   /** A Timeline's Tracks, with ids 100, 101 and so on, holding Clips placed at these spans, as [id, start, end]. */
   const placed = (...lanes: [id: number, start: number, end: number][][]) =>
     lanes.map((clips, i) => ({
@@ -66,16 +74,16 @@ describe('moveGroup', () => {
   );
 
   it('moves every selected Clip by the same amount', () => {
-    expect(landed(moveGroup(oneTrack, selected(1, 2), 1, 100, 13))).toEqual(['1:100@13', '2:100@28']);
+    expect(landed(moveSelection(oneTrack, selected(1, 2), 1, 100, 13))).toEqual(['1:100@13', '2:100@28']);
   });
 
   it('stops as one at a Clip outside the Selection', () => {
     // 2 would run into 3 past 10s later.
-    expect(landed(moveGroup(oneTrack, selected(1, 2), 1, 100, 25))).toEqual(['1:100@20', '2:100@35']);
+    expect(landed(moveSelection(oneTrack, selected(1, 2), 1, 100, 25))).toEqual(['1:100@20', '2:100@35']);
   });
 
   it('stops as one when its earliest Clip reaches 0:00', () => {
-    expect(landed(moveGroup(oneTrack, selected(1, 2), 2, 100, 5))).toEqual(['1:100@0', '2:100@15']);
+    expect(landed(moveSelection(oneTrack, selected(1, 2), 2, 100, 5))).toEqual(['1:100@0', '2:100@15']);
   });
 
   it('jumps an obstacle only to where every Clip fits on the far side', () => {
@@ -93,8 +101,8 @@ describe('moveGroup', () => {
     );
     // 2 fits before 4 up to 10s later, or after it from 30s; 1 before 3 up
     // to 25s, or after it from 45s: together, up to 10s or from 45s.
-    expect(landed(moveGroup(tracks, selected(1, 2), 1, 100, 22))).toEqual(['1:100@10', '2:101@10']);
-    expect(landed(moveGroup(tracks, selected(1, 2), 1, 100, 35))).toEqual(['1:100@45', '2:101@45']);
+    expect(landed(moveSelection(tracks, selected(1, 2), 1, 100, 22))).toEqual(['1:100@10', '2:101@10']);
+    expect(landed(moveSelection(tracks, selected(1, 2), 1, 100, 35))).toEqual(['1:100@45', '2:101@45']);
   });
 
   it('never has selected Clips block each other', () => {
@@ -103,15 +111,15 @@ describe('moveGroup', () => {
       [2, 10, 20],
       [3, 20, 30],
     ]);
-    expect(landed(moveGroup(run, selected(1, 2, 3), 2, 100, 15))).toEqual(['1:100@5', '2:100@15', '3:100@25']);
+    expect(landed(moveSelection(run, selected(1, 2, 3), 2, 100, 15))).toEqual(['1:100@5', '2:100@15', '3:100@25']);
   });
 
   it('takes a Selection on one Track to the Track it is dragged over, clear of the Clips there', () => {
-    expect(landed(moveGroup(oneTrack, selected(1, 2), 1, 101, 2))).toEqual(['1:101@5', '2:101@20']);
+    expect(landed(moveSelection(oneTrack, selected(1, 2), 1, 101, 2))).toEqual(['1:101@5', '2:101@20']);
   });
 
   it('keeps each Clip of a Selection over several Tracks on its own Track, moving them only in time', () => {
-    expect(landed(moveGroup(oneTrack, selected(2, 4), 2, 101, 30))).toEqual(['2:100@30', '4:101@5']);
+    expect(landed(moveSelection(oneTrack, selected(2, 4), 2, 101, 30))).toEqual(['2:100@30', '4:101@5']);
   });
 });
 

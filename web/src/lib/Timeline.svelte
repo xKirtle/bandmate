@@ -19,7 +19,7 @@
   import BeatPicker from './BeatPicker.svelte';
   import { Capture, CaptureError, frameAt, inputProblem } from './capture';
   import { addedTrack, chosenTrack, readChosen, storeChosen, type ChoiceEvent } from './chosenTrack';
-  import { clampMove, clampTrimEnd, clampTrimStart, draggedNudge, moveGroup, nudged } from './clipEdit';
+  import { clampMove, clampTrimEnd, clampTrimStart, draggedNudge, moveSelection, nudged } from './clipEdit';
   import {
     editTargets,
     guideLanes,
@@ -34,7 +34,7 @@
     type Snap,
   } from './snapping';
   import { activeTake, clipSources, clipTitle, fileStart, playing } from './clipSource';
-  import { formatCue, shiftedCues } from './cues';
+  import { formatCue, movedCues, type TimeSpan } from './cues';
   import { carriesFiles, fileDropTrack, importEach, type TrackRow } from './fileDrop';
   import {
     History,
@@ -168,7 +168,7 @@
   // belong to the vocal rather than the Beat.
   interface CueOffer {
     /** Where the Clips moved were, each from its start to its end, in seconds. */
-    spans: (readonly [number, number])[];
+    spans: TimeSpan[];
     by: number;
     count: number;
     /** How many Clips moved. */
@@ -1442,7 +1442,7 @@
     /** What a move or trim is snapped to, with the lanes of what's there, while it is. */
     snap: Snap<Aligned> | null;
     /** Where every selected Clip is shown, when the Selection is moved together; null for one Clip. */
-    group: ClipMove[] | null;
+    moves: ClipMove[] | null;
     saving: boolean;
   }
   let edit = $state<Edit | null>(null);
@@ -1459,16 +1459,16 @@
     // Until it's dragged, the Clip pressed stays where it is among the
     // others: moved in the page, it would never get its click, or double-click.
     const dragged = edit?.moved ? edit : null;
-    const group = dragged?.group;
-    const clips = new Map(timeline.tracks.flatMap((t) => t.clips.map((c) => [c.id, c])));
-    const moving = new Set(group ? group.map((m) => m.clipId) : dragged ? [dragged.clip.id] : []);
+    const moves = dragged?.moves;
+    const clips = placedClips();
+    const moving = new Set(moves ? moves.map((m) => m.clipId) : dragged ? [dragged.clip.id] : []);
     return timeline.tracks.map((track) => {
       const placed = track.clips
         .filter((c) => !moving.has(c.id))
         .map((clip) => ({ clip, at: clip as Placed, editing: clip.id === edit?.clip.id }));
-      if (group) {
-        for (const m of group) {
-          const clip = clips.get(m.clipId);
+      if (moves) {
+        for (const m of moves) {
+          const clip = clips.get(m.clipId)?.clip;
           if (clip && m.trackId === track.id) placed.push({ clip, at: { ...clip, start: m.start }, editing: true });
         }
       } else if (dragged?.trackId === track.id) {
@@ -1631,7 +1631,7 @@
       free: skipsSnapping(event),
       toggles,
       snap: null,
-      group: null,
+      moves: null,
       saving: false,
     };
     window.addEventListener('pointermove', editMove);
@@ -1661,7 +1661,7 @@
       // Moving a selected Clip moves the whole Selection; moving another
       // selects it alone. A trim or a nudge leaves the Selection be.
       select({ kind: 'drag', clipId: edit.clip.id });
-      if (selected.size > 1) edit.group = [];
+      if (selected.size > 1) edit.moves = [];
     }
     edit.moved = true;
     clearTimeout(pressTimer);
@@ -1672,10 +1672,10 @@
     const { clip } = edit;
     if (edit.mode === 'nudge') {
       edit.nudge = draggedNudge(clip, t - edit.grab - clip.start);
-    } else if (edit.group) {
+    } else if (edit.moves) {
       // Selected Clips move as one, without snapping for now.
       edit.trackId = trackAt(event.clientY);
-      edit.group = moveGroup(timeline.tracks, selected, clip.id, edit.trackId, t - edit.grab);
+      edit.moves = moveSelection(timeline.tracks, selected, clip.id, edit.trackId, t - edit.grab);
     } else if (edit.mode === 'move') {
       edit.trackId = trackAt(event.clientY);
       const others = othersOn(edit.trackId, clip);
@@ -1719,8 +1719,8 @@
       edit = null;
       return;
     }
-    if (edit.group) {
-      await moveTogether(edit.group);
+    if (edit.moves) {
+      await moveTogether(edit, edit.moves);
       edit = null;
       return;
     }
@@ -1736,19 +1736,17 @@
       edit = null;
       return;
     }
-    // Cues are Timeline times and stay put, but those the Clip spanned may
-    // belong with it, so moving them along is offered, as a step of its own.
     const ok = await perform({ kind: 'moveClip', clipId: clip.id, trackId, start: to.start });
     edit = null;
     if (ok) offerMove([clip], to.start - clip.start);
   }
 
-  /** Saves the Selection moved together, as one edit, unless it's back where it was. */
-  async function moveTogether(moves: ClipMove[]) {
-    const clips = new Map(timeline.tracks.flatMap((t) => t.clips.map((c) => [c.id, { clip: c, trackId: t.id }])));
+  /** Saves the Selection moved together by a drag, as one edit, unless it's back where it was. */
+  async function moveTogether(drag: Edit, moves: ClipMove[]) {
+    const clips = placedClips();
     const from = moves.map((m) => clips.get(m.clipId)!);
     if (moves.every((m, i) => m.trackId === from[i].trackId && m.start === from[i].clip.start)) return;
-    edit!.saving = true;
+    drag.saving = true;
     const ok = await perform({ kind: 'moveClips', moves });
     if (ok)
       offerMove(
@@ -1757,14 +1755,19 @@
       );
   }
 
+  /** Every Clip on the Timeline by its id, with the id of the Track it's on. */
+  function placedClips(): Map<number, { clip: Clip; trackId: number }> {
+    return new Map(timeline.tracks.flatMap((t) => t.clips.map((clip) => [clip.id, { clip, trackId: t.id }])));
+  }
+
   /**
    * Cues are Timeline times and stay put, but those the Clips moved spanned
    * may belong with them, so moving them along is offered, as a step of its own.
    */
   function offerMove(moved: Clip[], by: number) {
     if (by === 0) return;
-    const spans = moved.map((c) => [c.start, c.start + c.length] as const);
-    const count = shiftedCues(song, spans, by).length;
+    const spans = moved.map((c) => ({ start: c.start, end: c.start + c.length }));
+    const count = movedCues(song, spans, by).length;
     if (count === 0) return;
     const offer: CueOffer = { spans, by, count, clips: moved.length };
     offerCues = offer;
@@ -1776,12 +1779,14 @@
 
   onDestroy(() => clearTimeout(offerTimer));
 
-  // The Cues are worked out again as the edit is sent, from the Song as it
-  // is then, so each moves once, however many of the Clips spanned it.
+  // One Clip's Cues move by their span, as the server finds them. Several
+  // Clips' are worked out again as the edit is sent, from the Song as it is
+  // then, and set, so each moves once, however many of the Clips spanned it.
   function moveCues() {
     if (!offerCues) return;
     const { spans, by } = offerCues;
-    editCues((at) => api.restoreCues(at, restorable(shiftedCues(song, spans, by), song)));
+    if (spans.length === 1) editCues((at) => api.shiftCues(at, spans[0].start, spans[0].end, by));
+    else editCues((at) => api.restoreCues(at, restorable(movedCues(song, spans, by), song)));
   }
 
   function editCancel() {

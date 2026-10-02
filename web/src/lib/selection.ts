@@ -45,12 +45,12 @@ function boxed(tracks: Tracks, box: Extract<SelectionGesture, { kind: 'box' }>):
 }
 
 /**
- * The Selection after a gesture, given the Timeline's Tracks: a plain
- * click selects that Clip alone, a Mod+click adds it or takes it out, a
- * drag keeps the Selection if the Clip dragged is in it, so it all moves,
- * or else selects that Clip alone, a box selects the Clips it touches, or adds them with Mod, select-all
- * selects every Clip, and clearing, or clicking empty lane space without
- * Mod, selects none. Clips no longer on the Timeline, e.g. deleted in
+ * The Selection after a gesture, given the Timeline's Tracks. A plain
+ * click selects that Clip alone, and a Mod+click adds it or takes it out.
+ * Dragging a selected Clip keeps the Selection, so it all moves; dragging
+ * another selects it alone. A box selects the Clips it touches, or adds
+ * them with Mod, select-all selects every Clip, and clearing, or clicking
+ * empty lane space without Mod, selects none. Clips no longer on the Timeline, e.g. deleted in
  * another tab or taken away by undo, drop out; without a gesture, or on a
  * Mod+click on empty lane space, that's all that happens, and `selected`
  * itself is given back if none did.

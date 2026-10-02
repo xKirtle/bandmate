@@ -140,31 +140,35 @@ export function outOfOrderReason({ earlierThan, laterThan }: OutOfOrder, name: (
  * Alternate is switched back.
  */
 export function cuesInSpan(song: CuedSong, start: number, end: number): FoundCue[] {
+  return cuesInSpans(song, [{ start, end }]);
+}
+
+/** A stretch of the Timeline, from start up to end, in seconds. */
+export interface TimeSpan {
+  start: number;
+  end: number;
+}
+
+/** The Cues in any of the spans, as cuesInSpan finds them, each once however many of the spans it's in. */
+function cuesInSpans(song: CuedSong, spans: readonly TimeSpan[]): FoundCue[] {
   return song.sections.flatMap((s) =>
     s.alternates.flatMap((a) =>
-      a.lines.flatMap((l) =>
-        l.cue !== null && l.cue >= start && l.cue < end ? [{ section: s.id, line: l.id, cue: l.cue }] : [],
-      ),
+      a.lines.flatMap((l) => {
+        const cue = l.cue;
+        if (cue === null || !spans.some((span) => cue >= span.start && cue < span.end)) return [];
+        return [{ section: s.id, line: l.id, cue }];
+      }),
     ),
   );
 }
 
 /**
- * The Cues in any of the spans, each from its start up to its end in
- * seconds, moved by the seconds given, to the millisecond, as Cues follow
- * several Clips moved together: dormant ones included, as cuesInSpan
- * finds them, and each moved once, however many of the spans it's in.
+ * The Cues in any of the spans moved by the seconds given, to the
+ * millisecond, as Cues follow several Clips moved together: dormant ones
+ * included, and each moved once, however many of the spans it's in.
  */
-export function shiftedCues(song: CuedSong, spans: readonly (readonly [number, number])[], by: number): CueValue[] {
-  return song.sections.flatMap((s) =>
-    s.alternates.flatMap((a) =>
-      a.lines.flatMap((l) => {
-        const cue = l.cue;
-        if (cue === null || !spans.some(([start, end]) => cue >= start && cue < end)) return [];
-        return [{ lineId: l.id, cue: Math.round((cue + by) * 1000) / 1000 }];
-      }),
-    ),
-  );
+export function movedCues(song: CuedSong, spans: readonly TimeSpan[], by: number): CueValue[] {
+  return cuesInSpans(song, spans).map((c) => ({ lineId: c.line, cue: Math.round((c.cue + by) * 1000) / 1000 }));
 }
 
 /**

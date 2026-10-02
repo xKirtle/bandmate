@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// clipMove is where one Clip of a group goes: a Track and a start.
+// clipMove is where one Clip of several moved at once goes: a Track and a start.
 type clipMove struct {
 	ClipID  int64   `json:"clipId"`
 	TrackID int64   `json:"trackId"`
@@ -64,7 +64,7 @@ func TestAMoveOfSeveralClipsIsRefusedWhole(t *testing.T) {
 	ts := newTestServer(t)
 	p := placeTwoClips(t, ts)
 	beatTrack, adlibs := p.tl.Tracks[0].ID, p.tl.Tracks[1].ID
-	// A third Clip, outside the group, at 0:00-0:10 on the second Track.
+	// A third Clip, not among those moved, at 0:00-0:10 on the second Track.
 	timelineChange(t, ts.Do(http.MethodPost, timelinePath(p.song.ID)+"/clips",
 		map[string]any{"trackId": adlibs, "beatId": p.short.ID, "start": 0, "offset": 0, "length": 10}))
 	other := ts.createSong("Other")
@@ -76,7 +76,7 @@ func TestAMoveOfSeveralClipsIsRefusedWhole(t *testing.T) {
 		status int
 		msg    string
 	}{
-		"onto a Clip outside the group": {
+		"onto a Clip not moved": {
 			[]clipMove{{p.first, beatTrack, 70}, {p.second, adlibs, 5}}, http.StatusConflict, "Clips can't overlap on a Track"},
 		"onto each other": {
 			[]clipMove{{p.first, beatTrack, 70}, {p.second, beatTrack, 65}}, http.StatusConflict, "Clips can't overlap on a Track"},
