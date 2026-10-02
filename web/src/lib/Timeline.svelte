@@ -1518,6 +1518,17 @@
     removeSelection();
   }
 
+  /** Copies a Clip alone to the Clipboard, from its menu. */
+  function copyClip(clip: Clip) {
+    clipboard = copy(timeline.tracks, new Set([clip.id])) ?? clipboard;
+  }
+
+  /** Cuts a Clip alone, from its menu: copies it, then deletes it, as one edit to undo. */
+  function cutClip(clip: Clip) {
+    copyClip(clip);
+    remove(clip);
+  }
+
   /**
    * Pastes the Clipboard at the playhead on the Chosen Track, or later
    * where it fits, the playhead staying where it is, adding Tracks at the
@@ -2091,8 +2102,13 @@
     if (menuFor(timeline.tracks, selected, clip.id, frozen).menu === 'selection') {
       return selectionActions(
         selected.size,
-        { duplicateClips: duplicateSelection, deleteClips: removeSelection },
-        frozen,
+        {
+          copyClips: copySelection,
+          cutClips: cutSelection,
+          duplicateClips: duplicateSelection,
+          deleteClips: removeSelection,
+        },
+        { recording: frozen, ...clipboardKeys() },
       );
     }
     const clipId = clip.id;
@@ -2102,6 +2118,7 @@
         canRecord,
         soundName: clip.soundId === null ? null : sources.of(clip).title,
         nudgeKeys: hints.label(shortcuts.nudgeTake.keys),
+        ...clipboardKeys(),
         selected: selected.size,
         recording: frozen,
       },
@@ -2113,11 +2130,18 @@
         clearInactiveTakes: () => perform({ kind: 'clearInactiveTakes', clipId }),
         downloadTake: (takeId) => download(api.takeDownloadUrl(timeline.songId, takeId)),
         rename: () => startClipRename(clip),
+        copy: () => copyClip(clip),
+        cut: () => cutClip(clip),
         duplicate: () => duplicate(clip),
         downloadSound: (soundId) => download(api.soundDownloadUrl(timeline.songId, soundId)),
         deleteClip: () => remove(clip),
       },
     );
+  }
+
+  /** The keys that copy and cut, as the Clip and Selection menus name them. */
+  function clipboardKeys() {
+    return { copyKeys: hints.label(shortcuts.copyClips.keys), cutKeys: hints.label(shortcuts.cutClips.keys) };
   }
 
   /** Saves what a URL serves as a file, as the server names it. */

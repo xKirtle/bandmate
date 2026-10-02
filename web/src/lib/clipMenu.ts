@@ -17,6 +17,9 @@ export type ClipMenuState = {
   soundName: string | null;
   /** The keys that nudge a Take, as shown, or null for none. */
   nudgeKeys: string | null;
+  /** The keys that copy, and that cut, the Selection, as shown, or null for none. */
+  copyKeys: string | null;
+  cutKeys: string | null;
   /** How many Clips are selected. With several, no Retake is offered. */
   selected: number;
   /** A recording is starting, under way or saving, so nothing's edited. */
@@ -33,6 +36,10 @@ export type ClipRun = {
   clearInactiveTakes: () => void;
   downloadTake: (takeId: number) => void;
   rename: () => void;
+  /** Copies the Clip to the Clipboard. */
+  copy: () => void;
+  /** Copies the Clip to the Clipboard, then deletes it. */
+  cut: () => void;
   duplicate: () => void;
   downloadSound: (soundId: number) => void;
   deleteClip: () => void;
@@ -45,6 +52,7 @@ export function clipActions(clip: Clip, state: ClipMenuState, run: ClipRun): Men
   return [
     ...takeActions(clip, state, run),
     edit({ icon: '✎', label: 'Rename', title: 'Or double-click the Clip', run: run.rename }),
+    ...clipboardActions(edit, state, run.copy, run.cut),
     edit({ icon: '⧉', label: 'Duplicate', run: run.duplicate }),
     ...(soundId !== null
       ? [
@@ -65,20 +73,41 @@ function editing(recording: boolean): (action: MenuAction) => MenuAction {
   return (action) => (recording ? { ...action, disabled: true, title: editHint(true, action.title) } : action);
 }
 
+/** Copy and Cut, naming their keys, if there are any to name, as Rename names double-clicking. */
+function clipboardActions(
+  edit: (action: MenuAction) => MenuAction,
+  keys: Pick<ClipMenuState, 'copyKeys' | 'cutKeys'>,
+  copy: () => void,
+  cut: () => void,
+): MenuAction[] {
+  const or = (k: string | null) => (k ? `Or ${k}` : undefined);
+  return [
+    edit({ icon: '⎘', label: 'Copy', title: or(keys.copyKeys), run: copy }),
+    // Not ✂, which some fonts only draw as an emoji, unlike the other glyphs.
+    edit({ icon: '✁', label: 'Cut', title: or(keys.cutKeys), run: cut }),
+  ];
+}
+
 /** What each entry of the Selection menu does. */
 export type SelectionRun = {
+  copyClips: () => void;
+  cutClips: () => void;
   duplicateClips: () => void;
   deleteClips: () => void;
 };
+
+/** What the Selection menu needs to know besides how many Clips are selected. */
+export type SelectionMenuState = Pick<ClipMenuState, 'recording' | 'copyKeys' | 'cutKeys'>;
 
 /**
  * The entries of the Selection menu, a selected Clip's menu while there are
  * several selected, acting on all `count` of them.
  */
-export function selectionActions(count: number, run: SelectionRun, recording = false): MenuAction[] {
-  const edit = editing(recording);
+export function selectionActions(count: number, run: SelectionRun, state: SelectionMenuState): MenuAction[] {
+  const edit = editing(state.recording);
   const howMany = `${count} Clip${count === 1 ? '' : 's'}`;
   return [
+    ...clipboardActions(edit, state, run.copyClips, run.cutClips),
     edit({ icon: '⧉', label: `Duplicate ${howMany}`, run: run.duplicateClips }),
     edit({ icon: '×', label: `Delete ${howMany}`, run: run.deleteClips }),
   ];
