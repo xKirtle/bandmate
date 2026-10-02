@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Clip, Take, Track } from './api';
-import { copy, duplicate, emptyClipboard, paste } from './clipboard';
+import { copy, duplicate, emptyClipboard, paste, type Paste } from './clipboard';
 
 const clip = (id: number, start: number, length = 10, more: Partial<Clip> = {}): Clip => ({
   id,
@@ -37,7 +37,7 @@ const take = (id: number, position: number, nudge: number): Take => ({
 });
 
 /** Where each pasted Clip goes, as "Track id:start", or "new Track index:start" on a Track the paste adds. */
-const landing = (pasted: ReturnType<typeof paste> | ReturnType<typeof duplicate>) =>
+const landing = (pasted: Paste | null) =>
   pasted?.clips.map((p) => `${'trackId' in p ? p.trackId : `new ${p.newTrack}`}:${p.clip.start}`);
 
 describe('copy', () => {

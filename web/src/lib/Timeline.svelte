@@ -67,7 +67,14 @@
   import { allKeys, shortcuts, type Way } from './shortcuts';
   import { clipActions, selectionActions } from './clipMenu';
   import { menuFor, noSelection, selection, type Selection, type SelectionGesture } from './selection';
-  import { copy, duplicate as duplicateOf, emptyClipboard, paste, type Clipboard, type Paste } from './clipboard';
+  import {
+    copy,
+    duplicate as duplicatePlacement,
+    emptyClipboard,
+    paste,
+    type Clipboard,
+    type Paste,
+  } from './clipboard';
   import {
     addsBox,
     clearsSelection,
@@ -1977,7 +1984,7 @@
    * the copies. It leaves the Clipboard as it is.
    */
   function duplicateSelection() {
-    const copies = duplicateOf(timeline.tracks, selected);
+    const copies = duplicatePlacement(timeline.tracks, selected);
     if (copies) pasteAndSelect(copies);
   }
 

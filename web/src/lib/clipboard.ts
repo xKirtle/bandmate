@@ -5,6 +5,9 @@
 // it can be pasted again and again. Like the Selection, it isn't an edit, and it's
 // never kept: it lives in the page while the Song is open, so leaving the
 // Song drops it. The system clipboard is never touched.
+//
+// A Duplicate of several selected Clips lands as a paste does, so it's
+// placed here too, though it leaves the Clipboard as it is.
 
 import type { Clip, ClipCopy, PastedClip, Track, TrackToAdd } from './api';
 import type { Selection } from './selection';
@@ -129,9 +132,10 @@ export function paste(
  * fits, as a paste does. Null with none selected.
  */
 export function duplicate(tracks: readonly Track[], selected: Selection): Paste | null {
+  // The topmost selected Clip's Track takes the topmost copy.
+  const top = tracks.find((t) => t.clips.some((c) => selected.has(c.id)));
   const copied = copy(tracks, selected);
-  if (!copied) return null;
+  if (!top || !copied) return null;
   const end = Math.max(...copied.clips.map(({ clip }) => clip.start + clip.length));
-  const top = tracks.find((t) => t.clips.some((c) => selected.has(c.id)))!;
   return paste(copied, tracks, end, top.id);
 }

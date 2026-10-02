@@ -77,10 +77,10 @@ export type SelectionRun = {
  */
 export function selectionActions(count: number, run: SelectionRun, recording = false): MenuAction[] {
   const edit = editing(recording);
-  const clips = `${count} Clip${count === 1 ? '' : 's'}`;
+  const howMany = `${count} Clip${count === 1 ? '' : 's'}`;
   return [
-    edit({ icon: '⧉', label: `Duplicate ${clips}`, run: run.duplicateClips }),
-    edit({ icon: '×', label: `Delete ${clips}`, run: run.deleteClips }),
+    edit({ icon: '⧉', label: `Duplicate ${howMany}`, run: run.duplicateClips }),
+    edit({ icon: '×', label: `Delete ${howMany}`, run: run.deleteClips }),
   ];
 }
 
