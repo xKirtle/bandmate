@@ -41,9 +41,10 @@ function boxed(tracks: Tracks, box: Extract<SelectionGesture, { kind: 'box' }>):
  * The Selection after a gesture, given the Timeline's Tracks: a plain
  * click selects that Clip alone, a Mod+click adds it or takes it out, a
  * box selects the Clips it touches, or adds them with Mod, select-all
- * selects every Clip, and clearing selects none. Clips no longer on the Timeline, e.g. deleted in
- * another tab or taken away by undo, drop out; without a gesture that's
- * all that happens, and `selected` itself is given back if none did.
+ * selects every Clip, and clearing selects none. Clips no longer on the
+ * Timeline, e.g. deleted in another tab or taken away by undo, drop out;
+ * without a gesture that's all that happens, and `selected` itself is
+ * given back if none did.
  */
 export function selection(tracks: Tracks, selected: Selection, gesture?: SelectionGesture): Selection {
   const present = new Set(tracks.flatMap((t) => t.clips.map((c) => c.id)));

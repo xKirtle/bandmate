@@ -1319,9 +1319,11 @@
     adds: boolean;
     /** The Selection as it was pressed, which the box replaces or adds to. */
     before: Selection;
-    /** The box's corner where it was pressed, in seconds and Track index, and pixels down the lanes. */
+    /** Where it was pressed, in seconds: the box's start. */
     start: number;
-    track: number;
+    /** The index of the Track whose lane was pressed. */
+    trackIndex: number;
+    /** How far down the lanes it was pressed, in pixels. */
     top: number;
   }
   let lanePress: LanePress | null = null;
@@ -1333,7 +1335,13 @@
     return clientY - lanesElement!.getBoundingClientRect().top;
   }
 
-  function laneDown(event: PointerEvent, track: number) {
+  /** The index of the Track whose lane is nearest to a height on the page. */
+  function trackIndexAt(clientY: number): number {
+    const id = trackAt(clientY);
+    return timeline.tracks.findIndex((t) => t.id === id);
+  }
+
+  function laneDown(event: PointerEvent) {
     if (event.target !== event.currentTarget || !editable.current || !event.isPrimary || event.button !== 0) return;
     // Not selecting the page's text as it's drawn. Focus goes to the lanes,
     // so the Timeline's keys, e.g. Esc and Mod+A, work after it.
@@ -1345,7 +1353,7 @@
       adds: addsBox(event),
       before: selected,
       start: spanTimeAt(event.clientX),
-      track,
+      trackIndex: trackIndexAt(event.clientY),
       top: yIn(event.clientY),
     };
     window.addEventListener('pointermove', laneMove);
@@ -1358,11 +1366,11 @@
     // A small wobble while clicking isn't a box.
     if (!lanePress.moved && !pastSlop(lanePress.from, event)) return;
     lanePress.moved = true;
-    const { start, track, top, adds, before } = lanePress;
+    const { start, trackIndex, top, adds, before } = lanePress;
     const end = spanTimeAt(event.clientX);
-    const to = timeline.tracks.findIndex((t) => t.id === trackAt(event.clientY));
     box = { start, end, top, bottom: yIn(event.clientY) };
-    selected = selection(timeline.tracks, before, { kind: 'box', start, end, tracks: [track, to], adds });
+    const tracks = [trackIndex, trackIndexAt(event.clientY)] as const;
+    selected = selection(timeline.tracks, before, { kind: 'box', start, end, tracks, adds });
     dragAt(event, laneMove);
   }
 
@@ -2613,7 +2621,7 @@
                 class:drop-above={trackGap === t}
                 class:drop-below={trackGap === shown.length && t === shown.length - 1}
                 bind:this={laneElements[t]}
-                onpointerdown={(e) => laneDown(e, t)}
+                onpointerdown={laneDown}
               >
                 {#each placed as { clip, at, editing } (clip.id)}
                   {@const wave = waveWindow(view, at.start, at.length)}
