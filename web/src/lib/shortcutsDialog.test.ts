@@ -19,6 +19,8 @@ group('dialogGroups', () => {
         'Nudge a Cue by 0.1 s',
         'Select every Clip',
         'Clear the Selection',
+        'Copy the Selection',
+        'Paste',
       ],
       ['Cue the next Line'],
       [

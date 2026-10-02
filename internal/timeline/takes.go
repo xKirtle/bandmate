@@ -283,18 +283,9 @@ type TakeAt struct {
 // Clip or detached, and those it isn't given leave it, detached. It keeps
 // its Track, and must stay within its Takes and clear of its neighbours.
 func (s *Store) SetTakes(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64, ct ClipTakes) (Timeline, error) {
-	ids := make([]int64, len(ct.Takes))
-	for i, t := range ct.Takes {
-		ids[i] = t.ID
-		if math.IsNaN(t.Position) || math.IsInf(t.Position, 0) || t.Position < -tolerance {
-			return Timeline{}, &lyricsheet.InvalidError{Msg: "a Take can't start before its Clip's source"}
-		}
-		if err := checkNudge(t.Nudge); err != nil {
-			return Timeline{}, err
-		}
-	}
-	if ct.ActiveTakeID == nil || !slices.Contains(ids, *ct.ActiveTakeID) {
-		return Timeline{}, &lyricsheet.InvalidError{Msg: "a Clip of Takes plays one of them"}
+	ids, err := checkTakesAt(ct.Takes, ct.ActiveTakeID)
+	if err != nil {
+		return Timeline{}, err
 	}
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		p, err := takeClip(ctx, tx, songID, clipID)
@@ -331,6 +322,26 @@ func (s *Store) SetTakes(ctx context.Context, songID int64, based lyricsheet.Ver
 		p.start, p.offset, p.length = ct.Start, max(ct.Offset, 0), ct.Length
 		return place(ctx, tx, clipID, p)
 	})
+}
+
+// checkTakesAt checks the Takes a Clip of Takes is to have, each where it
+// starts in the Clip's source span and how far it's nudged, and the one it
+// plays among them, returning their ids.
+func checkTakesAt(takes []TakeAt, active *int64) ([]int64, error) {
+	ids := make([]int64, len(takes))
+	for i, t := range takes {
+		ids[i] = t.ID
+		if math.IsNaN(t.Position) || math.IsInf(t.Position, 0) || t.Position < -tolerance {
+			return nil, &lyricsheet.InvalidError{Msg: "a Take can't start before its Clip's source"}
+		}
+		if err := checkNudge(t.Nudge); err != nil {
+			return nil, err
+		}
+	}
+	if active == nil || !slices.Contains(ids, *active) {
+		return nil, &lyricsheet.InvalidError{Msg: "a Clip of Takes plays one of them"}
+	}
+	return ids, nil
 }
 
 // NudgeTake moves one of a Clip's Takes by hand, to be nudge seconds from

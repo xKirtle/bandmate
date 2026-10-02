@@ -980,6 +980,101 @@ func (s *Store) DuplicateClip(ctx context.Context, songID int64, based lyricshee
 	return tl, err
 }
 
+// ClipCopy is a Clip as it was copied, to paste as a new Clip on a Track:
+// a stretch of a Beat or a Sound, or of Takes, given as they were then, each
+// where it started in the Clip's source span and how far it was nudged.
+type ClipCopy struct {
+	TrackID int64
+	BeatID  *int64
+	SoundID *int64
+	// Name is its own name, if it had one.
+	Name *string
+	// Takes are a Clip of Takes', and ActiveTakeID the one of them it plays.
+	Takes        []TakeAt
+	ActiveTakeID *int64
+	Start        float64
+	Offset       float64
+	Length       float64
+}
+
+// PasteClips adds new Clips copied from others, as they were copied, each
+// on its Track: the Clipboard's, pasted. A Clip of Takes gets copies of the
+// Takes, sharing their files, which may be in a Clip still or detached, as a
+// Clip cut is. Each must stay within its source, start on the Timeline and
+// not overlap a Clip already there, or another of them. If any can't be
+// pasted, none is.
+func (s *Store) PasteClips(ctx context.Context, songID int64, based lyricsheet.Version, clips []ClipCopy) (Timeline, error) {
+	if len(clips) == 0 {
+		return Timeline{}, &lyricsheet.InvalidError{Msg: "clips are required"}
+	}
+	for _, c := range clips {
+		if len(c.Takes) == 0 {
+			continue
+		}
+		if _, err := checkTakesAt(c.Takes, c.ActiveTakeID); err != nil {
+			return Timeline{}, err
+		}
+	}
+	var linked []int64
+	tl, err := s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		for _, c := range clips {
+			nc := NewClip{BeatID: c.BeatID, SoundID: c.SoundID, Name: c.Name,
+				Start: c.Start, Offset: c.Offset, Length: c.Length}
+			if len(c.Takes) > 0 {
+				ids, active, err := s.copyTakesAt(ctx, tx, songID, c.Takes, *c.ActiveTakeID, &linked)
+				if err != nil {
+					return err
+				}
+				nc.TakeIDs, nc.ActiveTakeID = ids, &active
+			}
+			// Each pasted is there for the next to be checked against.
+			if err := placeOnTrack(ctx, tx, songID, PlacedClip{TrackID: c.TrackID, NewClip: nc}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		s.removeTakeFiles(linked)
+	}
+	return tl, err
+}
+
+// copyTakesAt adds a detached copy of each of the Song's Takes, sharing its
+// file, where it's given to start in its span and nudged as given, noting
+// each file linked in linked. It returns the copies' ids, in order, and the
+// id of the copy of active.
+func (s *Store) copyTakesAt(ctx context.Context, tx *sql.Tx, songID int64, takes []TakeAt, active int64,
+	linked *[]int64) ([]int64, int64, error) {
+	ids := make([]int64, len(takes))
+	for i, t := range takes {
+		if slices.Contains(ids[:i], t.ID) {
+			return nil, 0, &lyricsheet.InvalidError{Msg: "a Take can only be in a Clip once"}
+		}
+		ids[i] = t.ID
+		var n int
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM takes WHERE id = ? AND song_id = ?`,
+			t.ID, songID).Scan(&n); err != nil {
+			return nil, 0, fmt.Errorf("reading take: %w", err)
+		}
+		if n == 0 {
+			return nil, 0, &lyricsheet.InvalidError{Msg: "there's no such Take in this Song"}
+		}
+	}
+	copies, err := s.copyTakes(ctx, tx, ids, linked)
+	if err != nil {
+		return nil, 0, err
+	}
+	for i, t := range takes {
+		ids[i] = copies[t.ID]
+		if _, err := tx.ExecContext(ctx, `UPDATE takes SET position = ?, nudge = ? WHERE id = ?`,
+			max(t.Position, 0), t.Nudge, ids[i]); err != nil {
+			return nil, 0, fmt.Errorf("placing take: %w", err)
+		}
+	}
+	return ids, copies[active], nil
+}
+
 // copyTakes adds a detached copy of each of the Takes, sharing its file,
 // noting each file linked in linked. It returns the copies' ids by the ids
 // of the Takes copied.

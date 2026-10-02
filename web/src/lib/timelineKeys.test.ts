@@ -4,6 +4,7 @@ import {
   addsBox,
   clearsSelection,
   clipAction,
+  clipboardAction,
   isModifier,
   nudges,
   rulerSeek,
@@ -212,6 +213,22 @@ group('selectsAll', () => {
 
   it('leaves other keys alone', () => {
     expect(selectsAll(press('z', { ctrlKey: true }))).toBe(false);
+  });
+});
+
+group('clipboardAction', () => {
+  it('copies on Ctrl+C or ⌘C, and pastes on Ctrl+V or ⌘V', () => {
+    expect(clipboardAction(press('c', { ctrlKey: true }))).toBe('copy');
+    expect(clipboardAction(press('C', { metaKey: true }))).toBe('copy');
+    expect(clipboardAction(press('v', { ctrlKey: true }))).toBe('paste');
+    expect(clipboardAction(press('v', { metaKey: true }))).toBe('paste');
+  });
+
+  it('takes them only with Mod alone, leaving other keys alone', () => {
+    expect(clipboardAction(press('c'))).toBeNull();
+    expect(clipboardAction(press('v', { ctrlKey: true, shiftKey: true }))).toBeNull();
+    expect(clipboardAction(press('c', { ctrlKey: true, altKey: true }))).toBeNull();
+    expect(clipboardAction(press('a', { ctrlKey: true }))).toBeNull();
   });
 });
 

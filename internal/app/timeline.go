@@ -210,6 +210,37 @@ func (a *App) duplicateClip(w http.ResponseWriter, r *http.Request) {
 	a.changeClip(w, r, nil, a.timelines.DuplicateClip)
 }
 
+// clipToPaste is a Clip as it was copied, to paste on a Track, as a request
+// gives it.
+type clipToPaste struct {
+	TrackID      *int64            `json:"trackId"`
+	BeatID       *int64            `json:"beatId"`
+	SoundID      *int64            `json:"soundId"`
+	Name         *string           `json:"name"`
+	Takes        []timeline.TakeAt `json:"takes"`
+	ActiveTakeID *int64            `json:"activeTakeId"`
+	Start        *float64          `json:"start"`
+	Offset       *float64          `json:"offset"`
+	Length       *float64          `json:"length"`
+}
+
+func (a *App) pasteClips(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Clips []clipToPaste `json:"clips"`
+	}
+	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+		clips := make([]timeline.ClipCopy, len(req.Clips))
+		for i, c := range req.Clips {
+			if c.TrackID == nil || c.Start == nil || c.Offset == nil || c.Length == nil {
+				return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "trackId, start, offset and length are required"}
+			}
+			clips[i] = timeline.ClipCopy{TrackID: *c.TrackID, BeatID: c.BeatID, SoundID: c.SoundID, Name: c.Name,
+				Takes: c.Takes, ActiveTakeID: c.ActiveTakeID, Start: *c.Start, Offset: *c.Offset, Length: *c.Length}
+		}
+		return a.timelines.PasteClips(r.Context(), id, based, clips)
+	})
+}
+
 func (a *App) deleteClips(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ClipIDs []int64 `json:"clipIds"`

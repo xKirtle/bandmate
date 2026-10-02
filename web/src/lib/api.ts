@@ -357,6 +357,23 @@ export interface PlacedClip {
   clip: NewClip;
 }
 
+/**
+ * A Clip as it was copied, to paste as a new Clip: a stretch of a Beat or a
+ * Sound, or of Takes, given as they were then, each where it started in the
+ * Clip's source span and how far it was nudged.
+ */
+export type ClipCopy = Pick<Clip, 'start' | 'offset' | 'length'> & { name?: string } & (
+    | { beatId: number }
+    | { soundId: number }
+    | { takes: Pick<Take, 'id' | 'position' | 'nudge'>[]; activeTakeId: number }
+  );
+
+/** A Clip to paste, and the Track it goes on. */
+export interface PastedClip {
+  trackId: number;
+  clip: ClipCopy;
+}
+
 /** Where one of several Clips moved at once goes: a Track and a start, in seconds. */
 export interface ClipMove {
   clipId: number;
@@ -745,6 +762,18 @@ export const api = {
     request<Timeline>(
       'POST',
       `/songs/${at.id}/timeline/clips/place`,
+      { clips: clips.map((c) => ({ trackId: c.trackId, ...c.clip })) },
+      at,
+    ),
+  /**
+   * Pastes Clips as they were copied, each a new Clip: a Clip of Takes gets
+   * copies of its Takes, sharing their audio. Refused whole if any would
+   * overlap a Clip there, or another of them.
+   */
+  pasteClips: (at: SongAt, clips: PastedClip[]) =>
+    request<Timeline>(
+      'POST',
+      `/songs/${at.id}/timeline/clips/paste`,
       { clips: clips.map((c) => ({ trackId: c.trackId, ...c.clip })) },
       at,
     ),

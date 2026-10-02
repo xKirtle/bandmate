@@ -5,6 +5,7 @@ import {
   type CueValue,
   type NewClip,
   type NewTrack,
+  type PastedClip,
   type PlacedClip,
   type SongAt,
   type Song,
@@ -35,9 +36,9 @@ import { isBlank, type CuedSong } from './cues';
 // before or after it.
 //
 // Deleting a Clip of Takes, or its Track, only detaches its Takes, so
-// placing a Clip from their ids brings them back. A new Take, and a copied
-// Clip, are redone as that too, so redoing never uploads a Take again or
-// copies it again. Likewise, a Sound outlives its last Clip for as long as
+// placing a Clip from their ids brings them back. A new Take, a copied
+// Clip and pasted Clips are redone as that too, so redoing never uploads a
+// Take again or copies it again. Likewise, a Sound outlives its last Clip for as long as
 // undo lasts, so an imported Sound is undone by deleting its Clip and
 // redone by placing a Clip of it back, without uploading it again. A Retake
 // is undone and redone by setting its Clip's Takes, and where they are, as
@@ -59,6 +60,8 @@ export type Edit =
   | { kind: 'placeClip'; trackId: number; clip: NewClip }
   | { kind: 'placeClips'; clips: PlacedClip[] }
   | { kind: 'duplicateClip'; clipId: number }
+  /** Clips pasted from the Clipboard, as new Clips. */
+  | { kind: 'pasteClips'; clips: PastedClip[] }
   | { kind: 'moveClip'; clipId: number; trackId: number; start: number }
   | { kind: 'moveClips'; moves: ClipMove[] }
   | { kind: 'trimClip'; clipId: number; offset: number; length: number }
@@ -108,7 +111,12 @@ export class History {
   /** Keeps an edit that turned before into after, to undo, unless it changed nothing. */
   record(edit: Edit, before: Timeline, after: Timeline): void {
     if (content(before) === content(after)) return;
-    const redo = edit.kind === 'duplicateClip' ? placingAdded(before, after) : edit;
+    const redo =
+      edit.kind === 'duplicateClip'
+        ? placingAdded(before, after)
+        : edit.kind === 'pasteClips'
+          ? placingAllAdded(before, after)
+          : edit;
     this.#undo.push({ undo: inverse(edit, before, after), redo: { edit: redo, adds: added(before, after) } });
     this.#redo = [];
   }
@@ -202,6 +210,7 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
       return { edit: undo, adds: none };
     }
     case 'placeClips':
+    case 'pasteClips':
       return { edit: { kind: 'deleteClips', clipIds: added(before, after).clips }, adds: none };
     case 'updateTrack': {
       const track = before.tracks.find((t) => t.id === edit.trackId)!;
@@ -296,6 +305,20 @@ export function placingAdded(before: Timeline, after: Timeline): Edit {
   return { kind: 'placeClip', trackId: track.id, clip: placementOf(clip) };
 }
 
+/** The edit that places every Clip added when before turned into after, as it is, as placingAdded does one. */
+function placingAllAdded(before: Timeline, after: Timeline): Edit {
+  const clips = added(before, after).clips.map((id) => {
+    const { track, clip } = findClip(after, id);
+    return { trackId: track.id, clip: placementOf(clip) };
+  });
+  return { kind: 'placeClips', clips };
+}
+
+/** The ids of the Clips in after that weren't in before, in Timeline order, e.g. the Clips a paste made. */
+export function addedClips(before: Timeline, after: Timeline): number[] {
+  return added(before, after).clips;
+}
+
 /**
  * The edit that sets a Clip of Takes as it is in tl: its Takes and where
  * they are in its span, its active Take and its placement. A Retake is kept
@@ -383,6 +406,8 @@ function remap(edit: HistoryEdit, ids: IdMaps): HistoryEdit {
       return { ...edit, trackId: ids.track(edit.trackId) };
     case 'placeClips':
       return { ...edit, clips: edit.clips.map((c) => ({ ...c, trackId: ids.track(c.trackId) })) };
+    case 'pasteClips':
+      return { ...edit, clips: edit.clips.map((c) => ({ ...c, trackId: ids.track(c.trackId) })) };
     case 'moveClip':
       return { ...edit, clipId: ids.clip(edit.clipId), trackId: ids.track(edit.trackId) };
     case 'moveClips':
@@ -433,6 +458,8 @@ export function sendEdit(at: SongAt, edit: Edit): Promise<Timeline> {
       return api.placeClip(at, edit.trackId, edit.clip);
     case 'placeClips':
       return api.placeClips(at, edit.clips);
+    case 'pasteClips':
+      return api.pasteClips(at, edit.clips);
     case 'moveClip':
       return api.moveClip(at, edit.clipId, edit.trackId, edit.start);
     case 'moveClips':

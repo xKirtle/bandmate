@@ -40,6 +40,7 @@
   import { editHint, editsWhileRecording } from './freeze';
   import { carriesFiles, fileDropTrack, importEach, type TrackRow } from './fileDrop';
   import {
+    addedClips,
     History,
     placingAdded,
     restorable,
@@ -66,10 +67,12 @@
   import { allKeys, shortcuts, type Way } from './shortcuts';
   import { clipActions, selectionActions } from './clipMenu';
   import { menuFor, noSelection, selection, type Selection, type SelectionGesture } from './selection';
+  import { copy, emptyClipboard, paste, type Clipboard } from './clipboard';
   import {
     addsBox,
     clearsSelection,
     clipAction,
+    clipboardAction,
     isModifier,
     nudges,
     rulerSeek,
@@ -1488,18 +1491,52 @@
   }
   onDestroy(laneDone);
 
-  // Esc clears the Selection while focus is in the Timeline, and Mod+A
-  // selects every Clip, but not in a text field, a menu or a dialog, whose
-  // keys are their own, nor while a Track is dragged, which Esc cancels.
+  // The Clipboard: the Clips last copied from the Selection, as they were
+  // then. Like the Selection, it's never kept, so leaving the Song drops it,
+  // and undo and redo never change it.
+  let clipboard = $state.raw<Clipboard>(emptyClipboard);
+
+  /** Copies the Selection to the Clipboard; with none, the Clipboard stays as it was. */
+  function copySelection() {
+    clipboard = copy(timeline.tracks, selected) ?? clipboard;
+  }
+
+  /**
+   * Pastes the Clipboard at the playhead on the Chosen Track, or later
+   * where it fits, the playhead staying where it is, and selects the Clips
+   * pasted.
+   */
+  function pasteClipboard() {
+    if (chosen === null) return; // Never: a Song always has a Track.
+    const clips = paste(clipboard, timeline.tracks, playheadAt(), chosen);
+    if (!clips) return;
+    perform({ kind: 'pasteClips', clips }, (before, after) => {
+      // Unless the Selection is locked by a recording started since.
+      if (!frozen) selected = new Set(addedClips(before, after));
+    });
+  }
+
+  // Esc clears the Selection while focus is in the Timeline, Mod+A
+  // selects every Clip, and Mod+C and Mod+V copy and paste, but not in a
+  // text field, a menu or a dialog, whose keys are their own, nor while a
+  // Track is dragged, which Esc cancels. Copying and pasting are edits,
+  // so not on a phone, nor while recording.
   function timelineKey(event: KeyboardEvent) {
     if (event.defaultPrevented || trackDrag.current) return;
     if (inTextField(event.target) || inMenuOrDialog(event.target)) return;
+    const clipboardKey = clipboardAction(event);
     if (clearsSelection(event) && selected.size > 0) {
       event.preventDefault();
       select({ kind: 'clear' });
     } else if (selectsAll(event) && editable.current) {
       event.preventDefault();
       select({ kind: 'all' });
+    } else if (clipboardKey === 'copy' && selected.size > 0 && editable.current && !frozen) {
+      event.preventDefault();
+      copySelection();
+    } else if (clipboardKey === 'paste' && editable.current && !frozen) {
+      event.preventDefault();
+      pasteClipboard();
     }
   }
 
