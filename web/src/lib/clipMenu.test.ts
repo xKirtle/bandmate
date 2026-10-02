@@ -149,24 +149,31 @@ group('clipActions', () => {
 });
 
 group('selectionActions', () => {
-  it('offers deleting every selected Clip, naming how many', () => {
-    expect(selectionActions(3, { deleteClips: () => {} }).map((a) => a.label)).toEqual(['Delete 3 Clips']);
+  const run = { duplicateClips: () => {}, deleteClips: () => {} };
+
+  it('offers duplicating and deleting every selected Clip, naming how many', () => {
+    expect(selectionActions(3, run).map((a) => a.label)).toEqual(['Duplicate 3 Clips', 'Delete 3 Clips']);
   });
 
   it('names one Clip as one', () => {
-    expect(selectionActions(1, { deleteClips: () => {} }).map((a) => a.label)).toEqual(['Delete 1 Clip']);
+    expect(selectionActions(1, run).map((a) => a.label)).toEqual(['Duplicate 1 Clip', 'Delete 1 Clip']);
   });
 
-  it('deletes them when picked', () => {
-    let deleted = 0;
-    const [entry] = selectionActions(2, { deleteClips: () => deleted++ });
-    if ('run' in entry) entry.run();
-    expect(deleted).toBe(1);
+  it('duplicates or deletes them when picked', () => {
+    const picked: string[] = [];
+    const entries = selectionActions(2, {
+      duplicateClips: () => picked.push('duplicate'),
+      deleteClips: () => picked.push('delete'),
+    });
+    for (const entry of entries) if ('run' in entry) entry.run();
+    expect(picked).toEqual(['duplicate', 'delete']);
   });
 
-  it('turns deleting off while recording, saying why', () => {
-    const [entry] = selectionActions(2, { deleteClips: () => {} }, true);
-    expect(entry).toMatchObject({ label: 'Delete 2 Clips', disabled: true, title: 'Stop recording to edit' });
-    expect(selectionActions(2, { deleteClips: () => {} })[0].disabled).toBeFalsy();
+  it('turns duplicating and deleting off while recording, saying why', () => {
+    expect(selectionActions(2, run, true)).toMatchObject([
+      { label: 'Duplicate 2 Clips', disabled: true, title: 'Stop recording to edit' },
+      { label: 'Delete 2 Clips', disabled: true, title: 'Stop recording to edit' },
+    ]);
+    expect(selectionActions(2, run).some((a) => a.disabled)).toBe(false);
   });
 });

@@ -120,3 +120,18 @@ export function paste(
     }),
   };
 }
+
+/**
+ * Where a Duplicate of the selected Clips lands: on the same Tracks,
+ * starting where the Selection ends (its last Clip's end), keeping their
+ * places relative to each other. Where that would land any copy on another
+ * Clip, they all go later, together, to the first place where every one
+ * fits, as a paste does. Null with none selected.
+ */
+export function duplicate(tracks: readonly Track[], selected: Selection): Paste | null {
+  const copied = copy(tracks, selected);
+  if (!copied) return null;
+  const end = Math.max(...copied.clips.map(({ clip }) => clip.start + clip.length));
+  const top = tracks.find((t) => t.clips.some((c) => selected.has(c.id)))!;
+  return paste(copied, tracks, end, top.id);
+}
