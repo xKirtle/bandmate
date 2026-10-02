@@ -394,8 +394,9 @@
       return e
         ? send(at, e, (before, after) => {
             const back = history.undone(before, after);
-            // Clips deleted together come back selected, as they were.
-            if (e.kind === 'placeClips') selected = new Set(back);
+            // Clips deleted together come back selected, as they were,
+            // unless the Selection is locked while recording.
+            if (e.kind === 'placeClips' && !selectionLocked) selected = new Set(back);
           })
         : unchanged(at);
     });
@@ -1307,9 +1308,12 @@
   // a Track, selecting isn't an edit, and it's never kept, so leaving the
   // Song drops it. A phone, where Clips can't be edited, has none.
   let selected = $state<Selection>(noSelection);
+  // While recording, a new Take or a Retake, from its start until it's
+  // saved, the Selection is locked: gestures leave it as it was.
+  const selectionLocked = $derived(recording !== null);
 
   function select(gesture: SelectionGesture) {
-    selected = selection(timeline.tracks, selected, gesture);
+    selected = selection(timeline.tracks, selected, gesture, selectionLocked);
   }
 
   // Clips gone from the Timeline, e.g. deleted in another tab or taken away
@@ -1384,7 +1388,9 @@
     const end = spanTimeAt(event.clientX);
     box = { start, end, top, bottom: yIn(event.clientY) };
     const tracks = [trackIndex, trackIndexAt(event.clientY)] as const;
-    selected = selection(timeline.tracks, before, { kind: 'box', start, end, tracks, adds });
+    selected = selectionLocked
+      ? selection(timeline.tracks, selected)
+      : selection(timeline.tracks, before, { kind: 'box', start, end, tracks, adds });
     dragAt(event, laneMove);
   }
 
@@ -1678,7 +1684,8 @@
       // Moving a selected Clip moves the whole Selection; moving another
       // selects it alone. A trim or a nudge leaves the Selection be.
       select({ kind: 'drag', clipId: edit.clip.id });
-      if (selected.size > 1) edit.moves = [];
+      // Another Clip moves alone while the Selection is locked.
+      if (selected.size > 1 && selected.has(edit.clip.id)) edit.moves = [];
     }
     edit.moved = true;
     clearTimeout(pressTimer);
@@ -1939,11 +1946,11 @@
   let pressTimer: ReturnType<typeof setTimeout> | undefined;
 
   function clipMenuOpened(clip: Clip) {
-    selected = menuFor(timeline.tracks, selected, clip.id).selected;
+    selected = menuFor(timeline.tracks, selected, clip.id, selectionLocked).selected;
   }
 
   function clipMenuActions(clip: Clip): MenuAction[] {
-    if (menuFor(timeline.tracks, selected, clip.id).menu === 'selection') {
+    if (menuFor(timeline.tracks, selected, clip.id, selectionLocked).menu === 'selection') {
       return selectionActions(deletableSelection().length, { deleteClips: removeSelection });
     }
     const clipId = clip.id;
