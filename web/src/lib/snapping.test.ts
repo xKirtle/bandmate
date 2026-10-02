@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampMove, clampTrimEnd, clampTrimStart } from './clipEdit';
+import { clampMove, clampTrimEnd, clampTrimStart, moveSelection } from './clipEdit';
 import type { Placed } from './schedule';
 import {
   clipTargets,
@@ -11,6 +11,9 @@ import {
   snapEdge,
   snapLoop,
   snapMove,
+  snapSelection,
+  type Aligned,
+  type Target,
   editTargets,
 } from './snapping';
 
@@ -112,6 +115,81 @@ describe('snapMove', () => {
     // Its end snapped to a Clip ending at 0:04.5, it would start before 0:00.
     const early = [{ at: 4.5, of: 1 }];
     expect(snapMove(early, 5, 0.25, 1, clamp)).toEqual({ start: 0.25, snap: null });
+  });
+});
+
+describe('snapSelection', () => {
+  // Selected: 1 at 0:10-0:15 and 2 at 0:20-0:22. Targets: a Clip's end at
+  // 0:09 on lane 1, and the playhead at 0:23.
+  const clips = [
+    { id: 1, start: 10, length: 5 },
+    { id: 2, start: 20, length: 2 },
+  ];
+  const targets: Target<Aligned>[] = [
+    { at: 9, of: 1 },
+    { at: 23, of: 'playhead' },
+  ];
+  const free = (by: number) => by;
+
+  it("moves the Selection by whichever selected Clip's edge is nearest a target in reach", () => {
+    // Moved on 0.875s, 2 ends 0.125s short of the playhead.
+    expect(snapSelection(targets, clips, 0.875, 0.5, free)).toEqual({
+      by: 1,
+      snap: { clipId: 2, edge: 1, by: 0.125, at: 23, aligned: ['playhead'] },
+    });
+    // Moved back 1.25s, 1 starts 0.25s before the Clip's end at 0:09.
+    expect(snapSelection(targets, clips, -1.25, 0.5, free)).toEqual({
+      by: -1,
+      snap: { clipId: 1, edge: 0, by: 0.25, at: 9, aligned: [1] },
+    });
+  });
+
+  it('moves the Selection freely with no target in reach', () => {
+    expect(snapSelection(targets, clips, 4, 0.5, free)).toEqual({ by: 4, snap: null });
+  });
+
+  it('skips Snapping with Shift held, still kept within its limits', () => {
+    expect(snapSelection(targets, clips, 0.875, 0.5, free, true)).toEqual({ by: 0.875, snap: null });
+    const stop = (by: number) => Math.min(by, 0.5);
+    expect(snapSelection(targets, clips, 0.875, 0.5, stop, true)).toEqual({ by: 0.5, snap: null });
+  });
+
+  describe('among other Clips', () => {
+    // On the first Track: 1 at 0:10-0:15 and 2 at 0:20-0:22, both selected,
+    // and 3 at 0:30-0:40. On the second, 4 at 0:24-0:27. The playhead at 0:50.
+    const tracks = [
+      {
+        id: 100,
+        clips: [
+          { id: 1, start: 10, length: 5 },
+          { id: 2, start: 20, length: 2 },
+          { id: 3, start: 30, length: 10 },
+        ],
+      },
+      { id: 101, clips: [{ id: 4, start: 24, length: 3 }] },
+    ];
+    const selected = new Set([1, 2]);
+    const all = editTargets(tracks, selected, 50, null);
+    // How far moveSelection lets the Selection move, dragged by Clip 1.
+    const clamp = (by: number) => moveSelection(tracks, selected, 1, 100, 10 + by)[0].start - 10;
+    const moved = (by: number) => snapSelection(all, clips, by, 0.5, clamp);
+
+    it("never snaps to the Selection's own Clips", () => {
+      // Each selected Clip is 0.125s from where it was.
+      expect(moved(0.125)).toEqual({ by: 0.125, snap: null });
+    });
+
+    it('snaps an edge of any selected Clip to a Clip outside the Selection, on any Track', () => {
+      // 2 starts 0.125s before 4 on the second Track.
+      expect(moved(3.875)).toEqual({ by: 4, snap: { clipId: 2, edge: 0, by: 0.125, at: 24, aligned: [1] } });
+      // 2 ends 0.125s before 3, where the clamp stops it.
+      expect(moved(7.875)).toEqual({ by: 8, snap: { clipId: 2, edge: 1, by: 0.125, at: 30, aligned: [0] } });
+    });
+
+    it('is not snapped when the clamp keeps the Selection off the target', () => {
+      // Snapped, 2 would start on 3's start, overlapping it; the clamp stops it at 0:28.
+      expect(moved(9.875)).toEqual({ by: 8, snap: null });
+    });
   });
 });
 
@@ -238,7 +316,7 @@ describe('clipTargets', () => {
       { clips: [] },
       { clips: [{ id: 3, start: 4, length: 1 }] },
     ];
-    expect(clipTargets(tracks, 2)).toEqual([
+    expect(clipTargets(tracks, new Set([2]))).toEqual([
       { at: 0, of: 0 },
       { at: 5, of: 0 },
       { at: 4, of: 2 },
@@ -251,7 +329,7 @@ describe('editTargets', () => {
   const tracks = [{ clips: [{ id: 1, start: 0, length: 5 }] }, { clips: [{ id: 2, start: 10, length: 2 }] }];
 
   it("is other Clips' edges, the playhead and the Loop's start and end", () => {
-    expect(editTargets(tracks, 2, 7, { start: 3, end: 9 })).toEqual([
+    expect(editTargets(tracks, new Set([2]), 7, { start: 3, end: 9 })).toEqual([
       { at: 0, of: 0 },
       { at: 5, of: 0 },
       { at: 7, of: 'playhead' },
@@ -261,7 +339,7 @@ describe('editTargets', () => {
   });
 
   it("is only other Clips' edges and the playhead with no Loop", () => {
-    expect(editTargets(tracks, 2, 7, null)).toEqual([
+    expect(editTargets(tracks, new Set([2]), 7, null)).toEqual([
       { at: 0, of: 0 },
       { at: 5, of: 0 },
       { at: 7, of: 'playhead' },
@@ -271,7 +349,7 @@ describe('editTargets', () => {
 
 describe('snapping to the playhead and the Loop', () => {
   // A Clip on its own, the playhead at 0:07 and a Loop from 0:03 to 0:09.
-  const all = editTargets([{ clips: [{ id: 1, start: 20, length: 2 }] }], 1, 7, { start: 3, end: 9 });
+  const all = editTargets([{ clips: [{ id: 1, start: 20, length: 2 }] }], new Set([1]), 7, { start: 3, end: 9 });
   const free = (at: number) => at;
 
   it('moves a Clip onto the playhead or a Loop edge', () => {
