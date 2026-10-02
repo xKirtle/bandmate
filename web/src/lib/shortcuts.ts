@@ -5,8 +5,8 @@
  */
 
 /**
- * One of a Shortcut's keys: a `KeyboardEvent.key`, or `drag` or `wheel`
- * for a mouse Shortcut, held with exactly these modifiers. Mod is Ctrl or
+ * One of a Shortcut's keys: a `KeyboardEvent.key`, or `click`, `drag` or
+ * `wheel` for a mouse Shortcut, held with exactly these modifiers. Mod is Ctrl or
  * ⌘, either on any platform, shown as ⌘ on a Mac.
  */
 export type Key = { key: string; mod?: boolean; alt?: boolean; shift?: boolean };
@@ -108,11 +108,23 @@ export const shortcuts = {
     back: [{ key: 'ArrowDown', alt: true }],
     forward: [{ key: 'ArrowUp', alt: true }],
   },
+  clearSelection: {
+    name: 'Clear the Selection',
+    group: 'Timeline editing',
+    description: 'Clears the Selection, from the Timeline, so no Clip is selected.',
+    keys: [{ key: 'Escape' }],
+  },
   cueNextLine: {
     name: 'Cue the next Line',
     group: 'Sync mode',
     description: 'Cues the next Line at the playhead.',
     keys: [{ key: 'Enter' }],
+  },
+  toggleClip: {
+    name: 'Add or remove a Clip',
+    group: 'Mouse',
+    description: 'Adds the Clip clicked to the Selection, or takes it out, leaving the Chosen Track as it is.',
+    keys: [{ key: 'click', mod: true }],
   },
   nudgeTake: {
     name: 'Nudge a Take inside its Clip',
@@ -143,7 +155,7 @@ export const shortcuts = {
  */
 export const shortcutsDialogKeys: readonly Key[] = [{ key: '?' }];
 
-/** A key press, or a mouse action given as `drag` or `wheel`. */
+/** A key press, or a mouse action given as `click`, `drag` or `wheel`. */
 export type KeyPress = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'>;
 
 /**
@@ -215,9 +227,10 @@ const names: Record<string, string> = {
   ArrowUp: '↑',
   ArrowDown: '↓',
   ContextMenu: 'Menu',
+  Escape: 'Esc',
 };
 
-const mouse = ['drag', 'wheel'];
+const mouse = ['click', 'drag', 'wheel'];
 
 /** A key's own name, without its modifiers, e.g. Z, Space or ArrowLeft. */
 function keyName(key: Key): string {
