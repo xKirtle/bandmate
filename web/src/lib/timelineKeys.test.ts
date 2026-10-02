@@ -1,12 +1,14 @@
 import { describe as group, expect, it } from 'vitest';
 import type { KeyPress } from './shortcuts';
 import {
+  clearsSelection,
   clipAction,
   isModifier,
   nudges,
   rulerSeek,
   skipsSnapping,
   startOrEnd,
+  togglesSelection,
   zooms,
   type Modifiers,
 } from './timelineKeys';
@@ -156,5 +158,39 @@ group('isModifier', () => {
     for (const key of ['Shift', 'Alt', 'Control', 'Meta']) expect(isModifier(key)).toBe(true);
     expect(isModifier('a')).toBe(false);
     expect(isModifier('Escape')).toBe(false);
+  });
+});
+
+group('togglesSelection', () => {
+  it('adds a Clip to the Selection, or takes it out, when clicked with Ctrl or ⌘', () => {
+    expect(togglesSelection(held({ ctrlKey: true }))).toBe(true);
+    expect(togglesSelection(held({ metaKey: true }))).toBe(true);
+  });
+
+  it('selects it alone when clicked without Mod', () => {
+    expect(togglesSelection(held())).toBe(false);
+    expect(togglesSelection(held({ shiftKey: true }))).toBe(false);
+    expect(togglesSelection(held({ altKey: true }))).toBe(false);
+  });
+
+  it('takes Mod only on its own', () => {
+    expect(togglesSelection(held({ ctrlKey: true, metaKey: true }))).toBe(false);
+    expect(togglesSelection(held({ ctrlKey: true, shiftKey: true }))).toBe(false);
+  });
+});
+
+group('clearsSelection', () => {
+  it('clears the Selection on Esc', () => {
+    expect(clearsSelection(press('Escape'))).toBe(true);
+  });
+
+  it('takes Esc only on its own', () => {
+    expect(clearsSelection(press('Escape', { shiftKey: true }))).toBe(false);
+    expect(clearsSelection(press('Escape', { ctrlKey: true }))).toBe(false);
+  });
+
+  it('leaves other keys alone', () => {
+    expect(clearsSelection(press('Delete'))).toBe(false);
+    expect(clearsSelection(press('a', { ctrlKey: true }))).toBe(false);
   });
 });

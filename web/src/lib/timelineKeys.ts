@@ -10,8 +10,8 @@ import { matches, shortcuts, stepBy, way, type Key, type KeyPress, type Way } fr
 /** The modifiers held with a pointer or wheel event, or a key press. */
 export type Modifiers = Omit<KeyPress, 'key'>;
 
-/** A mouse action, `drag` or `wheel`, held with these modifiers, as a key press to match. */
-function mouse(key: 'drag' | 'wheel', e: Modifiers): KeyPress {
+/** A mouse action, `click`, `drag` or `wheel`, held with these modifiers, as a key press to match. */
+function mouse(key: 'click' | 'drag' | 'wheel', e: Modifiers): KeyPress {
   // Picked one by one: an event's modifiers are on its prototype, which spreading it would miss.
   return { key, ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, shiftKey: e.shiftKey };
 }
@@ -20,6 +20,16 @@ function mouse(key: 'drag' | 'wheel', e: Modifiers): KeyPress {
 export function clipAction(e: KeyPress): 'delete' | 'menu' | null {
   if (matches(e, shortcuts.deleteClip.keys)) return 'delete';
   return opensMenu(e) ? 'menu' : null;
+}
+
+/** Whether a key press clears the Selection: Esc. */
+export function clearsSelection(e: KeyPress): boolean {
+  return matches(e, shortcuts.clearSelection.keys);
+}
+
+/** Whether a Clip clicked with these modifiers is added to the Selection or taken out, rather than selected alone. */
+export function togglesSelection(e: Modifiers): boolean {
+  return matches(mouse('click', e), shortcuts.toggleClip.keys);
 }
 
 /** Where a key press on the ruler seeks to, from `position` on a Timeline `length` long, or null if it doesn't. */

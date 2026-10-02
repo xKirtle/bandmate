@@ -129,7 +129,9 @@ group('The list', () => {
       { name: 'Seek back or forward 15 s', group: 'Timeline editing', keys: 'Shift+← or Shift+↓ / Shift+→ or Shift+↑' },
       { name: 'Go to the start or end', group: 'Timeline editing', keys: 'Home / End' },
       { name: 'Nudge a Cue by 0.1 s', group: 'Timeline editing', keys: 'Alt+↓ / Alt+↑' },
+      { name: 'Clear the Selection', group: 'Timeline editing', keys: 'Esc' },
       { name: 'Cue the next Line', group: 'Sync mode', keys: 'Enter' },
+      { name: 'Add or remove a Clip', group: 'Mouse', keys: 'Ctrl+click' },
       { name: 'Nudge a Take inside its Clip', group: 'Mouse', keys: 'Alt+drag' },
       { name: 'Skip snapping', group: 'Mouse', keys: 'Shift+drag' },
       { name: 'Zoom the Timeline', group: 'Mouse', keys: 'Ctrl+wheel' },
@@ -140,6 +142,7 @@ group('The list', () => {
     expect(keysLabel(shortcuts.undo.keys, 'mac')).toBe('⌘Z');
     expect(keysLabel(shortcuts.redo.keys, 'mac')).toBe('⌘⇧Z or ⌘Y');
     expect(keysLabel(shortcuts.zoom.keys, 'mac')).toBe('⌘+wheel');
+    expect(keysLabel(shortcuts.toggleClip.keys, 'mac')).toBe('⌘+click');
   });
 
   it('describes every Shortcut in one line', () => {

@@ -60,7 +60,18 @@
   import { songKey } from './songKeys';
   import { allKeys, shortcuts, type Way } from './shortcuts';
   import { clipActions } from './clipMenu';
-  import { clipAction, isModifier, nudges, rulerSeek, skipsSnapping, startOrEnd, zooms } from './timelineKeys';
+  import { noSelection, selection, type Selection, type SelectionGesture } from './selection';
+  import {
+    clearsSelection,
+    clipAction,
+    isModifier,
+    nudges,
+    rulerSeek,
+    skipsSnapping,
+    startOrEnd,
+    togglesSelection,
+    zooms,
+  } from './timelineKeys';
   import { prepareUpload } from './upload';
   import { formatDuration } from './time';
   import { tracksDropped, type TrackDrop } from './trackDrag';
@@ -1272,6 +1283,63 @@
     if (remembered !== null) storeChosen(deviceStorage(), songId, remembered);
   });
 
+  // The Selection: the Clips the next Clip action applies to. Like choosing
+  // a Track, selecting isn't an edit, and it's never kept, so leaving the
+  // Song drops it. A phone, where Clips can't be edited, has none.
+  let selected = $state<Selection>(noSelection);
+
+  function select(gesture: SelectionGesture) {
+    selected = selection(timeline.tracks, selected, gesture);
+  }
+
+  // Clips gone from the Timeline, e.g. deleted in another tab or taken away
+  // by undo, drop out of it.
+  $effect(() => {
+    const { tracks } = timeline;
+    untrack(() => (selected = selection(tracks, selected)));
+  });
+
+  // A press on empty lane space that's let go without moving past the slop
+  // is a click there, which clears the Selection.
+  let lanePress: { from: Point; moved: boolean } | null = null;
+
+  function laneDown(event: PointerEvent) {
+    if (event.target !== event.currentTarget || !editable.current || !event.isPrimary || event.button !== 0) return;
+    lanePress = { from: { clientX: event.clientX, clientY: event.clientY }, moved: false };
+    window.addEventListener('pointermove', laneMove);
+    window.addEventListener('pointerup', laneUp);
+    window.addEventListener('pointercancel', laneDone);
+  }
+
+  function laneMove(event: PointerEvent) {
+    if (lanePress && pastSlop(lanePress.from, event)) lanePress.moved = true;
+  }
+
+  function laneUp(event: PointerEvent) {
+    laneMove(event);
+    if (lanePress && !lanePress.moved) select({ kind: 'clear' });
+    laneDone();
+  }
+
+  function laneDone() {
+    lanePress = null;
+    window.removeEventListener('pointermove', laneMove);
+    window.removeEventListener('pointerup', laneUp);
+    window.removeEventListener('pointercancel', laneDone);
+  }
+  onDestroy(laneDone);
+
+  // Esc clears the Selection while focus is in the Timeline, but not in a
+  // text field, a menu or a dialog, whose Esc is their own, nor while a
+  // Track is dragged, which Esc cancels.
+  function timelineKey(event: KeyboardEvent) {
+    if (event.defaultPrevented || !clearsSelection(event) || selected.size === 0 || trackDrag.current) return;
+    if (inTextField(event.target)) return;
+    if (event.target instanceof Element && event.target.closest('[role="menu"], dialog')) return;
+    event.preventDefault();
+    select({ kind: 'clear' });
+  }
+
   // Editing a Clip: dragging its body moves it, along its Track or onto
   // another; dragging an edge trims it. It stops at its neighbours, the
   // source's ends and 0:00 as it goes, and is saved on release. Until the
@@ -1294,6 +1362,8 @@
     nudge: number;
     /** Whether Shift is held, to move or trim without snapping. */
     free: boolean;
+    /** Whether Mod was held as it was pressed, so a click adds it to the Selection or takes it out. */
+    toggles: boolean;
     /** What a move or trim is snapped to, with the lanes of what's there, while it is. */
     snap: Snap<Aligned> | null;
     saving: boolean;
@@ -1445,7 +1515,9 @@
   }
 
   function editDown(event: PointerEvent, clip: Clip, mode: Edit['mode']) {
-    if (event.isPrimary && event.button === 0) choose({ kind: 'choose', trackId: trackOf(clip).id });
+    // Mod+clicking it to gather a Selection leaves the Chosen Track be.
+    const toggles = togglesSelection(event);
+    if (event.isPrimary && event.button === 0 && !toggles) choose({ kind: 'choose', trackId: trackOf(clip).id });
     if (!editable.current || !event.isPrimary || event.button !== 0 || edit || inClipMenu(event.target)) return;
     event.stopPropagation();
     // Clicking a Clip still focuses it, for its keys and its menu.
@@ -1469,6 +1541,7 @@
       placement: clip,
       nudge: take?.nudge ?? 0,
       free: skipsSnapping(event),
+      toggles,
       snap: null,
       saving: false,
     };
@@ -1536,6 +1609,8 @@
     if (!edit) return;
     edit.snap = null;
     const { clip, trackId, placement: to, mode } = edit;
+    // Pressed and let go without dragging, it's clicked.
+    if (!edit.moved) select({ kind: edit.toggles ? 'toggle' : 'click', clipId: clip.id });
     if (mode === 'nudge') {
       const takeId = clip.activeTakeId!;
       if (edit.moved && edit.nudge !== activeTake(clip)!.nudge) {
@@ -2119,10 +2194,13 @@
   </button>
 {/snippet}
 
+<!-- Esc pressed anywhere in it, on a focused control, clears the Selection. -->
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <section
   class="timeline"
   aria-label="Timeline"
   bind:offsetHeight={height}
+  onkeydown={timelineKey}
   ondragenter={filesOver}
   ondragover={filesOver}
   ondragleave={filesLeave}
@@ -2462,6 +2540,8 @@
               {/each}
             </div>
             {#each shown as { track, clips: placed }, t (track.id)}
+              <!-- Pointer only: clicking its empty space clears the Selection, as Esc does. -->
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
               <div
                 class="lane"
                 class:file-target={track.id === fileTarget}
@@ -2469,6 +2549,7 @@
                 class:drop-above={trackGap === t}
                 class:drop-below={trackGap === shown.length && t === shown.length - 1}
                 bind:this={laneElements[t]}
+                onpointerdown={laneDown}
               >
                 {#each placed as { clip, at, editing } (clip.id)}
                   {@const wave = waveWindow(view, at.start, at.length)}
@@ -2482,11 +2563,14 @@
                     class:moving={editing && edit?.mode === 'move'}
                     class:nudging={editing && edit?.mode === 'nudge'}
                     class:retaking={clip.id === recording?.clipId}
+                    class:selected={selected.has(clip.id)}
                     style:left="{percent(at.start)}%"
                     style:width="{percent(at.length)}%"
                     {title}
                     role="group"
-                    aria-label="{title}, {formatDuration(at.start)} to {formatDuration(at.start + at.length)}"
+                    aria-label="{title}{selected.has(clip.id) ? ', selected' : ''}, {formatDuration(
+                      at.start,
+                    )} to {formatDuration(at.start + at.length)}"
                     tabindex={editable.current ? 0 : undefined}
                     aria-keyshortcuts={editable.current && clip.id !== recording?.clipId
                       ? hints.aria(clipKeys)
@@ -3272,6 +3356,11 @@
   }
   .clip.editing {
     z-index: 1;
+  }
+  /* Selected: a solid border twice as thick, inside the focus ring, and a brighter fill. */
+  .clip.selected {
+    box-shadow: inset 0 0 0 1px var(--accent);
+    background: color-mix(in srgb, var(--accent) 16%, var(--surface-1));
   }
   .clip.moving {
     cursor: grabbing;
