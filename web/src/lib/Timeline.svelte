@@ -1683,15 +1683,14 @@
       edit.nudge = draggedNudge(clip, t - edit.grab - clip.start);
     } else if (edit.moves) {
       // Selected Clips move as one, snapped by any of their edges.
-      const trackId = (edit.trackId = trackAt(event.clientY));
+      edit.trackId = trackAt(event.clientY);
+      const { trackId } = edit;
       const place = (by: number) => moveSelection(timeline.tracks, selected, clip.id, trackId, clip.start + by);
-      // How far the group clamp lets them move, as the Clip dragged goes.
+      // How far moveSelection lets the Selection move, as the Clip dragged goes.
       const clamp = (by: number) => place(by).find((m) => m.clipId === clip.id)!.start - clip.start;
       const desired = t - edit.grab - clip.start;
       const clips = timeline.tracks.flatMap((track) => track.clips.filter((c) => selected.has(c.id)));
-      const moved = edit.free
-        ? { by: clamp(desired), snap: null }
-        : snapSelection(snapTargets(selected), clips, desired, reachAt(view.scale), clamp);
+      const moved = snapSelection(snapTargets(selected), clips, desired, reachAt(view.scale), clamp, edit.free);
       edit.moves = place(moved.by);
       edit.snap = moved.snap;
     } else if (edit.mode === 'move') {

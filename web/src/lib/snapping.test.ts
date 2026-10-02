@@ -148,6 +148,12 @@ describe('snapSelection', () => {
     expect(snapSelection(targets, clips, 4, 0.5, free)).toEqual({ by: 4, snap: null });
   });
 
+  it('skips Snapping with Shift held, still kept within its limits', () => {
+    expect(snapSelection(targets, clips, 0.875, 0.5, free, true)).toEqual({ by: 0.875, snap: null });
+    const stop = (by: number) => Math.min(by, 0.5);
+    expect(snapSelection(targets, clips, 0.875, 0.5, stop, true)).toEqual({ by: 0.5, snap: null });
+  });
+
   describe('among other Clips', () => {
     // On the first Track: 1 at 0:10-0:15 and 2 at 0:20-0:22, both selected,
     // and 3 at 0:30-0:40. On the second, 4 at 0:24-0:27. The playhead at 0:50.
@@ -164,7 +170,7 @@ describe('snapSelection', () => {
     ];
     const selected = new Set([1, 2]);
     const all = editTargets(tracks, selected, 50, null);
-    // How far the group clamp lets the Selection move, dragged by Clip 1.
+    // How far moveSelection lets the Selection move, dragged by Clip 1.
     const clamp = (by: number) => moveSelection(tracks, selected, 1, 100, 10 + by)[0].start - 10;
     const moved = (by: number) => snapSelection(all, clips, by, 0.5, clamp);
 

@@ -80,7 +80,8 @@ export type SelectionSnap<T> = Snap<T> & { clipId: number };
  * snapped by whichever start or end of any of them is nearest a target in
  * reach, then kept within their limits by clamp, which gives the amount
  * they can move by nearest to the one asked. A limit that keeps them off
- * the target leaves them unsnapped, where they would go without snapping.
+ * the target leaves them unsnapped, where they would go without snapping,
+ * as does free, for Shift held.
  */
 export function snapSelection<T>(
   targets: readonly Target<T>[],
@@ -88,7 +89,9 @@ export function snapSelection<T>(
   desired: number,
   reach: number,
   clamp: (by: number) => number,
+  free = false,
 ): { by: number; snap: SelectionSnap<T> | null } {
+  if (free) return { by: clamp(desired), snap: null };
   const edges = clips.flatMap((c) => [c.start, c.start + c.length]);
   const found = snap(
     targets,
@@ -98,6 +101,7 @@ export function snapSelection<T>(
   if (found) {
     // From the target itself, so the edge that snapped lands on it.
     const by = found.at - edges[found.edge];
+    // A hair off is still on it, as the clamp works out the amount from a start.
     if (Math.abs(clamp(by) - by) <= tolerance) {
       const clip = clips[Math.floor(found.edge / 2)];
       return { by, snap: { ...found, clipId: clip.id, edge: found.edge % 2 } };
