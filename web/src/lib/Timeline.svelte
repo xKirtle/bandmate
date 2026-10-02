@@ -62,8 +62,8 @@
   import { keyPlace } from './keyPlace';
   import { songKey } from './songKeys';
   import { allKeys, shortcuts, type Way } from './shortcuts';
-  import { clipActions } from './clipMenu';
-  import { noSelection, selection, type Selection, type SelectionGesture } from './selection';
+  import { clipActions, selectionActions } from './clipMenu';
+  import { menuFor, noSelection, selection, type Selection, type SelectionGesture } from './selection';
   import {
     addsBox,
     clearsSelection,
@@ -1903,8 +1903,12 @@
    */
   function removeWithSelection(clip: Clip) {
     if (!selected.has(clip.id)) return remove(clip);
-    const clipIds = [...selected].filter((id) => id !== recording?.clipId);
-    perform({ kind: 'deleteClips', clipIds });
+    perform({ kind: 'deleteClips', clipIds: deletableSelection() });
+  }
+
+  /** The selected Clips deleting the Selection deletes: all but the one a Retake is recording into. */
+  function deletableSelection(): number[] {
+    return [...selected].filter((id) => id !== recording?.clipId);
   }
 
   function clipKey(event: KeyboardEvent, clip: Clip) {
@@ -1920,12 +1924,24 @@
   }
 
   // Each Clip's menu, opened by its ⋯, right-click, the Menu key, Shift+F10
-  // or a long press.
+  // or a long press. On a Clip in a Selection of several, it's the
+  // Selection menu, acting on them all; opened on a Clip outside the
+  // Selection, that Clip becomes the Selection first.
   const clipMenus: Record<number, ActionsMenu> = {};
   // Waiting to open a Clip's menu, until the finger moves or lifts.
   let pressTimer: ReturnType<typeof setTimeout> | undefined;
 
+  function clipMenuOpened(clip: Clip) {
+    selected = menuFor(timeline.tracks, selected, clip.id).selected;
+  }
+
   function clipMenuActions(clip: Clip): MenuAction[] {
+    if (menuFor(timeline.tracks, selected, clip.id).menu === 'selection') {
+      const clipIds = deletableSelection();
+      return selectionActions(clipIds.length, {
+        deleteClips: () => perform({ kind: 'deleteClips', clipIds }),
+      });
+    }
     const clipId = clip.id;
     return clipActions(
       clip,
@@ -2769,6 +2785,7 @@
                           bind:this={clipMenus[clip.id]}
                           label="More actions for {title}"
                           entries={clipMenuActions(clip)}
+                          onopen={() => clipMenuOpened(clip)}
                         >
                           {#snippet trigger()}<span class="clip-more">⋯</span>{/snippet}
                         </ActionsMenu>

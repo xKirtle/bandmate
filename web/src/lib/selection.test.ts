@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { noSelection, selection, type Selection } from './selection';
+import { menuFor, noSelection, selection, type Selection } from './selection';
 
 /** A Timeline's Tracks, each holding Clips with these ids, wherever they are. */
 const tracks = (...lanes: number[][]) =>
@@ -178,5 +178,28 @@ describe('selection', () => {
       expect(selection(tracks([1], [4]), selected(1, 2), { kind: 'click', clipId: 7 })).toEqual(selected(1));
       expect(selection(tracks([1], [4]), selected(1, 2), { kind: 'toggle', clipId: 7 })).toEqual(selected(1));
     });
+  });
+});
+
+describe('menuFor', () => {
+  it('opens the Selection menu on a Clip in a Selection of several, leaving the Selection be', () => {
+    const s = selected(1, 3, 4);
+    const choice = menuFor(timeline, s, 3);
+    expect(choice.menu).toBe('selection');
+    expect(choice.selected).toBe(s);
+  });
+
+  it('makes a Clip outside the Selection the Selection, and opens its own menu', () => {
+    expect(menuFor(timeline, selected(1, 4), 3)).toEqual({ menu: 'clip', selected: selected(3) });
+    expect(menuFor(timeline, noSelection, 3)).toEqual({ menu: 'clip', selected: selected(3) });
+  });
+
+  it('opens its own menu on the only selected Clip, leaving the Selection be', () => {
+    const s = selected(3);
+    expect(menuFor(timeline, s, 3)).toEqual({ menu: 'clip', selected: s });
+  });
+
+  it('opens its own menu when the others selected are gone, e.g. deleted in another tab', () => {
+    expect(menuFor(tracks([1], [4]), selected(1, 2), 1)).toEqual({ menu: 'clip', selected: selected(1) });
   });
 });

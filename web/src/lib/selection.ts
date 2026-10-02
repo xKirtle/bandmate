@@ -79,3 +79,19 @@ export function selection(tracks: Tracks, selected: Selection, gesture?: Selecti
       return noSelection;
   }
 }
+
+/** Which menu a Clip's menu gesture opens, and what the Selection becomes. */
+export type MenuChoice = {
+  /** The Selection menu, acting on every selected Clip, or the Clip's own menu. */
+  menu: 'selection' | 'clip';
+  selected: Selection;
+};
+
+/**
+ * The menu a Clip's menu gesture opens, by right-click, its ⋯, a long
+ * press or the Menu key, and the Selection after it.
+ */
+export function menuFor(tracks: Tracks, selected: Selection, clipId: number): MenuChoice {
+  const after = selection(tracks, selected, { kind: 'drag', clipId });
+  return { menu: after.size > 1 && after.has(clipId) ? 'selection' : 'clip', selected: after };
+}

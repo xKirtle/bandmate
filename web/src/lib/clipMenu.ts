@@ -53,6 +53,19 @@ export function clipActions(clip: Clip, state: ClipMenuState, run: ClipRun): Men
   ];
 }
 
+/** What each entry of the Selection menu does. */
+export type SelectionRun = {
+  deleteClips: () => void;
+};
+
+/**
+ * The entries of the Selection menu, a selected Clip's menu while there are
+ * several selected, acting on all `count` of them.
+ */
+export function selectionActions(count: number, run: SelectionRun): MenuAction[] {
+  return [{ icon: '×', label: `Delete ${count} Clip${count === 1 ? '' : 's'}`, run: run.deleteClips }];
+}
+
 function takeActions(clip: Clip, state: ClipMenuState, run: ClipRun): MenuAction[] {
   if (clip.activeTakeId === null) return [];
   const { activeTakeId, takes } = clip;

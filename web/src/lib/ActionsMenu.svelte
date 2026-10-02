@@ -12,6 +12,7 @@
     trigger,
     align = 'end',
     disabled = false,
+    onopen,
   }: {
     /** What it offers: actions, or, for a menu that's a list to pick from, just the choices. */
     entries: (MenuAction | MenuChoice)[];
@@ -25,6 +26,8 @@
     align?: 'start' | 'end';
     /** Keeps the menu from opening, e.g. while what it acts on is busy. */
     disabled?: boolean;
+    /** Called as it opens, however it's opened, before its entries are shown, e.g. to change what it acts on. */
+    onopen?: () => void;
   } = $props();
 
   // The field's tooltip names the keys that step it, but only with a fine
@@ -69,6 +72,7 @@
   // Space, e.g. to play, runs none; the arrow keys move into the entries.
   // Opened again while it's open, e.g. by another right-click, it moves.
   async function show(focus: 'first' | 'last' | 'menu', at: Point | null = null) {
+    onopen?.();
     open = true;
     picking = null;
     point = at;
