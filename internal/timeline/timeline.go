@@ -647,20 +647,73 @@ func (src source) duration(ctx context.Context, tx *sql.Tx) (float64, error) {
 // keeping its trim. It can't overlap a Clip already there.
 func (s *Store) MoveClip(ctx context.Context, songID int64, based lyricsheet.Version, clipID, trackID int64, start float64) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		p, err := clipPlacement(ctx, tx, songID, clipID)
+		p, err := movedTo(ctx, tx, songID, clipID, trackID, start)
 		if err != nil {
 			return err
 		}
-		var found int
-		err = tx.QueryRowContext(ctx, `SELECT 1 FROM tracks WHERE id = ? AND song_id = ?`, trackID, songID).Scan(&found)
-		if errors.Is(err, sql.ErrNoRows) {
-			return &lyricsheet.InvalidError{Msg: "there's no such Track on this Timeline"}
-		}
-		if err != nil {
-			return fmt.Errorf("reading track: %w", err)
-		}
-		p.trackID, p.start = trackID, start
 		return place(ctx, tx, clipID, p)
+	})
+}
+
+// movedTo is where one of the Song's Clips would be, moved to start at a
+// time on a Track, if that's on the Song's Timeline.
+func movedTo(ctx context.Context, tx *sql.Tx, songID, clipID, trackID int64, start float64) (placement, error) {
+	p, err := clipPlacement(ctx, tx, songID, clipID)
+	if err != nil {
+		return placement{}, err
+	}
+	if err := findTrack(ctx, tx, songID, trackID); errors.Is(err, lyricsheet.ErrNotFound) {
+		return placement{}, &lyricsheet.InvalidError{Msg: "there's no such Track on this Timeline"}
+	} else if err != nil {
+		return placement{}, err
+	}
+	p.trackID, p.start = trackID, start
+	return onTimeline(p)
+}
+
+// ClipMove is where one Clip of several moved at once goes: a Track and a
+// start, in seconds.
+type ClipMove struct {
+	ClipID  int64   `json:"clipId"`
+	TrackID int64   `json:"trackId"`
+	Start   float64 `json:"start"`
+}
+
+// MoveClips moves several Clips at once, each to start at a time on a Track
+// of the same Timeline, keeping its trim. Each is checked where it lands
+// against the Timeline as the whole move leaves it, so Clips moved together
+// may pass each other's old places, but none can overlap another Clip.
+// If any can't go where it's moved, none moves.
+func (s *Store) MoveClips(ctx context.Context, songID int64, based lyricsheet.Version, moves []ClipMove) (Timeline, error) {
+	if len(moves) == 0 {
+		return Timeline{}, &lyricsheet.InvalidError{Msg: "clips are required"}
+	}
+	seen := map[int64]bool{}
+	for _, m := range moves {
+		if seen[m.ClipID] {
+			return Timeline{}, &lyricsheet.InvalidError{Msg: "each Clip can only move once"}
+		}
+		seen[m.ClipID] = true
+	}
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		placed := make([]placement, len(moves))
+		for i, m := range moves {
+			p, err := movedTo(ctx, tx, songID, m.ClipID, m.TrackID, m.Start)
+			if err != nil {
+				return err
+			}
+			if err := store(ctx, tx, m.ClipID, p); err != nil {
+				return err
+			}
+			placed[i] = p
+		}
+		// Only once every Clip is where it's going.
+		for i, m := range moves {
+			if err := checkFree(ctx, tx, m.ClipID, placed[i]); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 
@@ -1009,10 +1062,29 @@ func clipPlacement(ctx context.Context, tx *sql.Tx, songID, clipID int64) (place
 // place stores a Clip's new placement, if it starts on the Timeline and is
 // clear of the other Clips on its Track.
 func place(ctx context.Context, tx *sql.Tx, clipID int64, p placement) error {
+	p, err := onTimeline(p)
+	if err != nil {
+		return err
+	}
+	if err := checkFree(ctx, tx, clipID, p); err != nil {
+		return err
+	}
+	return store(ctx, tx, clipID, p)
+}
+
+// onTimeline is p, if it starts on the Timeline, a start rounded a hair
+// before 0:00 taken as 0:00.
+func onTimeline(p placement) (placement, error) {
 	if p.start < -tolerance {
-		return &lyricsheet.InvalidError{Msg: "a Clip can't start before 0:00"}
+		return placement{}, &lyricsheet.InvalidError{Msg: "a Clip can't start before 0:00"}
 	}
 	p.start = max(p.start, 0)
+	return p, nil
+}
+
+// checkFree refuses p if its stretch of its Track isn't clear of Clips
+// other than clipID.
+func checkFree(ctx context.Context, tx *sql.Tx, clipID int64, p placement) error {
 	free, err := isFree(ctx, tx, clipID, p)
 	if err != nil {
 		return err
@@ -1020,6 +1092,11 @@ func place(ctx context.Context, tx *sql.Tx, clipID int64, p placement) error {
 	if !free {
 		return errOverlap
 	}
+	return nil
+}
+
+// store writes a Clip's placement, unchecked.
+func store(ctx context.Context, tx *sql.Tx, clipID int64, p placement) error {
 	if _, err := tx.ExecContext(ctx, `UPDATE clips SET track_id = ?, start = ?, source_offset = ?, length = ? WHERE id = ?`,
 		p.trackID, p.start, p.offset, p.length, clipID); err != nil {
 		return fmt.Errorf("placing clip: %w", err)

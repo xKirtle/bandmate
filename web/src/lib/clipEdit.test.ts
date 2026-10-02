@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { Clip, Take } from './api';
-import { clampMove, clampTrimEnd, clampTrimStart, minClipLength, draggedNudge, nudged } from './clipEdit';
+import {
+  clampMove,
+  clampTrimEnd,
+  clampTrimStart,
+  minClipLength,
+  draggedNudge,
+  moveSelection,
+  nudged,
+} from './clipEdit';
 
 // On a Track: a Clip at 0:10-0:20 and one at 0:40-0:50, with a 30s gap
 // between them.
@@ -39,6 +47,79 @@ describe('clampMove', () => {
 
   it('goes anywhere on an empty Track', () => {
     expect(clampMove([], 5, 12.5)).toBe(12.5);
+  });
+});
+
+describe('moveSelection', () => {
+  /** A Timeline's Tracks, with ids 100, 101 and so on, holding Clips placed at these spans, as [id, start, end]. */
+  const placed = (...lanes: [id: number, start: number, end: number][][]) =>
+    lanes.map((clips, i) => ({
+      id: 100 + i,
+      clips: clips.map(([id, start, end]) => ({ id, start, length: end - start })),
+    }));
+  const selected = (...ids: number[]) => new Set(ids);
+  /** Where each Clip moved lands, as "id:track@start". */
+  const landed = (moves: { clipId: number; trackId: number; start: number }[]) =>
+    moves.map((m) => `${m.clipId}:${m.trackId}@${m.start}`);
+
+  // On one Track: two selected Clips, 1 at 0:10-0:20 and 2 at 0:25-0:30,
+  // and 3, not selected, at 0:40-0:50. On another, 4 at 0:00-0:05.
+  const oneTrack = placed(
+    [
+      [1, 10, 20],
+      [2, 25, 30],
+      [3, 40, 50],
+    ],
+    [[4, 0, 5]],
+  );
+
+  it('moves every selected Clip by the same amount', () => {
+    expect(landed(moveSelection(oneTrack, selected(1, 2), 1, 100, 13))).toEqual(['1:100@13', '2:100@28']);
+  });
+
+  it('stops as one at a Clip outside the Selection', () => {
+    // 2 would run into 3 past 10s later.
+    expect(landed(moveSelection(oneTrack, selected(1, 2), 1, 100, 25))).toEqual(['1:100@20', '2:100@35']);
+  });
+
+  it('stops as one when its earliest Clip reaches 0:00', () => {
+    expect(landed(moveSelection(oneTrack, selected(1, 2), 2, 100, 5))).toEqual(['1:100@0', '2:100@15']);
+  });
+
+  it('jumps an obstacle only to where every Clip fits on the far side', () => {
+    // 1 on the first Track and 2 on the second, each 0:00-0:10; 3 and 4,
+    // not selected, at 0:35-0:45 on the first and 0:20-0:30 on the second.
+    const tracks = placed(
+      [
+        [1, 0, 10],
+        [3, 35, 45],
+      ],
+      [
+        [2, 0, 10],
+        [4, 20, 30],
+      ],
+    );
+    // 2 fits before 4 up to 10s later, or after it from 30s; 1 before 3 up
+    // to 25s, or after it from 45s: together, up to 10s or from 45s.
+    expect(landed(moveSelection(tracks, selected(1, 2), 1, 100, 22))).toEqual(['1:100@10', '2:101@10']);
+    expect(landed(moveSelection(tracks, selected(1, 2), 1, 100, 35))).toEqual(['1:100@45', '2:101@45']);
+  });
+
+  it('never has selected Clips block each other', () => {
+    const run = placed([
+      [1, 0, 10],
+      [2, 10, 20],
+      [3, 20, 30],
+    ]);
+    expect(landed(moveSelection(run, selected(1, 2, 3), 2, 100, 15))).toEqual(['1:100@5', '2:100@15', '3:100@25']);
+  });
+
+  it('takes a Selection on one Track to the Track it is dragged over, clear of the Clips there', () => {
+    expect(landed(moveSelection(oneTrack, selected(1, 2), 1, 101, 2))).toEqual(['1:101@5', '2:101@20']);
+  });
+
+  it('keeps each Clip of a Selection over several Tracks on its own Track, moving them only in time', () => {
+    expect(landed(moveSelection(oneTrack, selected(2, 4), 2, 101, 30))).toEqual(['2:100@30', '4:101@5']);
   });
 });
 

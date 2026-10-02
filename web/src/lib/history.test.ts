@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Clip, Take, Timeline, TimelineLoop, Track } from './api';
 import type { CuedSong } from './cues';
-import { History, placingAdded, restorable, settingTakes } from './history';
+import { History, placingAdded, restorable, settingTakes, type Edit } from './history';
 
 const clip = (id: number, start: number, more: Partial<Clip> = {}): Clip => ({
   id,
@@ -88,6 +88,89 @@ describe('History', () => {
     h.record({ kind: 'moveClip', clipId: 5, trackId: 2, start: 12 }, before, after);
 
     expect(h.nextUndo()).toEqual({ kind: 'moveClip', clipId: 5, trackId: 1, start: 0 });
+  });
+
+  it('undoes moving several Clips by moving each back, as one step, and redoes it as one', () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0), clip(6, 20)]), track(2, [clip(7, 4)])]);
+    const t1 = timeline([track(1, [clip(5, 3), clip(6, 23)]), track(2, [clip(7, 7)])]);
+    const move: Edit = {
+      kind: 'moveClips',
+      moves: [
+        { clipId: 5, trackId: 1, start: 3 },
+        { clipId: 6, trackId: 1, start: 23 },
+        { clipId: 7, trackId: 2, start: 7 },
+      ],
+    };
+
+    h.record(move, t0, t1);
+
+    expect(h.nextUndo()).toEqual({
+      kind: 'moveClips',
+      moves: [
+        { clipId: 5, trackId: 1, start: 0 },
+        { clipId: 6, trackId: 1, start: 20 },
+        { clipId: 7, trackId: 2, start: 4 },
+      ],
+    });
+    h.undone(t1, t0);
+    expect(h.nextUndo()).toBeNull();
+    expect(h.nextRedo()).toEqual(move);
+  });
+
+  it('undoes moving several Clips onto another Track by moving them back to theirs', () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0), clip(6, 20)]), track(2)]);
+    const t1 = timeline([track(1), track(2, [clip(5, 0), clip(6, 20)])]);
+
+    h.record(
+      {
+        kind: 'moveClips',
+        moves: [
+          { clipId: 5, trackId: 2, start: 0 },
+          { clipId: 6, trackId: 2, start: 20 },
+        ],
+      },
+      t0,
+      t1,
+    );
+
+    expect(h.nextUndo()).toEqual({
+      kind: 'moveClips',
+      moves: [
+        { clipId: 5, trackId: 1, start: 0 },
+        { clipId: 6, trackId: 1, start: 20 },
+      ],
+    });
+  });
+
+  it('follows Clips moved together when one comes back with a new id', () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0), clip(6, 20)])]);
+    const t1 = timeline([track(1, [clip(5, 3), clip(6, 23)])]);
+    const t2 = timeline([track(1, [clip(6, 23)])]);
+    h.record(
+      {
+        kind: 'moveClips',
+        moves: [
+          { clipId: 5, trackId: 1, start: 3 },
+          { clipId: 6, trackId: 1, start: 23 },
+        ],
+      },
+      t0,
+      t1,
+    );
+    h.record({ kind: 'deleteClip', clipId: 5 }, t1, t2);
+
+    h.undone(t2, timeline([track(1, [clip(9, 3), clip(6, 23)])]));
+
+    expect(h.nextUndo()).toEqual({
+      kind: 'moveClips',
+      moves: [
+        { clipId: 9, trackId: 1, start: 0 },
+        { clipId: 6, trackId: 1, start: 20 },
+      ],
+    });
   });
 
   it('redoes what was undone, and undoes earlier edits in turn', () => {

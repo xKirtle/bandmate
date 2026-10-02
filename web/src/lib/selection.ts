@@ -14,6 +14,8 @@ export type SelectionGesture =
   | { kind: 'click'; clipId: number }
   /** A Clip was clicked with Mod (Ctrl, or ⌘ on a Mac) held. */
   | { kind: 'toggle'; clipId: number }
+  /** A press on a Clip became a drag to move it. */
+  | { kind: 'drag'; clipId: number }
   /**
    * A box was drawn over empty lane space, from `start` to `end` seconds,
    * over the Tracks from index `tracks[0]` to `tracks[1]`, either way
@@ -43,11 +45,12 @@ function boxed(tracks: Tracks, box: Extract<SelectionGesture, { kind: 'box' }>):
 }
 
 /**
- * The Selection after a gesture, given the Timeline's Tracks: a plain
- * click selects that Clip alone, a Mod+click adds it or takes it out, a
- * box selects the Clips it touches, or adds them with Mod, select-all
- * selects every Clip, and clearing, or clicking empty lane space without
- * Mod, selects none. Clips no longer on the Timeline, e.g. deleted in
+ * The Selection after a gesture, given the Timeline's Tracks. A plain
+ * click selects that Clip alone, and a Mod+click adds it or takes it out.
+ * Dragging a selected Clip keeps the Selection, so it all moves; dragging
+ * another selects it alone. A box selects the Clips it touches, or adds
+ * them with Mod, select-all selects every Clip, and clearing, or clicking
+ * empty lane space without Mod, selects none. Clips no longer on the Timeline, e.g. deleted in
  * another tab or taken away by undo, drop out; without a gesture, or on a
  * Mod+click on empty lane space, that's all that happens, and `selected`
  * itself is given back if none did.
@@ -60,6 +63,8 @@ export function selection(tracks: Tracks, selected: Selection, gesture?: Selecti
   switch (gesture.kind) {
     case 'click':
       return new Set([gesture.clipId]);
+    case 'drag':
+      return pruned.has(gesture.clipId) ? pruned : new Set([gesture.clipId]);
     case 'toggle':
       return selected.has(gesture.clipId)
         ? new Set(kept.filter((id) => id !== gesture.clipId))

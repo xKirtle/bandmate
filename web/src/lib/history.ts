@@ -1,5 +1,6 @@
 import {
   api,
+  type ClipMove,
   type ClipTakes,
   type CueValue,
   type NewClip,
@@ -55,6 +56,7 @@ export type Edit =
   | { kind: 'placeClip'; trackId: number; clip: NewClip }
   | { kind: 'duplicateClip'; clipId: number }
   | { kind: 'moveClip'; clipId: number; trackId: number; start: number }
+  | { kind: 'moveClips'; moves: ClipMove[] }
   | { kind: 'trimClip'; clipId: number; offset: number; length: number }
   /** A blank name clears the Clip's. */
   | { kind: 'renameClip'; clipId: number; name: string }
@@ -206,6 +208,13 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
       const { track, clip } = findClip(before, edit.clipId);
       return { edit: { kind: 'moveClip', clipId: clip.id, trackId: track.id, start: clip.start }, adds: none };
     }
+    case 'moveClips': {
+      const moves = edit.moves.map(({ clipId }) => {
+        const { track, clip } = findClip(before, clipId);
+        return { clipId, trackId: track.id, start: clip.start };
+      });
+      return { edit: { kind: 'moveClips', moves }, adds: none };
+    }
     case 'trimClip': {
       const { clip } = findClip(before, edit.clipId);
       return { edit: { kind: 'trimClip', clipId: clip.id, offset: clip.offset, length: clip.length }, adds: none };
@@ -348,6 +357,11 @@ function remap(edit: HistoryEdit, ids: IdMaps): HistoryEdit {
       return { ...edit, trackId: ids.track(edit.trackId) };
     case 'moveClip':
       return { ...edit, clipId: ids.clip(edit.clipId), trackId: ids.track(edit.trackId) };
+    case 'moveClips':
+      return {
+        ...edit,
+        moves: edit.moves.map((m) => ({ clipId: ids.clip(m.clipId), trackId: ids.track(m.trackId), start: m.start })),
+      };
     case 'trimClip':
     case 'renameClip':
     case 'duplicateClip':
@@ -389,6 +403,8 @@ export function sendEdit(at: SongAt, edit: Edit): Promise<Timeline> {
       return api.placeClip(at, edit.trackId, edit.clip);
     case 'moveClip':
       return api.moveClip(at, edit.clipId, edit.trackId, edit.start);
+    case 'moveClips':
+      return api.moveClips(at, edit.moves);
     case 'trimClip':
       return api.trimClip(at, edit.clipId, edit.offset, edit.length);
     case 'renameClip':

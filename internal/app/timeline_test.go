@@ -313,6 +313,10 @@ var timelineChanges = []struct {
 		return ts.DoAt(v, http.MethodPost, clipPath(songID, tl.Tracks[0].Clips[0].ID)+"/move",
 			map[string]any{"trackId": tl.Tracks[0].ID, "start": 5})
 	}},
+	{"move clips", func(ts *testServer, songID int64, tl timeline, v int64) response {
+		return ts.DoAt(v, http.MethodPost, timelinePath(songID)+"/clips/move",
+			map[string]any{"clips": []clipMove{{tl.Tracks[0].Clips[0].ID, tl.Tracks[1].ID, 5}}})
+	}},
 	{"trim a clip", func(ts *testServer, songID int64, tl timeline, v int64) response {
 		return ts.DoAt(v, http.MethodPost, clipPath(songID, tl.Tracks[0].Clips[0].ID)+"/trim",
 			map[string]any{"offset": 1, "length": 5})

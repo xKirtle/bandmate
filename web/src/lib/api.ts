@@ -351,6 +351,13 @@ export interface TakePlacement extends Captured {
   start: number;
 }
 
+/** Where one of several Clips moved at once goes: a Track and a start, in seconds. */
+export interface ClipMove {
+  clipId: number;
+  trackId: number;
+  start: number;
+}
+
 /**
  * How a Clip of Takes is to be, e.g. to undo or redo a Retake: its Takes,
  * each where it starts in its source span and how far it's nudged, the one
@@ -708,6 +715,13 @@ export const api = {
   /** Moves a Clip to start at a time on a Track, keeping its trim. Refused if it would overlap a Clip there. */
   moveClip: (at: SongAt, clipId: number, trackId: number, start: number) =>
     request<Timeline>('POST', `/songs/${at.id}/timeline/clips/${clipId}/move`, { trackId, start }, at),
+  /**
+   * Moves several Clips at once, each checked where it lands against the
+   * Timeline as the whole move leaves it. Refused whole if any would overlap
+   * a Clip there.
+   */
+  moveClips: (at: SongAt, clips: ClipMove[]) =>
+    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/move`, { clips }, at),
   /**
    * Has a Clip play length seconds of its source from offset. The audio stays
    * in place on the Timeline, so trimming the start moves where the Clip starts.

@@ -120,6 +120,15 @@ func (a *App) moveClip(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *App) moveClips(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Clips []timeline.ClipMove `json:"clips"`
+	}
+	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+		return a.timelines.MoveClips(r.Context(), id, based, req.Clips)
+	})
+}
+
 func (a *App) trimClip(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Offset *float64 `json:"offset"`

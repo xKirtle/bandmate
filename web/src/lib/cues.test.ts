@@ -16,6 +16,7 @@ import {
   outOfOrderReason,
   parseCue,
   playLabel,
+  movedCues,
   type ChordedLine,
   type CuedSong,
 } from './cues';
@@ -323,6 +324,66 @@ describe('cuesInSpan', () => {
 
   it('finds nothing in an empty span', () => {
     expect(cuesInSpan(song, 10, 10)).toEqual([]);
+  });
+});
+
+describe('movedCues', () => {
+  const song = cuedSong(
+    [
+      {
+        id: 9,
+        alternates: [
+          { active: false, lines: [{ id: 50, text: 'Old' }] },
+          {
+            active: true,
+            lines: [
+              { id: 60, text: 'New' },
+              { id: 61, text: 'Newer' },
+            ],
+          },
+        ],
+      },
+      { id: 10, alternates: [{ active: true, lines: [{ id: 70, text: 'Hook' }] }] },
+    ],
+    { 60: 10, 61: 14.2, 50: 12, 70: 30 },
+  );
+
+  it('moves the Cues in any of the spans by the same amount, dormant ones included', () => {
+    expect(
+      movedCues(
+        song,
+        [
+          { start: 9, end: 13 },
+          { start: 29, end: 31 },
+        ],
+        1.1,
+      ),
+    ).toEqual([
+      { lineId: 50, cue: 13.1 },
+      { lineId: 60, cue: 11.1 },
+      { lineId: 70, cue: 31.1 },
+    ]);
+  });
+
+  it('moves a Cue in two of the spans only once', () => {
+    expect(
+      movedCues(
+        song,
+        [
+          { start: 14, end: 20 },
+          { start: 10, end: 15 },
+        ],
+        -2,
+      ),
+    ).toEqual([
+      { lineId: 50, cue: 10 },
+      { lineId: 60, cue: 8 },
+      { lineId: 61, cue: 12.2 },
+    ]);
+  });
+
+  it('moves nothing outside the spans', () => {
+    expect(movedCues(song, [{ start: 40, end: 50 }], 3)).toEqual([]);
   });
 });
 
