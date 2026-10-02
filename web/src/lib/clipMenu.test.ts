@@ -30,7 +30,7 @@ group('clipActions', () => {
   const soundClip = clip({ soundId: 3 });
   const oneTake = clip({ takes: [take(10, 1)], activeTakeId: 10 });
   const twoTakes = clip({ takes: [take(10, 1), take(11, 2)], activeTakeId: 11 });
-  const state = { canRecord: true, soundName: 'Riff', nudgeKeys: 'Alt+←/→' };
+  const state = { canRecord: true, soundName: 'Riff', nudgeKeys: 'Alt+←/→', selected: 0 };
   const run = {
     retake: () => {},
     chooseTake: () => {},
@@ -105,6 +105,11 @@ group('clipActions', () => {
   it('offers no Retake while a Take couldn’t start', () => {
     expect(labels(oneTake)).toContain('Retake');
     expect(labels(oneTake, { ...state, canRecord: false })).not.toContain('Retake');
+  });
+
+  it('offers no Retake while several Clips are selected', () => {
+    expect(labels(oneTake, { ...state, selected: 1 })).toContain('Retake');
+    expect(labels(oneTake, { ...state, selected: 2 })).not.toContain('Retake');
   });
 
   it('downloads the Sound a Clip of a Sound plays, named in its title', () => {

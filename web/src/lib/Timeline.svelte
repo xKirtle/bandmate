@@ -1048,7 +1048,9 @@
    * of Takes.
    */
   async function startRecording(retaking?: Clip) {
-    if (!canRecord) return;
+    // No Retake while several Clips are selected, e.g. selected while
+    // calibration, offered first, ran.
+    if (!canRecord || (retaking && selected.size > 1)) return;
     // Calibration is offered first, the first time on this device.
     if (!calibration.offered && calibration.offset === null) {
       calibrating = { offer: true, retaking };
@@ -1951,6 +1953,7 @@
         canRecord,
         soundName: clip.soundId === null ? null : sources.of(clip).title,
         nudgeKeys: hints.label(shortcuts.nudgeTake.keys),
+        selected: selected.size,
       },
       {
         retake: () => startRecording(clip),
