@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Clip, Take, Track } from './api';
-import { copy, emptyClipboard, paste } from './clipboard';
+import { copy, duplicate, emptyClipboard, paste, type Paste } from './clipboard';
 
 const clip = (id: number, start: number, length = 10, more: Partial<Clip> = {}): Clip => ({
   id,
@@ -37,7 +37,7 @@ const take = (id: number, position: number, nudge: number): Take => ({
 });
 
 /** Where each pasted Clip goes, as "Track id:start", or "new Track index:start" on a Track the paste adds. */
-const landing = (pasted: ReturnType<typeof paste>) =>
+const landing = (pasted: Paste | null) =>
   pasted?.clips.map((p) => `${'trackId' in p ? p.trackId : `new ${p.newTrack}`}:${p.clip.start}`);
 
 describe('copy', () => {
@@ -231,5 +231,60 @@ describe('paste', () => {
 
       expect(landing(paste(clipboard, tracks, 0, 1))).toEqual(['1:45', '3:39']);
     });
+  });
+});
+
+describe('duplicate', () => {
+  it('copies the Selection onto the same Tracks, starting where its last Clip ends, keeping their places', () => {
+    const tracks = [track(1, [clip(5, 0, 10), clip(9, 50)]), track(2), track(3, [clip(6, 4, 20)])];
+
+    expect(landing(duplicate(tracks, new Set([5, 6])))).toEqual(['1:24', '3:28']);
+  });
+
+  it('goes later as a whole to the first place every copy fits, when any would land on a Clip', () => {
+    // The copy of 6 would land on 8, so both go on to where 8 ends, less 6's 4s after 5.
+    const tracks = [track(1, [clip(5, 0, 10), clip(9, 50)]), track(3, [clip(6, 4, 20), clip(8, 28, 2)])];
+
+    expect(landing(duplicate(tracks, new Set([5, 6])))).toEqual(['1:26', '3:30']);
+  });
+
+  it('lays copies end to end when duplicated again', () => {
+    const tracks = [track(1, [clip(5, 0, 10), clip(7, 10, 5)])];
+
+    expect(landing(duplicate(tracks, new Set([5])))).toEqual(['1:15']);
+  });
+
+  it('copies them as they are: trim, name and active Take, with their Takes', () => {
+    const takes = clip(6, 2, 3, {
+      beatId: null,
+      name: 'Hook',
+      takes: [take(60, 0, 0.1)],
+      activeTakeId: 60,
+      offset: 0.5,
+    });
+
+    expect(duplicate([track(1, [takes])], new Set([6]))?.clips).toEqual([
+      {
+        trackId: 1,
+        clip: {
+          name: 'Hook',
+          takes: [{ id: 60, position: 0, nudge: 0.1 }],
+          activeTakeId: 60,
+          start: 5,
+          offset: 0.5,
+          length: 3,
+        },
+      },
+    ]);
+  });
+
+  it('adds no Tracks', () => {
+    const tracks = [track(1, [clip(5, 0)]), track(2, [clip(6, 0)])];
+
+    expect(duplicate(tracks, new Set([5, 6]))?.newTracks).toEqual([]);
+  });
+
+  it('duplicates nothing with no Clip selected', () => {
+    expect(duplicate([track(1, [clip(5, 0)])], new Set())).toBeNull();
   });
 });

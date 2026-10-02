@@ -67,7 +67,14 @@
   import { allKeys, shortcuts, type Way } from './shortcuts';
   import { clipActions, selectionActions } from './clipMenu';
   import { menuFor, noSelection, selection, type Selection, type SelectionGesture } from './selection';
-  import { copy, emptyClipboard, paste, type Clipboard } from './clipboard';
+  import {
+    copy,
+    duplicate as duplicatePlacement,
+    emptyClipboard,
+    paste,
+    type Clipboard,
+    type Paste,
+  } from './clipboard';
   import {
     addsBox,
     clearsSelection,
@@ -1519,7 +1526,11 @@
   function pasteClipboard() {
     if (chosen === null) return; // Never: a Song always has a Track.
     const pasted = paste(clipboard, timeline.tracks, playheadAt(), chosen);
-    if (!pasted) return;
+    if (pasted) pasteAndSelect(pasted);
+  }
+
+  /** Makes the Clips of a paste, or a Selection Duplicate, as one edit, and selects them. */
+  function pasteAndSelect(pasted: Paste) {
     perform({ kind: 'pasteClips', ...pasted }, (before, after) => {
       // Unless the Selection is locked by a recording started since.
       if (!frozen) selected = new Set(addedClips(before, after));
@@ -1967,6 +1978,16 @@
     perform({ kind: 'duplicateClip', clipId: clip.id });
   }
 
+  /**
+   * Duplicates the selected Clips onto their Tracks, right after the
+   * Selection ends or later where they all fit, as one edit, and selects
+   * the copies. It leaves the Clipboard as it is.
+   */
+  function duplicateSelection() {
+    const copies = duplicatePlacement(timeline.tracks, selected);
+    if (copies) pasteAndSelect(copies);
+  }
+
   // A Clip is renamed in place, like a Track: double-clicked, or from its
   // menu. A blank name clears its own, so it goes by its source's again.
   // Until a new name is saved, it's shown.
@@ -2068,7 +2089,11 @@
 
   function clipMenuActions(clip: Clip): MenuAction[] {
     if (menuFor(timeline.tracks, selected, clip.id, frozen).menu === 'selection') {
-      return selectionActions(selected.size, { deleteClips: removeSelection }, frozen);
+      return selectionActions(
+        selected.size,
+        { duplicateClips: duplicateSelection, deleteClips: removeSelection },
+        frozen,
+      );
     }
     const clipId = clip.id;
     return clipActions(

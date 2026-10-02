@@ -67,6 +67,7 @@ function editing(recording: boolean): (action: MenuAction) => MenuAction {
 
 /** What each entry of the Selection menu does. */
 export type SelectionRun = {
+  duplicateClips: () => void;
   deleteClips: () => void;
 };
 
@@ -76,7 +77,11 @@ export type SelectionRun = {
  */
 export function selectionActions(count: number, run: SelectionRun, recording = false): MenuAction[] {
   const edit = editing(recording);
-  return [edit({ icon: '×', label: `Delete ${count} Clip${count === 1 ? '' : 's'}`, run: run.deleteClips })];
+  const howMany = `${count} Clip${count === 1 ? '' : 's'}`;
+  return [
+    edit({ icon: '⧉', label: `Duplicate ${howMany}`, run: run.duplicateClips }),
+    edit({ icon: '×', label: `Delete ${howMany}`, run: run.deleteClips }),
+  ];
 }
 
 function takeActions(clip: Clip, state: ClipMenuState, run: ClipRun): MenuAction[] {
