@@ -72,6 +72,40 @@ export function snapMove<T>(
   return { start: clamp(desired), snap: null };
 }
 
+/** A snap of the Selection: which selected Clip's edge, its start (0) or end (1), went onto a target. */
+export type SelectionSnap<T> = Snap<T> & { clipId: number };
+
+/**
+ * How far the selected Clips, moved together by desired seconds, go:
+ * snapped by whichever start or end of any of them is nearest a target in
+ * reach, then kept within their limits by clamp, which gives the amount
+ * they can move by nearest to the one asked. A limit that keeps them off
+ * the target leaves them unsnapped, where they would go without snapping.
+ */
+export function snapSelection<T>(
+  targets: readonly Target<T>[],
+  clips: readonly { id: number; start: number; length: number }[],
+  desired: number,
+  reach: number,
+  clamp: (by: number) => number,
+): { by: number; snap: SelectionSnap<T> | null } {
+  const edges = clips.flatMap((c) => [c.start, c.start + c.length]);
+  const found = snap(
+    targets,
+    edges.map((at) => at + desired),
+    reach,
+  );
+  if (found) {
+    // From the target itself, so the edge that snapped lands on it.
+    const by = found.at - edges[found.edge];
+    if (Math.abs(clamp(by) - by) <= tolerance) {
+      const clip = clips[Math.floor(found.edge / 2)];
+      return { by, snap: { ...found, clipId: clip.id, edge: found.edge % 2 } };
+    }
+  }
+  return { by: clamp(desired), snap: null };
+}
+
 /**
  * Where one edge dragged to desired goes: onto a target in reach, then
  * kept within its limits by clamp, e.g. a trimmed Clip's edge. A limit
@@ -160,14 +194,14 @@ export function guideLanes(
 }
 
 /**
- * The start and end of every Clip but the one being dragged, if one is,
- * on every Track, as targets, each with the lane it's in, counted from
- * the top.
+ * The start and end of every Clip but those being dragged, if any, on
+ * every Track, as targets, each with the lane it's in, counted from the
+ * top.
  */
-export function clipTargets(tracks: Tracks, draggedClip?: number): Target<number>[] {
+export function clipTargets(tracks: Tracks, dragged: ReadonlySet<number> = new Set()): Target<number>[] {
   return tracks.flatMap((track, lane) =>
     track.clips
-      .filter((c) => c.id !== draggedClip)
+      .filter((c) => !dragged.has(c.id))
       .flatMap((c) => [
         { at: c.start, of: lane },
         { at: c.start + c.length, of: lane },
@@ -176,13 +210,13 @@ export function clipTargets(tracks: Tracks, draggedClip?: number): Target<number
 }
 
 /**
- * Everything a moved or trimmed Clip snaps to: every other Clip's start
- * and end, the playhead, and the Loop's start and end, on or off, if
- * there is one.
+ * Everything a moved or trimmed Clip, or the Selection moved, snaps to:
+ * the start and end of every Clip not being dragged, the playhead, and
+ * the Loop's start and end, on or off, if there is one.
  */
 export function editTargets(
   tracks: Tracks,
-  draggedClip: number,
+  dragged: ReadonlySet<number>,
   playhead: number,
   loop: { start: number; end: number } | null,
 ): Target<Aligned>[] {
@@ -192,7 +226,7 @@ export function editTargets(
         { at: loop.end, of: 'loop' },
       ]
     : [];
-  return [...clipTargets(tracks, draggedClip), { at: playhead, of: 'playhead' }, ...loopEdges];
+  return [...clipTargets(tracks, dragged), { at: playhead, of: 'playhead' }, ...loopEdges];
 }
 
 /**

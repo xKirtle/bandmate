@@ -29,8 +29,10 @@
     snapEdge,
     snapLoop,
     snapMove,
+    snapSelection,
     type Aligned,
     type LoopDrag,
+    type SelectionSnap,
     type Snap,
   } from './snapping';
   import { activeTake, clipSources, clipTitle, fileStart, playing } from './clipSource';
@@ -1420,7 +1422,8 @@
   // source's ends and 0:00 as it goes, and is saved on release. Until the
   // saved Timeline comes back, the Clip is shown where it was dropped.
   // Moved or trimmed, it snaps to other Clips' edges, the playhead and the
-  // Loop's edges, unless Shift is held.
+  // Loop's edges, unless Shift is held; the Selection, moved together,
+  // snaps by any of its Clips' edges to those of Clips outside it.
   interface Edit {
     clip: Clip;
     /** Moving the Clip, trimming either edge, or, Alt+dragged, sliding its active Take within it. */
@@ -1439,8 +1442,8 @@
     free: boolean;
     /** Whether Mod was held as it was pressed, so a click adds it to the Selection or takes it out. */
     toggles: boolean;
-    /** What a move or trim is snapped to, with the lanes of what's there, while it is. */
-    snap: Snap<Aligned> | null;
+    /** What a move or trim is snapped to, with the lanes of what's there, while it is; for the Selection, by which Clip. */
+    snap: Snap<Aligned> | SelectionSnap<Aligned> | null;
     /** Where every selected Clip is shown, when the Selection is moved together; null for one Clip. */
     moves: ClipMove[] | null;
     saving: boolean;
@@ -1481,15 +1484,15 @@
 
   /**
    * The guide for what a moved or trimmed Clip, or the Loop being set, is
-   * snapped to: a line at that time, from the Clip's lane through every
-   * lane with a Clip aligned there, and up through the ruler for a Loop
-   * edge or the Loop, in pixels down the lanes. None for the playhead,
-   * which already is a line.
+   * snapped to: a line at that time, from the lane of the Clip whose edge
+   * snapped through every lane with a Clip aligned there, and up through
+   * the ruler for a Loop edge or the Loop, in pixels down the lanes. None
+   * for the playhead, which already is a line.
    */
   const guide = $derived.by(() => {
     const snapped = edit?.snap ?? loopEdit?.snap;
     if (!snapped) return null;
-    const dragged = edit?.snap ? timeline.tracks.findIndex((t) => t.id === edit!.trackId) : 'ruler';
+    const dragged = edit?.snap ? timeline.tracks.findIndex((t) => t.id === snappedTrack(edit!)) : 'ruler';
     const lanes = guideLanes(dragged, snapped.aligned);
     if (!lanes) return null;
     const top = lanes.from === 'ruler' ? rulerElement : laneElements[lanes.from];
@@ -1498,9 +1501,15 @@
     return { at: snapped.at, top: top.offsetTop, height: bottom.offsetTop + bottom.offsetHeight - top.offsetTop };
   });
 
-  /** What a Clip moved or trimmed snaps to: the other Clips' edges, the playhead and the Loop's edges. */
-  function snapTargets(clip: Clip) {
-    return editTargets(timeline.tracks, clip.id, position, loop);
+  /** The Track the Clip whose edge snapped is shown on: one of the Selection's, when it's moved together. */
+  function snappedTrack({ snap, moves, trackId }: Edit): number {
+    const clipId = snap && 'clipId' in snap ? snap.clipId : null;
+    return moves?.find((m) => m.clipId === clipId)?.trackId ?? trackId;
+  }
+
+  /** What Clips moved or trimmed snap to: the other Clips' edges, the playhead and the Loop's edges. */
+  function snapTargets(dragged: ReadonlySet<number>) {
+    return editTargets(timeline.tracks, dragged, position, loop);
   }
 
   function trackOf(clip: Clip) {
@@ -1673,9 +1682,18 @@
     if (edit.mode === 'nudge') {
       edit.nudge = draggedNudge(clip, t - edit.grab - clip.start);
     } else if (edit.moves) {
-      // Selected Clips move as one, without snapping for now.
-      edit.trackId = trackAt(event.clientY);
-      edit.moves = moveSelection(timeline.tracks, selected, clip.id, edit.trackId, t - edit.grab);
+      // Selected Clips move as one, snapped by any of their edges.
+      const trackId = (edit.trackId = trackAt(event.clientY));
+      const place = (by: number) => moveSelection(timeline.tracks, selected, clip.id, trackId, clip.start + by);
+      // How far the group clamp lets them move, as the Clip dragged goes.
+      const clamp = (by: number) => place(by).find((m) => m.clipId === clip.id)!.start - clip.start;
+      const desired = t - edit.grab - clip.start;
+      const clips = timeline.tracks.flatMap((track) => track.clips.filter((c) => selected.has(c.id)));
+      const moved = edit.free
+        ? { by: clamp(desired), snap: null }
+        : snapSelection(snapTargets(selected), clips, desired, reachAt(view.scale), clamp);
+      edit.moves = place(moved.by);
+      edit.snap = moved.snap;
     } else if (edit.mode === 'move') {
       edit.trackId = trackAt(event.clientY);
       const others = othersOn(edit.trackId, clip);
@@ -1683,7 +1701,7 @@
       const desired = t - edit.grab;
       const moved = edit.free
         ? { start: clamp(desired), snap: null }
-        : snapMove(snapTargets(clip), clip.length, desired, reachAt(view.scale), clamp);
+        : snapMove(snapTargets(new Set([clip.id])), clip.length, desired, reachAt(view.scale), clamp);
       edit.placement = { ...clip, start: moved.start };
       edit.snap = moved.snap;
     } else {
@@ -1696,7 +1714,9 @@
         const trimmed = trim(at);
         return trimStart ? trimmed.start : trimmed.start + trimmed.length;
       };
-      const snapped = edit.free ? { at: t, snap: null } : snapEdge(snapTargets(clip), t, reachAt(view.scale), edge);
+      const snapped = edit.free
+        ? { at: t, snap: null }
+        : snapEdge(snapTargets(new Set([clip.id])), t, reachAt(view.scale), edge);
       edit.placement = trim(snapped.at);
       edit.snap = snapped.snap;
     }
