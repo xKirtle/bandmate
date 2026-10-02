@@ -56,9 +56,9 @@ describe('copy', () => {
     const tracks = [track(1, [clip(5, 0, 10, { offset: 2 }), clip(7, 40)]), track(2, [takes])];
 
     expect(copy(tracks, new Set([6, 5]))?.clips).toEqual([
-      { row: 0, clip: { beatId: 100, start: 0, offset: 2, length: 10 } },
+      { below: 0, clip: { beatId: 100, start: 0, offset: 2, length: 10 } },
       {
-        row: 1,
+        below: 1,
         clip: {
           name: 'Hook',
           takes: [
@@ -76,18 +76,18 @@ describe('copy', () => {
 
   it('holds a Sound’s Clip by its Sound', () => {
     expect(copy([track(1, [clip(5, 4, 8, { beatId: null, soundId: 9 })])], new Set([5]))?.clips).toEqual([
-      { row: 0, clip: { soundId: 9, start: 4, offset: 0, length: 8 } },
+      { below: 0, clip: { soundId: 9, start: 4, offset: 0, length: 8 } },
     ]);
   });
 
-  it('holds each Clip’s row below the topmost copied, and the names of the Tracks they came from, those between included', () => {
+  it('holds how far below the topmost copied each Clip was, and the names of the Tracks they came from, those between included', () => {
     const tracks = [track(1), track(2, [clip(5, 0)]), track(3), track(4, [clip(6, 30)])];
 
     expect(copy(tracks, new Set([5, 6]))).toEqual({
       tracks: ['Track 2', 'Track 3', 'Track 4'],
       clips: [
-        { row: 0, clip: { beatId: 100, start: 0, offset: 0, length: 10 } },
-        { row: 2, clip: { beatId: 100, start: 30, offset: 0, length: 10 } },
+        { below: 0, clip: { beatId: 100, start: 0, offset: 0, length: 10 } },
+        { below: 2, clip: { beatId: 100, start: 30, offset: 0, length: 10 } },
       ],
     });
   });
@@ -181,10 +181,10 @@ describe('paste', () => {
       expect(paste(clipboard, tracks, 20, 1)!.newTracks).toEqual([]);
     });
 
-    it('puts rows past the last Track on new Tracks at the bottom, named after the Tracks they came from', () => {
+    it('puts Clips past the last Track on new Tracks at the bottom, named after the Tracks they came from', () => {
       const tracks = [track(1), track(2)];
 
-      // From Track 2, the Clipboard's three rows run two past the last.
+      // From Track 2, the Clipboard's three Tracks run two past the last.
       const pasted = paste(clipboard, tracks, 0, 2)!;
 
       expect(landing(pasted)).toEqual(['2:6', 'new 1:0']);

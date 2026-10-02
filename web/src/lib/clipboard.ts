@@ -9,15 +9,15 @@
 import type { Clip, ClipCopy, PastedClip, Track, TrackToAdd } from './api';
 import type { Selection } from './selection';
 
-/** A Clip as it was copied, and its row: how many Tracks below the topmost Clip copied it was then. */
+/** A Clip as it was copied, and how many Tracks below the topmost Clip copied it was then. */
 export interface CopiedClip {
-  row: number;
+  below: number;
   clip: ClipCopy;
 }
 
 export interface Clipboard {
   /**
-   * The names of the Tracks the Clips came from, by row: from the topmost
+   * The names of the Tracks the Clips came from, in order: from the topmost
    * Clip's Track to the bottommost's, those between included, to name the
    * Tracks a paste adds.
    */
@@ -65,7 +65,7 @@ export function copy(tracks: readonly Track[], selected: Selection): Clipboard |
   const bottom = copied[copied.length - 1].trackIndex;
   return {
     tracks: tracks.slice(top, bottom + 1).map((t) => t.name),
-    clips: copied.map(({ trackIndex, clip }) => ({ row: trackIndex - top, clip })),
+    clips: copied.map(({ trackIndex, clip }) => ({ below: trackIndex - top, clip })),
   };
 }
 
@@ -89,11 +89,13 @@ export function paste(
   const chosen = tracks.findIndex((t) => t.id === chosenTrackId);
   if (chosen < 0 || clipboard.clips.length === 0) return null;
   const earliest = Math.min(...clipboard.clips.map((c) => c.clip.start));
-  // Each row on the Track it lands on, or past the last one, on a new one.
-  const laid = clipboard.clips.map(({ row, clip }) => ({
+  // Each on the Track as far below the Chosen Track as it was below the
+  // topmost, or past the last one, on a new one, by its index among them.
+  const laid = clipboard.clips.map(({ below, clip }) => ({
     clip,
     after: clip.start - earliest,
-    on: chosen + row < tracks.length ? tracks[chosen + row] : null,
+    on: chosen + below < tracks.length ? tracks[chosen + below] : null,
+    newTrack: chosen + below - tracks.length,
   }));
   // Each Clip landing on another sends the paste on to where that one
   // ends, as nowhere before it would clear it, until none does.
@@ -109,13 +111,12 @@ export function paste(
     if (hit === undefined) break;
     at = hit;
   }
-  const rows = chosen + clipboard.tracks.length - tracks.length;
+  const adding = Math.max(chosen + clipboard.tracks.length - tracks.length, 0);
   return {
-    newTracks: clipboard.tracks.slice(clipboard.tracks.length - Math.max(rows, 0)).map((name) => ({ name })),
-    clips: clipboard.clips.map(({ row, clip }, i) => {
-      const placed = { ...clip, start: at + laid[i].after };
-      const on = laid[i].on;
-      return on ? { trackId: on.id, clip: placed } : { newTrack: chosen + row - tracks.length, clip: placed };
+    newTracks: clipboard.tracks.slice(clipboard.tracks.length - adding).map((name) => ({ name })),
+    clips: laid.map(({ clip, after, on, newTrack }) => {
+      const placed = { ...clip, start: at + after };
+      return on ? { trackId: on.id, clip: placed } : { newTrack, clip: placed };
     }),
   };
 }

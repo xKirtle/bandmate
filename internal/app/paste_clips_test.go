@@ -119,7 +119,7 @@ func TestAPasteIsRefusedWhole(t *testing.T) {
 			"takes": []map[string]any{{"id": r.take.ID, "position": 0, "nudge": 0}}, "activeTakeId": 999,
 			"start": 20, "offset": 0, "length": 1}}, http.StatusBadRequest, "a Clip of Takes plays one of them"},
 		"without a Track": {[]map[string]any{{"beatId": r.tl.Beats[0].ID, "start": 20, "offset": 0, "length": 1}},
-			http.StatusBadRequest, "trackId, start, offset and length are required"},
+			http.StatusBadRequest, "trackId or newTrack, start, offset and length are required"},
 		"no Clips": {[]map[string]any{}, http.StatusBadRequest, "clips are required"},
 	} {
 		t.Run(name, func(t *testing.T) {

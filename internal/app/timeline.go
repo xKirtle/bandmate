@@ -157,13 +157,14 @@ type clipToPlace struct {
 	Length       *float64 `json:"length"`
 }
 
-// placed is the Clip and the Track it goes on, if the request gave both.
+// placed is the Clip and the Track it goes on, if the request gave both,
+// the Track as one of the Timeline's or one the request adds, not both.
 func (c clipToPlace) placed() (timeline.PlacedClip, error) {
 	if c.TrackID != nil && c.NewTrack != nil {
 		return timeline.PlacedClip{}, &lyricsheet.InvalidError{Msg: "a Clip goes on a Track or a new Track, not both"}
 	}
 	if (c.TrackID == nil && c.NewTrack == nil) || c.Start == nil || c.Offset == nil || c.Length == nil {
-		return timeline.PlacedClip{}, &lyricsheet.InvalidError{Msg: "trackId, start, offset and length are required"}
+		return timeline.PlacedClip{}, &lyricsheet.InvalidError{Msg: "trackId or newTrack, start, offset and length are required"}
 	}
 	on := timeline.OnTrack{NewTrack: c.NewTrack}
 	if c.TrackID != nil {
@@ -247,7 +248,7 @@ type clipToPaste struct {
 }
 
 // copied is the Clip as it was copied and the Track it goes on, if the
-// request gave both.
+// request gave both, as placed reads them.
 func (c clipToPaste) copied() (timeline.ClipCopy, error) {
 	p, err := c.placed()
 	if err != nil {

@@ -404,9 +404,9 @@ type NewTrack struct {
 // volume must be from MinVolume to MaxVolume, and its Clips follow the same
 // rules as placing a Clip.
 func (s *Store) AddTrack(ctx context.Context, songID int64, based lyricsheet.Version, t NewTrack) (Timeline, error) {
-	name := strings.TrimSpace(t.Name)
-	if name == "" {
-		return Timeline{}, errTrackNameRequired
+	name, err := trackName(t.Name)
+	if err != nil {
+		return Timeline{}, err
 	}
 	if err := checkVolume(t.Volume); err != nil {
 		return Timeline{}, err
@@ -432,10 +432,9 @@ func (s *Store) AddTrack(ctx context.Context, songID int64, based lyricsheet.Ver
 			}
 			pos = *t.Position
 		}
-		res, err := tx.ExecContext(ctx, `INSERT INTO tracks (song_id, name, position, volume, muted, soloed)
-			VALUES (?, ?, ?, ?, ?, ?)`, songID, name, pos, t.Volume, t.Muted, t.Soloed)
+		trackID, err := insertTrack(ctx, tx, songID, name, pos, t.Volume, t.Muted, t.Soloed)
 		if err != nil {
-			return fmt.Errorf("adding track: %w", err)
+			return err
 		}
 		// Renumbered around it, as deleting Tracks may have left gaps.
 		for i, id := range order {
@@ -446,10 +445,6 @@ func (s *Store) AddTrack(ctx context.Context, songID int64, based lyricsheet.Ver
 			if _, err := tx.ExecContext(ctx, `UPDATE tracks SET position = ? WHERE id = ?`, at, id); err != nil {
 				return fmt.Errorf("making room for the track: %w", err)
 			}
-		}
-		trackID, err := res.LastInsertId()
-		if err != nil {
-			return err
 		}
 		for _, c := range t.Clips {
 			if err := addClip(ctx, tx, songID, trackID, c); err != nil {
@@ -807,16 +802,36 @@ func (o OnTrack) trackOf(added []int64) (int64, error) {
 	return added[*o.NewTrack], nil
 }
 
+// trackName is a Track's name as given, trimmed, which can't be blank.
+func trackName(name string) (string, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "", errTrackNameRequired
+	}
+	return name, nil
+}
+
 // checkTrackNames checks the names of Tracks to add, returning them trimmed.
 func checkTrackNames(names []string) ([]string, error) {
 	trimmed := make([]string, len(names))
 	for i, n := range names {
-		trimmed[i] = strings.TrimSpace(n)
-		if trimmed[i] == "" {
-			return nil, errTrackNameRequired
+		var err error
+		if trimmed[i], err = trackName(n); err != nil {
+			return nil, err
 		}
 	}
 	return trimmed, nil
+}
+
+// insertTrack adds a Track to the Song at a position, returning its id.
+func insertTrack(ctx context.Context, tx *sql.Tx, songID int64, name string, position int, volume float64,
+	muted, soloed bool) (int64, error) {
+	res, err := tx.ExecContext(ctx, `INSERT INTO tracks (song_id, name, position, volume, muted, soloed)
+		VALUES (?, ?, ?, ?, ?, ?)`, songID, name, position, volume, muted, soloed)
+	if err != nil {
+		return 0, fmt.Errorf("adding track: %w", err)
+	}
+	return res.LastInsertId()
 }
 
 // addTracksAtBottom adds empty Tracks with the names given, which must be
@@ -830,12 +845,8 @@ func addTracksAtBottom(ctx context.Context, tx *sql.Tx, songID int64, names []st
 	}
 	ids := make([]int64, len(names))
 	for i, name := range names {
-		res, err := tx.ExecContext(ctx, `INSERT INTO tracks (song_id, name, position, volume, muted, soloed)
-			VALUES (?, ?, ?, 0, 0, 0)`, songID, name, bottom+i)
-		if err != nil {
-			return nil, fmt.Errorf("adding track: %w", err)
-		}
-		if ids[i], err = res.LastInsertId(); err != nil {
+		var err error
+		if ids[i], err = insertTrack(ctx, tx, songID, name, bottom+i, 0, false, false); err != nil {
 			return nil, err
 		}
 	}

@@ -40,10 +40,10 @@ import { isBlank, type CuedSong } from './cues';
 // placing a Clip from their ids brings them back. A new Take, a copied
 // Clip and pasted Clips are redone as that too, so redoing never uploads a
 // Take again or copies it again. A paste that added Tracks is undone by
-// deleting them with its Clips, and redone by adding them again with them. Likewise, a Sound outlives its last Clip
-// for as long as undo lasts, so an imported Sound is undone by deleting
-// its Clip and redone by placing a Clip of it back, without uploading it
-// again. A Retake is undone and redone by setting its Clip's Takes, and where they are, as
+// deleting them with its Clips, and redone by adding them again with them.
+// Likewise, a Sound outlives its last Clip for as long as undo lasts, so an
+// imported Sound is undone by deleting its Clip and redone by placing a
+// Clip of it back, without uploading it again. A Retake is undone and redone by setting its Clip's Takes, and where they are, as
 // they were before or after it, which detaches the new Take or brings it
 // back. Deleting Takes, or clearing a
 // Clip's inactive ones, is undone the same way, as they're only detached,
