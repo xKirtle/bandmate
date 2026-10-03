@@ -19,6 +19,7 @@ group('clipActions', () => {
     beatId: null,
     soundId: null,
     name: null,
+    gain: 0,
     takes: [],
     activeTakeId: null,
     start: 0,
@@ -47,6 +48,7 @@ group('clipActions', () => {
     clearInactiveTakes: () => {},
     downloadTake: () => {},
     rename: () => {},
+    setGain: () => {},
     copy: () => {},
     cut: () => {},
     duplicate: () => {},
@@ -56,8 +58,8 @@ group('clipActions', () => {
   const labels = (c: Clip, s = state) => clipActions(c, s, run).map((a) => a.label);
 
   it('names its delete “Delete Clip”, whatever the Clip plays', () => {
-    expect(labels(beatClip)).toEqual(['Rename', 'Copy', 'Cut', 'Duplicate', 'Delete Clip']);
-    expect(labels(soundClip)).toEqual(['Rename', 'Copy', 'Cut', 'Duplicate', 'Download Sound', 'Delete Clip']);
+    expect(labels(beatClip)).toEqual(['Rename', 'Gain', 'Copy', 'Cut', 'Duplicate', 'Delete Clip']);
+    expect(labels(soundClip)).toEqual(['Rename', 'Gain', 'Copy', 'Cut', 'Duplicate', 'Download Sound', 'Delete Clip']);
     expect(labels(oneTake).at(-1)).toBe('Delete Clip');
   });
 
@@ -67,6 +69,7 @@ group('clipActions', () => {
       'Nudge',
       'Download Take',
       'Rename',
+      'Gain',
       'Copy',
       'Cut',
       'Duplicate',
@@ -83,6 +86,7 @@ group('clipActions', () => {
       'Clear inactive Takes',
       'Download Take',
       'Rename',
+      'Gain',
       'Copy',
       'Cut',
       'Duplicate',
@@ -100,6 +104,7 @@ group('clipActions', () => {
       clearInactiveTakes: () => ran.push('clear'),
       downloadTake: (id) => ran.push(`download take ${id}`),
       rename: () => ran.push('rename'),
+      setGain: (dB) => ran.push(`gain ${dB}`),
       copy: () => ran.push('copy'),
       cut: () => ran.push('cut'),
       duplicate: () => ran.push('duplicate'),
@@ -120,6 +125,7 @@ group('clipActions', () => {
       'clear',
       'download take 11',
       'rename',
+      'gain 5',
       'copy',
       'cut',
       'duplicate',
@@ -159,11 +165,13 @@ group('clipActions', () => {
       ['Nudge', hint],
       ['Clear inactive Takes', hint],
       ['Rename', hint],
+      ['Gain', hint],
       ['Copy', hint],
       ['Cut', hint],
       ['Duplicate', hint],
       ['Delete Clip', hint],
       ['Rename', hint],
+      ['Gain', hint],
       ['Copy', hint],
       ['Cut', hint],
       ['Duplicate', hint],
@@ -175,6 +183,7 @@ group('clipActions', () => {
   it('names the keys that copy and cut, where there are keys to name', () => {
     expect(clipActions(beatClip, state, run)).toMatchObject([
       { label: 'Rename' },
+      { label: 'Gain' },
       { label: 'Copy', title: 'Or Ctrl+C' },
       { label: 'Cut', title: 'Or Ctrl+X' },
       { label: 'Duplicate' },
@@ -185,6 +194,11 @@ group('clipActions', () => {
       undefined,
       undefined,
     ]);
+  });
+
+  it('takes an exact Gain in dB, from −36 to +36, starting at the Clip’s', () => {
+    const entry = clipActions({ ...beatClip, gain: -4.5 }, state, run).find((a) => a.label === 'Gain')!;
+    expect('field' in entry && entry.field).toMatchObject({ value: -4.5, unit: 'dB', min: -36, max: 36 });
   });
 
   it('leaves every entry on while not recording', () => {

@@ -1,6 +1,6 @@
 import { describe as group, expect, it } from 'vitest';
 import { KeyHints } from './keyHints';
-import { fieldHint, fieldStep, menuKey, opensMenu } from './menu';
+import { fieldHint, fieldStep, fieldInRange, menuKey, opensMenu } from './menu';
 
 group('menuKey', () => {
   it('moves down and up through the entries, wrapping round', () => {
@@ -55,6 +55,21 @@ group('fieldStep', () => {
     expect(fieldStep({ ...keys, key: 'ArrowUp', altKey: true }, 5, field)).toBeNull();
     expect(fieldStep({ ...keys, key: 'ArrowDown', ctrlKey: true }, 5, field)).toBeNull();
     expect(fieldStep({ ...keys, key: ' ' }, 5, field)).toBeNull();
+  });
+
+  it('stops at the ends of a field with a range', () => {
+    const ranged = { ...field, min: -36, max: 36 };
+    expect(fieldStep({ ...keys, key: 'ArrowUp', shiftKey: true }, 30, ranged)).toBe(36);
+    expect(fieldStep({ ...keys, key: 'ArrowDown', shiftKey: true }, -30, ranged)).toBe(-36);
+  });
+});
+
+group('fieldInRange', () => {
+  it('keeps a value typed within the range, if the field has one', () => {
+    expect(fieldInRange(50, { min: -36, max: 36 })).toBe(36);
+    expect(fieldInRange(-50, { min: -36, max: 36 })).toBe(-36);
+    expect(fieldInRange(-4.5, { min: -36, max: 36 })).toBe(-4.5);
+    expect(fieldInRange(5000, {})).toBe(5000);
   });
 });
 

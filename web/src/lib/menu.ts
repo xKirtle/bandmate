@@ -64,8 +64,16 @@ export type MenuField = {
   unit: string;
   step: number;
   shiftStep: number;
+  /** The least and most it can be, if it's limited, e.g. a Gain; typed or stepped past, it stops there. */
+  min?: number;
+  max?: number;
   set: (value: number) => void;
 };
+
+/** A value for a field, kept within its range, if it has one. */
+export function fieldInRange(value: number, field: Pick<MenuField, 'min' | 'max'>): number {
+  return Math.min(field.max ?? Infinity, Math.max(field.min ?? -Infinity, value));
+}
 
 // A field's keys are a number box's own, not Shortcuts: ←/→ are left to
 // move the text cursor, and Alt+←/→ to the browser. They're taken from
@@ -80,12 +88,16 @@ const shiftStepKeys: TwoWay = {
  * What a key does to a menu's field at `value`: the value it steps it to,
  * or null to leave the key alone.
  */
-export function fieldStep(e: KeyPress, value: number, field: Pick<MenuField, 'step' | 'shiftStep'>): number | null {
+export function fieldStep(
+  e: KeyPress,
+  value: number,
+  field: Pick<MenuField, 'step' | 'shiftStep' | 'min' | 'max'>,
+): number | null {
   const by = stepBy(e, [
     [stepKeys, field.step],
     [shiftStepKeys, field.shiftStep],
   ]);
-  return by === null ? null : value + by;
+  return by === null ? null : fieldInRange(value + by, field);
 }
 
 /** A field's tooltip, naming the keys that step it, e.g. "↑ or ↓ steps it by 1 ms, …", or undefined without a fine pointer. */

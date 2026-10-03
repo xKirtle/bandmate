@@ -211,6 +211,7 @@ describe('nudging', () => {
     beatId: null,
     soundId: null,
     name: null,
+    gain: 0,
     takes: [take(3), take(4, { nudge: 0.02 })],
     activeTakeId: 4,
     start: 10,

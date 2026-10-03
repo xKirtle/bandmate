@@ -150,6 +150,7 @@ type clipToPlace struct {
 	BeatID       *int64   `json:"beatId"`
 	SoundID      *int64   `json:"soundId"`
 	Name         *string  `json:"name"`
+	Gain         float64  `json:"gain"`
 	TakeIDs      []int64  `json:"takeIds"`
 	ActiveTakeID *int64   `json:"activeTakeId"`
 	Start        *float64 `json:"start"`
@@ -171,7 +172,7 @@ func (c clipToPlace) placed() (timeline.PlacedClip, error) {
 		on.TrackID = *c.TrackID
 	}
 	return timeline.PlacedClip{OnTrack: on, NewClip: timeline.NewClip{
-		BeatID: c.BeatID, SoundID: c.SoundID, Name: c.Name, TakeIDs: c.TakeIDs, ActiveTakeID: c.ActiveTakeID,
+		BeatID: c.BeatID, SoundID: c.SoundID, Name: c.Name, Gain: c.Gain, TakeIDs: c.TakeIDs, ActiveTakeID: c.ActiveTakeID,
 		Start: *c.Start, Offset: *c.Offset, Length: *c.Length,
 	}}, nil
 }
@@ -229,6 +230,18 @@ func (a *App) renameClip(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *App) setClipGain(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Gain *float64 `json:"gain"`
+	}
+	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based lyricsheet.Version, clipID int64) (timeline.Timeline, error) {
+		if req.Gain == nil {
+			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "gain is required"}
+		}
+		return a.timelines.SetClipGain(ctx, id, based, clipID, *req.Gain)
+	})
+}
+
 func (a *App) duplicateClip(w http.ResponseWriter, r *http.Request) {
 	a.changeClip(w, r, nil, a.timelines.DuplicateClip)
 }
@@ -263,7 +276,7 @@ func (c clipToPaste) copied() (timeline.ClipCopy, error) {
 	if err != nil {
 		return timeline.ClipCopy{}, err
 	}
-	return timeline.ClipCopy{OnTrack: p.OnTrack, BeatID: p.BeatID, SoundID: p.SoundID, Name: p.Name,
+	return timeline.ClipCopy{OnTrack: p.OnTrack, BeatID: p.BeatID, SoundID: p.SoundID, Name: p.Name, Gain: p.Gain,
 		Takes: c.Takes, ActiveTakeID: p.ActiveTakeID, Start: p.Start, Offset: p.Offset, Length: p.Length}, nil
 }
 

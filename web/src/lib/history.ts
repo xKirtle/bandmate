@@ -24,9 +24,10 @@ import { isBlank, type CuedSong } from './cues';
 // Song, before and after it. Undoing and redoing send those through the API
 // like any other edit.
 //
-// A deleted Clip, or a copied one redone, is placed back with its name, if
-// it has one; a rename is undone by giving the Clip back its old name, or
-// a blank one to clear it.
+// A deleted Clip, or a copied one redone, is placed back with its name and
+// Gain, if it has them; a rename is undone by giving the Clip back its old
+// name, or a blank one to clear it, and setting its Gain by setting the old
+// one back.
 //
 // Clips deleted together are placed back together, as one edit.
 //
@@ -77,6 +78,8 @@ export type Edit =
   | { kind: 'trimClip'; clipId: number; offset: number; length: number }
   /** A blank name clears the Clip's. */
   | { kind: 'renameClip'; clipId: number; name: string }
+  /** In dB. */
+  | { kind: 'setClipGain'; clipId: number; gain: number }
   | { kind: 'deleteClip'; clipId: number }
   /** Clips deleted at once, and Tracks with them, e.g. those a paste added. */
   | { kind: 'deleteClips'; clipIds: number[]; trackIds?: number[] }
@@ -277,6 +280,10 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
     case 'renameClip': {
       const { clip } = findClip(before, edit.clipId);
       return { edit: { kind: 'renameClip', clipId: clip.id, name: clip.name ?? '' }, adds: none };
+    }
+    case 'setClipGain': {
+      const { clip } = findClip(before, edit.clipId);
+      return { edit: { kind: 'setClipGain', clipId: clip.id, gain: clip.gain }, adds: none };
     }
     case 'deleteClip':
       return placingBack(before, edit.clipId);
@@ -495,6 +502,7 @@ function remap(edit: HistoryEdit, ids: IdMaps): HistoryEdit {
     }
     case 'trimClip':
     case 'renameClip':
+    case 'setClipGain':
     case 'duplicateClip':
     case 'deleteClip':
     case 'setTakes':
@@ -549,6 +557,8 @@ export function sendEdit(at: SongAt, edit: Edit): Promise<Timeline> {
       return api.trimClip(at, edit.clipId, edit.offset, edit.length);
     case 'renameClip':
       return api.renameClip(at, edit.clipId, edit.name);
+    case 'setClipGain':
+      return api.setClipGain(at, edit.clipId, edit.gain);
     case 'duplicateClip':
       return api.duplicateClip(at, edit.clipId);
     case 'deleteClip':

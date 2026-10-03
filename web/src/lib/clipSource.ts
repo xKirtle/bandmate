@@ -10,6 +10,7 @@
 // does. A Take nudged earlier still reaches where it ended before, so a
 // nudge never leaves its Clip playing past its source.
 import { api, type Clip, type NewClip, type Take, type Timeline } from './api';
+import { gainFactor } from './clipGain';
 import type { Placed } from './schedule';
 import type { PlayableClip } from './timelinePlayer';
 
@@ -139,7 +140,7 @@ export function playing(timeline: Timeline, sources: ClipSources, silent: number
   return timeline.tracks.flatMap((t) =>
     t.clips.flatMap((c) => {
       const h = c.id === silent ? null : heard(c);
-      return h ? [{ ...h, source: sources.of(c).audio, trackId: t.id }] : [];
+      return h ? [{ ...h, source: sources.of(c).audio, trackId: t.id, gainFactor: gainFactor(c.gain) }] : [];
     }),
   );
 }
@@ -155,14 +156,22 @@ export function clipTitle(clip: Clip, source: ClipSource): string {
   return take ? `${clip.name} · Take ${take.number}` : clip.name;
 }
 
-/** What places a Clip back as it is: its source, trim and name, without its id. */
+/**
+ * What a Clip has of its own, as placing or pasting it gives them: its name
+ * and its Gain, each left out while it has none.
+ */
+export function ownOf(clip: Clip): { name?: string; gain?: number } {
+  return { ...(clip.name !== null ? { name: clip.name } : {}), ...(clip.gain !== 0 ? { gain: clip.gain } : {}) };
+}
+
+/** What places a Clip back as it is: its source, trim, name and Gain, without its id. */
 export function placementOf(clip: Clip): NewClip {
   const { start, offset, length } = clip;
-  const name = clip.name !== null ? { name: clip.name } : {};
-  if (clip.beatId !== null) return { beatId: clip.beatId, ...name, start, offset, length };
-  if (clip.soundId !== null) return { soundId: clip.soundId, ...name, start, offset, length };
+  const own = ownOf(clip);
+  if (clip.beatId !== null) return { beatId: clip.beatId, ...own, start, offset, length };
+  if (clip.soundId !== null) return { soundId: clip.soundId, ...own, start, offset, length };
   return {
-    ...name,
+    ...own,
     takeIds: clip.takes.map((t) => t.id),
     activeTakeId: clip.activeTakeId!,
     start,

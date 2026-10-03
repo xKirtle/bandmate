@@ -1,17 +1,20 @@
 // Plays the Timeline: every Clip's audio is fetched, decoded into memory and
 // scheduled on one AudioContext, so Tracks stay sample-accurate with each
-// other (ADR 0006). Each Track plays through its own gain, which follows its
-// volume, mute and solo live: wired by TrackMix, which a Mixdown builds its
-// graph with too, so it sounds as playback would. A Loop's repeats are
+// other (ADR 0006). Each Clip plays at its Gain, through its Track's own
+// gain, which follows the Track's volume, mute and solo live: wired by
+// TrackMix, which a Mixdown and a Merge build their graph with too, so they
+// sound as playback would. A Loop's repeats are
 // scheduled a little ahead as they come round, each starting exactly as the
 // one before ends.
 import { playAlone, release } from './playback';
 import { positionAt, repeats, schedule, type Loop, type Placed } from './schedule';
 
-/** A Clip to play, with where its source's audio is fetched from and the Track it's on. */
+/** A Clip to play, with where its source's audio is fetched from, the Track it's on and its Gain. */
 export interface PlayableClip extends Placed {
   source: string;
   trackId: number;
+  /** Its Gain, as a factor of its audio, applied before its Track's. */
+  gainFactor: number;
 }
 
 export type PlayerState = 'stopped' | 'loading' | 'playing';
@@ -44,13 +47,28 @@ export class TrackMix {
   }
 
   /**
-   * Plays part of a Clip's audio on its Track: duration seconds of buffer,
-   * from `from` seconds into it, starting at context time `at`.
+   * Plays part of a Clip's audio on its Track, at the Clip's Gain: duration
+   * seconds of buffer, from `from` seconds into it, starting at context time `at`.
    */
-  play(buffer: AudioBuffer, trackId: number, at: number, from: number, duration: number): AudioBufferSourceNode {
+  play(
+    buffer: AudioBuffer,
+    clip: Pick<PlayableClip, 'trackId' | 'gainFactor'>,
+    at: number,
+    from: number,
+    duration: number,
+  ): AudioBufferSourceNode {
     const node = this.#context.createBufferSource();
     node.buffer = buffer;
-    node.connect(this.#track(trackId));
+    const track = this.#track(clip.trackId);
+    if (clip.gainFactor === 1) {
+      node.connect(track);
+    } else {
+      // Its own gain, let go of with it.
+      const gain = this.#context.createGain();
+      gain.gain.value = clip.gainFactor;
+      node.connect(gain).connect(track);
+      node.addEventListener('ended', () => gain.disconnect());
+    }
     node.start(at, from, duration);
     return node;
   }
@@ -204,7 +222,7 @@ export class TimelinePlayer {
       if (late >= s.duration) continue;
       const buffer = buffers[clipIndex.get(s.clip)!];
       const at = this.#startedAt + s.delay + late;
-      const node = this.#mix.play(buffer, s.clip.trackId, at, s.from + late, s.duration - late);
+      const node = this.#mix.play(buffer, s.clip, at, s.from + late, s.duration - late);
       // Let go of each once it's played, as a Loop keeps adding more.
       node.onended = () => {
         node.disconnect();
