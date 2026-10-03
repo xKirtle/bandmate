@@ -925,11 +925,11 @@ describe('Where undoing a new Take leaves the playhead', () => {
     expect(h.nextUndoPlayhead()).toBe(12);
   });
 
-  it('leaves it alone for a Retake, an import, a copy, or any other undo', () => {
+  it('leaves it alone for a Retake, an imported Sound, a Duplicate, or any other undo', () => {
     const h = new History();
     expect(h.nextUndoPlayhead()).toBeNull();
 
-    // An imported Sound or a copied Clip is placed the same way as a new Take.
+    // An imported Sound or a Duplicate is kept as placing its Clip, as a new Take is.
     h.record(placingAdded(t0(), t1()), t0(), t1());
     expect(h.nextUndoPlayhead()).toBeNull();
 

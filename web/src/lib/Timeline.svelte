@@ -423,14 +423,13 @@
     }).finally(() => queued--);
   }
 
-  function undo() {
+  async function undo() {
     if (frozen || (!undoable && queued === 0)) return;
     offerCues = null;
     mergeNote = null;
-    // Undoing a new Take returns the playhead to its Clip's start, to record
-    // again from there, once the Clip's gone: playing, playback jumps there.
+    // Where undoing a new Take returns the playhead to, to record again from.
     let returnTo: number | null = null;
-    change((at) => {
+    const ok = await change((at) => {
       const e = history.nextUndo();
       returnTo = history.nextUndoPlayhead();
       return e
@@ -441,9 +440,11 @@
             if ((e.kind === 'placeClips' || e.kind === 'replaceClips') && !frozen) selected = new Set(back);
           })
         : unchanged(at);
-    }).then((ok) => {
-      if (ok && returnTo !== null) seekTo(returnTo);
     });
+    // Once the Clip's gone, it's a seek like any other: playing, playback
+    // jumps there, superseding the restart the Clip's going started. Not
+    // while a recording started since, which plays from where it starts.
+    if (ok && returnTo !== null && !recording) seekTo(returnTo);
   }
 
   function redo() {

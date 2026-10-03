@@ -141,7 +141,7 @@ interface Entry {
   undo: Step;
   redo: Step;
   /** For a new Take, where its Clip starts, to return the playhead to on undoing it. */
-  returnTo?: number;
+  undoPlayhead?: number;
 }
 
 export class History {
@@ -150,24 +150,27 @@ export class History {
 
   /** Keeps an edit that turned before into after, to undo, unless it changed nothing. */
   record(edit: Edit, before: Timeline, after: Timeline): void {
-    if (content(before) === content(after)) return;
-    this.#undo.push({
-      undo: inverse(edit, before, after),
-      redo: redoing(edit, before, after),
-    });
-    this.#redo = [];
+    this.#keep(edit, before, after);
   }
 
   /**
    * Keeps a new Take, recorded in a new Clip, which turned before into
-   * after, as placingAdded does, noting where its Clip starts.
+   * after, as placingAdded does, with where its Clip starts, to return the
+   * playhead to on undoing it.
    */
   recordTake(before: Timeline, after: Timeline): void {
-    const kept = this.#undo.length;
-    this.record(placingAdded(before, after), before, after);
-    if (this.#undo.length === kept) return;
-    const { clip } = findClip(after, added(before, after).clips[0]);
-    this.#undo.at(-1)!.returnTo = clip.start;
+    const edit = placingAdded(before, after);
+    const entry = this.#keep(edit, before, after);
+    if (entry && edit.kind === 'placeClip') entry.undoPlayhead = edit.clip.start;
+  }
+
+  /** Keeps an edit that turned before into after, unless it changed nothing, giving what it kept. */
+  #keep(edit: Edit, before: Timeline, after: Timeline): Entry | null {
+    if (content(before) === content(after)) return null;
+    const entry: Entry = { undo: inverse(edit, before, after), redo: redoing(edit, before, after) };
+    this.#undo.push(entry);
+    this.#redo = [];
+    return entry;
   }
 
   /** Keeps a Cue edit that turned before into after, to undo, unless it changed no Cue. */
@@ -197,7 +200,7 @@ export class History {
    * Clip, or null if it leaves it where it is.
    */
   nextUndoPlayhead(): number | null {
-    return this.#undo.at(-1)?.returnTo ?? null;
+    return this.#undo.at(-1)?.undoPlayhead ?? null;
   }
 
   /** The edit that would redo the latest one undone, or null if there's none. */
