@@ -134,6 +134,7 @@ group('The list', () => {
       { name: 'Copy the Selection', group: 'Timeline editing', keys: 'Ctrl+C' },
       { name: 'Cut the Selection', group: 'Timeline editing', keys: 'Ctrl+X' },
       { name: 'Paste the Clipboard', group: 'Timeline editing', keys: 'Ctrl+V' },
+      { name: 'Split at the playhead', group: 'Timeline editing', keys: 'S' },
       { name: 'Cue the next Line', group: 'Sync mode', keys: 'Enter' },
       { name: 'Add or remove a Clip', group: 'Mouse', keys: 'Ctrl+click' },
       { name: 'Select Clips with a box', group: 'Mouse', keys: 'drag' },

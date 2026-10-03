@@ -22,6 +22,7 @@ group('dialogGroups', () => {
         'Copy the Selection',
         'Cut the Selection',
         'Paste the Clipboard',
+        'Split at the playhead',
       ],
       ['Cue the next Line'],
       [

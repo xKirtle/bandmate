@@ -39,6 +39,8 @@ group('clipActions', () => {
     nudgeKeys: 'Alt+←/→',
     copyKeys: 'Ctrl+C',
     cutKeys: 'Ctrl+X',
+    canSplit: true,
+    splitKeys: 'S',
     selected: 0,
     frozen: null,
   };
@@ -54,14 +56,32 @@ group('clipActions', () => {
     copy: () => {},
     cut: () => {},
     duplicate: () => {},
+    split: () => {},
     downloadSound: () => {},
     deleteClip: () => {},
   };
   const labels = (c: Clip, s = state) => clipActions(c, s, run).map((a) => a.label);
 
   it('names its delete “Delete Clip”, whatever the Clip plays', () => {
-    expect(labels(beatClip)).toEqual(['Rename', 'Gain', 'Copy', 'Cut', 'Duplicate', 'Delete Clip']);
-    expect(labels(soundClip)).toEqual(['Rename', 'Gain', 'Copy', 'Cut', 'Duplicate', 'Download Sound', 'Delete Clip']);
+    expect(labels(beatClip)).toEqual([
+      'Rename',
+      'Gain',
+      'Copy',
+      'Cut',
+      'Duplicate',
+      'Split at playhead',
+      'Delete Clip',
+    ]);
+    expect(labels(soundClip)).toEqual([
+      'Rename',
+      'Gain',
+      'Copy',
+      'Cut',
+      'Duplicate',
+      'Split at playhead',
+      'Download Sound',
+      'Delete Clip',
+    ]);
     expect(labels(oneTake).at(-1)).toBe('Delete Clip');
   });
 
@@ -75,6 +95,7 @@ group('clipActions', () => {
       'Copy',
       'Cut',
       'Duplicate',
+      'Split at playhead',
       'Delete Clip',
     ]);
   });
@@ -92,6 +113,7 @@ group('clipActions', () => {
       'Copy',
       'Cut',
       'Duplicate',
+      'Split at playhead',
       'Delete Clip',
     ]);
   });
@@ -110,6 +132,7 @@ group('clipActions', () => {
       copy: () => ran.push('copy'),
       cut: () => ran.push('cut'),
       duplicate: () => ran.push('duplicate'),
+      split: () => ran.push('split'),
       downloadSound: (id) => ran.push(`download sound ${id}`),
       deleteClip: () => ran.push('delete clip'),
     });
@@ -131,6 +154,7 @@ group('clipActions', () => {
       'copy',
       'cut',
       'duplicate',
+      'split',
       'delete clip',
     ]);
   });
@@ -171,12 +195,14 @@ group('clipActions', () => {
       ['Copy', hint],
       ['Cut', hint],
       ['Duplicate', hint],
+      ['Split at playhead', hint],
       ['Delete Clip', hint],
       ['Rename', hint],
       ['Gain', hint],
       ['Copy', hint],
       ['Cut', hint],
       ['Duplicate', hint],
+      ['Split at playhead', hint],
       ['Delete Clip', hint],
     ]);
     expect(on).toEqual(['Download Take', 'Download Sound']);
@@ -189,6 +215,7 @@ group('clipActions', () => {
       { label: 'Copy', title: 'Or Ctrl+C' },
       { label: 'Cut', title: 'Or Ctrl+X' },
       { label: 'Duplicate' },
+      { label: 'Split at playhead', title: 'Or S' },
       { label: 'Delete Clip' },
     ]);
     const noKeys = clipActions(beatClip, { ...state, copyKeys: null, cutKeys: null }, run);
@@ -206,6 +233,18 @@ group('clipActions', () => {
   it('leaves every entry on while not recording', () => {
     expect(clipActions(twoTakes, state, run).some((a) => a.disabled)).toBe(false);
   });
+
+  it('turns Split at playhead off, saying why, while the playhead doesn’t cross the Clip', () => {
+    const entry = clipActions(beatClip, { ...state, canSplit: false }, run).find(
+      (a) => a.label === 'Split at playhead',
+    );
+    expect(entry).toMatchObject({ disabled: true, title: 'Move the playhead into the Clip to split it' });
+    const noKeys = clipActions(beatClip, { ...state, splitKeys: null }, run).find(
+      (a) => a.label === 'Split at playhead',
+    );
+    expect(noKeys?.title).toBeUndefined();
+    expect(noKeys?.disabled).toBeFalsy();
+  });
 });
 
 group('selectionActions', () => {
@@ -213,21 +252,29 @@ group('selectionActions', () => {
     copyClips: () => {},
     cutClips: () => {},
     duplicateClips: () => {},
+    splitClips: () => {},
     mergeClips: () => {},
     deleteClips: () => {},
   };
-  const state = { frozen: null, copyKeys: 'Ctrl+C', cutKeys: 'Ctrl+X', canMerge: false };
+  const state = {
+    frozen: null,
+    copyKeys: 'Ctrl+C',
+    cutKeys: 'Ctrl+X',
+    canMerge: false,
+    canSplit: true,
+    splitKeys: 'S',
+  };
   const labels = (count: number) => selectionActions(count, run, state).map((a) => a.label);
 
-  it('offers copying, cutting, duplicating and deleting every selected Clip, naming how many it duplicates and deletes', () => {
-    expect(labels(3)).toEqual(['Copy', 'Cut', 'Duplicate 3 Clips', 'Delete 3 Clips']);
+  it('offers copying, cutting, duplicating, splitting and deleting every selected Clip, naming how many it duplicates and deletes', () => {
+    expect(labels(3)).toEqual(['Copy', 'Cut', 'Duplicate 3 Clips', 'Split at playhead', 'Delete 3 Clips']);
   });
 
   it('names one Clip as one', () => {
-    expect(labels(1)).toEqual(['Copy', 'Cut', 'Duplicate 1 Clip', 'Delete 1 Clip']);
+    expect(labels(1)).toEqual(['Copy', 'Cut', 'Duplicate 1 Clip', 'Split at playhead', 'Delete 1 Clip']);
   });
 
-  it('copies, cuts, duplicates or deletes them when picked', () => {
+  it('copies, cuts, duplicates, splits, merges or deletes them when picked', () => {
     const picked: string[] = [];
     const entries = selectionActions(
       2,
@@ -235,13 +282,14 @@ group('selectionActions', () => {
         copyClips: () => picked.push('copy'),
         cutClips: () => picked.push('cut'),
         duplicateClips: () => picked.push('duplicate'),
+        splitClips: () => picked.push('split'),
         mergeClips: () => picked.push('merge'),
         deleteClips: () => picked.push('delete'),
       },
       { ...state, canMerge: true },
     );
     for (const entry of entries) if ('run' in entry) entry.run();
-    expect(picked).toEqual(['copy', 'cut', 'duplicate', 'merge', 'delete']);
+    expect(picked).toEqual(['copy', 'cut', 'duplicate', 'split', 'merge', 'delete']);
   });
 
   it('offers merging them only where they can be merged', () => {
@@ -249,6 +297,7 @@ group('selectionActions', () => {
       'Copy',
       'Cut',
       'Duplicate 2 Clips',
+      'Split at playhead',
       'Merge',
       'Delete 2 Clips',
     ]);
@@ -260,10 +309,11 @@ group('selectionActions', () => {
       { label: 'Copy', title: 'Or Ctrl+C' },
       { label: 'Cut', title: 'Or Ctrl+X' },
       { label: 'Duplicate 2 Clips' },
+      { label: 'Split at playhead', title: 'Or S' },
       { label: 'Delete 2 Clips' },
     ]);
-    const noKeys = selectionActions(2, run, { ...state, copyKeys: null, cutKeys: null });
-    expect(noKeys.map((a) => a.title)).toEqual([undefined, undefined, undefined, undefined]);
+    const noKeys = selectionActions(2, run, { ...state, copyKeys: null, cutKeys: null, splitKeys: null });
+    expect(noKeys.map((a) => a.title)).toEqual([undefined, undefined, undefined, undefined, undefined]);
   });
 
   it('turns every entry off while recording, saying why', () => {
@@ -272,8 +322,19 @@ group('selectionActions', () => {
       { label: 'Copy', disabled: true, title: hint },
       { label: 'Cut', disabled: true, title: hint },
       { label: 'Duplicate 2 Clips', disabled: true, title: hint },
+      { label: 'Split at playhead', disabled: true, title: hint },
       { label: 'Delete 2 Clips', disabled: true, title: hint },
     ]);
+  });
+
+  it('turns Split at playhead off, saying why, while the playhead crosses none of them', () => {
+    expect(selectionActions(2, run, { ...state, canSplit: false })).toContainEqual(
+      expect.objectContaining({
+        label: 'Split at playhead',
+        disabled: true,
+        title: 'Move the playhead into a selected Clip to split it',
+      }),
+    );
   });
 
   it('turns every entry off while a Merge is being made, saying why', () => {

@@ -83,6 +83,28 @@ group('R', () => {
   });
 });
 
+group('S', () => {
+  it('splits at the playhead, whether or not Caps Lock is on', () => {
+    expect(songKey(press('s'), idle)).toBe('split');
+    expect(songKey(press('S'), idle)).toBe('split');
+  });
+
+  it('is left alone when held down, handled already, typed, with a modifier, or on a read-only Timeline', () => {
+    expect(songKey(press('s', { repeat: true }), idle)).toBeNull();
+    expect(songKey(press('s', { defaultPrevented: true }), idle)).toBeNull();
+    expect(songKey(press('s'), { ...idle, inTextField: true })).toBeNull();
+    expect(songKey(press('s', { ctrlKey: true }), idle)).toBeNull();
+    expect(songKey(press('S', { shiftKey: true }), idle)).toBeNull();
+    expect(songKey(press('s'), { ...idle, editable: false })).toBeNull();
+  });
+
+  it('waits while recording, a Beat is picked, the Latency Offset calibrated, a Mixdown made or a dialog is open', () => {
+    expect(songKey(press('s'), { ...idle, recording: true, canRecord: false })).toBeNull();
+    expect(songKey(press('s'), { ...idle, busy: true })).toBeNull();
+    expect(songKey(press('s'), { ...idle, dialogOpen: true })).toBeNull();
+  });
+});
+
 group('Undo and redo', () => {
   it('undo with Ctrl+Z or ⌘Z', () => {
     expect(songKey(press('z', { ctrlKey: true }), idle)).toBe('undo');
