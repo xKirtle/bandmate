@@ -3,6 +3,8 @@ name: wishlist
 description: Add ideas to the roadmap's wishlist in docs/roadmap.md, in its open wishlist PR. Use when the user hands over feature ideas to remember, or to grill later.
 ---
 
+If a `gh` command fails with `HTTP 403: GitHub GraphQL is not available`, use its `gh api` (REST) equivalent from `docs/agents/issue-tracker.md` instead.
+
 The user is jotting ideas down, not specifying them: record each one as they said it, and leave grilling it for its spec session.
 
 Ideas collect in one open **wishlist PR**, labelled `documentation` and `no-release-notes` and titled "Add … to the wishlist". Only the user merges or closes it; until then, every new idea joins it.

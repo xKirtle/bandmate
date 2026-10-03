@@ -1,6 +1,6 @@
 # Issue tracker: GitHub
 
-Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all operations, falling back to `gh api` where GraphQL is blocked (see below).
+Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all operations.
 
 ## Conventions
 
@@ -12,29 +12,6 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 - **Close**: `gh issue close <number> --comment "..."`
 
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone.
-
-## When `gh` can't reach GraphQL
-
-Most `gh` commands (`gh issue`, `gh pr`, `gh run`) talk to GitHub's GraphQL API, which some environments block: a Claude Code cloud session answers them with `HTTP 403: GitHub GraphQL is not available`. `gh api` talks to the REST API and still works there, so fall back to it, with `R=repos/xKirtle/bandmate`:
-
-- `gh issue view <n> --comments`: `gh api $R/issues/<n>`, then `gh api $R/issues/<n>/comments`
-- `gh issue list --state open --label <l>`: `gh api "$R/issues?state=open&labels=<l>" --jq '[.[] | select(.pull_request | not)]'` (the endpoint returns PRs too)
-- `gh issue create --title … --body-file f --label <l>`: `jq -n --rawfile body f '{title:"…", body:$body, labels:["<l>"]}' | gh api $R/issues --input -`
-- `gh issue edit <n> --body-file f`: `jq -n --rawfile body f '{body:$body}' | gh api -X PATCH $R/issues/<n> --input -`
-- `gh issue edit <n> --add-label <l>` / `--remove-label <l>`: `gh api $R/issues/<n>/labels -f 'labels[]=<l>'` / `gh api -X DELETE $R/issues/<n>/labels/<l>`
-- `gh issue edit <n> --add-assignee @me`: `gh api $R/issues/<n>/assignees -f "assignees[]=$(gh api user --jq .login)"`
-- `gh issue comment <n> --body …` (or `gh pr comment`): `gh api $R/issues/<n>/comments -f body=…`
-- `gh issue close <n> --comment …`: the comment as above, then `gh api -X PATCH $R/issues/<n> -f state=closed -f state_reason=completed`
-- `gh pr view <n> --comments` / `gh pr diff <n>`: `gh api $R/pulls/<n>` and `gh api $R/issues/<n>/comments` / `gh api $R/pulls/<n> -H "Accept: application/vnd.github.diff"`
-- `gh pr list --state open --label <l>`: `gh api "$R/pulls?state=open" --jq '[.[] | select(any(.labels[]; .name=="<l>")) | {number, title, head: .head.ref}]'`
-- `gh pr create --base main --head <b> --title … --body-file f`: `jq -n --rawfile body f '{title:"…", head:"<b>", base:"main", body:$body}' | gh api $R/pulls --input -`
-- `gh pr edit <n> --title …`: `gh api -X PATCH $R/pulls/<n> -f title=…`
-- `gh pr checks <n> --watch`: poll `gh api $R/commits/<head-sha>/check-runs --jq '.check_runs[] | [.name, .status, .conclusion]'` until every run is `completed`; a cloud session can instead subscribe to the PR and be woken when CI finishes
-- `gh pr merge <n> --merge`: `gh api -X PUT $R/pulls/<n>/merge -f merge_method=merge`. REST has no `--admin`: if `main` requires an approving review the author can't give, stop and ask the user to merge
-- `gh pr close <n>`: `gh api -X PATCH $R/pulls/<n> -f state=closed`
-- `gh run watch`: poll `gh api "$R/actions/runs?head_sha=<sha>" --jq '.workflow_runs[] | [.name, .status, .conclusion]'`
-
-Issues and PRs share their number space, so the `issues` endpoints for comments and labels work on a PR's number too. Sub-issues and dependencies below already use `gh api`.
 
 ## Pull requests as a triage surface
 
