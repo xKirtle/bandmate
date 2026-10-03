@@ -133,7 +133,7 @@ func (a *App) trimClip(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Offset *float64 `json:"offset"`
 		Length *float64 `json:"length"`
-		// FadeIn and FadeOut, if both are given, set the Clip's Fades, e.g.
+		// FadeIn and FadeOut, given together, set the Clip's Fades, e.g.
 		// to undo a trim that shortened them.
 		FadeIn  *float64 `json:"fadeIn"`
 		FadeOut *float64 `json:"fadeOut"`
@@ -142,9 +142,9 @@ func (a *App) trimClip(w http.ResponseWriter, r *http.Request) {
 		if req.Offset == nil || req.Length == nil {
 			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "offset and length are required"}
 		}
-		var fades *timeline.Fades
-		if req.FadeIn != nil && req.FadeOut != nil {
-			fades = &timeline.Fades{In: *req.FadeIn, Out: *req.FadeOut}
+		fades, err := timeline.FadesGiven(req.FadeIn, req.FadeOut)
+		if err != nil {
+			return timeline.Timeline{}, err
 		}
 		return a.timelines.TrimClip(ctx, id, based, clipID, *req.Offset, *req.Length, fades)
 	})

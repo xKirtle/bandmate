@@ -1364,6 +1364,18 @@ type Fades struct {
 	In, Out float64
 }
 
+// FadesGiven are the Fades a request sets along with something else, e.g. a
+// trim, if it gives them: both, or neither, to keep the Clip's.
+func FadesGiven(in, out *float64) (*Fades, error) {
+	if (in == nil) != (out == nil) {
+		return nil, &lyricsheet.InvalidError{Msg: "fadeIn and fadeOut go together"}
+	}
+	if in == nil {
+		return nil, nil
+	}
+	return &Fades{In: *in, Out: *out}, nil
+}
+
 // check checks that Fades are each at least nothing, and together no
 // longer than a Clip length seconds long.
 func (f Fades) check(length float64) error {

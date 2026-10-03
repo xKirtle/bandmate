@@ -348,7 +348,13 @@ describe('History', () => {
     const t1 = timeline([track(1, [clip(5, 0, { length: 4, fadeIn: 1, fadeOut: 3 })])]);
     h.record({ kind: 'trimClip', clipId: 5, offset: 0, length: 4 }, t0, t1);
 
-    expect(h.nextUndo()).toEqual({ kind: 'trimClip', clipId: 5, offset: 0, length: 10, fadeIn: 2, fadeOut: 6 });
+    expect(h.nextUndo()).toEqual({
+      kind: 'trimClip',
+      clipId: 5,
+      offset: 0,
+      length: 10,
+      fades: { fadeIn: 2, fadeOut: 6 },
+    });
     h.undone(t1, t0);
     expect(h.nextRedo()).toEqual({ kind: 'trimClip', clipId: 5, offset: 0, length: 4 });
   });

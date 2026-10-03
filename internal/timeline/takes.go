@@ -268,7 +268,7 @@ type ClipTakes struct {
 	Start        float64  `json:"start"`
 	Offset       float64  `json:"offset"`
 	Length       float64  `json:"length"`
-	// FadeIn and FadeOut set the Clip's Fades, if both are given, e.g. to
+	// FadeIn and FadeOut, given together, set the Clip's Fades, e.g. to
 	// undo a change that shortened them. Otherwise they're kept, shortened
 	// to fit if the Clip is now too short for them.
 	FadeIn  *float64 `json:"fadeIn"`
@@ -289,6 +289,10 @@ type TakeAt struct {
 // its Track, and must stay within its Takes and clear of its neighbours.
 func (s *Store) SetTakes(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64, ct ClipTakes) (Timeline, error) {
 	ids, err := checkTakesAt(ct.Takes, ct.ActiveTakeID)
+	if err != nil {
+		return Timeline{}, err
+	}
+	fades, err := FadesGiven(ct.FadeIn, ct.FadeOut)
 	if err != nil {
 		return Timeline{}, err
 	}
@@ -325,12 +329,11 @@ func (s *Store) SetTakes(ctx context.Context, songID int64, based lyricsheet.Ver
 			return fmt.Errorf("setting takes: %w", err)
 		}
 		p.start, p.offset, p.length = ct.Start, max(ct.Offset, 0), ct.Length
-		if ct.FadeIn != nil && ct.FadeOut != nil {
-			fades := Fades{In: *ct.FadeIn, Out: *ct.FadeOut}
+		if fades != nil {
 			if err := fades.check(ct.Length); err != nil {
 				return err
 			}
-			p.fades = fades
+			p.fades = *fades
 		}
 		return place(ctx, tx, clipID, p)
 	})

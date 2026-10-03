@@ -112,6 +112,9 @@ func TestATrimCanSetTheFadesBack(t *testing.T) {
 	expectError(t, ts.Do(http.MethodPost, clipPath(p.song.ID, p.first)+"/trim",
 		map[string]any{"offset": 0, "length": 4, "fadeIn": 2, "fadeOut": 6}),
 		http.StatusBadRequest, "a Clip's Fades can't together run longer than it")
+	expectError(t, ts.Do(http.MethodPost, clipPath(p.song.ID, p.first)+"/trim",
+		map[string]any{"offset": 0, "length": 10, "fadeIn": 2}),
+		http.StatusBadRequest, "fadeIn and fadeOut go together")
 }
 
 func TestADuplicateCopiesItsClipsFades(t *testing.T) {
@@ -187,6 +190,8 @@ func TestSettingAClipsTakesCanSetItsFadesBack(t *testing.T) {
 	if f := fadesOf(clipByID(t, got, c.ID)); f != [2]float64{1, 1} {
 		t.Errorf("fades = %v, want them back at [1 1]", f)
 	}
+	back.FadeOut = nil
+	expectError(t, ts.setTakes(s.ID, c.ID, back), http.StatusBadRequest, "fadeIn and fadeOut go together")
 }
 
 func TestAMergedClipStartsWithNoFades(t *testing.T) {

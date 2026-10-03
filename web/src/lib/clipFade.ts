@@ -7,13 +7,10 @@
 // then drops at the end. On the Clip they're drawn as straight slopes, and
 // set by dragging the dots at the gain line's ends. Plain arithmetic, so the
 // Timeline only has to draw and play them.
-import type { Clip } from './api';
-
-/** A Clip's Fades, in seconds from its edges. */
-export type Fades = Pick<Clip, 'fadeIn' | 'fadeOut'>;
+import type { ClipFades } from './api';
 
 /** A Clip's Fades where it is: from its start and up to its end, on the Timeline, in seconds. */
-export interface PlacedFades extends Fades {
+export interface PlacedFades extends ClipFades {
   start: number;
   end: number;
 }
@@ -39,7 +36,7 @@ export function fadeGainAt(fades: PlacedFades, t: number): number {
  * or else each shortened by the same share, to meet. The server does the
  * same (Fades.fitted in the timeline package).
  */
-export function fitFades(fades: Fades, length: number): Fades {
+export function fitFades(fades: ClipFades, length: number): ClipFades {
   const both = fades.fadeIn + fades.fadeOut;
   if (both <= length) return fades;
   const share = length / both;
@@ -56,6 +53,26 @@ export function fitFades(fades: Fades, length: number): Fades {
 export function draggedFade(at: number, other: number, length: number, rests: number): number {
   if (at <= rests) return 0;
   return Math.min(at, length - other);
+}
+
+/** Which of a Clip's Fades: its fade in or its fade out. */
+export type FadeEnd = keyof ClipFades;
+
+/** A Fade's name, as shown, e.g. "Fade in". */
+export function fadeName(end: FadeEnd): string {
+  return end === 'fadeIn' ? 'Fade in' : 'Fade out';
+}
+
+/**
+ * Which Fade's dot a press at x grabs, the dot `pressed` taking it, with
+ * the fade-in dot's middle at inAt and the fade-out dot's at outAt, each
+ * `width` wide, in pixels. Where the Fades meet, or the Clip is narrow,
+ * the dots sit together, one over the other, so the side of their middle
+ * the pointer is on says which, and both can still be grabbed.
+ */
+export function grabbedFade(pressed: FadeEnd, x: number, inAt: number, outAt: number, width: number): FadeEnd {
+  if (outAt - inAt >= width) return pressed;
+  return x < (inAt + outAt) / 2 ? 'fadeIn' : 'fadeOut';
 }
 
 /** A curve a gain follows: from `at` seconds, for `duration` seconds, through its values. */
@@ -93,7 +110,7 @@ export function fadeCurves(fades: PlacedFades, t: number, duration: number): { i
 }
 
 /** A waveform peak, t seconds into a Clip `length` seconds long, as its Fades make it sound. */
-export function shapedPeak(peak: number, fades: Fades, length: number, t: number): number {
+export function shapedPeak(peak: number, fades: ClipFades, length: number, t: number): number {
   return peak * fadeGainAt({ ...fades, start: 0, end: length }, t);
 }
 

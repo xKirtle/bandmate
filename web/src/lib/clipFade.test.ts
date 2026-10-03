@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { draggedFade, fadeCurves, fadeGainAt, fitFades, formatFade, shapedPeak } from './clipFade';
+import {
+  draggedFade,
+  fadeCurves,
+  fadeGainAt,
+  fadeName,
+  fitFades,
+  formatFade,
+  grabbedFade,
+  shapedPeak,
+} from './clipFade';
 
 // A 10-second Clip at 0:20, rising over 2 seconds and falling over 4.
 const placed = { start: 20, end: 30, fadeIn: 2, fadeOut: 4 };
@@ -100,6 +109,26 @@ describe('shapedPeak', () => {
     expect(shapedPeak(0.8, clip, 10, 0)).toBe(0);
     expect(shapedPeak(0.8, clip, 10, 1)).toBeCloseTo(0.8 * Math.SQRT1_2, 10);
     expect(shapedPeak(0.8, clip, 10, 5)).toBe(0.8);
+  });
+});
+
+describe('grabbedFade', () => {
+  it('grabs the dot pressed', () => {
+    expect(grabbedFade('fadeIn', 100, 100, 300, 12)).toBe('fadeIn');
+    expect(grabbedFade('fadeOut', 300, 100, 300, 12)).toBe('fadeOut');
+  });
+
+  it('grabs whichever of two dots sitting together the pointer is on the side of, so both can be moved', () => {
+    expect(grabbedFade('fadeOut', 198, 200, 202, 12)).toBe('fadeIn');
+    expect(grabbedFade('fadeOut', 203, 200, 202, 12)).toBe('fadeOut');
+    expect(grabbedFade('fadeIn', 202, 200, 202, 12)).toBe('fadeOut');
+  });
+});
+
+describe('fadeName', () => {
+  it('names each Fade', () => {
+    expect(fadeName('fadeIn')).toBe('Fade in');
+    expect(fadeName('fadeOut')).toBe('Fade out');
   });
 });
 

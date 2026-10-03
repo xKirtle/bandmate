@@ -79,7 +79,7 @@ export type Edit =
   | { kind: 'moveClip'; clipId: number; trackId: number; start: number }
   | { kind: 'moveClips'; moves: ClipMove[] }
   /** With fades given, it sets them too, e.g. to undo a trim that shortened them. */
-  | ({ kind: 'trimClip'; clipId: number; offset: number; length: number } & Partial<ClipFades>)
+  | { kind: 'trimClip'; clipId: number; offset: number; length: number; fades?: ClipFades }
   /** A blank name clears the Clip's. */
   | { kind: 'renameClip'; clipId: number; name: string }
   /** In dB. */
@@ -282,7 +282,8 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
     case 'trimClip': {
       const { clip } = findClip(before, edit.clipId);
       const { offset, length } = clip;
-      return { edit: { kind: 'trimClip', clipId: clip.id, offset, length, ...fadesIfAny(clip) }, adds: none };
+      const fades = fadesIfAny(clip);
+      return { edit: { kind: 'trimClip', clipId: clip.id, offset, length, ...(fades ? { fades } : {}) }, adds: none };
     }
     case 'renameClip': {
       const { clip } = findClip(before, edit.clipId);
@@ -423,8 +424,8 @@ export function settingTakes(tl: Timeline, clipId: number): Edit {
  * A Clip's Fades, to set back along with its trim or its Takes, unless it
  * has none: then there were none to shorten.
  */
-function fadesIfAny({ fadeIn, fadeOut }: Clip): Partial<ClipFades> {
-  return fadeIn !== 0 || fadeOut !== 0 ? { fadeIn, fadeOut } : {};
+function fadesIfAny({ fadeIn, fadeOut }: Clip): ClipFades | undefined {
+  return fadeIn !== 0 || fadeOut !== 0 ? { fadeIn, fadeOut } : undefined;
 }
 
 /** A Song's Cues by Line id, dormant ones included. */
@@ -575,15 +576,7 @@ export function sendEdit(at: SongAt, edit: Edit): Promise<Timeline> {
     case 'moveClips':
       return api.moveClips(at, edit.moves);
     case 'trimClip':
-      return api.trimClip(
-        at,
-        edit.clipId,
-        edit.offset,
-        edit.length,
-        edit.fadeIn !== undefined && edit.fadeOut !== undefined
-          ? { fadeIn: edit.fadeIn, fadeOut: edit.fadeOut }
-          : undefined,
-      );
+      return api.trimClip(at, edit.clipId, edit.offset, edit.length, edit.fades);
     case 'renameClip':
       return api.renameClip(at, edit.clipId, edit.name);
     case 'setClipGain':
