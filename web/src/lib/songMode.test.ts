@@ -29,6 +29,19 @@ describe('detailsSummary', () => {
   it('is empty when none are set', () => {
     expect(detailsSummary(none)).toBe('');
   });
+
+  it('shows the key the Chords are transposed to, with the written one', () => {
+    expect(detailsSummary({ key: 'G', bpm: '92', capo: '2', tuning: '' }, 2)).toBe(
+      'Key A (written G) · 92 BPM · Capo 2',
+    );
+    expect(detailsSummary({ ...none, key: ' G minor ' }, 2)).toBe('Key A minor (written G minor)');
+  });
+
+  it("shows the written key when it can't be read or isn't transposed", () => {
+    expect(detailsSummary({ ...none, key: 'Sol' }, 2)).toBe('Sol');
+    expect(detailsSummary({ ...none, key: 'G' }, 0)).toBe('G');
+    expect(detailsSummary({ ...none, bpm: '92' }, 2)).toBe('92 BPM');
+  });
 });
 
 describe('sideParts', () => {

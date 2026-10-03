@@ -2,6 +2,9 @@
 // the sheet is read, not an edit: it's kept on this device, for each Song,
 // rather than saved with it. Chords show unless hidden for that Song here.
 
+import { SvelteMap } from 'svelte/reactivity';
+import { deviceStorage } from './timelineHeight';
+
 /** Where hiding a Song's Chords is kept on this device. */
 export function chordsHiddenKey(songId: number): string {
   return `bandmate.chordsHidden.${songId}`;
@@ -25,3 +28,18 @@ export function storeChordsShown(storage: Storage | undefined, songId: number, s
     // Not kept, e.g. in a private window; the choice still applies until reload.
   }
 }
+
+// Whether each Song's Chords show on this device, shared beyond the Lyric
+// Sheet, which hides and shows them, so the Song page can read it too.
+
+const changed = new SvelteMap<number, boolean>();
+
+export const songChordsShown = {
+  /** Whether a Song's Chords show on this device. */
+  of: (songId: number): boolean => changed.get(songId) ?? readChordsShown(deviceStorage(), songId),
+  /** Shows or hides a Song's Chords on this device. */
+  set(songId: number, shown: boolean) {
+    changed.set(songId, shown);
+    storeChordsShown(deviceStorage(), songId, shown);
+  },
+};

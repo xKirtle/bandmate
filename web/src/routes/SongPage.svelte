@@ -30,6 +30,9 @@
   import { keyPlace } from '../lib/keyPlace';
   import { opensShortcuts } from '../lib/songKeys';
   import { detailsSummary, openingMode, sideParts, type Mode, type SidePart } from '../lib/songMode';
+  import { hasChords } from '../lib/chords';
+  import { songChordsShown } from '../lib/chordsShown';
+  import { songTranspose } from '../lib/sharedTranspose.svelte';
   import { timeAgo } from '../lib/time';
 
   let { id }: { id: number } = $props();
@@ -77,8 +80,11 @@
   // never saved: each visit starts from the Song's Status.
   let mode = $state<Mode>('write');
   const writing = $derived(mode === 'write');
-  // The Details as Read mode shows them.
-  const summary = $derived(detailsSummary(draft));
+  // How far Read mode shows the Chords transposed: by the Lyric Sheet's
+  // amount while they show, and not at all while they're hidden or there are none.
+  const transpose = $derived(song && hasChords(song) && songChordsShown.of(id) ? songTranspose.of(id) : 0);
+  // The Details as Read mode shows them, with the key the Chords are shown in.
+  const summary = $derived(detailsSummary(draft, transpose));
   const hasNotes = $derived(draft.notes.trim() !== '');
 
   // Whether the Notes under the Details are showing. They start hidden.

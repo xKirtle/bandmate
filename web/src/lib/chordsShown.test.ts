@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chordsHiddenKey, readChordsShown, storeChordsShown } from './chordsShown';
+import { chordsHiddenKey, readChordsShown, songChordsShown, storeChordsShown } from './chordsShown';
 
 /** A Storage holding some values, or one that throws like a blocked one. */
 function storage(values: Record<string, string> = {}, blocked = false): Storage {
@@ -45,5 +45,16 @@ describe('storeChordsShown', () => {
   it('does nothing without storage, or when it is blocked', () => {
     expect(() => storeChordsShown(undefined, 1, false)).not.toThrow();
     expect(() => storeChordsShown(storage({}, true), 1, false)).not.toThrow();
+  });
+});
+
+describe('songChordsShown', () => {
+  it("shares whether a Song's Chords show, for that Song only", () => {
+    expect(songChordsShown.of(7)).toBe(true);
+    songChordsShown.set(7, false);
+    expect(songChordsShown.of(7)).toBe(false);
+    expect(songChordsShown.of(8)).toBe(true);
+    songChordsShown.set(7, true);
+    expect(songChordsShown.of(7)).toBe(true);
   });
 });

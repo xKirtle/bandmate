@@ -1,4 +1,5 @@
 import type { Status } from './api';
+import { transposeKey } from './transpose';
 
 /** Whether the Song page offers editing (Write) or only shows the Song to play from (Read). */
 export type Mode = 'write' | 'read';
@@ -11,13 +12,23 @@ export function openingMode(status: Status): Mode {
   return status === 'finished' ? 'read' : 'write';
 }
 
-/** A Song's Details as one line of text, as Read mode shows them, e.g. "C#m · 92 BPM · Capo 2 · Standard". */
-export function detailsSummary(details: { key: string; bpm: string; capo: string; tuning: string }): string {
+/**
+ * A Song's Details as one line of text, as Read mode shows them, e.g. "C#m · 92 BPM · Capo 2 · Standard".
+ * With the Chords transposed by semitones, a readable key shows as the one
+ * they're shown in, with the written one: "Key A (written G)".
+ */
+export function detailsSummary(
+  details: { key: string; bpm: string; capo: string; tuning: string },
+  transpose = 0,
+): string {
   const key = details.key.trim();
+  const shownKey = transposeKey(key, transpose);
   const bpm = details.bpm.trim();
   const capo = details.capo.trim();
   const tuning = details.tuning.trim();
-  return [key, bpm && `${bpm} BPM`, capo && `Capo ${capo}`, tuning].filter(Boolean).join(' · ');
+  return [shownKey ? `Key ${shownKey} (written ${key})` : key, bpm && `${bpm} BPM`, capo && `Capo ${capo}`, tuning]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 /** A part of the Song page kept beside the Lyric Sheet on desktop, and after it on narrower windows. */

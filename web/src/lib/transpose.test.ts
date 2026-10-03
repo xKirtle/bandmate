@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { transposeChord } from './transpose';
+import { transposeChord, transposeKey } from './transpose';
 
 describe('transposeChord', () => {
   it('moves the root by semitones', () => {
@@ -54,5 +54,80 @@ describe('transposeChord', () => {
 
   it('spells moved notes C# Eb F# Ab Bb', () => {
     expect(['C', 'D', 'F', 'G', 'A'].map((n) => transposeChord(n, 1))).toEqual(['C#', 'Eb', 'F#', 'Ab', 'Bb']);
+  });
+});
+
+describe("transposeChord with the Song's key", () => {
+  it("spells moved notes from the shown key's signature", () => {
+    // G up 3 is Bb major, with flats; G up 2 is A major, with sharps.
+    expect(transposeChord('A#m', 3, 'G')).toBe('Dbm');
+    expect(transposeChord('F#m7/C#', 2, 'G')).toBe('G#m7/D#');
+    expect(transposeChord('C/G', 1, 'C')).toBe('Db/Ab');
+    expect(transposeChord('C', 1, 'D#')).toBe('C#');
+    expect(transposeChord('D', -1, 'F#')).toBe('Db');
+  });
+
+  it('reads F major as flats and E major as sharps', () => {
+    expect(transposeChord('A', 1, 'E')).toBe('Bb');
+    expect(transposeChord('A', 1, 'Eb')).toBe('A#');
+  });
+
+  it("follows a minor key's signature", () => {
+    // Gm up 7 is D minor, with a flat; Gm up 4 is B minor, with sharps.
+    expect(transposeChord('B', 7, 'Gm')).toBe('Gb');
+    expect(transposeChord('E', 4, 'Gm')).toBe('G#');
+    expect(transposeChord('Ab', 5, 'G minor')).toBe('Db');
+    expect(transposeChord('E', 2, 'C Minor')).toBe('Gb');
+    expect(transposeChord('D', 1, 'Dmin')).toBe('D#');
+    expect(transposeChord('E', -1, 'C min')).toBe('D#');
+  });
+
+  it('reads a capital M, maj or major after the note as major', () => {
+    for (const key of ['DM', 'D maj', 'D major']) expect(transposeChord('C', 1, key)).toBe('Db');
+  });
+
+  it('keeps the common spellings in C major, A minor, or an unreadable key', () => {
+    const naturals = ['C', 'D', 'F', 'G', 'A'];
+    const keys = [
+      ['Bb', 2],
+      ['Gm', 2],
+      ['', 1],
+      ['Do', 1],
+      ['Fa#', 1],
+      ['h', 1],
+      ['riff', 1],
+    ] as const;
+    for (const [key, by] of keys) {
+      expect(naturals.map((n) => transposeChord(n, by, key))).toEqual(naturals.map((n) => transposeChord(n, by)));
+    }
+  });
+});
+
+describe('transposeKey', () => {
+  it('moves a readable key by semitones', () => {
+    expect(transposeKey('G', 2)).toBe('A');
+    expect(transposeKey('A', -2)).toBe('G');
+    expect(transposeKey('B♭', 2)).toBe('C');
+  });
+
+  it('keeps the rest of the key as written', () => {
+    expect(transposeKey('G minor', 2)).toBe('A minor');
+    expect(transposeKey('C#m', 1)).toBe('Dm');
+    expect(transposeKey('E major', -1)).toBe('Eb major');
+  });
+
+  it("spells the shown key's note from its signature", () => {
+    expect(transposeKey('G', 1)).toBe('Ab');
+    expect(transposeKey('G', 6)).toBe('Db');
+    expect(transposeKey('C', 6)).toBe('F#');
+    expect(transposeKey('Gm', 1)).toBe('G#m');
+    expect(transposeKey('Gm', 6)).toBe('C#m');
+    expect(transposeKey('Am', 1)).toBe('Bbm');
+    expect(transposeKey('Dm', 1)).toBe('D#m');
+  });
+
+  it("is null when the key can't be read, or isn't moved", () => {
+    for (const key of ['', 'riff', 'am', 'H', 'Do', 'Fa#m', 'Sol']) expect(transposeKey(key, 2)).toBeNull();
+    expect(transposeKey('G', 0)).toBeNull();
   });
 });

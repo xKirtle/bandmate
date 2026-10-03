@@ -100,7 +100,7 @@
             >
               {#if showChords && line.chords.length > 0}
                 <div class="line" class:chord-line={line.chordLine}>
-                  {#each layoutLine(line, transpose) as word, w (w)}
+                  {#each layoutLine(line, transpose, song.key) as word, w (w)}
                     <span class="word">
                       {#each word as piece, p (p)}
                         <span class="piece">
