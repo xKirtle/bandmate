@@ -51,16 +51,17 @@ function readNote(text: string): RegExpExecArray | null {
   return solfege.test(text) ? null : note.exec(text);
 }
 
-/** A readable note's semitone from C, 0–11. */
-function semitone(m: RegExpExecArray, by = 0): number {
+/** A readable note moved by semitones, as its semitone from C, 0–11. */
+function semitone(m: RegExpExecArray, by: number): number {
   return (((naturals[m[1]] + accidentals[m[2]] + by) % 12) + 12) % 12;
 }
 
 /** A key moved by semitones: its note's semitone from C, its signature, and the rest as written. Null if unreadable. */
 function moveKey(key: string, by: number) {
-  const m = readNote(key.trim());
+  const written = key.trim();
+  const m = readNote(written);
   if (!m) return null;
-  const rest = key.trim().slice(m[0].length);
+  const rest = written.slice(m[0].length);
   const at = semitone(m, by);
   return { at, signature: signatures[minor.test(rest) ? (at + 3) % 12 : at], rest };
 }
