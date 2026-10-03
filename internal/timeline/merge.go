@@ -146,10 +146,8 @@ func (s *Store) ReplaceClips(ctx context.Context, songID int64, based lyricsheet
 	if len(clips) == 0 {
 		return Timeline{}, &lyricsheet.InvalidError{Msg: "clips are required"}
 	}
-	for i, id := range clipIDs {
-		if slices.Contains(clipIDs[:i], id) {
-			return Timeline{}, &lyricsheet.InvalidError{Msg: "each Clip can only be deleted once"}
-		}
+	if err := checkDeletedOnce(clipIDs); err != nil {
+		return Timeline{}, err
 	}
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		for _, id := range clipIDs {

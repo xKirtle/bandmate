@@ -437,7 +437,13 @@
     offerCues = null;
     change((at) => {
       const e = history.nextRedo();
-      return e ? send(at, e, (before, after) => history.redone(before, after)) : unchanged(at);
+      return e
+        ? send(at, e, (before, after) => {
+            history.redone(before, after);
+            // A Merge redone selects its Clip again, as it did.
+            if (e.kind === 'replaceClips' && !frozen) selected = new Set(addedClips(before, after));
+          })
+        : unchanged(at);
     });
   }
 
@@ -562,11 +568,11 @@
     perform({ kind: 'reorderTracks', order });
   }
 
-  // Dragging a Track by its grip, on desktop and not while recording. A drop
+  // Dragging a Track by its grip, on desktop and not while frozen. A drop
   // saves what as many presses of ↑ or ↓ would, as one edit.
   const trackIds = $derived(timeline.tracks.map((t) => t.id));
   const trackDrag = new TrackDragging(
-    () => editable.current && recording === null,
+    () => editable.current && !frozen,
     () => trackIds.join(),
   );
   // The gap between Tracks the dragged one would drop into, if it moves at all.
@@ -915,7 +921,7 @@
     const input = event.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
     input.value = '';
-    if (file && chosen !== null) importFiles([file], chosen);
+    if (file && chosen !== null && !frozen) importFiles([file], chosen);
   }
 
   // The transport row's ⋯, for its occasional actions, and what they open:
