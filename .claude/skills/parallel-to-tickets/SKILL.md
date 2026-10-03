@@ -4,6 +4,8 @@ description: Break a plan, spec or conversation into tickets as /to-tickets does
 disable-model-invocation: true
 ---
 
+If a `gh` command fails with `HTTP 403: GitHub GraphQL is not available`, use its `gh api` (REST) equivalent from `docs/agents/issue-tracker.md` instead.
+
 Read `.claude/skills/to-tickets/SKILL.md` and follow it with the amendments below. Where the two differ, the amendments win.
 
 ## The Epic

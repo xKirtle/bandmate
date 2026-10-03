@@ -4,6 +4,8 @@ description: Work through a queue of GitHub issues one at a time, delegating eac
 disable-model-invocation: true
 ---
 
+If a `gh` command fails with `HTTP 403: GitHub GraphQL is not available`, use its `gh api` (REST) equivalent from `docs/agents/issue-tracker.md` instead.
+
 The arguments are the issues to work through, plus any instructions. Work the issues in the order given, unless the user says otherwise. By default each PR is reviewed by hand. If the user says PRs can be merged once their checks pass, run in **auto-merge mode**.
 
 You are the orchestrator: you delegate, relay and gate, and each sub-agent does the implementing. Exactly one sub-agent works at a time. A gate separates each issue from the next: the user's go-ahead by default, or a green, merged PR in auto-merge mode.
@@ -27,7 +29,7 @@ A sub-agent that hands back with an ambiguity blocks the queue in either mode: r
 Fill in `<N>` and the repo. Add any environment gotchas from your memory that the agent can't find in the repo, such as how pushing works in this environment. Leave domain facts out, because the agent reads the repo's own docs.
 
 ```
-You are implementing GitHub issue #<N> in <repo path> (<owner/repo>). Before starting, read AGENTS.md / CLAUDE.md and the docs they point to.
+You are implementing GitHub issue #<N> in <repo path> (<owner/repo>). Before starting, read AGENTS.md / CLAUDE.md and the docs they point to. If a `gh` command fails with `HTTP 403: GitHub GraphQL is not available`, use its `gh api` equivalent from `docs/agents/issue-tracker.md`.
 
 1. Read the issue and its comments: `gh issue view <N> --comments`.
 2. Branch from the latest origin/main: `git fetch origin && git switch -c <prefix>/<N>-<slug> origin/main`, using the repo's branch naming. If a local branch with that name already exists, check it before you reuse it.

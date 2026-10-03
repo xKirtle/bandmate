@@ -4,6 +4,8 @@ description: Experimental. Work through an Epic's tickets from /parallel-to-tick
 disable-model-invocation: true
 ---
 
+If a `gh` command fails with `HTTP 403: GitHub GraphQL is not available`, use its `gh api` (REST) equivalent from `docs/agents/issue-tracker.md` instead.
+
 The argument is one Epic: a parent issue labelled `epic`, with an impact map, as `/parallel-to-tickets` writes it. Other instructions may follow it. Up to **2** tickets run at once, unless the user sets another limit. Run one Epic at a time, because an Epic's map only knows about its own tickets.
 
 You are the orchestrator: you schedule, relay and merge, and the sub-agents implement. The impact map is your only source for scheduling, and you never plan beyond it.
@@ -43,7 +45,7 @@ Once every ticket in the map is done, close the Epic with `gh issue close <E>`, 
 Fill in `<N>`, the Epic, the repo, the lease note and the ports. Add any environment gotchas from your memory that the agent can't find in the repo, such as how pushing works here. Give each running agent its own dev-server ports, because parallel agents on the default ports collide.
 
 ```
-You are implementing GitHub issue #<N> in <owner/repo>, part of Epic #<E>. You are in your own git worktree; other agents are working on other tickets of the Epic at the same time in theirs. Before starting, read AGENTS.md / CLAUDE.md and the docs they point to.
+You are implementing GitHub issue #<N> in <owner/repo>, part of Epic #<E>. You are in your own git worktree; other agents are working on other tickets of the Epic at the same time in theirs. Before starting, read AGENTS.md / CLAUDE.md and the docs they point to. If a `gh` command fails with `HTTP 403: GitHub GraphQL is not available`, use its `gh api` equivalent from `docs/agents/issue-tracker.md`.
 
 Leases: these modules are being changed by other agents right now: <module (#ticket), ...>. If your work needs to change one of them, stop and hand back, naming the module and why.
 
