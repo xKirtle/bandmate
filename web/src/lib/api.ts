@@ -377,11 +377,21 @@ export type ClipCopy = Pick<Clip, 'start' | 'offset' | 'length'> & { name?: stri
 /** A Clip to paste, and the Track it goes on. */
 export type PastedClip = OnTrack & { clip: ClipCopy };
 
-/** Which Clips a Merge merges, and the waveform of their audio rendered together, 100 peaks per second. */
-export interface ClipMerge {
-  clipIds: number[];
-  peaks: number[];
-}
+/**
+ * An empty Track to add at a position, from 0 (the top) to the number of
+ * Tracks (the bottom), pushing those from there down, at 0 dB and neither
+ * muted nor soloed: e.g. one a Merge adds for its Clip.
+ */
+export type TrackAt = { name: string; position: number };
+
+/** The Track a merged Clip goes on: one of the Timeline's, or a new one added for it. */
+export type MergeOnto = { trackId: number } | { newTrack: TrackAt };
+
+/**
+ * Which Clips a Merge merges, the waveform of their audio rendered
+ * together, 100 peaks per second, and the Track their Clip goes on.
+ */
+export type ClipMerge = { clipIds: number[]; peaks: number[] } & MergeOnto;
 
 /** Where one of several Clips moved at once goes: a Track and a start, in seconds. */
 export interface ClipMove {
@@ -799,15 +809,29 @@ export const api = {
   deleteClips: (at: SongAt, clipIds: number[], trackIds: number[] = []) =>
     request<Timeline>('POST', `/songs/${at.id}/timeline/clips/delete`, { clipIds, trackIds }, at),
   /**
-   * Deletes Clips and places others on the Timeline's Tracks in their place,
-   * in one step, e.g. to undo or redo a Merge. Refused whole if any can't be.
+   * Deletes Clips, then the Tracks trackIds, adds newTracks, in order, and
+   * places other Clips in their place, on the Timeline's Tracks or those
+   * added, in one step, e.g. to undo or redo a Merge. Refused whole if any
+   * can't be.
    */
-  replaceClips: (at: SongAt, clipIds: number[], clips: PlacedClip[]) =>
-    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/replace`, { clipIds, clips: onTracks(clips) }, at),
+  replaceClips: (
+    at: SongAt,
+    clipIds: number[],
+    clips: PlacedClip[],
+    trackIds: number[] = [],
+    newTracks: TrackAt[] = [],
+  ) =>
+    request<Timeline>(
+      'POST',
+      `/songs/${at.id}/timeline/clips/replace`,
+      { clipIds, trackIds, newTracks, clips: onTracks(clips) },
+      at,
+    ),
   /**
-   * Merges two or more Clips on one Track into one Clip of a new Sound,
+   * Merges two or more Clips, on any Tracks, into one Clip of a new Sound,
    * "Merged Clip", from their audio rendered together: a 24-bit WAV running
-   * from the earliest one's start to the latest one's end.
+   * from the earliest one's start to the latest one's end. It goes on the
+   * Track merge names, or a new one added where it says.
    */
   mergeClips: (at: SongAt, wav: Blob, merge: ClipMerge) => {
     const form = new FormData();

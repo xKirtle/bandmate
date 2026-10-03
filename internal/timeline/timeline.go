@@ -412,39 +412,9 @@ func (s *Store) AddTrack(ctx context.Context, songID int64, based lyricsheet.Ver
 		return Timeline{}, err
 	}
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		var order []int64
-		err := query(ctx, tx, `SELECT id FROM tracks WHERE song_id = ? ORDER BY position, id`, []any{songID},
-			func(rows *sql.Rows) error {
-				var id int64
-				if err := rows.Scan(&id); err != nil {
-					return err
-				}
-				order = append(order, id)
-				return nil
-			})
-		if err != nil {
-			return fmt.Errorf("reading tracks: %w", err)
-		}
-		pos := len(order)
-		if t.Position != nil {
-			if *t.Position < 0 || *t.Position > len(order) {
-				return &lyricsheet.InvalidError{Msg: "a Track's position must be from 0 to the number of Tracks"}
-			}
-			pos = *t.Position
-		}
-		trackID, err := insertTrack(ctx, tx, songID, name, pos, t.Volume, t.Muted, t.Soloed)
+		trackID, err := insertTrackAt(ctx, tx, songID, name, t.Position, t.Volume, t.Muted, t.Soloed)
 		if err != nil {
 			return err
-		}
-		// Renumbered around it, as deleting Tracks may have left gaps.
-		for i, id := range order {
-			at := i
-			if i >= pos {
-				at++
-			}
-			if _, err := tx.ExecContext(ctx, `UPDATE tracks SET position = ? WHERE id = ?`, at, id); err != nil {
-				return fmt.Errorf("making room for the track: %w", err)
-			}
 		}
 		for _, c := range t.Clips {
 			if err := addClip(ctx, tx, songID, trackID, c); err != nil {
@@ -832,6 +802,73 @@ func insertTrack(ctx context.Context, tx *sql.Tx, songID int64, name string, pos
 		return 0, fmt.Errorf("adding track: %w", err)
 	}
 	return res.LastInsertId()
+}
+
+// insertTrackAt adds a Track to the Song at position, from 0 (the top) to
+// the number of Tracks (the bottom), pushing those from there down, or at
+// the bottom for nil, returning its id. Its name must be checked.
+func insertTrackAt(ctx context.Context, tx *sql.Tx, songID int64, name string, position *int, volume float64,
+	muted, soloed bool) (int64, error) {
+	var order []int64
+	err := query(ctx, tx, `SELECT id FROM tracks WHERE song_id = ? ORDER BY position, id`, []any{songID},
+		func(rows *sql.Rows) error {
+			var id int64
+			if err := rows.Scan(&id); err != nil {
+				return err
+			}
+			order = append(order, id)
+			return nil
+		})
+	if err != nil {
+		return 0, fmt.Errorf("reading tracks: %w", err)
+	}
+	pos := len(order)
+	if position != nil {
+		if *position < 0 || *position > len(order) {
+			return 0, &lyricsheet.InvalidError{Msg: "a Track's position must be from 0 to the number of Tracks"}
+		}
+		pos = *position
+	}
+	trackID, err := insertTrack(ctx, tx, songID, name, pos, volume, muted, soloed)
+	if err != nil {
+		return 0, err
+	}
+	// Renumbered around it, as deleting Tracks may have left gaps.
+	for i, id := range order {
+		at := i
+		if i >= pos {
+			at++
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE tracks SET position = ? WHERE id = ?`, at, id); err != nil {
+			return 0, fmt.Errorf("making room for the track: %w", err)
+		}
+	}
+	return trackID, nil
+}
+
+// TrackAt is an empty Track to add at a position, from 0 (the top) to the
+// number of Tracks (the bottom), pushing those from there down, at 0 dB and
+// neither muted nor soloed: e.g. one a Merge adds for its Clip.
+type TrackAt struct {
+	Name     string `json:"name"`
+	Position int    `json:"position"`
+}
+
+// insertTracksAt adds Tracks at their positions, in order, each placed
+// among the Tracks there once those before it are added, returning their
+// ids.
+func insertTracksAt(ctx context.Context, tx *sql.Tx, songID int64, tracks []TrackAt) ([]int64, error) {
+	ids := make([]int64, len(tracks))
+	for i, t := range tracks {
+		name, err := trackName(t.Name)
+		if err != nil {
+			return nil, err
+		}
+		if ids[i], err = insertTrackAt(ctx, tx, songID, name, &t.Position, 0, false, false); err != nil {
+			return nil, err
+		}
+	}
+	return ids, nil
 }
 
 // addTracksAtBottom adds empty Tracks with the names given, which must be

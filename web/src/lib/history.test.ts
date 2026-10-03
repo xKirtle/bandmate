@@ -1165,4 +1165,46 @@ describe('History of Merges', () => {
     h.redone(t0, timeline([track(1, [merged(18, 0)]), track(2, [clip(7, 0)])]));
     expect(h.nextUndo()).toMatchObject({ kind: 'replaceClips', clipIds: [18] });
   });
+
+  it('undoes a Merge onto a new Track by deleting it with its Clip, and redoes it by adding it back where it was', () => {
+    const h = new History();
+    const t0 = timeline([
+      track(1, [clip(5, 0), clip(6, 12)]),
+      track(2, [clip(7, 5), clip(9, 30)]),
+      track(3, [clip(10, 0)]),
+    ]);
+    // 5 and 7 merged, onto Track 4, added below Track 2.
+    const t1 = timeline([
+      track(1, [clip(6, 12)]),
+      track(2, [clip(9, 30)]),
+      track(4, [merged(8, 0)]),
+      track(3, [clip(10, 0)]),
+    ]);
+
+    const edit = mergingAdded(t0, t1, [5, 7]);
+    h.record(edit, t0, t1);
+
+    expect(edit).toEqual({
+      kind: 'replaceClips',
+      clipIds: [5, 7],
+      newTracks: [{ name: 'Track 4', position: 2 }],
+      clips: [{ newTrack: 0, clip: { soundId: 40, start: 0, offset: 0, length: 30 } }],
+    });
+    expect(h.nextUndo()).toEqual({
+      kind: 'replaceClips',
+      clipIds: [8],
+      trackIds: [4],
+      clips: [
+        { trackId: 1, clip: { beatId: 100, start: 0, offset: 0, length: 10 } },
+        { trackId: 2, clip: { beatId: 100, start: 5, offset: 0, length: 10 } },
+      ],
+    });
+
+    h.undone(t1, timeline([track(1, [clip(15, 0), clip(6, 12)]), track(2, [clip(16, 5), clip(9, 30)]), track(3)]));
+    expect(h.nextRedo()).toEqual({ ...edit, clipIds: [15, 16] });
+
+    // Redone, the Track comes back with a new id, which undoing then names.
+    h.redone(t0, timeline([track(1, [clip(6, 12)]), track(2, [clip(9, 30)]), track(24, [merged(18, 0)]), track(3)]));
+    expect(h.nextUndo()).toMatchObject({ kind: 'replaceClips', clipIds: [18], trackIds: [24] });
+  });
 });

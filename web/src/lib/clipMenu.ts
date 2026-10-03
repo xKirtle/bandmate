@@ -101,7 +101,7 @@ export type SelectionRun = {
 
 /** What the Selection menu needs to know besides how many Clips are selected. */
 export type SelectionMenuState = Pick<ClipMenuState, 'frozen' | 'copyKeys' | 'cutKeys'> & {
-  /** They can be merged: two or more, all on one Track. */
+  /** They can be merged: two or more, on any Tracks. */
   canMerge: boolean;
 };
 

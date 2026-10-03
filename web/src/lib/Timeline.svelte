@@ -67,7 +67,7 @@
   import { songKey } from './songKeys';
   import { allKeys, shortcuts, type Way } from './shortcuts';
   import { clipActions, selectionActions } from './clipMenu';
-  import { mergeTarget, mergedClips, renderMerge, type MergedAudio } from './merge';
+  import { mergeTarget, mergeWarning, mergedClips, renderMerge, type MergedAudio } from './merge';
   import { menuFor, noSelection, selection, type Selection, type SelectionGesture } from './selection';
   import {
     copy,
@@ -194,6 +194,9 @@
   let offerCues = $state.raw<CueOffer | null>(null);
   let offerTimer: ReturnType<typeof setTimeout> | undefined;
   const offerFor = 8000;
+  // After a Merge, which Tracks came out silent, muted or left out by a
+  // solo, until it's dismissed or the next Merge.
+  let mergeNote = $state<string | null>(null);
 
   // Recording a Take onto the chosen Track, at the playhead, or where the
   // Track's last Clip ends if the playhead is before that. Playback leads
@@ -2105,12 +2108,14 @@
   }
 
   /**
-   * Merges the selected Clips, on one Track, into one Clip of a new Sound,
+   * Merges the selected Clips, on any Tracks, into one Clip of a new Sound,
    * rendered here from the Timeline as it is once the edits queued before
-   * it are saved. Until it's saved, the Timeline can't be edited; if
-   * rendering or saving fails, nothing changes. The merged Clip becomes the
-   * Selection, and its Track the Chosen Track. It's kept in the history as
-   * replacing the Clips with it, so redoing it never renders it again.
+   * it are saved, with its Tracks' levels as they are then. Until it's
+   * saved, the Timeline can't be edited; if rendering or saving fails,
+   * nothing changes. The merged Clip becomes the Selection, and its Track
+   * the Chosen Track, and a Track that came out silent is named. It's kept
+   * in the history as replacing the Clips with it, so redoing it never
+   * renders it again.
    */
   function mergeSelection() {
     if (frozen || !mergeTarget(timeline.tracks, selected)) return;
@@ -2118,6 +2123,7 @@
     merging = true;
     error = null;
     offerCues = null;
+    mergeNote = null;
     queued++;
     change(async (at) => {
       const target = mergeTarget(timeline.tracks, clipIds);
@@ -2129,12 +2135,16 @@
         throw new Error(`Couldn't merge the Clips (${(e as Error).message}).`);
       }
       const before = timeline;
-      const after = await saved(api.mergeClips(at, audio.wav, { clipIds: target.clipIds, peaks: audio.peaks }));
+      const after = await saved(
+        api.mergeClips(at, audio.wav, { clipIds: target.clipIds, peaks: audio.peaks, ...target.onto }),
+      );
       history.record(mergingAdded(before, after, target.clipIds), before, after);
       editedAt = after.version;
       showHistory();
-      selected = new Set(addedClips(before, after));
-      remembered = target.trackId;
+      const [mergedId] = addedClips(before, after);
+      selected = new Set([mergedId]);
+      remembered = after.tracks.find((t) => t.clips.some((c) => c.id === mergedId))!.id;
+      mergeNote = mergeWarning(target.silent);
       return { timeline: after };
     }).finally(() => {
       merging = false;
@@ -3241,6 +3251,12 @@
         >
       </div>
     {/if}
+    {#if mergeNote}
+      <div class="offer" role="status">
+        <span class="merge-note">{mergeNote}</span>
+        <button type="button" class="button" onclick={() => (mergeNote = null)}>OK</button>
+      </div>
+    {/if}
     {#if offerBpm}
       <div class="offer" role="status">
         <span>This Song has no BPM. Use {offerBpm.bpm} BPM from “{offerBpm.title}”?</span>
@@ -3809,7 +3825,8 @@
     opacity: 0.5;
     cursor: default;
   }
-  .input-note {
+  .input-note,
+  .merge-note {
     color: var(--warning);
   }
   .toggle.record:disabled {
