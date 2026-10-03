@@ -860,8 +860,8 @@ export const api = {
   /**
    * Splits Clips in two at a time on the Timeline, which must cross each:
    * each Clip keeps its id as the left half, ending there, and a new Clip
-   * is the right half, a Clip of Takes' with copies of its Takes. Refused
-   * whole if any can't be.
+   * is the right half, which for a Clip of Takes plays copies of its
+   * Takes. Refused whole if any can't be.
    */
   splitClips: (at: SongAt, clipIds: number[], time: number) =>
     request<Timeline>('POST', `/songs/${at.id}/timeline/clips/split`, { clipIds, at: time }, at),

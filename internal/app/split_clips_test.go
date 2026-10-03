@@ -109,6 +109,8 @@ func TestOnlyAClipThePlayheadCrossesCanBeSplit(t *testing.T) {
 	expectError(t, ts.splitClips(p.song.ID, 5, p.first, p.first), http.StatusBadRequest,
 		"each Clip can only be split once")
 	expectError(t, ts.splitClips(p.song.ID, 5), http.StatusBadRequest, "clipIds are required")
+	expectError(t, ts.Do(http.MethodPost, timelinePath(p.song.ID)+"/clips/split", map[string]any{"clipIds": []int64{p.first}}),
+		http.StatusBadRequest, "at is required")
 	expectStatus(t, ts.splitClips(p.song.ID, 5, 9999), http.StatusNotFound)
 	if got := ts.getTimeline(p.song.ID); len(got.Tracks[0].Clips) != 2 {
 		t.Errorf("clips = %+v, want none split", got.Tracks[0].Clips)

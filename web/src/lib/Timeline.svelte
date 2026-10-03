@@ -2172,11 +2172,11 @@
   function splitAtPlayhead(clipIds?: ReadonlySet<number>) {
     if (frozen) return;
     const at = playheadAt();
-    const cut = splitTargets(timeline.tracks, clipIds ?? selected, chosen, at);
-    if (cut.length === 0) return;
-    perform({ kind: 'splitClips', clipIds: cut, at }, (before, after) => {
+    const splitting = splitTargets(timeline.tracks, clipIds ?? selected, chosen, at);
+    if (splitting.length === 0) return;
+    perform({ kind: 'splitClips', clipIds: splitting, at }, (before, after) => {
       // Unless the Selection is locked by a recording started since.
-      if (!frozen) selected = new Set([...cut, ...addedClips(before, after)]);
+      if (!frozen) selected = new Set([...splitting, ...addedClips(before, after)]);
     });
   }
 
