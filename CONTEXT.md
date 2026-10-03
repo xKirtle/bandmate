@@ -109,7 +109,7 @@ _Avoid_: Beat dialog, Beat modal
 Listening to a Beat from the Beat Library, outside any Song's Timeline.
 
 **Sound**:
-An audio file imported into one Song, placed on the Timeline in Clips like a Beat, but without a credit or a library: it belongs to that Song alone, and several of its Clips can use it. It takes its name from the file when imported, and keeps it; only its Clips are renamed. Once no Clip has used it for a day (long enough for undo to bring a Clip back), it's gone, and deleting its Song deletes it at once.
+An audio file imported into one Song, or made there by a Merge, placed on the Timeline in Clips like a Beat, but without a credit or a library: it belongs to that Song alone, and several of its Clips can use it. It takes its name from the file when imported, or is called "Merged Clip", and keeps it; only its Clips are renamed. Once no Clip has used it for a day (long enough for undo to bring a Clip back), it's gone, and deleting its Song deletes it at once.
 _Avoid_: Sample, stem, audio file, import
 
 **Take**:
@@ -131,6 +131,10 @@ _Avoid_: Group, highlight, chosen (choosing is for Tracks)
 **Clipboard**:
 The Clips last copied or cut from the Selection, as they were then, to be pasted elsewhere on the same Song's Timeline: later changes to the Clips copied, or deleting them, never change it. A paste makes new Clips from it, as a Duplicate does, so the Clipboard can be pasted again. It lands at the playhead on the Chosen Track: its earliest Clip starts at the playhead, its topmost Clip goes on the Chosen Track, and the rest keep their places relative to those, on new Tracks named after theirs if they run past the last Track. Where that would land a Clip on another, the whole paste goes later, together, to the first place where every Clip fits, so pasting again and again lays copies end to end. The pasted Clips become the Selection. Like the Selection, it's never kept: leaving the Song drops it.
 _Avoid_: Copy buffer
+
+**Merge**:
+Turning two or more selected Clips, on any Tracks, into one Clip of a new Sound that runs from the earliest Clip's start to the latest one's end and sounds as playback of them would: where they overlap they play together, a gap is silence, and each Track's mute and solo apply as in a Mixdown, with its volume taken relative to the Track the merged Clip lands on. That's the topmost of their Tracks where nothing else is in the way, or else a new Track right below the lowest of them. The merged Clip replaces them and becomes the Selection; undoing the Merge brings them back. While a Merge is being made, the Timeline can't be edited.
+_Avoid_: Join, consolidate, bounce (a Mixdown is downloaded, never kept)
 
 **Loop**:
 A stretch of the Timeline that playback repeats, e.g. the hook of a Beat while writing over it: playback that reaches the Loop's end goes back to its start. Playback started or moved anywhere else plays on as usual until it reaches the Loop's end, so after the Loop it runs to the Timeline's end. Each Song keeps one, which can be switched on or off; only the user switches it, and it never moves the playhead.
