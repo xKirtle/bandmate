@@ -64,12 +64,16 @@ A single line of lyrics within an Alternate.
 _Avoid_: Row, verse (a verse is a Label)
 
 **Chord**:
-A chord name anchored at a character position within a Line, possibly mid-word. In Read mode a Song's Chords can be hidden; that choice is kept on each device, not on the Song.
+A chord name anchored at a character position within a Line, possibly mid-word. With a capo on, a Chord names the shape fingered, not the pitch that sounds: capo 2 and a G Chord sounds an A. In Read mode a Song's Chords can be hidden; that choice is kept on each device, not on the Song.
 _Avoid_: Chord marker
 
 **Chord Line**:
 A Line that holds only Chords and no lyrics, used for intros, outros, solos and other instrumental passages.
 _Avoid_: Chord bar, instrumental line
+
+**Transpose**:
+Showing a Song's Chords moved up or down by semitones in Read mode, for playing in another key. It's a way of reading the Song, not an edit: the Chords, the key and the audio stay as written, and the amount is kept on each device for each Song. A Chord name that can't be read stays as written.
+_Avoid_: Key change
 
 **Snapshot**:
 A saved copy of the whole Lyric Sheet at a point in time, taken automatically or named by the user.
