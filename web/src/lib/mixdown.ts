@@ -62,7 +62,7 @@ export async function mixDown(plan: MixdownPlan): Promise<AudioBuffer> {
   });
   const mix = new TrackMix(context, gains);
   for (const s of playing) {
-    mix.play(buffers.get(s.clip.source)!, s.clip.trackId, s.delay, s.from, Math.min(s.duration, length - s.delay));
+    mix.play(buffers.get(s.clip.source)!, s.clip, s.delay, s.from, Math.min(s.duration, length - s.delay));
   }
 
   // It pauses at each step to say how far it's got, and only carries on if

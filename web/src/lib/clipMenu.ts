@@ -1,13 +1,15 @@
 import type { Clip } from './api';
+import { maxGain, minGain } from './clipGain';
 import { activeTake } from './clipSource';
 import { editHint, type Freeze } from './freeze';
 import type { MenuAction } from './menu';
 
 // A Clip's menu, opened by its ⋯, right-click, the Menu key, Shift+F10 or a
-// long press: its entries, in the order they're listed. Deleting a Clip, or
-// choosing, nudging, deleting and clearing its Takes, don't ask first: they
-// can be undone, and a deleted Take is only detached. While recording, the
-// entries that edit are shown off, and only the downloads run.
+// long press: its entries, in the order they're listed. Deleting a Clip,
+// setting its Gain, or choosing, nudging, deleting and clearing its Takes,
+// don't ask first: they can be undone, and a deleted Take is only detached.
+// While recording, the entries that edit are shown off, and only the
+// downloads run.
 
 /** What the Clip's menu needs to know besides the Clip. */
 export type ClipMenuState = {
@@ -37,6 +39,8 @@ export type ClipRun = {
   clearInactiveTakes: () => void;
   downloadTake: (takeId: number) => void;
   rename: () => void;
+  /** Sets the Clip's Gain, in dB. */
+  setGain: (gain: number) => void;
   /** Copies the Clip to the Clipboard. */
   copy: () => void;
   /** Copies the Clip to the Clipboard, then deletes it. */
@@ -53,6 +57,12 @@ export function clipActions(clip: Clip, state: ClipMenuState, run: ClipRun): Men
   return [
     ...takeActions(clip, state, run),
     edit({ icon: '✎', label: 'Rename', title: 'Or double-click the Clip', run: run.rename }),
+    edit({
+      icon: '±',
+      label: 'Gain',
+      title: 'How much louder or quieter the Clip plays, in dB; or drag its gain line',
+      field: { value: clip.gain, unit: 'dB', step: 0.5, shiftStep: 3, min: minGain, max: maxGain, set: run.setGain },
+    }),
     ...clipboardActions(edit, state, run.copy, run.cut),
     edit({ icon: '⧉', label: 'Duplicate', run: run.duplicate }),
     ...(soundId !== null

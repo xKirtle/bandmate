@@ -1,7 +1,16 @@
 <script lang="ts">
   import { tick, type Snippet } from 'svelte';
   import { keyHints } from './keyHints';
-  import { fieldHint, fieldStep, menuKey, opensMenu, type MenuAction, type MenuChoice, type MenuField } from './menu';
+  import {
+    fieldHint,
+    fieldStep,
+    fieldInRange,
+    menuKey,
+    opensMenu,
+    type MenuAction,
+    type MenuChoice,
+    type MenuField,
+  } from './menu';
   import { popoverLeft, popoverSide, popoverTop, type PopoverAlign } from './popover';
   import type { Point } from './press';
 
@@ -163,6 +172,7 @@
 
   function setField(value: number | null) {
     if (!field || value === null || !Number.isFinite(value)) return;
+    value = fieldInRange(value, field);
     draft = value;
     if (value !== field.value) field.set(value);
   }
@@ -266,6 +276,8 @@
             <input
               type="number"
               step={field.step}
+              min={field.min}
+              max={field.max}
               bind:value={draft}
               bind:this={input}
               onkeydown={onFieldKey}

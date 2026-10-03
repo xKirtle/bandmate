@@ -130,6 +130,7 @@
   import { encodeWav } from './wav';
   import { barWidth, bars } from './waveform';
   import { clipping, LiveWave, tileBars } from './liveWave';
+  import { draggedGain, formatGain, gainLineAt, heardPeak } from './clipGain';
 
   // The Timeline, docked under the Lyric Sheet: its Tracks and Clips, and
   // playback with each Track's volume, mute and solo, and the Loop. Editing
@@ -1625,8 +1626,8 @@
   // snaps by any of its Clips' edges to those of Clips outside it.
   interface Edit {
     clip: Clip;
-    /** Moving the Clip, trimming either edge, or, Alt+dragged, sliding its active Take within it. */
-    mode: 'move' | 'start' | 'end' | 'nudge';
+    /** Moving the Clip, trimming either edge, Alt+dragged, sliding its active Take within it, or by its gain line, setting its Gain. */
+    mode: 'move' | 'start' | 'end' | 'nudge' | 'gain';
     /** Where the pointer went down, to tell a click or a long press from a drag. */
     from: Point;
     /** How far into the Clip it was grabbed, in seconds. */
@@ -1637,7 +1638,15 @@
     placement: Placed;
     /** Where its active Take is nudged to, for a nudge. */
     nudge: number;
-    /** Whether Shift is held, to move or trim without snapping. */
+    /** Its Gain as dragged, in dB, for the gain line. */
+    gain: number;
+    /**
+     * For the gain line, what it's dragged from: the Gain and the height of
+     * the pointer, both moved on whenever Shift is pressed or let go, so the
+     * line never jumps, and how tall the Clip's waveform is, in pixels.
+     */
+    gainFrom: { gain: number; clientY: number; height: number };
+    /** Whether Shift is held, to move or trim without snapping, or drag the gain line finely. */
     free: boolean;
     /** Whether Mod was held as it was pressed, so a click adds it to the Selection or takes it out. */
     toggles: boolean;
@@ -1674,7 +1683,12 @@
           if (clip && m.trackId === track.id) placed.push({ clip, at: { ...clip, start: m.start }, editing: true });
         }
       } else if (dragged?.trackId === track.id) {
-        const clip = dragged.mode === 'nudge' ? nudged(dragged.clip, dragged.nudge) : dragged.clip;
+        const clip =
+          dragged.mode === 'nudge'
+            ? nudged(dragged.clip, dragged.nudge)
+            : dragged.mode === 'gain'
+              ? { ...dragged.clip, gain: dragged.gain }
+              : dragged.clip;
         placed.push({ clip, at: dragged.placement, editing: true });
       }
       return { track, clips: placed };
@@ -1829,6 +1843,9 @@
     }
     // Alt+dragging a Clip of Takes slides its active Take, the Clip staying put.
     const take = activeTake(clip);
+    // Grabbing its gain line selects it, as clicking it does.
+    if (mode === 'gain') select({ kind: 'click', clipId: clip.id });
+    const wave = element.querySelector('.wave')?.getBoundingClientRect();
     edit = {
       clip,
       mode: mode === 'move' && nudges(event) && take ? 'nudge' : mode,
@@ -1838,6 +1855,8 @@
       trackId: trackOf(clip).id,
       placement: clip,
       nudge: take?.nudge ?? 0,
+      gain: clip.gain,
+      gainFrom: { gain: clip.gain, clientY: event.clientY, height: wave?.height ?? 0 },
       free: skipsSnapping(event),
       toggles,
       snap: null,
@@ -1859,6 +1878,13 @@
   // for the pointer to move.
   function editModifier(event: KeyboardEvent) {
     if (!isModifier(event.key) || !edit?.moved || edit.mode === 'nudge' || edit.saving) return;
+    if (edit.mode === 'gain') {
+      // Fine or not from here on, without the line jumping.
+      const free = skipsSnapping(event);
+      if (free !== edit.free) edit.gainFrom = { ...edit.gainFrom, gain: edit.gain, clientY: editAt.clientY };
+      edit.free = free;
+      return;
+    }
     edit.free = skipsSnapping(event);
     editMove(editAt);
   }
@@ -1877,6 +1903,15 @@
     edit.moved = true;
     clearTimeout(pressTimer);
     editAt = { clientX: event.clientX, clientY: event.clientY };
+    if (edit.mode === 'gain') {
+      // Shift held drags it finely. Up and down only, so no scrolling along.
+      const fine = 'shiftKey' in event && (event as PointerEvent).shiftKey;
+      if (fine !== edit.free) edit.gainFrom = { ...edit.gainFrom, gain: edit.gain, clientY: event.clientY };
+      edit.free = fine;
+      const { gain, clientY, height } = edit.gainFrom;
+      edit.gain = draggedGain(gain, event.clientY - clientY, height, fine);
+      return;
+    }
     // Scrolling along at an edge, or Shift pressed, moves it too, with no keys to go by.
     if ('shiftKey' in event) edit.free = skipsSnapping(event as PointerEvent);
     const t = spanTimeAt(event.clientX);
@@ -1929,8 +1964,16 @@
     if (!edit) return;
     edit.snap = null;
     const { clip, trackId, placement: to, mode } = edit;
-    // Pressed and let go without dragging, it's clicked.
-    if (!edit.moved) select({ kind: edit.toggles ? 'toggle' : 'click', clipId: clip.id });
+    // Pressed and let go without dragging, it's clicked. Its gain line selected it when grabbed.
+    if (!edit.moved && mode !== 'gain') select({ kind: edit.toggles ? 'toggle' : 'click', clipId: clip.id });
+    if (mode === 'gain') {
+      if (edit.moved && edit.gain !== clip.gain) {
+        edit.saving = true;
+        await perform({ kind: 'setClipGain', clipId: clip.id, gain: edit.gain });
+      }
+      edit = null;
+      return;
+    }
     if (mode === 'nudge') {
       const takeId = clip.activeTakeId!;
       if (edit.moved && edit.nudge !== activeTake(clip)!.nudge) {
@@ -2089,6 +2132,11 @@
     // Not on its ⋯ or menu, its trim edges, or its name being typed.
     if (inClipMenu(event.target) || inClipName(event.target)) return;
     if (event.target instanceof Element && event.target.closest('.trim')) return;
+    // Its gain line resets the Gain instead.
+    if (event.target instanceof Element && event.target.closest('.gain-line')) {
+      if (clip.gain !== 0 && !frozen) perform({ kind: 'setClipGain', clipId: clip.id, gain: 0 });
+      return;
+    }
     startClipRename(clip);
   }
 
@@ -2217,6 +2265,7 @@
         clearInactiveTakes: () => perform({ kind: 'clearInactiveTakes', clipId }),
         downloadTake: (takeId) => download(api.takeDownloadUrl(timeline.songId, takeId)),
         rename: () => startClipRename(clip),
+        setGain: (gain) => perform({ kind: 'setClipGain', clipId, gain }),
         copy: () => copyClips(new Set([clip.id])),
         cut: () => cutClip(clip),
         duplicate: () => duplicate(clip),
@@ -3044,13 +3093,16 @@
                     class:editing
                     class:moving={editing && edit?.mode === 'move'}
                     class:nudging={editing && edit?.mode === 'nudge'}
+                    class:gaining={editing && edit?.mode === 'gain'}
                     class:retaking={clip.id === recording?.clipId}
                     class:selected={isSelected}
                     style:left="{percent(at.start)}%"
                     style:width="{percent(at.length)}%"
                     {title}
                     role="group"
-                    aria-label="{title}{isSelected ? ', selected' : ''}, {extent}"
+                    aria-label="{title}{isSelected ? ', selected' : ''}, {extent}{clip.gain !== 0
+                      ? `, ${formatGain(clip.gain)}`
+                      : ''}"
                     tabindex={editable.current ? 0 : undefined}
                     aria-keyshortcuts={editable.current
                       ? hints.aria(frozen ? shortcuts.clipMenu.keys : clipKeys)
@@ -3076,6 +3128,9 @@
                       {:else}
                         <span class="clip-title">{title}</span>
                       {/if}
+                      {#if clip.gain !== 0}
+                        <span class="clip-gain">{formatGain(clip.gain)}</span>
+                      {/if}
                       <span class="clip-actions clip-menu edit-only">
                         <ActionsMenu
                           bind:this={clipMenus[clip.id]}
@@ -3098,7 +3153,8 @@
                           aria-hidden="true"
                         >
                           {#each clipShape(clip, at.offset + wave.from, wave.to - wave.from, (wave.bars * barWidth) / view.scale, wave.bars) as peak, i (i)}
-                            {@const height = Math.max(2, peak * 100)}
+                            <!-- Drawn as it sounds, at the Clip's Gain. -->
+                            {@const height = Math.max(2, heardPeak(peak, clip.gain) * 100)}
                             <!-- A Take's clipping stays marked once it's saved; a Beat's or a Sound's isn't, often being mastered loud. -->
                             <rect
                               class:clipped={clip.activeTakeId !== null && peak >= clipping}
@@ -3109,6 +3165,21 @@
                             />
                           {/each}
                         </svg>
+                      {/if}
+                      <!-- Its Gain, 0 dB in the middle: a thin target, dragged up or down, or double-clicked back to 0 dB. -->
+                      <span
+                        class="gain-line edit-only"
+                        class:changed={clip.gain !== 0}
+                        style:top="{gainLineAt(clip.gain) * 100}%"
+                        aria-hidden="true"
+                        title={editHint(
+                          freeze,
+                          `Gain ${formatGain(clip.gain)}: drag to change it, with Shift for fine steps, or double-click for 0 dB`,
+                        )}
+                        onpointerdown={(e) => editDown(e, clip, 'gain')}
+                      ></span>
+                      {#if editing && edit?.mode === 'gain' && edit.moved}
+                        <span class="gain-tip" style:top="{gainLineAt(clip.gain) * 100}%">{formatGain(clip.gain)}</span>
                       {/if}
                     </span>
                     <span
@@ -3911,6 +3982,9 @@
   .clip.nudging {
     cursor: ew-resize;
   }
+  .clip.gaining {
+    cursor: ns-resize;
+  }
   /* The Take being recorded, growing as it goes. */
   /* The Clip being retaken, silent and left be until the Retake is saved. */
   .clip.retaking {
@@ -4004,6 +4078,64 @@
   rect {
     fill: var(--accent);
     opacity: 0.7;
+  }
+  /*
+   * A Clip's gain line: a thin target a few pixels either side of a hairline,
+   * clear of the trim edges, which keep their own cursor.
+   */
+  .gain-line {
+    position: absolute;
+    left: calc(0.375 * var(--timeline-rem));
+    right: calc(0.375 * var(--timeline-rem));
+    height: calc(0.5 * var(--timeline-rem));
+    transform: translateY(-50%);
+    cursor: ns-resize;
+  }
+  .gain-line::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 1px;
+    background: var(--text-muted);
+    opacity: 0.35;
+  }
+  .gain-line.changed::before {
+    background: var(--accent);
+    opacity: 0.8;
+  }
+  .gain-line:hover::before,
+  .clip.gaining .gain-line::before {
+    height: 2px;
+    margin-top: -0.5px;
+    background: var(--accent);
+    opacity: 1;
+  }
+  /* The Gain while its line is dragged. */
+  .gain-tip {
+    position: absolute;
+    left: 50%;
+    z-index: 1;
+    padding: 0 calc(0.25 * var(--timeline-rem));
+    border: 1px solid var(--border);
+    border-radius: calc(0.25 * var(--timeline-rem));
+    background: var(--bg);
+    color: var(--text);
+    font-size: calc(0.6875 * var(--timeline-rem));
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    transform: translate(-50%, -120%);
+    pointer-events: none;
+  }
+  /* A Clip's Gain, when it isn't 0 dB. */
+  .clip-gain {
+    flex-shrink: 0;
+    padding: 0 calc(0.25 * var(--timeline-rem));
+    color: var(--text-muted);
+    font-size: calc(0.625 * var(--timeline-rem));
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
   /* A peak of a Take that clipped. */
   rect.clipped {

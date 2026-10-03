@@ -7,6 +7,7 @@ const clip = (id: number, start: number, length = 10, more: Partial<Clip> = {}):
   beatId: 100,
   soundId: null,
   name: null,
+  gain: 0,
   takes: [],
   activeTakeId: null,
   start,
@@ -72,6 +73,18 @@ describe('copy', () => {
         },
       },
     ]);
+  });
+
+  it('holds each Clip at its Gain, so a paste or a Duplicate keeps it', () => {
+    const tracks = [
+      track(1, [
+        clip(5, 0, 10, { gain: -6 }),
+        clip(7, 40, 10, { activeTakeId: 70, beatId: null, takes: [take(70, 0, 0)], gain: 3 }),
+      ]),
+    ];
+
+    expect(copy(tracks, new Set([5, 7]))?.clips.map((c) => c.clip.gain)).toEqual([-6, 3]);
+    expect(duplicate(tracks, new Set([5]))?.clips[0].clip).toMatchObject({ beatId: 100, gain: -6 });
   });
 
   it('holds a Sound’s Clip by its Sound', () => {

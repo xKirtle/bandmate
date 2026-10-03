@@ -8,6 +8,7 @@ const clip = (id: number, start: number, more: Partial<Clip> = {}): Clip => ({
   beatId: 100,
   soundId: null,
   name: null,
+  gain: 0,
   takes: [],
   activeTakeId: null,
   start,
@@ -322,6 +323,39 @@ describe('History', () => {
       timeline([track(1, [clip(5, 0, { name: 'Chorus 1' })])]),
     );
     expect(h.nextUndo()).toBeNull();
+  });
+
+  it("undoes setting a Clip's Gain by setting it back, one step each", () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0)])]);
+    const t1 = timeline([track(1, [clip(5, 0, { gain: 3 })])]);
+    const t2 = timeline([track(1, [clip(5, 0, { gain: -4.5 })])]);
+    h.record({ kind: 'setClipGain', clipId: 5, gain: 3 }, t0, t1);
+    h.record({ kind: 'setClipGain', clipId: 5, gain: -4.5 }, t1, t2);
+
+    expect(h.nextUndo()).toEqual({ kind: 'setClipGain', clipId: 5, gain: 3 });
+    h.undone(t2, t1);
+    expect(h.nextUndo()).toEqual({ kind: 'setClipGain', clipId: 5, gain: 0 });
+    h.undone(t1, t0);
+    expect(h.nextRedo()).toEqual({ kind: 'setClipGain', clipId: 5, gain: 3 });
+  });
+
+  it('undoes deleting a Clip by placing it back at its Gain, and sets its Gain by its new id', () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0)])]);
+    const t1 = timeline([track(1, [clip(5, 0, { gain: 6 })])]);
+    const t2 = timeline([track(1)]);
+    h.record({ kind: 'setClipGain', clipId: 5, gain: 6 }, t0, t1);
+    h.record({ kind: 'deleteClip', clipId: 5 }, t1, t2);
+
+    expect(h.nextUndo()).toEqual({
+      kind: 'placeClip',
+      trackId: 1,
+      clip: { beatId: 100, gain: 6, start: 0, offset: 0, length: 10 },
+    });
+    h.undone(t2, timeline([track(1, [clip(9, 0, { gain: 6 })])]));
+
+    expect(h.nextUndo()).toEqual({ kind: 'setClipGain', clipId: 9, gain: 0 });
   });
 
   it('undoes deleting a named Clip by placing it back with its name, and renames it by its new id', () => {

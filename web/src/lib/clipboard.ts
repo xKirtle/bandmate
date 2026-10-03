@@ -10,6 +10,7 @@
 // placed here too, though it leaves the Clipboard as it is.
 
 import type { Clip, ClipCopy, PastedClip, Track, TrackToAdd } from './api';
+import { ownOf } from './clipSource';
 import type { Selection } from './selection';
 
 /** A Clip as it was copied, and how many Tracks below the topmost Clip copied it was then. */
@@ -42,14 +43,14 @@ export interface Paste {
 // pasted right at a neighbour's end.
 const tolerance = 1e-6;
 
-/** A Clip as it is: its source, trim and name, and a Clip of Takes' Takes as they are in it. */
+/** A Clip as it is: its source, trim, name and Gain, and a Clip of Takes' Takes as they are in it. */
 function copyOf(clip: Clip): ClipCopy {
   const { start, offset, length } = clip;
-  const name = clip.name !== null ? { name: clip.name } : {};
-  if (clip.beatId !== null) return { beatId: clip.beatId, ...name, start, offset, length };
-  if (clip.soundId !== null) return { soundId: clip.soundId, ...name, start, offset, length };
+  const own = ownOf(clip);
+  if (clip.beatId !== null) return { beatId: clip.beatId, ...own, start, offset, length };
+  if (clip.soundId !== null) return { soundId: clip.soundId, ...own, start, offset, length };
   return {
-    ...name,
+    ...own,
     takes: clip.takes.map(({ id, position, nudge }) => ({ id, position, nudge })),
     activeTakeId: clip.activeTakeId!,
     start,

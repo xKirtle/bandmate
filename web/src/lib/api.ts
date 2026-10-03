@@ -266,6 +266,11 @@ export interface Clip {
   soundId: number | null;
   /** Its own name, or null until it's named, when it goes by its source's (see clipTitle). */
   name: string | null;
+  /**
+   * How much louder or quieter it plays, in dB, before its Track's volume
+   * applies, whichever Take is active: from minGain to maxGain (see clipGain), 0 until it's set.
+   */
+  gain: number;
   /** A Clip of Takes' Takes, by number; none for a Clip of a Beat. */
   takes: Take[];
   /** The Take a Clip of Takes plays, or null for a Clip of a Beat. */
@@ -305,9 +310,9 @@ export interface Take {
 /**
  * A stretch of a Beat or a Sound, or of detached Takes, to place on a Track,
  * e.g. a deleted Clip brought back, or a recording or import redone, with its
- * name if it has one.
+ * name if it has one, and its Gain, 0 dB if not given.
  */
-export type NewClip = Pick<Clip, 'start' | 'offset' | 'length'> & { name?: string } & (
+export type NewClip = Pick<Clip, 'start' | 'offset' | 'length'> & { name?: string; gain?: number } & (
     { beatId: number } | { soundId: number } | { takeIds: number[]; activeTakeId: number }
   );
 
@@ -368,7 +373,7 @@ export type PlacedClip = OnTrack & { clip: NewClip };
  * Sound, or of Takes, given as they were then, each where it started in the
  * Clip's source span and how far it was nudged.
  */
-export type ClipCopy = Pick<Clip, 'start' | 'offset' | 'length'> & { name?: string } & (
+export type ClipCopy = Pick<Clip, 'start' | 'offset' | 'length'> & { name?: string; gain?: number } & (
     | { beatId: number }
     | { soundId: number }
     | { takes: Pick<Take, 'id' | 'position' | 'nudge'>[]; activeTakeId: number }
@@ -795,7 +800,10 @@ export const api = {
   /** Gives a Clip a name of its own; a blank one clears it, and the Clip goes by its source's name again. */
   renameClip: (at: SongAt, clipId: number, name: string) =>
     request<Timeline>('PUT', `/songs/${at.id}/timeline/clips/${clipId}/name`, { name }, at),
-  /** Copies a Clip, name and all, right after itself, or after its Track's last Clip if that's taken. */
+  /** Sets how much louder or quieter a Clip plays, in dB, from minGain to maxGain. */
+  setClipGain: (at: SongAt, clipId: number, gain: number) =>
+    request<Timeline>('PUT', `/songs/${at.id}/timeline/clips/${clipId}/gain`, { gain }, at),
+  /** Copies a Clip, name, Gain and all, right after itself, or after its Track's last Clip if that's taken. */
   duplicateClip: (at: SongAt, clipId: number) =>
     request<Timeline>('POST', `/songs/${at.id}/timeline/clips/${clipId}/duplicate`, undefined, at),
   /** Removes a Clip from the Timeline; its Beat stays in the Beat Library, and its Takes are detached. */

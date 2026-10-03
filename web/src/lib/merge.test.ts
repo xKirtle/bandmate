@@ -8,6 +8,7 @@ const clip = (id: number, start: number, more: Partial<Clip> = {}): Clip => ({
   beatId: 100,
   soundId: null,
   name: null,
+  gain: 0,
   takes: [],
   activeTakeId: null,
   start,
@@ -170,7 +171,7 @@ describe('mergeWarning', () => {
 });
 
 describe('mergedClips', () => {
-  it('plays only the Clips merged, each as trimmed, a Take Clip only its active Take with its Nudge', () => {
+  it('plays only the Clips merged, each as trimmed and at its Gain, a Take Clip only its active Take with its Nudge', () => {
     // Take 41 starts 1s into its span, nudged 0.25s later; Take 42 isn't active.
     const takes = clip(6, 20, {
       beatId: null,
@@ -180,17 +181,17 @@ describe('mergedClips', () => {
       length: 6,
     });
     const tl = timeline([
-      track(1, [clip(5, 0, { offset: 3, length: 8 }), takes, clip(7, 40, { beatId: null, soundId: 30 })]),
+      track(1, [clip(5, 0, { offset: 3, length: 8, gain: -20 }), takes, clip(7, 40, { beatId: null, soundId: 30 })]),
       track(2, [clip(8, 0)]),
     ]);
 
     const got = mergedClips(tl, clipSources(tl), [5, 6, 7]);
 
     expect(got).toEqual([
-      { start: 0, offset: 3, length: 8, source: '/api/beats/100/audio?v=beat.mp3-1-60', trackId: 1 },
+      { start: 0, offset: 3, length: 8, source: '/api/beats/100/audio?v=beat.mp3-1-60', trackId: 1, gain: 0.1 },
       // Its span starts at 19.5, so Take 41 plays from 20.75 to its end at 24.75.
-      { start: 20.75, offset: 0, length: 4, source: '/api/songs/1/takes/41/audio', trackId: 1 },
-      { start: 40, offset: 0, length: 10, source: '/api/songs/1/sounds/30/audio', trackId: 1 },
+      { start: 20.75, offset: 0, length: 4, source: '/api/songs/1/takes/41/audio', trackId: 1, gain: 1 },
+      { start: 40, offset: 0, length: 10, source: '/api/songs/1/sounds/30/audio', trackId: 1, gain: 1 },
     ]);
   });
 });
