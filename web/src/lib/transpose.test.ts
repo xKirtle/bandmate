@@ -34,9 +34,18 @@ describe('transposeChord', () => {
     }
   });
 
-  it('reads a solfège name that starts with a capital C–G as a note, by the rule', () => {
-    expect(transposeChord('Do', 2)).toBe('Eo');
-    expect(transposeChord('Fa', 2)).toBe('Ga');
+  it('leaves a solfège name starting Do or Fa as written', () => {
+    for (const name of ['Do', 'Do7', 'Dom7', 'Dob', 'Fa', 'Fa#m', 'Fa♭', 'Fa/Do', 'Fa(add9)']) {
+      expect(transposeChord(name, 2)).toBe(name);
+    }
+  });
+
+  it('still moves a letter name whose second letter makes it English', () => {
+    expect(transposeChord('Fadd9', 2)).toBe('Gadd9');
+    expect(transposeChord('Faug', 2)).toBe('Gaug');
+    expect(transposeChord('D°7', 2)).toBe('E°7');
+    expect(transposeChord('Dm7', 2)).toBe('Em7');
+    expect(transposeChord('C/Do', 2)).toBe('D/Do');
   });
 
   it('leaves the whole name as written when moved by 0', () => {

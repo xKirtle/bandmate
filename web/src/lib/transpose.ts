@@ -9,6 +9,18 @@ const accidentals: Record<string, number> = { '#': 1, '♯': 1, b: -1, '♭': -1
 /** A readable note at the start of text: a capital A–G, optionally followed by #, b, ♯ or ♭. */
 const note = /^([A-G])([#b♯♭]?)/u;
 
+/**
+ * A solfège name that starts like a letter name: Do or Fa, then the end, an
+ * accidental, m, a digit or a non-letter (Do7, Dom7, Fa#m, Fa/Do). Only letter
+ * names are readable. Followed by another letter it's English: Fadd9, Faug.
+ */
+const solfege = /^(Do|Fa)(?=$|[#b♯♭m\d]|\P{L})/u;
+
+/** The readable note at the start of text, or null. */
+function readNote(text: string): RegExpExecArray | null {
+  return solfege.test(text) ? null : note.exec(text);
+}
+
 /** The note at the start of text moved by semitones, with the rest of text as written. */
 function moveNote(m: RegExpExecArray, text: string, by: number): string {
   const at = naturals[m[1]] + accidentals[m[2]];
@@ -17,10 +29,10 @@ function moveNote(m: RegExpExecArray, text: string, by: number): string {
 
 /** A Chord name moved by semitones. */
 export function transposeChord(name: string, by: number): string {
-  const root = note.exec(name);
+  const root = readNote(name);
   if (!root || by % 12 === 0) return name;
   const slash = name.lastIndexOf('/');
-  const bass = slash > 0 ? note.exec(name.slice(slash + 1)) : null;
+  const bass = slash > 0 ? readNote(name.slice(slash + 1)) : null;
   if (!bass) return moveNote(root, name, by);
   return moveNote(root, name.slice(0, slash), by) + '/' + moveNote(bass, name.slice(slash + 1), by);
 }
