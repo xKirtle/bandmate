@@ -99,7 +99,7 @@ func (s *Store) MergeClips(ctx context.Context, songID int64, based lyricsheet.V
 				return err
 			}
 		}
-		trackID, err := m.track(ctx, tx, songID)
+		trackID, err := m.landingTrack(ctx, tx, songID)
 		if err != nil {
 			return err
 		}
@@ -149,9 +149,9 @@ func mergedSpan(ctx context.Context, tx *sql.Tx, songID int64, clipIDs []int64) 
 	return start, end, nil
 }
 
-// track is the id of the Track a merged Clip goes on: the Song's Track m
-// names, or the new one, added where m says.
-func (m ClipMerge) track(ctx context.Context, tx *sql.Tx, songID int64) (int64, error) {
+// landingTrack is the id of the Track a merged Clip goes on: the Song's Track m
+// names, or the new one, which it adds where m says.
+func (m ClipMerge) landingTrack(ctx context.Context, tx *sql.Tx, songID int64) (int64, error) {
 	if m.NewTrack == nil {
 		return *m.TrackID, findTrackToPlaceOn(ctx, tx, songID, *m.TrackID)
 	}

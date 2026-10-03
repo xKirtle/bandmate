@@ -15,6 +15,7 @@
 import type { MergeOnto, Timeline, Track } from './api';
 import { playing, type ClipSources } from './clipSource';
 import { mixdownRate, mixDown } from './mixdown';
+import { trackGains } from './mixer';
 import { peaks } from './peaks';
 import type { PlayableClip } from './timelinePlayer';
 import { encodeWav } from './wav';
@@ -57,16 +58,14 @@ export function mergeTarget(tracks: readonly Track[], selected: ReadonlySet<numb
   const onto: MergeOnto = room
     ? { trackId: room.id }
     : { newTrack: { name: `Track ${tracks.length + 1}`, position: tracks.indexOf(on.at(-1)!) + 1 } };
-  // A new Track starts at 0 dB.
-  const volume = room?.volume ?? 0;
-  const soloing = tracks.some((t) => t.soloed);
-  const silent: SilentTrack[] = [];
-  const gains = new Map<number, number>();
-  for (const t of on) {
-    const why = t.muted ? 'muted' : soloing && !t.soloed ? 'notSoloed' : null;
-    if (why) silent.push({ name: t.name, why });
-    gains.set(t.id, why ? 0 : 10 ** ((t.volume - volume) / 20));
-  }
+  // As playback has them, divided by the volume they land at: a new Track's 0 dB.
+  const heard = trackGains(tracks);
+  const landing = 10 ** ((room?.volume ?? 0) / 20);
+  const gains = new Map(on.map((t) => [t.id, heard.get(t.id)! / landing]));
+  // Turned all the way down, a Track is still heard, so only mute and solo silence one.
+  const silent: SilentTrack[] = on
+    .filter((t) => gains.get(t.id) === 0)
+    .map((t) => ({ name: t.name, why: t.muted ? 'muted' : 'notSoloed' }));
   return { clipIds: clips.map((c) => c.id), start, end, onto, gains, silent };
 }
 

@@ -422,6 +422,7 @@
   function undo() {
     if (frozen || (!undoable && queued === 0)) return;
     offerCues = null;
+    mergeNote = null;
     change((at) => {
       const e = history.nextUndo();
       return e
@@ -438,6 +439,7 @@
   function redo() {
     if (frozen || !redoable) return;
     offerCues = null;
+    mergeNote = null;
     change((at) => {
       const e = history.nextRedo();
       return e
