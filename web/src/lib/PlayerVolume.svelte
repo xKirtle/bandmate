@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { canSetVolume, playerVolume } from './playerVolume.svelte';
+  import { canSetVolume, playerVolume } from './sharedVolume.svelte';
   import { loudness } from './volume';
 
   // Mute and the volume slider for the one volume every player shares, so it

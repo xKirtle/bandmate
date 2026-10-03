@@ -1,7 +1,7 @@
 <script lang="ts">
   import { playMediaAlone } from './playback';
   import PlayerVolume from './PlayerVolume.svelte';
-  import { canSetVolume, playerVolume } from './playerVolume.svelte';
+  import { canSetVolume, playerVolume } from './sharedVolume.svelte';
   import { formatDuration } from './time';
   import { gain } from './volume';
   import { bars } from './waveform';
