@@ -21,10 +21,6 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 
 - It covers the Arrangement's active Alternates. Scrapbook Sections are left out.
 
-## Clip gain, fades and silence
-
-- Per-Clip gain, fade in and out, and silencing a stretch of a Clip.
-
 ## A count-in or click
 
 - From the Song's BPM, for recording without a Beat, so a Beat added later can line up.

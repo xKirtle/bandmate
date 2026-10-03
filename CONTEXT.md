@@ -124,6 +124,18 @@ _Avoid_: Re-record, overdub
 A stretch of a Beat or a Sound, or a set of Takes, placed at a position on a Track; the same Beat or Sound can be used by several Clips, and trimming a Clip never changes the audio file; a Clip with several Takes plays exactly one active Take. A Clip can be given a name of its own, so two Clips of the same audio can be told apart; until then, it goes by its source's name (the Beat's title, the Sound's name, or its active Take's number), and a named Take Clip still shows which Take is active.
 _Avoid_: Region, segment
 
+**Gain**:
+How much louder or quieter a Clip plays, in dB, before its Track's volume applies. It belongs to the Clip, not to a Take, so it applies to whichever Take is active. All the way down is quiet, never silent, like a Track's volume. Playback, a Merge and a Mixdown all hear it.
+_Avoid_: Clip volume, level (volume is a Track's)
+
+**Fade**:
+A Clip rising from silence at its start (a fade in) or falling to silence at its end (a fade out), over a length measured from that edge as trimmed, so trimming the Clip carries the Fade with the edge. A Clip's two Fades together never run longer than the Clip. Playback, a Merge and a Mixdown all hear them.
+_Avoid_: Ramp, envelope
+
+**Split**:
+Cutting a Clip in two at the playhead, so a stretch can be trimmed or deleted on its own: the Selection's Clips the playhead crosses, or with none selected, the Chosen Track's Clip under the playhead. Both halves keep the Clip's source, name and Gain; the left keeps the fade in and the right the fade out, each shortened to end at the cut, and the cut gets no Fade. A Clip of Takes splits like a Duplicate: each half gets Takes of its own, of the same audio, with the same numbers and active Take. Both halves become the Selection. Silencing a stretch of a Clip is a Split on each side of it, then deleting the middle.
+_Avoid_: Cut (cutting is to the Clipboard), slice, razor
+
 **Selection**:
 The Clips that the next Clip action applies to: none, one or several, on any Tracks. Clicking a Clip selects it alone, and Clips can be added or taken out one at a time, or picked together by drawing a box over them. Dragging a selected Clip moves the whole Selection by the same amount, so the Clips keep their places relative to each other. Deleting deletes all of them, and copying, cutting or duplicating takes them all. With several selected, a selected Clip's menu acts on the whole Selection; opening the menu of a Clip outside it makes that Clip the Selection first. Clicking empty space on the Timeline clears the Selection, and it's never kept: leaving the Song drops it.
 _Avoid_: Group, highlight, chosen (choosing is for Tracks)
@@ -133,7 +145,7 @@ The Clips last copied or cut from the Selection, as they were then, to be pasted
 _Avoid_: Copy buffer
 
 **Merge**:
-Turning two or more selected Clips, on any Tracks, into one Clip of a new Sound that runs from the earliest Clip's start to the latest one's end and sounds as playback of them would: where they overlap they play together, a gap is silence, and each Track's mute and solo apply as in a Mixdown, with its volume taken relative to the Track the merged Clip lands on. That's the topmost of their Tracks where nothing else is in the way, or else a new Track right below the lowest of them. The merged Clip replaces them and becomes the Selection; undoing the Merge brings them back. While a Merge is being made, the Timeline can't be edited.
+Turning two or more selected Clips, on any Tracks, into one Clip of a new Sound that runs from the earliest Clip's start to the latest one's end and sounds as playback of them would: where they overlap they play together, a gap is silence, and each Track's mute and solo apply as in a Mixdown, with its volume taken relative to the Track the merged Clip lands on. Each Clip's Gain and Fades are heard in the new Sound, so the merged Clip starts with none of its own. That's the topmost of their Tracks where nothing else is in the way, or else a new Track right below the lowest of them. The merged Clip replaces them and becomes the Selection; undoing the Merge brings them back. While a Merge is being made, the Timeline can't be edited.
 _Avoid_: Join, consolidate, bounce (a Mixdown is downloaded, never kept)
 
 **Loop**:
