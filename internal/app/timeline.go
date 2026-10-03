@@ -296,9 +296,9 @@ func (a *App) deleteClips(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// mergeClips takes the audio of Clips on one Track merged, rendered by the
-// browser as a 24-bit WAV, with which Clips they are as "details", as a new
-// Sound, in a Clip that replaces them.
+// mergeClips takes the audio of Clips merged, rendered by the browser as a
+// 24-bit WAV, with which Clips they are and the Track their Clip goes on as
+// "details", as a new Sound, in a Clip that replaces them.
 func (a *App) mergeClips(w http.ResponseWriter, r *http.Request) {
 	id, ok := songID(w, r)
 	if !ok {
@@ -321,19 +321,22 @@ func (a *App) mergeClips(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, tl)
 }
 
-// replaceClips deletes Clips and places others in one step, e.g. to undo
-// or redo a Merge.
+// replaceClips deletes Clips, and Tracks after them, and places others, on
+// Tracks added for them first if need be, in one step, e.g. to undo or
+// redo a Merge.
 func (a *App) replaceClips(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		ClipIDs []int64       `json:"clipIds"`
-		Clips   []clipToPlace `json:"clips"`
+		ClipIDs   []int64            `json:"clipIds"`
+		TrackIDs  []int64            `json:"trackIds"`
+		NewTracks []timeline.TrackAt `json:"newTracks"`
+		Clips     []clipToPlace      `json:"clips"`
 	}
 	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
 		clips, err := placedClips(req.Clips)
 		if err != nil {
 			return timeline.Timeline{}, err
 		}
-		return a.timelines.ReplaceClips(r.Context(), id, based, req.ClipIDs, clips)
+		return a.timelines.ReplaceClips(r.Context(), id, based, req.ClipIDs, req.TrackIDs, req.NewTracks, clips)
 	})
 }
 
