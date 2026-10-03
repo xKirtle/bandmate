@@ -423,12 +423,15 @@
     }).finally(() => queued--);
   }
 
-  function undo() {
+  async function undo() {
     if (frozen || (!undoable && queued === 0)) return;
     offerCues = null;
     mergeNote = null;
-    change((at) => {
+    // Where undoing a new Take returns the playhead to, to record again from.
+    let returnTo: number | null = null;
+    const ok = await change((at) => {
       const e = history.nextUndo();
+      returnTo = history.nextUndoPlayhead();
       return e
         ? send(at, e, (before, after) => {
             const back = history.undone(before, after);
@@ -438,6 +441,10 @@
           })
         : unchanged(at);
     });
+    // Once the Clip's gone, it's a seek like any other: playing, playback
+    // jumps there, superseding the restart the Clip's going started. Not
+    // while a recording started since, which plays from where it starts.
+    if (ok && returnTo !== null && !recording) seekTo(returnTo);
   }
 
   function redo() {
@@ -1243,7 +1250,7 @@
         history.record(settingTakes(after, target.clipId), before, after);
       } else {
         after = await saved(api.recordTake(at, wav, { ...target, ...details }));
-        history.record(placingAdded(before, after), before, after);
+        history.recordTake(before, after);
       }
       editedAt = after.version;
       showHistory();

@@ -68,6 +68,10 @@ import { isBlank, type CuedSong } from './cues';
 // Clip as it was, in one step, a Clip of Takes getting its Takes back. It's
 // redone by replacing the Clip with both halves as they were, the right
 // half's Takes brought back, so redoing never copies Takes again.
+//
+// Undoing a new Take returns the playhead to where its Clip starts, so
+// recording again starts from the same place. That's where it started when
+// recorded too, as every edit since is undone first.
 
 /** A change to the Timeline, as the intent sent to the API. */
 export type Edit =
@@ -136,6 +140,8 @@ interface Step {
 interface Entry {
   undo: Step;
   redo: Step;
+  /** For a new Take, where its Clip starts, to return the playhead to on undoing it. */
+  undoPlayhead?: number;
 }
 
 export class History {
@@ -144,12 +150,27 @@ export class History {
 
   /** Keeps an edit that turned before into after, to undo, unless it changed nothing. */
   record(edit: Edit, before: Timeline, after: Timeline): void {
-    if (content(before) === content(after)) return;
-    this.#undo.push({
-      undo: inverse(edit, before, after),
-      redo: redoing(edit, before, after),
-    });
+    this.#keep(edit, before, after);
+  }
+
+  /**
+   * Keeps a new Take, recorded in a new Clip, which turned before into
+   * after, as placingAdded does, with where its Clip starts, to return the
+   * playhead to on undoing it.
+   */
+  recordTake(before: Timeline, after: Timeline): void {
+    const edit = placingAdded(before, after);
+    const entry = this.#keep(edit, before, after);
+    if (entry && edit.kind === 'placeClip') entry.undoPlayhead = edit.clip.start;
+  }
+
+  /** Keeps an edit that turned before into after, unless it changed nothing, giving what it kept. */
+  #keep(edit: Edit, before: Timeline, after: Timeline): Entry | null {
+    if (content(before) === content(after)) return null;
+    const entry: Entry = { undo: inverse(edit, before, after), redo: redoing(edit, before, after) };
+    this.#undo.push(entry);
     this.#redo = [];
+    return entry;
   }
 
   /** Keeps a Cue edit that turned before into after, to undo, unless it changed no Cue. */
@@ -172,6 +193,14 @@ export class History {
   /** The edit that would undo the latest one, or null if there's none. */
   nextUndo(): HistoryEdit | null {
     return this.#undo.at(-1)?.undo.edit ?? null;
+  }
+
+  /**
+   * Where the next undo returns the playhead to: the start of a new Take's
+   * Clip, or null if it leaves it where it is.
+   */
+  nextUndoPlayhead(): number | null {
+    return this.#undo.at(-1)?.undoPlayhead ?? null;
   }
 
   /** The edit that would redo the latest one undone, or null if there's none. */
