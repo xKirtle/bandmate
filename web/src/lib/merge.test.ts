@@ -188,10 +188,10 @@ describe('mergedClips', () => {
     const got = mergedClips(tl, clipSources(tl), [5, 6, 7]);
 
     expect(got).toEqual([
-      { start: 0, offset: 3, length: 8, source: '/api/beats/100/audio?v=beat.mp3-1-60', trackId: 1, gain: 0.1 },
+      { start: 0, offset: 3, length: 8, source: '/api/beats/100/audio?v=beat.mp3-1-60', trackId: 1, gainFactor: 0.1 },
       // Its span starts at 19.5, so Take 41 plays from 20.75 to its end at 24.75.
-      { start: 20.75, offset: 0, length: 4, source: '/api/songs/1/takes/41/audio', trackId: 1, gain: 1 },
-      { start: 40, offset: 0, length: 10, source: '/api/songs/1/sounds/30/audio', trackId: 1, gain: 1 },
+      { start: 20.75, offset: 0, length: 4, source: '/api/songs/1/takes/41/audio', trackId: 1, gainFactor: 1 },
+      { start: 40, offset: 0, length: 10, source: '/api/songs/1/sounds/30/audio', trackId: 1, gainFactor: 1 },
     ]);
   });
 });

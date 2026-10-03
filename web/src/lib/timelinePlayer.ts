@@ -14,7 +14,7 @@ export interface PlayableClip extends Placed {
   source: string;
   trackId: number;
   /** Its Gain, as a factor of its audio, applied before its Track's. */
-  gain: number;
+  gainFactor: number;
 }
 
 export type PlayerState = 'stopped' | 'loading' | 'playing';
@@ -52,7 +52,7 @@ export class TrackMix {
    */
   play(
     buffer: AudioBuffer,
-    clip: Pick<PlayableClip, 'trackId' | 'gain'>,
+    clip: Pick<PlayableClip, 'trackId' | 'gainFactor'>,
     at: number,
     from: number,
     duration: number,
@@ -60,12 +60,12 @@ export class TrackMix {
     const node = this.#context.createBufferSource();
     node.buffer = buffer;
     const track = this.#track(clip.trackId);
-    if (clip.gain === 1) {
+    if (clip.gainFactor === 1) {
       node.connect(track);
     } else {
       // Its own gain, let go of with it.
       const gain = this.#context.createGain();
-      gain.gain.value = clip.gain;
+      gain.gain.value = clip.gainFactor;
       node.connect(gain).connect(track);
       node.addEventListener('ended', () => gain.disconnect());
     }

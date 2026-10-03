@@ -140,7 +140,7 @@ export function playing(timeline: Timeline, sources: ClipSources, silent: number
   return timeline.tracks.flatMap((t) =>
     t.clips.flatMap((c) => {
       const h = c.id === silent ? null : heard(c);
-      return h ? [{ ...h, source: sources.of(c).audio, trackId: t.id, gain: gainFactor(c.gain) }] : [];
+      return h ? [{ ...h, source: sources.of(c).audio, trackId: t.id, gainFactor: gainFactor(c.gain) }] : [];
     }),
   );
 }

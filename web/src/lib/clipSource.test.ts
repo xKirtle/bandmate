@@ -136,7 +136,7 @@ describe('clipSources of Sounds', () => {
     const tl = timeline([c], [], [sound(4)]);
     expect(fileStart(c)).toBe(0);
     expect(playing(tl, clipSources(tl))).toEqual([
-      { start: 50, offset: 1, length: 4, source: '/api/songs/1/sounds/4/audio', trackId: 1, gain: 1 },
+      { start: 50, offset: 1, length: 4, source: '/api/songs/1/sounds/4/audio', trackId: 1, gainFactor: 1 },
     ]);
   });
 });
@@ -220,8 +220,8 @@ describe('playing', () => {
 
   it('plays what every Clip holds, from its audio, on its Track', () => {
     expect(playing(tl, clipSources(tl))).toEqual([
-      { start: 5, offset: 2, length: 10, source: '/api/beats/7/audio?v=beat-7.mp3-1000-90', trackId: 1, gain: 1 },
-      { start: 30, offset: 2, length: 10, source: '/api/songs/1/takes/3/audio', trackId: 1, gain: 1 },
+      { start: 5, offset: 2, length: 10, source: '/api/beats/7/audio?v=beat-7.mp3-1000-90', trackId: 1, gainFactor: 1 },
+      { start: 30, offset: 2, length: 10, source: '/api/songs/1/takes/3/audio', trackId: 1, gainFactor: 1 },
     ]);
   });
 
@@ -229,7 +229,7 @@ describe('playing', () => {
     const louder = { ...clip(1, 7), gain: 6 };
     const quieter = { ...takeClip(2, [take(3, { duration: 12 }), take(4, { duration: 12 })], 4), gain: -20 };
     const t = timeline([louder, quieter], [beat(7)]);
-    const [beatGain, takeGain] = playing(t, clipSources(t)).map((c) => c.gain);
+    const [beatGain, takeGain] = playing(t, clipSources(t)).map((c) => c.gainFactor);
     expect(beatGain).toBeCloseTo(1.9953, 4);
     expect(takeGain).toBeCloseTo(0.1, 4);
   });

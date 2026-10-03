@@ -130,7 +130,7 @@
   import { encodeWav } from './wav';
   import { barWidth, bars } from './waveform';
   import { clipping, LiveWave, tileBars } from './liveWave';
-  import { draggedGain, formatGain, gainLineAt, heardPeak } from './clipGain';
+  import { clampGain, draggedGain, formatGain, gainLineAt, heardPeak } from './clipGain';
 
   // The Timeline, docked under the Lyric Sheet: its Tracks and Clips, and
   // playback with each Track's volume, mute and solo, and the Loop. Editing
@@ -1844,7 +1844,7 @@
     // Alt+dragging a Clip of Takes slides its active Take, the Clip staying put.
     const take = activeTake(clip);
     // Grabbing its gain line selects it, as clicking it does.
-    if (mode === 'gain') select({ kind: 'click', clipId: clip.id });
+    if (mode === 'gain') select({ kind: toggles ? 'toggle' : 'click', clipId: clip.id });
     const wave = element.querySelector('.wave')?.getBoundingClientRect();
     edit = {
       clip,
@@ -1879,14 +1879,20 @@
   function editModifier(event: KeyboardEvent) {
     if (!isModifier(event.key) || !edit?.moved || edit.mode === 'nudge' || edit.saving) return;
     if (edit.mode === 'gain') {
-      // Fine or not from here on, without the line jumping.
-      const free = skipsSnapping(event);
-      if (free !== edit.free) edit.gainFrom = { ...edit.gainFrom, gain: edit.gain, clientY: editAt.clientY };
-      edit.free = free;
+      dragGainFinely(edit, skipsSnapping(event), editAt.clientY);
       return;
     }
     edit.free = skipsSnapping(event);
     editMove(editAt);
+  }
+
+  /**
+   * Has a gain line drag go finely, Shift held, or not, from here on: from
+   * the Gain it's at and the pointer's height, so the line never jumps.
+   */
+  function dragGainFinely(drag: Edit, fine: boolean, clientY: number) {
+    if (fine !== drag.free) drag.gainFrom = { ...drag.gainFrom, gain: drag.gain, clientY };
+    drag.free = fine;
   }
 
   function editMove(event: Point) {
@@ -1905,11 +1911,9 @@
     editAt = { clientX: event.clientX, clientY: event.clientY };
     if (edit.mode === 'gain') {
       // Shift held drags it finely. Up and down only, so no scrolling along.
-      const fine = 'shiftKey' in event && (event as PointerEvent).shiftKey;
-      if (fine !== edit.free) edit.gainFrom = { ...edit.gainFrom, gain: edit.gain, clientY: event.clientY };
-      edit.free = fine;
+      if ('shiftKey' in event) dragGainFinely(edit, skipsSnapping(event as PointerEvent), event.clientY);
       const { gain, clientY, height } = edit.gainFrom;
-      edit.gain = draggedGain(gain, event.clientY - clientY, height, fine);
+      edit.gain = draggedGain(gain, event.clientY - clientY, height, edit.free);
       return;
     }
     // Scrolling along at an edge, or Shift pressed, moves it too, with no keys to go by.
@@ -2265,7 +2269,8 @@
         clearInactiveTakes: () => perform({ kind: 'clearInactiveTakes', clipId }),
         downloadTake: (takeId) => download(api.takeDownloadUrl(timeline.songId, takeId)),
         rename: () => startClipRename(clip),
-        setGain: (gain) => perform({ kind: 'setClipGain', clipId, gain }),
+        // To the tenth, as a drag sets it.
+        setGain: (gain) => perform({ kind: 'setClipGain', clipId, gain: clampGain(gain) }),
         copy: () => copyClips(new Set([clip.id])),
         cut: () => cutClip(clip),
         duplicate: () => duplicate(clip),
@@ -3170,7 +3175,7 @@
                       <span
                         class="gain-line edit-only"
                         class:changed={clip.gain !== 0}
-                        style:top="{gainLineAt(clip.gain) * 100}%"
+                        style:--at={gainLineAt(clip.gain)}
                         aria-hidden="true"
                         title={editHint(
                           freeze,
@@ -3179,7 +3184,12 @@
                         onpointerdown={(e) => editDown(e, clip, 'gain')}
                       ></span>
                       {#if editing && edit?.mode === 'gain' && edit.moved}
-                        <span class="gain-tip" style:top="{gainLineAt(clip.gain) * 100}%">{formatGain(clip.gain)}</span>
+                        <!-- Above the line, or below it in the waveform's top half, to stay inside the Clip. -->
+                        <span
+                          class="gain-tip"
+                          class:below={gainLineAt(clip.gain) < 0.5}
+                          style:top="{gainLineAt(clip.gain) * 100}%">{formatGain(clip.gain)}</span
+                        >
                       {/if}
                     </span>
                     <span
@@ -4080,15 +4090,18 @@
     opacity: 0.7;
   }
   /*
-   * A Clip's gain line: a thin target a few pixels either side of a hairline,
-   * clear of the trim edges, which keep their own cursor.
+   * A Clip's gain line: a hairline --at of the way down the waveform, in a
+   * thin target a few pixels either side of it, clear of the trim edges,
+   * which keep their own cursor. The target slides as far down within the
+   * waveform as the line does, so at either end it stays inside it, clear
+   * of the Clip's head, the line still exactly --at of the way down.
    */
   .gain-line {
     position: absolute;
     left: calc(0.375 * var(--timeline-rem));
     right: calc(0.375 * var(--timeline-rem));
+    top: calc(var(--at) * (100% - 0.5 * var(--timeline-rem)));
     height: calc(0.5 * var(--timeline-rem));
-    transform: translateY(-50%);
     cursor: ns-resize;
   }
   .gain-line::before {
@@ -4096,7 +4109,7 @@
     position: absolute;
     left: 0;
     right: 0;
-    top: 50%;
+    top: calc(var(--at) * (100% - 1px));
     height: 1px;
     background: var(--text-muted);
     opacity: 0.35;
@@ -4127,6 +4140,9 @@
     white-space: nowrap;
     transform: translate(-50%, -120%);
     pointer-events: none;
+  }
+  .gain-tip.below {
+    transform: translate(-50%, 20%);
   }
   /* A Clip's Gain, when it isn't 0 dB. */
   .clip-gain {
