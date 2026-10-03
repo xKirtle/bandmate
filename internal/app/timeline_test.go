@@ -43,7 +43,9 @@ type clip struct {
 	// SoundID is the Sound a Clip of a Sound plays.
 	SoundID *int64 `json:"soundId"`
 	// Name is null until the Clip is named.
-	Name         *string `json:"name"`
+	Name *string `json:"name"`
+	// Gain is in dB, 0 until it's set.
+	Gain         float64 `json:"gain"`
 	Takes        []take  `json:"takes"`
 	ActiveTakeID *int64  `json:"activeTakeId"`
 	Start        float64 `json:"start"`

@@ -68,6 +68,9 @@ type Clip struct {
 	// Name is the Clip's own name, or nil until it's named, when it goes by
 	// its source's.
 	Name *string `json:"name"`
+	// Gain is how much louder or quieter it plays, in dB, before its Track's
+	// volume applies: from MinGain to MaxGain, 0 until it's set.
+	Gain float64 `json:"gain"`
 	// Takes are a Clip of Takes' Takes, by number, and ActiveTakeID the one
 	// it plays. A Clip of a Beat has none.
 	Takes        []Take `json:"takes"`
@@ -124,6 +127,14 @@ type Beat struct {
 const (
 	MinVolume = -36.0
 	MaxVolume = 36.0
+)
+
+// MinGain and MaxGain are a Clip's lowest and highest Gain, in dB, the same
+// as a Track's volume: even at its lowest a Clip is heard. The gain line
+// (web/src/lib/clipGain.ts) and the clips table's CHECK use the same range.
+const (
+	MinGain = MinVolume
+	MaxGain = MaxVolume
 )
 
 // timeFormat is how songs.updated_at is stored.
@@ -189,14 +200,14 @@ func read(ctx context.Context, tx *sql.Tx, songID int64) (Timeline, error) {
 
 	type at struct{ track, clip int }
 	clipAt := map[int64]at{}
-	err = query(ctx, tx, `SELECT c.id, c.track_id, c.beat_id, c.sound_id, c.name, c.active_take_id,
+	err = query(ctx, tx, `SELECT c.id, c.track_id, c.beat_id, c.sound_id, c.name, c.gain, c.active_take_id,
 			c.start, c.source_offset, c.length
 		FROM clips c JOIN tracks t ON t.id = c.track_id
 		WHERE t.song_id = ? ORDER BY c.start, c.id`, []any{songID},
 		func(rows *sql.Rows) error {
 			c := Clip{Takes: []Take{}}
 			var trackID int64
-			if err := rows.Scan(&c.ID, &trackID, &c.BeatID, &c.SoundID, &c.Name, &c.ActiveTakeID,
+			if err := rows.Scan(&c.ID, &trackID, &c.BeatID, &c.SoundID, &c.Name, &c.Gain, &c.ActiveTakeID,
 				&c.Start, &c.Offset, &c.Length); err != nil {
 				return err
 			}
@@ -556,13 +567,14 @@ const tolerance = 1e-6
 // errOverlap is refusing a Clip where another already plays on its Track.
 var errOverlap = &lyricsheet.ConflictError{Msg: "Clips can't overlap on a Track"}
 
-// placement is where a Clip is, what it plays and what it's named, as
-// stored.
+// placement is where a Clip is, what it plays, what it's named and its
+// Gain, as stored.
 type placement struct {
 	trackID int64
 	source  source
 	// name is null for a Clip that isn't named.
 	name   sql.NullString
+	gain   float64
 	start  float64
 	offset float64
 	length float64
@@ -734,7 +746,9 @@ type NewClip struct {
 	BeatID  *int64 `json:"beatId"`
 	SoundID *int64 `json:"soundId"`
 	// Name is its own name, if it has one.
-	Name         *string `json:"name"`
+	Name *string `json:"name"`
+	// Gain is in dB, 0 if not given.
+	Gain         float64 `json:"gain"`
 	TakeIDs      []int64 `json:"takeIds"`
 	ActiveTakeID *int64  `json:"activeTakeId"`
 	Start        float64 `json:"start"`
@@ -966,7 +980,10 @@ func addClip(ctx context.Context, tx *sql.Tx, songID, trackID int64, c NewClip) 
 	if c.Start < -tolerance {
 		return &lyricsheet.InvalidError{Msg: "a Clip can't start before 0:00"}
 	}
-	p := placement{trackID: trackID, source: src, name: clipName(c.Name),
+	if err := checkGain(c.Gain); err != nil {
+		return err
+	}
+	p := placement{trackID: trackID, source: src, name: clipName(c.Name), gain: c.Gain,
 		start: max(c.Start, 0), offset: max(c.Offset, 0), length: c.Length}
 	free, err := isFree(ctx, tx, 0, p)
 	if err != nil {
@@ -1061,17 +1078,18 @@ func attachTakes(ctx context.Context, tx *sql.Tx, clipID int64, takeIDs []int64)
 // returns its id.
 func insertClip(ctx context.Context, tx *sql.Tx, p placement) (int64, error) {
 	res, err := tx.ExecContext(ctx,
-		`INSERT INTO clips (track_id, beat_id, sound_id, name, active_take_id, start, source_offset, length)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.trackID, p.source.beatID, p.source.soundID, p.name, p.source.activeTakeID, p.start, p.offset, p.length)
+		`INSERT INTO clips (track_id, beat_id, sound_id, name, gain, active_take_id, start, source_offset, length)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.trackID, p.source.beatID, p.source.soundID, p.name, p.gain, p.source.activeTakeID, p.start, p.offset,
+		p.length)
 	if err != nil {
 		return 0, fmt.Errorf("adding clip: %w", err)
 	}
 	return res.LastInsertId()
 }
 
-// DuplicateClip adds a copy of a Clip, with the same trim and name, right
-// after it on its Track, or after the Track's last Clip if something is in
+// DuplicateClip adds a copy of a Clip, with the same trim, name and Gain,
+// right after it on its Track, or after the Track's last Clip if something is in
 // the way. A Clip of Takes gets copies of its Takes, sharing their files.
 func (s *Store) DuplicateClip(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64) (Timeline, error) {
 	var linked []int64
@@ -1125,6 +1143,8 @@ type ClipCopy struct {
 	SoundID *int64
 	// Name is its own name, if it had one.
 	Name *string
+	// Gain is in dB.
+	Gain float64
 	// Takes are a Clip of Takes', and ActiveTakeID the one of them it plays.
 	Takes        []TakeAt
 	ActiveTakeID *int64
@@ -1169,7 +1189,7 @@ func (s *Store) PasteClips(ctx context.Context, songID int64, based lyricsheet.V
 			if err != nil {
 				return err
 			}
-			nc := NewClip{BeatID: c.BeatID, SoundID: c.SoundID, Name: c.Name,
+			nc := NewClip{BeatID: c.BeatID, SoundID: c.SoundID, Name: c.Name, Gain: c.Gain,
 				Start: c.Start, Offset: c.Offset, Length: c.Length}
 			if len(c.Takes) > 0 {
 				ids, active, err := s.copyTakesAt(ctx, tx, songID, c.Takes, *c.ActiveTakeID, &linked)
@@ -1268,6 +1288,30 @@ func (s *Store) RenameClip(ctx context.Context, songID int64, based lyricsheet.V
 	})
 }
 
+// SetClipGain sets how much louder or quieter a Clip plays, in dB, from
+// MinGain to MaxGain.
+func (s *Store) SetClipGain(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64, gain float64) (Timeline, error) {
+	if err := checkGain(gain); err != nil {
+		return Timeline{}, err
+	}
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		res, err := tx.ExecContext(ctx, `UPDATE clips SET gain = ?
+			WHERE id = ? AND track_id IN (SELECT id FROM tracks WHERE song_id = ?)`, gain, clipID, songID)
+		if err != nil {
+			return fmt.Errorf("setting clip gain: %w", err)
+		}
+		return expectOneRow(res)
+	})
+}
+
+// checkGain checks that a Clip's Gain is from MinGain to MaxGain.
+func checkGain(gain float64) error {
+	if gain < MinGain || gain > MaxGain {
+		return &lyricsheet.InvalidError{Msg: fmt.Sprintf("a Clip's Gain goes from %g dB to +%g dB", MinGain, MaxGain)}
+	}
+	return nil
+}
+
 // clipName is a Clip's name as stored: trimmed, and null if it has none or
 // it's blank.
 func clipName(name *string) sql.NullString {
@@ -1341,11 +1385,11 @@ func deleteClip(ctx context.Context, tx *sql.Tx, songID, clipID int64) error {
 // clipPlacement reads where one of the Song's Clips is and what it plays.
 func clipPlacement(ctx context.Context, tx *sql.Tx, songID, clipID int64) (placement, error) {
 	var p placement
-	err := tx.QueryRowContext(ctx, `SELECT c.track_id, c.beat_id, c.sound_id, c.name, c.active_take_id,
+	err := tx.QueryRowContext(ctx, `SELECT c.track_id, c.beat_id, c.sound_id, c.name, c.gain, c.active_take_id,
 			c.start, c.source_offset, c.length
 		FROM clips c JOIN tracks t ON t.id = c.track_id
 		WHERE c.id = ? AND t.song_id = ?`, clipID, songID).
-		Scan(&p.trackID, &p.source.beatID, &p.source.soundID, &p.name, &p.source.activeTakeID,
+		Scan(&p.trackID, &p.source.beatID, &p.source.soundID, &p.name, &p.gain, &p.source.activeTakeID,
 			&p.start, &p.offset, &p.length)
 	if errors.Is(err, sql.ErrNoRows) {
 		return placement{}, lyricsheet.ErrNotFound
