@@ -1,4 +1,5 @@
 import type { Line, Song } from './api';
+import { transposeChord } from './transpose';
 
 /** A run of lyrics with the Chords (if any) that sit above its first character. */
 export interface Piece {
@@ -9,13 +10,15 @@ export interface Piece {
 /**
  * Lays out a parsed Line for showing Chords above lyrics. Each group of
  * Pieces is one word with its trailing spaces: it never wraps inside, so a
- * mid-word Chord stays over its word on narrow screens.
+ * mid-word Chord stays over its word on narrow screens. The Chords show
+ * transposed by semitones, as written by default.
  */
-export function layoutLine(line: Line): Piece[][] {
+export function layoutLine(line: Line, transpose = 0): Piece[][] {
   // Offsets count code points, which Array.from splits on.
   const chars = Array.from(line.lyrics);
   const chordsAt = new Map<number, string[]>();
-  for (const c of line.chords) chordsAt.set(c.offset, [...(chordsAt.get(c.offset) ?? []), c.name]);
+  for (const c of line.chords)
+    chordsAt.set(c.offset, [...(chordsAt.get(c.offset) ?? []), transposeChord(c.name, transpose)]);
 
   const words: Piece[][] = [];
   let word: Piece[] | null = null;
