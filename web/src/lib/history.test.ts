@@ -881,6 +881,67 @@ describe('History of Takes', () => {
   });
 });
 
+describe('Where undoing a new Take leaves the playhead', () => {
+  // A Clip on Track 1, and a Take recorded on Track 2 in a new Clip at 0:12.
+  const t0 = () => timeline([track(1, [clip(5, 0)]), track(2)]);
+  const t1 = (clipId = 6) => timeline([track(1, [clip(5, 0)]), track(2, [takeClip(clipId, 12, [take(40)])])]);
+
+  it("returns it to the start of the new Take's Clip", () => {
+    const h = new History();
+    h.recordTake(t0(), t1());
+
+    expect(h.nextUndo()).toEqual({ kind: 'deleteClip', clipId: 6 });
+    expect(h.nextUndoPlayhead()).toBe(12);
+  });
+
+  it('returns it there when undoing the Take removes the Track it was recorded on too', () => {
+    const h = new History();
+    const before = timeline([track(1, [clip(5, 0)])]);
+    h.recordTake(before, t1());
+
+    expect(h.nextUndo()).toEqual({ kind: 'deleteTrack', trackId: 2 });
+    expect(h.nextUndoPlayhead()).toBe(12);
+  });
+
+  it('returns it there for a Take further back, once the edits since are undone', () => {
+    const h = new History();
+    h.recordTake(t0(), t1());
+    const t2 = timeline([track(1, [clip(5, 0, { gain: 3 })]), track(2, [takeClip(6, 12, [take(40)])])]);
+    h.record({ kind: 'setClipGain', clipId: 5, gain: 3 }, t1(), t2);
+
+    expect(h.nextUndoPlayhead()).toBeNull();
+    h.undone(t2, t1());
+    expect(h.nextUndoPlayhead()).toBe(12);
+  });
+
+  it('returns it there each time the Take is undone after being redone', () => {
+    const h = new History();
+    h.recordTake(t0(), t1());
+    h.undone(t1(), t0());
+    expect(h.nextUndoPlayhead()).toBeNull();
+
+    h.redone(t0(), t1(9));
+    expect(h.nextUndo()).toEqual({ kind: 'deleteClip', clipId: 9 });
+    expect(h.nextUndoPlayhead()).toBe(12);
+  });
+
+  it('leaves it alone for a Retake, an import, a copy, or any other undo', () => {
+    const h = new History();
+    expect(h.nextUndoPlayhead()).toBeNull();
+
+    // An imported Sound or a copied Clip is placed the same way as a new Take.
+    h.record(placingAdded(t0(), t1()), t0(), t1());
+    expect(h.nextUndoPlayhead()).toBeNull();
+
+    const retaken = timeline([
+      track(1, [clip(5, 0)]),
+      track(2, [{ ...takeClip(6, 12, [take(40), { ...take(41), number: 2 }]), activeTakeId: 41 }]),
+    ]);
+    h.record(settingTakes(retaken, 6), t1(), retaken);
+    expect(h.nextUndoPlayhead()).toBeNull();
+  });
+});
+
 describe('History of pasting', () => {
   it('undoes a paste by deleting every Clip pasted, as one step, and redoes it by placing them back with their Takes', () => {
     const h = new History();

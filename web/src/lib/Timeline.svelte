@@ -427,8 +427,12 @@
     if (frozen || (!undoable && queued === 0)) return;
     offerCues = null;
     mergeNote = null;
+    // Undoing a new Take returns the playhead to its Clip's start, to record
+    // again from there, once the Clip's gone: playing, playback jumps there.
+    let returnTo: number | null = null;
     change((at) => {
       const e = history.nextUndo();
+      returnTo = history.nextUndoPlayhead();
       return e
         ? send(at, e, (before, after) => {
             const back = history.undone(before, after);
@@ -437,6 +441,8 @@
             if ((e.kind === 'placeClips' || e.kind === 'replaceClips') && !frozen) selected = new Set(back);
           })
         : unchanged(at);
+    }).then((ok) => {
+      if (ok && returnTo !== null) seekTo(returnTo);
     });
   }
 
@@ -1243,7 +1249,7 @@
         history.record(settingTakes(after, target.clipId), before, after);
       } else {
         after = await saved(api.recordTake(at, wav, { ...target, ...details }));
-        history.record(placingAdded(before, after), before, after);
+        history.recordTake(before, after);
       }
       editedAt = after.version;
       showHistory();
