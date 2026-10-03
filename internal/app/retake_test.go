@@ -43,6 +43,9 @@ type takesOf struct {
 	Start        float64  `json:"start"`
 	Offset       float64  `json:"offset"`
 	Length       float64  `json:"length"`
+	// FadeIn and FadeOut set the Clip's Fades, if given.
+	FadeIn  *float64 `json:"fadeIn,omitempty"`
+	FadeOut *float64 `json:"fadeOut,omitempty"`
 }
 
 type takeAt struct {

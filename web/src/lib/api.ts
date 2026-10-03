@@ -271,6 +271,13 @@ export interface Clip {
    * applies, whichever Take is active: from minGain to maxGain (see clipGain), 0 until it's set.
    */
   gain: number;
+  /**
+   * How long it rises from silence at its start, and falls to silence at its
+   * end, in seconds from that edge as trimmed: 0 for no Fade. Together they
+   * never run longer than it (see clipFade).
+   */
+  fadeIn: number;
+  fadeOut: number;
   /** A Clip of Takes' Takes, by number; none for a Clip of a Beat. */
   takes: Take[];
   /** The Take a Clip of Takes plays, or null for a Clip of a Beat. */
@@ -307,14 +314,17 @@ export interface Take {
   peaks?: number[];
 }
 
+/** What a Clip has of its own, each left out while it has none: its name, its Gain and its Fades. */
+export type OwnOfClip = { name?: string; gain?: number; fadeIn?: number; fadeOut?: number };
+
 /**
  * A stretch of a Beat or a Sound, or of detached Takes, to place on a Track,
  * e.g. a deleted Clip brought back, or a recording or import redone, with its
- * name if it has one, and its Gain, 0 dB if not given.
+ * name if it has one, its Gain, 0 dB if not given, and its Fades, none if not given.
  */
-export type NewClip = Pick<Clip, 'start' | 'offset' | 'length'> & { name?: string; gain?: number } & (
-    { beatId: number } | { soundId: number } | { takeIds: number[]; activeTakeId: number }
-  );
+export type NewClip = Pick<Clip, 'start' | 'offset' | 'length'> &
+  OwnOfClip &
+  ({ beatId: number } | { soundId: number } | { takeIds: number[]; activeTakeId: number });
 
 /**
  * An audio file imported into one Song, placed in Clips like a Beat, but
@@ -373,7 +383,9 @@ export type PlacedClip = OnTrack & { clip: NewClip };
  * Sound, or of Takes, given as they were then, each where it started in the
  * Clip's source span and how far it was nudged.
  */
-export type ClipCopy = Pick<Clip, 'start' | 'offset' | 'length'> & { name?: string; gain?: number } & (
+export type ClipCopy = Pick<Clip, 'start' | 'offset' | 'length'> &
+  OwnOfClip &
+  (
     | { beatId: number }
     | { soundId: number }
     | { takes: Pick<Take, 'id' | 'position' | 'nudge'>[]; activeTakeId: number }
@@ -412,7 +424,14 @@ export interface ClipMove {
  */
 export type ClipTakes = Pick<Clip, 'activeTakeId' | 'start' | 'offset' | 'length'> & {
   takes: Pick<Take, 'id' | 'position' | 'nudge'>[];
-};
+} & Partial<ClipFades>;
+
+/**
+ * A Clip's Fades, in seconds, to set along with its trim or Takes, e.g. to
+ * undo a change that shortened them; left out, they're kept, shortened to
+ * fit if the Clip is now too short for them.
+ */
+export type ClipFades = Pick<Clip, 'fadeIn' | 'fadeOut'>;
 
 /**
  * A Track to add: by default empty, at the bottom, at 0 dB and neither muted
@@ -778,8 +797,8 @@ export const api = {
    * Has a Clip play length seconds of its source from offset. The audio stays
    * in place on the Timeline, so trimming the start moves where the Clip starts.
    */
-  trimClip: (at: SongAt, clipId: number, offset: number, length: number) =>
-    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/${clipId}/trim`, { offset, length }, at),
+  trimClip: (at: SongAt, clipId: number, offset: number, length: number, fades?: ClipFades) =>
+    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/${clipId}/trim`, { offset, length, ...fades }, at),
   /** Places a stretch of a Beat, or detached Takes, on a Track. Refused if it would overlap a Clip there. */
   placeClip: (at: SongAt, trackId: number, clip: NewClip) =>
     request<Timeline>('POST', `/songs/${at.id}/timeline/clips`, { trackId, ...clip }, at),
@@ -803,7 +822,10 @@ export const api = {
   /** Sets how much louder or quieter a Clip plays, in dB, from minGain to maxGain. */
   setClipGain: (at: SongAt, clipId: number, gain: number) =>
     request<Timeline>('PUT', `/songs/${at.id}/timeline/clips/${clipId}/gain`, { gain }, at),
-  /** Copies a Clip, name, Gain and all, right after itself, or after its Track's last Clip if that's taken. */
+  /** Sets how long a Clip fades in from its start and out to its end, in seconds; 0 for none. */
+  setClipFades: (at: SongAt, clipId: number, fades: ClipFades) =>
+    request<Timeline>('PUT', `/songs/${at.id}/timeline/clips/${clipId}/fades`, fades, at),
+  /** Copies a Clip, name, Gain, Fades and all, right after itself, or after its Track's last Clip if that's taken. */
   duplicateClip: (at: SongAt, clipId: number) =>
     request<Timeline>('POST', `/songs/${at.id}/timeline/clips/${clipId}/duplicate`, undefined, at),
   /** Removes a Clip from the Timeline; its Beat stays in the Beat Library, and its Takes are detached. */

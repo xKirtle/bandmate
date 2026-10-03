@@ -7,6 +7,7 @@
     ApiError,
     type Beat,
     type Clip,
+    type ClipFades,
     type ClipMove,
     type Song,
     type SongAt,
@@ -131,6 +132,7 @@
   import { barWidth, bars } from './waveform';
   import { clipping, LiveWave, tileBars } from './liveWave';
   import { clampGain, draggedGain, formatGain, gainLineAt, heardPeak } from './clipGain';
+  import { draggedFade, fadeName, fitFades, formatFade, grabbedFade, shapedPeak, type FadeEnd } from './clipFade';
 
   // The Timeline, docked under the Lyric Sheet: its Tracks and Clips, and
   // playback with each Track's volume, mute and solo, and the Loop. Editing
@@ -1626,8 +1628,12 @@
   // snaps by any of its Clips' edges to those of Clips outside it.
   interface Edit {
     clip: Clip;
-    /** Moving the Clip, trimming either edge, Alt+dragged, sliding its active Take within it, or by its gain line, setting its Gain. */
-    mode: 'move' | 'start' | 'end' | 'nudge' | 'gain';
+    /**
+     * Moving the Clip, trimming either edge, Alt+dragged, sliding its active
+     * Take within it, by its gain line, setting its Gain, or by a dot at the
+     * gain line's ends, setting its fade in or fade out.
+     */
+    mode: 'move' | 'start' | 'end' | 'nudge' | 'gain' | 'fadeIn' | 'fadeOut';
     /** Where the pointer went down, to tell a click or a long press from a drag. */
     from: Point;
     /** How far into the Clip it was grabbed, in seconds. */
@@ -1646,6 +1652,14 @@
      * line never jumps, and how tall the Clip's waveform is, in pixels.
      */
     gainFrom: { gain: number; clientY: number; height: number };
+    /** Its Fades as dragged, in seconds, for a fade dot. */
+    fades: ClipFades;
+    /**
+     * For a fade dot, how far right of the dot's middle it was grabbed, in
+     * pixels, and how far in from the Clip's edge the dot rests without a
+     * Fade, in seconds.
+     */
+    fadeGrab: { by: number; rests: number };
     /** Whether Shift is held, to move or trim without snapping, or drag the gain line finely. */
     free: boolean;
     /** Whether Mod was held as it was pressed, so a click adds it to the Selection or takes it out. */
@@ -1688,7 +1702,9 @@
             ? nudged(dragged.clip, dragged.nudge)
             : dragged.mode === 'gain'
               ? { ...dragged.clip, gain: dragged.gain }
-              : dragged.clip;
+              : isFadeMode(dragged.mode)
+                ? { ...dragged.clip, ...dragged.fades }
+                : dragged.clip;
         placed.push({ clip, at: dragged.placement, editing: true });
       }
       return { track, clips: placed };
@@ -1843,9 +1859,11 @@
     }
     // Alt+dragging a Clip of Takes slides its active Take, the Clip staying put.
     const take = activeTake(clip);
-    // Grabbing its gain line selects it, as clicking it does.
-    if (mode === 'gain') select({ kind: toggles ? 'toggle' : 'click', clipId: clip.id });
+    // Grabbing its gain line, or a fade dot, selects it, as clicking it does.
+    if (mode === 'gain' || isFadeMode(mode)) select({ kind: toggles ? 'toggle' : 'click', clipId: clip.id });
     const wave = element.querySelector('.wave')?.getBoundingClientRect();
+    const grabbed = isFadeMode(mode) ? fadeGrab(event, element, mode) : null;
+    if (grabbed) mode = grabbed.end;
     edit = {
       clip,
       mode: mode === 'move' && nudges(event) && take ? 'nudge' : mode,
@@ -1857,6 +1875,8 @@
       nudge: take?.nudge ?? 0,
       gain: clip.gain,
       gainFrom: { gain: clip.gain, clientY: event.clientY, height: wave?.height ?? 0 },
+      fades: { fadeIn: clip.fadeIn, fadeOut: clip.fadeOut },
+      fadeGrab: grabbed ?? { by: 0, rests: 0 },
       free: skipsSnapping(event),
       toggles,
       snap: null,
@@ -1877,7 +1897,7 @@
   // skips snapping, snaps or frees the Clip there and then, without waiting
   // for the pointer to move.
   function editModifier(event: KeyboardEvent) {
-    if (!isModifier(event.key) || !edit?.moved || edit.mode === 'nudge' || edit.saving) return;
+    if (!isModifier(event.key) || !edit?.moved || edit.mode === 'nudge' || isFadeMode(edit.mode) || edit.saving) return;
     if (edit.mode === 'gain') {
       dragGainFinely(edit, skipsSnapping(event), editAt.clientY);
       return;
@@ -1893,6 +1913,44 @@
   function dragGainFinely(drag: Edit, fine: boolean, clientY: number) {
     if (fine !== drag.free) drag.gainFrom = { ...drag.gainFrom, gain: drag.gain, clientY };
     drag.free = fine;
+  }
+
+  /** Whether an edit is by a fade dot, setting the Clip's fade in or fade out. */
+  function isFadeMode(mode: Edit['mode']): mode is FadeEnd {
+    return mode === 'fadeIn' || mode === 'fadeOut';
+  }
+
+  /**
+   * Which fade dot a press grabbed, where the dots may sit together, and
+   * where: how far right of its middle, in pixels, and how far in from the
+   * Clip's edge it rests without a Fade, in seconds: just inside the trim edge.
+   */
+  function fadeGrab(
+    event: PointerEvent,
+    clipElement: HTMLElement,
+    pressed: FadeEnd,
+  ): Edit['fadeGrab'] & { end: FadeEnd } {
+    const middle = (end: FadeEnd) => {
+      const r = clipElement.querySelector(`.fade-dot.${end === 'fadeIn' ? 'in' : 'out'}`)!.getBoundingClientRect();
+      return { at: r.left + r.width / 2, width: r.width };
+    };
+    const trim = clipElement.querySelector('.trim')!.getBoundingClientRect();
+    const [fadeIn, fadeOut] = [middle('fadeIn'), middle('fadeOut')];
+    const end = grabbedFade(pressed, event.clientX, fadeIn.at, fadeOut.at, fadeIn.width);
+    const dot = end === 'fadeIn' ? fadeIn : fadeOut;
+    return { end, by: event.clientX - dot.at, rests: (trim.width + dot.width / 2) / view.scale };
+  }
+
+  /** Where dragging a fade dot to clientX sets the Clip's Fades. */
+  function dragFade(drag: Edit, clientX: number) {
+    const { clip, fadeGrab } = drag;
+    // The dot's middle, in seconds from the Clip's start.
+    const t = spanTimeAt(clientX - fadeGrab.by) - clip.start;
+    const { fadeIn, fadeOut } = drag.fades;
+    drag.fades =
+      drag.mode === 'fadeIn'
+        ? { fadeIn: draggedFade(t, fadeOut, clip.length, fadeGrab.rests), fadeOut }
+        : { fadeIn, fadeOut: draggedFade(clip.length - t, fadeIn, clip.length, fadeGrab.rests) };
   }
 
   function editMove(event: Point) {
@@ -1914,6 +1972,11 @@
       if ('shiftKey' in event) dragGainFinely(edit, skipsSnapping(event as PointerEvent), event.clientY);
       const { gain, clientY, height } = edit.gainFrom;
       edit.gain = draggedGain(gain, event.clientY - clientY, height, edit.free);
+      return;
+    }
+    if (isFadeMode(edit.mode)) {
+      dragFade(edit, event.clientX);
+      dragAt(event, editMove);
       return;
     }
     // Scrolling along at an edge, or Shift pressed, moves it too, with no keys to go by.
@@ -1968,8 +2031,19 @@
     if (!edit) return;
     edit.snap = null;
     const { clip, trackId, placement: to, mode } = edit;
-    // Pressed and let go without dragging, it's clicked. Its gain line selected it when grabbed.
-    if (!edit.moved && mode !== 'gain') select({ kind: edit.toggles ? 'toggle' : 'click', clipId: clip.id });
+    // Pressed and let go without dragging, it's clicked. Its gain line or a fade dot selected it when grabbed.
+    if (!edit.moved && mode !== 'gain' && !isFadeMode(edit.mode)) {
+      select({ kind: edit.toggles ? 'toggle' : 'click', clipId: clip.id });
+    }
+    if (isFadeMode(edit.mode)) {
+      const { fadeIn, fadeOut } = edit.fades;
+      if (edit.moved && (fadeIn !== clip.fadeIn || fadeOut !== clip.fadeOut)) {
+        edit.saving = true;
+        await perform({ kind: 'setClipFades', clipId: clip.id, fadeIn, fadeOut });
+      }
+      edit = null;
+      return;
+    }
     if (mode === 'gain') {
       if (edit.moved && edit.gain !== clip.gain) {
         edit.saving = true;
@@ -2135,7 +2209,7 @@
   function clipDoubleClick(event: MouseEvent, clip: Clip) {
     // Not on its ⋯ or menu, its trim edges, or its name being typed.
     if (inClipMenu(event.target) || inClipName(event.target)) return;
-    if (event.target instanceof Element && event.target.closest('.trim')) return;
+    if (event.target instanceof Element && event.target.closest('.trim, .fade-dot')) return;
     // Its gain line resets the Gain instead.
     if (event.target instanceof Element && event.target.closest('.gain-line')) {
       if (clip.gain !== 0 && !frozen) perform({ kind: 'setClipGain', clipId: clip.id, gain: 0 });
@@ -3090,6 +3164,8 @@
                   {@const title = titleOf(clip)}
                   {@const isSelected = selected.has(clip.id)}
                   {@const extent = `${formatDuration(at.start)} to ${formatDuration(at.start + at.length)}`}
+                  <!-- As trimmed, so a trim being dragged shortens them to fit, as saving it will. -->
+                  {@const fades = fitFades(clip, at.length)}
                   <!-- Focusable for its Delete and menu keys; pointer dragging has no key equivalent yet, and its actions are in its menu. -->
                   <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
                   <div
@@ -3099,6 +3175,7 @@
                     class:moving={editing && edit?.mode === 'move'}
                     class:nudging={editing && edit?.mode === 'nudge'}
                     class:gaining={editing && edit?.mode === 'gain'}
+                    class:fading={editing && !!edit && isFadeMode(edit.mode)}
                     class:retaking={clip.id === recording?.clipId}
                     class:selected={isSelected}
                     style:left="{percent(at.start)}%"
@@ -3107,6 +3184,8 @@
                     role="group"
                     aria-label="{title}{isSelected ? ', selected' : ''}, {extent}{clip.gain !== 0
                       ? `, ${formatGain(clip.gain)}`
+                      : ''}{fades.fadeIn > 0 ? `, fade in ${formatFade(fades.fadeIn)}` : ''}{fades.fadeOut > 0
+                      ? `, fade out ${formatFade(fades.fadeOut)}`
                       : ''}"
                     tabindex={editable.current ? 0 : undefined}
                     aria-keyshortcuts={editable.current
@@ -3158,8 +3237,12 @@
                           aria-hidden="true"
                         >
                           {#each clipShape(clip, at.offset + wave.from, wave.to - wave.from, (wave.bars * barWidth) / view.scale, wave.bars) as peak, i (i)}
-                            <!-- Drawn as it sounds, at the Clip's Gain. -->
-                            {@const height = Math.max(2, heardPeak(peak, clip.gain) * 100)}
+                            <!-- Drawn as it sounds, at the Clip's Gain, shaped by its Fades. -->
+                            {@const t = wave.from + ((i + 0.5) * barWidth) / view.scale}
+                            {@const height = Math.max(
+                              2,
+                              heardPeak(shapedPeak(peak, fades, at.length, t), clip.gain) * 100,
+                            )}
                             <!-- A Take's clipping stays marked once it's saved; a Beat's or a Sound's isn't, often being mastered loud. -->
                             <rect
                               class:clipped={clip.activeTakeId !== null && peak >= clipping}
@@ -3176,6 +3259,8 @@
                         class="gain-line edit-only"
                         class:changed={clip.gain !== 0}
                         style:--at={gainLineAt(clip.gain)}
+                        style:--fade-in={fades.fadeIn / at.length}
+                        style:--fade-out={fades.fadeOut / at.length}
                         aria-hidden="true"
                         title={editHint(
                           freeze,
@@ -3183,6 +3268,50 @@
                         )}
                         onpointerdown={(e) => editDown(e, clip, 'gain')}
                       ></span>
+                      {#if fades.fadeIn > 0 || fades.fadeOut > 0}
+                        <!-- Each Fade, a straight slope from the Clip's edge, silent, up to the gain line. -->
+                        <svg
+                          class="fade-slopes edit-only"
+                          viewBox="0 0 {at.length} 1"
+                          preserveAspectRatio="none"
+                          aria-hidden="true"
+                        >
+                          {#if fades.fadeIn > 0}
+                            <line x1="0" y1="1" x2={fades.fadeIn} y2={gainLineAt(clip.gain)} />
+                          {/if}
+                          {#if fades.fadeOut > 0}
+                            <line x1={at.length} y1="1" x2={at.length - fades.fadeOut} y2={gainLineAt(clip.gain)} />
+                          {/if}
+                        </svg>
+                      {/if}
+                      <!-- A dot at each end of the gain line, dragged in to fade in or out, or back to the edge for none. -->
+                      {#each ['fadeIn', 'fadeOut'] as const as end (end)}
+                        {@const fade = fades[end]}
+                        <span
+                          class="fade-dot edit-only"
+                          class:in={end === 'fadeIn'}
+                          class:out={end === 'fadeOut'}
+                          style:--at={gainLineAt(clip.gain)}
+                          style:--fade={fade / at.length}
+                          aria-hidden="true"
+                          title={editHint(
+                            freeze,
+                            fade > 0
+                              ? `${fadeName(end)} ${formatFade(fade)}: drag in to lengthen it, or back to the edge to remove it`
+                              : `${fadeName(end)}: drag in to add it`,
+                          )}
+                          onpointerdown={(e) => editDown(e, clip, end)}
+                        ></span>
+                      {/each}
+                      {#if editing && edit && isFadeMode(edit.mode) && edit.moved}
+                        {@const fade = fades[edit.mode]}
+                        <span
+                          class="gain-tip"
+                          class:below={gainLineAt(clip.gain) < 0.5}
+                          style:top="{gainLineAt(clip.gain) * 100}%"
+                          >{fade > 0 ? `${fadeName(edit.mode)} ${formatFade(fade)}` : 'No fade'}</span
+                        >
+                      {/if}
                       {#if editing && edit?.mode === 'gain' && edit.moved}
                         <!-- Above the line, or below it in the waveform's top half, to stay inside the Clip. -->
                         <span
@@ -3858,6 +3987,9 @@
   .frozen .trim:hover {
     background: none;
   }
+  .frozen .fade-dot {
+    cursor: default;
+  }
   .frozen button.name:disabled {
     opacity: 0.6;
     cursor: default;
@@ -4094,12 +4226,13 @@
    * thin target a few pixels either side of it, clear of the trim edges,
    * which keep their own cursor. The target slides as far down within the
    * waveform as the line does, so at either end it stays inside it, clear
-   * of the Clip's head, the line still exactly --at of the way down.
+   * of the Clip's head, the line still exactly --at of the way down. It runs
+   * between the Fades, which slope down from it to the Clip's edges.
    */
   .gain-line {
     position: absolute;
-    left: calc(0.375 * var(--timeline-rem));
-    right: calc(0.375 * var(--timeline-rem));
+    left: max(calc(0.375 * var(--timeline-rem)), calc(var(--fade-in) * 100%));
+    right: max(calc(0.375 * var(--timeline-rem)), calc(var(--fade-out) * 100%));
     top: calc(var(--at) * (100% - 0.5 * var(--timeline-rem)));
     height: calc(0.5 * var(--timeline-rem));
     cursor: ns-resize;
@@ -4125,7 +4258,62 @@
     background: var(--accent);
     opacity: 1;
   }
-  /* The Gain while its line is dragged. */
+  /* A Clip's Fades, drawn as straight slopes over its waveform, whatever their curve. */
+  .wave svg.fade-slopes {
+    left: 0;
+    width: 100%;
+    overflow: visible;
+    pointer-events: none;
+  }
+  .fade-slopes line {
+    stroke: var(--accent);
+    stroke-width: 1.5px;
+    vector-effect: non-scaling-stroke;
+    opacity: 0.8;
+  }
+  /*
+   * A fade dot, at an end of the gain line: --fade of the way in from the
+   * Clip's edge, or without a Fade, resting just inside the trim edge. It
+   * shows while the Clip is hovered or selected, and the dot itself is
+   * drawn small inside a larger target.
+   */
+  .fade-dot {
+    --dot: calc(0.625 * var(--timeline-rem));
+    position: absolute;
+    top: calc(var(--at) * (100% - 1px));
+    width: var(--dot);
+    height: var(--dot);
+    margin-top: calc(var(--dot) / -2);
+    cursor: col-resize;
+    opacity: 0;
+  }
+  .fade-dot.in {
+    left: max(calc(0.375 * var(--timeline-rem)), calc(var(--fade) * 100% - var(--dot) / 2));
+  }
+  .fade-dot.out {
+    right: max(calc(0.375 * var(--timeline-rem)), calc(var(--fade) * 100% - var(--dot) / 2));
+  }
+  .fade-dot::before {
+    content: '';
+    position: absolute;
+    inset: 25%;
+    border: 1px solid var(--bg);
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .fade-dot:hover::before,
+  .clip.fading .fade-dot::before {
+    inset: 15%;
+  }
+  .clip:hover .fade-dot,
+  .clip.selected .fade-dot,
+  .clip.fading .fade-dot {
+    opacity: 1;
+  }
+  .clip.fading {
+    cursor: col-resize;
+  }
+  /* The Gain while its line is dragged, or a Fade while its dot is. */
   .gain-tip {
     position: absolute;
     left: 50%;

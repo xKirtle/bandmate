@@ -18,6 +18,8 @@ const clip = (id: number, beatId: number, name: string | null = null): Clip => (
   soundId: null,
   name,
   gain: 0,
+  fadeIn: 0,
+  fadeOut: 0,
   takes: [],
   activeTakeId: null,
   start: 5,
@@ -45,6 +47,8 @@ const takeClip = (id: number, takes: Take[], active = takes[0].id, name: string 
   soundId: null,
   name,
   gain: 0,
+  fadeIn: 0,
+  fadeOut: 0,
   takes,
   activeTakeId: active,
   start: 30,
@@ -68,6 +72,8 @@ const soundClip = (id: number, soundId: number, name: string | null = null): Cli
   soundId,
   name,
   gain: 0,
+  fadeIn: 0,
+  fadeOut: 0,
   takes: [],
   activeTakeId: null,
   start: 50,
@@ -225,6 +231,16 @@ describe('playing', () => {
     ]);
   });
 
+  it("plays each Clip's Fades from its edges, where they are on the Timeline", () => {
+    const faded = { ...clip(1, 7), fadeIn: 1, fadeOut: 2 };
+    const t = timeline([faded], [beat(7)]);
+    expect(playing(t, clipSources(t))[0].fades).toEqual({ start: 5, end: 15, fadeIn: 1, fadeOut: 2 });
+    // A Take's audio may start later than its Clip, but its Fades are still the Clip's.
+    const late = { ...takeClip(2, [take(3, { position: 4, duration: 12 })]), fadeIn: 0.5, fadeOut: 0 };
+    const u = timeline([late], []);
+    expect(playing(u, clipSources(u))[0]).toMatchObject({ start: 32, fades: { start: 30, end: 40, fadeIn: 0.5 } });
+  });
+
   it('plays each Clip at its Gain, whichever Take is active', () => {
     const louder = { ...clip(1, 7), gain: 6 };
     const quieter = { ...takeClip(2, [take(3, { duration: 12 }), take(4, { duration: 12 })], 4), gain: -20 };
@@ -286,6 +302,18 @@ describe('placementOf', () => {
       length: 10,
     });
     expect(placementOf(takeClip(1, [take(3)], 3, 'Hook idea'))).toMatchObject({ takeIds: [3], name: 'Hook idea' });
+  });
+
+  it('places a Clip back with its Fades, leaving out one it has none of', () => {
+    expect(placementOf({ ...clip(1, 7), fadeOut: 1.5 })).toEqual({
+      beatId: 7,
+      fadeOut: 1.5,
+      start: 5,
+      offset: 2,
+      length: 10,
+    });
+    expect(placementOf({ ...takeClip(1, [take(3)], 3), fadeIn: 2 })).toMatchObject({ takeIds: [3], fadeIn: 2 });
+    expect(placementOf(clip(1, 7))).not.toHaveProperty('fadeIn');
   });
 
   it('places a Clip back at its Gain, unless it has none', () => {

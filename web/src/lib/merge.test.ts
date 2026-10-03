@@ -9,6 +9,8 @@ const clip = (id: number, start: number, more: Partial<Clip> = {}): Clip => ({
   soundId: null,
   name: null,
   gain: 0,
+  fadeIn: 0,
+  fadeOut: 0,
   takes: [],
   activeTakeId: null,
   start,

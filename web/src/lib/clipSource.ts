@@ -9,7 +9,8 @@
 // its position in it, and the span starts the Clip's offset before the Clip
 // does. A Take nudged earlier still reaches where it ended before, so a
 // nudge never leaves its Clip playing past its source.
-import { api, type Clip, type NewClip, type Take, type Timeline } from './api';
+import { api, type Clip, type NewClip, type OwnOfClip, type Take, type Timeline } from './api';
+import type { PlacedFades } from './clipFade';
 import { gainFactor } from './clipGain';
 import type { Placed } from './schedule';
 import type { PlayableClip } from './timelinePlayer';
@@ -140,9 +141,17 @@ export function playing(timeline: Timeline, sources: ClipSources, silent: number
   return timeline.tracks.flatMap((t) =>
     t.clips.flatMap((c) => {
       const h = c.id === silent ? null : heard(c);
-      return h ? [{ ...h, source: sources.of(c).audio, trackId: t.id, gainFactor: gainFactor(c.gain) }] : [];
+      if (!h) return [];
+      return [{ ...h, source: sources.of(c).audio, trackId: t.id, gainFactor: gainFactor(c.gain), ...fadesOf(c) }];
     }),
   );
+}
+
+/** A Clip's Fades where it is on the Timeline, from its edges, if it has any. */
+function fadesOf(clip: Clip): { fades?: PlacedFades } {
+  if (clip.fadeIn === 0 && clip.fadeOut === 0) return {};
+  const { start, length, fadeIn, fadeOut } = clip;
+  return { fades: { start, end: start + length, fadeIn, fadeOut } };
 }
 
 /**
@@ -157,14 +166,19 @@ export function clipTitle(clip: Clip, source: ClipSource): string {
 }
 
 /**
- * What a Clip has of its own, as placing or pasting it gives them: its name
- * and its Gain, each left out while it has none.
+ * What a Clip has of its own, as placing or pasting it gives them: its
+ * name, its Gain and its Fades, each left out while it has none.
  */
-export function ownOf(clip: Clip): { name?: string; gain?: number } {
-  return { ...(clip.name !== null ? { name: clip.name } : {}), ...(clip.gain !== 0 ? { gain: clip.gain } : {}) };
+export function ownOf(clip: Clip): OwnOfClip {
+  return {
+    ...(clip.name !== null ? { name: clip.name } : {}),
+    ...(clip.gain !== 0 ? { gain: clip.gain } : {}),
+    ...(clip.fadeIn !== 0 ? { fadeIn: clip.fadeIn } : {}),
+    ...(clip.fadeOut !== 0 ? { fadeOut: clip.fadeOut } : {}),
+  };
 }
 
-/** What places a Clip back as it is: its source, trim, name and Gain, without its id. */
+/** What places a Clip back as it is: its source, trim, name, Gain and Fades, without its id. */
 export function placementOf(clip: Clip): NewClip {
   const { start, offset, length } = clip;
   const own = ownOf(clip);

@@ -45,7 +45,10 @@ type clip struct {
 	// Name is null until the Clip is named.
 	Name *string `json:"name"`
 	// Gain is in dB, 0 until it's set.
-	Gain         float64 `json:"gain"`
+	Gain float64 `json:"gain"`
+	// FadeIn and FadeOut are in seconds, 0 until they're set.
+	FadeIn       float64 `json:"fadeIn"`
+	FadeOut      float64 `json:"fadeOut"`
 	Takes        []take  `json:"takes"`
 	ActiveTakeID *int64  `json:"activeTakeId"`
 	Start        float64 `json:"start"`
