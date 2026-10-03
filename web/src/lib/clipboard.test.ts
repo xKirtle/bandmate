@@ -8,6 +8,8 @@ const clip = (id: number, start: number, length = 10, more: Partial<Clip> = {}):
   soundId: null,
   name: null,
   gain: 0,
+  fadeIn: 0,
+  fadeOut: 0,
   takes: [],
   activeTakeId: null,
   start,
@@ -73,6 +75,13 @@ describe('copy', () => {
         },
       },
     ]);
+  });
+
+  it('holds each Clip with its Fades, so a paste or a Duplicate keeps them', () => {
+    const tracks = [track(1, [clip(5, 0, 10, { fadeIn: 1, fadeOut: 2 })])];
+
+    expect(copy(tracks, new Set([5]))?.clips[0].clip).toMatchObject({ fadeIn: 1, fadeOut: 2 });
+    expect(duplicate(tracks, new Set([5]))?.clips[0].clip).toMatchObject({ fadeIn: 1, fadeOut: 2 });
   });
 
   it('holds each Clip at its Gain, so a paste or a Duplicate keeps it', () => {

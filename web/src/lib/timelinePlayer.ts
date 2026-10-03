@@ -1,20 +1,23 @@
 // Plays the Timeline: every Clip's audio is fetched, decoded into memory and
 // scheduled on one AudioContext, so Tracks stay sample-accurate with each
-// other (ADR 0006). Each Clip plays at its Gain, through its Track's own
-// gain, which follows the Track's volume, mute and solo live: wired by
-// TrackMix, which a Mixdown and a Merge build their graph with too, so they
-// sound as playback would. A Loop's repeats are
+// other (ADR 0006). Each Clip plays at its Gain, shaped by its Fades,
+// through its Track's own gain, which follows the Track's volume, mute and
+// solo live: wired by TrackMix, which a Mixdown and a Merge build their
+// graph with too, so they sound as playback would. A Loop's repeats are
 // scheduled a little ahead as they come round, each starting exactly as the
 // one before ends.
+import { fadeCurves, type PlacedFades } from './clipFade';
 import { playAlone, release } from './playback';
 import { positionAt, repeats, schedule, type Loop, type Placed } from './schedule';
 
-/** A Clip to play, with where its source's audio is fetched from, the Track it's on and its Gain. */
+/** A Clip to play, with where its source's audio is fetched from, the Track it's on, its Gain and its Fades. */
 export interface PlayableClip extends Placed {
   source: string;
   trackId: number;
   /** Its Gain, as a factor of its audio, applied before its Track's. */
   gainFactor: number;
+  /** Its Fades, from the Clip's own edges, which a Take's audio may start after; left out if it has none. */
+  fades?: PlacedFades;
 }
 
 export type PlayerState = 'stopped' | 'loading' | 'playing';
@@ -47,30 +50,49 @@ export class TrackMix {
   }
 
   /**
-   * Plays part of a Clip's audio on its Track, at the Clip's Gain: duration
-   * seconds of buffer, from `from` seconds into it, starting at context time `at`.
+   * Plays part of a Clip's audio on its Track, at the Clip's Gain, shaped by
+   * its Fades: duration seconds of buffer, from `from` seconds into it,
+   * starting at context time `at`.
    */
-  play(
-    buffer: AudioBuffer,
-    clip: Pick<PlayableClip, 'trackId' | 'gainFactor'>,
-    at: number,
-    from: number,
-    duration: number,
-  ): AudioBufferSourceNode {
+  play(buffer: AudioBuffer, clip: PlayableClip, at: number, from: number, duration: number): AudioBufferSourceNode {
     const node = this.#context.createBufferSource();
     node.buffer = buffer;
     const track = this.#track(clip.trackId);
-    if (clip.gainFactor === 1) {
+    if (clip.gainFactor === 1 && !clip.fades) {
       node.connect(track);
     } else {
       // Its own gain, let go of with it.
       const gain = this.#context.createGain();
-      gain.gain.value = clip.gainFactor;
+      this.#shape(gain.gain, clip, at, from, duration);
       node.connect(gain).connect(track);
       node.addEventListener('ended', () => gain.disconnect());
     }
     node.start(at, from, duration);
     return node;
+  }
+
+  /**
+   * Has a Clip's own gain follow its Gain and its Fades, over the duration
+   * seconds of its audio played from `from` seconds in, at context time `at`.
+   */
+  #shape(gain: AudioParam, clip: PlayableClip, at: number, from: number, duration: number) {
+    if (!clip.fades) {
+      gain.value = clip.gainFactor;
+      return;
+    }
+    // Where on the Timeline what's played starts.
+    const t = clip.start + from - clip.offset;
+    const { initial, curves } = fadeCurves(clip.fades, t, duration);
+    // A curve starting right away starts at the initial gain itself, and
+    // nothing else may be set while one runs.
+    if (curves[0]?.at !== 0) gain.value = initial * clip.gainFactor;
+    for (const c of curves) {
+      gain.setValueCurveAtTime(
+        c.values.map((v) => v * clip.gainFactor),
+        at + c.at,
+        c.duration,
+      );
+    }
   }
 
   /** Sets each Track's gain by id, heard right away. A Track left out plays as is. */

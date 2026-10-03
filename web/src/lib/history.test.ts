@@ -9,6 +9,8 @@ const clip = (id: number, start: number, more: Partial<Clip> = {}): Clip => ({
   soundId: null,
   name: null,
   gain: 0,
+  fadeIn: 0,
+  fadeOut: 0,
   takes: [],
   activeTakeId: null,
   start,
@@ -323,6 +325,44 @@ describe('History', () => {
       timeline([track(1, [clip(5, 0, { name: 'Chorus 1' })])]),
     );
     expect(h.nextUndo()).toBeNull();
+  });
+
+  it("undoes setting a Clip's Fades by setting them back, one step each", () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0)])]);
+    const t1 = timeline([track(1, [clip(5, 0, { fadeIn: 2 })])]);
+    const t2 = timeline([track(1, [clip(5, 0, { fadeIn: 2, fadeOut: 1.5 })])]);
+    h.record({ kind: 'setClipFades', clipId: 5, fadeIn: 2, fadeOut: 0 }, t0, t1);
+    h.record({ kind: 'setClipFades', clipId: 5, fadeIn: 2, fadeOut: 1.5 }, t1, t2);
+
+    expect(h.nextUndo()).toEqual({ kind: 'setClipFades', clipId: 5, fadeIn: 2, fadeOut: 0 });
+    h.undone(t2, t1);
+    expect(h.nextUndo()).toEqual({ kind: 'setClipFades', clipId: 5, fadeIn: 0, fadeOut: 0 });
+    h.undone(t1, t0);
+    expect(h.nextRedo()).toEqual({ kind: 'setClipFades', clipId: 5, fadeIn: 2, fadeOut: 0 });
+  });
+
+  it('undoes a trim that shortened the Fades by setting them back with it', () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0, { fadeIn: 2, fadeOut: 6 })])]);
+    const t1 = timeline([track(1, [clip(5, 0, { length: 4, fadeIn: 1, fadeOut: 3 })])]);
+    h.record({ kind: 'trimClip', clipId: 5, offset: 0, length: 4 }, t0, t1);
+
+    expect(h.nextUndo()).toEqual({ kind: 'trimClip', clipId: 5, offset: 0, length: 10, fadeIn: 2, fadeOut: 6 });
+    h.undone(t1, t0);
+    expect(h.nextRedo()).toEqual({ kind: 'trimClip', clipId: 5, offset: 0, length: 4 });
+  });
+
+  it('undoes deleting a Clip by placing it back with its Fades', () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0, { fadeIn: 1, fadeOut: 0.5 })])]);
+    h.record({ kind: 'deleteClip', clipId: 5 }, t0, timeline([track(1)]));
+
+    expect(h.nextUndo()).toEqual({
+      kind: 'placeClip',
+      trackId: 1,
+      clip: { beatId: 100, fadeIn: 1, fadeOut: 0.5, start: 0, offset: 0, length: 10 },
+    });
   });
 
   it("undoes setting a Clip's Gain by setting it back, one step each", () => {
@@ -990,6 +1030,11 @@ describe('History of Retakes', () => {
       clipId: 6,
       takes: { takes: [{ id: 40, position: 0, nudge: 0 }], activeTakeId: 40, start: 10, offset: 2, length: 10 },
     });
+  });
+
+  it("sets a Clip of Takes' Fades back with its Takes, as a change to them may have shortened them", () => {
+    const t = timeline([track(2, [{ ...takeClip(6, 10, [take(40)]), fadeIn: 1, fadeOut: 2 }])]);
+    expect(settingTakes(t, 6)).toMatchObject({ kind: 'setTakes', takes: { fadeIn: 1, fadeOut: 2 } });
   });
 
   it('follows the Clip retaken when it comes back with a new id', () => {

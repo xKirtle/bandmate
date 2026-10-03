@@ -175,6 +175,8 @@ describe('schedule of a Take Clip', () => {
     soundId: null,
     name: null,
     gain: 0,
+    fadeIn: 0,
+    fadeOut: 0,
     takes: [
       {
         id: 7,

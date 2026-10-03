@@ -1,5 +1,7 @@
 import {
   api,
+  type Clip,
+  type ClipFades,
   type ClipMove,
   type ClipTakes,
   type CueValue,
@@ -24,10 +26,11 @@ import { isBlank, type CuedSong } from './cues';
 // Song, before and after it. Undoing and redoing send those through the API
 // like any other edit.
 //
-// A deleted Clip, or a copied one redone, is placed back with its name and
-// Gain, if it has them; a rename is undone by giving the Clip back its old
-// name, or a blank one to clear it, and setting its Gain by setting the old
-// one back.
+// A deleted Clip, or a copied one redone, is placed back with its name,
+// Gain and Fades, if it has them; a rename is undone by giving the Clip back
+// its old name, or a blank one to clear it, and setting its Gain or its
+// Fades by setting the old ones back. A trim, or a change to a Clip's Takes,
+// can shorten its Fades to fit, so it's undone by setting them back with it.
 //
 // Clips deleted together are placed back together, as one edit.
 //
@@ -75,11 +78,14 @@ export type Edit =
   | { kind: 'pasteClips'; clips: PastedClip[]; newTracks: TrackToAdd[] }
   | { kind: 'moveClip'; clipId: number; trackId: number; start: number }
   | { kind: 'moveClips'; moves: ClipMove[] }
-  | { kind: 'trimClip'; clipId: number; offset: number; length: number }
+  /** With fades given, it sets them too, e.g. to undo a trim that shortened them. */
+  | ({ kind: 'trimClip'; clipId: number; offset: number; length: number } & Partial<ClipFades>)
   /** A blank name clears the Clip's. */
   | { kind: 'renameClip'; clipId: number; name: string }
   /** In dB. */
   | { kind: 'setClipGain'; clipId: number; gain: number }
+  /** In seconds; 0 for none. */
+  | { kind: 'setClipFades'; clipId: number; fadeIn: number; fadeOut: number }
   | { kind: 'deleteClip'; clipId: number }
   /** Clips deleted at once, and Tracks with them, e.g. those a paste added. */
   | { kind: 'deleteClips'; clipIds: number[]; trackIds?: number[] }
@@ -275,7 +281,8 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
     }
     case 'trimClip': {
       const { clip } = findClip(before, edit.clipId);
-      return { edit: { kind: 'trimClip', clipId: clip.id, offset: clip.offset, length: clip.length }, adds: none };
+      const { offset, length } = clip;
+      return { edit: { kind: 'trimClip', clipId: clip.id, offset, length, ...fadesIfAny(clip) }, adds: none };
     }
     case 'renameClip': {
       const { clip } = findClip(before, edit.clipId);
@@ -284,6 +291,11 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
     case 'setClipGain': {
       const { clip } = findClip(before, edit.clipId);
       return { edit: { kind: 'setClipGain', clipId: clip.id, gain: clip.gain }, adds: none };
+    }
+    case 'setClipFades': {
+      const { clip } = findClip(before, edit.clipId);
+      const { fadeIn, fadeOut } = clip;
+      return { edit: { kind: 'setClipFades', clipId: clip.id, fadeIn, fadeOut }, adds: none };
     }
     case 'deleteClip':
       return placingBack(before, edit.clipId);
@@ -397,14 +409,22 @@ export function addedClips(before: Timeline, after: Timeline): number[] {
 
 /**
  * The edit that sets a Clip of Takes as it is in tl: its Takes and where
- * they are in its span, its active Take and its placement. A Retake is kept
+ * they are in its span, its active Take, its placement and its Fades. A Retake is kept
  * in the history as that, so redoing it never uploads its Take again.
  */
 export function settingTakes(tl: Timeline, clipId: number): Edit {
   const { clip } = findClip(tl, clipId);
   const { activeTakeId, start, offset, length } = clip;
   const takes = clip.takes.map(({ id, position, nudge }) => ({ id, position, nudge }));
-  return { kind: 'setTakes', clipId, takes: { takes, activeTakeId, start, offset, length } };
+  return { kind: 'setTakes', clipId, takes: { takes, activeTakeId, start, offset, length, ...fadesIfAny(clip) } };
+}
+
+/**
+ * A Clip's Fades, to set back along with its trim or its Takes, unless it
+ * has none: then there were none to shorten.
+ */
+function fadesIfAny({ fadeIn, fadeOut }: Clip): Partial<ClipFades> {
+  return fadeIn !== 0 || fadeOut !== 0 ? { fadeIn, fadeOut } : {};
 }
 
 /** A Song's Cues by Line id, dormant ones included. */
@@ -503,6 +523,7 @@ function remap(edit: HistoryEdit, ids: IdMaps): HistoryEdit {
     case 'trimClip':
     case 'renameClip':
     case 'setClipGain':
+    case 'setClipFades':
     case 'duplicateClip':
     case 'deleteClip':
     case 'setTakes':
@@ -554,11 +575,21 @@ export function sendEdit(at: SongAt, edit: Edit): Promise<Timeline> {
     case 'moveClips':
       return api.moveClips(at, edit.moves);
     case 'trimClip':
-      return api.trimClip(at, edit.clipId, edit.offset, edit.length);
+      return api.trimClip(
+        at,
+        edit.clipId,
+        edit.offset,
+        edit.length,
+        edit.fadeIn !== undefined && edit.fadeOut !== undefined
+          ? { fadeIn: edit.fadeIn, fadeOut: edit.fadeOut }
+          : undefined,
+      );
     case 'renameClip':
       return api.renameClip(at, edit.clipId, edit.name);
     case 'setClipGain':
       return api.setClipGain(at, edit.clipId, edit.gain);
+    case 'setClipFades':
+      return api.setClipFades(at, edit.clipId, { fadeIn: edit.fadeIn, fadeOut: edit.fadeOut });
     case 'duplicateClip':
       return api.duplicateClip(at, edit.clipId);
     case 'deleteClip':
