@@ -2,7 +2,14 @@ import { describe as group, expect, it } from 'vitest';
 import { transportActions } from './transportMenu';
 
 group('transportActions', () => {
-  const idle = { fullTimeline: true, importing: false, recording: false, chosenTrack: 'Vocals', hasClips: true };
+  const idle = {
+    fullTimeline: true,
+    importing: false,
+    recording: false,
+    merging: false,
+    chosenTrack: 'Vocals',
+    hasClips: true,
+  };
   const run = { importAudio: () => {}, mixDown: () => {}, recordingSettings: () => {} };
   const shown = (state: typeof idle) =>
     transportActions(state, run).map(({ label, disabled }) => ({ label, disabled: disabled ?? false }));
@@ -36,6 +43,17 @@ group('transportActions', () => {
       { label: 'Mix down…', disabled: false },
       { label: 'Recording settings…', disabled: false },
     ]);
+  });
+
+  it('disables Import audio… while a Merge is being made, saying why', () => {
+    expect(shown({ ...idle, merging: true })).toEqual([
+      { label: 'Import audio…', disabled: true },
+      { label: 'Mix down…', disabled: false },
+      { label: 'Recording settings…', disabled: false },
+    ]);
+    expect(transportActions({ ...idle, merging: true }, run)[0].title).toBe(
+      'Wait for the Merge to finish to import audio',
+    );
   });
 
   it('disables all three while recording', () => {

@@ -1,6 +1,6 @@
 import type { Clip } from './api';
 import { activeTake } from './clipSource';
-import { editHint } from './freeze';
+import { editHint, type Freeze } from './freeze';
 import type { MenuAction } from './menu';
 
 // A Clip's menu, opened by its ⋯, right-click, the Menu key, Shift+F10 or a
@@ -23,8 +23,8 @@ export type ClipMenuState = {
   cutKeys: string | null;
   /** How many Clips are selected. With several, no Retake is offered. */
   selected: number;
-  /** A recording is starting, under way or saving, so nothing's edited. */
-  recording: boolean;
+  /** A recording or a Merge is under way, so nothing's edited, or null. */
+  frozen: Freeze;
 };
 
 /** What each entry does. */
@@ -49,7 +49,7 @@ export type ClipRun = {
 /** The entries of a Clip's menu. */
 export function clipActions(clip: Clip, state: ClipMenuState, run: ClipRun): MenuAction[] {
   const { soundId } = clip;
-  const edit = editing(state.recording);
+  const edit = editing(state.frozen);
   return [
     ...takeActions(clip, state, run),
     edit({ icon: '✎', label: 'Rename', title: 'Or double-click the Clip', run: run.rename }),
@@ -69,9 +69,9 @@ export function clipActions(clip: Clip, state: ClipMenuState, run: ClipRun): Men
   ];
 }
 
-/** Marks an entry that edits as off while recording, saying why. */
-function editing(recording: boolean): (action: MenuAction) => MenuAction {
-  return (action) => (recording ? { ...action, disabled: true, title: editHint(true, action.title) } : action);
+/** Marks an entry that edits as off while frozen, saying why. */
+function editing(freeze: Freeze): (action: MenuAction) => MenuAction {
+  return (action) => (freeze ? { ...action, disabled: true, title: editHint(freeze, action.title) } : action);
 }
 
 /** Copy and Cut, naming their keys, if there are any to name, as Rename names double-clicking. */
@@ -94,22 +94,30 @@ export type SelectionRun = {
   copyClips: () => void;
   cutClips: () => void;
   duplicateClips: () => void;
+  /** Merges them into one Clip of a new Sound. */
+  mergeClips: () => void;
   deleteClips: () => void;
 };
 
 /** What the Selection menu needs to know besides how many Clips are selected. */
-export type SelectionMenuState = Pick<ClipMenuState, 'recording' | 'copyKeys' | 'cutKeys'>;
+export type SelectionMenuState = Pick<ClipMenuState, 'frozen' | 'copyKeys' | 'cutKeys'> & {
+  /** They can be merged: two or more, all on one Track. */
+  canMerge: boolean;
+};
 
 /**
  * The entries of the Selection menu, a selected Clip's menu while there are
  * several selected, acting on all `count` of them.
  */
 export function selectionActions(count: number, run: SelectionRun, state: SelectionMenuState): MenuAction[] {
-  const edit = editing(state.recording);
+  const edit = editing(state.frozen);
   const howMany = `${count} Clip${count === 1 ? '' : 's'}`;
   return [
     ...clipboardActions(edit, state, run.copyClips, run.cutClips),
     edit({ icon: '⧉', label: `Duplicate ${howMany}`, run: run.duplicateClips }),
+    ...(state.canMerge
+      ? [edit({ icon: '⊕', label: 'Merge', title: 'Into one Clip of a new Sound', run: run.mergeClips })]
+      : []),
     edit({ icon: '×', label: `Delete ${howMany}`, run: run.deleteClips }),
   ];
 }
@@ -119,7 +127,7 @@ function takeActions(clip: Clip, state: ClipMenuState, run: ClipRun): MenuAction
   const { activeTakeId, takes } = clip;
   const active = activeTake(clip)!;
   const { nudgeKeys } = state;
-  const edit = editing(state.recording);
+  const edit = editing(state.frozen);
   const canRecord = state.canRecord && state.selected <= 1;
   // With one Take, there's no other to choose, and deleting it is
   // deleting the Clip.
