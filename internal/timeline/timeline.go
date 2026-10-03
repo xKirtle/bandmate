@@ -71,6 +71,11 @@ type Clip struct {
 	// Gain is how much louder or quieter it plays, in dB, before its Track's
 	// volume applies: from MinGain to MaxGain, 0 until it's set.
 	Gain float64 `json:"gain"`
+	// FadeIn and FadeOut are how long it rises from silence at its start
+	// and falls to silence at its end, in seconds, each measured from that
+	// edge as trimmed: 0 for none. Together they never run longer than it.
+	FadeIn  float64 `json:"fadeIn"`
+	FadeOut float64 `json:"fadeOut"`
 	// Takes are a Clip of Takes' Takes, by number, and ActiveTakeID the one
 	// it plays. A Clip of a Beat has none.
 	Takes        []Take `json:"takes"`
@@ -200,15 +205,15 @@ func read(ctx context.Context, tx *sql.Tx, songID int64) (Timeline, error) {
 
 	type at struct{ track, clip int }
 	clipAt := map[int64]at{}
-	err = query(ctx, tx, `SELECT c.id, c.track_id, c.beat_id, c.sound_id, c.name, c.gain, c.active_take_id,
-			c.start, c.source_offset, c.length
+	err = query(ctx, tx, `SELECT c.id, c.track_id, c.beat_id, c.sound_id, c.name, c.gain, c.fade_in, c.fade_out,
+			c.active_take_id, c.start, c.source_offset, c.length
 		FROM clips c JOIN tracks t ON t.id = c.track_id
 		WHERE t.song_id = ? ORDER BY c.start, c.id`, []any{songID},
 		func(rows *sql.Rows) error {
 			c := Clip{Takes: []Take{}}
 			var trackID int64
-			if err := rows.Scan(&c.ID, &trackID, &c.BeatID, &c.SoundID, &c.Name, &c.Gain, &c.ActiveTakeID,
-				&c.Start, &c.Offset, &c.Length); err != nil {
+			if err := rows.Scan(&c.ID, &trackID, &c.BeatID, &c.SoundID, &c.Name, &c.Gain, &c.FadeIn, &c.FadeOut,
+				&c.ActiveTakeID, &c.Start, &c.Offset, &c.Length); err != nil {
 				return err
 			}
 			t := &tl.Tracks[trackAt[trackID]]
@@ -567,14 +572,15 @@ const tolerance = 1e-6
 // errOverlap is refusing a Clip where another already plays on its Track.
 var errOverlap = &lyricsheet.ConflictError{Msg: "Clips can't overlap on a Track"}
 
-// placement is where a Clip is, what it plays, what it's named and its
-// Gain, as stored.
+// placement is where a Clip is, what it plays, what it's named, its Gain
+// and its Fades, as stored. Its Fades are shortened to fit as it's stored.
 type placement struct {
 	trackID int64
 	source  source
 	// name is null for a Clip that isn't named.
 	name   sql.NullString
 	gain   float64
+	fades  Fades
 	start  float64
 	offset float64
 	length float64
@@ -701,8 +707,11 @@ func (s *Store) MoveClips(ctx context.Context, songID int64, based lyricsheet.Ve
 // TrimClip has a Clip play length seconds of its source from offset,
 // without touching the source's file. The audio stays where it was on the
 // Timeline, so trimming the start moves where the Clip starts. It can't
-// reach beyond the source or into a neighbour.
-func (s *Store) TrimClip(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64, offset, length float64) (Timeline, error) {
+// reach beyond the source or into a neighbour. Its Fades go with its edges,
+// shortened to fit if it's now too short for them, unless fades, if given,
+// sets them, e.g. to undo the trim.
+func (s *Store) TrimClip(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64, offset, length float64,
+	fades *Fades) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		p, err := clipPlacement(ctx, tx, songID, clipID)
 		if err != nil {
@@ -718,6 +727,12 @@ func (s *Store) TrimClip(ctx context.Context, songID int64, based lyricsheet.Ver
 		offset = max(offset, 0)
 		p.start += offset - p.offset
 		p.offset, p.length = offset, length
+		if fades != nil {
+			if err := fades.check(length); err != nil {
+				return err
+			}
+			p.fades = *fades
+		}
 		return place(ctx, tx, clipID, p)
 	})
 }
@@ -748,7 +763,10 @@ type NewClip struct {
 	// Name is its own name, if it has one.
 	Name *string `json:"name"`
 	// Gain is in dB, 0 if not given.
-	Gain         float64 `json:"gain"`
+	Gain float64 `json:"gain"`
+	// FadeIn and FadeOut are in seconds, 0 if not given.
+	FadeIn       float64 `json:"fadeIn"`
+	FadeOut      float64 `json:"fadeOut"`
 	TakeIDs      []int64 `json:"takeIds"`
 	ActiveTakeID *int64  `json:"activeTakeId"`
 	Start        float64 `json:"start"`
@@ -983,7 +1001,11 @@ func addClip(ctx context.Context, tx *sql.Tx, songID, trackID int64, c NewClip) 
 	if err := checkGain(c.Gain); err != nil {
 		return err
 	}
-	p := placement{trackID: trackID, source: src, name: clipName(c.Name), gain: c.Gain,
+	fades := Fades{In: c.FadeIn, Out: c.FadeOut}
+	if err := fades.check(c.Length); err != nil {
+		return err
+	}
+	p := placement{trackID: trackID, source: src, name: clipName(c.Name), gain: c.Gain, fades: fades,
 		start: max(c.Start, 0), offset: max(c.Offset, 0), length: c.Length}
 	free, err := isFree(ctx, tx, 0, p)
 	if err != nil {
@@ -1077,19 +1099,21 @@ func attachTakes(ctx context.Context, tx *sql.Tx, clipID int64, takeIDs []int64)
 // insertClip stores a new Clip as placed, without checking where, and
 // returns its id.
 func insertClip(ctx context.Context, tx *sql.Tx, p placement) (int64, error) {
+	fades := p.fades.fitted(p.length)
 	res, err := tx.ExecContext(ctx,
-		`INSERT INTO clips (track_id, beat_id, sound_id, name, gain, active_take_id, start, source_offset, length)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.trackID, p.source.beatID, p.source.soundID, p.name, p.gain, p.source.activeTakeID, p.start, p.offset,
-		p.length)
+		`INSERT INTO clips (track_id, beat_id, sound_id, name, gain, fade_in, fade_out, active_take_id,
+				start, source_offset, length)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.trackID, p.source.beatID, p.source.soundID, p.name, p.gain, fades.In, fades.Out, p.source.activeTakeID,
+		p.start, p.offset, p.length)
 	if err != nil {
 		return 0, fmt.Errorf("adding clip: %w", err)
 	}
 	return res.LastInsertId()
 }
 
-// DuplicateClip adds a copy of a Clip, with the same trim, name and Gain,
-// right after it on its Track, or after the Track's last Clip if something is in
+// DuplicateClip adds a copy of a Clip, with the same trim, name, Gain and
+// Fades, right after it on its Track, or after the Track's last Clip if something is in
 // the way. A Clip of Takes gets copies of its Takes, sharing their files.
 func (s *Store) DuplicateClip(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64) (Timeline, error) {
 	var linked []int64
@@ -1145,6 +1169,8 @@ type ClipCopy struct {
 	Name *string
 	// Gain is in dB.
 	Gain float64
+	// FadeIn and FadeOut are in seconds.
+	FadeIn, FadeOut float64
 	// Takes are a Clip of Takes', and ActiveTakeID the one of them it plays.
 	Takes        []TakeAt
 	ActiveTakeID *int64
@@ -1190,7 +1216,7 @@ func (s *Store) PasteClips(ctx context.Context, songID int64, based lyricsheet.V
 				return err
 			}
 			nc := NewClip{BeatID: c.BeatID, SoundID: c.SoundID, Name: c.Name, Gain: c.Gain,
-				Start: c.Start, Offset: c.Offset, Length: c.Length}
+				FadeIn: c.FadeIn, FadeOut: c.FadeOut, Start: c.Start, Offset: c.Offset, Length: c.Length}
 			if len(c.Takes) > 0 {
 				ids, active, err := s.copyTakesAt(ctx, tx, songID, c.Takes, *c.ActiveTakeID, &linked)
 				if err != nil {
@@ -1312,6 +1338,55 @@ func checkGain(gain float64) error {
 	return nil
 }
 
+// SetClipFades sets how long a Clip rises from silence at its start and
+// falls to silence at its end, in seconds: 0 for no Fade. Together they
+// can't run longer than the Clip.
+func (s *Store) SetClipFades(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64, fades Fades) (Timeline, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		p, err := clipPlacement(ctx, tx, songID, clipID)
+		if err != nil {
+			return err
+		}
+		if err := fades.check(p.length); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE clips SET fade_in = ?, fade_out = ? WHERE id = ?`,
+			fades.In, fades.Out, clipID); err != nil {
+			return fmt.Errorf("setting clip fades: %w", err)
+		}
+		return nil
+	})
+}
+
+// Fades are how long a Clip rises from silence at its start (In) and falls
+// to silence at its end (Out), in seconds, each measured from that edge.
+type Fades struct {
+	In, Out float64
+}
+
+// check checks that Fades are each at least nothing, and together no
+// longer than a Clip length seconds long.
+func (f Fades) check(length float64) error {
+	switch {
+	case f.In < 0 || f.Out < 0:
+		return &lyricsheet.InvalidError{Msg: "a Fade can't be shorter than nothing"}
+	case f.In+f.Out > length+tolerance:
+		return &lyricsheet.InvalidError{Msg: "a Clip's Fades can't together run longer than it"}
+	}
+	return nil
+}
+
+// fitted is the Fades of a Clip now length seconds long: as they are, if
+// they fit, or else each shortened by the same share, to meet. The web
+// app's fitFades (web/src/lib/clipFade.ts) works it out the same way.
+func (f Fades) fitted(length float64) Fades {
+	if f.In+f.Out <= length {
+		return f
+	}
+	share := length / (f.In + f.Out)
+	return Fades{In: f.In * share, Out: min(f.Out*share, length-f.In*share)}
+}
+
 // clipName is a Clip's name as stored: trimmed, and null if it has none or
 // it's blank.
 func clipName(name *string) sql.NullString {
@@ -1385,12 +1460,12 @@ func deleteClip(ctx context.Context, tx *sql.Tx, songID, clipID int64) error {
 // clipPlacement reads where one of the Song's Clips is and what it plays.
 func clipPlacement(ctx context.Context, tx *sql.Tx, songID, clipID int64) (placement, error) {
 	var p placement
-	err := tx.QueryRowContext(ctx, `SELECT c.track_id, c.beat_id, c.sound_id, c.name, c.gain, c.active_take_id,
-			c.start, c.source_offset, c.length
+	err := tx.QueryRowContext(ctx, `SELECT c.track_id, c.beat_id, c.sound_id, c.name, c.gain, c.fade_in, c.fade_out,
+			c.active_take_id, c.start, c.source_offset, c.length
 		FROM clips c JOIN tracks t ON t.id = c.track_id
 		WHERE c.id = ? AND t.song_id = ?`, clipID, songID).
-		Scan(&p.trackID, &p.source.beatID, &p.source.soundID, &p.name, &p.gain, &p.source.activeTakeID,
-			&p.start, &p.offset, &p.length)
+		Scan(&p.trackID, &p.source.beatID, &p.source.soundID, &p.name, &p.gain, &p.fades.In, &p.fades.Out,
+			&p.source.activeTakeID, &p.start, &p.offset, &p.length)
 	if errors.Is(err, sql.ErrNoRows) {
 		return placement{}, lyricsheet.ErrNotFound
 	}
@@ -1448,10 +1523,12 @@ func checkFree(ctx context.Context, tx *sql.Tx, clipID int64, p placement) error
 	return nil
 }
 
-// store writes a Clip's placement, unchecked.
+// store writes a Clip's placement, unchecked, its Fades shortened to fit.
 func store(ctx context.Context, tx *sql.Tx, clipID int64, p placement) error {
-	if _, err := tx.ExecContext(ctx, `UPDATE clips SET track_id = ?, start = ?, source_offset = ?, length = ? WHERE id = ?`,
-		p.trackID, p.start, p.offset, p.length, clipID); err != nil {
+	fades := p.fades.fitted(p.length)
+	if _, err := tx.ExecContext(ctx, `UPDATE clips SET track_id = ?, start = ?, source_offset = ?, length = ?,
+			fade_in = ?, fade_out = ? WHERE id = ?`,
+		p.trackID, p.start, p.offset, p.length, fades.In, fades.Out, clipID); err != nil {
 		return fmt.Errorf("placing clip: %w", err)
 	}
 	return nil

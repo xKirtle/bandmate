@@ -133,12 +133,20 @@ func (a *App) trimClip(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Offset *float64 `json:"offset"`
 		Length *float64 `json:"length"`
+		// FadeIn and FadeOut, if both are given, set the Clip's Fades, e.g.
+		// to undo a trim that shortened them.
+		FadeIn  *float64 `json:"fadeIn"`
+		FadeOut *float64 `json:"fadeOut"`
 	}
 	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based lyricsheet.Version, clipID int64) (timeline.Timeline, error) {
 		if req.Offset == nil || req.Length == nil {
 			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "offset and length are required"}
 		}
-		return a.timelines.TrimClip(ctx, id, based, clipID, *req.Offset, *req.Length)
+		var fades *timeline.Fades
+		if req.FadeIn != nil && req.FadeOut != nil {
+			fades = &timeline.Fades{In: *req.FadeIn, Out: *req.FadeOut}
+		}
+		return a.timelines.TrimClip(ctx, id, based, clipID, *req.Offset, *req.Length, fades)
 	})
 }
 
@@ -151,6 +159,8 @@ type clipToPlace struct {
 	SoundID      *int64   `json:"soundId"`
 	Name         *string  `json:"name"`
 	Gain         float64  `json:"gain"`
+	FadeIn       float64  `json:"fadeIn"`
+	FadeOut      float64  `json:"fadeOut"`
 	TakeIDs      []int64  `json:"takeIds"`
 	ActiveTakeID *int64   `json:"activeTakeId"`
 	Start        *float64 `json:"start"`
@@ -172,7 +182,8 @@ func (c clipToPlace) placed() (timeline.PlacedClip, error) {
 		on.TrackID = *c.TrackID
 	}
 	return timeline.PlacedClip{OnTrack: on, NewClip: timeline.NewClip{
-		BeatID: c.BeatID, SoundID: c.SoundID, Name: c.Name, Gain: c.Gain, TakeIDs: c.TakeIDs, ActiveTakeID: c.ActiveTakeID,
+		BeatID: c.BeatID, SoundID: c.SoundID, Name: c.Name, Gain: c.Gain, FadeIn: c.FadeIn, FadeOut: c.FadeOut,
+		TakeIDs: c.TakeIDs, ActiveTakeID: c.ActiveTakeID,
 		Start: *c.Start, Offset: *c.Offset, Length: *c.Length,
 	}}, nil
 }
@@ -242,6 +253,19 @@ func (a *App) setClipGain(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *App) setClipFades(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		FadeIn  *float64 `json:"fadeIn"`
+		FadeOut *float64 `json:"fadeOut"`
+	}
+	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based lyricsheet.Version, clipID int64) (timeline.Timeline, error) {
+		if req.FadeIn == nil || req.FadeOut == nil {
+			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "fadeIn and fadeOut are required"}
+		}
+		return a.timelines.SetClipFades(ctx, id, based, clipID, timeline.Fades{In: *req.FadeIn, Out: *req.FadeOut})
+	})
+}
+
 func (a *App) duplicateClip(w http.ResponseWriter, r *http.Request) {
 	a.changeClip(w, r, nil, a.timelines.DuplicateClip)
 }
@@ -277,6 +301,7 @@ func (c clipToPaste) copied() (timeline.ClipCopy, error) {
 		return timeline.ClipCopy{}, err
 	}
 	return timeline.ClipCopy{OnTrack: p.OnTrack, BeatID: p.BeatID, SoundID: p.SoundID, Name: p.Name, Gain: p.Gain,
+		FadeIn: p.FadeIn, FadeOut: p.FadeOut,
 		Takes: c.Takes, ActiveTakeID: p.ActiveTakeID, Start: p.Start, Offset: p.Offset, Length: p.Length}, nil
 }
 

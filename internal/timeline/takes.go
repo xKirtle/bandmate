@@ -268,6 +268,11 @@ type ClipTakes struct {
 	Start        float64  `json:"start"`
 	Offset       float64  `json:"offset"`
 	Length       float64  `json:"length"`
+	// FadeIn and FadeOut set the Clip's Fades, if both are given, e.g. to
+	// undo a change that shortened them. Otherwise they're kept, shortened
+	// to fit if the Clip is now too short for them.
+	FadeIn  *float64 `json:"fadeIn"`
+	FadeOut *float64 `json:"fadeOut"`
 }
 
 // TakeAt is a Take, where it starts in its Clip's source span, and how far
@@ -320,6 +325,13 @@ func (s *Store) SetTakes(ctx context.Context, songID int64, based lyricsheet.Ver
 			return fmt.Errorf("setting takes: %w", err)
 		}
 		p.start, p.offset, p.length = ct.Start, max(ct.Offset, 0), ct.Length
+		if ct.FadeIn != nil && ct.FadeOut != nil {
+			fades := Fades{In: *ct.FadeIn, Out: *ct.FadeOut}
+			if err := fades.check(ct.Length); err != nil {
+				return err
+			}
+			p.fades = fades
+		}
 		return place(ctx, tx, clipID, p)
 	})
 }
