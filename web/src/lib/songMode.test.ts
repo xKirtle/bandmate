@@ -31,10 +31,8 @@ describe('detailsSummary', () => {
   });
 
   it('shows the key the Chords are transposed to, with the written one', () => {
-    expect(detailsSummary({ key: 'G', bpm: '92', capo: '2', tuning: '' }, 2)).toBe(
-      'Key A (written G) · 92 BPM · Capo 2',
-    );
-    expect(detailsSummary({ ...none, key: ' G minor ' }, 2)).toBe('Key A minor (written G minor)');
+    expect(detailsSummary({ key: 'G', bpm: '92', capo: '2', tuning: '' }, 2)).toBe('A (written G) · 92 BPM · Capo 2');
+    expect(detailsSummary({ ...none, key: ' G minor ' }, 2)).toBe('A minor (written G minor)');
   });
 
   it("shows the written key when it can't be read or isn't transposed", () => {

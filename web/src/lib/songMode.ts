@@ -15,7 +15,7 @@ export function openingMode(status: Status): Mode {
 /**
  * A Song's Details as one line of text, as Read mode shows them, e.g. "C#m · 92 BPM · Capo 2 · Standard".
  * With the Chords transposed by semitones, a readable key shows as the one
- * they're shown in, with the written one: "Key A (written G)".
+ * they're shown in, with the written one: "A (written G)".
  */
 export function detailsSummary(
   details: { key: string; bpm: string; capo: string; tuning: string },
@@ -26,7 +26,7 @@ export function detailsSummary(
   const bpm = details.bpm.trim();
   const capo = details.capo.trim();
   const tuning = details.tuning.trim();
-  return [shownKey ? `Key ${shownKey} (written ${key})` : key, bpm && `${bpm} BPM`, capo && `Capo ${capo}`, tuning]
+  return [shownKey ? `${shownKey} (written ${key})` : key, bpm && `${bpm} BPM`, capo && `Capo ${capo}`, tuning]
     .filter(Boolean)
     .join(' · ');
 }
