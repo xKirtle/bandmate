@@ -75,6 +75,20 @@ _Avoid_: Chord bar, instrumental line
 Showing a Song's Chords moved up or down by semitones in Read mode, for playing in another key. It's a way of reading the Song, not an edit: the Chords, the key and the audio stay as written, and the amount is kept on each device for each Song. A Chord name that can't be read stays as written.
 _Avoid_: Key change
 
+**Key**:
+The key a Song is written in, one of its Details. Like a Chord, with a capo on it names the shapes fingered, not the pitch that sounds: capo 2 in G sounds in A.
+
+**Chord Finder**:
+A built-in reference for Chords: look up how to play one, name one from the notes placed on an Instrument, and get Chords that go well with a Chord or a Key. Opened from a Song, it follows that Song's tuning, capo and Key as shown, Transpose included. It holds nothing of the user's.
+_Avoid_: Chord Library (a library holds the user's things, like the Beat Library)
+
+**Voicing**:
+One way to play a Chord on an Instrument: which strings and frets on a guitar, which keys on a piano. A Chord has many; the user can prefer one per Chord and tuning, kept on each device.
+_Avoid_: Shape, fingering, chord diagram (a diagram draws a Voicing)
+
+**Instrument**:
+What a Voicing is played on. Only the guitar for now; others, like a piano, can follow.
+
 **Snapshot**:
 A saved copy of the whole Lyric Sheet at a point in time, taken automatically or named by the user.
 _Avoid_: Version, revision, backup
