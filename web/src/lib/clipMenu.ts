@@ -8,6 +8,8 @@ import type { MenuAction } from './menu';
 // long press: its entries, in the order they're listed. Deleting a Clip,
 // setting its Gain, or choosing, nudging, deleting and clearing its Takes,
 // don't ask first: they can be undone, and a deleted Take is only detached.
+// Split at playhead is always listed, but off while the playhead crosses
+// no Clip it would split.
 // While recording, the entries that edit are shown off, and only the
 // downloads run.
 
@@ -23,6 +25,10 @@ export type ClipMenuState = {
   copyKeys: string | null;
   /** The keys that cut, as shown, or null for none. */
   cutKeys: string | null;
+  /** The playhead crosses the Clip, so it can be split there. */
+  canSplit: boolean;
+  /** The keys that split, as shown, or null for none. */
+  splitKeys: string | null;
   /** How many Clips are selected. With several, no Retake is offered. */
   selected: number;
   /** A recording or a Merge is under way, so nothing's edited, or null. */
@@ -46,6 +52,8 @@ export type ClipRun = {
   /** Copies the Clip to the Clipboard, then deletes it. */
   cut: () => void;
   duplicate: () => void;
+  /** Splits the Clip in two at the playhead. */
+  split: () => void;
   downloadSound: (soundId: number) => void;
   deleteClip: () => void;
 };
@@ -65,6 +73,7 @@ export function clipActions(clip: Clip, state: ClipMenuState, run: ClipRun): Men
     }),
     ...clipboardActions(edit, state, run.copy, run.cut),
     edit({ icon: '⧉', label: 'Duplicate', run: run.duplicate }),
+    edit(splitAction(state, 'Move the playhead into the Clip to split it', run.split)),
     ...(soundId !== null
       ? [
           {
@@ -99,18 +108,33 @@ function clipboardActions(
   ];
 }
 
+/** Split at playhead, naming its keys, or off, saying why, while there's nothing to split. */
+function splitAction(
+  { canSplit, splitKeys }: Pick<ClipMenuState, 'canSplit' | 'splitKeys'>,
+  whyNot: string,
+  split: () => void,
+): MenuAction {
+  const action: MenuAction = { icon: '¦', label: 'Split at playhead', run: split };
+  if (!canSplit) return { ...action, disabled: true, title: whyNot };
+  return splitKeys ? { ...action, title: `Or ${splitKeys}` } : action;
+}
+
 /** What each entry of the Selection menu does. */
 export type SelectionRun = {
   copyClips: () => void;
   cutClips: () => void;
   duplicateClips: () => void;
+  /** Splits those the playhead crosses in two at it. */
+  splitClips: () => void;
   /** Merges them into one Clip of a new Sound. */
   mergeClips: () => void;
   deleteClips: () => void;
 };
 
 /** What the Selection menu needs to know besides how many Clips are selected. */
-export type SelectionMenuState = Pick<ClipMenuState, 'frozen' | 'copyKeys' | 'cutKeys'> & {
+export type SelectionMenuState = Pick<ClipMenuState, 'frozen' | 'copyKeys' | 'cutKeys' | 'splitKeys'> & {
+  /** The playhead crosses one or more of them, so they can be split there. */
+  canSplit: boolean;
   /** They can be merged: two or more, on any Tracks. */
   canMerge: boolean;
 };
@@ -125,6 +149,7 @@ export function selectionActions(count: number, run: SelectionRun, state: Select
   return [
     ...clipboardActions(edit, state, run.copyClips, run.cutClips),
     edit({ icon: '⧉', label: `Duplicate ${howMany}`, run: run.duplicateClips }),
+    edit(splitAction(state, 'Move the playhead into a selected Clip to split it', run.splitClips)),
     ...(state.canMerge
       ? [edit({ icon: '⊕', label: 'Merge', title: 'Into one Clip of a new Sound', run: run.mergeClips })]
       : []),

@@ -69,6 +69,7 @@
   import { allKeys, shortcuts, type Way } from './shortcuts';
   import { clipActions, selectionActions } from './clipMenu';
   import { mergeTarget, mergeWarning, mergedClips, renderMerge, type MergedAudio } from './merge';
+  import { splitTargets } from './split';
   import { menuFor, noSelection, selection, type Selection, type SelectionGesture } from './selection';
   import {
     copy,
@@ -494,6 +495,7 @@
       keyActedOnPage();
       toggle();
     } else if (shortcut === 'record') switchRecording();
+    else if (shortcut === 'split') splitAtPlayhead();
     else if (shortcut === 'undo') undo();
     else redo();
   }
@@ -2161,6 +2163,23 @@
     if (copies) pasteAndSelect(copies);
   }
 
+  /**
+   * Splits Clips in two at the playhead, as one edit, and selects both
+   * halves of each: the selected Clips it crosses, or with none selected,
+   * the Chosen Track's Clip under it; or, given, only those of clipIds it
+   * crosses. With nothing to split, nothing happens.
+   */
+  function splitAtPlayhead(clipIds?: ReadonlySet<number>) {
+    if (frozen) return;
+    const at = playheadAt();
+    const splitting = splitTargets(timeline.tracks, clipIds ?? selected, chosen, at);
+    if (splitting.length === 0) return;
+    perform({ kind: 'splitClips', clipIds: splitting, at }, (before, after) => {
+      // Unless the Selection is locked by a recording started since.
+      if (!frozen) selected = new Set([...splitting, ...addedClips(before, after)]);
+    });
+  }
+
   // A Clip is renamed in place, like a Track: double-clicked, or from its
   // menu. A blank name clears its own, so it goes by its source's again.
   // Until a new name is saved, it's shown.
@@ -2318,10 +2337,16 @@
           copyClips: copySelection,
           cutClips: cutSelection,
           duplicateClips: duplicateSelection,
+          splitClips: () => splitAtPlayhead(),
           mergeClips: mergeSelection,
           deleteClips: removeSelection,
         },
-        { frozen: freeze, canMerge: mergeTarget(timeline.tracks, selected) !== null, ...clipboardKeys() },
+        {
+          frozen: freeze,
+          canMerge: mergeTarget(timeline.tracks, selected) !== null,
+          canSplit: splitTargets(timeline.tracks, selected, chosen, playheadAt()).length > 0,
+          ...menuKeys(),
+        },
       );
     }
     const clipId = clip.id;
@@ -2331,7 +2356,8 @@
         canRecord,
         soundName: clip.soundId === null ? null : sources.of(clip).title,
         nudgeKeys: hints.label(shortcuts.nudgeTake.keys),
-        ...clipboardKeys(),
+        ...menuKeys(),
+        canSplit: splitTargets(timeline.tracks, new Set([clipId]), chosen, playheadAt()).length > 0,
         selected: selected.size,
         frozen: freeze,
       },
@@ -2348,15 +2374,20 @@
         copy: () => copyClips(new Set([clip.id])),
         cut: () => cutClip(clip),
         duplicate: () => duplicate(clip),
+        split: () => splitAtPlayhead(new Set([clipId])),
         downloadSound: (soundId) => download(api.soundDownloadUrl(timeline.songId, soundId)),
         deleteClip: () => remove(clip),
       },
     );
   }
 
-  /** The keys that copy and cut, as the Clip and Selection menus name them. */
-  function clipboardKeys() {
-    return { copyKeys: hints.label(shortcuts.copyClips.keys), cutKeys: hints.label(shortcuts.cutClips.keys) };
+  /** The keys that copy, cut and split, as the Clip and Selection menus name them. */
+  function menuKeys() {
+    return {
+      copyKeys: hints.label(shortcuts.copyClips.keys),
+      cutKeys: hints.label(shortcuts.cutClips.keys),
+      splitKeys: hints.label(shortcuts.splitClips.keys),
+    };
   }
 
   /** Saves what a URL serves as a file, as the server names it. */

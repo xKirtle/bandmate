@@ -1293,3 +1293,71 @@ describe('History of Merges', () => {
     expect(h.nextUndo()).toMatchObject({ kind: 'replaceClips', clipIds: [18], trackIds: [24] });
   });
 });
+
+describe('History of Splits', () => {
+  it('undoes a Split by replacing the halves with the Clips as they were, and redoes it by placing the same halves back, their Takes and all', () => {
+    const h = new History();
+    const takes = takeClip(6, 20, [take(41), take(42)]);
+    const t0 = timeline([
+      track(1, [clip(5, 0, { name: 'Hook', fadeIn: 3, fadeOut: 2 }), takes]),
+      track(2, [clip(7, 0)]),
+    ]);
+    // Split at 0:04 and 0:24: each Clip is its left half, and the right
+    // halves are new, 6's with copies of its Takes.
+    const t1 = timeline([
+      track(1, [
+        clip(5, 0, { name: 'Hook', fadeIn: 3, length: 4 }),
+        clip(8, 4, { name: 'Hook', fadeOut: 2, offset: 4, length: 6 }),
+        { ...takes, length: 4 },
+        { ...takeClip(9, 24, [take(51), take(52)]), offset: 6, length: 6 },
+      ]),
+      track(2, [clip(7, 0)]),
+    ]);
+
+    h.record({ kind: 'splitClips', clipIds: [5, 6], at: 4 }, t0, t1);
+
+    expect(h.nextUndo()).toEqual({
+      kind: 'replaceClips',
+      clipIds: [5, 6, 8, 9],
+      clips: [
+        { trackId: 1, clip: { beatId: 100, name: 'Hook', fadeIn: 3, fadeOut: 2, start: 0, offset: 0, length: 10 } },
+        { trackId: 1, clip: { takeIds: [41, 42], activeTakeId: 41, start: 20, offset: 2, length: 10 } },
+      ],
+    });
+
+    // Undone, the Clips come back with new ids, which redoing then replaces.
+    const back = h.undone(
+      t1,
+      timeline([
+        track(1, [clip(15, 0, { name: 'Hook', fadeIn: 3, fadeOut: 2 }), { ...takes, id: 16 }]),
+        track(2, [clip(7, 0)]),
+      ]),
+    );
+    expect(back).toEqual([15, 16]);
+    expect(h.nextRedo()).toEqual({
+      kind: 'replaceClips',
+      clipIds: [15, 16],
+      clips: [
+        { trackId: 1, clip: { beatId: 100, name: 'Hook', fadeIn: 3, start: 0, offset: 0, length: 4 } },
+        { trackId: 1, clip: { beatId: 100, name: 'Hook', fadeOut: 2, start: 4, offset: 4, length: 6 } },
+        { trackId: 1, clip: { takeIds: [41, 42], activeTakeId: 41, start: 20, offset: 2, length: 4 } },
+        { trackId: 1, clip: { takeIds: [51, 52], activeTakeId: 51, start: 24, offset: 6, length: 6 } },
+      ],
+    });
+
+    // Redone, every half comes back with a new id, which undoing then names.
+    h.redone(
+      t0,
+      timeline([
+        track(1, [
+          clip(25, 0, { name: 'Hook', fadeIn: 3, length: 4 }),
+          clip(26, 4, { name: 'Hook', fadeOut: 2, offset: 4, length: 6 }),
+          { ...takes, id: 27, length: 4 },
+          { ...takeClip(28, 24, [take(51), take(52)]), offset: 6, length: 6 },
+        ]),
+        track(2, [clip(7, 0)]),
+      ]),
+    );
+    expect(h.nextUndo()).toMatchObject({ kind: 'replaceClips', clipIds: [25, 27, 26, 28] });
+  });
+});

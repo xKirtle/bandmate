@@ -2,7 +2,7 @@ import { matches, shortcuts, shortcutsDialogKeys, type KeyDown } from './shortcu
 import type { KeyPlace } from './keyPlace';
 
 /** The Song-wide Shortcuts, which work wherever focus is on the Song page. */
-export type SongKey = 'playPause' | 'record' | 'undo' | 'redo';
+export type SongKey = 'playPause' | 'record' | 'undo' | 'redo' | 'split';
 
 /** Where a key was pressed, and what the Song page is doing. */
 export type SongKeyContext = KeyPlace & {
@@ -38,6 +38,11 @@ export function songKey(e: KeyDown, at: SongKeyContext): SongKey | null {
   if (matches(e, shortcuts.record.keys)) {
     if (e.repeat || at.inTextField || (!at.capturing && !at.canRecord)) return null;
     return 'record';
+  }
+  if (matches(e, shortcuts.splitClips.keys)) {
+    // Editing, so not on a phone, nor while recording.
+    if (e.repeat || !at.editable || at.inTextField || at.recording) return null;
+    return 'split';
   }
   return null;
 }

@@ -1133,29 +1133,36 @@ func (s *Store) DuplicateClip(ctx context.Context, songID int64, based lyricshee
 				return fmt.Errorf("finding the end of the track: %w", err)
 			}
 		}
-		if !p.source.activeTakeID.Valid {
-			_, err := insertClip(ctx, tx, p)
-			return err
-		}
-		copies, err := s.copyTakes(ctx, tx, p.source.takeIDs, &linked)
-		if err != nil {
-			return err
-		}
-		p.source.activeTakeID.Int64 = copies[p.source.activeTakeID.Int64]
-		copyID, err := insertClip(ctx, tx, p)
-		if err != nil {
-			return err
-		}
-		ids := make([]int64, 0, len(copies))
-		for _, id := range p.source.takeIDs {
-			ids = append(ids, copies[id])
-		}
-		return attachTakes(ctx, tx, copyID, ids)
+		return s.insertCopy(ctx, tx, p, &linked)
 	})
 	if err != nil {
 		s.removeTakeFiles(linked)
 	}
 	return tl, err
+}
+
+// insertCopy stores a new Clip as placed, unchecked, playing what p
+// plays: for a Clip of Takes, copies of its Takes, sharing their files,
+// noting each file linked in linked.
+func (s *Store) insertCopy(ctx context.Context, tx *sql.Tx, p placement, linked *[]int64) error {
+	if !p.source.activeTakeID.Valid {
+		_, err := insertClip(ctx, tx, p)
+		return err
+	}
+	copies, err := s.copyTakes(ctx, tx, p.source.takeIDs, linked)
+	if err != nil {
+		return err
+	}
+	p.source.activeTakeID.Int64 = copies[p.source.activeTakeID.Int64]
+	copyID, err := insertClip(ctx, tx, p)
+	if err != nil {
+		return err
+	}
+	ids := make([]int64, 0, len(copies))
+	for _, id := range p.source.takeIDs {
+		ids = append(ids, copies[id])
+	}
+	return attachTakes(ctx, tx, copyID, ids)
 }
 
 // ClipCopy is a Clip as it was copied, to paste as a new Clip on a Track:

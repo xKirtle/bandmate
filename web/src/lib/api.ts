@@ -858,6 +858,14 @@ export const api = {
       at,
     ),
   /**
+   * Splits Clips in two at a time on the Timeline, which must cross each:
+   * each Clip keeps its id as the left half, ending there, and a new Clip
+   * is the right half, which for a Clip of Takes plays copies of its
+   * Takes. Refused whole if any can't be.
+   */
+  splitClips: (at: SongAt, clipIds: number[], time: number) =>
+    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/split`, { clipIds, at: time }, at),
+  /**
    * Merges two or more Clips, on any Tracks, into one Clip of a new Sound,
    * "Merged Clip", from their audio rendered together: a 24-bit WAV running
    * from the earliest one's start to the latest one's end. It goes on the

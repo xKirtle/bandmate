@@ -378,6 +378,19 @@ func (a *App) replaceClips(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *App) splitClips(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ClipIDs []int64  `json:"clipIds"`
+		At      *float64 `json:"at"`
+	}
+	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+		if req.At == nil {
+			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "at is required"}
+		}
+		return a.timelines.SplitClips(r.Context(), id, based, req.ClipIDs, *req.At)
+	})
+}
+
 func (a *App) deleteClip(w http.ResponseWriter, r *http.Request) {
 	a.changeClip(w, r, nil, a.timelines.DeleteClip)
 }

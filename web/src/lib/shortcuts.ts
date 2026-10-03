@@ -139,6 +139,13 @@ export const shortcuts = {
       'Pastes the Clips last copied or cut at the playhead on the Chosen Track, both of which a click on empty lane space sets, or later where they fit, and selects them.',
     keys: [{ key: 'v', mod: true }],
   },
+  splitClips: {
+    name: 'Split at the playhead',
+    group: 'Timeline editing',
+    description:
+      "Splits each selected Clip the playhead crosses in two there, or with none selected, the Chosen Track's Clip under it, outside a text field.",
+    keys: [{ key: 's' }],
+  },
   cueNextLine: {
     name: 'Cue the next Line',
     group: 'Sync mode',

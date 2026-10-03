@@ -62,6 +62,12 @@ import { isBlank, type CuedSong } from './cues';
 // undone by replacing its Clip with the Clips it merged, as they were, in
 // one step, a Clip of Takes getting its Takes back. A Track it added for
 // its Clip is deleted with it, and redoing adds it back where it was.
+//
+// A Split is kept as cutting each Clip, which stays as its left half, and
+// adding its right half. It's undone by replacing both halves with the
+// Clip as it was, in one step, a Clip of Takes getting its Takes back. It's
+// redone by replacing the Clip with both halves as they were, the right
+// half's Takes brought back, so redoing never copies Takes again.
 
 /** A change to the Timeline, as the intent sent to the API. */
 export type Edit =
@@ -95,6 +101,8 @@ export type Edit =
    * Merge.
    */
   | { kind: 'replaceClips'; clipIds: number[]; clips: PlacedClip[]; trackIds?: number[]; newTracks?: TrackAt[] }
+  /** Clips cut in two at a time on the Timeline, in seconds, which crosses each. */
+  | { kind: 'splitClips'; clipIds: number[]; at: number }
   | { kind: 'setTakes'; clipId: number; takes: ClipTakes }
   | { kind: 'chooseTake'; clipId: number; takeId: number }
   | { kind: 'nudgeTake'; clipId: number; takeId: number; nudge: number }
@@ -139,7 +147,7 @@ export class History {
     if (content(before) === content(after)) return;
     this.#undo.push({
       undo: inverse(edit, before, after),
-      redo: { edit: redoing(edit, before, after), adds: added(before, after) },
+      redo: redoing(edit, before, after),
     });
     this.#redo = [];
   }
@@ -218,19 +226,42 @@ export class History {
 }
 
 /**
- * The edit that redoes edit, which turned before into after: itself, but
- * for a copy, a Duplicate or a paste, placing what it added, so redoing
- * never copies again.
+ * The step that redoes edit, which turned before into after: itself, but
+ * for a copy, a Duplicate, a paste or a Split, placing what it added, so
+ * redoing never copies again.
  */
-function redoing(edit: Edit, before: Timeline, after: Timeline): Edit {
+function redoing(edit: Edit, before: Timeline, after: Timeline): Step {
+  const adds = added(before, after);
   switch (edit.kind) {
     case 'duplicateClip':
-      return placingAdded(before, after);
+      return { edit: placingAdded(before, after), adds };
     case 'pasteClips':
-      return placingAllAdded(before, after);
+      return { edit: placingAllAdded(before, after), adds };
+    case 'splitClips':
+      return splittingAgain(edit.clipIds, before, after);
     default:
-      return edit;
+      return { edit, adds };
   }
+}
+
+/**
+ * The step that redoes a Split of the Clips clipIds, which turned before
+ * into after: replacing them with both halves of each as they are in
+ * after, which all come back with new ids.
+ */
+function splittingAgain(clipIds: readonly number[], before: Timeline, after: Timeline): Step {
+  const halves = new Set([...clipIds, ...added(before, after).clips]);
+  const placed = after.tracks.flatMap((track) =>
+    track.clips.filter((c) => halves.has(c.id)).map((clip) => ({ track, clip })),
+  );
+  return {
+    edit: {
+      kind: 'replaceClips',
+      clipIds: [...clipIds],
+      clips: placed.map(({ track, clip }) => ({ trackId: track.id, clip: placementOf(clip) })),
+    },
+    adds: { tracks: [], clips: placed.map(({ clip }) => clip.id) },
+  };
 }
 
 /** The edit that undoes edit, which turned before into after. */
@@ -310,6 +341,12 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
       const { tracks, clips } = added(before, after);
       const trackIds = tracks.length > 0 ? { trackIds: tracks } : {};
       return { edit: { kind: 'replaceClips', clipIds: clips, ...trackIds, clips: back.clips }, adds: back.adds };
+    }
+    case 'splitClips': {
+      // The Clips are their left halves now.
+      const back = placingBackAll(before, edit.clipIds);
+      const halves = [...edit.clipIds, ...added(before, after).clips];
+      return { edit: { kind: 'replaceClips', clipIds: halves, clips: back.clips }, adds: back.adds };
     }
     case 'setTakes':
     case 'nudgeTake':
@@ -513,6 +550,8 @@ function remap(edit: HistoryEdit, ids: IdMaps): HistoryEdit {
         ...edit,
         moves: edit.moves.map((m) => ({ clipId: ids.clip(m.clipId), trackId: ids.track(m.trackId), start: m.start })),
       };
+    case 'splitClips':
+      return { ...edit, clipIds: edit.clipIds.map(ids.clip) };
     case 'deleteClips':
       return edit.trackIds
         ? { ...edit, clipIds: edit.clipIds.map(ids.clip), trackIds: edit.trackIds.map(ids.track) }
@@ -591,6 +630,8 @@ export function sendEdit(at: SongAt, edit: Edit): Promise<Timeline> {
       return api.deleteClips(at, edit.clipIds, edit.trackIds);
     case 'replaceClips':
       return api.replaceClips(at, edit.clipIds, edit.clips, edit.trackIds, edit.newTracks);
+    case 'splitClips':
+      return api.splitClips(at, edit.clipIds, edit.at);
     case 'setTakes':
       return api.setTakes(at, edit.clipId, edit.takes);
     case 'chooseTake':
