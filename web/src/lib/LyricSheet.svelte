@@ -36,8 +36,8 @@
   import { inTextField } from './textField';
   import { deviceStorage } from './timelineHeight';
   import { readChordsShown, storeChordsShown } from './chordsShown';
-  import { transposeAmount } from './sharedTranspose.svelte';
-  import { transposeLimit } from './transposeAmount';
+  import { songTranspose } from './sharedTranspose.svelte';
+  import { stepTranspose, transposeLimit, transposeText } from './transposeAmount';
 
   let {
     song,
@@ -328,11 +328,11 @@
 
   // How far Read mode transposes the Chords, kept on this device for each
   // Song like hiding them, and kept while they're hidden.
-  const transpose = $derived(transposeAmount.of(songId));
-  const transposeText = $derived(transpose > 0 ? `+${transpose}` : transpose < 0 ? `−${-transpose}` : '0');
+  const transpose = $derived(songTranspose.of(songId));
+  const transposeShown = $derived(transposeText(transpose));
 
   function transposeBy(by: number) {
-    transposeAmount.set(songId, Math.max(-transposeLimit, Math.min(transposeLimit, transpose + by)));
+    songTranspose.set(songId, stepTranspose(transpose, by));
   }
 
   async function add(position: number) {
@@ -449,12 +449,12 @@
               type="button"
               class="button amount"
               disabled={transpose === 0}
-              onclick={() => transposeAmount.set(songId, 0)}
+              onclick={() => songTranspose.set(songId, 0)}
               aria-label={transpose === 0
                 ? 'The Chords show as written'
-                : `Transposed ${transposeText} semitones; show the Chords as written`}
+                : `Transposed ${transposeShown} semitones; show the Chords as written`}
               title={transpose === 0 ? 'The Chords show as written' : 'Show the Chords as written'}
-              >{transposeText}</button
+              >{transposeShown}</button
             >
             <button
               type="button"

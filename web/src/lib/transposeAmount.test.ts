@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readTranspose, storeTranspose, transposeKey } from './transposeAmount';
+import { readTranspose, stepTranspose, storeTranspose, transposeKey, transposeText } from './transposeAmount';
 
 /** A Storage holding some values, or one that throws like a blocked one. */
 function storage(values: Record<string, string> = {}, blocked = false): Storage {
@@ -47,5 +47,22 @@ describe('storeTranspose', () => {
   it('does nothing without storage, or when it is blocked', () => {
     expect(() => storeTranspose(undefined, 1, 2)).not.toThrow();
     expect(() => storeTranspose(storage({}, true), 1, 2)).not.toThrow();
+  });
+});
+
+describe('stepTranspose', () => {
+  it('steps by a semitone, held from −11 to +11', () => {
+    expect(stepTranspose(0, 1)).toBe(1);
+    expect(stepTranspose(-3, -1)).toBe(-4);
+    expect(stepTranspose(11, 1)).toBe(11);
+    expect(stepTranspose(-11, -1)).toBe(-11);
+  });
+});
+
+describe('transposeText', () => {
+  it('signs the amount, with 0 as written', () => {
+    expect(transposeText(2)).toBe('+2');
+    expect(transposeText(-3)).toBe('−3');
+    expect(transposeText(0)).toBe('0');
   });
 });

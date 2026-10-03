@@ -30,3 +30,13 @@ export function storeTranspose(storage: Storage | undefined, songId: number, amo
     // Not kept, e.g. in a private window; the amount still applies until reload.
   }
 }
+
+/** The amount after stepping by semitones, held from −11 to +11. */
+export function stepTranspose(amount: number, by: number): number {
+  return Math.max(-transposeLimit, Math.min(transposeLimit, amount + by));
+}
+
+/** How an amount reads on the stepper: "+2", "−3", or "0" when as written. */
+export function transposeText(amount: number): string {
+  return amount > 0 ? `+${amount}` : amount < 0 ? `−${-amount}` : '0';
+}
