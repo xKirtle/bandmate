@@ -36,6 +36,8 @@
   import { inTextField } from './textField';
   import { deviceStorage } from './timelineHeight';
   import { readChordsShown, storeChordsShown } from './chordsShown';
+  import { transposeAmount } from './sharedTranspose.svelte';
+  import { transposeLimit } from './transposeAmount';
 
   let {
     song,
@@ -324,6 +326,15 @@
     storeChordsShown(deviceStorage(), songId, showChords);
   }
 
+  // How far Read mode transposes the Chords, kept on this device for each
+  // Song like hiding them, and kept while they're hidden.
+  const transpose = $derived(transposeAmount.of(songId));
+  const transposeText = $derived(transpose > 0 ? `+${transpose}` : transpose < 0 ? `−${-transpose}` : '0');
+
+  function transposeBy(by: number) {
+    transposeAmount.set(songId, Math.max(-transposeLimit, Math.min(transposeLimit, transpose + by)));
+  }
+
   async function add(position: number) {
     if (await edit((at) => api.addSection(at, { position }))) {
       added = song.arrangement[position] ?? null;
@@ -415,13 +426,47 @@
     <h2 id="sheet-heading">Lyric Sheet</h2>
     <span class="spacer"></span>
     {#if mode === 'read' && songHasChords}
-      <button
-        type="button"
-        class="button toggle"
-        aria-pressed={showChords}
-        onclick={toggleChords}
-        title="Show or hide the Chords">Chords</button
-      >
+      <!-- Together, so on a narrow screen the stepper wraps with the Chords it moves. -->
+      <div class="chords">
+        <button
+          type="button"
+          class="button toggle"
+          aria-pressed={showChords}
+          onclick={toggleChords}
+          title="Show or hide the Chords">Chords</button
+        >
+        {#if showChords}
+          <div class="transpose" role="group" aria-label="Transpose">
+            <button
+              type="button"
+              class="button step"
+              disabled={transpose <= -transposeLimit}
+              onclick={() => transposeBy(-1)}
+              aria-label="Transpose the Chords down a semitone"
+              title="Transpose the Chords down a semitone">−</button
+            >
+            <button
+              type="button"
+              class="button amount"
+              disabled={transpose === 0}
+              onclick={() => transposeAmount.set(songId, 0)}
+              aria-label={transpose === 0
+                ? 'The Chords show as written'
+                : `Transposed ${transposeText} semitones; show the Chords as written`}
+              title={transpose === 0 ? 'The Chords show as written' : 'Show the Chords as written'}
+              >{transposeText}</button
+            >
+            <button
+              type="button"
+              class="button step"
+              disabled={transpose >= transposeLimit}
+              onclick={() => transposeBy(1)}
+              aria-label="Transpose the Chords up a semitone"
+              title="Transpose the Chords up a semitone">+</button
+            >
+          </div>
+        {/if}
+      </div>
     {/if}
     {#if mode === 'write' && canCue && hasCues(song)}
       <!-- Doesn't ask first: it can be undone. -->
@@ -496,7 +541,7 @@
   {/if}
 
   {#if mode === 'read'}
-    <LyricSheetView {song} showChords={chordsOnScreen} {current} play={leadInto} />
+    <LyricSheetView {song} showChords={chordsOnScreen} {transpose} {current} play={leadInto} />
   {:else}
     <ol
       class="arrangement"
@@ -603,6 +648,30 @@
   .shift-by {
     min-width: var(--control);
     padding: 0;
+  }
+  .chords {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .transpose {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  .step {
+    min-width: var(--control);
+    padding: 0;
+  }
+  /* Wide enough for "−11", so the steps don't move as the amount changes. */
+  .amount {
+    min-width: 3.25rem;
+    padding: 0 0.5rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .amount:disabled {
+    opacity: 1;
+    color: var(--text-muted);
   }
   .toggle[aria-pressed='true'] {
     border-color: var(--accent);

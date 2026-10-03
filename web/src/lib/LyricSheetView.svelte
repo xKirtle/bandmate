@@ -8,11 +8,14 @@
   let {
     song,
     showChords,
+    transpose = 0,
     current = null,
     play,
   }: {
     song: Song;
     showChords: boolean;
+    /** How far to transpose the Chords shown, in semitones. */
+    transpose?: number;
     /** Where playback is: highlighted and kept in view. */
     current?: Position | null;
     /** Given, clicking a cued Line plays from its Cue. */
@@ -97,7 +100,7 @@
             >
               {#if showChords && line.chords.length > 0}
                 <div class="line" class:chord-line={line.chordLine}>
-                  {#each layoutLine(line) as word, w (w)}
+                  {#each layoutLine(line, transpose) as word, w (w)}
                     <span class="word">
                       {#each word as piece, p (p)}
                         <span class="piece">
