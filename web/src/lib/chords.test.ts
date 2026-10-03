@@ -25,6 +25,12 @@ describe('layoutLine', () => {
     ]);
   });
 
+  it("spells the moved Chords from the Song's key", () => {
+    expect(layoutLine(line('Hi', [{ offset: 0, name: 'F#m7/C#' }]), 2, 'G')).toEqual([
+      [{ chord: 'G#m7/D#', text: 'Hi' }],
+    ]);
+  });
+
   it('shows the Chords as written by default', () => {
     expect(layoutLine(line('Hi', [{ offset: 0, name: 'F#' }]))).toEqual([[{ chord: 'F#', text: 'Hi' }]]);
   });

@@ -35,7 +35,7 @@
   import { cuesNextLine } from './syncKeys';
   import { inTextField } from './textField';
   import { deviceStorage } from './timelineHeight';
-  import { readChordsShown, storeChordsShown } from './chordsShown';
+  import { songChordsShown } from './chordsShown';
   import { songTranspose } from './sharedTranspose.svelte';
   import { stepTranspose, transposeLimit, transposeText } from './transposeAmount';
 
@@ -316,14 +316,13 @@
   // It isn't an edit, so it's never saved with the Song.
   // Read again only for another Song: the Song is replaced after every edit.
   const songId = $derived(song.id);
-  let showChords = $derived(readChordsShown(deviceStorage(), songId));
+  const showChords = $derived(songChordsShown.of(songId));
 
   // Whether Chord Lines are on screen: always in Write mode, which shows the raw text.
   const chordsOnScreen = $derived(mode === 'write' || (showChords && songHasChords));
 
   function toggleChords() {
-    showChords = !showChords;
-    storeChordsShown(deviceStorage(), songId, showChords);
+    songChordsShown.set(songId, !showChords);
   }
 
   // How far Read mode transposes the Chords, kept on this device for each

@@ -11,14 +11,14 @@ export interface Piece {
  * Lays out a parsed Line for showing Chords above lyrics. Each group of
  * Pieces is one word with its trailing spaces: it never wraps inside, so a
  * mid-word Chord stays over its word on narrow screens. The Chords show
- * transposed by semitones, as written by default.
+ * transposed by semitones, as written by default, spelled from the Song's key.
  */
-export function layoutLine(line: Line, transpose = 0): Piece[][] {
+export function layoutLine(line: Line, transpose = 0, key = ''): Piece[][] {
   // Offsets count code points, which Array.from splits on.
   const chars = Array.from(line.lyrics);
   const chordsAt = new Map<number, string[]>();
   for (const c of line.chords)
-    chordsAt.set(c.offset, [...(chordsAt.get(c.offset) ?? []), transposeChord(c.name, transpose)]);
+    chordsAt.set(c.offset, [...(chordsAt.get(c.offset) ?? []), transposeChord(c.name, transpose, key)]);
 
   const words: Piece[][] = [];
   let word: Piece[] | null = null;

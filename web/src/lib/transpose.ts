@@ -1,8 +1,35 @@
 // Transpose: reading a Chord name's root, and a slash chord's bass note, and
 // moving them by semitones. Everything else in the name is kept as written,
-// and a name that can't be read stays as written.
+// and a name that can't be read stays as written. The same rule reads the
+// Song's key, whose signature, once moved, spells the moved notes.
 
-const notes = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+/** How a note is spelled at each semitone from C. */
+type Spelling = readonly string[];
+
+const common: Spelling = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+const sharps: Spelling = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const flats: Spelling = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+/**
+ * Each major key's signature, by its note's semitone from C: Db, Eb, F, Ab
+ * and Bb major have flats, the rest sharps. C major has none, so it keeps
+ * the common spellings. A minor key has its relative major's.
+ */
+const signatures: Spelling[] = [
+  common, // C
+  flats, // Db
+  sharps, // D
+  flats, // Eb
+  sharps, // E
+  flats, // F
+  sharps, // F#
+  sharps, // G
+  flats, // Ab
+  sharps, // A
+  flats, // Bb
+  sharps, // B
+];
+
 const naturals: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
 const accidentals: Record<string, number> = { '#': 1, '♯': 1, b: -1, '♭': -1, '': 0 };
 
@@ -16,23 +43,54 @@ const note = /^([A-G])([#b♯♭]?)/u;
  */
 const solfege = /^(Do|Fa)(?=$|[#b♯♭m\d]|\P{L})/u;
 
+/** What, after its note, makes a key minor: m, min or minor, but not M or maj. */
+const minor = /^\s*(m|[Mm]in(or)?)(?!\p{L})/u;
+
 /** The readable note at the start of text, or null. */
 function readNote(text: string): RegExpExecArray | null {
   return solfege.test(text) ? null : note.exec(text);
 }
 
-/** The note at the start of text moved by semitones, with the rest of text as written. */
-function moveNote(m: RegExpExecArray, text: string, by: number): string {
-  const at = naturals[m[1]] + accidentals[m[2]];
-  return notes[(((at + by) % 12) + 12) % 12] + text.slice(m[0].length);
+/** A readable note moved by semitones, as its semitone from C, 0–11. */
+function semitone(m: RegExpExecArray, by: number): number {
+  return (((naturals[m[1]] + accidentals[m[2]] + by) % 12) + 12) % 12;
 }
 
-/** A Chord name moved by semitones. */
-export function transposeChord(name: string, by: number): string {
+/** A key moved by semitones: its note's semitone from C, its signature, and the rest as written. Null if unreadable. */
+function moveKey(key: string, by: number) {
+  const written = key.trim();
+  const m = readNote(written);
+  if (!m) return null;
+  const rest = written.slice(m[0].length);
+  const at = semitone(m, by);
+  return { at, signature: signatures[minor.test(rest) ? (at + 3) % 12 : at], rest };
+}
+
+/** The note at the start of text moved by semitones and spelled, with the rest of text as written. */
+function moveNote(m: RegExpExecArray, text: string, by: number, spelling: Spelling): string {
+  return spelling[semitone(m, by)] + text.slice(m[0].length);
+}
+
+/**
+ * A Chord name moved by semitones. Moved notes are spelled from the
+ * signature of the Song's key, moved too, or C# Eb F# Ab Bb without one.
+ */
+export function transposeChord(name: string, by: number, key = ''): string {
   const root = readNote(name);
   if (!root || by % 12 === 0) return name;
+  const spelling = moveKey(key, by)?.signature ?? common;
   const slash = name.lastIndexOf('/');
   const bass = slash > 0 ? readNote(name.slice(slash + 1)) : null;
-  if (!bass) return moveNote(root, name, by);
-  return moveNote(root, name.slice(0, slash), by) + '/' + moveNote(bass, name.slice(slash + 1), by);
+  if (!bass) return moveNote(root, name, by, spelling);
+  return moveNote(root, name.slice(0, slash), by, spelling) + '/' + moveNote(bass, name.slice(slash + 1), by, spelling);
+}
+
+/**
+ * The Song's key moved by semitones, its note spelled from its own signature
+ * and the rest kept as written ("G minor" up 2 is "A minor"). Null when the
+ * key can't be read or isn't moved, so it shows as written.
+ */
+export function transposeKey(key: string, by: number): string | null {
+  const moved = by % 12 === 0 ? null : moveKey(key, by);
+  return moved && moved.signature[moved.at] + moved.rest;
 }
