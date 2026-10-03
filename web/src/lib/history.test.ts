@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Clip, Take, Timeline, TimelineLoop, Track } from './api';
 import type { CuedSong } from './cues';
-import { History, placingAdded, restorable, settingTakes, type Edit } from './history';
+import { History, mergingAdded, placingAdded, restorable, settingTakes, type Edit } from './history';
 
 const clip = (id: number, start: number, more: Partial<Clip> = {}): Clip => ({
   id,
@@ -1125,5 +1125,44 @@ describe('History of nudging Takes', () => {
     h.undone(timeline([track(2, [{ ...t1.tracks[0].clips[0], id: 9 }])]), two({ id: 9 }));
 
     expect(h.nextRedo()).toEqual({ kind: 'nudgeTake', clipId: 9, takeId: 41, nudge: -0.35 });
+  });
+});
+
+describe('History of Merges', () => {
+  const merged = (id: number, start: number) => clip(id, start, { beatId: null, soundId: 40, length: 30 });
+
+  it('undoes a Merge by replacing its Clip with the Clips it merged, each as it was, and redoes it by placing the same Sound back in their place', () => {
+    const h = new History();
+    const takes = takeClip(6, 20, [take(41), take(42)]);
+    const t0 = timeline([track(1, [clip(5, 0, { name: 'Hook' }), takes]), track(2, [clip(7, 0)])]);
+    const t1 = timeline([track(1, [merged(8, 0)]), track(2, [clip(7, 0)])]);
+
+    const edit = mergingAdded(t0, t1, [5, 6]);
+    h.record(edit, t0, t1);
+
+    expect(edit).toEqual({
+      kind: 'replaceClips',
+      clipIds: [5, 6],
+      clips: [{ trackId: 1, clip: { soundId: 40, start: 0, offset: 0, length: 30 } }],
+    });
+    expect(h.nextUndo()).toEqual({
+      kind: 'replaceClips',
+      clipIds: [8],
+      clips: [
+        { trackId: 1, clip: { beatId: 100, name: 'Hook', start: 0, offset: 0, length: 10 } },
+        { trackId: 1, clip: { takeIds: [41, 42], activeTakeId: 41, start: 20, offset: 2, length: 10 } },
+      ],
+    });
+
+    // Undone, the Clips merged come back with new ids, which redoing then names.
+    const back = h.undone(
+      t1,
+      timeline([track(1, [clip(15, 0, { name: 'Hook' }), { ...takes, id: 16 }]), track(2, [clip(7, 0)])]),
+    );
+    expect(back).toEqual([15, 16]);
+    expect(h.nextRedo()).toEqual({ ...edit, clipIds: [15, 16] });
+
+    h.redone(t0, timeline([track(1, [merged(18, 0)]), track(2, [clip(7, 0)])]));
+    expect(h.nextUndo()).toMatchObject({ kind: 'replaceClips', clipIds: [18] });
   });
 });

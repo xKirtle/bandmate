@@ -1259,10 +1259,8 @@ func (s *Store) DeleteClips(ctx context.Context, songID int64, based lyricsheet.
 	if len(clipIDs) == 0 {
 		return Timeline{}, &lyricsheet.InvalidError{Msg: "clipIds are required"}
 	}
-	for i, id := range clipIDs {
-		if slices.Contains(clipIDs[:i], id) {
-			return Timeline{}, &lyricsheet.InvalidError{Msg: "each Clip can only be deleted once"}
-		}
+	if err := checkDeletedOnce(clipIDs); err != nil {
+		return Timeline{}, err
 	}
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		for _, id := range clipIDs {
@@ -1277,6 +1275,16 @@ func (s *Store) DeleteClips(ctx context.Context, songID int64, based lyricsheet.
 		}
 		return nil
 	})
+}
+
+// checkDeletedOnce refuses Clips to delete that name one twice.
+func checkDeletedOnce(clipIDs []int64) error {
+	for i, id := range clipIDs {
+		if slices.Contains(clipIDs[:i], id) {
+			return &lyricsheet.InvalidError{Msg: "each Clip can only be deleted once"}
+		}
+	}
+	return nil
 }
 
 // deleteClip removes one of the Song's Clips, detaching its Takes.

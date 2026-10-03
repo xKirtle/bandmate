@@ -51,6 +51,11 @@ import { isBlank, type CuedSong } from './cues';
 // A nudge is undone the same way, since nudging before the Clip's span
 // moves the other Takes in it too, and redone as the nudge, which says
 // where the Take goes rather than how far it moves.
+//
+// A Merge is kept as replacing the Clips it merged with its Clip, which
+// plays a Sound, so redoing it never renders or uploads it again. It's
+// undone by replacing its Clip with the Clips it merged, as they were, in
+// one step, a Clip of Takes getting its Takes back.
 
 /** A change to the Timeline, as the intent sent to the API. */
 export type Edit =
@@ -73,6 +78,8 @@ export type Edit =
   | { kind: 'deleteClip'; clipId: number }
   /** Clips deleted at once, and Tracks with them, e.g. those a paste added. */
   | { kind: 'deleteClips'; clipIds: number[]; trackIds?: number[] }
+  /** Clips deleted and others placed on the Timeline's Tracks in their place, in one step, e.g. by a Merge. */
+  | { kind: 'replaceClips'; clipIds: number[]; clips: PlacedClip[] }
   | { kind: 'setTakes'; clipId: number; takes: ClipTakes }
   | { kind: 'chooseTake'; clipId: number; takeId: number }
   | { kind: 'nudgeTake'; clipId: number; takeId: number; nudge: number }
@@ -268,17 +275,14 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
     case 'deleteClip':
       return placingBack(before, edit.clipId);
     case 'deleteClips': {
-      // In Timeline order, as they come back.
-      const deleted = new Set(edit.clipIds);
-      const back = before.tracks.flatMap((track) =>
-        track.clips.filter((c) => deleted.has(c.id)).map((clip) => ({ track, clip })),
-      );
+      const back = placingBackAll(before, edit.clipIds);
+      return { edit: { kind: 'placeClips', clips: back.clips }, adds: back.adds };
+    }
+    case 'replaceClips': {
+      const back = placingBackAll(before, edit.clipIds);
       return {
-        edit: {
-          kind: 'placeClips',
-          clips: back.map(({ track, clip }) => ({ trackId: track.id, clip: placementOf(clip) })),
-        },
-        adds: { tracks: [], clips: back.map(({ clip }) => clip.id) },
+        edit: { kind: 'replaceClips', clipIds: added(before, after).clips, clips: back.clips },
+        adds: back.adds,
       };
     }
     case 'setTakes':
@@ -311,6 +315,30 @@ function placingBack(before: Timeline, clipId: number): Step {
     edit: { kind: 'placeClip', trackId: track.id, clip: placementOf(clip) },
     adds: { tracks: [], clips: [clip.id] },
   };
+}
+
+/** The Clips of before to place back as they were, after they're deleted, in Timeline order, as they come back. */
+function placingBackAll(before: Timeline, clipIds: readonly number[]): { clips: PlacedClip[]; adds: Ids } {
+  const deleted = new Set(clipIds);
+  const back = before.tracks.flatMap((track) =>
+    track.clips.filter((c) => deleted.has(c.id)).map((clip) => ({ track, clip })),
+  );
+  return {
+    clips: back.map(({ track, clip }) => ({ trackId: track.id, clip: placementOf(clip) })),
+    adds: { tracks: [], clips: back.map(({ clip }) => clip.id) },
+  };
+}
+
+/**
+ * The edit that replaces the Clips a Merge merged, when it turned before
+ * into after, with the one Clip it added, as it is: to keep the Merge in
+ * the history, as redoing it places that Clip back, playing its Sound,
+ * without rendering or uploading it again.
+ */
+export function mergingAdded(before: Timeline, after: Timeline, clipIds: readonly number[]): Edit {
+  const [clipId] = added(before, after).clips;
+  const { track, clip } = findClip(after, clipId);
+  return { kind: 'replaceClips', clipIds: [...clipIds], clips: [{ trackId: track.id, clip: placementOf(clip) }] };
 }
 
 /**
@@ -449,6 +477,8 @@ function remap(edit: HistoryEdit, ids: IdMaps): HistoryEdit {
       return edit.trackIds
         ? { ...edit, clipIds: edit.clipIds.map(ids.clip), trackIds: edit.trackIds.map(ids.track) }
         : { ...edit, clipIds: edit.clipIds.map(ids.clip) };
+    case 'replaceClips':
+      return { ...edit, clipIds: edit.clipIds.map(ids.clip), clips: edit.clips.map((c) => remapOnTrack(c, ids)) };
     case 'trimClip':
     case 'renameClip':
     case 'duplicateClip':
@@ -511,6 +541,8 @@ export function sendEdit(at: SongAt, edit: Edit): Promise<Timeline> {
       return api.deleteClip(at, edit.clipId);
     case 'deleteClips':
       return api.deleteClips(at, edit.clipIds, edit.trackIds);
+    case 'replaceClips':
+      return api.replaceClips(at, edit.clipIds, edit.clips);
     case 'setTakes':
       return api.setTakes(at, edit.clipId, edit.takes);
     case 'chooseTake':

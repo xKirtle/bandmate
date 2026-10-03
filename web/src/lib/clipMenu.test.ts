@@ -37,7 +37,7 @@ group('clipActions', () => {
     copyKeys: 'Ctrl+C',
     cutKeys: 'Ctrl+X',
     selected: 0,
-    recording: false,
+    frozen: null,
   };
   const run = {
     retake: () => {},
@@ -148,7 +148,7 @@ group('clipActions', () => {
   });
 
   it('turns off every edit while recording, saying why, but still downloads', () => {
-    const recording = { ...state, canRecord: false, recording: true };
+    const recording = { ...state, canRecord: false, frozen: 'recording' as const };
     const shown = [...clipActions(twoTakes, recording, run), ...clipActions(soundClip, recording, run)];
     const off = shown.filter((a) => a.disabled).map((a) => [a.label, a.title]);
     const on = shown.filter((a) => !a.disabled).map((a) => a.label);
@@ -193,8 +193,14 @@ group('clipActions', () => {
 });
 
 group('selectionActions', () => {
-  const run = { copyClips: () => {}, cutClips: () => {}, duplicateClips: () => {}, deleteClips: () => {} };
-  const state = { recording: false, copyKeys: 'Ctrl+C', cutKeys: 'Ctrl+X' };
+  const run = {
+    copyClips: () => {},
+    cutClips: () => {},
+    duplicateClips: () => {},
+    mergeClips: () => {},
+    deleteClips: () => {},
+  };
+  const state = { frozen: null, copyKeys: 'Ctrl+C', cutKeys: 'Ctrl+X', canMerge: false };
   const labels = (count: number) => selectionActions(count, run, state).map((a) => a.label);
 
   it('offers copying, cutting, duplicating and deleting every selected Clip, naming how many it duplicates and deletes', () => {
@@ -213,12 +219,24 @@ group('selectionActions', () => {
         copyClips: () => picked.push('copy'),
         cutClips: () => picked.push('cut'),
         duplicateClips: () => picked.push('duplicate'),
+        mergeClips: () => picked.push('merge'),
         deleteClips: () => picked.push('delete'),
       },
-      state,
+      { ...state, canMerge: true },
     );
     for (const entry of entries) if ('run' in entry) entry.run();
-    expect(picked).toEqual(['copy', 'cut', 'duplicate', 'delete']);
+    expect(picked).toEqual(['copy', 'cut', 'duplicate', 'merge', 'delete']);
+  });
+
+  it('offers merging them only where they can be merged', () => {
+    expect(selectionActions(2, run, { ...state, canMerge: true }).map((a) => a.label)).toEqual([
+      'Copy',
+      'Cut',
+      'Duplicate 2 Clips',
+      'Merge',
+      'Delete 2 Clips',
+    ]);
+    expect(labels(2)).not.toContain('Merge');
   });
 
   it('names the keys that copy and cut, where there are keys to name', () => {
@@ -234,12 +252,18 @@ group('selectionActions', () => {
 
   it('turns every entry off while recording, saying why', () => {
     const hint = 'Stop recording to edit';
-    expect(selectionActions(2, run, { ...state, recording: true })).toMatchObject([
+    expect(selectionActions(2, run, { ...state, frozen: 'recording' })).toMatchObject([
       { label: 'Copy', disabled: true, title: hint },
       { label: 'Cut', disabled: true, title: hint },
       { label: 'Duplicate 2 Clips', disabled: true, title: hint },
       { label: 'Delete 2 Clips', disabled: true, title: hint },
     ]);
+  });
+
+  it('turns every entry off while a Merge is being made, saying why', () => {
+    const hint = 'Wait for the Merge to finish to edit';
+    const shown = selectionActions(2, run, { ...state, canMerge: true, frozen: 'merging' });
+    expect(shown.every((a) => a.disabled && a.title === hint)).toBe(true);
     expect(selectionActions(2, run, state).some((a) => a.disabled)).toBe(false);
   });
 });

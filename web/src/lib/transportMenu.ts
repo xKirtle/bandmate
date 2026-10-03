@@ -11,6 +11,8 @@ export type TransportState = {
   fullTimeline: boolean;
   importing: boolean;
   recording: boolean;
+  /** A Merge is being made, so the Timeline can't be edited. */
+  merging: boolean;
   /** The Chosen Track's name, which Import audio… imports onto. */
   chosenTrack: string;
   /** The Timeline has Clips, which a Mixdown needs. */
@@ -31,8 +33,10 @@ export function transportActions(state: TransportState, run: TransportRun): Menu
     label: 'Import audio…',
     title: state.recording
       ? 'Stop recording to import audio'
-      : `Import an audio file as a Sound onto ${state.chosenTrack}`,
-    disabled: state.importing || state.recording,
+      : state.merging
+        ? 'Wait for the Merge to finish to import audio'
+        : `Import an audio file as a Sound onto ${state.chosenTrack}`,
+    disabled: state.importing || state.recording || state.merging,
     run: run.importAudio,
   };
   const mixDown: MenuAction = {

@@ -377,6 +377,12 @@ export type ClipCopy = Pick<Clip, 'start' | 'offset' | 'length'> & { name?: stri
 /** A Clip to paste, and the Track it goes on. */
 export type PastedClip = OnTrack & { clip: ClipCopy };
 
+/** Which Clips a Merge merges, and the waveform of their audio rendered together, 100 peaks per second. */
+export interface ClipMerge {
+  clipIds: number[];
+  peaks: number[];
+}
+
 /** Where one of several Clips moved at once goes: a Track and a start, in seconds. */
 export interface ClipMove {
   clipId: number;
@@ -792,6 +798,23 @@ export const api = {
    */
   deleteClips: (at: SongAt, clipIds: number[], trackIds: number[] = []) =>
     request<Timeline>('POST', `/songs/${at.id}/timeline/clips/delete`, { clipIds, trackIds }, at),
+  /**
+   * Deletes Clips and places others on the Timeline's Tracks in their place,
+   * in one step, e.g. to undo or redo a Merge. Refused whole if any can't be.
+   */
+  replaceClips: (at: SongAt, clipIds: number[], clips: PlacedClip[]) =>
+    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/replace`, { clipIds, clips: onTracks(clips) }, at),
+  /**
+   * Merges two or more Clips on one Track into one Clip of a new Sound,
+   * "Merged Clip", from their audio rendered together: a 24-bit WAV running
+   * from the earliest one's start to the latest one's end.
+   */
+  mergeClips: (at: SongAt, wav: Blob, merge: ClipMerge) => {
+    const form = new FormData();
+    form.append('details', JSON.stringify(merge));
+    form.append('file', wav, 'merged.wav');
+    return request<Timeline>('POST', `/songs/${at.id}/timeline/clips/merge`, form, at);
+  },
   /**
    * Places a Take just recorded, a mono 24-bit WAV, in a new Clip at start.
    * Refused if it would overlap a Clip there.
