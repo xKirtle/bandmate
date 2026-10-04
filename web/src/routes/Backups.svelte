@@ -28,6 +28,7 @@
   }
 
   function showRenamed(backup: Backup) {
+    error = null;
     backups = (backups ?? []).map((b) => (b.id === backup.id ? backup : b));
   }
 

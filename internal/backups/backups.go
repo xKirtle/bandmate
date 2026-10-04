@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -108,7 +107,7 @@ func Open(conn *sql.DB, dataDir string, now func() time.Time) (*Store, error) {
 // List returns the Backups, newest first.
 func (s *Store) List(ctx context.Context) ([]Backup, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT `+columns+` FROM backups ORDER BY created_at DESC, id DESC`)
+		`SELECT `+backupColumns+` FROM backups ORDER BY created_at DESC, id DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +124,7 @@ func (s *Store) List(ctx context.Context) ([]Backup, error) {
 }
 
 func (s *Store) get(ctx context.Context, id int64) (Backup, error) {
-	b, err := scanBackup(s.db.QueryRowContext(ctx, `SELECT `+columns+` FROM backups WHERE id = ?`, id))
+	b, err := scanBackup(s.db.QueryRowContext(ctx, `SELECT `+backupColumns+` FROM backups WHERE id = ?`, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return b, ErrNotFound
 	}
@@ -139,36 +138,49 @@ func (s *Store) Rename(ctx context.Context, id int64, name string) (Backup, erro
 	if err != nil {
 		return Backup{}, fmt.Errorf("renaming backup: %w", err)
 	}
-	if n, err := res.RowsAffected(); err != nil {
+	if err := oneRow(res); err != nil {
 		return Backup{}, err
-	} else if n == 0 {
-		return Backup{}, ErrNotFound
 	}
 	return s.get(ctx, id)
 }
 
 // Delete deletes a Backup and its file, freeing its space. Nothing else
-// deletes a Backup.
+// deletes a Backup. Its row goes only once its file has, so a Backup still
+// listed can always be deleted again, and one gone from the list has freed
+// its space.
 func (s *Store) Delete(ctx context.Context, id int64) error {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM backups WHERE id = ?`, id)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	res, err := tx.ExecContext(ctx, `DELETE FROM backups WHERE id = ?`, id)
 	if err != nil {
 		return fmt.Errorf("deleting backup: %w", err)
 	}
-	if n, err := res.RowsAffected(); err != nil {
+	if err := oneRow(res); err != nil {
 		return err
-	} else if n == 0 {
-		return ErrNotFound
 	}
-	// The Backup is gone either way; a file left behind only takes space,
-	// and its id is never reused.
-	if err := os.Remove(s.path(id)); err != nil {
-		log.Printf("deleting backup %d: %v", id, err)
+	if err := os.Remove(s.path(id)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("deleting backup file: %w", err)
+	}
+	return tx.Commit()
+}
+
+// oneRow tells whether a statement on one Backup found it.
+func oneRow(res sql.Result) error {
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrNotFound
 	}
 	return nil
 }
 
-// columns are what a Backup is read from, in scanBackup's order.
-const columns = `id, songs, all_songs, beat_library, size, created_at, name`
+// backupColumns are what a Backup is read from, in scanBackup's order.
+const backupColumns = `id, songs, all_songs, beat_library, size, created_at, name`
 
 func scanBackup(row interface{ Scan(...any) error }) (Backup, error) {
 	var b Backup
