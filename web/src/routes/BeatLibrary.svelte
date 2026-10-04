@@ -76,7 +76,8 @@
   }
   // Without any Beats, the search and filters have nothing to act on, so
   // they're hidden, and cleared so ones from the URL don't hide the first
-  // Beat once it's added.
+  // Beat once it's added. An effect rather than the load, since deleting the
+  // last Beat empties the Library too.
   const anyBeats = $derived(beats === null || beats.length > 0);
   $effect(() => {
     if (!anyBeats && filtering) clearFilters();
@@ -202,8 +203,8 @@
   </button>
 {/snippet}
 
-{#snippet addBeat(text: string)}
-  <label class="button primary add" class:disabled={addBusy !== null}>
+{#snippet addBeatButton(text: string)}
+  <label class="button primary add-beat" class:disabled={addBusy !== null}>
     {text}
     <input class="visually-hidden" type="file" accept="audio/*" onchange={pick} disabled={addBusy !== null} />
   </label>
@@ -222,7 +223,7 @@
 
 <header class="bar" bind:borderBoxSize={headerBox}>
   <h1>Beats</h1>
-  {@render addBeat('Add Beat')}
+  {@render addBeatButton('Add Beat')}
 </header>
 
 <main
@@ -262,7 +263,7 @@
   {:else if beats.length === 0}
     <div class="empty">
       <p>No Beats yet. Add an audio file to use it in any Song.</p>
-      {@render addBeat('Add your first Beat')}
+      {@render addBeatButton('Add your first Beat')}
     </div>
   {:else if shown.length === 0 && filtering}
     <div class="empty">
@@ -305,11 +306,11 @@
 {/if}
 
 <style>
-  .add.disabled {
+  .add-beat.disabled {
     opacity: 0.6;
     cursor: default;
   }
-  .add:has(input:focus-visible) {
+  .add-beat:has(input:focus-visible) {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
