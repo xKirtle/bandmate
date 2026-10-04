@@ -20,6 +20,8 @@ export interface BatchRow {
   draft: BeatDraft;
   /** Whether Add adds it. */
   ticked: boolean;
+  /** The fields set from the bar above the table while the file was being read. */
+  setWhileReading: Partial<BeatDraft>;
   /** Why it can't be read, or why its last upload failed. */
   error: string | null;
 }
@@ -35,6 +37,23 @@ export function tickedState(rows: readonly Pick<BatchRow, 'status' | 'ticked'>[]
   const ticked = tickable.filter((row) => row.ticked).length;
   if (ticked === 0) return 'none';
   return ticked === tickable.length ? 'all' : 'some';
+}
+
+/**
+ * Ticks or unticks, as `on` says, every row that can be ticked from the one
+ * clicked last to the one clicked now, in the table's order, as shift-clicking
+ * does. With the last one gone, only the one clicked now.
+ */
+export function tickRange(
+  rows: readonly Pick<BatchRow, 'key' | 'status' | 'ticked'>[],
+  lastKey: number,
+  key: number,
+  on: boolean,
+) {
+  const to = rows.findIndex((row) => row.key === key);
+  const last = rows.findIndex((row) => row.key === lastKey);
+  const from = last === -1 ? to : last;
+  for (const row of rows.slice(Math.min(from, to), Math.max(from, to) + 1)) if (canTick(row)) row.ticked = on;
 }
 
 /** Whether any row has details typed over the ones its file suggested, which cancelling would lose. */
@@ -76,4 +95,28 @@ export function alreadyIn(
   if (beat) return { in: 'library', title: beat.title };
   // Keys count up as files are picked, so a lower key was picked earlier.
   return rows.some((r) => r.key < row.key && same(r.file.name, r.file.size)) ? { in: 'batch' } : null;
+}
+
+/** A field the bar above the table can set on every ticked row at once. */
+export type SharedField = Exclude<keyof BeatDraft, 'title'>;
+
+/**
+ * Sets one field to one value on every ticked row, over whatever it held. A
+ * row still being read keeps it once read, over what its file suggests.
+ */
+export function setOnTicked(
+  rows: readonly Pick<BatchRow, 'status' | 'ticked' | 'draft' | 'setWhileReading'>[],
+  field: SharedField,
+  value: string,
+) {
+  for (const row of rows) {
+    if (!row.ticked) continue;
+    row.draft[field] = value;
+    if (row.status === 'reading') row.setWhileReading[field] = value;
+  }
+}
+
+/** A row's details once its file is read: what the file suggested, under what was set on it meanwhile. */
+export function draftOnceRead(row: Pick<BatchRow, 'setWhileReading'>, suggested: BeatDraft): BeatDraft {
+  return { ...suggested, ...row.setWhileReading };
 }

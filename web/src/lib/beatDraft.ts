@@ -70,6 +70,11 @@ export function invalidFields(draft: BeatDraft): InvalidField[] {
   return invalid;
 }
 
+/** Whether a field would refuse this value, as it would if it were typed into it. */
+export function invalidValue(field: keyof BeatDraft, value: string): boolean {
+  return (invalidFields({ ...toDraft({ title: 'Any' }), [field]: value }) as (keyof BeatDraft)[]).includes(field);
+}
+
 function isWebAddress(text: string): boolean {
   try {
     const url = new URL(text);

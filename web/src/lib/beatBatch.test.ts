@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { toDraft } from './beatDraft';
-import { alreadyIn, anyEdited, byFileName, canAdd, tickedState } from './beatBatch';
+import {
+  alreadyIn,
+  anyEdited,
+  byFileName,
+  canAdd,
+  draftOnceRead,
+  setOnTicked,
+  tickedState,
+  tickRange,
+} from './beatBatch';
 
 describe('canAdd', () => {
   const draft = toDraft({ title: 'Echo Room' });
@@ -92,5 +101,62 @@ describe('alreadyIn', () => {
     const row = { key: 5, file: file('echo room.wav', 1001) };
     const other = { key: 1, file: file('echo room.wav', 999) };
     expect(alreadyIn(row, library, [other, row])).toBeNull();
+  });
+});
+
+describe('setOnTicked', () => {
+  const row = (ticked: boolean, draft = toDraft({ title: 'Echo Room', producer: 'Pryme' })) => ({
+    status: 'ready' as const,
+    ticked,
+    draft,
+    setWhileReading: {},
+  });
+
+  it('overwrites the field on every ticked row, edited or not, and leaves unticked rows alone', () => {
+    const rows = [row(true), row(true, toDraft({ title: 'Paper Hours' })), row(false)];
+    setOnTicked(rows, 'producer', 'Lunar');
+    expect(rows.map((r) => r.draft.producer)).toEqual(['Lunar', 'Lunar', 'Pryme']);
+    expect(rows.map((r) => r.draft.title)).toEqual(['Echo Room', 'Paper Hours', 'Echo Room']);
+  });
+});
+
+describe('draftOnceRead', () => {
+  it('fills a row from its file, keeping what was set on it while it was being read, even an emptied field', () => {
+    const row = { status: 'reading' as const, ticked: true, draft: toDraft(null), setWhileReading: {} };
+    setOnTicked([row], 'producer', '');
+    setOnTicked([row], 'notes', 'CC BY');
+    const suggested = toDraft({ title: 'Echo Room', producer: 'Pryme', bpm: 140 });
+    expect(draftOnceRead(row, suggested)).toEqual(toDraft({ title: 'Echo Room', bpm: 140, notes: 'CC BY' }));
+  });
+});
+
+describe('tickRange', () => {
+  const rows = () =>
+    [0, 1, 2, 3, 4, 5].map((key) => ({
+      key,
+      ticked: key === 0,
+      status: key === 3 ? ('unreadable' as const) : ('ready' as const),
+    }));
+  const tickedKeys = (rs: ReturnType<typeof rows>) => rs.filter((r) => r.ticked).map((r) => r.key);
+
+  it('ticks every row from the last one clicked to this one, either way down the table', () => {
+    const down = rows();
+    tickRange(down, 1, 5, true);
+    expect(tickedKeys(down)).toEqual([0, 1, 2, 4, 5]);
+    const up = rows();
+    tickRange(up, 4, 2, true);
+    expect(tickedKeys(up)).toEqual([0, 2, 4]);
+  });
+
+  it('unticks the range when the row clicked is unticked', () => {
+    const rs = rows().map((r) => ({ ...r, ticked: r.status === 'ready' }));
+    tickRange(rs, 0, 2, false);
+    expect(tickedKeys(rs)).toEqual([4, 5]);
+  });
+
+  it('ticks only the row clicked when the last one clicked has since gone', () => {
+    const rs = rows();
+    tickRange(rs, 9, 2, true);
+    expect(tickedKeys(rs)).toEqual([0, 2]);
   });
 });

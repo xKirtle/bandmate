@@ -1,8 +1,20 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import { api, commonKeys, type Beat, type BeatDetails } from './api';
-  import { alreadyIn, anyEdited, byFileName, canAdd, canTick, tickedState, type BatchRow } from './beatBatch';
-  import { fromDraft, invalidFields, toDraft, type InvalidField } from './beatDraft';
+  import {
+    alreadyIn,
+    anyEdited,
+    byFileName,
+    canAdd,
+    canTick,
+    draftOnceRead,
+    setOnTicked,
+    tickedState,
+    tickRange,
+    type BatchRow,
+    type SharedField,
+  } from './beatBatch';
+  import { fromDraft, invalidFields, invalidValue, toDraft, type InvalidField } from './beatDraft';
   import { suggestForFile } from './beatTags';
   import Combobox from './Combobox.svelte';
   import { guardLeaving } from './router.svelte';
@@ -45,6 +57,7 @@
       suggested: toDraft(null),
       draft: toDraft(null),
       ticked: true,
+      setWhileReading: {},
       error: null,
     }));
     const all = [...rows, ...added];
@@ -85,13 +98,13 @@
       try {
         const [decoded, suggestion] = await Promise.all([prepareUpload(file, maxUploadBytes), suggestForFile(file)]);
         const draft = toDraft(suggestion);
-        read = { status: 'ready', decoded, suggested: draft, draft: { ...draft } };
+        read = { status: 'ready', decoded, suggested: draft, draft };
       } catch (e) {
         read = { status: 'unreadable', ticked: false, error: (e as Error).message };
       }
       // It may have been removed while being read.
       const now = rows.find((r) => r.key === key);
-      if (now) Object.assign(now, read);
+      if (now) Object.assign(now, { ...read, draft: read.draft ? draftOnceRead(now, read.draft) : now.draft });
       readCount++;
     }
     reading = false;
@@ -108,6 +121,42 @@
 
   function tickAll(on: boolean) {
     for (const row of rows) if (canTick(row)) row.ticked = on;
+  }
+
+  // Shift-clicking a tick box ticks or unticks the rows from the one clicked last.
+  let lastClickedKey: number | null = null;
+
+  function tickRow(row: BatchRow, event: MouseEvent & { currentTarget: HTMLInputElement }) {
+    const on = event.currentTarget.checked;
+    if (event.shiftKey && lastClickedKey !== null) tickRange(rows, lastClickedKey, row.key, on);
+    else row.ticked = on;
+    lastClickedKey = row.key;
+  }
+
+  // The bar above the table sets one field to one value on every ticked row.
+  // Notes isn't a column: a Beat's own notes are edited once it's added.
+  const sharedFields: {
+    field: SharedField;
+    label: string;
+    placeholder: string;
+    type?: 'url';
+    inputmode?: 'numeric' | 'url';
+  }[] = [
+    { field: 'producer', label: 'Producer', placeholder: '—' },
+    { field: 'sourceLink', label: 'Source link', placeholder: 'https://…', type: 'url', inputmode: 'url' },
+    { field: 'bpm', label: 'BPM', placeholder: '—', inputmode: 'numeric' },
+    { field: 'key', label: 'Key', placeholder: '—' },
+    { field: 'notes', label: 'Notes', placeholder: 'License, where it’s from…' },
+  ];
+  let sharedField = $state<SharedField>('producer');
+  let sharedValue = $state('');
+  const shared = $derived(sharedFields.find((f) => f.field === sharedField)!);
+  const sharedInvalid = $derived(invalidValue(sharedField, sharedValue));
+
+  function setShared(event: SubmitEvent) {
+    event.preventDefault();
+    if (tickedCount === 0 || sharedInvalid) return;
+    setOnTicked(rows, sharedField, sharedValue);
   }
 
   function remove(key: number) {
@@ -184,6 +233,43 @@
       <p class="muted" role="status">Reading {readCount + 1} of {readCount + unread}</p>
     {/if}
   </div>
+  <form class="shared" novalidate onsubmit={setShared}>
+    <fieldset disabled={uploading}>
+      <label>
+        Set
+        <select bind:value={sharedField} onchange={() => (sharedValue = '')}>
+          {#each sharedFields as { field, label } (field)}
+            <option value={field}>{label}</option>
+          {/each}
+        </select>
+      </label>
+      <label for="batch-shared-value">to</label>
+      {#if sharedField === 'key'}
+        <Combobox
+          id="batch-shared-value"
+          bind:value={sharedValue}
+          options={commonKeys}
+          saved=""
+          autocomplete="off"
+          autocapitalize="characters"
+          placeholder="—"
+        />
+      {:else}
+        <input
+          id="batch-shared-value"
+          bind:value={sharedValue}
+          aria-invalid={sharedInvalid}
+          type={shared.type ?? 'text'}
+          inputmode={shared.inputmode}
+          autocomplete="off"
+          placeholder={shared.placeholder}
+        />
+      {/if}
+      <button type="submit" class="button" disabled={tickedCount === 0 || sharedInvalid}>
+        Set on {tickedCount} ticked
+      </button>
+    </fieldset>
+  </form>
   <div class="scroll">
     <fieldset disabled={uploading}>
       <table>
@@ -216,7 +302,13 @@
             {@const where = already.get(row.key)}
             <tr class:unreadable={row.status === 'unreadable'}>
               <td class="tick">
-                <input type="checkbox" aria-label="Add “{name}”" bind:checked={row.ticked} disabled={!canTick(row)} />
+                <input
+                  type="checkbox"
+                  aria-label="Add “{name}”"
+                  checked={row.ticked}
+                  disabled={!canTick(row)}
+                  onclick={(e) => tickRow(row, e)}
+                />
               </td>
               <td class="file">
                 <span class="ellipsis" title={name}>{name}</span>
@@ -345,6 +437,25 @@
   .scroll {
     overflow-x: auto;
   }
+  .shared fieldset {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .shared label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+  }
+  .shared :global(input) {
+    width: 16rem;
+  }
+  /* Shift-clicking a tick box shouldn't select the text between. */
+  td.tick {
+    user-select: none;
+  }
   fieldset {
     margin: 0;
     padding: 0;
@@ -386,6 +497,7 @@
     padding-inline: 0.5rem;
     font-size: 0.875rem;
   }
+  .shared input[aria-invalid='true'],
   td input[aria-invalid='true'] {
     border-color: var(--danger);
     box-shadow: inset 0 0 0 1px var(--danger);
