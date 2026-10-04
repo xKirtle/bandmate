@@ -39,7 +39,7 @@
   import { activeTake, clipSources, clipTitle, fileStart, playing } from './clipSource';
   import { formatCue, movedCues, type TimeSpan } from './cues';
   import { editHint, editsWhileRecording, type Freeze } from './freeze';
-  import { carriesFiles, fileDropTrack, importEach, type TrackRow } from './fileDrop';
+  import { draggedFiles, fileDropTrack, importEach, type TrackRow } from './fileDrop';
   import {
     addedClips,
     History,
@@ -983,11 +983,6 @@
   /** Whether files dropped now can be imported. */
   function takesFiles(): boolean {
     return editable.current && !frozen && !picking && !calibrating && !mixingDown && !collapsed;
-  }
-
-  /** The files a drag carries, or null for a drag of anything else, e.g. text. */
-  function draggedFiles(event: DragEvent): DataTransfer | null {
-    return event.dataTransfer && carriesFiles(event.dataTransfer.types) ? event.dataTransfer : null;
   }
 
   /**

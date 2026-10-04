@@ -24,6 +24,8 @@
   import { formatDuration } from '../lib/time';
   import { suggestForFile } from '../lib/beatTags';
   import { prepareUpload } from '../lib/upload';
+  import { draggedFiles } from '../lib/fileDrop';
+  import { audioDropped, entriesDropped, filesIn, skippedNote } from '../lib/droppedFiles';
 
   // The whole Library, loaded once and narrowed down here.
   let beats = $state<Beat[] | null>(null);
@@ -151,10 +153,16 @@
   let batchUploading = $state(false);
   let batch = $state<BeatBatch>();
 
-  async function pick(event: Event) {
+  function pick(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
     const files = [...(input.files ?? [])];
     input.value = '';
+    dropNote = null;
+    addFiles(files);
+  }
+
+  /** Opens the form for one file, or the review table for several, or adds them to the table already open. */
+  async function addFiles(files: File[]) {
     if (files.length === 0) return;
     if (batching || files.length > 1) {
       adding = null;
@@ -191,6 +199,7 @@
     try {
       await api.addBeat(adding.file, details, adding.decoded);
       adding = null;
+      dropNote = null;
       reloads++;
     } catch (e) {
       addError = (e as Error).message;
@@ -202,6 +211,61 @@
   function cancelAdd() {
     adding = null;
     addError = null;
+    dropNote = null;
+  }
+
+  // The Beat being edited in the dialog the table opens. The cards below
+  // 80rem open their own; this one stays open across a resize, keeping its
+  // unsaved changes.
+  let editingId = $state<number | null>(null);
+  const editingBeat = $derived(beats?.find((b) => b.id === editingId) ?? null);
+
+  // On desktop, audio files and folders can be dropped anywhere on the page,
+  // which shows it'll take them while they're dragged over it. They go where
+  // picking them would, once those that aren't audio are skipped, which is
+  // said. Not while files can't be picked, nor under the edit dialog. A drop
+  // the page doesn't take is never opened by the browser in its place.
+  const takesFiles = $derived(desktop.current && addBusy === null && !batchUploading && editingBeat === null);
+  // Entering one of the page's elements fires before leaving the last, so
+  // the drag is over the page until it's left as many times as entered.
+  let dragDepth = $state(0);
+  const dropTarget = $derived(takesFiles && dragDepth > 0);
+  // Said of the last files dropped: how many weren't audio.
+  let dropNote = $state<string | null>(null);
+
+  function filesEnter(event: DragEvent) {
+    if (draggedFiles(event)) dragDepth++;
+  }
+
+  function filesLeave(event: DragEvent) {
+    if (draggedFiles(event)) dragDepth = Math.max(0, dragDepth - 1);
+  }
+
+  function filesOver(event: DragEvent) {
+    const data = draggedFiles(event);
+    if (!data) return;
+    event.preventDefault();
+    data.dropEffect = takesFiles ? 'copy' : 'none';
+  }
+
+  async function filesDrop(event: DragEvent) {
+    const data = draggedFiles(event);
+    if (!data) return;
+    event.preventDefault();
+    dragDepth = 0;
+    if (!takesFiles) return;
+    // Asked before the drop is over, which empties it. Reading a folder can
+    // take a while, and nothing else can be added meanwhile.
+    const entries = entriesDropped(data);
+    let files = [...data.files];
+    if (entries) {
+      addBusy = 'Reading the files dropped…';
+      files = await filesIn(entries);
+      addBusy = null;
+    }
+    const { audio, skipped } = audioDropped(files);
+    dropNote = skippedNote(skipped);
+    addFiles(audio);
   }
 
   // A batch adds its Beats to the list as each saves, rather than loading
@@ -210,12 +274,6 @@
     if (beats) beats = [...beats, beat];
     else reloads++;
   }
-
-  // The Beat being edited in the dialog the table opens. The cards below
-  // 80rem open their own; this one stays open across a resize, keeping its
-  // unsaved changes.
-  let editingId = $state<number | null>(null);
-  const editingBeat = $derived(beats?.find((b) => b.id === editingId) ?? null);
 
   function showChanged(beat: Beat) {
     beats = beats?.map((b) => (b.id === beat.id ? beat : b)) ?? null;
@@ -269,6 +327,12 @@
   </button>
 {/snippet}
 
+<svelte:window ondragenter={filesEnter} ondragleave={filesLeave} ondragover={filesOver} ondrop={filesDrop} />
+
+{#if dropTarget}
+  <div class="drop-target" aria-hidden="true"><p>Drop audio files or folders to add them as Beats</p></div>
+{/if}
+
 <header class="bar" bind:borderBoxSize={headerBox}>
   <h1>Beats</h1>
   {@render addBeatButton('Add Beat')}
@@ -290,7 +354,10 @@
       onPreview={desktop.current ? (row) => togglePreview({ row }) : null}
       onLeave={dropStaged}
       onAdded={showAdded}
-      onClose={() => (batching = false)}
+      onClose={() => {
+        batching = false;
+        dropNote = null;
+      }}
     />
   {/if}
   {#if adding}
@@ -305,6 +372,9 @@
         <button type="button" class="button" onclick={cancelAdd} disabled={addBusy !== null}>Cancel</button>
       </div>
     </form>
+  {/if}
+  {#if dropNote}
+    <p class="muted skipped" role="status">{dropNote}</p>
   {/if}
   {#if addBusy}
     <p class="muted" role="status">{addBusy}</p>
@@ -397,8 +467,28 @@
     display: flex;
     gap: 0.5rem;
   }
-  .add-error {
+  .add-error,
+  .skipped {
     margin-bottom: 1rem;
+  }
+  /* The window, nav rail and all, while files dropped anywhere on it would be added. */
+  .drop-target {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: grid;
+    place-items: center;
+    box-shadow: inset 0 0 0 3px var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    pointer-events: none;
+  }
+  .drop-target p {
+    margin: 0;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    background: var(--bg);
+    color: var(--text);
+    font-weight: 600;
   }
   /* With the player docked below, the page reaches at least to it, so the bar
      sits at the bottom of the window even under a short list. */
