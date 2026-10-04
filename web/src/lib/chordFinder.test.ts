@@ -14,6 +14,7 @@ import {
   tunings,
   tuningText,
   type Frets,
+  type Suggestion,
 } from './chordFinder';
 
 const context = { tuning: standard, capo: 0 };
@@ -588,7 +589,7 @@ describe('suggesting from a Key', () => {
 });
 
 /** The Chords a Key suggests of one kind, as "numeral chord". */
-function kind(key: string, of: 'diatonic' | 'borrowed' | 'secondary'): string[] {
+function kind(key: string, of: Suggestion['kind']): string[] {
   const s = suggest(key);
   return s.kind === 'key' ? s.chords.filter((c) => c.kind === of).map((c) => `${c.numeral} ${c.chord}`) : [];
 }
@@ -693,6 +694,20 @@ describe('reasons', () => {
       expect(all.length).toBeGreaterThan(10);
       for (const c of all) expect(c.reason).toMatch(/^.{4,40}$/);
     }
+  });
+
+  it('says why each Chord follows', () => {
+    const reasons = (key: string, after: string) => {
+      const s = suggest(key, after);
+      return s.kind === 'key' ? s.follows?.map((c) => `${c.chord}: ${c.reason}`) : null;
+    };
+    expect(reasons('C', 'G')?.slice(0, 2)).toEqual(['C: Resolves home', 'Am: Deceptive: vi in place of I']);
+    expect(reasons('Em', 'Em')?.slice(0, 4)).toEqual([
+      'Am: Moves away from home',
+      'B7: Builds tension',
+      'C: Down a third',
+      'D: Steps down',
+    ]);
   });
 });
 

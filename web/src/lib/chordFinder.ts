@@ -148,7 +148,7 @@ export const keys: readonly string[] = [
   ...['Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'Bbm', 'Bm'],
 ];
 
-/** A Key's name, tidied (G major, E minor), read as Transpose reads the Song's key, or null if it can't be read. */
+/** A Key's name, tidied (G major, E minor), read as Transpose reads the Song's Key, or null if it can't be read. */
 export function keyName(text: string): string | null {
   return readKey(text)?.name ?? null;
 }
@@ -166,7 +166,7 @@ export type Suggest =
   | { kind: 'unreadable'; key: string };
 
 /**
- * Suggests Chords from a Key, read as Transpose reads the Song's key: its
+ * Suggests Chords from a Key, read as Transpose reads the Song's Key: its
  * Chords with their Roman numerals and why each fits, spelled from the Key's
  * signature, and, after a Chord, the Chords that usually follow it. The Key
  * is as written, the shapes fingered, so a capo doesn't move it.

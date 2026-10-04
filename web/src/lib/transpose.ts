@@ -4,7 +4,7 @@
 // Song's key, whose signature, once moved, spells the moved notes.
 
 /** How a note is spelled at each semitone from C. */
-type Spelling = readonly string[];
+export type Spelling = readonly string[];
 
 const common: Spelling = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
 const sharps: Spelling = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -75,12 +75,19 @@ export function signature(tonic: number, isMinor: boolean): Spelling {
   return signatures[isMinor ? (tonic + 3) % 12 : tonic];
 }
 
+/** A key as Transpose reads it: its tonic's semitone from C, whether it's minor, and its signature. */
+export interface ReadKey {
+  tonic: number;
+  minor: boolean;
+  signature: Spelling;
+}
+
 /**
  * A key read as Transpose reads the Song's key: its tonic's semitone from C,
  * whether it's minor, and its signature. Null if it can't be read. The Chord
  * Finder reads a Key with it, so the two never disagree.
  */
-export function readKey(key: string): { tonic: number; minor: boolean; signature: Spelling } | null {
+export function readKey(key: string): ReadKey | null {
   const moved = moveKey(key, 0);
   return moved && { tonic: moved.at, minor: moved.minor, signature: moved.signature };
 }

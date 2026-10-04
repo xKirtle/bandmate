@@ -3,7 +3,7 @@
 // that go with it. The Chord Finder (chordFinder.ts) is the one way in; the
 // Instruments that voice a Chord build on what this reads.
 
-import { readKey as readKeyText, readRoot, signature } from './transpose';
+import { readKey as readTransposeKey, readRoot, signature, type ReadKey, type Spelling } from './transpose';
 
 /** One note of a Chord, as an interval above its root. */
 export interface Tone {
@@ -264,20 +264,15 @@ export function spellNotes(notes: readonly number[], chord: Chord | null): strin
   return [...new Set(notes)].map((n) => spelling.get(n) ?? common[n]);
 }
 
-/** A Key read from its text. */
-export interface Key {
-  /** Its tonic's semitone from C, 0–11. */
-  tonic: number;
-  minor: boolean;
-  /** How its signature spells each semitone from C, as Transpose spells it. */
-  signature: readonly string[];
+/** A Key read from its text, as Transpose reads it, and its name. */
+export interface Key extends ReadKey {
   /** Its name, tidied: G major, E minor. */
   name: string;
 }
 
-/** Reads a Key the way Transpose reads the Song's key, or null if it can't be read. */
+/** Reads a Key the way Transpose reads the Song's Key, or null if it can't be read. */
 export function readKey(text: string): Key | null {
-  const key = readKeyText(text);
+  const key = readTransposeKey(text);
   return key && { ...key, name: key.signature[key.tonic] + (key.minor ? ' minor' : ' major') };
 }
 
@@ -293,132 +288,151 @@ export interface Suggestion {
   kind: 'diatonic' | 'borrowed' | 'secondary';
 }
 
-/** A Chord a Key holds: its numeral, its root in semitones above the tonic, its quality's suffix, and why it fits. */
-type Degree = [numeral: string, semitones: number, suffix: string, reason: string];
+/** A Chord a Key holds, by its numeral. */
+interface Degree {
+  numeral: string;
+  /** Its root, in semitones above the tonic. */
+  semitones: number;
+  /** Its quality's suffix. */
+  suffix: string;
+  /** Why it fits; a borrowed one's names the Key it's borrowed from instead. */
+  reason: string;
+}
 
-/** A major Key's own Chords. */
-const majorDegrees: Degree[] = [
-  ['I', 0, '', 'Home'],
-  ['ii', 2, 'm', 'Leads on to V'],
-  ['iii', 4, 'm', 'Shares two notes with I'],
-  ['IV', 5, '', 'Moves away from home'],
-  ['V', 7, '', 'Pulls back home to I'],
-  ['vi', 9, 'm', 'The relative minor'],
-  ['vii°', 11, 'dim', 'Pulls hard to I'],
-];
+const keyDegrees = (list: [string, number, string, string][]): Degree[] =>
+  list.map(([numeral, semitones, suffix, reason]) => ({ numeral, semitones, suffix, reason }));
 
-/** A minor Key's own Chords: natural minor's, then V from harmonic minor. */
-const minorDegrees: Degree[] = [
-  ['i', 0, 'm', 'Home'],
-  ['ii°', 2, 'dim', 'Leads on to V'],
-  ['III', 3, '', 'The relative major'],
-  ['iv', 5, 'm', 'Moves away from home'],
-  ['v', 7, 'm', 'A soft pull back home'],
-  ['VI', 8, '', 'Shares two notes with i'],
-  ['VII', 10, '', 'Steps down from home'],
-  ['V', 7, '7', 'From harmonic minor, pulls hard to i'],
-];
+/** The Chords that usually follow each of a Key's Chords, by numeral, and why. */
+type Moves = Record<string, [numeral: string, reason: string][]>;
 
-/** The Chords a major Key commonly borrows from its parallel minor; the reason names the minor Key. */
-const borrowedDegrees: Degree[] = [
+/** A major or minor Key's own Chords, and the Chords that usually follow each. */
+interface Mode {
+  degrees: Degree[];
+  moves: Moves;
+}
+
+/**
+ * A major Key's own Chords, and their functional moves, as V to I and IV to
+ * I, and the deceptive V to vi. The moves from the Chords it borrows are here
+ * too.
+ */
+const major: Mode = {
+  degrees: keyDegrees([
+    ['I', 0, '', 'Home'],
+    ['ii', 2, 'm', 'Leads on to V'],
+    ['iii', 4, 'm', 'Shares two notes with I'],
+    ['IV', 5, '', 'Moves away from home'],
+    ['V', 7, '', 'Pulls back home to I'],
+    ['vi', 9, 'm', 'The relative minor'],
+    ['vii°', 11, 'dim', 'Pulls hard to I'],
+  ]),
+  moves: {
+    I: [
+      ['IV', 'Moves away from home'],
+      ['V', 'Builds tension'],
+      ['vi', 'Turns to the relative minor'],
+    ],
+    ii: [
+      ['V', 'Sets up the pull home'],
+      ['vii°', 'Leads on to I'],
+    ],
+    iii: [
+      ['vi', 'Down a fifth'],
+      ['IV', 'Steps up'],
+    ],
+    IV: [
+      ['I', 'Plagal, back home'],
+      ['V', 'Builds to the dominant'],
+      ['ii', 'Its relative minor'],
+    ],
+    V: [
+      ['I', 'Resolves home'],
+      ['vi', 'Deceptive: vi in place of I'],
+    ],
+    vi: [
+      ['ii', 'Down a fifth'],
+      ['IV', 'Down a third'],
+      ['V', 'Builds to the dominant'],
+    ],
+    'vii°': [
+      ['I', 'Resolves home'],
+      ['iii', 'Down a fifth'],
+    ],
+    iv: [
+      ['I', 'Minor plagal, back home'],
+      ['V', 'Builds to the dominant'],
+    ],
+    bIII: [
+      ['IV', 'Steps up'],
+      ['bVI', 'Down a fifth'],
+    ],
+    bVI: [
+      ['bVII', 'Steps up'],
+      ['V', 'Steps down to the dominant'],
+    ],
+    bVII: [
+      ['I', 'Steps up home'],
+      ['IV', 'Down a fifth'],
+    ],
+  },
+};
+
+/** A minor Key's own Chords, natural minor's then V from harmonic minor, and their moves. */
+const minor: Mode = {
+  degrees: keyDegrees([
+    ['i', 0, 'm', 'Home'],
+    ['ii°', 2, 'dim', 'Leads on to V'],
+    ['III', 3, '', 'The relative major'],
+    ['iv', 5, 'm', 'Moves away from home'],
+    ['v', 7, 'm', 'A soft pull back home'],
+    ['VI', 8, '', 'Shares two notes with i'],
+    ['VII', 10, '', 'Steps down from home'],
+    ['V', 7, '7', 'From harmonic minor, pulls hard to i'],
+  ]),
+  moves: {
+    i: [
+      ['iv', 'Moves away from home'],
+      ['V', 'Builds tension'],
+      ['VI', 'Down a third'],
+      ['VII', 'Steps down'],
+    ],
+    'ii°': [['V', 'Sets up the pull home']],
+    III: [
+      ['VI', 'Down a fifth'],
+      ['iv', 'Steps up'],
+    ],
+    iv: [
+      ['V', 'Builds to the dominant'],
+      ['i', 'Plagal, back home'],
+      ['VII', 'Down a fifth'],
+    ],
+    v: [
+      ['i', 'A soft pull back home'],
+      ['VI', 'Steps up'],
+    ],
+    V: [
+      ['i', 'Resolves home'],
+      ['VI', 'Deceptive: VI in place of i'],
+    ],
+    VI: [
+      ['VII', 'Steps up'],
+      ['iv', 'Down a third'],
+      ['ii°', 'Leads on to V'],
+    ],
+    VII: [
+      ['III', 'Down a fifth, to the relative major'],
+      ['i', 'Steps up home'],
+    ],
+  },
+};
+
+/** The Chords a major Key commonly borrows from its parallel minor. */
+const borrowedDegrees = keyDegrees([
   ['iv', 5, 'm', ''],
   ['bIII', 3, '', ''],
   ['bVI', 8, '', ''],
   ['bVII', 10, '', ''],
-];
-
-type Moves = Record<string, [numeral: string, reason: string][]>;
-
-/**
- * The Chords that usually follow each of a major Key's Chords, by numeral:
- * functional moves, as V to I and IV to I, and the deceptive V to vi.
- */
-const majorMoves: Moves = {
-  I: [
-    ['IV', 'Moves away from home'],
-    ['V', 'Builds tension'],
-    ['vi', 'Turns to the relative minor'],
-  ],
-  ii: [
-    ['V', 'Sets up the pull home'],
-    ['vii°', 'Leads on to I'],
-  ],
-  iii: [
-    ['vi', 'Down a fifth'],
-    ['IV', 'Steps up'],
-  ],
-  IV: [
-    ['I', 'Plagal, back home'],
-    ['V', 'Builds to the dominant'],
-    ['ii', 'Its relative minor'],
-  ],
-  V: [
-    ['I', 'Resolves home'],
-    ['vi', 'Deceptive: vi in place of I'],
-  ],
-  vi: [
-    ['ii', 'Down a fifth'],
-    ['IV', 'Steps down'],
-    ['V', 'Builds to the dominant'],
-  ],
-  'vii°': [
-    ['I', 'Resolves home'],
-    ['iii', 'Down a fifth'],
-  ],
-  iv: [
-    ['I', 'Minor plagal, back home'],
-    ['V', 'Builds to the dominant'],
-  ],
-  bIII: [
-    ['IV', 'Steps up'],
-    ['bVI', 'Down a fifth'],
-  ],
-  bVI: [
-    ['bVII', 'Steps up'],
-    ['V', 'Steps down to the dominant'],
-  ],
-  bVII: [
-    ['I', 'Steps up home'],
-    ['IV', 'Down a fifth'],
-  ],
-};
-
-/** The same for a minor Key's Chords. */
-const minorMoves: Moves = {
-  i: [
-    ['iv', 'Moves away from home'],
-    ['V', 'Builds tension'],
-    ['VI', 'Steps up'],
-    ['VII', 'Steps down'],
-  ],
-  'ii°': [['V', 'Sets up the pull home']],
-  III: [
-    ['VI', 'Down a fifth'],
-    ['iv', 'Steps up'],
-  ],
-  iv: [
-    ['V', 'Builds to the dominant'],
-    ['i', 'Plagal, back home'],
-    ['VII', 'Down a fifth'],
-  ],
-  v: [
-    ['i', 'A soft pull back home'],
-    ['VI', 'Steps up'],
-  ],
-  V: [
-    ['i', 'Resolves home'],
-    ['VI', 'Deceptive: VI in place of i'],
-  ],
-  VI: [
-    ['VII', 'Steps up'],
-    ['iv', 'Steps down'],
-    ['ii°', 'Leads on to V'],
-  ],
-  VII: [
-    ['III', 'Down a fifth, to the relative major'],
-    ['i', 'Steps up home'],
-  ],
-};
+]);
 
 /** A Chord a Key holds, with its root's semitone from C and its quality's suffix. */
 interface KeyChord extends Suggestion {
@@ -434,34 +448,28 @@ const suggestion = ({ chord, numeral, reason, kind }: KeyChord): Suggestion => (
  * Every Chord that goes with a Key: its own, then those a major Key borrows
  * from its parallel minor, then the V of each of its own but the tonic and a
  * diminished one. Each is spelled from the Key's signature, as Transpose
- * spells Chords, and a borrowed one from its parallel minor's. A flat Key's
- * borrowed Chords stay flat, since Transpose reads the parallel minor of Eb,
- * Ab and Db as sharp (Eb minor as D# minor).
+ * spells Chords, and a borrowed one from its parallel minor's. A Key whose
+ * signature has flats keeps it for its borrowed Chords, as Transpose reads
+ * the parallel minor of Eb, Ab and Db as sharp (Eb minor as D# minor). As in
+ * Transpose, a note with no name of its own there takes its common one: Cb
+ * is written B, and E# F.
  */
 function keyChords(key: Key): KeyChord[] {
-  const at = (degree: Degree, kind: Suggestion['kind'], spelling: readonly string[], reason: string): KeyChord => {
-    const root = (key.tonic + degree[1]) % 12;
-    return { chord: spelling[root] + degree[2], numeral: degree[0], reason, kind, root, suffix: degree[2] };
+  const at = ({ numeral, semitones, suffix }: Degree, kind: Suggestion['kind'], spelling: Spelling, reason: string) => {
+    const root = (key.tonic + semitones) % 12;
+    return { chord: spelling[root] + suffix, numeral, reason, kind, root, suffix };
   };
-  const own = (key.minor ? minorDegrees : majorDegrees).map((d) => at(d, 'diatonic', key.signature, d[3]));
-  const flatKey = key.signature[1] === 'Db';
-  const parallel = flatKey ? key.signature : signature(key.tonic, true);
-  const borrowed = key.minor
-    ? []
-    : borrowedDegrees.map((d) => at(d, 'borrowed', parallel, `Borrowed from ${key.signature[key.tonic]} minor`));
+  const own = (key.minor ? minor : major).degrees.map((d) => at(d, 'diatonic', key.signature, d.reason));
+  const flatSignature = key.signature.includes('Db');
+  const parallel = flatSignature ? key.signature : signature(key.tonic, true);
+  const borrowedFrom = `Borrowed from ${key.signature[key.tonic]} minor`;
+  const borrowed = key.minor ? [] : borrowedDegrees.map((d) => at(d, 'borrowed', parallel, borrowedFrom));
   const secondary = own.slice(1).flatMap((c): KeyChord[] => {
     if (c.suffix === 'dim' || c.suffix === '7') return [];
     const root = (c.root + 7) % 12;
+    const chord = key.signature[root] + '7';
     return [
-      {
-        chord: key.signature[root] + '7',
-        numeral: 'V/' + c.numeral,
-        reason: `V of ${c.chord}`,
-        kind: 'secondary',
-        root,
-        suffix: '7',
-        of: c,
-      },
+      { chord, numeral: 'V/' + c.numeral, reason: `V of ${c.chord}`, kind: 'secondary', root, suffix: '7', of: c },
     ];
   });
   return [...own, ...borrowed, ...secondary];
@@ -472,12 +480,14 @@ export function suggestFromKey(key: Key): Suggestion[] {
   return keyChords(key).map(suggestion);
 }
 
+/** Whether a quality holds a tone this many semitones above its root. */
+const hasTone = (quality: Quality, semitones: number) => quality.tones.some((t) => t.semitones === semitones);
+
 /** A quality's triad, as a suffix: '' major, 'm' minor or 'dim', or null with no third (5, sus) or an augmented fifth. */
 function triad(quality: Quality): string | null {
-  const has = (n: number) => quality.tones.some((t) => t.semitones === n);
-  if (has(8)) return null;
-  if (has(4)) return '';
-  if (has(3)) return has(6) ? 'dim' : 'm';
+  if (hasTone(quality, 8)) return null;
+  if (hasTone(quality, 4)) return '';
+  if (hasTone(quality, 3)) return hasTone(quality, 6) ? 'dim' : 'm';
   return null;
 }
 
@@ -493,14 +503,13 @@ const suffixTriad = (suffix: string) => triad(qualities.find((q) => q.suffix ===
 export function suggestAfter(key: Key, picked: Chord): Suggestion[] {
   const chords = keyChords(key);
   const pickedTriad = triad(picked.quality);
-  const has = (n: number) => picked.quality.tones.some((t) => t.semitones === n);
   const resolvesTo =
-    pickedTriad === '' && !has(11)
+    pickedTriad === '' && !hasTone(picked.quality, 11)
       ? chords.find((c) => c.kind === 'secondary' && c.root === picked.root)?.of
       : undefined;
   const resolve = (to: KeyChord) => [{ ...suggestion(to), reason: `Resolves ${picked.name} as V of ${to.chord}` }];
   // A dominant seventh is the V of the Chord a fifth below, even on one of the Key's degrees (G7 in G).
-  if (resolvesTo && has(10)) return resolve(resolvesTo);
+  if (resolvesTo && hasTone(picked.quality, 10)) return resolve(resolvesTo);
 
   const own = chords.find(
     (c) =>
@@ -510,7 +519,7 @@ export function suggestAfter(key: Key, picked: Chord): Suggestion[] {
   );
   if (!own) return resolvesTo ? resolve(resolvesTo) : [];
 
-  const moves = ((key.minor ? minorMoves : majorMoves)[own.numeral] ?? []).flatMap(([numeral, reason]) => {
+  const moves = ((key.minor ? minor : major).moves[own.numeral] ?? []).flatMap(([numeral, reason]) => {
     const to = chords.find((c) => c.kind !== 'secondary' && c.numeral === numeral);
     return to ? [{ ...suggestion(to), reason }] : [];
   });
