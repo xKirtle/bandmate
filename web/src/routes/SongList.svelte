@@ -2,6 +2,7 @@
   import { api, statuses, type SongSummary } from '../lib/api';
   import {
     defaultSongListView,
+    loadSongList,
     songListViewFromParams,
     songListViewToParams,
     sortSongs,
@@ -15,6 +16,10 @@
   import { timeAgo } from '../lib/time';
 
   let songs = $state<SongSummary[] | null>(null);
+  // Whether there are any Songs at all, whatever the filters. Without any,
+  // the search and filters have nothing to act on, so they're hidden, and
+  // cleared so ones from the URL don't hide the first Song once it's made.
+  let anySongs = $state(true);
   let error = $state<string | null>(null);
   // The search, filters and sort start as the URL has them, and are kept in
   // it so going back to the list restores them. The filters combine.
@@ -42,7 +47,6 @@
     navigate(`/songs/${song.id}`);
   }
 
-  const filtering = $derived(view.status !== undefined || view.hasMaster || view.q.trim() !== '');
   // Not reactive: the first load shouldn't wait, later ones debounce typing.
   let loaded = false;
 
@@ -53,10 +57,12 @@
     let current = true;
     const timer = setTimeout(
       () => {
-        api.listSongs(filter).then(
-          (list) => {
+        loadSongList(filter, api.listSongs).then(
+          (result) => {
             if (!current) return;
-            songs = list;
+            songs = result.songs;
+            anySongs = result.anySongs;
+            if (!anySongs && (view.status || view.hasMaster || view.q)) clearFilters();
             error = null;
             loaded = true;
           },
@@ -107,57 +113,59 @@
   {#if createError}
     <p class="error" role="alert">{createError}</p>
   {/if}
-  <search class="filters">
-    <label class="visually-hidden" for="song-search">Search Songs by title</label>
-    <input
-      id="song-search"
-      type="search"
-      bind:value={view.q}
-      placeholder="Search titles"
-      autocomplete="off"
-      enterkeyhint="search"
-    />
-    <div class="chips" role="group" aria-label="Filter Songs">
-      <button
-        type="button"
-        class="chip"
-        aria-pressed={view.status === undefined}
-        onclick={() => (view.status = undefined)}
-      >
-        All
-      </button>
-      {#each statuses as s (s)}
-        <button type="button" class="chip" aria-pressed={view.status === s} onclick={() => (view.status = s)}
-          >{s}</button
+  {#if anySongs}
+    <search class="filters">
+      <label class="visually-hidden" for="song-search">Search Songs by title</label>
+      <input
+        id="song-search"
+        type="search"
+        bind:value={view.q}
+        placeholder="Search titles"
+        autocomplete="off"
+        enterkeyhint="search"
+      />
+      <div class="chips" role="group" aria-label="Filter Songs">
+        <button
+          type="button"
+          class="chip"
+          aria-pressed={view.status === undefined}
+          onclick={() => (view.status = undefined)}
         >
-      {/each}
-      <button
-        type="button"
-        class="chip master"
-        aria-pressed={view.hasMaster}
-        onclick={() => (view.hasMaster = !view.hasMaster)}
-      >
-        Has a Master
-      </button>
-    </div>
-  </search>
+          All
+        </button>
+        {#each statuses as s (s)}
+          <button type="button" class="chip" aria-pressed={view.status === s} onclick={() => (view.status = s)}
+            >{s}</button
+          >
+        {/each}
+        <button
+          type="button"
+          class="chip master"
+          aria-pressed={view.hasMaster}
+          onclick={() => (view.hasMaster = !view.hasMaster)}
+        >
+          Has a Master
+        </button>
+      </div>
+    </search>
+  {/if}
 
   {#if error}
     <p class="error" role="alert">{error}</p>
   {:else if songs === null}
     <p class="muted">Loading…</p>
-  {:else if songs.length === 0 && filtering}
-    <div class="empty">
-      <p>No Songs match.</p>
-      <button type="button" class="button" onclick={clearFilters}>Clear filters</button>
-    </div>
-  {:else if songs.length === 0}
+  {:else if !anySongs}
     <div class="empty">
       <p>No Songs yet.</p>
       <button type="button" class="button primary" disabled={creating} onclick={createSong}>
         {creating ? 'Creating…' : 'Write your first Song'}
       </button>
       <a class="button" href="/songs/import">Import one</a>
+    </div>
+  {:else if songs.length === 0}
+    <div class="empty">
+      <p>No Songs match.</p>
+      <button type="button" class="button" onclick={clearFilters}>Clear filters</button>
     </div>
   {:else if sorted}
     <table class="songs-table">

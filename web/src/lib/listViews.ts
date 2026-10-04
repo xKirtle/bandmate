@@ -1,7 +1,7 @@
 // What a list page shows: its search, filters and sort, how it sorts, and how
 // that is kept in the URL so going back to the list restores it.
 
-import { statuses, type Beat, type Song, type SongSummary, type Status } from './api';
+import { statuses, type Beat, type Song, type SongFilter, type SongSummary, type Status } from './api';
 
 export type SortDirection = 'asc' | 'desc';
 
@@ -116,6 +116,27 @@ export function songListViewFromParams(params: URLSearchParams): SongListView {
     hasMaster: params.get('hasMaster') === 'true',
     sort: sortFromParam(params.get('sort'), songColumns) ?? defaultSongListView.sort,
   };
+}
+
+/** The Songs a filter keeps, and whether there are any Songs at all. */
+export interface LoadedSongList {
+  songs: SongSummary[];
+  anySongs: boolean;
+}
+
+/**
+ * Lists the Songs a filter keeps, and whether there are any Songs at all. The
+ * server filters the list, so when nothing matches it asks again for every
+ * Song, to tell no matches from no Songs.
+ */
+export async function loadSongList(
+  filter: SongFilter,
+  list: (filter: SongFilter) => Promise<SongSummary[]>,
+): Promise<LoadedSongList> {
+  const songs = await list(filter);
+  const filtered = Object.values(filter).some((value) => value !== undefined && value !== '');
+  if (songs.length > 0 || !filtered) return { songs, anySongs: songs.length > 0 };
+  return { songs, anySongs: (await list({})).length > 0 };
 }
 
 /** A column of the Beat Library. */
