@@ -220,11 +220,11 @@ function spellingOf(chord: Chord): Map<number, string> {
  * from C, 0–11, lowest first.
  *
  * Readings with the root as the lowest note come first, then the simpler
- * ones, with fewer tones, then, with a Key, those whose root is in it. The best reading's root is written sharp or flat,
- * whichever writes its notes with fewer sharps and flats (G#m, not Abm with
- * its Cb), the common way when that's a tie; every other reading writes each
- * note the way the best one does, so a note is never Bb in one and A# in
- * another.
+ * ones, with fewer tones, then, with a Key, those whose root is in it. The
+ * best reading's root is written sharp or flat, whichever writes its notes
+ * with fewer sharps and flats (G#m, not Abm with its Cb), the common way
+ * when that's a tie; every other reading writes each note the way the best
+ * one does, so a note is never Bb in one and A# in another.
  */
 export function nameNotes(notes: readonly number[], key: Key | null = null): Chord[] {
   const bass = notes[0];

@@ -13,6 +13,7 @@ import {
   type Suggestion,
 } from './chordTheory';
 import { guitarNotes, guitarVoicings, type Voicing } from './guitar';
+import { transposeKey } from './transpose';
 import {
   guitarTuningName,
   guitarTuningNotes,
@@ -135,8 +136,8 @@ export type NameIt =
  * Names a shape placed on the guitar, its frets counted from the capo: every
  * reading of it, best first, and the notes sounding. Readings with the root
  * as the lowest note come first, then the simpler names, then, with a Key,
- * those whose root is in it. As a Chord names the
- * shape fingered, the capo moves none of the notes: capo 2's 320003 reads G.
+ * those whose root is in it. As a Chord names the shape fingered, the capo
+ * moves none of the notes: capo 2's 320003 reads G.
  */
 export function nameIt(frets: Frets, context: FinderContext): NameIt {
   const sounding = guitarNotes(frets, context.tuning);
@@ -158,6 +159,35 @@ export const keys: readonly string[] = [
 /** A Key's name, tidied (G major, E minor), read as Transpose reads the Song's Key, or null if it can't be read. */
 export function keyName(text: string): string | null {
   return readKey(text)?.name ?? null;
+}
+
+/**
+ * A Key's short name, as the Chord Finder's line above its tabs says it
+ * (G, Em), spelled from its own signature. Null if it can't be read.
+ */
+export function keyShortName(text: string): string | null {
+  const key = readKey(text);
+  return key && key.signature[key.tonic] + (key.minor ? 'm' : '');
+}
+
+/**
+ * A Song's Key as the Chord Finder follows it: unset, set but not a Key it
+ * reads (kept as written), or the Key as shown, moved by the Transpose
+ * amount, with its short name.
+ */
+export type KeyAsShown =
+  { kind: 'unset' } | { kind: 'unreadable'; written: string } | { kind: 'key'; key: string; short: string };
+
+/**
+ * A Song's Key as shown: as written, or moved by the Transpose amount in
+ * semitones, spelled from its own signature, as Read mode shows it.
+ */
+export function keyAsShown(written: string, transpose: number): KeyAsShown {
+  const key = written.trim();
+  if (!key) return { kind: 'unset' };
+  const shown = transposeKey(key, transpose) ?? key;
+  const short = keyShortName(shown);
+  return short ? { kind: 'key', key: shown, short } : { kind: 'unreadable', written: key };
 }
 
 export type Suggest =

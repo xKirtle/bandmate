@@ -5,7 +5,9 @@ import {
   qualities,
   readTuning,
   roots,
+  keyAsShown,
   keyName,
+  keyShortName,
   keys,
   standard,
   suggest,
@@ -772,5 +774,44 @@ describe("Keys it can't read", () => {
   it('says so, never a guess', () => {
     expect(suggest('Do', 'C')).toEqual({ kind: 'unreadable', key: 'Do' });
     expect(suggest('')).toEqual({ kind: 'unreadable', key: '' });
+  });
+});
+
+describe('a Key’s short name', () => {
+  it('names a major Key by its tonic and a minor one with an m, spelled from its signature', () => {
+    expect(keyShortName('G')).toBe('G');
+    expect(keyShortName('G major')).toBe('G');
+    expect(keyShortName('E minor')).toBe('Em');
+    expect(keyShortName('C#m')).toBe('C#m');
+    expect(keyShortName('Db')).toBe('Db');
+    expect(keyShortName('Bbm')).toBe('Bbm');
+  });
+
+  it('gives null for a Key it can’t read', () => {
+    expect(keyShortName('modal')).toBeNull();
+    expect(keyShortName('')).toBeNull();
+  });
+});
+
+describe('a Song’s Key as shown', () => {
+  it('is the Key as written when it isn’t transposed', () => {
+    expect(keyAsShown('G', 0)).toEqual({ kind: 'key', key: 'G', short: 'G' });
+    expect(keyAsShown(' E minor ', 0)).toEqual({ kind: 'key', key: 'E minor', short: 'Em' });
+  });
+
+  it('is moved by the Transpose amount, spelled from its own signature', () => {
+    expect(keyAsShown('G', 2)).toEqual({ kind: 'key', key: 'A', short: 'A' });
+    expect(keyAsShown('G minor', 2)).toEqual({ kind: 'key', key: 'A minor', short: 'Am' });
+    expect(keyAsShown('F', -1)).toEqual({ kind: 'key', key: 'E', short: 'E' });
+  });
+
+  it('is unset when the Song has no Key', () => {
+    expect(keyAsShown('', 0)).toEqual({ kind: 'unset' });
+    expect(keyAsShown('  ', 3)).toEqual({ kind: 'unset' });
+  });
+
+  it('can’t be read, kept as written, when the Song’s Key isn’t one it reads', () => {
+    expect(keyAsShown('modal', 0)).toEqual({ kind: 'unreadable', written: 'modal' });
+    expect(keyAsShown(' modal ', 2)).toEqual({ kind: 'unreadable', written: 'modal' });
   });
 });

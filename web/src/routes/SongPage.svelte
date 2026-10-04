@@ -146,6 +146,16 @@
     finderButton?.focus();
   }
 
+  // Crossing into or out of desktop closes it, rather than opening the
+  // other form, a modal sheet, and moving focus without the user asking.
+  let finderDesktop = desktop.current;
+  $effect(() => {
+    if (desktop.current !== finderDesktop) {
+      finderDesktop = desktop.current;
+      finderOpen = false;
+    }
+  });
+
   // How tall the docked Timeline is, which the side column stops above.
   let timelineHeight = $state(0);
 

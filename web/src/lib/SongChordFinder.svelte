@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { on } from 'svelte/events';
   import ChordFinder from './ChordFinder.svelte';
-  import { keyName, readTuning, standard, tuningName, tuningNotes } from './chordFinder';
-  import { transposeKey } from './transpose';
+  import { keyAsShown, readTuning, standard, tuningName, tuningNotes } from './chordFinder';
   import TuningField from './TuningField.svelte';
 
   // The Chord Finder opened from a Song: a side panel beside the Lyric Sheet
@@ -10,7 +10,9 @@
   // Song's tuning, capo and Key as shown, Transpose included, and says so
   // above the tabs. They're changed only in the Details. An unset tuning is
   // standard, with a picker to try another, and an unset Key makes Suggest
-  // ask for one; neither is saved to the Song.
+  // ask for one; neither is saved to the Song. A tuning or Key that can't be
+  // read is quoted in a notice, the tuning taken as standard and the Key
+  // asked for. Opened only by the user, it takes focus as it opens.
   let {
     tuning,
     capo,
@@ -47,20 +49,29 @@
     return name === 'Standard' ? 'Standard tuning' : (name ?? tuningNotes(tuningText) ?? '');
   });
 
-  /** The Key as shown: moved by Transpose, else as written. Null when it's unset or can't be read. */
-  const shownKey = $derived.by(() => {
-    const key = transposeKey(songKey, transpose) ?? songKey.trim();
-    return keyName(key) ? key : null;
-  });
-  /** A Key's name as the line above the tabs says it: G, Em. */
-  const shortKey = (key: string) => (keyName(key) ?? key).replace(' major', '').replace(' minor', 'm');
-  const key = $derived(shownKey ?? pickedKey);
+  const shown = $derived(keyAsShown(songKey, transpose));
+  const key = $derived(shown.kind === 'key' ? shown.key : pickedKey);
+  const keyPrompt = $derived(
+    shown.kind === 'unset'
+      ? 'This Song has no Key. Pick one to get suggestions; it isn’t saved to the Song.'
+      : shown.kind === 'unreadable'
+        ? `This Song’s Key “${shown.written}” can’t be read. Pick one to get suggestions; it isn’t saved to the Song.`
+        : undefined,
+  );
 
   const context = $derived({ tuning: pitches ?? standard, capo: capo ?? 0, key });
 
   let tuningError = $state('');
   let dialog = $state<HTMLDialogElement>();
   let panel = $state<HTMLElement>();
+
+  // Esc closes the side panel too, as it closes the sheet, unless something
+  // in it, like an open picker, took it first.
+  function closeOnEscape(e: KeyboardEvent) {
+    if (e.key !== 'Escape' || e.defaultPrevented) return;
+    e.preventDefault();
+    onclose();
+  }
 
   onMount(() => {
     if (sheet) dialog?.showModal();
@@ -96,9 +107,12 @@
     {/if}
     <span class="muted" aria-hidden="true">·</span>
     <span>{context.capo > 0 ? `Capo ${context.capo}` : 'No capo'}</span>
-    {#if shownKey}
+    {#if shown.kind === 'key'}
       <span class="muted" aria-hidden="true">·</span>
-      <span>Key of {shortKey(shownKey)}</span>
+      <span>Key of {shown.short}</span>
+    {:else if shown.kind === 'unreadable'}
+      <span class="muted" aria-hidden="true">·</span>
+      <span>Key “{shown.written}” can’t be read</span>
     {/if}
   </div>
   {#if tuningError}
@@ -111,7 +125,12 @@
   {:else if !written}
     <p class="notice muted">This Song has no tuning, so the Chord Finder uses standard. Trying another isn’t saved.</p>
   {/if}
-  <ChordFinder {context} suggestKey={key} onpickkey={shownKey ? undefined : (picked) => (pickedKey = picked)} />
+  <ChordFinder
+    {context}
+    suggestKey={key}
+    onpickkey={shown.kind === 'key' ? undefined : (picked) => (pickedKey = picked)}
+    {keyPrompt}
+  />
 {/snippet}
 
 {#if sheet}
@@ -119,7 +138,13 @@
     {@render content()}
   </dialog>
 {:else}
-  <aside bind:this={panel} class="panel" aria-labelledby="song-finder-heading" tabindex="-1">
+  <aside
+    bind:this={panel}
+    class="panel"
+    aria-labelledby="song-finder-heading"
+    tabindex="-1"
+    {@attach (el) => on(el, 'keydown', closeOnEscape)}
+  >
     {@render content()}
   </aside>
 {/if}

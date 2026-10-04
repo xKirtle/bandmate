@@ -27,6 +27,7 @@
     context,
     suggestKey,
     onpickkey,
+    keyPrompt,
   }: {
     context: FinderContext;
     /**
@@ -34,8 +35,13 @@
      * a Song's Details write it when it's fixed. Null asks for one.
      */
     suggestKey: string | null;
-    /** The user picked another Key for Suggest. Without it, the Key is fixed and Suggest offers no picker. */
+    /**
+     * The user picked another Key for Suggest. Without it, the Key is fixed
+     * and Suggest offers no picker.
+     */
     onpickkey?: (key: string) => void;
+    /** Said above Suggest's Key picker: why a Key is asked for, if it is. */
+    keyPrompt?: string;
   } = $props();
 
   const tabs = [
@@ -326,8 +332,8 @@
           </div>
         </div>
       {:else}
-        {#if suggestKey === null}
-          <p class="muted">This Song has no Key. Pick one to get suggestions; it isn’t saved to the Song.</p>
+        {#if keyPrompt}
+          <p class="muted">{keyPrompt}</p>
         {/if}
         <div class="pick suggest-pick">
           {#if onpickkey}
