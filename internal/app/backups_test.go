@@ -21,6 +21,10 @@ type backup struct {
 	CreatedAt string `json:"createdAt"`
 	// Songs is how many Songs it holds.
 	Songs int `json:"songs"`
+	// AllSongs tells whether it holds every Song there was.
+	AllSongs bool `json:"allSongs"`
+	// BeatLibrary tells whether it holds the whole Beat Library.
+	BeatLibrary bool `json:"beatLibrary"`
 	// Size is its file's size in bytes.
 	Size int64 `json:"size"`
 }
@@ -278,8 +282,8 @@ func TestABackupOfAllSongsHoldsEverySongAndEachBeatTheirClipsUseOnce(t *testing.
 	made := ts.backUp(map[string]any{"allSongs": true})
 	held := openBackup(t, ts.downloadBackup(made.ID).Body)
 
-	if made.Songs != 3 {
-		t.Errorf("backup = %+v, want 3 Songs", made)
+	if made.Songs != 3 || !made.AllSongs || made.BeatLibrary {
+		t.Errorf("backup = %+v, want all 3 Songs, without the Beat Library", made)
 	}
 	if got, want := titles(held.listSongs()), titles(ts.listSongs()); !reflect.DeepEqual(got, want) {
 		t.Errorf("songs in the backup = %q, want every Song: %q", got, want)
@@ -304,16 +308,22 @@ func TestBackupsAreListedNewestFirst(t *testing.T) {
 	}
 }
 
-func TestABackupMustPickSongsThatExist(t *testing.T) {
+func TestABackupMustPickSomethingThatExists(t *testing.T) {
 	ts := newTestServer(t)
 	expectError(t, ts.Do(http.MethodPost, "/api/backups", map[string]any{"allSongs": true}),
 		http.StatusBadRequest, "there are no Songs to back up")
+	expectError(t, ts.Do(http.MethodPost, "/api/backups", map[string]any{"beatLibrary": true}),
+		http.StatusBadRequest, "there's nothing to back up")
+	expectError(t, ts.Do(http.MethodPost, "/api/backups", map[string]any{"allSongs": true, "beatLibrary": true}),
+		http.StatusBadRequest, "there's nothing to back up")
 	s := ts.createSong("Night Drive")
 
 	expectError(t, ts.Do(http.MethodPost, "/api/backups", map[string]any{}),
-		http.StatusBadRequest, "pick at least one Song")
+		http.StatusBadRequest, "pick at least one Song, or the Beat Library")
 	expectError(t, ts.Do(http.MethodPost, "/api/backups", map[string]any{"songs": []int64{}}),
-		http.StatusBadRequest, "pick at least one Song")
+		http.StatusBadRequest, "pick at least one Song, or the Beat Library")
+	expectError(t, ts.Do(http.MethodPost, "/api/backups", map[string]any{"songs": []int64{}, "beatLibrary": true}),
+		http.StatusBadRequest, "there's nothing to back up")
 	expectError(t, ts.Do(http.MethodPost, "/api/backups", map[string]any{"songs": []int64{s.ID, s.ID + 1}}),
 		http.StatusBadRequest, "a Song picked doesn't exist")
 	expectError(t, ts.Do(http.MethodPost, "/api/backups", map[string]any{"allSongs": true, "songs": []int64{s.ID}}),
@@ -346,4 +356,82 @@ func TestABackupLeavesOutTakesAndSoundsKeptOnlyForUndo(t *testing.T) {
 	expectStatus(t, held.Do(http.MethodGet, takePath(s.ID, r.take.ID), nil), http.StatusNotFound)
 	expectStatus(t, ts.Do(http.MethodGet, soundPath(s.ID, *soundClip.SoundID), nil), http.StatusOK)
 	expectStatus(t, held.Do(http.MethodGet, soundPath(s.ID, *soundClip.SoundID), nil), http.StatusNotFound)
+}
+
+func TestABackupOfTheBeatLibraryHoldsEveryBeatAndNoSongs(t *testing.T) {
+	ts := newTestServer(t)
+	used := ts.beatOfLength("Used", 20)
+	unused := ts.uploadBeat(fakeAudio("unused.mp3").with(map[string]any{"title": "Unused", "producer": "Kai"}))
+	s := ts.createSong("Night Drive")
+	timelineChange(t, ts.addBeatToSong(s.ID, used.ID))
+
+	made := ts.backUp(map[string]any{"beatLibrary": true})
+	held := openBackup(t, ts.downloadBackup(made.ID).Body)
+
+	if made.Songs != 0 || made.AllSongs || !made.BeatLibrary {
+		t.Errorf("backup = %+v, want the Beat Library and no Songs", made)
+	}
+	if got := held.listSongs(); len(got) != 0 {
+		t.Errorf("songs in the backup = %q, want none", titles(got))
+	}
+	if got := beatTitles(held.listBeats()); !reflect.DeepEqual(got, beatTitles(ts.listBeats())) {
+		t.Errorf("beats in the backup = %q, want every Beat", got)
+	}
+	expectSame(t, ts, held, beatPath(unused.ID))
+	expectSame(t, ts, held, beatPath(unused.ID)+"/audio")
+	expectSame(t, ts, held, beatPath(used.ID)+"/audio")
+}
+
+func TestABackupOfEverythingHoldsEverySongAndEveryBeat(t *testing.T) {
+	ts := newTestServer(t)
+	used := ts.beatOfLength("Used", 20)
+	unused := ts.beatOfLength("Unused", 20)
+	s := ts.fullSong(t, used.ID)
+	other := ts.createSong("Midnight")
+
+	made := ts.backUp(map[string]any{"allSongs": true, "beatLibrary": true})
+	held := openBackup(t, ts.downloadBackup(made.ID).Body)
+
+	if made.Songs != 2 || !made.AllSongs || !made.BeatLibrary {
+		t.Errorf("backup = %+v, want Everything: both Songs and the Beat Library", made)
+	}
+	if list := ts.listBackups(); len(list) != 1 || list[0] != made {
+		t.Errorf("backups = %+v, want only %+v", list, made)
+	}
+	if got, want := titles(held.listSongs()), titles(ts.listSongs()); !reflect.DeepEqual(got, want) {
+		t.Errorf("songs in the backup = %q, want every Song: %q", got, want)
+	}
+	expectSame(t, ts, held, "/api/beats")
+	expectSame(t, ts, held, songPath(s.ID))
+	expectSame(t, ts, held, timelinePath(s.ID))
+	expectSame(t, ts, held, songPath(other.ID))
+	expectSame(t, ts, held, beatPath(used.ID))
+	expectSame(t, ts, held, beatPath(used.ID)+"/audio")
+	expectSame(t, ts, held, beatPath(unused.ID)+"/audio")
+}
+
+func TestABackupOfChosenSongsCanHoldTheBeatLibraryToo(t *testing.T) {
+	ts := newTestServer(t)
+	used := ts.beatOfLength("Used", 20)
+	unused := ts.beatOfLength("Unused", 20)
+	s := ts.createSong("Night Drive")
+	timelineChange(t, ts.addBeatToSong(s.ID, used.ID))
+	left := ts.createSong("Left Out")
+	timelineChange(t, ts.addBeatToSong(left.ID, used.ID))
+
+	made := ts.backUp(map[string]any{"songs": []int64{s.ID}, "beatLibrary": true})
+	held := openBackup(t, ts.downloadBackup(made.ID).Body)
+
+	if made.Songs != 1 || made.AllSongs || !made.BeatLibrary {
+		t.Errorf("backup = %+v, want 1 Song and the Beat Library", made)
+	}
+	if got := titles(held.listSongs()); !reflect.DeepEqual(got, []string{"Night Drive"}) {
+		t.Errorf("songs in the backup = %q, want only the one picked", got)
+	}
+	if got := beatTitles(held.listBeats()); len(got) != 2 {
+		t.Errorf("beats in the backup = %q, want both", got)
+	}
+	expectSame(t, ts, held, timelinePath(s.ID))
+	expectSame(t, ts, held, beatPath(used.ID)+"/audio")
+	expectSame(t, ts, held, beatPath(unused.ID)+"/audio")
 }

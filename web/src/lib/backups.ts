@@ -8,12 +8,22 @@ const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 /**
  * A Backup's automatic name, from the day it was made, where it's shown,
- * and what it holds: "4 Oct 2026 · 3 Songs".
+ * and what it holds: "4 Oct 2026 · 3 Songs", "4 Oct 2026 · Everything".
  */
-export function backupName(backup: Pick<Backup, 'createdAt' | 'songs'>): string {
+export function backupName(backup: Pick<Backup, 'createdAt'> & Contents): string {
   const made = new Date(backup.createdAt);
   const day = `${made.getDate()} ${months[made.getMonth()]} ${made.getFullYear()}`;
-  return `${day} · ${songCount(backup.songs)}`;
+  return `${day} · ${contentsName(backup)}`;
+}
+
+/** What a Backup holds: how many Songs, whether they're all of them, and whether the Beat Library. */
+type Contents = Pick<Backup, 'songs'> & Partial<Pick<Backup, 'allSongs' | 'beatLibrary'>>;
+
+/** What a Backup holds, in a few words: "3 Songs", "Beat Library", "2 Songs + Beat Library", "Everything". */
+export function contentsName({ songs, allSongs, beatLibrary }: Contents): string {
+  if (!beatLibrary) return songCount(songs);
+  if (allSongs) return 'Everything';
+  return songs === 0 ? 'Beat Library' : `${songCount(songs)} + Beat Library`;
 }
 
 /** "1 Song", "3 Songs". */

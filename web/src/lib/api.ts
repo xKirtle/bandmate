@@ -195,12 +195,20 @@ export interface Backup {
   createdAt: string;
   /** How many Songs it holds. */
   songs: number;
+  /** Whether its Songs are every Song there was. */
+  allSongs: boolean;
+  /** Whether it holds the whole Beat Library. With allSongs, it's Everything. */
+  beatLibrary: boolean;
   /** Its file's size, in bytes. */
   size: number;
 }
 
-/** What a new Backup holds: every Song, or the Songs picked, each with the Beats its Clips use. */
-export type BackupContents = { allSongs: true } | { songs: number[] };
+/**
+ * What a new Backup holds: every Song, the Songs picked, or none, each with
+ * the Beats its Clips use, and the whole Beat Library or not. Every Song and
+ * the Beat Library is Everything.
+ */
+export type BackupContents = ({ allSongs: true } | { songs: number[] }) & { beatLibrary?: boolean };
 
 /** Details the user enters about a Beat. "" and null mean "not set"; only the title is required. */
 export interface BeatDetails {

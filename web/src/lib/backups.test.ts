@@ -13,6 +13,27 @@ describe('backupName', () => {
     expect(backupName({ createdAt: made, songs: 1 })).toBe('4 Oct 2026 · 1 Song');
   });
 
+  it('names a Backup of every Song as one of that many Songs', () => {
+    expect(backupName({ createdAt: made, songs: 3, allSongs: true })).toBe('4 Oct 2026 · 3 Songs');
+  });
+
+  it('names a Backup of only the Beat Library after it', () => {
+    expect(backupName({ createdAt: made, songs: 0, beatLibrary: true })).toBe('4 Oct 2026 · Beat Library');
+  });
+
+  it('names a Backup of chosen Songs and the Beat Library after both', () => {
+    expect(backupName({ createdAt: made, songs: 2, beatLibrary: true })).toBe('4 Oct 2026 · 2 Songs + Beat Library');
+  });
+
+  it('names a Backup of every Song and the Beat Library Everything', () => {
+    expect(backupName({ createdAt: made, songs: 3, allSongs: true, beatLibrary: true })).toBe(
+      '4 Oct 2026 · Everything',
+    );
+    expect(backupName({ createdAt: made, songs: 0, allSongs: true, beatLibrary: true })).toBe(
+      '4 Oct 2026 · Everything',
+    );
+  });
+
   it('gives every month its three-letter name', () => {
     const months = Array.from(
       { length: 12 },
