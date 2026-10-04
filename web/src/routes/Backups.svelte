@@ -90,7 +90,7 @@
             </span>
           </div>
           <div class="row-actions">
-            {#if backup.songs > 0}
+            {#if backup.songs > 0 || backup.beatLibrary}
               <button
                 type="button"
                 class="button"

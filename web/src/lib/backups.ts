@@ -42,6 +42,15 @@ function beatCount(n: number): string {
 }
 
 /**
+ * What a Restore brought back, in a few words: "2 Songs", "1 Song and 1 Beat",
+ * "14 Beats". The Beats are named when there were any, or when the Beat
+ * Library was restored, even if it held none.
+ */
+export function restoredName(songs: number, beats: number, beatLibrary: boolean): string {
+  return [songs > 0 && songCount(songs), (beats > 0 || beatLibrary) && beatCount(beats)].filter(Boolean).join(' and ');
+}
+
+/**
  * The confirmation a Restore asks for before replacing Songs and Beats,
  * naming each as it's called in Bandmate, since that's the one lost.
  */

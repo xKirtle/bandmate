@@ -235,6 +235,23 @@ export interface BackupPresence {
   beats: BackupPresent[];
 }
 
+/**
+ * What a Restore brings back from a Backup: the Songs picked, by their ids
+ * in it, each with the Beats its Clips use, and its whole Beat Library or
+ * not. Every Song, with the Beat Library if it holds one, is everything it
+ * holds.
+ */
+export interface BackupPicks {
+  songs: number[];
+  beatLibrary: boolean;
+}
+
+/** What a Restore brought back: the Songs, by their ids here, and how many Beats it added or replaced. */
+export interface BackupRestored {
+  songs: BackupSong[];
+  beats: number;
+}
+
 /** The Songs and Beats already in Bandmate a Restore replaces rather than keeping both, by their ids in the Backup. */
 export interface BackupReplace {
   songs: number[];
@@ -703,16 +720,20 @@ export const api = {
   backupDownloadUrl: (id: number) => `/api/backups/${id}/file`,
   /** The Songs a Backup holds, by title, with their ids in it. */
   backupSongs: (id: number) => request<BackupSong[]>('GET', `/backups/${id}/songs`),
-  /** Which of the Songs picked from a Backup, and of the Beats their Clips use, are already in Bandmate. */
-  backupPresence: (id: number, songs: number[]) => request<BackupPresence>('POST', `/backups/${id}/present`, { songs }),
   /**
-   * Restores the Songs picked from a Backup, by their ids in it, each with
-   * the Beats its Clips use, answering once they're back. One already in
-   * Bandmate is replaced if listed in replace, and otherwise kept both: the
-   * restored one is added alongside, titled as restored.
+   * Which of the Songs picked from a Backup, of the Beats their Clips use,
+   * and of its Beat Library if picked, are already in Bandmate.
    */
-  restoreBackup: (id: number, songs: number[], replace: BackupReplace) =>
-    request<{ songs: BackupSong[] }>('POST', `/backups/${id}/restore`, { songs, replace }),
+  backupPresence: (id: number, picks: BackupPicks) => request<BackupPresence>('POST', `/backups/${id}/present`, picks),
+  /**
+   * Restores the Songs picked from a Backup, each with the Beats its Clips
+   * use, and its Beat Library if picked, answering once they're back. One
+   * already in Bandmate is replaced if listed in replace, and otherwise kept
+   * both: the restored one is added alongside, titled as restored. Nothing
+   * the Backup doesn't hold is deleted.
+   */
+  restoreBackup: (id: number, picks: BackupPicks, replace: BackupReplace) =>
+    request<BackupRestored>('POST', `/backups/${id}/restore`, { ...picks, replace }),
 
   listSongs: (filter: SongFilter = {}) => {
     const params = new URLSearchParams();

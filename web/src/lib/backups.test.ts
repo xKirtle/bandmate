@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { automaticName, backupName, backupSize, replaceConfirmation } from './backups';
+import { automaticName, backupName, backupSize, replaceConfirmation, restoredName } from './backups';
 
 // 18:30 on 4 Oct 2026, in the time zone the tests run in.
 const made = new Date(2026, 9, 4, 18, 30).toISOString();
@@ -98,5 +98,18 @@ describe('replaceConfirmation', () => {
     const songs = [1, 2].map((id) => ({ id, title: `S${id}`, inBandmate: { id, title: `S${id}` } }));
     expect(replaceConfirmation(songs, []).split('\n')[0]).toBe('Replace 2 Songs with the Backup’s versions?');
     expect(replaceConfirmation([], [songs[0]]).split('\n')[0]).toBe('Replace 1 Beat with the Backup’s version?');
+  });
+});
+
+describe('restoredName', () => {
+  it('names the Songs restored, and the Beats only when there were any', () => {
+    expect(restoredName(2, 0, false)).toBe('2 Songs');
+    expect(restoredName(1, 1, false)).toBe('1 Song and 1 Beat');
+  });
+
+  it('names the Beats whenever the Beat Library was restored, even none', () => {
+    expect(restoredName(0, 14, true)).toBe('14 Beats');
+    expect(restoredName(0, 0, true)).toBe('0 Beats');
+    expect(restoredName(3, 2, true)).toBe('3 Songs and 2 Beats');
   });
 });

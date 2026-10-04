@@ -25,14 +25,7 @@ type presentItem struct {
 // Beats their Clips use, that are already in Bandmate.
 func (ts *testServer) present(id int64, songs ...int64) (presentSongs, presentBeats []presentItem) {
 	ts.t.Helper()
-	res := ts.Do(http.MethodPost, backupPath(id)+"/present", map[string]any{"songs": songs})
-	expectStatus(ts.t, res, http.StatusOK)
-	var got struct {
-		Songs []presentItem `json:"songs"`
-		Beats []presentItem `json:"beats"`
-	}
-	res.JSON(ts.t, &got)
-	return got.Songs, got.Beats
+	return ts.presentPicked(id, map[string]any{"songs": songs})
 }
 
 func TestARestoreListsTheSongsAndBeatsAlreadyInBandmate(t *testing.T) {
@@ -183,15 +176,9 @@ func beatSongTitles(b beat) []string {
 // ids in the Backup, and returns the Songs restored.
 func (ts *testServer) restoreReplacing(id int64, songs, replaceSongs, replaceBeats []int64) []restoredSong {
 	ts.t.Helper()
-	res := ts.Do(http.MethodPost, backupPath(id)+"/restore", map[string]any{
+	return ts.restoreBody(id, map[string]any{
 		"songs": songs, "replace": map[string]any{"songs": replaceSongs, "beats": replaceBeats},
-	})
-	expectStatus(ts.t, res, http.StatusOK)
-	var restored struct {
-		Songs []restoredSong `json:"songs"`
-	}
-	res.JSON(ts.t, &restored)
-	return restored.Songs
+	}).Songs
 }
 
 // songFilesKept lists the files kept in the data directory for Masters,
