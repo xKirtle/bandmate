@@ -16,6 +16,10 @@ describe('currentPage', () => {
     expect(currentPage('/chords')).toBe('chords');
   });
 
+  it('marks Backups on the Backups page', () => {
+    expect(currentPage('/backups')).toBe('backups');
+  });
+
   it('marks About on the About page', () => {
     expect(currentPage('/about')).toBe('about');
   });
@@ -26,6 +30,7 @@ describe('currentPage', () => {
     expect(currentPage('/beatsx')).toBeUndefined();
     expect(currentPage('/songsx')).toBeUndefined();
     expect(currentPage('/chordsx')).toBeUndefined();
+    expect(currentPage('/backupsx')).toBeUndefined();
   });
 });
 
@@ -42,17 +47,19 @@ describe('listAt', () => {
     expect(listAt('/about')).toBeUndefined();
   });
 
-  it('is none on the Chord Finder, which is no list', () => {
+  it('is none on the Chord Finder or the Backups, which keep no search', () => {
     expect(listAt('/chords')).toBeUndefined();
+    expect(listAt('/backups')).toBeUndefined();
   });
 });
 
 describe('pages', () => {
-  it('leads to the Songs, the Beats and the Chord Finder, in that order', () => {
+  it('leads to the Songs, the Beats, the Chord Finder and the Backups, in that order', () => {
     expect(pages.map((p) => [p.label, p.href])).toEqual([
       ['Songs', '/'],
       ['Beats', '/beats'],
       ['Chord Finder', '/chords'],
+      ['Backups', '/backups'],
     ]);
   });
 });

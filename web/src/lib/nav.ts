@@ -5,8 +5,8 @@
 const lists = ['songs', 'beats'] as const;
 export type LibraryPage = (typeof lists)[number];
 
-/** A top-level page the navigation leads to: the lists and the Chord Finder. */
-export type MainPage = LibraryPage | 'chords';
+/** A top-level page the navigation leads to: the lists, the Chord Finder and the Backups. */
+export type MainPage = LibraryPage | 'chords' | 'backups';
 
 /** Any page the navigation leads to: the main pages, and About apart from them. */
 export type NavPage = MainPage | 'about';
@@ -22,6 +22,7 @@ export const pages = [
   { id: 'songs', href: '/', label: 'Songs', icon: '♪' },
   { id: 'beats', href: '/beats', label: 'Beats', icon: '◉' },
   { id: 'chords', href: '/chords', label: 'Chord Finder', icon: '♯' },
+  { id: 'backups', href: '/backups', label: 'Backups', icon: '⧉' },
 ] as const satisfies readonly NavLink<MainPage>[];
 
 /** Whether a main page is a list, which the navigation returns to as it was left. */
@@ -37,13 +38,14 @@ export const about = { id: 'about', href: '/about', label: 'About' } as const sa
 /**
  * The page the navigation marks as current for a path: Songs for the Song
  * list and anything under /songs, Beats for the Beat Library, the Chord
- * Finder for its page, About for the About page, and none for a path that
- * isn't the app's.
+ * Finder and the Backups for their pages, About for the About page, and none
+ * for a path that isn't the app's.
  */
 export function currentPage(path: string): NavPage | undefined {
   if (path === '/' || path.startsWith('/songs/')) return 'songs';
   if (path === '/beats') return 'beats';
   if (path === '/chords') return 'chords';
+  if (path === '/backups') return 'backups';
   if (path === about.href) return 'about';
   return undefined;
 }
