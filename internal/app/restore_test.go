@@ -323,10 +323,12 @@ func packBackup(t *testing.T, dir string) []byte {
 	return buf.Bytes()
 }
 
-func TestABackupMadeByAnOlderBandmateRestores(t *testing.T) {
-	// A Backup's database at the schema before Clips had gain, fades, and
-	// Songs and Beats identities, holding a Song with a cued Line and a Beat
-	// on its Timeline.
+// olderBackupDir is a Backup's database and files, unpacked, as made by an
+// older Bandmate: at the schema before Clips had gain, fades, and Songs and
+// Beats identities, holding Night Drive (id 4) with a cued Line and Dark
+// Trap on its Timeline.
+func olderBackupDir(t *testing.T) string {
+	t.Helper()
 	dir := t.TempDir()
 	old, err := db.OpenBefore(context.Background(), dir, "0029_clip_gain")
 	if err != nil {
@@ -357,6 +359,11 @@ func TestABackupMadeByAnOlderBandmateRestores(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "audio", "beats", "6"), []byte("dark trap"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	return dir
+}
+
+func TestABackupMadeByAnOlderBandmateRestores(t *testing.T) {
+	dir := olderBackupDir(t)
 	ts := newTestServer(t)
 	ts.createSong("Placeholder")
 	made := ts.backUp(map[string]any{"allSongs": true})
@@ -467,7 +474,7 @@ func TestARestoreThatFailsRestoresNothing(t *testing.T) {
 
 	res := ts.Do(http.MethodPost, backupPath(made.ID)+"/restore", map[string]any{"songs": []int64{a.ID, b.ID}})
 
-	expectStatus(t, res, http.StatusInternalServerError)
+	expectError(t, res, http.StatusBadRequest, "the Backup is damaged")
 	if got := titles(ts.listSongs()); !reflect.DeepEqual(got, before) {
 		t.Errorf("songs = %q, want them as they were, %q", got, before)
 	}

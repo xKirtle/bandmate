@@ -279,11 +279,48 @@ func (s *Store) openBackup(ctx context.Context, id int64) (*openedBackup, error)
 	if err != nil {
 		return nil, err
 	}
-	file, err := zip.OpenReader(s.path(id))
+	r, err := s.openFile(ctx, s.path(id))
 	if err != nil {
-		return nil, fmt.Errorf("opening backup file: %w", err)
+		return nil, err
 	}
-	r := &openedBackup{backup: b, file: file}
+	r.backup = b
+	return r, nil
+}
+
+// A Backup's file that can't be restored is refused whole, saying why.
+var (
+	errDamaged = &InvalidError{"the Backup is damaged"}
+	errNewer   = &InvalidError{"the Backup was made by a newer Bandmate: update Bandmate to restore it"}
+)
+
+// damagedBy is err, met reading a Backup's file, as the Backup being
+// damaged.
+func damagedBy(err error) error {
+	return fmt.Errorf("%w: %v", errDamaged, err)
+}
+
+// damagedOnRead reads a Backup's file entry, any failure to read it, such
+// as its bytes not matching their checksum, meaning the Backup is damaged.
+type damagedOnRead struct{ r io.Reader }
+
+func (d damagedOnRead) Read(p []byte) (int, error) {
+	n, err := d.r.Read(p)
+	if err != nil && !errors.Is(err, io.EOF) {
+		err = damagedBy(err)
+	}
+	return n, err
+}
+
+// openFile unpacks the database of the Backup's file at path into a
+// staging directory and runs the migrations on it, leaving the file as it
+// is. It refuses a file that can't be read as a Backup as damaged, and one
+// a newer Bandmate made.
+func (s *Store) openFile(ctx context.Context, path string) (*openedBackup, error) {
+	file, err := zip.OpenReader(path)
+	if err != nil {
+		return nil, damagedBy(err)
+	}
+	r := &openedBackup{file: file}
 	if r.staging, err = os.MkdirTemp(s.dir, makingPrefix+"*"); err != nil {
 		r.close()
 		return nil, fmt.Errorf("restoring backup: %w", err)
@@ -292,9 +329,12 @@ func (s *Store) openBackup(ctx context.Context, id int64) (*openedBackup, error)
 		r.close()
 		return nil, fmt.Errorf("unpacking backup database: %w", err)
 	}
-	if r.db, err = db.Open(ctx, r.staging); err != nil {
+	if r.db, err = db.OpenNoNewer(ctx, r.staging); err != nil {
 		r.close()
-		return nil, fmt.Errorf("opening backup database: %w", err)
+		if errors.Is(err, db.ErrNewer) {
+			return nil, errNewer
+		}
+		return nil, damagedBy(err)
 	}
 	return r, nil
 }
@@ -318,11 +358,12 @@ func (r *openedBackup) close() {
 	}
 }
 
-// unpack writes the Backup's file entry name to to.
+// unpack writes the Backup's file entry name to to. An entry missing, or
+// not as it was written, means the Backup is damaged.
 func (r *openedBackup) unpack(name, to string) error {
 	src, err := r.file.Open(name)
 	if err != nil {
-		return err
+		return damagedBy(err)
 	}
 	defer src.Close()
 	if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
@@ -332,7 +373,7 @@ func (r *openedBackup) unpack(name, to string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(dst, src); err != nil {
+	if _, err := io.Copy(dst, damagedOnRead{src}); err != nil {
 		dst.Close()
 		return err
 	}
