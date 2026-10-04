@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -587,5 +588,93 @@ func TestTracksBelowMinus36DecibelsComeUpToItAndSilentOnesAreMuted(t *testing.T)
 		if _, err := conn.Exec(`UPDATE tracks SET volume = ` + v + ` WHERE id = 5`); err == nil {
 			t.Errorf("setting %s dB succeeded, want the constraint to refuse it", v)
 		}
+	}
+}
+
+// identities reads the identity of every row of table, by id.
+func identities(t *testing.T, conn *sql.DB, table string) []string {
+	t.Helper()
+	var ids []string
+	rows, err := conn.Query(`SELECT identity FROM ` + table + ` ORDER BY id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id sql.NullString
+		if err := rows.Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, id.String)
+	}
+	return ids
+}
+
+// expectDistinctIdentities checks each identity is 32 hex digits and none
+// is shared.
+func expectDistinctIdentities(t *testing.T, what string, ids []string) {
+	t.Helper()
+	seen := map[string]bool{}
+	for _, id := range ids {
+		if len(id) != 32 || strings.Trim(id, "0123456789abcdef") != "" {
+			t.Errorf("%s identity = %q, want 32 hex digits", what, id)
+		}
+		if seen[id] {
+			t.Errorf("%s identity %q is shared", what, id)
+		}
+		seen[id] = true
+	}
+}
+
+func TestExistingSongsAndBeatsEachGetTheirOwnIdentity(t *testing.T) {
+	conn := openBefore(t, "0031_identities")
+	exec(t, conn,
+		// Songs and Beats with the same title are still different ones.
+		`INSERT INTO songs (id, title, created_at, updated_at) VALUES
+			(1, 'Midnight', '', ''), (2, 'Midnight', '', ''), (3, 'Neon', '', '')`,
+		`INSERT INTO beats (id, title, file_name, content_type, size, duration, peaks, created_at, updated_at) VALUES
+			(1, 'Beat', 'beat.mp3', 'audio/mpeg', 10, 30, '[]', '', ''),
+			(2, 'Beat', 'beat.mp3', 'audio/mpeg', 10, 30, '[]', '', '')`,
+	)
+
+	if err := migrate(context.Background(), conn); err != nil {
+		t.Fatalf("migrating: %v", err)
+	}
+
+	songs, beats := identities(t, conn, "songs"), identities(t, conn, "beats")
+	if len(songs) != 3 || len(beats) != 2 {
+		t.Fatalf("identities = %v and %v, want one per Song and Beat", songs, beats)
+	}
+	expectDistinctIdentities(t, "Song", songs)
+	expectDistinctIdentities(t, "Beat", beats)
+	if _, err := conn.Exec(`UPDATE songs SET identity = ? WHERE id = 2`, songs[0]); err == nil {
+		t.Errorf("two Songs were given the same identity")
+	}
+	if _, err := conn.Exec(`UPDATE beats SET identity = ? WHERE id = 2`, beats[0]); err == nil {
+		t.Errorf("two Beats were given the same identity")
+	}
+}
+
+func TestEachNewSongAndBeatGetsItsOwnIdentity(t *testing.T) {
+	conn := openBefore(t, "")
+	// However a Song or Beat is made (created, imported, or added alongside
+	// by a Restore), it's inserted without an identity, as here.
+	exec(t, conn,
+		`INSERT INTO songs (title, created_at, updated_at) VALUES ('Midnight', '', '')`,
+		`INSERT INTO songs (title, created_at, updated_at) VALUES ('Midnight', '', '')`,
+		`INSERT INTO beats (title, file_name, content_type, size, duration, peaks, created_at, updated_at)
+			VALUES ('Beat', 'beat.mp3', 'audio/mpeg', 10, 30, '[]', '', '')`,
+		`INSERT INTO beats (title, file_name, content_type, size, duration, peaks, created_at, updated_at)
+			VALUES ('Beat', 'beat.mp3', 'audio/mpeg', 10, 30, '[]', '', '')`,
+	)
+
+	expectDistinctIdentities(t, "Song", identities(t, conn, "songs"))
+	expectDistinctIdentities(t, "Beat", identities(t, conn, "beats"))
+
+	// One inserted with an identity, as a Restore replacing it will, keeps it.
+	const kept = "0123456789abcdef0123456789abcdef"
+	exec(t, conn, `INSERT INTO songs (id, identity, title, created_at, updated_at) VALUES (3, '`+kept+`', 'Neon', '', '')`)
+	if got := identities(t, conn, "songs")[2]; got != kept {
+		t.Errorf("identity given = %q, want %q kept", got, kept)
 	}
 }
