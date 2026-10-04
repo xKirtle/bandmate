@@ -3,6 +3,8 @@
   import { MediaQuery } from 'svelte/reactivity';
   import { api, type Beat, type DecodedAudio } from '../lib/api';
   import BeatBatch from '../lib/BeatBatch.svelte';
+  import type { BatchRow } from '../lib/beatBatch';
+  import type { Preview } from '../lib/beatPreview';
   import BeatFields from '../lib/BeatFields.svelte';
   import BeatFilters from '../lib/BeatFilters.svelte';
   import BeatEditDialog from '../lib/BeatEditDialog.svelte';
@@ -88,9 +90,17 @@
 
   // On desktop, the table previews Beats through the bar at the bottom, which
   // keeps the last Beat previewed until the Beat is deleted, the window narrows
-  // or the page is left.
-  let previewId = $state<number | null>(null);
-  const previewBeat = $derived((desktop.current && beats?.find((b) => b.id === previewId)) || null);
+  // or the page is left. The batch's rows preview their files through it too,
+  // until the row leaves the batch.
+  type Previewing = { beatId: number } | { row: BatchRow };
+  let previewing = $state<Previewing | null>(null);
+  const preview = $derived.by((): Preview | null => {
+    if (!desktop.current || !previewing) return null;
+    if ('row' in previewing) return previewing;
+    const { beatId } = previewing;
+    const beat = beats?.find((b) => b.id === beatId);
+    return beat ? { beat } : null;
+  });
   let previewPlaying = $state(false);
   let playerBar = $state<BeatPlayerBar>();
   let playerBarHeight = $state(0);
@@ -98,13 +108,19 @@
   let headerBox = $state<ResizeObserverSize[]>();
   const headerHeight = $derived(headerBox?.[0].blockSize ?? 0);
 
-  async function togglePreview(beat: Beat) {
-    if (previewId === beat.id && playerBar) {
+  const isPreviewing = (target: Previewing) =>
+    previewing !== null &&
+    ('row' in target
+      ? 'row' in previewing && previewing.row.key === target.row.key
+      : 'beatId' in previewing && previewing.beatId === target.beatId);
+
+  async function togglePreview(target: Previewing) {
+    if (isPreviewing(target) && playerBar) {
       playerBar.toggle();
       return;
     }
-    // A new Beat starts playing once the bar has loaded it.
-    previewId = beat.id;
+    // A new Beat or file starts playing once the bar has loaded it.
+    previewing = target;
     await tick();
     playerBar?.play();
   }
@@ -115,11 +131,18 @@
     if (!desktop.current) closePreview();
   });
 
-  const playingNow = (beat: Beat) => previewId === beat.id && previewPlaying;
+  const playingNow = (beat: Beat) => isPreviewing({ beatId: beat.id }) && previewPlaying;
+  const previewingRow = $derived(previewing && 'row' in previewing ? previewing.row.key : null);
+  const playingRow = $derived(previewPlaying && desktop.current ? previewingRow : null);
 
   function closePreview() {
-    previewId = null;
+    previewing = null;
     previewPlaying = false;
+  }
+
+  // A row leaving the batch, removed, added or cancelled, takes its preview with it.
+  function dropStaged(key: number) {
+    if (previewingRow === key) closePreview();
   }
 
   // Several files picked at once, on desktop, open a review table instead of
@@ -205,7 +228,7 @@
     const neighbour = shown?.[at + 1] ?? shown?.[at - 1];
     beats = beats?.filter((b) => b.id !== id) ?? null;
     if (editingId === id) editingId = null;
-    if (previewId === id) closePreview();
+    if (isPreviewing({ beatId: id })) closePreview();
     await tick();
     if (neighbour) document.getElementById(`edit-beat-${neighbour.id}`)?.focus();
   }
@@ -240,7 +263,7 @@
     type="button"
     class="icon"
     aria-label="{playingNow(beat) ? 'Pause' : 'Preview'} {beat.title}"
-    onclick={() => togglePreview(beat)}
+    onclick={() => togglePreview({ beatId: beat.id })}
   >
     {playingNow(beat) ? '❚❚' : '▶'}
   </button>
@@ -253,7 +276,7 @@
 
 <main
   class="page"
-  class:with-player={previewBeat}
+  class:with-player={preview}
   style:--header-height="{headerHeight}px"
   style:--player-height="{playerBarHeight}px"
 >
@@ -263,6 +286,9 @@
       bind:uploading={batchUploading}
       library={beats}
       {maxUploadBytes}
+      {playingRow}
+      onPreview={desktop.current ? (row) => togglePreview({ row }) : null}
+      onLeave={dropStaged}
       onAdded={showAdded}
       onClose={() => (batching = false)}
     />
@@ -336,8 +362,8 @@
   />
 {/if}
 
-{#if previewBeat}
-  <BeatPlayerBar bind:this={playerBar} bind:playing={previewPlaying} bind:height={playerBarHeight} beat={previewBeat} />
+{#if preview}
+  <BeatPlayerBar bind:this={playerBar} bind:playing={previewPlaying} bind:height={playerBarHeight} {preview} />
 {/if}
 
 <style>

@@ -1,17 +1,19 @@
 <script lang="ts">
-  import { api, type Beat } from './api';
+  import { api } from './api';
   import AudioPlayer from './AudioPlayer.svelte';
   import { loadBeatPeaks } from './beatPeaks';
+  import { previewCredit, type Preview } from './beatPreview';
   import PlayerVolume from './PlayerVolume.svelte';
 
-  // The Beat Library's desktop player: the last Beat previewed, docked at the
-  // bottom of the window across the content. It stays until the page closes it.
+  // The Beat Library's desktop player: the last Beat or staged file
+  // previewed, docked at the bottom of the window across the content. It
+  // stays until the page closes it.
   let {
-    beat,
+    preview,
     playing = $bindable(false),
     height = $bindable(0),
   }: {
-    beat: Beat;
+    preview: Preview;
     playing?: boolean;
     /** The bar's height, which the page leaves free below its content. */
     height?: number;
@@ -24,12 +26,36 @@
   });
   let peaks = $state<number[]>([]);
 
-  const src = $derived(api.beatAudioUrl(beat));
-  const beatId = $derived(beat.id);
+  const beat = $derived('beat' in preview ? preview.beat : null);
+  const row = $derived('row' in preview ? preview.row : null);
+  const credit = $derived(previewCredit(preview));
 
-  // The waveform of the Beat loaded here, and again for a replaced file.
+  // A staged file plays straight from the file picked, without uploading it,
+  // through a URL let go of once another file or Beat takes its place.
+  const file = $derived(row?.file ?? null);
+  let fileUrl = $state<string | null>(null);
+  $effect.pre(() => {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    fileUrl = url;
+    return () => {
+      URL.revokeObjectURL(url);
+      fileUrl = null;
+    };
+  });
+
+  const src = $derived(beat ? api.beatAudioUrl(beat) : (fileUrl ?? ''));
+  const duration = $derived(beat?.duration ?? row?.decoded?.duration ?? 0);
+  const beatId = $derived(beat?.id ?? null);
+
+  // The waveform of the Beat loaded here, and again for a replaced file. A
+  // staged file's was worked out when it was read.
   $effect(() => {
     void src;
+    if (beatId === null) {
+      peaks = row?.decoded?.peaks ?? [];
+      return;
+    }
     peaks = [];
     return loadBeatPeaks(beatId, (p) => (peaks = p));
   });
@@ -45,11 +71,11 @@
 
 <section class="player-bar" aria-label="Beat preview" bind:borderBoxSize={box}>
   <div class="credit">
-    <strong>{beat.title}</strong>
-    <span class="muted">{beat.producer || 'No producer credited'}</span>
+    <strong>{credit.title}</strong>
+    <span class="muted">{credit.byline}</span>
   </div>
   <div class="player">
-    <AudioPlayer bind:this={player} bind:playing {src} duration={beat.duration} {peaks} showVolume={false} />
+    <AudioPlayer bind:this={player} bind:playing {src} {duration} {peaks} showVolume={false} />
   </div>
   <div class="volume"><PlayerVolume /></div>
 </section>
