@@ -78,7 +78,6 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 - Both work offline, from data built into the binary, since the update check stays Bandmate's only outbound call. English comes first, from the CMU Pronouncing Dictionary. Each language is data Bandmate loads, so others can follow: by spelling rules where a language is spelled as it sounds, or from Wiktionary's pronunciations.
 - A Song's Details gain its languages, more than one if it mixes them. How a Line in a mixed Song picks its language (each word looked up in each of the Song's languages, or a language set per Section) is for the spec.
 
-## Backups
+## Scheduled Backups
 
-- Back up and restore from the UI, instead of stopping Bandmate and copying the data folder.
-- Finer than the whole folder: a single Song with its Timeline, Takes and Cover, or the Beat Library, as well as everything. A Song's backup also moves it to another install. What can be backed up on its own, and what a restore does when it meets a Song or Beat that already exists, are for the spec.
+- Backups made on a schedule (say, Everything weekly), not only when the user makes one. Scheduled ones can keep only the last N, which hand-made Backups never do: nothing deletes a Backup the user made.

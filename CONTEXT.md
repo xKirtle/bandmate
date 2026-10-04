@@ -199,3 +199,11 @@ _Avoid_: Bounce, export, render
 **Shortcut**:
 A key, or a key held with the mouse, that does something on a Song page without reaching for a button, like Space to play or R to record. Shortcuts are for a keyboard and mouse, so phones never show them. A control's usual keys, like arrows in a menu or Esc in a text field, work as they do everywhere and aren't Bandmate's Shortcuts.
 _Avoid_: Keybind, hotkey, key binding
+
+**Backup**:
+A copy of chosen Songs, the Beat Library, or both, kept in Bandmate to restore from, and downloadable as one file to keep elsewhere or move to another install. A Song's copy holds everything that belongs to the Song, from its Lyric Sheet and Snapshots to its Timeline, Cover and Masters, along with the Beats its Clips use; nothing kept on each device goes in it. A Backup made by an older Bandmate can be restored by a newer one, never the other way round.
+_Avoid_: Export, archive, Snapshot (a Snapshot is a copy of one Song's Lyric Sheet)
+
+**Restore**:
+Bringing back Songs, the Beat Library, or both, picked from a Backup. A Song brings the Beats its Clips use. Where a Song or Beat is already in Bandmate (the same one, not one with the same name), the user chooses to replace it or keep both, the restored one added alongside. A Restore only adds and replaces: it never deletes what the Backup doesn't hold.
+_Avoid_: Import (importing is pasting lyrics into a Song)
