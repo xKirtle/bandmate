@@ -115,53 +115,56 @@ describe('restoredName', () => {
 });
 
 describe('newBackup', () => {
-  const songs = [1, 2, 3];
+  const there = { songIds: [1, 2, 3], beats: 4 };
+  const everySong = new Set(there.songIds);
 
   it('is Everything with every Song and the Beat Library, as the dialog opens', () => {
-    expect(newBackup({ songs: true, picked: new Set(songs), beatLibrary: true }, songs)).toEqual({
+    expect(newBackup({ songsTicked: true, picked: everySong, beatLibrary: true }, there)).toEqual({
       contents: { allSongs: true, beatLibrary: true },
       name: 'Everything',
-      missing: null,
     });
   });
 
   it('is Everything whether the Songs were ticked one by one or left at the default', () => {
-    expect(newBackup({ songs: true, picked: new Set([3, 1, 2]), beatLibrary: true }, songs).name).toBe('Everything');
+    expect(newBackup({ songsTicked: true, picked: new Set([3, 1, 2]), beatLibrary: true }, there)).toMatchObject({
+      name: 'Everything',
+    });
   });
 
   it('asks for the Songs picked when only some are', () => {
-    expect(newBackup({ songs: true, picked: new Set([2]), beatLibrary: true }, songs)).toEqual({
+    expect(newBackup({ songsTicked: true, picked: new Set([2]), beatLibrary: true }, there)).toEqual({
       contents: { songs: [2], beatLibrary: true },
       name: '1 Song + Beat Library',
-      missing: null,
     });
   });
 
   it('asks for every Song without the Beat Library when it is unticked', () => {
-    expect(newBackup({ songs: true, picked: new Set(songs), beatLibrary: false }, songs)).toEqual({
+    expect(newBackup({ songsTicked: true, picked: everySong, beatLibrary: false }, there)).toEqual({
       contents: { allSongs: true, beatLibrary: false },
       name: '3 Songs',
-      missing: null,
     });
   });
 
   it('leaves the picks out while Songs is unticked', () => {
-    expect(newBackup({ songs: false, picked: new Set([1]), beatLibrary: true }, songs)).toEqual({
+    expect(newBackup({ songsTicked: false, picked: new Set([1]), beatLibrary: true }, there)).toEqual({
       contents: { songs: [], beatLibrary: true },
       name: 'Beat Library',
-      missing: null,
     });
   });
 
-  it('says what is missing when nothing is ticked', () => {
-    const made = newBackup({ songs: false, picked: new Set(songs), beatLibrary: false }, songs);
-    expect(made.contents).toBeNull();
-    expect(made.missing).toBe('Tick Songs or the Beat Library.');
+  it('says what is missing when nothing is ticked, naming only what can be', () => {
+    const none = { songsTicked: false, picked: everySong, beatLibrary: false };
+    expect(newBackup(none, there)).toEqual({ missing: 'Tick Songs or the Beat Library.' });
+    expect(newBackup(none, { ...there, beats: 0 })).toEqual({ missing: 'Tick Songs.' });
+    expect(newBackup(none, { songIds: [], beats: 4 })).toEqual({ missing: 'Tick the Beat Library.' });
   });
 
   it('says what is missing when Songs is ticked with none picked, even with the Beat Library', () => {
-    const made = newBackup({ songs: true, picked: new Set(), beatLibrary: true }, songs);
-    expect(made.contents).toBeNull();
-    expect(made.missing).toBe('Pick a Song, or untick Songs.');
+    expect(newBackup({ songsTicked: true, picked: new Set(), beatLibrary: true }, there)).toEqual({
+      missing: 'Pick a Song, or untick Songs.',
+    });
+    expect(newBackup({ songsTicked: true, picked: new Set(), beatLibrary: false }, there)).toEqual({
+      missing: 'Pick a Song.',
+    });
   });
 });

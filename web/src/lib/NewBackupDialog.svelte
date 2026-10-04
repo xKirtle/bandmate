@@ -31,8 +31,11 @@
   let beatLibrary = $state(false);
   let made = $state<Backup | null>(null);
 
-  /** The Backup asked for, its name, or what's missing before it can be made. */
-  const pick = $derived(newBackup({ songs: songsTicked, picked, beatLibrary }, songs?.map((s) => s.id) ?? []));
+  /** The Backup to make, with its name, or what's missing before one can be made. */
+  const toMake = $derived(
+    newBackup({ songsTicked, picked, beatLibrary }, { songIds: songs?.map((s) => s.id) ?? [], beats: beats ?? 0 }),
+  );
+  const name = $derived('name' in toMake ? toMake.name : '');
 
   onMount(() => dialog?.showModal());
 
@@ -49,11 +52,12 @@
   );
 
   async function make() {
-    if (!pick.contents) return;
+    if ('missing' in toMake) return;
+    const { contents } = toMake;
     phase = 'making';
     error = null;
     try {
-      made = await api.makeBackup(pick.contents);
+      made = await api.makeBackup(contents);
       onMade(made);
       phase = 'made';
     } catch (e) {
@@ -122,15 +126,15 @@
           <p id="backup-beat-library-note" class="muted">Every Beat goes in, with its credit.</p>
         </div>
       </fieldset>
-      {#if pick.missing}
-        <p class="muted">{pick.missing}</p>
+      {#if 'missing' in toMake}
+        <p id="backup-missing" class="muted">{toMake.missing}</p>
       {/if}
     {/if}
     {#if error}
       <p class="problem" role="alert">{error}</p>
     {/if}
   {:else if phase === 'making'}
-    <p role="status" aria-live="polite">Backing up {pick.name}…</p>
+    <p role="status" aria-live="polite">Backing up {name}…</p>
     <progress aria-label="Making the Backup"></progress>
     <p class="muted">Don't leave or close this page until it's done.</p>
   {:else if made}
@@ -140,8 +144,14 @@
   <div class="actions">
     {#if phase === 'picking'}
       {#if songs && beats !== null && (songs.length > 0 || beats > 0)}
-        <button type="button" class="button primary" onclick={make} disabled={!pick.contents}>
-          Back up {pick.name}
+        <button
+          type="button"
+          class="button primary"
+          onclick={make}
+          disabled={'missing' in toMake}
+          aria-describedby={'missing' in toMake ? 'backup-missing' : undefined}
+        >
+          Back up {name}
         </button>
       {/if}
       <button type="button" class="button" onclick={() => dialog?.close()}>Cancel</button>
@@ -211,7 +221,7 @@
     padding: 0;
     accent-color: var(--accent);
   }
-  /* A checkbox's note and list, lined up with its label. */
+  /* What's under a checkbox (its note, and for Songs their list), lined up with its label. */
   .nested {
     display: flex;
     flex-direction: column;
