@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { toDraft } from './beatDraft';
-import { anyEdited, byFileName, canAdd, tickedState } from './beatBatch';
+import { alreadyIn, anyEdited, byFileName, canAdd, tickedState } from './beatBatch';
 
 describe('canAdd', () => {
   const draft = toDraft({ title: 'Echo Room' });
@@ -68,5 +68,29 @@ describe('byFileName', () => {
   it('orders rows by file name, numbers by their value and ignoring case', () => {
     const sorted = named('beat 10.wav', 'Beat 2.wav', 'alpha.mp3', 'beat 1.wav').sort(byFileName);
     expect(sorted.map((r) => r.file.name)).toEqual(['alpha.mp3', 'beat 1.wav', 'Beat 2.wav', 'beat 10.wav']);
+  });
+});
+
+describe('alreadyIn', () => {
+  const file = (name: string, size: number) => ({ name, size });
+  const library = [{ title: 'Echo Room', fileName: 'echo room.wav', size: 1000 }];
+
+  it('names the Library Beat whose file name and size match', () => {
+    const row = { key: 0, file: file('echo room.wav', 1000) };
+    expect(alreadyIn(row, library, [row])).toEqual({ in: 'library', title: 'Echo Room' });
+  });
+
+  it('flags a row matching one picked before it, but not the first', () => {
+    const first = { key: 3, file: file('paper hours.mp3', 500) };
+    const second = { key: 7, file: file('paper hours.mp3', 500) };
+    const rows = [second, first];
+    expect(alreadyIn(first, library, rows)).toBeNull();
+    expect(alreadyIn(second, library, rows)).toEqual({ in: 'batch' });
+  });
+
+  it('does not flag a file with the same name but a different size', () => {
+    const row = { key: 5, file: file('echo room.wav', 1001) };
+    const other = { key: 1, file: file('echo room.wav', 999) };
+    expect(alreadyIn(row, library, [other, row])).toBeNull();
   });
 });

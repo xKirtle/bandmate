@@ -1,6 +1,6 @@
 // Adding several Beats at once: the review table's rows, one per file, and
 // the rules for when they can be added.
-import type { DecodedAudio } from './api';
+import type { Beat, DecodedAudio } from './api';
 import { invalidFields, sameDraft, type BeatDraft } from './beatDraft';
 
 /** One file in the batch, from picking it until its Beat is saved or it's removed. */
@@ -53,4 +53,27 @@ const fileNames = new Intl.Collator(undefined, { numeric: true, sensitivity: 'ba
 /** Orders rows by file name, as a file browser would: "Beat 2" before "beat 10". */
 export function byFileName(a: { file: { name: string } }, b: { file: { name: string } }): number {
   return fileNames.compare(a.file.name, b.file.name);
+}
+
+/** A row as far as telling whether its file was picked before: when it was picked, and its file. */
+type PickedRow = { key: number; file: Pick<File, 'name' | 'size'> };
+
+/** Where a row's file probably is already: in the Library, as the Beat with this title, or in the batch. */
+export type AlreadyIn = { in: 'library'; title: string } | { in: 'batch' };
+
+/**
+ * Where a row's file probably is already, going by its file name and size,
+ * which Bandmate keeps for every Beat: in the Library, or in the batch, as a
+ * row picked before it.
+ */
+export function alreadyIn(
+  row: PickedRow,
+  library: readonly Pick<Beat, 'title' | 'fileName' | 'size'>[],
+  rows: readonly PickedRow[],
+): AlreadyIn | null {
+  const same = (name: string, size: number) => name === row.file.name && size === row.file.size;
+  const beat = library.find((b) => same(b.fileName, b.size));
+  if (beat) return { in: 'library', title: beat.title };
+  // Keys count up as files are picked, so a lower key was picked earlier.
+  return rows.some((r) => r.key < row.key && same(r.file.name, r.file.size)) ? { in: 'batch' } : null;
 }
