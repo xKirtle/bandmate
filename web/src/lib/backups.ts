@@ -21,28 +21,50 @@ export function automaticName(backup: Pick<Backup, 'createdAt'> & Contents): str
   return `${day} · ${contentsName(backup)}`;
 }
 
-/** What a Backup holds: how many Songs, whether they're all of them, and whether the Beat Library. */
-type Contents = Pick<Backup, 'songs'> & Partial<Pick<Backup, 'allSongs' | 'beatLibrary'>>;
+/**
+ * What a Backup holds: how many Songs, whether they're all of them, how many
+ * Beats, with those its Songs bring, and whether they're the Beat Library.
+ */
+type Contents = Pick<Backup, 'songs'> & Partial<Pick<Backup, 'allSongs' | 'beats' | 'beatLibrary'>>;
 
-/** What a Backup holds, in a few words: "3 Songs", "Beat Library", "2 Songs + Beat Library", "Everything". */
-export function contentsName({ songs, allSongs, beatLibrary }: Contents): string {
-  if (!beatLibrary) return songCount(songs);
-  if (allSongs) return 'Everything';
-  return songs === 0 ? 'Beat Library' : `${songCount(songs)} + Beat Library`;
+/**
+ * What a Backup holds, in a few words: "3 Songs", "2 Songs + 4 Beats",
+ * "Beat Library", "2 Songs + Beat Library", "Everything".
+ */
+export function contentsName({ songs, allSongs, beats = 0, beatLibrary }: Contents): string {
+  if (beatLibrary) {
+    if (allSongs) return 'Everything';
+    return songs === 0 ? 'Beat Library' : `${songCount(songs)} + Beat Library`;
+  }
+  if (beats === 0) return songCount(songs);
+  return songs === 0 ? beatCount(beats) : `${songCount(songs)} + ${beatCount(beats)}`;
 }
 
-/** What's ticked in "New Backup": Songs, which of them are picked, and the Beat Library. */
+/** What's ticked in "New Backup": Songs and which of them are picked, and the Beat Library and which Beats are. */
 export interface NewBackupTicks {
   songsTicked: boolean;
   /** The Songs picked, by id, kept while Songs is unticked for when it's ticked again. */
   picked: ReadonlySet<number>;
-  beatLibrary: boolean;
+  /** Whether the Beat Library is ticked, to pick Beats from it. */
+  beatsTicked: boolean;
+  /**
+   * The Beats picked, by id, kept while the Beat Library is unticked. A Beat
+   * a picked Song uses is picked whatever its own tick, which comes back
+   * once no picked Song uses it.
+   */
+  pickedBeats: ReadonlySet<number>;
 }
 
-/** What there is to back up: every Song, by id, and how many Beats the Beat Library holds. */
+/** A Beat there is to back up, with the Songs using it. */
+export interface BackupSourceBeat {
+  id: number;
+  songs: readonly { id: number }[];
+}
+
+/** What there is to back up: every Song, by id, and every Beat. */
 export interface BackupSource {
   songIds: readonly number[];
-  beats: number;
+  beats: readonly BackupSourceBeat[];
 }
 
 /**
@@ -51,25 +73,49 @@ export interface BackupSource {
  */
 export type NewBackup = { contents: BackupContents; name: string } | { missing: string };
 
+/** The Beats, by id, that the Songs picked bring: those their Clips use. */
+export function beatsBrought(songs: readonly number[], beats: readonly BackupSourceBeat[]): Set<number> {
+  return new Set(beats.filter((b) => b.songs.some((s) => songs.includes(s.id))).map((b) => b.id));
+}
+
+/** How many Beats the picked Songs bring, said under them: "Brings the 3 Beats they use". */
+export function broughtNote(songs: number, beats: number): string {
+  if (beats === 0) return 'Brings no Beats';
+  return `Brings the ${beatCount(beats)} ${songs === 1 ? 'it uses' : 'they use'}`;
+}
+
 /**
  * The Backup "New Backup" asks for from what's ticked. Every Song picked is
- * all of them, however they were picked, so with the Beat Library it's
- * Everything. A hint for what's missing names only what can be ticked.
+ * all of them, and every Beat picked is the Beat Library, however they were
+ * picked, so together they're Everything. A Beat the picked Songs use counts
+ * as picked. A hint for what's missing names only what can be ticked.
  */
 export function newBackup(ticks: NewBackupTicks, there: BackupSource): NewBackup {
   const picked = ticks.songsTicked ? there.songIds.filter((id) => ticks.picked.has(id)) : [];
-  if (!ticks.songsTicked && !ticks.beatLibrary) {
-    if (there.beats === 0) return { missing: 'Tick Songs.' };
+  const brought = beatsBrought(picked, there.beats);
+  const pickedBeats = ticks.beatsTicked
+    ? there.beats.filter((b) => ticks.pickedBeats.has(b.id) || brought.has(b.id)).map((b) => b.id)
+    : [];
+  if (!ticks.songsTicked && !ticks.beatsTicked) {
+    if (there.beats.length === 0) return { missing: 'Tick Songs.' };
     if (there.songIds.length === 0) return { missing: 'Tick the Beat Library.' };
     return { missing: 'Tick Songs or the Beat Library.' };
   }
   if (ticks.songsTicked && picked.length === 0) {
-    return { missing: ticks.beatLibrary ? 'Pick a Song, or untick Songs.' : 'Pick a Song.' };
+    return { missing: ticks.beatsTicked ? 'Pick a Song, or untick Songs.' : 'Pick a Song.' };
+  }
+  if (ticks.beatsTicked && pickedBeats.length === 0) {
+    return { missing: ticks.songsTicked ? 'Pick a Beat, or untick the Beat Library.' : 'Pick a Beat.' };
   }
   const allSongs = picked.length > 0 && picked.length === there.songIds.length;
+  const beatLibrary = pickedBeats.length > 0 && pickedBeats.length === there.beats.length;
+  const beats = ticks.beatsTicked ? pickedBeats.length : brought.size;
   return {
-    contents: { ...(allSongs ? { allSongs: true as const } : { songs: picked }), beatLibrary: ticks.beatLibrary },
-    name: contentsName({ songs: picked.length, allSongs, beatLibrary: ticks.beatLibrary }),
+    contents: {
+      ...(allSongs ? { allSongs: true as const } : { songs: picked }),
+      ...(beatLibrary ? { beatLibrary: true as const } : { beats: pickedBeats }),
+    },
+    name: contentsName({ songs: picked.length, allSongs, beats, beatLibrary }),
   };
 }
 
@@ -79,7 +125,7 @@ export function songCount(n: number): string {
 }
 
 /** "1 Beat", "3 Beats". */
-function beatCount(n: number): string {
+export function beatCount(n: number): string {
   return `${n} ${n === 1 ? 'Beat' : 'Beats'}`;
 }
 

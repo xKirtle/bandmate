@@ -1,14 +1,14 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { api, type Backup, type SongSummary } from './api';
+  import { api, type Backup, type Beat, type SongSummary } from './api';
   import { closeOnBackdrop } from './backdrop';
-  import { backupName, backupSize, newBackup } from './backups';
+  import { backupName, backupSize, beatCount, beatsBrought, broughtNote, newBackup } from './backups';
   import PickList from './PickList.svelte';
 
-  // "New Backup": ticks what goes in, Songs (some or all) and the Beat
-  // Library, together or not, then makes the Backup in the same modal
-  // dialog, which holds focus until it's made: it can't be closed meanwhile,
-  // by a click outside, Esc, or a button.
+  // "New Backup": ticks what goes in, Songs and Beats (some or all of each),
+  // together or not, then makes the Backup in the same modal dialog, which
+  // holds focus until it's made: it can't be closed meanwhile, by a click
+  // outside, Esc, or a button.
   let {
     onMade,
     onClose,
@@ -21,19 +21,26 @@
   let dialog = $state<HTMLDialogElement>();
   let phase = $state<'picking' | 'making' | 'made'>('picking');
   let songs = $state<SongSummary[] | null>(null);
-  /** How many Beats the Beat Library holds. */
-  let beats = $state<number | null>(null);
+  /** The Beat Library's Beats. */
+  let beats = $state<Beat[] | null>(null);
   let loadError = $state<string | null>(null);
   let error = $state<string | null>(null);
   /** Whether Songs are ticked; unticking them keeps the picks for when they're ticked again. */
   let songsTicked = $state(false);
   let picked = $state<Set<number>>(new Set());
-  let beatLibrary = $state(false);
+  /** Whether the Beat Library is ticked; unticking it keeps the picks for when it's ticked again. */
+  let beatsTicked = $state(false);
+  let pickedBeats = $state<Set<number>>(new Set());
   let made = $state<Backup | null>(null);
 
+  const songIds = $derived(songs?.map((s) => s.id) ?? []);
+  /** The Songs that go in, by id. */
+  const songsIn = $derived(songsTicked ? songIds.filter((id) => picked.has(id)) : []);
+  /** The Beats the Songs that go in bring, shown ticked and locked. */
+  const brought = $derived(beatsBrought(songsIn, beats ?? []));
   /** The Backup to make, with its name, or what's missing before one can be made. */
   const toMake = $derived(
-    newBackup({ songsTicked, picked, beatLibrary }, { songIds: songs?.map((s) => s.id) ?? [], beats: beats ?? 0 }),
+    newBackup({ songsTicked, picked, beatsTicked, pickedBeats }, { songIds, beats: beats ?? [] }),
   );
   const name = $derived('name' in toMake ? toMake.name : '');
 
@@ -42,11 +49,12 @@
   Promise.all([api.listSongs(), api.listBeats()]).then(
     ([songList, beatList]) => {
       songs = [...songList].sort((a, b) => a.title.localeCompare(b.title));
-      beats = beatList.length;
+      beats = [...beatList].sort((a, b) => a.title.localeCompare(b.title));
       // Open on Everything there is, to back up in one click.
       songsTicked = songs.length > 0;
       picked = new Set(songs.map((s) => s.id));
-      beatLibrary = beats > 0;
+      beatsTicked = beats.length > 0;
+      pickedBeats = new Set(beats.map((b) => b.id));
     },
     (e: Error) => (loadError = e.message),
   );
@@ -90,7 +98,7 @@
       <p class="problem" role="alert">{loadError}</p>
     {:else if songs === null || beats === null}
       <p class="muted">Loading…</p>
-    {:else if songs.length === 0 && beats === 0}
+    {:else if songs.length === 0 && beats.length === 0}
       <p>There are no Songs or Beats to back up yet.</p>
     {:else}
       <fieldset>
@@ -111,19 +119,32 @@
           </p>
           {#if songsTicked}
             <PickList items={songs} bind:picked label="Songs to back up" />
+            {#if !beatsTicked && songsIn.length > 0}
+              <p class="muted">{broughtNote(songsIn.length, brought.size)}</p>
+            {/if}
           {/if}
         </div>
         <label>
           <input
             type="checkbox"
-            bind:checked={beatLibrary}
-            disabled={beats === 0}
+            bind:checked={beatsTicked}
+            disabled={beats.length === 0}
             aria-describedby="backup-beat-library-note"
           />
-          <span>Beat Library <span class="muted">· {beats === 1 ? '1 Beat' : `${beats} Beats`}</span></span>
+          <span>Beat Library <span class="muted">· {beatCount(beats.length)}</span></span>
         </label>
         <div class="nested">
-          <p id="backup-beat-library-note" class="muted">Every Beat goes in, with its credit.</p>
+          <p id="backup-beat-library-note" class="muted">Each Beat goes in with its credit.</p>
+          {#if beatsTicked}
+            <PickList
+              items={beats}
+              bind:picked={pickedBeats}
+              label="Beats to back up"
+              detail={(b) => b.producer}
+              locked={brought}
+              lockedNote="used by a picked Song"
+            />
+          {/if}
         </div>
       </fieldset>
       {#if 'missing' in toMake}
@@ -143,7 +164,7 @@
 
   <div class="actions">
     {#if phase === 'picking'}
-      {#if songs && beats !== null && (songs.length > 0 || beats > 0)}
+      {#if songs && beats && (songs.length > 0 || beats.length > 0)}
         <button
           type="button"
           class="button primary"

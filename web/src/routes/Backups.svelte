@@ -120,8 +120,8 @@
     <div class="empty">
       <p>No Backups yet.</p>
       <p class="muted">
-        A Backup is a copy of Songs, the Beat Library, or both, kept here to restore from, and downloadable as one file
-        to keep elsewhere. Upload one downloaded before, here or on another install, to restore from it.
+        A Backup is a copy of chosen Songs and Beats, kept here to restore from, and downloadable as one file to keep
+        elsewhere. Upload one downloaded before, here or on another install, to restore from it.
       </p>
     </div>
   {:else}

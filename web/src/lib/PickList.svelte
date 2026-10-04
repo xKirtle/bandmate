@@ -2,21 +2,35 @@
   // A list of things to pick, such as Songs, each with a checkbox, under
   // "Choose all" and "Clear". About six fit, then it scrolls. It holds no
   // picks of its own: they're the caller's, so they last as long as it keeps
-  // them, even while the list isn't shown.
+  // them, even while the list isn't shown. A locked item shows ticked
+  // whatever its own pick, which is kept under the lock for when it lifts.
   let {
     items,
     picked = $bindable(),
     label,
+    detail,
+    locked = new Set(),
+    lockedNote = '',
   }: {
     items: readonly T[];
     /** The ids picked. */
     picked: Set<number>;
     /** What the list is for, for assistive tech: "Songs to back up". */
     label: string;
+    /** A muted word or two after an item's title, such as a Beat's producer. */
+    detail?: (item: T) => string;
+    /** The ids shown ticked and locked, whatever their own pick. */
+    locked?: ReadonlySet<number>;
+    /** Why an item is locked, shown under it: "used by a picked Song". */
+    lockedNote?: string;
   } = $props();
+  const uid = $props.id();
 
-  const pickedAll = $derived(items.every((item) => picked.has(item.id)));
-  const pickedAny = $derived(items.some((item) => picked.has(item.id)));
+  const ticked = (id: number) => locked.has(id) || picked.has(id);
+  const tickedAll = $derived(items.every((item) => ticked(item.id)));
+  // Clear clears every pick, those under a lock too, but only what it would
+  // untick in sight enables it.
+  const clearable = $derived(items.some((item) => picked.has(item.id) && !locked.has(item.id)));
 
   function toggle(id: number) {
     const next = new Set(picked);
@@ -27,17 +41,31 @@
 
 <div class="pick-list">
   <div class="actions">
-    <button type="button" class="link" onclick={() => (picked = new Set(items.map((i) => i.id)))} disabled={pickedAll}>
+    <button type="button" class="link" onclick={() => (picked = new Set(items.map((i) => i.id)))} disabled={tickedAll}>
       Choose all
     </button>
-    <button type="button" class="link" onclick={() => (picked = new Set())} disabled={!pickedAny}>Clear</button>
+    <button type="button" class="link" onclick={() => (picked = new Set())} disabled={!clearable}>Clear</button>
   </div>
   <ul aria-label={label}>
     {#each items as item (item.id)}
+      {@const isLocked = locked.has(item.id)}
+      {@const more = detail?.(item)}
       <li>
-        <label>
-          <input type="checkbox" checked={picked.has(item.id)} onchange={() => toggle(item.id)} />
-          <span class="title">{item.title}</span>
+        <label class:locked={isLocked}>
+          <input
+            type="checkbox"
+            checked={ticked(item.id)}
+            disabled={isLocked}
+            onchange={() => toggle(item.id)}
+            aria-describedby={isLocked && lockedNote ? `pick-${uid}-${item.id}-note` : undefined}
+          />
+          <span class="text">
+            <span class="title">{item.title}</span>
+            {#if more}<span class="detail">· {more}</span>{/if}
+            {#if isLocked && lockedNote}
+              <span class="note" id="pick-{uid}-{item.id}-note">{lockedNote}</span>
+            {/if}
+          </span>
         </label>
       </li>
     {/each}
@@ -97,8 +125,19 @@
     padding: 0;
     accent-color: var(--accent);
   }
-  .title {
+  label.locked {
+    cursor: default;
+  }
+  .text {
     min-width: 0;
     overflow-wrap: anywhere;
+  }
+  .detail,
+  .note {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+  }
+  .note {
+    display: block;
   }
 </style>
