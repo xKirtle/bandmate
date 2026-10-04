@@ -24,6 +24,13 @@ var migrations embed.FS
 // Open opens (creating if needed) the database in dataDir and applies any
 // pending migrations.
 func Open(ctx context.Context, dataDir string) (*sql.DB, error) {
+	return OpenBefore(ctx, dataDir, "")
+}
+
+// OpenBefore is Open, stopping short of the migration named stop and those
+// after it, or applying them all if stop is "". It lets a test make a
+// database at an older schema, e.g. a Backup made by an older Bandmate.
+func OpenBefore(ctx context.Context, dataDir, stop string) (*sql.DB, error) {
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return nil, fmt.Errorf("creating data directory: %w", err)
 	}
@@ -36,7 +43,7 @@ func Open(ctx context.Context, dataDir string) (*sql.DB, error) {
 	// SQLite allows one writer at a time; a single connection avoids
 	// "database is locked" errors for a single-user app.
 	conn.SetMaxOpenConns(1)
-	if err := migrate(ctx, conn); err != nil {
+	if err := migrateBefore(ctx, conn, stop); err != nil {
 		conn.Close()
 		return nil, err
 	}

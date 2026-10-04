@@ -75,6 +75,41 @@ func (a *App) deleteBackup(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// backupSongs lists the Songs a Backup holds, to pick some to restore.
+func (a *App) backupSongs(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	list, err := a.backups.Songs(r.Context(), id)
+	if err != nil {
+		writeBackupError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, list)
+}
+
+// restoreBackup restores the Songs picked from a Backup, answering once
+// they're back, which takes as long as unpacking their files.
+func (a *App) restoreBackup(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var req struct {
+		Songs []int64 `json:"songs"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	restored, err := a.backups.Restore(r.Context(), id, req.Songs)
+	if err != nil {
+		writeBackupError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"songs": restored})
+}
+
 func writeBackupError(w http.ResponseWriter, err error) {
 	var invalid *backups.InvalidError
 	switch {

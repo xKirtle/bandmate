@@ -83,7 +83,7 @@ go test ./...                  # API tests: real handler, fresh SQLite per test
 (cd web && npm test)           # unit tests for plain TypeScript modules in the SPA
 ```
 
-The tests go through the HTTP API only. `internal/app/helpers_test.go` starts the real handler in-process against a fresh SQLite database in a temporary directory, sends requests, and checks the responses. New tests should use it too. The exceptions are checking that audio files are removed from the data directory, which the API can't show, and `internal/build`'s rule for the version and source link, since a build's stamps are fixed when it's built.
+The tests go through the HTTP API only. `internal/app/helpers_test.go` starts the real handler in-process against a fresh SQLite database in a temporary directory, sends requests, and checks the responses. New tests should use it too. The exceptions are checking that audio files are removed from the data directory, which the API can't show, putting a Backup's file made elsewhere or by an older Bandmate in place of one made through the API, and `internal/build`'s rule for the version and source link, since a build's stamps are fixed when it's built.
 
 Vitest covers plain TypeScript modules in `web/src/lib` that don't touch the DOM or Web Audio, e.g. reducing decoded audio to waveform peaks. Their tests sit next to them as `*.test.ts`. Components and audio playback are tested by hand.
 

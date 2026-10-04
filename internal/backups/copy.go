@@ -16,11 +16,12 @@ import (
 )
 
 // songTable is a table holding rows that belong to a Song, or to the Beat
-// Library, and which of them go in a Backup: where picks them from the live
-// database, attached as "live", given a Song's id as its one parameter for
-// a Song's tables, and nothing for the Beat Library's. Detached Takes, and
-// Sounds no Clip uses, are kept only for undo, which never outlasts a
-// session, so a Backup leaves them out.
+// Library, and which of them go in a Backup, or come back on a Restore:
+// where picks them from the database they're copied from, attached as
+// "src" (the live one when backing up, the Backup's when restoring), given
+// a Song's id as its one parameter for a Song's tables, and nothing for the
+// Beat Library's. Detached Takes, and Sounds no Clip uses, are kept only
+// for undo, which never outlasts a session, so a Backup leaves them out.
 type songTable struct {
 	name  string
 	where string
@@ -33,20 +34,20 @@ type songTable struct {
 var songTables = []songTable{
 	{name: "songs", where: `id = ?1`},
 	{name: "sections", where: `song_id = ?1`},
-	{name: "alternates", where: `section_id IN (SELECT id FROM live.sections WHERE song_id = ?1)`},
-	{name: "lines", where: `alternate_id IN (SELECT a.id FROM live.alternates a
-		JOIN live.sections s ON s.id = a.section_id WHERE s.song_id = ?1)`},
+	{name: "alternates", where: `section_id IN (SELECT id FROM src.sections WHERE song_id = ?1)`},
+	{name: "lines", where: `alternate_id IN (SELECT a.id FROM src.alternates a
+		JOIN src.sections s ON s.id = a.section_id WHERE s.song_id = ?1)`},
 	{name: "masters", where: `song_id = ?1`},
 	{name: "covers", where: `song_id = ?1`},
 	{name: "loops", where: `song_id = ?1`},
 	{name: "tracks", where: `song_id = ?1`},
-	{name: "beats", shared: true, where: `id IN (SELECT c.beat_id FROM live.clips c
-		JOIN live.tracks t ON t.id = c.track_id WHERE t.song_id = ?1)`},
-	{name: "sounds", where: `id IN (SELECT c.sound_id FROM live.clips c
-		JOIN live.tracks t ON t.id = c.track_id WHERE t.song_id = ?1)`},
-	{name: "clips", where: `track_id IN (SELECT id FROM live.tracks WHERE song_id = ?1)`},
-	{name: "takes", where: `clip_id IN (SELECT c.id FROM live.clips c
-		JOIN live.tracks t ON t.id = c.track_id WHERE t.song_id = ?1)`},
+	{name: "beats", shared: true, where: `id IN (SELECT c.beat_id FROM src.clips c
+		JOIN src.tracks t ON t.id = c.track_id WHERE t.song_id = ?1)`},
+	{name: "sounds", where: `id IN (SELECT c.sound_id FROM src.clips c
+		JOIN src.tracks t ON t.id = c.track_id WHERE t.song_id = ?1)`},
+	{name: "clips", where: `track_id IN (SELECT id FROM src.tracks WHERE song_id = ?1)`},
+	{name: "takes", where: `clip_id IN (SELECT c.id FROM src.clips c
+		JOIN src.tracks t ON t.id = c.track_id WHERE t.song_id = ?1)`},
 }
 
 // notCopied are the tables holding nothing of a Song: the schema's own
@@ -54,21 +55,23 @@ var songTables = []songTable{
 var notCopied = map[string]bool{"schema_migrations": true, "sqlite_sequence": true, "backups": true}
 
 // songFile is a kind of file a Song's rows, or the Beat Library's, use: the
-// directory such files are kept in under the data directory, and the query
+// directory such files are kept in under the data directory, the table of
+// the rows using them, each file kept under its row's id, and the query
 // listing, from the Backup's database given the same parameters as the
-// tables, the ids they're kept under.
-type songFile struct{ dir, ids string }
+// tables, those ids.
+type songFile struct{ dir, table, ids string }
 
 // songFiles lists the files a Song's rows use.
 var songFiles = func() []songFile {
 	files := []songFile{
-		{"audio/beats", `SELECT id FROM main.beats`},
-		{"audio/masters", `SELECT id FROM main.masters WHERE song_id = ?1`},
-		{"audio/takes", `SELECT id FROM main.takes WHERE song_id = ?1`},
-		{"audio/sounds", `SELECT id FROM main.sounds WHERE song_id = ?1`},
+		{"audio/beats", "beats", `SELECT DISTINCT c.beat_id FROM main.clips c
+			JOIN main.tracks t ON t.id = c.track_id WHERE t.song_id = ?1 AND c.beat_id IS NOT NULL`},
+		{"audio/masters", "masters", `SELECT id FROM main.masters WHERE song_id = ?1`},
+		{"audio/takes", "takes", `SELECT id FROM main.takes WHERE song_id = ?1`},
+		{"audio/sounds", "sounds", `SELECT id FROM main.sounds WHERE song_id = ?1`},
 	}
 	for _, p := range lyricsheet.CoverPictures {
-		files = append(files, songFile{"covers/" + string(p), `SELECT id FROM main.covers WHERE song_id = ?1`})
+		files = append(files, songFile{"covers/" + string(p), "covers", `SELECT id FROM main.covers WHERE song_id = ?1`})
 	}
 	return files
 }()
@@ -86,7 +89,7 @@ var errFileGone = errors.New("a file was removed while it was backed up")
 var beatLibraryTables = []songTable{{name: "beats", shared: true, where: `TRUE`}}
 
 // beatLibraryFiles lists the files the Beat Library's rows use.
-var beatLibraryFiles = []songFile{{"audio/beats", `SELECT id FROM main.beats`}}
+var beatLibraryFiles = []songFile{{"audio/beats", "beats", `SELECT id FROM main.beats`}}
 
 // copyContents makes, in staging, a database holding the Songs with ids,
 // and the whole Beat Library if beatLibrary is set, laid out with their
@@ -102,7 +105,7 @@ func (s *Store) copyContents(ctx context.Context, staging string, ids []int64, b
 		return 0, err
 	}
 	defer conn.Close()
-	if _, err := conn.ExecContext(ctx, `ATTACH DATABASE ? AS live`, filepath.Join(s.dataDir, db.FileName)); err != nil {
+	if _, err := conn.ExecContext(ctx, `ATTACH DATABASE ? AS src`, filepath.Join(s.dataDir, db.FileName)); err != nil {
 		return 0, fmt.Errorf("reading the database: %w", err)
 	}
 	columns, err := tableColumns(ctx, conn)
@@ -124,7 +127,7 @@ func (s *Store) copyContents(ctx context.Context, staging string, ids []int64, b
 			return 0, fmt.Errorf("backing up the beat library: %w", err)
 		}
 	}
-	if _, err := conn.ExecContext(ctx, `DETACH DATABASE live`); err != nil {
+	if _, err := conn.ExecContext(ctx, `DETACH DATABASE src`); err != nil {
 		return 0, err
 	}
 	// One file, with nothing left in a write-ahead log beside it.
@@ -137,7 +140,7 @@ func (s *Store) copyContents(ctx context.Context, staging string, ids []int64, b
 // copyRows copies the rows tables pick, given args, with the files they
 // use, trying again if a file is removed meanwhile. It tells whether a Song
 // was there to copy: whether the first table, unless shared, picked a row.
-func (s *Store) copyRows(ctx context.Context, conn *sql.Conn, staging string, columns map[string]string,
+func (s *Store) copyRows(ctx context.Context, conn *sql.Conn, staging string, columns map[string][]string,
 	tables []songTable, files []songFile, args ...any) (bool, error) {
 	for attempt := 1; ; attempt++ {
 		found, err := s.copyOnce(ctx, conn, staging, columns, tables, files, args)
@@ -150,12 +153,12 @@ func (s *Store) copyRows(ctx context.Context, conn *sql.Conn, staging string, co
 // tableColumns lists the columns of each table a Backup holds, as both databases have them,
 // being at the same schema. It refuses a database with a table it doesn't
 // know, which a migration added without saying whether a Backup holds it.
-func tableColumns(ctx context.Context, conn *sql.Conn) (map[string]string, error) {
+func tableColumns(ctx context.Context, conn *sql.Conn) (map[string][]string, error) {
 	known := map[string]bool{}
 	for _, t := range songTables {
 		known[t.name] = true
 	}
-	rows, err := conn.QueryContext(ctx, `SELECT name FROM live.sqlite_master WHERE type = 'table'`)
+	rows, err := conn.QueryContext(ctx, `SELECT name FROM src.sqlite_master WHERE type = 'table'`)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +180,7 @@ func tableColumns(ctx context.Context, conn *sql.Conn) (map[string]string, error
 			return nil, fmt.Errorf("table %s is neither backed up nor left out", name)
 		}
 	}
-	columns := map[string]string{}
+	columns := map[string][]string{}
 	for _, t := range songTables {
 		rows, err := conn.QueryContext(ctx, `SELECT name FROM main.pragma_table_info(?)`, t.name)
 		if err != nil {
@@ -190,22 +193,31 @@ func tableColumns(ctx context.Context, conn *sql.Conn) (map[string]string, error
 				rows.Close()
 				return nil, err
 			}
-			names = append(names, `"`+name+`"`)
+			names = append(names, name)
 		}
 		rows.Close()
 		if err := rows.Err(); err != nil {
 			return nil, err
 		}
-		columns[t.name] = strings.Join(names, ", ")
+		columns[t.name] = names
 	}
 	return columns, nil
+}
+
+// columnList lists columns for a statement, quoted.
+func columnList(columns []string) string {
+	quoted := make([]string, len(columns))
+	for i, c := range columns {
+		quoted[i] = `"` + c + `"`
+	}
+	return strings.Join(quoted, ", ")
 }
 
 // copyOnce copies the rows tables pick in one transaction, so they're all
 // read from one snapshot of the live database, e.g. a whole Song, and links
 // in the files they use before committing. It tells whether the first
 // table, unless shared, picked a row; if it picked none, nothing is copied.
-func (s *Store) copyOnce(ctx context.Context, conn *sql.Conn, staging string, columns map[string]string,
+func (s *Store) copyOnce(ctx context.Context, conn *sql.Conn, staging string, columns map[string][]string,
 	tables []songTable, files []songFile, args []any) (bool, error) {
 	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
@@ -222,8 +234,8 @@ func (s *Store) copyOnce(ctx context.Context, conn *sql.Conn, staging string, co
 		if t.shared {
 			insert = "INSERT OR IGNORE INTO"
 		}
-		cols := columns[t.name]
-		res, err := tx.ExecContext(ctx, fmt.Sprintf(`%s main.%s (%s) SELECT %s FROM live.%s WHERE %s`,
+		cols := columnList(columns[t.name])
+		res, err := tx.ExecContext(ctx, fmt.Sprintf(`%s main.%s (%s) SELECT %s FROM src.%s WHERE %s`,
 			insert, t.name, cols, cols, t.name, t.where), args...)
 		if err != nil {
 			return false, fmt.Errorf("copying %s: %w", t.name, err)

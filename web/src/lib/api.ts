@@ -212,6 +212,12 @@ export interface Backup {
  */
 export type BackupContents = ({ allSongs: true } | { songs: number[] }) & { beatLibrary?: boolean };
 
+/** A Song a Backup holds, by its id in the Backup, or one a Restore brought back, by its id here. */
+export interface BackupSong {
+  id: number;
+  title: string;
+}
+
 /** Details the user enters about a Beat. "" and null mean "not set"; only the title is required. */
 export interface BeatDetails {
   title: string;
@@ -672,6 +678,15 @@ export const api = {
   deleteBackup: (id: number) => request<null>('DELETE', `/backups/${id}`),
   /** Where a Backup's file downloads from, as one file. */
   backupDownloadUrl: (id: number) => `/api/backups/${id}/file`,
+  /** The Songs a Backup holds, by title, with their ids in it. */
+  backupSongs: (id: number) => request<BackupSong[]>('GET', `/backups/${id}/songs`),
+  /**
+   * Restores the Songs picked from a Backup, by their ids in it, each with
+   * the Beats its Clips use, answering once they're back. One already in
+   * Bandmate is kept both: the restored one is added alongside, titled as restored.
+   */
+  restoreBackup: (id: number, songs: number[]) =>
+    request<{ songs: BackupSong[] }>('POST', `/backups/${id}/restore`, { songs }),
 
   listSongs: (filter: SongFilter = {}) => {
     const params = new URLSearchParams();
