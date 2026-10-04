@@ -238,14 +238,21 @@ export interface BackupPresence {
 }
 
 /**
- * What a Restore brings back from a Backup: the Songs picked, by their ids
- * in it, each with the Beats its Clips use, and its whole Beat Library or
- * not. Every Song, with the Beat Library if it holds one, is everything it
- * holds.
+ * What a Restore brings back from a Backup: the Songs and the Beats picked,
+ * by their ids in it, each Song with the Beats its Clips use, whether
+ * they're picked or not.
  */
 export interface BackupPicks {
   songs: number[];
-  beatLibrary: boolean;
+  beats: number[];
+}
+
+/** A Beat a Backup holds, by its id in the Backup, with the Songs it holds whose Clips use it. */
+export interface BackupBeat {
+  id: number;
+  title: string;
+  producer: string;
+  songs: { id: number }[];
 }
 
 /** What a Restore brought back: the Songs, by their ids here, and how many Beats it added or replaced. */
@@ -729,14 +736,16 @@ export const api = {
   backupDownloadUrl: (id: number) => `/api/backups/${id}/file`,
   /** The Songs a Backup holds, by title, with their ids in it. */
   backupSongs: (id: number) => request<BackupSong[]>('GET', `/backups/${id}/songs`),
+  /** The Beats a Backup holds, by title, with their ids in it and the Songs it holds using each. */
+  backupBeats: (id: number) => request<BackupBeat[]>('GET', `/backups/${id}/beats`),
   /**
    * Which of the Songs picked from a Backup, of the Beats their Clips use,
-   * and of its Beat Library if picked, are already in Bandmate.
+   * and of the Beats picked, are already in Bandmate.
    */
   backupPresence: (id: number, picks: BackupPicks) => request<BackupPresence>('POST', `/backups/${id}/present`, picks),
   /**
    * Restores the Songs picked from a Backup, each with the Beats its Clips
-   * use, and its Beat Library if picked, answering once they're back. One
+   * use, and the Beats picked, answering once they're back. One
    * already in Bandmate is replaced if listed in replace, and otherwise kept
    * both: the restored one is added alongside, titled as restored. Nothing
    * the Backup doesn't hold is deleted.

@@ -1,5 +1,5 @@
 // How Backups are named, sized and asked for on the Backups page.
-import type { Backup, BackupContents, BackupPresent } from './api';
+import type { Backup, BackupContents, BackupPicks, BackupPresent } from './api';
 import { formatSize } from './upload';
 
 // Spelled out rather than left to the locale, which may shorten September
@@ -40,8 +40,11 @@ export function contentsName({ songs, allSongs, beats = 0, beatLibrary }: Conten
   return songs === 0 ? beatCount(beats) : `${songCount(songs)} + ${beatCount(beats)}`;
 }
 
-/** What's ticked in "New Backup": Songs and which of them are picked, and the Beat Library and which Beats are. */
-export interface NewBackupTicks {
+/**
+ * What's ticked in "New Backup" or "Restore": Songs and which of them are
+ * picked, and the Beat Library and which Beats are.
+ */
+export interface PickTicks {
   songsTicked: boolean;
   /** The Songs picked, by id, kept while Songs is unticked for when it's ticked again. */
   picked: ReadonlySet<number>;
@@ -55,13 +58,13 @@ export interface NewBackupTicks {
   pickedBeats: ReadonlySet<number>;
 }
 
-/** A Beat there is to back up, with the Songs using it. */
+/** A Beat there is to back up or restore, with the Songs using it. */
 export interface BackupSourceBeat {
   id: number;
   songs: readonly { id: number }[];
 }
 
-/** What there is to back up: every Song, by id, and every Beat. */
+/** What there is to back up, or to restore from a Backup: every Song, by id, and every Beat. */
 export interface BackupSource {
   songIds: readonly number[];
   beats: readonly BackupSourceBeat[];
@@ -85,15 +88,18 @@ export function broughtNote(songs: number, beats: number): string {
 }
 
 /**
- * The Backup "New Backup" asks for from what's ticked. Every Song picked is
- * all of them, and every Beat picked is the Beat Library, however they were
- * picked, so together they're Everything. A Beat the picked Songs use counts
- * as picked. A hint for what's missing names only what can be ticked.
+ * What's picked from what's ticked, in the order there lists it: the Songs,
+ * the Beats (a Beat the picked Songs use counting as picked), and how many
+ * Beats that brings in all, or what's missing before anything can be, as a
+ * short hint naming only what can be ticked.
  */
-export function newBackup(ticks: NewBackupTicks, there: BackupSource): NewBackup {
-  const picked = ticks.songsTicked ? there.songIds.filter((id) => ticks.picked.has(id)) : [];
-  const brought = beatsBrought(picked, there.beats);
-  const pickedBeats = ticks.beatsTicked
+function pickedFrom(
+  ticks: PickTicks,
+  there: BackupSource,
+): { songs: number[]; beats: number[]; beatCount: number } | { missing: string } {
+  const songs = ticks.songsTicked ? there.songIds.filter((id) => ticks.picked.has(id)) : [];
+  const brought = beatsBrought(songs, there.beats);
+  const beats = ticks.beatsTicked
     ? there.beats.filter((b) => ticks.pickedBeats.has(b.id) || brought.has(b.id)).map((b) => b.id)
     : [];
   if (!ticks.songsTicked && !ticks.beatsTicked) {
@@ -101,21 +107,55 @@ export function newBackup(ticks: NewBackupTicks, there: BackupSource): NewBackup
     if (there.songIds.length === 0) return { missing: 'Tick the Beat Library.' };
     return { missing: 'Tick Songs or the Beat Library.' };
   }
-  if (ticks.songsTicked && picked.length === 0) {
+  if (ticks.songsTicked && songs.length === 0) {
     return { missing: ticks.beatsTicked ? 'Pick a Song, or untick Songs.' : 'Pick a Song.' };
   }
-  if (ticks.beatsTicked && pickedBeats.length === 0) {
+  if (ticks.beatsTicked && beats.length === 0) {
     return { missing: ticks.songsTicked ? 'Pick a Beat, or untick the Beat Library.' : 'Pick a Beat.' };
   }
-  const allSongs = picked.length > 0 && picked.length === there.songIds.length;
-  const beatLibrary = pickedBeats.length > 0 && pickedBeats.length === there.beats.length;
-  const beats = ticks.beatsTicked ? pickedBeats.length : brought.size;
+  return { songs, beats, beatCount: ticks.beatsTicked ? beats.length : brought.size };
+}
+
+/**
+ * The Backup "New Backup" asks for from what's ticked. Every Song picked is
+ * all of them, and every Beat picked is the Beat Library, however they were
+ * picked, so together they're Everything. A Beat the picked Songs use counts
+ * as picked. A hint for what's missing names only what can be ticked.
+ */
+export function newBackup(ticks: PickTicks, there: BackupSource): NewBackup {
+  const picked = pickedFrom(ticks, there);
+  if ('missing' in picked) return picked;
+  const { songs, beats, beatCount } = picked;
+  const allSongs = songs.length > 0 && songs.length === there.songIds.length;
+  const beatLibrary = beats.length > 0 && beats.length === there.beats.length;
   return {
     contents: {
-      ...(allSongs ? { allSongs: true as const } : { songs: picked }),
-      ...(beatLibrary ? { beatLibrary: true as const } : { beats: pickedBeats }),
+      ...(allSongs ? { allSongs: true as const } : { songs }),
+      ...(beatLibrary ? { beatLibrary: true as const } : { beats }),
     },
-    name: contentsName({ songs: picked.length, allSongs, beats, beatLibrary }),
+    name: contentsName({ songs: songs.length, allSongs, beats: beatCount, beatLibrary }),
+  };
+}
+
+/** A Restore "Restore" can ask for, with its name, or what's missing before one can be, as a short hint. */
+export type RestorePicks = { picks: BackupPicks; name: string } | { missing: string };
+
+/**
+ * The Restore "Restore" asks for from what's ticked, of what a Backup holds,
+ * with whether that's the whole Beat Library. A Beat the picked Songs use
+ * counts as picked, and comes back with them anyway. Every Song and Beat it
+ * holds, with the Beat Library, is Everything; every Beat of chosen Beats is
+ * named by how many. A hint for what's missing names only what can be ticked.
+ */
+export function restorePicks(ticks: PickTicks, held: BackupSource & { beatLibrary: boolean }): RestorePicks {
+  const picked = pickedFrom(ticks, held);
+  if ('missing' in picked) return picked;
+  const { songs, beats, beatCount } = picked;
+  const allSongs = songs.length > 0 && songs.length === held.songIds.length;
+  const beatLibrary = held.beatLibrary && beats.length > 0 && beats.length === held.beats.length;
+  return {
+    picks: { songs, beats },
+    name: contentsName({ songs: songs.length, allSongs, beats: beatCount, beatLibrary }),
   };
 }
 
@@ -131,11 +171,10 @@ export function beatCount(n: number): string {
 
 /**
  * What a Restore brought back, in a few words: "2 Songs", "1 Song and 1 Beat",
- * "14 Beats". The Beats are named when there were any, or when the Beat
- * Library was restored, even if it held none.
+ * "14 Beats". The Beats are named when there were any.
  */
-export function restoredName(songs: number, beats: number, beatLibrary: boolean): string {
-  return [songs > 0 && songCount(songs), (beats > 0 || beatLibrary) && beatCount(beats)].filter(Boolean).join(' and ');
+export function restoredName(songs: number, beats: number): string {
+  return [songs > 0 && songCount(songs), beats > 0 && beatCount(beats)].filter(Boolean).join(' and ');
 }
 
 /**

@@ -3,18 +3,19 @@
   import {
     api,
     type Backup,
-    type BackupPicks,
+    type BackupBeat,
     type BackupPresence,
     type BackupPresent,
     type BackupRestored,
     type BackupSong,
   } from './api';
   import { closeOnBackdrop } from './backdrop';
-  import { backupName, contentsName, replaceConfirmation, restoredName } from './backups';
+  import { backupName, beatCount, beatsBrought, replaceConfirmation, restoredName, restorePicks } from './backups';
+  import PickList from './PickList.svelte';
 
-  // "Restore": picks Songs from a Backup, some or all, and its Beat Library
-  // if it holds one, then restores them, each Song with the Beats its Clips
-  // use, in the same modal dialog, which holds focus until they're back: it
+  // "Restore": ticks what comes back from a Backup, Songs and Beats (some or
+  // all of each), as "New Backup" ticks what goes in, then restores them,
+  // each Song with the Beats its Clips use, in the same modal dialog, which holds focus until they're back: it
   // can't be closed meanwhile, by a click outside, Esc, or a button. Where
   // Songs or Beats picked are already in Bandmate (the same ones, not just
   // the same titles), a step lists them, each to replace or keep both, keep
@@ -32,61 +33,56 @@
   let dialog = $state<HTMLDialogElement>();
   let phase = $state<'picking' | 'checking' | 'deciding' | 'restoring' | 'restored'>('picking');
   let songs = $state<BackupSong[] | null>(null);
+  /** The Beats the Backup holds, its Beat Library or chosen Beats. */
+  let beats = $state<BackupBeat[] | null>(null);
   let loadError = $state<string | null>(null);
   let error = $state<string | null>(null);
+  /** Whether Songs are ticked; unticking them keeps the picks for when they're ticked again. */
+  let songsTicked = $state(false);
   let picked = $state<Set<number>>(new Set());
-  /** Whether the Backup's Beat Library is picked; it can be only if the Backup holds one. */
-  let beatLibrary = $state(false);
+  /** Whether the Beat Library is ticked; unticking it keeps the picks for when it's ticked again. */
+  let beatsTicked = $state(false);
+  let pickedBeats = $state<Set<number>>(new Set());
   // What's already in Bandmate of what's picked, and which of it to
   // replace, by kind and id in the Backup.
   let present = $state<BackupPresence>({ songs: [], beats: [] });
   let replacing = $state<{ songs: Set<number>; beats: Set<number> }>({ songs: new Set(), beats: new Set() });
   let restored = $state<BackupRestored>({ songs: [], beats: 0 });
   const replacingAny = $derived(replacing.songs.size + replacing.beats.size > 0);
-  const picks = $derived<BackupPicks>({ songs: [...picked], beatLibrary });
-  /** How many things there are to pick: each Song, and the Beat Library if the Backup holds one. */
-  const pickable = $derived((songs?.length ?? 0) + (backup.beatLibrary ? 1 : 0));
-  const pickedAllSongs = $derived(songs !== null && picked.size === songs.length);
-  /** What's picked, in a few words: "2 Songs", "Beat Library", "Everything" for all the Backup holds. */
-  const pickedName = $derived(
-    contentsName({ songs: picked.size, allSongs: picked.size > 0 && pickedAllSongs, beatLibrary }),
+  const songIds = $derived(songs?.map((s) => s.id) ?? []);
+  /** The Beats the picked Songs bring, shown ticked and locked. */
+  const brought = $derived(beatsBrought(songsTicked ? songIds.filter((id) => picked.has(id)) : [], beats ?? []));
+  /** What to restore, with its name, or what's missing before it can be. */
+  const toRestore = $derived(
+    restorePicks(
+      { songsTicked, picked, beatsTicked, pickedBeats },
+      { songIds, beats: beats ?? [], beatLibrary: backup.beatLibrary },
+    ),
   );
-  const pickedAny = $derived(picked.size > 0 || beatLibrary);
-  /** Whether everything the Backup holds is picked. */
-  const pickedAll = $derived(pickedAllSongs && beatLibrary === backup.beatLibrary);
+  const pickedName = $derived('name' in toRestore ? toRestore.name : '');
 
   onMount(() => dialog?.showModal());
 
   // svelte-ignore state_referenced_locally
-  api.backupSongs(backup.id).then(
-    (list) => {
-      songs = list;
-      // With one thing to restore, it's picked.
-      if (pickable === 1) pickAll();
+  Promise.all([api.backupSongs(backup.id), api.backupBeats(backup.id)]).then(
+    ([songList, beatList]) => {
+      songs = songList;
+      beats = beatList;
+      // Open on everything the Backup holds, to restore in one click.
+      songsTicked = songs.length > 0;
+      picked = new Set(songs.map((s) => s.id));
+      beatsTicked = beats.length > 0;
+      pickedBeats = new Set(beats.map((b) => b.id));
     },
     (e: Error) => (loadError = e.message),
   );
 
-  function pickAll() {
-    picked = new Set(songs?.map((s) => s.id));
-    beatLibrary = backup.beatLibrary;
-  }
-
-  function clearPicks() {
-    picked = new Set();
-    beatLibrary = false;
-  }
-
-  function toggle(id: number) {
-    const next = new Set(picked);
-    if (!next.delete(id)) next.add(id);
-    picked = next;
-  }
-
-  // Asks which of the Songs picked, of their Beats, and of the Beat Library
-  // if picked, are already in Bandmate: if any are, the user says which to
-  // replace first.
+  // Asks which of the Songs picked, of their Beats, and of the Beats picked
+  // are already in Bandmate: if any are, the user says which to replace
+  // first.
   async function check() {
+    if ('missing' in toRestore) return;
+    const { picks } = toRestore;
     phase = 'checking';
     error = null;
     try {
@@ -114,6 +110,8 @@
   }
 
   async function restore() {
+    if ('missing' in toRestore) return;
+    const { picks } = toRestore;
     if (replacingAny) {
       const ok = confirm(
         replaceConfirmation(
@@ -159,43 +157,51 @@
     <p class="muted">From “{backupName(backup)}”</p>
     {#if loadError}
       <p class="problem" role="alert">{loadError}</p>
-    {:else if songs === null}
+    {:else if songs === null || beats === null}
       <p class="muted">Loading…</p>
-    {:else if songs.length === 0 && !backup.beatLibrary}
-      <p>This Backup holds no Songs.</p>
+    {:else if songs.length === 0 && beats.length === 0}
+      <p>This Backup holds no Songs or Beats.</p>
     {:else}
-      <div class="choose">
-        {#if pickable > 1}
-          <div class="choose-actions">
-            <button type="button" class="link" onclick={pickAll} disabled={pickedAll}>Choose all</button>
-            <button type="button" class="link" onclick={clearPicks} disabled={!pickedAny}>Clear</button>
+      <fieldset disabled={phase === 'checking'}>
+        <legend>What comes back</legend>
+        {#if songs.length > 0}
+          <label>
+            <input type="checkbox" bind:checked={songsTicked} aria-describedby="restore-songs-note" />
+            <span>Songs</span>
+          </label>
+          <div class="nested">
+            <p id="restore-songs-note" class="muted">Each Song comes back whole, with the Beats its Clips use.</p>
+            {#if songsTicked}
+              <PickList items={songs} bind:picked label="Songs to restore" />
+            {/if}
           </div>
         {/if}
-        {#if songs.length > 0}
-          <ul class="songs" aria-label="Songs to restore">
-            {#each songs as song (song.id)}
-              <li>
-                <label>
-                  <input type="checkbox" checked={picked.has(song.id)} onchange={() => toggle(song.id)} />
-                  <span class="title">{song.title}</span>
-                </label>
-              </li>
-            {/each}
-          </ul>
-        {/if}
-        {#if backup.beatLibrary}
-          <label class="beat-library">
-            <input type="checkbox" bind:checked={beatLibrary} />
-            <span>Beat Library <span class="muted">· every Beat it held, with its credit</span></span>
+        {#if beats.length > 0}
+          <label>
+            <input type="checkbox" bind:checked={beatsTicked} aria-describedby="restore-beats-note" />
+            <span>Beat Library <span class="muted">· {beatCount(beats.length)}</span></span>
           </label>
+          <div class="nested">
+            <p id="restore-beats-note" class="muted">Each Beat comes back with its credit.</p>
+            {#if beatsTicked}
+              <PickList
+                items={beats}
+                bind:picked={pickedBeats}
+                label="Beats to restore"
+                detail={(b) => b.producer}
+                locked={brought}
+                lockedNote="used by a picked Song"
+              />
+            {/if}
+          </div>
         {/if}
-      </div>
+      </fieldset>
+      {#if 'missing' in toRestore}
+        <p id="restore-missing" class="muted">{toRestore.missing}</p>
+      {/if}
       <p class="muted">
-        {#if songs.length > 0}
-          Each Song comes back whole, with the Beats its Clips use.
-        {/if}
-        Where a Song or Beat is already in Bandmate, you choose next whether to replace it or keep both. Nothing the Backup
-        doesn’t hold is touched.
+        Where a Song or Beat is already in Bandmate, you choose next whether to replace it or keep both. Nothing the
+        Backup doesn’t hold is touched.
       </p>
     {/if}
     {#if error}
@@ -266,7 +272,7 @@
     <progress aria-label="Restoring"></progress>
     <p class="muted">Don't leave or close this page until it's done.</p>
   {:else}
-    <p role="status">Restored {restoredName(restored.songs.length, restored.beats, beatLibrary)}.</p>
+    <p role="status">Restored {restoredName(restored.songs.length, restored.beats)}.</p>
     {#if restored.songs.length > 0}
       <ul class="restored">
         {#each restored.songs as song (song.id)}
@@ -274,16 +280,22 @@
         {/each}
       </ul>
     {/if}
-    {#if beatLibrary}
+    {#if restored.beats > 0}
       <p><a href="/beats" onclick={() => dialog?.close()}>Open the Beat Library</a></p>
     {/if}
   {/if}
 
   <div class="actions">
     {#if phase === 'picking' || phase === 'checking'}
-      {#if songs && (songs.length > 0 || backup.beatLibrary)}
-        <button type="button" class="button primary" onclick={check} disabled={!pickedAny || phase === 'checking'}>
-          Restore {pickedAny ? pickedName : ''}
+      {#if songs && beats && (songs.length > 0 || beats.length > 0)}
+        <button
+          type="button"
+          class="button primary"
+          onclick={check}
+          disabled={'missing' in toRestore || phase === 'checking'}
+          aria-describedby={'missing' in toRestore ? 'restore-missing' : undefined}
+        >
+          Restore {pickedName}
         </button>
       {/if}
       <button type="button" class="button" onclick={() => dialog?.close()} disabled={phase === 'checking'}>
@@ -347,11 +359,25 @@
     padding: 0;
     accent-color: var(--accent);
   }
-  .choose {
+  fieldset {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
     min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  legend {
+    margin-bottom: 0.375rem;
+    padding: 0;
+    font-weight: 600;
+  }
+  /* What's under a checkbox (its note, and its list), lined up with its label. */
+  .nested {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    margin: 0 0 0.5rem 1.75rem;
   }
   .choose-actions {
     display: flex;
@@ -370,20 +396,6 @@
   .link:disabled {
     color: var(--text-muted);
     cursor: default;
-  }
-  /* About six Songs, then it scrolls. */
-  .songs {
-    max-height: calc(6.5 * var(--control));
-    overflow-y: auto;
-    margin: 0;
-    padding: 0 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 0.5rem;
-    list-style: none;
-    overscroll-behavior: contain;
-  }
-  .songs label {
-    padding-block: 0.25rem;
   }
   .title {
     min-width: 0;

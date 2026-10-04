@@ -8,6 +8,7 @@ import {
   newBackup,
   replaceConfirmation,
   restoredName,
+  restorePicks,
 } from './backups';
 
 // 18:30 on 4 Oct 2026, in the time zone the tests run in.
@@ -120,14 +121,10 @@ describe('replaceConfirmation', () => {
 
 describe('restoredName', () => {
   it('names the Songs restored, and the Beats only when there were any', () => {
-    expect(restoredName(2, 0, false)).toBe('2 Songs');
-    expect(restoredName(1, 1, false)).toBe('1 Song and 1 Beat');
-  });
-
-  it('names the Beats whenever the Beat Library was restored, even none', () => {
-    expect(restoredName(0, 14, true)).toBe('14 Beats');
-    expect(restoredName(0, 0, true)).toBe('0 Beats');
-    expect(restoredName(3, 2, true)).toBe('3 Songs and 2 Beats');
+    expect(restoredName(2, 0)).toBe('2 Songs');
+    expect(restoredName(1, 1)).toBe('1 Song and 1 Beat');
+    expect(restoredName(0, 14)).toBe('14 Beats');
+    expect(restoredName(3, 2)).toBe('3 Songs and 2 Beats');
   });
 });
 
@@ -253,6 +250,78 @@ describe('newBackup', () => {
     expect(newBackup({ ...opened, picked: new Set([2]), pickedBeats: new Set() }, there)).toEqual({
       contents: { songs: [2], beats: [11] },
       name: '1 Song + 1 Beat',
+    });
+  });
+});
+
+describe('restorePicks', () => {
+  // Song 1 uses Beats 10 and 11, Song 2 uses 11, Song 3 none; 12 and 13 no Song.
+  const held = {
+    songIds: [1, 2, 3],
+    beats: [
+      { id: 10, songs: [{ id: 1 }] },
+      { id: 11, songs: [{ id: 1 }, { id: 2 }] },
+      { id: 12, songs: [] },
+      { id: 13, songs: [] },
+    ],
+    beatLibrary: true,
+  };
+  const opened = {
+    songsTicked: true,
+    picked: new Set(held.songIds),
+    beatsTicked: true,
+    pickedBeats: new Set([10, 11, 12, 13]),
+  };
+
+  it('is everything the Backup holds as the dialog opens', () => {
+    expect(restorePicks(opened, held)).toEqual({
+      picks: { songs: [1, 2, 3], beats: [10, 11, 12, 13] },
+      name: 'Everything',
+    });
+  });
+
+  it('names every Beat of a Backup of chosen Beats by how many there are', () => {
+    expect(restorePicks(opened, { ...held, beatLibrary: false })).toEqual({
+      picks: { songs: [1, 2, 3], beats: [10, 11, 12, 13] },
+      name: '3 Songs + 4 Beats',
+    });
+  });
+
+  it('asks for the Songs and Beats picked, with those the picked Songs use', () => {
+    expect(restorePicks({ ...opened, picked: new Set([2]), pickedBeats: new Set([12]) }, held)).toEqual({
+      picks: { songs: [2], beats: [11, 12] },
+      name: '1 Song + 2 Beats',
+    });
+  });
+
+  it('takes a Beat the picked Songs use as picked, even with none of your own', () => {
+    expect(restorePicks({ ...opened, picked: new Set([1]), pickedBeats: new Set() }, held)).toEqual({
+      picks: { songs: [1], beats: [10, 11] },
+      name: '1 Song + 2 Beats',
+    });
+  });
+
+  it('picks no Beats of your own while the Beat Library is unticked, counting those the Songs bring', () => {
+    expect(restorePicks({ ...opened, beatsTicked: false }, held)).toEqual({
+      picks: { songs: [1, 2, 3], beats: [] },
+      name: '3 Songs + 2 Beats',
+    });
+  });
+
+  it('picks no Songs while Songs is unticked', () => {
+    expect(restorePicks({ ...opened, songsTicked: false, pickedBeats: new Set([12, 13]) }, held)).toEqual({
+      picks: { songs: [], beats: [12, 13] },
+      name: '2 Beats',
+    });
+  });
+
+  it('says what is missing when nothing is ticked, or a ticked section has nothing picked', () => {
+    expect(restorePicks({ ...opened, songsTicked: false, beatsTicked: false }, held)).toEqual({
+      missing: 'Tick Songs or the Beat Library.',
+    });
+    expect(restorePicks({ ...opened, picked: new Set() }, held)).toEqual({ missing: 'Pick a Song, or untick Songs.' });
+    expect(restorePicks({ ...opened, picked: new Set([3]), pickedBeats: new Set() }, held)).toEqual({
+      missing: 'Pick a Beat, or untick the Beat Library.',
     });
   });
 });
