@@ -97,17 +97,40 @@ func (a *App) restoreBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Songs []int64 `json:"songs"`
+		Songs   []int64         `json:"songs"`
+		Replace backups.Replace `json:"replace"`
 	}
 	if !readJSON(w, r, &req) {
 		return
 	}
-	restored, err := a.backups.Restore(r.Context(), id, req.Songs)
+	restored, err := a.backups.Restore(r.Context(), id, req.Songs, req.Replace)
 	if err != nil {
 		writeBackupError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"songs": restored})
+}
+
+// presentInBandmate lists which of the Songs picked from a Backup, and of
+// the Beats their Clips use, are already in Bandmate, to choose for each
+// whether a Restore replaces it or keeps both.
+func (a *App) presentInBandmate(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var req struct {
+		Songs []int64 `json:"songs"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	present, err := a.backups.Present(r.Context(), id, req.Songs)
+	if err != nil {
+		writeBackupError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, present)
 }
 
 func writeBackupError(w http.ResponseWriter, err error) {

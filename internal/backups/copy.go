@@ -28,6 +28,10 @@ type songTable struct {
 	// shared rows, i.e. Beats, may already be in the Backup from another
 	// Song.
 	shared bool
+	// replacedInPlace lists, for a table whose rows a Restore can replace
+	// and whose replaced rows keep their place, i.e. Beats, the columns
+	// they take from the Backup. A Song replaced is made anew instead.
+	replacedInPlace []string
 }
 
 // songTables lists, parents first, every table holding a Song's rows.
@@ -41,7 +45,12 @@ var songTables = []songTable{
 	{name: "covers", where: `song_id = ?1`},
 	{name: "loops", where: `song_id = ?1`},
 	{name: "tracks", where: `song_id = ?1`},
-	{name: "beats", shared: true, where: `id IN (SELECT c.beat_id FROM src.clips c
+	// A Beat replaced keeps its place in every Song using it, and its audio,
+	// taking the Backup's Details: its title, credit (producer and source
+	// link), BPM, Key and Notes.
+	{name: "beats", shared: true,
+		replacedInPlace: []string{"title", "producer", "source_link", "bpm", "beat_key", "notes"},
+		where: `id IN (SELECT c.beat_id FROM src.clips c
 		JOIN src.tracks t ON t.id = c.track_id WHERE t.song_id = ?1)`},
 	{name: "sounds", where: `id IN (SELECT c.sound_id FROM src.clips c
 		JOIN src.tracks t ON t.id = c.track_id WHERE t.song_id = ?1)`},

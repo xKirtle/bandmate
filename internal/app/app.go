@@ -275,6 +275,7 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("DELETE /api/backups/{id}", a.deleteBackup)
 	mux.HandleFunc("GET /api/backups/{id}/file", a.backupFile)
 	mux.HandleFunc("GET /api/backups/{id}/songs", a.backupSongs)
+	mux.HandleFunc("POST /api/backups/{id}/present", a.presentInBandmate)
 	mux.HandleFunc("POST /api/backups/{id}/restore", a.restoreBackup)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not found")

@@ -218,6 +218,29 @@ export interface BackupSong {
   title: string;
 }
 
+/**
+ * A Song or Beat a Backup holds, by its id and title there, that's already
+ * in Bandmate (the same one, by its identity, never just the same title),
+ * with the one in Bandmate by its id and title here.
+ */
+export interface BackupPresent {
+  id: number;
+  title: string;
+  inBandmate: { id: number; title: string };
+}
+
+/** The Songs and Beats a Restore would bring back that are already in Bandmate. */
+export interface BackupPresence {
+  songs: BackupPresent[];
+  beats: BackupPresent[];
+}
+
+/** The Songs and Beats already in Bandmate a Restore replaces rather than keeping both, by their ids in the Backup. */
+export interface BackupReplace {
+  songs: number[];
+  beats: number[];
+}
+
 /** Details the user enters about a Beat. "" and null mean "not set"; only the title is required. */
 export interface BeatDetails {
   title: string;
@@ -680,13 +703,16 @@ export const api = {
   backupDownloadUrl: (id: number) => `/api/backups/${id}/file`,
   /** The Songs a Backup holds, by title, with their ids in it. */
   backupSongs: (id: number) => request<BackupSong[]>('GET', `/backups/${id}/songs`),
+  /** Which of the Songs picked from a Backup, and of the Beats their Clips use, are already in Bandmate. */
+  backupPresence: (id: number, songs: number[]) => request<BackupPresence>('POST', `/backups/${id}/present`, { songs }),
   /**
    * Restores the Songs picked from a Backup, by their ids in it, each with
    * the Beats its Clips use, answering once they're back. One already in
-   * Bandmate is kept both: the restored one is added alongside, titled as restored.
+   * Bandmate is replaced if listed in replace, and otherwise kept both: the
+   * restored one is added alongside, titled as restored.
    */
-  restoreBackup: (id: number, songs: number[]) =>
-    request<{ songs: BackupSong[] }>('POST', `/backups/${id}/restore`, { songs }),
+  restoreBackup: (id: number, songs: number[], replace: BackupReplace) =>
+    request<{ songs: BackupSong[] }>('POST', `/backups/${id}/restore`, { songs, replace }),
 
   listSongs: (filter: SongFilter = {}) => {
     const params = new URLSearchParams();
