@@ -156,7 +156,7 @@
             <ol class="voicings" aria-label="Voicings of {found.name}, best first">
               {#each shown as voicing, i (page * pageSize + i)}
                 <li>
-                  <ChordDiagram {voicing} name={found.name} />
+                  <ChordDiagram {voicing} name={found.name} capo={context.capo} />
                   <span class="rank muted">{page * pageSize + i + 1}</span>
                 </li>
               {/each}

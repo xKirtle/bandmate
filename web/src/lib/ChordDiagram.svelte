@@ -2,10 +2,12 @@
   // Draws a guitar Voicing as a chord diagram: the strings upright, the low
   // string on the left, the nut (or the fret the Voicing starts at, up the
   // neck) at the top. Above it, ○ marks a string that rings open and × one
-  // that's muted. "How to play a Chord" on the Lyric Sheet is to reuse it.
+  // that's muted. With a capo on, frets count from it: it's drawn as the nut,
+  // and labelled under the diagram. "How to play a Chord" on the Lyric Sheet
+  // is to reuse it.
   import type { Voicing } from './chordFinder';
 
-  let { voicing, name }: { voicing: Voicing; name: string } = $props();
+  let { voicing, name, capo = 0 }: { voicing: Voicing; name: string; capo?: number } = $props();
 
   /** How many frets the diagram shows. A Voicing spans four at most. */
   const rows = 5;
@@ -15,11 +17,14 @@
   const left = 22;
   const top = 20;
   const right = 10;
-  const bottom = 6;
+  /** Room below, and more for the capo's label. */
+  const bottom = $derived(capo > 0 ? 20 : 6);
 
   const strings = $derived(voicing.frets.length);
-  const width = $derived(left + (strings - 1) * stringGap + right);
-  const height = top + rows * fretGap + bottom;
+  /** From the low string to the high one. */
+  const neckWidth = $derived((strings - 1) * stringGap);
+  const width = $derived(left + neckWidth + right);
+  const height = $derived(top + rows * fretGap + bottom);
 
   /**
    * The fret the diagram's first row is: 1, under the nut, for a Voicing that
@@ -44,10 +49,11 @@
     }),
   );
 
-  /** Read out low string to high, e.g. "C: x 3 2 0 1 0", starting at fret 5 up the neck. */
+  /** Read out low string to high, e.g. "C: x 3 2 0 1 0", starting at fret 5 up the neck, with capo 2. */
   const label = $derived(
     `${name}: ${voicing.frets.map((f) => (f === null ? 'x' : f)).join(' ')}` +
-      (start > 1 ? `, from fret ${start}` : ''),
+      (start > 1 ? `, from fret ${start}` : '') +
+      (capo > 0 ? `, capo ${capo}` : ''),
   );
 </script>
 
@@ -59,8 +65,10 @@
   {#each { length: strings } as _, s (s)}
     <line class="string" x1={x(s)} x2={x(s)} y1={top} y2={top + rows * fretGap} />
   {/each}
-  {#if start === 1}
-    <rect class="nut" x={x(0) - 1} y={top - 3} width={(strings - 1) * stringGap + 2} height="4" />
+  {#if start === 1 && capo > 0}
+    <rect class="capo" x={x(0) - 5} y={top - 4} width={neckWidth + 10} height="6" rx="3" />
+  {:else if start === 1}
+    <rect class="nut" x={x(0) - 1} y={top - 3} width={neckWidth + 2} height="4" />
   {:else}
     <text class="start" x={left - 6} y={y(start)} text-anchor="end" dominant-baseline="central">{start}fr</text>
   {/if}
@@ -87,6 +95,12 @@
   {#each dots as d (d.string)}
     <circle class="finger" cx={x(d.string)} cy={y(d.fret)} r="6" />
   {/each}
+
+  {#if capo > 0}
+    <text class="capo-label" x={x(0) + neckWidth / 2} y={top + rows * fretGap + 14} text-anchor="middle">
+      Capo {capo}
+    </text>
+  {/if}
 </svg>
 
 <style>
@@ -102,6 +116,7 @@
     stroke-width: 1;
   }
   .nut,
+  .capo,
   .finger {
     fill: var(--text);
   }
@@ -111,7 +126,8 @@
     stroke: var(--text);
     stroke-width: 1.5;
   }
-  .start {
+  .start,
+  .capo-label {
     fill: var(--text-muted);
     font-size: 10px;
     font-weight: 600;

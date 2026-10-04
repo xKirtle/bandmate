@@ -272,6 +272,42 @@ describe('Voicings in standard tuning', () => {
   });
 });
 
+describe('Voicings in the tuning and capo in use', () => {
+  const dropD = readTuning('Drop D')!;
+
+  it('finds Voicings on the strings of the tuning in use', () => {
+    const d = voicingsOf('D', dropD);
+    expect(d).toContain('000232');
+    expect(d).toContain('xx0232');
+    expect(d.slice(0, 2)).toContain('000232');
+    // Standard tuning's open low E isn't a D's note.
+    expect(voicingsOf('D')).not.toContain('000232');
+  });
+
+  it("follows a named tuning's every string, not just the dropped one", () => {
+    expect(voicingsOf('D', readTuning('DADGAD')!)).toContain('004200');
+    // Open G's open strings are a G, its root on the 5th string.
+    expect(voicingsOf('G', readTuning('Open G')!)[0]).toBe('x00000');
+  });
+
+  it('counts frets from the capo, so a Chord is drawn as the shape fingered', () => {
+    // Capo 2: a G is the open G shape, sounding an A.
+    expect(voicingsOf('G', standard, 2)[0]).toBe('320003');
+    expect(voicingsOf('C', standard, 2)[0]).toBe('x32010');
+    expect(voicingsOf('D', dropD, 2)).toContain('000232');
+    // The capo moves no shape: they're the shapes with no capo, the capo as the nut.
+    expect(voicingsOf('G', standard, 2)).toEqual(voicingsOf('G'));
+    expect(voicingsOf('F#m7', dropD, 5)).toEqual(voicingsOf('F#m7', dropD));
+  });
+
+  it('reaches the 12th fret above the capo, and none past it', () => {
+    const found = lookUp('G', { tuning: standard, capo: 5 });
+    if (found.kind !== 'chord') throw new Error('G should read');
+    expect(found.voicings.map((v) => written(v.frets))).toContain('x(10)(12)(12)(12)(10)');
+    expect(found.voicings.every((v) => v.frets.every((f) => f === null || f <= 12))).toBe(true);
+  });
+});
+
 describe("names it can't read", () => {
   it('says so, never guessing at a near name', () => {
     for (const name of [
