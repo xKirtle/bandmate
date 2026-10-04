@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"testing"
 
@@ -58,7 +59,7 @@ func TestAnUploadedBackupJoinsTheListWithItsNameAndSize(t *testing.T) {
 		t.Errorf("uploaded = %+v, want %+v", up, want)
 	}
 	list := ts.listBackups()
-	if len(list) != 2 || !slicesContain(list, up) || !slicesContain(list, ours) {
+	if len(list) != 2 || !slices.Contains(list, up) || !slices.Contains(list, ours) {
 		t.Errorf("backups = %+v, want ours and the one uploaded", list)
 	}
 	if got := ts.downloadBackup(up.ID).Body; !bytes.Equal(got, file) {
@@ -72,15 +73,6 @@ func TestAnUploadedBackupJoinsTheListWithItsNameAndSize(t *testing.T) {
 	if got := restarted.listBackups(); !reflect.DeepEqual(got, list) {
 		t.Errorf("backups after restarting = %+v, want %+v", got, list)
 	}
-}
-
-func slicesContain(list []backup, b backup) bool {
-	for _, l := range list {
-		if l == b {
-			return true
-		}
-	}
-	return false
 }
 
 func TestABackupOfEverythingUploadedKeepsWhatItHolds(t *testing.T) {
@@ -212,9 +204,9 @@ func installWithABackup(t *testing.T) (ts *testServer, held string) {
 }
 
 const (
-	notABackup = "the file isn't a Bandmate Backup"
-	damaged    = "the Backup is damaged"
-	newer      = "the Backup was made by a newer Bandmate: update Bandmate to restore it"
+	notABackupMsg = "the file isn't a Bandmate Backup"
+	damagedMsg    = "the Backup is damaged"
+	newerMsg      = "the Backup was made by a newer Bandmate: update Bandmate to restore it"
 )
 
 func TestAFileThatIsntABackupIsRefused(t *testing.T) {
@@ -231,7 +223,7 @@ func TestAFileThatIsntABackupIsRefused(t *testing.T) {
 		"a database alone":   database,
 	} {
 		t.Run(name, func(t *testing.T) {
-			expectRefused(t, ts, file, notABackup)
+			expectRefused(t, ts, file, notABackupMsg)
 		})
 	}
 }
@@ -276,7 +268,7 @@ func TestADamagedBackupIsRefused(t *testing.T) {
 		}),
 	} {
 		t.Run(name, func(t *testing.T) {
-			expectRefused(t, ts, file, damaged)
+			expectRefused(t, ts, file, damagedMsg)
 		})
 	}
 }
@@ -331,6 +323,7 @@ func writeFile(t *testing.T, path string, data []byte) {
 // make it, recording a migration this one doesn't know.
 func fromANewerBandmate(t *testing.T, held string) []byte {
 	t.Helper()
+	// Not damage, but the same way of changing the Backup's database.
 	damage(t, held, `INSERT INTO schema_migrations (name) VALUES ('9999_from_the_future')`)
 	return packBackup(t, held)
 }
@@ -338,7 +331,7 @@ func fromANewerBandmate(t *testing.T, held string) []byte {
 func TestABackupFromANewerBandmateIsRefused(t *testing.T) {
 	ts, held := installWithABackup(t)
 
-	expectRefused(t, ts, fromANewerBandmate(t, held), newer)
+	expectRefused(t, ts, fromANewerBandmate(t, held), newerMsg)
 }
 
 func TestABackupFromANewerBandmateIsntRestored(t *testing.T) {
@@ -348,9 +341,9 @@ func TestABackupFromANewerBandmateIsntRestored(t *testing.T) {
 	ts.replaceBackupFile(made.ID, fromANewerBandmate(t, held))
 	s := ts.listSongs()[0]
 
-	expectError(t, ts.Do(http.MethodGet, backupPath(made.ID)+"/songs", nil), http.StatusBadRequest, newer)
+	expectError(t, ts.Do(http.MethodGet, backupPath(made.ID)+"/songs", nil), http.StatusBadRequest, newerMsg)
 	expectError(t, ts.Do(http.MethodPost, backupPath(made.ID)+"/restore", map[string]any{"songs": []int64{s.ID}}),
-		http.StatusBadRequest, newer)
+		http.StatusBadRequest, newerMsg)
 	if got := titles(ts.listSongs()); !reflect.DeepEqual(got, []string{"Night Drive"}) {
 		t.Errorf("songs = %q, want nothing restored", got)
 	}

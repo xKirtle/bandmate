@@ -13,30 +13,8 @@ import (
 	"strconv"
 )
 
-// A Backup's file that can't be restored is refused whole, saying why.
-var (
-	errNotABackup = &InvalidError{"the file isn't a Bandmate Backup"}
-	errDamaged    = &InvalidError{"the Backup is damaged"}
-	errNewer      = &InvalidError{"the Backup was made by a newer Bandmate: update Bandmate to restore it"}
-)
-
-// damagedBy is err, met reading a Backup's file, as the Backup being
-// damaged.
-func damagedBy(err error) error {
-	return fmt.Errorf("%w: %v", errDamaged, err)
-}
-
-// damagedOnRead reads a Backup's file entry, any failure to read it, such
-// as its bytes not matching their checksum, meaning the Backup is damaged.
-type damagedOnRead struct{ r io.Reader }
-
-func (d damagedOnRead) Read(p []byte) (int, error) {
-	n, err := d.r.Read(p)
-	if err != nil && !errors.Is(err, io.EOF) {
-		err = damagedBy(err)
-	}
-	return n, err
-}
+// errNotABackup refuses an upload that isn't a Backup's file at all.
+var errNotABackup = &InvalidError{"the file isn't a Bandmate Backup"}
 
 // zipSignature starts a zip file, so a file starting with it that can't be
 // read as one is a damaged Backup rather than something else.
@@ -87,8 +65,11 @@ func (s *Store) check(ctx context.Context, path string) (Backup, error) {
 	if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM songs`).Scan(&b.Songs); err != nil {
 		return Backup{}, damagedBy(err)
 	}
-	if b.Songs != m.Songs || (b.Songs == 0 && !b.BeatLibrary) {
+	if b.Songs != m.Songs {
 		return Backup{}, damagedBy(fmt.Errorf("it holds %d songs, and says it holds %d", b.Songs, m.Songs))
+	}
+	if b.Songs == 0 && !b.BeatLibrary {
+		return Backup{}, damagedBy(errors.New("it holds neither Songs nor the Beat Library"))
 	}
 	if err := r.checkFiles(ctx, entries); err != nil {
 		return Backup{}, err
@@ -188,7 +169,7 @@ func (r *openedBackup) checkFiles(ctx context.Context, entries map[string]bool) 
 	if err != nil {
 		return damagedBy(err)
 	}
-	check := func(files []songFile, args ...any) error {
+	need := func(files []songFile, args ...any) error {
 		for _, f := range files {
 			ids, err := queryIDs(ctx, r.db, f.ids, args...)
 			if err != nil {
@@ -203,9 +184,9 @@ func (r *openedBackup) checkFiles(ctx context.Context, entries map[string]bool) 
 		return nil
 	}
 	for _, song := range songs {
-		if err := check(songFiles, song); err != nil {
+		if err := need(songFiles, song); err != nil {
 			return err
 		}
 	}
-	return check(beatLibraryFiles)
+	return need(beatLibraryFiles)
 }

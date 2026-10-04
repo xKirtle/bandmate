@@ -287,6 +287,30 @@ func (s *Store) openBackup(ctx context.Context, id int64) (*openedBackup, error)
 	return r, nil
 }
 
+// A Backup's file that can't be restored is refused whole, saying why.
+var (
+	errDamaged = &InvalidError{"the Backup is damaged"}
+	errNewer   = &InvalidError{"the Backup was made by a newer Bandmate: update Bandmate to restore it"}
+)
+
+// damagedBy is err, met reading a Backup's file, as the Backup being
+// damaged.
+func damagedBy(err error) error {
+	return fmt.Errorf("%w: %v", errDamaged, err)
+}
+
+// damagedOnRead reads a Backup's file entry, any failure to read it, such
+// as its bytes not matching their checksum, meaning the Backup is damaged.
+type damagedOnRead struct{ r io.Reader }
+
+func (d damagedOnRead) Read(p []byte) (int, error) {
+	n, err := d.r.Read(p)
+	if err != nil && !errors.Is(err, io.EOF) {
+		err = damagedBy(err)
+	}
+	return n, err
+}
+
 // openFile unpacks the database of the Backup's file at path into a
 // staging directory and runs the migrations on it, leaving the file as it
 // is. It refuses a file that can't be read as a Backup as damaged, and one
