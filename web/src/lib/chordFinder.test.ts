@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { lookUp, qualities, roots, standard } from './chordFinder';
+import {
+  lookUp,
+  qualities,
+  readTuning,
+  roots,
+  standard,
+  tuningName,
+  tuningNotes,
+  tunings,
+  tuningText,
+} from './chordFinder';
 
 const context = { tuning: standard, capo: 0 };
 
@@ -287,5 +297,129 @@ describe("names it can't read", () => {
     for (const name of ['Do', 'Dom7', 'Fa#m', 'Sol']) expect(reads(name), name).toBeNull();
     expect(reads('Dm7')).toBe('Dm7');
     expect(reads('Fadd9')).toBe('Fadd9');
+  });
+});
+
+describe('reading a tuning', () => {
+  it("reads every named tuning as its strings' pitches, low to high", () => {
+    const expected: Record<string, number[]> = {
+      Standard: [40, 45, 50, 55, 59, 64],
+      'Half-step down': [39, 44, 49, 54, 58, 63],
+      'Drop D': [38, 45, 50, 55, 59, 64],
+      'Drop C': [36, 43, 48, 53, 57, 62],
+      DADGAD: [38, 45, 50, 55, 57, 62],
+      'Open G': [38, 43, 50, 55, 59, 62],
+      'Open D': [38, 45, 50, 54, 57, 62],
+      'Open E': [40, 47, 52, 56, 59, 64],
+    };
+    for (const [name, pitches] of Object.entries(expected)) expect(readTuning(name), name).toEqual(pitches);
+  });
+
+  it('reads a name in any case, spacing or common alias', () => {
+    const aliases: Record<string, string[]> = {
+      Standard: ['standard', 'STANDARD', 'Standard tuning', 'E standard', 'e std'],
+      'Half-step down': [
+        'half-step down',
+        'Half step down',
+        'half step',
+        'Eb standard',
+        'eb standard',
+        'E♭ standard',
+        'D# standard',
+        'Eb',
+        'Half-step down tuning',
+      ],
+      'Drop D': ['drop d', 'DROP D', '  Drop   D ', 'drop-d', 'DropD'],
+      'Drop C': ['drop c'],
+      DADGAD: ['dadgad', 'Dadgad'],
+      'Open G': ['open g', 'OPEN G'],
+      'Open D': ['open d'],
+      'Open E': ['open e', 'Open E tuning'],
+    };
+    for (const [name, spellings] of Object.entries(aliases))
+      for (const spelling of spellings) expect(readTuning(spelling), spelling).toEqual(readTuning(name));
+  });
+
+  it('reads six notes, low to high, each in the octave nearest that string in standard tuning', () => {
+    expect(readTuning('C G D G B D')).toEqual([36, 43, 50, 55, 59, 62]);
+    expect(readTuning('B E A D F# B')).toEqual([35, 40, 45, 50, 54, 59]);
+    expect(readTuning('F A C F C F')).toEqual([41, 45, 48, 53, 60, 65]);
+  });
+
+  it('takes the lower octave when two are as near, as strings are tuned down more than up', () => {
+    expect(readTuning('Bb Eb Ab Db F Bb')).toEqual([34, 39, 44, 49, 53, 58]);
+  });
+
+  it('reads six notes however they are separated, or run together', () => {
+    const dropD = readTuning('Drop D');
+    for (const text of ['D A D G B E', 'D,A,D,G,B,E', 'D-A-D-G-B-E', 'd a d g b e', ' D  A D G B E ', 'DADGBE'])
+      expect(readTuning(text), text).toEqual(dropD);
+    expect(readTuning('EbAbDbGbBbEb')).toEqual(readTuning('Half-step down'));
+    expect(readTuning('D♯ G♯ C♯ F♯ A♯ D♯')).toEqual(readTuning('Half-step down'));
+  });
+
+  it("gives null for text it can't read, never a near tuning", () => {
+    for (const text of [
+      '',
+      '   ',
+      'Nashville',
+      'Drop Q',
+      'Open',
+      'D standard',
+      'E A D G B',
+      'E A D G B E A',
+      'EADGB',
+      'H A D G B E',
+      'E A D G B E (capo 2)',
+      'Do Re Mi Fa Sol La',
+      'eadgbe',
+    ])
+      expect(readTuning(text), text).toBeNull();
+  });
+});
+
+describe('naming a tuning', () => {
+  it('lists the named tunings in order', () => {
+    expect(tunings).toEqual(['Standard', 'Half-step down', 'Drop D', 'Drop C', 'DADGAD', 'Open G', 'Open D', 'Open E']);
+  });
+
+  it('names the named tuning a text reads as, from a name, an alias or its notes', () => {
+    expect(tuningName('Drop D')).toBe('Drop D');
+    expect(tuningName('eb standard')).toBe('Half-step down');
+    expect(tuningName('Half step down')).toBe('Half-step down');
+    expect(tuningName('D A D G A D')).toBe('DADGAD');
+    expect(tuningName('E A D G B E')).toBe('Standard');
+  });
+
+  it('names no tuning for six notes that are none of them, or text it can’t read', () => {
+    expect(tuningName('C G D G B D')).toBeNull();
+    expect(tuningName('Nashville')).toBeNull();
+    expect(tuningName('')).toBeNull();
+  });
+});
+
+describe('writing a tuning', () => {
+  it('writes a named tuning by its name', () => {
+    expect(tuningText('drop d')).toBe('Drop D');
+    expect(tuningText('D A D G B E')).toBe('Drop D');
+    expect(tuningText('DADGAD')).toBe('DADGAD');
+  });
+
+  it('writes other notes spaced, each with a capital and # or b', () => {
+    expect(tuningText('c,g,d,g,b,d')).toBe('C G D G B D');
+    expect(tuningText('CGDGBD')).toBe('C G D G B D');
+    expect(tuningText('C♯ g♭ D G B D')).toBe('C# Gb D G B D');
+  });
+
+  it("writes nothing for text it can't read", () => {
+    expect(tuningText('E A D G B')).toBeNull();
+    expect(tuningText('Nashville')).toBeNull();
+  });
+
+  it("gives a tuning's six notes, spaced, even for a named tuning", () => {
+    expect(tuningNotes('drop d')).toBe('D A D G B E');
+    expect(tuningNotes('Eb standard')).toBe('Eb Ab Db Gb Bb Eb');
+    expect(tuningNotes('c,g,d,g,b,d')).toBe('C G D G B D');
+    expect(tuningNotes('Nashville')).toBeNull();
   });
 });
