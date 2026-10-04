@@ -5,7 +5,9 @@ import {
   qualities,
   readTuning,
   roots,
+  keyAsShown,
   keyName,
+  keyShortName,
   keys,
   standard,
   suggest,
@@ -13,6 +15,7 @@ import {
   tuningNotes,
   tunings,
   tuningText,
+  type FinderContext,
   type Frets,
   type Suggestion,
 } from './chordFinder';
@@ -508,7 +511,7 @@ function shape(written: string): Frets {
 }
 
 /** The readings of a shape, best first, or null when no reading fits. */
-function readings(written: string, ctx = context): string[] | null {
+function readings(written: string, ctx: FinderContext = context): string[] | null {
   const named = nameIt(shape(written), ctx);
   return named.kind === 'chord' ? named.readings : null;
 }
@@ -573,6 +576,33 @@ describe('naming a shape', () => {
     expect(nameIt(shape('x3x5xx'), context)).toEqual({ kind: 'none', notes: ['C'] });
     expect(nameIt(shape('xx0xxx'), context)).toEqual({ kind: 'none', notes: ['D'] });
     expect(nameIt(shape('xxxxxx'), context)).toEqual({ kind: 'none', notes: [] });
+  });
+});
+
+describe('naming a shape in a Key', () => {
+  // 002010 is Am7/E or C6/E: neither has its root in the bass, and both have four tones.
+  it('ranks the shape’s readings as it would without a Key, when none is known', () => {
+    expect(readings('002010')).toEqual(['Am7/E', 'C6/E']);
+  });
+
+  it('ranks a reading whose root is in the Key before one whose root isn’t', () => {
+    expect(readings('002010', { ...context, key: 'Eb' })).toEqual(['C6/E', 'Am7/E']);
+    expect(readings('002010', { ...context, key: 'Cm' })).toEqual(['C6/E', 'Am7/E']);
+    expect(readings('002010', { ...context, key: 'A' })).toEqual(['Am7/E', 'C6/E']);
+  });
+
+  it('keeps the order when both roots are in the Key', () => {
+    expect(readings('002010', { ...context, key: 'C' })).toEqual(['Am7/E', 'C6/E']);
+    expect(readings('002010', { ...context, key: 'E minor' })).toEqual(['Am7/E', 'C6/E']);
+  });
+
+  it('still ranks the root in the bass, then the simpler name, before the Key', () => {
+    expect(readings('x02010', { ...context, key: 'Eb' })?.slice(0, 2)).toEqual(['Am7', 'C6/A']);
+    expect(readings('x32210', { ...context, key: 'A' })).toEqual(['C6', 'Am/C']);
+  });
+
+  it('ranks as without a Key when the Key can’t be read', () => {
+    expect(readings('002010', { ...context, key: 'modal' })).toEqual(['Am7/E', 'C6/E']);
   });
 });
 
@@ -744,5 +774,44 @@ describe("Keys it can't read", () => {
   it('says so, never a guess', () => {
     expect(suggest('Do', 'C')).toEqual({ kind: 'unreadable', key: 'Do' });
     expect(suggest('')).toEqual({ kind: 'unreadable', key: '' });
+  });
+});
+
+describe('a Key’s short name', () => {
+  it('names a major Key by its tonic and a minor one with an m, spelled from its signature', () => {
+    expect(keyShortName('G')).toBe('G');
+    expect(keyShortName('G major')).toBe('G');
+    expect(keyShortName('E minor')).toBe('Em');
+    expect(keyShortName('C#m')).toBe('C#m');
+    expect(keyShortName('Db')).toBe('Db');
+    expect(keyShortName('Bbm')).toBe('Bbm');
+  });
+
+  it('gives null for a Key it can’t read', () => {
+    expect(keyShortName('modal')).toBeNull();
+    expect(keyShortName('')).toBeNull();
+  });
+});
+
+describe('a Song’s Key as shown', () => {
+  it('is the Key as written when it isn’t transposed', () => {
+    expect(keyAsShown('G', 0)).toEqual({ kind: 'key', key: 'G', short: 'G' });
+    expect(keyAsShown(' E minor ', 0)).toEqual({ kind: 'key', key: 'E minor', short: 'Em' });
+  });
+
+  it('is moved by the Transpose amount, spelled from its own signature', () => {
+    expect(keyAsShown('G', 2)).toEqual({ kind: 'key', key: 'A', short: 'A' });
+    expect(keyAsShown('G minor', 2)).toEqual({ kind: 'key', key: 'A minor', short: 'Am' });
+    expect(keyAsShown('F', -1)).toEqual({ kind: 'key', key: 'E', short: 'E' });
+  });
+
+  it('is unset when the Song has no Key', () => {
+    expect(keyAsShown('', 0)).toEqual({ kind: 'unset' });
+    expect(keyAsShown('  ', 3)).toEqual({ kind: 'unset' });
+  });
+
+  it('can’t be read, kept as written, when the Song’s Key isn’t one it reads', () => {
+    expect(keyAsShown('modal', 0)).toEqual({ kind: 'unreadable', written: 'modal' });
+    expect(keyAsShown(' modal ', 2)).toEqual({ kind: 'unreadable', written: 'modal' });
   });
 });

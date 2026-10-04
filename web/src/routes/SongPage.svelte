@@ -22,6 +22,7 @@
   import StatusBadge from '../lib/StatusBadge.svelte';
   import Timeline from '../lib/Timeline.svelte';
   import TuningField from '../lib/TuningField.svelte';
+  import SongChordFinder from '../lib/SongChordFinder.svelte';
   import type { Saved } from '../lib/history';
   import { takeNewFlag } from '../lib/newSong';
   import { navigate, replaceSearch, router } from '../lib/router.svelte';
@@ -130,6 +131,30 @@
     event.preventDefault();
     showingShortcuts = true;
   }
+
+  // The Chord Finder, following this Song: beside the Lyric Sheet at the top
+  // of the side column on desktop, a full-screen sheet on narrower windows.
+  // What it's tried with while the Song has no tuning or Key lasts the visit
+  // and isn't saved to the Song.
+  let finderOpen = $state(false);
+  let finderTuning = $state('Standard');
+  let finderKey = $state<string | null>(null);
+  let finderButton = $state<HTMLButtonElement>();
+
+  function closeFinder() {
+    finderOpen = false;
+    finderButton?.focus();
+  }
+
+  // Crossing into or out of desktop closes it, rather than opening the
+  // other form, a modal sheet, and moving focus without the user asking.
+  let finderDesktop = desktop.current;
+  $effect(() => {
+    if (desktop.current !== finderDesktop) {
+      finderDesktop = desktop.current;
+      finderOpen = false;
+    }
+  });
 
   // How tall the docked Timeline is, which the side column stops above.
   let timelineHeight = $state(0);
@@ -482,6 +507,15 @@
                 <label class="mode"><input type="radio" name="song-mode" value="write" bind:group={mode} />Write</label>
                 <label class="mode"><input type="radio" name="song-mode" value="read" bind:group={mode} />Read</label>
               </fieldset>
+              <button
+                bind:this={finderButton}
+                type="button"
+                class="button finder-toggle"
+                aria-expanded={finderOpen}
+                onclick={() => (finderOpen ? closeFinder() : (finderOpen = true))}
+                title="Look up, name and get suggestions for Chords in this Song’s tuning, capo and Key"
+                >Chord Finder</button
+              >
               {#if finePointer()}
                 <button
                   type="button"
@@ -611,6 +645,9 @@
            named by their toggles. Narrower, its parts follow the Lyric Sheet,
            always open. -->
       <div class="side">
+        {#if finderOpen && desktop.current}
+          {@render finder(false)}
+        {/if}
         {#each parts as { part, open: startsOpen } (part)}
           <details
             class="part {part}-part"
@@ -660,6 +697,25 @@
     {syncing}
     onRecording={(on) => (recording = on)}
   />
+{/if}
+
+{#snippet finder(sheet: boolean)}
+  {#if song}
+    <SongChordFinder
+      tuning={song.tuning}
+      capo={song.capo}
+      songKey={song.key}
+      transpose={writing ? 0 : transpose}
+      {sheet}
+      bind:triedTuning={finderTuning}
+      bind:pickedKey={finderKey}
+      onclose={closeFinder}
+    />
+  {/if}
+{/snippet}
+
+{#if finderOpen && !desktop.current}
+  {@render finder(true)}
 {/if}
 
 {#if showingShortcuts}

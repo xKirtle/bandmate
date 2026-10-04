@@ -1,6 +1,8 @@
 <script lang="ts">
   // The Chord Finder's three tabs: Look up, Name it and Suggest. Its own page
-  // shows it, and a Song is to show it too, in a side panel or a phone sheet.
+  // shows it, and a Song shows it too, in a side panel or a phone sheet. It
+  // lays itself out by its own width, not the window's, so a side panel gets
+  // the phone's layout.
   import { tick } from 'svelte';
   import ChordDiagram from './ChordDiagram.svelte';
   import {
@@ -25,12 +27,21 @@
     context,
     suggestKey,
     onpickkey,
+    keyPrompt,
   }: {
     context: FinderContext;
-    /** The Key Suggest suggests from, as its picker writes it (G, Em). */
-    suggestKey: string;
-    /** The user picked another Key for Suggest. */
-    onpickkey: (key: string) => void;
+    /**
+     * The Key Suggest suggests from: as its picker writes it (G, Em), or as
+     * a Song's Details write it when it's fixed. Null asks for one.
+     */
+    suggestKey: string | null;
+    /**
+     * The user picked another Key for Suggest. Without it, the Key is fixed
+     * and Suggest offers no picker.
+     */
+    onpickkey?: (key: string) => void;
+    /** Said above Suggest's Key picker: why a Key is asked for, if it is. */
+    keyPrompt?: string;
   } = $props();
 
   const tabs = [
@@ -116,12 +127,12 @@
   // Suggest: the Key's Chords, and what usually follows the Chord picked
   // after, if any. Picking another Key starts again with none picked.
   let after = $state<string | null>(null);
-  const suggested = $derived(suggest(suggestKey, after));
-  const chords = $derived(suggested.kind === 'key' ? suggested.chords : []);
+  const suggested = $derived(suggestKey === null ? null : suggest(suggestKey, after));
+  const chords = $derived(suggested?.kind === 'key' ? suggested.chords : []);
   const numeralOf = $derived(new Map(chords.map((c) => [c.chord, c.numeral])));
   const groups = $derived(
     [
-      { kind: 'diatonic', title: suggested.kind === 'key' ? 'In ' + suggested.key : '' },
+      { kind: 'diatonic', title: suggested?.kind === 'key' ? 'In ' + suggested.key : '' },
       { kind: 'borrowed', title: 'Borrowed' },
       { kind: 'secondary', title: 'Secondary dominants' },
     ]
@@ -129,10 +140,13 @@
       .filter((g) => g.chords.length),
   );
 
-  function pickKey(key: string) {
+  function pickKey(key: string | null) {
+    if (key === null) return;
     after = null;
-    onpickkey(key);
+    onpickkey?.(key);
   }
+  // The picker's Keys, with none picked while a Song with no Key asks for one.
+  const keyOptions: readonly (string | null)[] = keys;
 </script>
 
 {#snippet suggestions(list: Suggestion[], label: string)}
@@ -155,7 +169,7 @@
 {/snippet}
 
 <div class="finder">
-  <div class="bar">
+  <div class="tab-bar">
     <div class="tabs" role="tablist" aria-label="Chord Finder">
       {#each tabs as t, i (t.id)}
         <button
@@ -318,32 +332,41 @@
           </div>
         </div>
       {:else}
+        {#if keyPrompt}
+          <p class="muted">{keyPrompt}</p>
+        {/if}
         <div class="pick suggest-pick">
-          <div class="field">
-            <span id="finder-key-label">Key</span>
-            <Picker
-              id="finder-key"
-              aria-labelledby="finder-key-label"
-              options={keys}
-              value={suggestKey}
-              text={(key) => keyName(key) ?? key}
-              onpick={pickKey}
-            />
-          </div>
-          <div class="field">
-            <span id="finder-after-label">After</span>
-            <Picker
-              id="finder-after"
-              aria-labelledby="finder-after-label"
-              options={[null, ...chords.map((c) => c.chord)]}
-              value={after}
-              text={(chord) => (chord ? chord + ' · ' + numeralOf.get(chord) : 'Any Chord')}
-              onpick={(chord) => (after = chord)}
-            />
-          </div>
+          {#if onpickkey}
+            <div class="field">
+              <span id="finder-key-label">Key</span>
+              <Picker
+                id="finder-key"
+                aria-labelledby="finder-key-label"
+                options={keyOptions}
+                value={suggestKey}
+                text={(key) => (key === null ? 'Pick a Key' : (keyName(key) ?? key))}
+                onpick={pickKey}
+              />
+            </div>
+          {/if}
+          {#if suggested}
+            <div class="field">
+              <span id="finder-after-label">After</span>
+              <Picker
+                id="finder-after"
+                aria-labelledby="finder-after-label"
+                options={[null, ...chords.map((c) => c.chord)]}
+                value={after}
+                text={(chord) => (chord ? chord + ' · ' + numeralOf.get(chord) : 'Any Chord')}
+                onpick={(chord) => (after = chord)}
+              />
+            </div>
+          {/if}
         </div>
 
-        {#if suggested.kind === 'unreadable'}
+        {#if !suggested}
+          <!-- Nothing to suggest from until a Key is picked. -->
+        {:else if suggested.kind === 'unreadable'}
           <p class="unknown">No Key I know is called “{suggested.key}”.</p>
         {:else}
           {#if after && suggested.follows}
@@ -370,12 +393,13 @@
 
 <style>
   .finder {
+    container: finder / inline-size;
     border: 1px solid var(--border);
     border-radius: 0.75rem;
     background: var(--surface-1);
   }
   /* The tabs, and the left-handed setting at the end, on its own line on a narrow phone. */
-  .bar {
+  .tab-bar {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -436,7 +460,7 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.75rem;
   }
-  @media (min-width: 40rem) {
+  @container finder (min-width: 40rem) {
     .pick {
       grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr));
     }
@@ -444,7 +468,7 @@
   .name {
     grid-column: 1 / -1;
   }
-  @media (min-width: 40rem) {
+  @container finder (min-width: 40rem) {
     .name {
       grid-column: auto;
     }
@@ -495,7 +519,7 @@
     padding: 0;
     list-style: none;
   }
-  @media (min-width: 40rem) {
+  @container finder (min-width: 40rem) {
     .voicings {
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
@@ -536,7 +560,7 @@
     flex-direction: column;
     gap: 1rem;
   }
-  @media (min-width: 40rem) {
+  @container finder (min-width: 40rem) {
     .name-it {
       flex-direction: row-reverse;
       justify-content: flex-end;
@@ -551,7 +575,7 @@
     min-width: 0;
     min-height: 4.5rem;
   }
-  @media (min-width: 40rem) {
+  @container finder (min-width: 40rem) {
     .named {
       flex: 1;
     }
@@ -593,7 +617,7 @@
     max-width: 22rem;
     align-self: center;
   }
-  @media (min-width: 40rem) {
+  @container finder (min-width: 40rem) {
     .board {
       flex: 0 0 22rem;
       align-self: flex-start;
@@ -603,7 +627,7 @@
     align-self: flex-end;
   }
   /* Suggest: the Key and the Chord picked after, side by side. */
-  @media (min-width: 40rem) {
+  @container finder (min-width: 40rem) {
     .suggest-pick {
       grid-template-columns: repeat(2, minmax(0, 12rem));
     }
@@ -626,7 +650,7 @@
     padding: 0;
     list-style: none;
   }
-  @media (min-width: 40rem) {
+  @container finder (min-width: 40rem) {
     .suggestions {
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
