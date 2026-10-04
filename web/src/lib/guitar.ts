@@ -4,6 +4,7 @@
 // players use come first. So any tuning works.
 
 import type { Chord } from './chordTheory';
+import { readRoot } from './transpose';
 
 /** A barre: one finger flat across strings at a fret. Strings count from the lowest, 0. */
 export interface Barre {
@@ -135,4 +136,127 @@ export function guitarVoicings(chord: Chord, context: { tuning: readonly number[
   place(0, Infinity, -Infinity, false);
 
   return found.sort((a, b) => b.score - a.score || a.height - b.height).map((f) => f.voicing);
+}
+
+/** Standard tuning, its strings' pitches low to high, as MIDI note numbers (E2 A2 D3 G3 B3 E4). */
+export const standardTuning: readonly number[] = [40, 45, 50, 55, 59, 64];
+
+/**
+ * The named tunings, in the Details picker's order, each as its strings'
+ * notes, low to high, and the other names it's commonly written as, compared
+ * as `compact` leaves them.
+ */
+export const namedTunings: readonly { name: string; notes: string; aliases: string[] }[] = [
+  { name: 'Standard', notes: 'E A D G B E', aliases: ['estandard', 'std', 'estd'] },
+  {
+    name: 'Half-step down',
+    notes: 'Eb Ab Db Gb Bb Eb',
+    aliases: ['halfstep', 'halfstepdown', 'ebstandard', 'ebstd', 'd#standard', 'd#std', 'eb'],
+  },
+  { name: 'Drop D', notes: 'D A D G B E', aliases: [] },
+  { name: 'Drop C', notes: 'C G C F A D', aliases: [] },
+  { name: 'DADGAD', notes: 'D A D G A D', aliases: [] },
+  { name: 'Open G', notes: 'D G D G B D', aliases: [] },
+  { name: 'Open D', notes: 'D A D F# A D', aliases: [] },
+  { name: 'Open E', notes: 'E B E G# B E', aliases: [] },
+];
+
+/** A tuning's name as names are compared: lower case, with no spaces or hyphens, ♭ and ♯ as b and #, and no "tuning" after it. */
+function compact(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[\s-]+/g, '')
+    .replace(/♭/g, 'b')
+    .replace(/♯/g, '#')
+    .replace(/tuning$/, '');
+}
+
+/**
+ * Six notes as the strings' pitches, low to high: each in the octave nearest
+ * that string in standard tuning, the lower one when two are as near, as
+ * strings are tuned down more often than up.
+ */
+function pitchesOf(notes: number[]): number[] {
+  return notes.map((semitone, string) => {
+    const standard = standardTuning[string];
+    const up = (((semitone - standard) % 12) + 12) % 12;
+    return up < 6 ? standard + up : standard + up - 12;
+  });
+}
+
+/** A note as read: its semitone from C, and its name with a capital and # or b. */
+interface Note {
+  semitone: number;
+  name: string;
+}
+
+/** The note that is the whole of text, or null. */
+function readOneNote(text: string): Note | null {
+  const note = readRoot(text);
+  return note && note.length === text.length ? { semitone: note.semitone, name: tidy(text) } : null;
+}
+
+function tidy(note: string): string {
+  return note.replace('♯', '#').replace('♭', 'b');
+}
+
+/**
+ * Notes, low string to high, or null if text isn't only notes. Notes may be
+ * separated by spaces, commas or hyphens, each in any case, or run together
+ * as capitals (DADGBE), since a lower-case b there could be a flat or a B.
+ */
+function readNotes(text: string): Note[] | null {
+  const written = text.trim();
+  if (/[\s,-]/.test(written)) {
+    const notes = written.split(/[\s,-]+/).map((n) => readOneNote(n.charAt(0).toUpperCase() + n.slice(1)));
+    return notes.every((n) => n !== null) ? notes : null;
+  }
+  const notes: Note[] = [];
+  for (let at = 0; at < written.length;) {
+    const note = readRoot(written.slice(at));
+    if (!note) return null;
+    notes.push({ semitone: note.semitone, name: tidy(written.slice(at, at + note.length)) });
+    at += note.length;
+  }
+  return notes;
+}
+
+/**
+ * A tuning's text read: its strings' notes and pitches, low to high, and the
+ * named tuning it is, if any. Null if it can't be read: it's a named tuning,
+ * by its name or an alias, or six notes.
+ */
+function readTuningText(text: string): { notes: Note[]; pitches: number[]; name: string | null } | null {
+  const compacted = compact(text);
+  const byName = namedTunings.find((t) => compact(t.name) === compacted || t.aliases.includes(compacted));
+  const notes = readNotes(byName ? byName.notes : text);
+  if (notes?.length !== standardTuning.length) return null;
+  const pitches = pitchesOf(notes.map((n) => n.semitone));
+  const same = (t: (typeof namedTunings)[number]) =>
+    readNotes(t.notes)!.every((n, string) => n.semitone === notes[string].semitone);
+  return { notes, pitches, name: byName?.name ?? namedTunings.find(same)?.name ?? null };
+}
+
+/** A tuning's text as its strings' pitches, low to high, or null if it can't be read. */
+export function readGuitarTuning(text: string): number[] | null {
+  return readTuningText(text)?.pitches ?? null;
+}
+
+/** The named tuning a tuning's text reads as, or null if it's another or can't be read. */
+export function guitarTuningName(text: string): string | null {
+  return readTuningText(text)?.name ?? null;
+}
+
+/** A tuning's six notes, low to high, spaced, or null if it can't be read. */
+export function guitarTuningNotes(text: string): string | null {
+  return (
+    readTuningText(text)
+      ?.notes.map((n) => n.name)
+      .join(' ') ?? null
+  );
+}
+
+/** A tuning's text as the Details write it: its name if it has one, else its six notes spaced. Null if it can't be read. */
+export function guitarTuningText(text: string): string | null {
+  return guitarTuningName(text) ?? guitarTuningNotes(text);
 }
