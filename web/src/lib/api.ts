@@ -201,6 +201,8 @@ export interface Backup {
   beatLibrary: boolean;
   /** Its file's size, in bytes. */
   size: number;
+  /** A name of its own, shown in place of the automatic one; "" when it has none. */
+  name: string;
 }
 
 /**
@@ -664,6 +666,10 @@ export const api = {
   listBackups: () => request<Backup[]>('GET', '/backups'),
   /** Makes a Backup, answering once it's made, which takes as long as copying its Songs' files. */
   makeBackup: (contents: BackupContents) => request<Backup>('POST', '/backups', contents),
+  /** Gives a Backup a name of its own, or with a blank one, clears it back to the automatic one. */
+  renameBackup: (id: number, name: string) => request<Backup>('PATCH', `/backups/${id}`, { name }),
+  /** Deletes a Backup and its file. */
+  deleteBackup: (id: number) => request<null>('DELETE', `/backups/${id}`),
   /** Where a Backup's file downloads from, as one file. */
   backupDownloadUrl: (id: number) => `/api/backups/${id}/file`,
 

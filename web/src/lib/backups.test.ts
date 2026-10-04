@@ -1,35 +1,45 @@
 import { describe, expect, it } from 'vitest';
-import { backupName, backupSize } from './backups';
+import { automaticName, backupName, backupSize } from './backups';
 
 // 18:30 on 4 Oct 2026, in the time zone the tests run in.
 const made = new Date(2026, 9, 4, 18, 30).toISOString();
 
 describe('backupName', () => {
+  it('is the name of its own a Backup was given', () => {
+    expect(backupName({ createdAt: made, songs: 3, name: 'Before the big rewrite' })).toBe('Before the big rewrite');
+  });
+
+  it('is the automatic one while it has none', () => {
+    expect(backupName({ createdAt: made, songs: 3, name: '' })).toBe('4 Oct 2026 · 3 Songs');
+  });
+});
+
+describe('automaticName', () => {
   it('names a Backup after the day it was made and how many Songs it holds', () => {
-    expect(backupName({ createdAt: made, songs: 3 })).toBe('4 Oct 2026 · 3 Songs');
+    expect(automaticName({ createdAt: made, songs: 3 })).toBe('4 Oct 2026 · 3 Songs');
   });
 
   it('says Song for one', () => {
-    expect(backupName({ createdAt: made, songs: 1 })).toBe('4 Oct 2026 · 1 Song');
+    expect(automaticName({ createdAt: made, songs: 1 })).toBe('4 Oct 2026 · 1 Song');
   });
 
   it('names a Backup of every Song as one of that many Songs', () => {
-    expect(backupName({ createdAt: made, songs: 3, allSongs: true })).toBe('4 Oct 2026 · 3 Songs');
+    expect(automaticName({ createdAt: made, songs: 3, allSongs: true })).toBe('4 Oct 2026 · 3 Songs');
   });
 
   it('names a Backup of only the Beat Library after it', () => {
-    expect(backupName({ createdAt: made, songs: 0, beatLibrary: true })).toBe('4 Oct 2026 · Beat Library');
+    expect(automaticName({ createdAt: made, songs: 0, beatLibrary: true })).toBe('4 Oct 2026 · Beat Library');
   });
 
   it('names a Backup of chosen Songs and the Beat Library after both', () => {
-    expect(backupName({ createdAt: made, songs: 2, beatLibrary: true })).toBe('4 Oct 2026 · 2 Songs + Beat Library');
+    expect(automaticName({ createdAt: made, songs: 2, beatLibrary: true })).toBe('4 Oct 2026 · 2 Songs + Beat Library');
   });
 
   it('names a Backup of every Song and the Beat Library Everything', () => {
-    expect(backupName({ createdAt: made, songs: 3, allSongs: true, beatLibrary: true })).toBe(
+    expect(automaticName({ createdAt: made, songs: 3, allSongs: true, beatLibrary: true })).toBe(
       '4 Oct 2026 · Everything',
     );
-    expect(backupName({ createdAt: made, songs: 0, allSongs: true, beatLibrary: true })).toBe(
+    expect(automaticName({ createdAt: made, songs: 0, allSongs: true, beatLibrary: true })).toBe(
       '4 Oct 2026 · Everything',
     );
   });
@@ -37,7 +47,7 @@ describe('backupName', () => {
   it('gives every month its three-letter name', () => {
     const months = Array.from(
       { length: 12 },
-      (_, m) => backupName({ createdAt: new Date(2026, m, 15).toISOString(), songs: 2 }).split(' ')[1],
+      (_, m) => automaticName({ createdAt: new Date(2026, m, 15).toISOString(), songs: 2 }).split(' ')[1],
     );
     expect(months).toEqual(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']);
   });
@@ -45,7 +55,7 @@ describe('backupName', () => {
   it('takes the day where the Backup is shown, not where it was made', () => {
     // Just after midnight here can still be the day before in UTC.
     const justAfterMidnight = new Date(2026, 9, 5, 0, 10).toISOString();
-    expect(backupName({ createdAt: justAfterMidnight, songs: 2 })).toBe('5 Oct 2026 · 2 Songs');
+    expect(automaticName({ createdAt: justAfterMidnight, songs: 2 })).toBe('5 Oct 2026 · 2 Songs');
   });
 });
 

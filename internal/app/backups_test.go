@@ -27,6 +27,8 @@ type backup struct {
 	BeatLibrary bool `json:"beatLibrary"`
 	// Size is its file's size in bytes.
 	Size int64 `json:"size"`
+	// Name is the name of its own it's been given, "" for none.
+	Name string `json:"name"`
 }
 
 func backupPath(id int64) string {
@@ -434,4 +436,105 @@ func TestABackupOfChosenSongsCanHoldTheBeatLibraryToo(t *testing.T) {
 	expectSame(t, ts, held, timelinePath(s.ID))
 	expectSame(t, ts, held, beatPath(used.ID)+"/audio")
 	expectSame(t, ts, held, beatPath(unused.ID)+"/audio")
+}
+
+// renameBackup gives a Backup a name of its own, or with "" clears it, and
+// returns the Backup.
+func (ts *testServer) renameBackup(id int64, name string) backup {
+	ts.t.Helper()
+	res := ts.Do(http.MethodPatch, backupPath(id), map[string]any{"name": name})
+	expectStatus(ts.t, res, http.StatusOK)
+	var b backup
+	res.JSON(ts.t, &b)
+	return b
+}
+
+func TestABackupHasNoNameOfItsOwnAtFirst(t *testing.T) {
+	ts := newTestServer(t)
+	ts.createSong("Night Drive")
+
+	if made := ts.backUp(map[string]any{"allSongs": true}); made.Name != "" {
+		t.Errorf("name = %q, want none", made.Name)
+	}
+}
+
+func TestABackupCanBeGivenANameOfItsOwnAndHaveItClearedBackToTheAutomaticOne(t *testing.T) {
+	ts := newTestServer(t)
+	ts.createSong("Night Drive")
+	made := ts.backUp(map[string]any{"allSongs": true})
+	file := ts.downloadBackup(made.ID).Body
+
+	named := ts.renameBackup(made.ID, "  Before the big rewrite ")
+
+	want := made
+	want.Name = "Before the big rewrite"
+	if named != want {
+		t.Errorf("renamed = %+v, want %+v", named, want)
+	}
+	if list := ts.listBackups(); len(list) != 1 || list[0] != want {
+		t.Errorf("backups = %+v, want only %+v", list, want)
+	}
+	if renamed := ts.renameBackup(made.ID, "After the rewrite"); renamed.Name != "After the rewrite" {
+		t.Errorf("renamed again = %q, want %q", renamed.Name, "After the rewrite")
+	}
+	if !bytes.Equal(ts.downloadBackup(made.ID).Body, file) {
+		t.Error("renaming the Backup changed its file")
+	}
+
+	if cleared := ts.renameBackup(made.ID, "   "); cleared != made {
+		t.Errorf("cleared = %+v, want %+v", cleared, made)
+	}
+	if list := ts.listBackups(); len(list) != 1 || list[0] != made {
+		t.Errorf("backups = %+v, want only %+v", list, made)
+	}
+}
+
+func TestRenamingABackupThatDoesntExistIsNotFound(t *testing.T) {
+	ts := newTestServer(t)
+
+	res := ts.Do(http.MethodPatch, backupPath(1), map[string]any{"name": "Before the big rewrite"})
+
+	expectStatus(t, res, http.StatusNotFound)
+}
+
+func TestDeletingABackupRemovesItAndItsFile(t *testing.T) {
+	ts := newTestServer(t)
+	ts.createSong("Night Drive")
+	kept := ts.backUp(map[string]any{"allSongs": true})
+	deleted := ts.backUp(map[string]any{"allSongs": true})
+
+	res := ts.Do(http.MethodDelete, backupPath(deleted.ID), nil)
+
+	expectStatus(t, res, http.StatusNoContent)
+	if list := ts.listBackups(); len(list) != 1 || list[0] != kept {
+		t.Errorf("backups = %+v, want only %+v", list, kept)
+	}
+	expectStatus(t, ts.Do(http.MethodGet, backupPath(deleted.ID)+"/file", nil), http.StatusNotFound)
+	entries, err := os.ReadDir(filepath.Join(ts.DataDir, "backups"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != strconv.FormatInt(kept.ID, 10) {
+		var names []string
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		t.Errorf("backups directory holds %v, want only the kept Backup's file", names)
+	}
+	ts.downloadBackup(kept.ID)
+
+	expectStatus(t, ts.Do(http.MethodDelete, backupPath(deleted.ID), nil), http.StatusNotFound)
+}
+
+func TestBackupsAreKeptWhenBandmateRestarts(t *testing.T) {
+	ts := newTestServer(t)
+	ts.createSong("Night Drive")
+	made := ts.renameBackup(ts.backUp(map[string]any{"allSongs": true}).ID, "Before the big rewrite")
+
+	restarted := startTestServer(t, ts.DataDir)
+
+	if list := restarted.listBackups(); len(list) != 1 || list[0] != made {
+		t.Errorf("backups after restarting = %+v, want only %+v", list, made)
+	}
+	restarted.downloadBackup(made.ID)
 }

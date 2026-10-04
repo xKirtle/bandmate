@@ -6,11 +6,16 @@ import { formatSize } from './upload';
 // to "Sept".
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+/** A Backup's name: the one of its own it was given, or else the automatic one. */
+export function backupName(backup: Pick<Backup, 'createdAt' | 'name'> & Contents): string {
+  return backup.name || automaticName(backup);
+}
+
 /**
  * A Backup's automatic name, from the day it was made, where it's shown,
  * and what it holds: "4 Oct 2026 · 3 Songs", "4 Oct 2026 · Everything".
  */
-export function backupName(backup: Pick<Backup, 'createdAt'> & Contents): string {
+export function automaticName(backup: Pick<Backup, 'createdAt'> & Contents): string {
   const made = new Date(backup.createdAt);
   const day = `${made.getDate()} ${months[made.getMonth()]} ${made.getFullYear()}`;
   return `${day} · ${contentsName(backup)}`;
