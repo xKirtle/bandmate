@@ -1,19 +1,18 @@
 // The Chord Finder: a built-in reference for Chords. This module is its one
 // seam: the instrument-agnostic Chord theory (chordTheory.ts) and the guitar
-// Instrument (guitar.ts) sit behind it (ADR 0012) and can be reorganised
-// freely.
+// Instrument (guitar.ts, and its tunings in guitarTuning.ts) sit behind it
+// (ADR 0012) and can be reorganised freely.
 
 import { readChord } from './chordTheory';
+import { guitarVoicings, type Voicing } from './guitar';
 import {
   guitarTuningName,
   guitarTuningNotes,
   guitarTuningText,
-  guitarVoicings,
   namedTunings,
   readGuitarTuning,
   standardTuning,
-  type Voicing,
-} from './guitar';
+} from './guitarTuning';
 
 export { qualities, roots, type Quality } from './chordTheory';
 export type { Voicing } from './guitar';

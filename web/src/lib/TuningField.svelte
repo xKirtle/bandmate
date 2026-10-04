@@ -9,11 +9,14 @@
   // kept and shown as written, until another tuning is picked.
   let {
     id,
+    labelledby,
     value = $bindable(''),
     oncommit,
     oninvalid,
   }: {
     id: string;
+    /** The id of what labels the picker. */
+    labelledby: string;
     /** The tuning as text, as the Song holds it. */
     value?: string;
     /** `value` was set to a tuning to save. */
@@ -22,25 +25,25 @@
     oninvalid: (message: string) => void;
   } = $props();
 
-  type Choice = { kind: 'none' } | { kind: 'named'; name: string } | { kind: 'custom' } | { kind: 'written' };
+  type Choice = { kind: 'none' } | { kind: 'named'; name: string } | { kind: 'custom' } | { kind: 'unreadable' };
 
   const none: Choice = { kind: 'none' };
   const named: Choice[] = tunings.map((name) => ({ kind: 'named', name }));
   const custom: Choice = { kind: 'custom' };
-  const written: Choice = { kind: 'written' };
+  const unreadable: Choice = { kind: 'unreadable' };
 
   // Picking Custom shows the notes before any are saved.
   let customising = $state(false);
 
   /** What `value` is: no tuning, a named one, six other notes, or text that can't be read. */
-  const reads = $derived.by((): Choice => {
+  const valueChoice = $derived.by((): Choice => {
     if (!value.trim()) return none;
     const name = tuningName(value);
     if (name) return named[tunings.indexOf(name)];
-    return tuningNotes(value) ? custom : written;
+    return tuningNotes(value) ? custom : unreadable;
   });
-  const choice = $derived(customising ? custom : reads);
-  const options = $derived([none, ...named, custom, ...(reads === written ? [written] : [])]);
+  const choice = $derived(customising ? custom : valueChoice);
+  const options = $derived([none, ...named, custom, ...(valueChoice === unreadable ? [unreadable] : [])]);
 
   // The notes being typed for a custom tuning: those of the tuning picked so
   // far, or standard tuning's.
@@ -55,7 +58,7 @@
         return c.name;
       case 'custom':
         return 'Custom';
-      case 'written':
+      case 'unreadable':
         return value.trim();
     }
   }
@@ -70,7 +73,7 @@
       return;
     }
     customising = false;
-    if (c.kind === 'written') return;
+    if (c.kind === 'unreadable') return;
     value = c.kind === 'named' ? c.name : '';
     oncommit();
   }
@@ -89,12 +92,12 @@
 
   // Custom notes as saved show in the field, and change as the Song does.
   $effect(() => {
-    if (reads === custom && !customising) notes = value.trim();
+    if (valueChoice === custom && !customising) notes = value.trim();
   });
 </script>
 
 <div class="tuning-field">
-  <Picker {id} aria-labelledby="{id}-label" {options} value={choice} text={label} onpick={pick} />
+  <Picker {id} aria-labelledby={labelledby} {options} value={choice} text={label} onpick={pick} />
   {#if choice === custom}
     <input
       class="notes"

@@ -548,6 +548,7 @@
                 <span id="song-tuning-label">Tuning</span>
                 <TuningField
                   id="song-tuning"
+                  labelledby="song-tuning-label"
                   bind:value={draft.tuning}
                   oncommit={() => commitText('tuning')}
                   oninvalid={(message) => (saveError = message)}
