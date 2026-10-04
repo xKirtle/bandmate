@@ -1,7 +1,7 @@
 // Adding several Beats at once: the review table's rows, one per file, and
 // the rules for when they can be added.
 import type { Beat, DecodedAudio } from './api';
-import { invalidFields, sameDraft, type BeatDraft } from './beatDraft';
+import { invalidFields, sameDraft, toDraft, type BeatDraft } from './beatDraft';
 
 /** One file in the batch, from picking it until its Beat is saved or it's removed. */
 export interface BatchRow {
@@ -35,6 +35,23 @@ export function tickedState(rows: readonly Pick<BatchRow, 'status' | 'ticked'>[]
   const ticked = tickable.filter((row) => row.ticked).length;
   if (ticked === 0) return 'none';
   return ticked === tickable.length ? 'all' : 'some';
+}
+
+/**
+ * Ticks or unticks, as `on` says, every row that can be ticked from the one
+ * clicked last to the one clicked now, in the table's order, as shift-clicking
+ * does. With the last one gone, only the one clicked now.
+ */
+export function tickRange(
+  rows: readonly Pick<BatchRow, 'key' | 'status' | 'ticked'>[],
+  lastKey: number,
+  key: number,
+  on: boolean,
+) {
+  const to = rows.findIndex((row) => row.key === key);
+  const last = rows.findIndex((row) => row.key === lastKey);
+  const from = last === -1 ? to : last;
+  for (const row of rows.slice(Math.min(from, to), Math.max(from, to) + 1)) if (canTick(row)) row.ticked = on;
 }
 
 /** Whether any row has details typed over the ones its file suggested, which cancelling would lose. */
@@ -76,4 +93,28 @@ export function alreadyIn(
   if (beat) return { in: 'library', title: beat.title };
   // Keys count up as files are picked, so a lower key was picked earlier.
   return rows.some((r) => r.key < row.key && same(r.file.name, r.file.size)) ? { in: 'batch' } : null;
+}
+
+/** A field the bar above the table can set on every ticked row at once. */
+export type SharedField = 'producer' | 'sourceLink' | 'bpm' | 'key' | 'notes';
+
+/** Sets one field to one value on every ticked row, over whatever it held. */
+export function setOnTicked(rows: readonly Pick<BatchRow, 'ticked' | 'draft'>[], field: SharedField, value: string) {
+  for (const row of rows) if (row.ticked) row.draft[field] = value;
+}
+
+/** Whether a row would refuse this value for this field, as it would if it were typed into it. */
+export function invalidShared(field: SharedField, value: string): boolean {
+  const draft = { ...toDraft({ title: 'Any' }), [field]: value };
+  return (invalidFields(draft) as string[]).includes(field);
+}
+
+/**
+ * A row's details once its file is read: what the file suggested, under any
+ * field set on the row from the bar while it was still being read.
+ */
+export function draftOnceRead(draft: BeatDraft, suggested: BeatDraft): BeatDraft {
+  const read = { ...suggested };
+  for (const field of Object.keys(draft) as (keyof BeatDraft)[]) if (draft[field] !== '') read[field] = draft[field];
+  return read;
 }
