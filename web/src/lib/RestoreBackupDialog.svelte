@@ -212,8 +212,8 @@
     {#if replacingAny}
       <p class="warning" role="note">
         Replacing a Song makes it the Backup’s version entirely: anything it has now that the Backup’s doesn’t, such as
-        newer Takes, Sounds, Masters or its Cover, is lost. Replacing a Beat gives it the Backup’s title and credit in
-        every Song using it.
+        newer Takes, Sounds, Masters or its Cover, is lost. Replacing a Beat gives it the Backup’s title, credit, BPM,
+        Key and Notes in every Song using it, keeping its audio.
       </p>
     {/if}
     {#if error}

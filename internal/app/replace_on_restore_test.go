@@ -61,10 +61,11 @@ func TestARestoreListsTheSongsAndBeatsAlreadyInBandmate(t *testing.T) {
 	}
 }
 
-func TestAReplacedBeatTakesTheBackupsTitleAndCreditForEverySongUsingIt(t *testing.T) {
+func TestAReplacedBeatTakesTheBackupsDetailsForEverySongUsingIt(t *testing.T) {
 	ts := newTestServer(t)
 	used := ts.uploadBeat(fakeAudio("used.mp3").with(map[string]any{
 		"title": "Used", "producer": "Kai", "sourceLink": "https://example.com/used",
+		"bpm": 92, "key": "Am", "notes": "as backed up",
 	}))
 	s, other := ts.createSong("Night Drive"), ts.createSong("Midnight")
 	timelineChange(t, ts.addBeatToSong(s.ID, used.ID))
@@ -72,7 +73,7 @@ func TestAReplacedBeatTakesTheBackupsTitleAndCreditForEverySongUsingIt(t *testin
 	made := ts.backUp(map[string]any{"songs": []int64{s.ID}})
 	audio := ts.Do(http.MethodGet, beatPath(used.ID)+"/audio", nil).Body
 	expectStatus(t, ts.Do(http.MethodPatch, beatPath(used.ID), map[string]any{
-		"title": "Used Again", "producer": "Someone", "sourceLink": "", "notes": "kept here",
+		"title": "Used Again", "producer": "Someone", "sourceLink": "", "bpm": nil, "key": "C", "notes": "newer",
 	}), http.StatusOK)
 
 	restored := ts.restoreReplacing(made.ID, []int64{s.ID}, nil, []int64{used.ID})
@@ -85,8 +86,9 @@ func TestAReplacedBeatTakesTheBackupsTitleAndCreditForEverySongUsingIt(t *testin
 		t.Fatalf("beats = %+v, want only the one replaced, in its place", beats)
 	}
 	b := ts.getBeat(used.ID)
-	if b.Title != "Used" || b.Producer != "Kai" || b.SourceLink != "https://example.com/used" || b.Notes != "kept here" {
-		t.Errorf("beat = %+v, want the Backup's title and credit, and the rest as it was", b)
+	if b.Title != "Used" || b.Producer != "Kai" || b.SourceLink != "https://example.com/used" ||
+		b.BPM == nil || *b.BPM != 92 || b.Key != "Am" || b.Notes != "as backed up" {
+		t.Errorf("beat = %+v, want the Backup's Details: title, credit, BPM, Key and Notes", b)
 	}
 	if got := sorted(beatSongTitles(b)); !reflect.DeepEqual(got, []string{"Midnight", "Night Drive", "Night Drive (restored)"}) {
 		t.Errorf("songs using the beat = %q, want both it had and the one restored", got)

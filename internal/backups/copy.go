@@ -46,8 +46,11 @@ var songTables = []songTable{
 	{name: "loops", where: `song_id = ?1`},
 	{name: "tracks", where: `song_id = ?1`},
 	// A Beat replaced keeps its place in every Song using it, and its audio,
-	// taking only the Backup's title and credit.
-	{name: "beats", shared: true, replacedInPlace: []string{"title", "producer", "source_link"}, where: `id IN (SELECT c.beat_id FROM src.clips c
+	// taking the Backup's Details: its title, credit (producer and source
+	// link), BPM, Key and Notes.
+	{name: "beats", shared: true,
+		replacedInPlace: []string{"title", "producer", "source_link", "bpm", "beat_key", "notes"},
+		where: `id IN (SELECT c.beat_id FROM src.clips c
 		JOIN src.tracks t ON t.id = c.track_id WHERE t.song_id = ?1)`},
 	{name: "sounds", where: `id IN (SELECT c.sound_id FROM src.clips c
 		JOIN src.tracks t ON t.id = c.track_id WHERE t.song_id = ?1)`},

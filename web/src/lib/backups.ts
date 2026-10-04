@@ -54,7 +54,8 @@ export function replaceConfirmation(songs: BackupPresent[], beats: BackupPresent
   ];
   const lost = [
     songs.length > 0 && 'A Song replaced loses whatever it has now that the Backup’s version doesn’t.',
-    beats.length > 0 && 'A Beat replaced takes the Backup’s title and credit in every Song using it.',
+    beats.length > 0 &&
+      'A Beat replaced takes the Backup’s title, credit, BPM, Key and Notes in every Song using it, and keeps its audio.',
   ].filter(Boolean);
   return (
     `Replace ${counts.join(' and ')} with the Backup’s ${one ? 'version' : 'versions'}?\n\n${named.join('\n')}\n\n` +

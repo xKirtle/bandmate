@@ -81,14 +81,16 @@ describe('replaceConfirmation', () => {
       'Replace 1 Song and 1 Beat with the Backup’s versions?\n\n' +
         'Song: Night Drive II\nBeat: Used Again\n\n' +
         'A Song replaced loses whatever it has now that the Backup’s version doesn’t. ' +
-        'A Beat replaced takes the Backup’s title and credit in every Song using it. This can’t be undone.',
+        'A Beat replaced takes the Backup’s title, credit, BPM, Key and Notes in every Song using it, and keeps its audio. ' +
+        'This can’t be undone.',
     );
   });
 
   it('says what replacing loses only for the kinds replaced', () => {
     const beat = { id: 6, title: 'Used', inBandmate: { id: 2, title: 'Used' } };
     expect(replaceConfirmation([], [beat]).split('\n\n')[2]).toBe(
-      'A Beat replaced takes the Backup’s title and credit in every Song using it. This can’t be undone.',
+      'A Beat replaced takes the Backup’s title, credit, BPM, Key and Notes in every Song using it, and keeps its audio. ' +
+        'This can’t be undone.',
     );
   });
 

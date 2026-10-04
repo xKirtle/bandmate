@@ -78,8 +78,8 @@ type Replace struct {
 // Beats restored with it. A Song replaced is the Backup's version entirely,
 // keeping its id, with a version past the one it had, so a write based on
 // that is refused; what it had that the Backup's doesn't is gone. A Beat
-// replaced keeps its place in every Song using it, taking the Backup's
-// title and credit.
+// replaced keeps its id, its audio and its place in every Song using it,
+// taking the Backup's Details.
 func (s *Store) Restore(ctx context.Context, id int64, songs []int64, replace Replace) ([]Song, error) {
 	r, err := s.openBackup(ctx, id)
 	if err != nil {
