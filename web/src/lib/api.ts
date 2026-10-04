@@ -189,6 +189,19 @@ export interface SongSummary {
   updatedAt: string;
 }
 
+/** A copy of Songs kept in Bandmate, to restore from or download as one file. */
+export interface Backup {
+  id: number;
+  createdAt: string;
+  /** How many Songs it holds. */
+  songs: number;
+  /** Its file's size, in bytes. */
+  size: number;
+}
+
+/** What a new Backup holds: every Song, or the Songs picked, each with the Beats its Clips use. */
+export type BackupContents = { allSongs: true } | { songs: number[] };
+
 /** Details the user enters about a Beat. "" and null mean "not set"; only the title is required. */
 export interface BeatDetails {
   title: string;
@@ -638,6 +651,13 @@ export const api = {
    */
   beatAudioUrl: (beat: Pick<Beat, 'id' | 'fileName' | 'size' | 'duration'>) =>
     `/api/beats/${beat.id}/audio?v=${encodeURIComponent(`${beat.fileName}-${beat.size}-${beat.duration}`)}`,
+
+  /** The Backups, newest first. */
+  listBackups: () => request<Backup[]>('GET', '/backups'),
+  /** Makes a Backup, answering once it's made, which takes as long as copying its Songs' files. */
+  makeBackup: (contents: BackupContents) => request<Backup>('POST', '/backups', contents),
+  /** Where a Backup's file downloads from, as one file. */
+  backupDownloadUrl: (id: number) => `/api/backups/${id}/file`,
 
   listSongs: (filter: SongFilter = {}) => {
     const params = new URLSearchParams();

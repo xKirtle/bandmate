@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/xKirtle/bandmate/internal/audio"
+	"github.com/xKirtle/bandmate/internal/backups"
 	"github.com/xKirtle/bandmate/internal/beats"
 	"github.com/xKirtle/bandmate/internal/build"
 	"github.com/xKirtle/bandmate/internal/db"
@@ -67,6 +68,8 @@ type App struct {
 	db    *sql.DB
 	songs *lyricsheet.Store
 	beats *beats.Store
+	// backups makes and keeps Backups, in the data directory.
+	backups *backups.Store
 	// timelines owns Songs' Timelines, which are kept apart from the Song
 	// aggregate: most changes to a Song don't need them sent back.
 	timelines *timeline.Store
@@ -124,10 +127,20 @@ func New(cfg Config) (*App, error) {
 			return nil, err
 		}
 	}
+	now := time.Now
+	if cfg.Now != nil {
+		now = cfg.Now
+	}
+	backupStore, err := backups.Open(conn, cfg.DataDir, now)
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
 	a := &App{
 		db:          conn,
 		songs:       lyricsheet.NewStore(conn, masterFiles, coverFiles, takeFiles, soundFiles),
 		beats:       beats.NewStore(conn, beatFiles),
+		backups:     backupStore,
 		timelines:   timeline.NewStore(conn, takeFiles, soundFiles),
 		beatFiles:   beatFiles,
 		masterFiles: masterFiles,
@@ -147,10 +160,6 @@ func New(cfg Config) (*App, error) {
 	}
 	if a.build == (build.Info{}) {
 		a.build = build.Current()
-	}
-	now := time.Now
-	if cfg.Now != nil {
-		now = cfg.Now
 	}
 	a.startedAt = now()
 	a.dependencies = shipped(cfg.GoModules, cfg.SPA)
@@ -260,6 +269,9 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("DELETE /api/beats/{id}", a.deleteBeat)
 	mux.HandleFunc("PUT /api/beats/{id}/file", a.replaceBeatFile)
 	mux.HandleFunc("GET /api/beats/{id}/audio", a.beatAudio)
+	mux.HandleFunc("GET /api/backups", a.listBackups)
+	mux.HandleFunc("POST /api/backups", a.makeBackup)
+	mux.HandleFunc("GET /api/backups/{id}/file", a.backupFile)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not found")
 	})
