@@ -1,0 +1,128 @@
+<script lang="ts">
+  import { tick } from 'svelte';
+  import { tuningName, tuningNotes, tunings, tuningText } from './chordFinder';
+  import Picker from './Picker.svelte';
+
+  // A Song's tuning in its Details: a picker of the named tunings, or six
+  // notes for a custom one. It stays text on the Song: the picker writes a
+  // tuning's name, or its six notes. Text that can't be read (ADR 0008) is
+  // kept and shown as written, until another tuning is picked.
+  let {
+    id,
+    value = $bindable(''),
+    oncommit,
+    oninvalid,
+  }: {
+    id: string;
+    /** The tuning as text, as the Song holds it. */
+    value?: string;
+    /** `value` was set to a tuning to save. */
+    oncommit: () => void;
+    /** Custom notes couldn't be read, so nothing was saved. */
+    oninvalid: (message: string) => void;
+  } = $props();
+
+  type Choice = { kind: 'none' } | { kind: 'named'; name: string } | { kind: 'custom' } | { kind: 'written' };
+
+  const none: Choice = { kind: 'none' };
+  const named: Choice[] = tunings.map((name) => ({ kind: 'named', name }));
+  const custom: Choice = { kind: 'custom' };
+  const written: Choice = { kind: 'written' };
+
+  // Picking Custom shows the notes before any are saved.
+  let customising = $state(false);
+
+  /** What `value` is: no tuning, a named one, six other notes, or text that can't be read. */
+  const reads = $derived.by((): Choice => {
+    if (!value.trim()) return none;
+    const name = tuningName(value);
+    if (name) return named[tunings.indexOf(name)];
+    return tuningNotes(value) ? custom : written;
+  });
+  const choice = $derived(customising ? custom : reads);
+  const options = $derived([none, ...named, custom, ...(reads === written ? [written] : [])]);
+
+  // The notes being typed for a custom tuning: those of the tuning picked so
+  // far, or standard tuning's.
+  let notes = $state('');
+  let notesField = $state<HTMLInputElement>();
+
+  function label(c: Choice): string {
+    switch (c.kind) {
+      case 'none':
+        return '—';
+      case 'named':
+        return c.name;
+      case 'custom':
+        return 'Custom';
+      case 'written':
+        return value.trim();
+    }
+  }
+
+  async function pick(c: Choice) {
+    if (c.kind === 'custom') {
+      notes = tuningNotes(value) ?? tuningNotes(tunings[0])!;
+      customising = true;
+      await tick();
+      notesField?.focus();
+      notesField?.select();
+      return;
+    }
+    customising = false;
+    if (c.kind === 'written') return;
+    value = c.kind === 'named' ? c.name : '';
+    oncommit();
+  }
+
+  function commitNotes() {
+    const text = tuningText(notes);
+    if (!text) {
+      oninvalid('A custom tuning is six notes, low string to high, like D A D G B E');
+      return;
+    }
+    customising = false;
+    notes = text;
+    value = text;
+    oncommit();
+  }
+
+  // Custom notes as saved show in the field, and change as the Song does.
+  $effect(() => {
+    if (reads === custom && !customising) notes = value.trim();
+  });
+</script>
+
+<div class="tuning-field">
+  <Picker {id} aria-labelledby="{id}-label" {options} value={choice} text={label} onpick={pick} />
+  {#if choice === custom}
+    <input
+      class="notes"
+      bind:this={notesField}
+      bind:value={notes}
+      onchange={commitNotes}
+      aria-label="Custom tuning: six notes, low string to high"
+      autocomplete="off"
+      autocapitalize="characters"
+      spellcheck="false"
+      enterkeyhint="done"
+      placeholder="E A D G B E"
+    />
+  {/if}
+</div>
+
+<style>
+  .tuning-field {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+  }
+  /* Side by side when there's room, else the notes under the picker. */
+  .tuning-field > :global(.picker) {
+    flex: 1 1 9rem;
+  }
+  .notes {
+    flex: 1 1 8.5rem;
+    min-width: 0;
+  }
+</style>

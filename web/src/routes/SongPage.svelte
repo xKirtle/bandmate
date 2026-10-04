@@ -21,6 +21,7 @@
   import SongCover from '../lib/SongCover.svelte';
   import StatusBadge from '../lib/StatusBadge.svelte';
   import Timeline from '../lib/Timeline.svelte';
+  import TuningField from '../lib/TuningField.svelte';
   import type { Saved } from '../lib/history';
   import { takeNewFlag } from '../lib/newSong';
   import { navigate, replaceSearch, router } from '../lib/router.svelte';
@@ -132,8 +133,6 @@
 
   // How tall the docked Timeline is, which the side column stops above.
   let timelineHeight = $state(0);
-
-  const commonTunings = ['Standard', 'Drop D', 'Half step down', 'DADGAD', 'Open G', 'Open D'];
 
   $effect(() => {
     Promise.all([api.getSong(id), api.getTimeline(id)]).then(
@@ -545,20 +544,15 @@
                   placeholder="—"
                 />
               </label>
-              <label class="field tuning" for="song-tuning">
-                Tuning
-                <Combobox
+              <div class="field tuning">
+                <span id="song-tuning-label">Tuning</span>
+                <TuningField
                   id="song-tuning"
                   bind:value={draft.tuning}
-                  options={commonTunings}
-                  saved={song.tuning}
-                  onpick={() => commitText('tuning')}
-                  onchange={() => commitText('tuning')}
-                  autocomplete="off"
-                  enterkeyhint="done"
-                  placeholder="—"
+                  oncommit={() => commitText('tuning')}
+                  oninvalid={(message) => (saveError = message)}
                 />
-              </label>
+              </div>
               {@render notesToggle()}
             </div>
             {#if notesOpen}
@@ -844,8 +838,9 @@
   .capo input {
     width: 3.75rem;
   }
+  /* Grows to fit a custom tuning's notes beside the picker. */
   .tuning {
-    flex: 0 1 9rem;
+    flex: 0 1 auto;
     min-width: 6rem;
   }
   .notes-toggle {
