@@ -362,7 +362,6 @@
   fieldset {
     display: flex;
     flex-direction: column;
-    min-height: 0;
     margin: 0;
     padding: 0;
     border: 0;
