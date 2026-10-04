@@ -22,6 +22,10 @@ export interface Voicing {
 
 /** The highest fret a Voicing reaches, counted from the capo. */
 const highestFret = 12;
+/** The highest fret a first-position Voicing, like the open Chords, reaches. */
+const firstPositionFret = 3;
+/** How many bass strings may be muted under the bass: the 6th and 5th, for a bass on the 4th. */
+const mutedUnder = 2;
 /** The most frets a hand spans: from its lowest fretted note to its highest, 3 apart is 4 frets. */
 const widestStretch = 3;
 const fingers = 4;
@@ -49,6 +53,10 @@ function barreFor(frets: (number | null)[]): { barre?: Barre } | null {
  * strings, a lower position and a smaller stretch. A muted string above the
  * sounding ones costs twice what one below them does: a bass string is just
  * not strummed, but a treble one has to be damped by a fretting finger.
+ * Open strings only count for a Voicing in first position, every finger on
+ * the 3rd fret or below, like the open Chords players learn first. Up the
+ * neck an open string counts a little against it: an unusual sound and a
+ * reach (Bm's x24432 before x20402).
  */
 function score(frets: (number | null)[], lowestIsRoot: boolean): number {
   const fretted = frets.filter((f): f is number => f !== null && f > 0);
@@ -57,7 +65,10 @@ function score(frets: (number | null)[], lowestIsRoot: boolean): number {
   const mutedAbove = [...frets].reverse().findIndex((f) => f !== null);
   const position = fretted.length ? Math.min(...fretted) : 0;
   const stretch = fretted.length ? Math.max(...fretted) - position : 0;
-  return (lowestIsRoot ? 15 : 0) + 3 * open - 2 * mutedBelow - 4 * mutedAbove - 2 * position - stretch;
+  const firstPosition = fretted.every((f) => f <= firstPositionFret);
+  return (
+    (lowestIsRoot ? 15 : 0) + (firstPosition ? 3 : -2) * open - 2 * mutedBelow - 4 * mutedAbove - 2 * position - stretch
+  );
 }
 
 /** The sum of a Voicing's frets, which breaks a tie in score: the lower the hand, the sooner. */
@@ -66,7 +77,8 @@ const height = (frets: (number | null)[]) => frets.reduce<number>((sum, f) => su
 /**
  * Every playable Voicing of a Chord on a guitar, best first. A Voicing holds
  * every tone the Chord can't do without, sounds nothing outside it, has no
- * muted string between sounding ones, and fits a hand: four frets, four
+ * muted string between sounding ones, has its bass on the 6th, 5th or 4th
+ * string (treble strings may be muted), and fits a hand: four frets, four
  * fingers, a barre counting as one. A slash Chord's bass is its lowest note.
  */
 export function guitarVoicings(chord: Chord, context: { tuning: readonly number[]; capo: number }): Voicing[] {
@@ -101,10 +113,13 @@ export function guitarVoicings(chord: Chord, context: { tuning: readonly number[
   function place(string: number, low: number, high: number, ended: boolean) {
     if (string === tuning.length) return finish();
     const soundingYet = frets.some((f) => f !== null);
-    frets.push(null);
-    // Once a string is muted after sounding ones, every string above it is muted too.
-    place(string + 1, low, high, soundingYet);
-    frets.pop();
+    // Once a string is muted after sounding ones, every string above it is
+    // muted too. Under the bass, only the 6th and 5th strings may be muted.
+    if (soundingYet || string < mutedUnder) {
+      frets.push(null);
+      place(string + 1, low, high, soundingYet);
+      frets.pop();
+    }
     if (ended) return;
     for (let fret = 0; fret <= highestFret; fret++) {
       const pc = pitchClass(string, fret);

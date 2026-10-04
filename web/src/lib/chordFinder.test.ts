@@ -173,6 +173,11 @@ describe('Voicings in standard tuning', () => {
     expect(voicingsOf('F')[0]).toBe('133211');
   });
 
+  it('ranks a barre before a Voicing that mixes open strings with a reach up the neck', () => {
+    expect(voicingsOf('Bm')[0]).toBe('x24432');
+    expect(voicingsOf('B')[0]).toBe('x24442');
+  });
+
   it('returns Voicings all the way up to the 12th fret, and none past it', () => {
     const all = voicingsOf('G');
     expect(all).toContain('355433');
@@ -208,6 +213,14 @@ describe('Voicings in standard tuning', () => {
     for (const name of ['G', 'C7', 'Fmaj7', 'Bm7b5']) {
       for (const s of voicingsOf(name)) expect(s, `${name} ${s}`).toMatch(/^x*[^x]+x*$/);
     }
+  });
+
+  it('mutes at most the 6th and 5th strings under the bass, so the bass is on the 6th, 5th or 4th', () => {
+    for (const name of ['C', 'Am', 'G7', 'C/G', 'Bm', 'F#m7b5', 'E5']) {
+      for (const s of voicingsOf(name)) expect(s, `${name} ${s}`).not.toMatch(/^xxx/);
+    }
+    expect(voicingsOf('D')[0]).toBe('xx0232');
+    expect(voicingsOf('C7')).toContain('x3231x');
   });
 
   it('keeps the stretch to four frets and the fingers to four, a barre counting as one', () => {
