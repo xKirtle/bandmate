@@ -36,7 +36,12 @@ func (s *Store) Songs(ctx context.Context, id int64) ([]Song, error) {
 		return nil, err
 	}
 	defer r.close()
-	rows, err := r.db.QueryContext(ctx, `SELECT id, title FROM songs ORDER BY title COLLATE NOCASE, id`)
+	return querySongs(ctx, r.db, `SELECT id, title FROM songs ORDER BY title COLLATE NOCASE, id`)
+}
+
+// querySongs lists the Songs query selects, by id and title.
+func querySongs(ctx context.Context, q querier, query string) ([]Song, error) {
+	rows, err := q.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -84,11 +89,10 @@ func (s *Store) Restore(ctx context.Context, id int64, songs []int64) ([]Song, e
 			return nil, fmt.Errorf("restoring song %d: %w", song, err)
 		}
 	}
-	// Done with on its own: from here it's read attached to the live database.
-	if err := r.db.Close(); err != nil {
+	// From here it's read attached to the live database.
+	if err := r.closeDB(); err != nil {
 		return nil, err
 	}
-	r.db = nil
 	return s.copyIn(ctx, r.staging, picked)
 }
 
@@ -126,10 +130,19 @@ func (s *Store) openBackup(ctx context.Context, id int64) (*openedBackup, error)
 	return r, nil
 }
 
-func (r *openedBackup) close() {
-	if r.db != nil {
-		r.db.Close()
+// closeDB closes the Backup's database, leaving it in the staging directory.
+func (r *openedBackup) closeDB() error {
+	if r.db == nil {
+		return nil
 	}
+	err := r.db.Close()
+	r.db = nil
+	return err
+}
+
+// close closes the Backup and removes its staging directory.
+func (r *openedBackup) close() {
+	r.closeDB()
 	r.file.Close()
 	if r.staging != "" {
 		os.RemoveAll(r.staging)
@@ -241,23 +254,11 @@ func (s *Store) copyIn(ctx context.Context, staging string, songs []int64) (rest
 	if err != nil {
 		return nil, err
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT s.id, s.title FROM main.songs s
+	restored, err = querySongs(ctx, tx, `SELECT s.id, s.title FROM main.songs s
 		JOIN temp.restored r ON r.tbl = 'songs' AND r.new = s.id ORDER BY s.title COLLATE NOCASE, s.id`)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	for rows.Next() {
-		var song Song
-		if err := rows.Scan(&song.ID, &song.Title); err != nil {
-			return nil, err
-		}
-		restored = append(restored, song)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	rows.Close()
 	return restored, tx.Commit()
 }
 
@@ -315,11 +316,11 @@ func copyTableIn(ctx context.Context, tx *sql.Tx, t songTable, columns []string,
 	values := make([]string, len(columns))
 	for i, c := range columns {
 		switch {
-		case c == "id" && hasIDs:
+		case c == "id":
 			values[i] = freshID(t.name, c)
 		case references[c] != "":
 			values[i] = freshID(references[c], c)
-		case c == "identity" && keepsBoth:
+		case c == "identity":
 			values[i] = `CASE WHEN k.kept_both THEN NULL ELSE r.identity END`
 		case c == "title" && keepsBoth:
 			values[i] = `CASE WHEN k.kept_both THEN r.title || '` + keptBothSuffix + `' ELSE r.title END`

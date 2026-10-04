@@ -20,9 +20,8 @@ import (
 // where picks them from the database they're copied from, attached as
 // "src" (the live one when backing up, the Backup's when restoring), given
 // a Song's id as its one parameter for a Song's tables, and nothing for the
-// Beat Library's. Detached Takes, and
-// Sounds no Clip uses, are kept only for undo, which never outlasts a
-// session, so a Backup leaves them out.
+// Beat Library's. Detached Takes, and Sounds no Clip uses, are kept only
+// for undo, which never outlasts a session, so a Backup leaves them out.
 type songTable struct {
 	name  string
 	where string
