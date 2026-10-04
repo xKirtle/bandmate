@@ -104,6 +104,13 @@ func TestABackupOfChosenSongsIsListedWithItsSizeAndDownloadsAsOneFile(t *testing
 // directory, so what it holds can be read through the API.
 func openBackup(t *testing.T, file []byte) *testServer {
 	t.Helper()
+	return startTestServer(t, openBackupDir(t, file))
+}
+
+// openBackupDir unpacks a downloaded Backup's file into a directory, laid
+// out like a data directory, and returns it.
+func openBackupDir(t *testing.T, file []byte) string {
+	t.Helper()
 	zr, err := zip.NewReader(bytes.NewReader(file), int64(len(file)))
 	if err != nil {
 		t.Fatalf("reading backup: %v", err)
@@ -127,7 +134,7 @@ func openBackup(t *testing.T, file []byte) *testServer {
 			t.Fatal(err)
 		}
 	}
-	return startTestServer(t, dir)
+	return dir
 }
 
 // expectSame fails the test unless both servers answer a GET of path alike.
