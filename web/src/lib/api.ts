@@ -197,6 +197,8 @@ export interface Backup {
   songs: number;
   /** Whether its Songs are every Song there was. */
   allSongs: boolean;
+  /** How many Beats it holds, with those its Songs bring. */
+  beats: number;
   /** Whether it holds the whole Beat Library. With allSongs, it's Everything. */
   beatLibrary: boolean;
   /** Its file's size, in bytes. */
@@ -207,10 +209,10 @@ export interface Backup {
 
 /**
  * What a new Backup holds: every Song, the Songs picked, or none, each with
- * the Beats its Clips use, and the whole Beat Library or not. Every Song and
- * the Beat Library is Everything.
+ * the Beats its Clips use, and every Beat (the whole Beat Library), the
+ * Beats picked, or none. Every Song and the Beat Library is Everything.
  */
-export type BackupContents = ({ allSongs: true } | { songs: number[] }) & { beatLibrary?: boolean };
+export type BackupContents = ({ allSongs: true } | { songs: number[] }) & ({ beatLibrary: true } | { beats: number[] });
 
 /** A Song a Backup holds, by its id in the Backup, or one a Restore brought back, by its id here. */
 export interface BackupSong {

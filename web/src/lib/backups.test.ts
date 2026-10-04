@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { automaticName, backupName, backupSize, newBackup, replaceConfirmation, restoredName } from './backups';
+import {
+  automaticName,
+  backupName,
+  backupSize,
+  beatsBrought,
+  broughtNote,
+  newBackup,
+  replaceConfirmation,
+  restoredName,
+} from './backups';
 
 // 18:30 on 4 Oct 2026, in the time zone the tests run in.
 const made = new Date(2026, 9, 4, 18, 30).toISOString();
@@ -42,6 +51,14 @@ describe('automaticName', () => {
     expect(automaticName({ createdAt: made, songs: 0, allSongs: true, beatLibrary: true })).toBe(
       '4 Oct 2026 · Everything',
     );
+  });
+
+  it('counts every Beat a Backup holds without the Beat Library, with those its Songs bring', () => {
+    expect(automaticName({ createdAt: made, songs: 2, beats: 4 })).toBe('4 Oct 2026 · 2 Songs + 4 Beats');
+    expect(automaticName({ createdAt: made, songs: 3, allSongs: true, beats: 1 })).toBe(
+      '4 Oct 2026 · 3 Songs + 1 Beat',
+    );
+    expect(automaticName({ createdAt: made, songs: 0, beats: 5 })).toBe('4 Oct 2026 · 5 Beats');
   });
 
   it('gives every month its three-letter name', () => {
@@ -114,57 +131,128 @@ describe('restoredName', () => {
   });
 });
 
-describe('newBackup', () => {
-  const there = { songIds: [1, 2, 3], beats: 4 };
-  const everySong = new Set(there.songIds);
+describe('beatsBrought', () => {
+  const beats = [
+    { id: 10, songs: [{ id: 1 }] },
+    { id: 11, songs: [{ id: 1 }, { id: 2 }] },
+    { id: 12, songs: [] },
+  ];
 
-  it('is Everything with every Song and the Beat Library, as the dialog opens', () => {
-    expect(newBackup({ songsTicked: true, picked: everySong, beatLibrary: true }, there)).toEqual({
+  it('is the Beats the picked Songs use', () => {
+    expect(beatsBrought([2], beats)).toEqual(new Set([11]));
+    expect(beatsBrought([1, 3], beats)).toEqual(new Set([10, 11]));
+    expect(beatsBrought([], beats)).toEqual(new Set());
+  });
+});
+
+describe('broughtNote', () => {
+  it('says how many Beats the picked Songs bring', () => {
+    expect(broughtNote(3, 3)).toBe('Brings the 3 Beats they use');
+    expect(broughtNote(2, 1)).toBe('Brings the 1 Beat they use');
+    expect(broughtNote(1, 2)).toBe('Brings the 2 Beats it uses');
+    expect(broughtNote(1, 0)).toBe('Brings no Beats');
+  });
+});
+
+describe('newBackup', () => {
+  // Song 1 uses Beats 10 and 11, Song 2 uses 11, Song 3 none; 12 and 13 no Song.
+  const there = {
+    songIds: [1, 2, 3],
+    beats: [
+      { id: 10, songs: [{ id: 1 }] },
+      { id: 11, songs: [{ id: 1 }, { id: 2 }] },
+      { id: 12, songs: [] },
+      { id: 13, songs: [] },
+    ],
+  };
+  const everySong = new Set(there.songIds);
+  const everyBeat = new Set([10, 11, 12, 13]);
+  const opened = { songsTicked: true, picked: everySong, beatsTicked: true, pickedBeats: everyBeat };
+
+  it('is Everything with every Song and every Beat, as the dialog opens', () => {
+    expect(newBackup(opened, there)).toEqual({
       contents: { allSongs: true, beatLibrary: true },
       name: 'Everything',
     });
   });
 
-  it('is Everything whether the Songs were ticked one by one or left at the default', () => {
-    expect(newBackup({ songsTicked: true, picked: new Set([3, 1, 2]), beatLibrary: true }, there)).toMatchObject({
-      name: 'Everything',
-    });
+  it('is Everything whether the Songs and Beats were ticked one by one or left at the default', () => {
+    expect(newBackup({ ...opened, picked: new Set([3, 1, 2]), pickedBeats: new Set([13, 12, 11, 10]) }, there)).toEqual(
+      { contents: { allSongs: true, beatLibrary: true }, name: 'Everything' },
+    );
   });
 
   it('asks for the Songs picked when only some are', () => {
-    expect(newBackup({ songsTicked: true, picked: new Set([2]), beatLibrary: true }, there)).toEqual({
+    expect(newBackup({ ...opened, picked: new Set([2]) }, there)).toEqual({
       contents: { songs: [2], beatLibrary: true },
       name: '1 Song + Beat Library',
     });
   });
 
-  it('asks for every Song without the Beat Library when it is unticked', () => {
-    expect(newBackup({ songsTicked: true, picked: everySong, beatLibrary: false }, there)).toEqual({
-      contents: { allSongs: true, beatLibrary: false },
-      name: '3 Songs',
+  it('asks for the Beats picked when only some are, counting those the Songs bring', () => {
+    expect(newBackup({ ...opened, picked: new Set([2]), pickedBeats: new Set([12]) }, there)).toEqual({
+      contents: { songs: [2], beats: [11, 12] },
+      name: '1 Song + 2 Beats',
     });
   });
 
-  it('leaves the picks out while Songs is unticked', () => {
-    expect(newBackup({ songsTicked: false, picked: new Set([1]), beatLibrary: true }, there)).toEqual({
+  it('asks for chosen Beats alone while Songs is unticked', () => {
+    expect(newBackup({ ...opened, songsTicked: false, pickedBeats: new Set([10, 13]) }, there)).toEqual({
+      contents: { songs: [], beats: [10, 13] },
+      name: '2 Beats',
+    });
+  });
+
+  it('is the Beat Library when every Beat is ticked, some because the picked Songs use them', () => {
+    expect(newBackup({ ...opened, picked: new Set([1]), pickedBeats: new Set([12, 13]) }, there)).toEqual({
+      contents: { songs: [1], beatLibrary: true },
+      name: '1 Song + Beat Library',
+    });
+  });
+
+  it('counts the Beats the picked Songs bring while the Beat Library is unticked', () => {
+    expect(newBackup({ ...opened, beatsTicked: false }, there)).toEqual({
+      contents: { allSongs: true, beats: [] },
+      name: '3 Songs + 2 Beats',
+    });
+    expect(newBackup({ ...opened, picked: new Set([3]), beatsTicked: false }, there)).toEqual({
+      contents: { songs: [3], beats: [] },
+      name: '1 Song',
+    });
+  });
+
+  it('leaves the Song picks out while Songs is unticked', () => {
+    expect(newBackup({ ...opened, songsTicked: false, picked: new Set([1]) }, there)).toEqual({
       contents: { songs: [], beatLibrary: true },
       name: 'Beat Library',
     });
   });
 
   it('says what is missing when nothing is ticked, naming only what can be', () => {
-    const none = { songsTicked: false, picked: everySong, beatLibrary: false };
+    const none = { ...opened, songsTicked: false, beatsTicked: false };
     expect(newBackup(none, there)).toEqual({ missing: 'Tick Songs or the Beat Library.' });
-    expect(newBackup(none, { ...there, beats: 0 })).toEqual({ missing: 'Tick Songs.' });
-    expect(newBackup(none, { songIds: [], beats: 4 })).toEqual({ missing: 'Tick the Beat Library.' });
+    expect(newBackup(none, { ...there, beats: [] })).toEqual({ missing: 'Tick Songs.' });
+    expect(newBackup(none, { ...there, songIds: [] })).toEqual({ missing: 'Tick the Beat Library.' });
   });
 
   it('says what is missing when Songs is ticked with none picked, even with the Beat Library', () => {
-    expect(newBackup({ songsTicked: true, picked: new Set(), beatLibrary: true }, there)).toEqual({
-      missing: 'Pick a Song, or untick Songs.',
+    expect(newBackup({ ...opened, picked: new Set() }, there)).toEqual({ missing: 'Pick a Song, or untick Songs.' });
+    expect(newBackup({ ...opened, picked: new Set(), beatsTicked: false }, there)).toEqual({ missing: 'Pick a Song.' });
+  });
+
+  it('says what is missing when the Beat Library is ticked with no Beat picked', () => {
+    expect(newBackup({ ...opened, picked: new Set([3]), pickedBeats: new Set() }, there)).toEqual({
+      missing: 'Pick a Beat, or untick the Beat Library.',
     });
-    expect(newBackup({ songsTicked: true, picked: new Set(), beatLibrary: false }, there)).toEqual({
-      missing: 'Pick a Song.',
+    expect(newBackup({ ...opened, songsTicked: false, pickedBeats: new Set() }, there)).toEqual({
+      missing: 'Pick a Beat.',
+    });
+  });
+
+  it('takes a Beat the picked Songs use as picked, even with none of your own', () => {
+    expect(newBackup({ ...opened, picked: new Set([2]), pickedBeats: new Set() }, there)).toEqual({
+      contents: { songs: [2], beats: [11] },
+      name: '1 Song + 1 Beat',
     });
   });
 });

@@ -23,6 +23,8 @@ type backup struct {
 	Songs int `json:"songs"`
 	// AllSongs tells whether it holds every Song there was.
 	AllSongs bool `json:"allSongs"`
+	// Beats is how many Beats it holds, with those its Songs bring.
+	Beats int `json:"beats"`
 	// BeatLibrary tells whether it holds the whole Beat Library.
 	BeatLibrary bool `json:"beatLibrary"`
 	// Size is its file's size in bytes.
@@ -328,9 +330,9 @@ func TestABackupMustPickSomethingThatExists(t *testing.T) {
 	s := ts.createSong("Night Drive")
 
 	expectError(t, ts.Do(http.MethodPost, "/api/backups", map[string]any{}),
-		http.StatusBadRequest, "pick at least one Song, or the Beat Library")
+		http.StatusBadRequest, "pick at least one Song or Beat")
 	expectError(t, ts.Do(http.MethodPost, "/api/backups", map[string]any{"songs": []int64{}}),
-		http.StatusBadRequest, "pick at least one Song, or the Beat Library")
+		http.StatusBadRequest, "pick at least one Song or Beat")
 	expectError(t, ts.Do(http.MethodPost, "/api/backups", map[string]any{"songs": []int64{}, "beatLibrary": true}),
 		http.StatusBadRequest, "there's nothing to back up")
 	expectError(t, ts.Do(http.MethodPost, "/api/backups", map[string]any{"songs": []int64{s.ID, s.ID + 1}}),
