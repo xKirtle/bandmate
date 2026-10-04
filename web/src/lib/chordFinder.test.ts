@@ -148,33 +148,33 @@ describe('slash basses', () => {
 });
 
 /** A Voicing written low string to high, x for muted, a fret above 9 in brackets: x32010. */
-function shape(frets: (number | null)[]): string {
+function written(frets: (number | null)[]): string {
   return frets.map((f) => (f === null ? 'x' : f > 9 ? `(${f})` : String(f))).join('');
 }
 
-/** Every Voicing of a Chord, written as shapes, best first. */
-function shapes(name: string, tuning = standard, capo = 0): string[] {
+/** Every Voicing of a Chord, written out, best first. */
+function voicingsOf(name: string, tuning = standard, capo = 0): string[] {
   const found = lookUp(name, { tuning, capo });
-  return found.kind === 'chord' ? found.voicings.map((v) => shape(v.frets)) : [];
+  return found.kind === 'chord' ? found.voicings.map((v) => written(v.frets)) : [];
 }
 
 describe('Voicings in standard tuning', () => {
-  it('ranks the shapes most players use first', () => {
-    expect(shapes('C')[0]).toBe('x32010');
-    expect(shapes('G')[0]).toBe('320003');
-    expect(shapes('E')[0]).toBe('022100');
-    expect(shapes('Am')[0]).toBe('x02210');
-    expect(shapes('D')[0]).toBe('xx0232');
-    expect(shapes('Em')[0]).toBe('022000');
-    expect(shapes('A7')[0]).toBe('x02020');
+  it('ranks the Voicings most players use first', () => {
+    expect(voicingsOf('C')[0]).toBe('x32010');
+    expect(voicingsOf('G')[0]).toBe('320003');
+    expect(voicingsOf('E')[0]).toBe('022100');
+    expect(voicingsOf('Am')[0]).toBe('x02210');
+    expect(voicingsOf('D')[0]).toBe('xx0232');
+    expect(voicingsOf('Em')[0]).toBe('022000');
+    expect(voicingsOf('A7')[0]).toBe('x02020');
   });
 
   it('ranks the F barre first, up the neck from the open strings', () => {
-    expect(shapes('F')[0]).toBe('133211');
+    expect(voicingsOf('F')[0]).toBe('133211');
   });
 
   it('returns Voicings all the way up to the 12th fret, and none past it', () => {
-    const all = shapes('G');
+    const all = voicingsOf('G');
     expect(all).toContain('355433');
     expect(all).toContain('x(10)(12)(12)(12)(10)');
     const found = lookUp('G', context);
@@ -184,29 +184,29 @@ describe('Voicings in standard tuning', () => {
   });
 
   it('ranks open and low Voicings before ones up the neck', () => {
-    const all = shapes('G');
+    const all = voicingsOf('G');
     expect(all.indexOf('320003')).toBeLessThan(all.indexOf('355433'));
     expect(all.indexOf('355433')).toBeLessThan(all.indexOf('x(10)(12)(12)(12)(10)'));
   });
 
-  it('only returns shapes with the root and the third, or the sus note, or the fifth for a 5 Chord', () => {
+  it('only returns Voicings with the root and the third, or the sus note, or the fifth for a 5 Chord', () => {
     // E on the 6th string, B on the 5th: no G#, so not an E.
-    expect(shapes('E')).not.toContain('022xxx');
-    expect(shapes('E5')).toContain('022xxx');
-    expect(shapes('Asus4')).toContain('x02230');
-    expect(shapes('Dsus2')[0]).toBe('xx0230');
+    expect(voicingsOf('E')).not.toContain('022xxx');
+    expect(voicingsOf('E5')).toContain('022xxx');
+    expect(voicingsOf('Asus4')).toContain('x02230');
+    expect(voicingsOf('Dsus2')[0]).toBe('xx0230');
   });
 
   it('may leave out the fifth of a larger Chord, but not an altered one', () => {
     // C7 with no G: C E Bb C.
-    expect(shapes('C7')).toContain('x3231x');
+    expect(voicingsOf('C7')).toContain('x3231x');
     // B dim needs its F: B D B is no B dim.
-    expect(shapes('Bdim')).not.toContain('x204xx');
+    expect(voicingsOf('Bdim')).not.toContain('x204xx');
   });
 
   it('never mutes a string between sounding strings', () => {
     for (const name of ['G', 'C7', 'Fmaj7', 'Bm7b5']) {
-      for (const s of shapes(name)) expect(s, `${name} ${s}`).toMatch(/^x*[^x]+x*$/);
+      for (const s of voicingsOf(name)) expect(s, `${name} ${s}`).toMatch(/^x*[^x]+x*$/);
     }
   });
 
@@ -218,7 +218,7 @@ describe('Voicings in standard tuning', () => {
         const fretted = v.frets.filter((f): f is number => f !== null && f > 0);
         if (fretted.length) expect(Math.max(...fretted) - Math.min(...fretted)).toBeLessThanOrEqual(3);
         const fingers = v.barre ? 1 + fretted.filter((f) => f > v.barre!.fret).length : fretted.length;
-        expect(fingers, `${name} ${shape(v.frets)}`).toBeLessThanOrEqual(4);
+        expect(fingers, `${name} ${written(v.frets)}`).toBeLessThanOrEqual(4);
       }
     }
   });
@@ -233,18 +233,18 @@ describe('Voicings in standard tuning', () => {
   });
 
   it("puts a slash Chord's bass lowest", () => {
-    expect(shapes('G/B')[0]).toBe('x20003');
-    expect(shapes('D/F#')[0]).toBe('200232');
+    expect(voicingsOf('G/B')[0]).toBe('x20003');
+    expect(voicingsOf('D/F#')[0]).toBe('200232');
     const found = lookUp('C/G', context);
     if (found.kind !== 'chord') throw new Error('C/G should read');
     for (const v of found.voicings) {
       const lowest = v.frets.findIndex((f) => f !== null);
-      expect((standard[lowest] + v.frets[lowest]!) % 12, shape(v.frets)).toBe(7);
+      expect((standard[lowest] + v.frets[lowest]!) % 12, written(v.frets)).toBe(7);
     }
   });
 
   it("doesn't put the same Voicing in twice", () => {
-    const all = shapes('Am7');
+    const all = voicingsOf('Am7');
     expect(new Set(all).size).toBe(all.length);
   });
 });

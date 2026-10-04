@@ -43,12 +43,15 @@
   const pages = $derived(Math.ceil(voicings.length / pageSize));
   const shown = $derived(voicings.slice(page * pageSize, (page + 1) * pageSize));
 
-  function type(e: Event & { currentTarget: HTMLInputElement }) {
+  function typeName(e: Event & { currentTarget: HTMLInputElement }) {
     name = e.currentTarget.value;
     page = 0;
-    const read = lookUp(name, context);
-    if (read.kind === 'chord') picked = { root: read.root, quality: read.quality, bass: read.bass };
   }
+
+  // The pickers follow a typed name once it can be read.
+  $effect.pre(() => {
+    if (found.kind === 'chord') picked = { root: found.root, quality: found.quality, bass: found.bass };
+  });
 
   function pick(change: Partial<typeof picked>) {
     picked = { ...picked, ...change };
@@ -95,7 +98,7 @@
               id="finder-name"
               type="text"
               value={name}
-              oninput={type}
+              oninput={typeName}
               autocomplete="off"
               autocapitalize="off"
               spellcheck="false"

@@ -1,8 +1,9 @@
 // The app's one navigation: the nav rail on wide windows, the bottom tab bar
 // on narrow ones, with the same pages in both.
 
-/** A top-level list the navigation leads to. */
-export type LibraryPage = 'songs' | 'beats';
+/** The top-level lists the navigation leads to. */
+const lists = ['songs', 'beats'] as const;
+export type LibraryPage = (typeof lists)[number];
 
 /** A top-level page the navigation leads to: the lists and the Chord Finder. */
 export type MainPage = LibraryPage | 'chords';
@@ -24,7 +25,7 @@ export const pages = [
 ] as const satisfies readonly NavLink<MainPage>[];
 
 /** Whether a main page is a list, which the navigation returns to as it was left. */
-const isList = (page: MainPage): page is LibraryPage => page === 'songs' || page === 'beats';
+const isList = (page: MainPage): page is LibraryPage => (lists as readonly MainPage[]).includes(page);
 
 /**
  * About, pinned to the bottom of the nav rail, and the last tab of the tab

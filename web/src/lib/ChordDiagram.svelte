@@ -1,6 +1,6 @@
 <script lang="ts">
   // Draws a guitar Voicing as a chord diagram: the strings upright, the low
-  // string on the left, the nut (or the fret the shape starts at, up the
+  // string on the left, the nut (or the fret the Voicing starts at, up the
   // neck) at the top. Above it, ○ marks a string that rings open and × one
   // that's muted. "How to play a Chord" on the Lyric Sheet is to reuse it.
   import type { Voicing } from './chordFinder';
@@ -22,8 +22,8 @@
   const height = top + rows * fretGap + bottom;
 
   /**
-   * The fret the diagram's first row is: 1, under the nut, for a shape that
-   * fits there, else the lowest fret the shape presses.
+   * The fret the diagram's first row is: 1, under the nut, for a Voicing that
+   * fits there, else the lowest fret the Voicing presses.
    */
   const start = $derived.by(() => {
     const fretted = voicing.frets.filter((f): f is number => f !== null && f > 0);

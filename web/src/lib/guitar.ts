@@ -1,5 +1,5 @@
 // The guitar, the Chord Finder's one Instrument so far (ADR 0012). Its
-// Voicings are generated, not read from a table: every playable shape of a
+// Voicings are generated, not read from a table: every playable Voicing of a
 // Chord on the fretboard of the tuning in use, ranked so the ones most
 // players use come first. So any tuning works.
 
@@ -16,7 +16,7 @@ export interface Barre {
 export interface Voicing {
   /** Each string's fret, low string to high, counted from the capo: 0 for open, null for muted. */
   frets: (number | null)[];
-  /** The barre the shape needs, if it can't be played with four fingers otherwise. */
+  /** The barre the Voicing needs, if it can't be played with four fingers otherwise. */
   barre?: Barre;
 }
 
@@ -27,10 +27,10 @@ const widestStretch = 3;
 const fingers = 4;
 
 /**
- * How a shape is fingered: with no barre, or with one across the strings at
+ * How a Voicing is played: with no barre, or with one across the strings at
  * its lowest fret. Null if it takes more than four fingers either way.
  */
-function fingering(frets: (number | null)[]): { barre?: Barre } | null {
+function barreFor(frets: (number | null)[]): { barre?: Barre } | null {
   const fretted = frets.filter((f): f is number => f !== null && f > 0);
   if (fretted.length <= fingers) return {};
   const fret = Math.min(...fretted);
@@ -87,13 +87,13 @@ export function guitarVoicings(chord: Chord, context: { tuning: readonly number[
     if (sounding.slice(1).some((pc) => !tones.has(pc))) return;
     if (chord.bass !== null && sounding[0] !== chord.bass) return;
     if (!required.every((pc) => sounding.includes(pc))) return;
-    const fingered = fingering(frets);
-    if (!fingered) return;
-    const shape = [...frets];
+    const barre = barreFor(frets);
+    if (!barre) return;
+    const played = [...frets];
     found.push({
-      voicing: { frets: shape, ...fingered },
-      score: score(shape, sounding[0] === lowest),
-      height: height(shape),
+      voicing: { frets: played, ...barre },
+      score: score(played, sounding[0] === lowest),
+      height: height(played),
     });
   }
 
