@@ -199,3 +199,44 @@ export function readChord(text: string): Chord | null {
     notes,
   };
 }
+
+/**
+ * The Chord names that fit notes sounding, best first: every root and
+ * quality from the known set whose tones hold every note sounding and every
+ * tone the quality can't do without. A lowest note that isn't the root is a
+ * slash bass. Notes are semitones from C, 0–11, lowest first.
+ *
+ * Readings with the root as the lowest note come first, then the ones whose
+ * bass is a tone of the Chord, then the simpler names, with fewer tones.
+ */
+export function nameNotes(notes: readonly number[]): string[] {
+  const bass = notes[0];
+  const sounding = new Set(notes);
+  const found: { name: string; bassRank: number; size: number }[] = [];
+  for (const root of sounding) {
+    for (const quality of qualities) {
+      const at = quality.tones.map((t) => (root + t.semitones) % 12);
+      const required = at.filter((_, i) => !quality.tones[i].optional);
+      if (![...sounding].every((n) => at.includes(n))) continue;
+      if (!required.every((n) => sounding.has(n))) continue;
+      const chord = readChord(common[root] + quality.suffix)!;
+      const bassName = bass === root ? '' : '/' + chord.notes[at.indexOf(bass)];
+      found.push({ name: chord.name + bassName, bassRank: bass === root ? 0 : 1, size: at.length });
+    }
+  }
+  return found.sort((a, b) => a.bassRank - b.bassRank || a.size - b.size).map((f) => f.name);
+}
+
+/**
+ * Notes sounding, each once in the order given, spelled as a Chord they're
+ * read as spells them (D# in B, not Eb), or the common way with none.
+ * Notes are semitones from C, 0–11.
+ */
+export function spellNotes(notes: readonly number[], reading: string | null): string[] {
+  const chord = reading ? readChord(reading) : null;
+  const spelled = (n: number) => {
+    const i = chord ? chord.quality.tones.findIndex((t) => (chord.root + t.semitones) % 12 === n) : -1;
+    return chord && i >= 0 ? chord.notes[i] : common[n];
+  };
+  return [...new Set(notes)].map(spelled);
+}

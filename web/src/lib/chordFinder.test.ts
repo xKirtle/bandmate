@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   lookUp,
+  nameIt,
   qualities,
   readTuning,
   roots,
@@ -493,5 +494,65 @@ describe('writing a tuning', () => {
     expect(tuningNotes('Eb standard')).toBe('Eb Ab Db Gb Bb Eb');
     expect(tuningNotes('c,g,d,g,b,d')).toBe('C G D G B D');
     expect(tuningNotes('Nashville')).toBeNull();
+  });
+});
+
+/** Frets written as a shape, low string to high: x32010. */
+function shape(written: string): (number | null)[] {
+  return [...written].map((c) => (c === 'x' ? null : Number(c)));
+}
+
+/** The readings of a shape, best first, or null when no reading fits. */
+function readings(written: string, ctx = context): string[] | null {
+  const named = nameIt(shape(written), ctx);
+  return named.kind === 'chord' ? named.readings : null;
+}
+
+describe('naming a shape', () => {
+  it('reads x32010 as C', () => {
+    expect(readings('x32010')).toEqual(['C']);
+  });
+
+  it('offers every reading of an ambiguous shape, the root in the bass first: Am7, then C6/A for x02010', () => {
+    expect(readings('x02010')?.slice(0, 2)).toEqual(['Am7', 'C6/A']);
+  });
+
+  it('ranks a reading with the root in the bass before a simpler one without', () => {
+    expect(readings('x32210')).toEqual(['C6', 'Am/C']);
+  });
+
+  it('gives readings Look up reads back as the same Chord', () => {
+    for (const s of ['x32010', 'x02010', 'x32210', '2x0232', 'x24442', '133211']) {
+      for (const name of readings(s) ?? []) expect(reads(name)).toBe(name);
+    }
+  });
+
+  it('reads a slash Chord from its bass: D/F# for 2x0232', () => {
+    expect(readings('2x0232')?.[0]).toBe('D/F#');
+  });
+
+  it('reads the shape on the strings of the tuning in use', () => {
+    const dropD = { tuning: readTuning('Drop D')!, capo: 0 };
+    expect(readings('000232', dropD)?.[0]).toBe('D');
+    expect(readings('x32010', dropD)?.[0]).toBe('C');
+  });
+
+  it('counts frets from the capo, so a shape reads as the Chord fingered: capo 2’s 320003 is G', () => {
+    expect(readings('320003', { tuning: standard, capo: 2 })?.[0]).toBe('G');
+  });
+
+  it('lists the notes sounding, low string to high, each once, spelled as the best reading spells them', () => {
+    expect(nameIt(shape('x02010'), context)).toMatchObject({ notes: ['A', 'E', 'G', 'C'] });
+    expect(nameIt(shape('x24442'), context)).toEqual({ kind: 'chord', readings: ['B'], notes: ['B', 'F#', 'D#'] });
+  });
+
+  it('gives none, with the notes sounding, when no reading fits, never a near miss', () => {
+    expect(nameIt(shape('x344xx'), context)).toEqual({ kind: 'none', notes: ['C', 'F#', 'B'] });
+  });
+
+  it('gives none, with the notes sounding, for fewer than two different notes', () => {
+    expect(nameIt(shape('x3x5xx'), context)).toEqual({ kind: 'none', notes: ['C'] });
+    expect(nameIt(shape('xx0xxx'), context)).toEqual({ kind: 'none', notes: ['D'] });
+    expect(nameIt(shape('xxxxxx'), context)).toEqual({ kind: 'none', notes: [] });
   });
 });

@@ -3,8 +3,8 @@
 // Instrument (guitar.ts, and its tunings in guitarTuning.ts) sit behind it
 // (ADR 0012) and can be reorganised freely.
 
-import { readChord } from './chordTheory';
-import { guitarVoicings, type Voicing } from './guitar';
+import { nameNotes, readChord, spellNotes } from './chordTheory';
+import { guitarNotes, guitarVoicings, type Voicing } from './guitar';
 import {
   guitarTuningName,
   guitarTuningNotes,
@@ -101,6 +101,33 @@ export function lookUp(name: string, context: FinderContext): LookUp {
     voicings,
     preferred: preferredAt >= 0,
   };
+}
+
+export type NameIt =
+  | {
+      kind: 'chord';
+      /** Every Chord name the shape reads as, best first, each one Look up reads. */
+      readings: string[];
+      /** The notes sounding, low string to high, each once, spelled as the best reading spells them. */
+      notes: string[];
+    }
+  | {
+      /** No Chord in the known set fits, or fewer than two different notes sound. */
+      kind: 'none';
+      notes: string[];
+    };
+
+/**
+ * Names a shape placed on the guitar, its frets counted from the capo: every
+ * reading of it, best first, and the notes sounding. Readings with the root
+ * as the lowest note come first, then the simpler names. As a Chord names the
+ * shape fingered, the capo moves none of the notes: capo 2's 320003 reads G.
+ */
+export function nameIt(frets: Frets, context: FinderContext): NameIt {
+  const sounding = guitarNotes(frets, context.tuning);
+  const readings = nameNotes(sounding);
+  const notes = spellNotes(sounding, readings[0] ?? null);
+  return readings.length ? { kind: 'chord', readings, notes } : { kind: 'none', notes };
 }
 
 function sameFrets(a: Frets, b: Frets): boolean {

@@ -3,7 +3,8 @@
   // shows it, and a Song is to show it too, in a side panel or a phone sheet.
   import { tick } from 'svelte';
   import ChordDiagram from './ChordDiagram.svelte';
-  import { lookUp, qualities, roots, type FinderContext, type Voicing } from './chordFinder';
+  import { lookUp, nameIt, qualities, roots, type FinderContext, type Voicing } from './chordFinder';
+  import Fretboard from './Fretboard.svelte';
   import { leftHanded } from './sharedLeftHanded.svelte';
   import { preferredVoicings } from './sharedPreferredVoicings.svelte';
   import Picker from './Picker.svelte';
@@ -75,6 +76,20 @@
   }
 
   const qualityLabel = (suffix: string) => qualities.find((q) => q.suffix === suffix)?.label ?? suffix;
+
+  // Name it: the shape placed on the fretboard, every string open at first,
+  // and what it reads as.
+  const openStrings = () => context.tuning.map(() => 0);
+  let placed = $state<(number | null)[]>(openStrings());
+  const named = $derived(nameIt(placed, context));
+
+  /** Opens a reading in Look up, with focus on its tab. */
+  function openInLookUp(reading: string) {
+    name = reading;
+    page = 0;
+    tab = 'look-up';
+    tabButtons[0]?.focus();
+  }
 </script>
 
 <div class="finder">
@@ -101,7 +116,7 @@
       class="button toggle"
       aria-pressed={leftHanded.on}
       onclick={() => leftHanded.set(!leftHanded.on)}
-      title="Mirror the diagrams for a left-handed player">Left-handed</button
+      title="Mirror the diagrams and the fretboard for a left-handed player">Left-handed</button
     >
   </div>
 
@@ -211,6 +226,35 @@
             </div>
           {/if}
         {/if}
+      {:else if t.id === 'name-it'}
+        <div class="name-it">
+          <div class="named" aria-live="polite">
+            {#if named.kind === 'chord'}
+              <ol class="readings" aria-label="Readings, best first">
+                {#each named.readings as reading, i (reading)}
+                  <li>
+                    <button
+                      type="button"
+                      class="reading"
+                      class:best={i === 0}
+                      title="Look up how to play {reading}"
+                      onclick={() => openInLookUp(reading)}>{reading}</button
+                    >
+                  </li>
+                {/each}
+              </ol>
+              <p class="notes"><span class="muted">Notes</span> {named.notes.join(' ')}</p>
+            {:else if named.notes.length}
+              <p class="unknown">No Chord I know: {named.notes.join(', ')}</p>
+            {:else}
+              <p class="muted">Place a finger, or ring a string open above the nut.</p>
+            {/if}
+          </div>
+          <div class="board">
+            <Fretboard bind:frets={placed} capo={context.capo} />
+            <button type="button" class="button clear" onclick={() => (placed = openStrings())}>Clear</button>
+          </div>
+        </div>
       {:else}
         <p class="muted">Coming soon.</p>
       {/if}
@@ -376,6 +420,81 @@
     min-height: 2rem;
     padding: 0 0.75rem;
     font-size: 0.8125rem;
+  }
+  /*
+   * Name it: what the shape reads as above the fretboard on a phone, so it
+   * stays in view while fingers are placed; beside it on desktop.
+   */
+  .name-it {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  @media (min-width: 40rem) {
+    .name-it {
+      flex-direction: row-reverse;
+      justify-content: flex-end;
+      align-items: flex-start;
+      gap: 2rem;
+    }
+  }
+  .named {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 0;
+    min-height: 4.5rem;
+  }
+  @media (min-width: 40rem) {
+    .named {
+      flex: 1;
+    }
+  }
+  .readings {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .reading {
+    min-height: 2rem;
+    padding: 0 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .reading.best {
+    min-height: var(--control);
+    border-color: var(--accent);
+    font-size: 1.5rem;
+  }
+  .reading:hover {
+    border-color: var(--accent);
+  }
+  .board {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 22rem;
+    align-self: center;
+  }
+  @media (min-width: 40rem) {
+    .board {
+      flex: 0 0 22rem;
+      align-self: flex-start;
+    }
+  }
+  .clear {
+    align-self: flex-end;
   }
   .pager {
     display: flex;

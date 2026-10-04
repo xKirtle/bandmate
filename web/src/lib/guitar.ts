@@ -138,3 +138,12 @@ export function guitarVoicings(chord: Chord, tuning: readonly number[]): Voicing
 
   return found.sort((a, b) => b.score - a.score || a.height - b.height).map((f) => f.voicing);
 }
+
+/**
+ * The notes a shape placed on a guitar sounds, as semitones from C, 0–11,
+ * low string to high. With a capo on, frets count from it and, as a Chord
+ * names the shape fingered, the capo moves none of them.
+ */
+export function guitarNotes(frets: readonly (number | null)[], tuning: readonly number[]): number[] {
+  return frets.flatMap((fret, string) => (fret === null ? [] : [(tuning[string] + fret) % 12]));
+}
