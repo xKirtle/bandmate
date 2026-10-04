@@ -54,3 +54,25 @@ const fileNames = new Intl.Collator(undefined, { numeric: true, sensitivity: 'ba
 export function byFileName(a: { file: { name: string } }, b: { file: { name: string } }): number {
   return fileNames.compare(a.file.name, b.file.name);
 }
+
+type PickedFile = { key: number; file: { name: string; size: number } };
+
+/** What a row's file is probably a copy of: a Beat in the Library, by its title, or an earlier row. */
+export type Duplicate = { beat: string } | 'batch';
+
+/**
+ * What a row's file is probably a copy of, by its file name and size: a Beat
+ * in the Library, or a row picked before it.
+ */
+export function duplicateOf(
+  row: PickedFile,
+  library: readonly { title: string; fileName: string; size: number }[],
+  rows: readonly PickedFile[],
+): Duplicate | null {
+  const { name, size } = row.file;
+  const beat = library.find((b) => b.fileName === name && b.size === size);
+  if (beat) return { beat: beat.title };
+  // Keys count up as files are picked, so a lower key was picked earlier.
+  const earlier = rows.some((r) => r.key < row.key && r.file.name === name && r.file.size === size);
+  return earlier ? 'batch' : null;
+}
