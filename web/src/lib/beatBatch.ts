@@ -1,7 +1,7 @@
 // Adding several Beats at once: the review table's rows, one per file, and
 // the rules for when they can be added.
 import type { Beat, DecodedAudio } from './api';
-import { invalidFields, sameDraft, toDraft, type BeatDraft } from './beatDraft';
+import { invalidFields, sameDraft, type BeatDraft } from './beatDraft';
 
 /** One file in the batch, from picking it until its Beat is saved or it's removed. */
 export interface BatchRow {
@@ -20,6 +20,8 @@ export interface BatchRow {
   draft: BeatDraft;
   /** Whether Add adds it. */
   ticked: boolean;
+  /** The fields set from the bar above the table while the file was being read. */
+  setWhileReading: Partial<BeatDraft>;
   /** Why it can't be read, or why its last upload failed. */
   error: string | null;
 }
@@ -96,25 +98,25 @@ export function alreadyIn(
 }
 
 /** A field the bar above the table can set on every ticked row at once. */
-export type SharedField = 'producer' | 'sourceLink' | 'bpm' | 'key' | 'notes';
-
-/** Sets one field to one value on every ticked row, over whatever it held. */
-export function setOnTicked(rows: readonly Pick<BatchRow, 'ticked' | 'draft'>[], field: SharedField, value: string) {
-  for (const row of rows) if (row.ticked) row.draft[field] = value;
-}
-
-/** Whether a row would refuse this value for this field, as it would if it were typed into it. */
-export function invalidShared(field: SharedField, value: string): boolean {
-  const draft = { ...toDraft({ title: 'Any' }), [field]: value };
-  return (invalidFields(draft) as string[]).includes(field);
-}
+export type SharedField = Exclude<keyof BeatDraft, 'title'>;
 
 /**
- * A row's details once its file is read: what the file suggested, under any
- * field set on the row from the bar while it was still being read.
+ * Sets one field to one value on every ticked row, over whatever it held. A
+ * row still being read keeps it once read, over what its file suggests.
  */
-export function draftOnceRead(draft: BeatDraft, suggested: BeatDraft): BeatDraft {
-  const read = { ...suggested };
-  for (const field of Object.keys(draft) as (keyof BeatDraft)[]) if (draft[field] !== '') read[field] = draft[field];
-  return read;
+export function setOnTicked(
+  rows: readonly Pick<BatchRow, 'status' | 'ticked' | 'draft' | 'setWhileReading'>[],
+  field: SharedField,
+  value: string,
+) {
+  for (const row of rows) {
+    if (!row.ticked) continue;
+    row.draft[field] = value;
+    if (row.status === 'reading') row.setWhileReading[field] = value;
+  }
+}
+
+/** A row's details once its file is read: what the file suggested, under what was set on it meanwhile. */
+export function draftOnceRead(row: Pick<BatchRow, 'setWhileReading'>, suggested: BeatDraft): BeatDraft {
+  return { ...suggested, ...row.setWhileReading };
 }

@@ -8,14 +8,13 @@
     canAdd,
     canTick,
     draftOnceRead,
-    invalidShared,
     setOnTicked,
     tickedState,
     tickRange,
     type BatchRow,
     type SharedField,
   } from './beatBatch';
-  import { fromDraft, invalidFields, toDraft, type InvalidField } from './beatDraft';
+  import { fromDraft, invalidFields, invalidValue, toDraft, type InvalidField } from './beatDraft';
   import { suggestForFile } from './beatTags';
   import Combobox from './Combobox.svelte';
   import { guardLeaving } from './router.svelte';
@@ -58,6 +57,7 @@
       suggested: toDraft(null),
       draft: toDraft(null),
       ticked: true,
+      setWhileReading: {},
       error: null,
     }));
     const all = [...rows, ...added];
@@ -104,7 +104,7 @@
       }
       // It may have been removed while being read.
       const now = rows.find((r) => r.key === key);
-      if (now) Object.assign(now, { ...read, draft: read.draft ? draftOnceRead(now.draft, read.draft) : now.draft });
+      if (now) Object.assign(now, { ...read, draft: read.draft ? draftOnceRead(now, read.draft) : now.draft });
       readCount++;
     }
     reading = false;
@@ -124,29 +124,38 @@
   }
 
   // Shift-clicking a tick box ticks or unticks the rows from the one clicked last.
-  let lastClicked: number | null = null;
+  let lastClickedKey: number | null = null;
 
   function tickRow(row: BatchRow, event: MouseEvent & { currentTarget: HTMLInputElement }) {
     const on = event.currentTarget.checked;
-    if (event.shiftKey && lastClicked !== null) tickRange(rows, lastClicked, row.key, on);
+    if (event.shiftKey && lastClickedKey !== null) tickRange(rows, lastClickedKey, row.key, on);
     else row.ticked = on;
-    lastClicked = row.key;
+    lastClickedKey = row.key;
   }
 
   // The bar above the table sets one field to one value on every ticked row.
-  const sharedFields: { field: SharedField; label: string }[] = [
-    { field: 'producer', label: 'Producer' },
-    { field: 'sourceLink', label: 'Source link' },
-    { field: 'bpm', label: 'BPM' },
-    { field: 'key', label: 'Key' },
-    { field: 'notes', label: 'Notes' },
+  // Notes isn't a column: a Beat's own notes are edited once it's added.
+  const sharedFields: {
+    field: SharedField;
+    label: string;
+    placeholder: string;
+    type?: 'url';
+    inputmode?: 'numeric' | 'url';
+  }[] = [
+    { field: 'producer', label: 'Producer', placeholder: '—' },
+    { field: 'sourceLink', label: 'Source link', placeholder: 'https://…', type: 'url', inputmode: 'url' },
+    { field: 'bpm', label: 'BPM', placeholder: '—', inputmode: 'numeric' },
+    { field: 'key', label: 'Key', placeholder: '—' },
+    { field: 'notes', label: 'Notes', placeholder: 'License, where it’s from…' },
   ];
   let sharedField = $state<SharedField>('producer');
   let sharedValue = $state('');
+  const shared = $derived(sharedFields.find((f) => f.field === sharedField)!);
+  const sharedInvalid = $derived(invalidValue(sharedField, sharedValue));
 
   function setShared(event: SubmitEvent) {
     event.preventDefault();
-    if (tickedCount === 0) return;
+    if (tickedCount === 0 || sharedInvalid) return;
     setOnTicked(rows, sharedField, sharedValue);
   }
 
@@ -249,18 +258,14 @@
         <input
           id="batch-shared-value"
           bind:value={sharedValue}
-          aria-invalid={invalidShared(sharedField, sharedValue)}
-          type={sharedField === 'sourceLink' ? 'url' : 'text'}
-          inputmode={sharedField === 'bpm' ? 'numeric' : sharedField === 'sourceLink' ? 'url' : undefined}
+          aria-invalid={sharedInvalid}
+          type={shared.type ?? 'text'}
+          inputmode={shared.inputmode}
           autocomplete="off"
-          placeholder={sharedField === 'sourceLink'
-            ? 'https://…'
-            : sharedField === 'notes'
-              ? 'License, where it’s from…'
-              : '—'}
+          placeholder={shared.placeholder}
         />
       {/if}
-      <button type="submit" class="button" disabled={tickedCount === 0}>
+      <button type="submit" class="button" disabled={tickedCount === 0 || sharedInvalid}>
         Set on {tickedCount} ticked
       </button>
     </fieldset>
@@ -447,10 +452,6 @@
   .shared :global(input) {
     width: 16rem;
   }
-  .shared input[aria-invalid='true'] {
-    border-color: var(--danger);
-    box-shadow: inset 0 0 0 1px var(--danger);
-  }
   /* Shift-clicking a tick box shouldn't select the text between. */
   td.tick {
     user-select: none;
@@ -496,6 +497,7 @@
     padding-inline: 0.5rem;
     font-size: 0.875rem;
   }
+  .shared input[aria-invalid='true'],
   td input[aria-invalid='true'] {
     border-color: var(--danger);
     box-shadow: inset 0 0 0 1px var(--danger);

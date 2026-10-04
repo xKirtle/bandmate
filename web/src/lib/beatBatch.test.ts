@@ -6,7 +6,6 @@ import {
   byFileName,
   canAdd,
   draftOnceRead,
-  invalidShared,
   setOnTicked,
   tickedState,
   tickRange,
@@ -106,7 +105,12 @@ describe('alreadyIn', () => {
 });
 
 describe('setOnTicked', () => {
-  const row = (ticked: boolean, draft = toDraft({ title: 'Echo Room', producer: 'Pryme' })) => ({ ticked, draft });
+  const row = (ticked: boolean, draft = toDraft({ title: 'Echo Room', producer: 'Pryme' })) => ({
+    status: 'ready' as const,
+    ticked,
+    draft,
+    setWhileReading: {},
+  });
 
   it('overwrites the field on every ticked row, edited or not, and leaves unticked rows alone', () => {
     const rows = [row(true), row(true, toDraft({ title: 'Paper Hours' })), row(false)];
@@ -117,12 +121,12 @@ describe('setOnTicked', () => {
 });
 
 describe('draftOnceRead', () => {
-  it('fills a row from its file, keeping what was set on it while it was being read', () => {
-    const set = { ...toDraft(null), producer: 'Lunar', notes: 'CC BY' };
+  it('fills a row from its file, keeping what was set on it while it was being read, even an emptied field', () => {
+    const row = { status: 'reading' as const, ticked: true, draft: toDraft(null), setWhileReading: {} };
+    setOnTicked([row], 'producer', '');
+    setOnTicked([row], 'notes', 'CC BY');
     const suggested = toDraft({ title: 'Echo Room', producer: 'Pryme', bpm: 140 });
-    expect(draftOnceRead(set, suggested)).toEqual(
-      toDraft({ title: 'Echo Room', producer: 'Lunar', bpm: 140, notes: 'CC BY' }),
-    );
+    expect(draftOnceRead(row, suggested)).toEqual(toDraft({ title: 'Echo Room', bpm: 140, notes: 'CC BY' }));
   });
 });
 
@@ -154,21 +158,5 @@ describe('tickRange', () => {
     const rs = rows();
     tickRange(rs, 9, 2, true);
     expect(tickedKeys(rs)).toEqual([0, 2]);
-  });
-});
-
-describe('invalidShared', () => {
-  it('refuses a value for a field as it would refuse one typed into a row', () => {
-    expect(invalidShared('bpm', 'fast')).toBe(true);
-    expect(invalidShared('bpm', '1000')).toBe(true);
-    expect(invalidShared('sourceLink', 'beatstars')).toBe(true);
-  });
-
-  it('takes valid values, and an empty one, which clears the field', () => {
-    expect(invalidShared('bpm', '92')).toBe(false);
-    expect(invalidShared('sourceLink', 'https://example.com/b')).toBe(false);
-    expect(invalidShared('producer', '')).toBe(false);
-    expect(invalidShared('bpm', '')).toBe(false);
-    expect(invalidShared('notes', 'CC BY')).toBe(false);
   });
 });

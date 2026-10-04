@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeOffer, invalidFields, sameDraft, toDraft, wouldLoseEdits } from './beatDraft';
+import { describeOffer, invalidFields, invalidValue, sameDraft, toDraft, wouldLoseEdits } from './beatDraft';
 
 describe('describeOffer', () => {
   it('lists every offered change in the order the form shows them', () => {
@@ -83,5 +83,21 @@ describe('invalidFields', () => {
 
   it('lists every invalid field', () => {
     expect(invalidFields({ ...valid, title: '', bpm: 'x', sourceLink: 'y' })).toEqual(['title', 'bpm', 'sourceLink']);
+  });
+});
+
+describe('invalidValue', () => {
+  it('refuses a value for a field as it would refuse one typed into a row', () => {
+    expect(invalidValue('bpm', 'fast')).toBe(true);
+    expect(invalidValue('bpm', '1000')).toBe(true);
+    expect(invalidValue('sourceLink', 'beatstars')).toBe(true);
+  });
+
+  it('takes valid values, and an empty one, which clears the field', () => {
+    expect(invalidValue('bpm', '92')).toBe(false);
+    expect(invalidValue('sourceLink', 'https://example.com/b')).toBe(false);
+    expect(invalidValue('producer', '')).toBe(false);
+    expect(invalidValue('bpm', '')).toBe(false);
+    expect(invalidValue('notes', 'CC BY')).toBe(false);
   });
 });
