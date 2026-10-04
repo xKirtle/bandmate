@@ -171,8 +171,11 @@ func insertSong(ctx context.Context, db execer, title string) (int64, error) {
 		return 0, errTitleRequired
 	}
 	now := time.Now().UTC().Format(timeFormat)
+	// A new Song gets an identity of its own, as migration 0031 gave the
+	// Songs before it.
 	id, err := insert(ctx, db,
-		`INSERT INTO songs (title, status, created_at, updated_at) VALUES (?, ?, ?, ?)`,
+		`INSERT INTO songs (identity, title, status, created_at, updated_at)
+		 VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?)`,
 		title, StatusIdea, now, now)
 	if err != nil {
 		return 0, fmt.Errorf("creating song: %w", err)
