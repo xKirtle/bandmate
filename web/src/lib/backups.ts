@@ -1,5 +1,5 @@
 // How Backups are named and sized on the Backups page.
-import type { Backup } from './api';
+import type { Backup, BackupPresent } from './api';
 import { formatSize } from './upload';
 
 // Spelled out rather than left to the locale, which may shorten September
@@ -34,6 +34,32 @@ export function contentsName({ songs, allSongs, beatLibrary }: Contents): string
 /** "1 Song", "3 Songs". */
 export function songCount(n: number): string {
   return `${n} ${n === 1 ? 'Song' : 'Songs'}`;
+}
+
+/** "1 Beat", "3 Beats". */
+function beatCount(n: number): string {
+  return `${n} ${n === 1 ? 'Beat' : 'Beats'}`;
+}
+
+/**
+ * The confirmation a Restore asks for before replacing Songs and Beats,
+ * naming each as it's called in Bandmate, since that's the one lost.
+ */
+export function replaceConfirmation(songs: BackupPresent[], beats: BackupPresent[]): string {
+  const counts = [songs.length && songCount(songs.length), beats.length && beatCount(beats.length)].filter(Boolean);
+  const one = songs.length + beats.length === 1;
+  const named = [
+    ...songs.map((s) => `Song: ${s.inBandmate.title}`),
+    ...beats.map((b) => `Beat: ${b.inBandmate.title}`),
+  ];
+  const lost = [
+    songs.length > 0 && 'A Song replaced loses whatever it has now that the Backup’s version doesn’t.',
+    beats.length > 0 && 'A Beat replaced takes the Backup’s title and credit in every Song using it.',
+  ].filter(Boolean);
+  return (
+    `Replace ${counts.join(' and ')} with the Backup’s ${one ? 'version' : 'versions'}?\n\n${named.join('\n')}\n\n` +
+    `${lost.join(' ')} This can’t be undone.`
+  );
 }
 
 /** A Backup's size: "8 KB" under a megabyte, where "0.0 MB" would say nothing, and "4.2 MB" from there. */

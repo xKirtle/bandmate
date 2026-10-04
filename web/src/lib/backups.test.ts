@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { automaticName, backupName, backupSize } from './backups';
+import { automaticName, backupName, backupSize, replaceConfirmation } from './backups';
 
 // 18:30 on 4 Oct 2026, in the time zone the tests run in.
 const made = new Date(2026, 9, 4, 18, 30).toISOString();
@@ -70,5 +70,31 @@ describe('backupSize', () => {
     expect(backupSize(1 << 20)).toBe('1.0 MB');
     expect(backupSize(4.2 * (1 << 20))).toBe('4.2 MB');
     expect(backupSize(612 * (1 << 20))).toBe('612 MB');
+  });
+});
+
+describe('replaceConfirmation', () => {
+  it('names each Song and Beat to be replaced, as it is in Bandmate', () => {
+    const song = { id: 4, title: 'Night Drive', inBandmate: { id: 7, title: 'Night Drive II' } };
+    const beat = { id: 6, title: 'Used', inBandmate: { id: 2, title: 'Used Again' } };
+    expect(replaceConfirmation([song], [beat])).toBe(
+      'Replace 1 Song and 1 Beat with the Backup’s versions?\n\n' +
+        'Song: Night Drive II\nBeat: Used Again\n\n' +
+        'A Song replaced loses whatever it has now that the Backup’s version doesn’t. ' +
+        'A Beat replaced takes the Backup’s title and credit in every Song using it. This can’t be undone.',
+    );
+  });
+
+  it('says what replacing loses only for the kinds replaced', () => {
+    const beat = { id: 6, title: 'Used', inBandmate: { id: 2, title: 'Used' } };
+    expect(replaceConfirmation([], [beat]).split('\n\n')[2]).toBe(
+      'A Beat replaced takes the Backup’s title and credit in every Song using it. This can’t be undone.',
+    );
+  });
+
+  it('counts only what is replaced', () => {
+    const songs = [1, 2].map((id) => ({ id, title: `S${id}`, inBandmate: { id, title: `S${id}` } }));
+    expect(replaceConfirmation(songs, []).split('\n')[0]).toBe('Replace 2 Songs with the Backup’s versions?');
+    expect(replaceConfirmation([], [songs[0]]).split('\n')[0]).toBe('Replace 1 Beat with the Backup’s version?');
   });
 });
