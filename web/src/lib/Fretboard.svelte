@@ -3,23 +3,20 @@
   // string on the left (on the right for a left-handed player), the nut at
   // the top, as a chord diagram draws them. Tapping a fret places the
   // string's one finger there, and tapping it again lifts it, leaving the
-  // string open. Above the nut, a string is marked open or muted. With a
-  // capo on, frets count from it: it's drawn as the nut, and labelled. Arrow
-  // keys move between the frets, so the whole fretboard is one tab stop.
+  // string open. Above the nut, a string is marked open or muted. Arrow keys
+  // move between the frets, so the whole fretboard is one tab stop.
   import { tick } from 'svelte';
   import type { Frets } from './chordFinder';
   import { leftHanded } from './sharedLeftHanded.svelte';
 
   let {
     frets = $bindable(),
-    capo = 0,
   }: {
-    /** Each string's fret, low string to high, counted from the capo: 0 for open, null for muted. */
+    /** Each string's fret, low string to high: 0 for open, null for muted. */
     frets: Frets;
-    capo?: number;
   } = $props();
 
-  /** The frets above the nut (or capo) a finger can be placed on, as far as a Voicing reaches. */
+  /** The frets above the nut a finger can be placed on, as far as a Voicing reaches. */
   const fretCount = 12;
   /** The frets a fretboard marks with an inlay, so a fret is easy to find. */
   const inlays = new Set([3, 5, 7, 9, 12]);
@@ -73,16 +70,10 @@
   }
 </script>
 
-<div
-  bind:this={board}
-  class="fretboard"
-  role="group"
-  aria-label="Fretboard{capo > 0 ? `, frets counted from capo ${capo}` : ''}"
-  style:--strings={strings}
->
+<div bind:this={board} class="fretboard" role="group" aria-label="Fretboard" style:--strings={strings}>
   {#each rows as row (row)}
-    <span class="gutter" class:inlay={inlays.has(row)} class:capo={row === 0 && capo > 0}>
-      {#if row === 0}{capo > 0 ? `Capo ${capo}` : ''}{:else}{row}{/if}
+    <span class="gutter" class:inlay={inlays.has(row)}>
+      {#if row > 0}{row}{/if}
     </span>
     {#each order as string, column (string)}
       {@const fret = frets[string]}
@@ -90,7 +81,6 @@
         <button
           type="button"
           class="nut"
-          class:capo={capo > 0}
           tabindex={focused.column === column && focused.row === row ? 0 : -1}
           aria-label={nutLabel(string)}
           title={fret === null ? 'Ring this string open' : 'Mute this string'}
@@ -148,11 +138,6 @@
     color: var(--text);
     font-weight: 700;
   }
-  .gutter.capo {
-    font-size: 0.6875rem;
-    font-weight: 600;
-    white-space: nowrap;
-  }
   button {
     position: relative;
     display: flex;
@@ -188,13 +173,9 @@
     background: var(--text-muted);
     opacity: 0.35;
   }
-  /* The nut, or the capo as the nut: under the open and muted marks. */
+  /* The nut, under the open and muted marks. */
   .nut {
     border-bottom: 4px solid var(--text);
-  }
-  .nut.capo {
-    border-bottom-width: 6px;
-    border-bottom-color: var(--accent);
   }
   .open {
     width: 0.75rem;

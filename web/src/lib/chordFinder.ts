@@ -13,7 +13,6 @@ import {
   type Suggestion,
 } from './chordTheory';
 import { guitarNotes, guitarVoicings, type Voicing } from './guitar';
-import { transposeKey } from './transpose';
 import {
   guitarTuningName,
   guitarTuningNotes,
@@ -55,26 +54,18 @@ export function tuningNotes(text: string): string | null {
   return guitarTuningNotes(text);
 }
 
-/** A Voicing's frets, low string to high, counted from the capo: 0 for open, null for muted. */
+/** A Voicing's frets, low string to high: 0 for open, null for muted. */
 export type Frets = readonly (number | null)[];
 
-/** What the Chord Finder plays on: a tuning and a capo for the guitar. */
+/** What the Chord Finder plays on: a tuning for the guitar. */
 export interface FinderContext {
   /** The strings' pitches, low to high, as MIDI note numbers. */
   tuning: readonly number[];
-  /** The fret the capo is on, 0 for none. Frets are counted from it. */
-  capo: number;
   /**
    * The user's preferred Voicing of each Chord in this tuning, by the Chord's
    * name as read (see LookUp's name), as its frets low string to high.
    */
   preferred?: Readonly<Record<string, Frets>>;
-  /**
-   * The Key as shown, as a Song's Details write it (G, Em, A minor), when
-   * the Finder follows a Song. Name it ranks readings whose root is in it
-   * higher. None, or one that can't be read, ranks by the shape alone.
-   */
-  key?: string | null;
 }
 
 export type LookUp =
@@ -133,15 +124,13 @@ export type NameIt =
     };
 
 /**
- * Names a shape placed on the guitar, its frets counted from the capo: every
- * reading of it, best first, and the notes sounding. Readings with the root
- * as the lowest note come first, then the simpler names, then, with a Key,
- * those whose root is in it. As a Chord names the shape fingered, the capo
- * moves none of the notes: capo 2's 320003 reads G.
+ * Names a shape placed on the guitar: every reading of it, best first, and
+ * the notes sounding. Readings with the root as the lowest note come first,
+ * then the simpler names.
  */
 export function nameIt(frets: Frets, context: FinderContext): NameIt {
   const sounding = guitarNotes(frets, context.tuning);
-  const chords = nameNotes(sounding, context.key ? readKey(context.key) : null);
+  const chords = nameNotes(sounding);
   const notes = spellNotes(sounding, chords[0] ?? null);
   return chords.length ? { kind: 'chord', readings: chords.map((c) => c.name), notes } : { kind: 'none', notes };
 }
@@ -161,35 +150,6 @@ export function keyName(text: string): string | null {
   return readKey(text)?.name ?? null;
 }
 
-/**
- * A Key's short name, as the Chord Finder's line above its tabs says it
- * (G, Em), spelled from its own signature. Null if it can't be read.
- */
-export function keyShortName(text: string): string | null {
-  const key = readKey(text);
-  return key && key.signature[key.tonic] + (key.minor ? 'm' : '');
-}
-
-/**
- * A Song's Key as the Chord Finder follows it: unset, set but not a Key it
- * reads (kept as written), or the Key as shown, moved by the Transpose
- * amount, with its short name.
- */
-export type KeyAsShown =
-  { kind: 'unset' } | { kind: 'unreadable'; written: string } | { kind: 'key'; key: string; short: string };
-
-/**
- * A Song's Key as shown: as written, or moved by the Transpose amount in
- * semitones, spelled from its own signature, as Read mode shows it.
- */
-export function keyAsShown(written: string, transpose: number): KeyAsShown {
-  const key = written.trim();
-  if (!key) return { kind: 'unset' };
-  const shown = transposeKey(key, transpose) ?? key;
-  const short = keyShortName(shown);
-  return short ? { kind: 'key', key: shown, short } : { kind: 'unreadable', written: key };
-}
-
 export type Suggest =
   | {
       kind: 'key';
@@ -205,8 +165,7 @@ export type Suggest =
 /**
  * Suggests Chords from a Key, read as Transpose reads the Song's Key: its
  * Chords with their Roman numerals and why each fits, spelled from the Key's
- * signature, and, after a Chord, the Chords that usually follow it. The Key
- * is as written, the shapes fingered, so a capo doesn't move it.
+ * signature, and, after a Chord, the Chords that usually follow it.
  */
 export function suggest(key: string, after?: string | null): Suggest {
   const read = readKey(key);

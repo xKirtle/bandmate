@@ -1,25 +1,22 @@
 <script lang="ts">
-  // The Chord Finder's own page, standalone: no Song, so the user picks the
-  // tuning and capo, standard tuning and no capo until picked, and the Key
-  // Suggest suggests from, C major until picked. The last ones picked are
-  // kept on this device.
+  // The Chord Finder's own page, the one place it's offered: the user picks
+  // the tuning, standard tuning until picked, and the Key Suggest suggests
+  // from, C major until picked. The last ones picked are kept on this device.
   import ChordFinder from '../lib/ChordFinder.svelte';
   import { readTuning, standard } from '../lib/chordFinder';
-  import { capoLimit, readFinderKey, readFinderSetup, storeFinderKey, storeFinderSetup } from '../lib/finderSetup';
-  import Picker from '../lib/Picker.svelte';
+  import { readFinderKey, readFinderTuning, storeFinderKey, storeFinderTuning } from '../lib/finderSetup';
   import { deviceStorage } from '../lib/timelineHeight';
   import TuningField from '../lib/TuningField.svelte';
 
-  let setup = $state(readFinderSetup(deviceStorage()));
+  let tuning = $state(readFinderTuning(deviceStorage()));
   let tuningError = $state('');
   let suggestKey = $state(readFinderKey(deviceStorage()));
 
-  const context = $derived({ tuning: readTuning(setup.tuning) ?? standard, capo: setup.capo });
-  const capos = Array.from({ length: capoLimit + 1 }, (_, fret) => fret);
+  const context = $derived({ tuning: readTuning(tuning) ?? standard });
 
   function keep() {
     tuningError = '';
-    storeFinderSetup(deviceStorage(), setup);
+    storeFinderTuning(deviceStorage(), tuning);
   }
 </script>
 
@@ -35,23 +32,9 @@
         id="finder-tuning"
         labelledby="finder-tuning-label"
         allowNone={false}
-        bind:value={setup.tuning}
+        bind:value={tuning}
         oncommit={keep}
         oninvalid={(message) => (tuningError = message)}
-      />
-    </div>
-    <div class="field capo">
-      <span id="finder-capo-label">Capo</span>
-      <Picker
-        id="finder-capo"
-        aria-labelledby="finder-capo-label"
-        options={capos}
-        value={setup.capo}
-        text={(fret) => (fret === 0 ? 'None' : String(fret))}
-        onpick={(capo) => {
-          setup.capo = capo;
-          keep();
-        }}
       />
     </div>
   </div>
@@ -87,9 +70,6 @@
   .tuning {
     flex: 1 1 16rem;
     max-width: 24rem;
-  }
-  .capo {
-    flex: 0 0 6.5rem;
   }
   .error {
     margin: -0.5rem 0 1rem;

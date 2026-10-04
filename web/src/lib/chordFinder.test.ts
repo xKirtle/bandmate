@@ -5,9 +5,7 @@ import {
   qualities,
   readTuning,
   roots,
-  keyAsShown,
   keyName,
-  keyShortName,
   keys,
   standard,
   suggest,
@@ -20,7 +18,7 @@ import {
   type Suggestion,
 } from './chordFinder';
 
-const context = { tuning: standard, capo: 0 };
+const context = { tuning: standard };
 
 /** The Chord's notes, or null if the name can't be read. */
 function notes(name: string): string[] | null {
@@ -172,8 +170,8 @@ function written(frets: (number | null)[]): string {
 }
 
 /** Every Voicing of a Chord, written out, best first. */
-function voicingsOf(name: string, tuning = standard, capo = 0): string[] {
-  const found = lookUp(name, { tuning, capo });
+function voicingsOf(name: string, tuning = standard): string[] {
+  const found = lookUp(name, { tuning });
   return found.kind === 'chord' ? found.voicings.map((v) => written(v.frets)) : [];
 }
 
@@ -281,7 +279,7 @@ describe('Voicings in standard tuning', () => {
   });
 });
 
-describe('Voicings in the tuning and capo in use', () => {
+describe('Voicings in the tuning in use', () => {
   const dropD = readTuning('Drop D')!;
 
   it('finds Voicings on the strings of the tuning in use', () => {
@@ -298,28 +296,10 @@ describe('Voicings in the tuning and capo in use', () => {
     // Open G's open strings are a G, its root on the 5th string.
     expect(voicingsOf('G', readTuning('Open G')!)[0]).toBe('x00000');
   });
-
-  it('counts frets from the capo, so a Chord is drawn as the shape fingered', () => {
-    // Capo 2: a G is the open G shape, sounding an A.
-    expect(voicingsOf('G', standard, 2)[0]).toBe('320003');
-    expect(voicingsOf('C', standard, 2)[0]).toBe('x32010');
-    expect(voicingsOf('D', dropD, 2)).toContain('000232');
-    // The capo moves no shape: they're the shapes with no capo, the capo as the nut.
-    expect(voicingsOf('G', standard, 2)).toEqual(voicingsOf('G'));
-    expect(voicingsOf('F#m7', dropD, 5)).toEqual(voicingsOf('F#m7', dropD));
-  });
-
-  it('reaches the 12th fret above the capo, and none past it', () => {
-    const found = lookUp('G', { tuning: standard, capo: 5 });
-    if (found.kind !== 'chord') throw new Error('G should read');
-    expect(found.voicings.map((v) => written(v.frets))).toContain('x(10)(12)(12)(12)(10)');
-    expect(found.voicings.every((v) => v.frets.every((f) => f === null || f <= 12))).toBe(true);
-  });
 });
 
 describe('a preferred Voicing', () => {
-  const lookUpG = (preferred: Record<string, (number | null)[]>) =>
-    lookUp('G', { tuning: standard, capo: 0, preferred });
+  const lookUpG = (preferred: Record<string, (number | null)[]>) => lookUp('G', { tuning: standard, preferred });
 
   it('comes first, ahead of the best-ranked Voicing, the rest in their ranked order', () => {
     const ranked = voicingsOf('G');
@@ -334,7 +314,7 @@ describe('a preferred Voicing', () => {
   it('applies to the Chord it was preferred for, by its name as read', () => {
     const preferred = { Cmaj7: [null, 3, 5, 4, 5, 3] };
     for (const name of ['Cmaj7', 'CM7']) {
-      const found = lookUp(name, { tuning: standard, capo: 0, preferred });
+      const found = lookUp(name, { tuning: standard, preferred });
       if (found.kind !== 'chord') throw new Error(`${name} should read`);
       expect(written(found.voicings[0].frets), name).toBe('x35453');
     }
@@ -540,13 +520,9 @@ describe('naming a shape', () => {
   });
 
   it('reads the shape on the strings of the tuning in use', () => {
-    const dropD = { tuning: readTuning('Drop D')!, capo: 0 };
+    const dropD = { tuning: readTuning('Drop D')! };
     expect(readings('000232', dropD)?.[0]).toBe('D');
     expect(readings('x32010', dropD)?.[0]).toBe('C');
-  });
-
-  it('counts frets from the capo, so a shape reads as the Chord fingered: capo 2’s 320003 is G', () => {
-    expect(readings('320003', { tuning: standard, capo: 2 })?.[0]).toBe('G');
   });
 
   it('lists the notes sounding, low string to high, each once, spelled as the best reading spells them', () => {
@@ -576,33 +552,6 @@ describe('naming a shape', () => {
     expect(nameIt(shape('x3x5xx'), context)).toEqual({ kind: 'none', notes: ['C'] });
     expect(nameIt(shape('xx0xxx'), context)).toEqual({ kind: 'none', notes: ['D'] });
     expect(nameIt(shape('xxxxxx'), context)).toEqual({ kind: 'none', notes: [] });
-  });
-});
-
-describe('naming a shape in a Key', () => {
-  // 002010 is Am7/E or C6/E: neither has its root in the bass, and both have four tones.
-  it('ranks the shape’s readings as it would without a Key, when none is known', () => {
-    expect(readings('002010')).toEqual(['Am7/E', 'C6/E']);
-  });
-
-  it('ranks a reading whose root is in the Key before one whose root isn’t', () => {
-    expect(readings('002010', { ...context, key: 'Eb' })).toEqual(['C6/E', 'Am7/E']);
-    expect(readings('002010', { ...context, key: 'Cm' })).toEqual(['C6/E', 'Am7/E']);
-    expect(readings('002010', { ...context, key: 'A' })).toEqual(['Am7/E', 'C6/E']);
-  });
-
-  it('keeps the order when both roots are in the Key', () => {
-    expect(readings('002010', { ...context, key: 'C' })).toEqual(['Am7/E', 'C6/E']);
-    expect(readings('002010', { ...context, key: 'E minor' })).toEqual(['Am7/E', 'C6/E']);
-  });
-
-  it('still ranks the root in the bass, then the simpler name, before the Key', () => {
-    expect(readings('x02010', { ...context, key: 'Eb' })?.slice(0, 2)).toEqual(['Am7', 'C6/A']);
-    expect(readings('x32210', { ...context, key: 'A' })).toEqual(['C6', 'Am/C']);
-  });
-
-  it('ranks as without a Key when the Key can’t be read', () => {
-    expect(readings('002010', { ...context, key: 'modal' })).toEqual(['Am7/E', 'C6/E']);
   });
 });
 
@@ -774,44 +723,5 @@ describe("Keys it can't read", () => {
   it('says so, never a guess', () => {
     expect(suggest('Do', 'C')).toEqual({ kind: 'unreadable', key: 'Do' });
     expect(suggest('')).toEqual({ kind: 'unreadable', key: '' });
-  });
-});
-
-describe('a Key’s short name', () => {
-  it('names a major Key by its tonic and a minor one with an m, spelled from its signature', () => {
-    expect(keyShortName('G')).toBe('G');
-    expect(keyShortName('G major')).toBe('G');
-    expect(keyShortName('E minor')).toBe('Em');
-    expect(keyShortName('C#m')).toBe('C#m');
-    expect(keyShortName('Db')).toBe('Db');
-    expect(keyShortName('Bbm')).toBe('Bbm');
-  });
-
-  it('gives null for a Key it can’t read', () => {
-    expect(keyShortName('modal')).toBeNull();
-    expect(keyShortName('')).toBeNull();
-  });
-});
-
-describe('a Song’s Key as shown', () => {
-  it('is the Key as written when it isn’t transposed', () => {
-    expect(keyAsShown('G', 0)).toEqual({ kind: 'key', key: 'G', short: 'G' });
-    expect(keyAsShown(' E minor ', 0)).toEqual({ kind: 'key', key: 'E minor', short: 'Em' });
-  });
-
-  it('is moved by the Transpose amount, spelled from its own signature', () => {
-    expect(keyAsShown('G', 2)).toEqual({ kind: 'key', key: 'A', short: 'A' });
-    expect(keyAsShown('G minor', 2)).toEqual({ kind: 'key', key: 'A minor', short: 'Am' });
-    expect(keyAsShown('F', -1)).toEqual({ kind: 'key', key: 'E', short: 'E' });
-  });
-
-  it('is unset when the Song has no Key', () => {
-    expect(keyAsShown('', 0)).toEqual({ kind: 'unset' });
-    expect(keyAsShown('  ', 3)).toEqual({ kind: 'unset' });
-  });
-
-  it('can’t be read, kept as written, when the Song’s Key isn’t one it reads', () => {
-    expect(keyAsShown('modal', 0)).toEqual({ kind: 'unreadable', written: 'modal' });
-    expect(keyAsShown(' modal ', 2)).toEqual({ kind: 'unreadable', written: 'modal' });
   });
 });

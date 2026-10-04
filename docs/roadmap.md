@@ -56,7 +56,7 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 - Guitar only for now, as in the Chord Finder, whose Instruments let a ukulele or a bass follow later.
 - Diagrams show and hide with the Chords, through Read mode's "Chords" button. Hiding the Chords hides the diagrams too.
 - This reuses the Chord Finder's diagrams and the user's preferred Voicings, so a Chord looks the same on the Lyric Sheet as in the Chord Finder.
-- Diagrams follow the Song's tuning and capo, and draw the Chords as shown, so a transposed Song gets diagrams for the transposed Chords. A Chord name that can't be read gets no diagram rather than a guess. Which Voicings are shown, how a diagram is reached (hovering a Chord, a strip above the sheet), and whether Write mode shows them too, are for the spec.
+- Diagrams follow the Song's tuning, and draw the Chords as shown, so a transposed Song gets diagrams for the transposed Chords. A Chord name that can't be read gets no diagram rather than a guess. Which Voicings are shown, how a diagram is reached (hovering a Chord, a strip above the sheet), and whether Write mode shows them too, are for the spec.
 
 ## Hear a Chord in the Chord Finder
 

@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
-  capoLimit,
-  finderCapoKey,
   finderKeyKey,
   finderTuningKey,
   readFinderKey,
-  readFinderSetup,
+  readFinderTuning,
   storeFinderKey,
-  storeFinderSetup,
+  storeFinderTuning,
 } from './finderSetup';
 
 /** A Storage holding some values, or one that throws like a blocked one. */
@@ -22,56 +20,59 @@ function storage(values: Record<string, string> = {}, blocked = false): Storage 
   } as Storage;
 }
 
-const standard = { tuning: 'Standard', capo: 0 };
-
-describe('readFinderSetup', () => {
-  it('is standard tuning and no capo until picked on this device', () => {
-    expect(readFinderSetup(storage())).toEqual(standard);
+describe('the tuning', () => {
+  it('is standard tuning until picked on this device', () => {
+    expect(readFinderTuning(storage())).toBe('Standard');
   });
 
-  it('is standard tuning and no capo without storage, or when it is blocked', () => {
-    expect(readFinderSetup(undefined)).toEqual(standard);
-    expect(readFinderSetup(storage({}, true))).toEqual(standard);
+  it('is standard tuning without storage, or when it is blocked', () => {
+    expect(readFinderTuning(undefined)).toBe('Standard');
+    expect(readFinderTuning(storage({}, true))).toBe('Standard');
   });
-});
 
-describe('storeFinderSetup', () => {
-  it('keeps the tuning and capo picked, to read back after a reload', () => {
+  it('keeps the tuning picked, to read back after a reload', () => {
     const s = storage();
-    storeFinderSetup(s, { tuning: 'Drop D', capo: 2 });
-    expect(readFinderSetup(s)).toEqual({ tuning: 'Drop D', capo: 2 });
+    storeFinderTuning(s, 'Drop D');
+    expect(readFinderTuning(s)).toBe('Drop D');
   });
 
   it('keeps a custom tuning as its six notes', () => {
     const s = storage();
-    storeFinderSetup(s, { tuning: 'C G D G B D', capo: 0 });
-    expect(readFinderSetup(s)).toEqual({ tuning: 'C G D G B D', capo: 0 });
+    storeFinderTuning(s, 'C G D G B D');
+    expect(readFinderTuning(s)).toBe('C G D G B D');
   });
 
-  it('forgets the choice once back to standard tuning and no capo', () => {
+  it('forgets the choice once back to standard tuning', () => {
     const values: Record<string, string> = {};
-    storeFinderSetup(storage(values), { tuning: 'Open G', capo: 5 });
-    storeFinderSetup(storage(values), standard);
+    storeFinderTuning(storage(values), 'Open G');
+    storeFinderTuning(storage(values), 'Standard');
     expect(values).toEqual({});
   });
 
   it('does nothing without storage, or when it is blocked', () => {
-    expect(() => storeFinderSetup(undefined, { tuning: 'Drop D', capo: 2 })).not.toThrow();
-    expect(() => storeFinderSetup(storage({}, true), { tuning: 'Drop D', capo: 2 })).not.toThrow();
+    expect(() => storeFinderTuning(undefined, 'Drop D')).not.toThrow();
+    expect(() => storeFinderTuning(storage({}, true), 'Drop D')).not.toThrow();
+  });
+
+  it('reads a tuning it can no longer read as standard tuning', () => {
+    expect(readFinderTuning(storage({ [finderTuningKey]: 'Nashville' }))).toBe('Standard');
   });
 });
 
-describe('a kept setup that has gone wrong', () => {
-  it('reads a tuning it can no longer read as standard tuning, keeping the capo', () => {
-    const values = { [finderTuningKey]: 'Nashville', [finderCapoKey]: '3' };
-    expect(readFinderSetup(storage(values))).toEqual({ tuning: 'Standard', capo: 3 });
+describe('a capo kept from before', () => {
+  // The Chord Finder once had a capo, kept on each device under this key.
+  const capoKey = 'bandmate.chordFinder.capo';
+
+  it('is deleted when the tuning is read, which still reads the kept tuning', () => {
+    const values: Record<string, string> = { [finderTuningKey]: 'Drop D', [capoKey]: '3' };
+    expect(readFinderTuning(storage(values))).toBe('Drop D');
+    expect(values).toEqual({ [finderTuningKey]: 'Drop D' });
   });
 
-  it('reads a capo that is not a fret it offers as no capo, keeping the tuning', () => {
-    for (const capo of ['-1', '1.5', 'two', String(capoLimit + 1)]) {
-      const values = { [finderTuningKey]: 'Drop D', [finderCapoKey]: capo };
-      expect(readFinderSetup(storage(values)), capo).toEqual({ tuning: 'Drop D', capo: 0 });
-    }
+  it('is deleted with standard tuning kept too', () => {
+    const values: Record<string, string> = { [capoKey]: '5' };
+    expect(readFinderTuning(storage(values))).toBe('Standard');
+    expect(values).toEqual({});
   });
 });
 

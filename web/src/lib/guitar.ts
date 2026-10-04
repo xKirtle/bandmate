@@ -14,13 +14,13 @@ export interface Barre {
 
 /** One way to play a Chord on the guitar. */
 export interface Voicing {
-  /** Each string's fret, low string to high, counted from the capo: 0 for open, null for muted. */
+  /** Each string's fret, low string to high: 0 for open, null for muted. */
   frets: (number | null)[];
   /** The barre the Voicing needs, if it can't be played with four fingers otherwise. */
   barre?: Barre;
 }
 
-/** The highest fret a Voicing reaches, counted from the capo. */
+/** The highest fret a Voicing reaches. */
 const highestFret = 12;
 /** The highest fret a first-position Voicing, like the open Chords, reaches. */
 const firstPositionFret = 3;
@@ -80,9 +80,6 @@ const height = (frets: (number | null)[]) => frets.reduce<number>((sum, f) => su
  * muted string between sounding ones, has its bass on the 6th, 5th or 4th
  * string (treble strings may be muted), and fits a hand: four frets, four
  * fingers, a barre counting as one. A slash Chord's bass is its lowest note.
- * With a capo on, a Chord names the shape fingered, not the pitch that
- * sounds, so its Voicings are the shapes it has with the capo as the nut:
- * frets count from the capo, and the capo moves none of them.
  */
 export function guitarVoicings(chord: Chord, tuning: readonly number[]): Voicing[] {
   const pitchClass = (string: number, fret: number) => (tuning[string] + fret) % 12;
@@ -141,8 +138,7 @@ export function guitarVoicings(chord: Chord, tuning: readonly number[]): Voicing
 
 /**
  * The notes a shape placed on a guitar sounds, as semitones from C, 0–11,
- * low string to high. With a capo on, frets count from it and, as a Chord
- * names the shape fingered, the capo moves none of them.
+ * low string to high.
  */
 export function guitarNotes(frets: readonly (number | null)[], tuning: readonly number[]): number[] {
   return frets.flatMap((fret, string) => (fret === null ? [] : [(tuning[string] + fret) % 12]));
