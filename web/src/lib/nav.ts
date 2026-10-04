@@ -4,8 +4,11 @@
 /** A top-level list the navigation leads to. */
 export type LibraryPage = 'songs' | 'beats';
 
-/** Any page the navigation leads to: the lists, and About apart from them. */
-export type NavPage = LibraryPage | 'about';
+/** A top-level page the navigation leads to: the lists and the Chord Finder. */
+export type MainPage = LibraryPage | 'chords';
+
+/** Any page the navigation leads to: the main pages, and About apart from them. */
+export type NavPage = MainPage | 'about';
 
 interface NavLink<Id extends NavPage> {
   id: Id;
@@ -17,7 +20,11 @@ interface NavLink<Id extends NavPage> {
 export const pages = [
   { id: 'songs', href: '/', label: 'Songs', icon: '♪' },
   { id: 'beats', href: '/beats', label: 'Beats', icon: '◉' },
-] as const satisfies readonly NavLink<LibraryPage>[];
+  { id: 'chords', href: '/chords', label: 'Chord Finder', icon: '♯' },
+] as const satisfies readonly NavLink<MainPage>[];
+
+/** Whether a main page is a list, which the navigation returns to as it was left. */
+const isList = (page: MainPage): page is LibraryPage => page === 'songs' || page === 'beats';
 
 /**
  * About, pinned to the bottom of the nav rail, and the last tab of the tab
@@ -28,12 +35,14 @@ export const about = { id: 'about', href: '/about', label: 'About' } as const sa
 
 /**
  * The page the navigation marks as current for a path: Songs for the Song
- * list and anything under /songs, Beats for the Beat Library, About for the
- * About page, and none for a path that isn't the app's.
+ * list and anything under /songs, Beats for the Beat Library, the Chord
+ * Finder for its page, About for the About page, and none for a path that
+ * isn't the app's.
  */
 export function currentPage(path: string): NavPage | undefined {
   if (path === '/' || path.startsWith('/songs/')) return 'songs';
   if (path === '/beats') return 'beats';
+  if (path === '/chords') return 'chords';
   if (path === about.href) return 'about';
   return undefined;
 }
@@ -43,5 +52,6 @@ export function currentPage(path: string): NavPage | undefined {
  * a Song. The navigation returns to a list as it was left there.
  */
 export function listAt(path: string): LibraryPage | undefined {
-  return pages.find((page) => page.href === path)?.id;
+  const page = pages.find((page) => page.href === path)?.id;
+  return page && isList(page) ? page : undefined;
 }

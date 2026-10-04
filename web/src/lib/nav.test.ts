@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { currentPage, listAt } from './nav';
+import { currentPage, listAt, pages } from './nav';
 
 describe('currentPage', () => {
   it('marks Songs on the Song list and every page of a Song', () => {
@@ -12,6 +12,10 @@ describe('currentPage', () => {
     expect(currentPage('/beats')).toBe('beats');
   });
 
+  it('marks the Chord Finder on its page', () => {
+    expect(currentPage('/chords')).toBe('chords');
+  });
+
   it('marks About on the About page', () => {
     expect(currentPage('/about')).toBe('about');
   });
@@ -21,6 +25,7 @@ describe('currentPage', () => {
     expect(currentPage('/aboutx')).toBeUndefined();
     expect(currentPage('/beatsx')).toBeUndefined();
     expect(currentPage('/songsx')).toBeUndefined();
+    expect(currentPage('/chordsx')).toBeUndefined();
   });
 });
 
@@ -35,5 +40,19 @@ describe('listAt', () => {
     expect(listAt('/songs/import')).toBeUndefined();
     expect(listAt('/nowhere')).toBeUndefined();
     expect(listAt('/about')).toBeUndefined();
+  });
+
+  it('is none on the Chord Finder, which is no list', () => {
+    expect(listAt('/chords')).toBeUndefined();
+  });
+});
+
+describe('pages', () => {
+  it('leads to the Songs, the Beats and the Chord Finder, in that order', () => {
+    expect(pages.map((p) => [p.label, p.href])).toEqual([
+      ['Songs', '/'],
+      ['Beats', '/beats'],
+      ['Chord Finder', '/chords'],
+    ]);
   });
 });
