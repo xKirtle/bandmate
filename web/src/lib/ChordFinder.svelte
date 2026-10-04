@@ -3,6 +3,7 @@
   // shows it, and a Song is to show it too, in a side panel or a phone sheet.
   import ChordDiagram from './ChordDiagram.svelte';
   import { lookUp, qualities, roots, type FinderContext } from './chordFinder';
+  import { leftHanded } from './sharedLeftHanded.svelte';
   import Picker from './Picker.svelte';
 
   let { context }: { context: FinderContext } = $props();
@@ -63,22 +64,31 @@
 </script>
 
 <div class="finder">
-  <div class="tabs" role="tablist" aria-label="Chord Finder">
-    {#each tabs as t, i (t.id)}
-      <button
-        bind:this={tabButtons[i]}
-        id="finder-tab-{t.id}"
-        type="button"
-        role="tab"
-        aria-selected={tab === t.id}
-        aria-controls="finder-panel-{t.id}"
-        tabindex={tab === t.id ? 0 : -1}
-        onclick={() => (tab = t.id)}
-        onkeydown={(e) => tabKey(e, i)}
-      >
-        {t.label}
-      </button>
-    {/each}
+  <div class="bar">
+    <div class="tabs" role="tablist" aria-label="Chord Finder">
+      {#each tabs as t, i (t.id)}
+        <button
+          bind:this={tabButtons[i]}
+          id="finder-tab-{t.id}"
+          type="button"
+          role="tab"
+          aria-selected={tab === t.id}
+          aria-controls="finder-panel-{t.id}"
+          tabindex={tab === t.id ? 0 : -1}
+          onclick={() => (tab = t.id)}
+          onkeydown={(e) => tabKey(e, i)}
+        >
+          {t.label}
+        </button>
+      {/each}
+    </div>
+    <button
+      type="button"
+      class="button toggle"
+      aria-pressed={leftHanded.on}
+      onclick={() => leftHanded.set(!leftHanded.on)}
+      title="Mirror the diagrams for a left-handed player">Left-handed</button
+    >
   </div>
 
   {#each tabs as t (t.id)}
@@ -183,12 +193,31 @@
     border-radius: 0.75rem;
     background: var(--surface-1);
   }
+  /* The tabs, and the left-handed setting at the end, on its own line on a narrow phone. */
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem 0.5rem;
+    padding: 0 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
   .tabs {
     display: flex;
     flex-wrap: wrap;
     gap: 0.25rem;
-    padding: 0 0.5rem;
-    border-bottom: 1px solid var(--border);
+  }
+  .toggle {
+    min-height: 2rem;
+    margin-left: auto;
+    padding: 0 0.75rem;
+    font-size: 0.8125rem;
+  }
+  .toggle[aria-pressed='true'] {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--accent-text);
   }
   [role='tab'] {
     min-height: var(--control);

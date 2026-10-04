@@ -3,9 +3,11 @@
   // string on the left, the nut (or the fret the Voicing starts at, up the
   // neck) at the top. Above it, ○ marks a string that rings open and × one
   // that's muted. With a capo on, frets count from it: it's drawn as the nut,
-  // and labelled under the diagram. "How to play a Chord" on the Lyric Sheet
-  // is to reuse it.
+  // and labelled under the diagram. On a left-handed device it's mirrored,
+  // the low string on the right. "How to play a Chord" on the Lyric Sheet is
+  // to reuse it.
   import type { Voicing } from './chordFinder';
+  import { leftHanded } from './sharedLeftHanded.svelte';
 
   let { voicing, name, capo = 0 }: { voicing: Voicing; name: string; capo?: number } = $props();
 
@@ -35,7 +37,12 @@
     return fretted.length === 0 || Math.max(...fretted) <= rows ? 1 : Math.min(...fretted);
   });
 
-  const x = (string: number) => left + string * stringGap;
+  /**
+   * Where a string is drawn, counted from the low one: mirrored for a
+   * left-handed player. The neck's edges are left and left + neckWidth,
+   * whichever way it's drawn, never x(0).
+   */
+  const x = (string: number) => left + (leftHanded.on ? strings - 1 - string : string) * stringGap;
   /** The middle of a fret's row, where a finger presses. */
   const y = (fret: number) => top + (fret - start + 0.5) * fretGap;
 
@@ -60,15 +67,15 @@
 <svg class="diagram" viewBox="0 0 {width} {height}" role="img" aria-label={label}>
   <!-- Frets, then strings over them. -->
   {#each { length: rows + 1 } as _, i (i)}
-    <line class="fret" x1={x(0)} x2={x(strings - 1)} y1={top + i * fretGap} y2={top + i * fretGap} />
+    <line class="fret" x1={left} x2={left + neckWidth} y1={top + i * fretGap} y2={top + i * fretGap} />
   {/each}
   {#each { length: strings } as _, s (s)}
     <line class="string" x1={x(s)} x2={x(s)} y1={top} y2={top + rows * fretGap} />
   {/each}
   {#if start === 1 && capo > 0}
-    <rect class="capo" x={x(0) - 5} y={top - 4} width={neckWidth + 10} height="6" rx="3" />
+    <rect class="capo" x={left - 5} y={top - 4} width={neckWidth + 10} height="6" rx="3" />
   {:else if start === 1}
-    <rect class="nut" x={x(0) - 1} y={top - 3} width={neckWidth + 2} height="4" />
+    <rect class="nut" x={left - 1} y={top - 3} width={neckWidth + 2} height="4" />
   {:else}
     <text class="start" x={left - 6} y={y(start)} text-anchor="end" dominant-baseline="central">{start}fr</text>
   {/if}
@@ -85,7 +92,7 @@
     {@const b = voicing.barre}
     <rect
       class="finger"
-      x={x(b.from) - 6}
+      x={Math.min(x(b.from), x(b.to)) - 6}
       y={y(b.fret) - 6}
       width={(b.to - b.from) * stringGap + 12}
       height="12"
@@ -97,7 +104,7 @@
   {/each}
 
   {#if capo > 0}
-    <text class="capo-label" x={x(0) + neckWidth / 2} y={top + rows * fretGap + 14} text-anchor="middle">
+    <text class="capo-label" x={left + neckWidth / 2} y={top + rows * fretGap + 14} text-anchor="middle">
       Capo {capo}
     </text>
   {/if}
