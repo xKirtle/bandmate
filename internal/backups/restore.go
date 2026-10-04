@@ -109,7 +109,7 @@ type Restored struct {
 	Beats int    `json:"beats"`
 }
 
-// Restore brings back what picks picks from a Backup: Songs, each with the
+// Restore brings back what picks names from a Backup: Songs, each with the
 // Beats its Clips use, and the Beat Library. It never deletes a Song or
 // Beat the Backup doesn't hold. What it picks is copied in with fresh ids,
 // all of it or, if anything fails, none. A Song or Beat
@@ -148,7 +148,7 @@ func (s *Store) Restore(ctx context.Context, id int64, picks Picks, replace Repl
 	return s.copyIn(ctx, r.staging, picked, replace)
 }
 
-// pick checks picks picks Songs the Backup holds, listing each once, or
+// pick checks picks names Songs the Backup holds, listing each once, or
 // its Beat Library, if it holds one, or both.
 func (r *openedBackup) pick(ctx context.Context, picks Picks) (Picks, error) {
 	if len(picks.Songs) == 0 && !picks.BeatLibrary {
@@ -366,7 +366,7 @@ func (r *openedBackup) unpackFiles(ctx context.Context, files []songFile, args .
 	return nil
 }
 
-// copyIn copies what picks picks from the Backup's database in staging
+// copyIn copies what picks names from the Backup's database in staging
 // into the live one in one transaction, with fresh ids, but for the Songs
 // and Beats replace lists, linking in their unpacked files under those ids,
 // and returns what it copied in.
@@ -451,7 +451,7 @@ func (s *Store) copyIn(ctx context.Context, staging string, picks Picks, replace
 	return restored, nil
 }
 
-// giveIDs picks, for each row of what picks picks, the id it gets in the
+// giveIDs picks, for each row of what picks names, the id it gets in the
 // live database: for a Song or Beat already in Bandmate that replace
 // lists, the id of the one it replaces, and otherwise a fresh one, past
 // every id its table has used, in the order of their ids in the Backup.

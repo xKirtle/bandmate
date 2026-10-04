@@ -37,8 +37,17 @@ export function songCount(n: number): string {
 }
 
 /** "1 Beat", "3 Beats". */
-export function beatCount(n: number): string {
+function beatCount(n: number): string {
   return `${n} ${n === 1 ? 'Beat' : 'Beats'}`;
+}
+
+/**
+ * What a Restore brought back, in a few words: "2 Songs", "1 Song and 1 Beat",
+ * "14 Beats". The Beats are named when there were any, or when the Beat
+ * Library was restored, even if it held none.
+ */
+export function restoredName(songs: number, beats: number, beatLibrary: boolean): string {
+  return [songs > 0 && songCount(songs), (beats > 0 || beatLibrary) && beatCount(beats)].filter(Boolean).join(' and ');
 }
 
 /**

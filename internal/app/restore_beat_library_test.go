@@ -79,7 +79,7 @@ func (ts *testServer) presentPicked(id int64, body map[string]any) (presentSongs
 	return got.Songs, got.Beats
 }
 
-func TestTheBeatLibrarysBeatsAlreadyInBandmateAreReplacedOrKeptBoth(t *testing.T) {
+func TestBeatsOfTheBeatLibraryAlreadyInBandmateAreReplacedOrKeptBoth(t *testing.T) {
 	ts := newTestServer(t)
 	used := ts.uploadBeat(fakeAudio("used.mp3").with(map[string]any{"title": "Used", "producer": "Kai"}))
 	unused := ts.uploadBeat(fakeAudio("unused.mp3").with(map[string]any{"title": "Unused", "producer": "Kai"}))

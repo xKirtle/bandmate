@@ -10,7 +10,7 @@
     type BackupSong,
   } from './api';
   import { closeOnBackdrop } from './backdrop';
-  import { backupName, beatCount, contentsName, replaceConfirmation, songCount } from './backups';
+  import { backupName, contentsName, replaceConfirmation, restoredName } from './backups';
 
   // "Restore": picks Songs from a Backup, some or all, and its Beat Library
   // if it holds one, then restores them, each Song with the Beats its Clips
@@ -44,17 +44,16 @@
   let restored = $state<BackupRestored>({ songs: [], beats: 0 });
   const replacingAny = $derived(replacing.songs.size + replacing.beats.size > 0);
   const picks = $derived<BackupPicks>({ songs: [...picked], beatLibrary });
+  /** How many things there are to pick: each Song, and the Beat Library if the Backup holds one. */
+  const pickable = $derived((songs?.length ?? 0) + (backup.beatLibrary ? 1 : 0));
+  const pickedAllSongs = $derived(songs !== null && picked.size === songs.length);
   /** What's picked, in a few words: "2 Songs", "Beat Library", "Everything" for all the Backup holds. */
   const pickedName = $derived(
-    contentsName({
-      songs: picked.size,
-      allSongs: songs !== null && songs.length > 0 && picked.size === songs.length,
-      beatLibrary,
-    }),
+    contentsName({ songs: picked.size, allSongs: picked.size > 0 && pickedAllSongs, beatLibrary }),
   );
   const pickedAny = $derived(picked.size > 0 || beatLibrary);
   /** Whether everything the Backup holds is picked. */
-  const pickedAll = $derived(songs !== null && picked.size === songs.length && beatLibrary === backup.beatLibrary);
+  const pickedAll = $derived(pickedAllSongs && beatLibrary === backup.beatLibrary);
 
   onMount(() => dialog?.showModal());
 
@@ -62,9 +61,8 @@
   api.backupSongs(backup.id).then(
     (list) => {
       songs = list;
-      // One Song, or the Beat Library alone, is the one thing to restore.
-      if (list.length === 1 && !backup.beatLibrary) picked = new Set([list[0].id]);
-      if (list.length === 0 && backup.beatLibrary) beatLibrary = true;
+      // With one thing to restore, it's picked.
+      if (pickable === 1) pickAll();
     },
     (e: Error) => (loadError = e.message),
   );
@@ -72,6 +70,11 @@
   function pickAll() {
     picked = new Set(songs?.map((s) => s.id));
     beatLibrary = backup.beatLibrary;
+  }
+
+  function clearPicks() {
+    picked = new Set();
+    beatLibrary = false;
   }
 
   function toggle(id: number) {
@@ -162,17 +165,10 @@
       <p>This Backup holds no Songs.</p>
     {:else}
       <div class="choose">
-        {#if songs.length + (backup.beatLibrary ? 1 : 0) > 1}
+        {#if pickable > 1}
           <div class="choose-actions">
             <button type="button" class="link" onclick={pickAll} disabled={pickedAll}>Choose all</button>
-            <button
-              type="button"
-              class="link"
-              onclick={() => ((picked = new Set()), (beatLibrary = false))}
-              disabled={!pickedAny}
-            >
-              Clear
-            </button>
+            <button type="button" class="link" onclick={clearPicks} disabled={!pickedAny}>Clear</button>
           </div>
         {/if}
         {#if songs.length > 0}
@@ -270,14 +266,7 @@
     <progress aria-label="Restoring"></progress>
     <p class="muted">Don't leave or close this page until it's done.</p>
   {:else}
-    <p role="status">
-      Restored {[
-        restored.songs.length > 0 && songCount(restored.songs.length),
-        (restored.beats > 0 || beatLibrary) && beatCount(restored.beats),
-      ]
-        .filter(Boolean)
-        .join(' and ')}.
-    </p>
+    <p role="status">Restored {restoredName(restored.songs.length, restored.beats, beatLibrary)}.</p>
     {#if restored.songs.length > 0}
       <ul class="restored">
         {#each restored.songs as song (song.id)}
