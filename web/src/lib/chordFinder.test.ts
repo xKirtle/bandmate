@@ -295,6 +295,9 @@ describe('Voicings in the tuning and capo in use', () => {
     expect(voicingsOf('G', standard, 2)[0]).toBe('320003');
     expect(voicingsOf('C', standard, 2)[0]).toBe('x32010');
     expect(voicingsOf('D', dropD, 2)).toContain('000232');
+    // The capo moves no shape: they're the shapes with no capo, the capo as the nut.
+    expect(voicingsOf('G', standard, 2)).toEqual(voicingsOf('G'));
+    expect(voicingsOf('F#m7', dropD, 5)).toEqual(voicingsOf('F#m7', dropD));
   });
 
   it('reaches the 12th fret above the capo, and none past it', () => {

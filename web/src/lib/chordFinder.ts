@@ -82,6 +82,6 @@ export function lookUp(name: string, context: FinderContext): LookUp {
     quality: chord.quality.suffix,
     bass: chord.bassName,
     notes: chord.notes,
-    voicings: guitarVoicings(chord, context),
+    voicings: guitarVoicings(chord, context.tuning),
   };
 }

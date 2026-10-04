@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { capoLimit, readFinderSetup, storeFinderSetup } from './finderSetup';
+import { capoLimit, finderCapoKey, finderTuningKey, readFinderSetup, storeFinderSetup } from './finderSetup';
 
 /** A Storage holding some values, or one that throws like a blocked one. */
 function storage(values: Record<string, string> = {}, blocked = false): Storage {
@@ -54,17 +54,13 @@ describe('storeFinderSetup', () => {
 
 describe('a kept setup that has gone wrong', () => {
   it('reads a tuning it can no longer read as standard tuning, keeping the capo', () => {
-    const values: Record<string, string> = {};
-    storeFinderSetup(storage(values), { tuning: 'Drop D', capo: 3 });
-    for (const key of Object.keys(values)) if (values[key] === 'Drop D') values[key] = 'Nashville';
+    const values = { [finderTuningKey]: 'Nashville', [finderCapoKey]: '3' };
     expect(readFinderSetup(storage(values))).toEqual({ tuning: 'Standard', capo: 3 });
   });
 
   it('reads a capo that is not a fret it offers as no capo, keeping the tuning', () => {
     for (const capo of ['-1', '1.5', 'two', String(capoLimit + 1)]) {
-      const values: Record<string, string> = {};
-      storeFinderSetup(storage(values), { tuning: 'Drop D', capo: 3 });
-      for (const key of Object.keys(values)) if (values[key] === '3') values[key] = capo;
+      const values = { [finderTuningKey]: 'Drop D', [finderCapoKey]: capo };
       expect(readFinderSetup(storage(values)), capo).toEqual({ tuning: 'Drop D', capo: 0 });
     }
   });

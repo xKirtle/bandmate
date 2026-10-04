@@ -32,7 +32,7 @@
       <TuningField
         id="finder-tuning"
         labelledby="finder-tuning-label"
-        optional={false}
+        allowNone={false}
         bind:value={setup.tuning}
         oncommit={keep}
         oninvalid={(message) => (tuningError = message)}

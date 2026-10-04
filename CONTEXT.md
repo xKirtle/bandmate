@@ -79,7 +79,7 @@ _Avoid_: Key change
 The key a Song is written in, one of its Details. Like a Chord, with a capo on it names the shapes fingered, not the pitch that sounds: capo 2 in G sounds in A.
 
 **Chord Finder**:
-A built-in reference for Chords: look up how to play one, name one from the notes placed on an Instrument, and get Chords that go well with a Chord or a Key. Opened from a Song, it follows that Song's tuning, capo and Key as shown, Transpose included. It holds nothing of the user's.
+A built-in reference for Chords: look up how to play one, name one from the notes placed on an Instrument, and get Chords that go well with a Chord or a Key. Opened from a Song, it follows that Song's tuning, capo and Key as shown, Transpose included. On its own page, the user picks the tuning and capo, and the last ones picked are kept on each device. It holds nothing of the user's.
 _Avoid_: Chord Library (a library holds the user's things, like the Beat Library)
 
 **Voicing**:

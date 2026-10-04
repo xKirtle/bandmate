@@ -12,7 +12,7 @@
     id,
     labelledby,
     value = $bindable(''),
-    optional = true,
+    allowNone = true,
     oncommit,
     oninvalid,
   }: {
@@ -22,7 +22,7 @@
     /** The tuning as text, as the Song holds it. */
     value?: string;
     /** Whether no tuning (—) can be picked. */
-    optional?: boolean;
+    allowNone?: boolean;
     /** `value` was set to a tuning to save. */
     oncommit: () => void;
     /** Custom notes couldn't be read, so nothing was saved. */
@@ -48,7 +48,7 @@
   });
   const choice = $derived(customising ? custom : valueChoice);
   const options = $derived([
-    ...(optional ? [none] : []),
+    ...(allowNone ? [none] : []),
     ...named,
     custom,
     ...(valueChoice === unreadable ? [unreadable] : []),

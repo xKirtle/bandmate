@@ -84,8 +84,7 @@ const height = (frets: (number | null)[]) => frets.reduce<number>((sum, f) => su
  * sounds, so its Voicings are the shapes it has with the capo as the nut:
  * frets count from the capo, and the capo moves none of them.
  */
-export function guitarVoicings(chord: Chord, context: { tuning: readonly number[]; capo: number }): Voicing[] {
-  const { tuning } = context;
+export function guitarVoicings(chord: Chord, tuning: readonly number[]): Voicing[] {
   const pitchClass = (string: number, fret: number) => (tuning[string] + fret) % 12;
   const tones = new Set(chord.quality.tones.map((t) => (chord.root + t.semitones) % 12));
   const required = chord.quality.tones.filter((t) => !t.optional).map((t) => (chord.root + t.semitones) % 12);

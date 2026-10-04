@@ -21,7 +21,9 @@
   const bottom = $derived(capo > 0 ? 20 : 6);
 
   const strings = $derived(voicing.frets.length);
-  const width = $derived(left + (strings - 1) * stringGap + right);
+  /** From the low string to the high one. */
+  const neckWidth = $derived((strings - 1) * stringGap);
+  const width = $derived(left + neckWidth + right);
   const height = $derived(top + rows * fretGap + bottom);
 
   /**
@@ -64,9 +66,9 @@
     <line class="string" x1={x(s)} x2={x(s)} y1={top} y2={top + rows * fretGap} />
   {/each}
   {#if start === 1 && capo > 0}
-    <rect class="capo" x={x(0) - 5} y={top - 4} width={(strings - 1) * stringGap + 10} height="6" rx="3" />
+    <rect class="capo" x={x(0) - 5} y={top - 4} width={neckWidth + 10} height="6" rx="3" />
   {:else if start === 1}
-    <rect class="nut" x={x(0) - 1} y={top - 3} width={(strings - 1) * stringGap + 2} height="4" />
+    <rect class="nut" x={x(0) - 1} y={top - 3} width={neckWidth + 2} height="4" />
   {:else}
     <text class="start" x={left - 6} y={y(start)} text-anchor="end" dominant-baseline="central">{start}fr</text>
   {/if}
@@ -95,12 +97,7 @@
   {/each}
 
   {#if capo > 0}
-    <text
-      class="capo-label"
-      x={x(0) + ((strings - 1) * stringGap) / 2}
-      y={top + rows * fretGap + 14}
-      text-anchor="middle"
-    >
+    <text class="capo-label" x={x(0) + neckWidth / 2} y={top + rows * fretGap + 14} text-anchor="middle">
       Capo {capo}
     </text>
   {/if}
