@@ -424,14 +424,20 @@ func TestASongFromAnotherInstallNeverCountsAsAlreadyThere(t *testing.T) {
 	}
 }
 
-func TestARestoreMustPickSongsTheBackupHolds(t *testing.T) {
+func TestARestoreMustPickWhatTheBackupHolds(t *testing.T) {
 	ts := newTestServer(t)
 	s := ts.createSong("Night Drive")
+	timelineChange(t, ts.addBeatToSong(s.ID, ts.beatOfLength("Used", 20).ID))
 	made := ts.backUp(map[string]any{"allSongs": true})
 	path := backupPath(made.ID) + "/restore"
 
 	expectError(t, ts.Do(http.MethodPost, path, map[string]any{"songs": []int64{}}),
-		http.StatusBadRequest, "pick at least one Song to restore")
+		http.StatusBadRequest, "pick at least one Song, or the Beat Library, to restore")
+	// It holds the Beat its Song uses, but not the Beat Library.
+	expectError(t, ts.Do(http.MethodPost, path, map[string]any{"songs": []int64{s.ID}, "beatLibrary": true}),
+		http.StatusBadRequest, "the Backup doesn't hold the Beat Library")
+	expectError(t, ts.Do(http.MethodPost, backupPath(made.ID)+"/present", map[string]any{"beatLibrary": true}),
+		http.StatusBadRequest, "the Backup doesn't hold the Beat Library")
 	expectError(t, ts.Do(http.MethodPost, path, map[string]any{"songs": []int64{s.ID, s.ID + 1}}),
 		http.StatusBadRequest, "a Song picked isn't in the Backup")
 	expectError(t, ts.Do(http.MethodPost, backupPath(made.ID+1)+"/restore", map[string]any{"songs": []int64{s.ID}}),
@@ -440,6 +446,9 @@ func TestARestoreMustPickSongsTheBackupHolds(t *testing.T) {
 
 	if got := titles(ts.listSongs()); !reflect.DeepEqual(got, []string{"Night Drive"}) {
 		t.Errorf("songs = %q, want nothing restored", got)
+	}
+	if got := beatTitles(ts.listBeats()); !reflect.DeepEqual(got, []string{"Used"}) {
+		t.Errorf("beats = %q, want nothing restored", got)
 	}
 }
 

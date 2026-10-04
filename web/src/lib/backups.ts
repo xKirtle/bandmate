@@ -37,7 +37,7 @@ export function songCount(n: number): string {
 }
 
 /** "1 Beat", "3 Beats". */
-function beatCount(n: number): string {
+export function beatCount(n: number): string {
   return `${n} ${n === 1 ? 'Beat' : 'Beats'}`;
 }
 

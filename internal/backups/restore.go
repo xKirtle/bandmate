@@ -69,9 +69,50 @@ type Replace struct {
 	Beats []int64 `json:"beats"`
 }
 
-// Restore brings back the Songs a Backup holds with ids, each with the
-// Beats its Clips use, and returns them, by title. They're copied in with
-// fresh ids, all of them or, if anything fails, none. A Song or Beat
+// Picks is what a Restore brings back from a Backup: the Songs picked, by
+// their ids in it, each with the Beats its Clips use, and the whole Beat
+// Library or not. Every Song it holds, with its Beat Library if it holds
+// one, is everything it holds.
+type Picks struct {
+	Songs       []int64 `json:"songs"`
+	BeatLibrary bool    `json:"beatLibrary"`
+}
+
+// rowsPicked picks rows of a table to restore: where, given arg, a Song's
+// id, or nothing for the Beat Library.
+type rowsPicked struct {
+	where string
+	arg   any
+}
+
+// rows lists what picks the rows of table t to restore: its rows of each
+// Song picked and, for the Beats, every one if the Beat Library is picked.
+func (p Picks) rows(t songTable) []rowsPicked {
+	var list []rowsPicked
+	for _, song := range p.Songs {
+		list = append(list, rowsPicked{t.where, song})
+	}
+	if p.BeatLibrary {
+		for _, lib := range beatLibraryTables {
+			if lib.name == t.name {
+				list = append(list, rowsPicked{lib.where, nil})
+			}
+		}
+	}
+	return list
+}
+
+// Restored is what a Restore brought back: the Songs, by title, and how
+// many Beats it added or replaced, with the Songs or as the Beat Library.
+type Restored struct {
+	Songs []Song `json:"songs"`
+	Beats int    `json:"beats"`
+}
+
+// Restore brings back what picks picks from a Backup: Songs, each with the
+// Beats its Clips use, and the Beat Library. It never deletes a Song or
+// Beat the Backup doesn't hold. What it picks is copied in with fresh ids,
+// all of it or, if anything fails, none. A Song or Beat
 // already in Bandmate (the same one, by its identity) is kept, unless
 // replace lists it: the restored one is added alongside, titled as
 // restored, with an identity of its own, and a restored Song plays the
@@ -80,47 +121,55 @@ type Replace struct {
 // that is refused; what it had that the Backup's doesn't is gone. A Beat
 // replaced keeps its id, its audio and its place in every Song using it,
 // taking the Backup's Details.
-func (s *Store) Restore(ctx context.Context, id int64, songs []int64, replace Replace) ([]Song, error) {
+func (s *Store) Restore(ctx context.Context, id int64, picks Picks, replace Replace) (Restored, error) {
 	r, err := s.openBackup(ctx, id)
 	if err != nil {
-		return nil, err
+		return Restored{}, err
 	}
 	defer r.close()
-	picked, err := r.pick(ctx, songs)
+	picked, err := r.pick(ctx, picks)
 	if err != nil {
-		return nil, err
+		return Restored{}, err
 	}
-	for _, song := range picked {
-		if err := r.unpackFiles(ctx, song); err != nil {
-			return nil, fmt.Errorf("restoring song %d: %w", song, err)
+	for _, song := range picked.Songs {
+		if err := r.unpackFiles(ctx, songFiles, song); err != nil {
+			return Restored{}, fmt.Errorf("restoring song %d: %w", song, err)
+		}
+	}
+	if picked.BeatLibrary {
+		if err := r.unpackFiles(ctx, beatLibraryFiles); err != nil {
+			return Restored{}, fmt.Errorf("restoring the beat library: %w", err)
 		}
 	}
 	// From here it's read attached to the live database.
 	if err := r.closeDB(); err != nil {
-		return nil, err
+		return Restored{}, err
 	}
 	return s.copyIn(ctx, r.staging, picked, replace)
 }
 
-// pick checks the Songs with ids are in the Backup, and lists them once
-// each.
-func (r *openedBackup) pick(ctx context.Context, songs []int64) ([]int64, error) {
-	if len(songs) == 0 {
-		return nil, &InvalidError{"pick at least one Song to restore"}
+// pick checks picks picks Songs the Backup holds, listing each once, or
+// its Beat Library, if it holds one, or both.
+func (r *openedBackup) pick(ctx context.Context, picks Picks) (Picks, error) {
+	if len(picks.Songs) == 0 && !picks.BeatLibrary {
+		return Picks{}, &InvalidError{"pick at least one Song, or the Beat Library, to restore"}
 	}
-	picked := []int64{}
-	for _, song := range songs {
-		if slices.Contains(picked, song) {
+	if picks.BeatLibrary && !r.backup.BeatLibrary {
+		return Picks{}, &InvalidError{"the Backup doesn't hold the Beat Library"}
+	}
+	picked := Picks{Songs: []int64{}, BeatLibrary: picks.BeatLibrary}
+	for _, song := range picks.Songs {
+		if slices.Contains(picked.Songs, song) {
 			continue
 		}
 		var exists int
 		if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM songs WHERE id = ?`, song).Scan(&exists); err != nil {
-			return nil, err
+			return Picks{}, err
 		}
 		if exists == 0 {
-			return nil, &InvalidError{"a Song picked isn't in the Backup"}
+			return Picks{}, &InvalidError{"a Song picked isn't in the Backup"}
 		}
-		picked = append(picked, song)
+		picked.Songs = append(picked.Songs, song)
 	}
 	return picked, nil
 }
@@ -142,19 +191,19 @@ type Presence struct {
 	Beats []Present `json:"beats"`
 }
 
-// Present lists which of the Songs a Backup holds with ids, and of the
-// Beats their Clips use, are already in Bandmate.
-func (s *Store) Present(ctx context.Context, id int64, songs []int64) (Presence, error) {
+// Present lists which of the Songs and Beats a Restore of picks would bring
+// back are already in Bandmate.
+func (s *Store) Present(ctx context.Context, id int64, picks Picks) (Presence, error) {
 	r, err := s.openBackup(ctx, id)
 	if err != nil {
 		return Presence{}, err
 	}
 	defer r.close()
-	picked, err := r.pick(ctx, songs)
+	picked, err := r.pick(ctx, picks)
 	if err != nil {
 		return Presence{}, err
 	}
-	ids, err := json.Marshal(picked)
+	ids, err := json.Marshal(picked.Songs)
 	if err != nil {
 		return Presence{}, err
 	}
@@ -164,8 +213,8 @@ func (s *Store) Present(ctx context.Context, id int64, songs []int64) (Presence,
 		return Presence{}, err
 	}
 	if p.Beats, err = s.present(ctx, r.db, "beats", `SELECT id, title, identity FROM beats
-		WHERE id IN (SELECT c.beat_id FROM clips c JOIN tracks t ON t.id = c.track_id
-			WHERE t.song_id IN (SELECT value FROM json_each(?)))`, string(ids)); err != nil {
+		WHERE ?2 OR id IN (SELECT c.beat_id FROM clips c JOIN tracks t ON t.id = c.track_id
+			WHERE t.song_id IN (SELECT value FROM json_each(?1)))`, string(ids), picked.BeatLibrary); err != nil {
 		return Presence{}, err
 	}
 	return p, nil
@@ -217,6 +266,7 @@ func (s *Store) present(ctx context.Context, backup *sql.DB, table, query string
 // openedBackup is a Backup's database, brought up to this Bandmate's schema
 // in a staging directory, beside the files unpacked from it.
 type openedBackup struct {
+	backup  Backup
 	file    *zip.ReadCloser
 	staging string
 	db      *sql.DB
@@ -225,14 +275,15 @@ type openedBackup struct {
 // openBackup unpacks a Backup's database into a staging directory and runs
 // the migrations on it, leaving the Backup's file as it is.
 func (s *Store) openBackup(ctx context.Context, id int64) (*openedBackup, error) {
-	if _, err := s.get(ctx, id); err != nil {
+	b, err := s.get(ctx, id)
+	if err != nil {
 		return nil, err
 	}
 	file, err := zip.OpenReader(s.path(id))
 	if err != nil {
 		return nil, fmt.Errorf("opening backup file: %w", err)
 	}
-	r := &openedBackup{file: file}
+	r := &openedBackup{backup: b, file: file}
 	if r.staging, err = os.MkdirTemp(s.dir, makingPrefix+"*"); err != nil {
 		r.close()
 		return nil, fmt.Errorf("restoring backup: %w", err)
@@ -294,10 +345,10 @@ func stagedFile(staging, dir string, id int64) string {
 	return filepath.Join(staging, "files", filepath.FromSlash(dir), strconv.FormatInt(id, 10))
 }
 
-// unpackFiles unpacks the files the Song with id uses, each once.
-func (r *openedBackup) unpackFiles(ctx context.Context, song int64) error {
-	for _, f := range songFiles {
-		ids, err := queryIDs(ctx, r.db, f.ids, song)
+// unpackFiles unpacks the files listed by files, given args, each once.
+func (r *openedBackup) unpackFiles(ctx context.Context, files []songFile, args ...any) error {
+	for _, f := range files {
+		ids, err := queryIDs(ctx, r.db, f.ids, args...)
 		if err != nil {
 			return err
 		}
@@ -315,23 +366,23 @@ func (r *openedBackup) unpackFiles(ctx context.Context, song int64) error {
 	return nil
 }
 
-// copyIn copies the Songs with ids, and the Beats their Clips use, from the
-// Backup's database in staging into the live one in one transaction, with
-// fresh ids, but for the Songs and Beats replace lists, linking in their
-// unpacked files under those ids, and returns the Songs copied in.
-func (s *Store) copyIn(ctx context.Context, staging string, songs []int64, replace Replace) (restored []Song, err error) {
+// copyIn copies what picks picks from the Backup's database in staging
+// into the live one in one transaction, with fresh ids, but for the Songs
+// and Beats replace lists, linking in their unpacked files under those ids,
+// and returns what it copied in.
+func (s *Store) copyIn(ctx context.Context, staging string, picks Picks, replace Replace) (restored Restored, err error) {
 	conn, err := s.db.Conn(ctx)
 	if err != nil {
-		return nil, err
+		return Restored{}, err
 	}
 	defer conn.Close()
 	if _, err := conn.ExecContext(ctx, `ATTACH DATABASE ? AS src`, filepath.Join(staging, db.FileName)); err != nil {
-		return nil, fmt.Errorf("reading the backup database: %w", err)
+		return Restored{}, fmt.Errorf("reading the backup database: %w", err)
 	}
 	defer conn.ExecContext(context.WithoutCancel(ctx), `DETACH DATABASE src`)
 	columns, err := tableColumns(ctx, conn)
 	if err != nil {
-		return nil, err
+		return Restored{}, err
 	}
 	// The id each row copied in gets, by table and its id in the Backup:
 	// a fresh one, unless it's a Song or Beat already in Bandmate that's
@@ -342,31 +393,31 @@ func (s *Store) copyIn(ctx context.Context, staging string, songs []int64, repla
 		tbl TEXT NOT NULL, old INTEGER NOT NULL, new INTEGER NOT NULL,
 		kept_both INTEGER NOT NULL, replaced INTEGER NOT NULL, prior_version INTEGER,
 		PRIMARY KEY (tbl, old))`); err != nil {
-		return nil, err
+		return Restored{}, err
 	}
 	defer conn.ExecContext(context.WithoutCancel(ctx), `DROP TABLE temp.restored`)
 
 	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
-		return nil, err
+		return Restored{}, err
 	}
 	defer tx.Rollback()
 	// A Clip and its active Take refer to each other, so their references
 	// are checked once both are in.
 	if _, err := tx.ExecContext(ctx, `PRAGMA defer_foreign_keys = ON`); err != nil {
-		return nil, err
+		return Restored{}, err
 	}
-	if err := giveIDs(ctx, tx, columns, songs, replace); err != nil {
-		return nil, err
+	if err := giveIDs(ctx, tx, columns, picks, replace); err != nil {
+		return Restored{}, err
 	}
 	replacedFiles, err := clearReplacedSongs(ctx, tx)
 	if err != nil {
-		return nil, err
+		return Restored{}, err
 	}
 	now := s.now().UTC().Format(timeFormat)
 	for _, t := range songTables {
-		if err := copyTableIn(ctx, tx, t, columns[t.name], songs, now); err != nil {
-			return nil, fmt.Errorf("restoring %s: %w", t.name, err)
+		if err := copyTableIn(ctx, tx, t, columns[t.name], picks.Songs, now); err != nil {
+			return Restored{}, fmt.Errorf("restoring %s: %w", t.name, err)
 		}
 	}
 	linked, err := s.linkFilesIn(ctx, tx, staging)
@@ -378,15 +429,19 @@ func (s *Store) copyIn(ctx context.Context, staging string, songs []int64, repla
 		}
 	}()
 	if err != nil {
-		return nil, err
+		return Restored{}, err
 	}
-	restored, err = querySongs(ctx, tx, `SELECT s.id, s.title FROM main.songs s
+	restored.Songs, err = querySongs(ctx, tx, `SELECT s.id, s.title FROM main.songs s
 		JOIN temp.restored r ON r.tbl = 'songs' AND r.new = s.id ORDER BY s.title COLLATE NOCASE, s.id`)
 	if err != nil {
-		return nil, err
+		return Restored{}, err
+	}
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM temp.restored WHERE tbl = 'beats'`).
+		Scan(&restored.Beats); err != nil {
+		return Restored{}, err
 	}
 	if err := tx.Commit(); err != nil {
-		return nil, err
+		return Restored{}, err
 	}
 	for _, f := range replacedFiles {
 		if err := os.Remove(filepath.Join(s.dataDir, f)); err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -396,12 +451,11 @@ func (s *Store) copyIn(ctx context.Context, staging string, songs []int64, repla
 	return restored, nil
 }
 
-// giveIDs picks, for each row of the Songs with ids, and of the Beats their
-// Clips use, the id it gets in the live database: for a Song or Beat
-// already in Bandmate that replace lists, the id of the one it replaces,
-// and otherwise a fresh one, past every id its table has used, in the order
-// of their ids in the Backup.
-func giveIDs(ctx context.Context, tx *sql.Tx, columns map[string][]string, songs []int64, replace Replace) error {
+// giveIDs picks, for each row of what picks picks, the id it gets in the
+// live database: for a Song or Beat already in Bandmate that replace
+// lists, the id of the one it replaces, and otherwise a fresh one, past
+// every id its table has used, in the order of their ids in the Backup.
+func giveIDs(ctx context.Context, tx *sql.Tx, columns map[string][]string, picks Picks, replace Replace) error {
 	replacing := map[string][]int64{"songs": replace.Songs, "beats": replace.Beats}
 	for _, t := range songTables {
 		if !slices.Contains(columns[t.name], "id") {
@@ -426,7 +480,7 @@ func giveIDs(ctx context.Context, tx *sql.Tx, columns map[string][]string, songs
 		if slices.Contains(columns[t.name], "version") {
 			priorVersion = fmt.Sprintf(`(SELECT m.version FROM main.%s m WHERE m.identity = r.identity)`, t.name)
 		}
-		for _, song := range songs {
+		for _, rows := range picks.rows(t) {
 			if hasIdentity && len(replacing[t.name]) > 0 {
 				if _, err := tx.ExecContext(ctx, fmt.Sprintf(`INSERT INTO temp.restored
 					(tbl, old, new, kept_both, replaced, prior_version)
@@ -435,14 +489,14 @@ func giveIDs(ctx context.Context, tx *sql.Tx, columns map[string][]string, songs
 					WHERE (%[3]s) AND r.id IN (SELECT value FROM json_each(?2))
 						AND r.identity IN (SELECT identity FROM main.%[1]s)
 						AND r.id NOT IN (SELECT old FROM temp.restored WHERE tbl = '%[1]s')`,
-					t.name, priorVersion, t.where), song, string(replaced)); err != nil {
+					t.name, priorVersion, rows.where), rows.arg, string(replaced)); err != nil {
 					return fmt.Errorf("picking %s to replace: %w", t.name, err)
 				}
 			}
 			res, err := tx.ExecContext(ctx, fmt.Sprintf(`INSERT INTO temp.restored (tbl, old, new, kept_both, replaced)
 				SELECT '%[1]s', r.id, ?2 + ROW_NUMBER() OVER (ORDER BY r.id), %[2]s, 0 FROM src.%[1]s r
 				WHERE (%[3]s) AND r.id NOT IN (SELECT old FROM temp.restored WHERE tbl = '%[1]s')`,
-				t.name, keptBoth, t.where), song, next)
+				t.name, keptBoth, rows.where), rows.arg, next)
 			if err != nil {
 				return fmt.Errorf("picking ids for %s: %w", t.name, err)
 			}
