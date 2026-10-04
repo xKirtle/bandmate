@@ -10,6 +10,8 @@ The argument is one Epic: a parent issue labelled `epic`, with an impact map, as
 
 You are the orchestrator: you schedule, relay and merge, and the sub-agents implement. The impact map is your only source for scheduling, and you never plan beyond it.
 
+Keep the user's dev stack on `main` at http://localhost:5173 as the `orchestrate` skill's "Dev servers" section says (`.claude/skills/orchestrate/SKILL.md`): start it before the first sub-agent, and refresh it after every merge.
+
 ## Reading the map
 
 - A ticket is **done** once its issue is closed. Rows for closed tickets stay in the map as history.
@@ -35,14 +37,14 @@ If nothing is running and nothing is ready but open tickets remain, the map is i
    1. **Current:** if `main` has moved since the branch was cut, send the agent back to rebase onto `origin/main` and force-push with lease. It resolves any conflicts itself, using the `resolving-merge-conflicts` skill. If its intent clashes with a merged sibling's, it stops and you ask the user.
    2. **Green:** watch the checks with `gh pr checks <PR> --watch` in the background. If they go red, send the failure to the same agent.
    3. **No duplication:** spawn a fresh read-only agent to compare the PR's diff with every PR merged since its branch was cut. It looks for a piece that reimplements something now on `main`, or two new pieces that do one job. Keep only its verdict. If it finds anything, send the findings to the implementing agent to consolidate onto the existing piece, then run the gate again from step 1.
-   4. **Merge** with the repo's merge method, or a merge commit if nothing says otherwise. If the branch requires an approving review, add `--admin`: every agent's `gh` is the PR's author, and GitHub never counts an author's own approval. The gate above already stands in for review. Close the ticket's issue with `gh issue close <N> --comment "Fixed by #<PR>."`, because GitHub doesn't close it from a PR merged this way. Release the ticket's leases, and remove its worktree and local branch. If the agent reported modules or shared pieces its row didn't list, add them to the row. Tell the user in one line: the PR link and what it did.
+   4. **Merge** with the repo's merge method, or a merge commit if nothing says otherwise. If the branch requires an approving review, add `--admin`: every agent's `gh` is the PR's author, and GitHub never counts an author's own approval. The gate above already stands in for review. Close the ticket's issue with `gh issue close <N> --comment "Fixed by #<PR>."`, because GitHub doesn't close it from a PR merged this way. Release the ticket's leases, remove its worktree and local branch, and refresh the dev stack. If the agent reported modules or shared pieces its row didn't list, add them to the row. Tell the user in one line: the PR link, what it did, and that the stack is refreshed.
 4. A slot and some leases are now free, so schedule again.
 
 Once every ticket in the map is done, close the Epic with `gh issue close <E>`, then give the user a summary: each ticket, its PR, and anything that needed their input.
 
 ## Sub-agent brief
 
-Fill in `<N>`, the Epic, the repo, the lease note and the ports. Add any environment gotchas from your memory that the agent can't find in the repo, such as how pushing works here. Give each running agent its own dev-server ports, because parallel agents on the default ports collide.
+Fill in `<N>`, the Epic, the repo, the lease note and the ports. Add any environment gotchas from your memory that the agent can't find in the repo, such as how pushing works here. Give each running agent its own dev-server ports, other than the stack's :8080 and :5173, because agents sharing ports collide.
 
 ```
 You are implementing GitHub issue #<N> in <owner/repo>, part of Epic #<E>. You are in your own git worktree; other agents are working on other tickets of the Epic at the same time in theirs. Before starting, read AGENTS.md / CLAUDE.md and the docs they point to. If a `gh` command fails with `HTTP 403: GitHub GraphQL is not available`, use its `gh api` equivalent from `docs/agents/issue-tracker.md`.
