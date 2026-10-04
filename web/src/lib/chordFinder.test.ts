@@ -13,6 +13,7 @@ import {
   tuningNotes,
   tunings,
   tuningText,
+  type FinderContext,
   type Frets,
   type Suggestion,
 } from './chordFinder';
@@ -508,7 +509,7 @@ function shape(written: string): Frets {
 }
 
 /** The readings of a shape, best first, or null when no reading fits. */
-function readings(written: string, ctx = context): string[] | null {
+function readings(written: string, ctx: FinderContext = context): string[] | null {
   const named = nameIt(shape(written), ctx);
   return named.kind === 'chord' ? named.readings : null;
 }
@@ -573,6 +574,33 @@ describe('naming a shape', () => {
     expect(nameIt(shape('x3x5xx'), context)).toEqual({ kind: 'none', notes: ['C'] });
     expect(nameIt(shape('xx0xxx'), context)).toEqual({ kind: 'none', notes: ['D'] });
     expect(nameIt(shape('xxxxxx'), context)).toEqual({ kind: 'none', notes: [] });
+  });
+});
+
+describe('naming a shape in a Key', () => {
+  // 002010 is Am7/E or C6/E: neither has its root in the bass, and both have four tones.
+  it('ranks the shape’s readings as it would without a Key, when none is known', () => {
+    expect(readings('002010')).toEqual(['Am7/E', 'C6/E']);
+  });
+
+  it('ranks a reading whose root is in the Key before one whose root isn’t', () => {
+    expect(readings('002010', { ...context, key: 'Eb' })).toEqual(['C6/E', 'Am7/E']);
+    expect(readings('002010', { ...context, key: 'Cm' })).toEqual(['C6/E', 'Am7/E']);
+    expect(readings('002010', { ...context, key: 'A' })).toEqual(['Am7/E', 'C6/E']);
+  });
+
+  it('keeps the order when both roots are in the Key', () => {
+    expect(readings('002010', { ...context, key: 'C' })).toEqual(['Am7/E', 'C6/E']);
+    expect(readings('002010', { ...context, key: 'E minor' })).toEqual(['Am7/E', 'C6/E']);
+  });
+
+  it('still ranks the root in the bass, then the simpler name, before the Key', () => {
+    expect(readings('x02010', { ...context, key: 'Eb' })?.slice(0, 2)).toEqual(['Am7', 'C6/A']);
+    expect(readings('x32210', { ...context, key: 'A' })).toEqual(['C6', 'Am/C']);
+  });
+
+  it('ranks as without a Key when the Key can’t be read', () => {
+    expect(readings('002010', { ...context, key: 'modal' })).toEqual(['Am7/E', 'C6/E']);
   });
 });
 

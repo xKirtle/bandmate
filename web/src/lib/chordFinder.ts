@@ -68,6 +68,12 @@ export interface FinderContext {
    * name as read (see LookUp's name), as its frets low string to high.
    */
   preferred?: Readonly<Record<string, Frets>>;
+  /**
+   * The Key as shown, as a Song's Details write it (G, Em, A minor), when
+   * the Finder follows a Song. Name it ranks readings whose root is in it
+   * higher. None, or one that can't be read, ranks by the shape alone.
+   */
+  key?: string | null;
 }
 
 export type LookUp =
@@ -128,12 +134,13 @@ export type NameIt =
 /**
  * Names a shape placed on the guitar, its frets counted from the capo: every
  * reading of it, best first, and the notes sounding. Readings with the root
- * as the lowest note come first, then the simpler names. As a Chord names the
+ * as the lowest note come first, then the simpler names, then, with a Key,
+ * those whose root is in it. As a Chord names the
  * shape fingered, the capo moves none of the notes: capo 2's 320003 reads G.
  */
 export function nameIt(frets: Frets, context: FinderContext): NameIt {
   const sounding = guitarNotes(frets, context.tuning);
-  const chords = nameNotes(sounding);
+  const chords = nameNotes(sounding, context.key ? readKey(context.key) : null);
   const notes = spellNotes(sounding, chords[0] ?? null);
   return chords.length ? { kind: 'chord', readings: chords.map((c) => c.name), notes } : { kind: 'none', notes };
 }

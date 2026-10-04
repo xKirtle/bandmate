@@ -220,13 +220,13 @@ function spellingOf(chord: Chord): Map<number, string> {
  * from C, 0–11, lowest first.
  *
  * Readings with the root as the lowest note come first, then the simpler
- * ones, with fewer tones. The best reading's root is written sharp or flat,
+ * ones, with fewer tones, then, with a Key, those whose root is in it. The best reading's root is written sharp or flat,
  * whichever writes its notes with fewer sharps and flats (G#m, not Abm with
  * its Cb), the common way when that's a tie; every other reading writes each
  * note the way the best one does, so a note is never Bb in one and A# in
  * another.
  */
-export function nameNotes(notes: readonly number[]): Chord[] {
+export function nameNotes(notes: readonly number[], key: Key | null = null): Chord[] {
   const bass = notes[0];
   const sounding = new Set(notes);
   const fits: { root: number; quality: Quality }[] = [];
@@ -240,7 +240,11 @@ export function nameNotes(notes: readonly number[]): Chord[] {
   }
   if (fits.length === 0) return [];
   const rootInBass = (f: { root: number }) => (f.root === bass ? 0 : 1);
-  fits.sort((a, b) => rootInBass(a) - rootInBass(b) || a.quality.tones.length - b.quality.tones.length);
+  const outOfKey = (f: { root: number }) => (key && !inKey(key, f.root) ? 1 : 0);
+  fits.sort(
+    (a, b) =>
+      rootInBass(a) - rootInBass(b) || a.quality.tones.length - b.quality.tones.length || outOfKey(a) - outOfKey(b),
+  );
 
   const best = fits[0];
   const spellings = [...new Set([common[best.root], sharps[best.root], flats[best.root]])];
@@ -274,6 +278,11 @@ export interface Key extends ReadKey {
 export function readKey(text: string): Key | null {
   const key = readTransposeKey(text);
   return key && { ...key, name: key.signature[key.tonic] + (key.minor ? ' minor' : ' major') };
+}
+
+/** Whether a note, as its semitone from C, is one of a Key's own: its scale, natural minor for a minor Key. */
+function inKey(key: Key, note: number): boolean {
+  return (key.minor ? minor : major).degrees.some((d) => (key.tonic + d.semitones) % 12 === note);
 }
 
 /** A Chord that goes with a Key, as Suggest shows it. */
