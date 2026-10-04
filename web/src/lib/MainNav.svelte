@@ -2,14 +2,14 @@
   // Switches between the top-level pages, the same at every width: a nav rail
   // down the left of wide windows, a tab bar along the bottom of narrow ones.
   import BrandMark from './BrandMark.svelte';
-  import { about, currentPage, listAt, pages, type LibraryPage } from './nav';
+  import { about, currentPage, listAt, pages, type MainPage } from './nav';
   import { router } from './router.svelte';
 
   const current = $derived(currentPage(router.path));
 
   // Each list's query string as it was last left, so going back to it
   // restores its search, filters and sort.
-  let lastSearch = $state<Partial<Record<LibraryPage, string>>>({});
+  let lastSearch = $state<Partial<Record<MainPage, string>>>({});
   $effect.pre(() => {
     const list = listAt(router.path);
     if (list) lastSearch[list] = router.search;
@@ -71,6 +71,10 @@
     color: var(--text-muted);
     font-size: 0.6875rem;
     font-weight: 600;
+    /* A label too long for its tab, e.g. Chord Finder's on a narrow phone,
+       wraps under its icon, centred. */
+    line-height: 1.2;
+    text-align: center;
     text-decoration: none;
   }
   .glyph {

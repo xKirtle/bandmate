@@ -51,6 +51,17 @@ function readNote(text: string): RegExpExecArray | null {
   return solfege.test(text) ? null : note.exec(text);
 }
 
+/**
+ * The note at the start of text, read as a Chord's root is: its letter, its
+ * semitone from C (0–11), and how many characters it takes. Null if text
+ * doesn't start with a readable note. The Chord Finder reads roots with it,
+ * so a root Transpose can read, the Finder can too.
+ */
+export function readRoot(text: string): { letter: string; semitone: number; length: number } | null {
+  const m = readNote(text);
+  return m && { letter: m[1], semitone: semitone(m, 0), length: m[0].length };
+}
+
 /** A readable note moved by semitones, as its semitone from C, 0–11. */
 function semitone(m: RegExpExecArray, by: number): number {
   return (((naturals[m[1]] + accidentals[m[2]] + by) % 12) + 12) % 12;
