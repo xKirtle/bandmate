@@ -55,13 +55,12 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 - Show how to play the Lyric Sheet's Chords on a guitar, as Ultimate Guitar does: a fretboard diagram for each Chord the Song uses.
 - Guitar only for now. Instruments are kept as data (strings, tuning, frets), so a ukulele or a bass can be added later without reworking the diagrams.
 - Diagrams show and hide with the Chords, through Read mode's "Chords" button. Hiding the Chords hides the diagrams too.
-- Diagrams follow the Song's tuning and capo, and draw the Chords as shown, so a transposed Song gets diagrams for the transposed Chords. A Chord name that can't be read gets no diagram rather than a guess. Which voicings are shown, how a diagram is reached (hovering a Chord, a strip above the sheet), and whether Write mode shows them too, are for the spec.
+- It reuses the Chord Finder's diagrams and the user's preferred Voicings, so a Chord looks the same on the Lyric Sheet as in the Chord Finder.
+- Diagrams follow the Song's tuning and capo, and draw the Chords as shown, so a transposed Song gets diagrams for the transposed Chords. A Chord name that can't be read gets no diagram rather than a guess. Which Voicings are shown, how a diagram is reached (hovering a Chord, a strip above the sheet), and whether Write mode shows them too, are for the spec.
 
-## A Chord Library
+## Hear a Chord in the Chord Finder
 
-- A rough idea, built on the diagrams above. Pick a root and a quality (C major, D7sus2) and see how to play it, or place fingers on a fretboard and get the Chord's name.
-- It might also suggest Chords that go well with the one picked, or with the Song's key, to help write a progression.
-- What it covers, and where it lives (its own page, or beside the Lyric Sheet), are for the spec.
+- A synthesised strum of a Voicing in Look up, or of a Chord in Suggest, to hear it before playing it. Built in the browser, like the rest of the Chord Finder, with nothing to download.
 
 ## Playback speed
 
