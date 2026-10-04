@@ -60,6 +60,56 @@ func querySongs(ctx context.Context, q querier, query string) ([]Song, error) {
 	return list, rows.Err()
 }
 
+// Beat is a Beat a Backup holds, by its id there, with its title,
+// producer, and the Songs it holds whose Clips use it, by their ids there.
+type Beat struct {
+	ID       int64    `json:"id"`
+	Title    string   `json:"title"`
+	Producer string   `json:"producer"`
+	Songs    []SongID `json:"songs"`
+}
+
+// SongID is a Song by its id alone.
+type SongID struct {
+	ID int64 `json:"id"`
+}
+
+// Beats lists the Beats a Backup holds, by title, each with the Songs it
+// holds that use it.
+func (s *Store) Beats(ctx context.Context, id int64) ([]Beat, error) {
+	r, err := s.openBackup(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	defer r.close()
+	rows, err := r.db.QueryContext(ctx, `SELECT b.id, b.title, b.producer, COALESCE(json_group_array(DISTINCT t.song_id)
+			FILTER (WHERE t.song_id IS NOT NULL), '[]')
+		FROM beats b LEFT JOIN clips c ON c.beat_id = b.id LEFT JOIN tracks t ON t.id = c.track_id
+		GROUP BY b.id ORDER BY b.title COLLATE NOCASE, b.id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	list := []Beat{}
+	for rows.Next() {
+		var b Beat
+		var songs string
+		if err := rows.Scan(&b.ID, &b.Title, &b.Producer, &songs); err != nil {
+			return nil, err
+		}
+		var ids []int64
+		if err := json.Unmarshal([]byte(songs), &ids); err != nil {
+			return nil, err
+		}
+		b.Songs = []SongID{}
+		for _, song := range ids {
+			b.Songs = append(b.Songs, SongID{song})
+		}
+		list = append(list, b)
+	}
+	return list, rows.Err()
+}
+
 // Replace lists, by their ids in a Backup, the Songs and Beats already in
 // Bandmate that a Restore replaces rather than keeping both. Those it lists
 // that the Restore doesn't bring back, or that aren't in Bandmate, are
@@ -69,51 +119,54 @@ type Replace struct {
 	Beats []int64 `json:"beats"`
 }
 
-// Picks is what a Restore brings back from a Backup: the Songs picked, by
-// their ids in it, each with the Beats its Clips use, and the whole Beat
-// Library or not. Every Song it holds, with its Beat Library if it holds
-// one, is everything it holds.
+// Picks is what a Restore brings back from a Backup: the Songs and the
+// Beats picked, by their ids in it, each Song with the Beats its Clips use,
+// whether they're picked or not.
 type Picks struct {
-	Songs       []int64 `json:"songs"`
-	BeatLibrary bool    `json:"beatLibrary"`
+	Songs []int64 `json:"songs"`
+	Beats []int64 `json:"beats"`
 }
 
 // rowsPicked picks rows of a table to restore: where, given arg, a Song's
-// id, or nothing for the Beat Library.
+// id, or the Beats picked as a JSON array.
 type rowsPicked struct {
 	where string
 	arg   any
 }
 
 // rows lists what picks the rows of table t to restore: its rows of each
-// Song picked and, for the Beats, every one if the Beat Library is picked.
-func (p Picks) rows(t songTable) []rowsPicked {
+// Song picked and, for the Beats, those picked.
+func (p Picks) rows(t songTable) ([]rowsPicked, error) {
 	var list []rowsPicked
 	for _, song := range p.Songs {
 		list = append(list, rowsPicked{t.where, song})
 	}
-	if p.BeatLibrary {
-		for _, lib := range beatLibraryTables {
-			if lib.name == t.name {
-				list = append(list, rowsPicked{lib.where, nil})
-			}
+	if len(p.Beats) == 0 {
+		return list, nil
+	}
+	beats, err := json.Marshal(p.Beats)
+	if err != nil {
+		return nil, err
+	}
+	for _, chosen := range chosenBeatsTables {
+		if chosen.name == t.name {
+			list = append(list, rowsPicked{chosen.where, string(beats)})
 		}
 	}
-	return list
+	return list, nil
 }
 
 // Restored is what a Restore brought back: the Songs, by title, and how
-// many Beats it added or replaced, with the Songs or as the Beat Library.
+// many Beats it added or replaced, picked or brought by the Songs.
 type Restored struct {
 	Songs []Song `json:"songs"`
 	Beats int    `json:"beats"`
 }
 
 // Restore brings back what picks names from a Backup: Songs, each with the
-// Beats its Clips use, and the Beat Library. It never deletes a Song or
-// Beat the Backup doesn't hold. What it picks is copied in with fresh ids,
-// all of it or, if anything fails, none. A Song or Beat
-// already in Bandmate (the same one, by its identity) is kept, unless
+// Beats its Clips use, and Beats. It never deletes a Song or Beat the
+// Backup doesn't hold. What it picks is copied in with fresh ids, all of
+// it or, if anything fails, none. A Song or Beat already in Bandmate (the same one, by its identity) is kept, unless
 // replace lists it: the restored one is added alongside, titled as
 // restored, with an identity of its own, and a restored Song plays the
 // Beats restored with it. A Song replaced is the Backup's version entirely,
@@ -136,9 +189,13 @@ func (s *Store) Restore(ctx context.Context, id int64, picks Picks, replace Repl
 			return Restored{}, fmt.Errorf("restoring song %d: %w", song, err)
 		}
 	}
-	if picked.BeatLibrary {
-		if err := r.unpackFiles(ctx, beatLibraryFiles); err != nil {
-			return Restored{}, fmt.Errorf("restoring the beat library: %w", err)
+	if len(picked.Beats) > 0 {
+		beats, err := json.Marshal(picked.Beats)
+		if err != nil {
+			return Restored{}, err
+		}
+		if err := r.unpackFiles(ctx, chosenBeatsFiles, string(beats)); err != nil {
+			return Restored{}, fmt.Errorf("restoring the beats picked: %w", err)
 		}
 	}
 	// From here it's read attached to the live database.
@@ -148,30 +205,41 @@ func (s *Store) Restore(ctx context.Context, id int64, picks Picks, replace Repl
 	return s.copyIn(ctx, r.staging, picked, replace)
 }
 
-// pick checks picks names Songs the Backup holds, listing each once, or
-// its Beat Library, if it holds one, or both.
+// pick checks picks names Songs and Beats the Backup holds, at least one,
+// listing each once.
 func (r *openedBackup) pick(ctx context.Context, picks Picks) (Picks, error) {
-	if len(picks.Songs) == 0 && !picks.BeatLibrary {
-		return Picks{}, &InvalidError{"pick at least one Song, or the Beat Library, to restore"}
+	if len(picks.Songs) == 0 && len(picks.Beats) == 0 {
+		return Picks{}, &InvalidError{"pick at least one Song or Beat to restore"}
 	}
-	if picks.BeatLibrary && !r.backup.BeatLibrary {
-		return Picks{}, &InvalidError{"the Backup doesn't hold the Beat Library"}
+	var picked Picks
+	var err error
+	if picked.Songs, err = r.held(ctx, "songs", picks.Songs, "a Song picked isn't in the Backup"); err != nil {
+		return Picks{}, err
 	}
-	picked := Picks{Songs: []int64{}, BeatLibrary: picks.BeatLibrary}
-	for _, song := range picks.Songs {
-		if slices.Contains(picked.Songs, song) {
+	if picked.Beats, err = r.held(ctx, "beats", picks.Beats, "a Beat picked isn't in the Backup"); err != nil {
+		return Picks{}, err
+	}
+	return picked, nil
+}
+
+// held lists ids once each, refusing with missing if one isn't in the
+// Backup's table, which is a constant.
+func (r *openedBackup) held(ctx context.Context, table string, ids []int64, missing string) ([]int64, error) {
+	list := []int64{}
+	for _, id := range ids {
+		if slices.Contains(list, id) {
 			continue
 		}
 		var exists int
-		if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM songs WHERE id = ?`, song).Scan(&exists); err != nil {
-			return Picks{}, err
+		if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM `+table+` WHERE id = ?`, id).Scan(&exists); err != nil {
+			return nil, err
 		}
 		if exists == 0 {
-			return Picks{}, &InvalidError{"a Song picked isn't in the Backup"}
+			return nil, &InvalidError{missing}
 		}
-		picked.Songs = append(picked.Songs, song)
+		list = append(list, id)
 	}
-	return picked, nil
+	return list, nil
 }
 
 // Present is a Song or Beat a Backup holds, by its id and title there,
@@ -207,14 +275,19 @@ func (s *Store) Present(ctx context.Context, id int64, picks Picks) (Presence, e
 	if err != nil {
 		return Presence{}, err
 	}
+	beats, err := json.Marshal(picked.Beats)
+	if err != nil {
+		return Presence{}, err
+	}
 	var p Presence
 	if p.Songs, err = s.present(ctx, r.db, "songs", `SELECT id, title, identity FROM songs
 		WHERE id IN (SELECT value FROM json_each(?))`, string(ids)); err != nil {
 		return Presence{}, err
 	}
 	if p.Beats, err = s.present(ctx, r.db, "beats", `SELECT id, title, identity FROM beats
-		WHERE ?2 OR id IN (SELECT c.beat_id FROM clips c JOIN tracks t ON t.id = c.track_id
-			WHERE t.song_id IN (SELECT value FROM json_each(?1)))`, string(ids), picked.BeatLibrary); err != nil {
+		WHERE id IN (SELECT value FROM json_each(?2)) OR id IN (SELECT c.beat_id FROM clips c
+			JOIN tracks t ON t.id = c.track_id WHERE t.song_id IN (SELECT value FROM json_each(?1)))`,
+		string(ids), string(beats)); err != nil {
 		return Presence{}, err
 	}
 	return p, nil
@@ -521,7 +594,11 @@ func giveIDs(ctx context.Context, tx *sql.Tx, columns map[string][]string, picks
 		if slices.Contains(columns[t.name], "version") {
 			priorVersion = fmt.Sprintf(`(SELECT m.version FROM main.%s m WHERE m.identity = r.identity)`, t.name)
 		}
-		for _, rows := range picks.rows(t) {
+		picked, err := picks.rows(t)
+		if err != nil {
+			return err
+		}
+		for _, rows := range picked {
 			if hasIdentity && len(replacing[t.name]) > 0 {
 				if _, err := tx.ExecContext(ctx, fmt.Sprintf(`INSERT INTO temp.restored
 					(tbl, old, new, kept_both, replaced, prior_version)

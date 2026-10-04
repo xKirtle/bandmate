@@ -136,7 +136,7 @@
             </span>
           </div>
           <div class="row-actions">
-            {#if backup.songs > 0 || backup.beatLibrary}
+            {#if backup.songs > 0 || backup.beats > 0}
               <button
                 type="button"
                 class="button"

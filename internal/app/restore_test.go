@@ -439,12 +439,7 @@ func TestARestoreMustPickWhatTheBackupHolds(t *testing.T) {
 	path := backupPath(made.ID) + "/restore"
 
 	expectError(t, ts.Do(http.MethodPost, path, map[string]any{"songs": []int64{}}),
-		http.StatusBadRequest, "pick at least one Song, or the Beat Library, to restore")
-	// It holds the Beat its Song uses, but not the Beat Library.
-	expectError(t, ts.Do(http.MethodPost, path, map[string]any{"songs": []int64{s.ID}, "beatLibrary": true}),
-		http.StatusBadRequest, "the Backup doesn't hold the Beat Library")
-	expectError(t, ts.Do(http.MethodPost, backupPath(made.ID)+"/present", map[string]any{"beatLibrary": true}),
-		http.StatusBadRequest, "the Backup doesn't hold the Beat Library")
+		http.StatusBadRequest, "pick at least one Song or Beat to restore")
 	expectError(t, ts.Do(http.MethodPost, path, map[string]any{"songs": []int64{s.ID, s.ID + 1}}),
 		http.StatusBadRequest, "a Song picked isn't in the Backup")
 	expectError(t, ts.Do(http.MethodPost, backupPath(made.ID+1)+"/restore", map[string]any{"songs": []int64{s.ID}}),

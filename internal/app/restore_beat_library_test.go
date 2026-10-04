@@ -14,7 +14,7 @@ type restoredContents struct {
 }
 
 // restoreBody restores what body picks from a Backup, e.g.
-// {"beatLibrary": true}, and returns what came back.
+// {"beats": [1, 2]}, and returns what came back.
 func (ts *testServer) restoreBody(id int64, body map[string]any) restoredContents {
 	ts.t.Helper()
 	res := ts.Do(http.MethodPost, backupPath(id)+"/restore", body)
@@ -40,7 +40,7 @@ func TestRestoringTheBeatLibraryBringsBackEveryBeatWithoutSongs(t *testing.T) {
 		expectStatus(t, ts.Do(http.MethodDelete, beatPath(b.ID), nil), http.StatusNoContent)
 	}
 
-	got := ts.restoreBody(made.ID, map[string]any{"beatLibrary": true})
+	got := ts.restoreBody(made.ID, map[string]any{"beats": ts.everyBeatIn(made.ID)})
 
 	if len(got.Songs) != 0 || got.Beats != 2 {
 		t.Errorf("restored = %+v, want no Songs and 2 Beats", got)
@@ -66,7 +66,7 @@ func TestRestoringTheBeatLibraryBringsBackEveryBeatWithoutSongs(t *testing.T) {
 }
 
 // presentPicked lists what of body's picks from a Backup, e.g.
-// {"beatLibrary": true}, is already in Bandmate.
+// {"beats": [1, 2]}, is already in Bandmate.
 func (ts *testServer) presentPicked(id int64, body map[string]any) (presentSongs, presentBeats []presentItem) {
 	ts.t.Helper()
 	res := ts.Do(http.MethodPost, backupPath(id)+"/present", body)
@@ -91,7 +91,7 @@ func TestBeatsOfTheBeatLibraryAlreadyInBandmateAreReplacedOrKeptBoth(t *testing.
 			http.StatusOK)
 	}
 
-	songs, beats := ts.presentPicked(made.ID, map[string]any{"beatLibrary": true})
+	songs, beats := ts.presentPicked(made.ID, map[string]any{"beats": ts.everyBeatIn(made.ID)})
 
 	want := []presentItem{
 		{unused.ID, "Unused", restoredSong{unused.ID, "Unused Again"}},
@@ -102,7 +102,7 @@ func TestBeatsOfTheBeatLibraryAlreadyInBandmateAreReplacedOrKeptBoth(t *testing.
 	}
 
 	// Used is replaced; Unused is kept both.
-	got := ts.restoreBody(made.ID, map[string]any{"beatLibrary": true, "replace": map[string]any{"beats": []int64{used.ID}}})
+	got := ts.restoreBody(made.ID, map[string]any{"beats": ts.everyBeatIn(made.ID), "replace": map[string]any{"beats": []int64{used.ID}}})
 
 	if len(got.Songs) != 0 || got.Beats != 2 {
 		t.Errorf("restored = %+v, want no Songs and 2 Beats", got)
@@ -140,7 +140,7 @@ func TestRestoringEverythingABackupHoldsLeavesWhatItDoesntHoldUntouched(t *testi
 	expectStatus(t, ts.Do(http.MethodDelete, beatPath(gone.ID), nil), http.StatusNoContent)
 	newerBefore := ts.readSongCopy(newer.ID)
 	all := ts.backupSongs(made.ID)
-	everything := map[string]any{"songs": []int64{all[0].ID, all[1].ID}, "beatLibrary": true}
+	everything := map[string]any{"songs": []int64{all[0].ID, all[1].ID}, "beats": ts.everyBeatIn(made.ID)}
 
 	songs, beats := ts.presentPicked(made.ID, everything)
 
@@ -182,7 +182,7 @@ func TestASongRestoredWithTheBeatLibraryPlaysTheSameBeatKeptBoth(t *testing.T) {
 	timelineChange(t, ts.addBeatToSong(s.ID, used.ID))
 	made := ts.backUp(map[string]any{"allSongs": true, "beatLibrary": true})
 
-	got := ts.restoreBody(made.ID, map[string]any{"songs": []int64{s.ID}, "beatLibrary": true})
+	got := ts.restoreBody(made.ID, map[string]any{"songs": []int64{s.ID}, "beats": ts.everyBeatIn(made.ID)})
 
 	if len(got.Songs) != 1 || got.Songs[0].Title != "Night Drive (restored)" || got.Beats != 1 {
 		t.Fatalf("restored = %+v, want Night Drive and its Beat, kept both", got)

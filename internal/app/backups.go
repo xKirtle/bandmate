@@ -102,8 +102,22 @@ func (a *App) backupSongs(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, list)
 }
 
-// restoreBackup restores the Songs picked from a Backup, and its Beat
-// Library if picked, answering once they're back, which takes as long as
+// backupBeats lists the Beats a Backup holds, to pick some to restore.
+func (a *App) backupBeats(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	list, err := a.backups.Beats(r.Context(), id)
+	if err != nil {
+		writeBackupError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, list)
+}
+
+// restoreBackup restores the Songs and Beats picked from a Backup,
+// answering once they're back, which takes as long as
 // unpacking their files.
 func (a *App) restoreBackup(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
@@ -126,8 +140,8 @@ func (a *App) restoreBackup(w http.ResponseWriter, r *http.Request) {
 }
 
 // presentInBandmate lists which of the Songs picked from a Backup, of the
-// Beats their Clips use, and of its Beat Library if picked, are already in
-// Bandmate, to choose for each whether a Restore replaces it or keeps both.
+// Beats their Clips use, and of the Beats picked, are already in Bandmate,
+// to choose for each whether a Restore replaces it or keeps both.
 func (a *App) presentInBandmate(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
