@@ -119,7 +119,7 @@ export function songListViewFromParams(params: URLSearchParams): SongListView {
 }
 
 /** The Songs a filter keeps, and whether there are any Songs at all. */
-export interface SongListPage {
+export interface LoadedSongList {
   songs: SongSummary[];
   anySongs: boolean;
 }
@@ -129,17 +129,14 @@ export interface SongListPage {
  * server filters the list, so when nothing matches it asks again for every
  * Song, to tell no matches from no Songs.
  */
-export async function listSongPage(
+export async function loadSongList(
   filter: SongFilter,
   list: (filter: SongFilter) => Promise<SongSummary[]>,
-): Promise<SongListPage> {
+): Promise<LoadedSongList> {
   const songs = await list(filter);
-  if (songs.length > 0 || !isSongFilterSet(filter)) return { songs, anySongs: songs.length > 0 };
+  const filtered = Object.values(filter).some((value) => value !== undefined && value !== '');
+  if (songs.length > 0 || !filtered) return { songs, anySongs: songs.length > 0 };
   return { songs, anySongs: (await list({})).length > 0 };
-}
-
-function isSongFilterSet(filter: SongFilter): boolean {
-  return !!filter.status || !!filter.q?.trim() || filter.hasMaster !== undefined;
 }
 
 /** A column of the Beat Library. */

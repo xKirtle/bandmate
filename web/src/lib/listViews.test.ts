@@ -10,7 +10,7 @@ import {
   defaultSongListView,
   filterBeats,
   isBeatListFiltered,
-  listSongPage,
+  loadSongList,
   songBeatHint,
   sortBeats,
   songListViewFromParams,
@@ -138,7 +138,7 @@ describe('sortSongs', () => {
   });
 });
 
-describe('listSongPage', () => {
+describe('loadSongList', () => {
   // Lists Songs as the server would, from a fixed set, recording each filter asked for.
   function server(all: SongSummary[]) {
     const asked: SongFilter[] = [];
@@ -153,18 +153,18 @@ describe('listSongPage', () => {
 
   it('tells there are no Songs when the unfiltered list is empty', async () => {
     const { asked, list } = server([]);
-    expect(await listSongPage({}, list)).toEqual({ songs: [], anySongs: false });
+    expect(await loadSongList({}, list)).toEqual({ songs: [], anySongs: false });
     expect(asked).toEqual([{}]);
   });
 
   it('asks for every Song when none match, to tell no matches from no Songs', async () => {
     const { list } = server([song('Night Drive', { status: 'drafting' })]);
-    expect(await listSongPage({ status: 'finished' }, list)).toEqual({ songs: [], anySongs: true });
+    expect(await loadSongList({ status: 'finished' }, list)).toEqual({ songs: [], anySongs: true });
   });
 
   it('tells there are no Songs when filters are set but there are none to match', async () => {
     const { list } = server([]);
-    expect(await listSongPage({ status: 'finished', q: 'night', hasMaster: true }, list)).toEqual({
+    expect(await loadSongList({ status: 'finished', q: 'night', hasMaster: true }, list)).toEqual({
       songs: [],
       anySongs: false,
     });
@@ -173,7 +173,7 @@ describe('listSongPage', () => {
   it('asks only once when some Songs match', async () => {
     const nightDrive = song('Night Drive', { status: 'drafting' });
     const { asked, list } = server([nightDrive, song('Daylight')]);
-    expect(await listSongPage({ status: 'drafting' }, list)).toEqual({ songs: [nightDrive], anySongs: true });
+    expect(await loadSongList({ status: 'drafting' }, list)).toEqual({ songs: [nightDrive], anySongs: true });
     expect(asked).toEqual([{ status: 'drafting' }]);
   });
 });

@@ -2,7 +2,7 @@
   import { api, statuses, type SongSummary } from '../lib/api';
   import {
     defaultSongListView,
-    listSongPage,
+    loadSongList,
     songListViewFromParams,
     songListViewToParams,
     sortSongs,
@@ -17,8 +17,9 @@
 
   let songs = $state<SongSummary[] | null>(null);
   // Whether there are any Songs at all, whatever the filters. Without any,
-  // the search and filters have nothing to act on, so they're hidden.
-  let anySongs = $state(false);
+  // the search and filters have nothing to act on, so they're hidden, and
+  // cleared so ones from the URL don't hide the first Song once it's made.
+  let anySongs = $state(true);
   let error = $state<string | null>(null);
   // The search, filters and sort start as the URL has them, and are kept in
   // it so going back to the list restores them. The filters combine.
@@ -56,11 +57,12 @@
     let current = true;
     const timer = setTimeout(
       () => {
-        listSongPage(filter, api.listSongs).then(
-          (page) => {
+        loadSongList(filter, api.listSongs).then(
+          (result) => {
             if (!current) return;
-            songs = page.songs;
-            anySongs = page.anySongs;
+            songs = result.songs;
+            anySongs = result.anySongs;
+            if (!anySongs && (view.status || view.hasMaster || view.q)) clearFilters();
             error = null;
             loaded = true;
           },
