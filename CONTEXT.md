@@ -205,5 +205,5 @@ A copy of chosen Songs, the Beat Library, or both, kept in Bandmate to restore f
 _Avoid_: Export, archive, Snapshot (a Snapshot is a copy of one Song's Lyric Sheet)
 
 **Restore**:
-Bringing back Songs, the Beat Library, or both, picked from a Backup. A Song brings the Beats its Clips use. Where a Song or Beat is already in Bandmate (the same one, not one with the same name), the user chooses to replace it or keep both, the restored one added alongside. A Restore only adds and replaces: it never deletes what the Backup doesn't hold.
+Bringing back Songs, the Beat Library, or both, picked from a Backup. A Song brings the Beats its Clips use. Where a Song or Beat is already in Bandmate (the same one, even from another install, never just one with the same name or, for a Beat, the same audio), the user chooses to replace it or keep both, the restored one added alongside. A Restore only adds and replaces: it never deletes what the Backup doesn't hold.
 _Avoid_: Import (importing is pasting lyrics into a Song)
