@@ -3,6 +3,7 @@ package backups
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -100,50 +101,74 @@ var beatLibraryTables = []songTable{{name: "beats", shared: true, where: `TRUE`}
 // beatLibraryFiles lists the files the Beat Library's rows use.
 var beatLibraryFiles = []songFile{{"audio/beats", "beats", `SELECT id FROM main.beats`}}
 
+// chosenBeatsTables picks the Beats chosen, by their ids as a JSON array,
+// some of which may already be in the Backup from a Song.
+var chosenBeatsTables = []songTable{{name: "beats", shared: true, where: `id IN (SELECT value FROM json_each(?1))`}}
+
+// chosenBeatsFiles lists the files the chosen Beats' rows use.
+var chosenBeatsFiles = []songFile{{"audio/beats", "beats",
+	`SELECT id FROM main.beats WHERE id IN (SELECT value FROM json_each(?1))`}}
+
+// held is how many Songs and Beats a Backup holds.
+type held struct{ songs, beats int }
+
 // copyContents makes, in staging, a database holding the Songs with ids,
-// and the whole Beat Library if beatLibrary is set, laid out with their
-// files like a data directory, and returns how many Songs it holds.
-func (s *Store) copyContents(ctx context.Context, staging string, ids []int64, beatLibrary bool) (int, error) {
+// with the Beats their Clips use, and the Beats with beatIDs, or the whole
+// Beat Library if beatLibrary is set, laid out with their files like a data
+// directory, and returns how many Songs and Beats it holds.
+func (s *Store) copyContents(ctx context.Context, staging string, ids, beatIDs []int64, beatLibrary bool) (held, error) {
+	var h held
 	backup, err := db.Open(ctx, staging)
 	if err != nil {
-		return 0, fmt.Errorf("making backup database: %w", err)
+		return h, fmt.Errorf("making backup database: %w", err)
 	}
 	defer backup.Close()
 	conn, err := backup.Conn(ctx)
 	if err != nil {
-		return 0, err
+		return h, err
 	}
 	defer conn.Close()
 	if _, err := conn.ExecContext(ctx, `ATTACH DATABASE ? AS src`, filepath.Join(s.dataDir, db.FileName)); err != nil {
-		return 0, fmt.Errorf("reading the database: %w", err)
+		return h, fmt.Errorf("reading the database: %w", err)
 	}
 	columns, err := tableColumns(ctx, conn)
 	if err != nil {
-		return 0, err
+		return h, err
 	}
-	copied := 0
 	for _, id := range ids {
 		found, err := s.copyRows(ctx, conn, staging, columns, songTables, songFiles, id)
 		if err != nil {
-			return 0, fmt.Errorf("backing up song %d: %w", id, err)
+			return h, fmt.Errorf("backing up song %d: %w", id, err)
 		}
 		if found {
-			copied++
+			h.songs++
 		}
 	}
 	if beatLibrary {
 		if _, err := s.copyRows(ctx, conn, staging, columns, beatLibraryTables, beatLibraryFiles); err != nil {
-			return 0, fmt.Errorf("backing up the beat library: %w", err)
+			return h, fmt.Errorf("backing up the beat library: %w", err)
 		}
 	}
+	if len(beatIDs) > 0 {
+		picked, err := json.Marshal(beatIDs)
+		if err != nil {
+			return h, err
+		}
+		if _, err := s.copyRows(ctx, conn, staging, columns, chosenBeatsTables, chosenBeatsFiles, string(picked)); err != nil {
+			return h, fmt.Errorf("backing up the beats picked: %w", err)
+		}
+	}
+	if err := conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM main.beats`).Scan(&h.beats); err != nil {
+		return h, err
+	}
 	if _, err := conn.ExecContext(ctx, `DETACH DATABASE src`); err != nil {
-		return 0, err
+		return h, err
 	}
 	// One file, with nothing left in a write-ahead log beside it.
 	if _, err := conn.ExecContext(ctx, `PRAGMA journal_mode = DELETE`); err != nil {
-		return 0, err
+		return h, err
 	}
-	return copied, nil
+	return h, nil
 }
 
 // copyRows copies the rows tables pick, given args, with the files they

@@ -127,7 +127,7 @@ func TestABackupUploadedFromAnotherInstallRestoresItsSongsAsNewSongs(t *testing.
 func TestABackupFromAnOlderBandmateUploadsAndRestores(t *testing.T) {
 	dir := olderBackupDir(t)
 	writeFile(t, filepath.Join(dir, "backup.json"), []byte(
-		`{"createdAt":"2025-01-02T03:04:05Z","songs":1,"allSongs":true,"beatLibrary":false}`))
+		`{"createdAt":"2025-01-02T03:04:05Z","songs":1,"allSongs":true,"beats":1,"beatLibrary":false}`))
 	ts := newTestServer(t)
 
 	res := ts.uploadBackup(packBackup(t, dir))
