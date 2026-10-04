@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import { api, commonKeys, type Beat, type BeatDetails } from './api';
-  import { anyEdited, byFileName, canAdd, canTick, duplicateOf, tickedState, type BatchRow } from './beatBatch';
+  import { alreadyIn, anyEdited, byFileName, canAdd, canTick, tickedState, type BatchRow } from './beatBatch';
   import { fromDraft, invalidFields, toDraft, type InvalidField } from './beatDraft';
   import { suggestForFile } from './beatTags';
   import Combobox from './Combobox.svelte';
@@ -18,8 +18,8 @@
     onAdded,
     onClose,
   }: {
-    /** The Beats already in the Library, to flag files that are probably copies of one. */
-    library: readonly Beat[];
+    /** The Beats in the Library, to flag files that are probably already there. Null until it's loaded. */
+    library: readonly Beat[] | null;
     maxUploadBytes: number;
     /** Whether Beats are being uploaded, when no more files can be picked. */
     uploading?: boolean;
@@ -48,10 +48,21 @@
       error: null,
     }));
     const all = [...rows, ...added];
-    for (const row of added) row.ticked = !duplicateOf(row, library, all);
+    for (const row of added) {
+      if (library) row.ticked = !alreadyIn(row, library, all);
+      else unchecked.push(row.key);
+    }
     rows = all.sort(byFileName);
     readUnread();
   }
+
+  // Files picked before the Library has loaded are ticked or not once it has.
+  let unchecked: number[] = [];
+  $effect(() => {
+    if (!library || unchecked.length === 0) return;
+    for (const row of rows) if (unchecked.includes(row.key)) row.ticked = !alreadyIn(row, library, rows);
+    unchecked = [];
+  });
 
   // Files are read one at a time, in the table's order. The count is of the
   // files read since reading last stopped, out of those plus the ones left.
@@ -89,7 +100,7 @@
 
   // Worked out afresh as the Library and the batch change: a copy of a row
   // that's since been added is then flagged as being in the Library.
-  const duplicates = $derived(new Map(rows.map((row) => [row.key, duplicateOf(row, library, rows)])));
+  const already = $derived(new Map(rows.map((row) => [row.key, alreadyIn(row, library ?? [], rows)])));
 
   const ticked = $derived(tickedState(rows));
   const tickedCount = $derived(rows.filter((row) => row.ticked).length);
@@ -202,18 +213,16 @@
           {#each rows as row (row.key)}
             {@const name = row.file.name}
             {@const editable = row.status === 'ready'}
-            {@const duplicate = duplicates.get(row.key)}
+            {@const where = already.get(row.key)}
             <tr class:unreadable={row.status === 'unreadable'}>
               <td class="tick">
                 <input type="checkbox" aria-label="Add “{name}”" bind:checked={row.ticked} disabled={!canTick(row)} />
               </td>
               <td class="file">
                 <span class="ellipsis" title={name}>{name}</span>
-                {#if duplicate}
+                {#if where}
                   <span class="warning">
-                    {duplicate === 'batch'
-                      ? 'Already in this batch'
-                      : `Already in the Beat Library as “${duplicate.beat}”`}
+                    {where.in === 'batch' ? 'Already in this batch' : `Already in the Beat Library as “${where.title}”`}
                   </span>
                 {/if}
                 {#if row.error}

@@ -1,6 +1,6 @@
 // Adding several Beats at once: the review table's rows, one per file, and
 // the rules for when they can be added.
-import type { DecodedAudio } from './api';
+import type { Beat, DecodedAudio } from './api';
 import { invalidFields, sameDraft, type BeatDraft } from './beatDraft';
 
 /** One file in the batch, from picking it until its Beat is saved or it's removed. */
@@ -55,24 +55,25 @@ export function byFileName(a: { file: { name: string } }, b: { file: { name: str
   return fileNames.compare(a.file.name, b.file.name);
 }
 
-type PickedFile = { key: number; file: { name: string; size: number } };
+/** A row as far as telling whether its file was picked before: when it was picked, and its file. */
+type PickedRow = { key: number; file: Pick<File, 'name' | 'size'> };
 
-/** What a row's file is probably a copy of: a Beat in the Library, by its title, or an earlier row. */
-export type Duplicate = { beat: string } | 'batch';
+/** Where a row's file probably is already: in the Library, as the Beat with this title, or in the batch. */
+export type AlreadyIn = { in: 'library'; title: string } | { in: 'batch' };
 
 /**
- * What a row's file is probably a copy of, by its file name and size: a Beat
- * in the Library, or a row picked before it.
+ * Where a row's file probably is already, going by its file name and size,
+ * which Bandmate keeps for every Beat: in the Library, or in the batch, as a
+ * row picked before it.
  */
-export function duplicateOf(
-  row: PickedFile,
-  library: readonly { title: string; fileName: string; size: number }[],
-  rows: readonly PickedFile[],
-): Duplicate | null {
-  const { name, size } = row.file;
-  const beat = library.find((b) => b.fileName === name && b.size === size);
-  if (beat) return { beat: beat.title };
+export function alreadyIn(
+  row: PickedRow,
+  library: readonly Pick<Beat, 'title' | 'fileName' | 'size'>[],
+  rows: readonly PickedRow[],
+): AlreadyIn | null {
+  const same = (name: string, size: number) => name === row.file.name && size === row.file.size;
+  const beat = library.find((b) => same(b.fileName, b.size));
+  if (beat) return { in: 'library', title: beat.title };
   // Keys count up as files are picked, so a lower key was picked earlier.
-  const earlier = rows.some((r) => r.key < row.key && r.file.name === name && r.file.size === size);
-  return earlier ? 'batch' : null;
+  return rows.some((r) => r.key < row.key && same(r.file.name, r.file.size)) ? { in: 'batch' } : null;
 }

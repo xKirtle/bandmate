@@ -261,7 +261,7 @@
     <BeatBatch
       bind:this={batch}
       bind:uploading={batchUploading}
-      library={beats ?? []}
+      library={beats}
       {maxUploadBytes}
       onAdded={showAdded}
       onClose={() => (batching = false)}

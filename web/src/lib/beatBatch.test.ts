@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { toDraft } from './beatDraft';
-import { anyEdited, byFileName, canAdd, duplicateOf, tickedState } from './beatBatch';
+import { alreadyIn, anyEdited, byFileName, canAdd, tickedState } from './beatBatch';
 
 describe('canAdd', () => {
   const draft = toDraft({ title: 'Echo Room' });
@@ -71,26 +71,26 @@ describe('byFileName', () => {
   });
 });
 
-describe('duplicateOf', () => {
+describe('alreadyIn', () => {
   const file = (name: string, size: number) => ({ name, size });
   const library = [{ title: 'Echo Room', fileName: 'echo room.wav', size: 1000 }];
 
   it('names the Library Beat whose file name and size match', () => {
     const row = { key: 0, file: file('echo room.wav', 1000) };
-    expect(duplicateOf(row, library, [row])).toEqual({ beat: 'Echo Room' });
+    expect(alreadyIn(row, library, [row])).toEqual({ in: 'library', title: 'Echo Room' });
   });
 
   it('flags a row matching one picked before it, but not the first', () => {
     const first = { key: 3, file: file('paper hours.mp3', 500) };
     const second = { key: 7, file: file('paper hours.mp3', 500) };
     const rows = [second, first];
-    expect(duplicateOf(first, library, rows)).toBeNull();
-    expect(duplicateOf(second, library, rows)).toBe('batch');
+    expect(alreadyIn(first, library, rows)).toBeNull();
+    expect(alreadyIn(second, library, rows)).toEqual({ in: 'batch' });
   });
 
   it('does not flag a file with the same name but a different size', () => {
     const row = { key: 5, file: file('echo room.wav', 1001) };
     const other = { key: 1, file: file('echo room.wav', 999) };
-    expect(duplicateOf(row, library, [other, row])).toBeNull();
+    expect(alreadyIn(row, library, [other, row])).toBeNull();
   });
 });
