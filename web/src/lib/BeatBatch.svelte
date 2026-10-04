@@ -27,6 +27,9 @@
     library,
     maxUploadBytes,
     uploading = $bindable(false),
+    playingRow = null,
+    onPreview,
+    onLeave,
     onAdded,
     onClose,
   }: {
@@ -35,6 +38,12 @@
     maxUploadBytes: number;
     /** Whether Beats are being uploaded, when no more files can be picked. */
     uploading?: boolean;
+    /** The key of the row whose file the preview player bar is playing, if any. */
+    playingRow?: number | null;
+    /** A row's play button was clicked, to preview its file, or pause or resume it. */
+    onPreview: (row: BatchRow) => void;
+    /** A row has left the table: removed, its Beat added, or the batch cancelled. */
+    onLeave: (key: number) => void;
     /** A Beat was saved, and its row has left the table. */
     onAdded: (beat: Beat) => void;
     /** The batch is empty, all added, removed or cancelled. */
@@ -161,6 +170,7 @@
 
   function remove(key: number) {
     rows = rows.filter((row) => row.key !== key);
+    onLeave(key);
     if (rows.length === 0) onClose();
   }
 
@@ -186,6 +196,7 @@
       try {
         const beat = await api.addBeat(row.file, details, row.decoded);
         rows = rows.filter((r) => r.key !== key);
+        onLeave(key);
         onAdded(beat);
       } catch (e) {
         const failed = rows.find((r) => r.key === key);
@@ -199,7 +210,9 @@
 
   function cancel() {
     if (anyEdited(rows) && !confirm('Cancel adding these Beats? The details you typed will be lost.')) return;
+    const left = rows;
     rows = [];
+    for (const row of left) onLeave(row.key);
     onClose();
   }
 
@@ -285,6 +298,7 @@
                 onchange={(e) => tickAll(e.currentTarget.checked)}
               />
             </th>
+            <th class="preview"><span class="visually-hidden">Preview</span></th>
             <th>File</th>
             <th class="num">Duration</th>
             <th>Title</th>
@@ -309,6 +323,19 @@
                   disabled={!canTick(row)}
                   onclick={(e) => tickRow(row, e)}
                 />
+              </td>
+              <td class="preview">
+                {#if row.status === 'ready'}
+                  {@const playing = playingRow === row.key}
+                  <button
+                    type="button"
+                    class="icon"
+                    aria-label="{playing ? 'Pause' : 'Preview'} “{name}”"
+                    onclick={() => onPreview(row)}
+                  >
+                    {playing ? '❚❚' : '▶'}
+                  </button>
+                {/if}
               </td>
               <td class="file">
                 <span class="ellipsis" title={name}>{name}</span>
@@ -547,6 +574,7 @@
     width: 6rem;
     min-width: 6rem;
   }
+  .preview,
   .remove {
     width: calc(var(--control) + 0.5rem);
   }
