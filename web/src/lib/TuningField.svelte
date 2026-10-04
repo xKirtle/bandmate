@@ -6,11 +6,13 @@
   // A Song's tuning in its Details: a picker of the named tunings, or six
   // notes for a custom one. It stays text on the Song: the picker writes a
   // tuning's name, or its six notes. Text that can't be read (ADR 0008) is
-  // kept and shown as written, until another tuning is picked.
+  // kept and shown as written, until another tuning is picked. The
+  // standalone Chord Finder uses it too, where there's always a tuning.
   let {
     id,
     labelledby,
     value = $bindable(''),
+    optional = true,
     oncommit,
     oninvalid,
   }: {
@@ -19,6 +21,8 @@
     labelledby: string;
     /** The tuning as text, as the Song holds it. */
     value?: string;
+    /** Whether no tuning (—) can be picked. */
+    optional?: boolean;
     /** `value` was set to a tuning to save. */
     oncommit: () => void;
     /** Custom notes couldn't be read, so nothing was saved. */
@@ -43,7 +47,12 @@
     return tuningNotes(value) ? custom : unreadable;
   });
   const choice = $derived(customising ? custom : valueChoice);
-  const options = $derived([none, ...named, custom, ...(valueChoice === unreadable ? [unreadable] : [])]);
+  const options = $derived([
+    ...(optional ? [none] : []),
+    ...named,
+    custom,
+    ...(valueChoice === unreadable ? [unreadable] : []),
+  ]);
 
   // The notes being typed for a custom tuning: those of the tuning picked so
   // far, or standard tuning's.

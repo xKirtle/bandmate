@@ -80,10 +80,13 @@ const height = (frets: (number | null)[]) => frets.reduce<number>((sum, f) => su
  * muted string between sounding ones, has its bass on the 6th, 5th or 4th
  * string (treble strings may be muted), and fits a hand: four frets, four
  * fingers, a barre counting as one. A slash Chord's bass is its lowest note.
+ * With a capo on, a Chord names the shape fingered, not the pitch that
+ * sounds, so its Voicings are the shapes it has with the capo as the nut:
+ * frets count from the capo, and the capo moves none of them.
  */
 export function guitarVoicings(chord: Chord, context: { tuning: readonly number[]; capo: number }): Voicing[] {
-  const { tuning, capo } = context;
-  const pitchClass = (string: number, fret: number) => (tuning[string] + capo + fret) % 12;
+  const { tuning } = context;
+  const pitchClass = (string: number, fret: number) => (tuning[string] + fret) % 12;
   const tones = new Set(chord.quality.tones.map((t) => (chord.root + t.semitones) % 12));
   const required = chord.quality.tones.filter((t) => !t.optional).map((t) => (chord.root + t.semitones) % 12);
   const lowest = chord.bass ?? chord.root;
