@@ -74,6 +74,13 @@
   function clearFilters() {
     view = { ...defaultBeatListView, sort: view.sort };
   }
+  // Without any Beats, the search and filters have nothing to act on, so
+  // they're hidden, and cleared so ones from the URL don't hide the first
+  // Beat once it's added.
+  const anyBeats = $derived(beats === null || beats.length > 0);
+  $effect(() => {
+    if (!anyBeats && filtering) clearFilters();
+  });
 
   const desktop = new MediaQuery('min-width: 80rem');
 
@@ -195,6 +202,13 @@
   </button>
 {/snippet}
 
+{#snippet addBeat(text: string)}
+  <label class="button primary add" class:disabled={addBusy !== null}>
+    {text}
+    <input class="visually-hidden" type="file" accept="audio/*" onchange={pick} disabled={addBusy !== null} />
+  </label>
+{/snippet}
+
 {#snippet previewCell(beat: Beat)}
   <button
     type="button"
@@ -208,10 +222,7 @@
 
 <header class="bar" bind:borderBoxSize={headerBox}>
   <h1>Beats</h1>
-  <label class="button primary" class:disabled={addBusy !== null}>
-    Add Beat
-    <input class="visually-hidden" type="file" accept="audio/*" onchange={pick} disabled={addBusy !== null} />
-  </label>
+  {@render addBeat('Add Beat')}
 </header>
 
 <main
@@ -240,7 +251,9 @@
     <p class="error add-error" role="alert">{addError}</p>
   {/if}
 
-  <BeatFilters bind:view beats={beats ?? []} idPrefix="beat" />
+  {#if anyBeats}
+    <BeatFilters bind:view beats={beats ?? []} idPrefix="beat" />
+  {/if}
 
   {#if loadError}
     <p class="error" role="alert">{loadError}</p>
@@ -249,6 +262,7 @@
   {:else if beats.length === 0}
     <div class="empty">
       <p>No Beats yet. Add an audio file to use it in any Song.</p>
+      {@render addBeat('Add your first Beat')}
     </div>
   {:else if shown.length === 0 && filtering}
     <div class="empty">
@@ -291,11 +305,11 @@
 {/if}
 
 <style>
-  .bar label.disabled {
+  .add.disabled {
     opacity: 0.6;
     cursor: default;
   }
-  .bar label:has(input:focus-visible) {
+  .add:has(input:focus-visible) {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
