@@ -633,16 +633,17 @@ export class ApiError extends Error {
 
 async function request<T>(method: string, path: string, body?: unknown, at?: SongAt): Promise<T> {
   const headers: Record<string, string> = {};
-  // The browser sets a form's Content-Type itself, with its boundary.
-  const form = body instanceof FormData;
-  if (body !== undefined && !form) headers['Content-Type'] = 'application/json';
+  // The browser sets a form's Content-Type itself, with its boundary, and a
+  // file's from its type. Either is sent as it is.
+  const asIs = body instanceof FormData || body instanceof Blob;
+  if (body !== undefined && !asIs) headers['Content-Type'] = 'application/json';
   if (at) headers['If-Match'] = `"${at.version}"`;
   let res: Response;
   try {
     res = await fetch(`/api${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : form ? body : JSON.stringify(body),
+      body: body === undefined ? undefined : asIs ? body : JSON.stringify(body),
     });
   } catch {
     throw new ApiError(0, "Can't reach Bandmate. Check your connection.");
@@ -712,6 +713,12 @@ export const api = {
   listBackups: () => request<Backup[]>('GET', '/backups'),
   /** Makes a Backup, answering once it's made, which takes as long as copying its Songs' files. */
   makeBackup: (contents: BackupContents) => request<Backup>('POST', '/backups', contents),
+  /**
+   * Keeps a downloaded Backup's file, from this install or another, to
+   * restore from. It's refused whole, saying why, if it isn't a Backup, is
+   * damaged, or was made by a newer Bandmate.
+   */
+  uploadBackup: (file: File) => request<Backup>('POST', '/backups/upload', file),
   /** Gives a Backup a name of its own, or with a blank one, clears it back to the automatic one. */
   renameBackup: (id: number, name: string) => request<Backup>('PATCH', `/backups/${id}`, { name }),
   /** Deletes a Backup and its file. */

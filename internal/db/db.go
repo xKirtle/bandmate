@@ -5,6 +5,8 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -31,6 +33,42 @@ func Open(ctx context.Context, dataDir string) (*sql.DB, error) {
 // after it, or applying them all if stop is "". It lets a test make a
 // database at an older schema, e.g. a Backup made by an older Bandmate.
 func OpenBefore(ctx context.Context, dataDir, stop string) (*sql.DB, error) {
+	conn, err := open(dataDir)
+	if err != nil {
+		return nil, err
+	}
+	if err := migrateBefore(ctx, conn, stop); err != nil {
+		conn.Close()
+		return nil, err
+	}
+	return conn, nil
+}
+
+// ErrNewer means a database records a migration this Bandmate doesn't
+// know, so a newer Bandmate migrated it.
+var ErrNewer = errors.New("the database was migrated by a newer Bandmate")
+
+// OpenNoNewer is Open, refusing with ErrNewer a database a newer Bandmate
+// migrated, e.g. a Backup it made, rather than migrating it alongside
+// changes this Bandmate doesn't know.
+func OpenNoNewer(ctx context.Context, dataDir string) (*sql.DB, error) {
+	conn, err := open(dataDir)
+	if err != nil {
+		return nil, err
+	}
+	err = refuseNewer(ctx, conn)
+	if err == nil {
+		err = migrate(ctx, conn)
+	}
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+	return conn, nil
+}
+
+// open opens (creating if needed) the database in dataDir as it is.
+func open(dataDir string) (*sql.DB, error) {
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return nil, fmt.Errorf("creating data directory: %w", err)
 	}
@@ -43,11 +81,41 @@ func OpenBefore(ctx context.Context, dataDir, stop string) (*sql.DB, error) {
 	// SQLite allows one writer at a time; a single connection avoids
 	// "database is locked" errors for a single-user app.
 	conn.SetMaxOpenConns(1)
-	if err := migrateBefore(ctx, conn, stop); err != nil {
-		conn.Close()
-		return nil, err
-	}
 	return conn, nil
+}
+
+// refuseNewer returns ErrNewer if the database records a migration this
+// Bandmate doesn't know.
+func refuseNewer(ctx context.Context, conn *sql.DB) error {
+	var tables int
+	if err := conn.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'`).Scan(&tables); err != nil {
+		return fmt.Errorf("reading the schema: %w", err)
+	}
+	if tables == 0 {
+		return nil
+	}
+	known, err := fs.Glob(migrations, "migrations/*.sql")
+	if err != nil {
+		return err
+	}
+	names := make([]string, len(known))
+	for i, path := range known {
+		names[i] = strings.TrimSuffix(filepath.Base(path), ".sql")
+	}
+	list, err := json.Marshal(names)
+	if err != nil {
+		return err
+	}
+	var unknown int
+	if err := conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM schema_migrations
+		WHERE name NOT IN (SELECT value FROM json_each(?))`, string(list)).Scan(&unknown); err != nil {
+		return fmt.Errorf("reading the schema: %w", err)
+	}
+	if unknown > 0 {
+		return ErrNewer
+	}
+	return nil
 }
 
 // migrate applies every embedded migration not yet recorded in

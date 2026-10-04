@@ -32,6 +32,19 @@ func (a *App) makeBackup(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, b)
 }
 
+// uploadBackup keeps a Backup's file sent as the request's body, downloaded
+// from this install or another, to restore from like one made here. It's
+// refused whole if it isn't a Backup, is damaged, or was made by a newer
+// Bandmate.
+func (a *App) uploadBackup(w http.ResponseWriter, r *http.Request) {
+	b, err := a.backups.Upload(r.Context(), r.Body)
+	if err != nil {
+		writeBackupError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, b)
+}
+
 func (a *App) backupFile(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {

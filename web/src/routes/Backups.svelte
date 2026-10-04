@@ -1,8 +1,9 @@
 <script lang="ts">
   // The Backups kept in Bandmate, newest first, each named from when it was
   // made and what it holds, or with a name of its own, with its size, and
-  // downloadable as one file. Songs can be restored from each that holds
-  // some. Each can be renamed, or deleted after
+  // downloadable as one file. A downloaded one, from here or another
+  // install, can be uploaded to join them. Songs can be restored from each
+  // that holds some. Each can be renamed, or deleted after
   // confirming; nothing deletes one otherwise.
   import ActionsMenu from '../lib/ActionsMenu.svelte';
   import { api, type Backup } from '../lib/api';
@@ -18,6 +19,10 @@
   let making = $state(false);
   let renaming = $state<Backup | null>(null);
   let restoring = $state<Backup | null>(null);
+  /** The name of the file being uploaded, while it is. */
+  let uploading = $state<string | null>(null);
+  /** What the last upload added, to say so, since it's listed by when it was made, maybe far down. */
+  let uploaded = $state<string | null>(null);
 
   api.listBackups().then(
     (list) => (backups = list),
@@ -28,6 +33,36 @@
 
   function showMade(backup: Backup) {
     backups = [backup, ...(backups ?? []).filter((b) => b.id !== backup.id)];
+  }
+
+  /** Lists an uploaded Backup where it belongs, newest first, as the server lists them. */
+  function showUploaded(backup: Backup) {
+    const rest = (backups ?? []).filter((b) => b.id !== backup.id);
+    const made = Date.parse(backup.createdAt);
+    const at = rest.findIndex((b) => {
+      const other = Date.parse(b.createdAt);
+      return other < made || (other === made && b.id < backup.id);
+    });
+    backups = at < 0 ? [...rest, backup] : [...rest.slice(0, at), backup, ...rest.slice(at)];
+  }
+
+  async function upload(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    error = null;
+    uploaded = null;
+    uploading = file.name;
+    try {
+      const backup = await api.uploadBackup(file);
+      showUploaded(backup);
+      uploaded = `Added “${backupName(backup)}” from “${file.name}”.`;
+    } catch (e) {
+      error = `Couldn't upload “${file.name}” (${(e as Error).message})`;
+    } finally {
+      uploading = null;
+    }
   }
 
   function showRenamed(backup: Backup) {
@@ -59,12 +94,23 @@
 
 <header class="bar">
   <h1>Backups</h1>
-  <button type="button" class="button primary" onclick={() => (making = true)}>New Backup</button>
+  <div class="bar-actions">
+    <label class="button" class:disabled={uploading !== null}>
+      Upload
+      <input class="visually-hidden" type="file" onchange={upload} disabled={uploading !== null} />
+    </label>
+    <button type="button" class="button primary" onclick={() => (making = true)}>New Backup</button>
+  </div>
 </header>
 
 <main class="page">
   {#if error}
     <p class="error" role="alert">{error}</p>
+  {/if}
+  {#if uploading}
+    <p class="muted" role="status">Uploading “{uploading}”…</p>
+  {:else if uploaded}
+    <p class="muted" role="status">{uploaded}</p>
   {/if}
   {#if loadError}
     <p class="error" role="alert">{loadError}</p>
@@ -75,7 +121,7 @@
       <p>No Backups yet.</p>
       <p class="muted">
         A Backup is a copy of Songs, the Beat Library, or both, kept here to restore from, and downloadable as one file
-        to keep elsewhere.
+        to keep elsewhere. Upload one downloaded before, here or on another install, to restore from it.
       </p>
     </div>
   {:else}
@@ -125,6 +171,18 @@
 {/if}
 
 <style>
+  .bar-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .bar label.disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+  .bar label:has(input:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
   .backups {
     margin: 0;
     padding: 0;

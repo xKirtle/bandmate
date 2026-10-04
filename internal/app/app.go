@@ -271,6 +271,7 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("GET /api/beats/{id}/audio", a.beatAudio)
 	mux.HandleFunc("GET /api/backups", a.listBackups)
 	mux.HandleFunc("POST /api/backups", a.makeBackup)
+	mux.HandleFunc("POST /api/backups/upload", a.uploadBackup)
 	mux.HandleFunc("PATCH /api/backups/{id}", a.renameBackup)
 	mux.HandleFunc("DELETE /api/backups/{id}", a.deleteBackup)
 	mux.HandleFunc("GET /api/backups/{id}/file", a.backupFile)
