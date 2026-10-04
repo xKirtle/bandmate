@@ -187,7 +187,7 @@ export function readChord(text: string): Chord | null {
   const rootName = root.letter + root.accidental;
   const notes = quality.tones.map((t) => spell(root, t));
   const bassName = bass && bass.letter + bass.accidental;
-  const bassIsTone = bass && quality.tones.some((t) => (root.semitone + t.semitones) % 12 === bass.semitone);
+  const bassIsTone = bass && quality.tones.some((t) => toneAt(root.semitone, t) === bass.semitone);
   if (bassName && !bassIsTone) notes.push(bassName);
   return {
     name: rootName + quality.suffix + (bassName ? '/' + bassName : ''),
@@ -198,4 +198,67 @@ export function readChord(text: string): Chord | null {
     bassName,
     notes,
   };
+}
+
+/** A tone's note above a root, as its semitone from C, 0–11. */
+const toneAt = (root: number, tone: Tone) => (root + tone.semitones) % 12;
+
+/** How many sharps and flats a Chord's notes are written with. */
+const accidentalCount = (chord: Chord) => chord.notes.join('').replace(/[^#b]/g, '').length;
+
+/** Each note of a Chord's, as its semitone from C, to how the Chord spells it. */
+function spellingOf(chord: Chord): Map<number, string> {
+  return new Map(chord.quality.tones.map((t, i) => [toneAt(chord.root, t), chord.notes[i]]));
+}
+
+/**
+ * The Chords that fit notes sounding, best first: every root and quality
+ * from the known set whose tones hold every note sounding and every tone the
+ * quality can't do without. A lowest note that isn't the root is a slash
+ * bass, so a bass is always one of the Chord's tones. Notes are semitones
+ * from C, 0–11, lowest first.
+ *
+ * Readings with the root as the lowest note come first, then the simpler
+ * ones, with fewer tones. The best reading's root is written sharp or flat,
+ * whichever writes its notes with fewer sharps and flats (G#m, not Abm with
+ * its Cb), the common way when that's a tie; every other reading writes each
+ * note the way the best one does, so a note is never Bb in one and A# in
+ * another.
+ */
+export function nameNotes(notes: readonly number[]): Chord[] {
+  const bass = notes[0];
+  const sounding = new Set(notes);
+  const fits: { root: number; quality: Quality }[] = [];
+  for (const root of sounding) {
+    for (const quality of qualities) {
+      const at = quality.tones.map((t) => toneAt(root, t));
+      const required = at.filter((_, i) => !quality.tones[i].optional);
+      if ([...sounding].every((n) => at.includes(n)) && required.every((n) => sounding.has(n)))
+        fits.push({ root, quality });
+    }
+  }
+  if (fits.length === 0) return [];
+  const rootInBass = (f: { root: number }) => (f.root === bass ? 0 : 1);
+  fits.sort((a, b) => rootInBass(a) - rootInBass(b) || a.quality.tones.length - b.quality.tones.length);
+
+  const best = fits[0];
+  const spellings = [...new Set([common[best.root], sharps[best.root], flats[best.root]])];
+  const bestSpelled = spellings
+    .flatMap((root) => readChord(root + best.quality.suffix) ?? [])
+    .reduce((a, b) => (accidentalCount(b) < accidentalCount(a) ? b : a));
+  const spelling = spellingOf(bestSpelled);
+  const spell = (n: number) => spelling.get(n) ?? common[n];
+  return fits.flatMap(
+    ({ root, quality }) => readChord(spell(root) + quality.suffix + (root === bass ? '' : '/' + spell(bass))) ?? [],
+  );
+}
+
+/**
+ * Notes sounding, each once in the order given, spelled as a Chord they're
+ * read as spells them (D# in B, not Eb), or the common way with none.
+ * Notes are semitones from C, 0–11.
+ */
+export function spellNotes(notes: readonly number[], chord: Chord | null): string[] {
+  const spelling = chord ? spellingOf(chord) : new Map<number, string>();
+  return [...new Set(notes)].map((n) => spelling.get(n) ?? common[n]);
 }
