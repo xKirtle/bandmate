@@ -164,10 +164,9 @@ type Restored struct {
 }
 
 // Restore brings back what picks names from a Backup: Songs, each with the
-// Beats its Clips use, and Beats. It never deletes a Song or
-// Beat the Backup doesn't hold. What it picks is copied in with fresh ids,
-// all of it or, if anything fails, none. A Song or Beat
-// already in Bandmate (the same one, by its identity) is kept, unless
+// Beats its Clips use, and Beats. It never deletes a Song or Beat the
+// Backup doesn't hold. What it picks is copied in with fresh ids, all of
+// it or, if anything fails, none. A Song or Beat already in Bandmate (the same one, by its identity) is kept, unless
 // replace lists it: the restored one is added alongside, titled as
 // restored, with an identity of its own, and a restored Song plays the
 // Beats restored with it. A Song replaced is the Backup's version entirely,

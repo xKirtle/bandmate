@@ -140,7 +140,8 @@ func (a *App) restoreBackup(w http.ResponseWriter, r *http.Request) {
 }
 
 // presentInBandmate lists which of the Songs picked from a Backup, of the
-// Beats their Clips use, and of the Beats picked, are already in Bandmate, to choose for each whether a Restore replaces it or keeps both.
+// Beats their Clips use, and of the Beats picked, are already in Bandmate,
+// to choose for each whether a Restore replaces it or keeps both.
 func (a *App) presentInBandmate(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {

@@ -10,13 +10,22 @@
     type BackupSong,
   } from './api';
   import { closeOnBackdrop } from './backdrop';
-  import { backupName, beatCount, beatsBrought, replaceConfirmation, restoredName, restorePicks } from './backups';
+  import {
+    backupName,
+    beatCount,
+    beatsBrought,
+    broughtNote,
+    replaceConfirmation,
+    restoredName,
+    restorePicks,
+  } from './backups';
   import PickList from './PickList.svelte';
 
   // "Restore": ticks what comes back from a Backup, Songs and Beats (some or
   // all of each), as "New Backup" ticks what goes in, then restores them,
-  // each Song with the Beats its Clips use, in the same modal dialog, which holds focus until they're back: it
-  // can't be closed meanwhile, by a click outside, Esc, or a button. Where
+  // each Song with the Beats its Clips use, in the same modal dialog, which
+  // holds focus until they're back: it can't be closed meanwhile, by a
+  // click outside, Esc, or a button. Where
   // Songs or Beats picked are already in Bandmate (the same ones, not just
   // the same titles), a step lists them, each to replace or keep both, keep
   // both by default, which adds the restored one alongside as
@@ -50,8 +59,10 @@
   let restored = $state<BackupRestored>({ songs: [], beats: 0 });
   const replacingAny = $derived(replacing.songs.size + replacing.beats.size > 0);
   const songIds = $derived(songs?.map((s) => s.id) ?? []);
-  /** The Beats the picked Songs bring, shown ticked and locked. */
-  const brought = $derived(beatsBrought(songsTicked ? songIds.filter((id) => picked.has(id)) : [], beats ?? []));
+  /** The Songs that come back, by id. */
+  const songsIn = $derived(songsTicked ? songIds.filter((id) => picked.has(id)) : []);
+  /** The Beats the Songs that come back bring, shown ticked and locked. */
+  const brought = $derived(beatsBrought(songsIn, beats ?? []));
   /** What to restore, with its name, or what's missing before it can be. */
   const toRestore = $derived(
     restorePicks(
@@ -173,6 +184,9 @@
             <p id="restore-songs-note" class="muted">Each Song comes back whole, with the Beats its Clips use.</p>
             {#if songsTicked}
               <PickList items={songs} bind:picked label="Songs to restore" />
+              {#if !beatsTicked && songsIn.length > 0}
+                <p class="muted">{broughtNote(songsIn.length, brought.size)}</p>
+              {/if}
             {/if}
           </div>
         {/if}
