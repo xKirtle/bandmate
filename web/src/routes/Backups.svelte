@@ -1,7 +1,8 @@
 <script lang="ts">
   // The Backups kept in Bandmate, newest first, each named from when it was
   // made and what it holds, or with a name of its own, with its size, and
-  // downloadable as one file. Each can be renamed, or deleted after
+  // downloadable as one file. Songs can be restored from each that holds
+  // some. Each can be renamed, or deleted after
   // confirming; nothing deletes one otherwise.
   import ActionsMenu from '../lib/ActionsMenu.svelte';
   import { api, type Backup } from '../lib/api';
@@ -9,12 +10,14 @@
   import type { MenuAction } from '../lib/menu';
   import NewBackupDialog from '../lib/NewBackupDialog.svelte';
   import RenameBackupDialog from '../lib/RenameBackupDialog.svelte';
+  import RestoreBackupDialog from '../lib/RestoreBackupDialog.svelte';
 
   let backups = $state<Backup[] | null>(null);
   let loadError = $state<string | null>(null);
   let error = $state<string | null>(null);
   let making = $state(false);
   let renaming = $state<Backup | null>(null);
+  let restoring = $state<Backup | null>(null);
 
   api.listBackups().then(
     (list) => (backups = list),
@@ -87,6 +90,14 @@
             </span>
           </div>
           <div class="row-actions">
+            {#if backup.songs > 0}
+              <button
+                type="button"
+                class="button"
+                onclick={() => (restoring = backup)}
+                aria-label="Restore from {backupName(backup)}">Restore</button
+              >
+            {/if}
             <a
               class="button"
               href={api.backupDownloadUrl(backup.id)}
@@ -105,6 +116,10 @@
   <NewBackupDialog onMade={showMade} onClose={() => (making = false)} />
 {/if}
 
+{#if restoring}
+  <RestoreBackupDialog backup={restoring} onClose={() => (restoring = null)} />
+{/if}
+
 {#if renaming}
   <RenameBackupDialog backup={renaming} onRenamed={showRenamed} onClose={() => (renaming = null)} />
 {/if}
@@ -119,13 +134,16 @@
   li {
     display: flex;
     align-items: center;
+    /* Where the name would be squeezed, as at phone width, the buttons go under it. */
+    flex-wrap: wrap;
     justify-content: space-between;
-    gap: 1rem;
+    gap: 0.5rem 1rem;
     padding: 0.75rem 0;
     border-bottom: 1px solid var(--border);
   }
   .about {
     display: flex;
+    flex: 1 1 12rem;
     flex-direction: column;
     min-width: 0;
   }
@@ -141,6 +159,7 @@
     flex: none;
     align-items: center;
     gap: 0.25rem;
+    margin-left: auto;
   }
   .empty {
     text-align: center;
