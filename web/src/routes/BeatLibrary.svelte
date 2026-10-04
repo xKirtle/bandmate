@@ -2,6 +2,7 @@
   import { tick } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { api, type Beat, type DecodedAudio } from '../lib/api';
+  import BeatBatch from '../lib/BeatBatch.svelte';
   import BeatFields from '../lib/BeatFields.svelte';
   import BeatFilters from '../lib/BeatFilters.svelte';
   import BeatEditDialog from '../lib/BeatEditDialog.svelte';
@@ -121,11 +122,26 @@
     previewPlaying = false;
   }
 
+  // Several files picked at once, on desktop, open a review table instead of
+  // the form; files picked while it's open join it.
+  let batching = $state(false);
+  let batchUploading = $state(false);
+  let batch = $state<BeatBatch>();
+
   async function pick(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
+    const files = [...(input.files ?? [])];
     input.value = '';
-    if (!file) return;
+    if (files.length === 0) return;
+    if (batching || files.length > 1) {
+      adding = null;
+      addError = null;
+      batching = true;
+      await tick();
+      batch?.append(files);
+      return;
+    }
+    const [file] = files;
     adding = null;
     addError = null;
     addBusy = `Reading “${file.name}”…`;
@@ -163,6 +179,13 @@
   function cancelAdd() {
     adding = null;
     addError = null;
+  }
+
+  // A batch adds its Beats to the list as each saves, rather than loading
+  // the whole Library again for each one.
+  function showAdded(beat: Beat) {
+    if (beats) beats = [...beats, beat];
+    else reloads++;
   }
 
   // The Beat being edited in the dialog the table opens. The cards below
@@ -204,9 +227,11 @@
 {/snippet}
 
 {#snippet addBeatButton(text: string)}
-  <label class="button primary add-beat" class:disabled={addBusy !== null}>
+  {@const disabled = addBusy !== null || batchUploading}
+  <label class="button primary add-beat" class:disabled>
     {text}
-    <input class="visually-hidden" type="file" accept="audio/*" onchange={pick} disabled={addBusy !== null} />
+    <!-- Below desktop, Beats are added one at a time. -->
+    <input class="visually-hidden" type="file" accept="audio/*" multiple={desktop.current} onchange={pick} {disabled} />
   </label>
 {/snippet}
 
@@ -232,6 +257,15 @@
   style:--header-height="{headerHeight}px"
   style:--player-height="{playerBarHeight}px"
 >
+  {#if batching}
+    <BeatBatch
+      bind:this={batch}
+      bind:uploading={batchUploading}
+      {maxUploadBytes}
+      onAdded={showAdded}
+      onClose={() => (batching = false)}
+    />
+  {/if}
   {#if adding}
     <form class="adding" onsubmit={add} aria-labelledby="adding-heading">
       <h2 id="adding-heading">
