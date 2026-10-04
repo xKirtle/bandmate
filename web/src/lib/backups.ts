@@ -1,5 +1,5 @@
 // How Backups are named and sized on the Backups page.
-import type { Backup, BackupPresent } from './api';
+import type { Backup, BackupContents, BackupPresent } from './api';
 import { formatSize } from './upload';
 
 // Spelled out rather than left to the locale, which may shorten September
@@ -29,6 +29,37 @@ export function contentsName({ songs, allSongs, beatLibrary }: Contents): string
   if (!beatLibrary) return songCount(songs);
   if (allSongs) return 'Everything';
   return songs === 0 ? 'Beat Library' : `${songCount(songs)} + Beat Library`;
+}
+
+/** What's ticked in "New Backup": Songs, which of them are picked, and the Beat Library. */
+export interface NewBackupTicks {
+  songs: boolean;
+  /** The Songs picked, kept while Songs is unticked for when it's ticked again. */
+  picked: ReadonlySet<number>;
+  beatLibrary: boolean;
+}
+
+/**
+ * The Backup "New Backup" asks for from what's ticked, out of every Song's
+ * id, with its name, or what's missing before it can be made. Every Song
+ * picked is all of them, however they were picked, so with the Beat Library
+ * it's Everything.
+ */
+export function newBackup(
+  ticks: NewBackupTicks,
+  songs: readonly number[],
+): { contents: BackupContents | null; name: string; missing: string | null } {
+  const picked = ticks.songs ? songs.filter((id) => ticks.picked.has(id)) : [];
+  let missing: string | null = null;
+  if (!ticks.songs && !ticks.beatLibrary) missing = 'Tick Songs or the Beat Library.';
+  else if (ticks.songs && picked.length === 0) missing = 'Pick a Song, or untick Songs.';
+  if (missing) return { contents: null, name: '', missing };
+  const allSongs = picked.length > 0 && picked.length === songs.length;
+  return {
+    contents: { ...(allSongs ? { allSongs: true as const } : { songs: picked }), beatLibrary: ticks.beatLibrary },
+    name: contentsName({ songs: picked.length, allSongs, beatLibrary: ticks.beatLibrary }),
+    missing: null,
+  };
 }
 
 /** "1 Song", "3 Songs". */

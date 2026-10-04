@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { automaticName, backupName, backupSize, replaceConfirmation, restoredName } from './backups';
+import { automaticName, backupName, backupSize, newBackup, replaceConfirmation, restoredName } from './backups';
 
 // 18:30 on 4 Oct 2026, in the time zone the tests run in.
 const made = new Date(2026, 9, 4, 18, 30).toISOString();
@@ -111,5 +111,57 @@ describe('restoredName', () => {
     expect(restoredName(0, 14, true)).toBe('14 Beats');
     expect(restoredName(0, 0, true)).toBe('0 Beats');
     expect(restoredName(3, 2, true)).toBe('3 Songs and 2 Beats');
+  });
+});
+
+describe('newBackup', () => {
+  const songs = [1, 2, 3];
+
+  it('is Everything with every Song and the Beat Library, as the dialog opens', () => {
+    expect(newBackup({ songs: true, picked: new Set(songs), beatLibrary: true }, songs)).toEqual({
+      contents: { allSongs: true, beatLibrary: true },
+      name: 'Everything',
+      missing: null,
+    });
+  });
+
+  it('is Everything whether the Songs were ticked one by one or left at the default', () => {
+    expect(newBackup({ songs: true, picked: new Set([3, 1, 2]), beatLibrary: true }, songs).name).toBe('Everything');
+  });
+
+  it('asks for the Songs picked when only some are', () => {
+    expect(newBackup({ songs: true, picked: new Set([2]), beatLibrary: true }, songs)).toEqual({
+      contents: { songs: [2], beatLibrary: true },
+      name: '1 Song + Beat Library',
+      missing: null,
+    });
+  });
+
+  it('asks for every Song without the Beat Library when it is unticked', () => {
+    expect(newBackup({ songs: true, picked: new Set(songs), beatLibrary: false }, songs)).toEqual({
+      contents: { allSongs: true, beatLibrary: false },
+      name: '3 Songs',
+      missing: null,
+    });
+  });
+
+  it('leaves the picks out while Songs is unticked', () => {
+    expect(newBackup({ songs: false, picked: new Set([1]), beatLibrary: true }, songs)).toEqual({
+      contents: { songs: [], beatLibrary: true },
+      name: 'Beat Library',
+      missing: null,
+    });
+  });
+
+  it('says what is missing when nothing is ticked', () => {
+    const made = newBackup({ songs: false, picked: new Set(songs), beatLibrary: false }, songs);
+    expect(made.contents).toBeNull();
+    expect(made.missing).toBe('Tick Songs or the Beat Library.');
+  });
+
+  it('says what is missing when Songs is ticked with none picked, even with the Beat Library', () => {
+    const made = newBackup({ songs: true, picked: new Set(), beatLibrary: true }, songs);
+    expect(made.contents).toBeNull();
+    expect(made.missing).toBe('Pick a Song, or untick Songs.');
   });
 });

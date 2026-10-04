@@ -1,13 +1,14 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { api, type Backup, type BackupContents, type SongSummary } from './api';
+  import { api, type Backup, type SongSummary } from './api';
   import { closeOnBackdrop } from './backdrop';
-  import { backupName, backupSize, contentsName } from './backups';
+  import { backupName, backupSize, newBackup } from './backups';
+  import PickList from './PickList.svelte';
 
-  // "New Backup": picks what goes in (Everything, Songs with or without the
-  // Beat Library, or the Beat Library alone), then makes the Backup in the
-  // same modal dialog, which holds focus until it's made: it can't be closed
-  // meanwhile, by a click outside, Esc, or a button.
+  // "New Backup": ticks what goes in, Songs (some or all) and the Beat
+  // Library, together or not, then makes the Backup in the same modal
+  // dialog, which holds focus until it's made: it can't be closed meanwhile,
+  // by a click outside, Esc, or a button.
   let {
     onMade,
     onClose,
@@ -24,33 +25,14 @@
   let beats = $state<number | null>(null);
   let loadError = $state<string | null>(null);
   let error = $state<string | null>(null);
-  /** Everything, Songs (with the Beat Library or not), or the Beat Library alone. */
-  let what = $state<'everything' | 'songs' | 'beatLibrary'>('everything');
-  let all = $state(true);
+  /** Whether Songs are ticked; unticking them keeps the picks for when they're ticked again. */
+  let songsTicked = $state(false);
   let picked = $state<Set<number>>(new Set());
-  /** Whether Songs go with the whole Beat Library. */
-  let withBeatLibrary = $state(false);
+  let beatLibrary = $state(false);
   let made = $state<Backup | null>(null);
 
-  /**
-   * What's picked, as the Backup is asked for. Every Song ticked one by one
-   * is all Songs, so with the Beat Library it's named Everything, as when
-   * picked as Everything.
-   */
-  const contents = $derived.by((): BackupContents => {
-    if (what === 'everything') return { allSongs: true, beatLibrary: true };
-    if (what === 'beatLibrary') return { songs: [], beatLibrary: true };
-    const everySong = all || (songs !== null && songs.length > 0 && picked.size === songs.length);
-    return { ...(everySong ? { allSongs: true as const } : { songs: [...picked] }), beatLibrary: withBeatLibrary };
-  });
-  /** What it would hold, named as the Backup will be. */
-  const holds = $derived({
-    songs: 'allSongs' in contents ? (songs?.length ?? 0) : contents.songs.length,
-    allSongs: 'allSongs' in contents,
-    beatLibrary: contents.beatLibrary ?? false,
-  });
-  /** Whether it can be made: "Songs" needs at least one, and the Beat Library on its own needs a Beat. */
-  const ready = $derived(holds.songs > 0 || (what !== 'songs' && (beats ?? 0) > 0));
+  /** The Backup asked for, its name, or what's missing before it can be made. */
+  const pick = $derived(newBackup({ songs: songsTicked, picked, beatLibrary }, songs?.map((s) => s.id) ?? []));
 
   onMount(() => dialog?.showModal());
 
@@ -58,24 +40,20 @@
     ([songList, beatList]) => {
       songs = [...songList].sort((a, b) => a.title.localeCompare(b.title));
       beats = beatList.length;
-      // Start on what there is: with no Beats, Songs; with no Songs, the Beat Library.
-      if (beats === 0) what = 'songs';
-      else if (songs.length === 0) what = 'beatLibrary';
+      // Open on Everything there is, to back up in one click.
+      songsTicked = songs.length > 0;
+      picked = new Set(songs.map((s) => s.id));
+      beatLibrary = beats > 0;
     },
     (e: Error) => (loadError = e.message),
   );
 
-  function toggle(id: number) {
-    const next = new Set(picked);
-    if (!next.delete(id)) next.add(id);
-    picked = next;
-  }
-
   async function make() {
+    if (!pick.contents) return;
     phase = 'making';
     error = null;
     try {
-      made = await api.makeBackup(contents);
+      made = await api.makeBackup(pick.contents);
       onMade(made);
       phase = 'made';
     } catch (e) {
@@ -115,89 +93,44 @@
         <legend>What goes in</legend>
         <label>
           <input
-            type="radio"
-            name="backup-what"
-            checked={what === 'everything'}
-            onchange={() => (what = 'everything')}
-          />
-          <span>Everything <span class="muted">· every Song and the whole Beat Library</span></span>
-        </label>
-        <label>
-          <input
-            type="radio"
-            name="backup-what"
-            checked={what === 'songs'}
+            type="checkbox"
+            bind:checked={songsTicked}
             disabled={songs.length === 0}
-            onchange={() => (what = 'songs')}
+            aria-describedby="backup-songs-note"
           />
           <span>Songs</span>
         </label>
-        {#if what === 'songs'}
-          <div class="nested">
-            <fieldset>
-              <legend class="visually-hidden">Songs</legend>
-              <label>
-                <input type="radio" name="backup-songs" checked={all} onchange={() => (all = true)} />
-                <span>All Songs ({songs.length})</span>
-              </label>
-              <label>
-                <input type="radio" name="backup-songs" checked={!all} onchange={() => (all = false)} />
-                <span>Choose Songs</span>
-              </label>
-            </fieldset>
-            {#if !all}
-              <div class="choose">
-                <div class="choose-actions">
-                  <button type="button" class="link" onclick={() => (picked = new Set(songs?.map((s) => s.id)))}>
-                    Choose all
-                  </button>
-                  <button type="button" class="link" onclick={() => (picked = new Set())} disabled={picked.size === 0}>
-                    Clear
-                  </button>
-                </div>
-                <ul class="songs" aria-label="Songs to back up">
-                  {#each songs as song (song.id)}
-                    <li>
-                      <label>
-                        <input type="checkbox" checked={picked.has(song.id)} onchange={() => toggle(song.id)} />
-                        <span class="title">{song.title}</span>
-                      </label>
-                    </li>
-                  {/each}
-                </ul>
-              </div>
-            {/if}
-            <label>
-              <input type="checkbox" bind:checked={withBeatLibrary} disabled={beats === 0} />
-              <span>With the whole Beat Library</span>
-            </label>
-          </div>
-        {/if}
+        <div class="nested">
+          <p id="backup-songs-note" class="muted">
+            Each Song goes in whole, from its Lyric Sheet to its Timeline, Cover and Masters, with the Beats its Clips
+            use.
+          </p>
+          {#if songsTicked}
+            <PickList items={songs} bind:picked label="Songs to back up" />
+          {/if}
+        </div>
         <label>
           <input
-            type="radio"
-            name="backup-what"
-            checked={what === 'beatLibrary'}
+            type="checkbox"
+            bind:checked={beatLibrary}
             disabled={beats === 0}
-            onchange={() => (what = 'beatLibrary')}
+            aria-describedby="backup-beat-library-note"
           />
           <span>Beat Library <span class="muted">· {beats === 1 ? '1 Beat' : `${beats} Beats`}</span></span>
         </label>
+        <div class="nested">
+          <p id="backup-beat-library-note" class="muted">Every Beat goes in, with its credit.</p>
+        </div>
       </fieldset>
-      <p class="muted">
-        {#if what === 'beatLibrary'}
-          Every Beat is backed up, with its credit.
-        {:else}
-          Each Song is backed up whole, from its Lyric Sheet to its Timeline, Cover and Masters, with the Beats its
-          Clips use.
-        {/if}
-      </p>
+      {#if pick.missing}
+        <p class="muted">{pick.missing}</p>
+      {/if}
     {/if}
     {#if error}
       <p class="problem" role="alert">{error}</p>
     {/if}
   {:else if phase === 'making'}
-    <p role="status" aria-live="polite">Backing up {contentsName(holds)}…</p>
+    <p role="status" aria-live="polite">Backing up {pick.name}…</p>
     <progress aria-label="Making the Backup"></progress>
     <p class="muted">Don't leave or close this page until it's done.</p>
   {:else if made}
@@ -207,8 +140,8 @@
   <div class="actions">
     {#if phase === 'picking'}
       {#if songs && beats !== null && (songs.length > 0 || beats > 0)}
-        <button type="button" class="button primary" onclick={make} disabled={!ready}>
-          Back up {ready ? contentsName(holds) : ''}
+        <button type="button" class="button primary" onclick={make} disabled={!pick.contents}>
+          Back up {pick.name}
         </button>
       {/if}
       <button type="button" class="button" onclick={() => dialog?.close()}>Cancel</button>
@@ -278,55 +211,12 @@
     padding: 0;
     accent-color: var(--accent);
   }
-  /* Options under "Songs", lined up with its label. */
+  /* A checkbox's note and list, lined up with its label. */
   .nested {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-    min-height: 0;
-    margin-left: 1.75rem;
-  }
-  .choose {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    min-height: 0;
-  }
-  .choose-actions {
-    display: flex;
-    gap: 1rem;
-  }
-  .link {
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--accent);
-    font: inherit;
-    font-size: 0.875rem;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .link:disabled {
-    color: var(--text-muted);
-    cursor: default;
-  }
-  /* About six Songs, then it scrolls. */
-  .songs {
-    max-height: calc(6.5 * var(--control));
-    overflow-y: auto;
-    margin: 0;
-    padding: 0 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 0.5rem;
-    list-style: none;
-    overscroll-behavior: contain;
-  }
-  .songs label {
-    padding-block: 0.25rem;
-  }
-  .title {
-    min-width: 0;
-    overflow-wrap: anywhere;
+    gap: 0.375rem;
+    margin: 0 0 0.5rem 1.75rem;
   }
   progress {
     width: 100%;
