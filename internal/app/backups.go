@@ -42,6 +42,39 @@ func (a *App) backupFile(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// renameBackup gives a Backup a name of its own, or with a blank one clears
+// it back to the automatic one.
+func (a *App) renameBackup(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var req struct {
+		Name string `json:"name"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	b, err := a.backups.Rename(r.Context(), id, req.Name)
+	if err != nil {
+		writeBackupError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, b)
+}
+
+func (a *App) deleteBackup(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	if err := a.backups.Delete(r.Context(), id); err != nil {
+		writeBackupError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func writeBackupError(w http.ResponseWriter, err error) {
 	var invalid *backups.InvalidError
 	switch {

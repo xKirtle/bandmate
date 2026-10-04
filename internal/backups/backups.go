@@ -15,10 +15,12 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/xKirtle/bandmate/internal/audio"
@@ -64,6 +66,9 @@ type Backup struct {
 	BeatLibrary bool `json:"beatLibrary"`
 	// Size is its file's size in bytes.
 	Size int64 `json:"size"`
+	// Name is a name of its own, shown in place of the automatic one made
+	// from when it was made and what it holds; "" when it has none.
+	Name string `json:"name"`
 }
 
 // Contents is what a new Backup holds: every Song, the Songs picked, or
@@ -103,7 +108,7 @@ func Open(conn *sql.DB, dataDir string, now func() time.Time) (*Store, error) {
 // List returns the Backups, newest first.
 func (s *Store) List(ctx context.Context) ([]Backup, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, songs, all_songs, beat_library, size, created_at FROM backups ORDER BY created_at DESC, id DESC`)
+		`SELECT `+columns+` FROM backups ORDER BY created_at DESC, id DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -120,18 +125,55 @@ func (s *Store) List(ctx context.Context) ([]Backup, error) {
 }
 
 func (s *Store) get(ctx context.Context, id int64) (Backup, error) {
-	b, err := scanBackup(s.db.QueryRowContext(ctx,
-		`SELECT id, songs, all_songs, beat_library, size, created_at FROM backups WHERE id = ?`, id))
+	b, err := scanBackup(s.db.QueryRowContext(ctx, `SELECT `+columns+` FROM backups WHERE id = ?`, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return b, ErrNotFound
 	}
 	return b, err
 }
 
+// Rename gives a Backup a name of its own, or with a blank one, clears it,
+// so the automatic one is shown. Its file is left as it is.
+func (s *Store) Rename(ctx context.Context, id int64, name string) (Backup, error) {
+	res, err := s.db.ExecContext(ctx, `UPDATE backups SET name = ? WHERE id = ?`, strings.TrimSpace(name), id)
+	if err != nil {
+		return Backup{}, fmt.Errorf("renaming backup: %w", err)
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return Backup{}, err
+	} else if n == 0 {
+		return Backup{}, ErrNotFound
+	}
+	return s.get(ctx, id)
+}
+
+// Delete deletes a Backup and its file, freeing its space. Nothing else
+// deletes a Backup.
+func (s *Store) Delete(ctx context.Context, id int64) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM backups WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("deleting backup: %w", err)
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return err
+	} else if n == 0 {
+		return ErrNotFound
+	}
+	// The Backup is gone either way; a file left behind only takes space,
+	// and its id is never reused.
+	if err := os.Remove(s.path(id)); err != nil {
+		log.Printf("deleting backup %d: %v", id, err)
+	}
+	return nil
+}
+
+// columns are what a Backup is read from, in scanBackup's order.
+const columns = `id, songs, all_songs, beat_library, size, created_at, name`
+
 func scanBackup(row interface{ Scan(...any) error }) (Backup, error) {
 	var b Backup
 	var created string
-	if err := row.Scan(&b.ID, &b.Songs, &b.AllSongs, &b.BeatLibrary, &b.Size, &created); err != nil {
+	if err := row.Scan(&b.ID, &b.Songs, &b.AllSongs, &b.BeatLibrary, &b.Size, &created, &b.Name); err != nil {
 		return b, err
 	}
 	t, err := time.Parse(timeFormat, created)
