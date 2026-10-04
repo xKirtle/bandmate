@@ -3,7 +3,15 @@
 // Instrument (guitar.ts, and its tunings in guitarTuning.ts) sit behind it
 // (ADR 0012) and can be reorganised freely.
 
-import { nameNotes, readChord, spellNotes } from './chordTheory';
+import {
+  nameNotes,
+  readChord,
+  readKey,
+  spellNotes,
+  suggestAfter,
+  suggestFromKey,
+  type Suggestion,
+} from './chordTheory';
 import { guitarNotes, guitarVoicings, type Voicing } from './guitar';
 import {
   guitarTuningName,
@@ -14,7 +22,7 @@ import {
   standardTuning,
 } from './guitarTuning';
 
-export { qualities, roots, type Quality } from './chordTheory';
+export { qualities, roots, type Quality, type Suggestion } from './chordTheory';
 export type { Voicing } from './guitar';
 
 /** Standard tuning, its strings' pitches low to high, as MIDI note numbers (E2 A2 D3 G3 B3 E4). */
@@ -132,4 +140,45 @@ export function nameIt(frets: Frets, context: FinderContext): NameIt {
 
 function sameFrets(a: Frets, b: Frets): boolean {
   return a.length === b.length && a.every((f, i) => f === b[i]);
+}
+
+/** The Keys Suggest's picker offers, each spelled from its own signature: the twelve major Keys, then the twelve minor. */
+export const keys: readonly string[] = [
+  ...['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'],
+  ...['Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'Bbm', 'Bm'],
+];
+
+/** A Key's name, tidied (G major, E minor), read as Transpose reads the Song's Key, or null if it can't be read. */
+export function keyName(text: string): string | null {
+  return readKey(text)?.name ?? null;
+}
+
+export type Suggest =
+  | {
+      kind: 'key';
+      /** The Key's name, tidied: G major, E minor. */
+      key: string;
+      /** Its own Chords, then those a major Key borrows from its parallel minor, then the secondary dominants. */
+      chords: Suggestion[];
+      /** The Chords that usually follow the Chord picked, best first, or null with none picked or one that can't be read. */
+      follows: Suggestion[] | null;
+    }
+  | { kind: 'unreadable'; key: string };
+
+/**
+ * Suggests Chords from a Key, read as Transpose reads the Song's Key: its
+ * Chords with their Roman numerals and why each fits, spelled from the Key's
+ * signature, and, after a Chord, the Chords that usually follow it. The Key
+ * is as written, the shapes fingered, so a capo doesn't move it.
+ */
+export function suggest(key: string, after?: string | null): Suggest {
+  const read = readKey(key);
+  if (!read) return { kind: 'unreadable', key };
+  const picked = after ? readChord(after) : null;
+  return {
+    kind: 'key',
+    key: read.name,
+    chords: suggestFromKey(read),
+    follows: picked && suggestAfter(read, picked),
+  };
 }

@@ -4,7 +4,7 @@
 // Song's key, whose signature, once moved, spells the moved notes.
 
 /** How a note is spelled at each semitone from C. */
-type Spelling = readonly string[];
+export type Spelling = readonly string[];
 
 const common: Spelling = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
 const sharps: Spelling = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -67,6 +67,31 @@ function semitone(m: RegExpExecArray, by: number): number {
   return (((naturals[m[1]] + accidentals[m[2]] + by) % 12) + 12) % 12;
 }
 
+/**
+ * How a key's signature spells each semitone from C: its tonic's semitone
+ * from C, and whether it's minor, which takes its relative major's.
+ */
+export function signature(tonic: number, isMinor: boolean): Spelling {
+  return signatures[isMinor ? (tonic + 3) % 12 : tonic];
+}
+
+/** A key as Transpose reads it: its tonic's semitone from C, whether it's minor, and its signature. */
+export interface ReadKey {
+  tonic: number;
+  minor: boolean;
+  signature: Spelling;
+}
+
+/**
+ * A key read as Transpose reads the Song's key: its tonic's semitone from C,
+ * whether it's minor, and its signature. Null if it can't be read. The Chord
+ * Finder reads a Key with it, so the two never disagree.
+ */
+export function readKey(key: string): ReadKey | null {
+  const moved = moveKey(key, 0);
+  return moved && { tonic: moved.at, minor: moved.minor, signature: moved.signature };
+}
+
 /** A key moved by semitones: its note's semitone from C, its signature, and the rest as written. Null if unreadable. */
 function moveKey(key: string, by: number) {
   const written = key.trim();
@@ -74,7 +99,8 @@ function moveKey(key: string, by: number) {
   if (!m) return null;
   const rest = written.slice(m[0].length);
   const at = semitone(m, by);
-  return { at, signature: signatures[minor.test(rest) ? (at + 3) % 12 : at], rest };
+  const isMinor = minor.test(rest);
+  return { at, minor: isMinor, signature: signature(at, isMinor), rest };
 }
 
 /** The note at the start of text moved by semitones and spelled, with the rest of text as written. */
