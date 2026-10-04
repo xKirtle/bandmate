@@ -52,17 +52,21 @@ var songTables = []songTable{
 // bookkeeping, and the Backups.
 var notCopied = map[string]bool{"schema_migrations": true, "sqlite_sequence": true, "backups": true}
 
-// songFiles lists the files a Song's rows use, by the directory they're kept
-// in under the data directory and, from the Backup's database, their ids.
-var songFiles = func() []struct{ dir, ids string } {
-	files := []struct{ dir, ids string }{
+// songFile is a kind of file a Song's rows use: the directory such files are
+// kept in under the data directory, and the query listing, from the Backup's
+// database given the Song's id, the ids they're kept under.
+type songFile struct{ dir, ids string }
+
+// songFiles lists the files a Song's rows use.
+var songFiles = func() []songFile {
+	files := []songFile{
 		{"audio/beats", `SELECT id FROM main.beats`},
 		{"audio/masters", `SELECT id FROM main.masters WHERE song_id = ?1`},
 		{"audio/takes", `SELECT id FROM main.takes WHERE song_id = ?1`},
 		{"audio/sounds", `SELECT id FROM main.sounds WHERE song_id = ?1`},
 	}
 	for _, p := range lyricsheet.CoverPictures {
-		files = append(files, struct{ dir, ids string }{"covers/" + string(p), `SELECT id FROM main.covers WHERE song_id = ?1`})
+		files = append(files, songFile{"covers/" + string(p), `SELECT id FROM main.covers WHERE song_id = ?1`})
 	}
 	return files
 }()
@@ -202,8 +206,12 @@ func (s *Store) copySong(ctx context.Context, conn *sql.Conn, staging string, co
 			return false, fmt.Errorf("copying %s: %w", t.name, err)
 		}
 		if t.name == "songs" {
-			if n, err := res.RowsAffected(); err != nil || n == 0 {
+			n, err := res.RowsAffected()
+			if err != nil {
 				return false, err
+			}
+			if n == 0 {
+				return false, nil
 			}
 		}
 	}
@@ -254,8 +262,14 @@ func (s *Store) linkFiles(ctx context.Context, tx *sql.Tx, staging string, songI
 	return linked, nil
 }
 
-func queryIDs(ctx context.Context, tx *sql.Tx, query string, arg int64) ([]int64, error) {
-	rows, err := tx.QueryContext(ctx, query, arg)
+// querier runs queries, in a transaction or not.
+type querier interface {
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+}
+
+// queryIDs lists the ids query selects.
+func queryIDs(ctx context.Context, q querier, query string, args ...any) ([]int64, error) {
+	rows, err := q.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

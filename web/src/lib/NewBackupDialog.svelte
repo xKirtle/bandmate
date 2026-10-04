@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { api, type Backup, type SongSummary } from './api';
   import { closeOnBackdrop } from './backdrop';
-  import { backupName, backupSize } from './backups';
+  import { backupName, backupSize, songCount } from './backups';
 
   // "New Backup": picks what goes in, then makes the Backup in the same
   // modal dialog, which holds focus until it's made: it can't be closed
@@ -27,7 +27,6 @@
 
   /** How many Songs it would hold, as picked. */
   const count = $derived(all ? (songs?.length ?? 0) : picked.size);
-  const songsWord = (n: number) => `${n} ${n === 1 ? 'Song' : 'Songs'}`;
 
   onMount(() => dialog?.showModal());
 
@@ -97,7 +96,7 @@
         <div class="choose">
           <div class="choose-actions">
             <button type="button" class="link" onclick={() => (picked = new Set(songs?.map((s) => s.id)))}>
-              Select all
+              Choose all
             </button>
             <button type="button" class="link" onclick={() => (picked = new Set())} disabled={picked.size === 0}>
               Clear
@@ -124,7 +123,7 @@
       <p class="problem" role="alert">{error}</p>
     {/if}
   {:else if phase === 'making'}
-    <p role="status" aria-live="polite">Backing up {songsWord(count)}…</p>
+    <p role="status" aria-live="polite">Backing up {songCount(count)}…</p>
     <progress aria-label="Making the Backup"></progress>
     <p class="muted">Don't leave or close this page until it's done.</p>
   {:else if made}
@@ -135,7 +134,7 @@
     {#if phase === 'picking'}
       {#if songs && songs.length > 0}
         <button type="button" class="button primary" onclick={make} disabled={count === 0}>
-          Back up {count > 0 ? songsWord(count) : ''}
+          Back up {count > 0 ? songCount(count) : ''}
         </button>
       {/if}
       <button type="button" class="button" onclick={() => dialog?.close()}>Cancel</button>

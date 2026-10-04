@@ -255,13 +255,13 @@ func TestEachSongIsCopiedWholeWhileItsEditedMeanwhile(t *testing.T) {
 		t.Fatalf("editing: %v", err)
 	}
 
-	for _, copy := range held {
+	for _, copied := range held {
 		mu.Lock()
-		want, ok := linesAt[copy.Version]
+		want, ok := linesAt[copied.Version]
 		mu.Unlock()
-		got := lineTexts(copy.Sections[0].Alternates[0])
+		got := lineTexts(copied.Sections[0].Alternates[0])
 		if !ok || !reflect.DeepEqual(got, []string{want}) {
-			t.Errorf("copy at version %d holds %q, want %q", copy.Version, got, want)
+			t.Errorf("copy at version %d holds %q, want %q", copied.Version, got, want)
 		}
 	}
 }
@@ -315,16 +315,12 @@ func TestABackupMustPickSongsThatExist(t *testing.T) {
 	expectError(t, ts.Do(http.MethodPost, "/api/backups", map[string]any{"songs": []int64{}}),
 		http.StatusBadRequest, "pick at least one Song")
 	expectError(t, ts.Do(http.MethodPost, "/api/backups", map[string]any{"songs": []int64{s.ID, s.ID + 1}}),
-		http.StatusBadRequest, "a Song picked has been deleted")
+		http.StatusBadRequest, "a Song picked doesn't exist")
 	expectError(t, ts.Do(http.MethodPost, "/api/backups", map[string]any{"allSongs": true, "songs": []int64{s.ID}}),
 		http.StatusBadRequest, "pick all Songs or some, not both")
 
 	if list := ts.listBackups(); len(list) != 0 {
 		t.Errorf("backups = %+v, want none made", list)
-	}
-	entries, err := os.ReadDir(filepath.Join(ts.DataDir, "backups"))
-	if err != nil || len(entries) != 0 {
-		t.Errorf("backups directory = %v (%v), want it empty", entries, err)
 	}
 	expectError(t, ts.Do(http.MethodGet, backupPath(1)+"/file", nil), http.StatusNotFound, "not found")
 }

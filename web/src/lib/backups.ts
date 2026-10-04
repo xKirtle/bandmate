@@ -13,7 +13,12 @@ const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 export function backupName(backup: Pick<Backup, 'createdAt' | 'songs'>): string {
   const made = new Date(backup.createdAt);
   const day = `${made.getDate()} ${months[made.getMonth()]} ${made.getFullYear()}`;
-  return `${day} · ${backup.songs} ${backup.songs === 1 ? 'Song' : 'Songs'}`;
+  return `${day} · ${songCount(backup.songs)}`;
+}
+
+/** "1 Song", "3 Songs". */
+export function songCount(n: number): string {
+  return `${n} ${n === 1 ? 'Song' : 'Songs'}`;
 }
 
 /** A Backup's size: "8 KB" under a megabyte, where "0.0 MB" would say nothing, and "4.2 MB" from there. */

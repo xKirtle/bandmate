@@ -205,20 +205,8 @@ func (s *Store) songsIn(ctx context.Context, contents Contents) ([]int64, error)
 		if len(contents.Songs) > 0 {
 			return nil, &InvalidError{"pick all Songs or some, not both"}
 		}
-		rows, err := s.db.QueryContext(ctx, `SELECT id FROM songs ORDER BY id`)
+		ids, err := queryIDs(ctx, s.db, `SELECT id FROM songs ORDER BY id`)
 		if err != nil {
-			return nil, err
-		}
-		defer rows.Close()
-		ids := []int64{}
-		for rows.Next() {
-			var id int64
-			if err := rows.Scan(&id); err != nil {
-				return nil, err
-			}
-			ids = append(ids, id)
-		}
-		if err := rows.Err(); err != nil {
 			return nil, err
 		}
 		if len(ids) == 0 {
@@ -241,7 +229,7 @@ func (s *Store) songsIn(ctx context.Context, contents Contents) ([]int64, error)
 			return nil, err
 		}
 		if exists == 0 {
-			return nil, &InvalidError{"a Song picked has been deleted"}
+			return nil, &InvalidError{"a Song picked doesn't exist"}
 		}
 		ids = append(ids, id)
 	}
