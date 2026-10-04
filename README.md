@@ -144,9 +144,9 @@ A release with new features bumps the minor version, and one with only fixes bum
 
 **Rolling back:** run an older version tag instead. Migrations only go forward, so an older version doesn't undo a newer one's changes to the database. If the release you're leaving changed the database, put back the copy of the `data` folder you took before upgrading along with the older tag.
 
-**Backups:** the Backups page, in the main navigation, makes a Backup of the Songs you choose, the whole Beat Library, or both, and keeps it in Bandmate. A Song's Backup carries the Beats its Clips use. Download a Backup as one file to keep elsewhere, and upload it to this install or another. A Restore brings back the Songs you pick from a Backup, its Beat Library, or both. Where a Song or Beat is already in Bandmate, you choose to replace it or keep both, and a Restore never deletes what the Backup doesn't hold. A Backup from an older Bandmate restores on a newer one, never the other way round.
+**Backups:** the Backups page, in the main navigation, makes a Backup of the Songs you choose, the whole Beat Library, or both, and keeps it in Bandmate. Download a Backup as one file to keep elsewhere, and upload it to this install or another. A Restore brings back what you pick from a Backup. Where the same Song or Beat is already in Bandmate, even from another install, you choose to replace it or keep both, and nothing the Backup doesn't hold is deleted. A newer Bandmate restores an older one's Backups, never the other way round.
 
-The low-level option is to stop Bandmate, so the database isn't mid-write, and copy the `data` folder. It holds the database, every audio file, every Cover and every Backup, so the copy is a full backup. Take one before each upgrade: rolling back needs the folder as it was before the new version's migrations changed it.
+**Copying the data folder:** the low-level option. Stop Bandmate, so the database isn't mid-write, and copy the `data` folder. It holds the database, every audio file, every Cover and every Backup, so the copy holds everything. Copy it before each upgrade: rolling back needs the folder as it was before the new version's migrations changed it.
 
 ## How it's built
 
