@@ -308,6 +308,42 @@ describe('Voicings in the tuning and capo in use', () => {
   });
 });
 
+describe('a preferred Voicing', () => {
+  const lookUpG = (preferred: Record<string, (number | null)[]>) =>
+    lookUp('G', { tuning: standard, capo: 0, preferred });
+
+  it('comes first, ahead of the best-ranked Voicing, the rest in their ranked order', () => {
+    const ranked = voicingsOf('G');
+    const found = lookUpG({ G: [3, 5, 5, 4, 3, 3] });
+    if (found.kind !== 'chord') throw new Error('G should read');
+    const all = found.voicings.map((v) => written(v.frets));
+    expect(all[0]).toBe('355433');
+    expect(all.slice(1)).toEqual(ranked.filter((v) => v !== '355433'));
+    expect(found.preferred).toBe(true);
+  });
+
+  it('applies to the Chord it was preferred for, by its name as read', () => {
+    const preferred = { Cmaj7: [null, 3, 5, 4, 5, 3] };
+    for (const name of ['Cmaj7', 'CM7']) {
+      const found = lookUp(name, { tuning: standard, capo: 0, preferred });
+      if (found.kind !== 'chord') throw new Error(`${name} should read`);
+      expect(written(found.voicings[0].frets), name).toBe('x35453');
+    }
+    const other = lookUpG({ C: [null, 3, 2, 0, 1, 0] });
+    if (other.kind !== 'chord') throw new Error('G should read');
+    expect(written(other.voicings[0].frets)).toBe('320003');
+    expect(other.preferred).toBe(false);
+  });
+
+  it('leaves the ranked order as it is with no preference, or one that is no Voicing of the Chord', () => {
+    for (const found of [lookUp('G', context), lookUpG({ G: [0, 0, 0, 0, 0, 0] })]) {
+      if (found.kind !== 'chord') throw new Error('G should read');
+      expect(found.voicings.map((v) => written(v.frets))).toEqual(voicingsOf('G'));
+      expect(found.preferred).toBe(false);
+    }
+  });
+});
+
 describe("names it can't read", () => {
   it('says so, never guessing at a near name', () => {
     for (const name of [
