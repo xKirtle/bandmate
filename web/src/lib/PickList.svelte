@@ -49,7 +49,7 @@
   <ul aria-label={label}>
     {#each items as item (item.id)}
       {@const isLocked = locked.has(item.id)}
-      {@const more = detail?.(item)}
+      {@const itemDetail = detail?.(item)}
       <li>
         <label class:locked={isLocked}>
           <input
@@ -61,7 +61,7 @@
           />
           <span class="text">
             <span class="title">{item.title}</span>
-            {#if more}<span class="detail">· {more}</span>{/if}
+            {#if itemDetail}<span class="detail">· {itemDetail}</span>{/if}
             {#if isLocked && lockedNote}
               <span class="note" id="pick-{uid}-{item.id}-note">{lockedNote}</span>
             {/if}

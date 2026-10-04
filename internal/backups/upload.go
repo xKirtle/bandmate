@@ -71,8 +71,8 @@ func (s *Store) check(ctx context.Context, path string) (Backup, error) {
 	if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM beats`).Scan(&b.Beats); err != nil {
 		return Backup{}, damagedBy(err)
 	}
-	if b.Beats != m.Beats {
-		return Backup{}, damagedBy(fmt.Errorf("it holds %d beats, and says it holds %d", b.Beats, m.Beats))
+	if m.Beats != nil && b.Beats != *m.Beats {
+		return Backup{}, damagedBy(fmt.Errorf("it holds %d beats, and says it holds %d", b.Beats, *m.Beats))
 	}
 	if b.Songs == 0 && b.Beats == 0 && !b.BeatLibrary {
 		return Backup{}, damagedBy(errors.New("it holds neither Songs nor Beats"))

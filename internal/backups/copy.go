@@ -112,11 +112,11 @@ var chosenBeatsFiles = []songFile{{"audio/beats", "beats",
 // held is how many Songs and Beats a Backup holds.
 type held struct{ songs, beats int }
 
-// copyContents makes, in staging, a database holding the Songs with ids,
+// copyContents makes, in staging, a database holding the Songs with songIDs,
 // with the Beats their Clips use, and the Beats with beatIDs, or the whole
 // Beat Library if beatLibrary is set, laid out with their files like a data
 // directory, and returns how many Songs and Beats it holds.
-func (s *Store) copyContents(ctx context.Context, staging string, ids, beatIDs []int64, beatLibrary bool) (held, error) {
+func (s *Store) copyContents(ctx context.Context, staging string, songIDs, beatIDs []int64, beatLibrary bool) (held, error) {
 	var h held
 	backup, err := db.Open(ctx, staging)
 	if err != nil {
@@ -135,7 +135,7 @@ func (s *Store) copyContents(ctx context.Context, staging string, ids, beatIDs [
 	if err != nil {
 		return h, err
 	}
-	for _, id := range ids {
+	for _, id := range songIDs {
 		found, err := s.copyRows(ctx, conn, staging, columns, songTables, songFiles, id)
 		if err != nil {
 			return h, fmt.Errorf("backing up song %d: %w", id, err)
