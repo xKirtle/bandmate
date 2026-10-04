@@ -201,9 +201,9 @@ A key, or a key held with the mouse, that does something on a Song page without 
 _Avoid_: Keybind, hotkey, key binding
 
 **Backup**:
-A copy of chosen Songs, the Beat Library, or both, kept in Bandmate to restore from, and downloadable as one file to keep elsewhere or move to another install. A Song's copy holds everything that belongs to the Song, from its Lyric Sheet and Snapshots to its Timeline, Cover and Masters, along with the Beats its Clips use; nothing kept on each device goes in it. A Backup made by an older Bandmate can be restored by a newer one, never the other way round.
+A copy of chosen Songs and Beats, kept in Bandmate to restore from, and downloadable as one file to keep elsewhere or move to another install. A Song's copy holds everything that belongs to the Song, from its Lyric Sheet and Snapshots to its Timeline, Cover and Masters, along with the Beats its Clips use, so those Beats can't be left out while it's chosen; one holding every Beat holds the Beat Library. Nothing kept on each device goes in it. A Backup made by an older Bandmate can be restored by a newer one, never the other way round.
 _Avoid_: Export, archive, Snapshot (a Snapshot is a copy of one Song's Lyric Sheet)
 
 **Restore**:
-Bringing back Songs, the Beat Library, or both, picked from a Backup. A Song brings the Beats its Clips use. Where a Song or Beat is already in Bandmate (the same one, even from another install, never just one with the same name or, for a Beat, the same audio), the user chooses to replace it or keep both, the restored one added alongside. A Restore only adds and replaces: it never deletes what the Backup doesn't hold.
+Bringing back Songs and Beats picked from a Backup. A Song brings the Beats its Clips use, so those Beats can't be left out while it's picked. Where a Song or Beat is already in Bandmate (the same one, even from another install, never just one with the same name or, for a Beat, the same audio), the user chooses to replace it or keep both, the restored one added alongside. A Restore only adds and replaces: it never deletes what the Backup doesn't hold.
 _Avoid_: Import (importing is pasting lyrics into a Song)
