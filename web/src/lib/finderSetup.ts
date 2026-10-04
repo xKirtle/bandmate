@@ -1,8 +1,9 @@
-// The standalone Chord Finder's tuning and capo. With no Song to follow, the
-// user picks them, and the last ones picked are kept on this device, like
-// hiding a Song's Chords: standard tuning and no capo until picked here.
+// The standalone Chord Finder's tuning, capo and the Key Suggest suggests
+// from. With no Song to follow, the user picks them, and the last ones picked
+// are kept on this device, like hiding a Song's Chords: standard tuning, no
+// capo and C major until picked here.
 
-import { tunings, tuningText } from './chordFinder';
+import { keys, tunings, tuningText } from './chordFinder';
 
 /** The highest fret the capo picker offers. */
 export const capoLimit = 11;
@@ -38,6 +39,30 @@ export function storeFinderSetup(storage: Storage | undefined, setup: FinderSetu
     else storage?.setItem(finderTuningKey, setup.tuning);
     if (setup.capo === 0) storage?.removeItem(finderCapoKey);
     else storage?.setItem(finderCapoKey, String(setup.capo));
+  } catch {
+    // Not kept, e.g. in a private window; the choice still applies until reload.
+  }
+}
+
+/** Where the Key the standalone Chord Finder's Suggest suggests from is kept on this device. */
+export const finderKeyKey = 'bandmate.chordFinder.key';
+const defaultKey = keys[0];
+
+/** The Key last picked for Suggest on this device, as the picker writes it (G, Em), or C major. */
+export function readFinderKey(storage: Storage | undefined): string {
+  try {
+    const kept = storage?.getItem(finderKeyKey);
+    return kept && keys.includes(kept) ? kept : defaultKey;
+  } catch {
+    return defaultKey;
+  }
+}
+
+/** Keeps the Key picked for Suggest on this device, forgetting it once back to C major. */
+export function storeFinderKey(storage: Storage | undefined, key: string) {
+  try {
+    if (key === defaultKey) storage?.removeItem(finderKeyKey);
+    else storage?.setItem(finderKeyKey, key);
   } catch {
     // Not kept, e.g. in a private window; the choice still applies until reload.
   }

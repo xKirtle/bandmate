@@ -1,16 +1,18 @@
 <script lang="ts">
   // The Chord Finder's own page, standalone: no Song, so the user picks the
-  // tuning and capo, standard tuning and no capo until picked. The last ones
-  // picked are kept on this device.
+  // tuning and capo, standard tuning and no capo until picked, and the Key
+  // Suggest suggests from, C major until picked. The last ones picked are
+  // kept on this device.
   import ChordFinder from '../lib/ChordFinder.svelte';
   import { readTuning, standard } from '../lib/chordFinder';
-  import { capoLimit, readFinderSetup, storeFinderSetup } from '../lib/finderSetup';
+  import { capoLimit, readFinderKey, readFinderSetup, storeFinderKey, storeFinderSetup } from '../lib/finderSetup';
   import Picker from '../lib/Picker.svelte';
   import { deviceStorage } from '../lib/timelineHeight';
   import TuningField from '../lib/TuningField.svelte';
 
   let setup = $state(readFinderSetup(deviceStorage()));
   let tuningError = $state('');
+  let suggestKey = $state(readFinderKey(deviceStorage()));
 
   const context = $derived({ tuning: readTuning(setup.tuning) ?? standard, capo: setup.capo });
   const capos = Array.from({ length: capoLimit + 1 }, (_, fret) => fret);
@@ -56,7 +58,14 @@
   {#if tuningError}
     <p class="error" role="alert">{tuningError}</p>
   {/if}
-  <ChordFinder {context} />
+  <ChordFinder
+    {context}
+    {suggestKey}
+    onpickkey={(key) => {
+      suggestKey = key;
+      storeFinderKey(deviceStorage(), key);
+    }}
+  />
 </main>
 
 <style>

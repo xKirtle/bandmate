@@ -3,13 +3,35 @@
   // shows it, and a Song is to show it too, in a side panel or a phone sheet.
   import { tick } from 'svelte';
   import ChordDiagram from './ChordDiagram.svelte';
-  import { lookUp, nameIt, qualities, roots, type FinderContext, type Frets, type Voicing } from './chordFinder';
+  import {
+    keyName,
+    keys,
+    lookUp,
+    nameIt,
+    qualities,
+    roots,
+    suggest,
+    type FinderContext,
+    type Frets,
+    type Suggestion,
+    type Voicing,
+  } from './chordFinder';
   import Fretboard from './Fretboard.svelte';
   import { leftHanded } from './sharedLeftHanded.svelte';
   import { preferredVoicings } from './sharedPreferredVoicings.svelte';
   import Picker from './Picker.svelte';
 
-  let { context }: { context: FinderContext } = $props();
+  let {
+    context,
+    suggestKey,
+    onpickkey,
+  }: {
+    context: FinderContext;
+    /** The Key Suggest suggests from, as its picker writes it (G, Em). */
+    suggestKey: string;
+    /** The user picked another Key for Suggest. */
+    onpickkey: (key: string) => void;
+  } = $props();
 
   const tabs = [
     { id: 'look-up', label: 'Look up' },
@@ -90,7 +112,47 @@
     tab = 'look-up';
     tabButtons[tabs.findIndex((t) => t.id === 'look-up')]?.focus();
   }
+
+  // Suggest: the Key's Chords, and what usually follows the Chord picked
+  // after, if any. Picking another Key starts again with none picked.
+  let after = $state<string | null>(null);
+  const suggested = $derived(suggest(suggestKey, after));
+  const chords = $derived(suggested.kind === 'key' ? suggested.chords : []);
+  const numeralOf = $derived(new Map(chords.map((c) => [c.chord, c.numeral])));
+  const groups = $derived(
+    [
+      { kind: 'diatonic', title: suggested.kind === 'key' ? 'In ' + suggested.key : '' },
+      { kind: 'borrowed', title: 'Borrowed' },
+      { kind: 'secondary', title: 'Secondary dominants' },
+    ]
+      .map((g) => ({ ...g, chords: chords.filter((c) => c.kind === g.kind) }))
+      .filter((g) => g.chords.length),
+  );
+
+  function pickKey(key: string) {
+    after = null;
+    onpickkey(key);
+  }
 </script>
+
+{#snippet suggestions(list: Suggestion[], label: string)}
+  <ul class="suggestions" aria-label={label}>
+    {#each list as s (s.numeral + s.chord)}
+      <li>
+        <button
+          type="button"
+          class="suggestion"
+          title="Look up how to play {s.chord}"
+          onclick={() => openInLookUp(s.chord)}
+        >
+          <span class="numeral muted">{s.numeral}</span>
+          <span class="suggested">{s.chord}</span>
+          <span class="reason muted">{s.reason}</span>
+        </button>
+      </li>
+    {/each}
+  </ul>
+{/snippet}
 
 <div class="finder">
   <div class="bar">
@@ -256,7 +318,51 @@
           </div>
         </div>
       {:else}
-        <p class="muted">Coming soon.</p>
+        <div class="pick suggest-pick">
+          <div class="field">
+            <span id="finder-key-label">Key</span>
+            <Picker
+              id="finder-key"
+              aria-labelledby="finder-key-label"
+              options={keys}
+              value={suggestKey}
+              text={(key) => keyName(key) ?? key}
+              onpick={pickKey}
+            />
+          </div>
+          <div class="field">
+            <span id="finder-after-label">After</span>
+            <Picker
+              id="finder-after"
+              aria-labelledby="finder-after-label"
+              options={[null, ...chords.map((c) => c.chord)]}
+              value={after}
+              text={(chord) => (chord ? chord + ' · ' + numeralOf.get(chord) : 'Any Chord')}
+              onpick={(chord) => (after = chord)}
+            />
+          </div>
+        </div>
+
+        {#if suggested.kind === 'unreadable'}
+          <p class="unknown">No Key I know is called “{suggested.key}”.</p>
+        {:else}
+          {#if after && suggested.follows}
+            <section class="group" aria-live="polite">
+              <h3>After {after}</h3>
+              {#if suggested.follows.length}
+                {@render suggestions(suggested.follows, 'Chords that usually follow ' + after + ', best first')}
+              {:else}
+                <p class="muted">Nothing usually follows {after} in {suggested.key}.</p>
+              {/if}
+            </section>
+          {/if}
+          {#each groups as g (g.kind)}
+            <section class="group">
+              <h3>{g.title}</h3>
+              {@render suggestions(g.chords, g.title)}
+            </section>
+          {/each}
+        {/if}
       {/if}
     </div>
   {/each}
@@ -495,6 +601,66 @@
   }
   .clear {
     align-self: flex-end;
+  }
+  /* Suggest: the Key and the Chord picked after, side by side. */
+  @media (min-width: 40rem) {
+    .suggest-pick {
+      grid-template-columns: repeat(2, minmax(0, 12rem));
+    }
+  }
+  .group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  h3 {
+    margin: 0;
+    font-size: 0.9375rem;
+  }
+  /* Two suggestions a row on a phone, four on desktop. */
+  .suggestions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  @media (min-width: 40rem) {
+    .suggestions {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  .suggestion {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: baseline;
+    gap: 0.125rem 0.5rem;
+    width: 100%;
+    height: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .suggestion:hover {
+    border-color: var(--accent);
+  }
+  .numeral {
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+  .suggested {
+    font-size: 1.125rem;
+    font-weight: 600;
+  }
+  .reason {
+    grid-column: 1 / -1;
+    font-size: 0.8125rem;
   }
   .pager {
     display: flex;

@@ -5,7 +5,10 @@ import {
   qualities,
   readTuning,
   roots,
+  keyName,
+  keys,
   standard,
+  suggest,
   tuningName,
   tuningNotes,
   tunings,
@@ -569,5 +572,162 @@ describe('naming a shape', () => {
     expect(nameIt(shape('x3x5xx'), context)).toEqual({ kind: 'none', notes: ['C'] });
     expect(nameIt(shape('xx0xxx'), context)).toEqual({ kind: 'none', notes: ['D'] });
     expect(nameIt(shape('xxxxxx'), context)).toEqual({ kind: 'none', notes: [] });
+  });
+});
+
+/** A Key's Chords as "numeral chord", in order, or null if the Key can't be read. */
+function palette(key: string): string[] | null {
+  const s = suggest(key);
+  return s.kind === 'key' ? s.chords.map((c) => `${c.numeral} ${c.chord}`) : null;
+}
+
+describe('suggesting from a Key', () => {
+  it("gives a major Key's Chords with their Roman numerals: G", () => {
+    expect(palette('G')?.slice(0, 7)).toEqual(['I G', 'ii Am', 'iii Bm', 'IV C', 'V D', 'vi Em', 'vii° F#dim']);
+  });
+});
+
+/** The Chords a Key suggests of one kind, as "numeral chord". */
+function kind(key: string, of: 'diatonic' | 'borrowed' | 'secondary'): string[] {
+  const s = suggest(key);
+  return s.kind === 'key' ? s.chords.filter((c) => c.kind === of).map((c) => `${c.numeral} ${c.chord}`) : [];
+}
+
+/** The Chords suggested after one, in a Key, as "numeral chord", or null if there's no list. */
+function follows(key: string, after: string): string[] | null {
+  const s = suggest(key, after);
+  return s.kind === 'key' && s.follows ? s.follows.map((c) => `${c.numeral} ${c.chord}`) : null;
+}
+
+describe('suggesting borrowed Chords', () => {
+  it('borrows iv, bIII, bVI and bVII from the parallel minor in a major Key: Cm, Bb, Eb and F in G', () => {
+    expect(kind('G', 'borrowed')).toEqual(['iv Cm', 'bIII Bb', 'bVI Eb', 'bVII F']);
+  });
+
+  it('says where each is borrowed from', () => {
+    const s = suggest('G');
+    const borrowed = s.kind === 'key' ? s.chords.filter((c) => c.kind === 'borrowed') : [];
+    expect(borrowed.map((c) => c.reason)).toEqual(Array(4).fill('Borrowed from G minor'));
+  });
+
+  it('borrows nothing in a minor Key', () => {
+    expect(kind('Em', 'borrowed')).toEqual([]);
+  });
+});
+
+describe('suggesting from a minor Key', () => {
+  it("gives a minor Key's own Chords, natural minor's then V from harmonic minor: Em", () => {
+    expect(kind('Em', 'diatonic')).toEqual(['i Em', 'ii° F#dim', 'III G', 'iv Am', 'v Bm', 'VI C', 'VII D', 'V B7']);
+  });
+
+  it('reads a minor Key written out, as Transpose reads a Song’s key', () => {
+    expect(palette('E minor')).toEqual(palette('Em'));
+    expect(palette('e')).toBeNull();
+  });
+});
+
+describe('suggesting secondary dominants', () => {
+  it('gives the V of each of the Key’s own Chords but the tonic and the diminished one', () => {
+    expect(kind('G', 'secondary')).toEqual(['V/ii E7', 'V/iii F#7', 'V/IV G7', 'V/V A7', 'V/vi B7']);
+    expect(kind('Em', 'secondary')).toEqual(['V/III D7', 'V/iv E7', 'V/v F#7', 'V/VI G7', 'V/VII A7']);
+  });
+});
+
+describe('suggesting what follows a Chord', () => {
+  it('gives the functional moves from one of the Key’s Chords first: G → C, D, Em in G', () => {
+    expect(follows('G', 'G')?.slice(0, 3)).toEqual(['IV C', 'V D', 'vi Em']);
+  });
+
+  it('then the V of each Chord it moves to, leading there', () => {
+    expect(follows('G', 'G')?.slice(3)).toEqual(['V/IV G7', 'V/V A7', 'V/vi B7']);
+  });
+
+  it('resolves V to I, and offers the deceptive V to vi', () => {
+    expect(follows('C', 'G')?.slice(0, 2)).toEqual(['I C', 'vi Am']);
+  });
+
+  it('resolves IV to I', () => {
+    expect(follows('C', 'F')?.[0]).toBe('I C');
+  });
+
+  it('resolves a secondary dominant to the Chord it’s the V of: E7 → Am, as V of Am', () => {
+    const s = suggest('C', 'E7');
+    expect(s.kind === 'key' && s.follows).toEqual([
+      { chord: 'Am', numeral: 'vi', reason: 'Resolves E7 as V of Am', kind: 'diatonic' },
+    ]);
+    expect(follows('G', 'E7')).toEqual(['ii Am']);
+    expect(follows('G', 'E')).toEqual(['ii Am']);
+  });
+
+  it('reads a dominant seventh on one of the Key’s degrees as the V of the Chord a fifth below: G7 → C in G', () => {
+    expect(follows('G', 'G7')).toEqual(['IV C']);
+  });
+
+  it('reads a Chord by its triad, so Am7 follows as ii in G, Gmaj7 as I and D7 as V', () => {
+    expect(follows('G', 'Am7')).toEqual(follows('G', 'Am'));
+    expect(follows('G', 'Gmaj7')).toEqual(follows('G', 'G'));
+    expect(follows('G', 'D7')).toEqual(follows('G', 'D'));
+  });
+
+  it('follows a borrowed Chord too: bVII → I and iv → I in G', () => {
+    expect(follows('G', 'F')?.[0]).toBe('I G');
+    expect(follows('G', 'Cm')?.[0]).toBe('I G');
+  });
+
+  it('follows a minor Key’s Chords: B7 → Em, and the deceptive C', () => {
+    expect(follows('Em', 'B7')?.slice(0, 2)).toEqual(['i Em', 'VI C']);
+    expect(follows('Em', 'B')).toEqual(follows('Em', 'B7'));
+  });
+
+  it('suggests nothing after a Chord that isn’t the Key’s, and no list after a name it can’t read', () => {
+    expect(follows('G', 'C#m')).toEqual([]);
+    expect(follows('G', 'H7')).toBeNull();
+  });
+});
+
+describe('reasons', () => {
+  it('gives every suggestion a short reason', () => {
+    for (const key of keys) {
+      const s = suggest(key, key);
+      const all = s.kind === 'key' ? [...s.chords, ...(s.follows ?? [])] : [];
+      expect(all.length).toBeGreaterThan(10);
+      for (const c of all) expect(c.reason).toMatch(/^.{4,40}$/);
+    }
+  });
+});
+
+describe('spelling suggestions', () => {
+  it('spells them from the Key’s signature, as Transpose does', () => {
+    expect(kind('F', 'diatonic')).toEqual(['I F', 'ii Gm', 'iii Am', 'IV Bb', 'V C', 'vi Dm', 'vii° Edim']);
+    expect(kind('E', 'diatonic')).toEqual(['I E', 'ii F#m', 'iii G#m', 'IV A', 'V B', 'vi C#m', 'vii° D#dim']);
+    expect(kind('Bbm', 'diatonic')).toEqual([
+      'i Bbm',
+      'ii° Cdim',
+      'III Db',
+      'iv Ebm',
+      'v Fm',
+      'VI Gb',
+      'VII Ab',
+      'V F7',
+    ]);
+  });
+
+  it('spells a borrowed Chord from the parallel minor’s signature, kept flat in a flat Key', () => {
+    expect(kind('D', 'borrowed')).toEqual(['iv Gm', 'bIII F', 'bVI Bb', 'bVII C']);
+    expect(kind('Eb', 'borrowed')).toEqual(['iv Abm', 'bIII Gb', 'bVI B', 'bVII Db']);
+  });
+
+  it('offers Keys it reads, each named from its own signature', () => {
+    expect(keys.map(keyName)).toEqual([
+      ...['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'].map((k) => k + ' major'),
+      ...['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'Bb', 'B'].map((k) => k + ' minor'),
+    ]);
+  });
+});
+
+describe("Keys it can't read", () => {
+  it('says so, never a guess', () => {
+    expect(suggest('Do', 'C')).toEqual({ kind: 'unreadable', key: 'Do' });
+    expect(suggest('')).toEqual({ kind: 'unreadable', key: '' });
   });
 });
