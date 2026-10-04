@@ -132,9 +132,8 @@
   });
 
   const playingNow = (beat: Beat) => isPreviewing({ beatId: beat.id }) && previewPlaying;
-  const playingRow = $derived(
-    previewing && 'row' in previewing && previewPlaying && desktop.current ? previewing.row.key : null,
-  );
+  const previewingRow = $derived(previewing && 'row' in previewing ? previewing.row.key : null);
+  const playingRow = $derived(previewPlaying && desktop.current ? previewingRow : null);
 
   function closePreview() {
     previewing = null;
@@ -143,7 +142,7 @@
 
   // A row leaving the batch, removed, added or cancelled, takes its preview with it.
   function dropStaged(key: number) {
-    if (previewing && 'row' in previewing && previewing.row.key === key) closePreview();
+    if (previewingRow === key) closePreview();
   }
 
   // Several files picked at once, on desktop, open a review table instead of
@@ -288,7 +287,7 @@
       library={beats}
       {maxUploadBytes}
       {playingRow}
-      onPreview={(row) => togglePreview({ row })}
+      onPreview={desktop.current ? (row) => togglePreview({ row }) : null}
       onLeave={dropStaged}
       onAdded={showAdded}
       onClose={() => (batching = false)}

@@ -33,11 +33,14 @@
   // A staged file plays straight from the file picked, without uploading it,
   // through a URL let go of once another file or Beat takes its place.
   const file = $derived(row?.file ?? null);
-  const fileUrl = $derived(file && URL.createObjectURL(file));
-  $effect(() => {
-    const url = fileUrl;
+  let fileUrl = $state<string | null>(null);
+  $effect.pre(() => {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    fileUrl = url;
     return () => {
-      if (url) URL.revokeObjectURL(url);
+      URL.revokeObjectURL(url);
+      fileUrl = null;
     };
   });
 
