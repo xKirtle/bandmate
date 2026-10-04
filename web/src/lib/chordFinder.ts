@@ -46,6 +46,9 @@ export function tuningNotes(text: string): string | null {
   return guitarTuningNotes(text);
 }
 
+/** A Voicing's frets, low string to high, counted from the capo: 0 for open, null for muted. */
+export type Frets = readonly (number | null)[];
+
 /** What the Chord Finder plays on: a tuning and a capo for the guitar. */
 export interface FinderContext {
   /** The strings' pitches, low to high, as MIDI note numbers. */
@@ -56,7 +59,7 @@ export interface FinderContext {
    * The user's preferred Voicing of each Chord in this tuning, by the Chord's
    * name as read (see LookUp's name), as its frets low string to high.
    */
-  preferred?: Readonly<Record<string, readonly (number | null)[]>>;
+  preferred?: Readonly<Record<string, Frets>>;
 }
 
 export type LookUp =
@@ -85,9 +88,9 @@ export function lookUp(name: string, context: FinderContext): LookUp {
   const chord = readChord(name);
   if (!chord) return { kind: 'unreadable', name };
   const voicings = guitarVoicings(chord, context.tuning);
-  const want = context.preferred?.[chord.name];
-  const at = want ? voicings.findIndex((v) => sameFrets(v.frets, want)) : -1;
-  if (at > 0) voicings.unshift(...voicings.splice(at, 1));
+  const preferredFrets = context.preferred?.[chord.name];
+  const preferredAt = preferredFrets ? voicings.findIndex((v) => sameFrets(v.frets, preferredFrets)) : -1;
+  if (preferredAt > 0) voicings.unshift(...voicings.splice(preferredAt, 1));
   return {
     kind: 'chord',
     name: chord.name,
@@ -96,10 +99,10 @@ export function lookUp(name: string, context: FinderContext): LookUp {
     bass: chord.bassName,
     notes: chord.notes,
     voicings,
-    preferred: at >= 0,
+    preferred: preferredAt >= 0,
   };
 }
 
-function sameFrets(a: readonly (number | null)[], b: readonly (number | null)[]): boolean {
+function sameFrets(a: Frets, b: Frets): boolean {
   return a.length === b.length && a.every((f, i) => f === b[i]);
 }

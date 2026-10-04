@@ -1,11 +1,10 @@
 // The user's preferred Voicing of each Chord, shown first in the Chord
 // Finder's Look up. A choice about how the user plays, not about any Song:
-// it's kept on this device, per Instrument, tuning and Chord, so a shape
+// it's kept on this device, per Instrument, tuning and Chord, so a Voicing
 // preferred in standard tuning doesn't pick a wrong one in Drop D. Only the
 // guitar for now. None until preferred here.
 
-/** A preferred Voicing's frets, low string to high: 0 for open, null for muted. */
-export type Frets = readonly (number | null)[];
+import type { Frets } from './chordFinder';
 
 /** Each Chord's preferred Voicing in one tuning, by the Chord's name as read. */
 export type PreferredVoicings = Readonly<Record<string, Frets>>;
@@ -37,15 +36,21 @@ export function storePreferredVoicing(
   frets: Frets | null,
 ) {
   try {
-    const preferred: Record<string, Frets> = { ...readPreferredVoicings(storage, tuning) };
-    if (frets) preferred[chord] = frets;
-    else delete preferred[chord];
+    const preferred = withPreference(readPreferredVoicings(storage, tuning), chord, frets);
     const key = preferredVoicingsKey(tuning);
     if (Object.keys(preferred).length === 0) storage?.removeItem(key);
     else storage?.setItem(key, JSON.stringify(preferred));
   } catch {
     // Not kept, e.g. in a private window; the choice still applies until reload.
   }
+}
+
+/** Preferred Voicings with a Chord's preference set to a Voicing's frets, or cleared with null. */
+export function withPreference(preferred: PreferredVoicings, chord: string, frets: Frets | null): PreferredVoicings {
+  const changed: Record<string, Frets> = { ...preferred };
+  if (frets) changed[chord] = frets;
+  else delete changed[chord];
+  return changed;
 }
 
 /** Whether a kept value is a fret, or muted, for each of the tuning's strings. */

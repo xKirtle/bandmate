@@ -1,6 +1,12 @@
 import { SvelteMap } from 'svelte/reactivity';
-import { preferredVoicingsKey, readPreferredVoicings, storePreferredVoicing } from './preferredVoicings';
-import type { Frets, PreferredVoicings } from './preferredVoicings';
+import type { Frets } from './chordFinder';
+import {
+  preferredVoicingsKey,
+  readPreferredVoicings,
+  storePreferredVoicing,
+  withPreference,
+  type PreferredVoicings,
+} from './preferredVoicings';
 import { deviceStorage } from './timelineHeight';
 
 // The preferred Voicings on this device, per tuning, shared by every Chord
@@ -15,10 +21,7 @@ export const preferredVoicings = {
     changed.get(preferredVoicingsKey(tuning)) ?? readPreferredVoicings(deviceStorage(), tuning),
   /** Prefers a Voicing of a Chord in a tuning on this device, or clears the preference with null. */
   set(tuning: readonly number[], chord: string, frets: Frets | null) {
-    const preferred: Record<string, Frets> = { ...preferredVoicings.of(tuning) };
-    if (frets) preferred[chord] = frets;
-    else delete preferred[chord];
-    changed.set(preferredVoicingsKey(tuning), preferred);
+    changed.set(preferredVoicingsKey(tuning), withPreference(preferredVoicings.of(tuning), chord, frets));
     storePreferredVoicing(deviceStorage(), tuning, chord, frets);
   },
 };
