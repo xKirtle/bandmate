@@ -1,11 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { api, type Backup, type SongSummary } from './api';
+  import { api, type Backup, type BackupContents, type SongSummary } from './api';
   import { closeOnBackdrop } from './backdrop';
-  import { backupName, backupSize, songCount } from './backups';
+  import { backupName, backupSize, contentsName } from './backups';
 
-  // "New Backup": picks what goes in, then makes the Backup in the same
-  // modal dialog, which holds focus until it's made: it can't be closed
+  // "New Backup": picks what goes in (Everything, Songs with or without the
+  // Beat Library, or the Beat Library alone), then makes the Backup in the
+  // same modal dialog, which holds focus until it's made: it can't be closed
   // meanwhile, by a click outside, Esc, or a button.
   let {
     onMade,
@@ -19,21 +20,46 @@
   let dialog = $state<HTMLDialogElement>();
   let phase = $state<'picking' | 'making' | 'made'>('picking');
   let songs = $state<SongSummary[] | null>(null);
+  /** How many Beats the Beat Library holds. */
+  let beats = $state<number | null>(null);
   let loadError = $state<string | null>(null);
   let error = $state<string | null>(null);
+  /** Everything, Songs (with the Beat Library or not), or the Beat Library alone. */
+  let what = $state<'everything' | 'songs' | 'beatLibrary'>('everything');
   let all = $state(true);
   let picked = $state<Set<number>>(new Set());
+  /** Whether Songs go with the whole Beat Library. */
+  let withBeatLibrary = $state(false);
   let made = $state<Backup | null>(null);
 
-  /** How many Songs it would hold, as picked. */
-  const count = $derived(all ? (songs?.length ?? 0) : picked.size);
+  /** What it would hold, as picked, named as the Backup will be. */
+  const holds = $derived.by(() => {
+    const total = songs?.length ?? 0;
+    if (what === 'everything') return { songs: total, allSongs: true, beatLibrary: true };
+    if (what === 'beatLibrary') return { songs: 0, beatLibrary: true };
+    return { songs: all ? total : picked.size, allSongs: all, beatLibrary: withBeatLibrary };
+  });
+  /** Whether what's picked holds anything. */
+  const anything = $derived(holds.songs > 0 || (holds.beatLibrary && (beats ?? 0) > 0));
 
   onMount(() => dialog?.showModal());
 
-  api.listSongs().then(
-    (list) => (songs = [...list].sort((a, b) => a.title.localeCompare(b.title))),
+  Promise.all([api.listSongs(), api.listBeats()]).then(
+    ([songList, beatList]) => {
+      songs = [...songList].sort((a, b) => a.title.localeCompare(b.title));
+      beats = beatList.length;
+      // Start on what there is: with no Beats, Songs; with no Songs, the Beat Library.
+      if (beats === 0) what = 'songs';
+      else if (songs.length === 0) what = 'beatLibrary';
+    },
     (e: Error) => (loadError = e.message),
   );
+
+  function contents(): BackupContents {
+    if (what === 'everything') return { allSongs: true, beatLibrary: true };
+    if (what === 'beatLibrary') return { songs: [], beatLibrary: true };
+    return { ...(all ? { allSongs: true as const } : { songs: [...picked] }), beatLibrary: withBeatLibrary };
+  }
 
   function toggle(id: number) {
     const next = new Set(picked);
@@ -45,7 +71,7 @@
     phase = 'making';
     error = null;
     try {
-      made = await api.makeBackup(all ? { allSongs: true } : { songs: [...picked] });
+      made = await api.makeBackup(contents());
       onMade(made);
       phase = 'made';
     } catch (e) {
@@ -76,54 +102,98 @@
   {#if phase === 'picking'}
     {#if loadError}
       <p class="problem" role="alert">{loadError}</p>
-    {:else if songs === null}
+    {:else if songs === null || beats === null}
       <p class="muted">Loading…</p>
-    {:else if songs.length === 0}
-      <p>There are no Songs to back up yet.</p>
+    {:else if songs.length === 0 && beats === 0}
+      <p>There are no Songs or Beats to back up yet.</p>
     {:else}
       <fieldset>
-        <legend>Songs</legend>
+        <legend>What goes in</legend>
         <label>
-          <input type="radio" name="backup-songs" checked={all} onchange={() => (all = true)} />
-          <span>All Songs ({songs.length})</span>
+          <input
+            type="radio"
+            name="backup-what"
+            checked={what === 'everything'}
+            onchange={() => (what = 'everything')}
+          />
+          <span>Everything <span class="muted">· every Song and the whole Beat Library</span></span>
         </label>
         <label>
-          <input type="radio" name="backup-songs" checked={!all} onchange={() => (all = false)} />
-          <span>Choose Songs</span>
+          <input
+            type="radio"
+            name="backup-what"
+            checked={what === 'songs'}
+            disabled={songs.length === 0}
+            onchange={() => (what = 'songs')}
+          />
+          <span>Songs</span>
+        </label>
+        {#if what === 'songs'}
+          <div class="nested">
+            <fieldset>
+              <legend class="visually-hidden">Songs</legend>
+              <label>
+                <input type="radio" name="backup-songs" checked={all} onchange={() => (all = true)} />
+                <span>All Songs ({songs.length})</span>
+              </label>
+              <label>
+                <input type="radio" name="backup-songs" checked={!all} onchange={() => (all = false)} />
+                <span>Choose Songs</span>
+              </label>
+            </fieldset>
+            {#if !all}
+              <div class="choose">
+                <div class="choose-actions">
+                  <button type="button" class="link" onclick={() => (picked = new Set(songs?.map((s) => s.id)))}>
+                    Choose all
+                  </button>
+                  <button type="button" class="link" onclick={() => (picked = new Set())} disabled={picked.size === 0}>
+                    Clear
+                  </button>
+                </div>
+                <ul class="songs" aria-label="Songs to back up">
+                  {#each songs as song (song.id)}
+                    <li>
+                      <label>
+                        <input type="checkbox" checked={picked.has(song.id)} onchange={() => toggle(song.id)} />
+                        <span class="title">{song.title}</span>
+                      </label>
+                    </li>
+                  {/each}
+                </ul>
+              </div>
+            {/if}
+            <label>
+              <input type="checkbox" bind:checked={withBeatLibrary} disabled={beats === 0} />
+              <span>With the whole Beat Library</span>
+            </label>
+          </div>
+        {/if}
+        <label>
+          <input
+            type="radio"
+            name="backup-what"
+            checked={what === 'beatLibrary'}
+            disabled={beats === 0}
+            onchange={() => (what = 'beatLibrary')}
+          />
+          <span>Beat Library <span class="muted">· {beats === 1 ? '1 Beat' : `${beats} Beats`}</span></span>
         </label>
       </fieldset>
-      {#if !all}
-        <div class="choose">
-          <div class="choose-actions">
-            <button type="button" class="link" onclick={() => (picked = new Set(songs?.map((s) => s.id)))}>
-              Choose all
-            </button>
-            <button type="button" class="link" onclick={() => (picked = new Set())} disabled={picked.size === 0}>
-              Clear
-            </button>
-          </div>
-          <ul class="songs" aria-label="Songs to back up">
-            {#each songs as song (song.id)}
-              <li>
-                <label>
-                  <input type="checkbox" checked={picked.has(song.id)} onchange={() => toggle(song.id)} />
-                  <span class="title">{song.title}</span>
-                </label>
-              </li>
-            {/each}
-          </ul>
-        </div>
-      {/if}
       <p class="muted">
-        Each Song is backed up whole, from its Lyric Sheet to its Timeline, Cover and Masters, with the Beats its Clips
-        use.
+        {#if what === 'beatLibrary'}
+          Every Beat is backed up, with its credit.
+        {:else}
+          Each Song is backed up whole, from its Lyric Sheet to its Timeline, Cover and Masters, with the Beats its
+          Clips use.
+        {/if}
       </p>
     {/if}
     {#if error}
       <p class="problem" role="alert">{error}</p>
     {/if}
   {:else if phase === 'making'}
-    <p role="status" aria-live="polite">Backing up {songCount(count)}…</p>
+    <p role="status" aria-live="polite">Backing up {contentsName(holds)}…</p>
     <progress aria-label="Making the Backup"></progress>
     <p class="muted">Don't leave or close this page until it's done.</p>
   {:else if made}
@@ -132,9 +202,9 @@
 
   <div class="actions">
     {#if phase === 'picking'}
-      {#if songs && songs.length > 0}
-        <button type="button" class="button primary" onclick={make} disabled={count === 0}>
-          Back up {count > 0 ? songCount(count) : ''}
+      {#if songs && beats !== null && (songs.length > 0 || beats > 0)}
+        <button type="button" class="button primary" onclick={make} disabled={!anything}>
+          Back up {anything ? contentsName(holds) : ''}
         </button>
       {/if}
       <button type="button" class="button" onclick={() => dialog?.close()}>Cancel</button>
@@ -203,6 +273,14 @@
     margin: 0;
     padding: 0;
     accent-color: var(--accent);
+  }
+  /* Options under "Songs", lined up with its label. */
+  .nested {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-height: 0;
+    margin-left: 1.75rem;
   }
   .choose {
     display: flex;

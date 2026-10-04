@@ -79,10 +79,17 @@ const copyAttempts = 3
 // errFileGone means a file a Song's rows use was removed while it was copied.
 var errFileGone = errors.New("a file was removed while it was backed up")
 
-// copySongs makes, in staging, a database holding the Songs with ids, laid
-// out with their files like a data directory, and returns how many Songs it
-// holds.
-func (s *Store) copySongs(ctx context.Context, staging string, ids []int64) (int, error) {
+// beatLibraryTables picks every Beat: the whole Beat Library, some of which
+// may already be in the Backup from a Song.
+var beatLibraryTables = []songTable{{name: "beats", shared: true, where: `TRUE`}}
+
+// beatLibraryFiles lists the files the Beat Library's rows use.
+var beatLibraryFiles = []songFile{{"audio/beats", `SELECT id FROM main.beats`}}
+
+// copyContents makes, in staging, a database holding the Songs with ids,
+// and the whole Beat Library if beatLibrary is set, laid out with their
+// files like a data directory, and returns how many Songs it holds.
+func (s *Store) copyContents(ctx context.Context, staging string, ids []int64, beatLibrary bool) (int, error) {
 	backup, err := db.Open(ctx, staging)
 	if err != nil {
 		return 0, fmt.Errorf("making backup database: %w", err)
@@ -102,18 +109,17 @@ func (s *Store) copySongs(ctx context.Context, staging string, ids []int64) (int
 	}
 	copied := 0
 	for _, id := range ids {
-		var found bool
-		for attempt := 1; ; attempt++ {
-			found, err = s.copySong(ctx, conn, staging, columns, id)
-			if !errors.Is(err, errFileGone) || attempt == copyAttempts {
-				break
-			}
-		}
+		found, err := s.copyRows(ctx, conn, staging, columns, songTables, songFiles, id)
 		if err != nil {
 			return 0, fmt.Errorf("backing up song %d: %w", id, err)
 		}
 		if found {
 			copied++
+		}
+	}
+	if beatLibrary {
+		if _, err := s.copyRows(ctx, conn, staging, columns, beatLibraryTables, beatLibraryFiles); err != nil {
+			return 0, fmt.Errorf("backing up the beat library: %w", err)
 		}
 	}
 	if _, err := conn.ExecContext(ctx, `DETACH DATABASE live`); err != nil {
@@ -124,6 +130,19 @@ func (s *Store) copySongs(ctx context.Context, staging string, ids []int64) (int
 		return 0, err
 	}
 	return copied, nil
+}
+
+// copyRows copies the rows tables pick, given args, with the files they
+// use, trying again if a file is removed meanwhile. It tells whether the
+// first table picked any row, i.e. whether a Song was there to copy.
+func (s *Store) copyRows(ctx context.Context, conn *sql.Conn, staging string, columns map[string]string,
+	tables []songTable, files []songFile, args ...any) (bool, error) {
+	for attempt := 1; ; attempt++ {
+		found, err := s.copyOnce(ctx, conn, staging, columns, tables, files, args)
+		if !errors.Is(err, errFileGone) || attempt == copyAttempts {
+			return found, err
+		}
+	}
 }
 
 // tableColumns lists each Song table's columns, as both databases have them,
@@ -180,10 +199,12 @@ func tableColumns(ctx context.Context, conn *sql.Conn) (map[string]string, error
 	return columns, nil
 }
 
-// copySong copies one Song's rows in one transaction, so they're all read
-// from one snapshot of the live database, and links in the files they use
-// before committing. It tells whether the Song was there to copy.
-func (s *Store) copySong(ctx context.Context, conn *sql.Conn, staging string, columns map[string]string, id int64) (bool, error) {
+// copyOnce copies the rows tables pick in one transaction, so they're all
+// read from one snapshot of the live database, e.g. a whole Song, and links
+// in the files they use before committing. It tells whether the first table
+// picked any row.
+func (s *Store) copyOnce(ctx context.Context, conn *sql.Conn, staging string, columns map[string]string,
+	tables []songTable, files []songFile, args []any) (bool, error) {
 	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
 		return false, err
@@ -194,18 +215,18 @@ func (s *Store) copySong(ctx context.Context, conn *sql.Conn, staging string, co
 	if _, err := tx.ExecContext(ctx, `PRAGMA defer_foreign_keys = ON`); err != nil {
 		return false, err
 	}
-	for _, t := range songTables {
+	for i, t := range tables {
 		insert := "INSERT INTO"
 		if t.shared {
 			insert = "INSERT OR IGNORE INTO"
 		}
 		cols := columns[t.name]
 		res, err := tx.ExecContext(ctx, fmt.Sprintf(`%s main.%s (%s) SELECT %s FROM live.%s WHERE %s`,
-			insert, t.name, cols, cols, t.name, t.where), id)
+			insert, t.name, cols, cols, t.name, t.where), args...)
 		if err != nil {
 			return false, fmt.Errorf("copying %s: %w", t.name, err)
 		}
-		if t.name == "songs" {
+		if i == 0 && !t.shared {
 			n, err := res.RowsAffected()
 			if err != nil {
 				return false, err
@@ -215,7 +236,7 @@ func (s *Store) copySong(ctx context.Context, conn *sql.Conn, staging string, co
 			}
 		}
 	}
-	linked, err := s.linkFiles(ctx, tx, staging, id)
+	linked, err := s.linkFiles(ctx, tx, staging, files, args)
 	if err == nil {
 		err = tx.Commit()
 	}
@@ -228,13 +249,14 @@ func (s *Store) copySong(ctx context.Context, conn *sql.Conn, staging string, co
 	return true, nil
 }
 
-// linkFiles puts the files a Song's rows use into staging, at the paths
-// they have in the data directory, and returns those it put there. A Beat
-// already there, from another Song, is left as it is.
-func (s *Store) linkFiles(ctx context.Context, tx *sql.Tx, staging string, songID int64) ([]string, error) {
+// linkFiles puts the files listed by files, given args, into staging, at
+// the paths they have in the data directory, and returns those it put
+// there. A Beat already there, from another Song, or from the Beat Library,
+// is left as it is.
+func (s *Store) linkFiles(ctx context.Context, tx *sql.Tx, staging string, files []songFile, args []any) ([]string, error) {
 	var linked []string
-	for _, f := range songFiles {
-		ids, err := queryIDs(ctx, tx, f.ids, songID)
+	for _, f := range files {
+		ids, err := queryIDs(ctx, tx, f.ids, args...)
 		if err != nil {
 			return linked, err
 		}

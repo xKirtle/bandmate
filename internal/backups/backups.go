@@ -1,4 +1,4 @@
-// Package backups makes and keeps Backups: copies of chosen Songs, kept in
+// Package backups makes and keeps Backups: copies of chosen Songs, the Beat Library, or both, kept in
 // Bandmate to restore from and downloadable as one file (ADR 0013). A
 // Backup's file is a zip laid out like a data directory: a Bandmate database
 // holding only the chosen rows, at this Bandmate's schema, beside the audio
@@ -57,14 +57,22 @@ type Backup struct {
 	CreatedAt time.Time `json:"createdAt"`
 	// Songs is how many Songs it holds.
 	Songs int `json:"songs"`
+	// AllSongs tells whether its Songs are every Song there was.
+	AllSongs bool `json:"allSongs"`
+	// BeatLibrary tells whether it holds the whole Beat Library. With
+	// AllSongs, it's Everything.
+	BeatLibrary bool `json:"beatLibrary"`
 	// Size is its file's size in bytes.
 	Size int64 `json:"size"`
 }
 
-// Contents is what a new Backup holds: every Song, or the Songs picked.
+// Contents is what a new Backup holds: every Song, the Songs picked, or
+// none, and the whole Beat Library or not. Every Song and the Beat Library
+// is Everything.
 type Contents struct {
-	AllSongs bool    `json:"allSongs"`
-	Songs    []int64 `json:"songs"`
+	AllSongs    bool    `json:"allSongs"`
+	Songs       []int64 `json:"songs"`
+	BeatLibrary bool    `json:"beatLibrary"`
 }
 
 // Store makes and keeps the Backups of the data directory it's opened on.
@@ -95,7 +103,7 @@ func Open(conn *sql.DB, dataDir string, now func() time.Time) (*Store, error) {
 // List returns the Backups, newest first.
 func (s *Store) List(ctx context.Context) ([]Backup, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, songs, size, created_at FROM backups ORDER BY created_at DESC, id DESC`)
+		`SELECT id, songs, all_songs, beat_library, size, created_at FROM backups ORDER BY created_at DESC, id DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +121,7 @@ func (s *Store) List(ctx context.Context) ([]Backup, error) {
 
 func (s *Store) get(ctx context.Context, id int64) (Backup, error) {
 	b, err := scanBackup(s.db.QueryRowContext(ctx,
-		`SELECT id, songs, size, created_at FROM backups WHERE id = ?`, id))
+		`SELECT id, songs, all_songs, beat_library, size, created_at FROM backups WHERE id = ?`, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return b, ErrNotFound
 	}
@@ -123,7 +131,7 @@ func (s *Store) get(ctx context.Context, id int64) (Backup, error) {
 func scanBackup(row interface{ Scan(...any) error }) (Backup, error) {
 	var b Backup
 	var created string
-	if err := row.Scan(&b.ID, &b.Songs, &b.Size, &created); err != nil {
+	if err := row.Scan(&b.ID, &b.Songs, &b.AllSongs, &b.BeatLibrary, &b.Size, &created); err != nil {
 		return b, err
 	}
 	t, err := time.Parse(timeFormat, created)
@@ -160,10 +168,10 @@ func (s *Store) path(id int64) string {
 	return filepath.Join(s.dir, strconv.FormatInt(id, 10))
 }
 
-// Make makes a Backup of contents and keeps it. Each Song is copied in one
-// read of the database, so an edit made meanwhile is in its copy entirely or
-// not at all, and nothing is locked while it's made. A Song deleted while
-// it's made is left out.
+// Make makes a Backup of contents and keeps it. Each Song, and the Beat
+// Library, is copied in one read of the database, so an edit made meanwhile
+// is in its copy entirely or not at all, and nothing is locked while it's
+// made. A Song deleted while it's made is left out.
 func (s *Store) Make(ctx context.Context, contents Contents) (Backup, error) {
 	ids, err := s.songsIn(ctx, contents)
 	if err != nil {
@@ -175,32 +183,52 @@ func (s *Store) Make(ctx context.Context, contents Contents) (Backup, error) {
 	}
 	defer os.RemoveAll(staging)
 
-	copied, err := s.copySongs(ctx, staging, ids)
+	copied, err := s.copyContents(ctx, staging, ids, contents.BeatLibrary)
 	if err != nil {
 		return Backup{}, err
 	}
-	if copied == 0 {
+	if copied == 0 && !contents.BeatLibrary {
 		return Backup{}, &InvalidError{"the Songs picked have been deleted"}
 	}
-	made := s.now().UTC()
+	b := Backup{CreatedAt: s.now().UTC(), Songs: copied, AllSongs: contents.AllSongs, BeatLibrary: contents.BeatLibrary}
 	file, err := os.CreateTemp(s.dir, makingPrefix+"*"+FileExtension)
 	if err != nil {
 		return Backup{}, fmt.Errorf("making backup: %w", err)
 	}
 	defer os.Remove(file.Name())
-	size, err := pack(file, staging, manifest{CreatedAt: made, Songs: copied})
+	b.Size, err = pack(file, staging, manifest{
+		CreatedAt: b.CreatedAt, Songs: b.Songs, AllSongs: b.AllSongs, BeatLibrary: b.BeatLibrary,
+	})
 	if closeErr := file.Close(); err == nil {
 		err = closeErr
 	}
 	if err != nil {
 		return Backup{}, fmt.Errorf("packing backup: %w", err)
 	}
-	return s.keep(ctx, file.Name(), Backup{CreatedAt: made, Songs: copied, Size: size})
+	return s.keep(ctx, file.Name(), b)
 }
 
 // songsIn lists the ids of the Songs contents picks, refusing a pick of
-// none, or of a Song that doesn't exist.
+// nothing, of all Songs where there are none, of a Song that doesn't exist,
+// or of nothing but an empty Beat Library.
 func (s *Store) songsIn(ctx context.Context, contents Contents) ([]int64, error) {
+	ids, err := s.songsPicked(ctx, contents)
+	if err != nil || len(ids) > 0 {
+		return ids, err
+	}
+	var beats int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM beats`).Scan(&beats); err != nil {
+		return nil, err
+	}
+	if beats == 0 {
+		return nil, &InvalidError{"there's nothing to back up"}
+	}
+	return ids, nil
+}
+
+// songsPicked lists the ids of the Songs contents picks, which may be none
+// only beside the Beat Library.
+func (s *Store) songsPicked(ctx context.Context, contents Contents) ([]int64, error) {
 	if contents.AllSongs {
 		if len(contents.Songs) > 0 {
 			return nil, &InvalidError{"pick all Songs or some, not both"}
@@ -209,13 +237,16 @@ func (s *Store) songsIn(ctx context.Context, contents Contents) ([]int64, error)
 		if err != nil {
 			return nil, err
 		}
-		if len(ids) == 0 {
+		if len(ids) == 0 && !contents.BeatLibrary {
 			return nil, &InvalidError{"there are no Songs to back up"}
 		}
 		return ids, nil
 	}
 	if len(contents.Songs) == 0 {
-		return nil, &InvalidError{"pick at least one Song"}
+		if !contents.BeatLibrary {
+			return nil, &InvalidError{"pick at least one Song, or the Beat Library"}
+		}
+		return nil, nil
 	}
 	seen := map[int64]bool{}
 	ids := []int64{}
@@ -243,8 +274,8 @@ func (s *Store) keep(ctx context.Context, path string, b Backup) (Backup, error)
 		return b, err
 	}
 	defer tx.Rollback()
-	res, err := tx.ExecContext(ctx, `INSERT INTO backups (songs, size, created_at) VALUES (?, ?, ?)`,
-		b.Songs, b.Size, b.CreatedAt.Format(timeFormat))
+	res, err := tx.ExecContext(ctx, `INSERT INTO backups (songs, all_songs, beat_library, size, created_at) VALUES (?, ?, ?, ?, ?)`,
+		b.Songs, b.AllSongs, b.BeatLibrary, b.Size, b.CreatedAt.Format(timeFormat))
 	if err != nil {
 		return b, err
 	}
@@ -263,8 +294,10 @@ func (s *Store) keep(ctx context.Context, path string, b Backup) (Backup, error)
 
 // manifest describes a Backup inside its file.
 type manifest struct {
-	CreatedAt time.Time `json:"createdAt"`
-	Songs     int       `json:"songs"`
+	CreatedAt   time.Time `json:"createdAt"`
+	Songs       int       `json:"songs"`
+	AllSongs    bool      `json:"allSongs"`
+	BeatLibrary bool      `json:"beatLibrary"`
 }
 
 // pack writes the zip of the staging directory, with the manifest first,

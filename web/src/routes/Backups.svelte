@@ -35,7 +35,8 @@
     <div class="empty">
       <p>No Backups yet.</p>
       <p class="muted">
-        A Backup is a copy of Songs, kept here to restore from, and downloadable as one file to keep elsewhere.
+        A Backup is a copy of Songs, the Beat Library, or both, kept here to restore from, and downloadable as one file
+        to keep elsewhere.
       </p>
     </div>
   {:else}
