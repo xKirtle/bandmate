@@ -5,7 +5,26 @@ let path = $state(location.pathname);
 // The query string, with its "?", or "" when there's none.
 let search = $state(location.search);
 
+// Asked before going to another page; false stays on this one.
+let mayLeave: (() => boolean) | null = null;
+
+/**
+ * Has going to another page in the app ask first, e.g. while uploads are
+ * running. Returns the function that stops asking.
+ */
+export function guardLeaving(check: () => boolean): () => void {
+  mayLeave = check;
+  return () => {
+    if (mayLeave === check) mayLeave = null;
+  };
+}
+
 addEventListener('popstate', () => {
+  // Back and Forward have already moved: staying puts the page back.
+  if (location.pathname !== path && mayLeave && !mayLeave()) {
+    history.pushState(null, '', path + search);
+    return;
+  }
   path = location.pathname;
   search = location.search;
 });
@@ -21,6 +40,7 @@ export const router = {
 
 /** Goes to an in-app path, adding a history entry unless replace is set. */
 export function navigate(to: string, { replace = false } = {}) {
+  if (new URL(to, location.href).pathname !== path && mayLeave && !mayLeave()) return;
   if (replace) history.replaceState(null, '', to);
   else history.pushState(null, '', to);
   path = location.pathname;

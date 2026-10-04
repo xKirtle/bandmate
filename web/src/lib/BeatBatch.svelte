@@ -1,19 +1,11 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { api, commonKeys, type Beat } from './api';
-  import {
-    anyEdited,
-    byFileName,
-    canAdd,
-    canTick,
-    invalidFields,
-    tickedState,
-    type BatchRow,
-    type InvalidField,
-  } from './beatBatch';
-  import { fromDraft, toDraft } from './beatDraft';
+  import { api, commonKeys, type Beat, type BeatDetails } from './api';
+  import { anyEdited, byFileName, canAdd, canTick, tickedState, type BatchRow } from './beatBatch';
+  import { fromDraft, invalidFields, toDraft, type InvalidField } from './beatDraft';
   import { suggestForFile } from './beatTags';
   import Combobox from './Combobox.svelte';
+  import { guardLeaving } from './router.svelte';
   import { formatDuration } from './time';
   import { prepareUpload } from './upload';
 
@@ -50,7 +42,7 @@
       error: null,
     }));
     rows = [...rows, ...added].sort(byFileName);
-    readAll();
+    readUnread();
   }
 
   // Files are read one at a time, in the table's order. The count is of the
@@ -59,11 +51,15 @@
   let readCount = $state(0);
   const unread = $derived(rows.filter((row) => row.status === 'reading').length);
 
-  async function readAll() {
+  // Once the table is gone, nothing more is read.
+  let destroyed = false;
+  const nextUnread = () => (destroyed ? undefined : rows.find((row) => row.status === 'reading'));
+
+  async function readUnread() {
     if (reading) return;
     reading = true;
     readCount = 0;
-    for (let row = rows.find((r) => r.status === 'reading'); row; row = rows.find((r) => r.status === 'reading')) {
+    for (let row = nextUnread(); row; row = nextUnread()) {
       const key = row.key;
       const file = row.file;
       let read: Partial<BatchRow>;
@@ -112,14 +108,11 @@
       const row = rows.find((r) => r.key === key);
       if (!row || !row.decoded) continue;
       addCount = i + 1;
-      const details = fromDraft(row.draft);
-      if (typeof details === 'string') {
-        row.error = details;
-        continue;
-      }
+      // Add only starts once every ticked row's details are valid.
+      const details = fromDraft(row.draft) as BeatDetails;
       row.error = null;
       try {
-        const beat = await api.addBeat(row.file, details, $state.snapshot(row.decoded));
+        const beat = await api.addBeat(row.file, details, row.decoded);
         rows = rows.filter((r) => r.key !== key);
         onAdded(beat);
       } catch (e) {
@@ -143,10 +136,16 @@
     if (uploading) event.preventDefault();
   }
 
-  // Leaving the Library within the app ends the batch after the upload in
-  // progress, rather than carrying on unseen.
+  // Going to another page in the app asks first too. Leaving anyway ends the
+  // batch after the upload in progress, rather than carrying on unseen.
+  onDestroy(
+    guardLeaving(
+      () => !uploading || confirm('Beats are still being added. Leave, and stop after the one uploading now?'),
+    ),
+  );
   onDestroy(() => {
     stopping = true;
+    destroyed = true;
   });
 
   const marked = (row: BatchRow, field: InvalidField) =>

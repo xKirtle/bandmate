@@ -52,6 +52,33 @@ export function fromDraft(draft: BeatDraft): BeatDetails | string {
   };
 }
 
+/** A field of a Beat's draft that can't be saved as it is. */
+export type InvalidField = 'title' | 'bpm' | 'sourceLink';
+
+/**
+ * The fields the server would refuse, in the table's order: a missing Title,
+ * a BPM that isn't a whole number from 1 to 999, or a Source link that isn't
+ * a web address.
+ */
+export function invalidFields(draft: BeatDraft): InvalidField[] {
+  const invalid: InvalidField[] = [];
+  if (draft.title.trim() === '') invalid.push('title');
+  const bpm = draft.bpm.trim();
+  if (bpm !== '' && !(/^\d+$/.test(bpm) && Number(bpm) >= 1 && Number(bpm) <= 999)) invalid.push('bpm');
+  const link = draft.sourceLink.trim();
+  if (link !== '' && !isWebAddress(link)) invalid.push('sourceLink');
+  return invalid;
+}
+
+function isWebAddress(text: string): boolean {
+  try {
+    const url = new URL(text);
+    return (url.protocol === 'http:' || url.protocol === 'https:') && url.host !== '';
+  } catch {
+    return false;
+  }
+}
+
 /** The details that differ from the Beat's, for a partial update. */
 export function changedDetails(beat: Beat, details: BeatDetails): Partial<BeatDetails> {
   const changes: Partial<BeatDetails> = {};

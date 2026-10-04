@@ -181,8 +181,11 @@
     addError = null;
   }
 
+  // A batch adds its Beats to the list as each saves, rather than loading
+  // the whole Library again for each one.
   function showAdded(beat: Beat) {
-    beats = beats && [...beats, beat];
+    if (beats) beats = [...beats, beat];
+    else reloads++;
   }
 
   // The Beat being edited in the dialog the table opens. The cards below

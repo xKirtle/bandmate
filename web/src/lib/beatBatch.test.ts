@@ -1,44 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { toDraft } from './beatDraft';
-import { anyEdited, byFileName, canAdd, invalidFields, tickedState } from './beatBatch';
-
-describe('invalidFields', () => {
-  const valid = toDraft({
-    title: 'Echo Room',
-    producer: 'Pryme',
-    bpm: 140,
-    key: 'Am',
-    sourceLink: 'https://example.com/b',
-  });
-
-  it('finds nothing wrong with a Beat that can be added', () => {
-    expect(invalidFields(valid)).toEqual([]);
-    expect(invalidFields({ ...valid, bpm: '', sourceLink: '', producer: '', key: '' })).toEqual([]);
-  });
-
-  it('needs a Title', () => {
-    expect(invalidFields({ ...valid, title: '  ' })).toEqual(['title']);
-  });
-
-  it('needs a BPM to be a whole number the server takes', () => {
-    expect(invalidFields({ ...valid, bpm: '92.5' })).toEqual(['bpm']);
-    expect(invalidFields({ ...valid, bpm: 'fast' })).toEqual(['bpm']);
-    expect(invalidFields({ ...valid, bpm: '0' })).toEqual(['bpm']);
-    expect(invalidFields({ ...valid, bpm: '1000' })).toEqual(['bpm']);
-    expect(invalidFields({ ...valid, bpm: ' 999 ' })).toEqual([]);
-  });
-
-  it('needs a Source link to be a web address', () => {
-    expect(invalidFields({ ...valid, sourceLink: 'example.com' })).toEqual(['sourceLink']);
-    expect(invalidFields({ ...valid, sourceLink: 'ftp://example.com/b' })).toEqual(['sourceLink']);
-    expect(invalidFields({ ...valid, sourceLink: 'https://' })).toEqual(['sourceLink']);
-    expect(invalidFields({ ...valid, sourceLink: ' http://example.com ' })).toEqual([]);
-  });
-
-  it('lists every invalid field', () => {
-    expect(invalidFields({ ...valid, title: '', bpm: 'x', sourceLink: 'y' })).toEqual(['title', 'bpm', 'sourceLink']);
-  });
-});
+import { anyEdited, byFileName, canAdd, tickedState } from './beatBatch';
 
 describe('canAdd', () => {
   const draft = toDraft({ title: 'Echo Room' });

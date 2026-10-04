@@ -1,7 +1,7 @@
 // Adding several Beats at once: the review table's rows, one per file, and
 // the rules for when they can be added.
 import type { DecodedAudio } from './api';
-import { sameDraft, type BeatDraft } from './beatDraft';
+import { invalidFields, sameDraft, type BeatDraft } from './beatDraft';
 
 /** One file in the batch, from picking it until its Beat is saved or it's removed. */
 export interface BatchRow {
@@ -48,36 +48,9 @@ export function canAdd(rows: readonly Pick<BatchRow, 'status' | 'ticked' | 'draf
   return ticked.length > 0 && ticked.every((row) => row.status === 'ready' && invalidFields(row.draft).length === 0);
 }
 
-/** A field of a Beat's draft that can't be saved as it is. */
-export type InvalidField = 'title' | 'bpm' | 'sourceLink';
-
-/**
- * The fields the server would refuse, in the table's order: a missing Title,
- * a BPM that isn't a whole number from 1 to 999, or a Source link that isn't
- * a web address.
- */
-export function invalidFields(draft: BeatDraft): InvalidField[] {
-  const invalid: InvalidField[] = [];
-  if (draft.title.trim() === '') invalid.push('title');
-  const bpm = draft.bpm.trim();
-  if (bpm !== '' && !(/^\d+$/.test(bpm) && Number(bpm) >= 1 && Number(bpm) <= 999)) invalid.push('bpm');
-  const link = draft.sourceLink.trim();
-  if (link !== '' && !isWebAddress(link)) invalid.push('sourceLink');
-  return invalid;
-}
-
 const fileNames = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
 /** Orders rows by file name, as a file browser would: "Beat 2" before "beat 10". */
 export function byFileName(a: { file: { name: string } }, b: { file: { name: string } }): number {
   return fileNames.compare(a.file.name, b.file.name);
-}
-
-function isWebAddress(text: string): boolean {
-  try {
-    const url = new URL(text);
-    return (url.protocol === 'http:' || url.protocol === 'https:') && url.host !== '';
-  } catch {
-    return false;
-  }
 }
