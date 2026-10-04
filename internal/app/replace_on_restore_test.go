@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"database/sql"
 	"errors"
 	"io/fs"
 	"net/http"
@@ -8,6 +9,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/xKirtle/bandmate/internal/db"
 )
 
 // presentItem is a Song or Beat a Backup holds, by its id and title there,
@@ -128,11 +131,10 @@ func TestARestoreThatFailsReplacesNothing(t *testing.T) {
 	s := ts.createSong("Night Drive")
 	timelineChange(t, ts.addBeatToSong(s.ID, ts.beatOfLength("Used", 20).ID))
 	made := ts.backUp(map[string]any{"songs": []int64{s.ID}})
-	// Damaged: the Beat's audio is missing from the file.
+	// Damaged: the Song's row breaks a rule of the database, so copying it
+	// in fails once the Song it replaces is already cleared.
 	held := openBackupDir(t, ts.downloadBackup(made.ID).Body)
-	if err := os.RemoveAll(filepath.Join(held, "audio")); err != nil {
-		t.Fatal(err)
-	}
+	damage(t, held, `UPDATE songs SET status = 'lost'`)
 	ts.replaceBackupFile(made.ID, packBackup(t, held))
 	ts.uploadMaster(s.ID, fakeAudio("studio.wav").with(map[string]any{"name": "Studio"}))
 	before := ts.readSongCopy(s.ID)
@@ -145,6 +147,23 @@ func TestARestoreThatFailsReplacesNothing(t *testing.T) {
 	expectSameSong(t, before, ts.readSongCopy(s.ID))
 	if got := ts.getSong(s.ID).Version; float64(got) != before.Song.(map[string]any)["version"] {
 		t.Errorf("version = %d, want it as it was", got)
+	}
+}
+
+// damage runs stmt on the database in a Backup unpacked in dir, ignoring
+// the rules it would break.
+func damage(t *testing.T, dir, stmt string) {
+	t.Helper()
+	conn, err := sql.Open("sqlite", filepath.Join(dir, db.FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	conn.SetMaxOpenConns(1)
+	for _, s := range []string{`PRAGMA ignore_check_constraints = ON`, stmt} {
+		if _, err := conn.Exec(s); err != nil {
+			t.Fatalf("%s: %v", s, err)
+		}
 	}
 }
 

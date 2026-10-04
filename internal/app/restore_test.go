@@ -39,13 +39,7 @@ func (ts *testServer) backupSongs(id int64) []restoredSong {
 // returns the Songs restored.
 func (ts *testServer) restore(id int64, songs ...int64) []restoredSong {
 	ts.t.Helper()
-	res := ts.Do(http.MethodPost, backupPath(id)+"/restore", map[string]any{"songs": songs})
-	expectStatus(ts.t, res, http.StatusOK)
-	var restored struct {
-		Songs []restoredSong `json:"songs"`
-	}
-	res.JSON(ts.t, &restored)
-	return restored.Songs
+	return ts.restoreReplacing(id, songs, nil, nil)
 }
 
 // songCopy is all of a Song a test can read through the API: its Lyric

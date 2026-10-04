@@ -59,7 +59,7 @@
     try {
       present = await api.backupPresence(backup.id, [...picked]);
     } catch (e) {
-      error = `Couldn't restore (${(e as Error).message})`;
+      error = `Couldn't check what's already in Bandmate (${(e as Error).message})`;
       phase = 'picking';
       return;
     }
