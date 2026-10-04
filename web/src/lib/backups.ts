@@ -1,5 +1,5 @@
-// How Backups are named and sized on the Backups page.
-import type { Backup, BackupPresent } from './api';
+// How Backups are named, sized and asked for on the Backups page.
+import type { Backup, BackupContents, BackupPresent } from './api';
 import { formatSize } from './upload';
 
 // Spelled out rather than left to the locale, which may shorten September
@@ -29,6 +29,48 @@ export function contentsName({ songs, allSongs, beatLibrary }: Contents): string
   if (!beatLibrary) return songCount(songs);
   if (allSongs) return 'Everything';
   return songs === 0 ? 'Beat Library' : `${songCount(songs)} + Beat Library`;
+}
+
+/** What's ticked in "New Backup": Songs, which of them are picked, and the Beat Library. */
+export interface NewBackupTicks {
+  songsTicked: boolean;
+  /** The Songs picked, by id, kept while Songs is unticked for when it's ticked again. */
+  picked: ReadonlySet<number>;
+  beatLibrary: boolean;
+}
+
+/** What there is to back up: every Song, by id, and how many Beats the Beat Library holds. */
+export interface BackupSource {
+  songIds: readonly number[];
+  beats: number;
+}
+
+/**
+ * A Backup "New Backup" can ask for, with its name, or what's missing
+ * before one can be made, as a short hint.
+ */
+export type NewBackup = { contents: BackupContents; name: string } | { missing: string };
+
+/**
+ * The Backup "New Backup" asks for from what's ticked. Every Song picked is
+ * all of them, however they were picked, so with the Beat Library it's
+ * Everything. A hint for what's missing names only what can be ticked.
+ */
+export function newBackup(ticks: NewBackupTicks, there: BackupSource): NewBackup {
+  const picked = ticks.songsTicked ? there.songIds.filter((id) => ticks.picked.has(id)) : [];
+  if (!ticks.songsTicked && !ticks.beatLibrary) {
+    if (there.beats === 0) return { missing: 'Tick Songs.' };
+    if (there.songIds.length === 0) return { missing: 'Tick the Beat Library.' };
+    return { missing: 'Tick Songs or the Beat Library.' };
+  }
+  if (ticks.songsTicked && picked.length === 0) {
+    return { missing: ticks.beatLibrary ? 'Pick a Song, or untick Songs.' : 'Pick a Song.' };
+  }
+  const allSongs = picked.length > 0 && picked.length === there.songIds.length;
+  return {
+    contents: { ...(allSongs ? { allSongs: true as const } : { songs: picked }), beatLibrary: ticks.beatLibrary },
+    name: contentsName({ songs: picked.length, allSongs, beatLibrary: ticks.beatLibrary }),
+  };
 }
 
 /** "1 Song", "3 Songs". */
