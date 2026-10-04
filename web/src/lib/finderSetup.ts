@@ -1,50 +1,41 @@
-// The standalone Chord Finder's tuning, capo and the Key Suggest suggests
-// from. With no Song to follow, the user picks them, and the last ones picked
-// are kept on this device, like hiding a Song's Chords: standard tuning, no
-// capo and C major until picked here.
+// The Chord Finder's tuning and the Key Suggest suggests from. The user picks
+// them on the Finder's page, and the last ones picked are kept on this
+// device, like hiding a Song's Chords: standard tuning and C major until
+// picked here.
 
 import { keys, tunings, tuningText } from './chordFinder';
 
-/** The highest fret the capo picker offers. */
-export const capoLimit = 11;
-
-/** The standalone Chord Finder's tuning, as a Song's Details write it, and capo, 0 for none. */
-export interface FinderSetup {
-  tuning: string;
-  capo: number;
-}
-
-/** Where the standalone Chord Finder's tuning is kept on this device. */
+/** Where the Chord Finder's tuning is kept on this device. */
 export const finderTuningKey = 'bandmate.chordFinder.tuning';
-/** Where the standalone Chord Finder's capo is kept on this device. */
-export const finderCapoKey = 'bandmate.chordFinder.capo';
+/** Where the Chord Finder kept its capo on this device, before the Chord Finder dropped its capo. */
+const formerCapoKey = 'bandmate.chordFinder.capo';
 const standard = tunings[0];
 
-/** The tuning and capo last picked on this device, or standard tuning and no capo. */
-export function readFinderSetup(storage: Storage | undefined): FinderSetup {
+/**
+ * The tuning last picked on this device, as a Song's Details write it, or
+ * standard tuning. Reading it also deletes a capo kept from before the
+ * Chord Finder dropped its capo.
+ */
+export function readFinderTuning(storage: Storage | undefined): string {
   try {
-    const tuning = tuningText(storage?.getItem(finderTuningKey) ?? '') ?? standard;
-    const kept = storage?.getItem(finderCapoKey);
-    const capo = kept ? Number(kept) : 0;
-    return { tuning, capo: Number.isInteger(capo) && capo >= 0 && capo <= capoLimit ? capo : 0 };
+    storage?.removeItem(formerCapoKey);
+    return tuningText(storage?.getItem(finderTuningKey) ?? '') ?? standard;
   } catch {
-    return { tuning: standard, capo: 0 };
+    return standard;
   }
 }
 
-/** Keeps the tuning and capo picked on this device, forgetting each once back to standard tuning or no capo. */
-export function storeFinderSetup(storage: Storage | undefined, setup: FinderSetup) {
+/** Keeps the tuning picked on this device, forgetting it once back to standard tuning. */
+export function storeFinderTuning(storage: Storage | undefined, tuning: string) {
   try {
-    if (setup.tuning === standard) storage?.removeItem(finderTuningKey);
-    else storage?.setItem(finderTuningKey, setup.tuning);
-    if (setup.capo === 0) storage?.removeItem(finderCapoKey);
-    else storage?.setItem(finderCapoKey, String(setup.capo));
+    if (tuning === standard) storage?.removeItem(finderTuningKey);
+    else storage?.setItem(finderTuningKey, tuning);
   } catch {
     // Not kept, e.g. in a private window; the choice still applies until reload.
   }
 }
 
-/** Where the Key the standalone Chord Finder's Suggest suggests from is kept on this device. */
+/** Where the Key the Chord Finder's Suggest suggests from is kept on this device. */
 export const finderKeyKey = 'bandmate.chordFinder.key';
 const defaultKey = keys[0];
 

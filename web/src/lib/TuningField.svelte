@@ -6,8 +6,8 @@
   // A Song's tuning in its Details: a picker of the named tunings, or six
   // notes for a custom one. It stays text on the Song: the picker writes a
   // tuning's name, or its six notes. Text that can't be read (ADR 0008) is
-  // kept and shown as written, until another tuning is picked. The
-  // standalone Chord Finder uses it too, where there's always a tuning.
+  // kept and shown as written, until another tuning is picked. The Chord
+  // Finder's page uses it too, where there's always a tuning.
   let {
     id,
     labelledby,

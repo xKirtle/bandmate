@@ -1,8 +1,6 @@
 <script lang="ts">
-  // The Chord Finder's three tabs: Look up, Name it and Suggest. Its own page
-  // shows it, and a Song shows it too, in a side panel or a phone sheet. It
-  // lays itself out by its own width, not the window's, so a side panel gets
-  // the phone's layout.
+  // The Chord Finder's three tabs: Look up, Name it and Suggest, as its own
+  // page shows them. It lays itself out by its own width, not the window's.
   import { tick } from 'svelte';
   import ChordDiagram from './ChordDiagram.svelte';
   import {
@@ -27,21 +25,12 @@
     context,
     suggestKey,
     onpickkey,
-    keyPrompt,
   }: {
     context: FinderContext;
-    /**
-     * The Key Suggest suggests from: as its picker writes it (G, Em), or as
-     * a Song's Details write it when it's fixed. Null asks for one.
-     */
-    suggestKey: string | null;
-    /**
-     * The user picked another Key for Suggest. Without it, the Key is fixed
-     * and Suggest offers no picker.
-     */
-    onpickkey?: (key: string) => void;
-    /** Said above Suggest's Key picker: why a Key is asked for, if it is. */
-    keyPrompt?: string;
+    /** The Key Suggest suggests from, as its picker writes it (G, Em). */
+    suggestKey: string;
+    /** The user picked another Key for Suggest. */
+    onpickkey: (key: string) => void;
   } = $props();
 
   const tabs = [
@@ -127,12 +116,12 @@
   // Suggest: the Key's Chords, and what usually follows the Chord picked
   // after, if any. Picking another Key starts again with none picked.
   let after = $state<string | null>(null);
-  const suggested = $derived(suggestKey === null ? null : suggest(suggestKey, after));
-  const chords = $derived(suggested?.kind === 'key' ? suggested.chords : []);
+  const suggested = $derived(suggest(suggestKey, after));
+  const chords = $derived(suggested.kind === 'key' ? suggested.chords : []);
   const numeralOf = $derived(new Map(chords.map((c) => [c.chord, c.numeral])));
   const groups = $derived(
     [
-      { kind: 'diatonic', title: suggested?.kind === 'key' ? 'In ' + suggested.key : '' },
+      { kind: 'diatonic', title: suggested.kind === 'key' ? 'In ' + suggested.key : '' },
       { kind: 'borrowed', title: 'Borrowed' },
       { kind: 'secondary', title: 'Secondary dominants' },
     ]
@@ -140,13 +129,10 @@
       .filter((g) => g.chords.length),
   );
 
-  function pickKey(key: string | null) {
-    if (key === null) return;
+  function pickKey(key: string) {
     after = null;
-    onpickkey?.(key);
+    onpickkey(key);
   }
-  // The picker's Keys, with none picked while a Song with no Key asks for one.
-  const keyOptions: readonly (string | null)[] = keys;
 </script>
 
 {#snippet suggestions(list: Suggestion[], label: string)}
@@ -273,7 +259,7 @@
                 {@const rank = page * pageSize + i}
                 {@const preferred = found.preferred && rank === 0}
                 <li class:preferred>
-                  <ChordDiagram {voicing} name={found.name} capo={context.capo} />
+                  <ChordDiagram {voicing} name={found.name} />
                   <span class="rank muted">{preferred ? 'Preferred' : rank + 1}</span>
                   {#if preferred}
                     <button
@@ -327,46 +313,37 @@
             {/if}
           </div>
           <div class="board">
-            <Fretboard bind:frets={placed} capo={context.capo} />
+            <Fretboard bind:frets={placed} />
             <button type="button" class="button clear" onclick={() => (placed = nothingPlaced())}>Clear</button>
           </div>
         </div>
       {:else}
-        {#if keyPrompt}
-          <p class="muted">{keyPrompt}</p>
-        {/if}
         <div class="pick suggest-pick">
-          {#if onpickkey}
-            <div class="field">
-              <span id="finder-key-label">Key</span>
-              <Picker
-                id="finder-key"
-                aria-labelledby="finder-key-label"
-                options={keyOptions}
-                value={suggestKey}
-                text={(key) => (key === null ? 'Pick a Key' : (keyName(key) ?? key))}
-                onpick={pickKey}
-              />
-            </div>
-          {/if}
-          {#if suggested}
-            <div class="field">
-              <span id="finder-after-label">After</span>
-              <Picker
-                id="finder-after"
-                aria-labelledby="finder-after-label"
-                options={[null, ...chords.map((c) => c.chord)]}
-                value={after}
-                text={(chord) => (chord ? chord + ' · ' + numeralOf.get(chord) : 'Any Chord')}
-                onpick={(chord) => (after = chord)}
-              />
-            </div>
-          {/if}
+          <div class="field">
+            <span id="finder-key-label">Key</span>
+            <Picker
+              id="finder-key"
+              aria-labelledby="finder-key-label"
+              options={keys}
+              value={suggestKey}
+              text={(key) => keyName(key) ?? key}
+              onpick={pickKey}
+            />
+          </div>
+          <div class="field">
+            <span id="finder-after-label">After</span>
+            <Picker
+              id="finder-after"
+              aria-labelledby="finder-after-label"
+              options={[null, ...chords.map((c) => c.chord)]}
+              value={after}
+              text={(chord) => (chord ? chord + ' · ' + numeralOf.get(chord) : 'Any Chord')}
+              onpick={(chord) => (after = chord)}
+            />
+          </div>
         </div>
 
-        {#if !suggested}
-          <!-- Nothing to suggest from until a Key is picked. -->
-        {:else if suggested.kind === 'unreadable'}
+        {#if suggested.kind === 'unreadable'}
           <p class="unknown">No Key I know is called “{suggested.key}”.</p>
         {:else}
           {#if after && suggested.follows}
