@@ -15,11 +15,12 @@ import (
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
 )
 
-// songTable is a table holding rows that belong to a Song, and which of
-// them do: where, given the Song's id as its one parameter, picks them from
-// the live database, attached as "live". Detached Takes, and Sounds no Clip
-// uses, are kept only for undo, which never outlasts a session, so a Backup
-// leaves them out.
+// songTable is a table holding rows that belong to a Song, or to the Beat
+// Library, and which of them go in a Backup: where picks them from the live
+// database, attached as "live", given a Song's id as its one parameter for
+// a Song's tables, and nothing for the Beat Library's. Detached Takes, and
+// Sounds no Clip uses, are kept only for undo, which never outlasts a
+// session, so a Backup leaves them out.
 type songTable struct {
 	name  string
 	where string
@@ -52,9 +53,10 @@ var songTables = []songTable{
 // bookkeeping, and the Backups.
 var notCopied = map[string]bool{"schema_migrations": true, "sqlite_sequence": true, "backups": true}
 
-// songFile is a kind of file a Song's rows use: the directory such files are
-// kept in under the data directory, and the query listing, from the Backup's
-// database given the Song's id, the ids they're kept under.
+// songFile is a kind of file a Song's rows, or the Beat Library's, use: the
+// directory such files are kept in under the data directory, and the query
+// listing, from the Backup's database given the same parameters as the
+// tables, the ids they're kept under.
 type songFile struct{ dir, ids string }
 
 // songFiles lists the files a Song's rows use.
@@ -71,12 +73,12 @@ var songFiles = func() []songFile {
 	return files
 }()
 
-// copyAttempts is how often a Song's copy is tried before giving up: a file
-// removed between reading the Song and keeping its files, e.g. a Cover just
-// replaced, means reading the Song again.
+// copyAttempts is how often a Song's copy, or the Beat Library's, is tried
+// before giving up: a file removed between reading the rows and keeping
+// their files, e.g. a Cover just replaced, means reading them again.
 const copyAttempts = 3
 
-// errFileGone means a file a Song's rows use was removed while it was copied.
+// errFileGone means a file the rows copied use was removed meanwhile.
 var errFileGone = errors.New("a file was removed while it was backed up")
 
 // beatLibraryTables picks every Beat: the whole Beat Library, some of which
@@ -133,8 +135,8 @@ func (s *Store) copyContents(ctx context.Context, staging string, ids []int64, b
 }
 
 // copyRows copies the rows tables pick, given args, with the files they
-// use, trying again if a file is removed meanwhile. It tells whether the
-// first table picked any row, i.e. whether a Song was there to copy.
+// use, trying again if a file is removed meanwhile. It tells whether a Song
+// was there to copy: whether the first table, unless shared, picked a row.
 func (s *Store) copyRows(ctx context.Context, conn *sql.Conn, staging string, columns map[string]string,
 	tables []songTable, files []songFile, args ...any) (bool, error) {
 	for attempt := 1; ; attempt++ {
@@ -145,7 +147,7 @@ func (s *Store) copyRows(ctx context.Context, conn *sql.Conn, staging string, co
 	}
 }
 
-// tableColumns lists each Song table's columns, as both databases have them,
+// tableColumns lists the columns of each table a Backup holds, as both databases have them,
 // being at the same schema. It refuses a database with a table it doesn't
 // know, which a migration added without saying whether a Backup holds it.
 func tableColumns(ctx context.Context, conn *sql.Conn) (map[string]string, error) {
@@ -201,8 +203,8 @@ func tableColumns(ctx context.Context, conn *sql.Conn) (map[string]string, error
 
 // copyOnce copies the rows tables pick in one transaction, so they're all
 // read from one snapshot of the live database, e.g. a whole Song, and links
-// in the files they use before committing. It tells whether the first table
-// picked any row.
+// in the files they use before committing. It tells whether the first
+// table, unless shared, picked a row; if it picked none, nothing is copied.
 func (s *Store) copyOnce(ctx context.Context, conn *sql.Conn, staging string, columns map[string]string,
 	tables []songTable, files []songFile, args []any) (bool, error) {
 	tx, err := conn.BeginTx(ctx, nil)

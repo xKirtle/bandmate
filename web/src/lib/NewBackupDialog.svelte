@@ -32,15 +32,25 @@
   let withBeatLibrary = $state(false);
   let made = $state<Backup | null>(null);
 
-  /** What it would hold, as picked, named as the Backup will be. */
-  const holds = $derived.by(() => {
-    const total = songs?.length ?? 0;
-    if (what === 'everything') return { songs: total, allSongs: true, beatLibrary: true };
-    if (what === 'beatLibrary') return { songs: 0, beatLibrary: true };
-    return { songs: all ? total : picked.size, allSongs: all, beatLibrary: withBeatLibrary };
+  /**
+   * What's picked, as the Backup is asked for. Every Song ticked one by one
+   * is all Songs, so with the Beat Library it's named Everything, as when
+   * picked as Everything.
+   */
+  const contents = $derived.by((): BackupContents => {
+    if (what === 'everything') return { allSongs: true, beatLibrary: true };
+    if (what === 'beatLibrary') return { songs: [], beatLibrary: true };
+    const everySong = all || (songs !== null && songs.length > 0 && picked.size === songs.length);
+    return { ...(everySong ? { allSongs: true as const } : { songs: [...picked] }), beatLibrary: withBeatLibrary };
   });
-  /** Whether what's picked holds anything. */
-  const anything = $derived(holds.songs > 0 || (holds.beatLibrary && (beats ?? 0) > 0));
+  /** What it would hold, named as the Backup will be. */
+  const holds = $derived({
+    songs: 'allSongs' in contents ? (songs?.length ?? 0) : contents.songs.length,
+    allSongs: 'allSongs' in contents,
+    beatLibrary: contents.beatLibrary ?? false,
+  });
+  /** Whether it can be made: "Songs" needs at least one, and the Beat Library on its own needs a Beat. */
+  const ready = $derived(holds.songs > 0 || (what !== 'songs' && (beats ?? 0) > 0));
 
   onMount(() => dialog?.showModal());
 
@@ -55,12 +65,6 @@
     (e: Error) => (loadError = e.message),
   );
 
-  function contents(): BackupContents {
-    if (what === 'everything') return { allSongs: true, beatLibrary: true };
-    if (what === 'beatLibrary') return { songs: [], beatLibrary: true };
-    return { ...(all ? { allSongs: true as const } : { songs: [...picked] }), beatLibrary: withBeatLibrary };
-  }
-
   function toggle(id: number) {
     const next = new Set(picked);
     if (!next.delete(id)) next.add(id);
@@ -71,7 +75,7 @@
     phase = 'making';
     error = null;
     try {
-      made = await api.makeBackup(contents());
+      made = await api.makeBackup(contents);
       onMade(made);
       phase = 'made';
     } catch (e) {
@@ -203,8 +207,8 @@
   <div class="actions">
     {#if phase === 'picking'}
       {#if songs && beats !== null && (songs.length > 0 || beats > 0)}
-        <button type="button" class="button primary" onclick={make} disabled={!anything}>
-          Back up {anything ? contentsName(holds) : ''}
+        <button type="button" class="button primary" onclick={make} disabled={!ready}>
+          Back up {ready ? contentsName(holds) : ''}
         </button>
       {/if}
       <button type="button" class="button" onclick={() => dialog?.close()}>Cancel</button>

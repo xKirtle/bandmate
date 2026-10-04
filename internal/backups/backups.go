@@ -1,6 +1,6 @@
-// Package backups makes and keeps Backups: copies of chosen Songs, the Beat Library, or both, kept in
-// Bandmate to restore from and downloadable as one file (ADR 0013). A
-// Backup's file is a zip laid out like a data directory: a Bandmate database
+// Package backups makes and keeps Backups: copies of chosen Songs, the
+// Beat Library, or both, kept in Bandmate to restore from and downloadable
+// as one file (ADR 0013). A Backup's file is a zip laid out like a data directory: a Bandmate database
 // holding only the chosen rows, at this Bandmate's schema, beside the audio
 // files and Covers' pictures those rows use, under the same paths as in the
 // data directory.
