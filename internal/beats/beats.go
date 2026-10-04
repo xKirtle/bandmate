@@ -115,12 +115,10 @@ func (s *Store) Add(ctx context.Context, details Details, a audio.Upload, file *
 	}
 	defer tx.Rollback()
 	now := time.Now().UTC().Format(timeFormat)
-	// A new Beat gets an identity of its own, as migration 0031 gave the
-	// Beats before it.
 	res, err := tx.ExecContext(ctx,
-		`INSERT INTO beats (identity, title, producer, source_link, bpm, beat_key, notes,
+		`INSERT INTO beats (title, producer, source_link, bpm, beat_key, notes,
 			file_name, content_type, size, duration, peaks, created_at, updated_at)
-		 VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		details.Title, details.Producer, details.SourceLink, details.BPM, details.Key, details.Notes,
 		a.FileName, a.MediaType(), file.Size, a.Duration, string(peaks), now, now)
 	if err != nil {

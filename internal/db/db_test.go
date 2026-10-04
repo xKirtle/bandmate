@@ -654,3 +654,27 @@ func TestExistingSongsAndBeatsEachGetTheirOwnIdentity(t *testing.T) {
 		t.Errorf("two Beats were given the same identity")
 	}
 }
+
+func TestEachNewSongAndBeatGetsItsOwnIdentity(t *testing.T) {
+	conn := openBefore(t, "")
+	// However a Song or Beat is made (created, imported, or added alongside
+	// by a Restore), it's inserted without an identity, as here.
+	exec(t, conn,
+		`INSERT INTO songs (title, created_at, updated_at) VALUES ('Midnight', '', '')`,
+		`INSERT INTO songs (title, created_at, updated_at) VALUES ('Midnight', '', '')`,
+		`INSERT INTO beats (title, file_name, content_type, size, duration, peaks, created_at, updated_at)
+			VALUES ('Beat', 'beat.mp3', 'audio/mpeg', 10, 30, '[]', '', '')`,
+		`INSERT INTO beats (title, file_name, content_type, size, duration, peaks, created_at, updated_at)
+			VALUES ('Beat', 'beat.mp3', 'audio/mpeg', 10, 30, '[]', '', '')`,
+	)
+
+	expectDistinctIdentities(t, "Song", identities(t, conn, "songs"))
+	expectDistinctIdentities(t, "Beat", identities(t, conn, "beats"))
+
+	// One inserted with an identity, as a Restore replacing it will, keeps it.
+	const kept = "0123456789abcdef0123456789abcdef"
+	exec(t, conn, `INSERT INTO songs (id, identity, title, created_at, updated_at) VALUES (3, '`+kept+`', 'Neon', '', '')`)
+	if got := identities(t, conn, "songs")[2]; got != kept {
+		t.Errorf("identity given = %q, want %q kept", got, kept)
+	}
+}
