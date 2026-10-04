@@ -7,13 +7,14 @@ import { keys, tunings, tuningText } from './chordFinder';
 
 /** Where the Chord Finder's tuning is kept on this device. */
 export const finderTuningKey = 'bandmate.chordFinder.tuning';
-/** Where the Chord Finder kept its capo on this device, before it lost it. */
+/** Where the Chord Finder kept its capo on this device, before the Chord Finder dropped its capo. */
 const formerCapoKey = 'bandmate.chordFinder.capo';
 const standard = tunings[0];
 
 /**
  * The tuning last picked on this device, as a Song's Details write it, or
- * standard tuning. A capo kept from before the Finder lost it is deleted.
+ * standard tuning. Reading it also deletes a capo kept from before the
+ * Chord Finder dropped its capo.
  */
 export function readFinderTuning(storage: Storage | undefined): string {
   try {

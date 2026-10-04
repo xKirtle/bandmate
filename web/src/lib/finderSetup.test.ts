@@ -69,7 +69,7 @@ describe('a capo kept from before', () => {
     expect(values).toEqual({ [finderTuningKey]: 'Drop D' });
   });
 
-  it('is deleted with standard tuning kept too', () => {
+  it('is deleted when no tuning is kept too', () => {
     const values: Record<string, string> = { [capoKey]: '5' };
     expect(readFinderTuning(storage(values))).toBe('Standard');
     expect(values).toEqual({});
