@@ -52,6 +52,11 @@ export interface FinderContext {
   tuning: readonly number[];
   /** The fret the capo is on, 0 for none. Frets are counted from it. */
   capo: number;
+  /**
+   * The user's preferred Voicing of each Chord in this tuning, by the Chord's
+   * name as read (see LookUp's name), as its frets low string to high.
+   */
+  preferred?: Readonly<Record<string, readonly (number | null)[]>>;
 }
 
 export type LookUp =
@@ -64,17 +69,25 @@ export type LookUp =
       quality: string;
       bass: string | null;
       notes: string[];
+      /** Every Voicing, best first: the preferred one, then the rest as ranked. */
       voicings: Voicing[];
+      /** Whether the first Voicing is the user's preferred one, not just the best-ranked. */
+      preferred: boolean;
     }
   | { kind: 'unreadable'; name: string };
 
 /**
  * Looks up a Chord name: its notes and every Voicing of it, best first, or
- * that it can't be read.
+ * that it can't be read. The user's preferred Voicing of it comes first, if
+ * it's still one of its Voicings.
  */
 export function lookUp(name: string, context: FinderContext): LookUp {
   const chord = readChord(name);
   if (!chord) return { kind: 'unreadable', name };
+  const voicings = guitarVoicings(chord, context.tuning);
+  const want = context.preferred?.[chord.name];
+  const at = want ? voicings.findIndex((v) => sameFrets(v.frets, want)) : -1;
+  if (at > 0) voicings.unshift(...voicings.splice(at, 1));
   return {
     kind: 'chord',
     name: chord.name,
@@ -82,6 +95,11 @@ export function lookUp(name: string, context: FinderContext): LookUp {
     quality: chord.quality.suffix,
     bass: chord.bassName,
     notes: chord.notes,
-    voicings: guitarVoicings(chord, context.tuning),
+    voicings,
+    preferred: at >= 0,
   };
+}
+
+function sameFrets(a: readonly (number | null)[], b: readonly (number | null)[]): boolean {
+  return a.length === b.length && a.every((f, i) => f === b[i]);
 }

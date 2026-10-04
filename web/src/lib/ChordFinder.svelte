@@ -1,9 +1,11 @@
 <script lang="ts">
   // The Chord Finder's three tabs: Look up, Name it and Suggest. Its own page
   // shows it, and a Song is to show it too, in a side panel or a phone sheet.
+  import { tick } from 'svelte';
   import ChordDiagram from './ChordDiagram.svelte';
-  import { lookUp, qualities, roots, type FinderContext } from './chordFinder';
+  import { lookUp, qualities, roots, type FinderContext, type Voicing } from './chordFinder';
   import { leftHanded } from './sharedLeftHanded.svelte';
+  import { preferredVoicings } from './sharedPreferredVoicings.svelte';
   import Picker from './Picker.svelte';
 
   let { context }: { context: FinderContext } = $props();
@@ -35,7 +37,7 @@
   // name that could be read.
   let name = $state('C');
   let picked = $state<{ root: string; quality: string; bass: string | null }>({ root: 'C', quality: '', bass: null });
-  const found = $derived(lookUp(name, context));
+  const found = $derived(lookUp(name, { ...context, preferred: preferredVoicings.of(context.tuning) }));
 
   /** How many Voicings show at once; the rest are a page away. */
   const pageSize = 8;
@@ -58,6 +60,18 @@
     picked = { ...picked, ...change };
     name = picked.root + picked.quality + (picked.bass ? '/' + picked.bass : '');
     page = 0;
+  }
+
+  // Preferring a Voicing moves it first, so the first page shows it, and
+  // focus follows it there; clearing one leaves focus on the first Voicing.
+  let list: HTMLOListElement | undefined = $state();
+
+  async function prefer(voicing: Voicing | null) {
+    if (found.kind !== 'chord') return;
+    preferredVoicings.set(context.tuning, found.name, voicing?.frets ?? null);
+    page = 0;
+    await tick();
+    list?.querySelector<HTMLButtonElement>('.prefer')?.focus();
   }
 
   const qualityLabel = (suffix: string) => qualities.find((q) => q.suffix === suffix)?.label ?? suffix;
@@ -163,11 +177,28 @@
           {#if voicings.length === 0}
             <p class="muted">No Voicing of {found.name} fits a hand up to the 12th fret.</p>
           {:else}
-            <ol class="voicings" aria-label="Voicings of {found.name}, best first">
+            <ol bind:this={list} class="voicings" aria-label="Voicings of {found.name}, best first">
               {#each shown as voicing, i (page * pageSize + i)}
-                <li>
+                {@const rank = page * pageSize + i}
+                {@const preferred = found.preferred && rank === 0}
+                <li class:preferred>
                   <ChordDiagram {voicing} name={found.name} capo={context.capo} />
-                  <span class="rank muted">{page * pageSize + i + 1}</span>
+                  <span class="rank muted">{preferred ? 'Preferred' : rank + 1}</span>
+                  {#if preferred}
+                    <button
+                      type="button"
+                      class="button prefer"
+                      title="Stop preferring this Voicing, putting the best-ranked one first again"
+                      onclick={() => prefer(null)}>Clear</button
+                    >
+                  {:else}
+                    <button
+                      type="button"
+                      class="button prefer"
+                      title="Show this Voicing of {found.name} first in this tuning"
+                      onclick={() => prefer(voicing)}>Prefer</button
+                    >
+                  {/if}
                 </li>
               {/each}
             </ol>
@@ -332,6 +363,18 @@
     max-width: 9rem;
   }
   .rank {
+    font-size: 0.8125rem;
+  }
+  .preferred {
+    outline: 2px solid var(--accent);
+  }
+  .preferred .rank {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .prefer {
+    min-height: 2rem;
+    padding: 0 0.75rem;
     font-size: 0.8125rem;
   }
   .pager {
