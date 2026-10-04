@@ -7,6 +7,7 @@
   // capo on, frets count from it: it's drawn as the nut, and labelled. Arrow
   // keys move between the frets, so the whole fretboard is one tab stop.
   import { tick } from 'svelte';
+  import type { Frets } from './chordFinder';
   import { leftHanded } from './sharedLeftHanded.svelte';
 
   let {
@@ -14,7 +15,7 @@
     capo = 0,
   }: {
     /** Each string's fret, low string to high, counted from the capo: 0 for open, null for muted. */
-    frets: (number | null)[];
+    frets: Frets;
     capo?: number;
   } = $props();
 

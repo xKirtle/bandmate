@@ -125,9 +125,9 @@ export type NameIt =
  */
 export function nameIt(frets: Frets, context: FinderContext): NameIt {
   const sounding = guitarNotes(frets, context.tuning);
-  const readings = nameNotes(sounding);
-  const notes = spellNotes(sounding, readings[0] ?? null);
-  return readings.length ? { kind: 'chord', readings, notes } : { kind: 'none', notes };
+  const chords = nameNotes(sounding);
+  const notes = spellNotes(sounding, chords[0] ?? null);
+  return chords.length ? { kind: 'chord', readings: chords.map((c) => c.name), notes } : { kind: 'none', notes };
 }
 
 function sameFrets(a: Frets, b: Frets): boolean {

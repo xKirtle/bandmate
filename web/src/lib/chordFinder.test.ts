@@ -10,6 +10,7 @@ import {
   tuningNotes,
   tunings,
   tuningText,
+  type Frets,
 } from './chordFinder';
 
 const context = { tuning: standard, capo: 0 };
@@ -498,7 +499,7 @@ describe('writing a tuning', () => {
 });
 
 /** Frets written as a shape, low string to high: x32010. */
-function shape(written: string): (number | null)[] {
+function shape(written: string): Frets {
   return [...written].map((c) => (c === 'x' ? null : Number(c)));
 }
 
@@ -544,6 +545,20 @@ describe('naming a shape', () => {
   it('lists the notes sounding, low string to high, each once, spelled as the best reading spells them', () => {
     expect(nameIt(shape('x02010'), context)).toMatchObject({ notes: ['A', 'E', 'G', 'C'] });
     expect(nameIt(shape('x24442'), context)).toEqual({ kind: 'chord', readings: ['B'], notes: ['B', 'F#', 'D#'] });
+  });
+
+  it('spells a root sharp or flat, whichever spells its notes more simply: G#m, not Abm with a Cb', () => {
+    expect(nameIt(shape('466444'), context)).toEqual({
+      kind: 'chord',
+      readings: ['G#m', 'B6/G#'],
+      notes: ['G#', 'D#', 'B'],
+    });
+    expect(readings('x46654')?.[0]).toBe('C#m');
+    expect(readings('x13331')?.[0]).toBe('Bb');
+  });
+
+  it('spells a note the same way in every reading of a shape', () => {
+    expect(readings('x13321')).toEqual(['Bbm', 'Db6/Bb']);
   });
 
   it('gives none, with the notes sounding, when no reading fits, never a near miss', () => {

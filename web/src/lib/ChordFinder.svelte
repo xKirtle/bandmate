@@ -3,7 +3,7 @@
   // shows it, and a Song is to show it too, in a side panel or a phone sheet.
   import { tick } from 'svelte';
   import ChordDiagram from './ChordDiagram.svelte';
-  import { lookUp, nameIt, qualities, roots, type FinderContext, type Voicing } from './chordFinder';
+  import { lookUp, nameIt, qualities, roots, type FinderContext, type Frets, type Voicing } from './chordFinder';
   import Fretboard from './Fretboard.svelte';
   import { leftHanded } from './sharedLeftHanded.svelte';
   import { preferredVoicings } from './sharedPreferredVoicings.svelte';
@@ -77,10 +77,10 @@
 
   const qualityLabel = (suffix: string) => qualities.find((q) => q.suffix === suffix)?.label ?? suffix;
 
-  // Name it: the shape placed on the fretboard, every string open at first,
-  // and what it reads as.
-  const openStrings = () => context.tuning.map(() => 0);
-  let placed = $state<(number | null)[]>(openStrings());
+  // Name it: the shape placed on the fretboard, and what it reads as. It
+  // starts, and clears, with nothing placed: every string muted.
+  const nothingPlaced = (): Frets => context.tuning.map(() => null);
+  let placed = $state(nothingPlaced());
   const named = $derived(nameIt(placed, context));
 
   /** Opens a reading in Look up, with focus on its tab. */
@@ -88,7 +88,7 @@
     name = reading;
     page = 0;
     tab = 'look-up';
-    tabButtons[0]?.focus();
+    tabButtons[tabs.findIndex((t) => t.id === 'look-up')]?.focus();
   }
 </script>
 
@@ -252,7 +252,7 @@
           </div>
           <div class="board">
             <Fretboard bind:frets={placed} capo={context.capo} />
-            <button type="button" class="button clear" onclick={() => (placed = openStrings())}>Clear</button>
+            <button type="button" class="button clear" onclick={() => (placed = nothingPlaced())}>Clear</button>
           </div>
         </div>
       {:else}
