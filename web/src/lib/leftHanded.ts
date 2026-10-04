@@ -2,8 +2,6 @@
 // string on the left. A choice about how diagrams are drawn, not about any
 // Song: it's kept on this device, and is off until set here.
 
-import { deviceStorage } from './timelineHeight';
-
 /** Where being left-handed is kept on this device. */
 export const leftHandedKey = 'bandmate.leftHanded';
 
@@ -25,19 +23,3 @@ export function storeLeftHanded(storage: Storage | undefined, on: boolean) {
     // Not kept, e.g. in a private window; the choice still applies until reload.
   }
 }
-
-// Shared by every diagram, so turning it on mirrors the ones already showing.
-
-let on = $state(readLeftHanded(deviceStorage()));
-
-export const leftHanded = {
-  /** Whether diagrams are mirrored on this device. */
-  get on(): boolean {
-    return on;
-  },
-  /** Mirrors diagrams on this device, or stops. */
-  set(value: boolean) {
-    on = value;
-    storeLeftHanded(deviceStorage(), value);
-  },
-};

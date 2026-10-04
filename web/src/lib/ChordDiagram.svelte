@@ -7,7 +7,7 @@
   // the low string on the right. "How to play a Chord" on the Lyric Sheet is
   // to reuse it.
   import type { Voicing } from './chordFinder';
-  import { leftHanded } from './leftHanded.svelte';
+  import { leftHanded } from './sharedLeftHanded.svelte';
 
   let { voicing, name, capo = 0 }: { voicing: Voicing; name: string; capo?: number } = $props();
 
@@ -37,7 +37,11 @@
     return fretted.length === 0 || Math.max(...fretted) <= rows ? 1 : Math.min(...fretted);
   });
 
-  /** Where a string is drawn, counted from the low one: mirrored for a left-handed player. */
+  /**
+   * Where a string is drawn, counted from the low one: mirrored for a
+   * left-handed player. The neck's edges are left and left + neckWidth,
+   * whichever way it's drawn, never x(0).
+   */
   const x = (string: number) => left + (leftHanded.on ? strings - 1 - string : string) * stringGap;
   /** The middle of a fret's row, where a finger presses. */
   const y = (fret: number) => top + (fret - start + 0.5) * fretGap;

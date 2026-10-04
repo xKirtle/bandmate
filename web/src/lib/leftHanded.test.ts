@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { leftHanded, leftHandedKey, readLeftHanded, storeLeftHanded } from './leftHanded.svelte';
+import { leftHandedKey, readLeftHanded, storeLeftHanded } from './leftHanded';
 
 /** A Storage holding some values, or one that throws like a blocked one. */
 function storage(values: Record<string, string> = {}, blocked = false): Storage {
@@ -44,15 +44,5 @@ describe('storeLeftHanded', () => {
   it('does nothing without storage, or when it is blocked', () => {
     expect(() => storeLeftHanded(undefined, true)).not.toThrow();
     expect(() => storeLeftHanded(storage({}, true), true)).not.toThrow();
-  });
-});
-
-describe('leftHanded', () => {
-  it('shares whether diagrams are mirrored on this device', () => {
-    expect(leftHanded.on).toBe(false);
-    leftHanded.set(true);
-    expect(leftHanded.on).toBe(true);
-    leftHanded.set(false);
-    expect(leftHanded.on).toBe(false);
   });
 });

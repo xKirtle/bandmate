@@ -3,7 +3,7 @@
   // shows it, and a Song is to show it too, in a side panel or a phone sheet.
   import ChordDiagram from './ChordDiagram.svelte';
   import { lookUp, qualities, roots, type FinderContext } from './chordFinder';
-  import { leftHanded } from './leftHanded.svelte';
+  import { leftHanded } from './sharedLeftHanded.svelte';
   import Picker from './Picker.svelte';
 
   let { context }: { context: FinderContext } = $props();
