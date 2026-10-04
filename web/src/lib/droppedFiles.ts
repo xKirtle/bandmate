@@ -39,11 +39,12 @@ export function entriesDropped(data: DataTransfer): DroppedEntry[] | null {
  * file or folder the browser can't read is left out, keeping the rest.
  */
 export async function filesIn(entries: readonly DroppedEntry[]): Promise<File[]> {
-  const files = await Promise.all(entries.map(filesOf));
+  const files = await Promise.all(entries.map(filesInEntry));
   return files.flat();
 }
 
-async function filesOf(entry: DroppedEntry): Promise<File[]> {
+/** The file an entry is, or the files in the folder it is and its subfolders. */
+async function filesInEntry(entry: DroppedEntry): Promise<File[]> {
   try {
     if (entry.isFile) return [await new Promise<File>((done, fail) => entry.file(done, fail))];
     return await filesIn(await folderEntries(entry));
@@ -63,12 +64,12 @@ async function folderEntries(folder: Extract<DroppedEntry, { isDirectory: true }
   }
 }
 
-// Audio a browser may give no type, going by the file name's extension:
-// those the upload hint names, and others browsers commonly play.
+// Audio a browser may give no type, or another, going by the file name's
+// extension: those the upload hint names, and others browsers commonly play.
 const audioExtensions = /\.(mp3|wav|flac|m4a|ogg|oga|opus|aac|aif|aiff|weba)$/i;
 
 function isAudio(file: File): boolean {
-  return file.type ? file.type.startsWith('audio/') : audioExtensions.test(file.name);
+  return file.type.startsWith('audio/') || audioExtensions.test(file.name);
 }
 
 /**

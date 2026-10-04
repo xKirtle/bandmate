@@ -1,10 +1,15 @@
-// Dragging audio files from outside the page onto the Timeline, to import
-// them as Sounds: whether a drag carries files, which Track they'd go to,
-// and importing them in turn.
+// Dragging files from outside the page: whether a drag carries files, as
+// for any page that takes them, and, onto the Timeline to import them as
+// Sounds, which Track they'd go to and importing them in turn.
 
 /** Whether a drag, by its data's types, carries files, e.g. from a file manager. */
 export function carriesFiles(types: readonly string[]): boolean {
   return types.includes('Files');
+}
+
+/** The files a drag carries, or null for a drag of anything else, e.g. text. */
+export function draggedFiles(event: DragEvent): DataTransfer | null {
+  return event.dataTransfer && carriesFiles(event.dataTransfer.types) ? event.dataTransfer : null;
 }
 
 /** How far down the page something reaches, from its top to its bottom, in pixels. */

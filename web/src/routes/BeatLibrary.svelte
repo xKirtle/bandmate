@@ -24,7 +24,7 @@
   import { formatDuration } from '../lib/time';
   import { suggestForFile } from '../lib/beatTags';
   import { prepareUpload } from '../lib/upload';
-  import { carriesFiles } from '../lib/fileDrop';
+  import { draggedFiles } from '../lib/fileDrop';
   import { audioDropped, entriesDropped, filesIn, skippedNote } from '../lib/droppedFiles';
 
   // The whole Library, loaded once and narrowed down here.
@@ -157,7 +157,7 @@
     const input = event.currentTarget as HTMLInputElement;
     const files = [...(input.files ?? [])];
     input.value = '';
-    skipped = null;
+    dropNote = null;
     addFiles(files);
   }
 
@@ -199,7 +199,7 @@
     try {
       await api.addBeat(adding.file, details, adding.decoded);
       adding = null;
-      skipped = null;
+      dropNote = null;
       reloads++;
     } catch (e) {
       addError = (e as Error).message;
@@ -211,7 +211,7 @@
   function cancelAdd() {
     adding = null;
     addError = null;
-    skipped = null;
+    dropNote = null;
   }
 
   // The Beat being edited in the dialog the table opens. The cards below
@@ -231,12 +231,7 @@
   let dragDepth = $state(0);
   const dropTarget = $derived(takesFiles && dragDepth > 0);
   // Said of the last files dropped: how many weren't audio.
-  let skipped = $state<string | null>(null);
-
-  /** The files a drag carries, or null for a drag of anything else, e.g. text. */
-  function draggedFiles(event: DragEvent): DataTransfer | null {
-    return event.dataTransfer && carriesFiles(event.dataTransfer.types) ? event.dataTransfer : null;
-  }
+  let dropNote = $state<string | null>(null);
 
   function filesEnter(event: DragEvent) {
     if (draggedFiles(event)) dragDepth++;
@@ -259,11 +254,17 @@
     event.preventDefault();
     dragDepth = 0;
     if (!takesFiles) return;
-    // Read before the drop is over, which empties it.
+    // Asked before the drop is over, which empties it. Reading a folder can
+    // take a while, and nothing else can be added meanwhile.
     const entries = entriesDropped(data);
-    const files = entries ? await filesIn(entries) : [...data.files];
-    const { audio, skipped: notAudio } = audioDropped(files);
-    skipped = skippedNote(notAudio);
+    let files = [...data.files];
+    if (entries) {
+      addBusy = 'Reading the files dropped…';
+      files = await filesIn(entries);
+      addBusy = null;
+    }
+    const { audio, skipped } = audioDropped(files);
+    dropNote = skippedNote(skipped);
     addFiles(audio);
   }
 
@@ -355,7 +356,7 @@
       onAdded={showAdded}
       onClose={() => {
         batching = false;
-        skipped = null;
+        dropNote = null;
       }}
     />
   {/if}
@@ -372,8 +373,8 @@
       </div>
     </form>
   {/if}
-  {#if skipped}
-    <p class="muted skipped" role="status">{skipped}</p>
+  {#if dropNote}
+    <p class="muted skipped" role="status">{dropNote}</p>
   {/if}
   {#if addBusy}
     <p class="muted" role="status">{addBusy}</p>
@@ -470,10 +471,10 @@
   .skipped {
     margin-bottom: 1rem;
   }
-  /* The page, beside the nav rail, while files dragged over it would be added. */
+  /* The window, nav rail and all, while files dropped anywhere on it would be added. */
   .drop-target {
     position: fixed;
-    inset: 0 0 0 var(--rail-width);
+    inset: 0;
     z-index: 10;
     display: grid;
     place-items: center;

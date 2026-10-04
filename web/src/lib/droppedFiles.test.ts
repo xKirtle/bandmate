@@ -96,6 +96,15 @@ describe('audioDropped', () => {
     expect(skipped).toBe(1);
   });
 
+  it('keeps an audio file the browser gives another type, going by its name', () => {
+    const { audio, skipped } = audioDropped([
+      typed('loop.ogg', 'video/ogg'),
+      typed('one.flac', 'application/octet-stream'),
+    ]);
+    expect(names(audio)).toEqual(['loop.ogg', 'one.flac']);
+    expect(skipped).toBe(0);
+  });
+
   it('leaves out hidden files without counting them, e.g. a folder’s .DS_Store', () => {
     const { audio, skipped } = audioDropped([
       typed('.DS_Store', ''),
