@@ -1,13 +1,24 @@
 /* The colour tokens: the only place a literal colour may be written
    (docs/design.md). A Palette is a full set of them in light and dark,
    picked by `data-palette` on the root element, and Terracotta when it's
-   absent. Light or dark follows the system. palettes.test.ts checks every
-   Palette against the contrast floor. */
+   absent. `data-theme` on the root picks light or dark: appearance.ts sets
+   it from the system's setting, or from Light or Dark picked in Settings.
+   `data-palette` on an element inside the page shows another Palette there,
+   as Settings' swatches do. Light or dark is set by attribute alone, not by
+   light-dark(), which Safari before 17.5 doesn't know. palettes.test.ts
+   checks every Palette against the contrast floor. */
 
+/* The browser's own controls and scrollbars follow light or dark too. */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
 
-  /* Terracotta: terracotta on warm grey. */
+/* Terracotta: terracotta on warm grey. */
+:root,
+[data-palette='terracotta'] {
   --bg: #fafaf9;
   --surface-1: #f0efed;
   --surface-2: #e6e4e1;
@@ -42,7 +53,7 @@
 }
 
 /* Ink: fountain-pen blue on cream. */
-:root[data-palette='ink'] {
+[data-palette='ink'] {
   --bg: #f8f5ee;
   --surface-1: #efebe1;
   --surface-2: #e5e0d4;
@@ -60,7 +71,7 @@
 }
 
 /* Olive: muted green on stone. */
-:root[data-palette='olive'] {
+[data-palette='olive'] {
   --bg: #f6f5f0;
   --surface-1: #ecebe4;
   --surface-2: #e1e0d7;
@@ -77,58 +88,62 @@
   --finished-fg: #1d5550;
 }
 
-@media (prefers-color-scheme: dark) {
-  /* Terracotta: terracotta on charcoal. */
-  :root {
-    --bg: #16161a;
-    --surface-1: #1f1f24;
-    --surface-2: #2a2a31;
-    --border: #2f2f37;
-    --text: #ecebe8;
-    --text-muted: #a09d98;
-    --accent: #e0765c;
-    --accent-text: #16161a;
-    --danger: #f2877e;
-    --warning: #f3cf7a;
-    --drafting-bg: #3b2f14;
-    --drafting-fg: #f3cf7a;
-    --finished-bg: #173222;
-    --finished-fg: #8fd6a2;
-  }
+/* Dark, under `data-theme='dark'` on the root. Each selector here is more
+   specific than every light one, so it wins wherever it sits. */
 
-  /* Ink: blue on blue-black. */
-  :root[data-palette='ink'] {
-    --bg: #11141b;
-    --surface-1: #191d26;
-    --surface-2: #222733;
-    --border: #2b3140;
-    --text: #e8e6e0;
-    --text-muted: #9ca1ad;
-    --accent: #8eaaea;
-    --accent-text: #11141b;
-    --danger: #f2877e;
-    --warning: #efcd7c;
-    --drafting-bg: #352c15;
-    --drafting-fg: #efcd7c;
-    --finished-bg: #152d1f;
-    --finished-fg: #8fd6a2;
-  }
+/* Terracotta: terracotta on charcoal. */
+:root[data-theme='dark'],
+:root[data-theme='dark'] [data-palette='terracotta'] {
+  --bg: #16161a;
+  --surface-1: #1f1f24;
+  --surface-2: #2a2a31;
+  --border: #2f2f37;
+  --text: #ecebe8;
+  --text-muted: #a09d98;
+  --accent: #e0765c;
+  --accent-text: #16161a;
+  --danger: #f2877e;
+  --warning: #f3cf7a;
+  --drafting-bg: #3b2f14;
+  --drafting-fg: #f3cf7a;
+  --finished-bg: #173222;
+  --finished-fg: #8fd6a2;
+}
 
-  /* Olive: green on dark stone. */
-  :root[data-palette='olive'] {
-    --bg: #141612;
-    --surface-1: #1c1f1a;
-    --surface-2: #262a23;
-    --border: #30342b;
-    --text: #e7e8e1;
-    --text-muted: #9fa296;
-    --accent: #a9c47c;
-    --accent-text: #141612;
-    --danger: #f2877e;
-    --warning: #efcd7c;
-    --drafting-bg: #352c15;
-    --drafting-fg: #efcd7c;
-    --finished-bg: #13302d;
-    --finished-fg: #8ad3c8;
-  }
+/* Ink: blue on blue-black. */
+:root[data-theme='dark'][data-palette='ink'],
+:root[data-theme='dark'] [data-palette='ink'] {
+  --bg: #11141b;
+  --surface-1: #191d26;
+  --surface-2: #222733;
+  --border: #2b3140;
+  --text: #e8e6e0;
+  --text-muted: #9ca1ad;
+  --accent: #8eaaea;
+  --accent-text: #11141b;
+  --danger: #f2877e;
+  --warning: #efcd7c;
+  --drafting-bg: #352c15;
+  --drafting-fg: #efcd7c;
+  --finished-bg: #152d1f;
+  --finished-fg: #8fd6a2;
+}
+
+/* Olive: green on dark stone. */
+:root[data-theme='dark'][data-palette='olive'],
+:root[data-theme='dark'] [data-palette='olive'] {
+  --bg: #141612;
+  --surface-1: #1c1f1a;
+  --surface-2: #262a23;
+  --border: #30342b;
+  --text: #e7e8e1;
+  --text-muted: #9fa296;
+  --accent: #a9c47c;
+  --accent-text: #141612;
+  --danger: #f2877e;
+  --warning: #efcd7c;
+  --drafting-bg: #352c15;
+  --drafting-fg: #efcd7c;
+  --finished-bg: #13302d;
+  --finished-fg: #8ad3c8;
 }

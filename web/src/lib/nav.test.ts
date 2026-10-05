@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { currentPage, listAt, pages } from './nav';
+import { currentPage, listAt, pages, pinned } from './nav';
 
 describe('currentPage', () => {
   it('marks Songs on the Song list and every page of a Song', () => {
@@ -24,6 +24,10 @@ describe('currentPage', () => {
     expect(currentPage('/about')).toBe('about');
   });
 
+  it('marks Settings on the Settings page', () => {
+    expect(currentPage('/settings')).toBe('settings');
+  });
+
   it('marks none on a page that has no place in them', () => {
     expect(currentPage('/nowhere')).toBeUndefined();
     expect(currentPage('/aboutx')).toBeUndefined();
@@ -31,6 +35,7 @@ describe('currentPage', () => {
     expect(currentPage('/songsx')).toBeUndefined();
     expect(currentPage('/chordsx')).toBeUndefined();
     expect(currentPage('/backupsx')).toBeUndefined();
+    expect(currentPage('/settingsx')).toBeUndefined();
   });
 });
 
@@ -60,6 +65,15 @@ describe('pages', () => {
       ['Beats', '/beats'],
       ['Chord Finder', '/chords'],
       ['Backups', '/backups'],
+    ]);
+  });
+});
+
+describe('pinned', () => {
+  it('leads to Settings, then About, apart from the main pages', () => {
+    expect(pinned.map((p) => [p.label, p.href])).toEqual([
+      ['Settings', '/settings'],
+      ['About', '/about'],
     ]);
   });
 });

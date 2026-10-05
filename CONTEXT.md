@@ -204,6 +204,10 @@ _Avoid_: Bounce, export, render
 A key, or a key held with the mouse, that does something on a Song page without reaching for a button, like Space to play or R to record. Shortcuts are for a keyboard and mouse, so phones never show them. A control's usual keys, like arrows in a menu or Esc in a text field, work as they do everywhere and aren't Bandmate's Shortcuts.
 _Avoid_: Keybind, hotkey, key binding
 
+**Palette**:
+One of the sets of colours the user picks from in Settings (Terracotta, Ink or Olive), each with a light and a dark version. It's picked for each device, like light or dark beside it, and never belongs to a Song.
+_Avoid_: Theme (light or dark is the theme), skin, colour scheme
+
 **Backup**:
 A copy of chosen Songs and Beats, kept in Bandmate to restore from, and downloadable as one file to keep elsewhere or move to another install. A Song's copy holds everything that belongs to the Song, from its Lyric Sheet and Snapshots to its Timeline, Cover and Masters, along with the Beats its Clips use, so those Beats can't be left out while it's chosen; one holding every Beat holds the Beat Library. Nothing kept on each device goes in it. A Backup made by an older Bandmate can be restored by a newer one, never the other way round.
 _Avoid_: Export, archive, Snapshot (a Snapshot is a copy of one Song's Lyric Sheet)
