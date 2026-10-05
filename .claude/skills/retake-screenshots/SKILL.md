@@ -14,7 +14,7 @@ Check every tool the README lists is installed, including `ffmpeg`'s `libwebp_an
 
 ## 2. Issue
 
-File an issue labelled `ready-for-agent`, titled "Retake the README's screenshots", with the `to-tickets` issue template. It delivers screenshots and an animation that show the current UI. Its criteria are that each image shows what the README's table says it shows, and that the user knows whether the social preview needs uploading again.
+File an issue labelled `ready-for-agent`, titled "Retake the README's screenshots", with the `to-tickets` issue template. It delivers screenshots and an animation that show the current UI. Its criterion is that each image shows what the README's table says it shows.
 
 ## 3. Capture
 
@@ -42,4 +42,4 @@ Commit only the images, push, and open a PR against `main` that closes the issue
 
 Watch the checks with `gh pr checks <PR> --watch` in the background, fixing and pushing again if they go red. Once they're green, merge with `gh pr merge <PR> --merge --delete-branch` and `git pull --ff-only` on `main`.
 
-Report the PR link and which images changed. If `social-preview.png` changed, tell the user to upload it in the repo's Settings → General → Social preview, the only place GitHub takes it from.
+Report the PR link and which images changed.

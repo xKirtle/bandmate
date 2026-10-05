@@ -182,8 +182,14 @@ Bandmate's mark is a guitar pick with a flat, ♭, cut out of it: the B of Bandm
 - **The favicon** is the same path in `--accent-text` on a rounded tile of `--accent`, both Terracotta's light values, the default Palette's, since the file is static: `public/favicon.svg`, and `public/favicon.ico` holding it at 16 and 32px for browsers that don't take an SVG. At 32px the flat reads; at 16px it's a hint.
 - **The home-screen icon** is `public/apple-touch-icon.png`, 180px: the mark smaller on a square of Terracotta, since iOS takes only a PNG and rounds the corners itself.
 - **The README** opens with `public/favicon.svg` itself at 96px, not a copy, so it follows the favicon whenever the mark changes. Its tile carries its own background, so it reads on GitHub's light and dark themes alike.
+- **The social preview card**, what GitHub shows when the repo's link is shared, is `docs/brand/social-preview.png`, 1280×640: the mark in `--accent-text`, 280px tall, on full-bleed `--accent`, Terracotta's light values, with "Bandmate" beside it at 96px bold and the tagline under it at 36px, softened to 0.9 opacity (4.8:1, above the contrast floor's 4.5:1 for text). The tagline takes a line per sentence, since on one line at 36px it won't fit beside the mark. The mark and the title sit inside a centred 1100×520, so a crop keeps them. Its source is `docs/brand/social-preview.svg` beside it. Its text is set in Adwaita Sans, falling back to Inter or Noto Sans, and rendered once into the PNG; the app still bundles no typeface. Render it where Adwaita Sans is installed, or a fallback shifts the layout. GitHub doesn't read it from the repo: it's uploaded by hand in the repo's Settings → General → Social preview.
 
-`brandMark.test.ts` checks `index.html` declares the three icon files, and that `favicon.svg` draws `markPath` in those two colours. The two raster files are rendered from the SVG: when the mark changes, render the tile at 16, 32 and 180px in a browser and write them again.
+`brandMark.test.ts` checks `index.html` declares the three icon files, and that `favicon.svg` draws `markPath` in those two colours. The two raster files are rendered from the SVG: when the mark changes, render the tile at 16, 32 and 180px in a browser and write them again. `brandMark.test.ts` also checks the social preview card's source draws `markPath` in the same two colours, and that its PNG is 1280×640 and under 1 MB. When the mark changes, copy `markPath` into the card's source, render it again from the repo's root, and upload the new PNG:
+
+```sh
+chromium --headless --hide-scrollbars --window-size=1280,640 \
+  --screenshot=docs/brand/social-preview.png docs/brand/social-preview.svg
+```
 
 ### The Timeline's own scale
 

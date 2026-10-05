@@ -82,19 +82,6 @@ async function play(page) {
   await page.context().close();
 }
 
-// The social preview: Write mode laid out at GitHub's 2:1, shot at
-// 1280×640, from the Lyric Sheet down so its Lines show over the Timeline.
-{
-  const page = await open(heroURL, {
-    ...desktop,
-    viewport: { width: 1600, height: 800 },
-    deviceScaleFactor: 0.8,
-  });
-  await scrollToLyricSheet(page);
-  await save(page, "social-preview");
-  await page.context().close();
-}
-
 // The Lyric Sheet on a phone.
 {
   const page = await open(heroURL, {
