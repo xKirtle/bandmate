@@ -122,7 +122,7 @@
 <SettingsPage tab="about">
   <div class="about">
     <section class="card intro">
-      <BrandMark size="4rem" />
+      <BrandMark large />
       <h2>Bandmate</h2>
       {#if config}
         <p>Version <code>{config.version}</code></p>

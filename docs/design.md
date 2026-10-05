@@ -132,7 +132,7 @@ A transition or animation names both, such as `transition: transform var(--durat
 
 ### Icons
 
-[Lucide](https://lucide.dev), everywhere: no Unicode glyphs or hand-drawn SVGs as icons, so icons look the same on every platform and never turn into emoji. The only SVGs drawn by hand are drawings, not icons: Chord diagrams, waveforms and a Clip's Fades.
+[Lucide](https://lucide.dev), everywhere: no Unicode glyphs or hand-drawn SVGs as icons, so icons look the same on every platform and never turn into emoji. The only SVGs drawn by hand are drawings, not icons: Chord diagrams, waveforms, a Clip's Fades, and Bandmate's mark.
 
 - **Import each icon on its own**, from `@lucide/svelte/icons/<name>`, never from the package's index, so only the icons used are bundled. `icons.test.ts` fails an import of the whole set, and an inline `<svg>` outside the drawings. An icon passed around, like a menu entry's, is typed `Icon` from `icons.ts`.
 - **An icon is as big as the text it's in** (`.lucide-icon` in `app.css` sizes it at `1em`), so its size comes from a font-size token: an icon button's `--text-xl`, or `--text-lg` on desktop, a menu entry's text, a badge's `--text-xs`. To make one bigger than the text beside it, set a font size from the scale on the icon. Don't set a width or height.
@@ -173,6 +173,16 @@ One icon, one meaning, across the app. Every icon in use is here: a new one is a
 | `corner-down-left`                             | The Enter key, beside Sync mode's Now                                                                                                                                                       |
 | `music`, `disc-3`, `guitar`                    | The navigation: Songs, Beats, the Chord Finder                                                                                                                                              |
 | `settings`                                     | The navigation, pinned apart: Settings                                                                                                                                                      |
+
+### Brand marks
+
+Bandmate's mark is a guitar pick with a flat, ♭, cut out of it: the B of Bandmate, written as a pen stroke, thin in the stem and heavier in the bowl. It's one even-odd path on a 32-unit square, `markPath` in `brandMark.ts`, so the flat's bowl fills in again inside its cut-out.
+
+- **In the app**, `BrandMark` draws it in the accent, so it follows the Palette and theme: atop the nav rail at `--mark-rail`, and in About at `--mark-large`.
+- **The favicon** is the same path in the paper colour on a rounded Terracotta tile, the default Palette, since the file is static: `public/favicon.svg`, and `public/favicon.ico` holding it at 16 and 32px for browsers that don't take an SVG. At 32px the flat reads; at 16px it's a hint.
+- **The home-screen icon** is `public/apple-touch-icon.png`, 180px: the mark smaller on a square of Terracotta, since iOS takes only a PNG and rounds the corners itself.
+
+`brandMark.test.ts` checks `index.html` declares all three and that `favicon.svg` draws `markPath`. The two raster files are rendered from the SVG: when the mark changes, render the tile at 16, 32 and 180px in a browser and write them again.
 
 ### The Timeline's own scale
 
@@ -222,3 +232,4 @@ An outlined toggle is for one that would otherwise compete, like Read mode's Cho
 | `--side-width`, `--side-max-width`     | A desktop side column, such as the Song page's Scrapbook                 |
 | `--cover-list`, `--cover-header`       | A Song's Cover in lists and in the Song page header                      |
 | `--checkbox`                           | A checkbox or radio button, a touch bigger than the browser draws it     |
+| `--mark-rail`, `--mark-large`          | Bandmate's mark: atop the nav rail, and in About                         |

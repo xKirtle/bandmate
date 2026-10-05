@@ -22,6 +22,9 @@
   --cover-header: 8rem;
   /* A checkbox or radio button, a touch bigger than the browser draws it. */
   --checkbox: 1.25rem;
+  /* Bandmate's mark: atop the nav rail, and in About. */
+  --mark-rail: 1.75rem;
+  --mark-large: 4rem;
 
   /* Type sizes, named by size. Tools stay at the small end; content takes
      the larger sizes. */

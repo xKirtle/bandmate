@@ -35,8 +35,14 @@ describe('icons', () => {
 
   it('draws no icon by hand: the only inline SVGs are drawings', () => {
     // A Chord diagram; the waveforms of a Master, a Beat and a Clip; a
-    // Clip's Fades. An icon comes from Lucide instead (docs/design.md, Icons).
-    const drawings = ['lib/AudioPlayer.svelte', 'lib/ChordDiagram.svelte', 'lib/Timeline.svelte'];
+    // Clip's Fades; Bandmate's mark. An icon comes from Lucide instead
+    // (docs/design.md, Icons).
+    const drawings = [
+      'lib/AudioPlayer.svelte',
+      'lib/BrandMark.svelte',
+      'lib/ChordDiagram.svelte',
+      'lib/Timeline.svelte',
+    ];
     const drawn = files.filter(({ code }) => /<svg[\s>]/.test(code)).map(({ path }) => path);
     expect(drawn.sort()).toEqual(drawings);
   });
