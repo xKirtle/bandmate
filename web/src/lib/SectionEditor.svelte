@@ -514,7 +514,7 @@
   .lines {
     padding: 0 0.25rem;
     font-size: var(--lyric-write);
-    line-height: var(--lyric-write-leading);
+    line-height: var(--leading-content);
     overflow-wrap: anywhere;
   }
   .lines p {

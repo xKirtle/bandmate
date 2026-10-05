@@ -260,7 +260,7 @@
     min-height: 5.5rem;
     background: var(--bg);
     font-size: var(--lyric-write);
-    line-height: var(--lyric-write-leading);
+    line-height: var(--leading-content);
     resize: none;
     overflow: hidden;
     /* Keeps the text box clear of the sticky header when it scrolls into view. */
@@ -307,7 +307,7 @@
     padding-inline: 0.75rem;
     color: transparent;
     font-size: var(--lyric-write);
-    line-height: var(--lyric-write-leading);
+    line-height: var(--leading-content);
     pointer-events: none;
     user-select: none;
     scroll-margin: 5rem 0;

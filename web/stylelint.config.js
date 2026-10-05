@@ -29,6 +29,7 @@ const shadows = {
 // Type: a font size is one of the size or lyric tokens, or on the Timeline a
 // step of the same scale in its own unit, `--timeline-rem`. The `font`
 // shorthand only ever inherits, so it can't set a size of its own.
+// The steps are the --text-* sizes in app.css, in rem: keep them in step.
 const scaleSteps = '(0\\.75|0\\.8125|0\\.875|1|1\\.25|1\\.5)';
 const type = {
   'font-size': [
@@ -37,8 +38,6 @@ const type = {
     '/^var\\(--lyric-(write|read-line|read-chord)\\)$/',
     '/^var\\(--timeline-rem\\)$/',
     `/^calc\\(${scaleSteps} \\* var\\(--timeline-rem\\)\\)$/`,
-    // A Cover placeholder's initial grows with the Cover it stands in for.
-    '/^calc\\(var\\(--size\\) \\* [0-9.]+\\)$/',
   ],
   font: ['inherit'],
 };
@@ -60,6 +59,17 @@ export default {
       rules: {
         ...Object.fromEntries(Object.keys(colour).map((rule) => [rule, null])),
         'declaration-property-value-allowed-list': type,
+      },
+    },
+    // A Cover placeholder's initial grows with the Cover it stands in for.
+    {
+      files: ['src/lib/CoverPlaceholder.svelte'],
+      rules: {
+        'declaration-property-value-allowed-list': {
+          ...shadows,
+          ...type,
+          'font-size': [...type['font-size'], '/^calc\\(var\\(--size\\) \\* [0-9.]+\\)$/'],
+        },
       },
     },
   ],

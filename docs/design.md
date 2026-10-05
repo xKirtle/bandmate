@@ -60,26 +60,26 @@ A literal colour is written only in `palettes.css`, and a `box-shadow` is always
 
 The system font everywhere, with no typeface bundled. Content and tools differ by size and line height alone: tools take the small end of the scale, content the larger sizes and the lyric sizes.
 
-| Token          | Size                       | For                                                                            |
-| -------------- | -------------------------- | ------------------------------------------------------------------------------ |
-| `--text-xs`    | 0.75rem                    | The smallest labels: badges, the navigation's, a Timeline Clip's, hints in pills |
-| `--text-sm`    | 0.8125rem                  | Secondary text in tools: hints, notices, table cells, a Section's heading in Read mode |
-| `--text-md`    | 0.875rem                   | Tool text: buttons and fields in toolbars and dialogs, lists, menus            |
-| `--text-lg`    | 1rem                       | Body text, and the headings of cards and panels                                |
-| `--text-xl`    | 1.25rem                    | Dialog titles, glyph icons, larger headings                                    |
-| `--text-2xl`   | 1.5rem                     | Page titles, and a Song's title                                                |
-| `--text-field` | `max(var(--text-lg), 16px)` | Text fields: under 16px, iOS zooms in on focus                                |
+| Token          | Size                        | For                                                                                    |
+| -------------- | --------------------------- | -------------------------------------------------------------------------------------- |
+| `--text-xs`    | 0.75rem                     | The smallest labels: badges, navigation labels, Clip labels, hints in pills            |
+| `--text-sm`    | 0.8125rem                   | Secondary text in tools: hints, notices, table cells, a Section's heading in Read mode |
+| `--text-md`    | 0.875rem                    | Tool text: buttons and fields in toolbars and dialogs, lists, menus                    |
+| `--text-lg`    | 1rem                        | Body text, and the headings of cards and panels                                        |
+| `--text-xl`    | 1.25rem                     | Dialog titles, glyph icons, larger headings                                            |
+| `--text-2xl`   | 1.5rem                      | Page titles, and a Song's title                                                        |
+| `--text-field` | `max(var(--text-lg), 16px)` | Text fields: under 16px, iOS zooms in on focus                                         |
 
-The lyric sizes are content's own, separate from the scale so Read mode can be tuned on its own:
+Content's line height is `--leading-content` (1.6), for Lines in Write mode and a Song's notes; tools keep the page's 1.5. The lyric sizes are content's own, separate from the scale so Read mode can be tuned on its own:
 
-| Token                                    | For                                                                  |
-| ---------------------------------------- | -------------------------------------------------------------------- |
-| `--lyric-write`, `--lyric-write-leading` | Lines and Chords as typed in Write mode: a text field's size, roomy line height |
-| `--lyric-read-line`                      | Lines in Read mode                                                   |
-| `--lyric-read-chord`                     | Chords above their Lines in Read mode                                |
-| `--lyric-read-leading`                   | The line height of Lines in Read mode                                |
+| Token                  | For                                                                                    |
+| ---------------------- | -------------------------------------------------------------------------------------- |
+| `--lyric-write`        | Lines and Chords as typed in Write mode: a text field's size, with `--leading-content` |
+| `--lyric-read-line`    | Lines in Read mode                                                                     |
+| `--lyric-read-chord`   | Chords above their Lines in Read mode                                                  |
+| `--lyric-read-leading` | The line height of Lines in Read mode                                                  |
 
-Every time, BPM and Gain uses tabular digits, so numbers don't jitter as they change: the `.tabular` class gives them, and number fields have them anyway.
+Every time, BPM and Gain uses tabular digits, so numbers don't jitter as they change: through the `.tabular` class, or `font-variant-numeric: tabular-nums` in a component's own rule for it. Number fields have them anyway.
 
 A `font-size` is always one of these tokens, or `inherit`; the `font` shorthand only ever inherits. Stylelint fails anything else, with two exceptions: the Timeline's own scale (below), and a Cover placeholder's initial, which grows with its Cover.
 

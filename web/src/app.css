@@ -29,12 +29,14 @@
   --text-lg: 1rem;
   --text-xl: 1.25rem;
   --text-2xl: 1.5rem;
-  /* A text field's: 16px or more stops iOS from zooming in on focus. */
+  /* For text fields: 16px or more stops iOS from zooming in on focus. */
   --text-field: max(var(--text-lg), 16px);
+  /* Room for what the user wrote, e.g. Lines in Write mode and a Song's
+     notes; tools keep the page's 1.5. */
+  --leading-content: 1.6;
   /* Lines and Chords. In Write mode they're typed into a text field, so they
      keep its size; Read mode sets them apart, Chords above their Lines. */
   --lyric-write: var(--text-field);
-  --lyric-write-leading: 1.6;
   --lyric-read-line: 1.0625rem;
   --lyric-read-chord: 0.9375rem;
   --lyric-read-leading: 1.4;
@@ -180,7 +182,6 @@ select {
   border-radius: 0.5rem;
   background: var(--surface-1);
   color: var(--text);
-  /* 16px or more stops iOS from zooming in on focus. */
   font: inherit;
   font-size: var(--text-field);
 }

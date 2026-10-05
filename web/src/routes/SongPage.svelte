@@ -859,12 +859,17 @@
     display: block;
     margin-top: 0.5rem;
   }
+  .notes textarea,
+  .read-notes {
+    line-height: var(--leading-content);
+  }
   .summary,
   .read-notes {
     margin: 0;
   }
   .summary {
     font-size: var(--text-md);
+    font-variant-numeric: tabular-nums;
   }
   .read-notes {
     margin-top: 0.5rem;

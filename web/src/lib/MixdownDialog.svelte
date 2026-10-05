@@ -161,8 +161,8 @@
       <p>As it plays now: each Track at its volume, with mute and solo as they are.</p>
     {:else}
       <p>
-        The whole Timeline, 0:00 to {formatDuration(end)}, as it plays now: each Track at its volume, with mute and solo
-        as they are.
+        The whole Timeline, <span class="tabular">0:00 to {formatDuration(end)}</span>, as it plays now: each Track at
+        its volume, with mute and solo as they are.
       </p>
     {/if}
     <fieldset>

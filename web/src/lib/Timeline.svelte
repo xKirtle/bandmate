@@ -3504,8 +3504,8 @@
     {/if}
     {#if offerBpm}
       <div class="offer" role="status">
-        <span>This Song has no BPM. Use {offerBpm.bpm} BPM from “{offerBpm.title}”?</span>
-        <button type="button" class="button" onclick={useBpm}>Use {offerBpm.bpm} BPM</button>
+        <span class="tabular">This Song has no BPM. Use {offerBpm.bpm} BPM from “{offerBpm.title}”?</span>
+        <button type="button" class="button tabular" onclick={useBpm}>Use {offerBpm.bpm} BPM</button>
         <button type="button" class="button" onclick={() => (offerBpm = null)}>No thanks</button>
       </div>
     {/if}
