@@ -88,3 +88,8 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 
 - Each Track gets a muted colour of its own, assigned automatically from a small palette in the visual identity's tokens, so Clips on different Tracks can be told apart at a glance. Today every Clip is in the one accent colour.
 - The colours stay muted so the Timeline doesn't take on the busy look of a DAW. Whether the user can pick a Track's colour, and how the Chosen Track still stands out, are for the spec.
+
+## Song folders
+
+- Group Songs on the Songs page into folders, so a growing list can be kept in order (an EP's Songs together, say), rather than one long list sorted only by Status and date.
+- Whether a Song can sit in more than one folder, whether folders nest, how they sit beside the Status filter, and whether a Backup can choose Songs by folder, are for the spec.
