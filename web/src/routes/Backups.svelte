@@ -114,13 +114,18 @@
     highlightTimer = setTimeout(() => (highlighted = null), highlightFor);
   }
 
-  /** Whether all of an element shows: in the window, below the sticky bar, and not under the tab bar. */
+  /**
+   * Whether all of an element shows: in the window, and with nothing over
+   * its top or bottom edge, such as the sticky bar or the tab bar.
+   */
   function inView(el: HTMLElement): boolean {
     const r = el.getBoundingClientRect();
-    const top = document.querySelector('.bar')?.getBoundingClientRect().bottom ?? 0;
-    if (r.top < top || r.bottom > innerHeight) return false;
-    const under = document.elementFromPoint(r.left + r.width / 2, r.bottom - 1);
-    return under !== null && el.contains(under);
+    if (r.top < 0 || r.bottom > innerHeight) return false;
+    const x = r.left + r.width / 2;
+    return [r.top + 1, r.bottom - 1].every((y) => {
+      const at = document.elementFromPoint(x, y);
+      return at !== null && el.contains(at);
+    });
   }
 
   function showRenamed(backup: Backup) {
@@ -175,10 +180,13 @@
   {#if uploading}
     {@const { file, progress } = uploading}
     <div class="message">
-      <span class="muted" role="status">
-        {progress.step === 'sending'
-          ? `Uploading “${file}”… ${Math.floor(progress.sent * 100)}%`
-          : `Checking “${file}”…`}
+      <!-- The percentage is left out of what's announced, so a screen reader
+           says each step once; the bar tells how far it has got. -->
+      <span class="muted">
+        <span role="status">{progress.step === 'sending' ? `Uploading “${file}”…` : `Checking “${file}”…`}</span>
+        {#if progress.step === 'sending'}<span class="tabular" aria-hidden="true"
+            >{Math.floor(progress.sent * 100)}%</span
+          >{/if}
       </span>
       <!-- Without a value while checking: how long that takes isn't known. -->
       {#if progress.step === 'sending'}

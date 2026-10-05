@@ -11,7 +11,6 @@
 export type UploadProgress = { step: 'sending'; sent: number } | { step: 'checking' };
 
 export interface UploadOptions {
-  headers?: Record<string, string>;
   /** Told as the body goes out, and once it's all gone. */
   onProgress?: (progress: UploadProgress) => void;
   /** Aborting it stops the upload, which fails with an AbortError. */
@@ -27,7 +26,7 @@ export function sendWithProgress(
   method: string,
   url: string,
   body: XMLHttpRequestBodyInit,
-  { headers = {}, onProgress, signal }: UploadOptions = {},
+  { onProgress, signal }: UploadOptions = {},
 ): Promise<Response> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
@@ -36,7 +35,6 @@ export function sendWithProgress(
     }
     const xhr = new XMLHttpRequest();
     xhr.open(method, url);
-    for (const [name, value] of Object.entries(headers)) xhr.setRequestHeader(name, value);
 
     xhr.upload.addEventListener('progress', (event) => {
       const { loaded, total } = event as ProgressEvent;
@@ -46,10 +44,10 @@ export function sendWithProgress(
 
     const abort = () => xhr.abort();
     signal?.addEventListener('abort', abort);
-    const settle = () => signal?.removeEventListener('abort', abort);
+    const stopListening = () => signal?.removeEventListener('abort', abort);
 
     xhr.addEventListener('load', () => {
-      settle();
+      stopListening();
       resolve(
         new Response(nullBodyStatus(xhr.status) ? null : xhr.responseText, {
           status: xhr.status,
@@ -58,11 +56,11 @@ export function sendWithProgress(
       );
     });
     xhr.addEventListener('error', () => {
-      settle();
+      stopListening();
       reject(new TypeError('Failed to fetch'));
     });
     xhr.addEventListener('abort', () => {
-      settle();
+      stopListening();
       reject(abortError());
     });
     xhr.send(body);
