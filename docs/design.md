@@ -179,10 +179,10 @@ One icon, one meaning, across the app. Every icon in use is here: a new one is a
 Bandmate's mark is a guitar pick with a flat, ♭, cut out of it: the B of Bandmate, written as a pen stroke, thin in the stem and heavier in the bowl. It's one even-odd path on a 32-unit square, `markPath` in `brandMark.ts`, so the flat's bowl fills in again inside its cut-out.
 
 - **In the app**, `BrandMark` draws it in the accent, so it follows the Palette and theme: atop the nav rail at `--mark-rail`, and in About at `--mark-large`.
-- **The favicon** is the same path in the paper colour on a rounded Terracotta tile, the default Palette, since the file is static: `public/favicon.svg`, and `public/favicon.ico` holding it at 16 and 32px for browsers that don't take an SVG. At 32px the flat reads; at 16px it's a hint.
+- **The favicon** is the same path in `--accent-text` on a rounded tile of `--accent`, both Terracotta's light values, the default Palette's, since the file is static: `public/favicon.svg`, and `public/favicon.ico` holding it at 16 and 32px for browsers that don't take an SVG. At 32px the flat reads; at 16px it's a hint.
 - **The home-screen icon** is `public/apple-touch-icon.png`, 180px: the mark smaller on a square of Terracotta, since iOS takes only a PNG and rounds the corners itself.
 
-`brandMark.test.ts` checks `index.html` declares all three and that `favicon.svg` draws `markPath`. The two raster files are rendered from the SVG: when the mark changes, render the tile at 16, 32 and 180px in a browser and write them again.
+`brandMark.test.ts` checks `index.html` declares all three, and that `favicon.svg` draws `markPath` in those two colours. The two raster files are rendered from the SVG: when the mark changes, render the tile at 16, 32 and 180px in a browser and write them again.
 
 ### The Timeline's own scale
 
