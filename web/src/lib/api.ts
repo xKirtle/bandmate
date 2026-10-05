@@ -807,6 +807,10 @@ export const api = {
   listFolders: () => request<Folder[]>('GET', '/folders'),
   /** Makes an empty Folder; a name another Folder has, ignoring case, is refused. */
   createFolder: (name: string) => request<Folder>('POST', '/folders', { name }),
+  /** Gives a Folder a new name; one another Folder has, ignoring case, is refused. */
+  renameFolder: (id: number, name: string) => request<Folder>('PATCH', `/folders/${id}`, { name }),
+  /** Deletes a Folder, keeping its Songs in no Folder, or deleting them too, for good. */
+  deleteFolder: (id: number, songs: 'keep' | 'delete') => request<null>('DELETE', `/folders/${id}?songs=${songs}`),
   /** Puts a Song into the Folder with folderId, or, with null, into none. It doesn't change the Song's version. */
   moveSongToFolder: (songId: number, folderId: number | null) =>
     request<null>('PUT', `/songs/${songId}/folder`, { folderId }),

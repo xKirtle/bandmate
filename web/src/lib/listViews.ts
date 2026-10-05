@@ -74,6 +74,9 @@ export function sortFolders(folders: readonly Folder[]): Folder[] {
   return sortBy(folders, (f) => f.name, 'asc');
 }
 
+/** How many Songs there are, e.g. in a Folder: "1 Song", "3 Songs". */
+export const songCount = (n: number) => (n === 1 ? '1 Song' : `${n} Songs`);
+
 /** Columns that sort newest or biggest first when first picked. */
 const descendingFirst: readonly string[] = ['edited', 'added'];
 
