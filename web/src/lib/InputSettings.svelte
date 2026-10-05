@@ -305,7 +305,7 @@
     border-radius: 0.5rem;
     background: var(--bg);
     color: var(--text);
-    box-shadow: 0 0.5rem 1.5rem color-mix(in srgb, var(--text) 18%, transparent);
+    box-shadow: var(--shadow-float);
   }
   label {
     display: flex;

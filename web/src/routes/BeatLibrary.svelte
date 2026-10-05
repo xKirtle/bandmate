@@ -478,7 +478,7 @@
     z-index: 10;
     display: grid;
     place-items: center;
-    box-shadow: inset 0 0 0 3px var(--accent);
+    box-shadow: var(--selected-outline);
     background: color-mix(in srgb, var(--accent) 12%, transparent);
     pointer-events: none;
   }

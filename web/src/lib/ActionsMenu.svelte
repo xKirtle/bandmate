@@ -344,7 +344,7 @@
     border: 1px solid var(--border);
     border-radius: 0.5rem;
     background: var(--bg);
-    box-shadow: 0 0.5rem 1.5rem color-mix(in srgb, var(--text) 18%, transparent);
+    box-shadow: var(--shadow-float);
   }
   /* Focused itself only when opened by pointer, where a ring round it all
      would be stray: that it's open shows it has focus. */

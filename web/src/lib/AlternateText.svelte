@@ -315,7 +315,7 @@
   /* Highlighted as in Read mode. */
   .row.current {
     background: var(--surface-1);
-    box-shadow: inset 3px 0 0 var(--accent);
+    box-shadow: var(--selected-edge);
   }
   .syncing .text {
     pointer-events: none;

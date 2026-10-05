@@ -190,6 +190,6 @@
   }
   tbody tr.open {
     background: var(--surface-2);
-    box-shadow: inset 3px 0 0 var(--accent);
+    box-shadow: var(--selected-edge);
   }
 </style>

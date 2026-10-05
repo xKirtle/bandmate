@@ -256,7 +256,7 @@
     color: var(--text);
   }
   dialog::backdrop {
-    background: rgb(0 0 0 / 0.4);
+    background: var(--scrim);
   }
   header {
     display: flex;

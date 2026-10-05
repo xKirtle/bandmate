@@ -192,7 +192,7 @@
     gap: 0.75rem;
   }
   dialog::backdrop {
-    background: rgb(0 0 0 / 0.4);
+    background: var(--scrim);
   }
   /* A phone gives the whole screen to it, clear of the notch and home
      indicator. */
@@ -243,11 +243,12 @@
     max-width: none;
     pointer-events: none;
   }
-  /* The picture outside the square is dimmed. */
+  /* The picture outside the square is dimmed, by an outline wide enough to
+     cover the rest of the stage. */
   .frame {
     position: absolute;
-    border: 2px solid #fff;
-    box-shadow: 0 0 0 100vmax rgb(0 0 0 / 0.55);
+    border: 2px solid var(--on-scrim);
+    outline: 100vmax solid var(--scrim);
     pointer-events: none;
   }
   .zoom {

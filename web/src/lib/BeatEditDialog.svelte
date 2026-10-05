@@ -206,7 +206,7 @@
     gap: 0.75rem;
   }
   dialog::backdrop {
-    background: rgb(0 0 0 / 0.4);
+    background: var(--scrim);
   }
   /* A phone gives the whole screen to it, clear of the notch and home
      indicator. */
