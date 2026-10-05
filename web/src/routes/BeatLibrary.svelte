@@ -27,7 +27,7 @@
   import { formatDuration } from '../lib/time';
   import { suggestForFile } from '../lib/beatTags';
   import { prepareUpload } from '../lib/upload';
-  import { draggedFiles } from '../lib/fileDrop';
+  import FileDrop from '../lib/FileDrop.svelte';
   import { audioDropped, entriesDropped, filesIn, skippedNote } from '../lib/droppedFiles';
 
   // The whole Library, loaded once and narrowed down here.
@@ -223,40 +223,15 @@
   let editingId = $state<number | null>(null);
   const editingBeat = $derived(beats?.find((b) => b.id === editingId) ?? null);
 
-  // On desktop, audio files and folders can be dropped anywhere on the page,
-  // which shows it'll take them while they're dragged over it. They go where
-  // picking them would, once those that aren't audio are skipped, which is
-  // said. Not while files can't be picked, nor under the edit dialog. A drop
-  // the page doesn't take is never opened by the browser in its place.
+  // On desktop, audio files and folders can be dropped anywhere on the page.
+  // They go where picking them would, once those that aren't audio are
+  // skipped, which is said. Not while files can't be picked, nor under the
+  // edit dialog.
   const takesFiles = $derived(desktop.current && addBusy === null && !batchUploading && editingBeat === null);
-  // Entering one of the page's elements fires before leaving the last, so
-  // the drag is over the page until it's left as many times as entered.
-  let dragDepth = $state(0);
-  const dropTarget = $derived(takesFiles && dragDepth > 0);
   // Said of the last files dropped: how many weren't audio.
   let dropNote = $state<string | null>(null);
 
-  function filesEnter(event: DragEvent) {
-    if (draggedFiles(event)) dragDepth++;
-  }
-
-  function filesLeave(event: DragEvent) {
-    if (draggedFiles(event)) dragDepth = Math.max(0, dragDepth - 1);
-  }
-
-  function filesOver(event: DragEvent) {
-    const data = draggedFiles(event);
-    if (!data) return;
-    event.preventDefault();
-    data.dropEffect = takesFiles ? 'copy' : 'none';
-  }
-
-  async function filesDrop(event: DragEvent) {
-    const data = draggedFiles(event);
-    if (!data) return;
-    event.preventDefault();
-    dragDepth = 0;
-    if (!takesFiles) return;
+  async function filesDrop(data: DataTransfer) {
     // Asked before the drop is over, which empties it. Reading a folder can
     // take a while, and nothing else can be added meanwhile.
     const entries = entriesDropped(data);
@@ -327,11 +302,7 @@
   </button>
 {/snippet}
 
-<svelte:window ondragenter={filesEnter} ondragleave={filesLeave} ondragover={filesOver} ondrop={filesDrop} />
-
-{#if dropTarget}
-  <div class="drop-target" aria-hidden="true"><p>Drop audio files or folders to add them as Beats</p></div>
-{/if}
+<FileDrop takes={takesFiles} label="Drop audio files or folders to add them as Beats" onDrop={filesDrop} />
 
 <header class="bar" bind:borderBoxSize={headerBox}>
   <h1>Beats</h1>
@@ -459,25 +430,6 @@
   .add-error,
   .skipped {
     margin-bottom: var(--space-4);
-  }
-  /* The window, nav rail and all, while files dropped anywhere on it would be added. */
-  .drop-target {
-    position: fixed;
-    inset: 0;
-    z-index: 10;
-    display: grid;
-    place-items: center;
-    box-shadow: var(--selected-outline);
-    background: color-mix(in srgb, var(--accent) 12%, transparent);
-    pointer-events: none;
-  }
-  .drop-target p {
-    margin: 0;
-    padding: var(--space-2) var(--space-4);
-    border-radius: var(--radius-md);
-    background: var(--bg);
-    color: var(--text);
-    font-weight: 600;
   }
   /* With the player docked below, the page reaches at least to it, so the bar
      sits at the bottom of the window even under a short list. */

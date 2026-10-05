@@ -2,7 +2,8 @@
   // Settings' Backups tab: the Backups kept in Bandmate, newest first, each
   // named from when it was made and what it holds, or with a name of its
   // own, with its size, and downloadable as one file. A downloaded one, from
-  // here or another install, can be uploaded to join them. Songs can be
+  // here or another install, can be uploaded to join them, picked or
+  // dropped, several at once. Songs can be
   // restored from each that holds some. Each can be renamed, or deleted
   // after confirming; nothing deletes one otherwise.
   import Pencil from '@lucide/svelte/icons/pencil';
@@ -11,11 +12,12 @@
   import { onDestroy, tick } from 'svelte';
   import ActionsMenu from '../lib/ActionsMenu.svelte';
   import { api, type Backup } from '../lib/api';
-  import { automaticName, backupName, backupSize } from '../lib/backups';
+  import { addedNote, automaticName, backupName, backupSize, failedNote } from '../lib/backups';
+  import { BackupUploads } from '../lib/backupUploads.svelte';
+  import FileDrop from '../lib/FileDrop.svelte';
   import type { MenuAction } from '../lib/menu';
   import { scrollBehavior } from '../lib/motion';
   import NewBackupDialog from '../lib/NewBackupDialog.svelte';
-  import type { UploadProgress } from '../lib/progressUpload';
   import RenameBackupDialog from '../lib/RenameBackupDialog.svelte';
   import RestoreBackupDialog from '../lib/RestoreBackupDialog.svelte';
   import SettingsPage from '../lib/SettingsPage.svelte';
@@ -26,29 +28,39 @@
   let making = $state(false);
   let renaming = $state<Backup | null>(null);
   let restoring = $state<Backup | null>(null);
-  /** The file being uploaded, while it is, and how far it has got. */
-  let uploading = $state<{ file: string; progress: UploadProgress } | null>(null);
-  /** Stops the upload in progress: Cancel, or leaving the tab. */
-  let stopUpload: AbortController | null = null;
-  /** What the last upload added, to say so, since it's listed by when it was made, maybe far down. */
+  /**
+   * The Backups' files being uploaded, one after another. Each is listed
+   * as it's added, and once they all are, they're said and shown.
+   */
+  const uploads = new BackupUploads<Backup>((file, options) => api.uploadBackup(file, options), {
+    added: showUploaded,
+    done: (added) => {
+      uploaded = addedNote(added);
+      reveal(added.map(({ backup }) => backup.id));
+    },
+  });
+  /** What the last uploads added, to say so, since they're listed by when they were made, maybe far down. */
   let uploaded = $state<string | null>(null);
-  /** The Backup just uploaded, highlighted for a moment where it's listed. */
-  let highlighted = $state<number | null>(null);
+  /** The Backups just uploaded, highlighted for a moment where they're listed. */
+  let highlighted = $state<number[]>([]);
   let highlightTimer: ReturnType<typeof setTimeout> | undefined;
-  /** How long an uploaded Backup's row stays highlighted, in ms. */
+  /** How long uploaded Backups' rows stay highlighted, in ms. */
   const highlightFor = 2000;
   let list = $state<HTMLUListElement>();
 
-  // Switching Settings tabs, or leaving Settings, stops the upload quietly.
+  // Switching Settings tabs, or leaving Settings, stops the uploads quietly.
   onDestroy(() => {
-    stopUpload?.abort();
+    uploads.stop();
     clearTimeout(highlightTimer);
   });
 
-  // Closing or reloading the page would stop the upload, so ask first.
+  // Closing or reloading the page would stop the uploads, so ask first.
   function warnBeforeUnload(event: BeforeUnloadEvent) {
-    if (uploading) event.preventDefault();
+    if (uploads.current) event.preventDefault();
   }
+
+  // Files can be dropped anywhere on the page, but not under a dialog.
+  const takesFiles = $derived(!making && renaming === null && restoring === null);
 
   api.listBackups().then(
     (list) => (backups = list),
@@ -73,45 +85,35 @@
     backups = at < 0 ? [...rest, backup] : [...rest.slice(0, at), backup, ...rest.slice(at)];
   }
 
-  async function upload(event: Event) {
+  function pick(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
+    const files = [...(input.files ?? [])];
     input.value = '';
-    if (!file) return;
+    upload(files);
+  }
+
+  /** Uploads the files picked or dropped, joining the uploads under way, if any. */
+  function upload(files: File[]) {
+    if (files.length === 0) return;
     error = null;
     uploaded = null;
-    const stop = new AbortController();
-    stopUpload = stop;
-    uploading = { file: file.name, progress: { step: 'sending', sent: 0 } };
-    try {
-      const backup = await api.uploadBackup(file, {
-        signal: stop.signal,
-        onProgress: (progress) => (uploading = { file: file.name, progress }),
-      });
-      showUploaded(backup);
-      uploaded = `Added “${backupName(backup)}” from “${file.name}”.`;
-      reveal(backup.id);
-    } catch (e) {
-      // Cancelled: the status row just goes.
-      if (!stop.signal.aborted) error = `Couldn't upload “${file.name}” (${(e as Error).message})`;
-    } finally {
-      uploading = null;
-      stopUpload = null;
-    }
+    uploads.add(files);
   }
 
   /**
-   * Scrolls a Backup's row into view, if it's off-screen or under the bar
-   * or tab bar, and highlights it for a moment.
+   * Highlights Backups' rows for a moment, and scrolls the first listed
+   * into view if it's off-screen or under the bar or tab bar.
    */
-  async function reveal(id: number) {
+  async function reveal(ids: number[]) {
+    if (ids.length === 0) return;
     await tick();
-    const row = list?.querySelector<HTMLElement>(`[data-backup="${id}"]`);
-    if (!row) return;
-    if (!inView(row)) row.scrollIntoView({ block: 'center', behavior: scrollBehavior() });
-    highlighted = id;
+    const row = [...(list?.querySelectorAll<HTMLElement>('[data-backup]') ?? [])].find((row) =>
+      ids.includes(Number(row.dataset.backup)),
+    );
+    if (row && !inView(row)) row.scrollIntoView({ block: 'center', behavior: scrollBehavior() });
+    highlighted = ids;
     clearTimeout(highlightTimer);
-    highlightTimer = setTimeout(() => (highlighted = null), highlightFor);
+    highlightTimer = setTimeout(() => (highlighted = []), highlightFor);
   }
 
   /**
@@ -157,6 +159,8 @@
 
 <svelte:window onbeforeunload={warnBeforeUnload} />
 
+<FileDrop takes={takesFiles} label="Drop a Backup to upload it" onDrop={(data) => upload([...data.files])} />
+
 {#snippet dismiss(onclick: () => void)}
   <button type="button" class="icon" {onclick} aria-label="Dismiss" title="Dismiss"><X /></button>
 {/snippet}
@@ -164,9 +168,9 @@
 <SettingsPage tab="backups">
   {#snippet barActions()}
     <div class="bar-actions">
-      <label class="button" class:disabled={uploading !== null}>
+      <label class="button">
         Upload
-        <input class="visually-hidden" type="file" accept=".bandmate" onchange={upload} disabled={uploading !== null} />
+        <input class="visually-hidden" type="file" accept=".bandmate" multiple onchange={pick} />
       </label>
       <button type="button" class="button primary" onclick={() => (making = true)}>New Backup</button>
     </div>
@@ -177,8 +181,14 @@
       {@render dismiss(() => (error = null))}
     </div>
   {/if}
-  {#if uploading}
-    {@const { file, progress } = uploading}
+  {#if uploads.failures.length > 0}
+    <div class="message" role="alert">
+      <span class="error">{failedNote(uploads.failures)}</span>
+      {@render dismiss(() => (uploads.failures = []))}
+    </div>
+  {/if}
+  {#if uploads.current}
+    {@const { file, progress } = uploads.current}
     <div class="message">
       <!-- The percentage is left out of what's announced, so a screen reader
            says each step once; the bar tells how far it has got. -->
@@ -187,11 +197,12 @@
         {#if progress.step === 'sending'}<span class="tabular" aria-hidden="true"
             >{Math.floor(progress.sent * 100)}%</span
           >{/if}
+        {#if uploads.count}<span class="tabular">· {uploads.count.at} of {uploads.count.of}</span>{/if}
       </span>
       <!-- Without a value while checking: how long that takes isn't known. -->
       {#if progress.step === 'sending'}
         <progress max="1" value={progress.sent} aria-label="How much of the Backup has been sent"></progress>
-        <button type="button" class="button" onclick={() => stopUpload?.abort()}>Cancel</button>
+        <button type="button" class="button" onclick={() => uploads.cancel()}>Cancel</button>
       {:else}
         <progress aria-label="Checking the Backup"></progress>
       {/if}
@@ -211,13 +222,13 @@
       <p>No Backups yet.</p>
       <p class="muted">
         A Backup is a copy of chosen Songs and Beats, kept here to restore from, and downloadable as one file to keep
-        elsewhere. Upload one downloaded before, here or on another install, to restore from it.
+        elsewhere. Upload or drop one downloaded before, here or on another install, to restore from it.
       </p>
     </div>
   {:else}
     <ul class="backups" bind:this={list}>
       {#each backups as backup (backup.id)}
-        <li data-backup={backup.id} class:highlighted={highlighted === backup.id}>
+        <li data-backup={backup.id} class:highlighted={highlighted.includes(backup.id)}>
           <div class="about">
             <span class="name">{backupName(backup)}</span>
             <span class="muted details">
@@ -283,6 +294,11 @@
   .message .icon {
     margin-left: auto;
   }
+  /* A long message, such as several files that couldn't be uploaded, wraps
+     beside its x rather than pushing it onto a line of its own. */
+  .message:has(> .icon) > span {
+    flex: 1 1 0;
+  }
   progress {
     flex: 1 1 8rem;
     accent-color: var(--accent);
@@ -304,7 +320,7 @@
     border-bottom: 1px solid var(--border);
     transition: background-color var(--duration-base) var(--ease);
   }
-  /* The Backup just uploaded, for a moment. */
+  /* The Backups just uploaded, for a moment. */
   li.highlighted {
     background: color-mix(in srgb, var(--accent) 12%, transparent);
   }
