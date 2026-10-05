@@ -86,7 +86,8 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  /* The size of a diagram, so a Chord without one still holds its place. */
+  /* The size of a diagram, so a Chord without one still holds its place:
+     ChordDiagram's viewBox for six strings. */
   .empty {
     box-sizing: border-box;
     width: 100%;

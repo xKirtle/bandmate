@@ -4,7 +4,7 @@
 
 import type { Song } from './api';
 import { chordName, readTuning, standard } from './chordFinder';
-import { activeAlternate } from './sections';
+import { activeAlternate, sectionsInArrangement } from './sections';
 import { transposeChord } from './transpose';
 
 /**
@@ -18,8 +18,8 @@ import { transposeChord } from './transpose';
 export function chartChords(song: Song, transpose = 0): string[] {
   const sections = new Map(song.sections.map((s) => [s.id, s]));
   const listed = new Map<string, string>();
-  for (const id of song.arrangement)
-    for (const line of activeAlternate(sections.get(id))?.lines ?? [])
+  for (const section of sectionsInArrangement(song, sections))
+    for (const line of activeAlternate(section)?.lines ?? [])
       for (const chord of line.chords) {
         const shown = transposeChord(chord.name, transpose, song.key);
         const tidied = chordName(shown) ?? shown;

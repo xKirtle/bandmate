@@ -49,7 +49,7 @@ describe('which Chords the Chord Chart lists', () => {
 
   it("lists only the active Alternates' Chords, not the Scrapbook's", () => {
     const verse = section(alternate([line(['Bb'])], false), alternate([line(['G'])]), alternate([line(['F'])], false));
-    const leftover = section(alternate([line(['Am'])]));
+    const leftover = section(alternate([line(['Am'])]), alternate([line(['Dm'])], false));
     expect(chartChords(song([verse], [leftover]))).toEqual(['G']);
   });
 
