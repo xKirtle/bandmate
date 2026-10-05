@@ -1,3 +1,5 @@
+<img src="web/public/favicon.svg" alt="Bandmate's mark: a guitar pick with a flat cut out of it" width="96" height="96">
+
 # Bandmate
 
 A personal songwriting companion: write and structure lyrics with chords, then record vocal takes over uploaded beats and line them up on a timeline to iterate on a song. You host it yourself, for yourself.
