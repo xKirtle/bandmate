@@ -1,9 +1,7 @@
 <script lang="ts">
-  import X from '@lucide/svelte/icons/x';
-  import { onMount } from 'svelte';
   import { api, type Backup } from './api';
-  import { closeOnBackdrop } from './backdrop';
   import { automaticName } from './backups';
+  import Dialog from './Dialog.svelte';
 
   // Gives a Backup a name of its own, shown in place of the automatic one,
   // or clears it back to the automatic one: a blank name is none.
@@ -25,8 +23,6 @@
   let saving = $state(false);
   let error = $state<string | null>(null);
   const automatic = $derived(automaticName(backup));
-
-  onMount(() => dialog?.showModal());
 
   async function save(to: string) {
     if (to.trim() === backup.name) {
@@ -51,20 +47,14 @@
   }
 </script>
 
-<dialog
-  bind:this={dialog}
-  {@attach closeOnBackdrop(() => !saving && name.trim() === backup.name)}
+<Dialog
+  bind:dialog
+  title="Rename Backup"
+  close={saving ? 'disabled' : 'shown'}
+  dismissible={() => !saving && name.trim() === backup.name}
   oncancel={(e) => saving && e.preventDefault()}
   onclose={onClose}
-  aria-labelledby="rename-backup-heading"
 >
-  <header>
-    <h2 id="rename-backup-heading">Rename Backup</h2>
-    <button type="button" class="icon" onclick={() => dialog?.close()} disabled={saving} aria-label="Close"
-      ><X /></button
-    >
-  </header>
-
   <form {onsubmit}>
     <label>
       Name
@@ -83,36 +73,9 @@
       <button type="button" class="button" onclick={() => dialog?.close()} disabled={saving}>Cancel</button>
     </div>
   </form>
-</dialog>
+</Dialog>
 
 <style>
-  dialog {
-    width: min(28rem, calc(100vw - 2rem));
-    max-height: calc(100dvh - 2rem);
-    padding: var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--bg);
-    color: var(--text);
-  }
-  dialog[open] {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-  }
-  dialog::backdrop {
-    background: var(--scrim);
-  }
-  header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-3);
-  }
-  h2 {
-    margin: 0;
-    font-size: var(--text-xl);
-  }
   form {
     display: flex;
     flex-direction: column;

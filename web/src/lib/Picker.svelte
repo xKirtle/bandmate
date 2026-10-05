@@ -135,7 +135,7 @@
     {...rest}
     {id}
     bind:this={field}
-    class={['trigger', trigger ? 'custom' : 'field']}
+    class={['trigger', trigger ? 'custom' : 'boxed']}
     role="combobox"
     tabindex="0"
     aria-haspopup="listbox"
@@ -157,7 +157,7 @@
     <!-- Pressing an option keeps focus on the trigger. -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-      class="option-list"
+      class="popover option-list"
       id="{id}-list"
       role="listbox"
       tabindex="-1"
@@ -202,7 +202,7 @@
     user-select: none;
   }
   /* Looks like the other fields. */
-  .field {
+  .boxed {
     gap: var(--space-2);
     padding: 0 var(--space-3);
     border: 1px solid var(--border);

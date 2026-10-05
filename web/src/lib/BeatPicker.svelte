@@ -1,15 +1,14 @@
 <script lang="ts">
   import Pause from '@lucide/svelte/icons/pause';
   import Play from '@lucide/svelte/icons/play';
-  import X from '@lucide/svelte/icons/x';
-  import { onMount, tick } from 'svelte';
+  import { tick } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { api, type Beat, type DecodedAudio, type Song } from './api';
-  import { closeOnBackdrop } from './backdrop';
   import BeatFields from './BeatFields.svelte';
   import BeatFilters from './BeatFilters.svelte';
   import BeatTable from './BeatTable.svelte';
   import { fromDraft, toDraft, type BeatDraft } from './beatDraft';
+  import Dialog from './Dialog.svelte';
   import { defaultBeatListView, filterBeats, isBeatListFiltered, songBeatHint, sortBeats } from './listViews';
   import { playMediaAlone, release } from './playback';
   import { formatDuration } from './time';
@@ -39,8 +38,6 @@
   let adding = $state<{ file: File; decoded: DecodedAudio; draft: BeatDraft } | null>(null);
   let busy = $state<string | null>(null);
   let error = $state<string | null>(null);
-
-  onMount(() => dialog?.showModal());
 
   api.getConfig().then(
     (c) => (maxUploadBytes = c.maxUploadBytes),
@@ -158,18 +155,19 @@
   </button>
 {/snippet}
 
-<!-- A click outside closes it while browsing, but never loses a new Beat's file and details. -->
-<dialog
-  bind:this={dialog}
-  {@attach closeOnBackdrop(() => adding === null && busy === null)}
+<!-- A click outside closes it while browsing, but never loses a new Beat's file and details.
+     Desktop has room for the Library's table, sorted by its headers, and
+     the dialog keeps its height as filters narrow the Beats down. -->
+<Dialog
+  bind:dialog
+  title="Add a Beat"
+  dismissible={() => adding === null && busy === null}
+  stack={false}
   onclose={onClose}
-  aria-labelledby="beat-picker-heading"
+  --dialog-width={desktop.current ? 'min(64rem, calc(100vw - 4rem))' : '36rem'}
+  --dialog-height={desktop.current ? 'min(48rem, calc(100vh - 4rem))' : 'fit-content'}
+  --dialog-max-height={desktop.current ? 'none' : 'min(40rem, calc(100vh - 2rem))'}
 >
-  <header>
-    <h2 id="beat-picker-heading">Add a Beat</h2>
-    <button type="button" class="icon" onclick={() => dialog?.close()} aria-label="Close"><X /></button>
-  </header>
-
   {#if adding}
     <form class="adding" onsubmit={upload}>
       <p class="file">
@@ -246,31 +244,9 @@
   {#if error}
     <p class="error" role="alert">{error}</p>
   {/if}
-</dialog>
+</Dialog>
 
 <style>
-  dialog {
-    width: min(36rem, calc(100vw - 2rem));
-    max-height: min(40rem, calc(100vh - 2rem));
-    padding: var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--bg);
-    color: var(--text);
-  }
-  dialog::backdrop {
-    background: var(--scrim);
-  }
-  header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: var(--space-3);
-  }
-  h2 {
-    margin: 0;
-    font-size: var(--text-xl);
-  }
   .upload {
     flex-shrink: 0;
   }
@@ -349,15 +325,5 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
-  }
-
-  /* Desktop has room for the Library's table, sorted by its headers. The
-     dialog keeps its height as filters narrow the Beats down. */
-  @media (min-width: 80rem) {
-    dialog {
-      width: min(64rem, calc(100vw - 4rem));
-      height: min(48rem, calc(100vh - 4rem));
-      max-height: none;
-    }
   }
 </style>

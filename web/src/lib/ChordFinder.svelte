@@ -154,7 +154,7 @@
   </ul>
 {/snippet}
 
-<div class="finder">
+<div class="card finder">
   <div class="tab-bar">
     <div class="tabs" role="tablist" aria-label="Chord Finder">
       {#each tabs as t, i (t.id)}
@@ -371,9 +371,6 @@
 <style>
   .finder {
     container: finder / inline-size;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--surface-1);
   }
   /* The tabs, and the left-handed setting at the end, on its own line on a narrow phone. */
   .tab-bar {
@@ -395,11 +392,6 @@
     margin-left: auto;
     padding: 0 var(--space-3);
     font-size: var(--text-sm);
-  }
-  .toggle[aria-pressed='true'] {
-    border-color: var(--accent);
-    background: var(--accent);
-    color: var(--accent-text);
   }
   [role='tab'] {
     min-height: var(--control);
@@ -451,13 +443,7 @@
     }
   }
   .field {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
     min-width: 0;
-    color: var(--text-muted);
-    font-size: var(--text-sm);
-    font-weight: 600;
   }
   .field input {
     color: var(--text);

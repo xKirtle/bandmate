@@ -361,7 +361,7 @@
     />
   {/if}
   {#if adding}
-    <form class="adding" onsubmit={add} aria-labelledby="adding-heading">
+    <form class="card adding" onsubmit={add} aria-labelledby="adding-heading">
       <h2 id="adding-heading">
         Add “{adding.file.name}”
         <span class="muted tabular">{formatDuration(adding.decoded.duration)}</span>
@@ -451,9 +451,6 @@
     gap: var(--space-3);
     margin-bottom: var(--space-6);
     padding: var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--surface-1);
   }
   .adding h2 {
     margin: 0;

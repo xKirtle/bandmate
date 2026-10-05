@@ -2,10 +2,10 @@
   // Which Bandmate is running, with a link to exactly that version's source,
   // as AGPL-3.0 §13 asks of anyone running a modified Bandmate over a network,
   // the system facts a bug report needs, ready to copy, and what's new.
-  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import { api, type AboutInfo, type ReleasesReport, type ServerConfig } from '../lib/api';
   import { bugReportDetails, updateStatus, uptime } from '../lib/about';
   import BrandMark from '../lib/BrandMark.svelte';
+  import FoldChevron from '../lib/FoldChevron.svelte';
 
   // The version and its source link come from /api/config, which doesn't
   // need the database, so they show even if the system facts can't be read.
@@ -230,7 +230,7 @@
                   <li>
                     <details open={i === 0}>
                       <summary>
-                        <span class="chevron" aria-hidden="true"><ChevronRight /></span>
+                        <FoldChevron />
                         <span class="release-tag">{r.tag}</span>
                         {#if r.name && r.name !== r.tag}<span class="release-name">{r.name}</span>{/if}
                         <span class="muted date">{day(r.publishedAt)}</span>
@@ -280,7 +280,7 @@
             {#each dependencyLists as list (list.id)}
               <details class="dependencies" open>
                 <summary>
-                  <span class="chevron" aria-hidden="true"><ChevronRight /></span>
+                  <FoldChevron />
                   <span class="group-name">{list.label}</span>
                   <span class="muted">({list.items.length})</span>
                 </summary>
@@ -334,9 +334,6 @@
   /* The app's usual panel style. */
   .card {
     min-width: 0;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--surface-1);
   }
   .card p {
     margin: 0;
@@ -467,23 +464,7 @@
     gap: var(--space-1) var(--space-2);
     min-height: var(--control);
     padding: var(--space-2) 0;
-    list-style: none;
     cursor: pointer;
-  }
-  summary::-webkit-details-marker {
-    display: none;
-  }
-  summary:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-  .chevron {
-    display: inline-flex;
-    color: var(--text-muted);
-    transition: transform var(--duration-fast) var(--ease);
-  }
-  details[open] > summary .chevron {
-    transform: rotate(90deg);
   }
   .release-tag {
     font-weight: 600;
@@ -583,15 +564,8 @@
      Running the release that's running. */
   .badge {
     flex: none;
-    display: inline-block;
     min-width: 3rem;
-    padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius-full);
-    font-size: var(--text-xs);
-    font-weight: 600;
-    letter-spacing: 0.02em;
     text-align: center;
-    white-space: nowrap;
     background: var(--surface-2);
     color: var(--text-muted);
   }

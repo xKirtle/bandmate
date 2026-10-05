@@ -179,7 +179,34 @@ The Timeline zooms by its own unit, `--timeline-rem`, so its sizes are written a
 
 ### Components
 
-Named variants for buttons, the icon button, badges, fields, cards, dialogs and menus, and when to use each, are _to come_ (#575).
+The recurring components are written once, and a screen reaches for them rather than drawing its own. Where only the look repeats, on a native element, it's a class in `app.css`; where markup repeats too, it's a component in `web/src/lib`. A component's own styles add only what's particular to it, such as its width or its place in a row. `components.test.ts` fails a modal dialog that isn't a `Dialog`, and a fold whose chevron isn't a `FoldChevron`.
+
+**Buttons** are `.button`, with a variant beside it:
+
+| Variant   | Class                    | For                                                                                                |
+| --------- | ------------------------ | -------------------------------------------------------------------------------------------------- |
+| Primary   | `.button.primary`        | The one action a dialog or form is for: Save, Back up, Restore. At most one in a group             |
+| Secondary | `.button`                | Every other action: Cancel, Back, Clear all Cues. Also a `<label>` round a file input, or a link   |
+| Quiet     | `.button.quiet`          | A light action beside a list, in accent text with no box: Choose all, Clear                        |
+| Danger    | `.button.danger`         | Deletes or overwrites, after asking: Delete, Replace and restore. Primary's place when it's the one |
+| Toggle    | `.button.toggle`         | On or off, with `aria-pressed`: filled with the accent while on, e.g. Sync lyrics, Left-handed     |
+| Outlined  | `.toggle.outlined`       | A toggle beside something already in the accent: outlined and lettered in it while on, not filled  |
+
+An outlined toggle is for one that would otherwise compete, like Read mode's Chords toggle beside the Chords, or the Chord Chart's eye and pin. A disabled button fades; a disabled quiet one turns muted instead.
+
+**The icon button**, `.icon`, is a square of `--control` showing one Lucide icon at `--text-xl` (`--text-lg` on desktop), muted and boxless until it's hovered. It's for an action an icon says on its own, such as a dialog's close, a Section's ⋯ or Undo, and always has an `aria-label`. The Timeline's own buttons are in its scale instead.
+
+**Chips and badges** are both pills. A **chip**, `.chip`, is a toggle among others, with `aria-pressed`, such as the Song list's and Beat Library's filters; on a card, one that's off takes `--bg`. A **badge**, `.badge`, labels something and does nothing itself, at `--text-xs`: a Song's Status (`StatusBadge`), or a release note's kind on About. Its colours are its own, from the Status tokens or a tint.
+
+**Fields** are the native `input`, `textarea` and `select`, styled in `app.css` at `--text-field`. A field's name goes above it with `.field` on its `<label>` (or `<fieldset>`), muted at `--text-sm`; the Song page's Details take theirs a step smaller. A `Combobox` or `Picker` is a field with a list. Checkboxes and radio buttons are `.choice-row` labels in a `.choice-group` fieldset, each a touch target tall, with what's under one (its note, a `PickList`) in `.choice-under`, lined up with its label; `--checkbox` sizes them.
+
+**Cards** are flat: `.card` is a `--surface-1` panel with a border and `--radius-lg`, on the page, never floating. It holds a Section, the Chord Finder, About's sections, the Beat Library's add and batch forms and its filters. Two relatives aren't cards: the Scrapbook is a dashed outline with no fill, since Sections are dropped into it, and its Sections are cards inside it; and on desktop the Song page's side parts, its Masters and the Scrapbook, are each a card that folds.
+
+**Folds** are a `<details>` whose `<summary>` starts with `FoldChevron`, which turns from pointing right to down as it opens. `app.css` takes away the browser's own marker and rings a focused summary. About's release notes and dependency lists fold, and on desktop so do the Song page's side parts.
+
+**Dialogs** are `Dialog`: a modal `<dialog>`, opened as it mounts, over `--scrim`, with its title and a close button at its head and what it holds stacked beneath, `--space-3` apart. It's for a task that stops the page: New Backup, Restore, Mix down, editing a Beat. Its close button can be disabled or hidden while closing would lose work, and a click on the backdrop closes it only when its `dismissible` says nothing would be lost. It's 28rem wide unless the caller sets `--dialog-width`, and `--dialog-max-height`, `--dialog-height` and `--dialog-gap` likewise. A **sheet** is a dialog that takes the whole screen on a phone, for one with a lot to hold, like editing a Beat or cropping a Cover.
+
+**Menus and popovers** float: `.popover` is a layer in the top layer, placed by script beside what opened it (`popover.ts`), with a border, `--radius-md` and `--shadow-float`. A **menu** is `ActionsMenu`, a ⋯ of actions, each entry `--radius-sm` with its icon in a column. The others are the list a `Combobox` or `Picker` opens (`.option-list`), a Chord's diagram (`ChordPopover`) and Recording settings (`InputSettings`). A popover is for a quick choice or a glance that doesn't stop the page; what needs the page to wait is a dialog.
 
 ## Layout tokens
 
@@ -191,3 +218,4 @@ Named variants for buttons, the icon button, badges, fields, cards, dialogs and 
 | `--tabbar-space`, `--nav-bottom-space` | What the tab bar, or the navigation, takes from the bottom of the window |
 | `--side-width`, `--side-max-width`     | A desktop side column, such as the Song page's Scrapbook                 |
 | `--cover-list`, `--cover-header`       | A Song's Cover in lists and in the Song page header                      |
+| `--checkbox`                           | A checkbox or radio button, a touch bigger than the browser draws it     |

@@ -1,6 +1,4 @@
 <script lang="ts">
-  import X from '@lucide/svelte/icons/x';
-  import { onMount } from 'svelte';
   import {
     api,
     type Backup,
@@ -10,7 +8,6 @@
     type BackupRestored,
     type BackupSong,
   } from './api';
-  import { closeOnBackdrop } from './backdrop';
   import {
     backupName,
     beatCount,
@@ -20,6 +17,7 @@
     restoredName,
     restorePicks,
   } from './backups';
+  import Dialog from './Dialog.svelte';
   import PickList from './PickList.svelte';
 
   // "Restore": ticks what comes back from a Backup, Songs and Beats (some or
@@ -72,8 +70,6 @@
     ),
   );
   const pickedName = $derived('name' in toRestore ? toRestore.name : '');
-
-  onMount(() => dialog?.showModal());
 
   // svelte-ignore state_referenced_locally
   Promise.all([api.backupSongs(backup.id), api.backupBeats(backup.id)]).then(
@@ -151,20 +147,14 @@
   }
 </script>
 
-<dialog
-  bind:this={dialog}
-  {@attach closeOnBackdrop(() => phase !== 'restoring')}
+<Dialog
+  bind:dialog
+  title="Restore"
+  close={phase === 'restoring' || phase === 'checking' ? 'hidden' : 'shown'}
+  dismissible={() => phase !== 'restoring'}
   {oncancel}
   onclose={onClose}
-  aria-labelledby="restore-backup-heading"
 >
-  <header>
-    <h2 id="restore-backup-heading">Restore</h2>
-    {#if phase !== 'restoring' && phase !== 'checking'}
-      <button type="button" class="icon" onclick={() => dialog?.close()} aria-label="Close"><X /></button>
-    {/if}
-  </header>
-
   {#if phase === 'picking' || phase === 'checking'}
     <p class="muted">From “{backupName(backup)}”</p>
     {#if loadError}
@@ -174,14 +164,14 @@
     {:else if songs.length === 0 && beats.length === 0}
       <p>This Backup holds no Songs or Beats.</p>
     {:else}
-      <fieldset disabled={phase === 'checking'}>
+      <fieldset class="choice-group" disabled={phase === 'checking'}>
         <legend>What comes back</legend>
         {#if songs.length > 0}
-          <label>
+          <label class="choice-row">
             <input type="checkbox" bind:checked={songsTicked} aria-describedby="restore-songs-note" />
             <span>Songs</span>
           </label>
-          <div class="nested">
+          <div class="choice-under">
             <p id="restore-songs-note" class="muted">Each Song comes back whole, with the Beats its Clips use.</p>
             {#if songsTicked}
               <PickList items={songs} bind:picked label="Songs to restore" />
@@ -192,11 +182,11 @@
           </div>
         {/if}
         {#if beats.length > 0}
-          <label>
+          <label class="choice-row">
             <input type="checkbox" bind:checked={beatsTicked} aria-describedby="restore-beats-note" />
             <span>Beat Library <span class="muted">· {beatCount(beats.length)}</span></span>
           </label>
-          <div class="nested">
+          <div class="choice-under">
             <p id="restore-beats-note" class="muted">Each Beat comes back with its credit.</p>
             {#if beatsTicked}
               <PickList
@@ -225,8 +215,8 @@
   {:else if phase === 'deciding'}
     <p>Already in Bandmate. Keep both adds the restored one alongside, titled “(restored)”.</p>
     <div class="choose-actions">
-      <button type="button" class="link" onclick={() => setAll(true)}>Replace all</button>
-      <button type="button" class="link" onclick={() => setAll(false)}>Keep all</button>
+      <button type="button" class="button quiet" onclick={() => setAll(true)}>Replace all</button>
+      <button type="button" class="button quiet" onclick={() => setAll(false)}>Keep all</button>
     </div>
     <div class="present">
       {#each [{ kind: 'songs', name: 'Songs', list: present.songs }, { kind: 'beats', name: 'Beats', list: present.beats }] as const as group (group.kind)}
@@ -325,92 +315,15 @@
       <button type="button" class="button primary" onclick={() => dialog?.close()}>Done</button>
     {/if}
   </div>
-</dialog>
+</Dialog>
 
 <style>
-  dialog {
-    --checkbox: 1.25rem;
-    width: min(28rem, calc(100vw - 2rem));
-    max-height: calc(100dvh - 2rem);
-    padding: var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--bg);
-    color: var(--text);
-  }
-  dialog[open] {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-  }
-  dialog::backdrop {
-    background: var(--scrim);
-  }
-  header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-3);
-  }
-  h2 {
-    margin: 0;
-    font-size: var(--text-xl);
-  }
   p {
     margin: 0;
-  }
-  label {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    min-height: var(--control);
-    cursor: pointer;
-  }
-  label input {
-    flex: none;
-    width: var(--checkbox);
-    height: var(--checkbox);
-    min-height: 0;
-    margin: 0;
-    padding: 0;
-    accent-color: var(--accent);
-  }
-  fieldset {
-    display: flex;
-    flex-direction: column;
-    margin: 0;
-    padding: 0;
-    border: 0;
-  }
-  legend {
-    margin-bottom: var(--space-2);
-    padding: 0;
-    font-weight: 600;
-  }
-  /* What's under a checkbox (its note, and its list), lined up with its label. */
-  .nested {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    margin: 0 0 var(--space-2) calc(var(--checkbox) + var(--space-2));
   }
   .choose-actions {
     display: flex;
     gap: var(--space-4);
-  }
-  .link {
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--accent);
-    font: inherit;
-    font-size: var(--text-md);
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .link:disabled {
-    color: var(--text-muted);
-    cursor: default;
   }
   .title {
     min-width: 0;
@@ -459,10 +372,14 @@
     overflow: hidden;
   }
   .toggle label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
     min-height: 2rem;
     padding: 0 var(--space-3);
     font-size: var(--text-md);
     font-weight: 600;
+    cursor: pointer;
   }
   .toggle label + label {
     border-left: 1px solid var(--border);
@@ -472,6 +389,9 @@
     opacity: 0;
     width: 1px;
     height: 1px;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
   }
   .toggle label.on {
     background: var(--accent);

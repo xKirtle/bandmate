@@ -41,10 +41,15 @@
 
 <div class="pick-list">
   <div class="actions">
-    <button type="button" class="link" onclick={() => (picked = new Set(items.map((i) => i.id)))} disabled={tickedAll}>
+    <button
+      type="button"
+      class="button quiet"
+      onclick={() => (picked = new Set(items.map((i) => i.id)))}
+      disabled={tickedAll}
+    >
       Choose all
     </button>
-    <button type="button" class="link" onclick={() => (picked = new Set())} disabled={!clearable}>Clear</button>
+    <button type="button" class="button quiet" onclick={() => (picked = new Set())} disabled={!clearable}>Clear</button>
   </div>
   <ul aria-label={label}>
     {#each items as item (item.id)}
@@ -82,20 +87,6 @@
   .actions {
     display: flex;
     gap: var(--space-4);
-  }
-  .link {
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--accent);
-    font: inherit;
-    font-size: var(--text-md);
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .link:disabled {
-    color: var(--text-muted);
-    cursor: default;
   }
   /* About six, then it scrolls. */
   ul {

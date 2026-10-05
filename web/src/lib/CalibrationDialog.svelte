@@ -1,9 +1,8 @@
 <script lang="ts">
-  import X from '@lucide/svelte/icons/x';
-  import { onDestroy, onMount } from 'svelte';
-  import { closeOnBackdrop } from './backdrop';
+  import { onDestroy } from 'svelte';
   import { clickCount, clickTimes, formatOffset, measureOffset, type Measurement } from './calibration';
   import { Capture, CaptureError } from './capture';
+  import Dialog from './Dialog.svelte';
   import { readInput } from './inputSettings';
   import { deviceStorage } from './timelineHeight';
   import { audioContext } from './timelinePlayer';
@@ -42,7 +41,6 @@
   // Each measuring, so one cancelled finds nothing to show.
   let generation = 0;
 
-  onMount(() => dialog?.showModal());
   onDestroy(stopMeasuring);
 
   /** Plays a click at a context time: a short, bright blip. */
@@ -128,17 +126,7 @@
 </script>
 
 <!-- A click outside closes it, but never while measuring. -->
-<dialog
-  bind:this={dialog}
-  {@attach closeOnBackdrop(() => phase !== 'measuring')}
-  {onclose}
-  aria-labelledby="calibration-heading"
->
-  <header>
-    <h2 id="calibration-heading">Calibrate the latency</h2>
-    <button type="button" class="icon" onclick={() => close()} aria-label="Close"><X /></button>
-  </header>
-
+<Dialog bind:dialog title="Calibrate the latency" dismissible={() => phase !== 'measuring'} {onclose}>
   {#if phase === 'ready'}
     <p>
       {offer ? 'Before your first recording on this device, measure' : 'Measure'} how late your voice reaches the recording
@@ -196,35 +184,9 @@
       >
     {/if}
   </div>
-</dialog>
+</Dialog>
 
 <style>
-  dialog {
-    width: min(28rem, calc(100vw - 2rem));
-    padding: var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--bg);
-    color: var(--text);
-  }
-  dialog[open] {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-  }
-  dialog::backdrop {
-    background: var(--scrim);
-  }
-  header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-3);
-  }
-  h2 {
-    margin: 0;
-    font-size: var(--text-xl);
-  }
   p {
     margin: 0;
   }

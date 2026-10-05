@@ -167,7 +167,7 @@
     <!-- Pressing an option keeps focus in the field. -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-      class="option-list"
+      class="popover option-list"
       id="{id}-list"
       role="listbox"
       tabindex="-1"
