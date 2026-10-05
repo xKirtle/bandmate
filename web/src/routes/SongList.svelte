@@ -28,6 +28,7 @@
   import { newSongPath } from '../lib/newSong';
   import { navigate, replaceSearch, router } from '../lib/router.svelte';
   import SongCover from '../lib/SongCover.svelte';
+  import { SongDragging, songTarget } from '../lib/songDragging.svelte';
   import StatusBadge from '../lib/StatusBadge.svelte';
   import { timeAgo } from '../lib/time';
 
@@ -172,6 +173,20 @@
     changes++;
   }
 
+  // A Song dragged onto a Folder's row moves into it, and, inside a Folder,
+  // onto the "Songs" link out of it. There's nowhere to drop while a search
+  // lists every Song, as the Folders give way to it.
+  let header = $state<HTMLElement>();
+  const dragging = new SongDragging(
+    () => !folderMissing && (folderId !== undefined || listedFolders.length > 0),
+    () => ({
+      top: header?.getBoundingClientRect().bottom ?? 0,
+      // Above the tab bar, on a phone, which the page's foot leaves room for.
+      bottom: innerHeight - parseFloat(getComputedStyle(document.body).paddingBottom),
+    }),
+    (song, to) => moveSong(song, to),
+  );
+
   function madeFolder(made: Folder) {
     const song = newFolder?.for;
     if (song) moveSong(song, made.id);
@@ -249,12 +264,12 @@
 </script>
 
 <!-- Where the title and actions don't fit side by side, on a phone, the actions go under the title. -->
-<header class="bar list-bar">
+<header class="bar list-bar" bind:this={header}>
   {#if folderId === undefined}
     <h1>Songs</h1>
   {:else}
     <div class="trail">
-      <a class="up" href={topHref}>Songs</a>
+      <a class="up" class:drop-target={dragging.aimsAt(null)} href={topHref} {...songTarget(null)}>Songs</a>
       <span class="separator" aria-hidden="true">/</span>
       <span class="name">
         <h1>{folder?.name ?? (folderMissing ? 'Not found' : 'Folder')}</h1>
@@ -358,7 +373,7 @@
     </div>
   {:else if sorted}
     {#if listedFolders.length > 0 || sorted.length > 0}
-      <table class="songs-table">
+      <table class="songs-table" {@attach dragging.holdScroll}>
         <thead>
           <tr>
             {#each columns as column (column.id)}
@@ -386,7 +401,12 @@
         </thead>
         <tbody>
           {#each listedFolders as f (f.id)}
-            <tr class="folder" onclick={(event) => openRow(event, folderHref(f))}>
+            <tr
+              class="folder"
+              class:drop-target={dragging.aimsAt(f.id)}
+              onclick={(event) => openRow(event, folderHref(f))}
+              {...songTarget(f.id)}
+            >
               <td class="title">
                 <span class="with-cover">
                   <span class="folder-icon" aria-hidden="true"><FolderIcon /></span>
@@ -401,7 +421,11 @@
           {/each}
           {#each sorted as song (song.id)}
             {@const folderName = song.folderId === null ? undefined : folderNames.get(song.folderId)}
-            <tr onclick={(event) => openRow(event, `/songs/${song.id}`)}>
+            <tr
+              class:dragged={dragging.drags(song)}
+              onclick={(event) => openRow(event, `/songs/${song.id}`)}
+              {...dragging.row(song)}
+            >
               <td class="title">
                 <span class="with-cover">
                   <SongCover songId={song.id} coverId={song.coverId} title={song.title} status={song.status} />
@@ -425,9 +449,9 @@
           {/each}
         </tbody>
       </table>
-      <ul class="songs">
+      <ul class="songs" {@attach dragging.holdScroll}>
         {#each listedFolders as f (f.id)}
-          <li>
+          <li class:drop-target={dragging.aimsAt(f.id)} {...songTarget(f.id)}>
             <a href={folderHref(f)}>
               <span class="folder-icon" aria-hidden="true"><FolderIcon /></span>
               <span class="title">{f.name}</span>
@@ -438,7 +462,7 @@
         {/each}
         {#each sorted as song (song.id)}
           {@const folderName = song.folderId === null ? undefined : folderNames.get(song.folderId)}
-          <li>
+          <li class:dragged={dragging.drags(song)} {...dragging.row(song)}>
             <a href="/songs/{song.id}">
               <SongCover songId={song.id} coverId={song.coverId} title={song.title} status={song.status} />
               <span class="heading">
@@ -468,6 +492,20 @@
     {/if}
   {/if}
 </main>
+
+{#if dragging.current}
+  <!-- The Song being dragged, beside the pointer, clear of the finger: above
+       it, or over the header, where there's no room above, below it. -->
+  <div
+    class="drag-ghost"
+    class:below={dragging.current.y < (header?.getBoundingClientRect().bottom ?? 0)}
+    aria-hidden="true"
+    style:left="{dragging.current.x}px"
+    style:top="{dragging.current.y}px"
+  >
+    {dragging.current.song.title}
+  </div>
+{/if}
 
 {#if newFolder}
   <FolderNameDialog onSaved={madeFolder} onClose={() => (newFolder = null)} />
@@ -524,6 +562,45 @@
     color: var(--text);
     text-decoration: underline;
   }
+  .up.drop-target {
+    border-radius: var(--radius-sm);
+    box-shadow: var(--selected-outline);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    color: var(--text);
+  }
+
+  /* Dragging a Song: where it would drop is ringed, and the Song itself
+     follows the pointer, its row faded. */
+  .drop-target {
+    box-shadow: var(--selected-outline);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+  .dragged {
+    opacity: 0.5;
+  }
+  .drag-ghost {
+    position: fixed;
+    z-index: 10;
+    max-width: 16rem;
+    overflow: hidden;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface-1);
+    box-shadow: var(--shadow-float);
+    font-size: var(--text-md);
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    pointer-events: none;
+    transform: translate(var(--space-3), calc(-100% - var(--space-3)));
+  }
+  .drag-ghost.below {
+    transform: translate(var(--space-3), var(--space-6));
+  }
+  :global(.dragging-song) tbody tr {
+    cursor: grabbing;
+  }
   .actions {
     display: flex;
     justify-content: flex-end;
@@ -574,6 +651,10 @@
     display: flex;
     align-items: center;
     border-bottom: 1px solid var(--border);
+    /* A finger held on a Song drags it, rather than selecting its text or
+       opening the browser's menu for its link. */
+    -webkit-touch-callout: none;
+    user-select: none;
   }
   .songs a {
     display: flex;
