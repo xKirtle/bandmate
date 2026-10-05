@@ -34,4 +34,52 @@ describe('layoutLine', () => {
   it('shows the Chords as written by default', () => {
     expect(layoutLine(line('Hi', [{ offset: 0, name: 'F#' }]))).toEqual([[{ chords: ['F#'], text: 'Hi' }]]);
   });
+
+  it('puts a between-words Chord over all the whitespace it falls in, needing no room past its name', () => {
+    expect(layoutLine(line('I  wake', [{ offset: 2, name: 'G' }]))).toEqual([
+      [{ chords: [], text: 'I' }],
+      [{ chords: ['G'], text: '  ', snug: true }],
+      [{ chords: [], text: 'wake' }],
+    ]);
+  });
+
+  it('keeps the usual room after a between-words Chord when a Chord comes straight after', () => {
+    expect(
+      layoutLine(
+        line('I  wake', [
+          { offset: 2, name: 'G' },
+          { offset: 3, name: 'C' },
+        ]),
+      ),
+    ).toEqual([[{ chords: [], text: 'I' }], [{ chords: ['G'], text: '  ' }], [{ chords: ['C'], text: 'wake' }]]);
+  });
+
+  it('splits whitespace holding two between-words Chords where the second falls', () => {
+    expect(
+      layoutLine(
+        line('I   wake', [
+          { offset: 2, name: 'G' },
+          { offset: 3, name: 'C' },
+        ]),
+      ),
+    ).toEqual([
+      [{ chords: [], text: 'I' }],
+      [{ chords: ['G'], text: '  ' }],
+      [{ chords: ['C'], text: ' ', snug: true }],
+      [{ chords: [], text: 'wake' }],
+    ]);
+  });
+
+  it('treats a Chord on a space at the start of a Line as between words', () => {
+    expect(layoutLine(line(' Another day', [{ offset: 0, name: 'G' }]))).toEqual([
+      [{ chords: ['G'], text: ' ', snug: true }],
+      [{ chords: [], text: 'Another ' }],
+      [{ chords: [], text: 'day' }],
+    ]);
+  });
+
+  it("leaves a Chord Line's Chords as they are", () => {
+    const chordLine = { ...line('  ', [{ offset: 1, name: 'Am' }]), chordLine: true };
+    expect(layoutLine(chordLine)).toEqual([[{ chords: [], text: ' ' }], [{ chords: ['Am'], text: ' ' }]]);
+  });
 });
