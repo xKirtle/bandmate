@@ -20,12 +20,12 @@
   <span class="brand"><BrandMark /></span>
   {#each pages as page (page.id)}
     <a href={page.href + (lastSearch[page.id] ?? '')} aria-current={page.id === current ? 'page' : undefined}>
-      <span class="glyph" aria-hidden="true"><page.icon /></span>
+      <span class="nav-icon" aria-hidden="true"><page.icon /></span>
       {page.label}
     </a>
   {/each}
   <a class="about" href={about.href} aria-current={current === about.id ? 'page' : undefined}>
-    <span class="glyph" aria-hidden="true"><about.icon /></span>
+    <span class="nav-icon" aria-hidden="true"><about.icon /></span>
     {about.label}
   </a>
 </nav>
@@ -71,7 +71,7 @@
     text-decoration: none;
   }
   /* The icon alone, with no line's space below its baseline. */
-  .glyph {
+  .nav-icon {
     display: flex;
     font-size: var(--text-xl);
   }

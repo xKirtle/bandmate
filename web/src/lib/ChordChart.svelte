@@ -1,7 +1,4 @@
 <script lang="ts">
-  import Eye from '@lucide/svelte/icons/eye';
-  import EyeOff from '@lucide/svelte/icons/eye-off';
-  import Pin from '@lucide/svelte/icons/pin';
   // The Chord Chart, above the Lyric Sheet in Read mode: a diagram of a
   // Voicing for each Chord the Song shows, in one row that scrolls sideways.
   // Each draws the preferred Voicing for the Chord and the Song's tuning, or
@@ -11,6 +8,9 @@
   // Two buttons at its start hide or show it, and pin it to the top of the
   // window, for every Song on this device. Clicking a diagram opens the
   // Chord's popover.
+  import Eye from '@lucide/svelte/icons/eye';
+  import EyeOff from '@lucide/svelte/icons/eye-off';
+  import Pin from '@lucide/svelte/icons/pin';
   import type { Song } from './api';
   import ChordDiagram from './ChordDiagram.svelte';
   import type { ChordOpener } from './ChordPopover.svelte';

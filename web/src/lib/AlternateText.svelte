@@ -219,8 +219,7 @@
               onclick={sync.now}
               aria-label="Cue {lineLabel} now"
               aria-keyshortcuts={hints.aria(cueNextKeys)}
-              title={hints.withKeys('Cue this Line at the playhead', cueNextKeys)}
-              >Now <CornerDownLeft aria-hidden="true" /></button
+              title={hints.withKeys('Cue this Line at the playhead', cueNextKeys)}>Now <CornerDownLeft /></button
             >
           {:else}
             <CueField

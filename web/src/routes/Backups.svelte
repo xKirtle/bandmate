@@ -1,12 +1,12 @@
 <script lang="ts">
-  import Pencil from '@lucide/svelte/icons/pencil';
-  import Trash2 from '@lucide/svelte/icons/trash-2';
   // The Backups kept in Bandmate, newest first, each named from when it was
   // made and what it holds, or with a name of its own, with its size, and
   // downloadable as one file. A downloaded one, from here or another
   // install, can be uploaded to join them. Songs can be restored from each
   // that holds some. Each can be renamed, or deleted after
   // confirming; nothing deletes one otherwise.
+  import Pencil from '@lucide/svelte/icons/pencil';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
   import ActionsMenu from '../lib/ActionsMenu.svelte';
   import { api, type Backup } from '../lib/api';
   import { automaticName, backupName, backupSize } from '../lib/backups';

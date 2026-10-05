@@ -2,8 +2,8 @@
   import ArrowDown from '@lucide/svelte/icons/arrow-down';
   import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right';
   import ArrowUp from '@lucide/svelte/icons/arrow-up';
-  import CircleSlash from '@lucide/svelte/icons/circle-slash';
   import CopyPlus from '@lucide/svelte/icons/copy-plus';
+  import Eraser from '@lucide/svelte/icons/eraser';
   import GripVertical from '@lucide/svelte/icons/grip-vertical';
   import Minus from '@lucide/svelte/icons/minus';
   import Plus from '@lucide/svelte/icons/plus';
@@ -118,7 +118,7 @@
     if (canCue && hasCues({ arrangement: [section.id], sections: song.sections })) {
       // Doesn't ask first: it can be undone. It clears dormant Cues too.
       actions.push({
-        icon: CircleSlash,
+        icon: Eraser,
         label: "Clear this Section's Cues",
         run: () => editCues((at) => api.clearSectionCues(at, section.id)),
       });

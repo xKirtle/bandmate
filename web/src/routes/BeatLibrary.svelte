@@ -1,6 +1,6 @@
 <script lang="ts">
-  import Pencil from '@lucide/svelte/icons/pencil';
   import Pause from '@lucide/svelte/icons/pause';
+  import Pencil from '@lucide/svelte/icons/pencil';
   import Play from '@lucide/svelte/icons/play';
   import { tick } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';

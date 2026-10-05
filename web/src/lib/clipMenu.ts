@@ -3,11 +3,10 @@ import { maxGain, minGain } from './clipGain';
 import { activeTake } from './clipSource';
 import { editHint, type Freeze } from './freeze';
 import type { MenuAction } from './menu';
-import Ban from '@lucide/svelte/icons/ban';
 import CircleDot from '@lucide/svelte/icons/circle-dot';
 import Copy from '@lucide/svelte/icons/copy';
 import CopyPlus from '@lucide/svelte/icons/copy-plus';
-import Delete from '@lucide/svelte/icons/delete';
+import Eraser from '@lucide/svelte/icons/eraser';
 import Diff from '@lucide/svelte/icons/diff';
 import Download from '@lucide/svelte/icons/download';
 import Layers from '@lucide/svelte/icons/layers';
@@ -199,7 +198,7 @@ function takeActions(clip: Clip, state: ClipMenuState, run: ClipRun): MenuAction
             })),
           }),
           edit({
-            icon: Delete,
+            icon: X,
             label: 'Delete Take',
             choices: takes.map((t) => ({
               label: `Take ${t.number}${t.id === activeTakeId ? ' (active)' : ''}`,
@@ -220,7 +219,7 @@ function takeActions(clip: Clip, state: ClipMenuState, run: ClipRun): MenuAction
         set: (ms) => run.nudgeTake(activeTakeId, ms),
       },
     }),
-    ...(several ? [edit({ icon: Ban, label: 'Clear inactive Takes', run: run.clearInactiveTakes })] : []),
+    ...(several ? [edit({ icon: Eraser, label: 'Clear inactive Takes', run: run.clearInactiveTakes })] : []),
     {
       icon: Download,
       label: 'Download Take',

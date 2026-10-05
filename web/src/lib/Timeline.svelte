@@ -1,10 +1,9 @@
 <script lang="ts">
-  import Circle from '@lucide/svelte/icons/circle';
-  import Square from '@lucide/svelte/icons/square';
   import ArrowDown from '@lucide/svelte/icons/arrow-down';
   import ArrowUp from '@lucide/svelte/icons/arrow-up';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import ChevronUp from '@lucide/svelte/icons/chevron-up';
+  import Circle from '@lucide/svelte/icons/circle';
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import GripVertical from '@lucide/svelte/icons/grip-vertical';
   import Pause from '@lucide/svelte/icons/pause';
@@ -14,6 +13,7 @@
   import Redo2 from '@lucide/svelte/icons/redo-2';
   import SkipBack from '@lucide/svelte/icons/skip-back';
   import SkipForward from '@lucide/svelte/icons/skip-forward';
+  import Square from '@lucide/svelte/icons/square';
   import Undo2 from '@lucide/svelte/icons/undo-2';
   import X from '@lucide/svelte/icons/x';
   import { onDestroy, tick, untrack } from 'svelte';

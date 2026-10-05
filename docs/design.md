@@ -96,7 +96,7 @@ Quarter-rem steps for every gap, padding and margin. Tools take the small steps;
 | `--space-6` | 1.5rem  | Between Sections and larger parts of a page                              |
 | `--space-8` | 2rem    | The widest: around an empty state, the page's foot                       |
 
-`--gutter` and `--control` sit on top as layout tokens, and the safe-area insets join in through `max()` and `calc()`. A space that bleeds out, like a highlight past its text, is a step negated: `calc(-1 * var(--space-3))`. A space that squares something with a size, like text centred in a control or an indent past a checkbox, is a `calc()` over that size and the steps, with the size named in a custom property where it's set (`--checkbox`, `--glyph-width`).
+`--gutter` and `--control` sit on top as layout tokens, and the safe-area insets join in through `max()` and `calc()`. A space that bleeds out, like a highlight past its text, is a step negated: `calc(-1 * var(--space-3))`. A space that squares something with a size, like text centred in a control or an indent past a checkbox, is a `calc()` over that size and the steps, with the size named in a custom property where it's set (`--checkbox`, `--icon-width`).
 
 A gap, padding or margin is never a literal length otherwise, and a step is never scaled, only negated: Stylelint fails both. The two exceptions are a hairline, 1px or less, such as one that squares something with a border, and `1lh`, a line of text's own height. In the Timeline the steps are in its own unit (below).
 
@@ -137,23 +137,38 @@ A transition or animation names both, such as `transition: transform var(--durat
 - **An icon-only button names itself** with `aria-label` (and a `title` where a pointer helps). The icon is hidden from screen readers on its own: Lucide marks it `aria-hidden` unless it's given a name.
 - **A glyph that's text stays text**: an ellipsis ending a label ("Rename…"), quotes, dashes, the `·` between details, a minus sign in "−3 dB", the key names in Shortcuts (⌘, ⇧, ←), the × over a muted string in a Chord diagram, and a sentence that names the ⋯ menu.
 
-One icon, one meaning, across the app:
+One icon, one meaning, across the app. Every icon in use is here: a new one is added to this table, and an action that means the same as one here takes its icon.
 
-| Icon                                     | For                                                                         |
-| ---------------------------------------- | --------------------------------------------------------------------------- |
-| `ellipsis`                               | A ⋯ menu of more actions                                                    |
-| `x`                                      | Close, clear, or take out of somewhere (Move to the Scrapbook, Delete Clip) |
-| `trash-2`                                | Delete for good                                                             |
-| `pencil`                                 | Rename or edit                                                              |
-| `copy`, `copy-plus`                      | Copy; Duplicate                                                             |
-| `plus`, `minus`                          | Add; step a number up or down                                               |
-| `arrow-up`, `arrow-down`                 | Move up or down; a column's sort                                            |
-| `chevron-down`, `-right`, `-left`, `-up` | Opens a list or a fold; steps through choices                               |
-| `grip-vertical`                          | Drag to move                                                                |
-| `arrow-left-right`                       | Alternates                                                                  |
-| `play`, `pause`, `skip-back`, `-forward` | Playback                                                                    |
-| `circle`, `square`                       | Record, stop recording                                                      |
-| `check`                                  | The chosen option; has a Master                                             |
+| Icon                                           | For                                                                                                                                                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ellipsis`                                     | A ⋯ menu of more actions                                                                                                                                                                    |
+| `x`                                            | Close a dialog or dismiss a message; clear one value (a Cue, the Loop); take something out that Undo or the Scrapbook brings back (a Clip, a Track, a Take, a Section from the Lyric Sheet) |
+| `trash-2`                                      | Delete for good, after asking (a Backup, a Scrapbook Section, an Alternate, a Cover)                                                                                                        |
+| `eraser`                                       | Clear several at once (a Section's Cues, a Clip's inactive Takes)                                                                                                                           |
+| `pencil`                                       | Rename or edit                                                                                                                                                                              |
+| `copy`, `copy-plus`, `scissors`                | Copy; Duplicate; Cut                                                                                                                                                                        |
+| `plus`, `minus`                                | Add; step a number up or down                                                                                                                                                               |
+| `arrow-up`, `arrow-down`                       | Move up or down; a column's sort                                                                                                                                                            |
+| `chevron-down`, `-up`, `-right`, `-left`       | Opens a list, a fold or the Timeline; steps through Voicings; back in a menu                                                                                                                |
+| `grip-vertical`                                | Drag to move                                                                                                                                                                                |
+| `arrow-left-right`                             | Alternates                                                                                                                                                                                  |
+| `arrow-right-from-line`                        | Put back, or move, into the Lyric Sheet                                                                                                                                                     |
+| `check`                                        | The chosen option; has a Master                                                                                                                                                             |
+| `play`, `pause`, `skip-back`, `skip-forward`   | Playback                                                                                                                                                                                    |
+| `circle`, `square`, `circle-dot`               | Record; stop recording; Retake                                                                                                                                                              |
+| `undo-2`, `redo-2`                             | Undo; Redo                                                                                                                                                                                  |
+| `upload`, `download`                           | Import audio; Mix down, or download a Sound or Take                                                                                                                                         |
+| `mic`                                          | Recording settings                                                                                                                                                                          |
+| `layers`, `move-horizontal`                    | A Clip's Takes; Nudge a Take                                                                                                                                                                |
+| `diff`                                         | A Clip's Gain (a ±)                                                                                                                                                                         |
+| `square-split-horizontal`, `merge`             | Split at playhead; Merge                                                                                                                                                                    |
+| `crop`, `refresh-cw`                           | A Cover: adjust its crop; change its picture                                                                                                                                                |
+| `eye`, `eye-off`, `pin`                        | Show, hide and pin the Chord Chart                                                                                                                                                          |
+| `keyboard`                                     | Keyboard shortcuts                                                                                                                                                                          |
+| `volume-2`, `volume-1`, `volume-x`             | A player's volume: loud, quiet, muted                                                                                                                                                       |
+| `triangle-alert`                               | A warning, e.g. a Cue out of order                                                                                                                                                          |
+| `corner-down-left`                             | The Enter key, beside Sync mode's Now                                                                                                                                                       |
+| `music`, `disc-3`, `guitar`, `archive`, `info` | The navigation: Songs, Beats, the Chord Finder, Backups, About                                                                                                                              |
 
 ### The Timeline's own scale
 

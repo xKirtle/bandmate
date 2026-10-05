@@ -271,7 +271,7 @@
     >
       {#if picking}
         <button type="button" role="menuitem" tabindex="-1" onclick={(e) => pick(null, keyboardClick(e))}>
-          <span class="glyph" aria-hidden="true"><ChevronLeft /></span>
+          <span class="entry-icon" aria-hidden="true"><ChevronLeft /></span>
           {picking.label}
         </button>
         {#if field}
@@ -315,7 +315,7 @@
             onclick={(e) => choose(entry, keyboardClick(e))}
           >
             {#if 'icon' in entry}
-              <span class="glyph" aria-hidden="true"><entry.icon /></span>
+              <span class="entry-icon" aria-hidden="true"><entry.icon /></span>
             {/if}
             {entry.label}
           </button>
@@ -337,10 +337,10 @@
     cursor: pointer;
   }
   .menu {
-    /* The column the entries' glyphs line up in, and where an entry's text
+    /* The column the entries' icons line up in, and where an entry's text
        starts past it. */
-    --glyph-width: 1.25rem;
-    --past-glyph: calc(var(--space-3) + var(--glyph-width) + var(--space-3));
+    --icon-width: 1.25rem;
+    --past-icon: calc(var(--space-3) + var(--icon-width) + var(--space-3));
     position: fixed;
     inset: auto;
     display: flex;
@@ -385,20 +385,23 @@
   [role^='menuitem'][aria-disabled='true']:hover {
     background: transparent;
   }
-  /* A choice sits under the entry it's for, past where the glyphs line up. */
+  /* A choice sits under the entry it's for, past where the icons line up. */
   .choice {
-    padding-inline-start: var(--past-glyph);
+    padding-inline-start: var(--past-icon);
   }
-  /* The choice that's on is ticked in the glyphs' column. */
+  /* The choice that's on is ticked in the icons' column. */
   .choice:has(.check) {
     padding-inline-start: var(--space-3);
   }
   /* The column the entries' icons are centred in. */
   .check,
-  .glyph {
+  .entry-icon {
     display: flex;
     justify-content: center;
-    width: var(--glyph-width);
+    width: var(--icon-width);
+  }
+  .entry-icon {
+    color: var(--text-muted);
   }
   /* A field sits under the entry it's for, like a choice. */
   .field {
@@ -406,13 +409,10 @@
     align-items: center;
     gap: var(--space-2);
     min-height: var(--control);
-    padding: 0 var(--space-3) 0 var(--past-glyph);
+    padding: 0 var(--space-3) 0 var(--past-icon);
     color: var(--text-muted);
   }
   .field input {
     width: 6rem;
-  }
-  .glyph {
-    color: var(--text-muted);
   }
 </style>

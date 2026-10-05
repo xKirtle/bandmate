@@ -1,8 +1,8 @@
 <script lang="ts">
-  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   // Which Bandmate is running, with a link to exactly that version's source,
   // as AGPL-3.0 §13 asks of anyone running a modified Bandmate over a network,
   // the system facts a bug report needs, ready to copy, and what's new.
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import { api, type AboutInfo, type ReleasesReport, type ServerConfig } from '../lib/api';
   import { bugReportDetails, updateStatus, uptime } from '../lib/about';
   import BrandMark from '../lib/BrandMark.svelte';
