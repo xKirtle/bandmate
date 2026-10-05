@@ -73,3 +73,18 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 ## Scheduled Backups
 
 - Backups made on a schedule (say, Everything weekly), not only when the user makes one. Scheduled ones can keep only the last N, which hand-made Backups never do: nothing deletes a Backup the user made.
+
+## A lyric size for Read mode
+
+- Make the Lines and Chords larger or smaller in Read mode (A− and A+), kept per device, for reading from a music stand or a phone at whatever distance it sits. It builds on the larger default Read mode gets from the visual identity (#565).
+- Whether the Chord Chart and the Section Labels follow the size, and how far it goes each way, are for the spec.
+
+## A theme toggle
+
+- Choose System, Light or Dark in the app, instead of always following the system's setting, for a dark stage on a phone that's set to light.
+- It waits for a Settings page to hold it. Where that page lives, and whether the choice is kept per device, are for the spec.
+
+## Track colours
+
+- Each Track gets a muted colour of its own, assigned automatically from a small palette in the visual identity's tokens, so Clips on different Tracks can be told apart at a glance. Today every Clip is in the one accent colour.
+- The colours stay muted so the Timeline doesn't take on the busy look of a DAW. Whether the user can pick a Track's colour, and how the Chosen Track still stands out, are for the spec.
