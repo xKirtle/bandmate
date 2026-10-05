@@ -22,6 +22,10 @@ Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/do
 
 To decide whether to release, or to cut one, follow `docs/agents/release.md`. It ends in CONTRIBUTING's "Cutting a release": push the tag, wait for CI to publish the image, and only then create the GitHub Release.
 
+## UI
+
+Before writing or restyling UI, read `docs/design.md`: take every colour, size, space, radius, shadow and duration from its tokens.
+
 ## Formatting
 
-Before committing web app changes, run `npm run format` in `web/`. CI fails a PR whose web code isn't formatted. Format Go with `gofmt` (CI doesn't check it).
+Before committing web app changes, run `npm run format` and `npm run lint:css` in `web/`. CI fails a PR whose web code isn't formatted or whose styles don't pass Stylelint. Format Go with `gofmt` (CI doesn't check it).

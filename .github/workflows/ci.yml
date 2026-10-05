@@ -80,6 +80,10 @@ jobs:
         working-directory: web
         run: npm run format:check
 
+      - name: Lint the SPA's styles
+        working-directory: web
+        run: npm run lint:css
+
       - name: Type-check the SPA
         working-directory: web
         run: npm run check
