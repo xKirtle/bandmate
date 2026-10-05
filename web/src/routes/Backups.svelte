@@ -7,11 +7,15 @@
   // after confirming; nothing deletes one otherwise.
   import Pencil from '@lucide/svelte/icons/pencil';
   import Trash2 from '@lucide/svelte/icons/trash-2';
+  import X from '@lucide/svelte/icons/x';
+  import { onDestroy, tick } from 'svelte';
   import ActionsMenu from '../lib/ActionsMenu.svelte';
   import { api, type Backup } from '../lib/api';
   import { automaticName, backupName, backupSize } from '../lib/backups';
   import type { MenuAction } from '../lib/menu';
+  import { scrollBehavior } from '../lib/motion';
   import NewBackupDialog from '../lib/NewBackupDialog.svelte';
+  import type { UploadProgress } from '../lib/progressUpload';
   import RenameBackupDialog from '../lib/RenameBackupDialog.svelte';
   import RestoreBackupDialog from '../lib/RestoreBackupDialog.svelte';
   import SettingsPage from '../lib/SettingsPage.svelte';
@@ -22,10 +26,29 @@
   let making = $state(false);
   let renaming = $state<Backup | null>(null);
   let restoring = $state<Backup | null>(null);
-  /** The name of the file being uploaded, while it is. */
-  let uploading = $state<string | null>(null);
+  /** The file being uploaded, while it is, and how far it has got. */
+  let uploading = $state<{ file: string; progress: UploadProgress } | null>(null);
+  /** Stops the upload in progress: Cancel, or leaving the tab. */
+  let stopUpload: AbortController | null = null;
   /** What the last upload added, to say so, since it's listed by when it was made, maybe far down. */
   let uploaded = $state<string | null>(null);
+  /** The Backup just uploaded, highlighted for a moment where it's listed. */
+  let highlighted = $state<number | null>(null);
+  let highlightTimer: ReturnType<typeof setTimeout> | undefined;
+  /** How long an uploaded Backup's row stays highlighted, in ms. */
+  const highlightFor = 2000;
+  let list = $state<HTMLUListElement>();
+
+  // Switching Settings tabs, or leaving Settings, stops the upload quietly.
+  onDestroy(() => {
+    stopUpload?.abort();
+    clearTimeout(highlightTimer);
+  });
+
+  // Closing or reloading the page would stop the upload, so ask first.
+  function warnBeforeUnload(event: BeforeUnloadEvent) {
+    if (uploading) event.preventDefault();
+  }
 
   api.listBackups().then(
     (list) => (backups = list),
@@ -35,6 +58,7 @@
   const timeFormat = new Intl.DateTimeFormat(undefined, { timeStyle: 'short' });
 
   function showMade(backup: Backup) {
+    uploaded = null;
     backups = [backup, ...(backups ?? []).filter((b) => b.id !== backup.id)];
   }
 
@@ -56,16 +80,52 @@
     if (!file) return;
     error = null;
     uploaded = null;
-    uploading = file.name;
+    const stop = new AbortController();
+    stopUpload = stop;
+    uploading = { file: file.name, progress: { step: 'sending', sent: 0 } };
     try {
-      const backup = await api.uploadBackup(file);
+      const backup = await api.uploadBackup(file, {
+        signal: stop.signal,
+        onProgress: (progress) => (uploading = { file: file.name, progress }),
+      });
       showUploaded(backup);
       uploaded = `Added “${backupName(backup)}” from “${file.name}”.`;
+      reveal(backup.id);
     } catch (e) {
-      error = `Couldn't upload “${file.name}” (${(e as Error).message})`;
+      // Cancelled: the status row just goes.
+      if (!stop.signal.aborted) error = `Couldn't upload “${file.name}” (${(e as Error).message})`;
     } finally {
       uploading = null;
+      stopUpload = null;
     }
+  }
+
+  /**
+   * Scrolls a Backup's row into view, if it's off-screen or under the bar
+   * or tab bar, and highlights it for a moment.
+   */
+  async function reveal(id: number) {
+    await tick();
+    const row = list?.querySelector<HTMLElement>(`[data-backup="${id}"]`);
+    if (!row) return;
+    if (!inView(row)) row.scrollIntoView({ block: 'center', behavior: scrollBehavior() });
+    highlighted = id;
+    clearTimeout(highlightTimer);
+    highlightTimer = setTimeout(() => (highlighted = null), highlightFor);
+  }
+
+  /**
+   * Whether all of an element shows: in the window, and with nothing over
+   * its top or bottom edge, such as the sticky bar or the tab bar.
+   */
+  function inView(el: HTMLElement): boolean {
+    const r = el.getBoundingClientRect();
+    if (r.top < 0 || r.bottom > innerHeight) return false;
+    const x = r.left + r.width / 2;
+    return [r.top + 1, r.bottom - 1].every((y) => {
+      const at = document.elementFromPoint(x, y);
+      return at !== null && el.contains(at);
+    });
   }
 
   function showRenamed(backup: Backup) {
@@ -95,23 +155,52 @@
   }
 </script>
 
+<svelte:window onbeforeunload={warnBeforeUnload} />
+
+{#snippet dismiss(onclick: () => void)}
+  <button type="button" class="icon" {onclick} aria-label="Dismiss" title="Dismiss"><X /></button>
+{/snippet}
+
 <SettingsPage tab="backups">
   {#snippet barActions()}
     <div class="bar-actions">
       <label class="button" class:disabled={uploading !== null}>
         Upload
-        <input class="visually-hidden" type="file" onchange={upload} disabled={uploading !== null} />
+        <input class="visually-hidden" type="file" accept=".bandmate" onchange={upload} disabled={uploading !== null} />
       </label>
       <button type="button" class="button primary" onclick={() => (making = true)}>New Backup</button>
     </div>
   {/snippet}
   {#if error}
-    <p class="error" role="alert">{error}</p>
+    <div class="message" role="alert">
+      <span class="error">{error}</span>
+      {@render dismiss(() => (error = null))}
+    </div>
   {/if}
   {#if uploading}
-    <p class="muted" role="status">Uploading “{uploading}”…</p>
+    {@const { file, progress } = uploading}
+    <div class="message">
+      <!-- The percentage is left out of what's announced, so a screen reader
+           says each step once; the bar tells how far it has got. -->
+      <span class="muted">
+        <span role="status">{progress.step === 'sending' ? `Uploading “${file}”…` : `Checking “${file}”…`}</span>
+        {#if progress.step === 'sending'}<span class="tabular" aria-hidden="true"
+            >{Math.floor(progress.sent * 100)}%</span
+          >{/if}
+      </span>
+      <!-- Without a value while checking: how long that takes isn't known. -->
+      {#if progress.step === 'sending'}
+        <progress max="1" value={progress.sent} aria-label="How much of the Backup has been sent"></progress>
+        <button type="button" class="button" onclick={() => stopUpload?.abort()}>Cancel</button>
+      {:else}
+        <progress aria-label="Checking the Backup"></progress>
+      {/if}
+    </div>
   {:else if uploaded}
-    <p class="muted" role="status">{uploaded}</p>
+    <div class="message">
+      <span class="muted" role="status">{uploaded}</span>
+      {@render dismiss(() => (uploaded = null))}
+    </div>
   {/if}
   {#if loadError}
     <p class="error" role="alert">{loadError}</p>
@@ -126,9 +215,9 @@
       </p>
     </div>
   {:else}
-    <ul class="backups">
+    <ul class="backups" bind:this={list}>
       {#each backups as backup (backup.id)}
-        <li>
+        <li data-backup={backup.id} class:highlighted={highlighted === backup.id}>
           <div class="about">
             <span class="name">{backupName(backup)}</span>
             <span class="muted details">
@@ -177,6 +266,27 @@
     gap: var(--space-2);
     margin-left: auto;
   }
+  /* A message over the list, with what goes with it: an upload's bar and
+     Cancel, or the x that dismisses it. */
+  .message {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+  }
+  .message > span {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .message .icon {
+    margin-left: auto;
+  }
+  progress {
+    flex: 1 1 8rem;
+    accent-color: var(--accent);
+  }
   .backups {
     margin: 0;
     padding: 0;
@@ -192,6 +302,11 @@
     gap: var(--space-2) var(--space-4);
     padding: var(--space-3) 0;
     border-bottom: 1px solid var(--border);
+    transition: background-color var(--duration-base) var(--ease);
+  }
+  /* The Backup just uploaded, for a moment. */
+  li.highlighted {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
   }
   .about {
     display: flex;

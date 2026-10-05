@@ -1,5 +1,6 @@
 // The SPA's only way to talk to the server. It renders what the API returns
 // and sends user intents back; domain rules live on the server.
+import { sendWithProgress, type UploadOptions } from './progressUpload';
 
 export type Status = 'idea' | 'drafting' | 'finished';
 
@@ -647,14 +648,30 @@ async function request<T>(method: string, path: string, body?: unknown, at?: Son
   const asIs = body instanceof FormData || body instanceof Blob;
   if (body !== undefined && !asIs) headers['Content-Type'] = 'application/json';
   if (at) headers['If-Match'] = `"${at.version}"`;
-  let res: Response;
-  try {
-    res = await fetch(`/api${path}`, {
+  return answer<T>(
+    fetch(`/api${path}`, {
       method,
       headers,
       body: body === undefined ? undefined : asIs ? body : JSON.stringify(body),
-    });
-  } catch {
+    }),
+  );
+}
+
+/**
+ * Sends a file as it is, as request does, but reporting how much of it has
+ * been sent, and stopping if the signal aborts, which fails with an AbortError.
+ */
+function upload<T>(path: string, file: Blob, options: UploadOptions = {}): Promise<T> {
+  return answer<T>(sendWithProgress('POST', `/api${path}`, file, options));
+}
+
+/** What a request answered, or the ApiError saying why it failed. An abort is passed on as it is. */
+async function answer<T>(sent: Promise<Response>): Promise<T> {
+  let res: Response;
+  try {
+    res = await sent;
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') throw e;
     throw new ApiError(0, "Can't reach Bandmate. Check your connection.");
   }
   const data = res.status === 204 ? null : await res.json().catch(() => null);
@@ -725,9 +742,12 @@ export const api = {
   /**
    * Keeps a downloaded Backup's file, from this install or another, to
    * restore from. It's refused whole, saying why, if it isn't a Backup, is
-   * damaged, or was made by a newer Bandmate.
+   * damaged, or was made by a newer Bandmate. Reports how much of the file
+   * has been sent, then that the server is checking it; aborting it fails
+   * with an AbortError.
    */
-  uploadBackup: (file: File) => request<Backup>('POST', '/backups/upload', file),
+  uploadBackup: (file: File, options?: Pick<UploadOptions, 'onProgress' | 'signal'>) =>
+    upload<Backup>('/backups/upload', file, options),
   /** Gives a Backup a name of its own, or with a blank one, clears it back to the automatic one. */
   renameBackup: (id: number, name: string) => request<Backup>('PATCH', `/backups/${id}`, { name }),
   /** Deletes a Backup and its file. */
