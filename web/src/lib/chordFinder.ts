@@ -109,6 +109,11 @@ export function lookUp(name: string, context: FinderContext): LookUp {
   };
 }
 
+/** A Chord name, tidied as Look up reads it (CMaj7 reads as Cmaj7, F♯- as F#m), or null if it can't be read. */
+export function chordName(text: string): string | null {
+  return readChord(text)?.name ?? null;
+}
+
 export type NameIt =
   | {
       kind: 'chord';

@@ -50,14 +50,6 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 - A first-time walkthrough of Bandmate. It can be dismissed, and taken again whenever the user wants.
 - It comes with a demo Song and Beat to work through, created when the user asks for them, from audio built into the binary. A migration would add them to every existing install on upgrade, and a Beat's audio is a file in the data directory, not a row, so SQL alone can't ship it. Created on request, a deleted demo can be added again. The Beat's audio needs a licence that allows shipping it.
 
-## How to play a Chord
-
-- Show how to play the Lyric Sheet's Chords on a guitar, as Ultimate Guitar does: a fretboard diagram for each Chord the Song uses.
-- Guitar only for now, as in the Chord Finder, whose Instruments let a ukulele or a bass follow later.
-- Diagrams show and hide with the Chords, through Read mode's "Chords" button. Hiding the Chords hides the diagrams too.
-- This reuses the Chord Finder's diagrams and the user's preferred Voicings, so a Chord looks the same on the Lyric Sheet as in the Chord Finder.
-- Diagrams follow the Song's tuning, and draw the Chords as shown, so a transposed Song gets diagrams for the transposed Chords. A Chord name that can't be read gets no diagram rather than a guess. Which Voicings are shown, how a diagram is reached (hovering a Chord, a strip above the sheet), and whether Write mode shows them too, are for the spec.
-
 ## Hear a Chord in the Chord Finder
 
 - A synthesised strum of a Voicing being looked up, or of a suggested Chord, to hear it before playing it. The sound is made in the browser, like the rest of the Chord Finder, with no samples to download.

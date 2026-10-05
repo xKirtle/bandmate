@@ -3,7 +3,7 @@
   // string on the left, the nut (or the fret the Voicing starts at, up the
   // neck) at the top. Above it, ○ marks a string that rings open and × one
   // that's muted. On a left-handed device it's mirrored, the low string on
-  // the right. "How to play a Chord" on the Lyric Sheet is to reuse it.
+  // the right. The Chord Finder and the Chord Chart both draw with it.
   import type { Voicing } from './chordFinder';
   import { leftHanded } from './sharedLeftHanded.svelte';
 

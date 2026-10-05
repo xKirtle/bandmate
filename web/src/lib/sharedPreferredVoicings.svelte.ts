@@ -10,8 +10,8 @@ import {
 import { deviceStorage } from './timelineHeight';
 
 // The preferred Voicings on this device, per tuning, shared by every Chord
-// Finder (and "How to play a Chord", once it exists), so preferring one moves
-// it first wherever that Chord shows.
+// Finder and the Chord Chart, so preferring one moves it first wherever that
+// Chord shows.
 
 const changed = new SvelteMap<string, PreferredVoicings>();
 
