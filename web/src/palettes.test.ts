@@ -12,8 +12,8 @@ type Tokens = Record<string, string>;
 // The pairs that carry meaning: [foreground, background, floor, what].
 const PAIRS: [string, string, number, string][] = [
   ['--text', '--surface-2', 4.5, 'Text on controls'],
-  ['--text-muted', '--bg', 4.5, 'Muted text'],
-  ['--text-muted', '--surface-1', 4.5, 'Muted text on cards'],
+  ['--text-muted', '--bg', 4.5, 'Muted text, and Labels in Read mode'],
+  ['--text-muted', '--surface-1', 4.5, 'Muted text on cards, and Labels in the current Section'],
   ['--accent', '--bg', 4.5, 'Accent text, links, and Chords in Read mode'],
   ['--accent', '--surface-1', 4.5, 'Accent text on cards, and Chords on the current Line'],
   ['--accent-text', '--accent', 4.5, 'Text on the primary button'],
@@ -24,7 +24,7 @@ const PAIRS: [string, string, number, string][] = [
   ['--finished-fg', '--finished-bg', 4.5, 'The finished Status badge'],
   ['--accent', '--surface-2', 3, 'Accent controls and the selected outline on raised areas'],
   ['--text-muted', '--surface-2', 3, 'Icons on controls'],
-  ['--text', '--bg', 7, 'Lines and Labels in Read mode'],
+  ['--text', '--bg', 7, 'Lines in Read mode'],
   ['--text', '--surface-1', 7, 'Lines in Read mode, on the current Line'],
 ];
 
