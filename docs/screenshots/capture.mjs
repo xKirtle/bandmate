@@ -48,10 +48,14 @@ async function readMode(page) {
   await page.getByRole("radio", { name: "Read" }).check();
 }
 
-/** Scrolls the Song page to put the Lyric Sheet at the top. */
+/**
+ * Scrolls the Song page to put the Lyric Sheet at the top, from its first row:
+ * the heading in Write mode, the Chords and Transpose in Read mode, where the
+ * heading is for screen readers only.
+ */
 async function scrollToLyricSheet(page) {
   const sheet = await page
-    .getByRole("heading", { name: "Lyric Sheet" })
+    .getByRole("region", { name: "Lyric Sheet" })
     .boundingBox();
   await page.evaluate((top) => window.scrollTo(0, top - 8), sheet.y);
 }
