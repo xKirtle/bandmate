@@ -140,7 +140,7 @@
                   {#each layoutLine(line, transpose, song.key) as word, w (w)}
                     <span class="word">
                       {#each word as piece, p (p)}
-                        <span class="piece">
+                        <span class="piece" class:snug={piece.snug}>
                           <span class="chord"
                             >{#each piece.chords as name, c (c)}{#if c > 0}{' '}{/if}<span {@attach opens(name)}
                                 >{name}</span
@@ -249,6 +249,11 @@
   }
   .chord:not(:empty) {
     padding-right: var(--space-2);
+  }
+  /* Chords between words sit over the whitespace as typed, widening it only
+     as far as their names need. */
+  .snug > .chord {
+    padding-right: 0;
   }
   .chord-line .lyric {
     display: none;
