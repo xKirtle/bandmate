@@ -22,8 +22,10 @@
   --drafting-fg: #7a4f00;
   --finished-bg: #dcefe0;
   --finished-fg: #1f5e2e;
+}
 
-  /* Shared by every Palette. */
+/* Shared by every Palette, and the only shadows there are. */
+:root {
   /* Dims what's behind a dialog, or outside a Cover's crop. */
   --scrim: rgb(0 0 0 / 0.4);
   /* Drawn on a scrim, whatever the theme, e.g. the Cover crop's frame. */

@@ -5,7 +5,8 @@ import { describe, expect, it } from 'vitest';
 // docs/design.md, in both themes of every Palette.
 
 const PALETTES = ['terracotta', 'ink', 'olive'] as const;
-type Theme = 'light' | 'dark';
+const THEMES = ['light', 'dark'] as const;
+type Theme = (typeof THEMES)[number];
 type Tokens = Record<string, string>;
 
 // The pairs that carry meaning: [foreground, background, floor, what].
@@ -21,6 +22,8 @@ const PAIRS: [string, string, number, string][] = [
   ['--warning', '--bg', 4.5, 'Warnings'],
   ['--drafting-fg', '--drafting-bg', 4.5, 'The drafting Status badge'],
   ['--finished-fg', '--finished-bg', 4.5, 'The finished Status badge'],
+  ['--accent', '--surface-2', 3, 'Accent controls and the selected outline on raised areas'],
+  ['--text-muted', '--surface-2', 3, 'Icons on controls'],
   ['--text', '--bg', 7, 'Lines in Read mode'],
   ['--text', '--surface-1', 7, 'Lines in Read mode, on the current Line'],
 ];
@@ -30,7 +33,7 @@ const PAIRS: [string, string, number, string][] = [
     whatever sits in the `prefers-color-scheme: dark` block. Only hex values
     count as a Palette's own: the shared tokens are built from them. */
 function readPalettes(): Record<string, Record<Theme, Tokens>> {
-  const css = readFileSync(new URL('../palettes.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const css = readFileSync(new URL('./palettes.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   const media = '@media (prefers-color-scheme: dark)';
   const start = css.indexOf(media);
   expect(start, 'palettes.css has a dark block').toBeGreaterThan(-1);
@@ -46,19 +49,19 @@ function readPalettes(): Record<string, Record<Theme, Tokens>> {
     dark: css.slice(css.indexOf('{', start) + 1, end - 1),
   };
 
-  const out: Record<string, Record<Theme, Tokens>> = {};
-  for (const theme of ['light', 'dark'] as const) {
+  const byPalette: Record<string, Record<Theme, Tokens>> = {};
+  for (const theme of THEMES) {
     for (const rule of themes[theme].matchAll(/:root(?:\[data-palette='([a-z]+)'\])?\s*\{([^}]*)\}/g)) {
       const name = rule[1] ?? 'terracotta';
-      out[name] ??= { light: {}, dark: {} };
+      byPalette[name] ??= { light: {}, dark: {} };
       for (const [, token, value] of rule[2].matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/g)) {
         if (!value.startsWith('#')) continue;
         expect(value, `${name} ${theme} ${token}`).toMatch(/^#[0-9a-f]{6}$/);
-        out[name][theme][token] = value;
+        byPalette[name][theme][token] = value;
       }
     }
   }
-  return out;
+  return byPalette;
 }
 
 function luminance(hex: string): number {
@@ -96,17 +99,17 @@ describe('Palettes', () => {
   it('define every colour token in both themes', () => {
     expect(tokens).toContain('--accent');
     for (const name of PALETTES) {
-      for (const theme of ['light', 'dark'] as const) {
+      for (const theme of THEMES) {
         expect(Object.keys(palettes[name][theme]).sort(), `${name} ${theme}`).toEqual(tokens);
       }
     }
   });
 
   for (const name of PALETTES) {
-    for (const theme of ['light', 'dark'] as const) {
+    for (const theme of THEMES) {
       it.each(PAIRS)(`${name} ${theme}: %s on %s is at least %d:1 (%s)`, (fg, bg, floor) => {
-        const t = palettes[name][theme];
-        expect(contrast(t[fg], t[bg])).toBeGreaterThanOrEqual(floor);
+        const colours = palettes[name][theme];
+        expect(contrast(colours[fg], colours[bg])).toBeGreaterThanOrEqual(floor);
       });
     }
   }

@@ -3559,6 +3559,8 @@
     --timeline-rem: calc(var(--timeline-scale) * 1rem);
     /* The page's control size, scaled, and never smaller than it. */
     --touch: max(var(--control), calc(var(--timeline-scale) * var(--control)));
+    /* The shared edge, scaled to the room left for it on a Track's header. */
+    --selected-edge: inset calc(0.1875 * var(--timeline-rem)) 0 0 var(--accent);
     /* Docked at the bottom of the window, directly above the tab bar if there is one. */
     position: sticky;
     bottom: var(--nav-bottom-space);

@@ -8,9 +8,21 @@
 const colour = {
   'color-no-hex': true,
   'color-named': 'never',
-  'function-disallowed-list': ['rgb', 'rgba', 'hsl', 'hsla', 'hwb', 'lab', 'lch', 'oklab', 'oklch', 'color'],
+  'function-disallowed-list': [
+    'rgb',
+    'rgba',
+    'hsl',
+    'hsla',
+    'hwb',
+    'lab',
+    'lch',
+    'oklab',
+    'oklch',
+    'color',
+    'drop-shadow',
+  ],
   'declaration-property-value-allowed-list': {
-    '/^(box|text)-shadow$/': ['none', '/^var\\(--[a-z0-9-]+\\)$/'],
+    '/^(box|text)-shadow$/': ['none', '/^var\\(--(shadow-float|selected-outline|selected-edge|invalid-outline)\\)$/'],
   },
 };
 
