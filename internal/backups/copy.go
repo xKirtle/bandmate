@@ -9,7 +9,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -34,14 +33,19 @@ type songTable struct {
 	// and whose replaced rows keep their place, i.e. Beats, the columns
 	// they take from the Backup. A Song replaced is made anew instead.
 	replacedInPlace []string
-	// leftOut lists the columns a Backup leaves empty, and a Restore too:
-	// a Song's Folder, until Backups carry Folders.
-	leftOut []string
+	// matchedBy names, for a table whose rows a Restore matches to those
+	// already in Bandmate by a column rather than by identity, i.e. Folders
+	// by their folded name (see ADR 0015), that column. A row matched is
+	// used as it is, and one with no match is added.
+	matchedBy string
 }
 
 // songTables lists, parents first, every table holding a Song's rows.
 var songTables = []songTable{
-	{name: "songs", where: `id = ?1`, leftOut: []string{"folder_id"}},
+	// A Song's Folder, which other Songs may sit in too.
+	{name: "folders", shared: true, matchedBy: "folded",
+		where: `id IN (SELECT folder_id FROM src.songs WHERE id = ?1)`},
+	{name: "songs", where: `id = ?1`},
 	{name: "sections", where: `song_id = ?1`},
 	{name: "alternates", where: `section_id IN (SELECT id FROM src.sections WHERE song_id = ?1)`},
 	{name: "lines", where: `alternate_id IN (SELECT a.id FROM src.alternates a
@@ -65,8 +69,8 @@ var songTables = []songTable{
 }
 
 // notCopied are the tables holding nothing of a Song: the schema's own
-// bookkeeping, and the Backups; and, until Backups carry them, the Folders.
-var notCopied = map[string]bool{"schema_migrations": true, "sqlite_sequence": true, "backups": true, "folders": true}
+// bookkeeping, and the Backups.
+var notCopied = map[string]bool{"schema_migrations": true, "sqlite_sequence": true, "backups": true}
 
 // songFile is a kind of file a Song's rows, or the Beat Library's, use: the
 // directory such files are kept in under the data directory, the table of
@@ -177,7 +181,7 @@ func (s *Store) copyContents(ctx context.Context, staging string, songIDs, beatI
 
 // copyRows copies the rows tables pick, given args, with the files they
 // use, trying again if a file is removed meanwhile. It tells whether a Song
-// was there to copy: whether the first table, unless shared, picked a row.
+// was there to copy: whether the first table not shared picked a row.
 func (s *Store) copyRows(ctx context.Context, conn *sql.Conn, staging string, columns map[string][]string,
 	tables []songTable, files []songFile, args ...any) (bool, error) {
 	for attempt := 1; ; attempt++ {
@@ -254,7 +258,7 @@ func columnList(columns []string) string {
 // copyOnce copies the rows tables pick in one transaction, so they're all
 // read from one snapshot of the live database, e.g. a whole Song, and links
 // in the files they use before committing. It tells whether the first
-// table, unless shared, picked a row; if it picked none, nothing is copied.
+// table not shared picked a row; if it picked none, nothing is copied.
 func (s *Store) copyOnce(ctx context.Context, conn *sql.Conn, staging string, columns map[string][]string,
 	tables []songTable, files []songFile, args []any) (bool, error) {
 	tx, err := conn.BeginTx(ctx, nil)
@@ -267,24 +271,20 @@ func (s *Store) copyOnce(ctx context.Context, conn *sql.Conn, staging string, co
 	if _, err := tx.ExecContext(ctx, `PRAGMA defer_foreign_keys = ON`); err != nil {
 		return false, err
 	}
-	for i, t := range tables {
+	songCounted := false
+	for _, t := range tables {
 		insert := "INSERT INTO"
 		if t.shared {
 			insert = "INSERT OR IGNORE INTO"
 		}
-		values := make([]string, len(columns[t.name]))
-		for i, c := range columns[t.name] {
-			values[i] = `"` + c + `"`
-			if slices.Contains(t.leftOut, c) {
-				values[i] = "NULL"
-			}
-		}
+		list := columnList(columns[t.name])
 		res, err := tx.ExecContext(ctx, fmt.Sprintf(`%s main.%s (%s) SELECT %s FROM src.%s WHERE %s`,
-			insert, t.name, columnList(columns[t.name]), strings.Join(values, ", "), t.name, t.where), args...)
+			insert, t.name, list, list, t.name, t.where), args...)
 		if err != nil {
 			return false, fmt.Errorf("copying %s: %w", t.name, err)
 		}
-		if i == 0 && !t.shared {
+		if !songCounted && !t.shared {
+			songCounted = true
 			n, err := res.RowsAffected()
 			if err != nil {
 				return false, err
