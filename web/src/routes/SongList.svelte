@@ -47,12 +47,16 @@
   let changes = $state(0);
 
   const sorted = $derived(songs && sortSongs(songs, view.sort));
-  // At the top level the Folders come first, by name whatever the Songs are
-  // sorted by.
-  const listedFolders = $derived(folderId === undefined && folders ? sortFolders(folders) : []);
+  const filtered = $derived(!!(view.q.trim() || view.status || view.hasMaster));
+  // Every Folder by name, for the menus; at the top level they come first,
+  // whatever the Songs are sorted by, but for while a search or filter is
+  // on, which only looks at the Songs.
+  const sortedFolders = $derived(folders ? sortFolders(folders) : []);
+  const listedFolders = $derived(folderId === undefined && !filtered ? sortedFolders : []);
   const folder = $derived(folderId === undefined ? undefined : folders?.find((f) => f.id === folderId));
   const folderMissing = $derived(folderId !== undefined && folders !== null && !folder);
-  // A Folder opens with the Songs sorted as they are here.
+  // A Folder opens with the Songs sorted as they are here, and the way back
+  // out keeps that sort.
   const folderSearch = $derived(songListViewToParams({ ...defaultSongListView, sort: view.sort }).toString());
 
   $effect(() => {
@@ -176,7 +180,7 @@
         icon: FolderInput,
         label: 'Move to folder…',
         choices: [
-          ...sortFolders(folders ?? []).map((f) => ({
+          ...sortedFolders.map((f) => ({
             label: f.name,
             checked: song.folderId === f.id,
             run: () => moveSong(song, f.id),
@@ -195,7 +199,7 @@
     <h1>Songs</h1>
   {:else}
     <div class="trail">
-      <a class="up" href="/">Songs</a>
+      <a class="up" href={folderSearch ? `/?${folderSearch}` : '/'}>Songs</a>
       <span class="separator" aria-hidden="true">/</span>
       <h1>{folder?.name ?? (folderMissing ? 'Not found' : 'Folder')}</h1>
     </div>
@@ -374,7 +378,7 @@
         {/each}
       </ul>
     {/if}
-    {#if sorted.length === 0 && anySongs && (view.q || view.status || view.hasMaster)}
+    {#if sorted.length === 0 && anySongs && filtered}
       <div class="empty">
         <p>No Songs match.</p>
         <button type="button" class="button" onclick={clearFilters}>Clear filters</button>

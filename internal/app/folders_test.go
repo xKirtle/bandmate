@@ -238,6 +238,16 @@ func TestABackupLeavesFoldersOut(t *testing.T) {
 	if got := folderSongs(ts.listFolders()); !reflect.DeepEqual(got, map[string]int{"Summer EP": 1}) {
 		t.Errorf("songs per folder = %v, want Summer EP holding only the Song backed up", got)
 	}
+
+	// Replaced, the Song is made anew as the Backup holds it: in no Folder.
+	ts.restoreReplacing(made.ID, []int64{s.ID}, []int64{s.ID}, nil)
+
+	if got := folderSongs(ts.listFolders()); !reflect.DeepEqual(got, map[string]int{"Summer EP": 0}) {
+		t.Errorf("songs per folder after replacing = %v, want Summer EP holding none", got)
+	}
+	if got := len(ts.listSongs("folder=none")); got != 2 {
+		t.Errorf("songs in no folder after replacing = %d, want both", got)
+	}
 }
 
 func TestSongCreatedInAnUnknownFolderIsRefused(t *testing.T) {

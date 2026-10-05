@@ -197,7 +197,7 @@ export interface SongSummary {
   hasMaster: boolean;
   /** The Song's Cover's id; null when it has none. */
   coverId: number | null;
-  /** The Folder's the Song sits in; null when it's in none. */
+  /** The id of the Folder the Song sits in; null when it's in none. */
   folderId: number | null;
   updatedAt: string;
 }
