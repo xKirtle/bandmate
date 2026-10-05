@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Alternate, Line, Section, Song } from './api';
-import { chartChords, chartTuning, chartVoicing } from './chordChart';
+import { chartChords, chartTuning, chartVoicing, chartVoicings } from './chordChart';
 
 let nextId = 1;
 
@@ -106,5 +106,30 @@ describe('the Voicing the Chord Chart draws for a Chord', () => {
 
   it("says the tuning can't be read rather than drawing for Standard", () => {
     expect(chartVoicing('C', null)).toEqual({ kind: 'unreadable-tuning' });
+  });
+});
+
+describe("the Voicings a Chord's popover steps through", () => {
+  const standard = [40, 45, 50, 55, 59, 64];
+
+  it('lists every Voicing, top-ranked first, under the name the preference is kept by', () => {
+    const found = chartVoicings('CMaj7', standard);
+    expect(found.kind).toBe('voicings');
+    if (found.kind !== 'voicings') return;
+    expect(found.chord).toBe('Cmaj7');
+    expect(found.preferred).toBe(false);
+    expect(found.voicings.length).toBeGreaterThan(1);
+    expect(found.voicings[0].frets).toEqual([null, 3, 2, 0, 0, 0]);
+  });
+
+  it('puts the preferred Voicing first, and says it is preferred', () => {
+    const found = chartVoicings('CMaj7', standard, { Cmaj7: [null, 3, 5, 4, 5, 3] });
+    expect(found.kind === 'voicings' && found.preferred).toBe(true);
+    expect(found.kind === 'voicings' && found.voicings[0].frets).toEqual([null, 3, 5, 4, 5, 3]);
+  });
+
+  it("says why there's none to step through", () => {
+    expect(chartVoicings('Galt', standard)).toEqual({ kind: 'unreadable-chord' });
+    expect(chartVoicings('C', null)).toEqual({ kind: 'unreadable-tuning' });
   });
 });
