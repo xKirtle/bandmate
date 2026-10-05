@@ -31,26 +31,26 @@ Colours are named by role, never by hue, so a component reads the same in every 
 
 The `data-palette` attribute on the root element picks one (`ink` or `olive`; Terracotta when it's absent), and Light or Dark follows the system. The user will pick a Palette, and System, Light or Dark, in Settings, kept per device (_to come_, #578). All Clips on the Timeline use the one accent, and the Chosen Track is marked by an accent edge on its header.
 
-| Token                             | For                                                                      |
-| --------------------------------- | ------------------------------------------------------------------------ |
-| `--bg`                            | The page                                                                 |
-| `--surface-1`, `--surface-2`      | Cards and panels, then controls and raised areas on them                 |
-| `--border`                        | Edges. Decorative only: never the only thing that marks a control        |
-| `--text`, `--text-muted`          | Text, and secondary text (hints, timestamps, empty states)               |
-| `--accent`, `--accent-text`       | The primary action, the current or chosen thing, Chords; text on accent  |
-| `--danger`, `--warning`           | Destructive actions and errors; warnings                                 |
-| `--drafting-*`, `--finished-*`    | The drafting and finished Status badges (`-bg` and `-fg`)                |
+| Token                          | For                                                                     |
+| ------------------------------ | ----------------------------------------------------------------------- |
+| `--bg`                         | The page                                                                |
+| `--surface-1`, `--surface-2`   | Cards and panels, then controls and raised areas on them                |
+| `--border`                     | Edges. Decorative only: never the only thing that marks a control       |
+| `--text`, `--text-muted`       | Text, and secondary text (hints, timestamps, empty states)              |
+| `--accent`, `--accent-text`    | The primary action, the current or chosen thing, Chords; text on accent |
+| `--danger`, `--warning`        | Destructive actions and errors; warnings                                |
+| `--drafting-*`, `--finished-*` | The drafting and finished Status badges (`-bg` and `-fg`)               |
 
 Shared by every Palette, the scrim and the only shadows there are:
 
-| Token                | For                                                                         |
-| -------------------- | --------------------------------------------------------------------------- |
-| `--scrim`            | Dims what's behind a dialog, or outside a Cover's crop                      |
-| `--on-scrim`         | Drawn on the scrim, whatever the theme, e.g. the Cover crop's frame         |
-| `--shadow-float`     | Lifts a floating layer (a popover, menu or floating bar) off the page       |
-| `--selected-outline` | Rings what's selected, such as a Clip, or what a drop would land on         |
-| `--selected-edge`    | Marks the current or chosen row along its left edge, e.g. the Chosen Track  |
-| `--invalid-outline`  | Rings a field holding an invalid value, inside its danger border            |
+| Token                | For                                                                        |
+| -------------------- | -------------------------------------------------------------------------- |
+| `--scrim`            | Dims what's behind a dialog, or outside a Cover's crop                     |
+| `--on-scrim`         | Drawn on the scrim, whatever the theme, e.g. the Cover crop's frame        |
+| `--shadow-float`     | Lifts a floating layer (a popover, menu or floating bar) off the page      |
+| `--selected-outline` | Rings what's selected, such as a Clip, or what a drop would land on        |
+| `--selected-edge`    | Marks the current or chosen row along its left edge, e.g. the Chosen Track |
+| `--invalid-outline`  | Rings a field holding an invalid value, inside its danger border           |
 
 A literal colour is written only in `palettes.css`, and a `box-shadow` is always one of these tokens: Stylelint fails anything else. A tint of a token, such as `color-mix(in srgb, var(--accent) 12%, transparent)`, is allowed.
 
@@ -66,7 +66,7 @@ The system font everywhere, with no typeface bundled. Content and tools differ b
 | `--text-sm`    | 0.8125rem                   | Secondary text in tools: hints, notices, table cells, a Section's heading in Read mode |
 | `--text-md`    | 0.875rem                    | Tool text: buttons and fields in toolbars and dialogs, lists, menus                    |
 | `--text-lg`    | 1rem                        | Body text, and the headings of cards and panels                                        |
-| `--text-xl`    | 1.25rem                     | Dialog titles, glyph icons, larger headings                                            |
+| `--text-xl`    | 1.25rem                     | Dialog titles, icon buttons, larger headings                                           |
 | `--text-2xl`   | 1.5rem                      | Page titles, and a Song's title                                                        |
 | `--text-field` | `max(var(--text-lg), 16px)` | Text fields: under 16px, iOS zooms in on focus                                         |
 
@@ -96,7 +96,7 @@ Quarter-rem steps for every gap, padding and margin. Tools take the small steps;
 | `--space-6` | 1.5rem  | Between Sections and larger parts of a page                              |
 | `--space-8` | 2rem    | The widest: around an empty state, the page's foot                       |
 
-`--gutter` and `--control` sit on top as layout tokens, and the safe-area insets join in through `max()` and `calc()`. A space that bleeds out, like a highlight past its text, is a step negated: `calc(-1 * var(--space-3))`. A space that squares something with a size, like text centred in a control or an indent past a checkbox, is a `calc()` over that size and the steps, with the size named in a custom property where it's set (`--checkbox`, `--glyph-width`).
+`--gutter` and `--control` sit on top as layout tokens, and the safe-area insets join in through `max()` and `calc()`. A space that bleeds out, like a highlight past its text, is a step negated: `calc(-1 * var(--space-3))`. A space that squares something with a size, like text centred in a control or an indent past a checkbox, is a `calc()` over that size and the steps, with the size named in a custom property where it's set (`--checkbox`, `--icon-width`).
 
 A gap, padding or margin is never a literal length otherwise, and a step is never scaled, only negated: Stylelint fails both. The two exceptions are a hairline, 1px or less, such as one that squares something with a border, and `1lh`, a line of text's own height. In the Timeline the steps are in its own unit (below).
 
@@ -117,11 +117,11 @@ A radius is always one of these tokens, or `0`: Stylelint fails anything else. T
 
 Two durations and one curve. Something moves only to explain a change: opening, moving or appearing, never to decorate, and nothing bounces.
 
-| Token             | Value                          | For                                                                           |
-| ----------------- | ------------------------------ | ----------------------------------------------------------------------------- |
-| `--duration-fast` | 120ms                          | Small things: a chevron turning as a list opens, a scroll bar's thumb growing |
-| `--duration-base` | 200ms                          | What moves or appears: the highlight on the current Line or Section           |
-| `--ease`          | `cubic-bezier(0.2, 0, 0, 1)`   | Every transition and animation: quick to start, settling without overshoot    |
+| Token             | Value                        | For                                                                           |
+| ----------------- | ---------------------------- | ----------------------------------------------------------------------------- |
+| `--duration-fast` | 120ms                        | Small things: a chevron turning as a list opens, a scroll bar's thumb growing |
+| `--duration-base` | 200ms                        | What moves or appears: the highlight on the current Line or Section           |
+| `--ease`          | `cubic-bezier(0.2, 0, 0, 1)` | Every transition and animation: quick to start, settling without overshoot    |
 
 A transition or animation names both, such as `transition: transform var(--duration-fast) var(--ease)`, once for each property it lists, so none falls back on the browser's own curve. A delay, if any, is one of the durations too. Stylelint fails a literal or scaled time, any other duration, and any timing function but `--ease`, including none at all.
 
@@ -129,7 +129,46 @@ A transition or animation names both, such as `transition: transform var(--durat
 
 ### Icons
 
-Lucide, everywhere: no Unicode glyphs or hand-drawn SVGs as icons, so icons look the same on every platform. Icon-only buttons keep an accessible name. _To come_ (#573).
+[Lucide](https://lucide.dev), everywhere: no Unicode glyphs or hand-drawn SVGs as icons, so icons look the same on every platform and never turn into emoji. The only SVGs drawn by hand are drawings, not icons: Chord diagrams, waveforms and a Clip's Fades.
+
+- **Import each icon on its own**, from `@lucide/svelte/icons/<name>`, never from the package's index, so only the icons used are bundled. `icons.test.ts` fails an import of the whole set, and an inline `<svg>` outside the drawings. An icon passed around, like a menu entry's, is typed `Icon` from `icons.ts`.
+- **An icon is as big as the text it's in** (`.lucide-icon` in `app.css` sizes it at `1em`), so its size comes from a font-size token: an icon button's `--text-xl`, or `--text-lg` on desktop, a menu entry's text, a badge's `--text-xs`. To make one bigger than the text beside it, set a font size from the scale on the icon. Don't set a width or height.
+- **Outlined**, as Lucide draws them, with one exception: on the accent, or where it's tiny, a play, pause, skip or record icon is solid (`fill: currentColor`), like a Cue's ▶. A filled state, like the Chord Chart's pin while pinned, fills it too.
+- **An icon-only button names itself** with `aria-label` (and a `title` where a pointer helps). The icon is hidden from screen readers on its own: Lucide marks it `aria-hidden` unless it's given a name.
+- **A glyph that's text stays text**: an ellipsis ending a label ("Rename…"), quotes, dashes, the `·` between details, a minus sign in "−3 dB", the key names in Shortcuts (⌘, ⇧, ←), the × over a muted string in a Chord diagram, and a sentence that names the ⋯ menu.
+
+One icon, one meaning, across the app. Every icon in use is here: a new one is added to this table, and an action that means the same as one here takes its icon.
+
+| Icon                                           | For                                                                                                                                                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ellipsis`                                     | A ⋯ menu of more actions                                                                                                                                                                    |
+| `x`                                            | Close a dialog or dismiss a message; clear one value (a Cue, the Loop); take something out that Undo or the Scrapbook brings back (a Clip, a Track, a Take, a Section from the Lyric Sheet) |
+| `trash-2`                                      | Delete for good, after asking (a Backup, a Scrapbook Section, an Alternate, a Cover)                                                                                                        |
+| `eraser`                                       | Clear several at once (a Section's Cues, a Clip's inactive Takes)                                                                                                                           |
+| `pencil`                                       | Rename or edit                                                                                                                                                                              |
+| `copy`, `copy-plus`, `scissors`                | Copy; Duplicate; Cut                                                                                                                                                                        |
+| `plus`, `minus`                                | Add; step a number up or down                                                                                                                                                               |
+| `arrow-up`, `arrow-down`                       | Move up or down; a column's sort                                                                                                                                                            |
+| `chevron-down`, `-up`, `-right`, `-left`       | Opens a list, a fold or the Timeline; steps through Voicings; back in a menu                                                                                                                |
+| `grip-vertical`                                | Drag to move                                                                                                                                                                                |
+| `arrow-left-right`                             | Alternates                                                                                                                                                                                  |
+| `arrow-right-from-line`                        | Put back, or move, into the Lyric Sheet                                                                                                                                                     |
+| `check`                                        | The chosen option; has a Master                                                                                                                                                             |
+| `play`, `pause`, `skip-back`, `skip-forward`   | Playback                                                                                                                                                                                    |
+| `circle`, `square`, `circle-dot`               | Record; stop recording; Retake                                                                                                                                                              |
+| `undo-2`, `redo-2`                             | Undo; Redo                                                                                                                                                                                  |
+| `upload`, `download`                           | Import audio; Mix down, or download a Sound or Take                                                                                                                                         |
+| `mic`                                          | Recording settings                                                                                                                                                                          |
+| `layers`, `move-horizontal`                    | A Clip's Takes; Nudge a Take                                                                                                                                                                |
+| `diff`                                         | A Clip's Gain (a ±)                                                                                                                                                                         |
+| `square-split-horizontal`, `merge`             | Split at playhead; Merge                                                                                                                                                                    |
+| `crop`, `refresh-cw`                           | A Cover: adjust its crop; change its picture                                                                                                                                                |
+| `eye`, `eye-off`, `pin`                        | Show, hide and pin the Chord Chart                                                                                                                                                          |
+| `keyboard`                                     | Keyboard shortcuts                                                                                                                                                                          |
+| `volume-2`, `volume-1`, `volume-x`             | A player's volume: loud, quiet, muted                                                                                                                                                       |
+| `triangle-alert`                               | A warning, e.g. a Cue out of order                                                                                                                                                          |
+| `corner-down-left`                             | The Enter key, beside Sync mode's Now                                                                                                                                                       |
+| `music`, `disc-3`, `guitar`, `archive`, `info` | The navigation: Songs, Beats, the Chord Finder, Backups, About                                                                                                                              |
 
 ### The Timeline's own scale
 

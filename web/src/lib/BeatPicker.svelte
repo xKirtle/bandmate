@@ -1,4 +1,7 @@
 <script lang="ts">
+  import Pause from '@lucide/svelte/icons/pause';
+  import Play from '@lucide/svelte/icons/play';
+  import X from '@lucide/svelte/icons/x';
   import { onMount, tick } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { api, type Beat, type DecodedAudio, type Song } from './api';
@@ -151,7 +154,7 @@
     aria-label="{playingNow(beat) ? 'Pause' : 'Preview'} {beat.title}"
     onclick={() => togglePreview(beat)}
   >
-    {playingNow(beat) ? '❚❚' : '▶'}
+    {#if playingNow(beat)}<Pause />{:else}<Play />{/if}
   </button>
 {/snippet}
 
@@ -164,7 +167,7 @@
 >
   <header>
     <h2 id="beat-picker-heading">Add a Beat</h2>
-    <button type="button" class="icon" onclick={() => dialog?.close()} aria-label="Close">✕</button>
+    <button type="button" class="icon" onclick={() => dialog?.close()} aria-label="Close"><X /></button>
   </header>
 
   {#if adding}

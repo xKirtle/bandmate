@@ -1,4 +1,9 @@
 <script lang="ts">
+  import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right';
+  import ArrowRightFromLine from '@lucide/svelte/icons/arrow-right-from-line';
+  import GripVertical from '@lucide/svelte/icons/grip-vertical';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import X from '@lucide/svelte/icons/x';
   import { tick, untrack, type Snippet } from 'svelte';
   import ActionsMenu from './ActionsMenu.svelte';
   import AlternateText, { type Cueing } from './AlternateText.svelte';
@@ -173,7 +178,7 @@
   function alternateActions(alt: Alternate): MenuAction[] {
     const actions: MenuAction[] = [
       {
-        icon: '×',
+        icon: X,
         label: 'Move to the Scrapbook',
         title: 'Move to the Scrapbook: keep it as a Section of its own, with its Cues',
         run: () => moveToScrapbook(alt),
@@ -181,12 +186,12 @@
     ];
     if (places.length > 0) {
       actions.push({
-        icon: '↦',
+        icon: ArrowRightFromLine,
         label: 'Move to the Lyric Sheet…',
         choices: places.map((place) => ({ label: place.name, run: () => moveToArrangement(alt, place.position) })),
       });
     }
-    actions.push({ icon: '🗑', label: 'Delete', run: () => remove(alt) });
+    actions.push({ icon: Trash2, label: 'Delete', run: () => remove(alt) });
     return actions;
   }
 
@@ -209,7 +214,7 @@
     aria-label={action.label}
     title={action.title ?? action.label}
   >
-    {action.icon}
+    <action.icon />
   </button>
 {/snippet}
 
@@ -254,7 +259,7 @@
         aria-label={alternatesLabel(section)}
         title="Choose, make or rename this Section's Alternates"
       >
-        ⇄
+        <ArrowLeftRight />
       </button>
       {@render actions()}
       {#each more as action (action.label)}
@@ -291,7 +296,7 @@
                   class="grip"
                   aria-hidden="true"
                   title="Drag into the Lyric Sheet or onto the Scrapbook, as a Section of its own; Esc cancels"
-                  {...drag.grip({ alternate: alt.id }, dropAlternate(alt))}>⠿</span
+                  {...drag.grip({ alternate: alt.id }, dropAlternate(alt))}><GripVertical /></span
                 >
               {/if}
               <input

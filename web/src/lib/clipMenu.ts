@@ -3,6 +3,19 @@ import { maxGain, minGain } from './clipGain';
 import { activeTake } from './clipSource';
 import { editHint, type Freeze } from './freeze';
 import type { MenuAction } from './menu';
+import CircleDot from '@lucide/svelte/icons/circle-dot';
+import Copy from '@lucide/svelte/icons/copy';
+import CopyPlus from '@lucide/svelte/icons/copy-plus';
+import Eraser from '@lucide/svelte/icons/eraser';
+import Diff from '@lucide/svelte/icons/diff';
+import Download from '@lucide/svelte/icons/download';
+import Layers from '@lucide/svelte/icons/layers';
+import Merge from '@lucide/svelte/icons/merge';
+import MoveHorizontal from '@lucide/svelte/icons/move-horizontal';
+import Pencil from '@lucide/svelte/icons/pencil';
+import Scissors from '@lucide/svelte/icons/scissors';
+import SquareSplitHorizontal from '@lucide/svelte/icons/square-split-horizontal';
+import X from '@lucide/svelte/icons/x';
 
 // A Clip's menu, opened by its ⋯, right-click, the Menu key, Shift+F10 or a
 // long press: its entries, in the order they're listed. Deleting a Clip,
@@ -64,27 +77,27 @@ export function clipActions(clip: Clip, state: ClipMenuState, run: ClipRun): Men
   const edit = editing(state.frozen);
   return [
     ...takeActions(clip, state, run),
-    edit({ icon: '✎', label: 'Rename', title: 'Or double-click the Clip', run: run.rename }),
+    edit({ icon: Pencil, label: 'Rename', title: 'Or double-click the Clip', run: run.rename }),
     edit({
-      icon: '±',
+      icon: Diff,
       label: 'Gain',
       title: 'How much louder or quieter the Clip plays, in dB; or drag its gain line',
       field: { value: clip.gain, unit: 'dB', step: 0.5, shiftStep: 3, min: minGain, max: maxGain, set: run.setGain },
     }),
     ...clipboardActions(edit, state, run.copy, run.cut),
-    edit({ icon: '⧉', label: 'Duplicate', run: run.duplicate }),
+    edit({ icon: CopyPlus, label: 'Duplicate', run: run.duplicate }),
     edit(splitAction(state, 'Move the playhead into the Clip to split it', run.split)),
     ...(soundId !== null
       ? [
           {
-            icon: '⤓',
+            icon: Download,
             label: 'Download Sound',
             title: `Save “${state.soundName}” as it was imported`,
             run: () => run.downloadSound(soundId),
           },
         ]
       : []),
-    edit({ icon: '×', label: 'Delete Clip', run: run.deleteClip }),
+    edit({ icon: X, label: 'Delete Clip', run: run.deleteClip }),
   ];
 }
 
@@ -102,9 +115,8 @@ function clipboardActions(
 ): MenuAction[] {
   const orKeys = (shown: string | null) => (shown ? `Or ${shown}` : undefined);
   return [
-    edit({ icon: '⎘', label: 'Copy', title: orKeys(keys.copyKeys), run: copy }),
-    // Not ✂, which some fonts only draw as an emoji, unlike the other glyphs.
-    edit({ icon: '✁', label: 'Cut', title: orKeys(keys.cutKeys), run: cut }),
+    edit({ icon: Copy, label: 'Copy', title: orKeys(keys.copyKeys), run: copy }),
+    edit({ icon: Scissors, label: 'Cut', title: orKeys(keys.cutKeys), run: cut }),
   ];
 }
 
@@ -114,7 +126,7 @@ function splitAction(
   whyNot: string,
   split: () => void,
 ): MenuAction {
-  const action: MenuAction = { icon: '¦', label: 'Split at playhead', run: split };
+  const action: MenuAction = { icon: SquareSplitHorizontal, label: 'Split at playhead', run: split };
   if (!canSplit) return { ...action, disabled: true, title: whyNot };
   return splitKeys ? { ...action, title: `Or ${splitKeys}` } : action;
 }
@@ -148,12 +160,12 @@ export function selectionActions(count: number, run: SelectionRun, state: Select
   const howMany = `${count} Clip${count === 1 ? '' : 's'}`;
   return [
     ...clipboardActions(edit, state, run.copyClips, run.cutClips),
-    edit({ icon: '⧉', label: `Duplicate ${howMany}`, run: run.duplicateClips }),
+    edit({ icon: CopyPlus, label: `Duplicate ${howMany}`, run: run.duplicateClips }),
     edit(splitAction(state, 'Move the playhead into a selected Clip to split it', run.splitClips)),
     ...(state.canMerge
-      ? [edit({ icon: '⊕', label: 'Merge', title: 'Into one Clip of a new Sound', run: run.mergeClips })]
+      ? [edit({ icon: Merge, label: 'Merge', title: 'Into one Clip of a new Sound', run: run.mergeClips })]
       : []),
-    edit({ icon: '×', label: `Delete ${howMany}`, run: run.deleteClips }),
+    edit({ icon: X, label: `Delete ${howMany}`, run: run.deleteClips }),
   ];
 }
 
@@ -169,12 +181,12 @@ function takeActions(clip: Clip, state: ClipMenuState, run: ClipRun): MenuAction
   const several = takes.length > 1;
   return [
     ...(canRecord
-      ? [{ icon: '●', label: 'Retake', title: 'Record another Take into this Clip', run: run.retake }]
+      ? [{ icon: CircleDot, label: 'Retake', title: 'Record another Take into this Clip', run: run.retake }]
       : []),
     ...(several
       ? [
           edit({
-            icon: '♪',
+            icon: Layers,
             label: 'Takes',
             title: 'Choose the Take this Clip plays',
             choices: takes.map((t) => ({
@@ -186,7 +198,7 @@ function takeActions(clip: Clip, state: ClipMenuState, run: ClipRun): MenuAction
             })),
           }),
           edit({
-            icon: '⌫',
+            icon: X,
             label: 'Delete Take',
             choices: takes.map((t) => ({
               label: `Take ${t.number}${t.id === activeTakeId ? ' (active)' : ''}`,
@@ -196,7 +208,7 @@ function takeActions(clip: Clip, state: ClipMenuState, run: ClipRun): MenuAction
         ]
       : []),
     edit({
-      icon: '↔',
+      icon: MoveHorizontal,
       label: 'Nudge',
       title: `Move Take ${active.number} within the Clip, in milliseconds, later if positive${nudgeKeys ? `; or ${nudgeKeys} the Clip` : ''}`,
       field: {
@@ -207,9 +219,9 @@ function takeActions(clip: Clip, state: ClipMenuState, run: ClipRun): MenuAction
         set: (ms) => run.nudgeTake(activeTakeId, ms),
       },
     }),
-    ...(several ? [edit({ icon: '⊘', label: 'Clear inactive Takes', run: run.clearInactiveTakes })] : []),
+    ...(several ? [edit({ icon: Eraser, label: 'Clear inactive Takes', run: run.clearInactiveTakes })] : []),
     {
-      icon: '⤓',
+      icon: Download,
       label: 'Download Take',
       title: `Save Take ${active.number}'s WAV as it was recorded, lead-in and all`,
       run: () => run.downloadTake(activeTakeId),

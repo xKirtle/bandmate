@@ -1,4 +1,5 @@
 <script lang="ts">
+  import X from '@lucide/svelte/icons/x';
   import { onDestroy, onMount } from 'svelte';
   import { closeOnBackdrop } from './backdrop';
   import { clickCount, clickTimes, formatOffset, measureOffset, type Measurement } from './calibration';
@@ -135,7 +136,7 @@
 >
   <header>
     <h2 id="calibration-heading">Calibrate the latency</h2>
-    <button type="button" class="icon" onclick={() => close()} aria-label="Close">✕</button>
+    <button type="button" class="icon" onclick={() => close()} aria-label="Close"><X /></button>
   </header>
 
   {#if phase === 'ready'}

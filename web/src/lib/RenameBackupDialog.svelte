@@ -1,4 +1,5 @@
 <script lang="ts">
+  import X from '@lucide/svelte/icons/x';
   import { onMount } from 'svelte';
   import { api, type Backup } from './api';
   import { closeOnBackdrop } from './backdrop';
@@ -59,7 +60,9 @@
 >
   <header>
     <h2 id="rename-backup-heading">Rename Backup</h2>
-    <button type="button" class="icon" onclick={() => dialog?.close()} disabled={saving} aria-label="Close">✕</button>
+    <button type="button" class="icon" onclick={() => dialog?.close()} disabled={saving} aria-label="Close"
+      ><X /></button
+    >
   </header>
 
   <form {onsubmit}>

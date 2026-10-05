@@ -1,4 +1,7 @@
 <script lang="ts">
+  import Pause from '@lucide/svelte/icons/pause';
+  import Pencil from '@lucide/svelte/icons/pencil';
+  import Play from '@lucide/svelte/icons/play';
   import { tick } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { api, type Beat, type DecodedAudio } from '../lib/api';
@@ -300,10 +303,7 @@
     aria-label="Edit {beat.title}"
     onclick={() => (editingId = beat.id)}
   >
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M4 20h4L19 9l-4-4L4 16z" />
-      <path d="M13.5 6.5l4 4" />
-    </svg>
+    <Pencil />
   </button>
 {/snippet}
 
@@ -323,7 +323,7 @@
     aria-label="{playingNow(beat) ? 'Pause' : 'Preview'} {beat.title}"
     onclick={() => togglePreview({ beatId: beat.id })}
   >
-    {playingNow(beat) ? '❚❚' : '▶'}
+    {#if playingNow(beat)}<Pause />{:else}<Play />{/if}
   </button>
 {/snippet}
 
@@ -494,15 +494,6 @@
      sits at the bottom of the window even under a short list. */
   .page.with-player {
     min-height: calc(100dvh - var(--header-height) - var(--player-height));
-  }
-  .edit svg {
-    width: 1.125rem;
-    height: 1.125rem;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.75;
-    stroke-linecap: round;
-    stroke-linejoin: round;
   }
   .beats {
     border-top: 1px solid var(--border);

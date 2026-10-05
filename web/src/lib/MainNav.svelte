@@ -20,19 +20,12 @@
   <span class="brand"><BrandMark /></span>
   {#each pages as page (page.id)}
     <a href={page.href + (lastSearch[page.id] ?? '')} aria-current={page.id === current ? 'page' : undefined}>
-      <span class="glyph" aria-hidden="true">{page.icon}</span>
+      <span class="nav-icon" aria-hidden="true"><page.icon /></span>
       {page.label}
     </a>
   {/each}
   <a class="about" href={about.href} aria-current={current === about.id ? 'page' : undefined}>
-    <span class="glyph" aria-hidden="true">
-      <!-- Padded to about the size the font draws the other icons at. -->
-      <svg viewBox="-2 -2 24 24" width="1em" height="1em">
-        <circle cx="10" cy="10" r="8.25" fill="none" stroke="currentColor" stroke-width="1.75" />
-        <circle cx="10" cy="6.1" r="1.2" fill="currentColor" />
-        <path d="M10 9.25v5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-      </svg>
-    </span>
+    <span class="nav-icon" aria-hidden="true"><about.icon /></span>
     {about.label}
   </a>
 </nav>
@@ -77,13 +70,10 @@
     text-align: center;
     text-decoration: none;
   }
-  .glyph {
+  /* The icon alone, with no line's space below its baseline. */
+  .nav-icon {
+    display: flex;
     font-size: var(--text-xl);
-    line-height: 1;
-  }
-  /* A drawn icon takes a glyph's box, without the space below a baseline. */
-  .glyph svg {
-    display: block;
   }
   a:hover {
     color: var(--text);

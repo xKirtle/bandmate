@@ -1,4 +1,7 @@
 import type { MenuAction } from './menu';
+import Download from '@lucide/svelte/icons/download';
+import Mic from '@lucide/svelte/icons/mic';
+import Upload from '@lucide/svelte/icons/upload';
 
 // The transport row's ⋯: its occasional actions, in the order they're
 // listed. Those that edit the Timeline, or set up recording, apply only
@@ -29,7 +32,7 @@ export type TransportRun = {
 /** The entries of the transport row's ⋯: always at least Mix down…. */
 export function transportActions(state: TransportState, run: TransportRun): MenuAction[] {
   const importAudio: MenuAction = {
-    icon: '⤒',
+    icon: Upload,
     label: 'Import audio…',
     title: state.recording
       ? 'Stop recording to import audio'
@@ -40,7 +43,7 @@ export function transportActions(state: TransportState, run: TransportRun): Menu
     run: run.importAudio,
   };
   const mixDown: MenuAction = {
-    icon: '⤓',
+    icon: Download,
     label: 'Mix down…',
     title: state.recording
       ? 'Stop recording to mix down'
@@ -51,7 +54,7 @@ export function transportActions(state: TransportState, run: TransportRun): Menu
     run: run.mixDown,
   };
   const recordingSettings: MenuAction = {
-    icon: '◎',
+    icon: Mic,
     label: 'Recording settings…',
     title: state.recording
       ? 'Stop recording to change the recording settings'

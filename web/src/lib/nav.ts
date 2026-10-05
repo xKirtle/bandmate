@@ -1,6 +1,13 @@
 // The app's one navigation: the nav rail on wide windows, the bottom tab bar
 // on narrow ones, with the same pages in both.
 
+import Archive from '@lucide/svelte/icons/archive';
+import Disc3 from '@lucide/svelte/icons/disc-3';
+import Guitar from '@lucide/svelte/icons/guitar';
+import Info from '@lucide/svelte/icons/info';
+import Music from '@lucide/svelte/icons/music';
+import type { Icon } from './icons';
+
 /** The top-level lists the navigation leads to. */
 const lists = ['songs', 'beats'] as const;
 export type LibraryPage = (typeof lists)[number];
@@ -15,25 +22,21 @@ interface NavLink<Id extends NavPage> {
   id: Id;
   href: string;
   label: string;
-  icon: string;
+  icon: Icon;
 }
 
 export const pages = [
-  { id: 'songs', href: '/', label: 'Songs', icon: '♪' },
-  { id: 'beats', href: '/beats', label: 'Beats', icon: '◉' },
-  { id: 'chords', href: '/chords', label: 'Chord Finder', icon: '♯' },
-  { id: 'backups', href: '/backups', label: 'Backups', icon: '⧉' },
+  { id: 'songs', href: '/', label: 'Songs', icon: Music },
+  { id: 'beats', href: '/beats', label: 'Beats', icon: Disc3 },
+  { id: 'chords', href: '/chords', label: 'Chord Finder', icon: Guitar },
+  { id: 'backups', href: '/backups', label: 'Backups', icon: Archive },
 ] as const satisfies readonly NavLink<MainPage>[];
 
 /** Whether a main page is a list, which the navigation returns to as it was left. */
 const isList = (page: MainPage): page is LibraryPage => (lists as readonly MainPage[]).includes(page);
 
-/**
- * About, pinned to the bottom of the nav rail, and the last tab of the tab
- * bar. Its icon, an "i" in a circle, is drawn by the navigation, since the
- * app's font draws ⓘ as a tall capsule.
- */
-export const about = { id: 'about', href: '/about', label: 'About' } as const satisfies Omit<NavLink<'about'>, 'icon'>;
+/** About, pinned to the bottom of the nav rail, and the last tab of the tab bar. */
+export const about = { id: 'about', href: '/about', label: 'About', icon: Info } as const satisfies NavLink<'about'>;
 
 /**
  * The page the navigation marks as current for a path: Songs for the Song

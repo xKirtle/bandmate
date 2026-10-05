@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import { statuses, type Status } from './api';
   import Picker from './Picker.svelte';
 
@@ -10,7 +11,7 @@
 {#if onChange}
   <Picker {id} aria-label="Status" options={statuses} value={status} onpick={onChange}>
     {#snippet trigger(s)}
-      <span class="badge badge-{s}">{s} <span aria-hidden="true">▾</span></span>
+      <span class="badge badge-{s}">{s} <ChevronDown /></span>
     {/snippet}
     {#snippet option(s)}
       <span class="badge badge-{s}">{s}</span>

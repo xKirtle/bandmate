@@ -24,6 +24,8 @@
   // the Lines already played, or under it when there's no room above, so the
   // Line being read and those after it stay in view. From the Chart, it opens
   // under the diagram.
+  import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import { tick } from 'svelte';
   import type { Song } from './api';
   import ChordDiagram from './ChordDiagram.svelte';
@@ -170,13 +172,13 @@
           class="button step"
           aria-label="Previous Voicing"
           title="Previous Voicing"
-          onclick={() => step(-1)}>‹</button
+          onclick={() => step(-1)}><ChevronLeft /></button
         >
         <span class={['place', { preferred: isPreferred }]} aria-live="polite">
           {isPreferred ? 'Preferred' : `${showing + 1} of ${voicings.length}`}
         </span>
         <button type="button" class="button step" aria-label="Next Voicing" title="Next Voicing" onclick={() => step(1)}
-          >›</button
+          ><ChevronRight /></button
         >
       </div>
       <!-- One button, so focus stays on it as Prefer turns to Clear. -->

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import X from '@lucide/svelte/icons/x';
   import { onMount } from 'svelte';
   import { api, type Backup, type Beat, type SongSummary } from './api';
   import { closeOnBackdrop } from './backdrop';
@@ -89,7 +90,7 @@
   <header>
     <h2 id="new-backup-heading">New Backup</h2>
     {#if phase !== 'making'}
-      <button type="button" class="icon" onclick={() => dialog?.close()} aria-label="Close">✕</button>
+      <button type="button" class="icon" onclick={() => dialog?.close()} aria-label="Close"><X /></button>
     {/if}
   </header>
 

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Check from '@lucide/svelte/icons/check';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import { tick } from 'svelte';
   import type { HTMLInputAttributes } from 'svelte/elements';
   import { comboboxKey, filterOptions, optionIndex } from './combobox';
@@ -159,7 +161,7 @@
     onmousedown={(e) => e.preventDefault()}
     onclick={toggle}
   >
-    ▾
+    <ChevronDown />
   </button>
   {#if open}
     <!-- Pressing an option keeps focus in the field. -->
@@ -184,7 +186,9 @@
           aria-selected={i === active}
           onclick={() => pick(option)}
         >
-          <span class="option-list-check" aria-hidden="true">{i === savedAt ? '✓' : ''}</span>
+          <span class="option-list-check" aria-hidden="true"
+            >{#if i === savedAt}<Check />{/if}</span
+          >
           {option}
           {#if i === savedAt}<span class="visually-hidden">(saved)</span>{/if}
         </div>

@@ -1,4 +1,21 @@
 <script lang="ts">
+  import ArrowDown from '@lucide/svelte/icons/arrow-down';
+  import ArrowUp from '@lucide/svelte/icons/arrow-up';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import ChevronUp from '@lucide/svelte/icons/chevron-up';
+  import Circle from '@lucide/svelte/icons/circle';
+  import Ellipsis from '@lucide/svelte/icons/ellipsis';
+  import GripVertical from '@lucide/svelte/icons/grip-vertical';
+  import Pause from '@lucide/svelte/icons/pause';
+  import Pencil from '@lucide/svelte/icons/pencil';
+  import Play from '@lucide/svelte/icons/play';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Redo2 from '@lucide/svelte/icons/redo-2';
+  import SkipBack from '@lucide/svelte/icons/skip-back';
+  import SkipForward from '@lucide/svelte/icons/skip-forward';
+  import Square from '@lucide/svelte/icons/square';
+  import Undo2 from '@lucide/svelte/icons/undo-2';
+  import X from '@lucide/svelte/icons/x';
   import { onDestroy, tick, untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { innerHeight } from 'svelte/reactivity/window';
@@ -2770,7 +2787,7 @@
       disabled={!undoable || frozen}
       aria-label="Undo"
       aria-keyshortcuts={hints.aria(shortcuts.undo.keys)}
-      title={editHint(freeze, hints.withKeys('Undo', shortcuts.undo.keys))}>↶</button
+      title={editHint(freeze, hints.withKeys('Undo', shortcuts.undo.keys))}><Undo2 /></button
     >
     <button
       type="button"
@@ -2779,7 +2796,7 @@
       disabled={!redoable || frozen}
       aria-label="Redo"
       aria-keyshortcuts={hints.aria(shortcuts.redo.keys)}
-      title={editHint(freeze, hints.withKeys('Redo', shortcuts.redo.keys))}>↷</button
+      title={editHint(freeze, hints.withKeys('Redo', shortcuts.redo.keys))}><Redo2 /></button
     >
   </span>
 {/snippet}
@@ -2796,13 +2813,7 @@
     aria-keyshortcuts={hints.aria(keys)}
     title={recording !== null ? 'Stop recording to move the playhead' : hints.withKeys(text, keys)}
   >
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      {#if going === 'back'}
-        <path d="M6 5.5h2.5v13H6zM18.5 5.5v13L9.5 12z" />
-      {:else}
-        <path d="M15.5 5.5H18v13h-2.5zM5.5 5.5v13l9-6.5z" />
-      {/if}
-    </svg>
+    {#if going === 'back'}<SkipBack />{:else}<SkipForward />{/if}
   </button>
 {/snippet}
 
@@ -2852,11 +2863,7 @@
           aria-keyshortcuts={hints.aria(shortcuts.playPause.keys)}
           title={hints.withKeys('Play or pause', shortcuts.playPause.keys)}
         >
-          {#if playerState === 'stopped'}
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
-          {:else}
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /></svg>
-          {/if}
+          {#if playerState === 'stopped'}<Play />{:else}<Pause />{/if}
         </button>
         {@render toStartOrEnd('forward')}
       </span>
@@ -2893,7 +2900,10 @@
                 : hints.withKeys(
                     `Record a Take on ${timeline.tracks.find((t) => t.id === chosen)?.name ?? 'a new Track'}`,
                     shortcuts.record.keys,
-                  )}><span class="record-dot" aria-hidden="true"></span>{capturing ? 'Stop' : 'Record'}</button
+                  )}
+        ><span class="record-dot" aria-hidden="true"
+          >{#if capturing}<Square />{:else}<Circle />{/if}</span
+        >{capturing ? 'Stop' : 'Record'}</button
       >
       <input
         class="visually-hidden"
@@ -2945,7 +2955,7 @@
         aria-controls="timeline-tracks"
         aria-label={collapsed ? 'Show the Timeline' : 'Hide the Timeline'}
       >
-        {collapsed ? '▴' : '▾'}
+        {#if collapsed}<ChevronUp />{:else}<ChevronDown />{/if}
       </button>
     </div>
 
@@ -2968,7 +2978,7 @@
             title={editHint(
               freeze,
               `Add a Beat to ${timeline.tracks.find((t) => t.id === chosen)?.name ?? 'the Chosen Track'}`,
-            )}>+ Beat</button
+            )}><Plus />Beat</button
           >
           <button
             type="button"
@@ -2976,7 +2986,7 @@
             aria-label="Add a Track"
             onclick={addTrack}
             disabled={frozen}
-            title={editHint(freeze, undefined)}>+ Track</button
+            title={editHint(freeze, undefined)}><Plus />Track</button
           >
         </div>
         {#each timeline.tracks as track, i (track.id)}
@@ -3002,7 +3012,8 @@
                 class="grip"
                 aria-hidden="true"
                 title={trackDrag.on ? 'Drag to move; Esc cancels' : undefined}
-                {...trackDrag.on ? trackDrag.grip(i, dropTrack) : {}}>{trackDrag.on ? '⠿' : ''}</span
+                {...trackDrag.on ? trackDrag.grip(i, dropTrack) : {}}
+                >{#if trackDrag.on}<GripVertical />{/if}</span
               >
             {/if}
             <div class="head-row">
@@ -3037,24 +3048,21 @@
                     aria-label="Rename {track.name}"
                     title={editHint(freeze, 'Rename')}
                   >
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M4 20h4L19 9l-4-4L4 16z" />
-                      <path d="M13.5 6.5l4 4" />
-                    </svg>
+                    <Pencil />
                   </button>
                   <button
                     type="button"
                     onclick={() => shift(i, -1)}
                     disabled={i === 0 || frozen}
                     aria-label="Move {track.name} up"
-                    title={editHint(freeze, 'Move up')}>↑</button
+                    title={editHint(freeze, 'Move up')}><ArrowUp /></button
                   >
                   <button
                     type="button"
                     onclick={() => shift(i, 1)}
                     disabled={i === timeline.tracks.length - 1 || frozen}
                     aria-label="Move {track.name} down"
-                    title={editHint(freeze, 'Move down')}>↓</button
+                    title={editHint(freeze, 'Move down')}><ArrowDown /></button
                   >
                   <button
                     type="button"
@@ -3066,7 +3074,7 @@
                       lastTrack
                         ? "A Song always has a Track, so its last one can't be deleted"
                         : 'Delete the Track and its Clips',
-                    )}>×</button
+                    )}><X /></button
                   >
                 </span>
               {/if}
@@ -3148,7 +3156,7 @@
                     onclick={clearLoop}
                     disabled={frozen}
                     aria-label="Clear the Loop"
-                    title={editHint(freeze, 'Clear the Loop')}>×</button
+                    title={editHint(freeze, 'Clear the Loop')}><X /></button
                   >
                   <span
                     class="loop-edge end edit-only"
@@ -3255,7 +3263,7 @@
                           entries={clipMenuActions(clip)}
                           onopen={() => clipMenuOpened(clip)}
                         >
-                          {#snippet trigger()}<span class="clip-more">⋯</span>{/snippet}
+                          {#snippet trigger()}<span class="clip-more"><Ellipsis /></span>{/snippet}
                         </ActionsMenu>
                       </span>
                     </span>
@@ -3515,7 +3523,7 @@
     <div class="error-bar" role="alert">
       <span class="error">{error}</span>
       <button type="button" class="dismiss" onclick={() => (error = null)} aria-label="Dismiss" title="Dismiss"
-        >×</button
+        ><X /></button
       >
     </div>
   {/if}
@@ -3640,9 +3648,8 @@
     align-items: center;
     gap: calc(0.25 * var(--timeline-rem));
   }
-  .skip svg {
-    width: calc(1.125 * var(--timeline-rem));
-    height: calc(1.125 * var(--timeline-rem));
+  /* Solid, like play and pause between them. */
+  .skip :global(.lucide-icon) {
     fill: currentColor;
   }
   .play {
@@ -3656,11 +3663,11 @@
     border-radius: var(--radius-full);
     background: var(--accent);
     color: var(--accent-text);
+    font-size: calc(1.25 * var(--timeline-rem));
     cursor: pointer;
   }
-  .play svg {
-    width: calc(1.25 * var(--timeline-rem));
-    height: calc(1.25 * var(--timeline-rem));
+  /* Solid, to stand out on the accent. */
+  .play :global(.lucide-icon) {
     fill: currentColor;
   }
   .time {
@@ -3703,6 +3710,7 @@
   }
   /* Small enough for the corner, both side by side; the corner can't grow without moving the lanes. */
   .add {
+    gap: calc(0.25 * var(--timeline-rem));
     min-height: calc(1.75 * var(--timeline-rem));
     padding: 0 calc(0.5 * var(--timeline-rem));
     font-size: calc(0.875 * var(--timeline-rem));
@@ -3839,17 +3847,6 @@
   .track-actions button:hover:not(:disabled),
   :global(:root:not([data-pointer-focus])) .track-actions button:focus-visible {
     color: var(--accent);
-  }
-  /* As big as the arrows and cross beside it. */
-  .rename svg {
-    width: calc(0.625 * var(--timeline-rem));
-    height: calc(0.625 * var(--timeline-rem));
-    vertical-align: -0.0625em;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2.25;
-    stroke-linecap: round;
-    stroke-linejoin: round;
   }
   .track-actions button:disabled {
     opacity: 0.35;
@@ -3999,6 +3996,9 @@
   .loop-clear:focus-visible {
     display: block;
   }
+  .loop-clear :global(.lucide-icon) {
+    display: block;
+  }
   .loop-shade {
     position: absolute;
     top: calc(0.75 * var(--timeline-rem));
@@ -4049,21 +4049,22 @@
     width: auto;
     padding: 0 calc(0.5 * var(--timeline-rem));
   }
+  /* A dot, solid: a square to stop. */
   .record-dot {
-    width: calc(0.5 * var(--timeline-rem));
-    height: calc(0.5 * var(--timeline-rem));
-    border-radius: var(--radius-full);
-    background: var(--danger);
+    display: flex;
+    color: var(--danger);
+    font-size: calc(0.75 * var(--timeline-rem));
+  }
+  .record-dot :global(.lucide-icon) {
+    fill: currentColor;
   }
   .toggle.record[aria-pressed='true'] {
     border-color: var(--danger);
     background: var(--danger);
     color: var(--bg);
   }
-  /* Stop is a square. */
   .toggle.record[aria-pressed='true'] .record-dot {
-    border-radius: 0;
-    background: currentColor;
+    color: inherit;
   }
   .not-calibrated {
     padding: var(--space-1) var(--space-2);

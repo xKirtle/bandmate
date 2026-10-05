@@ -1,4 +1,7 @@
 <script lang="ts">
+  import ArrowDown from '@lucide/svelte/icons/arrow-down';
+  import ArrowUp from '@lucide/svelte/icons/arrow-up';
+  import Check from '@lucide/svelte/icons/check';
   import { api, statuses, type SongSummary } from '../lib/api';
   import {
     defaultSongListView,
@@ -182,7 +185,8 @@
             >
               <button type="button" onclick={() => (view.sort = toggleSort(view.sort, column.id))}>
                 {column.label}<span class="arrow" aria-hidden="true"
-                  >{view.sort.column === column.id ? (view.sort.direction === 'asc' ? '↑' : '↓') : ''}</span
+                  >{#if view.sort.column === column.id}{#if view.sort.direction === 'asc'}<ArrowUp />{:else}<ArrowDown
+                      />{/if}{/if}</span
                 >
               </button>
             </th>
@@ -202,8 +206,7 @@
             <td>{song.key || '—'}</td>
             <td class="num">{song.bpm ?? '—'}</td>
             <td>
-              {#if song.hasMaster}<span aria-hidden="true">✓</span><span class="visually-hidden">Has a Master</span
-                >{:else}—{/if}
+              {#if song.hasMaster}<Check /><span class="visually-hidden">Has a Master</span>{:else}—{/if}
             </td>
             <td class="muted"><time datetime={song.updatedAt}>{timeAgo(song.updatedAt)}</time></td>
           </tr>

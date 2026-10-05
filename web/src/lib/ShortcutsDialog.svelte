@@ -1,4 +1,5 @@
 <script lang="ts">
+  import X from '@lucide/svelte/icons/x';
   import { onMount } from 'svelte';
   import { closeOnBackdrop } from './backdrop';
   import { platform, shortcuts } from './shortcuts';
@@ -29,7 +30,7 @@
 >
   <header>
     <h2 id="shortcuts-heading">Keyboard shortcuts</h2>
-    <button type="button" class="icon" onclick={() => dialog?.close()} aria-label="Close">✕</button>
+    <button type="button" class="icon" onclick={() => dialog?.close()} aria-label="Close"><X /></button>
   </header>
 
   {#each groups as { group, rows }, g (group)}
