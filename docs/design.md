@@ -115,7 +115,17 @@ A radius is always one of these tokens, or `0`: Stylelint fails anything else. T
 
 ### Motion
 
-`--duration-fast` 120ms and `--duration-base` 200ms, with one easing curve. Under `prefers-reduced-motion`, nothing animates. _To come_ (#572).
+Two durations and one curve. Something moves only to explain a change: opening, moving or appearing, never to decorate, and nothing bounces.
+
+| Token             | Value                          | For                                                                           |
+| ----------------- | ------------------------------ | ----------------------------------------------------------------------------- |
+| `--duration-fast` | 120ms                          | Small things: a chevron turning as a list opens, a scroll bar's thumb growing |
+| `--duration-base` | 200ms                          | What moves or appears: the highlight on the current Line or Section           |
+| `--ease`          | `cubic-bezier(0.2, 0, 0, 1)`   | Every transition and animation: quick to start, settling without overshoot    |
+
+A transition or animation names both, such as `transition: transform var(--duration-fast) var(--ease)`, once for each property it lists, so none falls back on the browser's own curve. A delay, if any, is one of the durations too. Stylelint fails a literal or scaled time, any other duration, and any timing function but `--ease`, including none at all.
+
+**Reduced motion**: when the user asks for it, `app.css` sets both durations to 0s, so every transition and animation ends as it starts. Motion in script asks `motion.ts` instead: following playback down the Lyric Sheet glides there, or jumps under reduced motion. What tracks real time isn't decoration and keeps moving either way: the playhead, a Clip or the Loop being dragged, the Timeline scrolling as it follows playback, a waveform filling as it plays, and an input's level meter.
 
 ### Icons
 

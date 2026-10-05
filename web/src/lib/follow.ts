@@ -1,3 +1,4 @@
+import { scrollBehavior } from './motion';
 import { inTextField } from './textField';
 
 /** Names a Section among the tracked elements. */
@@ -27,11 +28,14 @@ export function follower() {
     /**
      * Scrolls to the element under a key, a Line to the middle and a whole
      * Section to the top, unless that would pull the page away from
-     * something being typed.
+     * something being typed. It glides there, or jumps under reduced
+     * motion: either way it keeps up with playback.
      */
     follow(key: string | null) {
       if (key === null || inTextField(document.activeElement)) return;
-      shown.get(key)?.scrollIntoView({ block: key.startsWith('line:') ? 'center' : 'start', behavior: 'smooth' });
+      shown
+        .get(key)
+        ?.scrollIntoView({ block: key.startsWith('line:') ? 'center' : 'start', behavior: scrollBehavior() });
     },
   };
 }

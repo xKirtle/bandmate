@@ -480,7 +480,7 @@
     display: inline-block;
     width: 1rem;
     color: var(--text-muted);
-    transition: transform 0.15s;
+    transition: transform var(--duration-fast) var(--ease);
   }
   details[open] > summary .chevron {
     transform: rotate(90deg);

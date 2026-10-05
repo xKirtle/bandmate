@@ -3924,8 +3924,8 @@
     outline: 1px solid color-mix(in srgb, var(--bg) 60%, transparent);
     cursor: grab;
     transition:
-      top 0.1s,
-      bottom 0.1s;
+      top var(--duration-fast) var(--ease),
+      bottom var(--duration-fast) var(--ease);
   }
   .scroll-thumb.dragging {
     top: calc(0.0625 * var(--timeline-rem));

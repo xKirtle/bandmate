@@ -1032,7 +1032,7 @@
       content: '›';
       width: 0.75rem;
       color: var(--text-muted);
-      transition: transform 0.15s;
+      transition: transform var(--duration-fast) var(--ease);
     }
     .part[open] > summary::before {
       transform: rotate(90deg);
