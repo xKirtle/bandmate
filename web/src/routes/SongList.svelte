@@ -5,11 +5,16 @@
   import FolderIcon from '@lucide/svelte/icons/folder';
   import FolderInput from '@lucide/svelte/icons/folder-input';
   import FolderPlus from '@lucide/svelte/icons/folder-plus';
+  import Pencil from '@lucide/svelte/icons/pencil';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
   import ActionsMenu from '../lib/ActionsMenu.svelte';
   import { ApiError, api, statuses, type Folder, type SongSummary } from '../lib/api';
+  import DeleteFolderDialog from '../lib/DeleteFolderDialog.svelte';
+  import FolderNameDialog from '../lib/FolderNameDialog.svelte';
   import {
     defaultSongListView,
     loadSongList,
+    songCount,
     songListViewFromParams,
     songListViewToParams,
     sortFolders,
@@ -19,7 +24,6 @@
   } from '../lib/listViews';
   import type { MenuAction } from '../lib/menu';
   import { newSongPath } from '../lib/newSong';
-  import NewFolderDialog from '../lib/NewFolderDialog.svelte';
   import { navigate, replaceSearch, router } from '../lib/router.svelte';
   import SongCover from '../lib/SongCover.svelte';
   import StatusBadge from '../lib/StatusBadge.svelte';
@@ -73,8 +77,7 @@
   ];
 
   const folderHref = (f: Folder) => `/folders/${f.id}` + (folderSearch ? `?${folderSearch}` : '');
-
-  const songCount = (n: number) => (n === 1 ? '1 Song' : `${n} Songs`);
+  const topHref = $derived(folderSearch ? `/?${folderSearch}` : '/');
 
   // A click anywhere on a row opens what it's for, as its title link does,
   // but for a click on a link or in its menu.
@@ -172,6 +175,55 @@
     else changes++;
   }
 
+  // The Folder being renamed, if any, and the one asked about deleting, by
+  // id, so the dialog follows its Songs as the list loads again, e.g. after
+  // deleting them failed partway.
+  let renaming = $state<Folder | null>(null);
+  let deletingId = $state<number | null>(null);
+  const deleting = $derived(deletingId === null ? undefined : folders?.find((f) => f.id === deletingId));
+  // Gone meanwhile, e.g. deleted elsewhere, it's no longer asked about.
+  $effect(() => {
+    if (deletingId !== null && folders && !deleting) deletingId = null;
+  });
+  let folderError = $state<string | null>(null);
+
+  // An empty Folder is deleted without asking; one holding Songs asks
+  // whether to keep them.
+  async function deleteFolder(f: Folder) {
+    folderError = null;
+    if (f.songs > 0) {
+      deletingId = f.id;
+      return;
+    }
+    try {
+      await api.deleteFolder(f, 'keep');
+      deletedFolder(f);
+    } catch (e) {
+      folderError = `Couldn't delete “${f.name}” (${(e as Error).message})`;
+    }
+  }
+
+  // Deleted from its own heading, the Folder's page goes with it, so the
+  // way back skips it.
+  function deletedFolder(f: Folder) {
+    if (f.id === folderId) navigate(topHref, { replace: true });
+    else changes++;
+  }
+
+  function folderActions(f: Folder): MenuAction[] {
+    return [
+      {
+        icon: Pencil,
+        label: 'Rename…',
+        run: () => {
+          folderError = null;
+          renaming = f;
+        },
+      },
+      { icon: Trash2, label: f.songs > 0 ? 'Delete…' : 'Delete', run: () => deleteFolder(f) },
+    ];
+  }
+
   // Filing a Song is organising, not editing it, so it's offered for every
   // Song, Finished ones included.
   function songActions(song: SongSummary): MenuAction[] {
@@ -199,9 +251,14 @@
     <h1>Songs</h1>
   {:else}
     <div class="trail">
-      <a class="up" href={folderSearch ? `/?${folderSearch}` : '/'}>Songs</a>
+      <a class="up" href={topHref}>Songs</a>
       <span class="separator" aria-hidden="true">/</span>
-      <h1>{folder?.name ?? (folderMissing ? 'Not found' : 'Folder')}</h1>
+      <span class="name">
+        <h1>{folder?.name ?? (folderMissing ? 'Not found' : 'Folder')}</h1>
+        {#if folder}
+          <ActionsMenu label="More actions for {folder.name}" entries={folderActions(folder)} align="start" />
+        {/if}
+      </span>
     </div>
   {/if}
   {#if !folderMissing}
@@ -231,6 +288,9 @@
   {/if}
   {#if moveError}
     <p class="error" role="alert">{moveError}</p>
+  {/if}
+  {#if folderError}
+    <p class="error" role="alert">{folderError}</p>
   {/if}
   {#if anySongs && !folderMissing}
     <search class="filters">
@@ -328,7 +388,9 @@
                 </span>
               </td>
               <td class="muted" colspan="5">{songCount(f.songs)}</td>
-              <td class="row-actions"></td>
+              <td class="row-actions">
+                <ActionsMenu label="More actions for {f.name}" entries={folderActions(f)} />
+              </td>
             </tr>
           {/each}
           {#each sorted as song (song.id)}
@@ -361,6 +423,7 @@
               <span class="title">{f.name}</span>
               <span class="meta">{songCount(f.songs)}</span>
             </a>
+            <ActionsMenu label="More actions for {f.name}" entries={folderActions(f)} />
           </li>
         {/each}
         {#each sorted as song (song.id)}
@@ -388,7 +451,18 @@
 </main>
 
 {#if newFolder}
-  <NewFolderDialog onMade={madeFolder} onClose={() => (newFolder = null)} />
+  <FolderNameDialog onSaved={madeFolder} onClose={() => (newFolder = null)} />
+{/if}
+{#if renaming}
+  <FolderNameDialog folder={renaming} onSaved={() => changes++} onClose={() => (renaming = null)} />
+{/if}
+{#if deleting}
+  <DeleteFolderDialog
+    folder={deleting}
+    onDeleted={() => deleting && deletedFolder(deleting)}
+    onFailed={() => changes++}
+    onClose={() => (deletingId = null)}
+  />
 {/if}
 
 <style>
@@ -409,6 +483,13 @@
   .trail h1 {
     min-width: 0;
     overflow-wrap: anywhere;
+  }
+  /* The Folder's ⋯ stays beside its name, however long. */
+  .name {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-width: 0;
   }
   /* The way back to all Songs, as big as the Folder's name it leads up from. */
   .up,

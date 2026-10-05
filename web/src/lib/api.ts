@@ -186,6 +186,9 @@ export interface Folder {
   songs: number;
 }
 
+/** What deleting a Folder does with its Songs: keeps them, in no Folder, or deletes them too. */
+export type FolderSongs = 'keep' | 'delete';
+
 /** A Song as shown in the Song list. */
 export interface SongSummary {
   id: number;
@@ -807,6 +810,17 @@ export const api = {
   listFolders: () => request<Folder[]>('GET', '/folders'),
   /** Makes an empty Folder; a name another Folder has, ignoring case, is refused. */
   createFolder: (name: string) => request<Folder>('POST', '/folders', { name }),
+  /** Gives a Folder a new name; one another Folder has, ignoring case, is refused. */
+  renameFolder: (id: number, name: string) => request<Folder>('PATCH', `/folders/${id}`, { name }),
+  /**
+   * Deletes a Folder, keeping its Songs in no Folder, or deleting them too, for good: only if it still holds as
+   * many as it did when read, so none filed into it since are lost unseen.
+   */
+  deleteFolder: (folder: Folder, songs: FolderSongs) =>
+    request<null>(
+      'DELETE',
+      `/folders/${folder.id}?songs=${songs}` + (songs === 'delete' ? `&count=${folder.songs}` : ''),
+    ),
   /** Puts a Song into the Folder with folderId, or, with null, into none. It doesn't change the Song's version. */
   moveSongToFolder: (songId: number, folderId: number | null) =>
     request<null>('PUT', `/songs/${songId}/folder`, { folderId }),

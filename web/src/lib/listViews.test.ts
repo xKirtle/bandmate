@@ -14,6 +14,7 @@ import {
   songBeatHint,
   sortBeats,
   sortFolders,
+  songCount,
   songListViewFromParams,
   songListViewToParams,
   sortSongs,
@@ -203,6 +204,12 @@ describe('sortFolders', () => {
     const folder = (id: number, name: string) => ({ id, name, songs: 0 });
     const sorted = sortFolders([folder(1, 'ep 10'), folder(2, 'Demos'), folder(3, 'EP 9'), folder(4, 'Ábaco')]);
     expect(sorted.map((f) => f.name)).toEqual(['Ábaco', 'Demos', 'EP 9', 'ep 10']);
+  });
+});
+
+describe('songCount', () => {
+  it('counts Songs, one in the singular', () => {
+    expect([0, 1, 2].map(songCount)).toEqual(['0 Songs', '1 Song', '2 Songs']);
   });
 });
 

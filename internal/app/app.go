@@ -198,6 +198,8 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("GET /api/folders", a.listFolders)
 	mux.HandleFunc("POST /api/folders", a.createFolder)
 	mux.HandleFunc("GET /api/folders/{id}", a.getFolder)
+	mux.HandleFunc("PATCH /api/folders/{id}", a.renameFolder)
+	mux.HandleFunc("DELETE /api/folders/{id}", a.deleteFolder)
 	mux.HandleFunc("PUT /api/songs/{id}/arrangement", a.reorderArrangement)
 	mux.HandleFunc("POST /api/songs/{id}/sections", a.addSection)
 	mux.HandleFunc("PATCH /api/songs/{id}/sections/{sectionID}", a.setSectionLabel)
