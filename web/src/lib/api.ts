@@ -174,6 +174,16 @@ export interface SongFilter {
   q?: string;
   /** Only Songs with a Master (true) or without one (false). */
   hasMaster?: boolean;
+  /** Only the Songs in the Folder with this id, or, with 'none', those in no Folder. */
+  folder?: number | 'none';
+}
+
+/** A named place on the Songs page that keeps some Songs together. */
+export interface Folder {
+  id: number;
+  name: string;
+  /** How many Songs it holds. */
+  songs: number;
 }
 
 /** A Song as shown in the Song list. */
@@ -187,6 +197,8 @@ export interface SongSummary {
   hasMaster: boolean;
   /** The Song's Cover's id; null when it has none. */
   coverId: number | null;
+  /** The Folder's the Song sits in; null when it's in none. */
+  folderId: number | null;
   updatedAt: string;
 }
 
@@ -778,14 +790,26 @@ export const api = {
     if (filter.status) params.set('status', filter.status);
     if (filter.q?.trim()) params.set('q', filter.q.trim());
     if (filter.hasMaster !== undefined) params.set('hasMaster', String(filter.hasMaster));
+    if (filter.folder !== undefined) params.set('folder', String(filter.folder));
     const query = params.toString();
     return request<SongSummary[]>('GET', query ? `/songs?${query}` : '/songs');
   },
   getSong: (id: number) => request<Song>('GET', `/songs/${id}`),
-  /** Creates a Song, titled "Untitled Song" by the server. */
-  createSong: () => request<Song>('POST', '/songs', {}),
-  /** Creates a new Song from pasted lyrics; a {title: …} line in the text wins over title. */
-  importSong: (text: string, title = '') => request<Song>('POST', '/songs/import', { text, title }),
+  /** Creates a Song, titled "Untitled Song" by the server, in the Folder with folderId, or in none. */
+  createSong: (folderId: number | null = null) => request<Song>('POST', '/songs', { folderId }),
+  /**
+   * Creates a new Song from pasted lyrics, in the Folder with folderId, or in none; a {title: …} line in the
+   * text wins over title.
+   */
+  importSong: (text: string, title = '', folderId: number | null = null) =>
+    request<Song>('POST', '/songs/import', { text, title, folderId }),
+  /** Every Folder, by name. */
+  listFolders: () => request<Folder[]>('GET', '/folders'),
+  /** Makes an empty Folder; a name another Folder has, ignoring case, is refused. */
+  createFolder: (name: string) => request<Folder>('POST', '/folders', { name }),
+  /** Puts a Song into the Folder with folderId, or, with null, into none. It doesn't change the Song's version. */
+  moveSongToFolder: (songId: number, folderId: number | null) =>
+    request<null>('PUT', `/songs/${songId}/folder`, { folderId }),
   updateSong: (at: SongAt, changes: SongChanges) => request<Song>('PATCH', `/songs/${at.id}`, changes, at),
   deleteSong: (at: SongAt) => request<null>('DELETE', `/songs/${at.id}`, undefined, at),
   /** Adds a Section at position in the Arrangement, or at the end. */

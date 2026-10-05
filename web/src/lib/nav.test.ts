@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { currentPage, listAt, movedTo, pages, pinned, settingsTabAt, settingsTabs } from './nav';
 
 describe('currentPage', () => {
-  it('marks Songs on the Song list and every page of a Song', () => {
+  it('marks Songs on the Song list, inside a Folder, and on every page of a Song', () => {
     expect(currentPage('/')).toBe('songs');
+    expect(currentPage('/folders/3')).toBe('songs');
     expect(currentPage('/songs/import')).toBe('songs');
     expect(currentPage('/songs/12')).toBe('songs');
   });

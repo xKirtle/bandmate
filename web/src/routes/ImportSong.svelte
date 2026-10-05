@@ -1,7 +1,11 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { ApiError, api } from '../lib/api';
-  import { navigate } from '../lib/router.svelte';
+  import { navigate, router } from '../lib/router.svelte';
+
+  // Opened from inside a Folder, the Song goes into it.
+  const folderParam = new URLSearchParams(router.search).get('folder');
+  const folderId = folderParam && /^\d+$/.test(folderParam) ? Number(folderParam) : null;
 
   let text = $state('');
   let title = $state('');
@@ -18,7 +22,7 @@
     saving = true;
     error = null;
     try {
-      const song = await api.importSong(text, title);
+      const song = await api.importSong(text, title, folderId);
       navigate(`/songs/${song.id}`, { replace: true });
     } catch (e) {
       error = (e as Error).message;

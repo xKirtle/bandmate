@@ -1,7 +1,7 @@
 // What a list page shows: its search, filters and sort, how it sorts, and how
 // that is kept in the URL so going back to the list restores it.
 
-import { statuses, type Beat, type Song, type SongFilter, type SongSummary, type Status } from './api';
+import { statuses, type Beat, type Folder, type Song, type SongFilter, type SongSummary, type Status } from './api';
 
 export type SortDirection = 'asc' | 'desc';
 
@@ -69,6 +69,11 @@ export function sortSongs(songs: readonly SongSummary[], sort: Sort<SongColumn>)
   return sortBy(songs, songSortKeys[sort.column], sort.direction);
 }
 
+/** Folders by name, whatever the Songs are sorted by. Doesn't change folders. */
+export function sortFolders(folders: readonly Folder[]): Folder[] {
+  return sortBy(folders, (f) => f.name, 'asc');
+}
+
 /** Columns that sort newest or biggest first when first picked. */
 const descendingFirst: readonly string[] = ['edited', 'added'];
 
@@ -125,18 +130,22 @@ export interface LoadedSongList {
 }
 
 /**
- * Lists the Songs a filter keeps, and whether there are any Songs at all. The
- * server filters the list, so when nothing matches it asks again for every
- * Song, to tell no matches from no Songs.
+ * Lists the Songs a filter keeps, and whether there are any Songs at all:
+ * inside a Folder, any in it, and at the top level, where the list is the
+ * Songs in no Folder, any anywhere. The server filters the list, so when
+ * nothing matches it asks again for every Song there, to tell no matches
+ * from no Songs.
  */
 export async function loadSongList(
   filter: SongFilter,
   list: (filter: SongFilter) => Promise<SongSummary[]>,
 ): Promise<LoadedSongList> {
   const songs = await list(filter);
-  const filtered = Object.values(filter).some((value) => value !== undefined && value !== '');
-  if (songs.length > 0 || !filtered) return { songs, anySongs: songs.length > 0 };
-  return { songs, anySongs: (await list({})).length > 0 };
+  const { folder, ...narrowing } = filter;
+  const filtered = Object.values(narrowing).some((value) => value !== undefined && value !== '');
+  const topLevel = folder === undefined || folder === 'none';
+  if (songs.length > 0 || (!filtered && folder !== 'none')) return { songs, anySongs: songs.length > 0 };
+  return { songs, anySongs: (await list(topLevel ? {} : { folder })).length > 0 };
 }
 
 /** A column of the Beat Library. */
