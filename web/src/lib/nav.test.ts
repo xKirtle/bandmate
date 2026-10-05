@@ -65,7 +65,7 @@ describe('pages', () => {
     expect(pages.map((p) => [p.label, p.href])).toEqual([
       ['Songs', '/'],
       ['Beats', '/beats'],
-      ['Chord Finder', '/chords'],
+      ['Chords', '/chords'],
     ]);
   });
 });

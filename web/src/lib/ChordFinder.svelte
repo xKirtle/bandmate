@@ -156,7 +156,7 @@
 
 <div class="card finder">
   <div class="tab-bar">
-    <div class="tabs" role="tablist" aria-label="Chord Finder">
+    <div class="tabs" role="tablist" aria-label="Chords">
       {#each tabs as t, i (t.id)}
         <button
           bind:this={tabButtons[i]}

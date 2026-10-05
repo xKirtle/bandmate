@@ -66,8 +66,8 @@
     color: var(--text-muted);
     font-size: var(--text-xs);
     font-weight: 600;
-    /* A label too long for its tab, e.g. Chord Finder's on a narrow phone,
-       wraps under its icon, centred. */
+    /* A label too long for its tab, e.g. with a large system font on a
+       narrow phone, wraps under its icon, centred. */
     line-height: 1.2;
     text-align: center;
     text-decoration: none;

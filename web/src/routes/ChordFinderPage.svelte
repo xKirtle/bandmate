@@ -21,7 +21,7 @@
 </script>
 
 <header class="bar">
-  <h1>Chord Finder</h1>
+  <h1>Chords</h1>
 </header>
 
 <main class="page">

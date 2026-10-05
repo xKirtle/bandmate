@@ -27,7 +27,7 @@ interface NavLink<Id extends NavPage> {
 export const pages = [
   { id: 'songs', href: '/', label: 'Songs', icon: Music },
   { id: 'beats', href: '/beats', label: 'Beats', icon: Disc3 },
-  { id: 'chords', href: '/chords', label: 'Chord Finder', icon: Guitar },
+  { id: 'chords', href: '/chords', label: 'Chords', icon: Guitar },
 ] as const satisfies readonly NavLink<MainPage>[];
 
 /** Whether a main page is a list, which the navigation returns to as it was left. */
