@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { currentPage, listAt, pages, pinned } from './nav';
+import { currentPage, listAt, movedTo, pages, pinned, settingsTabAt, settingsTabs } from './nav';
 
 describe('currentPage', () => {
   it('marks Songs on the Song list and every page of a Song', () => {
@@ -16,16 +16,15 @@ describe('currentPage', () => {
     expect(currentPage('/chords')).toBe('chords');
   });
 
-  it('marks Backups on the Backups page', () => {
-    expect(currentPage('/backups')).toBe('backups');
-  });
-
-  it('marks About on the About page', () => {
-    expect(currentPage('/about')).toBe('about');
-  });
-
-  it('marks Settings on the Settings page', () => {
+  it('marks Settings on every one of its tabs', () => {
     expect(currentPage('/settings')).toBe('settings');
+    expect(currentPage('/settings/backups')).toBe('settings');
+    expect(currentPage('/settings/about')).toBe('settings');
+  });
+
+  it('marks Settings on the old Backups and About addresses, which open its tabs', () => {
+    expect(currentPage('/backups')).toBe('settings');
+    expect(currentPage('/about')).toBe('settings');
   });
 
   it('marks none on a page that has no place in them', () => {
@@ -36,6 +35,7 @@ describe('currentPage', () => {
     expect(currentPage('/chordsx')).toBeUndefined();
     expect(currentPage('/backupsx')).toBeUndefined();
     expect(currentPage('/settingsx')).toBeUndefined();
+    expect(currentPage('/settings/nowhere')).toBeUndefined();
   });
 });
 
@@ -49,31 +49,66 @@ describe('listAt', () => {
     expect(listAt('/songs/12')).toBeUndefined();
     expect(listAt('/songs/import')).toBeUndefined();
     expect(listAt('/nowhere')).toBeUndefined();
-    expect(listAt('/about')).toBeUndefined();
   });
 
-  it('is none on the Chord Finder or the Backups, which keep no search', () => {
+  it('is none on the Chord Finder or Settings, which keep no search', () => {
     expect(listAt('/chords')).toBeUndefined();
-    expect(listAt('/backups')).toBeUndefined();
+    expect(listAt('/settings')).toBeUndefined();
+    expect(listAt('/settings/backups')).toBeUndefined();
+    expect(listAt('/settings/about')).toBeUndefined();
   });
 });
 
 describe('pages', () => {
-  it('leads to the Songs, the Beats, the Chord Finder and the Backups, in that order', () => {
+  it('leads to the Songs, the Beats and the Chord Finder, in that order', () => {
     expect(pages.map((p) => [p.label, p.href])).toEqual([
       ['Songs', '/'],
       ['Beats', '/beats'],
       ['Chord Finder', '/chords'],
-      ['Backups', '/backups'],
     ]);
   });
 });
 
 describe('pinned', () => {
-  it('leads to Settings, then About, apart from the main pages', () => {
-    expect(pinned.map((p) => [p.label, p.href])).toEqual([
-      ['Settings', '/settings'],
-      ['About', '/about'],
+  it('leads to Settings alone, apart from the main pages', () => {
+    expect(pinned.map((p) => [p.label, p.href])).toEqual([['Settings', '/settings']]);
+  });
+});
+
+describe('settingsTabs', () => {
+  it('are Appearance, Backups and About, in that order, each at its own address', () => {
+    expect(settingsTabs.map((t) => [t.label, t.href])).toEqual([
+      ['Appearance', '/settings'],
+      ['Backups', '/settings/backups'],
+      ['About', '/settings/about'],
     ]);
+  });
+});
+
+describe('settingsTabAt', () => {
+  it('is the Settings tab at a path', () => {
+    expect(settingsTabAt('/settings')).toBe('appearance');
+    expect(settingsTabAt('/settings/backups')).toBe('backups');
+    expect(settingsTabAt('/settings/about')).toBe('about');
+  });
+
+  it('is none outside Settings, or at an address in it that has no tab', () => {
+    expect(settingsTabAt('/')).toBeUndefined();
+    expect(settingsTabAt('/backups')).toBeUndefined();
+    expect(settingsTabAt('/settings/nowhere')).toBeUndefined();
+  });
+});
+
+describe('movedTo', () => {
+  it('sends the old Backups and About addresses to their Settings tabs', () => {
+    expect(movedTo('/backups')).toBe('/settings/backups');
+    expect(movedTo('/about')).toBe('/settings/about');
+  });
+
+  it('is none for an address that never moved', () => {
+    expect(movedTo('/')).toBeUndefined();
+    expect(movedTo('/settings')).toBeUndefined();
+    expect(movedTo('/settings/about')).toBeUndefined();
+    expect(movedTo('/backupsx')).toBeUndefined();
   });
 });

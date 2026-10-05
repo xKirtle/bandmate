@@ -39,4 +39,9 @@ describe('components', () => {
     );
     expect(ownChevron).toEqual([]);
   });
+
+  it("draws every tab with app.css's .tabs, styling none of its own", () => {
+    // A tab is styled through [role='tab'] in a component's own styles.
+    expect(filesMatching(/\[role=['"]tab['"]\]/)).toEqual([]);
+  });
 });

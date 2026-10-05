@@ -1,10 +1,10 @@
 <script lang="ts">
-  // The Backups kept in Bandmate, newest first, each named from when it was
-  // made and what it holds, or with a name of its own, with its size, and
-  // downloadable as one file. A downloaded one, from here or another
-  // install, can be uploaded to join them. Songs can be restored from each
-  // that holds some. Each can be renamed, or deleted after
-  // confirming; nothing deletes one otherwise.
+  // Settings' Backups tab: the Backups kept in Bandmate, newest first, each
+  // named from when it was made and what it holds, or with a name of its
+  // own, with its size, and downloadable as one file. A downloaded one, from
+  // here or another install, can be uploaded to join them. Songs can be
+  // restored from each that holds some. Each can be renamed, or deleted
+  // after confirming; nothing deletes one otherwise.
   import Pencil from '@lucide/svelte/icons/pencil';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import ActionsMenu from '../lib/ActionsMenu.svelte';
@@ -14,6 +14,7 @@
   import NewBackupDialog from '../lib/NewBackupDialog.svelte';
   import RenameBackupDialog from '../lib/RenameBackupDialog.svelte';
   import RestoreBackupDialog from '../lib/RestoreBackupDialog.svelte';
+  import SettingsPage from '../lib/SettingsPage.svelte';
 
   let backups = $state<Backup[] | null>(null);
   let loadError = $state<string | null>(null);
@@ -94,18 +95,16 @@
   }
 </script>
 
-<header class="bar">
-  <h1>Backups</h1>
-  <div class="bar-actions">
-    <label class="button" class:disabled={uploading !== null}>
-      Upload
-      <input class="visually-hidden" type="file" onchange={upload} disabled={uploading !== null} />
-    </label>
-    <button type="button" class="button primary" onclick={() => (making = true)}>New Backup</button>
-  </div>
-</header>
-
-<main class="page">
+<SettingsPage tab="backups">
+  {#snippet barActions()}
+    <div class="bar-actions">
+      <label class="button" class:disabled={uploading !== null}>
+        Upload
+        <input class="visually-hidden" type="file" onchange={upload} disabled={uploading !== null} />
+      </label>
+      <button type="button" class="button primary" onclick={() => (making = true)}>New Backup</button>
+    </div>
+  {/snippet}
   {#if error}
     <p class="error" role="alert">{error}</p>
   {/if}
@@ -158,7 +157,7 @@
       {/each}
     </ul>
   {/if}
-</main>
+</SettingsPage>
 
 {#if making}
   <NewBackupDialog onMade={showMade} onClose={() => (making = false)} />
@@ -176,6 +175,7 @@
   .bar-actions {
     display: flex;
     gap: var(--space-2);
+    margin-left: auto;
   }
   .backups {
     margin: 0;

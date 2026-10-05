@@ -171,8 +171,8 @@ One icon, one meaning, across the app. Every icon in use is here: a new one is a
 | `volume-2`, `volume-1`, `volume-x`             | A player's volume: loud, quiet, muted                                                                                                                                                       |
 | `triangle-alert`                               | A warning, e.g. a Cue out of order                                                                                                                                                          |
 | `corner-down-left`                             | The Enter key, beside Sync mode's Now                                                                                                                                                       |
-| `music`, `disc-3`, `guitar`, `archive`         | The navigation: Songs, Beats, the Chord Finder, Backups                                                                                                                                     |
-| `settings`, `info`                             | The navigation, pinned apart: Settings, About                                                                                                                                               |
+| `music`, `disc-3`, `guitar`                    | The navigation: Songs, Beats, the Chord Finder                                                                                                                                              |
+| `settings`                                     | The navigation, pinned apart: Settings                                                                                                                                                      |
 
 ### The Timeline's own scale
 
@@ -202,6 +202,8 @@ An outlined toggle is for one that would otherwise compete, like Read mode's Cho
 **Fields** are the native `input`, `textarea` and `select`, styled in `app.css` at `--text-field`. A field's name goes above it with `.field` on its `<label>` (or `<fieldset>`), muted at `--text-sm`; the Song page's Details take theirs a step smaller. A `Combobox` or `Picker` is a field with a list. Checkboxes and radio buttons are `.choice-row` labels in a `.choice-group` fieldset, each a touch target tall, with what's under one (its note, a `PickList`) in `.choice-under`, lined up with its label; `--checkbox` sizes them.
 
 **Cards** are flat: `.card` is a `--surface-1` panel with a border and `--radius-lg`, on the page, never floating. It holds a Section, the Chord Finder, About's sections, the Beat Library's add and batch forms and its filters. Two relatives aren't cards: the Scrapbook is a dashed outline with no fill, since Sections are dropped into it, and its Sections are cards inside it; and on desktop the Song page's side parts, its Masters and the Scrapbook, are each a card that folds.
+
+**Tabs** are a `.tabs` row over what they switch between, each tab muted until it's chosen, then underlined in the accent and in `--text`. They're buttons in a tablist (`role="tab"`, `aria-selected`) where switching stays on the page, like the Chord Finder's and About's, and links (`aria-current="page"`) where each tab has its own address, like Settings' Appearance, Backups and About. A component adds only where the row sits, such as its border or a phone's tighter tabs. `components.test.ts` fails a component that styles `[role='tab']` itself.
 
 **Folds** are a `<details>` whose `<summary>` starts with `FoldChevron`, which turns from pointing right to down as it opens. `app.css` takes away the browser's own marker and rings a focused summary. About's release notes and dependency lists fold, and on desktop so do the Song page's side parts.
 

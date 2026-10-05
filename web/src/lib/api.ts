@@ -551,7 +551,7 @@ export interface ServerConfig {
   bugReportUrl: string;
 }
 
-/** Everything the About page shows that's known without going online. */
+/** Everything About shows that's known without going online. */
 export interface AboutInfo {
   /** The running version: the release tag, else the short commit, else "dev". */
   version: string;
@@ -696,7 +696,7 @@ function onTracks(clips: readonly (PlacedClip | PastedClip)[]) {
 export const api = {
   getConfig: () => request<ServerConfig>('GET', '/config'),
   getAbout: () => request<AboutInfo>('GET', '/about'),
-  /** Asks GitHub, unless the server recently has, so it's slower than the rest of the About page. */
+  /** Asks GitHub, unless the server recently has, so it's slower than the rest of About. */
   getAboutReleases: () => request<ReleasesReport>('GET', '/about/releases'),
   /** The Beat Library, newest first; q matches titles and producers. */
   listBeats: (q = '') => request<Beat[]>('GET', q.trim() ? `/beats?q=${encodeURIComponent(q.trim())}` : '/beats'),

@@ -114,7 +114,7 @@ Bandmate itself reads these:
 | `BANDMATE_ADDR`          | `:8080`  | Listen address                                                                                                             |
 | `BANDMATE_DATA_DIR`      | `./data` | Directory holding the SQLite database (`bandmate.db`), audio files (`audio/`), Covers (`covers/`) and Backups (`backups/`) |
 | `BANDMATE_MAX_UPLOAD_MB` | `500`    | Largest audio file accepted for upload, in megabytes                                                                       |
-| `BANDMATE_UPDATE_CHECK`  | `on`     | `off` stops the About page asking GitHub for the latest release and the release notes. It's Bandmate's only outbound call  |
+| `BANDMATE_UPDATE_CHECK`  | `on`     | `off` stops the About tab asking GitHub for the latest release and the release notes. It's Bandmate's only outbound call   |
 
 The image sets `BANDMATE_DATA_DIR` to `/data`, the folder the examples above mount.
 
@@ -144,7 +144,7 @@ A release with new features bumps the minor version, and one with only fixes bum
 
 **Rolling back:** run an older version tag instead. Migrations only go forward, so an older version doesn't undo a newer one's changes to the database. If the release you're leaving changed the database, put back the copy of the `data` folder you took before upgrading along with the older tag.
 
-**Backups:** the Backups page, in the main navigation, makes a Backup of the Songs you choose, the whole Beat Library, or both, and keeps it in Bandmate. Download a Backup as one file to keep elsewhere, and upload it to this install or another. A Restore brings back what you pick from a Backup. Where the same Song or Beat is already in Bandmate, even from another install, you choose to replace it or keep both, and nothing the Backup doesn't hold is deleted. A newer Bandmate restores an older one's Backups, never the other way round.
+**Backups:** the Backups tab, in Settings, makes a Backup of the Songs you choose, the whole Beat Library, or both, and keeps it in Bandmate. Download a Backup as one file to keep elsewhere, and upload it to this install or another. A Restore brings back what you pick from a Backup. Where the same Song or Beat is already in Bandmate, even from another install, you choose to replace it or keep both, and nothing the Backup doesn't hold is deleted. A newer Bandmate restores an older one's Backups, never the other way round.
 
 **Copying the data folder:** the low-level option. Stop Bandmate, so the database isn't mid-write, and copy the `data` folder. It holds the database, every audio file, every Cover and every Backup, so the copy holds everything. Copy it before each upgrade: rolling back needs the folder as it was before the new version's migrations changed it.
 

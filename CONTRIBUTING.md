@@ -54,7 +54,7 @@ If the SPA hasn't been built, the binary still runs, but non-API pages show a "w
 
 ### Dependencies and their licenses
 
-The About page lists every third-party package that ships, with its license. The SPA's build records the web packages in its bundle itself. The Go modules are in `internal/build/go-modules.json`, which is committed: after adding, removing or upgrading a Go module, run
+About, in Settings, lists every third-party package that ships, with its license. The SPA's build records the web packages in its bundle itself. The Go modules are in `internal/build/go-modules.json`, which is committed: after adding, removing or upgrading a Go module, run
 
 ```sh
 go generate ./internal/build   # runs go-licenses, so it needs network access
@@ -127,4 +127,4 @@ Tag first, and publish the GitHub Release only once CI has published the image. 
    gh release create vX.Y.Z --verify-tag --generate-notes
    ```
 
-   The notes list the pull requests merged since the last release, grouped by their labels ([.github/release.yml](.github/release.yml)). Read them before publishing, because the About page shows them. Where they read poorly, write the notes by hand and pass `--notes-file` instead. v0.4.0 is one of those: it's the first release, and most earlier pull requests have no label.
+   The notes list the pull requests merged since the last release, grouped by their labels ([.github/release.yml](.github/release.yml)). Read them before publishing, because About, in Settings, shows them. Where they read poorly, write the notes by hand and pass `--notes-file` instead. v0.4.0 is one of those: it's the first release, and most earlier pull requests have no label.

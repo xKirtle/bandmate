@@ -382,33 +382,11 @@
     padding: 0 var(--space-2);
     border-bottom: 1px solid var(--border);
   }
-  .tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-1);
-  }
   .toggle {
     min-height: 2rem;
     margin-left: auto;
     padding: 0 var(--space-3);
     font-size: var(--text-sm);
-  }
-  [role='tab'] {
-    min-height: var(--control);
-    padding: 0 var(--space-3);
-    border: 0;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-    background: none;
-    color: var(--text-muted);
-    font: inherit;
-    font-weight: 600;
-    white-space: nowrap;
-    cursor: pointer;
-  }
-  [role='tab'][aria-selected='true'] {
-    border-bottom-color: var(--accent);
-    color: var(--text);
   }
   .panel {
     display: flex;

@@ -1,4 +1,4 @@
-// How Backups are named, sized and asked for on the Backups page.
+// How Backups are named, sized and asked for in Settings' Backups tab.
 import type { Backup, BackupContents, BackupPicks, BackupPresent } from './api';
 import { formatSize } from './upload';
 
