@@ -177,7 +177,7 @@
     padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-md);
     scroll-margin-top: 5rem;
-    transition: background-color 0.2s;
+    transition: background-color var(--duration-base) var(--ease);
   }
   .section.current {
     background: var(--surface-1);
@@ -201,7 +201,7 @@
     padding: 0 var(--space-3);
     border-radius: var(--radius-sm);
     scroll-margin: 5rem 0;
-    transition: background-color 0.2s;
+    transition: background-color var(--duration-base) var(--ease);
   }
   .line-box.current {
     background: var(--surface-1);

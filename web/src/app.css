@@ -57,6 +57,14 @@
   --radius-lg: 0.75rem;
   --radius-full: 999px;
 
+  /* Motion, only to explain a change: fast for small things, like a chevron
+     turning or a control changing state, base for what moves or appears,
+     like a highlight following playback. One curve, which settles without
+     overshooting. */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
   font-family:
     system-ui,
     -apple-system,
@@ -72,6 +80,15 @@
   :root {
     --control: 2.25rem;
     --gutter: 2rem;
+  }
+}
+
+/* Reduced motion: every transition and animation takes its duration from
+   these, so nothing animates. Script's own motion asks motion.ts. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0s;
+    --duration-base: 0s;
   }
 }
 

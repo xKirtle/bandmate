@@ -311,7 +311,7 @@
     pointer-events: none;
     user-select: none;
     scroll-margin: 5rem 0;
-    transition: background-color 0.2s;
+    transition: background-color var(--duration-base) var(--ease);
   }
   /* Highlighted as in Read mode. */
   .row.current {

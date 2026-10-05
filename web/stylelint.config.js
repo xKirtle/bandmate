@@ -76,8 +76,23 @@ const radiusWith = (...extra) => {
 };
 const radius = radiusWith();
 
+// Motion: a duration is one of the --duration-* tokens, and the easing is
+// always --ease, the one curve, written out in each transition and animation
+// of a list so none falls back on the browser's own. Under reduced motion
+// the duration tokens are 0s, so nothing animates.
+const eased = '[^,]*var\\(--ease\\)[^,]*';
+const motion = {
+  '/^(transition|animation)$/': ['none', `/^${eased}(,${eased})*$/`],
+  '/^(transition|animation)-(duration|delay)$/': ['/^var\\(--duration-(fast|base)\\)$/'],
+  '/^(transition|animation)-timing-function$/': ['/^var\\(--ease\\)$/'],
+};
+// No literal time in a transition or animation, only the tokens.
+const literalTime = {
+  '/^(transition|animation)(-.+)?$/': ['/(?<![\\w.-])(\\d*\\.)?\\d+m?s\\b/i'],
+};
+
 // What every file's allowed values start from.
-const allowed = { ...shadows, ...type, ...radius };
+const allowed = { ...shadows, ...type, ...radius, ...motion };
 
 export default {
   rules: {
@@ -87,7 +102,7 @@ export default {
     'unit-no-unknown': true,
     ...colour,
     'declaration-property-value-allowed-list': allowed,
-    'declaration-property-value-disallowed-list': spacing,
+    'declaration-property-value-disallowed-list': { ...spacing, ...literalTime },
   },
   overrides: [
     { files: ['**/*.svelte'], customSyntax: 'postcss-html' },
@@ -96,7 +111,7 @@ export default {
       files: ['src/palettes.css'],
       rules: {
         ...Object.fromEntries(Object.keys(colour).map((rule) => [rule, null])),
-        'declaration-property-value-allowed-list': { ...type, ...radius },
+        'declaration-property-value-allowed-list': { ...type, ...radius, ...motion },
       },
     },
     // A Cover's corners grow with it, a fixed share of its size like an app
