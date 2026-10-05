@@ -22,6 +22,8 @@
   let songs = $state<SongSummary[] | null>(null);
   /** The Beat Library's Beats. */
   let beats = $state<Beat[] | null>(null);
+  /** Each Folder's name, by its id, to group the Songs by Folder. */
+  let folderNames = $state<Map<number, string>>(new Map());
   let loadError = $state<string | null>(null);
   let error = $state<string | null>(null);
   /** Whether Songs are ticked; unticking them keeps the picks for when they're ticked again. */
@@ -43,8 +45,9 @@
   );
   const name = $derived('name' in toMake ? toMake.name : '');
 
-  Promise.all([api.listSongs(), api.listBeats()]).then(
-    ([songList, beatList]) => {
+  Promise.all([api.listSongs(), api.listBeats(), api.listFolders()]).then(
+    ([songList, beatList, folderList]) => {
+      folderNames = new Map(folderList.map((f) => [f.id, f.name]));
       songs = [...songList].sort((a, b) => a.title.localeCompare(b.title));
       beats = [...beatList].sort((a, b) => a.title.localeCompare(b.title));
       // Open on Everything there is, to back up in one click.
@@ -109,7 +112,12 @@
             use.
           </p>
           {#if songsTicked}
-            <PickList items={songs} bind:picked label="Songs to back up" />
+            <PickList
+              items={songs}
+              bind:picked
+              label="Songs to back up"
+              folderOf={(s) => (s.folderId === null ? null : (folderNames.get(s.folderId) ?? null))}
+            />
             {#if !beatsTicked && songsIn.length > 0}
               <p class="muted">{broughtNote(songsIn.length, brought.size)}</p>
             {/if}

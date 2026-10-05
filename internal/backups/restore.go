@@ -22,27 +22,32 @@ import (
 )
 
 // Song is a Song a Backup holds, by its id there, or one a Restore brought
-// back, by its id here.
+// back, by its id here, with the name of the Folder it sits in there or
+// here, nil for none.
 type Song struct {
-	ID    int64  `json:"id"`
-	Title string `json:"title"`
+	ID     int64   `json:"id"`
+	Title  string  `json:"title"`
+	Folder *string `json:"folder"`
 }
 
 // keptBothSuffix ends the title of a Song or Beat a Restore added alongside
 // the same one already in Bandmate.
 const keptBothSuffix = " (restored)"
 
-// Songs lists the Songs a Backup holds, by title.
+// Songs lists the Songs a Backup holds, by title, each with the Folder it
+// sat in.
 func (s *Store) Songs(ctx context.Context, id int64) ([]Song, error) {
 	r, err := s.openBackup(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	defer r.close()
-	return querySongs(ctx, r.db, `SELECT id, title FROM songs ORDER BY title COLLATE NOCASE, id`)
+	return querySongs(ctx, r.db, `SELECT s.id, s.title, f.name FROM songs s
+		LEFT JOIN folders f ON f.id = s.folder_id ORDER BY s.title COLLATE NOCASE, s.id`)
 }
 
-// querySongs lists the Songs query selects, by id and title.
+// querySongs lists the Songs query selects, by id, title and Folder name,
+// NULL for none.
 func querySongs(ctx context.Context, q querier, query string) ([]Song, error) {
 	rows, err := q.QueryContext(ctx, query)
 	if err != nil {
@@ -52,7 +57,7 @@ func querySongs(ctx context.Context, q querier, query string) ([]Song, error) {
 	list := []Song{}
 	for rows.Next() {
 		var song Song
-		if err := rows.Scan(&song.ID, &song.Title); err != nil {
+		if err := rows.Scan(&song.ID, &song.Title, &song.Folder); err != nil {
 			return nil, err
 		}
 		list = append(list, song)
@@ -549,8 +554,9 @@ func (s *Store) copyIn(ctx context.Context, staging string, picks Picks, replace
 	if err != nil {
 		return Restored{}, err
 	}
-	restored.Songs, err = querySongs(ctx, tx, `SELECT s.id, s.title FROM main.songs s
-		JOIN temp.restored r ON r.tbl = 'songs' AND r.new = s.id ORDER BY s.title COLLATE NOCASE, s.id`)
+	restored.Songs, err = querySongs(ctx, tx, `SELECT s.id, s.title, f.name FROM main.songs s
+		JOIN temp.restored r ON r.tbl = 'songs' AND r.new = s.id
+		LEFT JOIN main.folders f ON f.id = s.folder_id ORDER BY s.title COLLATE NOCASE, s.id`)
 	if err != nil {
 		return Restored{}, err
 	}

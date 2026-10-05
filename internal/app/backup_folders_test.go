@@ -60,6 +60,64 @@ func (ts *testServer) songsMovedSinceBackedUp() (made backup, opener, loose song
 	return made, opener, loose
 }
 
+// heldSong is a Song a Backup holds, as its listing answers: by its id
+// there, with the name of the Folder it sat in, or nil for none.
+type heldSong struct {
+	ID     int64   `json:"id"`
+	Title  string  `json:"title"`
+	Folder *string `json:"folder"`
+}
+
+// heldSongs lists the Songs a Backup holds, with their Folders.
+func (ts *testServer) heldSongs(id int64) []heldSong {
+	ts.t.Helper()
+	res := ts.Do(http.MethodGet, backupPath(id)+"/songs", nil)
+	expectStatus(ts.t, res, http.StatusOK)
+	var list []heldSong
+	res.JSON(ts.t, &list)
+	return list
+}
+
+func TestABackupListsEachSongWithTheFolderItSatIn(t *testing.T) {
+	ts := newTestServer(t)
+	ep := ts.createFolder("Summer EP")
+	opener := ts.createSong("Opener")
+	loose := ts.createSong("Loose")
+	ts.putInFolder(opener.ID, ep)
+	made := ts.backUp(map[string]any{"allSongs": true})
+	// What the Folder's called since has no bearing on what the Backup holds.
+	expectStatus(t, ts.renameFolder(ep.ID, "Winter EP"), http.StatusOK)
+
+	name := "Summer EP"
+	want := []heldSong{{loose.ID, "Loose", nil}, {opener.ID, "Opener", &name}}
+	if got := ts.heldSongs(made.ID); !reflect.DeepEqual(got, want) {
+		t.Errorf("backup's songs = %+v, want %+v", got, want)
+	}
+}
+
+func TestARestoreAnswersWithTheFolderEachSongWentIntoHere(t *testing.T) {
+	elsewhere := newTestServer(t)
+	theirs := elsewhere.createFolder("summer ep")
+	opener := elsewhere.createSong("Opener")
+	loose := elsewhere.createSong("Loose")
+	elsewhere.putInFolder(opener.ID, theirs)
+	made := elsewhere.backUp(map[string]any{"allSongs": true})
+	ts := newTestServer(t)
+	ts.createFolder("Summer EP")
+	up := ts.uploadFrom(elsewhere, made)
+
+	res := ts.Do(http.MethodPost, backupPath(up.ID)+"/restore", map[string]any{"songs": []int64{opener.ID, loose.ID}})
+	expectStatus(t, res, http.StatusOK)
+	var got struct{ Songs []heldSong }
+	res.JSON(t, &got)
+
+	name := "Summer EP"
+	if len(got.Songs) != 2 || !reflect.DeepEqual(got.Songs[0].Folder, (*string)(nil)) ||
+		!reflect.DeepEqual(got.Songs[1].Folder, &name) {
+		t.Errorf("restored = %+v, want Loose in no Folder, then Opener in Summer EP, as named here", got.Songs)
+	}
+}
+
 func TestARestoredSongComesBackInItsFolderMadeIfThisInstallHasNone(t *testing.T) {
 	elsewhere := newTestServer(t)
 	ep := elsewhere.createFolder("Summer EP")
@@ -145,6 +203,9 @@ func TestABackupMadeBeforeFoldersRestoresItsSongsInNoFolder(t *testing.T) {
 	made := ts.backUp(map[string]any{"songs": []int64{ts.createSong("Placeholder").ID}})
 	ts.replaceBackupFile(made.ID, packBackup(t, dir))
 
+	if got := ts.heldSongs(made.ID); !reflect.DeepEqual(got, []heldSong{{4, "Night Drive", nil}}) {
+		t.Errorf("backup's songs = %+v, want Night Drive in no Folder", got)
+	}
 	restored := ts.restore(made.ID, 4)
 
 	if len(restored) != 1 || restored[0].Title != "Night Drive" {

@@ -174,7 +174,7 @@
           <div class="choice-under">
             <p id="restore-songs-note" class="muted">Each Song comes back whole, with the Beats its Clips use.</p>
             {#if songsTicked}
-              <PickList items={songs} bind:picked label="Songs to restore" />
+              <PickList items={songs} bind:picked label="Songs to restore" folderOf={(s) => s.folder} />
               {#if !beatsTicked && songsIn.length > 0}
                 <p class="muted">{broughtNote(songsIn.length, brought.size)}</p>
               {/if}
