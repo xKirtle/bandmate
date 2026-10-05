@@ -24,49 +24,49 @@ export interface Piece {
 export function layoutLine(line: Line, transpose = 0, key = ''): Piece[][] {
   // Offsets count code points, which Array.from splits on.
   const chars = Array.from(line.lyrics);
-  const space = (i: number) => i >= 0 && i < chars.length && /\s/.test(chars[i]);
+  const isSpace = (i: number) => i >= 0 && i < chars.length && /\s/.test(chars[i]);
   const chordsAt = new Map<number, string[]>();
   for (const c of line.chords)
     chordsAt.set(c.offset, [...(chordsAt.get(c.offset) ?? []), transposeChord(c.name, transpose, key)]);
 
-  // Where each Chord's Piece starts, and whether it falls between words. A
-  // Chord Line's Chords sit on spaces too, but it has no words to fall
-  // between, so its Chords stay as they are.
-  const startsAt = new Map<number, { chords: string[]; between: boolean }>();
+  // The Chords whose Piece starts at each character, and whether they fall
+  // between words. A Chord Line's Chords sit on spaces too, but it has no
+  // words to fall between, so its Chords stay as they are.
+  const chordPieceAt = new Map<number, { chords: string[]; isBetween: boolean }>();
   for (const [offset, chords] of chordsAt) {
-    const between = !line.chordLine && space(offset);
+    const isBetween = !line.chordLine && isSpace(offset);
     let start = offset;
-    if (between) while (space(start - 1) && !chordsAt.has(start - 1)) start--;
-    startsAt.set(start, { chords, between });
+    if (isBetween) while (isSpace(start - 1) && !chordsAt.has(start - 1)) start--;
+    chordPieceAt.set(start, { chords, isBetween });
   }
 
   const words: Piece[][] = [];
-  const between = new Set<Piece>();
+  const betweenPieces = new Set<Piece>();
   let word: Piece[] | null = null;
   for (let i = 0; i <= chars.length; i++) {
-    const starts = startsAt.get(i);
+    const chordPiece = chordPieceAt.get(i);
     // The whitespace a Chord falls between is a word of its own, so the line
     // can still wrap before it.
-    if (starts?.between) word = null;
-    if (starts || (!word && i < chars.length)) {
+    if (chordPiece?.isBetween) word = null;
+    if (chordPiece || (!word && i < chars.length)) {
       if (!word) words.push((word = []));
-      const piece = { chords: starts?.chords ?? [], text: '' };
-      if (starts?.between) between.add(piece);
+      const piece = { chords: chordPiece?.chords ?? [], text: '' };
+      if (chordPiece?.isBetween) betweenPieces.add(piece);
       word.push(piece);
     }
     if (i === chars.length) break;
     const piece = word![word!.length - 1];
     piece.text += chars[i];
-    // A space ends the word, so the line can wrap after it, unless it's in
-    // whitespace a Chord falls between that goes on.
-    const goesOn = between.has(piece) && space(i + 1) && !startsAt.has(i + 1);
-    if (space(i) && !goesOn) word = null;
+    // A space ends the word, so the line can wrap after it, unless the
+    // whitespace a Chord falls between goes on. (Where another Chord falls
+    // in it, that Chord starts a word of its own anyway.)
+    if (isSpace(i) && !(betweenPieces.has(piece) && isSpace(i + 1))) word = null;
   }
 
   // A Chord straight after keeps the usual separation, so names never touch.
   const pieces = words.flat();
   pieces.forEach((piece, n) => {
-    if (between.has(piece) && !pieces[n + 1]?.chords.length) piece.snug = true;
+    if (betweenPieces.has(piece) && !pieces[n + 1]?.chords.length) piece.snug = true;
   });
   return words;
 }
