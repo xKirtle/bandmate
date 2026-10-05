@@ -126,6 +126,26 @@ export function songListViewFromParams(params: URLSearchParams): SongListView {
   };
 }
 
+/** Whether a Song list view searches or filters, rather than only sorting. */
+export function isSongListFiltered(view: SongListView): boolean {
+  return !!(view.q.trim() || view.status || view.hasMaster);
+}
+
+/**
+ * What to ask the server for to show a Song list view: inside a Folder, its
+ * Songs; at the top level, the Songs in no Folder, but for while a search or
+ * filter is on, which looks at every Song, whatever Folder it's in.
+ */
+export function songListFilter(view: SongListView, folderId?: number): SongFilter {
+  const filter: SongFilter = {};
+  if (view.q.trim()) filter.q = view.q;
+  if (view.status) filter.status = view.status;
+  if (view.hasMaster) filter.hasMaster = true;
+  if (folderId !== undefined) filter.folder = folderId;
+  else if (!isSongListFiltered(view)) filter.folder = 'none';
+  return filter;
+}
+
 /** The Songs a filter keeps, and whether there are any Songs at all. */
 export interface LoadedSongList {
   songs: SongSummary[];
@@ -134,10 +154,10 @@ export interface LoadedSongList {
 
 /**
  * Lists the Songs a filter keeps, and whether there are any Songs at all:
- * inside a Folder, any in it, and at the top level, where the list is the
- * Songs in no Folder, any anywhere. The server filters the list, so when
- * nothing matches it asks again for every Song there, to tell no matches
- * from no Songs.
+ * inside a Folder, any in it, and at the top level, any anywhere, whether
+ * the list is the Songs in no Folder or every Song. The server filters the
+ * list, so when nothing matches it asks again for every Song there, to tell
+ * no matches from no Songs.
  */
 export async function loadSongList(
   filter: SongFilter,

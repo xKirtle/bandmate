@@ -13,9 +13,11 @@
   import FolderNameDialog from '../lib/FolderNameDialog.svelte';
   import {
     defaultSongListView,
+    isSongListFiltered,
     loadSongList,
     songCount,
     songListViewFromParams,
+    songListFilter,
     songListViewToParams,
     sortFolders,
     sortSongs,
@@ -51,12 +53,17 @@
   let changes = $state(0);
 
   const sorted = $derived(songs && sortSongs(songs, view.sort));
-  const filtered = $derived(!!(view.q.trim() || view.status || view.hasMaster));
+  const filtered = $derived(isSongListFiltered(view));
+  // Whether the Songs shown are every Song, whatever Folder it's in, as at the
+  // top level while a search or filter is on: then the Folders give way to
+  // one list of Songs, each showing its Folder. Taken from the list as last
+  // loaded, not the filters as typed, so the two never show out of step.
+  let acrossFolders = $state(false);
   // Every Folder by name, for the menus; at the top level they come first,
-  // whatever the Songs are sorted by, but for while a search or filter is
-  // on, which only looks at the Songs.
+  // whatever the Songs are sorted by, but for while the list is every Song.
   const sortedFolders = $derived(folders ? sortFolders(folders) : []);
-  const listedFolders = $derived(folderId === undefined && !filtered ? sortedFolders : []);
+  const listedFolders = $derived(folderId === undefined && !acrossFolders ? sortedFolders : []);
+  const folderNames = $derived(new Map(folders?.map((f) => [f.id, f.name])));
   const folder = $derived(folderId === undefined ? undefined : folders?.find((f) => f.id === folderId));
   const folderMissing = $derived(folderId !== undefined && folders !== null && !folder);
   // A Folder opens with the Songs sorted as they are here, and the way back
@@ -93,12 +100,7 @@
   // Reloads whenever the filters change, waiting for a pause in typing. Only
   // the latest request's answer is shown.
   $effect(() => {
-    const filter = {
-      status: view.status,
-      q: view.q,
-      hasMaster: view.hasMaster || undefined,
-      folder: folderId ?? ('none' as const),
-    };
+    const filter = songListFilter(view, folderId);
     void changes;
     let current = true;
     const timer = setTimeout(
@@ -113,6 +115,7 @@
           ([result, allFolders]) => {
             if (!current) return;
             songs = result.songs;
+            acrossFolders = filter.folder === undefined;
             anySongs = result.anySongs;
             folders = allFolders;
             if (!anySongs && (view.status || view.hasMaster || view.q)) clearFilters();
@@ -374,6 +377,9 @@
                   >
                 </button>
               </th>
+              {#if column.id === 'title' && acrossFolders}
+                <th class="unsorted">Folder</th>
+              {/if}
             {/each}
             <th class="row-actions"><span class="visually-hidden">Actions</span></th>
           </tr>
@@ -394,6 +400,7 @@
             </tr>
           {/each}
           {#each sorted as song (song.id)}
+            {@const folderName = song.folderId === null ? undefined : folderNames.get(song.folderId)}
             <tr onclick={(event) => openRow(event, `/songs/${song.id}`)}>
               <td class="title">
                 <span class="with-cover">
@@ -401,6 +408,9 @@
                   <a href="/songs/{song.id}">{song.title}</a>
                 </span>
               </td>
+              {#if acrossFolders}
+                <td class="folder-name" title={folderName}>{folderName ?? '—'}</td>
+              {/if}
               <td><StatusBadge status={song.status} /></td>
               <td>{song.key || '—'}</td>
               <td class="num">{song.bpm ?? '—'}</td>
@@ -427,10 +437,19 @@
           </li>
         {/each}
         {#each sorted as song (song.id)}
+          {@const folderName = song.folderId === null ? undefined : folderNames.get(song.folderId)}
           <li>
             <a href="/songs/{song.id}">
               <SongCover songId={song.id} coverId={song.coverId} title={song.title} status={song.status} />
-              <span class="title">{song.title}</span>
+              <span class="heading">
+                <span class="title">{song.title}</span>
+                {#if acrossFolders && folderName !== undefined}
+                  <span class="in-folder"
+                    ><FolderIcon /><span class="visually-hidden">In</span>
+                    {folderName}</span
+                  >
+                {/if}
+              </span>
               <span class="meta">
                 <StatusBadge status={song.status} />
                 <time datetime={song.updatedAt}>{timeAgo(song.updatedAt)}</time>
@@ -586,8 +605,28 @@
     min-width: 0;
     overflow-wrap: anywhere;
   }
-  .songs .title {
+  /* A Song's title, over its Folder's name while the list looks in every Folder. */
+  .heading {
+    display: flex;
     flex: 1;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+  .songs > li > a > .title {
+    flex: 1;
+  }
+  .in-folder {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+  }
+  .in-folder :global(.lucide-icon) {
+    flex-shrink: 0;
   }
   /* On the narrowest phones, a Song's Status stands over when it was edited,
      leaving its title room beside them and its ⋯. */
@@ -642,6 +681,18 @@
   th button:hover,
   th[aria-sort] button {
     color: var(--text);
+  }
+  /* A column that doesn't sort, headed like one that does. */
+  th.unsorted {
+    padding: 0 var(--space-2);
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+  td.folder-name {
+    max-width: 12rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .arrow {
     display: inline-block;

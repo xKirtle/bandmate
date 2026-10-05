@@ -410,3 +410,84 @@ func TestDeletingAFolderRefusesAnUnknownChoiceForItsSongs(t *testing.T) {
 		t.Errorf("folders = %d, want the one still there", got)
 	}
 }
+
+// songsInFolders makes Songs spread across two Folders and none, for search
+// and filters to look through: in Summer EP, "Night Drive" (drafting, with a
+// Master) and "Daylight"; in Demos, "Night Sketch" (drafting); in none,
+// "Night Owl" and "Loose" (drafting, with a Master).
+func (ts *testServer) songsInFolders() (ep, demos folder) {
+	ts.t.Helper()
+	ep, demos = ts.createFolder("Summer EP"), ts.createFolder("Demos")
+	file := func(title string, in *folder, drafting, mastered bool) {
+		s := ts.createSong(title)
+		if drafting {
+			ts.updateSong(s.ID, map[string]any{"status": "drafting"})
+		}
+		if mastered {
+			ts.uploadMaster(s.ID, fakeAudio(title+".wav"))
+		}
+		if in != nil {
+			expectStatus(ts.t, ts.moveSong(s.ID, &in.ID), http.StatusNoContent)
+		}
+	}
+	file("Night Drive", &ep, true, true)
+	file("Daylight", &ep, false, false)
+	file("Night Sketch", &demos, true, false)
+	file("Night Owl", nil, false, false)
+	file("Loose", nil, true, true)
+	return ep, demos
+}
+
+// At the top level, a search or filter asks for every Song, whatever Folder
+// it's in, and each says which Folder that is.
+func TestSearchAndFiltersAtTheTopLevelLookInEveryFolder(t *testing.T) {
+	ts := newTestServer(t)
+	ep, demos := ts.songsInFolders()
+
+	cases := map[string][]string{
+		"q=night":                        {"Night Owl", "Night Sketch", "Night Drive"},
+		"status=drafting":                {"Loose", "Night Sketch", "Night Drive"},
+		"hasMaster=true":                 {"Loose", "Night Drive"},
+		"q=night&status=drafting":        {"Night Sketch", "Night Drive"},
+		"q=night&hasMaster=true":         {"Night Drive"},
+		"q=nothing+like+it":              {},
+		"status=finished&hasMaster=true": {},
+	}
+	for query, want := range cases {
+		if got := titles(ts.listSongs(query)); !reflect.DeepEqual(got, want) {
+			t.Errorf("song list for %q = %v, want %v", query, got, want)
+		}
+	}
+	wantFolder := map[string]*int64{"Night Drive": &ep.ID, "Night Sketch": &demos.ID, "Night Owl": nil}
+	for _, s := range ts.listSongs("q=night") {
+		if !reflect.DeepEqual(s.FolderID, wantFolder[s.Title]) {
+			t.Errorf("%s's folderId = %v, want %v", s.Title, s.FolderID, wantFolder[s.Title])
+		}
+	}
+}
+
+// Inside a Folder, or among the Songs in none, search and filters keep to
+// those Songs.
+func TestSearchAndFiltersInsideAFolderCoverOnlyIt(t *testing.T) {
+	ts := newTestServer(t)
+	ep, demos := ts.songsInFolders()
+	inEP, inDemos := fmt.Sprintf("folder=%d", ep.ID), fmt.Sprintf("folder=%d", demos.ID)
+
+	cases := map[string][]string{
+		inEP + "&q=night":             {"Night Drive"},
+		inEP + "&status=drafting":     {"Night Drive"},
+		inEP + "&hasMaster=true":      {"Night Drive"},
+		inEP + "&hasMaster=false":     {"Daylight"},
+		inEP + "&q=sketch":            {},
+		inDemos + "&q=night":          {"Night Sketch"},
+		inDemos + "&hasMaster=true":   {},
+		"folder=none&q=night":         {"Night Owl"},
+		"folder=none&status=drafting": {"Loose"},
+		"folder=none&q=drive":         {},
+	}
+	for query, want := range cases {
+		if got := titles(ts.listSongs(query)); !reflect.DeepEqual(got, want) {
+			t.Errorf("song list for %q = %v, want %v", query, got, want)
+		}
+	}
+}
