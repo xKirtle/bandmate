@@ -271,7 +271,7 @@
       <p class="muted">Set your interface's gain so the loudest part stays out of the red.</p>
     {/if}
     <div class="latency">
-      <p>
+      <p class="tabular">
         <span>Latency Offset</span>
         {#if offset !== null}
           {formatOffset(offset)}
@@ -315,7 +315,7 @@
   label span,
   .level > span:first-child {
     color: var(--text-muted);
-    font-size: 0.875rem;
+    font-size: var(--text-md);
   }
   select {
     width: 100%;
@@ -344,7 +344,7 @@
     padding: 0 0.375rem;
     border-radius: 0.25rem;
     color: var(--text-muted);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     font-weight: 600;
     opacity: 0.4;
   }
@@ -355,7 +355,7 @@
   }
   p {
     margin: 0;
-    font-size: 0.875rem;
+    font-size: var(--text-md);
   }
   .problem {
     color: var(--danger);

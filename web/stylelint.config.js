@@ -21,9 +21,26 @@ const colour = {
     'color',
     'drop-shadow',
   ],
-  'declaration-property-value-allowed-list': {
-    '/^(box|text)-shadow$/': ['none', '/^var\\(--(shadow-float|selected-outline|selected-edge|invalid-outline)\\)$/'],
-  },
+};
+const shadows = {
+  '/^(box|text)-shadow$/': ['none', '/^var\\(--(shadow-float|selected-outline|selected-edge|invalid-outline)\\)$/'],
+};
+
+// Type: a font size is one of the size or lyric tokens, or on the Timeline a
+// step of the same scale in its own unit, `--timeline-rem`. The `font`
+// shorthand only ever inherits, so it can't set a size of its own.
+const scaleSteps = '(0\\.75|0\\.8125|0\\.875|1|1\\.25|1\\.5)';
+const type = {
+  'font-size': [
+    'inherit',
+    '/^var\\(--text-(xs|sm|md|lg|xl|2xl|field)\\)$/',
+    '/^var\\(--lyric-(write|read-line|read-chord)\\)$/',
+    '/^var\\(--timeline-rem\\)$/',
+    `/^calc\\(${scaleSteps} \\* var\\(--timeline-rem\\)\\)$/`,
+    // A Cover placeholder's initial grows with the Cover it stands in for.
+    '/^calc\\(var\\(--size\\) \\* [0-9.]+\\)$/',
+  ],
+  font: ['inherit'],
 };
 
 export default {
@@ -33,10 +50,17 @@ export default {
     'property-no-unknown': true,
     'unit-no-unknown': true,
     ...colour,
+    'declaration-property-value-allowed-list': { ...shadows, ...type },
   },
   overrides: [
     { files: ['**/*.svelte'], customSyntax: 'postcss-html' },
     // Where the colour tokens are defined.
-    { files: ['src/palettes.css'], rules: Object.fromEntries(Object.keys(colour).map((rule) => [rule, null])) },
+    {
+      files: ['src/palettes.css'],
+      rules: {
+        ...Object.fromEntries(Object.keys(colour).map((rule) => [rule, null])),
+        'declaration-property-value-allowed-list': type,
+      },
+    },
   ],
 };

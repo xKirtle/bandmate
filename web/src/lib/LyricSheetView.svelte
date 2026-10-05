@@ -186,7 +186,7 @@
   h3 {
     margin: 0 0 0.25rem;
     color: var(--text-muted);
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -211,8 +211,8 @@
     cursor: pointer;
   }
   .line {
-    font-size: 1.0625rem;
-    line-height: 1.4;
+    font-size: var(--lyric-read-line);
+    line-height: var(--lyric-read-leading);
   }
   .plain {
     white-space: pre-wrap;
@@ -241,7 +241,7 @@
   .chord {
     min-height: 1.4em;
     color: var(--accent);
-    font-size: 0.9375rem;
+    font-size: var(--lyric-read-chord);
     font-weight: 700;
   }
   .chord:not(:empty) {

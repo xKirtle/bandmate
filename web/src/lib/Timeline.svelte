@@ -3614,7 +3614,7 @@
     width: var(--touch);
     height: var(--touch);
     border-radius: calc(0.5 * var(--timeline-rem));
-    font-size: calc(1.125 * var(--timeline-rem));
+    font-size: calc(1.25 * var(--timeline-rem));
   }
   .transport,
   .offer {
@@ -3861,7 +3861,7 @@
     border-radius: calc(0.25 * var(--timeline-rem));
     background: none;
     color: var(--text-muted);
-    font-size: calc(0.6875 * var(--timeline-rem));
+    font-size: calc(0.75 * var(--timeline-rem));
     font-weight: 700;
     cursor: pointer;
   }
@@ -4068,7 +4068,7 @@
     border-radius: 0.25rem;
     background: none;
     color: var(--warning);
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     cursor: pointer;
   }
   .not-calibrated:disabled {
@@ -4182,7 +4182,7 @@
     flex: 1;
     min-width: 0;
     padding: 0 calc(0.25 * var(--timeline-rem));
-    font-size: calc(0.6875 * var(--timeline-rem));
+    font-size: calc(0.75 * var(--timeline-rem));
     font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
@@ -4199,7 +4199,7 @@
     background: var(--bg);
     color: var(--text);
     font: inherit;
-    font-size: calc(0.6875 * var(--timeline-rem));
+    font-size: calc(0.75 * var(--timeline-rem));
     font-weight: 600;
     line-height: 1.25;
     user-select: text;
@@ -4358,7 +4358,7 @@
     border-radius: calc(0.25 * var(--timeline-rem));
     background: var(--bg);
     color: var(--text);
-    font-size: calc(0.6875 * var(--timeline-rem));
+    font-size: calc(0.75 * var(--timeline-rem));
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
     transform: translate(-50%, -120%);
@@ -4372,7 +4372,7 @@
     flex-shrink: 0;
     padding: 0 calc(0.25 * var(--timeline-rem));
     color: var(--text-muted);
-    font-size: calc(0.625 * var(--timeline-rem));
+    font-size: calc(0.75 * var(--timeline-rem));
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
@@ -4435,7 +4435,7 @@
     border: none;
     background: none;
     color: var(--text-muted);
-    font-size: calc(1.125 * var(--timeline-rem));
+    font-size: calc(1.25 * var(--timeline-rem));
     cursor: pointer;
   }
 

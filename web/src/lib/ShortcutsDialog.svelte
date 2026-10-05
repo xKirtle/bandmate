@@ -91,11 +91,11 @@
   }
   h2 {
     margin: 0;
-    font-size: 1.125rem;
+    font-size: var(--text-xl);
   }
   h3 {
     margin: 0 0 0.25rem;
-    font-size: 0.875rem;
+    font-size: var(--text-md);
     color: var(--text-muted);
   }
   ul {
@@ -121,7 +121,7 @@
     font-weight: 600;
   }
   .what .muted {
-    font-size: 0.875rem;
+    font-size: var(--text-md);
   }
   .keys {
     display: flex;
@@ -130,7 +130,7 @@
     align-items: flex-end;
     gap: 0.25rem;
     max-width: 50%;
-    font-size: 0.875rem;
+    font-size: var(--text-md);
   }
   .way {
     display: flex;

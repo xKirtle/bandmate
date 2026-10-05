@@ -513,8 +513,8 @@
   }
   .lines {
     padding: 0 0.25rem;
-    font-size: max(1rem, 16px);
-    line-height: 1.6;
+    font-size: var(--lyric-write);
+    line-height: var(--lyric-write-leading);
     overflow-wrap: anywhere;
   }
   .lines p {

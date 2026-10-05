@@ -155,8 +155,8 @@
     <p class="problem" role="alert">{error}</p>
   {:else if measured}
     <p role="status">
-      The Latency Offset is <strong>{formatOffset(measured.offset)}</strong>, from {measured.hits} of {clickCount} taps. New
-      Takes are placed earlier by it; Takes already recorded stay where they are.
+      The Latency Offset is <strong class="tabular">{formatOffset(measured.offset)}</strong>, from {measured.hits} of {clickCount}
+      taps. New Takes are placed earlier by it; Takes already recorded stay where they are.
     </p>
   {:else if result}
     <p class="problem" role="alert">
@@ -222,20 +222,20 @@
   }
   h2 {
     margin: 0;
-    font-size: 1.125rem;
+    font-size: var(--text-xl);
   }
   p {
     margin: 0;
   }
   .count {
-    font-size: 1.25rem;
+    font-size: var(--text-xl);
     font-variant-numeric: tabular-nums;
   }
   .problem {
     color: var(--danger);
   }
   .muted {
-    font-size: 0.875rem;
+    font-size: var(--text-md);
   }
   .actions {
     display: flex;

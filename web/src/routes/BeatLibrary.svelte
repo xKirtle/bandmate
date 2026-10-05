@@ -364,7 +364,7 @@
     <form class="adding" onsubmit={add} aria-labelledby="adding-heading">
       <h2 id="adding-heading">
         Add “{adding.file.name}”
-        <span class="muted">{formatDuration(adding.decoded.duration)}</span>
+        <span class="muted tabular">{formatDuration(adding.decoded.duration)}</span>
       </h2>
       <BeatFields bind:draft={adding.draft} idPrefix="new-beat" />
       <div class="actions">
@@ -457,7 +457,7 @@
   }
   .adding h2 {
     margin: 0;
-    font-size: 1rem;
+    font-size: var(--text-lg);
     overflow-wrap: anywhere;
   }
   .adding h2 span {

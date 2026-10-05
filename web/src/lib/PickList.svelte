@@ -89,7 +89,7 @@
     background: none;
     color: var(--accent);
     font: inherit;
-    font-size: 0.875rem;
+    font-size: var(--text-md);
     font-weight: 600;
     cursor: pointer;
   }
@@ -135,7 +135,7 @@
   .detail,
   .note {
     color: var(--text-muted);
-    font-size: 0.875rem;
+    font-size: var(--text-md);
   }
   .note {
     display: block;

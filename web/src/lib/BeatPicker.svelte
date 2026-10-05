@@ -170,7 +170,7 @@
   {#if adding}
     <form class="adding" onsubmit={upload}>
       <p class="file">
-        “{adding.file.name}” <span class="muted">{formatDuration(adding.decoded.duration)}</span>
+        “{adding.file.name}” <span class="muted tabular">{formatDuration(adding.decoded.duration)}</span>
       </p>
       <BeatFields bind:draft={adding.draft} idPrefix="picker-beat" />
       <div class="actions">
@@ -217,7 +217,7 @@
             {@render previewButton(beat)}
             <button type="button" class="pick" onclick={() => onPick(beat)}>
               <span class="title">{beat.title}</span>
-              <span class="muted">{facts(beat)}</span>
+              <span class="muted tabular">{facts(beat)}</span>
             </button>
           </li>
         {/each}
@@ -266,7 +266,7 @@
   }
   h2 {
     margin: 0;
-    font-size: 1.125rem;
+    font-size: var(--text-xl);
   }
   .upload {
     flex-shrink: 0;
@@ -320,7 +320,7 @@
     overflow-wrap: anywhere;
   }
   .beats .muted {
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
   }
   .empty {
     padding: 1.5rem 0;

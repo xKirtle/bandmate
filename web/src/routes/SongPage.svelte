@@ -678,7 +678,7 @@
     width: calc(100% + 0.5rem);
     border-color: transparent;
     background: transparent;
-    font-size: 1.5rem;
+    font-size: var(--text-2xl);
     font-weight: 700;
     line-height: 1.2;
   }
@@ -785,7 +785,7 @@
     min-height: var(--control);
     gap: 0 0.5rem;
     margin: 0 0 0.75rem;
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
   }
   .save-state {
     margin: 0;
@@ -823,7 +823,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.125rem;
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     font-weight: 600;
     color: var(--text-muted);
   }
@@ -864,7 +864,7 @@
     margin: 0;
   }
   .summary {
-    font-size: 0.875rem;
+    font-size: var(--text-md);
   }
   .read-notes {
     margin-top: 0.5rem;
@@ -895,7 +895,7 @@
       grid-area: title;
     }
     .title {
-      font-size: 1.25rem;
+      font-size: var(--text-xl);
     }
     .meta {
       margin: 0;
@@ -990,7 +990,7 @@
     }
     .title {
       min-height: 2.5rem;
-      font-size: 1.25rem;
+      font-size: var(--text-xl);
     }
     .part {
       border: 1px solid var(--border);

@@ -69,7 +69,7 @@
     padding: 0.25rem;
     border-radius: 0.5rem;
     color: var(--text-muted);
-    font-size: 0.6875rem;
+    font-size: var(--text-xs);
     font-weight: 600;
     /* A label too long for its tab, e.g. Chord Finder's on a narrow phone,
        wraps under its icon, centred. */
@@ -78,7 +78,7 @@
     text-decoration: none;
   }
   .glyph {
-    font-size: 1.25rem;
+    font-size: var(--text-xl);
     line-height: 1;
   }
   /* A drawn icon takes a glyph's box, without the space below a baseline. */

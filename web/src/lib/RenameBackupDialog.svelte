@@ -108,7 +108,7 @@
   }
   h2 {
     margin: 0;
-    font-size: 1.125rem;
+    font-size: var(--text-xl);
   }
   form {
     display: flex;
@@ -128,7 +128,7 @@
     margin: 0;
   }
   .muted {
-    font-size: 0.875rem;
+    font-size: var(--text-md);
     overflow-wrap: anywhere;
   }
   .problem {

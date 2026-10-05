@@ -229,12 +229,12 @@
     border-radius: 0.75rem;
   }
   h2 {
-    font-size: 1rem;
+    font-size: var(--text-lg);
     margin: 0 0 0.25rem;
   }
   .hint {
     margin: 0 0 0.75rem;
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
   }
   .list {
     display: flex;
@@ -308,7 +308,7 @@
     padding: 0.125rem 0.5rem;
     border-radius: 999px;
     background: var(--surface-2);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     font-weight: 600;
   }
   /* One row each, cut off, so a card stays short however long its Lines. */
@@ -318,7 +318,7 @@
     white-space: pre;
   }
   .more {
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
   }
   .done {
     width: 100%;

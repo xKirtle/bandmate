@@ -649,7 +649,7 @@
     margin-bottom: 0.75rem;
   }
   h2 {
-    font-size: 1rem;
+    font-size: var(--text-lg);
     margin: 0;
   }
   .spacer {
@@ -704,11 +704,11 @@
   .notice {
     flex-basis: 100%;
     margin: 0;
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
   }
   .hint {
     margin: 0.5rem 0 0;
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
   }
   .arrangement {
     display: flex;
@@ -774,7 +774,7 @@
     border-radius: 999px;
     background: var(--accent);
     color: var(--accent-text);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     font-weight: 600;
     line-height: 1.25rem;
   }

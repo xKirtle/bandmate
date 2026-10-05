@@ -190,7 +190,7 @@
     border-radius: 0 0 var(--trigger-radius) var(--trigger-radius);
     background: color-mix(in srgb, var(--surface-1) 85%, transparent);
     color: var(--text);
-    font-size: 0.875rem;
+    font-size: var(--text-md);
     font-weight: 600;
     text-align: center;
     pointer-events: none;

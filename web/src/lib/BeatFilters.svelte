@@ -160,7 +160,7 @@
     border-radius: 999px;
     background: var(--accent);
     color: var(--accent-text);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     line-height: 1.25rem;
   }
   .drawer {
@@ -185,7 +185,7 @@
     padding: 0;
     border: none;
     color: var(--text-muted);
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     font-weight: 600;
   }
   .bpm {
@@ -216,7 +216,7 @@
     background: var(--bg);
     color: var(--text);
     font: inherit;
-    font-size: 0.875rem;
+    font-size: var(--text-md);
     font-weight: 600;
     cursor: pointer;
   }
@@ -227,7 +227,7 @@
   }
   .hint {
     margin: 0;
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
   }
 
   /* Desktop has room for every filter beside the search, with no drawer. */

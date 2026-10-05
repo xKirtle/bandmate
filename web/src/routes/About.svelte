@@ -342,7 +342,7 @@
   }
   h2 {
     margin: 0;
-    font-size: 1.25rem;
+    font-size: var(--text-xl);
   }
 
   .intro {
@@ -356,7 +356,7 @@
   }
   .intro h2 {
     margin-top: 0.5rem;
-    font-size: 1.5rem;
+    font-size: var(--text-2xl);
   }
   .links {
     display: flex;
@@ -401,7 +401,7 @@
     display: none;
   }
   .hint {
-    font-size: 0.875rem;
+    font-size: var(--text-md);
   }
 
   .tabs {
@@ -440,7 +440,7 @@
     }
     [role='tab'] {
       padding: 0 0.5rem;
-      font-size: 0.9375rem;
+      font-size: var(--text-lg);
     }
   }
 
@@ -487,7 +487,7 @@
   }
   .release-tag {
     font-weight: 600;
-    font-size: 1.0625rem;
+    font-size: var(--text-lg);
   }
   /* Under the header's text, past the chevron. */
   .release-body {
@@ -501,7 +501,7 @@
   }
   .card .release-link {
     margin-top: 0.75rem;
-    font-size: 0.875rem;
+    font-size: var(--text-md);
   }
   .release-name {
     font-weight: 400;
@@ -540,7 +540,7 @@
   }
   .group-name {
     font-weight: 600;
-    font-size: 1.0625rem;
+    font-size: var(--text-lg);
   }
   /* The name and version on the left, the license on the right; on a phone,
      a long name pushes the rest onto the next line. */
@@ -561,7 +561,7 @@
     overflow-wrap: anywhere;
   }
   .dependency-version {
-    font-size: 0.875rem;
+    font-size: var(--text-md);
     overflow-wrap: anywhere;
   }
   .dependency-license {
@@ -587,7 +587,7 @@
     min-width: 3rem;
     padding: 0.125rem 0.5rem;
     border-radius: 999px;
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     font-weight: 600;
     letter-spacing: 0.02em;
     text-align: center;

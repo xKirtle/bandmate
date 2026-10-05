@@ -25,7 +25,7 @@
     display: inline-block;
     padding: 0.125rem 0.5rem;
     border-radius: 999px;
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     font-weight: 600;
     letter-spacing: 0.02em;
     text-transform: capitalize;
