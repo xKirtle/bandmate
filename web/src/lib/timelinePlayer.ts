@@ -7,6 +7,7 @@
 // scheduled a little ahead as they come round, each starting exactly as the
 // one before ends.
 import { fadeCurves, type PlacedFades } from './clipFade';
+import { hotKept } from './hotKept';
 import { playAlone, release } from './playback';
 import { positionAt, repeats, schedule, type Loop, type Placed } from './schedule';
 
@@ -24,12 +25,13 @@ export type PlayerState = 'stopped' | 'loading' | 'playing';
 
 // One clock for the whole app, which recording captures on too. Created on
 // first use: browsers let it decode right away, and only need a user
-// gesture before it plays.
-let shared: AudioContext | null = null;
-
-export function audioContext(): AudioContext {
-  return (shared ??= new AudioContext());
-}
+// gesture before it plays. Kept across hot updates in development, so a
+// hot update doesn't leave the old context running and play on a new one.
+export const audioContext: () => AudioContext = hotKept(
+  import.meta.hot?.data,
+  'audioContext',
+  () => new AudioContext(),
+);
 
 /**
  * The Clip → Track wiring on an audio context, live or offline: each Clip
