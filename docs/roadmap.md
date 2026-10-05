@@ -73,3 +73,30 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 ## Scheduled Backups
 
 - Backups made on a schedule (say, Everything weekly), not only when the user makes one. Scheduled ones can keep only the last N, which hand-made Backups never do: nothing deletes a Backup the user made.
+
+## A lyric size for Read mode
+
+- Make the Lines and Chords larger or smaller in Read mode (A− and A+), kept per device, for reading from a music stand or a phone at whatever distance it sits. It builds on the larger default Read mode gets from the visual identity (#565).
+- Whether the Chord Chart and the Section Labels follow the size, and how far it goes each way, are for the spec.
+
+## Every device setting in Settings
+
+- The Settings tab (#578) starts with the Palette and System, Light or Dark. The other settings kept per device, such as the Latency Offset, the Input and left-handed Chord diagrams, could be listed there too, so there's one place to find them.
+- Whether they also stay where they're used today is for the spec.
+
+## Track colours
+
+- Each Track gets a muted colour of its own, assigned automatically from a small palette in the visual identity's tokens, so Clips on different Tracks can be told apart at a glance. Today every Clip is in the one accent colour.
+- The colours stay muted so the Timeline doesn't take on the busy look of a DAW. Whether the user can pick a Track's colour, and how the Chosen Track still stands out, are for the spec.
+
+## Song folders
+
+- Group Songs on the Songs page into folders, so a growing list can be kept in order (an EP's Songs together, say), where today search, filters and sorting are the only way through one long list.
+- A Song sits in one folder at most. Marking it with more than one thing is what Song tags are for.
+- Whether folders nest, how they sit beside the search and filters, and whether a Backup can choose Songs by folder, are for the spec.
+
+## Song tags
+
+- Songs carry tags of the user's own (e.g. "Album 2023"), to mark them with what's relevant and find them by it. A Song can have any number of tags, where it sits in only one folder, so tags are how a Song belongs to several groups at once.
+- They aren't a Section's Label, which names a block of Lines within a Song.
+- Whether a tag is free text or picked from tags already used, whether the Songs page filters by them, and whether tags have colours, are for the spec.
