@@ -54,9 +54,31 @@ export function chartVoicing(
   tuning: readonly number[] | null,
   preferred?: FinderContext['preferred'],
 ): ChartVoicing {
+  const found = chartVoicings(name, tuning, preferred);
+  if (found.kind !== 'voicings') return found;
+  const voicing = found.voicings[0];
+  return voicing ? { kind: 'voicing', voicing } : { kind: 'no-voicing' };
+}
+
+/**
+ * What a Chord's popover steps through: every Voicing of the Chord as shown
+ * in the tuning, the preferred one first, else the top-ranked, as the Chord
+ * Finder lists them. With the Chord's name as the Chord Finder reads it,
+ * which its preference is kept by, and whether the first is preferred. Or
+ * why there are none to step through: the Chord or the tuning can't be read.
+ */
+export type ChartVoicings =
+  | { kind: 'voicings'; chord: string; voicings: Voicing[]; preferred: boolean }
+  | { kind: 'unreadable-chord' }
+  | { kind: 'unreadable-tuning' };
+
+export function chartVoicings(
+  name: string,
+  tuning: readonly number[] | null,
+  preferred?: FinderContext['preferred'],
+): ChartVoicings {
   if (!tuning) return { kind: 'unreadable-tuning' };
   const found = lookUp(name, { tuning, preferred });
   if (found.kind !== 'chord') return { kind: 'unreadable-chord' };
-  const voicing = found.voicings[0];
-  return voicing ? { kind: 'voicing', voicing } : { kind: 'no-voicing' };
+  return { kind: 'voicings', chord: found.name, voicings: found.voicings, preferred: found.preferred };
 }

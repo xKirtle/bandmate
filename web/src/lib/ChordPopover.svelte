@@ -13,7 +13,12 @@
 <script lang="ts">
   // A Chord's diagram, in a popover over the Lyric Sheet in Read mode: the
   // Voicing the Chord Chart draws for it, for the Chord as shown and the
-  // Song's tuning. A Chord or tuning that can't be read says so instead.
+  // Song's tuning, stepping forwards and backwards through its others. Prefer
+  // makes the one showing the Chord's preferred Voicing in the tuning, and
+  // Clear goes back to the top-ranked one: the device's preference the Chord
+  // Finder keeps, so the Chart and the Chord Finder follow at once. That's
+  // allowed in Read mode, as it's a device setting, not an edit to the Song.
+  // A Chord or tuning that can't be read says so instead.
   // Opened by hovering a Chord in a Line with a pointer, tapping it on a touch
   // screen, or clicking a diagram in the Chart. It opens over the Line, on
   // the Lines already played, or under it when there's no room above, so the
@@ -22,7 +27,7 @@
   import { tick } from 'svelte';
   import type { Song } from './api';
   import ChordDiagram from './ChordDiagram.svelte';
-  import { chartTuning, chartVoicing } from './chordChart';
+  import { chartTuning, chartVoicings } from './chordChart';
   import { popoverLeft, popoverTop } from './popover';
   import { preferredVoicings } from './sharedPreferredVoicings.svelte';
 
@@ -46,12 +51,39 @@
   $effect(() => () => clearTimeout(leaveTimer));
 
   const tuning = $derived(chartTuning(song.tuning));
-  const drawn = $derived(
-    opened && chartVoicing(opened.name, tuning, tuning ? preferredVoicings.of(tuning) : undefined),
+  const found = $derived(
+    opened && chartVoicings(opened.name, tuning, tuning ? preferredVoicings.of(tuning) : undefined),
   );
+  const voicings = $derived(found?.kind === 'voicings' ? found.voicings : []);
+  // Which of them shows: 0, the preferred or top-ranked one, when it opens.
+  let at = $state(0);
+  const showing = $derived(Math.min(at, voicings.length - 1));
+  const voicing = $derived(voicings[showing]);
+  const isPreferred = $derived(found?.kind === 'voicings' && found.preferred && showing === 0);
+
+  function step(by: number) {
+    at = Math.max(0, Math.min(showing + by, voicings.length - 1));
+  }
+
+  // Preferring the Voicing showing moves it first, so it stays showing;
+  // clearing the preference shows the top-ranked one.
+  function prefer() {
+    if (found?.kind !== 'voicings' || !tuning || !voicing) return;
+    preferredVoicings.set(tuning, found.chord, isPreferred ? null : voicing.frets);
+    at = 0;
+  }
+
+  // Arrow keys step through the Voicings too, as the buttons do.
+  function stepKey(e: KeyboardEvent) {
+    const by = { ArrowLeft: -1, ArrowRight: 1 }[e.key];
+    if (!by || voicings.length === 0) return;
+    e.preventDefault();
+    step(by);
+  }
 
   async function open(name: string, anchor: HTMLElement, line: HTMLElement | null, by: Opened['by']) {
     clearTimeout(leaveTimer);
+    if (opened?.name !== name) at = 0;
     opened = { name, anchor, line, by };
     await tick();
     if (box && !box.matches(':popover-open')) box.showPopover();
@@ -113,7 +145,7 @@
 <svelte:window onresize={place} onkeydown={onKey} />
 <svelte:document onscrollcapture={place} onpointerdowncapture={pressElsewhere} />
 
-{#if opened && drawn}
+{#if opened && found}
   <div
     class="chord-popover"
     role="dialog"
@@ -123,17 +155,48 @@
     bind:this={box}
     onpointerenter={(e) => e.pointerType !== 'touch' && clearTimeout(leaveTimer)}
     onpointerleave={(e) => e.pointerType !== 'touch' && opener.leave()}
+    onkeydown={stepKey}
   >
     <span class="name">{opened.name}</span>
-    {#if drawn.kind === 'voicing'}
+    {#if voicing}
       <div class="diagram">
-        <ChordDiagram voicing={drawn.voicing} name={opened.name} />
+        <ChordDiagram {voicing} name={opened.name} />
       </div>
+      <div class="stepper">
+        <button
+          type="button"
+          class="button step"
+          aria-label="Previous Voicing"
+          title="Previous Voicing"
+          disabled={showing === 0}
+          onclick={() => step(-1)}>‹</button
+        >
+        <span class={['place', { preferred: isPreferred }]} aria-live="polite">
+          {isPreferred ? 'Preferred' : `${showing + 1} of ${voicings.length}`}
+        </span>
+        <button
+          type="button"
+          class="button step"
+          aria-label="Next Voicing"
+          title="Next Voicing"
+          disabled={showing >= voicings.length - 1}
+          onclick={() => step(1)}>›</button
+        >
+      </div>
+      <!-- One button, so focus stays on it as Prefer turns to Clear. -->
+      <button
+        type="button"
+        class="button prefer"
+        title={isPreferred
+          ? 'Stop preferring this Voicing, putting the top-ranked one first again'
+          : `Show this Voicing of ${opened.name} first in this tuning, here and in the Chord Finder`}
+        onclick={prefer}>{isPreferred ? 'Clear' : 'Prefer'}</button
+      >
     {:else}
       <p class="muted note">
-        {#if drawn.kind === 'unreadable-tuning'}
+        {#if found.kind === 'unreadable-tuning'}
           The Song's tuning, “{song.tuning.trim()}”, can't be read, so there's no diagram.
-        {:else if drawn.kind === 'unreadable-chord'}
+        {:else if found.kind === 'unreadable-chord'}
           Bandmate can't read this Chord, so there's no diagram.
         {:else}
           Bandmate can't find a Voicing of this Chord in the Song's tuning.
@@ -166,6 +229,32 @@
   }
   .diagram {
     width: 7.5rem;
+  }
+  /* Previous, where it is among the Voicings, and Next. */
+  .stepper {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  .step {
+    width: var(--control);
+    padding: 0;
+    font-size: 1.25rem;
+  }
+  /* As wide as its longest text, so the buttons don't move as it steps. */
+  .place {
+    min-width: 5.5rem;
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+    text-align: center;
+  }
+  .place.preferred {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .prefer {
+    align-self: stretch;
+    font-size: 0.875rem;
   }
   .note {
     max-width: 14rem;
