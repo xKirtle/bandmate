@@ -65,20 +65,21 @@
     color: var(--text-muted);
     font-size: var(--text-sm);
   }
-  /* A Palette in small: its page, with its accent on it. */
+  /* A Palette in small, as tall as the radio button beside it: its page,
+     with its accent on it. */
   .swatch {
     flex: none;
     display: grid;
     place-items: center;
-    width: 2.5rem;
-    height: 1.5rem;
+    width: calc(2 * var(--checkbox));
+    height: var(--checkbox);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: var(--bg);
   }
   .accent {
-    width: 0.75rem;
-    height: 0.75rem;
+    width: calc(var(--checkbox) / 2);
+    height: calc(var(--checkbox) / 2);
     border-radius: var(--radius-full);
     background: var(--accent);
   }

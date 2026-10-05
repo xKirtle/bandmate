@@ -26,8 +26,20 @@ function show() {
   const root = document.documentElement;
   applyAppearance(root, palette, shownTheme(themeChoice, systemDark.matches));
   // The browser's own bars, where it draws them, take the page's colour.
+  // index.html has no theme colour of its own, which would be the wrong one
+  // for every Palette and theme but one until now.
   const bg = getComputedStyle(root).getPropertyValue('--bg').trim();
-  if (bg) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg);
+  if (bg) themeColor().content = bg;
+}
+
+function themeColor(): HTMLMetaElement {
+  let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    document.head.append(meta);
+  }
+  return meta;
 }
 
 systemDark.addEventListener('change', show);

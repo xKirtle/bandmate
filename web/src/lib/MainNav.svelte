@@ -25,7 +25,7 @@
     </a>
   {/each}
   {#each pinned as page, i (page.id)}
-    <a class:pinned={i === 0} href={page.href} aria-current={page.id === current ? 'page' : undefined}>
+    <a class:first-pinned={i === 0} href={page.href} aria-current={page.id === current ? 'page' : undefined}>
       <span class="nav-icon" aria-hidden="true"><page.icon /></span>
       {page.label}
     </a>
@@ -112,7 +112,8 @@
     a:hover {
       background: var(--surface-2);
     }
-    .pinned {
+    /* Pushes the pinned links to the bottom. */
+    .first-pinned {
       margin-top: auto;
     }
   }

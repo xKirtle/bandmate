@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyAppearance,
   paletteKey,
+  palettes,
   readPalette,
   readThemeChoice,
   shownTheme,
@@ -136,9 +137,8 @@ describe("index.html's first paint", () => {
   const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
   const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1] ?? '';
 
-  function firstPaint(kept: Record<string, string> | 'blocked', systemDark: boolean) {
+  function firstPaint(store: Storage, systemDark: boolean) {
     const el = root();
-    const store = kept === 'blocked' ? storage({}, true) : storage(kept);
     const matchMedia = (query: string) => ({ matches: query === '(prefers-color-scheme: dark)' && systemDark });
     new Function('document', 'localStorage', 'matchMedia', script)({ documentElement: el }, store, matchMedia);
     return el.dataset;
@@ -150,20 +150,36 @@ describe("index.html's first paint", () => {
   });
 
   it('is Terracotta, following the system, when nothing is kept', () => {
-    expect(firstPaint({}, false)).toEqual({ theme: 'light' });
-    expect(firstPaint({}, true)).toEqual({ theme: 'dark' });
+    expect(firstPaint(storage(), false)).toEqual({ theme: 'light' });
+    expect(firstPaint(storage(), true)).toEqual({ theme: 'dark' });
   });
 
   it('is the Palette and Light or Dark kept on this device', () => {
-    expect(firstPaint({ [paletteKey]: 'ink', [themeKey]: 'light' }, true)).toEqual({ palette: 'ink', theme: 'light' });
-    expect(firstPaint({ [paletteKey]: 'olive', [themeKey]: 'dark' }, false)).toEqual({
+    expect(firstPaint(storage({ [paletteKey]: 'ink', [themeKey]: 'light' }), true)).toEqual({
+      palette: 'ink',
+      theme: 'light',
+    });
+    expect(firstPaint(storage({ [paletteKey]: 'olive', [themeKey]: 'dark' }), false)).toEqual({
       palette: 'olive',
       theme: 'dark',
     });
   });
 
+  it('shows every Palette, in Light and in Dark, as the app does', () => {
+    for (const { id: palette } of palettes) {
+      for (const theme of ['light', 'dark'] as const) {
+        const el = root();
+        applyAppearance(el, palette, theme);
+        const kept = storage();
+        storePalette(kept, palette);
+        storeThemeChoice(kept, theme);
+        expect(firstPaint(kept, false), `${palette} ${theme}`).toEqual(el.dataset);
+      }
+    }
+  });
+
   it('falls back like the app when what is kept is no choice, or storage is blocked', () => {
-    expect(firstPaint({ [paletteKey]: 'neon', [themeKey]: 'sepia' }, true)).toEqual({ theme: 'dark' });
-    expect(firstPaint('blocked', false)).toEqual({ theme: 'light' });
+    expect(firstPaint(storage({ [paletteKey]: 'neon', [themeKey]: 'sepia' }), true)).toEqual({ theme: 'dark' });
+    expect(firstPaint(storage({}, true), false)).toEqual({ theme: 'light' });
   });
 });
