@@ -38,9 +38,9 @@ export function chartTuning(text: string): readonly number[] | null {
 }
 
 /**
- * What the Chord Chart, or a Chord's popover, draws for a Chord as shown: the
- * preferred Voicing of it in the tuning, else the top-ranked one, as the Chord
- * Finder would. Or why it draws none: the Chord can't be read, it has no
+ * What the Chord Chart draws for a Chord as shown: the preferred Voicing of
+ * it in the tuning, else the top-ranked one, as the Chord Finder would, and
+ * as a Chord's popover opens on. Or why it draws none: the Chord can't be read, it has no
  * Voicing in the tuning, or the tuning can't be read (null, from chartTuning).
  */
 export type ChartVoicing =

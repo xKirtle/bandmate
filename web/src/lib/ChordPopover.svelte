@@ -13,7 +13,7 @@
 <script lang="ts">
   // A Chord's diagram, in a popover over the Lyric Sheet in Read mode: the
   // Voicing the Chord Chart draws for it, for the Chord as shown and the
-  // Song's tuning, stepping forwards and backwards through its others. Prefer
+  // Song's tuning, stepping forwards and backwards through its other Voicings. Prefer
   // makes the one showing the Chord's preferred Voicing in the tuning, and
   // Clear goes back to the top-ranked one: the device's preference the Chord
   // Finder keeps, so the Chart and the Chord Finder follow at once. That's
@@ -61,8 +61,10 @@
   const voicing = $derived(voicings[showing]);
   const isPreferred = $derived(found?.kind === 'voicings' && found.preferred && showing === 0);
 
+  // Round from the last Voicing to the first and back, so the buttons are
+  // never disabled under the focus they hold.
   function step(by: number) {
-    at = Math.max(0, Math.min(showing + by, voicings.length - 1));
+    at = (showing + by + voicings.length) % voicings.length;
   }
 
   // Preferring the Voicing showing moves it first, so it stays showing;
@@ -168,19 +170,13 @@
           class="button step"
           aria-label="Previous Voicing"
           title="Previous Voicing"
-          disabled={showing === 0}
           onclick={() => step(-1)}>‹</button
         >
         <span class={['place', { preferred: isPreferred }]} aria-live="polite">
           {isPreferred ? 'Preferred' : `${showing + 1} of ${voicings.length}`}
         </span>
-        <button
-          type="button"
-          class="button step"
-          aria-label="Next Voicing"
-          title="Next Voicing"
-          disabled={showing >= voicings.length - 1}
-          onclick={() => step(1)}>›</button
+        <button type="button" class="button step" aria-label="Next Voicing" title="Next Voicing" onclick={() => step(1)}
+          >›</button
         >
       </div>
       <!-- One button, so focus stays on it as Prefer turns to Clear. -->
