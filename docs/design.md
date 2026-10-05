@@ -123,7 +123,7 @@ Two durations and one curve. Something moves only to explain a change: opening, 
 | `--duration-base` | 200ms                          | What moves or appears: the highlight on the current Line or Section           |
 | `--ease`          | `cubic-bezier(0.2, 0, 0, 1)`   | Every transition and animation: quick to start, settling without overshoot    |
 
-A transition or animation names both, such as `transition: transform var(--duration-fast) var(--ease)`, once for each property it lists, so none falls back on the browser's own curve. Stylelint fails a literal time, a timing function other than `--ease`, and a transition or animation without it.
+A transition or animation names both, such as `transition: transform var(--duration-fast) var(--ease)`, once for each property it lists, so none falls back on the browser's own curve. A delay, if any, is one of the durations too. Stylelint fails a literal or scaled time, any other duration, and any timing function but `--ease`, including none at all.
 
 **Reduced motion**: when the user asks for it, `app.css` sets both durations to 0s, so every transition and animation ends as it starts. Motion in script asks `motion.ts` instead: following playback down the Lyric Sheet glides there, or jumps under reduced motion. What tracks real time isn't decoration and keeps moving either way: the playhead, a Clip or the Loop being dragged, the Timeline scrolling as it follows playback, a waveform filling as it plays, and an input's level meter.
 

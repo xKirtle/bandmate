@@ -76,14 +76,21 @@ const radiusWith = (...extra) => {
 };
 const radius = radiusWith();
 
-// Motion: a duration is one of the --duration-* tokens, and the easing is
-// always --ease, the one curve, written out in each transition and animation
-// of a list so none falls back on the browser's own. Under reduced motion
+// Motion: a duration or delay is one of the --duration-* tokens, never
+// scaled, and the easing is always --ease, the one curve, written out in each
+// transition and animation of a list so none falls back on the browser's
+// own. Each is `<what> <duration> var(--ease) [<delay>]`, and an animation
+// may add its count, direction, fill and play state. Under reduced motion
 // the duration tokens are 0s, so nothing animates.
-const eased = '[^,]*var\\(--ease\\)[^,]*';
+const token = 'var\\(--duration-(fast|base)\\)';
+const timing = `${token} var\\(--ease\\)( ${token})?`;
+const animationKeyword =
+  '(infinite|\\d+|normal|reverse|alternate|alternate-reverse|none|forwards|backwards|both|running|paused)';
+const list = (item) => `/^\\s*${item}\\s*(,\\s*${item}\\s*)*$/`;
 const motion = {
-  '/^(transition|animation)$/': ['none', `/^${eased}(,${eased})*$/`],
-  '/^(transition|animation)-(duration|delay)$/': ['/^var\\(--duration-(fast|base)\\)$/'],
+  transition: ['none', 'inherit', list(`[a-z-]+ ${timing}`)],
+  animation: ['none', 'inherit', list(`[\\w-]+ ${timing}( ${animationKeyword})*`)],
+  '/^(transition|animation)-(duration|delay)$/': [`/^${token}$/`],
   '/^(transition|animation)-timing-function$/': ['/^var\\(--ease\\)$/'],
 };
 // No literal time in a transition or animation, only the tokens.
