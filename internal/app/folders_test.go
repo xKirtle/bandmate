@@ -260,3 +260,127 @@ func TestSongCreatedInAnUnknownFolderIsRefused(t *testing.T) {
 		t.Errorf("songs = %v, want none", titles(got))
 	}
 }
+
+// renameFolder gives a Folder a new name.
+func (ts *testServer) renameFolder(id int64, name string) response {
+	ts.t.Helper()
+	return ts.Do(http.MethodPatch, folderPath(id), map[string]any{"name": name})
+}
+
+func TestFolderCanBeRenamed(t *testing.T) {
+	ts := newTestServer(t)
+	ep := ts.createFolder("EP")
+	s := ts.createSong("Opener")
+	expectStatus(t, ts.moveSong(s.ID, &ep.ID), http.StatusNoContent)
+
+	res := ts.renameFolder(ep.ID, "  Summer EP  ")
+
+	expectStatus(t, res, http.StatusOK)
+	var renamed folder
+	res.JSON(t, &renamed)
+	if want := (folder{ID: ep.ID, Name: "Summer EP", Songs: 1}); renamed != want {
+		t.Errorf("renamed folder = %+v, want %+v", renamed, want)
+	}
+	if got := folderSongs(ts.listFolders()); !reflect.DeepEqual(got, map[string]int{"Summer EP": 1}) {
+		t.Errorf("songs per folder = %v, want Summer EP still holding its Song", got)
+	}
+}
+
+func TestFolderCanBeRenamedToItsOwnNameInAnotherCase(t *testing.T) {
+	ts := newTestServer(t)
+	ep := ts.createFolder("summer ep")
+
+	expectStatus(t, ts.renameFolder(ep.ID, "Summer EP"), http.StatusOK)
+
+	if got := folderNames(ts.listFolders()); !reflect.DeepEqual(got, []string{"Summer EP"}) {
+		t.Errorf("folders = %v, want [Summer EP]", got)
+	}
+}
+
+func TestRenamingAFolderRefusesAnotherFoldersNameIgnoringCase(t *testing.T) {
+	ts := newTestServer(t)
+	ts.createFolder("Canção")
+	demos := ts.createFolder("Demos")
+
+	expectError(t, ts.renameFolder(demos.ID, "CANÇÃO"), http.StatusConflict, "there's already a Folder called “Canção”")
+	expectError(t, ts.renameFolder(demos.ID, "  "), http.StatusBadRequest, "a Folder's name is required")
+	expectStatus(t, ts.renameFolder(demos.ID+1, "Other"), http.StatusNotFound)
+
+	if got := folderNames(ts.listFolders()); !reflect.DeepEqual(got, []string{"Canção", "Demos"}) {
+		t.Errorf("folders = %v, want them as they were", got)
+	}
+}
+
+func TestEmptyFolderCanBeDeleted(t *testing.T) {
+	ts := newTestServer(t)
+	ep := ts.createFolder("Summer EP")
+	ts.createFolder("Demos")
+
+	expectStatus(t, ts.Do(http.MethodDelete, folderPath(ep.ID), nil), http.StatusNoContent)
+
+	if got := folderNames(ts.listFolders()); !reflect.DeepEqual(got, []string{"Demos"}) {
+		t.Errorf("folders = %v, want [Demos]", got)
+	}
+	expectStatus(t, ts.Do(http.MethodGet, folderPath(ep.ID), nil), http.StatusNotFound)
+	expectStatus(t, ts.Do(http.MethodDelete, folderPath(ep.ID), nil), http.StatusNotFound)
+}
+
+func TestDeletedFolderKeepsItsSongsInNoFolder(t *testing.T) {
+	ts := newTestServer(t)
+	ep := ts.createFolder("Summer EP")
+	opener := ts.updateSong(ts.createSong("Opener").ID, map[string]any{"status": "finished"})
+	closer := ts.createSong("Closer")
+	ts.createSong("Loose")
+	expectStatus(t, ts.moveSong(opener.ID, &ep.ID), http.StatusNoContent)
+	expectStatus(t, ts.moveSong(closer.ID, &ep.ID), http.StatusNoContent)
+
+	expectStatus(t, ts.Do(http.MethodDelete, folderPath(ep.ID)+"?songs=keep", nil), http.StatusNoContent)
+
+	if got := ts.listFolders(); len(got) != 0 {
+		t.Errorf("folders = %v, want none", folderNames(got))
+	}
+	if got, want := titles(ts.listSongs("folder=none")), []string{"Loose", "Closer", "Opener"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("songs in no folder = %v, want %v", got, want)
+	}
+	if kept := ts.getSong(opener.ID); kept.Version != opener.Version || kept.UpdatedAt != opener.UpdatedAt {
+		t.Errorf("kept Song at version %d edited %s; want %d and %s as before",
+			kept.Version, kept.UpdatedAt, opener.Version, opener.UpdatedAt)
+	}
+}
+
+func TestDeletedFolderCanDeleteItsSongsToo(t *testing.T) {
+	ts := newTestServer(t)
+	ep := ts.createFolder("Summer EP")
+	ts.createFolder("Demos")
+	gone := ts.songWithMasters()
+	finished := ts.updateSong(ts.createSong("Done").ID, map[string]any{"status": "finished"})
+	kept := ts.uploadMaster(ts.createSong("Kept").ID, fakeAudio("kept.wav"))
+	expectStatus(t, ts.moveSong(gone.ID, &ep.ID), http.StatusNoContent)
+	expectStatus(t, ts.moveSong(finished.ID, &ep.ID), http.StatusNoContent)
+
+	expectStatus(t, ts.Do(http.MethodDelete, folderPath(ep.ID)+"?songs=delete", nil), http.StatusNoContent)
+
+	if got := folderNames(ts.listFolders()); !reflect.DeepEqual(got, []string{"Demos"}) {
+		t.Errorf("folders = %v, want [Demos]", got)
+	}
+	if got := titles(ts.listSongs()); !reflect.DeepEqual(got, []string{"Kept"}) {
+		t.Errorf("songs = %v, want only the one in no Folder", got)
+	}
+	expectStatus(t, ts.Do(http.MethodGet, songPath(gone.ID), nil), http.StatusNotFound)
+	expectStatus(t, ts.Do(http.MethodGet, songPath(finished.ID), nil), http.StatusNotFound)
+	if files := masterFiles(t, ts); !reflect.DeepEqual(files, []string{fmt.Sprint(kept.Masters[0].ID)}) {
+		t.Errorf("master files on disk = %q, want only the kept Song's", files)
+	}
+}
+
+func TestDeletingAFolderRefusesAnUnknownChoiceForItsSongs(t *testing.T) {
+	ts := newTestServer(t)
+	ep := ts.createFolder("Summer EP")
+
+	expectError(t, ts.Do(http.MethodDelete, folderPath(ep.ID)+"?songs=archive", nil),
+		http.StatusBadRequest, `songs must be "keep" or "delete"`)
+
+	if got := len(ts.listFolders()); got != 1 {
+		t.Errorf("folders = %d, want the one still there", got)
+	}
+}

@@ -94,13 +94,8 @@ func (s *Store) Create(ctx context.Context, name string) (Folder, error) {
 		return Folder{}, err
 	}
 	defer tx.Rollback()
-	var taken string
-	err = tx.QueryRowContext(ctx, `SELECT name FROM folders WHERE folded = ?`, fold(name)).Scan(&taken)
-	if err == nil {
-		return Folder{}, &ConflictError{Msg: fmt.Sprintf("there's already a Folder called “%s”", taken)}
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
-		return Folder{}, fmt.Errorf("checking folder names: %w", err)
+	if err := checkName(ctx, tx, name, 0); err != nil {
+		return Folder{}, err
 	}
 	res, err := tx.ExecContext(ctx, `INSERT INTO folders (name, folded) VALUES (?, ?)`, name, fold(name))
 	if err != nil {
@@ -114,6 +109,87 @@ func (s *Store) Create(ctx context.Context, name string) (Folder, error) {
 		return Folder{}, err
 	}
 	return Folder{ID: id, Name: name}, nil
+}
+
+// Rename gives a Folder a new name, refusing one another Folder has,
+// ignoring case. Its own name in another case is fine.
+func (s *Store) Rename(ctx context.Context, id int64, name string) (Folder, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return Folder{}, errNameRequired
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Folder{}, err
+	}
+	defer tx.Rollback()
+	if err := checkName(ctx, tx, name, id); err != nil {
+		return Folder{}, err
+	}
+	res, err := tx.ExecContext(ctx, `UPDATE folders SET name = ?, folded = ? WHERE id = ?`, name, fold(name), id)
+	if err != nil {
+		return Folder{}, fmt.Errorf("renaming folder: %w", err)
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return Folder{}, err
+	} else if n == 0 {
+		return Folder{}, ErrNotFound
+	}
+	if err := tx.Commit(); err != nil {
+		return Folder{}, err
+	}
+	return s.Get(ctx, id)
+}
+
+// SongIDs lists the ids of the Songs in a Folder, failing with ErrNotFound
+// if there's no such Folder.
+func (s *Store) SongIDs(ctx context.Context, id int64) ([]int64, error) {
+	if _, err := s.Get(ctx, id); err != nil {
+		return nil, err
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT id FROM songs WHERE folder_id = ? ORDER BY id`, id)
+	if err != nil {
+		return nil, fmt.Errorf("listing folder's songs: %w", err)
+	}
+	defer rows.Close()
+	var ids []int64
+	for rows.Next() {
+		var songID int64
+		if err := rows.Scan(&songID); err != nil {
+			return nil, err
+		}
+		ids = append(ids, songID)
+	}
+	return ids, rows.Err()
+}
+
+// Delete removes a Folder, leaving any Songs still in it in none.
+func (s *Store) Delete(ctx context.Context, id int64) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM folders WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("deleting folder: %w", err)
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return err
+	} else if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// checkName refuses, as a ConflictError, a name a Folder other than the one
+// with id except has, ignoring case. An except of 0 is none.
+func checkName(ctx context.Context, tx *sql.Tx, name string, except int64) error {
+	var taken string
+	err := tx.QueryRowContext(ctx, `SELECT name FROM folders WHERE folded = ? AND id <> ?`, fold(name), except).
+		Scan(&taken)
+	if err == nil {
+		return &ConflictError{Msg: fmt.Sprintf("there's already a Folder called “%s”", taken)}
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("checking folder names: %w", err)
+	}
+	return nil
 }
 
 // MoveSong puts a Song into the Folder with folderID, or, with nil, into

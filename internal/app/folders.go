@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/xKirtle/bandmate/internal/folders"
+	"github.com/xKirtle/bandmate/internal/lyricsheet"
 )
 
 func (a *App) listFolders(w http.ResponseWriter, r *http.Request) {
@@ -42,6 +43,65 @@ func (a *App) getFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, f)
+}
+
+func (a *App) renameFolder(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var req struct {
+		Name string `json:"name"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	f, err := a.folders.Rename(r.Context(), id, req.Name)
+	if err != nil {
+		writeFolderError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, f)
+}
+
+// deleteFolder removes a Folder. With ?songs=delete, its Songs are deleted
+// too, each as deleting a Song does; otherwise, or with ?songs=keep, they're
+// kept, in no Folder. Songs are deleted one by one before the Folder, so if
+// one fails, the Folder is left holding the rest, to try again.
+func (a *App) deleteFolder(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var deleteSongs bool
+	switch r.URL.Query().Get("songs") {
+	case "", "keep":
+	case "delete":
+		deleteSongs = true
+	default:
+		writeError(w, http.StatusBadRequest, `songs must be "keep" or "delete"`)
+		return
+	}
+	if deleteSongs {
+		songIDs, err := a.folders.SongIDs(r.Context(), id)
+		if err != nil {
+			writeFolderError(w, err)
+			return
+		}
+		for _, songID := range songIDs {
+			// One already gone, say deleted meanwhile, is as good as deleted.
+			err := a.songs.DeleteSong(r.Context(), songID, lyricsheet.AnyVersion)
+			if err != nil && !errors.Is(err, lyricsheet.ErrNotFound) {
+				writeDomainError(w, err)
+				return
+			}
+		}
+	}
+	if err := a.folders.Delete(r.Context(), id); err != nil {
+		writeFolderError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // moveSongToFolder puts a Song into a Folder, or, with a null folderId,
