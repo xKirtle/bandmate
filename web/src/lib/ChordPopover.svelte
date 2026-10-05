@@ -187,7 +187,7 @@
         class="button prefer"
         title={isPreferred
           ? 'Stop preferring this Voicing, putting the top-ranked one first again'
-          : `Show this Voicing of ${opened.name} first in this tuning, here and in the Chord Finder`}
+          : `Show this Voicing of ${opened.name} first in this tuning, here and on the Chords page`}
         onclick={prefer}>{isPreferred ? 'Clear' : 'Prefer'}</button
       >
     {:else}

@@ -100,9 +100,3 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 - At phone width, the Chord Finder's Left-handed toggle doesn't fit beside its tabs and drops onto a line of its own, which looks like an afterthought. It wants a place that feels deliberate on a phone, without losing the one-tap toggle on desktop.
 - It's a different thing from listing left-handed Chord diagrams in Settings (see Every device setting in Settings), though moving it there is one way out.
 - Where it goes instead (beside the tuning, in an overflow menu, as an icon, or only in Settings on a phone), and whether the tabs themselves change at that width, are for the spec.
-
-## A shorter name for the Chord Finder's tab
-
-- The navigation names the Chord Finder's tab "Chords", one word like Songs, Beats, Backups and Info, where today "Chord Finder" is the only label that wraps onto two lines. Its address is already /chords.
-- Only the tab's label changes: the page and the glossary keep calling it the Chord Finder, since it holds nothing of the user's and "Chords" alone could read like a list of them.
-- Whether the page heading follows the tab, and whether MainNav still needs its fallback for a label too long for its tab, are for the spec.
