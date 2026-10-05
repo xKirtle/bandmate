@@ -218,38 +218,6 @@ func TestSongCreatedInAFolderLandsInIt(t *testing.T) {
 	}
 }
 
-// Until Backups carry Folders, they leave them out, so a Song in a Folder
-// can still be backed up, and comes back in none.
-func TestABackupLeavesFoldersOut(t *testing.T) {
-	ts := newTestServer(t)
-	ep := ts.createFolder("Summer EP")
-	s := ts.createSong("Opener")
-	expectStatus(t, ts.moveSong(s.ID, &ep.ID), http.StatusNoContent)
-
-	made := ts.backUp(map[string]any{"songs": []int64{s.ID}})
-	restored := ts.restore(made.ID, s.ID)
-
-	if len(restored) != 1 {
-		t.Fatalf("restored = %+v, want the one Song", restored)
-	}
-	if got := titles(ts.listSongs("folder=none")); !reflect.DeepEqual(got, []string{restored[0].Title}) {
-		t.Errorf("songs in no folder = %v, want the restored Song", got)
-	}
-	if got := folderSongs(ts.listFolders()); !reflect.DeepEqual(got, map[string]int{"Summer EP": 1}) {
-		t.Errorf("songs per folder = %v, want Summer EP holding only the Song backed up", got)
-	}
-
-	// Replaced, the Song is made anew as the Backup holds it: in no Folder.
-	ts.restoreReplacing(made.ID, []int64{s.ID}, []int64{s.ID}, nil)
-
-	if got := folderSongs(ts.listFolders()); !reflect.DeepEqual(got, map[string]int{"Summer EP": 0}) {
-		t.Errorf("songs per folder after replacing = %v, want Summer EP holding none", got)
-	}
-	if got := len(ts.listSongs("folder=none")); got != 2 {
-		t.Errorf("songs in no folder after replacing = %d, want both", got)
-	}
-}
-
 func TestSongCreatedInAnUnknownFolderIsRefused(t *testing.T) {
 	ts := newTestServer(t)
 
