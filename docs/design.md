@@ -58,7 +58,30 @@ A literal colour is written only in `palettes.css`, and a `box-shadow` is always
 
 ### Type
 
-The system font everywhere. About six sizes, `--text-xs` to `--text-2xl` (0.75, 0.8125, 0.875, 1, 1.25 and 1.5rem), plus lyric sizes for Lines and Chords in Write mode and Read mode. Every time, BPM and Gain uses tabular digits, so numbers don't jitter as they change. _To come_ (#569).
+The system font everywhere, with no typeface bundled. Content and tools differ by size and line height alone: tools take the small end of the scale, content the larger sizes and the lyric sizes.
+
+| Token          | Size                       | For                                                                            |
+| -------------- | -------------------------- | ------------------------------------------------------------------------------ |
+| `--text-xs`    | 0.75rem                    | The smallest labels: badges, the navigation's, a Timeline Clip's, hints in pills |
+| `--text-sm`    | 0.8125rem                  | Secondary text in tools: hints, notices, table cells, a Section's heading in Read mode |
+| `--text-md`    | 0.875rem                   | Tool text: buttons and fields in toolbars and dialogs, lists, menus            |
+| `--text-lg`    | 1rem                       | Body text, and the headings of cards and panels                                |
+| `--text-xl`    | 1.25rem                    | Dialog titles, glyph icons, larger headings                                    |
+| `--text-2xl`   | 1.5rem                     | Page titles, and a Song's title                                                |
+| `--text-field` | `max(var(--text-lg), 16px)` | Text fields: under 16px, iOS zooms in on focus                                |
+
+The lyric sizes are content's own, separate from the scale so Read mode can be tuned on its own:
+
+| Token                                    | For                                                                  |
+| ---------------------------------------- | -------------------------------------------------------------------- |
+| `--lyric-write`, `--lyric-write-leading` | Lines and Chords as typed in Write mode: a text field's size, roomy line height |
+| `--lyric-read-line`                      | Lines in Read mode                                                   |
+| `--lyric-read-chord`                     | Chords above their Lines in Read mode                                |
+| `--lyric-read-leading`                   | The line height of Lines in Read mode                                |
+
+Every time, BPM and Gain uses tabular digits, so numbers don't jitter as they change: the `.tabular` class gives them, and number fields have them anyway.
+
+A `font-size` is always one of these tokens, or `inherit`; the `font` shorthand only ever inherits. Stylelint fails anything else, with two exceptions: the Timeline's own scale (below), and a Cover placeholder's initial, which grows with its Cover.
 
 ### Spacing
 
@@ -78,7 +101,7 @@ Lucide, everywhere: no Unicode glyphs or hand-drawn SVGs as icons, so icons look
 
 ### The Timeline's own scale
 
-The Timeline zooms by its own unit, `--timeline-rem`, so its sizes are written as multiples of it (`calc(0.75 * var(--timeline-rem))`). They follow the same scales, in that unit.
+The Timeline zooms by its own unit, `--timeline-rem`, so its sizes are written as multiples of it (`calc(0.75 * var(--timeline-rem))`). They follow the same scales, in that unit: a font size there is `var(--timeline-rem)` or one of the type scale's steps times it (0.75 to 1.5).
 
 ### Components
 
