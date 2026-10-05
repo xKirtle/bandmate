@@ -181,7 +181,7 @@
   }
   .section.current {
     background: var(--surface-1);
-    box-shadow: inset 3px 0 0 var(--accent);
+    box-shadow: var(--selected-edge);
   }
   h3 {
     margin: 0 0 0.25rem;
@@ -205,7 +205,7 @@
   }
   .line-box.current {
     background: var(--surface-1);
-    box-shadow: inset 3px 0 0 var(--accent);
+    box-shadow: var(--selected-edge);
   }
   .clickable {
     cursor: pointer;

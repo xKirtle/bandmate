@@ -3777,13 +3777,13 @@
   }
   /* Marked along its left edge, in the room left for it. */
   .head.chosen {
-    box-shadow: inset calc(0.1875 * var(--timeline-rem)) 0 0 var(--accent);
+    box-shadow: var(--selected-edge);
     background: color-mix(in srgb, var(--accent) 8%, transparent);
   }
   /* The Track audio files dragged over the Timeline would be imported onto, across its header and lane. */
   .head.file-target,
   .lane.file-target {
-    box-shadow: inset 0 0 0 2px var(--accent);
+    box-shadow: var(--selected-outline);
     background: color-mix(in srgb, var(--accent) 16%, transparent);
   }
   .head-row {
@@ -3916,7 +3916,7 @@
     bottom: calc(0.125 * var(--timeline-rem));
     border-radius: 999px;
     background: color-mix(in srgb, var(--text-muted) 60%, transparent);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--bg) 60%, transparent);
+    outline: 1px solid color-mix(in srgb, var(--bg) 60%, transparent);
     cursor: grab;
     transition:
       top 0.1s,
@@ -4145,9 +4145,9 @@
   .clip.editing {
     z-index: 1;
   }
-  /* Selected: a solid border twice as thick, inside the focus ring, and a brighter fill. */
+  /* Selected: ringed inside its border and the focus ring, and a brighter fill. */
   .clip.selected {
-    box-shadow: inset 0 0 0 1px var(--accent);
+    box-shadow: var(--selected-outline);
     background: color-mix(in srgb, var(--accent) 16%, var(--surface-1));
   }
   .clip.moving {
@@ -4421,7 +4421,7 @@
     border: 1px solid var(--danger);
     border-radius: calc(0.5 * var(--timeline-rem));
     background: var(--bg);
-    box-shadow: 0 calc(0.25 * var(--timeline-rem)) var(--timeline-rem) rgb(0 0 0 / 0.2);
+    box-shadow: var(--shadow-float);
   }
   .error-bar .error {
     flex: 1;

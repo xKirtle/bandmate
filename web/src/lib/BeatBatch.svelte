@@ -534,7 +534,7 @@
   .shared input[aria-invalid='true'],
   td input[aria-invalid='true'] {
     border-color: var(--danger);
-    box-shadow: inset 0 0 0 1px var(--danger);
+    box-shadow: var(--invalid-outline);
   }
   input[type='checkbox'] {
     width: 1rem;
