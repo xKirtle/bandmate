@@ -42,6 +42,7 @@ func conflict(msg string) error { return &ConflictError{Msg: msg} }
 var (
 	errTitleRequired = invalid("title is required")
 	errUnknownStatus = invalid("status must be idea, drafting or finished")
+	errNoSuchFolder  = invalid("there's no such Folder")
 )
 
 // Status is where a Song stands in its lifecycle.
@@ -104,7 +105,9 @@ type SongSummary struct {
 	BPM       *int   `json:"bpm"`
 	HasMaster bool   `json:"hasMaster"`
 	// CoverID is the Song's Cover's, or nil when it has none.
-	CoverID   *int64    `json:"coverId"`
+	CoverID *int64 `json:"coverId"`
+	// FolderID is the Folder's the Song sits in, or nil when it's in none.
+	FolderID  *int64    `json:"folderId"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
@@ -140,13 +143,22 @@ const timeFormat = "2006-01-02T15:04:05.000000000Z"
 const untitledSong = "Untitled Song"
 
 // CreateSong creates a Song with the given title, or "Untitled Song"
-// without one, and Status idea.
-func (s *Store) CreateSong(ctx context.Context, title string) (Song, error) {
+// without one, and Status idea, in the Folder with id folder, or in none if
+// it's nil.
+func (s *Store) CreateSong(ctx context.Context, title string, folder *int64) (Song, error) {
 	if strings.TrimSpace(title) == "" {
 		title = untitledSong
 	}
-	id, err := insertSong(ctx, s.db, title)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
+		return Song{}, err
+	}
+	defer tx.Rollback()
+	id, err := insertSong(ctx, tx, title, folder)
+	if err != nil {
+		return Song{}, err
+	}
+	if err := tx.Commit(); err != nil {
 		return Song{}, err
 	}
 	return s.GetSong(ctx, id)
@@ -161,23 +173,34 @@ type execer interface {
 // at least one.
 const firstTrackName = "Track 1"
 
-// insertSong creates a Song with the given title and Status idea, and its
-// first Track, and returns its id. CreateSong names a Song without a title
-// before it gets here, so a blank title is refused only for callers that
-// don't, such as import.
-func insertSong(ctx context.Context, db execer, title string) (int64, error) {
+// insertSong creates a Song with the given title and Status idea, in the
+// Folder with id folder, or in none if it's nil, and its first Track, and
+// returns its id. CreateSong names a Song without a title before it gets
+// here, so a blank title is refused only for callers that don't, such as
+// import.
+func insertSong(ctx context.Context, tx *sql.Tx, title string, folder *int64) (int64, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
 		return 0, errTitleRequired
 	}
+	if folder != nil {
+		var exists bool
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM folders WHERE id = ?)`, *folder).
+			Scan(&exists); err != nil {
+			return 0, fmt.Errorf("checking folder: %w", err)
+		}
+		if !exists {
+			return 0, errNoSuchFolder
+		}
+	}
 	now := time.Now().UTC().Format(timeFormat)
-	id, err := insert(ctx, db,
-		`INSERT INTO songs (title, status, created_at, updated_at) VALUES (?, ?, ?, ?)`,
-		title, StatusIdea, now, now)
+	id, err := insert(ctx, tx,
+		`INSERT INTO songs (title, status, folder_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+		title, StatusIdea, folder, now, now)
 	if err != nil {
 		return 0, fmt.Errorf("creating song: %w", err)
 	}
-	if _, err := db.ExecContext(ctx, `INSERT INTO tracks (song_id, name, position) VALUES (?, ?, 0)`,
+	if _, err := tx.ExecContext(ctx, `INSERT INTO tracks (song_id, name, position) VALUES (?, ?, 0)`,
 		id, firstTrackName); err != nil {
 		return 0, fmt.Errorf("adding the first track: %w", err)
 	}
@@ -228,7 +251,13 @@ type SongFilter struct {
 	// HasMaster keeps the Songs with at least one Master (true) or with
 	// none (false).
 	HasMaster *bool
+	// Folder keeps the Songs in the Folder with this id, or, pointing at
+	// NoFolder, those in none.
+	Folder *int64
 }
+
+// NoFolder is the Folder id a SongFilter keeps the Songs in no Folder by.
+const NoFolder int64 = 0
 
 // ListSongs returns the Songs matching filter, most recently edited first.
 func (s *Store) ListSongs(ctx context.Context, filter SongFilter) ([]SongSummary, error) {
@@ -242,8 +271,15 @@ func (s *Store) ListSongs(ctx context.Context, filter SongFilter) ([]SongSummary
 	if filter.HasMaster != nil {
 		conditions, args = append(conditions, "has_master = ?"), append(args, *filter.HasMaster)
 	}
+	if filter.Folder != nil {
+		if *filter.Folder == NoFolder {
+			conditions = append(conditions, "folder_id IS NULL")
+		} else {
+			conditions, args = append(conditions, "folder_id = ?"), append(args, *filter.Folder)
+		}
+	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, title, status, song_key, bpm, has_master, cover_id, updated_at FROM (
+		`SELECT id, title, status, song_key, bpm, has_master, cover_id, folder_id, updated_at FROM (
 		   SELECT *, EXISTS (SELECT 1 FROM masters WHERE masters.song_id = songs.id) AS has_master,
 		     (SELECT id FROM covers WHERE covers.song_id = songs.id) AS cover_id
 		   FROM songs
@@ -259,14 +295,18 @@ func (s *Store) ListSongs(ctx context.Context, filter SongFilter) ([]SongSummary
 	list := []SongSummary{}
 	for rows.Next() {
 		var sum SongSummary
-		var bpm, cover sql.NullInt64
+		var bpm, cover, folder sql.NullInt64
 		var updated string
-		if err := rows.Scan(&sum.ID, &sum.Title, &sum.Status, &sum.Key, &bpm, &sum.HasMaster, &cover, &updated); err != nil {
+		if err := rows.Scan(&sum.ID, &sum.Title, &sum.Status, &sum.Key, &bpm, &sum.HasMaster, &cover, &folder,
+			&updated); err != nil {
 			return nil, err
 		}
 		sum.BPM = intOrNil(bpm)
 		if cover.Valid {
 			sum.CoverID = &cover.Int64
+		}
+		if folder.Valid {
+			sum.FolderID = &folder.Int64
 		}
 		if !strings.Contains(strings.ToLower(sum.Title), needle) {
 			continue

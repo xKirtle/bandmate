@@ -263,6 +263,7 @@ type songSummary struct {
 	BPM       *int   `json:"bpm"`
 	HasMaster bool   `json:"hasMaster"`
 	CoverID   *int64 `json:"coverId"`
+	FolderID  *int64 `json:"folderId"`
 	UpdatedAt string `json:"updatedAt"`
 }
 

@@ -679,6 +679,8 @@ func copyTableIn(ctx context.Context, tx *sql.Tx, t songTable, columns []string,
 	values := make([]string, len(columns))
 	for i, c := range columns {
 		switch {
+		case slices.Contains(t.leftOut, c):
+			values[i] = "NULL"
 		case c == "id":
 			values[i] = freshID(t.name, c)
 		case references[c] != "":
