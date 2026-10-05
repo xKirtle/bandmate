@@ -35,7 +35,7 @@ const type = {
   'font-size': [
     'inherit',
     '/^var\\(--text-(xs|sm|md|lg|xl|2xl|field)\\)$/',
-    '/^var\\(--lyric-(write|read-line|read-chord)\\)$/',
+    '/^var\\(--lyric-(write|read-line|read-chord|read-label)\\)$/',
     '/^var\\(--timeline-rem\\)$/',
     `/^calc\\(${scaleSteps} \\* var\\(--timeline-rem\\)\\)$/`,
   ],

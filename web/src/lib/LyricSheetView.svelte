@@ -164,10 +164,11 @@
 </div>
 
 <style>
+  /* Sections well apart, so each reads as one block at a glance. */
   .view {
     display: flex;
     flex-direction: column;
-    gap: var(--space-6);
+    gap: var(--space-8);
     margin-bottom: var(--space-3);
   }
   /* Highlighted by a tint that bleeds a little past the text, so the text
@@ -183,13 +184,13 @@
     background: var(--surface-1);
     box-shadow: var(--selected-edge);
   }
+  /* A Label is content, set as written: a heading over its Lines, at the
+     Chords' size. */
   h3 {
     margin: 0 0 var(--space-1);
-    color: var(--text-muted);
-    font-size: var(--text-sm);
+    font-size: var(--lyric-read-label);
     font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    line-height: var(--lyric-read-leading);
   }
   .section p {
     margin: 0;
@@ -238,8 +239,9 @@
     flex-direction: column;
     min-width: 0;
   }
+  /* A piece with no Chord holds a Chord's height, so the lyrics stay level. */
   .chord {
-    min-height: 1.4em;
+    min-height: 1lh;
     color: var(--accent);
     font-size: var(--lyric-read-chord);
     font-weight: 700;

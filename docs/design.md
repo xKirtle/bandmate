@@ -63,7 +63,7 @@ The system font everywhere, with no typeface bundled. Content and tools differ b
 | Token          | Size                        | For                                                                                    |
 | -------------- | --------------------------- | -------------------------------------------------------------------------------------- |
 | `--text-xs`    | 0.75rem                     | The smallest labels: badges, navigation labels, Clip labels, hints in pills            |
-| `--text-sm`    | 0.8125rem                   | Secondary text in tools: hints, notices, table cells, a Section's heading in Read mode |
+| `--text-sm`    | 0.8125rem                   | Secondary text in tools: hints, notices, table cells |
 | `--text-md`    | 0.875rem                    | Tool text: buttons and fields in toolbars and dialogs, lists, menus                    |
 | `--text-lg`    | 1rem                        | Body text, and the headings of cards and panels                                        |
 | `--text-xl`    | 1.25rem                     | Dialog titles, icon buttons, larger headings                                           |
@@ -75,9 +75,12 @@ Content's line height is `--leading-content` (1.6), for Lines in Write mode and 
 | Token                  | For                                                                                    |
 | ---------------------- | -------------------------------------------------------------------------------------- |
 | `--lyric-write`        | Lines and Chords as typed in Write mode: a text field's size, with `--leading-content` |
-| `--lyric-read-line`    | Lines in Read mode                                                                     |
-| `--lyric-read-chord`   | Chords above their Lines in Read mode                                                  |
-| `--lyric-read-leading` | The line height of Lines in Read mode                                                  |
+| `--lyric-read-line`    | Lines in Read mode                                   |
+| `--lyric-read-chord`   | Chords above their Lines in Read mode             |
+| `--lyric-read-label`   | A Section's Label in Read mode, bold, at the Chords' size                                 |
+| `--lyric-read-leading` | The line height of Lines, Chords and Labels in Read mode                          |
+
+**Read mode** is read at arm's length, from a phone or a music stand, so its lyric sizes are larger than Write mode's: Lines at 1.25rem and Chords at 1.0625rem on a phone, a step larger again from 40rem wide (a tablet, a phone held sideways, or a desktop), at 1.5rem and 1.25rem. Lines are in `--text`, held to 7:1, Chords in the accent, held to 4.5:1, and Labels in `--text`, set as written: they're content too. Sections sit `--space-8` apart. Its chrome stays quiet: the Lyric Sheet's heading is for screen readers only, and the Chords toggle, when on, is outlined and lettered in the accent rather than filled, so it doesn't compete with the Chords drawn in the accent beside it.
 
 Every time, BPM and Gain uses tabular digits, so numbers don't jitter as they change: through the `.tabular` class, or `font-variant-numeric: tabular-nums` in a component's own rule for it. Number fields have them anyway.
 

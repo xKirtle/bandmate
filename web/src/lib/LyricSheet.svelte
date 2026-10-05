@@ -437,7 +437,8 @@
 
 <section class="sheet" aria-labelledby="sheet-heading">
   <div class="head">
-    <h2 id="sheet-heading">Lyric Sheet</h2>
+    <!-- Read mode keeps its chrome out of the way of the Lines: the heading is for screen readers only. -->
+    <h2 id="sheet-heading" class:visually-hidden={mode === 'read'}>Lyric Sheet</h2>
     <span class="spacer"></span>
     {#if mode === 'read' && songHasChords}
       <!-- Together, so on a narrow screen the stepper wraps with the Chords it moves. -->
@@ -705,6 +706,14 @@
     border-color: var(--accent);
     background: var(--accent);
     color: var(--accent-text);
+  }
+  /* In Read mode the Chords are drawn in the accent, so their toggle stays
+     quiet beside them: on, it's outlined and lettered in the accent, like
+     the Chord Chart's own controls, rather than filled. */
+  .chords .toggle[aria-pressed='true'] {
+    border-color: var(--accent);
+    background: var(--surface-1);
+    color: var(--accent);
   }
   .notice:empty {
     display: none;

@@ -35,11 +35,15 @@
      notes; tools keep the page's 1.5. */
   --leading-content: 1.6;
   /* Lines and Chords. In Write mode they're typed into a text field, so they
-     keep its size; Read mode sets them apart, Chords above their Lines. */
+     keep its size. Read mode is read at arm's length, from a phone or a
+     music stand, so it sets them larger, Chords above their Lines and each
+     Section under its Label: a phone's size here, a tablet's or desktop's
+     below. */
   --lyric-write: var(--text-field);
-  --lyric-read-line: 1.0625rem;
-  --lyric-read-chord: 0.9375rem;
-  --lyric-read-leading: 1.4;
+  --lyric-read-line: 1.25rem;
+  --lyric-read-chord: 1.0625rem;
+  --lyric-read-label: var(--lyric-read-chord);
+  --lyric-read-leading: 1.5;
 
   /* Spacing, in quarter-rem steps, for every gap, padding and margin. */
   --space-1: 0.25rem;
@@ -73,6 +77,15 @@
     sans-serif;
   line-height: 1.5;
   -webkit-text-size-adjust: 100%;
+}
+
+/* Wider than a phone held upright, e.g. a tablet on a music stand: Read
+   mode's Lines and Chords a step larger still. */
+@media (min-width: 40rem) {
+  :root {
+    --lyric-read-line: 1.5rem;
+    --lyric-read-chord: 1.25rem;
+  }
 }
 
 /* Desktop: compact controls and wider gutters. */
