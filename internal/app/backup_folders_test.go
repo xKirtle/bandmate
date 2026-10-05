@@ -43,7 +43,24 @@ func (ts *testServer) uploadFrom(elsewhere *testServer, made backup) backup {
 	return up
 }
 
-func TestARestoredSongComesBackInItsFolderMadeOnAnInstallWithout(t *testing.T) {
+// songsMovedSinceBackedUp backs up Opener, in Summer EP, and Loose, in no
+// Folder, then moves both into Demos and deletes Summer EP, returning the
+// Backup and the Songs.
+func (ts *testServer) songsMovedSinceBackedUp() (made backup, opener, loose song) {
+	ts.t.Helper()
+	ep := ts.createFolder("Summer EP")
+	demos := ts.createFolder("Demos")
+	opener = ts.createSong("Opener")
+	loose = ts.createSong("Loose")
+	ts.putInFolder(opener.ID, ep)
+	made = ts.backUp(map[string]any{"songs": []int64{opener.ID, loose.ID}})
+	ts.putInFolder(opener.ID, demos)
+	ts.putInFolder(loose.ID, demos)
+	expectStatus(ts.t, ts.Do(http.MethodDelete, folderPath(ep.ID), nil), http.StatusNoContent)
+	return made, opener, loose
+}
+
+func TestARestoredSongComesBackInItsFolderMadeIfThisInstallHasNone(t *testing.T) {
 	elsewhere := newTestServer(t)
 	ep := elsewhere.createFolder("Summer EP")
 	opener := elsewhere.createSong("Opener")
@@ -66,21 +83,18 @@ func TestARestoredSongComesBackInItsFolderMadeOnAnInstallWithout(t *testing.T) {
 	}
 }
 
-// songsMovedSinceBackedUp backs up Opener, in Summer EP, and Loose, in no
-// Folder, then moves both into Demos and deletes Summer EP, returning the
-// Backup and the Songs.
-func (ts *testServer) songsMovedSinceBackedUp() (made backup, opener, loose song) {
-	ts.t.Helper()
+func TestASongKeptBothGoesIntoItsFolderStillThere(t *testing.T) {
+	ts := newTestServer(t)
 	ep := ts.createFolder("Summer EP")
-	demos := ts.createFolder("Demos")
-	opener = ts.createSong("Opener")
-	loose = ts.createSong("Loose")
-	ts.putInFolder(opener.ID, ep)
-	made = ts.backUp(map[string]any{"songs": []int64{opener.ID, loose.ID}})
-	ts.putInFolder(opener.ID, demos)
-	ts.putInFolder(loose.ID, demos)
-	expectStatus(ts.t, ts.Do(http.MethodDelete, folderPath(ep.ID), nil), http.StatusNoContent)
-	return made, opener, loose
+	s := ts.createSong("Opener")
+	ts.putInFolder(s.ID, ep)
+	made := ts.backUp(map[string]any{"songs": []int64{s.ID}})
+
+	ts.restore(made.ID, s.ID)
+
+	if got := ts.listFolders(); !reflect.DeepEqual(got, []folder{{ID: ep.ID, Name: "Summer EP", Songs: 2}}) {
+		t.Errorf("folders = %+v, want Summer EP alone, holding both Songs", got)
+	}
 }
 
 func TestASongKeptBothGoesIntoTheBackupsFolder(t *testing.T) {

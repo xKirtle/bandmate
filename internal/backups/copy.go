@@ -271,7 +271,7 @@ func (s *Store) copyOnce(ctx context.Context, conn *sql.Conn, staging string, co
 	if _, err := tx.ExecContext(ctx, `PRAGMA defer_foreign_keys = ON`); err != nil {
 		return false, err
 	}
-	checked := false
+	songCounted := false
 	for _, t := range tables {
 		insert := "INSERT INTO"
 		if t.shared {
@@ -283,8 +283,8 @@ func (s *Store) copyOnce(ctx context.Context, conn *sql.Conn, staging string, co
 		if err != nil {
 			return false, fmt.Errorf("copying %s: %w", t.name, err)
 		}
-		if !checked && !t.shared {
-			checked = true
+		if !songCounted && !t.shared {
+			songCounted = true
 			n, err := res.RowsAffected()
 			if err != nil {
 				return false, err

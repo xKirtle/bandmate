@@ -504,11 +504,12 @@ func (s *Store) copyIn(ctx context.Context, staging string, picks Picks, replace
 	// a fresh one, unless it's a Song or Beat already in Bandmate that's
 	// replaced, which takes the id of the one it replaces, and the version
 	// that one had. A Song or Beat already in Bandmate that isn't replaced
-	// is kept both. A Folder matching one in Bandmate by name is marked
-	// replaced too, taking that one's id, but is used as it is.
+	// is kept both. A Folder matching one in Bandmate by name is matched:
+	// it takes that one's id, and that one is used as it is.
 	if _, err := conn.ExecContext(ctx, `CREATE TEMP TABLE restored (
 		tbl TEXT NOT NULL, old INTEGER NOT NULL, new INTEGER NOT NULL,
-		kept_both INTEGER NOT NULL, replaced INTEGER NOT NULL, prior_version INTEGER,
+		kept_both INTEGER NOT NULL, replaced INTEGER NOT NULL,
+		matched INTEGER NOT NULL DEFAULT 0, prior_version INTEGER,
 		PRIMARY KEY (tbl, old))`); err != nil {
 		return Restored{}, err
 	}
@@ -570,9 +571,9 @@ func (s *Store) copyIn(ctx context.Context, staging string, picks Picks, replace
 
 // giveIDs picks, for each row of what picks names, the id it gets in the
 // live database: for a Song or Beat already in Bandmate that replace
-// lists, the id of the one it replaces, for a Folder, that of the one
-// matching it by its table's matchedBy column, and otherwise a fresh one, past
-// every id its table has used, in the order of their ids in the Backup.
+// lists, the id of the one it replaces, for a Folder, that of the one of
+// the same name, ignoring case, and otherwise a fresh one, past every id
+// its table has used, in the order of their ids in the Backup.
 func giveIDs(ctx context.Context, tx *sql.Tx, columns map[string][]string, picks Picks, replace Replace) error {
 	replacing := map[string][]int64{"songs": replace.Songs, "beats": replace.Beats}
 	for _, t := range songTables {
@@ -605,8 +606,8 @@ func giveIDs(ctx context.Context, tx *sql.Tx, columns map[string][]string, picks
 		for _, rows := range picked {
 			if t.matchedBy != "" {
 				if _, err := tx.ExecContext(ctx, fmt.Sprintf(`INSERT INTO temp.restored
-					(tbl, old, new, kept_both, replaced)
-					SELECT '%[1]s', r.id, (SELECT m.id FROM main.%[1]s m WHERE m."%[2]s" = r."%[2]s"), 0, 1
+					(tbl, old, new, kept_both, replaced, matched)
+					SELECT '%[1]s', r.id, (SELECT m.id FROM main.%[1]s m WHERE m."%[2]s" = r."%[2]s"), 0, 0, 1
 					FROM src.%[1]s r
 					WHERE (%[3]s) AND r."%[2]s" IN (SELECT "%[2]s" FROM main.%[1]s)
 						AND r.id NOT IN (SELECT old FROM temp.restored WHERE tbl = '%[1]s')`,
@@ -713,15 +714,12 @@ func copyTableIn(ctx context.Context, tx *sql.Tx, t songTable, columns []string,
 		t.name, columnList(columns), strings.Join(values, ", "), t.name)
 	if hasIDs {
 		join := fmt.Sprintf(` JOIN temp.restored k ON k.tbl = '%s' AND k.old = r.id`, t.name)
-		if t.replacedInPlace == nil && t.matchedBy == "" {
-			_, err := tx.ExecContext(ctx, insert+join+` ORDER BY r.id`)
+		if t.replacedInPlace == nil {
+			_, err := tx.ExecContext(ctx, insert+join+` WHERE NOT k.matched ORDER BY r.id`)
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, insert+join+` WHERE NOT k.replaced ORDER BY r.id`); err != nil {
 			return err
-		}
-		if t.replacedInPlace == nil {
-			return nil
 		}
 		sets := make([]string, len(t.replacedInPlace))
 		same := make([]string, len(t.replacedInPlace))
