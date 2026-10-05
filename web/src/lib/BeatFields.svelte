@@ -63,12 +63,12 @@
   .fields {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
   label {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: var(--space-1);
     font-size: var(--text-sm);
     font-weight: 600;
     color: var(--text-muted);

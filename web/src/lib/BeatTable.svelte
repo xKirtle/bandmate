@@ -107,7 +107,7 @@
   th button {
     width: 100%;
     min-height: var(--control);
-    padding: 0 0.5rem;
+    padding: 0 var(--space-2);
     border: none;
     border-radius: 0.25rem;
     background: none;
@@ -125,11 +125,11 @@
   .arrow {
     display: inline-block;
     width: 1em;
-    margin-left: 0.25rem;
+    margin-left: var(--space-1);
   }
   td {
     height: calc(var(--control) + 0.5rem);
-    padding: 0 0.5rem;
+    padding: 0 var(--space-2);
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
   }
@@ -171,7 +171,7 @@
   }
   .lead {
     width: calc(var(--control) + 0.5rem);
-    padding: 0 0.25rem;
+    padding: 0 var(--space-1);
   }
   .num {
     text-align: right;
@@ -179,7 +179,7 @@
   }
   .trail {
     width: calc(var(--control) + 0.5rem);
-    padding: 0 0.25rem;
+    padding: 0 var(--space-1);
   }
   tbody tr.clickable {
     cursor: pointer;

@@ -209,9 +209,9 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.25rem;
+    gap: var(--space-1);
     margin: 0;
-    padding: 0.5rem 0.75rem 0.75rem;
+    padding: var(--space-2) var(--space-3) var(--space-3);
     border: 1px solid var(--border);
     border-radius: 0.5rem;
     background: var(--bg);
@@ -230,7 +230,7 @@
   .stepper {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: var(--space-1);
   }
   .step {
     width: var(--control);

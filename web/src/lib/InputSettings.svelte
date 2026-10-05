@@ -297,10 +297,10 @@
     inset: auto;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--space-3);
     width: min(22rem, calc(100vw - 2rem));
     margin: 0;
-    padding: 1rem;
+    padding: var(--space-4);
     border: 1px solid var(--border);
     border-radius: 0.5rem;
     background: var(--bg);
@@ -310,7 +310,7 @@
   label {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: var(--space-1);
   }
   label span,
   .level > span:first-child {
@@ -324,7 +324,7 @@
     display: grid;
     grid-template-columns: auto 1fr auto;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   .meter {
     height: 0.75rem;
@@ -341,7 +341,7 @@
     background: var(--danger);
   }
   .clip {
-    padding: 0 0.375rem;
+    padding: 0 var(--space-2);
     border-radius: 0.25rem;
     color: var(--text-muted);
     font-size: var(--text-xs);
@@ -365,7 +365,7 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   .latency span {
     display: block;

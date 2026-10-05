@@ -138,8 +138,8 @@
   .chart {
     display: flex;
     align-items: flex-start;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
   }
   /* Stays at the top of the window, over the Lines scrolling under it,
      clear of a notch. */
@@ -147,7 +147,7 @@
     position: sticky;
     top: 0;
     z-index: 1;
-    padding: max(0.5rem, env(safe-area-inset-top)) 0 0.5rem;
+    padding: max(var(--space-2), env(safe-area-inset-top)) 0 var(--space-2);
     border-bottom: 1px solid var(--border);
     background: var(--bg);
   }
@@ -156,16 +156,16 @@
     flex: none;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: var(--space-1);
   }
   .control {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.375rem;
+    gap: var(--space-2);
     min-width: var(--control);
     height: var(--control);
-    padding: 0 0.5rem;
+    padding: 0 var(--space-2);
     box-sizing: border-box;
     border: 1px solid var(--border);
     border-radius: 0.5rem;
@@ -205,9 +205,9 @@
     flex: 1;
     min-width: 0;
     display: flex;
-    gap: 0.75rem;
+    gap: var(--space-3);
     margin: 0;
-    padding: 0 0 0.25rem;
+    padding: 0 0 var(--space-1);
     list-style: none;
     overflow-x: auto;
     overscroll-behavior-x: contain;
@@ -220,9 +220,9 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.125rem;
+    gap: var(--space-1);
     width: 100%;
-    padding: 0.125rem;
+    padding: var(--space-1);
     border: none;
     border-radius: 0.375rem;
     background: none;

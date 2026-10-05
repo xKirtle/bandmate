@@ -670,12 +670,13 @@
   /* The title and its heading wrap alike and are as tall as each other,
      one line being 3rem, so switching mode doesn't shift the page. */
   .title {
+    --title-line: 3rem;
     display: block;
-    min-height: 3rem;
-    margin: 0 0 0.25rem;
-    padding: calc((3rem - 1.2em - 2px) / 2) 0.5rem;
-    margin-left: -0.5rem;
-    width: calc(100% + 0.5rem);
+    min-height: var(--title-line);
+    margin: 0 0 var(--space-1);
+    padding: calc((var(--title-line) - 1lh) / 2 - 1px) var(--space-2);
+    margin-left: calc(-1 * var(--space-2));
+    width: calc(100% + var(--space-2));
     border-color: transparent;
     background: transparent;
     font-size: var(--text-2xl);
@@ -708,14 +709,14 @@
   .head {
     display: flex;
     align-items: flex-start;
-    gap: 0.75rem;
-    margin-bottom: 0.5rem;
+    gap: var(--space-3);
+    margin-bottom: var(--space-2);
   }
   .head-main {
     display: flex;
     flex: 1;
     align-items: flex-start;
-    gap: 0.75rem;
+    gap: var(--space-3);
     min-width: 0;
   }
   .title-block {
@@ -726,7 +727,7 @@
   .head-tools {
     display: flex;
     flex: none;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   .shortcuts {
     width: var(--control);
@@ -755,7 +756,7 @@
     display: flex;
     align-items: center;
     min-height: var(--control);
-    padding: 0 0.875rem;
+    padding: 0 var(--space-4);
     background: var(--surface-1);
     font-weight: 600;
     cursor: pointer;
@@ -783,23 +784,23 @@
     align-items: center;
     /* As tall as the Status picker, which Read mode shows as a plain badge. */
     min-height: var(--control);
-    gap: 0 0.5rem;
-    margin: 0 0 0.75rem;
+    gap: 0 var(--space-2);
+    margin: 0 0 var(--space-3);
     font-size: var(--text-sm);
   }
   .save-state {
     margin: 0;
   }
   .error {
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-4);
   }
   .stale {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem 1rem;
-    margin-bottom: 1rem;
-    padding: 0.75rem 1rem;
+    gap: var(--space-2) var(--space-4);
+    margin-bottom: var(--space-4);
+    padding: var(--space-3) var(--space-4);
     border: 1px solid var(--border);
     border-radius: 0.5rem;
     background: var(--surface-1);
@@ -811,18 +812,18 @@
   /* The Details: small labelled fields in a row that wraps, the Notes
      toggle last. */
   .details {
-    margin: 0 0 0.75rem;
+    margin: 0 0 var(--space-3);
   }
   .fields {
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;
-    gap: 0.5rem 0.75rem;
+    gap: var(--space-2) var(--space-3);
   }
   .field {
     display: flex;
     flex-direction: column;
-    gap: 0.125rem;
+    gap: var(--space-1);
     font-size: var(--text-xs);
     font-weight: 600;
     color: var(--text-muted);
@@ -845,7 +846,7 @@
     min-width: 6rem;
   }
   .notes-toggle {
-    gap: 0.375rem;
+    gap: var(--space-2);
   }
   /* A dot says there are Notes behind the toggle. */
   .notes-toggle.has-notes::after {
@@ -857,7 +858,7 @@
   }
   .notes {
     display: block;
-    margin-top: 0.5rem;
+    margin-top: var(--space-2);
   }
   .notes textarea,
   .read-notes {
@@ -872,7 +873,7 @@
     font-variant-numeric: tabular-nums;
   }
   .read-notes {
-    margin-top: 0.5rem;
+    margin-top: var(--space-2);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
@@ -887,8 +888,8 @@
       grid-template-areas:
         'cover title'
         'modes modes';
-      gap: 0 0.75rem;
-      margin-bottom: 1rem;
+      gap: 0 var(--space-3);
+      margin-bottom: var(--space-4);
     }
     .head > :global(:first-child) {
       grid-area: cover;
@@ -907,7 +908,7 @@
     }
     .head-tools {
       grid-area: modes;
-      margin-top: 1rem;
+      margin-top: var(--space-4);
     }
     .modes {
       flex: 1;
@@ -919,7 +920,7 @@
     .fields:has(> .field) {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      row-gap: 0.875rem;
+      row-gap: var(--space-4);
     }
     .tuning {
       grid-column: span 2;
@@ -939,10 +940,10 @@
     flex-direction: column;
   }
   .scrapbook-part {
-    margin-bottom: 2rem;
+    margin-bottom: var(--space-8);
   }
   .delete {
-    margin-top: 1rem;
+    margin-top: var(--space-4);
   }
   .part > summary {
     display: none;
@@ -977,7 +978,7 @@
       grid-area: side;
       position: sticky;
       top: var(--gutter);
-      gap: 0.5rem;
+      gap: var(--space-2);
       max-height: calc(100dvh - var(--timeline-height) - 2 * var(--gutter));
       overflow-y: auto;
       overscroll-behavior: contain;
@@ -1003,21 +1004,21 @@
       background: var(--surface-1);
     }
     .part[open] {
-      padding: 0 0.75rem 0.75rem;
+      padding: 0 var(--space-3) var(--space-3);
     }
     .part > summary {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: var(--space-2);
       min-height: var(--control);
-      padding: 0 0.75rem;
+      padding: 0 var(--space-3);
       font-weight: 700;
       cursor: pointer;
       list-style: none;
       user-select: none;
     }
     .part[open] > summary {
-      margin: 0 -0.75rem 0.25rem;
+      margin: 0 calc(-1 * var(--space-3)) var(--space-1);
     }
     /* A Lyric Sheet Section dragged over the Scrapbook would drop into it. */
     .part.drop-target {

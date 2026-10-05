@@ -65,7 +65,7 @@
   dialog {
     width: min(40rem, calc(100vw - 2rem));
     max-height: calc(100dvh - 2rem);
-    padding: 1rem;
+    padding: var(--space-4);
     border: 1px solid var(--border);
     border-radius: 0.75rem;
     background: var(--bg);
@@ -74,7 +74,7 @@
   dialog[open] {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--space-4);
   }
   /* Focused itself only to hold focus for the list. */
   dialog:focus-visible {
@@ -87,14 +87,14 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
   h2 {
     margin: 0;
     font-size: var(--text-xl);
   }
   h3 {
-    margin: 0 0 0.25rem;
+    margin: 0 0 var(--space-1);
     font-size: var(--text-md);
     color: var(--text-muted);
   }
@@ -107,14 +107,14 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 0.25rem 1rem;
-    padding: 0.5rem 0;
+    gap: var(--space-1) var(--space-4);
+    padding: var(--space-2) 0;
     border-top: 1px solid var(--border);
   }
   .what {
     display: flex;
     flex-direction: column;
-    gap: 0.125rem;
+    gap: var(--space-1);
     min-width: 0;
   }
   .name {
@@ -128,7 +128,7 @@
     flex: none;
     flex-direction: column;
     align-items: flex-end;
-    gap: 0.25rem;
+    gap: var(--space-1);
     max-width: 50%;
     font-size: var(--text-md);
   }
@@ -137,10 +137,10 @@
     flex-wrap: wrap;
     align-items: baseline;
     justify-content: flex-end;
-    gap: 0.25rem;
+    gap: var(--space-1);
   }
   kbd {
-    padding: 0.0625rem 0.375rem;
+    padding: 0 var(--space-2);
     border: 1px solid var(--border);
     border-bottom-width: 2px;
     border-radius: 0.25rem;

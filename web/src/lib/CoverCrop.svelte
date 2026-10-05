@@ -180,7 +180,7 @@
   dialog {
     width: min(28rem, calc(100vw - 2rem));
     max-height: calc(100dvh - 2rem);
-    padding: 1rem;
+    padding: var(--space-4);
     border: 1px solid var(--border);
     border-radius: 0.75rem;
     background: var(--bg);
@@ -189,7 +189,7 @@
   dialog[open] {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
   dialog::backdrop {
     background: var(--scrim);
@@ -203,8 +203,8 @@
       height: 100%;
       max-height: none;
       margin: 0;
-      padding: max(1rem, env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right))
-        max(1rem, env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
+      padding: max(var(--space-4), env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right))
+        max(var(--space-4), env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
       border: none;
       border-radius: 0;
     }
@@ -254,7 +254,7 @@
   .zoom {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: var(--space-3);
     font-size: var(--text-md);
   }
   .zoom input {
@@ -262,7 +262,7 @@
   }
   .footer {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   @media (width < 40rem) {
     .footer > * {

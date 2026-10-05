@@ -277,7 +277,7 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: var(--inset-block) repeat(var(--rows), auto) minmax(var(--inset-block), 1fr);
-    column-gap: 0.5rem;
+    column-gap: var(--space-2);
   }
   .field.with-gutter {
     grid-template-columns: minmax(0, 1fr) auto;
@@ -304,7 +304,7 @@
     grid-column: 1;
     z-index: 1;
     margin-inline: 1px;
-    padding-inline: 0.75rem;
+    padding-inline: var(--space-3);
     color: transparent;
     font-size: var(--lyric-write);
     line-height: var(--leading-content);
@@ -329,7 +329,7 @@
   .now {
     width: 6.75rem;
     min-height: 1.5rem;
-    padding: 0 0.375rem;
+    padding: 0 var(--space-2);
     border: 1px solid var(--accent);
     border-radius: 0.375rem;
     background: var(--accent);

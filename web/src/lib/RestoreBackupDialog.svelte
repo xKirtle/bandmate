@@ -328,9 +328,10 @@
 
 <style>
   dialog {
+    --checkbox: 1.25rem;
     width: min(28rem, calc(100vw - 2rem));
     max-height: calc(100dvh - 2rem);
-    padding: 1rem;
+    padding: var(--space-4);
     border: 1px solid var(--border);
     border-radius: 0.75rem;
     background: var(--bg);
@@ -339,7 +340,7 @@
   dialog[open] {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
   dialog::backdrop {
     background: var(--scrim);
@@ -348,7 +349,7 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
   h2 {
     margin: 0;
@@ -360,14 +361,14 @@
   label {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
     min-height: var(--control);
     cursor: pointer;
   }
   label input {
     flex: none;
-    width: 1.25rem;
-    height: 1.25rem;
+    width: var(--checkbox);
+    height: var(--checkbox);
     min-height: 0;
     margin: 0;
     padding: 0;
@@ -381,7 +382,7 @@
     border: 0;
   }
   legend {
-    margin-bottom: 0.375rem;
+    margin-bottom: var(--space-2);
     padding: 0;
     font-weight: 600;
   }
@@ -389,12 +390,12 @@
   .nested {
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
-    margin: 0 0 0.5rem 1.75rem;
+    gap: var(--space-2);
+    margin: 0 0 var(--space-2) calc(var(--checkbox) + var(--space-2));
   }
   .choose-actions {
     display: flex;
-    gap: 1rem;
+    gap: var(--space-4);
   }
   .link {
     padding: 0;
@@ -418,18 +419,18 @@
   .present {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--space-2);
     max-height: calc(7.5 * var(--control));
     overflow-y: auto;
     overscroll-behavior: contain;
   }
   h3 {
-    margin: 0 0 0.25rem;
+    margin: 0 0 var(--space-1);
     font-size: var(--text-md);
   }
   .present ul {
     margin: 0;
-    padding: 0 0.5rem;
+    padding: 0 var(--space-2);
     border: 1px solid var(--border);
     border-radius: 0.5rem;
     list-style: none;
@@ -440,8 +441,8 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 0.25rem 0.75rem;
-    padding-block: 0.375rem;
+    gap: var(--space-1) var(--space-3);
+    padding-block: var(--space-2);
   }
   .present li + li {
     border-top: 1px solid var(--border);
@@ -458,7 +459,7 @@
   }
   .toggle label {
     min-height: 2rem;
-    padding: 0 0.625rem;
+    padding: 0 var(--space-3);
     font-size: var(--text-md);
     font-weight: 600;
   }
@@ -491,7 +492,7 @@
     max-height: calc(6.5 * var(--control));
     overflow-y: auto;
     margin: 0;
-    padding-left: 1.25rem;
+    padding-left: var(--space-6);
     overflow-wrap: anywhere;
   }
   progress {
@@ -507,6 +508,6 @@
   .actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 </style>

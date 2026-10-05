@@ -55,13 +55,13 @@
   .setup {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.75rem;
-    margin: 0 0 1rem;
+    gap: var(--space-3);
+    margin: 0 0 var(--space-4);
   }
   .field {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: var(--space-1);
     min-width: 0;
     color: var(--text-muted);
     font-size: var(--text-sm);
@@ -72,6 +72,6 @@
     max-width: 24rem;
   }
   .error {
-    margin: -0.5rem 0 1rem;
+    margin: calc(-1 * var(--space-2)) 0 var(--space-4);
   }
 </style>

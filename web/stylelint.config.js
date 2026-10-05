@@ -42,6 +42,23 @@ const type = {
   font: ['inherit'],
 };
 
+// Spacing: a gap, padding or margin is built from the --space-* steps
+// (negated as `calc(-1 * var(--space-2))`), the layout tokens and the
+// safe-area insets, or on the Timeline a step of the same scale in its own
+// unit. calc() may relate them to a size, e.g. centring text in a control.
+// No literal length, but for a hairline (1px or less) that squares something
+// with a border, and `1lh`, a line of text's own height.
+// The steps are the --space-* sizes in app.css, in rem: keep them in step.
+const spaceSteps = '(0\\.25|0\\.5|0\\.75|1|1\\.5|2)';
+const spacing = {
+  '/^(gap|row-gap|column-gap|padding|margin)(-.+)?$/': [
+    '/(?<![\\w.-])-?(?!(0\\.5|1)px\\b|1lh\\b)(\\d*\\.)?\\d+[a-z%]+/',
+    `/(?<![\\w.])(?!-?${spaceSteps} )-?(\\d*\\.)?\\d+ \\* var\\(--timeline-rem\\)/`,
+    // A step scaled into a value off the scale; negating it is fine.
+    '/(?<!\\(-1 )\\* var\\(--space-|var\\(--space-\\d+\\) *[*/]/',
+  ],
+};
+
 export default {
   rules: {
     'color-no-invalid-hex': true,
@@ -50,6 +67,7 @@ export default {
     'unit-no-unknown': true,
     ...colour,
     'declaration-property-value-allowed-list': { ...shadows, ...type },
+    'declaration-property-value-disallowed-list': spacing,
   },
   overrides: [
     { files: ['**/*.svelte'], customSyntax: 'postcss-html' },

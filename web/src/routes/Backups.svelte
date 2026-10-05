@@ -173,7 +173,7 @@
 <style>
   .bar-actions {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   .bar label.disabled {
     opacity: 0.6;
@@ -195,8 +195,8 @@
     /* Where the name would be squeezed, as at phone width, the buttons go under it. */
     flex-wrap: wrap;
     justify-content: space-between;
-    gap: 0.5rem 1rem;
-    padding: 0.75rem 0;
+    gap: var(--space-2) var(--space-4);
+    padding: var(--space-3) 0;
     border-bottom: 1px solid var(--border);
   }
   .about {
@@ -216,14 +216,14 @@
     display: flex;
     flex: none;
     align-items: center;
-    gap: 0.25rem;
+    gap: var(--space-1);
     margin-left: auto;
   }
   .empty {
     text-align: center;
-    padding: 3rem 0;
+    padding: var(--space-8) 0;
   }
   .empty p {
-    margin: 0 0 0.5rem;
+    margin: 0 0 var(--space-2);
   }
 </style>

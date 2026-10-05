@@ -217,7 +217,7 @@
     grid-template-areas: 'play elapsed wave total volume';
     justify-content: center;
     align-items: center;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
   /* Without the volume, no empty column takes the group off centre. */
   .controls.without-volume {
@@ -245,7 +245,7 @@
         'play wave wave'
         '. both volume';
       justify-content: stretch;
-      row-gap: 0.25rem;
+      row-gap: var(--space-1);
     }
     .elapsed,
     .total {

@@ -85,7 +85,20 @@ A `font-size` is always one of these tokens, or `inherit`; the `font` shorthand 
 
 ### Spacing
 
-Quarter-rem steps: `--space-1` 0.25, `--space-2` 0.5, `--space-3` 0.75, `--space-4` 1, `--space-6` 1.5 and `--space-8` 2rem. `--gutter` and `--control` sit on top as layout tokens. _To come_ (#570).
+Quarter-rem steps for every gap, padding and margin. Tools take the small steps; content and the space between parts of a page take the larger ones.
+
+| Token       | Size    | For                                                                              |
+| ----------- | ------- | -------------------------------------------------------------------------------- |
+| `--space-1` | 0.25rem | Inside the smallest things: a badge or chip, a table cell, between a label and its field |
+| `--space-2` | 0.5rem  | Between controls in a row, a field's inner padding, a list's items                |
+| `--space-3` | 0.75rem | A control's or menu entry's sides, between groups in a toolbar                    |
+| `--space-4` | 1rem    | A card's or dialog's padding, between a page's blocks                             |
+| `--space-6` | 1.5rem  | Between Sections and larger parts of a page                                       |
+| `--space-8` | 2rem    | The widest: around an empty state, the page's foot                                |
+
+`--gutter` and `--control` sit on top as layout tokens, and the safe-area insets join in through `max()` and `calc()`. A space that bleeds out, like a highlight past its text, is a step negated: `calc(-1 * var(--space-3))`. A space that squares something with a size, like text centred in a control or an indent past a checkbox, is a `calc()` over that size and the steps, with the size named in a custom property where it's set (`--checkbox`, `--glyph-width`).
+
+A gap, padding or margin is never a literal length otherwise, and a step is never scaled into a value between steps: Stylelint fails both. The two exceptions are a hairline, 1px or less, that squares something with a border, and `1lh`, a line of text's own height. In the Timeline the steps are in its own unit (below).
 
 ### Radius
 
@@ -101,7 +114,7 @@ Lucide, everywhere: no Unicode glyphs or hand-drawn SVGs as icons, so icons look
 
 ### The Timeline's own scale
 
-The Timeline zooms by its own unit, `--timeline-rem`, so its sizes are written as multiples of it (`calc(0.75 * var(--timeline-rem))`). They follow the same scales, in that unit: a font size there is `var(--timeline-rem)` or one of the type scale's steps times it (0.75 to 1.5).
+The Timeline zooms by its own unit, `--timeline-rem`, so its sizes are written as multiples of it (`calc(0.75 * var(--timeline-rem))`). They follow the same scales, in that unit: a font size there is `var(--timeline-rem)` or one of the type scale's steps times it (0.75 to 1.5), and a gap, padding or margin one of the spacing steps times it (0.25 to 2), or negated.
 
 ### Components
 

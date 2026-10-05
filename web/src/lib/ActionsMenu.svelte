@@ -334,13 +334,17 @@
     cursor: pointer;
   }
   .menu {
+    /* The column the entries' glyphs line up in, and where an entry's text
+       starts past it. */
+    --glyph-width: 1.25rem;
+    --past-glyph: calc(var(--space-3) + var(--glyph-width) + var(--space-3));
     position: fixed;
     inset: auto;
     display: flex;
     flex-direction: column;
     max-width: calc(100vw - 2rem);
     margin: 0;
-    padding: 0.25rem;
+    padding: var(--space-1);
     border: 1px solid var(--border);
     border-radius: 0.5rem;
     background: var(--bg);
@@ -354,9 +358,9 @@
   [role^='menuitem'] {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: var(--space-3);
     min-height: var(--control);
-    padding: 0 0.75rem;
+    padding: 0 var(--space-3);
     border: 0;
     border-radius: 0.375rem;
     background: transparent;
@@ -380,30 +384,30 @@
   }
   /* A choice sits under the entry it's for, past where the glyphs line up. */
   .choice {
-    padding-inline-start: 2.75rem;
+    padding-inline-start: var(--past-glyph);
   }
   /* The choice that's on is ticked in the glyphs' column. */
   .choice:has(.check) {
-    padding-inline-start: 0.75rem;
+    padding-inline-start: var(--space-3);
   }
   .check {
-    width: 1.25rem;
+    width: var(--glyph-width);
     text-align: center;
   }
   /* A field sits under the entry it's for, like a choice. */
   .field {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
     min-height: var(--control);
-    padding: 0 0.75rem 0 2.75rem;
+    padding: 0 var(--space-3) 0 var(--past-glyph);
     color: var(--text-muted);
   }
   .field input {
     width: 6rem;
   }
   .glyph {
-    width: 1.25rem;
+    width: var(--glyph-width);
     color: var(--text-muted);
     text-align: center;
   }

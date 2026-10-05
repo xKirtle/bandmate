@@ -23,7 +23,7 @@
 <style>
   .badge {
     display: inline-block;
-    padding: 0.125rem 0.5rem;
+    padding: var(--space-1) var(--space-2);
     border-radius: 999px;
     font-size: var(--text-xs);
     font-weight: 600;

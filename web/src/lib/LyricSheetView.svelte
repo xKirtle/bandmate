@@ -167,14 +167,14 @@
   .view {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
-    margin-bottom: 0.75rem;
+    gap: var(--space-6);
+    margin-bottom: var(--space-3);
   }
   /* Highlighted by a tint that bleeds a little past the text, so the text
      itself stays where it is. */
   .section {
-    margin: -0.5rem -0.75rem;
-    padding: 0.5rem 0.75rem;
+    margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-3));
+    padding: var(--space-2) var(--space-3);
     border-radius: 0.5rem;
     scroll-margin-top: 5rem;
     transition: background-color 0.2s;
@@ -184,7 +184,7 @@
     box-shadow: var(--selected-edge);
   }
   h3 {
-    margin: 0 0 0.25rem;
+    margin: 0 0 var(--space-1);
     color: var(--text-muted);
     font-size: var(--text-sm);
     font-weight: 700;
@@ -197,8 +197,8 @@
   /* A Line, whose highlight bleeds past the text like the Section's, taking
      in its Chords. */
   .line-box {
-    margin: 0 -0.75rem;
-    padding: 0 0.75rem;
+    margin: 0 calc(-1 * var(--space-3));
+    padding: 0 var(--space-3);
     border-radius: 0.375rem;
     scroll-margin: 5rem 0;
     transition: background-color 0.2s;
@@ -223,7 +223,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;
-    margin-top: 0.25rem;
+    margin-top: var(--space-1);
   }
   /* A word wider than the screen wraps inside rather than overflowing. */
   .word {
@@ -245,7 +245,7 @@
     font-weight: 700;
   }
   .chord:not(:empty) {
-    padding-right: 0.375em;
+    padding-right: var(--space-2);
   }
   .chord-line .lyric {
     display: none;

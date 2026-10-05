@@ -232,7 +232,7 @@
   .cue {
     width: 5.5rem;
     min-height: 1.5rem;
-    padding: 0 0.375rem;
+    padding: 0 var(--space-2);
     border: 1px solid transparent;
     border-radius: 0.375rem;
     background: transparent;
@@ -260,7 +260,7 @@
   }
   /* Small, so the time beside it still fits the gutter. */
   .warning {
-    margin-right: 0.125rem;
+    margin-right: var(--space-1);
     font-size: var(--text-xs);
   }
   .cue.editing {

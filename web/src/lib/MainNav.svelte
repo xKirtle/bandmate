@@ -50,8 +50,8 @@
     z-index: 2;
     display: flex;
     height: var(--tabbar-space);
-    padding: 0.25rem max(0.5rem, env(safe-area-inset-right)) calc(0.25rem + env(safe-area-inset-bottom))
-      max(0.5rem, env(safe-area-inset-left));
+    padding: var(--space-1) max(var(--space-2), env(safe-area-inset-right))
+      calc(var(--space-1) + env(safe-area-inset-bottom)) max(var(--space-2), env(safe-area-inset-left));
     border-top: 1px solid var(--border);
     background: var(--surface-1);
   }
@@ -65,8 +65,8 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.125rem;
-    padding: 0.25rem;
+    gap: var(--space-1);
+    padding: var(--space-1);
     border-radius: 0.5rem;
     color: var(--text-muted);
     font-size: var(--text-xs);
@@ -100,10 +100,10 @@
       position: sticky;
       top: 0;
       flex-direction: column;
-      gap: 0.25rem;
+      gap: var(--space-1);
       height: 100vh;
       height: 100dvh;
-      padding: 0.75rem 0.375rem;
+      padding: var(--space-3) var(--space-2);
       border-top: none;
       border-right: 1px solid var(--border);
     }
@@ -111,11 +111,11 @@
       display: grid;
       place-items: center;
       height: 2.25rem;
-      margin-bottom: 0.75rem;
+      margin-bottom: var(--space-3);
     }
     a {
       flex: none;
-      padding: 0.5rem 0.25rem;
+      padding: var(--space-2) var(--space-1);
     }
     a:hover {
       background: var(--surface-2);

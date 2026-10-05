@@ -76,12 +76,12 @@
   .pick-list {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: var(--space-1);
     min-height: 0;
   }
   .actions {
     display: flex;
-    gap: 1rem;
+    gap: var(--space-4);
   }
   .link {
     padding: 0;
@@ -102,7 +102,7 @@
     max-height: calc(6.5 * var(--control));
     overflow-y: auto;
     margin: 0;
-    padding: 0 0.5rem;
+    padding: 0 var(--space-2);
     border: 1px solid var(--border);
     border-radius: 0.5rem;
     list-style: none;
@@ -111,9 +111,9 @@
   label {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
     min-height: var(--control);
-    padding-block: 0.25rem;
+    padding-block: var(--space-1);
     cursor: pointer;
   }
   input {

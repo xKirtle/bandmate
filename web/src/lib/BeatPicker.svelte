@@ -249,7 +249,7 @@
   dialog {
     width: min(36rem, calc(100vw - 2rem));
     max-height: min(40rem, calc(100vh - 2rem));
-    padding: 1rem;
+    padding: var(--space-4);
     border: 1px solid var(--border);
     border-radius: 0.75rem;
     background: var(--bg);
@@ -262,7 +262,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 0.75rem;
+    margin-bottom: var(--space-3);
   }
   h2 {
     margin: 0;
@@ -288,7 +288,7 @@
   .beats li {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: var(--space-1);
     border-bottom: 1px solid var(--border);
   }
   .preview {
@@ -304,7 +304,7 @@
     flex: 1;
     min-width: 0;
     min-height: var(--control);
-    padding: 0.5rem 0.25rem;
+    padding: var(--space-2) var(--space-1);
     border: none;
     background: transparent;
     color: var(--text);
@@ -323,7 +323,7 @@
     font-size: var(--text-sm);
   }
   .empty {
-    padding: 1.5rem 0;
+    padding: var(--space-6) 0;
     text-align: center;
   }
   .empty p {
@@ -332,7 +332,7 @@
   .adding {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
   .file {
     margin: 0;
@@ -345,7 +345,7 @@
   .actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 
   /* Desktop has room for the Library's table, sorted by its headers. The

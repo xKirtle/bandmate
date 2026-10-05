@@ -3680,6 +3680,8 @@
     display: none;
   }
   .heads {
+    /* The grip's strip, and the room each header leaves for it. */
+    --grip-width: calc(1.625 * var(--timeline-rem));
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
@@ -3695,13 +3697,13 @@
   .ruler-gap {
     display: flex;
     align-items: center;
-    gap: calc(0.375 * var(--timeline-rem));
+    gap: calc(0.5 * var(--timeline-rem));
     height: calc(2.25 * var(--timeline-rem));
   }
   /* Small enough for the corner, both side by side; the corner can't grow without moving the lanes. */
   .add {
     min-height: calc(1.75 * var(--timeline-rem));
-    padding: 0 calc(0.625 * var(--timeline-rem));
+    padding: 0 calc(0.75 * var(--timeline-rem));
     font-size: calc(0.875 * var(--timeline-rem));
   }
   .head {
@@ -3711,7 +3713,7 @@
     flex-shrink: 0;
     gap: calc(0.25 * var(--timeline-rem));
     height: var(--track-height);
-    padding-left: calc(0.375 * var(--timeline-rem));
+    padding-left: calc(0.5 * var(--timeline-rem));
     border-bottom: 1px solid var(--border);
     cursor: pointer;
     /* Clicking it chooses the Track; its rename field is still selectable. */
@@ -3723,7 +3725,7 @@
   }
   .heads.gripped .head {
     position: relative;
-    padding-left: calc(1.625 * var(--timeline-rem));
+    padding-left: var(--grip-width);
   }
   .grip {
     position: absolute;
@@ -3735,7 +3737,7 @@
        header's edge and the name, clear of the Chosen Track's line. */
     place-content: start center;
     padding-top: calc(0.5 * var(--timeline-rem));
-    width: calc(1.625 * var(--timeline-rem));
+    width: var(--grip-width);
     color: var(--text-muted);
     font-size: calc(0.875 * var(--timeline-rem));
     cursor: grab;
@@ -3798,7 +3800,7 @@
     flex: 1;
     min-width: 0;
     min-height: 0;
-    padding: 0 calc(0.125 * var(--timeline-rem));
+    padding: 0 calc(0.25 * var(--timeline-rem));
     border: 1px solid transparent;
     border-radius: calc(0.25 * var(--timeline-rem));
     background: none;
@@ -4006,7 +4008,7 @@
   }
   .toggle.loop-toggle {
     width: auto;
-    padding: 0 calc(0.375 * var(--timeline-rem));
+    padding: 0 calc(0.5 * var(--timeline-rem));
   }
   .toggle.loop-toggle:disabled {
     opacity: 0.5;
@@ -4042,9 +4044,9 @@
   .toggle.record {
     display: inline-flex;
     align-items: center;
-    gap: calc(0.3125 * var(--timeline-rem));
+    gap: calc(0.25 * var(--timeline-rem));
     width: auto;
-    padding: 0 calc(0.375 * var(--timeline-rem));
+    padding: 0 calc(0.5 * var(--timeline-rem));
   }
   .record-dot {
     width: calc(0.5 * var(--timeline-rem));
@@ -4063,7 +4065,7 @@
     background: currentColor;
   }
   .not-calibrated {
-    padding: 0.125rem 0.375rem;
+    padding: var(--space-1) var(--space-2);
     border: 1px dashed var(--warning);
     border-radius: 0.25rem;
     background: none;
@@ -4192,8 +4194,8 @@
     flex: 1;
     min-width: 0;
     min-height: 0;
-    margin: calc(0.0625 * var(--timeline-rem));
-    padding: 0 calc(0.1875 * var(--timeline-rem));
+    margin: 1px;
+    padding: 0 calc(0.25 * var(--timeline-rem));
     border: 1px solid var(--border);
     border-radius: calc(0.25 * var(--timeline-rem));
     background: var(--bg);
@@ -4392,8 +4394,9 @@
   /* What a moved or trimmed Clip, or the Loop being set, is snapped to, through the lanes aligned there, and up through the ruler for a Loop edge or the Loop. */
   .snap-guide {
     position: absolute;
-    width: round(calc(0.125 * var(--timeline-rem)), 1px);
-    margin-left: round(calc(-0.0625 * var(--timeline-rem)), 1px);
+    --line-width: round(calc(0.125 * var(--timeline-rem)), 1px);
+    width: var(--line-width);
+    margin-left: round(calc(var(--line-width) / -2), 1px);
     background: var(--accent);
     pointer-events: none;
   }
@@ -4402,8 +4405,9 @@
     top: 0;
     bottom: 0;
     /* In whole pixels, so it stays sharp. */
-    width: round(calc(0.125 * var(--timeline-rem)), 1px);
-    margin-left: round(calc(-0.0625 * var(--timeline-rem)), 1px);
+    --line-width: round(calc(0.125 * var(--timeline-rem)), 1px);
+    width: var(--line-width);
+    margin-left: round(calc(var(--line-width) / -2), 1px);
     background: var(--text);
     pointer-events: none;
   }
@@ -4419,7 +4423,7 @@
     display: flex;
     align-items: center;
     gap: calc(0.5 * var(--timeline-rem));
-    padding: calc(0.375 * var(--timeline-rem)) calc(0.75 * var(--timeline-rem));
+    padding: calc(0.5 * var(--timeline-rem)) calc(0.75 * var(--timeline-rem));
     border: 1px solid var(--danger);
     border-radius: calc(0.5 * var(--timeline-rem));
     background: var(--bg);

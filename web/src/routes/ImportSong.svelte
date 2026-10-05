@@ -99,7 +99,7 @@
   form {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
   label {
     font-weight: 600;
