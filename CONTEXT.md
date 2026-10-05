@@ -86,6 +86,10 @@ _Avoid_: Chord Library (a library holds the user's things, like the Beat Library
 One way to play a Chord on an Instrument: which strings and frets on a guitar, which keys on a piano. A Chord has many; the user can prefer one per Chord and tuning, kept on each device.
 _Avoid_: Shape, fingering, chord diagram (a diagram draws a Voicing)
 
+**Chord Chart**:
+How to play the Chords a Song shows, in Read mode: a diagram of a Voicing for each Chord in the Arrangement's active Alternates, as written or transposed, in the order they first appear, drawn for the Song's tuning. It shows and hides with the Chords. A Chord whose name or tuning can't be read gets no diagram rather than a guess.
+_Avoid_: Chord strip, chord diagrams, chords used
+
 **Instrument**:
 What a Voicing is played on. Only the guitar for now; others, like a piano, can follow.
 
