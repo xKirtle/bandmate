@@ -303,7 +303,7 @@
     opacity: 1;
   }
   .time {
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     font-variant-numeric: tabular-nums;
   }
   .volume {

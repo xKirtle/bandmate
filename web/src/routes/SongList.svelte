@@ -252,7 +252,7 @@
     background: var(--surface-1);
     color: var(--text);
     font: inherit;
-    font-size: 0.875rem;
+    font-size: var(--text-md);
     font-weight: 600;
     text-transform: capitalize;
     cursor: pointer;
@@ -298,7 +298,7 @@
     gap: 0.5rem;
     flex-shrink: 0;
     color: var(--text-muted);
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
   }
   .empty {
     text-align: center;
@@ -310,7 +310,7 @@
     display: none;
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.875rem;
+    font-size: var(--text-md);
   }
   th {
     padding: 0;
@@ -327,7 +327,7 @@
     background: none;
     color: var(--text-muted);
     font: inherit;
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     font-weight: 600;
     text-align: inherit;
     cursor: pointer;

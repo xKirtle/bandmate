@@ -228,12 +228,12 @@
     margin-bottom: 0.75rem;
   }
   h2 {
-    font-size: 1rem;
+    font-size: var(--text-lg);
     margin: 0;
   }
   .hint {
     margin: 0;
-    font-size: 0.875rem;
+    font-size: var(--text-md);
   }
   .suggest {
     display: flex;
@@ -272,7 +272,7 @@
   }
   h3.name {
     margin: 0;
-    font-size: 1rem;
+    font-size: var(--text-lg);
     overflow-wrap: anywhere;
   }
   .read-notes {
@@ -286,14 +286,14 @@
     border-radius: 999px;
     background: var(--accent);
     color: var(--accent-text);
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     font-weight: 600;
   }
   .notes {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     font-weight: 600;
     color: var(--text-muted);
   }
@@ -306,7 +306,7 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem;
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
   }
   .spacer {
     flex: 1;

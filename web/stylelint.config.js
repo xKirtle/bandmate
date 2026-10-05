@@ -21,9 +21,25 @@ const colour = {
     'color',
     'drop-shadow',
   ],
-  'declaration-property-value-allowed-list': {
-    '/^(box|text)-shadow$/': ['none', '/^var\\(--(shadow-float|selected-outline|selected-edge|invalid-outline)\\)$/'],
-  },
+};
+const shadows = {
+  '/^(box|text)-shadow$/': ['none', '/^var\\(--(shadow-float|selected-outline|selected-edge|invalid-outline)\\)$/'],
+};
+
+// Type: a font size is one of the size or lyric tokens, or on the Timeline a
+// step of the same scale in its own unit, `--timeline-rem`. The `font`
+// shorthand only ever inherits, so it can't set a size of its own.
+// The steps are the --text-* sizes in app.css, in rem: keep them in step.
+const scaleSteps = '(0\\.75|0\\.8125|0\\.875|1|1\\.25|1\\.5)';
+const type = {
+  'font-size': [
+    'inherit',
+    '/^var\\(--text-(xs|sm|md|lg|xl|2xl|field)\\)$/',
+    '/^var\\(--lyric-(write|read-line|read-chord)\\)$/',
+    '/^var\\(--timeline-rem\\)$/',
+    `/^calc\\(${scaleSteps} \\* var\\(--timeline-rem\\)\\)$/`,
+  ],
+  font: ['inherit'],
 };
 
 export default {
@@ -33,10 +49,28 @@ export default {
     'property-no-unknown': true,
     'unit-no-unknown': true,
     ...colour,
+    'declaration-property-value-allowed-list': { ...shadows, ...type },
   },
   overrides: [
     { files: ['**/*.svelte'], customSyntax: 'postcss-html' },
     // Where the colour tokens are defined.
-    { files: ['src/palettes.css'], rules: Object.fromEntries(Object.keys(colour).map((rule) => [rule, null])) },
+    {
+      files: ['src/palettes.css'],
+      rules: {
+        ...Object.fromEntries(Object.keys(colour).map((rule) => [rule, null])),
+        'declaration-property-value-allowed-list': type,
+      },
+    },
+    // A Cover placeholder's initial grows with the Cover it stands in for.
+    {
+      files: ['src/lib/CoverPlaceholder.svelte'],
+      rules: {
+        'declaration-property-value-allowed-list': {
+          ...shadows,
+          ...type,
+          'font-size': [...type['font-size'], '/^calc\\(var\\(--size\\) \\* [0-9.]+\\)$/'],
+        },
+      },
+    },
   ],
 };

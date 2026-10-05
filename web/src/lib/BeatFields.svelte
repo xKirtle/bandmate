@@ -69,7 +69,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     font-weight: 600;
     color: var(--text-muted);
   }

@@ -394,7 +394,7 @@
     min-height: 2rem;
     margin-left: auto;
     padding: 0 0.75rem;
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
   }
   .toggle[aria-pressed='true'] {
     border-color: var(--accent);
@@ -456,7 +456,7 @@
     gap: 0.25rem;
     min-width: 0;
     color: var(--text-muted);
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     font-weight: 600;
   }
   .field input {
@@ -475,7 +475,7 @@
   }
   h2 {
     margin: 0;
-    font-size: 1.5rem;
+    font-size: var(--text-2xl);
   }
   .notes {
     font-weight: 600;
@@ -514,7 +514,7 @@
     max-width: 9rem;
   }
   .rank {
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
   }
   .preferred {
     outline: 2px solid var(--accent);
@@ -526,7 +526,7 @@
   .prefer {
     min-height: 2rem;
     padding: 0 0.75rem;
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
   }
   /*
    * Name it: what the shape reads as above the fretboard on a phone, so it
@@ -580,7 +580,7 @@
   .reading.best {
     min-height: var(--control);
     border-color: var(--accent);
-    font-size: 1.5rem;
+    font-size: var(--text-2xl);
   }
   .reading:hover {
     border-color: var(--accent);
@@ -616,7 +616,7 @@
   }
   h3 {
     margin: 0;
-    font-size: 0.9375rem;
+    font-size: var(--text-lg);
   }
   /* Two suggestions a row on a phone, four on desktop. */
   .suggestions {
@@ -652,16 +652,16 @@
     border-color: var(--accent);
   }
   .numeral {
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     font-weight: 600;
   }
   .suggested {
-    font-size: 1.125rem;
+    font-size: var(--text-xl);
     font-weight: 600;
   }
   .reason {
     grid-column: 1 / -1;
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
   }
   .pager {
     display: flex;

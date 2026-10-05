@@ -11,7 +11,7 @@
   );
 </script>
 
-<p class="muted">
+<p class="muted tabular">
   {#if beat.producer && beat.sourceLink}
     <a href={beat.sourceLink} target="_blank" rel="noopener noreferrer">{beat.producer}</a>
   {:else if beat.sourceLink}
@@ -27,7 +27,7 @@
 <style>
   p {
     margin: 0;
-    font-size: 0.875rem;
+    font-size: var(--text-md);
     overflow-wrap: anywhere;
   }
 </style>

@@ -71,7 +71,10 @@
   {#if start === 1}
     <rect class="nut" x={left - 1} y={top - 3} width={neckWidth + 2} height="4" />
   {:else}
-    <text class="start" x={left - 6} y={y(start)} text-anchor="end" dominant-baseline="central">{start}fr</text>
+    <!-- Sized in the drawing's units, like the rest of it, so it scales with the diagram. -->
+    <text class="start" x={left - 6} y={y(start)} font-size="10" text-anchor="end" dominant-baseline="central"
+      >{start}fr</text
+    >
   {/if}
 
   {#each voicing.frets as fret, s (s)}
@@ -122,7 +125,6 @@
   }
   .start {
     fill: var(--text-muted);
-    font-size: 10px;
     font-weight: 600;
   }
 </style>

@@ -96,7 +96,7 @@
   .beats-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.875rem;
+    font-size: var(--text-md);
   }
   th {
     padding: 0;
@@ -113,7 +113,7 @@
     background: none;
     color: var(--text-muted);
     font: inherit;
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     font-weight: 600;
     text-align: inherit;
     cursor: pointer;

@@ -220,7 +220,7 @@
   }
   .name {
     color: var(--accent);
-    font-size: 1rem;
+    font-size: var(--text-lg);
     font-weight: 700;
   }
   .diagram {
@@ -235,13 +235,13 @@
   .step {
     width: var(--control);
     padding: 0;
-    font-size: 1.25rem;
+    font-size: var(--text-xl);
   }
   /* As wide as its longest text, so the buttons don't move as it steps. */
   .place {
     min-width: 5.5rem;
     color: var(--text-muted);
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     text-align: center;
   }
   .place.preferred {
@@ -250,12 +250,12 @@
   }
   .prefer {
     align-self: stretch;
-    font-size: 0.875rem;
+    font-size: var(--text-md);
   }
   .note {
     max-width: 14rem;
     margin: 0;
-    font-size: 0.875rem;
+    font-size: var(--text-md);
     text-align: center;
   }
 </style>

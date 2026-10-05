@@ -131,7 +131,7 @@
     justify-content: flex-end;
     padding-right: 0.5rem;
     color: var(--text-muted);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     font-variant-numeric: tabular-nums;
   }
   .gutter.inlay {
@@ -184,7 +184,7 @@
     border-radius: 50%;
   }
   .muted {
-    font-size: 1.125rem;
+    font-size: var(--text-xl);
     line-height: 1;
   }
   .finger {

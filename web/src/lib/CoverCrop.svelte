@@ -211,11 +211,11 @@
   }
   h2 {
     margin: 0;
-    font-size: 1.125rem;
+    font-size: var(--text-xl);
   }
   .hint {
     margin: 0;
-    font-size: 0.875rem;
+    font-size: var(--text-md);
   }
   /* Square, and no taller than the screen leaves room for. */
   .stage {
@@ -255,7 +255,7 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    font-size: 0.875rem;
+    font-size: var(--text-md);
   }
   .zoom input {
     flex: 1;

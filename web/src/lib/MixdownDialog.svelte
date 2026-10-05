@@ -151,15 +151,18 @@
         {#each ranges as range (range.of)}
           <label>
             <input type="radio" name="mixdown-range" checked={chosen === range} onchange={() => (chosen = range)} />
-            <span>{range.of === 'loop' ? 'Loop' : 'Whole Timeline'} <span class="times">({span(range)})</span></span>
+            <span
+              >{range.of === 'loop' ? 'Loop' : 'Whole Timeline'}
+              <span class="times tabular">({span(range)})</span></span
+            >
           </label>
         {/each}
       </fieldset>
       <p>As it plays now: each Track at its volume, with mute and solo as they are.</p>
     {:else}
       <p>
-        The whole Timeline, 0:00 to {formatDuration(end)}, as it plays now: each Track at its volume, with mute and solo
-        as they are.
+        The whole Timeline, <span class="tabular">0:00 to {formatDuration(end)}</span>, as it plays now: each Track at
+        its volume, with mute and solo as they are.
       </p>
     {/if}
     <fieldset>
@@ -238,7 +241,7 @@
   }
   h2 {
     margin: 0;
-    font-size: 1.125rem;
+    font-size: var(--text-xl);
   }
   p {
     margin: 0;
@@ -282,7 +285,7 @@
     color: var(--danger);
   }
   .muted {
-    font-size: 0.875rem;
+    font-size: var(--text-md);
   }
   .actions {
     display: flex;

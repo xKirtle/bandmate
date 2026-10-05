@@ -64,7 +64,7 @@
     gap: 0.25rem;
     min-width: 0;
     color: var(--text-muted);
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     font-weight: 600;
   }
   .tuning {

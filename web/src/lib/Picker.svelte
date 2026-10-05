@@ -206,7 +206,7 @@
     background: var(--surface-1);
     color: var(--text);
     /* Matches the fields' size, which keeps iOS from zooming on theirs. */
-    font-size: max(1rem, 16px);
+    font-size: var(--text-field);
     font-weight: 400;
   }
   .value {
@@ -220,7 +220,7 @@
   }
   /* Not the look of whatever it sits in, e.g. a filter's label. */
   .option-list {
-    font-size: 1rem;
+    font-size: var(--text-lg);
     font-weight: 400;
   }
   .trigger:focus-visible {

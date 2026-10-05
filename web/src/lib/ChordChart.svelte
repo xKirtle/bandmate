@@ -172,7 +172,7 @@
     background: var(--surface-1);
     color: var(--text-muted);
     font: inherit;
-    font-size: 0.875rem;
+    font-size: var(--text-md);
     font-weight: 600;
     cursor: pointer;
   }
@@ -237,7 +237,7 @@
     max-width: 100%;
     overflow: hidden;
     color: var(--accent);
-    font-size: 0.9375rem;
+    font-size: var(--text-lg);
     font-weight: 700;
     text-overflow: ellipsis;
     white-space: nowrap;

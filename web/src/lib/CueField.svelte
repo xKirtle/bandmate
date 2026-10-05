@@ -238,7 +238,7 @@
     background: transparent;
     color: var(--text-muted);
     font: inherit;
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     font-variant-numeric: tabular-nums;
     text-align: right;
     cursor: pointer;
@@ -261,7 +261,7 @@
   /* Small, so the time beside it still fits the gutter. */
   .warning {
     margin-right: 0.125rem;
-    font-size: 0.6875rem;
+    font-size: var(--text-xs);
   }
   .cue.editing {
     cursor: text;
@@ -280,7 +280,7 @@
     background: transparent;
     color: var(--text-muted);
     font: inherit;
-    font-size: 0.625rem;
+    font-size: var(--text-xs);
     opacity: 0.5;
     cursor: pointer;
   }
@@ -309,7 +309,7 @@
     background: transparent;
     color: var(--text-muted);
     font: inherit;
-    font-size: 0.6875rem;
+    font-size: var(--text-xs);
     opacity: 0;
     pointer-events: none;
     cursor: pointer;

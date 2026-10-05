@@ -463,7 +463,7 @@
   }
   h2 {
     margin: 0;
-    font-size: 1rem;
+    font-size: var(--text-lg);
   }
   .head p {
     margin: 0;
@@ -481,7 +481,7 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: 0.875rem;
+    font-size: var(--text-md);
   }
   .shared :global(input) {
     width: 16rem;
@@ -499,13 +499,13 @@
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.875rem;
+    font-size: var(--text-md);
   }
   th {
     padding: 0 0.25rem 0.25rem;
     border-bottom: 1px solid var(--border);
     color: var(--text-muted);
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     font-weight: 600;
     text-align: left;
     white-space: nowrap;
@@ -529,7 +529,7 @@
   td :global(input) {
     min-height: var(--control);
     padding-inline: 0.5rem;
-    font-size: 0.875rem;
+    font-size: var(--text-md);
   }
   .shared input[aria-invalid='true'],
   td input[aria-invalid='true'] {
@@ -564,7 +564,7 @@
   .file .error {
     display: block;
     margin-top: 0.25rem;
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
   }
   .title {
     min-width: 12rem;

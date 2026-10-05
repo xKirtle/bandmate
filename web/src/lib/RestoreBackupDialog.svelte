@@ -352,7 +352,7 @@
   }
   h2 {
     margin: 0;
-    font-size: 1.125rem;
+    font-size: var(--text-xl);
   }
   p {
     margin: 0;
@@ -402,7 +402,7 @@
     background: none;
     color: var(--accent);
     font: inherit;
-    font-size: 0.875rem;
+    font-size: var(--text-md);
     font-weight: 600;
     cursor: pointer;
   }
@@ -425,7 +425,7 @@
   }
   h3 {
     margin: 0 0 0.25rem;
-    font-size: 0.875rem;
+    font-size: var(--text-md);
   }
   .present ul {
     margin: 0;
@@ -459,7 +459,7 @@
   .toggle label {
     min-height: 2rem;
     padding: 0 0.625rem;
-    font-size: 0.875rem;
+    font-size: var(--text-md);
     font-weight: 600;
   }
   .toggle label + label {
@@ -485,7 +485,7 @@
   }
   .warning {
     color: var(--warning);
-    font-size: 0.875rem;
+    font-size: var(--text-md);
   }
   .restored {
     max-height: calc(6.5 * var(--control));
@@ -502,7 +502,7 @@
     color: var(--danger);
   }
   .muted {
-    font-size: 0.875rem;
+    font-size: var(--text-md);
   }
   .actions {
     display: flex;
