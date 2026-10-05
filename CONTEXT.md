@@ -10,6 +10,10 @@ A personal songwriting companion: write and structure lyrics with chords, then r
 The unit of work: one piece of music being written, with its Lyric Sheet, Timeline, Cover and metadata (key, BPM, capo, tuning, notes).
 _Avoid_: Project, track (a Track is something else)
 
+**Folder**:
+A named place on the Songs page that keeps some Songs together, like an EP's, so a growing list stays in order. A Song sits in one Folder at most, or in none, and Folders don't hold other Folders. A Folder is only a name: deleting it can leave its Songs in no Folder, or delete them too.
+_Avoid_: Album (a release), Playlist, Collection, Group
+
 **Cover**:
 A Song's picture, like a release's cover art: at most one per Song, shown wherever the Song is as a square the user chooses from the picture. It belongs to the Song, not to any Master.
 _Avoid_: Artwork, image, album art, thumbnail
@@ -209,9 +213,9 @@ One of the sets of colours the user picks from in Settings (Terracotta, Ink or O
 _Avoid_: Theme (light or dark is the theme), skin, colour scheme
 
 **Backup**:
-A copy of chosen Songs and Beats, kept in Bandmate to restore from, and downloadable as one file to keep elsewhere or move to another install. A Song's copy holds everything that belongs to the Song, from its Lyric Sheet and Snapshots to its Timeline, Cover and Masters, along with the Beats its Clips use, so those Beats can't be left out while it's chosen; one holding every Beat holds the Beat Library. Nothing kept on each device goes in it. A Backup made by an older Bandmate can be restored by a newer one, never the other way round.
+A copy of chosen Songs and Beats, kept in Bandmate to restore from, and downloadable as one file to keep elsewhere or move to another install. A Song's copy holds everything that belongs to the Song, from its Lyric Sheet and Snapshots to its Timeline, Cover and Masters, along with the Folder it sits in and the Beats its Clips use, so those Beats can't be left out while it's chosen; one holding every Beat holds the Beat Library. Nothing kept on each device goes in it. A Backup made by an older Bandmate can be restored by a newer one, never the other way round.
 _Avoid_: Export, archive, Snapshot (a Snapshot is a copy of one Song's Lyric Sheet)
 
 **Restore**:
-Bringing back Songs and Beats picked from a Backup. A Song brings the Beats its Clips use, so those Beats can't be left out while it's picked. Where a Song or Beat is already in Bandmate (the same one, even from another install, never just one with the same name or, for a Beat, the same audio), the user chooses to replace it or keep both, the restored one added alongside. A Restore only adds and replaces: it never deletes what the Backup doesn't hold.
+Bringing back Songs and Beats picked from a Backup. A Song brings the Beats its Clips use, so those Beats can't be left out while it's picked. Where a Song or Beat is already in Bandmate (the same one, even from another install, never just one with the same name or, for a Beat, the same audio), the user chooses to replace it or keep both, the restored one added alongside. A restored Song goes into the Folder of the same name, made if there's none. A Restore only adds and replaces: it never deletes what the Backup doesn't hold.
 _Avoid_: Import (importing is pasting lyrics into a Song)
