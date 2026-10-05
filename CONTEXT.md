@@ -64,7 +64,7 @@ A single line of lyrics within an Alternate.
 _Avoid_: Row, verse (a verse is a Label)
 
 **Chord**:
-A chord name anchored at a character position within a Line, possibly mid-word. With a capo on, a Chord names the shape fingered, not the pitch that sounds: capo 2 and a G Chord sounds an A. In Read mode a Song's Chords can be hidden; that choice is kept on each device, not on the Song.
+A chord name anchored at a character position within a Line, possibly mid-word. One anchored on a space falls between words, in the pause before the next one is sung, not on the next word. With a capo on, a Chord names the shape fingered, not the pitch that sounds: capo 2 and a G Chord sounds an A. In Read mode a Song's Chords can be hidden; that choice is kept on each device, not on the Song.
 _Avoid_: Chord marker
 
 **Chord Line**:
