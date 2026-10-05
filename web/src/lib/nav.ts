@@ -64,12 +64,12 @@ export function movedTo(path: string): string | undefined {
 
 /**
  * The page the navigation marks as current for a path: Songs for the Song
- * list and anything under /songs, Beats for the Beat Library, the Chord
+ * list, a Folder and anything under /songs, Beats for the Beat Library, the Chord
  * Finder for its page, Settings for every one of its tabs, and none for a
  * path that isn't the app's.
  */
 export function currentPage(path: string): NavPage | undefined {
-  if (path === '/' || path.startsWith('/songs/')) return 'songs';
+  if (path === '/' || path.startsWith('/songs/') || path.startsWith('/folders/')) return 'songs';
   if (settingsTabAt(movedTo(path) ?? path)) return 'settings';
   return pages.find((page) => page.href === path)?.id;
 }

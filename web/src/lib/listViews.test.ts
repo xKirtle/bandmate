@@ -13,6 +13,7 @@ import {
   loadSongList,
   songBeatHint,
   sortBeats,
+  sortFolders,
   songListViewFromParams,
   songListViewToParams,
   sortSongs,
@@ -32,6 +33,7 @@ function song(title: string, fields: Partial<SongSummary> = {}): SongSummary {
     bpm: null,
     hasMaster: false,
     coverId: null,
+    folderId: null,
     updatedAt: '',
     ...fields,
   };
@@ -145,7 +147,10 @@ describe('loadSongList', () => {
     const list = async (filter: SongFilter) => {
       asked.push(filter);
       return all.filter(
-        (s) => (!filter.status || s.status === filter.status) && (!filter.q || s.title.includes(filter.q)),
+        (s) =>
+          (!filter.status || s.status === filter.status) &&
+          (!filter.q || s.title.includes(filter.q)) &&
+          (filter.folder === undefined || s.folderId === (filter.folder === 'none' ? null : filter.folder)),
       );
     };
     return { asked, list };
@@ -175,6 +180,29 @@ describe('loadSongList', () => {
     const { asked, list } = server([nightDrive, song('Daylight')]);
     expect(await loadSongList({ status: 'drafting' }, list)).toEqual({ songs: [nightDrive], anySongs: true });
     expect(asked).toEqual([{ status: 'drafting' }]);
+  });
+
+  it('inside a Folder, tells whether it holds any Songs, whatever the filters', async () => {
+    const { asked, list } = server([song('Night Drive', { folderId: 3 }), song('Elsewhere', { folderId: 4 })]);
+    expect(await loadSongList({ folder: 3, status: 'finished' }, list)).toEqual({ songs: [], anySongs: true });
+    expect(asked).toEqual([{ folder: 3, status: 'finished' }, { folder: 3 }]);
+    asked.length = 0;
+    expect(await loadSongList({ folder: 5 }, list)).toEqual({ songs: [], anySongs: false });
+    expect(asked).toEqual([{ folder: 5 }]);
+  });
+
+  it('at the top level, tells there are Songs when every one is in a Folder', async () => {
+    const { asked, list } = server([song('Night Drive', { folderId: 3 })]);
+    expect(await loadSongList({ folder: 'none' }, list)).toEqual({ songs: [], anySongs: true });
+    expect(asked).toEqual([{ folder: 'none' }, {}]);
+  });
+});
+
+describe('sortFolders', () => {
+  it('sorts Folders by name, ignoring case and accents, numbers in order', () => {
+    const folder = (id: number, name: string) => ({ id, name, songs: 0 });
+    const sorted = sortFolders([folder(1, 'ep 10'), folder(2, 'Demos'), folder(3, 'EP 9'), folder(4, 'Ábaco')]);
+    expect(sorted.map((f) => f.name)).toEqual(['Ábaco', 'Demos', 'EP 9', 'ep 10']);
   });
 });
 

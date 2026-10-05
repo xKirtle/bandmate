@@ -2,33 +2,62 @@
   import ArrowDown from '@lucide/svelte/icons/arrow-down';
   import ArrowUp from '@lucide/svelte/icons/arrow-up';
   import Check from '@lucide/svelte/icons/check';
-  import { api, statuses, type SongSummary } from '../lib/api';
+  import FolderIcon from '@lucide/svelte/icons/folder';
+  import FolderInput from '@lucide/svelte/icons/folder-input';
+  import FolderPlus from '@lucide/svelte/icons/folder-plus';
+  import ActionsMenu from '../lib/ActionsMenu.svelte';
+  import { ApiError, api, statuses, type Folder, type SongSummary } from '../lib/api';
   import {
     defaultSongListView,
     loadSongList,
     songListViewFromParams,
     songListViewToParams,
+    sortFolders,
     sortSongs,
     toggleSort,
     type SongColumn,
   } from '../lib/listViews';
+  import type { MenuAction } from '../lib/menu';
   import { newSongPath } from '../lib/newSong';
+  import NewFolderDialog from '../lib/NewFolderDialog.svelte';
   import { navigate, replaceSearch, router } from '../lib/router.svelte';
   import SongCover from '../lib/SongCover.svelte';
   import StatusBadge from '../lib/StatusBadge.svelte';
   import { timeAgo } from '../lib/time';
 
+  let {
+    folderId,
+  }: {
+    /** The Folder open, whose Songs are listed; left out, the top level: the Folders, then the Songs in none. */
+    folderId?: number;
+  } = $props();
+
   let songs = $state<SongSummary[] | null>(null);
-  // Whether there are any Songs at all, whatever the filters. Without any,
-  // the search and filters have nothing to act on, so they're hidden, and
-  // cleared so ones from the URL don't hide the first Song once it's made.
+  let folders = $state<Folder[] | null>(null);
+  // Whether there are any Songs at all, whatever the filters: in the Folder
+  // open, or anywhere at the top level. Without any, the search and filters
+  // have nothing to act on, so they're hidden, and cleared so ones from the
+  // URL don't hide the first Song once it's made.
   let anySongs = $state(true);
   let error = $state<string | null>(null);
   // The search, filters and sort start as the URL has them, and are kept in
   // it so going back to the list restores them. The filters combine.
   let view = $state(songListViewFromParams(new URLSearchParams(router.search)));
+  // Bumped to load the list again, e.g. once a Song has moved.
+  let changes = $state(0);
 
   const sorted = $derived(songs && sortSongs(songs, view.sort));
+  const filtered = $derived(!!(view.q.trim() || view.status || view.hasMaster));
+  // Every Folder by name, for the menus; at the top level they come first,
+  // whatever the Songs are sorted by, but for while a search or filter is
+  // on, which only looks at the Songs.
+  const sortedFolders = $derived(folders ? sortFolders(folders) : []);
+  const listedFolders = $derived(folderId === undefined && !filtered ? sortedFolders : []);
+  const folder = $derived(folderId === undefined ? undefined : folders?.find((f) => f.id === folderId));
+  const folderMissing = $derived(folderId !== undefined && folders !== null && !folder);
+  // A Folder opens with the Songs sorted as they are here, and the way back
+  // out keeps that sort.
+  const folderSearch = $derived(songListViewToParams({ ...defaultSongListView, sort: view.sort }).toString());
 
   $effect(() => {
     replaceSearch(songListViewToParams(view));
@@ -43,11 +72,16 @@
     { id: 'edited', label: 'Edited' },
   ];
 
-  // A click anywhere on a row opens its Song, as its title link does.
-  function openRow(event: MouseEvent, song: SongSummary) {
+  const folderHref = (f: Folder) => `/folders/${f.id}` + (folderSearch ? `?${folderSearch}` : '');
+
+  const songCount = (n: number) => (n === 1 ? '1 Song' : `${n} Songs`);
+
+  // A click anywhere on a row opens what it's for, as its title link does,
+  // but for a click on a link or in its menu.
+  function openRow(event: MouseEvent, href: string) {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    if ((event.target as Element).closest('a')) return;
-    navigate(`/songs/${song.id}`);
+    if ((event.target as Element).closest('a, button, [role="menu"]')) return;
+    navigate(href);
   }
 
   // Not reactive: the first load shouldn't wait, later ones debounce typing.
@@ -56,15 +90,28 @@
   // Reloads whenever the filters change, waiting for a pause in typing. Only
   // the latest request's answer is shown.
   $effect(() => {
-    const filter = { status: view.status, q: view.q, hasMaster: view.hasMaster || undefined };
+    const filter = {
+      status: view.status,
+      q: view.q,
+      hasMaster: view.hasMaster || undefined,
+      folder: folderId ?? ('none' as const),
+    };
+    void changes;
     let current = true;
     const timer = setTimeout(
       () => {
-        loadSongList(filter, api.listSongs).then(
-          (result) => {
+        // A Folder that doesn't exist lists no Songs: the Folders say it's missing.
+        const listing = loadSongList(filter, api.listSongs).catch((e: Error) => {
+          if (folderId !== undefined && e instanceof ApiError && e.status === 404)
+            return { songs: [], anySongs: false };
+          throw e;
+        });
+        Promise.all([listing, api.listFolders()]).then(
+          ([result, allFolders]) => {
             if (!current) return;
             songs = result.songs;
             anySongs = result.anySongs;
+            folders = allFolders;
             if (!anySongs && (view.status || view.hasMaster || view.q)) clearFilters();
             error = null;
             loaded = true;
@@ -80,8 +127,8 @@
     };
   });
 
-  // "New Song" makes an "Untitled Song" straight away and opens it, its
-  // title ready to type over. Back returns here.
+  // "New Song" makes an "Untitled Song" straight away, in the Folder open if
+  // any, and opens it, its title ready to type over. Back returns here.
   let creating = $state(false);
   let createError = $state<string | null>(null);
 
@@ -89,7 +136,7 @@
     creating = true;
     createError = null;
     try {
-      const song = await api.createSong();
+      const song = await api.createSong(folderId ?? null);
       navigate(newSongPath(song.id));
     } catch (e) {
       createError = (e as Error).message;
@@ -97,26 +144,95 @@
     }
   }
 
+  const importHref = $derived(folderId === undefined ? '/songs/import' : `/songs/import?folder=${folderId}`);
+
   function clearFilters() {
     view = { ...defaultSongListView, sort: view.sort };
   }
+
+  // "New folder" is open, and, from a Song's menu, which Song goes into the
+  // Folder once it's made.
+  let newFolder = $state<{ for: SongSummary | null } | null>(null);
+  let moveError = $state<string | null>(null);
+
+  async function moveSong(song: SongSummary, to: number | null) {
+    if (song.folderId === to) return;
+    moveError = null;
+    try {
+      await api.moveSongToFolder(song.id, to);
+    } catch (e) {
+      moveError = `Couldn't move “${song.title}” (${(e as Error).message})`;
+    }
+    changes++;
+  }
+
+  function madeFolder(made: Folder) {
+    const song = newFolder?.for;
+    if (song) moveSong(song, made.id);
+    else changes++;
+  }
+
+  // Filing a Song is organising, not editing it, so it's offered for every
+  // Song, Finished ones included.
+  function songActions(song: SongSummary): MenuAction[] {
+    return [
+      {
+        icon: FolderInput,
+        label: 'Move to folder…',
+        choices: [
+          ...sortedFolders.map((f) => ({
+            label: f.name,
+            checked: song.folderId === f.id,
+            run: () => moveSong(song, f.id),
+          })),
+          { label: 'No folder', checked: song.folderId === null, run: () => moveSong(song, null) },
+          { label: 'New folder…', run: () => (newFolder = { for: song }) },
+        ],
+      },
+    ];
+  }
 </script>
 
-<header class="bar">
-  <h1>Songs</h1>
-  <div class="actions">
-    <a class="button" href="/songs/import">Import</a>
-    <button type="button" class="button primary" disabled={creating} onclick={createSong}>
-      {creating ? 'Creating…' : 'New Song'}
-    </button>
-  </div>
+<!-- Where the title and actions don't fit side by side, on a phone, the actions go under the title. -->
+<header class="bar list-bar">
+  {#if folderId === undefined}
+    <h1>Songs</h1>
+  {:else}
+    <div class="trail">
+      <a class="up" href={folderSearch ? `/?${folderSearch}` : '/'}>Songs</a>
+      <span class="separator" aria-hidden="true">/</span>
+      <h1>{folder?.name ?? (folderMissing ? 'Not found' : 'Folder')}</h1>
+    </div>
+  {/if}
+  {#if !folderMissing}
+    <div class="actions">
+      <a class="button" href={importHref}>Import</a>
+      {#if folderId === undefined}
+        <!-- On the narrowest phones it's only its icon, for the three to fit. -->
+        <button
+          type="button"
+          class="button"
+          aria-label="New folder"
+          title="New folder"
+          onclick={() => (newFolder = { for: null })}
+          ><span class="narrow" aria-hidden="true"><FolderPlus /></span><span class="wide">New folder</span></button
+        >
+      {/if}
+      <button type="button" class="button primary" disabled={creating} onclick={createSong}>
+        {creating ? 'Creating…' : 'New Song'}
+      </button>
+    </div>
+  {/if}
 </header>
 
 <main class="page">
   {#if createError}
     <p class="error" role="alert">{createError}</p>
   {/if}
-  {#if anySongs}
+  {#if moveError}
+    <p class="error" role="alert">{moveError}</p>
+  {/if}
+  {#if anySongs && !folderMissing}
     <search class="filters">
       <label class="visually-hidden" for="song-search">Search Songs by title</label>
       <input
@@ -155,85 +271,180 @@
 
   {#if error}
     <p class="error" role="alert">{error}</p>
-  {:else if songs === null}
+  {:else if songs === null || folders === null}
     <p class="muted">Loading…</p>
-  {:else if !anySongs}
+  {:else if folderMissing}
     <div class="empty">
-      <p>No Songs yet.</p>
-      <button type="button" class="button primary" disabled={creating} onclick={createSong}>
-        {creating ? 'Creating…' : 'Write your first Song'}
-      </button>
-      <a class="button" href="/songs/import">Import one</a>
+      <p>This Folder doesn't exist.</p>
+      <a class="button" href="/">Go to Songs</a>
     </div>
-  {:else if songs.length === 0}
+  {:else if !anySongs && listedFolders.length === 0}
     <div class="empty">
-      <p>No Songs match.</p>
-      <button type="button" class="button" onclick={clearFilters}>Clear filters</button>
+      {#if folderId === undefined}
+        <p>No Songs yet.</p>
+        <button type="button" class="button primary" disabled={creating} onclick={createSong}>
+          {creating ? 'Creating…' : 'Write your first Song'}
+        </button>
+      {:else}
+        <p>No Songs in this Folder yet.</p>
+        <button type="button" class="button primary" disabled={creating} onclick={createSong}>
+          {creating ? 'Creating…' : 'Write one'}
+        </button>
+      {/if}
+      <a class="button" href={importHref}>Import one</a>
     </div>
   {:else if sorted}
-    <table class="songs-table">
-      <thead>
-        <tr>
-          {#each columns as column (column.id)}
-            <th
-              class:num={column.num}
-              aria-sort={view.sort.column === column.id
-                ? view.sort.direction === 'asc'
-                  ? 'ascending'
-                  : 'descending'
-                : undefined}
-            >
-              <button type="button" onclick={() => (view.sort = toggleSort(view.sort, column.id))}>
-                {column.label}<span class="arrow" aria-hidden="true"
-                  >{#if view.sort.column === column.id}{#if view.sort.direction === 'asc'}<ArrowUp />{:else}<ArrowDown
-                      />{/if}{/if}</span
-                >
-              </button>
-            </th>
-          {/each}
-        </tr>
-      </thead>
-      <tbody>
-        {#each sorted as song (song.id)}
-          <tr onclick={(event) => openRow(event, song)}>
-            <td class="title">
-              <span class="with-cover">
-                <SongCover songId={song.id} coverId={song.coverId} title={song.title} status={song.status} />
-                <a href="/songs/{song.id}">{song.title}</a>
-              </span>
-            </td>
-            <td><StatusBadge status={song.status} /></td>
-            <td>{song.key || '—'}</td>
-            <td class="num">{song.bpm ?? '—'}</td>
-            <td>
-              {#if song.hasMaster}<Check /><span class="visually-hidden">Has a Master</span>{:else}—{/if}
-            </td>
-            <td class="muted"><time datetime={song.updatedAt}>{timeAgo(song.updatedAt)}</time></td>
+    {#if listedFolders.length > 0 || sorted.length > 0}
+      <table class="songs-table">
+        <thead>
+          <tr>
+            {#each columns as column (column.id)}
+              <th
+                class:num={column.num}
+                aria-sort={view.sort.column === column.id
+                  ? view.sort.direction === 'asc'
+                    ? 'ascending'
+                    : 'descending'
+                  : undefined}
+              >
+                <button type="button" onclick={() => (view.sort = toggleSort(view.sort, column.id))}>
+                  {column.label}<span class="arrow" aria-hidden="true"
+                    >{#if view.sort.column === column.id}{#if view.sort.direction === 'asc'}<ArrowUp />{:else}<ArrowDown
+                        />{/if}{/if}</span
+                  >
+                </button>
+              </th>
+            {/each}
+            <th class="row-actions"><span class="visually-hidden">Actions</span></th>
           </tr>
+        </thead>
+        <tbody>
+          {#each listedFolders as f (f.id)}
+            <tr class="folder" onclick={(event) => openRow(event, folderHref(f))}>
+              <td class="title">
+                <span class="with-cover">
+                  <span class="folder-icon" aria-hidden="true"><FolderIcon /></span>
+                  <a href={folderHref(f)}>{f.name}</a>
+                </span>
+              </td>
+              <td class="muted" colspan="5">{songCount(f.songs)}</td>
+              <td class="row-actions"></td>
+            </tr>
+          {/each}
+          {#each sorted as song (song.id)}
+            <tr onclick={(event) => openRow(event, `/songs/${song.id}`)}>
+              <td class="title">
+                <span class="with-cover">
+                  <SongCover songId={song.id} coverId={song.coverId} title={song.title} status={song.status} />
+                  <a href="/songs/{song.id}">{song.title}</a>
+                </span>
+              </td>
+              <td><StatusBadge status={song.status} /></td>
+              <td>{song.key || '—'}</td>
+              <td class="num">{song.bpm ?? '—'}</td>
+              <td>
+                {#if song.hasMaster}<Check /><span class="visually-hidden">Has a Master</span>{:else}—{/if}
+              </td>
+              <td class="muted"><time datetime={song.updatedAt}>{timeAgo(song.updatedAt)}</time></td>
+              <td class="row-actions">
+                <ActionsMenu label="More actions for {song.title}" entries={songActions(song)} />
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+      <ul class="songs">
+        {#each listedFolders as f (f.id)}
+          <li>
+            <a href={folderHref(f)}>
+              <span class="folder-icon" aria-hidden="true"><FolderIcon /></span>
+              <span class="title">{f.name}</span>
+              <span class="meta">{songCount(f.songs)}</span>
+            </a>
+          </li>
         {/each}
-      </tbody>
-    </table>
-    <ul class="songs">
-      {#each sorted as song (song.id)}
-        <li>
-          <a href="/songs/{song.id}">
-            <SongCover songId={song.id} coverId={song.coverId} title={song.title} status={song.status} />
-            <span class="title">{song.title}</span>
-            <span class="meta">
-              <StatusBadge status={song.status} />
-              <time datetime={song.updatedAt}>{timeAgo(song.updatedAt)}</time>
-            </span>
-          </a>
-        </li>
-      {/each}
-    </ul>
+        {#each sorted as song (song.id)}
+          <li>
+            <a href="/songs/{song.id}">
+              <SongCover songId={song.id} coverId={song.coverId} title={song.title} status={song.status} />
+              <span class="title">{song.title}</span>
+              <span class="meta">
+                <StatusBadge status={song.status} />
+                <time datetime={song.updatedAt}>{timeAgo(song.updatedAt)}</time>
+              </span>
+            </a>
+            <ActionsMenu label="More actions for {song.title}" entries={songActions(song)} />
+          </li>
+        {/each}
+      </ul>
+    {/if}
+    {#if sorted.length === 0 && anySongs && filtered}
+      <div class="empty">
+        <p>No Songs match.</p>
+        <button type="button" class="button" onclick={clearFilters}>Clear filters</button>
+      </div>
+    {/if}
   {/if}
 </main>
 
+{#if newFolder}
+  <NewFolderDialog onMade={madeFolder} onClose={() => (newFolder = null)} />
+{/if}
+
 <style>
+  .list-bar {
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+  }
+  .list-bar > h1 {
+    flex-shrink: 0;
+  }
+  .trail {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0 var(--space-2);
+    min-width: 0;
+  }
+  .trail h1 {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  /* The way back to all Songs, as big as the Folder's name it leads up from. */
+  .up,
+  .separator {
+    color: var(--text-muted);
+    font-size: var(--text-2xl);
+    font-weight: 600;
+  }
+  .up {
+    text-decoration: none;
+  }
+  .up:hover {
+    color: var(--text);
+    text-decoration: underline;
+  }
   .actions {
     display: flex;
+    justify-content: flex-end;
     gap: var(--space-2);
+    margin-left: auto;
+    white-space: nowrap;
+  }
+  .wide {
+    display: none;
+  }
+  .narrow {
+    display: flex;
+    font-size: var(--text-lg);
+  }
+  @media (min-width: 24rem) {
+    .wide {
+      display: inline;
+    }
+    .narrow {
+      display: none;
+    }
   }
   .filters {
     display: flex;
@@ -259,18 +470,35 @@
     padding: 0;
     border-top: 1px solid var(--border);
   }
-  .songs a {
+  .songs li {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-2) var(--space-1);
     border-bottom: 1px solid var(--border);
+  }
+  .songs a {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: var(--space-3);
+    min-width: 0;
+    padding: var(--space-2) var(--space-1);
     color: inherit;
     text-decoration: none;
   }
-  .songs a:hover,
-  .songs a:focus-visible {
+  .songs li:hover,
+  .songs li:focus-within {
     background: var(--surface-1);
+  }
+  /* A Folder stands where a Song's Cover does. */
+  .folder-icon {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: var(--cover-list);
+    height: var(--cover-list);
+    color: var(--text-muted);
+    font-size: var(--text-xl);
   }
   .title {
     font-weight: 600;
@@ -280,13 +508,23 @@
   .songs .title {
     flex: 1;
   }
+  /* On the narrowest phones, a Song's Status stands over when it was edited,
+     leaving its title room beside them and its ⋯. */
   .meta {
     display: flex;
-    align-items: center;
-    gap: var(--space-2);
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--space-1);
     flex-shrink: 0;
     color: var(--text-muted);
     font-size: var(--text-sm);
+  }
+  @media (min-width: 24rem) {
+    .meta {
+      flex-direction: row;
+      align-items: center;
+      gap: var(--space-2);
+    }
   }
   .empty {
     text-align: center;
@@ -341,6 +579,9 @@
     max-width: 0;
     overflow: hidden;
     font-weight: 600;
+  }
+  td.row-actions {
+    padding: 0;
   }
   .with-cover {
     display: flex;

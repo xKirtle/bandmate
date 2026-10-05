@@ -13,6 +13,7 @@
   import MainNav from './lib/MainNav.svelte';
 
   const songMatch = $derived(router.path.match(/^\/songs\/(\d+)$/));
+  const folderMatch = $derived(router.path.match(/^\/folders\/(\d+)$/));
   const settingsTab = $derived(settingsTabAt(router.path));
   const moved = $derived(movedTo(router.path));
 
@@ -29,6 +30,10 @@
   <div class="content">
     {#if router.path === '/'}
       <SongList />
+    {:else if folderMatch}
+      {#key folderMatch[1]}
+        <SongList folderId={Number(folderMatch[1])} />
+      {/key}
     {:else if router.path === '/beats'}
       <BeatLibrary />
     {:else if router.path === '/chords'}

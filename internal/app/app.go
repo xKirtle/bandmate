@@ -17,6 +17,7 @@ import (
 	"github.com/xKirtle/bandmate/internal/beats"
 	"github.com/xKirtle/bandmate/internal/build"
 	"github.com/xKirtle/bandmate/internal/db"
+	"github.com/xKirtle/bandmate/internal/folders"
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
 	"github.com/xKirtle/bandmate/internal/releases"
 	"github.com/xKirtle/bandmate/internal/timeline"
@@ -68,6 +69,8 @@ type App struct {
 	db    *sql.DB
 	songs *lyricsheet.Store
 	beats *beats.Store
+	// folders keep some Songs together on the Songs page.
+	folders *folders.Store
 	// backups makes and keeps Backups, in the data directory.
 	backups *backups.Store
 	// timelines owns Songs' Timelines, which are kept apart from the Song
@@ -140,6 +143,7 @@ func New(cfg Config) (*App, error) {
 		db:          conn,
 		songs:       lyricsheet.NewStore(conn, masterFiles, coverFiles, takeFiles, soundFiles),
 		beats:       beats.NewStore(conn, beatFiles),
+		folders:     folders.NewStore(conn),
 		backups:     backupStore,
 		timelines:   timeline.NewStore(conn, takeFiles, soundFiles),
 		beatFiles:   beatFiles,
@@ -190,6 +194,10 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("GET /api/songs/{id}", a.getSong)
 	mux.HandleFunc("PATCH /api/songs/{id}", a.updateSong)
 	mux.HandleFunc("DELETE /api/songs/{id}", a.deleteSong)
+	mux.HandleFunc("PUT /api/songs/{id}/folder", a.moveSongToFolder)
+	mux.HandleFunc("GET /api/folders", a.listFolders)
+	mux.HandleFunc("POST /api/folders", a.createFolder)
+	mux.HandleFunc("GET /api/folders/{id}", a.getFolder)
 	mux.HandleFunc("PUT /api/songs/{id}/arrangement", a.reorderArrangement)
 	mux.HandleFunc("POST /api/songs/{id}/sections", a.addSection)
 	mux.HandleFunc("PATCH /api/songs/{id}/sections/{sectionID}", a.setSectionLabel)

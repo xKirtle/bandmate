@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -33,11 +34,14 @@ type songTable struct {
 	// and whose replaced rows keep their place, i.e. Beats, the columns
 	// they take from the Backup. A Song replaced is made anew instead.
 	replacedInPlace []string
+	// leftOut lists the columns a Backup leaves empty, and a Restore too:
+	// a Song's Folder, until Backups carry Folders.
+	leftOut []string
 }
 
 // songTables lists, parents first, every table holding a Song's rows.
 var songTables = []songTable{
-	{name: "songs", where: `id = ?1`},
+	{name: "songs", where: `id = ?1`, leftOut: []string{"folder_id"}},
 	{name: "sections", where: `song_id = ?1`},
 	{name: "alternates", where: `section_id IN (SELECT id FROM src.sections WHERE song_id = ?1)`},
 	{name: "lines", where: `alternate_id IN (SELECT a.id FROM src.alternates a
@@ -61,8 +65,8 @@ var songTables = []songTable{
 }
 
 // notCopied are the tables holding nothing of a Song: the schema's own
-// bookkeeping, and the Backups.
-var notCopied = map[string]bool{"schema_migrations": true, "sqlite_sequence": true, "backups": true}
+// bookkeeping, and the Backups; and, until Backups carry them, the Folders.
+var notCopied = map[string]bool{"schema_migrations": true, "sqlite_sequence": true, "backups": true, "folders": true}
 
 // songFile is a kind of file a Song's rows, or the Beat Library's, use: the
 // directory such files are kept in under the data directory, the table of
@@ -268,9 +272,15 @@ func (s *Store) copyOnce(ctx context.Context, conn *sql.Conn, staging string, co
 		if t.shared {
 			insert = "INSERT OR IGNORE INTO"
 		}
-		cols := columnList(columns[t.name])
+		values := make([]string, len(columns[t.name]))
+		for i, c := range columns[t.name] {
+			values[i] = `"` + c + `"`
+			if slices.Contains(t.leftOut, c) {
+				values[i] = "NULL"
+			}
+		}
 		res, err := tx.ExecContext(ctx, fmt.Sprintf(`%s main.%s (%s) SELECT %s FROM src.%s WHERE %s`,
-			insert, t.name, cols, cols, t.name, t.where), args...)
+			insert, t.name, columnList(columns[t.name]), strings.Join(values, ", "), t.name, t.where), args...)
 		if err != nil {
 			return false, fmt.Errorf("copying %s: %w", t.name, err)
 		}
