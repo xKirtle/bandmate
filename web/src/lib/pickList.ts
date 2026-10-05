@@ -7,8 +7,9 @@ export interface FolderGroup<T> {
 }
 
 /**
- * Items grouped under the Folders they sit in, by name ignoring case, each
- * group's items in the order given, then the items in no Folder.
+ * Items grouped under the names of the Folders they sit in, the Folders
+ * sorted by name ignoring case and each one's items in the order given,
+ * then the items in no Folder.
  */
 export function byFolder<T>(
   items: readonly T[],

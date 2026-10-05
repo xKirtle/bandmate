@@ -95,6 +95,29 @@ func TestABackupListsEachSongWithTheFolderItSatIn(t *testing.T) {
 	}
 }
 
+func TestARestoreAnswersWithTheFolderEachSongWentIntoHere(t *testing.T) {
+	elsewhere := newTestServer(t)
+	theirs := elsewhere.createFolder("summer ep")
+	opener := elsewhere.createSong("Opener")
+	loose := elsewhere.createSong("Loose")
+	elsewhere.putInFolder(opener.ID, theirs)
+	made := elsewhere.backUp(map[string]any{"allSongs": true})
+	ts := newTestServer(t)
+	ts.createFolder("Summer EP")
+	up := ts.uploadFrom(elsewhere, made)
+
+	res := ts.Do(http.MethodPost, backupPath(up.ID)+"/restore", map[string]any{"songs": []int64{opener.ID, loose.ID}})
+	expectStatus(t, res, http.StatusOK)
+	var got struct{ Songs []heldSong }
+	res.JSON(t, &got)
+
+	name := "Summer EP"
+	if len(got.Songs) != 2 || !reflect.DeepEqual(got.Songs[0].Folder, (*string)(nil)) ||
+		!reflect.DeepEqual(got.Songs[1].Folder, &name) {
+		t.Errorf("restored = %+v, want Loose in no Folder, then Opener in Summer EP, as named here", got.Songs)
+	}
+}
+
 func TestARestoredSongComesBackInItsFolderMadeIfThisInstallHasNone(t *testing.T) {
 	elsewhere := newTestServer(t)
 	ep := elsewhere.createFolder("Summer EP")

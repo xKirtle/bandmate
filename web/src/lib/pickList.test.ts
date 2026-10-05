@@ -4,7 +4,7 @@ import { byFolder, groupTicked, tickGroup } from './pickList';
 const song = (id: number, folder: string | null) => ({ id, folder });
 
 describe('byFolder', () => {
-  it('groups items under their Folders, by name ignoring case, then lists those in none', () => {
+  it('groups items under their Folders, sorted by name ignoring case, then lists those in none', () => {
     const items = [song(1, 'summer EP'), song(2, null), song(3, 'Demos'), song(4, 'summer EP'), song(5, null)];
 
     expect(byFolder(items, (s) => s.folder)).toEqual({
