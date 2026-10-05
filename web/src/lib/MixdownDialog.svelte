@@ -133,7 +133,7 @@
 <Dialog
   bind:dialog
   title="Mix down"
-  close={phase === 'mixing' ? 'hidden' : 'shown'}
+  closeButton={phase === 'mixing' ? 'hidden' : 'shown'}
   dismissible={() => phase !== 'mixing'}
   {onclose}
 >

@@ -1,8 +1,8 @@
 <script lang="ts">
   import { api, type Backup, type Beat, type SongSummary } from './api';
   import { backupName, backupSize, beatCount, beatsBrought, broughtNote, newBackup } from './backups';
-  import PickList from './PickList.svelte';
   import Dialog from './Dialog.svelte';
+  import PickList from './PickList.svelte';
 
   // "New Backup": ticks what goes in, Songs and Beats (some or all of each),
   // together or not, then makes the Backup in the same modal dialog, which
@@ -79,7 +79,7 @@
 <Dialog
   bind:dialog
   title="New Backup"
-  close={phase === 'making' ? 'hidden' : 'shown'}
+  closeButton={phase === 'making' ? 'hidden' : 'shown'}
   dismissible={() => phase !== 'making'}
   {oncancel}
   onclose={onClose}

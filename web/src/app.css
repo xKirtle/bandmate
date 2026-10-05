@@ -221,6 +221,17 @@ body {
   cursor: default;
 }
 
+/* A button that's a <label> round a file input: it fades with .disabled
+   while it can't be used, and takes the ring while its input has focus. */
+.button.disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+label.button:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* A quiet button: accent text with no box, for a light action beside a
    list, such as Choose all. */
 .button.quiet {

@@ -437,14 +437,6 @@
 {/if}
 
 <style>
-  .add-beat.disabled {
-    opacity: 0.6;
-    cursor: default;
-  }
-  .add-beat:has(input:focus-visible) {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
   .adding {
     display: flex;
     flex-direction: column;

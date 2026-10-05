@@ -126,7 +126,7 @@
 </script>
 
 <!-- A click outside never closes it, as its framing would be lost. -->
-<Dialog bind:dialog title="Choose the Cover" close="hidden" sheet onclose={onClose}>
+<Dialog bind:dialog title="Choose the Cover" closeButton="hidden" sheet onclose={onClose}>
   <p class="muted hint">Drag to move the picture in the square. Pinch, scroll or use the slider to zoom.</p>
 
   <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->

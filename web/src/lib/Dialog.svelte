@@ -12,7 +12,7 @@
   let {
     title,
     detail,
-    close = 'shown',
+    closeButton = 'shown',
     dismissible,
     sheet = false,
     stack = true,
@@ -24,7 +24,7 @@
     /** Under the title, e.g. a Beat's credit. */
     detail?: Snippet;
     /** The close button: shown, shown but disabled while closing would lose work, or hidden. */
-    close?: 'shown' | 'disabled' | 'hidden';
+    closeButton?: 'shown' | 'disabled' | 'hidden';
     /** Whether a click on the backdrop closes it now, as Esc does; left out, it never does. */
     dismissible?: () => boolean;
     /** On a phone, it takes the whole screen. */
@@ -53,12 +53,12 @@
       <h2 id="{id}-title">{title}</h2>
       {@render detail?.()}
     </div>
-    {#if close !== 'hidden'}
+    {#if closeButton !== 'hidden'}
       <button
         type="button"
         class="icon"
         onclick={() => dialog?.close()}
-        disabled={close === 'disabled'}
+        disabled={closeButton === 'disabled'}
         aria-label="Close"><X /></button
       >
     {/if}

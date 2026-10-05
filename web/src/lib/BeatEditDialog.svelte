@@ -128,7 +128,7 @@
 <Dialog
   bind:dialog
   title="Edit “{beat.title}”"
-  close={busy === null ? 'shown' : 'disabled'}
+  closeButton={busy === null ? 'shown' : 'disabled'}
   dismissible={nothingToLose}
   sheet
   onclose={onClose}
@@ -243,14 +243,6 @@
   .hint {
     margin: 0;
     font-size: var(--text-sm);
-  }
-  label.disabled {
-    opacity: 0.6;
-    cursor: default;
-  }
-  label.button:has(input:focus-visible) {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
   }
   p[role] {
     margin: 0;

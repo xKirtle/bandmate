@@ -250,14 +250,6 @@
   .upload {
     flex-shrink: 0;
   }
-  .upload.disabled {
-    opacity: 0.6;
-    cursor: default;
-  }
-  .upload:has(input:focus-visible) {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
   .beats {
     margin: 0;
     padding: 0;

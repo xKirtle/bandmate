@@ -150,7 +150,7 @@
 <Dialog
   bind:dialog
   title="Restore"
-  close={phase === 'restoring' || phase === 'checking' ? 'hidden' : 'shown'}
+  closeButton={phase === 'restoring' || phase === 'checking' ? 'hidden' : 'shown'}
   dismissible={() => phase !== 'restoring'}
   {oncancel}
   onclose={onClose}

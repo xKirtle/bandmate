@@ -983,6 +983,7 @@
       min-height: 2.5rem;
       font-size: var(--text-xl);
     }
+    /* A card, as .card draws one, on desktop only. */
     .part {
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);

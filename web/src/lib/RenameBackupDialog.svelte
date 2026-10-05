@@ -50,7 +50,7 @@
 <Dialog
   bind:dialog
   title="Rename Backup"
-  close={saving ? 'disabled' : 'shown'}
+  closeButton={saving ? 'disabled' : 'shown'}
   dismissible={() => !saving && name.trim() === backup.name}
   oncancel={(e) => saving && e.preventDefault()}
   onclose={onClose}

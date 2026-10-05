@@ -177,14 +177,6 @@
     display: flex;
     gap: var(--space-2);
   }
-  .bar label.disabled {
-    opacity: 0.6;
-    cursor: default;
-  }
-  .bar label:has(input:focus-visible) {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
   .backups {
     margin: 0;
     padding: 0;

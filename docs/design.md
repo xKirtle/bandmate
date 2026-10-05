@@ -186,7 +186,7 @@ The recurring components are written once, and a screen reaches for them rather 
 | Variant   | Class                    | For                                                                                                |
 | --------- | ------------------------ | -------------------------------------------------------------------------------------------------- |
 | Primary   | `.button.primary`        | The one action a dialog or form is for: Save, Back up, Restore. At most one in a group             |
-| Secondary | `.button`                | Every other action: Cancel, Back, Clear all Cues. Also a `<label>` round a file input, or a link   |
+| Secondary | `.button`                | Every other action: Cancel, Back, Clear all Cues. Also a link, or a `<label>` round a file input, which takes `.disabled` while it can't be used |
 | Quiet     | `.button.quiet`          | A light action beside a list, in accent text with no box: Choose all, Clear                        |
 | Danger    | `.button.danger`         | Deletes or overwrites, after asking: Delete, Replace and restore. Primary's place when it's the one |
 | Toggle    | `.button.toggle`         | On or off, with `aria-pressed`: filled with the accent while on, e.g. Sync lyrics, Left-handed     |
