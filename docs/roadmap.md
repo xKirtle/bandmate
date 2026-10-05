@@ -93,3 +93,9 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 
 - Group Songs on the Songs page into folders, so a growing list can be kept in order (an EP's Songs together, say), where today search, filters and sorting are the only way through one long list.
 - Whether a Song can sit in more than one folder, whether folders nest, how they sit beside the search and filters, and whether a Backup can choose Songs by folder, are for the spec.
+
+## Song tags
+
+- Songs carry tags of the user's own (e.g. "Album 2023"), to mark them with what's relevant and find them by it. They sit alongside Song folders rather than replacing them.
+- They aren't a Section's Label, which names a block of Lines within a Song.
+- Whether a tag is free text or picked from tags already used, whether the Songs page filters by them, how they differ from folders if a Song can sit in more than one folder, and whether tags have colours, are for the spec.
