@@ -234,6 +234,8 @@ export type BackupContents = ({ allSongs: true } | { songs: number[] }) & ({ bea
 export interface BackupSong {
   id: number;
   title: string;
+  /** The name of the Folder it sits in, in the Backup or, once restored, here; null when it's in none. */
+  folder: string | null;
 }
 
 /**
