@@ -6,6 +6,7 @@ import Disc3 from '@lucide/svelte/icons/disc-3';
 import Guitar from '@lucide/svelte/icons/guitar';
 import Info from '@lucide/svelte/icons/info';
 import Music from '@lucide/svelte/icons/music';
+import Settings from '@lucide/svelte/icons/settings';
 import type { Icon } from './icons';
 
 /** The top-level lists the navigation leads to. */
@@ -15,8 +16,8 @@ export type LibraryPage = (typeof lists)[number];
 /** A top-level page the navigation leads to: the lists, the Chord Finder and the Backups. */
 export type MainPage = LibraryPage | 'chords' | 'backups';
 
-/** Any page the navigation leads to: the main pages, and About apart from them. */
-export type NavPage = MainPage | 'about';
+/** Any page the navigation leads to: the main pages, and Settings and About apart from them. */
+export type NavPage = MainPage | 'settings' | 'about';
 
 interface NavLink<Id extends NavPage> {
   id: Id;
@@ -35,22 +36,21 @@ export const pages = [
 /** Whether a main page is a list, which the navigation returns to as it was left. */
 const isList = (page: MainPage): page is LibraryPage => (lists as readonly MainPage[]).includes(page);
 
-/** About, pinned to the bottom of the nav rail, and the last tab of the tab bar. */
-export const about = { id: 'about', href: '/about', label: 'About', icon: Info } as const satisfies NavLink<'about'>;
+/** Settings and About, pinned to the bottom of the nav rail, and the last tabs of the tab bar. */
+export const pinned = [
+  { id: 'settings', href: '/settings', label: 'Settings', icon: Settings },
+  { id: 'about', href: '/about', label: 'About', icon: Info },
+] as const satisfies readonly NavLink<'settings' | 'about'>[];
 
 /**
  * The page the navigation marks as current for a path: Songs for the Song
  * list and anything under /songs, Beats for the Beat Library, the Chord
- * Finder and the Backups for their pages, About for the About page, and none
- * for a path that isn't the app's.
+ * Finder, the Backups, Settings and About for their pages, and none for a
+ * path that isn't the app's.
  */
 export function currentPage(path: string): NavPage | undefined {
   if (path === '/' || path.startsWith('/songs/')) return 'songs';
-  if (path === '/beats') return 'beats';
-  if (path === '/chords') return 'chords';
-  if (path === '/backups') return 'backups';
-  if (path === about.href) return 'about';
-  return undefined;
+  return [...pages, ...pinned].find((page) => page.href === path)?.id;
 }
 
 /**

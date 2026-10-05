@@ -29,7 +29,7 @@ Colours are named by role, never by hue, so a component reads the same in every 
 - **Ink**: fountain-pen blue on cream, or blue-black.
 - **Olive**: muted green on stone.
 
-The `data-palette` attribute on the root element picks one (`ink` or `olive`; Terracotta when it's absent), and Light or Dark follows the system. The user will pick a Palette, and System, Light or Dark, in Settings, kept per device (_to come_, #578). All Clips on the Timeline use the one accent, and the Chosen Track is marked by an accent edge on its header.
+The user picks a Palette, and System, Light or Dark, in Settings, kept per device (`appearance.ts`) and falling back to Terracotta and System without storage. The `data-palette` attribute on the root element shows one (`ink` or `olive`; Terracotta when it's absent), and `data-theme` shows `light` or `dark`, set from the system under System; a script in `index.html` sets both before the first paint, so the page never flashes the default. `data-palette` on an element inside the page shows another Palette there, as Settings' swatches do. Light or dark is picked by attribute alone, never `light-dark()`, which breaks every colour on Safari before 17.5. All Clips on the Timeline use the one accent, and the Chosen Track is marked by an accent edge on its header.
 
 | Token                          | For                                                                     |
 | ------------------------------ | ----------------------------------------------------------------------- |
@@ -171,7 +171,7 @@ One icon, one meaning, across the app. Every icon in use is here: a new one is a
 | `volume-2`, `volume-1`, `volume-x`             | A player's volume: loud, quiet, muted                                                                                                                                                       |
 | `triangle-alert`                               | A warning, e.g. a Cue out of order                                                                                                                                                          |
 | `corner-down-left`                             | The Enter key, beside Sync mode's Now                                                                                                                                                       |
-| `music`, `disc-3`, `guitar`, `archive`, `info` | The navigation: Songs, Beats, the Chord Finder, Backups, About                                                                                                                              |
+| `music`, `disc-3`, `guitar`, `archive`, `settings`, `info` | The navigation: Songs, Beats, the Chord Finder, Backups, Settings, About |
 
 ### The Timeline's own scale
 

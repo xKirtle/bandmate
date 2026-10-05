@@ -28,37 +28,37 @@ const PAIRS: [string, string, number, string][] = [
   ['--text', '--surface-1', 7, 'Lines in Read mode, on the current Line'],
 ];
 
-/** Each Palette's colour tokens in each theme, read from palettes.css. A
-    Palette is `:root[data-palette='…']`, Terracotta plain `:root`, and dark is
-    whatever sits in the `prefers-color-scheme: dark` block. Only hex values
-    count as a Palette's own: the shared tokens are built from them. */
-function readPalettes(): Record<string, Record<Theme, Tokens>> {
-  const css = readFileSync(new URL('./palettes.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
-  const media = '@media (prefers-color-scheme: dark)';
-  const start = css.indexOf(media);
-  expect(start, 'palettes.css has a dark block').toBeGreaterThan(-1);
-  let depth = 0;
-  let end = css.indexOf('{', start);
-  do {
-    if (css[end] === '{') depth++;
-    if (css[end] === '}') depth--;
-    end++;
-  } while (depth > 0);
-  const themes: Record<Theme, string> = {
-    light: css.slice(0, start) + css.slice(end),
-    dark: css.slice(css.indexOf('{', start) + 1, end - 1),
-  };
+/** A Palette's tokens in one theme, and the selectors that set them. */
+interface PaletteRule {
+  tokens: Tokens;
+  selectors: string[];
+}
 
-  const byPalette: Record<string, Record<Theme, Tokens>> = {};
-  for (const theme of THEMES) {
-    for (const rule of themes[theme].matchAll(/:root(?:\[data-palette='([a-z]+)'\])?\s*\{([^}]*)\}/g)) {
-      const name = rule[1] ?? 'terracotta';
-      byPalette[name] ??= { light: {}, dark: {} };
-      for (const [, token, value] of rule[2].matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/g)) {
-        if (!value.startsWith('#')) continue;
-        expect(value, `${name} ${theme} ${token}`).toMatch(/^#[0-9a-f]{6}$/);
-        byPalette[name][theme][token] = value;
-      }
+/** Each Palette's colour tokens in each theme, read from palettes.css. A
+    rule's selectors name its Palette with `[data-palette='…']`, Terracotta
+    when none does, and its theme with `[data-theme='dark']`, light when none
+    does. Only hex values count as a Palette's own: the shared tokens are
+    built from them. */
+function readPalettes(): Record<string, Record<Theme, PaletteRule>> {
+  const css = readFileSync(new URL('./palettes.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  expect(css, 'palettes.css picks light or dark by attribute alone').not.toContain('@media');
+
+  const byPalette: Record<string, Record<Theme, PaletteRule>> = {};
+  for (const [, selectorList, body] of css.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+    const tokens = [...body.matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/g)].filter(([, , value]) => value.startsWith('#'));
+    if (tokens.length === 0) continue;
+    const selectors = selectorList.split(',').map((selector) => selector.trim());
+    const named = selectors.map((selector) => ({
+      palette: selector.match(/\[data-palette='([a-z]+)'\]/)?.[1] ?? 'terracotta',
+      theme: (selector.includes("[data-theme='dark']") ? 'dark' : 'light') as Theme,
+    }));
+    const { palette, theme } = named[0];
+    expect(named, `${selectorList.trim()} sets one Palette in one theme`).toEqual(named.map(() => named[0]));
+    byPalette[palette] ??= { light: { tokens: {}, selectors: [] }, dark: { tokens: {}, selectors: [] } };
+    byPalette[palette][theme].selectors.push(...selectors);
+    for (const [, token, value] of tokens) {
+      expect(value, `${palette} ${theme} ${token}`).toMatch(/^#[0-9a-f]{6}$/);
+      byPalette[palette][theme].tokens[token] = value;
     }
   }
   return byPalette;
@@ -90,7 +90,7 @@ describe('contrast', () => {
 
 describe('Palettes', () => {
   const palettes = readPalettes();
-  const tokens = Object.keys(palettes.terracotta.light).sort();
+  const tokens = Object.keys(palettes.terracotta.light.tokens).sort();
 
   it('are Terracotta, Ink and Olive', () => {
     expect(Object.keys(palettes).sort()).toEqual([...PALETTES].sort());
@@ -100,15 +100,27 @@ describe('Palettes', () => {
     expect(tokens).toContain('--accent');
     for (const name of PALETTES) {
       for (const theme of THEMES) {
-        expect(Object.keys(palettes[name][theme]).sort(), `${name} ${theme}`).toEqual(tokens);
+        expect(Object.keys(palettes[name][theme].tokens).sort(), `${name} ${theme}`).toEqual(tokens);
       }
+    }
+  });
+
+  it('show across the page, or on an element inside it, such as a swatch in Settings', () => {
+    expect(palettes.terracotta.light.selectors, 'Terracotta, the default').toContain(':root');
+    for (const name of PALETTES) {
+      const own = `[data-palette='${name}']`;
+      const page = name === 'terracotta' ? ":root[data-theme='dark']" : `:root[data-theme='dark']${own}`;
+      expect(palettes[name].light.selectors, `${name} light`).toContain(own);
+      expect(palettes[name].dark.selectors, `${name} dark`).toEqual(
+        expect.arrayContaining([page, `:root[data-theme='dark'] ${own}`]),
+      );
     }
   });
 
   for (const name of PALETTES) {
     for (const theme of THEMES) {
       it.each(PAIRS)(`${name} ${theme}: %s on %s is at least %d:1 (%s)`, (fg, bg, floor) => {
-        const colours = palettes[name][theme];
+        const colours = palettes[name][theme].tokens;
         expect(contrast(colours[fg], colours[bg])).toBeGreaterThanOrEqual(floor);
       });
     }

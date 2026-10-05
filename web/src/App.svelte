@@ -6,6 +6,7 @@
   import BeatLibrary from './routes/BeatLibrary.svelte';
   import ChordFinderPage from './routes/ChordFinderPage.svelte';
   import Backups from './routes/Backups.svelte';
+  import Settings from './routes/Settings.svelte';
   import About from './routes/About.svelte';
   import NotFound from './routes/NotFound.svelte';
   import MainNav from './lib/MainNav.svelte';
@@ -25,6 +26,8 @@
       <ChordFinderPage />
     {:else if router.path === '/backups'}
       <Backups />
+    {:else if router.path === '/settings'}
+      <Settings />
     {:else if router.path === '/about'}
       <About />
     {:else if router.path === '/songs/import'}

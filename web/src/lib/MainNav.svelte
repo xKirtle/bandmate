@@ -2,7 +2,7 @@
   // Switches between the top-level pages, the same at every width: a nav rail
   // down the left of wide windows, a tab bar along the bottom of narrow ones.
   import BrandMark from './BrandMark.svelte';
-  import { about, currentPage, listAt, pages, type MainPage } from './nav';
+  import { currentPage, listAt, pages, pinned, type MainPage } from './nav';
   import { router } from './router.svelte';
 
   const current = $derived(currentPage(router.path));
@@ -24,10 +24,12 @@
       {page.label}
     </a>
   {/each}
-  <a class="about" href={about.href} aria-current={current === about.id ? 'page' : undefined}>
-    <span class="nav-icon" aria-hidden="true"><about.icon /></span>
-    {about.label}
-  </a>
+  {#each pinned as page, i (page.id)}
+    <a class:pinned={i === 0} href={page.href} aria-current={page.id === current ? 'page' : undefined}>
+      <span class="nav-icon" aria-hidden="true"><page.icon /></span>
+      {page.label}
+    </a>
+  {/each}
 </nav>
 
 <style>
@@ -83,8 +85,8 @@
     color: var(--accent);
   }
 
-  /* The nav rail, in view however far the page scrolls, with About pinned
-     to its bottom, apart from the lists. */
+  /* The nav rail, in view however far the page scrolls, with Settings and
+     About pinned to its bottom, apart from the lists. */
   @media (min-width: 65.5rem) {
     nav {
       position: sticky;
@@ -110,7 +112,7 @@
     a:hover {
       background: var(--surface-2);
     }
-    .about {
+    .pinned {
       margin-top: auto;
     }
   }
