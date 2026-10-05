@@ -295,7 +295,7 @@
   /* The text box's background, behind the rows. */
   .backdrop {
     grid-area: 1 / 1 / -1 / 2;
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     background: var(--bg);
   }
   /* Set like the text box's text, so it wraps the same; its text is never
@@ -331,7 +331,7 @@
     min-height: 1.5rem;
     padding: 0 var(--space-2);
     border: 1px solid var(--accent);
-    border-radius: 0.375rem;
+    border-radius: var(--radius-sm);
     background: var(--accent);
     color: var(--accent-text);
     font: inherit;

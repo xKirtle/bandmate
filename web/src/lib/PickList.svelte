@@ -104,7 +104,7 @@
     margin: 0;
     padding: 0 var(--space-2);
     border: 1px solid var(--border);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     list-style: none;
     overscroll-behavior: contain;
   }

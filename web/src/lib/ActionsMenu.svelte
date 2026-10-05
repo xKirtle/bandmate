@@ -327,7 +327,7 @@
     display: block;
     padding: 0;
     border: 0;
-    border-radius: var(--trigger-radius, 0.5rem);
+    border-radius: var(--trigger-radius, var(--radius-md));
     background: none;
     color: inherit;
     font: inherit;
@@ -346,7 +346,7 @@
     margin: 0;
     padding: var(--space-1);
     border: 1px solid var(--border);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     background: var(--bg);
     box-shadow: var(--shadow-float);
   }
@@ -362,7 +362,7 @@
     min-height: var(--control);
     padding: 0 var(--space-3);
     border: 0;
-    border-radius: 0.375rem;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--text);
     font: inherit;

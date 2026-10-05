@@ -60,6 +60,25 @@ const spacing = {
   ],
 };
 
+// Radius: each corner is 0, one of the --radius-* tokens, or on the Timeline
+// a step of the same scale in its own unit (`full` needs no unit), plus any
+// corners a file is allowed besides.
+// The steps are the --radius-* sizes in app.css, in rem: keep them in step.
+const radiusSteps = '(0\\.375|0\\.5|0\\.75)';
+const radiusWith = (...extra) => {
+  const corner = [
+    '0',
+    'var\\(--radius-(sm|md|lg|full)\\)',
+    `calc\\(${radiusSteps} \\* var\\(--timeline-rem\\)\\)`,
+    ...extra,
+  ].join('|');
+  return { '/^border(-.+)?-radius$/': ['inherit', `/^(${corner})( (${corner})){0,3}$/`] };
+};
+const radius = radiusWith();
+
+// What every file's allowed values start from.
+const allowed = { ...shadows, ...type, ...radius };
+
 export default {
   rules: {
     'color-no-invalid-hex': true,
@@ -67,7 +86,7 @@ export default {
     'property-no-unknown': true,
     'unit-no-unknown': true,
     ...colour,
-    'declaration-property-value-allowed-list': { ...shadows, ...type },
+    'declaration-property-value-allowed-list': allowed,
     'declaration-property-value-disallowed-list': spacing,
   },
   overrides: [
@@ -77,17 +96,29 @@ export default {
       files: ['src/palettes.css'],
       rules: {
         ...Object.fromEntries(Object.keys(colour).map((rule) => [rule, null])),
-        'declaration-property-value-allowed-list': type,
+        'declaration-property-value-allowed-list': { ...type, ...radius },
       },
     },
-    // A Cover placeholder's initial grows with the Cover it stands in for.
+    // A Cover's corners grow with it, a fixed share of its size like an app
+    // icon's, and so does a Cover placeholder's initial.
     {
-      files: ['src/lib/CoverPlaceholder.svelte'],
+      files: ['src/lib/SongCover.svelte', 'src/lib/CoverPlaceholder.svelte'],
       rules: {
         'declaration-property-value-allowed-list': {
-          ...shadows,
-          ...type,
+          ...allowed,
+          ...radiusWith('calc\\(var\\(--size\\) \\* 0\\.18\\)'),
           'font-size': [...type['font-size'], '/^calc\\(var\\(--size\\) \\* [0-9.]+\\)$/'],
+        },
+      },
+    },
+    // The actions menu's trigger takes the shape of what it wraps, through
+    // --trigger-radius: only the Song page header's Cover sets it, to its own.
+    {
+      files: ['src/lib/ActionsMenu.svelte', 'src/lib/EditCover.svelte'],
+      rules: {
+        'declaration-property-value-allowed-list': {
+          ...allowed,
+          ...radiusWith('var\\(--trigger-radius(, var\\(--radius-md\\))?\\)'),
         },
       },
     },

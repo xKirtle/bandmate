@@ -67,7 +67,7 @@
     max-height: calc(100dvh - 2rem);
     padding: var(--space-4);
     border: 1px solid var(--border);
-    border-radius: 0.75rem;
+    border-radius: var(--radius-lg);
     background: var(--bg);
     color: var(--text);
   }
@@ -143,7 +143,7 @@
     padding: 0 var(--space-2);
     border: 1px solid var(--border);
     border-bottom-width: 2px;
-    border-radius: 0.25rem;
+    border-radius: var(--radius-sm);
     background: var(--surface-1);
     font: inherit;
     white-space: nowrap;

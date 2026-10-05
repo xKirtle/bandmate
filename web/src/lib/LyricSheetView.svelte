@@ -175,7 +175,7 @@
   .section {
     margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-3));
     padding: var(--space-2) var(--space-3);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     scroll-margin-top: 5rem;
     transition: background-color 0.2s;
   }
@@ -199,7 +199,7 @@
   .line-box {
     margin: 0 calc(-1 * var(--space-3));
     padding: 0 var(--space-3);
-    border-radius: 0.375rem;
+    border-radius: var(--radius-sm);
     scroll-margin: 5rem 0;
     transition: background-color 0.2s;
   }

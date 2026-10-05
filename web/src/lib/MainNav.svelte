@@ -67,7 +67,7 @@
     justify-content: center;
     gap: var(--space-1);
     padding: var(--space-1);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     color: var(--text-muted);
     font-size: var(--text-xs);
     font-weight: 600;

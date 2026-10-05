@@ -453,7 +453,7 @@
     margin-bottom: var(--space-6);
     padding: var(--space-4);
     border: 1px solid var(--border);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-lg);
     background: var(--surface-1);
   }
   .head {

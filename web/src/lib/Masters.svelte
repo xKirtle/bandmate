@@ -242,7 +242,7 @@
     gap: var(--space-2) var(--space-3);
     margin-bottom: var(--space-4);
     padding: var(--space-3) var(--space-4);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     background: var(--finished-bg);
     color: var(--finished-fg);
   }
@@ -283,7 +283,7 @@
   .main-badge {
     flex-shrink: 0;
     padding: var(--space-1) var(--space-3);
-    border-radius: 999px;
+    border-radius: var(--radius-full);
     background: var(--accent);
     color: var(--accent-text);
     font-size: var(--text-sm);

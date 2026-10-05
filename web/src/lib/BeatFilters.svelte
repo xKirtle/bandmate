@@ -157,7 +157,7 @@
   .count {
     min-width: 1.25rem;
     padding: 0 var(--space-2);
-    border-radius: 999px;
+    border-radius: var(--radius-full);
     background: var(--accent);
     color: var(--accent-text);
     font-size: var(--text-xs);
@@ -170,7 +170,7 @@
     gap: var(--space-3);
     padding: var(--space-3);
     border: 1px solid var(--border);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-lg);
     background: var(--surface-1);
   }
   .drawer.open {
@@ -212,7 +212,7 @@
     min-height: var(--control);
     padding: 0 var(--space-4);
     border: 1px solid var(--border);
-    border-radius: 999px;
+    border-radius: var(--radius-full);
     background: var(--bg);
     color: var(--text);
     font: inherit;

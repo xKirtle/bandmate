@@ -196,7 +196,7 @@
     max-height: min(44rem, calc(100dvh - 2rem));
     padding: var(--space-4);
     border: 1px solid var(--border);
-    border-radius: 0.75rem;
+    border-radius: var(--radius-lg);
     background: var(--bg);
     color: var(--text);
   }
@@ -284,7 +284,7 @@
     gap: var(--space-2);
     padding: var(--space-3);
     border: 1px solid var(--border);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     background: var(--surface-1);
   }
   .offer p {

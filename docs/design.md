@@ -102,7 +102,16 @@ A gap, padding or margin is never a literal length otherwise, and a step is neve
 
 ### Radius
 
-`--radius-sm` 0.375rem (chips, small buttons), `--radius-md` 0.5rem (controls, fields), `--radius-lg` 0.75rem (Section cards, panels, dialogs), `--radius-full` (pills, round buttons). _To come_ (#571).
+Four corners, by the kind of thing they round.
+
+| Token           | Size     | For                                                                                    |
+| --------------- | -------- | -------------------------------------------------------------------------------------- |
+| `--radius-sm`   | 0.375rem | Chips and small buttons: menu entries, Cues, a key in Shortcuts, a table's sort header |
+| `--radius-md`   | 0.5rem   | Controls and fields, menus and popovers, notices, a Section's Alternates               |
+| `--radius-lg`   | 0.75rem  | Section cards, panels and dialogs: the Scrapbook, the Chord Finder, About's cards      |
+| `--radius-full` | 999px    | Pills, badges, round buttons and dots: on a square, a circle                           |
+
+A radius is always one of these tokens, or `0`: Stylelint fails anything else. Two exceptions: a Cover's corners are a share of its size (`calc(var(--size) * 0.18)`), so they grow with it like an app icon's; and a trigger that takes the shape of what it wraps, like the Cover that opens its actions menu, gets it through `--trigger-radius`. In the Timeline the steps are in its own unit (below). A drawing's own corners, such as a barre in a Chord diagram, are part of the drawing and stay in its SVG.
 
 ### Motion
 
@@ -114,7 +123,7 @@ Lucide, everywhere: no Unicode glyphs or hand-drawn SVGs as icons, so icons look
 
 ### The Timeline's own scale
 
-The Timeline zooms by its own unit, `--timeline-rem`, so its sizes are written as multiples of it (`calc(0.75 * var(--timeline-rem))`). They follow the same scales, in that unit: a font size there is `var(--timeline-rem)` or one of the type scale's steps times it (0.75 to 1.5), and a gap, padding or margin one of the spacing steps times it (0.25 to 2), or negated.
+The Timeline zooms by its own unit, `--timeline-rem`, so its sizes are written as multiples of it (`calc(0.75 * var(--timeline-rem))`). They follow the same scales, in that unit: a font size there is `var(--timeline-rem)` or one of the type scale's steps times it (0.75 to 1.5), a gap, padding or margin one of the spacing steps times it (0.25 to 2) or negated, and a radius one of the radius steps times it (0.375 to 0.75), or `--radius-full`.
 
 ### Components
 

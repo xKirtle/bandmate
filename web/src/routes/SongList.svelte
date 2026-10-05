@@ -248,7 +248,7 @@
     min-height: var(--control);
     padding: 0 var(--space-4);
     border: 1px solid var(--border);
-    border-radius: 999px;
+    border-radius: var(--radius-full);
     background: var(--surface-1);
     color: var(--text);
     font: inherit;
@@ -323,7 +323,7 @@
     min-height: var(--control);
     padding: 0 var(--space-2);
     border: none;
-    border-radius: 0.25rem;
+    border-radius: var(--radius-sm);
     background: none;
     color: var(--text-muted);
     font: inherit;

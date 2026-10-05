@@ -264,7 +264,7 @@
     height: var(--control);
     padding: 0;
     border: none;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     background: var(--accent);
     color: var(--accent-text);
     cursor: pointer;
@@ -283,7 +283,7 @@
     height: 3rem;
     cursor: pointer;
     touch-action: none;
-    border-radius: 0.25rem;
+    border-radius: var(--radius-sm);
   }
   .wave:focus-visible {
     outline: 2px solid var(--accent);

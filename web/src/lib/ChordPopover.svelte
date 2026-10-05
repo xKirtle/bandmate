@@ -213,7 +213,7 @@
     margin: 0;
     padding: var(--space-2) var(--space-3) var(--space-3);
     border: 1px solid var(--border);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     background: var(--bg);
     color: var(--text);
     box-shadow: var(--shadow-float);

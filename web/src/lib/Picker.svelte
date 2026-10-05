@@ -202,7 +202,7 @@
     gap: var(--space-2);
     padding: 0 var(--space-3);
     border: 1px solid var(--border);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     background: var(--surface-1);
     color: var(--text);
     /* Matches the fields' size, which keeps iOS from zooming on theirs. */

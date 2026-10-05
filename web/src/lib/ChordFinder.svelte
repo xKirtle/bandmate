@@ -372,7 +372,7 @@
   .finder {
     container: finder / inline-size;
     border: 1px solid var(--border);
-    border-radius: 0.75rem;
+    border-radius: var(--radius-lg);
     background: var(--surface-1);
   }
   /* The tabs, and the left-handed setting at the end, on its own line on a narrow phone. */
@@ -507,7 +507,7 @@
     align-items: center;
     gap: var(--space-1);
     padding: var(--space-3) var(--space-2) var(--space-2);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     background: var(--bg);
   }
   .voicings :global(.diagram) {
@@ -570,7 +570,7 @@
     min-height: 2rem;
     padding: 0 var(--space-2);
     border: 1px solid var(--border);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     background: var(--bg);
     color: var(--text);
     font: inherit;
@@ -641,7 +641,7 @@
     height: 100%;
     padding: var(--space-2) var(--space-3);
     border: 1px solid var(--border);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     background: var(--bg);
     color: var(--text);
     font: inherit;

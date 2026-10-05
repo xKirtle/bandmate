@@ -749,7 +749,7 @@
     left: 0;
     right: 0;
     height: 3px;
-    border-radius: 2px;
+    border-radius: var(--radius-full);
     background: var(--accent);
   }
   .arrangement > .drop-above::before {
@@ -763,7 +763,7 @@
   .arrangement > .drop-onto {
     outline: 2px dashed var(--accent);
     outline-offset: 0.25rem;
-    border-radius: 0.75rem;
+    border-radius: var(--radius-lg);
   }
   .arrangement > .drop-onto::after {
     content: 'Add as Alternates';
@@ -771,7 +771,7 @@
     top: -0.625rem;
     right: 0.75rem;
     padding: 0 var(--space-2);
-    border-radius: 999px;
+    border-radius: var(--radius-full);
     background: var(--accent);
     color: var(--accent-text);
     font-size: var(--text-xs);

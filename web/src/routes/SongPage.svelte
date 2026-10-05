@@ -749,7 +749,7 @@
     margin: 0;
     padding: 0;
     border: 1px solid var(--border);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     overflow: hidden;
   }
   .mode {
@@ -802,7 +802,7 @@
     margin-bottom: var(--space-4);
     padding: var(--space-3) var(--space-4);
     border: 1px solid var(--border);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     background: var(--surface-1);
   }
   .stale p {
@@ -853,7 +853,7 @@
     content: '';
     width: 0.375rem;
     height: 0.375rem;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     background: var(--accent);
   }
   .notes {
@@ -1000,7 +1000,7 @@
     }
     .part {
       border: 1px solid var(--border);
-      border-radius: 0.5rem;
+      border-radius: var(--radius-lg);
       background: var(--surface-1);
     }
     .part[open] {
@@ -1040,7 +1040,7 @@
     .part > summary:focus-visible {
       outline: 2px solid var(--accent);
       outline-offset: -2px;
-      border-radius: 0.5rem;
+      border-radius: var(--radius-md);
     }
     /* The toggle names each section, so their own headings go. */
     .part :global(:is(#masters-heading, #scrapbook-heading)) {

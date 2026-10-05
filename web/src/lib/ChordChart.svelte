@@ -168,7 +168,7 @@
     padding: 0 var(--space-2);
     box-sizing: border-box;
     border: 1px solid var(--border);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     background: var(--surface-1);
     color: var(--text-muted);
     font: inherit;
@@ -224,7 +224,7 @@
     width: 100%;
     padding: var(--space-1);
     border: none;
-    border-radius: 0.375rem;
+    border-radius: var(--radius-sm);
     background: none;
     color: inherit;
     font: inherit;
@@ -249,6 +249,6 @@
     width: 100%;
     aspect-ratio: 112 / 126;
     border: 1px dashed var(--border);
-    border-radius: 0.375rem;
+    border-radius: var(--radius-sm);
   }
 </style>

@@ -202,7 +202,7 @@
     width: min(28rem, calc(100vw - 2rem));
     padding: var(--space-4);
     border: 1px solid var(--border);
-    border-radius: 0.75rem;
+    border-radius: var(--radius-lg);
     background: var(--bg);
     color: var(--text);
   }

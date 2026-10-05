@@ -55,7 +55,7 @@
     height: 2rem;
     padding: 0;
     border: none;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     background: none;
     color: var(--text-muted);
     cursor: pointer;
