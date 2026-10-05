@@ -38,15 +38,25 @@ export function pressSong(from: Point, touch: boolean): SongPress {
   return { from: { clientX: from.clientX, clientY: from.clientY }, phase: touch ? 'holding' : 'pressed' };
 }
 
+// How far a finger held for the long press can drift, in px either way,
+// before it's swiping, as browsers allow a touch before scrolling.
+const fingerSlop = 10;
+
+function fingerMoved(from: Point, to: Point): boolean {
+  return Math.abs(to.clientX - from.clientX) > fingerSlop || Math.abs(to.clientY - from.clientY) > fingerSlop;
+}
+
 /** The press after an input, or null once it's over, and what to do. */
 export function songStep(press: SongPress, input: SongInput): { press: SongPress | null; outcome: SongOutcome } {
   switch (input.kind) {
     case 'move':
       if (press.phase === 'dragging') return { press, outcome: 'drag' };
-      // A small wobble while clicking or holding still isn't a drag.
+      // A finger moving before the hold scrolls the list instead, but one
+      // held still drifts more than a mouse wobbles.
+      if (press.phase === 'holding')
+        return fingerMoved(press.from, input.at) ? { press: null, outcome: 'giveUp' } : { press, outcome: 'wait' };
+      // A small wobble while clicking isn't a drag.
       if (!pastSlop(press.from, input.at)) return { press, outcome: 'wait' };
-      // A finger moving before the hold scrolls the list instead.
-      if (press.phase === 'holding') return { press: null, outcome: 'giveUp' };
       return { press: { ...press, phase: 'dragging' }, outcome: 'drag' };
     case 'hold':
       if (press.phase !== 'holding') return { press, outcome: 'wait' };

@@ -29,6 +29,8 @@ export function songTarget(folder: number | null) {
 export class SongDragging {
   /** The drag under way: the Song, where it would drop, and where the pointer is. */
   current = $state<{ song: SongSummary; target: SongTarget | null; x: number; y: number } | null>(null);
+  /** Whether there's anywhere for a Song to drop, so Songs can be dragged. */
+  readonly on: boolean = $derived.by(() => this.#enabled());
 
   #enabled: () => boolean;
   #inView: () => { top: number; bottom: number };
@@ -52,7 +54,7 @@ export class SongDragging {
     this.#inView = inView;
     this.#onDrop = onDrop;
     $effect(() => {
-      if (!this.#enabled()) untrack(() => this.cancel());
+      if (!this.on) untrack(() => this.cancel());
     });
     $effect(() => () => this.cancel());
   }
@@ -88,6 +90,10 @@ export class SongDragging {
       oncontextmenu: (e: MouseEvent) => {
         if (this.#press?.press.phase === 'holding' || this.current) e.preventDefault();
       },
+      // Nor does the browser drag the row's link or Cover away itself.
+      ondragstart: (e: DragEvent) => {
+        if (this.on) e.preventDefault();
+      },
     };
   }
 
@@ -96,16 +102,16 @@ export class SongDragging {
    * drags the Song rather than scrolling. Attached before the touch starts,
    * as the browser decides then whether the touch can scroll.
    */
-  holdScroll = (el: HTMLElement) => {
-    const hold = (e: TouchEvent) => {
+  stopTouchScrolling = (el: HTMLElement) => {
+    const stop = (e: TouchEvent) => {
       if (this.current) e.preventDefault();
     };
-    el.addEventListener('touchmove', hold, { passive: false });
-    return () => el.removeEventListener('touchmove', hold);
+    el.addEventListener('touchmove', stop, { passive: false });
+    return () => el.removeEventListener('touchmove', stop);
   };
 
   #down(e: PointerEvent, song: SongSummary) {
-    if (!this.#enabled() || !e.isPrimary || e.button !== 0 || this.#press || this.current) return;
+    if (!this.on || !e.isPrimary || e.button !== 0 || this.#press || this.current) return;
     if ((e.target as Element).closest('button, [role="menu"]')) return;
     const touch = e.pointerType === 'touch';
     // Not selecting the row's text, or dragging its link away, as the mouse moves.
@@ -132,11 +138,11 @@ export class SongDragging {
         this.#aim(at.clientX, at.clientY);
         return;
       case 'drop': {
-        const { song, target } = this.current ?? {};
-        const drop = song && songDrop(song.folderId, target ?? null);
+        // Aimed only where it moves the Song, if anywhere.
+        const target = this.current?.target;
         this.cancel();
         this.#swallowClick();
-        if (song && drop) this.#onDrop(song, drop.folder);
+        if (target) this.#onDrop(pressing.song, target.folder);
         return;
       }
       case 'giveUp':

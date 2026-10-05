@@ -373,7 +373,7 @@
     </div>
   {:else if sorted}
     {#if listedFolders.length > 0 || sorted.length > 0}
-      <table class="songs-table" {@attach dragging.holdScroll}>
+      <table class="songs-table" class:draggable={dragging.on} {@attach dragging.stopTouchScrolling}>
         <thead>
           <tr>
             {#each columns as column (column.id)}
@@ -449,7 +449,7 @@
           {/each}
         </tbody>
       </table>
-      <ul class="songs" {@attach dragging.holdScroll}>
+      <ul class="songs" class:draggable={dragging.on} {@attach dragging.stopTouchScrolling}>
         {#each listedFolders as f (f.id)}
           <li class:drop-target={dragging.aimsAt(f.id)} {...songTarget(f.id)}>
             <a href={folderHref(f)}>
@@ -564,14 +564,14 @@
   }
   .up.drop-target {
     border-radius: var(--radius-sm);
-    box-shadow: var(--selected-outline);
-    background: color-mix(in srgb, var(--accent) 12%, transparent);
     color: var(--text);
   }
 
   /* Dragging a Song: where it would drop is ringed, and the Song itself
      follows the pointer, its row faded. */
-  .drop-target {
+  /* Over a row's own hover. */
+  .drop-target,
+  :is(.songs li, tbody tr).drop-target {
     box-shadow: var(--selected-outline);
     background: color-mix(in srgb, var(--accent) 12%, transparent);
   }
@@ -598,8 +598,14 @@
   .drag-ghost.below {
     transform: translate(var(--space-3), var(--space-6));
   }
-  :global(.dragging-song) tbody tr {
+  :global(.dragging-song) :is(tbody tr, .up) {
     cursor: grabbing;
+  }
+  /* A finger held on a Song drags it, rather than selecting its text or
+     opening the browser's menu for its link. */
+  .draggable :is(li, tr) {
+    -webkit-touch-callout: none;
+    user-select: none;
   }
   .actions {
     display: flex;
@@ -651,10 +657,6 @@
     display: flex;
     align-items: center;
     border-bottom: 1px solid var(--border);
-    /* A finger held on a Song drags it, rather than selecting its text or
-       opening the browser's menu for its link. */
-    -webkit-touch-callout: none;
-    user-select: none;
   }
   .songs a {
     display: flex;

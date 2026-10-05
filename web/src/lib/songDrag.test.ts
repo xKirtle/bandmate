@@ -26,6 +26,13 @@ group('a finger on a Song', () => {
     expect(songStep(pressSong(from, true), { kind: 'lift' }).outcome).toBe('giveUp');
   });
 
+  it('keeps holding through a finger drifting a little more than a mouse may', () => {
+    const drifted = { clientX: 108, clientY: 92 };
+    const step = songStep(pressSong(from, true), { kind: 'move', at: drifted });
+    expect(step.outcome).toBe('wait');
+    expect(songStep(step.press!, { kind: 'hold' }).outcome).toBe('drag');
+  });
+
   it('leaves a swipe before the long press to scroll the list', () => {
     expect(songStep(pressSong(from, true), { kind: 'move', at: away })).toEqual({ press: null, outcome: 'giveUp' });
   });
