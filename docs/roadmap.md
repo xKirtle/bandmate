@@ -89,12 +89,6 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 - Each Track gets a muted colour of its own, assigned automatically from a small palette in the visual identity's tokens, so Clips on different Tracks can be told apart at a glance. Today every Clip is in the one accent colour.
 - The colours stay muted so the Timeline doesn't take on the busy look of a DAW. Whether the user can pick a Track's colour, and how the Chosen Track still stands out, are for the spec.
 
-## Song tags
-
-- Songs carry tags of the user's own (e.g. "Album 2023"), to mark them with what's relevant and find them by it. A Song can have any number of tags, where it sits in only one folder, so tags are how a Song belongs to several groups at once.
-- They aren't a Section's Label, which names a block of Lines within a Song.
-- Whether a tag is free text or picked from tags already used, whether the Songs page filters by them, and whether tags have colours, are for the spec.
-
 ## The Left-handed toggle on a phone
 
 - At phone width, the Chord Finder's Left-handed toggle doesn't fit beside its tabs and drops onto a line of its own, which looks like an afterthought. It wants a place that feels deliberate on a phone, without losing the one-tap toggle on desktop.
