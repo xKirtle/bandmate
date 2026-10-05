@@ -1,6 +1,5 @@
 // How Backups are named, sized and asked for in Settings' Backups tab.
 import type { Backup, BackupContents, BackupPicks, BackupPresent } from './api';
-import type { Failure, Uploaded } from './backupUploads.svelte';
 import { formatSize } from './upload';
 
 // Spelled out rather than left to the locale, which may shorten September
@@ -203,24 +202,4 @@ export function replaceConfirmation(songs: BackupPresent[], beats: BackupPresent
 /** A Backup's size: "8 KB" under a megabyte, where "0.0 MB" would say nothing, and "4.2 MB" from there. */
 export function backupSize(bytes: number): string {
   return bytes < 1 << 20 ? `${Math.ceil(bytes / 1024)} KB` : formatSize(bytes);
-}
-
-/**
- * What a run of uploads added, if anything: the one Backup by name, with
- * the file it came from, since it's listed by when it was made, maybe far
- * down; several by how many.
- */
-export function addedNote(added: Uploaded<Parameters<typeof backupName>[0]>[]): string | null {
-  if (added.length === 0) return null;
-  if (added.length > 1) return `Added ${added.length} Backups.`;
-  const [{ backup, file }] = added;
-  return `Added “${backupName(backup)}” from “${file}”.`;
-}
-
-/** The files a run of uploads couldn't upload, if any, each with why. */
-export function failedNote(failures: Failure[]): string | null {
-  if (failures.length === 0) return null;
-  const named = failures.map(({ file, reason }) => `“${file}” (${reason})`);
-  const last = named.pop();
-  return `Couldn't upload ${named.length > 0 ? `${named.join(', ')} and ${last}` : last}`;
 }

@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-  addedNote,
   automaticName,
   backupName,
   backupSize,
   beatsBrought,
   broughtNote,
-  failedNote,
   newBackup,
   replaceConfirmation,
   restoredName,
@@ -325,51 +323,5 @@ describe('restorePicks', () => {
     expect(restorePicks({ ...opened, picked: new Set([3]), pickedBeats: new Set() }, held)).toEqual({
       missing: 'Pick a Beat, or untick the Beat Library.',
     });
-  });
-});
-
-describe('addedNote', () => {
-  const backup = { createdAt: made, songs: 3, name: '' };
-
-  it('names the Backup one upload added, and the file it came from', () => {
-    expect(addedNote([{ backup, file: 'old.bandmate' }])).toBe('Added “4 Oct 2026 · 3 Songs” from “old.bandmate”.');
-  });
-
-  it('counts the Backups several uploads added', () => {
-    expect(
-      addedNote([
-        { backup, file: 'a.bandmate' },
-        { backup, file: 'b.bandmate' },
-        { backup, file: 'c.bandmate' },
-      ]),
-    ).toBe('Added 3 Backups.');
-  });
-
-  it('says nothing when none was added', () => {
-    expect(addedNote([])).toBeNull();
-  });
-});
-
-describe('failedNote', () => {
-  it('names the file that could not be uploaded, with why', () => {
-    expect(failedNote([{ file: 'notes.txt', reason: "the file isn't a Bandmate Backup" }])).toBe(
-      "Couldn't upload “notes.txt” (the file isn't a Bandmate Backup)",
-    );
-  });
-
-  it('names each of several, with why', () => {
-    expect(
-      failedNote([
-        { file: 'notes.txt', reason: "the file isn't a Bandmate Backup" },
-        { file: 'a.bandmate', reason: 'the Backup is damaged' },
-        { file: 'b.bandmate', reason: 'made by a newer Bandmate' },
-      ]),
-    ).toBe(
-      "Couldn't upload “notes.txt” (the file isn't a Bandmate Backup), “a.bandmate” (the Backup is damaged) and “b.bandmate” (made by a newer Bandmate)",
-    );
-  });
-
-  it('says nothing when none failed', () => {
-    expect(failedNote([])).toBeNull();
   });
 });

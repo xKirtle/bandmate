@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BackupUploads } from './backupUploads.svelte';
+import { addedNote, BackupUploads, failedNote } from './backupUploads.svelte';
 import type { UploadOptions } from './progressUpload';
 
 /** A Backup as the server answers an upload with it, standing in for the real one. */
@@ -159,6 +159,18 @@ describe('BackupUploads', () => {
     expect(queue.count).toBeNull();
   });
 
+  it('starts a new run for files added straight after cancelling, before the upload has stopped', async () => {
+    const { queue, sent } = uploads();
+    queue.add([file('a.bandmate')]);
+    await settle();
+    queue.cancel();
+    queue.add([file('b.bandmate')]);
+    await settle();
+    expect(sent.map((s) => s.file)).toEqual(['a.bandmate', 'b.bandmate']);
+    expect(sent[1].options.signal?.aborted).toBe(false);
+    expect(queue.current).toEqual({ file: 'b.bandmate', progress: { step: 'sending', sent: 0 } });
+  });
+
   it('keeps failures through a run, and forgets them when the next starts', async () => {
     const { queue, sent } = uploads();
     queue.add([file('notes.txt'), file('a.bandmate')]);
@@ -180,5 +192,62 @@ describe('BackupUploads', () => {
     expect(sent[0].options.signal?.aborted).toBe(true);
     expect(sent).toHaveLength(1);
     expect(done).toEqual([]);
+  });
+});
+
+describe('addedNote', () => {
+  // 18:30 on 4 Oct 2026, in the time zone the tests run in.
+  const made = new Date(2026, 9, 4, 18, 30).toISOString();
+  const backup = {
+    id: 1,
+    createdAt: made,
+    songs: 3,
+    allSongs: false,
+    beats: 0,
+    beatLibrary: false,
+    size: 8192,
+    name: '',
+  };
+
+  it('names the Backup one upload added, and the file it came from', () => {
+    expect(addedNote([{ backup, file: 'old.bandmate' }])).toBe('Added “4 Oct 2026 · 3 Songs” from “old.bandmate”.');
+  });
+
+  it('counts the Backups several uploads added', () => {
+    expect(
+      addedNote([
+        { backup, file: 'a.bandmate' },
+        { backup, file: 'b.bandmate' },
+        { backup, file: 'c.bandmate' },
+      ]),
+    ).toBe('Added 3 Backups.');
+  });
+
+  it('says nothing when none was added', () => {
+    expect(addedNote([])).toBeNull();
+  });
+});
+
+describe('failedNote', () => {
+  it('names the file that could not be uploaded, with why', () => {
+    expect(failedNote([{ file: 'notes.txt', reason: "the file isn't a Bandmate Backup" }])).toBe(
+      "Couldn't upload “notes.txt” (the file isn't a Bandmate Backup)",
+    );
+  });
+
+  it('names each of several, with why', () => {
+    expect(
+      failedNote([
+        { file: 'notes.txt', reason: "the file isn't a Bandmate Backup" },
+        { file: 'a.bandmate', reason: 'the Backup is damaged' },
+        { file: 'b.bandmate', reason: 'made by a newer Bandmate' },
+      ]),
+    ).toBe(
+      "Couldn't upload “notes.txt” (the file isn't a Bandmate Backup), “a.bandmate” (the Backup is damaged) and “b.bandmate” (made by a newer Bandmate)",
+    );
+  });
+
+  it('says nothing when none failed', () => {
+    expect(failedNote([])).toBeNull();
   });
 });

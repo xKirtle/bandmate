@@ -2,6 +2,8 @@
 // after another, a run's queue taking those added while it goes, saying
 // which is being sent and how far it has got, and naming each that
 // couldn't be uploaded, with why, without stopping the rest.
+import type { Backup } from './api';
+import { backupName } from './backups';
 import type { UploadOptions, UploadProgress } from './progressUpload';
 
 /** Sends one Backup's file, answering with the Backup kept, and failing with why it was refused. */
@@ -78,12 +80,20 @@ export class BackupUploads<B> {
 
   /** Stops the upload under way and drops the rest of the queue. What was added is still told. */
   cancel() {
+    // The run is over now, not once its upload has stopped, so files added
+    // straight after start one of their own.
     this.#queue = [];
     this.#stop?.abort();
+    this.#stop = null;
     this.current = null;
   }
 
-  /** As cancelling, but telling nothing more, as when the page is left. */
+  /** Forgets the failures, once they've been read. */
+  dismissFailures() {
+    this.failures = [];
+  }
+
+  /** As cancelling, but telling nothing more, ever: for when the page is left. */
   stop() {
     this.#quiet = true;
     this.cancel();
@@ -94,7 +104,8 @@ export class BackupUploads<B> {
     this.#stop = stop;
     this.#at = 0;
     const added: Uploaded<B>[] = [];
-    for (let file = this.#queue.shift(); file; file = this.#queue.shift()) {
+    // A cancelled run takes no more files: the queue may already be the next run's.
+    for (let file = this.#queue.shift(); file; file = stop.signal.aborted ? undefined : this.#queue.shift()) {
       const name = file.name;
       this.#at++;
       this.current = { file: name, progress: { step: 'sending', sent: 0 } };
@@ -110,8 +121,30 @@ export class BackupUploads<B> {
         if (!stop.signal.aborted) this.failures.push({ file: name, reason: (e as Error).message });
       }
     }
-    this.current = null;
-    this.#stop = null;
+    if (!stop.signal.aborted) {
+      this.current = null;
+      this.#stop = null;
+    }
     if (!this.#quiet) this.#told.done(added);
   }
+}
+
+/**
+ * What a run of uploads added, if anything: the one Backup by name, with
+ * the file it came from, since it's listed by when it was made, maybe far
+ * down; several by how many.
+ */
+export function addedNote(added: Uploaded<Backup>[]): string | null {
+  if (added.length === 0) return null;
+  if (added.length > 1) return `Added ${added.length} Backups.`;
+  const [{ backup, file }] = added;
+  return `Added “${backupName(backup)}” from “${file}”.`;
+}
+
+/** The files a run of uploads couldn't upload, if any, each with why. */
+export function failedNote(failures: Failure[]): string | null {
+  if (failures.length === 0) return null;
+  const named = failures.map(({ file, reason }) => `“${file}” (${reason})`);
+  const last = named.pop();
+  return `Couldn't upload ${named.length > 0 ? `${named.join(', ')} and ${last}` : last}`;
 }

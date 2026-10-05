@@ -3,17 +3,17 @@
   // named from when it was made and what it holds, or with a name of its
   // own, with its size, and downloadable as one file. A downloaded one, from
   // here or another install, can be uploaded to join them, picked or
-  // dropped, several at once. Songs can be
-  // restored from each that holds some. Each can be renamed, or deleted
-  // after confirming; nothing deletes one otherwise.
+  // dropped, several at once. Songs can be restored from each that holds
+  // some. Each can be renamed, or deleted after confirming; nothing deletes
+  // one otherwise.
   import Pencil from '@lucide/svelte/icons/pencil';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import X from '@lucide/svelte/icons/x';
   import { onDestroy, tick } from 'svelte';
   import ActionsMenu from '../lib/ActionsMenu.svelte';
   import { api, type Backup } from '../lib/api';
-  import { addedNote, automaticName, backupName, backupSize, failedNote } from '../lib/backups';
-  import { BackupUploads } from '../lib/backupUploads.svelte';
+  import { automaticName, backupName, backupSize } from '../lib/backups';
+  import { addedNote, BackupUploads, failedNote } from '../lib/backupUploads.svelte';
   import FileDrop from '../lib/FileDrop.svelte';
   import type { MenuAction } from '../lib/menu';
   import { scrollBehavior } from '../lib/motion';
@@ -184,7 +184,7 @@
   {#if uploads.failures.length > 0}
     <div class="message" role="alert">
       <span class="error">{failedNote(uploads.failures)}</span>
-      {@render dismiss(() => (uploads.failures = []))}
+      {@render dismiss(() => uploads.dismissFailures())}
     </div>
   {/if}
   {#if uploads.current}
