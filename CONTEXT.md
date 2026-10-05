@@ -14,6 +14,10 @@ _Avoid_: Project, track (a Track is something else)
 A named place on the Songs page that keeps some Songs together, like an EP's, so a growing list stays in order. A Song sits in one Folder at most, or in none, and Folders don't hold other Folders. A Folder is only a name: deleting it can leave its Songs in no Folder, or delete them too.
 _Avoid_: Album (a release), Playlist, Collection, Group
 
+**Tag**:
+A name of the user's own (e.g. "Album 2023") that marks Songs with what's relevant, so they can be found by it. A Song can carry any number of Tags, where it sits in one Folder at most, so Tags are how a Song belongs to several groups at once. A Tag is one thing shared by every Song carrying it, its name unique ignoring case, and it lasts only while some Song carries it. Only Songs carry Tags. It isn't a Section's Label.
+_Avoid_: Label (a Label names a Section), category, keyword
+
 **Cover**:
 A Song's picture, like a release's cover art: at most one per Song, shown wherever the Song is as a square the user chooses from the picture. It belongs to the Song, not to any Master.
 _Avoid_: Artwork, image, album art, thumbnail
@@ -41,7 +45,7 @@ _Avoid_: Block, part, stanza, Occurrence
 
 **Label**:
 The free-text name of a Section (e.g. "Chorus", "Verse 2", "Hook"); common labels are suggested but never enforced.
-_Avoid_: Tag, section type
+_Avoid_: Tag (a Tag marks a Song), section type
 
 **Arrangement**:
 The ordered list of Sections that makes up a Song's Lyric Sheet.
@@ -213,9 +217,9 @@ One of the sets of colours the user picks from in Settings (Terracotta, Ink or O
 _Avoid_: Theme (light or dark is the theme), skin, colour scheme
 
 **Backup**:
-A copy of chosen Songs and Beats, kept in Bandmate to restore from, and downloadable as one file to keep elsewhere or move to another install. A Song's copy holds everything that belongs to the Song, from its Lyric Sheet and Snapshots to its Timeline, Cover and Masters, along with the Folder it sits in and the Beats its Clips use, so those Beats can't be left out while it's chosen; one holding every Beat holds the Beat Library. Nothing kept on each device goes in it. A Backup made by an older Bandmate can be restored by a newer one, never the other way round.
+A copy of chosen Songs and Beats, kept in Bandmate to restore from, and downloadable as one file to keep elsewhere or move to another install. A Song's copy holds everything that belongs to the Song, from its Lyric Sheet and Snapshots to its Timeline, Cover and Masters, along with the Folder it sits in, its Tags, and the Beats its Clips use, so those Beats can't be left out while it's chosen; one holding every Beat holds the Beat Library. Nothing kept on each device goes in it. A Backup made by an older Bandmate can be restored by a newer one, never the other way round.
 _Avoid_: Export, archive, Snapshot (a Snapshot is a copy of one Song's Lyric Sheet)
 
 **Restore**:
-Bringing back Songs and Beats picked from a Backup. A Song brings the Beats its Clips use, so those Beats can't be left out while it's picked. Where a Song or Beat is already in Bandmate (the same one, even from another install, never just one with the same name or, for a Beat, the same audio), the user chooses to replace it or keep both, the restored one added alongside. A restored Song goes into the Folder of the same name, made if there's none. A Restore only adds and replaces: it never deletes what the Backup doesn't hold.
+Bringing back Songs and Beats picked from a Backup. A Song brings the Beats its Clips use, so those Beats can't be left out while it's picked. Where a Song or Beat is already in Bandmate (the same one, even from another install, never just one with the same name or, for a Beat, the same audio), the user chooses to replace it or keep both, the restored one added alongside. A restored Song goes into the Folder of the same name, made if there's none, and carries the Tags of the same names, made if there are none, in place of any it had. A Restore only adds and replaces: it never deletes what the Backup doesn't hold.
 _Avoid_: Import (importing is pasting lyrics into a Song)
