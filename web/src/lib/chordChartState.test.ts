@@ -13,43 +13,49 @@ function storage(values: Record<string, string> = {}, blocked = false): Storage 
   } as Storage;
 }
 
+const shown = { shown: true, pinned: false };
+
 describe('readChordChartState', () => {
-  it('is shown until set otherwise on this device', () => {
-    expect(readChordChartState(storage())).toBe('shown');
+  it('is shown, unpinned, until set otherwise on this device', () => {
+    expect(readChordChartState(storage())).toEqual(shown);
   });
 
-  it('is shown without storage, or when it is blocked', () => {
-    expect(readChordChartState(undefined)).toBe('shown');
-    expect(readChordChartState(storage({}, true))).toBe('shown');
+  it('is shown, unpinned, without storage, or when it is blocked', () => {
+    expect(readChordChartState(undefined)).toEqual(shown);
+    expect(readChordChartState(storage({}, true))).toEqual(shown);
   });
 
-  it('is hidden or pinned once set so', () => {
-    expect(readChordChartState(storage({ [chordChartStateKey]: 'hidden' }))).toBe('hidden');
-    expect(readChordChartState(storage({ [chordChartStateKey]: 'pinned' }))).toBe('pinned');
+  it('reads what the old hidden / shown / pinned choice kept as it was', () => {
+    expect(readChordChartState(storage({ [chordChartStateKey]: 'hidden' }))).toEqual({ shown: false, pinned: false });
+    expect(readChordChartState(storage({ [chordChartStateKey]: 'pinned' }))).toEqual({ shown: true, pinned: true });
   });
 
-  it('is shown when what is kept is not a state', () => {
-    expect(readChordChartState(storage({ [chordChartStateKey]: 'sideways' }))).toBe('shown');
+  it('is shown, unpinned, when what is kept is not a state', () => {
+    expect(readChordChartState(storage({ [chordChartStateKey]: 'sideways' }))).toEqual(shown);
   });
 });
 
 describe('storeChordChartState', () => {
-  it('keeps hiding and pinning', () => {
+  it('keeps hiding and pinning apart', () => {
     const s = storage();
-    storeChordChartState(s, 'hidden');
-    expect(readChordChartState(s)).toBe('hidden');
-    storeChordChartState(s, 'pinned');
-    expect(readChordChartState(s)).toBe('pinned');
+    for (const state of [
+      { shown: false, pinned: false },
+      { shown: true, pinned: true },
+      { shown: false, pinned: true },
+    ]) {
+      storeChordChartState(s, state);
+      expect(readChordChartState(s)).toEqual(state);
+    }
   });
 
-  it('forgets the choice once shown again', () => {
-    const values = { [chordChartStateKey]: 'pinned' };
-    storeChordChartState(storage(values), 'shown');
+  it('forgets the choice once shown and unpinned again', () => {
+    const values = { [chordChartStateKey]: 'hidden-pinned' };
+    storeChordChartState(storage(values), shown);
     expect(values).toEqual({});
   });
 
   it('does nothing without storage, or when it is blocked', () => {
-    expect(() => storeChordChartState(undefined, 'hidden')).not.toThrow();
-    expect(() => storeChordChartState(storage({}, true), 'hidden')).not.toThrow();
+    expect(() => storeChordChartState(undefined, { shown: false, pinned: false })).not.toThrow();
+    expect(() => storeChordChartState(storage({}, true), { shown: false, pinned: false })).not.toThrow();
   });
 });
