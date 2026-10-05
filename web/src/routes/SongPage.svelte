@@ -668,7 +668,7 @@
 
 <style>
   /* The title and its heading wrap alike and are as tall as each other,
-     one line being 3rem, so switching mode doesn't shift the page. */
+     one line being --title-line, so switching mode doesn't shift the page. */
   .title {
     --title-line: 3rem;
     display: block;

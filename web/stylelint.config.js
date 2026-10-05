@@ -47,14 +47,15 @@ const type = {
 // safe-area insets, or on the Timeline a step of the same scale in its own
 // unit. calc() may relate them to a size, e.g. centring text in a control.
 // No literal length, but for a hairline (1px or less) that squares something
-// with a border, and `1lh`, a line of text's own height.
+// with a border, and `1lh`, a line of text's own height. Positioning (inset,
+// top…), scroll margins and focus-ring offsets aren't spacing.
 // The steps are the --space-* sizes in app.css, in rem: keep them in step.
 const spaceSteps = '(0\\.25|0\\.5|0\\.75|1|1\\.5|2)';
 const spacing = {
   '/^(gap|row-gap|column-gap|padding|margin)(-.+)?$/': [
-    '/(?<![\\w.-])-?(?!(0\\.5|1)px\\b|1lh\\b)(\\d*\\.)?\\d+[a-z%]+/',
-    `/(?<![\\w.])(?!-?${spaceSteps} )-?(\\d*\\.)?\\d+ \\* var\\(--timeline-rem\\)/`,
-    // A step scaled into a value off the scale; negating it is fine.
+    '/(?<![\\w.-])-?(?!(0\\.5|1)px\\b|1lh\\b)(\\d*\\.)?\\d+[a-z%]+/i',
+    `/(?<![\\w.])(?!-?${spaceSteps} )-?(\\d*\\.)?\\d+ \\* var\\(--timeline-rem\\)|var\\(--timeline-rem\\) *[*/]/`,
+    // A step is never scaled, only negated.
     '/(?<!\\(-1 )\\* var\\(--space-|var\\(--space-\\d+\\) *[*/]/',
   ],
 };

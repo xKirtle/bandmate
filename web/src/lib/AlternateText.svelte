@@ -272,7 +272,7 @@
      context keeps the text box's and rows' z-index inside it, so they never
      draw over the sticky header or Timeline. */
   .field.cued {
-    --inset-block: calc(0.5rem + 1px);
+    --inset-block: calc(var(--space-2) + 1px);
     isolation: isolate;
     display: grid;
     grid-template-columns: minmax(0, 1fr);

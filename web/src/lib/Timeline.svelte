@@ -3697,6 +3697,7 @@
   .ruler-gap {
     display: flex;
     align-items: center;
+    /* Its spacing and the buttons' are kept small, so both fit side by side. */
     gap: calc(0.25 * var(--timeline-rem));
     height: calc(2.25 * var(--timeline-rem));
   }
@@ -4393,19 +4394,19 @@
   }
   /* What a moved or trimmed Clip, or the Loop being set, is snapped to, through the lanes aligned there, and up through the ruler for a Loop edge or the Loop. */
   .snap-guide {
-    position: absolute;
     --line-width: round(calc(0.125 * var(--timeline-rem)), 1px);
+    position: absolute;
     width: var(--line-width);
     margin-left: round(calc(var(--line-width) / -2), 1px);
     background: var(--accent);
     pointer-events: none;
   }
   .playhead {
+    /* In whole pixels, so it stays sharp. */
+    --line-width: round(calc(0.125 * var(--timeline-rem)), 1px);
     position: absolute;
     top: 0;
     bottom: 0;
-    /* In whole pixels, so it stays sharp. */
-    --line-width: round(calc(0.125 * var(--timeline-rem)), 1px);
     width: var(--line-width);
     margin-left: round(calc(var(--line-width) / -2), 1px);
     background: var(--text);
