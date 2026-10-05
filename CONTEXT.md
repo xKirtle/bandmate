@@ -87,7 +87,7 @@ One way to play a Chord on an Instrument: which strings and frets on a guitar, w
 _Avoid_: Shape, fingering, chord diagram (a diagram draws a Voicing)
 
 **Chord Chart**:
-How to play the Chords a Song shows, in Read mode: a diagram of a Voicing for each Chord in the Arrangement's active Alternates, as written or transposed, in the order they first appear, drawn for the Song's tuning. The user can hide it, show it, or pin it so it stays at the top as the Lyric Sheet scrolls; that choice is kept on each device, not on the Song, and holds for every Song. Hiding the Chords hides it too, whatever that choice. A Chord whose name or tuning can't be read gets no diagram rather than a guess.
+How to play the Chords a Song shows, in Read mode: a diagram of a Voicing for each Chord in the Arrangement's active Alternates, as written or transposed, in the order they first appear, drawn for the Song's tuning. The user can hide or show it, and separately pin it so it stays at the top as the Lyric Sheet scrolls; a pinned Chart that's hidden comes back pinned when shown. Both choices are kept on each device, not on the Song, and hold for every Song. Hiding the Chords hides it too, whatever those choices. A Chord whose name or tuning can't be read gets no diagram rather than a guess.
 _Avoid_: Chord strip, chord diagrams, chords used
 
 **Instrument**:

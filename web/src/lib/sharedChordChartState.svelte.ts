@@ -7,13 +7,18 @@ import { deviceStorage } from './timelineHeight';
 let state = $state(readChordChartState(deviceStorage()));
 
 export const chordChartState = {
-  /** Whether the Chord Chart is hidden, shown or pinned on this device. */
+  /** Whether the Chord Chart is shown, and whether it's pinned, on this device. */
   get current(): ChordChartState {
     return state;
   },
-  /** Hides, shows or pins the Chord Chart on this device. */
-  set(value: ChordChartState) {
-    state = value;
-    storeChordChartState(deviceStorage(), value);
+  /** Shows or hides the Chord Chart on this device, keeping whether it's pinned. */
+  setShown(shown: boolean) {
+    state = { ...state, shown };
+    storeChordChartState(deviceStorage(), state);
+  },
+  /** Pins or unpins the Chord Chart on this device. */
+  setPinned(pinned: boolean) {
+    state = { ...state, pinned };
+    storeChordChartState(deviceStorage(), state);
   },
 };

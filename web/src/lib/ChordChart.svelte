@@ -5,15 +5,13 @@
   // the top-ranked one, as the Chord Finder would. A Chord that can't be read,
   // or has no Voicing, keeps its place as its name over an empty frame; a
   // tuning that can't be read gets no diagrams at all, rather than a guess.
-  // A control at its start hides it, shows it, or pins it to the top of the
+  // Two buttons at its start hide or show it, and pin it to the top of the
   // window, for every Song on this device. Clicking a diagram opens the
   // Chord's popover.
   import type { Song } from './api';
   import ChordDiagram from './ChordDiagram.svelte';
   import type { ChordOpener } from './ChordPopover.svelte';
-  import Picker from './Picker.svelte';
   import { chartChords, chartTuning, chartVoicing } from './chordChart';
-  import { chordChartStates, type ChordChartState } from './chordChartState';
   import { chordChartState } from './sharedChordChartState.svelte';
   import { preferredVoicings } from './sharedPreferredVoicings.svelte';
 
@@ -39,8 +37,8 @@
     });
   });
 
-  const chartState = $derived(chordChartState.current);
-  const stateText: Record<ChordChartState, string> = { hidden: 'Hidden', shown: 'Shown', pinned: 'Pinned' };
+  const shown = $derived(chordChartState.current.shown);
+  const pinned = $derived(chordChartState.current.pinned);
 
   // Pinned, the Chart covers the top of the window, so following playback
   // scrolls a Section or Line into view below it rather than under it.
@@ -49,7 +47,7 @@
   // padding is the whole Chart's, border and all.
   let height = $state(0);
   $effect(() => {
-    if (chartState !== 'pinned' || !chart || height === 0) return;
+    if (!shown || !pinned || !chart || height === 0) return;
     const page = document.documentElement;
     page.style.scrollPaddingTop = `${chart.offsetHeight}px`;
     return () => page.style.removeProperty('scroll-padding-top');
@@ -57,33 +55,49 @@
 </script>
 
 {#if names.length > 0}
-  <section class={['chart', chartState]} aria-label="Chord Chart" bind:this={chart} bind:clientHeight={height}>
-    <Picker
-      id="chord-chart-state"
-      class="state"
-      options={chordChartStates}
-      value={chartState}
-      text={(s) => stateText[s]}
-      onpick={chordChartState.set}
-      aria-label="Chord Chart: {stateText[chartState]}"
-      title="Hide, show or pin the Chord Chart"
-    >
-      {#snippet trigger(s)}
-        <span class="state-button">
-          {#if s === 'pinned'}
-            <!-- A pushpin. -->
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M9 3h6M10 3v6l-3 4h10l-3-4V3M12 13v8" />
-            </svg>
-          {:else}
-            <span class="chevron" aria-hidden="true">{s === 'hidden' ? '▸' : '▾'}</span>
-          {/if}
-          {#if s === 'hidden'}<span>Chord Chart</span>{/if}
-        </span>
-      {/snippet}
-    </Picker>
+  <section
+    class={['chart', { pinned: shown && pinned }]}
+    aria-label="Chord Chart"
+    bind:this={chart}
+    bind:clientHeight={height}
+  >
+    <div class="controls">
+      <button
+        type="button"
+        class="control"
+        aria-pressed={shown}
+        onclick={() => chordChartState.setShown(!shown)}
+        aria-label="Show the Chord Chart"
+        title={shown ? 'Hide the Chord Chart' : 'Show the Chord Chart'}
+      >
+        <!-- An eye, crossed out while the Chart is hidden. -->
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+          <circle cx="12" cy="12" r="3" />
+          {#if !shown}<path d="M3 3l18 18" />{/if}
+        </svg>
+        {#if !shown}<span>Chord Chart</span>{/if}
+      </button>
+      <!-- Hidden, the pin goes too, keeping whether it's pinned for when it's shown. -->
+      {#if shown}
+        <button
+          type="button"
+          class="control"
+          aria-pressed={pinned}
+          onclick={() => chordChartState.setPinned(!pinned)}
+          aria-label="Pin the Chord Chart to the top"
+          title={pinned ? 'Unpin the Chord Chart' : 'Pin the Chord Chart to the top'}
+        >
+          <!-- A pushpin, filled while pinned. -->
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path class="head" d="M10 3v6l-3 4h10l-3-4V3z" />
+            <path d="M9 3h6M12 13v8" />
+          </svg>
+        </button>
+      {/if}
+    </div>
     <!-- Hidden, the Chart collapses to its control, which brings it back. -->
-    {#if chartState !== 'hidden'}
+    {#if shown}
       {#if !tuning}
         <p class="muted note">
           The Song's tuning, “{song.tuning.trim()}”, can't be read, so the Chord Chart has no diagrams.
@@ -137,10 +151,14 @@
     border-bottom: 1px solid var(--border);
     background: var(--bg);
   }
-  .chart > :global(.state) {
+  /* The eye above the pin, so together they're no wider than one. */
+  .controls {
     flex: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
   }
-  .state-button {
+  .control {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -153,13 +171,19 @@
     border-radius: 0.5rem;
     background: var(--surface-1);
     color: var(--text-muted);
+    font: inherit;
     font-size: 0.875rem;
     font-weight: 600;
+    cursor: pointer;
   }
-  .state-button:hover {
+  .control:hover {
     color: var(--text);
   }
-  .state-button svg {
+  .control[aria-pressed='true'] {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .control svg {
     width: 1.125rem;
     height: 1.125rem;
     fill: none;
@@ -167,6 +191,9 @@
     stroke-width: 2;
     stroke-linecap: round;
     stroke-linejoin: round;
+  }
+  .control[aria-pressed='true'] .head {
+    fill: currentColor;
   }
   .note {
     flex: 1;
