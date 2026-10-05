@@ -10,7 +10,9 @@ import {
   defaultSongListView,
   filterBeats,
   isBeatListFiltered,
+  isSongListFiltered,
   loadSongList,
+  songListFilter,
   songBeatHint,
   sortBeats,
   sortFolders,
@@ -196,6 +198,43 @@ describe('loadSongList', () => {
     const { asked, list } = server([song('Night Drive', { folderId: 3 })]);
     expect(await loadSongList({ folder: 'none' }, list)).toEqual({ songs: [], anySongs: true });
     expect(asked).toEqual([{ folder: 'none' }, {}]);
+  });
+});
+
+describe('songListFilter', () => {
+  const view = (fields: Partial<SongListView> = {}): SongListView => ({ ...defaultSongListView, ...fields });
+
+  it('at the top level, unfiltered, asks for the Songs in no Folder', () => {
+    expect(songListFilter(view())).toEqual({ folder: 'none' });
+    expect(songListFilter(view({ q: '   ' }))).toEqual({ folder: 'none' });
+  });
+
+  it('at the top level, a search or any filter asks for every Song, whatever its Folder', () => {
+    expect(songListFilter(view({ q: 'night' }))).toEqual({ q: 'night' });
+    expect(songListFilter(view({ status: 'drafting' }))).toEqual({ status: 'drafting' });
+    expect(songListFilter(view({ hasMaster: true }))).toEqual({ hasMaster: true });
+  });
+
+  it('inside a Folder, asks only for its Songs, filtered or not', () => {
+    expect(songListFilter(view(), 3)).toEqual({ folder: 3 });
+    expect(songListFilter(view({ q: 'night', status: 'idea', hasMaster: true }), 3)).toEqual({
+      q: 'night',
+      status: 'idea',
+      hasMaster: true,
+      folder: 3,
+    });
+  });
+});
+
+describe('isSongListFiltered', () => {
+  it('is on for a search or any filter, not for a sort or a blank search', () => {
+    expect(isSongListFiltered(defaultSongListView)).toBe(false);
+    expect(isSongListFiltered({ ...defaultSongListView, q: '  ', sort: { column: 'title', direction: 'asc' } })).toBe(
+      false,
+    );
+    expect(isSongListFiltered({ ...defaultSongListView, q: 'night' })).toBe(true);
+    expect(isSongListFiltered({ ...defaultSongListView, status: 'finished' })).toBe(true);
+    expect(isSongListFiltered({ ...defaultSongListView, hasMaster: true })).toBe(true);
   });
 });
 
