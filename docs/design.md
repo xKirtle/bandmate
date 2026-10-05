@@ -171,8 +171,8 @@ One icon, one meaning, across the app. Every icon in use is here: a new one is a
 | `volume-2`, `volume-1`, `volume-x`             | A player's volume: loud, quiet, muted                                                                                                                                                       |
 | `triangle-alert`                               | A warning, e.g. a Cue out of order                                                                                                                                                          |
 | `corner-down-left`                             | The Enter key, beside Sync mode's Now                                                                                                                                                       |
-| `music`, `disc-3`, `guitar`, `archive`         | The navigation: Songs, Beats, the Chord Finder, Backups                                                                                                                                     |
-| `settings`, `info`                             | The navigation, pinned apart: Settings, About                                                                                                                                               |
+| `music`, `disc-3`, `guitar`                    | The navigation: Songs, Beats, the Chord Finder                                                                                                                                              |
+| `settings`                                     | The navigation, pinned apart: Settings                                                                                                                                                      |
 
 ### The Timeline's own scale
 

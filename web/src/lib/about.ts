@@ -1,6 +1,6 @@
-// What the About page works out in the browser: how long the server has been
-// up, the block Copy details puts on the clipboard, and how the server's
-// releases check reads under the version.
+// What About, in Settings, works out in the browser: how long the server
+// has been up, the block Copy details puts on the clipboard, and how the
+// server's releases check reads under the version.
 
 import type { ReleasesReport } from './api';
 

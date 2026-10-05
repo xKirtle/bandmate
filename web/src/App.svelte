@@ -14,12 +14,12 @@
 
   const songMatch = $derived(router.path.match(/^\/songs\/(\d+)$/));
   const settingsTab = $derived(settingsTabAt(router.path));
+  const moved = $derived(movedTo(router.path));
 
   // An address that moved, such as /about to its Settings tab, opens where
   // it went, in place of itself in the history.
   $effect.pre(() => {
-    const to = movedTo(router.path);
-    if (to) navigate(to + router.search + location.hash, { replace: true });
+    if (moved) navigate(moved + router.search + location.hash, { replace: true });
   });
 </script>
 
@@ -39,7 +39,7 @@
       <Backups />
     {:else if settingsTab === 'about'}
       <About />
-    {:else if movedTo(router.path)}
+    {:else if moved}
       <!-- On its way to where it moved. -->
     {:else if router.path === '/songs/import'}
       <ImportSong />

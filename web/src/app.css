@@ -175,7 +175,7 @@ body {
 }
 
 /* At least as tall as a control, so a title with no controls beside it,
-   e.g. About's, sits where the other pages' titles do. */
+   e.g. the Chord Finder's, sits where the other pages' titles do. */
 .bar h1 {
   display: flex;
   align-items: center;
