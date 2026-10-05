@@ -100,3 +100,15 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 - Songs carry tags of the user's own (e.g. "Album 2023"), to mark them with what's relevant and find them by it. A Song can have any number of tags, where it sits in only one folder, so tags are how a Song belongs to several groups at once.
 - They aren't a Section's Label, which names a block of Lines within a Song.
 - Whether a tag is free text or picked from tags already used, whether the Songs page filters by them, and whether tags have colours, are for the spec.
+
+## The Left-handed toggle on a phone
+
+- At phone width, the Chord Finder's Left-handed toggle doesn't fit beside its tabs and drops onto a line of its own, which looks like an afterthought. It wants a place that feels deliberate on a phone, without losing the one-tap toggle on desktop.
+- It's a different thing from listing left-handed Chord diagrams in Settings (see Every device setting in Settings), though moving it there is one way out.
+- Where it goes instead (beside the tuning, in an overflow menu, as an icon, or only in Settings on a phone), and whether the tabs themselves change at that width, are for the spec.
+
+## A shorter name for the Chord Finder's tab
+
+- The navigation names the Chord Finder's tab "Chords", one word like Songs, Beats, Backups and Info, where today "Chord Finder" is the only label that wraps onto two lines. Its address is already /chords.
+- Only the tab's label changes: the page and the glossary keep calling it the Chord Finder, since it holds nothing of the user's and "Chords" alone could read like a list of them.
+- Whether the page heading follows the tab, and whether MainNav still needs its fallback for a label too long for its tab, are for the spec.
