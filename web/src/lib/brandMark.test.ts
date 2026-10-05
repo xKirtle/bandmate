@@ -42,6 +42,21 @@ describe('brand marks', () => {
     expect(pngSize(read('public/apple-touch-icon.png'))).toEqual([180, 180]);
   });
 
+  it("draws the repo's social preview card from the same mark, in Terracotta", () => {
+    const palettes = read('src/palettes.css').toString();
+    const token = (name: string) => palettes.match(new RegExp(`--${name}: (#[0-9a-f]{6});`))?.[1];
+    const card = read('../docs/brand/social-preview.svg').toString();
+    expect(card).toContain(`d="${markPath}"`);
+    expect(card).toContain(`fill="${token('accent')}"`);
+    expect(card).toContain(`fill="${token('accent-text')}"`);
+  });
+
+  it('renders the social preview card at the 1280×640 GitHub asks for, under 1 MB', () => {
+    const png = read('../docs/brand/social-preview.png');
+    expect(pngSize(png)).toEqual([1280, 640]);
+    expect(png.length).toBeLessThan(1024 * 1024);
+  });
+
   it('packs the favicon.ico with 16 and 32px images', () => {
     const ico = read('public/favicon.ico');
     expect(ico.readUInt16LE(2)).toBe(1); // an icon, not a cursor
