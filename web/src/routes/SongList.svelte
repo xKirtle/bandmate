@@ -54,14 +54,15 @@
 
   const sorted = $derived(songs && sortSongs(songs, view.sort));
   const filtered = $derived(isSongListFiltered(view));
-  // At the top level, a search or filter looks at every Song, whatever Folder
-  // it's in, so the Folders give way to one list of Songs, each showing its
-  // Folder.
-  const acrossFolders = $derived(folderId === undefined && filtered);
+  // Whether the Songs shown are every Song, whatever Folder it's in, as at the
+  // top level while a search or filter is on: then the Folders give way to
+  // one list of Songs, each showing its Folder. Taken from the list as last
+  // loaded, not the filters as typed, so the two never show out of step.
+  let acrossFolders = $state(false);
   // Every Folder by name, for the menus; at the top level they come first,
-  // whatever the Songs are sorted by, but for while a search or filter is on.
+  // whatever the Songs are sorted by, but for while the list is every Song.
   const sortedFolders = $derived(folders ? sortFolders(folders) : []);
-  const listedFolders = $derived(folderId === undefined && !filtered ? sortedFolders : []);
+  const listedFolders = $derived(folderId === undefined && !acrossFolders ? sortedFolders : []);
   const folderNames = $derived(new Map(folders?.map((f) => [f.id, f.name])));
   const folder = $derived(folderId === undefined ? undefined : folders?.find((f) => f.id === folderId));
   const folderMissing = $derived(folderId !== undefined && folders !== null && !folder);
@@ -114,6 +115,7 @@
           ([result, allFolders]) => {
             if (!current) return;
             songs = result.songs;
+            acrossFolders = filter.folder === undefined;
             anySongs = result.anySongs;
             folders = allFolders;
             if (!anySongs && (view.status || view.hasMaster || view.q)) clearFilters();
@@ -398,6 +400,7 @@
             </tr>
           {/each}
           {#each sorted as song (song.id)}
+            {@const folderName = song.folderId === null ? undefined : folderNames.get(song.folderId)}
             <tr onclick={(event) => openRow(event, `/songs/${song.id}`)}>
               <td class="title">
                 <span class="with-cover">
@@ -406,7 +409,6 @@
                 </span>
               </td>
               {#if acrossFolders}
-                {@const folderName = song.folderId === null ? undefined : folderNames.get(song.folderId)}
                 <td class="folder-name" title={folderName}>{folderName ?? '—'}</td>
               {/if}
               <td><StatusBadge status={song.status} /></td>
@@ -435,15 +437,16 @@
           </li>
         {/each}
         {#each sorted as song (song.id)}
+          {@const folderName = song.folderId === null ? undefined : folderNames.get(song.folderId)}
           <li>
             <a href="/songs/{song.id}">
               <SongCover songId={song.id} coverId={song.coverId} title={song.title} status={song.status} />
               <span class="heading">
                 <span class="title">{song.title}</span>
-                {#if acrossFolders && song.folderId !== null}
+                {#if acrossFolders && folderName !== undefined}
                   <span class="in-folder"
                     ><FolderIcon /><span class="visually-hidden">In</span>
-                    {folderNames.get(song.folderId)}</span
+                    {folderName}</span
                   >
                 {/if}
               </span>
