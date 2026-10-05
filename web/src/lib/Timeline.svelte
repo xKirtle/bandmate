@@ -3697,13 +3697,13 @@
   .ruler-gap {
     display: flex;
     align-items: center;
-    gap: calc(0.5 * var(--timeline-rem));
+    gap: calc(0.25 * var(--timeline-rem));
     height: calc(2.25 * var(--timeline-rem));
   }
   /* Small enough for the corner, both side by side; the corner can't grow without moving the lanes. */
   .add {
     min-height: calc(1.75 * var(--timeline-rem));
-    padding: 0 calc(0.75 * var(--timeline-rem));
+    padding: 0 calc(0.5 * var(--timeline-rem));
     font-size: calc(0.875 * var(--timeline-rem));
   }
   .head {
