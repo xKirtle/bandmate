@@ -1,5 +1,7 @@
 <script lang="ts">
+  import type { Attachment } from 'svelte/attachments';
   import type { Section, Song } from './api';
+  import type { ChordOpener } from './ChordPopover.svelte';
   import { layoutLine } from './chords';
   import type { Position } from './cues';
   import { follower, lineKey, sectionKey } from './follow';
@@ -11,6 +13,7 @@
     transpose = 0,
     current = null,
     play,
+    chords,
   }: {
     song: Song;
     showChords: boolean;
@@ -20,6 +23,8 @@
     current?: Position | null;
     /** Given, clicking a cued Line plays from its Cue. */
     play?: (cue: number) => void;
+    /** Given, hovering a Chord, or tapping it on a touch screen, opens its diagram. */
+    chords?: ChordOpener;
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
@@ -49,6 +54,38 @@
   /** What clicking a Line does: play from its Cue. Null for nothing. */
   function clickLine(cue: number | null): (() => void) | null {
     return cue !== null && play ? () => play(cue) : null;
+  }
+
+  /**
+   * Opens a Chord's diagram as a pointer hovers it, or as it's tapped on a
+   * touch screen, where the tap doesn't also play the Line. Clicked with a
+   * mouse, it plays from the Line's Cue as the rest of the Line does.
+   */
+  function opens(name: string): Attachment<HTMLElement> {
+    return (el) => {
+      if (!chords || !name) return;
+      const opener = chords;
+      const line = () => el.closest<HTMLElement>('.line-box');
+      let touch = false;
+      const enter = (e: PointerEvent) => e.pointerType !== 'touch' && opener.hover(name, el, line());
+      const leave = (e: PointerEvent) => e.pointerType !== 'touch' && opener.leave();
+      const down = (e: PointerEvent) => (touch = e.pointerType === 'touch');
+      const click = (e: MouseEvent) => {
+        if (!touch) return;
+        e.stopPropagation();
+        opener.press(name, el, line());
+      };
+      el.addEventListener('pointerenter', enter);
+      el.addEventListener('pointerleave', leave);
+      el.addEventListener('pointerdown', down);
+      el.addEventListener('click', click);
+      return () => {
+        el.removeEventListener('pointerenter', enter);
+        el.removeEventListener('pointerleave', leave);
+        el.removeEventListener('pointerdown', down);
+        el.removeEventListener('click', click);
+      };
+    };
   }
 
   /** Does what clicking a Line does, unless the click was to select its text. */
@@ -104,7 +141,7 @@
                     <span class="word">
                       {#each word as piece, p (p)}
                         <span class="piece">
-                          <span class="chord">{piece.chord}</span>
+                          <span class="chord" {@attach opens(piece.chord)}>{piece.chord}</span>
                           <span class="lyric">{piece.text || ' '}</span>
                         </span>
                       {/each}

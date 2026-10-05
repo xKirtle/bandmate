@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Alternate, Line, Section, Song } from './api';
-import { chartChords, chartTuning } from './chordChart';
+import { chartChords, chartTuning, chartVoicing } from './chordChart';
 
 let nextId = 1;
 
@@ -83,5 +83,28 @@ describe("reading the Song's tuning for the Chord Chart", () => {
   it("reads a tuning that can't be read as none, never as Standard", () => {
     expect(chartTuning('my weird tuning')).toBeNull();
     expect(chartTuning('E A D G B')).toBeNull();
+  });
+});
+
+describe('the Voicing the Chord Chart draws for a Chord', () => {
+  const standard = [40, 45, 50, 55, 59, 64];
+
+  it('draws the top-ranked Voicing for the tuning', () => {
+    const drawn = chartVoicing('C', standard);
+    expect(drawn.kind === 'voicing' && drawn.voicing.frets).toEqual([null, 3, 2, 0, 1, 0]);
+  });
+
+  it('draws the preferred Voicing, read by its tidied name', () => {
+    const preferred = { Cmaj7: [null, 3, 5, 4, 5, 3] };
+    const drawn = chartVoicing('CMaj7', standard, preferred);
+    expect(drawn.kind === 'voicing' && drawn.voicing.frets).toEqual([null, 3, 5, 4, 5, 3]);
+  });
+
+  it("says a Chord can't be read rather than drawing one", () => {
+    expect(chartVoicing('Galt', standard)).toEqual({ kind: 'unreadable-chord' });
+  });
+
+  it("says the tuning can't be read rather than drawing for Standard", () => {
+    expect(chartVoicing('C', null)).toEqual({ kind: 'unreadable-tuning' });
   });
 });

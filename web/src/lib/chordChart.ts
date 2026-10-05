@@ -3,7 +3,7 @@
 // the Chord Finder (ADR 0012), drawn as its diagrams are.
 
 import type { Song } from './api';
-import { chordName, readTuning, standard } from './chordFinder';
+import { chordName, lookUp, readTuning, standard, type FinderContext, type Voicing } from './chordFinder';
 import { activeAlternate, sectionsInArrangement } from './sections';
 import { transposeChord } from './transpose';
 
@@ -35,4 +35,28 @@ export function chartChords(song: Song, transpose = 0): string[] {
  */
 export function chartTuning(text: string): readonly number[] | null {
   return text.trim() === '' ? standard : readTuning(text);
+}
+
+/**
+ * What the Chord Chart, or a Chord's popover, draws for a Chord as shown: the
+ * preferred Voicing of it in the tuning, else the top-ranked one, as the Chord
+ * Finder would. Or why it draws none: the Chord can't be read, it has no
+ * Voicing in the tuning, or the tuning can't be read (null, from chartTuning).
+ */
+export type ChartVoicing =
+  | { kind: 'voicing'; voicing: Voicing }
+  | { kind: 'unreadable-chord' }
+  | { kind: 'no-voicing' }
+  | { kind: 'unreadable-tuning' };
+
+export function chartVoicing(
+  name: string,
+  tuning: readonly number[] | null,
+  preferred?: FinderContext['preferred'],
+): ChartVoicing {
+  if (!tuning) return { kind: 'unreadable-tuning' };
+  const found = lookUp(name, { tuning, preferred });
+  if (found.kind !== 'chord') return { kind: 'unreadable-chord' };
+  const voicing = found.voicings[0];
+  return voicing ? { kind: 'voicing', voicing } : { kind: 'no-voicing' };
 }

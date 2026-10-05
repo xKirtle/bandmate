@@ -6,26 +6,36 @@
   // or has no Voicing, keeps its place as its name over an empty frame; a
   // tuning that can't be read gets no diagrams at all, rather than a guess.
   // A control at its start hides it, shows it, or pins it to the top of the
-  // window, for every Song on this device.
+  // window, for every Song on this device. Clicking a diagram opens the
+  // Chord's popover.
   import type { Song } from './api';
   import ChordDiagram from './ChordDiagram.svelte';
+  import type { ChordOpener } from './ChordPopover.svelte';
   import Picker from './Picker.svelte';
-  import { chartChords, chartTuning } from './chordChart';
+  import { chartChords, chartTuning, chartVoicing } from './chordChart';
   import { chordChartStates, type ChordChartState } from './chordChartState';
-  import { lookUp } from './chordFinder';
   import { chordChartState } from './sharedChordChartState.svelte';
   import { preferredVoicings } from './sharedPreferredVoicings.svelte';
 
-  let { song, transpose = 0 }: { song: Song; transpose?: number } = $props();
+  let {
+    song,
+    transpose = 0,
+    chords: opener,
+  }: {
+    song: Song;
+    transpose?: number;
+    /** Given, clicking a diagram opens its Chord's popover. */
+    chords?: ChordOpener;
+  } = $props();
 
   const names = $derived(chartChords(song, transpose));
   const tuning = $derived(chartTuning(song.tuning));
   const chords = $derived.by(() => {
     if (!tuning) return [];
-    const context = { tuning, preferred: preferredVoicings.of(tuning) };
+    const preferred = preferredVoicings.of(tuning);
     return names.map((name) => {
-      const found = lookUp(name, context);
-      return { name, voicing: found.kind === 'chord' ? (found.voicings[0] ?? null) : null };
+      const drawn = chartVoicing(name, tuning, preferred);
+      return { name, voicing: drawn.kind === 'voicing' ? drawn.voicing : null };
     });
   });
 
@@ -82,17 +92,26 @@
         <ul class="row">
           {#each chords as chord (chord.name)}
             <li>
-              <span class="name" title={chord.name}>{chord.name}</span>
-              {#if chord.voicing}
-                <ChordDiagram voicing={chord.voicing} name={chord.name} />
-              {:else}
-                <span
-                  class="empty"
-                  role="img"
-                  aria-label="{chord.name}: no diagram"
-                  title="No diagram: Bandmate can't read this Chord or find a Voicing for it"
-                ></span>
-              {/if}
+              <button
+                type="button"
+                class="chord"
+                disabled={!opener}
+                aria-haspopup="dialog"
+                title="Open {chord.name}'s diagram"
+                onclick={(e) => opener?.press(chord.name, e.currentTarget)}
+              >
+                <span class="name" title={chord.name}>{chord.name}</span>
+                {#if chord.voicing}
+                  <ChordDiagram voicing={chord.voicing} name={chord.name} />
+                {:else}
+                  <span
+                    class="empty"
+                    role="img"
+                    aria-label="{chord.name}: no diagram"
+                    title="No diagram: Bandmate can't read this Chord or find a Voicing for it"
+                  ></span>
+                {/if}
+              </button>
             </li>
           {/each}
         </ul>
@@ -168,11 +187,28 @@
     overscroll-behavior-x: contain;
   }
   .row li {
-    display: flex;
     flex: 0 0 4.5rem;
+  }
+  /* A diagram under its Chord's name, which opens its popover. */
+  .chord {
+    display: flex;
     flex-direction: column;
     align-items: center;
     gap: 0.125rem;
+    width: 100%;
+    padding: 0.125rem;
+    border: none;
+    border-radius: 0.375rem;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  .chord:hover {
+    background: var(--surface-1);
+  }
+  .chord:disabled {
+    cursor: default;
   }
   .name {
     max-width: 100%;

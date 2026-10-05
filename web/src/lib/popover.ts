@@ -1,16 +1,20 @@
 /**
  * The top of a popover `height` px tall, `gap` px from the field or button it
  * opens from: under it, or over it when there's no room below, but never off
- * the top of the window.
+ * the top of the window. Asked for `over`, it's over it unless there's no
+ * room above.
  */
 export function popoverTop(
   anchor: { top: number; bottom: number },
   height: number,
   viewportHeight: number,
   gap: number,
+  prefer: 'under' | 'over' = 'under',
 ): number {
+  const over = anchor.top - gap - height;
+  if (prefer === 'over' && over >= gap) return over;
   if (anchor.bottom + gap + height <= viewportHeight) return anchor.bottom + gap;
-  return Math.max(gap, anchor.top - gap - height);
+  return Math.max(gap, over);
 }
 
 /** Which edge of what a popover opens from it lines up with: its start, or its end. */
