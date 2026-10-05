@@ -1,3 +1,4 @@
+import type { Icon } from './icons';
 import type { KeyHints } from './keyHints';
 import { matches, shortcuts, stepBy, type KeyPress, type TwoWay } from './shortcuts';
 
@@ -39,7 +40,8 @@ export function opensMenu(e: KeyPress): boolean {
  * such an entry shows only in ⋯.
  */
 export type MenuAction = {
-  icon: string;
+  /** Beside the label in the menu, and alone on its icon button. */
+  icon: Icon;
   /** Names it in the menu, and to screen readers as a button. */
   label: string;
   /** The button's tooltip, when it has more to say than the label. */

@@ -1,4 +1,7 @@
 <script lang="ts">
+  import Eye from '@lucide/svelte/icons/eye';
+  import EyeOff from '@lucide/svelte/icons/eye-off';
+  import Pin from '@lucide/svelte/icons/pin';
   // The Chord Chart, above the Lyric Sheet in Read mode: a diagram of a
   // Voicing for each Chord the Song shows, in one row that scrolls sideways.
   // Each draws the preferred Voicing for the Chord and the Song's tuning, or
@@ -71,11 +74,7 @@
         title={shown ? 'Hide the Chord Chart' : 'Show the Chord Chart'}
       >
         <!-- An eye, crossed out while the Chart is hidden. -->
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
-          <circle cx="12" cy="12" r="3" />
-          {#if !shown}<path d="M3 3l18 18" />{/if}
-        </svg>
+        {#if shown}<Eye />{:else}<EyeOff />{/if}
         {#if !shown}<span>Chord Chart</span>{/if}
       </button>
       <!-- Hidden, the pin goes too, keeping whether it's pinned for when it's shown. -->
@@ -89,10 +88,7 @@
           title={pinned ? 'Unpin the Chord Chart' : 'Pin the Chord Chart to the top'}
         >
           <!-- A pushpin, filled while pinned. -->
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path class="head" d="M10 3v6l-3 4h10l-3-4V3z" />
-            <path d="M9 3h6M12 13v8" />
-          </svg>
+          <Pin />
         </button>
       {/if}
     </div>
@@ -183,16 +179,11 @@
     border-color: var(--accent);
     color: var(--accent);
   }
-  .control svg {
-    width: 1.125rem;
-    height: 1.125rem;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+  /* A size up from the label beside it. */
+  .control :global(.lucide-icon) {
+    font-size: var(--text-lg);
   }
-  .control[aria-pressed='true'] .head {
+  .control[aria-pressed='true'] :global(.lucide-pin) {
     fill: currentColor;
   }
   .note {

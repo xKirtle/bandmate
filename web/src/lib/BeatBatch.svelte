@@ -1,4 +1,7 @@
 <script lang="ts">
+  import Pause from '@lucide/svelte/icons/pause';
+  import Play from '@lucide/svelte/icons/play';
+  import X from '@lucide/svelte/icons/x';
   import { onDestroy } from 'svelte';
   import { api, commonKeys, type Beat, type BeatDetails } from './api';
   import {
@@ -339,7 +342,7 @@
                       aria-label="{playing ? 'Pause' : 'Preview'} “{name}”"
                       onclick={() => onPreview(row)}
                     >
-                      {playing ? '❚❚' : '▶'}
+                      {#if playing}<Pause />{:else}<Play />{/if}
                     </button>
                   {/if}
                 </td>
@@ -420,7 +423,7 @@
               </td>
               <td class="remove">
                 <button type="button" class="icon" aria-label="Remove “{name}”" onclick={() => remove(row.key)}>
-                  ✕
+                  <X />
                 </button>
               </td>
             </tr>

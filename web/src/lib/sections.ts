@@ -1,6 +1,8 @@
 import type { Alternate, Section, Song } from './api';
 import { isBlank } from './cues';
 import type { MenuAction } from './menu';
+import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right';
+import ArrowRightFromLine from '@lucide/svelte/icons/arrow-right-from-line';
 
 /** The Alternate whose Lines are sung. The server guarantees exactly one. */
 export function activeAlternate(section: Section | undefined): Alternate | undefined {
@@ -55,14 +57,14 @@ export function putBackActions(
 ): MenuAction[] {
   const actions: MenuAction[] = [
     {
-      icon: '↦',
+      icon: ArrowRightFromLine,
       label: 'Put back into the Lyric Sheet…',
       choices: places(inArrangement).map((place) => ({ label: place.name, run: () => putAt(place.position) })),
     },
   ];
   if (inArrangement.length > 0) {
     actions.push({
-      icon: '⇄',
+      icon: ArrowLeftRight,
       label: 'Add as an Alternate of…',
       choices: inArrangement.map((target) => ({ label: describe(target), run: () => addTo(target.id) })),
     });

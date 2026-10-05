@@ -1,4 +1,5 @@
 <script lang="ts">
+  import X from '@lucide/svelte/icons/x';
   import { onDestroy, onMount, untrack } from 'svelte';
   import type { TimelineLoop } from './api';
   import { closeOnBackdrop } from './backdrop';
@@ -140,7 +141,7 @@
   <header>
     <h2 id="mixdown-heading">Mix down</h2>
     {#if phase !== 'mixing'}
-      <button type="button" class="icon" onclick={() => dialog?.close()} aria-label="Close">✕</button>
+      <button type="button" class="icon" onclick={() => dialog?.close()} aria-label="Close"><X /></button>
     {/if}
   </header>
 

@@ -1,4 +1,7 @@
 <script lang="ts">
+  import Play from '@lucide/svelte/icons/play';
+  import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
+  import X from '@lucide/svelte/icons/x';
   import { tick } from 'svelte';
   import { formatCue, nudgeCue, parseCue, playLabel } from './cues';
   import { cueNudge, cueNudgeHint } from './cueKeys';
@@ -155,7 +158,7 @@
         onpointerdown={(e) => e.preventDefault()}
         onclick={() => play(at)}
         aria-label={playLabel(label, at)}
-        title="Play from here">▶</button
+        title="Play from here"><Play /></button
       >
     {/if}
   {/if}
@@ -203,7 +206,9 @@
             : `Change when this starts on the Timeline${nudgeHint.label ? `; ${nudgeHint.label} nudges it` : ''}`
       }`}
     >
-      {#if outOfOrder}<span class="warning" aria-hidden="true">⚠</span>{/if}{cue === null ? '–:––.–' : formatCue(cue)}
+      {#if outOfOrder}<span class="warning" aria-hidden="true"><TriangleAlert /></span>{/if}{cue === null
+        ? '–:––.–'
+        : formatCue(cue)}
     </button>
   {/if}
   {#if cue !== null && !pick && !editing}
@@ -215,7 +220,7 @@
       onpointerdown={(e) => e.preventDefault()}
       onclick={clear}
       aria-label="Clear the Cue of {label}"
-      title="Clear this Cue">✕</button
+      title="Clear this Cue"><X /></button
     >
   {:else}
     <!-- Holds the ✕'s room, so the gutter never shifts. -->
@@ -283,6 +288,10 @@
     font-size: var(--text-xs);
     opacity: 0.5;
     cursor: pointer;
+  }
+  /* Solid, so it reads at this size. */
+  .play :global(.lucide-icon) {
+    fill: currentColor;
   }
   .slot:hover .play,
   .play:focus-visible,

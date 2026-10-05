@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",
+    "@lucide/svelte": "^1.52.0",
     "music-metadata": "^11.16.1"
   }
 }

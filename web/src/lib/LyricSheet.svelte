@@ -1,4 +1,13 @@
 <script lang="ts">
+  import ArrowDown from '@lucide/svelte/icons/arrow-down';
+  import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right';
+  import ArrowUp from '@lucide/svelte/icons/arrow-up';
+  import CircleSlash from '@lucide/svelte/icons/circle-slash';
+  import CopyPlus from '@lucide/svelte/icons/copy-plus';
+  import GripVertical from '@lucide/svelte/icons/grip-vertical';
+  import Minus from '@lucide/svelte/icons/minus';
+  import Plus from '@lucide/svelte/icons/plus';
+  import X from '@lucide/svelte/icons/x';
   import { untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import type { Cueing } from './AlternateText.svelte';
@@ -103,13 +112,13 @@
   // A Section's actions after ↑ and ↓, folded into ⋯ on phones.
   function sectionActions(section: Section, i: number): MenuAction[] {
     const actions: MenuAction[] = [
-      { icon: '+', label: 'Add a Section below', run: () => add(i + 1) },
-      { icon: '⧉', label: 'Duplicate this Section below', run: () => duplicate(section.id, i + 1) },
+      { icon: Plus, label: 'Add a Section below', run: () => add(i + 1) },
+      { icon: CopyPlus, label: 'Duplicate this Section below', run: () => duplicate(section.id, i + 1) },
     ];
     if (canCue && hasCues({ arrangement: [section.id], sections: song.sections })) {
       // Doesn't ask first: it can be undone. It clears dormant Cues too.
       actions.push({
-        icon: '⌀',
+        icon: CircleSlash,
         label: "Clear this Section's Cues",
         run: () => editCues((at) => api.clearSectionCues(at, section.id)),
       });
@@ -118,13 +127,13 @@
     if (others.length > 0) {
       // Where there's room, it's dragged onto the Section instead.
       actions.push({
-        icon: '⇄',
+        icon: ArrowLeftRight,
         label: 'Add as an Alternate of…',
         choices: others.map((other) => ({ label: describe(other), run: () => addTo(section, other) })),
       });
     }
     actions.push({
-      icon: '×',
+      icon: X,
       ...removal(section),
       run: () => edit((at) => api.removeFromArrangement(at, section.id)),
     });
@@ -448,7 +457,7 @@
               disabled={transpose <= -transposeLimit}
               onclick={() => transposeBy(-1)}
               aria-label="Transpose the Chords down a semitone"
-              title="Transpose the Chords down a semitone">−</button
+              title="Transpose the Chords down a semitone"><Minus /></button
             >
             <button
               type="button"
@@ -467,7 +476,7 @@
               disabled={transpose >= transposeLimit}
               onclick={() => transposeBy(1)}
               aria-label="Transpose the Chords up a semitone"
-              title="Transpose the Chords up a semitone">+</button
+              title="Transpose the Chords up a semitone"><Plus /></button
             >
           </div>
         {/if}
@@ -519,14 +528,14 @@
           aria-label="Shift every Cue {shiftStep} s earlier"
           title={canShiftEarlier
             ? `Shift every Cue ${shiftStep} s earlier`
-            : `A Cue is closer to 0:00 than ${shiftStep} s`}>−</button
+            : `A Cue is closer to 0:00 than ${shiftStep} s`}><Minus /></button
         >
         <button
           type="button"
           class="button shift-by"
           onclick={() => shiftEveryCue(shiftStep)}
           aria-label="Shift every Cue {shiftStep} s later"
-          title="Shift every Cue {shiftStep} s later">+</button
+          title="Shift every Cue {shiftStep} s later"><Plus /></button
         >
       </div>
     {/if}
@@ -596,13 +605,13 @@
                     class="grip"
                     aria-hidden="true"
                     title="Drag to move, onto the Scrapbook, or onto another Section to add it as Alternates; Esc cancels"
-                    {...drag.grip({ arrangementAt: i }, dropSection)}>⠿</span
+                    {...drag.grip({ arrangementAt: i }, dropSection)}><GripVertical /></span
                   >
                 {/if}
               {/snippet}
               {#snippet actions()}
                 <button type="button" class="icon" onclick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">
-                  ↑
+                  <ArrowUp />
                 </button>
                 <button
                   type="button"
@@ -611,7 +620,7 @@
                   disabled={i === song.arrangement.length - 1}
                   aria-label="Move down"
                 >
-                  ↓
+                  <ArrowDown />
                 </button>
               {/snippet}
             </SectionEditor>

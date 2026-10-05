@@ -1,4 +1,7 @@
 <script lang="ts">
+  import Volume1 from '@lucide/svelte/icons/volume-1';
+  import Volume2 from '@lucide/svelte/icons/volume-2';
+  import VolumeX from '@lucide/svelte/icons/volume-x';
   import { canSetVolume, playerVolume } from './sharedVolume.svelte';
   import { loudness } from './volume';
 
@@ -16,17 +19,7 @@
     aria-label={volume.muted ? 'Unmute' : 'Mute'}
     aria-pressed={volume.muted}
   >
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path class="cone" d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z" />
-      {#if loudness(volume) === 'muted'}
-        <path d="M15.5 9.5l5 5M20.5 9.5l-5 5" />
-      {:else}
-        <path d="M15 9a4 4 0 0 1 0 6" />
-        {#if loudness(volume) === 'high'}
-          <path d="M17.5 6.5a7.5 7.5 0 0 1 0 11" />
-        {/if}
-      {/if}
-    </svg>
+    {#if loudness(volume) === 'muted'}<VolumeX />{:else if loudness(volume) === 'low'}<Volume1 />{:else}<Volume2 />{/if}
   </button>
   {#if slider}
     <input
@@ -58,6 +51,7 @@
     border-radius: var(--radius-full);
     background: none;
     color: var(--text-muted);
+    font-size: var(--text-xl);
     cursor: pointer;
   }
   .speaker:hover {
@@ -66,18 +60,6 @@
   .speaker:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
-  }
-  .speaker svg {
-    width: 1.25rem;
-    height: 1.25rem;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.75;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-  .speaker .cone {
-    fill: currentColor;
   }
   input[type='range'] {
     width: 5rem;

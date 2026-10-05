@@ -1,4 +1,7 @@
 <script lang="ts">
+  import Crop from '@lucide/svelte/icons/crop';
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
   import { api, type Cover, type PreparedCover, type Song, type SongAt, type Status } from './api';
   import ActionsMenu from './ActionsMenu.svelte';
   import type { Square } from './cover';
@@ -112,9 +115,9 @@
   }
 
   const entries = [
-    { icon: '⛶', label: 'Adjust crop', run: reopen },
-    { icon: '↻', label: 'Change picture', run: () => changeInput?.click() },
-    { icon: '🗑', label: 'Remove', run: remove },
+    { icon: Crop, label: 'Adjust crop', run: reopen },
+    { icon: RefreshCw, label: 'Change picture', run: () => changeInput?.click() },
+    { icon: Trash2, label: 'Remove', run: remove },
   ];
 </script>
 

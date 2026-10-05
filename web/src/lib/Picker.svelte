@@ -1,4 +1,6 @@
 <script lang="ts" generics="T">
+  import Check from '@lucide/svelte/icons/check';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import { tick, type Snippet } from 'svelte';
   import type { HTMLAttributes } from 'svelte/elements';
   import { pickerKey, typeaheadIndex } from './picker';
@@ -148,7 +150,7 @@
       {@render trigger(value)}
     {:else}
       <span class="value">{current >= 0 ? text(value) : ''}</span>
-      <span class="chevron" aria-hidden="true">▾</span>
+      <span class="chevron" aria-hidden="true"><ChevronDown /></span>
     {/if}
   </div>
   {#if open}
@@ -174,7 +176,9 @@
           aria-selected={i === active}
           onclick={() => pick(i)}
         >
-          <span class="option-list-check" aria-hidden="true">{i === current ? '✓' : ''}</span>
+          <span class="option-list-check" aria-hidden="true"
+            >{#if i === current}<Check />{/if}</span
+          >
           {#if option}{@render option(o)}{:else}{text(o)}{/if}
           {#if i === current}<span class="visually-hidden">(current)</span>{/if}
         </div>

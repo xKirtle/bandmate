@@ -1,4 +1,5 @@
 <script lang="ts">
+  import X from '@lucide/svelte/icons/x';
   import { onMount } from 'svelte';
   import {
     api,
@@ -160,7 +161,7 @@
   <header>
     <h2 id="restore-backup-heading">Restore</h2>
     {#if phase !== 'restoring' && phase !== 'checking'}
-      <button type="button" class="icon" onclick={() => dialog?.close()} aria-label="Close">✕</button>
+      <button type="button" class="icon" onclick={() => dialog?.close()} aria-label="Close"><X /></button>
     {/if}
   </header>
 

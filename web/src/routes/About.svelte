@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   // Which Bandmate is running, with a link to exactly that version's source,
   // as AGPL-3.0 §13 asks of anyone running a modified Bandmate over a network,
   // the system facts a bug report needs, ready to copy, and what's new.
@@ -229,7 +230,7 @@
                   <li>
                     <details open={i === 0}>
                       <summary>
-                        <span class="chevron" aria-hidden="true">▸</span>
+                        <span class="chevron" aria-hidden="true"><ChevronRight /></span>
                         <span class="release-tag">{r.tag}</span>
                         {#if r.name && r.name !== r.tag}<span class="release-name">{r.name}</span>{/if}
                         <span class="muted date">{day(r.publishedAt)}</span>
@@ -279,7 +280,7 @@
             {#each dependencyLists as list (list.id)}
               <details class="dependencies" open>
                 <summary>
-                  <span class="chevron" aria-hidden="true">▸</span>
+                  <span class="chevron" aria-hidden="true"><ChevronRight /></span>
                   <span class="group-name">{list.label}</span>
                   <span class="muted">({list.items.length})</span>
                 </summary>
@@ -477,8 +478,7 @@
     outline-offset: 2px;
   }
   .chevron {
-    display: inline-block;
-    width: 1rem;
+    display: inline-flex;
     color: var(--text-muted);
     transition: transform var(--duration-fast) var(--ease);
   }

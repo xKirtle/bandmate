@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Pencil from '@lucide/svelte/icons/pencil';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
   // The Backups kept in Bandmate, newest first, each named from when it was
   // made and what it holds, or with a name of its own, with its size, and
   // downloadable as one file. A downloaded one, from here or another
@@ -86,8 +88,8 @@
 
   function actions(backup: Backup): MenuAction[] {
     return [
-      { icon: '✎', label: 'Rename…', run: () => (renaming = backup) },
-      { icon: '🗑', label: 'Delete…', run: () => remove(backup) },
+      { icon: Pencil, label: 'Rename…', run: () => (renaming = backup) },
+      { icon: Trash2, label: 'Delete…', run: () => remove(backup) },
     ];
   }
 </script>

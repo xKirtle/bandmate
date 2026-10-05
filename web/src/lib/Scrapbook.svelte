@@ -1,4 +1,6 @@
 <script lang="ts">
+  import GripVertical from '@lucide/svelte/icons/grip-vertical';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
   import { tick } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import { api, type Song, type SongAt } from './api';
@@ -164,7 +166,7 @@
               {change}
               onUnsaved={track}
               {onEditing}
-              more={[{ icon: '🗑', label: 'Delete for good', run: () => remove(section.id) }]}
+              more={[{ icon: Trash2, label: 'Delete for good', run: () => remove(section.id) }]}
               {drag}
               places={placesBack}
             >
@@ -217,7 +219,7 @@
       class="grip"
       aria-hidden="true"
       title="Drag between Sections in the Lyric Sheet to put it back, or onto one to add it as Alternates; Esc cancels"
-      {...drag.grip({ section: sectionId }, dropSection)}>⠿</span
+      {...drag.grip({ section: sectionId }, dropSection)}><GripVertical /></span
     >
   {/if}
 {/snippet}

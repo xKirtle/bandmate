@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ArrowDown from '@lucide/svelte/icons/arrow-down';
+  import ArrowUp from '@lucide/svelte/icons/arrow-up';
   import type { Snippet } from 'svelte';
   import type { Beat } from './api';
   import { toggleSort, type BeatColumn, type Sort } from './listViews';
@@ -54,7 +56,8 @@
         <th class:num={column.num} aria-sort={sortState(column.id)}>
           <button type="button" onclick={() => (sort = toggleSort(sort, column.id))}>
             {column.label}<span class="arrow" aria-hidden="true"
-              >{{ ascending: '↑', descending: '↓', none: '' }[sortState(column.id) ?? 'none']}</span
+              >{#if sortState(column.id) === 'ascending'}<ArrowUp
+                />{:else if sortState(column.id) === 'descending'}<ArrowDown />{/if}</span
             >
           </button>
         </th>

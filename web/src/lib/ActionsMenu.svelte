@@ -1,4 +1,7 @@
 <script lang="ts">
+  import Check from '@lucide/svelte/icons/check';
+  import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+  import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import { tick, type Snippet } from 'svelte';
   import { keyHints } from './keyHints';
   import {
@@ -254,7 +257,7 @@
     onclick={(e) => (open ? close() : show(keyboardClick(e) ? 'first' : 'menu'))}
     onkeydown={onTriggerKey}
   >
-    {#if trigger}{@render trigger()}{:else if text}{text}{:else}⋯{/if}
+    {#if trigger}{@render trigger()}{:else if text}{text}{:else}<Ellipsis />{/if}
   </button>
   {#if open}
     <div
@@ -268,7 +271,7 @@
     >
       {#if picking}
         <button type="button" role="menuitem" tabindex="-1" onclick={(e) => pick(null, keyboardClick(e))}>
-          <span class="glyph" aria-hidden="true">‹</span>
+          <span class="glyph" aria-hidden="true"><ChevronLeft /></span>
           {picking.label}
         </button>
         {#if field}
@@ -295,7 +298,7 @@
             class="choice"
             onclick={(e) => choose(choice, keyboardClick(e))}
           >
-            {#if choice.checked}<span class="check" aria-hidden="true">✓</span>{/if}
+            {#if choice.checked}<span class="check" aria-hidden="true"><Check /></span>{/if}
             {choice.label}
           </button>
         {/each}
@@ -312,7 +315,7 @@
             onclick={(e) => choose(entry, keyboardClick(e))}
           >
             {#if 'icon' in entry}
-              <span class="glyph" aria-hidden="true">{entry.icon}</span>
+              <span class="glyph" aria-hidden="true"><entry.icon /></span>
             {/if}
             {entry.label}
           </button>
@@ -390,9 +393,12 @@
   .choice:has(.check) {
     padding-inline-start: var(--space-3);
   }
-  .check {
+  /* The column the entries' icons are centred in. */
+  .check,
+  .glyph {
+    display: flex;
+    justify-content: center;
     width: var(--glyph-width);
-    text-align: center;
   }
   /* A field sits under the entry it's for, like a choice. */
   .field {
@@ -407,8 +413,6 @@
     width: 6rem;
   }
   .glyph {
-    width: var(--glyph-width);
     color: var(--text-muted);
-    text-align: center;
   }
 </style>

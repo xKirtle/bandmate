@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Pause from '@lucide/svelte/icons/pause';
+  import Play from '@lucide/svelte/icons/play';
   import { playMediaAlone } from './playback';
   import PlayerVolume from './PlayerVolume.svelte';
   import { canSetVolume, playerVolume } from './sharedVolume.svelte';
@@ -143,11 +145,7 @@
       title={playOffHint ?? undefined}
       aria-label={playing ? 'Pause' : 'Play'}
     >
-      {#if playing}
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /></svg>
-      {:else}
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
-      {/if}
+      {#if playing}<Pause />{:else}<Play />{/if}
     </button>
 
     <span class="elapsed time muted">{formatDuration(time)}</span>
@@ -267,15 +265,15 @@
     border-radius: var(--radius-full);
     background: var(--accent);
     color: var(--accent-text);
+    font-size: var(--text-xl);
     cursor: pointer;
   }
   .play:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
-  .play svg {
-    width: 1.25rem;
-    height: 1.25rem;
+  /* Solid, to stand out on the accent. */
+  .play :global(.lucide-icon) {
     fill: currentColor;
   }
   .wave {

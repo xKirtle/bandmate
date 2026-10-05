@@ -11,6 +11,8 @@
 </script>
 
 <script lang="ts">
+  import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   // A Chord's diagram, in a popover over the Lyric Sheet in Read mode: the
   // Voicing the Chord Chart draws for it, for the Chord as shown and the
   // Song's tuning, stepping forwards and backwards through its other Voicings. Prefer
@@ -170,13 +172,13 @@
           class="button step"
           aria-label="Previous Voicing"
           title="Previous Voicing"
-          onclick={() => step(-1)}>‹</button
+          onclick={() => step(-1)}><ChevronLeft /></button
         >
         <span class={['place', { preferred: isPreferred }]} aria-live="polite">
           {isPreferred ? 'Preferred' : `${showing + 1} of ${voicings.length}`}
         </span>
         <button type="button" class="button step" aria-label="Next Voicing" title="Next Voicing" onclick={() => step(1)}
-          >›</button
+          ><ChevronRight /></button
         >
       </div>
       <!-- One button, so focus stays on it as Prefer turns to Clear. -->

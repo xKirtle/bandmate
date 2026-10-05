@@ -1,4 +1,5 @@
 <script lang="ts">
+  import X from '@lucide/svelte/icons/x';
   import { onMount } from 'svelte';
   import { api, type Beat } from './api';
   import { closeOnBackdrop } from './backdrop';
@@ -143,7 +144,7 @@
         <p class="muted songs">Used in {beat.songs.map((s) => s.title).join(', ')}</p>
       {/if}
     </div>
-    <button type="button" class="icon" onclick={close} aria-label="Close" disabled={busy !== null}>✕</button>
+    <button type="button" class="icon" onclick={close} aria-label="Close" disabled={busy !== null}><X /></button>
   </header>
 
   <form onsubmit={save}>

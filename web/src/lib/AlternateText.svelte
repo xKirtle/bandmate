@@ -37,6 +37,7 @@
 </script>
 
 <script lang="ts">
+  import CornerDownLeft from '@lucide/svelte/icons/corner-down-left';
   import { onDestroy, untrack } from 'svelte';
   import { api, type Alternate, type Song, type SongAt } from './api';
   import CueField from './CueField.svelte';
@@ -219,7 +220,7 @@
               aria-label="Cue {lineLabel} now"
               aria-keyshortcuts={hints.aria(cueNextKeys)}
               title={hints.withKeys('Cue this Line at the playhead', cueNextKeys)}
-              >Now <span aria-hidden="true">⏎</span></button
+              >Now <CornerDownLeft aria-hidden="true" /></button
             >
           {:else}
             <CueField

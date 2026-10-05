@@ -279,7 +279,17 @@ input[inputmode='decimal'] {
   white-space: nowrap;
 }
 
-/* A small square button showing one symbol, e.g. in a Section's actions. */
+/* An icon, from Lucide, is as big as the text it's in, so it follows the
+   type scale: what it sits in sets its size. Beside text it sits on the
+   text's middle, and in a flex row it never shrinks. */
+.lucide-icon {
+  flex: none;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em;
+}
+
+/* A small square button showing one icon, e.g. in a Section's actions. */
 .icon {
   display: inline-flex;
   align-items: center;
@@ -349,7 +359,8 @@ input[inputmode='decimal'] {
   background: var(--surface-2);
 }
 .option-list-check {
+  display: flex;
+  justify-content: center;
   width: 1rem;
   color: var(--accent);
-  text-align: center;
 }
