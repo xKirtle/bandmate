@@ -79,10 +79,10 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 - Make the Lines and Chords larger or smaller in Read mode (A− and A+), kept per device, for reading from a music stand or a phone at whatever distance it sits. It builds on the larger default Read mode gets from the visual identity (#565).
 - Whether the Chord Chart and the Section Labels follow the size, and how far it goes each way, are for the spec.
 
-## A theme toggle
+## Every device setting in Settings
 
-- Choose System, Light or Dark in the app, instead of always following the system's setting, for a dark stage on a phone that's set to light.
-- It waits for a Settings page to hold it. Where that page lives, and whether the choice is kept per device, are for the spec.
+- The Settings tab (#578) starts with the Palette and System, Light or Dark. The other settings kept per device, such as the Latency Offset, the Input and left-handed Chord diagrams, could be listed there too, so there's one place to find them.
+- Whether they also stay where they're used today is for the spec.
 
 ## Track colours
 
