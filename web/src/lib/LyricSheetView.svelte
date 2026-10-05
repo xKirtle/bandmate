@@ -185,11 +185,12 @@
     box-shadow: var(--selected-edge);
   }
   /* A Label is content, set as written: a heading over its Lines, at the
-     Chords' size. */
+     Chords' size, muted so it steps back from them. */
   h3 {
     margin: 0 0 var(--space-1);
     font-size: var(--lyric-read-label);
     font-weight: 700;
+    color: var(--text-muted);
     line-height: var(--lyric-read-leading);
   }
   .section p {
