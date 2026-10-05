@@ -7,6 +7,10 @@ const webRoot = join(import.meta.dirname, '../..');
 const read = (path: string) => readFileSync(join(webRoot, path));
 const indexHtml = read('index.html').toString();
 
+// A Terracotta token's light value: its light set comes first in palettes.css.
+const palettes = read('src/palettes.css').toString();
+const token = (name: string) => palettes.match(new RegExp(`--${name}: (#[0-9a-f]{6});`))?.[1];
+
 /** The width and height a PNG's header gives. */
 function pngSize(png: Buffer): [number, number] {
   expect(png.subarray(1, 4).toString()).toBe('PNG');
@@ -30,9 +34,6 @@ describe('brand marks', () => {
   });
 
   it("draws the static icons in Terracotta's light accent, the default Palette", () => {
-    // Terracotta's light set comes first in palettes.css.
-    const palettes = read('src/palettes.css').toString();
-    const token = (name: string) => palettes.match(new RegExp(`--${name}: (#[0-9a-f]{6});`))?.[1];
     const favicon = read('public/favicon.svg').toString();
     expect(favicon).toContain(`fill="${token('accent')}"`);
     expect(favicon).toContain(`fill="${token('accent-text')}"`);
@@ -43,8 +44,6 @@ describe('brand marks', () => {
   });
 
   it("draws the repo's social preview card from the same mark, in Terracotta", () => {
-    const palettes = read('src/palettes.css').toString();
-    const token = (name: string) => palettes.match(new RegExp(`--${name}: (#[0-9a-f]{6});`))?.[1];
     const card = read('../docs/brand/social-preview.svg').toString();
     expect(card).toContain(`d="${markPath}"`);
     expect(card).toContain(`fill="${token('accent')}"`);
