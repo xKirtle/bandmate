@@ -1,15 +1,24 @@
 <script lang="ts">
-  // Bandmate's mark, a placeholder "B" until there's a logo: at the top of
-  // the nav rail, and larger in About. A logo replaces it here.
-  let { size = 'var(--text-xl)' }: { size?: string } = $props();
+  // Bandmate's mark, in the Palette's accent: at the top of the nav rail, and
+  // larger in About.
+  import { markPath } from './brandMark';
+
+  let { large = false }: { large?: boolean } = $props();
 </script>
 
-<span class="brand-mark" style:font-size={size} aria-hidden="true">B</span>
+<svg class="brand-mark" class:large viewBox="0 0 32 32" aria-hidden="true">
+  <path fill-rule="evenodd" d={markPath} />
+</svg>
 
 <style>
   .brand-mark {
-    color: var(--accent);
-    font-weight: 800;
-    line-height: 1;
+    display: block;
+    width: var(--mark-rail);
+    height: var(--mark-rail);
+    fill: var(--accent);
+  }
+  .large {
+    width: var(--mark-large);
+    height: var(--mark-large);
   }
 </style>
