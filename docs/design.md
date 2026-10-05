@@ -36,7 +36,7 @@ The `data-palette` attribute on the root element picks one (`ink` or `olive`; Te
 | `--bg`                         | The page                                                                |
 | `--surface-1`, `--surface-2`   | Cards and panels, then controls and raised areas on them                |
 | `--border`                     | Edges. Decorative only: never the only thing that marks a control       |
-| `--text`, `--text-muted`       | Text, and secondary text (hints, timestamps, empty states)              |
+| `--text`, `--text-muted`       | Text, and secondary text (hints, timestamps, empty states, Labels in Read mode) |
 | `--accent`, `--accent-text`    | The primary action, the current or chosen thing, Chords; text on accent |
 | `--danger`, `--warning`        | Destructive actions and errors; warnings                                |
 | `--drafting-*`, `--finished-*` | The drafting and finished Status badges (`-bg` and `-fg`)               |
