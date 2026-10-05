@@ -25,6 +25,14 @@ group('popoverTop', () => {
   it('keeps it on screen when there is no room either way', () => {
     expect(popoverTop({ top: 100, bottom: 136 }, 200, 300, 4)).toBe(4);
   });
+
+  it('places it over the field when asked to and there is room', () => {
+    expect(popoverTop(field, 200, 800, 4, 'over')).toBe(296);
+  });
+
+  it('flips it under the field when asked for over but there is no room above', () => {
+    expect(popoverTop({ top: 100, bottom: 136 }, 200, 800, 4, 'over')).toBe(140);
+  });
 });
 
 group('popoverLeft', () => {

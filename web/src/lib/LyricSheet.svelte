@@ -21,6 +21,7 @@
   import { gutterFields } from './gutter';
   import { keyHints } from './keyHints';
   import ChordChart from './ChordChart.svelte';
+  import ChordPopover from './ChordPopover.svelte';
   import LyricSheetView from './LyricSheetView.svelte';
   import ActionsMenu from './ActionsMenu.svelte';
   import type { MenuAction } from './menu';
@@ -322,6 +323,10 @@
   // Whether Chord Lines are on screen: always in Write mode, which shows the raw text.
   const chordsOnScreen = $derived(mode === 'write' || (showChords && songHasChords));
 
+  // A Chord's diagram, opened from a Chord in a Line or the Chord Chart in
+  // Read mode while the Chords show.
+  let chordPopover = $state<ChordPopover>();
+
   function toggleChords() {
     songChordsShown.set(songId, !showChords);
   }
@@ -542,9 +547,20 @@
 
   {#if mode === 'read'}
     {#if chordsOnScreen}
-      <ChordChart {song} {transpose} />
+      <ChordChart {song} {transpose} opener={chordPopover?.opener} />
+      <!-- Transposing closes it, rather than leave it on a Chord no longer shown. -->
+      {#key transpose}
+        <ChordPopover {song} bind:this={chordPopover} />
+      {/key}
     {/if}
-    <LyricSheetView {song} showChords={chordsOnScreen} {transpose} {current} play={leadInto} />
+    <LyricSheetView
+      {song}
+      showChords={chordsOnScreen}
+      {transpose}
+      {current}
+      play={leadInto}
+      opener={chordPopover?.opener}
+    />
   {:else}
     <ol
       class="arrangement"
