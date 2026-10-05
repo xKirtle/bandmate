@@ -711,6 +711,7 @@
      quiet beside them: on, it's outlined and lettered in the accent, like
      the Chord Chart's own controls, rather than filled. */
   .chords .toggle[aria-pressed='true'] {
+    border-color: var(--accent);
     background: var(--surface-1);
     color: var(--accent);
   }

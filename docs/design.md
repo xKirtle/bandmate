@@ -75,12 +75,12 @@ Content's line height is `--leading-content` (1.6), for Lines in Write mode and 
 | Token                  | For                                                                                    |
 | ---------------------- | -------------------------------------------------------------------------------------- |
 | `--lyric-write`        | Lines and Chords as typed in Write mode: a text field's size, with `--leading-content` |
-| `--lyric-read-line`    | Lines in Read mode: 1.25rem on a phone, 1.5rem wider                                   |
-| `--lyric-read-chord`   | Chords above their Lines in Read mode: 1.0625rem on a phone, 1.25rem wider             |
-| `--lyric-read-label`   | A Section's Label in Read mode, bold: the Chords' size                                 |
-| `--lyric-read-leading` | The line height of Lines, Chords and Labels in Read mode: 1.5                          |
+| `--lyric-read-line`    | Lines in Read mode                                   |
+| `--lyric-read-chord`   | Chords above their Lines in Read mode             |
+| `--lyric-read-label`   | A Section's Label in Read mode, bold, at the Chords' size                                 |
+| `--lyric-read-leading` | The line height of Lines, Chords and Labels in Read mode                          |
 
-**Read mode** is read at arm's length, from a phone or a music stand, so its lyric sizes are larger than Write mode's, a step larger again from 40rem wide (a tablet on a stand, or a desktop). Lines are in `--text`, held to 7:1, Chords in the accent, held to 4.5:1, and Labels in `--text`, set as written: they're content too. Sections sit `--space-8` apart. Its chrome stays quiet: the Lyric Sheet's heading is for screen readers only, and the Chords toggle, when on, is outlined and lettered in the accent rather than filled, so it doesn't compete with the Chords drawn in the accent beside it.
+**Read mode** is read at arm's length, from a phone or a music stand, so its lyric sizes are larger than Write mode's: Lines at 1.25rem and Chords at 1.0625rem on a phone, a step larger again from 40rem wide (a tablet, a phone held sideways, or a desktop), at 1.5rem and 1.25rem. Lines are in `--text`, held to 7:1, Chords in the accent, held to 4.5:1, and Labels in `--text`, set as written: they're content too. Sections sit `--space-8` apart. Its chrome stays quiet: the Lyric Sheet's heading is for screen readers only, and the Chords toggle, when on, is outlined and lettered in the accent rather than filled, so it doesn't compete with the Chords drawn in the accent beside it.
 
 Every time, BPM and Gain uses tabular digits, so numbers don't jitter as they change: through the `.tabular` class, or `font-variant-numeric: tabular-nums` in a component's own rule for it. Number fields have them anyway.
 

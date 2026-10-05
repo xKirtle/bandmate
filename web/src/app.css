@@ -79,8 +79,8 @@
   -webkit-text-size-adjust: 100%;
 }
 
-/* Wider than a phone, e.g. a tablet on a music stand: Read mode's Lines and
-   Chords a step larger still. */
+/* Wider than a phone held upright, e.g. a tablet on a music stand: Read
+   mode's Lines and Chords a step larger still. */
 @media (min-width: 40rem) {
   :root {
     --lyric-read-line: 1.5rem;
