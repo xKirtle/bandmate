@@ -1,11 +1,13 @@
 <script lang="ts">
-  // Which Bandmate is running, with a link to exactly that version's source,
-  // as AGPL-3.0 §13 asks of anyone running a modified Bandmate over a network,
-  // the system facts a bug report needs, ready to copy, and what's new.
+  // Settings' About tab: which Bandmate is running, with a link to exactly
+  // that version's source, as AGPL-3.0 §13 asks of anyone running a modified
+  // Bandmate over a network, the system facts a bug report needs, ready to
+  // copy, and what's new.
   import { api, type AboutInfo, type ReleasesReport, type ServerConfig } from '../lib/api';
   import { bugReportDetails, updateStatus, uptime } from '../lib/about';
   import BrandMark from '../lib/BrandMark.svelte';
   import FoldChevron from '../lib/FoldChevron.svelte';
+  import SettingsPage from '../lib/SettingsPage.svelte';
 
   // The version and its source link come from /api/config, which doesn't
   // need the database, so they show even if the system facts can't be read.
@@ -117,11 +119,7 @@
   }
 </script>
 
-<header class="bar">
-  <h1>About</h1>
-</header>
-
-<main class="page">
+<SettingsPage tab="about">
   <div class="about">
     <section class="card intro">
       <BrandMark size="4rem" />
@@ -306,7 +304,7 @@
       {/each}
     </section>
   </div>
-</main>
+</SettingsPage>
 
 <style>
   /* Kept narrow enough not to stretch across a wide window, at the page's
@@ -403,29 +401,8 @@
   }
 
   .tabs {
-    display: flex;
-    /* Rather than run off a narrow phone, the tabs wrap. */
-    flex-wrap: wrap;
-    gap: var(--space-1);
     padding: 0 var(--space-2);
     border-bottom: 1px solid var(--border);
-  }
-  [role='tab'] {
-    min-height: var(--control);
-    padding: 0 var(--space-3);
-    border: 0;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-    background: none;
-    color: var(--text-muted);
-    font: inherit;
-    font-weight: 600;
-    white-space: nowrap;
-    cursor: pointer;
-  }
-  [role='tab'][aria-selected='true'] {
-    border-bottom-color: var(--accent);
-    color: var(--text);
   }
   .panel {
     padding: var(--space-4);
@@ -436,7 +413,7 @@
       padding: 0;
       gap: 0;
     }
-    [role='tab'] {
+    .tabs > button {
       padding: 0 var(--space-2);
       font-size: var(--text-lg);
     }

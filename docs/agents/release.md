@@ -30,14 +30,14 @@ gh api repos/xKirtle/bandmate/releases/generate-notes \
   -f tag_name=vX.Y.Z -f target_commitish=main -f previous_tag_name=<last tag> --jq .body
 ```
 
-Every self-hoster reads them on the About page. Check each line reads as a change they'd notice, under the right heading, and note every line that doesn't. Each is fixed on its PR, where the notes come from:
+Every self-hoster reads them in About, in Settings. Check each line reads as a change they'd notice, under the right heading, and note every line that doesn't. Each is fixed on its PR, where the notes come from:
 
 - A line that describes the code rather than what changed for a self-hoster gets a new title (`gh pr edit <number> --title`), which works on merged PRs too.
 - A line with nothing a self-hoster would notice gets the `no-release-notes` label, which drops it from the notes.
 
 ## 6. Recommend, then stop
 
-Give the verdict (release now or wait, and why), the version, a table of what ships grouped by feature, and each flagged line with the title or label proposed for it. Wait for the go-ahead: a tag publishes an image every self-hoster's About page offers as an update.
+Give the verdict (release now or wait, and why), the version, a table of what ships grouped by feature, and each flagged line with the title or label proposed for it. Wait for the go-ahead: a tag publishes an image every self-hoster's About tab offers as an update.
 
 ## 7. Cut it
 

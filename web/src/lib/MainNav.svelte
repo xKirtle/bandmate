@@ -85,8 +85,8 @@
     color: var(--accent);
   }
 
-  /* The nav rail, in view however far the page scrolls, with Settings and
-     About pinned to its bottom, apart from the lists. */
+  /* The nav rail, in view however far the page scrolls, with Settings
+     pinned to its bottom, apart from the lists. */
   @media (min-width: 65.5rem) {
     nav {
       position: sticky;
@@ -112,7 +112,7 @@
     a:hover {
       background: var(--surface-2);
     }
-    /* Pushes the pinned links to the bottom. */
+    /* Pushes the pinned link to the bottom. */
     .first-pinned {
       margin-top: auto;
     }

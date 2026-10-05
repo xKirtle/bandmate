@@ -295,6 +295,40 @@ label.button:has(input:focus-visible) {
   background: var(--surface-1);
 }
 
+/* Tabs: a row over what they switch between, the chosen one underlined in
+   the accent. They're buttons in a tablist (role=tab, aria-selected), e.g.
+   the Chord Finder's, or links where each tab has its own address
+   (aria-current=page), e.g. Settings'. :where() keeps the selectors light,
+   so a component's own rules can tighten them. Rather than run off a narrow
+   phone, the tabs wrap. */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.tabs > :where([role='tab'], a) {
+  min-height: var(--control);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tabs > :where(a) {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+.tabs > :where([aria-selected='true'], [aria-current='page']) {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+}
+
 /* A field's label above it, quieter than what's typed. */
 .field {
   display: flex;

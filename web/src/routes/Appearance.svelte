@@ -1,16 +1,13 @@
 <script lang="ts">
-  // Settings: choices about this device rather than any Song. For now, how
-  // the app looks: its Palette, and Light or Dark or the system's setting.
-  // Each applies at once and is kept on this device.
+  // Settings' Appearance tab: how the app looks on this device rather than
+  // any Song, its Palette, and Light or Dark or the system's setting. Each
+  // applies at once and is kept on this device.
   import { palettes, themeChoices } from '../lib/appearance';
+  import SettingsPage from '../lib/SettingsPage.svelte';
   import { appearance } from '../lib/sharedAppearance.svelte';
 </script>
 
-<header class="bar">
-  <h1>Settings</h1>
-</header>
-
-<main class="page">
+<SettingsPage tab="appearance">
   <section class="card" aria-labelledby="appearance-heading">
     <div>
       <h2 id="appearance-heading">Appearance</h2>
@@ -47,7 +44,7 @@
       {/each}
     </fieldset>
   </section>
-</main>
+</SettingsPage>
 
 <style>
   .card {
