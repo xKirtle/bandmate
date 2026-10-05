@@ -102,16 +102,16 @@ A gap, padding or margin is never a literal length otherwise, and a step is neve
 
 ### Radius
 
-Four corners. The bigger the thing, the rounder its corners, so something nested sits a step tighter than what holds it.
+Four corners, by the kind of thing they round.
 
 | Token           | Size     | For                                                                                    |
 | --------------- | -------- | -------------------------------------------------------------------------------------- |
 | `--radius-sm`   | 0.375rem | Chips and small buttons: menu entries, Cues, a key in Shortcuts, a table's sort header |
-| `--radius-md`   | 0.5rem   | Controls and fields, menus and popovers, notices, tiles inside a card                  |
+| `--radius-md`   | 0.5rem   | Controls and fields, menus and popovers, notices, a Section's Alternates               |
 | `--radius-lg`   | 0.75rem  | Section cards, panels and dialogs: the Scrapbook, the Chord Finder, About's cards      |
 | `--radius-full` | 999px    | Pills, badges, round buttons and dots: on a square, a circle                           |
 
-A radius is always one of these tokens, or `0`: Stylelint fails anything else. Two exceptions: a Cover's corners are a share of its size (`calc(var(--size) * 0.18)`), so they grow with it like an app icon's; and a trigger that takes the shape of what it wraps, like the Cover that opens its actions menu, gets it through `--trigger-radius`. In the Timeline the steps are in its own unit (below).
+A radius is always one of these tokens, or `0`: Stylelint fails anything else. Two exceptions: a Cover's corners are a share of its size (`calc(var(--size) * 0.18)`), so they grow with it like an app icon's; and a trigger that takes the shape of what it wraps, like the Cover that opens its actions menu, gets it through `--trigger-radius`. In the Timeline the steps are in its own unit (below). A drawing's own corners, such as a barre in a Chord diagram, are part of the drawing and stay in its SVG.
 
 ### Motion
 
