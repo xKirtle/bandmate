@@ -181,7 +181,7 @@ Bandmate's mark is a guitar pick with a flat, ♭, cut out of it: the B of Bandm
 - **In the app**, `BrandMark` draws it in the accent, so it follows the Palette and theme: atop the nav rail at `--mark-rail`, and in About at `--mark-large`.
 - **The favicon** is the same path in `--accent-text` on a rounded tile of `--accent`, both Terracotta's light values, the default Palette's, since the file is static: `public/favicon.svg`, and `public/favicon.ico` holding it at 16 and 32px for browsers that don't take an SVG. At 32px the flat reads; at 16px it's a hint.
 - **The home-screen icon** is `public/apple-touch-icon.png`, 180px: the mark smaller on a square of Terracotta, since iOS takes only a PNG and rounds the corners itself.
-- **The README** opens with `favicon.svg` itself at 96px, not a copy, so it changes whenever the mark does. The white mark on its Terracotta tile reads on GitHub's light and dark themes alike.
+- **The README** opens with `public/favicon.svg` itself at 96px, not a copy, so it follows the favicon whenever the mark changes. Its tile carries its own background, so it reads on GitHub's light and dark themes alike.
 
 `brandMark.test.ts` checks `index.html` declares the three icon files, and that `favicon.svg` draws `markPath` in those two colours. The two raster files are rendered from the SVG: when the mark changes, render the tile at 16, 32 and 180px in a browser and write them again.
 
