@@ -29,20 +29,33 @@
     });
   });
 
-  const state = $derived(chordChartState.current);
+  const chartState = $derived(chordChartState.current);
   const stateText: Record<ChordChartState, string> = { hidden: 'Hidden', shown: 'Shown', pinned: 'Pinned' };
+
+  // Pinned, the Chart covers the top of the window, so following playback
+  // scrolls a Section or Line into view below it rather than under it.
+  let chart = $state<HTMLElement>();
+  // Its content's height, bound to run the effect again as it changes; the
+  // padding is the whole Chart's, border and all.
+  let height = $state(0);
+  $effect(() => {
+    if (chartState !== 'pinned' || !chart || height === 0) return;
+    const page = document.documentElement;
+    page.style.scrollPaddingTop = `${chart.offsetHeight}px`;
+    return () => page.style.removeProperty('scroll-padding-top');
+  });
 </script>
 
 {#if names.length > 0}
-  <section class={['chart', state]} aria-label="Chord Chart">
+  <section class={['chart', chartState]} aria-label="Chord Chart" bind:this={chart} bind:clientHeight={height}>
     <Picker
       id="chord-chart-state"
       class="state"
       options={chordChartStates}
-      value={state}
+      value={chartState}
       text={(s) => stateText[s]}
       onpick={chordChartState.set}
-      aria-label="Chord Chart: {stateText[state]}"
+      aria-label="Chord Chart: {stateText[chartState]}"
       title="Hide, show or pin the Chord Chart"
     >
       {#snippet trigger(s)}
@@ -60,28 +73,30 @@
       {/snippet}
     </Picker>
     <!-- Hidden, the Chart collapses to its control, which brings it back. -->
-    {#if state === 'hidden'}{:else if !tuning}
-      <p class="muted note">
-        The Song's tuning, “{song.tuning.trim()}”, can't be read, so the Chord Chart has no diagrams.
-      </p>
-    {:else}
-      <ul class="row">
-        {#each chords as chord (chord.name)}
-          <li>
-            <span class="name" title={chord.name}>{chord.name}</span>
-            {#if chord.voicing}
-              <ChordDiagram voicing={chord.voicing} name={chord.name} />
-            {:else}
-              <span
-                class="empty"
-                role="img"
-                aria-label="{chord.name}: no diagram"
-                title="No diagram: Bandmate can't read this Chord or find a Voicing for it"
-              ></span>
-            {/if}
-          </li>
-        {/each}
-      </ul>
+    {#if chartState !== 'hidden'}
+      {#if !tuning}
+        <p class="muted note">
+          The Song's tuning, “{song.tuning.trim()}”, can't be read, so the Chord Chart has no diagrams.
+        </p>
+      {:else}
+        <ul class="row">
+          {#each chords as chord (chord.name)}
+            <li>
+              <span class="name" title={chord.name}>{chord.name}</span>
+              {#if chord.voicing}
+                <ChordDiagram voicing={chord.voicing} name={chord.name} />
+              {:else}
+                <span
+                  class="empty"
+                  role="img"
+                  aria-label="{chord.name}: no diagram"
+                  title="No diagram: Bandmate can't read this Chord or find a Voicing for it"
+                ></span>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      {/if}
     {/if}
   </section>
 {/if}
