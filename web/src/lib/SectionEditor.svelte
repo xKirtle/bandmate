@@ -357,7 +357,7 @@
   .section {
     padding: var(--space-2);
     border: 1px solid var(--border);
-    border-radius: 0.75rem;
+    border-radius: var(--radius-lg);
     background: var(--surface-1);
   }
   .head {
@@ -451,7 +451,7 @@
     right: 0.1875rem;
     width: 0.375rem;
     height: 0.375rem;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     background: var(--accent);
   }
   .choosing {
@@ -470,7 +470,7 @@
     gap: var(--space-2);
     padding: var(--space-2);
     border: 1px dashed var(--border);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     cursor: pointer;
   }
   .card.chosen {

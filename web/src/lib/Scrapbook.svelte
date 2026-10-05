@@ -226,7 +226,7 @@
   .scrapbook {
     padding: var(--space-3);
     border: 1px dashed var(--border);
-    border-radius: 0.75rem;
+    border-radius: var(--radius-lg);
   }
   h2 {
     font-size: var(--text-lg);
@@ -279,7 +279,7 @@
     min-width: 0;
     padding: var(--space-2) var(--space-3);
     border: 1px solid var(--border);
-    border-radius: 0.75rem;
+    border-radius: var(--radius-lg);
     background: var(--surface-1);
     color: var(--text);
     font: inherit;
@@ -306,7 +306,7 @@
     flex: none;
     margin-left: auto;
     padding: var(--space-1) var(--space-2);
-    border-radius: 999px;
+    border-radius: var(--radius-full);
     background: var(--surface-2);
     font-size: var(--text-xs);
     font-weight: 600;

@@ -182,7 +182,7 @@
     max-height: calc(100dvh - 2rem);
     padding: var(--space-4);
     border: 1px solid var(--border);
-    border-radius: 0.75rem;
+    border-radius: var(--radius-lg);
     background: var(--bg);
     color: var(--text);
   }
@@ -225,7 +225,7 @@
     aspect-ratio: 1;
     align-self: center;
     overflow: hidden;
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     background: var(--surface-1);
     cursor: grab;
     touch-action: none;

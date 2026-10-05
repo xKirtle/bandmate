@@ -333,7 +333,7 @@
     max-height: calc(100dvh - 2rem);
     padding: var(--space-4);
     border: 1px solid var(--border);
-    border-radius: 0.75rem;
+    border-radius: var(--radius-lg);
     background: var(--bg);
     color: var(--text);
   }
@@ -432,7 +432,7 @@
     margin: 0;
     padding: 0 var(--space-2);
     border: 1px solid var(--border);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     list-style: none;
   }
   .present li {
@@ -454,7 +454,7 @@
     display: inline-flex;
     flex: none;
     border: 1px solid var(--border);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     overflow: hidden;
   }
   .toggle label {

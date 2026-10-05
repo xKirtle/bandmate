@@ -3653,7 +3653,7 @@
     height: var(--touch);
     padding: 0;
     border: none;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     background: var(--accent);
     color: var(--accent-text);
     cursor: pointer;
@@ -3768,7 +3768,7 @@
     right: 0;
     z-index: 2;
     height: 3px;
-    border-radius: 2px;
+    border-radius: var(--radius-full);
     background: var(--accent);
     pointer-events: none;
   }
@@ -3803,7 +3803,7 @@
     min-height: 0;
     padding: 0 calc(0.25 * var(--timeline-rem));
     border: 1px solid transparent;
-    border-radius: calc(0.25 * var(--timeline-rem));
+    border-radius: calc(0.375 * var(--timeline-rem));
     background: none;
     color: var(--text);
     font: inherit;
@@ -3861,7 +3861,7 @@
     height: calc(1.25 * var(--timeline-rem));
     padding: 0;
     border: 1px solid var(--border);
-    border-radius: calc(0.25 * var(--timeline-rem));
+    border-radius: calc(0.375 * var(--timeline-rem));
     background: none;
     color: var(--text-muted);
     font-size: calc(0.75 * var(--timeline-rem));
@@ -3919,7 +3919,7 @@
     position: absolute;
     top: calc(0.25 * var(--timeline-rem));
     bottom: calc(0.125 * var(--timeline-rem));
-    border-radius: 999px;
+    border-radius: var(--radius-full);
     background: color-mix(in srgb, var(--text-muted) 60%, transparent);
     outline: 1px solid color-mix(in srgb, var(--bg) 60%, transparent);
     cursor: grab;
@@ -3961,7 +3961,7 @@
     bottom: 0;
     display: flex;
     justify-content: center;
-    border-radius: calc(0.125 * var(--timeline-rem));
+    border-radius: 0;
     background: var(--border);
   }
   .loop.on {
@@ -4052,7 +4052,7 @@
   .record-dot {
     width: calc(0.5 * var(--timeline-rem));
     height: calc(0.5 * var(--timeline-rem));
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     background: var(--danger);
   }
   .toggle.record[aria-pressed='true'] {
@@ -4062,13 +4062,13 @@
   }
   /* Stop is a square. */
   .toggle.record[aria-pressed='true'] .record-dot {
-    border-radius: 1px;
+    border-radius: 0;
     background: currentColor;
   }
   .not-calibrated {
     padding: var(--space-1) var(--space-2);
     border: 1px dashed var(--warning);
-    border-radius: 0.25rem;
+    border-radius: var(--radius-sm);
     background: none;
     color: var(--warning);
     font-size: var(--text-sm);
@@ -4131,7 +4131,7 @@
     flex-direction: column;
     overflow: hidden;
     border: 1px solid var(--accent);
-    border-radius: calc(0.25 * var(--timeline-rem));
+    border-radius: calc(0.375 * var(--timeline-rem));
     background: var(--surface-1);
     /* A long press opens the Clip's menu, not the browser's text selection or callout. */
     user-select: none;
@@ -4198,7 +4198,7 @@
     margin: 1px;
     padding: 0 calc(0.25 * var(--timeline-rem));
     border: 1px solid var(--border);
-    border-radius: calc(0.25 * var(--timeline-rem));
+    border-radius: calc(0.375 * var(--timeline-rem));
     background: var(--bg);
     color: var(--text);
     font: inherit;
@@ -4336,7 +4336,7 @@
     position: absolute;
     inset: 25%;
     border: 1px solid var(--bg);
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     background: var(--accent);
   }
   .fade-dot:hover::before,
@@ -4358,7 +4358,7 @@
     z-index: 1;
     padding: 0 calc(0.25 * var(--timeline-rem));
     border: 1px solid var(--border);
-    border-radius: calc(0.25 * var(--timeline-rem));
+    border-radius: calc(0.375 * var(--timeline-rem));
     background: var(--bg);
     color: var(--text);
     font-size: calc(0.75 * var(--timeline-rem));

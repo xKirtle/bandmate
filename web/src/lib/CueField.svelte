@@ -234,7 +234,7 @@
     min-height: 1.5rem;
     padding: 0 var(--space-2);
     border: 1px solid transparent;
-    border-radius: 0.375rem;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--text-muted);
     font: inherit;
@@ -276,7 +276,7 @@
     min-height: 1.5rem;
     padding: 0;
     border: 0;
-    border-radius: 0.375rem;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--text-muted);
     font: inherit;
@@ -305,7 +305,7 @@
     min-height: 1.5rem;
     padding: 0;
     border: 0;
-    border-radius: 0.375rem;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--text-muted);
     font: inherit;

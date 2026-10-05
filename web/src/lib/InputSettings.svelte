@@ -302,7 +302,7 @@
     margin: 0;
     padding: var(--space-4);
     border: 1px solid var(--border);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-lg);
     background: var(--bg);
     color: var(--text);
     box-shadow: var(--shadow-float);
@@ -329,7 +329,7 @@
   .meter {
     height: 0.75rem;
     overflow: hidden;
-    border-radius: 0.375rem;
+    border-radius: var(--radius-sm);
     background: var(--surface-2);
   }
   .meter-fill {
@@ -342,7 +342,7 @@
   }
   .clip {
     padding: 0 var(--space-2);
-    border-radius: 0.25rem;
+    border-radius: var(--radius-sm);
     color: var(--text-muted);
     font-size: var(--text-xs);
     font-weight: 600;

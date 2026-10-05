@@ -334,7 +334,7 @@
   .card {
     min-width: 0;
     border: 1px solid var(--border);
-    border-radius: 0.75rem;
+    border-radius: var(--radius-lg);
     background: var(--surface-1);
   }
   .card p {
@@ -586,7 +586,7 @@
     display: inline-block;
     min-width: 3rem;
     padding: var(--space-1) var(--space-2);
-    border-radius: 999px;
+    border-radius: var(--radius-full);
     font-size: var(--text-xs);
     font-weight: 600;
     letter-spacing: 0.02em;

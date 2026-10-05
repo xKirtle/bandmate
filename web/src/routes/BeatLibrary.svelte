@@ -452,7 +452,7 @@
     margin-bottom: var(--space-6);
     padding: var(--space-4);
     border: 1px solid var(--border);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-lg);
     background: var(--surface-1);
   }
   .adding h2 {
@@ -485,7 +485,7 @@
   .drop-target p {
     margin: 0;
     padding: var(--space-2) var(--space-4);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     background: var(--bg);
     color: var(--text);
     font-weight: 600;

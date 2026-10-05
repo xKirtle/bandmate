@@ -60,6 +60,29 @@ const spacing = {
   ],
 };
 
+// Radius: each corner is 0, one of the --radius-* tokens, or on the Timeline
+// a step of the same scale in its own unit (`full` needs no unit). A trigger
+// that takes the shape of what it wraps, e.g. the Cover that opens its
+// actions menu, takes it through --trigger-radius.
+// The steps are the --radius-* sizes in app.css, in rem: keep them in step.
+const radiusSteps = '(0\\.375|0\\.5|0\\.75)';
+const corner = [
+  '0',
+  'var\\(--radius-(sm|md|lg|full)\\)',
+  `calc\\(${radiusSteps} \\* var\\(--timeline-rem\\)\\)`,
+  'var\\(--trigger-radius(, var\\(--radius-md\\))?\\)',
+].join('|');
+const radiusProperty = '/^border(-.+)?-radius$/';
+const radius = {
+  [radiusProperty]: ['inherit', `/^(${corner})( (${corner})){0,3}$/`],
+};
+
+// A Cover's corners grow with the Cover, a fixed share of its size, like an
+// app icon's.
+const coverRadius = {
+  [radiusProperty]: [...radius[radiusProperty], '/^calc\\(var\\(--size\\) \\* 0\\.18\\)$/'],
+};
+
 export default {
   rules: {
     'color-no-invalid-hex': true,
@@ -67,7 +90,7 @@ export default {
     'property-no-unknown': true,
     'unit-no-unknown': true,
     ...colour,
-    'declaration-property-value-allowed-list': { ...shadows, ...type },
+    'declaration-property-value-allowed-list': { ...shadows, ...type, ...radius },
     'declaration-property-value-disallowed-list': spacing,
   },
   overrides: [
@@ -77,7 +100,7 @@ export default {
       files: ['src/palettes.css'],
       rules: {
         ...Object.fromEntries(Object.keys(colour).map((rule) => [rule, null])),
-        'declaration-property-value-allowed-list': type,
+        'declaration-property-value-allowed-list': { ...type, ...radius },
       },
     },
     // A Cover placeholder's initial grows with the Cover it stands in for.
@@ -87,8 +110,16 @@ export default {
         'declaration-property-value-allowed-list': {
           ...shadows,
           ...type,
+          ...coverRadius,
           'font-size': [...type['font-size'], '/^calc\\(var\\(--size\\) \\* [0-9.]+\\)$/'],
         },
+      },
+    },
+    // A Cover's corners grow with it.
+    {
+      files: ['src/lib/SongCover.svelte'],
+      rules: {
+        'declaration-property-value-allowed-list': { ...shadows, ...type, ...coverRadius },
       },
     },
   ],

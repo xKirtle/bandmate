@@ -169,7 +169,7 @@
     position: absolute;
     width: 0.875rem;
     height: 0.875rem;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     background: var(--text-muted);
     opacity: 0.35;
   }
@@ -181,7 +181,7 @@
     width: 0.75rem;
     height: 0.75rem;
     border: 1.5px solid var(--text);
-    border-radius: 50%;
+    border-radius: var(--radius-full);
   }
   .muted {
     font-size: var(--text-xl);
@@ -191,12 +191,12 @@
     position: relative;
     width: 1.125rem;
     height: 1.125rem;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     background: var(--text);
   }
   button:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: -2px;
-    border-radius: 0.25rem;
+    border-radius: var(--radius-sm);
   }
 </style>
