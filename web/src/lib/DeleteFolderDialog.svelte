@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { api, type Folder } from './api';
+  import { api, type Folder, type FolderSongs } from './api';
   import Dialog from './Dialog.svelte';
   import { songCount } from './listViews';
 
@@ -9,16 +9,19 @@
   let {
     folder,
     onDeleted,
+    onFailed,
     onClose,
   }: {
     folder: Folder;
     /** Hears the Folder as deleted, before the dialog closes. */
     onDeleted: () => void;
+    /** Hears that deleting it failed, perhaps partway, e.g. to load the Songs again. */
+    onFailed: () => void;
     onClose: () => void;
   } = $props();
 
   let dialog = $state<HTMLDialogElement>();
-  let songs = $state<'keep' | 'delete'>('keep');
+  let songs = $state<FolderSongs>('keep');
   let deleting = $state(false);
   let error = $state<string | null>(null);
   const count = $derived(songCount(folder.songs));
@@ -28,11 +31,12 @@
     deleting = true;
     error = null;
     try {
-      await api.deleteFolder(folder.id, songs);
+      await api.deleteFolder(folder, songs);
       onDeleted();
       dialog?.close();
     } catch (e) {
       error = `Couldn't delete the Folder (${(e as Error).message})`;
+      onFailed();
     } finally {
       deleting = false;
     }
@@ -59,7 +63,7 @@
         <input type="radio" name="folder-songs" value="delete" bind:group={songs} />
         <span>Delete its {count} too</span>
       </label>
-      <p class="choice-under warning">Deleted Songs, and everything in them, can't be brought back.</p>
+      <p class="choice-under for-good">Deleted Songs, and everything in them, can't be brought back.</p>
     </fieldset>
     {#if error}
       <p class="problem" role="alert">{error}</p>
@@ -85,9 +89,7 @@
   .choice-under {
     font-size: var(--text-md);
   }
-  .warning {
-    color: var(--danger);
-  }
+  .for-good,
   .problem {
     color: var(--danger);
   }

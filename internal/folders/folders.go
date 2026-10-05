@@ -141,12 +141,9 @@ func (s *Store) Rename(ctx context.Context, id int64, name string) (Folder, erro
 	return s.Get(ctx, id)
 }
 
-// SongIDs lists the ids of the Songs in a Folder, failing with ErrNotFound
-// if there's no such Folder.
+// SongIDs lists the ids of the Songs in a Folder: none if there's no such
+// Folder.
 func (s *Store) SongIDs(ctx context.Context, id int64) ([]int64, error) {
-	if _, err := s.Get(ctx, id); err != nil {
-		return nil, err
-	}
 	rows, err := s.db.QueryContext(ctx, `SELECT id FROM songs WHERE folder_id = ? ORDER BY id`, id)
 	if err != nil {
 		return nil, fmt.Errorf("listing folder's songs: %w", err)
@@ -177,8 +174,9 @@ func (s *Store) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 
-// checkName refuses, as a ConflictError, a name a Folder other than the one
-// with id except has, ignoring case. An except of 0 is none.
+// checkName refuses, as a ConflictError, a name another Folder already has,
+// ignoring case. The Folder with id except, the one being renamed, doesn't
+// count; ids start at 1, so a new Folder passes 0.
 func checkName(ctx context.Context, tx *sql.Tx, name string, except int64) error {
 	var taken string
 	err := tx.QueryRowContext(ctx, `SELECT name FROM folders WHERE folded = ? AND id <> ?`, fold(name), except).

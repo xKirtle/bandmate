@@ -2,39 +2,43 @@
   import { api, type Folder } from './api';
   import Dialog from './Dialog.svelte';
 
-  // Gives a Folder a new name. A name another Folder has, ignoring case, is
-  // refused, and the reason shown.
+  // Names a Folder: makes an empty one with a name, or, given a Folder,
+  // renames it. A name another Folder has, ignoring case, is refused, and the
+  // reason shown.
   let {
     folder,
-    onRenamed,
+    onSaved,
     onClose,
   }: {
-    folder: Folder;
-    /** Hears the Folder as renamed, before the dialog closes. */
-    onRenamed: (folder: Folder) => void;
+    /** The Folder to rename; left out, a new one is made. */
+    folder?: Folder;
+    /** Hears the Folder as made or renamed, before the dialog closes. */
+    onSaved: (folder: Folder) => void;
     onClose: () => void;
   } = $props();
 
+  const id = $props.id();
   let dialog = $state<HTMLDialogElement>();
   // Taken from the Folder as the dialog opens, and not followed after.
   // svelte-ignore state_referenced_locally
-  let name = $state(folder.name);
+  const before = folder?.name ?? '';
+  let name = $state(before);
   let saving = $state(false);
   let error = $state<string | null>(null);
 
   async function onsubmit(e: SubmitEvent) {
     e.preventDefault();
-    if (name.trim() === folder.name) {
+    if (folder && name.trim() === folder.name) {
       dialog?.close();
       return;
     }
     saving = true;
     error = null;
     try {
-      onRenamed(await api.renameFolder(folder.id, name));
+      onSaved(await (folder ? api.renameFolder(folder.id, name) : api.createFolder(name)));
       dialog?.close();
     } catch (e) {
-      error = `Couldn't rename the Folder (${(e as Error).message})`;
+      error = `Couldn't ${folder ? 'rename' : 'make'} the Folder (${(e as Error).message})`;
     } finally {
       saving = false;
     }
@@ -43,9 +47,9 @@
 
 <Dialog
   bind:dialog
-  title="Rename folder"
+  title={folder ? 'Rename folder' : 'New folder'}
   closeButton={saving ? 'disabled' : 'shown'}
-  dismissible={() => !saving && name.trim() === folder.name}
+  dismissible={() => !saving && name.trim() === before}
   oncancel={(e) => saving && e.preventDefault()}
   onclose={onClose}
 >
@@ -56,20 +60,21 @@
       <input
         bind:value={name}
         oninput={() => (error = null)}
+        placeholder={folder ? undefined : 'e.g. Summer EP'}
         autocomplete="off"
         enterkeyhint="done"
         required
         autofocus
         aria-invalid={error ? 'true' : undefined}
-        aria-describedby={error ? 'rename-folder-error' : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
       />
     </label>
     {#if error}
-      <p class="problem" id="rename-folder-error" role="alert">{error}</p>
+      <p class="problem" id="{id}-error" role="alert">{error}</p>
     {/if}
     <div class="actions">
       <button type="submit" class="button primary" disabled={saving || name.trim() === ''}>
-        {saving ? 'Saving…' : 'Save'}
+        {#if folder}{saving ? 'Saving…' : 'Save'}{:else}{saving ? 'Making…' : 'Make folder'}{/if}
       </button>
       <button type="button" class="button" onclick={() => dialog?.close()} disabled={saving}>Cancel</button>
     </div>

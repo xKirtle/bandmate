@@ -373,6 +373,32 @@ func TestDeletedFolderCanDeleteItsSongsToo(t *testing.T) {
 	}
 }
 
+// Asked to delete a Folder's Songs, counted as the user saw them, it deletes
+// none if the Folder holds another number by then, e.g. one filed into it
+// from another device.
+func TestDeletingAFoldersSongsRefusesAnotherCount(t *testing.T) {
+	ts := newTestServer(t)
+	ep := ts.createFolder("Summer EP")
+	for _, title := range []string{"Opener", "Closer"} {
+		s := ts.createSong(title)
+		expectStatus(t, ts.moveSong(s.ID, &ep.ID), http.StatusNoContent)
+	}
+
+	expectError(t, ts.Do(http.MethodDelete, folderPath(ep.ID)+"?songs=delete&count=1", nil),
+		http.StatusConflict, "“Summer EP” now holds 2 Songs, not 1")
+	expectError(t, ts.Do(http.MethodDelete, folderPath(ep.ID)+"?songs=delete&count=two", nil),
+		http.StatusBadRequest, "count must be a whole number")
+
+	if got := folderSongs(ts.listFolders()); !reflect.DeepEqual(got, map[string]int{"Summer EP": 2}) {
+		t.Errorf("songs per folder = %v, want Summer EP still holding both", got)
+	}
+
+	expectStatus(t, ts.Do(http.MethodDelete, folderPath(ep.ID)+"?songs=delete&count=2", nil), http.StatusNoContent)
+	if got := ts.listSongs(); len(got) != 0 {
+		t.Errorf("songs = %v, want none", titles(got))
+	}
+}
+
 func TestDeletingAFolderRefusesAnUnknownChoiceForItsSongs(t *testing.T) {
 	ts := newTestServer(t)
 	ep := ts.createFolder("Summer EP")

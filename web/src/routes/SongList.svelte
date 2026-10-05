@@ -10,6 +10,7 @@
   import ActionsMenu from '../lib/ActionsMenu.svelte';
   import { ApiError, api, statuses, type Folder, type SongSummary } from '../lib/api';
   import DeleteFolderDialog from '../lib/DeleteFolderDialog.svelte';
+  import FolderNameDialog from '../lib/FolderNameDialog.svelte';
   import {
     defaultSongListView,
     loadSongList,
@@ -23,8 +24,6 @@
   } from '../lib/listViews';
   import type { MenuAction } from '../lib/menu';
   import { newSongPath } from '../lib/newSong';
-  import NewFolderDialog from '../lib/NewFolderDialog.svelte';
-  import RenameFolderDialog from '../lib/RenameFolderDialog.svelte';
   import { navigate, replaceSearch, router } from '../lib/router.svelte';
   import SongCover from '../lib/SongCover.svelte';
   import StatusBadge from '../lib/StatusBadge.svelte';
@@ -176,9 +175,16 @@
     else changes++;
   }
 
-  // The Folder being renamed, or asked about deleting, if any.
+  // The Folder being renamed, if any, and the one asked about deleting, by
+  // id, so the dialog follows its Songs as the list loads again, e.g. after
+  // deleting them failed partway.
   let renaming = $state<Folder | null>(null);
-  let deleting = $state<Folder | null>(null);
+  let deletingId = $state<number | null>(null);
+  const deleting = $derived(deletingId === null ? undefined : folders?.find((f) => f.id === deletingId));
+  // Gone meanwhile, e.g. deleted elsewhere, it's no longer asked about.
+  $effect(() => {
+    if (deletingId !== null && folders && !deleting) deletingId = null;
+  });
   let folderError = $state<string | null>(null);
 
   // An empty Folder is deleted without asking; one holding Songs asks
@@ -186,11 +192,11 @@
   async function deleteFolder(f: Folder) {
     folderError = null;
     if (f.songs > 0) {
-      deleting = f;
+      deletingId = f.id;
       return;
     }
     try {
-      await api.deleteFolder(f.id, 'keep');
+      await api.deleteFolder(f, 'keep');
       deletedFolder(f);
     } catch (e) {
       folderError = `Couldn't delete “${f.name}” (${(e as Error).message})`;
@@ -445,16 +451,17 @@
 </main>
 
 {#if newFolder}
-  <NewFolderDialog onMade={madeFolder} onClose={() => (newFolder = null)} />
+  <FolderNameDialog onSaved={madeFolder} onClose={() => (newFolder = null)} />
 {/if}
 {#if renaming}
-  <RenameFolderDialog folder={renaming} onRenamed={() => changes++} onClose={() => (renaming = null)} />
+  <FolderNameDialog folder={renaming} onSaved={() => changes++} onClose={() => (renaming = null)} />
 {/if}
 {#if deleting}
   <DeleteFolderDialog
     folder={deleting}
     onDeleted={() => deleting && deletedFolder(deleting)}
-    onClose={() => (deleting = null)}
+    onFailed={() => changes++}
+    onClose={() => (deletingId = null)}
   />
 {/if}
 

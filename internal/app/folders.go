@@ -2,7 +2,9 @@ package app
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/xKirtle/bandmate/internal/folders"
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
@@ -66,15 +68,18 @@ func (a *App) renameFolder(w http.ResponseWriter, r *http.Request) {
 
 // deleteFolder removes a Folder. With ?songs=delete, its Songs are deleted
 // too, each as deleting a Song does; otherwise, or with ?songs=keep, they're
-// kept, in no Folder. Songs are deleted one by one before the Folder, so if
-// one fails, the Folder is left holding the rest, to try again.
+// kept, in no Folder. With &count=N, the Songs are deleted only if the
+// Folder still holds N, the number the user was asked about, so none filed
+// into it since go unseen. Songs are deleted one by one before the Folder,
+// so if one fails, the Folder is left holding the rest, to try again.
 func (a *App) deleteFolder(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
 		return
 	}
+	query := r.URL.Query()
 	var deleteSongs bool
-	switch r.URL.Query().Get("songs") {
+	switch query.Get("songs") {
 	case "", "keep":
 	case "delete":
 		deleteSongs = true
@@ -82,7 +87,25 @@ func (a *App) deleteFolder(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, `songs must be "keep" or "delete"`)
 		return
 	}
+	count := -1
+	if text := query.Get("count"); text != "" {
+		n, err := strconv.Atoi(text)
+		if err != nil || n < 0 {
+			writeError(w, http.StatusBadRequest, "count must be a whole number")
+			return
+		}
+		count = n
+	}
 	if deleteSongs {
+		f, err := a.folders.Get(r.Context(), id)
+		if err != nil {
+			writeFolderError(w, err)
+			return
+		}
+		if count >= 0 && f.Songs != count {
+			writeError(w, http.StatusConflict, fmt.Sprintf("“%s” now holds %s, not %d", f.Name, songCount(f.Songs), count))
+			return
+		}
 		songIDs, err := a.folders.SongIDs(r.Context(), id)
 		if err != nil {
 			writeFolderError(w, err)
@@ -102,6 +125,14 @@ func (a *App) deleteFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// songCount says how many Songs there are: "1 Song", "3 Songs".
+func songCount(n int) string {
+	if n == 1 {
+		return "1 Song"
+	}
+	return fmt.Sprintf("%d Songs", n)
 }
 
 // moveSongToFolder puts a Song into a Folder, or, with a null folderId,
