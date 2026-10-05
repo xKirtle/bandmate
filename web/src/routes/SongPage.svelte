@@ -1,5 +1,4 @@
 <script lang="ts">
-  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import Keyboard from '@lucide/svelte/icons/keyboard';
   import { onDestroy } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
@@ -14,6 +13,7 @@
     type Timeline as TimelineData,
   } from '../lib/api';
   import Combobox from '../lib/Combobox.svelte';
+  import FoldChevron from '../lib/FoldChevron.svelte';
   import LyricSheet from '../lib/LyricSheet.svelte';
   import Masters from '../lib/Masters.svelte';
   import Scrapbook from '../lib/Scrapbook.svelte';
@@ -618,14 +618,10 @@
             ontoggle={(e) => toggled(part, startsOpen, e.currentTarget.open)}
           >
             {#if part === 'masters'}
-              <summary
-                ><span class="chevron" aria-hidden="true"><ChevronRight /></span>{song.masters.length > 1
-                  ? 'Masters'
-                  : 'Master'}</summary
-              >
+              <summary><FoldChevron />{song.masters.length > 1 ? 'Masters' : 'Master'}</summary>
               <Masters {song} {mode} change={send} onUnsaved={setUnsaved} {setStatus} {recording} />
             {:else}
-              <summary><span class="chevron" aria-hidden="true"><ChevronRight /></span>Scrapbook</summary>
+              <summary><FoldChevron />Scrapbook</summary>
               <Scrapbook {song} change={send} {drag} onUnsaved={setUnsaved} onEditing={() => (syncing = false)} />
             {/if}
           </details>
@@ -813,13 +809,9 @@
     align-items: flex-end;
     gap: var(--space-2) var(--space-3);
   }
+  /* The Details' labels are a step smaller than a field's usual one. */
   .field {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
     font-size: var(--text-xs);
-    font-weight: 600;
-    color: var(--text-muted);
   }
   .field :global(input) {
     color: var(--text);
@@ -991,6 +983,7 @@
       min-height: 2.5rem;
       font-size: var(--text-xl);
     }
+    /* A card, as .card draws one, on desktop only. */
     .part {
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
@@ -1007,7 +1000,6 @@
       padding: 0 var(--space-3);
       font-weight: 700;
       cursor: pointer;
-      list-style: none;
       user-select: none;
     }
     .part[open] > summary {
@@ -1017,17 +1009,6 @@
     .part.drop-target {
       outline: 3px solid var(--accent);
       outline-offset: -3px;
-    }
-    .part > summary::-webkit-details-marker {
-      display: none;
-    }
-    .chevron {
-      display: flex;
-      color: var(--text-muted);
-      transition: transform var(--duration-fast) var(--ease);
-    }
-    .part[open] > summary .chevron {
-      transform: rotate(90deg);
     }
     .part > summary:focus-visible {
       outline: 2px solid var(--accent);

@@ -218,7 +218,7 @@
   </button>
 {/snippet}
 
-<article class="section" aria-label={labelOf(section)}>
+<article class="card section" aria-label={labelOf(section)}>
   <div class="head">
     {@render grip?.()}
     <label class="visually-hidden" for="label-{section.id}">Label</label>
@@ -284,7 +284,7 @@
           <!-- The radio takes the keyboard; a click anywhere else on the card is a shortcut to it. -->
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
           <div
-            class="card"
+            class="alternate"
             class:chosen={alt.active}
             class:dragged={drag?.alternate === alt.id}
             onclick={(e) => cardClicked(alt, e)}
@@ -361,9 +361,6 @@
 <style>
   .section {
     padding: var(--space-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--surface-1);
   }
   .head {
     display: flex;
@@ -469,7 +466,7 @@
     flex-direction: column;
     gap: var(--space-2);
   }
-  .card {
+  .alternate {
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
@@ -478,7 +475,7 @@
     border-radius: var(--radius-md);
     cursor: pointer;
   }
-  .card.chosen {
+  .alternate.chosen {
     border: 2px solid var(--accent);
     background: var(--bg);
   }
@@ -487,7 +484,7 @@
     align-items: center;
     gap: var(--space-2);
   }
-  .card.dragged {
+  .alternate.dragged {
     opacity: 0.5;
   }
   .grip {
@@ -502,7 +499,7 @@
   .grip:hover {
     color: var(--text);
   }
-  .card.dragged .grip {
+  .alternate.dragged .grip {
     cursor: grabbing;
   }
   .card-head input[type='radio'] {

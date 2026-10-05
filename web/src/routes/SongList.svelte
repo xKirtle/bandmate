@@ -248,25 +248,10 @@
   }
   .chip {
     flex-shrink: 0;
-    min-height: var(--control);
-    padding: 0 var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-full);
-    background: var(--surface-1);
-    color: var(--text);
-    font: inherit;
-    font-size: var(--text-md);
-    font-weight: 600;
     text-transform: capitalize;
-    cursor: pointer;
   }
   .chip.master {
     text-transform: none;
-  }
-  .chip[aria-pressed='true'] {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: var(--accent-text);
   }
   .songs {
     list-style: none;

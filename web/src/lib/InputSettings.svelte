@@ -214,7 +214,7 @@
 
 {#if open}
   <div
-    class="panel"
+    class="popover panel"
     role="dialog"
     aria-label="Recording settings"
     tabindex="-1"
@@ -293,19 +293,11 @@
 
 <style>
   .panel {
-    position: fixed;
-    inset: auto;
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
     width: min(22rem, calc(100vw - 2rem));
-    margin: 0;
     padding: var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    background: var(--bg);
-    color: var(--text);
-    box-shadow: var(--shadow-float);
   }
   label {
     display: flex;

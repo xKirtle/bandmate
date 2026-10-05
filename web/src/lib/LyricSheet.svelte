@@ -445,7 +445,7 @@
       <div class="chords">
         <button
           type="button"
-          class="button toggle"
+          class="button toggle outlined"
           aria-pressed={showChords}
           onclick={toggleChords}
           title="Show or hide the Chords">Chords</button
@@ -701,19 +701,6 @@
   .amount:disabled {
     opacity: 1;
     color: var(--text-muted);
-  }
-  .toggle[aria-pressed='true'] {
-    border-color: var(--accent);
-    background: var(--accent);
-    color: var(--accent-text);
-  }
-  /* In Read mode the Chords are drawn in the accent, so their toggle stays
-     quiet beside them: on, it's outlined and lettered in the accent, like
-     the Chord Chart's own controls, rather than filled. */
-  .chords .toggle[aria-pressed='true'] {
-    border-color: var(--accent);
-    background: var(--surface-1);
-    color: var(--accent);
   }
   .notice:empty {
     display: none;

@@ -1,10 +1,8 @@
 <script lang="ts">
-  import X from '@lucide/svelte/icons/x';
-  import { onMount } from 'svelte';
   import { api, type Beat } from './api';
-  import { closeOnBackdrop } from './backdrop';
   import BeatCredit from './BeatCredit.svelte';
   import BeatFields from './BeatFields.svelte';
+  import Dialog from './Dialog.svelte';
   import {
     changedDetails,
     describeOffer,
@@ -47,8 +45,6 @@
   let offer = $state<{ fileName: string; changes: Partial<BeatDraft> } | null>(null);
 
   const inUse = $derived(beat.songs.length > 0);
-
-  onMount(() => dialog?.showModal());
 
   function close() {
     dialog?.close();
@@ -129,23 +125,23 @@
   }
 </script>
 
-<dialog
-  bind:this={dialog}
-  {@attach closeOnBackdrop(nothingToLose)}
+<Dialog
+  bind:dialog
+  title="Edit “{beat.title}”"
+  closeButton={busy === null ? 'shown' : 'disabled'}
+  dismissible={nothingToLose}
+  sheet
   onclose={onClose}
   oncancel={cancel}
-  aria-labelledby="beat-edit-heading"
+  --dialog-width="36rem"
+  --dialog-max-height="min(44rem, calc(100dvh - 2rem))"
 >
-  <header>
-    <div class="credit">
-      <h2 id="beat-edit-heading">Edit “{beat.title}”</h2>
-      <BeatCredit {beat} />
-      {#if inUse}
-        <p class="muted songs">Used in {beat.songs.map((s) => s.title).join(', ')}</p>
-      {/if}
-    </div>
-    <button type="button" class="icon" onclick={close} aria-label="Close" disabled={busy !== null}><X /></button>
-  </header>
+  {#snippet detail()}
+    <BeatCredit {beat} />
+    {#if inUse}
+      <p class="muted songs">Used in {beat.songs.map((s) => s.title).join(', ')}</p>
+    {/if}
+  {/snippet}
 
   <form onsubmit={save}>
     {#if offer}
@@ -189,58 +185,9 @@
   {#if error}
     <p class="error" role="alert">{error}</p>
   {/if}
-</dialog>
+</Dialog>
 
 <style>
-  dialog {
-    width: min(36rem, calc(100vw - 2rem));
-    max-height: min(44rem, calc(100dvh - 2rem));
-    padding: var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--bg);
-    color: var(--text);
-  }
-  dialog[open] {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-  }
-  dialog::backdrop {
-    background: var(--scrim);
-  }
-  /* A phone gives the whole screen to it, clear of the notch and home
-     indicator. */
-  @media (width < 40rem) {
-    dialog {
-      width: 100%;
-      max-width: none;
-      height: 100%;
-      max-height: none;
-      margin: 0;
-      padding: max(var(--space-4), env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right))
-        max(var(--space-4), env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
-      border: none;
-      border-radius: 0;
-    }
-  }
-  header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-3);
-  }
-  .credit {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-    min-width: 0;
-  }
-  h2 {
-    margin: 0;
-    font-size: var(--text-xl);
-    overflow-wrap: anywhere;
-  }
   .songs {
     margin: 0;
     font-size: var(--text-md);
@@ -296,14 +243,6 @@
   .hint {
     margin: 0;
     font-size: var(--text-sm);
-  }
-  label.disabled {
-    opacity: 0.6;
-    cursor: default;
-  }
-  label.button:has(input:focus-visible) {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
   }
   p[role] {
     margin: 0;

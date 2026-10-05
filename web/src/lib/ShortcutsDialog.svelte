@@ -1,7 +1,6 @@
 <script lang="ts">
-  import X from '@lucide/svelte/icons/x';
   import { onMount } from 'svelte';
-  import { closeOnBackdrop } from './backdrop';
+  import Dialog from './Dialog.svelte';
   import { platform, shortcuts } from './shortcuts';
   import { dialogGroups } from './shortcutsDialog';
 
@@ -15,24 +14,18 @@
 
   // It takes focus itself, not its ✕, so Space scrolls the list rather
   // than closing it, as arrows do.
-  onMount(() => {
-    dialog?.showModal();
-    dialog?.focus();
-  });
+  onMount(() => dialog?.focus());
 </script>
 
-<dialog
-  bind:this={dialog}
-  {@attach closeOnBackdrop(() => true)}
+<Dialog
+  bind:dialog
+  title="Keyboard shortcuts"
+  dismissible={() => true}
   onclose={onClose}
-  aria-labelledby="shortcuts-heading"
-  tabindex="-1"
+  tabindex={-1}
+  --dialog-width="40rem"
+  --dialog-gap="var(--space-4)"
 >
-  <header>
-    <h2 id="shortcuts-heading">Keyboard shortcuts</h2>
-    <button type="button" class="icon" onclick={() => dialog?.close()} aria-label="Close"><X /></button>
-  </header>
-
   {#each groups as { group, rows }, g (group)}
     <section aria-labelledby="shortcuts-group-{g}">
       <h3 id="shortcuts-group-{g}">{group}</h3>
@@ -60,40 +53,9 @@
       </ul>
     </section>
   {/each}
-</dialog>
+</Dialog>
 
 <style>
-  dialog {
-    width: min(40rem, calc(100vw - 2rem));
-    max-height: calc(100dvh - 2rem);
-    padding: var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--bg);
-    color: var(--text);
-  }
-  dialog[open] {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-  }
-  /* Focused itself only to hold focus for the list. */
-  dialog:focus-visible {
-    outline: none;
-  }
-  dialog::backdrop {
-    background: var(--scrim);
-  }
-  header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-3);
-  }
-  h2 {
-    margin: 0;
-    font-size: var(--text-xl);
-  }
   h3 {
     margin: 0 0 var(--space-1);
     font-size: var(--text-md);

@@ -1,9 +1,7 @@
 <script lang="ts">
-  import X from '@lucide/svelte/icons/x';
-  import { onMount } from 'svelte';
   import { api, type Backup, type Beat, type SongSummary } from './api';
-  import { closeOnBackdrop } from './backdrop';
   import { backupName, backupSize, beatCount, beatsBrought, broughtNote, newBackup } from './backups';
+  import Dialog from './Dialog.svelte';
   import PickList from './PickList.svelte';
 
   // "New Backup": ticks what goes in, Songs and Beats (some or all of each),
@@ -45,8 +43,6 @@
   );
   const name = $derived('name' in toMake ? toMake.name : '');
 
-  onMount(() => dialog?.showModal());
-
   Promise.all([api.listSongs(), api.listBeats()]).then(
     ([songList, beatList]) => {
       songs = [...songList].sort((a, b) => a.title.localeCompare(b.title));
@@ -80,20 +76,14 @@
   }
 </script>
 
-<dialog
-  bind:this={dialog}
-  {@attach closeOnBackdrop(() => phase !== 'making')}
+<Dialog
+  bind:dialog
+  title="New Backup"
+  closeButton={phase === 'making' ? 'hidden' : 'shown'}
+  dismissible={() => phase !== 'making'}
   {oncancel}
   onclose={onClose}
-  aria-labelledby="new-backup-heading"
 >
-  <header>
-    <h2 id="new-backup-heading">New Backup</h2>
-    {#if phase !== 'making'}
-      <button type="button" class="icon" onclick={() => dialog?.close()} aria-label="Close"><X /></button>
-    {/if}
-  </header>
-
   {#if phase === 'picking'}
     {#if loadError}
       <p class="problem" role="alert">{loadError}</p>
@@ -102,9 +92,9 @@
     {:else if songs.length === 0 && beats.length === 0}
       <p>There are no Songs or Beats to back up yet.</p>
     {:else}
-      <fieldset>
+      <fieldset class="choice-group">
         <legend>What goes in</legend>
-        <label>
+        <label class="choice-row">
           <input
             type="checkbox"
             bind:checked={songsTicked}
@@ -113,7 +103,7 @@
           />
           <span>Songs</span>
         </label>
-        <div class="nested">
+        <div class="choice-under">
           <p id="backup-songs-note" class="muted">
             Each Song goes in whole, from its Lyric Sheet to its Timeline, Cover and Masters, with the Beats its Clips
             use.
@@ -125,7 +115,7 @@
             {/if}
           {/if}
         </div>
-        <label>
+        <label class="choice-row">
           <input
             type="checkbox"
             bind:checked={beatsTicked}
@@ -134,7 +124,7 @@
           />
           <span>Beat Library <span class="muted">· {beatCount(beats.length)}</span></span>
         </label>
-        <div class="nested">
+        <div class="choice-under">
           <p id="backup-beat-library-note" class="muted">Each Beat goes in with its credit.</p>
           {#if beatsTicked}
             <PickList
@@ -182,74 +172,11 @@
       <button type="button" class="button" onclick={() => dialog?.close()}>Done</button>
     {/if}
   </div>
-</dialog>
+</Dialog>
 
 <style>
-  dialog {
-    --checkbox: 1.25rem;
-    width: min(28rem, calc(100vw - 2rem));
-    max-height: calc(100dvh - 2rem);
-    padding: var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--bg);
-    color: var(--text);
-  }
-  dialog[open] {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-  }
-  dialog::backdrop {
-    background: var(--scrim);
-  }
-  header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-3);
-  }
-  h2 {
-    margin: 0;
-    font-size: var(--text-xl);
-  }
   p {
     margin: 0;
-  }
-  fieldset {
-    display: flex;
-    flex-direction: column;
-    margin: 0;
-    padding: 0;
-    border: 0;
-  }
-  legend {
-    margin-bottom: var(--space-2);
-    padding: 0;
-    font-weight: 600;
-  }
-  label {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    min-height: var(--control);
-    cursor: pointer;
-  }
-  label input {
-    flex: none;
-    width: var(--checkbox);
-    height: var(--checkbox);
-    min-height: 0;
-    margin: 0;
-    padding: 0;
-    accent-color: var(--accent);
-  }
-  /* What's under a checkbox (its note, and for Songs their list), lined up with its label. */
-  .nested {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    margin: 0 0 var(--space-2) calc(var(--checkbox) + var(--space-2));
   }
   progress {
     width: 100%;

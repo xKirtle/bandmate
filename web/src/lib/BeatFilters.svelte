@@ -75,7 +75,7 @@
     </button>
     {@render actions?.()}
   </div>
-  <div id="{idPrefix}-filters" class="drawer" class:open={drawerOpen}>
+  <div id="{idPrefix}-filters" class="card drawer" class:open={drawerOpen}>
     <div class="field">
       <span id="{idPrefix}-producer-label">Producer</span>
       <Picker
@@ -169,24 +169,15 @@
     align-items: end;
     gap: var(--space-3);
     padding: var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--surface-1);
   }
   .drawer.open {
     display: flex;
   }
   .field {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
     min-width: 8rem;
     margin: 0;
     padding: 0;
     border: none;
-    color: var(--text-muted);
-    font-size: var(--text-sm);
-    font-weight: 600;
   }
   .bpm {
     flex-direction: row;
@@ -208,22 +199,11 @@
     flex-wrap: wrap;
     gap: var(--space-2);
   }
-  .chip {
-    min-height: var(--control);
-    padding: 0 var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-full);
-    background: var(--bg);
-    color: var(--text);
-    font: inherit;
-    font-size: var(--text-md);
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .chip[aria-pressed='true'] {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: var(--accent-text);
+  /* On the drawer's card, a chip that's off takes the page's colour. */
+  @media (width < 80rem) {
+    .chip:not([aria-pressed='true']) {
+      background: var(--bg);
+    }
   }
   .hint {
     margin: 0;
@@ -249,9 +229,6 @@
       padding: 0;
       border: none;
       background: none;
-    }
-    .chip {
-      background: var(--surface-1);
     }
     .hint {
       align-self: center;

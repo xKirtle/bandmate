@@ -23,14 +23,7 @@
 
 <style>
   .badge {
-    display: inline-block;
-    padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius-full);
-    font-size: var(--text-xs);
-    font-weight: 600;
-    letter-spacing: 0.02em;
     text-transform: capitalize;
-    white-space: nowrap;
     background: var(--surface-2);
     color: var(--text-muted);
   }

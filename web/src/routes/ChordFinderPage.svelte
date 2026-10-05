@@ -59,13 +59,7 @@
     margin: 0 0 var(--space-4);
   }
   .field {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
     min-width: 0;
-    color: var(--text-muted);
-    font-size: var(--text-sm);
-    font-weight: 600;
   }
   .tuning {
     flex: 1 1 16rem;

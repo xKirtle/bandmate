@@ -67,7 +67,7 @@
     <div class="controls">
       <button
         type="button"
-        class="control"
+        class="control toggle outlined"
         aria-pressed={shown}
         onclick={() => chordChartState.setShown(!shown)}
         aria-label="Show the Chord Chart"
@@ -81,7 +81,7 @@
       {#if shown}
         <button
           type="button"
-          class="control"
+          class="control toggle outlined"
           aria-pressed={pinned}
           onclick={() => chordChartState.setPinned(!pinned)}
           aria-label="Pin the Chord Chart to the top"
@@ -172,12 +172,8 @@
     font-weight: 600;
     cursor: pointer;
   }
-  .control:hover {
+  .control:hover:not([aria-pressed='true']) {
     color: var(--text);
-  }
-  .control[aria-pressed='true'] {
-    border-color: var(--accent);
-    color: var(--accent);
   }
   /* A size up from the label beside it. */
   .control :global(.lucide-icon) {

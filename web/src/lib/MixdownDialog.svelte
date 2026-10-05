@@ -1,8 +1,7 @@
 <script lang="ts">
-  import X from '@lucide/svelte/icons/x';
-  import { onDestroy, onMount, untrack } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import type { TimelineLoop } from './api';
-  import { closeOnBackdrop } from './backdrop';
+  import Dialog from './Dialog.svelte';
   import {
     levelsOf,
     mixdownFormats,
@@ -64,7 +63,6 @@
   const name = $derived(mixdownName(songTitle, chosen, format));
   const span = (range: MixdownRange) => `${formatDuration(range.start)}–${formatDuration(range.end)}`;
 
-  onMount(() => dialog?.showModal());
   onDestroy(() => mixing?.abort());
 
   async function start() {
@@ -132,25 +130,19 @@
 </script>
 
 <!-- A click outside closes it, but never while it's mixing: Cancel, or Esc, does. -->
-<dialog
-  bind:this={dialog}
-  {@attach closeOnBackdrop(() => phase !== 'mixing')}
+<Dialog
+  bind:dialog
+  title="Mix down"
+  closeButton={phase === 'mixing' ? 'hidden' : 'shown'}
+  dismissible={() => phase !== 'mixing'}
   {onclose}
-  aria-labelledby="mixdown-heading"
 >
-  <header>
-    <h2 id="mixdown-heading">Mix down</h2>
-    {#if phase !== 'mixing'}
-      <button type="button" class="icon" onclick={() => dialog?.close()} aria-label="Close"><X /></button>
-    {/if}
-  </header>
-
   {#if phase === 'ready'}
     {#if ranges.length > 1}
-      <fieldset>
+      <fieldset class="choice-group">
         <legend>What to mix down</legend>
         {#each ranges as range (range.of)}
-          <label>
+          <label class="choice-row">
             <input type="radio" name="mixdown-range" checked={chosen === range} onchange={() => (chosen = range)} />
             <span
               >{range.of === 'loop' ? 'Loop' : 'Whole Timeline'}
@@ -166,10 +158,10 @@
         its volume, with mute and solo as they are.
       </p>
     {/if}
-    <fieldset>
+    <fieldset class="choice-group">
       <legend>Format</legend>
       {#each mixdownFormats as f (f.id)}
-        <label>
+        <label class="choice-row">
           <input type="radio" name="mixdown-format" checked={format === f} onchange={() => pick(f)} />
           <span>{f.label}</span>
         </label>
@@ -215,65 +207,11 @@
       <button type="button" class="button" onclick={() => dialog?.close()}>Cancel</button>
     {/if}
   </div>
-</dialog>
+</Dialog>
 
 <style>
-  dialog {
-    width: min(28rem, calc(100vw - 2rem));
-    padding: var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--bg);
-    color: var(--text);
-  }
-  dialog[open] {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-  }
-  dialog::backdrop {
-    background: var(--scrim);
-  }
-  header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-3);
-  }
-  h2 {
-    margin: 0;
-    font-size: var(--text-xl);
-  }
   p {
     margin: 0;
-  }
-  fieldset {
-    display: flex;
-    flex-direction: column;
-    margin: 0;
-    padding: 0;
-    border: 0;
-  }
-  legend {
-    margin-bottom: var(--space-2);
-    padding: 0;
-    font-weight: 600;
-  }
-  label {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    min-height: var(--control);
-    cursor: pointer;
-  }
-  label input {
-    flex: none;
-    width: 1.25rem;
-    height: 1.25rem;
-    min-height: 0;
-    margin: 0;
-    padding: 0;
-    accent-color: var(--accent);
   }
   .times {
     white-space: nowrap;

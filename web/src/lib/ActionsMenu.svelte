@@ -261,7 +261,7 @@
   </button>
   {#if open}
     <div
-      class="menu"
+      class="popover menu"
       role="menu"
       aria-label={label}
       tabindex="-1"
@@ -275,7 +275,7 @@
           {picking.label}
         </button>
         {#if field}
-          <label class="field" title={fieldHint(field, hints)}>
+          <label class="menu-field" title={fieldHint(field, hints)}>
             <input
               type="number"
               step={field.step}
@@ -341,17 +341,10 @@
        starts past it. */
     --icon-width: 1.25rem;
     --past-icon: calc(var(--space-3) + var(--icon-width) + var(--space-3));
-    position: fixed;
-    inset: auto;
     display: flex;
     flex-direction: column;
     max-width: calc(100vw - 2rem);
-    margin: 0;
     padding: var(--space-1);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    background: var(--bg);
-    box-shadow: var(--shadow-float);
   }
   /* Focused itself only when opened by pointer, where a ring round it all
      would be stray: that it's open shows it has focus. */
@@ -404,7 +397,7 @@
     color: var(--text-muted);
   }
   /* A field sits under the entry it's for, like a choice. */
-  .field {
+  .menu-field {
     display: flex;
     align-items: center;
     gap: var(--space-2);
@@ -412,7 +405,7 @@
     padding: 0 var(--space-3) 0 var(--past-icon);
     color: var(--text-muted);
   }
-  .field input {
+  .menu-field input {
     width: 6rem;
   }
 </style>

@@ -245,7 +245,7 @@
 
 <svelte:window onbeforeunload={warnBeforeUnload} />
 
-<section class="batch" aria-labelledby="batch-heading">
+<section class="card batch" aria-labelledby="batch-heading">
   <div class="head">
     <h2 id="batch-heading">Add Beats</h2>
     {#if unread > 0}
@@ -455,9 +455,6 @@
     gap: var(--space-3);
     margin-bottom: var(--space-6);
     padding: var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--surface-1);
   }
   .head {
     display: flex;

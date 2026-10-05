@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { centredSquare, maxCoverZoom, moveSquare, wholeSquare, zoomSquare, type Point, type Square } from './cover';
   import type { CoverToCrop } from './coverUpload';
+  import Dialog from './Dialog.svelte';
 
   // The crop step of adding a Cover or adjusting its crop: a square frame
   // over the picture, which is dragged under it and zoomed by pinching,
@@ -40,7 +41,6 @@
   const scale = $derived((stageSide - 2 * margin) / crop.size);
 
   onMount(() => {
-    dialog?.showModal();
     return () => URL.revokeObjectURL(url);
   });
 
@@ -126,8 +126,7 @@
 </script>
 
 <!-- A click outside never closes it, as its framing would be lost. -->
-<dialog bind:this={dialog} onclose={onClose} aria-labelledby="cover-crop-heading">
-  <h2 id="cover-crop-heading">Choose the Cover</h2>
+<Dialog bind:dialog title="Choose the Cover" closeButton="hidden" sheet onclose={onClose}>
   <p class="muted hint">Drag to move the picture in the square. Pinch, scroll or use the slider to zoom.</p>
 
   <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
@@ -174,45 +173,9 @@
     <button type="button" class="button primary" onclick={confirm}>{confirmLabel}</button>
     <button type="button" class="button" onclick={() => dialog?.close()}>Cancel</button>
   </div>
-</dialog>
+</Dialog>
 
 <style>
-  dialog {
-    width: min(28rem, calc(100vw - 2rem));
-    max-height: calc(100dvh - 2rem);
-    padding: var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--bg);
-    color: var(--text);
-  }
-  dialog[open] {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-  }
-  dialog::backdrop {
-    background: var(--scrim);
-  }
-  /* A phone gives the whole screen to it, clear of the notch and home
-     indicator. */
-  @media (width < 40rem) {
-    dialog {
-      width: 100%;
-      max-width: none;
-      height: 100%;
-      max-height: none;
-      margin: 0;
-      padding: max(var(--space-4), env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right))
-        max(var(--space-4), env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
-      border: none;
-      border-radius: 0;
-    }
-  }
-  h2 {
-    margin: 0;
-    font-size: var(--text-xl);
-  }
   .hint {
     margin: 0;
     font-size: var(--text-md);

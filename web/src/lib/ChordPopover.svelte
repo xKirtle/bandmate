@@ -151,7 +151,7 @@
 
 {#if opened && found}
   <div
-    class="chord-popover"
+    class="popover chord-popover"
     role="dialog"
     tabindex="-1"
     aria-label="{opened.name} diagram"
@@ -206,19 +206,11 @@
 
 <style>
   .chord-popover {
-    position: fixed;
-    inset: auto;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: var(--space-1);
-    margin: 0;
     padding: var(--space-2) var(--space-3) var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    background: var(--bg);
-    color: var(--text);
-    box-shadow: var(--shadow-float);
   }
   .name {
     color: var(--accent);

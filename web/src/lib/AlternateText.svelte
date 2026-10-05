@@ -171,7 +171,7 @@
 <!-- Hovering only shows a Line's ✕; the keyboard reaches it in the gutter slot. -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="field"
+  class="line-field"
   class:cued={cueing}
   class:with-gutter={cueing?.gutter}
   class:syncing={cueing?.sync}
@@ -271,7 +271,7 @@
      last takes whatever the text box's minimum height adds. Its own stacking
      context keeps the text box's and rows' z-index inside it, so they never
      draw over the sticky header or Timeline. */
-  .field.cued {
+  .line-field.cued {
     --inset-block: calc(var(--space-2) + 1px);
     isolation: isolate;
     display: grid;
@@ -279,7 +279,7 @@
     grid-template-rows: var(--inset-block) repeat(var(--rows), auto) minmax(var(--inset-block), 1fr);
     column-gap: var(--space-2);
   }
-  .field.with-gutter {
+  .line-field.with-gutter {
     grid-template-columns: minmax(0, 1fr) auto;
   }
   .cued .text {
