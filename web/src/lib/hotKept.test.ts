@@ -24,7 +24,7 @@ describe('hotKept', () => {
     expect(made).toBe(1);
   });
 
-  it('hands a value made by a later run on too', () => {
+  it('keeps a value first made after an update', () => {
     const data: Record<string, unknown> = {};
     let made = 0;
     const make = () => ({ n: ++made });
