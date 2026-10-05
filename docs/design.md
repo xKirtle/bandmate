@@ -1,6 +1,6 @@
 # Design
 
-How Bandmate looks, and why. The values themselves live in the tokens at the top of `web/src/app.css`; this page says what each is for and when to use it. Decided in the visual identity spec, #565, and recorded in [ADR 0014](adr/0014-every-style-value-comes-from-a-token.md).
+How Bandmate looks, and why. The values themselves live in the tokens: the colours in `web/src/palettes.css`, the rest at the top of `web/src/app.css`; this page says what each is for and when to use it. Decided in the visual identity spec, #565, and recorded in [ADR 0014](adr/0014-every-style-value-comes-from-a-token.md).
 
 ## Personality
 
@@ -29,7 +29,7 @@ Colours are named by role, never by hue, so a component reads the same in every 
 - **Ink**: fountain-pen blue on cream, or blue-black.
 - **Olive**: muted green on stone.
 
-The user picks a Palette, and System, Light or Dark, in Settings, kept per device. Ink and Olive, and Settings, are _to come_ (#568, #578). All Clips on the Timeline use the one accent, and the Chosen Track is marked by an accent edge on its header.
+The `data-palette` attribute on the root element picks one (`ink` or `olive`; Terracotta when it's absent), and Light or Dark follows the system. The user will pick a Palette, and System, Light or Dark, in Settings, kept per device (_to come_, #578). All Clips on the Timeline use the one accent, and the Chosen Track is marked by an accent edge on its header.
 
 | Token                             | For                                                                      |
 | --------------------------------- | ------------------------------------------------------------------------ |
@@ -41,9 +41,20 @@ The user picks a Palette, and System, Light or Dark, in Settings, kept per devic
 | `--danger`, `--warning`           | Destructive actions and errors; warnings                                 |
 | `--drafting-*`, `--finished-*`    | The drafting and finished Status badges (`-bg` and `-fg`)                |
 
-A scrim, a floating-layer shadow and a selected outline, shared by every Palette, are _to come_ (#568).
+Shared by every Palette, the scrim and the only shadows there are:
 
-**Contrast floor**, in both themes of every Palette: 4.5:1 for all text, 3:1 for controls and anything else that carries meaning, and 7:1 for Lines in Read mode. Chords in Read mode are held to 4.5:1, since Terracotta's accent misses 7:1 and that was accepted. A test checks every meaningful pair (_to come_, #568).
+| Token                | For                                                                         |
+| -------------------- | --------------------------------------------------------------------------- |
+| `--scrim`            | Dims what's behind a dialog, or outside a Cover's crop                      |
+| `--on-scrim`         | Drawn on the scrim, whatever the theme, e.g. the Cover crop's frame         |
+| `--shadow-float`     | Lifts a floating layer (a popover, menu or floating bar) off the page       |
+| `--selected-outline` | Rings what's selected, such as a Clip, or what a drop would land on         |
+| `--selected-edge`    | Marks the current or chosen row along its left edge, e.g. the Chosen Track  |
+| `--invalid-outline`  | Rings a field holding an invalid value, inside its danger border            |
+
+A literal colour is written only in `palettes.css`, and a `box-shadow` is always one of these tokens: Stylelint fails anything else. A tint of a token, such as `color-mix(in srgb, var(--accent) 12%, transparent)`, is allowed.
+
+**Contrast floor**, in both themes of every Palette: 4.5:1 for all text, 3:1 for controls and anything else that carries meaning, and 7:1 for Lines in Read mode. Chords in Read mode are held to 4.5:1, since Terracotta's accent misses 7:1 and that was accepted. `palettes.test.ts` checks every meaningful pair, so a Palette that breaks the floor fails CI.
 
 ### Type
 
