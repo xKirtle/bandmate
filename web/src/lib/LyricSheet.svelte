@@ -20,6 +20,7 @@
   import { follower, lineKey } from './follow';
   import { gutterFields } from './gutter';
   import { keyHints } from './keyHints';
+  import ChordChart from './ChordChart.svelte';
   import LyricSheetView from './LyricSheetView.svelte';
   import ActionsMenu from './ActionsMenu.svelte';
   import type { MenuAction } from './menu';
@@ -540,6 +541,9 @@
   {/if}
 
   {#if mode === 'read'}
+    {#if chordsOnScreen}
+      <ChordChart {song} {transpose} />
+    {/if}
     <LyricSheetView {song} showChords={chordsOnScreen} {transpose} {current} play={leadInto} />
   {:else}
     <ol
