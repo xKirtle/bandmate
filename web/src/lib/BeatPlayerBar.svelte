@@ -92,8 +92,8 @@
        narrower it shrinks while both sides keep room to read. */
     grid-template-columns: minmax(10rem, 1fr) minmax(0, 60rem) minmax(10rem, 1fr);
     align-items: center;
-    gap: 1rem;
-    padding: 0.5rem var(--gutter) max(0.5rem, env(safe-area-inset-bottom));
+    gap: var(--space-4);
+    padding: var(--space-2) var(--gutter) max(var(--space-2), env(safe-area-inset-bottom));
     border-top: 1px solid var(--border);
     background: var(--bg);
   }

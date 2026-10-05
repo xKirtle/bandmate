@@ -639,14 +639,14 @@
 
 <style>
   .sheet {
-    margin-bottom: 2rem;
+    margin-bottom: var(--space-8);
   }
   .head {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
   }
   h2 {
     font-size: var(--text-lg);
@@ -658,11 +658,11 @@
   .shift {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
-    margin-left: 0.5rem;
+    gap: var(--space-1);
+    margin-left: var(--space-2);
   }
   .shift :global(.shift-step) {
-    margin-left: 0.25rem;
+    margin-left: var(--space-1);
   }
   .shift-by {
     min-width: var(--control);
@@ -671,12 +671,12 @@
   .chords {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   .transpose {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: var(--space-1);
   }
   .step {
     min-width: var(--control);
@@ -685,7 +685,7 @@
   /* Wide enough for "−11", so the steps don't move as the amount changes. */
   .amount {
     min-width: 3.25rem;
-    padding: 0 0.5rem;
+    padding: 0 var(--space-2);
     font-variant-numeric: tabular-nums;
   }
   .amount:disabled {
@@ -707,14 +707,14 @@
     font-size: var(--text-sm);
   }
   .hint {
-    margin: 0.5rem 0 0;
+    margin: var(--space-2) 0 0;
     font-size: var(--text-sm);
   }
   .arrangement {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    margin: 0 0 0.75rem;
+    gap: var(--space-3);
+    margin: 0 0 var(--space-3);
     padding: 0;
     list-style: none;
   }
@@ -770,7 +770,7 @@
     position: absolute;
     top: -0.625rem;
     right: 0.75rem;
-    padding: 0 0.5rem;
+    padding: 0 var(--space-2);
     border-radius: 999px;
     background: var(--accent);
     color: var(--accent-text);
@@ -791,7 +791,7 @@
   .add-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   .add,
   .duplicate {

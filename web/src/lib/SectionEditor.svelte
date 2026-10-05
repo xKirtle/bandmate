@@ -355,7 +355,7 @@
 
 <style>
   .section {
-    padding: 0.5rem;
+    padding: var(--space-2);
     border: 1px solid var(--border);
     border-radius: 0.75rem;
     background: var(--surface-1);
@@ -364,8 +364,8 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.25rem 0.5rem;
-    margin-bottom: 0.5rem;
+    gap: var(--space-1) var(--space-2);
+    margin-bottom: var(--space-2);
   }
   /* Sized to its text, so the actions keep the rest of the row, with room
      at the end for ▾. Browsers without field-sizing get a fixed width
@@ -402,7 +402,7 @@
   .actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.25rem;
+    gap: var(--space-1);
     margin-left: auto;
   }
   /* A phone keeps the header on one row: the Label gives way, cut off, before
@@ -413,7 +413,7 @@
       flex-wrap: nowrap;
     }
     .head {
-      column-gap: 0.25rem;
+      column-gap: var(--space-1);
     }
     .head > :global(.combobox) {
       flex-shrink: 1;
@@ -421,7 +421,7 @@
     }
     .head :global(.label) {
       min-width: 4rem;
-      padding-inline-start: 0.5rem;
+      padding-inline-start: var(--space-2);
     }
     .actions {
       flex-shrink: 0;
@@ -457,18 +457,18 @@
   .choosing {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   .cards {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   .card {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    padding: 0.5rem;
+    gap: var(--space-2);
+    padding: var(--space-2);
     border: 1px dashed var(--border);
     border-radius: 0.5rem;
     cursor: pointer;
@@ -480,7 +480,7 @@
   .card-head {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   .card.dragged {
     opacity: 0.5;
@@ -512,7 +512,7 @@
     min-width: 0;
   }
   .lines {
-    padding: 0 0.25rem;
+    padding: 0 var(--space-1);
     font-size: var(--lyric-write);
     line-height: var(--leading-content);
     overflow-wrap: anywhere;
@@ -524,7 +524,7 @@
   .choosing-actions {
     display: flex;
     justify-content: flex-end;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   .choosing-actions .button {
     min-width: 8rem;

@@ -448,9 +448,9 @@
   .adding {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    margin-bottom: 1.5rem;
-    padding: 1rem;
+    gap: var(--space-3);
+    margin-bottom: var(--space-6);
+    padding: var(--space-4);
     border: 1px solid var(--border);
     border-radius: 0.5rem;
     background: var(--surface-1);
@@ -465,11 +465,11 @@
   }
   .actions {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   .add-error,
   .skipped {
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-4);
   }
   /* The window, nav rail and all, while files dropped anywhere on it would be added. */
   .drop-target {
@@ -484,7 +484,7 @@
   }
   .drop-target p {
     margin: 0;
-    padding: 0.5rem 1rem;
+    padding: var(--space-2) var(--space-4);
     border-radius: 0.5rem;
     background: var(--bg);
     color: var(--text);
@@ -509,6 +509,6 @@
   }
   .empty {
     text-align: center;
-    padding: 3rem 0;
+    padding: var(--space-8) 0;
   }
 </style>

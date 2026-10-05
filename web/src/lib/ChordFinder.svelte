@@ -381,19 +381,19 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 0.25rem 0.5rem;
-    padding: 0 0.5rem;
+    gap: var(--space-1) var(--space-2);
+    padding: 0 var(--space-2);
     border-bottom: 1px solid var(--border);
   }
   .tabs {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.25rem;
+    gap: var(--space-1);
   }
   .toggle {
     min-height: 2rem;
     margin-left: auto;
-    padding: 0 0.75rem;
+    padding: 0 var(--space-3);
     font-size: var(--text-sm);
   }
   .toggle[aria-pressed='true'] {
@@ -403,7 +403,7 @@
   }
   [role='tab'] {
     min-height: var(--control);
-    padding: 0 0.75rem;
+    padding: 0 var(--space-3);
     border: 0;
     border-bottom: 2px solid transparent;
     margin-bottom: -1px;
@@ -421,8 +421,8 @@
   .panel {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
-    padding: 1rem;
+    gap: var(--space-4);
+    padding: var(--space-4);
   }
   .panel[hidden] {
     display: none;
@@ -435,7 +435,7 @@
   .pick {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
   @container finder (min-width: 40rem) {
     .pick {
@@ -453,7 +453,7 @@
   .field {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: var(--space-1);
     min-width: 0;
     color: var(--text-muted);
     font-size: var(--text-sm);
@@ -471,7 +471,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 0.25rem 1rem;
+    gap: var(--space-1) var(--space-4);
   }
   h2 {
     margin: 0;
@@ -482,7 +482,7 @@
     word-spacing: 0.25em;
   }
   .notes .muted {
-    margin-right: 0.25rem;
+    margin-right: var(--space-1);
     font-weight: normal;
     word-spacing: normal;
   }
@@ -491,7 +491,7 @@
   .voicings {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1rem;
+    gap: var(--space-4);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -505,8 +505,8 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.25rem;
-    padding: 0.75rem 0.5rem 0.5rem;
+    gap: var(--space-1);
+    padding: var(--space-3) var(--space-2) var(--space-2);
     border-radius: 0.5rem;
     background: var(--bg);
   }
@@ -525,7 +525,7 @@
   }
   .prefer {
     min-height: 2rem;
-    padding: 0 0.75rem;
+    padding: 0 var(--space-3);
     font-size: var(--text-sm);
   }
   /*
@@ -535,20 +535,20 @@
   .name-it {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--space-4);
   }
   @container finder (min-width: 40rem) {
     .name-it {
       flex-direction: row-reverse;
       justify-content: flex-end;
       align-items: flex-start;
-      gap: 2rem;
+      gap: var(--space-8);
     }
   }
   .named {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--space-2);
     min-width: 0;
     min-height: 4.5rem;
   }
@@ -561,14 +561,14 @@
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 0.25rem 0.5rem;
+    gap: var(--space-1) var(--space-2);
     margin: 0;
     padding: 0;
     list-style: none;
   }
   .reading {
     min-height: 2rem;
-    padding: 0 0.5rem;
+    padding: 0 var(--space-2);
     border: 1px solid var(--border);
     border-radius: 0.5rem;
     background: var(--bg);
@@ -589,7 +589,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.75rem;
+    gap: var(--space-3);
     width: 100%;
     max-width: 22rem;
     align-self: center;
@@ -612,7 +612,7 @@
   .group {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   h3 {
     margin: 0;
@@ -622,7 +622,7 @@
   .suggestions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.5rem;
+    gap: var(--space-2);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -636,10 +636,10 @@
     display: grid;
     grid-template-columns: auto 1fr;
     align-items: baseline;
-    gap: 0.125rem 0.5rem;
+    gap: var(--space-1) var(--space-2);
     width: 100%;
     height: 100%;
-    padding: 0.5rem 0.75rem;
+    padding: var(--space-2) var(--space-3);
     border: 1px solid var(--border);
     border-radius: 0.5rem;
     background: var(--bg);
@@ -667,6 +667,6 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 </style>

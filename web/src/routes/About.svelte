@@ -313,7 +313,7 @@
      System information cards sit side by side, above the tabbed card. */
   .about {
     display: grid;
-    gap: 1rem;
+    gap: var(--space-4);
     max-width: 64rem;
   }
   @media (min-width: 65.5rem) {
@@ -350,20 +350,20 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
-    padding: 2rem 1rem 1.5rem;
+    gap: var(--space-2);
+    padding: var(--space-8) var(--space-4) var(--space-6);
     text-align: center;
   }
   .intro h2 {
-    margin-top: 0.5rem;
+    margin-top: var(--space-2);
     font-size: var(--text-2xl);
   }
   .links {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 0.5rem 1.5rem;
-    margin: 0.5rem 0;
+    gap: var(--space-2) var(--space-6);
+    margin: var(--space-2) 0;
     padding: 0;
     list-style: none;
   }
@@ -371,13 +371,13 @@
   .system {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    padding: 1.25rem 1rem;
+    gap: var(--space-3);
+    padding: var(--space-6) var(--space-4);
   }
   dl {
     display: grid;
     grid-template-columns: max-content minmax(0, 1fr);
-    gap: 0.375rem 1rem;
+    gap: var(--space-2) var(--space-4);
     margin: 0;
   }
   dt {
@@ -394,7 +394,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem 1rem;
+    gap: var(--space-2) var(--space-4);
     margin-top: auto;
   }
   .copy-status:empty {
@@ -408,13 +408,13 @@
     display: flex;
     /* Rather than run off a narrow phone, the tabs wrap. */
     flex-wrap: wrap;
-    gap: 0.25rem;
-    padding: 0 0.5rem;
+    gap: var(--space-1);
+    padding: 0 var(--space-2);
     border-bottom: 1px solid var(--border);
   }
   [role='tab'] {
     min-height: var(--control);
-    padding: 0 0.75rem;
+    padding: 0 var(--space-3);
     border: 0;
     border-bottom: 2px solid transparent;
     margin-bottom: -1px;
@@ -430,7 +430,7 @@
     color: var(--text);
   }
   .panel {
-    padding: 1rem;
+    padding: var(--space-4);
   }
   /* A phone's tabs are tighter, so their labels, with counts, fit on a line. */
   @media (max-width: 24rem) {
@@ -439,7 +439,7 @@
       gap: 0;
     }
     [role='tab'] {
-      padding: 0 0.5rem;
+      padding: 0 var(--space-2);
       font-size: var(--text-lg);
     }
   }
@@ -463,9 +463,9 @@
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 0.25rem 0.5rem;
+    gap: var(--space-1) var(--space-2);
     min-height: var(--control);
-    padding: 0.5rem 0;
+    padding: var(--space-2) 0;
     list-style: none;
     cursor: pointer;
   }
@@ -491,7 +491,7 @@
   }
   /* Under the header's text, past the chevron. */
   .release-body {
-    padding: 0 0 1rem 1.5rem;
+    padding: 0 0 var(--space-4) var(--space-6);
   }
   /* A phone can't spare the width. */
   @media (max-width: 24rem) {
@@ -500,7 +500,7 @@
     }
   }
   .card .release-link {
-    margin-top: 0.75rem;
+    margin-top: var(--space-3);
     font-size: var(--text-md);
   }
   .release-name {
@@ -510,7 +510,7 @@
   .notes {
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
+    gap: var(--space-2);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -518,7 +518,7 @@
   .change {
     display: flex;
     align-items: baseline;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   .change > span:last-child {
     min-width: 0;
@@ -529,14 +529,14 @@
     white-space: pre-wrap;
   }
   .card .more {
-    margin-top: 1.5rem;
+    margin-top: var(--space-6);
   }
 
   .dependencies + .dependencies {
     border-top: 1px solid var(--border);
   }
   .panel > p + .dependencies {
-    margin-top: 0.5rem;
+    margin-top: var(--space-2);
   }
   .group-name {
     font-weight: 600;
@@ -546,15 +546,15 @@
      a long name pushes the rest onto the next line. */
   .dependency-list {
     margin: 0;
-    padding: 0 0 1rem 1.5rem;
+    padding: 0 0 var(--space-4) var(--space-6);
     list-style: none;
   }
   .dependency-list li {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 0 0.5rem;
-    padding: 0.25rem 0;
+    gap: 0 var(--space-2);
+    padding: var(--space-1) 0;
   }
   .dependency-name {
     min-width: 0;
@@ -569,7 +569,7 @@
     white-space: nowrap;
   }
   .card .dependency-none {
-    padding: 0 0 1rem 1.5rem;
+    padding: 0 0 var(--space-4) var(--space-6);
   }
   /* A phone can't spare the width. */
   @media (max-width: 24rem) {
@@ -585,7 +585,7 @@
     flex: none;
     display: inline-block;
     min-width: 3rem;
-    padding: 0.125rem 0.5rem;
+    padding: var(--space-1) var(--space-2);
     border-radius: 999px;
     font-size: var(--text-xs);
     font-weight: 600;

@@ -186,7 +186,7 @@
   .caption {
     position: absolute;
     inset: auto 0 0;
-    padding: 0.375rem 0;
+    padding: var(--space-2) 0;
     border-radius: 0 0 var(--trigger-radius) var(--trigger-radius);
     background: color-mix(in srgb, var(--surface-1) 85%, transparent);
     color: var(--text);

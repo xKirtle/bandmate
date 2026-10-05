@@ -86,7 +86,7 @@
   dialog {
     width: min(28rem, calc(100vw - 2rem));
     max-height: calc(100dvh - 2rem);
-    padding: 1rem;
+    padding: var(--space-4);
     border: 1px solid var(--border);
     border-radius: 0.75rem;
     background: var(--bg);
@@ -95,7 +95,7 @@
   dialog[open] {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
   dialog::backdrop {
     background: var(--scrim);
@@ -104,7 +104,7 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
   h2 {
     margin: 0;
@@ -113,12 +113,12 @@
   form {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
   label {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: var(--space-1);
     font-weight: 600;
   }
   label input {
@@ -137,6 +137,6 @@
   .actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 </style>

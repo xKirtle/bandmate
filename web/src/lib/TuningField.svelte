@@ -127,7 +127,7 @@
   .tuning-field {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.375rem;
+    gap: var(--space-2);
   }
   /* Side by side when there's room, else the notes under the picker. */
   .tuning-field > :global(.picker) {

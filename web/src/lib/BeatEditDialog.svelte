@@ -194,7 +194,7 @@
   dialog {
     width: min(36rem, calc(100vw - 2rem));
     max-height: min(44rem, calc(100dvh - 2rem));
-    padding: 1rem;
+    padding: var(--space-4);
     border: 1px solid var(--border);
     border-radius: 0.75rem;
     background: var(--bg);
@@ -203,7 +203,7 @@
   dialog[open] {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
   dialog::backdrop {
     background: var(--scrim);
@@ -217,8 +217,8 @@
       height: 100%;
       max-height: none;
       margin: 0;
-      padding: max(1rem, env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right))
-        max(1rem, env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
+      padding: max(var(--space-4), env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right))
+        max(var(--space-4), env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
       border: none;
       border-radius: 0;
     }
@@ -227,12 +227,12 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
   .credit {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: var(--space-1);
     min-width: 0;
   }
   h2 {
@@ -248,13 +248,13 @@
   form {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
   .actions {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   /* Saving on the left, the file and deletion on the right. Each pair wraps
      as one, so a narrow dialog never leaves a button on a row of its own. */
@@ -263,11 +263,11 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   .pair {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   /* On a phone, each pair takes a row, its two buttons sharing it evenly. */
   @media (width < 40rem) {
@@ -281,8 +281,8 @@
   .offer {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    padding: 0.75rem;
+    gap: var(--space-2);
+    padding: var(--space-3);
     border: 1px solid var(--border);
     border-radius: 0.5rem;
     background: var(--surface-1);

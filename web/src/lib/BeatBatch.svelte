@@ -449,9 +449,9 @@
   .batch {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    margin-bottom: 1.5rem;
-    padding: 1rem;
+    gap: var(--space-3);
+    margin-bottom: var(--space-6);
+    padding: var(--space-4);
     border: 1px solid var(--border);
     border-radius: 0.5rem;
     background: var(--surface-1);
@@ -459,7 +459,7 @@
   .head {
     display: flex;
     align-items: baseline;
-    gap: 1rem;
+    gap: var(--space-4);
   }
   h2 {
     margin: 0;
@@ -475,12 +475,12 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   .shared label {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
     font-size: var(--text-md);
   }
   .shared :global(input) {
@@ -497,12 +497,13 @@
     min-width: 0;
   }
   table {
+    --checkbox: 1rem;
     width: 100%;
     border-collapse: collapse;
     font-size: var(--text-md);
   }
   th {
-    padding: 0 0.25rem 0.25rem;
+    padding: 0 var(--space-1) var(--space-1);
     border-bottom: 1px solid var(--border);
     color: var(--text-muted);
     font-size: var(--text-sm);
@@ -511,7 +512,7 @@
     white-space: nowrap;
   }
   td {
-    padding: 0.25rem;
+    padding: var(--space-1);
     border-bottom: 1px solid var(--border);
     vertical-align: top;
   }
@@ -523,12 +524,12 @@
   }
   td.num,
   td.file {
-    padding-top: calc(0.25rem + (var(--control) - 1.25rem) / 2);
+    padding-top: calc(var(--space-1) + (var(--control) - 1lh) / 2);
   }
   td input:not([type='checkbox']),
   td :global(input) {
     min-height: var(--control);
-    padding-inline: 0.5rem;
+    padding-inline: var(--space-2);
     font-size: var(--text-md);
   }
   .shared input[aria-invalid='true'],
@@ -537,9 +538,9 @@
     box-shadow: var(--invalid-outline);
   }
   input[type='checkbox'] {
-    width: 1rem;
+    width: var(--checkbox);
     min-height: 0;
-    height: 1rem;
+    height: var(--checkbox);
     margin: 0;
     accent-color: var(--accent);
   }
@@ -548,7 +549,7 @@
     text-align: center;
   }
   td.tick {
-    padding-top: calc((var(--control) - 1rem) / 2 + 0.25rem);
+    padding-top: calc((var(--control) - var(--checkbox)) / 2 + var(--space-1));
   }
   .file {
     width: 16rem;
@@ -563,7 +564,7 @@
   .file .warning,
   .file .error {
     display: block;
-    margin-top: 0.25rem;
+    margin-top: var(--space-1);
     font-size: var(--text-sm);
   }
   .title {
@@ -594,7 +595,7 @@
   .actions {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   .actions p {
     margin: 0;

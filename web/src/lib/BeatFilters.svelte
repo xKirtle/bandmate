@@ -139,12 +139,12 @@
   .filters {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
   }
   .search-row {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   .search-row input {
     flex: 1;
@@ -152,11 +152,11 @@
   }
   .drawer-toggle {
     flex-shrink: 0;
-    gap: 0.375rem;
+    gap: var(--space-2);
   }
   .count {
     min-width: 1.25rem;
-    padding: 0 0.375rem;
+    padding: 0 var(--space-2);
     border-radius: 999px;
     background: var(--accent);
     color: var(--accent-text);
@@ -167,8 +167,8 @@
     display: none;
     flex-wrap: wrap;
     align-items: end;
-    gap: 0.75rem;
-    padding: 0.75rem;
+    gap: var(--space-3);
+    padding: var(--space-3);
     border: 1px solid var(--border);
     border-radius: 0.5rem;
     background: var(--surface-1);
@@ -179,7 +179,7 @@
   .field {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: var(--space-1);
     min-width: 8rem;
     margin: 0;
     padding: 0;
@@ -195,7 +195,7 @@
   }
   .bpm legend {
     width: 100%;
-    margin-bottom: 0.25rem;
+    margin-bottom: var(--space-1);
     padding: 0;
   }
   .bpm input {
@@ -206,11 +206,11 @@
   .chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   .chip {
     min-height: var(--control);
-    padding: 0 1rem;
+    padding: 0 var(--space-4);
     border: 1px solid var(--border);
     border-radius: 999px;
     background: var(--bg);
@@ -236,7 +236,7 @@
       flex-direction: row;
       flex-wrap: wrap;
       align-items: end;
-      gap: 0.75rem;
+      gap: var(--space-3);
     }
     .search-row {
       flex: 1 1 16rem;

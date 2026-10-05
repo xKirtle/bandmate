@@ -224,23 +224,23 @@
 
 <style>
   .scrapbook {
-    padding: 0.75rem;
+    padding: var(--space-3);
     border: 1px dashed var(--border);
     border-radius: 0.75rem;
   }
   h2 {
     font-size: var(--text-lg);
-    margin: 0 0 0.25rem;
+    margin: 0 0 var(--space-1);
   }
   .hint {
-    margin: 0 0 0.75rem;
+    margin: 0 0 var(--space-3);
     font-size: var(--text-sm);
   }
   .list {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    margin: 0 0 0.75rem;
+    gap: var(--space-3);
+    margin: 0 0 var(--space-3);
     padding: 0;
     list-style: none;
   }
@@ -274,10 +274,10 @@
     display: flex;
     flex: 1;
     flex-direction: column;
-    gap: 0.125rem;
+    gap: var(--space-1);
     width: 100%;
     min-width: 0;
-    padding: 0.5rem 0.75rem;
+    padding: var(--space-2) var(--space-3);
     border: 1px solid var(--border);
     border-radius: 0.75rem;
     background: var(--surface-1);
@@ -292,8 +292,8 @@
   .card-head {
     display: flex;
     align-items: baseline;
-    gap: 0.5rem;
-    margin-bottom: 0.125rem;
+    gap: var(--space-2);
+    margin-bottom: var(--space-1);
   }
   .card-label {
     min-width: 0;
@@ -305,7 +305,7 @@
   .count {
     flex: none;
     margin-left: auto;
-    padding: 0.125rem 0.5rem;
+    padding: var(--space-1) var(--space-2);
     border-radius: 999px;
     background: var(--surface-2);
     font-size: var(--text-xs);
@@ -322,6 +322,6 @@
   }
   .done {
     width: 100%;
-    margin-top: 0.5rem;
+    margin-top: var(--space-2);
   }
 </style>

@@ -129,7 +129,7 @@
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    padding-right: 0.5rem;
+    padding-right: var(--space-2);
     color: var(--text-muted);
     font-size: var(--text-xs);
     font-variant-numeric: tabular-nums;

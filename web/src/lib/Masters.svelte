@@ -218,14 +218,14 @@
 
 <style>
   .masters {
-    margin-bottom: 2rem;
+    margin-bottom: var(--space-8);
   }
   .head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
   }
   h2 {
     font-size: var(--text-lg);
@@ -239,9 +239,9 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem 0.75rem;
-    margin-bottom: 1rem;
-    padding: 0.75rem 1rem;
+    gap: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-4);
+    padding: var(--space-3) var(--space-4);
     border-radius: 0.5rem;
     background: var(--finished-bg);
     color: var(--finished-fg);
@@ -254,8 +254,8 @@
   .master {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    padding: 0.75rem 0;
+    gap: var(--space-3);
+    padding: var(--space-3) 0;
   }
   .master + .master {
     border-top: 1px solid var(--border);
@@ -263,7 +263,7 @@
   .name-row {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   .name {
     flex: 1;
@@ -282,7 +282,7 @@
   }
   .main-badge {
     flex-shrink: 0;
-    padding: 0.125rem 0.625rem;
+    padding: var(--space-1) var(--space-3);
     border-radius: 999px;
     background: var(--accent);
     color: var(--accent-text);
@@ -292,7 +292,7 @@
   .notes {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: var(--space-1);
     font-size: var(--text-sm);
     font-weight: 600;
     color: var(--text-muted);
@@ -305,7 +305,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
     font-size: var(--text-sm);
   }
   .spacer {

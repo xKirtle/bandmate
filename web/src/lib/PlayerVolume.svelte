@@ -46,7 +46,7 @@
   .volume {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: var(--space-1);
   }
   .speaker {
     display: grid;

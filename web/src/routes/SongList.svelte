@@ -230,23 +230,23 @@
 <style>
   .actions {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   .filters {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
   }
   .chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   .chip {
     flex-shrink: 0;
     min-height: var(--control);
-    padding: 0 1rem;
+    padding: 0 var(--space-4);
     border: 1px solid var(--border);
     border-radius: 999px;
     background: var(--surface-1);
@@ -274,8 +274,8 @@
   .songs a {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.5rem 0.25rem;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-1);
     border-bottom: 1px solid var(--border);
     color: inherit;
     text-decoration: none;
@@ -295,14 +295,14 @@
   .meta {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
     flex-shrink: 0;
     color: var(--text-muted);
     font-size: var(--text-sm);
   }
   .empty {
     text-align: center;
-    padding: 3rem 0;
+    padding: var(--space-8) 0;
   }
 
   /* Desktop shows a table, narrower windows the list. */
@@ -321,7 +321,7 @@
   th button {
     width: 100%;
     min-height: var(--control);
-    padding: 0 0.5rem;
+    padding: 0 var(--space-2);
     border: none;
     border-radius: 0.25rem;
     background: none;
@@ -339,12 +339,12 @@
   .arrow {
     display: inline-block;
     width: 1em;
-    margin-left: 0.25rem;
+    margin-left: var(--space-1);
   }
   /* Rows fit the Cover with some room around it. */
   td {
     height: calc(var(--cover-list) + 0.75rem);
-    padding: 0 0.5rem;
+    padding: 0 var(--space-2);
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
   }
@@ -357,7 +357,7 @@
   .with-cover {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
   td.title a {
     min-width: 0;

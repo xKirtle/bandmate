@@ -219,7 +219,7 @@
 <style>
   dialog {
     width: min(28rem, calc(100vw - 2rem));
-    padding: 1rem;
+    padding: var(--space-4);
     border: 1px solid var(--border);
     border-radius: 0.75rem;
     background: var(--bg);
@@ -228,7 +228,7 @@
   dialog[open] {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
   dialog::backdrop {
     background: var(--scrim);
@@ -237,7 +237,7 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
   h2 {
     margin: 0;
@@ -254,14 +254,14 @@
     border: 0;
   }
   legend {
-    margin-bottom: 0.375rem;
+    margin-bottom: var(--space-2);
     padding: 0;
     font-weight: 600;
   }
   label {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
     min-height: var(--control);
     cursor: pointer;
   }
@@ -290,6 +290,6 @@
   .actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 </style>
