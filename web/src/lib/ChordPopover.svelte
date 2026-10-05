@@ -1,7 +1,7 @@
 <script lang="ts" module>
   /** Opens a Chord's popover, from a Chord in a Line or a diagram in the Chord Chart. */
   export interface ChordOpener {
-    /** A pointer came over a Chord: opens it until the pointer leaves it, and the popover. */
+    /** A pointer came over a Chord: opens it until the pointer leaves it and the popover, unless a press has one open. */
     hover(name: string, anchor: HTMLElement, line?: HTMLElement | null): void;
     /** The pointer left the Chord it hovered. */
     leave(): void;
@@ -43,6 +43,7 @@
   // How long the pointer has to move from a Chord into its popover.
   const leaveDelay = 150;
   let leaveTimer: ReturnType<typeof setTimeout> | undefined;
+  $effect(() => () => clearTimeout(leaveTimer));
 
   const tuning = $derived(chartTuning(song.tuning));
   const drawn = $derived(
@@ -69,8 +70,8 @@
 
   export const opener: ChordOpener = {
     hover(name, anchor, line = null) {
-      // A Chord opened by a press stays as it is.
-      if (opened?.by === 'press' && opened.anchor === anchor) return;
+      // One opened by a press stays open until a press elsewhere closes it.
+      if (opened?.by === 'press') return;
       open(name, anchor, line, 'hover');
     },
     leave() {

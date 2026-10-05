@@ -13,7 +13,7 @@
     transpose = 0,
     current = null,
     play,
-    chords,
+    opener,
   }: {
     song: Song;
     showChords: boolean;
@@ -24,7 +24,7 @@
     /** Given, clicking a cued Line plays from its Cue. */
     play?: (cue: number) => void;
     /** Given, hovering a Chord, or tapping it on a touch screen, opens its diagram. */
-    chords?: ChordOpener;
+    opener?: ChordOpener;
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
@@ -63,17 +63,17 @@
    */
   function opens(name: string): Attachment<HTMLElement> {
     return (el) => {
-      if (!chords || !name) return;
-      const opener = chords;
+      if (!opener || !name) return;
+      const popover = opener;
       const line = () => el.closest<HTMLElement>('.line-box');
       let touch = false;
-      const enter = (e: PointerEvent) => e.pointerType !== 'touch' && opener.hover(name, el, line());
-      const leave = (e: PointerEvent) => e.pointerType !== 'touch' && opener.leave();
+      const enter = (e: PointerEvent) => e.pointerType !== 'touch' && popover.hover(name, el, line());
+      const leave = (e: PointerEvent) => e.pointerType !== 'touch' && popover.leave();
       const down = (e: PointerEvent) => (touch = e.pointerType === 'touch');
       const click = (e: MouseEvent) => {
         if (!touch) return;
         e.stopPropagation();
-        opener.press(name, el, line());
+        popover.press(name, el, line());
       };
       el.addEventListener('pointerenter', enter);
       el.addEventListener('pointerleave', leave);
@@ -141,7 +141,11 @@
                     <span class="word">
                       {#each word as piece, p (p)}
                         <span class="piece">
-                          <span class="chord" {@attach opens(piece.chord)}>{piece.chord}</span>
+                          <span class="chord"
+                            >{#each piece.chords as name, c (c)}{#if c > 0}{' '}{/if}<span {@attach opens(name)}
+                                >{name}</span
+                              >{/each}</span
+                          >
                           <span class="lyric">{piece.text || ' '}</span>
                         </span>
                       {/each}

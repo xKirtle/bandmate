@@ -1,9 +1,9 @@
 import type { Line, Song } from './api';
 import { transposeChord } from './transpose';
 
-/** A run of lyrics with the Chords (if any) that sit above its first character. */
+/** A run of lyrics with the Chords (if any) that sit above its first character, in order. */
 export interface Piece {
-  chord: string;
+  chords: string[];
   text: string;
 }
 
@@ -26,7 +26,7 @@ export function layoutLine(line: Line, transpose = 0, key = ''): Piece[][] {
     const names = chordsAt.get(i);
     if (names || (!word && i < chars.length)) {
       if (!word) words.push((word = []));
-      word.push({ chord: names?.join(' ') ?? '', text: '' });
+      word.push({ chords: names ?? [], text: '' });
     }
     if (i === chars.length) break;
     word![word!.length - 1].text += chars[i];

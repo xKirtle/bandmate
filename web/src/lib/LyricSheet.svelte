@@ -547,8 +547,11 @@
 
   {#if mode === 'read'}
     {#if chordsOnScreen}
-      <ChordChart {song} {transpose} chords={chordPopover?.opener} />
-      <ChordPopover {song} bind:this={chordPopover} />
+      <ChordChart {song} {transpose} opener={chordPopover?.opener} />
+      <!-- Transposing closes it, rather than leave it on a Chord no longer shown. -->
+      {#key transpose}
+        <ChordPopover {song} bind:this={chordPopover} />
+      {/key}
     {/if}
     <LyricSheetView
       {song}
@@ -556,7 +559,7 @@
       {transpose}
       {current}
       play={leadInto}
-      chords={chordPopover?.opener}
+      opener={chordPopover?.opener}
     />
   {:else}
     <ol

@@ -20,12 +20,12 @@
   let {
     song,
     transpose = 0,
-    chords: opener,
+    opener,
   }: {
     song: Song;
     transpose?: number;
     /** Given, clicking a diagram opens its Chord's popover. */
-    chords?: ChordOpener;
+    opener?: ChordOpener;
   } = $props();
 
   const names = $derived(chartChords(song, transpose));
@@ -95,7 +95,6 @@
               <button
                 type="button"
                 class="chord"
-                disabled={!opener}
                 aria-haspopup="dialog"
                 title="Open {chord.name}'s diagram"
                 onclick={(e) => opener?.press(chord.name, e.currentTarget)}
@@ -206,9 +205,6 @@
   }
   .chord:hover {
     background: var(--surface-1);
-  }
-  .chord:disabled {
-    cursor: default;
   }
   .name {
     max-width: 100%;
