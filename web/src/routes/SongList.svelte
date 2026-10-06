@@ -6,6 +6,7 @@
   import FolderInput from '@lucide/svelte/icons/folder-input';
   import FolderPlus from '@lucide/svelte/icons/folder-plus';
   import Pencil from '@lucide/svelte/icons/pencil';
+  import TagIcon from '@lucide/svelte/icons/tag';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import ActionsMenu from '../lib/ActionsMenu.svelte';
   import { ApiError, api, statuses, type Folder, type SongSummary, type Status } from '../lib/api';
@@ -32,6 +33,8 @@
   import SongCover from '../lib/SongCover.svelte';
   import { SongDragging, songTarget } from '../lib/songDragging.svelte';
   import StatusBadge from '../lib/StatusBadge.svelte';
+  import TagChips from '../lib/TagChips.svelte';
+  import TagsDialog from '../lib/TagsDialog.svelte';
   import { timeAgo } from '../lib/time';
 
   let {
@@ -249,10 +252,14 @@
     ];
   }
 
-  // Filing a Song is organising, not editing it, so it's offered for every
-  // Song, Finished ones included.
+  // The Song whose Tags are being changed, if any.
+  let tagging = $state<SongSummary | null>(null);
+
+  // Filing or tagging a Song is organising, not editing it, so it's offered
+  // for every Song, Finished ones included.
   function songActions(song: SongSummary): MenuAction[] {
     return [
+      { icon: TagIcon, label: 'Tags…', run: () => (tagging = song) },
       {
         icon: FolderInput,
         label: 'Move to folder…',
@@ -438,7 +445,10 @@
               <td class="title">
                 <span class="with-cover">
                   <SongCover songId={song.id} coverId={song.coverId} title={song.title} status={song.status} />
-                  <a href="/songs/{song.id}">{song.title}</a>
+                  <span class="heading">
+                    <a href="/songs/{song.id}">{song.title}</a>
+                    <TagChips tags={song.tags} />
+                  </span>
                 </span>
               </td>
               {#if acrossFolders}
@@ -482,6 +492,7 @@
                     {folderName}</span
                   >
                 {/if}
+                <TagChips tags={song.tags} />
               </span>
               <span class="meta">
                 <StatusBadge status={song.status} />
@@ -521,6 +532,9 @@
 {/if}
 {#if renaming}
   <FolderNameDialog folder={renaming} onSaved={() => changes++} onClose={() => (renaming = null)} />
+{/if}
+{#if tagging}
+  <TagsDialog song={tagging} onSaved={() => changes++} onClose={() => (tagging = null)} />
 {/if}
 {#if deleting}
   <DeleteFolderDialog
@@ -814,6 +828,7 @@
     gap: var(--space-3);
   }
   td.title a {
+    max-width: 100%;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;

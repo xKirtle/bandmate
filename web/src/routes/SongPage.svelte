@@ -22,6 +22,8 @@
   import EditCover from '../lib/EditCover.svelte';
   import SongCover from '../lib/SongCover.svelte';
   import StatusBadge from '../lib/StatusBadge.svelte';
+  import TagChips from '../lib/TagChips.svelte';
+  import TagsField from '../lib/TagsField.svelte';
   import Timeline from '../lib/Timeline.svelte';
   import TuningField from '../lib/TuningField.svelte';
   import type { Saved } from '../lib/history';
@@ -90,6 +92,13 @@
   const summary = $derived(detailsSummary(draft, transpose));
   const hasNotes = $derived(draft.notes.trim() !== '');
 
+  // The Song's Tags as shown: changed at once, and saved one change after
+  // another, each sending the whole list. Every Tag's name, to suggest.
+  let tags = $state<string[]>([]);
+  let knownTags = $state<string[]>([]);
+  // Counts the changes to the Tags, so a save shows its Tags only if none came after.
+  let tagChanges = 0;
+
   // Whether the Notes under the Details are showing. They start hidden.
   let notesOpen = $state(false);
 
@@ -142,11 +151,37 @@
         song = s;
         timeline = tl;
         draft = toDraft(s);
+        tags = s.tags;
         mode = openingMode(s.status);
       },
       (e: Error) => (loadError = e.message),
     );
+    // Without suggestions, Tags can still be typed.
+    api.listTags().then(
+      (list) => (knownTags = list.map((t) => t.name)),
+      () => {},
+    );
   });
+
+  // Tagging leaves the Song's version as it was, so it's never stale; it's
+  // queued with the other saves only so they land in order. A failed save
+  // shows the Tags as they were.
+  function setTags(next: string[]) {
+    tags = next;
+    const change = ++tagChanges;
+    enqueue(
+      () => api.setSongTags(id, next),
+      (saved) => {
+        song = { ...song!, tags: saved };
+        // As saved: in order, and spelled as the Tags matched are, unless
+        // changed again meanwhile.
+        if (change === tagChanges) tags = saved;
+        knownTags = [...new Set([...knownTags, ...saved])];
+      },
+    ).then((ok) => {
+      if (!ok && song) tags = song.tags;
+    });
+  }
 
   function toDraft(s: Song | null): Draft {
     return {
@@ -267,6 +302,7 @@
         song = latest;
         timeline = latestTimeline;
         draft = toDraft(latest);
+        tags = latest.tags;
         stale = false;
       } catch {
         // Keep showing the Song as it was; the next save reports any problem.
@@ -554,6 +590,10 @@
               </div>
               {@render notesToggle()}
             </div>
+            <div class="field tags">
+              <span id="song-tags-label">Tags</span>
+              <TagsField id="song-tags" labelledby="song-tags-label" {tags} known={knownTags} onchange={setTags} />
+            </div>
             {#if notesOpen}
               <label class="notes">
                 <span class="visually-hidden">Notes</span>
@@ -566,6 +606,9 @@
               <p class="summary" class:muted={!summary}>{summary || 'No Details yet.'}</p>
               {#if hasNotes}{@render notesToggle()}{/if}
             </div>
+            {#if tags.length > 0}
+              <div class="read-tags"><TagChips {tags} /></div>
+            {/if}
             {#if notesOpen && hasNotes}
               <p id="song-notes" class="read-notes">{draft.notes}</p>
             {/if}
@@ -843,6 +886,15 @@
   }
   .notes {
     display: block;
+    margin-top: var(--space-2);
+  }
+  /* The Tags on a row of their own under the other Details, as they're many. */
+  .tags {
+    display: flex;
+    flex-direction: column;
+    margin-top: var(--space-2);
+  }
+  .read-tags {
     margin-top: var(--space-2);
   }
   .notes textarea,
