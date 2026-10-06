@@ -1,9 +1,11 @@
 <script lang="ts">
   import Pause from '@lucide/svelte/icons/pause';
   import Play from '@lucide/svelte/icons/play';
-  import { tick } from 'svelte';
+  import { onDestroy, tick } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
-  import { api, type Beat, type DecodedAudio, type Song } from './api';
+  import AddFromLink, { type FromLink } from './AddFromLink.svelte';
+  import { api, type Beat, type DecodedAudio, type Fetched, type Song } from './api';
+  import AudioPlayer from './AudioPlayer.svelte';
   import BeatFields from './BeatFields.svelte';
   import BeatFilters from './BeatFilters.svelte';
   import BeatTable from './BeatTable.svelte';
@@ -16,8 +18,8 @@
   import { prepareUpload } from './upload';
 
   // Picks a Beat to add to a Song: one from the Beat Library, found with the
-  // Library's search, filters and sort, or a new upload, which joins the
-  // Library first. The Song's BPM and key show as a hint but are never
+  // Library's search, filters and sort, or a new upload or one from a link,
+  // which joins the Library first. The Song's BPM and key show as a hint but are never
   // applied.
   let {
     song,
@@ -34,13 +36,27 @@
   // Song page, so it stays out of the URL and the Library's view.
   let view = $state({ ...defaultBeatListView });
 
-  // A file being uploaded: decoded, waiting for its details.
-  let adding = $state<{ file: File; decoded: DecodedAudio; draft: BeatDraft } | null>(null);
+  // A file being added: decoded, waiting for its details. One fetched from a
+  // link is already on the server, waiting there, and is previewed from the
+  // copy read to decode it.
+  interface Adding {
+    file: File;
+    decoded: DecodedAudio;
+    draft: BeatDraft;
+    fetched?: Fetched & { previewUrl: string };
+  }
+  let adding = $state<Adding | null>(null);
   let busy = $state<string | null>(null);
   let error = $state<string | null>(null);
+  // Whether From link is offered, and whether its box is open.
+  let addFromLink = $state(false);
+  let linking = $state(false);
 
   api.getConfig().then(
-    (c) => (maxUploadBytes = c.maxUploadBytes),
+    (c) => {
+      maxUploadBytes = c.maxUploadBytes;
+      addFromLink = c.addFromLink;
+    },
     // The server still enforces its limit.
     () => {},
   );
@@ -87,7 +103,7 @@
 
   // A Beat stops once its button goes, filtered out or behind an upload.
   $effect(() => {
-    if (previewId !== null && (adding || !shown?.some((b) => b.id === previewId))) audio?.pause();
+    if (previewId !== null && (adding || linking || !shown?.some((b) => b.id === previewId))) audio?.pause();
   });
 
   // Closing the picker ends its preview.
@@ -111,12 +127,12 @@
     const file = input.files?.[0];
     input.value = '';
     if (!file) return;
-    adding = null;
+    setAdding(null);
     error = null;
     busy = `Reading “${file.name}”…`;
     try {
       const [decoded, suggestion] = await Promise.all([prepareUpload(file, maxUploadBytes), suggestForFile(file)]);
-      adding = { file, decoded, draft: toDraft(suggestion) };
+      setAdding({ file, decoded, draft: toDraft(suggestion) });
     } catch (e) {
       error = (e as Error).message;
     } finally {
@@ -132,16 +148,43 @@
       error = details;
       return;
     }
-    busy = 'Uploading…';
+    const { fetched } = adding;
+    busy = fetched ? 'Adding…' : 'Uploading…';
     error = null;
     try {
-      onPick(await api.addBeat(adding.file, details, adding.decoded));
+      onPick(
+        fetched
+          ? await api.addFetchedBeat(fetched.id, details, adding.decoded)
+          : await api.addBeat(adding.file, details, adding.decoded),
+      );
     } catch (e) {
       error = (e as Error).message;
     } finally {
       busy = null;
     }
   }
+
+  /**
+   * Puts a file in the adding form, or empties it. A fetched file it held is
+   * left waiting on the server, to expire there.
+   */
+  function setAdding(next: Adding | null) {
+    const was = adding?.fetched;
+    if (was && was.id !== next?.fetched?.id) URL.revokeObjectURL(was.previewUrl);
+    adding = next;
+  }
+
+  function openLinkBox() {
+    error = null;
+    linking = true;
+  }
+
+  function fetchedFromLink({ fetched, file, decoded, draft }: FromLink) {
+    linking = false;
+    setAdding({ file, decoded, draft, fetched: { ...fetched, previewUrl: URL.createObjectURL(file) } });
+  }
+
+  onDestroy(() => setAdding(null));
 </script>
 
 {#snippet previewButton(beat: Beat)}
@@ -161,7 +204,7 @@
 <Dialog
   bind:dialog
   title="Add a Beat"
-  dismissible={() => adding === null && busy === null}
+  dismissible={() => adding === null && !linking && busy === null}
   stack={false}
   onclose={onClose}
   --dialog-width={desktop.current ? 'min(64rem, calc(100vw - 4rem))' : '36rem'}
@@ -173,16 +216,24 @@
       <p class="file">
         “{adding.file.name}” <span class="muted tabular">{formatDuration(adding.decoded.duration)}</span>
       </p>
+      {#if adding.fetched}
+        <AudioPlayer src={adding.fetched.previewUrl} duration={adding.decoded.duration} peaks={adding.decoded.peaks} />
+      {/if}
       <BeatFields bind:draft={adding.draft} idPrefix="picker-beat" />
       <div class="actions">
         <button type="submit" class="button primary" disabled={busy !== null}>Add to Library and Song</button>
-        <button type="button" class="button" onclick={() => (adding = null)} disabled={busy !== null}>Back</button>
+        <button type="button" class="button" onclick={() => setAdding(null)} disabled={busy !== null}>Back</button>
       </div>
     </form>
+  {:else if linking}
+    <AddFromLink {maxUploadBytes} card={false} onFetched={fetchedFromLink} onClose={() => (linking = false)} />
   {:else}
     <BeatFilters bind:view beats={beats ?? []} idPrefix="beat-picker" {hint}>
       {#snippet actions()}
-        <label class="button upload" class:disabled={busy !== null}>
+        {#if addFromLink}
+          <button type="button" class="button add" onclick={openLinkBox} disabled={busy !== null}>From link</button>
+        {/if}
+        <label class="button add" class:disabled={busy !== null}>
           Upload new
           <input class="visually-hidden" type="file" accept="audio/*" onchange={pickFile} disabled={busy !== null} />
         </label>
@@ -247,7 +298,7 @@
 </Dialog>
 
 <style>
-  .upload {
+  .add {
     flex-shrink: 0;
   }
   .beats {

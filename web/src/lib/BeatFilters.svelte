@@ -140,11 +140,13 @@
   .search-row {
     display: flex;
     flex: 1 1 16rem;
+    flex-wrap: wrap;
     gap: var(--space-2);
     min-width: 0;
   }
+  /* Its actions go under it where they'd squeeze it, as in the Beat Picker on a phone. */
   .search-row input {
-    flex: 1;
+    flex: 1 1 12rem;
     min-width: 0;
   }
   .bpm {
