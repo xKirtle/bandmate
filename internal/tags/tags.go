@@ -31,8 +31,8 @@ type ConflictError struct{ Msg string }
 func (e *ConflictError) Error() string { return e.Msg }
 
 var (
-	errBlankName = &InvalidError{Msg: "a Tag's name can't be blank"}
-	errComma     = &InvalidError{Msg: "a Tag's name can't have a comma"}
+	errBlankName   = &InvalidError{Msg: "a Tag's name can't be blank"}
+	errCommaInName = &InvalidError{Msg: "a Tag's name can't have a comma"}
 )
 
 // cleanName is a Tag's name as given, trimmed, or an InvalidError if it's
@@ -43,7 +43,7 @@ func cleanName(name string) (string, error) {
 	case name == "":
 		return "", errBlankName
 	case strings.Contains(name, ","):
-		return "", errComma
+		return "", errCommaInName
 	}
 	return name, nil
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addTags, finishedTags } from './tagsTyped';
+import { addTags, allTags, finishedTags } from './tagsTyped';
 
 describe('finishedTags', () => {
   it('finishes nothing until a comma is typed', () => {
@@ -16,15 +16,18 @@ describe('finishedTags', () => {
     expect(finishedTags('demo, li')).toEqual({ names: ['demo'], rest: 'li' });
   });
 
-  it('finishes every piece when told to, as when names are pasted', () => {
-    expect(finishedTags('demo, live, Album 2023', true)).toEqual({
-      names: ['demo', 'live', 'Album 2023'],
-      rest: '',
-    });
+  it('trims each name and ignores blank pieces', () => {
+    expect(finishedTags(' demo ,, ,live  ,x')).toEqual({ names: ['demo', 'live'], rest: 'x' });
+  });
+});
+
+describe('allTags', () => {
+  it('takes every piece as a name, the last too, as when names are pasted', () => {
+    expect(allTags('demo, live, Album 2023')).toEqual(['demo', 'live', 'Album 2023']);
   });
 
   it('trims each name and ignores blank pieces', () => {
-    expect(finishedTags(' demo ,, ,live  ,', true)).toEqual({ names: ['demo', 'live'], rest: '' });
+    expect(allTags(' demo ,, ,live  , ')).toEqual(['demo', 'live']);
   });
 });
 

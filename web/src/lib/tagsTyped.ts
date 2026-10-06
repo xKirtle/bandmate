@@ -2,17 +2,27 @@
 // Tag's name never has one; a space doesn't, so a name can have several words.
 
 /**
- * The names finished in `text`, trimmed and without blank pieces, and the
- * `rest` still being typed: what comes after the last comma, from its first
- * letter. With `all`, as
- * when names are pasted, every piece is finished and nothing is left typed.
+ * The names finished in `text` by a comma, and the `rest` still being typed:
+ * what comes after the last comma, from its first letter.
  */
-export function finishedTags(text: string, all = false): { names: string[]; rest: string } {
+export function finishedTags(text: string): { names: string[]; rest: string } {
   const pieces = text.split(',');
   // The space after a comma only parts one name from the next.
-  const rest = all ? '' : (pieces.pop() ?? '').trimStart();
-  const names = pieces.map((p) => p.trim()).filter((p) => p !== '');
-  return { names, rest };
+  const rest = (pieces.pop() ?? '').trimStart();
+  return { names: tagNames(pieces), rest };
+}
+
+/**
+ * Every name in `text`, the last piece too, as when names are pasted or the
+ * field is left.
+ */
+export function allTags(text: string): string[] {
+  return tagNames(text.split(','));
+}
+
+// Pieces as names: trimmed, and without blank ones.
+function tagNames(pieces: string[]): string[] {
+  return pieces.map((p) => p.trim()).filter((p) => p !== '');
 }
 
 /**
