@@ -4,6 +4,7 @@
   import { onDestroy, tick } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import AddFromLink, { type FromLink } from './AddFromLink.svelte';
+  import AlreadyInLibrary from './AlreadyInLibrary.svelte';
   import { api, type Beat, type DecodedAudio, type Fetched, type Song } from './api';
   import AudioPlayer from './AudioPlayer.svelte';
   import BeatFields from './BeatFields.svelte';
@@ -15,6 +16,7 @@
   import { playMediaAlone, release } from './playback';
   import { formatDuration } from './time';
   import { suggestForFile } from './beatTags';
+  import { beatWithSource } from './sameSource';
   import { prepareUpload } from './upload';
 
   // Picks a Beat to add to a Song: one from the Beat Library, found with the
@@ -184,6 +186,10 @@
     setAdding({ file, decoded, draft, fetched: { ...fetched, previewUrl: URL.createObjectURL(file) } });
   }
 
+  // The Beat already in the Library from the link being added, if any: it's
+  // offered instead, but can be added again.
+  const alreadyAdded = $derived(adding?.fetched && beats ? beatWithSource(beats, adding.fetched.sourceLink) : null);
+
   onDestroy(() => setAdding(null));
 </script>
 
@@ -219,9 +225,15 @@
       {#if adding.fetched}
         <AudioPlayer src={adding.fetched.previewUrl} duration={adding.decoded.duration} peaks={adding.decoded.peaks} />
       {/if}
+      {#if alreadyAdded}
+        {@const existing = alreadyAdded}
+        <AlreadyInLibrary beat={existing} action="Use it" onOpen={() => onPick(existing)} />
+      {/if}
       <BeatFields bind:draft={adding.draft} idPrefix="picker-beat" />
       <div class="actions">
-        <button type="submit" class="button primary" disabled={busy !== null}>Add to Library and Song</button>
+        <button type="submit" class="button primary" disabled={busy !== null}>
+          {alreadyAdded ? 'Add anyway' : 'Add to Library and Song'}
+        </button>
         <button type="button" class="button" onclick={() => setAdding(null)} disabled={busy !== null}>Back</button>
       </div>
     </form>
