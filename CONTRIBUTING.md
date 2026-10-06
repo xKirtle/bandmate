@@ -11,7 +11,7 @@ Bandmate is a personal, single-user tool, and it's grown by designing each featu
 
 Whoever or whatever wrote it: AI-written pull requests are welcome, and held to the same bar.
 
-- **Use the glossary's terms.** [CONTEXT.md](CONTEXT.md) defines the words Bandmate uses (Song, Section, Alternate, Clip, Take and so on), and the words to avoid. Code, UI text, tests and the pull request itself use them.
+- **Use the glossary's terms.** [GLOSSARY.md](GLOSSARY.md) defines the words Bandmate uses (Song, Section, Alternate, Clip, Take and so on), and the words to avoid. Code, UI text, tests and the pull request itself use them.
 - **Respect the ADRs.** [docs/adr/](docs/adr/) records the decisions Bandmate is built on, and why. If a change would contradict one, raise it on the issue first rather than working around it.
 - **Follow [AGENTS.md](AGENTS.md).** It holds the repo's conventions, for people as much as for coding agents.
 - **Format the code.** Run `npm run format` in `web/` for the web app, and `gofmt` on Go code. CI fails a pull request whose web code isn't formatted.
