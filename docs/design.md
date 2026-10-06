@@ -242,3 +242,4 @@ An outlined toggle is for one that would otherwise compete, like Read mode's Cho
 | `--cover-list`, `--cover-header`       | A Song's Cover in lists and in the Song page header                      |
 | `--checkbox`                           | A checkbox or radio button, a touch bigger than the browser draws it     |
 | `--mark-rail`, `--mark-large`          | Bandmate's mark: atop the nav rail, and in About                         |
+| `--cue-slot`, `--cue-button`           | A Cue's slot in the gutter, wide enough for "⚠ 12:34.5"; its ▶ or ✕      |
