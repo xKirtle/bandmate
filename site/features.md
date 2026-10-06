@@ -19,10 +19,19 @@ The words in bold are defined in the [glossary](https://github.com/xKirtle/bandm
 ## Listen
 
 - **Masters**: finished recordings of a Song made elsewhere, attached to it with their own waveform and player.
-- A **Beat Library** of **Beats**, shared across Songs, each carrying its credit (producer, source link). Upload a Beat, or paste a link to a video on YouTube, SoundCloud, Bandcamp or any other site [yt-dlp](https://github.com/yt-dlp/yt-dlp) reads, and Bandmate fetches its audio with the credit filled in.
+- A **Beat Library** of **Beats**, shared across Songs, each carrying its credit (producer, source link). Upload a Beat, or [download one from a link](#beats-from-a-link).
 - A **Timeline** per Song, with **Tracks** holding **Clips** of Beats or **Sounds** (audio imported into one Song). Clips are trimmed without touching the file.
 - Each Track has its own volume, mute and solo. A **Loop** repeats a stretch of the Timeline.
 - Undo and redo for every Timeline edit.
+
+### Beats from a link
+
+Paste a link to a video or track on YouTube, SoundCloud, Bandcamp or [any other site yt-dlp supports](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md), and Bandmate downloads its audio as a Beat, with the credit filled in. It uses [yt-dlp](https://github.com/yt-dlp/yt-dlp), which comes with Bandmate.
+
+- One video or track at a time: not playlists, channels or live streams.
+- The audio is saved as m4a. A download stops if it's larger than the upload limit (500 MB, unless [set otherwise](/self-hosting#configuration)), or takes longer than 10 minutes.
+- A download you don't add to the Beat Library is deleted after an hour, or when Bandmate restarts.
+- **If a site stops working**, yt-dlp probably needs a newer version. You don't need to wait for a new Bandmate: open **Settings → About**, and press **Update** beside yt-dlp. Bandmate always uses the newest yt-dlp it has, whether that's your update or the one a later Bandmate brings.
 
 ## Sync
 
@@ -40,6 +49,14 @@ The words in bold are defined in the [glossary](https://github.com/xKirtle/bandm
 - Retake a Clip to stack Takes in it, then choose the one it plays.
 - **Latency Offset** calibration per device, by tapping or clapping along with a click, and a **Nudge** per Take for the rest.
 - An **Input** picker with a level meter, remembered per device.
+
+## Backups
+
+- Back up the Songs you choose, the Beat Library, or both, in **Settings → Backups**, and download a Backup to keep it somewhere else.
+- Restore a Backup into this Bandmate or another one, picking what to bring back. Where a Song or Beat is already there, you choose whether to replace it or keep both, and nothing else is touched.
+- A Backup restores into the same Bandmate version or a newer one, never an older one.
+
+To copy everything at once, including every Backup, see [copying the data folder](/self-hosting#copying-the-data-folder).
 
 ## What's next
 

@@ -61,48 +61,13 @@ Set these in a `.env` file next to `compose.yaml`. All are optional.
 | `PUID` / `PGID`          | `1000`     | The user the container runs as. It must own `./data`                          |
 | `BANDMATE_MAX_UPLOAD_MB` | `500`      | The largest audio file Bandmate takes, uploaded or downloaded, in megabytes   |
 | `BANDMATE_UPDATE_CHECK`  | `on`       | `off` stops Bandmate checking GitHub for new versions of itself and of yt-dlp |
-| `BANDMATE_ADD_FROM_LINK` | `on`       | `off` turns off [downloading Beats from links](#downloading-beats-from-links) |
+| `BANDMATE_ADD_FROM_LINK` | `on`       | `off` turns off [downloading Beats from links](/features#beats-from-a-link)     |
 
 Running Bandmate outside Docker? It also reads `BANDMATE_ADDR`, the address it listens on (`:8080`), and `BANDMATE_DATA_DIR`, where it keeps its data (`./data`; the image sets it to `/data`).
 
-## Downloading Beats from links
-
-Paste a link to a video or track on YouTube, SoundCloud, Bandcamp or [any other site yt-dlp supports](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md), and Bandmate downloads its audio as a Beat, with the credit filled in. It uses [yt-dlp](https://github.com/yt-dlp/yt-dlp), which comes with the image.
-
-- It takes one video at a time: not playlists, channels or live streams.
-- The audio is saved as m4a. The download stops if it goes over `BANDMATE_MAX_UPLOAD_MB`, or takes longer than 10 minutes.
-- A download you don't add to the Beat Library is deleted after an hour, or when Bandmate restarts.
-- **Behind a reverse proxy?** A download is one long request, so give the proxy a read timeout of a few minutes.
-
-### Keeping yt-dlp up to date
-
-Sites change, and when they do, yt-dlp can stop working with them until its next release fixes it. You don't need to wait for a new Bandmate: open **Settings → About**, and if a newer yt-dlp is out, press **Update** beside it. Bandmate always uses the newest yt-dlp it has, whether that's your update or the one a later Bandmate brings.
-
-### Mounting your own yt-dlp
-
-::: warning For advanced setups only
-Most installs never need this: **Update**, above, keeps yt-dlp current.
-:::
-
-You need this only if Update says it **can't run programs from the data folder**. That happens when the data folder is mounted `noexec`, as on some NAS systems. Instead, give Bandmate a yt-dlp of your own:
-
-1. Download yt-dlp's [standalone Linux build](https://github.com/yt-dlp/yt-dlp/releases/latest): `yt-dlp_linux`, or `yt-dlp_linux_aarch64` on ARM.
-2. Make it executable: `chmod +x yt-dlp_linux`.
-3. Mount it over the bundled one, with a line under `volumes:` in `compose.yaml`:
-
-   ```yaml
-       volumes:
-         - ./data:/data
-         - ./yt-dlp_linux:/usr/local/bin/yt-dlp:ro
-   ```
-
-4. Recreate the container: `docker compose up -d`.
-
-To update it later, replace the file and recreate the container again.
-
 ## Security
 
-Bandmate has **no login**: anyone who can reach it can read and change every Song. That's fine on your own machine. Anywhere else, put it behind a reverse proxy that adds HTTPS and authentication, and let only the proxy reach it.
+Bandmate has **no login**: anyone who can reach it can read and change every Song. That's fine on your own machine. Anywhere else, put it behind a reverse proxy that adds HTTPS and authentication, and let only the proxy reach it. Downloading a Beat from a link is one long request, so give the proxy a read timeout of a few minutes.
 
 Recording also needs HTTPS, or `localhost`: browsers don't allow the microphone otherwise.
 
@@ -136,7 +101,7 @@ New features bump the middle number, and fixes alone the last one, as [CONTRIBUT
 
 ### Upgrading and rolling back
 
-**To upgrade**, first [copy the data folder](#backups), then:
+**To upgrade**, first [copy the data folder](#copying-the-data-folder), then:
 
 ```sh
 docker compose pull && docker compose up -d
@@ -146,11 +111,31 @@ Bandmate updates its database by itself when it starts.
 
 **To roll back**, run the older tag. If the newer version changed the database, put back the copy of the data folder you made before upgrading too: an older Bandmate can't undo a newer one's changes.
 
-## Backups
+### Copying the data folder
 
-**In the app**, open **Settings → Backups** to back up the Songs you choose, the Beat Library, or both. Download a Backup to keep it somewhere else. To restore, upload a Backup to this Bandmate or another one, and pick what to bring back. Where a Song or Beat is already there, you choose whether to replace it or keep both, and nothing else is touched. A Backup restores into the same Bandmate version or a newer one, never an older one.
+Stop Bandmate, so nothing is mid-write, and copy `data`. It holds everything: the database, audio, Covers and Backups. Do this before every upgrade, so you can roll back. To back up only some Songs or Beats, from the app, see [Backups](/features#backups).
 
-**By copying the data folder**: stop Bandmate, so nothing is mid-write, and copy `data`. It holds everything: the database, audio, Covers and Backups. Do this before every upgrade, so you can roll back.
+## Mounting your own yt-dlp
+
+::: warning For advanced setups only
+Most installs never need this: **Update**, in Settings → About, keeps yt-dlp current, as the [feature tour](/features#beats-from-a-link) describes.
+:::
+
+You need this only if Update says it **can't run programs from the data folder**. That happens when the data folder is mounted `noexec`, as on some NAS systems. Instead, give Bandmate a yt-dlp of your own:
+
+1. Download yt-dlp's [standalone Linux build](https://github.com/yt-dlp/yt-dlp/releases/latest): `yt-dlp_linux`, or `yt-dlp_linux_aarch64` on ARM.
+2. Make it executable: `chmod +x yt-dlp_linux`.
+3. Mount it over the bundled one, with a line under `volumes:` in `compose.yaml`:
+
+   ```yaml
+       volumes:
+         - ./data:/data
+         - ./yt-dlp_linux:/usr/local/bin/yt-dlp:ro
+   ```
+
+4. Recreate the container: `docker compose up -d`.
+
+To update it later, replace the file and recreate the container again.
 
 ## Licenses
 

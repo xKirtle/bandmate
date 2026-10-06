@@ -51,7 +51,7 @@ Then open http://localhost:8080. For Docker Compose, use the repo's [`compose.ya
 > [!WARNING]
 > Bandmate has no login: anything that can reach it can read and change every Song. Anywhere beyond your own machine, put it behind a reverse proxy that handles HTTPS and authentication. Recording also needs HTTPS, or localhost, for the microphone.
 
-Configuration, image tags, upgrading, backups and the rest are in the [self-hosting guide](https://xkirtle.github.io/bandmate/self-hosting).
+Configuration, updating and the rest are in the [self-hosting guide](https://xkirtle.github.io/bandmate/self-hosting).
 
 ## Learn more
 
