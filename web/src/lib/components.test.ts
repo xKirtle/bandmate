@@ -25,26 +25,6 @@ const filesMatching = (pattern: RegExp) =>
     .map(({ path }) => path)
     .sort();
 
-/** Some CSS without its `@media (hover: hover)` blocks. */
-function withoutHoverOnly(css: string): string {
-  const opening = /@media \(hover: hover\)\s*\{/g;
-  let rest = '';
-  let from = 0;
-  for (const m of css.matchAll(opening)) {
-    if (m.index < from) continue;
-    rest += css.slice(from, m.index);
-    let depth = 1;
-    let i = m.index + m[0].length;
-    while (depth > 0 && i < css.length) {
-      if (css[i] === '{') depth++;
-      else if (css[i] === '}') depth--;
-      i++;
-    }
-    from = i;
-  }
-  return rest + css.slice(from);
-}
-
 describe('components', () => {
   it('opens every modal dialog as a Dialog', () => {
     expect(filesMatching(/<dialog[\s>]/)).toEqual(['lib/Dialog.svelte']);
@@ -64,11 +44,13 @@ describe('components', () => {
     // A tab is styled through [role='tab'] in a component's own styles.
     expect(filesMatching(/\[role=['"]tab['"]\]/)).toEqual([]);
   });
+});
 
-  it("shows an icon button's hover box only to a pointer that can hover", () => {
+describe('the icon button', () => {
+  it('shows its hover box only to a pointer that can hover', () => {
     // A tap on a touch screen leaves :hover on what it tapped, so the box would stay.
     const css = readFileSync(join(src, 'app.css'), 'utf8');
-    expect(css).toMatch(/\.icon:hover/);
-    expect(withoutHoverOnly(css)).not.toMatch(/\.icon:hover/);
+    expect(css.match(/\.icon:hover/g)).toHaveLength(1);
+    expect(css).toMatch(/@media \(hover: hover\) \{\s*\.icon:hover/);
   });
 });

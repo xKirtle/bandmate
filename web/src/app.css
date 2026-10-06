@@ -520,8 +520,8 @@ input[inputmode='decimal'] {
   font-size: var(--text-xl);
   cursor: pointer;
 }
-/* Its box shows on hover only to a pointer that can hover: a tap on a touch
-   screen leaves the button hovered, so the box would stay after it. */
+/* An icon button's box shows on hover only to a pointer that can hover: a
+   tap on a touch screen leaves the button hovered, so the box would stay. */
 @media (hover: hover) {
   .icon:hover:not(:disabled) {
     border-color: var(--border);
