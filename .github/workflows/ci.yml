@@ -137,7 +137,8 @@ jobs:
       - uses: docker/setup-buildx-action@v4
 
       # From the Git context, like the image job, and loaded into Docker
-      # rather than pushed. The layers it caches speed up the image job.
+      # rather than pushed. The image job reuses the programs' layers it
+      # caches, which are the slow ones to build.
       - uses: docker/build-push-action@v7
         with:
           load: true

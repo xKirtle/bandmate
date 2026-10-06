@@ -54,16 +54,16 @@ func main() {
 	}
 }
 
-// bundledPrograms is where the image's build records the programs it bundles
-// beside Bandmate: yt-dlp, ffmpeg and QuickJS (see the Dockerfile). Outside
-// the image it isn't there, so none are listed.
-const bundledPrograms = "/usr/local/share/bandmate/programs.json"
+// bundledProgramsManifest is where the image's build records the programs it
+// bundles beside Bandmate: yt-dlp, ffmpeg and QuickJS (see the Dockerfile).
+// Outside the image it isn't there, so none are listed.
+const bundledProgramsManifest = "/usr/local/share/bandmate/programs.json"
 
 func run(addr, dataDir string, maxUploadBytes int64, updateCheckOff bool) error {
 	running := build.Current()
 	a, err := app.New(app.Config{
 		DataDir: dataDir, SPA: web.Dist(), MaxUploadBytes: maxUploadBytes, Build: running,
-		UpdateCheckOff: updateCheckOff, ProgramsManifest: bundledPrograms,
+		UpdateCheckOff: updateCheckOff, ProgramsManifest: bundledProgramsManifest,
 	})
 	if err != nil {
 		return err

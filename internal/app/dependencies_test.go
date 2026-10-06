@@ -104,7 +104,7 @@ func TestAboutListsTheProgramsBundledInTheImage(t *testing.T) {
 	manifest := filepath.Join(t.TempDir(), "programs.json")
 	if err := os.WriteFile(manifest, []byte(`[
 		{"name": "yt-dlp", "version": "2026.08.19", "license": "Unlicense"},
-		{"name": "ffmpeg", "version": "8.1.2", "license": "LGPL-2.1-or-later"},
+		{"name": "ffmpeg", "version": "8.1.3", "license": "LGPL-2.1-or-later"},
 		{"name": "QuickJS", "version": "2026-06-04", "license": "MIT"}
 	]`), 0o644); err != nil {
 		t.Fatal(err)
@@ -113,7 +113,7 @@ func TestAboutListsTheProgramsBundledInTheImage(t *testing.T) {
 
 	want := []dependency{
 		{Name: "yt-dlp", Version: "2026.08.19", License: "Unlicense"},
-		{Name: "ffmpeg", Version: "8.1.2", License: "LGPL-2.1-or-later"},
+		{Name: "ffmpeg", Version: "8.1.3", License: "LGPL-2.1-or-later"},
 		{Name: "QuickJS", Version: "2026-06-04", License: "MIT"},
 	}
 	if !slices.Equal(got.Programs, want) {

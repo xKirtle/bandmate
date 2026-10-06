@@ -3,7 +3,9 @@ name: yt-dlp
 # Once a week, opens a pull request that bundles yt-dlp's newest release in
 # the image when it's newer than the one the Dockerfile pins, so the bundled
 # yt-dlp doesn't fall behind unnoticed (ADR 0016). It skips a release that
-# already has a pull request's branch. Can also be started by hand.
+# already has an open pull request, and closes one for an older release once
+# the newer one is open. Can also be started by hand. Its pull requests have
+# no issue: each is a routine bump the weekly job stands for.
 #
 # Opening the pull request needs the repository's "Allow GitHub Actions to
 # create and approve pull requests" setting (Settings > Actions > General).
@@ -46,9 +48,13 @@ jobs:
             exit 0
           fi
 
+          # One bump pull request at a time: an open one for this release
+          # leaves nothing to do, and one for an older release is replaced.
           branch="deps/yt-dlp-$latest"
-          if git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
-            echo "$branch already exists, so its pull request is already open."
+          bumps=$(gh pr list --state open --limit 100 --json number,headRefName \
+            --jq '.[] | select(.headRefName | startswith("deps/yt-dlp-")) | "\(.number) \(.headRefName)"')
+          if grep -q " $branch\$" <<< "$bumps"; then
+            echo "The pull request for yt-dlp $latest is already open."
             exit 0
           fi
 
@@ -71,7 +77,9 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$branch"
           git commit -am "Bundle yt-dlp $latest"
-          git push origin "$branch"
+          # Forced, in case a run that failed before opening its pull request
+          # left the branch behind.
+          git push --force origin "$branch"
 
           gh pr create --base main --head "$branch" --label enhancement \
             --title "Bundle yt-dlp $latest" \
@@ -79,3 +87,8 @@ jobs:
 
           Opened by the weekly yt-dlp workflow. CI's bundle job checks the new yt-dlp runs in the built image."
           gh workflow run ci.yml --ref "$branch"
+
+          while read -r number _; do
+            [ -n "$number" ] || continue
+            gh pr close "$number" --delete-branch --comment "Replaced by the pull request for yt-dlp $latest."
+          done <<< "$bumps"
