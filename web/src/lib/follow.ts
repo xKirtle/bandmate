@@ -39,3 +39,11 @@ export function follower() {
     },
   };
 }
+
+/**
+ * Which Line is at the top of the view, given each Line's edges and the
+ * view's top edge: the first one at least half showing, or -1 for none.
+ */
+export function topLine(lines: { top: number; bottom: number }[], viewTop: number): number {
+  return lines.findIndex(({ top, bottom }) => (top + bottom) / 2 >= viewTop);
+}
