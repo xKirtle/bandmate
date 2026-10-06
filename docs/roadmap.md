@@ -85,3 +85,9 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 - At phone width, the Chord Finder's Left-handed toggle doesn't fit beside its tabs and drops onto a line of its own, which looks like an afterthought. It wants a place that feels deliberate on a phone, without losing the one-tap toggle on desktop.
 - Settings' This device tab already has a Left-handed switch (#649), the same setting as this toggle, so leaving it only in Settings on a phone is one way out.
 - Where it goes instead (beside the tuning, in an overflow menu, as an icon, or only in Settings on a phone), and whether the tabs themselves change at that width, are for the spec.
+
+## Adding a Beat from YouTube
+
+- An "Import from YouTube" button on the Beat Library page, beside Add Beat: the user gives a YouTube link and Bandmate fetches the audio with yt-dlp and adds it as a Beat, instead of the user downloading it and uploading the file.
+- It would be Bandmate's second outbound call, after the update check.
+- The glossary keeps "import" for bringing audio in as a Sound, so what the button is called is for the spec. So are: whether the link fills in the Beat's credit (the video as its source link, the channel as its producer); whether the Beat Picker offers it too; how yt-dlp and what it needs ship with Bandmate and keep up with YouTube's changes; and what the user sees while it downloads, or when it fails.
