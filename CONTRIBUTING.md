@@ -19,10 +19,16 @@ Whoever or whatever wrote it: AI-written pull requests are welcome, and held to 
 - **Title it for the release notes.** The title becomes the pull request's line in them, so it names the change a self-hoster notices, not the code that changed.
 - **Label it** for the release notes, which are grouped by `enhancement`, `bug` and `documentation` and leave out `no-release-notes`, whatever else a pull request is labelled:
   - A feature gets `enhancement`, a fix `bug`, and a docs change `documentation`.
-  - Add `no-release-notes` to a change no self-hoster would read or notice. Docs a self-hoster reads go in the notes: the README, how to install and run Bandmate, and the licence and security policy. The rest get `no-release-notes`: this file, the [roadmap](docs/roadmap.md), AGENTS.md, the agent docs and skills, the glossary and the ADRs.
+  - Add `no-release-notes` to a change no self-hoster would read or notice. Docs a self-hoster reads go in the notes: the README, the [docs site](site/), and the licence and security policy. The rest get `no-release-notes`: this file, the [roadmap](docs/roadmap.md), AGENTS.md, the agent docs and skills, the glossary and the ADRs.
   - A refactor, tooling or CI gets `no-release-notes` alone.
 
 ## Development
+
+### How it's built
+
+Bandmate is one Go binary. It serves a JSON API under `/api`, stores everything in SQLite and audio files in the data folder, and serves the Svelte single-page app from files built into the binary ([ADR 0001](docs/adr/0001-go-backend-svelte-spa.md)). Recording, waveforms and the Timeline's playback all run in the browser. It has no login: authentication is the reverse proxy's job ([ADR 0002](docs/adr/0002-single-user-auth-at-proxy.md)).
+
+The design is worked out in words before code. [GLOSSARY.md](GLOSSARY.md) is the glossary: the code, the UI and the issues all use its terms. The decisions that shaped it, and why, are the [ADRs](docs/adr/).
 
 Requirements: Go 1.27+ and Node 26+.
 
@@ -73,9 +79,21 @@ docker build -t bandmate:dev .
 BANDMATE_IMAGE=bandmate:dev docker compose up
 ```
 
+### Docs site
+
+The [docs site](https://xkirtle.github.io/bandmate/) holds the feature tour and the self-hosting guide, which the README links to rather than repeating. It's built with VitePress from the Markdown in [`site/`](site/):
+
+```sh
+cd site
+npm install
+npm run dev     # http://localhost:5173/bandmate/
+```
+
+A pull request that touches it builds it, which fails on a dead link. A release tag deploys it to GitHub Pages ([docs.yml](.github/workflows/docs.yml)), so it describes the latest release rather than `main`.
+
 ### Screenshots
 
-The README's screenshots are captured from a demo Bandmate. [docs/screenshots/README.md](docs/screenshots/README.md) says how to reseed it and recapture them when the UI changes.
+The screenshots in the README and on the docs site are captured from a demo Bandmate. [docs/screenshots/README.md](docs/screenshots/README.md) says how to reseed it and recapture them when the UI changes.
 
 ## Tests
 
