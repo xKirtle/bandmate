@@ -9,7 +9,8 @@
   // Calibrates the Latency Offset in a dialog: clicks play, the user taps
   // or claps on the mic along with them, and the delay found is shown and
   // kept. Offered before a device's first recording, where it can be
-  // skipped to record straight away; also run from the recording settings.
+  // skipped to record straight away; also run from the recording settings
+  // and Settings.
   let {
     offer = false,
     onCalibrated,

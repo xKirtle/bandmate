@@ -4,6 +4,7 @@ import {
   channelName,
   deviceName,
   inputKey,
+  inputName,
   inputSetting,
   meterLevel,
   readInput,
@@ -166,6 +167,22 @@ describe('deviceName and channelName', () => {
   it('names a channel after its device, counting from 1', () => {
     expect(channelName('Scarlett 2i2 USB (1235:8210)', 0)).toBe('Scarlett 2i2 USB · Input 1');
     expect(channelName('Scarlett 2i2 USB (1235:8210)', 1)).toBe('Scarlett 2i2 USB · Input 2');
+  });
+});
+
+describe('inputName', () => {
+  it('names the Input chosen by the label it had when chosen, and its channel', () => {
+    expect(inputName({ deviceId: 'abc', label: 'Scarlett 2i2 USB (1235:8210)', channel: 1 })).toBe(
+      'Scarlett 2i2 USB · Input 2',
+    );
+  });
+
+  it('is "Default input" while none is chosen', () => {
+    expect(inputName({ deviceId: '', label: '', channel: 0 })).toBe('Default input');
+  });
+
+  it("names the default input's channel past its first", () => {
+    expect(inputName({ deviceId: '', label: '', channel: 1 })).toBe('Default input · Input 2');
   });
 });
 
