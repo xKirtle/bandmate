@@ -2,10 +2,8 @@ package releases
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
+	"errors"
 	"log"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -54,9 +52,6 @@ func (l *Latest) Get(ctx context.Context) (Link, Check) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if !l.now().Before(l.cached.until) {
-		// A visitor leaving the page mustn't make the failure be remembered.
-		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), askTimeout)
-		defer cancel()
 		link, err := l.ask(ctx)
 		keep := keepSuccess
 		if err != nil {
@@ -74,27 +69,12 @@ func (l *Latest) Get(ctx context.Context) (Link, Check) {
 // ask asks GitHub for the repository's latest release, which is never a
 // draft or a pre-release.
 func (l *Latest) ask(ctx context.Context) (Link, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, l.api+"/repos/"+l.repo+"/releases/latest", nil)
-	if err != nil {
-		return Link{}, err
-	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	req.Header.Set("User-Agent", "Bandmate")
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return Link{}, err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return Link{}, fmt.Errorf("GitHub answered %s", res.Status)
-	}
 	var r ghRelease
-	if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
-		return Link{}, fmt.Errorf("reading GitHub's latest release: %w", err)
+	if err := askGitHub(ctx, l.api+"/repos/"+l.repo+"/releases/latest", &r); err != nil {
+		return Link{}, err
 	}
 	if r.TagName == "" {
-		return Link{}, fmt.Errorf("GitHub's latest release has no tag")
+		return Link{}, errors.New("GitHub's latest release has no tag")
 	}
 	return Link{Tag: r.TagName, URL: r.HTMLURL}, nil
 }

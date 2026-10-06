@@ -51,9 +51,9 @@
       () => (ytDlpCheck = { check: 'failed' }),
     );
   }
-  /** What the row offers: nothing until the check answers, so an update
-      isn't offered and then taken back. */
-  const ytDlpOffered = $derived(ytDlpCheck && ytDlpOffer(ytDlpCheck));
+  /** What the yt-dlp row offers: nothing until the check answers, so an
+      update isn't offered and then taken back. */
+  const ytDlpRowOffer = $derived(ytDlpCheck && ytDlpOffer(ytDlpCheck));
 
   let updatingYtDlp = $state(false);
   let ytDlpUpdate = $state<YtDlpUpdate | null>(null);
@@ -65,7 +65,8 @@
     try {
       ytDlpUpdate = await api.updateYtDlp();
       ytDlp = ytDlpUpdate;
-      // Against the yt-dlp now in use.
+      // Against the yt-dlp now in use, offering nothing until it answers.
+      ytDlpCheck = null;
       checkYtDlp();
     } catch (e) {
       ytDlpUpdateError = (e as Error).message;
@@ -237,10 +238,10 @@
               <div class="yt-dlp">
                 {#if ytDlp}
                   <span>{ytDlp.version} <span class="muted">({ytDlp.source})</span></span>
-                  {#if ytDlpOffered?.status}<span class="muted">{ytDlpOffered.status}</span>{/if}
-                  {#if ytDlpOffered?.button}
+                  {#if ytDlpRowOffer?.status}<span class="muted">{ytDlpRowOffer.status}</span>{/if}
+                  {#if ytDlpRowOffer?.button}
                     <button class="button quiet" type="button" disabled={updatingYtDlp} onclick={updateYtDlp}>
-                      {updatingYtDlp ? 'Updating…' : ytDlpOffered.button}
+                      {updatingYtDlp ? 'Updating…' : ytDlpRowOffer.button}
                     </button>
                   {/if}
                 {:else if ytDlpError}

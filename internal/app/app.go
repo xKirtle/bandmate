@@ -210,8 +210,9 @@ func New(cfg Config) (*App, error) {
 		conn.Close()
 		return nil, err
 	}
-	a.releases = releases.New(releases.Options{Off: cfg.UpdateCheckOff, API: cfg.GitHubAPI, Now: now})
-	a.ytDlpLatest = releases.NewLatest("yt-dlp/yt-dlp", releases.Options{Off: cfg.UpdateCheckOff, API: cfg.GitHubAPI, Now: now})
+	github := releases.Options{Off: cfg.UpdateCheckOff, API: cfg.GitHubAPI, Now: now}
+	a.releases = releases.New(github)
+	a.ytDlpLatest = releases.NewLatest("yt-dlp/yt-dlp", github)
 	// Only tidying, so it never stops the app starting.
 	if err := a.timelines.SweepDetachedTakes(context.Background(), now().Add(-DetachedTakesKept)); err != nil {
 		log.Printf("sweeping detached takes: %v", err)
