@@ -12,6 +12,7 @@
   import { MediaQuery } from 'svelte/reactivity';
   import type { Cueing } from './AlternateText.svelte';
   import { api, type Line, type Section, type Song, type SongAt } from './api';
+  import type { CueChange } from './cueChanges';
   import { hasChords } from './chords';
   import {
     canShiftCuesEarlier,
@@ -55,7 +56,7 @@
     mode,
     change,
     drag,
-    editCues,
+    changeCues,
     onUnsaved,
     playhead = null,
     hasClips = false,
@@ -73,8 +74,12 @@
     change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
     /** The drag of a Section, shared with the Scrapbook. */
     drag: SectionDragging;
-    /** Sends a Cue edit, to undo with the Timeline's edits; resolves to whether it succeeded. */
-    editCues: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
+    /**
+     * Makes a Cue change, shown at once and undone with the Timeline's edits,
+     * naming what it changes, e.g. "the Cue of Line 3 of Verse", in case it
+     * has to be taken back; resolves to whether it was saved.
+     */
+    changeCues: (change: CueChange, what: string) => Promise<boolean>;
     onUnsaved: (editor: object, unsaved: boolean) => void;
     /** Where the Timeline is playing, in seconds; null while it isn't. */
     playhead?: number | null;
@@ -120,7 +125,8 @@
       actions.push({
         icon: Eraser,
         label: "Clear this Section's Cues",
-        run: () => editCues((at) => api.clearSectionCues(at, section.id)),
+        run: () =>
+          changeCues({ kind: 'clearSectionCues', sectionId: section.id }, `clearing the Cues of ${describe(section)}`),
       });
     }
     const others = inArrangement.filter((other) => other.id !== section.id);
@@ -163,11 +169,12 @@
   }
 
   function shiftEveryCue(by: number) {
-    editCues((at) => api.shiftCues(at, everyCue.start, everyCue.end, by));
+    changeCues({ kind: 'shiftCues', ...everyCue, by }, 'shifting every Cue');
   }
 
-  function setLineCue(line: Line, cue: number | null) {
-    editCues((at) => (cue === null ? api.clearLineCue(at, line.id) : api.setLineCue(at, line.id, cue)));
+  /** Sets or, with null, clears the Cue of a Line, as the gutter names it. */
+  function setLineCue(line: Position, cue: number | null) {
+    changeCues({ kind: 'setLineCue', lineId: line.line, cue }, `the Cue of ${lineName(line)}`);
   }
 
   // In Write mode, each Line is tracked, to follow playback to, and each
@@ -210,7 +217,7 @@
       gutter: canCue
         ? {
             labelSuffix: ofSection(section.label),
-            save: setLineCue,
+            save: (line, cue) => setLineCue({ section: section.id, line: line.id }, cue),
             field: (line, field) => writeFields.set(lineKey(line), field),
             next: (line) => writeFields.editAfter(writeFieldOrder, lineKey(line)),
             play: leadInto,
@@ -244,7 +251,7 @@
 
   // Sync mode is only for cueing, so changing the lyrics ends it, playback
   // carrying on: any change to the Arrangement or a Section in it, and
-  // opening a Section's Alternates. Cue edits go through editCues, so never
+  // opening a Section's Alternates. Cue edits go through changeCues, so never
   // end it, and nor does saving Line text typed before it came on.
   function endSyncing() {
     syncing = false;
@@ -257,7 +264,8 @@
   // What the Line up next is worked out from: the Line last cued, or a Line
   // picked by clicking it. It doesn't follow playback, so playback can start
   // anywhere, and the Line up next only moves on as Lines are cued, whether
-  // or not their Cues are saved yet.
+  // or not their Cues are saved yet. A Cue taken back, as its save failed,
+  // leaves it where it is.
   let syncFrom = $state.raw<{ cued: NextLine | null; picked: NextLine | null }>({ cued: null, picked: null });
   // Marked by a Now button in its gutter slot.
   const upNext = $derived(syncing ? nextLine(song, syncFrom) : null);
@@ -281,16 +289,16 @@
     syncFrom = { cued: null, picked: null };
   }
 
-  /** Cues the Line up next at the playhead. */
-  async function cueNext() {
+  /**
+   * Cues the Line up next at the playhead. Its Cue shows at once, so it
+   * becomes the Line playing, as playback is already at its Cue, and the
+   * Line after it comes up next.
+   */
+  function cueNext() {
     const line = upNext;
     if (!playheadAt || !line) return;
-    const time = playheadAt();
-    const from = { cued: line, picked: null };
-    syncFrom = from;
-    const saved = await editCues((at) => api.setLineCue(at, line.line, time));
-    // Failed, the Line is still to cue, unless another has been picked since.
-    if (!saved && syncFrom === from) syncFrom = { cued: null, picked: line };
+    syncFrom = { cued: line, picked: null };
+    setLineCue(line, playheadAt());
   }
 
   // Playback is followed down the Lyric Sheet in Write mode, but in Sync
@@ -488,7 +496,7 @@
       <button
         type="button"
         class="button"
-        onclick={() => editCues((at) => api.clearCues(at))}
+        onclick={() => changeCues({ kind: 'clearCues' }, 'clearing every Cue')}
         title="Clear every Cue in the Song">Clear all Cues</button
       >
     {/if}

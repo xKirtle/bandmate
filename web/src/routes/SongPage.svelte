@@ -7,7 +7,6 @@
     ApiError,
     commonKeys,
     type Song,
-    type SongAt,
     type SongChanges,
     type Status,
     type Timeline as TimelineData,
@@ -26,6 +25,7 @@
   import TagsField from '../lib/TagsField.svelte';
   import Timeline from '../lib/Timeline.svelte';
   import TuningField from '../lib/TuningField.svelte';
+  import { savedRetrying, sendCueChange, withCueChange, type CueChange } from '../lib/cueChanges';
   import type { Saved } from '../lib/history';
   import { takeNewFlag } from '../lib/newSong';
   import { navigate, replaceSearch, router } from '../lib/router.svelte';
@@ -60,6 +60,8 @@
     notes: string;
   }
 
+  // The Song as last saved. What's shown has the Cue changes not saved yet
+  // made on top of it (see changeCues).
   let song = $state<Song | null>(null);
   let timeline = $state<TimelineData | null>(null);
   // Where the Timeline is playing, in seconds; null while it isn't.
@@ -200,9 +202,9 @@
 
   /**
    * Queues a change and shows the Song it returns. The change is based on
-   * the Song as shown when its turn comes. Resolves to whether it succeeded.
+   * the Song as saved when its turn comes. Resolves to whether it succeeded.
    */
-  function send(op: (at: SongAt) => Promise<Song>): Promise<boolean> {
+  function send(op: (saved: Song) => Promise<Song>): Promise<boolean> {
     return enqueue(op, (s) => (song = s));
   }
 
@@ -210,7 +212,7 @@
    * Queues a Timeline change like send, and shows the Timeline it returns,
    * or for a Cue edit, which the Timeline keeps to undo, the Song.
    */
-  function changeTimeline(op: (at: SongAt) => Promise<Saved>): Promise<boolean> {
+  function changeTimeline(op: (saved: Song) => Promise<Saved>): Promise<boolean> {
     return enqueue(op, (saved) => {
       if ('song' in saved) {
         song = saved.song;
@@ -222,12 +224,45 @@
     });
   }
 
-  /** Queues a Cue edit through the Timeline, so it can be undone with the Timeline's edits. */
-  function editCues(op: (at: SongAt) => Promise<Song>): Promise<boolean> {
+  // Cue changes not saved yet, in the order they were made. Each shows at
+  // once, made on top of the Song as saved, so syncing keeps its rhythm, and
+  // looks the same as a saved one. Once saved, the Song the save returns
+  // takes its place.
+  let unsavedCues = $state.raw<{ change: CueChange }[]>([]);
+  const shown = $derived(song && unsavedCues.reduce((s, u) => withCueChange(s, u.change), song));
+
+  /**
+   * Makes a Cue change at once, and queues its save through the Timeline, so
+   * it can be undone with the Timeline's edits. A save failing on the network
+   * or the server is tried again for a few seconds; if it still fails, the
+   * change is taken back, as a whole, and the save error names what, which
+   * is given as e.g. "the Cue of Line 3 of Verse". Refused because the Song
+   * changed elsewhere, it stays shown like any edit not saved, until Reload.
+   * Resolves to whether it was saved.
+   */
+  function changeCues(change: CueChange, what: string): Promise<boolean> {
+    if (deleting) return Promise.resolve(false);
+    const unsaved = { change };
+    unsavedCues = [...unsavedCues, unsaved];
+    const settle = () => (unsavedCues = unsavedCues.filter((u) => u !== unsaved));
+    const op = async (saved: Song) => {
+      try {
+        const after = await savedRetrying(() => sendCueChange(saved, change));
+        // Shown as saved in the same step it stops being made on top, so
+        // it's never made twice over.
+        song = after;
+        settle();
+        return after;
+      } catch (e) {
+        if (e instanceof ApiError && e.stale) throw e;
+        settle();
+        throw new Error(`Couldn't save ${what}, so it was taken back. ${(e as Error).message}`);
+      }
+    };
     return timelinePanel ? timelinePanel.editCues(op) : send(op);
   }
 
-  function enqueue<T>(op: (at: SongAt) => Promise<T>, show: (result: T) => void): Promise<boolean> {
+  function enqueue<T>(op: (saved: Song) => Promise<T>, show: (result: T) => void): Promise<boolean> {
     // Once the Song is being deleted, a late save would only fail.
     if (deleting) return Promise.resolve(false);
     pending++;
@@ -410,7 +445,7 @@
 
   function hasUnsavedEdits() {
     if (!song) return false;
-    if (pending > 0 || unsavedEditors.size > 0) return true;
+    if (pending > 0 || unsavedEditors.size > 0 || unsavedCues.length > 0) return true;
     const saved = toDraft(song);
     return (Object.keys(saved) as (keyof Draft)[]).some(
       (f) => (f === 'notes' ? draft[f] : draft[f].trim()) !== saved[f],
@@ -631,11 +666,11 @@
 
       <div class="sheet">
         <LyricSheet
-          {song}
+          song={shown!}
           {mode}
           change={send}
           {drag}
-          {editCues}
+          {changeCues}
           onUnsaved={setUnsaved}
           {playhead}
           playFrom={(at) => timelinePanel?.playFrom(at)}
@@ -688,13 +723,14 @@
   {/if}
 </main>
 
-{#if song && timeline}
+{#if shown && timeline}
   <Timeline
     bind:this={timelinePanel}
     bind:height={timelineHeight}
-    {song}
+    song={shown}
     {timeline}
     change={changeTimeline}
+    {changeCues}
     {setBpm}
     onPlayhead={(at) => (playhead = at)}
     onLoop={(on) => (loopOn = on)}
