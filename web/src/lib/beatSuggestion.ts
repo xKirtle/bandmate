@@ -1,7 +1,7 @@
 // Suggested details for a Beat being uploaded, worked out from the file's
 // tags where it has them and otherwise from its filename, e.g.
 // "dark_trap_140bpm_Am.wav" suggests "Dark Trap" at 140 BPM in Am.
-import type { BeatDetails } from './api';
+import type { BeatDetails, Fetched } from './api';
 
 /** Details a file suggests. "" and null mean it suggests nothing for that field. */
 export type BeatSuggestion = Pick<BeatDetails, 'title' | 'producer' | 'bpm' | 'key'>;
@@ -128,14 +128,7 @@ function tagKey(key: string): string {
 }
 
 /** What a link gave of a Beat fetched from it. "" where it gave nothing. */
-export interface LinkDetails {
-  title: string;
-  /** The channel. */
-  producer: string;
-  sourceLink: string;
-  /** The fetched file's name: the title, as an m4a. */
-  fileName: string;
-}
+export type LinkDetails = Pick<Fetched, 'title' | 'producer' | 'sourceLink' | 'fileName'>;
 
 /**
  * A Beat's details from a link: its title, channel and link as the link gave

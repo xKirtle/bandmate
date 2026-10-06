@@ -23,6 +23,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/xKirtle/bandmate/internal/audio"
 )
 
 // DefaultTimeout is how long a fetch may take before it's stopped.
@@ -47,12 +49,17 @@ const (
 	NotOneVideo
 	// Live: a live stream, or one yet to start.
 	Live
+	// Private: only those it's shared with can watch it.
 	Private
 	// SignIn: only someone signed in can watch it.
 	SignIn
+	// Unavailable: removed, or never there.
 	Unavailable
+	// Unsupported: yt-dlp can't read the site.
 	Unsupported
+	// TooLarge: over the upload limit.
 	TooLarge
+	// TimedOut: still going after the timeout.
 	TimedOut
 	// Missing: yt-dlp isn't installed.
 	Missing
@@ -222,13 +229,22 @@ func (s *Store) Discard(id string) {
 // it once keep succeeds. keep is given the file's path, and must leave the
 // file there: if keep fails, it stays waiting, to be tried again.
 func (s *Store) Keep(id string, keep func(path string, f Fetched) error) error {
+	// Taken out while it's kept, so it isn't kept twice, without holding up
+	// the other waiting files.
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	w, err := s.find(id)
+	if err == nil {
+		delete(s.waiting, id)
+	}
+	s.mu.Unlock()
 	if err != nil {
 		return err
 	}
-	if err := keep(w.path, w.Fetched); err != nil {
+	err = keep(w.path, w.Fetched)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.waiting[id] = w
+	if err != nil {
 		return err
 	}
 	s.remove(id)
@@ -342,7 +358,7 @@ func (s *Store) info(ctx context.Context, link, work string) (info, error) {
 	}
 	switch {
 	case i.IsLive, i.LiveStatus == "is_live", i.LiveStatus == "post_live":
-		return info{}, refused(Live, "That's a live stream. Only a video that's finished can be added.")
+		return info{}, refused(Live, liveStream)
 	case i.LiveStatus == "is_upcoming":
 		return info{}, refused(Live, "That video hasn't started yet. Only a video that's finished can be added.")
 	}
@@ -439,7 +455,7 @@ func (s *Store) run(ctx context.Context, args ...string) ([]byte, error) {
 }
 
 func (s *Store) tooLarge() error {
-	return refused(TooLarge, fmt.Sprintf("That video's audio is larger than the upload limit of %s.", formatSize(s.opts.MaxBytes)))
+	return refused(TooLarge, fmt.Sprintf("That video's audio is larger than the upload limit of %s.", audio.FormatSize(s.opts.MaxBytes)))
 }
 
 // failure says why a fetch failed, in words for the user, logging what
@@ -469,6 +485,10 @@ func (s *Store) failure(ctx context.Context, err error) error {
 	return refused(Failed, "Couldn't fetch that link. Try again, and if it keeps failing, Bandmate's log says why.")
 }
 
+// liveStream refuses a live stream, whether yt-dlp says it's live or fails
+// on it.
+const liveStream = "That's a live stream. Only a video that's finished can be added."
+
 // explanations are what yt-dlp's errors mean, in the order they're checked.
 var explanations = []struct {
 	says   []string
@@ -476,7 +496,7 @@ var explanations = []struct {
 	msg    string
 }{
 	{[]string{"private video"}, Private, "That video is private."},
-	{[]string{"live event will begin", "premieres in", "is live"}, Live, "That's a live stream. Only a video that's finished can be added."},
+	{[]string{"live event will begin", "premieres in", "is live"}, Live, liveStream},
 	{[]string{"members-only", "join this channel", "sign in", "login required", "log in"}, SignIn, "That video can only be watched signed in, so Bandmate can't fetch it."},
 	{[]string{"unsupported url"}, Unsupported, "Bandmate can't fetch from that site, or the link isn't to a video."},
 	{[]string{"unavailable", "not available", "has been removed", "no longer available", "does not exist", "http error 404", "http error 410"}, Unavailable, "That video isn't available. It may have been removed."},
@@ -535,18 +555,6 @@ func fileSize(path string) (int64, error) {
 func lastLines(out []byte) string {
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
 	return strings.Join(lines[max(0, len(lines)-3):], " / ")
-}
-
-// formatSize writes a byte count for people, e.g. "500 MB".
-func formatSize(bytes int64) string {
-	const mb = 1 << 20
-	if bytes >= mb && bytes%mb == 0 {
-		return fmt.Sprintf("%d MB", bytes/mb)
-	}
-	if bytes >= mb {
-		return fmt.Sprintf("%.1f MB", float64(bytes)/mb)
-	}
-	return fmt.Sprintf("%d bytes", bytes)
 }
 
 // formatDuration writes a timeout for people, e.g. "10 minutes".

@@ -44,7 +44,7 @@ type uploadedFile struct {
 // nothing and returns false; on success the caller keeps or discards the
 // file.
 func (a *App) readUpload(w http.ResponseWriter, r *http.Request, files *audio.Files, details any) (uploadedFile, bool) {
-	tooLarge := fmt.Sprintf("the file is larger than the upload limit of %s", formatSize(a.maxUpload))
+	tooLarge := fmt.Sprintf("the file is larger than the upload limit of %s", audio.FormatSize(a.maxUpload))
 	got, ok := readFiles(w, r, a.maxUpload, tooLarge, []filePart{{"file", files}}, details)
 	return got["file"], ok
 }
@@ -135,16 +135,4 @@ func readFiles(w http.ResponseWriter, r *http.Request, limit int64, tooLarge str
 		return fail(http.StatusBadRequest, "details are required")
 	}
 	return got, true
-}
-
-// formatSize writes a byte count for people, e.g. "500 MB".
-func formatSize(bytes int64) string {
-	const mb = 1 << 20
-	if bytes >= mb && bytes%mb == 0 {
-		return fmt.Sprintf("%d MB", bytes/mb)
-	}
-	if bytes >= mb {
-		return fmt.Sprintf("%.1f MB", float64(bytes)/mb)
-	}
-	return fmt.Sprintf("%d bytes", bytes)
 }

@@ -44,7 +44,7 @@ type fakeVideo struct {
 	fail string
 }
 
-// fakeAudio is the audio the stand-in fetches for a video, as the m4a
+// fakeFetchedAudio is the audio the stand-in fetches for a video, as the m4a
 // yt-dlp would leave.
 const fakeFetchedAudio = "fake m4a audio of Night"
 

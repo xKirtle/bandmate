@@ -7,10 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
@@ -287,18 +285,6 @@ func (ts *testServer) expectNothingWaiting() {
 		entries, err := os.ReadDir(filepath.Join(ts.DataDir, "audio", "waiting"))
 		return err == nil && len(entries) == 0
 	})
-}
-
-// expectStopped fails the test unless the stand-in yt-dlp whose process id
-// is in pidFile has stopped.
-func expectStopped(t *testing.T, pidFile string) {
-	t.Helper()
-	text, err := os.ReadFile(pidFile)
-	if err != nil {
-		t.Fatalf("the stand-in yt-dlp never started: %v", err)
-	}
-	pid, _ := strconv.Atoi(string(text))
-	waitFor(t, "yt-dlp to stop", func() bool { return syscall.Kill(pid, 0) != nil })
 }
 
 // waitFor waits up to 5 seconds for ok to hold.

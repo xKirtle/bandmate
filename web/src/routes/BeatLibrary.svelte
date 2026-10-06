@@ -491,8 +491,7 @@
      narrowest, the buttons go under the title rather than squeezing it. */
   .bar {
     flex-wrap: wrap;
-    column-gap: var(--space-2);
-    row-gap: var(--space-2);
+    gap: var(--space-2);
   }
   .bar .adds {
     margin-left: auto;

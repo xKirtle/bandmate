@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/xKirtle/bandmate/internal/audio"
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
 )
 
@@ -66,7 +67,7 @@ func (a *App) readCover(w http.ResponseWriter, r *http.Request, pictures []lyric
 	for _, p := range pictures {
 		parts = append(parts, filePart{string(p), a.coverFiles[p]})
 	}
-	tooLarge := fmt.Sprintf("the pictures are larger than the Cover limit of %s", formatSize(a.maxCover))
+	tooLarge := fmt.Sprintf("the pictures are larger than the Cover limit of %s", audio.FormatSize(a.maxCover))
 	files, ok := readFiles(w, r, a.maxCover, tooLarge, parts, details)
 	if !ok {
 		return

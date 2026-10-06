@@ -714,8 +714,11 @@ function upload<T>(path: string, file: Blob, options: UploadOptions = {}): Promi
   return answer<T>(sendWithProgress('POST', `/api${path}`, file, options));
 }
 
-/** What a request answered, or the ApiError saying why it failed. An abort is passed on as it is. */
-async function answer<T>(sent: Promise<Response>): Promise<T> {
+/**
+ * What a request answered, as JSON unless read says how to read it, or the
+ * ApiError saying why it failed. An abort is passed on as it is.
+ */
+async function answer<T>(sent: Promise<Response>, read?: (res: Response) => Promise<T>): Promise<T> {
   let res: Response;
   try {
     res = await sent;
@@ -723,6 +726,7 @@ async function answer<T>(sent: Promise<Response>): Promise<T> {
     if (e instanceof DOMException && e.name === 'AbortError') throw e;
     throw new ApiError(0, "Can't reach Bandmate. Check your connection.");
   }
+  if (res.ok && read) return read(res);
   const data = res.status === 204 ? null : await res.json().catch(() => null);
   if (!res.ok) {
     throw new ApiError(res.status, data?.error ?? `Request failed (${res.status})`, data?.code);
@@ -797,16 +801,13 @@ export const api = {
         signal,
       }),
     ),
-  /** A fetched file's audio, read once: to decode, to read its tags and to preview it. */
-  fetchedAudio: async (fetched: Fetched): Promise<File> => {
-    let res: Response;
-    try {
-      res = await fetch(`/api/fetches/${fetched.id}/audio`);
-    } catch {
-      throw new ApiError(0, "Can't reach Bandmate. Check your connection.");
-    }
-    if (!res.ok) await answer(Promise.resolve(res));
-    return new File([await res.blob()], fetched.fileName, { type: fetched.contentType });
+  /**
+   * A fetched file's audio, read once: to decode, to read its tags and to
+   * preview it. Aborting the signal stops reading it, failing with an AbortError.
+   */
+  fetchedAudio: async (fetched: Fetched, signal: AbortSignal): Promise<File> => {
+    const audio = await answer(fetch(`/api/fetches/${fetched.id}/audio`, { signal }), (res) => res.blob());
+    return new File([audio], fetched.fileName, { type: fetched.contentType });
   },
   /** Deletes a fetched file nobody's adding, rather than leaving it to expire. */
   discardFetched: (id: string) => request<null>('DELETE', `/fetches/${id}`),

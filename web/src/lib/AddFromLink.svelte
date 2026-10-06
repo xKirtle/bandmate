@@ -38,46 +38,52 @@
   // What it's doing: a fetch, which can be cancelled, or reading what it fetched.
   let phase = $state<'idle' | 'fetching' | 'reading'>('idle');
   let error = $state<string | null>(null);
-  let fetching: AbortController | null = null;
+  // Stops the fetch, or reading what it fetched, whichever is under way.
+  let busy: AbortController | null = null;
+
+  const aborted = (e: unknown) => e instanceof DOMException && e.name === 'AbortError';
 
   async function fetchLink(event: SubmitEvent) {
     event.preventDefault();
     error = null;
     phase = 'fetching';
-    fetching = new AbortController();
+    const stop = (busy = new AbortController());
     let fetched: Fetched;
     try {
-      fetched = await api.fetchLink(link.trim(), fetching.signal);
+      fetched = await api.fetchLink(link.trim(), stop.signal);
     } catch (e) {
+      busy = null;
       phase = 'idle';
-      if (!(e instanceof DOMException && e.name === 'AbortError')) error = (e as Error).message;
+      if (!aborted(e)) error = (e as Error).message;
       return;
-    } finally {
-      fetching = null;
     }
     phase = 'reading';
     try {
-      const file = await api.fetchedAudio(fetched);
+      const file = await api.fetchedAudio(fetched, stop.signal);
       const [decoded, tags] = await Promise.all([prepareUpload(file, maxUploadBytes), readTags(file)]);
+      if (stop.signal.aborted) throw new DOMException('Cancelled', 'AbortError');
+      busy = null;
       onFetched({ fetched, file, decoded, draft: toDraft(suggestFromLink(fetched, tags)) });
     } catch (e) {
+      // Nobody will add it now.
       api.discardFetched(fetched.id).catch(() => {});
-      error = (e as Error).message;
+      busy = null;
       phase = 'idle';
+      if (!aborted(e)) error = (e as Error).message;
     }
   }
 
-  /** Stops a fetch under way, which deletes what it fetched, or closes the box. */
+  /** Stops a fetch under way, deleting what it fetched, or closes the box. */
   function cancel() {
-    if (fetching) {
-      fetching.abort();
+    if (busy) {
+      busy.abort();
       return;
     }
     onClose();
   }
 
-  // Leaving the page stops a fetch too.
-  onDestroy(() => fetching?.abort());
+  // Leaving the page stops it too.
+  onDestroy(() => busy?.abort());
 </script>
 
 <form class="card from-link" onsubmit={fetchLink} aria-labelledby="from-link-heading">
@@ -102,6 +108,7 @@
     <progress aria-label="Fetching the link's audio"></progress>
   {:else if phase === 'reading'}
     <p role="status">Reading the audio…</p>
+    <progress aria-label="Reading the fetched audio"></progress>
   {/if}
   {#if error}
     <p class="error" role="alert">{error}</p>
@@ -110,7 +117,7 @@
     {#if phase === 'idle'}
       <button type="submit" class="button primary">Fetch</button>
     {/if}
-    <button type="button" class="button" onclick={cancel} disabled={phase === 'reading'}>Cancel</button>
+    <button type="button" class="button" onclick={cancel}>Cancel</button>
   </div>
 </form>
 

@@ -4,6 +4,7 @@
 package audio
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -152,24 +153,16 @@ func (f *Files) path(id int64) string {
 // does an upload, leaving the file at path as it is. It's linked rather than
 // copied where it can be.
 func (f *Files) ReceiveFile(path string) (*Received, error) {
-	tmp, err := os.CreateTemp(f.dir, tempPrefix+"*")
-	if err != nil {
-		return nil, fmt.Errorf("storing file: %w", err)
-	}
-	tmp.Close()
-	r := &Received{files: f, path: tmp.Name()}
-	os.Remove(r.path)
+	// A link fails rather than replace a file already there.
+	r := &Received{files: f, path: filepath.Join(f.dir, tempPrefix+rand.Text())}
 	if err := os.Link(path, r.path); err != nil {
+		// Elsewhere, such as on another file system: copied instead.
 		src, err := os.Open(path)
 		if err != nil {
 			return nil, fmt.Errorf("storing file: %w", err)
 		}
 		defer src.Close()
-		copied, err := f.Receive(src, math.MaxInt64-1)
-		if err != nil {
-			return nil, err
-		}
-		return copied, nil
+		return f.Receive(src, math.MaxInt64-1)
 	}
 	info, err := os.Stat(r.path)
 	if err != nil {
@@ -178,4 +171,16 @@ func (f *Files) ReceiveFile(path string) (*Received, error) {
 	}
 	r.Size = info.Size()
 	return r, nil
+}
+
+// FormatSize writes a byte count for people, e.g. "500 MB".
+func FormatSize(bytes int64) string {
+	const mb = 1 << 20
+	if bytes >= mb && bytes%mb == 0 {
+		return fmt.Sprintf("%d MB", bytes/mb)
+	}
+	if bytes >= mb {
+		return fmt.Sprintf("%.1f MB", float64(bytes)/mb)
+	}
+	return fmt.Sprintf("%d bytes", bytes)
 }
