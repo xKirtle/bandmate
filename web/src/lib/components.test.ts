@@ -45,3 +45,12 @@ describe('components', () => {
     expect(filesMatching(/\[role=['"]tab['"]\]/)).toEqual([]);
   });
 });
+
+describe('the icon button', () => {
+  it('shows its hover box only to a pointer that can hover', () => {
+    // A tap on a touch screen leaves :hover on what it tapped, so the box would stay.
+    const css = readFileSync(join(src, 'app.css'), 'utf8');
+    expect(css.match(/\.icon:hover/g)).toHaveLength(1);
+    expect(css).toMatch(/@media \(hover: hover\) \{\s*\.icon:hover/);
+  });
+});
