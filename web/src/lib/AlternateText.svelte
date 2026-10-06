@@ -327,7 +327,7 @@
   }
   /* As wide as a Cue's ▶, time and ✕, so the gutter doesn't shift as it moves on. */
   .now {
-    width: 6.75rem;
+    width: var(--cue-slot);
     min-height: 1.5rem;
     padding: 0 var(--space-2);
     border: 1px solid var(--accent);

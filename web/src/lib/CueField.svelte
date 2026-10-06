@@ -229,13 +229,18 @@
 </span>
 
 <style>
+  /* As wide as every other slot, whatever it shows, so the times line up
+     down the gutter. */
   .slot {
     display: inline-flex;
     align-items: center;
+    width: var(--cue-slot);
   }
-  /* Kept as short as the Line beside it. */
+  /* Kept as short as the Line beside it, on one line: it takes what the ▶
+     and ✕ leave, whether it shows the time or the field to type one. */
   .cue {
-    width: 5.5rem;
+    flex: 1;
+    min-width: 0;
     min-height: 1.5rem;
     padding: 0 var(--space-2);
     border: 1px solid transparent;
@@ -246,6 +251,7 @@
     font-size: var(--text-sm);
     font-variant-numeric: tabular-nums;
     text-align: right;
+    white-space: nowrap;
     cursor: pointer;
   }
   .cue:hover,
@@ -277,7 +283,7 @@
     align-items: center;
     justify-content: center;
     flex: none;
-    width: 1.25rem;
+    width: var(--cue-button);
     min-height: 1.5rem;
     padding: 0;
     border: 0;
@@ -299,10 +305,6 @@
     color: var(--accent);
     opacity: 1;
   }
-  /* Beside a ▶, the time gives up the room it takes. */
-  .play + .cue {
-    width: 4.25rem;
-  }
   /* Out of sight, but still reachable by Tab, until its Line is hovered or
      the keyboard is in its slot. */
   .clear {
@@ -310,7 +312,7 @@
     align-items: center;
     justify-content: center;
     flex: none;
-    width: 1.25rem;
+    width: var(--cue-button);
     min-height: 1.5rem;
     padding: 0;
     border: 0;

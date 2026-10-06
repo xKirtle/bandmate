@@ -25,6 +25,12 @@
   /* Bandmate's mark: atop the nav rail, and in About. */
   --mark-rail: 1.75rem;
   --mark-large: 4rem;
+  /* A Cue's slot in the Lyric Sheet's gutter: its ▶, time and ✕, wide
+     enough for a ⚠ and the widest time, "⚠ 12:34.5", so every slot, and
+     Sync mode's Now button in its place, is as wide and the gutter never
+     shifts. The ▶ and ✕ are each --cue-button wide; the time takes the rest. */
+  --cue-slot: 8.5rem;
+  --cue-button: 1.25rem;
 
   /* Type sizes, named by size. Tools stay at the small end; content takes
      the larger sizes. */
