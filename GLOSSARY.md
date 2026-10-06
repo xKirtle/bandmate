@@ -83,6 +83,10 @@ _Avoid_: Chord bar, instrumental line
 Showing a Song's Chords moved up or down by semitones in Read mode, for playing in another key. It's a way of reading the Song, not an edit: the Chords, the key and the audio stay as written, and the amount is kept on each device for each Song. A Chord name that can't be read stays as written.
 _Avoid_: Key change
 
+**Lyric Size**:
+How large a Song's Lines, Chords and Labels show in Read mode, for reading at whatever distance the device sits, from a music stand or in the hand. Like Transpose, it's a way of reading the Song, not an edit; it's kept on each device and holds for every Song.
+_Avoid_: Zoom, font size, text size
+
 **Key**:
 The key a Song is written in, one of its Details. Like a Chord, with a capo on it names the shapes fingered, not the pitch that sounds: capo 2 in G sounds in A.
 
