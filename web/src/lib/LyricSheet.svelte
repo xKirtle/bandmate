@@ -50,7 +50,7 @@
   import { inTextField } from './textField';
   import { deviceStorage } from './timelineHeight';
   import { songChordsShown } from './chordsShown';
-  import { lyricSizes, stepLyricSize } from './lyricSize';
+  import { largestLyricSize, smallestLyricSize, stepLyricSize, usualLyricSize } from './lyricSize';
   import { lyricSize } from './sharedLyricSize.svelte';
   import { songTranspose } from './sharedTranspose.svelte';
   import { stepTranspose, transposeLimit, transposeText } from './transposeAmount';
@@ -462,7 +462,7 @@
           <button
             type="button"
             class="button step"
-            disabled={size <= lyricSizes[0]}
+            disabled={size <= smallestLyricSize}
             onclick={() => lyricSize.set(stepLyricSize(size, -1))}
             aria-label="Make the lyrics smaller"
             title="Make the lyrics smaller"><AArrowDown /></button
@@ -470,18 +470,19 @@
           <button
             type="button"
             class="button amount"
-            disabled={size === 100}
-            onclick={() => lyricSize.set(100)}
-            aria-label={size === 100
+            disabled={size === usualLyricSize}
+            onclick={() => lyricSize.set(usualLyricSize)}
+            aria-label={size === usualLyricSize
               ? 'The lyrics show at their usual size'
               : `Lyrics at ${size}%; show them at their usual size`}
-            title={size === 100 ? 'The lyrics show at their usual size' : 'Show the lyrics at their usual size'}
-            >{size}%</button
+            title={size === usualLyricSize
+              ? 'The lyrics show at their usual size'
+              : 'Show the lyrics at their usual size'}>{size}%</button
           >
           <button
             type="button"
             class="button step"
-            disabled={size >= lyricSizes[lyricSizes.length - 1]}
+            disabled={size >= largestLyricSize}
             onclick={() => lyricSize.set(stepLyricSize(size, 1))}
             aria-label="Make the lyrics larger"
             title="Make the lyrics larger"><AArrowUp /></button

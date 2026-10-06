@@ -5,13 +5,14 @@
   import { layoutLine } from './chords';
   import type { Position } from './cues';
   import { follower, lineKey, sectionKey, topLine } from './follow';
+  import { usualLyricSize } from './lyricSize';
   import { activeAlternate, labelOf } from './sections';
 
   let {
     song,
     showChords,
     transpose = 0,
-    size = 100,
+    size = usualLyricSize,
     current = null,
     play,
     opener,

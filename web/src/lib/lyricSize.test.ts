@@ -64,7 +64,7 @@ describe('stepLyricSize', () => {
   });
 });
 
-describe("The Lyric Size's Device Setting", () => {
+describe('The Lyric Size as the app keeps it', () => {
   /** The Lyric Size as the app keeps it, in a stand-in Storage this device's other tabs share. */
   function setting(values: Record<string, string> = {}) {
     const tabs = new EventTarget();
