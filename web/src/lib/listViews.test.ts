@@ -1,20 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import type { Beat, SongFilter, SongSummary } from './api';
 import {
-  bpmFilterLabel,
-  keyFilterLabel,
-  producerFilterLabel,
-  useFilterLabel,
   beatKeys,
   beatListViewFromParams,
   beatListViewToParams,
   beatProducers,
+  bpmFilterLabel,
   defaultBeatListView,
   defaultSongListView,
   filterBeats,
   isBeatListFiltered,
+  isPicked,
   isSongListFiltered,
+  keyFilterLabel,
   loadSongList,
+  pickChoices,
+  producerFilterLabel,
   songListFilter,
   songBeatHint,
   sortBeats,
@@ -24,7 +25,9 @@ import {
   songListViewToParams,
   sortSongs,
   statusFilterLabel,
+  togglePick,
   toggleSort,
+  useFilterLabel,
   type BeatColumn,
   type BeatListView,
   type SongListView,
@@ -523,6 +526,24 @@ describe('beatProducers and beatKeys', () => {
   });
 });
 
+describe('picking producers and keys', () => {
+  it('offers those picked that no Beat has, before the Library’s, once each', () => {
+    expect(pickChoices(['Kato', 'Lune'], [])).toEqual(['Kato', 'Lune']);
+    expect(pickChoices(['Kato', 'Lune'], [' kato', 'Ghost'])).toEqual(['Ghost', 'Kato', 'Lune']);
+  });
+
+  it('ticks a choice on once, or off, ignoring case and surrounding space', () => {
+    expect(togglePick(['Kato'], 'Mira', true)).toEqual(['Kato', 'Mira']);
+    expect(togglePick(['Kato'], ' kato', true)).toEqual([' kato']);
+    expect(togglePick(['Kato', 'Mira'], 'KATO', false)).toEqual(['Mira']);
+  });
+
+  it('tells whether a choice is picked, ignoring case and surrounding space', () => {
+    expect(isPicked(['Kato '], 'kato')).toBe(true);
+    expect(isPicked(['Kato'], 'Mira')).toBe(false);
+  });
+});
+
 describe('the Beat Library in the URL', () => {
   const roundTrip = (view: BeatListView) => beatListViewFromParams(beatListViewToParams(view));
 
@@ -577,6 +598,14 @@ describe('the Beat Library in the URL', () => {
       ...defaultBeatListView,
       producers: ['Kato'],
       keys: ['F#m'],
+    });
+  });
+
+  it('reads each producer and key once, ignoring case', () => {
+    expect(beatListViewFromParams(new URLSearchParams('producer=Ghost&producer=ghost&key=Am&key=Am'))).toEqual({
+      ...defaultBeatListView,
+      producers: ['Ghost'],
+      keys: ['Am'],
     });
   });
 

@@ -658,12 +658,6 @@
     gap: var(--space-2);
     margin-bottom: var(--space-4);
   }
-  .filter-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    min-width: 0;
-  }
   .filter-bar > .chip {
     flex-shrink: 0;
   }

@@ -230,6 +230,24 @@ export const defaultBeatListView: BeatListView = {
 /** Text as a filter compares it: ignoring case and surrounding space. */
 const folded = (text: string) => text.trim().toLowerCase();
 
+/** Whether a producer or key is among those picked, ignoring case and surrounding space. */
+export const isPicked = (picked: readonly string[], choice: string) => picked.some((p) => folded(p) === folded(choice));
+
+/** The picks with a producer or key ticked on, once, or off. */
+export function togglePick(picked: readonly string[], choice: string, on: boolean): string[] {
+  const rest = picked.filter((p) => folded(p) !== folded(choice));
+  return on ? [...rest, choice] : rest;
+}
+
+/**
+ * The producers or keys a filter offers: those picked that no Beat has now,
+ * so they can be unticked, then the Library's.
+ */
+export function pickChoices(library: readonly string[], picked: readonly string[]): string[] {
+  const missing = picked.filter((p, i) => !isPicked(library, p) && !isPicked(picked.slice(0, i), p));
+  return [...missing, ...library];
+}
+
 /** Whether the view narrows the Beats down, rather than only sorting them. */
 export function isBeatListFiltered(view: BeatListView): boolean {
   return (
@@ -324,9 +342,15 @@ export const beatProducers = (beats: readonly Beat[]) => distinct(beats, (b) => 
 /** The keys in the Library, to pick one to filter by. */
 export const beatKeys = (beats: readonly Beat[]) => distinct(beats, (b) => b.key);
 
-/** Several values of a parameter, or, from before several could be picked, one; blank ones left out. */
+/**
+ * Several values of a parameter, or, from before several could be picked,
+ * one; each once ignoring case, and blank ones left out.
+ */
 function textsFromParams(params: URLSearchParams, name: string): string[] {
-  return params.getAll(name).filter((value) => value.trim());
+  return params.getAll(name).reduce((picked: string[], value) => {
+    if (value.trim() && !isPicked(picked, value)) picked.push(value);
+    return picked;
+  }, []);
 }
 
 function bpmFromParam(param: string | null): number | undefined {

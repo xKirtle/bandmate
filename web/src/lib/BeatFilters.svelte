@@ -6,14 +6,17 @@
     beatKeys,
     beatProducers,
     bpmFilterLabel,
+    isPicked,
     keyFilterLabel,
+    pickChoices,
     producerFilterLabel,
+    togglePick,
     useFilterLabel,
     type BeatListView,
     type BeatUse,
   } from './listViews';
 
-  // The Beat Library's search and filter bar, which the Beat picker shares:
+  // The Beat Library's search and filter bar, which the Beat Picker shares:
   // a button per filter, each opening what it's picked with.
   let {
     view = $bindable(),
@@ -33,23 +36,8 @@
     actions?: Snippet;
   } = $props();
 
-  const producers = $derived(withPicked(beatProducers(beats), view.producers));
-  const keys = $derived(withPicked(beatKeys(beats), view.keys));
-
-  /** The choices for a filter, keeping those picked even if no Beat has them now. */
-  function withPicked(choices: string[], picked: readonly string[]): string[] {
-    const missing = picked.filter((p) => !choices.some((c) => c.toLowerCase() === p.trim().toLowerCase()));
-    return [...missing, ...choices];
-  }
-
-  /** The picks with one choice ticked or unticked, matching ignoring case and surrounding space. */
-  function toggled(picked: readonly string[], choice: string, on: boolean): string[] {
-    const rest = picked.filter((p) => p.trim().toLowerCase() !== choice.trim().toLowerCase());
-    return on ? [...rest, choice] : rest;
-  }
-
-  const isPicked = (picked: readonly string[], choice: string) =>
-    picked.some((p) => p.trim().toLowerCase() === choice.trim().toLowerCase());
+  const producers = $derived(pickChoices(beatProducers(beats), view.producers));
+  const keys = $derived(pickChoices(beatKeys(beats), view.keys));
 
   function setBpm(end: 'bpmMin' | 'bpmMax', event: Event) {
     const bpm = (event.currentTarget as HTMLInputElement).valueAsNumber;
@@ -74,7 +62,7 @@
           <input
             type="checkbox"
             checked={isPicked(picked, choice)}
-            onchange={(e) => pick(toggled(picked, choice, e.currentTarget.checked))}
+            onchange={(e) => pick(togglePick(picked, choice, e.currentTarget.checked))}
           />
           {choice}
         </label>
@@ -172,12 +160,6 @@
   }
   .search-row input {
     flex: 1;
-    min-width: 0;
-  }
-  .filter-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
     min-width: 0;
   }
   /* A long list of producers or keys scrolls, about six at a time. */
