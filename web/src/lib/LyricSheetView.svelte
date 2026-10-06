@@ -4,13 +4,14 @@
   import type { ChordOpener } from './ChordPopover.svelte';
   import { layoutLine } from './chords';
   import type { Position } from './cues';
-  import { follower, lineKey, sectionKey } from './follow';
+  import { follower, lineKey, sectionKey, topLine } from './follow';
   import { activeAlternate, labelOf } from './sections';
 
   let {
     song,
     showChords,
     transpose = 0,
+    size = 100,
     current = null,
     play,
     opener,
@@ -19,6 +20,8 @@
     showChords: boolean;
     /** How far to transpose the Chords shown, in semitones. */
     transpose?: number;
+    /** The Lyric Size, in percent. */
+    size?: number;
     /** Where playback is: highlighted and kept in view. */
     current?: Position | null;
     /** Given, clicking a cued Line plays from its Cue. */
@@ -50,6 +53,23 @@
   $effect(() => {
     follow(currentKey);
   });
+
+  // The Lyric Size scales Read mode's lyric sizes from the page's root,
+  // where they're set. Changing it holds the Line at the top of the view in
+  // place, below a pinned Chord Chart, so the reader keeps their place.
+  let view = $state<HTMLElement>();
+  $effect(() => {
+    if (!view) return;
+    const root = document.documentElement;
+    const lines = [...view.querySelectorAll<HTMLElement>('.line-box')];
+    const viewTop = parseFloat(getComputedStyle(root).scrollPaddingTop) || 0;
+    const edges = lines.map((l) => l.getBoundingClientRect());
+    const held = lines[topLine(edges, viewTop)];
+    const before = held?.getBoundingClientRect().top;
+    root.style.setProperty('--lyric-size', String(size / 100));
+    if (held && before !== undefined) scrollBy(0, held.getBoundingClientRect().top - before);
+  });
+  $effect(() => () => document.documentElement.style.removeProperty('--lyric-size'));
 
   /** What clicking a Line does: play from its Cue. Null for nothing. */
   function clickLine(cue: number | null): (() => void) | null {
@@ -95,7 +115,7 @@
   }
 </script>
 
-<div class="view">
+<div class="view" bind:this={view}>
   {#each song.arrangement as sectionId (sectionId)}
     {@const section = sections.get(sectionId)}
     {#if section}

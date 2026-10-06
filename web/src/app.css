@@ -48,10 +48,12 @@
      keep its size. Read mode is read at arm's length, from a phone or a
      music stand, so it sets them larger, Chords above their Lines and each
      Section under its Label: a phone's size here, a tablet's or desktop's
-     below. */
+     below. Read mode's are scaled by the Lyric Size, which Read mode sets on
+     the page as a fraction: 1 at 100%. */
   --lyric-write: var(--text-field);
-  --lyric-read-line: 1.25rem;
-  --lyric-read-chord: 1.0625rem;
+  --lyric-size: 1;
+  --lyric-read-line: calc(1.25rem * var(--lyric-size));
+  --lyric-read-chord: calc(1.0625rem * var(--lyric-size));
   --lyric-read-label: var(--lyric-read-chord);
   --lyric-read-leading: 1.5;
 
@@ -93,8 +95,8 @@
    mode's Lines and Chords a step larger still. */
 @media (min-width: 40rem) {
   :root {
-    --lyric-read-line: 1.5rem;
-    --lyric-read-chord: 1.25rem;
+    --lyric-read-line: calc(1.5rem * var(--lyric-size));
+    --lyric-read-chord: calc(1.25rem * var(--lyric-size));
   }
 }
 
