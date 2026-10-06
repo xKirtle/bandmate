@@ -366,6 +366,10 @@
   let editedAt = untrack(() => timeline.version);
   // Edits queued and not yet saved, which undo waits for.
   let queued = 0;
+  // Counts the Cue edits that failed, so taken back: an undo pressed for
+  // one of them, before it failed, has nothing to undo, rather than undoing
+  // the edit before it.
+  let cueEditsFailed = 0;
 
   $effect(() => {
     if (timeline.version === editedAt) return;
@@ -441,7 +445,10 @@
     offerCues = null;
     queued++;
     return change(async (before) => {
-      const after = await saved(op(before));
+      const after = await saved(op(before)).catch((err) => {
+        cueEditsFailed++;
+        throw err;
+      });
       history.recordCues(before, after);
       showHistory();
       return { song: after };
@@ -454,7 +461,9 @@
     mergeNote = null;
     // Where undoing a new Take returns the playhead to, to record again from.
     let returnTo: number | null = null;
+    const failedBefore = cueEditsFailed;
     const ok = await change((at) => {
+      if (cueEditsFailed !== failedBefore) return unchanged(at);
       const e = history.nextUndo();
       returnTo = history.nextUndoPlayhead();
       return e

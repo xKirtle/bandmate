@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError } from './api';
-import { savedRetrying, withCueChange } from './cueChanges';
+import { sameCues, savedRetrying, withCueChange } from './cueChanges';
 
 // A Song of two Sections in the Arrangement and one in the Scrapbook. The
 // Verse has an inactive Alternate, whose Line's Cue is dormant.
@@ -90,6 +90,16 @@ describe('withCueChange', () => {
     expect(cues(restored)).toEqual({ 10: null, 11: null, 12: 1.5, 20: 8.25, 30: 21 });
   });
 
+  it('keeps a Cue set or restored to the millisecond, as the server does', () => {
+    expect(cues(withCueChange(song, { kind: 'setLineCue', lineId: 11, cue: 4.56789 }))[11]).toBe(4.568);
+    expect(cues(withCueChange(song, { kind: 'restoreCues', cues: [{ lineId: 11, cue: 2.0004 }] }))[11]).toBe(2);
+  });
+
+  it('shifts nothing if any Cue would go before 0:00 by the step as given, before rounding', () => {
+    // A step just over 1 s, which rounds to 1 s but, as given, takes the Cue at 1 s before 0:00.
+    expect(cues(withCueChange(song, { kind: 'shiftCues', start: 0, end: 1.2, by: -1.0004 }))[10]).toBe(1);
+  });
+
   it('leaves the Song it was given as it was', () => {
     const before = JSON.stringify(song);
     withCueChange(song, { kind: 'clearCues' });
@@ -103,6 +113,18 @@ describe('withCueChange', () => {
       version: 7,
       arrangement: [1, 2],
     });
+  });
+});
+
+describe('sameCues', () => {
+  it('holds for Songs whose every Line has the same Cue', () => {
+    const copy = { ...withCueChange(song, { kind: 'setLineCue', lineId: 10, cue: 1 }), title: 'other' };
+    expect(sameCues(copy, song)).toBe(true);
+  });
+
+  it("fails when any Line's Cue differs, a dormant one's included", () => {
+    expect(sameCues(withCueChange(song, { kind: 'setLineCue', lineId: 12, cue: 2 }), song)).toBe(false);
+    expect(sameCues(withCueChange(song, { kind: 'setLineCue', lineId: 30, cue: null }), song)).toBe(false);
   });
 });
 

@@ -43,30 +43,42 @@ export function withCueChange<S extends CuedSong>(song: S, change: CueChange): S
 function cueAfter(song: CuedSong, change: CueChange): (line: CuedLine, section: number) => number | null {
   switch (change.kind) {
     case 'setLineCue':
-      return (l) => (l.id === change.lineId ? change.cue : l.cue);
+      return (l) => (l.id === change.lineId ? kept(change.cue) : l.cue);
     case 'clearSectionCues':
       return (l, section) => (section === change.sectionId ? null : l.cue);
     case 'clearCues':
       return () => null;
     case 'restoreCues': {
-      const values = new Map(change.cues.map((c) => [c.lineId, c.cue]));
+      const values = new Map(change.cues.map((c) => [c.lineId, kept(c.cue)]));
       return (l) => (values.has(l.id) ? values.get(l.id)! : l.cue);
     }
     case 'shiftCues': {
       // In whole milliseconds, as Cues are kept.
       const [start, end, by] = [change.start, change.end, change.by].map(millis);
       const shifts = (cue: number | null): cue is number => cue !== null && millis(cue) >= start && millis(cue) < end;
-      const moved = (cue: number) => (millis(cue) + by) / 1000;
-      // The server refuses a shift taking any Cue out of the Timeline.
+      // The server refuses a shift taking any Cue out of the Timeline, by the step as given.
       const all = song.sections.flatMap((s) => s.alternates.flatMap((a) => a.lines.map((l) => l.cue)));
-      if (all.some((c) => shifts(c) && (moved(c) < 0 || moved(c) > maxCue))) return (l) => l.cue;
-      return (l) => (shifts(l.cue) ? moved(l.cue) : l.cue);
+      const out = (cue: number) => millis(cue) / 1000 + change.by < 0 || millis(cue) / 1000 + change.by > maxCue;
+      if (all.some((c) => shifts(c) && out(c))) return (l) => l.cue;
+      return (l) => (shifts(l.cue) ? (millis(l.cue) + by) / 1000 : l.cue);
     }
   }
 }
 
 function millis(seconds: number): number {
   return Math.round(seconds * 1000);
+}
+
+/** A Cue as the server keeps it: to the millisecond. */
+function kept(cue: number | null): number | null {
+  return cue === null ? null : millis(cue) / 1000;
+}
+
+/** Whether every Line of two Songs has the same Cue, dormant ones and the Scrapbook's included. */
+export function sameCues(a: CuedSong, b: CuedSong): boolean {
+  const cues = (s: CuedSong) =>
+    JSON.stringify(s.sections.flatMap((x) => x.alternates.flatMap((alt) => alt.lines.map((l) => [l.id, l.cue]))));
+  return cues(a) === cues(b);
 }
 
 /** Sends a Cue change, returning the Song it leaves. */

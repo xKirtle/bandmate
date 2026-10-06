@@ -25,7 +25,7 @@
   import TagsField from '../lib/TagsField.svelte';
   import Timeline from '../lib/Timeline.svelte';
   import TuningField from '../lib/TuningField.svelte';
-  import { savedRetrying, sendCueChange, withCueChange, type CueChange } from '../lib/cueChanges';
+  import { sameCues, savedRetrying, sendCueChange, withCueChange, type CueChange } from '../lib/cueChanges';
   import type { Saved } from '../lib/history';
   import { takeNewFlag } from '../lib/newSong';
   import { navigate, replaceSearch, router } from '../lib/router.svelte';
@@ -246,8 +246,11 @@
     unsavedCues = [...unsavedCues, unsaved];
     const settle = () => (unsavedCues = unsavedCues.filter((u) => u !== unsaved));
     const op = async (saved: Song) => {
+      let tries = 0;
       try {
-        const after = await savedRetrying(() => sendCueChange(saved, change));
+        const after = await savedRetrying(() => (tries++, sendCueChange(saved, change))).catch((e) =>
+          tries > 1 && e instanceof ApiError && e.stale ? landedEarlier(saved, change, e) : Promise.reject(e),
+        );
         // Shown as saved in the same step it stops being made on top, so
         // it's never made twice over.
         song = after;
@@ -256,20 +259,40 @@
       } catch (e) {
         if (e instanceof ApiError && e.stale) throw e;
         settle();
+        // Saves already waiting behind it don't clear what was taken back,
+        // e.g. the Lines cued meanwhile in Sync mode: only a change made since.
+        errorKeptUntil = queued;
         throw new Error(`Couldn't save ${what}, so it was taken back. ${(e as Error).message}`);
       }
     };
     return timelinePanel ? timelinePanel.editCues(op) : send(op);
   }
 
+  /**
+   * The Song a Cue change left, when trying it again was refused as the Song
+   * changed meanwhile, and that change was its own first try, saved though
+   * its answer never came back. Otherwise it was changed elsewhere after all.
+   */
+  async function landedEarlier(saved: Song, change: CueChange, refused: ApiError): Promise<Song> {
+    const latest = await api.getSong(saved.id).catch(() => null);
+    if (latest?.version === saved.version + 1 && sameCues(latest, withCueChange(saved, change))) return latest;
+    throw refused;
+  }
+
+  // Counts the saves queued, and the latest one queued before a save error
+  // that only a change made since clears.
+  let queued = 0;
+  let errorKeptUntil = 0;
+
   function enqueue<T>(op: (saved: Song) => Promise<T>, show: (result: T) => void): Promise<boolean> {
     // Once the Song is being deleted, a late save would only fail.
     if (deleting) return Promise.resolve(false);
     pending++;
+    const turn = ++queued;
     const done = queue.then(async () => {
       try {
         show(await op(song!));
-        saveError = null;
+        if (turn > errorKeptUntil) saveError = null;
         return true;
       } catch (e) {
         showError(e as Error);
