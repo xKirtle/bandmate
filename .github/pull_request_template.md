@@ -1,6 +1,6 @@
 Closes #
 
-<!-- Say what changed and why, in the words of CONTEXT.md's glossary. -->
+<!-- Say what changed and why, in the words of the glossary, GLOSSARY.md. -->
 
 ## Checklist
 

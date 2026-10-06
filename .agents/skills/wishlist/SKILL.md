@@ -11,7 +11,7 @@ Ideas collect in one open **wishlist PR**, labelled `documentation` and `no-rele
 
 1. Find the wishlist PR: `gh pr list --state open --label no-release-notes --json number,title,headRefName` and take the one whose title ends "to the wishlist". With one, check out its branch and pull. With none, branch from an up-to-date `main` as `docs/wishlist-<short-slug>`.
 
-2. Read `CONTEXT.md` and `docs/roadmap.md`. For each idea, append a `## <Name>` section to `docs/roadmap.md`, matching the existing entries:
+2. Read `GLOSSARY.md` and `docs/roadmap.md`. For each idea, append a `## <Name>` section to `docs/roadmap.md`, matching the existing entries:
    - The heading names the feature as a noun phrase ("Merging Clips", "Playback speed").
    - Bullets say what it does, then why, using the user's own real-world case when they gave one ("after a bad Take, record again from the same place").
    - Write in the glossary's terms, and steer clear of each term's _Avoid_ words: the user's "mix" may be a Mixdown, or something new that needs a name of its own. Where an idea sits near an existing term or wishlist entry, say how it differs, or extend that entry instead of adding one.

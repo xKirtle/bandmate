@@ -12,7 +12,7 @@ A personal songwriting companion: write and structure lyrics with chords, then r
 
 ## Features
 
-The words in bold are defined in the glossary, [CONTEXT.md](CONTEXT.md).
+The words in bold are defined in the [glossary](GLOSSARY.md).
 
 ### Write
 
@@ -154,7 +154,7 @@ A release with new features bumps the minor version, and one with only fixes bum
 
 Bandmate is one Go binary. It serves a JSON API under `/api`, stores everything in SQLite and audio files in the data folder, and serves the Svelte single-page app from files built into the binary ([ADR 0001](docs/adr/0001-go-backend-svelte-spa.md)). Recording, waveforms and the Timeline's playback all run in the browser. It has no login: authentication is the reverse proxy's job ([ADR 0002](docs/adr/0002-single-user-auth-at-proxy.md)).
 
-The design is worked out in words before code. [CONTEXT.md](CONTEXT.md) is the glossary: the code, the UI and the issues all use its terms. The decisions that shaped it, and why, are the [ADRs](docs/adr/).
+The design is worked out in words before code. [GLOSSARY.md](GLOSSARY.md) is the glossary: the code, the UI and the issues all use its terms. The decisions that shaped it, and why, are the [ADRs](docs/adr/).
 
 ## Contributing
 

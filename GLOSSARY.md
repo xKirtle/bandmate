@@ -187,7 +187,7 @@ A way of syncing a Song's Lines while the Timeline plays: as each Line starts, m
 _Avoid_: Tap mode, record mode
 
 **Latency Offset**:
-The delay between what the user heard and what the mic captured, the full round trip, measured by calibration once per device, since it belongs to the hardware chain: a click plays, the user taps or claps on the mic along with it, and the delays are averaged. Calibration is offered before a device's first recording, and can be skipped and run later from the recording settings; until then, the latency the browser reports stands in. Each Take is placed earlier by the offset it was recorded with and keeps it, so recalibrating never moves it, and it can be nudged by hand.
+The delay between what the user heard and what the mic captured, the full round trip, measured by calibration once per device, since it belongs to the hardware chain: a click plays, the user taps or claps on the mic along with it, and the delays are averaged. Calibration is offered before a device's first recording, and can be skipped and run later from the recording settings or Settings; until then, the latency the browser reports stands in. Each Take is placed earlier by the offset it was recorded with and keeps it, so recalibrating never moves it, and it can be nudged by hand.
 _Avoid_: Delay, lag
 
 **Nudge**:
@@ -211,6 +211,14 @@ _Avoid_: Bounce, export, render
 **Shortcut**:
 A key, or a key held with the mouse, that does something on a Song page without reaching for a button, like Space to play or R to record. Shortcuts are for a keyboard and mouse, so phones never show them. A control's usual keys, like arrows in a menu or Esc in a text field, work as they do everywhere and aren't Bandmate's Shortcuts.
 _Avoid_: Keybind, hotkey, key binding
+
+**Device**:
+The browser, on a computer or phone, that Bandmate is opened in. What's kept "on each device" stays in that browser alone: the same laptop's other browser keeps its own. The hardware a Take is recorded from is an audio device, never just a device.
+_Avoid_: Browser (in the UI), machine
+
+**Device Setting**:
+A choice the user makes on purpose about how Bandmate works on this Device, whatever the Song: the Palette, light or dark, the Input, the Latency Offset and left-handed Chord diagrams. Every one is listed together in Settings, even when it's also changed where it's used. What's simply remembered from last time, like a volume, a step or a Song's Transpose, isn't one.
+_Avoid_: Preference, local setting
 
 **Palette**:
 One of the sets of colours the user picks from in Settings (Terracotta, Ink or Olive), each with a light and a dark version. It's picked for each device, like light or dark beside it, and never belongs to a Song.
