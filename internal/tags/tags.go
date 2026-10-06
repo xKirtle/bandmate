@@ -1,7 +1,8 @@
 // Package tags owns Tags: names of the user's own that mark Songs, any
-// number per Song. A Tag is only a name, unique ignoring case, and lasts only
-// while some Song carries it. Tagging a Song is organising, not editing it,
-// so it leaves the Song's version and when it was edited as they were.
+// number per Song. A Tag is only a name, unique ignoring case and without a
+// comma (a comma finishes a Tag as it's typed), and lasts only while some
+// Song carries it. Tagging a Song is organising, not editing it, so it leaves
+// the Song's version and when it was edited as they were.
 package tags
 
 import (
@@ -29,7 +30,23 @@ type ConflictError struct{ Msg string }
 
 func (e *ConflictError) Error() string { return e.Msg }
 
-var errBlankName = &InvalidError{Msg: "a Tag's name can't be blank"}
+var (
+	errBlankName = &InvalidError{Msg: "a Tag's name can't be blank"}
+	errComma     = &InvalidError{Msg: "a Tag's name can't have a comma"}
+)
+
+// cleanName is a Tag's name as given, trimmed, or an InvalidError if it's
+// blank or has a comma: a comma finishes a Tag as it's typed.
+func cleanName(name string) (string, error) {
+	name = strings.TrimSpace(name)
+	switch {
+	case name == "":
+		return "", errBlankName
+	case strings.Contains(name, ","):
+		return "", errComma
+	}
+	return name, nil
+}
 
 // Tag is a Tag as listed, with how many Songs carry it.
 type Tag struct {
@@ -74,9 +91,9 @@ func (s *Store) List(ctx context.Context) ([]Tag, error) {
 // which takes the name as given, and every Song carrying either carries it.
 // It returns the Tag as renamed or merged into. No Song is edited.
 func (s *Store) Rename(ctx context.Context, id int64, name string, merge bool) (Tag, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return Tag{}, errBlankName
+	name, err := cleanName(name)
+	if err != nil {
+		return Tag{}, err
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -159,9 +176,9 @@ func (s *Store) SetSongTags(ctx context.Context, songID int64, names []string) (
 	// By folded name, as first written.
 	wanted := map[string]string{}
 	for _, name := range names {
-		name = strings.TrimSpace(name)
-		if name == "" {
-			return nil, errBlankName
+		name, err := cleanName(name)
+		if err != nil {
+			return nil, err
 		}
 		if _, ok := wanted[Fold(name)]; !ok {
 			wanted[Fold(name)] = name

@@ -114,6 +114,19 @@ func TestTagNameCantBeBlank(t *testing.T) {
 	}
 }
 
+func TestTagNameCantHaveAComma(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.createSong("Opener")
+	ts.tagSong(s.ID, "Live")
+
+	expectError(t, ts.setTags(s.ID, "Covers", "demo, live"), http.StatusBadRequest,
+		"a Tag's name can't have a comma")
+
+	if got := ts.getSong(s.ID).Tags; !reflect.DeepEqual(got, []string{"Live"}) {
+		t.Errorf("tags = %v, want [Live] as before", got)
+	}
+}
+
 func TestSettingTagsNeedsTheList(t *testing.T) {
 	ts := newTestServer(t)
 	s := ts.createSong("Opener")
@@ -361,6 +374,18 @@ func TestRenamingATagNeedsANonBlankName(t *testing.T) {
 
 	expectError(t, ts.renameTag(ts.tagNamed("Live").ID, "  ", false), http.StatusBadRequest,
 		"a Tag's name can't be blank")
+}
+
+func TestRenamingATagNeedsANameWithoutAComma(t *testing.T) {
+	ts := newTestServer(t)
+	ts.tagSong(ts.createSong("Opener").ID, "Live")
+
+	expectError(t, ts.renameTag(ts.tagNamed("Live").ID, "Live, 2023", false), http.StatusBadRequest,
+		"a Tag's name can't have a comma")
+
+	if got := ts.tagNamed("Live"); got.Songs != 1 {
+		t.Errorf("tag = %+v, want Live on 1 Song as before", got)
+	}
 }
 
 func TestRenamingAnUnknownTagIsNotFound(t *testing.T) {
