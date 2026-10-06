@@ -10,20 +10,12 @@ body:
     id: version
     attributes:
       label: Bandmate details
-      description: Paste the block from Bandmate's About page → Copy details. If you can't reach the About page, give the version or commit instead, for example `v0.4.0` or `1a2b3c4`. The image tag `latest` or `edge` alone isn't enough, since they move to newer builds.
+      description: Paste the block from Bandmate's Settings → About → Copy details. If you can't reach About, give the version or commit instead, for example `v0.9.0` or `1a2b3c4`, and the browser and operating system you use it on. The image tag `latest` or `edge` alone isn't enough, since they move to newer builds.
       placeholder: |
-        Bandmate v0.4.0 (1a2b3c4, 2026-09-29)
-        Go 1.25.1 linux/amd64 · SQLite 3.50.4 · schema 0027_track_volume_range
+        Bandmate v0.9.0 (1a2b3c4, 2026-10-06)
+        Go 1.27.0 linux/amd64 · SQLite 3.50.4 · schema 0037_tags · yt-dlp 2026.08.19
         Browser: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0
       render: text
-    validations:
-      required: true
-  - type: input
-    id: browser
-    attributes:
-      label: Browser
-      description: The browser and its version, and the operating system it runs on.
-      placeholder: Firefox 140 on Windows 11
     validations:
       required: true
   - type: textarea
