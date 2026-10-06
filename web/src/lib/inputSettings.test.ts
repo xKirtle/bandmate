@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { channelName, deviceName, inputKey, meterLevel, readInput, resolveInput, storeInput } from './inputSettings';
+import { DeviceSetting } from './deviceSetting.svelte';
+import {
+  channelName,
+  deviceName,
+  inputKey,
+  inputSetting,
+  meterLevel,
+  readInput,
+  resolveInput,
+  sameInput,
+  storeInput,
+} from './inputSettings';
 
 /** A Storage holding some values, or one that throws like a blocked one. */
 function storage(values: Record<string, string> = {}, blocked = false): Storage {
@@ -40,6 +51,70 @@ describe('readInput and storeInput', () => {
     const s = storage({}, true);
     storeInput(s, { deviceId: 'abc', label: 'Scarlett 2i2', channel: 1 });
     expect(readInput(s)).toEqual({ deviceId: '', label: '', channel: 0 });
+  });
+});
+
+describe("The Input's Device Setting", () => {
+  /** The Input as the app keeps it, in a stand-in Storage this device's other tabs share. */
+  function setting(values: Record<string, string> = {}, blocked = false) {
+    const tabs = new EventTarget();
+    const input = new DeviceSetting(inputSetting, storage(values, blocked), tabs);
+    /** Another tab keeps a value, or clears storage with a null key, as the browser tells this one. */
+    const otherTab = (key: string | null) => tabs.dispatchEvent(Object.assign(new Event('storage'), { key }));
+    return { input, values, otherTab };
+  }
+
+  const defaultInput = { deviceId: '', label: '', channel: 0 };
+  const scarlettInput2 = { deviceId: 'abc', label: 'Scarlett 2i2', channel: 1 };
+
+  it('is the default input, Input 1, until one is chosen on this device', () => {
+    expect(setting().input.value).toEqual(defaultInput);
+  });
+
+  it('is the default input when storage is blocked', () => {
+    expect(setting({}, true).input.value).toEqual(defaultInput);
+  });
+
+  it('keeps the Input chosen, to read back after a reload', () => {
+    const { input, values } = setting();
+    input.set(scarlettInput2);
+    expect(input.value).toEqual(scarlettInput2);
+    expect(setting(values).input.value).toEqual(scarlettInput2);
+  });
+
+  it('is the Input another tab chooses', () => {
+    const { input, values, otherTab } = setting();
+    values[inputKey] = JSON.stringify(scarlettInput2);
+    otherTab(inputKey);
+    expect(input.value).toEqual(scarlettInput2);
+  });
+
+  it('is the default input again when another tab clears storage', () => {
+    const { input, values, otherTab } = setting({ [inputKey]: JSON.stringify(scarlettInput2) });
+    delete values[inputKey];
+    otherTab(null);
+    expect(input.value).toEqual(defaultInput);
+  });
+
+  it('stays as chosen where storage is blocked, whatever else another tab changes', () => {
+    const { input, otherTab } = setting({}, true);
+    input.set(scarlettInput2);
+    otherTab('bandmate.palette');
+    expect(input.value).toEqual(scarlettInput2);
+  });
+});
+
+describe('sameInput', () => {
+  it('is the same Input on the same device and channel, whatever its label', () => {
+    expect(
+      sameInput({ deviceId: 'abc', label: 'Scarlett', channel: 1 }, { deviceId: 'abc', label: '', channel: 1 }),
+    ).toBe(true);
+  });
+
+  it('is another Input on another device or channel', () => {
+    const one = { deviceId: 'abc', label: 'Scarlett', channel: 0 };
+    expect(sameInput(one, { ...one, channel: 1 })).toBe(false);
+    expect(sameInput(one, { ...one, deviceId: 'def' })).toBe(false);
   });
 });
 

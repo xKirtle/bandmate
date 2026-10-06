@@ -5,6 +5,7 @@
 // are dropped, and the rest averaged. The offset is kept on this device,
 // like the input chosen, since it belongs to the hardware here, not to any
 // Song. Until it's calibrated, the latency the browser reports stands in.
+import type { DeviceSettingStorage } from './deviceSetting.svelte';
 
 /** How many clicks a calibration plays. */
 export const clickCount = 12;
@@ -121,23 +122,21 @@ export function readCalibration(storage: Storage | undefined): Calibration {
   }
 }
 
-function store(storage: Storage | undefined, calibration: Calibration) {
+/** Keeps the calibration on this device: an offset measured, or calibration skipped. */
+export function storeCalibration(storage: Storage | undefined, calibration: Calibration) {
   try {
     storage?.setItem(calibrationKey, JSON.stringify(calibration));
   } catch {
-    // Not kept, e.g. in a private window.
+    // Not kept, e.g. in a private window; it still applies until reload.
   }
 }
 
-/** Keeps an offset measured, in seconds, on this device. */
-export function storeOffset(storage: Storage | undefined, offset: number) {
-  store(storage, { offset, offered: true });
-}
-
-/** Keeps that calibration was offered and skipped, so it isn't offered again. */
-export function skipCalibration(storage: Storage | undefined) {
-  store(storage, { ...readCalibration(storage), offered: true });
-}
+/** The Latency Offset, and whether calibration was offered, as a Device Setting is kept on this device. */
+export const calibrationSetting = {
+  key: calibrationKey,
+  read: readCalibration,
+  store: storeCalibration,
+} satisfies DeviceSettingStorage<Calibration>;
 
 /** The offset to apply to a Take: the one calibrated, or else the latency the browser reports. */
 export function appliedOffset(calibration: Calibration, reported: number): number {

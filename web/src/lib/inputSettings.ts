@@ -2,6 +2,7 @@
 // Takes are mono and an interface usually has two inputs. It's chosen in
 // the recording settings and kept on this device, like its Latency Offset,
 // since it belongs to the hardware here, not to any Song.
+import type { DeviceSettingStorage } from './deviceSetting.svelte';
 
 /** The input chosen: a device, by id ('' for the default), and a channel of it, from 0. */
 export interface InputChoice {
@@ -35,6 +36,18 @@ export function storeInput(storage: Storage | undefined, choice: InputChoice) {
   } catch {
     // Not kept, e.g. in a private window; the choice still applies until reload.
   }
+}
+
+/** The Input, as a Device Setting is kept on this device. */
+export const inputSetting = {
+  key: inputKey,
+  read: readInput,
+  store: storeInput,
+} satisfies DeviceSettingStorage<InputChoice>;
+
+/** Whether two choices are the same Input: the same device and channel, whatever their labels. */
+export function sameInput(a: InputChoice, b: InputChoice): boolean {
+  return a.deviceId === b.deviceId && a.channel === b.channel;
 }
 
 /** The input to open: the one chosen, or where it can't be, the default's first channel. */
