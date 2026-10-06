@@ -1,12 +1,23 @@
 <script lang="ts">
-  import { untrack, type Snippet } from 'svelte';
+  import type { Snippet } from 'svelte';
   import type { Beat } from './api';
-  import Picker from './Picker.svelte';
-  import { beatDrawerFilterCount, beatKeys, beatProducers, type BeatListView, type BeatUse } from './listViews';
+  import FilterButton from './FilterButton.svelte';
+  import {
+    beatKeys,
+    beatProducers,
+    bpmFilterLabel,
+    isPicked,
+    keyFilterLabel,
+    pickChoices,
+    producerFilterLabel,
+    togglePick,
+    useFilterLabel,
+    type BeatListView,
+    type BeatUse,
+  } from './listViews';
 
-  // The Beat Library's search and filters, which the Beat picker shares.
-  // Below 80rem the filters other than the search sit in a drawer, which
-  // starts closed unless one is set; from 80rem they sit beside the search.
+  // The Beat Library's search and filter bar, which the Beat Picker shares:
+  // a button per filter, each opening what it's picked with.
   let {
     view = $bindable(),
     beats,
@@ -25,21 +36,8 @@
     actions?: Snippet;
   } = $props();
 
-  const producers = $derived(withChosen(beatProducers(beats), view.producer));
-  const keys = $derived(withChosen(beatKeys(beats), view.key));
-
-  /** The choices for a filter, keeping the chosen one even if no Beat has it now. */
-  function withChosen(choices: string[], chosen: string | undefined): string[] {
-    return chosen && !choices.some((c) => c.toLowerCase() === chosen.trim().toLowerCase())
-      ? [chosen, ...choices]
-      : choices;
-  }
-
-  // A filter's choices start with "Any", which clears it.
-  const anyOr = (choice: string | undefined) => choice ?? 'Any';
-
-  const drawerCount = $derived(beatDrawerFilterCount(view));
-  let drawerOpen = $state(untrack(() => drawerCount > 0));
+  const producers = $derived(pickChoices(beatProducers(beats), view.producers));
+  const keys = $derived(pickChoices(beatKeys(beats), view.keys));
 
   function setBpm(end: 'bpmMin' | 'bpmMax', event: Event) {
     const bpm = (event.currentTarget as HTMLInputElement).valueAsNumber;
@@ -53,6 +51,26 @@
   ];
 </script>
 
+{#snippet checklist(name: string, choices: string[], picked: string[], pick: (next: string[]) => void, none: string)}
+  {#if choices.length === 0}
+    <p class="muted none">{none}</p>
+  {:else}
+    <fieldset class="choice-group checklist">
+      <legend class="visually-hidden">{name}</legend>
+      {#each choices as choice (choice)}
+        <label class="choice-row">
+          <input
+            type="checkbox"
+            checked={isPicked(picked, choice)}
+            onchange={(e) => pick(togglePick(picked, choice, e.currentTarget.checked))}
+          />
+          {choice}
+        </label>
+      {/each}
+    </fieldset>
+  {/if}
+{/snippet}
+
 <search class="filters">
   <div class="search-row">
     <label class="visually-hidden" for="{idPrefix}-search">Search Beats by title or producer</label>
@@ -64,71 +82,62 @@
       autocomplete="off"
       enterkeyhint="search"
     />
-    <button
-      type="button"
-      class="button drawer-toggle"
-      aria-expanded={drawerOpen}
-      aria-controls="{idPrefix}-filters"
-      onclick={() => (drawerOpen = !drawerOpen)}
-    >
-      Filters{#if drawerCount > 0}<span class="count">{drawerCount}</span>{/if}
-    </button>
     {@render actions?.()}
   </div>
-  <div id="{idPrefix}-filters" class="card drawer" class:open={drawerOpen}>
-    <div class="field">
-      <span id="{idPrefix}-producer-label">Producer</span>
-      <Picker
-        id="{idPrefix}-producer"
-        aria-labelledby="{idPrefix}-producer-label"
-        options={[undefined, ...producers]}
-        value={view.producer}
-        text={anyOr}
-        onpick={(v) => (view.producer = v)}
-      />
-    </div>
-    <fieldset class="field bpm">
-      <legend>BPM</legend>
-      <label class="visually-hidden" for="{idPrefix}-bpm-min">Lowest BPM</label>
-      <input
-        id="{idPrefix}-bpm-min"
-        type="number"
-        inputmode="decimal"
-        min="0"
-        placeholder="From"
-        value={view.bpmMin ?? ''}
-        oninput={(e) => setBpm('bpmMin', e)}
-      />
-      <span aria-hidden="true">–</span>
-      <label class="visually-hidden" for="{idPrefix}-bpm-max">Highest BPM</label>
-      <input
-        id="{idPrefix}-bpm-max"
-        type="number"
-        inputmode="decimal"
-        min="0"
-        placeholder="To"
-        value={view.bpmMax ?? ''}
-        oninput={(e) => setBpm('bpmMax', e)}
-      />
-    </fieldset>
-    <div class="field">
-      <span id="{idPrefix}-key-label">Key</span>
-      <Picker
-        id="{idPrefix}-key"
-        aria-labelledby="{idPrefix}-key-label"
-        options={[undefined, ...keys]}
-        value={view.key}
-        text={anyOr}
-        onpick={(v) => (view.key = v)}
-      />
-    </div>
-    <div class="chips" role="group" aria-label="Used in a Song">
-      {#each uses as u (u.label)}
-        <button type="button" class="chip" aria-pressed={view.use === u.id} onclick={() => (view.use = u.id)}>
-          {u.label}
-        </button>
-      {/each}
-    </div>
+  <div class="filter-bar" role="group" aria-label="Filter Beats">
+    <FilterButton name="Producer" label={producerFilterLabel(view.producers)} picked={view.producers.length > 0}>
+      {@render checklist(
+        'Producer',
+        producers,
+        view.producers,
+        (next) => (view.producers = next),
+        'No Beat has a producer.',
+      )}
+    </FilterButton>
+    <FilterButton name="Key" label={keyFilterLabel(view.keys)} picked={view.keys.length > 0}>
+      {@render checklist('Key', keys, view.keys, (next) => (view.keys = next), 'No Beat has a key.')}
+    </FilterButton>
+    <FilterButton
+      name="BPM"
+      label={bpmFilterLabel(view)}
+      picked={view.bpmMin !== undefined || view.bpmMax !== undefined}
+    >
+      <fieldset class="bpm">
+        <legend class="visually-hidden">BPM</legend>
+        <label class="visually-hidden" for="{idPrefix}-bpm-min">Lowest BPM</label>
+        <input
+          id="{idPrefix}-bpm-min"
+          type="number"
+          inputmode="decimal"
+          min="0"
+          placeholder="From"
+          value={view.bpmMin ?? ''}
+          oninput={(e) => setBpm('bpmMin', e)}
+        />
+        <span aria-hidden="true">–</span>
+        <label class="visually-hidden" for="{idPrefix}-bpm-max">Highest BPM</label>
+        <input
+          id="{idPrefix}-bpm-max"
+          type="number"
+          inputmode="decimal"
+          min="0"
+          placeholder="To"
+          value={view.bpmMax ?? ''}
+          oninput={(e) => setBpm('bpmMax', e)}
+        />
+      </fieldset>
+    </FilterButton>
+    <FilterButton name="Used" label={useFilterLabel(view.use)} picked={view.use !== undefined}>
+      <fieldset class="choice-group">
+        <legend class="visually-hidden">Used in a Song</legend>
+        {#each uses as u (u.label)}
+          <label class="choice-row">
+            <input type="radio" name="{idPrefix}-use" checked={view.use === u.id} onchange={() => (view.use = u.id)} />
+            {u.label}
+          </label>
+        {/each}
+      </fieldset>
+    </FilterButton>
   </div>
   {#if hint}
     <p class="hint muted">This Song: {hint}</p>
@@ -138,100 +147,43 @@
 <style>
   .filters {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
+    align-items: center;
     gap: var(--space-2);
     margin-bottom: var(--space-2);
   }
   .search-row {
     display: flex;
+    flex: 1 1 16rem;
     gap: var(--space-2);
+    min-width: 0;
   }
   .search-row input {
     flex: 1;
     min-width: 0;
   }
-  .drawer-toggle {
-    flex-shrink: 0;
-    gap: var(--space-2);
+  /* A long list of producers or keys scrolls, about six at a time. */
+  .checklist {
+    max-height: calc(6 * var(--control));
+    overflow-y: auto;
+    padding-inline-end: var(--space-2);
   }
-  .count {
-    min-width: 1.25rem;
-    padding: 0 var(--space-2);
-    border-radius: var(--radius-full);
-    background: var(--accent);
-    color: var(--accent-text);
-    font-size: var(--text-xs);
-    line-height: 1.25rem;
-  }
-  .drawer {
-    display: none;
-    flex-wrap: wrap;
-    align-items: end;
-    gap: var(--space-3);
-    padding: var(--space-3);
-  }
-  .drawer.open {
-    display: flex;
-  }
-  .field {
-    min-width: 8rem;
-    margin: 0;
-    padding: 0;
-    border: none;
+  .none {
+    margin: var(--space-2) 0;
   }
   .bpm {
-    flex-direction: row;
-    flex-wrap: wrap;
+    display: flex;
     align-items: center;
-  }
-  .bpm legend {
-    width: 100%;
-    margin-bottom: var(--space-1);
-    padding: 0;
+    gap: var(--space-2);
+    margin: 0;
+    padding: var(--space-1) 0;
+    border: 0;
   }
   .bpm input {
     width: 5.5rem;
-    color: var(--text);
-    font-weight: 400;
-  }
-  .chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-  }
-  /* On the drawer's card, a chip that's off takes the page's colour. */
-  @media (width < 80rem) {
-    .chip:not([aria-pressed='true']) {
-      background: var(--bg);
-    }
   }
   .hint {
     margin: 0;
     font-size: var(--text-sm);
-  }
-
-  /* Desktop has room for every filter beside the search, with no drawer. */
-  @media (min-width: 80rem) {
-    .filters {
-      flex-direction: row;
-      flex-wrap: wrap;
-      align-items: end;
-      gap: var(--space-3);
-    }
-    .search-row {
-      flex: 1 1 16rem;
-    }
-    .drawer-toggle {
-      display: none;
-    }
-    .drawer {
-      display: flex;
-      padding: 0;
-      border: none;
-      background: none;
-    }
-    .hint {
-      align-self: center;
-    }
   }
 </style>

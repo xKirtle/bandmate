@@ -1,17 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import type { Beat, SongFilter, SongSummary } from './api';
 import {
-  beatDrawerFilterCount,
   beatKeys,
   beatListViewFromParams,
   beatListViewToParams,
   beatProducers,
+  bpmFilterLabel,
   defaultBeatListView,
   defaultSongListView,
   filterBeats,
   isBeatListFiltered,
+  isPicked,
   isSongListFiltered,
+  keyFilterLabel,
   loadSongList,
+  pickChoices,
+  producerFilterLabel,
   songListFilter,
   songBeatHint,
   sortBeats,
@@ -21,7 +25,9 @@ import {
   songListViewToParams,
   sortSongs,
   statusFilterLabel,
+  togglePick,
   toggleSort,
+  useFilterLabel,
   type BeatColumn,
   type BeatListView,
   type SongListView,
@@ -414,8 +420,13 @@ describe('filterBeats', () => {
   });
 
   it('keeps Beats by a producer, ignoring case and surrounding space', () => {
-    expect(showing({ producer: 'Kato' })).toEqual(['Night Shift', 'ocean']);
-    expect(showing({ producer: 'mira' })).toEqual(['Échos']);
+    expect(showing({ producers: ['Kato'] })).toEqual(['Night Shift', 'ocean']);
+    expect(showing({ producers: ['mira'] })).toEqual(['Échos']);
+  });
+
+  it('keeps Beats by any of several producers', () => {
+    expect(showing({ producers: ['Kato', 'Mira'] })).toEqual(['Night Shift', 'ocean', 'Échos']);
+    expect(showing({ producers: ['lune', 'Nobody'] })).toEqual(['Sunset']);
   });
 
   it('keeps Beats within a BPM range, including its ends', () => {
@@ -434,8 +445,13 @@ describe('filterBeats', () => {
   });
 
   it('keeps Beats in a key, ignoring case and surrounding space, and leaves out those with none', () => {
-    expect(showing({ key: 'AM' })).toEqual(['Night Shift', 'ocean']);
-    expect(showing({ key: ' c ' })).toEqual(['Sunset']);
+    expect(showing({ keys: ['AM'] })).toEqual(['Night Shift', 'ocean']);
+    expect(showing({ keys: [' c '] })).toEqual(['Sunset']);
+  });
+
+  it('keeps Beats in any of several keys, each matched as written', () => {
+    expect(showing({ keys: ['C', 'F#m'] })).toEqual(['Sunset', 'Échos']);
+    expect(showing({ keys: ['Gbm'] })).toEqual([]);
   });
 
   it('keeps Beats used in a Song, or those not used in any', () => {
@@ -444,9 +460,10 @@ describe('filterBeats', () => {
   });
 
   it('combines filters', () => {
-    expect(showing({ producer: 'kato', bpmMin: 90 })).toEqual(['Night Shift']);
-    expect(showing({ q: 'oce', use: 'unused', key: 'am' })).toEqual(['ocean']);
-    expect(showing({ key: 'C', use: 'unused' })).toEqual([]);
+    expect(showing({ producers: ['kato'], bpmMin: 90 })).toEqual(['Night Shift']);
+    expect(showing({ q: 'oce', use: 'unused', keys: ['am'] })).toEqual(['ocean']);
+    expect(showing({ keys: ['C'], use: 'unused' })).toEqual([]);
+    expect(showing({ producers: ['Kato', 'Lune'], keys: ['C', 'F#m'] })).toEqual(['Sunset']);
   });
 });
 
@@ -509,6 +526,24 @@ describe('beatProducers and beatKeys', () => {
   });
 });
 
+describe('picking producers and keys', () => {
+  it('offers those picked that no Beat has, before the Library’s, once each', () => {
+    expect(pickChoices(['Kato', 'Lune'], [])).toEqual(['Kato', 'Lune']);
+    expect(pickChoices(['Kato', 'Lune'], [' kato', 'Ghost'])).toEqual(['Ghost', 'Kato', 'Lune']);
+  });
+
+  it('ticks a choice on once, or off, ignoring case and surrounding space', () => {
+    expect(togglePick(['Kato'], 'Mira', true)).toEqual(['Kato', 'Mira']);
+    expect(togglePick(['Kato'], ' kato', true)).toEqual([' kato']);
+    expect(togglePick(['Kato', 'Mira'], 'KATO', false)).toEqual(['Mira']);
+  });
+
+  it('tells whether a choice is picked, ignoring case and surrounding space', () => {
+    expect(isPicked(['Kato '], 'kato')).toBe(true);
+    expect(isPicked(['Kato'], 'Mira')).toBe(false);
+  });
+});
+
 describe('the Beat Library in the URL', () => {
   const roundTrip = (view: BeatListView) => beatListViewFromParams(beatListViewToParams(view));
 
@@ -520,20 +555,22 @@ describe('the Beat Library in the URL', () => {
   it('keeps each filter and sort through a round trip', () => {
     const views: BeatListView[] = [
       { ...defaultBeatListView, q: 'night shift' },
-      { ...defaultBeatListView, producer: 'Kato & Lune' },
+      { ...defaultBeatListView, producers: ['Kato & Lune'] },
+      { ...defaultBeatListView, producers: ['Kato', 'Mira'] },
       { ...defaultBeatListView, bpmMin: 85 },
       { ...defaultBeatListView, bpmMax: 95.5 },
-      { ...defaultBeatListView, key: 'F#m' },
+      { ...defaultBeatListView, keys: ['F#m'] },
+      { ...defaultBeatListView, keys: ['C#m', 'Dbm'] },
       { ...defaultBeatListView, use: 'used' },
       { ...defaultBeatListView, use: 'unused' },
       { ...defaultBeatListView, sort: { column: 'usedBy', direction: 'asc' } },
       { ...defaultBeatListView, sort: { column: 'added', direction: 'asc' } },
       {
         q: 'canção',
-        producer: 'Mira',
+        producers: ['Mira', 'Lune'],
         bpmMin: 80,
         bpmMax: 100,
-        key: 'C#m',
+        keys: ['C#m'],
         use: 'unused',
         sort: { column: 'bpm', direction: 'desc' },
       },
@@ -550,8 +587,34 @@ describe('the Beat Library in the URL', () => {
     );
   });
 
+  it('writes each producer and key picked as a parameter of its own', () => {
+    expect(
+      beatListViewToParams({ ...defaultBeatListView, producers: ['Kato', 'Mira'], keys: ['Am', 'C'] }).toString(),
+    ).toBe('producer=Kato&producer=Mira&key=Am&key=C');
+  });
+
+  it('reads an old URL with a single producer or key', () => {
+    expect(beatListViewFromParams(new URLSearchParams('producer=Kato&key=F%23m'))).toEqual({
+      ...defaultBeatListView,
+      producers: ['Kato'],
+      keys: ['F#m'],
+    });
+  });
+
+  it('reads each producer and key once, ignoring case', () => {
+    expect(beatListViewFromParams(new URLSearchParams('producer=Ghost&producer=ghost&key=Am&key=Am'))).toEqual({
+      ...defaultBeatListView,
+      producers: ['Ghost'],
+      keys: ['Am'],
+    });
+  });
+
   it('leaves blank text out', () => {
-    expect(beatListViewToParams({ ...defaultBeatListView, q: ' ', producer: '  ', key: '' }).toString()).toBe('');
+    expect(beatListViewToParams({ ...defaultBeatListView, q: ' ', producers: ['  '], keys: [''] }).toString()).toBe('');
+    expect(beatListViewFromParams(new URLSearchParams('producer=&producer=Kato&key=+'))).toEqual({
+      ...defaultBeatListView,
+      producers: ['Kato'],
+    });
   });
 
   it('falls back to the default for anything unknown or malformed', () => {
@@ -569,6 +632,33 @@ describe('the Beat Library in the URL', () => {
   });
 });
 
+describe('the Beat filter buttons', () => {
+  it('name the filter alone while nothing is picked', () => {
+    expect(producerFilterLabel([])).toBe('Producer');
+    expect(keyFilterLabel([])).toBe('Key');
+    expect(bpmFilterLabel({})).toBe('BPM');
+    expect(useFilterLabel(undefined)).toBe('Used');
+  });
+
+  it('name the producers and keys picked, sorted ignoring case', () => {
+    expect(producerFilterLabel(['Mira', 'kato'])).toBe('Producer: kato, Mira');
+    expect(keyFilterLabel(['F#m', 'Am', 'C'])).toBe('Key: Am, C, F#m');
+  });
+
+  it('name the BPM range, or the end of it that is set', () => {
+    expect(bpmFilterLabel({ bpmMin: 80, bpmMax: 95 })).toBe('BPM: 80–95');
+    expect(bpmFilterLabel({ bpmMin: 90, bpmMax: 90 })).toBe('BPM: 90');
+    expect(bpmFilterLabel({ bpmMin: 80 })).toBe('BPM: from 80');
+    expect(bpmFilterLabel({ bpmMax: 95.5 })).toBe('BPM: up to 95.5');
+    expect(bpmFilterLabel({ bpmMin: 0 })).toBe('BPM: from 0');
+  });
+
+  it('name whether the Beats shown are used', () => {
+    expect(useFilterLabel('used')).toBe('Used: Yes');
+    expect(useFilterLabel('unused')).toBe('Used: No');
+  });
+});
+
 describe('isBeatListFiltered', () => {
   it('is whether any filter is set, whatever the sort', () => {
     expect(isBeatListFiltered(defaultBeatListView)).toBe(false);
@@ -578,20 +668,8 @@ describe('isBeatListFiltered', () => {
     expect(isBeatListFiltered({ ...defaultBeatListView, bpmMin: 0 })).toBe(true);
     expect(isBeatListFiltered({ ...defaultBeatListView, use: 'unused' })).toBe(true);
     expect(isBeatListFiltered({ ...defaultBeatListView, q: 'x' })).toBe(true);
-  });
-});
-
-describe('beatDrawerFilterCount', () => {
-  it('counts the set filters other than the search, a BPM range as one', () => {
-    expect(beatDrawerFilterCount({ ...defaultBeatListView, q: 'x' })).toBe(0);
-    expect(beatDrawerFilterCount({ ...defaultBeatListView, bpmMin: 80, bpmMax: 100 })).toBe(1);
-    expect(beatDrawerFilterCount({ ...defaultBeatListView, producer: 'Nox', key: 'Am', use: 'used', bpmMax: 0 })).toBe(
-      4,
-    );
-  });
-
-  it('ignores blank text', () => {
-    expect(beatDrawerFilterCount({ ...defaultBeatListView, producer: '  ', key: '' })).toBe(0);
+    expect(isBeatListFiltered({ ...defaultBeatListView, producers: ['Kato'] })).toBe(true);
+    expect(isBeatListFiltered({ ...defaultBeatListView, keys: ['Am'] })).toBe(true);
   });
 });
 

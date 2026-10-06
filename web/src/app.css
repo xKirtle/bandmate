@@ -281,6 +281,15 @@ label.button:has(input:focus-visible) {
   cursor: pointer;
 }
 
+/* A list page's filter bar: its filter buttons, wrapping onto more rows
+   where there's no room. */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
 /* A badge: a small pill of text that labels something, e.g. a Status. Its
    colours are its own. */
 .badge {
