@@ -116,13 +116,27 @@ Bandmate itself reads these:
 | `BANDMATE_DATA_DIR`      | `./data` | Directory holding the SQLite database (`bandmate.db`), audio files (`audio/`), Covers (`covers/`) and Backups (`backups/`) |
 | `BANDMATE_MAX_UPLOAD_MB` | `500`    | Largest audio file accepted for upload, in megabytes                                                                       |
 | `BANDMATE_UPDATE_CHECK`  | `on`     | `off` stops the About tab asking GitHub for the latest release and the release notes                                       |
-| `BANDMATE_ADD_FROM_LINK` | `on`     | `off` stops Beats being added from a link: the Add from link button is hidden, and Bandmate refuses to fetch one           |
+| `BANDMATE_ADD_FROM_LINK` | `on`     | `off` stops Beats being added from a link: Add from link and Update yt-dlp are hidden, and Bandmate refuses both           |
 
 The image sets `BANDMATE_DATA_DIR` to `/data`, the folder the examples above mount.
 
-Bandmate makes two kinds of outbound call, each only when asked: the update check, when About is opened (to GitHub), and, when the user adds a Beat from a link, the fetch of that link (to the site it's on, through yt-dlp). `BANDMATE_UPDATE_CHECK=off` and `BANDMATE_ADD_FROM_LINK=off` turn each off.
+Bandmate makes three kinds of outbound call, each only when asked: the update check, when About is opened (to GitHub); when the user adds a Beat from a link, the fetch of that link (to the site it's on, through yt-dlp); and when the user presses Update yt-dlp in About, yt-dlp's own update (to GitHub). `BANDMATE_UPDATE_CHECK=off` turns off the first, and `BANDMATE_ADD_FROM_LINK=off` the other two.
 
 A fetch takes the audio of one video, never a playlist, a channel or a live stream, and keeps it as an m4a. It's held to `BANDMATE_MAX_UPLOAD_MB`, like an upload, and stopped after 10 minutes. The fetched audio waits in `audio/waiting/` in the data folder until it's added, and is deleted after an hour if it isn't, or when Bandmate restarts. A fetch is one long request, so a reverse proxy in front of Bandmate needs a read timeout long enough for it.
+
+### Mounting your own yt-dlp
+
+When a site changes, yt-dlp can stop fetching from it until a newer yt-dlp fixes it. A Bandmate release brings one. Until then, About, in Settings, shows the yt-dlp in use, and its **Update yt-dlp** button runs yt-dlp's own update on a copy in `programs/` in the data folder. Of the bundled yt-dlp and that copy, whichever is newer is used, so an old update never stands in for a fresher yt-dlp a later Bandmate bundles.
+
+Some setups, such as a NAS, mount the data folder `noexec`, so no program can run from it. There, Update yt-dlp keeps the bundled one and says so. Instead, download yt-dlp's [standalone Linux build](https://github.com/yt-dlp/yt-dlp/releases/latest) (`yt-dlp_linux`, or `yt-dlp_linux_aarch64` on ARM), make it executable, and mount it over the bundled one, at `/usr/local/bin/yt-dlp`, with a line under `volumes:` in the Compose file:
+
+```yaml
+    volumes:
+      - ./data:/data
+      - ./yt-dlp_linux:/usr/local/bin/yt-dlp:ro
+```
+
+Then recreate the container (`docker compose up -d`). The mounted yt-dlp counts as the bundled one, so an update in the data folder is still used if it's newer.
 
 `GET /api/health` returns `200 {"status":"ok"}` when the database is reachable. `bandmate healthcheck` calls it and exits non-zero on failure. The container healthcheck uses it because the image has no shell or curl.
 

@@ -1,8 +1,9 @@
 // What About, in Settings, works out in the browser: how long the server
-// has been up, the block Copy details puts on the clipboard, and how the
-// server's releases check reads under the version.
+// has been up, the block Copy details puts on the clipboard, how the
+// server's releases check reads under the version, and how the yt-dlp in use
+// and its update read beside it.
 
-import type { ReleasesReport } from './api';
+import type { ReleasesReport, YtDlpInUse, YtDlpUpdate } from './api';
 
 const units: [string, number][] = [
   ['day', 24 * 3600],
@@ -50,5 +51,22 @@ export function updateStatus(r: ReleasesReport): UpdateStatus | null {
       return { text: `${r.latest.tag} available`, url: r.latest.url };
     default:
       return { text: `Latest release: ${r.latest.tag}`, url: r.latest.url };
+  }
+}
+
+/** The yt-dlp fetches use, beside the update check: "yt-dlp 2026.09.12 (updated)". */
+export function ytDlpInUse(y: YtDlpInUse): string {
+  return `yt-dlp ${y.version} (${y.source})`;
+}
+
+/** What Update yt-dlp did, in words. */
+export function ytDlpUpdated(u: YtDlpUpdate): string {
+  switch (u.outcome) {
+    case 'upToDate':
+      return 'Already up to date';
+    case 'updated':
+      return `Updated to ${u.version}`;
+    case 'cantRun':
+      return "Can't run programs from the data folder; mount a newer yt-dlp instead";
   }
 }

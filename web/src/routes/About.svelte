@@ -3,8 +3,15 @@
   // that version's source, as AGPL-3.0 §13 asks of anyone running a modified
   // Bandmate over a network, the system facts a bug report needs, ready to
   // copy, and what's new.
-  import { api, type AboutInfo, type ReleasesReport, type ServerConfig } from '../lib/api';
-  import { bugReportDetails, updateStatus, uptime } from '../lib/about';
+  import {
+    api,
+    type AboutInfo,
+    type ReleasesReport,
+    type ServerConfig,
+    type YtDlpInUse,
+    type YtDlpUpdate,
+  } from '../lib/api';
+  import { bugReportDetails, updateStatus, uptime, ytDlpInUse, ytDlpUpdated } from '../lib/about';
   import BrandMark from '../lib/BrandMark.svelte';
   import FoldChevron from '../lib/FoldChevron.svelte';
   import SettingsPage from '../lib/SettingsPage.svelte';
@@ -17,9 +24,40 @@
   let aboutError = $state<string | null>(null);
 
   api.getConfig().then(
-    (c) => (config = c),
+    (c) => {
+      config = c;
+      if (c.addFromLink) loadYtDlp();
+    },
     (e: Error) => (error = e.message),
   );
+
+  // The yt-dlp that fetches links, shown beside the update check unless
+  // adding from a link is off. Asking it runs yt-dlp, so it loads on its own.
+  let ytDlp = $state<YtDlpInUse | null>(null);
+  let ytDlpError = $state<string | null>(null);
+  function loadYtDlp() {
+    api.getYtDlp().then(
+      (y) => (ytDlp = y),
+      (e: Error) => (ytDlpError = e.message),
+    );
+  }
+
+  let updatingYtDlp = $state(false);
+  let ytDlpUpdate = $state<YtDlpUpdate | null>(null);
+  let ytDlpUpdateError = $state<string | null>(null);
+  async function updateYtDlp() {
+    updatingYtDlp = true;
+    ytDlpUpdate = null;
+    ytDlpUpdateError = null;
+    try {
+      ytDlpUpdate = await api.updateYtDlp();
+      ytDlp = { version: ytDlpUpdate.version, source: ytDlpUpdate.source };
+    } catch (e) {
+      ytDlpUpdateError = (e as Error).message;
+    } finally {
+      updatingYtDlp = false;
+    }
+  }
   api.getAbout().then(
     (a) => (about = a),
     (e: Error) => (aboutError = e.message),
@@ -142,6 +180,24 @@
               · <a href={releasesUrl}>See releases</a>
             {/if}
           </p>
+        {/if}
+        {#if config.addFromLink}
+          <div class="yt-dlp">
+            <p class="update">
+              {#if ytDlp}{ytDlpInUse(ytDlp)}{:else if ytDlpError}{ytDlpError}{:else}Checking yt-dlp…{/if}
+            </p>
+            {#if ytDlp}
+              <button class="button" type="button" disabled={updatingYtDlp} onclick={updateYtDlp}>
+                {updatingYtDlp ? 'Updating yt-dlp…' : 'Update yt-dlp'}
+              </button>
+            {/if}
+            <p class="yt-dlp-status" class:error={ytDlpUpdateError} role="status">
+              {#if ytDlpUpdate}
+                {ytDlpUpdated(ytDlpUpdate)}{#if ytDlpUpdate.outcome === 'cantRun'}:
+                  <a href="{config.sourceUrl}#mounting-your-own-yt-dlp">see how in the README</a>{/if}
+              {:else if ytDlpUpdateError}{ytDlpUpdateError}{/if}
+            </p>
+          </div>
         {/if}
         <ul class="links">
           <li><a href={config.sourceUrl}>Source code</a></li>
@@ -433,6 +489,21 @@
   }
   .update.available a {
     font-weight: 600;
+  }
+
+  /* The yt-dlp in use, its Update button, and what updating did. */
+  .yt-dlp {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+  }
+  .yt-dlp-status {
+    font-size: var(--text-md);
+  }
+  .yt-dlp-status:empty {
+    display: none;
   }
 
   .releases {

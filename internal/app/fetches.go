@@ -17,8 +17,7 @@ import (
 // fetchLink fetches a link's audio into a waiting file, answering once it's
 // there. Abandoning the request stops the fetch.
 func (a *App) fetchLink(w http.ResponseWriter, r *http.Request) {
-	if a.addFromLinkOff {
-		writeError(w, http.StatusForbidden, "Adding a Beat from a link is turned off on this Bandmate.")
+	if a.refuseWhenAddFromLinkOff(w) {
 		return
 	}
 	var req struct {
@@ -75,6 +74,43 @@ func (a *App) addFetchedBeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, added)
+}
+
+// refuseWhenAddFromLinkOff answers that adding from a link is turned off,
+// when it is, saying whether it did.
+func (a *App) refuseWhenAddFromLinkOff(w http.ResponseWriter) bool {
+	if a.addFromLinkOff {
+		writeError(w, http.StatusForbidden, "Adding a Beat from a link is turned off on this Bandmate.")
+	}
+	return a.addFromLinkOff
+}
+
+// ytDlpInUse tells About which yt-dlp fetches run, and whether it's the
+// bundled one or an updated copy.
+func (a *App) ytDlpInUse(w http.ResponseWriter, r *http.Request) {
+	if a.refuseWhenAddFromLinkOff(w) {
+		return
+	}
+	in, err := a.ytDlp.InUse(r.Context())
+	if err != nil {
+		writeFetchError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, in)
+}
+
+// updateYtDlp runs yt-dlp's self-update, only when About's Update yt-dlp is
+// pressed, and says what it did.
+func (a *App) updateYtDlp(w http.ResponseWriter, r *http.Request) {
+	if a.refuseWhenAddFromLinkOff(w) {
+		return
+	}
+	u, err := a.ytDlp.Update(r.Context())
+	if err != nil {
+		writeFetchError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, u)
 }
 
 // writeFetchError maps a fetch's errors onto HTTP responses.
