@@ -152,6 +152,19 @@ dialog {
   overscroll-behavior: contain;
 }
 
+/* On a phone held sideways, or any landscape window under 30rem tall, a
+   Song's Timeline fills the window (Timeline.svelte). The Song page and the
+   navigation stay laid out behind it, hidden and still, so turning back
+   upright finds them as they were. */
+@media (orientation: landscape) and (height < 30rem) {
+  :root:has(.timeline) {
+    overflow: hidden;
+  }
+  :root:has(.timeline) :is(.app > nav, .page) {
+    visibility: hidden;
+  }
+}
+
 /* The page leaves room for the tab bar, which the nav rail replaces on wide
    windows. */
 body {

@@ -81,7 +81,7 @@ Content's line height is `--leading-content` (1.6), for Lines in Write mode and 
 | `--lyric-read-leading` | The line height of Lines, Chords and Labels in Read mode                          |
 | `--lyric-size`         | The Lyric Size as a fraction, set on the page by Read mode: the Read mode sizes scale by it |
 
-**Read mode** is read at arm's length, from a phone or a music stand, so its lyric sizes are larger than Write mode's: Lines at 1.25rem and Chords at 1.0625rem on a phone, a step larger again from 40rem wide (a tablet, a phone held sideways, or a desktop), at 1.5rem and 1.25rem. The Lyric Size scales Lines, Chords and Labels together from these, from 80% to 175%, for reading from wherever the device sits; the Chord Chart keeps its own size. Lines are in `--text`, held to 7:1, Chords in the accent, held to 4.5:1, and Labels in `--text-muted`, held to 4.5:1, set as written and bold: they're content too, but step back from the Lines they head. Sections sit `--space-8` apart. Its chrome stays quiet: the Lyric Sheet's heading is for screen readers only, and the Lyric Size, whether the Chords show, Transpose and the Chord Chart's eye and pin sit behind one Reading button at its head, which shows only how far the Chords are transposed, as a badge.
+**Read mode** is read at arm's length, from a phone or a music stand, so its lyric sizes are larger than Write mode's: Lines at 1.25rem and Chords at 1.0625rem on a phone, a step larger again from 40rem wide (a tablet or a desktop), at 1.5rem and 1.25rem. The Lyric Size scales Lines, Chords and Labels together from these, from 80% to 175%, for reading from wherever the device sits; the Chord Chart keeps its own size. Lines are in `--text`, held to 7:1, Chords in the accent, held to 4.5:1, and Labels in `--text-muted`, held to 4.5:1, set as written and bold: they're content too, but step back from the Lines they head. Sections sit `--space-8` apart. Its chrome stays quiet: the Lyric Sheet's heading is for screen readers only, and the Lyric Size, whether the Chords show, Transpose and the Chord Chart's eye and pin sit behind one Reading button at its head, which shows only how far the Chords are transposed, as a badge.
 
 Every time, BPM and Gain uses tabular digits, so numbers don't jitter as they change: through the `.tabular` class, or `font-variant-numeric: tabular-nums` in a component's own rule for it. Number fields have them anyway.
 
@@ -198,6 +198,11 @@ chromium --headless --hide-scrollbars --window-size=1280,640 \
 ### The Timeline's own scale
 
 The Timeline zooms by its own unit, `--timeline-rem`, so its sizes are written as multiples of it (`calc(0.75 * var(--timeline-rem))`). They follow the same scales, in that unit: a font size there is `var(--timeline-rem)` or one of the type scale's steps times it (0.75 to 1.5), a gap, padding or margin one of the spacing steps times it (0.25 to 2) or negated, and a radius one of the radius steps times it (0.375 to 0.75), or `--radius-full`.
+
+Docked at the foot of the Song page, the Timeline is drawn at 1.25×, and its Tracks area is resized by dragging its top edge, the height kept on the device. A phone gets 1×, with no room to spare, and its own layout by how it's held:
+
+- **Upright**, up to 40rem wide, the Timeline only plays: the transport row alone, for playing along while reading.
+- **Sideways**, any landscape window under 30rem tall (a short desktop window too), it's **the full-screen Timeline**, in Read mode and Write mode alike: it fills the window, over the Song page and the navigation, which wait behind it as they were. It can't be collapsed or resized: its Tracks take all the height below the transport row, which stays on one line, a message in it cut short with "…". The height kept on the device is left for elsewhere, and the safe-area insets are kept clear on every side.
 
 ### Components
 
