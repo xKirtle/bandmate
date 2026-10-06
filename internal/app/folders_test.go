@@ -207,13 +207,9 @@ func TestSongCreatedInAFolderLandsInIt(t *testing.T) {
 
 	res := ts.Do(http.MethodPost, "/api/songs", map[string]any{"folderId": ep.ID})
 	expectStatus(t, res, http.StatusCreated)
-	res = ts.Do(http.MethodPost, "/api/songs/import", map[string]any{
-		"title": "Pasted", "text": "[Verse]\nLa la la", "folderId": ep.ID,
-	})
-	expectStatus(t, res, http.StatusCreated)
 
 	got := titles(ts.listSongs(fmt.Sprintf("folder=%d", ep.ID)))
-	if want := []string{"Pasted", "Untitled Song"}; !reflect.DeepEqual(got, want) {
+	if want := []string{"Untitled Song"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("songs in the folder = %v, want %v", got, want)
 	}
 }

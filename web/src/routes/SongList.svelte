@@ -164,8 +164,6 @@
     }
   }
 
-  const importHref = $derived(folderId === undefined ? '/songs/import' : `/songs/import?folder=${folderId}`);
-
   function clearFilters() {
     view = { ...defaultSongListView, sort: view.sort };
   }
@@ -318,9 +316,8 @@
   {/if}
   {#if !folderMissing}
     <div class="actions">
-      <a class="button" href={importHref}>Import</a>
       {#if folderId === undefined}
-        <!-- On the narrowest phones it's only its icon, for the three to fit. -->
+        <!-- On the narrowest phones it's only its icon, to fit beside New Song. -->
         <button
           type="button"
           class="button"
@@ -415,7 +412,6 @@
           {creating ? 'Creating…' : 'Write one'}
         </button>
       {/if}
-      <a class="button" href={importHref}>Import one</a>
     </div>
   {:else if sorted}
     {#if listedFolders.length > 0 || sorted.length > 0}

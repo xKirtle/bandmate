@@ -5,7 +5,6 @@ describe('currentPage', () => {
   it('marks Songs on the Song list, inside a Folder, and on every page of a Song', () => {
     expect(currentPage('/')).toBe('songs');
     expect(currentPage('/folders/3')).toBe('songs');
-    expect(currentPage('/songs/import')).toBe('songs');
     expect(currentPage('/songs/12')).toBe('songs');
   });
 
@@ -48,7 +47,6 @@ describe('listAt', () => {
 
   it('is none on a page within a list, such as a Song, or outside them', () => {
     expect(listAt('/songs/12')).toBeUndefined();
-    expect(listAt('/songs/import')).toBeUndefined();
     expect(listAt('/nowhere')).toBeUndefined();
   });
 

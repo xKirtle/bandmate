@@ -21,7 +21,6 @@ The words in bold are defined in the [glossary](GLOSSARY.md).
 - **Alternates**: competing versions of a Section's Lines, one active at a time, all shown in full in **Alternates mode** to choose between.
 - **Chords** anchored anywhere in a **Line**, even mid-word, and **Chord Lines** for intros, solos and other instrumental passages.
 - A **Scrapbook** for Sections that aren't in the Arrangement: leftovers and loose ideas kept for later.
-- Paste-import of plain text or ChordPro, which never guesses or drops what you paste.
 - **Write mode** for working on a Song and **Read mode** for playing from it. Finished Songs open in Read mode.
 - A two-column Song page on desktop, and a layout for writing lyrics on a phone.
 

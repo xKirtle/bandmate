@@ -1,5 +1,5 @@
-// Captures the README's screenshots from a Bandmate just seeded by
-// cmd/demoseed. See README.md beside it.
+// Captures the README's screenshots from a Bandmate the demo Backup,
+// demo.bandmate, was just restored into. See README.md beside it.
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -10,10 +10,10 @@ const base = process.env.BANDMATE_URL ?? "http://localhost:8080";
 const out = import.meta.dirname;
 
 const songs = await (await fetch(`${base}/api/songs`)).json();
-// The hero Song's title, heroTitle in cmd/demoseed.
+// The hero Song's title in the demo.
 const hero = songs.find((s) => s.title === "Lorem Ipsum");
 if (!hero)
-  throw new Error(`${base} has no Song titled Lorem Ipsum: run the seed first`);
+  throw new Error(`${base} has no Song titled Lorem Ipsum: restore the demo first`);
 const heroURL = `${base}/songs/${hero.id}`;
 
 const browser = await chromium.launch({

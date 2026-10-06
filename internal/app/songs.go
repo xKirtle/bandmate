@@ -71,24 +71,6 @@ func (a *App) createSong(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, song)
 }
 
-func (a *App) importSong(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Title string `json:"title"`
-		Text  string `json:"text"`
-		// FolderID is the Folder it's made in; nil for none.
-		FolderID *int64 `json:"folderId"`
-	}
-	if !readJSON(w, r, &req) {
-		return
-	}
-	song, err := a.songs.ImportSong(r.Context(), req.Title, req.Text, req.FolderID)
-	if err != nil {
-		writeDomainError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusCreated, song)
-}
-
 func (a *App) getSong(w http.ResponseWriter, r *http.Request) {
 	id, ok := songID(w, r)
 	if !ok {

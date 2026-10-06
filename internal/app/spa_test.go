@@ -27,7 +27,7 @@ func TestSPAStaticFilesAreServed(t *testing.T) {
 }
 
 func TestUnknownClientRouteFallsBackToSPAEntryPage(t *testing.T) {
-	for _, path := range []string{"/songs/42", "/songs/import", "/some/deep/route"} {
+	for _, path := range []string{"/songs/42", "/some/deep/route"} {
 		t.Run(path, func(t *testing.T) {
 			ts := newTestServer(t)
 

@@ -17,10 +17,6 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 - They're the way back from unwanted edits, since saving is automatic and Read mode only decides when editing is offered.
 - The Lyric Sheet's structure (deleting a Section, reordering, switching an Alternate, moving to or from the Scrapbook) has no undo. With dormant Cues (ADR 0007) an Alternate switch is undone by switching back; whether Snapshots cover the rest, or it gets an undo of its own, is for this spec to decide.
 
-## ChordPro export
-
-- It covers the Arrangement's active Alternates. Scrapbook Sections are left out.
-
 ## A count-in or click
 
 - From the Song's BPM, for recording without a Beat, so a Beat added later can line up.
