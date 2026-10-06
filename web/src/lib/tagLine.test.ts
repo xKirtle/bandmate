@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fitTags } from './tagLine';
 
 // Badges 4px apart, and a "+N" badge 24px wide.
-const line = (widths: number[], room: number) => fitTags({ widths, room, gap: 4, more: 24 });
+const line = (widths: number[], room: number) => fitTags({ widths, room, gap: 4, moreWidth: 24 });
 
 describe('fitTags', () => {
   it('shows every Tag when they all fit', () => {

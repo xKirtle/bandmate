@@ -5,40 +5,35 @@
   // tooltip names the rest: shown, never changed here.
   let { tags }: { tags: readonly string[] } = $props();
 
-  let line = $state<HTMLElement>();
-  // Every badge drawn out of sight, to measure what fits.
+  // Every badge drawn out of sight, to measure what fits, and the widest
+  // "+N" there can be.
   let probe = $state<HTMLElement>();
+  let probeMore = $state<HTMLElement>();
   let room = $state(0);
-  let shown = $state(0);
+  // How many Tags show, once measured: until then, all of them.
+  let shown = $state<number>();
   // Whether the first Tag is cut short for want of room.
-  let cut = $state(false);
+  let firstCut = $state(false);
 
-  const rest = $derived(tags.slice(shown));
-
-  $effect(() => {
-    if (!line) return;
-    const observer = new ResizeObserver(([entry]) => (room = entry.contentRect.width));
-    observer.observe(line);
-    return () => observer.disconnect();
-  });
+  const rest = $derived(shown === undefined ? [] : tags.slice(shown));
 
   $effect(() => {
-    if (!probe) return;
+    if (!probe || !probeMore) return;
     void tags;
-    const badges = [...probe.children].map((badge) => badge.getBoundingClientRect().width);
-    const more = badges.pop() ?? 0;
+    const badges = [...probe.querySelectorAll('.name')].map((badge) => badge.getBoundingClientRect().width);
+    const moreWidth = probeMore.getBoundingClientRect().width;
     const gap = parseFloat(getComputedStyle(probe).columnGap) || 0;
-    shown = fitTags({ widths: badges, room, gap, more });
-    cut = badges[0] + (shown < badges.length ? gap + more : 0) > room;
+    shown = fitTags({ widths: badges, room, gap, moreWidth });
+    firstCut = badges.length > 0 && badges[0] + (shown < badges.length ? gap + moreWidth : 0) > room;
   });
 </script>
 
 <div class="tag-line">
-  <ul class="tags" aria-label="Tags" bind:this={line}>
-    {#each tags.slice(0, shown || tags.length) as name, i (name)}
-      <li class="badge tag" title={i === 0 && cut ? name : undefined}>{name}</li>
+  <ul class="tags" aria-label="Tags" bind:clientWidth={room}>
+    {#each tags.slice(0, shown) as name, i (name)}
+      <li class="badge tag" title={i === 0 && firstCut ? name : undefined}>{name}</li>
     {/each}
-    {#if shown > 0 && rest.length > 0}
+    {#if rest.length > 0}
       <li class="badge tag more" title={rest.join(', ')}>
         <span aria-hidden="true">+{rest.length}</span><span class="visually-hidden">and {rest.join(', ')}</span>
       </li>
@@ -46,9 +41,9 @@
   </ul>
   <ul class="tags probe" aria-hidden="true" bind:this={probe}>
     {#each tags as name (name)}
-      <li class="badge tag">{name}</li>
+      <li class="badge tag name">{name}</li>
     {/each}
-    <li class="badge tag more">+{tags.length - 1}</li>
+    <li class="badge tag more" bind:this={probeMore}>+{tags.length - 1}</li>
   </ul>
 </div>
 
