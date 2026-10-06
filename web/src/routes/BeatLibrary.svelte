@@ -4,9 +4,10 @@
   import Play from '@lucide/svelte/icons/play';
   import { onDestroy, tick } from 'svelte';
   import AddFromLink, { type FromLink } from '../lib/AddFromLink.svelte';
+  import AlreadyInLibrary from '../lib/AlreadyInLibrary.svelte';
   import AudioPlayer from '../lib/AudioPlayer.svelte';
   import { MediaQuery } from 'svelte/reactivity';
-  import { api, type Beat, type DecodedAudio } from '../lib/api';
+  import { api, type Beat, type DecodedAudio, type Fetched } from '../lib/api';
   import BeatBatch from '../lib/BeatBatch.svelte';
   import type { BatchRow } from '../lib/beatBatch';
   import type { Preview } from '../lib/beatPreview';
@@ -26,6 +27,7 @@
     sortBeats,
   } from '../lib/listViews';
   import { replaceSearch, router } from '../lib/router.svelte';
+  import { beatWithSource } from '../lib/sameSource';
   import { formatDuration } from '../lib/time';
   import { suggestForFile } from '../lib/beatTags';
   import { prepareUpload } from '../lib/upload';
@@ -44,12 +46,12 @@
 
   // A file being added: decoded, waiting for its details. One fetched from a
   // link is already on the server, waiting there, and is previewed from the
-  // copy read to decode it.
+  // copy read to decode it, keeping what the link gave, such as its clean link.
   interface Adding {
     file: File;
     decoded: DecodedAudio;
     draft: BeatDraft;
-    fetched?: { id: string; previewUrl: string };
+    fetched?: Fetched & { previewUrl: string };
   }
   let adding = $state<Adding | null>(null);
   let addBusy = $state<string | null>(null);
@@ -251,8 +253,17 @@
 
   function fetchedFromLink({ fetched, file, decoded, draft }: FromLink) {
     linking = false;
-    setAdding({ file, decoded, draft, fetched: { id: fetched.id, previewUrl: URL.createObjectURL(file) } });
+    setAdding({
+      file,
+      decoded,
+      draft,
+      fetched: { ...fetched, previewUrl: URL.createObjectURL(file) },
+    });
   }
+
+  // The Beat already in the Library from the link being added, if any: it's
+  // warned of, but can be added again.
+  const alreadyAdded = $derived(adding?.fetched && beats ? beatWithSource(beats, adding.fetched.sourceLink) : null);
 
   onDestroy(() => setAdding(null));
 
@@ -393,9 +404,15 @@
       {#if adding.fetched}
         <AudioPlayer src={adding.fetched.previewUrl} duration={adding.decoded.duration} peaks={adding.decoded.peaks} />
       {/if}
+      {#if alreadyAdded}
+        {@const beatId = alreadyAdded.id}
+        <AlreadyInLibrary beat={alreadyAdded} onOpen={() => (editingId = beatId)} />
+      {/if}
       <BeatFields bind:draft={adding.draft} idPrefix="new-beat" />
       <div class="actions">
-        <button type="submit" class="button primary" disabled={addBusy !== null}>Add to Library</button>
+        <button type="submit" class="button primary" disabled={addBusy !== null}>
+          {alreadyAdded ? 'Add anyway' : 'Add to Library'}
+        </button>
         <button type="button" class="button" onclick={cancelAdd} disabled={addBusy !== null}>Cancel</button>
       </div>
     </form>
