@@ -24,9 +24,9 @@
   let name = $state(before);
   let saving = $state(false);
   let error = $state<string | null>(null);
-  // Why the name merges the Tag into another, once the server has said so;
-  // asked about before merging.
-  let merging = $state<string | null>(null);
+  // Whether the name is another Tag's, so saving merges the two, once the
+  // server has said so; asked about before merging.
+  let merging = $state(false);
 
   async function onsubmit(e: SubmitEvent) {
     e.preventDefault();
@@ -37,11 +37,10 @@
     saving = true;
     error = null;
     try {
-      onSaved(await api.renameTag(tag.id, name, merging !== null));
+      onSaved(await api.renameTag(tag.id, name, merging));
       dialog?.close();
     } catch (e) {
-      if (e instanceof ApiError && e.status === 409 && merging === null)
-        merging = e.message.charAt(0).toUpperCase() + e.message.slice(1);
+      if (e instanceof ApiError && e.status === 409 && !merging) merging = true;
       else error = `Couldn't ${merging ? 'merge' : 'rename'} the Tag (${(e as Error).message})`;
     } finally {
       saving = false;
@@ -65,7 +64,7 @@
         bind:value={name}
         oninput={() => {
           error = null;
-          merging = null;
+          merging = false;
         }}
         autocomplete="off"
         enterkeyhint="done"
@@ -77,7 +76,8 @@
     </label>
     {#if merging}
       <p id="{id}-merge" role="alert">
-        {merging}. Merge them? Every Song carrying “{before}” will carry “{name.trim()}” instead.
+        Another Tag is already called that, ignoring case. Merge them? Every Song carrying “{before}” will carry “{name.trim()}”
+        instead.
       </p>
     {/if}
     {#if error}

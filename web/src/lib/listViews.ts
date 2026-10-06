@@ -241,10 +241,10 @@ export const defaultBeatListView: BeatListView = {
 /** Text as a filter compares it: ignoring case and surrounding space. */
 const folded = (text: string) => text.trim().toLowerCase();
 
-/** Whether a producer or key is among those picked, ignoring case and surrounding space. */
+/** Whether a choice, e.g. a producer or Tag, is among those picked, ignoring case and surrounding space. */
 export const isPicked = (picked: readonly string[], choice: string) => picked.some((p) => folded(p) === folded(choice));
 
-/** The picks with a producer or key ticked on, once, or off. */
+/** The picks with a choice, e.g. a producer or Tag, ticked on, once, or off. */
 export function togglePick(picked: readonly string[], choice: string, on: boolean): string[] {
   const rest = picked.filter((p) => folded(p) !== folded(choice));
   return on ? [...rest, choice] : rest;
@@ -258,10 +258,10 @@ export function matchingChoices(choices: readonly string[], find: string): strin
 
 /**
  * The picks once a choice is renamed, e.g. a Tag: in its place, under its
- * new name, and once only, as renaming a Tag onto another's name merges them.
+ * new name, and once only, as renaming a Tag onto another's name merges
+ * them, whichever of the two was picked.
  */
 export function renamePick(picked: readonly string[], from: string, to: string): string[] {
-  if (!isPicked(picked, from)) return [...picked];
   return picked.reduce((next: string[], p) => {
     const name = folded(p) === folded(from) || folded(p) === folded(to) ? to : p;
     if (!isPicked(next, name)) next.push(name);
@@ -270,8 +270,9 @@ export function renamePick(picked: readonly string[], from: string, to: string):
 }
 
 /**
- * The producers or keys a filter offers: those picked that no Beat has now,
- * so they can be unticked, then the Library's.
+ * The choices a filter offers, e.g. producers or Tags: those picked that
+ * aren't among them now, e.g. a producer no Beat has, so they can be
+ * unticked, then the rest.
  */
 export function pickChoices(library: readonly string[], picked: readonly string[]): string[] {
   const missing = picked.filter((p, i) => !isPicked(library, p) && !isPicked(picked.slice(0, i), p));

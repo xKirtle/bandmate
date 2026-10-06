@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/xKirtle/bandmate/internal/audio"
+	"github.com/xKirtle/bandmate/internal/tags"
 )
 
 // ErrNotFound means the requested Song, or the part of it asked for, doesn't
@@ -312,8 +313,7 @@ func (s *Store) ListSongs(ctx context.Context, filter SongFilter) ([]SongSummary
 		}
 	}
 	for _, tag := range filter.Tags {
-		// Folded as Tags' names are compared: see package tags.
-		folded := strings.ToLower(strings.TrimSpace(tag))
+		folded := tags.Fold(tag)
 		if folded == "" {
 			continue
 		}

@@ -32,10 +32,10 @@
   } from '../lib/listViews';
   import type { MenuAction } from '../lib/menu';
   import { newSongPath } from '../lib/newSong';
+  import RenameTagDialog from '../lib/RenameTagDialog.svelte';
   import { navigate, replaceSearch, router } from '../lib/router.svelte';
   import SongCover from '../lib/SongCover.svelte';
   import { SongDragging, songTarget } from '../lib/songDragging.svelte';
-  import RenameTagDialog from '../lib/RenameTagDialog.svelte';
   import StatusBadge from '../lib/StatusBadge.svelte';
   import TagChips from '../lib/TagChips.svelte';
   import TagFilter from '../lib/TagFilter.svelte';

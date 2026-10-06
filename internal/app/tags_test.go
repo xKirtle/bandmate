@@ -202,6 +202,12 @@ func (ts *testServer) renameTag(id int64, name string, merge bool) response {
 	return ts.Do(http.MethodPatch, fmt.Sprintf("/api/tags/%d", id), map[string]any{"name": name, "merge": merge})
 }
 
+// deleteTag deletes a Tag.
+func (ts *testServer) deleteTag(id int64) response {
+	ts.t.Helper()
+	return ts.Do(http.MethodDelete, fmt.Sprintf("/api/tags/%d", id), nil)
+}
+
 // tagNamed finds a Tag by its name as listed.
 func (ts *testServer) tagNamed(name string) tag {
 	ts.t.Helper()
@@ -233,6 +239,26 @@ func TestSongListCanBeFilteredBySeveralTags(t *testing.T) {
 		"tag=Covers&status=finished":         {"Finished Cover"},
 		"tag=Covers&q=2023":                  {"Live Cover 2023"},
 		"tag=Live&tag=LIVE":                  {"Live Cover 2023", "Live Only", "Live Cover"},
+	}
+	for query, want := range cases {
+		if got := titles(ts.listSongs(query)); !reflect.DeepEqual(got, want) {
+			t.Errorf("song list for %q = %v, want %v", query, got, want)
+		}
+	}
+}
+
+func TestSongListByTagLooksInsideAFolderOrInEvery(t *testing.T) {
+	ts := newTestServer(t)
+	ep := ts.createFolder("EP")
+	inEP := ts.createSong("In the EP")
+	expectStatus(t, ts.moveSong(inEP.ID, &ep.ID), http.StatusNoContent)
+	ts.tagSong(inEP.ID, "Live")
+	ts.tagSong(ts.createSong("Loose").ID, "Live")
+
+	cases := map[string][]string{
+		"tag=Live":                               {"Loose", "In the EP"},
+		fmt.Sprintf("tag=Live&folder=%d", ep.ID): {"In the EP"},
+		"tag=Live&folder=none":                   {"Loose"},
 	}
 	for query, want := range cases {
 		if got := titles(ts.listSongs(query)); !reflect.DeepEqual(got, want) {
@@ -351,8 +377,7 @@ func TestTagCanBeDeletedKeepingItsSongs(t *testing.T) {
 	closer := ts.createSong("Closer")
 	ts.tagSong(closer.ID, "Live")
 
-	expectStatus(t, ts.Do(http.MethodDelete, fmt.Sprintf("/api/tags/%d", ts.tagNamed("Live").ID), nil),
-		http.StatusNoContent)
+	expectStatus(t, ts.deleteTag(ts.tagNamed("Live").ID), http.StatusNoContent)
 
 	if got := titles(ts.listSongs()); !reflect.DeepEqual(got, []string{"Closer", "Opener"}) {
 		t.Errorf("songs = %v, want both kept", got)
@@ -376,5 +401,5 @@ func TestTagCanBeDeletedKeepingItsSongs(t *testing.T) {
 func TestDeletingAnUnknownTagIsNotFound(t *testing.T) {
 	ts := newTestServer(t)
 
-	expectStatus(t, ts.Do(http.MethodDelete, "/api/tags/1", nil), http.StatusNotFound)
+	expectStatus(t, ts.deleteTag(1), http.StatusNotFound)
 }

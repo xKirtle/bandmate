@@ -44,9 +44,9 @@ type Store struct{ db *sql.DB }
 // NewStore returns a Store backed by db.
 func NewStore(db *sql.DB) *Store { return &Store{db: db} }
 
-// fold is a name as Tags' names are compared: ignoring case, and the spaces
+// Fold is a name as Tags' names are compared: ignoring case, and the spaces
 // around it.
-func fold(name string) string { return strings.ToLower(strings.TrimSpace(name)) }
+func Fold(name string) string { return strings.ToLower(strings.TrimSpace(name)) }
 
 // List returns every Tag, by name ignoring case.
 func (s *Store) List(ctx context.Context) ([]Tag, error) {
@@ -88,7 +88,7 @@ func (s *Store) Rename(ctx context.Context, id int64, name string, merge bool) (
 	}
 	var other int64
 	var otherName string
-	err = tx.QueryRowContext(ctx, `SELECT id, name FROM tags WHERE folded = ? AND id <> ?`, fold(name), id).
+	err = tx.QueryRowContext(ctx, `SELECT id, name FROM tags WHERE folded = ? AND id <> ?`, Fold(name), id).
 		Scan(&other, &otherName)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
@@ -109,7 +109,7 @@ func (s *Store) Rename(ctx context.Context, id int64, name string, merge bool) (
 		}
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE tags SET name = ?, folded = ? WHERE id = ?`,
-		name, fold(name), other); err != nil {
+		name, Fold(name), other); err != nil {
 		return Tag{}, fmt.Errorf("renaming tag: %w", err)
 	}
 	t := Tag{ID: other, Name: name}
@@ -163,8 +163,8 @@ func (s *Store) SetSongTags(ctx context.Context, songID int64, names []string) (
 		if name == "" {
 			return nil, errBlankName
 		}
-		if _, ok := wanted[fold(name)]; !ok {
-			wanted[fold(name)] = name
+		if _, ok := wanted[Fold(name)]; !ok {
+			wanted[Fold(name)] = name
 		}
 	}
 	tx, err := s.db.BeginTx(ctx, nil)

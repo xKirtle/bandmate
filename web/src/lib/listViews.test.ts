@@ -340,7 +340,11 @@ describe('renamePick', () => {
     expect(renamePick(['Live shows', 'live'], 'live', 'live shows')).toEqual(['live shows']);
   });
 
-  it('leaves the picks as they are when the one renamed is not picked', () => {
+  it('renames a pick merged into, when the one renamed is not picked', () => {
+    expect(renamePick(['Covers', 'Live shows'], 'live', 'LIVE SHOWS')).toEqual(['Covers', 'LIVE SHOWS']);
+  });
+
+  it('leaves the picks as they are when neither Tag is picked', () => {
     expect(renamePick(['Covers'], 'live', 'Live shows')).toEqual(['Covers']);
   });
 });
