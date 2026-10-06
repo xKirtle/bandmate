@@ -28,6 +28,15 @@ permissions:
 
 env:
   IMAGE: ghcr.io/xkirtle/bandmate
+  # Stamp the binary with the version the About page shows: the release tag
+  # on tag builds only, the commit, and this repository, so a fork's image
+  # links to the fork's own source. The bundle and image jobs both build
+  # with them, so the image job finds the bundle job's whole build in the
+  # cache, and the bundle job checks the binary that ships.
+  BUILD_ARGS: |
+    VERSION=${{ github.ref_type == 'tag' && github.ref_name || '' }}
+    REVISION=${{ github.sha }}
+    SOURCE_URL=${{ github.server_url }}/${{ github.repository }}
 
 jobs:
   # Whether anything the build or tests read has changed. The workflow itself
@@ -136,13 +145,14 @@ jobs:
     steps:
       - uses: docker/setup-buildx-action@v4
 
-      # From the Git context, like the image job, and loaded into Docker
-      # rather than pushed. The image job reuses the programs' layers it
-      # caches, which are the slow ones to build.
+      # From the Git context and with the build args, like the image job, and
+      # loaded into Docker rather than pushed. The image job reuses every
+      # layer it caches, so it only tags and pushes what was built here.
       - uses: docker/build-push-action@v7
         with:
           load: true
           tags: bandmate:ci
+          build-args: ${{ env.BUILD_ARGS }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -227,19 +237,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Builds from the Git context, so no checkout is needed. Layers
-      # (including npm ci and go mod download) are cached in the GitHub
-      # Actions cache. The build args stamp the binary with the version the
-      # About page shows: the release tag on tag builds only, the commit, and
-      # this repository, so a fork's image links to the fork's own source.
+      # Builds from the Git context, so no checkout is needed. Every layer,
+      # the stamped binary included, is in the GitHub Actions cache from the
+      # bundle job's build of the same commit with the same build args.
       - uses: docker/build-push-action@v7
         with:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            VERSION=${{ github.ref_type == 'tag' && github.ref_name || '' }}
-            REVISION=${{ github.sha }}
-            SOURCE_URL=${{ github.server_url }}/${{ github.repository }}
+          build-args: ${{ env.BUILD_ARGS }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
