@@ -205,19 +205,25 @@ const beatUses: readonly BeatUse[] = ['used', 'unused'];
 export interface BeatListView {
   /** Matched against titles and producers; blank matches every Beat. */
   q: string;
-  producer?: string;
+  /** Only Beats by any of these producers; none keeps every Beat. */
+  producers: string[];
   /** The lowest BPM kept, inclusive; unset leaves the range open. */
   bpmMin?: number;
   /** The highest BPM kept, inclusive; unset leaves the range open. */
   bpmMax?: number;
-  /** Matched as written, so C# and Db are different keys. */
-  key?: string;
+  /**
+   * Only Beats in any of these keys; none keeps every Beat. Matched as
+   * written, so C# and Db are different keys.
+   */
+  keys: string[];
   use?: BeatUse;
   sort: Sort<BeatColumn>;
 }
 
 export const defaultBeatListView: BeatListView = {
   q: '',
+  producers: [],
+  keys: [],
   sort: { column: 'added', direction: 'desc' },
 };
 
@@ -228,25 +234,36 @@ const folded = (text: string) => text.trim().toLowerCase();
 export function isBeatListFiltered(view: BeatListView): boolean {
   return (
     view.q.trim() !== '' ||
-    !!view.producer?.trim() ||
+    view.producers.length > 0 ||
     view.bpmMin !== undefined ||
     view.bpmMax !== undefined ||
-    !!view.key?.trim() ||
+    view.keys.length > 0 ||
     view.use !== undefined
   );
 }
 
-/**
- * How many filters other than the search are set, a BPM range counting as
- * one. Below 80rem these sit in a drawer, which shows the count.
- */
-export function beatDrawerFilterCount(view: BeatListView): number {
-  return [
-    view.producer?.trim(),
-    view.bpmMin !== undefined || view.bpmMax !== undefined,
-    view.key?.trim(),
-    view.use,
-  ].filter(Boolean).length;
+/** What the Producer filter's button says, naming the producers picked, sorted. */
+export function producerFilterLabel(picked: readonly string[]): string {
+  return filterLabel('Producer', [...picked].sort(compareText));
+}
+
+/** What the Key filter's button says, naming the keys picked, sorted. */
+export function keyFilterLabel(picked: readonly string[]): string {
+  return filterLabel('Key', [...picked].sort(compareText));
+}
+
+/** What the BPM filter's button says: the range, e.g. "BPM: 80–95", or the end of it that's set. */
+export function bpmFilterLabel({ bpmMin, bpmMax }: Pick<BeatListView, 'bpmMin' | 'bpmMax'>): string {
+  if (bpmMin !== undefined && bpmMax !== undefined)
+    return filterLabel('BPM', [bpmMin === bpmMax ? `${bpmMin}` : `${bpmMin}–${bpmMax}`]);
+  if (bpmMin !== undefined) return filterLabel('BPM', [`from ${bpmMin}`]);
+  if (bpmMax !== undefined) return filterLabel('BPM', [`up to ${bpmMax}`]);
+  return filterLabel('BPM', []);
+}
+
+/** What the Used filter's button says: whether the Beats shown are used in a Song. */
+export function useFilterLabel(use: BeatUse | undefined): string {
+  return filterLabel('Used', use ? [use === 'used' ? 'Yes' : 'No'] : []);
 }
 
 /**
@@ -261,14 +278,14 @@ export function songBeatHint(song: Pick<Song, 'bpm' | 'key'>): string | undefine
 /** The Beats the view's search and filters keep, in the order given. */
 export function filterBeats(beats: readonly Beat[], view: BeatListView): Beat[] {
   const q = folded(view.q);
-  const producer = view.producer && folded(view.producer);
-  const key = view.key && folded(view.key);
+  const producers = view.producers.map(folded);
+  const keys = view.keys.map(folded);
   return beats.filter((b) => {
     if (q && !b.title.toLowerCase().includes(q) && !b.producer.toLowerCase().includes(q)) return false;
-    if (producer && folded(b.producer) !== producer) return false;
+    if (producers.length > 0 && !producers.includes(folded(b.producer))) return false;
     if (view.bpmMin !== undefined && (b.bpm === null || b.bpm < view.bpmMin)) return false;
     if (view.bpmMax !== undefined && (b.bpm === null || b.bpm > view.bpmMax)) return false;
-    if (key && folded(b.key) !== key) return false;
+    if (keys.length > 0 && !keys.includes(folded(b.key))) return false;
     if (view.use && b.songs.length > 0 !== (view.use === 'used')) return false;
     return true;
   });
@@ -307,8 +324,9 @@ export const beatProducers = (beats: readonly Beat[]) => distinct(beats, (b) => 
 /** The keys in the Library, to pick one to filter by. */
 export const beatKeys = (beats: readonly Beat[]) => distinct(beats, (b) => b.key);
 
-function textFromParam(param: string | null): string | undefined {
-  return param?.trim() ? param : undefined;
+/** Several values of a parameter, or, from before several could be picked, one; blank ones left out. */
+function textsFromParams(params: URLSearchParams, name: string): string[] {
+  return params.getAll(name).filter((value) => value.trim());
 }
 
 function bpmFromParam(param: string | null): number | undefined {
@@ -321,10 +339,10 @@ function bpmFromParam(param: string | null): number | undefined {
 export function beatListViewToParams(view: BeatListView): URLSearchParams {
   const params = new URLSearchParams();
   if (view.q.trim()) params.set('q', view.q);
-  if (view.producer?.trim()) params.set('producer', view.producer);
+  for (const producer of view.producers) if (producer.trim()) params.append('producer', producer);
   if (view.bpmMin !== undefined) params.set('bpmMin', String(view.bpmMin));
   if (view.bpmMax !== undefined) params.set('bpmMax', String(view.bpmMax));
-  if (view.key?.trim()) params.set('key', view.key);
+  for (const key of view.keys) if (key.trim()) params.append('key', key);
   if (view.use) params.set('use', view.use);
   const sort = sortToParam(view.sort);
   if (sort !== sortToParam(defaultBeatListView.sort)) params.set('sort', sort);
@@ -339,10 +357,10 @@ export function beatListViewFromParams(params: URLSearchParams): BeatListView {
   const use = params.get('use');
   return {
     q: params.get('q') ?? defaultBeatListView.q,
-    producer: textFromParam(params.get('producer')),
+    producers: textsFromParams(params, 'producer'),
     bpmMin: bpmFromParam(params.get('bpmMin')),
     bpmMax: bpmFromParam(params.get('bpmMax')),
-    key: textFromParam(params.get('key')),
+    keys: textsFromParams(params, 'key'),
     use: beatUses.find((u) => u === use),
     sort: sortFromParam(params.get('sort'), beatColumns) ?? defaultBeatListView.sort,
   };
