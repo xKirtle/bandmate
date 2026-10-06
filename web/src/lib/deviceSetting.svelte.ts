@@ -3,20 +3,20 @@
 // when it's set, and read again when another of this device's tabs keeps a
 // new one, so a choice made in one tab shows in all of them.
 
-/** How one Device Setting is kept on this device: where, and how it's read and kept. */
-export interface DeviceSettingKind<T> {
+/** How one Device Setting is kept in this device's storage: under which key, and how it's read and kept. */
+export interface DeviceSettingStorage<T> {
   key: string;
   read: (storage: Storage | undefined) => T;
   store: (storage: Storage | undefined, value: T) => void;
 }
 
 export class DeviceSetting<T> {
-  #kind: DeviceSettingKind<T>;
+  #kind: DeviceSettingStorage<T>;
   #storage: Storage | undefined;
   #value: T = $state() as T;
 
   /** `tabs` tells of other tabs' changes to storage: the window, in the app. */
-  constructor(kind: DeviceSettingKind<T>, storage: Storage | undefined, tabs: EventTarget) {
+  constructor(kind: DeviceSettingStorage<T>, storage: Storage | undefined, tabs: EventTarget) {
     this.#kind = kind;
     this.#storage = storage;
     this.#value = kind.read(storage);

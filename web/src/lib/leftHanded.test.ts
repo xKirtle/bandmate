@@ -50,9 +50,9 @@ describe('storeLeftHanded', () => {
 
 describe("Left-handed's Device Setting", () => {
   /** Left-handed as the app keeps it, in a stand-in Storage this device's other tabs share. */
-  function setting(values: Record<string, string> = {}) {
+  function setting(values: Record<string, string> = {}, blocked = false) {
     const tabs = new EventTarget();
-    const left = new DeviceSetting(leftHandedSetting, storage(values), tabs);
+    const left = new DeviceSetting(leftHandedSetting, storage(values, blocked), tabs);
     /** Another tab keeps a value, or clears storage with a null key, as the browser tells this one. */
     const otherTab = (key: string | null) => tabs.dispatchEvent(Object.assign(new Event('storage'), { key }));
     return { left, values, otherTab };
@@ -60,6 +60,10 @@ describe("Left-handed's Device Setting", () => {
 
   it('is right-handed until set on this device', () => {
     expect(setting().left.value).toBe(false);
+  });
+
+  it('is right-handed when storage is blocked', () => {
+    expect(setting({}, true).left.value).toBe(false);
   });
 
   it('keeps left-handed, to read back after a reload', () => {
@@ -84,10 +88,9 @@ describe("Left-handed's Device Setting", () => {
   });
 
   it('stays as set where storage is blocked, whatever else another tab changes', () => {
-    const tabs = new EventTarget();
-    const left = new DeviceSetting(leftHandedSetting, storage({}, true), tabs);
+    const { left, otherTab } = setting({}, true);
     left.set(true);
-    tabs.dispatchEvent(Object.assign(new Event('storage'), { key: 'bandmate.palette' }));
+    otherTab('bandmate.palette');
     expect(left.value).toBe(true);
   });
 });

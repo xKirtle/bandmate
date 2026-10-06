@@ -1,6 +1,7 @@
 // Whether Chord diagrams are mirrored for a left-handed player, the high
 // string on the left. A choice about how diagrams are drawn, not about any
 // Song: it's kept on this device, and is off until set here.
+import type { DeviceSettingStorage } from './deviceSetting.svelte';
 
 /** Where being left-handed is kept on this device. */
 export const leftHandedKey = 'bandmate.leftHanded';
@@ -14,9 +15,6 @@ export function readLeftHanded(storage: Storage | undefined): boolean {
   }
 }
 
-/** Left-handed, as a Device Setting is kept. */
-export const leftHandedSetting = { key: leftHandedKey, read: readLeftHanded, store: storeLeftHanded };
-
 /** Keeps whether this device is left-handed, forgetting it once right-handed again. */
 export function storeLeftHanded(storage: Storage | undefined, on: boolean) {
   try {
@@ -26,3 +24,10 @@ export function storeLeftHanded(storage: Storage | undefined, on: boolean) {
     // Not kept, e.g. in a private window; the choice still applies until reload.
   }
 }
+
+/** Left-handed, as a Device Setting is kept on this device. */
+export const leftHandedSetting = {
+  key: leftHandedKey,
+  read: readLeftHanded,
+  store: storeLeftHanded,
+} satisfies DeviceSettingStorage<boolean>;

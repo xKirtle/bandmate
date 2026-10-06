@@ -11,7 +11,7 @@
 </script>
 
 <SettingsPage tab="device">
-  <p class="kept">Kept on this device.</p>
+  <p class="kept hint">Kept on this device.</p>
   <div class="cards">
     <section class="card" aria-labelledby="appearance-heading">
       <h2 id="appearance-heading">Appearance</h2>
@@ -49,7 +49,7 @@
 
     <section class="card" aria-labelledby="chord-diagrams-heading">
       <h2 id="chord-diagrams-heading">Chord diagrams</h2>
-      <div>
+      <fieldset class="choice-group">
         <label class="choice-row">
           <input
             type="checkbox"
@@ -61,7 +61,7 @@
           <span>Left-handed</span>
         </label>
         <p id="left-handed-note" class="choice-under hint">Mirrors every Chord diagram, high string on the left.</p>
-      </div>
+      </fieldset>
     </section>
   </div>
 </SettingsPage>
@@ -69,8 +69,6 @@
 <style>
   .kept {
     margin: 0 0 var(--space-4);
-    color: var(--text-muted);
-    font-size: var(--text-sm);
   }
   .cards {
     display: flex;
