@@ -245,7 +245,8 @@ func (s *Store) GetSong(ctx context.Context, id int64) (Song, error) {
 
 // SongFilter narrows the Song list. Zero fields don't filter.
 type SongFilter struct {
-	Status Status
+	// Statuses keeps the Songs with any of them; blank ones are ignored.
+	Statuses []Status
 	// Title keeps Songs whose title contains it, ignoring case and
 	// surrounding spaces.
 	Title string
@@ -263,11 +264,18 @@ const NoFolder int64 = 0
 // ListSongs returns the Songs matching filter, most recently edited first.
 func (s *Store) ListSongs(ctx context.Context, filter SongFilter) ([]SongSummary, error) {
 	conditions, args := []string{"1"}, []any{}
-	if filter.Status != "" {
-		if !filter.Status.valid() {
+	var statuses []string
+	for _, status := range filter.Statuses {
+		if status == "" {
+			continue
+		}
+		if !status.valid() {
 			return nil, errUnknownStatus
 		}
-		conditions, args = append(conditions, "status = ?"), append(args, filter.Status)
+		statuses, args = append(statuses, "?"), append(args, status)
+	}
+	if len(statuses) > 0 {
+		conditions = append(conditions, "status IN ("+strings.Join(statuses, ", ")+")")
 	}
 	if filter.HasMaster != nil {
 		conditions, args = append(conditions, "has_master = ?"), append(args, *filter.HasMaster)

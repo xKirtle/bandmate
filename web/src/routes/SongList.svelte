@@ -8,8 +8,9 @@
   import Pencil from '@lucide/svelte/icons/pencil';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import ActionsMenu from '../lib/ActionsMenu.svelte';
-  import { ApiError, api, statuses, type Folder, type SongSummary } from '../lib/api';
+  import { ApiError, api, statuses, type Folder, type SongSummary, type Status } from '../lib/api';
   import DeleteFolderDialog from '../lib/DeleteFolderDialog.svelte';
+  import FilterButton from '../lib/FilterButton.svelte';
   import FolderNameDialog from '../lib/FolderNameDialog.svelte';
   import {
     defaultSongListView,
@@ -21,6 +22,7 @@
     songListViewToParams,
     sortFolders,
     sortSongs,
+    statusFilterLabel,
     toggleSort,
     type SongColumn,
   } from '../lib/listViews';
@@ -119,7 +121,7 @@
             acrossFolders = filter.folder === undefined;
             anySongs = result.anySongs;
             folders = allFolders;
-            if (!anySongs && (view.status || view.hasMaster || view.q)) clearFilters();
+            if (!anySongs && (view.statuses.length > 0 || view.hasMaster || view.q)) clearFilters();
             error = null;
             loaded = true;
           },
@@ -155,6 +157,11 @@
 
   function clearFilters() {
     view = { ...defaultSongListView, sort: view.sort };
+  }
+
+  // Picking Statuses keeps them in lifecycle order, as the button names them.
+  function pickStatus(status: Status, on: boolean) {
+    view.statuses = statuses.filter((s) => (s === status ? on : view.statuses.includes(s)));
   }
 
   // "New folder" is open, and, from a Song's menu, which Song goes into the
@@ -321,23 +328,25 @@
         autocomplete="off"
         enterkeyhint="search"
       />
-      <div class="chips" role="group" aria-label="Filter Songs">
+      <div class="filter-bar" role="group" aria-label="Filter Songs">
+        <FilterButton name="Status" label={statusFilterLabel(view.statuses)} picked={view.statuses.length > 0}>
+          <fieldset class="choice-group">
+            <legend class="visually-hidden">Status</legend>
+            {#each statuses as s (s)}
+              <label class="choice-row status-choice">
+                <input
+                  type="checkbox"
+                  checked={view.statuses.includes(s)}
+                  onchange={(e) => pickStatus(s, e.currentTarget.checked)}
+                />
+                {s}
+              </label>
+            {/each}
+          </fieldset>
+        </FilterButton>
         <button
           type="button"
           class="chip"
-          aria-pressed={view.status === undefined}
-          onclick={() => (view.status = undefined)}
-        >
-          All
-        </button>
-        {#each statuses as s (s)}
-          <button type="button" class="chip" aria-pressed={view.status === s} onclick={() => (view.status = s)}
-            >{s}</button
-          >
-        {/each}
-        <button
-          type="button"
-          class="chip master"
           aria-pressed={view.hasMaster}
           onclick={() => (view.hasMaster = !view.hasMaster)}
         >
@@ -635,17 +644,18 @@
     gap: var(--space-2);
     margin-bottom: var(--space-4);
   }
-  .chips {
+  .filter-bar {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
+    min-width: 0;
   }
-  .chip {
+  .filter-bar > .chip {
     flex-shrink: 0;
-    text-transform: capitalize;
   }
-  .chip.master {
-    text-transform: none;
+  .status-choice {
+    padding-inline-end: var(--space-2);
+    text-transform: capitalize;
   }
   .songs {
     list-style: none;
