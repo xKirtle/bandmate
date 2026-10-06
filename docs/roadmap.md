@@ -79,11 +79,6 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 - Make the Lines and Chords larger or smaller in Read mode (A− and A+), kept per device, for reading from a music stand or a phone at whatever distance it sits. It builds on the larger default Read mode gets from the visual identity (#565).
 - Whether the Chord Chart and the Section Labels follow the size, and how far it goes each way, are for the spec.
 
-## Every device setting in Settings
-
-- The Settings tab (#578) starts with the Palette and System, Light or Dark. The other settings kept per device, such as the Latency Offset, the Input and left-handed Chord diagrams, could be listed there too, so there's one place to find them.
-- Whether they also stay where they're used today is for the spec.
-
 ## Track colours
 
 - Each Track gets a muted colour of its own, assigned automatically from a small palette in the visual identity's tokens, so Clips on different Tracks can be told apart at a glance. Today every Clip is in the one accent colour.
@@ -92,5 +87,5 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 ## The Left-handed toggle on a phone
 
 - At phone width, the Chord Finder's Left-handed toggle doesn't fit beside its tabs and drops onto a line of its own, which looks like an afterthought. It wants a place that feels deliberate on a phone, without losing the one-tap toggle on desktop.
-- It's a different thing from listing left-handed Chord diagrams in Settings (see Every device setting in Settings), though moving it there is one way out.
+- Settings' This device tab already has a Left-handed switch (#649), the same setting as this toggle, so leaving it only in Settings on a phone is one way out.
 - Where it goes instead (beside the tuning, in an overflow menu, as an icon, or only in Settings on a phone), and whether the tabs themselves change at that width, are for the spec.
