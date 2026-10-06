@@ -5,3 +5,5 @@ Import only creates structure the pasted text states, and never discards input w
 This reverses story 48 of the paste-import spec (#1), where blank lines split Sections, and replaces the old rule that the last `{title:}` wins. The one deliberate loss is a timestamp alone on a line. In LRC it marks where a line ends or a gap starts, and Cues have no end time to hold it, so it's read as a blank line.
 
 _(Since ADR 0010, labelled repeats aren't merged into shared Sections either: each becomes its own Section, and a heading on its own becomes a Duplicate of the most recent Section with that Label.)_
+
+_(Paste Import was removed in #658: nobody used it. Songs are made with New Song, or brought back from a Backup.)_

@@ -137,16 +137,6 @@ func TestANewSongStartsWithTrack1(t *testing.T) {
 	}
 }
 
-func TestAnImportedSongStartsWithTrack1(t *testing.T) {
-	ts := newTestServer(t)
-	var s song
-	ts.importSong("Night Drive", "[Verse]\nHeadlights on the highway").JSON(t, &s)
-
-	if got := trackNames(ts.getTimeline(s.ID)); !reflect.DeepEqual(got, []string{"Track 1"}) {
-		t.Errorf("tracks = %q, want only %q", got, "Track 1")
-	}
-}
-
 func firstTrackID(tl timeline) int64 {
 	if len(tl.Tracks) == 0 {
 		return 0

@@ -218,6 +218,15 @@ type chord struct {
 	Name   string `json:"name"`
 }
 
+// sectionsByID indexes a Song's Sections by id.
+func sectionsByID(s song) map[int64]section {
+	sections := map[int64]section{}
+	for _, sec := range s.Sections {
+		sections[sec.ID] = sec
+	}
+	return sections
+}
+
 // cuesOf maps the ids of a Section's cued Lines, in every Alternate, to
 // their Cues.
 func cuesOf(sec section) map[int64]float64 {

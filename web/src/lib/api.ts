@@ -818,12 +818,6 @@ export const api = {
   getSong: (id: number) => request<Song>('GET', `/songs/${id}`),
   /** Creates a Song, titled "Untitled Song" by the server, in the Folder with folderId, or in none. */
   createSong: (folderId: number | null = null) => request<Song>('POST', '/songs', { folderId }),
-  /**
-   * Creates a new Song from pasted lyrics, in the Folder with folderId, or in none; a {title: …} line in the
-   * text wins over title.
-   */
-  importSong: (text: string, title = '', folderId: number | null = null) =>
-    request<Song>('POST', '/songs/import', { text, title, folderId }),
   /** Every Folder, by name. */
   listFolders: () => request<Folder[]>('GET', '/folders'),
   /** Makes an empty Folder; a name another Folder has, ignoring case, is refused. */

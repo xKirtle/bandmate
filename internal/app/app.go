@@ -194,7 +194,6 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("GET /api/health", a.health)
 	mux.HandleFunc("GET /api/songs", a.listSongs)
 	mux.HandleFunc("POST /api/songs", a.createSong)
-	mux.HandleFunc("POST /api/songs/import", a.importSong)
 	mux.HandleFunc("GET /api/songs/{id}", a.getSong)
 	mux.HandleFunc("PATCH /api/songs/{id}", a.updateSong)
 	mux.HandleFunc("DELETE /api/songs/{id}", a.deleteSong)

@@ -196,13 +196,9 @@ const firstTrackName = "Track 1"
 // insertSong creates a Song with the given title and Status idea, in the
 // Folder with id folderID, or in none if it's nil, and its first Track, and
 // returns its id. CreateSong names a Song without a title before it gets
-// here, so a blank title is refused only for callers that don't, such as
-// import.
+// here.
 func insertSong(ctx context.Context, tx *sql.Tx, title string, folderID *int64) (int64, error) {
 	title = strings.TrimSpace(title)
-	if title == "" {
-		return 0, errTitleRequired
-	}
 	if folderID != nil {
 		var exists bool
 		if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM folders WHERE id = ?)`, *folderID).

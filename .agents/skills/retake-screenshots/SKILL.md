@@ -23,7 +23,7 @@ Branch from the latest `origin/main` as `docs/<N>-retake-screenshots`.
 Run the README's steps against a **fresh** Bandmate of your own, on :8095 with an empty data directory in your scratchpad, so a dev stack on :8080 stays untouched:
 
 - Bandmate: `BANDMATE_ADDR=:8095` and `BANDMATE_DATA_DIR=<scratchpad dir>`.
-- Seed: `-url http://localhost:8095`.
+- Restore: `url=http://localhost:8095`.
 - Capture: `BANDMATE_URL=http://localhost:8095`.
 
 Capturing changes the demo, so every retry starts from a new empty data directory. Once the capture is done, stop Bandmate by killing the pid holding :8095 as well as the background command: `go run` leaves its `bandmate` binary listening.
