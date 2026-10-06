@@ -85,9 +85,3 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 - At phone width, the Chord Finder's Left-handed toggle doesn't fit beside its tabs and drops onto a line of its own, which looks like an afterthought. It wants a place that feels deliberate on a phone, without losing the one-tap toggle on desktop.
 - Settings' This device tab already has a Left-handed switch (#649), the same setting as this toggle, so leaving it only in Settings on a phone is one way out.
 - Where it goes instead (beside the tuning, in an overflow menu, as an icon, or only in Settings on a phone), and whether the tabs themselves change at that width, are for the spec.
-
-## Cueing without waiting for the save
-
-- In Sync mode, marking a Line "Now" shows its Cue's time and brings up the next Line straight away, without waiting for the server to save the Cue and send back the Song. Today the Cue's time only shows once the save comes back, and that pause throws off the rhythm of syncing Line after Line.
-- It's about the wait on the save, not what's heard: "Playback in step with what's heard" is about the audio's output latency.
-- What happens when a save fails, and whether other Cue changes (nudging, clearing) stop waiting for the save too, are for the spec.

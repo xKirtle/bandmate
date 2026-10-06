@@ -55,6 +55,7 @@
   } from './snapping';
   import { activeTake, clipSources, clipTitle, fileStart, playing } from './clipSource';
   import { formatCue, movedCues, type TimeSpan } from './cues';
+  import type { CueChange } from './cueChanges';
   import { editHint, editsWhileRecording, type Freeze } from './freeze';
   import { draggedFiles, fileDropTrack, importEach, type TrackRow } from './fileDrop';
   import {
@@ -168,6 +169,7 @@
     song,
     timeline,
     change,
+    changeCues,
     setBpm,
     onPlayhead,
     onLoop,
@@ -177,8 +179,13 @@
   }: {
     song: Song;
     timeline: Timeline;
-    /** Queues a Timeline change, or a Cue edit; resolves to whether it succeeded. */
-    change: (op: (at: SongAt) => Promise<Saved>) => Promise<boolean>;
+    /**
+     * Queues a Timeline change, or a Cue edit, based on the Song as saved
+     * when its turn comes; resolves to whether it succeeded.
+     */
+    change: (op: (saved: Song) => Promise<Saved>) => Promise<boolean>;
+    /** Makes a Cue change, shown at once, naming what it changes in case it's taken back; resolves to whether it was saved. */
+    changeCues: (change: CueChange, what: string) => Promise<boolean>;
     /** Sets the Song's BPM. */
     setBpm: (bpm: number) => void;
     /** Hears where playback is, in seconds, every frame while playing, then null once it stops. */
@@ -359,6 +366,10 @@
   let editedAt = untrack(() => timeline.version);
   // Edits queued and not yet saved, which undo waits for.
   let queued = 0;
+  // Counts the Cue edits that failed, so taken back: an undo pressed for
+  // one of them, before it failed, has nothing to undo, rather than undoing
+  // the edit before it.
+  let cueEditsFailed = 0;
 
   $effect(() => {
     if (timeline.version === editedAt) return;
@@ -389,12 +400,12 @@
    * Sends an edit, based on the Timeline or Song as it is when its turn
    * comes, and notes in the history what it did.
    */
-  async function send(at: SongAt, e: HistoryEdit, note: (before: Timeline, after: Timeline) => void): Promise<Saved> {
+  async function send(at: Song, e: HistoryEdit, note: (before: Timeline, after: Timeline) => void): Promise<Saved> {
     if (e.kind === 'restoreCues') {
       // Cues whose Line is gone since, or can't take one, can't come back. With
       // none left, there's nothing to send, and the step is passed over.
-      const cues = restorable(e.cues, song);
-      const after = cues.length > 0 ? await saved(api.restoreCues(at, cues)) : song;
+      const cues = restorable(e.cues, at);
+      const after = cues.length > 0 ? await saved(api.restoreCues(at, cues)) : at;
       note(timeline, timeline);
       showHistory();
       return { song: after };
@@ -427,14 +438,17 @@
   /**
    * Queues a Cue edit, e.g. from the Lyric Sheet, to undo along with the
    * Timeline's edits, in the order they were made; resolves to whether it
-   * succeeded.
+   * succeeded. It's kept as what it changed in the Song as saved, whatever
+   * Cue changes not saved yet the Song shown has.
    */
-  export function editCues(op: (at: SongAt) => Promise<Song>): Promise<boolean> {
+  export function editCues(op: (saved: Song) => Promise<Song>): Promise<boolean> {
     offerCues = null;
     queued++;
-    return change(async (at) => {
-      const before = song;
-      const after = await saved(op(at));
+    return change(async (before) => {
+      const after = await saved(op(before)).catch((err) => {
+        cueEditsFailed++;
+        throw err;
+      });
       history.recordCues(before, after);
       showHistory();
       return { song: after };
@@ -447,7 +461,9 @@
     mergeNote = null;
     // Where undoing a new Take returns the playhead to, to record again from.
     let returnTo: number | null = null;
+    const failedBefore = cueEditsFailed;
     const ok = await change((at) => {
+      if (cueEditsFailed !== failedBefore) return unchanged(at);
       const e = history.nextUndo();
       returnTo = history.nextUndoPlayhead();
       return e
@@ -2141,13 +2157,15 @@
   onDestroy(() => clearTimeout(offerTimer));
 
   // One Clip's Cues move by their span, as the server finds them. Several
-  // Clips' are worked out again as the edit is sent, from the Song as it is
-  // then, and set, so each moves once, however many of the Clips spanned it.
+  // Clips' are worked out from the Song as shown, Cue changes not saved yet
+  // included, and set, so each moves once, however many of the Clips
+  // spanned it. Either way, they move on screen at once.
   function moveCues() {
     if (!offerCues) return;
     const { spans, by } = offerCues;
-    if (spans.length === 1) editCues((at) => api.shiftCues(at, spans[0].start, spans[0].end, by));
-    else editCues((at) => api.restoreCues(at, restorable(movedCues(song, spans, by), song)));
+    const what = `moving the Cues with ${offerCues.clips === 1 ? 'the Clip' : 'the Clips'}`;
+    if (spans.length === 1) changeCues({ kind: 'shiftCues', ...spans[0], by }, what);
+    else changeCues({ kind: 'restoreCues', cues: restorable(movedCues(song, spans, by), song) }, what);
   }
 
   function editCancel() {
