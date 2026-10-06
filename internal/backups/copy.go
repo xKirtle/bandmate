@@ -35,7 +35,7 @@ type songTable struct {
 	replacedInPlace []string
 	// matchedBy names, for a table whose rows a Restore matches to those
 	// already in Bandmate by a column rather than by identity, i.e. Folders
-	// by their folded name (see ADR 0015), that column. A row matched is
+	// and Tags by their folded names (see ADR 0015), that column. A row matched is
 	// used as it is, and one with no match is added.
 	matchedBy string
 }
@@ -54,6 +54,10 @@ var songTables = []songTable{
 	{name: "covers", where: `song_id = ?1`},
 	{name: "loops", where: `song_id = ?1`},
 	{name: "tracks", where: `song_id = ?1`},
+	// A Song's Tags, which other Songs may carry too.
+	{name: "tags", shared: true, matchedBy: "folded",
+		where: `id IN (SELECT tag_id FROM src.song_tags WHERE song_id = ?1)`},
+	{name: "song_tags", where: `song_id = ?1`},
 	// A Beat replaced keeps its place in every Song using it, and its audio,
 	// taking the Backup's Details: its title, credit (producer and source
 	// link), BPM, Key and Notes.
@@ -69,10 +73,8 @@ var songTables = []songTable{
 }
 
 // notCopied are the tables holding nothing of a Song: the schema's own
-// bookkeeping, and the Backups. Songs' Tags are left out too, until Backups
-// carry them (#635).
-var notCopied = map[string]bool{"schema_migrations": true, "sqlite_sequence": true, "backups": true,
-	"tags": true, "song_tags": true}
+// bookkeeping, and the Backups.
+var notCopied = map[string]bool{"schema_migrations": true, "sqlite_sequence": true, "backups": true}
 
 // songFile is a kind of file a Song's rows, or the Beat Library's, use: the
 // directory such files are kept in under the data directory, the table of

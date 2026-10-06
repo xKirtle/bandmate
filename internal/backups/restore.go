@@ -180,7 +180,9 @@ type Restored struct {
 // replaced keeps its id, its audio and its place in every Song using it,
 // taking the Backup's Details. A Song, added, kept both or replaced, goes
 // into the Folder of the same name as its Folder in the Backup, ignoring
-// case, made if there's none, or into none if it's in none there.
+// case, made if there's none, or into none if it's in none there. It
+// carries exactly the Tags it carries in the Backup, each the Tag of the
+// same name, ignoring case, made if there's none.
 func (s *Store) Restore(ctx context.Context, id int64, picks Picks, replace Replace) (Restored, error) {
 	r, err := s.openBackup(ctx, id)
 	if err != nil {
@@ -509,7 +511,7 @@ func (s *Store) copyIn(ctx context.Context, staging string, picks Picks, replace
 	// a fresh one, unless it's a Song or Beat already in Bandmate that's
 	// replaced, which takes the id of the one it replaces, and the version
 	// that one had. A Song or Beat already in Bandmate that isn't replaced
-	// is kept both. A Folder matching one in Bandmate by name is matched:
+	// is kept both. A Folder or Tag matching one in Bandmate by name is matched:
 	// it takes that one's id, and that one is used as it is.
 	if _, err := conn.ExecContext(ctx, `CREATE TEMP TABLE restored (
 		tbl TEXT NOT NULL, old INTEGER NOT NULL, new INTEGER NOT NULL,
@@ -577,7 +579,7 @@ func (s *Store) copyIn(ctx context.Context, staging string, picks Picks, replace
 
 // giveIDs picks, for each row of what picks names, the id it gets in the
 // live database: for a Song or Beat already in Bandmate that replace
-// lists, the id of the one it replaces, for a Folder, that of the one of
+// lists, the id of the one it replaces, for a Folder or Tag, that of the one of
 // the same name, ignoring case, and otherwise a fresh one, past every id
 // its table has used, in the order of their ids in the Backup.
 func giveIDs(ctx context.Context, tx *sql.Tx, columns map[string][]string, picks Picks, replace Replace) error {
@@ -687,8 +689,8 @@ func clearReplacedSongs(ctx context.Context, tx *sql.Tx) ([]string, error) {
 // own, from the trigger giving one to each made without, and a title
 // saying it's restored. A Song replaced gets a version past the one it had,
 // and a Beat replaced takes the Backup's columns t lists as replaced in
-// place, marked as updated now if that changes it. A Folder matched is
-// left as it is.
+// place, marked as updated now if that changes it. A Folder or Tag matched
+// is left as it is, unless it went with a Song replaced.
 func copyTableIn(ctx context.Context, tx *sql.Tx, t songTable, columns []string, songs []int64, now string) error {
 	references, err := foreignKeys(ctx, tx, t.name)
 	if err != nil {
@@ -721,7 +723,11 @@ func copyTableIn(ctx context.Context, tx *sql.Tx, t songTable, columns []string,
 	if hasIDs {
 		join := fmt.Sprintf(` JOIN temp.restored k ON k.tbl = '%s' AND k.old = r.id`, t.name)
 		if t.replacedInPlace == nil {
-			_, err := tx.ExecContext(ctx, insert+join+` WHERE NOT k.matched ORDER BY r.id`)
+			// A row matched is added back, under the id it matched, if it
+			// went since with a Song replaced, as a Tag goes with the last
+			// Song carrying it.
+			_, err := tx.ExecContext(ctx, insert+join+fmt.Sprintf(` WHERE NOT k.matched
+				OR k.new NOT IN (SELECT id FROM main.%s) ORDER BY r.id`, t.name))
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, insert+join+` WHERE NOT k.replaced ORDER BY r.id`); err != nil {
