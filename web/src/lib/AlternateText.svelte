@@ -158,7 +158,7 @@
   }
 
   // The Now button names its keys as this platform does, but only with a
-  // fine pointer.
+  // keyboard and mouse.
   const hints = keyHints();
   const cueNextKeys = shortcuts.cueNextLine.keys;
 </script>

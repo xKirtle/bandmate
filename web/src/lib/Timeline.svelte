@@ -516,7 +516,7 @@
   }
 
   // Tooltips name a Shortcut's keys as this platform does, e.g. ⌘Z on a
-  // Mac, but only with a fine pointer.
+  // Mac, but only with a keyboard and mouse.
   const hints = keyHints();
   // What a focused Clip and the ruler declare as their keys.
   const clipKeys = [...shortcuts.deleteClip.keys, ...shortcuts.clipMenu.keys];

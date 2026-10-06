@@ -83,7 +83,7 @@ group('fieldHint', () => {
     expect(fieldHint(field, new KeyHints('mac', () => true))).toBe('↑ or ↓ steps it by 1 ms, or by 10 with ⇧↑ or ⇧↓');
   });
 
-  it('gives no hint without a fine pointer', () => {
+  it('gives no hint on a phone or a narrow window', () => {
     expect(fieldHint(field, new KeyHints('other', () => false))).toBeUndefined();
   });
 });

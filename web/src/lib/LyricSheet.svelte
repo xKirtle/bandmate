@@ -311,7 +311,8 @@
   });
 
   // The Sync hints name the keys that cue as this platform does, but only
-  // with a fine pointer: without one, Now is the way to cue.
+  // with a keyboard and mouse: on a phone or a narrow window, Now is the
+  // way to cue.
   const hints = keyHints();
   const cueNextLabel = $derived(hints.label(shortcuts.cueNextLine.keys));
   const cueNextWays = $derived(cueNextLabel ? `${cueNextLabel} or Now` : 'Now');
