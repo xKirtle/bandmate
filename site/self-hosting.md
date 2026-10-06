@@ -43,11 +43,9 @@ docker run -d --name bandmate --restart unless-stopped \
 
 Bandmate is then on http://localhost:8080. Before using it anywhere beyond your own machine, read [Security](#security).
 
-## Security
+### Health check
 
-Bandmate has no login, so anything that can reach it can read and change every Song. Anywhere beyond your own machine, put it behind a reverse proxy that handles HTTPS and authentication, and let only the proxy reach it. Browsers also only allow the microphone, which recording needs, over HTTPS or on localhost.
-
-To report a vulnerability, and for what counts as one, see [SECURITY.md](https://github.com/xKirtle/bandmate/blob/main/SECURITY.md).
+`GET /api/health` returns `200 {"status":"ok"}` when the database is reachable. `bandmate healthcheck` calls it and exits non-zero on failure. The container healthcheck uses it because the image has no shell or curl.
 
 ## Configuration
 
@@ -71,10 +69,6 @@ Bandmate itself reads these:
 
 The image sets `BANDMATE_DATA_DIR` to `/data`, the folder the examples above mount.
 
-### Outbound calls
-
-Bandmate makes four kinds of outbound call, each only when asked: the update check, when About is opened (to GitHub); the check for yt-dlp's latest release, also when About is opened (to GitHub); when the user adds a Beat from a link, the fetch of that link (to the site it's on, through yt-dlp); and when the user presses Update in About's yt-dlp row, yt-dlp's own update (to GitHub). `BANDMATE_UPDATE_CHECK=off` turns off the first two, and `BANDMATE_ADD_FROM_LINK=off` the last three.
-
 ### Adding a Beat from a link
 
 A fetch takes the audio of one video, never a playlist, a channel or a live stream, and keeps it as an m4a. It's held to `BANDMATE_MAX_UPLOAD_MB`, like an upload, and stopped after 10 minutes. The fetched audio waits in `audio/waiting/` in the data folder until it's added, and is deleted after an hour if it isn't, or when Bandmate restarts. A fetch is one long request, so a reverse proxy in front of Bandmate needs a read timeout long enough for it.
@@ -93,11 +87,19 @@ Some setups, such as a NAS, mount the data folder `noexec`, so no program can ru
 
 Then recreate the container (`docker compose up -d`). The mounted yt-dlp counts as the bundled one, so an update in the data folder is still used if it's newer.
 
-### Health check
+## Security
 
-`GET /api/health` returns `200 {"status":"ok"}` when the database is reachable. `bandmate healthcheck` calls it and exits non-zero on failure. The container healthcheck uses it because the image has no shell or curl.
+Bandmate has no login, so anything that can reach it can read and change every Song. Anywhere beyond your own machine, put it behind a reverse proxy that handles HTTPS and authentication, and let only the proxy reach it. Browsers also only allow the microphone, which recording needs, over HTTPS or on localhost.
 
-## Image tags
+To report a vulnerability, and for what counts as one, see [SECURITY.md](https://github.com/xKirtle/bandmate/blob/main/SECURITY.md).
+
+### Outbound calls
+
+Bandmate makes four kinds of outbound call, each only when asked: the update check, when About is opened (to GitHub); the check for yt-dlp's latest release, also when About is opened (to GitHub); when the user adds a Beat from a link, the fetch of that link (to the site it's on, through yt-dlp); and when the user presses Update in About's yt-dlp row, yt-dlp's own update (to GitHub). `BANDMATE_UPDATE_CHECK=off` turns off the first two, and `BANDMATE_ADD_FROM_LINK=off` the last three.
+
+## Updating
+
+### Image tags
 
 Each release is published under these tags:
 
@@ -111,7 +113,7 @@ Each release is published under these tags:
 
 A release with new features bumps the minor version, and one with only fixes bumps the patch, as [CONTRIBUTING.md](https://github.com/xKirtle/bandmate/blob/main/CONTRIBUTING.md#versions) describes. Pin `:X.Y` to get fixes without new features, or `:X.Y.Z` to change only when you choose. Set the tag with `BANDMATE_IMAGE`, e.g. `BANDMATE_IMAGE=ghcr.io/xkirtle/bandmate:0.4`.
 
-## Upgrading and rolling back
+### Upgrading and rolling back
 
 **Upgrading:** pull the new image and recreate the container (`docker compose pull && docker compose up -d`). Database migrations are built into the binary and run automatically on startup.
 
