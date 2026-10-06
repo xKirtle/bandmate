@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bugReportDetails, updateStatus, uptime } from './about';
+import { bugReportDetails, updateStatus, uptime, ytDlpInUse, ytDlpUpdated } from './about';
 import type { ReleasesReport } from './api';
 
 describe('uptime', () => {
@@ -71,5 +71,27 @@ describe('updateStatus', () => {
   it('says nothing when the check is off, or there are no releases yet', () => {
     expect(updateStatus(report({ check: 'off' }))).toBeNull();
     expect(updateStatus(report({}))).toBeNull();
+  });
+});
+
+describe('ytDlpInUse', () => {
+  it("names the yt-dlp in use, and whether it's bundled or updated", () => {
+    expect(ytDlpInUse({ version: '2026.08.19', source: 'bundled' })).toBe('yt-dlp 2026.08.19 (bundled)');
+    expect(ytDlpInUse({ version: '2026.09.12', source: 'updated' })).toBe('yt-dlp 2026.09.12 (updated)');
+  });
+});
+
+describe('ytDlpUpdated', () => {
+  it('says whether updating changed anything', () => {
+    expect(ytDlpUpdated({ outcome: 'upToDate', version: '2026.08.19', source: 'bundled' })).toBe('Already up to date');
+    expect(ytDlpUpdated({ outcome: 'updated', version: '2026.09.12', source: 'updated' })).toBe(
+      'Updated to 2026.09.12',
+    );
+  });
+
+  it("says why an update that can't run from the data folder isn't used", () => {
+    expect(ytDlpUpdated({ outcome: 'cantRun', version: '2026.08.19', source: 'bundled' })).toBe(
+      "Can't run programs from the data folder; mount a newer yt-dlp instead",
+    );
   });
 });

@@ -84,6 +84,8 @@ var fakeVideos = map[string]fakeVideo{
 	}},
 	// Its size isn't known until it's fetched, and it keeps growing.
 	"/growing": {info: map[string]any{"_type": "video", "title": "Growing", "webpage_url": "https://video.test/growing"}},
+	// Its title is the stand-in's version, to tell which yt-dlp fetched it.
+	"/version": {info: map[string]any{"_type": "video", "webpage_url": "https://video.test/version"}, audio: "fake audio"},
 	// It never finishes. Its link's ?pidfile= says where it writes its process id.
 	"/slow": {info: map[string]any{"_type": "video", "title": "Slow", "webpage_url": "https://video.test/slow"}},
 }
@@ -96,6 +98,9 @@ func fakeYtDlp(args []string) int {
 			return args[i+1]
 		}
 		return ""
+	}
+	if code, ok := fakeYtDlpRelease(args); ok {
+		return code
 	}
 	for _, want := range []string{"--ignore-config", "--no-playlist"} {
 		if !slices.Contains(args, want) {
@@ -158,6 +163,9 @@ func fakeInfo(link string) int {
 	info := map[string]any{"original_url": link}
 	for k, v := range video.info {
 		info[k] = v
+	}
+	if u.Path == "/version" {
+		info["title"] = os.Getenv(ytDlpVersion)
 	}
 	json.NewEncoder(os.Stdout).Encode(info)
 	return 0

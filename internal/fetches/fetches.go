@@ -97,8 +97,8 @@ type Fetched struct {
 type Options struct {
 	// Dir holds the waiting files. Whatever is in it when opened is deleted.
 	Dir string
-	// YtDlp is the yt-dlp to run. Empty means the one on the PATH.
-	YtDlp string
+	// YtDlp picks the yt-dlp to run.
+	YtDlp *YtDlp
 	// MaxBytes caps a fetch's size, as uploads are capped.
 	MaxBytes int64
 	// Timeout stops a fetch that takes longer. Zero means DefaultTimeout.
@@ -127,9 +127,6 @@ type waiting struct {
 // Store keeping them there. It deletes expired ones as they expire until
 // closed.
 func Open(opts Options) (*Store, error) {
-	if opts.YtDlp == "" {
-		opts.YtDlp = "yt-dlp"
-	}
 	if opts.Timeout <= 0 {
 		opts.Timeout = DefaultTimeout
 	}
@@ -442,16 +439,7 @@ func (e *ytDlpError) Unwrap() error { return e.err }
 // run runs yt-dlp, returning what it printed. It's stopped, with anything it
 // started, when ctx is done.
 func (s *Store) run(ctx context.Context, args ...string) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, s.opts.YtDlp, args...)
-	stopTogether(cmd)
-	cmd.WaitDelay = 5 * time.Second
-	var stderr strings.Builder
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
-	if err != nil {
-		return out, &ytDlpError{err: err, stderr: stderr.String()}
-	}
-	return out, nil
+	return runYtDlp(ctx, s.opts.YtDlp.path(ctx), args...)
 }
 
 func (s *Store) tooLarge() error {
@@ -473,7 +461,7 @@ func (s *Store) failure(ctx context.Context, err error) error {
 	}
 	if errors.Is(err, exec.ErrNotFound) || errors.Is(err, fs.ErrNotExist) {
 		log.Printf("fetching a link: %v", err)
-		return refused(Missing, "Adding from a link needs yt-dlp, which this Bandmate can't find.")
+		return refused(Missing, missingYtDlp)
 	}
 	var y *ytDlpError
 	if errors.As(err, &y) {

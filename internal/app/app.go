@@ -61,8 +61,9 @@ type Config struct {
 	// AddFromLinkOff stops Beats being added from a link, so Bandmate never
 	// fetches one.
 	AddFromLinkOff bool
-	// YtDlp is the yt-dlp that fetches a link's audio. Empty means the one
-	// on the PATH.
+	// YtDlp is the bundled yt-dlp that fetches a link's audio, unless a
+	// newer copy was updated into the data folder. Empty means the one on
+	// the PATH.
 	YtDlp string
 	// FetchTimeout stops a fetch from a link that takes longer. Zero means
 	// fetches.DefaultTimeout.
@@ -112,7 +113,9 @@ type App struct {
 	dependencies dependencies
 	// fetches fetches links' audio for Beats added from a link, unless
 	// addFromLinkOff.
-	fetches        *fetches.Store
+	fetches *fetches.Store
+	// ytDlp is the yt-dlp fetches run, which About shows and updates.
+	ytDlp          *fetches.YtDlp
 	addFromLinkOff bool
 	spa            fs.FS
 	handler        http.Handler
@@ -191,9 +194,10 @@ func New(cfg Config) (*App, error) {
 	a.startedAt = now()
 	a.dependencies = shipped(cfg.GoModules, cfg.SPA, cfg.ProgramsManifest)
 	a.addFromLinkOff = cfg.AddFromLinkOff
+	a.ytDlp = fetches.NewYtDlp(cfg.YtDlp, filepath.Join(cfg.DataDir, "programs"))
 	a.fetches, err = fetches.Open(fetches.Options{
 		Dir:      filepath.Join(cfg.DataDir, "audio", "waiting"),
-		YtDlp:    cfg.YtDlp,
+		YtDlp:    a.ytDlp,
 		MaxBytes: a.maxUpload,
 		Timeout:  cfg.FetchTimeout,
 		Now:      now,
@@ -324,6 +328,8 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("GET /api/fetches/{id}/audio", a.fetchedAudio)
 	mux.HandleFunc("DELETE /api/fetches/{id}", a.discardFetched)
 	mux.HandleFunc("POST /api/fetches/{id}/beat", a.addFetchedBeat)
+	mux.HandleFunc("GET /api/yt-dlp", a.ytDlpInUse)
+	mux.HandleFunc("POST /api/yt-dlp/update", a.updateYtDlp)
 	mux.HandleFunc("GET /api/backups", a.listBackups)
 	mux.HandleFunc("POST /api/backups", a.makeBackup)
 	mux.HandleFunc("POST /api/backups/upload", a.uploadBackup)

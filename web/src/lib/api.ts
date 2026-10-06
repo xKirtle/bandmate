@@ -643,6 +643,19 @@ export interface Dependency {
   url?: string;
 }
 
+/** The yt-dlp that fetches links: the image's own (or one mounted over it), or the copy Update yt-dlp keeps in the data folder, whichever is newer. */
+export interface YtDlpInUse {
+  /** yt-dlp's version, e.g. 2026.09.12. */
+  version: string;
+  source: 'bundled' | 'updated';
+}
+
+/** What Update yt-dlp did, and the yt-dlp in use after it. */
+export interface YtDlpUpdate extends YtDlpInUse {
+  /** cantRun: the data folder can't run programs, so the one in use was kept. */
+  outcome: 'upToDate' | 'updated' | 'cantRun';
+}
+
 /** How the running build stands against its repository's releases on GitHub. */
 export interface ReleasesReport {
   /** Whether GitHub was asked: "off" when the check is turned off or the
@@ -768,6 +781,10 @@ export const api = {
   getAbout: () => request<AboutInfo>('GET', '/about'),
   /** Asks GitHub, unless the server recently has, so it's slower than the rest of About. */
   getAboutReleases: () => request<ReleasesReport>('GET', '/about/releases'),
+  /** Runs yt-dlp the first time, so it can be slower than the rest of About. */
+  getYtDlp: () => request<YtDlpInUse>('GET', '/yt-dlp'),
+  /** Runs yt-dlp's self-update, which downloads from GitHub. */
+  updateYtDlp: () => request<YtDlpUpdate>('POST', '/yt-dlp/update'),
   /** The Beat Library, newest first; q matches titles and producers. */
   listBeats: (q = '') => request<Beat[]>('GET', q.trim() ? `/beats?q=${encodeURIComponent(q.trim())}` : '/beats'),
   /** One Beat, with its peaks. */
