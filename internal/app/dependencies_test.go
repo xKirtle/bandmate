@@ -2,6 +2,8 @@ package app_test
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -21,8 +23,9 @@ type dependency struct {
 
 // dependencies is GET /api/about's dependencies: what ships in Bandmate.
 type dependencies struct {
-	Go  []dependency `json:"go"`
-	Web []dependency `json:"web"`
+	Go       []dependency `json:"go"`
+	Web      []dependency `json:"web"`
+	Programs []dependency `json:"programs"`
 }
 
 func getDependencies(t *testing.T, configure func(*app.Config)) dependencies {
@@ -93,6 +96,46 @@ func TestAboutListsTheWebPackagesTheBuiltAppRecorded(t *testing.T) {
 	}
 	if !slices.Equal(got.Web, want) {
 		t.Errorf("web packages = %+v, want %+v", got.Web, want)
+	}
+}
+
+func TestAboutListsTheProgramsBundledInTheImage(t *testing.T) {
+	// The image's build records them in a manifest beside them.
+	manifest := filepath.Join(t.TempDir(), "programs.json")
+	if err := os.WriteFile(manifest, []byte(`[
+		{"name": "yt-dlp", "version": "2026.08.19", "license": "Unlicense"},
+		{"name": "ffmpeg", "version": "8.1.3", "license": "LGPL-2.1-or-later"},
+		{"name": "QuickJS", "version": "2026-06-04", "license": "MIT"}
+	]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := getDependencies(t, func(c *app.Config) { c.ProgramsManifest = manifest })
+
+	want := []dependency{
+		{Name: "yt-dlp", Version: "2026.08.19", License: "Unlicense"},
+		{Name: "ffmpeg", Version: "8.1.3", License: "LGPL-2.1-or-later"},
+		{Name: "QuickJS", Version: "2026-06-04", License: "MIT"},
+	}
+	if !slices.Equal(got.Programs, want) {
+		t.Errorf("programs = %+v, want %+v", got.Programs, want)
+	}
+}
+
+func TestAnInstallWithoutTheBundledProgramsListsNone(t *testing.T) {
+	// The dev stack runs the binary outside the image, where the manifest
+	// isn't. The raw body tells an empty list apart from null.
+	for name, manifest := range map[string]string{
+		"no manifest given":  "",
+		"manifest not there": filepath.Join(t.TempDir(), "programs.json"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			res := newTestServerWith(t, func(c *app.Config) { c.ProgramsManifest = manifest }).
+				Do(http.MethodGet, "/api/about", nil)
+			expectStatus(t, res, http.StatusOK)
+			if !strings.Contains(string(res.Body), `"programs":[]`) {
+				t.Errorf("about = %s, want an empty list of programs", res.Body)
+			}
+		})
 	}
 }
 

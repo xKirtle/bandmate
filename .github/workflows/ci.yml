@@ -1,15 +1,20 @@
 name: CI
 
-# Pull requests only test. A push to main tests again, then publishes the
-# image as `:edge` and `:sha-<short>`. A `v*` version tag (e.g. `v0.4.0`)
-# tests, then publishes a release as `:0.4.0`, `:0.4` and `:latest`, so
-# `latest` is the newest release, never the latest merge. Changes to main or a
-# PR that only touch docs or other files outside the build skip both jobs.
+# Pull requests only test, and check the image's bundled programs run. A push
+# to main does both again, then publishes the image as `:edge` and
+# `:sha-<short>`. A `v*` version tag (e.g. `v0.4.0`) does too, then publishes
+# a release as `:0.4.0`, `:0.4` and `:latest`, so `latest` is the newest
+# release, never the latest merge. Changes to main or a PR that only touch
+# docs or other files outside the build skip every job.
+#
+# The weekly yt-dlp job starts a run on the branch of each pull request it
+# opens, since a pull request opened with GITHUB_TOKEN doesn't start one.
 on:
   push:
     branches: [main]
     tags: ["v*"]
   pull_request:
+  workflow_dispatch:
 
 # A newer run on the same PR replaces an older one. Runs on main and on tags
 # are never cancelled, so every merged commit that changes code gets its
@@ -29,7 +34,8 @@ jobs:
   # always runs, so the required `test` check always reports: skipped counts
   # as passing, while a check that never starts leaves the PR waiting.
   # A tag has no previous commit to diff against, and a release must be
-  # tested whatever changed, so a tag always counts as a code change.
+  # tested whatever changed, so a tag always counts as a code change. So does
+  # a run started by hand or by the yt-dlp job: it was started to test.
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -46,7 +52,7 @@ jobs:
         env:
           BEFORE: ${{ github.event.before }}
         run: |
-          if [ "$GITHUB_REF_TYPE" = tag ]; then
+          if [ "$GITHUB_REF_TYPE" = tag ] || [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
             echo code=true >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -119,13 +125,79 @@ jobs:
       - name: go test
         run: go test ./...
 
-  # Only on pushes to main and version tags: building the image on pull
-  # requests mostly repeats the test job's builds, and a Dockerfile problem it
-  # misses only fails a publish, leaving the last good image in place (for a
-  # tag, that version goes unpublished until the tag is pushed again).
-  # Skipped with `test`, and never runs when it fails.
+  # Builds the image and runs the programs bundled in it (ADR 0016), so a
+  # broken bundle, such as a yt-dlp that won't start, fails the build rather
+  # than a user's fetch. Then checks the image starts and passes its
+  # healthcheck.
+  bundle:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/setup-buildx-action@v4
+
+      # From the Git context, like the image job, and loaded into Docker
+      # rather than pushed. The image job reuses the programs' layers it
+      # caches, which are the slow ones to build.
+      - uses: docker/build-push-action@v7
+        with:
+          load: true
+          tags: bandmate:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run yt-dlp, ffmpeg and QuickJS in the image
+        run: |
+          # Each assignment fails the step when its program fails.
+          run() { docker run --rm --entrypoint "/usr/local/bin/$1" bandmate:ci "${@:2}"; }
+          yt_dlp=$(run yt-dlp --version)
+          ffmpeg=$(run ffmpeg -hide_banner -version)
+          ffprobe=$(run ffprobe -hide_banner -version)
+          quickjs=$(run qjs -e 'console.log("QuickJS runs")')
+          echo "yt-dlp $yt_dlp"
+          echo "${ffmpeg%%$'\n'*}"
+          echo "${ffprobe%%$'\n'*}"
+          echo "$quickjs"
+
+      # yt-dlp finds ffmpeg and QuickJS on its own: its verbose header names
+      # them. The made-up link fails without reaching the network.
+      - name: Check yt-dlp finds ffmpeg and QuickJS
+        run: |
+          header=$(docker run --rm --entrypoint /usr/local/bin/yt-dlp bandmate:ci \
+            --verbose --ignore-config --js-runtimes quickjs --simulate https://bundle-check.invalid/ 2>&1 || true)
+          grep '^\[debug\] \(exe versions\|JS runtimes\)' <<< "$header" || true
+          if ! grep -q '^\[debug\] exe versions: ffmpeg .*ffprobe' <<< "$header"; then
+            echo "::error::yt-dlp doesn't find the bundled ffmpeg and ffprobe."
+            exit 1
+          fi
+          if ! grep -q '^\[debug\] JS runtimes: quickjs' <<< "$header"; then
+            echo "::error::yt-dlp doesn't find the bundled QuickJS."
+            exit 1
+          fi
+
+      # The healthcheck's own command, checked every 2 seconds instead of 30.
+      - name: Check the image starts healthy
+        run: |
+          docker run -d --name bandmate --health-interval 2s bandmate:ci
+          for _ in $(seq 30); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' bandmate)
+            if [ "$status" = healthy ]; then
+              echo "The image started healthy."
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs bandmate
+          echo "::error::The image didn't become healthy (last status: $status)."
+          exit 1
+
+  # Only on pushes to main and version tags: pull requests have the bundle
+  # job's build instead. A Dockerfile problem those miss only fails a
+  # publish, leaving the last good image in place (for a tag, that version
+  # goes unpublished until the tag is pushed again). Skipped with `test` and
+  # `bundle`, and never runs when either fails.
   image:
-    needs: test
+    needs: [test, bundle]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:

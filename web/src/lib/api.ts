@@ -611,13 +611,14 @@ export interface AboutInfo {
   /** The block a bug report asks for, without the browser, which the SPA adds. */
   details: string;
   /** The third-party packages that ship in Bandmate: the Go modules the
-      server is built from and the web packages in the SPA's bundle. */
-  dependencies: { go: Dependency[]; web: Dependency[] };
+      server is built from, the web packages in the SPA's bundle, and the
+      programs bundled beside them in the image (none outside it). */
+  dependencies: { go: Dependency[]; web: Dependency[]; programs: Dependency[] };
 }
 
-/** A third-party package that ships in Bandmate. */
+/** A third-party package or program that ships in Bandmate. */
 export interface Dependency {
-  /** A Go module's path, or a web package's name. */
+  /** A Go module's path, a web package's name, or a program's name. */
   name: string;
   version: string;
   /** Its SPDX identifier, e.g. MIT, or "Unknown" when it couldn't be identified. */

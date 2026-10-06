@@ -1,0 +1,94 @@
+name: yt-dlp
+
+# Once a week, opens a pull request that bundles yt-dlp's newest release in
+# the image when it's newer than the one the Dockerfile pins, so the bundled
+# yt-dlp doesn't fall behind unnoticed (ADR 0016). It skips a release that
+# already has an open pull request, and closes one for an older release once
+# the newer one is open. Can also be started by hand. Its pull requests have
+# no issue: each is a routine bump the weekly job stands for.
+#
+# Opening the pull request needs the repository's "Allow GitHub Actions to
+# create and approve pull requests" setting (Settings > Actions > General).
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  # To start CI on the new branch: a pull request opened with GITHUB_TOKEN
+  # doesn't start a run on its own.
+  actions: write
+
+concurrency:
+  group: ${{ github.workflow }}
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Open a pull request for a newer yt-dlp
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest=$(gh api repos/yt-dlp/yt-dlp/releases/latest --jq .tag_name)
+          pinned=$(sed -n 's/^ARG YT_DLP_VERSION=//p' Dockerfile)
+          if [ -z "$pinned" ]; then
+            echo "::error file=Dockerfile::No ARG YT_DLP_VERSION=… line to update."
+            exit 1
+          fi
+          # Versions are dates (2026.08.19), so sorting them as versions
+          # puts the newest last.
+          newest=$(printf '%s\n%s\n' "$pinned" "$latest" | sort -V | tail -n 1)
+          if [ "$latest" = "$pinned" ] || [ "$newest" != "$latest" ]; then
+            echo "The bundled yt-dlp, $pinned, is up to date (latest release: $latest)."
+            exit 0
+          fi
+
+          # One bump pull request at a time: an open one for this release
+          # leaves nothing to do, and one for an older release is replaced.
+          branch="deps/yt-dlp-$latest"
+          bumps=$(gh pr list --state open --limit 100 --json number,headRefName \
+            --jq '.[] | select(.headRefName | startswith("deps/yt-dlp-")) | "\(.number) \(.headRefName)"')
+          if grep -q " $branch\$" <<< "$bumps"; then
+            echo "The pull request for yt-dlp $latest is already open."
+            exit 0
+          fi
+
+          # The standalone builds' checksums, as the release publishes them.
+          sums=$(curl -fsSL "https://github.com/yt-dlp/yt-dlp/releases/download/$latest/SHA2-256SUMS")
+          amd64=$(awk '$2 == "yt-dlp_linux" { print $1 }' <<< "$sums")
+          arm64=$(awk '$2 == "yt-dlp_linux_aarch64" { print $1 }' <<< "$sums")
+          if [ -z "$amd64" ] || [ -z "$arm64" ]; then
+            echo "::error::yt-dlp $latest's SHA2-256SUMS has no yt-dlp_linux or yt-dlp_linux_aarch64."
+            exit 1
+          fi
+          sed -i \
+            -e "s/^ARG YT_DLP_VERSION=.*/ARG YT_DLP_VERSION=$latest/" \
+            -e "s/^ARG YT_DLP_SHA256_AMD64=.*/ARG YT_DLP_SHA256_AMD64=$amd64/" \
+            -e "s/^ARG YT_DLP_SHA256_ARM64=.*/ARG YT_DLP_SHA256_ARM64=$arm64/" \
+            Dockerfile
+          git diff -- Dockerfile
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -am "Bundle yt-dlp $latest"
+          # Forced, in case a run that failed before opening its pull request
+          # left the branch behind.
+          git push --force origin "$branch"
+
+          gh pr create --base main --head "$branch" --label enhancement \
+            --title "Bundle yt-dlp $latest" \
+            --body "Bundles [yt-dlp $latest](https://github.com/yt-dlp/yt-dlp/releases/tag/$latest) in the image, in place of $pinned, so adding a Beat from a link keeps up with the sites yt-dlp reads.
+
+          Opened by the weekly yt-dlp workflow. CI's bundle job checks the new yt-dlp runs in the built image."
+          gh workflow run ci.yml --ref "$branch"
+
+          while read -r number _; do
+            [ -n "$number" ] || continue
+            gh pr close "$number" --delete-branch --comment "Replaced by the pull request for yt-dlp $latest."
+          done <<< "$bumps"

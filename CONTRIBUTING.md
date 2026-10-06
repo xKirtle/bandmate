@@ -62,6 +62,8 @@ go generate ./internal/build   # runs go-licenses, so it needs network access
 
 and commit the result. CI fails a pull request whose manifest is stale, and says to re-run `go generate`.
 
+The image also bundles three programs, for adding a Beat from a link ([ADR 0016](docs/adr/0016-bundle-yt-dlp-in-the-image.md)): yt-dlp, ffmpeg and QuickJS. The [Dockerfile](Dockerfile) pins each one's version and checksum in its `ARG`s, and records them with their licenses in `/usr/local/share/bandmate/programs.json`, which About lists. Their license texts ship in `/usr/local/share/licenses/`. A build outside the image has no such file, so About lists no programs. To upgrade one, change its `ARG`s. A [weekly workflow](.github/workflows/yt-dlp.yml) opens a pull request when yt-dlp releases, and starts CI on it, as a pull request opened by a workflow doesn't start CI on its own.
+
 ### Docker
 
 To try a local build of the image, build it under a separate tag and point `BANDMATE_IMAGE` at it:
@@ -91,10 +93,10 @@ Vitest covers plain TypeScript modules in `web/src/lib` that don't touch the DOM
 
 ### Continuous integration
 
-1. Open a pull request. The [CI workflow](.github/workflows/ci.yml) checks the SPA's formatting, type-checks, unit-tests and builds it, checks the Go license manifest is up to date, and runs `go vet` and `go test`. Pushes to other branches don't run CI, so open a draft PR for early feedback. A pull request that only changes docs or other files outside the build skips the tests.
+1. Open a pull request. The [CI workflow](.github/workflows/ci.yml) checks the SPA's formatting, type-checks, unit-tests and builds it, checks the Go license manifest is up to date, and runs `go vet` and `go test`. Its `bundle` job builds the image, runs yt-dlp, ffmpeg and QuickJS in it, checks yt-dlp finds the other two, and checks the image starts healthy. Pushes to other branches don't run CI, so open a draft PR for early feedback. A pull request that only changes docs or other files outside the build skips the tests.
 2. Merge to `main`. CI runs again and, if it passes, builds and publishes the image to `ghcr.io/xkirtle/bandmate` tagged `edge` and `sha-<short>` (the commit's short SHA). A merge never moves `latest`.
 
-`main` requires the `test` check to pass before merging. (`image` only runs on pushes, so pull requests show it as skipped.)
+`main` requires the `test` check to pass before merging. `bundle` isn't required, so check it's green too: on `main`, a failing `bundle` stops the image being published. (`image` only runs on pushes, so pull requests show it as skipped.)
 
 ### Versions
 

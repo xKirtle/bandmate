@@ -52,6 +52,11 @@ type Config struct {
 	// GoModules is the Go modules the About page lists. Nil means
 	// build.GoModules().
 	GoModules []build.Dependency
+	// ProgramsManifest is the file the image's build records the programs
+	// bundled beside Bandmate in (yt-dlp, ffmpeg and QuickJS), which the
+	// About page lists. Empty, or a file that isn't there, lists none, as an
+	// install built without them has.
+	ProgramsManifest string
 }
 
 // DetachedTakesKept is how long a Take is kept once detached, well past
@@ -170,7 +175,7 @@ func New(cfg Config) (*App, error) {
 		a.build = build.Current()
 	}
 	a.startedAt = now()
-	a.dependencies = shipped(cfg.GoModules, cfg.SPA)
+	a.dependencies = shipped(cfg.GoModules, cfg.SPA, cfg.ProgramsManifest)
 	a.releases = releases.New(releases.Options{Off: cfg.UpdateCheckOff, API: cfg.GitHubAPI, Now: now})
 	// Only tidying, so it never stops the app starting.
 	if err := a.timelines.SweepDetachedTakes(context.Background(), now().Add(-DetachedTakesKept)); err != nil {
