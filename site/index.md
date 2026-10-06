@@ -21,16 +21,16 @@ hero:
 
 features:
   - title: Write
-    details: Lyrics in Sections, with Chords anchored anywhere in a Line. Alternates to weigh versions, and a Scrapbook for leftovers.
+    details: Write lyrics with the chords right where you play them. Try a few versions of a verse, and keep the lines that didn't make it.
     link: /features#write
   - title: Listen
-    details: A Timeline of Beats and Sounds, each Track with its own volume, mute and solo. Upload a Beat, or paste a link to one.
+    details: Lay out your beats on a multi-track timeline. Upload a beat, or download one from YouTube, SoundCloud or Bandcamp.
     link: /features#listen
   - title: Sync
-    details: Cue each Line to the moment it's sung, and the Lyric Sheet follows along as the Timeline plays.
+    details: Tap along to mark when each line starts, and the lyrics light up and scroll as the song plays.
     link: /features#sync
   - title: Record
-    details: Lossless Takes in the browser, over whatever the Timeline holds, with latency calibrated per device.
+    details: Sing over your beat in the browser, in full quality, and keep every take until you pick one.
     link: /features#record
 ---
 
@@ -38,7 +38,7 @@ features:
 
 ## Why Bandmate
 
-Writing a song often means lyrics in a notes app, chords somewhere else, the beat in a browser tab and voice memos scattered across a phone. Bandmate puts them on one page: the Lyric Sheet beside a Timeline holding the Beat and your Takes, with each Line cued to the moment it's sung.
+Writing a song often means lyrics in a notes app, chords somewhere else, the beat in a browser tab and voice memos scattered across a phone. Bandmate puts them on one page: your lyrics and chords beside a timeline holding the beat and your takes, with each line marked at the moment it's sung.
 
 It's built for one songwriter, and runs on your own machine or homelab. There are no accounts and no subscription, and your Songs stay on your server.
 

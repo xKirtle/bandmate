@@ -11,16 +11,16 @@
 
 ![A Song in Write mode: its Details, the Lyric Sheet with Chords and Cues, the Scrapbook, and the Timeline with a Beat and a Take](docs/screenshots/write-mode.png)
 
-Writing a song often means lyrics in a notes app, chords somewhere else, the beat in a browser tab and voice memos scattered across a phone. Bandmate puts them on one page: the Lyric Sheet beside a Timeline holding the Beat and your Takes, with each Line cued to the moment it's sung.
+Writing a song often means lyrics in a notes app, chords somewhere else, the beat in a browser tab and voice memos scattered across a phone. Bandmate puts them on one page: your lyrics and chords beside a timeline holding the beat and your takes, with each line marked at the moment it's sung.
 
 It's built for one songwriter, and runs on your own machine or homelab. There are no accounts and no subscription, and your Songs stay on your server.
 
 ## What it does
 
-- **Write** lyrics in Sections, with Chords anchored anywhere in a Line, Alternates to weigh versions, and a Scrapbook for leftovers.
-- **Listen** on a Timeline of Beats and Sounds, each Track with its own volume, mute and solo. Upload a Beat, or paste a YouTube, SoundCloud or Bandcamp link.
-- **Sync** each Line to the moment it's sung, and the Lyric Sheet follows along as the Timeline plays.
-- **Record** lossless Takes in the browser, over whatever the Timeline holds, with latency calibrated per device.
+- **Write** lyrics with the chords right where you play them. Try a few versions of a verse, and keep the lines that didn't make it.
+- **Listen** to your beats on a multi-track timeline. Upload a beat, or download one from YouTube, SoundCloud or Bandcamp.
+- **Sync** your lyrics to the music: tap along to mark when each line starts, and they light up and scroll as the song plays.
+- **Record** takes over your beat in the browser, in full quality, and keep every one until you pick one.
 
 ![Sync mode cueing a Section's Lines as the Timeline plays](docs/screenshots/sync-mode.webp)
 
