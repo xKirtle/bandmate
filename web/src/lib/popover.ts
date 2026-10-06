@@ -45,6 +45,20 @@ export function popoverSide(point: number, size: number, viewport: number, gap: 
 }
 
 /**
+ * Places `panel`, a popover in the top layer, `gap` px under `anchor`, or
+ * over it when there's no room below, lined up with its start or end and
+ * kept inside the window.
+ */
+export function placeBeside(panel: HTMLElement, anchor: HTMLElement, gap: number, align: PopoverAlign) {
+  // Measured at the window's left, where nothing squeezes it.
+  panel.style.left = '0px';
+  const at = anchor.getBoundingClientRect();
+  const { width, height } = panel.getBoundingClientRect();
+  panel.style.top = `${popoverTop(at, height, window.innerHeight, gap)}px`;
+  panel.style.left = `${popoverLeft(at, width, document.documentElement.clientWidth, gap, align)}px`;
+}
+
+/**
  * Places `list`, a popover in the top layer, `gap` px under `anchor`, or over
  * it when there's no room below: at least as wide as it, and inside the window.
  */

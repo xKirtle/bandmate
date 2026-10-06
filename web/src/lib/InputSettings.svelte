@@ -3,7 +3,7 @@
   import { formatOffset } from './calibration';
   import { CaptureError, InputLevel } from './capture';
   import { channelName, deviceName, meterLevel, readInput, storeInput, type InputChoice } from './inputSettings';
-  import { popoverLeft, popoverTop } from './popover';
+  import { placeBeside } from './popover';
   import { deviceStorage } from './timelineHeight';
   import { audioContext } from './timelinePlayer';
 
@@ -164,12 +164,7 @@
   }
 
   function place() {
-    if (!panel || !anchor) return;
-    const at = anchor.getBoundingClientRect();
-    panel.style.left = '0px';
-    const { width, height } = panel.getBoundingClientRect();
-    panel.style.top = `${popoverTop(at, height, window.innerHeight, gap)}px`;
-    panel.style.left = `${popoverLeft(at, width, document.documentElement.clientWidth, gap, 'end')}px`;
+    if (panel && anchor) placeBeside(panel, anchor, gap, 'end');
   }
 
   function hide(refocus = true) {

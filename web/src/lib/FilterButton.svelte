@@ -1,7 +1,7 @@
 <script lang="ts">
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import { tick, type Snippet } from 'svelte';
-  import { popoverLeft, popoverTop } from './popover';
+  import { placeBeside } from './popover';
 
   // A filter in a list page's filter bar: a pill naming the filter, and what's
   // picked in it, that opens what it's picked with, e.g. a checklist, under it.
@@ -41,12 +41,7 @@
   // Under the button, or over it where there's no room below, lined up with
   // its start and kept inside the window.
   function place() {
-    if (!panel) return;
-    panel.style.left = '0px';
-    const at = button.getBoundingClientRect();
-    const { width, height } = panel.getBoundingClientRect();
-    panel.style.top = `${popoverTop(at, height, window.innerHeight, gap)}px`;
-    panel.style.left = `${popoverLeft(at, width, document.documentElement.clientWidth, gap, 'start')}px`;
+    if (panel) placeBeside(panel, button, gap, 'start');
   }
 
   // The button grows or shrinks as what's picked changes, so it follows it.
@@ -126,12 +121,6 @@
     gap: var(--space-1);
     max-width: 100%;
     padding-inline-end: var(--space-3);
-  }
-  /* Something picked fills it, as a toggle that's on. */
-  .chip.picked {
-    border-color: var(--accent);
-    background: var(--accent);
-    color: var(--accent-text);
   }
   /* A long pick is cut short rather than overflowing a phone. */
   .label {

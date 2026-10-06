@@ -250,11 +250,13 @@ label.button:has(input:focus-visible) {
   color: var(--text-muted);
 }
 
-/* A toggle (aria-pressed) is filled with the accent while it's on. An
-   outlined one is only outlined and lettered in the accent, for one beside
-   something already in the accent, such as Read mode's Chords. */
+/* A toggle (aria-pressed) is filled with the accent while it's on, and so
+   is a filter button (.picked) with anything picked. An outlined one is only
+   outlined and lettered in the accent, for one beside something already in
+   the accent, such as Read mode's Chords. */
 .button.toggle[aria-pressed='true'],
-.chip[aria-pressed='true'] {
+.chip[aria-pressed='true'],
+.chip.picked {
   border-color: var(--accent);
   background: var(--accent);
   color: var(--accent-text);

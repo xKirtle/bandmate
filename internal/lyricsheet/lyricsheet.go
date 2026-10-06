@@ -264,7 +264,7 @@ const NoFolder int64 = 0
 // ListSongs returns the Songs matching filter, most recently edited first.
 func (s *Store) ListSongs(ctx context.Context, filter SongFilter) ([]SongSummary, error) {
 	conditions, args := []string{"1"}, []any{}
-	var statuses []string
+	var placeholders []string
 	for _, status := range filter.Statuses {
 		if status == "" {
 			continue
@@ -272,10 +272,10 @@ func (s *Store) ListSongs(ctx context.Context, filter SongFilter) ([]SongSummary
 		if !status.valid() {
 			return nil, errUnknownStatus
 		}
-		statuses, args = append(statuses, "?"), append(args, status)
+		placeholders, args = append(placeholders, "?"), append(args, status)
 	}
-	if len(statuses) > 0 {
-		conditions = append(conditions, "status IN ("+strings.Join(statuses, ", ")+")")
+	if len(placeholders) > 0 {
+		conditions = append(conditions, "status IN ("+strings.Join(placeholders, ", ")+")")
 	}
 	if filter.HasMaster != nil {
 		conditions, args = append(conditions, "has_master = ?"), append(args, *filter.HasMaster)
