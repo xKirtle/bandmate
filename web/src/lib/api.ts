@@ -656,6 +656,17 @@ export interface YtDlpUpdate extends YtDlpInUse {
   outcome: 'upToDate' | 'updated' | 'cantRun';
 }
 
+/** How the yt-dlp in use stands against yt-dlp's latest release on GitHub. */
+export interface YtDlpCheck {
+  /** Whether GitHub was asked: "off" when the update check is turned off,
+      "failed" when GitHub couldn't be asked. */
+  check: 'ok' | 'off' | 'failed';
+  /** Checked only: upToDate when the one in use isn't older than the latest. */
+  verdict?: 'upToDate' | 'updateAvailable';
+  /** Checked only: yt-dlp's latest release. */
+  latest?: { tag: string; url: string };
+}
+
 /** How the running build stands against its repository's releases on GitHub. */
 export interface ReleasesReport {
   /** Whether GitHub was asked: "off" when the check is turned off or the
@@ -783,6 +794,8 @@ export const api = {
   getAboutReleases: () => request<ReleasesReport>('GET', '/about/releases'),
   /** Runs yt-dlp the first time, so it can be slower than the rest of About. */
   getYtDlp: () => request<YtDlpInUse>('GET', '/yt-dlp'),
+  /** Asks GitHub, through the server, so it loads apart from the version. */
+  getYtDlpCheck: () => request<YtDlpCheck>('GET', '/yt-dlp/latest'),
   /** Runs yt-dlp's self-update, which downloads from GitHub. */
   updateYtDlp: () => request<YtDlpUpdate>('POST', '/yt-dlp/update'),
   /** The Beat Library, newest first; q matches titles and producers. */

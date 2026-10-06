@@ -1,11 +1,11 @@
 // Package releases tells the About page whether a newer Bandmate has been
 // released, and what the recent releases changed, from GitHub's releases API
-// for the repository the build came from.
+// for the repository the build came from; and, with Latest, a program's
+// latest release, such as yt-dlp's.
 //
-// It's the app's only outbound call. It's made only when asked, which is
-// when the About page is opened, never in the background, and only for a
-// repository on github.com. The answer is remembered for a while, so opening
-// the page again doesn't ask again.
+// GitHub is asked only when the About page is opened, never in the
+// background, and only for a repository on github.com. The answer is
+// remembered for a while, so opening the page again doesn't ask again.
 package releases
 
 import (
@@ -96,7 +96,7 @@ type Release struct {
 	Notes   []Note `json:"notes"`
 }
 
-// Options configure a Checker.
+// Options configure a Checker or a Latest.
 type Options struct {
 	// Off turns the check off: GitHub is never asked.
 	Off bool
@@ -239,9 +239,6 @@ func (c *Checker) releases(ctx context.Context, repo string) ([]ghRelease, error
 	if c.now().Before(c.cached.until) {
 		return c.cached.releases, c.cached.err
 	}
-	// A visitor leaving the page mustn't make the failure be remembered.
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), askTimeout)
-	defer cancel()
 	published, err := c.ask(ctx, repo)
 	keep := keepSuccess
 	if err != nil {
@@ -254,27 +251,39 @@ func (c *Checker) releases(ctx context.Context, repo string) ([]ghRelease, error
 
 // ask asks GitHub for repo's releases.
 func (c *Checker) ask(ctx context.Context, repo string) ([]ghRelease, error) {
+	var all []ghRelease
 	// Enough to find Shown releases among drafts and pre-releases.
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.api+"/repos/"+repo+"/releases?per_page=30", nil)
-	if err != nil {
+	if err := askGitHub(ctx, c.api+"/repos/"+repo+"/releases?per_page=30", &all); err != nil {
 		return nil, err
+	}
+	published := slices.DeleteFunc(all, func(r ghRelease) bool { return r.Draft || r.Prerelease })
+	slices.SortStableFunc(published, func(a, b ghRelease) int { return b.PublishedAt.Compare(a.PublishedAt) })
+	return published, nil
+}
+
+// askGitHub asks GitHub's REST API for url, reading its JSON answer into
+// into. It waits at most askTimeout, even if the visitor leaves the page,
+// so leaving never makes a failure be remembered.
+func askGitHub(ctx context.Context, url string, into any) error {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), askTimeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 	req.Header.Set("User-Agent", "Bandmate")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GitHub answered %s", res.Status)
+		return fmt.Errorf("GitHub answered %s", res.Status)
 	}
-	var all []ghRelease
-	if err := json.NewDecoder(res.Body).Decode(&all); err != nil {
-		return nil, fmt.Errorf("reading GitHub's releases: %w", err)
+	if err := json.NewDecoder(res.Body).Decode(into); err != nil {
+		return fmt.Errorf("reading GitHub's answer: %w", err)
 	}
-	published := slices.DeleteFunc(all, func(r ghRelease) bool { return r.Draft || r.Prerelease })
-	slices.SortStableFunc(published, func(a, b ghRelease) int { return b.PublishedAt.Compare(a.PublishedAt) })
-	return published, nil
+	return nil
 }

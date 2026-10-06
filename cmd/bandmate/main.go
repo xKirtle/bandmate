@@ -5,7 +5,7 @@
 //	BANDMATE_ADDR      listen address (default ":8080")
 //	BANDMATE_DATA_DIR  directory holding the database and audio files (default "./data")
 //	BANDMATE_MAX_UPLOAD_MB  largest audio file accepted, in megabytes (default 500)
-//	BANDMATE_UPDATE_CHECK   "off" stops the About page asking GitHub for releases (default "on")
+//	BANDMATE_UPDATE_CHECK   "off" stops the About page asking GitHub for releases, Bandmate's and yt-dlp's (default "on")
 //	BANDMATE_ADD_FROM_LINK  "off" stops Beats being added from a link, which fetches them (default "on")
 //
 // "bandmate healthcheck" asks a running server whether it is healthy and exits

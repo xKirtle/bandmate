@@ -1,9 +1,9 @@
 // What About, in Settings, works out in the browser: how long the server
 // has been up, the block Copy details puts on the clipboard, how the
-// server's releases check reads under the version, and how the yt-dlp in use
-// and its update read beside it.
+// server's releases check reads under the version, and what System
+// information's yt-dlp row offers and how its update reads.
 
-import type { ReleasesReport, YtDlpInUse, YtDlpUpdate } from './api';
+import type { ReleasesReport, YtDlpCheck, YtDlpUpdate } from './api';
 
 const units: [string, number][] = [
   ['day', 24 * 3600],
@@ -29,9 +29,11 @@ export function uptime(startedAt: string, now = Date.now()): string {
   return shown.join(' ');
 }
 
-/** The server's details for a bug report, with the browser's user agent added. */
-export function bugReportDetails(details: string, userAgent: string): string {
-  return `${details}\nBrowser: ${userAgent}`;
+/** The server's details for a bug report, with the yt-dlp in use added to
+    its system line once known, and the browser's user agent after. */
+export function bugReportDetails(details: string, userAgent: string, ytDlpVersion?: string): string {
+  const withYtDlp = ytDlpVersion ? `${details} · yt-dlp ${ytDlpVersion}` : details;
+  return `${withYtDlp}\nBrowser: ${userAgent}`;
 }
 
 /** The line under the version: the verdict, linking to the release it names
@@ -54,9 +56,17 @@ export function updateStatus(r: ReleasesReport): UpdateStatus | null {
   }
 }
 
-/** The yt-dlp fetches use, beside the update check: "yt-dlp 2026.09.12 (updated)". */
-export function ytDlpInUse(y: YtDlpInUse): string {
-  return `yt-dlp ${y.version} (${y.source})`;
+/** What the yt-dlp row offers beside the version: a word on the check
+    (status), and the label of its Update button, if it has one. */
+export type YtDlpOffer = { status?: string; button?: string };
+
+/** What the yt-dlp row offers, from the check for a newer release: an
+    update only when there's one, or a plain one when the check can't say. */
+export function ytDlpOffer(c: YtDlpCheck): YtDlpOffer {
+  if (c.check === 'failed') return { status: "Couldn't check", button: 'Update' };
+  if (c.check !== 'ok' || !c.latest) return { button: 'Update' };
+  if (c.verdict === 'updateAvailable') return { button: `Update to ${c.latest.tag}` };
+  return { status: 'Up to date' };
 }
 
 /** What Update yt-dlp did, in words. */
