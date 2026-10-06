@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bugReportDetails, updateStatus, uptime, ytDlpInUse, ytDlpUpdated } from './about';
+import { bugReportDetails, updateStatus, uptime, ytDlpOffer, ytDlpUpdated } from './about';
 import type { ReleasesReport } from './api';
 
 describe('uptime', () => {
@@ -32,6 +32,15 @@ describe('bugReportDetails', () => {
       'Bandmate v0.4.0 (1a2b3c4, 2026-09-29)\n' +
         'Go 1.25.1 linux/amd64 · SQLite 3.50.4 · schema 0027_x\n' +
         'Browser: Mozilla/5.0 (X11; Linux x86_64) Firefox/140.0',
+    );
+  });
+
+  it('adds the yt-dlp in use to the system line, once known', () => {
+    const server = 'Bandmate v0.4.0\nGo 1.25.1 linux/amd64 · SQLite 3.50.4 · schema 0027_x';
+    expect(bugReportDetails(server, 'Firefox/140.0', '2026.09.12')).toBe(
+      'Bandmate v0.4.0\n' +
+        'Go 1.25.1 linux/amd64 · SQLite 3.50.4 · schema 0027_x · yt-dlp 2026.09.12\n' +
+        'Browser: Firefox/140.0',
     );
   });
 });
@@ -74,10 +83,23 @@ describe('updateStatus', () => {
   });
 });
 
-describe('ytDlpInUse', () => {
-  it("names the yt-dlp in use, and whether it's bundled or updated", () => {
-    expect(ytDlpInUse({ version: '2026.08.19', source: 'bundled' })).toBe('yt-dlp 2026.08.19 (bundled)');
-    expect(ytDlpInUse({ version: '2026.09.12', source: 'updated' })).toBe('yt-dlp 2026.09.12 (updated)');
+describe('ytDlpOffer', () => {
+  const latest = { tag: '2026.10.01', url: 'https://github.com/yt-dlp/yt-dlp/releases/tag/2026.10.01' };
+
+  it('says the yt-dlp in use is up to date, offering no update', () => {
+    expect(ytDlpOffer({ check: 'ok', verdict: 'upToDate', latest })).toEqual({ status: 'Up to date' });
+  });
+
+  it('offers to update to a newer release, naming it', () => {
+    expect(ytDlpOffer({ check: 'ok', verdict: 'updateAvailable', latest })).toEqual({ button: 'Update to 2026.10.01' });
+  });
+
+  it('offers a plain update when the check is off', () => {
+    expect(ytDlpOffer({ check: 'off' })).toEqual({ button: 'Update' });
+  });
+
+  it("says a failed check couldn't check, and offers a plain update", () => {
+    expect(ytDlpOffer({ check: 'failed' })).toEqual({ status: "Couldn't check", button: 'Update' });
   });
 });
 

@@ -2,9 +2,8 @@
 // released, and what the recent releases changed, from GitHub's releases API
 // for the repository the build came from.
 //
-// It's the app's only outbound call. It's made only when asked, which is
-// when the About page is opened, never in the background, and only for a
-// repository on github.com. The answer is remembered for a while, so opening
+// It's asked only when the About page is opened, never in the background,
+// and only for a repository on github.com. The answer is remembered for a while, so opening
 // the page again doesn't ask again.
 package releases
 

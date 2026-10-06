@@ -45,7 +45,8 @@ type Config struct {
 	// Clip has used, for more than DetachedTakesKept are removed. Nil means
 	// time.Now.
 	Now func() time.Time
-	// UpdateCheckOff stops the About page asking GitHub for releases.
+	// UpdateCheckOff stops the About page asking GitHub for releases, both
+	// Bandmate's and yt-dlp's latest.
 	UpdateCheckOff bool
 	// GitHubAPI is GitHub's REST API base URL, which the About page's
 	// releases come from. Empty means releases.DefaultAPI.
@@ -115,7 +116,10 @@ type App struct {
 	// addFromLinkOff.
 	fetches *fetches.Store
 	// ytDlp is the yt-dlp fetches run, which About shows and updates.
-	ytDlp          *fetches.YtDlp
+	ytDlp *fetches.YtDlp
+	// ytDlpLatest checks GitHub for yt-dlp's latest release, which About
+	// offers to update to.
+	ytDlpLatest    *releases.Latest
 	addFromLinkOff bool
 	spa            fs.FS
 	handler        http.Handler
@@ -207,6 +211,7 @@ func New(cfg Config) (*App, error) {
 		return nil, err
 	}
 	a.releases = releases.New(releases.Options{Off: cfg.UpdateCheckOff, API: cfg.GitHubAPI, Now: now})
+	a.ytDlpLatest = releases.NewLatest("yt-dlp/yt-dlp", releases.Options{Off: cfg.UpdateCheckOff, API: cfg.GitHubAPI, Now: now})
 	// Only tidying, so it never stops the app starting.
 	if err := a.timelines.SweepDetachedTakes(context.Background(), now().Add(-DetachedTakesKept)); err != nil {
 		log.Printf("sweeping detached takes: %v", err)
@@ -329,6 +334,7 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("DELETE /api/fetches/{id}", a.discardFetched)
 	mux.HandleFunc("POST /api/fetches/{id}/beat", a.addFetchedBeat)
 	mux.HandleFunc("GET /api/yt-dlp", a.ytDlpInUse)
+	mux.HandleFunc("GET /api/yt-dlp/latest", a.ytDlpLatestCheck)
 	mux.HandleFunc("POST /api/yt-dlp/update", a.updateYtDlp)
 	mux.HandleFunc("GET /api/backups", a.listBackups)
 	mux.HandleFunc("POST /api/backups", a.makeBackup)

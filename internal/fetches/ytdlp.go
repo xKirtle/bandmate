@@ -32,6 +32,10 @@ type InUse struct {
 	path    string
 }
 
+// Behind says whether the yt-dlp in use is older than version, e.g.
+// yt-dlp's latest release.
+func (in InUse) Behind(version string) bool { return newer(version, in.Version) }
+
 // Outcome is what updating yt-dlp did.
 type Outcome string
 

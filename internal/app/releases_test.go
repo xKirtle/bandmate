@@ -25,12 +25,14 @@ type ghRelease struct {
 	PublishedAt time.Time `json:"published_at"`
 }
 
-// fakeGitHub stands in for GitHub's API, serving one repository's releases
-// and counting how often it's asked.
+// fakeGitHub stands in for GitHub's API, serving Bandmate's releases and
+// yt-dlp's latest, and counting how often it's asked.
 type fakeGitHub struct {
 	srv      *httptest.Server
 	calls    atomic.Int32
 	releases []ghRelease
+	// ytDlp is yt-dlp's latest release; nil when it has none.
+	ytDlp *ghRelease
 	// status, when set, is the error GitHub answers with instead.
 	status int
 }
@@ -40,7 +42,13 @@ func newFakeGitHub(t *testing.T, releases ...ghRelease) *fakeGitHub {
 	gh := &fakeGitHub{releases: releases}
 	gh.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gh.calls.Add(1)
-		if r.URL.Path != "/repos/xKirtle/bandmate/releases" {
+		var answer any
+		switch {
+		case r.URL.Path == "/repos/xKirtle/bandmate/releases":
+			answer = gh.releases
+		case r.URL.Path == "/repos/yt-dlp/yt-dlp/releases/latest" && gh.ytDlp != nil:
+			answer = gh.ytDlp
+		default:
 			http.NotFound(w, r)
 			return
 		}
@@ -49,7 +57,7 @@ func newFakeGitHub(t *testing.T, releases ...ghRelease) *fakeGitHub {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(gh.releases)
+		json.NewEncoder(w).Encode(answer)
 	}))
 	t.Cleanup(gh.srv.Close)
 	return gh

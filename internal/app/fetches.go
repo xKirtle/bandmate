@@ -8,6 +8,7 @@ import (
 
 	"github.com/xKirtle/bandmate/internal/beats"
 	"github.com/xKirtle/bandmate/internal/fetches"
+	"github.com/xKirtle/bandmate/internal/releases"
 )
 
 // A Beat added from a link is fetched first, into a waiting file the
@@ -97,6 +98,35 @@ func (a *App) ytDlpInUse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, in)
+}
+
+// ytDlpLatestCheck tells About whether a newer yt-dlp than the one in use
+// has been released, so its Update button is offered only when there is
+// one. A yt-dlp in use that's newer than the latest release, e.g. a mounted
+// nightly, is up to date.
+func (a *App) ytDlpLatestCheck(w http.ResponseWriter, r *http.Request) {
+	if a.refuseWhenAddFromLinkOff(w) {
+		return
+	}
+	in, err := a.ytDlp.InUse(r.Context())
+	if err != nil {
+		writeFetchError(w, err)
+		return
+	}
+	latest, check := a.ytDlpLatest.Get(r.Context())
+	report := struct {
+		Check   releases.Check   `json:"check"`
+		Verdict releases.Verdict `json:"verdict,omitempty"`
+		Latest  *releases.Link   `json:"latest,omitempty"`
+	}{Check: check}
+	if check == releases.Checked {
+		report.Latest = &latest
+		report.Verdict = releases.UpToDate
+		if in.Behind(latest.Tag) {
+			report.Verdict = releases.UpdateAvailable
+		}
+	}
+	writeJSON(w, http.StatusOK, report)
 }
 
 // updateYtDlp runs yt-dlp's self-update, only when About's Update yt-dlp is

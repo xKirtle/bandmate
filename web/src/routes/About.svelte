@@ -8,10 +8,11 @@
     type AboutInfo,
     type ReleasesReport,
     type ServerConfig,
+    type YtDlpCheck,
     type YtDlpInUse,
     type YtDlpUpdate,
   } from '../lib/api';
-  import { bugReportDetails, updateStatus, uptime, ytDlpInUse, ytDlpUpdated } from '../lib/about';
+  import { bugReportDetails, updateStatus, uptime, ytDlpOffer, ytDlpUpdated } from '../lib/about';
   import BrandMark from '../lib/BrandMark.svelte';
   import FoldChevron from '../lib/FoldChevron.svelte';
   import SettingsPage from '../lib/SettingsPage.svelte';
@@ -31,16 +32,28 @@
     (e: Error) => (error = e.message),
   );
 
-  // The yt-dlp that fetches links, shown beside the update check unless
-  // adding from a link is off. Asking it runs yt-dlp, so it loads on its own.
+  // The yt-dlp that fetches links, a row of System information unless
+  // adding from a link is off. Asking it runs yt-dlp, so it loads on its own,
+  // as does the check for a newer release, which asks GitHub.
   let ytDlp = $state<YtDlpInUse | null>(null);
   let ytDlpError = $state<string | null>(null);
+  let ytDlpCheck = $state<YtDlpCheck | null>(null);
   function loadYtDlp() {
     api.getYtDlp().then(
       (y) => (ytDlp = y),
       (e: Error) => (ytDlpError = e.message),
     );
+    checkYtDlp();
   }
+  function checkYtDlp() {
+    api.getYtDlpCheck().then(
+      (c) => (ytDlpCheck = c),
+      () => (ytDlpCheck = { check: 'failed' }),
+    );
+  }
+  /** What the row offers: nothing until the check answers, so an update
+      isn't offered and then taken back. */
+  const ytDlpOffered = $derived(ytDlpCheck && ytDlpOffer(ytDlpCheck));
 
   let updatingYtDlp = $state(false);
   let ytDlpUpdate = $state<YtDlpUpdate | null>(null);
@@ -52,6 +65,8 @@
     try {
       ytDlpUpdate = await api.updateYtDlp();
       ytDlp = ytDlpUpdate;
+      // Against the yt-dlp now in use.
+      checkYtDlp();
     } catch (e) {
       ytDlpUpdateError = (e as Error).message;
     } finally {
@@ -113,7 +128,7 @@
   let copyStatusTimer: ReturnType<typeof setTimeout> | undefined;
 
   async function copyDetails(details: string) {
-    const text = bugReportDetails(details, navigator.userAgent);
+    const text = bugReportDetails(details, navigator.userAgent, ytDlp?.version);
     clearTimeout(copyStatusTimer);
     copyStatus = (await copy(text)) ? 'copied' : 'failed';
     if (copyStatus === 'copied') copyStatusTimer = setTimeout(() => (copyStatus = null), 2000);
@@ -181,24 +196,6 @@
             {/if}
           </p>
         {/if}
-        {#if config.addFromLink}
-          <div class="yt-dlp">
-            <p class="yt-dlp-version">
-              {#if ytDlp}{ytDlpInUse(ytDlp)}{:else if ytDlpError}{ytDlpError}{:else}Checking yt-dlp…{/if}
-            </p>
-            {#if ytDlp}
-              <button class="button" type="button" disabled={updatingYtDlp} onclick={updateYtDlp}>
-                {updatingYtDlp ? 'Updating yt-dlp…' : 'Update yt-dlp'}
-              </button>
-            {/if}
-            <p class="yt-dlp-status" class:error={ytDlpUpdateError} role="status">
-              {#if ytDlpUpdate}
-                {ytDlpUpdated(ytDlpUpdate)}{#if ytDlpUpdate.outcome === 'cantRun'}:
-                  <a href="{config.sourceUrl}#mounting-your-own-yt-dlp">see how in the README</a>{/if}
-              {:else if ytDlpUpdateError}{ytDlpUpdateError}{/if}
-            </p>
-          </div>
-        {/if}
         <ul class="links">
           <li><a href={config.sourceUrl}>Source code</a></li>
           <li><a href={config.bugReportUrl}>Report a bug</a></li>
@@ -234,6 +231,32 @@
           <dd>{about.os}/{about.arch}</dd>
           <dt>SQLite</dt>
           <dd>{about.sqliteVersion}</dd>
+          {#if config?.addFromLink}
+            <dt>yt-dlp</dt>
+            <dd>
+              <div class="yt-dlp">
+                {#if ytDlp}
+                  <span>{ytDlp.version} <span class="muted">({ytDlp.source})</span></span>
+                  {#if ytDlpOffered?.status}<span class="muted">{ytDlpOffered.status}</span>{/if}
+                  {#if ytDlpOffered?.button}
+                    <button class="button quiet" type="button" disabled={updatingYtDlp} onclick={updateYtDlp}>
+                      {updatingYtDlp ? 'Updating…' : ytDlpOffered.button}
+                    </button>
+                  {/if}
+                {:else if ytDlpError}
+                  <span class="error">{ytDlpError}</span>
+                {:else}
+                  <span class="muted">Checking…</span>
+                {/if}
+              </div>
+              <p class="yt-dlp-status" class:error={ytDlpUpdateError} role="status">
+                {#if ytDlpUpdate}
+                  {ytDlpUpdated(ytDlpUpdate)}{#if ytDlpUpdate.outcome === 'cantRun'}:
+                    <a href="{config.sourceUrl}#mounting-your-own-yt-dlp">see how in the README</a>{/if}
+                {:else if ytDlpUpdateError}{ytDlpUpdateError}{/if}
+              </p>
+            </dd>
+          {/if}
           <dt>Schema</dt>
           <dd>
             <code>{about.schema.migration}</code>
@@ -491,18 +514,20 @@
     font-weight: 600;
   }
 
-  /* The yt-dlp in use, its Update button, and what updating did. */
+  /* The yt-dlp row: its version, then what the check says or its Update
+     button, wrapping on a phone; what updating did goes under it. */
   .yt-dlp {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-2);
-    margin-top: var(--space-2);
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--space-3);
   }
-  .yt-dlp-version {
-    color: var(--text-muted);
+  /* The version and its source stay on one line; what follows wraps. */
+  .yt-dlp > span:first-child {
+    white-space: nowrap;
   }
   .yt-dlp-status {
+    margin-top: var(--space-1);
     font-size: var(--text-md);
   }
   .yt-dlp-status:empty {
