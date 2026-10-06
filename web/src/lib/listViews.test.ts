@@ -38,6 +38,7 @@ function song(title: string, fields: Partial<SongSummary> = {}): SongSummary {
     hasMaster: false,
     coverId: null,
     folderId: null,
+    tags: [],
     updatedAt: '',
     ...fields,
   };

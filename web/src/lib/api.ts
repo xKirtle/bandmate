@@ -31,6 +31,8 @@ export interface Song {
   masters: Master[];
   /** The Song's picture; null when it has none. */
   cover: Cover | null;
+  /** The names of the Tags it carries, by name ignoring case. */
+  tags: string[];
 }
 
 /** A Song's picture, shown as a square chosen from it. */
@@ -187,6 +189,14 @@ export interface Folder {
   songs: number;
 }
 
+/** A name of the user's own that marks Songs; it lasts only while some Song carries it. */
+export interface Tag {
+  id: number;
+  name: string;
+  /** How many Songs carry it. */
+  songs: number;
+}
+
 /** What deleting a Folder does with its Songs: keeps them, in no Folder, or deletes them too. */
 export type FolderSongs = 'keep' | 'delete';
 
@@ -203,6 +213,8 @@ export interface SongSummary {
   coverId: number | null;
   /** The id of the Folder the Song sits in; null when it's in none. */
   folderId: number | null;
+  /** The names of the Tags it carries, by name ignoring case. */
+  tags: string[];
   updatedAt: string;
 }
 
@@ -827,6 +839,13 @@ export const api = {
   /** Puts a Song into the Folder with folderId, or, with null, into none. It doesn't change the Song's version. */
   moveSongToFolder: (songId: number, folderId: number | null) =>
     request<null>('PUT', `/songs/${songId}/folder`, { folderId }),
+  /** Every Tag, by name. */
+  listTags: () => request<Tag[]>('GET', '/tags'),
+  /**
+   * Gives a Song exactly the Tags named, matched to those there are ignoring case and made where there's none,
+   * and answers with their names. It doesn't change the Song's version.
+   */
+  setSongTags: (songId: number, tags: string[]) => request<string[]>('PUT', `/songs/${songId}/tags`, { tags }),
   updateSong: (at: SongAt, changes: SongChanges) => request<Song>('PATCH', `/songs/${at.id}`, changes, at),
   deleteSong: (at: SongAt) => request<null>('DELETE', `/songs/${at.id}`, undefined, at),
   /** Adds a Section at position in the Arrangement, or at the end. */

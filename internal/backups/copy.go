@@ -69,8 +69,10 @@ var songTables = []songTable{
 }
 
 // notCopied are the tables holding nothing of a Song: the schema's own
-// bookkeeping, and the Backups.
-var notCopied = map[string]bool{"schema_migrations": true, "sqlite_sequence": true, "backups": true}
+// bookkeeping, and the Backups. Songs' Tags are left out too, until Backups
+// carry them (#635).
+var notCopied = map[string]bool{"schema_migrations": true, "sqlite_sequence": true, "backups": true,
+	"tags": true, "song_tags": true}
 
 // songFile is a kind of file a Song's rows, or the Beat Library's, use: the
 // directory such files are kept in under the data directory, the table of

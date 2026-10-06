@@ -93,6 +93,8 @@ type Song struct {
 	Masters []Master `json:"masters"`
 	// Cover is nil when the Song has none.
 	Cover *Cover `json:"cover"`
+	// Tags are the names of the Tags the Song carries, by name ignoring case.
+	Tags []string `json:"tags"`
 }
 
 // SongSummary is a Song as shown in the Song list.
@@ -108,7 +110,9 @@ type SongSummary struct {
 	CoverID *int64 `json:"coverId"`
 	// FolderID is the id of the Folder the Song sits in, or nil when it's in
 	// none.
-	FolderID  *int64    `json:"folderId"`
+	FolderID *int64 `json:"folderId"`
+	// Tags are as on the Song.
+	Tags      []string  `json:"tags"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
@@ -134,6 +138,20 @@ func NewStore(db *sql.DB, masterFiles *audio.Files, coverFiles CoverFiles, takeF
 		takeFiles:   takeFiles,
 		soundFiles:  soundFiles,
 	}
+}
+
+// songTags is, in a query on songs, the names of a Song's Tags as a JSON
+// array, by name ignoring case.
+const songTags = `(SELECT json_group_array(t.name ORDER BY t.folded) FROM song_tags st
+	JOIN tags t ON t.id = st.tag_id WHERE st.song_id = songs.id)`
+
+// decodeTags reads the names songTags gives.
+func decodeTags(text string) ([]string, error) {
+	names := []string{}
+	if err := json.Unmarshal([]byte(text), &names); err != nil {
+		return nil, fmt.Errorf("reading song's tags: %w", err)
+	}
+	return names, nil
 }
 
 // timeFormat keeps sub-second precision and sorts correctly as text.
@@ -212,12 +230,12 @@ func insertSong(ctx context.Context, tx *sql.Tx, title string, folderID *int64) 
 func (s *Store) GetSong(ctx context.Context, id int64) (Song, error) {
 	var song Song
 	var bpm, capo sql.NullInt64
-	var created, updated string
+	var created, updated, tags string
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, version, title, status, song_key, bpm, capo, tuning, notes, created_at, updated_at
+		`SELECT id, version, title, status, song_key, bpm, capo, tuning, notes, created_at, updated_at, `+songTags+`
 		 FROM songs WHERE id = ?`, id).
 		Scan(&song.ID, &song.Version, &song.Title, &song.Status, &song.Key, &bpm, &capo, &song.Tuning, &song.Notes,
-			&created, &updated)
+			&created, &updated, &tags)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Song{}, ErrNotFound
 	}
@@ -229,6 +247,9 @@ func (s *Store) GetSong(ctx context.Context, id int64) (Song, error) {
 		return Song{}, err
 	}
 	if song.UpdatedAt, err = parseTime(updated); err != nil {
+		return Song{}, err
+	}
+	if song.Tags, err = decodeTags(tags); err != nil {
 		return Song{}, err
 	}
 	if song.LyricSheet, err = s.loadLyricSheet(ctx, id); err != nil {
@@ -288,9 +309,10 @@ func (s *Store) ListSongs(ctx context.Context, filter SongFilter) ([]SongSummary
 		}
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, title, status, song_key, bpm, has_master, cover_id, folder_id, updated_at FROM (
+		`SELECT id, title, status, song_key, bpm, has_master, cover_id, folder_id, tags, updated_at FROM (
 		   SELECT *, EXISTS (SELECT 1 FROM masters WHERE masters.song_id = songs.id) AS has_master,
-		     (SELECT id FROM covers WHERE covers.song_id = songs.id) AS cover_id
+		     (SELECT id FROM covers WHERE covers.song_id = songs.id) AS cover_id,
+		     `+songTags+` AS tags
 		   FROM songs
 		 ) WHERE `+strings.Join(conditions, " AND ")+`
 		 ORDER BY updated_at DESC, id DESC`, args...)
@@ -305,9 +327,9 @@ func (s *Store) ListSongs(ctx context.Context, filter SongFilter) ([]SongSummary
 	for rows.Next() {
 		var sum SongSummary
 		var bpm, cover, folder sql.NullInt64
-		var updated string
+		var tags, updated string
 		if err := rows.Scan(&sum.ID, &sum.Title, &sum.Status, &sum.Key, &bpm, &sum.HasMaster, &cover, &folder,
-			&updated); err != nil {
+			&tags, &updated); err != nil {
 			return nil, err
 		}
 		sum.BPM = intOrNil(bpm)
@@ -321,6 +343,9 @@ func (s *Store) ListSongs(ctx context.Context, filter SongFilter) ([]SongSummary
 			continue
 		}
 		if sum.UpdatedAt, err = parseTime(updated); err != nil {
+			return nil, err
+		}
+		if sum.Tags, err = decodeTags(tags); err != nil {
 			return nil, err
 		}
 		list = append(list, sum)

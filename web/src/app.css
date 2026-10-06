@@ -292,6 +292,15 @@ label.button:has(input:focus-visible) {
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
+/* A Song's Tag: a badge in one muted style, without colours, outlined
+   rather than filled so it isn't taken for an Idea's Status. */
+.badge.tag {
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+}
 
 /* A card: a flat panel on the page, e.g. a Section or the Chord Finder. */
 .card {
