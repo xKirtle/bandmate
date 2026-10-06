@@ -1,10 +1,12 @@
 <script lang="ts">
   import X from '@lucide/svelte/icons/x';
   import Combobox from './Combobox.svelte';
+  import { addTags, allTags, finishedTags } from './tagsTyped';
 
   // Changes a Song's Tags: each one carried, with a button taking it off,
-  // then a field to add one, suggesting the Tags already in use. A name no
-  // Tag has makes one; the server trims names and matches them ignoring case.
+  // then a field to add one, suggesting the Tags already in use. A comma or
+  // Enter finishes a Tag. A name no Tag has makes one; the server trims names
+  // and matches them ignoring case.
   let {
     id,
     tags,
@@ -31,14 +33,30 @@
   // The Tags it doesn't carry yet.
   const suggestions = $derived(known.filter((name) => !carried.has(name.toLowerCase())));
 
-  // A name it carries already, ignoring case, adds nothing; one a Tag has
-  // takes that Tag's spelling.
+  // Only what's new changes the Song's Tags.
+  function addNames(names: string[]) {
+    const next = addTags(tags, known, names);
+    if (next.length > tags.length) onchange(next);
+  }
+
+  // Adds everything typed, as Enter, picking a suggestion or leaving the
+  // field does.
   function add(text: string) {
-    const name = text.trim();
     typed = '';
-    if (!name || carried.has(name.toLowerCase())) return;
-    const existing = known.find((k) => k.toLowerCase() === name.toLowerCase());
-    onchange([...tags, existing ?? name]);
+    addNames(allTags(text));
+  }
+
+  // A comma adds what's before it as a Tag, keeping what's after typed from
+  // its first letter. Pasted names with commas between them are each added.
+  function oninput(e: Event & { currentTarget: HTMLInputElement }) {
+    const text = e.currentTarget.value;
+    if (e instanceof InputEvent && e.inputType.startsWith('insertFrom') && text.includes(',')) {
+      add(text);
+      return;
+    }
+    const { names, rest } = finishedTags(text);
+    if (rest !== text) typed = rest;
+    if (names.length) addNames(names);
   }
 
   function remove(name: string) {
@@ -79,6 +97,7 @@
       saved=""
       onpick={add}
       onchange={() => add(typed)}
+      {oninput}
       {onkeydown}
       aria-labelledby={labelledby}
       {autofocus}

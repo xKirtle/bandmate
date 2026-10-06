@@ -15,7 +15,7 @@ A named place on the Songs page that keeps some Songs together, like an EP's, so
 _Avoid_: Album (a release), Playlist, Collection, Group
 
 **Tag**:
-A name of the user's own (e.g. "Album 2023") that marks Songs with what's relevant, so they can be found by it. A Song can carry any number of Tags, where it sits in one Folder at most, so Tags are how a Song belongs to several groups at once. A Tag is one thing shared by every Song carrying it, its name unique ignoring case, and it lasts only while some Song carries it. Only Songs carry Tags. It isn't a Section's Label.
+A name of the user's own (e.g. "Album 2023") that marks Songs with what's relevant, so they can be found by it. A Song can carry any number of Tags, where it sits in one Folder at most, so Tags are how a Song belongs to several groups at once. A Tag is one thing shared by every Song carrying it, its name unique ignoring case and without a comma, and it lasts only while some Song carries it. Only Songs carry Tags. It isn't a Section's Label.
 _Avoid_: Label (a Label names a Section), category, keyword
 
 **Cover**:
