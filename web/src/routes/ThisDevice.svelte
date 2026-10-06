@@ -4,10 +4,25 @@
   // in every one of this device's tabs, and is kept on this device. Those
   // also changed where they're used, like Left-handed in the Chord Finder,
   // are the same setting here.
+  import { MediaQuery } from 'svelte/reactivity';
   import { palettes, themeChoices } from '../lib/appearance';
+  import { offsetSummary } from '../lib/calibration';
+  import CalibrationDialog from '../lib/CalibrationDialog.svelte';
+  import InputPicker from '../lib/InputPicker.svelte';
+  import { inputName } from '../lib/inputSettings';
   import SettingsPage from '../lib/SettingsPage.svelte';
   import { appearance } from '../lib/sharedAppearance.svelte';
+  import { calibration } from '../lib/sharedCalibration.svelte';
+  import { input } from '../lib/sharedInput.svelte';
   import { leftHanded } from '../lib/sharedLeftHanded.svelte';
+
+  // Recording is offered only as wide as the Timeline offers editing, so
+  // the Recording card is too. Narrower, it goes, closing the mic with it.
+  const recordingOffered = new MediaQuery('min-width: 40.0625rem');
+  // Whether the Input picker is shown, with the mic open for its meter;
+  // leaving the tab closes both.
+  let changingInput = $state(false);
+  let calibrating = $state(false);
 </script>
 
 <SettingsPage tab="device">
@@ -47,6 +62,45 @@
       </fieldset>
     </section>
 
+    {#if recordingOffered.current}
+      <section class="card" aria-labelledby="recording-heading">
+        <h2 id="recording-heading">Recording</h2>
+        <!-- At a glance, without asking for the mic. -->
+        <dl class="summary">
+          <div>
+            <dt>Input</dt>
+            <dd>{inputName(input.value)}</dd>
+          </div>
+          <div>
+            <dt>Latency Offset</dt>
+            <dd class="tabular">{offsetSummary(calibration.value.offset)}</dd>
+          </div>
+        </dl>
+        {#if changingInput}
+          <div id="input-picker">
+            <InputPicker />
+          </div>
+        {/if}
+        <div class="actions">
+          <button
+            type="button"
+            class="button"
+            aria-expanded={changingInput}
+            aria-controls="input-picker"
+            onclick={() => (changingInput = !changingInput)}>{changingInput ? 'Done' : 'Change input'}</button
+          >
+          <button
+            type="button"
+            class="button"
+            onclick={() => {
+              changingInput = false;
+              calibrating = true;
+            }}>{calibration.value.offset !== null ? 'Calibrate again' : 'Calibrate'}</button
+          >
+        </div>
+      </section>
+    {/if}
+
     <section class="card" aria-labelledby="chord-diagrams-heading">
       <h2 id="chord-diagrams-heading">Chord diagrams</h2>
       <fieldset class="choice-group">
@@ -66,6 +120,13 @@
   </div>
 </SettingsPage>
 
+{#if calibrating}
+  <CalibrationDialog
+    onCalibrated={(offset) => calibration.set({ offset, offered: true })}
+    onClose={() => (calibrating = false)}
+  />
+{/if}
+
 <style>
   .kept {
     margin: 0 0 var(--space-4);
@@ -84,6 +145,24 @@
   h2 {
     margin: 0;
     font-size: var(--text-lg);
+  }
+  .summary {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin: 0;
+  }
+  dt {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+  }
+  dd {
+    margin: 0;
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
   }
   .hint {
     color: var(--text-muted);

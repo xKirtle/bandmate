@@ -6,6 +6,7 @@ import {
   clickTimes,
   measureOffset,
   minHits,
+  offsetSummary,
   readCalibration,
   storeCalibration,
 } from './calibration';
@@ -234,5 +235,16 @@ describe('appliedOffset', () => {
     expect(appliedOffset({ offset: 0.031, offered: true }, 0.012)).toBe(0.031);
     expect(appliedOffset({ offset: 0, offered: true }, 0.012)).toBe(0);
     expect(appliedOffset({ offset: null, offered: true }, 0.012)).toBe(0.012);
+  });
+});
+
+describe('offsetSummary', () => {
+  it('is the offset calibrated, in whole milliseconds', () => {
+    expect(offsetSummary(0.0123)).toBe('12 ms, calibrated');
+    expect(offsetSummary(0)).toBe('0 ms, calibrated');
+  });
+
+  it('says so until calibrated', () => {
+    expect(offsetSummary(null)).toBe('Not calibrated');
   });
 });

@@ -147,3 +147,8 @@ export function appliedOffset(calibration: Calibration, reported: number): numbe
 export function formatOffset(seconds: number): string {
   return `${Math.round(seconds * 1000)} ms`;
 }
+
+/** The Latency Offset, to show at a glance: "12 ms, calibrated", or "Not calibrated". */
+export function offsetSummary(offset: number | null): string {
+  return offset === null ? 'Not calibrated' : `${formatOffset(offset)}, calibrated`;
+}

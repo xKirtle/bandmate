@@ -85,6 +85,15 @@ export function channelName(label: string, channel: number): string {
   return `${deviceName(label)} · Input ${channel + 1}`;
 }
 
+/**
+ * The Input chosen, to show without opening it: by the label it had when
+ * chosen, and its channel, or "Default input" while none is chosen.
+ */
+export function inputName(choice: InputChoice): string {
+  if (choice.deviceId === '' && choice.channel === 0) return 'Default input';
+  return channelName(choice.deviceId === '' ? 'Default input' : choice.label, choice.channel);
+}
+
 // The meter's range, in dB below full scale.
 const floor = -60;
 // At or past this, an input has clipped: interfaces clip just short of 1.
