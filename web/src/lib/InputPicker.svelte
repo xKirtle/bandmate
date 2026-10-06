@@ -7,7 +7,7 @@
 
   // The Input picker: the inputs connected and their channels, to choose the
   // one recorded from on this device, and a live level meter of it, to set
-  // the interface's gain by. It opens the mic as it's shown, asking for it
+  // the interface's gain by. It opens the Input as it's shown, asking for it
   // if it hasn't been allowed, and closes it as it goes. In the recording
   // settings and in Settings' Recording card alike.
 
@@ -30,7 +30,7 @@
   // How many channels the input open has, and which is metered, once it's open.
   let channels = $state(0);
   let channel = $state(0);
-  // The device chosen when it isn't connected, so the default is metered instead.
+  // The audio device chosen when it isn't connected, so the default is metered instead.
   let gone = $state<string | null>(null);
   let problem = $state<string | null>(null);
   let opening = $state(false);

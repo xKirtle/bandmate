@@ -17,12 +17,18 @@
   import { leftHanded } from '../lib/sharedLeftHanded.svelte';
 
   // Recording is offered only as wide as the Timeline offers editing, so
-  // the Recording card is too. Narrower, it goes, closing the mic with it.
+  // the Recording card is too. Narrower, it goes, closing the Input with it.
   const recordingOffered = new MediaQuery('min-width: 40.0625rem');
-  // Whether the Input picker is shown, with the mic open for its meter;
+  // Whether the Input picker is shown, with the Input open for its meter;
   // leaving the tab closes both.
   let changingInput = $state(false);
   let calibrating = $state(false);
+
+  // Narrowed past where recording is offered, the picker goes for good, so
+  // widening again never opens the Input unasked.
+  $effect(() => {
+    if (!recordingOffered.current) changingInput = false;
+  });
 </script>
 
 <SettingsPage tab="device">
@@ -65,7 +71,7 @@
     {#if recordingOffered.current}
       <section class="card" aria-labelledby="recording-heading">
         <h2 id="recording-heading">Recording</h2>
-        <!-- At a glance, without asking for the mic. -->
+        <!-- At a glance, without opening the Input. -->
         <dl class="summary">
           <div>
             <dt>Input</dt>
