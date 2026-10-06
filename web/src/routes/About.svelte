@@ -39,17 +39,26 @@
   /** How many releases the Release notes tab lists, once checked. */
   const releaseCount = $derived(releases?.check === 'ok' ? ` (${releases.releases.length})` : '');
 
-  /** The Dependencies tab's lists, Go's first. */
+  /** The Dependencies tab's lists, Go's first, each with what it says when
+      it lists none. Programs ship only in Bandmate's image. */
   const dependencyLists = $derived(
     about
       ? [
-          { id: 'go', label: 'Go', items: about.dependencies.go },
-          { id: 'web', label: 'Web', items: about.dependencies.web },
+          { id: 'go', label: 'Go', items: about.dependencies.go, none: 'None recorded in this build.' },
+          { id: 'web', label: 'Web', items: about.dependencies.web, none: 'None recorded in this build.' },
+          {
+            id: 'programs',
+            label: 'Programs',
+            items: about.dependencies.programs,
+            none: "None bundled: this Bandmate isn't running from its image.",
+          },
         ]
       : [],
   );
   /** How many dependencies the Dependencies tab lists, once loaded. */
-  const dependencyCount = $derived(about ? ` (${about.dependencies.go.length + about.dependencies.web.length})` : '');
+  const dependencyCount = $derived(
+    about ? ` (${dependencyLists.reduce((count, list) => count + list.items.length, 0)})` : '',
+  );
   const counts = $derived({ 'release-notes': releaseCount, dependencies: dependencyCount });
 
   // The uptime counts on while the page is open.
@@ -273,8 +282,8 @@
           {:else if aboutError}
             <p class="error" role="alert">Couldn't load the dependencies: {aboutError}</p>
           {:else if about}
-            <p class="muted">The third-party packages that ship in Bandmate, with their licenses.</p>
-            <!-- Like the release notes, each list folds away; both start open. -->
+            <p class="muted">The third-party packages and programs that ship in Bandmate, with their licenses.</p>
+            <!-- Like the release notes, each list folds away; all start open. -->
             {#each dependencyLists as list (list.id)}
               <details class="dependencies" open>
                 <summary>
@@ -295,7 +304,7 @@
                     {/each}
                   </ul>
                 {:else}
-                  <p class="muted dependency-none">None recorded in this build.</p>
+                  <p class="muted dependency-none">{list.none}</p>
                 {/if}
               </details>
             {/each}

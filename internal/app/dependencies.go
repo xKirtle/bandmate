@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io/fs"
 	"log"
+	"os"
 
 	"github.com/xKirtle/bandmate/internal/build"
 )
@@ -14,35 +15,56 @@ import (
 const webDependencies = "dependencies.json"
 
 // dependencies is the third-party packages that ship in Bandmate, as the
-// About page lists them.
+// About page lists them: the Go modules the binary is built from, the web
+// packages in the SPA's bundle, and the programs bundled beside them in the
+// image.
 type dependencies struct {
-	Go  []build.Dependency `json:"go"`
-	Web []build.Dependency `json:"web"`
+	Go       []build.Dependency `json:"go"`
+	Web      []build.Dependency `json:"web"`
+	Programs []build.Dependency `json:"programs"`
 }
 
-// shipped is what ships: goModules, else the binary's own, and the web
-// packages the built SPA recorded, if any.
-func shipped(goModules []build.Dependency, spa fs.FS) dependencies {
+// shipped is what ships: goModules, else the binary's own, the web packages
+// the built SPA recorded, if any, and the programs the image's build recorded
+// in programsManifest, if any.
+func shipped(goModules []build.Dependency, spa fs.FS, programsManifest string) dependencies {
 	if goModules == nil {
 		goModules = build.GoModules()
 	}
-	d := dependencies{Go: listedGoModules(goModules), Web: []build.Dependency{}}
-
-	manifest, err := fs.ReadFile(spa, webDependencies)
-	switch {
-	case errors.Is(err, fs.ErrNotExist):
-		// The SPA hasn't been built, so no web packages ship.
-	case err != nil:
-		log.Printf("reading the web app's dependencies: %v", err)
-	default:
-		if err := json.Unmarshal(manifest, &d.Web); err != nil {
-			log.Printf("reading the web app's dependencies: %v", err)
-		}
-		if d.Web == nil {
-			d.Web = []build.Dependency{}
-		}
+	d := dependencies{
+		Go:  listedGoModules(goModules),
+		Web: recorded("the web app's dependencies", func() ([]byte, error) { return fs.ReadFile(spa, webDependencies) }),
+	}
+	if programsManifest == "" {
+		d.Programs = []build.Dependency{}
+	} else {
+		d.Programs = recorded("the bundled programs", func() ([]byte, error) { return os.ReadFile(programsManifest) })
 	}
 	return d
+}
+
+// recorded is the dependencies a build recorded in the manifest read reads,
+// what they are, or none when it recorded none: a build without them, such
+// as an SPA that hasn't been built or a binary run outside the image, has no
+// manifest. A manifest that can't be read is logged and lists none, so it
+// never stops the app starting.
+func recorded(what string, read func() ([]byte, error)) []build.Dependency {
+	manifest, err := read()
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return []build.Dependency{}
+	case err != nil:
+		log.Printf("reading %s: %v", what, err)
+		return []build.Dependency{}
+	}
+	var deps []build.Dependency
+	if err := json.Unmarshal(manifest, &deps); err != nil {
+		log.Printf("reading %s: %v", what, err)
+	}
+	if deps == nil {
+		deps = []build.Dependency{}
+	}
+	return deps
 }
 
 // listedGoModules is the Go modules as the About page lists them: one whose
