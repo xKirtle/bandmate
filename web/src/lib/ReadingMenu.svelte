@@ -109,7 +109,8 @@
     <SlidersHorizontal />
     <span class:visually-hidden={!wide.current}>Reading</span>
     {#if badge}
-      <span class="badge tabular" aria-label="transposed {badge} semitones">{badge}</span>
+      <span class="badge tabular" aria-hidden="true">{badge}</span>
+      <span class="visually-hidden">, transposed {badge} semitones</span>
     {/if}
   </button>
   {#if open}
@@ -159,7 +160,7 @@
         <!-- An eye, crossed out while the Chords are hidden. -->
         <button
           type="button"
-          class="button toggle outlined step"
+          class="button toggle step"
           aria-pressed={hasChords && chordsShown}
           disabled={blocked.chords !== null}
           onclick={() => songChordsShown.set(songId, !chordsShown)}
@@ -208,7 +209,7 @@
         <!-- Hidden, the Chart keeps whether it's pinned for when it's shown. -->
         <button
           type="button"
-          class="button toggle outlined step"
+          class="button toggle step"
           aria-pressed={chart.shown}
           disabled={blocked.chart !== null}
           onclick={() => chordChartState.setShown(!chart.shown)}
@@ -219,7 +220,7 @@
         <!-- A pushpin, filled while pinned. -->
         <button
           type="button"
-          class="button toggle outlined step pin"
+          class="button toggle step pin"
           aria-pressed={chart.pinned}
           disabled={blocked.chart !== null}
           onclick={() => chordChartState.setPinned(!chart.pinned)}
@@ -238,10 +239,11 @@
     align-items: center;
     gap: var(--space-2);
   }
-  /* How far the Chords on screen are transposed, in the accent like them. */
+  /* How far the Chords on screen are transposed, in a tint of the accent
+     they're drawn in. */
   .trigger .badge {
-    background: var(--accent);
-    color: var(--accent-text);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    color: var(--accent);
   }
   /* Each row's name, then its controls, lined up in two columns. */
   .panel {
