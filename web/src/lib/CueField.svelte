@@ -61,7 +61,7 @@
   let clearButton = $state<HTMLButtonElement>();
 
   // The keys that nudge the Cue, later then earlier, named as this platform
-  // does, but only with a fine pointer, and not in Sync mode.
+  // does, but only with a keyboard and mouse, and not in Sync mode.
   const hints = keyHints();
   const nudgeHint = $derived(cueNudgeHint(hints, syncing));
 

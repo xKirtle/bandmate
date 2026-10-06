@@ -102,7 +102,7 @@ export function fieldStep(
   return by === null ? null : fieldInRange(value + by, field);
 }
 
-/** A field's tooltip, naming the keys that step it, e.g. "↑ or ↓ steps it by 1 ms, …", or undefined without a fine pointer. */
+/** A field's tooltip, naming the keys that step it, e.g. "↑ or ↓ steps it by 1 ms, …", or undefined on a phone or a narrow window. */
 export function fieldHint(field: Pick<MenuField, 'step' | 'shiftStep' | 'unit'>, hints: KeyHints): string | undefined {
   const step = hints.twoWay(stepKeys, 'forward');
   if (!step) return undefined;

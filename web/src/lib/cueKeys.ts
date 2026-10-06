@@ -16,7 +16,7 @@ export function cueNudge(e: KeyPress, syncing: boolean): 1 | -1 | null {
 /**
  * The keys that nudge a Cue, later then earlier, named for its tooltip and
  * declared for `aria-keyshortcuts`, or neither in Sync mode, where they do
- * nothing, or without a fine pointer.
+ * nothing, or on a phone or a narrow window.
  */
 export function cueNudgeHint(hints: KeyHints, syncing: boolean): { label: string | null; aria: string | undefined } {
   if (syncing) return { label: null, aria: undefined };

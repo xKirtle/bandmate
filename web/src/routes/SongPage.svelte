@@ -29,7 +29,7 @@
   import type { Saved } from '../lib/history';
   import { takeNewFlag } from '../lib/newSong';
   import { navigate, replaceSearch, router } from '../lib/router.svelte';
-  import { finePointer, keyHints } from '../lib/keyHints';
+  import { keyboardAndMouse, keyHints } from '../lib/keyHints';
   import { shortcutsDialogKeys } from '../lib/shortcuts';
   import ShortcutsDialog from '../lib/ShortcutsDialog.svelte';
   import { keyPlace } from '../lib/keyPlace';
@@ -135,8 +135,8 @@
     () => (song ? `${song.arrangement}|${song.scrapbook}` : ''),
   );
   // The shortcuts dialog, opened by its button or ?. Shortcuts are for a
-  // keyboard and mouse, so the button only shows with a fine pointer, and
-  // never on a phone.
+  // keyboard and mouse, so the button never shows on a phone or a narrow
+  // window, though ? still opens the dialog there.
   let showingShortcuts = $state(false);
   const hints = keyHints();
 
@@ -581,7 +581,7 @@
                 <label class="mode"><input type="radio" name="song-mode" value="write" bind:group={mode} />Write</label>
                 <label class="mode"><input type="radio" name="song-mode" value="read" bind:group={mode} />Read</label>
               </fieldset>
-              {#if finePointer()}
+              {#if keyboardAndMouse()}
                 <button
                   type="button"
                   class="button shortcuts"

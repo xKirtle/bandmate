@@ -14,54 +14,63 @@ import {
 let query: MediaQuery | undefined;
 
 /**
- * Whether this device has a fine pointer, e.g. a mouse or a trackpad,
- * following it as one is plugged in or taken away. Shortcuts are for a
- * keyboard and mouse, so without one, e.g. on a phone, nothing names them.
+ * A keyboard and mouse, as far as a browser can tell: a window at least
+ * 40rem wide, the phone breakpoint, whose primary pointer can hover, as
+ * the icon button's hover box asks. Some phones report a fine pointer
+ * anyway, but none hovers.
  */
-export function finePointer(): boolean {
-  query ??= new MediaQuery('any-pointer: fine');
+export const keyboardAndMouseQuery = '(min-width: 40rem) and (hover: hover)';
+
+/**
+ * Whether this looks like a keyboard and mouse, following the window as it
+ * resizes and the pointer as one is plugged in or taken away. Shortcuts are
+ * for a keyboard and mouse, so on a phone or a narrow window neither the
+ * shortcuts button nor any key names show. The Shortcuts still work there.
+ */
+export function keyboardAndMouse(): boolean {
+  query ??= new MediaQuery(keyboardAndMouseQuery);
   return query.current;
 }
 
 /**
  * Names Shortcuts' keys in tooltips and hints, and declares them in
- * `aria-keyshortcuts`, as a platform does, but only with a fine pointer.
+ * `aria-keyshortcuts`, as a platform does, but only with a keyboard and mouse.
  * A control's usual keys aren't Shortcuts. Most are written out in a hint
  * as they are, e.g. Enter saving a field, but a number box's ↑/↓ are named
  * here too, so they show as the platform shows them.
  */
 export class KeyHints {
   #on: Platform;
-  #finePointer: () => boolean;
+  #keyboardAndMouse: () => boolean;
 
-  constructor(on: Platform, finePointer: () => boolean) {
+  constructor(on: Platform, keyboardAndMouse: () => boolean) {
     this.#on = on;
-    this.#finePointer = finePointer;
+    this.#keyboardAndMouse = keyboardAndMouse;
   }
 
-  /** Names `keys` as this platform does, e.g. "⌘Z", or null without a fine pointer. */
+  /** Names `keys` as this platform does, e.g. "⌘Z", or null on a phone or a narrow window. */
   label(keys: readonly Key[]): string | null {
-    return this.#finePointer() ? keysLabel(keys, this.#on) : null;
+    return this.#keyboardAndMouse() ? keysLabel(keys, this.#on) : null;
   }
 
-  /** Names two-way keys, e.g. a Shortcut's, "⌥↓ or ⌥↑", back first unless asked otherwise, or null without a fine pointer. */
+  /** Names two-way keys, e.g. a Shortcut's, "⌥↓ or ⌥↑", back first unless asked otherwise, or null on a phone or a narrow window. */
   twoWay(shortcut: TwoWay, first: FirstWay = 'back'): string | null {
-    return this.#finePointer() ? twoWayLabel(shortcut, this.#on, first) : null;
+    return this.#keyboardAndMouse() ? twoWayLabel(shortcut, this.#on, first) : null;
   }
 
-  /** `text` with `keys` named after it, e.g. "Undo (⌘Z)", or just `text` without a fine pointer. */
+  /** `text` with `keys` named after it, e.g. "Undo (⌘Z)", or just `text` on a phone or a narrow window. */
   withKeys(text: string, keys: readonly Key[]): string {
     const label = this.label(keys);
     return label ? `${text} (${label})` : text;
   }
 
-  /** Declares `keys` for `aria-keyshortcuts`, or undefined, leaving it off, without a fine pointer. */
+  /** Declares `keys` for `aria-keyshortcuts`, or undefined, leaving it off, on a phone or a narrow window. */
   aria(keys: readonly Key[]): string | undefined {
-    return this.#finePointer() ? ariaKeyShortcuts(keys, this.#on) : undefined;
+    return this.#keyboardAndMouse() ? ariaKeyShortcuts(keys, this.#on) : undefined;
   }
 }
 
-/** Key hints for this browser's platform and pointer. */
+/** Key hints for this browser's platform, window and pointer. */
 export function keyHints(): KeyHints {
-  return new KeyHints(platform(), finePointer);
+  return new KeyHints(platform(), keyboardAndMouse);
 }

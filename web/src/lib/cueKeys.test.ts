@@ -60,7 +60,7 @@ group('The nudge hint', () => {
     expect(cueNudgeHint(desktop(), syncing)).toEqual({ label: null, aria: undefined });
   });
 
-  it('names no keys without a fine pointer', () => {
+  it('names no keys on a phone or a narrow window', () => {
     expect(cueNudgeHint(new KeyHints('other', () => false), writing)).toEqual({ label: null, aria: undefined });
   });
 });
