@@ -3,16 +3,6 @@
 // dragged height is kept on this device as the least a Song's area starts at,
 // and never taller than the window allows or the Tracks need.
 
-/**
- * A phone held sideways, or any landscape window under 30rem tall: the
- * Timeline fills the window, and its Tracks area takes all the height below
- * the transport row, whatever height is chosen.
- */
-export const fullScreenQuery = '(orientation: landscape) and (height < 30rem)';
-
-/** A phone held upright: the transport row alone, where the full-screen Timeline isn't. */
-export const phoneQuery = '(max-width: 40rem) and ((orientation: portrait) or (height >= 30rem))';
-
 /** Where the chosen height is kept on this device. */
 export const heightKey = 'bandmate.timelineHeight';
 

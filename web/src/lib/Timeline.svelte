@@ -127,12 +127,12 @@
     clampHeight,
     defaultHeight,
     deviceStorage,
-    fullScreenQuery,
     grownHeight,
     heightBounds,
     readHeight,
     storeHeight,
   } from './timelineHeight';
+  import { fullScreenQuery } from './timelineLayout';
   import { audioContext, TimelinePlayer, type PlayableClip, type PlayerState } from './timelinePlayer';
   import { forgetUnsaved, Keeper, unsavedSamples, unsavedTakes, whileHeld } from './unsavedTakes';
   import {
@@ -340,8 +340,10 @@
   // A phone held sideways: the Timeline fills the window and can't be
   // collapsed, its Tracks taking all the height below the transport row.
   const fullScreen = new MediaQuery(fullScreenQuery);
-  // Collapsing is only set aside there, so it's back on turning upright or widening the window.
+  // Collapsing is only set aside there, so it's back on turning upright or
+  // widening the window.
   const tracksShown = $derived(!collapsed || fullScreen.current);
+  const resizable = $derived(!collapsed && !fullScreen.current);
 
   // Decode in the background, so playing can start right away.
   $effect(() => {
@@ -2856,7 +2858,7 @@
   ondragleave={filesLeave}
   ondrop={filesDrop}
 >
-  {#if tracksShown && !fullScreen.current}
+  {#if resizable}
     <!-- A focusable separator with a value is a widget, resized with Up and Down. -->
     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
     <div
@@ -4536,7 +4538,8 @@
     .transport > * {
       flex-shrink: 0;
     }
-    /* A message gives way first, cut short rather than wrapping, so the Tracks keep their height mid-take. */
+    /* A message gives way first, cut short rather than wrapping, so the
+       Tracks keep their height mid-take. */
     .transport > .status {
       flex-shrink: 1;
       min-width: 0;
