@@ -26,10 +26,13 @@
   // upload, and hands it on to be added.
   let {
     maxUploadBytes,
+    card = true,
     onFetched,
     onClose,
   }: {
     maxUploadBytes: number;
+    /** A card on the page; off, it fills a dialog, such as the Beat Picker. */
+    card?: boolean;
     onFetched: (fromLink: FromLink) => void;
     onClose: () => void;
   } = $props();
@@ -86,7 +89,7 @@
   onDestroy(() => busy?.abort());
 </script>
 
-<form class="card from-link" onsubmit={fetchLink} aria-labelledby="from-link-heading">
+<form class="from-link" class:card onsubmit={fetchLink} aria-labelledby="from-link-heading">
   <h2 id="from-link-heading">Add from link</h2>
   <label class="field" for="from-link-link">Link to one video</label>
   <!-- svelte-ignore a11y_autofocus -->
@@ -126,6 +129,8 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
+  }
+  .card {
     margin-bottom: var(--space-6);
     padding: var(--space-4);
   }

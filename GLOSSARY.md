@@ -128,7 +128,7 @@ The user's collection of Beats, uploaded or added from a link, shared across all
 _Avoid_: Beat store, uploads
 
 **Beat Picker**:
-Where a Beat is chosen from the Beat Library, or uploaded into it, to place on the Chosen Track.
+Where a Beat is chosen from the Beat Library, or uploaded or added from a link into it, to place on the Chosen Track.
 _Avoid_: Beat dialog, Beat modal
 
 **Beat preview**:
