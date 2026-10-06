@@ -20,6 +20,7 @@ import {
   songListViewFromParams,
   songListViewToParams,
   sortSongs,
+  statusFilterLabel,
   toggleSort,
   type BeatColumn,
   type BeatListView,
@@ -151,7 +152,7 @@ describe('loadSongList', () => {
       asked.push(filter);
       return all.filter(
         (s) =>
-          (!filter.status || s.status === filter.status) &&
+          (!filter.statuses || filter.statuses.includes(s.status)) &&
           (!filter.q || s.title.includes(filter.q)) &&
           (filter.folder === undefined || s.folderId === (filter.folder === 'none' ? null : filter.folder)),
       );
@@ -167,12 +168,12 @@ describe('loadSongList', () => {
 
   it('asks for every Song when none match, to tell no matches from no Songs', async () => {
     const { list } = server([song('Night Drive', { status: 'drafting' })]);
-    expect(await loadSongList({ status: 'finished' }, list)).toEqual({ songs: [], anySongs: true });
+    expect(await loadSongList({ statuses: ['finished'] }, list)).toEqual({ songs: [], anySongs: true });
   });
 
   it('tells there are no Songs when filters are set but there are none to match', async () => {
     const { list } = server([]);
-    expect(await loadSongList({ status: 'finished', q: 'night', hasMaster: true }, list)).toEqual({
+    expect(await loadSongList({ statuses: ['finished'], q: 'night', hasMaster: true }, list)).toEqual({
       songs: [],
       anySongs: false,
     });
@@ -181,14 +182,17 @@ describe('loadSongList', () => {
   it('asks only once when some Songs match', async () => {
     const nightDrive = song('Night Drive', { status: 'drafting' });
     const { asked, list } = server([nightDrive, song('Daylight')]);
-    expect(await loadSongList({ status: 'drafting' }, list)).toEqual({ songs: [nightDrive], anySongs: true });
-    expect(asked).toEqual([{ status: 'drafting' }]);
+    expect(await loadSongList({ statuses: ['drafting', 'finished'] }, list)).toEqual({
+      songs: [nightDrive],
+      anySongs: true,
+    });
+    expect(asked).toEqual([{ statuses: ['drafting', 'finished'] }]);
   });
 
   it('inside a Folder, tells whether it holds any Songs, whatever the filters', async () => {
     const { asked, list } = server([song('Night Drive', { folderId: 3 }), song('Elsewhere', { folderId: 4 })]);
-    expect(await loadSongList({ folder: 3, status: 'finished' }, list)).toEqual({ songs: [], anySongs: true });
-    expect(asked).toEqual([{ folder: 3, status: 'finished' }, { folder: 3 }]);
+    expect(await loadSongList({ folder: 3, statuses: ['finished'] }, list)).toEqual({ songs: [], anySongs: true });
+    expect(asked).toEqual([{ folder: 3, statuses: ['finished'] }, { folder: 3 }]);
     asked.length = 0;
     expect(await loadSongList({ folder: 5 }, list)).toEqual({ songs: [], anySongs: false });
     expect(asked).toEqual([{ folder: 5 }]);
@@ -211,15 +215,16 @@ describe('songListFilter', () => {
 
   it('at the top level, a search or any filter asks for every Song, whatever its Folder', () => {
     expect(songListFilter(view({ q: 'night' }))).toEqual({ q: 'night' });
-    expect(songListFilter(view({ status: 'drafting' }))).toEqual({ status: 'drafting' });
+    expect(songListFilter(view({ statuses: ['drafting'] }))).toEqual({ statuses: ['drafting'] });
+    expect(songListFilter(view({ statuses: ['idea', 'drafting'] }))).toEqual({ statuses: ['idea', 'drafting'] });
     expect(songListFilter(view({ hasMaster: true }))).toEqual({ hasMaster: true });
   });
 
   it('inside a Folder, asks only for its Songs, filtered or not', () => {
     expect(songListFilter(view(), 3)).toEqual({ folder: 3 });
-    expect(songListFilter(view({ q: 'night', status: 'idea', hasMaster: true }), 3)).toEqual({
+    expect(songListFilter(view({ q: 'night', statuses: ['idea', 'finished'], hasMaster: true }), 3)).toEqual({
       q: 'night',
-      status: 'idea',
+      statuses: ['idea', 'finished'],
       hasMaster: true,
       folder: 3,
     });
@@ -233,7 +238,8 @@ describe('isSongListFiltered', () => {
       false,
     );
     expect(isSongListFiltered({ ...defaultSongListView, q: 'night' })).toBe(true);
-    expect(isSongListFiltered({ ...defaultSongListView, status: 'finished' })).toBe(true);
+    expect(isSongListFiltered({ ...defaultSongListView, statuses: ['finished'] })).toBe(true);
+    expect(isSongListFiltered({ ...defaultSongListView, statuses: ['idea', 'drafting', 'finished'] })).toBe(true);
     expect(isSongListFiltered({ ...defaultSongListView, hasMaster: true })).toBe(true);
   });
 });
@@ -267,6 +273,17 @@ describe('toggleSort', () => {
   });
 });
 
+describe('statusFilterLabel', () => {
+  it('names the filter alone while no Status is picked', () => {
+    expect(statusFilterLabel([])).toBe('Status');
+  });
+
+  it('names the Statuses picked, capitalised, in lifecycle order', () => {
+    expect(statusFilterLabel(['drafting'])).toBe('Status: Drafting');
+    expect(statusFilterLabel(['finished', 'idea', 'drafting'])).toBe('Status: Idea, Drafting, Finished');
+  });
+});
+
 describe('the Song list in the URL', () => {
   const roundTrip = (view: SongListView) => songListViewFromParams(songListViewToParams(view));
 
@@ -278,22 +295,44 @@ describe('the Song list in the URL', () => {
   it('keeps each filter and sort through a round trip', () => {
     const views: SongListView[] = [
       { ...defaultSongListView, q: 'night drive' },
-      { ...defaultSongListView, status: 'drafting' },
+      { ...defaultSongListView, statuses: ['drafting'] },
+      { ...defaultSongListView, statuses: ['idea', 'drafting'] },
       { ...defaultSongListView, hasMaster: true },
       { ...defaultSongListView, sort: { column: 'bpm', direction: 'asc' } },
       { ...defaultSongListView, sort: { column: 'edited', direction: 'asc' } },
-      { q: 'canção & 100%', status: 'finished', hasMaster: true, sort: { column: 'title', direction: 'desc' } },
+      {
+        q: 'canção & 100%',
+        statuses: ['drafting', 'finished'],
+        hasMaster: true,
+        sort: { column: 'title', direction: 'desc' },
+      },
     ];
     for (const view of views) expect(roundTrip(view)).toEqual(view);
   });
 
   it('writes only what differs from the default', () => {
-    expect(songListViewToParams({ ...defaultSongListView, status: 'idea', hasMaster: true }).toString()).toBe(
+    expect(songListViewToParams({ ...defaultSongListView, statuses: ['idea'], hasMaster: true }).toString()).toBe(
       'status=idea&hasMaster=true',
+    );
+    expect(songListViewToParams({ ...defaultSongListView, statuses: ['idea', 'finished'] }).toString()).toBe(
+      'status=idea&status=finished',
     );
     expect(
       songListViewToParams({ ...defaultSongListView, sort: { column: 'bpm', direction: 'desc' } }).toString(),
     ).toBe('sort=-bpm');
+  });
+
+  it('reads an old URL with a single Status', () => {
+    expect(songListViewFromParams(new URLSearchParams('status=drafting'))).toEqual({
+      ...defaultSongListView,
+      statuses: ['drafting'],
+    });
+  });
+
+  it('reads several Statuses in lifecycle order, each once, leaving out unknown ones', () => {
+    expect(
+      songListViewFromParams(new URLSearchParams('status=finished&status=released&status=idea&status=finished')),
+    ).toEqual({ ...defaultSongListView, statuses: ['idea', 'finished'] });
   });
 
   it('leaves a blank search out', () => {

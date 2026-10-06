@@ -19,8 +19,8 @@ export const songColumns: readonly SongColumn[] = ['title', 'status', 'key', 'bp
 export interface SongListView {
   /** Matched against titles; blank matches every Song. */
   q: string;
-  /** Only Songs with this Status, or any Status. */
-  status?: Status;
+  /** Only Songs with any of these Statuses, in lifecycle order; none keeps every Status. */
+  statuses: Status[];
   /** Only Songs with a Master. */
   hasMaster: boolean;
   sort: Sort<SongColumn>;
@@ -28,6 +28,7 @@ export interface SongListView {
 
 export const defaultSongListView: SongListView = {
   q: '',
+  statuses: [],
   hasMaster: false,
   sort: { column: 'edited', direction: 'desc' },
 };
@@ -105,7 +106,7 @@ function sortFromParam<C extends string>(param: string | null, columns: readonly
 export function songListViewToParams(view: SongListView): URLSearchParams {
   const params = new URLSearchParams();
   if (view.q.trim()) params.set('q', view.q);
-  if (view.status) params.set('status', view.status);
+  for (const status of view.statuses) params.append('status', status);
   if (view.hasMaster) params.set('hasMaster', 'true');
   const sort = sortToParam(view.sort);
   if (sort !== sortToParam(defaultSongListView.sort)) params.set('sort', sort);
@@ -117,18 +118,34 @@ export function songListViewToParams(view: SongListView): URLSearchParams {
  * malformed falls back to the default rather than failing.
  */
 export function songListViewFromParams(params: URLSearchParams): SongListView {
-  const status = params.get('status');
+  // Several, or, from before several could be picked, one.
+  const picked = params.getAll('status');
   return {
     q: params.get('q') ?? defaultSongListView.q,
-    status: statuses.find((s) => s === status),
+    statuses: statuses.filter((s) => picked.includes(s)),
     hasMaster: params.get('hasMaster') === 'true',
     sort: sortFromParam(params.get('sort'), songColumns) ?? defaultSongListView.sort,
   };
 }
 
+/**
+ * What a filter button says: the filter's name, and, once some are picked,
+ * what's picked, e.g. "Status: Idea, Drafting".
+ */
+function filterLabel(name: string, picked: readonly string[]): string {
+  return picked.length > 0 ? `${name}: ${picked.join(', ')}` : name;
+}
+
+const capitalised = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** What the Status filter's button says, naming the Statuses picked in lifecycle order. */
+export function statusFilterLabel(picked: readonly Status[]): string {
+  return filterLabel('Status', statuses.filter((s) => picked.includes(s)).map(capitalised));
+}
+
 /** Whether a Song list view searches or filters, rather than only sorting. */
 export function isSongListFiltered(view: SongListView): boolean {
-  return !!(view.q.trim() || view.status || view.hasMaster);
+  return !!(view.q.trim() || view.statuses.length > 0 || view.hasMaster);
 }
 
 /**
@@ -139,7 +156,7 @@ export function isSongListFiltered(view: SongListView): boolean {
 export function songListFilter(view: SongListView, folderId?: number): SongFilter {
   const filter: SongFilter = {};
   if (view.q.trim()) filter.q = view.q;
-  if (view.status) filter.status = view.status;
+  if (view.statuses.length > 0) filter.statuses = [...view.statuses];
   if (view.hasMaster) filter.hasMaster = true;
   if (folderId !== undefined) filter.folder = folderId;
   else if (!isSongListFiltered(view)) filter.folder = 'none';

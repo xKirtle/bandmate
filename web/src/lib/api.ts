@@ -169,7 +169,8 @@ export type SongChanges = Partial<Pick<Song, 'title' | 'status' | 'key' | 'bpm' 
 
 /** Narrows the Song list. */
 export interface SongFilter {
-  status?: Status;
+  /** Only Songs with any of these Statuses. */
+  statuses?: Status[];
   /** Matches titles containing it, ignoring case. */
   q?: string;
   /** Only Songs with a Master (true) or without one (false). */
@@ -792,7 +793,7 @@ export const api = {
 
   listSongs: (filter: SongFilter = {}) => {
     const params = new URLSearchParams();
-    if (filter.status) params.set('status', filter.status);
+    for (const status of filter.statuses ?? []) params.append('status', status);
     if (filter.q?.trim()) params.set('q', filter.q.trim());
     if (filter.hasMaster !== undefined) params.set('hasMaster', String(filter.hasMaster));
     if (filter.folder !== undefined) params.set('folder', String(filter.folder));

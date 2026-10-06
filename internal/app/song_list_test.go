@@ -47,12 +47,33 @@ func TestSongListCanBeFilteredByStatus(t *testing.T) {
 	}
 }
 
+func TestSongListCanBeFilteredBySeveralStatuses(t *testing.T) {
+	ts := newTestServer(t)
+	ts.createSong("Just An Idea")
+	ts.updateSong(ts.createSong("Half Written").ID, map[string]any{"status": "drafting"})
+	ts.updateSong(ts.createSong("Done").ID, map[string]any{"status": "finished"})
+
+	cases := map[string][]string{
+		"status=idea&status=drafting":                 {"Half Written", "Just An Idea"},
+		"status=drafting&status=finished":             {"Done", "Half Written"},
+		"status=idea&status=drafting&status=finished": {"Done", "Half Written", "Just An Idea"},
+		"status=idea&status=idea":                     {"Just An Idea"},
+		"status=finished&status=&q=d":                 {"Done"},
+	}
+	for query, want := range cases {
+		if got := titles(ts.listSongs(query)); !reflect.DeepEqual(got, want) {
+			t.Errorf("song list for %q = %v, want %v", query, got, want)
+		}
+	}
+}
+
 func TestSongListRejectsUnknownStatusFilter(t *testing.T) {
 	ts := newTestServer(t)
 
-	res := ts.Do(http.MethodGet, "/api/songs?status=released", nil)
-
-	expectStatus(t, res, http.StatusBadRequest)
+	for _, query := range []string{"status=released", "status=idea&status=released"} {
+		res := ts.Do(http.MethodGet, "/api/songs?"+query, nil)
+		expectStatus(t, res, http.StatusBadRequest)
+	}
 }
 
 func TestSongListCanBeSearchedByTitle(t *testing.T) {

@@ -13,9 +13,10 @@ import (
 
 func (a *App) listSongs(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
-	filter := lyricsheet.SongFilter{
-		Status: lyricsheet.Status(query.Get("status")),
-		Title:  query.Get("q"),
+	// Several Statuses keep the Songs with any of them.
+	filter := lyricsheet.SongFilter{Title: query.Get("q")}
+	for _, status := range query["status"] {
+		filter.Statuses = append(filter.Statuses, lyricsheet.Status(status))
 	}
 	switch hasMaster := query.Get("hasMaster"); hasMaster {
 	case "":
