@@ -1,9 +1,11 @@
 name: CI
 
 # Pull requests only test, and check the image's bundled programs run. A push
-# to main does both again, then publishes the image as `:edge` and
-# `:sha-<short>`. A `v*` version tag (e.g. `v0.4.0`) does too, then publishes
-# a release as `:0.4.0`, `:0.4` and `:latest`, so `latest` is the newest
+# to main only publishes the image as `:edge` and `:sha-<short>`: main's
+# ruleset requires a pull request to be up to date and to pass `test` and
+# `bundle` before it merges, so what lands is what they checked. A `v*`
+# version tag (e.g. `v0.4.0`) tests and checks again, then publishes a
+# release as `:0.4.0`, `:0.4` and `:latest`, so `latest` is the newest
 # release, never the latest merge. Changes to main or a PR that only touch
 # docs or other files outside the build skip every job.
 #
@@ -31,7 +33,7 @@ env:
 
 jobs:
   # Whether anything the build or tests read has changed. The workflow itself
-  # always runs, so the required `test` check always reports: skipped counts
+  # always runs, so the required `test` and `bundle` checks always report: skipped counts
   # as passing, while a check that never starts leaves the PR waiting.
   # A tag has no previous commit to diff against, and a release must be
   # tested whatever changed, so a tag always counts as a code change. So does
@@ -65,9 +67,10 @@ jobs:
             echo code=false >> "$GITHUB_OUTPUT"
           fi
 
+  # Not on a push to main, whose pull request ran it on the same tree.
   test:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && !(github.event_name == 'push' && github.ref_type == 'branch')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -128,10 +131,10 @@ jobs:
   # Builds the image and runs the programs bundled in it (ADR 0016), so a
   # broken bundle, such as a yt-dlp that won't start, fails the build rather
   # than a user's fetch. Then checks the image starts and passes its
-  # healthcheck.
+  # healthcheck. Not on a push to main, like `test`.
   bundle:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && !(github.event_name == 'push' && github.ref_type == 'branch')
     runs-on: ubuntu-latest
     steps:
       - uses: docker/setup-buildx-action@v4
@@ -191,14 +194,18 @@ jobs:
           echo "::error::The image didn't become healthy (last status: $status)."
           exit 1
 
-  # Only on pushes to main and version tags: pull requests have the bundle
-  # job's build instead. A Dockerfile problem those miss only fails a
-  # publish, leaving the last good image in place (for a tag, that version
-  # goes unpublished until the tag is pushed again). Skipped with `test` and
-  # `bundle`, and never runs when either fails.
+  # Only on pushes to main and version tags that change code: pull requests
+  # have the bundle job's build instead. A Dockerfile problem those miss only
+  # fails a publish, leaving the last good image in place (for a tag, that
+  # version goes unpublished until the tag is pushed again). On main it runs
+  # alone, `test` and `bundle` having passed on the pull request; on a tag,
+  # only once both pass again. `!cancelled()` keeps it from being skipped
+  # with them on main.
   image:
-    needs: [test, bundle]
-    if: github.event_name == 'push'
+    needs: [changes, test, bundle]
+    if: >-
+      !cancelled() && github.event_name == 'push' && needs.changes.outputs.code == 'true' &&
+      (github.ref_type == 'branch' || (needs.test.result == 'success' && needs.bundle.result == 'success'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
