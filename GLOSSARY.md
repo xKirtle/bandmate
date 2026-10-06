@@ -213,7 +213,7 @@ _Avoid_: Bounce, export, render
 ### Around the app
 
 **Shortcut**:
-A key, or a key held with the mouse, that does something on a Song page without reaching for a button, like Space to play or R to record. Shortcuts are for a keyboard and mouse, so phones never show them. A control's usual keys, like arrows in a menu or Esc in a text field, work as they do everywhere and aren't Bandmate's Shortcuts.
+A key, or a key held with the mouse, that does something on a Song page without reaching for a button, like Space to play or R to record. Shortcuts are for a keyboard and mouse, so a phone or a narrow window never shows them, though they still work there. A control's usual keys, like arrows in a menu or Esc in a text field, work as they do everywhere and aren't Bandmate's Shortcuts.
 _Avoid_: Keybind, hotkey, key binding
 
 **Device**:

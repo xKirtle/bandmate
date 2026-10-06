@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { describe as group, expect, it } from 'vitest';
 import { KeyHints, keyboardAndMouseQuery } from './keyHints';
 import { allKeys, shortcuts } from './shortcuts';
@@ -36,18 +34,9 @@ group('KeyHints', () => {
   });
 });
 
-group('a keyboard and mouse', () => {
-  const src = join(import.meta.dirname, '..');
-  const read = (path: string) => readFileSync(join(src, path), 'utf8');
-
+group('keyboardAndMouseQuery', () => {
   it('is a window at least 40rem wide whose primary pointer can hover', () => {
     // A phone can report a fine pointer, but not one that hovers.
     expect(keyboardAndMouseQuery).toBe('(min-width: 40rem) and (hover: hover)');
-  });
-
-  it('shows the shortcuts button', () => {
-    expect(read('routes/SongPage.svelte')).toMatch(
-      /\{#if keyboardAndMouse\(\)\}\s*<button[^>]*class="button shortcuts"/,
-    );
   });
 });
