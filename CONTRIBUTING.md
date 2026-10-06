@@ -94,9 +94,9 @@ Vitest covers plain TypeScript modules in `web/src/lib` that don't touch the DOM
 ### Continuous integration
 
 1. Open a pull request. The [CI workflow](.github/workflows/ci.yml) checks the SPA's formatting, type-checks, unit-tests and builds it, checks the Go license manifest is up to date, and runs `go vet` and `go test`. Its `bundle` job builds the image, runs yt-dlp, ffmpeg and QuickJS in it, checks yt-dlp finds the other two, and checks the image starts healthy. Pushes to other branches don't run CI, so open a draft PR for early feedback. A pull request that only changes docs or other files outside the build skips the tests.
-2. Merge to `main`. CI runs again and, if it passes, builds and publishes the image to `ghcr.io/xkirtle/bandmate` tagged `edge` and `sha-<short>` (the commit's short SHA). A merge never moves `latest`.
+2. Merge to `main`. CI doesn't test again: it builds and publishes the image to `ghcr.io/xkirtle/bandmate` tagged `edge` and `sha-<short>` (the commit's short SHA). A merge never moves `latest`.
 
-`main` requires the `test` check to pass before merging. `bundle` isn't required, so check it's green too: on `main`, a failing `bundle` stops the image being published. (`image` only runs on pushes, so pull requests show it as skipped.)
+`main` requires a pull request to pass `test` and `bundle`, and to be up to date with `main`, before it merges, so what lands is what CI checked. A pull request that falls behind, because another merged first, needs updating (**Update branch**, or `gh pr update-branch`), and its checks run again. (`image` only runs on pushes, so pull requests show it as skipped.)
 
 ### Versions
 
