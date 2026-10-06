@@ -119,8 +119,9 @@
   import CalibrationDialog from './CalibrationDialog.svelte';
   import MixdownDialog from './MixdownDialog.svelte';
   import { mixdownEnd } from './mixdown';
-  import { appliedOffset, readCalibration, skipCalibration, storeOffset } from './calibration';
-  import { readInput } from './inputSettings';
+  import { appliedOffset } from './calibration';
+  import { calibration } from './sharedCalibration.svelte';
+  import { input } from './sharedInput.svelte';
   import {
     clampHeight,
     defaultHeight,
@@ -1080,23 +1081,20 @@
     };
   });
 
-  // The Latency Offset calibrated on this device, and calibration while it
-  // runs: offered before the first recording here, where the Clip to retake
-  // waits for it, or run from the recording settings.
-  let calibration = $state(readCalibration(deviceStorage()));
+  // Calibration while it runs, of the Latency Offset shared by this
+  // device's tabs: offered before the first recording here, where the Clip
+  // to retake waits for it, or run from the recording settings.
   let calibrating = $state<{ offer: boolean; retaking?: Clip } | null>(null);
   // Whether calibration was just skipped, to say where to run it later.
   let skipped = $state(false);
 
   function storeCalibrated(offset: number) {
-    storeOffset(deviceStorage(), offset);
     // Applied even where storage can't keep it, until reload.
-    calibration = { offset, offered: true };
+    calibration.set({ offset, offered: true });
   }
 
   function skipOffer() {
-    skipCalibration(deviceStorage());
-    calibration = { ...calibration, offered: true };
+    calibration.set({ ...calibration.value, offered: true });
     skipped = true;
   }
 
@@ -1129,7 +1127,7 @@
     // calibration, offered first, ran.
     if (!canRecord || (retaking && selected.size > 1)) return;
     // Calibration is offered first, the first time on this device.
-    if (!calibration.offered && calibration.offset === null) {
+    if (!calibration.value.offered && calibration.value.offset === null) {
       calibrating = { offer: true, retaking };
       return;
     }
@@ -1155,7 +1153,7 @@
       // Said up front where it can be, in place of a recording that fails.
       const trouble = await inputProblem();
       if (trouble) throw new CaptureError(trouble);
-      const capture = await Capture.open(audioContext(), readInput(deviceStorage()));
+      const capture = await Capture.open(audioContext(), $state.snapshot(input.value));
       recording = { ...starting, capture };
       if (capture.gone) inputNote = `${capture.gone} isn't connected, so recording from the default input.`;
       if (destroyed) throw new CaptureError('The Timeline closed before recording started.');
@@ -1176,7 +1174,7 @@
         clipId: starting.clipId,
         takes: clip ? takesAt(clip) : [],
         plan,
-        latencyOffset: appliedOffset(calibration, capture.latency),
+        latencyOffset: appliedOffset(calibration.value, capture.latency),
       };
       const first = frameAt(startedAt, capture.sampleRate);
       const keeper = new Keeper({
@@ -2917,10 +2915,10 @@
       <InputSettings
         bind:this={inputSettings}
         disabled={recording !== null || !editable.current}
-        offset={calibration.offset}
+        offset={calibration.value.offset}
         onCalibrate={() => (calibrating = { offer: false })}
       />
-      {#if calibration.offset === null && !recording}
+      {#if calibration.value.offset === null && !recording}
         <button
           type="button"
           class="not-calibrated edit-only"

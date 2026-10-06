@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
   appliedOffset,
   calibrationKey,
+  calibrationSetting,
   clickTimes,
   measureOffset,
   minHits,
   readCalibration,
-  skipCalibration,
-  storeOffset,
+  storeCalibration,
 } from './calibration';
+import { DeviceSetting } from './deviceSetting.svelte';
 
 const rate = 48000;
 
@@ -138,14 +139,13 @@ describe('readCalibration', () => {
 
   it('remembers skipping, still uncalibrated', () => {
     const s = storage();
-    skipCalibration(s);
+    storeCalibration(s, { offset: null, offered: true });
     expect(readCalibration(s)).toEqual({ offset: null, offered: true });
   });
 
   it('remembers the offset measured', () => {
     const s = storage();
-    skipCalibration(s);
-    storeOffset(s, 0.021);
+    storeCalibration(s, { offset: 0.021, offered: true });
     expect(readCalibration(s)).toEqual({ offset: 0.021, offered: true });
   });
 
@@ -159,10 +159,73 @@ describe('readCalibration', () => {
 
   it('is uncalibrated, and keeps nothing, when storage is blocked', () => {
     const s = storage({}, true);
-    storeOffset(s, 0.02);
-    skipCalibration(s);
+    storeCalibration(s, { offset: 0.02, offered: true });
     expect(readCalibration(s)).toEqual({ offset: null, offered: false });
     expect(readCalibration(undefined)).toEqual({ offset: null, offered: false });
+  });
+});
+
+describe("The Latency Offset's Device Setting", () => {
+  /** The Latency Offset as the app keeps it, in a stand-in Storage this device's other tabs share. */
+  function setting(values: Record<string, string> = {}, blocked = false) {
+    const tabs = new EventTarget();
+    const calibration = new DeviceSetting(calibrationSetting, storage(values, blocked), tabs);
+    /** Another tab keeps a value, or clears storage with a null key, as the browser tells this one. */
+    const otherTab = (key: string | null) => tabs.dispatchEvent(Object.assign(new Event('storage'), { key }));
+    return { calibration, values, otherTab };
+  }
+
+  const fresh = { offset: null, offered: false };
+
+  it('is uncalibrated and not yet offered until calibrated on this device', () => {
+    expect(setting().calibration.value).toEqual(fresh);
+  });
+
+  it('is uncalibrated and not yet offered when storage is blocked', () => {
+    expect(setting({}, true).calibration.value).toEqual(fresh);
+  });
+
+  it('keeps the offset measured, to read back after a reload', () => {
+    const { calibration, values } = setting();
+    calibration.set({ offset: 0.021, offered: true });
+    expect(calibration.value).toEqual({ offset: 0.021, offered: true });
+    expect(setting(values).calibration.value).toEqual({ offset: 0.021, offered: true });
+  });
+
+  it('keeps calibration skipped, to not offer it again after a reload', () => {
+    const { calibration, values } = setting();
+    calibration.set({ offset: null, offered: true });
+    expect(setting(values).calibration.value).toEqual({ offset: null, offered: true });
+  });
+
+  it('is the offset another tab calibrates', () => {
+    const { calibration, values, otherTab } = setting();
+    values[calibrationKey] = JSON.stringify({ offset: 0.034, offered: true });
+    otherTab(calibrationKey);
+    expect(calibration.value).toEqual({ offset: 0.034, offered: true });
+  });
+
+  it('is offered no more once another tab skips calibration', () => {
+    const { calibration, values, otherTab } = setting();
+    values[calibrationKey] = JSON.stringify({ offset: null, offered: true });
+    otherTab(calibrationKey);
+    expect(calibration.value).toEqual({ offset: null, offered: true });
+  });
+
+  it('is uncalibrated and not yet offered again when another tab clears storage', () => {
+    const { calibration, values, otherTab } = setting({
+      [calibrationKey]: JSON.stringify({ offset: 0.021, offered: true }),
+    });
+    delete values[calibrationKey];
+    otherTab(null);
+    expect(calibration.value).toEqual(fresh);
+  });
+
+  it('stays as calibrated where storage is blocked, whatever else another tab changes', () => {
+    const { calibration, otherTab } = setting({}, true);
+    calibration.set({ offset: 0.021, offered: true });
+    otherTab('bandmate.input');
+    expect(calibration.value).toEqual({ offset: 0.021, offered: true });
   });
 });
 

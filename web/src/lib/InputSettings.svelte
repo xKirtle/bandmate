@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { onDestroy, tick } from 'svelte';
+  import { onDestroy, tick, untrack } from 'svelte';
   import { formatOffset } from './calibration';
   import { CaptureError, InputLevel } from './capture';
-  import { channelName, deviceName, meterLevel, readInput, storeInput, type InputChoice } from './inputSettings';
+  import { channelName, deviceName, meterLevel, type InputChoice } from './inputSettings';
   import { placeBeside } from './popover';
-  import { deviceStorage } from './timelineHeight';
+  import { input } from './sharedInput.svelte';
   import { audioContext } from './timelinePlayer';
 
   // The recording settings, opened from the transport row's ⋯: the input
@@ -35,7 +35,10 @@
   // Between what they're placed by and the panel, in px.
   const gap = 4;
 
-  let choice = $state<InputChoice>(readInput(deviceStorage()));
+  // The Input chosen on this device, in this tab or another.
+  const choice = $derived(input.value);
+  // The one metered while they're open, to meter another chosen in another tab.
+  let metered: InputChoice | null = null;
   // The inputs connected, apart from the browser's own stand-ins for the default.
   let devices = $state<{ deviceId: string; label: string }[]>([]);
   let level = $state.raw<InputLevel | null>(null);
@@ -83,8 +86,9 @@
     audioContext()
       .resume()
       .catch(() => {});
+    metered = $state.snapshot(choice);
     try {
-      const opened = await InputLevel.open(audioContext(), $state.snapshot(choice));
+      const opened = await InputLevel.open(audioContext(), metered);
       if (mine !== generation) {
         opened.close();
         return;
@@ -127,8 +131,7 @@
   }
 
   function choose(next: InputChoice) {
-    choice = next;
-    storeInput(deviceStorage(), next);
+    input.set(next);
     meter();
   }
 
@@ -153,7 +156,6 @@
     anchor = by;
     returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     open = true;
-    choice = readInput(deviceStorage());
     await tick();
     if (!panel) return;
     panel.showPopover();
@@ -173,6 +175,7 @@
     generation++;
     closeLevel();
     opening = false;
+    metered = null;
     navigator.mediaDevices?.removeEventListener('devicechange', onDeviceChange);
     if (refocus) returnFocus?.focus();
     anchor = returnFocus = null;
@@ -200,6 +203,12 @@
 
   $effect(() => {
     if (disabled) hide(false);
+  });
+
+  // Another tab chose an Input while they're open: it's metered in place of the one before.
+  $effect(() => {
+    const { deviceId, channel } = choice;
+    if (open && metered && (deviceId !== metered.deviceId || channel !== metered.channel)) untrack(meter);
   });
 
   onDestroy(() => hide(false));

@@ -3,8 +3,7 @@
   import { clickCount, clickTimes, formatOffset, measureOffset, type Measurement } from './calibration';
   import { Capture, CaptureError } from './capture';
   import Dialog from './Dialog.svelte';
-  import { readInput } from './inputSettings';
-  import { deviceStorage } from './timelineHeight';
+  import { input } from './sharedInput.svelte';
   import { audioContext } from './timelinePlayer';
 
   // Calibrates the Latency Offset in a dialog: clicks play, the user taps
@@ -68,7 +67,7 @@
     error = null;
     try {
       await resumed;
-      const opened = await Capture.open(context, readInput(deviceStorage()));
+      const opened = await Capture.open(context, $state.snapshot(input.value));
       if (mine !== generation) return opened.close();
       capture = opened;
       // A moment on, so the first click is scheduled clear of now.
