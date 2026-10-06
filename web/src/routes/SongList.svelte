@@ -9,14 +9,16 @@
   import TagIcon from '@lucide/svelte/icons/tag';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import ActionsMenu from '../lib/ActionsMenu.svelte';
-  import { ApiError, api, statuses, type Folder, type SongSummary, type Status } from '../lib/api';
+  import { ApiError, api, statuses, type Folder, type SongSummary, type Status, type Tag } from '../lib/api';
   import DeleteFolderDialog from '../lib/DeleteFolderDialog.svelte';
+  import DeleteTagDialog from '../lib/DeleteTagDialog.svelte';
   import FilterButton from '../lib/FilterButton.svelte';
   import FolderNameDialog from '../lib/FolderNameDialog.svelte';
   import {
     defaultSongListView,
     isSongListFiltered,
     loadSongList,
+    renamePick,
     songCount,
     songListViewFromParams,
     songListFilter,
@@ -24,16 +26,19 @@
     sortFolders,
     sortSongs,
     statusFilterLabel,
+    togglePick,
     toggleSort,
     type SongColumn,
   } from '../lib/listViews';
   import type { MenuAction } from '../lib/menu';
   import { newSongPath } from '../lib/newSong';
+  import RenameTagDialog from '../lib/RenameTagDialog.svelte';
   import { navigate, replaceSearch, router } from '../lib/router.svelte';
   import SongCover from '../lib/SongCover.svelte';
   import { SongDragging, songTarget } from '../lib/songDragging.svelte';
   import StatusBadge from '../lib/StatusBadge.svelte';
   import TagChips from '../lib/TagChips.svelte';
+  import TagFilter from '../lib/TagFilter.svelte';
   import TagsDialog from '../lib/TagsDialog.svelte';
   import { timeAgo } from '../lib/time';
 
@@ -46,6 +51,8 @@
 
   let songs = $state<SongSummary[] | null>(null);
   let folders = $state<Folder[] | null>(null);
+  // Every Tag, wherever the Songs carrying it are, to filter by.
+  let tags = $state<Tag[]>([]);
   // Whether there are any Songs at all, whatever the filters: in the Folder
   // open, or anywhere at the top level. Without any, the search and filters
   // have nothing to act on, so they're hidden, and cleared so ones from the
@@ -117,14 +124,15 @@
             return { songs: [], anySongs: false };
           throw e;
         });
-        Promise.all([listing, api.listFolders()]).then(
-          ([result, allFolders]) => {
+        Promise.all([listing, api.listFolders(), api.listTags()]).then(
+          ([result, allFolders, allTags]) => {
             if (!current) return;
             songs = result.songs;
             acrossFolders = filter.folder === undefined;
             anySongs = result.anySongs;
             folders = allFolders;
-            if (!anySongs && (view.statuses.length > 0 || view.hasMaster || view.q)) clearFilters();
+            tags = allTags;
+            if (!anySongs && isSongListFiltered(view)) clearFilters();
             error = null;
             loaded = true;
           },
@@ -252,6 +260,21 @@
     ];
   }
 
+  // The Tag being renamed, or asked about deleting, if any, from the Tags
+  // filter. Picked, it stays picked as renamed, and goes as deleted.
+  let renamingTag = $state<Tag | null>(null);
+  let deletingTag = $state<Tag | null>(null);
+
+  function renamedTag(from: Tag, to: Tag) {
+    view.tags = renamePick(view.tags, from.name, to.name);
+    changes++;
+  }
+
+  function deletedTag(tag: Tag) {
+    view.tags = togglePick(view.tags, tag.name, false);
+    changes++;
+  }
+
   // The Song whose Tags are being changed, if any.
   let tagging = $state<SongSummary | null>(null);
 
@@ -351,6 +374,13 @@
             {/each}
           </fieldset>
         </FilterButton>
+        <TagFilter
+          picked={view.tags}
+          {tags}
+          onpick={(next) => (view.tags = next)}
+          onrename={(tag) => (renamingTag = tag)}
+          ondelete={(tag) => (deletingTag = tag)}
+        />
         <button
           type="button"
           class="chip"
@@ -535,6 +565,14 @@
 {/if}
 {#if tagging}
   <TagsDialog song={tagging} onSaved={() => changes++} onClose={() => (tagging = null)} />
+{/if}
+{#if renamingTag}
+  {@const from = renamingTag}
+  <RenameTagDialog tag={from} onSaved={(to) => renamedTag(from, to)} onClose={() => (renamingTag = null)} />
+{/if}
+{#if deletingTag}
+  {@const tag = deletingTag}
+  <DeleteTagDialog {tag} onDeleted={() => deletedTag(tag)} onClose={() => (deletingTag = null)} />
 {/if}
 {#if deleting}
   <DeleteFolderDialog

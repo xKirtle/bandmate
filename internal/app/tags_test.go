@@ -1,8 +1,10 @@
 package app_test
 
 import (
+	"fmt"
 	"net/http"
 	"reflect"
+	"slices"
 	"testing"
 )
 
@@ -191,4 +193,213 @@ func tagsWithoutIDs(list []tag) []tag {
 		out = append(out, t)
 	}
 	return out
+}
+
+// renameTag sends a Tag's new name, merging it into another Tag with that
+// name only when merge is set.
+func (ts *testServer) renameTag(id int64, name string, merge bool) response {
+	ts.t.Helper()
+	return ts.Do(http.MethodPatch, fmt.Sprintf("/api/tags/%d", id), map[string]any{"name": name, "merge": merge})
+}
+
+// deleteTag deletes a Tag.
+func (ts *testServer) deleteTag(id int64) response {
+	ts.t.Helper()
+	return ts.Do(http.MethodDelete, fmt.Sprintf("/api/tags/%d", id), nil)
+}
+
+// tagNamed finds a Tag by its name as listed.
+func (ts *testServer) tagNamed(name string) tag {
+	ts.t.Helper()
+	for _, t := range ts.listTags() {
+		if t.Name == name {
+			return t
+		}
+	}
+	ts.t.Fatalf("no Tag named %q", name)
+	return tag{}
+}
+
+func TestSongListCanBeFilteredBySeveralTags(t *testing.T) {
+	ts := newTestServer(t)
+	ts.tagSong(ts.createSong("Live Cover").ID, "Live", "Covers")
+	ts.tagSong(ts.createSong("Live Only").ID, "Live")
+	ts.tagSong(ts.createSong("Live Cover 2023").ID, "Live", "Covers", "Album 2023")
+	ts.createSong("Untagged")
+	ts.updateSong(ts.createSong("Finished Cover").ID, map[string]any{"status": "finished"})
+	ts.tagSong(ts.listSongs("q=finished")[0].ID, "Covers")
+
+	cases := map[string][]string{
+		"tag=Live":                           {"Live Cover 2023", "Live Only", "Live Cover"},
+		"tag=live":                           {"Live Cover 2023", "Live Only", "Live Cover"},
+		"tag=Live&tag=Covers":                {"Live Cover 2023", "Live Cover"},
+		"tag=Live&tag=Covers&tag=Album+2023": {"Live Cover 2023"},
+		"tag=Live&tag=Nothing":               {},
+		"tag=+covers+&tag=":                  {"Finished Cover", "Live Cover 2023", "Live Cover"},
+		"tag=Covers&status=finished":         {"Finished Cover"},
+		"tag=Covers&q=2023":                  {"Live Cover 2023"},
+		"tag=Live&tag=LIVE":                  {"Live Cover 2023", "Live Only", "Live Cover"},
+	}
+	for query, want := range cases {
+		if got := titles(ts.listSongs(query)); !reflect.DeepEqual(got, want) {
+			t.Errorf("song list for %q = %v, want %v", query, got, want)
+		}
+	}
+}
+
+func TestSongListByTagLooksInsideAFolderOrInEvery(t *testing.T) {
+	ts := newTestServer(t)
+	ep := ts.createFolder("EP")
+	inEP := ts.createSong("In the EP")
+	expectStatus(t, ts.moveSong(inEP.ID, &ep.ID), http.StatusNoContent)
+	ts.tagSong(inEP.ID, "Live")
+	ts.tagSong(ts.createSong("Loose").ID, "Live")
+
+	cases := map[string][]string{
+		"tag=Live":                               {"Loose", "In the EP"},
+		fmt.Sprintf("tag=Live&folder=%d", ep.ID): {"In the EP"},
+		"tag=Live&folder=none":                   {"Loose"},
+	}
+	for query, want := range cases {
+		if got := titles(ts.listSongs(query)); !reflect.DeepEqual(got, want) {
+			t.Errorf("song list for %q = %v, want %v", query, got, want)
+		}
+	}
+}
+
+func TestTitleSearchDoesntMatchTagNames(t *testing.T) {
+	ts := newTestServer(t)
+	ts.tagSong(ts.createSong("Opener").ID, "Live")
+
+	if got := titles(ts.listSongs("q=live")); len(got) != 0 {
+		t.Errorf("searching for a Tag's name lists %v, want nothing", got)
+	}
+}
+
+func TestTagCanBeRenamed(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.updateSong(ts.createSong("Opener").ID, map[string]any{"status": "finished"})
+	ts.tagSong(s.ID, "live", "Covers")
+	live := ts.tagNamed("live")
+
+	res := ts.renameTag(live.ID, "  Live shows ", false)
+
+	expectStatus(t, res, http.StatusOK)
+	var got tag
+	res.JSON(t, &got)
+	if want := (tag{ID: live.ID, Name: "Live shows", Songs: 1}); got != want {
+		t.Errorf("renamed tag = %+v, want %+v", got, want)
+	}
+	renamed := ts.getSong(s.ID)
+	if want := []string{"Covers", "Live shows"}; !reflect.DeepEqual(renamed.Tags, want) {
+		t.Errorf("song's tags = %v, want %v", renamed.Tags, want)
+	}
+	if renamed.Version != s.Version || renamed.UpdatedAt != s.UpdatedAt {
+		t.Errorf("after renaming a Tag, version %d edited %s; want %d and %s as before",
+			renamed.Version, renamed.UpdatedAt, s.Version, s.UpdatedAt)
+	}
+}
+
+func TestTagCanBeRenamedToItsOwnNameInAnotherCase(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.createSong("Opener")
+	ts.tagSong(s.ID, "live")
+
+	expectStatus(t, ts.renameTag(ts.tagNamed("live").ID, "Live", false), http.StatusOK)
+
+	if got := ts.getSong(s.ID).Tags; !reflect.DeepEqual(got, []string{"Live"}) {
+		t.Errorf("song's tags = %v, want [Live]", got)
+	}
+}
+
+func TestRenamingATagOntoAnothersNameAsksToMerge(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.createSong("Opener")
+	ts.tagSong(s.ID, "live")
+	ts.tagSong(ts.createSong("Closer").ID, "Live shows")
+
+	res := ts.renameTag(ts.tagNamed("live").ID, "LIVE SHOWS", false)
+
+	expectError(t, res, http.StatusConflict, "there's already a Tag called “Live shows”")
+	if got := ts.getSong(s.ID).Tags; !reflect.DeepEqual(got, []string{"live"}) {
+		t.Errorf("song's tags = %v, want [live] as before", got)
+	}
+}
+
+func TestRenamingATagOntoAnothersNameMergesThem(t *testing.T) {
+	ts := newTestServer(t)
+	both := ts.createSong("Both")
+	ts.tagSong(both.ID, "live", "Live shows", "Covers")
+	onlyLive := ts.createSong("Only live")
+	ts.tagSong(onlyLive.ID, "live")
+	onlyShows := ts.createSong("Only shows")
+	ts.tagSong(onlyShows.ID, "Live shows")
+	shows := ts.tagNamed("Live shows")
+
+	res := ts.renameTag(ts.tagNamed("live").ID, "live SHOWS", true)
+
+	expectStatus(t, res, http.StatusOK)
+	var got tag
+	res.JSON(t, &got)
+	if want := (tag{ID: shows.ID, Name: "live SHOWS", Songs: 3}); got != want {
+		t.Errorf("merged tag = %+v, want %+v, the other Tag, named as typed", got, want)
+	}
+	want := []tag{{Name: "Covers", Songs: 1}, {Name: "live SHOWS", Songs: 3}}
+	if got := tagsWithoutIDs(ts.listTags()); !reflect.DeepEqual(got, want) {
+		t.Errorf("tags = %+v, want %+v", got, want)
+	}
+	for _, s := range []song{both, onlyLive, onlyShows} {
+		if got := ts.getSong(s.ID).Tags; !slices.Contains(got, "live SHOWS") || slices.Contains(got, "live") {
+			t.Errorf("%s's tags = %v, want the merged Tag only", s.Title, got)
+		}
+	}
+}
+
+func TestRenamingATagNeedsANonBlankName(t *testing.T) {
+	ts := newTestServer(t)
+	ts.tagSong(ts.createSong("Opener").ID, "Live")
+
+	expectError(t, ts.renameTag(ts.tagNamed("Live").ID, "  ", false), http.StatusBadRequest,
+		"a Tag's name can't be blank")
+}
+
+func TestRenamingAnUnknownTagIsNotFound(t *testing.T) {
+	ts := newTestServer(t)
+	ts.tagSong(ts.createSong("Opener").ID, "Live")
+
+	expectStatus(t, ts.renameTag(ts.tagNamed("Live").ID+1, "Covers", true), http.StatusNotFound)
+}
+
+func TestTagCanBeDeletedKeepingItsSongs(t *testing.T) {
+	ts := newTestServer(t)
+	opener := ts.updateSong(ts.createSong("Opener").ID, map[string]any{"status": "finished"})
+	ts.tagSong(opener.ID, "Live", "Covers")
+	closer := ts.createSong("Closer")
+	ts.tagSong(closer.ID, "Live")
+
+	expectStatus(t, ts.deleteTag(ts.tagNamed("Live").ID), http.StatusNoContent)
+
+	if got := titles(ts.listSongs()); !reflect.DeepEqual(got, []string{"Closer", "Opener"}) {
+		t.Errorf("songs = %v, want both kept", got)
+	}
+	after := ts.getSong(opener.ID)
+	if !reflect.DeepEqual(after.Tags, []string{"Covers"}) {
+		t.Errorf("opener's tags = %v, want [Covers]", after.Tags)
+	}
+	if after.Version != opener.Version || after.UpdatedAt != opener.UpdatedAt {
+		t.Errorf("after deleting a Tag, version %d edited %s; want %d and %s as before",
+			after.Version, after.UpdatedAt, opener.Version, opener.UpdatedAt)
+	}
+	if got := ts.getSong(closer.ID).Tags; len(got) != 0 {
+		t.Errorf("closer's tags = %v, want none", got)
+	}
+	if got, want := tagsWithoutIDs(ts.listTags()), []tag{{Name: "Covers", Songs: 1}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("tags = %+v, want %+v", got, want)
+	}
+}
+
+func TestDeletingAnUnknownTagIsNotFound(t *testing.T) {
+	ts := newTestServer(t)
+
+	expectStatus(t, ts.deleteTag(1), http.StatusNotFound)
 }

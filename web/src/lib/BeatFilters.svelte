@@ -1,16 +1,15 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import type { Beat } from './api';
+  import Checklist from './Checklist.svelte';
   import FilterButton from './FilterButton.svelte';
   import {
     beatKeys,
     beatProducers,
     bpmFilterLabel,
-    isPicked,
     keyFilterLabel,
     pickChoices,
     producerFilterLabel,
-    togglePick,
     useFilterLabel,
     type BeatListView,
     type BeatUse,
@@ -51,26 +50,6 @@
   ];
 </script>
 
-{#snippet checklist(name: string, choices: string[], picked: string[], pick: (next: string[]) => void, none: string)}
-  {#if choices.length === 0}
-    <p class="muted none">{none}</p>
-  {:else}
-    <fieldset class="choice-group checklist">
-      <legend class="visually-hidden">{name}</legend>
-      {#each choices as choice (choice)}
-        <label class="choice-row">
-          <input
-            type="checkbox"
-            checked={isPicked(picked, choice)}
-            onchange={(e) => pick(togglePick(picked, choice, e.currentTarget.checked))}
-          />
-          {choice}
-        </label>
-      {/each}
-    </fieldset>
-  {/if}
-{/snippet}
-
 <search class="filters">
   <div class="search-row">
     <label class="visually-hidden" for="{idPrefix}-search">Search Beats by title or producer</label>
@@ -86,16 +65,22 @@
   </div>
   <div class="filter-bar" role="group" aria-label="Filter Beats">
     <FilterButton name="Producer" label={producerFilterLabel(view.producers)} picked={view.producers.length > 0}>
-      {@render checklist(
-        'Producer',
-        producers,
-        view.producers,
-        (next) => (view.producers = next),
-        'No Beat has a producer.',
-      )}
+      <Checklist
+        name="Producer"
+        choices={producers}
+        picked={view.producers}
+        onpick={(next) => (view.producers = next)}
+        none="No Beat has a producer."
+      />
     </FilterButton>
     <FilterButton name="Key" label={keyFilterLabel(view.keys)} picked={view.keys.length > 0}>
-      {@render checklist('Key', keys, view.keys, (next) => (view.keys = next), 'No Beat has a key.')}
+      <Checklist
+        name="Key"
+        choices={keys}
+        picked={view.keys}
+        onpick={(next) => (view.keys = next)}
+        none="No Beat has a key."
+      />
     </FilterButton>
     <FilterButton
       name="BPM"
@@ -161,15 +146,6 @@
   .search-row input {
     flex: 1;
     min-width: 0;
-  }
-  /* A long list of producers or keys scrolls, about six at a time. */
-  .checklist {
-    max-height: calc(6 * var(--control));
-    overflow-y: auto;
-    padding-inline-end: var(--space-2);
-  }
-  .none {
-    margin: var(--space-2) 0;
   }
   .bpm {
     display: flex;

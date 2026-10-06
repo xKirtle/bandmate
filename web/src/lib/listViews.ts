@@ -21,6 +21,8 @@ export interface SongListView {
   q: string;
   /** Only Songs with any of these Statuses, in lifecycle order; none keeps every Status. */
   statuses: Status[];
+  /** Only Songs carrying all of these Tags, by name; none keeps every Song. */
+  tags: string[];
   /** Only Songs with a Master. */
   hasMaster: boolean;
   sort: Sort<SongColumn>;
@@ -29,6 +31,7 @@ export interface SongListView {
 export const defaultSongListView: SongListView = {
   q: '',
   statuses: [],
+  tags: [],
   hasMaster: false,
   sort: { column: 'edited', direction: 'desc' },
 };
@@ -107,6 +110,7 @@ export function songListViewToParams(view: SongListView): URLSearchParams {
   const params = new URLSearchParams();
   if (view.q.trim()) params.set('q', view.q);
   for (const status of view.statuses) params.append('status', status);
+  for (const tag of view.tags) if (tag.trim()) params.append('tag', tag);
   if (view.hasMaster) params.set('hasMaster', 'true');
   const sort = sortToParam(view.sort);
   if (sort !== sortToParam(defaultSongListView.sort)) params.set('sort', sort);
@@ -123,6 +127,7 @@ export function songListViewFromParams(params: URLSearchParams): SongListView {
   return {
     q: params.get('q') ?? defaultSongListView.q,
     statuses: statuses.filter((s) => picked.includes(s)),
+    tags: textsFromParams(params, 'tag'),
     hasMaster: params.get('hasMaster') === 'true',
     sort: sortFromParam(params.get('sort'), songColumns) ?? defaultSongListView.sort,
   };
@@ -143,9 +148,14 @@ export function statusFilterLabel(picked: readonly Status[]): string {
   return filterLabel('Status', statuses.filter((s) => picked.includes(s)).map(capitalised));
 }
 
+/** What the Tags filter's button says, naming the Tags picked, sorted. */
+export function tagFilterLabel(picked: readonly string[]): string {
+  return filterLabel('Tags', [...picked].sort(compareText));
+}
+
 /** Whether a Song list view searches or filters, rather than only sorting. */
 export function isSongListFiltered(view: SongListView): boolean {
-  return !!(view.q.trim() || view.statuses.length > 0 || view.hasMaster);
+  return !!(view.q.trim() || view.statuses.length > 0 || view.tags.length > 0 || view.hasMaster);
 }
 
 /**
@@ -157,6 +167,7 @@ export function songListFilter(view: SongListView, folderId?: number): SongFilte
   const filter: SongFilter = {};
   if (view.q.trim()) filter.q = view.q;
   if (view.statuses.length > 0) filter.statuses = [...view.statuses];
+  if (view.tags.length > 0) filter.tags = [...view.tags];
   if (view.hasMaster) filter.hasMaster = true;
   if (folderId !== undefined) filter.folder = folderId;
   else if (!isSongListFiltered(view)) filter.folder = 'none';
@@ -230,18 +241,38 @@ export const defaultBeatListView: BeatListView = {
 /** Text as a filter compares it: ignoring case and surrounding space. */
 const folded = (text: string) => text.trim().toLowerCase();
 
-/** Whether a producer or key is among those picked, ignoring case and surrounding space. */
+/** Whether a choice, e.g. a producer or Tag, is among those picked, ignoring case and surrounding space. */
 export const isPicked = (picked: readonly string[], choice: string) => picked.some((p) => folded(p) === folded(choice));
 
-/** The picks with a producer or key ticked on, once, or off. */
+/** The picks with a choice, e.g. a producer or Tag, ticked on, once, or off. */
 export function togglePick(picked: readonly string[], choice: string, on: boolean): string[] {
   const rest = picked.filter((p) => folded(p) !== folded(choice));
   return on ? [...rest, choice] : rest;
 }
 
+/** The choices a filter offers that contain what's typed to find one, ignoring case and surrounding space. */
+export function matchingChoices(choices: readonly string[], find: string): string[] {
+  const text = folded(find);
+  return choices.filter((c) => c.toLowerCase().includes(text));
+}
+
 /**
- * The producers or keys a filter offers: those picked that no Beat has now,
- * so they can be unticked, then the Library's.
+ * The picks once a choice is renamed, e.g. a Tag: in its place, under its
+ * new name, and once only, as renaming a Tag onto another's name merges
+ * them, whichever of the two was picked.
+ */
+export function renamePick(picked: readonly string[], from: string, to: string): string[] {
+  return picked.reduce((next: string[], p) => {
+    const name = folded(p) === folded(from) || folded(p) === folded(to) ? to : p;
+    if (!isPicked(next, name)) next.push(name);
+    return next;
+  }, []);
+}
+
+/**
+ * The choices a filter offers, e.g. producers or Tags: those picked that
+ * aren't among them now, e.g. a producer no Beat has, so they can be
+ * unticked, then the rest.
  */
 export function pickChoices(library: readonly string[], picked: readonly string[]): string[] {
   const missing = picked.filter((p, i) => !isPicked(library, p) && !isPicked(picked.slice(0, i), p));

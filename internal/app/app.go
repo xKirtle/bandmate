@@ -201,6 +201,8 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("PUT /api/songs/{id}/folder", a.moveSongToFolder)
 	mux.HandleFunc("PUT /api/songs/{id}/tags", a.setSongTags)
 	mux.HandleFunc("GET /api/tags", a.listTags)
+	mux.HandleFunc("PATCH /api/tags/{id}", a.renameTag)
+	mux.HandleFunc("DELETE /api/tags/{id}", a.deleteTag)
 	mux.HandleFunc("GET /api/folders", a.listFolders)
 	mux.HandleFunc("POST /api/folders", a.createFolder)
 	mux.HandleFunc("GET /api/folders/{id}", a.getFolder)
