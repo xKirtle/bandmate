@@ -124,7 +124,7 @@ An audio file in the user's Beat Library, carrying its own credit (producer, sou
 _Avoid_: Instrumental, backing track, sample
 
 **Beat Library**:
-The user's collection of uploaded Beats, shared across all Songs.
+The user's collection of Beats, uploaded or added from a link, shared across all Songs.
 _Avoid_: Beat store, uploads
 
 **Beat Picker**:
