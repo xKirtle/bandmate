@@ -35,7 +35,7 @@
   import { keyPlace } from '../lib/keyPlace';
   import { opensShortcuts } from '../lib/songKeys';
   import { detailsSummary, openingMode, sideParts, type Mode, type SidePart } from '../lib/songMode';
-  import { hasChords } from '../lib/chords';
+  import { chordsInRead } from '../lib/chordChart';
   import { songChordsShown } from '../lib/chordsShown';
   import { songTranspose } from '../lib/sharedTranspose.svelte';
   import { timeAgo } from '../lib/time';
@@ -88,8 +88,11 @@
   let mode = $state<Mode>('write');
   const writing = $derived(mode === 'write');
   // How far Read mode shows the Chords transposed: by the Lyric Sheet's
-  // amount while they show, and not at all while they're hidden or there are none.
-  const transpose = $derived(song && hasChords(song) && songChordsShown.of(id) ? songTranspose.of(id) : 0);
+  // amount while they show, and not at all while they're hidden or Read mode
+  // shows none, e.g. when only the Scrapbook has Chords.
+  const transpose = $derived(
+    song && chordsInRead(song) === 'shown' && songChordsShown.of(id) ? songTranspose.of(id) : 0,
+  );
   // The Details as Read mode shows them, with the key the Chords are shown in.
   const summary = $derived(detailsSummary(draft, transpose));
   const hasNotes = $derived(draft.notes.trim() !== '');
