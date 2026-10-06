@@ -179,7 +179,7 @@
         knownTags = [...new Set([...knownTags, ...saved])];
       },
     ).then((ok) => {
-      if (!ok && song) tags = song.tags;
+      if (!ok && change === tagChanges && song) tags = song.tags;
     });
   }
 

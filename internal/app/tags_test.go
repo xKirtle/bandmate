@@ -84,7 +84,7 @@ func TestTagNamesAreMatchedIgnoringCase(t *testing.T) {
 		t.Errorf("tags = %v, want the existing %v, once each", got, want)
 	}
 	want := []tag{{Name: "Canção", Songs: 2}, {Name: "Live", Songs: 2}}
-	if got := tagNames(ts.listTags()); !reflect.DeepEqual(got, want) {
+	if got := tagsWithoutIDs(ts.listTags()); !reflect.DeepEqual(got, want) {
 		t.Errorf("tags listed = %+v, want %+v", got, want)
 	}
 }
@@ -159,11 +159,11 @@ func TestTagGoesWithItsLastSong(t *testing.T) {
 	ts.tagSong(opener.ID, "Live")
 
 	want := []tag{{Name: "Live", Songs: 2}}
-	if got := tagNames(ts.listTags()); !reflect.DeepEqual(got, want) {
+	if got := tagsWithoutIDs(ts.listTags()); !reflect.DeepEqual(got, want) {
 		t.Errorf("tags = %+v, want %+v, Covers gone with its last Song", got, want)
 	}
 	ts.tagSong(opener.ID)
-	if got, want := tagNames(ts.listTags()), []tag{{Name: "Live", Songs: 1}}; !reflect.DeepEqual(got, want) {
+	if got, want := tagsWithoutIDs(ts.listTags()), []tag{{Name: "Live", Songs: 1}}; !reflect.DeepEqual(got, want) {
 		t.Errorf("tags = %+v, want %+v", got, want)
 	}
 }
@@ -178,13 +178,13 @@ func TestTagGoesWithItsLastSongDeleted(t *testing.T) {
 	expectStatus(t, ts.Do(http.MethodDelete, songPath(opener.ID), nil), http.StatusNoContent)
 
 	want := []tag{{Name: "Live", Songs: 1}}
-	if got := tagNames(ts.listTags()); !reflect.DeepEqual(got, want) {
+	if got := tagsWithoutIDs(ts.listTags()); !reflect.DeepEqual(got, want) {
 		t.Errorf("tags = %+v, want %+v", got, want)
 	}
 }
 
-// tagNames is Tags as listed, with ids left out, which the API picks.
-func tagNames(list []tag) []tag {
+// tagsWithoutIDs is Tags as listed, with ids left out, which the API picks.
+func tagsWithoutIDs(list []tag) []tag {
 	out := []tag{}
 	for _, t := range list {
 		t.ID = 0
