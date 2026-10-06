@@ -13,13 +13,21 @@ import (
 	"strings"
 )
 
-// ErrNotFound means the Song asked to tag doesn't exist.
+// ErrNotFound means the Song asked to tag, or the Tag asked for, doesn't
+// exist.
 var ErrNotFound = errors.New("not found")
 
 // InvalidError is a rejected operation. Its message is safe to show the user.
 type InvalidError struct{ Msg string }
 
 func (e *InvalidError) Error() string { return e.Msg }
+
+// ConflictError is an operation the Tags as they are don't allow without
+// asking, e.g. renaming one onto a name another has. Its message is safe to
+// show the user.
+type ConflictError struct{ Msg string }
+
+func (e *ConflictError) Error() string { return e.Msg }
 
 var errBlankName = &InvalidError{Msg: "a Tag's name can't be blank"}
 
@@ -58,6 +66,89 @@ func (s *Store) List(ctx context.Context) ([]Tag, error) {
 		list = append(list, t)
 	}
 	return list, rows.Err()
+}
+
+// Rename gives a Tag a new name, trimmed, which every Song carrying it then
+// shows. A name another Tag has, ignoring case, is refused as a
+// ConflictError, unless merge is set: then the Tag merges into that one,
+// which takes the name as given, and every Song carrying either carries it.
+// It returns the Tag as renamed or merged into. No Song is edited.
+func (s *Store) Rename(ctx context.Context, id int64, name string, merge bool) (Tag, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return Tag{}, errBlankName
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Tag{}, err
+	}
+	defer tx.Rollback()
+	if err := tagExists(ctx, tx, id); err != nil {
+		return Tag{}, err
+	}
+	var other int64
+	var otherName string
+	err = tx.QueryRowContext(ctx, `SELECT id, name FROM tags WHERE folded = ? AND id <> ?`, fold(name), id).
+		Scan(&other, &otherName)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		other = id
+	case err != nil:
+		return Tag{}, fmt.Errorf("checking tag names: %w", err)
+	case !merge:
+		return Tag{}, &ConflictError{Msg: fmt.Sprintf("there's already a Tag called “%s”", otherName)}
+	default:
+		// The Songs carrying this Tag carry the other instead, and, off
+		// its last Song, this one goes.
+		if _, err := tx.ExecContext(ctx, `INSERT INTO song_tags (song_id, tag_id)
+			SELECT song_id, ? FROM song_tags WHERE tag_id = ? ON CONFLICT DO NOTHING`, other, id); err != nil {
+			return Tag{}, fmt.Errorf("merging tag: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM song_tags WHERE tag_id = ?`, id); err != nil {
+			return Tag{}, fmt.Errorf("merging tag: %w", err)
+		}
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE tags SET name = ?, folded = ? WHERE id = ?`,
+		name, fold(name), other); err != nil {
+		return Tag{}, fmt.Errorf("renaming tag: %w", err)
+	}
+	t := Tag{ID: other, Name: name}
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM song_tags WHERE tag_id = ?`, other).
+		Scan(&t.Songs); err != nil {
+		return Tag{}, fmt.Errorf("counting tag's songs: %w", err)
+	}
+	return t, tx.Commit()
+}
+
+// Delete takes a Tag off every Song carrying it, so it goes. No Song is
+// deleted or edited.
+func (s *Store) Delete(ctx context.Context, id int64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := tagExists(ctx, tx, id); err != nil {
+		return err
+	}
+	// Off its last Song, the Tag goes with it.
+	if _, err := tx.ExecContext(ctx, `DELETE FROM song_tags WHERE tag_id = ?`, id); err != nil {
+		return fmt.Errorf("untagging songs: %w", err)
+	}
+	return tx.Commit()
+}
+
+// tagExists is ErrNotFound unless there's a Tag with id.
+func tagExists(ctx context.Context, tx *sql.Tx, id int64) error {
+	var exists bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM tags WHERE id = ?)`, id).
+		Scan(&exists); err != nil {
+		return fmt.Errorf("checking tag: %w", err)
+	}
+	if !exists {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // SetSongTags gives a Song exactly the Tags named, whatever its Status, and

@@ -14,7 +14,8 @@ import (
 func (a *App) listSongs(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	// Several Statuses keep the Songs with any of them.
-	filter := lyricsheet.SongFilter{Title: query.Get("q")}
+	// Several Tags keep the Songs carrying all of them.
+	filter := lyricsheet.SongFilter{Title: query.Get("q"), Tags: query["tag"]}
 	for _, status := range query["status"] {
 		filter.Statuses = append(filter.Statuses, lyricsheet.Status(status))
 	}

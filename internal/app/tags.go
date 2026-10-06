@@ -43,12 +43,51 @@ func (a *App) setSongTags(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, names)
 }
 
+// renameTag gives a Tag a new name. Onto a name another Tag has, ignoring
+// case, it's refused, unless merge is set, the user having been asked: then
+// it merges into that Tag. It answers with the Tag renamed or merged into.
+func (a *App) renameTag(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var req struct {
+		Name  string `json:"name"`
+		Merge bool   `json:"merge"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	t, err := a.tags.Rename(r.Context(), id, req.Name, req.Merge)
+	if err != nil {
+		writeTagError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, t)
+}
+
+// deleteTag takes a Tag off every Song carrying it, deleting none of them.
+func (a *App) deleteTag(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	if err := a.tags.Delete(r.Context(), id); err != nil {
+		writeTagError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // writeTagError maps Tag errors onto HTTP responses.
 func writeTagError(w http.ResponseWriter, err error) {
 	var invalid *tags.InvalidError
+	var conflict *tags.ConflictError
 	switch {
 	case errors.As(err, &invalid):
 		writeError(w, http.StatusBadRequest, invalid.Msg)
+	case errors.As(err, &conflict):
+		writeError(w, http.StatusConflict, conflict.Msg)
 	case errors.Is(err, tags.ErrNotFound):
 		writeError(w, http.StatusNotFound, "not found")
 	default:

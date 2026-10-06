@@ -14,8 +14,10 @@ import {
   isSongListFiltered,
   keyFilterLabel,
   loadSongList,
+  matchingChoices,
   pickChoices,
   producerFilterLabel,
+  renamePick,
   songListFilter,
   songBeatHint,
   sortBeats,
@@ -25,6 +27,7 @@ import {
   songListViewToParams,
   sortSongs,
   statusFilterLabel,
+  tagFilterLabel,
   togglePick,
   toggleSort,
   useFilterLabel,
@@ -225,13 +228,17 @@ describe('songListFilter', () => {
     expect(songListFilter(view({ statuses: ['drafting'] }))).toEqual({ statuses: ['drafting'] });
     expect(songListFilter(view({ statuses: ['idea', 'drafting'] }))).toEqual({ statuses: ['idea', 'drafting'] });
     expect(songListFilter(view({ hasMaster: true }))).toEqual({ hasMaster: true });
+    expect(songListFilter(view({ tags: ['Live', 'Album 2023'] }))).toEqual({ tags: ['Live', 'Album 2023'] });
   });
 
   it('inside a Folder, asks only for its Songs, filtered or not', () => {
     expect(songListFilter(view(), 3)).toEqual({ folder: 3 });
-    expect(songListFilter(view({ q: 'night', statuses: ['idea', 'finished'], hasMaster: true }), 3)).toEqual({
+    expect(
+      songListFilter(view({ q: 'night', statuses: ['idea', 'finished'], tags: ['Live'], hasMaster: true }), 3),
+    ).toEqual({
       q: 'night',
       statuses: ['idea', 'finished'],
+      tags: ['Live'],
       hasMaster: true,
       folder: 3,
     });
@@ -248,6 +255,7 @@ describe('isSongListFiltered', () => {
     expect(isSongListFiltered({ ...defaultSongListView, statuses: ['finished'] })).toBe(true);
     expect(isSongListFiltered({ ...defaultSongListView, statuses: ['idea', 'drafting', 'finished'] })).toBe(true);
     expect(isSongListFiltered({ ...defaultSongListView, hasMaster: true })).toBe(true);
+    expect(isSongListFiltered({ ...defaultSongListView, tags: ['Live'] })).toBe(true);
   });
 });
 
@@ -291,6 +299,52 @@ describe('statusFilterLabel', () => {
   });
 });
 
+describe('tagFilterLabel', () => {
+  it('names the filter alone while no Tag is picked', () => {
+    expect(tagFilterLabel([])).toBe('Tags');
+  });
+
+  it('names the Tags picked, sorted ignoring case', () => {
+    expect(tagFilterLabel(['Album 2023'])).toBe('Tags: Album 2023');
+    expect(tagFilterLabel(['live', 'Covers', 'Album 2023'])).toBe('Tags: Album 2023, Covers, live');
+  });
+});
+
+describe('matchingChoices', () => {
+  const tags = ['Album 2023', 'Canção', 'Covers', 'Live'];
+
+  it('keeps every choice for a blank find', () => {
+    expect(matchingChoices(tags, '')).toEqual(tags);
+    expect(matchingChoices(tags, '   ')).toEqual(tags);
+  });
+
+  it('keeps the choices containing what is typed, ignoring case and surrounding space', () => {
+    expect(matchingChoices(tags, 'CO')).toEqual(['Covers']);
+    expect(matchingChoices(tags, ' ção ')).toEqual(['Canção']);
+    expect(matchingChoices(tags, 'v')).toEqual(['Covers', 'Live']);
+    expect(matchingChoices(tags, 'nothing')).toEqual([]);
+  });
+});
+
+describe('renamePick', () => {
+  it('renames a pick in place, matched ignoring case', () => {
+    expect(renamePick(['Covers', 'live', 'Album 2023'], 'Live', 'Live shows')).toEqual([
+      'Covers',
+      'Live shows',
+      'Album 2023',
+    ]);
+  });
+
+  it('keeps one pick when renamed onto another picked, as Tags merge', () => {
+    expect(renamePick(['live', 'Live shows'], 'live', 'LIVE SHOWS')).toEqual(['LIVE SHOWS']);
+    expect(renamePick(['Live shows', 'live'], 'live', 'live shows')).toEqual(['live shows']);
+  });
+
+  it('leaves the picks as they are when the one renamed is not picked', () => {
+    expect(renamePick(['Covers'], 'live', 'Live shows')).toEqual(['Covers']);
+  });
+});
+
 describe('the Song list in the URL', () => {
   const roundTrip = (view: SongListView) => songListViewFromParams(songListViewToParams(view));
 
@@ -305,11 +359,14 @@ describe('the Song list in the URL', () => {
       { ...defaultSongListView, statuses: ['drafting'] },
       { ...defaultSongListView, statuses: ['idea', 'drafting'] },
       { ...defaultSongListView, hasMaster: true },
+      { ...defaultSongListView, tags: ['Live'] },
+      { ...defaultSongListView, tags: ['Album 2023', 'canção & 100%'] },
       { ...defaultSongListView, sort: { column: 'bpm', direction: 'asc' } },
       { ...defaultSongListView, sort: { column: 'edited', direction: 'asc' } },
       {
         q: 'canção & 100%',
         statuses: ['drafting', 'finished'],
+        tags: ['Live', 'Covers'],
         hasMaster: true,
         sort: { column: 'title', direction: 'desc' },
       },
@@ -323,6 +380,9 @@ describe('the Song list in the URL', () => {
     );
     expect(songListViewToParams({ ...defaultSongListView, statuses: ['idea', 'finished'] }).toString()).toBe(
       'status=idea&status=finished',
+    );
+    expect(songListViewToParams({ ...defaultSongListView, tags: ['Live', 'Album 2023'] }).toString()).toBe(
+      'tag=Live&tag=Album+2023',
     );
     expect(
       songListViewToParams({ ...defaultSongListView, sort: { column: 'bpm', direction: 'desc' } }).toString(),
@@ -340,6 +400,13 @@ describe('the Song list in the URL', () => {
     expect(
       songListViewFromParams(new URLSearchParams('status=finished&status=released&status=idea&status=finished')),
     ).toEqual({ ...defaultSongListView, statuses: ['idea', 'finished'] });
+  });
+
+  it('reads several Tags, each once ignoring case, leaving out blank ones', () => {
+    expect(songListViewFromParams(new URLSearchParams('tag=Live&tag=&tag=LIVE&tag=Covers'))).toEqual({
+      ...defaultSongListView,
+      tags: ['Live', 'Covers'],
+    });
   });
 
   it('leaves a blank search out', () => {

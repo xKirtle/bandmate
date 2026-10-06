@@ -173,6 +173,8 @@ export type SongChanges = Partial<Pick<Song, 'title' | 'status' | 'key' | 'bpm' 
 export interface SongFilter {
   /** Only Songs with any of these Statuses. */
   statuses?: Status[];
+  /** Only Songs carrying all of these Tags, by name, ignoring case. */
+  tags?: string[];
   /** Matches titles containing it, ignoring case. */
   q?: string;
   /** Only Songs with a Master (true) or without one (false). */
@@ -806,6 +808,7 @@ export const api = {
   listSongs: (filter: SongFilter = {}) => {
     const params = new URLSearchParams();
     for (const status of filter.statuses ?? []) params.append('status', status);
+    for (const tag of filter.tags ?? []) params.append('tag', tag);
     if (filter.q?.trim()) params.set('q', filter.q.trim());
     if (filter.hasMaster !== undefined) params.set('hasMaster', String(filter.hasMaster));
     if (filter.folder !== undefined) params.set('folder', String(filter.folder));
@@ -846,6 +849,14 @@ export const api = {
    * and answers with their names. It doesn't change the Song's version.
    */
   setSongTags: (songId: number, tags: string[]) => request<string[]>('PUT', `/songs/${songId}/tags`, { tags }),
+  /**
+   * Gives a Tag a new name, which every Song carrying it shows. A name another Tag has, ignoring case, is refused
+   * with a 409, unless merge is set, the user having been asked: then it merges into that Tag. Answers with the Tag
+   * renamed or merged into. It doesn't change any Song's version.
+   */
+  renameTag: (id: number, name: string, merge = false) => request<Tag>('PATCH', `/tags/${id}`, { name, merge }),
+  /** Takes a Tag off every Song carrying it, deleting none of them. It doesn't change any Song's version. */
+  deleteTag: (id: number) => request<null>('DELETE', `/tags/${id}`),
   updateSong: (at: SongAt, changes: SongChanges) => request<Song>('PATCH', `/songs/${at.id}`, changes, at),
   deleteSong: (at: SongAt) => request<null>('DELETE', `/songs/${at.id}`, undefined, at),
   /** Adds a Section at position in the Arrangement, or at the end. */

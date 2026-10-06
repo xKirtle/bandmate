@@ -277,6 +277,9 @@ type SongFilter struct {
 	// Folder keeps the Songs in the Folder with this id, or, pointing at
 	// NoFolder, those in none.
 	Folder *int64
+	// Tags keeps the Songs carrying all of the Tags named, matched ignoring
+	// case and surrounding spaces; blank ones are ignored.
+	Tags []string
 }
 
 // NoFolder is the Folder id a SongFilter keeps the Songs in no Folder by.
@@ -307,6 +310,16 @@ func (s *Store) ListSongs(ctx context.Context, filter SongFilter) ([]SongSummary
 		} else {
 			conditions, args = append(conditions, "folder_id = ?"), append(args, *filter.Folder)
 		}
+	}
+	for _, tag := range filter.Tags {
+		// Folded as Tags' names are compared: see package tags.
+		folded := strings.ToLower(strings.TrimSpace(tag))
+		if folded == "" {
+			continue
+		}
+		conditions = append(conditions, `id IN (SELECT st.song_id FROM song_tags st
+			JOIN tags t ON t.id = st.tag_id WHERE t.folded = ?)`)
+		args = append(args, folded)
 	}
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, title, status, song_key, bpm, has_master, cover_id, folder_id, tags, updated_at FROM (
