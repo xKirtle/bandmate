@@ -185,23 +185,31 @@ func TestASongReplacedGoesIntoTheBackupsFolder(t *testing.T) {
 	}
 }
 
-func TestABackupMadeBeforeFoldersRestoresItsSongsInNoFolder(t *testing.T) {
-	dir := t.TempDir()
-	old, err := db.OpenBefore(context.Background(), dir, "0036_folders")
+// nightDriveBackedUpBefore makes a Backup's file, as a Bandmate without
+// migration made it, holding the Song Night Drive, by id 4, and puts it in
+// place of the Backup with id.
+func (ts *testServer) nightDriveBackedUpBefore(migration string, id int64) {
+	ts.t.Helper()
+	dir := ts.t.TempDir()
+	old, err := db.OpenBefore(context.Background(), dir, migration)
 	if err != nil {
-		t.Fatal(err)
+		ts.t.Fatal(err)
 	}
 	if _, err := old.Exec(`INSERT INTO songs (id, title, status, version, created_at, updated_at)
 		VALUES (4, 'Night Drive', 'drafting', 1, '2025-01-02T03:04:05.000000000Z', '2025-01-02T03:04:05.000000000Z')`); err != nil {
-		t.Fatal(err)
+		ts.t.Fatal(err)
 	}
 	if err := old.Close(); err != nil {
-		t.Fatal(err)
+		ts.t.Fatal(err)
 	}
+	ts.replaceBackupFile(id, packBackup(ts.t, dir))
+}
+
+func TestABackupMadeBeforeFoldersRestoresItsSongsInNoFolder(t *testing.T) {
 	ts := newTestServer(t)
 	ts.createFolder("Summer EP")
 	made := ts.backUp(map[string]any{"songs": []int64{ts.createSong("Placeholder").ID}})
-	ts.replaceBackupFile(made.ID, packBackup(t, dir))
+	ts.nightDriveBackedUpBefore("0036_folders", made.ID)
 
 	if got := ts.heldSongs(made.ID); !reflect.DeepEqual(got, []heldSong{{4, "Night Drive", nil}}) {
 		t.Errorf("backup's songs = %+v, want Night Drive in no Folder", got)

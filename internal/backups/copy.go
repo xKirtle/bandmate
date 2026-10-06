@@ -26,8 +26,8 @@ import (
 type songTable struct {
 	name  string
 	where string
-	// shared rows, i.e. Beats, may already be in the Backup from another
-	// Song.
+	// shared rows, i.e. Folders, Tags and Beats, may already be in the
+	// Backup from another Song.
 	shared bool
 	// replacedInPlace lists, for a table whose rows a Restore can replace
 	// and whose replaced rows keep their place, i.e. Beats, the columns
@@ -35,8 +35,10 @@ type songTable struct {
 	replacedInPlace []string
 	// matchedBy names, for a table whose rows a Restore matches to those
 	// already in Bandmate by a column rather than by identity, i.e. Folders
-	// and Tags by their folded names (see ADR 0015), that column. A row matched is
-	// used as it is, and one with no match is added.
+	// and Tags by their folded names (see ADR 0015), that column. A row
+	// matched is used as it is, and one with no match is added, as is one
+	// whose match went with a Song replaced, as a Tag goes with the last
+	// Song carrying it, keeping that match's id and name.
 	matchedBy string
 }
 

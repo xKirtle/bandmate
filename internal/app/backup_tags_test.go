@@ -1,16 +1,13 @@
 package app_test
 
 import (
-	"context"
 	"net/http"
 	"reflect"
 	"testing"
-
-	"github.com/xKirtle/bandmate/internal/db"
 )
 
-// songTags maps each Song's title to the names of the Tags it carries.
-func (ts *testServer) songTags() map[string][]string {
+// tagsBySong maps each Song's title to the names of the Tags it carries.
+func (ts *testServer) tagsBySong() map[string][]string {
 	ts.t.Helper()
 	carries := map[string][]string{}
 	for _, s := range ts.listSongs() {
@@ -36,7 +33,7 @@ func TestARestoredSongCarriesItsTagsMatchedByNameOrMade(t *testing.T) {
 	want := map[string][]string{
 		"Opener": {"Album 2023", "Live"}, "Closer": {"Album 2023"}, "Loose": {}, "Encore": {"Live"},
 	}
-	if got := ts.songTags(); !reflect.DeepEqual(got, want) {
+	if got := ts.tagsBySong(); !reflect.DeepEqual(got, want) {
 		t.Errorf("songs' tags = %v, want %v", got, want)
 	}
 	wantTags := []tag{{Name: "Album 2023", Songs: 2}, {Name: "Live", Songs: 2}}
@@ -69,14 +66,13 @@ func TestASongReplacedTakesExactlyTheBackupsTags(t *testing.T) {
 	both := []int64{opener.ID, closer.ID}
 	ts.restoreReplacing(made.ID, both, both, nil)
 
-	// covers went with the Songs replaced, the only ones carrying it, so it
-	// comes back as the Backup names it, as Live does; Demos, off its last
-	// Song, goes.
-	want := map[string][]string{"Opener": {"Covers", "Live"}, "Closer": {"Covers"}}
-	if got := ts.songTags(); !reflect.DeepEqual(got, want) {
+	// Live, gone since, comes back as the Backup names it; Demos, off its
+	// last Song, goes.
+	want := map[string][]string{"Opener": {"covers", "Live"}, "Closer": {"covers"}}
+	if got := ts.tagsBySong(); !reflect.DeepEqual(got, want) {
 		t.Errorf("songs' tags = %v, want %v", got, want)
 	}
-	wantTags := []tag{{Name: "Covers", Songs: 2}, {Name: "Live", Songs: 1}}
+	wantTags := []tag{{Name: "covers", Songs: 2}, {Name: "Live", Songs: 1}}
 	if got := tagsWithoutIDs(ts.listTags()); !reflect.DeepEqual(got, wantTags) {
 		t.Errorf("tags = %+v, want %+v", got, wantTags)
 	}
@@ -87,36 +83,43 @@ func TestASongReplacedKeepsATagItWasTheLastToCarry(t *testing.T) {
 	s := ts.createSong("Opener")
 	ts.tagSong(s.ID, "Live")
 	made := ts.backUp(map[string]any{"songs": []int64{s.ID}})
-	ts.tagSong(s.ID, "LIVE")
+	live := ts.tagNamed("Live")
+	expectStatus(t, ts.renameTag(live.ID, "LIVE", false), http.StatusOK)
 
+	// LIVE goes with Opener, cleared to be made anew, yet the Backup's
+	// Opener carries it, as Live.
 	ts.restoreReplacing(made.ID, []int64{s.ID}, []int64{s.ID}, nil)
 
-	if got := ts.songTags(); !reflect.DeepEqual(got, map[string][]string{"Opener": {"Live"}}) {
-		t.Errorf("songs' tags = %v, want Opener tagged Live", got)
+	if got := ts.tagsBySong(); !reflect.DeepEqual(got, map[string][]string{"Opener": {"LIVE"}}) {
+		t.Errorf("songs' tags = %v, want Opener tagged LIVE, as named here", got)
 	}
-	if got := tagsWithoutIDs(ts.listTags()); !reflect.DeepEqual(got, []tag{{Name: "Live", Songs: 1}}) {
-		t.Errorf("tags = %+v, want Live alone, on Opener", got)
+	if got := ts.listTags(); !reflect.DeepEqual(got, []tag{{ID: live.ID, Name: "LIVE", Songs: 1}}) {
+		t.Errorf("tags = %+v, want LIVE alone, the same Tag, on Opener", got)
+	}
+}
+
+func TestARestoredSongMatchesATagIgnoringCaseBeyondASCII(t *testing.T) {
+	elsewhere := newTestServer(t)
+	s := elsewhere.createSong("Opener")
+	elsewhere.tagSong(s.ID, "ÉTÉ")
+	made := elsewhere.backUp(map[string]any{"songs": []int64{s.ID}})
+	ts := newTestServer(t)
+	ts.tagSong(ts.createSong("Closer").ID, "Été")
+	up := ts.uploadFrom(elsewhere, made)
+
+	ts.restore(up.ID, s.ID)
+
+	if got := tagsWithoutIDs(ts.listTags()); !reflect.DeepEqual(got, []tag{{Name: "Été", Songs: 2}}) {
+		t.Errorf("tags = %+v, want ours alone, as named here, on both Songs", got)
 	}
 }
 
 func TestABackupMadeBeforeTagsRestoresItsSongsWithNoTags(t *testing.T) {
-	dir := t.TempDir()
-	old, err := db.OpenBefore(context.Background(), dir, "0037_tags")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := old.Exec(`INSERT INTO songs (id, title, status, version, created_at, updated_at)
-		VALUES (4, 'Night Drive', 'drafting', 1, '2025-01-02T03:04:05.000000000Z', '2025-01-02T03:04:05.000000000Z')`); err != nil {
-		t.Fatal(err)
-	}
-	if err := old.Close(); err != nil {
-		t.Fatal(err)
-	}
 	ts := newTestServer(t)
 	placeholder := ts.createSong("Placeholder")
 	ts.tagSong(placeholder.ID, "Live")
 	made := ts.backUp(map[string]any{"songs": []int64{placeholder.ID}})
-	ts.replaceBackupFile(made.ID, packBackup(t, dir))
+	ts.nightDriveBackedUpBefore("0037_tags", made.ID)
 
 	restored := ts.restore(made.ID, 4)
 
@@ -124,7 +127,7 @@ func TestABackupMadeBeforeTagsRestoresItsSongsWithNoTags(t *testing.T) {
 		t.Fatalf("restored = %+v, want Night Drive", restored)
 	}
 	want := map[string][]string{"Placeholder": {"Live"}, "Night Drive": {}}
-	if got := ts.songTags(); !reflect.DeepEqual(got, want) {
+	if got := ts.tagsBySong(); !reflect.DeepEqual(got, want) {
 		t.Errorf("songs' tags = %v, want %v", got, want)
 	}
 	if got := tagsWithoutIDs(ts.listTags()); !reflect.DeepEqual(got, []tag{{Name: "Live", Songs: 1}}) {
@@ -142,7 +145,7 @@ func TestASongKeptBothCarriesTheBackupsTags(t *testing.T) {
 		"Opener": {"Demos"}, "Closer": {"covers", "Demos"},
 		"Opener (restored)": {"covers", "Live"}, "Closer (restored)": {"covers"},
 	}
-	if got := ts.songTags(); !reflect.DeepEqual(got, want) {
+	if got := ts.tagsBySong(); !reflect.DeepEqual(got, want) {
 		t.Errorf("songs' tags = %v, want %v", got, want)
 	}
 }
