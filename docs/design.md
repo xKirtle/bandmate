@@ -214,7 +214,7 @@ The recurring components are written once, and a screen reaches for them rather 
 | Toggle    | `.button.toggle`         | On or off, with `aria-pressed`: filled with the accent while on, e.g. Sync lyrics, Left-handed     |
 | Outlined  | `.toggle.outlined`       | A toggle beside something already in the accent: outlined and lettered in it while on, not filled  |
 
-An outlined toggle is for one that would otherwise compete, like Read mode's Chords toggle beside the Chords, or the Chord Chart's eye and pin. A disabled button fades; a disabled quiet one turns muted instead.
+An outlined toggle is for one that would otherwise compete, like the Reading menu's eyes and pin, which float over the Chords. A disabled button fades; a disabled quiet one turns muted instead.
 
 **The icon button**, `.icon`, is a square of `--control` showing one Lucide icon at `--text-xl` (`--text-lg` on desktop), muted and boxless until it's hovered. It's for an action an icon says on its own, such as a dialog's close, a Section's ⋯ or Undo, and always has an `aria-label`. The Timeline's own buttons are in its scale instead.
 
@@ -230,7 +230,7 @@ An outlined toggle is for one that would otherwise compete, like Read mode's Cho
 
 **Dialogs** are `Dialog`: a modal `<dialog>`, opened as it mounts, over `--scrim`, with its title and a close button at its head and what it holds stacked beneath, `--space-3` apart. It's for a task that stops the page: New Backup, Restore, Mix down, editing a Beat. Its close button can be disabled or hidden while closing would lose work, and a click on the backdrop closes it only when its `dismissible` says nothing would be lost. It's 28rem wide unless the caller sets `--dialog-width`, and `--dialog-max-height`, `--dialog-height` and `--dialog-gap` likewise. A **sheet** is a dialog that takes the whole screen on a phone, for one with a lot to hold, like editing a Beat or cropping a Cover.
 
-**Menus and popovers** float: `.popover` is a layer in the top layer, placed by script beside what opened it (`popover.ts`), with a border, `--radius-md` and `--shadow-float`. A **menu** is `ActionsMenu`, a ⋯ of actions, each entry `--radius-sm` with its icon in a column. The others are the list a `Combobox` or `Picker` opens (`.option-list`), a Chord's diagram (`ChordPopover`) and Recording settings (`InputSettings`). A filter button's checklist is a popover too. A popover is for a quick choice or a glance that doesn't stop the page; what needs the page to wait is a dialog.
+**Menus and popovers** float: `.popover` is a layer in the top layer, placed by script beside what opened it (`popover.ts`), with a border, `--radius-md` and `--shadow-float`. A **menu** is `ActionsMenu`, a ⋯ of actions, each entry `--radius-sm` with its icon in a column. The others are the list a `Combobox` or `Picker` opens (`.option-list`), a Chord's diagram (`ChordPopover`), Recording settings (`InputSettings`) and the Reading menu (`ReadingMenu`), Read mode's choices about how a Song reads, behind one button at the end of the Lyric Sheet's header. A filter button's checklist is a popover too. A popover is for a quick choice or a glance that doesn't stop the page; what needs the page to wait is a dialog.
 
 ## Layout tokens
 

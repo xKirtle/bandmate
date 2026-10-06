@@ -5,12 +5,9 @@
   // the top-ranked one, as the Chord Finder would. A Chord that can't be read,
   // or has no Voicing, keeps its place as its name over an empty frame; a
   // tuning that can't be read gets no diagrams at all, rather than a guess.
-  // Two buttons at its start hide or show it, and pin it to the top of the
-  // window, for every Song on this device. Clicking a diagram opens the
-  // Chord's popover.
-  import Eye from '@lucide/svelte/icons/eye';
-  import EyeOff from '@lucide/svelte/icons/eye-off';
-  import Pin from '@lucide/svelte/icons/pin';
+  // Hidden, it isn't drawn at all; it's hidden, shown and pinned to the top
+  // of the window from the Reading menu, for every Song on this device.
+  // Clicking a diagram opens the Chord's popover.
   import type { Song } from './api';
   import ChordDiagram from './ChordDiagram.svelte';
   import type { ChordOpener } from './ChordPopover.svelte';
@@ -57,84 +54,45 @@
   });
 </script>
 
-{#if names.length > 0}
-  <section
-    class={['chart', { pinned: shown && pinned }]}
-    aria-label="Chord Chart"
-    bind:this={chart}
-    bind:clientHeight={height}
-  >
-    <div class="controls">
-      <button
-        type="button"
-        class="control toggle outlined"
-        aria-pressed={shown}
-        onclick={() => chordChartState.setShown(!shown)}
-        aria-label="Show the Chord Chart"
-        title={shown ? 'Hide the Chord Chart' : 'Show the Chord Chart'}
-      >
-        <!-- An eye, crossed out while the Chart is hidden. -->
-        {#if shown}<Eye />{:else}<EyeOff />{/if}
-        {#if !shown}<span>Chord Chart</span>{/if}
-      </button>
-      <!-- Hidden, the pin goes too, keeping whether it's pinned for when it's shown. -->
-      {#if shown}
-        <button
-          type="button"
-          class="control toggle outlined"
-          aria-pressed={pinned}
-          onclick={() => chordChartState.setPinned(!pinned)}
-          aria-label="Pin the Chord Chart to the top"
-          title={pinned ? 'Unpin the Chord Chart' : 'Pin the Chord Chart to the top'}
-        >
-          <!-- A pushpin, filled while pinned. -->
-          <Pin />
-        </button>
-      {/if}
-    </div>
-    <!-- Hidden, the Chart collapses to its control, which brings it back. -->
-    {#if shown}
-      {#if !tuning}
-        <p class="muted note">
-          The Song's tuning, “{song.tuning.trim()}”, can't be read, so the Chord Chart has no diagrams.
-        </p>
-      {:else}
-        <ul class="row">
-          {#each chords as chord (chord.name)}
-            <li>
-              <button
-                type="button"
-                class="chord"
-                aria-haspopup="dialog"
-                title="Open {chord.name}'s diagram"
-                onclick={(e) => opener?.press(chord.name, e.currentTarget)}
-              >
-                <span class="name" title={chord.name}>{chord.name}</span>
-                {#if chord.voicing}
-                  <ChordDiagram voicing={chord.voicing} name={chord.name} />
-                {:else}
-                  <span
-                    class="empty"
-                    role="img"
-                    aria-label="{chord.name}: no diagram"
-                    title="No diagram: Bandmate can't read this Chord or find a Voicing for it"
-                  ></span>
-                {/if}
-              </button>
-            </li>
-          {/each}
-        </ul>
-      {/if}
+{#if names.length > 0 && shown}
+  <section class={['chart', { pinned }]} aria-label="Chord Chart" bind:this={chart} bind:clientHeight={height}>
+    {#if !tuning}
+      <p class="muted note">
+        The Song's tuning, “{song.tuning.trim()}”, can't be read, so the Chord Chart has no diagrams.
+      </p>
+    {:else}
+      <ul class="row">
+        {#each chords as chord (chord.name)}
+          <li>
+            <button
+              type="button"
+              class="chord"
+              aria-haspopup="dialog"
+              title="Open {chord.name}'s diagram"
+              onclick={(e) => opener?.press(chord.name, e.currentTarget)}
+            >
+              <span class="name" title={chord.name}>{chord.name}</span>
+              {#if chord.voicing}
+                <ChordDiagram voicing={chord.voicing} name={chord.name} />
+              {:else}
+                <span
+                  class="empty"
+                  role="img"
+                  aria-label="{chord.name}: no diagram"
+                  title="No diagram: Bandmate can't read this Chord or find a Voicing for it"
+                ></span>
+              {/if}
+            </button>
+          </li>
+        {/each}
+      </ul>
     {/if}
   </section>
 {/if}
 
 <style>
-  /* The control, then the row of diagrams beside it. */
   .chart {
     display: flex;
-    align-items: flex-start;
-    gap: var(--space-2);
     margin-bottom: var(--space-4);
   }
   /* Stays at the top of the window, over the Lines scrolling under it,
@@ -146,41 +104,6 @@
     padding: max(var(--space-2), env(safe-area-inset-top)) 0 var(--space-2);
     border-bottom: 1px solid var(--border);
     background: var(--bg);
-  }
-  /* The eye above the pin, so together they're no wider than one. */
-  .controls {
-    flex: none;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-  }
-  .control {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-2);
-    min-width: var(--control);
-    height: var(--control);
-    padding: 0 var(--space-2);
-    box-sizing: border-box;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    background: var(--surface-1);
-    color: var(--text-muted);
-    font: inherit;
-    font-size: var(--text-md);
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .control:hover:not([aria-pressed='true']) {
-    color: var(--text);
-  }
-  /* A size up from the label beside it. */
-  .control :global(.lucide-icon) {
-    font-size: var(--text-lg);
-  }
-  .control[aria-pressed='true'] :global(.lucide-pin) {
-    fill: currentColor;
   }
   .note {
     flex: 1;

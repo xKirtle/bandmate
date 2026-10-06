@@ -1,6 +1,4 @@
 <script lang="ts">
-  import AArrowDown from '@lucide/svelte/icons/a-arrow-down';
-  import AArrowUp from '@lucide/svelte/icons/a-arrow-up';
   import ArrowDown from '@lucide/svelte/icons/arrow-down';
   import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right';
   import ArrowUp from '@lucide/svelte/icons/arrow-up';
@@ -38,6 +36,7 @@
   import ActionsMenu from './ActionsMenu.svelte';
   import type { MenuAction } from './menu';
   import Picker from './Picker.svelte';
+  import ReadingMenu from './ReadingMenu.svelte';
   import SectionEditor from './SectionEditor.svelte';
   import { moveTo, type Drop } from './sectionDrag';
   import type { SectionDragging } from './sectionDragging.svelte';
@@ -50,10 +49,8 @@
   import { inTextField } from './textField';
   import { deviceStorage } from './timelineHeight';
   import { songChordsShown } from './chordsShown';
-  import { largestLyricSize, smallestLyricSize, stepLyricSize, usualLyricSize } from './lyricSize';
   import { lyricSize } from './sharedLyricSize.svelte';
   import { songTranspose } from './sharedTranspose.svelte';
-  import { stepTranspose, transposeLimit, transposeText } from './transposeAmount';
 
   let {
     song,
@@ -348,18 +345,9 @@
   // Read mode while the Chords show.
   let chordPopover = $state<ChordPopover>();
 
-  function toggleChords() {
-    songChordsShown.set(songId, !showChords);
-  }
-
   // How far Read mode transposes the Chords, kept on this device for each
   // Song like hiding them, and kept while they're hidden.
   const transpose = $derived(songTranspose.of(songId));
-  const transposeShown = $derived(transposeText(transpose));
-
-  function transposeBy(by: number) {
-    songTranspose.set(songId, stepTranspose(transpose, by));
-  }
 
   // How large Read mode shows the lyrics, kept on this device for every Song.
   const size = $derived(lyricSize.value);
@@ -456,82 +444,7 @@
     <h2 id="sheet-heading" class:visually-hidden={mode === 'read'}>Lyric Sheet</h2>
     <span class="spacer"></span>
     {#if mode === 'read'}
-      <!-- Together, so on a narrow screen they wrap as one. -->
-      <div class="reading">
-        <div class="stepper" role="group" aria-label="Lyric Size">
-          <button
-            type="button"
-            class="button step"
-            disabled={size <= smallestLyricSize}
-            onclick={() => lyricSize.set(stepLyricSize(size, -1))}
-            aria-label="Make the lyrics smaller"
-            title="Make the lyrics smaller"><AArrowDown /></button
-          >
-          <button
-            type="button"
-            class="button amount"
-            disabled={size === usualLyricSize}
-            onclick={() => lyricSize.set(usualLyricSize)}
-            aria-label={size === usualLyricSize
-              ? 'The lyrics show at their usual size'
-              : `Lyrics at ${size}%; show them at their usual size`}
-            title={size === usualLyricSize
-              ? 'The lyrics show at their usual size'
-              : 'Show the lyrics at their usual size'}>{size}%</button
-          >
-          <button
-            type="button"
-            class="button step"
-            disabled={size >= largestLyricSize}
-            onclick={() => lyricSize.set(stepLyricSize(size, 1))}
-            aria-label="Make the lyrics larger"
-            title="Make the lyrics larger"><AArrowUp /></button
-          >
-        </div>
-        {#if songHasChords}
-          <!-- Together, so on a narrow screen the stepper wraps with the Chords it moves. -->
-          <div class="chords">
-            <button
-              type="button"
-              class="button toggle outlined"
-              aria-pressed={showChords}
-              onclick={toggleChords}
-              title="Show or hide the Chords">Chords</button
-            >
-            {#if showChords}
-              <div class="stepper" role="group" aria-label="Transpose">
-                <button
-                  type="button"
-                  class="button step"
-                  disabled={transpose <= -transposeLimit}
-                  onclick={() => transposeBy(-1)}
-                  aria-label="Transpose the Chords down a semitone"
-                  title="Transpose the Chords down a semitone"><Minus /></button
-                >
-                <button
-                  type="button"
-                  class="button amount"
-                  disabled={transpose === 0}
-                  onclick={() => songTranspose.set(songId, 0)}
-                  aria-label={transpose === 0
-                    ? 'The Chords show as written'
-                    : `Transposed ${transposeShown} semitones; show the Chords as written`}
-                  title={transpose === 0 ? 'The Chords show as written' : 'Show the Chords as written'}
-                  >{transposeShown}</button
-                >
-                <button
-                  type="button"
-                  class="button step"
-                  disabled={transpose >= transposeLimit}
-                  onclick={() => transposeBy(1)}
-                  aria-label="Transpose the Chords up a semitone"
-                  title="Transpose the Chords up a semitone"><Plus /></button
-                >
-              </div>
-            {/if}
-          </div>
-        {/if}
-      </div>
+      <ReadingMenu {songId} hasChords={songHasChords} />
     {/if}
     {#if mode === 'write' && canCue && hasCues(song)}
       <!-- Doesn't ask first: it can be undone. -->
@@ -728,39 +641,6 @@
   .shift-by {
     min-width: var(--control);
     padding: 0;
-  }
-  /* Read mode's controls: the Lyric Size, then the Chords and Transpose.
-     Too wide for a phone, the Chords wrap under the Lyric Size. */
-  .reading {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    align-items: center;
-    gap: var(--space-2);
-  }
-  .chords {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-  }
-  .stepper {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1);
-  }
-  .step {
-    min-width: var(--control);
-    padding: 0;
-  }
-  /* Wide enough for "−11" or "175%", so the steps don't move as the amount changes. */
-  .amount {
-    min-width: 3.25rem;
-    padding: 0 var(--space-2);
-    font-variant-numeric: tabular-nums;
-  }
-  .amount:disabled {
-    opacity: 1;
-    color: var(--text-muted);
   }
   .notice:empty {
     display: none;
