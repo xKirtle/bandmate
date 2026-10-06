@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"mime"
 	"net/http"
 	"os"
@@ -145,4 +146,36 @@ func (f *Files) Remove(id int64) error {
 
 func (f *Files) path(id int64) string {
 	return filepath.Join(f.dir, strconv.FormatInt(id, 10))
+}
+
+// ReceiveFile stores the file at path under a temporary name, as Receive
+// does an upload, leaving the file at path as it is. It's linked rather than
+// copied where it can be.
+func (f *Files) ReceiveFile(path string) (*Received, error) {
+	tmp, err := os.CreateTemp(f.dir, tempPrefix+"*")
+	if err != nil {
+		return nil, fmt.Errorf("storing file: %w", err)
+	}
+	tmp.Close()
+	r := &Received{files: f, path: tmp.Name()}
+	os.Remove(r.path)
+	if err := os.Link(path, r.path); err != nil {
+		src, err := os.Open(path)
+		if err != nil {
+			return nil, fmt.Errorf("storing file: %w", err)
+		}
+		defer src.Close()
+		copied, err := f.Receive(src, math.MaxInt64-1)
+		if err != nil {
+			return nil, err
+		}
+		return copied, nil
+	}
+	info, err := os.Stat(r.path)
+	if err != nil {
+		r.Discard()
+		return nil, fmt.Errorf("storing file: %w", err)
+	}
+	r.Size = info.Size()
+	return r, nil
 }

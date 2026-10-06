@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { suggestBeatDetails } from './beatSuggestion';
+import { suggestBeatDetails, suggestFromLink } from './beatSuggestion';
 
 describe('suggestBeatDetails from a filename', () => {
   it.each([
@@ -98,5 +98,53 @@ describe('suggestBeatDetails from tags', () => {
     ['a key in another notation', { key: '8A' }, { title: 'Dark Trap', producer: '', bpm: 140, key: '8A' }],
   ])('with %s', (_, tags, suggestion, name = fileName) => {
     expect(suggestBeatDetails(name, tags)).toEqual(suggestion);
+  });
+});
+
+describe('suggestFromLink', () => {
+  const link = {
+    title: '[FREE] Night (prod. Kofi) 140 BPM Am',
+    producer: 'Kofi Beats',
+    sourceLink: 'https://video.test/watch?v=night',
+    fileName: '[FREE] Night (prod. Kofi) 140 BPM Am.m4a',
+  };
+
+  it("keeps the link's title, channel and link as they are, reading a BPM and key from its title", () => {
+    expect(suggestFromLink(link, {})).toEqual({
+      title: '[FREE] Night (prod. Kofi) 140 BPM Am',
+      producer: 'Kofi Beats',
+      sourceLink: 'https://video.test/watch?v=night',
+      bpm: 140,
+      key: 'Am',
+    });
+  });
+
+  it("takes the BPM and key from the file's tags first, but never its title or artist", () => {
+    const tags = { title: 'Tagged', artist: 'Ana', bpm: 92, key: 'F#m' };
+    expect(suggestFromLink(link, tags)).toEqual({
+      title: '[FREE] Night (prod. Kofi) 140 BPM Am',
+      producer: 'Kofi Beats',
+      sourceLink: 'https://video.test/watch?v=night',
+      bpm: 92,
+      key: 'F#m',
+    });
+  });
+
+  it("fills what the link doesn't give from the file", () => {
+    const untitled = { title: '', producer: '', sourceLink: 'https://video.test/x', fileName: 'audio.m4a' };
+    expect(suggestFromLink(untitled, { title: 'Tagged', artist: 'Ana' })).toEqual({
+      title: 'Tagged',
+      producer: 'Ana',
+      sourceLink: 'https://video.test/x',
+      bpm: null,
+      key: '',
+    });
+    expect(suggestFromLink(untitled, {})).toEqual({
+      title: 'Audio',
+      producer: '',
+      sourceLink: 'https://video.test/x',
+      bpm: null,
+      key: '',
+    });
   });
 });

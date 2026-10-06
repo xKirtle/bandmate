@@ -582,6 +582,22 @@ export interface ServerConfig {
   sourceUrl: string;
   /** Where to report a bug: the new-issue page of the repository it came from. */
   bugReportUrl: string;
+  /** Whether Beats can be added from a link. Off, nothing offers it. */
+  addFromLink: boolean;
+}
+
+/** A link's audio, fetched and waiting on the server to be added as a Beat, with what the link gave. */
+export interface Fetched {
+  id: string;
+  /** The video's title, "" if it has none. */
+  title: string;
+  /** The video's channel, "" if it has none. */
+  producer: string;
+  /** The video's own link, without the playlist or tracking it was pasted with. */
+  sourceLink: string;
+  fileName: string;
+  contentType: string;
+  size: number;
 }
 
 /** Everything About shows that's known without going online. */
@@ -767,6 +783,36 @@ export const api = {
    */
   beatAudioUrl: (beat: Pick<Beat, 'id' | 'fileName' | 'size' | 'duration'>) =>
     `/api/beats/${beat.id}/audio?v=${encodeURIComponent(`${beat.fileName}-${beat.size}-${beat.duration}`)}`,
+  /**
+   * Fetches a link's audio into a file waiting on the server to be added as a
+   * Beat, answering once it's there. Aborting the signal stops the fetch,
+   * failing with an AbortError.
+   */
+  fetchLink: (link: string, signal: AbortSignal) =>
+    answer<Fetched>(
+      fetch('/api/fetches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ link }),
+        signal,
+      }),
+    ),
+  /** A fetched file's audio, read once: to decode, to read its tags and to preview it. */
+  fetchedAudio: async (fetched: Fetched): Promise<File> => {
+    let res: Response;
+    try {
+      res = await fetch(`/api/fetches/${fetched.id}/audio`);
+    } catch {
+      throw new ApiError(0, "Can't reach Bandmate. Check your connection.");
+    }
+    if (!res.ok) await answer(Promise.resolve(res));
+    return new File([await res.blob()], fetched.fileName, { type: fetched.contentType });
+  },
+  /** Deletes a fetched file nobody's adding, rather than leaving it to expire. */
+  discardFetched: (id: string) => request<null>('DELETE', `/fetches/${id}`),
+  /** Adds a fetched file as a Beat, sending only its details: the file is on the server already. */
+  addFetchedBeat: (id: string, details: BeatDetails, decoded: DecodedAudio) =>
+    request<Beat>('POST', `/fetches/${id}/beat`, { ...details, ...decoded }),
 
   /** The Backups, newest first. */
   listBackups: () => request<Backup[]>('GET', '/backups'),
