@@ -183,6 +183,7 @@ type song struct {
 	Scrapbook   []int64   `json:"scrapbook"`
 	Masters     []master  `json:"masters"`
 	Cover       *cover    `json:"cover"`
+	Tags        []string  `json:"tags"`
 }
 
 // section is a Section with all its Alternates.
@@ -256,15 +257,16 @@ func songCues(s song) map[int64]float64 {
 
 // songSummary is one entry of the Song list.
 type songSummary struct {
-	ID        int64  `json:"id"`
-	Title     string `json:"title"`
-	Status    string `json:"status"`
-	Key       string `json:"key"`
-	BPM       *int   `json:"bpm"`
-	HasMaster bool   `json:"hasMaster"`
-	CoverID   *int64 `json:"coverId"`
-	FolderID  *int64 `json:"folderId"`
-	UpdatedAt string `json:"updatedAt"`
+	ID        int64    `json:"id"`
+	Title     string   `json:"title"`
+	Status    string   `json:"status"`
+	Key       string   `json:"key"`
+	BPM       *int     `json:"bpm"`
+	HasMaster bool     `json:"hasMaster"`
+	CoverID   *int64   `json:"coverId"`
+	FolderID  *int64   `json:"folderId"`
+	Tags      []string `json:"tags"`
+	UpdatedAt string   `json:"updatedAt"`
 }
 
 // songPath is where a Song lives.
