@@ -3,6 +3,7 @@
 // the Chord Finder (ADR 0012), drawn as its diagrams are.
 
 import type { Song } from './api';
+import { hasChords } from './chords';
 import { chordName, lookUp, readTuning, standard, type FinderContext, type Voicing } from './chordFinder';
 import { activeAlternate, sectionsInArrangement } from './sections';
 import { transposeChord } from './transpose';
@@ -26,6 +27,18 @@ export function chartChords(song: Song, transpose = 0): string[] {
         if (!listed.has(tidied)) listed.set(tidied, shown);
       }
   return [...listed.values()];
+}
+
+/**
+ * Where a Song has Chords, as Read mode shows it: `shown` in the Arrangement's
+ * active Alternates, the ones the Chord Chart draws; `elsewhere`, only in the
+ * Scrapbook or an inactive Alternate, so Read mode shows none; or `none`.
+ */
+export type ChordsInRead = 'shown' | 'elsewhere' | 'none';
+
+export function chordsInRead(song: Song): ChordsInRead {
+  if (chartChords(song).length > 0) return 'shown';
+  return hasChords(song) ? 'elsewhere' : 'none';
 }
 
 /**

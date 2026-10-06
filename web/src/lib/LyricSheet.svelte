@@ -13,7 +13,6 @@
   import type { Cueing } from './AlternateText.svelte';
   import { api, type Line, type Section, type Song, type SongAt } from './api';
   import type { CueChange } from './cueChanges';
-  import { hasChords } from './chords';
   import {
     canShiftCuesEarlier,
     currentPosition,
@@ -30,6 +29,7 @@
   import { follower, lineKey } from './follow';
   import { gutterFields } from './gutter';
   import { keyHints } from './keyHints';
+  import { chordsInRead } from './chordChart';
   import ChordChart from './ChordChart.svelte';
   import ChordPopover from './ChordPopover.svelte';
   import LyricSheetView from './LyricSheetView.svelte';
@@ -331,7 +331,9 @@
 
   // The Section just added or duplicated, whose Label gets focus.
   let added = $state<number | null>(null);
-  const songHasChords = $derived(hasChords(song));
+  // Where the Song has Chords, as Read mode shows it: only the Arrangement's
+  // active Alternates count.
+  const chords = $derived(chordsInRead(song));
   // Whether Read mode shows the Chords, kept on this device for each Song.
   // It isn't an edit, so it's never saved with the Song.
   // Read again only for another Song: the Song is replaced after every edit.
@@ -339,7 +341,7 @@
   const showChords = $derived(songChordsShown.of(songId));
 
   // Whether Chord Lines are on screen: always in Write mode, which shows the raw text.
-  const chordsOnScreen = $derived(mode === 'write' || (showChords && songHasChords));
+  const chordsOnScreen = $derived(mode === 'write' || (showChords && chords === 'shown'));
 
   // A Chord's diagram, opened from a Chord in a Line or the Chord Chart in
   // Read mode while the Chords show.
@@ -444,7 +446,7 @@
     <h2 id="sheet-heading" class:visually-hidden={mode === 'read'}>Lyric Sheet</h2>
     <span class="spacer"></span>
     {#if mode === 'read'}
-      <ReadingMenu {songId} hasChords={songHasChords} />
+      <ReadingMenu {songId} {chords} />
     {/if}
     {#if mode === 'write' && canCue && hasCues(song)}
       <!-- Doesn't ask first: it can be undone. -->
