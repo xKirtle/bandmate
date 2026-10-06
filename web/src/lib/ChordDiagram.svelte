@@ -39,7 +39,7 @@
    * left-handed player. The neck's edges are left and left + neckWidth,
    * whichever way it's drawn, never x(0).
    */
-  const x = (string: number) => left + (leftHanded.on ? strings - 1 - string : string) * stringGap;
+  const x = (string: number) => left + (leftHanded.value ? strings - 1 - string : string) * stringGap;
   /** The middle of a fret's row, where a finger presses. */
   const y = (fret: number) => top + (fret - start + 0.5) * fretGap;
 

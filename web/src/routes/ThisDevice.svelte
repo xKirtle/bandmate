@@ -1,0 +1,112 @@
+<script lang="ts">
+  // Settings' This device tab: every Device Setting, the choices about how
+  // Bandmate works on this device rather than any Song. Each applies at once,
+  // in every one of this device's tabs, and is kept on this device. Those
+  // also changed where they're used, like Left-handed in the Chord Finder,
+  // are the same setting here.
+  import { palettes, themeChoices } from '../lib/appearance';
+  import SettingsPage from '../lib/SettingsPage.svelte';
+  import { appearance } from '../lib/sharedAppearance.svelte';
+  import { leftHanded } from '../lib/sharedLeftHanded.svelte';
+</script>
+
+<SettingsPage tab="device">
+  <p class="kept">Kept on this device.</p>
+  <div class="cards">
+    <section class="card" aria-labelledby="appearance-heading">
+      <h2 id="appearance-heading">Appearance</h2>
+      <fieldset class="choice-group">
+        <legend>Palette</legend>
+        {#each palettes as palette (palette.id)}
+          <label class="choice-row">
+            <input
+              type="radio"
+              name="palette"
+              checked={appearance.palette === palette.id}
+              onchange={() => appearance.setPalette(palette.id)}
+            />
+            <!-- The Palette's page and accent, in the light or dark shown now. -->
+            <span class="swatch" data-palette={palette.id} aria-hidden="true"><span class="accent"></span></span>
+            <span>{palette.label}</span>
+          </label>
+        {/each}
+      </fieldset>
+      <fieldset class="choice-group">
+        <legend>Light or dark</legend>
+        {#each themeChoices as choice (choice.id)}
+          <label class="choice-row">
+            <input
+              type="radio"
+              name="theme"
+              checked={appearance.themeChoice === choice.id}
+              onchange={() => appearance.setThemeChoice(choice.id)}
+            />
+            <span>{choice.label}</span>
+          </label>
+        {/each}
+      </fieldset>
+    </section>
+
+    <section class="card" aria-labelledby="chord-diagrams-heading">
+      <h2 id="chord-diagrams-heading">Chord diagrams</h2>
+      <div>
+        <label class="choice-row">
+          <input
+            type="checkbox"
+            role="switch"
+            checked={leftHanded.value}
+            onchange={(e) => leftHanded.set(e.currentTarget.checked)}
+            aria-describedby="left-handed-note"
+          />
+          <span>Left-handed</span>
+        </label>
+        <p id="left-handed-note" class="choice-under hint">Mirrors every Chord diagram, high string on the left.</p>
+      </div>
+    </section>
+  </div>
+</SettingsPage>
+
+<style>
+  .kept {
+    margin: 0 0 var(--space-4);
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+  }
+  .cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    padding: var(--space-4);
+  }
+  h2 {
+    margin: 0;
+    font-size: var(--text-lg);
+  }
+  .hint {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+  }
+  /* A Palette in small, as tall as the radio button beside it: its page,
+     with its accent on it. */
+  .swatch {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: calc(2 * var(--checkbox));
+    height: var(--checkbox);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+  }
+  .accent {
+    width: calc(var(--checkbox) / 2);
+    height: calc(var(--checkbox) / 2);
+    border-radius: var(--radius-full);
+    background: var(--accent);
+  }
+</style>

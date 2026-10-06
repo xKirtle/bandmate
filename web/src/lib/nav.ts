@@ -38,9 +38,9 @@ export const pinned = [
   { id: 'settings', href: '/settings', label: 'Settings', icon: Settings },
 ] as const satisfies readonly NavLink<'settings'>[];
 
-/** Settings' tabs, each at its own address: Appearance at Settings' own. */
+/** Settings' tabs, each at its own address: This device at Settings' own. */
 export const settingsTabs = [
-  { id: 'appearance', href: '/settings', label: 'Appearance' },
+  { id: 'device', href: '/settings', label: 'This device' },
   { id: 'backups', href: '/settings/backups', label: 'Backups' },
   { id: 'about', href: '/settings/about', label: 'About' },
 ] as const;

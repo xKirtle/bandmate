@@ -176,8 +176,8 @@
     <button
       type="button"
       class="button toggle"
-      aria-pressed={leftHanded.on}
-      onclick={() => leftHanded.set(!leftHanded.on)}
+      aria-pressed={leftHanded.value}
+      onclick={() => leftHanded.set(!leftHanded.value)}
       title="Mirror the diagrams and the fretboard for a left-handed player">Left-handed</button
     >
   </div>

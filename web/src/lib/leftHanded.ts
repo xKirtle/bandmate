@@ -14,6 +14,9 @@ export function readLeftHanded(storage: Storage | undefined): boolean {
   }
 }
 
+/** Left-handed, as a Device Setting is kept. */
+export const leftHandedSetting = { key: leftHandedKey, read: readLeftHanded, store: storeLeftHanded };
+
 /** Keeps whether this device is left-handed, forgetting it once right-handed again. */
 export function storeLeftHanded(storage: Storage | undefined, on: boolean) {
   try {

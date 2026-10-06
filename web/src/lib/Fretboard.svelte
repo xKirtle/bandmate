@@ -23,7 +23,7 @@
 
   const strings = $derived(frets.length);
   /** The strings in the order they're drawn, left to right: mirrored for a left-handed player. */
-  const order = $derived(Array.from({ length: strings }, (_, i) => (leftHanded.on ? strings - 1 - i : i)));
+  const order = $derived(Array.from({ length: strings }, (_, i) => (leftHanded.value ? strings - 1 - i : i)));
   /** Row 0 is above the nut; rows 1 to fretCount are the frets. */
   const rows = Array.from({ length: fretCount + 1 }, (_, fret) => fret);
 
