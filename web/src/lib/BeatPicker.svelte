@@ -101,7 +101,7 @@
     audio?.play().catch(() => (previewPlaying = false));
   }
 
-  // A Beat stops once its button goes, filtered out or behind an upload.
+  // A Beat stops once its button goes, filtered out or behind an upload or the link box.
   $effect(() => {
     if (previewId !== null && (adding || linking || !shown?.some((b) => b.id === previewId))) audio?.pause();
   });
