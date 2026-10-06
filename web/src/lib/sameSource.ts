@@ -3,6 +3,7 @@
 // yt-dlp reports one link per video however it was pasted, so the same video
 // pasted as youtu.be/… or with a playlist matches. A Source link typed by hand
 // may still differ in ways that don't change the page, which are ignored.
+// A file picked again is caught by its name and size instead, in beatBatch.ts.
 import type { Beat } from './api';
 
 /**
@@ -11,7 +12,7 @@ import type { Beat } from './api';
  * written, since they name the video. One that isn't a web address is
  * compared as written.
  */
-function comparable(link: string): string {
+function comparableLink(link: string): string {
   const text = link.trim();
   let url: URL;
   try {
@@ -30,7 +31,7 @@ export function beatWithSource<B extends Pick<Beat, 'sourceLink'>>(
   library: readonly B[],
   sourceLink: string,
 ): B | null {
-  const link = comparable(sourceLink);
+  const link = comparableLink(sourceLink);
   if (link === '') return null;
-  return library.find((b) => comparable(b.sourceLink) === link) ?? null;
+  return library.find((b) => comparableLink(b.sourceLink) === link) ?? null;
 }

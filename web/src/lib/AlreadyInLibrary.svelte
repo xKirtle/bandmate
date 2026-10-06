@@ -13,7 +13,7 @@
 </script>
 
 <p class="already" role="status">
-  <span>“{beat.title}” is already in your Library.</span>
+  <span>“{beat.title}” is already in the Beat Library.</span>
   <button type="button" class="button quiet" onclick={onOpen}>Open it</button>
 </p>
 

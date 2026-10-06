@@ -7,7 +7,7 @@
   import AlreadyInLibrary from '../lib/AlreadyInLibrary.svelte';
   import AudioPlayer from '../lib/AudioPlayer.svelte';
   import { MediaQuery } from 'svelte/reactivity';
-  import { api, type Beat, type DecodedAudio } from '../lib/api';
+  import { api, type Beat, type DecodedAudio, type Fetched } from '../lib/api';
   import BeatBatch from '../lib/BeatBatch.svelte';
   import type { BatchRow } from '../lib/beatBatch';
   import type { Preview } from '../lib/beatPreview';
@@ -46,12 +46,12 @@
 
   // A file being added: decoded, waiting for its details. One fetched from a
   // link is already on the server, waiting there, and is previewed from the
-  // copy read to decode it, and keeps the clean link it came from.
+  // copy read to decode it, keeping what the link gave, such as its clean link.
   interface Adding {
     file: File;
     decoded: DecodedAudio;
     draft: BeatDraft;
-    fetched?: { id: string; previewUrl: string; sourceLink: string };
+    fetched?: Fetched & { previewUrl: string };
   }
   let adding = $state<Adding | null>(null);
   let addBusy = $state<string | null>(null);
@@ -257,7 +257,7 @@
       file,
       decoded,
       draft,
-      fetched: { id: fetched.id, previewUrl: URL.createObjectURL(file), sourceLink: fetched.sourceLink },
+      fetched: { ...fetched, previewUrl: URL.createObjectURL(file) },
     });
   }
 
