@@ -97,7 +97,7 @@ type Fetched struct {
 type Options struct {
 	// Dir holds the waiting files. Whatever is in it when opened is deleted.
 	Dir string
-	// YtDlp picks the yt-dlp to run. Nil means the one on the PATH.
+	// YtDlp picks the yt-dlp to run.
 	YtDlp *YtDlp
 	// MaxBytes caps a fetch's size, as uploads are capped.
 	MaxBytes int64
@@ -127,9 +127,6 @@ type waiting struct {
 // Store keeping them there. It deletes expired ones as they expire until
 // closed.
 func Open(opts Options) (*Store, error) {
-	if opts.YtDlp == nil {
-		opts.YtDlp = NewYtDlp("", "")
-	}
 	if opts.Timeout <= 0 {
 		opts.Timeout = DefaultTimeout
 	}
@@ -442,7 +439,7 @@ func (e *ytDlpError) Unwrap() error { return e.err }
 // run runs yt-dlp, returning what it printed. It's stopped, with anything it
 // started, when ctx is done.
 func (s *Store) run(ctx context.Context, args ...string) ([]byte, error) {
-	return runProgram(ctx, s.opts.YtDlp.path(ctx), args...)
+	return runYtDlp(ctx, s.opts.YtDlp.path(ctx), args...)
 }
 
 func (s *Store) tooLarge() error {

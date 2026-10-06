@@ -51,7 +51,7 @@
     ytDlpUpdateError = null;
     try {
       ytDlpUpdate = await api.updateYtDlp();
-      ytDlp = { version: ytDlpUpdate.version, source: ytDlpUpdate.source };
+      ytDlp = ytDlpUpdate;
     } catch (e) {
       ytDlpUpdateError = (e as Error).message;
     } finally {
@@ -183,7 +183,7 @@
         {/if}
         {#if config.addFromLink}
           <div class="yt-dlp">
-            <p class="update">
+            <p class="yt-dlp-version">
               {#if ytDlp}{ytDlpInUse(ytDlp)}{:else if ytDlpError}{ytDlpError}{:else}Checking yt-dlp…{/if}
             </p>
             {#if ytDlp}
@@ -498,6 +498,9 @@
     align-items: center;
     gap: var(--space-2);
     margin-top: var(--space-2);
+  }
+  .yt-dlp-version {
+    color: var(--text-muted);
   }
   .yt-dlp-status {
     font-size: var(--text-md);

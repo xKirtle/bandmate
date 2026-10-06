@@ -64,7 +64,7 @@ const versionTimeout = 30 * time.Second
 // Bandmate is upgraded.
 type YtDlp struct {
 	bundled string
-	// dir holds the updated copy. Empty means there's none.
+	// dir holds the updated copy.
 	dir string
 	// updating lets one update run at a time.
 	updating sync.Mutex
@@ -74,7 +74,7 @@ type YtDlp struct {
 }
 
 // NewYtDlp picks between bundled, a path or a name on the PATH ("" for
-// "yt-dlp"), and an updated copy in dir.
+// "yt-dlp"), and an updated copy it keeps in dir.
 func NewYtDlp(bundled, dir string) *YtDlp {
 	if bundled == "" {
 		bundled = "yt-dlp"
@@ -98,10 +98,10 @@ func (y *YtDlp) InUse(ctx context.Context) (InUse, error) {
 		path   string
 		source Source
 	}
-	candidates := []candidate{{y.bundled, Bundled}}
-	if y.dir != "" {
-		candidates = append(candidates, candidate{y.updated(), Updated})
-	}
+	// Found once and kept, so a request given up partway never leaves
+	// one out.
+	ctx = context.WithoutCancel(ctx)
+	candidates := []candidate{{y.bundled, Bundled}, {y.updated(), Updated}}
 	var found *InUse
 	for _, c := range candidates {
 		path, err := exec.LookPath(c.path)
@@ -145,9 +145,6 @@ func (y *YtDlp) Update(ctx context.Context) (Update, error) {
 	if err != nil {
 		return Update{}, err
 	}
-	if y.dir == "" {
-		return Update{}, errors.New("no folder to keep an updated yt-dlp in")
-	}
 	ctx, cancel := context.WithTimeout(ctx, updateTimeout)
 	defer cancel()
 	if err := os.MkdirAll(y.dir, 0o755); err != nil {
@@ -162,18 +159,19 @@ func (y *YtDlp) Update(ctx context.Context) (Update, error) {
 		log.Printf("running yt-dlp from the data folder: %v", err)
 		return Update{Outcome: CantRun, InUse: current}, nil
 	}
-	if _, err := runProgram(ctx, next, "--ignore-config", "-U"); err != nil {
-		if ctx.Err() != nil {
+	if _, err := runYtDlp(ctx, next, "--ignore-config", "-U"); err != nil {
+		if errors.Is(ctx.Err(), context.Canceled) {
 			return Update{}, ctx.Err()
 		}
 		log.Printf("updating yt-dlp: %v", err)
-		return Update{}, refused(Failed, "Couldn't update yt-dlp. Try again, and if it keeps failing, Bandmate's log says why.")
+		return Update{}, updateFailed
 	}
-	// The update is used only once it's seen to run.
+	// The update is used only once it's seen to run. The copy ran before
+	// it, so the update is what broke it.
 	v, err := version(ctx, next)
 	if err != nil {
-		log.Printf("running the updated yt-dlp from the data folder: %v", err)
-		return Update{Outcome: CantRun, InUse: current}, nil
+		log.Printf("running the updated yt-dlp: %v", err)
+		return Update{}, updateFailed
 	}
 	if !newer(v, current.Version) {
 		return Update{Outcome: UpToDate, InUse: current}, nil
@@ -188,11 +186,13 @@ func (y *YtDlp) Update(ctx context.Context) (Update, error) {
 	return Update{Outcome: UpdatedTo, InUse: in}, nil
 }
 
+var updateFailed = refused(Failed, "Couldn't update yt-dlp. Try again, and if it keeps failing, Bandmate's log says why.")
+
 // version asks the yt-dlp at path its version, e.g. 2026.08.19.
 func version(ctx context.Context, path string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, versionTimeout)
 	defer cancel()
-	out, err := runProgram(ctx, path, "--version")
+	out, err := runYtDlp(ctx, path, "--version")
 	if err != nil {
 		return "", err
 	}
@@ -248,9 +248,9 @@ func copyProgram(from, to string) error {
 	return os.Chmod(to, 0o755)
 }
 
-// runProgram runs a program, returning what it printed. It's stopped, with
+// runYtDlp runs the yt-dlp at path, returning what it printed. It's stopped, with
 // anything it started, when ctx is done.
-func runProgram(ctx context.Context, path string, args ...string) ([]byte, error) {
+func runYtDlp(ctx context.Context, path string, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, path, args...)
 	stopTogether(cmd)
 	cmd.WaitDelay = 5 * time.Second

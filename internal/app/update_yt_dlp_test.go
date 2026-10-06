@@ -18,7 +18,7 @@ import (
 const (
 	ytDlpVersion = "BANDMATE_TEST_YT_DLP_VERSION"
 	// ytDlpLatest is the release its self-update finds: "unreachable"
-	// when it can't reach GitHub.
+	// when it can't reach GitHub, and "broken" for one that won't run.
 	ytDlpLatest = "BANDMATE_TEST_YT_DLP_LATEST"
 	// ytDlpNoexec is a folder it can't run from, as a data folder mounted
 	// noexec can't run programs.
@@ -207,6 +207,18 @@ func TestAYtDlpUpdateThatFailsSaysSo(t *testing.T) {
 	ts.expectNoUpdatedYtDlp()
 }
 
+func TestAYtDlpUpdateThatLeavesACopyThatWontRunIsNotUsed(t *testing.T) {
+	ts := newTestServerWith(t, bundledYtDlp{version: "2026.08.19", latest: "broken"}.with(t))
+
+	res := ts.Do(http.MethodPost, "/api/yt-dlp/update", nil)
+
+	expectError(t, res, http.StatusBadGateway, "Couldn't update yt-dlp. Try again, and if it keeps failing, Bandmate's log says why.")
+	if by := ts.fetchedBy(); by != "2026.08.19" {
+		t.Errorf("fetched by yt-dlp %s, want the bundled 2026.08.19", by)
+	}
+	ts.expectNoUpdatedYtDlp()
+}
+
 func TestWithoutYtDlpThereIsNoneToShowOrUpdate(t *testing.T) {
 	ts := newTestServerWith(t, func(c *app.Config) { c.YtDlp = filepath.Join(t.TempDir(), "no-yt-dlp") })
 	missing := "Adding from a link needs yt-dlp, which this Bandmate can't find."
@@ -257,6 +269,9 @@ func fakeYtDlpRelease(args []string) (code int, ok bool) {
 			return 1, true
 		}
 		updated := strings.Replace(string(script), ytDlpVersion+"="+version+"\n", ytDlpVersion+"="+latest+"\n", 1)
+		if latest == "broken" {
+			updated = "#!/bin/sh\nexit 1\n"
+		}
 		if err := os.WriteFile(self+".new", []byte(updated), 0o755); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return 1, true
