@@ -8,6 +8,7 @@ import {
   meterLevel,
   readInput,
   resolveInput,
+  sameInput,
   storeInput,
 } from './inputSettings';
 
@@ -100,6 +101,20 @@ describe("The Input's Device Setting", () => {
     input.set(scarlettInput2);
     otherTab('bandmate.palette');
     expect(input.value).toEqual(scarlettInput2);
+  });
+});
+
+describe('sameInput', () => {
+  it('is the same Input on the same device and channel, whatever its label', () => {
+    expect(
+      sameInput({ deviceId: 'abc', label: 'Scarlett', channel: 1 }, { deviceId: 'abc', label: '', channel: 1 }),
+    ).toBe(true);
+  });
+
+  it('is another Input on another device or channel', () => {
+    const one = { deviceId: 'abc', label: 'Scarlett', channel: 0 };
+    expect(sameInput(one, { ...one, channel: 1 })).toBe(false);
+    expect(sameInput(one, { ...one, deviceId: 'def' })).toBe(false);
   });
 });
 

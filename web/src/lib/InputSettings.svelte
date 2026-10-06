@@ -2,7 +2,7 @@
   import { onDestroy, tick, untrack } from 'svelte';
   import { formatOffset } from './calibration';
   import { CaptureError, InputLevel } from './capture';
-  import { channelName, deviceName, meterLevel, type InputChoice } from './inputSettings';
+  import { channelName, deviceName, meterLevel, sameInput, type InputChoice } from './inputSettings';
   import { placeBeside } from './popover';
   import { input } from './sharedInput.svelte';
   import { audioContext } from './timelinePlayer';
@@ -207,8 +207,9 @@
 
   // Another tab chose an Input while they're open: it's metered in place of the one before.
   $effect(() => {
-    const { deviceId, channel } = choice;
-    if (open && metered && (deviceId !== metered.deviceId || channel !== metered.channel)) untrack(meter);
+    // Read first, so a choice is tracked even while nothing is metered.
+    const chosen = choice;
+    if (open && metered && !sameInput(chosen, metered)) untrack(meter);
   });
 
   onDestroy(() => hide(false));

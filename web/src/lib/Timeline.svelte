@@ -121,7 +121,7 @@
   import { mixdownEnd } from './mixdown';
   import { appliedOffset } from './calibration';
   import { calibration } from './sharedCalibration.svelte';
-  import { input } from './sharedInput.svelte';
+  import { input as chosenInput } from './sharedInput.svelte';
   import {
     clampHeight,
     defaultHeight,
@@ -1153,7 +1153,7 @@
       // Said up front where it can be, in place of a recording that fails.
       const trouble = await inputProblem();
       if (trouble) throw new CaptureError(trouble);
-      const capture = await Capture.open(audioContext(), $state.snapshot(input.value));
+      const capture = await Capture.open(audioContext(), $state.snapshot(chosenInput.value));
       recording = { ...starting, capture };
       if (capture.gone) inputNote = `${capture.gone} isn't connected, so recording from the default input.`;
       if (destroyed) throw new CaptureError('The Timeline closed before recording started.');

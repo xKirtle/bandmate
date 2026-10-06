@@ -45,6 +45,11 @@ export const inputSetting = {
   store: storeInput,
 } satisfies DeviceSettingStorage<InputChoice>;
 
+/** Whether two choices are the same Input: the same device and channel, whatever their labels. */
+export function sameInput(a: InputChoice, b: InputChoice): boolean {
+  return a.deviceId === b.deviceId && a.channel === b.channel;
+}
+
 /** The input to open: the one chosen, or where it can't be, the default's first channel. */
 export interface ResolvedInput {
   deviceId: string;
