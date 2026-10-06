@@ -37,8 +37,8 @@
   import SongCover from '../lib/SongCover.svelte';
   import { SongDragging, songTarget } from '../lib/songDragging.svelte';
   import StatusBadge from '../lib/StatusBadge.svelte';
-  import TagChips from '../lib/TagChips.svelte';
   import TagFilter from '../lib/TagFilter.svelte';
+  import TagLine from '../lib/TagLine.svelte';
   import TagsDialog from '../lib/TagsDialog.svelte';
   import { timeAgo } from '../lib/time';
 
@@ -438,8 +438,9 @@
                   >
                 </button>
               </th>
-              {#if column.id === 'title' && acrossFolders}
-                <th class="unsorted">Folder</th>
+              {#if column.id === 'title'}
+                {#if acrossFolders}<th class="unsorted">Folder</th>{/if}
+                <th class="unsorted tags">Tags</th>
               {/if}
             {/each}
             <th class="row-actions"><span class="visually-hidden">Actions</span></th>
@@ -459,7 +460,7 @@
                   <a href={folderHref(f)}>{f.name}</a>
                 </span>
               </td>
-              <td class="muted" colspan="5">{songCount(f.songs)}</td>
+              <td class="muted" colspan="6">{songCount(f.songs)}</td>
               <td class="row-actions">
                 <ActionsMenu label="More actions for {f.name}" entries={folderActions(f)} />
               </td>
@@ -475,15 +476,15 @@
               <td class="title">
                 <span class="with-cover">
                   <SongCover songId={song.id} coverId={song.coverId} title={song.title} status={song.status} />
-                  <span class="heading">
-                    <a href="/songs/{song.id}">{song.title}</a>
-                    <TagChips tags={song.tags} />
-                  </span>
+                  <a href="/songs/{song.id}">{song.title}</a>
                 </span>
               </td>
               {#if acrossFolders}
                 <td class="folder-name" title={folderName}>{folderName ?? '—'}</td>
               {/if}
+              <td class="tags">
+                {#if song.tags.length > 0}<TagLine tags={song.tags} />{:else}—{/if}
+              </td>
               <td><StatusBadge status={song.status} /></td>
               <td>{song.key || '—'}</td>
               <td class="num">{song.bpm ?? '—'}</td>
@@ -522,7 +523,6 @@
                     {folderName}</span
                   >
                 {/if}
-                <TagChips tags={song.tags} />
               </span>
               <span class="meta">
                 <StatusBadge status={song.status} />
@@ -832,6 +832,13 @@
     max-width: 12rem;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  /* A Song's Tags, on one line whatever they hold: as many as fit, then "+N". */
+  th.tags,
+  td.tags {
+    width: 16rem;
+    min-width: 16rem;
+    max-width: 16rem;
   }
   .arrow {
     display: inline-block;
