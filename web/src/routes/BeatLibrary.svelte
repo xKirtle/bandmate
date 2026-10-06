@@ -2,7 +2,9 @@
   import Pause from '@lucide/svelte/icons/pause';
   import Pencil from '@lucide/svelte/icons/pencil';
   import Play from '@lucide/svelte/icons/play';
-  import { tick } from 'svelte';
+  import { onDestroy, tick } from 'svelte';
+  import AddFromLink, { type FromLink } from '../lib/AddFromLink.svelte';
+  import AudioPlayer from '../lib/AudioPlayer.svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { api, type Beat, type DecodedAudio } from '../lib/api';
   import BeatBatch from '../lib/BeatBatch.svelte';
@@ -40,18 +42,27 @@
   let reloads = $state(0);
   let maxUploadBytes = $state(Infinity);
 
-  // A file being added: decoded, waiting for its details.
+  // A file being added: decoded, waiting for its details. One fetched from a
+  // link is already on the server, waiting there, and is previewed from the
+  // copy read to decode it.
   interface Adding {
     file: File;
     decoded: DecodedAudio;
     draft: BeatDraft;
+    fetched?: { id: string; previewUrl: string };
   }
   let adding = $state<Adding | null>(null);
   let addBusy = $state<string | null>(null);
   let addError = $state<string | null>(null);
+  // Whether Add from link is offered, and whether its box is open.
+  let addFromLink = $state(false);
+  let linking = $state(false);
 
   api.getConfig().then(
-    (c) => (maxUploadBytes = c.maxUploadBytes),
+    (c) => {
+      maxUploadBytes = c.maxUploadBytes;
+      addFromLink = c.addFromLink;
+    },
     // The server still enforces its limit.
     () => {},
   );
@@ -167,8 +178,9 @@
   /** Opens the form for one file, or the review table for several, or adds them to the table already open. */
   async function addFiles(files: File[]) {
     if (files.length === 0) return;
+    linking = false;
     if (batching || files.length > 1) {
-      adding = null;
+      setAdding(null);
       addError = null;
       batching = true;
       await tick();
@@ -176,12 +188,12 @@
       return;
     }
     const [file] = files;
-    adding = null;
+    setAdding(null);
     addError = null;
     addBusy = `Reading “${file.name}”…`;
     try {
       const [decoded, suggestion] = await Promise.all([prepareUpload(file, maxUploadBytes), suggestForFile(file)]);
-      adding = { file, decoded, draft: toDraft(suggestion) };
+      setAdding({ file, decoded, draft: toDraft(suggestion) });
     } catch (e) {
       addError = (e as Error).message;
     } finally {
@@ -197,11 +209,13 @@
       addError = details;
       return;
     }
-    addBusy = 'Uploading…';
+    const { fetched } = adding;
+    addBusy = fetched ? 'Adding…' : 'Uploading…';
     addError = null;
     try {
-      await api.addBeat(adding.file, details, adding.decoded);
-      adding = null;
+      if (fetched) await api.addFetchedBeat(fetched.id, details, adding.decoded);
+      else await api.addBeat(adding.file, details, adding.decoded);
+      setAdding(null, true);
       dropNote = null;
       reloads++;
     } catch (e) {
@@ -212,10 +226,35 @@
   }
 
   function cancelAdd() {
-    adding = null;
+    setAdding(null);
     addError = null;
     dropNote = null;
   }
+
+  /**
+   * Puts a file in the adding form, or empties it. A fetched file it held
+   * stops waiting on the server, unless it was just added.
+   */
+  function setAdding(next: Adding | null, added = false) {
+    const was = adding?.fetched;
+    if (was && was.id !== next?.fetched?.id) {
+      URL.revokeObjectURL(was.previewUrl);
+      if (!added) api.discardFetched(was.id).catch(() => {});
+    }
+    adding = next;
+  }
+
+  function openLinkBox() {
+    cancelAdd();
+    linking = true;
+  }
+
+  function fetchedFromLink({ fetched, file, decoded, draft }: FromLink) {
+    linking = false;
+    setAdding({ file, decoded, draft, fetched: { id: fetched.id, previewUrl: URL.createObjectURL(file) } });
+  }
+
+  onDestroy(() => setAdding(null));
 
   // The Beat being edited in the dialog the table opens. The cards below
   // 80rem open their own; this one stays open across a resize, keeping its
@@ -291,6 +330,14 @@
   </label>
 {/snippet}
 
+{#snippet addFromLinkButton()}
+  {#if addFromLink}
+    <button type="button" class="button" onclick={openLinkBox} disabled={addBusy !== null || batchUploading || linking}>
+      Add from link
+    </button>
+  {/if}
+{/snippet}
+
 {#snippet previewCell(beat: Beat)}
   <button
     type="button"
@@ -306,7 +353,10 @@
 
 <header class="bar" bind:borderBoxSize={headerBox}>
   <h1>Beats</h1>
-  {@render addBeatButton('Add Beat')}
+  <div class="adds">
+    {@render addFromLinkButton()}
+    {@render addBeatButton('Add Beat')}
+  </div>
 </header>
 
 <main
@@ -331,12 +381,18 @@
       }}
     />
   {/if}
+  {#if linking}
+    <AddFromLink {maxUploadBytes} onFetched={fetchedFromLink} onClose={() => (linking = false)} />
+  {/if}
   {#if adding}
     <form class="card adding" onsubmit={add} aria-labelledby="adding-heading">
       <h2 id="adding-heading">
         Add “{adding.file.name}”
         <span class="muted tabular">{formatDuration(adding.decoded.duration)}</span>
       </h2>
+      {#if adding.fetched}
+        <AudioPlayer src={adding.fetched.previewUrl} duration={adding.decoded.duration} peaks={adding.decoded.peaks} />
+      {/if}
       <BeatFields bind:draft={adding.draft} idPrefix="new-beat" />
       <div class="actions">
         <button type="submit" class="button primary" disabled={addBusy !== null}>Add to Library</button>
@@ -365,7 +421,10 @@
   {:else if beats.length === 0}
     <div class="empty">
       <p>No Beats yet. Add an audio file to use it in any Song.</p>
-      {@render addBeatButton('Add your first Beat')}
+      <div class="adds">
+        {@render addBeatButton('Add your first Beat')}
+        {@render addFromLinkButton()}
+      </div>
     </div>
   {:else if shown.length === 0 && filtering}
     <div class="empty">
@@ -423,9 +482,26 @@
   .adding h2 span {
     font-weight: 400;
   }
-  .actions {
+  .actions,
+  .adds {
     display: flex;
     gap: var(--space-2);
+  }
+  /* The title and both ways to add a Beat share a phone's width; on the
+     narrowest, the buttons go under the title rather than squeezing it. */
+  .bar {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .bar .adds {
+    margin-left: auto;
+  }
+  .adds :global(.button) {
+    white-space: nowrap;
+  }
+  .empty .adds {
+    flex-wrap: wrap;
+    justify-content: center;
   }
   .add-error,
   .skipped {

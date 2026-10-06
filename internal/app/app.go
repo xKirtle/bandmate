@@ -17,6 +17,7 @@ import (
 	"github.com/xKirtle/bandmate/internal/beats"
 	"github.com/xKirtle/bandmate/internal/build"
 	"github.com/xKirtle/bandmate/internal/db"
+	"github.com/xKirtle/bandmate/internal/fetches"
 	"github.com/xKirtle/bandmate/internal/folders"
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
 	"github.com/xKirtle/bandmate/internal/releases"
@@ -57,6 +58,15 @@ type Config struct {
 	// About page lists. Empty, or a file that isn't there, lists none, as an
 	// install built without them has.
 	ProgramsManifest string
+	// AddFromLinkOff stops Beats being added from a link, so Bandmate never
+	// fetches one.
+	AddFromLinkOff bool
+	// YtDlp is the yt-dlp that fetches a link's audio. Empty means the one
+	// on the PATH.
+	YtDlp string
+	// FetchTimeout stops a fetch from a link that takes longer. Zero means
+	// fetches.DefaultTimeout.
+	FetchTimeout time.Duration
 }
 
 // DetachedTakesKept is how long a Take is kept once detached, well past
@@ -100,8 +110,12 @@ type App struct {
 	releases *releases.Checker
 	// dependencies is what ships in Bandmate, for the About page.
 	dependencies dependencies
-	spa          fs.FS
-	handler      http.Handler
+	// fetches fetches links' audio for Beats added from a link, unless
+	// addFromLinkOff.
+	fetches        *fetches.Store
+	addFromLinkOff bool
+	spa            fs.FS
+	handler        http.Handler
 }
 
 // New opens the database in cfg.DataDir, migrates it, and builds the HTTP
@@ -176,6 +190,18 @@ func New(cfg Config) (*App, error) {
 	}
 	a.startedAt = now()
 	a.dependencies = shipped(cfg.GoModules, cfg.SPA, cfg.ProgramsManifest)
+	a.addFromLinkOff = cfg.AddFromLinkOff
+	a.fetches, err = fetches.Open(fetches.Options{
+		Dir:      filepath.Join(cfg.DataDir, "audio", "waiting"),
+		YtDlp:    cfg.YtDlp,
+		MaxBytes: a.maxUpload,
+		Timeout:  cfg.FetchTimeout,
+		Now:      now,
+	})
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
 	a.releases = releases.New(releases.Options{Off: cfg.UpdateCheckOff, API: cfg.GitHubAPI, Now: now})
 	// Only tidying, so it never stops the app starting.
 	if err := a.timelines.SweepDetachedTakes(context.Background(), now().Add(-DetachedTakesKept)); err != nil {
@@ -192,7 +218,10 @@ func New(cfg Config) (*App, error) {
 func (a *App) Handler() http.Handler { return a.handler }
 
 // Close releases the database.
-func (a *App) Close() error { return a.db.Close() }
+func (a *App) Close() error {
+	a.fetches.Close()
+	return a.db.Close()
+}
 
 func (a *App) routes() http.Handler {
 	mux := http.NewServeMux()
@@ -291,6 +320,10 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("DELETE /api/beats/{id}", a.deleteBeat)
 	mux.HandleFunc("PUT /api/beats/{id}/file", a.replaceBeatFile)
 	mux.HandleFunc("GET /api/beats/{id}/audio", a.beatAudio)
+	mux.HandleFunc("POST /api/fetches", a.fetchLink)
+	mux.HandleFunc("GET /api/fetches/{id}/audio", a.fetchedAudio)
+	mux.HandleFunc("DELETE /api/fetches/{id}", a.discardFetched)
+	mux.HandleFunc("POST /api/fetches/{id}/beat", a.addFetchedBeat)
 	mux.HandleFunc("GET /api/backups", a.listBackups)
 	mux.HandleFunc("POST /api/backups", a.makeBackup)
 	mux.HandleFunc("POST /api/backups/upload", a.uploadBackup)
@@ -317,7 +350,8 @@ func (a *App) health(w http.ResponseWriter, r *http.Request) {
 }
 
 // config tells the SPA the limits it should check before sending anything,
-// and which version is running, with a link to its source.
+// which version is running, with a link to its source, and whether Beats can
+// be added from a link.
 func (a *App) config(w http.ResponseWriter, r *http.Request) {
 	// The rest of the build is the About page's, from /api/about.
 	writeJSON(w, http.StatusOK, struct {
@@ -327,7 +361,8 @@ func (a *App) config(w http.ResponseWriter, r *http.Request) {
 		Revision       string `json:"revision"`
 		SourceURL      string `json:"sourceUrl"`
 		BugReportURL   string `json:"bugReportUrl"`
-	}{a.maxUpload, a.maxCover, a.build.Version, a.build.Revision, a.build.SourceURL, a.build.BugReportURL})
+		AddFromLink    bool   `json:"addFromLink"`
+	}{a.maxUpload, a.maxCover, a.build.Version, a.build.Revision, a.build.SourceURL, a.build.BugReportURL, !a.addFromLinkOff})
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

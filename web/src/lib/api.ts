@@ -582,6 +582,22 @@ export interface ServerConfig {
   sourceUrl: string;
   /** Where to report a bug: the new-issue page of the repository it came from. */
   bugReportUrl: string;
+  /** Whether Beats can be added from a link. Off, nothing offers it. */
+  addFromLink: boolean;
+}
+
+/** A link's audio, fetched and waiting on the server to be added as a Beat, with what the link gave. */
+export interface Fetched {
+  id: string;
+  /** The video's title, "" if it has none. */
+  title: string;
+  /** The video's channel, "" if it has none. */
+  producer: string;
+  /** The video's own link, without the playlist or tracking it was pasted with. */
+  sourceLink: string;
+  fileName: string;
+  contentType: string;
+  size: number;
 }
 
 /** Everything About shows that's known without going online. */
@@ -698,8 +714,11 @@ function upload<T>(path: string, file: Blob, options: UploadOptions = {}): Promi
   return answer<T>(sendWithProgress('POST', `/api${path}`, file, options));
 }
 
-/** What a request answered, or the ApiError saying why it failed. An abort is passed on as it is. */
-async function answer<T>(sent: Promise<Response>): Promise<T> {
+/**
+ * What a request answered, as JSON unless read says how to read it, or the
+ * ApiError saying why it failed. An abort is passed on as it is.
+ */
+async function answer<T>(sent: Promise<Response>, read?: (res: Response) => Promise<T>): Promise<T> {
   let res: Response;
   try {
     res = await sent;
@@ -707,6 +726,7 @@ async function answer<T>(sent: Promise<Response>): Promise<T> {
     if (e instanceof DOMException && e.name === 'AbortError') throw e;
     throw new ApiError(0, "Can't reach Bandmate. Check your connection.");
   }
+  if (res.ok && read) return read(res);
   const data = res.status === 204 ? null : await res.json().catch(() => null);
   if (!res.ok) {
     throw new ApiError(res.status, data?.error ?? `Request failed (${res.status})`, data?.code);
@@ -767,6 +787,33 @@ export const api = {
    */
   beatAudioUrl: (beat: Pick<Beat, 'id' | 'fileName' | 'size' | 'duration'>) =>
     `/api/beats/${beat.id}/audio?v=${encodeURIComponent(`${beat.fileName}-${beat.size}-${beat.duration}`)}`,
+  /**
+   * Fetches a link's audio into a file waiting on the server to be added as a
+   * Beat, answering once it's there. Aborting the signal stops the fetch,
+   * failing with an AbortError.
+   */
+  fetchLink: (link: string, signal: AbortSignal) =>
+    answer<Fetched>(
+      fetch('/api/fetches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ link }),
+        signal,
+      }),
+    ),
+  /**
+   * A fetched file's audio, read once: to decode, to read its tags and to
+   * preview it. Aborting the signal stops reading it, failing with an AbortError.
+   */
+  fetchedAudio: async (fetched: Fetched, signal: AbortSignal): Promise<File> => {
+    const audio = await answer(fetch(`/api/fetches/${fetched.id}/audio`, { signal }), (res) => res.blob());
+    return new File([audio], fetched.fileName, { type: fetched.contentType });
+  },
+  /** Deletes a fetched file nobody's adding, rather than leaving it to expire. */
+  discardFetched: (id: string) => request<null>('DELETE', `/fetches/${id}`),
+  /** Adds a fetched file as a Beat, sending only its details: the file is on the server already. */
+  addFetchedBeat: (id: string, details: BeatDetails, decoded: DecodedAudio) =>
+    request<Beat>('POST', `/fetches/${id}/beat`, { ...details, ...decoded }),
 
   /** The Backups, newest first. */
   listBackups: () => request<Backup[]>('GET', '/backups'),

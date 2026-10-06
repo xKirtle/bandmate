@@ -1,7 +1,7 @@
 // Suggested details for a Beat being uploaded, worked out from the file's
 // tags where it has them and otherwise from its filename, e.g.
 // "dark_trap_140bpm_Am.wav" suggests "Dark Trap" at 140 BPM in Am.
-import type { BeatDetails } from './api';
+import type { BeatDetails, Fetched } from './api';
 
 /** Details a file suggests. "" and null mean it suggests nothing for that field. */
 export type BeatSuggestion = Pick<BeatDetails, 'title' | 'producer' | 'bpm' | 'key'>;
@@ -125,6 +125,25 @@ function plainAccidentals(text: string): string {
 function tagKey(key: string): string {
   const match = key.match(keyTagPattern);
   return match ? keyName(match[1], match[2], match[3]) : key;
+}
+
+/** What a link gave of a Beat fetched from it. "" where it gave nothing. */
+export type LinkDetails = Pick<Fetched, 'title' | 'producer' | 'sourceLink' | 'fileName'>;
+
+/**
+ * A Beat's details from a link: its title, channel and link as the link gave
+ * them, and the rest suggested as for an upload, from the file's tags and
+ * then the title, e.g. a "140 BPM" in it.
+ */
+export function suggestFromLink(link: LinkDetails, tags: BeatTags = {}): BeatSuggestion & { sourceLink: string } {
+  const file = suggestBeatDetails(link.fileName, tags);
+  return {
+    title: link.title.trim() || file.title,
+    producer: link.producer.trim() || file.producer,
+    sourceLink: link.sourceLink,
+    bpm: file.bpm,
+    key: file.key,
+  };
 }
 
 /** A file's details: its tags where it has them, otherwise read from its filename. */

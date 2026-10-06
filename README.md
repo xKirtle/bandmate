@@ -31,7 +31,7 @@ The words in bold are defined in the [glossary](GLOSSARY.md).
 ### Listen
 
 - **Masters**: finished recordings of a Song made elsewhere, attached to it with their own waveform and player.
-- A **Beat Library** of uploaded **Beats**, shared across Songs, each carrying its credit (producer, source link).
+- A **Beat Library** of **Beats**, shared across Songs, each carrying its credit (producer, source link). Upload a Beat, or paste a link to a video on YouTube, SoundCloud, Bandcamp or any other site [yt-dlp](https://github.com/yt-dlp/yt-dlp) reads, and Bandmate fetches its audio with the credit filled in.
 - A **Timeline** per Song, with **Tracks** holding **Clips** of Beats or **Sounds** (audio imported into one Song). Clips are trimmed without touching the file.
 - Each Track has its own volume, mute and solo. A **Loop** repeats a stretch of the Timeline.
 - Undo and redo for every Timeline edit.
@@ -115,9 +115,14 @@ Bandmate itself reads these:
 | `BANDMATE_ADDR`          | `:8080`  | Listen address                                                                                                             |
 | `BANDMATE_DATA_DIR`      | `./data` | Directory holding the SQLite database (`bandmate.db`), audio files (`audio/`), Covers (`covers/`) and Backups (`backups/`) |
 | `BANDMATE_MAX_UPLOAD_MB` | `500`    | Largest audio file accepted for upload, in megabytes                                                                       |
-| `BANDMATE_UPDATE_CHECK`  | `on`     | `off` stops the About tab asking GitHub for the latest release and the release notes. It's Bandmate's only outbound call   |
+| `BANDMATE_UPDATE_CHECK`  | `on`     | `off` stops the About tab asking GitHub for the latest release and the release notes                                       |
+| `BANDMATE_ADD_FROM_LINK` | `on`     | `off` stops Beats being added from a link: the Add from link button is hidden, and Bandmate refuses to fetch one           |
 
 The image sets `BANDMATE_DATA_DIR` to `/data`, the folder the examples above mount.
+
+Bandmate makes two kinds of outbound call, each only when asked: the update check, when About is opened (to GitHub), and, when the user adds a Beat from a link, the fetch of that link (to the site it's on, through yt-dlp). `BANDMATE_UPDATE_CHECK=off` and `BANDMATE_ADD_FROM_LINK=off` turn each off.
+
+A fetch takes the audio of one video, never a playlist, a channel or a live stream, and keeps it as an m4a. It's held to `BANDMATE_MAX_UPLOAD_MB`, like an upload, and stopped after 10 minutes. The fetched audio waits in `audio/waiting/` in the data folder until it's added, and is deleted after an hour if it isn't, or when Bandmate restarts. A fetch is one long request, so a reverse proxy in front of Bandmate needs a read timeout long enough for it.
 
 `GET /api/health` returns `200 {"status":"ok"}` when the database is reachable. `bandmate healthcheck` calls it and exits non-zero on failure. The container healthcheck uses it because the image has no shell or curl.
 

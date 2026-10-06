@@ -41,9 +41,9 @@ func newTestServer(t *testing.T) *testServer {
 
 // newTestServerWith starts a server with a fresh data directory and the
 // configuration changed by configure, e.g. to lower the upload cap.
-func newTestServerWith(t *testing.T, configure func(*app.Config)) *testServer {
+func newTestServerWith(t *testing.T, configure ...func(*app.Config)) *testServer {
 	t.Helper()
-	return startTestServer(t, t.TempDir(), configure)
+	return startTestServer(t, t.TempDir(), configure...)
 }
 
 // startTestServer starts a server on an existing data directory, e.g. to
