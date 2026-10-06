@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Alternate, Line, Section, Song } from './api';
-import { chartChords, chartTuning, chartVoicing, chartVoicings } from './chordChart';
+import { chartChords, chartTuning, chartVoicing, chartVoicings, chordsInRead } from './chordChart';
 
 let nextId = 1;
 
@@ -131,5 +131,23 @@ describe("the Voicings a Chord's popover steps through", () => {
   it("says why there's none to step through", () => {
     expect(chartVoicings('Galt', standard)).toEqual({ kind: 'unreadable-chord' });
     expect(chartVoicings('C', null)).toEqual({ kind: 'unreadable-tuning' });
+  });
+});
+
+describe('where a Song has Chords, as Read mode shows it', () => {
+  it('has them shown when an active Alternate in the Arrangement has Chords', () => {
+    expect(chordsInRead(song([section(alternate([line([]), line(['C'])]))]))).toBe('shown');
+  });
+
+  it('has them elsewhere when only the Scrapbook has Chords', () => {
+    expect(chordsInRead(song([section(alternate([line([])]))], [section(alternate([line(['C'])]))]))).toBe('elsewhere');
+  });
+
+  it('has them elsewhere when only an inactive Alternate has Chords', () => {
+    expect(chordsInRead(song([section(alternate([line([])]), alternate([line(['C'])], false))]))).toBe('elsewhere');
+  });
+
+  it('has none when no Line anywhere has a Chord', () => {
+    expect(chordsInRead(song([section(alternate([line([])]))], [section(alternate([line([])]))]))).toBe('none');
   });
 });

@@ -9,6 +9,7 @@
   import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
   import { tick } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
+  import type { ChordsInRead } from './chordChart';
   import { songChordsShown } from './chordsShown';
   import { largestLyricSize, smallestLyricSize, stepLyricSize, usualLyricSize } from './lyricSize';
   import { placeBeside } from './popover';
@@ -26,11 +27,11 @@
 
   let {
     songId,
-    hasChords,
+    chords,
   }: {
     songId: number;
-    /** Whether the Song has any Chords. */
-    hasChords: boolean;
+    /** Where the Song has Chords, as Read mode shows it. */
+    chords: ChordsInRead;
   } = $props();
 
   const size = $derived(lyricSize.value);
@@ -38,8 +39,8 @@
   const transpose = $derived(songTranspose.of(songId));
   const transposeShown = $derived(transposeText(transpose));
   const chart = $derived(chordChartState.current);
-  const badge = $derived(readingBadge({ hasChords, chordsShown, transpose }));
-  const blocked = $derived(blockedRows({ hasChords, chordsShown }));
+  const badge = $derived(readingBadge({ chords, chordsShown, transpose }));
+  const blocked = $derived(blockedRows({ chords, chordsShown }));
 
   // On a phone the button is its icon alone.
   const wide = new MediaQuery('min-width: 40.0625rem');
@@ -161,12 +162,12 @@
         <button
           type="button"
           class="button toggle step"
-          aria-pressed={hasChords && chordsShown}
+          aria-pressed={chords === 'shown' && chordsShown}
           disabled={blocked.chords !== null}
           onclick={() => songChordsShown.set(songId, !chordsShown)}
           aria-label="Show the Chords"
           title={blocked.chords ?? (chordsShown ? 'Hide the Chords' : 'Show the Chords')}
-          >{#if hasChords && chordsShown}<Eye />{:else}<EyeOff />{/if}</button
+          >{#if chords === 'shown' && chordsShown}<Eye />{:else}<EyeOff />{/if}</button
         >
       </div>
 
