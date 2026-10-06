@@ -7,7 +7,7 @@
   import BeatLibrary from './routes/BeatLibrary.svelte';
   import ChordFinderPage from './routes/ChordFinderPage.svelte';
   import Backups from './routes/Backups.svelte';
-  import Appearance from './routes/Appearance.svelte';
+  import ThisDevice from './routes/ThisDevice.svelte';
   import About from './routes/About.svelte';
   import NotFound from './routes/NotFound.svelte';
   import MainNav from './lib/MainNav.svelte';
@@ -38,8 +38,8 @@
       <BeatLibrary />
     {:else if router.path === '/chords'}
       <ChordFinderPage />
-    {:else if settingsTab === 'appearance'}
-      <Appearance />
+    {:else if settingsTab === 'device'}
+      <ThisDevice />
     {:else if settingsTab === 'backups'}
       <Backups />
     {:else if settingsTab === 'about'}

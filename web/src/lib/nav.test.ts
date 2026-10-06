@@ -77,9 +77,9 @@ describe('pinned', () => {
 });
 
 describe('settingsTabs', () => {
-  it('are Appearance, Backups and About, in that order, each at its own address', () => {
+  it('are This device, Backups and About, in that order, each at its own address', () => {
     expect(settingsTabs.map((t) => [t.label, t.href])).toEqual([
-      ['Appearance', '/settings'],
+      ['This device', '/settings'],
       ['Backups', '/settings/backups'],
       ['About', '/settings/about'],
     ]);
@@ -88,7 +88,7 @@ describe('settingsTabs', () => {
 
 describe('settingsTabAt', () => {
   it('is the Settings tab at a path', () => {
-    expect(settingsTabAt('/settings')).toBe('appearance');
+    expect(settingsTabAt('/settings')).toBe('device');
     expect(settingsTabAt('/settings/backups')).toBe('backups');
     expect(settingsTabAt('/settings/about')).toBe('about');
   });
