@@ -132,6 +132,7 @@
     readHeight,
     storeHeight,
   } from './timelineHeight';
+  import { fullScreenQuery } from './timelineLayout';
   import { audioContext, TimelinePlayer, type PlayableClip, type PlayerState } from './timelinePlayer';
   import { forgetUnsaved, Keeper, unsavedSamples, unsavedTakes, whileHeld } from './unsavedTakes';
   import {
@@ -334,8 +335,15 @@
   const loopOn = $derived((timeline.loop?.on ?? false) && !switchingOff);
   // The Loop playback repeats: the saved one, while it's on.
   const playingLoop = $derived<Loop | null>(loopOn ? { start: timeline.loop!.start, end: timeline.loop!.end } : null);
-  // Matches the phone layout below, which hides editing.
-  const editable = new MediaQuery('min-width: 40.0625rem');
+  // Matches the upright phone's layout below, which hides editing.
+  const editable = new MediaQuery(`(min-width: 40.0625rem), ${fullScreenQuery}`);
+  // A phone held sideways: the Timeline fills the window and can't be
+  // collapsed, its Tracks taking all the height below the transport row.
+  const fullScreen = new MediaQuery(fullScreenQuery);
+  // Collapsing is only set aside there, so it's back on turning upright or
+  // widening the window.
+  const tracksShown = $derived(!collapsed || fullScreen.current);
+  const resizable = $derived(!collapsed && !fullScreen.current);
 
   // Decode in the background, so playing can start right away.
   $effect(() => {
@@ -1016,7 +1024,7 @@
 
   /** Whether files dropped now can be imported. */
   function takesFiles(): boolean {
-    return editable.current && !frozen && !picking && !calibrating && !mixingDown && !collapsed;
+    return editable.current && !frozen && !picking && !calibrating && !mixingDown && tracksShown;
   }
 
   /**
@@ -1826,7 +1834,8 @@
     const needed = neededHeight;
     if (!needed) return;
     untrack(() => {
-      if (chosenHeight !== null) {
+      // Full-screen, the height kept for elsewhere is left as it is.
+      if (chosenHeight !== null && !fullScreen.current) {
         chosenHeight = grownHeight(chosenHeight, neededBefore, needed, windowHeight);
       }
     });
@@ -2833,6 +2842,10 @@
   </button>
 {/snippet}
 
+{#snippet status(text: string, tone: 'muted' | 'input-note' = 'muted')}
+  <span class={['status', tone]} role="status" title={text}>{text}</span>
+{/snippet}
+
 <!-- Esc pressed anywhere in it, on a focused control, clears the Selection. -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <section
@@ -2845,7 +2858,7 @@
   ondragleave={filesLeave}
   ondrop={filesDrop}
 >
-  {#if !collapsed}
+  {#if resizable}
     <!-- A focusable separator with a value is a widget, resized with Up and Down. -->
     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
     <div
@@ -2945,18 +2958,19 @@
           onclick={() => (calibrating = { offer: false })}>Not calibrated</button
         >
       {/if}
+      <!-- On one line full-screen, cut short with the whole of it in the title. -->
       {#if recording?.phase === 'starting'}
-        <span class="muted" role="status">Opening the microphone…</span>
+        {@render status('Opening the microphone…')}
       {:else if recording?.phase === 'saving'}
-        <span class="muted" role="status">Saving the Take…</span>
+        {@render status('Saving the Take…')}
       {:else if recording && inputNote}
-        <span class="input-note" role="status">{inputNote}</span>
+        {@render status(inputNote, 'input-note')}
       {:else if recording && skipped}
-        <span class="muted" role="status">Calibrate the latency any time from Recording settings… in the ⋯ menu.</span>
+        {@render status('Calibrate the latency any time from Recording settings… in the ⋯ menu.')}
       {:else if importing}
-        <span class="muted" role="status">{importing}</span>
+        {@render status(importing)}
       {:else if playerState === 'loading'}
-        <span class="muted" role="status">Loading audio…</span>
+        {@render status('Loading audio…')}
       {/if}
       <span class="spacer"></span>
       {@render undoRedo()}
@@ -2980,8 +2994,8 @@
       id="timeline-tracks"
       bind:this={tracksElement}
       class:frozen
-      hidden={collapsed}
-      style:max-height="{tracksHeight}px"
+      hidden={!tracksShown}
+      style:max-height={fullScreen.current ? null : `${tracksHeight}px`}
       onscroll={() => trackDrag.aim()}
     >
       <div class="heads" class:gripped={editable.current} bind:offsetHeight={headsHeight}>
@@ -4462,11 +4476,12 @@
   }
 
   /*
-   * On a phone, the Timeline only plays: the transport row alone. The Tracks
-   * are hidden much as when collapsed, so they come back as they were on
-   * widening the window, and playback goes on with their saved levels and Loop.
+   * On a phone held upright, the Timeline only plays: the transport row
+   * alone. The Tracks are hidden much as when collapsed, so they come back as
+   * they were on widening the window or turning it sideways, and playback
+   * goes on with their saved levels and Loop.
    */
-  @media (max-width: 40rem) {
+  @media (max-width: 40rem) and ((orientation: portrait) or (height >= 30rem)) {
     /* Already sized for a phone, and there's no room to spare. */
     .timeline {
       --timeline-scale: 1;
@@ -4486,6 +4501,55 @@
     /* Easier to hit with a thumb. */
     .toggle.loop-toggle {
       height: calc(1.5 * var(--timeline-rem));
+    }
+  }
+
+  /*
+   * On a phone held sideways, or any landscape window under 30rem tall, the
+   * Timeline is all there is: it fills the window over the Song page and the
+   * navigation (app.css), can't be collapsed or resized, and its Tracks take
+   * all the height below the transport row, which stays on one line.
+   */
+  @media (orientation: landscape) and (height < 30rem) {
+    /* Already sized for a phone, and there's no room to spare. */
+    .timeline {
+      --timeline-scale: 1;
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      border-top: none;
+    }
+    .collapse-toggle {
+      display: none;
+    }
+    /* Clear of a camera cutout or the home indicator, on whichever side. */
+    .inner {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      padding-top: max(calc(0.5 * var(--timeline-rem)), env(safe-area-inset-top));
+      padding-bottom: max(calc(0.5 * var(--timeline-rem)), env(safe-area-inset-bottom));
+    }
+    .transport {
+      flex-wrap: nowrap;
+    }
+    .transport > * {
+      flex-shrink: 0;
+    }
+    /* A message gives way first, cut short rather than wrapping, so the
+       Tracks keep their height mid-take. */
+    .transport > .status {
+      flex-shrink: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tracks {
+      flex: 1;
+      min-height: 0;
     }
   }
 </style>
