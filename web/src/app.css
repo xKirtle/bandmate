@@ -520,10 +520,14 @@ input[inputmode='decimal'] {
   font-size: var(--text-xl);
   cursor: pointer;
 }
-.icon:hover:not(:disabled) {
-  border-color: var(--border);
-  background: var(--bg);
-  color: var(--text);
+/* Its box shows on hover only to a pointer that can hover: a tap on a touch
+   screen leaves the button hovered, so the box would stay after it. */
+@media (hover: hover) {
+  .icon:hover:not(:disabled) {
+    border-color: var(--border);
+    background: var(--bg);
+    color: var(--text);
+  }
 }
 .icon:disabled {
   opacity: 0.35;
