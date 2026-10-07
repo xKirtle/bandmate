@@ -127,7 +127,7 @@ On a song's page, press **?**, or the keyboard button by Write and Read, to see 
 | Enter | In Sync mode, mark the next line as starting now |
 | Ctrl+scroll | Zoom the timeline |
 
-On a Mac, ⌘ works wherever Ctrl does. Shortcuts can't be changed yet.
+On a Mac, ⌘ works wherever Ctrl does. Choosing your own keys is coming soon.
 
 ## Backups
 
