@@ -1,30 +1,43 @@
-import { resolve } from 'node:path';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { APIRequestContext, Page } from '@playwright/test';
+import { toneWav } from '../beats';
 import { failRequests } from '../faults';
 import { expect, test } from '../fixtures';
 
 // Recording Takes on the Song page's Timeline, from Chromium's fake
-// microphone, which captures media/tone.wav on a loop: a half-second 440 Hz
-// tone, mono, 16-bit at 48 kHz. The tests check where Takes' Clips land and
-// that their lengths are sensible, never the audio. How long a recording
-// runs depends on how fast the page is, so lengths are checked within
-// tolerances.
-
-const tone = resolve(import.meta.dirname, '../media/tone.wav');
+// microphone, which captures a half-second 440 Hz tone on a loop. The tests
+// check where Takes' Clips land and that their lengths are sensible, never
+// the audio. How long a recording runs depends on how fast the page is, so
+// lengths are checked within tolerances.
 
 // Only these tests start Chromium with the fake microphone, so this file runs
-// in workers of its own.
+// in workers of its own. Each worker writes the tone to a file of its own
+// before its Chromium starts, for the fake microphone to play.
 test.use({
   permissions: ['microphone'],
-  launchOptions: {
-    // As playwright.config.ts picks it.
-    executablePath: process.env.CHROMIUM || undefined,
-    args: [
-      '--use-fake-device-for-media-stream',
-      '--use-fake-ui-for-media-stream',
-      `--use-file-for-fake-audio-capture=${tone}`,
-    ],
-  },
+  launchOptions: [
+    async ({}, use) => {
+      const dir = mkdtempSync(join(tmpdir(), 'bandmate-e2e-mic-'));
+      const tone = join(dir, 'tone.wav');
+      writeFileSync(tone, toneWav('tone.wav', 0.5).buffer);
+      try {
+        await use({
+          // As playwright.config.ts picks it.
+          executablePath: process.env.CHROMIUM || undefined,
+          args: [
+            '--use-fake-device-for-media-stream',
+            '--use-fake-ui-for-media-stream',
+            `--use-file-for-fake-audio-capture=${tone}`,
+          ],
+        });
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+    { scope: 'worker' },
+  ],
 });
 
 /** How long playback leads in before a Take's Clip starts, in seconds. */
