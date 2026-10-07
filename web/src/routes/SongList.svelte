@@ -9,7 +9,7 @@
   import TagIcon from '@lucide/svelte/icons/tag';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import ActionsMenu from '../lib/ActionsMenu.svelte';
-  import { ApiError, api, statuses, type Folder, type SongSummary, type Status, type Tag } from '../lib/api';
+  import { api, statuses, type Folder, type SongSummary, type Status, type Tag } from '../lib/api';
   import DeleteFolderDialog from '../lib/DeleteFolderDialog.svelte';
   import DeleteTagDialog from '../lib/DeleteTagDialog.svelte';
   import FilterButton from '../lib/FilterButton.svelte';
@@ -17,11 +17,9 @@
   import {
     defaultSongListView,
     isSongListFiltered,
-    loadSongList,
     renamePick,
     songCount,
     songListViewFromParams,
-    songListFilter,
     songListViewToParams,
     sortFolders,
     sortSongs,
@@ -35,6 +33,7 @@
   import RenameTagDialog from '../lib/RenameTagDialog.svelte';
   import { navigate, replaceSearch, router } from '../lib/router.svelte';
   import SongCover from '../lib/SongCover.svelte';
+  import { SongListQuery } from '../lib/songListQuery.svelte';
   import { SongDragging, songTarget } from '../lib/songDragging.svelte';
   import StatusBadge from '../lib/StatusBadge.svelte';
   import TagFilter from '../lib/TagFilter.svelte';
@@ -49,42 +48,27 @@
     folderId?: number;
   } = $props();
 
-  let songs = $state<SongSummary[] | null>(null);
-  let folders = $state<Folder[] | null>(null);
-  // Every Tag, wherever the Songs carrying it are, to filter by.
-  let tags = $state<Tag[]>([]);
-  // Whether there are any Songs at all, whatever the filters: in the Folder
-  // open, or anywhere at the top level. Without any, the search and filters
-  // have nothing to act on, so they're hidden, and cleared so ones from the
-  // URL don't hide the first Song once it's made.
-  let anySongs = $state(true);
-  let error = $state<string | null>(null);
   // The search, filters and sort start as the URL has them, and are kept in
-  // it so going back to the list restores them. The filters combine.
-  let view = $state(songListViewFromParams(new URLSearchParams(router.search)));
-  // Bumped to load the list again, e.g. once a Song has moved.
-  let changes = $state(0);
+  // it so going back to the list restores them. The filters combine. The
+  // Folder open never changes: App makes a new Song list for each.
+  // svelte-ignore state_referenced_locally
+  const query = new SongListQuery(api, songListViewFromParams(new URLSearchParams(router.search)), folderId);
 
-  const sorted = $derived(songs && sortSongs(songs, view.sort));
-  const filtered = $derived(isSongListFiltered(view));
-  // Whether the Songs shown are every Song, whatever Folder it's in, as at the
-  // top level while a search or filter is on: then the Folders give way to
-  // one list of Songs, each showing its Folder. Taken from the list as last
-  // loaded, not the filters as typed, so the two never show out of step.
-  let acrossFolders = $state(false);
+  const sorted = $derived(query.songs && sortSongs(query.songs, query.view.sort));
+  const filtered = $derived(isSongListFiltered(query.view));
   // Every Folder by name, for the menus; at the top level they come first,
   // whatever the Songs are sorted by, but for while the list is every Song.
-  const sortedFolders = $derived(folders ? sortFolders(folders) : []);
-  const listedFolders = $derived(folderId === undefined && !acrossFolders ? sortedFolders : []);
-  const folderNames = $derived(new Map(folders?.map((f) => [f.id, f.name])));
-  const folder = $derived(folderId === undefined ? undefined : folders?.find((f) => f.id === folderId));
-  const folderMissing = $derived(folderId !== undefined && folders !== null && !folder);
+  const sortedFolders = $derived(query.folders ? sortFolders(query.folders) : []);
+  const listedFolders = $derived(folderId === undefined && !query.acrossFolders ? sortedFolders : []);
+  const folderNames = $derived(new Map(query.folders?.map((f) => [f.id, f.name])));
+  const folder = $derived(folderId === undefined ? undefined : query.folders?.find((f) => f.id === folderId));
+  const folderMissing = $derived(folderId !== undefined && query.folders !== null && !folder);
   // A Folder opens with the Songs sorted as they are here, and the way back
   // out keeps that sort.
-  const folderSearch = $derived(songListViewToParams({ ...defaultSongListView, sort: view.sort }).toString());
+  const folderSearch = $derived(songListViewToParams({ ...defaultSongListView, sort: query.view.sort }).toString());
 
   $effect(() => {
-    replaceSearch(songListViewToParams(view));
+    replaceSearch(songListViewToParams(query.view));
   });
 
   const columns: { id: SongColumn; label: string; num?: boolean }[] = [
@@ -107,46 +91,6 @@
     navigate(href);
   }
 
-  // Not reactive: the first load shouldn't wait, later ones debounce typing.
-  let loaded = false;
-
-  // Reloads whenever the filters change, waiting for a pause in typing. Only
-  // the latest request's answer is shown.
-  $effect(() => {
-    const filter = songListFilter(view, folderId);
-    void changes;
-    let current = true;
-    const timer = setTimeout(
-      () => {
-        // A Folder that doesn't exist lists no Songs: the Folders say it's missing.
-        const listing = loadSongList(filter, api.listSongs).catch((e: Error) => {
-          if (folderId !== undefined && e instanceof ApiError && e.status === 404)
-            return { songs: [], anySongs: false };
-          throw e;
-        });
-        Promise.all([listing, api.listFolders(), api.listTags()]).then(
-          ([result, allFolders, allTags]) => {
-            if (!current) return;
-            songs = result.songs;
-            acrossFolders = filter.folder === undefined;
-            anySongs = result.anySongs;
-            folders = allFolders;
-            tags = allTags;
-            if (!anySongs && isSongListFiltered(view)) clearFilters();
-            error = null;
-            loaded = true;
-          },
-          (e: Error) => current && (error = e.message),
-        );
-      },
-      loaded ? 200 : 0,
-    );
-    return () => {
-      current = false;
-      clearTimeout(timer);
-    };
-  });
-
   // "New Song" makes an "Untitled Song" straight away, in the Folder open if
   // any, and opens it, its title ready to type over. Back returns here.
   let creating = $state(false);
@@ -164,13 +108,9 @@
     }
   }
 
-  function clearFilters() {
-    view = { ...defaultSongListView, sort: view.sort };
-  }
-
   // Picking Statuses keeps them in lifecycle order, as the button names them.
   function pickStatus(status: Status, on: boolean) {
-    view.statuses = statuses.filter((s) => (s === status ? on : view.statuses.includes(s)));
+    query.view.statuses = statuses.filter((s) => (s === status ? on : query.view.statuses.includes(s)));
   }
 
   // "New folder" is open, and, from a Song's menu, which Song goes into the
@@ -186,7 +126,7 @@
     } catch (e) {
       moveError = `Couldn't move “${song.title}” (${(e as Error).message})`;
     }
-    changes++;
+    query.reload();
   }
 
   // A Song dragged onto a Folder's row moves into it, and, inside a Folder,
@@ -206,7 +146,7 @@
   function madeFolder(made: Folder) {
     const song = newFolder?.for;
     if (song) moveSong(song, made.id);
-    else changes++;
+    else query.reload();
   }
 
   // The Folder being renamed, if any, and the one asked about deleting, by
@@ -214,10 +154,10 @@
   // deleting them failed partway.
   let renaming = $state<Folder | null>(null);
   let deletingId = $state<number | null>(null);
-  const deleting = $derived(deletingId === null ? undefined : folders?.find((f) => f.id === deletingId));
+  const deleting = $derived(deletingId === null ? undefined : query.folders?.find((f) => f.id === deletingId));
   // Gone meanwhile, e.g. deleted elsewhere, it's no longer asked about.
   $effect(() => {
-    if (deletingId !== null && folders && !deleting) deletingId = null;
+    if (deletingId !== null && query.folders && !deleting) deletingId = null;
   });
   let folderError = $state<string | null>(null);
 
@@ -241,7 +181,7 @@
   // way back skips it.
   function deletedFolder(f: Folder) {
     if (f.id === folderId) navigate(topHref, { replace: true });
-    else changes++;
+    else query.reload();
   }
 
   function folderActions(f: Folder): MenuAction[] {
@@ -264,13 +204,13 @@
   let deletingTag = $state<Tag | null>(null);
 
   function renamedTag(from: Tag, to: Tag) {
-    view.tags = renamePick(view.tags, from.name, to.name);
-    changes++;
+    query.view.tags = renamePick(query.view.tags, from.name, to.name);
+    query.reload();
   }
 
   function deletedTag(tag: Tag) {
-    view.tags = togglePick(view.tags, tag.name, false);
-    changes++;
+    query.view.tags = togglePick(query.view.tags, tag.name, false);
+    query.reload();
   }
 
   // The Song whose Tags are being changed, if any.
@@ -344,26 +284,30 @@
   {#if folderError}
     <p class="error" role="alert">{folderError}</p>
   {/if}
-  {#if anySongs && !folderMissing}
+  {#if query.anySongs && !folderMissing}
     <search class="filters">
       <label class="visually-hidden" for="song-search">Search Songs by title</label>
       <input
         id="song-search"
         type="search"
-        bind:value={view.q}
+        bind:value={query.view.q}
         placeholder="Search titles"
         autocomplete="off"
         enterkeyhint="search"
       />
       <div class="filter-bar" role="group" aria-label="Filter Songs">
-        <FilterButton name="Status" label={statusFilterLabel(view.statuses)} picked={view.statuses.length > 0}>
+        <FilterButton
+          name="Status"
+          label={statusFilterLabel(query.view.statuses)}
+          picked={query.view.statuses.length > 0}
+        >
           <fieldset class="choice-group">
             <legend class="visually-hidden">Status</legend>
             {#each statuses as s (s)}
               <label class="choice-row status-choice">
                 <input
                   type="checkbox"
-                  checked={view.statuses.includes(s)}
+                  checked={query.view.statuses.includes(s)}
                   onchange={(e) => pickStatus(s, e.currentTarget.checked)}
                 />
                 {s}
@@ -372,17 +316,17 @@
           </fieldset>
         </FilterButton>
         <TagFilter
-          picked={view.tags}
-          {tags}
-          onpick={(next) => (view.tags = next)}
+          picked={query.view.tags}
+          tags={query.tags}
+          onpick={(next) => (query.view.tags = next)}
           onrename={(tag) => (renamingTag = tag)}
           ondelete={(tag) => (deletingTag = tag)}
         />
         <button
           type="button"
           class="chip"
-          aria-pressed={view.hasMaster}
-          onclick={() => (view.hasMaster = !view.hasMaster)}
+          aria-pressed={query.view.hasMaster}
+          onclick={() => (query.view.hasMaster = !query.view.hasMaster)}
         >
           Has a Master
         </button>
@@ -390,16 +334,16 @@
     </search>
   {/if}
 
-  {#if error}
-    <p class="error" role="alert">{error}</p>
-  {:else if songs === null || folders === null}
+  {#if query.error}
+    <p class="error" role="alert">{query.error}</p>
+  {:else if query.songs === null || query.folders === null}
     <p class="muted">Loading…</p>
   {:else if folderMissing}
     <div class="empty">
       <p>This Folder doesn't exist.</p>
       <a class="button" href="/">Go to Songs</a>
     </div>
-  {:else if !anySongs && listedFolders.length === 0}
+  {:else if !query.anySongs && listedFolders.length === 0}
     <div class="empty">
       {#if folderId === undefined}
         <p>No Songs yet.</p>
@@ -421,21 +365,21 @@
             {#each columns as column (column.id)}
               <th
                 class:num={column.num}
-                aria-sort={view.sort.column === column.id
-                  ? view.sort.direction === 'asc'
+                aria-sort={query.view.sort.column === column.id
+                  ? query.view.sort.direction === 'asc'
                     ? 'ascending'
                     : 'descending'
                   : undefined}
               >
-                <button type="button" onclick={() => (view.sort = toggleSort(view.sort, column.id))}>
+                <button type="button" onclick={() => (query.view.sort = toggleSort(query.view.sort, column.id))}>
                   {column.label}<span class="arrow" aria-hidden="true"
-                    >{#if view.sort.column === column.id}{#if view.sort.direction === 'asc'}<ArrowUp />{:else}<ArrowDown
-                        />{/if}{/if}</span
+                    >{#if query.view.sort.column === column.id}{#if query.view.sort.direction === 'asc'}<ArrowUp
+                        />{:else}<ArrowDown />{/if}{/if}</span
                   >
                 </button>
               </th>
               {#if column.id === 'title'}
-                {#if acrossFolders}<th class="unsorted">Folder</th>{/if}
+                {#if query.acrossFolders}<th class="unsorted">Folder</th>{/if}
                 <th class="unsorted tags">Tags</th>
               {/if}
             {/each}
@@ -475,7 +419,7 @@
                   <a href="/songs/{song.id}">{song.title}</a>
                 </span>
               </td>
-              {#if acrossFolders}
+              {#if query.acrossFolders}
                 <td class="folder-name" title={folderName}>{folderName ?? '—'}</td>
               {/if}
               <td class="tags">
@@ -513,7 +457,7 @@
               <SongCover songId={song.id} coverId={song.coverId} title={song.title} status={song.status} />
               <span class="heading">
                 <span class="title">{song.title}</span>
-                {#if acrossFolders && folderName !== undefined}
+                {#if query.acrossFolders && folderName !== undefined}
                   <span class="in-folder"
                     ><FolderIcon /><span class="visually-hidden">In</span>
                     {folderName}</span
@@ -530,10 +474,10 @@
         {/each}
       </ul>
     {/if}
-    {#if sorted.length === 0 && anySongs && filtered}
+    {#if sorted.length === 0 && query.anySongs && filtered}
       <div class="empty">
         <p>No Songs match.</p>
-        <button type="button" class="button" onclick={clearFilters}>Clear filters</button>
+        <button type="button" class="button" onclick={() => query.clearFilters()}>Clear filters</button>
       </div>
     {/if}
   {/if}
@@ -557,10 +501,10 @@
   <FolderNameDialog onSaved={madeFolder} onClose={() => (newFolder = null)} />
 {/if}
 {#if renaming}
-  <FolderNameDialog folder={renaming} onSaved={() => changes++} onClose={() => (renaming = null)} />
+  <FolderNameDialog folder={renaming} onSaved={() => query.reload()} onClose={() => (renaming = null)} />
 {/if}
 {#if tagging}
-  <TagsDialog song={tagging} onSaved={() => changes++} onClose={() => (tagging = null)} />
+  <TagsDialog song={tagging} onSaved={() => query.reload()} onClose={() => (tagging = null)} />
 {/if}
 {#if renamingTag}
   {@const from = renamingTag}
@@ -574,7 +518,7 @@
   <DeleteFolderDialog
     folder={deleting}
     onDeleted={() => deleting && deletedFolder(deleting)}
-    onFailed={() => changes++}
+    onFailed={() => query.reload()}
     onClose={() => (deletingId = null)}
   />
 {/if}

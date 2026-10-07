@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Beat, SongFilter, SongSummary } from './api';
+import type { Beat, SongSummary } from './api';
 import {
   beatKeys,
   beatListViewFromParams,
@@ -13,12 +13,10 @@ import {
   isPicked,
   isSongListFiltered,
   keyFilterLabel,
-  loadSongList,
   matchingChoices,
   pickChoices,
   producerFilterLabel,
   renamePick,
-  songListFilter,
   songBeatHint,
   sortBeats,
   sortFolders,
@@ -151,97 +149,6 @@ describe('sortSongs', () => {
     const given = [...songs];
     sortSongs(given, { column: 'title', direction: 'asc' });
     expect(given).toEqual(songs);
-  });
-});
-
-describe('loadSongList', () => {
-  // Lists Songs as the server would, from a fixed set, recording each filter asked for.
-  function server(all: SongSummary[]) {
-    const asked: SongFilter[] = [];
-    const list = async (filter: SongFilter) => {
-      asked.push(filter);
-      return all.filter(
-        (s) =>
-          (!filter.statuses || filter.statuses.includes(s.status)) &&
-          (!filter.q || s.title.includes(filter.q)) &&
-          (filter.folder === undefined || s.folderId === (filter.folder === 'none' ? null : filter.folder)),
-      );
-    };
-    return { asked, list };
-  }
-
-  it('tells there are no Songs when the unfiltered list is empty', async () => {
-    const { asked, list } = server([]);
-    expect(await loadSongList({}, list)).toEqual({ songs: [], anySongs: false });
-    expect(asked).toEqual([{}]);
-  });
-
-  it('asks for every Song when none match, to tell no matches from no Songs', async () => {
-    const { list } = server([song('Night Drive', { status: 'drafting' })]);
-    expect(await loadSongList({ statuses: ['finished'] }, list)).toEqual({ songs: [], anySongs: true });
-  });
-
-  it('tells there are no Songs when filters are set but there are none to match', async () => {
-    const { list } = server([]);
-    expect(await loadSongList({ statuses: ['finished'], q: 'night', hasMaster: true }, list)).toEqual({
-      songs: [],
-      anySongs: false,
-    });
-  });
-
-  it('asks only once when some Songs match', async () => {
-    const nightDrive = song('Night Drive', { status: 'drafting' });
-    const { asked, list } = server([nightDrive, song('Daylight')]);
-    expect(await loadSongList({ statuses: ['drafting', 'finished'] }, list)).toEqual({
-      songs: [nightDrive],
-      anySongs: true,
-    });
-    expect(asked).toEqual([{ statuses: ['drafting', 'finished'] }]);
-  });
-
-  it('inside a Folder, tells whether it holds any Songs, whatever the filters', async () => {
-    const { asked, list } = server([song('Night Drive', { folderId: 3 }), song('Elsewhere', { folderId: 4 })]);
-    expect(await loadSongList({ folder: 3, statuses: ['finished'] }, list)).toEqual({ songs: [], anySongs: true });
-    expect(asked).toEqual([{ folder: 3, statuses: ['finished'] }, { folder: 3 }]);
-    asked.length = 0;
-    expect(await loadSongList({ folder: 5 }, list)).toEqual({ songs: [], anySongs: false });
-    expect(asked).toEqual([{ folder: 5 }]);
-  });
-
-  it('at the top level, tells there are Songs when every one is in a Folder', async () => {
-    const { asked, list } = server([song('Night Drive', { folderId: 3 })]);
-    expect(await loadSongList({ folder: 'none' }, list)).toEqual({ songs: [], anySongs: true });
-    expect(asked).toEqual([{ folder: 'none' }, {}]);
-  });
-});
-
-describe('songListFilter', () => {
-  const view = (fields: Partial<SongListView> = {}): SongListView => ({ ...defaultSongListView, ...fields });
-
-  it('at the top level, unfiltered, asks for the Songs in no Folder', () => {
-    expect(songListFilter(view())).toEqual({ folder: 'none' });
-    expect(songListFilter(view({ q: '   ' }))).toEqual({ folder: 'none' });
-  });
-
-  it('at the top level, a search or any filter asks for every Song, whatever its Folder', () => {
-    expect(songListFilter(view({ q: 'night' }))).toEqual({ q: 'night' });
-    expect(songListFilter(view({ statuses: ['drafting'] }))).toEqual({ statuses: ['drafting'] });
-    expect(songListFilter(view({ statuses: ['idea', 'drafting'] }))).toEqual({ statuses: ['idea', 'drafting'] });
-    expect(songListFilter(view({ hasMaster: true }))).toEqual({ hasMaster: true });
-    expect(songListFilter(view({ tags: ['Live', 'Album 2023'] }))).toEqual({ tags: ['Live', 'Album 2023'] });
-  });
-
-  it('inside a Folder, asks only for its Songs, filtered or not', () => {
-    expect(songListFilter(view(), 3)).toEqual({ folder: 3 });
-    expect(
-      songListFilter(view({ q: 'night', statuses: ['idea', 'finished'], tags: ['Live'], hasMaster: true }), 3),
-    ).toEqual({
-      q: 'night',
-      statuses: ['idea', 'finished'],
-      tags: ['Live'],
-      hasMaster: true,
-      folder: 3,
-    });
   });
 });
 
