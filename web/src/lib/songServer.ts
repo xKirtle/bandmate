@@ -1,10 +1,11 @@
 // The reads and writes Saves makes itself: reading the Song and its
 // Timeline, the Cue changes and Timeline edits it tries again, undoes,
 // redoes and takes back, the Lyric Sheet changes it's given by name, and
-// setting the Tags, which it's given as a list rather than a write. Writes a
-// caller brings are built against the Song as saved already, so they don't
-// go through here.
-import { api, type Song, type SongAt, type Timeline } from './api';
+// setting the Tags, which it's given as a list rather than a write. Saves
+// also hands it to a rarer edit's work, which imports a Sound or merges
+// Clips through it. Other writes a caller brings are built against the
+// Song as saved already, so they don't go through here.
+import { api, type ClipMerge, type Song, type SongAt, type SoundImport, type Timeline } from './api';
 import { sendCueChange, type CueChange } from './cueChanges';
 import { sendEdit, type Edit } from './history';
 import { isLyricSheetChange, sendLyricSheetChange, type LyricSheetChange } from './lyricSheetChanges';
@@ -21,6 +22,10 @@ export interface SongServer {
   apply(at: SongAt, edit: Edit): Promise<Timeline>;
   /** Sets the Song's Tags, returning them as saved. Tagging leaves the Song's version as it was. */
   setTags(tags: string[]): Promise<string[]>;
+  /** Imports an audio file as a Sound, in a new Clip after a Track's last Clip, or at 0:00, returning the Timeline it leaves. */
+  importSound(at: SongAt, file: File, details: SoundImport): Promise<Timeline>;
+  /** Replaces Clips with one Clip of a new Sound, "Merged Clip", from their audio rendered together, returning the Timeline it leaves. */
+  mergeClips(at: SongAt, wav: Blob, merge: ClipMerge): Promise<Timeline>;
 }
 
 /** Waits the milliseconds given, e.g. between tries of a save. */
@@ -52,5 +57,7 @@ export function songServer(id: number): SongServer {
       return sendEdit(at, change);
     }) as SongServer['apply'],
     setTags: (tags) => api.setSongTags(id, tags),
+    importSound: api.importSound,
+    mergeClips: api.mergeClips,
   };
 }

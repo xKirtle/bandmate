@@ -16,13 +16,18 @@
 //   change, withdraws it once it lands. Ignoring it leaves them where they
 //   were: after recording, they usually belong to the vocal rather than
 //   the Beat.
-import type { Song, Timeline } from './api';
+// - Merge and Sound import, the rarer edits whose audio the browser makes
+//   (see the audio port below). Each is kept to undo as placing what it
+//   made, so redoing it never renders or uploads anything again.
+import type { DecodedAudio, Song, Timeline } from './api';
 import { addedTrack } from './chosenTrack';
 import type { DragSave } from './clipDrag.svelte';
 import { sameCues } from './cueChanges';
 import { movedCues, type TimeSpan } from './cues';
+import { importEach } from './fileDrop';
 import { editsWhileRecording, type Freeze } from './freeze';
-import { addedClips, restorable, type Edit } from './history';
+import { addedClips, mergingAdded, placingAdded, restorable, type Edit } from './history';
+import { mergeTarget, mergeWarning, type MergedAudio, type MergeTarget } from './merge';
 import type { Edited, Saves } from './saves.svelte';
 import type { Selection } from './selection.svelte';
 import { rightHalves } from './split';
@@ -50,6 +55,22 @@ interface MadeOffer {
   song: Song;
 }
 
+/** An audio file decoded and named, ready to import as a Sound. */
+export interface PreparedSound extends DecodedAudio {
+  name: string;
+}
+
+/** The audio the browser makes for an edit: the browser's own, or a fake of it. */
+export interface TimelineAudio {
+  /**
+   * Checks an audio file can be imported, decodes it, and names it. Fails
+   * with a message to show if it can't be imported.
+   */
+  prepare(file: File): Promise<PreparedSound>;
+  /** Renders the audio of the Clips a Merge merges, from the Timeline as saved. */
+  renderMerge(timeline: Timeline, target: MergeTarget): Promise<MergedAudio>;
+}
+
 export interface TimelineEditingOptions {
   /** The Song's saves, which every edit goes through. */
   saves: Saves;
@@ -59,6 +80,8 @@ export interface TimelineEditingOptions {
   recording: () => boolean;
   /** Chooses a Track, e.g. one just added. */
   choose: (trackId: number) => void;
+  /** Prepares files to import and renders Merges. */
+  audio: TimelineAudio;
 }
 
 export class TimelineEditing {
@@ -66,11 +89,20 @@ export class TimelineEditing {
   #selection: Selection;
   #recording: () => boolean;
   #choose: (trackId: number) => void;
+  #audio: TimelineAudio;
   /** Whether a Merge is under way, from pressing Merge until its Sound is saved or it fails. */
   #merging = $state(false);
   /** The Cue-move offer made last, until it lapses or is answered. Raw, so the timer can tell it's still its own. */
   #made = $state.raw<MadeOffer | null>(null);
   #offerTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Which Tracks the last Merge left silent, until it's dismissed or the next Merge. */
+  #mergeNote = $state<string | null>(null);
+  /** What importing an audio file is doing, while it is. */
+  #importing = $state<string | null>(null);
+  /** Imports run one at a time, in the order they were asked for. */
+  #imports: Promise<void> = Promise.resolve();
+  /** What the files imported refused said, until a new import or a Merge. */
+  #error = $state<string | null>(null);
   /** The offer made last, while the Timeline as saved and the Cues as shown are still the ones it was made for. */
   #standing = $derived.by(() => {
     const made = this.#made;
@@ -83,6 +115,7 @@ export class TimelineEditing {
     this.#selection = options.selection;
     this.#recording = options.recording;
     this.#choose = options.choose;
+    this.#audio = options.audio;
   }
 
   /** Why the Timeline can't be edited: a recording or a Merge under way, or null while it can be. */
@@ -177,15 +210,117 @@ export class TimelineEditing {
     this.#made = null;
   }
 
-  /** Freezes the Timeline for a Merge while its work runs, until it's saved or fails. */
-  whileMerging = async <T>(work: () => Promise<T>): Promise<T> => {
+  /** Whether the Clips selected can be merged now: two or more, all on the Timeline, while it isn't frozen. */
+  get mergeable(): boolean {
+    return !this.frozen && mergeTarget(this.#saves.timeline.tracks, this.#selection.ids) !== null;
+  }
+
+  /**
+   * Merges the selected Clips, on any Tracks, into one Clip of a new
+   * Sound, rendered from the Timeline as saved once the edits queued
+   * before it land, with its Tracks' levels as they are then. Until it's
+   * saved, or fails, the Timeline is frozen; if rendering or saving fails,
+   * nothing changes, and the save error says why. Once saved, the merged
+   * Clip becomes the Selection, its Track the Chosen Track, and the Merge
+   * note names any Track that came out silent. It's kept in the history as
+   * replacing the Clips with it, so redoing it never renders it again.
+   * Resolves to whether it was saved; refused while it can't be merged.
+   */
+  merge = async (): Promise<boolean> => {
+    if (!this.mergeable) return false;
+    const clipIds = new Set(this.#selection.ids);
+    this.#error = null;
+    this.#mergeNote = null;
+    // What it says once made, worked out in its turn.
+    let note: string | null = null;
     this.#merging = true;
-    try {
-      return await work();
-    } finally {
-      this.#merging = false;
-    }
+    const made = await this.#saves
+      .make(async (at, before, server) => {
+        const target = mergeTarget(before.tracks, clipIds);
+        if (!target) throw new Error("The Clips to merge aren't all on the Timeline any more.");
+        let audio: MergedAudio;
+        try {
+          audio = await this.#audio.renderMerge(before, target);
+        } catch (e) {
+          throw new Error(`Couldn't merge the Clips (${(e as Error).message}).`);
+        }
+        const after = await server.mergeClips(at, audio.wav, {
+          clipIds: target.clipIds,
+          peaks: audio.peaks,
+          ...target.onto,
+        });
+        note = mergeWarning(target.silent);
+        return { timeline: after, kept: mergingAdded(before, after, target.clipIds) };
+      })
+      .finally(() => (this.#merging = false));
+    if (!made) return false;
+    const [mergedId] = addedClips(made.before, made.after);
+    this.#selection.selectEdited([mergedId]);
+    this.#choose(made.after.tracks.find((t) => t.clips.some((c) => c.id === mergedId))!.id);
+    this.#mergeNote = note;
+    return true;
   };
+
+  /** Which Tracks the last Merge left silent, muted or left out by a solo, until it's dismissed, the next Merge, or an undo or redo. */
+  get mergeNote(): string | null {
+    return this.#mergeNote;
+  }
+
+  dismissMergeNote() {
+    this.#mergeNote = null;
+  }
+
+  /**
+   * Imports audio files as Sounds onto a Track, each after the last, e.g.
+   * from Import audio… or dropped, once the imports asked for before are
+   * done; refused while frozen. Each one refused says why in the error as
+   * it's refused, and a new import clears what the last ones said, unless
+   * one is still under way. Resolves once they're done.
+   */
+  importFiles = (files: File[], trackId: number): Promise<void> => {
+    if (this.frozen) return Promise.resolve();
+    if (this.#importing === null) this.#error = null;
+    const done = this.#imports.then(async () => {
+      await importEach(
+        files,
+        (file) => this.#importSound(file, trackId),
+        (message) => (this.#error = this.#error ? `${this.#error} ${message}` : message),
+      );
+      this.#importing = null;
+    });
+    this.#imports = done;
+    return done;
+  };
+
+  /**
+   * Imports an audio file as a Sound, in a new Clip after a Track's last
+   * Clip, or at 0:00. Fails with why if the file can't be imported. It's
+   * kept in the history as placing that Clip, so redoing it never uploads
+   * the file again.
+   */
+  async #importSound(file: File, trackId: number) {
+    this.#importing = `Reading “${file.name}”…`;
+    const { name, ...decoded } = await this.#audio.prepare(file);
+    this.#importing = `Importing “${name}”…`;
+    await this.#saves.make(async (at, before, server) => {
+      const after = await server.importSound(at, file, { trackId, name, ...decoded });
+      return { timeline: after, kept: placingAdded(before, after) };
+    });
+  }
+
+  /** What importing an audio file is doing, e.g. "Reading “intro.wav”…", while it is. */
+  get importing(): string | null {
+    return this.#importing;
+  }
+
+  /** What the files imported refused said, until a new import, a Merge, or it's dismissed. */
+  get error(): string | null {
+    return this.#error;
+  }
+
+  dismissError() {
+    this.#error = null;
+  }
 
   /**
    * Whether pressing undo would do anything: not while frozen, and not with
@@ -209,6 +344,7 @@ export class TimelineEditing {
    */
   undo = async (): Promise<number | null> => {
     if (!this.undoes) return null;
+    this.#mergeNote = null;
     const undone = await this.#saves.undo();
     if (!undone) return null;
     if (undone.reselect) this.#selection.selectEdited(undone.reselect);
@@ -218,6 +354,7 @@ export class TimelineEditing {
   /** Redoes the latest edit undone, unless frozen; a Merge or a Split redone selects what it did again. */
   redo = async (): Promise<void> => {
     if (!this.redoes) return;
+    this.#mergeNote = null;
     const redone = await this.#saves.redo();
     if (redone?.reselect) this.#selection.selectEdited(redone.reselect);
   };

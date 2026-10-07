@@ -48,8 +48,7 @@
   import { formatCue } from './cues';
   import type { Saves } from './saves.svelte';
   import { editHint, type Freeze } from './freeze';
-  import { draggedFiles, fileDropTrack, importEach, type TrackRow } from './fileDrop';
-  import { addedClips, mergingAdded, placingAdded } from './history';
+  import { draggedFiles, fileDropTrack, type TrackRow } from './fileDrop';
   import { keyHints } from './keyHints';
   import { formatVolume, maxVolume, minVolume, trackGains, type Levels } from './mixer';
   import type { MenuAction } from './menu';
@@ -65,7 +64,7 @@
   import { songKey } from './songKeys';
   import { allKeys, shortcuts, type Way } from './shortcuts';
   import { clipActions, selectionActions } from './clipMenu';
-  import { mergeTarget, mergeWarning, mergedClips, renderMerge, type MergedAudio } from './merge';
+  import { mergeTarget, mergedClips, renderMerge } from './merge';
   import { rightHalfOf, splitTargets } from './split';
   import { Selection, type ClipIds, type SelectionBox } from './selection.svelte';
   import { TimelineEditing } from './timelineEditing.svelte';
@@ -171,9 +170,6 @@
   let picking = $state(false);
   // A Beat just added whose BPM could become the Song's.
   let offerBpm = $state<{ bpm: number; title: string } | null>(null);
-  // After a Merge, which Tracks came out silent, muted or left out by a
-  // solo, until it's dismissed or the next Merge.
-  let mergeNote = $state<string | null>(null);
 
   // Recording a Take onto the chosen Track, or a Retake into a Clip of
   // Takes, and offering back Takes that never reached the server: see
@@ -225,13 +221,23 @@
 
   // Every edit made here goes through Timeline editing, on top of Saves,
   // which keeps them to undo: see timelineEditing.svelte.ts. It selects
-  // what an edit adds, chooses a Track added, and offers to move the Cues
-  // of Clips moved. The Timeline keeps the playhead and the Merge note.
+  // what an edit adds, chooses a Track added, offers to move the Cues of
+  // Clips moved, and makes Merges and Sound imports, with the audio the
+  // browser decodes and renders. The Timeline keeps the playhead.
   const editing: TimelineEditing = new TimelineEditing({
     saves: untrack(() => saves),
     selection,
     recording: () => recording,
     choose: (trackId) => choose({ kind: 'add', trackId }),
+    audio: {
+      prepare: async (file) => {
+        const [decoded, name] = await Promise.all([prepareUpload(file, maxUploadBytes), nameSound(file)]);
+        return { ...decoded, name };
+      },
+      // Loading each source as the player does, which keeps it for playback.
+      renderMerge: (before, target) =>
+        renderMerge(mergedClips(before, sources, target.clipIds), target, (s) => player.load(s)),
+    },
   });
   onDestroy(() => editing.close());
 
@@ -312,9 +318,6 @@
   });
 
   async function undo() {
-    // Pressed with nothing to do, it leaves everything, the Merge note too, as it is.
-    if (!editing.undoes) return;
-    mergeNote = null;
     // Undoing a new Take returns the playhead to where its Clip starts, to
     // record again from. Once the Clip's gone, it's a seek like any other:
     // playing, playback jumps there, superseding the restart the Clip's
@@ -324,8 +327,6 @@
   }
 
   async function redo() {
-    if (!editing.redoes) return;
-    mergeNote = null;
     await editing.redo();
   }
 
@@ -751,42 +752,23 @@
     // The server still enforces its limit.
     () => {},
   );
-  // What importing an audio file is doing, while it is.
-  let importing = $state<string | null>(null);
+  // What went wrong here, then what the files imported refused.
+  const shownError = $derived([error, editing.error].filter((e) => e !== null).join(' ') || null);
 
-  // Imports run one at a time, in the order they were asked for.
-  let imports = Promise.resolve();
-
-  /**
-   * Imports audio files as Sounds onto a Track, each after the last, from
-   * Import audio… or dropped. Each one refused says why as it's refused,
-   * and a new import clears what the last ones said once they're done.
-   */
-  function importFiles(files: File[], trackId: number) {
-    if (importing === null) error = null;
-    imports = imports.then(async () => {
-      await importEach(
-        files,
-        (file) => importSound(file, trackId),
-        (message) => (error = error ? `${error} ${message}` : message),
-      );
-      importing = null;
-    });
+  function dismissError() {
+    error = null;
+    editing.dismissError();
   }
 
   /**
-   * Imports an audio file as a Sound, in a new Clip after a Track's last
-   * Clip, or at 0:00. It's kept in the history as placing that Clip, so
-   * redoing it never uploads the file again.
+   * Imports audio files as Sounds onto a Track, each after the last, from
+   * Import audio… or dropped, unless frozen: see Timeline editing. A new
+   * import clears what the Timeline said before, unless one's under way.
    */
-  async function importSound(file: File, trackId: number) {
-    importing = `Reading “${file.name}”…`;
-    const [decoded, name] = await Promise.all([prepareUpload(file, maxUploadBytes), nameSound(file)]);
-    importing = `Importing “${name}”…`;
-    await saves.make(async (at, before) => {
-      const after = await api.importSound(at, file, { trackId, name, ...decoded });
-      return { timeline: after, kept: placingAdded(before, after) };
-    });
+  function importFiles(files: File[], trackId: number) {
+    if (frozen) return;
+    if (editing.importing === null) error = null;
+    void editing.importFiles(files, trackId);
   }
 
   /** Imports the file picked with Import audio… onto the Chosen Track. */
@@ -794,7 +776,7 @@
     const input = event.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
     input.value = '';
-    if (file && chosen !== null && !frozen) importFiles([file], chosen);
+    if (file && chosen !== null) importFiles([file], chosen);
   }
 
   // The transport row's ⋯, for its occasional actions, and what they open:
@@ -809,7 +791,7 @@
       {
         // Only there can the Timeline be edited.
         fullTimeline: editable.current,
-        importing: importing !== null,
+        importing: editing.importing !== null,
         recording,
         merging: freeze === 'merging',
         chosenTrack: timeline.tracks.find((t) => t.id === chosen)?.name ?? 'the Chosen Track',
@@ -1662,46 +1644,13 @@
   }
 
   /**
-   * Merges the selected Clips, on any Tracks, into one Clip of a new Sound,
-   * rendered here from the Timeline as it is once the edits queued before
-   * it are saved, with its Tracks' levels as they are then. Until it's
-   * saved, the Timeline can't be edited; if rendering or saving fails,
-   * nothing changes. The merged Clip becomes the Selection, and its Track
-   * the Chosen Track, and a Track that came out silent is named. It's kept
-   * in the history as replacing the Clips with it, so redoing it never
-   * renders it again.
+   * Merges the selected Clips into one Clip of a new Sound: see Timeline
+   * editing. Pressing it clears what the Timeline said before.
    */
   function mergeSelection() {
-    if (frozen || !mergeTarget(timeline.tracks, selection.ids)) return;
-    const clipIds = selection.ids;
+    if (!editing.mergeable) return;
     error = null;
-    mergeNote = null;
-    // What it says once made, worked out in its turn.
-    let note: string | null = null;
-    editing.whileMerging(async () => {
-      const made = await saves.make(async (at, before) => {
-        const target = mergeTarget(before.tracks, clipIds);
-        if (!target) throw new Error("The Clips to merge aren't all on the Timeline any more.");
-        let audio: MergedAudio;
-        try {
-          audio = await renderMerge(mergedClips(before, sources, target.clipIds), target, (s) => player.load(s));
-        } catch (e) {
-          throw new Error(`Couldn't merge the Clips (${(e as Error).message}).`);
-        }
-        const after = await api.mergeClips(at, audio.wav, {
-          clipIds: target.clipIds,
-          peaks: audio.peaks,
-          ...target.onto,
-        });
-        note = mergeWarning(target.silent);
-        return { timeline: after, kept: mergingAdded(before, after, target.clipIds) };
-      });
-      if (!made) return;
-      const [mergedId] = addedClips(made.before, made.after);
-      selection.selectEdited([mergedId]);
-      remembered = made.after.tracks.find((t) => t.clips.some((c) => c.id === mergedId))!.id;
-      mergeNote = note;
-    });
+    void editing.merge();
   }
 
   /** Deletes the selected Clips, as one edit. */
@@ -2310,8 +2259,8 @@
         {@render status(recorder.inputNote, 'input-note')}
       {:else if recording && skipped}
         {@render status('Calibrate the latency any time from Recording settings… in the ⋯ menu.')}
-      {:else if importing}
-        {@render status(importing)}
+      {:else if editing.importing}
+        {@render status(editing.importing)}
       {:else if playerState === 'loading'}
         {@render status('Loading audio…')}
       {/if}
@@ -2875,10 +2824,10 @@
         >
       </div>
     {/if}
-    {#if mergeNote}
+    {#if editing.mergeNote}
       <div class="offer" role="status">
-        <span class="merge-note">{mergeNote}</span>
-        <button type="button" class="button" onclick={() => (mergeNote = null)}>OK</button>
+        <span class="merge-note">{editing.mergeNote}</span>
+        <button type="button" class="button" onclick={() => editing.dismissMergeNote()}>OK</button>
       </div>
     {/if}
     {#if offerBpm}
@@ -2889,13 +2838,11 @@
       </div>
     {/if}
   </div>
-  {#if error}
+  {#if shownError}
     <!-- Over the page just above the Timeline, so showing it never moves anything. -->
     <div class="error-bar" role="alert">
-      <span class="error">{error}</span>
-      <button type="button" class="dismiss" onclick={() => (error = null)} aria-label="Dismiss" title="Dismiss"
-        ><X /></button
-      >
+      <span class="error">{shownError}</span>
+      <button type="button" class="dismiss" onclick={dismissError} aria-label="Dismiss" title="Dismiss"><X /></button>
     </div>
   {/if}
 </section>

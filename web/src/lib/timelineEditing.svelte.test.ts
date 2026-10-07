@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Clip, Song, Track } from './api';
+import type { Clip, Song, Timeline, Track } from './api';
 import type { DragSave } from './clipDrag.svelte';
 import { Saves } from './saves.svelte';
 import { Selection } from './selection.svelte';
 import { emptySong, FakeSongServer } from './songServerFake';
-import { offerFor, TimelineEditing } from './timelineEditing.svelte';
+import type { MergeTarget } from './merge';
+import { offerFor, TimelineEditing, type PreparedSound, type TimelineAudio } from './timelineEditing.svelte';
 
 /** A Clip of Beat 1, from start to end seconds. */
 const beatClip = (id: number, start: number, end: number): Clip => ({
@@ -36,14 +37,57 @@ const track = (id: number, clips: Clip[] = []): Track => ({
 const twoTracks = () => [track(1, [beatClip(1, 0, 10), beatClip(2, 20, 30)]), track(2)];
 
 /**
+ * The browser's audio, faked: a file lasts 2 s and is named after its name
+ * without its extension, unless the test refuses it, and a Merge renders
+ * to a fixed WAV, unless the test fails it. Either can be held until
+ * released. It counts the Merges it rendered.
+ */
+class FakeAudio implements TimelineAudio {
+  rendered = 0;
+  /** Why each file of these names is refused. */
+  refusing = new Map<string, string>();
+  /** Why the next render fails, if it does. */
+  renderFailure: Error | null = null;
+  #holding: Promise<void> | null = null;
+
+  /** Holds the next file prepared or Merge rendered until the function returned is called. */
+  holdNext(): () => void {
+    let release!: () => void;
+    this.#holding = new Promise((done) => (release = done));
+    return release;
+  }
+
+  prepare = async (file: File): Promise<PreparedSound> => {
+    await this.#held();
+    const refused = this.refusing.get(file.name);
+    if (refused) throw new Error(refused);
+    return { name: file.name.replace(/\.[^.]*$/, ''), duration: 2, peaks: new Array(200).fill(0.5) };
+  };
+
+  renderMerge = async (timeline: Timeline, target: MergeTarget) => {
+    await this.#held();
+    if (this.renderFailure) throw this.renderFailure;
+    this.rendered++;
+    return { wav: new Blob(['merged']), peaks: new Array((target.end - target.start) * 100).fill(0.5) };
+  };
+
+  async #held() {
+    const holding = this.#holding;
+    this.#holding = null;
+    await holding;
+  }
+}
+
+/**
  * Timeline editing on top of Saves for the Song the server holds, as the
- * Timeline makes it, with whether a recording is on, set by the test, and
- * the Tracks it chose.
+ * Timeline makes it, with the audio faked, whether a recording is on, set
+ * by the test, and the Tracks it chose.
  */
 async function editingFor(server: FakeSongServer) {
   const [song, timeline] = await Promise.all([server.getSong(), server.getTimeline()]);
   const saves = new Saves({ server, song, timeline, wait: () => Promise.resolve() });
   const state = { recording: false, chosen: [] as number[] };
+  const audio = new FakeAudio();
   let editing!: TimelineEditing;
   let selection!: Selection;
   const dispose = $effect.root(() => {
@@ -56,13 +100,14 @@ async function editingFor(server: FakeSongServer) {
       selection,
       recording: () => state.recording,
       choose: (trackId) => state.chosen.push(trackId),
+      audio,
     });
   });
   disposers.push(() => {
     editing.close();
     dispose();
   });
-  return { saves, editing, selection, state };
+  return { saves, editing, selection, state, audio };
 }
 
 const disposers: (() => void)[] = [];
@@ -95,19 +140,43 @@ describe('Timeline editing, the freeze', () => {
     expect(server.timeline.tracks[0]).toMatchObject({ muted: true, volume: -6, name: 'Track 1' });
   });
 
-  it('refuses an edit while a Merge is under way, but a Track’s levels, until it ends', async () => {
-    const server = new FakeSongServer(emptySong(), twoTracks());
-    const { editing } = await editingFor(server);
-    let finish!: () => void;
-    const merge = editing.whileMerging(() => new Promise<void>((done) => (finish = done)));
+  it('refuses an edit while a Merge is under way, from its press, but a Track’s levels, until it’s saved', async () => {
+    const server = new FakeSongServer(emptySong(), mergeTracks());
+    const { editing, selection, audio } = await editingFor(server);
+    selection.selectEdited([1, 3]);
+    const release = audio.holdNext();
+    const merging = editing.merge();
     expect(editing.freeze).toBe('merging');
-    expect(await editing.edit({ kind: 'deleteClip', clipId: 1 })).toBeNull();
-    expect(await editing.edit({ kind: 'updateTrack', trackId: 2, changes: { soloed: true } })).not.toBeNull();
-    finish();
-    await merge;
+    expect(editing.mergeable).toBe(false);
+    expect(await editing.edit({ kind: 'deleteClip', clipId: 2 })).toBeNull();
+    // Queued after the Merge.
+    const soloing = editing.edit({ kind: 'updateTrack', trackId: 2, changes: { soloed: true } });
+    release();
+    expect(await merging).toBe(true);
+    expect(await soloing).not.toBeNull();
     expect(editing.freeze).toBeNull();
-    expect(await editing.edit({ kind: 'deleteClip', clipId: 1 })).not.toBeNull();
-    expect(clipIdsOn(server, 1)).toEqual([2]);
+    expect(await editing.edit({ kind: 'deleteClip', clipId: 2 })).not.toBeNull();
+  });
+
+  it('stays frozen through a Merge until its Sound is saved, and thaws once one fails', async () => {
+    const server = new FakeSongServer(emptySong(), mergeTracks());
+    const { editing, selection } = await editingFor(server);
+    selection.selectEdited([1, 3]);
+    const release = server.holdNextAnswer();
+    const merging = editing.merge();
+    await vi.advanceTimersByTimeAsync(0);
+    // Rendered and sent, not saved yet.
+    expect(server.landed).toBe(1);
+    expect(editing.frozen).toBe(true);
+    release();
+    await merging;
+    expect(editing.frozen).toBe(false);
+    selection.selectEdited(clipIdsOn(server, 1));
+    server.failNext(1);
+    const failing = editing.merge();
+    expect(editing.frozen).toBe(true);
+    expect(await failing).toBe(false);
+    expect(editing.frozen).toBe(false);
   });
 
   it('refuses undo and redo while frozen', async () => {
@@ -418,5 +487,281 @@ describe('Timeline editing, the Cue-move offer', () => {
     await editing.saveDrag(clipOneMoved(server));
     await saves.setTags(['Demo']);
     expect(editing.cueOffer).toEqual({ by: 40, count: 2, clips: 1 });
+  });
+});
+
+/**
+ * Clips to merge: on Track 1, a Beat in Clips 1 (0–10 s) and 2 (20–30 s),
+ * and on Track 2, a Beat in Clip 3 (12–15 s).
+ */
+const mergeTracks = () => [track(1, [beatClip(1, 0, 10), beatClip(2, 20, 30)]), track(2, [beatClip(3, 12, 15)])];
+
+/** The ids of the Clips on each Track, top to bottom. */
+const clipIds = (server: FakeSongServer) => server.timeline.tracks.map((t) => t.clips.map((c) => c.id));
+
+describe('Timeline editing, a Merge', () => {
+  it('is refused while frozen, or for Clips that can’t be merged', async () => {
+    const server = new FakeSongServer(emptySong(), mergeTracks());
+    const { editing, selection, state, audio } = await editingFor(server);
+    selection.selectEdited([1]);
+    expect(editing.mergeable).toBe(false);
+    expect(await editing.merge()).toBe(false);
+    selection.selectEdited([1, 3]);
+    expect(editing.mergeable).toBe(true);
+    state.recording = true;
+    expect(editing.mergeable).toBe(false);
+    expect(await editing.merge()).toBe(false);
+    expect(audio.rendered).toBe(0);
+    expect(server.landed).toBe(0);
+  });
+
+  it('selects the merged Clip once saved, and chooses its Track', async () => {
+    const server = new FakeSongServer(emptySong(), mergeTracks());
+    const { editing, selection, state, audio } = await editingFor(server);
+    selection.selectEdited([1, 3]);
+    expect(await editing.merge()).toBe(true);
+    expect(audio.rendered).toBe(1);
+    // On the topmost of their Tracks with room over 0–15 s.
+    const [merged, kept] = server.timeline.tracks[0].clips;
+    expect(merged).toMatchObject({ start: 0, length: 15, beatId: null });
+    expect(kept.id).toBe(2);
+    expect(server.timeline.tracks[1].clips).toEqual([]);
+    expect(server.timeline.sounds.find((s) => s.id === merged.soundId)?.name).toBe('Merged Clip');
+    expect([...selection.ids]).toEqual([merged.id]);
+    expect(state.chosen).toEqual([1]);
+    expect(editing.mergeNote).toBeNull();
+  });
+
+  it('names the Tracks that came out silent in the Merge note, until it’s dismissed', async () => {
+    const tracks = mergeTracks();
+    tracks[1].muted = true;
+    const server = new FakeSongServer(emptySong(), tracks);
+    const { editing, selection } = await editingFor(server);
+    selection.selectEdited([1, 3]);
+    const merging = editing.merge();
+    expect(editing.mergeNote).toBeNull();
+    await merging;
+    expect(editing.mergeNote).toBe('Track 2 is muted, so it merged as silence.');
+    editing.dismissMergeNote();
+    expect(editing.mergeNote).toBeNull();
+  });
+
+  it('takes the Merge note away at the next Merge’s press, or an undo', async () => {
+    const tracks = mergeTracks();
+    tracks[1].muted = true;
+    const server = new FakeSongServer(emptySong(), tracks);
+    const { editing, selection } = await editingFor(server);
+    const note = 'Track 2 is muted, so it merged as silence.';
+    selection.selectEdited([1, 3]);
+    await editing.merge();
+    expect(editing.mergeNote).toBe(note);
+    // The merged Clip and Clip 2, both on Track 1, which isn't muted.
+    selection.selectEdited(clipIdsOn(server, 1));
+    const merging = editing.merge();
+    expect(editing.mergeNote).toBeNull();
+    await merging;
+    expect(editing.mergeNote).toBeNull();
+
+    // Back to before both, then merged again, and undone. The Clips come
+    // back with new ids each time.
+    const firstAndThird = () => [clipIdsOn(server, 1)[0], ...clipIdsOn(server, 2)];
+    await editing.undo();
+    await editing.undo();
+    selection.selectEdited(firstAndThird());
+    await editing.merge();
+    expect(editing.mergeNote).toBe(note);
+    await editing.undo();
+    expect(editing.mergeNote).toBeNull();
+
+    // Merged again, a redo with nothing to redo leaves it.
+    selection.selectEdited(firstAndThird());
+    await editing.merge();
+    await editing.redo();
+    expect(editing.mergeNote).toBe(note);
+  });
+
+  it('changes nothing when it fails to render, and says why', async () => {
+    const server = new FakeSongServer(emptySong(), mergeTracks());
+    const { saves, editing, selection, state, audio } = await editingFor(server);
+    selection.selectEdited([1, 3]);
+    audio.renderFailure = new Error('the Beat could not be loaded');
+    expect(await editing.merge()).toBe(false);
+    expect(saves.saveError).toBe("Couldn't merge the Clips (the Beat could not be loaded).");
+    expect(server.landed).toBe(0);
+    expect(clipIds(server)).toEqual([[1, 2], [3]]);
+    expect([...selection.ids]).toEqual([1, 3]);
+    expect(state.chosen).toEqual([]);
+    expect(saves.canUndo).toBe(false);
+  });
+
+  it('changes nothing when it fails to save, and says why', async () => {
+    const tracks = mergeTracks();
+    tracks[1].muted = true;
+    const server = new FakeSongServer(emptySong(), tracks);
+    const { saves, editing, selection, state } = await editingFor(server);
+    selection.selectEdited([1, 3]);
+    server.failNext(1);
+    expect(await editing.merge()).toBe(false);
+    expect(saves.saveError).toBe("Can't reach Bandmate. Check your connection.");
+    expect(clipIds(server)).toEqual([[1, 2], [3]]);
+    expect([...selection.ids]).toEqual([1, 3]);
+    expect(state.chosen).toEqual([]);
+    expect(editing.mergeNote).toBeNull();
+    expect(saves.canUndo).toBe(false);
+  });
+
+  it('is refused in its turn once its Clips are gone, saying why', async () => {
+    const server = new FakeSongServer(emptySong(), mergeTracks());
+    const { saves, editing, selection, audio } = await editingFor(server);
+    selection.selectEdited([1, 3]);
+    // Queued before the Merge, it deletes one of its Clips.
+    const deleting = editing.edit({ kind: 'deleteClip', clipId: 3 });
+    const merging = editing.merge();
+    await deleting;
+    expect(await merging).toBe(false);
+    expect(saves.saveError).toBe("The Clips to merge aren't all on the Timeline any more.");
+    expect(audio.rendered).toBe(0);
+    expect(clipIds(server)).toEqual([[1, 2], []]);
+  });
+
+  it('is redone without rendering it again, selecting its Clip', async () => {
+    const server = new FakeSongServer(emptySong(), mergeTracks());
+    const { editing, selection, audio } = await editingFor(server);
+    selection.selectEdited([1, 3]);
+    await editing.merge();
+    const [merged] = server.timeline.tracks[0].clips;
+    await editing.undo();
+    expect(server.timeline.tracks.map((t) => t.clips.map((c) => c.start))).toEqual([[0, 20], [12]]);
+    selection.selectEdited([]);
+    await editing.redo();
+    const [again] = server.timeline.tracks[0].clips;
+    expect(again).toMatchObject({ soundId: merged.soundId, start: 0, length: 15 });
+    expect(server.timeline.tracks[1].clips).toEqual([]);
+    expect([...selection.ids]).toEqual([again.id]);
+    expect(audio.rendered).toBe(1);
+    expect(server.timeline.sounds).toHaveLength(1);
+  });
+});
+
+/** An audio file of that name. */
+const audioFile = (name: string) => new File(['audio'], name, { type: 'audio/wav' });
+
+/** The names of the Sounds the Clips on a Track play, in Timeline order, with where each starts. */
+const soundsOn = (server: FakeSongServer, trackId: number) =>
+  server.timeline.tracks
+    .find((t) => t.id === trackId)!
+    .clips.filter((c) => c.soundId !== null)
+    .map((c) => [server.timeline.sounds.find((s) => s.id === c.soundId)!.name, c.start]);
+
+describe('Timeline editing, a Sound import', () => {
+  it('places each file after the Track’s last Clip, one at a time, in the order asked, saying what it’s doing', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { editing, audio } = await editingFor(server);
+    const release = audio.holdNext();
+    const first = editing.importFiles([audioFile('night drive.wav'), audioFile('night ride.mp3')], 1);
+    const second = editing.importFiles([audioFile('outro.wav')], 2);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(editing.importing).toBe('Reading “night drive.wav”…');
+    const answer = server.holdNextAnswer();
+    release();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(editing.importing).toBe('Importing “night drive”…');
+    answer();
+    await Promise.all([first, second]);
+    expect(editing.importing).toBeNull();
+    expect(soundsOn(server, 1)).toEqual([
+      ['night drive', 30],
+      ['night ride', 32],
+    ]);
+    expect(soundsOn(server, 2)).toEqual([['outro', 0]]);
+    expect(server.timeline.sounds.map((s) => s.name)).toEqual(['night drive', 'night ride', 'outro']);
+  });
+
+  it('joins what each file refused says into its error, which the next import clears', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { editing, audio } = await editingFor(server);
+    audio.refusing.set('huge.wav', '“huge.wav” is 300 MB, over the upload limit of 200 MB.');
+    audio.refusing.set('notes.txt', '“notes.txt” can’t be played in this browser.');
+    await editing.importFiles([audioFile('huge.wav'), audioFile('intro.wav'), audioFile('notes.txt')], 1);
+    expect(editing.error).toBe(
+      '“huge.wav” is 300 MB, over the upload limit of 200 MB. “notes.txt” can’t be played in this browser.',
+    );
+    // The one between them was imported.
+    expect(soundsOn(server, 1)).toEqual([['intro', 30]]);
+    const next = editing.importFiles([audioFile('outro.wav')], 1);
+    expect(editing.error).toBeNull();
+    await next;
+    expect(editing.error).toBeNull();
+  });
+
+  it('keeps what the files before it refused while an import still runs', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { editing, audio } = await editingFor(server);
+    audio.refusing.set('huge.wav', 'Too big.');
+    const release = audio.holdNext();
+    const first = editing.importFiles([audioFile('intro.wav'), audioFile('huge.wav')], 1);
+    await vi.advanceTimersByTimeAsync(0);
+    // Asked for while the first is under way, which then refuses a file.
+    const second = editing.importFiles([audioFile('outro.wav')], 1);
+    release();
+    await Promise.all([first, second]);
+    expect(editing.error).toBe('Too big.');
+  });
+
+  it('has its error cleared by a Merge’s press, or dismissed', async () => {
+    const server = new FakeSongServer(emptySong(), mergeTracks());
+    const { editing, selection, audio } = await editingFor(server);
+    audio.refusing.set('huge.wav', 'Too big.');
+    await editing.importFiles([audioFile('huge.wav')], 1);
+    expect(editing.error).toBe('Too big.');
+    editing.dismissError();
+    expect(editing.error).toBeNull();
+    await editing.importFiles([audioFile('huge.wav')], 1);
+    selection.selectEdited([1, 3]);
+    const merging = editing.merge();
+    expect(editing.error).toBeNull();
+    await merging;
+  });
+
+  it('is refused while frozen', async () => {
+    const server = new FakeSongServer(emptySong(), mergeTracks());
+    const { editing, selection, state, audio } = await editingFor(server);
+    audio.refusing.set('huge.wav', 'Too big.');
+    await editing.importFiles([audioFile('huge.wav')], 1);
+    state.recording = true;
+    await editing.importFiles([audioFile('intro.wav')], 1);
+    expect(editing.importing).toBeNull();
+    // What the last import said stands.
+    expect(editing.error).toBe('Too big.');
+    state.recording = false;
+    selection.selectEdited([1, 3]);
+    const release = audio.holdNext();
+    const merging = editing.merge();
+    await editing.importFiles([audioFile('outro.wav')], 1);
+    release();
+    await merging;
+    expect(server.timeline.sounds.map((s) => s.name)).toEqual(['Merged Clip']);
+  });
+
+  it('is redone without uploading the file again', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { editing } = await editingFor(server);
+    await editing.importFiles([audioFile('night drive.wav')], 2);
+    const [imported] = server.timeline.tracks[1].clips;
+    await editing.undo();
+    expect(server.timeline.tracks[1].clips).toEqual([]);
+    await editing.redo();
+    expect(server.timeline.tracks[1].clips).toMatchObject([{ soundId: imported.soundId, start: 0, length: 2 }]);
+    expect(server.timeline.sounds).toHaveLength(1);
+  });
+
+  it('leaves a failure to save to the save error', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { saves, editing } = await editingFor(server);
+    server.failNext(1);
+    await editing.importFiles([audioFile('night drive.wav')], 2);
+    expect(saves.saveError).toBe("Can't reach Bandmate. Check your connection.");
+    expect(editing.error).toBeNull();
+    expect(server.timeline.tracks[1].clips).toEqual([]);
   });
 });
