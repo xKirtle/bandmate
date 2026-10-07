@@ -20,6 +20,9 @@ import { peaks } from './peaks';
 import type { PlayableClip } from './timelinePlayer';
 import { encodeWav } from './wav';
 
+// As the server's, so Clips that only touch don't overlap, give or take rounding.
+const tolerance = 1e-6;
+
 /** Why a Track's Clips merge as silence: it's muted, or other Tracks are soloed and it isn't. */
 export interface SilentTrack {
   name: string;
@@ -53,7 +56,7 @@ export function mergeTarget(tracks: readonly Track[], selected: ReadonlySet<numb
   const end = Math.max(...clips.map((c) => c.start + c.length));
   // Clips touching the span's ends aren't in the way.
   const room = on.find((t) =>
-    t.clips.every((c) => selected.has(c.id) || c.start >= end || c.start + c.length <= start),
+    t.clips.every((c) => selected.has(c.id) || c.start >= end - tolerance || c.start + c.length <= start + tolerance),
   );
   const onto: MergeOnto = room
     ? { trackId: room.id }
