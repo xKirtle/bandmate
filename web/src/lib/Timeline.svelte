@@ -370,7 +370,9 @@
   });
 
   async function undo() {
-    if (frozen) return;
+    // With nothing to undo, nor any save queued that could be, pressing it
+    // leaves everything as it is.
+    if (frozen || (!saves.canUndo && saves.pending === 0)) return;
     offerCues = null;
     mergeNote = null;
     const undone = await saves.undo();
@@ -387,7 +389,7 @@
   }
 
   async function redo() {
-    if (frozen) return;
+    if (frozen || !saves.canRedo) return;
     offerCues = null;
     mergeNote = null;
     const redone = await saves.redo();
@@ -2042,6 +2044,7 @@
     if (!offerCues) return;
     const { spans, by } = offerCues;
     const what = `moving the Cues with ${offerCues.clips === 1 ? 'the Clip' : 'the Clips'}`;
+    offerCues = null;
     if (spans.length === 1) saves.cue({ kind: 'shiftCues', ...spans[0], by }, what);
     else saves.cue({ kind: 'restoreCues', cues: restorable(movedCues(song, spans, by), song) }, what);
   }

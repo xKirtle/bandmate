@@ -237,7 +237,7 @@ export class Saves {
    * Queues an undo or a redo: in its turn, next gives the edit to send and
    * what it did, or null if there's nothing to.
    */
-  #step(next: () => { edit: HistoryEdit; done: (edited: Edited) => Undone } | null): Promise<Undone | null> {
+  #step(next: () => Step | null): Promise<Undone | null> {
     let undone: Undone | null = null;
     return this.#turn(
       async (at) => {
@@ -249,9 +249,11 @@ export class Saves {
       (sent) => {
         if (!sent) return;
         const { step, before, after } = sent;
-        if ('tracks' in after) this.#showTimeline(after);
+        let timeline = before;
+        if ('tracks' in after) this.#showTimeline((timeline = after));
+        // A Cue edit leaves the Timeline as it was.
         else this.#saved = after;
-        undone = step.done({ before, after: 'tracks' in after ? after : before });
+        undone = step.done({ before, after: timeline });
         this.#showHistory();
       },
       () => undone,
@@ -478,3 +480,9 @@ export class Saves {
  * up to its next await, before the next turn starts.
  */
 const hop = () => Promise.resolve();
+
+/** An undo or a redo to send: the edit kept for it, and what it did once sent. */
+interface Step {
+  edit: HistoryEdit;
+  done: (edited: Edited) => Undone;
+}

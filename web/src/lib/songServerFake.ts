@@ -138,7 +138,7 @@ export class FakeSongServer implements SongServer {
   #edited(edit: Edit): (tl: Timeline) => Timeline {
     const place = (tl: Timeline, trackId: number, clip: NewClip) =>
       withClips(tl, trackId, (cs) => [...cs, this.#clip(clip)]);
-    const remove = (tl: Timeline, ids: number[]) => ({
+    const withoutClips = (tl: Timeline, ids: number[]) => ({
       ...tl,
       tracks: tl.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => !ids.includes(c.id)) })),
     });
@@ -159,18 +159,18 @@ export class FakeSongServer implements SongServer {
           return c;
         });
         const replaced = edit.kind === 'replaceClips' ? edit.clipIds : [];
-        return (tl) => placed.reduce((t, c) => place(t, c.trackId, c.clip), remove(tl, replaced));
+        return (tl) => placed.reduce((t, c) => place(t, c.trackId, c.clip), withoutClips(tl, replaced));
       }
       case 'moveClip':
         return (tl) => {
           const clip = tl.tracks.flatMap((t) => t.clips).find((c) => c.id === edit.clipId)!;
-          return withClips(remove(tl, [clip.id]), edit.trackId, (cs) => [...cs, { ...clip, start: edit.start }]);
+          return withClips(withoutClips(tl, [clip.id]), edit.trackId, (cs) => [...cs, { ...clip, start: edit.start }]);
         };
       case 'deleteClip':
-        return (tl) => remove(tl, [edit.clipId]);
+        return (tl) => withoutClips(tl, [edit.clipId]);
       case 'deleteClips':
         if (edit.trackIds) throw notModelled(edit);
-        return (tl) => remove(tl, edit.clipIds);
+        return (tl) => withoutClips(tl, edit.clipIds);
       default:
         throw notModelled(edit);
     }
