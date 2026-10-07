@@ -35,13 +35,47 @@ export async function dragClip(page: Page, target: Locator, by: number, from: 'b
   if (!box) throw new Error('The Clip is not on screen');
   // The end's trim edge is a few pixels wide, inside the Clip.
   const x = from === 'body' ? box.x + box.width / 2 : box.x + box.width - 2;
-  const y = box.y + box.height / 2;
-  await page.mouse.move(x, y);
+  await drag(page, { x, y: box.y + box.height / 2 }, { x: by, y: 0 });
+}
+
+/** A point on the page, or how far across and down to go from one, in pixels. */
+export interface Point {
+  x: number;
+  y: number;
+}
+
+/**
+ * Presses at a point on the page and drags `by` pixels across and down from
+ * it, in steps as a hand would, then lets go.
+ */
+export async function drag(page: Page, from: Point, by: Point) {
+  await page.mouse.move(from.x, from.y);
   await page.mouse.down();
-  await page.mouse.move(x + by / 2, y, { steps: 5 });
-  await page.mouse.move(x + by, y, { steps: 5 });
+  await page.mouse.move(from.x + by.x / 2, from.y + by.y / 2, { steps: 5 });
+  await page.mouse.move(from.x + by.x, from.y + by.y, { steps: 5 });
   await page.mouse.up();
 }
+
+/** The middle of something on screen. */
+export async function middleOf(target: Locator): Promise<Point> {
+  const box = await target.boundingBox();
+  if (!box) throw new Error(`${target} is not on screen`);
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+}
+
+/** Presses something on screen in its middle and drags it `by` pixels across and down. */
+export async function dragMiddleOf(page: Page, target: Locator, by: Point) {
+  await drag(page, await middleOf(target), by);
+}
+
+// A Clip's gain line and fade dots aren't named for a screen reader, so
+// they're found by the hint each shows on hover.
+
+/** A Clip's gain line. */
+export const gainLine = (target: Locator) => target.getByTitle(/^Gain .*: drag to change it/);
+
+/** A Clip's fade in or fade out dot. */
+export const fadeDot = (target: Locator, end: 'Fade in' | 'Fade out') => target.getByTitle(new RegExp(`^${end}\\b`));
 
 /** A Line's Cue time in the Lyric Sheet's gutter, e.g. of "Line 1 of Verse 1", outside Sync mode. */
 export const cueOf = (page: Page, line: string) => page.getByRole('button', { name: `Cue for ${line}:`, exact: false });
