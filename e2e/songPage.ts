@@ -86,3 +86,16 @@ export async function comeBackTo(page: Page) {
   await page.bringToFront();
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
 }
+
+/**
+ * Whether leaving or reloading the page would ask first, as it does while
+ * edits aren't saved. The page is sent the beforeunload the browser sends,
+ * and the browser would ask if it was cancelled.
+ */
+export async function warnsOnLeaving(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const leaving = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(leaving);
+    return leaving.defaultPrevented;
+  });
+}

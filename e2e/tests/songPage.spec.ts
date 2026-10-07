@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { failRequests, loseAnswers } from '../faults';
+import { failRequests, holdRequests, loseAnswers } from '../faults';
 import { expect, test } from '../fixtures';
 import {
   clip,
@@ -12,6 +12,7 @@ import {
   serverClips,
   serverCues,
   timeline,
+  warnsOnLeaving,
 } from '../songPage';
 
 // The Song page, and how it saves: Clips edited on the Timeline and undone,
@@ -20,6 +21,9 @@ import {
 
 /** A Cue's save, setting a Line's Cue. */
 const cueSave = { method: 'PUT', url: '**/api/songs/*/lines/*/cue' };
+
+/** A save of an Alternate's Lines, typed in its text box. */
+const textSave = { method: 'PUT', url: '**/api/songs/*/alternates/*/text' };
 
 /** The page's save error, under the Details. */
 const saveError = (page: Page) => page.getByRole('main').getByRole('alert');
@@ -371,6 +375,42 @@ test('coming back to a tab with nothing unsaved shows a change made in another',
   await other.getByRole('textbox', { name: 'Capo' }).press('Enter');
   await expect.poll(async () => (await bandmate.getSong(song.id)).capo).toBe(2);
   await expect(other.getByRole('alert')).toHaveCount(0);
+});
+
+test("an Alternate's text box closed while its save fails leaves nothing unsaved once that save is over", async ({
+  page,
+  bandmate,
+}) => {
+  const song = await bandmate.song({ title: 'Anthem' });
+  await page.goto(`/songs/${song.id}`);
+  await page.getByRole('button', { name: 'Add Section' }).click();
+  const lines = page.getByRole('textbox', { name: 'Lines' });
+  await expect(lines).toBeVisible();
+  // The save as the text box blurs, and the one as it closes.
+  const fault = await failRequests(page, textSave, { times: 2, error: 'Disk full' });
+
+  await lines.fill('First line');
+  await lines.blur();
+  await expect(saveError(page)).toHaveText('Disk full');
+
+  // Opening Alternates mode closes the text box, which saves it again.
+  const hold = await holdRequests(page, textSave);
+  await page.getByRole('button', { name: 'Alternates', exact: true }).click();
+  await expect(lines).toHaveCount(0);
+  await hold.reached;
+  // While that save is on its way, leaving still warns.
+  expect(await warnsOnLeaving(page)).toBe(true);
+  await hold.release();
+  await fault.spent;
+
+  // It failed, and says so, but the text box is gone, and nothing is unsaved.
+  await expect(saveError(page)).toHaveText('Disk full');
+  await expect.poll(() => warnsOnLeaving(page)).toBe(false);
+  // So coming back to the tab shows a change made elsewhere.
+  await bandmate.retitle(song.id, 'Ballad');
+  await comeBackTo(page);
+  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('Ballad');
+  await expect(page.getByRole('alert').filter({ hasText: 'This Song changed elsewhere' })).toHaveCount(0);
 });
 
 test('the Details and Tags save as they are edited', async ({ page, bandmate }) => {

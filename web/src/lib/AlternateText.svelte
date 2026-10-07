@@ -80,6 +80,8 @@
   let inFlight = 0;
   // The last save failed, so the text box holds edits the server doesn't have.
   let failed = false;
+  // The text box has gone: once its last save is over, it holds nothing unsaved.
+  let closed = false;
   // Identifies this text box to onUnsaved.
   const editor = {};
 
@@ -114,10 +116,11 @@
   }
 
   // Once nothing is waiting to be saved, show the server's text again, unless
-  // the last save failed and the text box is the only copy of the edits.
+  // the last save failed and the text box is the only copy of the edits, and
+  // it's still open.
   function settle() {
     if (timer !== undefined || inFlight > 0) return;
-    if (failed) return;
+    if (failed && !closed) return;
     onUnsaved(editor, false);
     if (!editingText) text = sent = savedText;
   }
@@ -130,6 +133,7 @@
   // Leaving the page, or the box going away, doesn't blur the text box, so
   // save what's still waiting or failed last time.
   onDestroy(() => {
+    closed = true;
     if (timer !== undefined || failed) save();
   });
 
