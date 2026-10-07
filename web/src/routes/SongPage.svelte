@@ -69,7 +69,8 @@
   let syncing = $state(false);
   // Whether the Timeline is recording, from pressing Record until the Take
   // is saved. Meanwhile no Master plays, the Song can't be deleted, leaving
-  // asks first, and changes made elsewhere wait to be shown.
+  // asks first, and changes made elsewhere wait to be shown (the Timeline's
+  // recorder holds Saves' refreshes).
   let recording = $state(false);
   let draft = $state<Draft>(toDraft(null));
   let loadError = $state<string | null>(null);
@@ -196,12 +197,6 @@
       for (const f of fields) revert(f);
     }
   }
-
-  // Not under a recording: the Timeline a Take's made against stays as it
-  // is, so coming back to the tab meanwhile refreshes once the Take's saved.
-  $effect(() => {
-    if (recording && saves) return saves.hold();
-  });
 
   // Coming back to the tab shows what changed meanwhile, e.g. on another
   // device (see Saves.refresh).
