@@ -1329,12 +1329,8 @@
     return clips.find((c) => c.id === id) ?? null;
   }
 
-  // Dragging a Clip's body, an edge, or Alt+dragging a Clip of Takes, goes
-  // through ClipDrag (see clipDrag.svelte.ts), which moves it, or the
-  // Selection, trims it or nudges its active Take, in seconds and Tracks.
-  // The Timeline measures the page for it, listens to the pointer, scrolls
-  // along at the edges, saves what it says to on release and tells it when
-  // that's saved, and offers to move the Cues after a move.
+  // Moving, trimming and nudging a Clip, and moving the Selection, go
+  // through ClipDrag (see clipDrag.svelte.ts), with the page measured here.
   const clipDrag = new ClipDrag(selection, {
     tracks: () => timeline.tracks,
     playhead: () => position,
@@ -1569,9 +1565,8 @@
         saving: false,
       };
     } else {
-      // Alt+dragging a Clip of Takes slides its active Take, the Clip staying put.
-      const at = { point: { clientX: event.clientX, clientY: event.clientY }, time: spanTimeAt(event.clientX) };
-      clipDrag.press(clip, mode, at, { free: skipsSnapping(event), toggles, nudges: nudges(event) });
+      // Its body moves it, or with Alt held nudges its active Take; an edge trims it.
+      clipDrag.press(clip, mode, clipDragAt(event), { free: skipsSnapping(event), toggles, nudges: nudges(event) });
     }
     window.addEventListener('pointermove', editMove);
     window.addEventListener('pointerup', editUp);
@@ -1588,7 +1583,10 @@
   // for the pointer to move.
   function editModifier(event: KeyboardEvent) {
     if (!isModifier(event.key)) return;
-    if (clipDrag.clip) return clipDrag.modifier(skipsSnapping(event), clipDragAt(editAt));
+    if (clipDrag.clip) {
+      clipDrag.modifier(skipsSnapping(event), clipDragAt(editAt));
+      return;
+    }
     if (!edit?.moved || isFadeMode(edit.mode) || edit.saving) return;
     dragGainFinely(edit, skipsSnapping(event), editAt.clientY);
   }

@@ -153,9 +153,9 @@ export class ClipDrag {
     const drag = this.#drag;
     if (!drag?.moved) return [];
     if (drag.moves) {
-      const clips = new Map(this.#context.tracks().flatMap((t) => t.clips.map((c) => [c.id, c])));
+      const clips = this.#placed();
       return drag.moves.flatMap((m) => {
-        const clip = clips.get(m.clipId);
+        const clip = clips.get(m.clipId)?.clip;
         return clip ? [{ clip, trackId: m.trackId, at: { ...clip, start: m.start } }] : [];
       });
     }
@@ -208,7 +208,7 @@ export class ClipDrag {
       // Moving a selected Clip moves the whole Selection; moving another
       // selects it alone. A trim or a nudge leaves the Selection be.
       this.#selection.apply({ kind: 'drag', clipId: drag.clip.id });
-      // Another Clip moves alone while the Selection is locked.
+      // Another Clip moves alone while the Selection is frozen.
       if (this.#selection.size > 1 && this.#selection.has(drag.clip.id)) drag.moves = [];
     }
     drag.moved = true;
@@ -302,9 +302,7 @@ export class ClipDrag {
     }
     if (drag.moves) {
       const { moves } = drag;
-      const clips = new Map(
-        this.#context.tracks().flatMap((t) => t.clips.map((c) => [c.id, { clip: c, trackId: t.id }])),
-      );
+      const clips = this.#placed();
       const from = moves.map((m) => clips.get(m.clipId)!);
       if (moves.every((m, i) => m.trackId === from[i].trackId && m.start === from[i].clip.start)) return null;
       return {
@@ -341,6 +339,11 @@ export class ClipDrag {
   #targets(dragged: ReadonlySet<number>) {
     const { tracks, playhead, loop } = this.#context;
     return editTargets(tracks(), dragged, playhead(), loop());
+  }
+
+  /** Every Clip on the Timeline by its id, with the id of the Track it's on. */
+  #placed(): Map<number, { clip: Clip; trackId: number }> {
+    return new Map(this.#context.tracks().flatMap((t) => t.clips.map((clip) => [clip.id, { clip, trackId: t.id }])));
   }
 
   #trackOf(clip: Clip): number {
