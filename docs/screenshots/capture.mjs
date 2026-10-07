@@ -465,6 +465,16 @@ const phone = {
   await page.context().close();
 }
 
+// The hero Song on a phone held sideways, where the Timeline fills the screen.
+{
+  const page = await open(heroURL, {
+    ...phone,
+    viewport: { width: phone.viewport.height, height: phone.viewport.width },
+  });
+  await save(page, "phone-timeline");
+  await page.context().close();
+}
+
 // The Lyric Sheet on a phone.
 {
   const page = await open(heroURL, phone);

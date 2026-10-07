@@ -52,7 +52,10 @@ On a computer, everything fits on one screen, and a tablet gets the very same, b
 
 Syncing lyrics to the music, and keyboard shortcuts, need a bigger screen.
 
-<img class="phone" src="@screenshots/phone-song-list.png" alt="The Songs page on a phone, listing every song with its status">
+<div class="phones">
+<img src="@screenshots/phone-song-list.png" alt="The Songs page on a phone, listing every song with its status">
+<img src="@screenshots/phone-timeline.png" alt="A song's timeline filling a phone held sideways">
+</div>
 
 ## Try it
 

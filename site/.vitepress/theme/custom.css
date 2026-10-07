@@ -60,6 +60,37 @@
   max-width: 300px;
 }
 
+/* A phone held upright beside one held sideways, the upright one narrower;
+   one above the other on a phone. */
+.vp-doc .phones {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.vp-doc .phones img {
+  min-width: 0;
+}
+
+.vp-doc .phones img:first-child {
+  flex: 0 0 30%;
+}
+
+.vp-doc .phones img:last-child {
+  flex: 1;
+}
+
+@media (max-width: 640px) {
+  .vp-doc .phones {
+    flex-direction: column;
+  }
+
+  .vp-doc .phones img:first-child {
+    flex: none;
+    max-width: 300px;
+  }
+}
+
 /* Two shots side by side, wrapping onto two rows on a phone. */
 .vp-doc .pair {
   display: flex;
