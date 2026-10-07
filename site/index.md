@@ -42,9 +42,9 @@ Writing a song often means lyrics in a notes app, chords somewhere else, the bea
 
 It's built for one songwriter, and runs on your own machine or homelab. There are no accounts and no subscription, and your Songs stay on your server.
 
-## Made for a computer, at home on a phone
+## Desktop first, and on your phone too
 
-Bandmate is built desktop first: on a computer, everything fits on one screen. A tablet gets the very same, by touch. On a phone, most of it still works:
+On a computer, everything fits on one screen, and a tablet gets the very same, by touch. On a phone, most of it still works:
 
 - **Write** your lyrics and chords, in a layout made for a phone.
 - **Play from Read mode**, and listen back to your takes.
