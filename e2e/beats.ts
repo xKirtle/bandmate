@@ -10,6 +10,8 @@ export interface AudioFile {
   name: string;
   mimeType: string;
   buffer: Buffer;
+  /** How long it plays, in seconds. */
+  seconds: number;
 }
 
 /**
@@ -37,7 +39,7 @@ export function toneWav(name: string, seconds = 2): AudioFile {
   for (let i = 0; i < samples; i++) {
     buffer.writeInt16LE(Math.round(8000 * Math.sin((2 * Math.PI * 440 * i) / rate)), 44 + i * 2);
   }
-  return { name, mimeType: 'audio/wav', buffer };
+  return { name, mimeType: 'audio/wav', buffer, seconds };
 }
 
 /** A Beat's details, as the app sends them. */
@@ -52,7 +54,7 @@ export interface BeatDetails {
 
 /** Uploads a file as a Beat through the HTTP API, as Add Beat does, and answers with it. */
 export async function uploadBeat(api: APIRequestContext, file: AudioFile, details: BeatDetails): Promise<Beat> {
-  const seconds = (file.buffer.length - 44) / 2 / 8000;
+  const { seconds } = file;
   const res = await api.post('/api/beats', {
     multipart: {
       details: JSON.stringify({
@@ -65,19 +67,22 @@ export async function uploadBeat(api: APIRequestContext, file: AudioFile, detail
         duration: seconds,
         peaks: Array.from({ length: Math.ceil(seconds * 100) }, () => 0.25),
       }),
-      file,
+      file: { name: file.name, mimeType: file.mimeType, buffer: file.buffer },
     },
   });
   expect(res.ok(), `adding a Beat answered ${res.status()}: ${await res.text()}`).toBe(true);
   return (await res.json()) as Beat;
 }
 
-/** The Clips on each of a Song's Tracks, by Track name: the Beat each plays, by id. */
-export async function beatsOnTracks(api: APIRequestContext, songId: number): Promise<Record<string, number[]>> {
+/** The Clips on each of a Song's Tracks, by Track name: the Beat each plays, by id, or null for a Clip of Takes or a Sound. */
+export async function beatsOnTracks(
+  api: APIRequestContext,
+  songId: number,
+): Promise<Record<string, (number | null)[]>> {
   const res = await api.get(`/api/songs/${songId}/timeline`);
   expect(res.ok()).toBe(true);
   const timeline = (await res.json()) as { tracks: { name: string; clips: { beatId: number | null }[] }[] };
-  return Object.fromEntries(timeline.tracks.map((t) => [t.name, t.clips.map((c) => c.beatId ?? 0)]));
+  return Object.fromEntries(timeline.tracks.map((t) => [t.name, t.clips.map((c) => c.beatId)]));
 }
 
 /** What a link's fetch, as fetchLink answers it, says of the video. */
@@ -141,4 +146,12 @@ export async function stubLinkFetches(page: Page, video: FetchedVideo): Promise<
     await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(beat) });
   });
   return stubbed;
+}
+
+/**
+ * Waits until the requests the app has made so far have been routed, so a
+ * test can check one wasn't made: a request made now is routed after them.
+ */
+export async function settled(page: Page): Promise<void> {
+  await page.evaluate(() => fetch('/api/health').then((r) => r.ok));
 }

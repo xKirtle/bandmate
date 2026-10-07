@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { beatsOnTracks, stubLinkFetches, toneWav, uploadBeat, type FetchedVideo } from '../beats';
+import { beatsOnTracks, settled, stubLinkFetches, toneWav, uploadBeat, type FetchedVideo } from '../beats';
 import { failRequests } from '../faults';
 import { expect, test } from '../fixtures';
 
@@ -20,7 +20,11 @@ const nightDrive = (): FetchedVideo => ({
   file: toneWav('night_drive_90bpm_Cm.wav'),
 });
 
-/** The POSTs that add a Beat, from a file or a fetched one, sent so far. */
+/**
+ * The POSTs that add a Beat, from a file or a fetched one, sent so far:
+ * invalid details are refused before they're sent, which an empty Library
+ * afterwards can't tell apart from the server refusing them.
+ */
 function addsSent(page: Page): string[] {
   const sent: string[] = [];
   page.on('request', (r) => {
@@ -50,7 +54,7 @@ test.describe('in the Beat Library', () => {
     await page.getByLabel('Add Beat', { exact: true }).setInputFiles(file);
   }
 
-  /** The Beats the Library's table lists, by title. */
+  /** The rows of the Beats the Library's table lists. */
   const listed = (page: Page) =>
     page
       .getByRole('table')
@@ -108,6 +112,7 @@ test.describe('in the Beat Library', () => {
     expect(await f.title.evaluate((input: HTMLInputElement) => input.validity.valueMissing)).toBe(true);
 
     await expect(form(page)).toBeVisible();
+    await settled(page);
     expect(sent).toEqual([]);
     expect(await bandmate.beats()).toEqual([]);
   });
@@ -142,6 +147,7 @@ test.describe('in the Beat Library', () => {
 
     await expect(form(page)).toHaveCount(0);
     await expect(page.getByText('No Beats yet.', { exact: false })).toBeVisible();
+    await settled(page);
     expect(sent).toEqual([]);
     expect(await bandmate.beats()).toEqual([]);
   });
@@ -149,6 +155,7 @@ test.describe('in the Beat Library', () => {
   test('adds a Beat from a link, with the details the link suggests', async ({ page, bandmate }) => {
     const fetches = await stubLinkFetches(page, nightDrive());
 
+    // An empty Library offers it twice: over the list and in its place.
     await page.getByRole('button', { name: 'Add from link' }).first().click();
     await page.getByLabel('Link to one video').fill('https://youtu.be/night-drive?si=tracking');
     await page.getByRole('button', { name: 'Fetch' }).click();
@@ -181,7 +188,9 @@ test.describe('in the Beat Library', () => {
         },
       },
     ]);
-    // Added, it's no longer waiting, so there's nothing to discard.
+    // Added, it's no longer waiting, so there's nothing to discard. The stub
+    // stands in for the server here, so it's what says so.
+    await settled(page);
     expect(fetches.discarded).toEqual([]);
     expect(await bandmate.beats()).toMatchObject([{ title: 'Night Drive (Remix)', producer: 'Kofi Beats' }]);
   });
@@ -294,6 +303,7 @@ test.describe('in the Beat Picker', () => {
     expect(await f.title.evaluate((input: HTMLInputElement) => input.validity.valueMissing)).toBe(true);
 
     await expect(form(page)).toBeVisible();
+    await settled(page);
     expect(sent).toEqual([]);
     expect(await bandmate.beats()).toEqual([]);
     expect(await beatsOnTracks(page.request, song.id)).toEqual({ 'Track 1': [], 'Track 2': [] });
@@ -334,6 +344,7 @@ test.describe('in the Beat Picker', () => {
 
     await expect(form(page)).toHaveCount(0);
     await expect(picker(page).getByText('The Beat Library is empty.')).toBeVisible();
+    await settled(page);
     expect(sent).toEqual([]);
     expect(await bandmate.beats()).toEqual([]);
     expect(await beatsOnTracks(page.request, song.id)).toEqual({ 'Track 1': [], 'Track 2': [] });
@@ -357,6 +368,8 @@ test.describe('in the Beat Picker', () => {
 
     await expect(picker(page)).toHaveCount(0);
     expect(fetches.added).toMatchObject([{ id: 'stub-1', details: { title: 'Night Drive', bpm: 90, key: 'Cm' } }]);
+    // Added, it's never discarded, though the Picker closed.
+    await settled(page);
     expect(fetches.discarded).toEqual([]);
     const [beat] = await bandmate.beats();
     expect(beat).toMatchObject({ title: 'Night Drive', producer: 'Kofi Beats' });
