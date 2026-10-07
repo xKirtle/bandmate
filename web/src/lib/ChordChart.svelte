@@ -157,7 +157,7 @@
   .empty {
     box-sizing: border-box;
     width: 100%;
-    aspect-ratio: 112 / 126;
+    aspect-ratio: 120 / 126;
     border: 1px dashed var(--border);
     border-radius: var(--radius-sm);
   }
