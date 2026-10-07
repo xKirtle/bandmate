@@ -15,7 +15,7 @@ import type { PlayableClip, PlayerState } from './timelinePlayer';
 /** Plays the Timeline: the Timeline's player, or a fake of it. */
 export interface TransportPlayer {
   readonly state: PlayerState;
-  /** Plays clips from a Timeline position, repeating the Loop if one's given, in place of anything playing. */
+  /** Plays Clips from a Timeline position, repeating the Loop if one's given, in place of anything playing. */
   play(clips: readonly PlayableClip[], from: number, loop: Loop | null): Promise<void>;
   /** Stops playing, keeping the position to resume from. */
   stop(): void;
@@ -31,7 +31,7 @@ export interface TransportPlayer {
 
 /** Runs a callback on the next frame: the browser's, or frames stepped by hand. */
 export interface Frames {
-  request(callback: (now: number) => void): number;
+  request(callback: () => void): number;
   cancel(id: number): void;
 }
 
@@ -72,7 +72,8 @@ export class Transport implements TakePlayer {
   #state = $state<PlayerState>('stopped');
   #position = $state(0);
   /** Whether playback stopped by reaching the end, keeping the playhead there until it's moved. */
-  #ended = $state(false);
+  #ended = false;
+  #playingAt = $state<number | null>(null);
 
   #player: TransportPlayer;
   #options: TransportOptions;
@@ -108,6 +109,7 @@ export class Transport implements TakePlayer {
       if (this.#state !== 'playing') return;
       const step = () => {
         if (!options.dragging?.()) this.#position = this.#player.position();
+        this.#playingAt = this.#position;
         // A recording runs on past the end until it's stopped.
         const length = options.length();
         if (this.#position >= length && !this.#player.repeating && !options.capturing()) {
@@ -115,6 +117,7 @@ export class Transport implements TakePlayer {
           this.#player.stop();
           this.#player.seek(length);
           this.#position = length;
+          this.#playingAt = length;
           return;
         }
         options.onFrame?.(this.#position);
@@ -136,12 +139,13 @@ export class Transport implements TakePlayer {
   }
 
   /**
-   * Where playback is for the Song page to follow: the playhead while
-   * playing, or while starting over from elsewhere, and once it's reached
-   * the end, until it's moved; null once stopped.
+   * Where playback is for the Song page to follow: the playhead as of the
+   * last frame, kept while starting over from elsewhere, which loads for a
+   * moment, and once it's reached the end, until it's moved; null once
+   * stopped, until playing's first frame.
    */
   get playingAt(): number | null {
-    return this.#state === 'stopped' && !this.#ended ? null : this.#position;
+    return this.#playingAt;
   }
 
   /** The context time at which playback was at the time it started from, e.g. to line up a recording. */
@@ -162,7 +166,7 @@ export class Transport implements TakePlayer {
    */
   toggle() {
     if (this.#options.recording()) {
-      // Stopping playback ends the capture, through the hook.
+      // Stopping playback ends the capture, through onCaptureStopped.
       if (this.#options.capturing()) this.stop();
       return;
     }
@@ -184,7 +188,7 @@ export class Transport implements TakePlayer {
   seek(to: number) {
     if (this.#options.recording()) return;
     this.#position = to;
-    this.#ended = false;
+    this.#release();
     if (this.#state === 'stopped') this.#player.seek(to);
     else this.#play(to);
   }
@@ -235,11 +239,19 @@ export class Transport implements TakePlayer {
       .catch((e: Error) => this.#options.onError?.(e.message));
   }
 
+  /** Lets go of the playhead kept at the end, once it's moved from there. */
+  #release() {
+    if (!this.#ended) return;
+    this.#ended = false;
+    if (this.#state === 'stopped') this.#playingAt = null;
+  }
+
   #stateChanged(state: PlayerState) {
     this.#state = state;
     if (state !== 'stopped') return;
     // Also when something else playing stopped it.
     this.#position = this.#player.position();
+    if (!this.#ended) this.#playingAt = null;
     if (this.#options.capturing()) this.#options.onCaptureStopped();
   }
 }

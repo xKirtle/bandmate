@@ -87,6 +87,19 @@ describe('Transport, playing to the end', () => {
     expect(player.position()).toBe(10);
     expect(frames.waiting).toBe(0);
   });
+
+  it('lets go of the playhead kept at the end once it’s moved', async () => {
+    const { transport, player, frames } = transportFor();
+    transport.toggle();
+    await loaded();
+    player.now += 11;
+    frames.step();
+    flushSync();
+    expect(transport.playingAt).toBe(10);
+    transport.seek(3);
+    expect(transport.playingAt).toBeNull();
+    expect(player.plays).toHaveLength(1);
+  });
 });
 
 describe('Transport, starting over', () => {
@@ -295,7 +308,7 @@ describe('Transport, recording', () => {
     expect(transport.state).toBe('playing');
   });
 
-  it('stops a capture on Space, ending it through the hook', async () => {
+  it('stops a capture on Space, ending it through onCaptureStopped', async () => {
     const { transport, state, heard } = transportFor();
     state.recording = true;
     await transport.playAlong(2);
@@ -328,7 +341,7 @@ describe('Transport, recording', () => {
     expect(transport.position).toBe(5);
   });
 
-  it('doesn’t call the hook when playback stops without a capture', async () => {
+  it('doesn’t call onCaptureStopped when playback stops without a capture', async () => {
     const { transport, heard } = transportFor();
     transport.toggle();
     await loaded();
@@ -369,10 +382,26 @@ describe('Transport, the playhead', () => {
     frames.step();
     transport.seek(6);
     expect(transport.state).toBe('loading');
-    expect(transport.playingAt).toBe(6);
+    // Kept as the last frame had it, until the next.
+    expect(transport.playingAt).toBe(2);
     await loaded();
     transport.toggle();
     expect(transport.playingAt).toBeNull();
+  });
+
+  it('isn’t heard while loading to play from stopped, until the first frame', async () => {
+    const { transport, frames, player } = transportFor();
+    transport.seek(3);
+    const release = player.holdLoading();
+    transport.toggle();
+    expect(transport.state).toBe('loading');
+    expect(transport.playingAt).toBeNull();
+    release();
+    await loaded();
+    expect(transport.playingAt).toBeNull();
+    player.now += 1;
+    frames.step();
+    expect(transport.playingAt).toBe(4);
   });
 
   it('is left where it’s dragged by frames', async () => {

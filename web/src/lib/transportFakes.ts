@@ -87,9 +87,9 @@ export class FakeTimelinePlayer implements TransportPlayer {
 /** Frames asked for, run when the test steps them. */
 export class FakeFrames implements Frames {
   #next = 1;
-  #pending = new Map<number, (now: number) => void>();
+  #pending = new Map<number, () => void>();
 
-  request(callback: (now: number) => void): number {
+  request(callback: () => void): number {
     const id = this.#next++;
     this.#pending.set(id, callback);
     return id;
@@ -108,6 +108,6 @@ export class FakeFrames implements Frames {
   step() {
     const due = [...this.#pending.values()];
     this.#pending.clear();
-    for (const callback of due) callback(0);
+    for (const callback of due) callback();
   }
 }
