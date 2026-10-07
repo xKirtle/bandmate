@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy, untrack } from 'svelte';
   import type { TimelineLoop } from './api';
+  import { deviceStorage } from './deviceStorage';
   import Dialog from './Dialog.svelte';
   import {
     levelsOf,
@@ -19,7 +20,6 @@
     type MixdownRange,
   } from './mixdown';
   import { formatDuration } from './time';
-  import { deviceStorage } from './timelineHeight';
   import { encodeWav } from './wav';
 
   // Mixes the whole Timeline, or the Loop's stretch of it, down to a file in

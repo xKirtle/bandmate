@@ -7,7 +7,7 @@ import {
   withPreference,
   type PreferredVoicings,
 } from './preferredVoicings';
-import { deviceStorage } from './timelineHeight';
+import { deviceStorage } from './deviceStorage';
 
 // The preferred Voicings on this device, per tuning, shared by every Chord
 // Finder and the Chord Chart, so preferring one moves it first wherever that

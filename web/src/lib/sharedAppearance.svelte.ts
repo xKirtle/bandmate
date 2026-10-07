@@ -10,7 +10,7 @@ import {
   type Palette,
   type ThemeChoice,
 } from './appearance';
-import { deviceStorage } from './timelineHeight';
+import { deviceStorage } from './deviceStorage';
 
 // How the app looks on this device, shown across the page from the moment
 // the app starts: the Palette and Light or Dark picked in Settings. It
