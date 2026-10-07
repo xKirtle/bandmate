@@ -304,6 +304,65 @@ test('Clips selected by drawing a box are deleted with Delete, and one undo brin
   await expect.poll(() => serverClips(bandmate, song.id, 'Beat')).toEqual([]);
 });
 
+test('a Split selects and focuses the right half of each Clip it cuts, so Delete trims off what follows the playhead', async ({
+  page,
+  bandmate,
+}) => {
+  const song = await heroSong(bandmate);
+  await page.goto(`/songs/${song.id}`);
+  const take = clip(page, 'Take 2');
+  const beatClip = clip(page, 'Lorem Click');
+  const undo = timeline(page).getByRole('button', { name: 'Undo' });
+  const redo = timeline(page).getByRole('button', { name: 'Redo' });
+  const named = (name: string) => timeline(page).getByRole('group', { name, exact: true });
+  await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
+
+  // The playhead at 0:10, across Take 2 and the Beat's Clip, 5 s at a time.
+  const ruler = timeline(page).getByRole('slider', { name: 'Position' });
+  await ruler.press('ArrowRight');
+  await ruler.press('ArrowRight');
+  await expect(ruler).toHaveAttribute('aria-valuenow', '10');
+
+  // One Clip split: only its right half is selected, and focused.
+  await take.click();
+  await page.keyboard.press('s');
+  await expect(named('Take 2, selected, 0:10 to 0:25')).toBeFocused();
+  await expect(named('Take 2, 0:04 to 0:10')).toBeVisible();
+  await expect
+    .poll(() => serverClips(bandmate, song.id, 'Lead vox'))
+    .toMatchObject([
+      { start: 4, length: 6 },
+      { start: 10, length: 15 },
+    ]);
+
+  // Undone, the whole Clip is selected; redone, only the right half again.
+  await undo.click();
+  await expect(take).toHaveCount(1);
+  await expect(take).toHaveAccessibleName('Take 2, selected, 0:04 to 0:25');
+  await redo.click();
+  await expect(named('Take 2, selected, 0:10 to 0:25')).toBeVisible();
+  await expect(named('Take 2, 0:04 to 0:10')).toBeVisible();
+  await undo.click();
+  await expect(take).toHaveCount(1);
+  await expect(take).toHaveAccessibleName('Take 2, selected, 0:04 to 0:25');
+
+  // Several split: each one's right half is selected, the left halves not,
+  // and focus moves from the Beat's Clip to its right half.
+  await beatClip.click({ modifiers: ['ControlOrMeta'] });
+  await page.keyboard.press('s');
+  await expect(named('Take 2, selected, 0:10 to 0:25')).toBeVisible();
+  await expect(named('Lorem Click, selected, 0:10 to 1:30')).toBeFocused();
+  await expect(named('Take 2, 0:04 to 0:10')).toBeVisible();
+  await expect(named('Lorem Click, 0:00 to 0:10')).toBeVisible();
+
+  // Delete trims off what follows the playhead, leaving the left halves.
+  await page.keyboard.press('Delete');
+  await expect.poll(() => serverClips(bandmate, song.id, 'Lead vox')).toMatchObject([{ start: 4, length: 6 }]);
+  await expect.poll(() => serverClips(bandmate, song.id, 'Beat')).toMatchObject([{ start: 0, length: 10 }]);
+  await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:10');
+  await expect(beatClip).toHaveAccessibleName('Lorem Click, 0:00 to 0:10');
+});
+
 test('Cue edits are undone in order with the Clip edits around them', async ({ page, bandmate }) => {
   const song = await heroSong(bandmate);
   await page.goto(`/songs/${song.id}`);

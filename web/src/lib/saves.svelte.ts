@@ -20,7 +20,7 @@
 // refresh bringing in a change made elsewhere, forgets them all.
 import { ApiError, type Song, type Timeline } from './api';
 import { sameCues, savedRetrying, withCueChange, type CueChange } from './cueChanges';
-import { addedClips, History, restorable, type Edit, type HistoryEdit } from './history';
+import { History, restorable, type Edit, type HistoryEdit } from './history';
 import type { LyricSheetChange } from './lyricSheetChanges';
 import { waitFor, type SongServer, type Wait } from './songServer';
 
@@ -35,7 +35,7 @@ export interface Edited {
 
 /** What an undo or redo did, and what the Timeline goes back to with it. */
 export interface Undone extends Edited {
-  /** The Clips to select again: Clips deleted together, brought back, or a Merge redone. Null to leave the Selection as it is. */
+  /** The Clips to select again: Clips deleted together, brought back, a Merge redone, or a Split redone's right halves. Null to leave the Selection as it is. */
   reselect: number[] | null;
   /** Where to return the playhead to: where a new Take undone started. Null to leave it where it is. */
   playhead: number | null;
@@ -229,9 +229,8 @@ export class Saves {
       return {
         edit,
         done: ({ before, after }) => {
-          this.#history.redone(before, after);
-          // A Merge redone selects its Clip again, as it did.
-          const reselect = edit.kind === 'replaceClips' ? addedClips(before, after) : null;
+          // A Merge redone selects its Clip again, and a Split its right halves, as they did.
+          const reselect = this.#history.redone(before, after);
           return { before, after, reselect, playhead: null };
         },
       };

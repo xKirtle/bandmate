@@ -163,7 +163,7 @@ A Clip rising from silence at its start (a fade in) or falling to silence at its
 _Avoid_: Ramp, envelope
 
 **Split**:
-Cutting a Clip in two at the playhead, so a stretch can be trimmed or deleted on its own: the Selection's Clips the playhead crosses, or with none selected, the Chosen Track's Clip under the playhead. Both halves keep the Clip's source, name and Gain; the left keeps the fade in and the right the fade out, each shortened to end at the cut, and the cut gets no Fade. A Clip of Takes splits like a Duplicate: each half gets Takes of its own, of the same audio, with the same numbers and active Take. Both halves become the Selection. Silencing a stretch of a Clip is a Split on each side of it, then deleting the middle.
+Cutting a Clip in two at the playhead, so a stretch can be trimmed or deleted on its own: the Selection's Clips the playhead crosses, or with none selected, the Chosen Track's Clip under the playhead. Both halves keep the Clip's source, name and Gain; the left keeps the fade in and the right the fade out, each shortened to end at the cut, and the cut gets no Fade. A Clip of Takes splits like a Duplicate: each half gets Takes of its own, of the same audio, with the same numbers and active Take. The right halves become the Selection. Silencing a stretch of a Clip is a Split on each side of it, then deleting the middle.
 _Avoid_: Cut (cutting is to the Clipboard), slice, razor
 
 **Selection**:

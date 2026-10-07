@@ -1308,7 +1308,8 @@ describe('History of Merges', () => {
     expect(back).toEqual([15, 16]);
     expect(h.nextRedo()).toEqual({ ...edit, clipIds: [15, 16] });
 
-    h.redone(t0, timeline([track(1, [merged(18, 0)]), track(2, [clip(7, 0)])]));
+    // Redone, it selects the merged Clip again, under its new id.
+    expect(h.redone(t0, timeline([track(1, [merged(18, 0)]), track(2, [clip(7, 0)])]))).toEqual([18]);
     expect(h.nextUndo()).toMatchObject({ kind: 'replaceClips', clipIds: [18] });
   });
 
@@ -1406,8 +1407,9 @@ describe('History of Splits', () => {
       ],
     });
 
-    // Redone, every half comes back with a new id, which undoing then names.
-    h.redone(
+    // Redone, every half comes back with a new id, which undoing then
+    // names, and it selects only the right halves, as the Split did.
+    const selected = h.redone(
       t0,
       timeline([
         track(1, [
@@ -1419,6 +1421,7 @@ describe('History of Splits', () => {
         track(2, [clip(7, 0)]),
       ]),
     );
+    expect(selected).toEqual([26, 28]);
     expect(h.nextUndo()).toMatchObject({ kind: 'replaceClips', clipIds: [25, 27, 26, 28] });
   });
 });
