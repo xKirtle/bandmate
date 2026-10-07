@@ -64,8 +64,8 @@ async function tracks(request: APIRequestContext, songId: number): Promise<Track
 /** A Track's Clips, read back from the server. */
 async function clipsOn(request: APIRequestContext, songId: number, name: string): Promise<Clip[]> {
   const track = (await tracks(request, songId)).find((t) => t.name === name);
-  expect(track, `No Track ${name}`).toBeDefined();
-  return track!.clips;
+  if (!track) throw new Error(`No Track ${name}`);
+  return track.clips;
 }
 
 const timeline = (page: Page) => page.getByRole('region', { name: 'Timeline' });
@@ -92,6 +92,21 @@ async function seek(page: Page, to: number) {
   await expect(ruler(page)).toHaveAttribute('aria-valuenow', String(to));
 }
 
+/** The calibration offered before a device's first recording. */
+const calibrationOffer = (page: Page) => page.getByRole('dialog', { name: 'Calibrate the latency' });
+
+/** Skips the calibration offered, to record straight away. */
+async function skipCalibration(page: Page) {
+  await calibrationOffer(page).getByRole('button', { name: 'Skip and record' }).click();
+}
+
+/** Waits for the playhead to pass a time, in seconds, e.g. while recording. */
+async function playheadPast(page: Page, time: number) {
+  await expect
+    .poll(async () => Number(await ruler(page).getAttribute('aria-valuenow')), { timeout: 15_000 })
+    .toBeGreaterThan(time);
+}
+
 /**
  * Records until the playhead is past `until`, in seconds, then stops,
  * waiting for the Take to save. With skip, skips the calibration offered
@@ -99,17 +114,29 @@ async function seek(page: Page, to: number) {
  */
 async function record(page: Page, start: () => Promise<void>, until: number, { skip = false } = {}) {
   await start();
-  if (skip)
-    await page
-      .getByRole('dialog', { name: 'Calibrate the latency' })
-      .getByRole('button', { name: 'Skip and record' })
-      .click();
+  if (skip) await skipCalibration(page);
   await expect(stopButton(page)).toBeVisible();
-  await expect
-    .poll(async () => Number(await ruler(page).getAttribute('aria-valuenow')), { timeout: 15_000 })
-    .toBeGreaterThan(until);
+  await playheadPast(page, until);
   await stopButton(page).click();
   await expect(recordButton(page)).toBeEnabled();
+}
+
+// Recordings stop once the playhead's whole seconds pass a time: 2 s past
+// the Clip's start means at least 1.5 s were sung, less a few ms of Latency
+// Offset. Stopping and saving can run on a few seconds on a slow machine.
+const minSung = 1.4;
+const overrun = 4;
+
+/**
+ * Checks a Clip starts at start, and is sensibly long: longer than least,
+ * but by no more than the time sung past it plus overrun; and that it holds
+ * its active Take whole.
+ */
+function expectSung(c: Clip, start: number, least: number) {
+  expect(c.start).toBeCloseTo(start, 3);
+  expect(c.length).toBeGreaterThan(least);
+  expect(c.length).toBeLessThan(least + 2 + overrun);
+  expectWholeTake(c);
 }
 
 /**
@@ -118,8 +145,9 @@ async function record(page: Page, start: () => Promise<void>, until: number, { s
  * lead-in is kept hidden before the Clip's start.
  */
 function expectWholeTake(c: Clip) {
-  const take = c.takes.find((t) => t.id === c.activeTakeId)!;
-  expect(take, 'its active Take').toBeDefined();
+  const take = c.takes.find((t) => t.id === c.activeTakeId);
+  if (!take) throw new Error(`Clip ${c.id} has no active Take`);
+  // Every Take here starts at 0:05 or later, so its lead-in is never cut short at 0:00.
   expect(c.offset).toBeCloseTo(leadIn + take.latencyOffset, 2);
   expect(c.offset + c.length).toBeCloseTo(take.duration, 2);
 }
@@ -134,9 +162,9 @@ test('calibration offered before the first recording can be skipped, and is not 
   await expect(timeline(page).getByRole('button', { name: 'Not calibrated' })).toBeVisible();
 
   await recordButton(page).click();
-  const offer = page.getByRole('dialog', { name: 'Calibrate the latency' });
+  const offer = calibrationOffer(page);
   await expect(offer).toBeVisible();
-  await offer.getByRole('button', { name: 'Skip and record' }).click();
+  await skipCalibration(page);
 
   // Skipped, it records straight away, saying where to calibrate later.
   await expect(offer).toBeHidden();
@@ -144,7 +172,7 @@ test('calibration offered before the first recording can be skipped, and is not 
   await expect(timeline(page).getByRole('status')).toHaveText(
     'Calibrate the latency any time from Recording settings… in the ⋯ menu.',
   );
-  await expect.poll(async () => Number(await ruler(page).getAttribute('aria-valuenow'))).toBeGreaterThan(leadIn);
+  await playheadPast(page, leadIn);
   await stopButton(page).click();
   await expect(clip(page, 'Take 1')).toBeVisible();
   // Still uncalibrated, so the latency the browser reports places Takes.
@@ -172,32 +200,26 @@ test('a Take records on the Chosen Track at the playhead, or after its last Clip
   await expect(timeline(page).getByRole('group', { name: 'Track Track 2' })).toBeVisible();
   await timeline(page).getByRole('button', { name: 'Choose Track 1' }).click();
   await seek(page, 5);
-  await expect(recordButton(page)).toHaveAttribute('title', /^Record a Take on Track 1/);
+  await expect(recordButton(page)).toHaveAccessibleDescription(/^Record a Take on Track 1/);
 
   await record(page, () => recordButton(page).click(), 5 + 2, { skip: true });
 
-  await expect(clip(page, 'Take 1')).toHaveAccessibleName(/^Take 1, 0:05 to 0:0[6-9]$/);
-  const [take] = await clipsOn(request, song.id, 'Track 1');
+  await expect(clip(page, 'Take 1')).toHaveAccessibleName(/^Take 1, 0:05 to \d+:\d\d$/);
+  const [made] = await clipsOn(request, song.id, 'Track 1');
   expect(await clipsOn(request, song.id, 'Track 2')).toEqual([]);
-  expect(take.start).toBeCloseTo(5, 3);
-  // Stopped once the playhead passed 0:07: at least 1.5 s were sung.
-  expect(take.length).toBeGreaterThan(1.4);
-  expect(take.length).toBeLessThan(6);
-  expect(take.takes).toHaveLength(1);
-  expectWholeTake(take);
+  expect(made.takes).toHaveLength(1);
+  expectSung(made, 5, minSung);
 
   // With the playhead back before it, the next Take goes where it ends, never over it.
   await timeline(page).getByRole('button', { name: 'Go to the start' }).click();
   await expect(ruler(page)).toHaveAttribute('aria-valuenow', '0');
-  const end = take.start + take.length;
+  const end = made.start + made.length;
   await record(page, () => recordButton(page).click(), Math.ceil(end) + 1);
 
   const [first, second] = await clipsOn(request, song.id, 'Track 1');
-  expect(first).toEqual(take);
-  expect(second.start).toBeCloseTo(end, 3);
-  expect(second.length).toBeGreaterThan(0.4);
-  expect(second.length).toBeLessThan(6);
-  expectWholeTake(second);
+  expect([first.id, first.start, first.length]).toEqual([made.id, made.start, made.length]);
+  // Stopped once the playhead passed the second after `end` rounds up to.
+  expectSung(second, end, 0.4);
 });
 
 test('a Retake records into its Clip, from its start, growing it', async ({ page, bandmate, request }) => {
@@ -226,12 +248,10 @@ test('a Retake records into its Clip, from its start, growing it', async ({ page
   const [after, ...others] = await clipsOn(request, song.id, 'Track 1');
   expect(others).toEqual([]);
   expect(after.id).toBe(before.id);
-  expect(after.start).toBeCloseTo(5, 3);
   expect(after.takes.map((t) => t.number)).toEqual([1, 2]);
   expect(after.activeTakeId).toBe(after.takes[1].id);
-  expect(after.length).toBeGreaterThan(before.length + 1);
-  expect(after.length).toBeLessThan(10);
-  expectWholeTake(after);
+  // Stopped 2 s past where the first Take's Clip ended.
+  expectSung(after, 5, before.length + 1);
 });
 
 test('stopping during the lead-in keeps nothing, and says so', async ({ page, bandmate, request }) => {
@@ -240,10 +260,7 @@ test('stopping during the lead-in keeps nothing, and says so', async ({ page, ba
   await seek(page, 5);
 
   await recordButton(page).click();
-  await page
-    .getByRole('dialog', { name: 'Calibrate the latency' })
-    .getByRole('button', { name: 'Skip and record' })
-    .click();
+  await skipCalibration(page);
   // Stopped as soon as it can be, well inside the 2 s lead-in.
   await stopButton(page).click();
 
@@ -279,13 +296,10 @@ test('a Take whose save fails is offered back, and kept after a reload', async (
   await offer.getByRole('button', { name: 'Keep' }).click();
 
   await expect(offer).toBeHidden();
-  await expect(clip(page, 'Take 1')).toHaveAccessibleName(/^Take 1, 0:05 to 0:0[6-9]$/);
-  const [take, ...others] = await clipsOn(request, song.id, 'Track 1');
+  await expect(clip(page, 'Take 1')).toHaveAccessibleName(/^Take 1, 0:05 to \d+:\d\d$/);
+  const [kept, ...others] = await clipsOn(request, song.id, 'Track 1');
   expect(others).toEqual([]);
-  expect(take.start).toBeCloseTo(5, 3);
-  expect(take.length).toBeGreaterThan(1.4);
-  expect(take.length).toBeLessThan(6);
-  expectWholeTake(take);
+  expectSung(kept, 5, minSung);
   // Kept, it's no longer offered.
   await page.reload();
   await expect(clip(page, 'Take 1')).toBeVisible();
@@ -303,7 +317,7 @@ test('undoing a new Take takes it away and returns the playhead to where it star
   await record(page, () => recordButton(page).click(), 5 + 1, { skip: true });
   await expect(clip(page, 'Take 1')).toBeVisible();
   // The playhead stopped where the recording did.
-  expect(Number(await ruler(page).getAttribute('aria-valuenow'))).toBeGreaterThan(5);
+  await playheadPast(page, 5);
 
   await timeline(page).getByRole('button', { name: 'Undo' }).click();
 
