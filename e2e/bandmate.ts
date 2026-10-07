@@ -60,6 +60,13 @@ export interface Timeline {
   [field: string]: unknown;
 }
 
+/** A Timeline's Loop, in seconds, and whether it's on. */
+export interface Loop {
+  start: number;
+  end: number;
+  on: boolean;
+}
+
 /** What a new Song is made with; whatever is left out stays as New Song makes it. */
 export interface NewSong {
   title?: string;
@@ -100,6 +107,11 @@ export class Bandmate {
   /** A Song's Timeline, as it is now. */
   timeline(songId: number): Promise<Timeline> {
     return json<Timeline>(this.api.get(`/api/songs/${songId}/timeline`));
+  }
+
+  /** Sets a Song's Loop, on or off, as dragging along the top of the ruler does. */
+  setLoop(songId: number, loop: Loop): Promise<Timeline> {
+    return json<Timeline>(this.api.put(`/api/songs/${songId}/timeline/loop`, { data: loop }));
   }
 
   /** Every Song, wherever it's filed. */

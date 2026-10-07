@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import type { Bandmate, Clip, Song } from './bandmate';
 
 // The Song page, as its tests find it: the Timeline and its Clips, the Lyric
@@ -13,6 +13,25 @@ export async function heroSong(bandmate: Bandmate): Promise<Song> {
 
 /** The docked Timeline. */
 export const timeline = (page: Page) => page.getByRole('region', { name: 'Timeline' });
+
+/** The Timeline's ruler, whose value is the playhead, in whole seconds. */
+export const ruler = (page: Page) => timeline(page).getByRole('slider', { name: 'Position' });
+
+/** The Timeline's Play button, shown while it's stopped. */
+export const playButton = (page: Page) => timeline(page).getByRole('button', { name: 'Play', exact: true });
+
+/** The Timeline's Pause button, shown while it plays. */
+export const pauseButton = (page: Page) => timeline(page).getByRole('button', { name: 'Pause', exact: true });
+
+/** Where the playhead is now, in whole seconds, as the ruler says. */
+export async function playhead(page: Page): Promise<number> {
+  return Number(await ruler(page).getAttribute('aria-valuenow'));
+}
+
+/** Waits for the playhead to reach a time, in whole seconds, e.g. while playing. */
+export async function playheadReaches(page: Page, time: number, { timeout = 15_000 } = {}) {
+  await expect.poll(() => playhead(page), { timeout }).toBeGreaterThanOrEqual(time);
+}
 
 /** A Clip on the Timeline, by its title, e.g. "Take 2". */
 export const clip = (page: Page, title: string) =>
