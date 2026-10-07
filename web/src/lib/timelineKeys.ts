@@ -1,12 +1,12 @@
 /**
  * The Timeline's editing and mouse Shortcuts: the Selection's and a focused
- * Clip's keys, decided with all their guards in `timelineKey`, the ruler's,
+ * Clip's keys, decided with all their guards in `timelineKey`, the ruler's arrows,
  * and the modifiers held while dragging or turning the wheel.
  */
 
 import { opensMenu } from './menu';
 import type { Freeze } from './freeze';
-import { matches, shortcuts, stepBy, way, type Key, type KeyDown, type KeyPress, type Way } from './shortcuts';
+import { matches, shortcuts, stepBy, type Key, type KeyDown, type KeyPress, type Way } from './shortcuts';
 
 /** The modifiers held with a pointer or wheel event, or a key press. */
 export type Modifiers = Omit<KeyPress, 'key'>;
@@ -87,15 +87,16 @@ export function togglesSelection(e: Modifiers): boolean {
   return matches(mouse('click', e), shortcuts.toggleClip.keys);
 }
 
-/** Where a key press on the ruler seeks to, from `position` on a Timeline `length` long, or null if it doesn't. */
-export function rulerSeek(e: KeyPress, position: number, length: number): number | null {
+/**
+ * Where a key press on the ruler seeks to, from `position`, or null if it
+ * doesn't. Home and End are Song-wide, so `songKey` decides them.
+ */
+export function rulerSeek(e: KeyPress, position: number): number | null {
   const by = stepBy(e, [
     [shortcuts.seek, 5],
     [shortcuts.seekFar, 15],
   ]);
-  if (by !== null) return position + by;
-  const going = way(e, shortcuts.startOrEnd);
-  return going ? startOrEnd(going, length) : null;
+  return by === null ? null : position + by;
 }
 
 /** The start of a Timeline `length` long, going back, or its end, going forward: where its keys and its buttons go. */

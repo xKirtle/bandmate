@@ -377,6 +377,7 @@
       busy: picking || calibrating !== null || mixingDown,
       ...keyPlace(event),
       ownsSpace: ownsSpace(event.target),
+      ownsHomeEnd: ownsHomeEnd(event.target),
       editable: editable.current,
       recording,
       capturing,
@@ -388,6 +389,10 @@
     if (shortcut === 'playPause') {
       keyActedOnPage();
       toggle();
+    } else if (shortcut === 'start' || shortcut === 'end') {
+      // It seeks, rather than acting on what a click focused, e.g. a lane's Clip.
+      keyActedOnPage();
+      seekTo(startOrEnd(shortcut === 'start' ? 'back' : 'forward', length));
     } else if (shortcut === 'record') switchRecording();
     else if (shortcut === 'split') splitAtPlayhead();
     else if (shortcut === 'undo') undo();
@@ -680,7 +685,7 @@
   }
 
   function rulerKey(event: KeyboardEvent) {
-    const to = rulerSeek(event, position, length);
+    const to = rulerSeek(event, position);
     if (to === null) return;
     event.preventDefault();
     // It seeks, rather than acting on the ruler a click focused.
@@ -716,6 +721,17 @@
     if (inTextField(target) || target instanceof HTMLSelectElement) return true;
     if (target instanceof HTMLInputElement && (target.type === 'checkbox' || target.type === 'radio')) return true;
     // Space in a dialog or a ⋯ menu is for what's in it.
+    return inMenuOrDialog(target);
+  }
+
+  /**
+   * Whether Home and End pressed there are its own: in a text field, a
+   * list (a select) or a slider, e.g. a Track's volume, or a ⋯ menu. The ruler isn't
+   * one: there they go to the start and the end as anywhere else.
+   */
+  function ownsHomeEnd(target: EventTarget | null): boolean {
+    if (inTextField(target) || target instanceof HTMLSelectElement) return true;
+    if (target instanceof HTMLInputElement && target.type === 'range') return true;
     return inMenuOrDialog(target);
   }
 

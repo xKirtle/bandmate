@@ -7,7 +7,7 @@ group('dialogGroups', () => {
     const groups = dialogGroups(shortcuts, 'other');
     expect(groups.map((g) => g.group)).toEqual(['Playback & recording', 'Timeline editing', 'Sync mode', 'Mouse']);
     expect(groups.map((g) => g.rows.map((r) => r.name))).toEqual([
-      ['Play or pause', 'Record'],
+      ['Play or pause', 'Record', 'Go to the start or end'],
       [
         'Undo',
         'Redo',
@@ -15,7 +15,6 @@ group('dialogGroups', () => {
         "Open a Clip's menu",
         'Seek back or forward 5 s',
         'Seek back or forward 15 s',
-        'Go to the start or end',
         'Nudge a Cue by 0.1 s',
         'Select every Clip',
         'Clear the Selection',
@@ -39,6 +38,12 @@ group('dialogGroups', () => {
       description: 'Records a Take on the Chosen Track, or stops recording.',
       keys: [['R']],
     });
+    expect(groups[0].rows[2]).toEqual({
+      name: 'Go to the start or end',
+      description:
+        'Moves the playhead to the start or the end, from anywhere but a text field, a list, a slider, a menu or a dialog.',
+      keys: [['Home'], ['End']],
+    });
   });
 
   it('names each key as this platform does, each way of a two-way Shortcut on its own', () => {
@@ -49,13 +54,13 @@ group('dialogGroups', () => {
       ['←', '↓'],
       ['→', '↑'],
     ]);
-    expect(editing('mac')[6].keys).toEqual([['Home'], ['End']]);
+    expect(dialogGroups(shortcuts, 'mac')[0].rows[2].keys).toEqual([['Home'], ['End']]);
   });
 
   it('lists nudging a Cue under Timeline editing, saying it works in Write mode', () => {
     const editing = dialogGroups(shortcuts, 'other')[1];
     expect(editing.group).toBe('Timeline editing');
-    expect(editing.rows[7]).toEqual({
+    expect(editing.rows[6]).toEqual({
       name: 'Nudge a Cue by 0.1 s',
       description: 'Moves the focused Cue time 0.1 seconds earlier or later, in Write mode.',
       keys: [['Alt+↓'], ['Alt+↑']],

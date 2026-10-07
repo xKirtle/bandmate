@@ -32,39 +32,36 @@ const press = (key: string, mods: Partial<Omit<KeyDown, 'key'>> = {}): KeyDown =
 
 group('rulerSeek', () => {
   const position = 60;
-  const length = 200;
 
   it('seeks 5 s back on ← and ↓, and forward on → and ↑', () => {
-    expect(rulerSeek(press('ArrowLeft'), position, length)).toBe(55);
-    expect(rulerSeek(press('ArrowDown'), position, length)).toBe(55);
-    expect(rulerSeek(press('ArrowRight'), position, length)).toBe(65);
-    expect(rulerSeek(press('ArrowUp'), position, length)).toBe(65);
+    expect(rulerSeek(press('ArrowLeft'), position)).toBe(55);
+    expect(rulerSeek(press('ArrowDown'), position)).toBe(55);
+    expect(rulerSeek(press('ArrowRight'), position)).toBe(65);
+    expect(rulerSeek(press('ArrowUp'), position)).toBe(65);
   });
 
   it('seeks 15 s with Shift', () => {
-    expect(rulerSeek(press('ArrowLeft', { shiftKey: true }), position, length)).toBe(45);
-    expect(rulerSeek(press('ArrowDown', { shiftKey: true }), position, length)).toBe(45);
-    expect(rulerSeek(press('ArrowRight', { shiftKey: true }), position, length)).toBe(75);
-    expect(rulerSeek(press('ArrowUp', { shiftKey: true }), position, length)).toBe(75);
+    expect(rulerSeek(press('ArrowLeft', { shiftKey: true }), position)).toBe(45);
+    expect(rulerSeek(press('ArrowDown', { shiftKey: true }), position)).toBe(45);
+    expect(rulerSeek(press('ArrowRight', { shiftKey: true }), position)).toBe(75);
+    expect(rulerSeek(press('ArrowUp', { shiftKey: true }), position)).toBe(75);
   });
 
-  it('goes to the start on Home and the end on End', () => {
-    expect(rulerSeek(press('Home'), position, length)).toBe(0);
-    expect(rulerSeek(press('End'), position, length)).toBe(200);
+  it('leaves Home and End to the Song-wide Shortcut', () => {
+    expect(rulerSeek(press('Home'), position)).toBeNull();
+    expect(rulerSeek(press('End'), position)).toBeNull();
   });
 
   it('leaves other keys alone', () => {
-    expect(rulerSeek(press('Enter'), position, length)).toBeNull();
-    expect(rulerSeek(press(' '), position, length)).toBeNull();
-    expect(rulerSeek(press('PageUp'), position, length)).toBeNull();
+    expect(rulerSeek(press('Enter'), position)).toBeNull();
+    expect(rulerSeek(press(' '), position)).toBeNull();
+    expect(rulerSeek(press('PageUp'), position)).toBeNull();
   });
 
   it('takes each key only with its exact modifiers', () => {
-    expect(rulerSeek(press('ArrowLeft', { ctrlKey: true }), position, length)).toBeNull();
-    expect(rulerSeek(press('ArrowRight', { altKey: true }), position, length)).toBeNull();
-    expect(rulerSeek(press('ArrowUp', { metaKey: true, shiftKey: true }), position, length)).toBeNull();
-    expect(rulerSeek(press('Home', { shiftKey: true }), position, length)).toBeNull();
-    expect(rulerSeek(press('End', { ctrlKey: true }), position, length)).toBeNull();
+    expect(rulerSeek(press('ArrowLeft', { ctrlKey: true }), position)).toBeNull();
+    expect(rulerSeek(press('ArrowRight', { altKey: true }), position)).toBeNull();
+    expect(rulerSeek(press('ArrowUp', { metaKey: true, shiftKey: true }), position)).toBeNull();
   });
 });
 

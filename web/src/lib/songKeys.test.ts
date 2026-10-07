@@ -19,6 +19,7 @@ const idle: SongKeyContext = {
   dialogOpen: false,
   inTextField: false,
   ownsSpace: false,
+  ownsHomeEnd: false,
   editable: true,
   recording: false,
   capturing: false,
@@ -102,6 +103,46 @@ group('S', () => {
     expect(songKey(press('s'), { ...idle, recording: true, canRecord: false })).toBeNull();
     expect(songKey(press('s'), { ...idle, busy: true })).toBeNull();
     expect(songKey(press('s'), { ...idle, dialogOpen: true })).toBeNull();
+  });
+});
+
+group('Home and End', () => {
+  it('go to the start and the end', () => {
+    expect(songKey(press('Home'), idle)).toBe('start');
+    expect(songKey(press('End'), idle)).toBe('end');
+  });
+
+  it('go on going while held down, so the page never scrolls instead', () => {
+    expect(songKey(press('Home', { repeat: true }), idle)).toBe('start');
+    expect(songKey(press('End', { repeat: true }), idle)).toBe('end');
+  });
+
+  it('work in Read mode and on a phone, since moving the playhead is no edit', () => {
+    expect(songKey(press('Home'), { ...idle, editable: false })).toBe('start');
+    expect(songKey(press('End'), { ...idle, editable: false })).toBe('end');
+  });
+
+  it('are left to a text field, a menu or a control whose Home and End are its own, e.g. a volume slider', () => {
+    expect(songKey(press('Home'), { ...idle, inTextField: true })).toBeNull();
+    expect(songKey(press('End'), { ...idle, inTextField: true })).toBeNull();
+    expect(songKey(press('Home'), { ...idle, ownsHomeEnd: true })).toBeNull();
+    expect(songKey(press('End'), { ...idle, ownsHomeEnd: true })).toBeNull();
+  });
+
+  it('are left alone in a dialog, handled already, or with a modifier', () => {
+    expect(songKey(press('Home'), { ...idle, dialogOpen: true })).toBeNull();
+    expect(songKey(press('End'), { ...idle, dialogOpen: true })).toBeNull();
+    expect(songKey(press('Home', { defaultPrevented: true }), idle)).toBeNull();
+    expect(songKey(press('Home', { shiftKey: true }), idle)).toBeNull();
+    expect(songKey(press('End', { ctrlKey: true }), idle)).toBeNull();
+  });
+
+  it('are taken while recording, so the page never scrolls, though the playhead stays', () => {
+    expect(songKey(press('Home'), { ...idle, recording: true, capturing: true, canRecord: false })).toBe('start');
+  });
+
+  it('wait while a Beat is picked, the Latency Offset calibrated or a Mixdown made', () => {
+    expect(songKey(press('End'), { ...idle, busy: true })).toBeNull();
   });
 });
 
