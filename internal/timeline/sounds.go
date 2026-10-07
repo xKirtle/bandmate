@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/xKirtle/bandmate/internal/audio"
@@ -38,7 +36,7 @@ type Sound struct {
 type SoundImport struct {
 	TrackID int64 `json:"trackId"`
 	// Name is the file's title tag, or else its name without its
-	// extension. Left blank, it's the file's name without its extension.
+	// extension. Left blank, it's named as audio.Upload.Name says.
 	Name string `json:"name"`
 }
 
@@ -52,17 +50,7 @@ func (s *Store) ImportSound(ctx context.Context, songID int64, based lyricsheet.
 	if msg := a.Problem(); msg != "" {
 		return Timeline{}, &lyricsheet.InvalidError{Msg: msg}
 	}
-	name := strings.TrimSpace(imp.Name)
-	if name == "" {
-		name = strings.TrimSpace(strings.TrimSuffix(a.FileName, filepath.Ext(a.FileName)))
-	}
-	if name == "" {
-		// A name that's all extension, e.g. ".m4a".
-		name = strings.TrimSpace(a.FileName)
-	}
-	if name == "" {
-		name = "Sound"
-	}
+	name := a.Name(imp.Name, "Sound")
 	peaks, err := json.Marshal(a.Peaks)
 	if err != nil {
 		return Timeline{}, err

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -41,7 +40,7 @@ type Master struct {
 
 // MasterDetails are what the user enters about a Master.
 type MasterDetails struct {
-	// Name defaults to the file's name without its extension.
+	// Name defaults to the file's name, as audio.Upload.Name says.
 	Name  string `json:"name"`
 	Notes string `json:"notes"`
 }
@@ -57,13 +56,7 @@ func (s *Store) AddMaster(ctx context.Context, songID int64, based Version, deta
 	if msg := up.Problem(); msg != "" {
 		return Song{}, invalid(msg)
 	}
-	name := strings.TrimSpace(details.Name)
-	if name == "" {
-		name = strings.TrimSpace(strings.TrimSuffix(up.FileName, filepath.Ext(up.FileName)))
-	}
-	if name == "" {
-		name = "Master"
-	}
+	name := up.Name(details.Name, "Master")
 	peaks, err := json.Marshal(up.Peaks)
 	if err != nil {
 		return Song{}, err

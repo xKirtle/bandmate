@@ -56,6 +56,17 @@ func TestUploadedMasterIsPartOfTheSong(t *testing.T) {
 	}
 }
 
+func TestAMasterWhoseFileNameIsAllExtensionIsNamedAfterItWhole(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.createSong("Night Drive")
+
+	got := ts.uploadMaster(s.ID, fakeAudio(".m4a"))
+
+	if len(got.Masters) != 1 || got.Masters[0].Name != ".m4a" {
+		t.Errorf("masters = %+v, want one named \".m4a\", as a Sound is", got.Masters)
+	}
+}
+
 func TestTheFirstMasterIsMainAndTheMainOneCanBeChanged(t *testing.T) {
 	ts := newTestServer(t)
 	s := ts.createSong("Night Drive")
