@@ -172,10 +172,10 @@
 
   // Playing, pausing, seeking and stopping at the end go through Transport
   // (see transport.svelte.ts), on the Timeline's player, which the
-  // Timeline also loads audio and sets each Track's gain through. So do
-  // the ruler scrub and following the playhead, in seconds: the Timeline
+  // Timeline also loads audio and sets each Track's gain through. The ruler
+  // scrub and following the playhead go through Transport too: the Timeline
   // turns the pointer into seconds, scrolls the lanes at their edges, and
-  // scrolls the playhead into view as Transport says to follow it.
+  // scrolls the playhead into view while Transport says it's followed.
   let player!: TimelinePlayer;
   const transport: Transport = new Transport({
     player: (onState) => (player = new TimelinePlayer(onState)),
@@ -1818,10 +1818,8 @@
   let scroll = $state(0);
   let width = $state(0);
   const view = $derived(timelineView({ span, width, scale, scroll }));
-  // The view follows the playhead while playing, as Transport says: until
-  // scrolled away from by hand, then again once playing starts or the
-  // ruler's clicked.
-  // Where the lanes were last scrolled to from here, to tell scrolling by hand.
+  // Where the lanes were last scrolled to from here, to tell scrolling by
+  // hand, which stops the playhead being followed.
   let scrolledTo = 0;
 
   /** Shows the Timeline zoomed and scrolled as v has it. */

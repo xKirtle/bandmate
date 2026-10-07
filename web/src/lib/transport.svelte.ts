@@ -190,11 +190,11 @@ export class Transport implements TakePlayer {
    */
   seek(to: number) {
     this.#following = true;
-    this.#seek(to);
+    this.#moveTo(to);
   }
 
-  /** Moves the playhead, as seek does, without following it. */
-  #seek(to: number) {
+  /** Moves the playhead as seek does, but without following it again, e.g. as it's scrubbed. */
+  #moveTo(to: number) {
     if (this.#options.recording()) return;
     this.#position = to;
     this.#release();
@@ -242,7 +242,7 @@ export class Transport implements TakePlayer {
     this.#following = true;
     if (this.#options.recording()) return;
     this.#scrubbing = true;
-    this.#seek(at);
+    this.#moveTo(at);
   }
 
   /**
@@ -252,7 +252,7 @@ export class Transport implements TakePlayer {
    */
   scrubTo(at: number) {
     if (!this.#scrubbing) return;
-    if (this.#state === 'stopped') this.#seek(at);
+    if (this.#state === 'stopped') this.#moveTo(at);
     else this.#position = at;
   }
 
@@ -260,7 +260,7 @@ export class Transport implements TakePlayer {
   endScrub(at: number) {
     if (!this.#scrubbing) return;
     this.#scrubbing = false;
-    this.#seek(at);
+    this.#moveTo(at);
   }
 
   /**
