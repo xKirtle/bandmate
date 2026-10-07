@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"mime"
 	"net/http"
 	"time"
@@ -200,12 +199,9 @@ func (s *Store) swapCover(ctx context.Context, songID int64, based Version, uplo
 	if err != nil {
 		return Song{}, err
 	}
-	var kept []CoverPicture
-	var id, old int64
-	err = s.changeTx(ctx, songID, based, func(tx *sql.Tx) error {
-		var c newCover
-		var err error
-		if old, c, err = find(tx); err != nil {
+	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
+		old, c, err := find(tx)
+		if err != nil {
 			return err
 		}
 		if old != 0 {
@@ -216,7 +212,7 @@ func (s *Store) swapCover(ctx context.Context, songID int64, based Version, uplo
 		if _, ok := types[CoverOriginal]; !ok {
 			types[CoverOriginal] = c.originalType
 		}
-		id, err = insert(ctx, tx,
+		id, err := insert(ctx, tx,
 			`INSERT INTO covers (song_id, width, height, crop_x, crop_y, crop_size,
 			   original_type, list_type, header_type, added_at)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -225,30 +221,19 @@ func (s *Store) swapCover(ctx context.Context, songID int64, based Version, uplo
 		if err != nil {
 			return fmt.Errorf("adding cover: %w", err)
 		}
-		// Kept last, so nothing after them can fail but the commit.
 		for _, p := range CoverPictures {
 			if _, ok := pictures[p]; ok {
-				err = pictures[p].File.Keep(id)
+				changes.Keep(pictures[p].File, id)
 			} else {
-				err = s.coverFiles[p].Link(old, id)
+				changes.Link(s.coverFiles[p], old, id)
 			}
-			if err != nil {
-				return err
-			}
-			kept = append(kept, p)
+		}
+		// Removed after the links made from them.
+		if old != 0 {
+			s.removeCoverFiles(changes, old)
 		}
 		return nil
 	})
-	if err != nil {
-		if len(kept) > 0 {
-			s.removeCoverFiles(id)
-		}
-		return Song{}, err
-	}
-	if old != 0 {
-		s.removeCoverFiles(old)
-	}
-	return s.GetSong(ctx, songID)
 }
 
 // typesOf checks the given pictures uploaded for a Cover and says what type
@@ -270,22 +255,20 @@ func typesOf(uploaded []CoverPicture, pictures map[CoverPicture]UploadedPicture)
 
 // RemoveCover deletes a Song's Cover and its files.
 func (s *Store) RemoveCover(ctx context.Context, songID int64, based Version) (Song, error) {
-	var id int64
-	err := s.changeTx(ctx, songID, based, func(tx *sql.Tx) error {
-		var err error
-		if id, err = coverID(ctx, tx, songID); err != nil {
+	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
+		id, err := coverID(ctx, tx, songID)
+		if err != nil {
 			return err
 		}
 		if id == 0 {
 			return conflict("this Song has no Cover")
 		}
-		return deleteCover(ctx, tx, id)
+		if err := deleteCover(ctx, tx, id); err != nil {
+			return err
+		}
+		s.removeCoverFiles(changes, id)
+		return nil
 	})
-	if err != nil {
-		return Song{}, err
-	}
-	s.removeCoverFiles(id)
-	return s.GetSong(ctx, songID)
 }
 
 // loadCover reads a Song's Cover, or nil if it has none.
@@ -349,12 +332,10 @@ func deleteCover(ctx context.Context, tx *sql.Tx, id int64) error {
 	return nil
 }
 
-// removeCoverFiles deletes the pictures of a Cover already gone from the
-// database. A file left behind only takes space, so failures are logged.
-func (s *Store) removeCoverFiles(id int64) {
+// removeCoverFiles has changes remove a Cover's pictures once the change
+// deleting its row is committed.
+func (s *Store) removeCoverFiles(changes *audio.FileChanges, id int64) {
 	for _, p := range CoverPictures {
-		if err := s.coverFiles[p].Remove(id); err != nil {
-			log.Printf("deleting %s of cover %d: %v", p, id, err)
-		}
+		changes.Remove(s.coverFiles[p], id)
 	}
 }
