@@ -221,12 +221,12 @@ describe("Lyric Sheet editing, the Lyric Sheet's edits not saved yet", () => {
     const server = new FakeSongServer(verseSong());
     const { saves, editing } = await editingFor(server);
     const naming = {};
-    editing.naming(naming, 1, true);
+    editing.nameTyped(naming, 1, true);
     expect(editing.unsaved).toBe(true);
     expect(saves.unsaved).toBe(true);
     expect(editing.unsavedIn(1)).toBe(true);
     expect(editing.unsavedIn(2)).toBe(false);
-    editing.naming(naming, 1, false);
+    editing.nameTyped(naming, 1, false);
     expect(editing.unsaved).toBe(false);
     expect(editing.unsavedIn(1)).toBe(false);
   });
@@ -237,7 +237,7 @@ describe("Lyric Sheet editing, the Lyric Sheet's edits not saved yet", () => {
     const box = editing.textBox(1, 1);
     box.focus();
     box.type('One\nTwo\nThree');
-    editing.naming({}, 1, true);
+    editing.nameTyped({}, 1, true);
     expect(editing.typedIn(1)).toBe(2);
     expect(editing.typedIn(2)).toBe(0);
     expect(editing.unsavedIn(1)).toBe(true);

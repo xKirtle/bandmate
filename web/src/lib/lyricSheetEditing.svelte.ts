@@ -46,7 +46,7 @@ export class LyricSheetEditing {
    * editor, not saved yet, or no longer: they save on change, just before
    * they blur.
    */
-  naming(editor: object, sectionId: number, unsaved: boolean) {
+  nameTyped(editor: object, sectionId: number, unsaved: boolean) {
     this.#report(editor, sectionId, unsaved);
   }
 

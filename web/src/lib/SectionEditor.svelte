@@ -60,7 +60,7 @@
 
   let label = $state(untrack(() => section.label));
   let editingLabel = false;
-  // Identifies the Label or Alternate name being typed to editing. They
+  // Identifies the Label or Alternate name being typed to Lyric Sheet editing. They
   // save on change, which comes just before blur.
   const naming = {};
   // In the Alternates mode, the Alternates show as cards to choose the active
@@ -234,13 +234,13 @@
         // Focus stays in the field, to carry on typing.
         editingLabel = true;
       }}
-      onrevert={() => editing.naming(naming, section.id, false)}
+      onrevert={() => editing.nameTyped(naming, section.id, false)}
       onfocus={() => (editingLabel = true)}
-      oninput={() => editing.naming(naming, section.id, true)}
+      oninput={() => editing.nameTyped(naming, section.id, true)}
       onchange={commitLabel}
       onblur={() => {
         editingLabel = false;
-        editing.naming(naming, section.id, false);
+        editing.nameTyped(naming, section.id, false);
       }}
       placeholder="Label"
       autocomplete="off"
@@ -314,13 +314,13 @@
                 id="name-{section.id}-{alt.id}"
                 class="name"
                 value={alt.name}
-                oninput={() => editing.naming(naming, section.id, true)}
+                oninput={() => editing.nameTyped(naming, section.id, true)}
                 onchange={(e) => rename(alt, e)}
                 onkeydown={(e) => {
                   // Escape takes back what was typed, then leaves the mode as anywhere in it.
                   if (e.key === 'Escape') e.currentTarget.value = alt.name;
                 }}
-                onblur={() => editing.naming(naming, section.id, false)}
+                onblur={() => editing.nameTyped(naming, section.id, false)}
                 placeholder={name}
                 autocomplete="off"
                 enterkeyhint="done"
