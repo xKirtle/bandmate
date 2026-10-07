@@ -21,8 +21,8 @@ export const clip = (page: Page, title: string) =>
   });
 
 /** Where a Clip is on the Timeline, as it says: e.g. "0:04 to 0:25". */
-export async function extentOf(clipped: Locator): Promise<string> {
-  const name = (await clipped.getAttribute('aria-label')) ?? '';
+export async function extentOf(target: Locator): Promise<string> {
+  const name = (await target.getAttribute('aria-label')) ?? '';
   return /(\d+:\d\d to \d+:\d\d)/.exec(name)?.[1] ?? '';
 }
 
@@ -30,8 +30,8 @@ export async function extentOf(clipped: Locator): Promise<string> {
  * Drags a Clip by its body, moving it, or by its end, trimming it, `by`
  * pixels along the Timeline, in steps as a hand would.
  */
-export async function dragClip(page: Page, clipped: Locator, by: number, from: 'body' | 'end' = 'body') {
-  const box = await clipped.boundingBox();
+export async function dragClip(page: Page, target: Locator, by: number, from: 'body' | 'end' = 'body') {
+  const box = await target.boundingBox();
   if (!box) throw new Error('The Clip is not on screen');
   // The end's trim edge is a few pixels wide, inside the Clip.
   const x = from === 'body' ? box.x + box.width / 2 : box.x + box.width - 2;
@@ -51,7 +51,7 @@ export const cueOf = (page: Page, line: string) => page.getByRole('button', { na
  * whether or not it goes on to say it's out of order.
  */
 export const cueName = (line: string, cue: string) =>
-  new RegExp(`^Cue for ${line}: ${cue.replace('.', '\\.')}\\. (Out of order\\. .*)?Change it$`);
+  new RegExp(`^Cue for ${line}: ${cue.replaceAll('.', '\\.')}\\. (Out of order\\. .*)?Change it$`);
 
 /** A Clip as the server has it. */
 export interface ServerClip {

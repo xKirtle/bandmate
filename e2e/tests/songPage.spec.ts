@@ -22,7 +22,7 @@ import {
 const cueSave = { method: 'PUT', url: '**/api/songs/*/lines/*/cue' };
 
 /** The page's save error, under the Details. */
-const saveError = (page: Page) => page.locator('main').getByRole('alert');
+const saveError = (page: Page) => page.getByRole('main').getByRole('alert');
 
 test('a Clip moved, trimmed and deleted is undone and redone a step at a time', async ({ page, bandmate, request }) => {
   const song = await heroSong(bandmate);
@@ -75,8 +75,14 @@ test('a Clip moved, trimmed and deleted is undone and redone a step at a time', 
   // Redone, the same steps again: moved, trimmed, deleted.
   await redo.click();
   await expect.poll(() => extentOf(take)).toBe(movedExtent);
+  await expect
+    .poll(() => serverClips(request, song.id, 'Lead vox'))
+    .toMatchObject([{ start: moved.start, length: 21 }]);
   await redo.click();
   await expect.poll(() => extentOf(take)).toBe(trimmedExtent);
+  await expect
+    .poll(() => serverClips(request, song.id, 'Lead vox'))
+    .toMatchObject([{ start: trimmed.start, length: trimmed.length }]);
   await redo.click();
   await expect(take).toHaveCount(0);
   await expect.poll(() => serverClips(request, song.id, 'Lead vox')).toEqual([]);
@@ -151,7 +157,10 @@ test('Sync mode cues the Lines up next at the playhead while playing', async ({ 
 
   await page.keyboard.press('Enter');
   await expect.poll(async () => (await serverCues(bandmate, song.id, 'Bridge'))[0]).not.toBeNull();
-  await page.waitForTimeout(500);
+  // Played on past it, the next is cued later.
+  const [cued] = await serverCues(bandmate, song.id, 'Bridge');
+  const position = timeline(page).getByRole('slider', { name: 'Position' });
+  await expect.poll(async () => Number(await position.getAttribute('aria-valuenow'))).toBeGreaterThan(cued!);
   await page.keyboard.press('Enter');
   await expect.poll(async () => (await serverCues(bandmate, song.id, 'Bridge'))[1]).not.toBeNull();
 
@@ -162,6 +171,8 @@ test('Sync mode cues the Lines up next at the playhead while playing', async ({ 
   expect(second).toBeGreaterThan(first!);
   expect([third, fourth]).toEqual([null, null]);
   await pause.click();
+  // Where it was paused, to the second, is past both.
+  expect(Number(await position.getAttribute('aria-valuenow'))).toBeGreaterThanOrEqual(Math.round(second!));
 
   // Out of Sync mode, the Cues show as any other.
   await sync.click();
@@ -243,7 +254,7 @@ test('a Cue save whose answer is lost, but which landed, is kept', async ({ page
   await expect(page.getByRole('status').filter({ hasText: 'Edited' })).toBeVisible();
   await expect(cueOf(page, 'Line 1 of Verse 1')).toHaveAccessibleName(cueName('Line 1 of Verse 1', '0:05.1'));
   await expect(page.getByRole('alert')).toHaveCount(0);
-  expect(await serverCues(bandmate, song.id, 'Verse 1')).toEqual([5.1, 10, 15, 20]);
+  await expect.poll(() => serverCues(bandmate, song.id, 'Verse 1')).toEqual([5.1, 10, 15, 20]);
 
   // The page goes on from the Song it left: the next edit saves.
   await page.keyboard.press('Alt+ArrowUp');
@@ -276,11 +287,13 @@ test("two tabs on one Song: the other tab's next edit marks it Stale, and Reload
   expect((await bandmate.getSong(song.id)).capo).toBeNull();
 
   // Reload asks first, as the edit there is lost, then shows the change.
-  other.once('dialog', (dialog) => dialog.accept());
+  const asked: string[] = [];
+  other.once('dialog', (dialog) => (asked.push(dialog.message()), dialog.accept()));
   await stale.getByRole('button', { name: 'Reload' }).click();
   await expect(other.getByRole('textbox', { name: 'BPM' })).toHaveValue('120');
   await expect(other.getByRole('textbox', { name: 'Capo' })).toHaveValue('');
   await expect(other.getByRole('alert')).toHaveCount(0);
+  expect(asked).toEqual(['Reload the Song? Edits that weren’t saved here will be lost.']);
 });
 
 test('coming back to a tab with nothing unsaved shows a change made in another', async ({ page, bandmate }) => {
@@ -314,6 +327,7 @@ test('the Details and Tags save as they are edited', async ({ page, bandmate }) 
   const song = await bandmate.song({ title: 'Anthem' });
   await page.goto(`/songs/${song.id}`);
   const details = page.getByRole('region', { name: 'Details' });
+  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('Anthem');
 
   await page.getByRole('textbox', { name: 'Title' }).fill('Night Drive');
   await page.getByRole('textbox', { name: 'Title' }).press('Enter');
