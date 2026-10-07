@@ -763,8 +763,9 @@
   .in-folder :global(.lucide-icon) {
     flex-shrink: 0;
   }
-  /* On the narrowest phones, a Song's Status stands over when it was edited,
-     leaving its title room beside them and its ⋯. */
+  /* On a phone, a Song's Status stands over when it was edited, leaving its
+     title room beside them and its ⋯ to wrap between words. Side by side,
+     they'd squeeze a 390px phone's title so narrow its words break. */
   .meta {
     display: flex;
     flex-direction: column;
@@ -774,7 +775,7 @@
     color: var(--text-muted);
     font-size: var(--text-sm);
   }
-  @media (min-width: 24rem) {
+  @media (min-width: 30rem) {
     .meta {
       flex-direction: row;
       align-items: center;
