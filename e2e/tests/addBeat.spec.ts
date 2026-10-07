@@ -6,8 +6,9 @@ import { expect, test } from '../fixtures';
 // Adding a Beat, in the Beat Library and in the Beat Picker on a Song's
 // Timeline: from an audio file, or from a link, whose fetch is stubbed in the
 // browser (see beats.ts), as yt-dlp and the network are out of the suite's
-// reach. The two places add a Beat each their own way today, which these
-// tests pin, differences and all.
+// reach. The two places add a Beat through one form, and differ only in what
+// they call leaving it, what the already-in-the-Library warning offers, and
+// what they do with the Beat added, which these tests pin.
 
 /** A file whose name suggests its details: "Dark Trap", at 140 BPM, in Am. */
 const darkTrap = () => toneWav('dark_trap_140bpm_Am.wav');
@@ -376,9 +377,10 @@ test.describe('in the Beat Picker', () => {
     await expect.poll(() => beatsOnTracks(page.request, song.id)).toEqual({ 'Track 1': [beat.id], 'Track 2': [] });
   });
 
-  // #710 changes this on purpose: Back will discard the fetched file at once,
-  // as Cancel in the Beat Library does.
-  test('Back leaves a file fetched from a link waiting on the server, to expire', async ({ page, bandmate }) => {
+  test('Back discards a file fetched from a link at once, as Cancel in the Beat Library does', async ({
+    page,
+    bandmate,
+  }) => {
     const song = await bandmate.song({ title: 'Anthem' });
     await openPicker(page, song.id);
     const fetches = await stubLinkFetches(page, nightDrive());
@@ -386,16 +388,17 @@ test.describe('in the Beat Picker', () => {
 
     await form(page).getByRole('button', { name: 'Back' }).click();
     await expect(form(page)).toHaveCount(0);
-    // Nor does closing the Picker discard it.
+    await expect.poll(() => fetches.discarded).toEqual(['stub-1']);
+    // Closing the Picker then discards nothing more: the file's gone already.
     await page.keyboard.press('Escape');
     await expect(picker(page)).toHaveCount(0);
 
     // Opening the Picker again lists the Library, a request made after any
-    // discard would have been.
+    // second discard would have been.
     const listed = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/beats');
     await page.getByRole('button', { name: 'Beat', exact: true }).click();
     await listed;
-    expect(fetches.discarded).toEqual([]);
+    expect(fetches.discarded).toEqual(['stub-1']);
     expect(fetches.added).toEqual([]);
     expect(await bandmate.beats()).toEqual([]);
   });
