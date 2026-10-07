@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/xKirtle/bandmate/internal/audio"
 )
 
 // LyricSheet is the written side of a Song: its Sections laid out by the
@@ -172,27 +174,32 @@ func query(ctx context.Context, q queryer, stmt string, args []any, row func(*sq
 // with a new version, and returns the updated Song. If the Song is no longer
 // at the version the change was based on, or fn fails, nothing changes.
 func (s *Store) change(ctx context.Context, songID int64, based Version, fn func(tx *sql.Tx) error) (Song, error) {
-	if err := s.changeTx(ctx, songID, based, fn); err != nil {
-		return Song{}, err
-	}
-	return s.GetSong(ctx, songID)
+	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges) error {
+		return fn(tx)
+	})
 }
 
-// changeTx is change without reading the Song back, for changes with work
-// to do once they're committed.
-func (s *Store) changeTx(ctx context.Context, songID int64, based Version, fn func(tx *sql.Tx) error) error {
+// changeWithFiles is change for a change with files to keep, link or
+// remove, which fn adds to changes. They're changed only once the change is
+// committed.
+func (s *Store) changeWithFiles(ctx context.Context, songID int64, based Version,
+	fn func(tx *sql.Tx, changes *audio.FileChanges) error) (Song, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return Song{}, err
 	}
 	defer tx.Rollback()
 	if err := Touch(ctx, tx, songID, based); err != nil {
-		return err
+		return Song{}, err
 	}
-	if err := fn(tx); err != nil {
-		return err
+	var changes audio.FileChanges
+	if err := fn(tx, &changes); err != nil {
+		return Song{}, err
 	}
-	return tx.Commit()
+	if err := changes.Commit(tx.Commit); err != nil {
+		return Song{}, err
+	}
+	return s.GetSong(ctx, songID)
 }
 
 // Touch marks a Song as edited within tx, giving it a new version, for a

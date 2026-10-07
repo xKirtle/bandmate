@@ -128,11 +128,9 @@ func (s *Store) Add(ctx context.Context, details Details, a audio.Upload, file *
 	if err != nil {
 		return Beat{}, err
 	}
-	if err := file.Keep(id); err != nil {
-		return Beat{}, err
-	}
-	if err := tx.Commit(); err != nil {
-		s.files.Remove(id)
+	var changes audio.FileChanges
+	changes.Keep(file, id)
+	if err := changes.Commit(tx.Commit); err != nil {
 		return Beat{}, err
 	}
 	return s.Get(ctx, id)
@@ -307,12 +305,9 @@ func (s *Store) ReplaceFile(ctx context.Context, id int64, a audio.Upload, file 
 	if err != nil {
 		return Beat{}, fmt.Errorf("replacing beat file: %w", err)
 	}
-	// If the commit then fails, the new file is in place with the old
-	// details; that is rare enough, and the Beat still plays.
-	if err := file.Keep(id); err != nil {
-		return Beat{}, err
-	}
-	if err := tx.Commit(); err != nil {
+	var changes audio.FileChanges
+	changes.Keep(file, id)
+	if err := changes.Commit(tx.Commit); err != nil {
 		return Beat{}, err
 	}
 	return s.Get(ctx, id)

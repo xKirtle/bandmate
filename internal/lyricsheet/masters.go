@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -61,8 +60,7 @@ func (s *Store) AddMaster(ctx context.Context, songID int64, based Version, deta
 	if err != nil {
 		return Song{}, err
 	}
-	var kept int64
-	err = s.changeTx(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
 		var hasMain bool
 		if err := tx.QueryRowContext(ctx,
 			`SELECT EXISTS (SELECT 1 FROM masters WHERE song_id = ? AND main = 1)`, songID).Scan(&hasMain); err != nil {
@@ -76,20 +74,9 @@ func (s *Store) AddMaster(ctx context.Context, songID int64, based Version, deta
 		if err != nil {
 			return fmt.Errorf("adding master: %w", err)
 		}
-		// Kept last, so nothing after it can fail but the commit.
-		if err := file.Keep(id); err != nil {
-			return err
-		}
-		kept = id
+		changes.Keep(file, id)
 		return nil
 	})
-	if err != nil {
-		if kept != 0 {
-			s.masterFiles.Remove(kept)
-		}
-		return Song{}, err
-	}
-	return s.GetSong(ctx, songID)
 }
 
 // masterColumns are the masters columns scanMaster reads, in its order.
@@ -202,7 +189,7 @@ func (s *Store) MakeMainMaster(ctx context.Context, songID int64, based Version,
 // DeleteMaster removes a Master and its file. If it was the main Master,
 // the earliest added of the others becomes main.
 func (s *Store) DeleteMaster(ctx context.Context, songID int64, based Version, masterID int64) (Song, error) {
-	err := s.changeTx(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
 		res, err := tx.ExecContext(ctx, `DELETE FROM masters WHERE id = ? AND song_id = ?`, masterID, songID)
 		if err != nil {
 			return fmt.Errorf("deleting master: %w", err)
@@ -217,13 +204,9 @@ func (s *Store) DeleteMaster(ctx context.Context, songID int64, based Version, m
 		if err != nil {
 			return fmt.Errorf("choosing main master: %w", err)
 		}
+		changes.Remove(s.masterFiles, masterID)
 		return nil
 	})
-	if err != nil {
-		return Song{}, err
-	}
-	s.removeMasterFiles([]int64{masterID})
-	return s.GetSong(ctx, songID)
 }
 
 // ServeMaster answers a request for a Master's audio file, with Range
@@ -244,16 +227,6 @@ func (s *Store) ServeMaster(w http.ResponseWriter, r *http.Request, songID, mast
 		audio.OfferToSave(w, fileName)
 	}
 	return s.masterFiles.Serve(w, r, masterID, contentType)
-}
-
-// removeMasterFiles deletes the files of Masters already gone from the
-// database. A file left behind only takes space, so failures are logged.
-func (s *Store) removeMasterFiles(ids []int64) {
-	for _, id := range ids {
-		if err := s.masterFiles.Remove(id); err != nil {
-			log.Printf("deleting master %d: %v", id, err)
-		}
-	}
 }
 
 // findMaster checks a Master belongs to the Song.
