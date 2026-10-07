@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"slices"
 
+	"github.com/xKirtle/bandmate/internal/audio"
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
 )
 
@@ -26,24 +27,19 @@ func (s *Store) SplitClips(ctx context.Context, songID int64, based lyricsheet.V
 			return Timeline{}, &lyricsheet.InvalidError{Msg: "each Clip can only be split once"}
 		}
 	}
-	var linked []int64
-	tl, err := s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
 		for _, id := range clipIDs {
-			if err := s.splitClip(ctx, tx, songID, id, at, &linked); err != nil {
+			if err := s.splitClip(ctx, tx, changes, songID, id, at); err != nil {
 				return err
 			}
 		}
 		return nil
 	})
-	if err != nil {
-		s.removeTakeFiles(linked)
-	}
-	return tl, err
 }
 
 // splitClip cuts one of the Song's Clips in two at a time, as SplitClips
-// does, noting each Take file linked in linked.
-func (s *Store) splitClip(ctx context.Context, tx *sql.Tx, songID, clipID int64, at float64, linked *[]int64) error {
+// does, with the Take files to link added to changes.
+func (s *Store) splitClip(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, songID, clipID int64, at float64) error {
 	p, err := clipPlacement(ctx, tx, songID, clipID)
 	if err != nil {
 		return err
@@ -63,5 +59,5 @@ func (s *Store) splitClip(ctx context.Context, tx *sql.Tx, songID, clipID int64,
 	if err := store(ctx, tx, clipID, left); err != nil {
 		return err
 	}
-	return s.insertCopy(ctx, tx, right, linked)
+	return s.insertCopy(ctx, tx, changes, right)
 }

@@ -1116,8 +1116,7 @@ func insertClip(ctx context.Context, tx *sql.Tx, p placement) (int64, error) {
 // Fades, right after it on its Track, or after the Track's last Clip if something is in
 // the way. A Clip of Takes gets copies of its Takes, sharing their files.
 func (s *Store) DuplicateClip(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64) (Timeline, error) {
-	var linked []int64
-	tl, err := s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
 		p, err := clipPlacement(ctx, tx, songID, clipID)
 		if err != nil {
 			return err
@@ -1133,23 +1132,19 @@ func (s *Store) DuplicateClip(ctx context.Context, songID int64, based lyricshee
 				return fmt.Errorf("finding the end of the track: %w", err)
 			}
 		}
-		return s.insertCopy(ctx, tx, p, &linked)
+		return s.insertCopy(ctx, tx, changes, p)
 	})
-	if err != nil {
-		s.removeTakeFiles(linked)
-	}
-	return tl, err
 }
 
 // insertCopy stores a new Clip as placed, unchecked, playing what p
 // plays: for a Clip of Takes, copies of its Takes, sharing their files,
-// noting each file linked in linked.
-func (s *Store) insertCopy(ctx context.Context, tx *sql.Tx, p placement, linked *[]int64) error {
+// which changes links once the change is committed.
+func (s *Store) insertCopy(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, p placement) error {
 	if !p.source.activeTakeID.Valid {
 		_, err := insertClip(ctx, tx, p)
 		return err
 	}
-	copies, err := s.copyTakes(ctx, tx, p.source.takeIDs, linked)
+	copies, err := s.copyTakes(ctx, tx, changes, p.source.takeIDs)
 	if err != nil {
 		return err
 	}
@@ -1211,8 +1206,7 @@ func (s *Store) PasteClips(ctx context.Context, songID int64, based lyricsheet.V
 			return Timeline{}, err
 		}
 	}
-	var linked []int64
-	tl, err := s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
 		added, err := addTracksAtBottom(ctx, tx, songID, names)
 		if err != nil {
 			return err
@@ -1225,7 +1219,7 @@ func (s *Store) PasteClips(ctx context.Context, songID int64, based lyricsheet.V
 			nc := NewClip{BeatID: c.BeatID, SoundID: c.SoundID, Name: c.Name, Gain: c.Gain,
 				FadeIn: c.FadeIn, FadeOut: c.FadeOut, Start: c.Start, Offset: c.Offset, Length: c.Length}
 			if len(c.Takes) > 0 {
-				ids, active, err := s.copyTakesAt(ctx, tx, songID, c.Takes, *c.ActiveTakeID, &linked)
+				ids, active, err := s.copyTakesAt(ctx, tx, changes, songID, c.Takes, *c.ActiveTakeID)
 				if err != nil {
 					return err
 				}
@@ -1238,18 +1232,14 @@ func (s *Store) PasteClips(ctx context.Context, songID int64, based lyricsheet.V
 		}
 		return nil
 	})
-	if err != nil {
-		s.removeTakeFiles(linked)
-	}
-	return tl, err
 }
 
 // copyTakesAt adds a detached copy of each of the Song's Takes, sharing its
-// file, where it's given to start in its span and nudged as given, noting
-// each file linked in linked. It returns the copies' ids, in order, and the
+// file, linked by changes once committed, where it's given to start in its
+// span and nudged as given. It returns the copies' ids, in order, and the
 // id of the copy of active.
-func (s *Store) copyTakesAt(ctx context.Context, tx *sql.Tx, songID int64, takes []TakeAt, active int64,
-	linked *[]int64) ([]int64, int64, error) {
+func (s *Store) copyTakesAt(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, songID int64, takes []TakeAt,
+	active int64) ([]int64, int64, error) {
 	ids := make([]int64, len(takes))
 	for i, t := range takes {
 		ids[i] = t.ID
@@ -1258,7 +1248,7 @@ func (s *Store) copyTakesAt(ctx context.Context, tx *sql.Tx, songID int64, takes
 	if _, err := takesOfSong(ctx, tx, songID, ids); err != nil {
 		return nil, 0, err
 	}
-	copies, err := s.copyTakes(ctx, tx, ids, linked)
+	copies, err := s.copyTakes(ctx, tx, changes, ids)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -1273,9 +1263,9 @@ func (s *Store) copyTakesAt(ctx context.Context, tx *sql.Tx, songID int64, takes
 }
 
 // copyTakes adds a detached copy of each of the Takes, sharing its file,
-// noting each file linked in linked. It returns the copies' ids by the ids
+// linked by changes once committed. It returns the copies' ids by the ids
 // of the Takes copied.
-func (s *Store) copyTakes(ctx context.Context, tx *sql.Tx, ids []int64, linked *[]int64) (map[int64]int64, error) {
+func (s *Store) copyTakes(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, ids []int64) (map[int64]int64, error) {
 	copies := map[int64]int64{}
 	for _, id := range ids {
 		res, err := tx.ExecContext(ctx, `INSERT INTO takes (song_id, number, size, duration, sample_rate, peaks,
@@ -1289,10 +1279,7 @@ func (s *Store) copyTakes(ctx context.Context, tx *sql.Tx, ids []int64, linked *
 		if err != nil {
 			return nil, err
 		}
-		if err := s.takeFiles.Link(id, copyID); err != nil {
-			return nil, err
-		}
-		*linked = append(*linked, copyID)
+		changes.Link(s.takeFiles, id, copyID)
 		copies[id] = copyID
 	}
 	return copies, nil
@@ -1570,6 +1557,16 @@ func isFree(ctx context.Context, tx *sql.Tx, clipID int64, p placement) (bool, e
 // Song as edited, and returns the updated Timeline. If the Song is no longer
 // at the version the change was based on, or fn fails, nothing changes.
 func (s *Store) change(ctx context.Context, songID int64, based lyricsheet.Version, fn func(tx *sql.Tx) error) (Timeline, error) {
+	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges) error {
+		return fn(tx)
+	})
+}
+
+// changeWithFiles is change for a change with files to keep, link or
+// remove, which fn adds to changes. They're changed only once the change is
+// committed.
+func (s *Store) changeWithFiles(ctx context.Context, songID int64, based lyricsheet.Version,
+	fn func(tx *sql.Tx, changes *audio.FileChanges) error) (Timeline, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Timeline{}, err
@@ -1578,7 +1575,8 @@ func (s *Store) change(ctx context.Context, songID int64, based lyricsheet.Versi
 	if err := lyricsheet.Touch(ctx, tx, songID, based); err != nil {
 		return Timeline{}, err
 	}
-	if err := fn(tx); err != nil {
+	var changes audio.FileChanges
+	if err := fn(tx, &changes); err != nil {
 		return Timeline{}, err
 	}
 	// Any change can leave a Sound unused, or, by undo, use it again.
@@ -1589,7 +1587,7 @@ func (s *Store) change(ctx context.Context, songID int64, based lyricsheet.Versi
 	if err != nil {
 		return Timeline{}, err
 	}
-	return tl, tx.Commit()
+	return tl, changes.Commit(tx.Commit)
 }
 
 // query runs a query and calls row for each result row.
