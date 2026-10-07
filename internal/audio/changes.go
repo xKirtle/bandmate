@@ -15,11 +15,12 @@ type FileChanges struct {
 	changes []fileChange
 }
 
-// fileChange is one change to make once committed. remove marks one whose
-// failure only leaves a file taking space.
+// fileChange is one change to make once committed. A failure is logged
+// rather than returned if failureLogged, for a change whose failure only
+// leaves a file taking space.
 type fileChange struct {
-	apply  func() error
-	remove bool
+	apply         func() error
+	failureLogged bool
 }
 
 // Keep has the received file kept under id once committed, replacing any
@@ -36,12 +37,14 @@ func (c *FileChanges) Link(files *Files, from, to int64) {
 
 // Remove has the file in files under id removed once committed.
 func (c *FileChanges) Remove(files *Files, id int64) {
-	c.changes = append(c.changes, fileChange{apply: func() error { return files.Remove(id) }, remove: true})
+	c.changes = append(c.changes, fileChange{apply: func() error { return files.Remove(id) }, failureLogged: true})
 }
 
 // Commit runs commit, the transaction's, then makes every change, in the
 // order they were asked for. If commit fails, it makes none. A file that
-// can't be kept or linked once committed is an error; one that can't be
+// can't be kept or linked once committed is an error, though what was
+// committed stays so: a rename or a link within one directory failing is
+// rare enough to leave its row without the file. A file that can't be
 // removed only takes space, so that's logged.
 func (c *FileChanges) Commit(commit func() error) error {
 	if err := commit(); err != nil {
@@ -52,7 +55,7 @@ func (c *FileChanges) Commit(commit func() error) error {
 		err := change.apply()
 		switch {
 		case err == nil:
-		case change.remove:
+		case change.failureLogged:
 			log.Print(err)
 		default:
 			errs = append(errs, err)

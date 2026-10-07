@@ -39,7 +39,9 @@ func TestFileChanges(t *testing.T) {
 		change func(c *FileChanges, files *Files, received *Received)
 		// commit is the transaction's commit, or nil if it rolls back.
 		commit func() error
-		want   map[string]string
+		// wantErr is what Commit returns.
+		wantErr error
+		want    map[string]string
 	}{
 		{
 			name:   "keep, committed",
@@ -81,8 +83,9 @@ func TestFileChanges(t *testing.T) {
 				c.Link(f, 1, 4)
 				c.Remove(f, 2)
 			},
-			commit: func() error { return failed },
-			want:   map[string]string{"1": "1", "2": "2"},
+			commit:  func() error { return failed },
+			wantErr: failed,
+			want:    map[string]string{"1": "1", "2": "2"},
 		},
 		{
 			name: "every change, rolled back",
@@ -113,8 +116,8 @@ func TestFileChanges(t *testing.T) {
 			var c FileChanges
 			tt.change(&c, files, received)
 			if tt.commit != nil {
-				if err := c.Commit(tt.commit); !errors.Is(err, tt.commit()) {
-					t.Fatalf("Commit = %v, want %v", err, tt.commit())
+				if err := c.Commit(tt.commit); !errors.Is(err, tt.wantErr) {
+					t.Fatalf("Commit = %v, want %v", err, tt.wantErr)
 				}
 			}
 			// As whoever received it does, kept or not.

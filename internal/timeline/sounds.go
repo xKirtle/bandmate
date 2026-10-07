@@ -55,7 +55,7 @@ func (s *Store) ImportSound(ctx context.Context, songID int64, based lyricsheet.
 	if err != nil {
 		return Timeline{}, err
 	}
-	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, files *audio.FileChanges) error {
+	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
 		if err := findTrack(ctx, tx, songID, imp.TrackID); errors.Is(err, lyricsheet.ErrNotFound) {
 			return &lyricsheet.InvalidError{Msg: "there's no such Track on this Timeline"}
 		} else if err != nil {
@@ -77,7 +77,7 @@ func (s *Store) ImportSound(ctx context.Context, songID int64, based lyricsheet.
 		if err != nil {
 			return err
 		}
-		files.Keep(file, soundID)
+		changes.Keep(file, soundID)
 		return addClip(ctx, tx, songID, imp.TrackID, NewClip{SoundID: &soundID, Start: start, Length: a.Duration})
 	})
 }

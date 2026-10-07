@@ -27,9 +27,9 @@ func (s *Store) SplitClips(ctx context.Context, songID int64, based lyricsheet.V
 			return Timeline{}, &lyricsheet.InvalidError{Msg: "each Clip can only be split once"}
 		}
 	}
-	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, files *audio.FileChanges) error {
+	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
 		for _, id := range clipIDs {
-			if err := s.splitClip(ctx, tx, files, songID, id, at); err != nil {
+			if err := s.splitClip(ctx, tx, changes, songID, id, at); err != nil {
 				return err
 			}
 		}
@@ -38,8 +38,8 @@ func (s *Store) SplitClips(ctx context.Context, songID int64, based lyricsheet.V
 }
 
 // splitClip cuts one of the Song's Clips in two at a time, as SplitClips
-// does, with the Take files to link added to files.
-func (s *Store) splitClip(ctx context.Context, tx *sql.Tx, files *audio.FileChanges, songID, clipID int64, at float64) error {
+// does, with the Take files to link added to changes.
+func (s *Store) splitClip(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, songID, clipID int64, at float64) error {
 	p, err := clipPlacement(ctx, tx, songID, clipID)
 	if err != nil {
 		return err
@@ -59,5 +59,5 @@ func (s *Store) splitClip(ctx context.Context, tx *sql.Tx, files *audio.FileChan
 	if err := store(ctx, tx, clipID, left); err != nil {
 		return err
 	}
-	return s.insertCopy(ctx, tx, files, right)
+	return s.insertCopy(ctx, tx, changes, right)
 }

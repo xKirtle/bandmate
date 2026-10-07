@@ -156,12 +156,12 @@ func (t newTake) insert(ctx context.Context, tx *sql.Tx, songID int64, number in
 // made. Otherwise the file is discarded.
 func (s *Store) addTake(ctx context.Context, songID int64, based lyricsheet.Version, file *audio.Received,
 	add func(tx *sql.Tx) (int64, error)) (Timeline, error) {
-	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, files *audio.FileChanges) error {
+	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
 		takeID, err := add(tx)
 		if err != nil {
 			return err
 		}
-		files.Keep(file, takeID)
+		changes.Keep(file, takeID)
 		return nil
 	})
 }

@@ -82,7 +82,7 @@ func (s *Store) MergeClips(ctx context.Context, songID int64, based lyricsheet.V
 	if err != nil {
 		return Timeline{}, err
 	}
-	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, files *audio.FileChanges) error {
+	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
 		start, end, err := mergedSpan(ctx, tx, songID, m.ClipIDs)
 		if err != nil {
 			return err
@@ -114,7 +114,7 @@ func (s *Store) MergeClips(ctx context.Context, songID int64, based lyricsheet.V
 		if err != nil {
 			return err
 		}
-		files.Keep(file, soundID)
+		changes.Keep(file, soundID)
 		return addClip(ctx, tx, songID, trackID, NewClip{SoundID: &soundID, Start: start, Length: length})
 	})
 }
