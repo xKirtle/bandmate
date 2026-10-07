@@ -1648,12 +1648,14 @@
     const at = playheadAt();
     const splitting = splitTargets(timeline.tracks, clipIds ?? selection.ids, chosen, at);
     if (splitting.length === 0) return;
+    const focused = focusedClip(document.activeElement)?.id;
     perform({ kind: 'splitClips', clipIds: splitting, at }, (before, after) => {
       selection.selectEdited(rightHalves(before, after));
-      // Not while recording, which leaves the Selection as it was.
-      if (recording) return;
-      const focused = focusedClip(document.activeElement);
-      const right = focused && splitting.includes(focused.id) ? rightHalfOf(before, after, focused.id) : null;
+      // Focus stays put while recording, as the Selection does, and once
+      // it's moved on from the Clip since.
+      if (focused === undefined || !splitting.includes(focused) || recording) return;
+      if (document.activeElement?.id !== `clip-${focused}`) return;
+      const right = rightHalfOf(before, after, focused);
       if (right !== null) tick().then(() => document.getElementById(`clip-${right}`)?.focus());
     });
   }

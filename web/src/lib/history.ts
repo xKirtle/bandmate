@@ -18,6 +18,7 @@ import {
 } from './api';
 import { placementOf } from './clipSource';
 import { isBlank, type CuedSong } from './cues';
+import { rightHalves } from './split';
 
 // Undo and redo for Timeline edits and Cue edits, kept in the browser while
 // the page is open, in one history. Each edit is kept as data, with the
@@ -218,8 +219,10 @@ export class History {
     const entry = this.#undo.pop();
     if (!entry) return [];
     this.#redo.push(entry);
-    const ids = this.#follow(entry.undo, before, after);
-    return entry.undo.adds.clips.map(ids.clip);
+    // Read as sent: following the new ids remaps the entry too.
+    const sent = entry.undo;
+    const ids = this.#follow(sent, before, after);
+    return sent.adds.clips.map(ids.clip);
   }
 
   /**
@@ -231,8 +234,9 @@ export class History {
     const entry = this.#redo.pop();
     if (!entry) return null;
     this.#undo.push(entry);
-    const ids = this.#follow(entry.redo, before, after);
-    return entry.redo.selects?.map(ids.clip) ?? null;
+    const sent = entry.redo;
+    const ids = this.#follow(sent, before, after);
+    return sent.selects?.map(ids.clip) ?? null;
   }
 
   /** Forgets every edit, e.g. once the Timeline changed elsewhere. */
@@ -243,8 +247,8 @@ export class History {
 
   /**
    * Has every edit kept name the new ids of what a sent step brought back,
-   * giving how its ids map to the new ones. The sent step, being remapped
-   * too, is read through them before it is.
+   * giving how its ids map to the new ones, to read the step as sent
+   * through.
    */
   #follow(sent: Step, before: Timeline, after: Timeline): IdMaps {
     const got = added(before, after);
@@ -291,9 +295,8 @@ function redoing(edit: Edit, before: Timeline, after: Timeline): Step {
  * as the Split did.
  */
 function splittingAgain(clipIds: readonly number[], before: Timeline, after: Timeline): Step {
-  // Each Clip cut stayed as its left half, and its right half is new.
-  const rightHalves = added(before, after).clips;
-  const halves = new Set([...clipIds, ...rightHalves]);
+  const rights = rightHalves(before, after);
+  const halves = new Set([...clipIds, ...rights]);
   const placed = after.tracks.flatMap((track) =>
     track.clips.filter((c) => halves.has(c.id)).map((clip) => ({ track, clip })),
   );
@@ -304,7 +307,7 @@ function splittingAgain(clipIds: readonly number[], before: Timeline, after: Tim
       clips: placed.map(({ track, clip }) => ({ trackId: track.id, clip: placementOf(clip) })),
     },
     adds: { tracks: [], clips: placed.map(({ clip }) => clip.id) },
-    selects: rightHalves,
+    selects: rights,
   };
 }
 
@@ -389,7 +392,7 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
     case 'splitClips': {
       // The Clips are their left halves now.
       const back = placingBackAll(before, edit.clipIds);
-      const halves = [...edit.clipIds, ...added(before, after).clips];
+      const halves = [...edit.clipIds, ...rightHalves(before, after)];
       return { edit: { kind: 'replaceClips', clipIds: halves, clips: back.clips }, adds: back.adds };
     }
     case 'setTakes':

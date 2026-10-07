@@ -1,5 +1,4 @@
 import type { Clip, Timeline, Track } from './api';
-import { addedClips } from './history';
 import { tolerance } from './trackPlacement';
 
 // A Split cuts Clips in two at the playhead: the Selection's Clips it
@@ -41,7 +40,8 @@ export function splitTargets(
  * half, and its right half is a new Clip.
  */
 export function rightHalves(before: Timeline, after: Timeline): number[] {
-  return addedClips(before, after);
+  const kept = new Set(before.tracks.flatMap((t) => t.clips.map((c) => c.id)));
+  return after.tracks.flatMap((t) => t.clips.map((c) => c.id)).filter((id) => !kept.has(id));
 }
 
 /**
