@@ -1,5 +1,5 @@
 import { expect, type APIRequestContext, type Page, type Request } from '@playwright/test';
-import type { Beat } from './bandmate';
+import { Bandmate, type Beat } from './bandmate';
 
 // What adding a Beat needs that the harness doesn't have: an audio file to
 // add, a Beat already in the Library, and a link's fetch stubbed in the
@@ -79,9 +79,7 @@ export async function beatsOnTracks(
   api: APIRequestContext,
   songId: number,
 ): Promise<Record<string, (number | null)[]>> {
-  const res = await api.get(`/api/songs/${songId}/timeline`);
-  expect(res.ok()).toBe(true);
-  const timeline = (await res.json()) as { tracks: { name: string; clips: { beatId: number | null }[] }[] };
+  const timeline = await new Bandmate(api).timeline(songId);
   return Object.fromEntries(timeline.tracks.map((t) => [t.name, t.clips.map((c) => c.beatId)]));
 }
 

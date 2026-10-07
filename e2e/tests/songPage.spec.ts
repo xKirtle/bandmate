@@ -24,7 +24,7 @@ const cueSave = { method: 'PUT', url: '**/api/songs/*/lines/*/cue' };
 /** The page's save error, under the Details. */
 const saveError = (page: Page) => page.getByRole('main').getByRole('alert');
 
-test('a Clip moved, trimmed and deleted is undone and redone a step at a time', async ({ page, bandmate, request }) => {
+test('a Clip moved, trimmed and deleted is undone and redone a step at a time', async ({ page, bandmate }) => {
   const song = await heroSong(bandmate);
   await page.goto(`/songs/${song.id}`);
   const take = clip(page, 'Take 2');
@@ -35,16 +35,16 @@ test('a Clip moved, trimmed and deleted is undone and redone a step at a time', 
 
   // Moved later.
   await dragClip(page, take, 100);
-  await expect.poll(async () => (await serverClips(request, song.id, 'Lead vox'))[0].start).toBeGreaterThan(4);
-  const [moved] = await serverClips(request, song.id, 'Lead vox');
+  await expect.poll(async () => (await serverClips(bandmate, song.id, 'Lead vox'))[0].start).toBeGreaterThan(4);
+  const [moved] = await serverClips(bandmate, song.id, 'Lead vox');
   expect(moved.length).toBe(21);
   const movedExtent = await extentOf(take);
   expect(movedExtent).not.toBe('0:04 to 0:25');
 
   // Its end trimmed in.
   await dragClip(page, take, -60, 'end');
-  await expect.poll(async () => (await serverClips(request, song.id, 'Lead vox'))[0].length).toBeLessThan(21);
-  const [trimmed] = await serverClips(request, song.id, 'Lead vox');
+  await expect.poll(async () => (await serverClips(bandmate, song.id, 'Lead vox'))[0].length).toBeLessThan(21);
+  const [trimmed] = await serverClips(bandmate, song.id, 'Lead vox');
   expect(trimmed.start).toBe(moved.start);
   const trimmedExtent = await extentOf(take);
   expect(trimmedExtent).not.toBe(movedExtent);
@@ -53,43 +53,43 @@ test('a Clip moved, trimmed and deleted is undone and redone a step at a time', 
   await take.focus();
   await page.keyboard.press('Delete');
   await expect(take).toHaveCount(0);
-  await expect.poll(() => serverClips(request, song.id, 'Lead vox')).toEqual([]);
+  await expect.poll(() => serverClips(bandmate, song.id, 'Lead vox')).toEqual([]);
 
   // Undone a step at a time, back to where it started.
   await undo.click();
   await expect(take).toContainText('Take 2');
   await expect.poll(async () => (await extentOf(take)) === trimmedExtent).toBe(true);
   await expect
-    .poll(() => serverClips(request, song.id, 'Lead vox'))
+    .poll(() => serverClips(bandmate, song.id, 'Lead vox'))
     .toMatchObject([{ start: trimmed.start, length: trimmed.length }]);
   await undo.click();
   await expect.poll(() => extentOf(take)).toBe(movedExtent);
   await expect
-    .poll(() => serverClips(request, song.id, 'Lead vox'))
+    .poll(() => serverClips(bandmate, song.id, 'Lead vox'))
     .toMatchObject([{ start: moved.start, length: 21 }]);
   await undo.click();
   await expect.poll(() => extentOf(take)).toBe('0:04 to 0:25');
-  await expect.poll(() => serverClips(request, song.id, 'Lead vox')).toMatchObject([{ start: 4, length: 21 }]);
+  await expect.poll(() => serverClips(bandmate, song.id, 'Lead vox')).toMatchObject([{ start: 4, length: 21 }]);
   await expect(undo).toBeDisabled();
 
   // Redone, the same steps again: moved, trimmed, deleted.
   await redo.click();
   await expect.poll(() => extentOf(take)).toBe(movedExtent);
   await expect
-    .poll(() => serverClips(request, song.id, 'Lead vox'))
+    .poll(() => serverClips(bandmate, song.id, 'Lead vox'))
     .toMatchObject([{ start: moved.start, length: 21 }]);
   await redo.click();
   await expect.poll(() => extentOf(take)).toBe(trimmedExtent);
   await expect
-    .poll(() => serverClips(request, song.id, 'Lead vox'))
+    .poll(() => serverClips(bandmate, song.id, 'Lead vox'))
     .toMatchObject([{ start: trimmed.start, length: trimmed.length }]);
   await redo.click();
   await expect(take).toHaveCount(0);
-  await expect.poll(() => serverClips(request, song.id, 'Lead vox')).toEqual([]);
+  await expect.poll(() => serverClips(bandmate, song.id, 'Lead vox')).toEqual([]);
   await expect(redo).toBeDisabled();
 });
 
-test('Cue edits are undone in order with the Clip edits around them', async ({ page, bandmate, request }) => {
+test('Cue edits are undone in order with the Clip edits around them', async ({ page, bandmate }) => {
   const song = await heroSong(bandmate);
   await page.goto(`/songs/${song.id}`);
   const take = clip(page, 'Take 2');
@@ -101,7 +101,7 @@ test('Cue edits are undone in order with the Clip edits around them', async ({ p
   await dragClip(page, take, 100);
   await timeline(page).getByRole('button', { name: 'Move 4 Cues with it' }).click();
   await expect.poll(() => serverCues(bandmate, song.id, 'Verse 1')).not.toEqual([5, 10, 15, 20]);
-  const [moved] = await serverClips(request, song.id, 'Lead vox');
+  const [moved] = await serverClips(bandmate, song.id, 'Lead vox');
   const by = moved.start - 4;
   expect((await serverCues(bandmate, song.id, 'Verse 1')).map((c) => c! - by)).toEqual([
     expect.closeTo(5, 2),
@@ -118,21 +118,21 @@ test('Cue edits are undone in order with the Clip edits around them', async ({ p
   await undo.click();
   await expect(cueOf(page, 'Line 1 of Chorus')).toHaveAccessibleName(cueName('Line 1 of Chorus', '0:25.0'));
   await expect.poll(() => serverCues(bandmate, song.id, 'Chorus')).toEqual([25, 30, 35, 40]);
-  expect((await serverClips(request, song.id, 'Lead vox'))[0].start).toBe(moved.start);
+  expect((await serverClips(bandmate, song.id, 'Lead vox'))[0].start).toBe(moved.start);
 
   await undo.click();
   await expect(cueOf(page, 'Line 1 of Verse 1')).toHaveAccessibleName(cueName('Line 1 of Verse 1', '0:05.0'));
   await expect.poll(() => serverCues(bandmate, song.id, 'Verse 1')).toEqual([5, 10, 15, 20]);
-  expect((await serverClips(request, song.id, 'Lead vox'))[0].start).toBe(moved.start);
+  expect((await serverClips(bandmate, song.id, 'Lead vox'))[0].start).toBe(moved.start);
 
   await undo.click();
   await expect.poll(() => extentOf(take)).toBe('0:04 to 0:25');
-  await expect.poll(async () => (await serverClips(request, song.id, 'Lead vox'))[0].start).toBe(4);
+  await expect.poll(async () => (await serverClips(bandmate, song.id, 'Lead vox'))[0].start).toBe(4);
   await expect(undo).toBeDisabled();
 
   // Redone in the order they were made.
   await redo.click();
-  await expect.poll(async () => (await serverClips(request, song.id, 'Lead vox'))[0].start).toBe(moved.start);
+  await expect.poll(async () => (await serverClips(bandmate, song.id, 'Lead vox'))[0].start).toBe(moved.start);
   expect(await serverCues(bandmate, song.id, 'Verse 1')).toEqual([5, 10, 15, 20]);
   await redo.click();
   await expect.poll(() => serverCues(bandmate, song.id, 'Verse 1')).not.toEqual([5, 10, 15, 20]);

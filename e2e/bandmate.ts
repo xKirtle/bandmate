@@ -40,6 +40,26 @@ export interface Beat {
   [field: string]: unknown;
 }
 
+/** A Clip on a Track, as the server has it; tests read what else they need from it themselves. */
+export interface Clip {
+  id: number;
+  name: string | null;
+  /** The Beat it plays, or null for a Clip of Takes or a Sound. */
+  beatId: number | null;
+  start: number;
+  offset: number;
+  length: number;
+  [field: string]: unknown;
+}
+
+/** A Song's Timeline as GET /api/songs/{id}/timeline has it: its Tracks, top to bottom, and their Clips. */
+export interface Timeline {
+  songId: number;
+  version: number;
+  tracks: { id: number; name: string; clips: Clip[]; [field: string]: unknown }[];
+  [field: string]: unknown;
+}
+
 /** What a new Song is made with; whatever is left out stays as New Song makes it. */
 export interface NewSong {
   title?: string;
@@ -70,6 +90,11 @@ export class Bandmate {
   /** A Song, as it is now. */
   getSong(id: number): Promise<Song> {
     return json<Song>(this.api.get(`/api/songs/${id}`));
+  }
+
+  /** A Song's Timeline, as it is now. */
+  timeline(songId: number): Promise<Timeline> {
+    return json<Timeline>(this.api.get(`/api/songs/${songId}/timeline`));
   }
 
   /** Every Song, wherever it's filed. */

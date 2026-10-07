@@ -1,5 +1,5 @@
-import { expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
-import type { Bandmate, Song } from './bandmate';
+import type { Locator, Page } from '@playwright/test';
+import type { Bandmate, Clip, Song } from './bandmate';
 
 // The Song page, as its tests find it: the Timeline and its Clips, the Lyric
 // Sheet's Cues, and the server's Timeline and Cues to read back.
@@ -53,33 +53,11 @@ export const cueOf = (page: Page, line: string) => page.getByRole('button', { na
 export const cueName = (line: string, cue: string) =>
   new RegExp(`^Cue for ${line}: ${cue.replaceAll('.', '\\.')}\\. (Out of order\\. .*)?Change it$`);
 
-/** A Clip as the server has it. */
-export interface ServerClip {
-  id: number;
-  name: string | null;
-  start: number;
-  offset: number;
-  length: number;
-}
-
-/** The Song's Timeline as the server has it: its Tracks' names and Clips. */
-export async function serverTimeline(
-  request: APIRequestContext,
-  songId: number,
-): Promise<{
-  version: number;
-  tracks: { name: string; clips: ServerClip[] }[];
-}> {
-  const res = await request.get(`/api/songs/${songId}/timeline`);
-  expect(res.ok()).toBe(true);
-  return res.json();
-}
-
-/** The Clips on a Track, as the server has them. */
-export async function serverClips(request: APIRequestContext, songId: number, track: string): Promise<ServerClip[]> {
-  const t = (await serverTimeline(request, songId)).tracks.find((x) => x.name === track);
-  if (!t) throw new Error(`No Track "${track}"`);
-  return t.clips;
+/** The Clips on a Track, by its name, as the server has them. */
+export async function serverClips(bandmate: Bandmate, songId: number, track: string): Promise<Clip[]> {
+  const found = (await bandmate.timeline(songId)).tracks.find((t) => t.name === track);
+  if (!found) throw new Error(`No Track "${track}"`);
+  return found.clips;
 }
 
 interface CuedSong {
