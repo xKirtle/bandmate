@@ -79,7 +79,7 @@ async function play(page) {
   await page.context().close();
 }
 
-// The numbered shots, for the feature tour (site/features.md): each number is
+// The numbered shots, for the feature tour (docs/web/features.md): each number is
 // placed beside what it names as the page is captured, so it follows the UI
 // as it changes. The tour's key under each shot says what the numbers are.
 

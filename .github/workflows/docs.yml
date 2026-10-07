@@ -1,6 +1,6 @@
 name: Docs
 
-# Builds the docs site in site/ with VitePress. A pull request that touches it
+# Builds the docs site in docs/web/ with VitePress. A pull request that touches it
 # only builds it, which fails on a dead link. A `v*` version tag deploys it to
 # GitHub Pages, so the site describes the latest release, never unreleased
 # main; a run started by hand deploys too, to republish without a release.
@@ -9,7 +9,7 @@ on:
     tags: ["v*"]
   pull_request:
     paths:
-      - site/**
+      - docs/web/**
       - docs/screenshots/*.png
       - docs/screenshots/*.webp
       - web/public/favicon.svg
@@ -34,20 +34,20 @@ jobs:
         with:
           node-version: 26
           cache: npm
-          cache-dependency-path: site/package-lock.json
+          cache-dependency-path: docs/web/package-lock.json
 
       - name: Install
-        working-directory: site
+        working-directory: docs/web
         run: npm ci
 
       - name: Build the site
-        working-directory: site
+        working-directory: docs/web
         run: npm run build
 
       # A page that fails to render still builds, as an empty shell the
       # browser has to fill in, so a link straight to it shows nothing.
       - name: Check every page has its content
-        working-directory: site/.vitepress/dist
+        working-directory: docs/web/.vitepress/dist
         run: |
           if grep -l '<div id="app"><!----></div>' *.html; then
             echo "::error::Those pages were built empty: rendering them failed. The build step's log says why."
@@ -57,7 +57,7 @@ jobs:
       - if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v5
         with:
-          path: site/.vitepress/dist
+          path: docs/web/.vitepress/dist
 
   # Pages must be set to deploy from GitHub Actions, in the repository's
   # Settings → Pages.

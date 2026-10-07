@@ -19,7 +19,7 @@ Whoever or whatever wrote it: AI-written pull requests are welcome, and held to 
 - **Title it for the release notes.** The title becomes the pull request's line in them, so it names the change a self-hoster notices, not the code that changed.
 - **Label it** for the release notes, which are grouped by `enhancement`, `bug` and `documentation` and leave out `no-release-notes`, whatever else a pull request is labelled:
   - A feature gets `enhancement`, a fix `bug`, and a docs change `documentation`.
-  - Add `no-release-notes` to a change no self-hoster would read or notice. Docs a self-hoster reads go in the notes: the README, the [docs site](site/), and the licence and security policy. The rest get `no-release-notes`: this file, the [roadmap](docs/roadmap.md), AGENTS.md, the agent docs and skills, the glossary and the ADRs.
+  - Add `no-release-notes` to a change no self-hoster would read or notice. Docs a self-hoster reads go in the notes: the README, the [docs site](docs/web/), and the licence and security policy. The rest get `no-release-notes`: this file, the [roadmap](docs/roadmap.md), AGENTS.md, the agent docs and skills, the glossary and the ADRs.
   - A refactor, tooling or CI gets `no-release-notes` alone.
 
 ## Development
@@ -81,10 +81,10 @@ BANDMATE_IMAGE=bandmate:dev docker compose up
 
 ### Docs site
 
-The [docs site](https://xkirtle.github.io/bandmate/) holds the features and the self-hosting guide, which the README links to rather than repeating. It's built with VitePress from the Markdown in [`site/`](site/):
+The [docs site](https://xkirtle.github.io/bandmate/) holds the features and the self-hosting guide, which the README links to rather than repeating. It's built with VitePress from the Markdown in [`docs/web/`](docs/web/):
 
 ```sh
-cd site
+cd docs/web
 npm install
 npm run dev     # http://localhost:5173/bandmate/
 ```

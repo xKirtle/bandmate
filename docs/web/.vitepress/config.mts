@@ -48,7 +48,7 @@ export default defineConfig({
   // this folder, so retaking them updates both. They're reached through an
   // alias, as the dev server drops the base from a plain ../ path out here.
   vite: {
-    resolve: { alias: { '@screenshots': fileURLToPath(new URL('../../docs/screenshots', import.meta.url)) } },
+    resolve: { alias: { '@screenshots': fileURLToPath(new URL('../../screenshots', import.meta.url)) } },
     server: { fs: { allow: ['..'] } },
   },
 });
