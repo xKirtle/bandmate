@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Clip, Track } from './api';
-import { ClipDrag, type DragAt } from './clipDrag.svelte';
+import { ClipDrag, type ClipGrip, type ClipMeasure, type DragAt } from './clipDrag.svelte';
 import type { Freeze } from './freeze';
 import { Selection } from './selection.svelte';
 
@@ -61,6 +61,15 @@ const at = (time: number, trackId = 1): DragAt => ({
   trackId,
 });
 
+/** The pointer at a time over a Track's lane, `dy` px below its middle, e.g. dragging a gain line. */
+const below = (dy: number, time: number, trackId = 1): DragAt => {
+  const point = at(time, trackId);
+  return { ...point, point: { ...point.point, clientY: point.point.clientY + dy } };
+};
+
+// A Clip's waveform 72 px tall: its gain line goes 1 dB a pixel.
+const waveHeight = 72;
+
 /**
  * A Clip drag over a Timeline, as the Timeline makes it, with its
  * Selection, a playhead and a Loop that change as they would.
@@ -93,16 +102,17 @@ function timelineDrag(tracks: Track[] = song()) {
     drag,
     selection,
     state,
-    /** Presses a Clip, by its body or an edge, at a time, with the modifiers held. */
+    /** Presses a Clip, by its body, an edge, its gain line or a fade dot, at a time, with the modifiers held. */
     press(
       clipId: number,
-      grip: 'move' | 'start' | 'end',
+      grip: ClipGrip,
       time: number,
       keys: Partial<{ free: boolean; toggles: boolean; nudges: boolean }> = {},
+      measured: ClipMeasure = { waveHeight },
     ) {
       const c = clipOf(clipId);
       const trackId = state.tracks.find((t) => t.clips.includes(c))!.id;
-      drag.press(c, grip, at(time, trackId), { free: false, toggles: false, nudges: false, ...keys });
+      drag.press(c, grip, at(time, trackId), { free: false, toggles: false, nudges: false, ...keys }, measured);
     },
   };
 }
@@ -472,6 +482,174 @@ describe('ClipDrag', () => {
 
       expect(ids(selection)).toEqual([1, 3]);
       expect(drag.release()?.edit).toEqual({ kind: 'moveClip', clipId: 2, trackId: 1, start: 55 });
+    });
+  });
+
+  describe("dragging a Clip's gain line", () => {
+    it('shows and saves the Gain it is dragged to, the line following the pointer', () => {
+      const { drag, press } = timelineDrag();
+      press(1, 'gain', 15);
+
+      drag.move(below(-10, 15));
+
+      expect(drag.mode).toBe('gain');
+      expect(drag.shown).toEqual([
+        { clip: expect.objectContaining({ id: 1, gain: 10 }), trackId: 1, at: expect.objectContaining({ start: 10 }) },
+      ]);
+      expect(drag.release()).toEqual({ edit: { kind: 'setClipGain', clipId: 1, gain: 10 }, moved: null });
+    });
+
+    it('drags it a tenth as far with Shift held as it was pressed', () => {
+      const { drag, press } = timelineDrag();
+      press(1, 'gain', 15, { free: true });
+
+      drag.move(below(-10, 15));
+
+      expect(drag.shown[0].clip.gain).toBe(1);
+    });
+
+    it('drags it finely from where it is as Shift is pressed mid-drag, so the line never jumps, and back', () => {
+      const { drag, press } = timelineDrag();
+      press(1, 'gain', 15);
+      drag.move(below(-10, 15));
+
+      drag.modifier(true, below(-10, 15));
+      expect(drag.shown[0].clip.gain).toBe(10);
+      drag.move(below(-20, 15));
+      expect(drag.shown[0].clip.gain).toBe(11);
+
+      drag.modifier(false, below(-20, 15));
+      drag.move(below(-30, 15));
+      expect(drag.shown[0].clip.gain).toBe(21);
+    });
+
+    it('selects the Clip alone as it is grabbed, and lets go without clicking it', () => {
+      const { drag, selection, press } = timelineDrag();
+      selection.apply({ kind: 'all' });
+
+      press(1, 'gain', 15);
+      expect(ids(selection)).toEqual([1]);
+
+      expect(drag.release()).toBeNull();
+      expect(ids(selection)).toEqual([1]);
+      expect(drag.clip).toBeNull();
+    });
+
+    it('adds the Clip to the Selection as it is grabbed with Mod held', () => {
+      const { drag, selection, press } = timelineDrag();
+      selection.apply({ kind: 'click', clipId: 3 });
+
+      press(1, 'gain', 15, { toggles: true });
+      expect(ids(selection)).toEqual([1, 3]);
+
+      drag.release();
+      expect(ids(selection)).toEqual([1, 3]);
+    });
+
+    it('saves nothing when let go at the Gain it had', () => {
+      const { drag, press } = timelineDrag();
+      press(1, 'gain', 15);
+
+      drag.move(below(-10, 15));
+      drag.move(below(0, 15));
+
+      expect(drag.release()).toBeNull();
+      expect(drag.clip).toBeNull();
+    });
+
+    it('goes by Shift as the pointer moves, rebased the same way', () => {
+      const { drag, press } = timelineDrag();
+      press(1, 'gain', 15);
+      drag.move(below(-10, 15), false);
+
+      drag.move(below(-12, 15), true);
+      expect(drag.shown[0].clip.gain).toBe(10);
+      drag.move(below(-22, 15), true);
+      expect(drag.shown[0].clip.gain).toBe(11);
+    });
+  });
+
+  describe("dragging a Clip's fade dot", () => {
+    // Each dot 0.6 s wide, resting 0.5 s in from the Clip's edge without a Fade.
+    const dots = (fadeIn: number, fadeOut: number) => ({ dots: { fadeIn, fadeOut, width: 0.6, rests: 0.5 } });
+
+    it('shows and saves the fade in it is dragged to, from where the dot was grabbed', () => {
+      const { drag, press } = timelineDrag();
+      press(1, 'fadeIn', 10.6, {}, dots(10.5, 19.5));
+
+      drag.move(at(14.1));
+
+      expect(drag.mode).toBe('fadeIn');
+      expect(drag.shown).toEqual([
+        {
+          clip: expect.objectContaining({ id: 1, fadeIn: 4, fadeOut: 0 }),
+          trackId: 1,
+          at: expect.objectContaining({ start: 10, length: 10 }),
+        },
+      ]);
+      expect(drag.release()).toEqual({
+        edit: { kind: 'setClipFades', clipId: 1, fadeIn: 4, fadeOut: 0 },
+        moved: null,
+      });
+    });
+
+    it('shows and saves the fade out it is dragged to', () => {
+      const { drag, press } = timelineDrag();
+      press(1, 'fadeOut', 19.5, {}, dots(10.5, 19.5));
+
+      drag.move(at(17));
+
+      expect(drag.release()?.edit).toEqual({ kind: 'setClipFades', clipId: 1, fadeIn: 0, fadeOut: 3 });
+    });
+
+    it('takes a Fade off when its dot is dragged back to where it rests', () => {
+      const tracks = [track(1, [{ ...clip(1, 10, 20), fadeIn: 4 }])];
+      const { drag, press } = timelineDrag(tracks);
+      press(1, 'fadeIn', 14, {}, dots(14, 19.5));
+
+      drag.move(at(10.3));
+
+      expect(drag.release()?.edit).toEqual({ kind: 'setClipFades', clipId: 1, fadeIn: 0, fadeOut: 0 });
+    });
+
+    it('grabs the dot on the side of their middle pressed, where the Fades meet', () => {
+      const tracks = [track(1, [{ ...clip(1, 10, 20), fadeIn: 5, fadeOut: 5 }])];
+      const { drag, press } = timelineDrag(tracks);
+
+      // The fade out's dot is pressed, over the fade in's, left of their middle.
+      press(1, 'fadeOut', 14.8, {}, dots(15, 15));
+      expect(drag.mode).toBe('fadeIn');
+      drag.move(at(12.8));
+      expect(drag.release()?.edit).toEqual({ kind: 'setClipFades', clipId: 1, fadeIn: 3, fadeOut: 5 });
+      drag.saved();
+
+      // The fade in's dot is pressed, right of their middle.
+      press(1, 'fadeIn', 15.2, {}, dots(15, 15));
+      expect(drag.mode).toBe('fadeOut');
+      drag.move(at(17.2));
+      expect(drag.release()?.edit).toEqual({ kind: 'setClipFades', clipId: 1, fadeIn: 5, fadeOut: 3 });
+    });
+
+    it('selects the Clip as it is grabbed, and lets go without clicking it', () => {
+      const { drag, selection, press } = timelineDrag();
+      selection.apply({ kind: 'click', clipId: 3 });
+
+      press(1, 'fadeIn', 10.5, { toggles: true }, dots(10.5, 19.5));
+      expect(ids(selection)).toEqual([1, 3]);
+
+      expect(drag.release()).toBeNull();
+      expect(ids(selection)).toEqual([1, 3]);
+    });
+
+    it('saves nothing when let go at the Fades it had', () => {
+      const { drag, press } = timelineDrag();
+      press(1, 'fadeIn', 10.5, {}, dots(10.5, 19.5));
+
+      drag.move(at(14));
+      drag.move(at(10.5));
+
+      expect(drag.release()).toBeNull();
+      expect(drag.clip).toBeNull();
     });
   });
 
