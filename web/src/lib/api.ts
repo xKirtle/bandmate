@@ -2,9 +2,9 @@
 // and sends user intents back; domain rules live on the server.
 import { sendWithProgress, type UploadOptions } from './progressUpload';
 
-export type Status = 'idea' | 'drafting' | 'finished';
+export type Status = 'idea' | 'drafting' | 'finished' | 'shelved';
 
-export const statuses: readonly Status[] = ['idea', 'drafting', 'finished'];
+export const statuses: readonly Status[] = ['idea', 'drafting', 'finished', 'shelved'];
 
 /** The full Song aggregate. Every Lyric Sheet change returns one. */
 export interface Song {

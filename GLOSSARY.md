@@ -23,11 +23,11 @@ A Song's picture, like a release's cover art: at most one per Song, shown wherev
 _Avoid_: Artwork, image, album art, thumbnail
 
 **Status**:
-Where a Song stands in its lifecycle: idea, drafting, or finished.
-_Avoid_: Stage, state
+Where a Song stands in its lifecycle: idea, drafting, or finished; or shelved, set aside for now to perhaps come back to. A shelved Song is kept whole and can take any other Status again.
+_Avoid_: Stage, state; abandoned or discarded for shelved, as nothing of the Song goes
 
 **Write mode**:
-The Song page for working on the Song: its title, Status, Details, Lyric Sheet, Masters and Scrapbook can be edited. Idea and Drafting Songs open in it.
+The Song page for working on the Song: its title, Status, Details, Lyric Sheet, Masters and Scrapbook can be edited. Idea, Drafting and Shelved Songs open in it.
 
 **Read mode**:
 The Song page for playing from: the Song shows and its Masters play, but its content can't be edited, only the Timeline and how the Lyric Sheet shows. Finished Songs open in it.

@@ -8,7 +8,7 @@ import { expect, type APIRequestContext, type APIResponse } from '@playwright/te
 /** The demo Backup the screenshots are taken from: a hero Song with a full Timeline, and six more. */
 const demoBackup = resolve(import.meta.dirname, '../docs/screenshots/demo.bandmate');
 
-export type Status = 'idea' | 'drafting' | 'finished';
+export type Status = 'idea' | 'drafting' | 'finished' | 'shelved';
 
 /** A Song as the Song list has it. */
 export interface SongSummary {

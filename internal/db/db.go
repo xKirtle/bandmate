@@ -206,13 +206,57 @@ func Describe(ctx context.Context, conn *sql.DB) (Description, error) {
 const appliedAtLayout = "2006-01-02T15:04:05.000Z"
 
 func apply(ctx context.Context, conn *sql.DB, name, script string) error {
-	tx, err := conn.BeginTx(ctx, nil)
+	// One connection throughout, as the foreign_keys pragma holds for it alone.
+	c, err := conn.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer c.Close()
+	off := strings.HasPrefix(script, foreignKeysOff)
+	if off {
+		if _, err := c.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); err != nil {
+			return err
+		}
+	}
+	if err := applyIn(ctx, c, name, script, off); err != nil {
+		if off {
+			c.ExecContext(context.Background(), `PRAGMA foreign_keys = ON`)
+		}
+		return err
+	}
+	if off {
+		if _, err := c.ExecContext(ctx, `PRAGMA foreign_keys = ON`); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// foreignKeysOff starts a migration that runs with foreign keys off, as one
+// that rebuilds a table others refer to must: SQLite can't change a column's
+// constraint in place, and dropping the old table with foreign keys on would
+// delete what refers to it. It's recorded only if every reference still holds.
+const foreignKeysOff = "-- foreign_keys: off\n"
+
+// applyIn runs a migration's script and records it, in one transaction.
+func applyIn(ctx context.Context, c *sql.Conn, name, script string, checkReferences bool) error {
+	tx, err := c.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 	if _, err := tx.ExecContext(ctx, script); err != nil {
 		return err
+	}
+	if checkReferences {
+		var table string
+		err := tx.QueryRowContext(ctx, `SELECT "table" FROM pragma_foreign_key_check`).Scan(&table)
+		if err == nil {
+			return fmt.Errorf("a row of %s refers to one that's gone", table)
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations (name) VALUES (?)`, name); err != nil {
 		return err

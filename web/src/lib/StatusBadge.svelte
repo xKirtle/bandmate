@@ -35,4 +35,8 @@
     background: var(--finished-bg);
     color: var(--finished-fg);
   }
+  .badge-shelved {
+    background: var(--shelved-bg);
+    color: var(--shelved-fg);
+  }
 </style>

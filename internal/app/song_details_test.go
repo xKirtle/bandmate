@@ -11,7 +11,7 @@ func TestSongStatusCanChangeBetweenAnyStatuses(t *testing.T) {
 	ts := newTestServer(t)
 	created := ts.createSong("Midnight Drive")
 
-	for _, status := range []string{"finished", "idea", "drafting", "finished", "drafting", "idea"} {
+	for _, status := range []string{"finished", "idea", "shelved", "drafting", "finished", "shelved", "idea"} {
 		got := ts.updateSong(created.ID, map[string]any{"status": status})
 
 		if got.Status != status {
@@ -29,7 +29,7 @@ func TestUnknownStatusIsRejected(t *testing.T) {
 
 	res := ts.patchSong(created.ID, map[string]any{"status": "released", "title": "Renamed"})
 
-	expectError(t, res, http.StatusBadRequest, "status must be idea, drafting or finished")
+	expectError(t, res, http.StatusBadRequest, "status must be idea, drafting, finished or shelved")
 	if got := ts.getSong(created.ID); !reflect.DeepEqual(got, created) {
 		t.Errorf("song after rejected change = %+v, want it unchanged %+v", got, created)
 	}
