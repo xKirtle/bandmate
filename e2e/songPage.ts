@@ -20,6 +20,9 @@ export const clip = (page: Page, title: string) =>
     name: new RegExp(`^${title}(, selected)?, \\d`),
   });
 
+/** A Clip on the Timeline, by the whole of what it's called, e.g. "Take 2, selected, 0:10 to 0:25". */
+export const namedClip = (page: Page, name: string) => timeline(page).getByRole('group', { name, exact: true });
+
 /** Where a Clip is on the Timeline, as it says: e.g. "0:04 to 0:25". */
 export async function extentOf(target: Locator): Promise<string> {
   const name = (await target.getAttribute('aria-label')) ?? '';

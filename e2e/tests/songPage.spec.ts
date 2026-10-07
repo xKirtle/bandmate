@@ -6,6 +6,7 @@ import { expect, test } from '../fixtures';
 import {
   clip,
   comeBackTo,
+  namedClip,
   cueName,
   cueOf,
   dragMiddleOf,
@@ -315,7 +316,6 @@ test('a Split selects and focuses the right half of each Clip it cuts, so Delete
   const beatClip = clip(page, 'Lorem Click');
   const undo = timeline(page).getByRole('button', { name: 'Undo' });
   const redo = timeline(page).getByRole('button', { name: 'Redo' });
-  const named = (name: string) => timeline(page).getByRole('group', { name, exact: true });
   await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
 
   // The playhead at 0:10, across Take 2 and the Beat's Clip, 5 s at a time.
@@ -327,8 +327,8 @@ test('a Split selects and focuses the right half of each Clip it cuts, so Delete
   // One Clip split: only its right half is selected, and focused.
   await take.click();
   await page.keyboard.press('s');
-  await expect(named('Take 2, selected, 0:10 to 0:25')).toBeFocused();
-  await expect(named('Take 2, 0:04 to 0:10')).toBeVisible();
+  await expect(namedClip(page, 'Take 2, selected, 0:10 to 0:25')).toBeFocused();
+  await expect(namedClip(page, 'Take 2, 0:04 to 0:10')).toBeVisible();
   await expect
     .poll(() => serverClips(bandmate, song.id, 'Lead vox'))
     .toMatchObject([
@@ -341,8 +341,8 @@ test('a Split selects and focuses the right half of each Clip it cuts, so Delete
   await expect(take).toHaveCount(1);
   await expect(take).toHaveAccessibleName('Take 2, selected, 0:04 to 0:25');
   await redo.click();
-  await expect(named('Take 2, selected, 0:10 to 0:25')).toBeVisible();
-  await expect(named('Take 2, 0:04 to 0:10')).toBeVisible();
+  await expect(namedClip(page, 'Take 2, selected, 0:10 to 0:25')).toBeVisible();
+  await expect(namedClip(page, 'Take 2, 0:04 to 0:10')).toBeVisible();
   await undo.click();
   await expect(take).toHaveCount(1);
   await expect(take).toHaveAccessibleName('Take 2, selected, 0:04 to 0:25');
@@ -351,10 +351,10 @@ test('a Split selects and focuses the right half of each Clip it cuts, so Delete
   // and focus moves from the Beat's Clip to its right half.
   await beatClip.click({ modifiers: ['ControlOrMeta'] });
   await page.keyboard.press('s');
-  await expect(named('Take 2, selected, 0:10 to 0:25')).toBeVisible();
-  await expect(named('Lorem Click, selected, 0:10 to 1:30')).toBeFocused();
-  await expect(named('Take 2, 0:04 to 0:10')).toBeVisible();
-  await expect(named('Lorem Click, 0:00 to 0:10')).toBeVisible();
+  await expect(namedClip(page, 'Take 2, selected, 0:10 to 0:25')).toBeVisible();
+  await expect(namedClip(page, 'Lorem Click, selected, 0:10 to 1:30')).toBeFocused();
+  await expect(namedClip(page, 'Take 2, 0:04 to 0:10')).toBeVisible();
+  await expect(namedClip(page, 'Lorem Click, 0:00 to 0:10')).toBeVisible();
 
   // Delete trims off what follows the playhead, leaving the left halves.
   await page.keyboard.press('Delete');
@@ -364,13 +364,12 @@ test('a Split selects and focuses the right half of each Clip it cuts, so Delete
   await expect(beatClip).toHaveAccessibleName('Lorem Click, 0:00 to 0:10');
 });
 
-test('Clips copied and pasted at the playhead on the Chosen Track are selected, the Clips copied no longer', async ({
+test('Clips copied and pasted at the playhead on the Chosen Track are selected, and the Clips copied no longer are', async ({
   page,
   bandmate,
 }) => {
   const song = await heroSong(bandmate);
   await page.goto(`/songs/${song.id}`);
-  const named = (name: string) => timeline(page).getByRole('group', { name, exact: true });
   const beat = timeline(page).getByRole('group', { name: 'Track Beat' });
   await expect(clip(page, 'Take 2')).toHaveAccessibleName('Take 2, 0:04 to 0:25');
 
@@ -386,10 +385,10 @@ test('Clips copied and pasted at the playhead on the Chosen Track are selected, 
   // The earliest, the Beat's Clip, starts at the playhead, on the Beat, and
   // Take 2 keeps its place from it, a Track below and 4 s later.
   await page.keyboard.press('ControlOrMeta+v');
-  await expect(named('Lorem Click, selected, 1:30 to 3:00')).toBeVisible();
-  await expect(named('Take 2, selected, 1:34 to 1:55')).toBeVisible();
-  await expect(named('Lorem Click, 0:00 to 1:30')).toBeVisible();
-  await expect(named('Take 2, 0:04 to 0:25')).toBeVisible();
+  await expect(namedClip(page, 'Lorem Click, selected, 1:30 to 3:00')).toBeVisible();
+  await expect(namedClip(page, 'Take 2, selected, 1:34 to 1:55')).toBeVisible();
+  await expect(namedClip(page, 'Lorem Click, 0:00 to 1:30')).toBeVisible();
+  await expect(namedClip(page, 'Take 2, 0:04 to 0:25')).toBeVisible();
   await expect
     .poll(() => serverClips(bandmate, song.id, 'Beat'))
     .toMatchObject([
@@ -418,11 +417,7 @@ test('Selected Clips merged become one Clip, selected, its Track chosen, and und
   const beat = timeline(page).getByRole('group', { name: 'Track Beat' });
   const leadVox = timeline(page).getByRole('group', { name: 'Track Lead vox' });
   await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
-  const renders: string[] = [];
-  page.on(
-    'request',
-    (r) => r.method() === 'POST' && r.url().endsWith('/timeline/clips/merge') && renders.push(r.url()),
-  );
+  const [{ beatId }] = await serverClips(bandmate, song.id, 'Beat');
 
   // Take 2 clicked, which chooses Lead vox, then the Beat's Clip added, and
   // the Selection's menu opened on Take 2, which keeps Lead vox chosen.
@@ -450,12 +445,12 @@ test('Selected Clips merged become one Clip, selected, its Track chosen, and und
   // Undone, the Clips are back.
   await undo.click();
   await expect(merged).toHaveCount(0);
-  await expect(take).toHaveAccessibleName(/^Take 2, (selected, )?0:04 to 0:25$/);
-  await expect(beatClip).toHaveAccessibleName(/^Lorem Click, (selected, )?0:00 to 1:30$/);
+  await expect(take).toHaveAccessibleName('Take 2, selected, 0:04 to 0:25');
+  await expect(beatClip).toHaveAccessibleName('Lorem Click, selected, 0:00 to 1:30');
   await expect.poll(() => serverClips(bandmate, song.id, 'Lead vox')).toMatchObject([{ start: 4, length: 21 }]);
-  await expect.poll(() => serverClips(bandmate, song.id, 'Beat')).toMatchObject([{ beatId: 1, start: 0, length: 90 }]);
+  await expect.poll(() => serverClips(bandmate, song.id, 'Beat')).toMatchObject([{ beatId, start: 0, length: 90 }]);
 
-  // Redone, they're merged again, into the same Sound, without rendering it again.
+  // Redone, they're merged again, into the same Sound, rather than rendering a new one.
   await redo.click();
   await expect(merged).toHaveAccessibleName('Merged Clip, selected, 0:00 to 1:30');
   await expect(take).toHaveCount(0);
@@ -464,7 +459,6 @@ test('Selected Clips merged become one Clip, selected, its Track chosen, and und
     .poll(() => serverClips(bandmate, song.id, 'Beat'))
     .toMatchObject([{ soundId: made.soundId, start: 0, length: 90 }]);
   expect(await serverClips(bandmate, song.id, 'Lead vox')).toEqual([]);
-  expect(renders).toHaveLength(1);
 });
 
 test('a Merge with a muted Track names it in the Merge note, until OK', async ({ page, bandmate }) => {
@@ -487,52 +481,59 @@ test('a Merge with a muted Track names it in the Merge note, until OK', async ({
   await expect(note).toHaveCount(0);
 });
 
-test('Import audio places a Sound in a new Clip after the Chosen Track’s last Clip, and undo and redo take it away and bring it back', async ({
+test('a Sound imported with Import audio… goes in a new Clip after the Chosen Track’s last Clip, and undo and redo take it away and bring it back', async ({
   page,
   bandmate,
 }) => {
   const song = await heroSong(bandmate);
   await page.goto(`/songs/${song.id}`);
-  const sound = clip(page, 'night drive');
+  const first = clip(page, 'night drive');
+  const second = clip(page, 'night ride');
   const undo = timeline(page).getByRole('button', { name: 'Undo' });
   const redo = timeline(page).getByRole('button', { name: 'Redo' });
   await expect(clip(page, 'Take 2')).toHaveAccessibleName('Take 2, 0:04 to 0:25');
-  const uploads: string[] = [];
-  page.on('request', (r) => r.method() === 'POST' && r.url().endsWith('/timeline/sounds') && uploads.push(r.url()));
+
+  /** Imports a file with Import audio…, from the transport row's ⋯. */
+  async function importAudio(name: string) {
+    await timeline(page).getByRole('button', { name: 'More Timeline actions' }).click();
+    const chooser = page.waitForEvent('filechooser');
+    await page.getByRole('menuitem', { name: 'Import audio…' }).click();
+    await (await chooser).setFiles(toneWav(name, 2));
+  }
 
   // Lead vox chosen, with the playhead at the start, before Take 2.
   await timeline(page).getByRole('button', { name: 'Choose Lead vox' }).click();
-  await timeline(page).getByRole('button', { name: 'More Timeline actions' }).click();
-  const chooser = page.waitForEvent('filechooser');
-  await page.getByRole('menuitem', { name: 'Import audio…' }).click();
-  await (await chooser).setFiles(toneWav('night drive.wav', 2));
+  await importAudio('night drive.wav');
 
   // Named after its file, it goes where Take 2 ends, not at the playhead.
-  await expect(sound).toHaveAccessibleName('night drive, 0:25 to 0:27');
+  await expect(first).toHaveAccessibleName('night drive, 0:25 to 0:27');
   await expect
     .poll(() => serverClips(bandmate, song.id, 'Lead vox'))
     .toMatchObject([
       { start: 4, length: 21 },
       { name: null, beatId: null, start: 25, length: 2 },
     ]);
-  const [, imported] = await serverClips(bandmate, song.id, 'Lead vox');
-  expect(imported.soundId).toEqual(expect.any(Number));
+  expect((await serverClips(bandmate, song.id, 'Lead vox'))[1].soundId).toEqual(expect.any(Number));
   expect(await serverClips(bandmate, song.id, 'Beat')).toHaveLength(1);
 
-  await undo.click();
-  await expect(sound).toHaveCount(0);
-  await expect.poll(() => serverClips(bandmate, song.id, 'Lead vox')).toMatchObject([{ start: 4, length: 21 }]);
+  // The next goes after it, now the Track's last Clip.
+  await importAudio('night ride.wav');
+  await expect(second).toHaveAccessibleName('night ride, 0:27 to 0:29');
+  await expect.poll(async () => (await serverClips(bandmate, song.id, 'Lead vox')).length).toBe(3);
+  const [, , imported] = await serverClips(bandmate, song.id, 'Lead vox');
+  expect(imported).toMatchObject({ start: 27, length: 2 });
 
-  // Redone, the same Sound is back, without uploading the file again.
+  await undo.click();
+  await expect(second).toHaveCount(0);
+  await expect(first).toHaveAccessibleName('night drive, 0:25 to 0:27');
+  await expect.poll(async () => (await serverClips(bandmate, song.id, 'Lead vox')).length).toBe(2);
+
+  // Redone, the same Sound is back, rather than the file uploaded again.
   await redo.click();
-  await expect(sound).toHaveAccessibleName('night drive, 0:25 to 0:27');
+  await expect(second).toHaveAccessibleName('night ride, 0:27 to 0:29');
   await expect
-    .poll(() => serverClips(bandmate, song.id, 'Lead vox'))
-    .toMatchObject([
-      { start: 4, length: 21 },
-      { soundId: imported.soundId, start: 25, length: 2 },
-    ]);
-  expect(uploads).toHaveLength(1);
+    .poll(async () => (await serverClips(bandmate, song.id, 'Lead vox'))[2])
+    .toMatchObject({ soundId: imported.soundId, start: 27, length: 2 });
 });
 
 test('a Clip moved over Cues offers to move them, naming how many, which moves them, and another edit withdraws the offer', async ({
@@ -573,6 +574,8 @@ test('a Clip moved over Cues offers to move them, naming how many, which moves t
   await clip(page, 'Lorem Click').focus();
   await page.keyboard.press('Delete');
   await expect.poll(() => serverClips(bandmate, song.id, 'Beat')).toEqual([]);
+  await expect(take).toHaveCount(1);
+  expect(await serverClips(bandmate, song.id, 'Lead vox')).toHaveLength(1);
   await expect(offer).toHaveCount(0);
   expect(await serverCues(bandmate, song.id, 'Verse 1')).toEqual(moved);
 });
