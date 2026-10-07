@@ -75,7 +75,7 @@
   import { clipActions, selectionActions } from './clipMenu';
   import { mergeTarget, mergeWarning, mergedClips, renderMerge, type MergedAudio } from './merge';
   import { splitTargets } from './split';
-  import { menuFor, noSelection, selection, type Selection, type SelectionGesture } from './selection';
+  import { Selection, type ClipIds, type SelectionBox } from './selection.svelte';
   import {
     copy,
     duplicate as duplicatePlacement,
@@ -351,9 +351,8 @@
     mergeNote = null;
     const undone = await saves.undo();
     if (!undone) return;
-    // Clips deleted together come back selected, as they were, unless the
-    // Selection is locked by a recording started since.
-    if (undone.reselect && !frozen) selected = new Set(undone.reselect);
+    // Clips deleted together come back selected, as they were.
+    if (undone.reselect) selection.selectEdited(undone.reselect);
     // Undoing a new Take returns the playhead to where its Clip starts, to
     // record again from. Once the Clip's gone, it's a seek like any other:
     // playing, playback jumps there, superseding the restart the Clip's
@@ -368,7 +367,7 @@
     mergeNote = null;
     const redone = await saves.redo();
     // A Merge redone selects its Clip again, as it did.
-    if (redone?.reselect && !frozen) selected = new Set(redone.reselect);
+    if (redone?.reselect) selection.selectEdited(redone.reselect);
   }
 
   // Tooltips name a Shortcut's keys as this platform does, e.g. ⌘Z on a
@@ -998,7 +997,7 @@
   function startRecording(retaking?: Clip) {
     // No Retake while several Clips are selected, e.g. selected while
     // calibration, offered first, ran.
-    if (!canRecord || (retaking && selected.size > 1)) return;
+    if (!canRecord || (retaking && selection.size > 1)) return;
     // Calibration is offered first, the first time on this device.
     if (!calibration.value.offered && calibration.value.offset === null) {
       calibrating = { offer: true, retaking };
@@ -1078,17 +1077,10 @@
   // The Selection: the Clips the next Clip action applies to. Like choosing
   // a Track, selecting isn't an edit, and it's never kept, so leaving the
   // Song drops it. A phone, where Clips can't be edited, has none.
-  let selected = $state<Selection>(noSelection);
-  function select(gesture: SelectionGesture) {
-    selected = selection(timeline.tracks, selected, gesture, frozen);
-  }
-
-  // Clips gone from the Timeline, e.g. deleted in another tab or taken away
-  // by undo, drop out of it.
-  $effect(() => {
-    const { tracks } = timeline;
-    untrack(() => (selected = selection(tracks, selected)));
-  });
+  const selection = new Selection(
+    () => timeline.tracks,
+    () => freeze,
+  );
 
   // Dragging from empty lane space draws a box, and the Clips it touches
   // on the Tracks it spans become the Selection as it's drawn, or, with
@@ -1109,8 +1101,8 @@
     /** The press, telling a click, a box and a pan apart. */
     press: LanePress;
     pointerId: number;
-    /** The Selection as it was pressed, which the box replaces or adds to. */
-    before: Selection;
+    /** The box's hold on the Selection, which it replaces or adds to as it was pressed. */
+    selecting: SelectionBox;
     /** Where it was pressed, in seconds: the box's start. */
     start: number;
     /** The index of the Track whose lane was pressed. */
@@ -1147,10 +1139,11 @@
     event.preventDefault();
     lanesElement!.focus({ preventScroll: true });
     const touch = event.pointerType === 'touch';
+    const adds = addsBox(event);
     laneBox = {
-      press: pressLane(event, touch, addsBox(event)),
+      press: pressLane(event, touch, adds),
       pointerId: event.pointerId,
-      before: selected,
+      selecting: selection.startBox(adds),
       start: spanTimeAt(event.clientX),
       trackIndex: trackIndexAt(event.clientY),
       top: yIn(event.clientY),
@@ -1174,7 +1167,7 @@
         drawBox(laneBox, at);
         return;
       case 'insertionPoint': {
-        select({ kind: 'emptyClick', adds: false });
+        selection.apply({ kind: 'emptyClick', adds: false });
         // Not even following the playhead again while recording.
         if (frozen) break;
         seekTo(laneBox.start);
@@ -1183,10 +1176,10 @@
         break;
       }
       case 'click':
-        select({ kind: 'emptyClick', adds: laneBox.press.adds });
+        selection.apply({ kind: 'emptyClick', adds: laneBox.press.adds });
         break;
       case 'restore':
-        selected = selection(timeline.tracks, laneBox.before);
+        laneBox.selecting.restore();
         break;
       case 'keep':
       case 'giveUp':
@@ -1195,13 +1188,10 @@
     laneDone();
   }
 
-  function drawBox({ start, trackIndex, top, press: { adds }, before }: LaneBox, at: Point) {
+  function drawBox({ start, trackIndex, top, selecting }: LaneBox, at: Point) {
     const end = spanTimeAt(at.clientX);
     box = { start, end, top, bottom: yIn(at.clientY) };
-    const tracks = [trackIndex, trackIndexAt(at.clientY)] as const;
-    selected = frozen
-      ? selection(timeline.tracks, selected)
-      : selection(timeline.tracks, before, { kind: 'box', start, end, tracks, adds });
+    selecting.draw({ start, end, tracks: [trackIndex, trackIndexAt(at.clientY)] });
     dragAt(at, laneMove);
   }
 
@@ -1262,11 +1252,11 @@
 
   /** Copies the Selection to the Clipboard; with none, the Clipboard stays as it was. */
   function copySelection() {
-    copyClips(selected);
+    copyClips(selection.ids);
   }
 
   /** Copies these Clips to the Clipboard; with none, the Clipboard stays as it was. */
-  function copyClips(clipIds: Selection) {
+  function copyClips(clipIds: ClipIds) {
     clipboard = copy(timeline.tracks, clipIds) ?? clipboard;
   }
 
@@ -1299,10 +1289,7 @@
 
   /** Makes the Clips of a paste, or a Selection Duplicate, as one edit, and selects them. */
   function pasteAndSelect(pasted: Paste) {
-    perform({ kind: 'pasteClips', ...pasted }, (before, after) => {
-      // Unless the Selection is locked by a recording started since.
-      if (!frozen) selected = new Set(addedClips(before, after));
-    });
+    perform({ kind: 'pasteClips', ...pasted }, (before, after) => selection.selectEdited(addedClips(before, after)));
   }
 
   // Esc clears the Selection while focus is in the Timeline, Mod+A
@@ -1317,13 +1304,13 @@
     if (event.defaultPrevented || trackDrag.current) return;
     if (inTextField(event.target) || inMenuOrDialog(event.target)) return;
     const clipboardKey = clipboardAction(event);
-    const editsSelection = selected.size > 0 && editable.current && !frozen;
-    if (clearsSelection(event) && selected.size > 0) {
+    const editsSelection = selection.size > 0 && editable.current && !frozen;
+    if (clearsSelection(event) && selection.size > 0) {
       event.preventDefault();
-      select({ kind: 'clear' });
+      selection.apply({ kind: 'clear' });
     } else if (selectsAll(event) && editable.current) {
       event.preventDefault();
-      select({ kind: 'all' });
+      selection.apply({ kind: 'all' });
     } else if (clipAction(event) === 'delete' && editsSelection) {
       event.preventDefault();
       removeSelection();
@@ -1581,7 +1568,7 @@
     // Alt+dragging a Clip of Takes slides its active Take, the Clip staying put.
     const take = activeTake(clip);
     // Grabbing its gain line, or a fade dot, selects it, as clicking it does.
-    if (mode === 'gain' || isFadeMode(mode)) select({ kind: toggles ? 'toggle' : 'click', clipId: clip.id });
+    if (mode === 'gain' || isFadeMode(mode)) selection.apply({ kind: toggles ? 'toggle' : 'click', clipId: clip.id });
     const wave = element.querySelector('.wave')?.getBoundingClientRect();
     const grabbed = isFadeMode(mode) ? fadeGrab(event, element, mode) : null;
     if (grabbed) mode = grabbed.end;
@@ -1681,9 +1668,9 @@
     if (!edit.moved && edit.mode === 'move') {
       // Moving a selected Clip moves the whole Selection; moving another
       // selects it alone. A trim or a nudge leaves the Selection be.
-      select({ kind: 'drag', clipId: edit.clip.id });
+      selection.apply({ kind: 'drag', clipId: edit.clip.id });
       // Another Clip moves alone while the Selection is locked.
-      if (selected.size > 1 && selected.has(edit.clip.id)) edit.moves = [];
+      if (selection.size > 1 && selection.has(edit.clip.id)) edit.moves = [];
     }
     edit.moved = true;
     clearTimeout(pressTimer);
@@ -1710,12 +1697,12 @@
       // Selected Clips move as one, snapped by any of their edges.
       edit.trackId = trackAt(event.clientY);
       const { trackId } = edit;
-      const place = (by: number) => moveSelection(timeline.tracks, selected, clip.id, trackId, clip.start + by);
+      const place = (by: number) => moveSelection(timeline.tracks, selection.ids, clip.id, trackId, clip.start + by);
       // How far moveSelection lets the Selection move, as the Clip dragged goes.
       const clamp = (by: number) => place(by).find((m) => m.clipId === clip.id)!.start - clip.start;
       const desired = t - edit.grab - clip.start;
-      const clips = timeline.tracks.flatMap((track) => track.clips.filter((c) => selected.has(c.id)));
-      const moved = snapSelection(snapTargets(selected), clips, desired, reachAt(view.scale), clamp, edit.free);
+      const clips = timeline.tracks.flatMap((track) => track.clips.filter((c) => selection.has(c.id)));
+      const moved = snapSelection(snapTargets(selection.ids), clips, desired, reachAt(view.scale), clamp, edit.free);
       edit.moves = place(moved.by);
       edit.snap = moved.snap;
     } else if (edit.mode === 'move') {
@@ -1754,7 +1741,7 @@
     const { clip, trackId, placement: to, mode } = edit;
     // Pressed and let go without dragging, it's clicked. Its gain line or a fade dot selected it when grabbed.
     if (!edit.moved && mode !== 'gain' && !isFadeMode(edit.mode)) {
-      select({ kind: edit.toggles ? 'toggle' : 'click', clipId: clip.id });
+      selection.apply({ kind: edit.toggles ? 'toggle' : 'click', clipId: clip.id });
     }
     if (isFadeMode(edit.mode)) {
       const { fadeIn, fadeOut } = edit.fades;
@@ -1881,7 +1868,7 @@
    * the copies. It leaves the Clipboard as it is.
    */
   function duplicateSelection() {
-    const copies = duplicatePlacement(timeline.tracks, selected);
+    const copies = duplicatePlacement(timeline.tracks, selection.ids);
     if (copies) pasteAndSelect(copies);
   }
 
@@ -1894,12 +1881,11 @@
   function splitAtPlayhead(clipIds?: ReadonlySet<number>) {
     if (frozen) return;
     const at = playheadAt();
-    const splitting = splitTargets(timeline.tracks, clipIds ?? selected, chosen, at);
+    const splitting = splitTargets(timeline.tracks, clipIds ?? selection.ids, chosen, at);
     if (splitting.length === 0) return;
-    perform({ kind: 'splitClips', clipIds: splitting, at }, (before, after) => {
-      // Unless the Selection is locked by a recording started since.
-      if (!frozen) selected = new Set([...splitting, ...addedClips(before, after)]);
-    });
+    perform({ kind: 'splitClips', clipIds: splitting, at }, (before, after) =>
+      selection.selectEdited([...splitting, ...addedClips(before, after)]),
+    );
   }
 
   // A Clip is renamed in place, like a Track: double-clicked, or from its
@@ -1972,7 +1958,7 @@
 
   /** Deletes a Clip with the whole Selection, as one edit, if it's selected; else the Clip alone. */
   function removeWithSelection(clip: Clip) {
-    if (selected.has(clip.id)) removeSelection();
+    if (selection.has(clip.id)) removeSelection();
     else remove(clip);
   }
 
@@ -1987,8 +1973,8 @@
    * renders it again.
    */
   function mergeSelection() {
-    if (frozen || !mergeTarget(timeline.tracks, selected)) return;
-    const clipIds = new Set(selected);
+    if (frozen || !mergeTarget(timeline.tracks, selection.ids)) return;
+    const clipIds = selection.ids;
     merging = true;
     error = null;
     offerCues = null;
@@ -2016,7 +2002,7 @@
       .then((made) => {
         if (!made) return;
         const [mergedId] = addedClips(made.before, made.after);
-        selected = new Set([mergedId]);
+        selection.selectEdited([mergedId]);
         remembered = made.after.tracks.find((t) => t.clips.some((c) => c.id === mergedId))!.id;
         mergeNote = note;
       })
@@ -2025,7 +2011,7 @@
 
   /** Deletes the selected Clips, as one edit. */
   function removeSelection() {
-    perform({ kind: 'deleteClips', clipIds: [...selected] });
+    perform({ kind: 'deleteClips', clipIds: [...selection.ids] });
   }
 
   function clipKey(event: KeyboardEvent, clip: Clip) {
@@ -2050,13 +2036,13 @@
   let pressTimer: ReturnType<typeof setTimeout> | undefined;
 
   function clipMenuOpened(clip: Clip) {
-    selected = menuFor(timeline.tracks, selected, clip.id, frozen).selected;
+    selection.openMenu(clip.id);
   }
 
   function clipMenuActions(clip: Clip): MenuAction[] {
-    if (menuFor(timeline.tracks, selected, clip.id, frozen).menu === 'selection') {
+    if (selection.menuFor(clip.id) === 'selection') {
       return selectionActions(
-        selected.size,
+        selection.size,
         {
           copyClips: copySelection,
           cutClips: cutSelection,
@@ -2067,8 +2053,8 @@
         },
         {
           frozen: freeze,
-          canMerge: mergeTarget(timeline.tracks, selected) !== null,
-          canSplit: splitTargets(timeline.tracks, selected, chosen, playheadAt()).length > 0,
+          canMerge: mergeTarget(timeline.tracks, selection.ids) !== null,
+          canSplit: splitTargets(timeline.tracks, selection.ids, chosen, playheadAt()).length > 0,
           ...menuKeys(),
         },
       );
@@ -2082,7 +2068,7 @@
         nudgeKeys: hints.label(shortcuts.nudgeTake.keys),
         ...menuKeys(),
         canSplit: splitTargets(timeline.tracks, new Set([clipId]), chosen, playheadAt()).length > 0,
-        selected: selected.size,
+        selected: selection.size,
         frozen: freeze,
       },
       {
@@ -2908,7 +2894,7 @@
                 {#each placed as { clip, at, editing } (clip.id)}
                   {@const wave = waveWindow(view, at.start, at.length)}
                   {@const title = titleOf(clip)}
-                  {@const isSelected = selected.has(clip.id)}
+                  {@const isSelected = selection.has(clip.id)}
                   {@const extent = `${formatDuration(at.start)} to ${formatDuration(at.start + at.length)}`}
                   <!-- As trimmed, so a trim being dragged shortens them to fit, as saving it will. -->
                   {@const fades = fitFades(clip, at.length)}
