@@ -1,8 +1,20 @@
 // An in-memory SongServer, for testing Saves without the api: one Song and
 // its Timeline, sharing a version, as the server keeps them.
-import { ApiError, type Clip, type NewClip, type Song, type SongAt, type Timeline, type Track } from './api';
+import {
+  ApiError,
+  type Captured,
+  type Clip,
+  type NewClip,
+  type Song,
+  type SongAt,
+  type Take,
+  type TakePlacement,
+  type Timeline,
+  type Track,
+} from './api';
 import { withCueChange, type CueChange } from './cueChanges';
 import type { Edit } from './history';
+import { peaksPerSecond } from './peaks';
 import { isCueChange, type SongServer } from './songServer';
 
 /** A failure as the network gives it. */
@@ -42,8 +54,8 @@ export function emptySong(fields: Partial<Song> = {}): Song {
  *
  * Saves makes its own writes through `apply` and `setTags`. Writes a
  * caller brings, as the Song page's panels make through the api, are made
- * here with `update` and `remove`, or for the Timeline, e.g. a Take's
- * upload or a Merge, with `apply`.
+ * here with `update` and `remove`, a Take's upload with `recordTake` and
+ * `retake`, or for the Timeline, e.g. a Merge, with `apply`.
  */
 export class FakeSongServer implements SongServer {
   song: Song;
@@ -56,8 +68,10 @@ export class FakeSongServer implements SongServer {
   #losing = 0;
   #holding: Promise<void> | null = null;
 
-  /** The id the next Clip placed gets. */
+  /** The ids the next Clip, Track and Take made get. */
   #nextClipId = 1;
+  #nextTrackId = 1;
+  #nextTakeId = 1;
 
   /** Holds the Song given, and a Timeline of the Tracks given, by default none. */
   constructor(song: Song = emptySong(), tracks: Track[] = []) {
@@ -73,6 +87,9 @@ export class FakeSongServer implements SongServer {
     };
     const ids = tracks.flatMap((t) => t.clips.map((c) => c.id));
     this.#nextClipId = Math.max(0, ...ids) + 1;
+    this.#nextTrackId = Math.max(0, ...tracks.map((t) => t.id)) + 1;
+    const takeIds = tracks.flatMap((t) => t.clips.flatMap((c) => c.takes.map((k) => k.id)));
+    this.#nextTakeId = Math.max(0, ...takeIds) + 1;
   }
 
   /** Fails the next writes, n of them, before they're made, by default on the network. */
@@ -132,8 +149,8 @@ export class FakeSongServer implements SongServer {
 
   /**
    * What a Timeline edit does, for the edits the fake models: the Loop's,
-   * and placing, moving and deleting Clips on the Tracks there are. Others
-   * throw "not modelled".
+   * adding a Track, and placing, moving and deleting Clips on the Tracks
+   * there are. Others throw "not modelled".
    */
   #edited(edit: Edit): (tl: Timeline) => Timeline {
     const place = (tl: Timeline, trackId: number, clip: NewClip) =>
@@ -149,6 +166,12 @@ export class FakeSongServer implements SongServer {
         return (tl) => ({ ...tl, loop: tl.loop && { ...tl.loop, on: edit.on } });
       case 'clearLoop':
         return (tl) => ({ ...tl, loop: null });
+      case 'addTrack':
+        return (tl) => {
+          const { name } = edit.track;
+          const track: Track = { id: this.#nextTrackId++, name, volume: 0, muted: false, soloed: false, clips: [] };
+          return { ...tl, tracks: [...tl.tracks, track] };
+        };
       case 'placeClip':
         return (tl) => place(tl, edit.trackId, edit.clip);
       case 'placeClips':
@@ -193,6 +216,46 @@ export class FakeSongServer implements SongServer {
       offset,
       length,
     };
+  }
+
+  /**
+   * Places a Take just recorded in a new Clip, as the api's recordTake
+   * does: the Clip runs from start to where the Take ends, as long as its
+   * peaks say, and its Take starts where it was heard.
+   */
+  recordTake(at: SongAt, wav: Blob, placement: TakePlacement): Promise<Timeline> {
+    const { trackId, start, ...captured } = placement;
+    const heard = captured.captureStart - captured.latencyOffset;
+    return this.#write(at, () => {
+      const take = this.#take(captured, 0);
+      // A Clip of Takes plays no Sound.
+      const placed = this.#clip({ soundId: 0, start, offset: start - heard, length: heard + take.duration - start });
+      const clip: Clip = { ...placed, soundId: null, takes: [take], activeTakeId: take.id };
+      this.timeline = withClips(this.timeline, trackId, (cs) => [...cs, clip]);
+      return structuredClone(this.timeline);
+    });
+  }
+
+  /** Records a Take into a Clip of Takes, as its active Take, as the api's retake does, leaving the Clip's length as it is. */
+  retake(at: SongAt, clipId: number, wav: Blob, captured: Captured): Promise<Timeline> {
+    return this.#write(at, () => {
+      const track = this.timeline.tracks.find((t) => t.clips.some((c) => c.id === clipId))!;
+      this.timeline = withClips(this.timeline, track.id, (cs) =>
+        cs.map((c) => {
+          if (c.id !== clipId) return c;
+          const take = this.#take(captured, captured.captureStart - captured.latencyOffset - (c.start - c.offset));
+          return { ...c, takes: [...c.takes, take], activeTakeId: take.id };
+        }),
+      );
+      return structuredClone(this.timeline);
+    });
+  }
+
+  /** A Take uploaded, lasting as long as its peaks say, at a position in its Clip's span. */
+  #take({ latencyOffset, peaks }: Captured, position: number): Take {
+    const id = this.#nextTakeId++;
+    const duration = peaks.length / peaksPerSecond;
+    return { id, number: id, size: 0, duration, sampleRate: 0, latencyOffset, position, nudge: 0, recordedAt: '' };
   }
 
   setTags(tags: string[]): Promise<string[]> {
