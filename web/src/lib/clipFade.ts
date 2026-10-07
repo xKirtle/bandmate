@@ -58,6 +58,11 @@ export function draggedFade(at: number, other: number, length: number, rests: nu
 /** Which of a Clip's Fades: its fade in or its fade out. */
 export type FadeEnd = keyof ClipFades;
 
+/** Whether what's dragged is a Fade's dot, setting its fade in or its fade out. */
+export function isFadeEnd(what: string | null): what is FadeEnd {
+  return what === 'fadeIn' || what === 'fadeOut';
+}
+
 /** A Fade's name, as shown, e.g. "Fade in". */
 export function fadeName(end: FadeEnd): string {
   return end === 'fadeIn' ? 'Fade in' : 'Fade out';

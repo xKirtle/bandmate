@@ -1,5 +1,7 @@
-import type { Clip, ClipMove, Track } from './api';
+import type { Clip, ClipFades, ClipMove, Track } from './api';
 import { clampMove, clampTrimEnd, clampTrimStart, draggedNudge, moveSelection, nudged } from './clipEdit';
+import { draggedFade, grabbedFade, isFadeEnd, type FadeEnd } from './clipFade';
+import { draggedGain } from './clipGain';
 import { activeTake } from './clipSource';
 import type { Edit } from './history';
 import { pastSlop, type Point } from './press';
@@ -17,25 +19,50 @@ import {
 
 // Dragging a Clip, from press to release: its body moves it, along its
 // Track or onto another; an edge trims it; Alt+dragging a Clip of Takes
-// nudges its active Take within it. It stops at its neighbours, the
-// source's ends and 0:00 as it goes, and is saved on release. Until the
-// save resolves, the Clip is shown where it was dropped. Moved or trimmed,
-// it snaps to other Clips' edges, the playhead and the Loop's edges,
-// unless Shift is held; the Selection, moved together, snaps by any of its
-// Clips' edges to those of Clips outside it.
+// nudges its active Take within it; its gain line sets its Gain, finely
+// with Shift held; a dot at either end of the gain line sets its fade in or
+// fade out. It stops at its neighbours, the source's ends and 0:00 as it
+// goes, and is saved on release, if it changed. Until the save resolves,
+// the Clip is shown as it was dropped. Moved or trimmed, it snaps to other
+// Clips' edges, the playhead and the Loop's edges, unless Shift is held;
+// the Selection, moved together, snaps by any of its Clips' edges to those
+// of Clips outside it.
 //
 // It works in seconds and Tracks: the Timeline measures the page, listens
 // to the pointer, scrolls at the edges, saves and offers to move the Cues.
 
-/** Where a Clip is pressed: its body, to move it, or its start or end edge, to trim it. */
-export type ClipGrip = 'move' | 'start' | 'end';
+/**
+ * Where a Clip is pressed: its body, to move it, its start or end edge, to
+ * trim it, its gain line, to set its Gain, or a fade dot, to set that Fade.
+ */
+export type ClipGrip = 'move' | 'start' | 'end' | 'gain' | FadeEnd;
 
-/** What a Clip drag does: move the Clip (or the Selection), trim either edge, or nudge its active Take. */
+/** What a Clip drag does: move the Clip (or the Selection), trim either edge, nudge its active Take, or set its Gain or a Fade. */
 export type ClipDragMode = ClipGrip | 'nudge';
+
+/** Where a Clip's fade dots are as it's pressed, in seconds. */
+export interface FadeDots {
+  /** Where the fade in's dot's middle is, along the Timeline. */
+  fadeIn: number;
+  /** Where the fade out's dot's middle is, along the Timeline. */
+  fadeOut: number;
+  /** How wide a dot is. */
+  width: number;
+  /** How far in from the Clip's edge a dot rests without a Fade: just inside the trim edge. */
+  rests: number;
+}
+
+/** What the Timeline measures of a Clip as it's pressed: for its gain line or for a fade dot. */
+export interface ClipMeasure {
+  /** How tall its waveform is, in pixels, which its gain line goes up and down. */
+  waveHeight?: number;
+  /** Where its fade dots are. */
+  dots?: FadeDots;
+}
 
 /** Where the pointer is, as the Timeline measures it. */
 export interface DragAt {
-  /** On the page, to tell a click from a drag. */
+  /** On the page, to tell a click from a drag, and for the gain line, how high it is. */
   point: Point;
   /** The time under it across the lanes, in seconds, which may be past the end. */
   time: number;
@@ -45,7 +72,7 @@ export interface DragAt {
 
 /** The modifiers held as a Clip is pressed. */
 export interface PressKeys {
-  /** Shift, to move or trim without snapping. */
+  /** Shift, to move or trim without snapping, or to drag the gain line finely. */
   free: boolean;
   /** Mod, so a click adds the Clip to the Selection or takes it out. */
   toggles: boolean;
@@ -69,7 +96,7 @@ export interface DraggedClip {
 
 /** The edit a release saves, and for a move, which Clips moved and by how far, to offer moving their Cues. */
 export interface DragSave {
-  edit: Extract<Edit, { kind: 'moveClip' | 'moveClips' | 'trimClip' | 'nudgeTake' }>;
+  edit: Extract<Edit, { kind: 'moveClip' | 'moveClips' | 'trimClip' | 'nudgeTake' | 'setClipGain' | 'setClipFades' }>;
   moved: { clips: Clip[]; by: number } | null;
 }
 
@@ -91,7 +118,7 @@ interface Drag {
   mode: ClipDragMode;
   /** Where the pointer went down, to tell a click or a long press from a drag. */
   from: Point;
-  /** How far into the Clip it was grabbed, in seconds. */
+  /** How far right of what it drags it was grabbed, in seconds: the Clip's start, or for a fade dot, the dot's middle. */
   grab: number;
   moved: boolean;
   /** The Track it's shown on now. */
@@ -100,7 +127,19 @@ interface Drag {
   placement: Placed;
   /** Where its active Take is nudged to, for a nudge. */
   nudge: number;
-  /** Whether Shift is held, to move or trim without snapping. */
+  /** Its Gain as dragged, in dB, for the gain line. */
+  gain: number;
+  /**
+   * For the gain line, what it's dragged from: the Gain and the pointer's
+   * height, both moved on whenever Shift is pressed or let go, so the line
+   * never jumps, and how tall the Clip's waveform is, in pixels.
+   */
+  gainFrom: { gain: number; clientY: number; height: number };
+  /** Its Fades as dragged, in seconds, for a fade dot. */
+  fades: ClipFades;
+  /** For a fade dot, how far in from the Clip's edge it rests without a Fade, in seconds. */
+  rests: number;
+  /** Whether Shift is held, to move or trim without snapping, or to drag the gain line finely. */
   free: boolean;
   /** Whether Mod was held as it was pressed, so a click adds it to the Selection or takes it out. */
   toggles: boolean;
@@ -109,6 +148,11 @@ interface Drag {
   /** Where every selected Clip is shown, when the Selection is moved together; null for one Clip. */
   moves: ClipMove[] | null;
   saving: boolean;
+}
+
+/** Whether a Clip is selected as it's grabbed, as clicking it does, rather than when let go: by its gain line or a fade dot. */
+function selectsAtPress(mode: ClipDragMode): boolean {
+  return mode === 'gain' || isFadeEnd(mode);
 }
 
 /** A Clip drag on a Timeline, from press to release, and until its save resolves. */
@@ -159,8 +203,7 @@ export class ClipDrag {
         return clip ? [{ clip, trackId: m.trackId, at: { ...clip, start: m.start } }] : [];
       });
     }
-    const clip = drag.mode === 'nudge' ? nudged(drag.clip, drag.nudge) : drag.clip;
-    return [{ clip, trackId: drag.trackId, at: drag.placement }];
+    return [{ clip: shownClip(drag), trackId: drag.trackId, at: drag.placement }];
   }
 
   /** What a move or trim is snapped to, while it is, for the guide. */
@@ -173,25 +216,43 @@ export class ClipDrag {
     return { at: snap.at, aligned: snap.aligned, trackId };
   }
 
-  /** Presses a Clip by its body or an edge, at a point, with modifiers held. */
-  press(clip: Clip, grip: ClipGrip, at: Pick<DragAt, 'point' | 'time'>, keys: PressKeys) {
-    const trackId = this.#trackOf(clip);
+  /**
+   * Presses a Clip by its body, an edge, its gain line or a fade dot, at a
+   * point, with modifiers held, as measured for the gain line or the fade
+   * dots. Where the dots sit together, the side of their middle pressed
+   * says which is grabbed. Its gain line or a fade dot selects it there and
+   * then, as clicking it does.
+   */
+  press(clip: Clip, grip: ClipGrip, at: Pick<DragAt, 'point' | 'time'>, keys: PressKeys, measured: ClipMeasure = {}) {
     const take = activeTake(clip);
+    let mode: ClipDragMode = grip === 'move' && keys.nudges && take ? 'nudge' : grip;
+    let grab = at.time - clip.start;
+    let rests = 0;
+    if (isFadeEnd(grip)) {
+      const dots = measured.dots!;
+      const end = grabbedFade(grip, at.time, dots.fadeIn, dots.fadeOut, dots.width);
+      [mode, grab, rests] = [end, at.time - dots[end], dots.rests];
+    }
     this.#drag = {
       clip,
-      mode: grip === 'move' && keys.nudges && take ? 'nudge' : grip,
+      mode,
       from: { clientX: at.point.clientX, clientY: at.point.clientY },
-      grab: at.time - clip.start,
+      grab,
       moved: false,
-      trackId,
+      trackId: this.#trackOf(clip),
       placement: clip,
       nudge: take?.nudge ?? 0,
+      gain: clip.gain,
+      gainFrom: { gain: clip.gain, clientY: at.point.clientY, height: measured.waveHeight ?? 0 },
+      fades: { fadeIn: clip.fadeIn, fadeOut: clip.fadeOut },
+      rests,
       free: keys.free,
       toggles: keys.toggles,
       snap: null,
       moves: null,
       saving: false,
     };
+    if (selectsAtPress(grip)) this.#selection.apply({ kind: keys.toggles ? 'toggle' : 'click', clipId: clip.id });
   }
 
   /**
@@ -206,85 +267,136 @@ export class ClipDrag {
     if (!drag.moved && !pastSlop(drag.from, at.point)) return false;
     if (!drag.moved && drag.mode === 'move') {
       // Moving a selected Clip moves the whole Selection; moving another
-      // selects it alone. A trim or a nudge leaves the Selection be.
+      // selects it alone. Any other drag leaves the Selection be.
       this.#selection.apply({ kind: 'drag', clipId: drag.clip.id });
       // Another Clip moves alone while the Selection is frozen.
       if (this.#selection.size > 1 && this.#selection.has(drag.clip.id)) drag.moves = [];
     }
     drag.moved = true;
-    if (free !== undefined) drag.free = free;
+    if (free !== undefined) this.#hold(drag, free, at);
     this.#place(drag, at);
     return true;
   }
 
   /**
-   * A modifier pressed or let go mid-move or mid-trim, e.g. the Shift that
-   * skips snapping, snaps or frees the Clip there and then, where the
-   * pointer is, without waiting for it to move.
+   * A modifier pressed or let go mid-drag, e.g. Shift: mid-move or
+   * mid-trim, it snaps or frees the Clip there and then, where the pointer
+   * is, without waiting for it to move; on the gain line, it drags finely,
+   * or not, from there on.
    */
   modifier(free: boolean, at: DragAt) {
     const drag = this.#drag;
-    if (!drag?.moved || drag.mode === 'nudge' || drag.saving) return;
+    if (!drag?.moved || drag.saving) return;
+    this.#hold(drag, free, at);
+    if (drag.mode === 'move' || drag.mode === 'start' || drag.mode === 'end') this.#place(drag, at);
+  }
+
+  /**
+   * Shift held, or not. The gain line goes finely, or not, from the Gain
+   * it's at and the pointer's height, so it never jumps.
+   */
+  #hold(drag: Drag, free: boolean, at: DragAt) {
+    if (drag.mode === 'gain' && free !== drag.free) {
+      drag.gainFrom = { ...drag.gainFrom, gain: drag.gain, clientY: at.point.clientY };
+    }
     drag.free = free;
-    this.#place(drag, at);
   }
 
   #place(drag: Drag, at: DragAt) {
+    const { clip } = drag;
+    switch (drag.mode) {
+      case 'move':
+        if (drag.moves) this.#placeSelection(drag, at);
+        else this.#placeMove(drag, at);
+        return;
+      case 'start':
+      case 'end':
+        this.#placeTrim(drag, at);
+        return;
+      case 'nudge':
+        drag.nudge = draggedNudge(clip, at.time - drag.grab - clip.start);
+        return;
+      case 'gain': {
+        const { gain, clientY, height } = drag.gainFrom;
+        drag.gain = draggedGain(gain, at.point.clientY - clientY, height, drag.free);
+        return;
+      }
+      case 'fadeIn':
+      case 'fadeOut': {
+        // The dot's middle, in seconds from the Clip's start.
+        const dot = at.time - drag.grab - clip.start;
+        const { fadeIn, fadeOut } = drag.fades;
+        drag.fades =
+          drag.mode === 'fadeIn'
+            ? { fadeIn: draggedFade(dot, fadeOut, clip.length, drag.rests), fadeOut }
+            : { fadeIn, fadeOut: draggedFade(clip.length - dot, fadeIn, clip.length, drag.rests) };
+        return;
+      }
+    }
+  }
+
+  /** Moves the selected Clips as one, snapped by any of their edges. */
+  #placeSelection(drag: Drag, at: DragAt) {
     const { tracks, reach } = this.#context;
     const { clip } = drag;
+    drag.trackId = at.trackId;
+    const ids = this.#selection.ids;
+    const place = (by: number) => moveSelection(tracks(), ids, clip.id, at.trackId, clip.start + by);
+    // How far moveSelection lets the Selection move, as the Clip dragged goes.
+    const clamp = (by: number) => place(by).find((m) => m.clipId === clip.id)!.start - clip.start;
+    const desired = at.time - drag.grab - clip.start;
+    const clips = tracks().flatMap((track) => track.clips.filter((c) => ids.has(c.id)));
+    const moved = snapSelection(this.#targets(ids), clips, desired, reach(), clamp, drag.free);
+    drag.moves = place(moved.by);
+    drag.snap = moved.snap;
+  }
+
+  #placeMove(drag: Drag, at: DragAt) {
+    const { clip } = drag;
+    drag.trackId = at.trackId;
+    const others = this.#othersOn(drag.trackId, clip);
+    const clamp = (start: number) => clampMove(others, clip.length, start);
+    const desired = at.time - drag.grab;
+    const moved = drag.free
+      ? { start: clamp(desired), snap: null }
+      : snapMove(this.#targets(new Set([clip.id])), clip.length, desired, this.#context.reach(), clamp);
+    drag.placement = { ...clip, start: moved.start };
+    drag.snap = moved.snap;
+  }
+
+  #placeTrim(drag: Drag, at: DragAt) {
+    const { clip } = drag;
     const t = at.time;
-    if (drag.mode === 'nudge') {
-      drag.nudge = draggedNudge(clip, t - drag.grab - clip.start);
-    } else if (drag.moves) {
-      // Selected Clips move as one, snapped by any of their edges.
-      drag.trackId = at.trackId;
-      const ids = this.#selection.ids;
-      const place = (by: number) => moveSelection(tracks(), ids, clip.id, at.trackId, clip.start + by);
-      // How far moveSelection lets the Selection move, as the Clip dragged goes.
-      const clamp = (by: number) => place(by).find((m) => m.clipId === clip.id)!.start - clip.start;
-      const desired = t - drag.grab - clip.start;
-      const clips = tracks().flatMap((track) => track.clips.filter((c) => ids.has(c.id)));
-      const moved = snapSelection(this.#targets(ids), clips, desired, reach(), clamp, drag.free);
-      drag.moves = place(moved.by);
-      drag.snap = moved.snap;
-    } else if (drag.mode === 'move') {
-      drag.trackId = at.trackId;
-      const others = this.#othersOn(drag.trackId, clip);
-      const clamp = (start: number) => clampMove(others, clip.length, start);
-      const desired = t - drag.grab;
-      const moved = drag.free
-        ? { start: clamp(desired), snap: null }
-        : snapMove(this.#targets(new Set([clip.id])), clip.length, desired, reach(), clamp);
-      drag.placement = { ...clip, start: moved.start };
-      drag.snap = moved.snap;
-    } else {
-      const others = this.#othersOn(drag.trackId, clip);
-      const trimStart = drag.mode === 'start';
-      const trim = (to: number) =>
-        trimStart ? clampTrimStart(clip, others, to) : clampTrimEnd(clip, others, this.#context.sourceLength(clip), to);
-      // Where the edge dragged ends up, trimmed to `to`.
-      const edge = (to: number) => {
-        const trimmed = trim(to);
-        return trimStart ? trimmed.start : trimmed.start + trimmed.length;
-      };
-      const snapped = drag.free ? { at: t, snap: null } : snapEdge(this.#targets(new Set([clip.id])), t, reach(), edge);
-      drag.placement = trim(snapped.at);
-      drag.snap = snapped.snap;
-    }
+    const others = this.#othersOn(drag.trackId, clip);
+    const trimStart = drag.mode === 'start';
+    const trim = (to: number) =>
+      trimStart ? clampTrimStart(clip, others, to) : clampTrimEnd(clip, others, this.#context.sourceLength(clip), to);
+    // Where the edge dragged ends up, trimmed to `to`.
+    const edge = (to: number) => {
+      const trimmed = trim(to);
+      return trimStart ? trimmed.start : trimmed.start + trimmed.length;
+    };
+    const snapped = drag.free
+      ? { at: t, snap: null }
+      : snapEdge(this.#targets(new Set([clip.id])), t, this.#context.reach(), edge);
+    drag.placement = trim(snapped.at);
+    drag.snap = snapped.snap;
   }
 
   /**
    * Lets go. Pressed and let go without dragging, the Clip is clicked: it's
    * selected alone, or with Mod held as it was pressed, added to the
-   * Selection or taken out. Gives back the edit to save, holding the Clips
-   * where they were dropped until told it's saved, or null with nothing
-   * changed, ending the drag.
+   * Selection or taken out, unless it was selected as it was grabbed.
+   * Gives back the edit to save, holding the Clips as they were dropped
+   * until told it's saved, or null with nothing changed, ending the drag.
    */
   release(): DragSave | null {
     const drag = this.#drag;
     if (!drag || drag.saving) return null;
     drag.snap = null;
-    if (!drag.moved) this.#selection.apply({ kind: drag.toggles ? 'toggle' : 'click', clipId: drag.clip.id });
+    if (!drag.moved && !selectsAtPress(drag.mode)) {
+      this.#selection.apply({ kind: drag.toggles ? 'toggle' : 'click', clipId: drag.clip.id });
+    }
     const save = drag.moved ? this.#save(drag) : null;
     if (save) drag.saving = true;
     else this.#drag = null;
@@ -292,36 +404,51 @@ export class ClipDrag {
   }
 
   #save(drag: Drag): DragSave | null {
-    const { clip, trackId, placement: to, mode } = drag;
-    if (mode === 'nudge') {
-      if (drag.nudge === activeTake(clip)!.nudge) return null;
-      return {
-        edit: { kind: 'nudgeTake', clipId: clip.id, takeId: clip.activeTakeId!, nudge: drag.nudge },
-        moved: null,
-      };
-    }
-    if (drag.moves) {
-      const { moves } = drag;
-      const clips = this.#placed();
-      const from = moves.map((m) => clips.get(m.clipId)!);
-      if (moves.every((m, i) => m.trackId === from[i].trackId && m.start === from[i].clip.start)) return null;
-      return {
-        edit: { kind: 'moveClips', moves },
-        moved: { clips: from.map((f) => f.clip), by: moves[0].start - from[0].clip.start },
-      };
-    }
-    const unchanged =
+    const { clip, trackId, placement: to } = drag;
+    // Moved or trimmed, the Clip is where it was, on the Track it was on.
+    const unchanged = () =>
       trackId === this.#trackOf(clip) &&
       to.start === clip.start &&
       to.offset === clip.offset &&
       to.length === clip.length;
-    if (unchanged) return null;
-    if (mode !== 'move') {
-      return { edit: { kind: 'trimClip', clipId: clip.id, offset: to.offset, length: to.length }, moved: null };
+    switch (drag.mode) {
+      case 'move':
+        if (drag.moves) return this.#saveSelection(drag.moves);
+        if (unchanged()) return null;
+        return {
+          edit: { kind: 'moveClip', clipId: clip.id, trackId, start: to.start },
+          moved: { clips: [clip], by: to.start - clip.start },
+        };
+      case 'start':
+      case 'end':
+        if (unchanged()) return null;
+        return { edit: { kind: 'trimClip', clipId: clip.id, offset: to.offset, length: to.length }, moved: null };
+      case 'nudge':
+        if (drag.nudge === activeTake(clip)!.nudge) return null;
+        return {
+          edit: { kind: 'nudgeTake', clipId: clip.id, takeId: clip.activeTakeId!, nudge: drag.nudge },
+          moved: null,
+        };
+      case 'gain':
+        if (drag.gain === clip.gain) return null;
+        return { edit: { kind: 'setClipGain', clipId: clip.id, gain: drag.gain }, moved: null };
+      case 'fadeIn':
+      case 'fadeOut': {
+        const { fadeIn, fadeOut } = drag.fades;
+        if (fadeIn === clip.fadeIn && fadeOut === clip.fadeOut) return null;
+        return { edit: { kind: 'setClipFades', clipId: clip.id, fadeIn, fadeOut }, moved: null };
+      }
     }
+  }
+
+  /** The selected Clips moved together, unless let go where they were. */
+  #saveSelection(moves: ClipMove[]): DragSave | null {
+    const clips = this.#placed();
+    const from = moves.map((m) => clips.get(m.clipId)!);
+    if (moves.every((m, i) => m.trackId === from[i].trackId && m.start === from[i].clip.start)) return null;
     return {
-      edit: { kind: 'moveClip', clipId: clip.id, trackId, start: to.start },
-      moved: { clips: [clip], by: to.start - clip.start },
+      edit: { kind: 'moveClips', moves },
+      moved: { clips: from.map((f) => f.clip), by: moves[0].start - from[0].clip.start },
     };
   }
 
@@ -356,5 +483,20 @@ export class ClipDrag {
       .tracks()
       .find((t) => t.id === trackId)!
       .clips.filter((c) => c.id !== clip.id);
+  }
+}
+
+/** The Clip dragged, as shown: nudged, or with the Gain or Fades it's dragged to. */
+function shownClip(drag: Drag): Clip {
+  switch (drag.mode) {
+    case 'nudge':
+      return nudged(drag.clip, drag.nudge);
+    case 'gain':
+      return { ...drag.clip, gain: drag.gain };
+    case 'fadeIn':
+    case 'fadeOut':
+      return { ...drag.clip, ...drag.fades };
+    default:
+      return drag.clip;
   }
 }
