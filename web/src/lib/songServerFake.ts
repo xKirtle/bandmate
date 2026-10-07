@@ -5,7 +5,9 @@ import {
   ApiError,
   type Captured,
   type Clip,
+  type ClipMove,
   type NewClip,
+  type OwnOfClip,
   type Section,
   type Song,
   type SongAt,
@@ -175,8 +177,9 @@ export class FakeSongServer implements SongServer {
 
   /**
    * What a Timeline edit does, for the edits the fake models: the Loop's,
-   * adding a Track, and placing, moving and deleting Clips on the Tracks
-   * there are. Others throw "not modelled".
+   * adding, changing and deleting a Track, and placing, pasting, moving,
+   * splitting, setting the Gain of and deleting Clips of a Beat or a Sound
+   * on the Tracks there are. Others throw "not modelled".
    */
   #edited(edit: Edit): (tl: Timeline) => Timeline {
     const place = (tl: Timeline, trackId: number, clip: NewClip) =>
@@ -198,6 +201,13 @@ export class FakeSongServer implements SongServer {
           const track: Track = { id: this.#nextTrackId++, name, volume: 0, muted: false, soloed: false, clips: [] };
           return { ...tl, tracks: [...tl.tracks, track] };
         };
+      case 'updateTrack':
+        return (tl) => ({
+          ...tl,
+          tracks: tl.tracks.map((t) => (t.id === edit.trackId ? { ...t, ...edit.changes } : t)),
+        });
+      case 'deleteTrack':
+        return (tl) => ({ ...tl, tracks: tl.tracks.filter((t) => t.id !== edit.trackId) });
       case 'placeClip':
         return (tl) => place(tl, edit.trackId, edit.clip);
       case 'placeClips':
@@ -210,11 +220,46 @@ export class FakeSongServer implements SongServer {
         const replaced = edit.kind === 'replaceClips' ? edit.clipIds : [];
         return (tl) => placed.reduce((t, c) => place(t, c.trackId, c.clip), withoutClips(tl, replaced));
       }
+      case 'pasteClips': {
+        if (edit.newTracks.length > 0) throw notModelled(edit);
+        const pasted = edit.clips.map((c) => {
+          if (!('trackId' in c) || 'takes' in c.clip) throw notModelled(edit);
+          return { trackId: c.trackId, clip: c.clip as NewClip };
+        });
+        return (tl) => pasted.reduce((t, c) => place(t, c.trackId, c.clip), tl);
+      }
+      case 'splitClips':
+        // Each Clip keeps its id as its left half; its right half is a new
+        // Clip. Fades and Takes aren't modelled.
+        return (tl) => ({
+          ...tl,
+          tracks: tl.tracks.map((t) => ({
+            ...t,
+            clips: t.clips.flatMap((c) => {
+              if (!edit.clipIds.includes(c.id)) return [c];
+              const cut = edit.at - c.start;
+              const right = this.#clip({
+                ...sourceOf(c),
+                start: edit.at,
+                offset: c.offset + cut,
+                length: c.length - cut,
+              });
+              return [{ ...c, length: cut }, right];
+            }),
+          })),
+        });
       case 'moveClip':
-        return (tl) => {
-          const clip = tl.tracks.flatMap((t) => t.clips).find((c) => c.id === edit.clipId)!;
-          return withClips(withoutClips(tl, [clip.id]), edit.trackId, (cs) => [...cs, { ...clip, start: edit.start }]);
-        };
+        return (tl) => moved(tl, edit);
+      case 'moveClips':
+        return (tl) => edit.moves.reduce(moved, tl);
+      case 'setClipGain':
+        return (tl) => ({
+          ...tl,
+          tracks: tl.tracks.map((t) => ({
+            ...t,
+            clips: t.clips.map((c) => (c.id === edit.clipId ? { ...c, gain: edit.gain } : c)),
+          })),
+        });
       case 'deleteClip':
         return (tl) => withoutClips(tl, [edit.clipId]);
       case 'deleteClips':
@@ -414,6 +459,22 @@ export class FakeSongServer implements SongServer {
 }
 
 const notModelled = (change: Edit | LyricSheetChange) => new Error(`${change.kind} is not modelled`);
+
+/** What a Clip of a Beat or a Sound plays, and its own name and Gain, to place a Clip of the same. */
+function sourceOf(clip: Clip): OwnOfClip & ({ beatId: number } | { soundId: number }) {
+  const own = { name: clip.name ?? undefined, gain: clip.gain };
+  return clip.beatId !== null ? { ...own, beatId: clip.beatId } : { ...own, soundId: clip.soundId! };
+}
+
+/** A Timeline with a Clip moved to a Track and a start. */
+function moved(tl: Timeline, move: ClipMove): Timeline {
+  const clip = tl.tracks.flatMap((t) => t.clips).find((c) => c.id === move.clipId)!;
+  const without = {
+    ...tl,
+    tracks: tl.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => c.id !== clip.id) })),
+  };
+  return withClips(without, move.trackId, (cs) => [...cs, { ...clip, start: move.start }]);
+}
 
 /** A Song without a Section, wherever it was. */
 function withoutSection(song: Song, sectionId: number): Song {
