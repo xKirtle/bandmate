@@ -54,3 +54,13 @@
 .vp-doc .phone {
   max-width: 300px;
 }
+
+/* A screenshot opened full size sits above the nav bar. */
+.medium-zoom-overlay,
+.medium-zoom-image--opened {
+  z-index: 100;
+}
+
+.vp-doc img:not(.medium-zoom-image--opened) {
+  cursor: zoom-in;
+}

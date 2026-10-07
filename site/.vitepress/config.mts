@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitepress';
 
 const repo = 'https://github.com/xKirtle/bandmate';
@@ -44,6 +45,10 @@ export default defineConfig({
     footer: { message: 'Released under the GNU Affero General Public License v3.0.' },
   },
   // The pages show the README's screenshots from docs/screenshots, outside
-  // this folder, so retaking them updates both.
-  vite: { server: { fs: { allow: ['..'] } } },
+  // this folder, so retaking them updates both. They're reached through an
+  // alias, as the dev server drops the base from a plain ../ path out here.
+  vite: {
+    resolve: { alias: { '@screenshots': fileURLToPath(new URL('../../docs/screenshots', import.meta.url)) } },
+    server: { fs: { allow: ['..'] } },
+  },
 });

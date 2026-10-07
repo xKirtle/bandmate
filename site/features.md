@@ -6,7 +6,7 @@ Bandmate follows a song from the first idea to a rough recording. Here's what yo
 
 Write lyrics the way you would in a notebook, with the chords right where you play them.
 
-![A song in Write mode, numbered 1 to 9 to match the list below it](../docs/screenshots/write-mode-labelled.png)
+<img src="@screenshots/write-mode-labelled.png" alt="A song in Write mode, numbered 1 to 9 to match the list below it">
 
 1. **Status**: where the song is at: an idea, a draft, or finished.
 2. **Song details**: its key, tempo, capo and tuning, and notes of your own.
@@ -20,9 +20,9 @@ Write lyrics the way you would in a notebook, with the chords right where you pl
 
 Every song is in one list, with its status, key and tempo at a glance. And you can write on your phone too, in a layout made for it.
 
-![The Song list on desktop, with each Song's Status, key and BPM](../docs/screenshots/song-list.png)
+<img src="@screenshots/song-list.png" alt="The Song list on desktop, with each Song's Status, key and BPM">
 
-<img class="phone" src="../docs/screenshots/phone-lyric-sheet.png" alt="A Song's Lyric Sheet on a phone">
+<img class="phone" src="@screenshots/phone-lyric-sheet.png" alt="A Song's Lyric Sheet on a phone">
 
 ## Listen
 
@@ -49,9 +49,9 @@ Line your lyrics up with the music, so you always know where you are.
 - In Read mode, tap a line to play the song from there.
 - Moved the beat? Shift every timing at once.
 
-![Sync mode cueing a Section's Lines as the Timeline plays](../docs/screenshots/sync-mode.webp)
+<img src="@screenshots/sync-mode.webp" alt="Sync mode cueing a Section's Lines as the Timeline plays">
 
-![A Song in Read mode, with the Line playing highlighted](../docs/screenshots/read-mode.png)
+<img src="@screenshots/read-mode.png" alt="A Song in Read mode, with the Line playing highlighted">
 
 ## Record
 

@@ -34,7 +34,7 @@ features:
     link: /features#record
 ---
 
-![A Song in Write mode: its Details, the Lyric Sheet with Chords and Cues, the Scrapbook, and the Timeline with a Beat and a Take](../docs/screenshots/write-mode.png)
+<img src="@screenshots/write-mode.png" alt="A Song in Write mode: its Details, the Lyric Sheet with Chords and Cues, the Scrapbook, and the Timeline with a Beat and a Take">
 
 ## Why Bandmate
 
