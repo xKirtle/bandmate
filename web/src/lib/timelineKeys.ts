@@ -50,22 +50,22 @@ export type TimelineKeyContext = {
 export function timelineKey(e: KeyDown, at: TimelineKeyContext): TimelineKey | null {
   // A text field's, a menu's or a dialog's keys are their own.
   if (e.defaultPrevented || at.inTextField || at.inMenuOrDialog) return null;
+  // Nor while a Track is dragged, which Esc then cancels.
+  if (at.draggingTrack) return null;
   // Deleting, copying, cutting and pasting go with editing, so not on a
   // phone, nor while recording or merging.
   const edits = at.editable && at.freeze === null;
   const deletes = matches(e, shortcuts.deleteClip.keys);
   if (at.focusedClip && opensMenu(e)) {
-    // Even while recording or merging, with its edits off, and while a Track is dragged.
+    // Even while recording or merging, with its edits off.
     return at.editable ? 'clipMenu' : null;
   }
-  // A focused Clip's Delete, even while a Track is dragged: the whole
-  // Selection if it's in it, else that Clip alone.
+  // A focused Clip's Delete: the whole Selection if it's in it, else that
+  // Clip alone.
   if (at.focusedClip && deletes) {
     if (!edits) return null;
     return at.focusedClip.inSelection ? 'deleteSelection' : 'deleteClip';
   }
-  // Esc then cancels the drag.
-  if (at.draggingTrack) return null;
   if (matches(e, shortcuts.clearSelection.keys)) return at.selected > 0 ? 'clearSelection' : null;
   if (matches(e, shortcuts.selectAll.keys)) return at.editable ? 'selectAll' : null;
   if (matches(e, shortcuts.pasteClips.keys)) return edits ? 'paste' : null;

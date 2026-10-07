@@ -312,13 +312,10 @@ group('timelineKey', () => {
       expect(timelineKey(press('Delete'), { ...idle, inMenuOrDialog: true })).toBeNull();
     });
 
-    it('does nothing to the Selection while a Track is dragged', () => {
-      expect(timelineKey(press('Delete'), { ...idle, draggingTrack: true })).toBeNull();
-    });
-
-    it('still deletes from a focused Clip while a Track is dragged', () => {
-      expect(timelineKey(press('Delete'), { ...inside, draggingTrack: true })).toBe('deleteSelection');
-      expect(timelineKey(press('Delete'), { ...outside, draggingTrack: true })).toBe('deleteClip');
+    it('does nothing while a Track is dragged, from a focused Clip or not', () => {
+      for (const at of [idle, inside, outside]) {
+        expect(timelineKey(press('Delete'), { ...at, draggingTrack: true })).toBeNull();
+      }
     });
   });
 
@@ -430,8 +427,8 @@ group('timelineKey', () => {
       }
     });
 
-    it('still opens it while a Track is dragged', () => {
-      for (const k of menuKeys) expect(timelineKey(k, { ...outside, draggingTrack: true })).toBe('clipMenu');
+    it('does nothing while a Track is dragged', () => {
+      for (const k of menuKeys) expect(timelineKey(k, { ...outside, draggingTrack: true })).toBeNull();
     });
   });
 
