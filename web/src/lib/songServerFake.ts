@@ -5,12 +5,14 @@ import {
   ApiError,
   type Captured,
   type Clip,
+  type ClipMerge,
   type ClipMove,
   type NewClip,
   type OwnOfClip,
   type Section,
   type Song,
   type SongAt,
+  type SoundImport,
   type Take,
   type TakePlacement,
   type Timeline,
@@ -60,10 +62,11 @@ export function emptySong(fields: Partial<Song> = {}): Song {
  * network), change the Song elsewhere, and hold an answer until released.
  *
  * Saves makes its own writes through `apply` and `setTags`, `apply` taking
- * Cue changes, Timeline edits and Lyric Sheet changes. Writes a
- * caller brings, as the Song page's panels make through the api, are made
- * here with `update` and `remove`, a Take's upload with `recordTake` and
- * `retake`, or for the Timeline, e.g. a Merge, with `apply`.
+ * Cue changes, Timeline edits and Lyric Sheet changes, and hands it to a
+ * rarer edit's work to import a Sound with `importSound` or merge Clips
+ * with `mergeClips`. Writes a caller brings, as the Song page's panels make
+ * through the api, are made here with `update` and `remove`, or a Take's
+ * upload with `recordTake` and `retake`.
  */
 export class FakeSongServer implements SongServer {
   song: Song;
@@ -83,6 +86,7 @@ export class FakeSongServer implements SongServer {
   #nextClipId = 1;
   #nextTrackId = 1;
   #nextTakeId = 1;
+  #nextSoundId = 1;
 
   /** Holds the Song given, and a Timeline of the Tracks given, by default none. */
   constructor(song: Song = emptySong(), tracks: Track[] = []) {
@@ -105,6 +109,8 @@ export class FakeSongServer implements SongServer {
     this.#nextTrackId = Math.max(0, ...tracks.map((t) => t.id)) + 1;
     const takeIds = tracks.flatMap((t) => t.clips.flatMap((c) => c.takes.map((k) => k.id)));
     this.#nextTakeId = Math.max(0, ...takeIds) + 1;
+    const soundIds = tracks.flatMap((t) => t.clips.flatMap((c) => (c.soundId === null ? [] : [c.soundId])));
+    this.#nextSoundId = Math.max(0, ...soundIds) + 1;
   }
 
   /** Fails the next writes, n of them, before they're made, by default on the network. */
@@ -400,6 +406,65 @@ export class FakeSongServer implements SongServer {
     });
   }
 
+  /**
+   * Imports an audio file as a Sound, as the api's importSound does: the
+   * whole of it, as long as its details say, in a new Clip after the
+   * Track's last Clip, or at 0:00.
+   */
+  importSound(at: SongAt, file: File, { trackId, name, duration }: SoundImport): Promise<Timeline> {
+    if (!this.timeline.tracks.some((t) => t.id === trackId)) return Promise.reject(noSuchTrack());
+    return this.#write(at, () => {
+      const soundId = this.#sound(name, file.name, file.size, duration);
+      const track = this.timeline.tracks.find((t) => t.id === trackId)!;
+      const start = Math.max(0, ...track.clips.map((c) => c.start + c.length));
+      this.timeline = withClip(this.timeline, trackId, this.#clip({ soundId, start, offset: 0, length: duration }));
+      return structuredClone(this.timeline);
+    });
+  }
+
+  /**
+   * Merges Clips, as the api's mergeClips does: they're replaced with one
+   * Clip of a new Sound, "Merged Clip", from the earliest one's start to
+   * the latest one's end, on the Track the Merge names, or on a new Track
+   * added where it says. The audio isn't read: it's taken to last that long.
+   */
+  mergeClips(at: SongAt, wav: Blob, merge: ClipMerge): Promise<Timeline> {
+    const clips = this.timeline.tracks.flatMap((t) => t.clips).filter((c) => merge.clipIds.includes(c.id));
+    if (merge.clipIds.length < 2 || clips.length !== merge.clipIds.length) {
+      return Promise.reject(new ApiError(400, 'merge two or more Clips on the Timeline'));
+    }
+    if ('trackId' in merge && !this.timeline.tracks.some((t) => t.id === merge.trackId)) {
+      return Promise.reject(noSuchTrack());
+    }
+    const start = Math.min(...clips.map((c) => c.start));
+    const end = Math.max(...clips.map((c) => c.start + c.length));
+    return this.#write(at, () => {
+      let tracks = this.timeline.tracks.map((t) => ({
+        ...t,
+        clips: t.clips.filter((c) => !merge.clipIds.includes(c.id)),
+      }));
+      let trackId: number;
+      if ('trackId' in merge) trackId = merge.trackId;
+      else {
+        const { name, position } = merge.newTrack;
+        trackId = this.#nextTrackId++;
+        const added: Track = { id: trackId, name, volume: 0, muted: false, soloed: false, clips: [] };
+        tracks = [...tracks.slice(0, position), added, ...tracks.slice(position)];
+      }
+      const soundId = this.#sound('Merged Clip', 'Merged Clip.wav', wav.size, end - start);
+      const clip = this.#clip({ soundId, start, offset: 0, length: end - start });
+      this.timeline = withClip({ ...this.timeline, tracks }, trackId, clip);
+      return structuredClone(this.timeline);
+    });
+  }
+
+  /** Adds a Sound to the Timeline's, giving its id. */
+  #sound(name: string, fileName: string, size: number, duration: number): number {
+    const id = this.#nextSoundId++;
+    this.timeline = { ...this.timeline, sounds: [...this.timeline.sounds, { id, name, fileName, size, duration }] };
+    return id;
+  }
+
   /** A Take uploaded, lasting as long as its peaks say, at a position in its Clip's span. */
   #take({ latencyOffset, peaks }: Captured, position: number): Take {
     const id = this.#nextTakeId++;
@@ -458,6 +523,8 @@ export class FakeSongServer implements SongServer {
   }
 }
 
+const noSuchTrack = () => new ApiError(400, "there's no such Track on this Timeline");
+
 const notModelled = (change: Edit | LyricSheetChange) => new Error(`${change.kind} is not modelled`);
 
 /** What a Clip of a Beat or a Sound plays, and its own name and Gain, to place a Clip of the same. */
@@ -484,6 +551,11 @@ function withoutSection(song: Song, sectionId: number): Song {
     scrapbook: song.scrapbook.filter((id) => id !== sectionId),
     sections: song.sections.filter((s) => s.id !== sectionId),
   };
+}
+
+/** A Timeline with a Clip placed on a Track. */
+function withClip(tl: Timeline, trackId: number, clip: Clip): Timeline {
+  return withClips(tl, trackId, (cs) => [...cs, clip]);
 }
 
 /** A Timeline with one Track's Clips changed, kept in the order they start. */
