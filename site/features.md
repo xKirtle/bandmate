@@ -111,6 +111,10 @@ Sing over your beat, right in the browser, in full quality.
 
 The take menu is the **⋯** on a take. Recording settings is in the timeline's **⋯** menu.
 
+::: info
+Recording only works when you open Bandmate on `localhost` or over HTTPS: browsers don't allow the microphone anywhere else. See [Security](/self-hosting#security) for putting Bandmate behind HTTPS.
+:::
+
 ## Keyboard shortcuts
 
 On a song's page, press **?**, or the keyboard button by Write and Read, to see every shortcut. The ones you'll use most:
