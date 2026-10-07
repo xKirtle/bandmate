@@ -105,7 +105,7 @@ go test ./...                  # API tests: real handler, fresh SQLite per test
 
 The tests go through the HTTP API only. `internal/app/helpers_test.go` starts the real handler in-process against a fresh SQLite database in a temporary directory, sends requests, and checks the responses. New tests should use it too. The exceptions are checking that audio files are removed from the data directory, or that updating yt-dlp leaves no copy of it there, which the API can't show, putting a Backup's file made elsewhere or by an older Bandmate in place of one made through the API, and `internal/build`'s rule for the version and source link, since a build's stamps are fixed when it's built.
 
-Vitest covers plain TypeScript modules in `web/src/lib` that don't touch the DOM or Web Audio, e.g. reducing decoded audio to waveform peaks. Their tests sit next to them as `*.test.ts`. Components and audio playback are tested by hand.
+Vitest covers plain TypeScript modules in `web/src/lib` that don't touch the DOM or Web Audio, e.g. reducing decoded audio to waveform peaks. Their tests sit next to them as `*.test.ts`. A module whose runes run effects, e.g. `songListQuery.svelte.ts`, is tested in a `*.svelte.test.ts`: those run with Svelte's browser build, as its server build runs no effects. Components and audio playback are tested by hand.
 
 ### End-to-end tests
 
