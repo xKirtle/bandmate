@@ -57,7 +57,7 @@
   // the Song's loaded.
   let saves = $state<Saves | null>(null);
   // Every change to the Lyric Sheet goes through Lyric Sheet editing, on top
-  // of Saves.
+  // of Saves, which ends Sync mode as the lyrics change.
   let editing = $state<LyricSheetEditing | null>(null);
   // The Song as last saved. What's shown has the Cue changes not saved yet
   // made on top of it.
@@ -151,7 +151,7 @@
     Promise.all([server.getSong(), server.getTimeline()]).then(
       ([s, tl]) => {
         saves = new Saves({ server, song: s, timeline: tl, editsOutside, onReplace });
-        editing = new LyricSheetEditing(saves);
+        editing = new LyricSheetEditing(saves, () => (syncing = false));
         draft = toDraft(s);
         tags = s.tags;
         mode = openingMode(s.status);
@@ -536,7 +536,6 @@
         <LyricSheet
           song={shown!}
           {mode}
-          change={saves.change}
           {drag}
           changeCues={saves.cue}
           {editing}
@@ -568,7 +567,7 @@
               <Masters {song} {mode} change={saves.change} onUnsaved={setUnsaved} {setStatus} {recording} />
             {:else}
               <summary><FoldChevron />Scrapbook</summary>
-              <Scrapbook {song} change={saves.change} {drag} {editing} onEditing={() => (syncing = false)} />
+              <Scrapbook {song} {drag} {editing} />
             {/if}
           </details>
         {/each}

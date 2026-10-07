@@ -6,6 +6,7 @@ import {
   type Captured,
   type Clip,
   type NewClip,
+  type Section,
   type Song,
   type SongAt,
   type Take,
@@ -18,6 +19,7 @@ import { linesByRow } from './cues';
 import type { Edit } from './history';
 import { isLyricSheetChange, type LyricSheetChange } from './lyricSheetChanges';
 import { peaksPerSecond } from './peaks';
+import { isEmpty } from './sections';
 import { isCueChange, type SongServer } from './songServer';
 
 /** A failure as the network gives it. */
@@ -72,7 +74,9 @@ export class FakeSongServer implements SongServer {
   #losing = 0;
   #holding: Promise<void> | null = null;
 
-  /** The ids the next Line, Clip, Track and Take made get. */
+  /** The ids the next Section, Alternate, Line, Clip, Track and Take made get. */
+  #nextSectionId = 1;
+  #nextAlternateId = 1;
   #nextLineId = 1;
   #nextClipId = 1;
   #nextTrackId = 1;
@@ -90,6 +94,8 @@ export class FakeSongServer implements SongServer {
       sounds: [],
       loop: null,
     };
+    this.#nextSectionId = Math.max(0, ...song.sections.map((s) => s.id)) + 1;
+    this.#nextAlternateId = Math.max(0, ...song.sections.flatMap((s) => s.alternates.map((a) => a.id))) + 1;
     const lineIds = song.sections.flatMap((s) => s.alternates.flatMap((a) => a.lines.map((l) => l.id)));
     this.#nextLineId = Math.max(0, ...lineIds) + 1;
     const ids = tracks.flatMap((t) => t.clips.map((c) => c.id));
@@ -144,8 +150,14 @@ export class FakeSongServer implements SongServer {
       });
     }
     if (isLyricSheetChange(change)) {
+      let after: (song: Song) => Song;
+      try {
+        after = this.#changed(change);
+      } catch (e) {
+        return Promise.reject(e);
+      }
       return this.#write(at, () => {
-        this.song = this.#changed(this.song, change);
+        this.song = after(this.song);
         return structuredClone(this.song);
       });
     }
@@ -214,12 +226,64 @@ export class FakeSongServer implements SongServer {
   }
 
   /**
-   * What a Lyric Sheet change does: replacing an Alternate's text makes a
-   * Line of each row, keeping the Line, and its Cue, of each row matched to
-   * one as the text box matches them. Its Chords aren't read.
+   * What a Lyric Sheet change does, for the changes the fake models: adding
+   * a Section to the Arrangement, taking one out of it, deleting one in the
+   * Scrapbook, adding one to another, and replacing an Alternate's text.
+   * Others throw "not modelled".
    */
-  #changed(song: Song, change: LyricSheetChange): Song {
-    const { alternateId, text } = change;
+  #changed(change: LyricSheetChange): (song: Song) => Song {
+    switch (change.kind) {
+      case 'addSection':
+        return (song) => {
+          const section: Section = {
+            id: this.#nextSectionId++,
+            label: '',
+            alternates: [{ id: this.#nextAlternateId++, name: '', active: true, lines: [] }],
+          };
+          const arrangement = [...song.arrangement];
+          arrangement.splice(change.position ?? arrangement.length, 0, section.id);
+          return { ...song, arrangement, sections: [...song.sections, section] };
+        };
+      case 'removeFromArrangement':
+        // It goes to the end of the Scrapbook, or is deleted if nothing is written in it.
+        return (song) => {
+          const arrangement = song.arrangement.filter((id) => id !== change.sectionId);
+          const section = song.sections.find((s) => s.id === change.sectionId)!;
+          if (isEmpty(section)) return withoutSection({ ...song, arrangement }, section.id);
+          return { ...song, arrangement, scrapbook: [...song.scrapbook, section.id] };
+        };
+      case 'deleteSection':
+        return (song) => withoutSection(song, change.sectionId);
+      case 'addToSection':
+        // Each of its Alternates is made anew, inactive, after the Section's
+        // own, an unnamed one taking its Label as its name; their Lines keep
+        // their ids and Cues.
+        return (song) => {
+          const added = song.sections.find((s) => s.id === change.sectionId)!;
+          const joining = added.alternates.map((a) => ({
+            ...a,
+            id: this.#nextAlternateId++,
+            name: a.name || added.label,
+            active: false,
+          }));
+          const sections = song.sections.map((s) =>
+            s.id === change.targetId ? { ...s, alternates: [...s.alternates, ...joining] } : s,
+          );
+          return withoutSection({ ...song, sections }, added.id);
+        };
+      case 'replaceAlternateText':
+        return (song) => this.#withText(song, change.alternateId, change.text);
+      default:
+        throw notModelled(change);
+    }
+  }
+
+  /**
+   * An Alternate's text replaced: a Line of each row, keeping the Line, and
+   * its Cue, of each row matched to one as the text box matches them. Its
+   * Chords aren't read.
+   */
+  #withText(song: Song, alternateId: number, text: string): Song {
     const sections = song.sections.map((s) => ({
       ...s,
       alternates: s.alternates.map((a) => {
@@ -349,7 +413,17 @@ export class FakeSongServer implements SongServer {
   }
 }
 
-const notModelled = (edit: Edit) => new Error(`${edit.kind} is not modelled`);
+const notModelled = (change: Edit | LyricSheetChange) => new Error(`${change.kind} is not modelled`);
+
+/** A Song without a Section, wherever it was. */
+function withoutSection(song: Song, sectionId: number): Song {
+  return {
+    ...song,
+    arrangement: song.arrangement.filter((id) => id !== sectionId),
+    scrapbook: song.scrapbook.filter((id) => id !== sectionId),
+    sections: song.sections.filter((s) => s.id !== sectionId),
+  };
+}
 
 /** A Timeline with one Track's Clips changed, kept in the order they start. */
 function withClips(tl: Timeline, trackId: number, change: (clips: Clip[]) => Clip[]): Timeline {

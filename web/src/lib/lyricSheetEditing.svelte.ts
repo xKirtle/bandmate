@@ -1,7 +1,18 @@
 // Lyric Sheet editing: the changes the Lyric Sheet, its Section editors and
 // the Scrapbook make, made once per Song by the Song page on top of Saves
 // and handed to them. Each change is named by its kind (see
-// lyricSheetChanges.ts) and sent through Saves.
+// lyricSheetChanges.ts) and sent through Saves, in the order asked for.
+//
+// It keeps the Lyric Sheet's editing rules:
+// - Sync mode is only for cueing, so changing the lyrics ends it, playback
+//   carrying on (see the GLOSSARY): every change but deleting a Section in
+//   the Scrapbook, which isn't in the Lyric Sheet, and saving Lines text,
+//   which may still be on its way as Sync mode comes on. Opening a Section
+//   in the Scrapbook, or a Section's Alternates, ends it too. Cue changes
+//   don't go through here, so never end it.
+// - Adding a Section to another makes its Alternates anew, so the Lines
+//   text still waiting in their text boxes is sent first, while it can
+//   still land on them.
 //
 // It saves an Alternate's text as typed into its text box (see TextBox),
 // and holds the Lyric Sheet's edits not saved yet: Lines text, and a
@@ -9,6 +20,7 @@
 // through what the Song page gives it.
 import { SvelteMap } from 'svelte/reactivity';
 import type { Song } from './api';
+import type { LyricSheetChange } from './lyricSheetChanges';
 import type { Saves } from './saves.svelte';
 
 /** How long typing has to pause before an Alternate's text is saved, in milliseconds. */
@@ -16,13 +28,40 @@ export const saveDelay = 800;
 
 export class LyricSheetEditing {
   #saves: Saves;
+  #endSyncMode: () => void;
   /** The editors holding edits not saved yet, each with the Section it edits. */
   #unsaved = new SvelteMap<object, number>();
   /** How many edits have been typed into each Section's editor. */
   #typed = new SvelteMap<number, number>();
 
-  constructor(saves: Saves) {
+  /** Lyric Sheet editing through Saves, ending Sync mode with endSyncMode. */
+  constructor(saves: Saves, endSyncMode: () => void) {
     this.#saves = saves;
+    this.#endSyncMode = endSyncMode;
+  }
+
+  /**
+   * Queues a change to the Lyric Sheet, ending Sync mode for it, and
+   * sending first the Lines text waiting in Alternates it makes anew.
+   * Resolves to whether it was saved; a caller's code up to its next await
+   * runs before the next change starts.
+   */
+  change = (change: LyricSheetChange): Promise<boolean> => {
+    if (endsSyncMode(change)) this.#endSyncMode();
+    for (const [editor, sectionId] of this.#unsaved) {
+      if (editor instanceof TextBox && remakes(change, sectionId)) editor.saveNow();
+    }
+    return this.#saves.changeLyricSheet(change);
+  };
+
+  /** Hears a Section in the Scrapbook being opened in its editor. */
+  scrapbookSectionOpened() {
+    this.#endSyncMode();
+  }
+
+  /** Hears a Section's Alternates being opened, to choose, make or rename them. */
+  alternatesOpened() {
+    this.#endSyncMode();
   }
 
   /** Whether the Lyric Sheet holds edits not saved yet. */
@@ -54,7 +93,7 @@ export class LyricSheetEditing {
   textBox(alternateId: number, sectionId: number): TextBox {
     return new TextBox(
       () => this.#saves.song,
-      (text) => this.#saves.changeLyricSheet({ kind: 'replaceAlternateText', alternateId, text }),
+      (text) => this.change({ kind: 'replaceAlternateText', alternateId, text }),
       (editor, unsaved) => this.#report(editor, sectionId, unsaved),
       alternateId,
     );
@@ -66,6 +105,24 @@ export class LyricSheetEditing {
       this.#typed.set(sectionId, this.typedIn(sectionId) + 1);
     } else this.#unsaved.delete(editor);
   }
+}
+
+/**
+ * Whether a change ends Sync mode: every change to the lyrics, but deleting
+ * a Section in the Scrapbook and saving Lines text.
+ */
+function endsSyncMode(change: LyricSheetChange): boolean {
+  return change.kind !== 'deleteSection' && change.kind !== 'replaceAlternateText';
+}
+
+/**
+ * Whether a change makes a Section's Alternates anew, so text sent to them
+ * after it would be lost: adding the Section to another. (Moving an
+ * Alternate out makes it anew too, but only an inactive one, which has no
+ * text box.)
+ */
+function remakes(change: LyricSheetChange, sectionId: number): boolean {
+  return change.kind === 'addToSection' && change.sectionId === sectionId;
 }
 
 /**
@@ -145,8 +202,13 @@ export class TextBox {
    */
   close = () => {
     this.#closed = true;
-    if (this.#timer !== undefined || this.#failed) void this.#save();
+    this.saveNow();
   };
+
+  /** Saves at once what's waiting or failed last time, e.g. before its Alternate is made anew. */
+  saveNow() {
+    if (this.#timer !== undefined || this.#failed) void this.#save();
+  }
 
   /** Keeps the box's own text from now on, starting from the server's. */
   #hold() {
