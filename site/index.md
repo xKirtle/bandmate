@@ -13,7 +13,7 @@ hero:
       text: Get started
       link: /self-hosting
     - theme: alt
-      text: Take the tour
+      text: See the features
       link: /features
     - theme: alt
       text: View on GitHub

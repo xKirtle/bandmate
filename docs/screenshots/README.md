@@ -4,7 +4,6 @@ The screenshots in the README and on the docs site, `site/`, taken in the dark t
 
 | File                    | Shows                                                          |
 | ----------------------- | -------------------------------------------------------------- |
-| `song-list.png`         | The Song list on desktop                                       |
 | `write-mode.png`        | The hero Song in Write mode on desktop, with the Timeline open |
 | `write-mode-labelled.png` | The hero Song in Write mode with the Chorus's Alternates open, numbered for the feature tour's key: Status, Details, Write and Read, a Section's Label, Chords, a Chord Line, an Alternate, a Cue and the Scrapbook |
 | `timeline-labelled.png` | The hero Song's Timeline with a Loop from 0:20 to 0:40 on, the playhead in it and the Take's Clip selected, numbered: Play, Loop, the Loop's stretch, Record, Not calibrated, Undo, the Timeline's menu, Add a Track, the Chosen Track, the Beat's Clip and the Take's Clip |

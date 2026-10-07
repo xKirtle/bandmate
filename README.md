@@ -22,20 +22,7 @@ It's built for one songwriter, and runs on your own machine or homelab. There ar
 - **Sync** your lyrics to the music: tap along to mark when each line starts, and they light up and scroll as the song plays.
 - **Record** takes over your beat in the browser, in full quality, and keep every one until you pick one.
 
-![Sync mode cueing a Section's Lines as the Timeline plays](docs/screenshots/sync-mode.webp)
-
-<details>
-<summary>More screenshots</summary>
-
-![The Song list on desktop, with each Song's Status, key and BPM](docs/screenshots/song-list.png)
-
-![A Song in Read mode, with the Line playing highlighted](docs/screenshots/read-mode.png)
-
-<img src="docs/screenshots/phone-lyric-sheet.png" alt="A Song in Read mode on a phone" width="300">
-
-</details>
-
-Every feature is in the [tour](https://xkirtle.github.io/bandmate/features).
+If you'd like to see more, check out the [wiki](https://xkirtle.github.io/bandmate/features).
 
 ## Quickstart
 
@@ -73,7 +60,7 @@ Configuration, updating and the rest are in the [self-hosting guide](https://xki
 
 ## Learn more
 
-- [Documentation](https://xkirtle.github.io/bandmate/): the feature tour and the self-hosting guide
+- [Wiki](https://xkirtle.github.io/bandmate/): every feature, and how to self-host Bandmate
 - [Glossary](GLOSSARY.md): the words Bandmate uses, in the code and the UI alike
 - [Roadmap](docs/roadmap.md) and [release notes](https://github.com/xKirtle/bandmate/releases): what might come next, and what each version shipped
 - [Contributing](CONTRIBUTING.md): reporting bugs, sharing ideas, and building Bandmate

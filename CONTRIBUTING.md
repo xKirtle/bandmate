@@ -81,7 +81,7 @@ BANDMATE_IMAGE=bandmate:dev docker compose up
 
 ### Docs site
 
-The [docs site](https://xkirtle.github.io/bandmate/) holds the feature tour and the self-hosting guide, which the README links to rather than repeating. It's built with VitePress from the Markdown in [`site/`](site/):
+The [docs site](https://xkirtle.github.io/bandmate/) holds the features and the self-hosting guide, which the README links to rather than repeating. It's built with VitePress from the Markdown in [`site/`](site/):
 
 ```sh
 cd site

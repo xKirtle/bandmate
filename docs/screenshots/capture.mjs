@@ -72,16 +72,6 @@ async function play(page) {
   await page.getByRole("button", { name: "Play", exact: true }).click();
 }
 
-// The Song list.
-{
-  const page = await open(base);
-  const table = await page.locator("table").boundingBox();
-  await save(page, "song-list", {
-    clip: { x: 0, y: 0, width: 1440, height: table.y + table.height + 32 },
-  });
-  await page.context().close();
-}
-
 // The hero Song in Write mode, with the Timeline open.
 {
   const page = await open(heroURL);
