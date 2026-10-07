@@ -24,7 +24,6 @@
     type Beat,
     type Clip,
     type ClipFades,
-    type ClipMove,
     type Song,
     type Timeline,
     type TimelineLoop,
@@ -35,23 +34,18 @@
   import BeatPicker from './BeatPicker.svelte';
   import { inputProblem } from './capture';
   import { addedTrack, chosenTrack, readChosen, storeChosen, type ChoiceEvent } from './chosenTrack';
-  import { clampMove, clampTrimEnd, clampTrimStart, draggedNudge, moveSelection, nudged } from './clipEdit';
+  import { ClipDrag, type ClipGrip, type DragAt } from './clipDrag.svelte';
   import {
-    editTargets,
     guideLanes,
     loopMark,
     loopTargets,
     reachAt,
-    snapEdge,
     snapLoop,
-    snapMove,
-    snapSelection,
     type Aligned,
     type LoopDrag,
-    type SelectionSnap,
     type Snap,
   } from './snapping';
-  import { activeTake, clipSources, clipTitle, fileStart, playing } from './clipSource';
+  import { clipSources, clipTitle, fileStart, playing } from './clipSource';
   import { formatCue, movedCues, type TimeSpan } from './cues';
   import type { Saves } from './saves.svelte';
   import { editHint, editsWhileRecording, type Freeze } from './freeze';
@@ -549,7 +543,7 @@
         return;
       }
       // Not while something's dragged, which would jump with the page.
-      if (following && !dragging && !edit && !loopEdit) reveal(position);
+      if (following && !dragging && !edit && !clipDrag.clip && !loopEdit) reveal(position);
       frame = requestAnimationFrame(step);
     });
     return () => cancelAnimationFrame(frame);
@@ -1335,31 +1329,41 @@
     return clips.find((c) => c.id === id) ?? null;
   }
 
-  // Editing a Clip: dragging its body moves it, along its Track or onto
-  // another; dragging an edge trims it. It stops at its neighbours, the
-  // source's ends and 0:00 as it goes, and is saved on release. Until the
-  // saved Timeline comes back, the Clip is shown where it was dropped.
-  // Moved or trimmed, it snaps to other Clips' edges, the playhead and the
-  // Loop's edges, unless Shift is held; the Selection, moved together,
-  // snaps by any of its Clips' edges to those of Clips outside it.
+  // Dragging a Clip's body, an edge, or Alt+dragging a Clip of Takes, goes
+  // through ClipDrag (see clipDrag.svelte.ts), which moves it, or the
+  // Selection, trims it or nudges its active Take, in seconds and Tracks.
+  // The Timeline measures the page for it, listens to the pointer, scrolls
+  // along at the edges, saves what it says to on release and tells it when
+  // that's saved, and offers to move the Cues after a move.
+  const clipDrag = new ClipDrag(selection, {
+    tracks: () => timeline.tracks,
+    playhead: () => position,
+    loop: () => loop,
+    reach: () => reachAt(view.scale),
+    sourceLength: (clip) => sources.of(clip).duration,
+  });
+
+  /** Where a point is, for ClipDrag: the time under it across the lanes and the Track whose lane is nearest. */
+  function clipDragAt(at: Point): DragAt {
+    return {
+      point: { clientX: at.clientX, clientY: at.clientY },
+      time: spanTimeAt(at.clientX),
+      trackId: trackAt(at.clientY),
+    };
+  }
+
+  // Editing a Clip by its gain line, or a fade dot: dragging it sets the
+  // Clip's Gain, or its fade in or fade out, saved on release. Until the
+  // saved Timeline comes back, the Clip is shown as it was dropped.
   interface Edit {
     clip: Clip;
-    /**
-     * Moving the Clip, trimming either edge, Alt+dragged, sliding its active
-     * Take within it, by its gain line, setting its Gain, or by a dot at the
-     * gain line's ends, setting its fade in or fade out.
-     */
-    mode: 'move' | 'start' | 'end' | 'nudge' | 'gain' | 'fadeIn' | 'fadeOut';
+    /** By its gain line, setting its Gain, or by a dot at the gain line's ends, setting its fade in or fade out. */
+    mode: 'gain' | FadeEnd;
     /** Where the pointer went down, to tell a click or a long press from a drag. */
     from: Point;
-    /** How far into the Clip it was grabbed, in seconds. */
-    grab: number;
     moved: boolean;
-    /** Where the Clip is shown now. */
+    /** The Track the Clip is on. */
     trackId: number;
-    placement: Placed;
-    /** Where its active Take is nudged to, for a nudge. */
-    nudge: number;
     /** Its Gain as dragged, in dB, for the gain line. */
     gain: number;
     /**
@@ -1376,14 +1380,8 @@
      * Fade, in seconds.
      */
     fadeGrab: { by: number; rests: number };
-    /** Whether Shift is held, to move or trim without snapping, or drag the gain line finely. */
+    /** Whether Shift is held, to drag the gain line finely. */
     free: boolean;
-    /** Whether Mod was held as it was pressed, so a click adds it to the Selection or takes it out. */
-    toggles: boolean;
-    /** What a move or trim is snapped to, with the lanes of what's there, while it is; for the Selection, by which Clip. */
-    snap: Snap<Aligned> | SelectionSnap<Aligned> | null;
-    /** Where every selected Clip is shown, when the Selection is moved together; null for one Clip. */
-    moves: ClipMove[] | null;
     saving: boolean;
   }
   let edit = $state<Edit | null>(null);
@@ -1400,28 +1398,20 @@
     // Until it's dragged, the Clip pressed stays where it is among the
     // others: moved in the page, it would never get its click, or double-click.
     const dragged = edit?.moved ? edit : null;
-    const moves = dragged?.moves;
-    const clips = placedClips();
-    const moving = new Set(moves ? moves.map((m) => m.clipId) : dragged ? [dragged.clip.id] : []);
+    const moving = clipDrag.shown;
+    const away = new Set([...moving.map((m) => m.clip.id), ...(dragged ? [dragged.clip.id] : [])]);
+    const pressed = edit?.clip.id ?? clipDrag.clip?.id;
     return timeline.tracks.map((track) => {
       const placed = track.clips
-        .filter((c) => !moving.has(c.id))
-        .map((clip) => ({ clip, at: clip as Placed, editing: clip.id === edit?.clip.id }));
-      if (moves) {
-        for (const m of moves) {
-          const clip = clips.get(m.clipId)?.clip;
-          if (clip && m.trackId === track.id) placed.push({ clip, at: { ...clip, start: m.start }, editing: true });
-        }
-      } else if (dragged?.trackId === track.id) {
+        .filter((c) => !away.has(c.id))
+        .map((clip) => ({ clip, at: clip as Placed, editing: clip.id === pressed }));
+      for (const m of moving) {
+        if (m.trackId === track.id) placed.push({ clip: m.clip, at: m.at, editing: true });
+      }
+      if (dragged?.trackId === track.id) {
         const clip =
-          dragged.mode === 'nudge'
-            ? nudged(dragged.clip, dragged.nudge)
-            : dragged.mode === 'gain'
-              ? { ...dragged.clip, gain: dragged.gain }
-              : isFadeMode(dragged.mode)
-                ? { ...dragged.clip, ...dragged.fades }
-                : dragged.clip;
-        placed.push({ clip, at: dragged.placement, editing: true });
+          dragged.mode === 'gain' ? { ...dragged.clip, gain: dragged.gain } : { ...dragged.clip, ...dragged.fades };
+        placed.push({ clip, at: dragged.clip, editing: true });
       }
       return { track, clips: placed };
     });
@@ -1435,9 +1425,10 @@
    * for the playhead, which already is a line.
    */
   const guide = $derived.by(() => {
-    const snapped = edit?.snap ?? loopEdit?.snap;
+    const clipSnap = clipDrag.snap;
+    const snapped = clipSnap ?? loopEdit?.snap;
     if (!snapped) return null;
-    const dragged = edit?.snap ? timeline.tracks.findIndex((t) => t.id === snappedTrack(edit!)) : 'ruler';
+    const dragged = clipSnap ? timeline.tracks.findIndex((t) => t.id === clipSnap.trackId) : 'ruler';
     const lanes = guideLanes(dragged, snapped.aligned);
     if (!lanes) return null;
     const top = lanes.from === 'ruler' ? rulerElement : laneElements[lanes.from];
@@ -1446,24 +1437,8 @@
     return { at: snapped.at, top: top.offsetTop, height: bottom.offsetTop + bottom.offsetHeight - top.offsetTop };
   });
 
-  /** The Track the Clip whose edge snapped is shown on: one of the Selection's, when it's moved together. */
-  function snappedTrack({ snap, moves, trackId }: Edit): number {
-    const clipId = snap && 'clipId' in snap ? snap.clipId : null;
-    return moves?.find((m) => m.clipId === clipId)?.trackId ?? trackId;
-  }
-
-  /** What Clips moved or trimmed snap to: the other Clips' edges, the playhead and the Loop's edges. */
-  function snapTargets(dragged: ReadonlySet<number>) {
-    return editTargets(timeline.tracks, dragged, position, loop);
-  }
-
   function trackOf(clip: Clip) {
     return timeline.tracks.find((t) => t.clips.some((c) => c.id === clip.id))!;
-  }
-
-  /** The other Clips on a Track, which the one being edited can't overlap. */
-  function othersOn(trackId: number, clip: Clip): Clip[] {
-    return timeline.tracks.find((t) => t.id === trackId)!.clips.filter((c) => c.id !== clip.id);
   }
 
   /** The Track whose lane is nearest to a height on the page. */
@@ -1557,13 +1532,14 @@
     storeHeight(deviceStorage(), null);
   }
 
-  function editDown(event: PointerEvent, clip: Clip, mode: Edit['mode']) {
+  function editDown(event: PointerEvent, clip: Clip, mode: ClipGrip | Edit['mode']) {
     // Not even choosing its Track while recording.
     if (frozen) return;
     // Mod+clicking it to gather a Selection leaves the Chosen Track be.
     const toggles = togglesSelection(event);
     if (event.isPrimary && event.button === 0 && !toggles) choose({ kind: 'choose', trackId: trackOf(clip).id });
-    if (!editable.current || !event.isPrimary || event.button !== 0 || edit || inClipMenu(event.target)) return;
+    const pressed = edit || clipDrag.clip;
+    if (!editable.current || !event.isPrimary || event.button !== 0 || pressed || inClipMenu(event.target)) return;
     event.stopPropagation();
     // Clicking a Clip still focuses it, for its keys and its menu.
     const element = (event.currentTarget as HTMLElement).closest<HTMLElement>('.clip')!;
@@ -1574,32 +1550,29 @@
       const finger = { clientX: event.clientX, clientY: event.clientY };
       pressTimer = setTimeout(() => openClipMenu(clip, element, finger), longPressDelay);
     }
-    // Alt+dragging a Clip of Takes slides its active Take, the Clip staying put.
-    const take = activeTake(clip);
-    // Grabbing its gain line, or a fade dot, selects it, as clicking it does.
-    if (mode === 'gain' || isFadeMode(mode)) selection.apply({ kind: toggles ? 'toggle' : 'click', clipId: clip.id });
-    const wave = element.querySelector('.wave')?.getBoundingClientRect();
-    const grabbed = isFadeMode(mode) ? fadeGrab(event, element, mode) : null;
-    if (grabbed) mode = grabbed.end;
-    edit = {
-      clip,
-      mode: mode === 'move' && nudges(event) && take ? 'nudge' : mode,
-      from: { clientX: event.clientX, clientY: event.clientY },
-      grab: spanTimeAt(event.clientX) - clip.start,
-      moved: false,
-      trackId: trackOf(clip).id,
-      placement: clip,
-      nudge: take?.nudge ?? 0,
-      gain: clip.gain,
-      gainFrom: { gain: clip.gain, clientY: event.clientY, height: wave?.height ?? 0 },
-      fades: { fadeIn: clip.fadeIn, fadeOut: clip.fadeOut },
-      fadeGrab: grabbed ?? { by: 0, rests: 0 },
-      free: skipsSnapping(event),
-      toggles,
-      snap: null,
-      moves: null,
-      saving: false,
-    };
+    if (mode === 'gain' || isFadeMode(mode)) {
+      // Grabbing its gain line, or a fade dot, selects it, as clicking it does.
+      selection.apply({ kind: toggles ? 'toggle' : 'click', clipId: clip.id });
+      const wave = element.querySelector('.wave')?.getBoundingClientRect();
+      const grabbed = isFadeMode(mode) ? fadeGrab(event, element, mode) : null;
+      edit = {
+        clip,
+        mode: grabbed ? grabbed.end : mode,
+        from: { clientX: event.clientX, clientY: event.clientY },
+        moved: false,
+        trackId: trackOf(clip).id,
+        gain: clip.gain,
+        gainFrom: { gain: clip.gain, clientY: event.clientY, height: wave?.height ?? 0 },
+        fades: { fadeIn: clip.fadeIn, fadeOut: clip.fadeOut },
+        fadeGrab: grabbed ?? { by: 0, rests: 0 },
+        free: skipsSnapping(event),
+        saving: false,
+      };
+    } else {
+      // Alt+dragging a Clip of Takes slides its active Take, the Clip staying put.
+      const at = { point: { clientX: event.clientX, clientY: event.clientY }, time: spanTimeAt(event.clientX) };
+      clipDrag.press(clip, mode, at, { free: skipsSnapping(event), toggles, nudges: nudges(event) });
+    }
     window.addEventListener('pointermove', editMove);
     window.addEventListener('pointerup', editUp);
     window.addEventListener('pointercancel', editCancel);
@@ -1614,13 +1587,10 @@
   // skips snapping, snaps or frees the Clip there and then, without waiting
   // for the pointer to move.
   function editModifier(event: KeyboardEvent) {
-    if (!isModifier(event.key) || !edit?.moved || edit.mode === 'nudge' || isFadeMode(edit.mode) || edit.saving) return;
-    if (edit.mode === 'gain') {
-      dragGainFinely(edit, skipsSnapping(event), editAt.clientY);
-      return;
-    }
-    edit.free = skipsSnapping(event);
-    editMove(editAt);
+    if (!isModifier(event.key)) return;
+    if (clipDrag.clip) return clipDrag.modifier(skipsSnapping(event), clipDragAt(editAt));
+    if (!edit?.moved || isFadeMode(edit.mode) || edit.saving) return;
+    dragGainFinely(edit, skipsSnapping(event), editAt.clientY);
   }
 
   /**
@@ -1633,7 +1603,7 @@
   }
 
   /** Whether an edit is by a fade dot, setting the Clip's fade in or fade out. */
-  function isFadeMode(mode: Edit['mode']): mode is FadeEnd {
+  function isFadeMode(mode: ClipGrip | Edit['mode']): mode is FadeEnd {
     return mode === 'fadeIn' || mode === 'fadeOut';
   }
 
@@ -1671,16 +1641,18 @@
   }
 
   function editMove(event: Point) {
+    if (clipDrag.clip) {
+      // Scrolling along at an edge moves it too, with no keys to go by.
+      const free = 'shiftKey' in event ? skipsSnapping(event as PointerEvent) : undefined;
+      if (!clipDrag.move(clipDragAt(event), free)) return;
+      clearTimeout(pressTimer);
+      editAt = { clientX: event.clientX, clientY: event.clientY };
+      dragAt(event, editMove);
+      return;
+    }
     if (!edit || edit.saving) return;
     // A small wobble while clicking or holding still isn't a drag.
     if (!edit.moved && !pastSlop(edit.from, event)) return;
-    if (!edit.moved && edit.mode === 'move') {
-      // Moving a selected Clip moves the whole Selection; moving another
-      // selects it alone. A trim or a nudge leaves the Selection be.
-      selection.apply({ kind: 'drag', clipId: edit.clip.id });
-      // Another Clip moves alone while the Selection is locked.
-      if (selection.size > 1 && selection.has(edit.clip.id)) edit.moves = [];
-    }
     edit.moved = true;
     clearTimeout(pressTimer);
     editAt = { clientX: event.clientX, clientY: event.clientY };
@@ -1691,67 +1663,23 @@
       edit.gain = draggedGain(gain, event.clientY - clientY, height, edit.free);
       return;
     }
-    if (isFadeMode(edit.mode)) {
-      dragFade(edit, event.clientX);
-      dragAt(event, editMove);
-      return;
-    }
-    // Scrolling along at an edge, or Shift pressed, moves it too, with no keys to go by.
-    if ('shiftKey' in event) edit.free = skipsSnapping(event as PointerEvent);
-    const t = spanTimeAt(event.clientX);
-    const { clip } = edit;
-    if (edit.mode === 'nudge') {
-      edit.nudge = draggedNudge(clip, t - edit.grab - clip.start);
-    } else if (edit.moves) {
-      // Selected Clips move as one, snapped by any of their edges.
-      edit.trackId = trackAt(event.clientY);
-      const { trackId } = edit;
-      const place = (by: number) => moveSelection(timeline.tracks, selection.ids, clip.id, trackId, clip.start + by);
-      // How far moveSelection lets the Selection move, as the Clip dragged goes.
-      const clamp = (by: number) => place(by).find((m) => m.clipId === clip.id)!.start - clip.start;
-      const desired = t - edit.grab - clip.start;
-      const clips = timeline.tracks.flatMap((track) => track.clips.filter((c) => selection.has(c.id)));
-      const moved = snapSelection(snapTargets(selection.ids), clips, desired, reachAt(view.scale), clamp, edit.free);
-      edit.moves = place(moved.by);
-      edit.snap = moved.snap;
-    } else if (edit.mode === 'move') {
-      edit.trackId = trackAt(event.clientY);
-      const others = othersOn(edit.trackId, clip);
-      const clamp = (start: number) => clampMove(others, clip.length, start);
-      const desired = t - edit.grab;
-      const moved = edit.free
-        ? { start: clamp(desired), snap: null }
-        : snapMove(snapTargets(new Set([clip.id])), clip.length, desired, reachAt(view.scale), clamp);
-      edit.placement = { ...clip, start: moved.start };
-      edit.snap = moved.snap;
-    } else {
-      const others = othersOn(edit.trackId, clip);
-      const trimStart = edit.mode === 'start';
-      const trim = (at: number) =>
-        trimStart ? clampTrimStart(clip, others, at) : clampTrimEnd(clip, others, sources.of(clip).duration, at);
-      // Where the edge dragged ends up, trimmed to at.
-      const edge = (at: number) => {
-        const trimmed = trim(at);
-        return trimStart ? trimmed.start : trimmed.start + trimmed.length;
-      };
-      const snapped = edit.free
-        ? { at: t, snap: null }
-        : snapEdge(snapTargets(new Set([clip.id])), t, reachAt(view.scale), edge);
-      edit.placement = trim(snapped.at);
-      edit.snap = snapped.snap;
-    }
+    dragFade(edit, event.clientX);
     dragAt(event, editMove);
   }
 
   async function editUp() {
     stopListening();
-    if (!edit) return;
-    edit.snap = null;
-    const { clip, trackId, placement: to, mode } = edit;
-    // Pressed and let go without dragging, it's clicked. Its gain line or a fade dot selected it when grabbed.
-    if (!edit.moved && mode !== 'gain' && !isFadeMode(edit.mode)) {
-      selection.apply({ kind: edit.toggles ? 'toggle' : 'click', clipId: clip.id });
+    if (clipDrag.clip) {
+      const save = clipDrag.release();
+      if (!save) return;
+      const ok = await perform(save.edit);
+      clipDrag.saved();
+      if (ok && save.moved) offerMove(save.moved.clips, save.moved.by);
+      return;
     }
+    if (!edit) return;
+    // Its gain line or a fade dot selected it when grabbed, so let go without dragging, it isn't clicked.
+    const { clip } = edit;
     if (isFadeMode(edit.mode)) {
       const { fadeIn, fadeOut } = edit.fades;
       if (edit.moved && (fadeIn !== clip.fadeIn || fadeOut !== clip.fadeOut)) {
@@ -1761,62 +1689,11 @@
       edit = null;
       return;
     }
-    if (mode === 'gain') {
-      if (edit.moved && edit.gain !== clip.gain) {
-        edit.saving = true;
-        await perform({ kind: 'setClipGain', clipId: clip.id, gain: edit.gain });
-      }
-      edit = null;
-      return;
+    if (edit.moved && edit.gain !== clip.gain) {
+      edit.saving = true;
+      await perform({ kind: 'setClipGain', clipId: clip.id, gain: edit.gain });
     }
-    if (mode === 'nudge') {
-      const takeId = clip.activeTakeId!;
-      if (edit.moved && edit.nudge !== activeTake(clip)!.nudge) {
-        edit.saving = true;
-        await perform({ kind: 'nudgeTake', clipId: clip.id, takeId, nudge: edit.nudge });
-      }
-      edit = null;
-      return;
-    }
-    if (edit.moves) {
-      await moveTogether(edit, edit.moves);
-      edit = null;
-      return;
-    }
-    const unchanged =
-      trackId === trackOf(clip).id && to.start === clip.start && to.offset === clip.offset && to.length === clip.length;
-    if (!edit.moved || unchanged) {
-      edit = null;
-      return;
-    }
-    edit.saving = true;
-    if (mode !== 'move') {
-      await perform({ kind: 'trimClip', clipId: clip.id, offset: to.offset, length: to.length });
-      edit = null;
-      return;
-    }
-    const ok = await perform({ kind: 'moveClip', clipId: clip.id, trackId, start: to.start });
     edit = null;
-    if (ok) offerMove([clip], to.start - clip.start);
-  }
-
-  /** Saves the Selection moved together by a drag, as one edit, unless it's back where it was. */
-  async function moveTogether(drag: Edit, moves: ClipMove[]) {
-    const clips = placedClips();
-    const from = moves.map((m) => clips.get(m.clipId)!);
-    if (moves.every((m, i) => m.trackId === from[i].trackId && m.start === from[i].clip.start)) return;
-    drag.saving = true;
-    const ok = await perform({ kind: 'moveClips', moves });
-    if (ok)
-      offerMove(
-        from.map((f) => f.clip),
-        moves[0].start - from[0].clip.start,
-      );
-  }
-
-  /** Every Clip on the Timeline by its id, with the id of the Track it's on. */
-  function placedClips(): Map<number, { clip: Clip; trackId: number }> {
-    return new Map(timeline.tracks.flatMap((t) => t.clips.map((clip) => [clip.id, { clip, trackId: t.id }])));
   }
 
   /**
@@ -1853,6 +1730,7 @@
 
   function editCancel() {
     stopListening();
+    clipDrag.cancel();
     if (!edit?.saving) edit = null;
   }
 
@@ -2112,9 +1990,9 @@
   function openClipMenu(clip: Clip, element: HTMLElement, point?: Point) {
     // Not while a Clip's edit is saving: it's then put back in its place,
     // which would take the menu out of the page under it.
-    if (edit?.saving) return;
+    if (edit?.saving || clipDrag.saving) return;
     // A press that opens the menu isn't a drag.
-    if (edit) editCancel();
+    if (edit || clipDrag.clip) editCancel();
     // So its ⋯, which a menu opened by keyboard lines up with, shows, and
     // focus comes back to the Clip.
     element.focus();
@@ -2127,7 +2005,7 @@
     // The Clip has a menu of its own, in place of the browser's.
     event.preventDefault();
     // Right-clicking its ⋯ opens it there too, but not right-clicking in it.
-    if (!editable.current || edit?.moved || inOpenMenu(event.target)) return;
+    if (!editable.current || edit?.moved || clipDrag.moved || inOpenMenu(event.target)) return;
     openClipMenu(clip, event.currentTarget as HTMLElement, event);
   }
 
@@ -2894,8 +2772,8 @@
                     id="clip-{clip.id}"
                     class="clip"
                     class:editing
-                    class:moving={editing && edit?.mode === 'move'}
-                    class:nudging={editing && edit?.mode === 'nudge'}
+                    class:moving={editing && clipDrag.mode === 'move'}
+                    class:nudging={editing && clipDrag.mode === 'nudge'}
                     class:gaining={editing && edit?.mode === 'gain'}
                     class:fading={editing && !!edit && isFadeMode(edit.mode)}
                     class:retaking={clip.id === recorder.clipId}
