@@ -21,6 +21,7 @@
 import { ApiError, type Song, type Timeline } from './api';
 import { sameCues, savedRetrying, withCueChange, type CueChange } from './cueChanges';
 import { addedClips, History, restorable, type Edit, type HistoryEdit } from './history';
+import type { LyricSheetChange } from './lyricSheetChanges';
 import { waitFor, type SongServer, type Wait } from './songServer';
 
 /** How a save ended: saved, failed, refused as the Song changed elsewhere, or never sent as the Song's being deleted. */
@@ -145,6 +146,10 @@ export class Saves {
    * turn comes, and shows the Song it returns. Resolves to whether it was saved.
    */
   change = (op: (saved: Song) => Promise<Song>): Promise<boolean> => this.submit(op).then((ended) => ended === 'saved');
+
+  /** Queues a Lyric Sheet change, named by its kind, like change. */
+  changeLyricSheet = (change: LyricSheetChange): Promise<boolean> =>
+    this.change((saved) => this.#server.apply(saved, change));
 
   /** Queues a change like change, resolving to how it ended. */
   submit = (op: (saved: Song) => Promise<Song>): Promise<Submitted> =>

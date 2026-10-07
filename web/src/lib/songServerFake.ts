@@ -1,5 +1,6 @@
-// An in-memory SongServer, for testing Saves without the api: one Song and
-// its Timeline, sharing a version, as the server keeps them.
+// An in-memory SongServer, for testing Saves, and Lyric Sheet editing on top
+// of it, without the api: one Song and its Timeline, sharing a version, as
+// the server keeps them.
 import {
   ApiError,
   type Captured,
@@ -13,7 +14,9 @@ import {
   type Track,
 } from './api';
 import { withCueChange, type CueChange } from './cueChanges';
+import { linesByRow } from './cues';
 import type { Edit } from './history';
+import { isLyricSheetChange, type LyricSheetChange } from './lyricSheetChanges';
 import { peaksPerSecond } from './peaks';
 import { isCueChange, type SongServer } from './songServer';
 
@@ -52,7 +55,8 @@ export function emptySong(fields: Partial<Song> = {}): Song {
  * next writes, lose the next answer (making the write, then failing on the
  * network), change the Song elsewhere, and hold an answer until released.
  *
- * Saves makes its own writes through `apply` and `setTags`. Writes a
+ * Saves makes its own writes through `apply` and `setTags`, `apply` taking
+ * Cue changes, Timeline edits and Lyric Sheet changes. Writes a
  * caller brings, as the Song page's panels make through the api, are made
  * here with `update` and `remove`, a Take's upload with `recordTake` and
  * `retake`, or for the Timeline, e.g. a Merge, with `apply`.
@@ -68,7 +72,8 @@ export class FakeSongServer implements SongServer {
   #losing = 0;
   #holding: Promise<void> | null = null;
 
-  /** The ids the next Clip, Track and Take made get. */
+  /** The ids the next Line, Clip, Track and Take made get. */
+  #nextLineId = 1;
   #nextClipId = 1;
   #nextTrackId = 1;
   #nextTakeId = 1;
@@ -85,6 +90,8 @@ export class FakeSongServer implements SongServer {
       sounds: [],
       loop: null,
     };
+    const lineIds = song.sections.flatMap((s) => s.alternates.flatMap((a) => a.lines.map((l) => l.id)));
+    this.#nextLineId = Math.max(0, ...lineIds) + 1;
     const ids = tracks.flatMap((t) => t.clips.map((c) => c.id));
     this.#nextClipId = Math.max(0, ...ids) + 1;
     this.#nextTrackId = Math.max(0, ...tracks.map((t) => t.id)) + 1;
@@ -127,11 +134,18 @@ export class FakeSongServer implements SongServer {
   }
 
   apply(at: SongAt, change: CueChange): Promise<Song>;
+  apply(at: SongAt, change: LyricSheetChange): Promise<Song>;
   apply(at: SongAt, edit: Edit): Promise<Timeline>;
-  apply(at: SongAt, change: CueChange | Edit): Promise<Song | Timeline> {
+  apply(at: SongAt, change: CueChange | LyricSheetChange | Edit): Promise<Song | Timeline> {
     if (isCueChange(change)) {
       return this.#write(at, () => {
         this.song = withCueChange(this.song, change);
+        return structuredClone(this.song);
+      });
+    }
+    if (isLyricSheetChange(change)) {
+      return this.#write(at, () => {
+        this.song = this.#changed(this.song, change);
         return structuredClone(this.song);
       });
     }
@@ -197,6 +211,32 @@ export class FakeSongServer implements SongServer {
       default:
         throw notModelled(edit);
     }
+  }
+
+  /**
+   * What a Lyric Sheet change does: replacing an Alternate's text makes a
+   * Line of each row, keeping the Line, and its Cue, of each row matched to
+   * one as the text box matches them. Its Chords aren't read.
+   */
+  #changed(song: Song, change: LyricSheetChange): Song {
+    const { alternateId, text } = change;
+    const sections = song.sections.map((s) => ({
+      ...s,
+      alternates: s.alternates.map((a) => {
+        if (a.id !== alternateId) return a;
+        const rows = text.split('\n');
+        const lines = linesByRow(text, a.lines).map((line, i) => ({
+          id: line?.id ?? this.#nextLineId++,
+          text: rows[i],
+          lyrics: rows[i],
+          chords: [],
+          chordLine: false,
+          cue: line?.cue ?? null,
+        }));
+        return { ...a, lines };
+      }),
+    }));
+    return { ...song, sections };
   }
 
   /** A Clip placed, with the next id. */

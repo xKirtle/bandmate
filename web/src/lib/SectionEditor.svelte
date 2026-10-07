@@ -9,6 +9,7 @@
   import AlternateText, { type Cueing } from './AlternateText.svelte';
   import { api, suggestedLabels, type Alternate, type Section, type Song, type SongAt } from './api';
   import Combobox from './Combobox.svelte';
+  import type { LyricSheetEditing } from './lyricSheetEditing.svelte';
   import type { MenuAction } from './menu';
   import type { Drop } from './sectionDrag';
   import type { SectionDragging } from './sectionDragging.svelte';
@@ -18,7 +19,7 @@
     section,
     autofocus = false,
     change,
-    onUnsaved,
+    editing,
     grip,
     actions,
     more,
@@ -32,8 +33,8 @@
     autofocus?: boolean;
     /** Sends a Lyric Sheet change; resolves to whether it succeeded. */
     change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
-    /** Tells the page whether this editor holds edits not yet saved. */
-    onUnsaved: (editor: object, unsaved: boolean) => void;
+    /** Saves the Lines typed, and holds the edits typed here while they aren't saved. */
+    editing: LyricSheetEditing;
     /** Given, shows first in the header, e.g. a handle to drag the Section by. */
     grip?: Snippet;
     /** The actions that always show. */
@@ -59,7 +60,7 @@
 
   let label = $state(untrack(() => section.label));
   let editingLabel = false;
-  // Identifies the Label or Alternate name being typed to onUnsaved. They
+  // Identifies the Label or Alternate name being typed to editing. They
   // save on change, which comes just before blur.
   const naming = {};
   // In the Alternates mode, the Alternates show as cards to choose the active
@@ -233,13 +234,13 @@
         // Focus stays in the field, to carry on typing.
         editingLabel = true;
       }}
-      onrevert={() => onUnsaved(naming, false)}
+      onrevert={() => editing.naming(naming, section.id, false)}
       onfocus={() => (editingLabel = true)}
-      oninput={() => onUnsaved(naming, true)}
+      oninput={() => editing.naming(naming, section.id, true)}
       onchange={commitLabel}
       onblur={() => {
         editingLabel = false;
-        onUnsaved(naming, false);
+        editing.naming(naming, section.id, false);
       }}
       placeholder="Label"
       autocomplete="off"
@@ -313,13 +314,13 @@
                 id="name-{section.id}-{alt.id}"
                 class="name"
                 value={alt.name}
-                oninput={() => onUnsaved(naming, true)}
+                oninput={() => editing.naming(naming, section.id, true)}
                 onchange={(e) => rename(alt, e)}
                 onkeydown={(e) => {
                   // Escape takes back what was typed, then leaves the mode as anywhere in it.
                   if (e.key === 'Escape') e.currentTarget.value = alt.name;
                 }}
-                onblur={() => onUnsaved(naming, false)}
+                onblur={() => editing.naming(naming, section.id, false)}
                 placeholder={name}
                 autocomplete="off"
                 enterkeyhint="done"
@@ -353,7 +354,7 @@
     </div>
   {:else}
     {#key active.id}
-      <AlternateText alternate={active} label="Lines" {change} {onUnsaved} {cueing} />
+      <AlternateText alternate={active} sectionId={section.id} label="Lines" {editing} {cueing} />
     {/key}
   {/if}
 </article>

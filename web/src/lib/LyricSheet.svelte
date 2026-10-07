@@ -37,6 +37,7 @@
   import type { MenuAction } from './menu';
   import Picker from './Picker.svelte';
   import ReadingMenu from './ReadingMenu.svelte';
+  import type { LyricSheetEditing } from './lyricSheetEditing.svelte';
   import SectionEditor from './SectionEditor.svelte';
   import { moveTo, type Drop } from './sectionDrag';
   import type { SectionDragging } from './sectionDragging.svelte';
@@ -58,7 +59,7 @@
     change,
     drag,
     changeCues,
-    onUnsaved,
+    editing,
     playhead = null,
     hasClips = false,
     playFrom,
@@ -81,7 +82,8 @@
      * has to be taken back; resolves to whether it was saved.
      */
     changeCues: (change: CueChange, what: string) => Promise<boolean>;
-    onUnsaved: (editor: object, unsaved: boolean) => void;
+    /** Saves the Lines typed, and holds the edits typed into the Lyric Sheet while they aren't saved. */
+    editing: LyricSheetEditing;
     /** Where the Timeline is playing, in seconds; null while it isn't. */
     playhead?: number | null;
     /** Whether the Timeline has any Clip, so there's something to cue to. */
@@ -560,7 +562,7 @@
               autofocus={added === section.id}
               {change}
               onEditing={endSyncing}
-              {onUnsaved}
+              {editing}
               cueing={cueingFor(section)}
               more={sectionActions(section, i)}
               {drag}
