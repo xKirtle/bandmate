@@ -243,6 +243,27 @@ test('a Retake records into its Clip, from its start, growing it', async ({ page
   expectSung(after, 5, before.length + 1);
 });
 
+test('Space stops a recording that is capturing, keeping its Take', async ({ page, bandmate }) => {
+  const song = await bandmate.song({ title: 'Anthem' });
+  await open(page, song.id);
+  await seek(page, 5);
+  await recordButton(page).click();
+  await skipCalibration(page);
+  await expect(stopButton(page)).toBeVisible();
+  await playheadPast(page, 5 + 2);
+
+  await page.keyboard.press('Space');
+
+  await expect(recordButton(page)).toBeEnabled();
+  await expect(stopButton(page)).toHaveCount(0);
+  await expect(clip(page, 'Take 1')).toHaveAccessibleName(/^Take 1, 0:05 to \d+:\d\d$/);
+  const [kept, ...others] = await clipsOn(bandmate, song.id, 'Track 1');
+  expect(others).toEqual([]);
+  expectSung(kept, 5, minSung);
+  // Stopped, not paused: playback isn't running on.
+  await expect(timeline(page).getByRole('button', { name: 'Play', exact: true })).toBeVisible();
+});
+
 test('stopping during the lead-in keeps nothing, and says so', async ({ page, bandmate }) => {
   const song = await bandmate.song({ title: 'Anthem' });
   await open(page, song.id);

@@ -102,6 +102,11 @@ export class Bandmate {
     return json<Timeline>(this.api.get(`/api/songs/${songId}/timeline`));
   }
 
+  /** Sets a Song's Loop, in seconds, on or off, as dragging along the top of the ruler does. */
+  setLoop(songId: number, loop: { start: number; end: number; on: boolean }): Promise<Timeline> {
+    return json<Timeline>(this.api.put(`/api/songs/${songId}/timeline/loop`, { data: loop }));
+  }
+
   /** Every Song, wherever it's filed. */
   songs(): Promise<SongSummary[]> {
     return json<SongSummary[]>(this.api.get('/api/songs'));
