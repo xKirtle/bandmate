@@ -18,11 +18,9 @@ Write lyrics the way you would in a notebook, with the chords right where you pl
 8. **Line timings**: when each line starts in the song, set as you [sync](#sync). They appear once the [timeline](#timeline) has some audio on it: a beat, a take or another sound.
 9. **Scrapbook**: sections that aren't in the song: leftovers and ideas to come back to.
 
-Every song is in one list, with its status, key and tempo at a glance. And you can write on your phone too, in a layout made for it.
+And this is Read mode, here on a phone: the chords over the words, and how to play each one at the top. The button at the top right sets the text size, hides or transposes the chords, and shows or pins the chord shapes.
 
-<img src="@screenshots/song-list.png" alt="The Song list on desktop, with each Song's Status, key and BPM">
-
-<img class="phone" src="@screenshots/phone-lyric-sheet.png" alt="A Song's Lyric Sheet on a phone">
+<img class="phone" src="@screenshots/phone-lyric-sheet.png" alt="A song in Read mode on a phone, with the chord shapes at the top">
 
 ## Listen
 

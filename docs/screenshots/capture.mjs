@@ -339,6 +339,9 @@ async function number(page, places, { first = 1, into } = {}) {
       height: box.height + 36,
     },
   });
+  // The Loop is kept with the Song, so clear it before the shots after this.
+  await clear.evaluate((button) => button.click());
+  await page.waitForTimeout(500);
   await page.context().close();
 }
 

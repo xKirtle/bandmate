@@ -31,7 +31,7 @@ It's built for one songwriter, and runs on your own machine or homelab. There ar
 
 ![A Song in Read mode, with the Line playing highlighted](docs/screenshots/read-mode.png)
 
-<img src="docs/screenshots/phone-lyric-sheet.png" alt="A Song's Lyric Sheet on a phone" width="300">
+<img src="docs/screenshots/phone-lyric-sheet.png" alt="A Song in Read mode on a phone" width="300">
 
 </details>
 
