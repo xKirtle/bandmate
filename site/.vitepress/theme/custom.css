@@ -55,6 +55,19 @@
   max-width: 300px;
 }
 
+/* Two shots side by side, wrapping onto two rows on a phone. */
+.vp-doc .pair {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.vp-doc .pair img {
+  min-width: 0;
+  max-height: 420px;
+}
+
 /* A screenshot opened full size sits above the nav bar. */
 .medium-zoom-overlay,
 .medium-zoom-image--opened {

@@ -15,7 +15,7 @@ Write lyrics the way you would in a notebook, with the chords right where you pl
 5. **Chords**: typed in brackets right before the syllable they land on, even mid-word. Read mode shows them above the words.
 6. **A line of chords alone**: for intros, solos and other parts without words.
 7. **Alternates**: other versions of a section. Write a few, and pick the one the song uses. The others wait here until you change your mind.
-8. **Line timings**: when each line starts in the song, set as you [sync](#sync).
+8. **Line timings**: when each line starts in the song, set as you [sync](#sync). They appear once the [timeline](#timeline) has some audio on it: a beat, a take or another sound.
 9. **Scrapbook**: sections that aren't in the song: leftovers and ideas to come back to.
 
 Every song is in one list, with its status, key and tempo at a glance. And you can write on your phone too, in a layout made for it.
@@ -26,12 +26,18 @@ Every song is in one list, with its status, key and tempo at a glance. And you c
 
 ## Listen
 
-Bring in the music you're writing to, and lay it out on a timeline.
+Keep the music you write to in one library, and use it in any song.
 
-- Keep your beats in one library, credited to their producers, and use them in any song.
-- Upload a beat, or [download one from a link](#beats-from-a-link).
-- Arrange beats and other audio on a multi-track timeline: trim clips, loop a part, and set each track's volume, or mute or solo it. Undo anything.
-- Attach finished recordings of a song, made elsewhere, to listen back to.
+<img src="@screenshots/beat-library-labelled.png" alt="The Beat Library, numbered 1 to 6 to match the list below it">
+
+1. **Add a beat**: upload a file, or [download one from a link](#beats-from-a-link).
+2. **Search and filter**: by title or producer, key, tempo, or whether a song uses it.
+3. **A beat**: press ▶ to hear it.
+4. **Its producer**, kept with the beat as its credit.
+5. **The songs that use it.**
+6. **Edit it**: its title, credit and details.
+
+You can also attach a song's finished recordings, made elsewhere, to listen back to.
 
 ### Beats from a link
 
@@ -39,6 +45,26 @@ Paste a link to a video or track on YouTube, SoundCloud, Bandcamp or [any other 
 
 - It takes one video or track at a time, not playlists or live streams, up to 500 MB [unless you change it](/self-hosting#configuration).
 - If a site stops working, open **Settings → About** and press **Update** beside yt-dlp, the downloader Bandmate uses. You don't need to wait for a new Bandmate.
+
+## Timeline
+
+Every song has a timeline: its beat, your takes and any other audio, laid out on tracks and played together.
+
+<img src="@screenshots/timeline-labelled.png" alt="A song's Timeline, numbered 1 to 11 to match the list below it">
+
+1. **Play**, or jump to the start or the end. Click the ruler to move the playhead.
+2. **Loop**: repeat a stretch while you write or rehearse.
+3. **The stretch it repeats**: drag along the top of the ruler to set it.
+4. **Record** a take, see [Record](#record).
+5. **Not calibrated**: set this device up so takes land on the beat, see [Record](#record).
+6. **Undo and redo** any change on the timeline.
+7. **More**: import other audio, mix the song down, and recording settings.
+8. **Add a beat** from your library, or **a track**.
+9. **A track**, with its own volume, mute and solo. New takes go on the highlighted one: click a track's name to choose it.
+10. **A beat**: drag it to move it, or its ends to trim it. The file itself is never changed.
+11. **A take**, selected. Its **⋯** menu records it again or picks another take, see [Record](#record).
+
+Zoom in with Ctrl and the scroll wheel, or by pinching.
 
 ## Sync
 
@@ -55,22 +81,34 @@ Line your lyrics up with the music, so you always know where you are.
 
 ## Record
 
-Sing over your beat, right in the browser.
+Sing over your beat, right in the browser, in full quality.
 
-- Record takes in full quality over whatever's on the timeline.
-- Record a part again as often as you like, and pick the take you keep.
-- Calibrate once per device, by tapping or clapping along to a click, so your takes land on the beat. Fine-tune any take by hand.
-- Pick your microphone and watch its level. Bandmate remembers it for each device.
+<div class="pair">
+<img src="@screenshots/take-menu-labelled.png" alt="A take's menu on the Timeline, numbered 1 to 3 to match the list below it">
+<img src="@screenshots/recording-settings-labelled.png" alt="Recording settings, numbered 4 to 6 to match the list below it">
+</div>
+
+1. **Retake**: record the part again. Every take is kept.
+2. **Takes**: choose the take the song plays.
+3. **Nudge**: shift a take by a few milliseconds, so it sits on the beat.
+4. **Input**: your microphone or audio interface, and its channel. Each device remembers its own.
+5. **Level**: sing your loudest, and keep the meter out of the red. Here it's in the red, from a test tone.
+6. **Calibrate**: tap or clap along to a click, once on each device, so your takes land on the beat. Bandmate offers it the first time you record.
+
+The take menu is the **⋯** on a take. Recording settings is in the timeline's **⋯** menu.
 
 ## Backups
 
 Keep copies of your work, and move it between installs.
 
-- Back up some songs, your beat library, or both, in **Settings → Backups**, and download the file to keep it somewhere safe.
-- Restore into this Bandmate or another one. If a song is already there, choose to replace it or keep both.
-- A Backup restores into the same version of Bandmate or a newer one.
+<img src="@screenshots/backups-labelled.png" alt="Settings' Backups, numbered 1 to 4 to match the list below it">
 
-To copy everything at once, see [copying the data folder](/self-hosting#copying-the-data-folder).
+1. **Upload** a Backup, made by this Bandmate or another.
+2. **New Backup**: of the songs you choose, your beat library, or both.
+3. **A Backup**, with when it was made and its size.
+4. **Restore** what you pick from it, or download it to keep it somewhere safe. Where a song is already here, you choose to replace it or keep both.
+
+A Backup restores into the same version of Bandmate or a newer one. To copy everything at once, see [copying the data folder](/self-hosting#copying-the-data-folder).
 
 ## What's next
 

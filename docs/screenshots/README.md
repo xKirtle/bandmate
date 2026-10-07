@@ -7,6 +7,11 @@ The screenshots in the README and on the docs site, `site/`, taken in the dark t
 | `song-list.png`         | The Song list on desktop                                       |
 | `write-mode.png`        | The hero Song in Write mode on desktop, with the Timeline open |
 | `write-mode-labelled.png` | The hero Song in Write mode with the Chorus's Alternates open, numbered for the feature tour's key: Status, Details, Write and Read, a Section's Label, Chords, a Chord Line, an Alternate, a Cue and the Scrapbook |
+| `timeline-labelled.png` | The hero Song's Timeline with a Loop from 0:20 to 0:40 on, the playhead in it and the Take's Clip selected, numbered: Play, Loop, the Loop's stretch, Record, Not calibrated, Undo, the Timeline's menu, Add a Track, the Chosen Track, the Beat's Clip and the Take's Clip |
+| `take-menu-labelled.png` | The Take's Clip menu, numbered: Retake, Takes and Nudge |
+| `recording-settings-labelled.png` | Recording settings hearing Chromium's fake microphone, numbered 4 to 6: Input, the level hint and Calibrate |
+| `beat-library-labelled.png` | The Beat Library, numbered: Add from link, the search, the Beat's title, its producer, the Song using it and Edit |
+| `backups-labelled.png` | Settings' Backups holding the demo Backup, numbered: Upload, New Backup, the Backup and Restore |
 | `phone-lyric-sheet.png` | The hero Song's Lyric Sheet on a phone                         |
 | `read-mode.png`         | The hero Song in Read mode, with the Line playing highlighted  |
 | `sync-mode.webp`        | Sync mode cueing the Bridge's Lines, animated                  |
