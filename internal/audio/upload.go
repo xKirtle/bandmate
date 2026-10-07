@@ -39,8 +39,7 @@ func (u Upload) Problem() string {
 
 // Name is what to call the upload: the name it was given, else its file's
 // name without the extension, else its whole name (one that's all
-// extension, e.g. ".m4a"), else fallback. The browser gives a Sound its
-// file's title tag.
+// extension, e.g. ".m4a"), else fallback.
 func (u Upload) Name(given, fallback string) string {
 	if name := strings.TrimSpace(given); name != "" {
 		return name
