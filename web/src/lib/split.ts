@@ -1,16 +1,17 @@
 import type { Clip, Track } from './api';
+import { tolerance } from './trackPlacement';
 
 // A Split cuts Clips in two at the playhead: the Selection's Clips it
 // crosses, or with none selected, the Chosen Track's Clip under it. A Clip
 // the playhead is on the edge of isn't split. The server cuts them, and
 // refuses a Clip the time doesn't cross by the same reckoning.
 
-/** How near a Clip's edge, in seconds, the playhead counts as on it, as the server takes it. */
-const edge = 1e-6;
-
-/** Whether a time on the Timeline crosses a Clip, rather than being on its edge or outside it. */
+/**
+ * Whether a time on the Timeline crosses a Clip, rather than being on its
+ * edge, within the server's tolerance, or outside it.
+ */
 function crosses(clip: Clip, at: number): boolean {
-  return at - clip.start > edge && clip.start + clip.length - at > edge;
+  return at - clip.start > tolerance && clip.start + clip.length - at > tolerance;
 }
 
 /**

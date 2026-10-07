@@ -5,6 +5,7 @@
 // Clip instead, from the Clip's start as trimmed, and grows it, but never
 // into the next Clip.
 import type { Placed } from './schedule';
+import { tolerance } from './trackPlacement';
 
 /** How long playback leads in before a Take, in seconds, so the Beat is heard coming in. */
 export const leadIn = 2;
@@ -38,13 +39,10 @@ export function retakePlan(clip: Placed): RecordingPlan {
  */
 export function retakeLength(clip: Placed, clips: readonly Placed[], end: number): number {
   // With the server's tolerance, so a neighbour placed right at its end counts as next.
-  const after = clip.start + clip.length - 1e-6;
+  const after = clip.start + clip.length - tolerance;
   const next = clips.reduce((at, c) => (c.start >= after ? Math.min(at, c.start) : at), Infinity);
   return Math.max(clip.length, Math.min(end, next) - clip.start);
 }
-
-// As the server's, so a Take ending right at its Clip's start counts as none.
-const tolerance = 1e-6;
 
 /**
  * Whether a recording planned so, lasting duration seconds and placed
@@ -52,5 +50,6 @@ const tolerance = 1e-6;
  * stopping during the lead-in with nothing to keep.
  */
 export function sungPastStart(plan: RecordingPlan, duration: number, latencyOffset: number): boolean {
+  // With the server's tolerance, so a Take ending right at its Clip's start counts as none.
   return plan.from + duration - latencyOffset > plan.start + tolerance;
 }

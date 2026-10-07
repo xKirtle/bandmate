@@ -18,10 +18,8 @@ import { mixdownRate, mixDown } from './mixdown';
 import { trackGains } from './mixer';
 import { peaks } from './peaks';
 import type { PlayableClip } from './timelinePlayer';
+import { isFree } from './trackPlacement';
 import { encodeWav } from './wav';
-
-// As the server's, so Clips that only touch don't overlap, give or take rounding.
-const tolerance = 1e-6;
 
 /** Why a Track's Clips merge as silence: it's muted, or other Tracks are soloed and it isn't. */
 export interface SilentTrack {
@@ -54,10 +52,7 @@ export function mergeTarget(tracks: readonly Track[], selected: ReadonlySet<numb
   if (clips.length !== selected.size) return null;
   const start = Math.min(...clips.map((c) => c.start));
   const end = Math.max(...clips.map((c) => c.start + c.length));
-  // Clips touching the span's ends aren't in the way.
-  const room = on.find((t) =>
-    t.clips.every((c) => selected.has(c.id) || c.start >= end - tolerance || c.start + c.length <= start + tolerance),
-  );
+  const room = on.find((t) => isFree(t.clips, { start, end }, selected));
   const onto: MergeOnto = room
     ? { trackId: room.id }
     : { newTrack: { name: `Track ${tracks.length + 1}`, position: tracks.indexOf(on.at(-1)!) + 1 } };
