@@ -151,8 +151,6 @@ export interface TakeRecorderOptions {
   input: TakeInput;
   keeping: TakeKeeping;
   uploads: TakeUploads;
-  /** Hears that a Take is about to be saved, or a Track added for one, e.g. to end offers the next edit ends. */
-  onSave?: () => void;
   /** Hears the id of a Track added for an unsaved Take, e.g. to choose it. */
   onTrackAdded?: (trackId: number) => void;
   /** Hears why a recording, or keeping unsaved Takes, failed, e.g. to show it. */
@@ -189,7 +187,6 @@ export class TakeRecorder {
   #input: TakeInput;
   #keeping: TakeKeeping;
   #uploads: TakeUploads;
-  #onSave: () => void;
   #onTrackAdded: (trackId: number) => void;
   #onError: (message: string) => void;
 
@@ -206,7 +203,6 @@ export class TakeRecorder {
     this.#input = options.input;
     this.#keeping = options.keeping;
     this.#uploads = options.uploads;
-    this.#onSave = options.onSave ?? (() => {});
     this.#onTrackAdded = options.onTrackAdded ?? (() => {});
     this.#onError = options.onError ?? (() => {});
   }
@@ -349,7 +345,6 @@ export class TakeRecorder {
   ): Promise<boolean> {
     const wav = new Blob([encodeWav([samples], rate)], { type: 'audio/wav' });
     const peaks = peaksOf([samples], rate);
-    this.#onSave();
     return this.#saves
       .make(async (at, timeline) => {
         const { target, captureStart } = place(timeline);
@@ -424,7 +419,6 @@ export class TakeRecorder {
 
   /** Adds a Track at the bottom for an unsaved Take; resolves to its id, or null if it wasn't added. */
   async #addTrack(): Promise<number | null> {
-    this.#onSave();
     const name = `Track ${this.#saves.timeline.tracks.length + 1}`;
     const edited = await this.#saves.edit({ kind: 'addTrack', track: { name } });
     const added = edited && addedTrack(edited.before.tracks, edited.after.tracks);

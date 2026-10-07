@@ -32,7 +32,7 @@
   import ActionsMenu from './ActionsMenu.svelte';
   import BeatPicker from './BeatPicker.svelte';
   import { inputProblem } from './capture';
-  import { addedTrack, chosenTrack, readChosen, storeChosen, type ChoiceEvent } from './chosenTrack';
+  import { chosenTrack, readChosen, storeChosen, type ChoiceEvent } from './chosenTrack';
   import { ClipDrag, type ClipGrip, type ClipMeasure, type DragAt } from './clipDrag.svelte';
   import {
     guideLanes,
@@ -45,12 +45,11 @@
     type Snap,
   } from './snapping';
   import { clipSources, clipTitle, fileStart, playing } from './clipSource';
-  import { formatCue, movedCues, type TimeSpan } from './cues';
+  import { formatCue } from './cues';
   import type { Saves } from './saves.svelte';
-  import { editHint, editsWhileRecording, type Freeze } from './freeze';
+  import { editHint, type Freeze } from './freeze';
   import { draggedFiles, fileDropTrack, importEach, type TrackRow } from './fileDrop';
-  import { addedClips, mergingAdded, placingAdded, restorable, type Edit as TimelineEdit } from './history';
-  import { sameCues } from './cueChanges';
+  import { addedClips, mergingAdded, placingAdded } from './history';
   import { keyHints } from './keyHints';
   import { formatVolume, maxVolume, minVolume, trackGains, type Levels } from './mixer';
   import type { MenuAction } from './menu';
@@ -67,8 +66,9 @@
   import { allKeys, shortcuts, type Way } from './shortcuts';
   import { clipActions, selectionActions } from './clipMenu';
   import { mergeTarget, mergeWarning, mergedClips, renderMerge, type MergedAudio } from './merge';
-  import { rightHalfOf, rightHalves, splitTargets } from './split';
+  import { rightHalfOf, splitTargets } from './split';
   import { Selection, type ClipIds, type SelectionBox } from './selection.svelte';
+  import { TimelineEditing } from './timelineEditing.svelte';
   import {
     copy,
     duplicate as duplicatePlacement,
@@ -171,22 +171,6 @@
   let picking = $state(false);
   // A Beat just added whose BPM could become the Song's.
   let offerBpm = $state<{ bpm: number; title: string } | null>(null);
-  // After a Clip, or the Selection, is moved, moving the Cues they spanned
-  // along with them is offered for a few seconds, or until the next edit.
-  // Ignoring it leaves them where they were: after recording, they usually
-  // belong to the vocal rather than the Beat.
-  interface CueOffer {
-    /** Where the Clips moved were, each from its start to its end, in seconds. */
-    spans: TimeSpan[];
-    by: number;
-    count: number;
-    /** How many Clips moved. */
-    clips: number;
-  }
-  // Raw, so the timer can tell whether the offer shown is still its own.
-  let offerCues = $state.raw<CueOffer | null>(null);
-  let offerTimer: ReturnType<typeof setTimeout> | undefined;
-  const offerFor = 8000;
   // After a Merge, which Tracks came out silent, muted or left out by a
   // solo, until it's dismissed or the next Merge.
   let mergeNote = $state<string | null>(null);
@@ -222,7 +206,6 @@
     ),
     keeping: browserKeeping,
     uploads: api,
-    onSave: () => (offerCues = null),
     onTrackAdded: (trackId) => choose({ kind: 'add', trackId }),
     onError: (message) => (error = message),
   });
@@ -231,15 +214,35 @@
   const recording = $derived(recorder.phase !== null);
   // Whether a recording is capturing, rather than starting or saving.
   const capturing = $derived(recorder.capturing);
+
+  // The Selection: the Clips the next Clip action applies to. Like choosing
+  // a Track, selecting isn't an edit, and it's never kept, so leaving the
+  // Song drops it. A phone, where Clips can't be edited, has none.
+  const selection: Selection = new Selection(
+    () => timeline.tracks,
+    (): Freeze => editing.freeze,
+  );
+
+  // Every edit made here goes through Timeline editing, on top of Saves,
+  // which keeps them to undo: see timelineEditing.svelte.ts. It selects
+  // what an edit adds, chooses a Track added, and offers to move the Cues
+  // of Clips moved. The Timeline keeps the playhead and the Merge note.
+  const editing: TimelineEditing = new TimelineEditing({
+    saves: untrack(() => saves),
+    selection,
+    recording: () => recording,
+    choose: (trackId) => choose({ kind: 'add', trackId }),
+  });
+  onDestroy(() => editing.close());
+
   // While recording, a new Take or a Retake, from its start until it's
   // saved, the Timeline is frozen: nothing on it is edited but a Track's
   // levels, the playhead stays with the recording, and the Selection is
   // locked, gestures leaving it as it was (see freeze.ts). Likewise while a
   // Merge is made, from pressing Merge until its Sound is saved, though
   // playback carries on as usual.
-  let merging = $state(false);
-  const freeze = $derived<Freeze>(recording ? 'recording' : merging ? 'merging' : null);
-  const frozen = $derived(freeze !== null);
+  const freeze = $derived(editing.freeze);
+  const frozen = $derived(editing.frozen);
 
   // Why the unsaved Takes offered can't be kept or discarded meanwhile.
   const unsavedFrozenHint = $derived(
@@ -308,56 +311,21 @@
     }
   });
 
-  // Every edit made here, and every Cue edit, goes through Saves, which
-  // keeps them to undo. The Timeline keeps the Selection, the playhead and
-  // the Merge note, reacting to what an edit did once it's saved.
-
-  /**
-   * Queues an edit, to undo later, telling done what it did once saved;
-   * resolves to whether it succeeded.
-   */
-  async function perform(e: TimelineEdit, done?: (before: Timeline, after: Timeline) => void): Promise<boolean> {
-    if (frozen && !editsWhileRecording(e)) return false;
-    e = $state.snapshot(e) as TimelineEdit;
-    offerCues = null;
-    const edited = await saves.edit(e);
-    if (edited) done?.(edited.before, edited.after);
-    return edited !== null;
-  }
-
-  // A Cue edit, e.g. from the Lyric Sheet, ends the offer to move Cues with
-  // the Clips moved, like any other edit.
-  let cuesWere = untrack(() => song);
-  $effect(() => {
-    if (!sameCues(cuesWere, song)) offerCues = null;
-    cuesWere = song;
-  });
-
   async function undo() {
-    // With nothing to undo, nor any save queued that could be, pressing it
-    // leaves everything as it is.
-    if (frozen || (!saves.canUndo && saves.pending === 0)) return;
-    offerCues = null;
+    if (frozen) return;
     mergeNote = null;
-    const undone = await saves.undo();
-    if (!undone) return;
-    // Clips deleted together come back selected, as they were.
-    if (undone.reselect) selection.selectEdited(undone.reselect);
     // Undoing a new Take returns the playhead to where its Clip starts, to
     // record again from. Once the Clip's gone, it's a seek like any other:
     // playing, playback jumps there, superseding the restart the Clip's
-    // going started. Not while a recording started since, which plays from
-    // where it starts.
-    if (undone.playhead !== null && !recording) seekTo(undone.playhead);
+    // going started.
+    const at = await editing.undo();
+    if (at !== null) seekTo(at);
   }
 
   async function redo() {
-    if (frozen || !saves.canRedo) return;
-    offerCues = null;
+    if (frozen) return;
     mergeNote = null;
-    const redone = await saves.redo();
-    // A Merge redone selects its Clip again, and a Split its right halves, as they did.
-    if (redone?.reselect) selection.selectEdited(redone.reselect);
+    await editing.redo();
   }
 
   // Tooltips name a Shortcut's keys as this platform does, e.g. ⌘Z on a
@@ -417,7 +385,7 @@
   async function setLevels(track: Track, levelChanges: LevelChanges) {
     preview(track, levelChanges);
     // If it fails, the Track goes back to how it's saved.
-    await perform({ kind: 'updateTrack', trackId: track.id, changes: levelChanges });
+    await editing.edit({ kind: 'updateTrack', trackId: track.id, changes: levelChanges });
     // Each value stops being shown over the Timeline's once saved, unless
     // it's been changed again since, e.g. by a fader still being dragged.
     const shown = adjusting[track.id];
@@ -458,7 +426,7 @@
     if (!name || name === track.name) return;
     naming[track.id] = name;
     // If it fails, the name goes back to how it's saved.
-    await perform({ kind: 'updateTrack', trackId: track.id, changes: { name } });
+    await editing.edit({ kind: 'updateTrack', trackId: track.id, changes: { name } });
     if (naming[track.id] === name) delete naming[track.id];
   }
 
@@ -474,7 +442,7 @@
   function shift(index: number, by: -1 | 1) {
     const order = timeline.tracks.map((t) => t.id);
     [order[index], order[index + by]] = [order[index + by], order[index]];
-    perform({ kind: 'reorderTracks', order });
+    editing.edit({ kind: 'reorderTracks', order });
   }
 
   // Dragging a Track by its grip, on desktop and not while frozen. A drop
@@ -488,7 +456,7 @@
   const trackGap = $derived(trackDrag.current?.drop?.gap ?? null);
 
   function dropTrack(drop: TrackDrop) {
-    perform({ kind: 'reorderTracks', order: tracksDropped(trackIds, drop) });
+    editing.edit({ kind: 'reorderTracks', order: tracksDropped(trackIds, drop) });
   }
 
   // Deleting a Track doesn't ask first either: it can be undone. A Song
@@ -497,7 +465,7 @@
 
   function removeTrack(track: Track) {
     if (lastTrack) return;
-    perform({ kind: 'deleteTrack', trackId: track.id });
+    editing.edit({ kind: 'deleteTrack', trackId: track.id });
   }
 
   // A change to what plays is heard right away. The Timeline is replaced
@@ -595,7 +563,7 @@
   async function switchLoopOff() {
     switchingOff = true;
     // If it fails, the Loop is on again.
-    await perform({ kind: 'switchLoop', on: false });
+    await editing.edit({ kind: 'switchLoop', on: false });
     switchingOff = false;
   }
 
@@ -760,7 +728,7 @@
   async function addBeat(beat: Beat) {
     picking = false;
     if (chosen === null) return; // Never: a Song always has a Track.
-    const ok = await perform({ kind: 'addBeat', trackId: chosen, beatId: beat.id });
+    const ok = (await editing.edit({ kind: 'addBeat', trackId: chosen, beatId: beat.id })) !== null;
     // Never copied without asking.
     if (ok && song.bpm === null && beat.bpm !== null) offerBpm = { bpm: beat.bpm, title: beat.title };
   }
@@ -770,19 +738,9 @@
     offerBpm = null;
   }
 
-  /** Adds a Track at the bottom and chooses it; resolves to whether it was added. */
-  /** Adds a Track and chooses it; resolves to its id, or null if it wasn't added. */
-  async function addTrack(): Promise<number | null> {
-    let added: number | null = null;
-    const ok = await perform(
-      { kind: 'addTrack', track: { name: `Track ${timeline.tracks.length + 1}` } },
-      (before, after) => {
-        added = addedTrack(before.tracks, after.tracks);
-      },
-    );
-    // Once the Timeline shows it: until then, it isn't there to choose.
-    if (ok && added !== null) choose({ kind: 'add', trackId: added });
-    return ok ? added : null;
+  /** Adds a Track at the bottom, which is chosen once it's saved. */
+  function addTrack() {
+    editing.edit({ kind: 'addTrack', track: { name: `Track ${timeline.tracks.length + 1}` } });
   }
 
   // The largest audio file the server takes, checked before importing one.
@@ -824,7 +782,6 @@
     importing = `Reading “${file.name}”…`;
     const [decoded, name] = await Promise.all([prepareUpload(file, maxUploadBytes), nameSound(file)]);
     importing = `Importing “${name}”…`;
-    offerCues = null;
     await saves.make(async (at, before) => {
       const after = await api.importSound(at, file, { trackId, name, ...decoded });
       return { timeline: after, kept: placingAdded(before, after) };
@@ -853,7 +810,7 @@
         fullTimeline: editable.current,
         importing: importing !== null,
         recording,
-        merging,
+        merging: freeze === 'merging',
         chosenTrack: timeline.tracks.find((t) => t.id === chosen)?.name ?? 'the Chosen Track',
         hasClips: clips.length > 0,
       },
@@ -984,7 +941,7 @@
 
   const canRecord = $derived(
     recorder.phase === null &&
-      !merging &&
+      freeze !== 'merging' &&
       playerState === 'stopped' &&
       !syncing &&
       !calibrating &&
@@ -1079,14 +1036,6 @@
   $effect(() => {
     if (remembered !== null) storeChosen(deviceStorage(), songId, remembered);
   });
-
-  // The Selection: the Clips the next Clip action applies to. Like choosing
-  // a Track, selecting isn't an edit, and it's never kept, so leaving the
-  // Song drops it. A phone, where Clips can't be edited, has none.
-  const selection = new Selection(
-    () => timeline.tracks,
-    () => freeze,
-  );
 
   // Dragging from empty lane space draws a box, and the Clips it touches
   // on the Tracks it spans become the Selection as it's drawn, or, with
@@ -1295,7 +1244,7 @@
 
   /** Makes the Clips of a paste, or a Selection Duplicate, as one edit, and selects them. */
   function pasteAndSelect(pasted: Paste) {
-    perform({ kind: 'pasteClips', ...pasted }, (before, after) => selection.selectEdited(addedClips(before, after)));
+    editing.edit({ kind: 'pasteClips', ...pasted });
   }
 
   // The Selection's and a focused Clip's keys, pressed anywhere in the
@@ -1584,41 +1533,9 @@
     stopListening();
     const save = clipDrag.release();
     if (!save) return;
-    const ok = await perform(save.edit);
+    // A move over Cues offers to move them along.
+    await editing.saveDrag(save);
     clipDrag.saved();
-    if (ok && save.moved) offerMove(save.moved.clips, save.moved.by);
-  }
-
-  /**
-   * Cues are Timeline times and stay put, but those the Clips moved spanned
-   * may belong with them, so moving them along is offered, as a step of its own.
-   */
-  function offerMove(moved: Clip[], by: number) {
-    if (by === 0) return;
-    const spans = moved.map((c) => ({ start: c.start, end: c.start + c.length }));
-    const count = movedCues(song, spans, by).length;
-    if (count === 0) return;
-    const offer: CueOffer = { spans, by, count, clips: moved.length };
-    offerCues = offer;
-    clearTimeout(offerTimer);
-    offerTimer = setTimeout(() => {
-      if (offerCues === offer) offerCues = null;
-    }, offerFor);
-  }
-
-  onDestroy(() => clearTimeout(offerTimer));
-
-  // One Clip's Cues move by their span, as the server finds them. Several
-  // Clips' are worked out from the Song as shown, Cue changes not saved yet
-  // included, and set, so each moves once, however many of the Clips
-  // spanned it. Either way, they move on screen at once.
-  function moveCues() {
-    if (!offerCues) return;
-    const { spans, by } = offerCues;
-    const what = `moving the Cues with ${offerCues.clips === 1 ? 'the Clip' : 'the Clips'}`;
-    offerCues = null;
-    if (spans.length === 1) saves.cue({ kind: 'shiftCues', ...spans[0], by }, what);
-    else saves.cue({ kind: 'restoreCues', cues: restorable(movedCues(song, spans, by), song) }, what);
   }
 
   function editCancel() {
@@ -1638,7 +1555,7 @@
   onDestroy(stopListening);
 
   function duplicate(clip: Clip) {
-    perform({ kind: 'duplicateClip', clipId: clip.id });
+    editing.edit({ kind: 'duplicateClip', clipId: clip.id });
   }
 
   /**
@@ -1665,13 +1582,12 @@
     const splitting = splitTargets(timeline.tracks, clipIds ?? selection.ids, chosen, at);
     if (splitting.length === 0) return;
     const focused = focusedClip(document.activeElement)?.id;
-    perform({ kind: 'splitClips', clipIds: splitting, at }, (before, after) => {
-      selection.selectEdited(rightHalves(before, after));
+    editing.edit({ kind: 'splitClips', clipIds: splitting, at }).then((edited) => {
       // Focus stays put while recording, as the Selection does, and once
       // it's moved on from the Clip since.
-      if (focused === undefined || !splitting.includes(focused) || recording) return;
+      if (!edited || focused === undefined || !splitting.includes(focused) || recording) return;
       if (document.activeElement?.id !== `clip-${focused}`) return;
-      const right = rightHalfOf(before, after, focused);
+      const right = rightHalfOf(edited.before, edited.after, focused);
       if (right !== null) tick().then(() => document.getElementById(`clip-${right}`)?.focus());
     });
   }
@@ -1709,7 +1625,7 @@
     if (name === clip.name) return;
     clipNaming[clip.id] = name;
     // If it fails, the name goes back to how it's saved.
-    await perform({ kind: 'renameClip', clipId: clip.id, name: typed });
+    await editing.edit({ kind: 'renameClip', clipId: clip.id, name: typed });
     if (clipNaming[clip.id] === name) delete clipNaming[clip.id];
   }
 
@@ -1727,7 +1643,7 @@
     if (event.target instanceof Element && event.target.closest('.trim, .fade-dot')) return;
     // Its gain line resets the Gain instead.
     if (event.target instanceof Element && event.target.closest('.gain-line')) {
-      if (clip.gain !== 0 && !frozen) perform({ kind: 'setClipGain', clipId: clip.id, gain: 0 });
+      if (clip.gain !== 0 && !frozen) editing.edit({ kind: 'setClipGain', clipId: clip.id, gain: 0 });
       return;
     }
     startClipRename(clip);
@@ -1741,7 +1657,7 @@
   // Deleting doesn't ask first: it can be undone, and the Beat stays in the
   // Beat Library.
   function remove(clip: Clip) {
-    perform({ kind: 'deleteClip', clipId: clip.id });
+    editing.edit({ kind: 'deleteClip', clipId: clip.id });
   }
 
   /**
@@ -1757,14 +1673,12 @@
   function mergeSelection() {
     if (frozen || !mergeTarget(timeline.tracks, selection.ids)) return;
     const clipIds = selection.ids;
-    merging = true;
     error = null;
-    offerCues = null;
     mergeNote = null;
     // What it says once made, worked out in its turn.
     let note: string | null = null;
-    saves
-      .make(async (at, before) => {
+    editing.whileMerging(async () => {
+      const made = await saves.make(async (at, before) => {
         const target = mergeTarget(before.tracks, clipIds);
         if (!target) throw new Error("The Clips to merge aren't all on the Timeline any more.");
         let audio: MergedAudio;
@@ -1780,20 +1694,18 @@
         });
         note = mergeWarning(target.silent);
         return { timeline: after, kept: mergingAdded(before, after, target.clipIds) };
-      })
-      .then((made) => {
-        if (!made) return;
-        const [mergedId] = addedClips(made.before, made.after);
-        selection.selectEdited([mergedId]);
-        remembered = made.after.tracks.find((t) => t.clips.some((c) => c.id === mergedId))!.id;
-        mergeNote = note;
-      })
-      .finally(() => (merging = false));
+      });
+      if (!made) return;
+      const [mergedId] = addedClips(made.before, made.after);
+      selection.selectEdited([mergedId]);
+      remembered = made.after.tracks.find((t) => t.clips.some((c) => c.id === mergedId))!.id;
+      mergeNote = note;
+    });
   }
 
   /** Deletes the selected Clips, as one edit. */
   function removeSelection() {
-    perform({ kind: 'deleteClips', clipIds: [...selection.ids] });
+    editing.edit({ kind: 'deleteClips', clipIds: [...selection.ids] });
   }
 
   // Each Clip's menu, opened by its ⋯, right-click, the Menu key, Shift+F10
@@ -1842,14 +1754,14 @@
       },
       {
         retake: () => startRecording(clip),
-        chooseTake: (takeId) => perform({ kind: 'chooseTake', clipId, takeId }),
-        deleteTake: (takeId) => perform({ kind: 'deleteTake', clipId, takeId }),
-        nudgeTake: (takeId, ms) => perform({ kind: 'nudgeTake', clipId, takeId, nudge: ms / 1000 }),
-        clearInactiveTakes: () => perform({ kind: 'clearInactiveTakes', clipId }),
+        chooseTake: (takeId) => editing.edit({ kind: 'chooseTake', clipId, takeId }),
+        deleteTake: (takeId) => editing.edit({ kind: 'deleteTake', clipId, takeId }),
+        nudgeTake: (takeId, ms) => editing.edit({ kind: 'nudgeTake', clipId, takeId, nudge: ms / 1000 }),
+        clearInactiveTakes: () => editing.edit({ kind: 'clearInactiveTakes', clipId }),
         downloadTake: (takeId) => download(api.takeDownloadUrl(timeline.songId, takeId)),
         rename: () => startClipRename(clip),
         // To the tenth, as a drag sets it.
-        setGain: (gain) => perform({ kind: 'setClipGain', clipId, gain: clampGain(gain) }),
+        setGain: (gain) => editing.edit({ kind: 'setClipGain', clipId, gain: clampGain(gain) }),
         copy: () => copyClips(new Set([clip.id])),
         cut: () => cutClip(clip),
         duplicate: () => duplicate(clip),
@@ -2008,7 +1920,7 @@
       return;
     }
     loopEdit.saving = true;
-    await perform({ kind: 'setLoop', loop: to });
+    await editing.edit({ kind: 'setLoop', loop: to });
     loopEdit = null;
   }
 
@@ -2020,11 +1932,11 @@
   function switchLoop() {
     if (!timeline.loop || frozen) return;
     // Switched off by Sync mode and still saving, it's shown off already.
-    perform({ kind: 'switchLoop', on: !loopOn });
+    editing.edit({ kind: 'switchLoop', on: !loopOn });
   }
 
   function clearLoop() {
-    perform({ kind: 'clearLoop' });
+    editing.edit({ kind: 'clearLoop' });
   }
 
   /** A stretch of the Timeline's position and width across it, cut off at its end. */
@@ -2926,19 +2838,18 @@
       </div>
     </div>
 
-    {#if offerCues}
+    {#if editing.cueOffer}
+      {@const offer = editing.cueOffer}
       <div class="offer" role="status">
         <span
-          >{offerCues.clips === 1 ? 'The Clip' : `The ${offerCues.clips} Clips`} moved {formatCue(
-            Math.abs(offerCues.by),
-          )}
-          {offerCues.by > 0 ? 'later' : 'earlier'}.</span
+          >{offer.clips === 1 ? 'The Clip' : `The ${offer.clips} Clips`} moved {formatCue(Math.abs(offer.by))}
+          {offer.by > 0 ? 'later' : 'earlier'}.</span
         >
-        <button type="button" class="button" onclick={moveCues}
-          >Move {offerCues.count}
-          {offerCues.count === 1 ? 'Cue' : 'Cues'} with {offerCues.clips === 1 ? 'it' : 'them'}</button
+        <button type="button" class="button" onclick={() => editing.moveCues()}
+          >Move {offer.count}
+          {offer.count === 1 ? 'Cue' : 'Cues'} with {offer.clips === 1 ? 'it' : 'them'}</button
         >
-        <button type="button" class="button" onclick={() => (offerCues = null)}>Leave them</button>
+        <button type="button" class="button" onclick={() => editing.leaveCues()}>Leave them</button>
       </div>
     {/if}
     {#if recorder.unsaved.length > 0}
