@@ -10,7 +10,7 @@ export type SongKeyContext = KeyPlace & {
   busy: boolean;
   /** Space there is the control's own, e.g. a text field, a checkbox or a ⋯ menu. */
   ownsSpace: boolean;
-  /** Home and End there are the control's own, e.g. a menu's or a volume slider's. */
+  /** Home and End there are the control's own, e.g. a list's, a menu's or a volume slider's. */
   ownsHomeEnd: boolean;
   /** The Timeline can be edited, i.e. it isn't on a phone, where it only plays. */
   editable: boolean;
@@ -34,9 +34,9 @@ export function songKey(e: KeyDown, at: SongKeyContext): SongKey | null {
   }
   const going = way(e, shortcuts.startOrEnd);
   if (going) {
-    // Even held down, so the page never scrolls instead. Not while
-    // recording, which plays from where it started.
-    if (at.inTextField || at.ownsHomeEnd || at.recording) return null;
+    // Even held down or recording, so the page never scrolls instead,
+    // though a recording keeps the playhead where it started.
+    if (at.inTextField || at.ownsHomeEnd) return null;
     return going === 'back' ? 'start' : 'end';
   }
   if (matches(e, shortcuts.undo.keys) || matches(e, shortcuts.redo.keys)) {

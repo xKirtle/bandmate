@@ -137,8 +137,11 @@ group('Home and End', () => {
     expect(songKey(press('End', { ctrlKey: true }), idle)).toBeNull();
   });
 
-  it('wait while recording, which plays from where it started, or while a Beat is picked', () => {
-    expect(songKey(press('Home'), { ...idle, recording: true, canRecord: false })).toBeNull();
+  it('are taken while recording, so the page never scrolls, though the playhead stays', () => {
+    expect(songKey(press('Home'), { ...idle, recording: true, capturing: true, canRecord: false })).toBe('start');
+  });
+
+  it('wait while a Beat is picked, the Latency Offset calibrated or a Mixdown made', () => {
     expect(songKey(press('End'), { ...idle, busy: true })).toBeNull();
   });
 });

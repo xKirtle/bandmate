@@ -50,7 +50,8 @@ export const shortcuts = {
   startOrEnd: {
     name: 'Go to the start or end',
     group: 'Playback & recording',
-    description: 'Moves the playhead to the start or the end, from anywhere outside a text field, a menu or a dialog.',
+    description:
+      'Moves the playhead to the start or the end, from anywhere but a text field, a list, a slider, a menu or a dialog.',
     back: [{ key: 'Home' }],
     forward: [{ key: 'End' }],
   },

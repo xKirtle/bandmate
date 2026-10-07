@@ -726,7 +726,7 @@
 
   /**
    * Whether Home and End pressed there are its own: in a text field, a
-   * select or a slider, e.g. a Track's volume, or a ⋯ menu. The ruler isn't
+   * list (a select) or a slider, e.g. a Track's volume, or a ⋯ menu. The ruler isn't
    * one: there they go to the start and the end as anywhere else.
    */
   function ownsHomeEnd(target: EventTarget | null): boolean {

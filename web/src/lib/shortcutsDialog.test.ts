@@ -41,7 +41,7 @@ group('dialogGroups', () => {
     expect(groups[0].rows[2]).toEqual({
       name: 'Go to the start or end',
       description:
-        'Moves the playhead to the start or the end, from anywhere outside a text field, a menu or a dialog.',
+        'Moves the playhead to the start or the end, from anywhere but a text field, a list, a slider, a menu or a dialog.',
       keys: [['Home'], ['End']],
     });
   });
