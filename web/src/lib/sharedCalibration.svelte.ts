@@ -1,6 +1,6 @@
 import { calibrationSetting } from './calibration';
 import { DeviceSetting } from './deviceSetting.svelte';
-import { deviceStorage } from './timelineHeight';
+import { deviceStorage } from './deviceStorage';
 
 // The Latency Offset calibrated on this device, and whether calibration was
 // offered yet, shared by every open Song, so one calibrated or skipped in

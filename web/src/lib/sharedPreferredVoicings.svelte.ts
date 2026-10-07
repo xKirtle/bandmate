@@ -1,5 +1,6 @@
 import { SvelteMap } from 'svelte/reactivity';
 import type { Frets } from './chordFinder';
+import { deviceStorage } from './deviceStorage';
 import {
   preferredVoicingsKey,
   readPreferredVoicings,
@@ -7,7 +8,6 @@ import {
   withPreference,
   type PreferredVoicings,
 } from './preferredVoicings';
-import { deviceStorage } from './timelineHeight';
 
 // The preferred Voicings on this device, per tuning, shared by every Chord
 // Finder and the Chord Chart, so preferring one moves it first wherever that
