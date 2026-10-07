@@ -2,15 +2,7 @@
   import Keyboard from '@lucide/svelte/icons/keyboard';
   import { onDestroy } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
-  import {
-    api,
-    ApiError,
-    commonKeys,
-    type Song,
-    type SongChanges,
-    type Status,
-    type Timeline as TimelineData,
-  } from '../lib/api';
+  import { api, commonKeys, type Song, type SongChanges, type Status } from '../lib/api';
   import Combobox from '../lib/Combobox.svelte';
   import FoldChevron from '../lib/FoldChevron.svelte';
   import LyricSheet from '../lib/LyricSheet.svelte';
@@ -25,8 +17,8 @@
   import TagsField from '../lib/TagsField.svelte';
   import Timeline from '../lib/Timeline.svelte';
   import TuningField from '../lib/TuningField.svelte';
-  import { sameCues, savedRetrying, sendCueChange, withCueChange, type CueChange } from '../lib/cueChanges';
-  import type { Saved } from '../lib/history';
+  import { Saves } from '../lib/saves.svelte';
+  import { songServer } from '../lib/songServer';
   import { takeNewFlag } from '../lib/newSong';
   import { navigate, replaceSearch, router } from '../lib/router.svelte';
   import { keyboardAndMouse, keyHints } from '../lib/keyHints';
@@ -60,10 +52,14 @@
     notes: string;
   }
 
+  // Every save the page and its panels make goes through Saves, made once
+  // the Song's loaded.
+  let saves = $state<Saves | null>(null);
   // The Song as last saved. What's shown has the Cue changes not saved yet
-  // made on top of it (see changeCues).
-  let song = $state<Song | null>(null);
-  let timeline = $state<TimelineData | null>(null);
+  // made on top of it.
+  const song = $derived(saves?.saved ?? null);
+  const shown = $derived(saves?.song ?? null);
+  const timeline = $derived(saves?.timeline ?? null);
   // Where the Timeline is playing, in seconds; null while it isn't.
   let playhead = $state<number | null>(null);
   let timelinePanel = $state<Timeline>();
@@ -77,11 +73,6 @@
   let recording = $state(false);
   let draft = $state<Draft>(toDraft(null));
   let loadError = $state<string | null>(null);
-  let saveError = $state<string | null>(null);
-  // A write was refused, or a refresh couldn't be shown, because the Song
-  // changed elsewhere (e.g. in another tab) since this page loaded it.
-  let stale = $state(false);
-  let pending = $state(0);
   let deleting = $state(false);
   // Read mode offers no editing anywhere on the page but the Timeline. It's
   // never saved: each visit starts from the Song's Status.
@@ -151,10 +142,10 @@
   let timelineHeight = $state(0);
 
   $effect(() => {
-    Promise.all([api.getSong(id), api.getTimeline(id)]).then(
+    const server = songServer(id);
+    Promise.all([server.getSong(), server.getTimeline()]).then(
       ([s, tl]) => {
-        song = s;
-        timeline = tl;
+        saves = new Saves({ server, song: s, timeline: tl, editsOutside, onReplace });
         draft = toDraft(s);
         tags = s.tags;
         mode = openingMode(s.status);
@@ -171,21 +162,17 @@
   // Tagging leaves the Song's version as it was, so it's never stale; it's
   // queued with the other saves only so they land in order. A failed save
   // shows the Tags as they were.
-  function setTags(next: string[]) {
+  async function setTags(next: string[]) {
+    if (!saves) return;
     tags = next;
     const change = ++tagChanges;
-    enqueue(
-      () => api.setSongTags(id, next),
-      (saved) => {
-        song = { ...song!, tags: saved };
-        // As saved: in order, and spelled as the Tags matched are, unless
-        // changed again meanwhile.
-        if (change === tagChanges) tags = saved;
-        knownTags = [...new Set([...knownTags, ...saved])];
-      },
-    ).then((ok) => {
-      if (!ok && change === tagChanges && song) tags = song.tags;
-    });
+    const saved = await saves.setTags(next);
+    if (saved) {
+      // As saved: in order, and spelled as the Tags matched are, unless
+      // changed again meanwhile.
+      if (change === tagChanges) tags = saved;
+      knownTags = [...new Set([...knownTags, ...saved])];
+    } else if (change === tagChanges && song) tags = song.tags;
   }
 
   function toDraft(s: Song | null): Draft {
@@ -200,182 +187,43 @@
     };
   }
 
-  // Saves run one after another so they land in the order they were made.
-  let queue = Promise.resolve();
-
-  /**
-   * Queues a change and shows the Song it returns. The change is based on
-   * the Song as saved when its turn comes. Resolves to whether it succeeded.
-   */
-  function send(op: (saved: Song) => Promise<Song>): Promise<boolean> {
-    return enqueue(op, (s) => (song = s));
-  }
-
-  /**
-   * Queues a Timeline change like send, and shows the Timeline it returns,
-   * or for a Cue edit, which the Timeline keeps to undo, the Song.
-   */
-  function changeTimeline(op: (saved: Song) => Promise<Saved>): Promise<boolean> {
-    return enqueue(op, (saved) => {
-      if ('song' in saved) {
-        song = saved.song;
-        return;
-      }
-      timeline = saved.timeline;
-      // The change moved the Song on too.
-      song = { ...song!, version: timeline.version, updatedAt: timeline.updatedAt };
-    });
-  }
-
-  // Cue changes not saved yet, in the order they were made. Each shows at
-  // once, made on top of the Song as saved, so syncing keeps its rhythm, and
-  // looks the same as a saved one. Once saved, the Song the save returns
-  // takes its place.
-  let unsavedCues = $state.raw<{ change: CueChange }[]>([]);
-  const shown = $derived(song && unsavedCues.reduce((s, u) => withCueChange(s, u.change), song));
-
-  /**
-   * Makes a Cue change at once, and queues its save through the Timeline, so
-   * it can be undone with the Timeline's edits. A save failing on the network
-   * or the server is tried again for a few seconds; if it still fails, the
-   * change is taken back, as a whole, and the save error names what, which
-   * is given as e.g. "the Cue of Line 3 of Verse". Refused because the Song
-   * changed elsewhere, it stays shown like any edit not saved, until Reload.
-   * Resolves to whether it was saved.
-   */
-  function changeCues(change: CueChange, what: string): Promise<boolean> {
-    if (deleting) return Promise.resolve(false);
-    const unsaved = { change };
-    unsavedCues = [...unsavedCues, unsaved];
-    const settle = () => (unsavedCues = unsavedCues.filter((u) => u !== unsaved));
-    const op = async (saved: Song) => {
-      let tries = 0;
-      try {
-        const after = await savedRetrying(() => (tries++, sendCueChange(saved, change))).catch((e) =>
-          tries > 1 && e instanceof ApiError && e.stale ? landedEarlier(saved, change, e) : Promise.reject(e),
-        );
-        // Shown as saved in the same step it stops being made on top, so
-        // it's never made twice over.
-        song = after;
-        settle();
-        return after;
-      } catch (e) {
-        if (e instanceof ApiError && e.stale) throw e;
-        settle();
-        // Saves already waiting behind it don't clear what was taken back,
-        // e.g. the Lines cued meanwhile in Sync mode: only a change made since.
-        errorKeptUntil = queued;
-        throw new Error(`Couldn't save ${what}, so it was taken back. ${(e as Error).message}`);
-      }
-    };
-    return timelinePanel ? timelinePanel.editCues(op) : send(op);
-  }
-
-  /**
-   * The Song a Cue change left, when trying it again was refused as the Song
-   * changed meanwhile, and that change was its own first try, saved though
-   * its answer never came back. Otherwise it was changed elsewhere after all.
-   */
-  async function landedEarlier(saved: Song, change: CueChange, refused: ApiError): Promise<Song> {
-    const latest = await api.getSong(saved.id).catch(() => null);
-    if (latest?.version === saved.version + 1 && sameCues(latest, withCueChange(saved, change))) return latest;
-    throw refused;
-  }
-
-  // Counts the saves queued, and the latest one queued before a save error
-  // that only a change made since clears.
-  let queued = 0;
-  let errorKeptUntil = 0;
-
-  function enqueue<T>(op: (saved: Song) => Promise<T>, show: (result: T) => void): Promise<boolean> {
-    // Once the Song is being deleted, a late save would only fail.
-    if (deleting) return Promise.resolve(false);
-    pending++;
-    const turn = ++queued;
-    const done = queue.then(async () => {
-      try {
-        show(await op(song!));
-        if (turn > errorKeptUntil) saveError = null;
-        return true;
-      } catch (e) {
-        showError(e as Error);
-        return false;
-      } finally {
-        pending--;
-      }
-    });
-    queue = done.then(() => {});
-    return done;
-  }
-
-  function showError(e: Error) {
-    if (e instanceof ApiError && e.stale) stale = true;
-    else saveError = e.message;
-  }
-
   async function save(changes: SongChanges, fields: (keyof Draft)[]) {
-    let rejectedAsStale = false;
-    const ok = await send((at) =>
-      api.updateSong(at, changes).catch((e) => {
-        rejectedAsStale = e instanceof ApiError && e.stale;
-        throw e;
-      }),
-    );
+    if (!saves) return;
+    const ended = await saves.submit((at) => api.updateSong(at, changes));
     // Put back what the server has for the fields that failed, unless the
     // Song changed elsewhere: then the edits stay, to be copied out.
-    if (!ok && !rejectedAsStale) {
+    if (ended === 'failed' || ended === 'closed') {
       for (const f of fields) revert(f);
     }
   }
 
-  // Coming back to the tab while recording, the refresh waits until the Take's saved.
-  let refreshAfterRecording = false;
+  // Not under a recording: the Timeline a Take's made against stays as it
+  // is, so coming back to the tab meanwhile refreshes once the Take's saved.
   $effect(() => {
-    if (recording || !refreshAfterRecording) return;
-    refreshAfterRecording = false;
-    refresh();
+    if (recording && saves) return saves.hold();
   });
 
   // Coming back to the tab shows what changed meanwhile, e.g. on another
-  // device. It waits for saves already on their way, and never replaces
-  // edits not saved yet: those are based on the Song as it was, so the Song
-  // is marked stale instead.
-  function refresh() {
-    if (document.visibilityState !== 'visible' || !song || deleting) return;
-    // Not under a recording: the Timeline it's made against stays as it is.
-    if (recording) {
-      refreshAfterRecording = true;
-      return;
-    }
-    queue = queue.then(async () => {
-      try {
-        const latest = await api.getSong(id);
-        if (latest.version === song?.version) return;
-        if (hasUnsavedEdits()) {
-          stale = true;
-          return;
-        }
-        const latestTimeline = await api.getTimeline(id);
-        // A focused field would keep showing the old Song, and typing into
-        // it would then overwrite the change made elsewhere. Nothing is
-        // unsaved, so leaving it saves nothing.
-        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-        song = latest;
-        timeline = latestTimeline;
-        draft = toDraft(latest);
-        tags = latest.tags;
-        stale = false;
-      } catch {
-        // Keep showing the Song as it was; the next save reports any problem.
-      }
-    });
+  // device (see Saves.refresh).
+  function refreshOnReturn() {
+    if (document.visibilityState === 'visible') saves?.refresh();
+  }
+
+  // A refresh is about to show the Song as changed elsewhere. A focused
+  // field would keep showing the old Song, and typing into it would then
+  // overwrite the change made elsewhere. Nothing is unsaved, so leaving it
+  // saves nothing.
+  function onReplace(latest: Song) {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    draft = toDraft(latest);
+    tags = latest.tags;
   }
 
   // Set while reloading on purpose, so leaving doesn't ask again.
   let reloading = false;
 
   function reload() {
-    if (hasUnsavedEdits() && !confirm('Reload the Song? Edits that weren’t saved here will be lost.')) return;
+    if (saves?.unsaved && !confirm('Reload the Song? Edits that weren’t saved here will be lost.')) return;
     reloading = true;
     location.reload();
   }
@@ -447,7 +295,7 @@
     if (!song) return;
     const text = draft[field].trim();
     if (text !== '' && !/^\d+$/.test(text)) {
-      saveError = `${label} must be a whole number`;
+      saves?.report(`${label} must be a whole number`);
       revert(field);
       return;
     }
@@ -469,9 +317,10 @@
   // back button doesn't blur, so save whatever is still being edited.
   onDestroy(commitAll);
 
-  function hasUnsavedEdits() {
+  /** Whether the page holds edits Saves doesn't: Details being typed, or a Lyric Sheet editor's. */
+  function editsOutside() {
     if (!song) return false;
-    if (pending > 0 || unsavedEditors.size > 0 || unsavedCues.length > 0) return true;
+    if (unsavedEditors.size > 0) return true;
     const saved = toDraft(song);
     return (Object.keys(saved) as (keyof Draft)[]).some(
       (f) => (f === 'notes' ? draft[f] : draft[f].trim()) !== saved[f],
@@ -480,23 +329,16 @@
 
   // Closing or reloading the tab can't wait for a save, or a recording, so ask first.
   function warnBeforeUnload(event: BeforeUnloadEvent) {
-    if (!reloading && (recording || hasUnsavedEdits())) event.preventDefault();
+    if (!reloading && (recording || saves?.unsaved)) event.preventDefault();
   }
 
   async function remove() {
-    if (!song || recording) return;
+    if (!saves || !song || recording) return;
     const ok = confirm(`Delete “${song.title}”?\n\nThis removes the Song and everything in it. It can't be undone.`);
     if (!ok) return;
     deleting = true;
-    try {
-      // Let queued saves finish first, so none of them lands after the delete.
-      await queue;
-      await api.deleteSong(song);
-      navigate('/', { replace: true });
-    } catch (e) {
-      showError(e as Error);
-      deleting = false;
-    }
+    if (await saves.close((at) => api.deleteSong(at))) navigate('/', { replace: true });
+    else deleting = false;
   }
 </script>
 
@@ -514,12 +356,12 @@
 {/snippet}
 
 <svelte:window onbeforeunload={warnBeforeUnload} onkeydown={openShortcutsOnKey} />
-<svelte:document onvisibilitychange={refresh} />
+<svelte:document onvisibilitychange={refreshOnReturn} />
 
 <main class="page" style:--timeline-height="{timelineHeight}px">
   {#if loadError}
     <p class="error" role="alert">{loadError}</p>
-  {:else if song === null}
+  {:else if !saves || !song}
     <p class="muted">Loading…</p>
   {:else}
     <div class="song">
@@ -531,8 +373,8 @@
               cover={song.cover}
               title={draft.title}
               status={draft.status}
-              change={send}
-              onError={(m) => (saveError = m)}
+              change={saves.change}
+              onError={saves.report}
             />
           {:else}
             <SongCover
@@ -567,7 +409,7 @@
                 <StatusBadge status={draft.status} onChange={writing ? setStatus : undefined} />
                 <span class="muted" aria-hidden="true">·</span>
                 <p class="save-state muted" role="status">
-                  {#if pending > 0}
+                  {#if saves.pending > 0}
                     Saving…
                   {:else}
                     Edited <time datetime={song.updatedAt}>{timeAgo(song.updatedAt)}</time>
@@ -646,7 +488,7 @@
                   labelledby="song-tuning-label"
                   bind:value={draft.tuning}
                   oncommit={() => commitText('tuning')}
-                  oninvalid={(message) => (saveError = message)}
+                  oninvalid={saves.report}
                 />
               </div>
               {@render notesToggle()}
@@ -676,7 +518,7 @@
           {/if}
         </section>
 
-        {#if stale}
+        {#if saves.stale}
           <div class="stale" role="alert">
             <p>
               This Song changed elsewhere, so edits made here since can’t be saved. Reload to see the latest. Edits that
@@ -685,8 +527,8 @@
             <button type="button" class="button" onclick={reload}>Reload</button>
           </div>
         {/if}
-        {#if saveError}
-          <p class="error" role="alert">{saveError}</p>
+        {#if saves.saveError}
+          <p class="error" role="alert">{saves.saveError}</p>
         {/if}
       </div>
 
@@ -694,9 +536,9 @@
         <LyricSheet
           song={shown!}
           {mode}
-          change={send}
+          change={saves.change}
           {drag}
-          {changeCues}
+          changeCues={saves.cue}
           onUnsaved={setUnsaved}
           {playhead}
           playFrom={(at) => timelinePanel?.playFrom(at)}
@@ -723,10 +565,16 @@
           >
             {#if part === 'masters'}
               <summary><FoldChevron />{song.masters.length > 1 ? 'Masters' : 'Master'}</summary>
-              <Masters {song} {mode} change={send} onUnsaved={setUnsaved} {setStatus} {recording} />
+              <Masters {song} {mode} change={saves.change} onUnsaved={setUnsaved} {setStatus} {recording} />
             {:else}
               <summary><FoldChevron />Scrapbook</summary>
-              <Scrapbook {song} change={send} {drag} onUnsaved={setUnsaved} onEditing={() => (syncing = false)} />
+              <Scrapbook
+                {song}
+                change={saves.change}
+                {drag}
+                onUnsaved={setUnsaved}
+                onEditing={() => (syncing = false)}
+              />
             {/if}
           </details>
         {/each}
@@ -749,14 +597,13 @@
   {/if}
 </main>
 
-{#if shown && timeline}
+{#if saves && shown && timeline}
   <Timeline
     bind:this={timelinePanel}
     bind:height={timelineHeight}
     song={shown}
     {timeline}
-    change={changeTimeline}
-    {changeCues}
+    {saves}
     {setBpm}
     onPlayhead={(at) => (playhead = at)}
     onLoop={(on) => (loopOn = on)}

@@ -55,7 +55,7 @@
   } from './snapping';
   import { activeTake, clipSources, clipTitle, fileStart, playing } from './clipSource';
   import { formatCue, movedCues, type TimeSpan } from './cues';
-  import type { CueChange } from './cueChanges';
+  import type { Saves } from './saves.svelte';
   import { editHint, editsWhileRecording, type Freeze } from './freeze';
   import { draggedFiles, fileDropTrack, importEach, type TrackRow } from './fileDrop';
   import {
@@ -162,8 +162,7 @@
   let {
     song,
     timeline,
-    change,
-    changeCues,
+    saves,
     setBpm,
     onPlayhead,
     onLoop,
@@ -173,13 +172,8 @@
   }: {
     song: Song;
     timeline: Timeline;
-    /**
-     * Queues a Timeline change, or a Cue edit, based on the Song as saved
-     * when its turn comes; resolves to whether it succeeded.
-     */
-    change: (op: (saved: Song) => Promise<Saved>) => Promise<boolean>;
-    /** Makes a Cue change, shown at once, naming what it changes in case it's taken back; resolves to whether it was saved. */
-    changeCues: (change: CueChange, what: string) => Promise<boolean>;
+    /** The Song's saves, which the Timeline's edits and Cue changes go through. */
+    saves: Saves;
     /** Sets the Song's BPM. */
     setBpm: (bpm: number) => void;
     /** Hears where playback is, in seconds, every frame while playing, then null once it stops. */
@@ -389,11 +383,16 @@
     try {
       return await save;
     } catch (err) {
-      if (err instanceof ApiError && err.stale) {
-        history.clear();
-        showHistory();
-      }
+      forgetIfStale(err);
       throw err;
+    }
+  }
+
+  /** Forgets every edit kept if a save was refused because the Song changed elsewhere. */
+  function forgetIfStale(err: unknown) {
+    if (err instanceof ApiError && err.stale) {
+      history.clear();
+      showHistory();
     }
   }
 
@@ -428,33 +427,40 @@
     e = $state.snapshot(e) as TimelineEdit;
     offerCues = null;
     queued++;
-    return change((at) =>
-      send(at, e, (before, after) => {
-        history.record(e, before, after);
-        done?.(before, after);
-      }),
-    ).finally(() => queued--);
+    return saves
+      .rawSend((at) =>
+        send(at, e, (before, after) => {
+          history.record(e, before, after);
+          done?.(before, after);
+        }),
+      )
+      .finally(() => queued--);
   }
 
-  /**
-   * Queues a Cue edit, e.g. from the Lyric Sheet, to undo along with the
-   * Timeline's edits, in the order they were made; resolves to whether it
-   * succeeded. It's kept as what it changed in the Song as saved, whatever
-   * Cue changes not saved yet the Song shown has.
-   */
-  export function editCues(op: (saved: Song) => Promise<Song>): Promise<boolean> {
-    offerCues = null;
-    queued++;
-    return change(async (before) => {
-      const after = await saved(op(before)).catch((err) => {
+  // Cue edits, e.g. from the Lyric Sheet, are kept to undo along with the
+  // Timeline's edits, in the order they were made. Each is kept as what it
+  // changed in the Song as saved, whatever Cue changes not saved yet the
+  // Song shown has.
+  $effect(() => {
+    saves.cueHook = {
+      asked() {
+        offerCues = null;
+        queued++;
+      },
+      landed(before, after) {
+        history.recordCues(before, after);
+        showHistory();
+      },
+      failed(err) {
+        forgetIfStale(err);
         cueEditsFailed++;
-        throw err;
-      });
-      history.recordCues(before, after);
-      showHistory();
-      return { song: after };
-    }).finally(() => queued--);
-  }
+      },
+      settled() {
+        queued--;
+      },
+    };
+    return () => (saves.cueHook = null);
+  });
 
   async function undo() {
     if (frozen || (!undoable && queued === 0)) return;
@@ -463,7 +469,7 @@
     // Where undoing a new Take returns the playhead to, to record again from.
     let returnTo: number | null = null;
     const failedBefore = cueEditsFailed;
-    const ok = await change((at) => {
+    const ok = await saves.rawSend((at) => {
       if (cueEditsFailed !== failedBefore) return unchanged(at);
       const e = history.nextUndo();
       returnTo = history.nextUndoPlayhead();
@@ -486,7 +492,7 @@
     if (frozen || !redoable) return;
     offerCues = null;
     mergeNote = null;
-    change((at) => {
+    saves.rawSend((at) => {
       const e = history.nextRedo();
       return e
         ? send(at, e, (before, after) => {
@@ -958,14 +964,16 @@
     importing = `Importing “${name}”…`;
     offerCues = null;
     queued++;
-    await change(async (at) => {
-      const before = timeline;
-      const after = await saved(api.importSound(at, file, { trackId, name, ...decoded }));
-      history.record(placingAdded(before, after), before, after);
-      editedAt = after.version;
-      showHistory();
-      return { timeline: after };
-    }).finally(() => queued--);
+    await saves
+      .rawSend(async (at) => {
+        const before = timeline;
+        const after = await saved(api.importSound(at, file, { trackId, name, ...decoded }));
+        history.record(placingAdded(before, after), before, after);
+        editedAt = after.version;
+        showHistory();
+        return { timeline: after };
+      })
+      .finally(() => queued--);
   }
 
   /** Imports the file picked with Import audio… onto the Chosen Track. */
@@ -1266,23 +1274,25 @@
     const peaks = peaksOf([samples], rate);
     offerCues = null;
     queued++;
-    return change(async (at) => {
-      const { target, captureStart } = place();
-      if (!target) throw new Error("There's no Track to put the Take on.");
-      const details = { captureStart, latencyOffset, peaks };
-      const before = timeline;
-      let after: Timeline;
-      if ('clipId' in target) {
-        after = await saved(api.retake(at, target.clipId, wav, details));
-        history.record(settingTakes(after, target.clipId), before, after);
-      } else {
-        after = await saved(api.recordTake(at, wav, { ...target, ...details }));
-        history.recordTake(before, after);
-      }
-      editedAt = after.version;
-      showHistory();
-      return { timeline: after };
-    }).finally(() => queued--);
+    return saves
+      .rawSend(async (at) => {
+        const { target, captureStart } = place();
+        if (!target) throw new Error("There's no Track to put the Take on.");
+        const details = { captureStart, latencyOffset, peaks };
+        const before = timeline;
+        let after: Timeline;
+        if ('clipId' in target) {
+          after = await saved(api.retake(at, target.clipId, wav, details));
+          history.record(settingTakes(after, target.clipId), before, after);
+        } else {
+          after = await saved(api.recordTake(at, wav, { ...target, ...details }));
+          history.recordTake(before, after);
+        }
+        editedAt = after.version;
+        showHistory();
+        return { timeline: after };
+      })
+      .finally(() => queued--);
   }
 
   $effect(() => {
@@ -2166,8 +2176,8 @@
     if (!offerCues) return;
     const { spans, by } = offerCues;
     const what = `moving the Cues with ${offerCues.clips === 1 ? 'the Clip' : 'the Clips'}`;
-    if (spans.length === 1) changeCues({ kind: 'shiftCues', ...spans[0], by }, what);
-    else changeCues({ kind: 'restoreCues', cues: restorable(movedCues(song, spans, by), song) }, what);
+    if (spans.length === 1) saves.cue({ kind: 'shiftCues', ...spans[0], by }, what);
+    else saves.cue({ kind: 'restoreCues', cues: restorable(movedCues(song, spans, by), song) }, what);
   }
 
   function editCancel() {
@@ -2309,31 +2319,33 @@
     offerCues = null;
     mergeNote = null;
     queued++;
-    change(async (at) => {
-      const target = mergeTarget(timeline.tracks, clipIds);
-      if (!target) throw new Error("The Clips to merge aren't all on the Timeline any more.");
-      let audio: MergedAudio;
-      try {
-        audio = await renderMerge(mergedClips(timeline, sources, target.clipIds), target, (s) => player.load(s));
-      } catch (e) {
-        throw new Error(`Couldn't merge the Clips (${(e as Error).message}).`);
-      }
-      const before = timeline;
-      const after = await saved(
-        api.mergeClips(at, audio.wav, { clipIds: target.clipIds, peaks: audio.peaks, ...target.onto }),
-      );
-      history.record(mergingAdded(before, after, target.clipIds), before, after);
-      editedAt = after.version;
-      showHistory();
-      const [mergedId] = addedClips(before, after);
-      selected = new Set([mergedId]);
-      remembered = after.tracks.find((t) => t.clips.some((c) => c.id === mergedId))!.id;
-      mergeNote = mergeWarning(target.silent);
-      return { timeline: after };
-    }).finally(() => {
-      merging = false;
-      queued--;
-    });
+    saves
+      .rawSend(async (at) => {
+        const target = mergeTarget(timeline.tracks, clipIds);
+        if (!target) throw new Error("The Clips to merge aren't all on the Timeline any more.");
+        let audio: MergedAudio;
+        try {
+          audio = await renderMerge(mergedClips(timeline, sources, target.clipIds), target, (s) => player.load(s));
+        } catch (e) {
+          throw new Error(`Couldn't merge the Clips (${(e as Error).message}).`);
+        }
+        const before = timeline;
+        const after = await saved(
+          api.mergeClips(at, audio.wav, { clipIds: target.clipIds, peaks: audio.peaks, ...target.onto }),
+        );
+        history.record(mergingAdded(before, after, target.clipIds), before, after);
+        editedAt = after.version;
+        showHistory();
+        const [mergedId] = addedClips(before, after);
+        selected = new Set([mergedId]);
+        remembered = after.tracks.find((t) => t.clips.some((c) => c.id === mergedId))!.id;
+        mergeNote = mergeWarning(target.silent);
+        return { timeline: after };
+      })
+      .finally(() => {
+        merging = false;
+        queued--;
+      });
   }
 
   /** Deletes the selected Clips, as one edit. */
