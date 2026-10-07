@@ -47,6 +47,13 @@ export const shortcuts = {
     description: 'Records a Take on the Chosen Track, or stops recording.',
     keys: [{ key: 'r' }],
   },
+  startOrEnd: {
+    name: 'Go to the start or end',
+    group: 'Playback & recording',
+    description: 'Moves the playhead to the start or the end, from anywhere outside a text field, a menu or a dialog.',
+    back: [{ key: 'Home' }],
+    forward: [{ key: 'End' }],
+  },
   undo: {
     name: 'Undo',
     group: 'Timeline editing',
@@ -93,13 +100,6 @@ export const shortcuts = {
       { key: 'ArrowRight', shift: true },
       { key: 'ArrowUp', shift: true },
     ],
-  },
-  startOrEnd: {
-    name: 'Go to the start or end',
-    group: 'Timeline editing',
-    description: 'Moves the playhead to the start or the end, from the ruler.',
-    back: [{ key: 'Home' }],
-    forward: [{ key: 'End' }],
   },
   nudgeCue: {
     name: 'Nudge a Cue by 0.1 s',

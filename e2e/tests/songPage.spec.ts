@@ -363,6 +363,38 @@ test('a Split selects and focuses the right half of each Clip it cuts, so Delete
   await expect(beatClip).toHaveAccessibleName('Lorem Click, 0:00 to 0:10');
 });
 
+test('Home and End go to the start and the end with focus on the lanes, without scrolling the page, and a volume slider keeps its own', async ({
+  page,
+  bandmate,
+}) => {
+  const song = await heroSong(bandmate);
+  await page.goto(`/songs/${song.id}`);
+  const ruler = timeline(page).getByRole('slider', { name: 'Position' });
+  const take = clip(page, 'Take 2');
+  await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
+
+  // Focus on a Clip in the lanes, which a click selects.
+  await take.click();
+  await expect(take).toBeFocused();
+  const scrolled = await page.evaluate(() => window.scrollY);
+  await page.keyboard.press('End');
+  await expect(ruler).toHaveAttribute('aria-valuetext', /^(\d+:\d+) of \1$/);
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrolled);
+  await page.keyboard.press('Home');
+  await expect(ruler).toHaveAttribute('aria-valuenow', '0');
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrolled);
+
+  // A Track's volume slider takes Home to its lowest, leaving the playhead be.
+  await page.keyboard.press('End');
+  const volume = timeline(page).getByRole('slider', { name: 'Volume of Lead vox' });
+  const lowest = (await volume.getAttribute('min'))!;
+  await expect(volume).not.toHaveValue(lowest);
+  await volume.focus();
+  await page.keyboard.press('Home');
+  await expect(volume).toHaveValue(lowest);
+  await expect(ruler).toHaveAttribute('aria-valuetext', /^(\d+:\d+) of \1$/);
+});
+
 test('Cue edits are undone in order with the Clip edits around them', async ({ page, bandmate }) => {
   const song = await heroSong(bandmate);
   await page.goto(`/songs/${song.id}`);
