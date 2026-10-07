@@ -17,10 +17,10 @@ const clip = (source: string, trackId: number, start: number, end: number): Play
 
 /**
  * Transport as the Timeline makes it, inside an effect root, on a fake
- * player and frames, with what plays, the Loop, the length, the recording
- * and whether the playhead's dragged set by the test through state, and
- * what its hooks heard: captures ended by playback stopping, errors said,
- * playback starting and the playhead each frame.
+ * player and frames, with what plays, the Loop, the length and the
+ * recording set by the test through state, and what its hooks heard:
+ * captures ended by playback stopping, errors said, and the playhead each
+ * frame it's followed.
  */
 function transportFor() {
   const state = $state({
@@ -29,10 +29,9 @@ function transportFor() {
     length: 10,
     recording: false,
     capturing: false,
-    dragging: false,
   });
   const frames = new FakeFrames();
-  const heard = { captures: 0, errors: [] as (string | null)[], starts: 0, frames: [] as number[] };
+  const heard = { captures: 0, errors: [] as (string | null)[], followed: [] as number[] };
   let player!: FakeTimelinePlayer;
   let transport!: Transport;
   const dispose = $effect.root(() => {
@@ -45,9 +44,7 @@ function transportFor() {
       capturing: () => state.capturing,
       onCaptureStopped: () => heard.captures++,
       onError: (message) => heard.errors.push(message),
-      onPlay: () => heard.starts++,
-      dragging: () => state.dragging,
-      onFrame: (position) => heard.frames.push(position),
+      onFollow: (position) => heard.followed.push(position),
       frames,
     });
   });
@@ -258,11 +255,10 @@ describe('Transport, seeking', () => {
 
 describe('Transport, playing from a time asked for', () => {
   it('starts playback there while stopped', () => {
-    const { transport, player, heard } = transportFor();
+    const { transport, player } = transportFor();
     transport.playFrom(5);
     expect(transport.position).toBe(5);
     expect(player.plays.map((p) => p.from)).toEqual([5]);
-    expect(heard.starts).toBe(1);
   });
 
   it('jumps there while playing, never pausing', async () => {
@@ -286,14 +282,13 @@ describe('Transport, playing from a time asked for', () => {
 
 describe('Transport, recording', () => {
   it('plays along from where the recording starts, ignoring the Loop', async () => {
-    const { transport, player, state, heard } = transportFor();
+    const { transport, player, state } = transportFor();
     state.loop = { start: 0, end: 4 };
     state.recording = true;
     flushSync();
     expect(await transport.playAlong(2)).toBe(true);
     expect(player.plays).toEqual([{ clips: state.playable, from: 2, loop: null }]);
     expect(transport.startedAt).toBe(100);
-    expect(heard.starts).toBe(1);
   });
 
   it('plays on past the end while capturing', async () => {
@@ -403,29 +398,6 @@ describe('Transport, the playhead', () => {
     frames.step();
     expect(transport.playingAt).toBe(4);
   });
-
-  it('is left where it’s dragged by frames', async () => {
-    const { transport, player, frames, state } = transportFor();
-    transport.toggle();
-    await loaded();
-    state.dragging = true;
-    transport.dragTo(7);
-    player.now += 1;
-    frames.step();
-    expect(transport.position).toBe(7);
-    expect(player.plays).toHaveLength(1);
-  });
-
-  it('is heard each frame while playing on', async () => {
-    const { transport, player, frames, heard } = transportFor();
-    transport.toggle();
-    await loaded();
-    player.now += 1;
-    frames.step();
-    player.now += 1;
-    frames.step();
-    expect(heard.frames).toEqual([1, 2]);
-  });
 });
 
 describe('Transport, failing to play', () => {
@@ -439,5 +411,172 @@ describe('Transport, failing to play', () => {
     player.failing = null;
     transport.toggle();
     expect(heard.errors.at(-1)).toBeNull();
+  });
+});
+
+describe('Transport, the ruler scrub', () => {
+  it('seeks as it goes while stopped', () => {
+    const { transport, player } = transportFor();
+    transport.startScrub(2);
+    expect(transport.scrubbing).toBe(true);
+    transport.scrubTo(5);
+    expect(transport.position).toBe(5);
+    expect(player.position()).toBe(5);
+    transport.endScrub(6);
+    expect(transport.scrubbing).toBe(false);
+    expect(transport.position).toBe(6);
+    expect(player.position()).toBe(6);
+    expect(player.plays).toHaveLength(0);
+  });
+
+  it('while playing, moves the playhead, left there by frames, and jumps playback only on release', async () => {
+    const { transport, player, frames } = transportFor();
+    transport.toggle();
+    await loaded();
+    // Pressed, playback jumps there.
+    transport.startScrub(2);
+    expect(player.plays.map((p) => p.from)).toEqual([0, 2]);
+    await loaded();
+    transport.scrubTo(7);
+    player.now += 1;
+    frames.step();
+    expect(transport.position).toBe(7);
+    transport.scrubTo(8);
+    expect(transport.position).toBe(8);
+    expect(player.plays).toHaveLength(2);
+    transport.endScrub(8.5);
+    expect(player.plays.map((p) => p.from)).toEqual([0, 2, 8.5]);
+    await loaded();
+    player.now += 1;
+    frames.step();
+    expect(transport.position).toBe(9.5);
+  });
+
+  it('given up while playing, isn’t a seek: playback plays on from where it was', async () => {
+    const { transport, player, frames } = transportFor();
+    transport.toggle();
+    await loaded();
+    transport.startScrub(2);
+    await loaded();
+    transport.scrubTo(7);
+    transport.cancelScrub();
+    expect(transport.scrubbing).toBe(false);
+    transport.endScrub(7);
+    expect(player.plays.map((p) => p.from)).toEqual([0, 2]);
+    player.now += 1;
+    frames.step();
+    expect(transport.position).toBe(3);
+  });
+
+  it('given up while stopped, leaves the playhead where it was scrubbed to', () => {
+    const { transport, player } = transportFor();
+    transport.startScrub(2);
+    transport.scrubTo(5);
+    transport.cancelScrub();
+    transport.scrubTo(8);
+    expect(transport.position).toBe(5);
+    expect(player.position()).toBe(5);
+  });
+
+  it('isn’t started while a recording is on', async () => {
+    const { transport, player, state } = transportFor();
+    state.recording = true;
+    await transport.playAlong(2);
+    state.capturing = true;
+    transport.startScrub(6);
+    expect(transport.scrubbing).toBe(false);
+    transport.scrubTo(7);
+    transport.endScrub(7);
+    expect(transport.position).toBe(2);
+    expect(player.plays).toHaveLength(1);
+  });
+});
+
+describe('Transport, following the playhead', () => {
+  it('is heard each frame while playing on', async () => {
+    const { transport, player, frames, heard } = transportFor();
+    expect(transport.following).toBe(true);
+    transport.toggle();
+    await loaded();
+    player.now += 1;
+    frames.step();
+    player.now += 1;
+    frames.step();
+    expect(heard.followed).toEqual([1, 2]);
+  });
+
+  it('goes off with a hand scroll, no longer heard each frame', async () => {
+    const { transport, player, frames, heard } = transportFor();
+    transport.toggle();
+    await loaded();
+    transport.stopFollowing();
+    expect(transport.following).toBe(false);
+    player.now += 1;
+    frames.step();
+    expect(heard.followed).toEqual([]);
+    expect(transport.position).toBe(1);
+  });
+
+  it('comes on with playing from stopped, but not with pausing', async () => {
+    const { transport } = transportFor();
+    transport.stopFollowing();
+    transport.toggle();
+    expect(transport.following).toBe(true);
+    await loaded();
+    transport.stopFollowing();
+    transport.toggle();
+    expect(transport.following).toBe(false);
+  });
+
+  it('comes on with playing from a time asked for', () => {
+    const { transport } = transportFor();
+    transport.stopFollowing();
+    transport.playFrom(5);
+    expect(transport.following).toBe(true);
+  });
+
+  it('comes on with playing along with a recording', async () => {
+    const { transport, state } = transportFor();
+    transport.stopFollowing();
+    state.recording = true;
+    await transport.playAlong(2);
+    expect(transport.following).toBe(true);
+  });
+
+  it('comes on with a hand seek', () => {
+    const { transport } = transportFor();
+    transport.stopFollowing();
+    transport.seek(4);
+    expect(transport.following).toBe(true);
+  });
+
+  it('comes on with a ruler press, even during a recording, which it doesn’t move', async () => {
+    const { transport, player, state } = transportFor();
+    state.recording = true;
+    await transport.playAlong(2);
+    state.capturing = true;
+    transport.stopFollowing();
+    transport.startScrub(6);
+    expect(transport.following).toBe(true);
+    expect(transport.scrubbing).toBe(false);
+    expect(transport.position).toBe(2);
+    expect(player.plays).toHaveLength(1);
+  });
+
+  it('isn’t heard while the playhead’s scrubbed, which shows it where it’s dragged', async () => {
+    const { transport, player, frames, heard } = transportFor();
+    transport.toggle();
+    await loaded();
+    transport.startScrub(2);
+    await loaded();
+    transport.scrubTo(7);
+    player.now += 1;
+    frames.step();
+    expect(heard.followed).toEqual([]);
+    transport.endScrub(7);
+    await loaded();
+    player.now += 1;
+    frames.step();
+    expect(heard.followed).toEqual([8]);
   });
 });
