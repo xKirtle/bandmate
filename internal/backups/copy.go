@@ -78,11 +78,6 @@ var songTables = []songTable{
 // bookkeeping, and the Backups.
 var notCopied = map[string]bool{"schema_migrations": true, "sqlite_sequence": true, "backups": true}
 
-// fileKind is a kind of file the rows a Backup holds use, a Song's or the
-// Beat Library's, whose ids are listed, from the Backup's database, given
-// the same parameters as the tables.
-type fileKind = songfiles.Kind
-
 // copyAttempts is how often a Song's copy, or the Beat Library's, is tried
 // before giving up: a file removed between reading the rows and keeping
 // their files, e.g. a Cover just replaced, means reading them again.
@@ -96,14 +91,14 @@ var errFileGone = errors.New("a file was removed while it was backed up")
 var beatLibraryTables = []songTable{{name: "beats", shared: true, where: `TRUE`}}
 
 // beatLibraryFiles lists the files the Beat Library's rows use.
-var beatLibraryFiles = []fileKind{{Dir: songfiles.Beats.Dir, Table: songfiles.Beats.Table, IDs: `SELECT id FROM main.beats`}}
+var beatLibraryFiles = []songfiles.Kind{{Dir: songfiles.Beats.Dir, Table: songfiles.Beats.Table, IDs: `SELECT id FROM main.beats`}}
 
 // chosenBeatsTables picks the Beats chosen, by their ids as a JSON array,
 // some of which may already be in the Backup from a Song.
 var chosenBeatsTables = []songTable{{name: "beats", shared: true, where: `id IN (SELECT value FROM json_each(?1))`}}
 
 // chosenBeatsFiles lists the files the chosen Beats' rows use.
-var chosenBeatsFiles = []fileKind{{Dir: songfiles.Beats.Dir, Table: songfiles.Beats.Table,
+var chosenBeatsFiles = []songfiles.Kind{{Dir: songfiles.Beats.Dir, Table: songfiles.Beats.Table,
 	IDs: `SELECT id FROM main.beats WHERE id IN (SELECT value FROM json_each(?1))`}}
 
 // held is how many Songs and Beats a Backup holds.
@@ -172,7 +167,7 @@ func (s *Store) copyContents(ctx context.Context, staging string, songIDs, beatI
 // use, trying again if a file is removed meanwhile. It tells whether a Song
 // was there to copy: whether the first table not shared picked a row.
 func (s *Store) copyRows(ctx context.Context, conn *sql.Conn, staging string, columns map[string][]string,
-	tables []songTable, files []fileKind, args ...any) (bool, error) {
+	tables []songTable, files []songfiles.Kind, args ...any) (bool, error) {
 	for attempt := 1; ; attempt++ {
 		found, err := s.copyOnce(ctx, conn, staging, columns, tables, files, args)
 		if !errors.Is(err, errFileGone) || attempt == copyAttempts {
@@ -249,7 +244,7 @@ func columnList(columns []string) string {
 // in the files they use before committing. It tells whether the first
 // table not shared picked a row; if it picked none, nothing is copied.
 func (s *Store) copyOnce(ctx context.Context, conn *sql.Conn, staging string, columns map[string][]string,
-	tables []songTable, files []fileKind, args []any) (bool, error) {
+	tables []songTable, files []songfiles.Kind, args []any) (bool, error) {
 	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
 		return false, err
@@ -300,7 +295,7 @@ func (s *Store) copyOnce(ctx context.Context, conn *sql.Conn, staging string, co
 // the paths they have in the data directory, and returns those it put
 // there. A Beat already there, from another Song, or from the Beat Library,
 // is left as it is.
-func (s *Store) linkFiles(ctx context.Context, tx *sql.Tx, staging string, files []fileKind, args []any) ([]string, error) {
+func (s *Store) linkFiles(ctx context.Context, tx *sql.Tx, staging string, files []songfiles.Kind, args []any) ([]string, error) {
 	var linked []string
 	for _, f := range files {
 		ids, err := queryIDs(ctx, tx, f.IDs, args...)

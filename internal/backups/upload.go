@@ -177,7 +177,7 @@ func (r *openedBackup) checkFiles(ctx context.Context, entries map[string]bool) 
 	if err != nil {
 		return damagedBy(err)
 	}
-	need := func(files []fileKind, args ...any) error {
+	need := func(files []songfiles.Kind, args ...any) error {
 		for _, f := range files {
 			ids, err := queryIDs(ctx, r.db, f.IDs, args...)
 			if err != nil {

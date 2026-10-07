@@ -470,7 +470,7 @@ func stagedFile(staging, dir string, id int64) string {
 }
 
 // unpackFiles unpacks the files listed by files, given args, each once.
-func (r *openedBackup) unpackFiles(ctx context.Context, files []fileKind, args ...any) error {
+func (r *openedBackup) unpackFiles(ctx context.Context, files []songfiles.Kind, args ...any) error {
 	for _, f := range files {
 		ids, err := queryIDs(ctx, r.db, f.IDs, args...)
 		if err != nil {
