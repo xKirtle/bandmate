@@ -4,8 +4,8 @@
   // from, C major until picked. The last ones picked are kept on this device.
   import ChordFinder from '../lib/ChordFinder.svelte';
   import { readTuning, standard } from '../lib/chordFinder';
+  import { deviceStorage } from '../lib/deviceStorage';
   import { readFinderKey, readFinderTuning, storeFinderKey, storeFinderTuning } from '../lib/finderSetup';
-  import { deviceStorage } from '../lib/timelineHeight';
   import TuningField from '../lib/TuningField.svelte';
 
   let tuning = $state(readFinderTuning(deviceStorage()));

@@ -47,7 +47,7 @@
   import { markSyncHintSeen, sawSyncHint } from './syncHint';
   import { cuesNextLine } from './syncKeys';
   import { inTextField } from './textField';
-  import { deviceStorage } from './timelineHeight';
+  import { deviceStorage } from './deviceStorage';
   import { songChordsShown } from './chordsShown';
   import { lyricSize } from './sharedLyricSize.svelte';
   import { songTranspose } from './sharedTranspose.svelte';

@@ -121,17 +121,10 @@
   import MixdownDialog from './MixdownDialog.svelte';
   import { mixdownEnd } from './mixdown';
   import { appliedOffset } from './calibration';
+  import { deviceStorage } from './deviceStorage';
   import { calibration } from './sharedCalibration.svelte';
   import { input as chosenInput } from './sharedInput.svelte';
-  import {
-    clampHeight,
-    defaultHeight,
-    deviceStorage,
-    grownHeight,
-    heightBounds,
-    readHeight,
-    storeHeight,
-  } from './timelineHeight';
+  import { clampHeight, defaultHeight, grownHeight, heightBounds, readHeight, storeHeight } from './timelineHeight';
   import { fullScreenQuery } from './timelineLayout';
   import { audioContext, TimelinePlayer, type PlayableClip, type PlayerState } from './timelinePlayer';
   import { forgetUnsaved, Keeper, unsavedSamples, unsavedTakes, whileHeld } from './unsavedTakes';

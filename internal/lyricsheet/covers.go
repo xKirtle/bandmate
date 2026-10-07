@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/xKirtle/bandmate/internal/audio"
+	"github.com/xKirtle/bandmate/internal/songfiles"
 )
 
 // Cover is a Song's picture, shown as a square chosen from it. The browser
@@ -63,15 +64,21 @@ func (d CoverDetails) problem() string {
 type CoverPicture string
 
 const (
-	CoverOriginal CoverPicture = "original"
+	CoverOriginal CoverPicture = songfiles.CoverOriginal
 	// CoverList is the crop square at the Song list's size.
-	CoverList CoverPicture = "list"
+	CoverList CoverPicture = songfiles.CoverList
 	// CoverHeader is the crop square at the Song page header's size.
-	CoverHeader CoverPicture = "header"
+	CoverHeader CoverPicture = songfiles.CoverHeader
 )
 
-// CoverPictures lists a Cover's pictures.
-var CoverPictures = []CoverPicture{CoverOriginal, CoverList, CoverHeader}
+// CoverPictures lists a Cover's pictures, each a kind of file a Song has.
+var CoverPictures = func() []CoverPicture {
+	pictures := make([]CoverPicture, len(songfiles.CoverPictures))
+	for i, p := range songfiles.CoverPictures {
+		pictures[i] = CoverPicture(p)
+	}
+	return pictures
+}()
 
 // SquarePictures lists the pictures made from a Cover's crop square.
 var SquarePictures = []CoverPicture{CoverList, CoverHeader}
@@ -79,6 +86,16 @@ var SquarePictures = []CoverPicture{CoverList, CoverHeader}
 // CoverFiles is where Covers' pictures are kept: one directory for each
 // picture, each file named by its Cover's id.
 type CoverFiles map[CoverPicture]*audio.Files
+
+// CoverFilesIn picks out Covers' pictures from the files of each kind a
+// Song has, by the kind's directory.
+func CoverFilesIn(songFiles map[string]*audio.Files) CoverFiles {
+	files := CoverFiles{}
+	for _, p := range CoverPictures {
+		files[p] = songFiles[songfiles.Cover(string(p)).Dir]
+	}
+	return files
+}
 
 // UploadedPicture is a picture as uploaded, stored under a temporary name.
 type UploadedPicture struct {

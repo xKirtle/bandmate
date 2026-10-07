@@ -253,23 +253,6 @@ func (s *Store) ServeMaster(w http.ResponseWriter, r *http.Request, songID, mast
 	return s.masterFiles.Serve(w, r, masterID, contentType)
 }
 
-// masterIDs lists a Song's Masters by id.
-func masterIDs(ctx context.Context, q queryer, songID int64) ([]int64, error) {
-	var ids []int64
-	err := query(ctx, q, `SELECT id FROM masters WHERE song_id = ?`, []any{songID}, func(rows *sql.Rows) error {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
-			return err
-		}
-		ids = append(ids, id)
-		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("listing masters: %w", err)
-	}
-	return ids, nil
-}
-
 // removeMasterFiles deletes the files of Masters already gone from the
 // database. A file left behind only takes space, so failures are logged.
 func (s *Store) removeMasterFiles(ids []int64) {

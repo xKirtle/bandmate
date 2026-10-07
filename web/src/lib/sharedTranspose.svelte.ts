@@ -1,5 +1,5 @@
 import { SvelteMap } from 'svelte/reactivity';
-import { deviceStorage } from './timelineHeight';
+import { deviceStorage } from './deviceStorage';
 import { readTranspose, storeTranspose } from './transposeAmount';
 
 // Each Song's Transpose amount on this device, shared beyond the Lyric

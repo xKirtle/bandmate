@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/xKirtle/bandmate/internal/audio"
+	"github.com/xKirtle/bandmate/internal/songfiles"
 	"github.com/xKirtle/bandmate/internal/tags"
 )
 
@@ -119,25 +120,23 @@ type SongSummary struct {
 
 // Store reads and changes Songs in the database.
 type Store struct {
-	db          *sql.DB
+	db *sql.DB
+	// songFiles holds the files of each kind a Song has, by the kind's
+	// directory: those it owns go when it does.
+	songFiles   map[string]*audio.Files
 	masterFiles *audio.Files
 	coverFiles  CoverFiles
-	// takeFiles and soundFiles hold the audio of the Takes and Sounds on
-	// Songs' Timelines, which go when their Song does.
-	takeFiles  *audio.Files
-	soundFiles *audio.Files
 }
 
-// NewStore returns a Store backed by db, keeping Masters' audio in
-// masterFiles, Covers' pictures in coverFiles, Takes' audio in takeFiles
-// and Sounds' in soundFiles.
-func NewStore(db *sql.DB, masterFiles *audio.Files, coverFiles CoverFiles, takeFiles, soundFiles *audio.Files) *Store {
+// NewStore returns a Store backed by db, keeping the files of each kind a
+// Song has, from Masters' audio to Covers' pictures, in songFiles, by the
+// kind's directory: one for each of songfiles.Kinds.
+func NewStore(db *sql.DB, songFiles map[string]*audio.Files) *Store {
 	return &Store{
 		db:          db,
-		masterFiles: masterFiles,
-		coverFiles:  coverFiles,
-		takeFiles:   takeFiles,
-		soundFiles:  soundFiles,
+		songFiles:   songFiles,
+		masterFiles: songFiles[songfiles.Masters.Dir],
+		coverFiles:  CoverFilesIn(songFiles),
 	}
 }
 
@@ -445,29 +444,20 @@ func (s *Store) UpdateSong(ctx context.Context, id int64, based Version, changes
 }
 
 // DeleteSong removes a Song. Everything the Song owns references it with
-// ON DELETE CASCADE, so it goes too, and so do its Masters', Cover's,
-// Takes' and Sounds' files, detached Takes and unused Sounds included.
+// ON DELETE CASCADE, so it goes too, and so do the files of every kind it
+// owns (see songfiles), detached Takes and unused Sounds included.
 func (s *Store) DeleteSong(ctx context.Context, id int64, based Version) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	masters, err := masterIDs(ctx, tx, id)
-	if err != nil {
-		return err
-	}
-	cover, err := coverID(ctx, tx, id)
-	if err != nil {
-		return err
-	}
-	takes, err := songOwnedIDs(ctx, tx, "takes", id)
-	if err != nil {
-		return err
-	}
-	sounds, err := songOwnedIDs(ctx, tx, "sounds", id)
-	if err != nil {
-		return err
+	owned := songfiles.Owned()
+	ids := make([][]int64, len(owned))
+	for i, k := range owned {
+		if ids[i], err = songFileIDs(ctx, tx, k, id); err != nil {
+			return err
+		}
 	}
 	res, err := tx.ExecContext(ctx, `DELETE FROM songs WHERE id = ? AND (?2 = 0 OR version = ?2)`, id, based)
 	if err != nil {
@@ -479,28 +469,21 @@ func (s *Store) DeleteSong(ctx context.Context, id int64, based Version) error {
 	if err := tx.Commit(); err != nil {
 		return err
 	}
-	s.removeMasterFiles(masters)
-	if cover != 0 {
-		s.removeCoverFiles(cover)
-	}
-	for _, take := range takes {
-		if err := s.takeFiles.Remove(take); err != nil {
-			log.Printf("deleting take %d: %v", take, err)
-		}
-	}
-	for _, sound := range sounds {
-		if err := s.soundFiles.Remove(sound); err != nil {
-			log.Printf("deleting sound %d: %v", sound, err)
+	// A file left behind only takes space, so failures are logged.
+	for i, k := range owned {
+		for _, file := range ids[i] {
+			if err := s.songFiles[k.Dir].Remove(file); err != nil {
+				log.Printf("deleting %s/%d: %v", k.Dir, file, err)
+			}
 		}
 	}
 	return nil
 }
 
-// songOwnedIDs lists the ids of a Song's rows in table, one that has a
-// song_id.
-func songOwnedIDs(ctx context.Context, tx *sql.Tx, table string, songID int64) ([]int64, error) {
+// songFileIDs lists the ids of a Song's files of kind k.
+func songFileIDs(ctx context.Context, tx *sql.Tx, k songfiles.Kind, songID int64) ([]int64, error) {
 	var ids []int64
-	err := query(ctx, tx, `SELECT id FROM `+table+` WHERE song_id = ?`, []any{songID}, func(rows *sql.Rows) error {
+	err := query(ctx, tx, k.IDs, []any{songID}, func(rows *sql.Rows) error {
 		var id int64
 		if err := rows.Scan(&id); err != nil {
 			return err
@@ -509,7 +492,7 @@ func songOwnedIDs(ctx context.Context, tx *sql.Tx, table string, songID int64) (
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("listing %s: %w", table, err)
+		return nil, fmt.Errorf("listing %s: %w", k.Dir, err)
 	}
 	return ids, nil
 }

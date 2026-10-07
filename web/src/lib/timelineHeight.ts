@@ -49,15 +49,6 @@ export function clampHeight(height: number, bounds: HeightBounds): number {
   return Math.min(Math.max(height, bounds.min), bounds.max);
 }
 
-/** This device's storage, if the browser allows it. */
-export function deviceStorage(): Storage | undefined {
-  try {
-    return localStorage;
-  } catch {
-    return undefined;
-  }
-}
-
 /** The height chosen on this device, or null for the default. */
 export function readHeight(storage: Storage | undefined): number | null {
   try {

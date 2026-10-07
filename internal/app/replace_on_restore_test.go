@@ -2,15 +2,13 @@ package app_test
 
 import (
 	"database/sql"
-	"errors"
-	"io/fs"
 	"net/http"
-	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
 
 	"github.com/xKirtle/bandmate/internal/db"
+	"github.com/xKirtle/bandmate/internal/songfiles"
 )
 
 // presentItem is a Song or Beat a Backup holds, by its id and title there,
@@ -181,18 +179,14 @@ func (ts *testServer) restoreReplacing(id int64, songs, replaceSongs, replaceBea
 	}).Songs
 }
 
-// songFilesKept lists the files kept in the data directory for Masters,
-// Covers, Takes and Sounds, by directory.
+// songFilesKept lists the files kept in the data directory of each kind a
+// Song owns, by the kind's directory.
 func songFilesKept(t *testing.T, ts *testServer) map[string][]string {
 	t.Helper()
-	kept := map[string][]string{}
-	for _, dir := range []string{"audio/masters", "audio/takes", "audio/sounds", "covers/original", "covers/list", "covers/header"} {
-		entries, err := os.ReadDir(filepath.Join(ts.DataDir, filepath.FromSlash(dir)))
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
-			t.Fatalf("reading %s: %v", dir, err)
-		}
-		for _, e := range entries {
-			kept[dir] = append(kept[dir], e.Name())
+	kept := filesKept(t, ts.DataDir)
+	for _, k := range songfiles.Kinds {
+		if !k.Owned {
+			delete(kept, k.Dir)
 		}
 	}
 	return kept
