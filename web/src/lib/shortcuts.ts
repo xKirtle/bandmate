@@ -65,7 +65,7 @@ export const shortcuts = {
   deleteClip: {
     name: 'Delete a Clip',
     group: 'Timeline editing',
-    description: "Deletes the selected Clips, or the focused Clip if it isn't selected.",
+    description: 'Deletes the selected Clips, or, on a focused Clip outside the Selection, that Clip alone.',
     keys: [{ key: 'Delete' }, { key: 'Backspace' }],
   },
   clipMenu: {

@@ -126,6 +126,17 @@ test('Clips selected by drawing a box are deleted with Delete, and one undo brin
   await expect.poll(() => serverClips(bandmate, song.id, 'Lead vox')).toMatchObject([{ start: 4, length: 21 }]);
   await expect.poll(() => serverClips(bandmate, song.id, 'Beat')).toMatchObject([{ start: 0, length: 90 }]);
   await expect(undo).toBeDisabled();
+
+  // Selected with Mod+A, after a click on empty lane space, they go the same way.
+  await page.mouse.click(fromX, fromY);
+  await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
+  await page.keyboard.press('ControlOrMeta+a');
+  await expect(take).toHaveAccessibleName(/^Take 2, selected, /);
+  await page.keyboard.press('Delete');
+  await expect(take).toHaveCount(0);
+  await expect(click).toHaveCount(0);
+  await expect.poll(() => serverClips(bandmate, song.id, 'Lead vox')).toEqual([]);
+  await expect.poll(() => serverClips(bandmate, song.id, 'Beat')).toEqual([]);
 });
 
 test('Cue edits are undone in order with the Clip edits around them', async ({ page, bandmate }) => {
