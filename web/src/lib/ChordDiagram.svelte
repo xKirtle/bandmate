@@ -1,10 +1,11 @@
 <script lang="ts">
   // Draws a guitar Voicing as a chord diagram: the strings upright, the low
   // string on the left, the nut (or the fret the Voicing starts at, up the
-  // neck) at the top. Above it, ○ marks a string that rings open and × one
+  // neck or at its barre) at the top. Above it, ○ marks a string that rings open and × one
   // that's muted. On a left-handed device it's mirrored, the low string on
   // the right. The Chord Finder and the Chord Chart both draw with it.
   import type { Voicing } from './chordFinder';
+  import { diagramStartFret } from './guitar';
   import { leftHanded } from './sharedLeftHanded.svelte';
 
   let { voicing, name }: { voicing: Voicing; name: string } = $props();
@@ -25,14 +26,8 @@
   const width = $derived(left + neckWidth + right);
   const height = top + rows * fretGap + bottom;
 
-  /**
-   * The fret the diagram's first row is: 1, under the nut, for a Voicing that
-   * fits there, else the lowest fret the Voicing presses.
-   */
-  const start = $derived.by(() => {
-    const fretted = voicing.frets.filter((f): f is number => f !== null && f > 0);
-    return fretted.length === 0 || Math.max(...fretted) <= rows ? 1 : Math.min(...fretted);
-  });
+  /** The fret the diagram's first row is: a barre's, else 1 under the nut when the Voicing fits there. */
+  const start = $derived(diagramStartFret(voicing, rows));
 
   /**
    * Where a string is drawn, counted from the low one: mirrored for a

@@ -137,6 +137,17 @@ export function guitarVoicings(chord: Chord, tuning: readonly number[]): Voicing
 }
 
 /**
+ * The fret a chord diagram of a Voicing starts at, its first of `rows` rows:
+ * a barre's fret, so the barre lies on the first row; else 1, under the nut,
+ * for a Voicing that fits there; else the lowest fret the Voicing presses.
+ */
+export function diagramStartFret(voicing: Voicing, rows: number): number {
+  if (voicing.barre) return voicing.barre.fret;
+  const fretted = voicing.frets.filter((f): f is number => f !== null && f > 0);
+  return fretted.length === 0 || Math.max(...fretted) <= rows ? 1 : Math.min(...fretted);
+}
+
+/**
  * The notes a shape placed on a guitar sounds, as semitones from C, 0–11,
  * low string to high.
  */
