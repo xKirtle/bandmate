@@ -21,6 +21,7 @@ import (
 	"github.com/xKirtle/bandmate/internal/folders"
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
 	"github.com/xKirtle/bandmate/internal/releases"
+	"github.com/xKirtle/bandmate/internal/songfiles"
 	"github.com/xKirtle/bandmate/internal/tags"
 	"github.com/xKirtle/bandmate/internal/timeline"
 )
@@ -132,33 +133,17 @@ func New(cfg Config) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	beatFiles, err := audio.Open(filepath.Join(cfg.DataDir, "audio", "beats"))
-	if err != nil {
-		conn.Close()
-		return nil, err
-	}
-	masterFiles, err := audio.Open(filepath.Join(cfg.DataDir, "audio", "masters"))
-	if err != nil {
-		conn.Close()
-		return nil, err
-	}
-	takeFiles, err := audio.Open(filepath.Join(cfg.DataDir, "audio", "takes"))
-	if err != nil {
-		conn.Close()
-		return nil, err
-	}
-	soundFiles, err := audio.Open(filepath.Join(cfg.DataDir, "audio", "sounds"))
-	if err != nil {
-		conn.Close()
-		return nil, err
-	}
-	coverFiles := lyricsheet.CoverFiles{}
-	for _, p := range lyricsheet.CoverPictures {
-		if coverFiles[p], err = audio.Open(filepath.Join(cfg.DataDir, "covers", string(p))); err != nil {
+	songFiles := map[string]*audio.Files{}
+	for _, k := range songfiles.Kinds {
+		if songFiles[k.Dir], err = audio.Open(filepath.Join(cfg.DataDir, filepath.FromSlash(k.Dir))); err != nil {
 			conn.Close()
 			return nil, err
 		}
 	}
+	beatFiles := songFiles[songfiles.Beats.Dir]
+	masterFiles := songFiles[songfiles.Masters.Dir]
+	takeFiles := songFiles[songfiles.Takes.Dir]
+	soundFiles := songFiles[songfiles.Sounds.Dir]
 	now := time.Now
 	if cfg.Now != nil {
 		now = cfg.Now
@@ -170,7 +155,7 @@ func New(cfg Config) (*App, error) {
 	}
 	a := &App{
 		db:          conn,
-		songs:       lyricsheet.NewStore(conn, masterFiles, coverFiles, takeFiles, soundFiles),
+		songs:       lyricsheet.NewStore(conn, songFiles),
 		beats:       beats.NewStore(conn, beatFiles),
 		folders:     folders.NewStore(conn),
 		tags:        tags.NewStore(conn),
@@ -180,7 +165,7 @@ func New(cfg Config) (*App, error) {
 		masterFiles: masterFiles,
 		takeFiles:   takeFiles,
 		soundFiles:  soundFiles,
-		coverFiles:  coverFiles,
+		coverFiles:  lyricsheet.CoverFilesIn(songFiles),
 		maxUpload:   cfg.MaxUploadBytes,
 		maxCover:    cfg.MaxCoverBytes,
 		build:       cfg.Build,

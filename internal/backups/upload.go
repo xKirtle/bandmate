@@ -11,6 +11,8 @@ import (
 	"os"
 	"path"
 	"strconv"
+
+	"github.com/xKirtle/bandmate/internal/songfiles"
 )
 
 // errNotABackup refuses an upload that isn't a Backup's file at all.
@@ -175,14 +177,14 @@ func (r *openedBackup) checkFiles(ctx context.Context, entries map[string]bool) 
 	if err != nil {
 		return damagedBy(err)
 	}
-	need := func(files []songFile, args ...any) error {
+	need := func(files []songfiles.Kind, args ...any) error {
 		for _, f := range files {
-			ids, err := queryIDs(ctx, r.db, f.ids, args...)
+			ids, err := queryIDs(ctx, r.db, f.IDs, args...)
 			if err != nil {
 				return damagedBy(err)
 			}
 			for _, id := range ids {
-				if name := path.Join(f.dir, strconv.FormatInt(id, 10)); !entries[name] {
+				if name := path.Join(f.Dir, strconv.FormatInt(id, 10)); !entries[name] {
 					return damagedBy(fmt.Errorf("%s is missing", name))
 				}
 			}
@@ -190,7 +192,7 @@ func (r *openedBackup) checkFiles(ctx context.Context, entries map[string]bool) 
 		return nil
 	}
 	for _, song := range songs {
-		if err := need(songFiles, song); err != nil {
+		if err := need(songfiles.Kinds, song); err != nil {
 			return err
 		}
 	}

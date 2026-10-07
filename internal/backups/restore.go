@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/xKirtle/bandmate/internal/db"
+	"github.com/xKirtle/bandmate/internal/songfiles"
 )
 
 // Song is a Song a Backup holds, by its id there, or one a Restore brought
@@ -194,7 +195,7 @@ func (s *Store) Restore(ctx context.Context, id int64, picks Picks, replace Repl
 		return Restored{}, err
 	}
 	for _, song := range picked.Songs {
-		if err := r.unpackFiles(ctx, songFiles, song); err != nil {
+		if err := r.unpackFiles(ctx, songfiles.Kinds, song); err != nil {
 			return Restored{}, fmt.Errorf("restoring song %d: %w", song, err)
 		}
 	}
@@ -469,18 +470,18 @@ func stagedFile(staging, dir string, id int64) string {
 }
 
 // unpackFiles unpacks the files listed by files, given args, each once.
-func (r *openedBackup) unpackFiles(ctx context.Context, files []songFile, args ...any) error {
+func (r *openedBackup) unpackFiles(ctx context.Context, files []songfiles.Kind, args ...any) error {
 	for _, f := range files {
-		ids, err := queryIDs(ctx, r.db, f.ids, args...)
+		ids, err := queryIDs(ctx, r.db, f.IDs, args...)
 		if err != nil {
 			return err
 		}
 		for _, id := range ids {
-			to := stagedFile(r.staging, f.dir, id)
+			to := stagedFile(r.staging, f.Dir, id)
 			if _, err := os.Stat(to); err == nil {
 				continue
 			}
-			name := path.Join(f.dir, strconv.FormatInt(id, 10))
+			name := path.Join(f.Dir, strconv.FormatInt(id, 10))
 			if err := r.unpack(name, to); err != nil {
 				return fmt.Errorf("unpacking %s: %w", name, err)
 			}
@@ -666,16 +667,13 @@ func clearReplacedSongs(ctx context.Context, tx *sql.Tx) ([]string, error) {
 	}
 	var files []string
 	for _, id := range ids {
-		for _, f := range songFiles {
-			if f.table == "beats" {
-				continue
-			}
-			owned, err := queryIDs(ctx, tx, f.ids, id)
+		for _, f := range songfiles.Owned() {
+			owned, err := queryIDs(ctx, tx, f.IDs, id)
 			if err != nil {
 				return nil, err
 			}
 			for _, o := range owned {
-				files = append(files, filepath.Join(filepath.FromSlash(f.dir), strconv.FormatInt(o, 10)))
+				files = append(files, filepath.Join(filepath.FromSlash(f.Dir), strconv.FormatInt(o, 10)))
 			}
 		}
 	}
@@ -785,9 +783,9 @@ func foreignKeys(ctx context.Context, tx *sql.Tx, table string) (map[string]stri
 // there.
 func (s *Store) linkFilesIn(ctx context.Context, tx *sql.Tx, staging string) ([]string, error) {
 	var linked []string
-	for _, f := range songFiles {
+	for _, f := range songfiles.Kinds {
 		// A Beat replaced keeps its own file.
-		rows, err := tx.QueryContext(ctx, `SELECT old, new FROM temp.restored WHERE tbl = ? AND NOT replaced`, f.table)
+		rows, err := tx.QueryContext(ctx, `SELECT old, new FROM temp.restored WHERE tbl = ? AND NOT replaced`, f.Table)
 		if err != nil {
 			return linked, err
 		}
@@ -808,7 +806,7 @@ func (s *Store) linkFilesIn(ctx context.Context, tx *sql.Tx, staging string) ([]
 		if len(moves) == 0 {
 			continue
 		}
-		dir := filepath.Join(s.dataDir, filepath.FromSlash(f.dir))
+		dir := filepath.Join(s.dataDir, filepath.FromSlash(f.Dir))
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return linked, err
 		}
@@ -817,8 +815,8 @@ func (s *Store) linkFilesIn(ctx context.Context, tx *sql.Tx, staging string) ([]
 			if err := os.Remove(to); err != nil && !errors.Is(err, fs.ErrNotExist) {
 				return linked, err
 			}
-			if err := linkOrCopy(stagedFile(staging, f.dir, m.old), to); err != nil {
-				return linked, fmt.Errorf("restoring %s %d: %w", f.dir, m.old, err)
+			if err := linkOrCopy(stagedFile(staging, f.Dir, m.old), to); err != nil {
+				return linked, fmt.Errorf("restoring %s %d: %w", f.Dir, m.old, err)
 			}
 			linked = append(linked, to)
 		}
