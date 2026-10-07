@@ -11,7 +11,7 @@ export interface SongListSource {
 }
 
 /** What to ask the server for to show a view, and what the answer will be. */
-interface Request {
+interface SongRequest {
   filter: SongFilter;
   /** Whether the answer is every Song, whatever Folder it's in. */
   acrossFolders: boolean;
@@ -28,7 +28,7 @@ interface Request {
  * no Folder, but for while a search or filter is on, which looks at every
  * Song, whatever Folder it's in.
  */
-function request(view: SongListView, folderId: number | undefined): Request {
+function request(view: SongListView, folderId: number | undefined): SongRequest {
   const filter: SongFilter = {};
   if (view.q.trim()) filter.q = view.q;
   if (view.statuses.length > 0) filter.statuses = [...view.statuses];
@@ -47,7 +47,7 @@ function request(view: SongListView, folderId: number | undefined): Request {
  * The Songs a request keeps, and whether there are any Songs at all. A
  * Folder that doesn't exist holds none.
  */
-async function load(source: SongListSource, asked: Request) {
+async function load(source: SongListSource, asked: SongRequest) {
   try {
     const songs = await source.listSongs(asked.filter);
     if (songs.length > 0 || !asked.everySong) return { songs, anySongs: songs.length > 0 };
@@ -60,7 +60,7 @@ async function load(source: SongListSource, asked: Request) {
 }
 
 /** How long to wait for a pause in typing before loading again, in ms. */
-const pause = 200;
+const typingPause = 200;
 
 /**
  * Loads the Songs page, for the Folder open or the top level, and holds its
@@ -122,7 +122,7 @@ export class SongListQuery {
             (e: Error) => current && (this.error = e.message),
           );
         },
-        loaded ? pause : 0,
+        loaded ? typingPause : 0,
       );
       return () => {
         current = false;

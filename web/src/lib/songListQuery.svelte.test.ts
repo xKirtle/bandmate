@@ -20,7 +20,7 @@ function song(title: string, fields: Partial<SongSummary> = {}): SongSummary {
   };
 }
 
-const folder = (id: number, name: string): Folder => ({ id, name, songs: 0 }) as Folder;
+const folder = (id: number, name: string): Folder => ({ id, name, songs: 0 });
 
 /**
  * A server holding some Songs, Folders and Tags, filtering the Songs as the
