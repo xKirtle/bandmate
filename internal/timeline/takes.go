@@ -156,23 +156,14 @@ func (t newTake) insert(ctx context.Context, tx *sql.Tx, songID int64, number in
 // made. Otherwise the file is discarded.
 func (s *Store) addTake(ctx context.Context, songID int64, based lyricsheet.Version, file *audio.Received,
 	add func(tx *sql.Tx) (int64, error)) (Timeline, error) {
-	var kept int64
-	tl, err := s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, files *audio.FileChanges) error {
 		takeID, err := add(tx)
 		if err != nil {
 			return err
 		}
-		// Kept last, so nothing after it can fail but the commit.
-		if err := file.Keep(takeID); err != nil {
-			return err
-		}
-		kept = takeID
+		files.Keep(file, takeID)
 		return nil
 	})
-	if err != nil && kept != 0 {
-		s.removeTakeFiles([]int64{kept})
-	}
-	return tl, err
 }
 
 // Retake records another Take into a Clip of Takes, numbered after the

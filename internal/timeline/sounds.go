@@ -55,8 +55,7 @@ func (s *Store) ImportSound(ctx context.Context, songID int64, based lyricsheet.
 	if err != nil {
 		return Timeline{}, err
 	}
-	var kept int64
-	tl, err := s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, files *audio.FileChanges) error {
 		if err := findTrack(ctx, tx, songID, imp.TrackID); errors.Is(err, lyricsheet.ErrNotFound) {
 			return &lyricsheet.InvalidError{Msg: "there's no such Track on this Timeline"}
 		} else if err != nil {
@@ -78,21 +77,9 @@ func (s *Store) ImportSound(ctx context.Context, songID int64, based lyricsheet.
 		if err != nil {
 			return err
 		}
-		if err := addClip(ctx, tx, songID, imp.TrackID,
-			NewClip{SoundID: &soundID, Start: start, Length: a.Duration}); err != nil {
-			return err
-		}
-		// Kept last, so nothing after it can fail but the commit.
-		if err := file.Keep(soundID); err != nil {
-			return err
-		}
-		kept = soundID
-		return nil
+		files.Keep(file, soundID)
+		return addClip(ctx, tx, songID, imp.TrackID, NewClip{SoundID: &soundID, Start: start, Length: a.Duration})
 	})
-	if err != nil && kept != 0 {
-		s.removeSoundFiles([]int64{kept})
-	}
-	return tl, err
 }
 
 // soundsInUse selects the ids of the Sounds some Clip uses.

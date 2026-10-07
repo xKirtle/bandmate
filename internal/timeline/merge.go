@@ -82,8 +82,7 @@ func (s *Store) MergeClips(ctx context.Context, songID int64, based lyricsheet.V
 	if err != nil {
 		return Timeline{}, err
 	}
-	var kept int64
-	tl, err := s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, files *audio.FileChanges) error {
 		start, end, err := mergedSpan(ctx, tx, songID, m.ClipIDs)
 		if err != nil {
 			return err
@@ -115,21 +114,9 @@ func (s *Store) MergeClips(ctx context.Context, songID int64, based lyricsheet.V
 		if err != nil {
 			return err
 		}
-		if err := addClip(ctx, tx, songID, trackID,
-			NewClip{SoundID: &soundID, Start: start, Length: length}); err != nil {
-			return err
-		}
-		// Kept last, so nothing after it can fail but the commit.
-		if err := file.Keep(soundID); err != nil {
-			return err
-		}
-		kept = soundID
-		return nil
+		files.Keep(file, soundID)
+		return addClip(ctx, tx, songID, trackID, NewClip{SoundID: &soundID, Start: start, Length: length})
 	})
-	if err != nil && kept != 0 {
-		s.removeSoundFiles([]int64{kept})
-	}
-	return tl, err
 }
 
 // mergedSpan is where on the Timeline the earliest of the Song's Clips
