@@ -1,6 +1,6 @@
 # Screenshots
 
-The screenshots in the README and on the docs site, `site/`, taken in the dark theme from a demo Bandmate. The desktop and phone shots are at twice their CSS pixels, so they stay sharp on HiDPI screens:
+The screenshots in the README and on the docs site, `docs/web/`, taken in the dark theme from a demo Bandmate. The desktop and phone shots are at twice their CSS pixels, so they stay sharp on HiDPI screens:
 
 | File                    | Shows                                                          |
 | ----------------------- | -------------------------------------------------------------- |

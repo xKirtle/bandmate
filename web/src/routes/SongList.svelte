@@ -841,7 +841,8 @@
       flex-direction: row;
       align-items: center;
     }
-    .filters input {
+    /* Only the search box: the filter popovers' checkboxes are inputs in here too. */
+    .filters > input {
       flex: 1;
     }
   }
