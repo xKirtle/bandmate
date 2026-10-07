@@ -134,6 +134,8 @@ interface Ids {
 interface Step {
   edit: HistoryEdit;
   adds: Ids;
+  /** The Clips of adds that doing it selects, e.g. a Merge's Clip or a Split's right halves. */
+  selects?: number[];
 }
 
 interface Entry {
@@ -216,15 +218,21 @@ export class History {
     const entry = this.#undo.pop();
     if (!entry) return [];
     this.#redo.push(entry);
-    return this.#follow(entry.undo, before, after);
+    const ids = this.#follow(entry.undo, before, after);
+    return entry.undo.adds.clips.map(ids.clip);
   }
 
-  /** Notes that nextRedo's edit was sent, turning before into after, like undone. */
-  redone(before: Timeline, after: Timeline): void {
+  /**
+   * Notes that nextRedo's edit was sent, turning before into after, like
+   * undone, and gives the new ids of the Clips it selects, as the edit did:
+   * a Merge's Clip, or a Split's right halves. Null if it selects none.
+   */
+  redone(before: Timeline, after: Timeline): number[] | null {
     const entry = this.#redo.pop();
-    if (!entry) return;
+    if (!entry) return null;
     this.#undo.push(entry);
-    this.#follow(entry.redo, before, after);
+    const ids = this.#follow(entry.redo, before, after);
+    return entry.redo.selects?.map(ids.clip) ?? null;
   }
 
   /** Forgets every edit, e.g. once the Timeline changed elsewhere. */
@@ -235,9 +243,10 @@ export class History {
 
   /**
    * Has every edit kept name the new ids of what a sent step brought back,
-   * giving the new ids of the Clips.
+   * giving how its ids map to the new ones. The sent step, being remapped
+   * too, is read through them before it is.
    */
-  #follow(sent: Step, before: Timeline, after: Timeline): number[] {
+  #follow(sent: Step, before: Timeline, after: Timeline): IdMaps {
     const got = added(before, after);
     const tracks = new Map(sent.adds.tracks.map((id, i) => [id, got.tracks[i]]));
     const clips = new Map(sent.adds.clips.map((id, i) => [id, got.clips[i]]));
@@ -249,14 +258,15 @@ export class History {
       entry.undo = remapStep(entry.undo, ids);
       entry.redo = remapStep(entry.redo, ids);
     }
-    return sent.adds.clips.map(ids.clip);
+    return ids;
   }
 }
 
 /**
  * The step that redoes edit, which turned before into after: itself, but
  * for a copy, a Duplicate, a paste or a Split, placing what it added, so
- * redoing never copies again.
+ * redoing never copies again. A Merge, kept as replacing its Clips, selects
+ * its Clip again.
  */
 function redoing(edit: Edit, before: Timeline, after: Timeline): Step {
   const adds = added(before, after);
@@ -267,6 +277,8 @@ function redoing(edit: Edit, before: Timeline, after: Timeline): Step {
       return { edit: placingAllAdded(before, after), adds };
     case 'splitClips':
       return splittingAgain(edit.clipIds, before, after);
+    case 'replaceClips':
+      return { edit, adds, selects: adds.clips };
     default:
       return { edit, adds };
   }
@@ -275,10 +287,13 @@ function redoing(edit: Edit, before: Timeline, after: Timeline): Step {
 /**
  * The step that redoes a Split of the Clips clipIds, which turned before
  * into after: replacing them with both halves of each as they are in
- * after, which all come back with new ids.
+ * after, which all come back with new ids. It selects the right halves,
+ * as the Split did.
  */
 function splittingAgain(clipIds: readonly number[], before: Timeline, after: Timeline): Step {
-  const halves = new Set([...clipIds, ...added(before, after).clips]);
+  // Each Clip cut stayed as its left half, and its right half is new.
+  const rightHalves = added(before, after).clips;
+  const halves = new Set([...clipIds, ...rightHalves]);
   const placed = after.tracks.flatMap((track) =>
     track.clips.filter((c) => halves.has(c.id)).map((clip) => ({ track, clip })),
   );
@@ -289,6 +304,7 @@ function splittingAgain(clipIds: readonly number[], before: Timeline, after: Tim
       clips: placed.map(({ track, clip }) => ({ trackId: track.id, clip: placementOf(clip) })),
     },
     adds: { tracks: [], clips: placed.map(({ clip }) => clip.id) },
+    selects: rightHalves,
   };
 }
 
@@ -545,6 +561,7 @@ function remapStep(step: Step, ids: IdMaps): Step {
   return {
     edit: remap(step.edit, ids),
     adds: { tracks: step.adds.tracks.map(ids.track), clips: step.adds.clips.map(ids.clip) },
+    ...(step.selects && { selects: step.selects.map(ids.clip) }),
   };
 }
 

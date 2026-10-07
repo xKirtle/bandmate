@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Clip, Timeline, Track } from './api';
-import { rightHalves, splitTargets } from './split';
+import { rightHalfOf, rightHalves, splitTargets } from './split';
 
 const clip = (id: number, start: number, length = 10): Clip => ({
   id,
@@ -55,17 +55,17 @@ describe('splitTargets', () => {
   });
 });
 
-describe('rightHalves', () => {
-  const timeline = (tracks: Track[]): Timeline => ({
-    songId: 1,
-    version: 1,
-    updatedAt: '',
-    tracks,
-    beats: [],
-    sounds: [],
-    loop: null,
-  });
+const timeline = (tracks: Track[]): Timeline => ({
+  songId: 1,
+  version: 1,
+  updatedAt: '',
+  tracks,
+  beats: [],
+  sounds: [],
+  loop: null,
+});
 
+describe('rightHalves', () => {
   it('is the right half of each Clip a Split cut, in Timeline order, never the left halves it kept', () => {
     // Split at 0:07: Clip 1 into 1 and 4, Clip 3 into 3 and 5.
     const after = timeline([
@@ -84,5 +84,25 @@ describe('rightHalves', () => {
       track(3, []),
     ]);
     expect(rightHalves(timeline(tracks), after)).toEqual([4]);
+  });
+});
+
+describe('rightHalfOf', () => {
+  // Split at 0:07: Clip 1 into 1 and 5, Clip 3 into 3 and 4, the new ids
+  // not in the order of the Clips they came from.
+  const after = timeline([
+    track(1, [clip(1, 0, 7), clip(5, 7, 3), clip(2, 10)]),
+    track(2, [clip(3, 5, 2), clip(4, 7, 8)]),
+    track(3, []),
+  ]);
+
+  it('is the right half a Split cut from a Clip, which stayed as its left half', () => {
+    expect(rightHalfOf(timeline(tracks), after, 1)).toBe(5);
+    expect(rightHalfOf(timeline(tracks), after, 3)).toBe(4);
+  });
+
+  it('is null for a Clip the Split left whole', () => {
+    expect(rightHalfOf(timeline(tracks), after, 2)).toBeNull();
+    expect(rightHalfOf(timeline(tracks), after, 9)).toBeNull();
   });
 });

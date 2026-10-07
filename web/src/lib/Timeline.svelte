@@ -67,7 +67,7 @@
   import { allKeys, shortcuts, type Way } from './shortcuts';
   import { clipActions, selectionActions } from './clipMenu';
   import { mergeTarget, mergeWarning, mergedClips, renderMerge, type MergedAudio } from './merge';
-  import { rightHalves, splitTargets } from './split';
+  import { rightHalfOf, rightHalves, splitTargets } from './split';
   import { Selection, type ClipIds, type SelectionBox } from './selection.svelte';
   import {
     copy,
@@ -356,7 +356,7 @@
     offerCues = null;
     mergeNote = null;
     const redone = await saves.redo();
-    // A Merge redone selects its Clip again, as it did.
+    // A Merge redone selects its Clip again, and a Split its right halves, as they did.
     if (redone?.reselect) selection.selectEdited(redone.reselect);
   }
 
@@ -1639,16 +1639,23 @@
    * Splits Clips in two at the playhead, as one edit, and selects the
    * right half of each: the selected Clips it crosses, or with none selected,
    * the Chosen Track's Clip under it; or, given, only those of clipIds it
-   * crosses. With nothing to split, nothing happens.
+   * crosses. With nothing to split, nothing happens. Focus on a Clip it
+   * splits moves to its right half, so Delete then trims off what's after
+   * the playhead, not the left half alone.
    */
   function splitAtPlayhead(clipIds?: ReadonlySet<number>) {
     if (frozen) return;
     const at = playheadAt();
     const splitting = splitTargets(timeline.tracks, clipIds ?? selection.ids, chosen, at);
     if (splitting.length === 0) return;
-    perform({ kind: 'splitClips', clipIds: splitting, at }, (before, after) =>
-      selection.selectEdited(rightHalves(before, after)),
-    );
+    perform({ kind: 'splitClips', clipIds: splitting, at }, (before, after) => {
+      selection.selectEdited(rightHalves(before, after));
+      // Not while recording, which leaves the Selection as it was.
+      if (recording) return;
+      const focused = focusedClip(document.activeElement);
+      const right = focused && splitting.includes(focused.id) ? rightHalfOf(before, after, focused.id) : null;
+      if (right !== null) tick().then(() => document.getElementById(`clip-${right}`)?.focus());
+    });
   }
 
   // A Clip is renamed in place, like a Track: double-clicked, or from its

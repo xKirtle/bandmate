@@ -43,3 +43,17 @@ export function splitTargets(
 export function rightHalves(before: Timeline, after: Timeline): number[] {
   return addedClips(before, after);
 }
+
+/**
+ * The id of the right half a Split cut from a Clip, from the Timeline
+ * before and after it: the new Clip starting where the Clip, now its left
+ * half, ends. Null if the Split left it whole.
+ */
+export function rightHalfOf(before: Timeline, after: Timeline, clipId: number): number | null {
+  const track = after.tracks.find((t) => t.clips.some((c) => c.id === clipId));
+  if (!track) return null;
+  const left = track.clips.find((c) => c.id === clipId)!;
+  const cut = left.start + left.length;
+  const rights = new Set(rightHalves(before, after));
+  return track.clips.find((c) => rights.has(c.id) && Math.abs(c.start - cut) <= tolerance)?.id ?? null;
+}
