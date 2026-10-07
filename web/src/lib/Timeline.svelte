@@ -312,7 +312,8 @@
   });
 
   async function undo() {
-    if (frozen) return;
+    // Pressed with nothing to do, it leaves everything, the Merge note too, as it is.
+    if (!editing.undoes) return;
     mergeNote = null;
     // Undoing a new Take returns the playhead to where its Clip starts, to
     // record again from. Once the Clip's gone, it's a seek like any other:
@@ -323,7 +324,7 @@
   }
 
   async function redo() {
-    if (frozen) return;
+    if (!editing.redoes) return;
     mergeNote = null;
     await editing.redo();
   }

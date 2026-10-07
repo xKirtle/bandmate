@@ -68,13 +68,14 @@ export class TimelineEditing {
   #choose: (trackId: number) => void;
   /** Whether a Merge is under way, from pressing Merge until its Sound is saved or it fails. */
   #merging = $state(false);
-  // Raw, so the timer can tell whether the offer made is still its own.
+  /** The Cue-move offer made last, until it lapses or is answered. Raw, so the timer can tell it's still its own. */
   #made = $state.raw<MadeOffer | null>(null);
   #offerTimer: ReturnType<typeof setTimeout> | undefined;
-  #offer = $derived.by(() => {
+  /** The offer made last, while the Timeline as saved and the Cues as shown are still the ones it was made for. */
+  #standing = $derived.by(() => {
     const made = this.#made;
     if (!made || made.timeline !== this.#saves.timeline || !sameCues(made.song, this.#saves.song)) return null;
-    return made.offer;
+    return made;
   });
 
   constructor(options: TimelineEditingOptions) {
@@ -129,17 +130,18 @@ export class TimelineEditing {
    */
   saveDrag = async ({ edit, moved }: DragSave): Promise<boolean> => {
     const edited = await this.edit(edit);
-    if (edited && moved) this.#offerMove(moved.clips, moved.by, edited.after);
+    if (edited && moved) this.#offerMove(moved, edited.after);
     return edited !== null;
   };
 
-  #offerMove(moved: readonly { start: number; length: number }[], by: number, timeline: Timeline) {
+  /** Offers to move the Cues the Clips moved spanned, if any, made for the Timeline the move left. */
+  #offerMove({ clips, by }: NonNullable<DragSave['moved']>, timeline: Timeline) {
     if (by === 0) return;
-    const spans = moved.map((c) => ({ start: c.start, end: c.start + c.length }));
+    const spans = clips.map((c) => ({ start: c.start, end: c.start + c.length }));
     const song = this.#saves.song;
     const count = movedCues(song, spans, by).length;
     if (count === 0) return;
-    const made: MadeOffer = { offer: { by, count, clips: moved.length }, spans, timeline, song };
+    const made: MadeOffer = { offer: { by, count, clips: clips.length }, spans, timeline, song };
     this.#made = made;
     clearTimeout(this.#offerTimer);
     this.#offerTimer = setTimeout(() => {
@@ -149,7 +151,7 @@ export class TimelineEditing {
 
   /** The offer to move the Cues the Clips just moved spanned, while it stands. */
   get cueOffer(): CueOffer | null {
-    return this.#offer;
+    return this.#standing?.offer ?? null;
   }
 
   /**
@@ -160,7 +162,7 @@ export class TimelineEditing {
    * screen at once.
    */
   moveCues() {
-    const made = this.#offer && this.#made;
+    const made = this.#standing;
     if (!made) return;
     this.#made = null;
     const { spans, offer } = made;
@@ -186,6 +188,19 @@ export class TimelineEditing {
   };
 
   /**
+   * Whether pressing undo would do anything: not while frozen, and not with
+   * nothing to undo, nor any save queued that could be.
+   */
+  get undoes(): boolean {
+    return !this.frozen && (this.#saves.canUndo || this.#saves.pending > 0);
+  }
+
+  /** Whether pressing redo would do anything: not while frozen, and not with nothing to redo. */
+  get redoes(): boolean {
+    return !this.frozen && this.#saves.canRedo;
+  }
+
+  /**
    * Undoes the latest edit, once those queued before it land, unless
    * frozen, or with nothing to undo and nothing queued. Clips it brings
    * back together are selected again. Resolves to where to return the
@@ -193,7 +208,7 @@ export class TimelineEditing {
    * started since. Null to leave it where it is.
    */
   undo = async (): Promise<number | null> => {
-    if (this.frozen || (!this.#saves.canUndo && this.#saves.pending === 0)) return null;
+    if (!this.undoes) return null;
     const undone = await this.#saves.undo();
     if (!undone) return null;
     if (undone.reselect) this.#selection.selectEdited(undone.reselect);
@@ -202,7 +217,7 @@ export class TimelineEditing {
 
   /** Redoes the latest edit undone, unless frozen; a Merge or a Split redone selects what it did again. */
   redo = async (): Promise<void> => {
-    if (this.frozen || !this.#saves.canRedo) return;
+    if (!this.redoes) return;
     const redone = await this.#saves.redo();
     if (redone?.reselect) this.#selection.selectEdited(redone.reselect);
   };

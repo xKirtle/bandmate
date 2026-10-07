@@ -5,6 +5,7 @@ import {
   ApiError,
   type Captured,
   type Clip,
+  type ClipMove,
   type NewClip,
   type OwnOfClip,
   type Section,
@@ -248,16 +249,9 @@ export class FakeSongServer implements SongServer {
           })),
         });
       case 'moveClip':
-        return (tl) => {
-          const clip = tl.tracks.flatMap((t) => t.clips).find((c) => c.id === edit.clipId)!;
-          return withClips(withoutClips(tl, [clip.id]), edit.trackId, (cs) => [...cs, { ...clip, start: edit.start }]);
-        };
+        return (tl) => moved(tl, edit);
       case 'moveClips':
-        return (tl) =>
-          edit.moves.reduce((t, m) => {
-            const clip = t.tracks.flatMap((tr) => tr.clips).find((c) => c.id === m.clipId)!;
-            return withClips(withoutClips(t, [clip.id]), m.trackId, (cs) => [...cs, { ...clip, start: m.start }]);
-          }, tl);
+        return (tl) => edit.moves.reduce(moved, tl);
       case 'setClipGain':
         return (tl) => ({
           ...tl,
@@ -470,6 +464,16 @@ const notModelled = (change: Edit | LyricSheetChange) => new Error(`${change.kin
 function sourceOf(clip: Clip): OwnOfClip & ({ beatId: number } | { soundId: number }) {
   const own = { name: clip.name ?? undefined, gain: clip.gain };
   return clip.beatId !== null ? { ...own, beatId: clip.beatId } : { ...own, soundId: clip.soundId! };
+}
+
+/** A Timeline with a Clip moved to a Track and a start. */
+function moved(tl: Timeline, move: ClipMove): Timeline {
+  const clip = tl.tracks.flatMap((t) => t.clips).find((c) => c.id === move.clipId)!;
+  const without = {
+    ...tl,
+    tracks: tl.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => c.id !== clip.id) })),
+  };
+  return withClips(without, move.trackId, (cs) => [...cs, { ...clip, start: move.start }]);
 }
 
 /** A Song without a Section, wherever it was. */

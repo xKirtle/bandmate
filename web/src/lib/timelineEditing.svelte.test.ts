@@ -22,6 +22,7 @@ const beatClip = (id: number, start: number, end: number): Clip => ({
   length: end - start,
 });
 
+/** A Track at 0 dB, neither muted nor soloed, holding the Clips given. */
 const track = (id: number, clips: Clip[] = []): Track => ({
   id,
   name: `Track ${id}`,
@@ -132,9 +133,15 @@ describe('Timeline editing, undo and redo', () => {
   it('does nothing with nothing to undo or redo, and nothing queued', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
     const { editing } = await editingFor(server);
+    expect(editing.undoes).toBe(false);
+    expect(editing.redoes).toBe(false);
     await editing.undo();
     await editing.redo();
     expect(server.landed).toBe(0);
+    // Once an edit is queued, undo has something to wait for.
+    const deleting = editing.edit({ kind: 'deleteClip', clipId: 1 });
+    expect(editing.undoes).toBe(true);
+    await deleting;
   });
 
   it('undoes an edit still queued, once it lands', async () => {
@@ -298,6 +305,12 @@ const clipOneMoved = (server: FakeSongServer): DragSave => ({
   moved: { clips: [server.timeline.tracks[0].clips[0]], by: 40 },
 });
 
+/** Clip 2 dragged 40 s later, as a Clip drag saves it. */
+const clipTwoMoved = (server: FakeSongServer): DragSave => ({
+  edit: { kind: 'moveClip', clipId: 2, trackId: 1, start: 60 },
+  moved: { clips: server.timeline.tracks[0].clips.filter((c) => c.id === 2), by: 40 },
+});
+
 /** Clips 1 and 2 dragged 40 s later together, as a Clip drag saves them. */
 const bothMoved = (server: FakeSongServer): DragSave => ({
   edit: {
@@ -354,10 +367,7 @@ describe('Timeline editing, the Cue-move offer', () => {
     expect(editing.cueOffer).not.toBeNull();
     await vi.advanceTimersByTimeAsync(1);
     expect(editing.cueOffer).toBeNull();
-    await editing.saveDrag({
-      edit: { kind: 'moveClip', clipId: 2, trackId: 1, start: 60 },
-      moved: { clips: [server.timeline.tracks[0].clips[0]], by: 40 },
-    });
+    await editing.saveDrag(clipTwoMoved(server));
     expect(editing.cueOffer).not.toBeNull();
     editing.leaveCues();
     expect(editing.cueOffer).toBeNull();
