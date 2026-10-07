@@ -54,10 +54,11 @@
 {#if toAdd.adding}
   {@const adding = toAdd.adding}
   <form class="adding" class:card onsubmit={submit} aria-labelledby="{idPrefix}-heading">
-    <h2 id="{idPrefix}-heading">
+    <!-- In a dialog, under the dialog's own title. -->
+    <svelte:element this={card ? 'h2' : 'h3'} id="{idPrefix}-heading" class="heading">
       {card ? 'Add ' : ''}“{adding.file.name}”
       <span class="muted tabular">{formatDuration(adding.decoded.duration)}</span>
-    </h2>
+    </svelte:element>
     {#if adding.fetched}
       <AudioPlayer src={adding.fetched.previewUrl} duration={adding.decoded.duration} peaks={adding.decoded.peaks} />
     {/if}
@@ -91,12 +92,15 @@
     margin-bottom: var(--space-6);
     padding: var(--space-4);
   }
-  h2 {
+  .heading {
     margin: 0;
     font-size: var(--text-lg);
     overflow-wrap: anywhere;
   }
-  h2 span {
+  h3.heading {
+    font-weight: 600;
+  }
+  .heading span {
     font-weight: 400;
   }
   .actions {

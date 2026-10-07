@@ -38,7 +38,6 @@
     fileReader(() => maxUploadBytes),
     api,
   );
-  const busy = $derived(toAdd.busy);
   // Whether From link is offered, and whether its box is open.
   let addFromLink = $state(false);
   let linking = $state(false);
@@ -146,7 +145,7 @@
 <Dialog
   bind:dialog
   title="Add a Beat"
-  dismissible={() => toAdd.adding === null && !linking && busy === null}
+  dismissible={() => toAdd.adding === null && !linking && toAdd.busy === null}
   stack={false}
   onclose={onClose}
   --dialog-width={desktop.current ? 'min(64rem, calc(100vw - 4rem))' : '36rem'}
@@ -154,7 +153,7 @@
   --dialog-max-height={desktop.current ? 'none' : 'min(40rem, calc(100vh - 2rem))'}
 >
   <!-- The form adding a Beat, below, takes the dialog while it's open. -->
-  {#if toAdd.adding}{:else if linking}
+  {#if !toAdd.adding && linking}
     <AddFromLink
       {maxUploadBytes}
       card={false}
@@ -164,15 +163,23 @@
       }}
       onClose={() => (linking = false)}
     />
-  {:else}
+  {:else if !toAdd.adding}
     <BeatFilters bind:view beats={beats ?? []} idPrefix="beat-picker" {hint}>
       {#snippet actions()}
         {#if addFromLink}
-          <button type="button" class="button add" onclick={openLinkBox} disabled={busy !== null}>From link</button>
+          <button type="button" class="button add" onclick={openLinkBox} disabled={toAdd.busy !== null}
+            >From link</button
+          >
         {/if}
-        <label class="button add" class:disabled={busy !== null}>
+        <label class="button add" class:disabled={toAdd.busy !== null}>
           Upload new
-          <input class="visually-hidden" type="file" accept="audio/*" onchange={pickFile} disabled={busy !== null} />
+          <input
+            class="visually-hidden"
+            type="file"
+            accept="audio/*"
+            onchange={pickFile}
+            disabled={toAdd.busy !== null}
+          />
         </label>
       {/snippet}
     </BeatFilters>

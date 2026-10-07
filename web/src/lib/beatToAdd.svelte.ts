@@ -29,7 +29,7 @@ export function fileReader(maxUploadBytes: () => number): BeatReader {
 }
 
 /** The api calls adding a Beat makes; the api module's own are the real ones. */
-export interface BeatAdds {
+export interface BeatAddApi {
   addBeat: (file: File, details: BeatDetails, decoded: DecodedAudio) => Promise<Beat>;
   addFetchedBeat: (id: string, details: BeatDetails, decoded: DecodedAudio) => Promise<Beat>;
   discardFetched: (id: string) => Promise<unknown>;
@@ -45,6 +45,11 @@ export interface Adding extends BeatRead {
   fetched?: Fetched & { previewUrl: string };
 }
 
+/**
+ * The one Beat being added, from a file or a link. A fetched file that isn't
+ * added is discarded as soon as it's left, another file is read, or the page
+ * or Picker closes; the server's expiry is the fallback for a closed tab.
+ */
 export class BeatToAdd {
   /** The Beat being added, if any. */
   adding = $state<Adding | null>(null);
@@ -54,15 +59,15 @@ export class BeatToAdd {
   error = $state<string | null>(null);
 
   #read: BeatReader;
-  #api: BeatAdds;
-  /** Counts reads, so only the latest one's file is held. */
-  #reads = 0;
+  #api: BeatAddApi;
+  /** The read under way, if one is: only its file is held, once read. */
+  #reading: object | null = null;
   /** The Beat being added that's on its way to the server, if one is. */
   #sending: Adding | null = null;
   /** Whether the page or Picker it belongs to has closed. */
   #closed = false;
 
-  constructor(read: BeatReader, api: BeatAdds) {
+  constructor(read: BeatReader, api: BeatAddApi) {
     this.#read = read;
     this.#api = api;
   }
@@ -72,20 +77,24 @@ export class BeatToAdd {
     this.#drop();
     this.error = null;
     if (this.#closed) return;
-    const reading = ++this.#reads;
+    const reading = (this.#reading = {});
     this.busy = `Reading “${file.name}”…`;
     try {
       const read = await this.#read(file);
-      if (reading === this.#reads) this.adding = { file, ...read };
+      if (this.#reading === reading) this.adding = { file, ...read };
     } catch (e) {
-      if (reading === this.#reads) this.error = (e as Error).message;
+      if (this.#reading === reading) this.error = (e as Error).message;
     } finally {
-      if (reading === this.#reads) this.busy = null;
+      if (this.#reading === reading) {
+        this.#reading = null;
+        this.busy = null;
+      }
     }
   }
 
   /** Takes a file fetched from a link, as the link box hands it over, in place of any other. */
   take({ fetched, file, decoded, draft }: FromLink): void {
+    this.#forgetRead();
     this.#drop();
     this.error = null;
     if (this.#closed) {
@@ -123,7 +132,7 @@ export class BeatToAdd {
       return null;
     } finally {
       this.#sending = null;
-      this.busy = null;
+      if (this.#reading === null) this.busy = null;
     }
   }
 
@@ -138,9 +147,7 @@ export class BeatToAdd {
 
   /** Leaves the form: the Beat being added is dropped, with the last error. */
   leave(): void {
-    // A read under way is forgotten.
-    this.#reads++;
-    this.busy = null;
+    this.#forgetRead();
     this.#drop();
     this.error = null;
   }
@@ -149,6 +156,13 @@ export class BeatToAdd {
   close(): void {
     this.leave();
     this.#closed = true;
+  }
+
+  /** Forgets a read under way: what it reads, or why it fails, is never held. */
+  #forgetRead() {
+    if (this.#reading === null) return;
+    this.#reading = null;
+    this.busy = null;
   }
 
   /**

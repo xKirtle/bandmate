@@ -46,7 +46,7 @@
   );
   // Reading a folder dropped, before its files go where picking them would.
   let readingDrop = $state(false);
-  const addBusy = $derived(toAdd.busy ?? (readingDrop ? 'Reading the files dropped…' : null));
+  const addBusy = $derived(toAdd.busy !== null || readingDrop);
   // Whether Add from link is offered, and whether its box is open.
   let addFromLink = $state(false);
   let linking = $state(false);
@@ -200,7 +200,7 @@
   // They go where picking them would, once those that aren't audio are
   // skipped, which is said. Not while files can't be picked, nor under the
   // edit dialog.
-  const takesFiles = $derived(desktop.current && addBusy === null && !batchUploading && editingBeat === null);
+  const takesFiles = $derived(desktop.current && !addBusy && !batchUploading && editingBeat === null);
   // Said of the last files dropped: how many weren't audio.
   let dropNote = $state<string | null>(null);
 
@@ -256,7 +256,7 @@
 {/snippet}
 
 {#snippet addBeatButton(text: string)}
-  {@const disabled = addBusy !== null || batchUploading}
+  {@const disabled = addBusy || batchUploading}
   <label class="button primary add-beat" class:disabled>
     {text}
     <!-- Below desktop, Beats are added one at a time. -->
@@ -266,7 +266,7 @@
 
 {#snippet addFromLinkButton()}
   {#if addFromLink}
-    <button type="button" class="button" onclick={openLinkBox} disabled={addBusy !== null || batchUploading || linking}>
+    <button type="button" class="button" onclick={openLinkBox} disabled={addBusy || batchUploading || linking}>
       Add from link
     </button>
   {/if}

@@ -135,6 +135,18 @@ describe('BeatToAdd', () => {
     expect(toAdd.error).toBeNull();
   });
 
+  it('a file fetched while another is being read takes its place', async () => {
+    const { toAdd, record } = setup();
+    const reading = toAdd.read(file('dark_trap.wav'));
+
+    toAdd.take(fromLink('fetch-1'));
+    await reading;
+
+    expect(toAdd.adding?.fetched?.id).toBe('fetch-1');
+    expect(toAdd.busy).toBeNull();
+    expect(record.discarded).toEqual([]);
+  });
+
   it('a file read after closing is not held', async () => {
     const { toAdd } = setup();
     const reading = toAdd.read(file('dark_trap.wav'));
