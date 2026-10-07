@@ -10,7 +10,6 @@ import {
   type PastedClip,
   type PlacedClip,
   type SongAt,
-  type Song,
   type Timeline,
   type TimelineLoop,
   type TrackAt,
@@ -616,9 +615,6 @@ function findClip(tl: Timeline, clipId: number) {
   }
   throw new Error(`Clip ${clipId} isn't on the Timeline`);
 }
-
-/** What a change saved: the Timeline, or for a Cue edit, the Song. */
-export type Saved = { timeline: Timeline } | { song: Song };
 
 /** Sends an edit to the Song's Timeline, returning the Timeline it leaves. */
 export function sendEdit(at: SongAt, edit: Edit): Promise<Timeline> {
