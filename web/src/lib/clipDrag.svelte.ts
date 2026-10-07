@@ -150,6 +150,11 @@ interface Drag {
   saving: boolean;
 }
 
+/** Whether a drag snaps, unless Shift is held: a move or a trim. */
+function snaps(mode: ClipDragMode): boolean {
+  return mode === 'move' || mode === 'start' || mode === 'end';
+}
+
 /** Whether a Clip is selected as it's grabbed, as clicking it does, rather than when let go: by its gain line or a fade dot. */
 function selectsAtPress(mode: ClipDragMode): boolean {
   return mode === 'gain' || isFadeEnd(mode);
@@ -273,7 +278,7 @@ export class ClipDrag {
       if (this.#selection.size > 1 && this.#selection.has(drag.clip.id)) drag.moves = [];
     }
     drag.moved = true;
-    if (free !== undefined) this.#hold(drag, free, at);
+    if (free !== undefined) this.#shiftHeld(drag, free, at);
     this.#place(drag, at);
     return true;
   }
@@ -287,15 +292,15 @@ export class ClipDrag {
   modifier(free: boolean, at: DragAt) {
     const drag = this.#drag;
     if (!drag?.moved || drag.saving) return;
-    this.#hold(drag, free, at);
-    if (drag.mode === 'move' || drag.mode === 'start' || drag.mode === 'end') this.#place(drag, at);
+    this.#shiftHeld(drag, free, at);
+    if (snaps(drag.mode)) this.#place(drag, at);
   }
 
   /**
    * Shift held, or not. The gain line goes finely, or not, from the Gain
    * it's at and the pointer's height, so it never jumps.
    */
-  #hold(drag: Drag, free: boolean, at: DragAt) {
+  #shiftHeld(drag: Drag, free: boolean, at: DragAt) {
     if (drag.mode === 'gain' && free !== drag.free) {
       drag.gainFrom = { ...drag.gainFrom, gain: drag.gain, clientY: at.point.clientY };
     }

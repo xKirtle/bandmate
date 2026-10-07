@@ -58,7 +58,7 @@ export function draggedFade(at: number, other: number, length: number, rests: nu
 /** Which of a Clip's Fades: its fade in or its fade out. */
 export type FadeEnd = keyof ClipFades;
 
-/** Whether what's dragged is a Fade's dot, setting its fade in or its fade out. */
+/** Whether it names one of a Clip's Fades: its fade in or its fade out. */
 export function isFadeEnd(what: string | null): what is FadeEnd {
   return what === 'fadeIn' || what === 'fadeOut';
 }
@@ -71,7 +71,7 @@ export function fadeName(end: FadeEnd): string {
 /**
  * Which Fade's dot a press at x grabs, the dot `pressed` taking it, with
  * the fade-in dot's middle at inAt and the fade-out dot's at outAt, each
- * `width` wide, in pixels. Where the Fades meet, or the Clip is narrow,
+ * `width` wide, all in one unit, e.g. pixels or seconds. Where the Fades meet, or the Clip is narrow,
  * the dots sit together, one over the other, so the side of their middle
  * the pointer is on says which, and both can still be grabbed.
  */
