@@ -30,11 +30,12 @@ export class FakePlayer implements TakePlayer {
 }
 
 /**
- * An Input capturing at a rate, with a latency, that can be gone, have a
+ * An Input capturing at a rate, placed by a Latency Offset, that can be gone, have a
  * problem known before trying, fail to open, or be held opening until
  * released. Once open, sing captures what's sung.
  */
 export class FakeInput implements TakeInput {
+  /** Why recording can't work, known before trying. */
   problemFound: string | null = null;
   /** The name of the Input chosen, when it isn't connected. */
   gone: string | null = null;
@@ -45,7 +46,7 @@ export class FakeInput implements TakeInput {
 
   constructor(
     readonly sampleRate = 100,
-    readonly latency = 0,
+    readonly latencyOffset = 0,
   ) {}
 
   problem(): Promise<string | null> {
@@ -62,11 +63,12 @@ export class FakeInput implements TakeInput {
   async open(): Promise<OpenedInput> {
     if (this.failing) throw new CaptureError(this.failing);
     await this.#holding;
-    this.opened = new FakeOpenedInput(this.sampleRate, this.latency, this.gone);
+    this.opened = new FakeOpenedInput(this.sampleRate, this.latencyOffset, this.gone);
     return this.opened;
   }
 }
 
+/** An Input opened, capturing what's sung into it, until it's stopped or closed. */
 export class FakeOpenedInput implements OpenedInput {
   #batches: Batch[] = [];
   #sink: ((batch: Batch) => void) | null = null;
@@ -74,7 +76,7 @@ export class FakeOpenedInput implements OpenedInput {
 
   constructor(
     readonly sampleRate: number,
-    readonly latency: number,
+    readonly latencyOffset: number,
     readonly gone: string | null,
   ) {}
 

@@ -53,10 +53,13 @@ async function setup(tracks: Track[] = [track(1), track(2)], options: Partial<Ta
   const player = new FakePlayer(startedAt);
   const input = new FakeInput();
   const keeping = new FakeKeeping();
-  const recorder = new TakeRecorder({ saves, player, input, keeping, uploads: server, ...options });
+  /** The errors the recorder said, in order. */
+  const errors: string[] = [];
+  const onError = (message: string) => errors.push(message);
+  const recorder = new TakeRecorder({ saves, player, input, keeping, uploads: server, onError, ...options });
   /** Sings for seconds from the start of playback, lead-in included. */
   const sing = (seconds: number) => input.opened!.sing(startedAt, seconds);
-  return { server, saves, player, input, keeping, recorder, sing };
+  return { server, saves, player, input, keeping, recorder, errors, sing };
 }
 
 /** Lets everything waiting on the fakes run. */
@@ -64,7 +67,7 @@ const settled = () => new Promise((done) => setTimeout(done));
 
 describe('TakeRecorder', () => {
   it('records a new Take on the Chosen Track at the playhead, and saves it there', async () => {
-    const { server, player, keeping, recorder, sing } = await setup();
+    const { server, player, keeping, recorder, sing, errors } = await setup();
 
     await recorder.start({ trackId: 1, playhead: 5 });
     expect(recorder.phase).toBe('recording');
@@ -78,7 +81,7 @@ describe('TakeRecorder', () => {
     await recorder.stop();
 
     expect(recorder.phase).toBeNull();
-    expect(recorder.error).toBeNull();
+    expect(errors).toEqual([]);
     expect(player.playing).toBe(false);
     const [clip] = server.timeline.tracks[0].clips;
     expect(clip).toMatchObject({ start: 5, length: 2 });
@@ -105,14 +108,14 @@ describe('TakeRecorder', () => {
   });
 
   it('keeps nothing from a recording stopped during the lead-in, and forgets the copy kept', async () => {
-    const { server, keeping, recorder, sing } = await setup();
+    const { server, keeping, recorder, sing, errors } = await setup();
 
     await recorder.start({ trackId: 1, playhead: 5 });
     sing(1.5);
     await recorder.stop();
     await settled();
 
-    expect(recorder.error).toBe('Recording stopped during the lead-in, so there was nothing to keep.');
+    expect(errors).toEqual(['Recording stopped during the lead-in, so there was nothing to keep.']);
     expect(recorder.phase).toBeNull();
     expect(server.landed).toBe(0);
     expect(keeping.takes).toEqual([]);
@@ -120,30 +123,30 @@ describe('TakeRecorder', () => {
   });
 
   it("says why recording can't start where that's known before opening the Input", async () => {
-    const { player, input, recorder } = await setup();
+    const { player, input, recorder, errors } = await setup();
     input.problemFound = "Bandmate isn't allowed to use the microphone.";
 
     await recorder.start({ trackId: 1, playhead: 0 });
 
-    expect(recorder.error).toBe("Bandmate isn't allowed to use the microphone.");
+    expect(errors).toEqual(["Bandmate isn't allowed to use the microphone."]);
     expect(recorder.phase).toBeNull();
     expect(input.opened).toBeNull();
     expect(player.played).toEqual([]);
   });
 
   it("says why the Input couldn't be opened", async () => {
-    const { player, input, recorder } = await setup();
+    const { player, input, recorder, errors } = await setup();
     input.failing = 'The audio input is busy or unavailable.';
 
     await recorder.start({ trackId: 1, playhead: 0 });
 
-    expect(recorder.error).toBe('The audio input is busy or unavailable.');
+    expect(errors).toEqual(['The audio input is busy or unavailable.']);
     expect(recorder.phase).toBeNull();
     expect(player.played).toEqual([]);
   });
 
   it('fails a Retake whose Clip is gone by the time the Input opens, letting go of the Input', async () => {
-    const { server, saves, player, input, keeping, recorder } = await setup([track(1, [takeClip(7, 4, 3)])]);
+    const { server, saves, player, input, keeping, recorder, errors } = await setup([track(1, [takeClip(7, 4, 3)])]);
     const opening = input.holdOpen();
 
     const started = recorder.start({ trackId: 1, playhead: 0, retake: 7 });
@@ -151,7 +154,7 @@ describe('TakeRecorder', () => {
     opening();
     await started;
 
-    expect(recorder.error).toBe('The Clip to retake is gone.');
+    expect(errors).toEqual(['The Clip to retake is gone.']);
     expect(recorder.phase).toBeNull();
     expect(input.opened!.closed).toBe(true);
     expect(player.played).toEqual([]);
@@ -255,12 +258,12 @@ describe('TakeRecorder', () => {
   });
 
   it("doesn't record when playback is stopped before it starts", async () => {
-    const { player, input, recorder } = await setup();
+    const { player, input, recorder, errors } = await setup();
     player.stopsBeforeStart = true;
 
     await recorder.start({ trackId: 1, playhead: 5 });
 
-    expect(recorder.error).toBe('Recording stopped before it started.');
+    expect(errors).toEqual(['Recording stopped before it started.']);
     expect(recorder.phase).toBeNull();
     expect(input.opened!.closed).toBe(true);
   });

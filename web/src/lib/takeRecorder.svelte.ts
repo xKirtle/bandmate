@@ -55,7 +55,7 @@ export interface OpenedInput {
   readonly gone: string | null;
   readonly sampleRate: number;
   /** The Latency Offset a Take captured from it is placed by, in seconds. */
-  readonly latency: number;
+  readonly latencyOffset: number;
   /** Hands sink every batch captured, those so far and each one after. */
   keep(sink: (batch: Batch) => void): void;
   /** Stops capturing, and returns what was captured from context time from on. */
@@ -108,7 +108,7 @@ export function capturedInput(
       return {
         gone: capture.gone,
         sampleRate: capture.sampleRate,
-        latency: offset(capture.latency),
+        latencyOffset: offset(capture.latency),
         keep: (sink) => capture.keep(sink),
         stop: (from) => capture.stop(from),
         close: () => capture.close(),
@@ -155,6 +155,8 @@ export interface TakeRecorderOptions {
   onSave?: () => void;
   /** Hears the id of a Track added for an unsaved Take, e.g. to choose it. */
   onTrackAdded?: (trackId: number) => void;
+  /** Hears why a recording, or keeping unsaved Takes, failed, e.g. to show it. */
+  onError?: (message: string) => void;
 }
 
 /** A recording under way. */
@@ -175,8 +177,6 @@ export class TakeRecorder {
   trackId = $state<number | null>(null);
   /** Where it goes, and where playback starts for it, once it's placed. */
   plan = $state.raw<RecordingPlan | null>(null);
-  /** Why the latest recording, or keeping unsaved Takes, failed. */
-  error = $state<string | null>(null);
   /** Said of the Input a recording uses, e.g. that the one chosen isn't connected. */
   inputNote = $state<string | null>(null);
   /** The unsaved Takes offered back. */
@@ -191,6 +191,7 @@ export class TakeRecorder {
   #uploads: TakeUploads;
   #onSave: () => void;
   #onTrackAdded: (trackId: number) => void;
+  #onError: (message: string) => void;
 
   #recording: Recording | null = null;
   #wave: LiveWave | null = null;
@@ -207,6 +208,7 @@ export class TakeRecorder {
     this.#uploads = options.uploads;
     this.#onSave = options.onSave ?? (() => {});
     this.#onTrackAdded = options.onTrackAdded ?? (() => {});
+    this.#onError = options.onError ?? (() => {});
   }
 
   /** Whether a recording is capturing, rather than starting or saving. */
@@ -234,7 +236,6 @@ export class TakeRecorder {
     this.clipId = retake ?? null;
     this.trackId = null;
     this.plan = null;
-    this.error = null;
     this.inputNote = null;
     this.#release = this.#saves.hold();
     const recording: Recording = { input: null, startedAt: 0, unsaved: null, kept: null };
@@ -261,7 +262,7 @@ export class TakeRecorder {
         clipId: this.clipId,
         takes: clip ? takesAt(clip) : [],
         plan,
-        latencyOffset: input.latency,
+        latencyOffset: input.latencyOffset,
       };
       const first = frameAt(startedAt, input.sampleRate);
       const kept = this.#keeping.keep({
@@ -285,7 +286,7 @@ export class TakeRecorder {
       this.phase = 'recording';
     } catch (e) {
       recording.input?.close();
-      this.error = e instanceof CaptureError ? e.message : `Couldn't start recording (${(e as Error).message}).`;
+      this.#onError(e instanceof CaptureError ? e.message : `Couldn't start recording (${(e as Error).message}).`);
       this.#done();
     }
   }
@@ -306,7 +307,7 @@ export class TakeRecorder {
     // What was sung after the lead-in, placed where it was heard.
     if (!sungPastStart(plan, samples.length / rate, latencyOffset)) {
       void r.kept.forget();
-      this.error = 'Recording stopped during the lead-in, so there was nothing to keep.';
+      this.#onError('Recording stopped during the lead-in, so there was nothing to keep.');
       this.#done();
       return;
     }
@@ -380,7 +381,6 @@ export class TakeRecorder {
   async keepUnsaved(): Promise<void> {
     if (this.recovering || this.phase !== null) return;
     this.recovering = true;
-    this.error = null;
     try {
       for (const offer of this.unsaved) {
         if (!(await this.#keepOne(offer))) break;
@@ -396,7 +396,7 @@ export class TakeRecorder {
     try {
       samples = await offer.samples();
     } catch {
-      this.error = "Couldn't read the unsaved Take back from this browser.";
+      this.#onError("Couldn't read the unsaved Take back from this browser.");
       return false;
     }
     const duration = samples.length / offer.sampleRate;

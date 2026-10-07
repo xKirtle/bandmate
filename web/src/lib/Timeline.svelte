@@ -234,6 +234,7 @@
     uploads: api,
     onSave: () => (offerCues = null),
     onTrackAdded: (trackId) => choose({ kind: 'add', trackId }),
+    onError: (message) => (error = message),
   });
   const liveTiles = $derived.by(() => recorder.liveTiles(barWidth / view.scale));
   // Whether a recording is on, from pressing Record until its Take is saved.
@@ -256,11 +257,6 @@
       ? 'Wait for the Merge to finish to keep or discard them'
       : 'Stop recording to keep or discard them',
   );
-
-  // The recorder's errors show along with the Timeline's own.
-  $effect(() => {
-    if (recorder.error !== null) error = recorder.error;
-  });
 
   // Peaks by source key, fetched once each, so waveforms show before the
   // audio is decoded.
