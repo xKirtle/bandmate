@@ -43,7 +43,7 @@ func conflict(msg string) error { return &ConflictError{Msg: msg} }
 
 var (
 	errTitleRequired = invalid("title is required")
-	errUnknownStatus = invalid("status must be idea, drafting or finished")
+	errUnknownStatus = invalid("status must be idea, drafting, finished or shelved")
 	errNoSuchFolder  = invalid("there's no such Folder")
 )
 
@@ -54,11 +54,13 @@ const (
 	StatusIdea     Status = "idea"
 	StatusDrafting Status = "drafting"
 	StatusFinished Status = "finished"
+	// StatusShelved is a Song set aside for now, that might be come back to.
+	StatusShelved Status = "shelved"
 )
 
 func (s Status) valid() bool {
 	switch s {
-	case StatusIdea, StatusDrafting, StatusFinished:
+	case StatusIdea, StatusDrafting, StatusFinished, StatusShelved:
 		return true
 	}
 	return false

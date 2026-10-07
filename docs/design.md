@@ -40,6 +40,7 @@ The user picks a Palette, and System, Light or Dark, in Settings, kept per devic
 | `--accent`, `--accent-text`    | The primary action, the current or chosen thing, Chords; text on accent |
 | `--danger`, `--warning`        | Destructive actions and errors; warnings                                |
 | `--drafting-*`, `--finished-*` | The drafting and finished Status badges (`-bg` and `-fg`)               |
+| `--shelved-*`                  | The shelved Status badge (`-bg` and `-fg`)                              |
 
 Shared by every Palette, the scrim and the only shadows there are:
 

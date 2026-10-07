@@ -92,6 +92,11 @@ describe('sortSongs', () => {
     ]);
   });
 
+  it('sorts a Shelved Song after a Finished one, as set aside from the lifecycle', () => {
+    const list = [song('Set aside', { status: 'shelved' }), song('Done', { status: 'finished' }), song('Seed')];
+    expect(titles(sortSongs(list, { column: 'status', direction: 'asc' }))).toEqual(['Seed', 'Done', 'Set aside']);
+  });
+
   it('sorts by key, with Songs that have none last either way', () => {
     expect(titles(sortSongs(songs, { column: 'key', direction: 'asc' }))).toEqual([
       'midnight drive',

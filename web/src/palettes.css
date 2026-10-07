@@ -33,6 +33,8 @@
   --drafting-fg: #7a4f00;
   --finished-bg: #dcefe0;
   --finished-fg: #1f5e2e;
+  --shelved-bg: #efe6ee;
+  --shelved-fg: #5f4566;
 }
 
 /* Shared by every Palette, and the only shadows there are. */
@@ -68,6 +70,8 @@
   --drafting-fg: #6b4700;
   --finished-bg: #dcebe0;
   --finished-fg: #1d5a30;
+  --shelved-bg: #e9e6f0;
+  --shelved-fg: #4f4869;
 }
 
 /* Olive: muted green on stone. */
@@ -86,6 +90,8 @@
   --drafting-fg: #6b4700;
   --finished-bg: #dde9e6;
   --finished-fg: #1d5550;
+  --shelved-bg: #ebe5ea;
+  --shelved-fg: #574a5a;
 }
 
 /* Dark, under `data-theme='dark'` on the root. Each selector here is more
@@ -108,6 +114,8 @@
   --drafting-fg: #f3cf7a;
   --finished-bg: #173222;
   --finished-fg: #8fd6a2;
+  --shelved-bg: #2f2534;
+  --shelved-fg: #d3bcdc;
 }
 
 /* Ink: blue on blue-black. */
@@ -127,6 +135,8 @@
   --drafting-fg: #efcd7c;
   --finished-bg: #152d1f;
   --finished-fg: #8fd6a2;
+  --shelved-bg: #28263a;
+  --shelved-fg: #c4bee2;
 }
 
 /* Olive: green on dark stone. */
@@ -146,4 +156,6 @@
   --drafting-fg: #efcd7c;
   --finished-bg: #13302d;
   --finished-fg: #8ad3c8;
+  --shelved-bg: #2b2630;
+  --shelved-fg: #cbbccf;
 }

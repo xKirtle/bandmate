@@ -678,3 +678,61 @@ func TestEachNewSongAndBeatGetsItsOwnIdentity(t *testing.T) {
 		t.Errorf("identity given = %q, want %q kept", got, kept)
 	}
 }
+
+func TestASongCanBeShelvedKeepingEverythingThatHangsOffIt(t *testing.T) {
+	conn := openBefore(t, "0038_shelved_status")
+	exec(t, conn,
+		`INSERT INTO folders (id, name, folded) VALUES (1, 'Demos', 'demos')`,
+		`INSERT INTO songs (id, identity, title, status, created_at, updated_at, song_key, bpm, capo, tuning, notes, version, folder_id)
+			VALUES (1, 'abc', 'Midnight', 'drafting', 'c', 'u', 'G', 92, 2, 'DADGAD', 'n', 7, 1)`,
+		`INSERT INTO sections (id, song_id, label) VALUES (1, 1, 'Verse')`,
+		`INSERT INTO tags (id, name, folded) VALUES (1, 'Ballad', 'ballad')`,
+		`INSERT INTO song_tags (song_id, tag_id) VALUES (1, 1)`,
+	)
+
+	if err := migrate(context.Background(), conn); err != nil {
+		t.Fatalf("migrating: %v", err)
+	}
+
+	// Rebuilding songs neither drops nor changes a Song, nor anything of it.
+	var identity, title, status, created, updated, key, tuning, notes string
+	var bpm, capo, version, folder int64
+	if err := conn.QueryRow(`SELECT identity, title, status, created_at, updated_at, song_key, bpm, capo, tuning, notes, version, folder_id
+		FROM songs WHERE id = 1`).Scan(&identity, &title, &status, &created, &updated, &key, &bpm, &capo, &tuning, &notes, &version, &folder); err != nil {
+		t.Fatalf("reading the Song: %v", err)
+	}
+	got := []any{identity, title, status, created, updated, key, bpm, capo, tuning, notes, version, folder}
+	want := []any{"abc", "Midnight", "drafting", "c", "u", "G", int64(92), int64(2), "DADGAD", "n", int64(7), int64(1)}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Song = %v, want %v", got, want)
+	}
+	for table, rows := range map[string]int{"sections": 1, "song_tags": 1, "tags": 1} {
+		var n int
+		if err := conn.QueryRow(`SELECT COUNT(*) FROM ` + table).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		if n != rows {
+			t.Errorf("%s has %d rows, want %d", table, n, rows)
+		}
+	}
+
+	exec(t, conn, `UPDATE songs SET status = 'shelved' WHERE id = 1`)
+	if _, err := conn.Exec(`UPDATE songs SET status = 'binned' WHERE id = 1`); err == nil {
+		t.Errorf("a Status that isn't one was kept")
+	}
+
+	// Foreign keys are back on: a Song deleted still takes what's of it along.
+	var on int
+	if err := conn.QueryRow(`PRAGMA foreign_keys`).Scan(&on); err != nil || on != 1 {
+		t.Fatalf("foreign_keys = %d (%v), want 1", on, err)
+	}
+	exec(t, conn, `DELETE FROM songs WHERE id = 1`)
+	var sections int
+	if err := conn.QueryRow(`SELECT COUNT(*) FROM sections`).Scan(&sections); err != nil || sections != 0 {
+		t.Errorf("sections left after the Song was deleted = %d (%v), want 0", sections, err)
+	}
+
+	// A new Song still gets an identity, so its trigger came back too.
+	exec(t, conn, `INSERT INTO songs (title, created_at, updated_at) VALUES ('Neon', '', '')`)
+	expectDistinctIdentities(t, "Song", identities(t, conn, "songs"))
+}

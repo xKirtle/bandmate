@@ -6,9 +6,10 @@ describe('openingMode', () => {
     expect(openingMode('finished')).toBe('read');
   });
 
-  it('opens Idea and Drafting Songs in Write mode', () => {
+  it('opens Idea, Drafting and Shelved Songs in Write mode', () => {
     expect(openingMode('idea')).toBe('write');
     expect(openingMode('drafting')).toBe('write');
+    expect(openingMode('shelved')).toBe('write');
   });
 });
 

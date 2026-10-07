@@ -22,6 +22,7 @@ const PAIRS: [string, string, number, string][] = [
   ['--warning', '--bg', 4.5, 'Warnings'],
   ['--drafting-fg', '--drafting-bg', 4.5, 'The drafting Status badge'],
   ['--finished-fg', '--finished-bg', 4.5, 'The finished Status badge'],
+  ['--shelved-fg', '--shelved-bg', 4.5, 'The shelved Status badge'],
   ['--accent', '--surface-2', 3, 'Accent controls and the selected outline on raised areas'],
   ['--text-muted', '--surface-2', 3, 'Icons on controls'],
   ['--text', '--bg', 7, 'Lines in Read mode'],
