@@ -11,6 +11,7 @@
 import type { Take } from './api';
 import { recordingPlan, sungPastStart, type RecordingPlan } from './recording';
 import type { Placed } from './schedule';
+import { isFree } from './trackPlacement';
 
 /** Where a recording was going, as kept with it. */
 export interface Unsaved {
@@ -44,9 +45,6 @@ type PlacedClip = Placed & {
   takes: readonly Pick<Take, 'id' | 'position' | 'nudge'>[];
 };
 
-// As the server's, so Clips that only touch don't overlap.
-const tolerance = 1e-6;
-
 /** The Timeline time each of a Clip's Takes was recorded to start at, before any nudge. */
 export function takesAt(clip: PlacedClip): { id: number; at: number }[] {
   return clip.takes.map((t) => ({ id: t.id, at: clip.start - clip.offset + t.position - t.nudge }));
@@ -79,8 +77,8 @@ export function recoveredPlacement(
   const own = tracks.find((t) => t.id === unsaved.trackId);
   if (own && unsaved.clipId === null) {
     const end = plan.from + duration - latencyOffset;
-    const free = own.clips.every((c) => c.start + c.length <= plan.start + tolerance || c.start >= end - tolerance);
-    if (free) return { target: { trackId: own.id, start: plan.start }, captureStart: plan.from };
+    if (isFree(own.clips, { start: plan.start, end }))
+      return { target: { trackId: own.id, start: plan.start }, captureStart: plan.from };
   }
   const track = own ?? tracks.find((t) => t.id === added);
   if (!track) return { target: null, captureStart: plan.from };

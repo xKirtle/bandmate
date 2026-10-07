@@ -12,6 +12,7 @@
 import type { Clip, ClipCopy, PastedClip, Track, TrackToAdd } from './api';
 import { ownOf } from './clipSource';
 import type { ClipIds } from './selection.svelte';
+import { inTheWay } from './trackPlacement';
 
 /** A Clip as it was copied, and how many Tracks below the topmost Clip copied it was then. */
 export interface CopiedClip {
@@ -38,10 +39,6 @@ export interface Paste {
   newTracks: TrackToAdd[];
   clips: PastedClip[];
 }
-
-// Absorbs rounding when comparing times, as the server does, e.g. a Clip
-// pasted right at a neighbour's end.
-const tolerance = 1e-6;
 
 /** A Clip as it is: its source, trim, name and Gain, and a Clip of Takes' Takes as they are in it. */
 function copyOf(clip: Clip): ClipCopy {
@@ -107,9 +104,9 @@ export function paste(
   for (;;) {
     const hit = laid
       .flatMap(({ clip, after, on }) =>
-        (on?.clips ?? [])
-          .filter((c) => at + after < c.start + c.length - tolerance && at + after + clip.length > c.start + tolerance)
-          .map((c) => c.start + c.length - after),
+        inTheWay(on?.clips ?? [], { start: at + after, end: at + after + clip.length }).map(
+          (c) => c.start + c.length - after,
+        ),
       )
       .at(0);
     if (hit === undefined) break;

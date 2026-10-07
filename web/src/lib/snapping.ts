@@ -3,6 +3,8 @@
 // only has to follow it: it says what can be snapped to, which edges are
 // dragged and how near is near enough, and keeps its own limits after.
 
+import { tolerance } from './trackPlacement';
+
 /** A Timeline's Tracks, top to bottom, as far as snapping goes: where each Clip on them is. */
 export type Tracks = readonly { clips: readonly { id: number; start: number; length: number }[] }[];
 
@@ -20,9 +22,8 @@ export interface Snap<T> {
   aligned: T[];
 }
 
-// Times this close are the same time, as rounding leaves a Clip's end a
-// hair off a start it was lined up with. As the server has it.
-const tolerance = 1e-6;
+// Times within the server's tolerance are the same time, as rounding leaves
+// a Clip's end a hair off a start it was lined up with.
 
 /**
  * Where the edges dragged would snap: onto the target nearest any of them,

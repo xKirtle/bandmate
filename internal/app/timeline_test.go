@@ -637,6 +637,40 @@ func TestMovingAClipIntoANeighbourIsRejected(t *testing.T) {
 	}
 }
 
+func TestAClipMayOverlapANeighbourByLessThanTheTolerance(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+	beatTrack := p.tl.Tracks[0].ID
+	timelineChange(t, ts.moveClip(p.song.ID, p.first, p.tl.Tracks[1].ID, 0))
+
+	// The second Clip is at 0:30-0:50 on Track 1, and the first, 10
+	// seconds long, goes just over either edge of it: by less than the
+	// tolerance of a microsecond it's rounding, and fits.
+	for name, c := range map[string]struct {
+		start float64
+		want  string
+	}{
+		"its start": {20.0000005, "0:20.0000005+10@0"},
+		"its end":   {49.9999995, "0:49.9999995+10@0"},
+	} {
+		t.Run("under it, over "+name, func(t *testing.T) {
+			got := timelineChange(t, ts.moveClip(p.song.ID, p.first, beatTrack, c.start))
+			if at := clipAt(got, p.first); at != c.want {
+				t.Errorf("first clip = %s, want %s", at, c.want)
+			}
+		})
+	}
+	before := ts.getTimeline(p.song.ID)
+	for name, start := range map[string]float64{"its start": 20.000002, "its end": 49.999998} {
+		t.Run("over it, over "+name, func(t *testing.T) {
+			expectError(t, ts.moveClip(p.song.ID, p.first, beatTrack, start), http.StatusConflict, "Clips can't overlap on a Track")
+			if read := ts.getTimeline(p.song.ID); !reflect.DeepEqual(read, before) {
+				t.Errorf("timeline = %+v, want it unchanged: %+v", read, before)
+			}
+		})
+	}
+}
+
 func TestAMoveMustStayOnTheSongsTimeline(t *testing.T) {
 	ts := newTestServer(t)
 	p := placeTwoClips(t, ts)
