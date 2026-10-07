@@ -107,7 +107,10 @@ export class LyricSheetEditing {
   }
 }
 
-/** Whether a change ends Sync mode: every change to the lyrics but deleting a Section in the Scrapbook. */
+/**
+ * Whether a change ends Sync mode: every change to the lyrics, but deleting
+ * a Section in the Scrapbook and saving Lines text.
+ */
 function endsSyncMode(change: LyricSheetChange): boolean {
   return change.kind !== 'deleteSection' && change.kind !== 'replaceAlternateText';
 }

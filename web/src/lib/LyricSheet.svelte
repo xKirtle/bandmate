@@ -392,9 +392,10 @@
   // the other's, inactive, which a notice says: it isn't asked first, and
   // it's undone by moving them to the Scrapbook and back.
   async function addTo(section: Section, to: Section) {
-    // Its Alternates are made anew in the Section they join, so edits still
-    // waiting in its editor are saved first, while they can be: a drag
-    // doesn't blur the text box.
+    // Its Alternates are made anew in the Section they join, and an unnamed
+    // one is named after its Label, so a Label or an Alternate name still
+    // being typed in its editor is saved first: they save as they blur,
+    // which a drag doesn't do. Lyric Sheet editing sends its Lines text first.
     const focused = document.activeElement;
     if (focused instanceof HTMLElement && focused.closest(`[data-section="${section.id}"]`)) focused.blur();
     const said = addedNotice(section, to);
