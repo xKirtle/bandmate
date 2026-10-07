@@ -107,14 +107,35 @@ The tests go through the HTTP API only. `internal/app/helpers_test.go` starts th
 
 Vitest covers plain TypeScript modules in `web/src/lib` that don't touch the DOM or Web Audio, e.g. reducing decoded audio to waveform peaks. Their tests sit next to them as `*.test.ts`. Components and audio playback are tested by hand.
 
+### End-to-end tests
+
+The suite in [`e2e/`](e2e/) drives the real app in Chromium with [Playwright](https://playwright.dev/), and pins what the pages do, so a change that moves code behind them can't change it unnoticed. Run it before and after such a change:
+
+```sh
+cd e2e
+npm ci
+npx playwright install chromium   # once; or set CHROMIUM=/usr/bin/chromium to use your own
+npm test                          # builds the web app, then runs every test
+npm test -- tests/songs.spec.ts   # or only some
+npm run check                     # type-check the suite
+```
+
+It needs Go too: the suite builds the Bandmate binary once, then each worker starts its own Bandmate on a free port, with an empty data directory of its own. A failed test keeps its trace in `e2e/test-results/`; open it with `npx playwright show-trace <trace.zip>`.
+
+Tests import `test` and `expect` from `e2e/fixtures.ts`, and:
+
+- go through the UI only, finding things by their role and accessible name, and check only what a user sees, or what the server holds afterwards, read back through the API;
+- make the Songs and Folders they need through the HTTP API, with the `library` fixture (`e2e/library.ts`), which empties Bandmate before each test, or restore the demo Backup with `library.restoreDemo()` when they need a full Timeline;
+- inject faults in the browser with `e2e/faults.ts`: fail a request N times, let it reach the server but lose its answer, or hold it until released.
+
 ## Releasing
 
 ### Continuous integration
 
-1. Open a pull request. The [CI workflow](.github/workflows/ci.yml) checks the SPA's formatting, type-checks, unit-tests and builds it, checks the Go license manifest is up to date, and runs `go vet` and `go test`. Its `bundle` job builds the image, runs yt-dlp, ffmpeg and QuickJS in it, checks yt-dlp finds the other two, and checks the image starts healthy. Pushes to other branches don't run CI, so open a draft PR for early feedback. A pull request that only changes docs or other files outside the build skips the tests.
+1. Open a pull request. The [CI workflow](.github/workflows/ci.yml) checks the SPA's formatting, type-checks, unit-tests and builds it, checks the Go license manifest is up to date, and runs `go vet` and `go test`. Its `e2e` job runs the [end-to-end tests](#end-to-end-tests), retrying a failed test once, and uploads the traces of failed tests as the run's `e2e-traces` artifact. Its `bundle` job builds the image, runs yt-dlp, ffmpeg and QuickJS in it, checks yt-dlp finds the other two, and checks the image starts healthy. Pushes to other branches don't run CI, so open a draft PR for early feedback. A pull request that only changes docs or other files outside the build skips the tests.
 2. Merge to `main`. CI doesn't test again: it builds and publishes the image to `ghcr.io/xkirtle/bandmate` tagged `edge` and `sha-<short>` (the commit's short SHA). A merge never moves `latest`.
 
-`main` requires a pull request to pass `test` and `bundle`, and to be up to date with `main`, before it merges, so what lands is what CI checked. A pull request that falls behind, because another merged first, needs updating (**Update branch**, or `gh pr update-branch`), and its checks run again. (`image` only runs on pushes, so pull requests show it as skipped.)
+`main` requires a pull request to pass `test`, `bundle` and `e2e`, and to be up to date with `main`, before it merges, so what lands is what CI checked. A pull request that falls behind, because another merged first, needs updating (**Update branch**, or `gh pr update-branch`), and its checks run again. (`image` only runs on pushes, so pull requests show it as skipped.)
 
 ### Versions
 
