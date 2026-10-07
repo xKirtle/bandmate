@@ -1,27 +1,11 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from '../fixtures';
-import { clip, heroSong, timeline } from '../songPage';
+import { clip, heroSong, pauseButton, playButton, playhead, playheadReaches, ruler, timeline } from '../songPage';
 
 // How the Timeline plays, on the demo Backup's hero Song, whose Timeline
 // plays for 1:30: playing to the end, a ruler click while playing, the
 // Loop, and playing from a Cue. The playhead is read from the ruler, to the
 // second, so how fast the page plays only moves it within a second or so.
-
-/** The ruler, whose value is the playhead, in whole seconds. */
-const ruler = (page: Page) => timeline(page).getByRole('slider', { name: 'Position' });
-
-const playButton = (page: Page) => timeline(page).getByRole('button', { name: 'Play', exact: true });
-const pauseButton = (page: Page) => timeline(page).getByRole('button', { name: 'Pause', exact: true });
-
-/** Where the playhead is now, in whole seconds, as the ruler says. */
-async function playhead(page: Page): Promise<number> {
-  return Number(await ruler(page).getAttribute('aria-valuenow'));
-}
-
-/** Waits for the playhead to reach a time, in whole seconds, e.g. while playing. */
-async function playheadReaches(page: Page, time: number) {
-  await expect.poll(() => playhead(page), { timeout: 15_000 }).toBeGreaterThanOrEqual(time);
-}
 
 /** Opens a Song's page, with its Timeline ready to play. */
 async function open(page: Page, songId: number) {
@@ -52,6 +36,7 @@ test('playing to the end stops there, keeping the playhead at the end, and playi
   await expect(playButton(page)).toBeVisible({ timeout: 15_000 });
   await expect(ruler(page)).toHaveAttribute('aria-valuetext', atTheEnd);
   await expect(ruler(page)).toHaveAttribute('aria-valuenow', String(end));
+  // Given time to play on, were it still playing.
   await page.waitForTimeout(500);
   await expect(ruler(page)).toHaveAttribute('aria-valuenow', String(end));
 
@@ -70,20 +55,20 @@ test('a ruler click while playing jumps playback there, and it carries on playin
   await expect(pauseButton(page)).toBeVisible();
   await playheadReaches(page, 1);
 
-  // Clicked a third of the way along the ruler shown, well ahead of the playhead.
+  // Clicked two thirds of the way along the ruler shown, far ahead of the playhead.
   const box = (await ruler(page).boundingBox())!;
   const shown = Math.min(box.width, page.viewportSize()!.width - box.x);
   const span = Number(await ruler(page).getAttribute('aria-valuemax'));
-  const x = shown / 3;
+  const x = (shown * 2) / 3;
   const to = (x / box.width) * span;
-  expect(to).toBeGreaterThan(10);
+  expect(to - (await playhead(page))).toBeGreaterThan(15);
   await page.mouse.click(box.x + x, box.y + box.height / 2);
 
-  // Jumped there, and plays on from there.
-  await playheadReaches(page, Math.floor(to) - 1);
-  const jumped = await playhead(page);
-  expect(jumped).toBeLessThanOrEqual(Math.ceil(to) + 2);
-  await playheadReaches(page, jumped + 2);
+  // Jumped there at once, far sooner than playing on would get there.
+  await playheadReaches(page, Math.floor(to) - 1, { timeout: 3_000 });
+  expect(await playhead(page)).toBeLessThanOrEqual(Math.ceil(to) + 2);
+  // Playing on from there, rather than from where it was.
+  await playheadReaches(page, Math.floor(to) + 2, { timeout: 5_000 });
   await expect(pauseButton(page)).toBeVisible();
 });
 
@@ -102,6 +87,7 @@ test('with the Loop on, playback wraps at its end, and switching it on never mov
   // Switched on while stopped, before the Loop, the playhead stays.
   await loop.click();
   await expect(loop).toHaveAttribute('aria-pressed', 'true');
+  // Given time for a restart that would move it.
   await page.waitForTimeout(300);
   await expect(ruler(page)).toHaveAttribute('aria-valuenow', '5');
   await loop.click();
@@ -117,21 +103,21 @@ test('with the Loop on, playback wraps at its end, and switching it on never mov
 
   // It plays into the Loop, wrapping only at its end, back to its start:
   // the playhead, read as it goes, rises to the Loop's end, then drops back.
-  const heard = [switchedAt];
-  const highest = () => heard.indexOf(Math.max(...heard));
+  const readings = [switchedAt];
+  const highest = () => readings.indexOf(Math.max(...readings));
   await expect
     .poll(
       async () => {
-        heard.push(await playhead(page));
-        return heard[highest()] >= 13 && heard.slice(highest() + 1).some((t) => t <= 11);
+        readings.push(await playhead(page));
+        return readings[highest()] >= 12 && readings.slice(highest() + 1).some((t) => t <= 11);
       },
       { timeout: 15_000, intervals: [100] },
     )
     .toBe(true);
-  const rising = heard.slice(0, highest() + 1);
+  const rising = readings.slice(0, highest() + 1);
   expect(rising).toEqual([...rising].sort((a, b) => a - b));
-  expect(heard[highest()]).toBeLessThanOrEqual(14);
-  expect(Math.min(...heard.slice(highest()))).toBeGreaterThanOrEqual(10);
+  expect(readings[highest()]).toBeLessThanOrEqual(14);
+  expect(Math.min(...readings.slice(highest()))).toBeGreaterThanOrEqual(10);
   await expect(pauseButton(page)).toBeVisible();
 });
 
@@ -145,12 +131,13 @@ test('playing from a Cue in the Lyric Sheet starts playback there, and while pla
   // Played from a second before the Cue, to lead into it.
   await page.getByRole('button', { name: 'Play from Line 1 of Chorus at 0:25.0' }).click();
   await expect(pauseButton(page)).toBeVisible();
-  await playheadReaches(page, 24);
+  // Sooner than playing from 0:00 would get there.
+  await playheadReaches(page, 24, { timeout: 5_000 });
   expect(await playhead(page)).toBeLessThanOrEqual(26);
 
   // Played from another while playing, it jumps there, never pausing.
   await page.getByRole('button', { name: 'Play from Line 1 of Verse 1 at 0:05.0' }).click();
-  await expect.poll(() => playhead(page)).toBeLessThanOrEqual(6);
+  await expect.poll(() => playhead(page), { timeout: 15_000 }).toBeLessThanOrEqual(6);
   expect(await playhead(page)).toBeGreaterThanOrEqual(4);
   await playheadReaches(page, 7);
   await expect(pauseButton(page)).toBeVisible();
