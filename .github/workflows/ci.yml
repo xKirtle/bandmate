@@ -2,8 +2,8 @@ name: CI
 
 # Pull requests only test, and check the image's bundled programs run. A push
 # to main only publishes the image as `:edge` and `:sha-<short>`: main's
-# ruleset requires a pull request to be up to date and to pass `test` and
-# `bundle` before it merges, so what lands is what they checked. A `v*`
+# ruleset requires a pull request to be up to date and to pass `test`,
+# `bundle` and `e2e` before it merges, so what lands is what they checked. A `v*`
 # version tag (e.g. `v0.4.0`) tests and checks again, then publishes a
 # release as `:0.4.0`, `:0.4` and `:latest`, so `latest` is the newest
 # release, never the latest merge. Changes to main or a PR that only touch
@@ -33,7 +33,7 @@ env:
 
 jobs:
   # Whether anything the build or tests read has changed. The workflow itself
-  # always runs, so the required `test` and `bundle` checks always report: skipped counts
+  # always runs, so the required `test`, `bundle` and `e2e` checks always report: skipped counts
   # as passing, while a check that never starts leaves the PR waiting.
   # A tag has no previous commit to diff against, and a release must be
   # tested whatever changed, so a tag always counts as a code change. So does
@@ -60,7 +60,7 @@ jobs:
           fi
           base=$([ "$GITHUB_EVENT_NAME" = pull_request ] && echo "$GITHUB_SHA^1" || echo "$BEFORE")
           if git diff --name-only "$base" "$GITHUB_SHA" -- \
-              cmd internal web go.mod go.sum Dockerfile .dockerignore .github/workflows \
+              cmd internal web e2e docs/screenshots/demo.bandmate go.mod go.sum Dockerfile .dockerignore .github/workflows \
               ':!*.md' | grep -q .; then
             echo code=true >> "$GITHUB_OUTPUT"
           else
@@ -127,6 +127,61 @@ jobs:
 
       - name: go test
         run: go test ./...
+
+  # The end-to-end suite in e2e/: Chromium driving the built web app against
+  # a real Bandmate per worker. A test that fails is retried once. When the
+  # job fails, the failed tests' traces are uploaded, to open with `npx
+  # playwright show-trace`. Not on a push to main, like `test`.
+  e2e:
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && !(github.event_name == 'push' && github.ref_type == 'branch')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            e2e/package-lock.json
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Install the suite's dependencies
+        working-directory: e2e
+        run: npm ci
+
+      - name: Type-check the suite
+        working-directory: e2e
+        run: npm run check
+
+      - name: Install Chromium
+        working-directory: e2e
+        run: npx playwright install --with-deps chromium
+
+      # Builds the web app, then the Bandmate each worker starts, then runs
+      # the suite.
+      - name: Run the end-to-end suite
+        working-directory: e2e
+        run: npm test
+
+      - name: Upload the traces of failed tests
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-traces
+          path: |
+            e2e/test-results/
+            e2e/playwright-report/
+          retention-days: 14
 
   # Builds the image and runs the programs bundled in it (ADR 0016), so a
   # broken bundle, such as a yt-dlp that won't start, fails the build rather
@@ -198,14 +253,15 @@ jobs:
   # have the bundle job's build instead. A Dockerfile problem those miss only
   # fails a publish, leaving the last good image in place (for a tag, that
   # version goes unpublished until the tag is pushed again). On main it runs
-  # alone, `test` and `bundle` having passed on the pull request; on a tag,
-  # only once both pass again. `!cancelled()` keeps it from being skipped
-  # with them on main.
+  # alone, `test`, `bundle` and `e2e` having passed on the pull request; on a
+  # tag, only once all three pass again. `!cancelled()` keeps it from being
+  # skipped with them on main.
   image:
-    needs: [changes, test, bundle]
+    needs: [changes, test, bundle, e2e]
     if: >-
       !cancelled() && github.event_name == 'push' && needs.changes.outputs.code == 'true' &&
-      (github.ref_type == 'branch' || (needs.test.result == 'success' && needs.bundle.result == 'success'))
+      (github.ref_type == 'branch' ||
+        (needs.test.result == 'success' && needs.bundle.result == 'success' && needs.e2e.result == 'success'))
     runs-on: ubuntu-latest
     permissions:
       contents: read

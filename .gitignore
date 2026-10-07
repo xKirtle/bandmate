@@ -8,6 +8,9 @@
 web/node_modules/
 docs/screenshots/node_modules/
 site/node_modules/
+e2e/node_modules/
+e2e/test-results/
+e2e/playwright-report/
 site/.vitepress/dist/
 site/.vitepress/cache/
 web/dist/*
