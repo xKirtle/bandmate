@@ -82,6 +82,11 @@ export class Bandmate {
     return song;
   }
 
+  /** Renames a Song, as another tab would. */
+  async retitle(id: number, title: string): Promise<Song> {
+    return json<Song>(this.api.patch(`/api/songs/${id}`, { data: { title } }));
+  }
+
   /** Makes an empty Folder. */
   folder(name: string): Promise<Folder> {
     return json<Folder>(this.api.post('/api/folders', { data: { name } }));
