@@ -11,7 +11,7 @@
 
 import type { Clip, ClipCopy, PastedClip, Track, TrackToAdd } from './api';
 import { ownOf } from './clipSource';
-import type { Selection } from './selection';
+import type { ClipIds } from './selection.svelte';
 
 /** A Clip as it was copied, and how many Tracks below the topmost Clip copied it was then. */
 export interface CopiedClip {
@@ -60,7 +60,7 @@ function copyOf(clip: Clip): ClipCopy {
 }
 
 /** The Clipboard after copying the selected Clips as they are, or null with none selected, which leaves it as it was. */
-export function copy(tracks: readonly Track[], selected: Selection): Clipboard | null {
+export function copy(tracks: readonly Track[], selected: ClipIds): Clipboard | null {
   const copied = tracks.flatMap((t, trackIndex) =>
     t.clips.filter((c) => selected.has(c.id)).map((c) => ({ trackIndex, clip: copyOf(c) })),
   );
@@ -132,7 +132,7 @@ export function paste(
  * Clip, they all go later, together, to the first place where every one
  * fits, as a paste does. Null with none selected.
  */
-export function duplicate(tracks: readonly Track[], selected: Selection): Paste | null {
+export function duplicate(tracks: readonly Track[], selected: ClipIds): Paste | null {
   // The topmost selected Clip's Track takes the topmost copy.
   const top = tracks.find((t) => t.clips.some((c) => selected.has(c.id)));
   const copied = copy(tracks, selected);
