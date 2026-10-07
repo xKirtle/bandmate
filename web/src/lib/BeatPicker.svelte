@@ -3,21 +3,16 @@
   import Play from '@lucide/svelte/icons/play';
   import { onDestroy, tick } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
-  import AddFromLink, { type FromLink } from './AddFromLink.svelte';
-  import AlreadyInLibrary from './AlreadyInLibrary.svelte';
-  import { api, type Beat, type DecodedAudio, type Fetched, type Song } from './api';
-  import AudioPlayer from './AudioPlayer.svelte';
-  import BeatFields from './BeatFields.svelte';
+  import AddBeatForm from './AddBeatForm.svelte';
+  import AddFromLink from './AddFromLink.svelte';
+  import { api, type Beat, type Song } from './api';
   import BeatFilters from './BeatFilters.svelte';
   import BeatTable from './BeatTable.svelte';
-  import { fromDraft, toDraft, type BeatDraft } from './beatDraft';
+  import { BeatToAdd, fileReader } from './beatToAdd.svelte';
   import Dialog from './Dialog.svelte';
   import { defaultBeatListView, filterBeats, isBeatListFiltered, songBeatHint, sortBeats } from './listViews';
   import { playMediaAlone, release } from './playback';
   import { formatDuration } from './time';
-  import { suggestForFile } from './beatTags';
-  import { beatWithSource } from './sameSource';
-  import { prepareUpload } from './upload';
 
   // Picks a Beat to add to a Song: one from the Beat Library, found with the
   // Library's search, filters and sort, or a new upload or one from a link,
@@ -38,18 +33,11 @@
   // Song page, so it stays out of the URL and the Library's view.
   let view = $state({ ...defaultBeatListView });
 
-  // A file being added: decoded, waiting for its details. One fetched from a
-  // link is already on the server, waiting there, and is previewed from the
-  // copy read to decode it.
-  interface Adding {
-    file: File;
-    decoded: DecodedAudio;
-    draft: BeatDraft;
-    fetched?: Fetched & { previewUrl: string };
-  }
-  let adding = $state<Adding | null>(null);
-  let busy = $state<string | null>(null);
-  let error = $state<string | null>(null);
+  // A new Beat being added, which joins the Library and is then picked.
+  const toAdd = new BeatToAdd(
+    fileReader(() => maxUploadBytes),
+    api,
+  );
   // Whether From link is offered, and whether its box is open.
   let addFromLink = $state(false);
   let linking = $state(false);
@@ -105,7 +93,7 @@
 
   // A Beat stops once its button goes, filtered out or behind an upload or the link box.
   $effect(() => {
-    if (previewId !== null && (adding || linking || !shown?.some((b) => b.id === previewId))) audio?.pause();
+    if (previewId !== null && (toAdd.adding || linking || !shown?.some((b) => b.id === previewId))) audio?.pause();
   });
 
   // Closing the picker ends its preview.
@@ -128,69 +116,16 @@
     const input = event.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
     input.value = '';
-    if (!file) return;
-    setAdding(null);
-    error = null;
-    busy = `Reading “${file.name}”…`;
-    try {
-      const [decoded, suggestion] = await Promise.all([prepareUpload(file, maxUploadBytes), suggestForFile(file)]);
-      setAdding({ file, decoded, draft: toDraft(suggestion) });
-    } catch (e) {
-      error = (e as Error).message;
-    } finally {
-      busy = null;
-    }
-  }
-
-  async function upload(event: SubmitEvent) {
-    event.preventDefault();
-    if (!adding) return;
-    const details = fromDraft(adding.draft);
-    if (typeof details === 'string') {
-      error = details;
-      return;
-    }
-    const { fetched } = adding;
-    busy = fetched ? 'Adding…' : 'Uploading…';
-    error = null;
-    try {
-      onPick(
-        fetched
-          ? await api.addFetchedBeat(fetched.id, details, adding.decoded)
-          : await api.addBeat(adding.file, details, adding.decoded),
-      );
-    } catch (e) {
-      error = (e as Error).message;
-    } finally {
-      busy = null;
-    }
-  }
-
-  /**
-   * Puts a file in the adding form, or empties it. A fetched file it held is
-   * left waiting on the server, to expire there.
-   */
-  function setAdding(next: Adding | null) {
-    const was = adding?.fetched;
-    if (was && was.id !== next?.fetched?.id) URL.revokeObjectURL(was.previewUrl);
-    adding = next;
+    if (file) toAdd.read(file);
   }
 
   function openLinkBox() {
-    error = null;
+    toAdd.leave();
     linking = true;
   }
 
-  function fetchedFromLink({ fetched, file, decoded, draft }: FromLink) {
-    linking = false;
-    setAdding({ file, decoded, draft, fetched: { ...fetched, previewUrl: URL.createObjectURL(file) } });
-  }
-
-  // The Beat already in the Library from the link being added, if any: it's
-  // offered instead, but can be added again.
-  const alreadyAdded = $derived(adding?.fetched && beats ? beatWithSource(beats, adding.fetched.sourceLink) : null);
-
-  onDestroy(() => setAdding(null));
+  // Closing the Picker discards a fetched file not added.
+  onDestroy(() => toAdd.close());
 </script>
 
 {#snippet previewButton(beat: Beat)}
@@ -210,44 +145,41 @@
 <Dialog
   bind:dialog
   title="Add a Beat"
-  dismissible={() => adding === null && !linking && busy === null}
+  dismissible={() => toAdd.adding === null && !linking && toAdd.busy === null}
   stack={false}
   onclose={onClose}
   --dialog-width={desktop.current ? 'min(64rem, calc(100vw - 4rem))' : '36rem'}
   --dialog-height={desktop.current ? 'min(48rem, calc(100vh - 4rem))' : 'fit-content'}
   --dialog-max-height={desktop.current ? 'none' : 'min(40rem, calc(100vh - 2rem))'}
 >
-  {#if adding}
-    <form class="adding" onsubmit={upload}>
-      <p class="file">
-        “{adding.file.name}” <span class="muted tabular">{formatDuration(adding.decoded.duration)}</span>
-      </p>
-      {#if adding.fetched}
-        <AudioPlayer src={adding.fetched.previewUrl} duration={adding.decoded.duration} peaks={adding.decoded.peaks} />
-      {/if}
-      {#if alreadyAdded}
-        {@const existing = alreadyAdded}
-        <AlreadyInLibrary beat={existing} action="Use it" onOpen={() => onPick(existing)} />
-      {/if}
-      <BeatFields bind:draft={adding.draft} idPrefix="picker-beat" />
-      <div class="actions">
-        <button type="submit" class="button primary" disabled={busy !== null}>
-          {alreadyAdded ? 'Add anyway' : 'Add to Library and Song'}
-        </button>
-        <button type="button" class="button" onclick={() => setAdding(null)} disabled={busy !== null}>Back</button>
-      </div>
-    </form>
-  {:else if linking}
-    <AddFromLink {maxUploadBytes} card={false} onFetched={fetchedFromLink} onClose={() => (linking = false)} />
-  {:else}
+  <!-- The form adding a Beat, below, takes the dialog while it's open. -->
+  {#if !toAdd.adding && linking}
+    <AddFromLink
+      {maxUploadBytes}
+      card={false}
+      onFetched={(fromLink) => {
+        linking = false;
+        toAdd.take(fromLink);
+      }}
+      onClose={() => (linking = false)}
+    />
+  {:else if !toAdd.adding}
     <BeatFilters bind:view beats={beats ?? []} idPrefix="beat-picker" {hint}>
       {#snippet actions()}
         {#if addFromLink}
-          <button type="button" class="button add" onclick={openLinkBox} disabled={busy !== null}>From link</button>
+          <button type="button" class="button add" onclick={openLinkBox} disabled={toAdd.busy !== null}
+            >From link</button
+          >
         {/if}
-        <label class="button add" class:disabled={busy !== null}>
+        <label class="button add" class:disabled={toAdd.busy !== null}>
           Upload new
-          <input class="visually-hidden" type="file" accept="audio/*" onchange={pickFile} disabled={busy !== null} />
+          <input
+            class="visually-hidden"
+            type="file"
+            accept="audio/*"
+            onchange={pickFile}
+            disabled={toAdd.busy !== null}
+          />
         </label>
       {/snippet}
     </BeatFilters>
@@ -301,12 +233,17 @@
     onended={() => (previewPlaying = false)}
   ></audio>
 
-  {#if busy}
-    <p class="muted" role="status">{busy}</p>
-  {/if}
-  {#if error}
-    <p class="error" role="alert">{error}</p>
-  {/if}
+  <!-- With what reading or adding a Beat says, under the list while there's no form. -->
+  <AddBeatForm
+    {toAdd}
+    library={beats}
+    already={{ action: 'Use it', onUse: onPick }}
+    submitLabel="Add to Library and Song"
+    leaveLabel="Back"
+    onAdded={onPick}
+    idPrefix="picker-beat"
+    card={false}
+  />
 </Dialog>
 
 <style>
@@ -362,23 +299,5 @@
   }
   .empty p {
     margin-top: 0;
-  }
-  .adding {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-  }
-  .file {
-    margin: 0;
-    font-weight: 600;
-    overflow-wrap: anywhere;
-  }
-  .file span {
-    font-weight: 400;
-  }
-  .actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
   }
 </style>
