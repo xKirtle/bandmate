@@ -1306,24 +1306,31 @@
   }
 
   // Esc clears the Selection while focus is in the Timeline, Mod+A
-  // selects every Clip, and Mod+C, Mod+X and Mod+V copy, cut and paste, but
-  // not in a text field, a menu or a dialog, whose keys are their own, nor
-  // while a Track is dragged, which Esc cancels. Copying, cutting and
-  // pasting only go with editing, so not on a phone, nor while recording.
+  // selects every Clip, Delete deletes the Selection, and Mod+C, Mod+X and
+  // Mod+V copy, cut and paste, but not in a text field, a menu or a dialog,
+  // whose keys are their own, nor while a Track is dragged, which Esc
+  // cancels. Deleting, copying, cutting and pasting only go with editing,
+  // so not on a phone, nor while recording. A focused Clip handles Delete
+  // itself; this is for a Selection made by a box or Mod+A, where no Clip
+  // has focus.
   function timelineKey(event: KeyboardEvent) {
     if (event.defaultPrevented || trackDrag.current) return;
     if (inTextField(event.target) || inMenuOrDialog(event.target)) return;
     const clipboardKey = clipboardAction(event);
+    const editsSelection = selected.size > 0 && editable.current && !frozen;
     if (clearsSelection(event) && selected.size > 0) {
       event.preventDefault();
       select({ kind: 'clear' });
     } else if (selectsAll(event) && editable.current) {
       event.preventDefault();
       select({ kind: 'all' });
-    } else if (clipboardKey === 'copy' && selected.size > 0 && editable.current && !frozen) {
+    } else if (clipAction(event) === 'delete' && editsSelection) {
+      event.preventDefault();
+      removeSelection();
+    } else if (clipboardKey === 'copy' && editsSelection) {
       event.preventDefault();
       copySelection();
-    } else if (clipboardKey === 'cut' && selected.size > 0 && editable.current && !frozen) {
+    } else if (clipboardKey === 'cut' && editsSelection) {
       event.preventDefault();
       cutSelection();
     } else if (clipboardKey === 'paste' && editable.current && !frozen) {

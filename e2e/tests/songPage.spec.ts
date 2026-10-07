@@ -89,6 +89,56 @@ test('a Clip moved, trimmed and deleted is undone and redone a step at a time', 
   await expect(redo).toBeDisabled();
 });
 
+test('Clips selected by drawing a box are deleted with Delete, and one undo brings them all back', async ({
+  page,
+  bandmate,
+}) => {
+  const song = await heroSong(bandmate);
+  await page.goto(`/songs/${song.id}`);
+  const click = clip(page, 'Lorem Click');
+  const take = clip(page, 'Take 2');
+  const undo = timeline(page).getByRole('button', { name: 'Undo' });
+  await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
+
+  // A box drawn from the empty Lead vox lane before Take 2, up over the
+  // Beat's Clip and right into Take 2, selects both, focusing neither.
+  const takeBox = (await take.boundingBox())!;
+  const clickBox = (await click.boundingBox())!;
+  const fromX = takeBox.x - 15;
+  const fromY = takeBox.y + takeBox.height / 2;
+  await page.mouse.move(fromX, fromY);
+  await page.mouse.down();
+  await page.mouse.move(takeBox.x + 20, clickBox.y + clickBox.height / 2, { steps: 10 });
+  await page.mouse.up();
+  await expect(take).toHaveAccessibleName(/^Take 2, selected, /);
+  await expect(click).toHaveAccessibleName(/^Lorem Click, selected, /);
+
+  await page.keyboard.press('Delete');
+  await expect(take).toHaveCount(0);
+  await expect(click).toHaveCount(0);
+  await expect.poll(() => serverClips(bandmate, song.id, 'Lead vox')).toEqual([]);
+  await expect.poll(() => serverClips(bandmate, song.id, 'Beat')).toEqual([]);
+
+  // One undo brings both back, still selected.
+  await undo.click();
+  await expect(take).toHaveAccessibleName('Take 2, selected, 0:04 to 0:25');
+  await expect(click).toHaveAccessibleName('Lorem Click, selected, 0:00 to 1:30');
+  await expect.poll(() => serverClips(bandmate, song.id, 'Lead vox')).toMatchObject([{ start: 4, length: 21 }]);
+  await expect.poll(() => serverClips(bandmate, song.id, 'Beat')).toMatchObject([{ start: 0, length: 90 }]);
+  await expect(undo).toBeDisabled();
+
+  // Selected with Mod+A, after a click on empty lane space, they go the same way.
+  await page.mouse.click(fromX, fromY);
+  await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
+  await page.keyboard.press('ControlOrMeta+a');
+  await expect(take).toHaveAccessibleName(/^Take 2, selected, /);
+  await page.keyboard.press('Delete');
+  await expect(take).toHaveCount(0);
+  await expect(click).toHaveCount(0);
+  await expect.poll(() => serverClips(bandmate, song.id, 'Lead vox')).toEqual([]);
+  await expect.poll(() => serverClips(bandmate, song.id, 'Beat')).toEqual([]);
+});
+
 test('Cue edits are undone in order with the Clip edits around them', async ({ page, bandmate }) => {
   const song = await heroSong(bandmate);
   await page.goto(`/songs/${song.id}`);
