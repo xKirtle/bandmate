@@ -44,6 +44,16 @@ jobs:
         working-directory: site
         run: npm run build
 
+      # A page that fails to render still builds, as an empty shell the
+      # browser has to fill in, so a link straight to it shows nothing.
+      - name: Check every page has its content
+        working-directory: site/.vitepress/dist
+        run: |
+          if grep -l '<div id="app"><!----></div>' *.html; then
+            echo "::error::Those pages were built empty: rendering them failed. The build step's log says why."
+            exit 1
+          fi
+
       - if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v5
         with:
