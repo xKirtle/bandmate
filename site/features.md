@@ -2,6 +2,13 @@
 
 Bandmate follows a song from the first idea to a rough recording. Here's what you can do with it.
 
+## Your songs
+
+Every song is in one list. Search it by title, filter it by status, tag or whether a song has a finished recording, and sort it by title, status, key, tempo or when you last edited it.
+
+- **Folders** keep songs together, like an EP's. A song sits in one folder at most: drag it onto a folder, or move it from its menu. Deleting a folder asks whether to keep its songs or delete them too.
+- **Tags** mark songs with whatever matters to you, like "Album 2023", and a song can have as many as you like. Pick several in the filter to see the songs that have all of them.
+
 ## Write
 
 Write lyrics the way you would in a notebook, with the chords right where you play them.
@@ -21,6 +28,15 @@ Write lyrics the way you would in a notebook, with the chords right where you pl
 And this is Read mode, here on a phone: the chords over the words, and how to play each one at the top. The button at the top right sets the text size, hides or transposes the chords, and shows or pins the chord shapes.
 
 <img class="phone" src="@screenshots/phone-lyric-sheet.png" alt="A song in Read mode on a phone, with the chord shapes at the top">
+
+## Chords
+
+The **Chords** page, in the side bar, helps with chords away from any song, on guitar, in standard tuning or any other.
+
+- **Look up** a chord by name, like Cmaj7 or D/F#, and see the ways to play it, best first. Prefer one, and that's the shape Read mode shows you.
+- **Name it**: put your fingers on the fretboard, and Bandmate tells you which chord you're playing.
+- **Suggest**: pick a key, and see the chords that belong in it, the ones borrowed from other keys, and what usually comes after a chord.
+- Left-handed? One switch flips every diagram.
 
 ## Listen
 
@@ -94,6 +110,24 @@ Sing over your beat, right in the browser, in full quality.
 6. **Calibrate**: tap or clap along to a click, once on each device, so your takes land on the beat. Bandmate offers it the first time you record.
 
 The take menu is the **⋯** on a take. Recording settings is in the timeline's **⋯** menu.
+
+## Keyboard shortcuts
+
+On a song's page, press **?**, or the keyboard button by Write and Read, to see every shortcut. The ones you'll use most:
+
+| Keys | What they do |
+| --- | --- |
+| Space | Play or pause |
+| R | Record a take, or stop |
+| Ctrl+Z, Ctrl+Shift+Z | Undo, redo |
+| Home, End | Go to the start or the end |
+| S | Split a clip at the playhead |
+| Ctrl+C, Ctrl+X, Ctrl+V | Copy, cut and paste clips |
+| Delete | Delete the selected clips |
+| Enter | In Sync mode, mark the next line as starting now |
+| Ctrl+scroll | Zoom the timeline |
+
+On a Mac, ⌘ works wherever Ctrl does. Shortcuts can't be changed yet.
 
 ## Backups
 
