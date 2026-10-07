@@ -1,0 +1,236 @@
+import { describe, expect, it } from 'vitest';
+import type { Song } from './api';
+import { Saves, type SavesOptions } from './saves.svelte';
+import { emptySong, FakeSongServer } from './songServerFake';
+
+/** A Saves for the Song the server holds, as the Song page makes one once it's loaded. */
+async function savesFor(server: FakeSongServer, options: Partial<SavesOptions> = {}) {
+  const [song, timeline] = await Promise.all([server.getSong(), server.getTimeline()]);
+  return new Saves({ server, song, timeline, wait: () => Promise.resolve(), ...options });
+}
+
+/** A change to the Song's Details, as the Song page's panels bring them. */
+const update = (server: FakeSongServer, changes: Partial<Song>) => (at: Song) => server.update(at, changes);
+
+/** Lets everything waiting on the fake server's answers run. */
+const settled = () => new Promise((done) => setTimeout(done));
+
+describe('Saves', () => {
+  it('lands saves in the order asked for, each against the Song as saved when its turn comes', async () => {
+    const server = new FakeSongServer();
+    const saves = await savesFor(server);
+    const first = saves.change(update(server, { title: 'One' }));
+    const second = saves.change(update(server, { key: 'Am' }));
+    expect(saves.pending).toBe(2);
+    expect(await Promise.all([first, second])).toEqual([true, true]);
+    expect(server.song).toMatchObject({ title: 'One', key: 'Am', version: 3 });
+    expect(saves.song).toMatchObject({ title: 'One', key: 'Am', version: 3 });
+    expect(saves.pending).toBe(0);
+    expect(saves.stale).toBe(false);
+    expect(saves.saveError).toBeNull();
+  });
+
+  it('marks the Song stale when a save is refused because it changed elsewhere, keeping no save error', async () => {
+    const server = new FakeSongServer();
+    const saves = await savesFor(server);
+    server.changeElsewhere({ title: 'From another tab' });
+    expect(await saves.submit(update(server, { key: 'Am' }))).toBe('stale');
+    expect(saves.stale).toBe(true);
+    expect(saves.saveError).toBeNull();
+    expect(server.song.key).toBe('');
+    expect(saves.song.title).toBe('Untitled');
+  });
+
+  it('shows a failed save as the save error, until a later save lands', async () => {
+    const server = new FakeSongServer();
+    const saves = await savesFor(server);
+    server.failNext(1);
+    expect(await saves.submit(update(server, { key: 'Am' }))).toBe('failed');
+    expect(saves.saveError).toMatch(/Can't reach Bandmate/);
+    expect(saves.stale).toBe(false);
+    expect(await saves.change(update(server, { key: 'Am' }))).toBe(true);
+    expect(saves.saveError).toBeNull();
+  });
+
+  it('shows an error reported by a caller until a later save lands', async () => {
+    const server = new FakeSongServer();
+    const saves = await savesFor(server);
+    saves.report('BPM must be a whole number');
+    expect(saves.saveError).toBe('BPM must be a whole number');
+    await saves.change(update(server, { bpm: 90 }));
+    expect(saves.saveError).toBeNull();
+  });
+
+  it("runs a caller's code after awaiting a save before the next save's turn starts", async () => {
+    const server = new FakeSongServer();
+    const saves = await savesFor(server);
+    const seen: string[] = [];
+    const caller = (async () => {
+      await saves.change(update(server, { title: 'One' }));
+      seen.push(`caller saw version ${saves.saved.version}`);
+    })();
+    const next = saves.change((at) => {
+      seen.push(`next turn built against version ${at.version}`);
+      return server.update(at, { key: 'Am' });
+    });
+    await Promise.all([caller, next]);
+    expect(seen).toEqual(['caller saw version 2', 'next turn built against version 2']);
+  });
+
+  it('sets the Tags, leaving the version as it was', async () => {
+    const server = new FakeSongServer();
+    const saves = await savesFor(server);
+    expect(await saves.setTags(['Live', 'Live', 'Demo'])).toEqual(['Live', 'Demo']);
+    expect(saves.saved).toMatchObject({ tags: ['Live', 'Demo'], version: 1 });
+    server.failNext(1);
+    expect(await saves.setTags(['Live'])).toBeNull();
+    expect(saves.saved.tags).toEqual(['Live', 'Demo']);
+  });
+});
+
+describe('Saves, refreshing', () => {
+  it('waits for saves on their way, then shows the Song as changed elsewhere', async () => {
+    const server = new FakeSongServer();
+    const replaced: Song[] = [];
+    const saves = await savesFor(server, { replacing: (s) => replaced.push(s) });
+    const release = server.holdNextAnswer();
+    const saving = saves.change(update(server, { key: 'Am' }));
+    const refreshing = saves.refresh();
+    await settled();
+    expect(server.landed).toBe(1);
+    server.changeElsewhere({ title: 'From another tab' });
+    release();
+    await Promise.all([saving, refreshing]);
+    expect(saves.song).toMatchObject({ title: 'From another tab', key: 'Am', version: 3 });
+    expect(saves.timeline.version).toBe(3);
+    expect(replaced.map((s) => s.title)).toEqual(['From another tab']);
+    expect(saves.stale).toBe(false);
+  });
+
+  it('marks the Song stale rather than replace edits not saved yet', async () => {
+    const server = new FakeSongServer();
+    let typing = true;
+    const saves = await savesFor(server, { editsOutside: () => typing });
+    server.changeElsewhere({ title: 'From another tab' });
+    await saves.refresh();
+    expect(saves.stale).toBe(true);
+    expect(saves.song.title).toBe('Untitled');
+    typing = false;
+    await saves.refresh();
+    expect(saves.stale).toBe(false);
+    expect(saves.song.title).toBe('From another tab');
+  });
+
+  it('waits while held, e.g. recording, and refreshes once released', async () => {
+    const server = new FakeSongServer();
+    const saves = await savesFor(server);
+    const release = saves.hold();
+    server.changeElsewhere({ title: 'From another tab' });
+    await saves.refresh();
+    await settled();
+    expect(saves.song.title).toBe('Untitled');
+    release();
+    await settled();
+    expect(saves.song.title).toBe('From another tab');
+  });
+});
+
+describe('Saves, Cue changes', () => {
+  /** A Song of one Section of two Lines, neither cued. */
+  const cuedSong = () =>
+    emptySong({
+      arrangement: [1],
+      sections: [
+        {
+          id: 1,
+          label: 'Verse',
+          alternates: [
+            {
+              id: 1,
+              name: '',
+              active: true,
+              lines: [10, 11].map((id) => ({ id, text: '', lyrics: '', chords: [], chordLine: false, cue: null })),
+            },
+          ],
+        },
+      ],
+    });
+  const cueOf = (song: Song, lineId: number) => song.sections[0].alternates[0].lines.find((l) => l.id === lineId)!.cue;
+  const setCue = (lineId: number, cue: number) => ({ kind: 'setLineCue', lineId, cue }) as const;
+
+  it('shows a Cue change at once, before it lands', async () => {
+    const server = new FakeSongServer(cuedSong());
+    const saves = await savesFor(server);
+    const release = server.holdNextAnswer();
+    const saving = saves.cue(setCue(10, 1.5), 'the Cue of Line 1');
+    expect(cueOf(saves.song, 10)).toBe(1.5);
+    expect(cueOf(saves.saved, 10)).toBeNull();
+    expect(saves.unsaved).toBe(true);
+    release();
+    expect(await saving).toBe(true);
+    expect(cueOf(saves.saved, 10)).toBe(1.5);
+    expect(saves.unsaved).toBe(false);
+  });
+
+  it('keeps a Cue change whose answer was lost though it landed, without making it twice', async () => {
+    const server = new FakeSongServer(cuedSong());
+    const saves = await savesFor(server);
+    server.loseNextAnswer();
+    expect(await saves.cue(setCue(10, 1.5), 'the Cue of Line 1')).toBe(true);
+    expect(server.landed).toBe(1);
+    expect(cueOf(saves.song, 10)).toBe(1.5);
+    expect(saves.saved.version).toBe(2);
+    expect(saves.saveError).toBeNull();
+    expect(saves.stale).toBe(false);
+  });
+
+  it('tries a failing Cue change again, then takes it back as a whole, naming it in the save error', async () => {
+    const server = new FakeSongServer(cuedSong());
+    const saves = await savesFor(server);
+    server.failNext(4);
+    const taken = saves.cue(setCue(10, 1.5), 'the Cue of Line 1');
+    const queuedBehind = saves.cue(setCue(11, 3), 'the Cue of Line 2');
+    expect(await taken).toBe(false);
+    expect(await queuedBehind).toBe(true);
+    expect(cueOf(saves.song, 10)).toBeNull();
+    expect(cueOf(saves.song, 11)).toBe(3);
+    expect(saves.saveError).toMatch(/^Couldn't save the Cue of Line 1, so it was taken back\./);
+    expect(await saves.change(update(server, { key: 'Am' }))).toBe(true);
+    expect(saves.saveError).toBeNull();
+  });
+
+  it('keeps a Cue change refused as the Song changed elsewhere shown, unsaved', async () => {
+    const server = new FakeSongServer(cuedSong());
+    const saves = await savesFor(server);
+    server.changeElsewhere();
+    expect(await saves.cue(setCue(10, 1.5), 'the Cue of Line 1')).toBe(false);
+    expect(saves.stale).toBe(true);
+    expect(cueOf(saves.song, 10)).toBe(1.5);
+    expect(saves.unsaved).toBe(true);
+  });
+});
+
+describe('Saves, closing', () => {
+  it('deletes the Song once the saves queued land, then sends nothing more', async () => {
+    const server = new FakeSongServer();
+    const saves = await savesFor(server);
+    const queued = saves.change(update(server, { title: 'Last words' }));
+    const closing = saves.close((at) => server.remove(at));
+    expect(await saves.change(update(server, { key: 'Am' }))).toBe(false);
+    expect(await saves.submit(update(server, { key: 'Am' }))).toBe('closed');
+    expect(await saves.cue({ kind: 'clearCues' }, 'every Cue')).toBe(false);
+    expect(await queued).toBe(true);
+    expect(await closing).toBe(true);
+    expect(server.deleted).toBe(true);
+    expect(server.landed).toBe(2);
+  });
+
+  it('opens again when the delete fails', async () => {
+    const server = new FakeSongServer();
+    const saves = await savesFor(server);
+    server.failNext(1);
+    expect(await saves.close((at) => server.remove(at))).toBe(false);
+    expect(saves.saveError).toMatch(/Can't reach Bandmate/);
+    expect(await saves.change(update(server, { key: 'Am' }))).toBe(true);
+  });
+});
