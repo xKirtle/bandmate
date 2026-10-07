@@ -19,7 +19,7 @@ Apply CONTRIBUTING's "Versions" to the PRs' labels: any `enhancement` bumps the 
 
 ## 4. Clear the roadmap
 
-Every shipped feature leaves `docs/roadmap.md`. A wishlist idea that shipped in part keeps only its unshipped bullets. The feature tour's "What's next", in `site/features.md`, names a few ideas as examples; swap out any that shipped. Open this as a PR labelled `documentation` and `no-release-notes`, merged before the tag so the release carries it.
+Every shipped feature leaves `docs/roadmap.md`. A wishlist idea that shipped in part keeps only its unshipped bullets. Open this as a PR labelled `documentation` and `no-release-notes`, merged before the tag so the release carries it.
 
 ## 5. Preview the notes
 

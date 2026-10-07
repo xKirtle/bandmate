@@ -110,4 +110,4 @@ A Backup restores into the same version of Bandmate or a newer one. To copy ever
 
 ## What's next
 
-Ideas for what comes next, like snapshots of your lyrics and your own keyboard shortcuts, are on the [roadmap](https://github.com/xKirtle/bandmate/blob/main/docs/roadmap.md). What each version added is in the [release notes](https://github.com/xKirtle/bandmate/releases).
+Ideas for Bandmate's future are on the [roadmap](https://github.com/xKirtle/bandmate/blob/main/docs/roadmap.md). It's a wishlist, not a queue: nothing on it is promised, and it isn't in the order things will be built. What each version added is in the [release notes](https://github.com/xKirtle/bandmate/releases).

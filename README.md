@@ -39,6 +39,24 @@ Every feature is in the [tour](https://xkirtle.github.io/bandmate/features).
 
 ## Quickstart
 
+With Docker Compose, save this as `compose.yaml`, then run `mkdir data && docker compose up -d`:
+
+```yaml
+services:
+  bandmate:
+    image: ghcr.io/xkirtle/bandmate:latest
+    container_name: bandmate
+    restart: unless-stopped
+    # The user that owns ./data, so Bandmate can write to it.
+    user: "${PUID:-1000}:${PGID:-1000}"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+```
+
+Or with plain Docker:
+
 ```sh
 mkdir data
 docker run -d --name bandmate --restart unless-stopped \
@@ -46,7 +64,7 @@ docker run -d --name bandmate --restart unless-stopped \
   ghcr.io/xkirtle/bandmate:latest
 ```
 
-Then open http://localhost:8080. For Docker Compose, use the repo's [`compose.yaml`](compose.yaml) with `mkdir data && docker compose up -d`.
+Then open http://localhost:8080. The repo's [`compose.yaml`](compose.yaml) is the full version, with a health check.
 
 > [!WARNING]
 > Bandmate has no login: anything that can reach it can read and change every Song. Anywhere beyond your own machine, put it behind a reverse proxy that handles HTTPS and authentication. Recording also needs HTTPS, or localhost, for the microphone.
