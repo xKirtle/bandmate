@@ -497,7 +497,7 @@ describe('Timeline editing, the Cue-move offer', () => {
 const mergeTracks = () => [track(1, [beatClip(1, 0, 10), beatClip(2, 20, 30)]), track(2, [beatClip(3, 12, 15)])];
 
 /** The ids of the Clips on each Track, top to bottom. */
-const clipIds = (server: FakeSongServer) => server.timeline.tracks.map((t) => t.clips.map((c) => c.id));
+const clipIdsByTrack = (server: FakeSongServer) => server.timeline.tracks.map((t) => t.clips.map((c) => c.id));
 
 describe('Timeline editing, a Merge', () => {
   it('is refused while frozen, or for Clips that can’t be merged', async () => {
@@ -588,7 +588,7 @@ describe('Timeline editing, a Merge', () => {
     expect(await editing.merge()).toBe(false);
     expect(saves.saveError).toBe("Couldn't merge the Clips (the Beat could not be loaded).");
     expect(server.landed).toBe(0);
-    expect(clipIds(server)).toEqual([[1, 2], [3]]);
+    expect(clipIdsByTrack(server)).toEqual([[1, 2], [3]]);
     expect([...selection.ids]).toEqual([1, 3]);
     expect(state.chosen).toEqual([]);
     expect(saves.canUndo).toBe(false);
@@ -603,7 +603,7 @@ describe('Timeline editing, a Merge', () => {
     server.failNext(1);
     expect(await editing.merge()).toBe(false);
     expect(saves.saveError).toBe("Can't reach Bandmate. Check your connection.");
-    expect(clipIds(server)).toEqual([[1, 2], [3]]);
+    expect(clipIdsByTrack(server)).toEqual([[1, 2], [3]]);
     expect([...selection.ids]).toEqual([1, 3]);
     expect(state.chosen).toEqual([]);
     expect(editing.mergeNote).toBeNull();
@@ -621,7 +621,7 @@ describe('Timeline editing, a Merge', () => {
     expect(await merging).toBe(false);
     expect(saves.saveError).toBe("The Clips to merge aren't all on the Timeline any more.");
     expect(audio.rendered).toBe(0);
-    expect(clipIds(server)).toEqual([[1, 2], []]);
+    expect(clipIdsByTrack(server)).toEqual([[1, 2], []]);
   });
 
   it('is redone without rendering it again, selecting its Clip', async () => {

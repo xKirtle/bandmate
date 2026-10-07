@@ -19,7 +19,7 @@
 // - Merge and Sound import, the rarer edits whose audio the browser makes
 //   (see the audio port below). Each is kept to undo as placing what it
 //   made, so redoing it never renders or uploads anything again.
-import type { DecodedAudio, Song, Timeline } from './api';
+import type { Song, SoundImport, Timeline } from './api';
 import { addedTrack } from './chosenTrack';
 import type { DragSave } from './clipDrag.svelte';
 import { sameCues } from './cueChanges';
@@ -55,10 +55,8 @@ interface MadeOffer {
   song: Song;
 }
 
-/** An audio file decoded and named, ready to import as a Sound. */
-export interface PreparedSound extends DecodedAudio {
-  name: string;
-}
+/** An audio file decoded and named, ready to import as a Sound onto a Track. */
+export type PreparedSound = Omit<SoundImport, 'trackId'>;
 
 /** The audio the browser makes for an edit: the browser's own, or a fake of it. */
 export interface TimelineAudio {
@@ -266,6 +264,7 @@ export class TimelineEditing {
     return this.#mergeNote;
   }
 
+  /** Dismisses the Merge note. */
   dismissMergeNote() {
     this.#mergeNote = null;
   }
@@ -318,6 +317,7 @@ export class TimelineEditing {
     return this.#error;
   }
 
+  /** Dismisses what the files imported refused said. */
   dismissError() {
     this.#error = null;
   }

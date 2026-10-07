@@ -203,7 +203,7 @@
     keeping: browserKeeping,
     uploads: api,
     onTrackAdded: (trackId) => choose({ kind: 'add', trackId }),
-    onError: (message) => (error = message),
+    onError: (message) => showError(message),
   });
   const liveTiles = $derived.by(() => recorder.liveTiles(barWidth / view.scale));
   // Whether a recording is on, from pressing Record until its Take is saved.
@@ -525,8 +525,8 @@
 
   function play(from: number) {
     ended = false;
-    error = null;
-    player.play(playable, from, playingLoop).catch((e: Error) => (error = e.message));
+    showError(null);
+    player.play(playable, from, playingLoop).catch((e: Error) => showError(e.message));
   }
 
   function toggle() {
@@ -752,11 +752,15 @@
     // The server still enforces its limit.
     () => {},
   );
-  // What went wrong here, then what the files imported refused.
+  // What went wrong here, then what the files imported since refused.
   const shownError = $derived([error, editing.error].filter((e) => e !== null).join(' ') || null);
 
-  function dismissError() {
-    error = null;
+  /**
+   * Shows what went wrong here, or with null clears it, replacing what the
+   * Timeline said before, what the files imported refused included.
+   */
+  function showError(message: string | null) {
+    error = message;
     editing.dismissError();
   }
 
@@ -767,7 +771,7 @@
    */
   function importFiles(files: File[], trackId: number) {
     if (frozen) return;
-    if (editing.importing === null) error = null;
+    if (editing.importing === null) showError(null);
     void editing.importFiles(files, trackId);
   }
 
@@ -949,7 +953,7 @@
       calibrating = { offer: true, retaking };
       return;
     }
-    error = null;
+    showError(null);
     // Resumed right away, while the key press or click still counts.
     audioContext()
       .resume()
@@ -971,7 +975,7 @@
   /** Keeps the unsaved Takes offered, one after another, until one can't be. */
   function keepUnsaved() {
     if (recorder.recovering || frozen) return;
-    error = null;
+    showError(null);
     recorder.keepUnsaved();
   }
 
@@ -1649,7 +1653,7 @@
    */
   function mergeSelection() {
     if (!editing.mergeable) return;
-    error = null;
+    showError(null);
     void editing.merge();
   }
 
@@ -2842,7 +2846,9 @@
     <!-- Over the page just above the Timeline, so showing it never moves anything. -->
     <div class="error-bar" role="alert">
       <span class="error">{shownError}</span>
-      <button type="button" class="dismiss" onclick={dismissError} aria-label="Dismiss" title="Dismiss"><X /></button>
+      <button type="button" class="dismiss" onclick={() => showError(null)} aria-label="Dismiss" title="Dismiss"
+        ><X /></button
+      >
     </div>
   {/if}
 </section>

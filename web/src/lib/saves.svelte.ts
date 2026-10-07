@@ -171,8 +171,9 @@ export class Saves {
    * Queues a rarer edit to the Timeline that the caller makes itself, e.g.
    * importing a Sound, saving a Take or a Merge. Its work runs in its turn,
    * against the Song and Timeline as saved then, with the Song on the
-   * server to write through, and says how it's kept to undo. Resolves to what it did, or null if it wasn't saved, e.g. when
-   * the work throws, whose message becomes the save error.
+   * server to write through, and says how it's kept to undo. Resolves to
+   * what it did, or null if it wasn't saved, e.g. when the work throws,
+   * whose message becomes the save error.
    */
   make = (work: (at: Song, timeline: Timeline, server: SongServer) => Promise<Made>): Promise<Edited | null> => {
     let edited: Edited | null = null;
