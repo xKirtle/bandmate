@@ -7,12 +7,12 @@
 # Frontend
 web/node_modules/
 docs/screenshots/node_modules/
-site/node_modules/
+docs/web/node_modules/
 e2e/node_modules/
 e2e/test-results/
 e2e/playwright-report/
-site/.vitepress/dist/
-site/.vitepress/cache/
+docs/web/.vitepress/dist/
+docs/web/.vitepress/cache/
 web/dist/*
 !web/dist/.gitkeep
 
