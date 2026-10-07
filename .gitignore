@@ -7,6 +7,9 @@
 # Frontend
 web/node_modules/
 docs/screenshots/node_modules/
+site/node_modules/
+site/.vitepress/dist/
+site/.vitepress/cache/
 web/dist/*
 !web/dist/.gitkeep
 

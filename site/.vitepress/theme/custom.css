@@ -1,0 +1,115 @@
+/* The docs site in Bandmate's default Palette, Terracotta, and its one
+   typeface, the system font (docs/design.md). VitePress picks dark with a
+   `.dark` class, where the app uses `data-theme`, so the colours are copied
+   from web/src/palettes.css rather than imported: change them together. */
+
+:root {
+  --vp-font-family-base: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --vp-c-bg: #fafaf9;
+  --vp-c-bg-alt: #f0efed;
+  --vp-c-bg-elv: #fafaf9;
+  --vp-c-bg-soft: #f0efed;
+  --vp-c-divider: #dddad6;
+  --vp-c-border: #dddad6;
+  --vp-c-gutter: #e6e4e1;
+  --vp-c-text-1: #1c1b1a;
+  --vp-c-text-2: #6b6864;
+
+  --vp-c-brand-1: #b4432c;
+  --vp-c-brand-2: color-mix(in srgb, #b4432c 85%, #1c1b1a);
+  --vp-c-brand-3: #b4432c;
+  --vp-c-brand-soft: color-mix(in srgb, #b4432c 14%, transparent);
+  --vp-button-brand-text: #ffffff;
+  --vp-button-brand-hover-text: #ffffff;
+  --vp-button-brand-active-text: #ffffff;
+}
+
+.dark {
+  --vp-c-bg: #16161a;
+  --vp-c-bg-alt: #1f1f24;
+  --vp-c-bg-elv: #1f1f24;
+  --vp-c-bg-soft: #1f1f24;
+  --vp-c-divider: #2f2f37;
+  --vp-c-border: #2f2f37;
+  --vp-c-gutter: #16161a;
+  --vp-c-text-1: #ecebe8;
+  --vp-c-text-2: #a09d98;
+
+  --vp-c-brand-1: #e0765c;
+  --vp-c-brand-2: color-mix(in srgb, #e0765c 85%, #ecebe8);
+  --vp-c-brand-3: #e0765c;
+  --vp-c-brand-soft: color-mix(in srgb, #e0765c 16%, transparent);
+  --vp-button-brand-text: #16161a;
+  --vp-button-brand-hover-text: #16161a;
+  --vp-button-brand-active-text: #16161a;
+}
+
+/* Screenshots sit on the page like paper: a border, no shadow. */
+.vp-doc img {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 0.75rem;
+}
+
+/* The landing page's screenshot stands apart from the feature cards. */
+.vp-doc .landing-shot {
+  margin-top: 48px;
+}
+
+.vp-doc .phone {
+  max-width: 300px;
+}
+
+/* A phone held upright beside one held sideways, the upright one narrower;
+   one above the other on a phone. */
+.vp-doc .phones {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.vp-doc .phones img {
+  min-width: 0;
+}
+
+.vp-doc .phones img:first-child {
+  flex: 0 0 30%;
+}
+
+.vp-doc .phones img:last-child {
+  flex: 1;
+}
+
+@media (max-width: 640px) {
+  .vp-doc .phones {
+    flex-direction: column;
+  }
+
+  .vp-doc .phones img:first-child {
+    flex: none;
+    max-width: 300px;
+  }
+}
+
+/* Two shots side by side, wrapping onto two rows on a phone. */
+.vp-doc .pair {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.vp-doc .pair img {
+  min-width: 0;
+  max-height: 420px;
+}
+
+/* A screenshot opened full size sits above the nav bar. */
+.medium-zoom-overlay,
+.medium-zoom-image--opened {
+  z-index: 100;
+}
+
+.vp-doc img:not(.medium-zoom-image--opened) {
+  cursor: zoom-in;
+}

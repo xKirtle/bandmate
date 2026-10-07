@@ -253,7 +253,9 @@
               <p class="yt-dlp-status" class:error={ytDlpUpdateError} role="status">
                 {#if ytDlpUpdate}
                   {ytDlpUpdated(ytDlpUpdate)}{#if ytDlpUpdate.outcome === 'cantRun'}:
-                    <a href="{config.sourceUrl}#mounting-your-own-yt-dlp">see how in the README</a>{/if}
+                    <a href="https://xkirtle.github.io/bandmate/self-hosting#mounting-your-own-yt-dlp"
+                      >see how in the self-hosting guide</a
+                    >{/if}
                 {:else if ytDlpUpdateError}{ytDlpUpdateError}{/if}
               </p>
             </dd>
