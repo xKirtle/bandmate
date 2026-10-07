@@ -458,7 +458,7 @@ const phone = {
   hasTouch: true,
 };
 
-// The Songs page on a phone, listing every Song.
+// The Songs page on a phone: the Folders, then the Songs in none.
 {
   const page = await open(base, phone);
   await save(page, "phone-song-list");
