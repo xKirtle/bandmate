@@ -7,6 +7,10 @@
 // A recording plays from where it starts, in time with what it captures, so
 // it isn't moved while one is on, and playback stopped while capturing ends
 // it. TakeRecorder plays along with a recording through it.
+//
+// The playhead is scrubbed along the ruler through it too, and it says when
+// the playhead's followed, for the Timeline to scroll it into view: the
+// Timeline turns the pointer into seconds, and scrolls the view.
 import { untrack } from 'svelte';
 import { repeats, type Loop } from './schedule';
 import type { TakePlayer } from './takeRecorder.svelte';
@@ -58,12 +62,8 @@ export interface TransportOptions {
   onCaptureStopped: () => void;
   /** Hears why playing failed, or null as Play is pressed, to clear what was said. */
   onError?: (message: string | null) => void;
-  /** Hears playback starting from stopped, by hand or for a recording, e.g. to follow the playhead. */
-  onPlay?: () => void;
-  /** Whether the playhead is dragged by hand, so frames leave it where it's dragged. */
-  dragging?: () => boolean;
-  /** Hears the playhead each frame while playing on, e.g. to scroll it into view. */
-  onFrame?: (position: number) => void;
+  /** Hears the playhead each frame while playing on, followed and not scrubbed, to scroll it into view. */
+  onFollow?: (position: number) => void;
   /** The frames the playhead moves on; the browser's by default. */
   frames?: Frames;
 }
@@ -74,6 +74,8 @@ export class Transport implements TakePlayer {
   /** Whether playback stopped by reaching the end, keeping the playhead there until it's moved. */
   #ended = false;
   #playingAt = $state<number | null>(null);
+  #scrubbing = false;
+  #following = true;
 
   #player: TransportPlayer;
   #options: TransportOptions;
@@ -108,7 +110,7 @@ export class Transport implements TakePlayer {
     $effect(() => {
       if (this.#state !== 'playing') return;
       const step = () => {
-        if (!options.dragging?.()) this.#position = this.#player.position();
+        if (!this.#scrubbing) this.#position = this.#player.position();
         this.#playingAt = this.#position;
         // A recording runs on past the end until it's stopped.
         const length = options.length();
@@ -120,7 +122,7 @@ export class Transport implements TakePlayer {
           this.#playingAt = length;
           return;
         }
-        options.onFrame?.(this.#position);
+        if (this.#following && !this.#scrubbing) options.onFollow?.(this.#position);
         frame = this.#frames.request(step);
       };
       let frame = this.#frames.request(step);
@@ -176,16 +178,23 @@ export class Transport implements TakePlayer {
     }
     const loop = this.#options.loop();
     const position = this.#position;
-    this.#options.onPlay?.();
+    this.#following = true;
     this.#play(position >= this.#options.length() && !repeats(position, loop) ? 0 : position);
   }
 
   /**
-   * Moves the playhead: while playing, playback jumps there. A recording
-   * plays from where it starts, in time with what it captures, so it isn't
-   * moved while one is on.
+   * Moves the playhead by hand, following it again: while playing,
+   * playback jumps there. A recording plays from where it starts, in time
+   * with what it captures, so it isn't moved while one is on, though it's
+   * still followed again.
    */
   seek(to: number) {
+    this.#following = true;
+    this.#seek(to);
+  }
+
+  /** Moves the playhead, as seek does, without following it. */
+  #seek(to: number) {
     if (this.#options.recording()) return;
     this.#position = to;
     this.#release();
@@ -202,13 +211,65 @@ export class Transport implements TakePlayer {
     if (this.#options.recording()) return;
     this.seek(at);
     if (this.#state !== 'stopped') return;
-    this.#options.onPlay?.();
     this.#play(at);
   }
 
-  /** Moves the playhead shown while it's dragged and playing: playback jumps there only once it's let go. */
-  dragTo(at: number) {
-    this.#position = at;
+  /** Whether the playhead is being scrubbed along the ruler. */
+  get scrubbing(): boolean {
+    return this.#scrubbing;
+  }
+
+  /**
+   * Whether the view follows the playhead while playing: until it's
+   * scrolled away from by hand, then again once playing starts, it's
+   * moved by hand or the ruler's pressed.
+   */
+  get following(): boolean {
+    return this.#following;
+  }
+
+  /** Stops following the playhead, as the view's scrolled away from it by hand. */
+  stopFollowing() {
+    this.#following = false;
+  }
+
+  /**
+   * Starts scrubbing the playhead along the ruler, pressed at a time, which
+   * follows it again. A recording plays from where it starts, so it isn't
+   * moved while one is on.
+   */
+  startScrub(at: number) {
+    this.#following = true;
+    if (this.#options.recording()) return;
+    this.#scrubbing = true;
+    this.#seek(at);
+  }
+
+  /**
+   * Scrubs the playhead to a time: while stopped, it seeks as it goes; while
+   * playing, frames leave the playhead there, and playback jumps there only
+   * once it's let go, so it doesn't stutter.
+   */
+  scrubTo(at: number) {
+    if (!this.#scrubbing) return;
+    if (this.#state === 'stopped') this.#seek(at);
+    else this.#position = at;
+  }
+
+  /** Lets go of the playhead scrubbed, at a time. */
+  endScrub(at: number) {
+    if (!this.#scrubbing) return;
+    this.#scrubbing = false;
+    this.#seek(at);
+  }
+
+  /**
+   * Gives up a scrub, e.g. for a pinch, which isn't a seek: while playing,
+   * playback never left where it was; while stopped, the playhead stays
+   * where it was scrubbed to.
+   */
+  cancelScrub() {
+    this.#scrubbing = false;
   }
 
   /**
@@ -216,7 +277,7 @@ export class Transport implements TakePlayer {
    * ignoring the Loop. Resolves to whether it's playing once started.
    */
   async playAlong(from: number): Promise<boolean> {
-    this.#options.onPlay?.();
+    this.#following = true;
     this.#ended = false;
     this.#position = from;
     await this.#player.play(this.#options.playable(), from, null);

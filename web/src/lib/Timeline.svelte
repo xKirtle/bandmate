@@ -172,8 +172,10 @@
 
   // Playing, pausing, seeking and stopping at the end go through Transport
   // (see transport.svelte.ts), on the Timeline's player, which the
-  // Timeline also loads audio and sets each Track's gain through. The
-  // Timeline scrolls the playhead into view as it plays.
+  // Timeline also loads audio and sets each Track's gain through. So do
+  // the ruler scrub and following the playhead, in seconds: the Timeline
+  // turns the pointer into seconds, scrolls the lanes at their edges, and
+  // scrolls the playhead into view as Transport says to follow it.
   let player!: TimelinePlayer;
   const transport: Transport = new Transport({
     player: (onState) => (player = new TimelinePlayer(onState)),
@@ -184,11 +186,9 @@
     capturing: () => capturing,
     onCaptureStopped: () => stopRecording(),
     onError: (message) => showError(message),
-    onPlay: () => (following = true),
-    dragging: () => dragging,
-    onFrame: (at) => {
-      // Not while something's dragged, which would jump with the page.
-      if (following && !dragging && !clipDrag.clip && !loopEdit) reveal(at);
+    onFollow: (at) => {
+      // Not while a Clip or the Loop is dragged, which would jump with the page.
+      if (!clipDrag.clip && !loopEdit) reveal(at);
     },
   });
   const playerState = $derived(transport.state);
@@ -485,10 +485,6 @@
     return Math.max(0, Math.min(span, t));
   }
 
-  function seek(to: number) {
-    transport.seek(clamp(to));
-  }
-
   async function switchLoopOff() {
     switchingOff = true;
     // If it fails, the Loop is on again.
@@ -496,10 +492,8 @@
     switchingOff = false;
   }
 
-  // Clicking on the ruler seeks. Dragging moves the playhead, and while
-  // playing, playback only jumps there on release, so it doesn't stutter.
-  let dragging = false;
-
+  // Clicking on the ruler seeks, and dragging along it scrubs the playhead:
+  // see Transport.
   function timeAt(event: Point): number {
     return clamp(spanTimeAt(event.clientX));
   }
@@ -531,7 +525,7 @@
       const speed = edgeSpeed(view, xIn(dragScroll.at.clientX));
       if (speed !== 0) {
         show(timelineView({ ...view, scroll: view.scroll + (speed * (now - last)) / 1000 }));
-        if (!dragging) following = false;
+        if (!transport.scrubbing) transport.stopFollowing();
         dragScroll.move(dragScroll.at);
       }
       last = now;
@@ -549,35 +543,28 @@
   function pointerDown(event: PointerEvent) {
     // A second finger is pinching.
     if (!event.isPrimary) return;
-    // Clicking the playhead back into view follows it again.
-    following = true;
-    // A recording plays from where it starts, so it isn't moved.
-    if (recording) return;
-    dragging = true;
-    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-    seek(timeAt(event));
+    // Clicking the playhead back into view follows it again, even while
+    // recording, which doesn't scrub.
+    transport.startScrub(timeAt(event));
+    if (transport.scrubbing) (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   }
 
   function pointerMove(event: Point) {
-    if (!dragging) return;
-    if (playerState === 'stopped') seek(timeAt(event));
-    else transport.dragTo(timeAt(event));
+    if (!transport.scrubbing) return;
+    transport.scrubTo(timeAt(event));
     dragAt(event, pointerMove);
   }
 
   function pointerUp(event: PointerEvent) {
-    if (!dragging) return;
-    dragging = false;
+    if (!transport.scrubbing) return;
     dragDone();
-    seek(timeAt(event));
+    transport.endScrub(timeAt(event));
   }
 
-  // A drag given up, e.g. for a pinch, isn't a seek: while playing, playback
-  // never left where it was; while stopped, the playhead stays where it was
-  // dragged to.
+  // A drag given up, e.g. for a pinch, isn't a seek.
   function pointerCancel() {
-    if (!dragging) return;
-    dragging = false;
+    if (!transport.scrubbing) return;
+    transport.cancelScrub();
     dragDone();
   }
 
@@ -592,8 +579,7 @@
 
   /** Seeks as asked by hand, bringing the playhead into view. */
   function seekTo(to: number) {
-    following = true;
-    seek(to);
+    transport.seek(clamp(to));
     reveal(position);
   }
 
@@ -604,7 +590,6 @@
   export function playFrom(at: number) {
     // Nor while a recording starts or saves, stopped meanwhile.
     if (recording) return;
-    following = true;
     transport.playFrom(clamp(at));
     reveal(position);
   }
@@ -1833,10 +1818,9 @@
   let scroll = $state(0);
   let width = $state(0);
   const view = $derived(timelineView({ span, width, scale, scroll }));
-  // Whether the view follows the playhead while playing: until scrolled
-  // away from by hand, then again once playing starts or the ruler's clicked.
-  // Only read each frame while playing, so it needn't be state.
-  let following = true;
+  // The view follows the playhead while playing, as Transport says: until
+  // scrolled away from by hand, then again once playing starts or the
+  // ruler's clicked.
   // Where the lanes were last scrolled to from here, to tell scrolling by hand.
   let scrolledTo = 0;
 
@@ -1920,7 +1904,7 @@
   function scrolled() {
     scroll = lanesElement!.scrollLeft;
     // Scrolled by hand, rather than to where it was shown.
-    if (Math.abs(scroll - timelineView({ ...view, scroll: scrolledTo }).scroll) > 1) following = false;
+    if (Math.abs(scroll - timelineView({ ...view, scroll: scrolledTo }).scroll) > 1) transport.stopFollowing();
     scrolledTo = scroll;
   }
 
@@ -1967,7 +1951,7 @@
       pinch = pinchOf(event);
       // The first finger may have started dragging the playhead, the Loop or the thumb.
       thumbDrag = null;
-      dragging = false;
+      transport.cancelScrub();
       dragDone();
       loopCancel();
     };
