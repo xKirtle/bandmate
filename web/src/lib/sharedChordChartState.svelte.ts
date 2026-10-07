@@ -1,5 +1,5 @@
 import { readChordChartState, storeChordChartState, type ChordChartState } from './chordChartState';
-import { deviceStorage } from './timelineHeight';
+import { deviceStorage } from './deviceStorage';
 
 // The Chord Chart's state on this device, held for the session too, so the
 // choice carries from Song to Song even where it can't be kept.

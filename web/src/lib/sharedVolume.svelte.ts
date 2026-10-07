@@ -1,4 +1,4 @@
-import { deviceStorage } from './timelineHeight';
+import { deviceStorage } from './deviceStorage';
 import { readVolume, setLevel, storeVolume, toggleMute, type Volume } from './volume';
 
 // The one volume every player outside the Timeline follows, so turning a

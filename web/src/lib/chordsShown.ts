@@ -3,7 +3,7 @@
 // rather than saved with it. Chords show unless hidden for that Song here.
 
 import { SvelteMap } from 'svelte/reactivity';
-import { deviceStorage } from './timelineHeight';
+import { deviceStorage } from './deviceStorage';
 
 /** Where hiding a Song's Chords is kept on this device. */
 export function chordsHiddenKey(songId: number): string {
