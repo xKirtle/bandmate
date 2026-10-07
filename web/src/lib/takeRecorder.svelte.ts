@@ -14,7 +14,7 @@
 // have been (see recovery.ts), or to discard.
 //
 // The Timeline decides when Record is offered, and draws what's recorded;
-// the recorder does the rest, through its ports: the Timeline's player, the
+// the recorder does the rest, through its ports: Transport, playing along, the
 // chosen Input, and the copy kept in the browser. Saving goes through the
 // Song's Saves, whose refreshes are held from the start of a recording
 // until its Take is saved, as the Timeline it's made against has to stay
@@ -32,10 +32,10 @@ import type { Saves } from './saves.svelte';
 import { forgetUnsaved, Keeper, unsavedSamples, unsavedTakes, whileHeld, type UnsavedTake } from './unsavedTakes';
 import { encodeWav } from './wav';
 
-/** Plays the Timeline along with a recording: the Timeline's player, or a fake of it. */
+/** Plays the Timeline along with a recording: Transport, or a fake of it. */
 export interface TakePlayer {
   /** Plays from a Timeline time, ignoring the Loop; resolves to whether it's playing once started. */
-  play(from: number): Promise<boolean>;
+  playAlong(from: number): Promise<boolean>;
   stop(): void;
   /** The context time at which playback was at the time it started from. */
   readonly startedAt: number;
@@ -251,7 +251,7 @@ export class TakeRecorder {
       const clip = retake !== undefined && track.clips.find((c) => c.id === retake)!;
       const plan = clip ? retakePlan(clip) : recordingPlan(track.clips, playhead);
       this.plan = plan;
-      if (!(await this.#player.play(plan.from))) throw new CaptureError('Recording stopped before it started.');
+      if (!(await this.#player.playAlong(plan.from))) throw new CaptureError('Recording stopped before it started.');
       const { startedAt } = this.#player;
       const unsaved: Unsaved = {
         trackId: track.id,

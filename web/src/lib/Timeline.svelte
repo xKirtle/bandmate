@@ -57,7 +57,7 @@
   import { laneStep, pressLane, type LaneInput, type LanePress } from './lanePress';
   import { longPressDelay, type Point } from './press';
   import { retakeLength } from './recording';
-  import { repeats, timelineEnd, type Loop, type Placed } from './schedule';
+  import { timelineEnd, type Loop, type Placed } from './schedule';
   import { nameSound } from './soundName';
   import { inTextField } from './textField';
   import { keyPlace } from './keyPlace';
@@ -102,7 +102,8 @@
   import { input as chosenInput } from './sharedInput.svelte';
   import { clampHeight, defaultHeight, grownHeight, heightBounds, readHeight, storeHeight } from './timelineHeight';
   import { fullScreenQuery } from './timelineLayout';
-  import { audioContext, TimelinePlayer, type PlayableClip, type PlayerState } from './timelinePlayer';
+  import { audioContext, TimelinePlayer, type PlayableClip } from './timelinePlayer';
+  import { Transport } from './transport.svelte';
   import {
     edgeSpeed,
     fitScale,
@@ -163,38 +164,45 @@
     height?: number;
   } = $props();
 
-  let playerState = $state<PlayerState>('stopped');
-  let position = $state(0);
   let error = $state<string | null>(null);
   let collapsed = $state(false);
   let picking = $state(false);
   // A Beat just added whose BPM could become the Song's.
   let offerBpm = $state<{ bpm: number; title: string } | null>(null);
 
+  // Playing, pausing, seeking and stopping at the end go through Transport
+  // (see transport.svelte.ts), on the Timeline's player, which the
+  // Timeline also loads audio and sets each Track's gain through. The
+  // Timeline scrolls the playhead into view as it plays.
+  let player!: TimelinePlayer;
+  const transport: Transport = new Transport({
+    player: (onState) => (player = new TimelinePlayer(onState)),
+    playable: () => playable,
+    loop: () => playingLoop,
+    length: () => length,
+    recording: () => recording,
+    capturing: () => capturing,
+    onCaptureStopped: () => stopRecording(),
+    onError: (message) => showError(message),
+    onPlay: () => (following = true),
+    dragging: () => dragging,
+    onFrame: (at) => {
+      // Not while something's dragged, which would jump with the page.
+      if (following && !dragging && !clipDrag.clip && !loopEdit) reveal(at);
+    },
+  });
+  const playerState = $derived(transport.state);
+  const position = $derived(transport.position);
+
   // Recording a Take onto the chosen Track, or a Retake into a Clip of
   // Takes, and offering back Takes that never reached the server: see
-  // takeRecorder.svelte.ts. The Timeline decides when Record is offered,
-  // and draws the recording. Only offered while stopped, and never along
-  // with Sync mode.
-  const recorder = new TakeRecorder({
+  // takeRecorder.svelte.ts. Transport plays along with it: everything
+  // playing as mixed but ignoring the Loop, the Clip retaken left silent.
+  // The Timeline decides when Record is offered, and draws the recording.
+  // Only offered while stopped, and never along with Sync mode.
+  const recorder: TakeRecorder = new TakeRecorder({
     saves: untrack(() => saves),
-    player: {
-      play: async (from) => {
-        following = true;
-        ended = false;
-        position = from;
-        // Everything playing as mixed but ignoring the Loop, the Clip retaken left silent.
-        await player.play(playable, from, null);
-        return player.state === 'playing';
-      },
-      stop: () => {
-        if (playerState !== 'stopped') player.stop();
-        position = player.position();
-      },
-      get startedAt() {
-        return player.startedAt;
-      },
-    },
+    player: transport,
     input: capturedInput(
       audioContext,
       () => $state.snapshot(chosenInput.value),
@@ -261,12 +269,6 @@
   // audio is decoded.
   let peaks = $state<Record<string, number[]>>({});
 
-  const player = new TimelinePlayer((s) => {
-    playerState = s;
-    // Also when something else playing stopped it, which stops a recording too.
-    if (s === 'stopped') position = player.position();
-    if (s === 'stopped' && capturing) stopRecording();
-  });
   onDestroy(() => {
     recorder.close();
     player.dispose();
@@ -358,7 +360,7 @@
     event.preventDefault();
     if (shortcut === 'playPause') {
       keyActedOnPage();
-      toggle();
+      transport.toggle();
     } else if (shortcut === 'start' || shortcut === 'end') {
       // It seeks, rather than acting on what a click focused, e.g. a lane's Clip.
       keyActedOnPage();
@@ -470,80 +472,10 @@
     editing.edit({ kind: 'deleteTrack', trackId: track.id });
   }
 
-  // A change to what plays is heard right away. The Timeline is replaced
-  // after every change to it, so compare what would play, not the objects,
-  // and in an order reordering Tracks doesn't change. The Loop never moves
-  // the playhead: playing, it starts over from where it is.
-  const playKey = $derived(
-    JSON.stringify([[...playable].sort((a, b) => a.trackId - b.trackId || a.start - b.start), playingLoop]),
-  );
-  $effect(() => {
-    void playKey;
-    untrack(() => {
-      // A recording plays on as it started, in time with what it captures.
-      if (capturing) return;
-      if (playerState !== 'stopped') play(player.position());
-    });
-  });
-
-  // Whether playback stopped by reaching the end, keeping the playhead.
-  let ended = false;
-
-  /** Lets go of the playhead kept at the end, once it's moved from there. */
-  function releaseEnded() {
-    if (!ended) return;
-    ended = false;
-    if (playerState === 'stopped') onPlayhead?.(null);
-  }
-
-  // Follow the playhead every frame while playing, and stop at the end,
-  // unless going round the Loop.
-  $effect(() => {
-    // Only stopping lets go of the playhead: starting over from elsewhere
-    // (e.g. after an edit) loads for a moment, and keeps it. So does
-    // reaching the end, so the last Line stays highlighted, until it's moved.
-    if (playerState === 'stopped' && !ended) untrack(() => onPlayhead?.(null));
-    if (playerState !== 'playing') return;
-    let frame = requestAnimationFrame(function step() {
-      if (!dragging) position = player.position();
-      onPlayhead?.(position);
-      // A recording runs on past the end until it's stopped.
-      if (position >= length && !player.repeating && !capturing) {
-        ended = true;
-        player.stop();
-        player.seek(length);
-        position = length;
-        onPlayhead?.(length);
-        return;
-      }
-      // Not while something's dragged, which would jump with the page.
-      if (following && !dragging && !clipDrag.clip && !loopEdit) reveal(position);
-      frame = requestAnimationFrame(step);
-    });
-    return () => cancelAnimationFrame(frame);
-  });
-
-  function play(from: number) {
-    ended = false;
-    showError(null);
-    player.play(playable, from, playingLoop).catch((e: Error) => showError(e.message));
-  }
-
-  function toggle() {
-    // Space stops a recording, and does nothing while one starts or saves.
-    if (recording) {
-      if (capturing) stopRecording();
-      return;
-    }
-    if (playerState !== 'stopped') {
-      player.stop();
-      position = player.position();
-      return;
-    }
-    following = true;
-    // At the end, playing starts over, unless there's a Loop yet to go round.
-    play(position >= length && !repeats(position, playingLoop) ? 0 : position);
-  }
+  // Tells the Song page where playback is, e.g. for the Lyric Sheet to
+  // follow: every frame while playing, and kept at the end once reached,
+  // so the last Line stays highlighted, until it's moved.
+  $effect(() => onPlayhead?.(transport.playingAt));
 
   /**
    * A time on the Timeline shown, kept on its ruler: past the end too, e.g.
@@ -554,12 +486,7 @@
   }
 
   function seek(to: number) {
-    // A recording plays from where it starts, in time with what it captures.
-    if (recording) return;
-    position = clamp(to);
-    releaseEnded();
-    if (playerState === 'stopped') player.seek(position);
-    else play(position);
+    transport.seek(clamp(to));
   }
 
   async function switchLoopOff() {
@@ -634,7 +561,7 @@
   function pointerMove(event: Point) {
     if (!dragging) return;
     if (playerState === 'stopped') seek(timeAt(event));
-    else position = timeAt(event);
+    else transport.dragTo(timeAt(event));
     dragAt(event, pointerMove);
   }
 
@@ -677,8 +604,9 @@
   export function playFrom(at: number) {
     // Nor while a recording starts or saves, stopped meanwhile.
     if (recording) return;
-    seekTo(at);
-    if (playerState === 'stopped') play(position);
+    following = true;
+    transport.playFrom(clamp(at));
+    reveal(position);
   }
 
   /**
@@ -712,8 +640,7 @@
 
   /** Where the playhead is, playing or paused, in seconds to the millisecond, e.g. to cue a Line at. */
   export function playheadAt(): number {
-    const at = playerState === 'stopped' ? position : player.position();
-    return Math.round(at * 1000) / 1000;
+    return transport.playheadAt();
   }
 
   /** Switches the Loop off, if it's on, e.g. as Sync mode comes on. */
@@ -2183,7 +2110,7 @@
         <button
           type="button"
           class="play"
-          onclick={toggle}
+          onclick={() => transport.toggle()}
           aria-label={playerState === 'stopped' ? 'Play' : 'Pause'}
           aria-keyshortcuts={hints.aria(shortcuts.playPause.keys)}
           title={hints.withKeys('Play or pause', shortcuts.playPause.keys)}
@@ -2868,11 +2795,7 @@
     end={mixdownEnd(clips)}
     loop={timeline.loop && { ...timeline.loop, on: loopOn }}
     plan={() => ({ clips: playable, gains: trackGains(levels), load: (source) => player.load(source) })}
-    onStart={() => {
-      if (playerState === 'stopped') return;
-      player.stop();
-      position = player.position();
-    }}
+    onStart={() => transport.stop()}
     onClose={() => (mixingDown = false)}
   />
 {/if}
