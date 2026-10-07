@@ -34,7 +34,7 @@ features:
     link: /features#record
 ---
 
-<img src="@screenshots/write-mode.png" alt="A Song in Write mode: its Details, the Lyric Sheet with Chords and Cues, the Scrapbook, and the Timeline with a Beat and a Take">
+<img class="landing-shot" src="@screenshots/write-mode.png" alt="A Song in Write mode: its Details, the Lyric Sheet with Chords and Cues, the Scrapbook, and the Timeline with a Beat and a Take">
 
 ## Why Bandmate
 
@@ -44,11 +44,30 @@ It's built for one songwriter, and runs on your own machine or homelab. There ar
 
 ## Try it
 
-```sh
+::: code-group
+
+```yaml [Docker Compose]
+# Save as compose.yaml, then run: mkdir data && docker compose up -d
+services:
+  bandmate:
+    image: ghcr.io/xkirtle/bandmate:latest
+    container_name: bandmate
+    restart: unless-stopped
+    # The user that owns ./data, so Bandmate can write to it.
+    user: "${PUID:-1000}:${PGID:-1000}"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+```
+
+```sh [docker run]
 mkdir data
 docker run -d --name bandmate --restart unless-stopped \
   --user "$(id -u):$(id -g)" -p 8080:8080 -v "$PWD/data:/data" \
   ghcr.io/xkirtle/bandmate:latest
 ```
 
-Then open http://localhost:8080. Bandmate has no login, so before using it anywhere beyond your own machine, read [Security](/self-hosting#security).
+:::
+
+Then open http://localhost:8080. The full Compose file, with a health check, and every setting are in the [self-hosting guide](/self-hosting). Bandmate has no login, so before using it anywhere beyond your own machine, read [Security](/self-hosting#security).

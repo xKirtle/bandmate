@@ -51,6 +51,11 @@
   border-radius: 0.75rem;
 }
 
+/* The landing page's screenshot stands apart from the feature cards. */
+.vp-doc .landing-shot {
+  margin-top: 48px;
+}
+
 .vp-doc .phone {
   max-width: 300px;
 }
