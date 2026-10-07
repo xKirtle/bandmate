@@ -6,11 +6,12 @@ The screenshots in the README and on the docs site, `site/`, taken in the dark t
 | ----------------------- | -------------------------------------------------------------- |
 | `song-list.png`         | The Song list on desktop                                       |
 | `write-mode.png`        | The hero Song in Write mode on desktop, with the Timeline open |
+| `write-mode-labelled.png` | The hero Song in Write mode with the Chorus's Alternates open, numbered for the feature tour's key: Status, Details, Write and Read, a Section's Label, Chords, a Chord Line, an Alternate, a Cue and the Scrapbook |
 | `phone-lyric-sheet.png` | The hero Song's Lyric Sheet on a phone                         |
 | `read-mode.png`         | The hero Song in Read mode, with the Line playing highlighted  |
 | `sync-mode.webp`        | Sync mode cueing the Bridge's Lines, animated                  |
 
-The demo content is lorem ipsum, kept in the Backup [`demo.bandmate`](demo.bandmate) beside this file: a hero Song with Chords, a Chord Line, a second Alternate, Cues, a Scrapbook Section, a click-track Beat and two Takes, and six other Songs across every Status. Restoring it is also a quick way to fill a dev stack with Songs that have Timelines.
+The demo content is lorem ipsum, kept in the Backup [`demo.bandmate`](demo.bandmate) beside this file: a hero Song with Chords, a Chord Line, a second Alternate of the Chorus with words of its own, Cues, a Scrapbook Section, a click-track Beat and two Takes, and six other Songs across every Status. Restoring it is also a quick way to fill a dev stack with Songs that have Timelines.
 
 ## Retaking them
 

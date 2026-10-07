@@ -82,6 +82,116 @@ async function play(page) {
   await page.context().close();
 }
 
+/**
+ * Where a field's line of text ends, or an element's text, in the page: the
+ * place to put a label right after it.
+ */
+async function textEnd(locator, line = 0) {
+  return locator.evaluate((el, line) => {
+    if (!("value" in el)) {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const text = range.getBoundingClientRect();
+      return { x: text.right, y: text.y + text.height / 2 };
+    }
+    // A field's text has no box of its own: measure it in the field's font.
+    const style = getComputedStyle(el);
+    const context = document.createElement("canvas").getContext("2d");
+    context.font = style.font;
+    const box = el.getBoundingClientRect();
+    return {
+      x:
+        box.x +
+        parseFloat(style.paddingLeft) +
+        context.measureText(el.value.split("\n")[line]).width,
+      y:
+        box.y +
+        parseFloat(style.paddingTop) +
+        parseFloat(style.lineHeight) * (line + 0.5),
+    };
+  }, line);
+}
+
+/** Beside the middle of an element's right edge. */
+async function rightOf(locator) {
+  const box = await locator.boundingBox();
+  return { x: box.x + box.width, y: box.y + box.height / 2 };
+}
+
+/** Under the middle of an element. */
+async function below(locator) {
+  const box = await locator.boundingBox();
+  return { x: box.x + box.width / 2 - 24, y: box.y + box.height + 22 };
+}
+
+// The hero Song in Write mode with the Chorus's Alternates open, numbered for
+// the feature tour's key (site/features.md): each number is placed beside
+// what it names when it's captured, so it follows the UI as it changes.
+{
+  // Tall enough that the Timeline sits below the shot.
+  const page = await open(heroURL, {
+    ...desktop,
+    viewport: { width: 1440, height: 2000 },
+  });
+  const intro = page.getByRole("article", { name: "Intro" });
+  const verse = page.getByRole("article", { name: "Verse 1" });
+  const chorus = page.getByRole("article", { name: "Chorus" });
+  const scrapbook = page.locator("summary", { hasText: "Scrapbook" });
+  await chorus.getByRole("button", { name: /^Alternates/ }).click();
+
+  // In the key's order.
+  const marks = [
+    await below(page.getByRole("combobox", { name: "Status" })),
+    await rightOf(page.getByRole("button", { name: /^Notes/ })),
+    await below(page.getByRole("radio", { name: "Read" }).locator("xpath=../..")),
+    await textEnd(verse.getByRole("combobox")),
+    await textEnd(verse.locator("textarea")),
+    await textEnd(intro.locator("textarea")),
+    await textEnd(chorus.getByPlaceholder("Softer")),
+    await rightOf(page.getByRole("button", { name: /^Cue for Line 1 of Verse 1/ })),
+    await textEnd(scrapbook),
+  ];
+  await page.evaluate((marks) => {
+    marks.forEach(({ x, y }, i) => {
+      const mark = document.createElement("div");
+      mark.textContent = i + 1;
+      Object.assign(mark.style, {
+        position: "absolute",
+        left: `${x + 8}px`,
+        top: `${y - 16}px`,
+        width: "32px",
+        height: "32px",
+        display: "grid",
+        placeItems: "center",
+        borderRadius: "999px",
+        background: "var(--accent)",
+        color: "var(--accent-text)",
+        outline: "3px solid var(--bg)",
+        font: "700 18px system-ui, sans-serif",
+        zIndex: 1000,
+      });
+      document.body.append(mark);
+    });
+  }, marks);
+
+  // From the nav rail to the Scrapbook's edge, down to the Chorus's foot.
+  const nav = await page.getByRole("navigation").first().boundingBox();
+  const side = await page
+    .locator("details", { has: scrapbook })
+    .boundingBox();
+  const end = await chorus.boundingBox();
+  const left = nav.x + nav.width;
+  await save(page, "write-mode-labelled", {
+    clip: {
+      x: left,
+      y: 0,
+      width: side.x + side.width + 24 - left,
+      height: end.y + end.height + 8,
+    },
+  });
+  await page.context().close();
+}
+
 // The Lyric Sheet on a phone.
 {
   const page = await open(heroURL, {

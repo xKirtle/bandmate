@@ -6,13 +6,19 @@ Bandmate follows a song from the first idea to a rough recording. Here's what yo
 
 Write lyrics the way you would in a notebook, with the chords right where you play them.
 
-- Build a song from sections (verses, choruses, a hook), move them around, and repeat one wherever it comes back.
-- Put chords over any word, even mid-word, and write intros and solos as lines of chords alone.
-- Unsure about a verse? Write a few versions of it, and switch between them until one wins.
-- Keep the lines that didn't make it in a scrapbook, to come back to later.
-- Mark each song as an idea, a draft or finished, and note its key, tempo, capo and tuning, with a cover image and notes of your own.
-- Switch to Read mode to play from a song: larger text and nothing in the way. Finished songs open in it.
-- Write on your phone too, in a layout made for it.
+![A song in Write mode, numbered 1 to 9 to match the list below it](../docs/screenshots/write-mode-labelled.png)
+
+1. **Status**: where the song is at: an idea, a draft, or finished.
+2. **Song details**: its key, tempo, capo and tuning, and notes of your own.
+3. **Write and Read**: Read mode shows the song large and uncluttered, to play from. Finished songs open in it.
+4. **A section**: one part of the song, named however you like: a verse, a chorus, a hook. Move sections around, or repeat one wherever it comes back.
+5. **Chords**: typed in brackets right before the syllable they land on, even mid-word. Read mode shows them above the words.
+6. **A line of chords alone**: for intros, solos and other parts without words.
+7. **Alternates**: other versions of a section. Write a few, and pick the one the song uses. The others wait here until you change your mind.
+8. **Line timings**: when each line starts in the song, set as you [sync](#sync).
+9. **Scrapbook**: sections that aren't in the song: leftovers and ideas to come back to.
+
+Every song is in one list, with its status, key and tempo at a glance. And you can write on your phone too, in a layout made for it.
 
 ![The Song list on desktop, with each Song's Status, key and BPM](../docs/screenshots/song-list.png)
 
