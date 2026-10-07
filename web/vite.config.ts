@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { defineConfig, type Plugin } from 'vite';
+import type { Plugin } from 'vite';
+import { defineConfig } from 'vitest/config';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import type { Dependency } from './src/lib/api';
 import { licenseOf, packageDir } from './src/lib/dependencyManifest';
@@ -45,5 +46,17 @@ export default defineConfig({
     proxy: {
       '/api': process.env.BANDMATE_API ?? 'http://localhost:8080',
     },
+  },
+  test: {
+    // Tests run in Node, but those of modules whose runes run effects, named
+    // *.svelte.test.ts, need the code built for the browser: Svelte's server
+    // build runs no effects.
+    projects: [
+      { extends: true, test: { name: 'node', exclude: ['**/node_modules/**', 'src/**/*.svelte.test.ts'] } },
+      {
+        extends: true,
+        test: { name: 'runes', include: ['src/**/*.svelte.test.ts'], environment: './vitest.runes.ts' },
+      },
+    ],
   },
 });

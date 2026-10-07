@@ -1,7 +1,7 @@
 // What a list page shows: its search, filters and sort, how it sorts, and how
 // that is kept in the URL so going back to the list restores it.
 
-import { statuses, type Beat, type Folder, type Song, type SongFilter, type SongSummary, type Status } from './api';
+import { statuses, type Beat, type Folder, type Song, type SongSummary, type Status } from './api';
 
 export type SortDirection = 'asc' | 'desc';
 
@@ -156,47 +156,6 @@ export function tagFilterLabel(picked: readonly string[]): string {
 /** Whether a Song list view searches or filters, rather than only sorting. */
 export function isSongListFiltered(view: SongListView): boolean {
   return !!(view.q.trim() || view.statuses.length > 0 || view.tags.length > 0 || view.hasMaster);
-}
-
-/**
- * What to ask the server for to show a Song list view: inside a Folder, its
- * Songs; at the top level, the Songs in no Folder, but for while a search or
- * filter is on, which looks at every Song, whatever Folder it's in.
- */
-export function songListFilter(view: SongListView, folderId?: number): SongFilter {
-  const filter: SongFilter = {};
-  if (view.q.trim()) filter.q = view.q;
-  if (view.statuses.length > 0) filter.statuses = [...view.statuses];
-  if (view.tags.length > 0) filter.tags = [...view.tags];
-  if (view.hasMaster) filter.hasMaster = true;
-  if (folderId !== undefined) filter.folder = folderId;
-  else if (!isSongListFiltered(view)) filter.folder = 'none';
-  return filter;
-}
-
-/** The Songs a filter keeps, and whether there are any Songs at all. */
-export interface LoadedSongList {
-  songs: SongSummary[];
-  anySongs: boolean;
-}
-
-/**
- * Lists the Songs a filter keeps, and whether there are any Songs at all:
- * inside a Folder, any in it, and at the top level, any anywhere, whether
- * the list is the Songs in no Folder or every Song. The server filters the
- * list, so when nothing matches it asks again for every Song there, to tell
- * no matches from no Songs.
- */
-export async function loadSongList(
-  filter: SongFilter,
-  list: (filter: SongFilter) => Promise<SongSummary[]>,
-): Promise<LoadedSongList> {
-  const songs = await list(filter);
-  const { folder, ...narrowing } = filter;
-  const filtered = Object.values(narrowing).some((value) => value !== undefined && value !== '');
-  const topLevel = folder === undefined || folder === 'none';
-  if (songs.length > 0 || (!filtered && folder !== 'none')) return { songs, anySongs: songs.length > 0 };
-  return { songs, anySongs: (await list(topLevel ? {} : { folder })).length > 0 };
 }
 
 /** A column of the Beat Library. */
