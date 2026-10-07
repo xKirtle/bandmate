@@ -21,13 +21,11 @@
   import { innerHeight } from 'svelte/reactivity/window';
   import {
     api,
-    ApiError,
     type Beat,
     type Clip,
     type ClipFades,
     type ClipMove,
     type Song,
-    type SongAt,
     type Timeline,
     type TimelineLoop,
     type Track,
@@ -60,16 +58,13 @@
   import { draggedFiles, fileDropTrack, importEach, type TrackRow } from './fileDrop';
   import {
     addedClips,
-    History,
     mergingAdded,
     placingAdded,
     restorable,
-    sendEdit,
     settingTakes,
     type Edit as TimelineEdit,
-    type HistoryEdit,
-    type Saved,
   } from './history';
+  import { sameCues } from './cueChanges';
   import { keyHints } from './keyHints';
   import { formatVolume, maxVolume, minVolume, trackGains, type Levels } from './mixer';
   import type { MenuAction } from './menu';
@@ -349,169 +344,55 @@
     }
   });
 
-  // Every edit made here, and every Cue edit (see editCues), is kept to
-  // undo, for as long as the page is open. The Timeline is only ever the
-  // one the latest edit left, unless a refresh brought in changes made
-  // elsewhere: then the edits kept would no longer undo what they did, so
-  // they're forgotten.
-  const history = new History();
-  let undoable = $state(false);
-  let redoable = $state(false);
-  // The Song version the latest edit here left the Timeline at.
-  let editedAt = untrack(() => timeline.version);
-  // Edits queued and not yet saved, which undo waits for.
-  let queued = 0;
-  // Counts the Cue edits that failed, so taken back: an undo pressed for
-  // one of them, before it failed, has nothing to undo, rather than undoing
-  // the edit before it.
-  let cueEditsFailed = 0;
-
-  $effect(() => {
-    if (timeline.version === editedAt) return;
-    editedAt = timeline.version;
-    history.clear();
-    showHistory();
-  });
-
-  function showHistory() {
-    undoable = history.nextUndo() !== null;
-    redoable = history.nextRedo() !== null;
-  }
-
-  /** Waits for a save, forgetting every edit kept if it's refused because the Song changed elsewhere. */
-  async function saved<T>(save: Promise<T>): Promise<T> {
-    try {
-      return await save;
-    } catch (err) {
-      forgetIfStale(err);
-      throw err;
-    }
-  }
-
-  /** Forgets every edit kept if a save was refused because the Song changed elsewhere. */
-  function forgetIfStale(err: unknown) {
-    if (err instanceof ApiError && err.stale) {
-      history.clear();
-      showHistory();
-    }
-  }
-
-  /**
-   * Sends an edit, based on the Timeline or Song as it is when its turn
-   * comes, and notes in the history what it did.
-   */
-  async function send(at: Song, e: HistoryEdit, note: (before: Timeline, after: Timeline) => void): Promise<Saved> {
-    if (e.kind === 'restoreCues') {
-      // Cues whose Line is gone since, or can't take one, can't come back. With
-      // none left, there's nothing to send, and the step is passed over.
-      const cues = restorable(e.cues, at);
-      const after = cues.length > 0 ? await saved(api.restoreCues(at, cues)) : at;
-      note(timeline, timeline);
-      showHistory();
-      return { song: after };
-    }
-    const before = timeline;
-    const after = await saved(sendEdit(at, e));
-    note(before, after);
-    editedAt = after.version;
-    showHistory();
-    return { timeline: after };
-  }
+  // Every edit made here, and every Cue edit, goes through Saves, which
+  // keeps them to undo. The Timeline keeps the Selection, the playhead and
+  // the Merge note, reacting to what an edit did once it's saved.
 
   /**
    * Queues an edit, to undo later, telling done what it did once saved;
    * resolves to whether it succeeded.
    */
-  function perform(e: TimelineEdit, done?: (before: Timeline, after: Timeline) => void): Promise<boolean> {
-    if (frozen && !editsWhileRecording(e)) return Promise.resolve(false);
+  async function perform(e: TimelineEdit, done?: (before: Timeline, after: Timeline) => void): Promise<boolean> {
+    if (frozen && !editsWhileRecording(e)) return false;
     e = $state.snapshot(e) as TimelineEdit;
     offerCues = null;
-    queued++;
-    return saves
-      .rawSend((at) =>
-        send(at, e, (before, after) => {
-          history.record(e, before, after);
-          done?.(before, after);
-        }),
-      )
-      .finally(() => queued--);
+    const edited = await saves.edit(e);
+    if (edited) done?.(edited.before, edited.after);
+    return edited !== null;
   }
 
-  // Cue edits, e.g. from the Lyric Sheet, are kept to undo along with the
-  // Timeline's edits, in the order they were made. Each is kept as what it
-  // changed in the Song as saved, whatever Cue changes not saved yet the
-  // Song shown has.
+  // A Cue edit, e.g. from the Lyric Sheet, ends the offer to move Cues with
+  // the Clips moved, like any other edit.
+  let cuesWere = untrack(() => song);
   $effect(() => {
-    saves.cueHook = {
-      asked() {
-        offerCues = null;
-        queued++;
-      },
-      landed(before, after) {
-        history.recordCues(before, after);
-        showHistory();
-      },
-      failed(err) {
-        forgetIfStale(err);
-        cueEditsFailed++;
-      },
-      settled() {
-        queued--;
-      },
-    };
-    return () => (saves.cueHook = null);
+    if (!sameCues(cuesWere, song)) offerCues = null;
+    cuesWere = song;
   });
 
   async function undo() {
-    if (frozen || (!undoable && queued === 0)) return;
+    if (frozen) return;
     offerCues = null;
     mergeNote = null;
-    // Where undoing a new Take returns the playhead to, to record again from.
-    let returnTo: number | null = null;
-    const failedBefore = cueEditsFailed;
-    const ok = await saves.rawSend((at) => {
-      if (cueEditsFailed !== failedBefore) return unchanged(at);
-      const e = history.nextUndo();
-      returnTo = history.nextUndoPlayhead();
-      return e
-        ? send(at, e, (before, after) => {
-            const back = history.undone(before, after);
-            // Clips deleted together come back selected, as they were,
-            // unless the Selection is locked by a recording started since.
-            if ((e.kind === 'placeClips' || e.kind === 'replaceClips') && !frozen) selected = new Set(back);
-          })
-        : unchanged(at);
-    });
-    // Once the Clip's gone, it's a seek like any other: playing, playback
-    // jumps there, superseding the restart the Clip's going started. Not
-    // while a recording started since, which plays from where it starts.
-    if (ok && returnTo !== null && !recording) seekTo(returnTo);
+    const undone = await saves.undo();
+    if (!undone) return;
+    // Clips deleted together come back selected, as they were, unless the
+    // Selection is locked by a recording started since.
+    if (undone.reselect && !frozen) selected = new Set(undone.reselect);
+    // Undoing a new Take returns the playhead to where its Clip starts, to
+    // record again from. Once the Clip's gone, it's a seek like any other:
+    // playing, playback jumps there, superseding the restart the Clip's
+    // going started. Not while a recording started since, which plays from
+    // where it starts.
+    if (undone.playhead !== null && !recording) seekTo(undone.playhead);
   }
 
-  function redo() {
-    if (frozen || !redoable) return;
+  async function redo() {
+    if (frozen) return;
     offerCues = null;
     mergeNote = null;
-    saves.rawSend((at) => {
-      const e = history.nextRedo();
-      return e
-        ? send(at, e, (before, after) => {
-            history.redone(before, after);
-            // A Merge redone selects its Clip again, as it did.
-            if (e.kind === 'replaceClips' && !frozen) selected = new Set(addedClips(before, after));
-          })
-        : unchanged(at);
-    });
-  }
-
-  /**
-   * The Timeline as shown, when there turned out to be nothing to undo or
-   * redo, e.g. after pressing the key twice quickly. Nothing is sent, so
-   * the Song stays at the version it's at.
-   */
-  async function unchanged(at: SongAt): Promise<Saved> {
-    editedAt = at.version;
-    return { timeline: { ...timeline, version: at.version, updatedAt: song.updatedAt } };
+    const redone = await saves.redo();
+    // A Merge redone selects its Clip again, as it did.
+    if (redone?.reselect && !frozen) selected = new Set(redone.reselect);
   }
 
   // Tooltips name a Shortcut's keys as this platform does, e.g. ⌘Z on a
@@ -963,17 +844,10 @@
     const [decoded, name] = await Promise.all([prepareUpload(file, maxUploadBytes), nameSound(file)]);
     importing = `Importing “${name}”…`;
     offerCues = null;
-    queued++;
-    await saves
-      .rawSend(async (at) => {
-        const before = timeline;
-        const after = await saved(api.importSound(at, file, { trackId, name, ...decoded }));
-        history.record(placingAdded(before, after), before, after);
-        editedAt = after.version;
-        showHistory();
-        return { timeline: after };
-      })
-      .finally(() => queued--);
+    await saves.make(async (at, before) => {
+      const after = await api.importSound(at, file, { trackId, name, ...decoded });
+      return { timeline: after, kept: placingAdded(before, after) };
+    });
   }
 
   /** Imports the file picked with Import audio… onto the Chosen Track. */
@@ -1273,26 +1147,18 @@
     const wav = new Blob([encodeWav([samples], rate)], { type: 'audio/wav' });
     const peaks = peaksOf([samples], rate);
     offerCues = null;
-    queued++;
     return saves
-      .rawSend(async (at) => {
+      .make(async (at) => {
         const { target, captureStart } = place();
         if (!target) throw new Error("There's no Track to put the Take on.");
         const details = { captureStart, latencyOffset, peaks };
-        const before = timeline;
-        let after: Timeline;
         if ('clipId' in target) {
-          after = await saved(api.retake(at, target.clipId, wav, details));
-          history.record(settingTakes(after, target.clipId), before, after);
-        } else {
-          after = await saved(api.recordTake(at, wav, { ...target, ...details }));
-          history.recordTake(before, after);
+          const after = await api.retake(at, target.clipId, wav, details);
+          return { timeline: after, kept: settingTakes(after, target.clipId) };
         }
-        editedAt = after.version;
-        showHistory();
-        return { timeline: after };
+        return { timeline: await api.recordTake(at, wav, { ...target, ...details }), kept: 'take' as const };
       })
-      .finally(() => queued--);
+      .then((made) => made !== null);
   }
 
   $effect(() => {
@@ -2318,34 +2184,34 @@
     error = null;
     offerCues = null;
     mergeNote = null;
-    queued++;
+    // What it says once made, worked out in its turn.
+    let note: string | null = null;
     saves
-      .rawSend(async (at) => {
-        const target = mergeTarget(timeline.tracks, clipIds);
+      .make(async (at, before) => {
+        const target = mergeTarget(before.tracks, clipIds);
         if (!target) throw new Error("The Clips to merge aren't all on the Timeline any more.");
         let audio: MergedAudio;
         try {
-          audio = await renderMerge(mergedClips(timeline, sources, target.clipIds), target, (s) => player.load(s));
+          audio = await renderMerge(mergedClips(before, sources, target.clipIds), target, (s) => player.load(s));
         } catch (e) {
           throw new Error(`Couldn't merge the Clips (${(e as Error).message}).`);
         }
-        const before = timeline;
-        const after = await saved(
-          api.mergeClips(at, audio.wav, { clipIds: target.clipIds, peaks: audio.peaks, ...target.onto }),
-        );
-        history.record(mergingAdded(before, after, target.clipIds), before, after);
-        editedAt = after.version;
-        showHistory();
-        const [mergedId] = addedClips(before, after);
-        selected = new Set([mergedId]);
-        remembered = after.tracks.find((t) => t.clips.some((c) => c.id === mergedId))!.id;
-        mergeNote = mergeWarning(target.silent);
-        return { timeline: after };
+        const after = await api.mergeClips(at, audio.wav, {
+          clipIds: target.clipIds,
+          peaks: audio.peaks,
+          ...target.onto,
+        });
+        note = mergeWarning(target.silent);
+        return { timeline: after, kept: mergingAdded(before, after, target.clipIds) };
       })
-      .finally(() => {
-        merging = false;
-        queued--;
-      });
+      .then((made) => {
+        if (!made) return;
+        const [mergedId] = addedClips(made.before, made.after);
+        selected = new Set([mergedId]);
+        remembered = made.after.tracks.find((t) => t.clips.some((c) => c.id === mergedId))!.id;
+        mergeNote = note;
+      })
+      .finally(() => (merging = false));
   }
 
   /** Deletes the selected Clips, as one edit. */
@@ -2814,7 +2680,7 @@
       type="button"
       class="icon"
       onclick={undo}
-      disabled={!undoable || frozen}
+      disabled={!saves.canUndo || frozen}
       aria-label="Undo"
       aria-keyshortcuts={hints.aria(shortcuts.undo.keys)}
       title={editHint(freeze, hints.withKeys('Undo', shortcuts.undo.keys))}><Undo2 /></button
@@ -2823,7 +2689,7 @@
       type="button"
       class="icon"
       onclick={redo}
-      disabled={!redoable || frozen}
+      disabled={!saves.canRedo || frozen}
       aria-label="Redo"
       aria-keyshortcuts={hints.aria(shortcuts.redo.keys)}
       title={editHint(freeze, hints.withKeys('Redo', shortcuts.redo.keys))}><Redo2 /></button

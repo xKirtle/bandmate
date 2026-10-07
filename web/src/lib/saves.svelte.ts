@@ -13,27 +13,41 @@
 // cueChanges.ts), so syncing keeps its rhythm. Its save is tried again for
 // a few seconds while it fails on the network or the server; if it still
 // fails, it's taken back, as a whole.
+//
+// Timeline edits and Cue changes are kept to undo, in one history (see
+// history.ts), in the order they were made. An undo waits for the edits
+// queued before it. A save refused as the Song changed elsewhere, or a
+// refresh bringing in a change made elsewhere, forgets them all.
 import { ApiError, type Song, type Timeline } from './api';
 import { sameCues, savedRetrying, withCueChange, type CueChange } from './cueChanges';
-import type { Saved } from './history';
+import { addedClips, History, restorable, type Edit, type HistoryEdit } from './history';
 import { waitFor, type SongServer, type Wait } from './songServer';
 
 /** How a save ended: saved, failed, refused as the Song changed elsewhere, or never sent as the Song's being deleted. */
 export type Submitted = 'saved' | 'failed' | 'stale' | 'closed';
 
+/** What a Timeline edit did: the Timeline as saved before it, and the Timeline it left. */
+export interface Edited {
+  before: Timeline;
+  after: Timeline;
+}
+
+/** What an undo or redo did, and what the Timeline goes back to with it. */
+export interface Undone extends Edited {
+  /** The Clips to select again: Clips deleted together, brought back, or a Merge redone. Null to leave the Selection as it is. */
+  reselect: number[] | null;
+  /** Where to return the playhead to: where a new Take undone started. Null to leave it where it is. */
+  playhead: number | null;
+}
+
 /**
- * Lets the Timeline note Cue changes in its undo history. Temporary: the
- * undo history moves into Saves next (#709), and this goes.
+ * What a rarer edit, made with make, did: the Timeline it left, and how
+ * it's kept to undo: as an edit that makes it again without uploading or
+ * rendering anything again, or as a new Take.
  */
-export interface CueHook {
-  /** A Cue change was asked for, before it's queued. */
-  asked(): void;
-  /** It landed: the Song as saved before it, and the Song it left. */
-  landed(before: Song, after: Song): void;
-  /** It failed, with the error the save error shows, or a stale refusal. */
-  failed(error: unknown): void;
-  /** It's over, saved or not. */
-  settled(): void;
+export interface Made {
+  timeline: Timeline;
+  kept: Edit | 'take';
 }
 
 export interface SavesOptions {
@@ -76,11 +90,22 @@ export class Saves {
   /** How many saves are queued or on their way. */
   pending = $state(0);
 
+  /** Whether there's an edit to undo, or one to redo. */
+  canUndo = $state(false);
+  canRedo = $state(false);
+
+  // Every Timeline edit and Cue edit is kept to undo, in the order they
+  // were made, for as long as the page is open. Once the Song changed
+  // elsewhere, they'd no longer undo what they did, so they're forgotten.
+  #history = new History();
+  /** Undoable edits queued, which an undo waits for. */
+  #undoablesQueued = 0;
   /**
-   * Temporary, until #709: the Timeline's hook into Cue changes, to keep
-   * them in its undo history.
+   * Counts the Cue edits that failed, so were taken back: an undo pressed
+   * for one before it failed has nothing to undo, rather than undoing the
+   * edit before it.
    */
-  cueHook: CueHook | null = null;
+  #cueEditsFailed = 0;
 
   #queue: Promise<unknown> = Promise.resolve();
   /** Counts the saves queued. */
@@ -130,23 +155,137 @@ export class Saves {
     );
 
   /**
-   * Temporary, until #709: queues one of the Timeline's saves as it builds
-   * it, and shows the Timeline it returns, or for a Cue edit the Song.
+   * Queues a Timeline edit, made against the Timeline as saved when its
+   * turn comes, and keeps it to undo. Resolves to what it did, or null if
+   * it wasn't saved.
    */
-  rawSend = (op: (saved: Song) => Promise<Saved>): Promise<boolean> =>
-    this.#turn(
-      op,
-      (saved) => {
-        if ('song' in saved) {
-          this.#saved = saved.song;
-          return;
-        }
-        this.timeline = saved.timeline;
-        // The change moved the Song on too.
-        this.#saved = { ...this.#saved, version: saved.timeline.version, updatedAt: saved.timeline.updatedAt };
+  edit = (edit: Edit): Promise<Edited | null> =>
+    this.make(async (at) => ({ timeline: await this.#server.apply(at, edit), kept: edit }));
+
+  /**
+   * Queues a rarer edit to the Timeline that the caller makes itself, e.g.
+   * importing a Sound, saving a Take or a Merge. Its work runs in its turn,
+   * against the Song and Timeline as saved then, and says how it's kept to
+   * undo. Resolves to what it did, or null if it wasn't saved, e.g. when
+   * the work throws, whose message becomes the save error.
+   */
+  make = (work: (at: Song, timeline: Timeline) => Promise<Made>): Promise<Edited | null> => {
+    let edited: Edited | null = null;
+    this.#undoablesQueued++;
+    return this.#turn(
+      (at) => work(at, this.timeline),
+      ({ timeline, kept }) => {
+        const before = this.timeline;
+        if (kept === 'take') this.#history.recordTake(before, timeline);
+        else this.#history.record(kept, before, timeline);
+        this.#showHistory();
+        this.#showTimeline(timeline);
+        edited = { before, after: timeline };
       },
-      (ended) => ended === 'saved',
+      () => {
+        this.#undoablesQueued--;
+        return edited;
+      },
     );
+  };
+
+  /**
+   * Undoes the latest edit, once the edits queued before it are saved.
+   * Resolves to what it did, or null if there was nothing to undo or it
+   * wasn't saved. An undo pressed for a Cue edit that then failed, so was
+   * taken back, undoes nothing.
+   */
+  undo = (): Promise<Undone | null> => {
+    if (!this.canUndo && this.#undoablesQueued === 0) return Promise.resolve(null);
+    const failedBefore = this.#cueEditsFailed;
+    return this.#step(() => {
+      if (this.#cueEditsFailed !== failedBefore) return null;
+      const edit = this.#history.nextUndo();
+      if (!edit) return null;
+      const playhead = this.#history.nextUndoPlayhead();
+      return {
+        edit,
+        done: ({ before, after }) => {
+          const back = this.#history.undone(before, after);
+          // Clips deleted together come back as they were, selected.
+          const reselect = edit.kind === 'placeClips' || edit.kind === 'replaceClips' ? back : null;
+          return { before, after, reselect, playhead };
+        },
+      };
+    });
+  };
+
+  /** Redoes the latest edit undone, like undo. */
+  redo = (): Promise<Undone | null> => {
+    if (!this.canRedo) return Promise.resolve(null);
+    return this.#step(() => {
+      const edit = this.#history.nextRedo();
+      if (!edit) return null;
+      return {
+        edit,
+        done: ({ before, after }) => {
+          this.#history.redone(before, after);
+          // A Merge redone selects its Clip again, as it did.
+          const reselect = edit.kind === 'replaceClips' ? addedClips(before, after) : null;
+          return { before, after, reselect, playhead: null };
+        },
+      };
+    });
+  };
+
+  /**
+   * Queues an undo or a redo: in its turn, next gives the edit to send and
+   * what it did, or null if there's nothing to.
+   */
+  #step(next: () => { edit: HistoryEdit; done: (edited: Edited) => Undone } | null): Promise<Undone | null> {
+    let undone: Undone | null = null;
+    return this.#turn(
+      async (at) => {
+        const step = next();
+        if (!step) return null;
+        const before = this.timeline;
+        return { step, before, after: await this.#send(at, step.edit) };
+      },
+      (sent) => {
+        if (!sent) return;
+        const { step, before, after } = sent;
+        if ('tracks' in after) this.#showTimeline(after);
+        else this.#saved = after;
+        undone = step.done({ before, after: 'tracks' in after ? after : before });
+        this.#showHistory();
+      },
+      () => undone,
+    );
+  }
+
+  /**
+   * Sends an edit kept to undo or redo, giving the Timeline it leaves, or
+   * for a Cue edit the Song. Cues whose Line is gone since, or can't take
+   * one, can't come back: with none left, nothing is sent, and the Song is
+   * as it was.
+   */
+  async #send(at: Song, edit: HistoryEdit): Promise<Timeline | Song> {
+    if (edit.kind !== 'restoreCues') return this.#server.apply(at, edit);
+    const cues = restorable(edit.cues, at);
+    return cues.length > 0 ? this.#server.apply(at, { kind: 'restoreCues', cues }) : at;
+  }
+
+  /** Shows the Timeline an edit left, which moved the Song on too. */
+  #showTimeline(timeline: Timeline) {
+    this.timeline = timeline;
+    this.#saved = { ...this.#saved, version: timeline.version, updatedAt: timeline.updatedAt };
+  }
+
+  #showHistory() {
+    this.canUndo = this.#history.nextUndo() !== null;
+    this.canRedo = this.#history.nextRedo() !== null;
+  }
+
+  /** Forgets every edit kept, e.g. once the Song changed elsewhere. */
+  #forget() {
+    this.#history.clear();
+    this.#showHistory();
+  }
 
   /**
    * Queues setting the Song's Tags, which leaves its version as it was.
@@ -177,8 +316,7 @@ export class Saves {
     const unsaved = { change };
     this.#unsavedCues = [...this.#unsavedCues, unsaved];
     const settle = () => (this.#unsavedCues = this.#unsavedCues.filter((u) => u !== unsaved));
-    const hook = this.cueHook;
-    hook?.asked();
+    this.#undoablesQueued++;
     const op = async (saved: Song): Promise<Song> => {
       try {
         let tries = 0;
@@ -189,29 +327,29 @@ export class Saves {
         // it's never made twice over.
         this.#saved = after;
         settle();
-        hook?.landed(saved, after);
+        // Kept to undo as what it changed in the Song as saved, whatever
+        // Cue changes not saved yet the Song shown has.
+        this.#history.recordCues(saved, after);
+        this.#showHistory();
         return after;
       } catch (e) {
-        if (e instanceof ApiError && e.stale) {
-          hook?.failed(e);
-          throw e;
-        }
+        this.#cueEditsFailed++;
+        if (e instanceof ApiError && e.stale) throw e;
         settle();
         // Saves already waiting behind it don't clear what was taken back,
         // e.g. the Lines cued meanwhile in Sync mode: only one asked for since.
         this.#errorKeptUntil = this.#turns;
-        const takenBack = new Error(`Couldn't save ${what}, so it was taken back. ${(e as Error).message}`);
-        hook?.failed(takenBack);
-        throw takenBack;
+        throw new Error(`Couldn't save ${what}, so it was taken back. ${(e as Error).message}`);
       }
     };
-    const done = this.#turn(
+    return this.#turn(
       op,
       () => {},
-      (ended) => ended === 'saved',
+      (ended) => {
+        this.#undoablesQueued--;
+        return ended === 'saved';
+      },
     );
-    if (hook) void done.then(() => hook.settled());
-    return done;
   };
 
   /**
@@ -255,6 +393,7 @@ export class Saves {
         this.#saved = latest;
         this.timeline = timeline;
         this.stale = false;
+        this.#forget();
       } catch {
         // Keep showing the Song as it was; the next save reports any problem.
       }
@@ -326,6 +465,7 @@ export class Saves {
   #fail(e: unknown): Submitted {
     if (e instanceof ApiError && e.stale) {
       this.stale = true;
+      this.#forget();
       return 'stale';
     }
     this.saveError = (e as Error).message;

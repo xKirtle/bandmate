@@ -1,6 +1,6 @@
 // An in-memory SongServer, for testing Saves without the api: one Song and
 // its Timeline, sharing a version, as the server keeps them.
-import { ApiError, type Song, type SongAt, type Timeline } from './api';
+import { ApiError, type Clip, type NewClip, type Song, type SongAt, type Timeline, type Track } from './api';
 import { withCueChange, type CueChange } from './cueChanges';
 import type { Edit } from './history';
 import { isCueChange, type SongServer } from './songServer';
@@ -42,7 +42,8 @@ export function emptySong(fields: Partial<Song> = {}): Song {
  *
  * Saves makes its own writes through `apply` and `setTags`. Writes a
  * caller brings, as the Song page's panels make through the api, are made
- * here with `update` and `remove`.
+ * here with `update` and `remove`, or for the Timeline, e.g. a Take's
+ * upload or a Merge, with `apply`.
  */
 export class FakeSongServer implements SongServer {
   song: Song;
@@ -55,17 +56,23 @@ export class FakeSongServer implements SongServer {
   #losing = 0;
   #holding: Promise<void> | null = null;
 
-  constructor(song: Song = emptySong()) {
+  /** The id the next Clip placed gets. */
+  #nextClipId = 1;
+
+  /** Holds the Song given, and a Timeline of the Tracks given, by default none. */
+  constructor(song: Song = emptySong(), tracks: Track[] = []) {
     this.song = structuredClone(song);
     this.timeline = {
       songId: song.id,
       version: song.version,
       updatedAt: song.updatedAt,
-      tracks: [],
+      tracks: structuredClone(tracks),
       beats: [],
       sounds: [],
       loop: null,
     };
+    const ids = tracks.flatMap((t) => t.clips.map((c) => c.id));
+    this.#nextClipId = Math.max(0, ...ids) + 1;
   }
 
   /** Fails the next writes, n of them, before they're made, by default on the network. */
@@ -111,16 +118,81 @@ export class FakeSongServer implements SongServer {
         return structuredClone(this.song);
       });
     }
-    let loop: Timeline['loop'];
+    let after: (tl: Timeline) => Timeline;
     try {
-      loop = loopAfter(this.timeline, change);
+      after = this.#edited(change);
     } catch (e) {
       return Promise.reject(e);
     }
     return this.#write(at, () => {
-      this.timeline = { ...this.timeline, loop };
+      this.timeline = after(this.timeline);
       return structuredClone(this.timeline);
     });
+  }
+
+  /**
+   * What a Timeline edit does, for the edits the fake models: the Loop's,
+   * and placing, moving and deleting Clips on the Tracks there are. Others
+   * throw "not modelled".
+   */
+  #edited(edit: Edit): (tl: Timeline) => Timeline {
+    const place = (tl: Timeline, trackId: number, clip: NewClip) =>
+      withClips(tl, trackId, (cs) => [...cs, this.#clip(clip)]);
+    const remove = (tl: Timeline, ids: number[]) => ({
+      ...tl,
+      tracks: tl.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => !ids.includes(c.id)) })),
+    });
+    switch (edit.kind) {
+      case 'setLoop':
+        return (tl) => ({ ...tl, loop: { ...edit.loop } });
+      case 'switchLoop':
+        return (tl) => ({ ...tl, loop: tl.loop && { ...tl.loop, on: edit.on } });
+      case 'clearLoop':
+        return (tl) => ({ ...tl, loop: null });
+      case 'placeClip':
+        return (tl) => place(tl, edit.trackId, edit.clip);
+      case 'placeClips':
+      case 'replaceClips': {
+        if (edit.newTracks || ('trackIds' in edit && edit.trackIds)) throw notModelled(edit);
+        const placed = edit.clips.map((c) => {
+          if (!('trackId' in c)) throw notModelled(edit);
+          return c;
+        });
+        const replaced = edit.kind === 'replaceClips' ? edit.clipIds : [];
+        return (tl) => placed.reduce((t, c) => place(t, c.trackId, c.clip), remove(tl, replaced));
+      }
+      case 'moveClip':
+        return (tl) => {
+          const clip = tl.tracks.flatMap((t) => t.clips).find((c) => c.id === edit.clipId)!;
+          return withClips(remove(tl, [clip.id]), edit.trackId, (cs) => [...cs, { ...clip, start: edit.start }]);
+        };
+      case 'deleteClip':
+        return (tl) => remove(tl, [edit.clipId]);
+      case 'deleteClips':
+        if (edit.trackIds) throw notModelled(edit);
+        return (tl) => remove(tl, edit.clipIds);
+      default:
+        throw notModelled(edit);
+    }
+  }
+
+  /** A Clip placed, with the next id. */
+  #clip(placed: NewClip): Clip {
+    const { start, offset, length } = placed;
+    return {
+      id: this.#nextClipId++,
+      beatId: 'beatId' in placed ? placed.beatId : null,
+      soundId: 'soundId' in placed ? placed.soundId : null,
+      name: placed.name ?? null,
+      gain: placed.gain ?? 0,
+      fadeIn: placed.fadeIn ?? 0,
+      fadeOut: placed.fadeOut ?? 0,
+      takes: [],
+      activeTakeId: null,
+      start,
+      offset,
+      length,
+    };
   }
 
   setTags(tags: string[]): Promise<string[]> {
@@ -174,16 +246,14 @@ export class FakeSongServer implements SongServer {
   }
 }
 
-/** The Loop a Timeline edit leaves; the Loop's edits are the only ones the fake models. */
-function loopAfter(timeline: Timeline, edit: Edit): Timeline['loop'] {
-  switch (edit.kind) {
-    case 'setLoop':
-      return { ...edit.loop };
-    case 'switchLoop':
-      return timeline.loop && { ...timeline.loop, on: edit.on };
-    case 'clearLoop':
-      return null;
-    default:
-      throw new Error(`${edit.kind} is not modelled`);
-  }
+const notModelled = (edit: Edit) => new Error(`${edit.kind} is not modelled`);
+
+/** A Timeline with one Track's Clips changed, kept in the order they start. */
+function withClips(tl: Timeline, trackId: number, change: (clips: Clip[]) => Clip[]): Timeline {
+  return {
+    ...tl,
+    tracks: tl.tracks.map((t) =>
+      t.id === trackId ? { ...t, clips: change(t.clips).sort((a, b) => a.start - b.start) } : t,
+    ),
+  };
 }
