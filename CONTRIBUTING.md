@@ -112,6 +112,7 @@ Vitest covers plain TypeScript modules in `web/src/lib` that don't touch the DOM
 The suite in [`e2e/`](e2e/) drives the real app in Chromium with [Playwright](https://playwright.dev/), and pins what the pages do, so a change that moves code behind them can't change it unnoticed. Run it before and after such a change:
 
 ```sh
+(cd web && npm ci)                # once: npm test builds the web app
 cd e2e
 npm ci
 npx playwright install chromium   # once; or set CHROMIUM=/usr/bin/chromium to use your own
@@ -125,7 +126,7 @@ It needs Go too: the suite builds the Bandmate binary once, then each worker sta
 Tests import `test` and `expect` from `e2e/fixtures.ts`, and:
 
 - go through the UI only, finding things by their role and accessible name, and check only what a user sees, or what the server holds afterwards, read back through the API;
-- make the Songs and Folders they need through the HTTP API, with the `library` fixture (`e2e/library.ts`), which empties Bandmate before each test, or restore the demo Backup with `library.restoreDemo()` when they need a full Timeline;
+- make the Songs and Folders they need through the HTTP API, with the `bandmate` fixture (`e2e/bandmate.ts`), which empties Bandmate before each test, or restore the demo Backup with `bandmate.restoreDemo()` when they need a full Timeline;
 - inject faults in the browser with `e2e/faults.ts`: fail a request N times, let it reach the server but lose its answer, or hold it until released.
 
 ## Releasing

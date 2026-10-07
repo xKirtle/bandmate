@@ -102,29 +102,31 @@ async function applyTimes(
   times: number,
   apply: (route: Route) => Promise<void>,
 ): Promise<Fault> {
+  // Claimed as each request matches; applied once its fault has been.
   let count = 0;
+  let applied = 0;
   let spend!: () => void;
   const spent = new Promise<void>((resolve) => (spend = resolve));
+  if (times <= 0) spend();
   const handler = async (route: Route) => {
     if (count >= times || !matches(route.request(), match)) return route.fallback();
     count++;
-    await apply(route);
-    if (count === times) spend();
+    try {
+      await apply(route);
+    } finally {
+      if (++applied === times) spend();
+    }
   };
   await target.route(match.url, handler);
   return {
     get count() {
-      return count;
+      return applied;
     },
     spent,
   };
 }
 
-// Playwright matches the URL; the method, and a predicate, are checked here.
-function urlMatcher(match: RequestMatch): string | RegExp | ((url: URL) => boolean) {
-  return match.url;
-}
-
+// Playwright matches the URL, and the method is checked here.
 function matches(request: Request, match: RequestMatch): boolean {
   return match.method === undefined || request.method() === match.method.toUpperCase();
 }

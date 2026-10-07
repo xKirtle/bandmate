@@ -13,18 +13,21 @@ const listed = (page: Page) => table(page).getByRole('link');
 /** The filter bar, over the table. */
 const filters = (page: Page) => page.getByRole('group', { name: 'Filter Songs' });
 
+/** The search, over the table. */
+const search = (page: Page) => page.getByRole('searchbox', { name: 'Search Songs by title' });
+
 /** A Song's or a Folder's row in the table. */
 const row = (page: Page, title: string) =>
   table(page)
     .getByRole('row')
     .filter({ has: page.getByRole('link', { name: title, exact: true }) });
 
-test('the top level lists the Folders first, then the Songs in no Folder', async ({ page, library }) => {
-  const rehearsals = await library.folder('Rehearsals');
-  await library.folder('Archive');
-  await library.song({ title: 'Inside Song', folder: rehearsals });
-  await library.song({ title: 'Anthem' });
-  await library.song({ title: 'Ballad' });
+test('the top level lists the Folders first, then the Songs in no Folder', async ({ page, bandmate }) => {
+  const rehearsals = await bandmate.folder('Rehearsals');
+  await bandmate.folder('Archive');
+  await bandmate.song({ title: 'Inside Song', folder: rehearsals });
+  await bandmate.song({ title: 'Anthem' });
+  await bandmate.song({ title: 'Ballad' });
 
   // Sorted by title, the Folders still come first, by name.
   await page.goto('/?sort=title');
@@ -37,16 +40,16 @@ test('the top level lists the Folders first, then the Songs in no Folder', async
   await expect(table(page).getByRole('columnheader', { name: 'Folder' })).toHaveCount(0);
 });
 
-test('a search lists every Song it matches, across Folders, each showing its Folder', async ({ page, library }) => {
-  const rehearsals = await library.folder('Rehearsals');
-  const demos = await library.folder('Demos');
-  await library.song({ title: 'Night Drive', folder: rehearsals });
-  await library.song({ title: 'Night Swim', folder: demos });
-  await library.song({ title: 'Nightfall' });
-  await library.song({ title: 'Morning' });
+test('a search lists every Song it matches, across Folders, each showing its Folder', async ({ page, bandmate }) => {
+  const rehearsals = await bandmate.folder('Rehearsals');
+  const demos = await bandmate.folder('Demos');
+  await bandmate.song({ title: 'Night Drive', folder: rehearsals });
+  await bandmate.song({ title: 'Night Swim', folder: demos });
+  await bandmate.song({ title: 'Nightfall' });
+  await bandmate.song({ title: 'Morning' });
 
   await page.goto('/?sort=title');
-  await page.getByRole('searchbox', { name: 'Search Songs by title' }).fill('night');
+  await search(page).fill('night');
 
   // The Folders give way to one list of Songs.
   await expect(listed(page)).toHaveText(['Night Drive', 'Night Swim', 'Nightfall']);
@@ -58,16 +61,16 @@ test('a search lists every Song it matches, across Folders, each showing its Fol
 
   // The search is kept in the URL, so it's back on a reload.
   await page.reload();
-  await expect(page.getByRole('searchbox', { name: 'Search Songs by title' })).toHaveValue('night');
+  await expect(search(page)).toHaveValue('night');
   await expect(listed(page)).toHaveText(['Night Drive', 'Night Swim', 'Nightfall']);
 });
 
-test('filtering by Status lists the Songs with those Statuses, across Folders', async ({ page, library }) => {
-  const rehearsals = await library.folder('Rehearsals');
-  await library.song({ title: 'Idea One', status: 'idea' });
-  await library.song({ title: 'Draft One', status: 'drafting' });
-  await library.song({ title: 'Draft Two', status: 'drafting', folder: rehearsals });
-  await library.song({ title: 'Done One', status: 'finished' });
+test('filtering by Status lists the Songs with those Statuses, across Folders', async ({ page, bandmate }) => {
+  const rehearsals = await bandmate.folder('Rehearsals');
+  await bandmate.song({ title: 'Idea One', status: 'idea' });
+  await bandmate.song({ title: 'Draft One', status: 'drafting' });
+  await bandmate.song({ title: 'Draft Two', status: 'drafting', folder: rehearsals });
+  await bandmate.song({ title: 'Done One', status: 'finished' });
 
   await page.goto('/?sort=title');
   await filters(page).getByRole('button', { name: 'Status', exact: true }).click();
@@ -84,12 +87,12 @@ test('filtering by Status lists the Songs with those Statuses, across Folders', 
   await expect(filters(page).getByRole('button', { name: 'Status: Drafting, Finished' })).toBeVisible();
 });
 
-test('filtering by Tag lists the Songs carrying it, across Folders', async ({ page, library }) => {
-  const rehearsals = await library.folder('Rehearsals');
-  await library.song({ title: 'Live Opener', tags: ['live', 'loud'] });
-  await library.song({ title: 'Live Closer', tags: ['live'], folder: rehearsals });
-  await library.song({ title: 'Studio Only', tags: ['loud'] });
-  await library.song({ title: 'Untagged' });
+test('filtering by Tag lists the Songs carrying it, across Folders', async ({ page, bandmate }) => {
+  const rehearsals = await bandmate.folder('Rehearsals');
+  await bandmate.song({ title: 'Live Opener', tags: ['live', 'loud'] });
+  await bandmate.song({ title: 'Live Closer', tags: ['live'], folder: rehearsals });
+  await bandmate.song({ title: 'Studio Only', tags: ['loud'] });
+  await bandmate.song({ title: 'Untagged' });
 
   await page.goto('/?sort=title');
   await filters(page).getByRole('button', { name: 'Tags', exact: true }).click();
@@ -106,8 +109,8 @@ test('filtering by Tag lists the Songs carrying it, across Folders', async ({ pa
   await expect(filters(page).getByRole('button', { name: 'Tags: live, loud' })).toBeVisible();
 });
 
-test('filters that match nothing say so, and clear', async ({ page, library }) => {
-  await library.song({ title: 'Idea One', status: 'idea' });
+test('filters that match nothing say so, and clear', async ({ page, bandmate }) => {
+  await bandmate.song({ title: 'Idea One', status: 'idea' });
 
   await page.goto('/?status=finished');
   await expect(page.getByText('No Songs match.')).toBeVisible();
@@ -117,12 +120,12 @@ test('filters that match nothing say so, and clear', async ({ page, library }) =
   await expect(page).toHaveURL(/\/$/);
 });
 
-test('inside a Folder, only its Songs are listed, with the way back to every Song', async ({ page, library }) => {
-  const rehearsals = await library.folder('Rehearsals');
-  await library.folder('Archive');
-  await library.song({ title: 'Opener', folder: rehearsals });
-  await library.song({ title: 'Closer', folder: rehearsals });
-  await library.song({ title: 'Loose' });
+test('inside a Folder, only its Songs are listed, with the way back to every Song', async ({ page, bandmate }) => {
+  const rehearsals = await bandmate.folder('Rehearsals');
+  await bandmate.folder('Archive');
+  await bandmate.song({ title: 'Opener', folder: rehearsals });
+  await bandmate.song({ title: 'Closer', folder: rehearsals });
+  await bandmate.song({ title: 'Loose' });
 
   await page.goto('/?sort=title');
   await page.getByRole('link', { name: 'Rehearsals', exact: true }).click();
@@ -136,7 +139,7 @@ test('inside a Folder, only its Songs are listed, with the way back to every Son
   // New Song makes it in the Folder.
   await page.getByRole('button', { name: 'New Song' }).click();
   await expect(page).toHaveURL(/\/songs\/\d+$/);
-  const made = (await library.songs()).find((s) => s.title === 'Untitled Song');
+  const made = (await bandmate.songs()).find((s) => s.title === 'Untitled Song');
   expect(made?.folderId).toBe(rehearsals.id);
 
   await page.goBack();
@@ -145,9 +148,9 @@ test('inside a Folder, only its Songs are listed, with the way back to every Son
   await expect(listed(page)).toHaveText(['Archive', 'Rehearsals', 'Loose']);
 });
 
-test("a Folder that doesn't exist says it's missing", async ({ page, library }) => {
-  const rehearsals = await library.folder('Rehearsals');
-  await library.song({ title: 'Opener', folder: rehearsals });
+test("a Folder that doesn't exist says it's missing", async ({ page, bandmate }) => {
+  const rehearsals = await bandmate.folder('Rehearsals');
+  await bandmate.song({ title: 'Opener', folder: rehearsals });
 
   await page.goto('/folders/999999');
 
@@ -162,7 +165,7 @@ test("a Folder that doesn't exist says it's missing", async ({ page, library }) 
   await expect(listed(page)).toHaveText(['Rehearsals']);
 });
 
-test('an empty library clears filters left in the URL, so the first Song made shows', async ({ page, library }) => {
+test('an empty bandmate clears filters left in the URL, so the first Song made shows', async ({ page, bandmate }) => {
   await page.goto('/?q=nothing&status=finished&tag=live&hasMaster=true');
 
   await expect(page.getByText('No Songs yet.')).toBeVisible();
@@ -172,7 +175,7 @@ test('an empty library clears filters left in the URL, so the first Song made sh
 
   await page.getByRole('button', { name: 'Write your first Song' }).click();
   await expect(page).toHaveURL(/\/songs\/\d+$/);
-  expect(await library.songs()).toHaveLength(1);
+  expect(await bandmate.songs()).toHaveLength(1);
 
   // Back on the Songs page, the Song just made shows: no filter hides it.
   await page.goBack();

@@ -129,9 +129,9 @@ jobs:
         run: go test ./...
 
   # The end-to-end suite in e2e/: Chromium driving the built web app against
-  # a real Bandmate per worker. A test that fails is retried once, and every
-  # failed attempt's trace is uploaded, to open with `npx playwright
-  # show-trace`. Not on a push to main, like `test`.
+  # a real Bandmate per worker. A test that fails is retried once. When the
+  # job fails, the failed tests' traces are uploaded, to open with `npx
+  # playwright show-trace`. Not on a push to main, like `test`.
   e2e:
     needs: changes
     if: needs.changes.outputs.code == 'true' && !(github.event_name == 'push' && github.ref_type == 'branch')
@@ -253,14 +253,15 @@ jobs:
   # have the bundle job's build instead. A Dockerfile problem those miss only
   # fails a publish, leaving the last good image in place (for a tag, that
   # version goes unpublished until the tag is pushed again). On main it runs
-  # alone, `test` and `bundle` having passed on the pull request; on a tag,
-  # only once both pass again. `!cancelled()` keeps it from being skipped
-  # with them on main.
+  # alone, `test`, `bundle` and `e2e` having passed on the pull request; on a
+  # tag, only once all three pass again. `!cancelled()` keeps it from being
+  # skipped with them on main.
   image:
-    needs: [changes, test, bundle]
+    needs: [changes, test, bundle, e2e]
     if: >-
       !cancelled() && github.event_name == 'push' && needs.changes.outputs.code == 'true' &&
-      (github.ref_type == 'branch' || (needs.test.result == 'success' && needs.bundle.result == 'success'))
+      (github.ref_type == 'branch' ||
+        (needs.test.result == 'success' && needs.bundle.result == 'success' && needs.e2e.result == 'success'))
     runs-on: ubuntu-latest
     permissions:
       contents: read

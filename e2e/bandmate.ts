@@ -6,7 +6,7 @@ import { expect, type APIRequestContext, type APIResponse } from '@playwright/te
 // as the app itself would, and read back from it afterwards.
 
 /** The demo Backup the screenshots are taken from: a hero Song with a full Timeline, and six more. */
-export const demoBackup = resolve(import.meta.dirname, '../docs/screenshots/demo.bandmate');
+const demoBackup = resolve(import.meta.dirname, '../docs/screenshots/demo.bandmate');
 
 export type Status = 'idea' | 'drafting' | 'finished';
 
@@ -48,8 +48,8 @@ export interface NewSong {
   tags?: string[];
 }
 
-/** Bandmate's library through its HTTP API: what's in it, and making more. */
-export class Library {
+/** The worker's Bandmate, through its HTTP API: what's in it, and making more. */
+export class Bandmate {
   constructor(private readonly api: APIRequestContext) {}
 
   /** Makes a Song, as New Song does, then gives it what's asked for. */

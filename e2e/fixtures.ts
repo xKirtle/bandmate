@@ -4,7 +4,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test as base, expect } from '@playwright/test';
-import { Library } from './library';
+import { Bandmate } from './bandmate';
 
 // The suite's test, with a Bandmate per worker. Import { test, expect } from
 // here, not from @playwright/test.
@@ -19,10 +19,10 @@ export interface Server {
 
 interface TestFixtures {
   /**
-   * The worker's Bandmate, emptied before the test starts, through its HTTP
+   * The worker's Bandmate, emptied before every test starts, through its HTTP
    * API: make what the test needs with it, and read back what it holds.
    */
-  library: Library;
+  bandmate: Bandmate;
 }
 
 interface WorkerFixtures {
@@ -63,13 +63,18 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 
   baseURL: async ({ server }, use) => use(server.url),
 
-  library: async ({ playwright, server }, use) => {
-    const api = await playwright.request.newContext({ baseURL: server.url });
-    const library = new Library(api);
-    await library.wipe();
-    await use(library);
-    await api.dispose();
-  },
+  // Auto, so every test starts with Bandmate empty, whether it asks for this
+  // fixture or not.
+  bandmate: [
+    async ({ playwright, server }, use) => {
+      const api = await playwright.request.newContext({ baseURL: server.url });
+      const bandmate = new Bandmate(api);
+      await bandmate.wipe();
+      await use(bandmate);
+      await api.dispose();
+    },
+    { auto: true },
+  ],
 });
 
 export { expect };
@@ -92,7 +97,7 @@ function freePort(): Promise<number> {
 async function healthy(url: string, proc: ChildProcess, output: () => string): Promise<void> {
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
-    if (proc.exitCode !== null) throw new Error(`Bandmate exited (${proc.exitCode}):\n${output()}`);
+    if (exited(proc)) throw new Error(`Bandmate exited (${proc.exitCode ?? proc.signalCode}):\n${output()}`);
     try {
       if ((await fetch(`${url}/api/health`)).ok) return;
     } catch {
@@ -106,9 +111,14 @@ async function healthy(url: string, proc: ChildProcess, output: () => string): P
 
 /** Stops the server, waiting for it to exit. */
 function stop(proc: ChildProcess): Promise<void> {
-  if (proc.exitCode !== null) return Promise.resolve();
+  if (exited(proc)) return Promise.resolve();
   return new Promise((resolve) => {
     proc.once('exit', () => resolve());
     proc.kill();
   });
+}
+
+/** Whether the process has exited, on its own or killed by a signal. */
+function exited(proc: ChildProcess): boolean {
+  return proc.exitCode !== null || proc.signalCode !== null;
 }
