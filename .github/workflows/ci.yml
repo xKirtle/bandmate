@@ -167,12 +167,21 @@ jobs:
         working-directory: e2e
         run: npm run check
 
-      # Usually well under a minute, but it has stalled for 19. A hung install
-      # fails after 5.
+      # The browser Playwright downloads, kept per version of the suite's
+      # dependencies, so most runs skip the download.
+      - name: Cache Chromium
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('e2e/package-lock.json') }}
+
+      # Without --with-deps: the runner already has the libraries Chromium
+      # needs, and apt, for the few fonts it would add, reaches a mirror that
+      # has stalled the install for minutes. A hung install fails after 5.
       - name: Install Chromium
         working-directory: e2e
         timeout-minutes: 5
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
 
       # Builds the web app, then the Bandmate each worker starts, then runs
       # the suite.
