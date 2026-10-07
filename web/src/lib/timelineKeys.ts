@@ -1,11 +1,12 @@
 /**
- * The Timeline's editing and mouse Shortcuts: a focused Clip's keys, the
- * ruler's, and the modifiers held while dragging or turning the wheel.
- * Each handler keeps its own guards, e.g. whether the Timeline can be edited.
+ * The Timeline's editing and mouse Shortcuts: the Selection's and a focused
+ * Clip's keys, decided with all their guards in `timelineKey`, the ruler's,
+ * and the modifiers held while dragging or turning the wheel.
  */
 
 import { opensMenu } from './menu';
-import { matches, shortcuts, stepBy, way, type Key, type KeyPress, type Way } from './shortcuts';
+import type { Freeze } from './freeze';
+import { matches, shortcuts, stepBy, way, type Key, type KeyDown, type KeyPress, type Way } from './shortcuts';
 
 /** The modifiers held with a pointer or wheel event, or a key press. */
 export type Modifiers = Omit<KeyPress, 'key'>;
@@ -16,30 +17,64 @@ function mouse(key: 'click' | 'drag' | 'wheel', e: Modifiers): KeyPress {
   return { key, ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, shiftKey: e.shiftKey };
 }
 
-/** What a key press does to a focused Clip: delete it, open its ⋯ menu, or nothing. */
-export function clipAction(e: KeyPress): 'delete' | 'menu' | null {
-  if (matches(e, shortcuts.deleteClip.keys)) return 'delete';
-  return opensMenu(e) ? 'menu' : null;
-}
+/**
+ * What a Timeline Shortcut does: clear the Selection, select every Clip,
+ * delete the Selection or a focused Clip alone, copy or cut the Selection,
+ * paste the Clipboard, or open a focused Clip's ⋯ menu.
+ */
+export type TimelineKey =
+  'clearSelection' | 'selectAll' | 'deleteSelection' | 'deleteClip' | 'copy' | 'cut' | 'paste' | 'clipMenu';
 
-/** Whether a key press clears the Selection: Esc. */
-export function clearsSelection(e: KeyPress): boolean {
-  return matches(e, shortcuts.clearSelection.keys);
-}
-
-/** Whether a key press selects every Clip: Mod+A. */
-export function selectsAll(e: KeyPress): boolean {
-  return matches(e, shortcuts.selectAll.keys);
-}
+/** Where a key was pressed in the Timeline, and what the Timeline is doing. */
+export type TimelineKeyContext = {
+  /** It was pressed in a text field, which takes typed keys. */
+  inTextField: boolean;
+  /** It was pressed in a ⋯ menu or a dialog, whose keys are for what's in it. */
+  inMenuOrDialog: boolean;
+  /** The Timeline can be edited, i.e. it isn't in Read mode or on a phone. */
+  editable: boolean;
+  /** Why the Timeline can't be edited now, if it can't. */
+  freeze: Freeze;
+  /** How many Clips are selected. */
+  selected: number;
+  /** The Clip the key was pressed on, if it has focus itself, and whether it's in the Selection. */
+  focusedClip: { inSelection: boolean } | null;
+  /** A Track is being dragged by its grip. */
+  draggingTrack: boolean;
+};
 
 /**
- * What a key press does with the Clipboard: copy the Selection to it
- * (Mod+C), cut the Selection to it (Mod+X), paste it (Mod+V), or nothing.
+ * Which Timeline Shortcut a key press is, if any, and if it should act
+ * now: null leaves the key to the page.
  */
-export function clipboardAction(e: KeyPress): 'copy' | 'cut' | 'paste' | null {
+export function timelineKey(e: KeyDown, at: TimelineKeyContext): TimelineKey | null {
+  // A text field's, a menu's or a dialog's keys are their own.
+  if (e.defaultPrevented || at.inTextField || at.inMenuOrDialog) return null;
+  // Nor while a Track is dragged, which Esc then cancels.
+  if (at.draggingTrack) return null;
+  // Deleting, copying, cutting and pasting go with editing, so not on a
+  // phone, nor while recording or merging.
+  const edits = at.editable && at.freeze === null;
+  const deletes = matches(e, shortcuts.deleteClip.keys);
+  if (at.focusedClip && opensMenu(e)) {
+    // Even while recording or merging, with its edits off.
+    return at.editable ? 'clipMenu' : null;
+  }
+  // A focused Clip's Delete: the whole Selection if it's in it, else that
+  // Clip alone.
+  if (at.focusedClip && deletes) {
+    if (!edits) return null;
+    return at.focusedClip.inSelection ? 'deleteSelection' : 'deleteClip';
+  }
+  if (matches(e, shortcuts.clearSelection.keys)) return at.selected > 0 ? 'clearSelection' : null;
+  if (matches(e, shortcuts.selectAll.keys)) return at.editable ? 'selectAll' : null;
+  if (matches(e, shortcuts.pasteClips.keys)) return edits ? 'paste' : null;
+  // These act on the Selection, even from a focused Clip outside it.
+  if (!edits || at.selected === 0) return null;
+  if (deletes) return 'deleteSelection';
   if (matches(e, shortcuts.copyClips.keys)) return 'copy';
   if (matches(e, shortcuts.cutClips.keys)) return 'cut';
-  return matches(e, shortcuts.pasteClips.keys) ? 'paste' : null;
+  return null;
 }
 
 /** Whether a box drawn over empty lane space with these modifiers adds the Clips it touches to the Selection, rather than replacing it. */

@@ -86,15 +86,12 @@
   } from './clipboard';
   import {
     addsBox,
-    clearsSelection,
-    clipAction,
-    clipboardAction,
     isModifier,
     nudges,
     rulerSeek,
-    selectsAll,
     skipsSnapping,
     startOrEnd,
+    timelineKey,
     togglesSelection,
     zooms,
   } from './timelineKeys';
@@ -1292,38 +1289,50 @@
     perform({ kind: 'pasteClips', ...pasted }, (before, after) => selection.selectEdited(addedClips(before, after)));
   }
 
-  // Esc clears the Selection while focus is in the Timeline, Mod+A
-  // selects every Clip, Delete deletes the Selection, and Mod+C, Mod+X and
-  // Mod+V copy, cut and paste, but not in a text field, a menu or a dialog,
-  // whose keys are their own, nor while a Track is dragged, which Esc
-  // cancels. Deleting, copying, cutting and pasting only go with editing,
-  // so not on a phone, nor while recording. A focused Clip handles Delete
-  // itself; this is for a Selection made by a box or Mod+A, where no Clip
-  // has focus.
-  function timelineKey(event: KeyboardEvent) {
-    if (event.defaultPrevented || trackDrag.current) return;
-    if (inTextField(event.target) || inMenuOrDialog(event.target)) return;
-    const clipboardKey = clipboardAction(event);
-    const editsSelection = selection.size > 0 && editable.current && !frozen;
-    if (clearsSelection(event) && selection.size > 0) {
-      event.preventDefault();
-      selection.apply({ kind: 'clear' });
-    } else if (selectsAll(event) && editable.current) {
-      event.preventDefault();
-      selection.apply({ kind: 'all' });
-    } else if (clipAction(event) === 'delete' && editsSelection) {
-      event.preventDefault();
-      removeSelection();
-    } else if (clipboardKey === 'copy' && editsSelection) {
-      event.preventDefault();
-      copySelection();
-    } else if (clipboardKey === 'cut' && editsSelection) {
-      event.preventDefault();
-      cutSelection();
-    } else if (clipboardKey === 'paste' && editable.current && !frozen) {
-      event.preventDefault();
-      pasteClipboard();
+  // The Selection's and a focused Clip's keys, pressed anywhere in the
+  // Timeline: `timelineKey` decides what each does and when, and this only
+  // dispatches it.
+  function timelineKeyDown(event: KeyboardEvent) {
+    const clip = focusedClip(event.target);
+    const action = timelineKey(event, {
+      inTextField: inTextField(event.target),
+      inMenuOrDialog: inMenuOrDialog(event.target),
+      editable: editable.current,
+      freeze,
+      selected: selection.size,
+      focusedClip: clip && { inSelection: selection.has(clip.id) },
+      draggingTrack: trackDrag.current !== null,
+    });
+    if (!action) return;
+    event.preventDefault();
+    switch (action) {
+      case 'clearSelection':
+        return selection.apply({ kind: 'clear' });
+      case 'selectAll':
+        return selection.apply({ kind: 'all' });
+      case 'deleteSelection':
+        return removeSelection();
+      case 'copy':
+        return copySelection();
+      case 'cut':
+        return cutSelection();
+      case 'paste':
+        return pasteClipboard();
+      // Only ever given with a focused Clip.
+      case 'deleteClip':
+        return clip && remove(clip);
+      case 'clipMenu':
+        return clip && openClipMenu(clip, event.target as HTMLElement);
+      default:
+        return action satisfies never;
     }
+  }
+
+  /** The Clip a key was pressed on, if it has focus itself, not e.g. its ⋯ or its name's field. */
+  function focusedClip(target: EventTarget | null): Clip | null {
+    if (!(target instanceof HTMLElement) || !target.matches('.clip[id^="clip-"]')) return null;
+    const id = Number(target.id.slice('clip-'.length));
+    return clips.find((c) => c.id === id) ?? null;
   }
 
   // Editing a Clip: dragging its body moves it, along its Track or onto
@@ -1956,12 +1965,6 @@
     perform({ kind: 'deleteClip', clipId: clip.id });
   }
 
-  /** Deletes a Clip with the whole Selection, as one edit, if it's selected; else the Clip alone. */
-  function removeWithSelection(clip: Clip) {
-    if (selection.has(clip.id)) removeSelection();
-    else remove(clip);
-  }
-
   /**
    * Merges the selected Clips, on any Tracks, into one Clip of a new Sound,
    * rendered here from the Timeline as it is once the edits queued before
@@ -2012,19 +2015,6 @@
   /** Deletes the selected Clips, as one edit. */
   function removeSelection() {
     perform({ kind: 'deleteClips', clipIds: [...selection.ids] });
-  }
-
-  function clipKey(event: KeyboardEvent, clip: Clip) {
-    if (event.target !== event.currentTarget || !editable.current) return;
-    const action = clipAction(event);
-    // While recording, its menu still opens, with its edits off.
-    if (action === 'delete') {
-      event.preventDefault();
-      if (!frozen) removeWithSelection(clip);
-    } else if (action === 'menu') {
-      event.preventDefault();
-      openClipMenu(clip, event.currentTarget as HTMLElement);
-    }
   }
 
   // Each Clip's menu, opened by its ⋯, right-click, the Menu key, Shift+F10
@@ -2507,13 +2497,13 @@
   <span class={['status', tone]} role="status" title={text}>{text}</span>
 {/snippet}
 
-<!-- Esc pressed anywhere in it, on a focused control, clears the Selection. -->
+<!-- Its keys, pressed anywhere in it, e.g. Esc on a focused control or Delete on a focused Clip, go to one listener. -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <section
   class="timeline"
   aria-label="Timeline"
   bind:offsetHeight={height}
-  onkeydown={timelineKey}
+  onkeydown={timelineKeyDown}
   ondragenter={filesOver}
   ondragover={filesOver}
   ondragleave={filesLeave}
@@ -2924,7 +2914,6 @@
                       ? hints.aria(frozen ? shortcuts.clipMenu.keys : clipKeys)
                       : undefined}
                     onpointerdown={(e) => editDown(e, clip, 'move')}
-                    onkeydown={(e) => clipKey(e, clip)}
                     oncontextmenu={(e) => clipContextMenu(e, clip)}
                     ondblclick={(e) => clipDoubleClick(e, clip)}
                   >
