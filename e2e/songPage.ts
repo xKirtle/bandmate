@@ -38,11 +38,17 @@ export async function dragClip(page: Page, target: Locator, by: number, from: 'b
   await drag(page, { x, y: box.y + box.height / 2 }, { x: by, y: 0 });
 }
 
+/** A point on the page, or how far across and down to go from one, in pixels. */
+export interface Point {
+  x: number;
+  y: number;
+}
+
 /**
  * Presses at a point on the page and drags `by` pixels across and down from
  * it, in steps as a hand would, then lets go.
  */
-export async function drag(page: Page, from: { x: number; y: number }, by: { x: number; y: number }) {
+export async function drag(page: Page, from: Point, by: Point) {
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
   await page.mouse.move(from.x + by.x / 2, from.y + by.y / 2, { steps: 5 });
@@ -50,21 +56,25 @@ export async function drag(page: Page, from: { x: number; y: number }, by: { x: 
   await page.mouse.up();
 }
 
-/**
- * Drags something on a Clip by its middle, `by` pixels across and down: its
- * gain line or a fade dot, found by the hint it shows on hover, as neither
- * is named for a screen reader.
- */
-export async function dragBy(page: Page, target: Locator, by: { x: number; y: number }) {
+/** The middle of something on screen. */
+export async function middleOf(target: Locator): Promise<Point> {
   const box = await target.boundingBox();
-  if (!box) throw new Error('It is not on screen');
-  await drag(page, { x: box.x + box.width / 2, y: box.y + box.height / 2 }, by);
+  if (!box) throw new Error(`${target} is not on screen`);
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 }
 
-/** A Clip's gain line, by the hint it shows on hover. */
+/** Presses something on screen in its middle and drags it `by` pixels across and down. */
+export async function dragMiddleOf(page: Page, target: Locator, by: Point) {
+  await drag(page, await middleOf(target), by);
+}
+
+// A Clip's gain line and fade dots aren't named for a screen reader, so
+// they're found by the hint each shows on hover.
+
+/** A Clip's gain line. */
 export const gainLine = (target: Locator) => target.getByTitle(/^Gain .*: drag to change it/);
 
-/** A Clip's fade in or fade out dot, by the hint it shows on hover. */
+/** A Clip's fade in or fade out dot. */
 export const fadeDot = (target: Locator, end: 'Fade in' | 'Fade out') => target.getByTitle(new RegExp(`^${end}\\b`));
 
 /** A Line's Cue time in the Lyric Sheet's gutter, e.g. of "Line 1 of Verse 1", outside Sync mode. */
