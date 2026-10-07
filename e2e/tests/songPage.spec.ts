@@ -393,12 +393,12 @@ test("an Alternate's text box closed while its save fails leaves nothing unsaved
   await lines.blur();
   await expect(saveError(page)).toHaveText('Disk full');
 
-  // Opening the Alternates closes the text box, which saves it again.
+  // Opening Alternates mode closes the text box, which saves it again.
   const hold = await holdRequests(page, textSave);
   await page.getByRole('button', { name: 'Alternates', exact: true }).click();
   await expect(lines).toHaveCount(0);
   await hold.reached;
-  // On its way, it's unsaved.
+  // While that save is on its way, leaving still warns.
   expect(await warnsOnLeaving(page)).toBe(true);
   await hold.release();
   await fault.spent;

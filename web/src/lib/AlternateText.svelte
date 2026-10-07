@@ -116,9 +116,8 @@
   }
 
   // Once nothing is waiting to be saved, show the server's text again, unless
-  // the last save failed and the text box is the only copy of the edits. Once
-  // closed, it holds nothing, so it stops being unsaved whether or not its
-  // last save landed.
+  // the last save failed and the text box is the only copy of the edits, and
+  // it's still open.
   function settle() {
     if (timer !== undefined || inFlight > 0) return;
     if (failed && !closed) return;
