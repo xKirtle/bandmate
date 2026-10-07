@@ -14,7 +14,7 @@
 export const tolerance = 1e-6;
 
 /** Where a Clip is on its Track, as far as fitting goes. */
-export interface PlacedClip {
+export interface ClipSpan {
   id: number;
   start: number;
   length: number;
@@ -31,7 +31,7 @@ export interface Span {
  * overlapping it by more than the tolerance at both its edges, but for
  * those left out, e.g. the Clips being moved.
  */
-export function inTheWay<C extends PlacedClip>(
+export function inTheWay<C extends ClipSpan>(
   clips: readonly C[],
   span: Span,
   leaveOut: ReadonlySet<number> = new Set(),
@@ -46,6 +46,6 @@ export function inTheWay<C extends PlacedClip>(
  * left out: touching a neighbour's edge is fine, as is overlapping it by
  * less than the tolerance.
  */
-export function isFree(clips: readonly PlacedClip[], span: Span, leaveOut?: ReadonlySet<number>): boolean {
+export function isFree(clips: readonly ClipSpan[], span: Span, leaveOut?: ReadonlySet<number>): boolean {
   return inTheWay(clips, span, leaveOut).length === 0;
 }

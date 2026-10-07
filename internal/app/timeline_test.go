@@ -643,8 +643,8 @@ func TestAClipMayOverlapANeighbourByLessThanTheTolerance(t *testing.T) {
 	beatTrack := p.tl.Tracks[0].ID
 	timelineChange(t, ts.moveClip(p.song.ID, p.first, p.tl.Tracks[1].ID, 0))
 
-	// The second Clip is at 0:30-0:50 on Track 1, and the first, 10
-	// seconds long, goes just over either edge of it: by less than the
+	// The second Clip is at 0:30-0:50 on the first Track, and the first
+	// Clip, 10 seconds long, goes just over either edge of it: by less than the
 	// tolerance of a microsecond it's rounding, and fits.
 	for name, c := range map[string]struct {
 		start float64

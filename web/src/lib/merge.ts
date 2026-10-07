@@ -52,7 +52,6 @@ export function mergeTarget(tracks: readonly Track[], selected: ReadonlySet<numb
   if (clips.length !== selected.size) return null;
   const start = Math.min(...clips.map((c) => c.start));
   const end = Math.max(...clips.map((c) => c.start + c.length));
-  // Clips touching the span's ends aren't in the way.
   const room = on.find((t) => isFree(t.clips, { start, end }, selected));
   const onto: MergeOnto = room
     ? { trackId: room.id }

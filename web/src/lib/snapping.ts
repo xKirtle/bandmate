@@ -22,9 +22,6 @@ export interface Snap<T> {
   aligned: T[];
 }
 
-// Times within the server's tolerance are the same time, as rounding leaves
-// a Clip's end a hair off a start it was lined up with.
-
 /**
  * Where the edges dragged would snap: onto the target nearest any of them,
  * within reach seconds, or null with none in reach. It gives back
@@ -40,6 +37,8 @@ export function snap<T>(targets: readonly Target<T>[], edges: readonly number[],
   }
   if (!best) return null;
   const { at } = best;
+  // Times within the server's tolerance are the same time, as rounding
+  // leaves a Clip's end a hair off a start it was lined up with.
   return { ...best, aligned: targets.filter((t) => Math.abs(t.at - at) <= tolerance).map((t) => t.of) };
 }
 
