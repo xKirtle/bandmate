@@ -53,14 +53,14 @@ export interface SavesOptions {
    * Hears that a refresh is about to show the Song as changed elsewhere,
    * e.g. to show its Details in the inputs.
    */
-  replacing?: (song: Song) => void;
+  onReplace?: (song: Song) => void;
 }
 
 export class Saves {
   #server: SongServer;
   #wait: Wait;
   #editsOutside: () => boolean;
-  #replacing: (song: Song) => void;
+  #onReplace: (song: Song) => void;
 
   #saved: Song = $state.raw()!;
   /** Cue changes not saved yet, in the order they were made. */
@@ -95,7 +95,7 @@ export class Saves {
     this.#server = options.server;
     this.#wait = options.wait ?? waitFor;
     this.#editsOutside = options.editsOutside ?? (() => false);
-    this.#replacing = options.replacing ?? (() => {});
+    this.#onReplace = options.onReplace ?? (() => {});
     this.#saved = options.song;
     this.timeline = options.timeline;
   }
@@ -119,12 +119,7 @@ export class Saves {
    * Queues a change to the Song, built against the Song as saved when its
    * turn comes, and shows the Song it returns. Resolves to whether it was saved.
    */
-  change = (op: (saved: Song) => Promise<Song>): Promise<boolean> =>
-    this.#turn(
-      op,
-      (s) => (this.#saved = s),
-      (ended) => ended === 'saved',
-    );
+  change = (op: (saved: Song) => Promise<Song>): Promise<boolean> => this.submit(op).then((ended) => ended === 'saved');
 
   /** Queues a change like change, resolving to how it ended. */
   submit = (op: (saved: Song) => Promise<Song>): Promise<Submitted> =>
@@ -138,7 +133,7 @@ export class Saves {
    * Temporary, until #709: queues one of the Timeline's saves as it builds
    * it, and shows the Timeline it returns, or for a Cue edit the Song.
    */
-  send = (op: (saved: Song) => Promise<Saved>): Promise<boolean> =>
+  rawSend = (op: (saved: Song) => Promise<Saved>): Promise<boolean> =>
     this.#turn(
       op,
       (saved) => {
@@ -256,7 +251,7 @@ export class Saves {
           return;
         }
         const timeline = await this.#server.getTimeline();
-        this.#replacing(latest);
+        this.#onReplace(latest);
         this.#saved = latest;
         this.timeline = timeline;
         this.stale = false;

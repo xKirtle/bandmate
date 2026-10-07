@@ -1,7 +1,8 @@
-// The writes and reads Saves makes itself, and makes again: reading the
-// Song and its Timeline, and the Cue changes and Timeline edits it tries
-// again, undoes, redoes and takes back. Writes a caller brings are built
-// against the Song as saved already, so they don't go through here.
+// The reads and writes Saves makes itself: reading the Song and its
+// Timeline, the Cue changes and Timeline edits it tries again, undoes,
+// redoes and takes back, and setting the Tags, which it's given as a list
+// rather than a write. Writes a caller brings are built against the Song as
+// saved already, so they don't go through here.
 import { api, type Song, type SongAt, type Timeline } from './api';
 import { sendCueChange, type CueChange } from './cueChanges';
 import { sendEdit, type Edit } from './history';

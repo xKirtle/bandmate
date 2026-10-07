@@ -92,7 +92,7 @@ describe('Saves, refreshing', () => {
   it('waits for saves on their way, then shows the Song as changed elsewhere', async () => {
     const server = new FakeSongServer();
     const replaced: Song[] = [];
-    const saves = await savesFor(server, { replacing: (s) => replaced.push(s) });
+    const saves = await savesFor(server, { onReplace: (s) => replaced.push(s) });
     const release = server.holdNextAnswer();
     const saving = saves.change(update(server, { key: 'Am' }));
     const refreshing = saves.refresh();

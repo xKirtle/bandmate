@@ -383,11 +383,16 @@
     try {
       return await save;
     } catch (err) {
-      if (err instanceof ApiError && err.stale) {
-        history.clear();
-        showHistory();
-      }
+      forgetIfStale(err);
       throw err;
+    }
+  }
+
+  /** Forgets every edit kept if a save was refused because the Song changed elsewhere. */
+  function forgetIfStale(err: unknown) {
+    if (err instanceof ApiError && err.stale) {
+      history.clear();
+      showHistory();
     }
   }
 
@@ -423,7 +428,7 @@
     offerCues = null;
     queued++;
     return saves
-      .send((at) =>
+      .rawSend((at) =>
         send(at, e, (before, after) => {
           history.record(e, before, after);
           done?.(before, after);
@@ -447,10 +452,7 @@
         showHistory();
       },
       failed(err) {
-        if (err instanceof ApiError && err.stale) {
-          history.clear();
-          showHistory();
-        }
+        forgetIfStale(err);
         cueEditsFailed++;
       },
       settled() {
@@ -467,7 +469,7 @@
     // Where undoing a new Take returns the playhead to, to record again from.
     let returnTo: number | null = null;
     const failedBefore = cueEditsFailed;
-    const ok = await saves.send((at) => {
+    const ok = await saves.rawSend((at) => {
       if (cueEditsFailed !== failedBefore) return unchanged(at);
       const e = history.nextUndo();
       returnTo = history.nextUndoPlayhead();
@@ -490,7 +492,7 @@
     if (frozen || !redoable) return;
     offerCues = null;
     mergeNote = null;
-    saves.send((at) => {
+    saves.rawSend((at) => {
       const e = history.nextRedo();
       return e
         ? send(at, e, (before, after) => {
@@ -963,7 +965,7 @@
     offerCues = null;
     queued++;
     await saves
-      .send(async (at) => {
+      .rawSend(async (at) => {
         const before = timeline;
         const after = await saved(api.importSound(at, file, { trackId, name, ...decoded }));
         history.record(placingAdded(before, after), before, after);
@@ -1273,7 +1275,7 @@
     offerCues = null;
     queued++;
     return saves
-      .send(async (at) => {
+      .rawSend(async (at) => {
         const { target, captureStart } = place();
         if (!target) throw new Error("There's no Track to put the Take on.");
         const details = { captureStart, latencyOffset, peaks };
@@ -2318,7 +2320,7 @@
     mergeNote = null;
     queued++;
     saves
-      .send(async (at) => {
+      .rawSend(async (at) => {
         const target = mergeTarget(timeline.tracks, clipIds);
         if (!target) throw new Error("The Clips to merge aren't all on the Timeline any more.");
         let audio: MergedAudio;

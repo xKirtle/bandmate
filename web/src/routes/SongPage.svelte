@@ -145,7 +145,7 @@
     const server = songServer(id);
     Promise.all([server.getSong(), server.getTimeline()]).then(
       ([s, tl]) => {
-        saves = new Saves({ server, song: s, timeline: tl, editsOutside, replacing });
+        saves = new Saves({ server, song: s, timeline: tl, editsOutside, onReplace });
         draft = toDraft(s);
         tags = s.tags;
         mode = openingMode(s.status);
@@ -213,7 +213,7 @@
   // field would keep showing the old Song, and typing into it would then
   // overwrite the change made elsewhere. Nothing is unsaved, so leaving it
   // saves nothing.
-  function replacing(latest: Song) {
+  function onReplace(latest: Song) {
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     draft = toDraft(latest);
     tags = latest.tags;
