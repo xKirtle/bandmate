@@ -37,8 +37,8 @@ export type TimelineKeyContext = {
   freeze: Freeze;
   /** How many Clips are selected. */
   selected: number;
-  /** The Clip the key was pressed on, if it has focus itself, and whether it's selected. */
-  focusedClip: { selected: boolean } | null;
+  /** The Clip the key was pressed on, if it has focus itself, and whether it's in the Selection. */
+  focusedClip: { inSelection: boolean } | null;
   /** A Track is being dragged by its grip. */
   draggingTrack: boolean;
 };
@@ -62,7 +62,7 @@ export function timelineKey(e: KeyDown, at: TimelineKeyContext): TimelineKey | n
   // Selection if it's in it, else that Clip alone.
   if (at.focusedClip && deletes) {
     if (!edits) return null;
-    return at.focusedClip.selected ? 'deleteSelection' : 'deleteClip';
+    return at.focusedClip.inSelection ? 'deleteSelection' : 'deleteClip';
   }
   // Esc then cancels the drag.
   if (at.draggingTrack) return null;

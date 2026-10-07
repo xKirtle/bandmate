@@ -1,5 +1,5 @@
 import { describe as group, expect, it } from 'vitest';
-import type { KeyDown, KeyPress } from './shortcuts';
+import type { KeyDown } from './shortcuts';
 import {
   addsBox,
   isModifier,
@@ -22,7 +22,13 @@ const held = (mods: Partial<Modifiers> = {}): Modifiers => ({
   ...mods,
 });
 
-const press = (key: string, mods: Partial<Modifiers> = {}): KeyPress => ({ key, ...held(mods) });
+const press = (key: string, mods: Partial<Omit<KeyDown, 'key'>> = {}): KeyDown => ({
+  key,
+  ...held(),
+  repeat: false,
+  defaultPrevented: false,
+  ...mods,
+});
 
 group('rulerSeek', () => {
   const position = 60;
@@ -170,14 +176,6 @@ group('addsBox', () => {
 });
 
 group('timelineKey', () => {
-  const key = (k: string, mods: Partial<Omit<KeyDown, 'key'>> = {}): KeyDown => ({
-    key: k,
-    ...held(),
-    repeat: false,
-    defaultPrevented: false,
-    ...mods,
-  });
-
   // A Timeline at rest on desktop: editable, not frozen, two Clips selected, none focused.
   const idle: TimelineKeyContext = {
     inTextField: false,
@@ -191,155 +189,159 @@ group('timelineKey', () => {
 
   group('Esc', () => {
     it('clears the Selection', () => {
-      expect(timelineKey(key('Escape'), idle)).toBe('clearSelection');
+      expect(timelineKey(press('Escape'), idle)).toBe('clearSelection');
     });
 
     it('is taken only on its own', () => {
-      expect(timelineKey(key('Escape', { shiftKey: true }), idle)).toBeNull();
-      expect(timelineKey(key('Escape', { ctrlKey: true }), idle)).toBeNull();
+      expect(timelineKey(press('Escape', { shiftKey: true }), idle)).toBeNull();
+      expect(timelineKey(press('Escape', { ctrlKey: true }), idle)).toBeNull();
     });
 
     it('is left alone with nothing selected', () => {
-      expect(timelineKey(key('Escape'), { ...idle, selected: 0 })).toBeNull();
+      expect(timelineKey(press('Escape'), { ...idle, selected: 0 })).toBeNull();
     });
 
     it('is left to a text field, a menu or a dialog, or to a Track dragged, which it cancels', () => {
-      expect(timelineKey(key('Escape'), { ...idle, inTextField: true })).toBeNull();
-      expect(timelineKey(key('Escape'), { ...idle, inMenuOrDialog: true })).toBeNull();
-      expect(timelineKey(key('Escape'), { ...idle, draggingTrack: true })).toBeNull();
+      expect(timelineKey(press('Escape'), { ...idle, inTextField: true })).toBeNull();
+      expect(timelineKey(press('Escape'), { ...idle, inMenuOrDialog: true })).toBeNull();
+      expect(timelineKey(press('Escape'), { ...idle, draggingTrack: true })).toBeNull();
     });
 
     it('is left alone once handled', () => {
-      expect(timelineKey(key('Escape', { defaultPrevented: true }), idle)).toBeNull();
+      expect(timelineKey(press('Escape', { defaultPrevented: true }), idle)).toBeNull();
     });
 
     it('is taken in Read mode or on a phone too', () => {
-      expect(timelineKey(key('Escape'), { ...idle, editable: false })).toBe('clearSelection');
+      expect(timelineKey(press('Escape'), { ...idle, editable: false })).toBe('clearSelection');
     });
 
-    it('is taken while recording or merging, leaving the locked Selection as it is', () => {
-      expect(timelineKey(key('Escape'), { ...idle, freeze: 'recording' })).toBe('clearSelection');
-      expect(timelineKey(key('Escape'), { ...idle, freeze: 'merging' })).toBe('clearSelection');
+    it('is taken while recording or merging, leaving the frozen Selection as it is', () => {
+      expect(timelineKey(press('Escape'), { ...idle, freeze: 'recording' })).toBe('clearSelection');
+      expect(timelineKey(press('Escape'), { ...idle, freeze: 'merging' })).toBe('clearSelection');
     });
 
     it('clears the Selection from a focused Clip, in it or not', () => {
-      expect(timelineKey(key('Escape'), { ...idle, focusedClip: { selected: true } })).toBe('clearSelection');
-      expect(timelineKey(key('Escape'), { ...idle, focusedClip: { selected: false } })).toBe('clearSelection');
+      expect(timelineKey(press('Escape'), { ...idle, focusedClip: { inSelection: true } })).toBe('clearSelection');
+      expect(timelineKey(press('Escape'), { ...idle, focusedClip: { inSelection: false } })).toBe('clearSelection');
     });
   });
 
   group('Mod+A', () => {
     it('selects every Clip on Ctrl+A or ⌘A, with or without a Selection', () => {
-      expect(timelineKey(key('a', { ctrlKey: true }), idle)).toBe('selectAll');
-      expect(timelineKey(key('a', { metaKey: true }), idle)).toBe('selectAll');
-      expect(timelineKey(key('A', { ctrlKey: true }), idle)).toBe('selectAll');
-      expect(timelineKey(key('a', { ctrlKey: true }), { ...idle, selected: 0 })).toBe('selectAll');
+      expect(timelineKey(press('a', { ctrlKey: true }), idle)).toBe('selectAll');
+      expect(timelineKey(press('a', { metaKey: true }), idle)).toBe('selectAll');
+      expect(timelineKey(press('A', { ctrlKey: true }), idle)).toBe('selectAll');
+      expect(timelineKey(press('a', { ctrlKey: true }), { ...idle, selected: 0 })).toBe('selectAll');
     });
 
     it('is taken only with Mod alone', () => {
-      expect(timelineKey(key('a'), idle)).toBeNull();
-      expect(timelineKey(key('a', { ctrlKey: true, shiftKey: true }), idle)).toBeNull();
-      expect(timelineKey(key('a', { ctrlKey: true, altKey: true }), idle)).toBeNull();
+      expect(timelineKey(press('a'), idle)).toBeNull();
+      expect(timelineKey(press('a', { ctrlKey: true, shiftKey: true }), idle)).toBeNull();
+      expect(timelineKey(press('a', { ctrlKey: true, altKey: true }), idle)).toBeNull();
     });
 
     it('is left to the page in Read mode or on a phone', () => {
-      expect(timelineKey(key('a', { ctrlKey: true }), { ...idle, editable: false })).toBeNull();
+      expect(timelineKey(press('a', { ctrlKey: true }), { ...idle, editable: false })).toBeNull();
     });
 
     it('is left to a text field, a menu or a dialog, or while a Track is dragged', () => {
-      expect(timelineKey(key('a', { ctrlKey: true }), { ...idle, inTextField: true })).toBeNull();
-      expect(timelineKey(key('a', { ctrlKey: true }), { ...idle, inMenuOrDialog: true })).toBeNull();
-      expect(timelineKey(key('a', { ctrlKey: true }), { ...idle, draggingTrack: true })).toBeNull();
+      expect(timelineKey(press('a', { ctrlKey: true }), { ...idle, inTextField: true })).toBeNull();
+      expect(timelineKey(press('a', { ctrlKey: true }), { ...idle, inMenuOrDialog: true })).toBeNull();
+      expect(timelineKey(press('a', { ctrlKey: true }), { ...idle, draggingTrack: true })).toBeNull();
     });
 
-    it('is taken while recording or merging, leaving the locked Selection as it is', () => {
-      expect(timelineKey(key('a', { ctrlKey: true }), { ...idle, freeze: 'recording' })).toBe('selectAll');
-      expect(timelineKey(key('a', { ctrlKey: true }), { ...idle, freeze: 'merging' })).toBe('selectAll');
+    it('is taken while recording or merging, leaving the frozen Selection as it is', () => {
+      expect(timelineKey(press('a', { ctrlKey: true }), { ...idle, freeze: 'recording' })).toBe('selectAll');
+      expect(timelineKey(press('a', { ctrlKey: true }), { ...idle, freeze: 'merging' })).toBe('selectAll');
     });
 
     it('selects every Clip from a focused Clip, in the Selection or not', () => {
-      expect(timelineKey(key('a', { ctrlKey: true }), { ...idle, focusedClip: { selected: true } })).toBe('selectAll');
-      expect(timelineKey(key('a', { ctrlKey: true }), { ...idle, focusedClip: { selected: false } })).toBe('selectAll');
+      expect(timelineKey(press('a', { ctrlKey: true }), { ...idle, focusedClip: { inSelection: true } })).toBe(
+        'selectAll',
+      );
+      expect(timelineKey(press('a', { ctrlKey: true }), { ...idle, focusedClip: { inSelection: false } })).toBe(
+        'selectAll',
+      );
     });
   });
 
   group('Delete', () => {
-    const inside = { ...idle, focusedClip: { selected: true } };
-    const outside = { ...idle, focusedClip: { selected: false } };
+    const inside = { ...idle, focusedClip: { inSelection: true } };
+    const outside = { ...idle, focusedClip: { inSelection: false } };
 
     it('deletes the Selection on Delete or Backspace, e.g. one made by a box or Mod+A, with no Clip focused', () => {
-      expect(timelineKey(key('Delete'), idle)).toBe('deleteSelection');
-      expect(timelineKey(key('Backspace'), idle)).toBe('deleteSelection');
+      expect(timelineKey(press('Delete'), idle)).toBe('deleteSelection');
+      expect(timelineKey(press('Backspace'), idle)).toBe('deleteSelection');
     });
 
     it('deletes the whole Selection from a focused Clip in it', () => {
-      expect(timelineKey(key('Delete'), inside)).toBe('deleteSelection');
-      expect(timelineKey(key('Backspace'), { ...inside, selected: 1 })).toBe('deleteSelection');
+      expect(timelineKey(press('Delete'), inside)).toBe('deleteSelection');
+      expect(timelineKey(press('Backspace'), { ...inside, selected: 1 })).toBe('deleteSelection');
     });
 
     it('deletes a focused Clip outside the Selection alone', () => {
-      expect(timelineKey(key('Delete'), outside)).toBe('deleteClip');
-      expect(timelineKey(key('Backspace'), { ...outside, selected: 0 })).toBe('deleteClip');
+      expect(timelineKey(press('Delete'), outside)).toBe('deleteClip');
+      expect(timelineKey(press('Backspace'), { ...outside, selected: 0 })).toBe('deleteClip');
     });
 
     it('is taken only on its own', () => {
-      expect(timelineKey(key('Backspace', { ctrlKey: true }), idle)).toBeNull();
-      expect(timelineKey(key('Delete', { shiftKey: true }), idle)).toBeNull();
-      expect(timelineKey(key('Delete', { shiftKey: true }), outside)).toBeNull();
+      expect(timelineKey(press('Backspace', { ctrlKey: true }), idle)).toBeNull();
+      expect(timelineKey(press('Delete', { shiftKey: true }), idle)).toBeNull();
+      expect(timelineKey(press('Delete', { shiftKey: true }), outside)).toBeNull();
     });
 
     it('is left alone with nothing selected and no Clip focused', () => {
-      expect(timelineKey(key('Delete'), { ...idle, selected: 0 })).toBeNull();
+      expect(timelineKey(press('Delete'), { ...idle, selected: 0 })).toBeNull();
     });
 
     it('does nothing in Read mode or on a phone', () => {
       for (const at of [idle, inside, outside]) {
-        expect(timelineKey(key('Delete'), { ...at, editable: false })).toBeNull();
+        expect(timelineKey(press('Delete'), { ...at, editable: false })).toBeNull();
       }
     });
 
     it('does nothing while recording or merging', () => {
       for (const at of [idle, inside, outside]) {
-        expect(timelineKey(key('Delete'), { ...at, freeze: 'recording' })).toBeNull();
-        expect(timelineKey(key('Delete'), { ...at, freeze: 'merging' })).toBeNull();
+        expect(timelineKey(press('Delete'), { ...at, freeze: 'recording' })).toBeNull();
+        expect(timelineKey(press('Delete'), { ...at, freeze: 'merging' })).toBeNull();
       }
     });
 
     it('is left to a text field, a menu or a dialog', () => {
-      expect(timelineKey(key('Backspace'), { ...idle, inTextField: true })).toBeNull();
-      expect(timelineKey(key('Delete'), { ...idle, inMenuOrDialog: true })).toBeNull();
+      expect(timelineKey(press('Backspace'), { ...idle, inTextField: true })).toBeNull();
+      expect(timelineKey(press('Delete'), { ...idle, inMenuOrDialog: true })).toBeNull();
     });
 
     it('does nothing to the Selection while a Track is dragged', () => {
-      expect(timelineKey(key('Delete'), { ...idle, draggingTrack: true })).toBeNull();
+      expect(timelineKey(press('Delete'), { ...idle, draggingTrack: true })).toBeNull();
     });
 
     it('still deletes from a focused Clip while a Track is dragged', () => {
-      expect(timelineKey(key('Delete'), { ...inside, draggingTrack: true })).toBe('deleteSelection');
-      expect(timelineKey(key('Delete'), { ...outside, draggingTrack: true })).toBe('deleteClip');
+      expect(timelineKey(press('Delete'), { ...inside, draggingTrack: true })).toBe('deleteSelection');
+      expect(timelineKey(press('Delete'), { ...outside, draggingTrack: true })).toBe('deleteClip');
     });
   });
 
   group('copy, cut and paste', () => {
-    const copy = key('c', { ctrlKey: true });
-    const cut = key('x', { ctrlKey: true });
-    const paste = key('v', { ctrlKey: true });
+    const copy = press('c', { ctrlKey: true });
+    const cut = press('x', { ctrlKey: true });
+    const paste = press('v', { ctrlKey: true });
 
     it('copies on Ctrl+C or ⌘C, cuts on Ctrl+X or ⌘X, and pastes on Ctrl+V or ⌘V', () => {
       expect(timelineKey(copy, idle)).toBe('copy');
-      expect(timelineKey(key('C', { metaKey: true }), idle)).toBe('copy');
+      expect(timelineKey(press('C', { metaKey: true }), idle)).toBe('copy');
       expect(timelineKey(cut, idle)).toBe('cut');
-      expect(timelineKey(key('X', { metaKey: true }), idle)).toBe('cut');
+      expect(timelineKey(press('X', { metaKey: true }), idle)).toBe('cut');
       expect(timelineKey(paste, idle)).toBe('paste');
-      expect(timelineKey(key('v', { metaKey: true }), idle)).toBe('paste');
+      expect(timelineKey(press('v', { metaKey: true }), idle)).toBe('paste');
     });
 
     it('is taken only with Mod alone', () => {
-      expect(timelineKey(key('c'), idle)).toBeNull();
-      expect(timelineKey(key('x'), idle)).toBeNull();
-      expect(timelineKey(key('x', { ctrlKey: true, shiftKey: true }), idle)).toBeNull();
-      expect(timelineKey(key('v', { ctrlKey: true, shiftKey: true }), idle)).toBeNull();
-      expect(timelineKey(key('c', { ctrlKey: true, altKey: true }), idle)).toBeNull();
+      expect(timelineKey(press('c'), idle)).toBeNull();
+      expect(timelineKey(press('x'), idle)).toBeNull();
+      expect(timelineKey(press('x', { ctrlKey: true, shiftKey: true }), idle)).toBeNull();
+      expect(timelineKey(press('v', { ctrlKey: true, shiftKey: true }), idle)).toBeNull();
+      expect(timelineKey(press('c', { ctrlKey: true, altKey: true }), idle)).toBeNull();
     });
 
     it('copies and cuts only a Selection, but pastes with nothing selected', () => {
@@ -373,7 +375,7 @@ group('timelineKey', () => {
 
     it('copies and cuts the Selection from a focused Clip, in it or not', () => {
       for (const selected of [true, false]) {
-        const at = { ...idle, focusedClip: { selected } };
+        const at = { ...idle, focusedClip: { inSelection: selected } };
         expect(timelineKey(copy, at)).toBe('copy');
         expect(timelineKey(cut, at)).toBe('cut');
         expect(timelineKey(paste, at)).toBe('paste');
@@ -381,16 +383,16 @@ group('timelineKey', () => {
     });
 
     it('copies and cuts nothing from a focused Clip with nothing selected', () => {
-      const at = { ...idle, selected: 0, focusedClip: { selected: false } };
+      const at = { ...idle, selected: 0, focusedClip: { inSelection: false } };
       expect(timelineKey(copy, at)).toBeNull();
       expect(timelineKey(cut, at)).toBeNull();
     });
   });
 
   group("a Clip's menu key", () => {
-    const inside = { ...idle, focusedClip: { selected: true } };
-    const outside = { ...idle, focusedClip: { selected: false } };
-    const menuKeys = [key('ContextMenu'), key('F10', { shiftKey: true })];
+    const inside = { ...idle, focusedClip: { inSelection: true } };
+    const outside = { ...idle, focusedClip: { inSelection: false } };
+    const menuKeys = [press('ContextMenu'), press('F10', { shiftKey: true })];
 
     it("opens a focused Clip's menu on the Menu key or Shift+F10, in the Selection or not", () => {
       for (const k of menuKeys) {
@@ -401,9 +403,9 @@ group('timelineKey', () => {
     });
 
     it('is taken only with its exact modifiers', () => {
-      expect(timelineKey(key('F10'), outside)).toBeNull();
-      expect(timelineKey(key('ContextMenu', { altKey: true }), outside)).toBeNull();
-      expect(timelineKey(key('F10', { shiftKey: true, ctrlKey: true }), outside)).toBeNull();
+      expect(timelineKey(press('F10'), outside)).toBeNull();
+      expect(timelineKey(press('ContextMenu', { altKey: true }), outside)).toBeNull();
+      expect(timelineKey(press('F10', { shiftKey: true, ctrlKey: true }), outside)).toBeNull();
     });
 
     it('is left alone with no Clip focused', () => {
@@ -434,8 +436,8 @@ group('timelineKey', () => {
   });
 
   it('leaves other keys alone', () => {
-    const focused = { ...idle, focusedClip: { selected: true } };
-    for (const k of [key('Enter'), key('d'), key('z', { ctrlKey: true }), key(' ')]) {
+    const focused = { ...idle, focusedClip: { inSelection: true } };
+    for (const k of [press('Enter'), press('d'), press('z', { ctrlKey: true }), press(' ')]) {
       expect(timelineKey(k, idle)).toBeNull();
       expect(timelineKey(k, focused)).toBeNull();
     }

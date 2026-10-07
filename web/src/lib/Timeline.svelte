@@ -1300,19 +1300,32 @@
       editable: editable.current,
       freeze,
       selected: selection.size,
-      focusedClip: clip && { selected: selection.has(clip.id) },
+      focusedClip: clip && { inSelection: selection.has(clip.id) },
       draggingTrack: trackDrag.current !== null,
     });
     if (!action) return;
     event.preventDefault();
-    if (action === 'clearSelection') selection.apply({ kind: 'clear' });
-    else if (action === 'selectAll') selection.apply({ kind: 'all' });
-    else if (action === 'deleteSelection') removeSelection();
-    else if (action === 'deleteClip') remove(clip!);
-    else if (action === 'copy') copySelection();
-    else if (action === 'cut') cutSelection();
-    else if (action === 'paste') pasteClipboard();
-    else openClipMenu(clip!, event.target as HTMLElement);
+    switch (action) {
+      case 'clearSelection':
+        return selection.apply({ kind: 'clear' });
+      case 'selectAll':
+        return selection.apply({ kind: 'all' });
+      case 'deleteSelection':
+        return removeSelection();
+      case 'copy':
+        return copySelection();
+      case 'cut':
+        return cutSelection();
+      case 'paste':
+        return pasteClipboard();
+      // Only ever given with a focused Clip.
+      case 'deleteClip':
+        return clip && remove(clip);
+      case 'clipMenu':
+        return clip && openClipMenu(clip, event.target as HTMLElement);
+      default:
+        return action satisfies never;
+    }
   }
 
   /** The Clip a key was pressed on, if it has focus itself, not e.g. its ⋯ or its name's field. */
