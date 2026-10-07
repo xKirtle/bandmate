@@ -1,7 +1,8 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { APIRequestContext, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import type { Bandmate, Clip as SharedClip } from '../bandmate';
 import { toneWav } from '../beats';
 import { failRequests } from '../faults';
 import { expect, test } from '../fixtures';
@@ -51,34 +52,14 @@ interface Take {
   latencyOffset: number;
 }
 
-/** A Clip as the Timeline has it, in seconds. */
-interface Clip {
-  id: number;
-  start: number;
-  offset: number;
-  length: number;
-  takes: Take[];
-  activeTakeId: number | null;
-}
+/** A Clip of Takes, in seconds, with the Takes the shared Clip leaves to tests to read. */
+type Clip = SharedClip & { takes: Take[]; activeTakeId: number | null };
 
-interface Track {
-  id: number;
-  name: string;
-  clips: Clip[];
-}
-
-/** A Song's Timeline's Tracks, top to bottom, read back from the server. */
-async function tracks(request: APIRequestContext, songId: number): Promise<Track[]> {
-  const res = await request.get(`/api/songs/${songId}/timeline`);
-  expect(res.ok()).toBe(true);
-  return ((await res.json()) as { tracks: Track[] }).tracks;
-}
-
-/** A Track's Clips, read back from the server. */
-async function clipsOn(request: APIRequestContext, songId: number, name: string): Promise<Clip[]> {
-  const track = (await tracks(request, songId)).find((t) => t.name === name);
+/** A Track's Clips, as the server has them now. */
+async function clipsOn(bandmate: Bandmate, songId: number, name: string): Promise<Clip[]> {
+  const track = (await bandmate.timeline(songId)).tracks.find((t) => t.name === name);
   if (!track) throw new Error(`No Track ${name}`);
-  return track.clips;
+  return track.clips as Clip[];
 }
 
 const timeline = (page: Page) => page.getByRole('region', { name: 'Timeline' });
@@ -168,7 +149,6 @@ function expectWholeTake(c: Clip) {
 test('calibration offered before the first recording can be skipped, and is not offered again', async ({
   page,
   bandmate,
-  request,
 }) => {
   const song = await bandmate.song({ title: 'Anthem' });
   await open(page, song.id);
@@ -198,14 +178,10 @@ test('calibration offered before the first recording can be skipped, and is not 
   await record(page, () => recordButton(page).click(), 5 + 1);
   await expect(offer).toHaveCount(0);
   await expect(clip(page, 'Take 1')).toHaveCount(2);
-  expect(await clipsOn(request, song.id, 'Track 1')).toHaveLength(2);
+  expect(await clipsOn(bandmate, song.id, 'Track 1')).toHaveLength(2);
 });
 
-test('a Take records on the Chosen Track at the playhead, or after its last Clip', async ({
-  page,
-  bandmate,
-  request,
-}) => {
+test('a Take records on the Chosen Track at the playhead, or after its last Clip', async ({ page, bandmate }) => {
   const song = await bandmate.song({ title: 'Anthem' });
   await open(page, song.id);
   // A Track added is chosen; Track 1 is chosen back.
@@ -218,8 +194,8 @@ test('a Take records on the Chosen Track at the playhead, or after its last Clip
   await record(page, () => recordButton(page).click(), 5 + 2, { skip: true });
 
   await expect(clip(page, 'Take 1')).toHaveAccessibleName(/^Take 1, 0:05 to \d+:\d\d$/);
-  const [made] = await clipsOn(request, song.id, 'Track 1');
-  expect(await clipsOn(request, song.id, 'Track 2')).toEqual([]);
+  const [made] = await clipsOn(bandmate, song.id, 'Track 1');
+  expect(await clipsOn(bandmate, song.id, 'Track 2')).toEqual([]);
   expect(made.takes).toHaveLength(1);
   expectSung(made, 5, minSung);
 
@@ -229,18 +205,18 @@ test('a Take records on the Chosen Track at the playhead, or after its last Clip
   const end = made.start + made.length;
   await record(page, () => recordButton(page).click(), Math.ceil(end) + 1);
 
-  const [first, second] = await clipsOn(request, song.id, 'Track 1');
+  const [first, second] = await clipsOn(bandmate, song.id, 'Track 1');
   expect([first.id, first.start, first.length]).toEqual([made.id, made.start, made.length]);
   // Stopped once the playhead passed the second after `end` rounds up to.
   expectSung(second, end, 0.4);
 });
 
-test('a Retake records into its Clip, from its start, growing it', async ({ page, bandmate, request }) => {
+test('a Retake records into its Clip, from its start, growing it', async ({ page, bandmate }) => {
   const song = await bandmate.song({ title: 'Anthem' });
   await open(page, song.id);
   await seek(page, 5);
   await record(page, () => recordButton(page).click(), 5 + 1, { skip: true });
-  const [before] = await clipsOn(request, song.id, 'Track 1');
+  const [before] = await clipsOn(bandmate, song.id, 'Track 1');
   // Seeked away, a Retake still starts from its Clip's start.
   await timeline(page).getByRole('button', { name: 'Go to the start' }).click();
 
@@ -258,7 +234,7 @@ test('a Retake records into its Clip, from its start, growing it', async ({ page
   // The same Clip, playing its second Take, now longer.
   await expect(clip(page, 'Take 2')).toHaveAccessibleName(/^Take 2(, selected)?, 0:05 to /);
   await expect(clip(page, 'Take 1')).toHaveCount(0);
-  const [after, ...others] = await clipsOn(request, song.id, 'Track 1');
+  const [after, ...others] = await clipsOn(bandmate, song.id, 'Track 1');
   expect(others).toEqual([]);
   expect(after.id).toBe(before.id);
   expect(after.takes.map((t) => t.number)).toEqual([1, 2]);
@@ -267,7 +243,7 @@ test('a Retake records into its Clip, from its start, growing it', async ({ page
   expectSung(after, 5, before.length + 1);
 });
 
-test('stopping during the lead-in keeps nothing, and says so', async ({ page, bandmate, request }) => {
+test('stopping during the lead-in keeps nothing, and says so', async ({ page, bandmate }) => {
   const song = await bandmate.song({ title: 'Anthem' });
   await open(page, song.id);
   await seek(page, 5);
@@ -281,14 +257,14 @@ test('stopping during the lead-in keeps nothing, and says so', async ({ page, ba
     'Recording stopped during the lead-in, so there was nothing to keep.',
   );
   await expect(recordButton(page)).toBeEnabled();
-  expect(await clipsOn(request, song.id, 'Track 1')).toEqual([]);
+  expect(await clipsOn(bandmate, song.id, 'Track 1')).toEqual([]);
   // Nor is it offered back as unsaved.
   await page.reload();
   await expect(recordButton(page)).toBeEnabled();
   await expect(page.getByText(/^Recovered \d+ unsaved/)).toHaveCount(0);
 });
 
-test('a Take whose save fails is offered back, and kept after a reload', async ({ page, bandmate, request }) => {
+test('a Take whose save fails is offered back, and kept after a reload', async ({ page, bandmate }) => {
   const song = await bandmate.song({ title: 'Anthem' });
   await open(page, song.id);
   await seek(page, 5);
@@ -301,7 +277,7 @@ test('a Take whose save fails is offered back, and kept after a reload', async (
   await expect(offer).toBeVisible();
   await expect(page.getByRole('alert')).toContainText('Injected failure');
   await expect(clip(page, 'Take 1')).toHaveCount(0);
-  expect(await clipsOn(request, song.id, 'Track 1')).toEqual([]);
+  expect(await clipsOn(bandmate, song.id, 'Track 1')).toEqual([]);
 
   // Kept in the browser, it's offered again once the page reloads.
   await page.reload();
@@ -310,7 +286,7 @@ test('a Take whose save fails is offered back, and kept after a reload', async (
 
   await expect(offer).toBeHidden();
   await expect(clip(page, 'Take 1')).toHaveAccessibleName(/^Take 1, 0:05 to \d+:\d\d$/);
-  const [kept, ...others] = await clipsOn(request, song.id, 'Track 1');
+  const [kept, ...others] = await clipsOn(bandmate, song.id, 'Track 1');
   expect(others).toEqual([]);
   expectSung(kept, 5, minSung);
   // Kept, it's no longer offered.
@@ -319,11 +295,7 @@ test('a Take whose save fails is offered back, and kept after a reload', async (
   await expect(offer).toHaveCount(0);
 });
 
-test('undoing a new Take takes it away and returns the playhead to where it started', async ({
-  page,
-  bandmate,
-  request,
-}) => {
+test('undoing a new Take takes it away and returns the playhead to where it started', async ({ page, bandmate }) => {
   const song = await bandmate.song({ title: 'Anthem' });
   await open(page, song.id);
   await seek(page, 5);
@@ -337,5 +309,5 @@ test('undoing a new Take takes it away and returns the playhead to where it star
   await expect(clip(page, 'Take 1')).toHaveCount(0);
   await expect(ruler(page)).toHaveAttribute('aria-valuenow', '5');
   await expect(ruler(page)).toHaveAttribute('aria-valuetext', /^0:05 of /);
-  expect(await clipsOn(request, song.id, 'Track 1')).toEqual([]);
+  expect(await clipsOn(bandmate, song.id, 'Track 1')).toEqual([]);
 });
