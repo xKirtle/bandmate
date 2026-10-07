@@ -94,6 +94,12 @@ describe('mergeTarget', () => {
     expect(mergeTarget(crowded, new Set([5, 9, 11]))).toMatchObject({ onto: { trackId: 4 }, start: 0, end: 54 });
   });
 
+  it("doesn't count a neighbour as in the way when rounding leaves it overlapping by less than the server's tolerance", () => {
+    // A drag left 6 ending a hair past 7's start, which the server stored.
+    const touching = [track(1, [clip(5, 0), clip(6, 8.590000000000003), clip(7, 18.59)]), track(2)];
+    expect(mergeTarget(touching, new Set([5, 6]))).toMatchObject({ onto: { trackId: 1 } });
+  });
+
   it('goes on a new Track right below the lowest of theirs, named like any new Track, when none of theirs has room', () => {
     // 0 to 24, where Track 1's 6 and Track 2's 7 are in the way.
     const crowded = [
