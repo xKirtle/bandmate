@@ -7,7 +7,7 @@
   import { tick, untrack, type Snippet } from 'svelte';
   import ActionsMenu from './ActionsMenu.svelte';
   import AlternateText, { type Cueing } from './AlternateText.svelte';
-  import { api, suggestedLabels, type Alternate, type Section, type Song, type SongAt } from './api';
+  import { suggestedLabels, type Alternate, type Section } from './api';
   import Combobox from './Combobox.svelte';
   import type { LyricSheetEditing } from './lyricSheetEditing.svelte';
   import type { MenuAction } from './menu';
@@ -18,7 +18,6 @@
   let {
     section,
     autofocus = false,
-    change,
     editing,
     grip,
     actions,
@@ -26,14 +25,11 @@
     cueing,
     drag,
     places = [],
-    onEditing,
   }: {
     section: Section;
     /** Focus the Label when this becomes true, e.g. for a Section just added. */
     autofocus?: boolean;
-    /** Sends a Lyric Sheet change; resolves to whether it succeeded. */
-    change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
-    /** Saves the Lines typed, and holds the edits typed here while they aren't saved. */
+    /** Makes the Section's changes, saves the Lines typed, and holds the edits typed here while they aren't saved. */
     editing: LyricSheetEditing;
     /** Given, shows first in the header, e.g. a handle to drag the Section by. */
     grip?: Snippet;
@@ -47,12 +43,6 @@
     drag?: SectionDragging;
     /** Where in the Lyric Sheet an inactive Alternate can be moved to, as a Section of its own. */
     places?: Place[];
-    /**
-     * Hears the Section being changed, or its Alternates opening, e.g. to end
-     * Sync mode. Saving its Lines' text isn't heard: Sync mode keeps them
-     * read-only, but may come on while an edit typed before is still saving.
-     */
-    onEditing?: () => void;
   } = $props();
 
   // The server guarantees exactly one active Alternate.
@@ -73,11 +63,6 @@
     if (!editingLabel) label = l;
   });
 
-  function edit(op: (at: SongAt) => Promise<Song>): Promise<boolean> {
-    onEditing?.();
-    return change(op);
-  }
-
   async function commitLabel() {
     editingLabel = false;
     const next = label.trim();
@@ -85,11 +70,11 @@
       label = section.label;
       return;
     }
-    if (!(await edit((at) => api.setSectionLabel(at, section.id, next)))) label = section.label;
+    if (!(await editing.change({ kind: 'setSectionLabel', sectionId: section.id, label: next }))) label = section.label;
   }
 
   async function addAlternate() {
-    if (!(await edit((at) => api.addAlternate(at, section.id)))) return;
+    if (!(await editing.change({ kind: 'addAlternate', sectionId: section.id }))) return;
     // The copy is active now, as the last card: ready to be renamed.
     await tick();
     const name = document.getElementById(`name-${section.id}-${active.id}`);
@@ -98,7 +83,7 @@
   }
 
   async function startChoosing() {
-    onEditing?.();
+    editing.alternatesOpened();
     choosing = true;
     await tick();
     // Straight to the choice, where the arrow keys go through the Alternates.
@@ -124,13 +109,13 @@
       input.value = alt.name;
       return;
     }
-    if (!(await edit((at) => api.renameAlternate(at, alt.id, next)))) input.value = alt.name;
+    if (!(await editing.change({ kind: 'renameAlternate', alternateId: alt.id, name: next }))) input.value = alt.name;
   }
 
   async function choose(alt: Alternate) {
     if (alt.active) return;
     const previous = active.id;
-    if (await edit((at) => api.activateAlternate(at, alt.id))) return;
+    if (await editing.change({ kind: 'activateAlternate', alternateId: alt.id })) return;
     // Put the choice back as the server has it.
     const picked = radio(alt.id);
     const kept = radio(previous);
@@ -153,17 +138,19 @@
     const ok = confirm(`Delete ${alternateName(section, alt)} for good?\n\nIts Lines go with it. It can't be undone.`);
     if (!ok) return;
     // Its ⋯ goes with it: the keyboard carries on from the active card.
-    if (await edit((at) => api.deleteAlternate(at, alt.id))) radio(active.id)?.focus();
+    if (await editing.change({ kind: 'deleteAlternate', alternateId: alt.id })) radio(active.id)?.focus();
   }
 
   async function moveToScrapbook(alt: Alternate) {
     // Its ⋯ goes with it: the keyboard carries on from the active card.
-    if (await edit((at) => api.moveAlternateToScrapbook(at, alt.id))) radio(active.id)?.focus();
+    if (await editing.change({ kind: 'moveAlternateToScrapbook', alternateId: alt.id })) radio(active.id)?.focus();
   }
 
   async function moveToArrangement(alt: Alternate, position: number) {
     // Its ⋯ goes with it: the keyboard carries on from the active card.
-    if (await edit((at) => api.moveAlternateToArrangement(at, alt.id, position))) radio(active.id)?.focus();
+    if (await editing.change({ kind: 'moveAlternateToArrangement', alternateId: alt.id, position })) {
+      radio(active.id)?.focus();
+    }
   }
 
   // Dragged by its card's grip, an inactive Alternate goes into a gap in the

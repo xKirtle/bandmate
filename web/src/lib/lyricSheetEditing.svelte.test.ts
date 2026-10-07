@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Song } from './api';
+import type { LyricSheetChange } from './lyricSheetChanges';
 import { LyricSheetEditing } from './lyricSheetEditing.svelte';
 import { Saves } from './saves.svelte';
 import { emptySong, FakeSongServer } from './songServerFake';
@@ -38,13 +39,17 @@ const withText = (song: Song, text: string): Partial<Song> => {
   return { sections: [{ ...verse, alternates: [{ ...alternate, lines }] }] };
 };
 
-/** Lyric Sheet editing on top of Saves for the Song the server holds, as the Song page makes it. */
+/**
+ * Lyric Sheet editing on top of Saves for the Song the server holds, as the
+ * Song page makes it, with how many times it ended Sync mode.
+ */
 async function editingFor(server: FakeSongServer) {
   const [song, timeline] = await Promise.all([server.getSong(), server.getTimeline()]);
   let editing: LyricSheetEditing | null = null;
   const saves = new Saves({ server, song, timeline, editsOutside: () => editing?.unsaved ?? false });
-  editing = new LyricSheetEditing(saves);
-  return { saves, editing };
+  const sync = { ended: 0 };
+  editing = new LyricSheetEditing(saves, () => sync.ended++);
+  return { saves, editing, sync };
 }
 
 /** Lets everything waiting on the fake server's answers run. */
@@ -254,5 +259,180 @@ describe("Lyric Sheet editing, the Lyric Sheet's edits not saved yet", () => {
     expect(saves.stale).toBe(true);
     expect(saves.song.title).toBe('Untitled');
     expect(box.text).toBe('One\nTwo\nThree');
+  });
+});
+
+/** The Verse in the Arrangement, as verseSong has it, and the Bridge in the Scrapbook, of one Alternate, Lines 20 and 21. */
+const withBridge = () => {
+  const song = verseSong();
+  const bridge = {
+    id: 2,
+    label: 'Bridge',
+    alternates: [
+      {
+        id: 2,
+        name: '',
+        active: true,
+        lines: [
+          { id: 20, text: 'Up', lyrics: 'Up', chords: [], chordLine: false, cue: null },
+          { id: 21, text: 'Down', lyrics: 'Down', chords: [], chordLine: false, cue: 12 },
+        ],
+      },
+    ],
+  };
+  return { ...song, sections: [...song.sections, bridge], scrapbook: [2] };
+};
+
+describe('Lyric Sheet editing, the structure of the Lyric Sheet', () => {
+  it('adds a Section to the Arrangement, which a caller awaiting it finds there', async () => {
+    const server = new FakeSongServer(verseSong());
+    const { saves, editing } = await editingFor(server);
+    expect(await editing.change({ kind: 'addSection', position: 0 })).toBe(true);
+    const added = saves.song.arrangement[0];
+    expect(saves.song.arrangement).toEqual([added, 1]);
+    expect(server.song.arrangement).toEqual([added, 1]);
+    const section = saves.song.sections.find((s) => s.id === added)!;
+    expect(section.label).toBe('');
+    expect(section.alternates).toHaveLength(1);
+    expect(section.alternates[0].active).toBe(true);
+  });
+
+  it('takes a Section out of the Arrangement to the Scrapbook, or deletes it if nothing is written in it', async () => {
+    const server = new FakeSongServer(verseSong());
+    const { saves, editing } = await editingFor(server);
+    await editing.change({ kind: 'addSection' });
+    const empty = saves.song.arrangement[1];
+    expect(await editing.change({ kind: 'removeFromArrangement', sectionId: empty })).toBe(true);
+    expect(saves.song.sections.map((s) => s.id)).toEqual([1]);
+    expect(saves.song.scrapbook).toEqual([]);
+    expect(await editing.change({ kind: 'removeFromArrangement', sectionId: 1 })).toBe(true);
+    expect(saves.song.arrangement).toEqual([]);
+    expect(saves.song.scrapbook).toEqual([1]);
+  });
+
+  it("adds a Section to another, its Alternates joining the other's, inactive, named by its Label", async () => {
+    const server = new FakeSongServer(withBridge());
+    const { saves, editing } = await editingFor(server);
+    expect(await editing.change({ kind: 'addToSection', sectionId: 2, targetId: 1 })).toBe(true);
+    expect(saves.song.scrapbook).toEqual([]);
+    expect(saves.song.sections.map((s) => s.id)).toEqual([1]);
+    const [own, joined] = saves.song.sections[0].alternates;
+    expect(own.active).toBe(true);
+    expect(joined).toMatchObject({ name: 'Bridge', active: false });
+    expect(joined.id).not.toBe(2);
+    expect(joined.lines.map((l) => [l.id, l.text, l.cue])).toEqual([
+      [20, 'Up', null],
+      [21, 'Down', 12],
+    ]);
+  });
+
+  it('fails a change the fake leaves out as not modelled', async () => {
+    const server = new FakeSongServer(verseSong());
+    const { saves, editing } = await editingFor(server);
+    expect(await editing.change({ kind: 'addAlternate', sectionId: 1 })).toBe(false);
+    expect(saves.saveError).toMatch(/addAlternate is not modelled/);
+  });
+});
+
+describe('Lyric Sheet editing, Sync mode', () => {
+  // Every change the GLOSSARY says ends Sync mode: to the Arrangement or a
+  // Section, moving a Section or an Alternate between the Scrapbook and the
+  // Arrangement, and adding a Section in the Scrapbook.
+  const ending: LyricSheetChange[] = [
+    { kind: 'addSection' },
+    { kind: 'duplicateSection', sectionId: 1 },
+    { kind: 'reorderArrangement', order: [1] },
+    { kind: 'removeFromArrangement', sectionId: 1 },
+    { kind: 'addToSection', sectionId: 2, targetId: 1 },
+    { kind: 'setSectionLabel', sectionId: 1, label: 'Chorus' },
+    { kind: 'addAlternate', sectionId: 1 },
+    { kind: 'renameAlternate', alternateId: 1, name: 'Darker' },
+    { kind: 'activateAlternate', alternateId: 1 },
+    { kind: 'deleteAlternate', alternateId: 1 },
+    { kind: 'moveAlternateToScrapbook', alternateId: 1 },
+    { kind: 'moveAlternateToArrangement', alternateId: 1, position: 0 },
+    { kind: 'addToScrapbook' },
+    { kind: 'addToArrangement', sectionId: 2, position: 0 },
+  ];
+
+  it.each(ending.map((c) => [c.kind, c] as const))('ends it as %s is asked for', async (_, change) => {
+    const server = new FakeSongServer(withBridge());
+    const { editing, sync } = await editingFor(server);
+    const changing = editing.change(change);
+    expect(sync.ended).toBe(1);
+    await changing;
+  });
+
+  it('leaves it on for deleting a Scrapbook Section, a text save, or a Cue change', async () => {
+    const server = new FakeSongServer(withBridge());
+    const { saves, editing, sync } = await editingFor(server);
+    expect(await editing.change({ kind: 'deleteSection', sectionId: 2 })).toBe(true);
+    const box = editing.textBox(1, 1);
+    box.focus();
+    box.type('One\nTwo\nThree');
+    box.blur();
+    await settled();
+    expect(await saves.cue({ kind: 'setLineCue', lineId: 10, cue: 1 }, 'the Cue of Line 1 of Verse')).toBe(true);
+    expect(sync.ended).toBe(0);
+    expect(server.song.sections.map((s) => s.id)).toEqual([1]);
+    expect(textOf(server.song)).toBe('One\nTwo\nThree');
+  });
+
+  it('ends it as a Scrapbook Section or Alternates mode opens', async () => {
+    const server = new FakeSongServer(withBridge());
+    const { editing, sync } = await editingFor(server);
+    editing.scrapbookSectionOpened();
+    expect(sync.ended).toBe(1);
+    editing.alternatesOpened();
+    expect(sync.ended).toBe(2);
+    expect(server.landed).toBe(0);
+  });
+});
+
+describe('Lyric Sheet editing, saving waiting text first', () => {
+  it('sends the Lines text still waiting in a Section before adding it to another, in order', async () => {
+    const server = new FakeSongServer(withBridge());
+    const { saves, editing } = await editingFor(server);
+    const box = editing.textBox(2, 2);
+    box.focus();
+    box.type('Up\nDown\nAround');
+    // No blur: a drag by the grip leaves the text box focused.
+    expect(await editing.change({ kind: 'addToSection', sectionId: 2, targetId: 1 })).toBe(true);
+    expect(server.landed).toBe(2);
+    const joined = server.song.sections[0].alternates[1];
+    expect(joined.lines.map((l) => l.text)).toEqual(['Up', 'Down', 'Around']);
+    expect(saves.saveError).toBeNull();
+    // Nothing is sent again as typing's pause comes round, or as the box closes.
+    box.close();
+    await vi.advanceTimersByTimeAsync(800);
+    expect(server.landed).toBe(2);
+    expect(editing.unsaved).toBe(false);
+  });
+
+  it('sends a failed save in the Section again before adding it to another', async () => {
+    const server = new FakeSongServer(withBridge());
+    const { editing } = await editingFor(server);
+    const box = editing.textBox(2, 2);
+    box.focus();
+    server.failNext(1);
+    box.type('Up\nDown\nAround');
+    await vi.advanceTimersByTimeAsync(800);
+    expect(server.landed).toBe(0);
+    expect(await editing.change({ kind: 'addToSection', sectionId: 2, targetId: 1 })).toBe(true);
+    const joined = server.song.sections[0].alternates[1];
+    expect(joined.lines.map((l) => l.text)).toEqual(['Up', 'Down', 'Around']);
+  });
+
+  it("leaves text waiting in another Section's box to save as it would", async () => {
+    const server = new FakeSongServer(withBridge());
+    const { editing } = await editingFor(server);
+    const box = editing.textBox(1, 1);
+    box.focus();
+    box.type('One\nTwo\nThree');
+    expect(await editing.change({ kind: 'addToSection', sectionId: 2, targetId: 1 })).toBe(true);
+    expect(server.landed).toBe(1);
+    await vi.advanceTimersByTimeAsync(800);
+    expect(server.landed).toBe(2);
+    expect(textOf(server.song)).toBe('One\nTwo\nThree');
   });
 });

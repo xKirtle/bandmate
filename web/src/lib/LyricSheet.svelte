@@ -11,7 +11,7 @@
   import { untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import type { Cueing } from './AlternateText.svelte';
-  import { api, type Line, type Section, type Song, type SongAt } from './api';
+  import type { Line, Section, Song } from './api';
   import type { CueChange } from './cueChanges';
   import {
     canShiftCuesEarlier,
@@ -56,7 +56,6 @@
   let {
     song,
     mode,
-    change,
     drag,
     changeCues,
     editing,
@@ -72,8 +71,6 @@
     song: Song;
     /** The Song page's mode: Write edits the raw text; Read shows Chords above the lyrics. */
     mode: Mode;
-    /** Sends a Lyric Sheet change; resolves to whether it succeeded. */
-    change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
     /** The drag of a Section, shared with the Scrapbook. */
     drag: SectionDragging;
     /**
@@ -82,7 +79,11 @@
      * has to be taken back; resolves to whether it was saved.
      */
     changeCues: (change: CueChange, what: string) => Promise<boolean>;
-    /** Saves the Lines typed, and holds the edits typed into the Lyric Sheet while they aren't saved. */
+    /**
+     * Makes every change to the Lyric Sheet, ending Sync mode as it does,
+     * saves the Lines typed, and holds the edits typed into the Lyric Sheet
+     * while they aren't saved.
+     */
     editing: LyricSheetEditing;
     /** Where the Timeline is playing, in seconds; null while it isn't. */
     playhead?: number | null;
@@ -98,7 +99,7 @@
     recording?: boolean;
     /**
      * Whether Sync mode is on, e.g. to keep recording from starting. Switched
-     * off from outside, it ends, e.g. as a Section in the Scrapbook opens.
+     * off from outside, it ends, e.g. as Lyric Sheet editing changes the lyrics.
      */
     syncing?: boolean;
     /** Switches the Timeline's Loop off, as Sync mode comes on. */
@@ -144,7 +145,7 @@
     actions.push({
       icon: X,
       ...removal(section),
-      run: () => edit((at) => api.removeFromArrangement(at, section.id)),
+      run: () => editing.change({ kind: 'removeFromArrangement', sectionId: section.id }),
     });
     return actions;
   }
@@ -252,18 +253,6 @@
     if (!canSync || loopOn) untrack(() => (syncing = false));
   });
 
-  // Sync mode is only for cueing, so changing the lyrics ends it, playback
-  // carrying on: any change to the Arrangement or a Section in it, and
-  // opening a Section's Alternates. Cue edits go through changeCues, so never
-  // end it, and nor does saving Line text typed before it came on.
-  function endSyncing() {
-    syncing = false;
-  }
-  function edit(op: (at: SongAt) => Promise<Song>): Promise<boolean> {
-    endSyncing();
-    return change(op);
-  }
-
   // What the Line up next is worked out from: the Line last cued, or a Line
   // picked by clicking it. It doesn't follow playback, so playback can start
   // anywhere, and the Line up next only moves on as Lines are cued, whether
@@ -358,21 +347,21 @@
   const size = $derived(lyricSize.value);
 
   async function add(position: number) {
-    if (await edit((at) => api.addSection(at, { position }))) {
+    if (await editing.change({ kind: 'addSection', position })) {
       added = song.arrangement[position] ?? null;
     }
   }
 
   /** Duplicates a Section at position in the Arrangement, or at the end. */
   async function duplicate(sectionId: number, position?: number) {
-    if (await edit((at) => api.duplicateSection(at, sectionId, position))) {
+    if (await editing.change({ kind: 'duplicateSection', sectionId, position })) {
       added = (position === undefined ? song.arrangement.at(-1) : song.arrangement[position]) ?? null;
     }
   }
 
   function move(index: number, by: -1 | 1) {
     const order = moveTo(song.arrangement, index, index + by);
-    edit((at) => api.reorderArrangement(at, order));
+    editing.change({ kind: 'reorderArrangement', order });
   }
 
   // On desktop, a Section is also dragged by the grip on its header: within
@@ -389,7 +378,7 @@
     if ('reorder' in drop) {
       const { from, to } = drop.reorder;
       const order = moveTo(song.arrangement, from, to);
-      edit((at) => api.reorderArrangement(at, order));
+      editing.change({ kind: 'reorderArrangement', order });
     } else if ('toScrapbook' in drop) {
       toScrapbook(drop.toScrapbook);
     } else if ('addTo' in drop && 'arrangementAt' in drop.addTo.dragged) {
@@ -409,7 +398,7 @@
     const focused = document.activeElement;
     if (focused instanceof HTMLElement && focused.closest(`[data-section="${section.id}"]`)) focused.blur();
     const said = addedNotice(section, to);
-    if (await edit((at) => api.addToSection(at, section.id, to.id))) notice = said;
+    if (await editing.change({ kind: 'addToSection', sectionId: section.id, targetId: to.id })) notice = said;
   }
 
   // Dropped on the Scrapbook, a Section goes to its end, or isn't kept if
@@ -419,7 +408,7 @@
     if (!section) return;
     const empty = isEmpty(section);
     const name = describe(section);
-    if ((await edit((at) => api.removeFromArrangement(at, section.id))) && empty) {
+    if ((await editing.change({ kind: 'removeFromArrangement', sectionId: section.id })) && empty) {
       notice = `Nothing was written in ${name}, so it wasn't kept.`;
     }
   }
@@ -560,8 +549,6 @@
             <SectionEditor
               {section}
               autofocus={added === section.id}
-              {change}
-              onEditing={endSyncing}
               {editing}
               cueing={cueingFor(section)}
               more={sectionActions(section, i)}
