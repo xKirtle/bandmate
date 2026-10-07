@@ -449,15 +449,25 @@ async function number(page, places, { first = 1, into } = {}) {
   await page.context().close();
 }
 
+// A phone, held upright.
+const phone = {
+  colorScheme: "dark",
+  viewport: { width: 390, height: 844 },
+  deviceScaleFactor: 2,
+  isMobile: true,
+  hasTouch: true,
+};
+
+// The Songs page on a phone, listing every Song.
+{
+  const page = await open(base, phone);
+  await save(page, "phone-song-list");
+  await page.context().close();
+}
+
 // The Lyric Sheet on a phone.
 {
-  const page = await open(heroURL, {
-    colorScheme: "dark",
-    viewport: { width: 390, height: 844 },
-    deviceScaleFactor: 2,
-    isMobile: true,
-    hasTouch: true,
-  });
+  const page = await open(heroURL, phone);
   await readMode(page);
   await scrollToLyricSheet(page);
   await save(page, "phone-lyric-sheet");

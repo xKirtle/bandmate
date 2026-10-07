@@ -11,6 +11,7 @@ The screenshots in the README and on the docs site, `site/`, taken in the dark t
 | `recording-settings-labelled.png` | Recording settings hearing Chromium's fake microphone, numbered 4 to 6: Input, the level hint and Calibrate |
 | `beat-library-labelled.png` | The Beat Library, numbered: Add from link, the search, the Beat's title, its producer, the Song using it and Edit |
 | `backups-labelled.png` | Settings' Backups holding the demo Backup, numbered: Upload, New Backup, the Backup and Restore |
+| `phone-song-list.png` | The Songs page on a phone, listing every Song |
 | `phone-lyric-sheet.png` | The hero Song in Read mode on a phone                          |
 | `read-mode.png`         | The hero Song in Read mode, with the Line playing highlighted  |
 | `sync-mode.webp`        | Sync mode cueing the Bridge's Lines, animated                  |

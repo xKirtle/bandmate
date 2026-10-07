@@ -146,6 +146,17 @@ Keep copies of your work, and move it between installs.
 
 A Backup restores into the same version of Bandmate or a newer one. To copy everything at once, see [copying the data folder](/self-hosting#copying-the-data-folder).
 
+## Settings
+
+**Settings**, at the foot of the side bar, has three tabs:
+
+- **This device**: what each device keeps for itself.
+  - **Appearance**: three colour palettes, Terracotta (the default), Ink and Olive, each in light and dark. Follow your system's light or dark, or pick one. More palettes may come.
+  - **Recording**: your input and its calibration, as in [Record](#record).
+  - **Chord diagrams**: flip them for left-handed playing.
+- **Backups**: see [Backups](#backups).
+- **About**: the version you're running, what changed in it, whether a newer one is out, and the yt-dlp in use.
+
 ## What's next
 
 Ideas for Bandmate's future are on the [roadmap](https://github.com/xKirtle/bandmate/blob/main/docs/roadmap.md). It's a wishlist, not a queue: nothing on it is promised, and it isn't in the order things will be built. What each version added is in the [release notes](https://github.com/xKirtle/bandmate/releases).
