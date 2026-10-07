@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import type { Clip } from '../bandmate';
 import { failRequests, holdRequests, loseAnswers } from '../faults';
 import { expect, test } from '../fixtures';
 import {
@@ -6,8 +7,12 @@ import {
   comeBackTo,
   cueName,
   cueOf,
+  drag,
+  dragBy,
   dragClip,
   extentOf,
+  fadeDot,
+  gainLine,
   heroSong,
   serverClips,
   serverCues,
@@ -24,6 +29,12 @@ const cueSave = { method: 'PUT', url: '**/api/songs/*/lines/*/cue' };
 
 /** A save of an Alternate's Lines, typed in its text box. */
 const textSave = { method: 'PUT', url: '**/api/songs/*/alternates/*/text' };
+
+/** A Clip of Takes, with the Takes the shared Clip leaves to tests to read. */
+type TakesClip = Clip & { activeTakeId: number; takes: { id: number; nudge: number }[] };
+
+/** The Nudge of a Clip's active Take, in seconds. */
+const activeNudge = (c: TakesClip) => c.takes.find((t) => t.id === c.activeTakeId)!.nudge;
 
 /** The page's save error, under the Details. */
 const saveError = (page: Page) => page.getByRole('main').getByRole('alert');
@@ -91,6 +102,152 @@ test('a Clip moved, trimmed and deleted is undone and redone a step at a time', 
   await expect(take).toHaveCount(0);
   await expect.poll(() => serverClips(bandmate, song.id, 'Lead vox')).toEqual([]);
   await expect(redo).toBeDisabled();
+});
+
+test("a Clip's gain line dragged up sets its Gain, and an undo brings it back", async ({ page, bandmate }) => {
+  const song = await heroSong(bandmate);
+  await page.goto(`/songs/${song.id}`);
+  const take = clip(page, 'Take 2');
+  const undo = timeline(page).getByRole('button', { name: 'Undo' });
+  await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
+
+  // Dragged up past the Clip's top, it stops at the top of the range.
+  const height = (await take.boundingBox())!.height;
+  await dragBy(page, gainLine(take), { x: 0, y: -height });
+  await expect(take).toHaveAccessibleName('Take 2, selected, 0:04 to 0:25, +36 dB');
+  await expect
+    .poll(() => serverClips(bandmate, song.id, 'Lead vox'))
+    .toMatchObject([{ start: 4, length: 21, gain: 36 }]);
+
+  await undo.click();
+  await expect(take).toHaveAccessibleName('Take 2, selected, 0:04 to 0:25');
+  await expect
+    .poll(() => serverClips(bandmate, song.id, 'Lead vox'))
+    .toMatchObject([{ start: 4, length: 21, gain: 0 }]);
+  await expect(undo).toBeDisabled();
+});
+
+test("a Clip's fade dot dragged in sets its Fade, and an undo brings it back", async ({ page, bandmate }) => {
+  const song = await heroSong(bandmate);
+  await page.goto(`/songs/${song.id}`);
+  const take = clip(page, 'Take 2');
+  const undo = timeline(page).getByRole('button', { name: 'Undo' });
+  await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
+
+  // The fade in's dot, dragged in to the Clip's middle, fades it in over half its 21 s.
+  const takeBox = (await take.boundingBox())!;
+  const dotBox = (await fadeDot(take, 'Fade in').boundingBox())!;
+  await dragBy(page, fadeDot(take, 'Fade in'), {
+    x: takeBox.x + takeBox.width / 2 - (dotBox.x + dotBox.width / 2),
+    y: 0,
+  });
+  await expect(take).toHaveAccessibleName(/^Take 2, selected, 0:04 to 0:25, fade in \d+(\.\d+)? s$/);
+  await expect.poll(async () => (await serverClips(bandmate, song.id, 'Lead vox'))[0].fadeIn).not.toBe(0);
+  const [faded] = await serverClips(bandmate, song.id, 'Lead vox');
+  expect(faded).toMatchObject({ start: 4, length: 21, fadeOut: 0 });
+  expect(faded.fadeIn as number).toBeCloseTo(10.5, 0);
+
+  await undo.click();
+  await expect(take).toHaveAccessibleName('Take 2, selected, 0:04 to 0:25');
+  await expect
+    .poll(() => serverClips(bandmate, song.id, 'Lead vox'))
+    .toMatchObject([{ start: 4, length: 21, fadeIn: 0, fadeOut: 0 }]);
+  await expect(undo).toBeDisabled();
+});
+
+test('a Clip of Takes Alt+dragged nudges its active Take, the Clip staying put, and an undo brings it back', async ({
+  page,
+  bandmate,
+}) => {
+  const song = await heroSong(bandmate);
+  await page.goto(`/songs/${song.id}`);
+  const take = clip(page, 'Take 2');
+  const undo = timeline(page).getByRole('button', { name: 'Undo' });
+  await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
+  const [before] = (await serverClips(bandmate, song.id, 'Lead vox')) as TakesClip[];
+  expect(activeNudge(before)).toBe(0);
+
+  // Dragged a fifth of its width later: 4.2 s, as the Clip spans 21 s.
+  const width = (await take.boundingBox())!.width;
+  await page.keyboard.down('Alt');
+  await dragClip(page, take, width / 5);
+  await page.keyboard.up('Alt');
+  await expect
+    .poll(async () => activeNudge((await serverClips(bandmate, song.id, 'Lead vox'))[0] as TakesClip))
+    .not.toBe(0);
+  const [nudged] = (await serverClips(bandmate, song.id, 'Lead vox')) as TakesClip[];
+  expect(activeNudge(nudged)).toBeCloseTo(4.2, 1);
+  expect(nudged).toMatchObject({ start: 4, offset: before.offset, length: 21, activeTakeId: before.activeTakeId });
+  // A Nudge leaves the Selection be.
+  await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
+
+  await undo.click();
+  await expect
+    .poll(async () => activeNudge((await serverClips(bandmate, song.id, 'Lead vox'))[0] as TakesClip))
+    .toBe(0);
+  expect((await serverClips(bandmate, song.id, 'Lead vox'))[0]).toMatchObject({
+    start: 4,
+    offset: before.offset,
+    length: 21,
+  });
+  await expect(undo).toBeDisabled();
+});
+
+test('a Clip dragged in a Selection of several moves them all by as much, and one undo brings them back', async ({
+  page,
+  bandmate,
+}) => {
+  const song = await heroSong(bandmate);
+  await page.goto(`/songs/${song.id}`);
+  const take = clip(page, 'Take 2');
+  const click = clip(page, 'Lorem Click');
+  const undo = timeline(page).getByRole('button', { name: 'Undo' });
+  await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
+
+  // Take 2 clicked, then the Beat's Clip added with Mod+click.
+  await take.click();
+  await click.click({ modifiers: ['ControlOrMeta'] });
+  await expect(take).toHaveAccessibleName('Take 2, selected, 0:04 to 0:25');
+  await expect(click).toHaveAccessibleName('Lorem Click, selected, 0:00 to 1:30');
+
+  // Dragging Take 2 later takes the Beat's Clip with it, still selected.
+  await dragClip(page, take, 100);
+  await expect.poll(async () => (await serverClips(bandmate, song.id, 'Lead vox'))[0].start).toBeGreaterThan(4);
+  const [movedTake] = await serverClips(bandmate, song.id, 'Lead vox');
+  const [movedClick] = await serverClips(bandmate, song.id, 'Beat');
+  expect(movedClick.start).toBeGreaterThan(0);
+  expect(movedClick.start).toBeCloseTo(movedTake.start - 4, 6);
+  expect([movedTake.length, movedClick.length]).toEqual([21, 90]);
+  await expect(take).toHaveAccessibleName(/^Take 2, selected, /);
+  await expect(click).toHaveAccessibleName(/^Lorem Click, selected, /);
+  expect(await extentOf(take)).not.toBe('0:04 to 0:25');
+
+  // One undo brings both back.
+  await undo.click();
+  await expect(take).toHaveAccessibleName('Take 2, selected, 0:04 to 0:25');
+  await expect(click).toHaveAccessibleName('Lorem Click, selected, 0:00 to 1:30');
+  await expect.poll(() => serverClips(bandmate, song.id, 'Lead vox')).toMatchObject([{ start: 4, length: 21 }]);
+  await expect.poll(() => serverClips(bandmate, song.id, 'Beat')).toMatchObject([{ start: 0, length: 90 }]);
+  await expect(undo).toBeDisabled();
+});
+
+test('a Clip pressed and let go without dragging is selected, and nothing is saved', async ({ page, bandmate }) => {
+  const song = await heroSong(bandmate);
+  await page.goto(`/songs/${song.id}`);
+  const take = clip(page, 'Take 2');
+  const undo = timeline(page).getByRole('button', { name: 'Undo' });
+  await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
+  const before = await bandmate.timeline(song.id);
+  const saves: string[] = [];
+  page.on('request', (r) => r.method() !== 'GET' && saves.push(`${r.method()} ${r.url()}`));
+
+  // A wobble of a few pixels isn't a drag.
+  const box = (await take.boundingBox())!;
+  await drag(page, { x: box.x + box.width / 2, y: box.y + box.height / 2 }, { x: 3, y: -3 });
+  await expect(take).toHaveAccessibleName('Take 2, selected, 0:04 to 0:25');
+  await expect(undo).toBeDisabled();
+  expect(saves).toEqual([]);
+  expect(await bandmate.timeline(song.id)).toEqual(before);
 });
 
 test('Clips selected by drawing a box are deleted with Delete, and one undo brings them all back', async ({

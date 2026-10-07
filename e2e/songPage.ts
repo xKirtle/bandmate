@@ -35,13 +35,37 @@ export async function dragClip(page: Page, target: Locator, by: number, from: 'b
   if (!box) throw new Error('The Clip is not on screen');
   // The end's trim edge is a few pixels wide, inside the Clip.
   const x = from === 'body' ? box.x + box.width / 2 : box.x + box.width - 2;
-  const y = box.y + box.height / 2;
-  await page.mouse.move(x, y);
+  await drag(page, { x, y: box.y + box.height / 2 }, { x: by, y: 0 });
+}
+
+/**
+ * Presses at a point on the page and drags `by` pixels across and down from
+ * it, in steps as a hand would, then lets go.
+ */
+export async function drag(page: Page, from: { x: number; y: number }, by: { x: number; y: number }) {
+  await page.mouse.move(from.x, from.y);
   await page.mouse.down();
-  await page.mouse.move(x + by / 2, y, { steps: 5 });
-  await page.mouse.move(x + by, y, { steps: 5 });
+  await page.mouse.move(from.x + by.x / 2, from.y + by.y / 2, { steps: 5 });
+  await page.mouse.move(from.x + by.x, from.y + by.y, { steps: 5 });
   await page.mouse.up();
 }
+
+/**
+ * Drags something on a Clip by its middle, `by` pixels across and down: its
+ * gain line or a fade dot, found by the hint it shows on hover, as neither
+ * is named for a screen reader.
+ */
+export async function dragBy(page: Page, target: Locator, by: { x: number; y: number }) {
+  const box = await target.boundingBox();
+  if (!box) throw new Error('It is not on screen');
+  await drag(page, { x: box.x + box.width / 2, y: box.y + box.height / 2 }, by);
+}
+
+/** A Clip's gain line, by the hint it shows on hover. */
+export const gainLine = (target: Locator) => target.getByTitle(/^Gain .*: drag to change it/);
+
+/** A Clip's fade in or fade out dot, by the hint it shows on hover. */
+export const fadeDot = (target: Locator, end: 'Fade in' | 'Fade out') => target.getByTitle(new RegExp(`^${end}\\b`));
 
 /** A Line's Cue time in the Lyric Sheet's gutter, e.g. of "Line 1 of Verse 1", outside Sync mode. */
 export const cueOf = (page: Page, line: string) => page.getByRole('button', { name: `Cue for ${line}:`, exact: false });
