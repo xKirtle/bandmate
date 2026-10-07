@@ -131,11 +131,14 @@ jobs:
   # The end-to-end suite in e2e/: Chromium driving the built web app against
   # a real Bandmate per worker. A test that fails is retried once. When the
   # job fails, the failed tests' traces are uploaded, to open with `npx
-  # playwright show-trace`. Not on a push to main, like `test`.
+  # playwright show-trace`. Not on a push to main, like `test`. A run takes 2
+  # to 5 minutes, so one still going after 15 has hung, and fails rather than
+  # hold the pull request for GitHub's 6-hour default.
   e2e:
     needs: changes
     if: needs.changes.outputs.code == 'true' && !(github.event_name == 'push' && github.ref_type == 'branch')
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -163,8 +166,10 @@ jobs:
         working-directory: e2e
         run: npm run check
 
+      # Usually well under a minute, but it has stalled for 19.
       - name: Install Chromium
         working-directory: e2e
+        timeout-minutes: 5
         run: npx playwright install --with-deps chromium
 
       # Builds the web app, then the Bandmate each worker starts, then runs
