@@ -11,13 +11,13 @@ The screenshots in the README and on the docs site, `docs/web/`, taken in the da
 | `recording-settings-labelled.png` | Recording settings hearing Chromium's fake microphone, numbered 4 to 6: Input, the level hint and Calibrate |
 | `beat-library-labelled.png` | The Beat Library, numbered: Add from link, the search, the Beat's title, its producer, the Song using it and Edit |
 | `backups-labelled.png` | Settings' Backups holding the demo Backup, numbered: Upload, New Backup, the Backup and Restore |
-| `phone-song-list.png` | The Songs page on a phone, listing every Song |
+| `phone-song-list.png` | The Songs page on a phone: both Folders, then the Songs in none |
 | `phone-timeline.png` | The hero Song on a phone held sideways, the Timeline filling the screen |
 | `phone-lyric-sheet.png` | The hero Song in Read mode on a phone                          |
 | `read-mode.png`         | The hero Song in Read mode, with the Line playing highlighted  |
 | `sync-mode.webp`        | Sync mode cueing the Bridge's Lines, animated                  |
 
-The demo content is lorem ipsum, kept in the Backup [`demo.bandmate`](demo.bandmate) beside this file: a hero Song with Chords, a Chord Line, a second Alternate of the Chorus with words of its own, Cues, a Scrapbook Section, a click-track Beat and two Takes, and six other Songs across every Status. Restoring it is also a quick way to fill a dev stack with Songs that have Timelines.
+The demo content is lorem ipsum, kept in the Backup [`demo.bandmate`](demo.bandmate) beside this file: a hero Song with Chords, a Chord Line, a second Alternate of the Chorus with words of its own, Cues, a Scrapbook Section, a click-track Beat and two Takes, and six other Songs across every Status, one of them in the Folder "Album 2025". Restoring it is also a quick way to fill a dev stack with Songs that have Timelines.
 
 ## Retaking them
 
@@ -39,9 +39,10 @@ When the UI changes and the screenshots go stale, restore the demo into a fresh 
    songs=$(curl -s $url/api/backups/$id/songs | jq -c 'map(.id)')
    beats=$(curl -s $url/api/backups/$id/beats | jq -c 'map(.id)')
    curl -s $url/api/backups/$id/restore -H 'content-type: application/json' -d "{\"songs\": $songs, \"beats\": $beats}"
+   curl -s $url/api/folders -H 'content-type: application/json' -d '{"name": "Demos EP"}'
    ```
 
-   Or, in the app, upload it in Settings, Backups, and Restore everything it holds.
+   Or, in the app, upload it in Settings, Backups, Restore everything it holds, and make a New folder "Demos EP" on the Songs page. A Backup holds only the Folders its Songs sit in, so the demo's empty Folder is made by hand.
 
 3. Capture:
 
