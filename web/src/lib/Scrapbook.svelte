@@ -2,8 +2,8 @@
   import GripVertical from '@lucide/svelte/icons/grip-vertical';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import { tick } from 'svelte';
-  import { SvelteSet } from 'svelte/reactivity';
   import { api, type Song, type SongAt } from './api';
+  import type { LyricSheetEditing } from './lyricSheetEditing.svelte';
   import type { Drop } from './sectionDrag';
   import type { SectionDragging } from './sectionDragging.svelte';
   import ActionsMenu from './ActionsMenu.svelte';
@@ -14,7 +14,7 @@
     song,
     change,
     drag,
-    onUnsaved,
+    editing,
     onEditing,
   }: {
     song: Song;
@@ -22,7 +22,8 @@
     change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
     /** The drag of a Section, shared with the Lyric Sheet. */
     drag: SectionDragging;
-    onUnsaved: (editor: object, unsaved: boolean) => void;
+    /** Saves the Lines typed, and holds the edits typed into the open editor while they aren't saved. */
+    editing: LyricSheetEditing;
     /**
      * Hears a Section being opened, added, or moved into the Lyric Sheet, or
      * an open one being changed, e.g. to end Sync mode.
@@ -50,11 +51,19 @@
   // Where to go once the open editor's edits are saved: another Section, or
   // null to close it. Closing sooner would throw away edits that failed to save.
   let next = $state<number | null | undefined>(undefined);
-  // The open editor's text boxes holding edits not yet saved.
-  const unsaved = new SvelteSet<object>();
+  // How many edits had been typed into the open editor when next was set.
+  let typedAt = 0;
 
   $effect(() => {
-    if (next === undefined || unsaved.size > 0) return;
+    if (next === undefined) return;
+    if (open !== null) {
+      // Typing again after a failed save stays in this editor.
+      if (editing.typedIn(open) !== typedAt) {
+        next = undefined;
+        return;
+      }
+      if (editing.unsavedIn(open)) return;
+    }
     const opening = next;
     open = opening;
     next = undefined;
@@ -69,17 +78,9 @@
     focusing = null;
   }
 
-  function track(editor: object, isUnsaved: boolean) {
-    if (isUnsaved) {
-      unsaved.add(editor);
-      // Typing again after a failed save stays in this editor.
-      next = undefined;
-    } else unsaved.delete(editor);
-    onUnsaved(editor, isUnsaved);
-  }
-
   function show(sectionId: number | null) {
     if (sectionId !== null) onEditing?.();
+    typedAt = open === null ? 0 : editing.typedIn(open);
     next = sectionId;
   }
 
@@ -136,8 +137,6 @@
     return (ok: boolean) => {
       if (!ok || open !== sectionId) return;
       open = null;
-      // Its editor is gone, and whatever it held with it.
-      unsaved.clear();
     };
   }
 
@@ -164,7 +163,7 @@
               {section}
               autofocus={focusing === section.id}
               {change}
-              onUnsaved={track}
+              {editing}
               {onEditing}
               more={[{ icon: Trash2, label: 'Delete for good', run: () => remove(section.id) }]}
               {drag}

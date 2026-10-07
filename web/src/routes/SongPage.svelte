@@ -17,6 +17,7 @@
   import TagsField from '../lib/TagsField.svelte';
   import Timeline from '../lib/Timeline.svelte';
   import TuningField from '../lib/TuningField.svelte';
+  import { LyricSheetEditing } from '../lib/lyricSheetEditing.svelte';
   import { Saves } from '../lib/saves.svelte';
   import { songServer } from '../lib/songServer';
   import { takeNewFlag } from '../lib/newSong';
@@ -55,6 +56,9 @@
   // Every save the page and its panels make goes through Saves, made once
   // the Song's loaded.
   let saves = $state<Saves | null>(null);
+  // Every change to the Lyric Sheet goes through Lyric Sheet editing, on top
+  // of Saves.
+  let editing = $state<LyricSheetEditing | null>(null);
   // The Song as last saved. What's shown has the Cue changes not saved yet
   // made on top of it.
   const song = $derived(saves?.saved ?? null);
@@ -147,6 +151,7 @@
     Promise.all([server.getSong(), server.getTimeline()]).then(
       ([s, tl]) => {
         saves = new Saves({ server, song: s, timeline: tl, editsOutside, onReplace });
+        editing = new LyricSheetEditing(saves);
         draft = toDraft(s);
         tags = s.tags;
         mode = openingMode(s.status);
@@ -223,7 +228,7 @@
     location.reload();
   }
 
-  // Lyric Sheet editors holding edits that aren't saved yet.
+  // Masters' fields holding edits that aren't saved yet.
   const unsavedEditors = new Set<object>();
 
   function setUnsaved(editor: object, unsaved: boolean) {
@@ -312,10 +317,10 @@
   // back button doesn't blur, so save whatever is still being edited.
   onDestroy(commitAll);
 
-  /** Whether the page holds edits Saves doesn't: Details being typed, or a Lyric Sheet editor's. */
+  /** Whether the page holds edits Saves doesn't: Details being typed, a Master's, or the Lyric Sheet's. */
   function editsOutside() {
     if (!song) return false;
-    if (unsavedEditors.size > 0) return true;
+    if (unsavedEditors.size > 0 || editing?.unsaved) return true;
     const saved = toDraft(song);
     return (Object.keys(saved) as (keyof Draft)[]).some(
       (f) => (f === 'notes' ? draft[f] : draft[f].trim()) !== saved[f],
@@ -356,7 +361,7 @@
 <main class="page" style:--timeline-height="{timelineHeight}px">
   {#if loadError}
     <p class="error" role="alert">{loadError}</p>
-  {:else if !saves || !song}
+  {:else if !saves || !song || !editing}
     <p class="muted">Loading…</p>
   {:else}
     <div class="song">
@@ -534,7 +539,7 @@
           change={saves.change}
           {drag}
           changeCues={saves.cue}
-          onUnsaved={setUnsaved}
+          {editing}
           {playhead}
           playFrom={(at) => timelinePanel?.playFrom(at)}
           playheadAt={() => timelinePanel?.playheadAt() ?? 0}
@@ -563,13 +568,7 @@
               <Masters {song} {mode} change={saves.change} onUnsaved={setUnsaved} {setStatus} {recording} />
             {:else}
               <summary><FoldChevron />Scrapbook</summary>
-              <Scrapbook
-                {song}
-                change={saves.change}
-                {drag}
-                onUnsaved={setUnsaved}
-                onEditing={() => (syncing = false)}
-              />
+              <Scrapbook {song} change={saves.change} {drag} {editing} onEditing={() => (syncing = false)} />
             {/if}
           </details>
         {/each}

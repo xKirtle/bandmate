@@ -1,11 +1,13 @@
 // The reads and writes Saves makes itself: reading the Song and its
 // Timeline, the Cue changes and Timeline edits it tries again, undoes,
-// redoes and takes back, and setting the Tags, which it's given as a list
-// rather than a write. Writes a caller brings are built against the Song as
-// saved already, so they don't go through here.
+// redoes and takes back, the Lyric Sheet changes it's given by name, and
+// setting the Tags, which it's given as a list rather than a write. Writes a
+// caller brings are built against the Song as saved already, so they don't
+// go through here.
 import { api, type Song, type SongAt, type Timeline } from './api';
 import { sendCueChange, type CueChange } from './cueChanges';
 import { sendEdit, type Edit } from './history';
+import { isLyricSheetChange, sendLyricSheetChange, type LyricSheetChange } from './lyricSheetChanges';
 
 /** One Song on the server, as Saves reads and writes it: the api, or a fake of it. */
 export interface SongServer {
@@ -13,6 +15,8 @@ export interface SongServer {
   getTimeline(): Promise<Timeline>;
   /** Makes a Cue change, returning the Song it leaves. */
   apply(at: SongAt, change: CueChange): Promise<Song>;
+  /** Makes a Lyric Sheet change, returning the Song it leaves. */
+  apply(at: SongAt, change: LyricSheetChange): Promise<Song>;
   /** Makes a Timeline edit, returning the Timeline it leaves. */
   apply(at: SongAt, edit: Edit): Promise<Timeline>;
   /** Sets the Song's Tags, returning them as saved. Tagging leaves the Song's version as it was. */
@@ -33,7 +37,7 @@ const cueChangeKinds: ReadonlySet<string> = new Set<CueChange['kind']>([
 ]);
 
 /** Whether a change is to the Cues, rather than to the Timeline. */
-export function isCueChange(change: CueChange | Edit): change is CueChange {
+export function isCueChange(change: CueChange | LyricSheetChange | Edit): change is CueChange {
   return cueChangeKinds.has(change.kind);
 }
 
@@ -42,8 +46,11 @@ export function songServer(id: number): SongServer {
   return {
     getSong: () => api.getSong(id),
     getTimeline: () => api.getTimeline(id),
-    apply: ((at: SongAt, change: CueChange | Edit) =>
-      isCueChange(change) ? sendCueChange(at, change) : sendEdit(at, change)) as SongServer['apply'],
+    apply: ((at: SongAt, change: CueChange | LyricSheetChange | Edit) => {
+      if (isCueChange(change)) return sendCueChange(at, change);
+      if (isLyricSheetChange(change)) return sendLyricSheetChange(at, change);
+      return sendEdit(at, change);
+    }) as SongServer['apply'],
     setTags: (tags) => api.setSongTags(id, tags),
   };
 }
