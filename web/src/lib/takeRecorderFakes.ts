@@ -18,7 +18,7 @@ export class FakePlayer implements TakePlayer {
     this.startedAt = startedAt;
   }
 
-  play(from: number): Promise<boolean> {
+  playAlong(from: number): Promise<boolean> {
     this.played.push(from);
     this.playing = !this.stopsBeforeStart;
     return Promise.resolve(this.playing);

@@ -50,12 +50,14 @@ export default defineConfig({
   test: {
     // Tests run in Node, but those of modules whose runes run effects, named
     // *.svelte.test.ts, need the code built for the browser: Svelte's server
-    // build runs no effects.
+    // build runs no effects. They import Svelte's browser build too, or its
+    // untrack and flushSync would be the server's, which do nothing.
     projects: [
       { extends: true, test: { name: 'node', exclude: ['**/node_modules/**', 'src/**/*.svelte.test.ts'] } },
       {
         extends: true,
         test: { name: 'runes', include: ['src/**/*.svelte.test.ts'], environment: './vitest.runes.ts' },
+        resolve: { conditions: ['browser'] },
       },
     ],
   },
