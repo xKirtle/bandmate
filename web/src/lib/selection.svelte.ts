@@ -11,6 +11,13 @@ export type ClipIds = ReadonlySet<number>;
 /** No Clip. */
 export const noClips: ClipIds = new Set();
 
+/**
+ * Where a box is drawn over empty lane space: from `start` to `end`
+ * seconds, over the Tracks from index `tracks[0]` to `tracks[1]`, either
+ * way round, as drawn from any corner.
+ */
+export type BoxSpan = { start: number; end: number; tracks: readonly [number, number] };
+
 /** Something done to the Clips that changes which are selected. */
 export type SelectionGesture =
   /** A Clip was clicked, with no Mod held. */
@@ -19,12 +26,8 @@ export type SelectionGesture =
   | { kind: 'toggle'; clipId: number }
   /** A press on a Clip became a drag to move it. */
   | { kind: 'drag'; clipId: number }
-  /**
-   * A box was drawn over empty lane space, from `start` to `end` seconds,
-   * over the Tracks from index `tracks[0]` to `tracks[1]`, either way
-   * round, as drawn from any corner. With Mod held, it `adds`.
-   */
-  | { kind: 'box'; start: number; end: number; tracks: readonly [number, number]; adds: boolean }
+  /** A box was drawn over empty lane space. With Mod held, it `adds`. */
+  | ({ kind: 'box'; adds: boolean } & BoxSpan)
   /** Every Clip was asked for, with Mod+A. */
   | { kind: 'all' }
   /**
@@ -58,7 +61,7 @@ function boxed(tracks: Tracks, box: Extract<SelectionGesture, { kind: 'box' }>):
  * without a gesture, or on a Mod+click on empty lane space, that's all
  * that happens, and `selected` itself is given back if none did.
  *
- * The seam inside the Selection, which applies it unless locked.
+ * The seam inside the Selection, which applies it unless frozen.
  */
 export function afterGesture(tracks: Tracks, selected: ClipIds, gesture?: SelectionGesture): ClipIds {
   const present = new Set(tracks.flatMap((t) => t.clips.map((c) => c.id)));
@@ -87,11 +90,8 @@ export function afterGesture(tracks: Tracks, selected: ClipIds, gesture?: Select
 
 /** A box being drawn over empty lane space, selecting the Clips it touches. */
 export interface SelectionBox {
-  /**
-   * Draws it over these seconds and Tracks, as in a box gesture, selecting
-   * the Clips it touches.
-   */
-  draw(box: { start: number; end: number; tracks: readonly [number, number] }): void;
+  /** Draws it over this span, selecting the Clips it touches. */
+  draw(span: BoxSpan): void;
   /** Gives it up, e.g. for a second finger, selecting what was selected before it. */
   restore(): void;
 }
@@ -107,7 +107,7 @@ function menuOf(selected: ClipIds, clipId: number): ClipMenu {
  * A Timeline's Selection, and the only way it changes. A phone, where
  * Clips can't be edited, has none.
  *
- * While the Timeline is frozen, by a recording or a Merge, it's locked: a
+ * While the Timeline is frozen, by a recording or a Merge, a
  * user's gesture leaves it as it is (see freeze.ts).
  */
 export class Selection {
@@ -144,7 +144,7 @@ export class Selection {
     return this.#ids.has(clipId);
   }
 
-  /** Applies a user's gesture, unless locked. */
+  /** Applies a user's gesture, unless frozen. */
   apply(gesture: SelectionGesture) {
     if (this.#freeze()) return;
     this.#ids = afterGesture(this.#tracks(), this.#ids, gesture);
@@ -152,15 +152,15 @@ export class Selection {
 
   /**
    * Starts a box over empty lane space, which replaces the Selection as it
-   * is now, or with Mod held as it's pressed, `adds` to it. Locked, the
+   * is now, or with Mod held as it's pressed, `adds` to it. Frozen, the
    * box leaves the Selection as it is.
    */
   startBox(adds: boolean): SelectionBox {
     const before = this.#ids;
     return {
-      draw: ({ start, end, tracks }) => {
+      draw: (span) => {
         if (this.#freeze()) return;
-        this.#ids = afterGesture(this.#tracks(), before, { kind: 'box', start, end, tracks, adds });
+        this.#ids = afterGesture(this.#tracks(), before, { kind: 'box', adds, ...span });
       },
       restore: () => {
         this.#ids = afterGesture(this.#tracks(), before);
@@ -173,23 +173,23 @@ export class Selection {
    * long press or the Menu key, as `openMenu` would, changing nothing.
    */
   menuFor(clipId: number): ClipMenu {
-    return menuOf(this.#opened(clipId), clipId);
+    return menuOf(this.#afterMenu(clipId), clipId);
   }
 
   /**
    * Opens a Clip's menu: on a Clip in a Selection of several, it's the
    * Selection menu; on a Clip outside it, that Clip becomes the Selection,
-   * unless locked, and its own menu opens, as it does on the only
-   * selected Clip. Locked, a Clip outside it opens its own menu without
+   * unless frozen, and its own menu opens, as it does on the only
+   * selected Clip. Frozen, a Clip outside it opens its own menu without
    * becoming it.
    */
   openMenu(clipId: number): ClipMenu {
-    this.#ids = this.#opened(clipId);
+    this.#ids = this.#afterMenu(clipId);
     return menuOf(this.#ids, clipId);
   }
 
-  /** The Selection after opening a Clip's menu: what dragging the Clip would make it. */
-  #opened(clipId: number): ClipIds {
+  /** The Selection after opening a Clip's menu: what dragging the Clip would make it, unless frozen. */
+  #afterMenu(clipId: number): ClipIds {
     const tracks = this.#tracks();
     return this.#freeze() ? afterGesture(tracks, this.#ids) : afterGesture(tracks, this.#ids, { kind: 'drag', clipId });
   }
@@ -197,7 +197,7 @@ export class Selection {
   /**
    * Selects the Clips an edit made or brought back, e.g. pasted,
    * duplicated, split, merged, undone or redone, once it's saved. Unless
-   * locked by a recording started since: a Merge, frozen until it's saved,
+   * a recording has started since: a Merge, frozen until it's saved,
    * still selects its merged Clip.
    */
   selectEdited(clipIds: Iterable<number>) {

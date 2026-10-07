@@ -1102,7 +1102,7 @@
     press: LanePress;
     pointerId: number;
     /** The box's hold on the Selection, which it replaces or adds to as it was pressed. */
-    selecting: SelectionBox;
+    selectionBox: SelectionBox;
     /** Where it was pressed, in seconds: the box's start. */
     start: number;
     /** The index of the Track whose lane was pressed. */
@@ -1143,7 +1143,7 @@
     laneBox = {
       press: pressLane(event, touch, adds),
       pointerId: event.pointerId,
-      selecting: selection.startBox(adds),
+      selectionBox: selection.startBox(adds),
       start: spanTimeAt(event.clientX),
       trackIndex: trackIndexAt(event.clientY),
       top: yIn(event.clientY),
@@ -1179,7 +1179,7 @@
         selection.apply({ kind: 'emptyClick', adds: laneBox.press.adds });
         break;
       case 'restore':
-        laneBox.selecting.restore();
+        laneBox.selectionBox.restore();
         break;
       case 'keep':
       case 'giveUp':
@@ -1188,10 +1188,10 @@
     laneDone();
   }
 
-  function drawBox({ start, trackIndex, top, selecting }: LaneBox, at: Point) {
+  function drawBox({ start, trackIndex, top, selectionBox }: LaneBox, at: Point) {
     const end = spanTimeAt(at.clientX);
     box = { start, end, top, bottom: yIn(at.clientY) };
-    selecting.draw({ start, end, tracks: [trackIndex, trackIndexAt(at.clientY)] });
+    selectionBox.draw({ start, end, tracks: [trackIndex, trackIndexAt(at.clientY)] });
     dragAt(at, laneMove);
   }
 
