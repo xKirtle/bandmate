@@ -3,21 +3,19 @@
   import Pencil from '@lucide/svelte/icons/pencil';
   import Play from '@lucide/svelte/icons/play';
   import { onDestroy, tick } from 'svelte';
-  import AddFromLink, { type FromLink } from '../lib/AddFromLink.svelte';
-  import AlreadyInLibrary from '../lib/AlreadyInLibrary.svelte';
-  import AudioPlayer from '../lib/AudioPlayer.svelte';
+  import AddBeatForm from '../lib/AddBeatForm.svelte';
+  import AddFromLink from '../lib/AddFromLink.svelte';
   import { MediaQuery } from 'svelte/reactivity';
-  import { api, type Beat, type DecodedAudio, type Fetched } from '../lib/api';
+  import { api, type Beat } from '../lib/api';
   import BeatBatch from '../lib/BeatBatch.svelte';
   import type { BatchRow } from '../lib/beatBatch';
   import type { Preview } from '../lib/beatPreview';
-  import BeatFields from '../lib/BeatFields.svelte';
   import BeatFilters from '../lib/BeatFilters.svelte';
   import BeatEditDialog from '../lib/BeatEditDialog.svelte';
   import BeatItem from '../lib/BeatItem.svelte';
   import BeatPlayerBar from '../lib/BeatPlayerBar.svelte';
   import BeatTable from '../lib/BeatTable.svelte';
-  import { fromDraft, toDraft, type BeatDraft } from '../lib/beatDraft';
+  import { BeatToAdd, fileReader } from '../lib/beatToAdd.svelte';
   import {
     beatListViewFromParams,
     beatListViewToParams,
@@ -27,10 +25,6 @@
     sortBeats,
   } from '../lib/listViews';
   import { replaceSearch, router } from '../lib/router.svelte';
-  import { beatWithSource } from '../lib/sameSource';
-  import { formatDuration } from '../lib/time';
-  import { suggestForFile } from '../lib/beatTags';
-  import { prepareUpload } from '../lib/upload';
   import FileDrop from '../lib/FileDrop.svelte';
   import { audioDropped, entriesDropped, filesIn, skippedNote } from '../lib/droppedFiles';
 
@@ -44,18 +38,15 @@
   let reloads = $state(0);
   let maxUploadBytes = $state(Infinity);
 
-  // A file being added: decoded, waiting for its details. One fetched from a
-  // link is already on the server, waiting there, and is previewed from the
-  // copy read to decode it, keeping what the link gave, such as its clean link.
-  interface Adding {
-    file: File;
-    decoded: DecodedAudio;
-    draft: BeatDraft;
-    fetched?: Fetched & { previewUrl: string };
-  }
-  let adding = $state<Adding | null>(null);
-  let addBusy = $state<string | null>(null);
-  let addError = $state<string | null>(null);
+  // The one Beat being added, through the form. Several files go to the
+  // batch's review table instead.
+  const toAdd = new BeatToAdd(
+    fileReader(() => maxUploadBytes),
+    api,
+  );
+  // Reading a folder dropped, before its files go where picking them would.
+  let readingDrop = $state(false);
+  const addBusy = $derived(toAdd.busy ?? (readingDrop ? 'Reading the files dropped…' : null));
   // Whether Add from link is offered, and whether its box is open.
   let addFromLink = $state(false);
   let linking = $state(false);
@@ -182,90 +173,22 @@
     if (files.length === 0) return;
     linking = false;
     if (batching || files.length > 1) {
-      setAdding(null);
-      addError = null;
+      toAdd.leave();
       batching = true;
       await tick();
       batch?.append(files);
       return;
     }
-    const [file] = files;
-    setAdding(null);
-    addError = null;
-    addBusy = `Reading “${file.name}”…`;
-    try {
-      const [decoded, suggestion] = await Promise.all([prepareUpload(file, maxUploadBytes), suggestForFile(file)]);
-      setAdding({ file, decoded, draft: toDraft(suggestion) });
-    } catch (e) {
-      addError = (e as Error).message;
-    } finally {
-      addBusy = null;
-    }
-  }
-
-  async function add(event: SubmitEvent) {
-    event.preventDefault();
-    if (!adding) return;
-    const details = fromDraft(adding.draft);
-    if (typeof details === 'string') {
-      addError = details;
-      return;
-    }
-    const { fetched } = adding;
-    addBusy = fetched ? 'Adding…' : 'Uploading…';
-    addError = null;
-    try {
-      if (fetched) await api.addFetchedBeat(fetched.id, details, adding.decoded);
-      else await api.addBeat(adding.file, details, adding.decoded);
-      setAdding(null, true);
-      dropNote = null;
-      reloads++;
-    } catch (e) {
-      addError = (e as Error).message;
-    } finally {
-      addBusy = null;
-    }
-  }
-
-  function cancelAdd() {
-    setAdding(null);
-    addError = null;
-    dropNote = null;
-  }
-
-  /**
-   * Puts a file in the adding form, or empties it. A fetched file it held
-   * stops waiting on the server, unless it was just added.
-   */
-  function setAdding(next: Adding | null, added = false) {
-    const was = adding?.fetched;
-    if (was && was.id !== next?.fetched?.id) {
-      URL.revokeObjectURL(was.previewUrl);
-      if (!added) api.discardFetched(was.id).catch(() => {});
-    }
-    adding = next;
+    await toAdd.read(files[0]);
   }
 
   function openLinkBox() {
-    cancelAdd();
+    toAdd.leave();
+    dropNote = null;
     linking = true;
   }
 
-  function fetchedFromLink({ fetched, file, decoded, draft }: FromLink) {
-    linking = false;
-    setAdding({
-      file,
-      decoded,
-      draft,
-      fetched: { ...fetched, previewUrl: URL.createObjectURL(file) },
-    });
-  }
-
-  // The Beat already in the Library from the link being added, if any: it's
-  // warned of, but can be added again.
-  const alreadyAdded = $derived(adding?.fetched && beats ? beatWithSource(beats, adding.fetched.sourceLink) : null);
-
-  onDestroy(() => setAdding(null));
+  onDestroy(() => toAdd.close());
 
   // The Beat being edited in the dialog the table opens. The cards below
   // 80rem open their own; this one stays open across a resize, keeping its
@@ -287,9 +210,9 @@
     const entries = entriesDropped(data);
     let files = [...data.files];
     if (entries) {
-      addBusy = 'Reading the files dropped…';
+      readingDrop = true;
       files = await filesIn(entries);
-      addBusy = null;
+      readingDrop = false;
     }
     const { audio, skipped } = audioDropped(files);
     dropNote = skippedNote(skipped);
@@ -393,38 +316,33 @@
     />
   {/if}
   {#if linking}
-    <AddFromLink {maxUploadBytes} onFetched={fetchedFromLink} onClose={() => (linking = false)} />
+    <AddFromLink
+      {maxUploadBytes}
+      onFetched={(fromLink) => {
+        linking = false;
+        toAdd.take(fromLink);
+      }}
+      onClose={() => (linking = false)}
+    />
   {/if}
-  {#if adding}
-    <form class="card adding" onsubmit={add} aria-labelledby="adding-heading">
-      <h2 id="adding-heading">
-        Add “{adding.file.name}”
-        <span class="muted tabular">{formatDuration(adding.decoded.duration)}</span>
-      </h2>
-      {#if adding.fetched}
-        <AudioPlayer src={adding.fetched.previewUrl} duration={adding.decoded.duration} peaks={adding.decoded.peaks} />
-      {/if}
-      {#if alreadyAdded}
-        {@const beatId = alreadyAdded.id}
-        <AlreadyInLibrary beat={alreadyAdded} onOpen={() => (editingId = beatId)} />
-      {/if}
-      <BeatFields bind:draft={adding.draft} idPrefix="new-beat" />
-      <div class="actions">
-        <button type="submit" class="button primary" disabled={addBusy !== null}>
-          {alreadyAdded ? 'Add anyway' : 'Add to Library'}
-        </button>
-        <button type="button" class="button" onclick={cancelAdd} disabled={addBusy !== null}>Cancel</button>
-      </div>
-    </form>
-  {/if}
+  <AddBeatForm
+    {toAdd}
+    library={beats}
+    already={{ action: 'Open it', onUse: (beat) => (editingId = beat.id) }}
+    submitLabel="Add to Library"
+    leaveLabel="Cancel"
+    onAdded={() => {
+      dropNote = null;
+      reloads++;
+    }}
+    onLeave={() => (dropNote = null)}
+    idPrefix="new-beat"
+  />
   {#if dropNote}
     <p class="muted skipped" role="status">{dropNote}</p>
   {/if}
-  {#if addBusy}
-    <p class="muted" role="status">{addBusy}</p>
-  {/if}
-  {#if addError}
-    <p class="error add-error" role="alert">{addError}</p>
+  {#if readingDrop}
+    <p class="muted" role="status">Reading the files dropped…</p>
   {/if}
 
   {#if anyBeats}
@@ -484,22 +402,6 @@
 {/if}
 
 <style>
-  .adding {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-    margin-bottom: var(--space-6);
-    padding: var(--space-4);
-  }
-  .adding h2 {
-    margin: 0;
-    font-size: var(--text-lg);
-    overflow-wrap: anywhere;
-  }
-  .adding h2 span {
-    font-weight: 400;
-  }
-  .actions,
   .adds {
     display: flex;
     gap: var(--space-2);
@@ -520,7 +422,6 @@
     flex-wrap: wrap;
     justify-content: center;
   }
-  .add-error,
   .skipped {
     margin-bottom: var(--space-4);
   }
