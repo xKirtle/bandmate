@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Clip, Track } from './api';
-import { splitTargets } from './split';
+import type { Clip, Timeline, Track } from './api';
+import { rightHalves, splitTargets } from './split';
 
 const clip = (id: number, start: number, length = 10): Clip => ({
   id,
@@ -52,5 +52,37 @@ describe('splitTargets', () => {
     expect(splitTargets(tracks, new Set(), 1, 10)).toEqual([]);
     expect(splitTargets(tracks, new Set(), 1, 0)).toEqual([]);
     expect(splitTargets(tracks, new Set([1, 2, 3]), 1, 15)).toEqual([2]);
+  });
+});
+
+describe('rightHalves', () => {
+  const timeline = (tracks: Track[]): Timeline => ({
+    songId: 1,
+    version: 1,
+    updatedAt: '',
+    tracks,
+    beats: [],
+    sounds: [],
+    loop: null,
+  });
+
+  it('is the right half of each Clip a Split cut, in Timeline order, never the left halves it kept', () => {
+    // Split at 0:07: Clip 1 into 1 and 4, Clip 3 into 3 and 5.
+    const after = timeline([
+      track(1, [clip(1, 0, 7), clip(4, 7, 3), clip(2, 10)]),
+      track(2, [clip(3, 5, 2), clip(5, 7, 8)]),
+      track(3, []),
+    ]);
+    expect(rightHalves(timeline(tracks), after)).toEqual([4, 5]);
+  });
+
+  it('is the one right half when a Split cut one Clip', () => {
+    // Split at 0:12: Clip 2 into 2 and 4.
+    const after = timeline([
+      track(1, [clip(1, 0), clip(2, 10, 2), clip(4, 12, 8)]),
+      track(2, [clip(3, 5)]),
+      track(3, []),
+    ]);
+    expect(rightHalves(timeline(tracks), after)).toEqual([4]);
   });
 });

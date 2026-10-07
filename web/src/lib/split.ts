@@ -1,10 +1,13 @@
-import type { Clip, Track } from './api';
+import type { Clip, Timeline, Track } from './api';
+import { addedClips } from './history';
 import { tolerance } from './trackPlacement';
 
 // A Split cuts Clips in two at the playhead: the Selection's Clips it
 // crosses, or with none selected, the Chosen Track's Clip under it. A Clip
 // the playhead is on the edge of isn't split. The server cuts them, and
-// refuses a Clip the time doesn't cross by the same reckoning.
+// refuses a Clip the time doesn't cross by the same reckoning. The right
+// halves become the Selection, so the next action is on what's after the
+// playhead: Delete trims it off, and a drag moves it.
 
 /**
  * Whether a time on the Timeline crosses a Clip, rather than being on its
@@ -30,4 +33,13 @@ export function splitTargets(
       ? tracks.flatMap((t) => t.clips.filter((c) => selected.has(c.id)))
       : (tracks.find((t) => t.id === chosen)?.clips ?? []);
   return among.filter((c) => crosses(c, at)).map((c) => c.id);
+}
+
+/**
+ * The ids of the right halves a Split made, in Timeline order, from the
+ * Timeline before and after it. Each Clip cut keeps its id as the left
+ * half, and its right half is a new Clip.
+ */
+export function rightHalves(before: Timeline, after: Timeline): number[] {
+  return addedClips(before, after);
 }
