@@ -314,7 +314,7 @@ describe('Timeline editing, the Timeline as shown', () => {
     expect(shownTrack(editing, 1).volume).toBe(-9);
   });
 
-  it('refuses to adjust a value while frozen, as the same edit would be, but a Track’s levels', async () => {
+  it('refuses to adjust a value while frozen, as it would the same edit, but a Track’s levels', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
     const { editing, state } = await editingFor(server);
     state.recording = true;

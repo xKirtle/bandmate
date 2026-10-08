@@ -232,7 +232,7 @@
   });
   onDestroy(() => editing.close());
   // The Timeline as shown, which it draws and plays: as saved, with the
-  // values of edits on their way and of values being adjusted on top, e.g.
+  // values of edits on their way, and values being adjusted, on top, e.g.
   // a fader's level while it's dragged, or a name until it's saved.
   const timeline = $derived(editing.timeline);
 
