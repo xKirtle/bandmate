@@ -30,7 +30,11 @@ export interface LoopContext {
   tracks: () => Tracks;
   /** Where the playhead is, in seconds, to snap to. */
   playhead: () => number;
-  /** The Loop as shown, if there is one: its edges are what's dragged, and let go as it was, nothing's set. */
+  /**
+   * The Loop as Timeline editing shows it, saved or on its way, never as
+   * it's being dragged: its edges are what's pressed, and let go as it
+   * was, nothing's set.
+   */
   loop: () => TimelineLoop | null;
   /** How near a target an edge snaps to it, in seconds, at the zoom shown. */
   reach: () => number;

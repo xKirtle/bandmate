@@ -1650,9 +1650,7 @@
   }
 
   // Setting the Loop by dragging along the top of the ruler goes through
-  // LoopDrag (see loopDrag.svelte.ts), with the page measured here. It's
-  // saved on release, and Timeline editing shows it where it was dropped
-  // until it's saved, so a new one can be dragged straight away.
+  // LoopDrag (see loopDrag.svelte.ts), with the page measured here.
   const loopDrag = new LoopDrag({
     tracks: () => timeline.tracks,
     playhead: () => position,
