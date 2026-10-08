@@ -90,6 +90,8 @@ export class Saves {
   saveError = $state<string | null>(null);
   /** How many saves are queued or on their way. */
   pending = $state(0);
+  /** How many times a refresh has replaced the Song and its Timeline with those changed elsewhere. */
+  replaced = $state(0);
 
   /** Whether there's an edit to undo, or one to redo. */
   canUndo = $state(false);
@@ -401,6 +403,7 @@ export class Saves {
         this.timeline = timeline;
         this.stale = false;
         this.#forget();
+        this.replaced++;
       } catch {
         // Keep showing the Song as it was; the next save reports any problem.
       }

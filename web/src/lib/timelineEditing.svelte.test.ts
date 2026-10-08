@@ -198,6 +198,158 @@ describe('Timeline editing, the freeze', () => {
   });
 });
 
+/** A Track on the Timeline as shown. */
+const shownTrack = (editing: TimelineEditing, trackId: number) =>
+  editing.timeline.tracks.find((t) => t.id === trackId)!;
+
+describe('Timeline editing, the Timeline as shown', () => {
+  it('shows a Track’s levels sent until they’re saved, then as saved', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { saves, editing } = await editingFor(server);
+    const release = server.holdNextAnswer();
+    const editing1 = editing.edit({ kind: 'updateTrack', trackId: 1, changes: { volume: -6, muted: true } });
+    expect(shownTrack(editing, 1)).toMatchObject({ volume: -6, muted: true, soloed: false });
+    expect(saves.timeline.tracks[0]).toMatchObject({ volume: 0, muted: false });
+    release();
+    await editing1;
+    expect(shownTrack(editing, 1)).toMatchObject({ volume: -6, muted: true });
+    expect(editing.timeline).toBe(saves.timeline);
+  });
+
+  it('shows a Track’s new name until it’s saved', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { saves, editing } = await editingFor(server);
+    const release = server.holdNextAnswer();
+    const renaming = editing.edit({ kind: 'updateTrack', trackId: 2, changes: { name: ' Vocals ' } });
+    expect(shownTrack(editing, 2).name).toBe('Vocals');
+    expect(saves.timeline.tracks[1].name).toBe('Track 2');
+    release();
+    await renaming;
+    expect(shownTrack(editing, 2).name).toBe('Vocals');
+    expect(editing.timeline).toBe(saves.timeline);
+  });
+
+  it('shows a Clip’s new name, or its name cleared, until it’s saved', async () => {
+    const named = { ...beatClip(1, 0, 10), name: 'Intro' };
+    const server = new FakeSongServer(emptySong(), [track(1, [named, beatClip(2, 20, 30)])]);
+    const { saves, editing } = await editingFor(server);
+    const clipName = (id: number) => shownTrack(editing, 1).clips.find((c) => c.id === id)!.name;
+    const release = server.holdNextAnswer();
+    const clearing = editing.edit({ kind: 'renameClip', clipId: 1, name: '' });
+    const renaming = editing.edit({ kind: 'renameClip', clipId: 2, name: 'Outro' });
+    expect(clipName(1)).toBeNull();
+    expect(clipName(2)).toBe('Outro');
+    release();
+    await clearing;
+    expect(clipName(1)).toBeNull();
+    expect(clipName(2)).toBe('Outro');
+    await renaming;
+    expect(server.timeline.tracks[0].clips.map((c) => c.name)).toEqual([null, 'Outro']);
+    expect(editing.timeline).toBe(saves.timeline);
+  });
+
+  it('keeps showing a second rename sent before the first is saved, once the first is', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { saves, editing } = await editingFor(server);
+    const release = server.holdNextAnswer();
+    const first = editing.edit({ kind: 'updateTrack', trackId: 1, changes: { name: 'Guitar' } });
+    const second = editing.edit({ kind: 'updateTrack', trackId: 1, changes: { name: 'Bass' } });
+    expect(shownTrack(editing, 1).name).toBe('Bass');
+    release();
+    await first;
+    expect(saves.timeline.tracks[0].name).toBe('Guitar');
+    expect(shownTrack(editing, 1).name).toBe('Bass');
+    await second;
+    expect(shownTrack(editing, 1).name).toBe('Bass');
+    expect(editing.timeline).toBe(saves.timeline);
+  });
+
+  it('stops showing a value whose save fails, going back to the Timeline as saved', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { saves, editing } = await editingFor(server);
+    server.failNext(1);
+    const renaming = editing.edit({ kind: 'renameClip', clipId: 1, name: 'Intro' });
+    expect(shownTrack(editing, 1).clips[0].name).toBe('Intro');
+    expect(await renaming).toBeNull();
+    expect(shownTrack(editing, 1).clips[0].name).toBeNull();
+    expect(editing.timeline).toBe(saves.timeline);
+  });
+
+  it('leaves a newer value for the same field showing when an earlier save fails', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { editing } = await editingFor(server);
+    server.failNext(1);
+    const first = editing.edit({ kind: 'updateTrack', trackId: 1, changes: { volume: -6 } });
+    const release = server.holdNextAnswer();
+    const second = editing.edit({ kind: 'updateTrack', trackId: 1, changes: { volume: -12 } });
+    expect(await first).toBeNull();
+    expect(shownTrack(editing, 1).volume).toBe(-12);
+    release();
+    await second;
+    expect(shownTrack(editing, 1).volume).toBe(-12);
+    expect(server.timeline.tracks[0].volume).toBe(-12);
+  });
+
+  it('shows a preview without sending it, until the next preview or edit of its field', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { editing } = await editingFor(server);
+    expect(editing.preview({ kind: 'updateTrack', trackId: 1, changes: { volume: -3 } })).toBe(true);
+    expect(editing.preview({ kind: 'updateTrack', trackId: 1, changes: { volume: -4 } })).toBe(true);
+    expect(shownTrack(editing, 1).volume).toBe(-4);
+    expect(server.landed).toBe(0);
+    await editing.edit({ kind: 'updateTrack', trackId: 1, changes: { volume: -5 } });
+    expect(shownTrack(editing, 1).volume).toBe(-5);
+    expect(server.timeline.tracks[0].volume).toBe(-5);
+  });
+
+  it('keeps showing a fader previewed during an earlier save of its level, once that save is', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { saves, editing } = await editingFor(server);
+    const release = server.holdNextAnswer();
+    const saving = editing.edit({ kind: 'updateTrack', trackId: 1, changes: { volume: -6 } });
+    editing.preview({ kind: 'updateTrack', trackId: 1, changes: { volume: -9 } });
+    release();
+    await saving;
+    expect(saves.timeline.tracks[0].volume).toBe(-6);
+    expect(shownTrack(editing, 1).volume).toBe(-9);
+  });
+
+  it('refuses a preview while frozen, as the same edit would be, but a Track’s levels', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { editing, state } = await editingFor(server);
+    state.recording = true;
+    expect(editing.preview({ kind: 'updateTrack', trackId: 1, changes: { name: 'Vocals' } })).toBe(false);
+    expect(editing.preview({ kind: 'renameClip', clipId: 1, name: 'Intro' })).toBe(false);
+    expect(editing.preview({ kind: 'updateTrack', trackId: 1, changes: { volume: -6, soloed: true } })).toBe(true);
+    expect(shownTrack(editing, 1)).toMatchObject({ name: 'Track 1', volume: -6, soloed: true });
+    expect(shownTrack(editing, 1).clips[0].name).toBeNull();
+  });
+
+  it('drops everything shown when a refresh replaces the Song', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { saves, editing } = await editingFor(server);
+    editing.preview({ kind: 'updateTrack', trackId: 1, changes: { volume: -6 } });
+    editing.preview({ kind: 'renameClip', clipId: 1, name: 'Intro' });
+    server.changeElsewhere({ title: 'From another tab' });
+    await saves.refresh();
+    expect(saves.song.title).toBe('From another tab');
+    expect(editing.timeline).toBe(saves.timeline);
+  });
+
+  it('leaves what’s shown alone through an undo and a redo', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { editing } = await editingFor(server);
+    await editing.edit({ kind: 'updateTrack', trackId: 1, changes: { volume: -6 } });
+    editing.preview({ kind: 'updateTrack', trackId: 1, changes: { volume: -9 } });
+    await editing.undo();
+    expect(server.timeline.tracks[0].volume).toBe(0);
+    expect(shownTrack(editing, 1).volume).toBe(-9);
+    await editing.redo();
+    expect(server.timeline.tracks[0].volume).toBe(-6);
+    expect(shownTrack(editing, 1).volume).toBe(-9);
+  });
+});
+
 describe('Timeline editing, undo and redo', () => {
   it('does nothing with nothing to undo or redo, and nothing queued', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());

@@ -50,7 +50,7 @@
   import { editHint, type Freeze } from './freeze';
   import { draggedFiles, fileDropTrack, type TrackRow } from './fileDrop';
   import { keyHints } from './keyHints';
-  import { formatVolume, maxVolume, minVolume, trackGains, type Levels } from './mixer';
+  import { formatVolume, maxVolume, minVolume, trackGains } from './mixer';
   import type { MenuAction } from './menu';
   import { peaksPerSecond } from './peaks';
   import { keyActedOnPage } from './pointerFocus';
@@ -137,7 +137,6 @@
   // down to a file on both.
   let {
     song,
-    timeline,
     saves,
     setBpm,
     onPlayhead,
@@ -147,7 +146,6 @@
     height = $bindable(0),
   }: {
     song: Song;
-    timeline: Timeline;
     /** The Song's saves, which the Timeline's edits and Cue changes go through. */
     saves: Saves;
     /** Sets the Song's BPM. */
@@ -248,6 +246,10 @@
     },
   });
   onDestroy(() => editing.close());
+  // The Timeline as shown, which it draws and plays: as saved, with the
+  // values of edits on their way and of previews on top, e.g. a fader's
+  // level while it's dragged, or a name until it's saved.
+  const timeline = $derived(editing.timeline);
 
   // While recording, a new Take or a Retake, from its start until it's
   // saved, the Timeline is frozen: nothing on it is edited but a Track's
@@ -372,36 +374,18 @@
   }
 
   // Changes to a Track's levels are shown and heard right away, before
-  // they're saved, so a fader follows the hand. Once saved, the Timeline has
-  // them.
-  let adjusting = $state<Record<number, Partial<Levels>>>({});
-  const levels = $derived<Levels[]>(timeline.tracks.map((t) => ({ ...t, ...adjusting[t.id] })));
+  // they're saved, and a fader's level while it's dragged, so it follows
+  // the hand: see the Timeline as shown.
+  $effect(() => player.setGains(trackGains(timeline.tracks)));
 
-  $effect(() => player.setGains(trackGains(levels)));
-
-  /** Shows a change to a Track's levels right away, without saving it yet. */
-  function preview(track: Track, change: Partial<Levels>) {
-    adjusting[track.id] = { ...adjusting[track.id], ...change };
-  }
-
-  type LevelChanges = Omit<TrackChanges, 'name'>;
-
-  async function setLevels(track: Track, levelChanges: LevelChanges) {
-    preview(track, levelChanges);
+  function setLevels(track: Track, changes: Omit<TrackChanges, 'name'>) {
     // If it fails, the Track goes back to how it's saved.
-    await editing.edit({ kind: 'updateTrack', trackId: track.id, changes: levelChanges });
-    // Each value stops being shown over the Timeline's once saved, unless
-    // it's been changed again since, e.g. by a fader still being dragged.
-    const shown = adjusting[track.id];
-    if (!shown) return;
-    for (const key of Object.keys(levelChanges) as (keyof LevelChanges)[]) {
-      if (shown[key] === levelChanges[key]) delete shown[key];
-    }
-    if (Object.keys(shown).length === 0) delete adjusting[track.id];
+    editing.edit({ kind: 'updateTrack', trackId: track.id, changes });
   }
 
   function volumeInput(track: Track, event: Event) {
-    preview(track, { volume: Number((event.currentTarget as HTMLInputElement).value) });
+    const volume = Number((event.currentTarget as HTMLInputElement).value);
+    editing.preview({ kind: 'updateTrack', trackId: track.id, changes: { volume } });
   }
 
   function volumeChange(track: Track, event: Event) {
@@ -411,7 +395,6 @@
   // A Track's name shows as a button that chooses it; its pencil swaps it
   // for a field to rename it in. Until a new name is saved, it's shown.
   let renaming = $state<number | null>(null);
-  let naming = $state<Record<number, string>>({});
 
   function focusField(input: HTMLInputElement) {
     input.focus();
@@ -425,13 +408,11 @@
     if (save) rename(track, input.value.trim());
   }
 
-  async function rename(track: Track, name: string) {
+  function rename(track: Track, name: string) {
     // A Track needs a name, so a blank one leaves it as it was.
     if (!name || name === track.name) return;
-    naming[track.id] = name;
     // If it fails, the name goes back to how it's saved.
-    await editing.edit({ kind: 'updateTrack', trackId: track.id, changes: { name } });
-    if (naming[track.id] === name) delete naming[track.id];
+    editing.edit({ kind: 'updateTrack', trackId: track.id, changes: { name } });
   }
 
   function nameKey(track: Track, event: KeyboardEvent) {
@@ -1495,16 +1476,10 @@
   // menu. A blank name clears its own, so it goes by its source's again.
   // Until a new name is saved, it's shown.
   let renamingClip = $state<number | null>(null);
-  let clipNaming = $state<Record<number, string | null>>({});
-
-  /** A Clip's name, as saved or being saved; null if it has none. */
-  function nameOf(clip: Clip): string | null {
-    return clip.id in clipNaming ? clipNaming[clip.id] : clip.name;
-  }
 
   /** What a Clip goes by, as shown. */
   function titleOf(clip: Clip): string {
-    return clipTitle({ ...clip, name: nameOf(clip) }, sources.of(clip));
+    return clipTitle(clip, sources.of(clip));
   }
 
   function startClipRename(clip: Clip) {
@@ -1519,13 +1494,11 @@
     if (save) renameClip(clip, input.value.trim());
   }
 
-  async function renameClip(clip: Clip, typed: string) {
-    const name = typed || null;
-    if (name === clip.name) return;
-    clipNaming[clip.id] = name;
+  function renameClip(clip: Clip, typed: string) {
+    // A blank name clears its own.
+    if ((typed || null) === clip.name) return;
     // If it fails, the name goes back to how it's saved.
-    await editing.edit({ kind: 'renameClip', clipId: clip.id, name: typed });
-    if (clipNaming[clip.id] === name) delete clipNaming[clip.id];
+    editing.edit({ kind: 'renameClip', clipId: clip.id, name: typed });
   }
 
   function clipNameKey(clip: Clip, event: KeyboardEvent) {
@@ -2225,7 +2198,6 @@
           >
         </div>
         {#each timeline.tracks as track, i (track.id)}
-          {@const trackLevels = levels[i]}
           <!-- Clicking it outside its controls chooses the Track, pointer only for now, like dragging Clips. -->
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
           <div
@@ -2255,7 +2227,7 @@
               {#if editable.current && renaming === track.id}
                 <input
                   class="name"
-                  value={naming[track.id] ?? track.name}
+                  value={track.name}
                   aria-label="Name of Track {track.name}"
                   onkeydown={(e) => nameKey(track, e)}
                   onblur={(e) => endRename(track, e.currentTarget, true)}
@@ -2269,7 +2241,7 @@
                   disabled={frozen}
                   title={editHint(freeze, undefined)}
                   onclick={() => choose({ kind: 'choose', trackId: track.id })}
-                  ondblclick={() => editable.current && (renaming = track.id)}>{naming[track.id] ?? track.name}</button
+                  ondblclick={() => editable.current && (renaming = track.id)}>{track.name}</button
                 >
               {/if}
               {#if editable.current}
@@ -2318,16 +2290,16 @@
               <button
                 type="button"
                 class="toggle mute"
-                aria-pressed={trackLevels.muted}
-                onclick={() => setLevels(track, { muted: !trackLevels.muted })}
+                aria-pressed={track.muted}
+                onclick={() => setLevels(track, { muted: !track.muted })}
                 aria-label="Mute {track.name}"
                 title="Mute">M</button
               >
               <button
                 type="button"
                 class="toggle solo"
-                aria-pressed={trackLevels.soloed}
-                onclick={() => setLevels(track, { soloed: !trackLevels.soloed })}
+                aria-pressed={track.soloed}
+                onclick={() => setLevels(track, { soloed: !track.soloed })}
                 aria-label="Solo {track.name}"
                 title="Solo">S</button
               >
@@ -2337,10 +2309,10 @@
                 min={minVolume}
                 max={maxVolume}
                 step="0.5"
-                value={trackLevels.volume}
+                value={track.volume}
                 aria-label="Volume of {track.name}"
-                aria-valuetext={formatVolume(trackLevels.volume)}
-                title="{formatVolume(trackLevels.volume)} (double-click for 0 dB)"
+                aria-valuetext={formatVolume(track.volume)}
+                title="{formatVolume(track.volume)} (double-click for 0 dB)"
                 oninput={(e) => volumeInput(track, e)}
                 onchange={(e) => volumeChange(track, e)}
                 ondblclick={() => setLevels(track, { volume: 0 })}
@@ -2476,7 +2448,7 @@
                         <!-- Pressed, it's typed in, so the Clip doesn't move. -->
                         <input
                           class="clip-name"
-                          value={nameOf(clip) ?? ''}
+                          value={clip.name ?? ''}
                           placeholder={sources.of(clip).title}
                           aria-label="Name of {title}"
                           onpointerdown={(e) => e.stopPropagation()}
@@ -2776,7 +2748,7 @@
     songTitle={song.title}
     end={mixdownEnd(clips)}
     loop={timeline.loop && { ...timeline.loop, on: loopOn }}
-    plan={() => ({ clips: playable, gains: trackGains(levels), load: (source) => player.load(source) })}
+    plan={() => ({ clips: playable, gains: trackGains(timeline.tracks), load: (source) => player.load(source) })}
     onStart={() => transport.stop()}
     onClose={() => (mixingDown = false)}
   />
