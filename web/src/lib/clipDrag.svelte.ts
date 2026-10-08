@@ -22,8 +22,10 @@ import {
 // nudges its active Take within it; its gain line sets its Gain, finely
 // with Shift held; a dot at either end of the gain line sets its fade in or
 // fade out. It stops at its neighbours, the source's ends and 0:00 as it
-// goes, and is saved on release, if it changed. Until the save resolves,
-// the Clip is shown as it was dropped. Moved or trimmed, it snaps to other
+// goes, and is saved on release, if it changed. Moved, trimmed or nudged,
+// the Clip is shown as it was dropped until the save resolves; its Gain or
+// Fades are handed over on release, for Timeline editing to show until
+// saved (see timelineEditing.svelte.ts). Moved or trimmed, it snaps to other
 // Clips' edges, the playhead and the Loop's edges, unless Shift is held;
 // the Selection, moved together, snaps by any of its Clips' edges to those
 // of Clips outside it.
@@ -155,14 +157,25 @@ function snaps(mode: ClipDragMode): boolean {
   return mode === 'move' || mode === 'start' || mode === 'end';
 }
 
+/**
+ * Whether a drag holds the Clip as it was dropped until its save resolves:
+ * a move, a trim or a nudge, which Timeline editing doesn't show before
+ * it's saved. A Gain or a Fade is handed over to it on release.
+ */
+function holdsDropped(mode: ClipDragMode): boolean {
+  return mode !== 'gain' && !isFadeEnd(mode);
+}
+
 /** Whether a Clip is selected as it's grabbed, as clicking it does, rather than when let go: by its gain line or a fade dot. */
 function selectsAtPress(mode: ClipDragMode): boolean {
   return mode === 'gain' || isFadeEnd(mode);
 }
 
-/** A Clip drag on a Timeline, from press to release, and until its save resolves. */
+/** A Clip drag on a Timeline, from press to release, and for a move, a trim or a nudge, until its save resolves. */
 export class ClipDrag {
   #drag = $state<Drag | null>(null);
+  /** The save the drag holds the Clips as they were dropped for, while it does: only that one resolving lets them go. */
+  #held: DragSave | null = null;
   #selection: Selection;
   #context: DragContext;
 
@@ -172,7 +185,7 @@ export class ClipDrag {
     this.#context = context;
   }
 
-  /** The Clip pressed, while it's pressed, dragged or saving. */
+  /** The Clip pressed, while it's pressed, dragged, or held as dropped while saving. */
   get clip(): Clip | null {
     return this.#drag?.clip ?? null;
   }
@@ -187,7 +200,7 @@ export class ClipDrag {
     return this.#drag?.moved ?? false;
   }
 
-  /** Whether it's been let go, and its edit is saving. */
+  /** Whether it's been let go, holding the Clips as dropped while its edit is saving. */
   get saving(): boolean {
     return this.#drag?.saving ?? false;
   }
@@ -392,8 +405,9 @@ export class ClipDrag {
    * Lets go. Pressed and let go without dragging, the Clip is clicked: it's
    * selected alone, or with Mod held as it was pressed, added to the
    * Selection or taken out, unless it was selected as it was grabbed.
-   * Gives back the edit to save, holding the Clips as they were dropped
-   * until told it's saved, or null with nothing changed, ending the drag.
+   * Gives back the edit to save, or null with nothing changed. A move, a
+   * trim or a nudge holds the Clips as they were dropped until told it's
+   * saved; anything else ends the drag, as does nothing changed.
    */
   release(): DragSave | null {
     const drag = this.#drag;
@@ -403,8 +417,10 @@ export class ClipDrag {
       this.#selection.apply({ kind: drag.toggles ? 'toggle' : 'click', clipId: drag.clip.id });
     }
     const save = drag.moved ? this.#save(drag) : null;
-    if (save) drag.saving = true;
-    else this.#drag = null;
+    if (save && holdsDropped(drag.mode)) {
+      drag.saving = true;
+      this.#held = save;
+    } else this.#drag = null;
     return save;
   }
 
@@ -457,8 +473,14 @@ export class ClipDrag {
     };
   }
 
-  /** Its save resolved, saved or not: the Clips are shown as the Timeline has them again. */
-  saved() {
+  /**
+   * A save released resolved, saved or not: if the drag holds the Clips as
+   * they were dropped for it, they're shown as the Timeline has them again.
+   * Any other, e.g. a Gain handed over before this drag, leaves it be.
+   */
+  saved(save: DragSave) {
+    if (save !== this.#held) return;
+    this.#held = null;
     this.#drag = null;
   }
 

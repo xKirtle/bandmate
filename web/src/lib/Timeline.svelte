@@ -1406,9 +1406,10 @@
     stopListening();
     const save = clipDrag.release();
     if (!save) return;
-    // A move over Cues offers to move them along.
+    // A move over Cues offers to move them along. A Gain or Fades, handed
+    // over, show through Timeline editing until saved.
     await editing.saveDrag(save);
-    clipDrag.saved();
+    clipDrag.saved(save);
   }
 
   function editCancel() {

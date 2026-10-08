@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Clip, Song, Timeline, Track } from './api';
-import type { DragSave } from './clipDrag.svelte';
+import { ClipDrag, type DragAt, type DragSave } from './clipDrag.svelte';
 import { Saves } from './saves.svelte';
 import { Selection } from './selection.svelte';
 import { emptySong, FakeSongServer } from './songServerFake';
@@ -442,6 +442,98 @@ describe('Timeline editing, the Loop as shown', () => {
     expect(editing.preview({ kind: 'clearLoop' })).toBe(false);
     expect(editing.timeline.loop).toBeNull();
     expect(server.landed).toBe(0);
+  });
+});
+
+describe('Timeline editing, a Clip’s Gain and Fades as shown', () => {
+  /** A Clip on the Timeline as shown. */
+  const shownClip = (editing: TimelineEditing, clipId: number) =>
+    editing.timeline.tracks.flatMap((t) => t.clips).find((c) => c.id === clipId)!;
+
+  /** A Clip drag over the Timeline as shown, as the Timeline makes it, drawn at 10 px a second. */
+  const dragOver = (editing: TimelineEditing, selection: Selection) =>
+    new ClipDrag(selection, {
+      tracks: () => editing.timeline.tracks,
+      playhead: () => 0,
+      loop: () => null,
+      reach: () => 0.8,
+      sourceLength: () => 60,
+    });
+
+  /** The pointer at a time over Track 1's lane, `dy` px below its middle. */
+  const at = (time: number, dy = 0): DragAt => ({ point: { clientX: time * 10, clientY: 150 + dy }, time, trackId: 1 });
+  const keys = { free: false, toggles: false, nudges: false };
+
+  it('shows a Gain and Fades dragged and released until each is saved, the drag letting go of the Clip at once', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { saves, editing, selection } = await editingFor(server);
+    const drag = dragOver(editing, selection);
+    const release = server.holdNextAnswer();
+
+    // Its gain line, on a waveform 72 px tall, dragged 10 px up: +10 dB.
+    drag.press(shownClip(editing, 1), 'gain', at(5), keys, { waveHeight: 72 });
+    drag.move(at(5, -10));
+    const gaining = editing.saveDrag(drag.release()!);
+    expect(drag.clip).toBeNull();
+    expect(drag.shown).toEqual([]);
+    expect(shownClip(editing, 1)).toMatchObject({ gain: 10, fadeIn: 0 });
+    expect(saves.timeline.tracks[0].clips[0].gain).toBe(0);
+
+    // Its fade in's dot, dragged from where it rests to 0:04: a 4 s fade in.
+    drag.press(shownClip(editing, 1), 'fadeIn', at(0.5), keys, {
+      dots: { fadeIn: 0.5, fadeOut: 9.5, width: 0.6, rests: 0.5 },
+    });
+    drag.move(at(4));
+    const fading = editing.saveDrag(drag.release()!);
+    expect(drag.clip).toBeNull();
+    expect(shownClip(editing, 1)).toMatchObject({ gain: 10, fadeIn: 4, fadeOut: 0 });
+
+    release();
+    expect(await gaining).toBe(true);
+    expect(shownClip(editing, 1)).toMatchObject({ gain: 10, fadeIn: 4 });
+    expect(await fading).toBe(true);
+    expect(server.timeline.tracks[0].clips[0]).toMatchObject({ gain: 10, fadeIn: 4, fadeOut: 0 });
+    expect(editing.timeline).toBe(saves.timeline);
+  });
+
+  it('goes back to a Clip’s Gain as saved when its save fails, leaving its Fades showing', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { saves, editing } = await editingFor(server);
+    server.failNext(1);
+    const gaining = editing.saveDrag({ edit: { kind: 'setClipGain', clipId: 1, gain: 10 }, moved: null });
+    const release = server.holdNextAnswer();
+    const fading = editing.saveDrag({ edit: { kind: 'setClipFades', clipId: 1, fadeIn: 2, fadeOut: 3 }, moved: null });
+    expect(shownClip(editing, 1)).toMatchObject({ gain: 10, fadeIn: 2, fadeOut: 3 });
+    expect(await gaining).toBe(false);
+    expect(shownClip(editing, 1)).toMatchObject({ gain: 0, fadeIn: 2, fadeOut: 3 });
+    release();
+    await fading;
+    expect(server.timeline.tracks[0].clips[0]).toMatchObject({ gain: 0, fadeIn: 2, fadeOut: 3 });
+    expect(editing.timeline).toBe(saves.timeline);
+  });
+
+  it('goes back to a Clip’s Fades as saved when their save fails', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { saves, editing } = await editingFor(server);
+    server.failNext(1);
+    const fading = editing.saveDrag({ edit: { kind: 'setClipFades', clipId: 1, fadeIn: 2, fadeOut: 0 }, moved: null });
+    expect(shownClip(editing, 1).fadeIn).toBe(2);
+    expect(await fading).toBe(false);
+    expect(shownClip(editing, 1).fadeIn).toBe(0);
+    expect(editing.timeline).toBe(saves.timeline);
+  });
+
+  it('shows a Clip’s Gain reset at once', async () => {
+    const server = new FakeSongServer(emptySong(), [track(1, [{ ...beatClip(1, 0, 10), gain: 6 }])]);
+    const { saves, editing } = await editingFor(server);
+    const release = server.holdNextAnswer();
+    const resetting = editing.edit({ kind: 'setClipGain', clipId: 1, gain: 0 });
+    expect(shownClip(editing, 1).gain).toBe(0);
+    expect(saves.timeline.tracks[0].clips[0].gain).toBe(6);
+    release();
+    await resetting;
+    expect(server.timeline.tracks[0].clips[0].gain).toBe(0);
+    expect(editing.timeline).toBe(saves.timeline);
   });
 });
 
