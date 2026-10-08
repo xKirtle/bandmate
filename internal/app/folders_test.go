@@ -1,10 +1,14 @@
 package app_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
+
+	"github.com/xKirtle/bandmate/internal/db"
 )
 
 // folder is a Folder as the API returns it.
@@ -360,6 +364,95 @@ func TestDeletingAFoldersSongsRefusesAnotherCount(t *testing.T) {
 	expectStatus(t, ts.Do(http.MethodDelete, folderPath(ep.ID)+"?songs=delete&count=2", nil), http.StatusNoContent)
 	if got := ts.listSongs(); len(got) != 0 {
 		t.Errorf("songs = %v, want none", titles(got))
+	}
+}
+
+// Deleting a Folder with its Songs is all or nothing: if any of it fails,
+// the Folder still holds every Song, and their files are still there.
+func TestDeletingAFolderWithItsSongsThatFailsDeletesNothing(t *testing.T) {
+	ts := newTestServer(t)
+	ep := ts.createFolder("Summer EP")
+	songs := []song{ts.songWithMasters(), ts.uploadMaster(ts.createSong("Closer").ID, fakeAudio("closer.wav"))}
+	for _, s := range songs {
+		expectStatus(t, ts.moveSong(s.ID, &ep.ID), http.StatusNoContent)
+	}
+	files := masterFiles(t, ts)
+	ts.exec(`CREATE TRIGGER refuse_folder_delete BEFORE DELETE ON folders
+		BEGIN SELECT RAISE(ABORT, 'refused'); END`)
+
+	expectStatus(t, ts.Do(http.MethodDelete, folderPath(ep.ID)+"?songs=delete&count=2", nil),
+		http.StatusInternalServerError)
+
+	if got := folderSongs(ts.listFolders()); !reflect.DeepEqual(got, map[string]int{"Summer EP": 2}) {
+		t.Errorf("songs per folder = %v, want Summer EP still holding both", got)
+	}
+	for _, s := range songs {
+		if kept := ts.getSong(s.ID); len(kept.Masters) != len(s.Masters) {
+			t.Errorf("Song %q has %d Masters, want its %d", s.Title, len(kept.Masters), len(s.Masters))
+		}
+	}
+	if got := masterFiles(t, ts); !reflect.DeepEqual(got, files) {
+		t.Errorf("master files on disk = %q, want all of %q", got, files)
+	}
+}
+
+// A Song filed into a Folder while it's being deleted, say from another
+// tab, is never deleted without the user being asked about it: asked about
+// n Songs, the delete deletes those n or none.
+func TestDeletingAFolderNeverDeletesASongFiledInMeanwhile(t *testing.T) {
+	ts := newTestServer(t)
+	for round := range 20 {
+		ep := ts.createFolder(fmt.Sprintf("Summer EP %d", round))
+		asked := ts.createSong("Opener")
+		expectStatus(t, ts.moveSong(asked.ID, &ep.ID), http.StatusNoContent)
+		filed := ts.createSong("Filed meanwhile")
+
+		// Filed from another goroutine, which mustn't fail the test itself.
+		moved := make(chan error)
+		go func() {
+			body := strings.NewReader(fmt.Sprintf(`{"folderId": %d}`, ep.ID))
+			req, err := http.NewRequest(http.MethodPut, ts.srv.URL+songPath(filed.ID)+"/folder", body)
+			if err == nil {
+				var res *http.Response
+				if res, err = ts.srv.Client().Do(req); err == nil {
+					res.Body.Close()
+				}
+			}
+			moved <- err
+		}()
+		res := ts.Do(http.MethodDelete, folderPath(ep.ID)+"?songs=delete&count=1", nil)
+		if err := <-moved; err != nil {
+			t.Fatalf("round %d: filing a Song: %v", round, err)
+		}
+
+		filedGone := ts.Do(http.MethodGet, songPath(filed.ID), nil).Status == http.StatusNotFound
+		switch res.Status {
+		case http.StatusNoContent:
+			if filedGone {
+				t.Fatalf("round %d: the Song filed meanwhile was deleted, unseen", round)
+			}
+		case http.StatusConflict:
+			if filedGone || ts.Do(http.MethodGet, songPath(asked.ID), nil).Status == http.StatusNotFound {
+				t.Fatalf("round %d: refused, yet deleted a Song", round)
+			}
+			expectStatus(t, ts.Do(http.MethodDelete, folderPath(ep.ID)+"?songs=keep", nil), http.StatusNoContent)
+		default:
+			t.Fatalf("round %d: status %d, want 204 or 409", round, res.Status)
+		}
+	}
+}
+
+// exec runs a statement straight on the database, e.g. to make a later
+// change fail.
+func (ts *testServer) exec(stmt string) {
+	ts.t.Helper()
+	conn, err := db.Open(context.Background(), ts.DataDir)
+	if err != nil {
+		ts.t.Fatalf("opening database: %v", err)
+	}
+	defer conn.Close()
+	if _, err := conn.Exec(stmt); err != nil {
+		ts.t.Fatalf("running %q: %v", stmt, err)
 	}
 }
 
