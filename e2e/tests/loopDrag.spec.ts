@@ -1,33 +1,38 @@
 import type { Page } from '@playwright/test';
 import type { Bandmate, Loop } from '../bandmate';
 import { expect, test } from '../fixtures';
-import { clip, drag, heroSong, loopBar, loopButton, middleOf, timeline, type Point } from '../songPage';
+import { clip, drag, heroSong, loopBar, loopButton, loopEdge, middleOf, timeline, type Point } from '../songPage';
 
 // Dragging the Loop along the top of the ruler, on the demo Backup's hero
 // Song: marking a new one, moving its edges, snapping them to Clips' edges
 // or not with Shift held, and what sets nothing. Its Beat's Clip runs from
 // 0:00 to 1:30 and Take 2 from 0:04 to 0:25, so nothing is near 0:30 to 1:20
-// to snap to, and the playhead stays at 0:00.
+// to snap to, and the playhead stays at 0:00. Where something lands unsnapped
+// is checked to within two pixels' worth of seconds.
 
-/** One of the Loop's edges, dragged to move it. */
-const loopEdge = (page: Page, edge: 'start' | 'end') => timeline(page).getByTitle(`Drag to move the Loop's ${edge}`);
+/** How long the hero Song's Beat's Clip runs, from 0:00, in seconds. */
+const beatLength = 90;
+
+/** Where the Beat's Clip is on screen, to measure the Timeline off. */
+async function beatBox(page: Page) {
+  const box = await clip(page, 'Lorem Click').boundingBox();
+  if (!box) throw new Error("The Beat's Clip is not on screen");
+  return box;
+}
 
 /**
  * Where a time is on the top of the ruler, measured off the Beat's Clip,
- * which runs from 0:00 to 1:30, so the tests don't depend on the zoom.
+ * so the tests don't depend on the zoom.
  */
 async function loopBarAt(page: Page, time: number): Promise<Point> {
-  const beat = await clip(page, 'Lorem Click').boundingBox();
-  if (!beat) throw new Error("The Beat's Clip is not on screen");
+  const beat = await beatBox(page);
   const { y } = await middleOf(loopBar(page));
-  return { x: beat.x + (time / 90) * beat.width, y };
+  return { x: beat.x + (time / beatLength) * beat.width, y };
 }
 
 /** How many seconds a pixel is along the Timeline. */
 async function secondsPerPixel(page: Page): Promise<number> {
-  const beat = await clip(page, 'Lorem Click').boundingBox();
-  if (!beat) throw new Error("The Beat's Clip is not on screen");
-  return 90 / beat.width;
+  return beatLength / (await beatBox(page)).width;
 }
 
 /** Drags from one point on the page to another. */
@@ -42,8 +47,14 @@ async function dragEdge(page: Page, edge: 'start' | 'end', to: Point) {
 
 /** The server's Loop, once it's no longer what it was. */
 async function savedLoop(bandmate: Bandmate, songId: number, was: Loop | null): Promise<Loop> {
-  await expect.poll(async () => (await bandmate.timeline(songId)).loop ?? null).not.toEqual(was);
-  return (await bandmate.timeline(songId)).loop!;
+  let loop: Loop | null = null;
+  await expect
+    .poll(async () => {
+      loop = (await bandmate.timeline(songId)).loop ?? null;
+      return loop;
+    })
+    .not.toEqual(was);
+  return loop!;
 }
 
 /** Opens a Song's page, with its Timeline's Clips shown. */
@@ -68,8 +79,8 @@ test('dragging along the top of the ruler marks a new Loop, switched on, where i
   await expect(loopButton(page)).toHaveAttribute('aria-pressed', 'true');
   const loop = await savedLoop(bandmate, song.id, was);
   expect(loop.on).toBe(true);
-  expect(Math.abs(loop.start - 40)).toBeLessThanOrEqual(pixel);
-  expect(Math.abs(loop.end - 60)).toBeLessThanOrEqual(pixel);
+  expect(Math.abs(loop.start - 40)).toBeLessThanOrEqual(2 * pixel);
+  expect(Math.abs(loop.end - 60)).toBeLessThanOrEqual(2 * pixel);
 });
 
 test("dragging the Loop's start or end moves only that edge", async ({ page, bandmate }) => {
@@ -82,13 +93,13 @@ test("dragging the Loop's start or end moves only that edge", async ({ page, ban
   // The start, earlier.
   await dragEdge(page, 'start', await loopBarAt(page, 32));
   const started = await savedLoop(bandmate, song.id, was);
-  expect(Math.abs(started.start - 32)).toBeLessThanOrEqual(pixel);
+  expect(Math.abs(started.start - 32)).toBeLessThanOrEqual(2 * pixel);
   expect(started).toMatchObject({ end: 60, on: true });
 
   // The end, later.
   await dragEdge(page, 'end', await loopBarAt(page, 75));
   const ended = await savedLoop(bandmate, song.id, started);
-  expect(Math.abs(ended.end - 75)).toBeLessThanOrEqual(pixel);
+  expect(Math.abs(ended.end - 75)).toBeLessThanOrEqual(2 * pixel);
   expect(ended).toMatchObject({ start: started.start, on: true });
 });
 
@@ -131,9 +142,9 @@ test("a Loop edge dragged near a Clip's edge snaps to it, and with Shift held it
   await page.keyboard.up('Shift');
 
   expect(freeStart.start).toBeGreaterThan(25);
-  expect(Math.abs(freeStart.start - (25 + off * pixel))).toBeLessThanOrEqual(pixel);
+  expect(Math.abs(freeStart.start - (25 + off * pixel))).toBeLessThanOrEqual(2 * pixel);
   expect(freeEnd.end).toBeLessThan(90);
-  expect(Math.abs(freeEnd.end - (90 - off * pixel))).toBeLessThanOrEqual(pixel);
+  expect(Math.abs(freeEnd.end - (90 - off * pixel))).toBeLessThanOrEqual(2 * pixel);
   expect(freeEnd.start).toBe(freeStart.start);
 });
 
@@ -146,13 +157,15 @@ test('a click on the top of the ruler, or a drag shorter than the shortest Loop,
   await open(page, song.id);
   const undo = timeline(page).getByRole('button', { name: 'Undo' });
   const before = await bandmate.timeline(song.id);
+  // A save of the Loop it already has wouldn't change what the server holds, so saves are counted too.
   const saves: string[] = [];
   page.on('request', (r) => r.method() !== 'GET' && saves.push(`${r.method()} ${r.url()}`));
   const at = await loopBarAt(page, 40);
 
   // A click.
   await page.mouse.click(at.x, at.y);
-  // A drag out and back to where it was pressed: a Loop shorter than the shortest.
+  // A drag out and back to where it was pressed, by hand as drag() only goes one way:
+  // a Loop shorter than the shortest.
   await page.mouse.move(at.x, at.y);
   await page.mouse.down();
   await page.mouse.move(at.x + 60, at.y, { steps: 5 });
