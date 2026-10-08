@@ -111,6 +111,37 @@ describe('detailFields', () => {
     expect(server.song.notes).toBe('Half time');
     expect(saves.unsaved).toBe(false);
   });
+
+  it('saves a custom tuning’s notes typed as the tuning', async () => {
+    const { server, saves, details: d } = await details({ tuning: 'Drop D' });
+    expect(d.customTuning.shown).toBe('D A D G B E');
+    d.customTuning.shown = 'c g d g b d';
+    expect(saves.unsaved).toBe(true);
+    d.customTuning.commit();
+    expect(d.tuning.shown).toBe('C G D G B D');
+    await settled();
+    expect(server.song.tuning).toBe('C G D G B D');
+    expect(saves.unsaved).toBe(false);
+  });
+
+  it('saves a custom tuning’s notes typed as the page goes', async () => {
+    const { server, saves, details: d } = await details();
+    d.customTuning.shown = 'C G D G B D';
+    // As the Song page destroys them, in order.
+    for (const field of Object.values(d)) field.destroy();
+    await settled();
+    expect(server.song.tuning).toBe('C G D G B D');
+    expect(saves.unsaved).toBe(false);
+  });
+
+  it('says a custom tuning’s notes that can’t be read must be six notes', async () => {
+    const { server, saves, details: d } = await details();
+    d.customTuning.shown = 'C G D';
+    expect(d.customTuning.commit()).toBe(false);
+    expect(saves.saveError).toBe('A custom tuning is six notes, low string to high, like D A D G B E');
+    await settled();
+    expect(server.landed).toBe(0);
+  });
 });
 
 /** A Master of the Song, as uploaded. */

@@ -1,13 +1,21 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import { tuningName, tuningNotes, tunings, tuningText } from './chordFinder';
+  import { tuningName, tuningNotes, tunings } from './chordFinder';
+  import { customTuningField } from './customTuning';
   import Picker from './Picker.svelte';
+  import { committedAsItGoes, type TypedField } from './typedField.svelte';
 
   // A Song's tuning in its Details: a picker of the named tunings, or six
   // notes for a custom one. It stays text on the Song: the picker writes a
   // tuning's name, or its six notes. Text that can't be read (ADR 0008) is
   // kept and shown as written, until another tuning is picked. The Chord
   // Finder's page uses it too, where there's always a tuning.
+  //
+  // A custom tuning's notes are a field typed in place (see customTuning.ts):
+  // Enter or blur sets them as the tuning, and Esc takes them back. The Song
+  // page gives its own, among its Details, which sets them as the tuning
+  // when left behind too, e.g. as Read mode shows. Without one, the field
+  // keeps its own, which nothing else knows of.
   let {
     id,
     labelledby,
@@ -15,6 +23,7 @@
     allowNone = true,
     oncommit,
     oninvalid,
+    customNotes,
   }: {
     id: string;
     /** The id of what labels the picker. */
@@ -27,6 +36,8 @@
     oncommit: () => void;
     /** Custom notes couldn't be read, so nothing was saved. */
     oninvalid: (message: string) => void;
+    /** A custom tuning's notes as a field, set as the tuning when left behind (see customTuningField). */
+    customNotes?: TypedField<string>;
   } = $props();
 
   type Choice = { kind: 'none' } | { kind: 'named'; name: string } | { kind: 'custom' } | { kind: 'unreadable' };
@@ -54,9 +65,19 @@
     ...(valueChoice === unreadable ? [unreadable] : []),
   ]);
 
-  // The notes being typed for a custom tuning: those of the tuning picked so
-  // far, or standard tuning's.
-  let notes = $state('');
+  // The notes for a custom tuning: those of the tuning picked so far, or
+  // standard tuning's, until typed in.
+  const ownNotes = customTuningField({
+    tuning: () => value,
+    commit: (text) => {
+      value = text;
+      oncommit();
+    },
+    invalid: (message) => oninvalid(message),
+    // On no list: there's nothing else to save them.
+    typing: () => () => {},
+  });
+  const notes = $derived(customNotes ?? ownNotes);
   let notesField = $state<HTMLInputElement>();
 
   function label(c: Choice): string {
@@ -74,13 +95,14 @@
 
   async function pick(c: Choice) {
     if (c.kind === 'custom') {
-      notes = tuningNotes(value) ?? tuningNotes(tunings[0])!;
       customising = true;
       await tick();
       notesField?.focus();
       notesField?.select();
       return;
     }
+    // Another tuning picked drops the notes typed, rather than set them as they go.
+    notes.cancel();
     customising = false;
     if (c.kind === 'unreadable') return;
     value = c.kind === 'named' ? c.name : '';
@@ -88,34 +110,19 @@
   }
 
   function commitNotes() {
-    const text = tuningText(notes);
-    if (!text) {
-      oninvalid('A custom tuning is six notes, low string to high, like D A D G B E');
-      return;
-    }
-    customising = false;
-    notes = text;
-    value = text;
-    oncommit();
+    if (notes.commit()) customising = false;
   }
 
   // Esc takes back the notes typed: back to the tuning as it is, and to the
   // picker if that isn't a custom one.
   async function notesKey(event: KeyboardEvent) {
     if (event.key !== 'Escape') return;
+    notes.cancel();
     customising = false;
-    if (valueChoice === custom) {
-      notes = value.trim();
-      return;
-    }
+    if (valueChoice === custom) return;
     await tick();
     document.getElementById(id)?.focus();
   }
-
-  // Custom notes as saved show in the field, and change as the Song does.
-  $effect(() => {
-    if (valueChoice === custom && !customising) notes = value.trim();
-  });
 </script>
 
 <div class="tuning-field">
@@ -124,7 +131,8 @@
     <input
       class="notes"
       bind:this={notesField}
-      bind:value={notes}
+      bind:value={notes.shown}
+      {@attach customNotes && committedAsItGoes(customNotes)}
       onchange={commitNotes}
       onkeydown={notesKey}
       aria-label="Custom tuning: six notes, low string to high"

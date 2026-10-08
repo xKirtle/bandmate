@@ -9,6 +9,7 @@ import {
   namedClip,
   cueName,
   cueOf,
+  customTuningNotes,
   dragMiddleOf,
   middleOf,
   dragClip,
@@ -16,6 +17,7 @@ import {
   fadeDot,
   gainLine,
   heroSong,
+  pickCustomTuning,
   serverClips,
   serverCues,
   timeline,
@@ -981,4 +983,79 @@ test('a name being typed makes closing the tab ask first', async ({ page, bandma
   await expect(timeline(page).getByRole('button', { name: 'Choose Track 1' })).toBeVisible();
   expect(await warnsOnLeaving(page)).toBe(false);
   expect((await bandmate.timeline(song.id)).tracks.map((t) => t.name)).toEqual(['Track 1']);
+});
+
+test('custom tuning notes being typed make closing the tab ask first, and Esc takes them back', async ({
+  page,
+  bandmate,
+}) => {
+  const song = await bandmate.song({ title: 'Anthem' });
+  await page.goto(`/songs/${song.id}`);
+  const notes = await pickCustomTuning(page);
+  // Custom picked but nothing typed, nothing is unsaved.
+  await expect(notes).toHaveValue('E A D G B E');
+  expect(await warnsOnLeaving(page)).toBe(false);
+
+  await notes.fill('C G D G');
+  expect(await warnsOnLeaving(page)).toBe(true);
+
+  // Esc takes them back, to the tuning as it was, and nothing is unsaved again.
+  await notes.press('Escape');
+  await expect(notes).toHaveCount(0);
+  await expect(page.getByRole('combobox', { name: 'Tuning' })).toHaveText('—');
+  expect(await warnsOnLeaving(page)).toBe(false);
+  expect((await bandmate.getSong(song.id)).tuning).toBe('');
+
+  // With a custom tuning saved, Esc takes them back to its notes.
+  await (await pickCustomTuning(page)).fill('C G D G B D');
+  await notes.press('Enter');
+  await expect.poll(async () => (await bandmate.getSong(song.id)).tuning).toBe('C G D G B D');
+  await notes.fill('C G C G C E');
+  expect(await warnsOnLeaving(page)).toBe(true);
+  await notes.press('Escape');
+  await expect(notes).toHaveValue('C G D G B D');
+  await expect(page.getByRole('combobox', { name: 'Tuning' })).toHaveText('Custom');
+  expect(await warnsOnLeaving(page)).toBe(false);
+});
+
+test('custom tuning notes that can’t be read are dropped for another tuning picked', async ({ page, bandmate }) => {
+  const song = await bandmate.song({ title: 'Anthem' });
+  await page.goto(`/songs/${song.id}`);
+  await (await pickCustomTuning(page)).fill('C G D');
+  await page.getByRole('combobox', { name: 'Tuning' }).click();
+  await expect(saveError(page)).toHaveText('A custom tuning is six notes, low string to high, like D A D G B E');
+  await page.getByRole('option', { name: 'Drop D' }).click();
+  await expect(customTuningNotes(page)).toHaveCount(0);
+  await expect.poll(async () => (await bandmate.getSong(song.id)).tuning).toBe('Drop D');
+  expect(await warnsOnLeaving(page)).toBe(false);
+});
+
+test('custom tuning notes typed and then left behind are saved', async ({ page, bandmate }) => {
+  const song = await bandmate.song({ title: 'Anthem' });
+  // Opened from the Songs list, so Back stays in the app.
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Anthem', exact: true }).click();
+
+  // Left for Read mode.
+  await (await pickCustomTuning(page)).fill('c g d g b d');
+  await page.getByRole('radio', { name: 'Read' }).check();
+  await expect.poll(async () => (await bandmate.getSong(song.id)).tuning).toBe('C G D G B D');
+  await expect(page.getByRole('region', { name: 'Details' })).toContainText('C G D G B D');
+
+  // Left with Back.
+  await page.getByRole('radio', { name: 'Write' }).check();
+  await customTuningNotes(page).fill('C G C G C E');
+  await page.goBack();
+  await expect(page.getByRole('heading', { level: 1, name: 'Songs' })).toBeVisible();
+  await expect.poll(async () => (await bandmate.getSong(song.id)).tuning).toBe('C G C G C E');
+});
+
+test('custom tuning notes that can’t be read are dropped as they’re left behind', async ({ page, bandmate }) => {
+  const song = await bandmate.song({ title: 'Anthem' });
+  await page.goto(`/songs/${song.id}`);
+  await (await pickCustomTuning(page)).fill('C G D');
+  await page.getByRole('radio', { name: 'Read' }).check();
+  await expect(saveError(page)).toHaveText('A custom tuning is six notes, low string to high, like D A D G B E');
+  expect(await warnsOnLeaving(page)).toBe(false);
+  expect((await bandmate.getSong(song.id)).tuning).toBe('');
 });

@@ -441,6 +441,7 @@
                   bind:value={details.tuning.shown}
                   oncommit={() => details?.tuning.commit()}
                   oninvalid={saves.report}
+                  customNotes={details.customTuning}
                 />
               </div>
               {@render notesToggle()}

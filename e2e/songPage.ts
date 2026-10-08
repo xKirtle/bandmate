@@ -2,7 +2,8 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import type { Bandmate, Clip, Song } from './bandmate';
 
 // The Song page, as its tests find it: the Timeline and its Clips, the Lyric
-// Sheet's Cues, and the server's Timeline and Cues to read back.
+// Sheet's Cues, the tuning field it shares with the Chord Finder, and the
+// server's Timeline and Cues to read back.
 
 /** The demo Backup's hero Song, restored, with its Beat's Clip and a Clip of two Takes on the Timeline. */
 export async function heroSong(bandmate: Bandmate): Promise<Song> {
@@ -185,4 +186,16 @@ export async function warnsOnLeaving(page: Page): Promise<boolean> {
     window.dispatchEvent(leaving);
     return leaving.defaultPrevented;
   });
+}
+
+/** A tuning field's notes for a custom tuning, on the Song page or the Chord Finder's. */
+export const customTuningNotes = (page: Page): Locator =>
+  page.getByRole('textbox', { name: 'Custom tuning: six notes, low string to high' });
+
+/** Picks Custom in the tuning field, focusing its notes to type, and returns them. */
+export async function pickCustomTuning(page: Page): Promise<Locator> {
+  await page.getByRole('combobox', { name: 'Tuning' }).click();
+  await page.getByRole('option', { name: 'Custom' }).click();
+  await expect(customTuningNotes(page)).toBeFocused();
+  return customTuningNotes(page);
 }
