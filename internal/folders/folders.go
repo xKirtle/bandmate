@@ -172,8 +172,8 @@ func (s *Store) MoveSong(ctx context.Context, songID int64, folderID *int64) err
 	return tx.Commit()
 }
 
-// check refuses, as invalid, a Folder that doesn't exist, for
-// putting a Song into it. A nil one, none, is always there.
+// check refuses, as invalid, a Folder that doesn't exist, for putting a
+// Song into it. A nil one, none, is always there.
 func check(ctx context.Context, tx *sql.Tx, folderID *int64) error {
 	if folderID == nil {
 		return nil

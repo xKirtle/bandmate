@@ -32,10 +32,12 @@ type Error struct {
 	// client can act on it, e.g. "stale" for a change to an out-of-date Song.
 	Code string
 	// Details, when set, are what the client needs to explain the refusal,
-	// e.g. the Songs using a Beat.
+	// e.g. the Songs using a Beat. They're sent beside the message and the
+	// code, so neither "error" nor "code" is a key of theirs.
 	Details map[string]any
 }
 
+// Error is the message.
 func (e *Error) Error() string { return e.Msg }
 
 // Invalid is a request that can't be carried out as asked.
@@ -91,6 +93,7 @@ type Change[T any] struct {
 	Value T
 }
 
+// UnmarshalJSON marks the field Set, as it was sent, and reads its value.
 func (c *Change[T]) UnmarshalJSON(b []byte) error {
 	c.Set = true
 	return json.Unmarshal(b, &c.Value)

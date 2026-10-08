@@ -552,8 +552,8 @@ func queryIDs(ctx context.Context, tx *sql.Tx, stmt string, args ...any) ([]int6
 }
 
 // expectCurrent checks that a write to a Song, guarded by the version it
-// was based on, matched the Song. If not, the Song is gone (domain.ErrNotFound) or
-// has moved on to a newer version (ErrStale).
+// was based on, matched the Song. If not, the Song is gone
+// (domain.ErrNotFound) or has moved on to a newer version (ErrStale).
 func expectCurrent(ctx context.Context, db domain.Queryer, res sql.Result, id int64) error {
 	if err := domain.ExpectOneRow(res); !errors.Is(err, domain.ErrNotFound) {
 		return err

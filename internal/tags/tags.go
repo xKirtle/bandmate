@@ -21,8 +21,8 @@ var (
 	errCommaInName = domain.Invalid("a Tag's name can't have a comma")
 )
 
-// cleanName is a Tag's name as given, trimmed, or invalid if it's
-// blank or has a comma: a comma finishes a Tag as it's typed.
+// cleanName is a Tag's name as given, trimmed, or invalid if it's blank or
+// has a comma: a comma finishes a Tag as it's typed.
 func cleanName(name string) (string, error) {
 	name = strings.TrimSpace(name)
 	switch {
