@@ -1,14 +1,11 @@
 package app_test
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"reflect"
 	"strings"
 	"testing"
-
-	"github.com/xKirtle/bandmate/internal/db"
 )
 
 // folder is a Folder as the API returns it.
@@ -377,8 +374,7 @@ func TestDeletingAFolderWithItsSongsThatFailsDeletesNothing(t *testing.T) {
 		expectStatus(t, ts.moveSong(s.ID, &ep.ID), http.StatusNoContent)
 	}
 	files := masterFiles(t, ts)
-	ts.exec(`CREATE TRIGGER refuse_folder_delete BEFORE DELETE ON folders
-		BEGIN SELECT RAISE(ABORT, 'refused'); END`)
+	ts.failStatements(deletes, "folders")
 
 	expectStatus(t, ts.Do(http.MethodDelete, folderPath(ep.ID)+"?songs=delete&count=2", nil),
 		http.StatusInternalServerError)
@@ -439,20 +435,6 @@ func TestDeletingAFolderNeverDeletesASongFiledInMeanwhile(t *testing.T) {
 		default:
 			t.Fatalf("round %d: status %d, want 204 or 409", round, res.Status)
 		}
-	}
-}
-
-// exec runs a statement straight on the database, e.g. to make a later
-// change fail.
-func (ts *testServer) exec(stmt string) {
-	ts.t.Helper()
-	conn, err := db.Open(context.Background(), ts.DataDir)
-	if err != nil {
-		ts.t.Fatalf("opening database: %v", err)
-	}
-	defer conn.Close()
-	if _, err := conn.Exec(stmt); err != nil {
-		ts.t.Fatalf("running %q: %v", stmt, err)
 	}
 }
 

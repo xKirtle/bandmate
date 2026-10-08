@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,11 +11,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
+	"strings"
 	"testing"
 	"testing/fstest"
 	"time"
 
 	"github.com/xKirtle/bandmate/internal/app"
+	"github.com/xKirtle/bandmate/internal/db"
 )
 
 // testSPA stands in for the built Svelte app, so API tests don't depend on a
@@ -74,6 +77,41 @@ func (ts *testServer) Stop() {
 	ts.srv = nil
 	if err := ts.app.Close(); err != nil {
 		ts.t.Errorf("closing app: %v", err)
+	}
+}
+
+// statement is a kind of statement the database can be made to fail.
+type statement string
+
+const (
+	inserts statement = "INSERT"
+	updates statement = "UPDATE"
+	deletes statement = "DELETE"
+)
+
+// failStatements injects a database fault: from now until the test ends, the
+// database fails every statement of the given kind on table, with an error
+// that isn't a domain error, so the request making it fails partway. It's
+// how a test shows, through the API, what a failure the API can't cause
+// does, e.g. that a change failing partway changes nothing.
+func (ts *testServer) failStatements(kind statement, table string) {
+	ts.t.Helper()
+	trigger := fmt.Sprintf("injected_fault_%s_%s", strings.ToLower(string(kind)), table)
+	ts.exec(fmt.Sprintf(`CREATE TRIGGER %s BEFORE %s ON %s
+		BEGIN SELECT RAISE(ABORT, 'injected fault: %s on %s'); END`, trigger, kind, table, kind, table))
+	ts.t.Cleanup(func() { ts.exec("DROP TRIGGER " + trigger) })
+}
+
+// exec runs a statement straight on the database.
+func (ts *testServer) exec(stmt string) {
+	ts.t.Helper()
+	conn, err := db.Open(context.Background(), ts.DataDir)
+	if err != nil {
+		ts.t.Fatalf("opening database: %v", err)
+	}
+	defer conn.Close()
+	if _, err := conn.Exec(stmt); err != nil {
+		ts.t.Fatalf("running %q: %v", stmt, err)
 	}
 }
 
