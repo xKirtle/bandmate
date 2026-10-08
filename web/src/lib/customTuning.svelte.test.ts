@@ -3,7 +3,7 @@ import { customTuningField } from './customTuning';
 import type { Typing } from './saves.svelte';
 
 /** The notes of a custom tuning, typed against a tuning that commits set. */
-function notesField(tuning = 'Standard', withTyping = true) {
+function notesField(tuning = 'Standard') {
   const state = { tuning, committed: [] as string[], invalid: [] as string[], typing: [] as Typing[] };
   const field = customTuningField({
     tuning: () => state.tuning,
@@ -12,12 +12,10 @@ function notesField(tuning = 'Standard', withTyping = true) {
       state.tuning = text;
     },
     invalid: (message) => state.invalid.push(message),
-    typing: withTyping
-      ? (entry) => {
-          state.typing.push(entry);
-          return () => (state.typing = state.typing.filter((t) => t !== entry));
-        }
-      : undefined,
+    typing: (entry) => {
+      state.typing.push(entry);
+      return () => (state.typing = state.typing.filter((t) => t !== entry));
+    },
   });
   return { state, field };
 }
@@ -87,12 +85,5 @@ describe('customTuningField', () => {
     expect(state.committed).toEqual([]);
     expect(field.shown).toBe('E A D G B E');
     expect(state.typing).toEqual([]);
-  });
-
-  it('types without a list of edits being typed', () => {
-    const { state, field } = notesField('Standard', false);
-    field.shown = 'C G D G B D';
-    expect(field.commit()).toBe(true);
-    expect(state.committed).toEqual(['C G D G B D']);
   });
 });

@@ -12,11 +12,8 @@ export interface CustomTuningOptions {
   commit: (text: string) => void;
   /** Says why the notes typed can't be read. */
   invalid: (message: string) => void;
-  /**
-   * Puts the notes typed on a list of edits being typed, e.g. Saves', until
-   * the function returned is called. Without one, they're on no list.
-   */
-  typing?: (entry: Typing) => () => void;
+  /** Puts the notes typed on a list of edits being typed, e.g. Saves', until the function returned is called. */
+  typing: (entry: Typing) => () => void;
 }
 
 /**
@@ -37,6 +34,6 @@ export function customTuningField(options: CustomTuningOptions): TypedField<stri
       return { message };
     },
     commit: options.commit,
-    typing: options.typing ?? (() => () => {}),
+    typing: options.typing,
   });
 }

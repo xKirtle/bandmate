@@ -1,7 +1,8 @@
-// The Song page's fields typed in place: its Details, and a Master's name
-// and notes. Each is a TypedField (see typedField.svelte.ts) with its own
+// The Song page's fields typed in place: its Details, a custom tuning's
+// notes among them, and a Master's name and notes. Each is a TypedField (see typedField.svelte.ts) with its own
 // rule for what's typed.
 import type { Master, MasterChanges, Song, SongAt, SongChanges } from './api';
+import { customTuningField } from './customTuning';
 import type { Saves, Typing } from './saves.svelte';
 import { TypedField, type Parsed, type TypedFieldOptions } from './typedField.svelte';
 
@@ -14,6 +15,8 @@ export interface DetailFields {
   key: TypedField<string>;
   bpm: TypedField<number | null>;
   capo: TypedField<number | null>;
+  /** A custom tuning's notes, typed in the tuning field, and set as the tuning; before it, so it's committed first. */
+  customTuning: TypedField<string>;
   tuning: TypedField<string>;
   notes: TypedField<string>;
 }
@@ -59,12 +62,22 @@ export function detailFields(saves: Saves, update: UpdateSong): DetailFields {
       typing: saves.typing,
     });
 
+  const tuning = text('tuning');
   return {
     title: text('title'),
     key: text('key'),
     bpm: number('bpm', 'BPM'),
     capo: number('capo', 'Capo'),
-    tuning: text('tuning'),
+    customTuning: customTuningField({
+      tuning: () => tuning.shown,
+      commit: (typed) => {
+        tuning.shown = typed;
+        tuning.commit();
+      },
+      invalid: saves.report,
+      typing: saves.typing,
+    }),
+    tuning,
     notes: text('notes'),
   };
 }
