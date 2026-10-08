@@ -25,7 +25,8 @@
   import { inputProblem } from './capture';
   import { chosenTrack, readChosen, storeChosen, type ChoiceEvent } from './chosenTrack';
   import { ClipDrag, type ClipGrip, type ClipMeasure, type DragAt } from './clipDrag.svelte';
-  import { LoopDrag, type LoopAt } from './loopDrag.svelte';
+  import { LoopDrag } from './loopDrag.svelte';
+  import { PointerFollow, type EdgeScroll, type PointerAt } from './pointerFollow';
   import { guideLanes, reachAt } from './snapping';
   import { clipSources, clipTitle, fileStart, playing } from './clipSource';
   import { formatCue } from './cues';
@@ -63,7 +64,6 @@
   } from './clipboard';
   import {
     addsBox,
-    isModifier,
     nudges,
     rulerSeek,
     skipsSnapping,
@@ -509,6 +509,9 @@
     dragFrame = 0;
   }
   onDestroy(dragDone);
+
+  /** Scrolling along at the edges, for the drags that follow the pointer (see pointerFollow.ts). */
+  const edgeScroll: EdgeScroll = { along: dragAt, done: dragDone };
 
   function pointerDown(event: PointerEvent) {
     // A second finger is pinching.
@@ -1358,23 +1361,30 @@
     // trims it; its gain line sets its Gain, and a fade dot its Fade.
     const keys = { free: skipsSnapping(event), toggles, nudges: nudges(event) };
     clipDrag.press(clip, grip, clipDragAt(event), keys, measureClip(element, grip));
-    window.addEventListener('pointermove', editMove);
-    window.addEventListener('pointerup', editUp);
-    window.addEventListener('pointercancel', editCancel);
-    window.addEventListener('keydown', editModifier);
-    window.addEventListener('keyup', editModifier);
+    clipFollow.start();
   }
 
-  /** Where the pointer last dragged a Clip to. */
-  let editAt: Point = { clientX: 0, clientY: 0 };
-
-  // A modifier pressed or let go mid-drag, e.g. the Shift that skips
-  // snapping, or drags the gain line finely, goes there and then, without
-  // waiting for the pointer to move.
-  function editModifier(event: KeyboardEvent) {
-    if (!isModifier(event.key) || !clipDrag.clip) return;
-    clipDrag.modifier(skipsSnapping(event), clipDragAt(editAt));
-  }
+  // The pointer followed for a Clip drag. A modifier pressed or let go
+  // mid-drag, e.g. the Shift that skips snapping, or drags the gain line
+  // finely, goes there and then, without waiting for the pointer to move.
+  const clipFollow = new PointerFollow<DragAt>(
+    {
+      at: clipDragAt,
+      move: (at, free) => {
+        if (!clipDrag.move(at, free)) return false;
+        clearTimeout(pressTimer);
+        // The gain line goes up and down only, so it never scrolls along.
+        return clipDrag.mode !== 'gain';
+      },
+      modifier: (free, at) => clipDrag.modifier(free, at),
+      up: editUp,
+      cancel: () => {
+        clearTimeout(pressTimer);
+        clipDrag.cancel();
+      },
+    },
+    edgeScroll,
+  );
 
   /**
    * What ClipDrag needs of a Clip pressed by its gain line, how tall its
@@ -1401,18 +1411,8 @@
     };
   }
 
-  function editMove(event: Point) {
-    // Scrolling along at an edge moves it too, with no keys to go by.
-    const free = 'shiftKey' in event ? skipsSnapping(event as PointerEvent) : undefined;
-    if (!clipDrag.move(clipDragAt(event), free)) return;
-    clearTimeout(pressTimer);
-    editAt = { clientX: event.clientX, clientY: event.clientY };
-    // The gain line goes up and down only, so it never scrolls along.
-    if (clipDrag.mode !== 'gain') dragAt(event, editMove);
-  }
-
   async function editUp() {
-    stopListening();
+    clearTimeout(pressTimer);
     const save = clipDrag.release();
     if (!save) return;
     // A move over Cues offers to move them along. A Gain or Fades, handed
@@ -1428,12 +1428,7 @@
 
   function stopListening() {
     clearTimeout(pressTimer);
-    dragDone();
-    window.removeEventListener('pointermove', editMove);
-    window.removeEventListener('pointerup', editUp);
-    window.removeEventListener('pointercancel', editCancel);
-    window.removeEventListener('keydown', editModifier);
-    window.removeEventListener('keyup', editModifier);
+    clipFollow.stop();
   }
   onDestroy(stopListening);
 
@@ -1670,7 +1665,7 @@
   const loop = $derived(loopDrag.loop ?? timeline.loop);
 
   /** Where a point is, for LoopDrag: the time under it across the lanes. */
-  function loopDragAt(at: Point): LoopAt {
+  function loopDragAt(at: Point): PointerAt {
     return { point: { clientX: at.clientX, clientY: at.clientY }, time: spanTimeAt(at.clientX) };
   }
 
@@ -1680,44 +1675,31 @@
     event.preventDefault();
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
     loopDrag.press(edge ?? 'new', loopDragAt(event), skipsSnapping(event));
-    window.addEventListener('keydown', loopModifier);
-    window.addEventListener('keyup', loopModifier);
+    loopFollow.start();
   }
 
-  /** Where the pointer last dragged the Loop to. */
-  let loopAt: Point = { clientX: 0, clientY: 0 };
-
-  // A modifier pressed or let go mid-drag, e.g. the Shift that skips
-  // snapping, snaps or frees the Loop there and then, without waiting for
-  // the pointer to move.
-  function loopModifier(event: KeyboardEvent) {
-    if (!isModifier(event.key)) return;
-    loopDrag.modifier(skipsSnapping(event), loopDragAt(loopAt));
-  }
-
-  function loopMove(event: Point) {
-    // Scrolling along at an edge moves it too, with no keys to go by.
-    const free = 'shiftKey' in event ? skipsSnapping(event as PointerEvent) : undefined;
-    if (!loopDrag.move(loopDragAt(event), free)) return;
-    loopAt = { clientX: event.clientX, clientY: event.clientY };
-    dragAt(event, loopMove);
-  }
-
-  function stopLoopListening() {
-    dragDone();
-    window.removeEventListener('keydown', loopModifier);
-    window.removeEventListener('keyup', loopModifier);
-  }
-  onDestroy(stopLoopListening);
+  // The pointer followed for a Loop drag. A modifier pressed or let go
+  // mid-drag, e.g. the Shift that skips snapping, snaps or frees the Loop
+  // there and then, without waiting for the pointer to move.
+  const loopFollow = new PointerFollow<PointerAt>(
+    {
+      at: loopDragAt,
+      move: (at, free) => loopDrag.move(at, free),
+      modifier: (free, at) => loopDrag.modifier(free, at),
+      up: loopUp,
+      cancel: () => loopDrag.cancel(),
+    },
+    edgeScroll,
+  );
+  onDestroy(() => loopFollow.stop());
 
   function loopUp() {
-    stopLoopListening();
     const save = loopDrag.release();
     if (save) editing.edit(save);
   }
 
   function loopCancel() {
-    stopLoopListening();
+    loopFollow.stop();
     loopDrag.cancel();
   }
 
@@ -2292,9 +2274,6 @@
               class:editable={editable.current && !frozen}
               title={editable.current ? editHint(freeze, 'Drag to set a Loop') : undefined}
               onpointerdown={loopDown}
-              onpointermove={loopMove}
-              onpointerup={loopUp}
-              onpointercancel={loopCancel}
             >
               {#if loop}
                 {@const at = spanStyle(loop.start, loop.end)}

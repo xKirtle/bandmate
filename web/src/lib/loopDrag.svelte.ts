@@ -1,5 +1,6 @@
 import type { TimelineLoop } from './api';
 import type { Edit } from './history';
+import type { PointerAt } from './pointerFollow';
 import { pastSlop, type Point } from './press';
 import { loopMark, loopTargets, snapLoop, type Aligned, type LoopGrip, type Snap, type Tracks } from './snapping';
 
@@ -16,13 +17,8 @@ import { loopMark, loopTargets, snapLoop, type Aligned, type LoopGrip, type Snap
 // It works in seconds: the Timeline measures the page, listens to the
 // pointer and the keys, scrolls at the edges and saves.
 
-/** Where the pointer is, as the Timeline measures it. */
-export interface LoopAt {
-  /** On the page, to tell a click from a drag. */
-  point: Point;
-  /** The time under it, in seconds, which may be before 0:00 or past the Timeline shown. */
-  time: number;
-}
+/** Where the pointer is, for a Loop drag: its point and the time under it. */
+export type LoopAt = PointerAt;
 
 /** The Timeline a Loop drag goes over. */
 export interface LoopContext {

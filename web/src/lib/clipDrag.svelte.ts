@@ -4,6 +4,7 @@ import { draggedFade, grabbedFade, isFadeEnd, type FadeEnd } from './clipFade';
 import { draggedGain } from './clipGain';
 import { activeTake } from './clipSource';
 import type { Edit } from './history';
+import type { PointerAt } from './pointerFollow';
 import { pastSlop, type Point } from './press';
 import type { Placed } from './schedule';
 import type { Selection } from './selection.svelte';
@@ -62,12 +63,12 @@ export interface ClipMeasure {
   dots?: FadeDots;
 }
 
-/** Where the pointer is, as the Timeline measures it. */
-export interface DragAt {
-  /** On the page, to tell a click from a drag, and for the gain line, how high it is. */
-  point: Point;
-  /** The time under it across the lanes, in seconds, which may be past the end. */
-  time: number;
+/**
+ * Where the pointer is, for a Clip drag: its point, on the page, which for
+ * the gain line also says how high it is, the time under it, and the Track
+ * under it.
+ */
+export interface DragAt extends PointerAt {
   /** The Track whose lane is nearest to it. */
   trackId: number;
 }
@@ -241,7 +242,7 @@ export class ClipDrag {
    * says which is grabbed. Its gain line or a fade dot selects it there and
    * then, as clicking it does.
    */
-  press(clip: Clip, grip: ClipGrip, at: Pick<DragAt, 'point' | 'time'>, keys: PressKeys, measured: ClipMeasure = {}) {
+  press(clip: Clip, grip: ClipGrip, at: PointerAt, keys: PressKeys, measured: ClipMeasure = {}) {
     const take = activeTake(clip);
     let mode: ClipDragMode = grip === 'move' && keys.nudges && take ? 'nudge' : grip;
     let grab = at.time - clip.start;
