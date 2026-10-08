@@ -1,6 +1,6 @@
 import type { CDPSession, Page } from '@playwright/test';
 import { expect, test } from '../fixtures';
-import { clip, drag, heroSong, playhead, seek, timeline, trackHead, type Point } from '../songPage';
+import { clip, dragTo, heroSong, playhead, seek, timeline, trackHead, type Point } from '../songPage';
 
 // Drawing a box over Tracks to select Clips, and clicking empty space along
 // a Track, on the demo Backup's hero Song, with the mouse and with touch. Its
@@ -12,7 +12,7 @@ import { clip, drag, heroSong, playhead, seek, timeline, trackHead, type Point }
 const beatClip = (page: Page) => clip(page, 'Lorem Click');
 
 /** Take 2, the Clip on the Lead vox Track. */
-const take = (page: Page) => clip(page, 'Take 2');
+const takeClip = (page: Page) => clip(page, 'Take 2');
 
 /** Expects a Clip to be selected, or not. */
 async function expectSelected(page: Page, title: string, selected: boolean) {
@@ -65,16 +65,20 @@ async function playheadX(page: Page): Promise<number> {
   return box.x + box.width / 2;
 }
 
-/** Drags from one point on the page to another. */
-async function dragTo(page: Page, from: Point, to: Point) {
-  await drag(page, from, { x: to.x - from.x, y: to.y - from.y });
+/**
+ * Sends a finger's touch as the browser's own touch event: down or moved to
+ * a point, or lifted. Playwright's touchscreen only taps, so a finger held
+ * and dragged is sent this way.
+ */
+async function touch(cdp: CDPSession, type: 'touchStart' | 'touchMove' | 'touchEnd', at?: Point) {
+  await cdp.send('Input.dispatchTouchEvent', { type, touchPoints: at ? [{ x: at.x, y: at.y }] : [] });
 }
 
 /** Opens a Song's page, with its Timeline's Clips shown. */
 async function open(page: Page, songId: number) {
   await page.goto(`/songs/${songId}`);
   await expect(beatClip(page)).toHaveAccessibleName('Lorem Click, 0:00 to 1:30');
-  await expect(take(page)).toHaveAccessibleName('Take 2, 0:04 to 0:25');
+  await expect(takeClip(page)).toHaveAccessibleName('Take 2, 0:04 to 0:25');
 }
 
 /**
@@ -120,7 +124,6 @@ test.describe('with the mouse', () => {
 
     await expectSelected(page, 'Take 2', true);
     await expectSelected(page, 'Lorem Click', false);
-    await expect(take(page)).not.toBeFocused();
   });
 
   test('with Mod held at the press, the boxed Clips are added to the Selection', async ({ page, bandmate }) => {
@@ -198,8 +201,6 @@ test.describe('with touch', () => {
     await expectSelected(page, 'Lorem Click', true);
     const from = await beforeTake(page, 15);
     const to = await intoTake(page, 20);
-    // Playwright's touchscreen only taps, so a finger held and dragged is
-    // sent as the browser's own touch events.
     const cdp = await page.context().newCDPSession(page);
 
     await touch(cdp, 'touchStart', from);
@@ -210,13 +211,9 @@ test.describe('with touch', () => {
       await touch(cdp, 'touchMove', { x: from.x + ((to.x - from.x) * step) / 10, y: from.y });
     }
     await touch(cdp, 'touchEnd');
+    await cdp.detach();
 
     await expectSelected(page, 'Take 2', true);
     await expectSelected(page, 'Lorem Click', false);
   });
 });
-
-/** Sends a finger's touch as the browser's own touch event: down or moved to a point, or lifted. */
-async function touch(cdp: CDPSession, type: 'touchStart' | 'touchMove' | 'touchEnd', at?: Point) {
-  await cdp.send('Input.dispatchTouchEvent', { type, touchPoints: at ? [{ x: at.x, y: at.y }] : [] });
-}

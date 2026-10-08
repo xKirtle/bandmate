@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import type { Bandmate, Loop } from '../bandmate';
 import { expect, test } from '../fixtures';
-import { clip, drag, heroSong, loopBar, loopButton, loopEdge, middleOf, timeline, type Point } from '../songPage';
+import { clip, dragTo, heroSong, loopBar, loopButton, loopEdge, middleOf, timeline, type Point } from '../songPage';
 
 // Dragging the Loop along the top of the ruler, on the demo Backup's hero
 // Song: marking a new one, moving its edges, snapping them to Clips' edges
@@ -33,11 +33,6 @@ async function loopBarAt(page: Page, time: number): Promise<Point> {
 /** How many seconds a pixel is along the Timeline. */
 async function secondsPerPixel(page: Page): Promise<number> {
   return beatLength / (await beatBox(page)).width;
-}
-
-/** Drags from one point on the page to another. */
-async function dragTo(page: Page, from: Point, to: Point) {
-  await drag(page, from, { x: to.x - from.x, y: to.y - from.y });
 }
 
 /** Drags one of the Loop's edges to a point on the page. */

@@ -109,6 +109,11 @@ export async function drag(page: Page, from: Point, by: Point) {
   await page.mouse.up();
 }
 
+/** Drags from one point on the page to another. */
+export async function dragTo(page: Page, from: Point, to: Point) {
+  await drag(page, from, { x: to.x - from.x, y: to.y - from.y });
+}
+
 /** The middle of something on screen. */
 export async function middleOf(target: Locator): Promise<Point> {
   const box = await target.boundingBox();
