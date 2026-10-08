@@ -45,7 +45,7 @@ export class LyricSheetEditing {
    */
   change = (change: LyricSheetChange): Promise<boolean> => {
     if (endsSyncMode(change)) this.#endSyncMode();
-    const remade = remakes(change);
+    const remade = sectionRemadeBy(change);
     if (remade !== null) {
       for (const entry of this.#saves.typingIn(remade)) if (entry instanceof TextBox) entry.saveNow();
     }
@@ -80,23 +80,29 @@ export class LyricSheetEditing {
 
   /** A Section's Label, typed in place. It's saved trimmed; blank, the Section goes by its place. */
   sectionLabel(sectionId: number): TypedField<string> {
-    return new TypedField({
-      saved: () => this.#saves.song.sections.find((s) => s.id === sectionId)?.label ?? '',
-      format: (label) => label,
-      parse: (typed) => ({ value: typed.trim() }),
-      commit: (label) => this.change({ kind: 'setSectionLabel', sectionId, label }),
-      typing: this.#saves.typing,
-      section: sectionId,
-    });
+    return this.#trimmedField(
+      sectionId,
+      () => this.#saves.song.sections.find((s) => s.id === sectionId)?.label ?? '',
+      (label) => ({ kind: 'setSectionLabel', sectionId, label }),
+    );
   }
 
   /** An Alternate's name, typed in place, in a Section's editor. It's saved trimmed; blank removes it. */
   alternateName(alternateId: number, sectionId: number): TypedField<string> {
-    return new TypedField({
-      saved: () => this.#saves.song.sections.flatMap((s) => s.alternates).find((a) => a.id === alternateId)?.name ?? '',
-      format: (name) => name,
+    return this.#trimmedField(
+      sectionId,
+      () => this.#saves.song.sections.flatMap((s) => s.alternates).find((a) => a.id === alternateId)?.name ?? '',
+      (name) => ({ kind: 'renameAlternate', alternateId, name }),
+    );
+  }
+
+  /** Text typed in place in a Section's editor, saved trimmed by the change it makes. */
+  #trimmedField(sectionId: number, saved: () => string, change: (text: string) => LyricSheetChange) {
+    return new TypedField<string>({
+      saved,
+      format: (text) => text,
       parse: (typed) => ({ value: typed.trim() }),
-      commit: (name) => this.change({ kind: 'renameAlternate', alternateId, name }),
+      commit: (text) => this.change(change(text)),
       typing: this.#saves.typing,
       section: sectionId,
     });
@@ -127,7 +133,7 @@ function endsSyncMode(change: LyricSheetChange): boolean {
  * after it would be lost: one added to another. (Moving an Alternate out
  * makes it anew too, but only an inactive one, which has no text box.)
  */
-function remakes(change: LyricSheetChange): number | null {
+function sectionRemadeBy(change: LyricSheetChange): number | null {
   return change.kind === 'addToSection' ? change.sectionId : null;
 }
 

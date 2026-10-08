@@ -275,6 +275,18 @@ describe("Lyric Sheet editing, the Lyric Sheet's edits not saved yet", () => {
     expect(editing.unsavedIn(1)).toBe(false);
   });
 
+  it('doesn’t count what’s saved shown again as typed, e.g. the Label’s Esc putting it back', async () => {
+    const server = new FakeSongServer(verseSong());
+    const { editing } = await editingFor(server);
+    const label = editing.sectionLabel(1);
+    label.shown = 'Chorus';
+    expect(editing.typedIn(1)).toBe(1);
+    // The Label's Combobox puts back what's saved, then cancels.
+    label.shown = 'Verse';
+    label.cancel();
+    expect(editing.typedIn(1)).toBe(1);
+  });
+
   it('marks the Song stale on a refresh while text waits to be saved, rather than replace it', async () => {
     const server = new FakeSongServer(verseSong());
     const { saves, editing } = await editingFor(server);
