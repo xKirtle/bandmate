@@ -35,6 +35,10 @@ export const recordButton = (page: Page) => timeline(page).getByRole('button', {
 /** The top of the ruler, dragged along to set a Loop. */
 export const loopBar = (page: Page) => timeline(page).getByTitle('Drag to set a Loop');
 
+/** One of the Loop's edges, dragged along the top of the ruler to move it. */
+export const loopEdge = (page: Page, edge: 'start' | 'end') =>
+  timeline(page).getByTitle(`Drag to move the Loop's ${edge}`);
+
 /** The Lyric Sheet's Sync lyrics switch, which switches Sync mode on and off. */
 export const syncButton = (page: Page) => page.getByRole('button', { name: 'Sync lyrics' });
 
