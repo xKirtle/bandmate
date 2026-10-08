@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/xKirtle/bandmate/internal/audio"
+	"github.com/xKirtle/bandmate/internal/domain"
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
 )
 
@@ -142,9 +143,6 @@ const (
 	MaxGain = MaxVolume
 )
 
-// timeFormat is how songs.updated_at is stored.
-const timeFormat = "2006-01-02T15:04:05.000000000Z"
-
 // Store reads and changes Timelines.
 type Store struct {
 	db *sql.DB
@@ -178,12 +176,12 @@ func read(ctx context.Context, tx *sql.Tx, songID int64) (Timeline, error) {
 	err := tx.QueryRowContext(ctx, `SELECT version, updated_at FROM songs WHERE id = ?`, songID).
 		Scan(&tl.Version, &updated)
 	if errors.Is(err, sql.ErrNoRows) {
-		return Timeline{}, lyricsheet.ErrNotFound
+		return Timeline{}, domain.ErrNotFound
 	}
 	if err != nil {
 		return Timeline{}, fmt.Errorf("reading song: %w", err)
 	}
-	if tl.UpdatedAt, err = time.Parse(timeFormat, updated); err != nil {
+	if tl.UpdatedAt, err = domain.ParseTime(updated); err != nil {
 		return Timeline{}, fmt.Errorf("parsing stored time %q: %w", updated, err)
 	}
 
@@ -322,10 +320,10 @@ func trackEnd(ctx context.Context, tx *sql.Tx, trackID int64) (float64, error) {
 // TrackChanges is a partial update to a Track's name and levels.
 // Fields not Set are unchanged.
 type TrackChanges struct {
-	Name   lyricsheet.Change[string]  `json:"name"`
-	Volume lyricsheet.Change[float64] `json:"volume"`
-	Muted  lyricsheet.Change[bool]    `json:"muted"`
-	Soloed lyricsheet.Change[bool]    `json:"soloed"`
+	Name   domain.Change[string]  `json:"name"`
+	Volume domain.Change[float64] `json:"volume"`
+	Muted  domain.Change[bool]    `json:"muted"`
+	Soloed domain.Change[bool]    `json:"soloed"`
 }
 
 // UpdateTrack renames a Track or sets its volume, mute or solo. Its name
@@ -361,43 +359,31 @@ func (s *Store) UpdateTrack(ctx context.Context, songID int64, based lyricsheet.
 		if err != nil {
 			return fmt.Errorf("updating track: %w", err)
 		}
-		return expectOneRow(res)
+		return domain.ExpectOneRow(res)
 	})
 }
 
 // checkVolume checks that a Track's volume is from MinVolume to MaxVolume.
 func checkVolume(volume float64) error {
 	if volume < MinVolume || volume > MaxVolume {
-		return &lyricsheet.InvalidError{
-			Msg: fmt.Sprintf("a Track's volume goes from %g dB to +%g dB", MinVolume, MaxVolume)}
+		return domain.Invalid(
+			fmt.Sprintf("a Track's volume goes from %g dB to +%g dB", MinVolume, MaxVolume))
 	}
 	return nil
 }
 
 // errTrackNameRequired refuses a Track without a name.
-var errTrackNameRequired = &lyricsheet.InvalidError{Msg: "a Track's name is required"}
+var errTrackNameRequired = domain.Invalid("a Track's name is required")
 
 // findTrack checks that a Track is on the Song's Timeline.
 func findTrack(ctx context.Context, tx *sql.Tx, songID, trackID int64) error {
 	var found int
 	err := tx.QueryRowContext(ctx, `SELECT 1 FROM tracks WHERE id = ? AND song_id = ?`, trackID, songID).Scan(&found)
 	if errors.Is(err, sql.ErrNoRows) {
-		return lyricsheet.ErrNotFound
+		return domain.ErrNotFound
 	}
 	if err != nil {
 		return fmt.Errorf("reading track: %w", err)
-	}
-	return nil
-}
-
-// expectOneRow turns a change that touched no row into ErrNotFound.
-func expectOneRow(res sql.Result) error {
-	n, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return lyricsheet.ErrNotFound
 	}
 	return nil
 }
@@ -458,7 +444,7 @@ func (s *Store) ReorderTracks(ctx context.Context, songID int64, based lyricshee
 		if err != nil {
 			return fmt.Errorf("reading tracks: %w", err)
 		}
-		errOrder := &lyricsheet.InvalidError{Msg: "the new order must list every Track exactly once"}
+		errOrder := domain.Invalid("the new order must list every Track exactly once")
 		if len(order) != len(current) {
 			return errOrder
 		}
@@ -495,7 +481,7 @@ func deleteTrack(ctx context.Context, tx *sql.Tx, songID, trackID int64) error {
 	if err != nil {
 		return fmt.Errorf("deleting track: %w", err)
 	}
-	if err := expectOneRow(res); err != nil {
+	if err := domain.ExpectOneRow(res); err != nil {
 		return err
 	}
 	var left int
@@ -509,14 +495,14 @@ func deleteTrack(ctx context.Context, tx *sql.Tx, songID, trackID int64) error {
 }
 
 // errLastTrack refuses deleting a Song's only Track.
-var errLastTrack = &lyricsheet.ConflictError{Msg: "a Song always has a Track, so its last one can't be deleted"}
+var errLastTrack = domain.Conflict("a Song always has a Track, so its last one can't be deleted")
 
 // markDetached notes when the Song's Takes that just left their Clips, by
 // the foreign key, were detached.
 func markDetached(ctx context.Context, tx *sql.Tx, songID int64) error {
 	if _, err := tx.ExecContext(ctx, `UPDATE takes SET detached_at = ?
 		WHERE song_id = ? AND clip_id IS NULL AND detached_at IS NULL`,
-		time.Now().UTC().Format(timeFormat), songID); err != nil {
+		time.Now().UTC().Format(domain.TimeFormat), songID); err != nil {
 		return fmt.Errorf("detaching takes: %w", err)
 	}
 	return nil
@@ -527,9 +513,9 @@ func markDetached(ctx context.Context, tx *sql.Tx, songID int64) error {
 func (s *Store) SetLoop(ctx context.Context, songID int64, based lyricsheet.Version, start, end float64, on bool) (Timeline, error) {
 	switch {
 	case start < -tolerance:
-		return Timeline{}, &lyricsheet.InvalidError{Msg: "a Loop can't start before 0:00"}
+		return Timeline{}, domain.Invalid("a Loop can't start before 0:00")
 	case end <= start:
-		return Timeline{}, &lyricsheet.InvalidError{Msg: "a Loop's start must be before its end"}
+		return Timeline{}, domain.Invalid("a Loop's start must be before its end")
 	}
 	start = max(start, 0)
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
@@ -550,7 +536,7 @@ func (s *Store) SwitchLoop(ctx context.Context, songID int64, based lyricsheet.V
 		if err != nil {
 			return fmt.Errorf("switching loop: %w", err)
 		}
-		return expectOneRow(res)
+		return domain.ExpectOneRow(res)
 	})
 }
 
@@ -561,7 +547,7 @@ func (s *Store) ClearLoop(ctx context.Context, songID int64, based lyricsheet.Ve
 		if err != nil {
 			return fmt.Errorf("clearing loop: %w", err)
 		}
-		return expectOneRow(res)
+		return domain.ExpectOneRow(res)
 	})
 }
 
@@ -570,7 +556,7 @@ func (s *Store) ClearLoop(ctx context.Context, songID int64, based lyricsheet.Ve
 const tolerance = 1e-6
 
 // errOverlap is refusing a Clip where another already plays on its Track.
-var errOverlap = &lyricsheet.ConflictError{Msg: "Clips can't overlap on a Track"}
+var errOverlap = domain.Conflict("Clips can't overlap on a Track")
 
 // placement is where a Clip is, what it plays, what it's named, its Gain
 // and its Fades, as stored. Its Fades are shortened to fit as it's stored.
@@ -624,7 +610,7 @@ func (src source) duration(ctx context.Context, tx *sql.Tx) (float64, error) {
 	}
 	err := tx.QueryRowContext(ctx, `SELECT duration FROM beats WHERE id = ?`, src.beatID.Int64).Scan(&duration)
 	if errors.Is(err, sql.ErrNoRows) {
-		return 0, &lyricsheet.InvalidError{Msg: "there's no such Beat in the Beat Library"}
+		return 0, domain.Invalid("there's no such Beat in the Beat Library")
 	}
 	if err != nil {
 		return 0, fmt.Errorf("reading beat: %w", err)
@@ -673,12 +659,12 @@ type ClipMove struct {
 // If any can't go where it's moved, none moves.
 func (s *Store) MoveClips(ctx context.Context, songID int64, based lyricsheet.Version, moves []ClipMove) (Timeline, error) {
 	if len(moves) == 0 {
-		return Timeline{}, &lyricsheet.InvalidError{Msg: "clips are required"}
+		return Timeline{}, domain.Invalid("clips are required")
 	}
 	seen := map[int64]bool{}
 	for _, m := range moves {
 		if seen[m.ClipID] {
-			return Timeline{}, &lyricsheet.InvalidError{Msg: "each Clip can only move once"}
+			return Timeline{}, domain.Invalid("each Clip can only move once")
 		}
 		seen[m.ClipID] = true
 	}
@@ -742,11 +728,11 @@ func (s *Store) TrimClip(ctx context.Context, songID int64, based lyricsheet.Ver
 func checkTrim(offset, length, duration float64) error {
 	switch {
 	case offset < -tolerance:
-		return &lyricsheet.InvalidError{Msg: "a Clip can't start before its source does"}
+		return domain.Invalid("a Clip can't start before its source does")
 	case length <= 0:
-		return &lyricsheet.InvalidError{Msg: "a Clip must play for some time"}
+		return domain.Invalid("a Clip must play for some time")
 	case offset+length > duration+tolerance:
-		return &lyricsheet.InvalidError{Msg: "a Clip can't play past the end of its source"}
+		return domain.Invalid("a Clip can't play past the end of its source")
 	}
 	return nil
 }
@@ -799,7 +785,7 @@ func (o OnTrack) trackOf(added []int64) (int64, error) {
 		return o.TrackID, nil
 	}
 	if *o.NewTrack < 0 || *o.NewTrack >= len(added) {
-		return 0, &lyricsheet.InvalidError{Msg: "there's no such new Track"}
+		return 0, domain.Invalid("there's no such new Track")
 	}
 	return added[*o.NewTrack], nil
 }
@@ -857,7 +843,7 @@ func insertTrackAt(ctx context.Context, tx *sql.Tx, songID int64, name string, p
 	pos := len(order)
 	if position != nil {
 		if *position < 0 || *position > len(order) {
-			return 0, &lyricsheet.InvalidError{Msg: "a Track's position must be from 0 to the number of Tracks"}
+			return 0, domain.Invalid("a Track's position must be from 0 to the number of Tracks")
 		}
 		pos = *position
 	}
@@ -936,7 +922,7 @@ type PlacedClip struct {
 func (s *Store) PlaceClips(ctx context.Context, songID int64, based lyricsheet.Version, newTracks []string,
 	clips []PlacedClip) (Timeline, error) {
 	if len(clips) == 0 {
-		return Timeline{}, &lyricsheet.InvalidError{Msg: "clips are required"}
+		return Timeline{}, domain.Invalid("clips are required")
 	}
 	names, err := checkTrackNames(newTracks)
 	if err != nil {
@@ -972,8 +958,8 @@ func placeOnTrack(ctx context.Context, tx *sql.Tx, songID, trackID int64, c NewC
 // findTrackToPlaceOn checks that a Track a Clip is to go on is one of the
 // Song's, refusing the request if not.
 func findTrackToPlaceOn(ctx context.Context, tx *sql.Tx, songID, trackID int64) error {
-	if err := findTrack(ctx, tx, songID, trackID); errors.Is(err, lyricsheet.ErrNotFound) {
-		return &lyricsheet.InvalidError{Msg: "there's no such Track on this Timeline"}
+	if err := findTrack(ctx, tx, songID, trackID); errors.Is(err, domain.ErrNotFound) {
+		return domain.Invalid("there's no such Track on this Timeline")
 	} else if err != nil {
 		return err
 	}
@@ -996,7 +982,7 @@ func addClip(ctx context.Context, tx *sql.Tx, songID, trackID int64, c NewClip) 
 		return err
 	}
 	if c.Start < -tolerance {
-		return &lyricsheet.InvalidError{Msg: "a Clip can't start before 0:00"}
+		return domain.Invalid("a Clip can't start before 0:00")
 	}
 	if err := checkGain(c.Gain); err != nil {
 		return err
@@ -1032,7 +1018,7 @@ func newSource(ctx context.Context, tx *sql.Tx, songID int64, c NewClip) (source
 	}
 	switch {
 	case given != 1:
-		return source{}, &lyricsheet.InvalidError{Msg: "a Clip plays one of a Beat, a Sound or Takes"}
+		return source{}, domain.Invalid("a Clip plays one of a Beat, a Sound or Takes")
 	case c.BeatID != nil:
 		return source{beatID: sql.NullInt64{Int64: *c.BeatID, Valid: true}}, nil
 	case c.SoundID != nil:
@@ -1042,7 +1028,7 @@ func newSource(ctx context.Context, tx *sql.Tx, songID int64, c NewClip) (source
 		return source{soundID: sql.NullInt64{Int64: *c.SoundID, Valid: true}}, nil
 	}
 	if c.ActiveTakeID == nil || !slices.Contains(c.TakeIDs, *c.ActiveTakeID) {
-		return source{}, &lyricsheet.InvalidError{Msg: "a Clip of Takes plays one of them"}
+		return source{}, domain.Invalid("a Clip of Takes plays one of them")
 	}
 	if err := checkTakes(ctx, tx, songID, 0, c.TakeIDs); err != nil {
 		return source{}, err
@@ -1059,7 +1045,7 @@ func checkTakes(ctx context.Context, tx *sql.Tx, songID, clipID int64, ids []int
 	}
 	for _, c := range in {
 		if c.Valid && c.Int64 != clipID {
-			return &lyricsheet.ConflictError{Msg: "a Take can only be in one Clip"}
+			return domain.Conflict("a Take can only be in one Clip")
 		}
 	}
 	return nil
@@ -1071,12 +1057,12 @@ func takesOfSong(ctx context.Context, tx *sql.Tx, songID int64, ids []int64) ([]
 	in := make([]sql.NullInt64, len(ids))
 	for i, id := range ids {
 		if slices.Contains(ids[:i], id) {
-			return nil, &lyricsheet.InvalidError{Msg: "a Take can only be in a Clip once"}
+			return nil, domain.Invalid("a Take can only be in a Clip once")
 		}
 		err := tx.QueryRowContext(ctx, `SELECT clip_id FROM takes WHERE id = ? AND song_id = ?`,
 			id, songID).Scan(&in[i])
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, &lyricsheet.InvalidError{Msg: "there's no such Take in this Song"}
+			return nil, domain.Invalid("there's no such Take in this Song")
 		}
 		if err != nil {
 			return nil, fmt.Errorf("reading take: %w", err)
@@ -1192,7 +1178,7 @@ type ClipCopy struct {
 func (s *Store) PasteClips(ctx context.Context, songID int64, based lyricsheet.Version, newTracks []string,
 	clips []ClipCopy) (Timeline, error) {
 	if len(clips) == 0 {
-		return Timeline{}, &lyricsheet.InvalidError{Msg: "clips are required"}
+		return Timeline{}, domain.Invalid("clips are required")
 	}
 	names, err := checkTrackNames(newTracks)
 	if err != nil {
@@ -1304,7 +1290,7 @@ func (s *Store) RenameClip(ctx context.Context, songID int64, based lyricsheet.V
 		if err != nil {
 			return fmt.Errorf("renaming clip: %w", err)
 		}
-		return expectOneRow(res)
+		return domain.ExpectOneRow(res)
 	})
 }
 
@@ -1320,14 +1306,14 @@ func (s *Store) SetClipGain(ctx context.Context, songID int64, based lyricsheet.
 		if err != nil {
 			return fmt.Errorf("setting clip gain: %w", err)
 		}
-		return expectOneRow(res)
+		return domain.ExpectOneRow(res)
 	})
 }
 
 // checkGain checks that a Clip's Gain is from MinGain to MaxGain.
 func checkGain(gain float64) error {
 	if gain < MinGain || gain > MaxGain {
-		return &lyricsheet.InvalidError{Msg: fmt.Sprintf("a Clip's Gain goes from %g dB to +%g dB", MinGain, MaxGain)}
+		return domain.Invalid(fmt.Sprintf("a Clip's Gain goes from %g dB to +%g dB", MinGain, MaxGain))
 	}
 	return nil
 }
@@ -1362,7 +1348,7 @@ type Fades struct {
 // trim, if it gives them: both, or neither, to keep the Clip's.
 func FadesGiven(in, out *float64) (*Fades, error) {
 	if (in == nil) != (out == nil) {
-		return nil, &lyricsheet.InvalidError{Msg: "fadeIn and fadeOut go together"}
+		return nil, domain.Invalid("fadeIn and fadeOut go together")
 	}
 	if in == nil {
 		return nil, nil
@@ -1375,9 +1361,9 @@ func FadesGiven(in, out *float64) (*Fades, error) {
 func (f Fades) check(length float64) error {
 	switch {
 	case f.In < 0 || f.Out < 0:
-		return &lyricsheet.InvalidError{Msg: "a Fade can't be shorter than nothing"}
+		return domain.Invalid("a Fade can't be shorter than nothing")
 	case f.In+f.Out > length+tolerance:
-		return &lyricsheet.InvalidError{Msg: "a Clip's Fades can't together run longer than it"}
+		return domain.Invalid("a Clip's Fades can't together run longer than it")
 	}
 	return nil
 }
@@ -1419,7 +1405,7 @@ func (s *Store) DeleteClip(ctx context.Context, songID int64, based lyricsheet.V
 // nothing is removed.
 func (s *Store) DeleteClips(ctx context.Context, songID int64, based lyricsheet.Version, clipIDs, trackIDs []int64) (Timeline, error) {
 	if len(clipIDs) == 0 {
-		return Timeline{}, &lyricsheet.InvalidError{Msg: "clipIds are required"}
+		return Timeline{}, domain.Invalid("clipIds are required")
 	}
 	if err := checkDeletedOnce(clipIDs); err != nil {
 		return Timeline{}, err
@@ -1443,7 +1429,7 @@ func (s *Store) DeleteClips(ctx context.Context, songID int64, based lyricsheet.
 func checkDeletedOnce(clipIDs []int64) error {
 	for i, id := range clipIDs {
 		if slices.Contains(clipIDs[:i], id) {
-			return &lyricsheet.InvalidError{Msg: "each Clip can only be deleted once"}
+			return domain.Invalid("each Clip can only be deleted once")
 		}
 	}
 	return nil
@@ -1457,7 +1443,7 @@ func deleteClip(ctx context.Context, tx *sql.Tx, songID, clipID int64) error {
 	if err != nil {
 		return fmt.Errorf("deleting clip: %w", err)
 	}
-	if err := expectOneRow(res); err != nil {
+	if err := domain.ExpectOneRow(res); err != nil {
 		return err
 	}
 	return markDetached(ctx, tx, songID)
@@ -1473,7 +1459,7 @@ func clipPlacement(ctx context.Context, tx *sql.Tx, songID, clipID int64) (place
 		Scan(&p.trackID, &p.source.beatID, &p.source.soundID, &p.name, &p.gain, &p.fades.In, &p.fades.Out,
 			&p.source.activeTakeID, &p.start, &p.offset, &p.length)
 	if errors.Is(err, sql.ErrNoRows) {
-		return placement{}, lyricsheet.ErrNotFound
+		return placement{}, domain.ErrNotFound
 	}
 	if err != nil {
 		return placement{}, fmt.Errorf("reading clip: %w", err)
@@ -1510,7 +1496,7 @@ func place(ctx context.Context, tx *sql.Tx, clipID int64, p placement) error {
 // before 0:00 taken as 0:00.
 func onTimeline(p placement) (placement, error) {
 	if p.start < -tolerance {
-		return placement{}, &lyricsheet.InvalidError{Msg: "a Clip can't start before 0:00"}
+		return placement{}, domain.Invalid("a Clip can't start before 0:00")
 	}
 	p.start = max(p.start, 0)
 	return p, nil

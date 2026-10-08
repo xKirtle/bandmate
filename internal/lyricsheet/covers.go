@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/xKirtle/bandmate/internal/audio"
+	"github.com/xKirtle/bandmate/internal/domain"
 	"github.com/xKirtle/bandmate/internal/songfiles"
 )
 
@@ -126,7 +127,7 @@ func (s *Store) ReplaceCover(ctx context.Context, songID int64, based Version, d
 func (s *Store) putCover(ctx context.Context, songID int64, based Version, details CoverDetails, pictures map[CoverPicture]UploadedPicture, replace bool) (Song, error) {
 	return s.swapCover(ctx, songID, based, CoverPictures, pictures, func(tx *sql.Tx) (int64, newCover, error) {
 		if msg := details.problem(); msg != "" {
-			return 0, newCover{}, invalid(msg)
+			return 0, newCover{}, domain.Invalid(msg)
 		}
 		old, err := coverID(ctx, tx, songID)
 		if err != nil {
@@ -134,9 +135,9 @@ func (s *Store) putCover(ctx context.Context, songID int64, based Version, detai
 		}
 		switch {
 		case old != 0 && !replace:
-			return 0, newCover{}, conflict("this Song already has a Cover")
+			return 0, newCover{}, domain.Conflict("this Song already has a Cover")
 		case old == 0 && replace:
-			return 0, newCover{}, conflict("this Song has no Cover")
+			return 0, newCover{}, domain.Conflict("this Song has no Cover")
 		}
 		return old, newCover{details: details, addedAt: time.Now().UTC()}, nil
 	})
@@ -157,19 +158,19 @@ func (s *Store) AdjustCoverCrop(ctx context.Context, songID int64, based Version
 			`SELECT id, width, height, original_type, added_at FROM covers WHERE song_id = ?`, songID).
 			Scan(&old, &c.details.Width, &c.details.Height, &c.originalType, &added)
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, c, conflict("this Song has no Cover")
+			return 0, c, domain.Conflict("this Song has no Cover")
 		}
 		if err != nil {
 			return 0, c, fmt.Errorf("reading cover: %w", err)
 		}
 		if old != from {
-			return 0, c, conflict("this Song's Cover has changed")
+			return 0, c, domain.Conflict("this Song's Cover has changed")
 		}
 		c.details.Crop = crop
 		if msg := c.details.problem(); msg != "" {
-			return 0, c, invalid(msg)
+			return 0, c, domain.Invalid(msg)
 		}
-		if c.addedAt, err = parseTime(added); err != nil {
+		if c.addedAt, err = domain.ParseTime(added); err != nil {
 			return 0, c, err
 		}
 		return old, c, nil
@@ -217,7 +218,7 @@ func (s *Store) swapCover(ctx context.Context, songID int64, based Version, uplo
 			   original_type, list_type, header_type, added_at)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			songID, c.details.Width, c.details.Height, c.details.Crop.X, c.details.Crop.Y, c.details.Crop.Size,
-			types[CoverOriginal], types[CoverList], types[CoverHeader], c.addedAt.Format(timeFormat))
+			types[CoverOriginal], types[CoverList], types[CoverHeader], c.addedAt.Format(domain.TimeFormat))
 		if err != nil {
 			return fmt.Errorf("adding cover: %w", err)
 		}
@@ -243,10 +244,10 @@ func typesOf(uploaded []CoverPicture, pictures map[CoverPicture]UploadedPicture)
 	for _, p := range uploaded {
 		t, _, err := mime.ParseMediaType(pictures[p].ContentType)
 		if err != nil || !pictureTypes[t] {
-			return nil, invalid("a Cover's pictures must be JPEG, PNG or WebP")
+			return nil, domain.Invalid("a Cover's pictures must be JPEG, PNG or WebP")
 		}
 		if pictures[p].File.Size == 0 {
-			return nil, invalid("a Cover's pictures can't be empty")
+			return nil, domain.Invalid("a Cover's pictures can't be empty")
 		}
 		types[p] = t
 	}
@@ -261,7 +262,7 @@ func (s *Store) RemoveCover(ctx context.Context, songID int64, based Version) (S
 			return err
 		}
 		if id == 0 {
-			return conflict("this Song has no Cover")
+			return domain.Conflict("this Song has no Cover")
 		}
 		if err := deleteCover(ctx, tx, id); err != nil {
 			return err
@@ -272,7 +273,7 @@ func (s *Store) RemoveCover(ctx context.Context, songID int64, based Version) (S
 }
 
 // loadCover reads a Song's Cover, or nil if it has none.
-func loadCover(ctx context.Context, q queryer, songID int64) (*Cover, error) {
+func loadCover(ctx context.Context, q domain.Queryer, songID int64) (*Cover, error) {
 	var c Cover
 	var added string
 	err := q.QueryRowContext(ctx,
@@ -284,7 +285,7 @@ func loadCover(ctx context.Context, q queryer, songID int64) (*Cover, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading cover: %w", err)
 	}
-	if c.AddedAt, err = parseTime(added); err != nil {
+	if c.AddedAt, err = domain.ParseTime(added); err != nil {
 		return nil, err
 	}
 	return &c, nil
@@ -294,7 +295,7 @@ func loadCover(ctx context.Context, q queryer, songID int64) (*Cover, error) {
 func (s *Store) ServeCover(w http.ResponseWriter, r *http.Request, songID int64, picture CoverPicture) error {
 	files, ok := s.coverFiles[picture]
 	if !ok {
-		return ErrNotFound
+		return domain.ErrNotFound
 	}
 	var id int64
 	var contentType string
@@ -302,7 +303,7 @@ func (s *Store) ServeCover(w http.ResponseWriter, r *http.Request, songID int64,
 	err := s.db.QueryRowContext(r.Context(),
 		`SELECT id, `+string(picture)+`_type FROM covers WHERE song_id = ?`, songID).Scan(&id, &contentType)
 	if errors.Is(err, sql.ErrNoRows) {
-		return ErrNotFound
+		return domain.ErrNotFound
 	}
 	if err != nil {
 		return fmt.Errorf("reading cover: %w", err)
@@ -311,7 +312,7 @@ func (s *Store) ServeCover(w http.ResponseWriter, r *http.Request, songID int64,
 }
 
 // coverID is a Song's Cover's id, or 0 if it has none.
-func coverID(ctx context.Context, q queryer, songID int64) (int64, error) {
+func coverID(ctx context.Context, q domain.Queryer, songID int64) (int64, error) {
 	var id int64
 	err := q.QueryRowContext(ctx, `SELECT id FROM covers WHERE song_id = ?`, songID).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {

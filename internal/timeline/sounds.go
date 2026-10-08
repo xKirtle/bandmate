@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/xKirtle/bandmate/internal/audio"
+	"github.com/xKirtle/bandmate/internal/domain"
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
 )
 
@@ -48,7 +49,7 @@ func (s *Store) ImportSound(ctx context.Context, songID int64, based lyricsheet.
 	a audio.Upload, file *audio.Received) (Timeline, error) {
 	defer file.Discard()
 	if msg := a.Problem(); msg != "" {
-		return Timeline{}, &lyricsheet.InvalidError{Msg: msg}
+		return Timeline{}, domain.Invalid(msg)
 	}
 	name := a.Name(imp.Name, "Sound")
 	peaks, err := json.Marshal(a.Peaks)
@@ -56,8 +57,8 @@ func (s *Store) ImportSound(ctx context.Context, songID int64, based lyricsheet.
 		return Timeline{}, err
 	}
 	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
-		if err := findTrack(ctx, tx, songID, imp.TrackID); errors.Is(err, lyricsheet.ErrNotFound) {
-			return &lyricsheet.InvalidError{Msg: "there's no such Track on this Timeline"}
+		if err := findTrack(ctx, tx, songID, imp.TrackID); errors.Is(err, domain.ErrNotFound) {
+			return domain.Invalid("there's no such Track on this Timeline")
 		} else if err != nil {
 			return err
 		}
@@ -65,7 +66,7 @@ func (s *Store) ImportSound(ctx context.Context, songID int64, based lyricsheet.
 				peaks, added_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 			songID, name, a.FileName, a.MediaType(), file.Size, a.Duration, string(peaks),
-			time.Now().UTC().Format(timeFormat))
+			time.Now().UTC().Format(domain.TimeFormat))
 		if err != nil {
 			return fmt.Errorf("adding sound: %w", err)
 		}
@@ -90,7 +91,7 @@ const soundsInUse = `SELECT sound_id FROM clips WHERE sound_id IS NOT NULL`
 func markUnusedSounds(ctx context.Context, tx *sql.Tx, songID int64) error {
 	if _, err := tx.ExecContext(ctx, `UPDATE sounds SET unused_since = ?
 		WHERE song_id = ? AND unused_since IS NULL AND id NOT IN (`+soundsInUse+`)`,
-		time.Now().UTC().Format(timeFormat), songID); err != nil {
+		time.Now().UTC().Format(domain.TimeFormat), songID); err != nil {
 		return fmt.Errorf("marking unused sounds: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE sounds SET unused_since = NULL
@@ -113,7 +114,7 @@ func (s *Store) SweepUnusedSounds(ctx context.Context, before time.Time) error {
 	defer tx.Rollback()
 	var ids []int64
 	err = query(ctx, tx, `SELECT id FROM sounds WHERE unused_since < ? AND id NOT IN (`+soundsInUse+`)`,
-		[]any{before.UTC().Format(timeFormat)}, func(rows *sql.Rows) error {
+		[]any{before.UTC().Format(domain.TimeFormat)}, func(rows *sql.Rows) error {
 			var id int64
 			if err := rows.Scan(&id); err != nil {
 				return err
@@ -151,7 +152,7 @@ func findSound(ctx context.Context, tx *sql.Tx, songID, soundID int64) error {
 	var found int
 	err := tx.QueryRowContext(ctx, `SELECT 1 FROM sounds WHERE id = ? AND song_id = ?`, soundID, songID).Scan(&found)
 	if errors.Is(err, sql.ErrNoRows) {
-		return &lyricsheet.InvalidError{Msg: "there's no such Sound in this Song"}
+		return domain.Invalid("there's no such Sound in this Song")
 	}
 	if err != nil {
 		return fmt.Errorf("reading sound: %w", err)
@@ -167,7 +168,7 @@ func (s *Store) GetSound(ctx context.Context, songID, soundID int64) (Sound, err
 		WHERE id = ? AND song_id = ?`, soundID, songID).
 		Scan(&snd.ID, &snd.Name, &snd.FileName, &snd.Size, &snd.Duration, &peaks)
 	if errors.Is(err, sql.ErrNoRows) {
-		return Sound{}, lyricsheet.ErrNotFound
+		return Sound{}, domain.ErrNotFound
 	}
 	if err != nil {
 		return Sound{}, fmt.Errorf("reading sound: %w", err)
@@ -186,7 +187,7 @@ func (s *Store) ServeSound(w http.ResponseWriter, r *http.Request, songID, sound
 	err := s.db.QueryRowContext(r.Context(), `SELECT file_name, content_type FROM sounds WHERE id = ? AND song_id = ?`,
 		soundID, songID).Scan(&fileName, &contentType)
 	if errors.Is(err, sql.ErrNoRows) {
-		return lyricsheet.ErrNotFound
+		return domain.ErrNotFound
 	}
 	if err != nil {
 		return fmt.Errorf("reading sound: %w", err)

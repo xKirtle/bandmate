@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"errors"
-	"log"
 	"net/http"
 
 	"github.com/xKirtle/bandmate/internal/beats"
@@ -71,7 +70,7 @@ func (a *App) addFetchedBeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		writeBeatError(w, err)
+		writeDomainError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, added)
@@ -154,8 +153,7 @@ func writeFetchError(w http.ResponseWriter, err error) {
 	case errors.Is(err, context.Canceled):
 		// Nobody is waiting for the answer.
 	default:
-		log.Printf("internal error: %v", err)
-		writeError(w, http.StatusInternalServerError, "something went wrong")
+		writeDomainError(w, err)
 	}
 }
 

@@ -25,15 +25,8 @@ import (
 
 	"github.com/xKirtle/bandmate/internal/audio"
 	"github.com/xKirtle/bandmate/internal/db"
+	"github.com/xKirtle/bandmate/internal/domain"
 )
-
-// ErrNotFound means the requested Backup doesn't exist.
-var ErrNotFound = errors.New("not found")
-
-// InvalidError is a rejected request. Its message is safe to show the user.
-type InvalidError struct{ Msg string }
-
-func (e *InvalidError) Error() string { return e.Msg }
 
 // Dir is where Backups are kept, inside the data directory, so copying the
 // data directory copies them too.
@@ -49,9 +42,6 @@ const manifestName = "backup.json"
 // makingPrefix marks a Backup still being made: its staging directory and
 // its file before it's kept.
 const makingPrefix = ".making-"
-
-// timeFormat is how times are stored, as elsewhere in the database.
-const timeFormat = "2006-01-02T15:04:05.000000000Z"
 
 // Backup is a Backup kept in Bandmate.
 type Backup struct {
@@ -137,7 +127,7 @@ func (s *Store) List(ctx context.Context) ([]Backup, error) {
 func (s *Store) get(ctx context.Context, id int64) (Backup, error) {
 	b, err := scanBackup(s.db.QueryRowContext(ctx, `SELECT `+backupColumns+` FROM backups WHERE id = ?`, id))
 	if errors.Is(err, sql.ErrNoRows) {
-		return b, ErrNotFound
+		return b, domain.ErrNotFound
 	}
 	return b, err
 }
@@ -149,7 +139,7 @@ func (s *Store) Rename(ctx context.Context, id int64, name string) (Backup, erro
 	if err != nil {
 		return Backup{}, fmt.Errorf("renaming backup: %w", err)
 	}
-	if err := oneRow(res); err != nil {
+	if err := domain.ExpectOneRow(res); err != nil {
 		return Backup{}, err
 	}
 	return s.get(ctx, id)
@@ -169,25 +159,13 @@ func (s *Store) Delete(ctx context.Context, id int64) error {
 	if err != nil {
 		return fmt.Errorf("deleting backup: %w", err)
 	}
-	if err := oneRow(res); err != nil {
+	if err := domain.ExpectOneRow(res); err != nil {
 		return err
 	}
 	if err := os.Remove(s.path(id)); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("deleting backup file: %w", err)
 	}
 	return tx.Commit()
-}
-
-// oneRow tells whether a statement on one Backup found it.
-func oneRow(res sql.Result) error {
-	n, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return ErrNotFound
-	}
-	return nil
 }
 
 // backupColumns are what a Backup is read from, in scanBackup's order.
@@ -199,7 +177,7 @@ func scanBackup(row interface{ Scan(...any) error }) (Backup, error) {
 	if err := row.Scan(&b.ID, &b.Songs, &b.AllSongs, &b.Beats, &b.BeatLibrary, &b.Size, &created, &b.Name); err != nil {
 		return b, err
 	}
-	t, err := time.Parse(timeFormat, created)
+	t, err := domain.ParseTime(created)
 	if err != nil {
 		return b, fmt.Errorf("reading when backup %d was made: %w", b.ID, err)
 	}
@@ -258,7 +236,7 @@ func (s *Store) Make(ctx context.Context, contents Contents) (Backup, error) {
 		return Backup{}, err
 	}
 	if held.songs == 0 && held.beats == 0 && !contents.BeatLibrary {
-		return Backup{}, &InvalidError{"the Songs and Beats picked have been deleted"}
+		return Backup{}, domain.Invalid("the Songs and Beats picked have been deleted")
 	}
 	b := Backup{CreatedAt: s.now().UTC(), Songs: held.songs, AllSongs: contents.AllSongs,
 		Beats: held.beats, BeatLibrary: contents.BeatLibrary}
@@ -292,7 +270,7 @@ func (s *Store) songsIn(ctx context.Context, contents Contents) ([]int64, error)
 		return nil, err
 	}
 	if beats == 0 {
-		return nil, &InvalidError{"there's nothing to back up"}
+		return nil, domain.Invalid("there's nothing to back up")
 	}
 	return ids, nil
 }
@@ -302,20 +280,20 @@ func (s *Store) songsIn(ctx context.Context, contents Contents) ([]int64, error)
 func (s *Store) songsPicked(ctx context.Context, contents Contents) ([]int64, error) {
 	if contents.AllSongs {
 		if len(contents.Songs) > 0 {
-			return nil, &InvalidError{"pick all Songs or some, not both"}
+			return nil, domain.Invalid("pick all Songs or some, not both")
 		}
 		ids, err := queryIDs(ctx, s.db, `SELECT id FROM songs ORDER BY id`)
 		if err != nil {
 			return nil, err
 		}
 		if len(ids) == 0 && !contents.anyBeats() {
-			return nil, &InvalidError{"there are no Songs to back up"}
+			return nil, domain.Invalid("there are no Songs to back up")
 		}
 		return ids, nil
 	}
 	if len(contents.Songs) == 0 {
 		if !contents.anyBeats() {
-			return nil, &InvalidError{"pick at least one Song or Beat"}
+			return nil, domain.Invalid("pick at least one Song or Beat")
 		}
 		return nil, nil
 	}
@@ -330,7 +308,7 @@ func (s *Store) beatsPicked(ctx context.Context, contents Contents) ([]int64, er
 		return nil, nil
 	}
 	if contents.BeatLibrary {
-		return nil, &InvalidError{"pick the Beat Library or some Beats, not both"}
+		return nil, domain.Invalid("pick the Beat Library or some Beats, not both")
 	}
 	return s.distinctExisting(ctx, "beats", contents.Beats, "a Beat picked doesn't exist")
 }
@@ -350,7 +328,7 @@ func (s *Store) distinctExisting(ctx context.Context, table string, ids []int64,
 			return nil, err
 		}
 		if exists == 0 {
-			return nil, &InvalidError{missing}
+			return nil, domain.Invalid(missing)
 		}
 		list = append(list, id)
 	}
@@ -366,7 +344,7 @@ func (s *Store) keep(ctx context.Context, path string, b Backup) (Backup, error)
 	defer tx.Rollback()
 	res, err := tx.ExecContext(ctx, `INSERT INTO backups (songs, all_songs, beats, beat_library, size, created_at)
 		VALUES (?, ?, ?, ?, ?, ?)`,
-		b.Songs, b.AllSongs, b.Beats, b.BeatLibrary, b.Size, b.CreatedAt.Format(timeFormat))
+		b.Songs, b.AllSongs, b.Beats, b.BeatLibrary, b.Size, b.CreatedAt.Format(domain.TimeFormat))
 	if err != nil {
 		return b, err
 	}

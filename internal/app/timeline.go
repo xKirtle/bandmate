@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/xKirtle/bandmate/internal/domain"
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
 	"github.com/xKirtle/bandmate/internal/timeline"
 )
@@ -32,7 +33,7 @@ func (a *App) addBeatToTimeline(w http.ResponseWriter, r *http.Request) {
 	}
 	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
 		if req.TrackID == nil || req.BeatID == nil {
-			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "trackId and beatId are required"}
+			return timeline.Timeline{}, domain.Invalid("trackId and beatId are required")
 		}
 		return a.timelines.AddBeat(r.Context(), id, based, *req.TrackID, *req.BeatID)
 	})
@@ -83,7 +84,7 @@ func (a *App) setLoop(w http.ResponseWriter, r *http.Request) {
 	}
 	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
 		if req.Start == nil || req.End == nil {
-			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "start and end are required"}
+			return timeline.Timeline{}, domain.Invalid("start and end are required")
 		}
 		return a.timelines.SetLoop(r.Context(), id, based, *req.Start, *req.End, req.On)
 	})
@@ -95,7 +96,7 @@ func (a *App) switchLoop(w http.ResponseWriter, r *http.Request) {
 	}
 	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
 		if req.On == nil {
-			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "on is required"}
+			return timeline.Timeline{}, domain.Invalid("on is required")
 		}
 		return a.timelines.SwitchLoop(r.Context(), id, based, *req.On)
 	})
@@ -114,7 +115,7 @@ func (a *App) moveClip(w http.ResponseWriter, r *http.Request) {
 	}
 	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based lyricsheet.Version, clipID int64) (timeline.Timeline, error) {
 		if req.TrackID == nil || req.Start == nil {
-			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "trackId and start are required"}
+			return timeline.Timeline{}, domain.Invalid("trackId and start are required")
 		}
 		return a.timelines.MoveClip(ctx, id, based, clipID, *req.TrackID, *req.Start)
 	})
@@ -140,7 +141,7 @@ func (a *App) trimClip(w http.ResponseWriter, r *http.Request) {
 	}
 	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based lyricsheet.Version, clipID int64) (timeline.Timeline, error) {
 		if req.Offset == nil || req.Length == nil {
-			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "offset and length are required"}
+			return timeline.Timeline{}, domain.Invalid("offset and length are required")
 		}
 		fades, err := timeline.FadesGiven(req.FadeIn, req.FadeOut)
 		if err != nil {
@@ -172,10 +173,10 @@ type clipToPlace struct {
 // the Track as one of the Timeline's or one the request adds, not both.
 func (c clipToPlace) placed() (timeline.PlacedClip, error) {
 	if c.TrackID != nil && c.NewTrack != nil {
-		return timeline.PlacedClip{}, &lyricsheet.InvalidError{Msg: "a Clip goes on a Track or a new Track, not both"}
+		return timeline.PlacedClip{}, domain.Invalid("a Clip goes on a Track or a new Track, not both")
 	}
 	if (c.TrackID == nil && c.NewTrack == nil) || c.Start == nil || c.Offset == nil || c.Length == nil {
-		return timeline.PlacedClip{}, &lyricsheet.InvalidError{Msg: "trackId or newTrack, start, offset and length are required"}
+		return timeline.PlacedClip{}, domain.Invalid("trackId or newTrack, start, offset and length are required")
 	}
 	on := timeline.OnTrack{NewTrack: c.NewTrack}
 	if c.TrackID != nil {
@@ -209,7 +210,7 @@ func (a *App) placeClip(w http.ResponseWriter, r *http.Request) {
 			return timeline.Timeline{}, err
 		}
 		if p.NewTrack != nil {
-			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "there's no such new Track"}
+			return timeline.Timeline{}, domain.Invalid("there's no such new Track")
 		}
 		return a.timelines.PlaceClip(r.Context(), id, based, p.TrackID, p.NewClip)
 	})
@@ -235,7 +236,7 @@ func (a *App) renameClip(w http.ResponseWriter, r *http.Request) {
 	}
 	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based lyricsheet.Version, clipID int64) (timeline.Timeline, error) {
 		if req.Name == nil {
-			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "name is required"}
+			return timeline.Timeline{}, domain.Invalid("name is required")
 		}
 		return a.timelines.RenameClip(ctx, id, based, clipID, *req.Name)
 	})
@@ -247,7 +248,7 @@ func (a *App) setClipGain(w http.ResponseWriter, r *http.Request) {
 	}
 	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based lyricsheet.Version, clipID int64) (timeline.Timeline, error) {
 		if req.Gain == nil {
-			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "gain is required"}
+			return timeline.Timeline{}, domain.Invalid("gain is required")
 		}
 		return a.timelines.SetClipGain(ctx, id, based, clipID, *req.Gain)
 	})
@@ -260,7 +261,7 @@ func (a *App) setClipFades(w http.ResponseWriter, r *http.Request) {
 	}
 	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based lyricsheet.Version, clipID int64) (timeline.Timeline, error) {
 		if req.FadeIn == nil || req.FadeOut == nil {
-			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "fadeIn and fadeOut are required"}
+			return timeline.Timeline{}, domain.Invalid("fadeIn and fadeOut are required")
 		}
 		return a.timelines.SetClipFades(ctx, id, based, clipID, timeline.Fades{In: *req.FadeIn, Out: *req.FadeOut})
 	})
@@ -385,7 +386,7 @@ func (a *App) splitClips(w http.ResponseWriter, r *http.Request) {
 	}
 	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
 		if req.At == nil {
-			return timeline.Timeline{}, &lyricsheet.InvalidError{Msg: "at is required"}
+			return timeline.Timeline{}, domain.Invalid("at is required")
 		}
 		return a.timelines.SplitClips(r.Context(), id, based, req.ClipIDs, *req.At)
 	})

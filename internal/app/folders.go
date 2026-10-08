@@ -1,18 +1,16 @@
 package app
 
 import (
-	"errors"
 	"net/http"
 	"strconv"
 
-	"github.com/xKirtle/bandmate/internal/folders"
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
 )
 
 func (a *App) listFolders(w http.ResponseWriter, r *http.Request) {
 	list, err := a.folders.List(r.Context())
 	if err != nil {
-		writeFolderError(w, err)
+		writeDomainError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, list)
@@ -27,7 +25,7 @@ func (a *App) createFolder(w http.ResponseWriter, r *http.Request) {
 	}
 	f, err := a.folders.Create(r.Context(), req.Name)
 	if err != nil {
-		writeFolderError(w, err)
+		writeDomainError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, f)
@@ -40,7 +38,7 @@ func (a *App) getFolder(w http.ResponseWriter, r *http.Request) {
 	}
 	f, err := a.folders.Get(r.Context(), id)
 	if err != nil {
-		writeFolderError(w, err)
+		writeDomainError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, f)
@@ -59,7 +57,7 @@ func (a *App) renameFolder(w http.ResponseWriter, r *http.Request) {
 	}
 	f, err := a.folders.Rename(r.Context(), id, req.Name)
 	if err != nil {
-		writeFolderError(w, err)
+		writeDomainError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, f)
@@ -101,7 +99,7 @@ func (a *App) deleteFolder(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else if err := a.folders.Delete(r.Context(), id); err != nil {
-		writeFolderError(w, err)
+		writeDomainError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -121,24 +119,8 @@ func (a *App) moveSongToFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := a.folders.MoveSong(r.Context(), id, req.FolderID); err != nil {
-		writeFolderError(w, err)
+		writeDomainError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// writeFolderError maps Folder errors onto HTTP responses.
-func writeFolderError(w http.ResponseWriter, err error) {
-	var invalid *folders.InvalidError
-	var conflict *folders.ConflictError
-	switch {
-	case errors.As(err, &invalid):
-		writeError(w, http.StatusBadRequest, invalid.Msg)
-	case errors.As(err, &conflict):
-		writeError(w, http.StatusConflict, conflict.Msg)
-	case errors.Is(err, folders.ErrNotFound):
-		writeError(w, http.StatusNotFound, "not found")
-	default:
-		writeDomainError(w, err)
-	}
 }

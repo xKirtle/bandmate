@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/xKirtle/bandmate/internal/audio"
+	"github.com/xKirtle/bandmate/internal/domain"
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
 )
 
@@ -43,10 +44,10 @@ const (
 func (s *Store) RecordTake(ctx context.Context, songID int64, based lyricsheet.Version, rec TakePlacement, file *audio.Received) (Timeline, error) {
 	defer file.Discard()
 	if math.IsNaN(rec.Start) || math.IsInf(rec.Start, 0) {
-		return Timeline{}, &lyricsheet.InvalidError{Msg: "start must be a number"}
+		return Timeline{}, domain.Invalid("start must be a number")
 	}
 	if rec.Start < -tolerance {
-		return Timeline{}, &lyricsheet.InvalidError{Msg: "a Clip can't start before 0:00"}
+		return Timeline{}, domain.Invalid("a Clip can't start before 0:00")
 	}
 	take, err := readTake(file, rec.Captured)
 	if err != nil {
@@ -61,8 +62,8 @@ func (s *Store) RecordTake(ctx context.Context, songID int64, based lyricsheet.V
 		return Timeline{}, errTakeTooEarly
 	}
 	return s.addTake(ctx, songID, based, file, func(tx *sql.Tx) (int64, error) {
-		if err := findTrack(ctx, tx, songID, rec.TrackID); errors.Is(err, lyricsheet.ErrNotFound) {
-			return 0, &lyricsheet.InvalidError{Msg: "there's no such Track on this Timeline"}
+		if err := findTrack(ctx, tx, songID, rec.TrackID); errors.Is(err, domain.ErrNotFound) {
+			return 0, domain.Invalid("there's no such Track on this Timeline")
 		} else if err != nil {
 			return 0, err
 		}
@@ -88,7 +89,7 @@ type Captured struct {
 }
 
 // errTakeTooEarly is refusing a Take that has no audio in its Clip.
-var errTakeTooEarly = &lyricsheet.InvalidError{Msg: "the Take ended before its Clip's start"}
+var errTakeTooEarly = domain.Invalid("the Take ended before its Clip's start")
 
 // newTake is a Take uploaded, checked, and where it was sung on the
 // Timeline.
@@ -112,22 +113,22 @@ func readTake(file *audio.Received, c Captured) (newTake, error) {
 	wav, err := file.ReadWAV()
 	if errors.Is(err, audio.ErrNotWAV) || (err == nil &&
 		(wav.Format != pcmFormat || wav.Channels != takeChannels || wav.BitsPerSample != takeBitDepth)) {
-		return newTake{}, &lyricsheet.InvalidError{Msg: "a Take must be a mono 24-bit WAV file"}
+		return newTake{}, domain.Invalid("a Take must be a mono 24-bit WAV file")
 	}
 	if err != nil {
 		return newTake{}, err
 	}
 	duration := wav.Duration()
 	if msg := (audio.Upload{Duration: duration, Peaks: c.Peaks}).Problem(); msg != "" {
-		return newTake{}, &lyricsheet.InvalidError{Msg: msg}
+		return newTake{}, domain.Invalid(msg)
 	}
 	for _, v := range []float64{c.CaptureStart, c.LatencyOffset} {
 		if math.IsNaN(v) || math.IsInf(v, 0) {
-			return newTake{}, &lyricsheet.InvalidError{Msg: "captureStart and latencyOffset must be numbers"}
+			return newTake{}, domain.Invalid("captureStart and latencyOffset must be numbers")
 		}
 	}
 	if c.LatencyOffset < 0 {
-		return newTake{}, &lyricsheet.InvalidError{Msg: "a latency offset can't be negative"}
+		return newTake{}, domain.Invalid("a latency offset can't be negative")
 	}
 	return newTake{Captured: c, wav: wav, size: file.Size, duration: duration,
 		start: c.CaptureStart - c.LatencyOffset}, nil
@@ -144,7 +145,7 @@ func (t newTake) insert(ctx context.Context, tx *sql.Tx, songID int64, number in
 			latency_offset, position, recorded_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		songID, number, t.size, t.duration, t.wav.SampleRate, string(peaks), t.LatencyOffset, position,
-		time.Now().UTC().Format(timeFormat))
+		time.Now().UTC().Format(domain.TimeFormat))
 	if err != nil {
 		return 0, fmt.Errorf("adding take: %w", err)
 	}
@@ -186,7 +187,7 @@ func (s *Store) Retake(ctx context.Context, songID int64, based lyricsheet.Versi
 			return 0, err
 		}
 		if !p.source.activeTakeID.Valid {
-			return 0, &lyricsheet.InvalidError{Msg: "only a Clip of Takes can be retaken"}
+			return 0, domain.Invalid("only a Clip of Takes can be retaken")
 		}
 		if take.end() <= p.start+tolerance {
 			return 0, errTakeTooEarly
@@ -338,14 +339,14 @@ func checkTakesAt(takes []TakeAt, active *int64) ([]int64, error) {
 	for i, t := range takes {
 		ids[i] = t.ID
 		if math.IsNaN(t.Position) || math.IsInf(t.Position, 0) || t.Position < -tolerance {
-			return nil, &lyricsheet.InvalidError{Msg: "a Take can't start before its Clip's source"}
+			return nil, domain.Invalid("a Take can't start before its Clip's source")
 		}
 		if err := checkNudge(t.Nudge); err != nil {
 			return nil, err
 		}
 	}
 	if active == nil || !slices.Contains(ids, *active) {
-		return nil, &lyricsheet.InvalidError{Msg: "a Clip of Takes plays one of them"}
+		return nil, domain.Invalid("a Clip of Takes plays one of them")
 	}
 	return ids, nil
 }
@@ -366,7 +367,7 @@ func (s *Store) NudgeTake(ctx context.Context, songID int64, based lyricsheet.Ve
 			return err
 		}
 		if !slices.Contains(p.source.takeIDs, takeID) {
-			return lyricsheet.ErrNotFound
+			return domain.ErrNotFound
 		}
 		var position, previous float64
 		if err := tx.QueryRowContext(ctx, `SELECT position, nudge FROM takes WHERE id = ?`, takeID).
@@ -386,7 +387,7 @@ func (s *Store) NudgeTake(ctx context.Context, songID int64, based lyricsheet.Ve
 			return err
 		}
 		if p.offset+p.length > end+tolerance {
-			return &lyricsheet.InvalidError{Msg: "the Clip would play past where its Takes end; trim it first"}
+			return domain.Invalid("the Clip would play past where its Takes end; trim it first")
 		}
 		return place(ctx, tx, clipID, p)
 	})
@@ -395,7 +396,7 @@ func (s *Store) NudgeTake(ctx context.Context, songID int64, based lyricsheet.Ve
 // checkNudge checks how far a Take is nudged.
 func checkNudge(nudge float64) error {
 	if math.IsNaN(nudge) || math.IsInf(nudge, 0) {
-		return &lyricsheet.InvalidError{Msg: "a nudge must be a number"}
+		return domain.Invalid("a nudge must be a number")
 	}
 	return nil
 }
@@ -408,7 +409,7 @@ func takeClip(ctx context.Context, tx *sql.Tx, songID, clipID int64) (placement,
 		return placement{}, err
 	}
 	if !p.source.activeTakeID.Valid {
-		return placement{}, &lyricsheet.InvalidError{Msg: "only a Clip of Takes has Takes"}
+		return placement{}, domain.Invalid("only a Clip of Takes has Takes")
 	}
 	return p, nil
 }
@@ -422,7 +423,7 @@ func (s *Store) ChooseTake(ctx context.Context, songID int64, based lyricsheet.V
 			return err
 		}
 		if !slices.Contains(p.source.takeIDs, takeID) {
-			return &lyricsheet.InvalidError{Msg: "a Clip of Takes plays one of them"}
+			return domain.Invalid("a Clip of Takes plays one of them")
 		}
 		return setActiveTake(ctx, tx, clipID, takeID)
 	})
@@ -447,7 +448,7 @@ func (s *Store) DeleteTake(ctx context.Context, songID int64, based lyricsheet.V
 			return err
 		}
 		if !slices.Contains(p.source.takeIDs, takeID) {
-			return lyricsheet.ErrNotFound
+			return domain.ErrNotFound
 		}
 		if len(p.source.takeIDs) == 1 {
 			return deleteClip(ctx, tx, songID, clipID)
@@ -518,7 +519,7 @@ func (s *Store) SweepDetachedTakes(ctx context.Context, before time.Time) error 
 	defer tx.Rollback()
 	var ids []int64
 	err = query(ctx, tx, `SELECT id FROM takes WHERE clip_id IS NULL AND detached_at < ?`,
-		[]any{before.UTC().Format(timeFormat)}, func(rows *sql.Rows) error {
+		[]any{before.UTC().Format(domain.TimeFormat)}, func(rows *sql.Rows) error {
 			var id int64
 			if err := rows.Scan(&id); err != nil {
 				return err
@@ -554,7 +555,7 @@ func scanTake(row interface{ Scan(...any) error }, extra ...any) (Take, error) {
 	if err != nil {
 		return Take{}, err
 	}
-	if t.RecordedAt, err = time.Parse(timeFormat, recorded); err != nil {
+	if t.RecordedAt, err = domain.ParseTime(recorded); err != nil {
 		return Take{}, fmt.Errorf("parsing stored time %q: %w", recorded, err)
 	}
 	return t, nil
@@ -567,7 +568,7 @@ func (s *Store) GetTake(ctx context.Context, songID, takeID int64) (Take, error)
 	t, err := scanTake(s.db.QueryRowContext(ctx, `SELECT `+takeColumns+`, peaks FROM takes
 		WHERE id = ? AND song_id = ?`, takeID, songID), &peaks)
 	if errors.Is(err, sql.ErrNoRows) {
-		return Take{}, lyricsheet.ErrNotFound
+		return Take{}, domain.ErrNotFound
 	}
 	if err != nil {
 		return Take{}, fmt.Errorf("reading take: %w", err)
@@ -589,7 +590,7 @@ func (s *Store) ServeTake(w http.ResponseWriter, r *http.Request, songID, takeID
 		JOIN songs ON songs.id = takes.song_id WHERE takes.id = ? AND takes.song_id = ?`, takeID, songID).
 		Scan(&title, &number)
 	if errors.Is(err, sql.ErrNoRows) {
-		return lyricsheet.ErrNotFound
+		return domain.ErrNotFound
 	}
 	if err != nil {
 		return fmt.Errorf("reading take: %w", err)

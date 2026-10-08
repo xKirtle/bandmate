@@ -2,8 +2,6 @@ package app
 
 import (
 	"encoding/json"
-	"errors"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -41,7 +39,7 @@ func (a *App) listSongs(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if _, err := a.folders.Get(r.Context(), id); err != nil {
-			writeFolderError(w, err)
+			writeDomainError(w, err)
 			return
 		}
 		filter.Folder = &id
@@ -168,25 +166,4 @@ func pathID(w http.ResponseWriter, r *http.Request, name string) (int64, bool) {
 		return 0, false
 	}
 	return id, true
-}
-
-// writeDomainError maps Lyric Sheet errors onto HTTP responses.
-func writeDomainError(w http.ResponseWriter, err error) {
-	var invalid *lyricsheet.InvalidError
-	var conflict *lyricsheet.ConflictError
-	switch {
-	case errors.As(err, &invalid):
-		writeError(w, http.StatusBadRequest, invalid.Msg)
-	case errors.As(err, &conflict):
-		writeError(w, http.StatusConflict, conflict.Msg)
-	case errors.Is(err, lyricsheet.ErrStale):
-		// The code tells a stale tab apart from other conflicts, so the SPA
-		// can offer to reload the Song.
-		writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error(), "code": "stale"})
-	case errors.Is(err, lyricsheet.ErrNotFound):
-		writeError(w, http.StatusNotFound, "not found")
-	default:
-		log.Printf("internal error: %v", err)
-		writeError(w, http.StatusInternalServerError, "something went wrong")
-	}
 }

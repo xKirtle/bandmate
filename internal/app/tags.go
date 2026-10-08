@@ -1,10 +1,7 @@
 package app
 
 import (
-	"errors"
 	"net/http"
-
-	"github.com/xKirtle/bandmate/internal/tags"
 )
 
 // listTags lists every Tag, with how many Songs carry each, for suggesting
@@ -12,7 +9,7 @@ import (
 func (a *App) listTags(w http.ResponseWriter, r *http.Request) {
 	list, err := a.tags.List(r.Context())
 	if err != nil {
-		writeTagError(w, err)
+		writeDomainError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, list)
@@ -37,7 +34,7 @@ func (a *App) setSongTags(w http.ResponseWriter, r *http.Request) {
 	}
 	names, err := a.tags.SetSongTags(r.Context(), id, *req.Tags)
 	if err != nil {
-		writeTagError(w, err)
+		writeDomainError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, names)
@@ -60,7 +57,7 @@ func (a *App) renameTag(w http.ResponseWriter, r *http.Request) {
 	}
 	t, err := a.tags.Rename(r.Context(), id, req.Name, req.Merge)
 	if err != nil {
-		writeTagError(w, err)
+		writeDomainError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, t)
@@ -73,24 +70,8 @@ func (a *App) deleteTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := a.tags.Delete(r.Context(), id); err != nil {
-		writeTagError(w, err)
+		writeDomainError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// writeTagError maps Tag errors onto HTTP responses.
-func writeTagError(w http.ResponseWriter, err error) {
-	var invalid *tags.InvalidError
-	var conflict *tags.ConflictError
-	switch {
-	case errors.As(err, &invalid):
-		writeError(w, http.StatusBadRequest, invalid.Msg)
-	case errors.As(err, &conflict):
-		writeError(w, http.StatusConflict, conflict.Msg)
-	case errors.Is(err, tags.ErrNotFound):
-		writeError(w, http.StatusNotFound, "not found")
-	default:
-		writeDomainError(w, err)
-	}
 }

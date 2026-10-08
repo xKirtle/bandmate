@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"math"
 	"strings"
+
+	"github.com/xKirtle/bandmate/internal/domain"
 )
 
 // maxCue is the latest a Cue can be, in seconds: far past any Song, and
@@ -17,11 +19,11 @@ const maxCue = 24 * 60 * 60
 func cueMillis(seconds float64) (int64, error) {
 	switch {
 	case math.IsNaN(seconds):
-		return 0, invalid("a Cue must be a time in seconds")
+		return 0, domain.Invalid("a Cue must be a time in seconds")
 	case seconds < 0:
-		return 0, invalid("a Cue can't be before the start of the Timeline")
+		return 0, domain.Invalid("a Cue can't be before the start of the Timeline")
 	case seconds > maxCue:
-		return 0, invalid("a Cue can't be more than 24 hours into the Timeline")
+		return 0, domain.Invalid("a Cue can't be more than 24 hours into the Timeline")
 	}
 	return millis(seconds), nil
 }
@@ -43,7 +45,7 @@ func (s *Store) SetLineCue(ctx context.Context, songID int64, based Version, lin
 			return err
 		}
 		if !inArrangement {
-			return conflict("a Line in the Scrapbook can't be given a Cue")
+			return domain.Conflict("a Line in the Scrapbook can't be given a Cue")
 		}
 		return writeLineCue(ctx, tx, songID, lineID, sql.NullInt64{Int64: ms, Valid: true})
 	})
@@ -64,7 +66,7 @@ func writeLineCue(ctx context.Context, tx *sql.Tx, songID, lineID int64, ms sql.
 		return err
 	}
 	if ms.Valid && blank(text) {
-		return invalid("a blank Line can't have a Cue")
+		return domain.Invalid("a blank Line can't have a Cue")
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE lines SET cue_ms = ? WHERE id = ?`, ms, lineID); err != nil {
 		return fmt.Errorf("writing line cue: %w", err)
@@ -140,7 +142,7 @@ func (s *Store) RestoreCues(ctx context.Context, songID int64, based Version, va
 // Timeline, or the shift is refused.
 func (s *Store) ShiftCues(ctx context.Context, songID int64, based Version, start, end, by float64) (Song, error) {
 	if end <= start {
-		return Song{}, invalid("the span must end after it starts")
+		return Song{}, domain.Invalid("the span must end after it starts")
 	}
 	startMs, endMs := millis(start), millis(end)
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
@@ -182,7 +184,7 @@ func findLine(ctx context.Context, tx *sql.Tx, songID, lineID int64) (text strin
 		FROM lines l JOIN alternates a ON a.id = l.alternate_id JOIN sections s ON s.id = a.section_id
 		WHERE l.id = ? AND s.song_id = ?`, lineID, songID).Scan(&text, &inArrangement)
 	if errors.Is(err, sql.ErrNoRows) {
-		return "", false, ErrNotFound
+		return "", false, domain.ErrNotFound
 	}
 	return text, inArrangement, err
 }

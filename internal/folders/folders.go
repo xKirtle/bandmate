@@ -10,26 +10,13 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/xKirtle/bandmate/internal/domain"
 )
 
-// ErrNotFound means the requested Folder, or the Song asked to move,
-// doesn't exist.
-var ErrNotFound = errors.New("not found")
-
-// InvalidError is a rejected operation. Its message is safe to show the user.
-type InvalidError struct{ Msg string }
-
-func (e *InvalidError) Error() string { return e.Msg }
-
-// ConflictError is an operation the Folders as they are don't allow, e.g. a
-// name another has. Its message is safe to show the user.
-type ConflictError struct{ Msg string }
-
-func (e *ConflictError) Error() string { return e.Msg }
-
 var (
-	errNameRequired = &InvalidError{Msg: "a Folder's name is required"}
-	errNoSuchFolder = &InvalidError{Msg: "there's no such Folder"}
+	errNameRequired = domain.Invalid("a Folder's name is required")
+	errNoSuchFolder = domain.Invalid("there's no such Folder")
 )
 
 // Folder is a Folder as listed, with how many Songs it holds.
@@ -74,7 +61,7 @@ func (s *Store) Get(ctx context.Context, id int64) (Folder, error) {
 	var f Folder
 	err := s.db.QueryRowContext(ctx, selectFolders+` WHERE f.id = ?`, id).Scan(&f.ID, &f.Name, &f.Songs)
 	if errors.Is(err, sql.ErrNoRows) {
-		return Folder{}, ErrNotFound
+		return Folder{}, domain.ErrNotFound
 	}
 	if err != nil {
 		return Folder{}, fmt.Errorf("reading folder: %w", err)
@@ -130,10 +117,8 @@ func (s *Store) Rename(ctx context.Context, id int64, name string) (Folder, erro
 	if err != nil {
 		return Folder{}, fmt.Errorf("renaming folder: %w", err)
 	}
-	if n, err := res.RowsAffected(); err != nil {
+	if err := domain.ExpectOneRow(res); err != nil {
 		return Folder{}, err
-	} else if n == 0 {
-		return Folder{}, ErrNotFound
 	}
 	if err := tx.Commit(); err != nil {
 		return Folder{}, err
@@ -147,15 +132,10 @@ func (s *Store) Delete(ctx context.Context, id int64) error {
 	if err != nil {
 		return fmt.Errorf("deleting folder: %w", err)
 	}
-	if n, err := res.RowsAffected(); err != nil {
-		return err
-	} else if n == 0 {
-		return ErrNotFound
-	}
-	return nil
+	return domain.ExpectOneRow(res)
 }
 
-// checkName refuses, as a ConflictError, a name another Folder already has,
+// checkName refuses, as a conflict, a name another Folder already has,
 // ignoring case. The Folder with id except, the one being renamed, doesn't
 // count; ids start at 1, so a new Folder passes 0.
 func checkName(ctx context.Context, tx *sql.Tx, name string, except int64) error {
@@ -163,7 +143,7 @@ func checkName(ctx context.Context, tx *sql.Tx, name string, except int64) error
 	err := tx.QueryRowContext(ctx, `SELECT name FROM folders WHERE folded = ? AND id <> ?`, fold(name), except).
 		Scan(&taken)
 	if err == nil {
-		return &ConflictError{Msg: fmt.Sprintf("there's already a Folder called “%s”", taken)}
+		return domain.Conflict(fmt.Sprintf("there's already a Folder called “%s”", taken))
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("checking folder names: %w", err)
@@ -186,16 +166,14 @@ func (s *Store) MoveSong(ctx context.Context, songID int64, folderID *int64) err
 	if err != nil {
 		return fmt.Errorf("moving song: %w", err)
 	}
-	if n, err := res.RowsAffected(); err != nil {
+	if err := domain.ExpectOneRow(res); err != nil {
 		return err
-	} else if n == 0 {
-		return ErrNotFound
 	}
 	return tx.Commit()
 }
 
-// check refuses, as an InvalidError, a Folder that doesn't exist, for
-// putting a Song into it. A nil one, none, is always there.
+// check refuses, as invalid, a Folder that doesn't exist, for putting a
+// Song into it. A nil one, none, is always there.
 func check(ctx context.Context, tx *sql.Tx, folderID *int64) error {
 	if folderID == nil {
 		return nil
