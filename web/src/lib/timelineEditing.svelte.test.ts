@@ -290,11 +290,11 @@ describe('Timeline editing, the Timeline as shown', () => {
     expect(server.timeline.tracks[0].volume).toBe(-12);
   });
 
-  it('shows a preview without sending it, until the next preview or edit of its field', async () => {
+  it('shows a value being adjusted without sending it, until its field is next adjusted or edited', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
     const { editing } = await editingFor(server);
-    expect(editing.preview({ kind: 'updateTrack', trackId: 1, changes: { volume: -3 } })).toBe(true);
-    expect(editing.preview({ kind: 'updateTrack', trackId: 1, changes: { volume: -4 } })).toBe(true);
+    expect(editing.adjust({ kind: 'updateTrack', trackId: 1, changes: { volume: -3 } })).toBe(true);
+    expect(editing.adjust({ kind: 'updateTrack', trackId: 1, changes: { volume: -4 } })).toBe(true);
     expect(shownTrack(editing, 1).volume).toBe(-4);
     expect(server.landed).toBe(0);
     await editing.edit({ kind: 'updateTrack', trackId: 1, changes: { volume: -5 } });
@@ -302,25 +302,25 @@ describe('Timeline editing, the Timeline as shown', () => {
     expect(server.timeline.tracks[0].volume).toBe(-5);
   });
 
-  it('keeps showing a fader previewed during an earlier save of its level, once that save is', async () => {
+  it('keeps showing a fader adjusted during an earlier save of its level, once that save is', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
     const { saves, editing } = await editingFor(server);
     const release = server.holdNextAnswer();
     const saving = editing.edit({ kind: 'updateTrack', trackId: 1, changes: { volume: -6 } });
-    editing.preview({ kind: 'updateTrack', trackId: 1, changes: { volume: -9 } });
+    editing.adjust({ kind: 'updateTrack', trackId: 1, changes: { volume: -9 } });
     release();
     await saving;
     expect(saves.timeline.tracks[0].volume).toBe(-6);
     expect(shownTrack(editing, 1).volume).toBe(-9);
   });
 
-  it('refuses a preview while frozen, as the same edit would be, but a Track’s levels', async () => {
+  it('refuses to adjust a value while frozen, as it would the same edit, but a Track’s levels', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
     const { editing, state } = await editingFor(server);
     state.recording = true;
-    expect(editing.preview({ kind: 'updateTrack', trackId: 1, changes: { name: 'Vocals' } })).toBe(false);
-    expect(editing.preview({ kind: 'renameClip', clipId: 1, name: 'Intro' })).toBe(false);
-    expect(editing.preview({ kind: 'updateTrack', trackId: 1, changes: { volume: -6, soloed: true } })).toBe(true);
+    expect(editing.adjust({ kind: 'updateTrack', trackId: 1, changes: { name: 'Vocals' } })).toBe(false);
+    expect(editing.adjust({ kind: 'renameClip', clipId: 1, name: 'Intro' })).toBe(false);
+    expect(editing.adjust({ kind: 'updateTrack', trackId: 1, changes: { volume: -6, soloed: true } })).toBe(true);
     expect(shownTrack(editing, 1)).toMatchObject({ name: 'Track 1', volume: -6, soloed: true });
     expect(shownTrack(editing, 1).clips[0].name).toBeNull();
   });
@@ -328,8 +328,8 @@ describe('Timeline editing, the Timeline as shown', () => {
   it('drops everything shown when a refresh replaces the Song', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
     const { saves, editing } = await editingFor(server);
-    editing.preview({ kind: 'updateTrack', trackId: 1, changes: { volume: -6 } });
-    editing.preview({ kind: 'renameClip', clipId: 1, name: 'Intro' });
+    editing.adjust({ kind: 'updateTrack', trackId: 1, changes: { volume: -6 } });
+    editing.adjust({ kind: 'renameClip', clipId: 1, name: 'Intro' });
     server.changeElsewhere({ title: 'From another tab' });
     await saves.refresh();
     expect(saves.song.title).toBe('From another tab');
@@ -340,7 +340,7 @@ describe('Timeline editing, the Timeline as shown', () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
     const { editing } = await editingFor(server);
     await editing.edit({ kind: 'updateTrack', trackId: 1, changes: { volume: -6 } });
-    editing.preview({ kind: 'updateTrack', trackId: 1, changes: { volume: -9 } });
+    editing.adjust({ kind: 'updateTrack', trackId: 1, changes: { volume: -9 } });
     await editing.undo();
     expect(server.timeline.tracks[0].volume).toBe(0);
     expect(shownTrack(editing, 1).volume).toBe(-9);
@@ -660,7 +660,7 @@ describe('Timeline editing, the Loop as shown', () => {
     state.recording = true;
     expect(await editing.edit({ kind: 'setLoop', loop: { start: 4, end: 8, on: true } })).toBeNull();
     expect(await editing.edit({ kind: 'switchLoop', on: true })).toBeNull();
-    expect(editing.preview({ kind: 'clearLoop' })).toBe(false);
+    expect(editing.adjust({ kind: 'clearLoop' })).toBe(false);
     expect(editing.timeline.loop).toBeNull();
     expect(server.landed).toBe(0);
   });
