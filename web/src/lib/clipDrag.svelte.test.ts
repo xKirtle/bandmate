@@ -718,7 +718,7 @@ describe('ClipDrag', () => {
       expect(drag.shown).toEqual([]);
     });
 
-    it('is left be by an earlier drag’s save resolving, e.g. a Gain handed over', () => {
+    it('isn’t let go by an earlier drag’s save resolving, e.g. a Gain handed over', () => {
       const { drag, press } = timelineDrag();
       press(1, 'gain', 15);
       drag.move(below(-10, 15));

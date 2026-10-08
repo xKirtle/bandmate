@@ -7,9 +7,9 @@
 //   The Timeline reads it to disable its controls and refuse drags.
 // - The Timeline as shown, which the Timeline draws and plays: the Timeline
 //   as saved, with the values of edits on their way and of previews on top,
-//   for the edits that set values on a Track or a Clip already there, or
-//   on the Loop (see ShownEdit), e.g. a Clip's Gain or Fades, which the
-//   Clip drag hands over on release. A preview is a value shown without being
+//   for the edits that set values on a Track or a Clip already there,
+//   e.g. a Clip's Gain or Fades, which the Clip drag hands over on
+//   release, or on the Loop (see ShownEdit). A preview is a value shown without being
 //   sent, e.g. a fader's level while it's dragged, refused whenever the
 //   same edit would be. Which value shows goes by field, e.g. a Track's
 //   volume, or the Loop: an edit's stops showing once its save resolves,
