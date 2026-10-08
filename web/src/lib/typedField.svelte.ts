@@ -61,6 +61,8 @@ export class TypedField<T> implements Typing {
   #message = $state<string | null>(null);
   /** Takes it off Saves' list: set once typed in, until destroyed. */
   #leave: (() => void) | null = null;
+  /** How many edits have been typed into it since it went on Saves' list. */
+  #edits = $state(0);
   readonly section?: number;
 
   constructor(options: TypedFieldOptions<T>) {
@@ -76,6 +78,12 @@ export class TypedField<T> implements Typing {
   set shown(typed: string) {
     this.#type(typed);
     this.#message = null;
+    this.#edits++;
+  }
+
+  /** How many edits have been typed into it since it went on Saves' list, e.g. keystrokes. */
+  get typed(): number {
+    return this.#edits;
   }
 
   /** Why what's typed was refused, until it's typed in again. */
@@ -127,6 +135,7 @@ export class TypedField<T> implements Typing {
     if (!this.commit()) this.cancel();
     this.#leave?.();
     this.#leave = null;
+    this.#edits = 0;
   };
 
   /** Shows what's typed, or with null what's saved; typed in, it's on Saves' list. */

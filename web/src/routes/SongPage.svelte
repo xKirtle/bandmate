@@ -161,7 +161,7 @@
     const server = songServer(id);
     Promise.all([server.getSong(), server.getTimeline()]).then(
       ([s, tl]) => {
-        saves = new Saves({ server, song: s, timeline: tl, editsOutside, onReplace });
+        saves = new Saves({ server, song: s, timeline: tl, onReplace });
         editing = new LyricSheetEditing(saves, () => syncMode.end());
         details = detailFields(saves, api.updateSong);
         tags = s.tags;
@@ -277,11 +277,6 @@
   onDestroy(() => {
     for (const field of detailList()) field.destroy();
   });
-
-  /** Whether the page holds edits Saves doesn't: the Lyric Sheet's. */
-  function editsOutside() {
-    return editing?.unsaved ?? false;
-  }
 
   // Closing or reloading the tab can't wait for a save, or a recording, so ask first.
   function warnBeforeUnload(event: BeforeUnloadEvent) {

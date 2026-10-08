@@ -132,13 +132,13 @@ describe('Saves, refreshing', () => {
 
   it('marks the Song stale rather than replace edits not saved yet', async () => {
     const server = new FakeSongServer();
-    let typing = true;
-    const saves = await savesFor(server, { editsOutside: () => typing });
+    const saves = await savesFor(server);
+    const leave = saves.typing({ unsaved: true, typed: 1 });
     server.changeElsewhere({ title: 'From another tab' });
     await saves.refresh();
     expect(saves.stale).toBe(true);
     expect(saves.song.title).toBe('Untitled');
-    typing = false;
+    leave();
     await saves.refresh();
     expect(saves.stale).toBe(false);
     expect(saves.song.title).toBe('From another tab');

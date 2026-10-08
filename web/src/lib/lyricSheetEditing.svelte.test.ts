@@ -3,6 +3,7 @@ import type { Song } from './api';
 import type { LyricSheetChange } from './lyricSheetChanges';
 import { LyricSheetEditing } from './lyricSheetEditing.svelte';
 import { Saves } from './saves.svelte';
+import { TypedField } from './typedField.svelte';
 import { emptySong, FakeSongServer } from './songServerFake';
 
 /** A Song of one Section, the Verse, whose one Alternate has two Lines. */
@@ -45,10 +46,9 @@ const withText = (song: Song, text: string): Partial<Song> => {
  */
 async function editingFor(server: FakeSongServer) {
   const [song, timeline] = await Promise.all([server.getSong(), server.getTimeline()]);
-  let editing: LyricSheetEditing | null = null;
-  const saves = new Saves({ server, song, timeline, editsOutside: () => editing?.unsaved ?? false });
+  const saves = new Saves({ server, song, timeline });
   const sync = { ended: 0 };
-  editing = new LyricSheetEditing(saves, () => sync.ended++);
+  const editing = new LyricSheetEditing(saves, () => sync.ended++);
   return { saves, editing, sync };
 }
 
@@ -74,7 +74,7 @@ describe("Lyric Sheet editing, an Alternate's text", () => {
     box.type('One\nTwo\nThree');
     await vi.advanceTimersByTimeAsync(799);
     expect(server.landed).toBe(0);
-    expect(editing.unsaved).toBe(true);
+    expect(editing.unsavedIn(1)).toBe(true);
     expect(saves.unsaved).toBe(true);
     await vi.advanceTimersByTimeAsync(1);
     await settled();
@@ -82,7 +82,7 @@ describe("Lyric Sheet editing, an Alternate's text", () => {
     expect(textOf(server.song)).toBe('One\nTwo\nThree');
     expect(textOf(saves.song)).toBe('One\nTwo\nThree');
     expect(box.text).toBe('One\nTwo\nThree');
-    expect(editing.unsaved).toBe(false);
+    expect(editing.unsavedIn(1)).toBe(false);
     expect(saves.unsaved).toBe(false);
   });
 
@@ -95,7 +95,7 @@ describe("Lyric Sheet editing, an Alternate's text", () => {
     box.blur();
     await settled();
     expect(textOf(server.song)).toBe('One\nTwo\nThree');
-    expect(editing.unsaved).toBe(false);
+    expect(editing.unsavedIn(1)).toBe(false);
     await vi.advanceTimersByTimeAsync(800);
     expect(server.landed).toBe(1);
   });
@@ -110,7 +110,7 @@ describe("Lyric Sheet editing, an Alternate's text", () => {
     box.blur();
     await settled();
     expect(server.landed).toBe(0);
-    expect(editing.unsaved).toBe(false);
+    expect(editing.unsavedIn(1)).toBe(false);
   });
 
   it('saves at once when the box closes, as leaving the page does without a blur', async () => {
@@ -122,7 +122,7 @@ describe("Lyric Sheet editing, an Alternate's text", () => {
     box.close();
     await settled();
     expect(textOf(server.song)).toBe('One\nTwo\nThree');
-    expect(editing.unsaved).toBe(false);
+    expect(editing.unsavedIn(1)).toBe(false);
   });
 
   it('keeps the text after a failed save, shows the save error, and sends it again on the next keystroke', async () => {
@@ -136,7 +136,7 @@ describe("Lyric Sheet editing, an Alternate's text", () => {
     expect(saves.saveError).toMatch(/Can't reach Bandmate/);
     expect(box.text).toBe('One\nTwo\nThree');
     expect(textOf(saves.song)).toBe('One\nTwo');
-    expect(editing.unsaved).toBe(true);
+    expect(editing.unsavedIn(1)).toBe(true);
     // It isn't tried again by itself.
     await vi.advanceTimersByTimeAsync(10_000);
     expect(server.landed).toBe(0);
@@ -144,7 +144,7 @@ describe("Lyric Sheet editing, an Alternate's text", () => {
     await vi.advanceTimersByTimeAsync(800);
     expect(textOf(server.song)).toBe('One\nTwo\nThree!');
     expect(saves.saveError).toBeNull();
-    expect(editing.unsaved).toBe(false);
+    expect(editing.unsavedIn(1)).toBe(false);
   });
 
   it('sends a failed save again on blur, though the text is as it was', async () => {
@@ -155,12 +155,12 @@ describe("Lyric Sheet editing, an Alternate's text", () => {
     server.failNext(1);
     box.type('One\nTwo\nThree');
     await vi.advanceTimersByTimeAsync(800);
-    expect(editing.unsaved).toBe(true);
+    expect(editing.unsavedIn(1)).toBe(true);
     box.blur();
     await settled();
     expect(textOf(server.song)).toBe('One\nTwo\nThree');
     expect(saves.saveError).toBeNull();
-    expect(editing.unsaved).toBe(false);
+    expect(editing.unsavedIn(1)).toBe(false);
   });
 
   it("keeps its own text over the server's while a save is on its way, or failed", async () => {
@@ -212,40 +212,67 @@ describe("Lyric Sheet editing, the Lyric Sheet's edits not saved yet", () => {
     server.failNext(2);
     box.type('One\nTwo\nThree');
     await vi.advanceTimersByTimeAsync(800);
-    expect(editing.unsaved).toBe(true);
+    expect(editing.unsavedIn(1)).toBe(true);
     box.close();
-    expect(editing.unsaved).toBe(true);
+    expect(editing.unsavedIn(1)).toBe(true);
     await settled();
     expect(server.landed).toBe(0);
     expect(saves.saveError).toMatch(/Can't reach Bandmate/);
-    expect(editing.unsaved).toBe(false);
+    expect(editing.unsavedIn(1)).toBe(false);
     expect(saves.unsaved).toBe(false);
   });
 
-  it('counts a Label or an Alternate name being typed until it saves, in its Section', async () => {
-    const server = new FakeSongServer(verseSong());
+  it('counts a Label, an Alternate name or a Cue time being typed as unsaved in its Section, until it saves', async () => {
+    const server = new FakeSongServer(withBridge());
     const { saves, editing } = await editingFor(server);
-    const naming = {};
-    editing.nameTyped(naming, 1, true);
-    expect(editing.unsaved).toBe(true);
+    const label = editing.sectionLabel(1);
+    label.shown = 'Chorus';
     expect(saves.unsaved).toBe(true);
     expect(editing.unsavedIn(1)).toBe(true);
     expect(editing.unsavedIn(2)).toBe(false);
-    editing.nameTyped(naming, 1, false);
-    expect(editing.unsaved).toBe(false);
+    label.commit();
+    await settled();
+    expect(editing.unsavedIn(1)).toBe(false);
+    expect(saves.unsaved).toBe(false);
+
+    const name = editing.alternateName(2, 2);
+    name.shown = 'Darker';
+    expect(editing.unsavedIn(2)).toBe(true);
+    name.cancel();
+    expect(editing.unsavedIn(2)).toBe(false);
+
+    // A Cue's time typed into a Section's Lines, as CueField types it.
+    const cue = new TypedField<string>({
+      saved: () => '0:12.0',
+      format: (at) => at,
+      parse: () => 'back',
+      commit: () => {},
+      typing: editing.typing,
+      section: 2,
+    });
+    cue.shown = '0:1';
+    expect(editing.unsavedIn(2)).toBe(true);
     expect(editing.unsavedIn(1)).toBe(false);
   });
 
-  it("counts the edits typed into a Section's editor, Lines text and names alike", async () => {
+  it("counts the edits typed into a Section's editor, Lines text and names alike, gone or not", async () => {
     const server = new FakeSongServer(verseSong());
     const { editing } = await editingFor(server);
     const box = editing.textBox(1, 1);
     box.focus();
     box.type('One\nTwo\nThree');
-    editing.nameTyped({}, 1, true);
-    expect(editing.typedIn(1)).toBe(2);
+    const label = editing.sectionLabel(1);
+    label.shown = 'C';
+    label.shown = 'Ch';
+    expect(editing.typedIn(1)).toBe(3);
     expect(editing.typedIn(2)).toBe(0);
     expect(editing.unsavedIn(1)).toBe(true);
+    // A field gone, e.g. as Alternates mode closes, still counts as typed in.
+    label.destroy();
+    box.close();
+    await settled();
+    expect(editing.typedIn(1)).toBe(3);
+    expect(editing.unsavedIn(1)).toBe(false);
   });
 
   it('marks the Song stale on a refresh while text waits to be saved, rather than replace it', async () => {
@@ -259,6 +286,149 @@ describe("Lyric Sheet editing, the Lyric Sheet's edits not saved yet", () => {
     expect(saves.stale).toBe(true);
     expect(saves.song.title).toBe('Untitled');
     expect(box.text).toBe('One\nTwo\nThree');
+  });
+
+  it('marks the Song stale on a refresh while a Label is typed, rather than replace it', async () => {
+    const server = new FakeSongServer(verseSong());
+    const { saves, editing } = await editingFor(server);
+    const label = editing.sectionLabel(1);
+    label.shown = 'Chorus';
+    server.changeElsewhere({ title: 'From another tab' });
+    await saves.refresh();
+    expect(saves.stale).toBe(true);
+    expect(label.shown).toBe('Chorus');
+  });
+});
+
+describe("Lyric Sheet editing, a Section's Label", () => {
+  it('saves the Label typed, trimmed, ending Sync mode', async () => {
+    const server = new FakeSongServer(verseSong());
+    const { saves, editing, sync } = await editingFor(server);
+    const label = editing.sectionLabel(1);
+    expect(label.shown).toBe('Verse');
+    label.shown = ' Chorus ';
+    label.commit();
+    expect(sync.ended).toBe(1);
+    await settled();
+    expect(server.song.sections[0].label).toBe('Chorus');
+    expect(saves.song.sections[0].label).toBe('Chorus');
+    expect(label.shown).toBe('Chorus');
+  });
+
+  it('saves a blank Label, so the Section goes by its place again', async () => {
+    const server = new FakeSongServer(verseSong());
+    const { editing } = await editingFor(server);
+    const label = editing.sectionLabel(1);
+    label.shown = '  ';
+    label.commit();
+    await settled();
+    expect(server.song.sections[0].label).toBe('');
+  });
+
+  it('does nothing when what’s typed is what’s saved', async () => {
+    const server = new FakeSongServer(verseSong());
+    const { editing, sync } = await editingFor(server);
+    const label = editing.sectionLabel(1);
+    label.shown = 'Verse ';
+    label.commit();
+    await settled();
+    expect(server.landed).toBe(0);
+    expect(sync.ended).toBe(0);
+    expect(label.shown).toBe('Verse');
+  });
+
+  it('shows what’s saved again once a save fails', async () => {
+    const server = new FakeSongServer(verseSong());
+    const { saves, editing } = await editingFor(server);
+    const label = editing.sectionLabel(1);
+    server.failNext(1);
+    label.shown = 'Chorus';
+    label.commit();
+    await settled();
+    expect(saves.saveError).toMatch(/Can't reach Bandmate/);
+    expect(label.shown).toBe('Verse');
+    expect(saves.unsaved).toBe(false);
+  });
+
+  it('takes back what’s typed on cancel, e.g. Esc', async () => {
+    const server = new FakeSongServer(verseSong());
+    const { saves, editing } = await editingFor(server);
+    const label = editing.sectionLabel(1);
+    label.shown = 'Chorus';
+    label.cancel();
+    expect(label.shown).toBe('Verse');
+    expect(saves.unsaved).toBe(false);
+    label.destroy();
+    await settled();
+    expect(server.landed).toBe(0);
+  });
+
+  it('saves what’s typed as its field goes', async () => {
+    const server = new FakeSongServer(verseSong());
+    const { editing } = await editingFor(server);
+    const label = editing.sectionLabel(1);
+    label.shown = 'Chorus';
+    label.destroy();
+    await settled();
+    expect(server.song.sections[0].label).toBe('Chorus');
+  });
+});
+
+describe("Lyric Sheet editing, an Alternate's name", () => {
+  it('saves the name typed, trimmed, and a blank one removes it', async () => {
+    const server = new FakeSongServer(verseSong());
+    const { editing, sync } = await editingFor(server);
+    const name = editing.alternateName(1, 1);
+    expect(name.shown).toBe('');
+    name.shown = ' Darker ';
+    name.commit();
+    expect(sync.ended).toBe(1);
+    await settled();
+    expect(server.song.sections[0].alternates[0].name).toBe('Darker');
+    expect(name.shown).toBe('Darker');
+    name.shown = ' ';
+    name.commit();
+    await settled();
+    expect(server.song.sections[0].alternates[0].name).toBe('');
+  });
+
+  it('does nothing when what’s typed is what’s saved', async () => {
+    const server = new FakeSongServer(verseSong());
+    const { editing } = await editingFor(server);
+    const name = editing.alternateName(1, 1);
+    name.shown = ' ';
+    name.commit();
+    await settled();
+    expect(server.landed).toBe(0);
+    expect(name.shown).toBe('');
+  });
+
+  it('shows what’s saved again once a save fails', async () => {
+    const server = new FakeSongServer(verseSong());
+    const { saves, editing } = await editingFor(server);
+    const name = editing.alternateName(1, 1);
+    server.failNext(1);
+    name.shown = 'Darker';
+    name.commit();
+    await settled();
+    expect(saves.saveError).toMatch(/Can't reach Bandmate/);
+    expect(name.shown).toBe('');
+  });
+
+  it('takes back what’s typed on cancel, e.g. Esc, and saves what’s typed as its field goes', async () => {
+    const server = new FakeSongServer(verseSong());
+    const { editing } = await editingFor(server);
+    const name = editing.alternateName(1, 1);
+    name.shown = 'Darker';
+    name.cancel();
+    expect(name.shown).toBe('');
+    name.destroy();
+    await settled();
+    expect(server.landed).toBe(0);
+    name.shown = 'Brighter';
+    name.destroy();
+    await settled();
+    expect(server.song.sections[0].alternates[0].name).toBe('Brighter');
   });
 });
 
@@ -406,7 +576,7 @@ describe('Lyric Sheet editing, saving waiting text first', () => {
     box.close();
     await vi.advanceTimersByTimeAsync(800);
     expect(server.landed).toBe(2);
-    expect(editing.unsaved).toBe(false);
+    expect(editing.unsavedIn(2)).toBe(false);
   });
 
   it('sends a failed save in the Section again before adding it to another', async () => {

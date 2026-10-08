@@ -300,7 +300,7 @@ describe('Saves, the list of edits being typed', () => {
   it('reports unsaved edits while an edit on it isn’t saved, until it leaves', async () => {
     const server = new FakeSongServer();
     const saves = await savesFor(server);
-    const label = { unsaved: false, section: 3 };
+    const label = { unsaved: false, typed: 0, section: 3 };
     const leave = saves.typing(label);
     expect(saves.unsaved).toBe(false);
     label.unsaved = true;
