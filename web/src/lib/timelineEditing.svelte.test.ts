@@ -350,6 +350,92 @@ describe('Timeline editing, the Timeline as shown', () => {
   });
 });
 
+/** Lets everything waiting on the fake server's answers run, under fake timers. */
+const answered = () => vi.runAllTimersAsync();
+
+describe('Timeline editing, Track and Clip names typed', () => {
+  it('saves a Track’s name typed, leaving the list of edits being typed as soon as it’s sent', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { saves, editing } = await editingFor(server);
+    const name = editing.trackName(2);
+    expect(name.shown).toBe('Track 2');
+    name.shown = ' Vocals ';
+    expect(saves.unsaved).toBe(true);
+    const release = server.holdNextAnswer();
+    expect(name.commit()).toBe(true);
+    expect(name.unsaved).toBe(false);
+    expect(shownTrack(editing, 2).name).toBe('Vocals');
+    release();
+    await answered();
+    expect(server.timeline.tracks[1].name).toBe('Vocals');
+    expect(name.shown).toBe('Vocals');
+    expect(saves.unsaved).toBe(false);
+  });
+
+  it('takes a blank Track name back to the one saved', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { saves, editing } = await editingFor(server);
+    const name = editing.trackName(1);
+    name.shown = '   ';
+    expect(name.commit()).toBe(true);
+    expect(name.shown).toBe('Track 1');
+    expect(saves.pending).toBe(0);
+  });
+
+  it('saves a Track’s name typed as its field goes, e.g. leaving the page', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { saves, editing } = await editingFor(server);
+    const name = editing.trackName(1);
+    name.shown = 'Guitar';
+    name.destroy();
+    await answered();
+    expect(server.timeline.tracks[0].name).toBe('Guitar');
+    expect(saves.unsaved).toBe(false);
+  });
+
+  it('shows the Track’s name saved again when its save fails', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { editing } = await editingFor(server);
+    const name = editing.trackName(1);
+    server.failNext(1);
+    name.shown = 'Guitar';
+    name.commit();
+    await answered();
+    expect(name.shown).toBe('Track 1');
+    expect(shownTrack(editing, 1).name).toBe('Track 1');
+  });
+
+  it('clears a Clip’s own name when it’s typed blank, and saves a new one', async () => {
+    const named = { ...beatClip(1, 0, 10), name: 'Intro' };
+    const server = new FakeSongServer(emptySong(), [track(1, [named, beatClip(2, 20, 30)])]);
+    const { saves, editing } = await editingFor(server);
+    const intro = editing.clipName(1);
+    const second = editing.clipName(2);
+    expect(intro.shown).toBe('Intro');
+    expect(second.shown).toBe('');
+    intro.shown = ' ';
+    intro.commit();
+    second.shown = 'Outro';
+    second.destroy();
+    await answered();
+    expect(server.timeline.tracks[0].clips.map((c) => c.name)).toEqual([null, 'Outro']);
+    expect(intro.shown).toBe('');
+    expect(saves.unsaved).toBe(false);
+  });
+
+  it('keeps a refresh from replacing the Song while a name is typed', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { saves, editing } = await editingFor(server);
+    const name = editing.trackName(1);
+    name.shown = 'Guitar';
+    server.changeElsewhere({ title: 'From another tab' });
+    await saves.refresh();
+    expect(saves.stale).toBe(true);
+    expect(saves.song.title).toBe('Untitled');
+    expect(name.shown).toBe('Guitar');
+  });
+});
+
 describe('Timeline editing, the Loop as shown', () => {
   /** Editing a Timeline with a Loop from 0 to 10 s, switched on. */
   const looped = async () => {

@@ -14,6 +14,11 @@
 // a few seconds while it fails on the network or the server; if it still
 // fails, it's taken back, as a whole.
 //
+// It keeps a list of the edits being typed, e.g. a Track's name typed in
+// place (see typedField.svelte.ts): while any differs from what's saved,
+// the Song has unsaved edits, so closing the tab asks first and a refresh
+// doesn't replace the Song.
+//
 // Timeline edits and Cue changes are kept to undo, in one history (see
 // history.ts), in the order they were made. An undo waits for the edits
 // queued before it. A save refused as the Song changed elsewhere, or a
@@ -51,6 +56,14 @@ export interface Made {
   kept: Edit | 'take';
 }
 
+/** An edit being typed, on Saves' list, e.g. a field typed in place (see typedField.svelte.ts). */
+export interface Typing {
+  /** Whether what's typed isn't saved yet. */
+  readonly unsaved: boolean;
+  /** The Section it's typed in, if any. */
+  readonly section?: number;
+}
+
 export interface SavesOptions {
   /** The Song on the server. */
   server: SongServer;
@@ -81,6 +94,8 @@ export class Saves {
   /** Cue changes not saved yet, in the order they were made. */
   #unsavedCues: { change: CueChange }[] = $state.raw([]);
   #shown = $derived(this.#unsavedCues.reduce((s, u) => withCueChange(s, u.change), this.#saved));
+  /** The edits being typed, e.g. fields typed in place, unsaved while they differ from what's saved. */
+  #typing: Typing[] = $state.raw([]);
 
   /** The Timeline as saved. */
   timeline: Timeline = $state.raw()!;
@@ -138,10 +153,27 @@ export class Saves {
     return this.#saved;
   }
 
-  /** Whether anything isn't saved yet: saves on their way, Cue changes, or edits outside Saves. */
+  /** Whether anything isn't saved yet: saves on their way, Cue changes, edits being typed, or edits outside Saves. */
   get unsaved(): boolean {
-    return this.pending > 0 || this.#unsavedCues.length > 0 || this.#editsOutside();
+    return (
+      this.pending > 0 || this.#unsavedCues.length > 0 || this.#typing.some((t) => t.unsaved) || this.#editsOutside()
+    );
   }
+
+  /** Whether an edit being typed in a Section isn't saved yet. */
+  unsavedIn(sectionId: number): boolean {
+    return this.#typing.some((t) => t.section === sectionId && t.unsaved);
+  }
+
+  /**
+   * Puts an edit being typed, e.g. a field typed in place, on the list
+   * whose edits not saved yet the Song has, until the function returned is
+   * called, e.g. as its field goes.
+   */
+  typing = (entry: Typing): (() => void) => {
+    this.#typing = [...this.#typing, entry];
+    return () => (this.#typing = this.#typing.filter((t) => t !== entry));
+  };
 
   /**
    * Queues a change to the Song, built against the Song as saved when its

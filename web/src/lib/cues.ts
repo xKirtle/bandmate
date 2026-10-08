@@ -4,6 +4,7 @@
 // and reads and writes the times as typed.
 
 import type { CueValue } from './api';
+import type { Parsed } from './typedField.svelte';
 
 /** A Section, as far as its Lines take Cues. */
 export interface CuedSection<L extends CuedLine = CuedLine> {
@@ -279,6 +280,19 @@ export function parseCue(text: string): number | null {
   const [, minutes, seconds, plain] = match;
   const total = plain !== undefined ? Number(plain) : Number(minutes) * 60 + Number(seconds);
   return Math.round(total * 1000) / 1000;
+}
+
+/**
+ * A Cue's time as typed into its field, against the Cue it has: empty
+ * clears it, typed as shown leaves it as it is even if it's finer than
+ * tenths, and what isn't a time says how to type one.
+ */
+export function typedCue(typed: string, cue: number | null): Parsed<number | null> {
+  const text = typed.trim();
+  if (text === '') return { value: null };
+  if (cue !== null && text === formatCue(cue)) return 'back';
+  const at = parseCue(text);
+  return at === null ? { message: 'Type a time like 45, 0:45, 0:45.25 or 1:02' } : { value: at };
 }
 
 /** Shows a time in seconds as m:ss.s, which parseCue reads back. */

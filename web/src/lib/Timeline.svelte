@@ -17,6 +17,7 @@
   import Undo2 from '@lucide/svelte/icons/undo-2';
   import X from '@lucide/svelte/icons/x';
   import { onDestroy, onMount, tick, untrack } from 'svelte';
+  import type { Attachment } from 'svelte/attachments';
   import { MediaQuery } from 'svelte/reactivity';
   import { innerHeight } from 'svelte/reactivity/window';
   import { api, type Beat, type Clip, type Song, type Timeline, type Track, type TrackChanges } from './api';
@@ -52,6 +53,7 @@
   import { rightHalfOf, splitTargets } from './split';
   import { Selection, type ClipIds, type SelectionBox } from './selection.svelte';
   import { TimelineEditing } from './timelineEditing.svelte';
+  import type { TypedField } from './typedField.svelte';
   import {
     copy,
     duplicate as duplicatePlacement,
@@ -374,32 +376,40 @@
   }
 
   // A Track's name shows as a button that chooses it; its pencil swaps it
-  // for a field to rename it in. Until a new name is saved, it's shown.
-  let renaming = $state<number | null>(null);
+  // for a field to rename it in (see TimelineEditing.trackName): a blank
+  // name goes back to the one saved. Until a new name is saved, it's shown.
+  let renaming = $state.raw<{ trackId: number; name: TypedField<string> } | null>(null);
 
   function focusField(input: HTMLInputElement) {
     input.focus();
     input.select();
   }
 
-  /** Stops renaming a Track, saving the name typed unless asked not to. */
-  function endRename(track: Track, input: HTMLInputElement, save: boolean) {
-    if (renaming !== track.id) return;
-    renaming = null;
-    if (save) rename(track, input.value.trim());
+  /**
+   * Commits what's typed in a name's field as the field goes, which doesn't
+   * blur it, e.g. as the Timeline collapses or the page goes.
+   */
+  function committedOnLeaving(name: { destroy: () => void }): Attachment {
+    return () => name.destroy;
   }
 
-  function rename(track: Track, name: string) {
-    // A Track needs a name, so a blank one leaves it as it was.
-    if (!name || name === track.name) return;
-    // If it fails, the name goes back to how it's saved.
-    editing.edit({ kind: 'updateTrack', trackId: track.id, changes: { name } });
+  function startRename(track: Track) {
+    if (renaming?.trackId === track.id) return;
+    renaming = { trackId: track.id, name: editing.trackName(track.id) };
+  }
+
+  /** Stops renaming a Track, saving the name typed unless asked not to. */
+  function endRename(track: Track, save: boolean) {
+    if (renaming?.trackId !== track.id) return;
+    if (save) renaming.name.commit();
+    else renaming.name.cancel();
+    renaming = null;
   }
 
   function nameKey(track: Track, event: KeyboardEvent) {
     if (event.key !== 'Enter' && event.key !== 'Escape') return;
     event.preventDefault();
-    endRename(track, event.currentTarget as HTMLInputElement, event.key === 'Enter');
+    endRename(track, event.key === 'Enter');
     // Back to the pencil, where renaming started.
     tick().then(() => document.getElementById(`rename-track-${track.id}`)?.focus());
   }
@@ -1461,9 +1471,9 @@
   }
 
   // A Clip is renamed in place, like a Track: double-clicked, or from its
-  // menu. A blank name clears its own, so it goes by its source's again.
-  // Until a new name is saved, it's shown.
-  let renamingClip = $state<number | null>(null);
+  // menu. A blank name clears its own, so it goes by its source's again
+  // (see TimelineEditing.clipName). Until a new name is saved, it's shown.
+  let renamingClip = $state.raw<{ clipId: number; name: TypedField<string | null> } | null>(null);
 
   /** What a Clip goes by, as shown. */
   function titleOf(clip: Clip): string {
@@ -1471,28 +1481,22 @@
   }
 
   function startClipRename(clip: Clip) {
-    if (!editable.current || frozen) return;
-    renamingClip = clip.id;
+    if (!editable.current || frozen || renamingClip?.clipId === clip.id) return;
+    renamingClip = { clipId: clip.id, name: editing.clipName(clip.id) };
   }
 
   /** Stops renaming a Clip, saving the name typed unless asked not to. */
-  function endClipRename(clip: Clip, input: HTMLInputElement, save: boolean) {
-    if (renamingClip !== clip.id) return;
+  function endClipRename(clip: Clip, save: boolean) {
+    if (renamingClip?.clipId !== clip.id) return;
+    if (save) renamingClip.name.commit();
+    else renamingClip.name.cancel();
     renamingClip = null;
-    if (save) renameClip(clip, input.value.trim());
-  }
-
-  function renameClip(clip: Clip, typed: string) {
-    // A blank name clears its own.
-    if ((typed || null) === clip.name) return;
-    // If it fails, the name goes back to how it's saved.
-    editing.edit({ kind: 'renameClip', clipId: clip.id, name: typed });
   }
 
   function clipNameKey(clip: Clip, event: KeyboardEvent) {
     if (event.key !== 'Enter' && event.key !== 'Escape') return;
     event.preventDefault();
-    endClipRename(clip, event.currentTarget as HTMLInputElement, event.key === 'Enter');
+    endClipRename(clip, event.key === 'Enter');
     // Back to the Clip, where renaming started.
     tick().then(() => document.getElementById(`clip-${clip.id}`)?.focus());
   }
@@ -2167,14 +2171,15 @@
               >
             {/if}
             <div class="head-row">
-              {#if editable.current && renaming === track.id}
+              {#if editable.current && renaming?.trackId === track.id}
                 <input
                   class="name"
-                  value={track.name}
+                  bind:value={renaming.name.shown}
                   aria-label="Name of Track {track.name}"
                   onkeydown={(e) => nameKey(track, e)}
-                  onblur={(e) => endRename(track, e.currentTarget, true)}
+                  onblur={() => endRename(track, true)}
                   {@attach focusField}
+                  {@attach committedOnLeaving(renaming.name)}
                 />
               {:else}
                 <button
@@ -2184,7 +2189,7 @@
                   disabled={frozen}
                   title={editHint(freeze, undefined)}
                   onclick={() => choose({ kind: 'choose', trackId: track.id })}
-                  ondblclick={() => editable.current && (renaming = track.id)}>{track.name}</button
+                  ondblclick={() => editable.current && startRename(track)}>{track.name}</button
                 >
               {/if}
               {#if editable.current}
@@ -2193,7 +2198,7 @@
                     type="button"
                     id="rename-track-{track.id}"
                     class="rename"
-                    onclick={() => (renaming = track.id)}
+                    onclick={() => startRename(track)}
                     disabled={frozen}
                     aria-label="Rename {track.name}"
                     title={editHint(freeze, 'Rename')}
@@ -2387,17 +2392,18 @@
                     ondblclick={(e) => clipDoubleClick(e, clip)}
                   >
                     <span class="clip-head">
-                      {#if editable.current && renamingClip === clip.id}
+                      {#if editable.current && renamingClip?.clipId === clip.id}
                         <!-- Pressed, it's typed in, so the Clip doesn't move. -->
                         <input
                           class="clip-name"
-                          value={clip.name ?? ''}
+                          bind:value={renamingClip.name.shown}
                           placeholder={sources.of(clip).title}
                           aria-label="Name of {title}"
                           onpointerdown={(e) => e.stopPropagation()}
                           onkeydown={(e) => clipNameKey(clip, e)}
-                          onblur={(e) => endClipRename(clip, e.currentTarget, true)}
+                          onblur={() => endClipRename(clip, true)}
                           {@attach focusField}
+                          {@attach committedOnLeaving(renamingClip.name)}
                         />
                       {:else}
                         <span class="clip-title">{title}</span>

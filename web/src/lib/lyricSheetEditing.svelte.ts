@@ -21,7 +21,7 @@
 import { SvelteMap } from 'svelte/reactivity';
 import type { Song } from './api';
 import type { LyricSheetChange } from './lyricSheetChanges';
-import type { Saves } from './saves.svelte';
+import type { Saves, Typing } from './saves.svelte';
 
 /** How long typing has to pause before an Alternate's text is saved, in milliseconds. */
 export const saveDelay = 800;
@@ -88,6 +88,9 @@ export class LyricSheetEditing {
   nameTyped(editor: object, sectionId: number, unsaved: boolean) {
     this.#report(editor, sectionId, unsaved);
   }
+
+  /** Puts an edit being typed into the Lyric Sheet, e.g. a Cue's time, on Saves' list (see Saves.typing). */
+  typing = (entry: Typing): (() => void) => this.#saves.typing(entry);
 
   /** The text box of an Alternate's Lines, in a Section's editor. Saves always go to that Alternate. */
   textBox(alternateId: number, sectionId: number): TextBox {

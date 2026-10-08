@@ -46,6 +46,7 @@ import { mergeTarget, mergeWarning, type MergedAudio, type MergeTarget } from '.
 import type { Edited, Saves } from './saves.svelte';
 import type { Selection } from './selection.svelte';
 import { rightHalves } from './split';
+import { TypedField } from './typedField.svelte';
 
 /** How long the Cue-move offer stands, in milliseconds. */
 export const offerFor = 8000;
@@ -204,6 +205,35 @@ export class TimelineEditing {
     this.#show(this.#fieldsOf(previewed), previewed);
     return true;
   };
+
+  /**
+   * A Track's name, typed in place (see typedField.svelte.ts). What's
+   * saved is the name on the Timeline as shown, so a name sent shows at
+   * once. A blank one goes back to the name saved, as a Track needs one.
+   */
+  trackName(trackId: number): TypedField<string> {
+    return new TypedField({
+      saved: () => this.#timeline.tracks.find((t) => t.id === trackId)?.name ?? '',
+      format: (name) => name,
+      parse: (typed) => (typed.trim() ? { value: typed.trim() } : 'back'),
+      commit: (name) => this.edit({ kind: 'updateTrack', trackId, changes: { name } }),
+      typing: this.#saves.typing,
+    });
+  }
+
+  /**
+   * A Clip's name, typed in place, like a Track's. A blank one clears its
+   * own name, so it goes by its source's again.
+   */
+  clipName(clipId: number): TypedField<string | null> {
+    return new TypedField<string | null>({
+      saved: () => this.#timeline.tracks.flatMap((t) => t.clips).find((c) => c.id === clipId)?.name ?? null,
+      format: (name) => name ?? '',
+      parse: (typed) => ({ value: typed.trim() || null }),
+      commit: (name) => this.edit({ kind: 'renameClip', clipId, name: name ?? '' }),
+      typing: this.#saves.typing,
+    });
+  }
 
   /** How an edit sets each field it shows a value for, over what's shown for that field now. */
   #fieldsOf(e: Edit): Map<string, SetField> {

@@ -950,3 +950,35 @@ test('a failed Details save puts the field back, and the next change clears its 
   await expect(saveError(page)).toHaveCount(0);
   await expect(title).toHaveValue('Anthem');
 });
+
+test('a Track name typed and then left with Back is saved', async ({ page, bandmate }) => {
+  const song = await bandmate.song({ title: 'Anthem' });
+  // Opened from the Songs list, so Back stays in the app.
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Anthem', exact: true }).click();
+  await timeline(page).getByRole('button', { name: 'Rename Track 1' }).click();
+  await timeline(page).getByRole('textbox', { name: 'Name of Track Track 1' }).fill('Lead vox');
+
+  await page.goBack();
+  await expect(page.getByRole('heading', { level: 1, name: 'Songs' })).toBeVisible();
+  await expect.poll(async () => (await bandmate.timeline(song.id)).tracks.map((t) => t.name)).toEqual(['Lead vox']);
+});
+
+test('a name being typed makes closing the tab ask first', async ({ page, bandmate }) => {
+  const song = await bandmate.song({ title: 'Anthem' });
+  await page.goto(`/songs/${song.id}`);
+  await timeline(page).getByRole('button', { name: 'Rename Track 1' }).click();
+  const name = timeline(page).getByRole('textbox', { name: 'Name of Track Track 1' });
+  await expect(name).toBeFocused();
+  // Opened but not typed in, nothing is unsaved.
+  expect(await warnsOnLeaving(page)).toBe(false);
+
+  await name.fill('Lead vox');
+  expect(await warnsOnLeaving(page)).toBe(true);
+
+  // Esc takes it back, and nothing is unsaved again.
+  await name.press('Escape');
+  await expect(timeline(page).getByRole('button', { name: 'Choose Track 1' })).toBeVisible();
+  expect(await warnsOnLeaving(page)).toBe(false);
+  expect((await bandmate.timeline(song.id)).tracks.map((t) => t.name)).toEqual(['Track 1']);
+});
