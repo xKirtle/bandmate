@@ -6,6 +6,7 @@ import type { Bandmate, Clip as SharedClip } from '../bandmate';
 import { toneWav } from '../beats';
 import { failRequests } from '../faults';
 import { expect, test } from '../fixtures';
+import { heroSong } from '../songPage';
 
 // Recording Takes on the Song page's Timeline, from Chromium's fake
 // microphone, which captures a half-second 440 Hz tone on a loop. The tests
@@ -333,4 +334,23 @@ test('undoing a new Take takes it away and returns the playhead to where it star
   await expect(ruler(page)).toHaveAttribute('aria-valuenow', '5');
   await expect(ruler(page)).toHaveAttribute('aria-valuetext', /^0:05 of /);
   expect(await clipsOn(bandmate, song.id, 'Track 1')).toEqual([]);
+});
+
+test("Sync mode can't be switched on while recording, and can once it stops", async ({ page, bandmate }) => {
+  const song = await heroSong(bandmate);
+  await open(page, song.id);
+  const sync = page.getByRole('button', { name: 'Sync lyrics' });
+  await expect(sync).toBeEnabled();
+
+  await recordButton(page).click();
+  await skipCalibration(page);
+  await expect(stopButton(page)).toBeVisible();
+  await expect(sync).toBeDisabled();
+  await expect(sync).toHaveAccessibleDescription('Stop recording to sync lyrics');
+
+  // Stopped, whether or not it kept a Take, Sync mode can come on again.
+  await stopButton(page).click();
+  await expect(recordButton(page)).toBeEnabled();
+  await expect(sync).toBeEnabled();
+  await expect(sync).toHaveAttribute('aria-pressed', 'false');
 });
