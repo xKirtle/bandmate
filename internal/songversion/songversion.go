@@ -31,6 +31,15 @@ const Any Version = 0
 // reload the Song.
 var ErrStale = domain.CodedConflict("stale", "this Song changed elsewhere, so the change wasn't saved", nil)
 
+// Expect checks that a change based on based can apply to a Song at current,
+// failing with ErrStale if not, for a change that writes nothing.
+func Expect(based, current Version) error {
+	if based != Any && current != based {
+		return ErrStale
+	}
+	return nil
+}
+
 // Touch marks a Song as edited within tx, giving it a new version. It fails
 // with ErrStale if the Song is no longer at the version the change was based
 // on, and domain.ErrNotFound if there is no such Song.

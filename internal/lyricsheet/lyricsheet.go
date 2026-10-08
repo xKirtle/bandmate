@@ -385,10 +385,13 @@ func (s *Store) UpdateSong(ctx context.Context, id int64, based songversion.Vers
 	}
 	if len(sets) == 0 {
 		song, err := s.GetSong(ctx, id)
-		if err == nil && based != songversion.Any && song.Version != based {
-			return Song{}, songversion.ErrStale
+		if err != nil {
+			return Song{}, err
 		}
-		return song, err
+		if err := songversion.Expect(based, song.Version); err != nil {
+			return Song{}, err
+		}
+		return song, nil
 	}
 	return s.change(ctx, id, based, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx,
