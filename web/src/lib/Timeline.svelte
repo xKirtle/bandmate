@@ -365,28 +365,28 @@
     editing.edit({ kind: 'updateTrack', trackId: track.id, changes });
   }
 
-  // A fader's level is sent once it's let go (see TimelineEditing.letGoFader).
+  // A fader's volume is sent once it's let go (see TimelineEditing.letGoFader).
   // The browser says so with a change, but not for one let go where it
   // started, which only the pointer's release tells, so either lets go of it.
-  function volumeInput(track: Track, event: Event) {
-    editing.moveFader(track.id, Number((event.currentTarget as HTMLInputElement).value));
-  }
+  /** Stops waiting for the fader pressed to be let go, if one is. */
+  let ungrab = () => {};
 
-  function letGoVolume(track: Track, fader: HTMLInputElement) {
-    editing.letGoFader(track.id, Number(fader.value));
-  }
-
-  function grabVolume(track: Track, event: PointerEvent) {
-    const fader = event.currentTarget as HTMLInputElement;
-    // The fader may be let go anywhere on the page, or the pointer lost.
+  function grabFader(trackId: number, fader: HTMLInputElement) {
+    ungrab();
+    // It may be let go anywhere on the page, or the pointer lost.
     const release = () => {
-      removeEventListener('pointerup', release);
-      removeEventListener('pointercancel', release);
-      letGoVolume(track, fader);
+      ungrab();
+      editing.letGoFader(trackId, Number(fader.value));
     };
-    addEventListener('pointerup', release);
-    addEventListener('pointercancel', release);
+    ungrab = () => {
+      window.removeEventListener('pointerup', release);
+      window.removeEventListener('pointercancel', release);
+      ungrab = () => {};
+    };
+    window.addEventListener('pointerup', release);
+    window.addEventListener('pointercancel', release);
   }
+  onDestroy(() => ungrab());
 
   // A Track's name shows as a button that chooses it; its pencil swaps it
   // for a field to rename it in (see TimelineEditing.trackName): a blank
@@ -2266,9 +2266,9 @@
                 aria-label="Volume of {track.name}"
                 aria-valuetext={formatVolume(track.volume)}
                 title="{formatVolume(track.volume)} (double-click for 0 dB)"
-                oninput={(e) => volumeInput(track, e)}
-                onchange={(e) => letGoVolume(track, e.currentTarget)}
-                onpointerdown={(e) => grabVolume(track, e)}
+                oninput={(e) => editing.moveFader(track.id, Number(e.currentTarget.value))}
+                onchange={(e) => editing.letGoFader(track.id, Number(e.currentTarget.value))}
+                onpointerdown={(e) => grabFader(track.id, e.currentTarget)}
                 ondblclick={() => setLevels(track, { volume: 0 })}
               />
             </div>

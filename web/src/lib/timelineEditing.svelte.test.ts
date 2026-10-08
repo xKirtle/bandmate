@@ -351,7 +351,7 @@ describe('Timeline editing, the Timeline as shown', () => {
 });
 
 describe('Timeline editing, a Track’s fader', () => {
-  it('shows a fader’s level as it moves, sending it once let go elsewhere', async () => {
+  it('shows a fader’s volume as it moves, sending it once let go elsewhere', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
     const { editing } = await editingFor(server);
     expect(editing.moveFader(1, -3)).toBe(true);
@@ -385,7 +385,36 @@ describe('Timeline editing, a Track’s fader', () => {
     expect(shownTrack(editing, 1).volume).toBe(0);
   });
 
-  it('sends a fader’s level once, however many times it’s let go', async () => {
+  it('keeps showing a volume on its way for a fader let go where it started, until its save resolves', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { saves, editing } = await editingFor(server);
+    const release = server.holdNextAnswer();
+    const saving = editing.edit({ kind: 'updateTrack', trackId: 1, changes: { volume: -6 } });
+    editing.moveFader(1, -9);
+    editing.moveFader(1, -6);
+    await editing.letGoFader(1, -6);
+    expect(shownTrack(editing, 1).volume).toBe(-6);
+    release();
+    await saving;
+    expect(server.landed).toBe(1);
+    expect(editing.timeline).toBe(saves.timeline);
+  });
+
+  it('shows the Track’s volume as saved for a fader let go where it started, once the save it started from resolved', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { saves, editing } = await editingFor(server);
+    const release = server.holdNextAnswer();
+    const saving = editing.edit({ kind: 'updateTrack', trackId: 1, changes: { volume: -6 } });
+    editing.moveFader(1, -9);
+    release();
+    await saving;
+    editing.moveFader(1, -6);
+    await editing.letGoFader(1, -6);
+    expect(editing.timeline).toBe(saves.timeline);
+    expect(shownTrack(editing, 1).volume).toBe(-6);
+  });
+
+  it('sends a fader’s volume once, however many times it’s let go', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
     const { editing } = await editingFor(server);
     editing.moveFader(1, -3);
