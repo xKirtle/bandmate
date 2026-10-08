@@ -7,15 +7,17 @@
 //   The Timeline reads it to disable its controls and refuse drags.
 // - The Timeline as shown, which the Timeline draws and plays: the Timeline
 //   as saved, with the values of edits on their way and of previews on top,
-//   for the edits that set values on a Track or a Clip already there (see
-//   ShownEdit). A preview is a value shown without being sent, e.g. a
-//   fader's level while it's dragged, refused whenever the same edit would
-//   be. Which value shows goes by field, e.g. a Track's volume: an edit's
-//   stops showing once its save resolves, saved or failed, unless something
-//   newer for that field is showing, and a preview gives way to the next
-//   preview or edit of that field. A refresh replacing the Song drops them
-//   all; undo and redo leave them be. What's worked out to send (Merge
-//   rendering, the Cue-move offer, undo) goes by the Timeline as saved.
+//   for the edits that set values on a Track or a Clip already there, or
+//   on the Loop (see ShownEdit). A preview is a value shown without being
+//   sent, e.g. a fader's level while it's dragged, refused whenever the
+//   same edit would be. Which value shows goes by field, e.g. a Track's
+//   volume, or the Loop: an edit's stops showing once its save resolves,
+//   saved or failed, unless something newer for that field is showing, and
+//   a preview gives way to the next preview or edit of that field. A Loop
+//   switched keeps the stretch shown when it was. A refresh replacing the
+//   Song drops them all; undo and redo leave them be. What's worked out to
+//   send (Merge rendering, the Cue-move offer, undo) goes by the Timeline
+//   as saved.
 // - What follows an edit: Clips it adds are selected, and a Track it adds
 //   chosen. An undo says where to return the playhead to, and the Timeline
 //   seeks there, as playback is its own.
@@ -71,15 +73,15 @@ export type PreparedSound = Omit<SoundImport, 'trackId'>;
 
 /**
  * The edits shown before they're saved: those setting values on a Track or
- * a Clip already on the Timeline, which the browser makes exactly as the
- * server will.
+ * a Clip already on the Timeline, or on the Loop, which the browser makes
+ * exactly as the server will.
  */
-export type ShownEdit = Extract<Edit, { kind: 'updateTrack' | 'renameClip' }>;
+export type ShownEdit = Extract<Edit, { kind: 'updateTrack' | 'renameClip' | 'setLoop' | 'switchLoop' | 'clearLoop' }>;
 
-/** Sets one field of a Track or a Clip on a Timeline to the value an edit gives it. */
+/** Sets one field of a Track or a Clip, or the Loop, on a Timeline to the value an edit gives it. */
 type SetField = (timeline: Timeline) => Timeline;
 
-/** A value shown over the Timeline as saved, for one field of a Track or a Clip. */
+/** A value shown over the Timeline as saved, for one field of a Track or a Clip, or the Loop. */
 interface ShownValue {
   show: SetField;
   /** The edit or preview it came from, by identity: only that one stops it showing. */
@@ -173,7 +175,7 @@ export class TimelineEditing {
   edit = async (e: Edit): Promise<Edited | null> => {
     if (this.frozen && !editsWhileRecording(e)) return null;
     const sent = $state.snapshot(e) as Edit;
-    const fields = shownFields(sent);
+    const fields = this.#shownFields(sent);
     this.#show(fields, sent);
     const edited = await this.#saves.edit(sent);
     this.#unshow(fields, sent);
@@ -194,9 +196,14 @@ export class TimelineEditing {
   preview = (e: ShownEdit): boolean => {
     if (this.frozen && !editsWhileRecording(e)) return false;
     const previewed = $state.snapshot(e) as Edit;
-    this.#show(shownFields(previewed), previewed);
+    this.#show(this.#shownFields(previewed), previewed);
     return true;
   };
+
+  /** How an edit sets each field it shows a value for, over what's shown for that field now. */
+  #shownFields(e: Edit): Map<string, SetField> {
+    return shownFields(e, (field) => this.#values.get(field)?.show);
+  }
 
   /** Shows values over the Timeline as saved, each in place of any shown for its field. */
   #show(fields: Map<string, SetField>, from: object) {
@@ -441,10 +448,27 @@ export class TimelineEditing {
   }
 }
 
-/** How an edit sets each field it shows a value for, by field, or none for an edit that isn't shown before it's saved. */
-function shownFields(e: Edit): Map<string, SetField> {
+/**
+ * How an edit sets each field it shows a value for, by field, or none for
+ * an edit that isn't shown before it's saved. Given what's shown for a
+ * field now, e.g. a Loop set but not saved yet, so that switching it keeps
+ * that stretch, as the server will once the set lands before it.
+ */
+function shownFields(e: Edit, shown: (field: string) => SetField | undefined): Map<string, SetField> {
   const fields = new Map<string, SetField>();
-  if (e.kind === 'updateTrack') {
+  if (e.kind === 'setLoop') {
+    const loop = { ...e.loop };
+    fields.set('loop', (tl) => ({ ...tl, loop }));
+  } else if (e.kind === 'switchLoop') {
+    // Switched, it keeps its stretch: the one shown, if any, else as saved.
+    const under = shown('loop');
+    fields.set('loop', (tl) => {
+      const { loop } = under ? under(tl) : tl;
+      return { ...tl, loop: loop && { ...loop, on: e.on } };
+    });
+  } else if (e.kind === 'clearLoop') {
+    fields.set('loop', (tl) => ({ ...tl, loop: null }));
+  } else if (e.kind === 'updateTrack') {
     const { name, ...levels } = e.changes;
     // As the server saves it, which refuses a blank one.
     const named = name?.trim();

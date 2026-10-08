@@ -288,10 +288,7 @@
   const span = $derived(
     shownSpan({ end: length, loopEnd: timeline.loop?.end, recordingAt: capturing ? position : undefined }),
   );
-  // Sync mode coming on switches the Loop off, and until that's saved,
-  // playback already goes on without it.
-  let switchingOff = $state(false);
-  const loopOn = $derived((timeline.loop?.on ?? false) && !switchingOff);
+  const loopOn = $derived(timeline.loop?.on ?? false);
   // The Loop playback repeats, while it's on.
   const playingLoop = $derived<Loop | null>(loopOn ? { start: timeline.loop!.start, end: timeline.loop!.end } : null);
   // Matches the upright phone's layout below, which hides editing.
@@ -466,13 +463,6 @@
     return Math.max(0, Math.min(span, t));
   }
 
-  async function switchLoopOff() {
-    switchingOff = true;
-    // If it fails, the Loop is on again.
-    await editing.edit({ kind: 'switchLoop', on: false });
-    switchingOff = false;
-  }
-
   // Clicking on the ruler seeks, and dragging along it scrubs the playhead:
   // see Transport.
   function timeAt(event: Point): number {
@@ -609,9 +599,12 @@
     return transport.playheadAt();
   }
 
-  /** Switches the Loop off, if it's on, e.g. as Sync mode comes on. */
+  /**
+   * Switches the Loop off, if it's on, e.g. as Sync mode comes on: playback
+   * goes on without it at once, and with it again if that fails.
+   */
   export function stopLoop() {
-    if (loopOn) switchLoopOff();
+    if (loopOn) editing.edit({ kind: 'switchLoop', on: false });
   }
 
   // Sync mode and the Loop are exclusive: see the Lyric Sheet.
@@ -1662,8 +1655,9 @@
   }
 
   // Setting the Loop: dragging along the top of the ruler marks a new one,
-  // switched on, and dragging its edges adjusts it. It's saved on release,
-  // and until the saved Timeline comes back, shown where it was dropped.
+  // switched on, and dragging its edges adjusts it. It's set on release,
+  // and Timeline editing shows it where it was dropped until it's saved, so
+  // a new one can be dragged straight away.
   // Marked or adjusted, it snaps to Clips' edges and the playhead, unless
   // Shift is held: a new one both where it's pressed and where it's dragged to.
   interface LoopEdit {
@@ -1678,7 +1672,6 @@
     free: boolean;
     /** What the edge dragged is snapped to, with the lanes of what's there, while it is. */
     snap: Snap<Aligned> | null;
-    saving: boolean;
   }
   let loopEdit = $state<LoopEdit | null>(null);
   const loop = $derived(loopEdit?.moved ? loopEdit.loop : timeline.loop);
@@ -1698,7 +1691,7 @@
     const t = loopTimeAt(event.clientX);
     event.preventDefault();
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-    const common = { fromX: event.clientX, moved: false, free: skipsSnapping(event), snap: null, saving: false };
+    const common = { fromX: event.clientX, moved: false, free: skipsSnapping(event), snap: null };
     loopEdit =
       edge && current
         ? { ...common, mode: edge, anchor: edge === 'start' ? current.end : current.start, loop: current }
@@ -1714,13 +1707,13 @@
   // snapping, snaps or frees the Loop there and then, without waiting for
   // the pointer to move.
   function loopModifier(event: KeyboardEvent) {
-    if (!isModifier(event.key) || !loopEdit?.moved || loopEdit.saving) return;
+    if (!isModifier(event.key) || !loopEdit?.moved) return;
     loopEdit.free = skipsSnapping(event);
     loopMove(loopAt);
   }
 
   function loopMove(event: Point) {
-    if (!loopEdit || loopEdit.saving) return;
+    if (!loopEdit) return;
     // A small wobble while clicking isn't a drag.
     if (!loopEdit.moved && Math.abs(event.clientX - loopEdit.fromX) < 4) return;
     loopEdit.moved = true;
@@ -1746,31 +1739,24 @@
   }
   onDestroy(stopLoopListening);
 
-  async function loopUp() {
+  function loopUp() {
     stopLoopListening();
     if (!loopEdit) return;
-    loopEdit.snap = null;
-    if (loopEdit.saving) return;
     const { moved, loop: to } = loopEdit;
+    loopEdit = null;
     const current = timeline.loop;
     const unchanged = current && to.start === current.start && to.end === current.end && to.on === current.on;
-    if (!moved || unchanged || to.end - to.start < minLoop) {
-      loopEdit = null;
-      return;
-    }
-    loopEdit.saving = true;
-    await editing.edit({ kind: 'setLoop', loop: to });
-    loopEdit = null;
+    if (!moved || unchanged || to.end - to.start < minLoop) return;
+    editing.edit({ kind: 'setLoop', loop: to });
   }
 
   function loopCancel() {
     stopLoopListening();
-    if (!loopEdit?.saving) loopEdit = null;
+    loopEdit = null;
   }
 
   function switchLoop() {
     if (!timeline.loop || frozen) return;
-    // Switched off by Sync mode and still saving, it's shown off already.
     editing.edit({ kind: 'switchLoop', on: !loopOn });
   }
 
