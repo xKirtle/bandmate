@@ -2,10 +2,12 @@
   import Play from '@lucide/svelte/icons/play';
   import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
   import X from '@lucide/svelte/icons/x';
-  import { tick } from 'svelte';
-  import { formatCue, nudgeCue, parseCue, playLabel } from './cues';
+  import { onDestroy, tick, untrack } from 'svelte';
+  import { formatCue, nudgeCue, parseCue, playLabel, typedCue } from './cues';
   import { cueNudge, cueNudgeHint } from './cueKeys';
   import { keyHints } from './keyHints';
+  import type { Typing } from './saves.svelte';
+  import { TypedField } from './typedField.svelte';
 
   // A Line's Cue time, shown as m:ss.s in the gutter beside it. Clicking it
   // lets the time be typed: Enter or leaving the field saves, Esc cancels,
@@ -26,6 +28,8 @@
     pick,
     syncing = false,
     outOfOrder = null,
+    typing,
+    section,
   }: {
     /** In seconds, or null without a Cue. */
     cue: number | null;
@@ -33,6 +37,10 @@
     label: string;
     /** Saves the new Cue, or null to clear it. */
     save: (cue: number | null) => void;
+    /** Puts the time being typed on Saves' list of edits being typed, until the function returned is called. */
+    typing: (entry: Typing) => () => void;
+    /** The Section whose Line it is, which the time being typed is in. */
+    section?: number;
     /** Given, Enter goes on to the next field; it answers whether there was one. */
     next?: () => boolean;
     /** Given, a ▶ before the time plays from the Cue. */
@@ -53,9 +61,21 @@
     outOfOrder?: string | null;
   } = $props();
 
+  // The time as typed, by the rules of a field typed in place: an empty
+  // field clears the Cue, and one that isn't a time stays open, marked.
+  // It's saved as the field goes, e.g. on leaving the page.
+  const field = new TypedField<number | null>({
+    saved: () => cue,
+    format: (at) => (at === null ? '' : formatCue(at)),
+    parse: (typed) => typedCue(typed, cue),
+    commit: (at) => save(at),
+    typing: untrack(() => typing),
+    section: untrack(() => section),
+  });
+  onDestroy(field.destroy);
+
   let editing = $state(false);
-  let text = $state('');
-  let invalid = $state(false);
+  const invalid = $derived(field.message !== null);
   let input = $state<HTMLInputElement>();
   let button = $state<HTMLButtonElement>();
   let clearButton = $state<HTMLButtonElement>();
@@ -70,27 +90,18 @@
 
   /** Opens the field to type a time. */
   export async function edit() {
-    text = cue === null ? '' : formatCue(cue);
-    invalid = false;
+    field.cancel();
     editing = true;
     await tick();
     input?.select();
   }
 
   function commit() {
-    if (!editing) return;
-    const next = text.trim() === '' ? null : parseCue(text);
-    if (next === null && text.trim() !== '') {
-      invalid = true;
-      return;
-    }
-    editing = false;
-    // Typed as shown means unchanged, even if the Cue is finer than tenths.
-    if (next === cue || (cue !== null && text.trim() === formatCue(cue))) return;
-    save(next);
+    if (editing && field.commit()) editing = false;
   }
 
   function cancel() {
+    field.cancel();
     editing = false;
   }
 
@@ -115,12 +126,12 @@
   function nudge(e: KeyboardEvent): boolean {
     const by = cueNudge(e, syncing);
     if (by === null) return false;
-    const from = editing ? (parseCue(text) ?? cue) : cue;
+    const from = editing ? (parseCue(field.shown) ?? cue) : cue;
     if (from === null) return false;
     e.preventDefault();
     const to = nudgeCue(from, by);
     if (editing) {
-      editing = false;
+      cancel();
       tick().then(() => button?.focus());
     }
     if (to !== cue) save(to);
@@ -138,8 +149,8 @@
   // Leaving saves, unless what's typed isn't a time: then it's dropped
   // rather than kept open behind the user's back.
   function onblur() {
-    if (editing && text.trim() !== '' && parseCue(text) === null) cancel();
-    else commit();
+    if (editing && !field.commit()) field.cancel();
+    editing = false;
   }
 </script>
 
@@ -165,21 +176,19 @@
   {#if editing}
     <input
       bind:this={input}
-      bind:value={text}
+      bind:value={field.shown}
       class="cue editing"
       class:invalid
       aria-label="Cue for {label}"
       aria-invalid={invalid}
       aria-keyshortcuts={nudgeHint.aria}
-      title={invalid
-        ? 'Type a time like 45, 0:45, 0:45.25 or 1:02'
-        : `Enter saves, Esc cancels, empty clears${nudgeHint.label ? `, ${nudgeHint.label} nudges` : ''}`}
+      title={field.message ??
+        `Enter saves, Esc cancels, empty clears${nudgeHint.label ? `, ${nudgeHint.label} nudges` : ''}`}
       placeholder="0:00.0"
       autocomplete="off"
       spellcheck="false"
       inputmode="decimal"
       enterkeyhint="done"
-      oninput={() => (invalid = false)}
       {onkeydown}
       {onblur}
     />
