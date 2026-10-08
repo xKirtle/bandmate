@@ -262,21 +262,11 @@ export class FakeSongServer implements SongServer {
       case 'moveClips':
         return (tl) => edit.moves.reduce(moved, tl);
       case 'setClipGain':
-        return (tl) => ({
-          ...tl,
-          tracks: tl.tracks.map((t) => ({
-            ...t,
-            clips: t.clips.map((c) => (c.id === edit.clipId ? { ...c, gain: edit.gain } : c)),
-          })),
-        });
+        return (tl) => changedClip(tl, edit.clipId, { gain: edit.gain });
+      case 'setClipFades':
+        return (tl) => changedClip(tl, edit.clipId, { fadeIn: edit.fadeIn, fadeOut: edit.fadeOut });
       case 'renameClip':
-        return (tl) => ({
-          ...tl,
-          tracks: tl.tracks.map((t) => ({
-            ...t,
-            clips: t.clips.map((c) => (c.id === edit.clipId ? { ...c, name: edit.name.trim() || null } : c)),
-          })),
-        });
+        return (tl) => changedClip(tl, edit.clipId, { name: edit.name.trim() || null });
       case 'deleteClip':
         return (tl) => withoutClips(tl, [edit.clipId]);
       case 'deleteClips':
@@ -537,6 +527,14 @@ export class FakeSongServer implements SongServer {
 const noSuchTrack = () => new ApiError(400, "there's no such Track on this Timeline");
 
 const notModelled = (change: Edit | LyricSheetChange) => new Error(`${change.kind} is not modelled`);
+
+/** A Timeline with changes made to a Clip, if it's there. */
+function changedClip(tl: Timeline, clipId: number, changes: Partial<Clip>): Timeline {
+  return {
+    ...tl,
+    tracks: tl.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === clipId ? { ...c, ...changes } : c)) })),
+  };
+}
 
 /** What a Clip of a Beat or a Sound plays, and its own name and Gain, to place a Clip of the same. */
 function sourceOf(clip: Clip): OwnOfClip & ({ beatId: number } | { soundId: number }) {

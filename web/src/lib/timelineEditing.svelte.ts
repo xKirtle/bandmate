@@ -8,7 +8,8 @@
 // - The Timeline as shown, which the Timeline draws and plays: the Timeline
 //   as saved, with the values of edits on their way and of previews on top,
 //   for the edits that set values on a Track or a Clip already there, or
-//   on the Loop (see ShownEdit). A preview is a value shown without being
+//   on the Loop (see ShownEdit), e.g. a Clip's Gain or Fades, which the
+//   Clip drag hands over on release. A preview is a value shown without being
 //   sent, e.g. a fader's level while it's dragged, refused whenever the
 //   same edit would be. Which value shows goes by field, e.g. a Track's
 //   volume, or the Loop: an edit's stops showing once its save resolves,
@@ -33,7 +34,7 @@
 // - Merge and Sound import, the rarer edits whose audio the browser makes
 //   (see the audio port below). Each is kept to undo as placing what it
 //   made, so redoing it never renders or uploads anything again.
-import type { Song, SoundImport, Timeline, Track } from './api';
+import type { Clip, Song, SoundImport, Timeline, Track } from './api';
 import { addedTrack } from './chosenTrack';
 import type { DragSave } from './clipDrag.svelte';
 import { sameCues } from './cueChanges';
@@ -77,7 +78,10 @@ export type PreparedSound = Omit<SoundImport, 'trackId'>;
  * a Clip already on the Timeline, or on the Loop, which the browser makes
  * exactly as the server will.
  */
-export type ShownEdit = Extract<Edit, { kind: 'updateTrack' | 'renameClip' | 'setLoop' | 'switchLoop' | 'clearLoop' }>;
+export type ShownEdit = Extract<
+  Edit,
+  { kind: 'updateTrack' | 'renameClip' | 'setClipGain' | 'setClipFades' | 'setLoop' | 'switchLoop' | 'clearLoop' }
+>;
 
 /** Sets one field of a Track or a Clip, or the Loop, on a Timeline to the value an edit gives it. */
 type SetField = (timeline: Timeline) => Timeline;
@@ -481,16 +485,28 @@ function shownFields(e: Edit, shown: (field: string) => SetField | undefined): M
   } else if (e.kind === 'renameClip') {
     // A blank name clears the Clip's own, as the server saves it.
     const name = e.name.trim() || null;
-    fields.set(`clip ${e.clipId} name`, (tl) => ({
-      ...tl,
-      tracks: tl.tracks.map((t) =>
-        t.clips.some((c) => c.id === e.clipId)
-          ? { ...t, clips: t.clips.map((c) => (c.id === e.clipId ? { ...c, name } : c)) }
-          : t,
-      ),
-    }));
+    fields.set(`clip ${e.clipId} name`, (tl) => withClip(tl, e.clipId, { name }));
+  } else if (e.kind === 'setClipGain') {
+    const { gain } = e;
+    fields.set(`clip ${e.clipId} gain`, (tl) => withClip(tl, e.clipId, { gain }));
+  } else if (e.kind === 'setClipFades') {
+    // Both Fades are one field, as they're set together.
+    const { fadeIn, fadeOut } = e;
+    fields.set(`clip ${e.clipId} fades`, (tl) => withClip(tl, e.clipId, { fadeIn, fadeOut }));
   }
   return fields;
+}
+
+/** A Timeline with changes made to a Clip, if it's there. */
+function withClip(tl: Timeline, clipId: number, changes: Partial<Clip>): Timeline {
+  return {
+    ...tl,
+    tracks: tl.tracks.map((t) =>
+      t.clips.some((c) => c.id === clipId)
+        ? { ...t, clips: t.clips.map((c) => (c.id === clipId ? { ...c, ...changes } : c)) }
+        : t,
+    ),
+  };
 }
 
 /** A Timeline with changes made to a Track, if it's there. */

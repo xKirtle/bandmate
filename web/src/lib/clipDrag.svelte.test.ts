@@ -499,6 +499,18 @@ describe('ClipDrag', () => {
       expect(drag.release()).toEqual({ edit: { kind: 'setClipGain', clipId: 1, gain: 10 }, moved: null });
     });
 
+    it('lets go of the Clip on release, handing its Gain over to be shown until saved', () => {
+      const { drag, press } = timelineDrag();
+      press(1, 'gain', 15);
+      drag.move(below(-10, 15));
+
+      expect(drag.release()).not.toBeNull();
+
+      expect(drag.clip).toBeNull();
+      expect(drag.saving).toBe(false);
+      expect(drag.shown).toEqual([]);
+    });
+
     it('drags it a tenth as far with Shift held as it was pressed', () => {
       const { drag, press } = timelineDrag();
       press(1, 'gain', 15, { free: true });
@@ -593,6 +605,18 @@ describe('ClipDrag', () => {
       });
     });
 
+    it('lets go of the Clip on release, handing its Fades over to be shown until saved', () => {
+      const { drag, press } = timelineDrag();
+      press(1, 'fadeOut', 19.5, {}, dots(10.5, 19.5));
+      drag.move(at(17));
+
+      expect(drag.release()).not.toBeNull();
+
+      expect(drag.clip).toBeNull();
+      expect(drag.saving).toBe(false);
+      expect(drag.shown).toEqual([]);
+    });
+
     it('shows and saves the fade out it is dragged to', () => {
       const { drag, press } = timelineDrag();
       press(1, 'fadeOut', 19.5, {}, dots(10.5, 19.5));
@@ -621,7 +645,6 @@ describe('ClipDrag', () => {
       expect(drag.mode).toBe('fadeIn');
       drag.move(at(12.8));
       expect(drag.release()?.edit).toEqual({ kind: 'setClipFades', clipId: 1, fadeIn: 3, fadeOut: 5 });
-      drag.saved();
 
       // The fade in's dot is pressed, right of their middle.
       press(1, 'fadeIn', 15.2, {}, dots(15, 15));
@@ -653,7 +676,7 @@ describe('ClipDrag', () => {
     });
   });
 
-  describe('until its save resolves', () => {
+  describe('a move or a trim, until its save resolves', () => {
     it('holds the Clip where it was dropped, however the pointer goes', () => {
       const { drag, press } = timelineDrag();
       press(1, 'move', 15);
@@ -671,17 +694,46 @@ describe('ClipDrag', () => {
       expect(drag.shown[0].at.start).toBe(23);
     });
 
+    it('holds a trimmed Clip where it was dropped too', () => {
+      const { drag, press } = timelineDrag();
+      press(1, 'end', 20);
+      drag.move(at(17));
+
+      expect(drag.release()).not.toBeNull();
+
+      expect(drag.saving).toBe(true);
+      expect(drag.shown[0].at).toMatchObject({ start: 10, length: 7 });
+    });
+
     it('shows the Clips as the Timeline has them once resolved', () => {
       const { drag, press } = timelineDrag();
       press(1, 'move', 15);
       drag.move(at(28));
-      drag.release();
+      const save = drag.release()!;
 
-      drag.saved();
+      drag.saved(save);
 
       expect(drag.clip).toBeNull();
       expect(drag.saving).toBe(false);
       expect(drag.shown).toEqual([]);
+    });
+
+    it('is left be by an earlier drag’s save resolving, e.g. a Gain handed over', () => {
+      const { drag, press } = timelineDrag();
+      press(1, 'gain', 15);
+      drag.move(below(-10, 15));
+      const gained = drag.release()!;
+      press(2, 'move', 45);
+      drag.move(at(55));
+
+      drag.saved(gained);
+      expect(drag.clip?.id).toBe(2);
+      const moved = drag.release()!;
+      drag.saved(gained);
+      expect(drag.saving).toBe(true);
+
+      drag.saved(moved);
+      expect(drag.clip).toBeNull();
     });
   });
 
