@@ -73,6 +73,8 @@ export class FakeSongServer implements SongServer {
   timeline: Timeline;
   /** How many writes landed, each one a write the server made. */
   landed = 0;
+  /** How many changes and edits were sent to apply, landed or not, e.g. refused. */
+  sent = 0;
   /** The Song as deleted, once it is. */
   deleted = false;
   #failing: (() => Error)[] = [];
@@ -151,6 +153,7 @@ export class FakeSongServer implements SongServer {
   apply(at: SongAt, change: LyricSheetChange): Promise<Song>;
   apply(at: SongAt, edit: Edit): Promise<Timeline>;
   apply(at: SongAt, change: CueChange | LyricSheetChange | Edit): Promise<Song | Timeline> {
+    this.sent++;
     if (isCueChange(change)) {
       return this.#write(at, () => {
         this.song = withCueChange(this.song, change);

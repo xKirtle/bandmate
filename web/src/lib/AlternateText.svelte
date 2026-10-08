@@ -12,6 +12,8 @@
       /** Ends each Line's name for screen readers, e.g. " of Chorus". */
       labelSuffix: string;
       save: (line: Line, cue: number | null) => void;
+      /** Whether a Line's still in the Song, e.g. not deleted with its Section. */
+      has: (line: number) => boolean;
       /** Hands over a Line's field, or null once it's gone, so Enter elsewhere can go on to it. */
       field: (line: number, field: GutterField | null | undefined) => void;
       /** Opens the next Line's field; answers whether there was one. */
@@ -167,6 +169,7 @@
               cue={line.cue}
               label={lineLabel}
               save={(cue) => gutter.save(line, cue)}
+              exists={() => gutter.has(line.id)}
               typing={editing.typing}
               section={sectionId}
               next={() => gutter.next(line.id)}

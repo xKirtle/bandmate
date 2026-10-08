@@ -108,7 +108,8 @@ export interface MasterFields {
  * A Master's name and notes as fields typed in place. A name is saved
  * trimmed; a blank one is refused, saying why, and goes back to what's
  * saved. The notes are saved as typed. A save that fails, or is refused as
- * the Song changed elsewhere, shows what's saved again.
+ * the Song changed elsewhere, shows what's saved again. Once the Master's
+ * removed, what's typed is dropped.
  */
 export function masterFields(masterId: number, options: MasterFieldsOptions): MasterFields {
   const field = (detail: 'name' | 'notes', parse: (typed: string) => Parsed<string>) =>

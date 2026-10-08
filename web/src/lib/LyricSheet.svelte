@@ -206,6 +206,7 @@
         ? {
             labelSuffix: ofSection(section.label),
             save: (line, cue) => setLineCue({ section: section.id, line: line.id }, cue),
+            has: (line) => song.sections.some((s) => s.alternates.some((a) => a.lines.some((l) => l.id === line))),
             field: (line, field) => writeFields.set(lineKey(line), field),
             next: (line) => writeFields.editAfter(writeFieldOrder, lineKey(line)),
             play: leadInto,
