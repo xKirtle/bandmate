@@ -15,9 +15,10 @@
 // fails, it's taken back, as a whole.
 //
 // It keeps a list of the edits being typed, e.g. a Track's name typed in
-// place (see typedField.svelte.ts): while any differs from what's saved,
-// the Song has unsaved edits, so closing the tab asks first and a refresh
-// doesn't replace the Song.
+// place (see typedField.svelte.ts) or an Alternate's text: while any
+// differs from what's saved, the Song has unsaved edits, so closing the tab
+// asks first and a refresh doesn't replace the Song. An edit typed into a
+// Section carries it, so the list also says what's typed into each Section.
 //
 // Timeline edits and Cue changes are kept to undo, in one history (see
 // history.ts), in the order they were made. An undo waits for the edits
@@ -60,6 +61,8 @@ export interface Made {
 export interface Typing {
   /** Whether what's typed isn't saved yet. */
   readonly unsaved: boolean;
+  /** How many edits have been typed into it, e.g. keystrokes. */
+  readonly typed: number;
   /** The Section it's typed in, if any. */
   readonly section?: number;
 }
@@ -73,11 +76,6 @@ export interface SavesOptions {
   /** Waits between tries of a Cue change's save. */
   wait?: Wait;
   /**
-   * Whether the page holds edits that aren't saved, outside Saves: a Lyric
-   * Sheet editor's.
-   */
-  editsOutside?: () => boolean;
-  /**
    * Hears that a refresh is about to show the Song as changed elsewhere,
    * e.g. to show its Details in the inputs.
    */
@@ -87,7 +85,6 @@ export interface SavesOptions {
 export class Saves {
   #server: SongServer;
   #wait: Wait;
-  #editsOutside: () => boolean;
   #onReplace: (song: Song) => void;
 
   #saved: Song = $state.raw()!;
@@ -96,6 +93,8 @@ export class Saves {
   #shown = $derived(this.#unsavedCues.reduce((s, u) => withCueChange(s, u.change), this.#saved));
   /** The edits being typed, e.g. fields typed in place, unsaved while they differ from what's saved. */
   #typing: Typing[] = $state.raw([]);
+  /** How many edits were typed into each Section by edits since gone from the list. */
+  #typedGone = $state.raw(new Map<number, number>());
 
   /** The Timeline as saved. */
   timeline: Timeline = $state.raw()!;
@@ -137,7 +136,6 @@ export class Saves {
   constructor(options: SavesOptions) {
     this.#server = options.server;
     this.#wait = options.wait ?? waitFor;
-    this.#editsOutside = options.editsOutside ?? (() => false);
     this.#onReplace = options.onReplace ?? (() => {});
     this.#saved = options.song;
     this.timeline = options.timeline;
@@ -153,11 +151,9 @@ export class Saves {
     return this.#saved;
   }
 
-  /** Whether anything isn't saved yet: saves on their way, Cue changes, edits being typed, or edits outside Saves. */
+  /** Whether anything isn't saved yet: saves on their way, Cue changes, or edits being typed. */
   get unsaved(): boolean {
-    return (
-      this.pending > 0 || this.#unsavedCues.length > 0 || this.#typing.some((t) => t.unsaved) || this.#editsOutside()
-    );
+    return this.pending > 0 || this.#unsavedCues.length > 0 || this.#typing.some((t) => t.unsaved);
   }
 
   /**
@@ -167,8 +163,26 @@ export class Saves {
    */
   typing = (entry: Typing): (() => void) => {
     this.#typing = [...this.#typing, entry];
-    return () => (this.#typing = this.#typing.filter((t) => t !== entry));
+    return () => {
+      this.#typing = this.#typing.filter((t) => t !== entry);
+      const { section } = entry;
+      if (section === undefined || entry.typed === 0) return;
+      this.#typedGone = new Map(this.#typedGone).set(section, (this.#typedGone.get(section) ?? 0) + entry.typed);
+    };
   };
+
+  /** The edits being typed in a Section, on the list. */
+  typingIn(sectionId: number): Typing[] {
+    return this.#typing.filter((t) => t.section === sectionId);
+  }
+
+  /**
+   * How many edits have been typed into a Section, by the edits on the list
+   * and those gone from it, e.g. to tell when typing carries on.
+   */
+  typedIn(sectionId: number): number {
+    return this.typingIn(sectionId).reduce((n, t) => n + t.typed, this.#typedGone.get(sectionId) ?? 0);
+  }
 
   /**
    * Queues a change to the Song, built against the Song as saved when its

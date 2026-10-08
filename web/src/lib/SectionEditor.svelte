@@ -14,6 +14,7 @@
   import type { Drop } from './sectionDrag';
   import type { SectionDragging } from './sectionDragging.svelte';
   import { activeAlternate, alternateName, alternatesLabel, labelOf, type Place } from './sections';
+  import { cancelOnEscape, committedAsItGoes, type TypedField } from './typedField.svelte';
 
   let {
     section,
@@ -48,30 +49,23 @@
   // The server guarantees exactly one active Alternate.
   const active = $derived(activeAlternate(section)!);
 
-  let label = $state(untrack(() => section.label));
-  let editingLabel = false;
-  // Identifies the Label or Alternate name being typed to Lyric Sheet editing. They
-  // save on change, which comes just before blur.
-  const naming = {};
+  // The Label and the Alternates' names, typed in place: each saves on
+  // change, which comes just before blur, and as its field goes.
+  const label = untrack(() => editing.sectionLabel(section.id));
+  const names = new Map<number, TypedField<string>>();
+
+  function nameOf(alt: Alternate): TypedField<string> {
+    let name = names.get(alt.id);
+    if (!name) {
+      name = editing.alternateName(alt.id, section.id);
+      names.set(alt.id, name);
+    }
+    return name;
+  }
   // In the Alternates mode, the Alternates show as cards to choose the active
   // one from, in place of its Lines. ⇄ opens and closes it.
   let choosing = $state(false);
   let toggle = $state<HTMLButtonElement>();
-
-  $effect(() => {
-    const l = section.label;
-    if (!editingLabel) label = l;
-  });
-
-  async function commitLabel() {
-    editingLabel = false;
-    const next = label.trim();
-    if (next === section.label) {
-      label = section.label;
-      return;
-    }
-    if (!(await editing.change({ kind: 'setSectionLabel', sectionId: section.id, label: next }))) label = section.label;
-  }
 
   async function addAlternate() {
     if (!(await editing.change({ kind: 'addAlternate', sectionId: section.id }))) return;
@@ -100,16 +94,6 @@
     if (e.key !== 'Escape') return;
     e.preventDefault();
     leaveChoosing();
-  }
-
-  async function rename(alt: Alternate, e: Event & { currentTarget: HTMLInputElement }) {
-    const input = e.currentTarget;
-    const next = input.value.trim();
-    if (next === alt.name) {
-      input.value = alt.name;
-      return;
-    }
-    if (!(await editing.change({ kind: 'renameAlternate', alternateId: alt.id, name: next }))) input.value = alt.name;
   }
 
   async function choose(alt: Alternate) {
@@ -213,22 +197,13 @@
     <Combobox
       id="label-{section.id}"
       class="label"
-      bind:value={label}
+      bind:value={label.shown}
+      {@attach committedAsItGoes(label)}
       options={suggestedLabels}
       saved={section.label}
-      onpick={() => {
-        commitLabel();
-        // Focus stays in the field, to carry on typing.
-        editingLabel = true;
-      }}
-      onrevert={() => editing.nameTyped(naming, section.id, false)}
-      onfocus={() => (editingLabel = true)}
-      oninput={() => editing.nameTyped(naming, section.id, true)}
-      onchange={commitLabel}
-      onblur={() => {
-        editingLabel = false;
-        editing.nameTyped(naming, section.id, false);
-      }}
+      onpick={() => label.commit()}
+      onrevert={() => label.cancel()}
+      onchange={() => label.commit()}
       placeholder="Label"
       autocomplete="off"
       autocapitalize="words"
@@ -269,6 +244,7 @@
       <div class="cards" role="radiogroup" aria-label="Alternates of {labelOf(section)}">
         {#each section.alternates as alt (alt.id)}
           {@const name = alternateName(section, alt)}
+          {@const typedName = nameOf(alt)}
           <!-- The radio takes the keyboard; a click anywhere else on the card is a shortcut to it. -->
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
           <div
@@ -297,17 +273,14 @@
                 aria-describedby="lines-{section.id}-{alt.id}"
               />
               <label class="visually-hidden" for="name-{section.id}-{alt.id}">Name of {name}</label>
+              <!-- Escape takes back what was typed, then leaves the mode as anywhere in it. -->
               <input
                 id="name-{section.id}-{alt.id}"
                 class="name"
-                value={alt.name}
-                oninput={() => editing.nameTyped(naming, section.id, true)}
-                onchange={(e) => rename(alt, e)}
-                onkeydown={(e) => {
-                  // Escape takes back what was typed, then leaves the mode as anywhere in it.
-                  if (e.key === 'Escape') e.currentTarget.value = alt.name;
-                }}
-                onblur={() => editing.nameTyped(naming, section.id, false)}
+                bind:value={typedName.shown}
+                {@attach committedAsItGoes(typedName)}
+                onchange={() => typedName.commit()}
+                onkeydown={cancelOnEscape(typedName)}
                 placeholder={name}
                 autocomplete="off"
                 enterkeyhint="done"

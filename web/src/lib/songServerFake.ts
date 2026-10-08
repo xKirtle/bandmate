@@ -280,7 +280,8 @@ export class FakeSongServer implements SongServer {
   /**
    * What a Lyric Sheet change does, for the changes the fake models: adding
    * a Section to the Arrangement, taking one out of it, deleting one in the
-   * Scrapbook, adding one to another, and replacing an Alternate's text.
+   * Scrapbook, adding one to another, setting its Label, renaming an
+   * Alternate, and replacing an Alternate's text.
    * Others throw "not modelled".
    */
   #changed(change: LyricSheetChange): (song: Song) => Song {
@@ -323,6 +324,19 @@ export class FakeSongServer implements SongServer {
           );
           return withoutSection({ ...song, sections }, added.id);
         };
+      case 'setSectionLabel':
+        return (song) => ({
+          ...song,
+          sections: song.sections.map((s) => (s.id === change.sectionId ? { ...s, label: change.label } : s)),
+        });
+      case 'renameAlternate':
+        return (song) => ({
+          ...song,
+          sections: song.sections.map((s) => ({
+            ...s,
+            alternates: s.alternates.map((a) => (a.id === change.alternateId ? { ...a, name: change.name } : a)),
+          })),
+        });
       case 'replaceAlternateText':
         return (song) => this.#withText(song, change.alternateId, change.text);
       default:

@@ -14,14 +14,15 @@
 //   text still waiting in their text boxes is sent first, while it can
 //   still land on them.
 //
-// It saves an Alternate's text as typed into its text box (see TextBox),
-// and holds the Lyric Sheet's edits not saved yet: Lines text, and a
-// Section's Label or an Alternate's name being typed. Saves sees them
-// through what the Song page gives it.
-import { SvelteMap } from 'svelte/reactivity';
+// It makes a Section's Label and an Alternate's name fields typed in place
+// (see typedField.svelte.ts), and saves an Alternate's text as typed into
+// its text box (see TextBox). Each goes on Saves' list of edits being
+// typed, with its Section, which answers whether a Section holds edits not
+// saved yet, and how much has been typed into it.
 import type { Song } from './api';
 import type { LyricSheetChange } from './lyricSheetChanges';
 import type { Saves, Typing } from './saves.svelte';
+import { TypedField } from './typedField.svelte';
 
 /** How long typing has to pause before an Alternate's text is saved, in milliseconds. */
 export const saveDelay = 800;
@@ -29,10 +30,6 @@ export const saveDelay = 800;
 export class LyricSheetEditing {
   #saves: Saves;
   #endSyncMode: () => void;
-  /** The editors holding edits not saved yet, each with the Section it edits. */
-  #unsaved = new SvelteMap<object, number>();
-  /** How many edits have been typed into each Section's editor. */
-  #typed = new SvelteMap<number, number>();
 
   /** Lyric Sheet editing through Saves, ending Sync mode with endSyncMode. */
   constructor(saves: Saves, endSyncMode: () => void) {
@@ -48,8 +45,9 @@ export class LyricSheetEditing {
    */
   change = (change: LyricSheetChange): Promise<boolean> => {
     if (endsSyncMode(change)) this.#endSyncMode();
-    for (const [editor, sectionId] of this.#unsaved) {
-      if (editor instanceof TextBox && remakes(change, sectionId)) editor.saveNow();
+    const remade = sectionRemadeBy(change);
+    if (remade !== null) {
+      for (const entry of this.#saves.typingIn(remade)) if (entry instanceof TextBox) entry.saveNow();
     }
     return this.#saves.changeLyricSheet(change);
   };
@@ -64,49 +62,61 @@ export class LyricSheetEditing {
     this.#endSyncMode();
   }
 
-  /** Whether the Lyric Sheet holds edits not saved yet. */
-  get unsaved(): boolean {
-    return this.#unsaved.size > 0;
-  }
-
-  /** Whether a Section's editor holds edits not saved yet: its Label, an Alternate's name, or its Lines' text. */
+  /**
+   * Whether a Section's editor holds edits not saved yet: its Label, an
+   * Alternate's name, its Lines' text or a Cue's time.
+   */
   unsavedIn(sectionId: number): boolean {
-    for (const s of this.#unsaved.values()) if (s === sectionId) return true;
-    return false;
+    return this.#saves.typingIn(sectionId).some((t) => t.unsaved);
   }
 
   /** How many edits have been typed into a Section's editor, e.g. to tell when typing carries on. */
   typedIn(sectionId: number): number {
-    return this.#typed.get(sectionId) ?? 0;
-  }
-
-  /**
-   * Hears a Section's Label or an Alternate's name being typed into its
-   * editor, not saved yet, or no longer: they save on change, just before
-   * they blur.
-   */
-  nameTyped(editor: object, sectionId: number, unsaved: boolean) {
-    this.#report(editor, sectionId, unsaved);
+    return this.#saves.typedIn(sectionId);
   }
 
   /** Puts an edit being typed into the Lyric Sheet, e.g. a Cue's time, on Saves' list (see Saves.typing). */
   typing = (entry: Typing): (() => void) => this.#saves.typing(entry);
+
+  /** A Section's Label, typed in place. It's saved trimmed; blank, the Section goes by its place. */
+  sectionLabel(sectionId: number): TypedField<string> {
+    return this.#trimmedField(
+      sectionId,
+      () => this.#saves.song.sections.find((s) => s.id === sectionId)?.label ?? '',
+      (label) => ({ kind: 'setSectionLabel', sectionId, label }),
+    );
+  }
+
+  /** An Alternate's name, typed in place, in a Section's editor. It's saved trimmed; blank removes it. */
+  alternateName(alternateId: number, sectionId: number): TypedField<string> {
+    return this.#trimmedField(
+      sectionId,
+      () => this.#saves.song.sections.flatMap((s) => s.alternates).find((a) => a.id === alternateId)?.name ?? '',
+      (name) => ({ kind: 'renameAlternate', alternateId, name }),
+    );
+  }
+
+  /** Text typed in place in a Section's editor, saved trimmed by the change it makes. */
+  #trimmedField(sectionId: number, saved: () => string, change: (text: string) => LyricSheetChange) {
+    return new TypedField<string>({
+      saved,
+      format: (text) => text,
+      parse: (typed) => ({ value: typed.trim() }),
+      commit: (text) => this.change(change(text)),
+      typing: this.#saves.typing,
+      section: sectionId,
+    });
+  }
 
   /** The text box of an Alternate's Lines, in a Section's editor. Saves always go to that Alternate. */
   textBox(alternateId: number, sectionId: number): TextBox {
     return new TextBox(
       () => this.#saves.song,
       (text) => this.change({ kind: 'replaceAlternateText', alternateId, text }),
-      (editor, unsaved) => this.#report(editor, sectionId, unsaved),
+      this.#saves.typing,
       alternateId,
+      sectionId,
     );
-  }
-
-  #report(editor: object, sectionId: number, unsaved: boolean) {
-    if (unsaved) {
-      this.#unsaved.set(editor, sectionId);
-      this.#typed.set(sectionId, this.typedIn(sectionId) + 1);
-    } else this.#unsaved.delete(editor);
   }
 }
 
@@ -119,13 +129,12 @@ function endsSyncMode(change: LyricSheetChange): boolean {
 }
 
 /**
- * Whether a change makes a Section's Alternates anew, so text sent to them
- * after it would be lost: adding the Section to another. (Moving an
- * Alternate out makes it anew too, but only an inactive one, which has no
- * text box.)
+ * The Section whose Alternates a change makes anew, so text sent to them
+ * after it would be lost: one added to another. (Moving an Alternate out
+ * makes it anew too, but only an inactive one, which has no text box.)
  */
-function remakes(change: LyricSheetChange, sectionId: number): boolean {
-  return change.kind === 'addToSection' && change.sectionId === sectionId;
+function sectionRemadeBy(change: LyricSheetChange): number | null {
+  return change.kind === 'addToSection' ? change.sectionId : null;
 }
 
 /**
@@ -134,12 +143,18 @@ function remakes(change: LyricSheetChange, sectionId: number): boolean {
  * focused, or holds text waiting, on its way or failed to save, it keeps
  * its own text over the server's. A failed save isn't tried again until
  * the next keystroke or blur.
+ *
+ * Typed in, it goes on Saves' list of edits being typed, with its Section,
+ * until it's closed and its last save is over. It's unsaved from a
+ * keystroke until nothing is waiting, on its way or, while it's open,
+ * failed.
  */
-export class TextBox {
+export class TextBox implements Typing {
   #song: () => Song;
   #send: (text: string) => Promise<boolean>;
-  #report: (box: TextBox, unsaved: boolean) => void;
+  #typing: (entry: Typing) => () => void;
   #alternateId: number;
+  readonly section: number;
 
   /** The text as saved, or none once the Alternate's gone. */
   #saved = $derived(this.#savedText());
@@ -154,17 +169,33 @@ export class TextBox {
   #failed = false;
   /** The box has gone: once its last save is over, it holds nothing unsaved. */
   #closed = false;
+  #unsaved = $state(false);
+  #edits = $state(0);
+  /** Takes it off Saves' list: set once typed in, until it's closed and settled. */
+  #leave: (() => void) | null = null;
 
   constructor(
     song: () => Song,
     send: (text: string) => Promise<boolean>,
-    report: (box: TextBox, unsaved: boolean) => void,
+    typing: (entry: Typing) => () => void,
     alternateId: number,
+    section: number,
   ) {
     this.#song = song;
     this.#send = send;
-    this.#report = report;
+    this.#typing = typing;
     this.#alternateId = alternateId;
+    this.section = section;
+  }
+
+  /** Whether it holds text that isn't saved yet. */
+  get unsaved(): boolean {
+    return this.#unsaved;
+  }
+
+  /** How many edits have been typed into it, e.g. keystrokes. */
+  get typed(): number {
+    return this.#edits;
   }
 
   /** The text the box shows. */
@@ -190,7 +221,9 @@ export class TextBox {
     this.#hold();
     this.#own = text;
     clearTimeout(this.#timer);
-    this.#report(this, true);
+    this.#leave ??= this.#typing(this);
+    this.#unsaved = true;
+    this.#edits++;
     this.#timer = setTimeout(this.#save, saveDelay);
   };
 
@@ -206,6 +239,7 @@ export class TextBox {
   close = () => {
     this.#closed = true;
     this.saveNow();
+    this.#settle();
   };
 
   /** Saves at once what's waiting or failed last time, e.g. before its Alternate is made anew. */
@@ -240,7 +274,11 @@ export class TextBox {
   #settle() {
     if (this.#timer !== undefined || this.#inFlight > 0) return;
     if (this.#failed && !this.#closed) return;
-    this.#report(this, false);
+    this.#unsaved = false;
     if (!this.#focused) this.#own = null;
+    if (this.#closed) {
+      this.#leave?.();
+      this.#leave = null;
+    }
   }
 }
