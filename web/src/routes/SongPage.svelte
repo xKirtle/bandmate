@@ -19,6 +19,7 @@
   import TuningField from '../lib/TuningField.svelte';
   import { LyricSheetEditing } from '../lib/lyricSheetEditing.svelte';
   import { Saves } from '../lib/saves.svelte';
+  import { SyncMode } from '../lib/syncMode.svelte';
   import { songServer } from '../lib/songServer';
   import { takeNewFlag } from '../lib/newSong';
   import { navigate, replaceSearch, router } from '../lib/router.svelte';
@@ -67,10 +68,6 @@
   // Where the Timeline is playing, in seconds; null while it isn't.
   let playhead = $state<number | null>(null);
   let timelinePanel = $state<Timeline>();
-  // Whether the Timeline's Loop is on, which keeps Sync mode in the Lyric Sheet off.
-  let loopOn = $state(false);
-  // Sync mode and recording are exclusive: neither starts while the other's on.
-  let syncing = $state(false);
   // Whether the Timeline is recording, from pressing Record until the Take
   // is saved. Meanwhile no Master plays, the Song can't be deleted, leaving
   // asks first, and changes made elsewhere wait to be shown (the Timeline's
@@ -83,6 +80,16 @@
   // never saved: each visit starts from the Song's Status.
   let mode = $state<Mode>('write');
   const writing = $derived(mode === 'write');
+  // Sync mode, which the Lyric Sheet draws and the Timeline attaches its
+  // Loop, recording, Clips and playhead to: see syncMode.svelte.ts. Like
+  // editing Cues, it's only on wider screens.
+  const wide = new MediaQuery('min-width: 40.0625rem');
+  const syncMode = new SyncMode({
+    mode: () => mode,
+    wide: () => wide.current,
+    song: () => shown,
+    cue: (change, what) => saves?.cue(change, what) ?? Promise.resolve(false),
+  });
   // How far Read mode shows the Chords transposed: by the Lyric Sheet's
   // amount while they show, and not at all while they're hidden or Read mode
   // shows none, e.g. when only the Scrapbook has Chords.
@@ -151,7 +158,7 @@
     Promise.all([server.getSong(), server.getTimeline()]).then(
       ([s, tl]) => {
         saves = new Saves({ server, song: s, timeline: tl, editsOutside, onReplace });
-        editing = new LyricSheetEditing(saves, () => (syncing = false));
+        editing = new LyricSheetEditing(saves, () => syncMode.end());
         draft = toDraft(s);
         tags = s.tags;
         mode = openingMode(s.status);
@@ -541,11 +548,8 @@
           {editing}
           {playhead}
           playFrom={(at) => timelinePanel?.playFrom(at)}
-          playheadAt={() => timelinePanel?.playheadAt() ?? 0}
-          {loopOn}
-          stopLoop={() => timelinePanel?.stopLoop()}
           {recording}
-          bind:syncing
+          {syncMode}
           hasClips={timeline?.tracks.some((t) => t.clips.length > 0) ?? false}
         />
       </div>
@@ -598,8 +602,7 @@
     {saves}
     {setBpm}
     onPlayhead={(at) => (playhead = at)}
-    onLoop={(on) => (loopOn = on)}
-    {syncing}
+    {syncMode}
     onRecording={(on) => (recording = on)}
   />
 {/if}

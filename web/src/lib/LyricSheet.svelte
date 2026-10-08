@@ -8,7 +8,6 @@
   import Minus from '@lucide/svelte/icons/minus';
   import Plus from '@lucide/svelte/icons/plus';
   import X from '@lucide/svelte/icons/x';
-  import { untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import type { Cueing } from './AlternateText.svelte';
   import type { Line, Section, Song } from './api';
@@ -20,10 +19,8 @@
     hasCues,
     isBlank,
     leadIn,
-    nextLine,
     outOfOrderCues,
     outOfOrderReason,
-    type NextLine,
     type Position,
   } from './cues';
   import { follower, lineKey } from './follow';
@@ -41,12 +38,20 @@
   import SectionEditor from './SectionEditor.svelte';
   import { moveTo, type Drop } from './sectionDrag';
   import type { SectionDragging } from './sectionDragging.svelte';
-  import { activeAlternate, addedNotice, describe, isEmpty, places, sectionsInArrangement } from './sections';
+  import {
+    activeAlternate,
+    addedNotice,
+    describe,
+    isEmpty,
+    lineName as nameLine,
+    places,
+    sectionsInArrangement,
+  } from './sections';
   import type { Mode } from './songMode';
   import { readShiftStep, shiftSteps, storeShiftStep, type ShiftStep } from './shiftStep';
   import { shortcuts } from './shortcuts';
-  import { markSyncHintSeen, sawSyncHint } from './syncHint';
   import { cuesNextLine } from './syncKeys';
+  import type { SyncMode } from './syncMode.svelte';
   import { inTextField } from './textField';
   import { deviceStorage } from './deviceStorage';
   import { songChordsShown } from './chordsShown';
@@ -62,11 +67,8 @@
     playhead = null,
     hasClips = false,
     playFrom,
-    playheadAt,
-    loopOn = false,
-    stopLoop,
     recording = false,
-    syncing = $bindable(false),
+    syncMode,
   }: {
     song: Song;
     /** The Song page's mode: Write edits the raw text; Read shows Chords above the lyrics. */
@@ -91,19 +93,10 @@
     hasClips?: boolean;
     /** Plays the Timeline from a time, or jumps there if it's playing, e.g. to lead into a Cue from its ▶. */
     playFrom?: (at: number) => void;
-    /** Where the Timeline's playhead is, playing or paused, in seconds: where Sync mode cues a Line. */
-    playheadAt?: () => number;
-    /** Whether the Timeline's Loop is on, which switches Sync mode off: the two are exclusive. */
-    loopOn?: boolean;
-    /** Whether the Timeline is recording, which keeps Sync mode off: the two are exclusive. */
+    /** Whether the Timeline is recording, which keeps Sync mode off, to say why it can't come on. */
     recording?: boolean;
-    /**
-     * Whether Sync mode is on, e.g. to keep recording from starting. Switched
-     * off from outside, it ends, e.g. as Lyric Sheet editing changes the lyrics.
-     */
-    syncing?: boolean;
-    /** Switches the Timeline's Loop off, as Sync mode comes on. */
-    stopLoop?: () => void;
+    /** Sync mode, which the Lyric Sheet draws, and sends its switching, cueing and picking through. */
+    syncMode: SyncMode;
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
@@ -207,10 +200,8 @@
   // out of order with as the gutter names Lines, e.g. "Line 6 of Chorus".
   const outOfOrder = $derived(new Map(outOfOrderCues(song).map((c) => [c.line, c])));
 
-  function lineName({ section, line }: Position): string {
-    const s = sections.get(section);
-    const n = activeLines(s).findIndex((l) => l.id === line) + 1;
-    return `Line ${n}${ofSection(s?.label)}`;
+  function lineName(line: Position): string {
+    return nameLine(song, line);
   }
 
   /** How a Section's Cues show on its text box in Write mode. */
@@ -231,36 +222,21 @@
             },
           }
         : undefined,
-      sync: syncing
+      sync: syncMode.on
         ? {
             next: upNext?.line ?? null,
-            now: cueNext,
-            pick: (line) => (syncFrom = { cued: null, picked: { section: section.id, line } }),
+            now: () => syncMode.cue(),
+            pick: (line) => syncMode.pick({ section: section.id, line }),
           }
         : undefined,
     };
   }
 
-  // Sync mode cues the next Line at the playhead with Enter. Like the Cue
-  // gutter, it's in Write mode on wider screens only, and only once there's
-  // a Clip to cue along to. It and the Loop are exclusive, so going round
-  // the Loop mid-pass can't cue Lines out of order: switching Sync mode on
-  // switches the Loop off, and the Loop coming on, however it does,
-  // switches Sync mode off.
-  // Nor does it come on while recording, which only starts while it's off.
-  const canSync = $derived(mode === 'write' && wide.current && hasClips && !recording);
-  $effect(() => {
-    if (!canSync || loopOn) untrack(() => (syncing = false));
-  });
-
-  // What the Line up next is worked out from: the Line last cued, or a Line
-  // picked by clicking it. It doesn't follow playback, so playback can start
-  // anywhere, and the Line up next only moves on as Lines are cued, whether
-  // or not their Cues are saved yet. A Cue taken back, as its save failed,
-  // leaves it where it is.
-  let syncFrom = $state.raw<{ cued: NextLine | null; picked: NextLine | null }>({ cued: null, picked: null });
-  // Marked by a Now button in its gutter slot.
-  const upNext = $derived(syncing ? nextLine(song, syncFrom) : null);
+  // Sync mode cues the next Line at the playhead with Enter, or its Now
+  // button, in Write mode on wider screens only, and only once there's a
+  // Clip to cue along to: see syncMode.svelte.ts. The Line up next is
+  // marked by a Now button in its gutter slot.
+  const upNext = $derived(syncMode.next);
 
   // Where playback is in the Lyric Sheet. In Sync mode, the Line up next is
   // being retaken, so its old Cue is ignored until it's cued again.
@@ -269,34 +245,10 @@
   // current is on screen.
   const writeKey = $derived(mode === 'write' && current ? lineKey(current.line) : null);
 
-  // The first time Sync mode comes on on this device, a hint says how to use it.
-  let hinting = $state(false);
-
-  function switchSyncing() {
-    syncing = !syncing;
-    hinting = syncing && !sawSyncHint(deviceStorage());
-    if (!syncing) return;
-    stopLoop?.();
-    markSyncHintSeen(deviceStorage());
-    syncFrom = { cued: null, picked: null };
-  }
-
-  /**
-   * Cues the Line up next at the playhead. Its Cue shows at once, so it
-   * becomes the Line playing, as playback is already at its Cue, and the
-   * Line after it comes up next.
-   */
-  function cueNext() {
-    const line = upNext;
-    if (!playheadAt || !line) return;
-    syncFrom = { cued: line, picked: null };
-    setLineCue(line, playheadAt());
-  }
-
   // Playback is followed down the Lyric Sheet in Write mode, but in Sync
   // mode it's the Line up next that's kept in view instead: following both
   // would pull the page two ways at once.
-  const followKey = $derived(syncing ? upNext && lineKey(upNext.line) : writeKey);
+  const followKey = $derived(syncMode.on ? upNext && lineKey(upNext.line) : writeKey);
   $effect(() => {
     follow(followKey);
   });
@@ -312,13 +264,13 @@
   // a button: syncing along shouldn't depend on where focus was left.
   function cueKey(event: KeyboardEvent) {
     const at = {
-      syncing,
+      syncing: syncMode.on,
       inTextField: inTextField(event.target),
       inDialogOrMenu: event.target instanceof Element && !!event.target.closest('dialog, [role="menu"]'),
     };
     if (!cuesNextLine(event, at)) return;
     event.preventDefault();
-    cueNext();
+    syncMode.cue();
   }
 
   // The Section just added or duplicated, whose Label gets focus.
@@ -455,13 +407,13 @@
       <button
         type="button"
         class="button toggle"
-        aria-pressed={syncing}
-        disabled={!canSync}
+        aria-pressed={syncMode.on}
+        disabled={!syncMode.canBeOn}
         onpointerdown={(e) => e.preventDefault()}
-        onclick={switchSyncing}
+        onclick={() => syncMode.switch()}
         title={recording
           ? 'Stop recording to sync lyrics'
-          : canSync
+          : syncMode.canBeOn
             ? `Sync lyrics: press ${cueNextWays} as each Line starts to cue it at the playhead`
             : 'Add a Beat to the Timeline to sync lyrics to it'}>Sync lyrics</button
       >
@@ -499,7 +451,7 @@
       </div>
     {/if}
     <p class="notice muted" role="status">{notice ?? ''}</p>
-    {#if syncing && hinting}
+    {#if syncMode.hint}
       <p class="sync-hint muted">
         Play, then press {cueNextWays} as each Line starts. Click a Line to start from it.
       </p>

@@ -1,5 +1,5 @@
 import type { Alternate, Section, Song } from './api';
-import { isBlank } from './cues';
+import { isBlank, type Position } from './cues';
 import type { MenuAction } from './menu';
 import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right';
 import ArrowRightFromLine from '@lucide/svelte/icons/arrow-right-from-line';
@@ -83,6 +83,16 @@ export function describe(section: Section): string {
     ?.lines.find((l) => l.lyrics.trim())
     ?.lyrics.trim();
   return section.label || (first ? `“${first}”` : labelOf(section));
+}
+
+/**
+ * How the Cue gutter names a Line, e.g. "Line 3 of Verse": by its place in
+ * its Section's active Alternate, and its Section's Label, if it has one.
+ */
+export function lineName(song: { sections: Section[] }, { section, line }: Position): string {
+  const s = song.sections.find((x) => x.id === section);
+  const n = (activeAlternate(s)?.lines.findIndex((l) => l.id === line) ?? -1) + 1;
+  return `Line ${n}${s?.label ? ` of ${s.label}` : ''}`;
 }
 
 /** The notice a Section added to another as Alternates leaves, e.g. "Hook added to Verse 1 as an Alternate". */
