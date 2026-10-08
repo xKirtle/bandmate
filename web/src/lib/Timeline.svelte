@@ -27,6 +27,7 @@
   import { ClipDrag, type ClipGrip, type ClipMeasure, type DragAt } from './clipDrag.svelte';
   import { LoopDrag } from './loopDrag.svelte';
   import { PointerFollow, type EdgeScroll, type PointerAt } from './pointerFollow';
+  import { BoxDrag, type BoxAt } from './boxDrag.svelte';
   import { guideLanes, reachAt } from './snapping';
   import { clipSources, clipTitle, fileStart, playing } from './clipSource';
   import { formatCue } from './cues';
@@ -39,7 +40,6 @@
   import type { MenuAction } from './menu';
   import { peaksPerSecond } from './peaks';
   import { keyActedOnPage } from './pointerFocus';
-  import { laneStep, pressLane, type LaneInput, type LanePress } from './lanePress';
   import { longPressDelay, type Point } from './press';
   import { retakeLength } from './recording';
   import { timelineEnd, type Loop, type Placed } from './schedule';
@@ -51,7 +51,7 @@
   import { clipActions, selectionActions } from './clipMenu';
   import { mergeTarget, mergedClips, renderMerge } from './merge';
   import { rightHalfOf, splitTargets } from './split';
-  import { Selection, type ClipIds, type SelectionBox } from './selection.svelte';
+  import { Selection, type ClipIds } from './selection.svelte';
   import { TimelineEditing } from './timelineEditing.svelte';
   import { committedAsItGoes, type TypedField } from './typedField.svelte';
   import {
@@ -922,39 +922,17 @@
     if (remembered !== null) storeChosen(deviceStorage(), songId, remembered);
   });
 
-  // Dragging from empty lane space draws a box, and the Clips it touches
-  // on the Tracks it spans become the Selection as it's drawn, or, with
-  // Mod held as it's pressed, are added to it. It leaves the Chosen Track
-  // and the playhead be, and scrolls the lanes along near their edges, as
-  // a Clip dragged does. A press let go without moving past the slop is a
-  // click there instead, an insertion point: it clears the Selection,
-  // moves the playhead to exactly where it was pressed, unsnapped, as the
-  // ruler does, and chooses that Track, so a paste, a recording or
-  // "+ Beat" goes there. With Mod held, that was likely the start of a
-  // box to add, so it leaves the Selection, the playhead and the Chosen
-  // Track be. A finger dragging pans the lanes instead: a tap does what a
-  // click does, and it draws a box only once held still for a long press, and that
-  // box always replaces the Selection; let go without dragging, it only
-  // clears the Selection. A second finger, e.g. pinching, gives the box
-  // up.
-  interface LaneBox {
-    /** The press, telling a click, a box and a pan apart. */
-    press: LanePress;
-    pointerId: number;
-    /** The box's hold on the Selection, which it replaces or adds to as it was pressed. */
-    selectionBox: SelectionBox;
-    /** Where it was pressed, in seconds: the box's start. */
-    start: number;
-    /** The index of the Track whose lane was pressed. */
-    trackIndex: number;
-    /** How far down the lanes it was pressed, in pixels. */
-    top: number;
-  }
-  let laneBox: LaneBox | null = null;
-  /** The box being drawn, in seconds across and pixels down the lanes, once the press has moved past the slop or a finger's been held. */
-  let box = $state<{ start: number; end: number; top: number; bottom: number } | null>(null);
+  // Dragging from empty lane space draws a box, selecting the Clips it
+  // touches, and a click there is an insertion point: see
+  // boxDrag.svelte.ts. Here it's measured, the pointer followed, the lanes
+  // scrolled along near their edges, a finger's long press timed and a
+  // second finger heard, and the playhead moved and the Track chosen as a
+  // click asks.
+  const boxDrag = new BoxDrag({ selection, frozen: () => frozen });
+  /** The pointer pressing empty lane space, the only one followed. */
+  let boxPointer = 0;
   /** Waiting for a finger on empty lane space to be held still long enough to draw a box. */
-  let laneTimer: ReturnType<typeof setTimeout> | undefined;
+  let boxTimer: ReturnType<typeof setTimeout> | undefined;
 
   /** How far a point is down the lanes, in pixels. */
   function yIn(clientY: number): number {
@@ -967,9 +945,19 @@
     return timeline.tracks.findIndex((t) => t.id === id);
   }
 
+  /** Where a point is, for BoxDrag: the time under it across the lanes, the Track whose lane is nearest, and how far down the lanes it is. */
+  function boxAt(at: Point): BoxAt {
+    return {
+      point: { clientX: at.clientX, clientY: at.clientY },
+      time: spanTimeAt(at.clientX),
+      track: trackIndexAt(at.clientY),
+      y: yIn(at.clientY),
+    };
+  }
+
   /** Whether a finger is drawing a box, so the lanes mustn't pan under it. */
   function touchBoxing(): boolean {
-    return laneBox?.press.touch === true && laneBox.press.phase === 'boxing';
+    return boxDrag.touch && boxDrag.box !== null;
   }
 
   function laneDown(event: PointerEvent) {
@@ -978,112 +966,72 @@
     // so the Timeline's keys, e.g. Esc and Mod+A, work after it.
     event.preventDefault();
     lanesElement!.focus({ preventScroll: true });
-    const touch = event.pointerType === 'touch';
-    const adds = addsBox(event);
-    laneBox = {
-      press: pressLane(event, touch, adds),
-      pointerId: event.pointerId,
-      selectionBox: selection.startBox(adds),
-      start: spanTimeAt(event.clientX),
-      trackIndex: trackIndexAt(event.clientY),
-      top: yIn(event.clientY),
-    };
-    if (laneBox.press.phase === 'holding') laneTimer = setTimeout(laneHold, longPressDelay);
-    window.addEventListener('pointerdown', laneOtherDown);
-    window.addEventListener('pointermove', laneMove);
-    window.addEventListener('pointerup', laneUp);
-    window.addEventListener('pointercancel', laneCancel);
+    boxDrag.press(boxAt(event), event.pointerType === 'touch', addsBox(event));
+    boxPointer = event.pointerId;
+    boxFollow.start(event.pointerId);
+    if (!boxDrag.touch) return;
+    const held = { clientX: event.clientX, clientY: event.clientY };
+    boxTimer = setTimeout(() => boxHold(held), longPressDelay);
+    window.addEventListener('pointerdown', boxOtherDown);
   }
 
-  /** Steps the press on, drawing the box to `at` or ending the press as it says. */
-  function laneInput(input: LaneInput, at: Point) {
-    if (!laneBox) return;
-    const { press, outcome } = laneStep(laneBox.press, input);
-    if (press) laneBox.press = press;
-    switch (outcome) {
-      case 'wait':
-        return;
-      case 'box':
-        drawBox(laneBox, at);
-        return;
-      case 'insertionPoint': {
-        selection.apply({ kind: 'emptyClick', adds: false });
-        // Not even following the playhead again while recording.
-        if (frozen) break;
-        seekTo(laneBox.start);
-        const track = timeline.tracks[laneBox.trackIndex];
+  // The pointer followed for a box. A finger moving before it's held
+  // pans the lanes instead, so it stops being followed.
+  const boxFollow = new PointerFollow<BoxAt>(
+    {
+      at: boxAt,
+      move: (at) => {
+        const drawing = boxDrag.move(at);
+        if (!boxDrag.pressed) boxDone();
+        return drawing;
+      },
+      up: (event) => {
+        boxDrag.move(boxAt(event));
+        const click = boxDrag.release();
+        boxDone();
+        // Frozen, e.g. recording, a click asks for nothing, not even following the playhead again.
+        if (!click) return;
+        seekTo(click.time);
+        const track = timeline.tracks[click.track];
         if (track) choose({ kind: 'choose', trackId: track.id });
-        break;
-      }
-      case 'click':
-        selection.apply({ kind: 'emptyClick', adds: laneBox.press.adds });
-        break;
-      case 'restore':
-        laneBox.selectionBox.restore();
-        break;
-      case 'keep':
-      case 'giveUp':
-        break;
-    }
-    laneDone();
-  }
-
-  function drawBox({ start, trackIndex, top, selectionBox }: LaneBox, at: Point) {
-    const end = spanTimeAt(at.clientX);
-    box = { start, end, top, bottom: yIn(at.clientY) };
-    selectionBox.draw({ start, end, tracks: [trackIndex, trackIndexAt(at.clientY)] });
-    dragAt(at, laneMove);
-  }
+      },
+      // A box given up, e.g. for a pinch or a scroll on touch, selects what was selected before it.
+      cancel: boxCancel,
+    },
+    edgeScroll,
+  );
 
   // Held still, a finger draws a box from under it, with a buzz where the
-  // device has one. Not while recording, when the Selection is locked.
-  function laneHold() {
-    if (!laneBox) return;
-    if (frozen) return laneDone();
+  // device has one, and the lanes scroll along if it's near an edge. Not
+  // while recording, when the Selection is locked.
+  function boxHold(held: Point) {
+    if (!boxDrag.hold()) return boxDone();
     navigator.vibrate?.(15);
-    laneInput({ kind: 'hold' }, laneBox.press.from);
-  }
-
-  function laneMove(event: Point) {
-    if ('pointerId' in event && event.pointerId !== laneBox?.pointerId) return;
-    laneInput({ kind: 'move', at: event }, event);
-  }
-
-  function laneUp(event: PointerEvent) {
-    if (event.pointerId !== laneBox?.pointerId) return;
-    laneMove(event);
-    laneInput({ kind: 'lift' }, event);
-  }
-
-  // A box given up, e.g. for a pinch or a scroll on touch, selects what was
-  // selected before it.
-  function laneCancel(event: PointerEvent) {
-    if (event.pointerId !== laneBox?.pointerId) return;
-    laneInput({ kind: 'cancel' }, event);
+    boxFollow.moveTo(held);
   }
 
   // A second finger landing, e.g. to pinch, gives a finger's box up.
-  function laneOtherDown(event: PointerEvent) {
-    if (!laneBox?.press.touch || event.pointerId === laneBox.pointerId) return;
-    laneInput({ kind: 'cancel' }, event);
+  function boxOtherDown(event: PointerEvent) {
+    if (!boxDrag.touch || event.pointerId === boxPointer) return;
+    boxCancel();
+  }
+
+  function boxCancel() {
+    boxDrag.cancel();
+    boxDone();
   }
 
   // A finger's long press opens no menu of the browser's on empty lane space.
   function laneContextMenu(event: MouseEvent) {
-    if (laneBox?.press.touch) event.preventDefault();
+    if (boxDrag.touch) event.preventDefault();
   }
 
-  function laneDone() {
-    laneBox = null;
-    box = null;
-    clearTimeout(laneTimer);
-    dragDone();
-    window.removeEventListener('pointerdown', laneOtherDown);
-    window.removeEventListener('pointermove', laneMove);
-    window.removeEventListener('pointerup', laneUp);
-    window.removeEventListener('pointercancel', laneCancel);
+  function boxDone() {
+    clearTimeout(boxTimer);
+    boxFollow.stop();
+    window.removeEventListener('pointerdown', boxOtherDown);
   }
-  onDestroy(laneDone);
+  onDestroy(boxDone);
 
   // The Clipboard: the Clips last copied or cut from the Selection, as they
   // were then. Like the Selection, it's never kept, so leaving the Song
@@ -2565,7 +2513,8 @@
               {@const at = spanStyle(loop.start, loop.end)}
               <span class="loop-shade" style:left={at.left} style:width={at.width} aria-hidden="true"></span>
             {/if}
-            {#if box}
+            {#if boxDrag.box}
+              {@const box = boxDrag.box}
               {@const at = spanStyle(Math.max(0, Math.min(box.start, box.end)), Math.max(box.start, box.end))}
               <span
                 class="box"
