@@ -1,6 +1,7 @@
 import type { TimelineLoop } from './api';
 import type { Edit } from './history';
-import { pastSlop, type Point, type PointerAt } from './press';
+import type { PointerAt } from './pointerFollow';
+import { pastSlop, type Point } from './press';
 import { loopMark, loopTargets, snapLoop, type Aligned, type LoopGrip, type Snap, type Tracks } from './snapping';
 
 // Setting the Loop by dragging along the top of the ruler, from press to

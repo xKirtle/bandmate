@@ -3,14 +3,6 @@
 /** Where a pointer is on the page. */
 export type Point = Pick<PointerEvent, 'clientX' | 'clientY'>;
 
-/** Where the pointer is for a drag on the Timeline, as the Timeline measures it. */
-export interface PointerAt {
-  /** Where it is, to tell a click from a drag. */
-  point: Point;
-  /** The time under it across the lanes, in seconds, which may be before 0:00 or past the Timeline shown. */
-  time: number;
-}
-
 /** How long a finger held still takes to count as a long press, in ms. */
 export const longPressDelay = 500;
 

@@ -4,7 +4,8 @@ import { draggedFade, grabbedFade, isFadeEnd, type FadeEnd } from './clipFade';
 import { draggedGain } from './clipGain';
 import { activeTake } from './clipSource';
 import type { Edit } from './history';
-import { pastSlop, type Point, type PointerAt } from './press';
+import type { PointerAt } from './pointerFollow';
+import { pastSlop, type Point } from './press';
 import type { Placed } from './schedule';
 import type { Selection } from './selection.svelte';
 import {

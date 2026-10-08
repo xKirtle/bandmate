@@ -26,7 +26,7 @@
   import { chosenTrack, readChosen, storeChosen, type ChoiceEvent } from './chosenTrack';
   import { ClipDrag, type ClipGrip, type ClipMeasure, type DragAt } from './clipDrag.svelte';
   import { LoopDrag } from './loopDrag.svelte';
-  import { PointerFollow, type EdgeScroll } from './pointerFollow';
+  import { PointerFollow, type EdgeScroll, type PointerAt } from './pointerFollow';
   import { guideLanes, reachAt } from './snapping';
   import { clipSources, clipTitle, fileStart, playing } from './clipSource';
   import { formatCue } from './cues';
@@ -40,7 +40,7 @@
   import { peaksPerSecond } from './peaks';
   import { keyActedOnPage } from './pointerFocus';
   import { laneStep, pressLane, type LaneInput, type LanePress } from './lanePress';
-  import { longPressDelay, type Point, type PointerAt } from './press';
+  import { longPressDelay, type Point } from './press';
   import { retakeLength } from './recording';
   import { timelineEnd, type Loop, type Placed } from './schedule';
   import { nameSound } from './soundName';
@@ -1378,7 +1378,10 @@
       },
       modifier: (free, at) => clipDrag.modifier(free, at),
       up: editUp,
-      cancel: editCancel,
+      cancel: () => {
+        clearTimeout(pressTimer);
+        clipDrag.cancel();
+      },
     },
     edgeScroll,
   );
