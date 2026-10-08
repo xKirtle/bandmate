@@ -129,7 +129,7 @@ export function snapEdge<T>(
 }
 
 /** How the Loop is being set: marking a new one, or dragging its start or end. */
-export type LoopDrag = 'new' | 'start' | 'end';
+export type LoopGrip = 'new' | 'start' | 'end';
 
 /** Where a new Loop pressed at desired is marked from: onto a target in reach, if there is one. */
 export function loopMark<T>(targets: readonly Target<T>[], desired: number, reach: number): number {
@@ -149,7 +149,7 @@ export function loopMark<T>(targets: readonly Target<T>[], desired: number, reac
  */
 export function snapLoop<T>(
   targets: readonly Target<T>[],
-  mode: LoopDrag,
+  mode: LoopGrip,
   anchor: number,
   desired: number,
   reach: number,

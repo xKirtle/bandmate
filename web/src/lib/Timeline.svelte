@@ -19,31 +19,14 @@
   import { onDestroy, onMount, tick, untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { innerHeight } from 'svelte/reactivity/window';
-  import {
-    api,
-    type Beat,
-    type Clip,
-    type Song,
-    type Timeline,
-    type TimelineLoop,
-    type Track,
-    type TrackChanges,
-  } from './api';
+  import { api, type Beat, type Clip, type Song, type Timeline, type Track, type TrackChanges } from './api';
   import ActionsMenu from './ActionsMenu.svelte';
   import BeatPicker from './BeatPicker.svelte';
   import { inputProblem } from './capture';
   import { chosenTrack, readChosen, storeChosen, type ChoiceEvent } from './chosenTrack';
   import { ClipDrag, type ClipGrip, type ClipMeasure, type DragAt } from './clipDrag.svelte';
-  import {
-    guideLanes,
-    loopMark,
-    loopTargets,
-    reachAt,
-    snapLoop,
-    type Aligned,
-    type LoopDrag,
-    type Snap,
-  } from './snapping';
+  import { LoopDrag, type LoopAt } from './loopDrag.svelte';
+  import { guideLanes, reachAt } from './snapping';
   import { clipSources, clipTitle, fileStart, playing } from './clipSource';
   import { formatCue } from './cues';
   import type { Saves } from './saves.svelte';
@@ -187,7 +170,7 @@
     onError: (message) => showError(message),
     onFollow: (at) => {
       // Not while a Clip or the Loop is dragged, which would jump with the page.
-      if (!clipDrag.clip && !loopEdit) reveal(at);
+      if (!clipDrag.clip && !loopDrag.pressed) reveal(at);
     },
   });
   const playerState = $derived(transport.state);
@@ -1232,7 +1215,7 @@
    */
   const guide = $derived.by(() => {
     const clipSnap = clipDrag.snap;
-    const snapped = clipSnap ?? loopEdit?.snap;
+    const snapped = clipSnap ?? loopDrag.snap;
     if (!snapped) return null;
     const dragged = clipSnap ? timeline.tracks.findIndex((t) => t.id === clipSnap.trackId) : 'ruler';
     const lanes = guideLanes(dragged, snapped.aligned);
@@ -1666,48 +1649,30 @@
     openClipMenu(clip, event.currentTarget as HTMLElement, event);
   }
 
-  // Setting the Loop: dragging along the top of the ruler marks a new one,
-  // switched on, and dragging its edges adjusts it. It's set on release,
-  // and Timeline editing shows it where it was dropped until it's saved, so
-  // a new one can be dragged straight away.
-  // Marked or adjusted, it snaps to Clips' edges and the playhead, unless
-  // Shift is held: a new one both where it's pressed and where it's dragged to.
-  interface LoopEdit {
-    mode: LoopDrag;
-    /** The time the Loop is marked from: where a new one was pressed, before snapping, or its edge that isn't dragged. */
-    anchor: number;
-    /** Where the pointer went down, to tell a click from a drag. */
-    fromX: number;
-    moved: boolean;
-    loop: TimelineLoop;
-    /** Whether Shift is held, to set the Loop without snapping. */
-    free: boolean;
-    /** What the edge dragged is snapped to, with the lanes of what's there, while it is. */
-    snap: Snap<Aligned> | null;
-  }
-  let loopEdit = $state<LoopEdit | null>(null);
-  const loop = $derived(loopEdit?.moved ? loopEdit.loop : timeline.loop);
-  // The shortest Loop the browser sets, in seconds, so a stray click doesn't
-  // set one. The server only needs its start before its end.
-  const minLoop = 0.25;
+  // Setting the Loop by dragging along the top of the ruler goes through
+  // LoopDrag (see loopDrag.svelte.ts), with the page measured here. It's
+  // saved on release, and Timeline editing shows it where it was dropped
+  // until it's saved, so a new one can be dragged straight away.
+  const loopDrag = new LoopDrag({
+    tracks: () => timeline.tracks,
+    playhead: () => position,
+    loop: () => timeline.loop,
+    reach: () => reachAt(view.scale),
+    span: () => span,
+  });
+  const loop = $derived(loopDrag.loop ?? timeline.loop);
 
-  /** The time under a point on the loop bar, within the Timeline shown. */
-  function loopTimeAt(clientX: number): number {
-    return Math.max(0, Math.min(span, spanTimeAt(clientX)));
+  /** Where a point is, for LoopDrag: the time under it across the lanes. */
+  function loopDragAt(at: Point): LoopAt {
+    return { point: { clientX: at.clientX, clientY: at.clientY }, time: spanTimeAt(at.clientX) };
   }
 
   function loopDown(event: PointerEvent) {
-    if (!editable.current || frozen || !event.isPrimary || event.button !== 0 || loopEdit) return;
+    if (!editable.current || frozen || !event.isPrimary || event.button !== 0 || loopDrag.pressed) return;
     const edge = (event.target as HTMLElement).dataset.edge as 'start' | 'end' | undefined;
-    const current = timeline.loop;
-    const t = loopTimeAt(event.clientX);
     event.preventDefault();
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-    const common = { fromX: event.clientX, moved: false, free: skipsSnapping(event), snap: null };
-    loopEdit =
-      edge && current
-        ? { ...common, mode: edge, anchor: edge === 'start' ? current.end : current.start, loop: current }
-        : { ...common, mode: 'new', anchor: t, loop: { start: t, end: t, on: true } };
+    loopDrag.press(edge ?? 'new', loopDragAt(event), skipsSnapping(event));
     window.addEventListener('keydown', loopModifier);
     window.addEventListener('keyup', loopModifier);
   }
@@ -1719,28 +1684,15 @@
   // snapping, snaps or frees the Loop there and then, without waiting for
   // the pointer to move.
   function loopModifier(event: KeyboardEvent) {
-    if (!isModifier(event.key) || !loopEdit?.moved) return;
-    loopEdit.free = skipsSnapping(event);
-    loopMove(loopAt);
+    if (!isModifier(event.key)) return;
+    loopDrag.modifier(skipsSnapping(event), loopDragAt(loopAt));
   }
 
   function loopMove(event: Point) {
-    if (!loopEdit) return;
-    // A small wobble while clicking isn't a drag.
-    if (!loopEdit.moved && Math.abs(event.clientX - loopEdit.fromX) < 4) return;
-    loopEdit.moved = true;
+    // Scrolling along at an edge moves it too, with no keys to go by.
+    const free = 'shiftKey' in event ? skipsSnapping(event as PointerEvent) : undefined;
+    if (!loopDrag.move(loopDragAt(event), free)) return;
     loopAt = { clientX: event.clientX, clientY: event.clientY };
-    // Scrolling along at an edge, or Shift pressed, moves it too, with no keys to go by.
-    if ('shiftKey' in event) loopEdit.free = skipsSnapping(event as PointerEvent);
-    const t = loopTimeAt(event.clientX);
-    const { mode, anchor, loop: shown } = loopEdit;
-    const targets = loopEdit.free ? [] : loopTargets(timeline.tracks, position);
-    const reach = reachAt(view.scale);
-    // Where a new one was pressed snaps too, so both its ends can go onto something.
-    const from = mode === 'new' ? loopMark(targets, anchor, reach) : anchor;
-    const placed = snapLoop(targets, mode, from, t, reach, minLoop);
-    loopEdit.loop = { ...shown, start: placed.start, end: placed.end };
-    loopEdit.snap = placed.snap;
     dragAt(event, loopMove);
   }
 
@@ -1753,18 +1705,13 @@
 
   function loopUp() {
     stopLoopListening();
-    if (!loopEdit) return;
-    const { moved, loop: to } = loopEdit;
-    loopEdit = null;
-    const current = timeline.loop;
-    const unchanged = current && to.start === current.start && to.end === current.end && to.on === current.on;
-    if (!moved || unchanged || to.end - to.start < minLoop) return;
-    editing.edit({ kind: 'setLoop', loop: to });
+    const save = loopDrag.release();
+    if (save) editing.edit(save);
   }
 
   function loopCancel() {
     stopLoopListening();
-    loopEdit = null;
+    loopDrag.cancel();
   }
 
   function switchLoop() {
