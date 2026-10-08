@@ -418,11 +418,27 @@ describe('Timeline editing, the Loop as shown', () => {
     expect(editing.timeline.loop?.on).toBe(true);
   });
 
+  it('keeps a switch sent over a Loop set showing the set’s stretch until the switch resolves, if the set fails', async () => {
+    const { server, saves, editing } = await looped();
+    server.failNext(1);
+    const setting = editing.edit({ kind: 'setLoop', loop: { start: 4, end: 8, on: true } });
+    const release = server.holdNextAnswer();
+    const switching = editing.edit({ kind: 'switchLoop', on: false });
+    expect(editing.timeline.loop).toEqual({ start: 4, end: 8, on: false });
+    expect(await setting).toBeNull();
+    expect(editing.timeline.loop).toEqual({ start: 4, end: 8, on: false });
+    release();
+    await switching;
+    expect(server.timeline.loop).toEqual({ start: 0, end: 10, on: false });
+    expect(editing.timeline).toBe(saves.timeline);
+  });
+
   it('refuses setting, switching and clearing the Loop while frozen', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
     const { editing, state } = await editingFor(server);
     state.recording = true;
     expect(await editing.edit({ kind: 'setLoop', loop: { start: 4, end: 8, on: true } })).toBeNull();
+    expect(await editing.edit({ kind: 'switchLoop', on: true })).toBeNull();
     expect(editing.preview({ kind: 'clearLoop' })).toBe(false);
     expect(editing.timeline.loop).toBeNull();
     expect(server.landed).toBe(0);

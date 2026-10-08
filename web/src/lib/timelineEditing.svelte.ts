@@ -14,10 +14,11 @@
 //   volume, or the Loop: an edit's stops showing once its save resolves,
 //   saved or failed, unless something newer for that field is showing, and
 //   a preview gives way to the next preview or edit of that field. A Loop
-//   switched keeps the stretch shown when it was. A refresh replacing the
-//   Song drops them all; undo and redo leave them be. What's worked out to
-//   send (Merge rendering, the Cue-move offer, undo) goes by the Timeline
-//   as saved.
+//   switched keeps the stretch shown when it was, even if the set that
+//   stretch came from then fails, until the switch resolves. A refresh
+//   replacing the Song drops them all; undo and redo leave them be. What's
+//   worked out to send (Merge rendering, the Cue-move offer, undo) goes by
+//   the Timeline as saved.
 // - What follows an edit: Clips it adds are selected, and a Track it adds
 //   chosen. An undo says where to return the playhead to, and the Timeline
 //   seeks there, as playback is its own.
@@ -175,7 +176,7 @@ export class TimelineEditing {
   edit = async (e: Edit): Promise<Edited | null> => {
     if (this.frozen && !editsWhileRecording(e)) return null;
     const sent = $state.snapshot(e) as Edit;
-    const fields = this.#shownFields(sent);
+    const fields = this.#fieldsOf(sent);
     this.#show(fields, sent);
     const edited = await this.#saves.edit(sent);
     this.#unshow(fields, sent);
@@ -196,12 +197,12 @@ export class TimelineEditing {
   preview = (e: ShownEdit): boolean => {
     if (this.frozen && !editsWhileRecording(e)) return false;
     const previewed = $state.snapshot(e) as Edit;
-    this.#show(this.#shownFields(previewed), previewed);
+    this.#show(this.#fieldsOf(previewed), previewed);
     return true;
   };
 
   /** How an edit sets each field it shows a value for, over what's shown for that field now. */
-  #shownFields(e: Edit): Map<string, SetField> {
+  #fieldsOf(e: Edit): Map<string, SetField> {
     return shownFields(e, (field) => this.#values.get(field)?.show);
   }
 
@@ -461,9 +462,9 @@ function shownFields(e: Edit, shown: (field: string) => SetField | undefined): M
     fields.set('loop', (tl) => ({ ...tl, loop }));
   } else if (e.kind === 'switchLoop') {
     // Switched, it keeps its stretch: the one shown, if any, else as saved.
-    const under = shown('loop');
+    const shownLoop = shown('loop');
     fields.set('loop', (tl) => {
-      const { loop } = under ? under(tl) : tl;
+      const { loop } = shownLoop ? shownLoop(tl) : tl;
       return { ...tl, loop: loop && { ...loop, on: e.on } };
     });
   } else if (e.kind === 'clearLoop') {
