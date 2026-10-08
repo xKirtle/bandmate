@@ -82,7 +82,7 @@ export class LyricSheetEditing {
   sectionLabel(sectionId: number): TypedField<string> {
     return this.#trimmedField(
       sectionId,
-      () => this.#saves.song.sections.find((s) => s.id === sectionId)?.label ?? '',
+      () => this.#saves.song.sections.find((s) => s.id === sectionId)?.label,
       (label) => ({ kind: 'setSectionLabel', sectionId, label }),
     );
   }
@@ -91,18 +91,27 @@ export class LyricSheetEditing {
   alternateName(alternateId: number, sectionId: number): TypedField<string> {
     return this.#trimmedField(
       sectionId,
-      () => this.#saves.song.sections.flatMap((s) => s.alternates).find((a) => a.id === alternateId)?.name ?? '',
+      () => this.#saves.song.sections.flatMap((s) => s.alternates).find((a) => a.id === alternateId)?.name,
       (name) => ({ kind: 'renameAlternate', alternateId, name }),
     );
   }
 
-  /** Text typed in place in a Section's editor, saved trimmed by the change it makes. */
-  #trimmedField(sectionId: number, saved: () => string, change: (text: string) => LyricSheetChange) {
+  /**
+   * Text typed in place in a Section's editor, saved trimmed by the change
+   * it makes. What's saved is undefined once what it belongs to has gone,
+   * e.g. its Section deleted, and what's typed is then dropped.
+   */
+  #trimmedField(
+    sectionId: number,
+    saved: () => string | undefined,
+    change: (text: string) => LyricSheetChange,
+  ): TypedField<string> {
     return new TypedField<string>({
-      saved,
+      saved: () => saved() ?? '',
       format: (text) => text,
       parse: (typed) => ({ value: typed.trim() }),
       commit: (text) => this.change(change(text)),
+      exists: () => saved() !== undefined,
       typing: this.#saves.typing,
       section: sectionId,
     });

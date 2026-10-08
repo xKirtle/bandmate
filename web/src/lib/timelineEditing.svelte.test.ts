@@ -526,6 +526,38 @@ describe('Timeline editing, Track and Clip names typed', () => {
     expect(saves.unsaved).toBe(false);
   });
 
+  it('drops a Track’s name typed when its Track goes away, e.g. its adding undone, with no save error', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { saves, editing } = await editingFor(server);
+    await editing.edit({ kind: 'addTrack', track: { name: 'Track 3' } });
+    const name = editing.trackName(3);
+    name.shown = 'Bass';
+    await editing.undo();
+    const sent = server.sent;
+    name.destroy();
+    await answered();
+    expect(server.sent).toBe(sent);
+    expect(server.timeline.tracks.map((t) => t.id)).toEqual([1, 2]);
+    expect(saves.saveError).toBeNull();
+    expect(saves.unsaved).toBe(false);
+  });
+
+  it('drops a Clip’s name typed when its Clip goes away, with no save error', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { saves, editing } = await editingFor(server);
+    const name = editing.clipName(2);
+    name.shown = 'Outro';
+    await editing.edit({ kind: 'deleteClip', clipId: 2 });
+    const sent = server.sent;
+    expect(name.commit()).toBe(true);
+    name.shown = 'Coda';
+    name.destroy();
+    await answered();
+    expect(server.sent).toBe(sent);
+    expect(saves.saveError).toBeNull();
+    expect(saves.unsaved).toBe(false);
+  });
+
   it('keeps a refresh from replacing the Song while a name is typed', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
     const { saves, editing } = await editingFor(server);

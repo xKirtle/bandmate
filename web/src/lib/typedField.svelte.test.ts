@@ -125,6 +125,29 @@ describe('TypedField', () => {
     expect(saves.unsaved).toBe(false);
   });
 
+  it('drops what’s typed, sending nothing, once what it belongs to has gone, e.g. undone', async () => {
+    const server = new FakeSongServer(emptySong({ key: 'C' }));
+    const saves = await savesFor(server);
+    const there = { now: true };
+    const committed: string[] = [];
+    const field = new TypedField<string>({
+      saved: () => saves.saved.key,
+      format: (key) => key,
+      parse: parseKey,
+      commit: (key) => void committed.push(key),
+      exists: () => there.now,
+      typing: saves.typing,
+    });
+    field.shown = 'Am';
+    there.now = false;
+    expect(field.commit()).toBe(true);
+    field.shown = 'Am7';
+    field.destroy();
+    expect(committed).toEqual([]);
+    expect(saves.unsaved).toBe(false);
+    expect(saves.saveError).toBeNull();
+  });
+
   it('shows what’s saved again once a commit fails', async () => {
     const { server, saves, field } = await keyField();
     server.failNext(1);
@@ -238,10 +261,11 @@ async function cueField() {
     format: (at) => (at === null ? '' : formatCue(at)),
     parse: (typed) => typedCue(typed, cue()),
     commit: (to) => void saves.cue({ kind: 'setLineCue', lineId: 10, cue: to }, 'the Cue of Line 1 of Verse'),
+    exists: () => saves.song.sections.some((s) => s.alternates.some((a) => a.lines.some((l) => l.id === 10))),
     typing: saves.typing,
   });
   const serverCue = () => server.song.sections[0].alternates[0].lines[0].cue;
-  return { saves, field, serverCue };
+  return { server, saves, field, serverCue };
 }
 
 describe('TypedField, a Cue’s time', () => {
@@ -285,6 +309,18 @@ describe('TypedField, a Cue’s time', () => {
     expect(saves.unsaved).toBe(false);
     await settled();
     expect(serverCue()).toBe(45.03);
+  });
+
+  it('drops a time typed, sending nothing, once its Line has gone with its Section', async () => {
+    const { server, saves, field } = await cueField();
+    field.shown = '50';
+    await saves.change((at) => server.apply(at, { kind: 'deleteSection', sectionId: 1 }));
+    const sent = server.sent;
+    field.destroy();
+    await settled();
+    expect(server.sent).toBe(sent);
+    expect(saves.saveError).toBeNull();
+    expect(saves.unsaved).toBe(false);
   });
 
   it('saves a time typed as its field goes', async () => {

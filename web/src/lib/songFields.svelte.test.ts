@@ -212,6 +212,20 @@ describe('masterFields', () => {
     expect(fields.notes.shown).toBe('');
   });
 
+  it('drops what’s typed, sending nothing, once the Master’s removed', async () => {
+    const { server, saves, fields } = await secondMaster();
+    fields.name.shown = 'Demo';
+    fields.notes.shown = 'Rough';
+    await saves.change((at) => server.update(at, { masters: server.song.masters.filter((m) => m.id !== 2) }));
+    const landed = server.landed;
+    expect(fields.name.commit()).toBe(true);
+    fields.notes.destroy();
+    await settled();
+    expect(server.landed).toBe(landed);
+    expect(saves.saveError).toBeNull();
+    expect(saves.unsaved).toBe(false);
+  });
+
   it('is unsaved while typed, takes a name back on cancel, and saves notes when destroyed', async () => {
     const { saves, fields, saved } = await secondMaster();
     fields.name.shown = 'Demo';

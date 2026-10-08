@@ -21,6 +21,7 @@
     cue,
     label,
     save,
+    exists,
     next,
     play,
     current = false,
@@ -37,6 +38,8 @@
     label: string;
     /** Saves the new Cue, or null to clear it. */
     save: (cue: number | null) => void;
+    /** Given, whether the Line's still there: once it's gone, a time typed is dropped. */
+    exists?: () => boolean;
     /** Puts the time being typed on Saves' list of edits being typed, until the function returned is called. */
     typing: (entry: Typing) => () => void;
     /** The Section whose Line it is, which the time being typed is in. */
@@ -69,6 +72,7 @@
     format: (at) => (at === null ? '' : formatCue(at)),
     parse: (typed) => typedCue(typed, cue),
     commit: (at) => save(at),
+    exists: untrack(() => exists),
     typing: untrack(() => typing),
     section: untrack(() => section),
   });
