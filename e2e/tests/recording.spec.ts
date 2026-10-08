@@ -6,7 +6,7 @@ import type { Bandmate, Clip as SharedClip } from '../bandmate';
 import { toneWav } from '../beats';
 import { failRequests } from '../faults';
 import { expect, test } from '../fixtures';
-import { heroSong } from '../songPage';
+import { heroSong, recordButton, seek, syncButton } from '../songPage';
 
 // Recording Takes on the Song page's Timeline, from Chromium's fake
 // microphone, which captures a half-second 440 Hz tone on a loop. The tests
@@ -68,7 +68,6 @@ const timeline = (page: Page) => page.getByRole('region', { name: 'Timeline' });
 /** The ruler, whose value is the playhead, in whole seconds. */
 const ruler = (page: Page) => timeline(page).getByRole('slider', { name: 'Position' });
 
-const recordButton = (page: Page) => timeline(page).getByRole('button', { name: 'Record', exact: true });
 const stopButton = (page: Page) => timeline(page).getByRole('button', { name: 'Stop', exact: true });
 
 /** A Clip on the Timeline, by its title, e.g. "Take 1". */
@@ -78,13 +77,6 @@ const clip = (page: Page, title: string) => timeline(page).getByRole('group', { 
 async function open(page: Page, songId: number) {
   await page.goto(`/songs/${songId}`);
   await expect(recordButton(page)).toBeEnabled();
-}
-
-/** Moves the playhead to a whole number of seconds, 5 s at a time from the ruler. */
-async function seek(page: Page, to: number) {
-  expect(to % 5).toBe(0);
-  for (let at = 0; at < to; at += 5) await ruler(page).press('ArrowRight');
-  await expect(ruler(page)).toHaveAttribute('aria-valuenow', String(to));
 }
 
 /** The calibration offered before a device's first recording. */
@@ -339,7 +331,7 @@ test('undoing a new Take takes it away and returns the playhead to where it star
 test("Sync mode can't be switched on while recording, and can once it stops", async ({ page, bandmate }) => {
   const song = await heroSong(bandmate);
   await open(page, song.id);
-  const sync = page.getByRole('button', { name: 'Sync lyrics' });
+  const sync = syncButton(page);
   await expect(sync).toBeEnabled();
 
   await recordButton(page).click();

@@ -23,6 +23,21 @@ export const playButton = (page: Page) => timeline(page).getByRole('button', { n
 /** The Timeline's Pause button, shown while it plays. */
 export const pauseButton = (page: Page) => timeline(page).getByRole('button', { name: 'Pause', exact: true });
 
+/** The Timeline's Loop switch. */
+export const loopButton = (page: Page) => timeline(page).getByRole('button', { name: 'Loop', exact: true });
+
+/** The Timeline's Record button, shown while it isn't recording. */
+export const recordButton = (page: Page) => timeline(page).getByRole('button', { name: 'Record', exact: true });
+
+// The top of the ruler, where a Loop is set by dragging, is pointer only and
+// isn't named for a screen reader, so it's found by the hint it shows on hover.
+
+/** The top of the ruler, dragged along to set a Loop. */
+export const loopBar = (page: Page) => timeline(page).getByTitle('Drag to set a Loop');
+
+/** The Lyric Sheet's Sync lyrics switch, which switches Sync mode on and off. */
+export const syncButton = (page: Page) => page.getByRole('button', { name: 'Sync lyrics' });
+
 /** Where the playhead is now, in whole seconds, as the ruler says. */
 export async function playhead(page: Page): Promise<number> {
   return Number(await ruler(page).getAttribute('aria-valuenow'));
@@ -31,6 +46,13 @@ export async function playhead(page: Page): Promise<number> {
 /** Waits for the playhead to reach a time, in whole seconds, e.g. while playing. */
 export async function playheadReaches(page: Page, time: number, { timeout = 15_000 } = {}) {
   await expect.poll(() => playhead(page), { timeout }).toBeGreaterThanOrEqual(time);
+}
+
+/** Moves the playhead from 0:00 to a whole number of seconds, 5 s at a time from the ruler. */
+export async function seek(page: Page, to: number) {
+  expect(to % 5).toBe(0);
+  for (let at = 0; at < to; at += 5) await ruler(page).press('ArrowRight');
+  await expect(ruler(page)).toHaveAttribute('aria-valuenow', String(to));
 }
 
 /** A Clip on the Timeline, by its title, e.g. "Take 2". */
@@ -114,6 +136,11 @@ export async function serverClips(bandmate: Bandmate, songId: number, track: str
   const found = (await bandmate.timeline(songId)).tracks.find((t) => t.name === track);
   if (!found) throw new Error(`No Track "${track}"`);
   return found.clips;
+}
+
+/** Whether the server has a Song's Loop on. */
+export async function serverLoopOn(bandmate: Bandmate, songId: number): Promise<boolean> {
+  return (await bandmate.timeline(songId)).loop?.on ?? false;
 }
 
 interface CuedSong {

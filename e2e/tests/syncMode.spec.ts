@@ -1,15 +1,20 @@
 import type { Page } from '@playwright/test';
-import type { Bandmate, Loop } from '../bandmate';
 import { expect, test } from '../fixtures';
 import {
   dragMiddleOf,
   heroSong,
+  loopBar,
+  loopButton,
   pauseButton,
   playButton,
   playhead,
   playheadReaches,
+  recordButton,
   ruler,
+  seek,
   serverCues,
+  serverLoopOn,
+  syncButton,
   timeline,
 } from '../songPage';
 
@@ -18,15 +23,6 @@ import {
 // Loop, recording and the lyrics changing, and which Line it cues next.
 // Recording's part is pinned with the recording tests, which have a
 // microphone.
-
-/** The Lyric Sheet's Sync lyrics switch. */
-const syncButton = (page: Page) => page.getByRole('button', { name: 'Sync lyrics' });
-
-/** The Timeline's Loop switch. */
-const loopButton = (page: Page) => timeline(page).getByRole('button', { name: 'Loop', exact: true });
-
-/** The Timeline's Record button. */
-const recordButton = (page: Page) => timeline(page).getByRole('button', { name: 'Record', exact: true });
 
 /** The Now button, by the Line up next in Sync mode: there's only ever one. */
 const nowButton = (page: Page) => page.getByRole('button', { name: /^Cue .* now$/ });
@@ -41,12 +37,6 @@ async function open(page: Page, songId: number) {
 async function syncOn(page: Page) {
   await syncButton(page).click();
   await expect(syncButton(page)).toHaveAttribute('aria-pressed', 'true');
-}
-
-/** Whether the server has the Song's Loop on. */
-async function serverLoopOn(bandmate: Bandmate, songId: number): Promise<boolean> {
-  const loop = (await bandmate.timeline(songId)).loop as Loop | null | undefined;
-  return loop?.on ?? false;
 }
 
 test('switching Sync mode on switches the Loop off', async ({ page, bandmate }) => {
@@ -81,7 +71,7 @@ test('a Loop set by dragging along the top of the ruler ends Sync mode', async (
   await syncOn(page);
 
   // A new Loop is set on.
-  await dragMiddleOf(page, timeline(page).getByTitle('Drag to set a Loop'), { x: 120, y: 0 });
+  await dragMiddleOf(page, loopBar(page), { x: 120, y: 0 });
 
   await expect(loopButton(page)).toHaveAttribute('aria-pressed', 'true');
   await expect(syncButton(page)).toHaveAttribute('aria-pressed', 'false');
@@ -141,8 +131,7 @@ test('the next Line is the first without a Cue, and Now or Enter cues it at the 
   await expect(nowButton(page)).toHaveAccessibleName('Cue Line 1 of Bridge now');
 
   // Now, with the playhead at 0:05, stopped.
-  await ruler(page).press('ArrowRight');
-  await expect(ruler(page)).toHaveAttribute('aria-valuenow', '5');
+  await seek(page, 5);
   await nowButton(page).click();
   await expect.poll(() => serverCues(bandmate, song.id, 'Bridge')).toEqual([5, null, null, null]);
   await expect(nowButton(page)).toHaveAccessibleName('Cue Line 2 of Bridge now');
@@ -164,15 +153,14 @@ test('a Line clicked becomes the next one, cued or not, and playing from a Cue l
   await syncOn(page);
   await expect(nowButton(page)).toHaveAccessibleName('Cue Line 1 of Bridge now');
 
-  // A cued Line clicked comes up next, and cueing it brings up the Line after it, cued too.
+  // A Line without a Cue clicked comes up next.
+  await page.getByRole('button', { name: 'Cue Line 3 of Bridge next' }).click();
+  await expect(nowButton(page)).toHaveAccessibleName('Cue Line 3 of Bridge now');
+
+  // So does a cued Line, and cueing it brings up the Line after it, cued too.
   await page.getByRole('button', { name: 'Cue Line 3 of Verse 1 next, cued at 0:15.0' }).click();
   await expect(nowButton(page)).toHaveAccessibleName('Cue Line 3 of Verse 1 now');
-  await ruler(page).press('ArrowRight');
-  await ruler(page).press('ArrowRight');
-  await ruler(page).press('ArrowRight');
-  await expect(ruler(page)).toHaveAttribute('aria-valuenow', '15');
-  await ruler(page).press('ArrowRight');
-  await expect(ruler(page)).toHaveAttribute('aria-valuenow', '20');
+  await seek(page, 20);
   await nowButton(page).click();
   await expect.poll(() => serverCues(bandmate, song.id, 'Verse 1')).toEqual([5, 10, 20, 20]);
   await expect(nowButton(page)).toHaveAccessibleName('Cue Line 4 of Verse 1 now');

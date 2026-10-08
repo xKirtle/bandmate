@@ -57,6 +57,8 @@ export interface Timeline {
   songId: number;
   version: number;
   tracks: { id: number; name: string; clips: Clip[]; [field: string]: unknown }[];
+  /** Its Loop, if one is set. */
+  loop?: Loop | null;
   [field: string]: unknown;
 }
 
