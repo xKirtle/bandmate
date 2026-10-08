@@ -365,13 +365,27 @@
     editing.edit({ kind: 'updateTrack', trackId: track.id, changes });
   }
 
+  // A fader's level is sent once it's let go (see TimelineEditing.letGoFader).
+  // The browser says so with a change, but not for one let go where it
+  // started, which only the pointer's release tells, so either lets go of it.
   function volumeInput(track: Track, event: Event) {
-    const volume = Number((event.currentTarget as HTMLInputElement).value);
-    editing.preview({ kind: 'updateTrack', trackId: track.id, changes: { volume } });
+    editing.moveFader(track.id, Number((event.currentTarget as HTMLInputElement).value));
   }
 
-  function volumeChange(track: Track, event: Event) {
-    setLevels(track, { volume: Number((event.currentTarget as HTMLInputElement).value) });
+  function letGoVolume(track: Track, fader: HTMLInputElement) {
+    editing.letGoFader(track.id, Number(fader.value));
+  }
+
+  function grabVolume(track: Track, event: PointerEvent) {
+    const fader = event.currentTarget as HTMLInputElement;
+    // The fader may be let go anywhere on the page, or the pointer lost.
+    const release = () => {
+      removeEventListener('pointerup', release);
+      removeEventListener('pointercancel', release);
+      letGoVolume(track, fader);
+    };
+    addEventListener('pointerup', release);
+    addEventListener('pointercancel', release);
   }
 
   // A Track's name shows as a button that chooses it; its pencil swaps it
@@ -2253,7 +2267,8 @@
                 aria-valuetext={formatVolume(track.volume)}
                 title="{formatVolume(track.volume)} (double-click for 0 dB)"
                 oninput={(e) => volumeInput(track, e)}
-                onchange={(e) => volumeChange(track, e)}
+                onchange={(e) => letGoVolume(track, e.currentTarget)}
+                onpointerdown={(e) => grabVolume(track, e)}
                 ondblclick={() => setLevels(track, { volume: 0 })}
               />
             </div>

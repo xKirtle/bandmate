@@ -14,7 +14,8 @@
 //   same edit would be. Which value shows goes by field, e.g. a Track's
 //   volume, or the Loop: an edit's stops showing once its save resolves,
 //   saved or failed, unless something newer for that field is showing, and
-//   a preview gives way to the next preview or edit of that field. A Loop
+//   a preview gives way to the next preview or edit of that field, or, for
+//   a fader let go where it started, to the Timeline as saved. A Loop
 //   switched keeps the stretch shown when it was, even if the set that
 //   stretch came from then fails, until the switch resolves. A refresh
 //   replacing the Song drops them all; undo and redo leave them be. What's
@@ -147,6 +148,11 @@ export class TimelineEditing {
   #values = $derived.by(() =>
     this.#shown.over === this.#saves.replaced ? this.#shown.values : new Map<string, ShownValue>(),
   );
+  /**
+   * The Tracks' faders moved since they were last let go, by Track: the
+   * level each started from, and the preview of the level it's at now.
+   */
+  #faders = new Map<number, { from: number; shown: Edit }>();
   /** The Timeline as shown: as saved, with the values of edits on their way and of previews on top. */
   #timeline = $derived.by(() => [...this.#values.values()].reduce((tl, v) => v.show(tl), this.#saves.timeline));
   /** The offer made last, while the Timeline as saved and the Cues as shown are still the ones it was made for. */
@@ -199,11 +205,44 @@ export class TimelineEditing {
    * it's dragged, until the next preview or edit of the same field.
    * Refused whenever the same edit would be. Returns whether it's shown.
    */
-  preview = (e: ShownEdit): boolean => {
-    if (this.frozen && !editsWhileRecording(e)) return false;
+  preview = (e: ShownEdit): boolean => this.#preview(e) !== null;
+
+  /** Shows a preview, returning it so it can stop showing, or null if it's refused. */
+  #preview(e: ShownEdit): Edit | null {
+    if (this.frozen && !editsWhileRecording(e)) return null;
     const previewed = $state.snapshot(e) as Edit;
     this.#show(this.#fieldsOf(previewed), previewed);
-    return true;
+    return previewed;
+  }
+
+  /**
+   * Moves a Track's fader: its level shows, and is heard, at once, as a
+   * preview, until it's let go. Returns whether it's shown.
+   */
+  moveFader = (trackId: number, volume: number): boolean => {
+    const from = this.#faders.get(trackId)?.from ?? this.#timeline.tracks.find((t) => t.id === trackId)?.volume;
+    if (from === undefined) return false;
+    const shown = this.#preview({ kind: 'updateTrack', trackId, changes: { volume } });
+    if (shown) this.#faders.set(trackId, { from, shown });
+    return shown !== null;
+  };
+
+  /**
+   * Lets go of a Track's fader at the level it was moved to last. Let go
+   * where it started, it sends nothing and stops showing its preview, so
+   * the Track's volume as saved shows again, e.g. after an undo. Let go
+   * anywhere else, it sends that level. Resolves to what the edit did, or
+   * null if nothing was sent or it wasn't saved. A fader that hasn't moved
+   * since it was last let go is left alone, as the browser may say twice
+   * that it was.
+   */
+  letGoFader = async (trackId: number, volume: number): Promise<Edited | null> => {
+    const moved = this.#faders.get(trackId);
+    if (!moved) return null;
+    this.#faders.delete(trackId);
+    if (volume !== moved.from) return this.edit({ kind: 'updateTrack', trackId, changes: { volume } });
+    this.#unshow(this.#fieldsOf(moved.shown), moved.shown);
+    return null;
   };
 
   /**

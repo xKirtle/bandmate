@@ -350,6 +350,80 @@ describe('Timeline editing, the Timeline as shown', () => {
   });
 });
 
+describe('Timeline editing, a Track’s fader', () => {
+  it('shows a fader’s level as it moves, sending it once let go elsewhere', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { editing } = await editingFor(server);
+    expect(editing.moveFader(1, -3)).toBe(true);
+    editing.moveFader(1, -4);
+    expect(shownTrack(editing, 1).volume).toBe(-4);
+    expect(server.landed).toBe(0);
+    await editing.letGoFader(1, -4);
+    expect(server.timeline.tracks[0].volume).toBe(-4);
+    expect(shownTrack(editing, 1).volume).toBe(-4);
+  });
+
+  it('shows the Track’s volume as saved for a fader let go where it started, sending nothing', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { saves, editing } = await editingFor(server);
+    editing.moveFader(1, -3);
+    editing.moveFader(1, 0);
+    expect(await editing.letGoFader(1, 0)).toBeNull();
+    expect(server.landed).toBe(0);
+    expect(editing.timeline).toBe(saves.timeline);
+  });
+
+  it('shows an undo of a Track’s volume at once after its fader was let go where it started', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { editing } = await editingFor(server);
+    await editing.edit({ kind: 'updateTrack', trackId: 1, changes: { volume: -6 } });
+    editing.moveFader(1, -9);
+    editing.moveFader(1, -6);
+    await editing.letGoFader(1, -6);
+    await editing.undo();
+    expect(server.timeline.tracks[0].volume).toBe(0);
+    expect(shownTrack(editing, 1).volume).toBe(0);
+  });
+
+  it('sends a fader’s level once, however many times it’s let go', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { editing } = await editingFor(server);
+    editing.moveFader(1, -3);
+    await editing.letGoFader(1, -3);
+    expect(await editing.letGoFader(1, -3)).toBeNull();
+    expect(server.landed).toBe(1);
+  });
+
+  it('leaves a fader let go without moving alone', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { editing } = await editingFor(server);
+    editing.moveFader(2, -3);
+    expect(await editing.letGoFader(1, 0)).toBeNull();
+    expect(server.landed).toBe(0);
+    expect(shownTrack(editing, 2).volume).toBe(-3);
+  });
+
+  it('starts a fader where it was let go last, for its next move', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { editing } = await editingFor(server);
+    editing.moveFader(1, -3);
+    await editing.letGoFader(1, -3);
+    editing.moveFader(1, 0);
+    await editing.letGoFader(1, 0);
+    expect(server.landed).toBe(2);
+    expect(server.timeline.tracks[0].volume).toBe(0);
+  });
+
+  it('moves a fader while frozen, as a Track’s levels can be', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { editing, state } = await editingFor(server);
+    state.recording = true;
+    expect(editing.moveFader(1, -3)).toBe(true);
+    await editing.letGoFader(1, -3);
+    expect(server.timeline.tracks[0].volume).toBe(-3);
+  });
+});
+
 /** Lets everything waiting on the fake server's answers run, under fake timers. */
 const answered = () => vi.runAllTimersAsync();
 
