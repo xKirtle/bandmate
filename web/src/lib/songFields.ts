@@ -3,7 +3,7 @@
 // rule for what's typed.
 import type { Master, MasterChanges, Song, SongAt, SongChanges } from './api';
 import type { Saves, Typing } from './saves.svelte';
-import { TypedField, type Parsed } from './typedField.svelte';
+import { TypedField, type Parsed, type TypedFieldOptions } from './typedField.svelte';
 
 /** Sends a change to the Song's Details, as the api's updateSong does. */
 export type UpdateSong = (at: SongAt, changes: SongChanges) => Promise<Song>;
@@ -16,6 +16,11 @@ export interface DetailFields {
   capo: TypedField<number | null>;
   tuning: TypedField<string>;
   notes: TypedField<string>;
+}
+
+/** A field of text typed in place, shown as it's saved. */
+function textField(options: Omit<TypedFieldOptions<string>, 'format'>): TypedField<string> {
+  return new TypedField<string>({ ...options, format: (value) => value });
 }
 
 type TextDetail = 'title' | 'key' | 'tuning' | 'notes';
@@ -32,9 +37,8 @@ export function detailFields(saves: Saves, update: UpdateSong): DetailFields {
   const save = (changes: SongChanges) => saves.submit((at) => update(at, changes));
 
   const text = (detail: TextDetail) =>
-    new TypedField<string>({
+    textField({
       saved: () => saves.saved[detail],
-      format: (value) => value,
       parse: (typed) => ({ value: detail === 'notes' ? typed : typed.trim() }),
       commit: (value) => save({ [detail]: value }),
       typing: saves.typing,
@@ -75,6 +79,7 @@ export interface MasterFieldsOptions {
   change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
   /** Puts an edit on Saves' list of edits being typed (see Saves.typing). */
   typing: (entry: Typing) => () => void;
+  /** Sends a change to the Master, against the Song as saved. */
   update: UpdateMaster;
   /** Shows why what was typed was refused. */
   refuse: (message: string) => void;
@@ -92,20 +97,19 @@ export interface MasterFields {
  * saved. The notes are saved as typed. A save that fails, or is refused as
  * the Song changed elsewhere, shows what's saved again.
  */
-export function masterFields(masterId: number, o: MasterFieldsOptions): MasterFields {
+export function masterFields(masterId: number, options: MasterFieldsOptions): MasterFields {
   const field = (detail: 'name' | 'notes', parse: (typed: string) => Parsed<string>) =>
-    new TypedField<string>({
-      saved: () => o.master()?.[detail] ?? '',
-      format: (value) => value,
+    textField({
+      saved: () => options.master()?.[detail] ?? '',
       parse,
-      commit: (value) => o.change((at) => o.update(at, masterId, { [detail]: value })),
-      typing: o.typing,
+      commit: (value) => options.change((at) => options.update(at, masterId, { [detail]: value })),
+      typing: options.typing,
     });
 
   return {
     name: field('name', (typed) => {
       if (typed.trim()) return { value: typed.trim() };
-      o.refuse('A Master needs a name once there are several.');
+      options.refuse('A Master needs a name once there are several.');
       return 'back';
     }),
     notes: field('notes', (typed) => ({ value: typed })),

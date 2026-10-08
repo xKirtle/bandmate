@@ -20,7 +20,7 @@
   import { LyricSheetEditing } from '../lib/lyricSheetEditing.svelte';
   import { Saves } from '../lib/saves.svelte';
   import { detailFields, type DetailFields } from '../lib/songFields';
-  import { committedAsItGoes } from '../lib/typedField.svelte';
+  import { cancelOnEscape, committedAsItGoes, leaveOnEscape } from '../lib/typedField.svelte';
   import { SyncMode } from '../lib/syncMode.svelte';
   import { songServer } from '../lib/songServer';
   import { takeNewFlag } from '../lib/newSong';
@@ -271,17 +271,6 @@
     } else if (event.key === 'Escape') details?.title.cancel();
   }
 
-  /** Esc takes back what's typed in a Detail. */
-  function cancelOnEscape(field: { cancel: () => void }) {
-    return (event: KeyboardEvent) => event.key === 'Escape' && field.cancel();
-  }
-
-  // Esc in the notes leaves them, keeping what's typed, so one key never
-  // throws away paragraphs.
-  function leaveOnEscape(event: KeyboardEvent & { currentTarget: HTMLTextAreaElement }) {
-    if (event.key === 'Escape') event.currentTarget.blur();
-  }
-
   // Inputs save on change, which fires on blur, and as they go (see
   // committedAsItGoes). Whatever is still typed as the page goes is saved
   // too, e.g. a tuning picked.
@@ -473,7 +462,7 @@
                   bind:value={details.notes.shown}
                   {@attach committedAsItGoes(details.notes)}
                   onchange={() => details?.notes.commit()}
-                  onkeydown={leaveOnEscape}
+                  onkeydown={leaveOnEscape(details.notes)}
                   rows="4"></textarea>
               </label>
             {/if}

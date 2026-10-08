@@ -20,7 +20,10 @@
 // edits: closing the tab asks first, and a refresh doesn't replace what's
 // typed.
 import type { Attachment } from 'svelte/attachments';
-import type { Typing } from './saves.svelte';
+import type { Submitted, Typing } from './saves.svelte';
+
+/** How a save refused as the Song changed elsewhere ends (see Saves.submit). */
+const refusedAsStale: Submitted = 'stale';
 
 /** What a field's rule makes of what's typed: a value to save, going back to what's saved, or a message to show. */
 export type Parsed<T> = { value: T } | 'back' | { message: string };
@@ -108,7 +111,7 @@ export class TypedField<T> implements Typing {
     this.#type((this.#sending = shown));
     const settle = (ended?: unknown) => {
       if (this.#sending === shown) this.#sending = null;
-      if (this.#typed === shown && ended !== 'stale') this.#type(null);
+      if (this.#typed === shown && ended !== refusedAsStale) this.#type(null);
     };
     sent.then(settle, () => settle());
     return true;
@@ -145,4 +148,26 @@ export class TypedField<T> implements Typing {
  */
 export function committedAsItGoes(field: { destroy: () => void }): Attachment {
   return () => field.destroy;
+}
+
+/** A key pressed in a field typed in place. */
+type FieldKey = Pick<KeyboardEvent, 'key'> & { currentTarget: { blur: () => void } };
+
+/** Esc in a field takes back what's typed. */
+export function cancelOnEscape(field: { cancel: () => void }): (event: Pick<KeyboardEvent, 'key'>) => void {
+  return (event) => {
+    if (event.key === 'Escape') field.cancel();
+  };
+}
+
+/**
+ * Esc in a notes field leaves it, committing what's typed, so one key never
+ * throws away paragraphs.
+ */
+export function leaveOnEscape(field: { commit: () => unknown }): (event: FieldKey) => void {
+  return (event) => {
+    if (event.key !== 'Escape') return;
+    field.commit();
+    event.currentTarget.blur();
+  };
 }

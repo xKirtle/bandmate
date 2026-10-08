@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { formatCue, typedCue } from './cues';
 import { Saves } from './saves.svelte';
 import { emptySong, FakeSongServer } from './songServerFake';
-import { TypedField, type Parsed } from './typedField.svelte';
+import { cancelOnEscape, leaveOnEscape, TypedField, type Parsed } from './typedField.svelte';
 
 /** A Saves for the Song the server holds, as the Song page makes one once it's loaded. */
 async function savesFor(server: FakeSongServer) {
@@ -170,6 +170,28 @@ describe('TypedField', () => {
     field.commit();
     await settled();
     expect(server.song.key).toBe('Am7');
+  });
+
+  it('takes back what’s typed on Esc, and nothing on another key', async () => {
+    const { saves, field } = await keyField();
+    const key = cancelOnEscape(field);
+    field.shown = 'Am';
+    key({ key: 'a' });
+    expect(field.shown).toBe('Am');
+    key({ key: 'Escape' });
+    expect(field.shown).toBe('C');
+    expect(saves.unsaved).toBe(false);
+  });
+
+  it('in a notes field, leaves it on Esc, keeping and saving what’s typed', async () => {
+    const { server, field } = await keyField();
+    let blurred = false;
+    field.shown = 'Am';
+    leaveOnEscape(field)({ key: 'Escape', currentTarget: { blur: () => (blurred = true) } });
+    expect(blurred).toBe(true);
+    expect(field.shown).toBe('Am');
+    await settled();
+    expect(server.song.key).toBe('Am');
   });
 
   it('keeps a refresh from replacing the Song while typed, showing it changed elsewhere instead', async () => {

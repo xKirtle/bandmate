@@ -5,7 +5,7 @@
   import type { Typing } from './saves.svelte';
   import { masterFields, type MasterFields } from './songFields';
   import type { Mode } from './songMode';
-  import { committedAsItGoes } from './typedField.svelte';
+  import { cancelOnEscape, committedAsItGoes, leaveOnEscape } from './typedField.svelte';
   import { prepareUpload } from './upload';
 
   // A Song's Masters: finished recordings made elsewhere. The page is made
@@ -81,16 +81,6 @@
     return f;
   }
 
-  // Esc takes back a name typed, but leaves the notes keeping what's typed,
-  // so one key never throws away paragraphs.
-  function nameKey(name: MasterFields['name'], event: KeyboardEvent) {
-    if (event.key === 'Escape') name.cancel();
-  }
-
-  function notesKey(event: KeyboardEvent & { currentTarget: HTMLTextAreaElement }) {
-    if (event.key === 'Escape') event.currentTarget.blur();
-  }
-
   async function pick(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
@@ -163,7 +153,7 @@
               bind:value={name.shown}
               {@attach committedAsItGoes(name)}
               onchange={() => name.commit()}
-              onkeydown={(e) => nameKey(name, e)}
+              onkeydown={cancelOnEscape(name)}
               autocomplete="off"
               enterkeyhint="done"
             />
@@ -194,7 +184,7 @@
             bind:value={notes.shown}
             {@attach committedAsItGoes(notes)}
             onchange={() => notes.commit()}
-            onkeydown={notesKey}
+            onkeydown={leaveOnEscape(notes)}
             rows="2"></textarea>
         </label>
       {:else if m.notes.trim()}
