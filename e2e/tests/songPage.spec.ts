@@ -10,6 +10,7 @@ import {
   cueName,
   cueOf,
   customTuningNotes,
+  drag,
   dragMiddleOf,
   middleOf,
   dragClip,
@@ -951,6 +952,44 @@ test('a failed Details save puts the field back, and the next change clears its 
   await expect.poll(async () => (await bandmate.getSong(song.id)).bpm).toBe(100);
   await expect(saveError(page)).toHaveCount(0);
   await expect(title).toHaveValue('Anthem');
+});
+
+test('a Track’s fader let go where it started sends nothing, so an undo of its volume shows at once, and let go elsewhere sends its level', async ({
+  page,
+  bandmate,
+}) => {
+  const song = await bandmate.song({ title: 'Anthem' });
+  await page.goto(`/songs/${song.id}`);
+  const fader = timeline(page).getByRole('slider', { name: 'Volume of Track 1' });
+  const undo = timeline(page).getByRole('button', { name: 'Undo' });
+  const volume = async () => (await bandmate.timeline(song.id)).tracks[0].volume;
+
+  // Let go anywhere but where it started, it sends its level. The browser
+  // sets a fader to where it's pressed, so pressing there again keeps it.
+  const middle = await middleOf(fader);
+  const left = { x: middle.x - 30, y: middle.y };
+  await drag(page, middle, { x: -30, y: 0 });
+  await expect.poll(volume).toBeLessThan(0);
+  const stepped = String(await volume());
+  await expect(fader).toHaveValue(stepped);
+
+  // Dragged away and back, and let go where it started, it sends nothing.
+  const saves: string[] = [];
+  page.on('request', (r) => r.method() !== 'GET' && saves.push(`${r.method()} ${r.url()}`));
+  await page.mouse.move(left.x, left.y);
+  await page.mouse.down();
+  await page.mouse.move(middle.x, middle.y, { steps: 5 });
+  await expect(fader).not.toHaveValue(stepped);
+  await page.mouse.move(left.x, left.y, { steps: 5 });
+  await page.mouse.up();
+  await expect(fader).toHaveValue(stepped);
+
+  // So undoing the first drag shows on the fader at once.
+  await undo.click();
+  await expect.poll(volume).toBe(0);
+  await expect(fader).toHaveValue('0');
+  // The undo's is the only save since.
+  expect(saves).toEqual([expect.stringMatching(/^PATCH .*\/tracks\/\d+$/)]);
 });
 
 test('a Track name typed and then left with Back is saved', async ({ page, bandmate }) => {
