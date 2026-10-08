@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/xKirtle/bandmate/internal/audio"
+	"github.com/xKirtle/bandmate/internal/domain"
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
 )
 
@@ -29,10 +30,10 @@ const MergedName = "Merged Clip"
 const mergedBitDepth = 24
 
 // errNotMergedWAV is refusing merged audio that isn't lossless as a Mixdown is.
-var errNotMergedWAV = &lyricsheet.InvalidError{Msg: "a merged Clip's audio must be a 24-bit WAV file"}
+var errNotMergedWAV = domain.Invalid("a merged Clip's audio must be a 24-bit WAV file")
 
 // errMergedTrack refuses a Merge that doesn't say which one Track its Clip goes on.
-var errMergedTrack = &lyricsheet.InvalidError{Msg: "a merged Clip goes on one Track, of the Timeline's or a new one"}
+var errMergedTrack = domain.Invalid("a merged Clip goes on one Track, of the Timeline's or a new one")
 
 // ClipMerge is which Clips a Merge merges, the waveform of their audio and
 // the Track its Clip goes on, as the browser sends them with the file.
@@ -57,11 +58,11 @@ func (s *Store) MergeClips(ctx context.Context, songID int64, based lyricsheet.V
 	file *audio.Received) (Timeline, error) {
 	defer file.Discard()
 	if len(m.ClipIDs) < 2 {
-		return Timeline{}, &lyricsheet.InvalidError{Msg: "merge two or more Clips"}
+		return Timeline{}, domain.Invalid("merge two or more Clips")
 	}
 	for i, id := range m.ClipIDs {
 		if slices.Contains(m.ClipIDs[:i], id) {
-			return Timeline{}, &lyricsheet.InvalidError{Msg: "each Clip can only be merged once"}
+			return Timeline{}, domain.Invalid("each Clip can only be merged once")
 		}
 	}
 	if (m.TrackID == nil) == (m.NewTrack == nil) {
@@ -76,7 +77,7 @@ func (s *Store) MergeClips(ctx context.Context, songID int64, based lyricsheet.V
 	}
 	duration := wav.Duration()
 	if msg := (audio.Upload{Duration: duration, Peaks: m.Peaks}).Problem(); msg != "" {
-		return Timeline{}, &lyricsheet.InvalidError{Msg: msg}
+		return Timeline{}, domain.Invalid(msg)
 	}
 	peaks, err := json.Marshal(m.Peaks)
 	if err != nil {
@@ -90,7 +91,7 @@ func (s *Store) MergeClips(ctx context.Context, songID int64, based lyricsheet.V
 		// Rendered to whole samples, it may fall short by part of one.
 		length := end - start
 		if duration < length-1/float64(wav.SampleRate) {
-			return &lyricsheet.InvalidError{Msg: "the merged audio must last as long as the Clips merged"}
+			return domain.Invalid("the merged audio must last as long as the Clips merged")
 		}
 		length = min(length, duration)
 		for _, id := range m.ClipIDs {
@@ -106,7 +107,7 @@ func (s *Store) MergeClips(ctx context.Context, songID int64, based lyricsheet.V
 				peaks, added_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 			songID, MergedName, MergedName+".wav", takeMediaType, file.Size, duration, string(peaks),
-			time.Now().UTC().Format(timeFormat))
+			time.Now().UTC().Format(domain.TimeFormat))
 		if err != nil {
 			return fmt.Errorf("adding sound: %w", err)
 		}
@@ -159,10 +160,10 @@ func (m ClipMerge) landingTrack(ctx context.Context, tx *sql.Tx, songID int64) (
 func (s *Store) ReplaceClips(ctx context.Context, songID int64, based lyricsheet.Version, clipIDs, trackIDs []int64,
 	newTracks []TrackAt, clips []PlacedClip) (Timeline, error) {
 	if len(clipIDs) == 0 {
-		return Timeline{}, &lyricsheet.InvalidError{Msg: "clipIds are required"}
+		return Timeline{}, domain.Invalid("clipIds are required")
 	}
 	if len(clips) == 0 {
-		return Timeline{}, &lyricsheet.InvalidError{Msg: "clips are required"}
+		return Timeline{}, domain.Invalid("clips are required")
 	}
 	if err := checkDeletedOnce(clipIDs); err != nil {
 		return Timeline{}, err

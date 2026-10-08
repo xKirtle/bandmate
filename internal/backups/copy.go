@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/xKirtle/bandmate/internal/db"
+	"github.com/xKirtle/bandmate/internal/domain"
 	"github.com/xKirtle/bandmate/internal/songfiles"
 )
 
@@ -326,13 +327,8 @@ func (s *Store) linkFiles(ctx context.Context, tx *sql.Tx, staging string, files
 	return linked, nil
 }
 
-// querier runs queries, in a transaction or not.
-type querier interface {
-	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
-}
-
 // queryIDs lists the ids query selects.
-func queryIDs(ctx context.Context, q querier, query string, args ...any) ([]int64, error) {
+func queryIDs(ctx context.Context, q domain.Queryer, query string, args ...any) ([]int64, error) {
 	rows, err := q.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err

@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/xKirtle/bandmate/internal/audio"
+	"github.com/xKirtle/bandmate/internal/domain"
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
 )
 
@@ -20,11 +21,11 @@ import (
 func (s *Store) SplitClips(ctx context.Context, songID int64, based lyricsheet.Version, clipIDs []int64,
 	at float64) (Timeline, error) {
 	if len(clipIDs) == 0 {
-		return Timeline{}, &lyricsheet.InvalidError{Msg: "clipIds are required"}
+		return Timeline{}, domain.Invalid("clipIds are required")
 	}
 	for i, id := range clipIDs {
 		if slices.Contains(clipIDs[:i], id) {
-			return Timeline{}, &lyricsheet.InvalidError{Msg: "each Clip can only be split once"}
+			return Timeline{}, domain.Invalid("each Clip can only be split once")
 		}
 	}
 	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
@@ -46,7 +47,7 @@ func (s *Store) splitClip(ctx context.Context, tx *sql.Tx, changes *audio.FileCh
 	}
 	cut := at - p.start
 	if cut <= tolerance || cut >= p.length-tolerance {
-		return &lyricsheet.InvalidError{Msg: "a Clip is only split where the playhead crosses it"}
+		return domain.Invalid("a Clip is only split where the playhead crosses it")
 	}
 	right := p
 	right.start, right.offset, right.length = at, p.offset+cut, p.length-cut

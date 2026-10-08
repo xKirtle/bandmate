@@ -16,29 +16,10 @@ import (
 	"time"
 
 	"github.com/xKirtle/bandmate/internal/audio"
-	"github.com/xKirtle/bandmate/internal/lyricsheet"
+	"github.com/xKirtle/bandmate/internal/domain"
 )
 
-// ErrNotFound means the requested Beat doesn't exist.
-var ErrNotFound = errors.New("not found")
-
-// InvalidError is a rejected operation. Its message is safe to show the user.
-type InvalidError struct{ Msg string }
-
-func (e *InvalidError) Error() string { return e.Msg }
-
-func invalid(msg string) error { return &InvalidError{Msg: msg} }
-
-// InUseError refuses a change to a Beat that Songs use. Its message, which
-// names those Songs, is safe to show the user.
-type InUseError struct {
-	Msg   string
-	Songs []SongTitle
-}
-
-func (e *InUseError) Error() string { return e.Msg }
-
-var errTitleRequired = invalid("title is required")
+var errTitleRequired = domain.Invalid("title is required")
 
 // Beat is an audio file in the Beat Library, with its credit.
 type Beat struct {
@@ -91,9 +72,6 @@ func NewStore(db *sql.DB, files *audio.Files) *Store {
 	return &Store{db: db, files: files}
 }
 
-// timeFormat keeps sub-second precision and sorts correctly as text.
-const timeFormat = "2006-01-02T15:04:05.000000000Z"
-
 // Add puts an uploaded file into the Beat Library as a new Beat. The file
 // is kept if the Beat is added, and discarded otherwise.
 func (s *Store) Add(ctx context.Context, details Details, a audio.Upload, file *audio.Received) (Beat, error) {
@@ -103,7 +81,7 @@ func (s *Store) Add(ctx context.Context, details Details, a audio.Upload, file *
 		return Beat{}, err
 	}
 	if msg := a.Problem(); msg != "" {
-		return Beat{}, invalid(msg)
+		return Beat{}, domain.Invalid(msg)
 	}
 	peaks, err := json.Marshal(a.Peaks)
 	if err != nil {
@@ -114,7 +92,7 @@ func (s *Store) Add(ctx context.Context, details Details, a audio.Upload, file *
 		return Beat{}, err
 	}
 	defer tx.Rollback()
-	now := time.Now().UTC().Format(timeFormat)
+	now := time.Now().UTC().Format(domain.TimeFormat)
 	res, err := tx.ExecContext(ctx,
 		`INSERT INTO beats (title, producer, source_link, bpm, beat_key, notes,
 			file_name, content_type, size, duration, peaks, created_at, updated_at)
@@ -167,10 +145,10 @@ func scan(row interface{ Scan(...any) error }, extra ...any) (Beat, error) {
 		n := int(bpm.Int64)
 		b.BPM = &n
 	}
-	if b.CreatedAt, err = parseTime(created); err != nil {
+	if b.CreatedAt, err = domain.ParseTime(created); err != nil {
 		return Beat{}, err
 	}
-	if b.UpdatedAt, err = parseTime(updated); err != nil {
+	if b.UpdatedAt, err = domain.ParseTime(updated); err != nil {
 		return Beat{}, err
 	}
 	return b, nil
@@ -181,7 +159,7 @@ func (s *Store) read(ctx context.Context, id int64) (Beat, string, error) {
 	var peaks string
 	b, err := scan(s.db.QueryRowContext(ctx, `SELECT `+columns+`, peaks FROM beats WHERE id = ?`, id), &peaks)
 	if errors.Is(err, sql.ErrNoRows) {
-		return Beat{}, "", ErrNotFound
+		return Beat{}, "", domain.ErrNotFound
 	}
 	if err != nil {
 		return Beat{}, "", fmt.Errorf("reading beat: %w", err)
@@ -229,12 +207,12 @@ func (s *Store) List(ctx context.Context, query string) ([]Beat, error) {
 // Changes is a partial update to a Beat's Details. Fields not Set are
 // unchanged.
 type Changes struct {
-	Title      lyricsheet.Change[string] `json:"title"`
-	Producer   lyricsheet.Change[string] `json:"producer"`
-	SourceLink lyricsheet.Change[string] `json:"sourceLink"`
-	BPM        lyricsheet.Change[*int]   `json:"bpm"`
-	Key        lyricsheet.Change[string] `json:"key"`
-	Notes      lyricsheet.Change[string] `json:"notes"`
+	Title      domain.Change[string] `json:"title"`
+	Producer   domain.Change[string] `json:"producer"`
+	SourceLink domain.Change[string] `json:"sourceLink"`
+	BPM        domain.Change[*int]   `json:"bpm"`
+	Key        domain.Change[string] `json:"key"`
+	Notes      domain.Change[string] `json:"notes"`
 }
 
 // Update changes a Beat's Details. Every change is validated before any is
@@ -260,14 +238,14 @@ func (s *Store) Update(ctx context.Context, id int64, changes Changes) (Beat, er
 	_, err = s.db.ExecContext(ctx,
 		`UPDATE beats SET title = ?, producer = ?, source_link = ?, bpm = ?, beat_key = ?, notes = ?, updated_at = ?
 		 WHERE id = ?`,
-		d.Title, d.Producer, d.SourceLink, d.BPM, d.Key, d.Notes, time.Now().UTC().Format(timeFormat), id)
+		d.Title, d.Producer, d.SourceLink, d.BPM, d.Key, d.Notes, time.Now().UTC().Format(domain.TimeFormat), id)
 	if err != nil {
 		return Beat{}, fmt.Errorf("updating beat: %w", err)
 	}
 	return s.Get(ctx, id)
 }
 
-func apply[T any](field *T, c lyricsheet.Change[T]) {
+func apply[T any](field *T, c domain.Change[T]) {
 	if c.Set {
 		*field = c.Value
 	}
@@ -280,7 +258,7 @@ func apply[T any](field *T, c lyricsheet.Change[T]) {
 func (s *Store) ReplaceFile(ctx context.Context, id int64, a audio.Upload, file *audio.Received) (Beat, error) {
 	defer file.Discard()
 	if msg := a.Problem(); msg != "" {
-		return Beat{}, invalid(msg)
+		return Beat{}, domain.Invalid(msg)
 	}
 	b, _, err := s.read(ctx, id)
 	if err != nil {
@@ -301,7 +279,7 @@ func (s *Store) ReplaceFile(ctx context.Context, id int64, a audio.Upload, file 
 	_, err = tx.ExecContext(ctx,
 		`UPDATE beats SET file_name = ?, content_type = ?, size = ?, duration = ?, peaks = ?, updated_at = ?
 		 WHERE id = ?`,
-		a.FileName, a.MediaType(), file.Size, a.Duration, string(peaks), time.Now().UTC().Format(timeFormat), id)
+		a.FileName, a.MediaType(), file.Size, a.Duration, string(peaks), time.Now().UTC().Format(domain.TimeFormat), id)
 	if err != nil {
 		return Beat{}, fmt.Errorf("replacing beat file: %w", err)
 	}
@@ -338,7 +316,7 @@ func (s *Store) ServeFile(w http.ResponseWriter, r *http.Request, id int64) erro
 	var contentType string
 	err := s.db.QueryRowContext(r.Context(), `SELECT content_type FROM beats WHERE id = ?`, id).Scan(&contentType)
 	if errors.Is(err, sql.ErrNoRows) {
-		return ErrNotFound
+		return domain.ErrNotFound
 	}
 	if err != nil {
 		return fmt.Errorf("reading beat: %w", err)
@@ -367,15 +345,16 @@ func (s *Store) songsUsing(ctx context.Context, id int64) ([]SongTitle, error) {
 	return songs, rows.Err()
 }
 
+// inUse refuses a change to a Beat that Songs use: a conflict with the code
+// in_use, its message naming those Songs, and them as its details.
 func inUse(b Beat, change string) error {
 	titles := make([]string, len(b.Songs))
 	for i, song := range b.Songs {
 		titles[i] = song.Title
 	}
-	return &InUseError{
-		Msg:   fmt.Sprintf("“%s” can't %s while these Songs use it: %s", b.Title, change, strings.Join(titles, ", ")),
-		Songs: b.Songs,
-	}
+	return domain.CodedConflict("in_use",
+		fmt.Sprintf("“%s” can't %s while these Songs use it: %s", b.Title, change, strings.Join(titles, ", ")),
+		map[string]any{"songs": b.Songs})
 }
 
 // clean trims the Details and checks them.
@@ -388,21 +367,13 @@ func (d Details) clean() (Details, error) {
 		return d, errTitleRequired
 	}
 	if d.BPM != nil && (*d.BPM < 1 || *d.BPM > 999) {
-		return d, invalid("bpm must be between 1 and 999")
+		return d, domain.Invalid("bpm must be between 1 and 999")
 	}
 	if d.SourceLink != "" {
 		u, err := url.Parse(d.SourceLink)
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-			return d, invalid("source link must be a web address starting with http:// or https://")
+			return d, domain.Invalid("source link must be a web address starting with http:// or https://")
 		}
 	}
 	return d, nil
-}
-
-func parseTime(s string) (time.Time, error) {
-	t, err := time.Parse(timeFormat, s)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("parsing stored time %q: %w", s, err)
-	}
-	return t, nil
 }

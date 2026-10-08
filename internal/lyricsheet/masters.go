@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/xKirtle/bandmate/internal/audio"
+	"github.com/xKirtle/bandmate/internal/domain"
 )
 
 // Master is a finished recording of a Song made elsewhere, attached to the
@@ -44,7 +45,7 @@ type MasterDetails struct {
 	Notes string `json:"notes"`
 }
 
-var errMasterNameRequired = invalid("a Master's name is required")
+var errMasterNameRequired = domain.Invalid("a Master's name is required")
 
 // AddMaster attaches an uploaded file to a Song as a new Master. A Song's
 // first Master is its main one. The file is kept if the Master is added,
@@ -53,7 +54,7 @@ var errMasterNameRequired = invalid("a Master's name is required")
 func (s *Store) AddMaster(ctx context.Context, songID int64, based Version, details MasterDetails, up audio.Upload, file *audio.Received) (Song, error) {
 	defer file.Discard()
 	if msg := up.Problem(); msg != "" {
-		return Song{}, invalid(msg)
+		return Song{}, domain.Invalid(msg)
 	}
 	name := up.Name(details.Name, "Master")
 	peaks, err := json.Marshal(up.Peaks)
@@ -70,7 +71,7 @@ func (s *Store) AddMaster(ctx context.Context, songID int64, based Version, deta
 			`INSERT INTO masters (song_id, name, main, notes, file_name, content_type, size, duration, peaks, added_at)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			songID, name, !hasMain, details.Notes, up.FileName, up.MediaType(), file.Size, up.Duration,
-			string(peaks), time.Now().UTC().Format(timeFormat))
+			string(peaks), time.Now().UTC().Format(domain.TimeFormat))
 		if err != nil {
 			return fmt.Errorf("adding master: %w", err)
 		}
@@ -92,7 +93,7 @@ func scanMaster(row interface{ Scan(...any) error }, extra ...any) (Master, erro
 	if err != nil {
 		return Master{}, err
 	}
-	if m.AddedAt, err = parseTime(added); err != nil {
+	if m.AddedAt, err = domain.ParseTime(added); err != nil {
 		return Master{}, err
 	}
 	return m, nil
@@ -100,7 +101,7 @@ func scanMaster(row interface{ Scan(...any) error }, extra ...any) (Master, erro
 
 // loadMasters reads a Song's Masters, without their peaks, in the order
 // they were added.
-func loadMasters(ctx context.Context, q queryer, songID int64) ([]Master, error) {
+func loadMasters(ctx context.Context, q domain.Queryer, songID int64) ([]Master, error) {
 	masters := []Master{}
 	err := query(ctx, q, `SELECT `+masterColumns+` FROM masters WHERE song_id = ? ORDER BY id`, []any{songID},
 		func(rows *sql.Rows) error {
@@ -123,7 +124,7 @@ func (s *Store) GetMaster(ctx context.Context, songID, masterID int64) (Master, 
 	m, err := scanMaster(s.db.QueryRowContext(ctx,
 		`SELECT `+masterColumns+`, peaks FROM masters WHERE id = ? AND song_id = ?`, masterID, songID), &peaks)
 	if errors.Is(err, sql.ErrNoRows) {
-		return Master{}, ErrNotFound
+		return Master{}, domain.ErrNotFound
 	}
 	if err != nil {
 		return Master{}, fmt.Errorf("reading master: %w", err)
@@ -137,8 +138,8 @@ func (s *Store) GetMaster(ctx context.Context, songID, masterID int64) (Master, 
 // MasterChanges is a partial update to a Master's details. Fields not Set
 // are unchanged.
 type MasterChanges struct {
-	Name  Change[string] `json:"name"`
-	Notes Change[string] `json:"notes"`
+	Name  domain.Change[string] `json:"name"`
+	Notes domain.Change[string] `json:"notes"`
 }
 
 // UpdateMaster changes a Master's name or notes.
@@ -164,7 +165,7 @@ func (s *Store) UpdateMaster(ctx context.Context, songID int64, based Version, m
 		if err != nil {
 			return fmt.Errorf("updating master: %w", err)
 		}
-		return expectOneRow(res)
+		return domain.ExpectOneRow(res)
 	})
 }
 
@@ -194,7 +195,7 @@ func (s *Store) DeleteMaster(ctx context.Context, songID int64, based Version, m
 		if err != nil {
 			return fmt.Errorf("deleting master: %w", err)
 		}
-		if err := expectOneRow(res); err != nil {
+		if err := domain.ExpectOneRow(res); err != nil {
 			return err
 		}
 		_, err = tx.ExecContext(ctx,
@@ -218,7 +219,7 @@ func (s *Store) ServeMaster(w http.ResponseWriter, r *http.Request, songID, mast
 		`SELECT file_name, content_type FROM masters WHERE id = ? AND song_id = ?`, masterID, songID).
 		Scan(&fileName, &contentType)
 	if errors.Is(err, sql.ErrNoRows) {
-		return ErrNotFound
+		return domain.ErrNotFound
 	}
 	if err != nil {
 		return fmt.Errorf("reading master: %w", err)
@@ -230,14 +231,14 @@ func (s *Store) ServeMaster(w http.ResponseWriter, r *http.Request, songID, mast
 }
 
 // findMaster checks a Master belongs to the Song.
-func findMaster(ctx context.Context, q queryer, songID, masterID int64) error {
+func findMaster(ctx context.Context, q domain.Queryer, songID, masterID int64) error {
 	var exists bool
 	if err := q.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM masters WHERE id = ? AND song_id = ?)`,
 		masterID, songID).Scan(&exists); err != nil {
 		return fmt.Errorf("finding master: %w", err)
 	}
 	if !exists {
-		return ErrNotFound
+		return domain.ErrNotFound
 	}
 	return nil
 }

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/xKirtle/bandmate/internal/domain"
 )
 
 // AddAlternate creates a new Alternate of a Section with the given name, as a
@@ -95,10 +97,10 @@ func (s *Store) DeleteAlternate(ctx context.Context, songID int64, based Version
 			return err
 		}
 		if count == 1 {
-			return conflict("a Section's last Alternate can't be deleted")
+			return domain.Conflict("a Section's last Alternate can't be deleted")
 		}
 		if active {
-			return conflict("the active Alternate can't be deleted; activate another one first")
+			return domain.Conflict("the active Alternate can't be deleted; activate another one first")
 		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM alternates WHERE id = ?`, alternateID); err != nil {
 			return fmt.Errorf("deleting alternate: %w", err)
@@ -152,13 +154,13 @@ func moveAlternateOut(ctx context.Context, tx *sql.Tx, songID, alternateID int64
 		JOIN sections s ON s.id = a.section_id WHERE a.id = ? AND s.song_id = ?`,
 		alternateID, songID).Scan(&label, &name, &active)
 	if errors.Is(err, sql.ErrNoRows) {
-		return 0, ErrNotFound
+		return 0, domain.ErrNotFound
 	}
 	if err != nil {
 		return 0, fmt.Errorf("reading alternate: %w", err)
 	}
 	if active {
-		return 0, conflict("the active Alternate can't be moved out of its Section; activate another one first")
+		return 0, domain.Conflict("the active Alternate can't be moved out of its Section; activate another one first")
 	}
 	newID, err := insert(ctx, tx, `INSERT INTO sections (song_id, label) VALUES (?, ?)`,
 		songID, movedOutLabel(label, name))
@@ -190,10 +192,10 @@ func (s *Store) AddToSection(ctx context.Context, songID int64, based Version, a
 			return err
 		}
 		if addedID == sectionID {
-			return conflict("a Section can't be added to itself")
+			return domain.Conflict("a Section can't be added to itself")
 		}
 		if !at.Valid {
-			return conflict("a Section can only be added to a Section in the Lyric Sheet")
+			return domain.Conflict("a Section can only be added to a Section in the Lyric Sheet")
 		}
 		if addedAt.Valid {
 			if err := leaveArrangement(ctx, tx, songID, addedID, addedAt.Int64); err != nil {
@@ -242,7 +244,7 @@ func findAlternate(ctx context.Context, tx *sql.Tx, songID, alternateID int64) (
 		JOIN sections s ON s.id = a.section_id WHERE a.id = ? AND s.song_id = ?`,
 		alternateID, songID).Scan(&sectionID, &active)
 	if errors.Is(err, sql.ErrNoRows) {
-		return 0, false, ErrNotFound
+		return 0, false, domain.ErrNotFound
 	}
 	return sectionID, active, err
 }

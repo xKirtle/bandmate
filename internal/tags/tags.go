@@ -12,30 +12,16 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/xKirtle/bandmate/internal/domain"
 )
-
-// ErrNotFound means the Song asked to tag, or the Tag asked for, doesn't
-// exist.
-var ErrNotFound = errors.New("not found")
-
-// InvalidError is a rejected operation. Its message is safe to show the user.
-type InvalidError struct{ Msg string }
-
-func (e *InvalidError) Error() string { return e.Msg }
-
-// ConflictError is an operation the Tags as they are don't allow without
-// asking, e.g. renaming one onto a name another has. Its message is safe to
-// show the user.
-type ConflictError struct{ Msg string }
-
-func (e *ConflictError) Error() string { return e.Msg }
 
 var (
-	errBlankName   = &InvalidError{Msg: "a Tag's name can't be blank"}
-	errCommaInName = &InvalidError{Msg: "a Tag's name can't have a comma"}
+	errBlankName   = domain.Invalid("a Tag's name can't be blank")
+	errCommaInName = domain.Invalid("a Tag's name can't have a comma")
 )
 
-// cleanName is a Tag's name as given, trimmed, or an InvalidError if it's
+// cleanName is a Tag's name as given, trimmed, or invalid if it's
 // blank or has a comma: a comma finishes a Tag as it's typed.
 func cleanName(name string) (string, error) {
 	name = strings.TrimSpace(name)
@@ -87,7 +73,7 @@ func (s *Store) List(ctx context.Context) ([]Tag, error) {
 
 // Rename gives a Tag a new name, trimmed, which every Song carrying it then
 // shows. A name another Tag has, ignoring case, is refused as a
-// ConflictError, unless merge is set: then the Tag merges into that one,
+// conflict, unless merge is set: then the Tag merges into that one,
 // which takes the name as given, and every Song carrying either carries it.
 // It returns the Tag as renamed or merged into. No Song is edited.
 func (s *Store) Rename(ctx context.Context, id int64, name string, merge bool) (Tag, error) {
@@ -113,7 +99,7 @@ func (s *Store) Rename(ctx context.Context, id int64, name string, merge bool) (
 	case err != nil:
 		return Tag{}, fmt.Errorf("checking tag names: %w", err)
 	case !merge:
-		return Tag{}, &ConflictError{Msg: fmt.Sprintf("there's already a Tag called “%s”", otherName)}
+		return Tag{}, domain.Conflict(fmt.Sprintf("there's already a Tag called “%s”", otherName))
 	default:
 		// The Songs carrying this Tag carry the other instead, and, off
 		// its last Song, this one goes.
@@ -155,7 +141,7 @@ func (s *Store) Delete(ctx context.Context, id int64) error {
 	return tx.Commit()
 }
 
-// tagExists is ErrNotFound unless there's a Tag with id.
+// tagExists is domain.ErrNotFound unless there's a Tag with id.
 func tagExists(ctx context.Context, tx *sql.Tx, id int64) error {
 	var exists bool
 	if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM tags WHERE id = ?)`, id).
@@ -163,7 +149,7 @@ func tagExists(ctx context.Context, tx *sql.Tx, id int64) error {
 		return fmt.Errorf("checking tag: %w", err)
 	}
 	if !exists {
-		return ErrNotFound
+		return domain.ErrNotFound
 	}
 	return nil
 }
@@ -195,7 +181,7 @@ func (s *Store) SetSongTags(ctx context.Context, songID int64, names []string) (
 		return nil, fmt.Errorf("checking song: %w", err)
 	}
 	if !exists {
-		return nil, ErrNotFound
+		return nil, domain.ErrNotFound
 	}
 	// Linked anew, the Tags kept are never without a Song, so only those
 	// taken off go.

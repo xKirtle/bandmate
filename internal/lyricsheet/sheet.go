@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/xKirtle/bandmate/internal/audio"
+	"github.com/xKirtle/bandmate/internal/domain"
 )
 
 // LyricSheet is the written side of a Song: its Sections laid out by the
@@ -149,14 +150,8 @@ func (s *Store) loadLyricSheet(ctx context.Context, songID int64) (LyricSheet, e
 	return sheet, nil
 }
 
-// queryer is what both *sql.DB and *sql.Tx offer for reading.
-type queryer interface {
-	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
-	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
-}
-
 // query runs a query and calls row for each result row.
-func query(ctx context.Context, q queryer, stmt string, args []any, row func(*sql.Rows) error) error {
+func query(ctx context.Context, q domain.Queryer, stmt string, args []any, row func(*sql.Rows) error) error {
 	rows, err := q.QueryContext(ctx, stmt, args...)
 	if err != nil {
 		return err
@@ -205,11 +200,11 @@ func (s *Store) changeWithFiles(ctx context.Context, songID int64, based Version
 // Touch marks a Song as edited within tx, giving it a new version, for a
 // change to part of the Song kept elsewhere (e.g. its Timeline). It fails
 // with ErrStale if the Song is no longer at the version the change was based
-// on, and ErrNotFound if there is no such Song.
+// on, and domain.ErrNotFound if there is no such Song.
 func Touch(ctx context.Context, tx *sql.Tx, songID int64, based Version) error {
 	res, err := tx.ExecContext(ctx,
 		`UPDATE songs SET updated_at = ?, version = version + 1 WHERE id = ? AND (?3 = 0 OR version = ?3)`,
-		time.Now().UTC().Format(timeFormat), songID, based)
+		time.Now().UTC().Format(domain.TimeFormat), songID, based)
 	if err != nil {
 		return fmt.Errorf("touching song: %w", err)
 	}
@@ -264,7 +259,7 @@ func (s *Store) DeleteSection(ctx context.Context, songID int64, based Version, 
 			return err
 		}
 		if pos.Valid {
-			return conflict("only a Section in the Scrapbook can be deleted; remove it from the Arrangement first")
+			return domain.Conflict("only a Section in the Scrapbook can be deleted; remove it from the Arrangement first")
 		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM sections WHERE id = ?`, sectionID); err != nil {
 			return fmt.Errorf("deleting section: %w", err)
@@ -300,7 +295,7 @@ func (s *Store) AddToArrangement(ctx context.Context, songID int64, based Versio
 			return err
 		}
 		if at.Valid {
-			return conflict("that Section is already in the Lyric Sheet; Duplicate it instead")
+			return domain.Conflict("that Section is already in the Lyric Sheet; Duplicate it instead")
 		}
 		pos, err := arrangementPosition(ctx, tx, songID, position)
 		if err != nil {
@@ -343,7 +338,7 @@ func (s *Store) RemoveFromArrangement(ctx context.Context, songID int64, based V
 			return err
 		}
 		if !pos.Valid {
-			return conflict("that Section isn't in the Lyric Sheet")
+			return domain.Conflict("that Section isn't in the Lyric Sheet")
 		}
 		if err := leaveArrangement(ctx, tx, songID, sectionID, pos.Int64); err != nil {
 			return err
@@ -401,7 +396,7 @@ func findSection(ctx context.Context, tx *sql.Tx, songID, sectionID int64) (pos 
 	err = tx.QueryRowContext(ctx, `SELECT position FROM sections WHERE id = ? AND song_id = ?`,
 		sectionID, songID).Scan(&pos)
 	if errors.Is(err, sql.ErrNoRows) {
-		return sql.NullInt64{}, ErrNotFound
+		return sql.NullInt64{}, domain.ErrNotFound
 	}
 	return pos, err
 }
@@ -487,7 +482,7 @@ func arrangementPosition(ctx context.Context, tx *sql.Tx, songID int64, position
 		return count, nil
 	}
 	if *position < 0 || *position > count {
-		return 0, invalid(fmt.Sprintf("position must be between 0 and %d", count))
+		return 0, domain.Invalid(fmt.Sprintf("position must be between 0 and %d", count))
 	}
 	return *position, nil
 }
@@ -514,7 +509,7 @@ func (s *Store) SetSectionLabel(ctx context.Context, songID int64, based Version
 		if err != nil {
 			return fmt.Errorf("changing label: %w", err)
 		}
-		return expectOneRow(res)
+		return domain.ExpectOneRow(res)
 	})
 }
 
@@ -533,7 +528,7 @@ func (s *Store) ReorderArrangement(ctx context.Context, songID int64, based Vers
 		if err != nil {
 			return fmt.Errorf("reading arrangement: %w", err)
 		}
-		errOrder := invalid("the new order must list every Section in the Lyric Sheet exactly once")
+		errOrder := domain.Invalid("the new order must list every Section in the Lyric Sheet exactly once")
 		if len(order) != len(current) {
 			return errOrder
 		}

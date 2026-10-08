@@ -3,6 +3,7 @@ package app
 import (
 	"net/http"
 
+	"github.com/xKirtle/bandmate/internal/domain"
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
 )
 
@@ -54,7 +55,7 @@ func (a *App) addToArrangement(w http.ResponseWriter, r *http.Request) {
 	}
 	a.changeSheet(w, r, &req, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
 		if req.SectionID == nil {
-			return lyricsheet.Song{}, &lyricsheet.InvalidError{Msg: "sectionId is required"}
+			return lyricsheet.Song{}, domain.Invalid("sectionId is required")
 		}
 		return a.songs.AddToArrangement(r.Context(), id, based, *req.SectionID, req.Position)
 	})
@@ -96,7 +97,7 @@ func (a *App) addToSection(w http.ResponseWriter, r *http.Request) {
 	}
 	a.changeSheet(w, r, &req, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
 		if req.SectionID == nil {
-			return lyricsheet.Song{}, &lyricsheet.InvalidError{Msg: "sectionId is required"}
+			return lyricsheet.Song{}, domain.Invalid("sectionId is required")
 		}
 		return a.songs.AddToSection(r.Context(), id, based, addedID, *req.SectionID)
 	})
@@ -112,7 +113,7 @@ func (a *App) setLineCue(w http.ResponseWriter, r *http.Request) {
 	}
 	a.changeSheet(w, r, &req, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
 		if req.Cue == nil {
-			return lyricsheet.Song{}, &lyricsheet.InvalidError{Msg: "cue is required"}
+			return lyricsheet.Song{}, domain.Invalid("cue is required")
 		}
 		return a.songs.SetLineCue(r.Context(), id, based, lineID, *req.Cue)
 	})
@@ -155,12 +156,12 @@ func (a *App) restoreCues(w http.ResponseWriter, r *http.Request) {
 	}
 	a.changeSheet(w, r, &req, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
 		if req.Cues == nil {
-			return lyricsheet.Song{}, &lyricsheet.InvalidError{Msg: "cues is required"}
+			return lyricsheet.Song{}, domain.Invalid("cues is required")
 		}
 		values := make([]lyricsheet.CueValue, len(*req.Cues))
 		for i, c := range *req.Cues {
 			if c.LineID == nil {
-				return lyricsheet.Song{}, &lyricsheet.InvalidError{Msg: "each Cue needs a lineId"}
+				return lyricsheet.Song{}, domain.Invalid("each Cue needs a lineId")
 			}
 			values[i] = lyricsheet.CueValue{LineID: *c.LineID, Cue: c.Cue}
 		}
@@ -178,7 +179,7 @@ func (a *App) shiftCues(w http.ResponseWriter, r *http.Request) {
 	}
 	a.changeSheet(w, r, &req, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
 		if req.Start == nil || req.End == nil || req.By == nil {
-			return lyricsheet.Song{}, &lyricsheet.InvalidError{Msg: "start, end and by are required"}
+			return lyricsheet.Song{}, domain.Invalid("start, end and by are required")
 		}
 		return a.songs.ShiftCues(r.Context(), id, based, *req.Start, *req.End, *req.By)
 	})
@@ -263,7 +264,7 @@ func (a *App) moveAlternateToArrangement(w http.ResponseWriter, r *http.Request)
 	}
 	a.changeSheet(w, r, &req, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
 		if req.Position == nil {
-			return lyricsheet.Song{}, &lyricsheet.InvalidError{Msg: "position is required"}
+			return lyricsheet.Song{}, domain.Invalid("position is required")
 		}
 		return a.songs.MoveAlternateToArrangement(r.Context(), id, based, alternateID, *req.Position)
 	})

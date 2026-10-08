@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/xKirtle/bandmate/internal/db"
+	"github.com/xKirtle/bandmate/internal/domain"
 	"github.com/xKirtle/bandmate/internal/songfiles"
 )
 
@@ -49,7 +50,7 @@ func (s *Store) Songs(ctx context.Context, id int64) ([]Song, error) {
 
 // querySongs lists the Songs query selects, by id, title and Folder name,
 // NULL for none.
-func querySongs(ctx context.Context, q querier, query string) ([]Song, error) {
+func querySongs(ctx context.Context, q domain.Queryer, query string) ([]Song, error) {
 	rows, err := q.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -219,7 +220,7 @@ func (s *Store) Restore(ctx context.Context, id int64, picks Picks, replace Repl
 // listing each once.
 func (r *openedBackup) pick(ctx context.Context, picks Picks) (Picks, error) {
 	if len(picks.Songs) == 0 && len(picks.Beats) == 0 {
-		return Picks{}, &InvalidError{"pick at least one Song or Beat to restore"}
+		return Picks{}, domain.Invalid("pick at least one Song or Beat to restore")
 	}
 	var picked Picks
 	var err error
@@ -245,7 +246,7 @@ func (r *openedBackup) held(ctx context.Context, table string, ids []int64, miss
 			return nil, err
 		}
 		if exists == 0 {
-			return nil, &InvalidError{missing}
+			return nil, domain.Invalid(missing)
 		}
 		list = append(list, id)
 	}
@@ -372,8 +373,8 @@ func (s *Store) openBackup(ctx context.Context, id int64) (*openedBackup, error)
 
 // A Backup's file that can't be restored is refused whole, saying why.
 var (
-	errDamaged = &InvalidError{"the Backup is damaged"}
-	errNewer   = &InvalidError{"the Backup was made by a newer Bandmate: update Bandmate to restore it"}
+	errDamaged = domain.Invalid("the Backup is damaged")
+	errNewer   = domain.Invalid("the Backup was made by a newer Bandmate: update Bandmate to restore it")
 )
 
 // damagedBy is err, met reading a Backup's file, as the Backup being
@@ -542,7 +543,7 @@ func (s *Store) copyIn(ctx context.Context, staging string, picks Picks, replace
 	if err != nil {
 		return Restored{}, err
 	}
-	now := s.now().UTC().Format(timeFormat)
+	now := s.now().UTC().Format(domain.TimeFormat)
 	for _, t := range songTables {
 		if err := copyTableIn(ctx, tx, t, columns[t.name], picks.Songs, now); err != nil {
 			return Restored{}, fmt.Errorf("restoring %s: %w", t.name, err)

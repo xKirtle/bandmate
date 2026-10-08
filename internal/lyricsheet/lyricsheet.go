@@ -16,37 +16,21 @@ import (
 	"time"
 
 	"github.com/xKirtle/bandmate/internal/audio"
+	"github.com/xKirtle/bandmate/internal/domain"
 	"github.com/xKirtle/bandmate/internal/songfiles"
 	"github.com/xKirtle/bandmate/internal/tags"
 )
 
-// ErrNotFound means the requested Song, or the part of it asked for, doesn't
-// exist.
-var ErrNotFound = errors.New("not found")
-
 // ErrStale means a change was based on a version of the Song that is no
 // longer current: the Song changed in the meantime, e.g. from another tab.
-var ErrStale = errors.New("this Song changed elsewhere, so the change wasn't saved")
-
-// InvalidError is a rejected operation. Its message is safe to show the user.
-type InvalidError struct{ Msg string }
-
-func (e *InvalidError) Error() string { return e.Msg }
-
-func invalid(msg string) error { return &InvalidError{Msg: msg} }
-
-// ConflictError is an operation the Song's current state doesn't allow. Its
-// message is safe to show the user.
-type ConflictError struct{ Msg string }
-
-func (e *ConflictError) Error() string { return e.Msg }
-
-func conflict(msg string) error { return &ConflictError{Msg: msg} }
+// Its code tells it apart from other conflicts, so the client can offer to
+// reload the Song.
+var ErrStale = domain.CodedConflict("stale", "this Song changed elsewhere, so the change wasn't saved", nil)
 
 var (
-	errTitleRequired = invalid("title is required")
-	errUnknownStatus = invalid("status must be idea, drafting, finished or shelved")
-	errNoSuchFolder  = invalid("there's no such Folder")
+	errTitleRequired = domain.Invalid("title is required")
+	errUnknownStatus = domain.Invalid("status must be idea, drafting, finished or shelved")
+	errNoSuchFolder  = domain.Invalid("there's no such Folder")
 )
 
 // Status is where a Song stands in its lifecycle.
@@ -158,9 +142,6 @@ func decodeTags(text string) ([]string, error) {
 	return names, nil
 }
 
-// timeFormat keeps sub-second precision and sorts correctly as text.
-const timeFormat = "2006-01-02T15:04:05.000000000Z"
-
 // untitledSong names a Song created without a title. Titles needn't be
 // unique, so any number of Songs can have it.
 const untitledSong = "Untitled Song"
@@ -212,7 +193,7 @@ func insertSong(ctx context.Context, tx *sql.Tx, title string, folderID *int64) 
 			return 0, errNoSuchFolder
 		}
 	}
-	now := time.Now().UTC().Format(timeFormat)
+	now := time.Now().UTC().Format(domain.TimeFormat)
 	id, err := insert(ctx, tx,
 		`INSERT INTO songs (title, status, folder_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
 		title, StatusIdea, folderID, now, now)
@@ -237,16 +218,16 @@ func (s *Store) GetSong(ctx context.Context, id int64) (Song, error) {
 		Scan(&song.ID, &song.Version, &song.Title, &song.Status, &song.Key, &bpm, &capo, &song.Tuning, &song.Notes,
 			&created, &updated, &tags)
 	if errors.Is(err, sql.ErrNoRows) {
-		return Song{}, ErrNotFound
+		return Song{}, domain.ErrNotFound
 	}
 	if err != nil {
 		return Song{}, fmt.Errorf("reading song: %w", err)
 	}
 	song.BPM, song.Capo = intOrNil(bpm), intOrNil(capo)
-	if song.CreatedAt, err = parseTime(created); err != nil {
+	if song.CreatedAt, err = domain.ParseTime(created); err != nil {
 		return Song{}, err
 	}
-	if song.UpdatedAt, err = parseTime(updated); err != nil {
+	if song.UpdatedAt, err = domain.ParseTime(updated); err != nil {
 		return Song{}, err
 	}
 	if song.Tags, err = decodeTags(tags); err != nil {
@@ -354,7 +335,7 @@ func (s *Store) ListSongs(ctx context.Context, filter SongFilter) ([]SongSummary
 		if !strings.Contains(strings.ToLower(sum.Title), needle) {
 			continue
 		}
-		if sum.UpdatedAt, err = parseTime(updated); err != nil {
+		if sum.UpdatedAt, err = domain.ParseTime(updated); err != nil {
 			return nil, err
 		}
 		if sum.Tags, err = decodeTags(tags); err != nil {
@@ -365,27 +346,15 @@ func (s *Store) ListSongs(ctx context.Context, filter SongFilter) ([]SongSummary
 	return list, rows.Err()
 }
 
-// Change is one field of a partial update. It is Set only when the field was
-// sent; a JSON null sets it to the zero value, which clears optional fields.
-type Change[T any] struct {
-	Set   bool
-	Value T
-}
-
-func (c *Change[T]) UnmarshalJSON(b []byte) error {
-	c.Set = true
-	return json.Unmarshal(b, &c.Value)
-}
-
 // SongChanges is a partial update to a Song. Fields not Set are unchanged.
 type SongChanges struct {
-	Title  Change[string] `json:"title"`
-	Status Change[Status] `json:"status"`
-	Key    Change[string] `json:"key"`
-	BPM    Change[*int]   `json:"bpm"`
-	Capo   Change[*int]   `json:"capo"`
-	Tuning Change[string] `json:"tuning"`
-	Notes  Change[string] `json:"notes"`
+	Title  domain.Change[string] `json:"title"`
+	Status domain.Change[Status] `json:"status"`
+	Key    domain.Change[string] `json:"key"`
+	BPM    domain.Change[*int]   `json:"bpm"`
+	Capo   domain.Change[*int]   `json:"capo"`
+	Tuning domain.Change[string] `json:"tuning"`
+	Notes  domain.Change[string] `json:"notes"`
 }
 
 // UpdateSong applies changes to a Song. Every change is validated before
@@ -414,13 +383,13 @@ func (s *Store) UpdateSong(ctx context.Context, id int64, based Version, changes
 	}
 	if c := changes.BPM; c.Set {
 		if c.Value != nil && (*c.Value < 1 || *c.Value > 999) {
-			return Song{}, invalid("bpm must be between 1 and 999")
+			return Song{}, domain.Invalid("bpm must be between 1 and 999")
 		}
 		set("bpm", c.Value)
 	}
 	if c := changes.Capo; c.Set {
 		if c.Value != nil && (*c.Value < 0 || *c.Value > 24) {
-			return Song{}, invalid("capo must be between 0 and 24")
+			return Song{}, domain.Invalid("capo must be between 0 and 24")
 		}
 		set("capo", c.Value)
 	}
@@ -482,7 +451,7 @@ const AnyCount = -1
 // DeleteSong does, all at once: if any of it fails, nothing is deleted. With
 // a count other than AnyCount, the number of Songs the user was asked about,
 // it deletes nothing unless the Folder still holds that many, so none filed
-// into it since goes unseen. A missing Folder is ErrNotFound.
+// into it since goes unseen. A missing Folder is domain.ErrNotFound.
 func (s *Store) DeleteFolderWithSongs(ctx context.Context, folderID int64, count int) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -492,7 +461,7 @@ func (s *Store) DeleteFolderWithSongs(ctx context.Context, folderID int64, count
 	var name string
 	err = tx.QueryRowContext(ctx, `SELECT name FROM folders WHERE id = ?`, folderID).Scan(&name)
 	if errors.Is(err, sql.ErrNoRows) {
-		return ErrNotFound
+		return domain.ErrNotFound
 	}
 	if err != nil {
 		return fmt.Errorf("reading folder: %w", err)
@@ -502,7 +471,7 @@ func (s *Store) DeleteFolderWithSongs(ctx context.Context, folderID int64, count
 		return fmt.Errorf("listing folder's songs: %w", err)
 	}
 	if count != AnyCount && len(songIDs) != count {
-		return conflict(fmt.Sprintf("“%s” now holds %s, not %d", name, songCount(len(songIDs)), count))
+		return domain.Conflict(fmt.Sprintf("“%s” now holds %s, not %d", name, songCount(len(songIDs)), count))
 	}
 	files := ownedFiles{}
 	for _, songID := range songIDs {
@@ -583,10 +552,10 @@ func queryIDs(ctx context.Context, tx *sql.Tx, stmt string, args ...any) ([]int6
 }
 
 // expectCurrent checks that a write to a Song, guarded by the version it
-// was based on, matched the Song. If not, the Song is gone (ErrNotFound) or
+// was based on, matched the Song. If not, the Song is gone (domain.ErrNotFound) or
 // has moved on to a newer version (ErrStale).
-func expectCurrent(ctx context.Context, db queryer, res sql.Result, id int64) error {
-	if err := expectOneRow(res); !errors.Is(err, ErrNotFound) {
+func expectCurrent(ctx context.Context, db domain.Queryer, res sql.Result, id int64) error {
+	if err := domain.ExpectOneRow(res); !errors.Is(err, domain.ErrNotFound) {
 		return err
 	}
 	var exists bool
@@ -596,19 +565,7 @@ func expectCurrent(ctx context.Context, db queryer, res sql.Result, id int64) er
 	if exists {
 		return ErrStale
 	}
-	return ErrNotFound
-}
-
-// expectOneRow turns a write that matched no Song into ErrNotFound.
-func expectOneRow(res sql.Result) error {
-	n, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return ErrNotFound
-	}
-	return nil
+	return domain.ErrNotFound
 }
 
 func intOrNil(n sql.NullInt64) *int {
@@ -617,12 +574,4 @@ func intOrNil(n sql.NullInt64) *int {
 	}
 	v := int(n.Int64)
 	return &v
-}
-
-func parseTime(s string) (time.Time, error) {
-	t, err := time.Parse(timeFormat, s)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("parsing stored time %q: %w", s, err)
-	}
-	return t, nil
 }

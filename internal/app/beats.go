@@ -1,8 +1,6 @@
 package app
 
 import (
-	"errors"
-	"log"
 	"net/http"
 
 	"github.com/xKirtle/bandmate/internal/beats"
@@ -11,7 +9,7 @@ import (
 func (a *App) listBeats(w http.ResponseWriter, r *http.Request) {
 	list, err := a.beats.List(r.Context(), r.URL.Query().Get("q"))
 	if err != nil {
-		writeBeatError(w, err)
+		writeDomainError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, list)
@@ -28,7 +26,7 @@ func (a *App) addBeat(w http.ResponseWriter, r *http.Request) {
 	}
 	b, err := a.beats.Add(r.Context(), details.Details, details.audio(file.name, file.contentType), file.Received)
 	if err != nil {
-		writeBeatError(w, err)
+		writeDomainError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, b)
@@ -41,7 +39,7 @@ func (a *App) getBeat(w http.ResponseWriter, r *http.Request) {
 	}
 	b, err := a.beats.Get(r.Context(), id)
 	if err != nil {
-		writeBeatError(w, err)
+		writeDomainError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, b)
@@ -58,7 +56,7 @@ func (a *App) updateBeat(w http.ResponseWriter, r *http.Request) {
 	}
 	b, err := a.beats.Update(r.Context(), id, changes)
 	if err != nil {
-		writeBeatError(w, err)
+		writeDomainError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, b)
@@ -76,7 +74,7 @@ func (a *App) replaceBeatFile(w http.ResponseWriter, r *http.Request) {
 	}
 	b, err := a.beats.ReplaceFile(r.Context(), id, details.audio(file.name, file.contentType), file.Received)
 	if err != nil {
-		writeBeatError(w, err)
+		writeDomainError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, b)
@@ -88,7 +86,7 @@ func (a *App) deleteBeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := a.beats.Delete(r.Context(), id); err != nil {
-		writeBeatError(w, err)
+		writeDomainError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -100,23 +98,6 @@ func (a *App) beatAudio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := a.beats.ServeFile(w, r, id); err != nil {
-		writeBeatError(w, err)
-	}
-}
-
-// writeBeatError maps Beat Library errors onto HTTP responses.
-func writeBeatError(w http.ResponseWriter, err error) {
-	var invalid *beats.InvalidError
-	var inUse *beats.InUseError
-	switch {
-	case errors.As(err, &invalid):
-		writeError(w, http.StatusBadRequest, invalid.Msg)
-	case errors.As(err, &inUse):
-		writeJSON(w, http.StatusConflict, map[string]any{"error": inUse.Msg, "code": "in_use", "songs": inUse.Songs})
-	case errors.Is(err, beats.ErrNotFound):
-		writeError(w, http.StatusNotFound, "not found")
-	default:
-		log.Printf("internal error: %v", err)
-		writeError(w, http.StatusInternalServerError, "something went wrong")
+		writeDomainError(w, err)
 	}
 }

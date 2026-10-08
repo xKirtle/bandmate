@@ -12,11 +12,12 @@ import (
 	"path"
 	"strconv"
 
+	"github.com/xKirtle/bandmate/internal/domain"
 	"github.com/xKirtle/bandmate/internal/songfiles"
 )
 
 // errNotABackup refuses an upload that isn't a Backup's file at all.
-var errNotABackup = &InvalidError{"the file isn't a Bandmate Backup"}
+var errNotABackup = domain.Invalid("the file isn't a Bandmate Backup")
 
 // zipSignature starts a zip file, so a file starting with it that can't be
 // read as one is a damaged Backup rather than something else.
