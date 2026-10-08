@@ -14,7 +14,7 @@ import (
 
 	"github.com/xKirtle/bandmate/internal/audio"
 	"github.com/xKirtle/bandmate/internal/domain"
-	"github.com/xKirtle/bandmate/internal/lyricsheet"
+	"github.com/xKirtle/bandmate/internal/songversion"
 )
 
 // TakePlacement is where a Take was recorded, as the browser sends it with the
@@ -41,7 +41,7 @@ const (
 // is kept, hidden behind it, so the Clip plays from its start to the
 // Take's end. It can't overlap a Clip already there. The file is kept if
 // the Take is added, and discarded otherwise.
-func (s *Store) RecordTake(ctx context.Context, songID int64, based lyricsheet.Version, rec TakePlacement, file *audio.Received) (Timeline, error) {
+func (s *Store) RecordTake(ctx context.Context, songID int64, based songversion.Version, rec TakePlacement, file *audio.Received) (Timeline, error) {
 	defer file.Discard()
 	if math.IsNaN(rec.Start) || math.IsInf(rec.Start, 0) {
 		return Timeline{}, domain.Invalid("start must be a number")
@@ -155,7 +155,7 @@ func (t newTake) insert(ctx context.Context, tx *sql.Tx, songID int64, number in
 // addTake runs a change to the Song's Timeline that adds a Take uploaded
 // as file, and keeps the file under the id the change gives it, if it's
 // made. Otherwise the file is discarded.
-func (s *Store) addTake(ctx context.Context, songID int64, based lyricsheet.Version, file *audio.Received,
+func (s *Store) addTake(ctx context.Context, songID int64, based songversion.Version, file *audio.Received,
 	add func(tx *sql.Tx) (int64, error)) (Timeline, error) {
 	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
 		takeID, err := add(tx)
@@ -175,7 +175,7 @@ func (s *Store) addTake(ctx context.Context, songID int64, based lyricsheet.Vers
 // but never past the next Clip on its Track: the rest is kept, hidden, to
 // trim into view once there's room. The file is kept if the Take is added,
 // and discarded otherwise.
-func (s *Store) Retake(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64, c Captured, file *audio.Received) (Timeline, error) {
+func (s *Store) Retake(ctx context.Context, songID int64, based songversion.Version, clipID int64, c Captured, file *audio.Received) (Timeline, error) {
 	defer file.Discard()
 	take, err := readTake(file, c)
 	if err != nil {
@@ -279,7 +279,7 @@ type TakeAt struct {
 // Retake exactly. Takes of the Song it's given are put in it, from the
 // Clip or detached, and those it isn't given leave it, detached. It keeps
 // its Track, and must stay within its Takes and clear of its neighbours.
-func (s *Store) SetTakes(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64, ct ClipTakes) (Timeline, error) {
+func (s *Store) SetTakes(ctx context.Context, songID int64, based songversion.Version, clipID int64, ct ClipTakes) (Timeline, error) {
 	ids, err := checkTakesAt(ct.Takes, ct.ActiveTakeID)
 	if err != nil {
 		return Timeline{}, err
@@ -357,7 +357,7 @@ func checkTakesAt(takes []TakeAt, active *int64) ([]int64, error) {
 // span, the span is taken back to where it starts, as for a Retake. It's
 // refused if the Clip would then play past where its Takes end, which only
 // a Clip trimmed out to a Take nudged later can.
-func (s *Store) NudgeTake(ctx context.Context, songID int64, based lyricsheet.Version, clipID, takeID int64, nudge float64) (Timeline, error) {
+func (s *Store) NudgeTake(ctx context.Context, songID int64, based songversion.Version, clipID, takeID int64, nudge float64) (Timeline, error) {
 	if err := checkNudge(nudge); err != nil {
 		return Timeline{}, err
 	}
@@ -416,7 +416,7 @@ func takeClip(ctx context.Context, tx *sql.Tx, songID, clipID int64) (placement,
 
 // ChooseTake makes one of a Clip's Takes the one it plays, through the same
 // window.
-func (s *Store) ChooseTake(ctx context.Context, songID int64, based lyricsheet.Version, clipID, takeID int64) (Timeline, error) {
+func (s *Store) ChooseTake(ctx context.Context, songID int64, based songversion.Version, clipID, takeID int64) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		p, err := takeClip(ctx, tx, songID, clipID)
 		if err != nil {
@@ -441,7 +441,7 @@ func setActiveTake(ctx context.Context, tx *sql.Tx, clipID, takeID int64) error 
 // the Clip's Takes. Deleting the active Take makes the most recent one left
 // active, and deleting the last deletes the Clip. The Clip's window shrinks
 // to the Takes left, as for keepTakes.
-func (s *Store) DeleteTake(ctx context.Context, songID int64, based lyricsheet.Version, clipID, takeID int64) (Timeline, error) {
+func (s *Store) DeleteTake(ctx context.Context, songID int64, based songversion.Version, clipID, takeID int64) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		p, err := takeClip(ctx, tx, songID, clipID)
 		if err != nil {
@@ -461,7 +461,7 @@ func (s *Store) DeleteTake(ctx context.Context, songID int64, based lyricsheet.V
 // ClearInactiveTakes detaches all of a Clip's Takes but the active one, to
 // be brought back by setting the Clip's Takes. The Clip's window shrinks to
 // the Take left, as for keepTakes.
-func (s *Store) ClearInactiveTakes(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64) (Timeline, error) {
+func (s *Store) ClearInactiveTakes(ctx context.Context, songID int64, based songversion.Version, clipID int64) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		p, err := takeClip(ctx, tx, songID, clipID)
 		if err != nil {

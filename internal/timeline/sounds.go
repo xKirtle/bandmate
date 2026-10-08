@@ -12,7 +12,7 @@ import (
 
 	"github.com/xKirtle/bandmate/internal/audio"
 	"github.com/xKirtle/bandmate/internal/domain"
-	"github.com/xKirtle/bandmate/internal/lyricsheet"
+	"github.com/xKirtle/bandmate/internal/songversion"
 )
 
 // Sound is an audio file imported into one Song, placed in Clips like a
@@ -45,7 +45,7 @@ type SoundImport struct {
 // the whole of it in a new Clip on a Track, after its last Clip, or at 0:00
 // if it has none. The file is kept if the Sound is added, and discarded
 // otherwise.
-func (s *Store) ImportSound(ctx context.Context, songID int64, based lyricsheet.Version, imp SoundImport,
+func (s *Store) ImportSound(ctx context.Context, songID int64, based songversion.Version, imp SoundImport,
 	a audio.Upload, file *audio.Received) (Timeline, error) {
 	defer file.Discard()
 	if msg := a.Problem(); msg != "" {

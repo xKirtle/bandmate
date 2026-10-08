@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/xKirtle/bandmate/internal/domain"
+	"github.com/xKirtle/bandmate/internal/songversion"
 )
 
 // maxCue is the latest a Cue can be, in seconds: far past any Song, and
@@ -32,7 +33,7 @@ func cueMillis(seconds float64) (int64, error) {
 // Line may be in any of its Section's Alternates, but can't be blank, and
 // its Section must be in the Arrangement. A Section has no Cue of its own:
 // it starts where its first Line is cued (ADR 0009).
-func (s *Store) SetLineCue(ctx context.Context, songID int64, based Version, lineID int64, seconds float64) (Song, error) {
+func (s *Store) SetLineCue(ctx context.Context, songID int64, based songversion.Version, lineID int64, seconds float64) (Song, error) {
 	ms, err := cueMillis(seconds)
 	if err != nil {
 		return Song{}, err
@@ -52,7 +53,7 @@ func (s *Store) SetLineCue(ctx context.Context, songID int64, based Version, lin
 }
 
 // ClearLineCue removes a Line's Cue.
-func (s *Store) ClearLineCue(ctx context.Context, songID int64, based Version, lineID int64) (Song, error) {
+func (s *Store) ClearLineCue(ctx context.Context, songID int64, based songversion.Version, lineID int64) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		return writeLineCue(ctx, tx, songID, lineID, sql.NullInt64{})
 	})
@@ -76,7 +77,7 @@ func writeLineCue(ctx context.Context, tx *sql.Tx, songID, lineID int64, ms sql.
 
 // ClearSectionCues removes the Cues of all a Section's Lines, dormant ones
 // included.
-func (s *Store) ClearSectionCues(ctx context.Context, songID int64, based Version, sectionID int64) (Song, error) {
+func (s *Store) ClearSectionCues(ctx context.Context, songID int64, based songversion.Version, sectionID int64) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		if _, err := findSection(ctx, tx, songID, sectionID); err != nil {
 			return err
@@ -90,7 +91,7 @@ func (s *Store) ClearSectionCues(ctx context.Context, songID int64, based Versio
 }
 
 // ClearCues removes every Cue in a Song, dormant ones included.
-func (s *Store) ClearCues(ctx context.Context, songID int64, based Version) (Song, error) {
+func (s *Store) ClearCues(ctx context.Context, songID int64, based songversion.Version) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx, `UPDATE lines SET cue_ms = NULL
 			WHERE cue_ms IS NOT NULL AND id IN (`+songLines+`)`, songID); err != nil {
@@ -114,7 +115,7 @@ type CueValue struct {
 // and leaves every other Cue alone. It puts back what another Cue edit
 // changed, e.g. to undo it, so a Line in the Scrapbook may be given back
 // the Cue it kept there.
-func (s *Store) RestoreCues(ctx context.Context, songID int64, based Version, values []CueValue) (Song, error) {
+func (s *Store) RestoreCues(ctx context.Context, songID int64, based songversion.Version, values []CueValue) (Song, error) {
 	ms := make([]sql.NullInt64, len(values))
 	for i, v := range values {
 		if v.Cue == nil {
@@ -140,7 +141,7 @@ func (s *Store) RestoreCues(ctx context.Context, songID int64, based Version, va
 // seconds, by the seconds given, dormant ones included. It's how Cues
 // follow a Clip that was moved. None may end up before the start of the
 // Timeline, or the shift is refused.
-func (s *Store) ShiftCues(ctx context.Context, songID int64, based Version, start, end, by float64) (Song, error) {
+func (s *Store) ShiftCues(ctx context.Context, songID int64, based songversion.Version, start, end, by float64) (Song, error) {
 	if end <= start {
 		return Song{}, domain.Invalid("the span must end after it starts")
 	}

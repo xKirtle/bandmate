@@ -16,7 +16,7 @@ import (
 
 	"github.com/xKirtle/bandmate/internal/audio"
 	"github.com/xKirtle/bandmate/internal/domain"
-	"github.com/xKirtle/bandmate/internal/lyricsheet"
+	"github.com/xKirtle/bandmate/internal/songversion"
 )
 
 // Timeline is a Song's audio space, measured in seconds.
@@ -24,8 +24,8 @@ type Timeline struct {
 	SongID int64 `json:"songId"`
 	// Version and UpdatedAt are the Song's, which every Timeline change
 	// moves on.
-	Version   lyricsheet.Version `json:"version"`
-	UpdatedAt time.Time          `json:"updatedAt"`
+	Version   songversion.Version `json:"version"`
+	UpdatedAt time.Time           `json:"updatedAt"`
 	// Tracks are top to bottom.
 	Tracks []Track `json:"tracks"`
 	// Beats are the Beats the Clips play, each once, without their peaks.
@@ -289,7 +289,7 @@ func read(ctx context.Context, tx *sql.Tx, songID int64) (Timeline, error) {
 
 // AddBeat places the whole of a Beat on a Track of the Song, after its last
 // Clip, or at 0:00 if it has none.
-func (s *Store) AddBeat(ctx context.Context, songID int64, based lyricsheet.Version, trackID, beatID int64) (Timeline, error) {
+func (s *Store) AddBeat(ctx context.Context, songID int64, based songversion.Version, trackID, beatID int64) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		if err := findTrack(ctx, tx, songID, trackID); err != nil {
 			return err
@@ -328,7 +328,7 @@ type TrackChanges struct {
 
 // UpdateTrack renames a Track or sets its volume, mute or solo. Its name
 // can't be blank, and its volume must be from MinVolume to MaxVolume.
-func (s *Store) UpdateTrack(ctx context.Context, songID int64, based lyricsheet.Version, trackID int64, changes TrackChanges) (Timeline, error) {
+func (s *Store) UpdateTrack(ctx context.Context, songID int64, based songversion.Version, trackID int64, changes TrackChanges) (Timeline, error) {
 	var sets []string
 	var args []any
 	if c := changes.Name; c.Set {
@@ -405,7 +405,7 @@ type NewTrack struct {
 // AddTrack adds a Track to the Timeline. Its name can't be blank, its
 // volume must be from MinVolume to MaxVolume, and its Clips follow the same
 // rules as placing a Clip.
-func (s *Store) AddTrack(ctx context.Context, songID int64, based lyricsheet.Version, t NewTrack) (Timeline, error) {
+func (s *Store) AddTrack(ctx context.Context, songID int64, based songversion.Version, t NewTrack) (Timeline, error) {
 	name, err := trackName(t.Name)
 	if err != nil {
 		return Timeline{}, err
@@ -429,7 +429,7 @@ func (s *Store) AddTrack(ctx context.Context, songID int64, based lyricsheet.Ver
 
 // ReorderTracks puts a Song's Tracks in the given order, top to bottom,
 // which must list every one of them exactly once. Their Clips go with them.
-func (s *Store) ReorderTracks(ctx context.Context, songID int64, based lyricsheet.Version, order []int64) (Timeline, error) {
+func (s *Store) ReorderTracks(ctx context.Context, songID int64, based songversion.Version, order []int64) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		current := map[int64]bool{}
 		err := query(ctx, tx, `SELECT id FROM tracks WHERE song_id = ?`, []any{songID},
@@ -467,7 +467,7 @@ func (s *Store) ReorderTracks(ctx context.Context, songID int64, based lyricshee
 // stay in the Beat Library, their Sounds are kept a while for undo, and
 // their Takes are detached, to be placed again. A Song always has a Track,
 // so its last one can't be deleted.
-func (s *Store) DeleteTrack(ctx context.Context, songID int64, based lyricsheet.Version, trackID int64) (Timeline, error) {
+func (s *Store) DeleteTrack(ctx context.Context, songID int64, based songversion.Version, trackID int64) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		return deleteTrack(ctx, tx, songID, trackID)
 	})
@@ -510,7 +510,7 @@ func markDetached(ctx context.Context, tx *sql.Tx, songID int64) error {
 
 // SetLoop sets the Song's Loop to repeat from start to end, which must come
 // after start, switched on or off.
-func (s *Store) SetLoop(ctx context.Context, songID int64, based lyricsheet.Version, start, end float64, on bool) (Timeline, error) {
+func (s *Store) SetLoop(ctx context.Context, songID int64, based songversion.Version, start, end float64, on bool) (Timeline, error) {
 	switch {
 	case start < -tolerance:
 		return Timeline{}, domain.Invalid("a Loop can't start before 0:00")
@@ -530,7 +530,7 @@ func (s *Store) SetLoop(ctx context.Context, songID int64, based lyricsheet.Vers
 
 // SwitchLoop switches the Song's Loop on or off, keeping its stretch. The
 // Song must have a Loop.
-func (s *Store) SwitchLoop(ctx context.Context, songID int64, based lyricsheet.Version, on bool) (Timeline, error) {
+func (s *Store) SwitchLoop(ctx context.Context, songID int64, based songversion.Version, on bool) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx, `UPDATE loops SET is_on = ? WHERE song_id = ?`, on, songID)
 		if err != nil {
@@ -541,7 +541,7 @@ func (s *Store) SwitchLoop(ctx context.Context, songID int64, based lyricsheet.V
 }
 
 // ClearLoop removes the Song's Loop.
-func (s *Store) ClearLoop(ctx context.Context, songID int64, based lyricsheet.Version) (Timeline, error) {
+func (s *Store) ClearLoop(ctx context.Context, songID int64, based songversion.Version) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx, `DELETE FROM loops WHERE song_id = ?`, songID)
 		if err != nil {
@@ -620,7 +620,7 @@ func (src source) duration(ctx context.Context, tx *sql.Tx) (float64, error) {
 
 // MoveClip moves a Clip to start at a time on a Track of the same Timeline,
 // keeping its trim. It can't overlap a Clip already there.
-func (s *Store) MoveClip(ctx context.Context, songID int64, based lyricsheet.Version, clipID, trackID int64, start float64) (Timeline, error) {
+func (s *Store) MoveClip(ctx context.Context, songID int64, based songversion.Version, clipID, trackID int64, start float64) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		p, err := movedTo(ctx, tx, songID, clipID, trackID, start)
 		if err != nil {
@@ -657,7 +657,7 @@ type ClipMove struct {
 // against the Timeline as the whole move leaves it, so Clips moved together
 // may pass each other's old places, but none can overlap another Clip.
 // If any can't go where it's moved, none moves.
-func (s *Store) MoveClips(ctx context.Context, songID int64, based lyricsheet.Version, moves []ClipMove) (Timeline, error) {
+func (s *Store) MoveClips(ctx context.Context, songID int64, based songversion.Version, moves []ClipMove) (Timeline, error) {
 	if len(moves) == 0 {
 		return Timeline{}, domain.Invalid("clips are required")
 	}
@@ -696,7 +696,7 @@ func (s *Store) MoveClips(ctx context.Context, songID int64, based lyricsheet.Ve
 // reach beyond the source or into a neighbour. Its Fades go with its edges,
 // shortened to fit if it's now too short for them, unless fades, if given,
 // sets them, e.g. to undo the trim.
-func (s *Store) TrimClip(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64, offset, length float64,
+func (s *Store) TrimClip(ctx context.Context, songID int64, based songversion.Version, clipID int64, offset, length float64,
 	fades *Fades) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		p, err := clipPlacement(ctx, tx, songID, clipID)
@@ -764,7 +764,7 @@ type NewClip struct {
 // a Track of the Timeline, e.g. to bring back a deleted Clip as it was. It
 // must stay within its source, start on the Timeline and not overlap a Clip
 // already there.
-func (s *Store) PlaceClip(ctx context.Context, songID int64, based lyricsheet.Version, trackID int64, c NewClip) (Timeline, error) {
+func (s *Store) PlaceClip(ctx context.Context, songID int64, based songversion.Version, trackID int64, c NewClip) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		return placeOnTrack(ctx, tx, songID, trackID, c)
 	})
@@ -919,7 +919,7 @@ type PlacedClip struct {
 // newTracks are added at the bottom first, in order, for Clips to go on, as
 // a paste adds them. None may overlap a Clip already there, or another of
 // them. If any can't be placed, none is, and no Track is added.
-func (s *Store) PlaceClips(ctx context.Context, songID int64, based lyricsheet.Version, newTracks []string,
+func (s *Store) PlaceClips(ctx context.Context, songID int64, based songversion.Version, newTracks []string,
 	clips []PlacedClip) (Timeline, error) {
 	if len(clips) == 0 {
 		return Timeline{}, domain.Invalid("clips are required")
@@ -1101,7 +1101,7 @@ func insertClip(ctx context.Context, tx *sql.Tx, p placement) (int64, error) {
 // DuplicateClip adds a copy of a Clip, with the same trim, name, Gain and
 // Fades, right after it on its Track, or after the Track's last Clip if something is in
 // the way. A Clip of Takes gets copies of its Takes, sharing their files.
-func (s *Store) DuplicateClip(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64) (Timeline, error) {
+func (s *Store) DuplicateClip(ctx context.Context, songID int64, based songversion.Version, clipID int64) (Timeline, error) {
 	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
 		p, err := clipPlacement(ctx, tx, songID, clipID)
 		if err != nil {
@@ -1175,7 +1175,7 @@ type ClipCopy struct {
 // within its source, start on the Timeline and not overlap a Clip already
 // there, or another of them. If any can't be pasted, none is, and no Track
 // is added.
-func (s *Store) PasteClips(ctx context.Context, songID int64, based lyricsheet.Version, newTracks []string,
+func (s *Store) PasteClips(ctx context.Context, songID int64, based songversion.Version, newTracks []string,
 	clips []ClipCopy) (Timeline, error) {
 	if len(clips) == 0 {
 		return Timeline{}, domain.Invalid("clips are required")
@@ -1283,7 +1283,7 @@ func (s *Store) removeTakeFiles(ids []int64) {
 
 // RenameClip gives a Clip a name of its own, or, given a blank one, clears
 // it, so the Clip goes by its source's name again.
-func (s *Store) RenameClip(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64, name string) (Timeline, error) {
+func (s *Store) RenameClip(ctx context.Context, songID int64, based songversion.Version, clipID int64, name string) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx, `UPDATE clips SET name = ?
 			WHERE id = ? AND track_id IN (SELECT id FROM tracks WHERE song_id = ?)`, clipName(&name), clipID, songID)
@@ -1296,7 +1296,7 @@ func (s *Store) RenameClip(ctx context.Context, songID int64, based lyricsheet.V
 
 // SetClipGain sets how much louder or quieter a Clip plays, in dB, from
 // MinGain to MaxGain.
-func (s *Store) SetClipGain(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64, gain float64) (Timeline, error) {
+func (s *Store) SetClipGain(ctx context.Context, songID int64, based songversion.Version, clipID int64, gain float64) (Timeline, error) {
 	if err := checkGain(gain); err != nil {
 		return Timeline{}, err
 	}
@@ -1321,7 +1321,7 @@ func checkGain(gain float64) error {
 // SetClipFades sets how long a Clip rises from silence at its start and
 // falls to silence at its end, in seconds: 0 for no Fade. Together they
 // can't run longer than the Clip.
-func (s *Store) SetClipFades(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64, fades Fades) (Timeline, error) {
+func (s *Store) SetClipFades(ctx context.Context, songID int64, based songversion.Version, clipID int64, fades Fades) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		p, err := clipPlacement(ctx, tx, songID, clipID)
 		if err != nil {
@@ -1392,7 +1392,7 @@ func clipName(name *string) sql.NullString {
 // DeleteClip removes a Clip from the Timeline. Its Beat stays in the Beat
 // Library, its Sound is kept a while for undo, and its Takes are detached,
 // to be placed again.
-func (s *Store) DeleteClip(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64) (Timeline, error) {
+func (s *Store) DeleteClip(ctx context.Context, songID int64, based songversion.Version, clipID int64) (Timeline, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		return deleteClip(ctx, tx, songID, clipID)
 	})
@@ -1403,7 +1403,7 @@ func (s *Store) DeleteClip(ctx context.Context, songID int64, based lyricsheet.V
 // them, as DeleteTrack does each: e.g. to undo a paste that added Tracks.
 // If any isn't on the Song's Timeline, or none of its Tracks would be left,
 // nothing is removed.
-func (s *Store) DeleteClips(ctx context.Context, songID int64, based lyricsheet.Version, clipIDs, trackIDs []int64) (Timeline, error) {
+func (s *Store) DeleteClips(ctx context.Context, songID int64, based songversion.Version, clipIDs, trackIDs []int64) (Timeline, error) {
 	if len(clipIDs) == 0 {
 		return Timeline{}, domain.Invalid("clipIds are required")
 	}
@@ -1542,7 +1542,7 @@ func isFree(ctx context.Context, tx *sql.Tx, clipID int64, p placement) (bool, e
 // change runs one change to a Song's Timeline in a transaction, marks the
 // Song as edited, and returns the updated Timeline. If the Song is no longer
 // at the version the change was based on, or fn fails, nothing changes.
-func (s *Store) change(ctx context.Context, songID int64, based lyricsheet.Version, fn func(tx *sql.Tx) error) (Timeline, error) {
+func (s *Store) change(ctx context.Context, songID int64, based songversion.Version, fn func(tx *sql.Tx) error) (Timeline, error) {
 	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges) error {
 		return fn(tx)
 	})
@@ -1551,14 +1551,14 @@ func (s *Store) change(ctx context.Context, songID int64, based lyricsheet.Versi
 // changeWithFiles is change for a change with files to keep, link or
 // remove, which fn adds to changes. They're changed only once the change is
 // committed.
-func (s *Store) changeWithFiles(ctx context.Context, songID int64, based lyricsheet.Version,
+func (s *Store) changeWithFiles(ctx context.Context, songID int64, based songversion.Version,
 	fn func(tx *sql.Tx, changes *audio.FileChanges) error) (Timeline, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Timeline{}, err
 	}
 	defer tx.Rollback()
-	if err := lyricsheet.Touch(ctx, tx, songID, based); err != nil {
+	if err := songversion.Touch(ctx, tx, songID, based); err != nil {
 		return Timeline{}, err
 	}
 	var changes audio.FileChanges

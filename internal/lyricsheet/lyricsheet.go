@@ -18,14 +18,9 @@ import (
 	"github.com/xKirtle/bandmate/internal/audio"
 	"github.com/xKirtle/bandmate/internal/domain"
 	"github.com/xKirtle/bandmate/internal/songfiles"
+	"github.com/xKirtle/bandmate/internal/songversion"
 	"github.com/xKirtle/bandmate/internal/tags"
 )
-
-// ErrStale means a change was based on a version of the Song that is no
-// longer current: the Song changed in the meantime, e.g. from another tab.
-// Its code tells it apart from other conflicts, so the client can offer to
-// reload the Song.
-var ErrStale = domain.CodedConflict("stale", "this Song changed elsewhere, so the change wasn't saved", nil)
 
 var (
 	errTitleRequired = domain.Invalid("title is required")
@@ -52,23 +47,12 @@ func (s Status) valid() bool {
 	return false
 }
 
-// Version counts the changes to a Song: its metadata, Status or Lyric Sheet.
-// It only guards against overwriting newer work, and is no Snapshot: older
-// versions aren't kept.
-//
-// Every change takes the version it was based on and fails with ErrStale if
-// the Song has changed since. AnyVersion applies the change regardless.
-type Version int64
-
-// AnyVersion skips the version check.
-const AnyVersion Version = 0
-
 // Song is the full Song aggregate.
 type Song struct {
-	ID      int64   `json:"id"`
-	Version Version `json:"version"`
-	Title   string  `json:"title"`
-	Status  Status  `json:"status"`
+	ID      int64               `json:"id"`
+	Version songversion.Version `json:"version"`
+	Title   string              `json:"title"`
+	Status  Status              `json:"status"`
 	// Key, BPM, Capo and Tuning record how to play the Song. Empty text and
 	// nil numbers mean "not set".
 	Key       string    `json:"key"`
@@ -359,7 +343,7 @@ type SongChanges struct {
 
 // UpdateSong applies changes to a Song. Every change is validated before
 // anything is written, so a rejected update leaves the Song as it was.
-func (s *Store) UpdateSong(ctx context.Context, id int64, based Version, changes SongChanges) (Song, error) {
+func (s *Store) UpdateSong(ctx context.Context, id int64, based songversion.Version, changes SongChanges) (Song, error) {
 	var sets []string
 	var args []any
 	set := func(column string, value any) {
@@ -401,10 +385,13 @@ func (s *Store) UpdateSong(ctx context.Context, id int64, based Version, changes
 	}
 	if len(sets) == 0 {
 		song, err := s.GetSong(ctx, id)
-		if err == nil && based != AnyVersion && song.Version != based {
-			return Song{}, ErrStale
+		if err != nil {
+			return Song{}, err
 		}
-		return song, err
+		if err := songversion.Expect(based, song.Version); err != nil {
+			return Song{}, err
+		}
+		return song, nil
 	}
 	return s.change(ctx, id, based, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx,
@@ -419,7 +406,7 @@ func (s *Store) UpdateSong(ctx context.Context, id int64, based Version, changes
 // DeleteSong removes a Song. Everything the Song owns references it with
 // ON DELETE CASCADE, so it goes too, and so do the files of every kind it
 // owns (see songfiles), detached Takes and unused Sounds included.
-func (s *Store) DeleteSong(ctx context.Context, id int64, based Version) error {
+func (s *Store) DeleteSong(ctx context.Context, id int64, based songversion.Version) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -433,7 +420,7 @@ func (s *Store) DeleteSong(ctx context.Context, id int64, based Version) error {
 	if err != nil {
 		return fmt.Errorf("deleting song: %w", err)
 	}
-	if err := expectCurrent(ctx, tx, res, id); err != nil {
+	if err := songversion.ExpectCurrent(ctx, tx, res, id); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
@@ -549,23 +536,6 @@ func queryIDs(ctx context.Context, tx *sql.Tx, stmt string, args ...any) ([]int6
 		return nil
 	})
 	return ids, err
-}
-
-// expectCurrent checks that a write to a Song, guarded by the version it
-// was based on, matched the Song. If not, the Song is gone
-// (domain.ErrNotFound) or has moved on to a newer version (ErrStale).
-func expectCurrent(ctx context.Context, db domain.Queryer, res sql.Result, id int64) error {
-	if err := domain.ExpectOneRow(res); !errors.Is(err, domain.ErrNotFound) {
-		return err
-	}
-	var exists bool
-	if err := db.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM songs WHERE id = ?)`, id).Scan(&exists); err != nil {
-		return fmt.Errorf("checking song: %w", err)
-	}
-	if exists {
-		return ErrStale
-	}
-	return domain.ErrNotFound
 }
 
 func intOrNil(n sql.NullInt64) *int {

@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
+	"github.com/xKirtle/bandmate/internal/songversion"
 )
 
 // Masters are part of the Song: every change to one answers with the full,
@@ -54,7 +55,7 @@ func (a *App) updateMaster(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var changes lyricsheet.MasterChanges
-	a.changeSheet(w, r, &changes, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
+	a.changeSheet(w, r, &changes, func(id int64, based songversion.Version) (lyricsheet.Song, error) {
 		return a.songs.UpdateMaster(r.Context(), id, based, masterID, changes)
 	})
 }
@@ -64,7 +65,7 @@ func (a *App) makeMainMaster(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	a.changeSheet(w, r, nil, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
+	a.changeSheet(w, r, nil, func(id int64, based songversion.Version) (lyricsheet.Song, error) {
 		return a.songs.MakeMainMaster(r.Context(), id, based, masterID)
 	})
 }
@@ -74,7 +75,7 @@ func (a *App) deleteMaster(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	a.changeSheet(w, r, nil, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
+	a.changeSheet(w, r, nil, func(id int64, based songversion.Version) (lyricsheet.Song, error) {
 		return a.songs.DeleteMaster(r.Context(), id, based, masterID)
 	})
 }
