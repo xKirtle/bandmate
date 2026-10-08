@@ -99,6 +99,19 @@
     oncommit();
   }
 
+  // Esc takes back the notes typed: back to the tuning as it is, and to the
+  // picker if that isn't a custom one.
+  async function notesKey(event: KeyboardEvent) {
+    if (event.key !== 'Escape') return;
+    customising = false;
+    if (valueChoice === custom) {
+      notes = value.trim();
+      return;
+    }
+    await tick();
+    document.getElementById(id)?.focus();
+  }
+
   // Custom notes as saved show in the field, and change as the Song does.
   $effect(() => {
     if (valueChoice === custom && !customising) notes = value.trim();
@@ -113,6 +126,7 @@
       bind:this={notesField}
       bind:value={notes}
       onchange={commitNotes}
+      onkeydown={notesKey}
       aria-label="Custom tuning: six notes, low string to high"
       autocomplete="off"
       autocapitalize="characters"

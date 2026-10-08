@@ -2,7 +2,7 @@
   import Keyboard from '@lucide/svelte/icons/keyboard';
   import { onDestroy } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
-  import { api, commonKeys, type Song, type SongChanges, type Status } from '../lib/api';
+  import { api, commonKeys, type Song, type Status } from '../lib/api';
   import Combobox from '../lib/Combobox.svelte';
   import FoldChevron from '../lib/FoldChevron.svelte';
   import LyricSheet from '../lib/LyricSheet.svelte';
@@ -19,6 +19,8 @@
   import TuningField from '../lib/TuningField.svelte';
   import { LyricSheetEditing } from '../lib/lyricSheetEditing.svelte';
   import { Saves } from '../lib/saves.svelte';
+  import { detailFields, type DetailFields } from '../lib/songFields';
+  import { committedAsItGoes } from '../lib/typedField.svelte';
   import { SyncMode } from '../lib/syncMode.svelte';
   import { songServer } from '../lib/songServer';
   import { takeNewFlag } from '../lib/newSong';
@@ -43,23 +45,14 @@
   if (isNew) replaceSearch(queryWithoutFlag);
   let titleAwaitsFocus = isNew;
 
-  // What the inputs show. Numbers stay text while typing.
-  interface Draft {
-    title: string;
-    status: Status;
-    key: string;
-    bpm: string;
-    capo: string;
-    tuning: string;
-    notes: string;
-  }
-
   // Every save the page and its panels make goes through Saves, made once
   // the Song's loaded.
   let saves = $state<Saves | null>(null);
   // Every change to the Lyric Sheet goes through Lyric Sheet editing, on top
   // of Saves, which ends Sync mode as the lyrics change.
   let editing = $state<LyricSheetEditing | null>(null);
+  // The Details, each typed in place and saved on its own (see songFields.ts).
+  let details = $state.raw<DetailFields | null>(null);
   // The Song as last saved. What's shown has the Cue changes not saved yet
   // made on top of it.
   const song = $derived(saves?.saved ?? null);
@@ -73,7 +66,10 @@
   // asks first, and changes made elsewhere wait to be shown (the Timeline's
   // recorder holds Saves' refreshes).
   let recording = $state(false);
-  let draft = $state<Draft>(toDraft(null));
+  // A Status picked, shown until its save ends.
+  let statusSent = $state<Status | null>(null);
+  const status = $derived(statusSent ?? song?.status ?? 'idea');
+  const title = $derived(details?.title.shown ?? '');
   let loadError = $state<string | null>(null);
   let deleting = $state(false);
   // Read mode offers no editing anywhere on the page but the Timeline. It's
@@ -97,8 +93,16 @@
     song && chordsInRead(song) === 'shown' && songChordsShown.of(id) ? songTranspose.of(id) : 0,
   );
   // The Details as Read mode shows them, with the key the Chords are shown in.
-  const summary = $derived(detailsSummary(draft, transpose));
-  const hasNotes = $derived(draft.notes.trim() !== '');
+  const summary = $derived(
+    details
+      ? detailsSummary(
+          { key: details.key.shown, bpm: details.bpm.shown, capo: details.capo.shown, tuning: details.tuning.shown },
+          transpose,
+        )
+      : '',
+  );
+  const notes = $derived(details?.notes.shown ?? '');
+  const hasNotes = $derived(notes.trim() !== '');
 
   // The Song's Tags as shown: changed at once, and saved one change after
   // another, each sending the whole list. Every Tag's name, to suggest.
@@ -159,7 +163,7 @@
       ([s, tl]) => {
         saves = new Saves({ server, song: s, timeline: tl, editsOutside, onReplace });
         editing = new LyricSheetEditing(saves, () => syncMode.end());
-        draft = toDraft(s);
+        details = detailFields(saves, api.updateSong);
         tags = s.tags;
         mode = openingMode(s.status);
       },
@@ -188,42 +192,23 @@
     } else if (change === tagChanges && song) tags = song.tags;
   }
 
-  function toDraft(s: Song | null): Draft {
-    return {
-      title: s?.title ?? '',
-      status: s?.status ?? 'idea',
-      key: s?.key ?? '',
-      bpm: s?.bpm?.toString() ?? '',
-      capo: s?.capo?.toString() ?? '',
-      tuning: s?.tuning ?? '',
-      notes: s?.notes ?? '',
-    };
-  }
-
-  async function save(changes: SongChanges, fields: (keyof Draft)[]) {
-    if (!saves) return;
-    const ended = await saves.submit((at) => api.updateSong(at, changes));
-    // Put back what the server has for the fields that failed, unless the
-    // Song changed elsewhere: then the edits stay, to be copied out.
-    if (ended === 'failed' || ended === 'closed') {
-      for (const f of fields) revert(f);
-    }
-  }
-
   // Coming back to the tab shows what changed meanwhile, e.g. on another
   // device (see Saves.refresh).
   function refreshOnReturn() {
     if (document.visibilityState === 'visible') saves?.refresh();
   }
 
-  // A refresh is about to show the Song as changed elsewhere. A focused
-  // field would keep showing the old Song, and typing into it would then
-  // overwrite the change made elsewhere. Nothing is unsaved, so leaving it
-  // saves nothing.
+  // A refresh is about to show the Song as changed elsewhere. Nothing is
+  // unsaved, so a Detail typed back to what's saved is let go, to show the
+  // change, and leaving a focused field saves nothing.
   function onReplace(latest: Song) {
+    for (const field of detailList()) field.cancel();
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-    draft = toDraft(latest);
     tags = latest.tags;
+  }
+
+  function detailList() {
+    return details ? Object.values(details) : [];
   }
 
   // Set while reloading on purpose, so leaving doesn't ask again.
@@ -235,38 +220,18 @@
     location.reload();
   }
 
-  // Masters' fields holding edits that aren't saved yet.
-  const unsavedEditors = new Set<object>();
-
-  function setUnsaved(editor: object, unsaved: boolean) {
-    if (unsaved) unsavedEditors.add(editor);
-    else unsavedEditors.delete(editor);
-  }
-
-  /** Shows what the server has for one field again. */
-  function revert<F extends keyof Draft>(field: F) {
-    draft[field] = toDraft(song)[field];
-  }
-
   /** Sets the BPM, e.g. copied from a Beat when asked to. */
   function setBpm(bpm: number) {
-    draft.bpm = String(bpm);
-    save({ bpm }, ['bpm']);
+    if (!details) return;
+    details.bpm.shown = String(bpm);
+    details.bpm.commit();
   }
 
-  function setStatus(status: Status) {
-    draft.status = status;
-    save({ status }, ['status']);
-  }
-
-  function commitText(field: 'title' | 'key' | 'tuning' | 'notes') {
-    if (!song) return;
-    const value = field === 'notes' ? draft.notes : draft[field].trim();
-    if (value === song[field]) {
-      revert(field);
-      return;
-    }
-    save({ [field]: value }, [field]);
+  async function setStatus(next: Status) {
+    if (!saves) return;
+    statusSent = next;
+    await saves.submit((at) => api.updateSong(at, { status: next }));
+    if (statusSent === next) statusSent = null;
   }
 
   // The title wraps in Write mode as it does in Read mode, so switching
@@ -279,7 +244,7 @@
     const resized = new ResizeObserver(fit);
     resized.observe(el);
     $effect(() => {
-      void draft.title;
+      void title;
       fit();
     });
     return () => resized.disconnect();
@@ -292,46 +257,41 @@
     el.select();
   }
 
-  // A title is one line: Enter saves it, and a pasted line break is a space.
+  // A title is one line: Enter saves it, Esc takes it back, and a pasted
+  // line break is a space.
   function oneLine(event: Event & { currentTarget: HTMLTextAreaElement }) {
-    if (/[\r\n]/.test(event.currentTarget.value))
-      draft.title = event.currentTarget.value.replace(/\s*[\r\n]+\s*/g, ' ');
+    if (details && /[\r\n]/.test(event.currentTarget.value))
+      details.title.shown = event.currentTarget.value.replace(/\s*[\r\n]+\s*/g, ' ');
   }
 
-  function commitNumber(field: 'bpm' | 'capo', label: string) {
-    if (!song) return;
-    const text = draft[field].trim();
-    if (text !== '' && !/^\d+$/.test(text)) {
-      saves?.report(`${label} must be a whole number`);
-      revert(field);
-      return;
-    }
-    const value = text === '' ? null : Number(text);
-    if (value === song[field]) {
-      revert(field);
-      return;
-    }
-    save({ [field]: value }, [field]);
+  function titleKey(event: KeyboardEvent & { currentTarget: HTMLTextAreaElement }) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      event.currentTarget.blur();
+    } else if (event.key === 'Escape') details?.title.cancel();
   }
 
-  function commitAll() {
-    for (const f of ['title', 'key', 'tuning', 'notes'] as const) commitText(f);
-    commitNumber('bpm', 'BPM');
-    commitNumber('capo', 'Capo');
+  /** Esc takes back what's typed in a Detail. */
+  function cancelOnEscape(field: { cancel: () => void }) {
+    return (event: KeyboardEvent) => event.key === 'Escape' && field.cancel();
   }
 
-  // Inputs save on change, which fires on blur. Leaving with the browser's
-  // back button doesn't blur, so save whatever is still being edited.
-  onDestroy(commitAll);
+  // Esc in the notes leaves them, keeping what's typed, so one key never
+  // throws away paragraphs.
+  function leaveOnEscape(event: KeyboardEvent & { currentTarget: HTMLTextAreaElement }) {
+    if (event.key === 'Escape') event.currentTarget.blur();
+  }
 
-  /** Whether the page holds edits Saves doesn't: Details being typed, a Master's, or the Lyric Sheet's. */
+  // Inputs save on change, which fires on blur, and as they go (see
+  // committedAsItGoes). Whatever is still typed as the page goes is saved
+  // too, e.g. a tuning picked.
+  onDestroy(() => {
+    for (const field of detailList()) field.destroy();
+  });
+
+  /** Whether the page holds edits Saves doesn't: the Lyric Sheet's. */
   function editsOutside() {
-    if (!song) return false;
-    if (unsavedEditors.size > 0 || editing?.unsaved) return true;
-    const saved = toDraft(song);
-    return (Object.keys(saved) as (keyof Draft)[]).some(
-      (f) => (f === 'notes' ? draft[f] : draft[f].trim()) !== saved[f],
-    );
+    return editing?.unsaved ?? false;
   }
 
   // Closing or reloading the tab can't wait for a save, or a recording, so ask first.
@@ -368,7 +328,7 @@
 <main class="page" style:--timeline-height="{timelineHeight}px">
   {#if loadError}
     <p class="error" role="alert">{loadError}</p>
-  {:else if !saves || !song || !editing}
+  {:else if !saves || !song || !editing || !details}
     <p class="muted">Loading…</p>
   {:else}
     <div class="song">
@@ -378,19 +338,13 @@
             <EditCover
               songId={song.id}
               cover={song.cover}
-              title={draft.title}
-              status={draft.status}
+              {title}
+              {status}
               change={saves.change}
               onError={saves.report}
             />
           {:else}
-            <SongCover
-              songId={song.id}
-              coverId={song.cover?.id ?? null}
-              title={draft.title}
-              status={draft.status}
-              size="header"
-            />
+            <SongCover songId={song.id} coverId={song.cover?.id ?? null} {title} {status} size="header" />
           {/if}
           <div class="head-main">
             <div class="title-block">
@@ -400,20 +354,21 @@
                   id="song-title"
                   class="title"
                   rows="1"
-                  bind:value={draft.title}
+                  bind:value={details.title.shown}
                   {@attach fitTitle}
                   {@attach focusNewTitle}
+                  {@attach committedAsItGoes(details.title)}
                   oninput={oneLine}
-                  onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), e.currentTarget.blur())}
-                  onchange={() => commitText('title')}
+                  onkeydown={titleKey}
+                  onchange={() => details?.title.commit()}
                   required
                   autocomplete="off"
                   enterkeyhint="done"></textarea>
               {:else}
-                <h1 class="title">{draft.title}</h1>
+                <h1 class="title">{title}</h1>
               {/if}
               <div class="meta">
-                <StatusBadge status={draft.status} onChange={writing ? setStatus : undefined} />
+                <StatusBadge {status} onChange={writing ? setStatus : undefined} />
                 <span class="muted" aria-hidden="true">·</span>
                 <p class="save-state muted" role="status">
                   {#if saves.pending > 0}
@@ -455,11 +410,13 @@
                 Key
                 <Combobox
                   id="song-key"
-                  bind:value={draft.key}
+                  bind:value={details.key.shown}
+                  {@attach committedAsItGoes(details.key)}
                   options={commonKeys}
                   saved={song.key}
-                  onpick={() => commitText('key')}
-                  onchange={() => commitText('key')}
+                  onpick={() => details?.key.commit()}
+                  onchange={() => details?.key.commit()}
+                  onrevert={() => details?.key.cancel()}
                   autocomplete="off"
                   autocapitalize="characters"
                   enterkeyhint="done"
@@ -469,8 +426,10 @@
               <label class="field bpm">
                 BPM
                 <input
-                  bind:value={draft.bpm}
-                  onchange={() => commitNumber('bpm', 'BPM')}
+                  bind:value={details.bpm.shown}
+                  {@attach committedAsItGoes(details.bpm)}
+                  onchange={() => details?.bpm.commit()}
+                  onkeydown={cancelOnEscape(details.bpm)}
                   inputmode="numeric"
                   autocomplete="off"
                   enterkeyhint="done"
@@ -480,8 +439,10 @@
               <label class="field capo">
                 Capo
                 <input
-                  bind:value={draft.capo}
-                  onchange={() => commitNumber('capo', 'Capo')}
+                  bind:value={details.capo.shown}
+                  {@attach committedAsItGoes(details.capo)}
+                  onchange={() => details?.capo.commit()}
+                  onkeydown={cancelOnEscape(details.capo)}
                   inputmode="numeric"
                   autocomplete="off"
                   enterkeyhint="done"
@@ -493,8 +454,8 @@
                 <TuningField
                   id="song-tuning"
                   labelledby="song-tuning-label"
-                  bind:value={draft.tuning}
-                  oncommit={() => commitText('tuning')}
+                  bind:value={details.tuning.shown}
+                  oncommit={() => details?.tuning.commit()}
                   oninvalid={saves.report}
                 />
               </div>
@@ -507,8 +468,13 @@
             {#if notesOpen}
               <label class="notes">
                 <span class="visually-hidden">Notes</span>
-                <textarea id="song-notes" bind:value={draft.notes} onchange={() => commitText('notes')} rows="4"
-                ></textarea>
+                <textarea
+                  id="song-notes"
+                  bind:value={details.notes.shown}
+                  {@attach committedAsItGoes(details.notes)}
+                  onchange={() => details?.notes.commit()}
+                  onkeydown={leaveOnEscape}
+                  rows="4"></textarea>
               </label>
             {/if}
           {:else}
@@ -520,7 +486,7 @@
               <div class="read-tags"><TagChips {tags} /></div>
             {/if}
             {#if notesOpen && hasNotes}
-              <p id="song-notes" class="read-notes">{draft.notes}</p>
+              <p id="song-notes" class="read-notes">{notes}</p>
             {/if}
           {/if}
         </section>
@@ -568,7 +534,7 @@
           >
             {#if part === 'masters'}
               <summary><FoldChevron />{song.masters.length > 1 ? 'Masters' : 'Master'}</summary>
-              <Masters {song} {mode} change={saves.change} onUnsaved={setUnsaved} {setStatus} {recording} />
+              <Masters {song} {mode} change={saves.change} typing={saves.typing} {setStatus} {recording} />
             {:else}
               <summary><FoldChevron />Scrapbook</summary>
               <Scrapbook {song} {drag} {editing} />

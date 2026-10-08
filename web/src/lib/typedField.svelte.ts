@@ -9,7 +9,8 @@
 //   nothing.
 // - Once a value is sent, the field shows what's saved again as its save
 //   resolves: the value, or what was saved before if it failed. Anything
-//   typed since wins over it.
+//   typed since wins over it. Refused as the Song changed elsewhere, what
+//   was typed stays, unsaved, to copy out.
 // - Cancelled, e.g. on Esc, it shows what's saved again.
 // - Destroyed, e.g. as the page goes, it commits what's typed, dropping it
 //   if its rule refuses it.
@@ -18,6 +19,7 @@
 // While what it shows differs from what's saved, the Song has unsaved
 // edits: closing the tab asks first, and a refresh doesn't replace what's
 // typed.
+import type { Attachment } from 'svelte/attachments';
 import type { Typing } from './saves.svelte';
 
 /** What a field's rule makes of what's typed: a value to save, going back to what's saved, or a message to show. */
@@ -30,7 +32,10 @@ export interface TypedFieldOptions<T> {
   format: (value: T) => string;
   /** The field's rule for what's typed. */
   parse: (typed: string) => Parsed<T>;
-  /** Saves a value; given a promise, what's typed shows until it resolves. */
+  /**
+   * Saves a value; given a promise, what's typed shows until it resolves,
+   * and stays if it resolves to 'stale', refused as the Song changed elsewhere.
+   */
   commit: (value: T) => unknown;
   /** Puts an edit on Saves' list of edits being typed, until the function returned is called. */
   typing: (entry: Typing) => () => void;
@@ -101,10 +106,11 @@ export class TypedField<T> implements Typing {
     // Shown as sent, e.g. trimmed, until its save resolves.
     const shown = this.#options.format(parsed.value);
     this.#type((this.#sending = shown));
-    void sent.finally(() => {
+    const settle = (ended?: unknown) => {
       if (this.#sending === shown) this.#sending = null;
-      if (this.#typed === shown) this.#type(null);
-    });
+      if (this.#typed === shown && ended !== 'stale') this.#type(null);
+    };
+    sent.then(settle, () => settle());
     return true;
   }
 
@@ -131,4 +137,12 @@ export class TypedField<T> implements Typing {
     this.#message = null;
     return true;
   }
+}
+
+/**
+ * Commits what's typed in a field as its input goes, e.g. as the Timeline
+ * collapses, the mode switches or the page goes, which needn't blur it first.
+ */
+export function committedAsItGoes(field: { destroy: () => void }): Attachment {
+  return () => field.destroy;
 }

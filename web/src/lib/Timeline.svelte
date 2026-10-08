@@ -17,7 +17,6 @@
   import Undo2 from '@lucide/svelte/icons/undo-2';
   import X from '@lucide/svelte/icons/x';
   import { onDestroy, onMount, tick, untrack } from 'svelte';
-  import type { Attachment } from 'svelte/attachments';
   import { MediaQuery } from 'svelte/reactivity';
   import { innerHeight } from 'svelte/reactivity/window';
   import { api, type Beat, type Clip, type Song, type Timeline, type Track, type TrackChanges } from './api';
@@ -53,7 +52,7 @@
   import { rightHalfOf, splitTargets } from './split';
   import { Selection, type ClipIds, type SelectionBox } from './selection.svelte';
   import { TimelineEditing } from './timelineEditing.svelte';
-  import type { TypedField } from './typedField.svelte';
+  import { committedAsItGoes, type TypedField } from './typedField.svelte';
   import {
     copy,
     duplicate as duplicatePlacement,
@@ -383,14 +382,6 @@
   function focusField(input: HTMLInputElement) {
     input.focus();
     input.select();
-  }
-
-  /**
-   * Commits what's typed in a name's field as the field goes, e.g. as the
-   * Timeline collapses or the page goes, which needn't blur it first.
-   */
-  function committedAsItGoes(field: { destroy: () => void }): Attachment {
-    return () => field.destroy;
   }
 
   function startRename(track: Track) {

@@ -73,8 +73,8 @@ export interface SavesOptions {
   /** Waits between tries of a Cue change's save. */
   wait?: Wait;
   /**
-   * Whether the page holds edits that aren't saved, outside Saves, e.g.
-   * Details being typed or a Lyric Sheet editor open.
+   * Whether the page holds edits that aren't saved, outside Saves: a Lyric
+   * Sheet editor's.
    */
   editsOutside?: () => boolean;
   /**

@@ -136,6 +136,25 @@ describe('TypedField', () => {
     expect(saves.unsaved).toBe(false);
   });
 
+  it('keeps what’s typed, unsaved, when its save is refused as the Song changed elsewhere', async () => {
+    const server = new FakeSongServer(emptySong({ key: 'C' }));
+    const saves = await savesFor(server);
+    const field = new TypedField<string>({
+      saved: () => saves.saved.key,
+      format: (key) => key,
+      parse: parseKey,
+      commit: (key) => saves.submit((at) => server.update(at, { key })),
+      typing: saves.typing,
+    });
+    server.changeElsewhere({ title: 'From another tab' });
+    field.shown = 'Am';
+    field.commit();
+    await settled();
+    expect(saves.stale).toBe(true);
+    expect(field.shown).toBe('Am');
+    expect(saves.unsaved).toBe(true);
+  });
+
   it('keeps typing newer than a commit on its way, and doesn’t send a commit twice', async () => {
     const { server, saves, field, committed } = await keyField();
     const release = server.holdNextAnswer();
