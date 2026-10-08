@@ -615,8 +615,9 @@
       get recording() {
         return recording;
       },
+      // As saved, as the Lyric Sheet's Cue gutter reads them.
       get hasClips() {
-        return clips.length > 0;
+        return saves.timeline.tracks.some((t) => t.clips.length > 0);
       },
       playheadAt,
     }),

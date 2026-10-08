@@ -43,7 +43,8 @@
     addedNotice,
     describe,
     isEmpty,
-    lineName as nameLine,
+    lineName,
+    ofSection,
     places,
     sectionsInArrangement,
   } from './sections';
@@ -171,7 +172,7 @@
 
   /** Sets or, with null, clears the Cue of a Line, as the gutter names it. */
   function setLineCue(line: Position, cue: number | null) {
-    changeCues({ kind: 'setLineCue', lineId: line.line, cue }, `the Cue of ${lineName(line)}`);
+    changeCues({ kind: 'setLineCue', lineId: line.line, cue }, `the Cue of ${lineName(song, line)}`);
   }
 
   // In Write mode, each Line is tracked, to follow playback to, and each
@@ -182,10 +183,6 @@
   /** The Lines of a Section's active Alternate: those whose Cues are in effect. */
   function activeLines(section: Section | undefined): Line[] {
     return activeAlternate(section)?.lines ?? [];
-  }
-  /** Ends a Line's name with its Section's Label, e.g. " of Chorus", as the gutter names Lines. */
-  function ofSection(label: string | undefined): string {
-    return label ? ` of ${label}` : '';
   }
   // The Line Cue fields in order down the page.
   const writeFieldOrder = $derived(
@@ -199,10 +196,6 @@
   // Cues out of order are marked in the gutter, each naming the Line it's
   // out of order with as the gutter names Lines, e.g. "Line 6 of Chorus".
   const outOfOrder = $derived(new Map(outOfOrderCues(song).map((c) => [c.line, c])));
-
-  function lineName(line: Position): string {
-    return nameLine(song, line);
-  }
 
   /** How a Section's Cues show on its text box in Write mode. */
   function cueingFor(section: Section): Cueing {
@@ -218,7 +211,7 @@
             play: leadInto,
             outOfOrder: (line) => {
               const mark = outOfOrder.get(line);
-              return mark ? outOfOrderReason(mark, lineName) : null;
+              return mark ? outOfOrderReason(mark, (at) => lineName(song, at)) : null;
             },
           }
         : undefined,

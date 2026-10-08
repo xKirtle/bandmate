@@ -51,15 +51,12 @@ class FakePort implements SyncPort {
   }
 }
 
-/** A Device's storage, kept in memory. */
-class FakeStorage {
-  #items = new Map<string, string>();
-  getItem(key: string) {
-    return this.#items.get(key) ?? null;
-  }
-  setItem(key: string, value: string) {
-    this.#items.set(key, value);
-  }
+/** A Device's storage, holding some values. */
+function storage(values: Record<string, string> = {}): Storage {
+  return {
+    getItem: (key: string) => values[key] ?? null,
+    setItem: (key: string, value: string) => void (values[key] = value),
+  } as Storage;
 }
 
 /**
@@ -68,7 +65,7 @@ class FakeStorage {
  * Device's storage, in Write mode on a wide screen unless the test changes
  * the page.
  */
-async function syncModeFor(server: FakeSongServer, storage = new FakeStorage()) {
+async function syncModeFor(server: FakeSongServer, onDevice = storage()) {
   const [song, timeline] = await Promise.all([server.getSong(), server.getTimeline()]);
   const saves = new Saves({ server, song, timeline, wait: () => Promise.resolve() });
   const page = $state<{ mode: Mode; wide: boolean }>({ mode: 'write', wide: true });
@@ -81,13 +78,13 @@ async function syncModeFor(server: FakeSongServer, storage = new FakeStorage()) 
         wide: () => page.wide,
         song: () => saves.song,
         cue: saves.cue,
-        storage: storage as unknown as Storage,
+        storage: onDevice,
       });
     }),
   );
   const detach = syncMode.attach(port);
   flushSync();
-  return { saves, syncMode, port, page, storage, detach };
+  return { saves, syncMode, port, page, detach };
 }
 
 type Harness = Awaited<ReturnType<typeof syncModeFor>>;
@@ -299,9 +296,9 @@ describe('Sync mode, the Line up next', () => {
 
 describe('Sync mode, the first-time hint', () => {
   it('shows the first time Sync mode comes on on a Device, and never again there', async () => {
-    const storage = new FakeStorage();
+    const device = storage();
     const server = new FakeSongServer(verseSong());
-    const { syncMode } = await syncModeFor(server, storage);
+    const { syncMode } = await syncModeFor(server, device);
     switchOn(syncMode);
     expect(syncMode.hint).toBe(true);
     syncMode.switch();
@@ -310,7 +307,7 @@ describe('Sync mode, the first-time hint', () => {
     switchOn(syncMode);
     expect(syncMode.hint).toBe(false);
 
-    const onAnotherVisit = await syncModeFor(server, storage);
+    const onAnotherVisit = await syncModeFor(server, device);
     switchOn(onAnotherVisit.syncMode);
     expect(onAnotherVisit.syncMode.hint).toBe(false);
 

@@ -53,7 +53,7 @@ export interface SyncModeOptions {
    * Verse", in case it has to be taken back; resolves to whether it was saved.
    */
   cue: (change: CueChange, what: string) => Promise<boolean>;
-  /** The Device's storage, where the first-time hint is remembered as seen. By default this device's. */
+  /** The Device's storage, where the first-time hint is remembered as seen. By default this Device's. */
   storage?: Storage;
 }
 

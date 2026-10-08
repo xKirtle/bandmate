@@ -92,7 +92,12 @@ export function describe(section: Section): string {
 export function lineName(song: { sections: Section[] }, { section, line }: Position): string {
   const s = song.sections.find((x) => x.id === section);
   const n = (activeAlternate(s)?.lines.findIndex((l) => l.id === line) ?? -1) + 1;
-  return `Line ${n}${s?.label ? ` of ${s.label}` : ''}`;
+  return `Line ${n}${ofSection(s?.label)}`;
+}
+
+/** Ends a Line's name with its Section's Label, e.g. " of Chorus", as the Cue gutter names Lines. */
+export function ofSection(label: string | undefined): string {
+  return label ? ` of ${label}` : '';
 }
 
 /** The notice a Section added to another as Alternates leaves, e.g. "Hook added to Verse 1 as an Alternate". */
