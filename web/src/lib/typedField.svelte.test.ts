@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { formatCue, typedCue } from './cues';
 import { Saves } from './saves.svelte';
 import { emptySong, FakeSongServer } from './songServerFake';
-import { TypedField, type Parsed } from './typedField.svelte';
+import { cancelOnEscape, leaveOnEscape, TypedField, type Parsed } from './typedField.svelte';
 
 /** A Saves for the Song the server holds, as the Song page makes one once it's loaded. */
 async function savesFor(server: FakeSongServer) {
@@ -136,6 +136,25 @@ describe('TypedField', () => {
     expect(saves.unsaved).toBe(false);
   });
 
+  it('keeps what’s typed, unsaved, when its save is refused as the Song changed elsewhere', async () => {
+    const server = new FakeSongServer(emptySong({ key: 'C' }));
+    const saves = await savesFor(server);
+    const field = new TypedField<string>({
+      saved: () => saves.saved.key,
+      format: (key) => key,
+      parse: parseKey,
+      commit: (key) => saves.submit((at) => server.update(at, { key })),
+      typing: saves.typing,
+    });
+    server.changeElsewhere({ title: 'From another tab' });
+    field.shown = 'Am';
+    field.commit();
+    await settled();
+    expect(saves.stale).toBe(true);
+    expect(field.shown).toBe('Am');
+    expect(saves.unsaved).toBe(true);
+  });
+
   it('keeps typing newer than a commit on its way, and doesn’t send a commit twice', async () => {
     const { server, saves, field, committed } = await keyField();
     const release = server.holdNextAnswer();
@@ -151,6 +170,28 @@ describe('TypedField', () => {
     field.commit();
     await settled();
     expect(server.song.key).toBe('Am7');
+  });
+
+  it('takes back what’s typed on Esc, and nothing on another key', async () => {
+    const { saves, field } = await keyField();
+    const key = cancelOnEscape(field);
+    field.shown = 'Am';
+    key({ key: 'a' });
+    expect(field.shown).toBe('Am');
+    key({ key: 'Escape' });
+    expect(field.shown).toBe('C');
+    expect(saves.unsaved).toBe(false);
+  });
+
+  it('in a notes field, leaves it on Esc, keeping and saving what’s typed', async () => {
+    const { server, field } = await keyField();
+    let blurred = false;
+    field.shown = 'Am';
+    leaveOnEscape(field)({ key: 'Escape', currentTarget: { blur: () => (blurred = true) } });
+    expect(blurred).toBe(true);
+    expect(field.shown).toBe('Am');
+    await settled();
+    expect(server.song.key).toBe('Am');
   });
 
   it('keeps a refresh from replacing the Song while typed, showing it changed elsewhere instead', async () => {

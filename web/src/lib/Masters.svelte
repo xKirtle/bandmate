@@ -1,7 +1,11 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { api, type Master, type Song, type SongAt, type Status } from './api';
   import AudioPlayer from './AudioPlayer.svelte';
+  import type { Typing } from './saves.svelte';
+  import { masterFields, type MasterFields } from './songFields';
   import type { Mode } from './songMode';
+  import { cancelOnEscape, committedAsItGoes, leaveOnEscape } from './typedField.svelte';
   import { prepareUpload } from './upload';
 
   // A Song's Masters: finished recordings made elsewhere. The page is made
@@ -10,7 +14,7 @@
     song,
     mode,
     change,
-    onUnsaved,
+    typing,
     setStatus,
     recording = false,
   }: {
@@ -19,7 +23,8 @@
     mode: Mode;
     /** Sends a change to the Song; resolves to whether it succeeded. */
     change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
-    onUnsaved: (editor: object, unsaved: boolean) => void;
+    /** Puts a name or notes being typed on Saves' list of edits being typed. */
+    typing: (entry: Typing) => () => void;
     /** Changes the Song's Status, as its own Status control would. */
     setStatus: (status: Status) => void;
     /** Whether the Timeline is recording, which no Master plays over. */
@@ -57,14 +62,23 @@
 
   const several = $derived(song.masters.length > 1);
   const writing = $derived(mode === 'write');
-  // Identifies each Master's name and notes being typed to onUnsaved.
-  const editors = new Map<string, object>();
+  // Each Master's name and notes, typed in place (see songFields.ts): a
+  // blank name is refused, saying why. Made once per Master.
+  const fields = new Map<number, MasterFields>();
 
-  function editor(m: Master, field: 'name' | 'notes'): object {
-    const key = `${m.id}-${field}`;
-    let e = editors.get(key);
-    if (!e) editors.set(key, (e = {}));
-    return e;
+  function fieldsOf(m: Master): MasterFields {
+    let f = fields.get(m.id);
+    if (!f) {
+      f = masterFields(m.id, {
+        master: () => song.masters.find((s) => s.id === m.id),
+        change: untrack(() => change),
+        typing: untrack(() => typing),
+        update: api.updateMaster,
+        refuse: (message) => (error = message),
+      });
+      fields.set(m.id, f);
+    }
+    return f;
   }
 
   async function pick(event: Event) {
@@ -90,27 +104,6 @@
   function markFinished() {
     suggestFinished = false;
     setStatus('finished');
-  }
-
-  async function rename(m: Master, input: HTMLInputElement) {
-    onUnsaved(editor(m, 'name'), false);
-    const next = input.value.trim();
-    if (next === m.name) {
-      input.value = m.name;
-      return;
-    }
-    if (next === '') {
-      error = 'A Master needs a name once there are several.';
-      input.value = m.name;
-      return;
-    }
-    if (!(await change((at) => api.updateMaster(at, m.id, { name: next })))) input.value = m.name;
-  }
-
-  async function saveNotes(m: Master, input: HTMLTextAreaElement) {
-    onUnsaved(editor(m, 'notes'), false);
-    if (input.value === m.notes) return;
-    if (!(await change((at) => api.updateMaster(at, m.id, { notes: input.value })))) input.value = m.notes;
   }
 
   function remove(m: Master) {
@@ -148,6 +141,7 @@
   {/if}
 
   {#each song.masters as m (m.id)}
+    {@const { name, notes } = fieldsOf(m)}
     <article class="master" aria-label={several ? m.name : 'Master'}>
       {#if several}
         <div class="name-row">
@@ -156,10 +150,10 @@
             <input
               id="master-{m.id}-name"
               class="name"
-              value={m.name}
-              oninput={() => onUnsaved(editor(m, 'name'), true)}
-              onchange={(e) => rename(m, e.currentTarget)}
-              onblur={() => onUnsaved(editor(m, 'name'), false)}
+              bind:value={name.shown}
+              {@attach committedAsItGoes(name)}
+              onchange={() => name.commit()}
+              onkeydown={cancelOnEscape(name)}
               autocomplete="off"
               enterkeyhint="done"
             />
@@ -187,10 +181,10 @@
         <label class="notes">
           Notes
           <textarea
-            value={m.notes}
-            oninput={() => onUnsaved(editor(m, 'notes'), true)}
-            onchange={(e) => saveNotes(m, e.currentTarget)}
-            onblur={() => onUnsaved(editor(m, 'notes'), false)}
+            bind:value={notes.shown}
+            {@attach committedAsItGoes(notes)}
+            onchange={() => notes.commit()}
+            onkeydown={leaveOnEscape(notes)}
             rows="2"></textarea>
         </label>
       {:else if m.notes.trim()}
