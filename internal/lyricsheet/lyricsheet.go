@@ -1,6 +1,8 @@
 // Package lyricsheet owns a Song, with its Lyric Sheet, Masters and Cover, as one
 // aggregate and exposes intent-level operations on it. All domain rules
 // live here; the HTTP layer only maps requests onto these operations.
+// Deleting Songs lives here too, a Folder's included: deleting a Folder with
+// its Songs is one operation, so it can't be left half done.
 package lyricsheet
 
 import (
@@ -468,7 +470,7 @@ func (s *Store) DeleteSong(ctx context.Context, id int64, based Version) error {
 	if err := tx.Commit(); err != nil {
 		return err
 	}
-	s.remove(files)
+	s.removeFiles(files)
 	return nil
 }
 
@@ -495,24 +497,16 @@ func (s *Store) DeleteFolderWithSongs(ctx context.Context, folderID int64, count
 	if err != nil {
 		return fmt.Errorf("reading folder: %w", err)
 	}
-	var ids []int64
-	err = query(ctx, tx, `SELECT id FROM songs WHERE folder_id = ?`, []any{folderID}, func(rows *sql.Rows) error {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
-			return err
-		}
-		ids = append(ids, id)
-		return nil
-	})
+	songIDs, err := queryIDs(ctx, tx, `SELECT id FROM songs WHERE folder_id = ?`, folderID)
 	if err != nil {
 		return fmt.Errorf("listing folder's songs: %w", err)
 	}
-	if count != AnyCount && len(ids) != count {
-		return conflict(fmt.Sprintf("“%s” now holds %s, not %d", name, songCount(len(ids)), count))
+	if count != AnyCount && len(songIDs) != count {
+		return conflict(fmt.Sprintf("“%s” now holds %s, not %d", name, songCount(len(songIDs)), count))
 	}
 	files := ownedFiles{}
-	for _, id := range ids {
-		if err := files.add(ctx, tx, id); err != nil {
+	for _, songID := range songIDs {
+		if err := files.add(ctx, tx, songID); err != nil {
 			return err
 		}
 	}
@@ -525,7 +519,7 @@ func (s *Store) DeleteFolderWithSongs(ctx context.Context, folderID int64, count
 	if err := tx.Commit(); err != nil {
 		return err
 	}
-	s.remove(files)
+	s.removeFiles(files)
 	return nil
 }
 
@@ -541,21 +535,21 @@ func songCount(n int) string {
 // those to remove once the Songs are deleted.
 type ownedFiles map[string][]int64
 
-// add adds the files of every kind the Song with id owns.
-func (o ownedFiles) add(ctx context.Context, tx *sql.Tx, id int64) error {
+// add adds the files of every kind the Song with songID owns.
+func (o ownedFiles) add(ctx context.Context, tx *sql.Tx, songID int64) error {
 	for _, k := range songfiles.Owned() {
-		ids, err := songFileIDs(ctx, tx, k, id)
+		fileIDs, err := songFileIDs(ctx, tx, k, songID)
 		if err != nil {
 			return err
 		}
-		o[k.Dir] = append(o[k.Dir], ids...)
+		o[k.Dir] = append(o[k.Dir], fileIDs...)
 	}
 	return nil
 }
 
-// remove removes files once the Songs owning them are deleted. A file left
-// behind only takes space, so failures are logged.
-func (s *Store) remove(files ownedFiles) {
+// removeFiles removes files once the Songs owning them are deleted. A file
+// left behind only takes space, so failures are logged.
+func (s *Store) removeFiles(files ownedFiles) {
 	for dir, ids := range files {
 		for _, file := range ids {
 			if err := s.songFiles[dir].Remove(file); err != nil {
@@ -567,8 +561,17 @@ func (s *Store) remove(files ownedFiles) {
 
 // songFileIDs lists the ids of a Song's files of kind k.
 func songFileIDs(ctx context.Context, tx *sql.Tx, k songfiles.Kind, songID int64) ([]int64, error) {
+	ids, err := queryIDs(ctx, tx, k.IDs, songID)
+	if err != nil {
+		return nil, fmt.Errorf("listing %s: %w", k.Dir, err)
+	}
+	return ids, nil
+}
+
+// queryIDs runs a query whose rows are each one id, and lists them.
+func queryIDs(ctx context.Context, tx *sql.Tx, stmt string, args ...any) ([]int64, error) {
 	var ids []int64
-	err := query(ctx, tx, k.IDs, []any{songID}, func(rows *sql.Rows) error {
+	err := query(ctx, tx, stmt, args, func(rows *sql.Rows) error {
 		var id int64
 		if err := rows.Scan(&id); err != nil {
 			return err
@@ -576,10 +579,7 @@ func songFileIDs(ctx context.Context, tx *sql.Tx, k songfiles.Kind, songID int64
 		ids = append(ids, id)
 		return nil
 	})
-	if err != nil {
-		return nil, fmt.Errorf("listing %s: %w", k.Dir, err)
-	}
-	return ids, nil
+	return ids, err
 }
 
 // expectCurrent checks that a write to a Song, guarded by the version it

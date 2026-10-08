@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/xKirtle/bandmate/internal/db"
@@ -406,10 +407,23 @@ func TestDeletingAFolderNeverDeletesASongFiledInMeanwhile(t *testing.T) {
 		expectStatus(t, ts.moveSong(asked.ID, &ep.ID), http.StatusNoContent)
 		filed := ts.createSong("Filed meanwhile")
 
-		moved := make(chan int)
-		go func() { moved <- ts.moveSong(filed.ID, &ep.ID).Status }()
+		// Filed from another goroutine, which mustn't fail the test itself.
+		moved := make(chan error)
+		go func() {
+			body := strings.NewReader(fmt.Sprintf(`{"folderId": %d}`, ep.ID))
+			req, err := http.NewRequest(http.MethodPut, ts.srv.URL+songPath(filed.ID)+"/folder", body)
+			if err == nil {
+				var res *http.Response
+				if res, err = ts.srv.Client().Do(req); err == nil {
+					res.Body.Close()
+				}
+			}
+			moved <- err
+		}()
 		res := ts.Do(http.MethodDelete, folderPath(ep.ID)+"?songs=delete&count=1", nil)
-		<-moved
+		if err := <-moved; err != nil {
+			t.Fatalf("round %d: filing a Song: %v", round, err)
+		}
 
 		filedGone := ts.Do(http.MethodGet, songPath(filed.ID), nil).Status == http.StatusNotFound
 		switch res.Status {
