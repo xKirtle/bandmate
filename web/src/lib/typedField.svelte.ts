@@ -14,6 +14,9 @@
 // - Cancelled, e.g. on Esc, it shows what's saved again.
 // - Destroyed, e.g. as the page goes, it commits what's typed, dropping it
 //   if its rule refuses it.
+// - Once what its value belongs to has gone, e.g. a Track whose adding was
+//   undone, committing drops what's typed, sending nothing: losing it is
+//   expected, and a save the server would refuse isn't.
 //
 // Typed in, it goes on Saves' list of edits being typed, until destroyed.
 // While what it shows differs from what's saved, the Song has unsaved
@@ -40,6 +43,11 @@ export interface TypedFieldOptions<T> {
    * and stays if it resolves to 'stale', refused as the Song changed elsewhere.
    */
   commit: (value: T) => unknown;
+  /**
+   * Whether what the value belongs to is still there, e.g. a Track; by
+   * default it always is. Gone, what's typed is dropped as it's committed.
+   */
+  exists?: () => boolean;
   /** Puts an edit on Saves' list of edits being typed, until the function returned is called. */
   typing: (entry: Typing) => () => void;
   /** The Section the field is in, if any. */
@@ -101,12 +109,14 @@ export class TypedField<T> implements Typing {
   }
 
   /**
-   * Commits what's typed, by the field's rule. Returns whether it's done
-   * with it: false when the rule refused it, keeping it with a message.
+   * Commits what's typed, by the field's rule, or drops it if what it
+   * belongs to has gone. Returns whether it's done with it: false when the
+   * rule refused it, keeping it with a message.
    */
   commit(): boolean {
     const typed = this.#typed;
     if (typed === null || typed === this.#sending) return true;
+    if (this.#options.exists?.() === false) return this.#back();
     const saved = this.#options.saved();
     if (typed === this.#options.format(saved)) return this.#back();
     const parsed = this.#options.parse(typed);

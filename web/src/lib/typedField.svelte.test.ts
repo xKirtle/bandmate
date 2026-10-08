@@ -125,6 +125,29 @@ describe('TypedField', () => {
     expect(saves.unsaved).toBe(false);
   });
 
+  it('drops what’s typed, sending nothing, once what it belongs to has gone, e.g. undone', async () => {
+    const server = new FakeSongServer(emptySong({ key: 'C' }));
+    const saves = await savesFor(server);
+    const there = { now: true };
+    const committed: string[] = [];
+    const field = new TypedField<string>({
+      saved: () => saves.saved.key,
+      format: (key) => key,
+      parse: parseKey,
+      commit: (key) => void committed.push(key),
+      exists: () => there.now,
+      typing: saves.typing,
+    });
+    field.shown = 'Am';
+    there.now = false;
+    expect(field.commit()).toBe(true);
+    field.shown = 'Am7';
+    field.destroy();
+    expect(committed).toEqual([]);
+    expect(saves.unsaved).toBe(false);
+    expect(saves.saveError).toBeNull();
+  });
+
   it('shows what’s saved again once a commit fails', async () => {
     const { server, saves, field } = await keyField();
     server.failNext(1);

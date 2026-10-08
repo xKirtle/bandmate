@@ -465,6 +465,26 @@ const withBridge = () => {
   return { ...song, sections: [...song.sections, bridge], scrapbook: [2] };
 };
 
+describe('Lyric Sheet editing, a Label or an Alternate’s name typed as its Section goes', () => {
+  it('drops what’s typed, sending nothing, with no save error', async () => {
+    const server = new FakeSongServer(withBridge());
+    const { saves, editing } = await editingFor(server);
+    const label = editing.sectionLabel(2);
+    const name = editing.alternateName(2, 2);
+    label.shown = 'Middle 8';
+    name.shown = 'Darker';
+    expect(await editing.change({ kind: 'deleteSection', sectionId: 2 })).toBe(true);
+    const landed = server.landed;
+    expect(label.commit()).toBe(true);
+    name.destroy();
+    label.destroy();
+    await settled();
+    expect(server.landed).toBe(landed);
+    expect(saves.saveError).toBeNull();
+    expect(saves.unsaved).toBe(false);
+  });
+});
+
 describe('Lyric Sheet editing, the structure of the Lyric Sheet', () => {
   it('adds a Section to the Arrangement, which a caller awaiting it finds there', async () => {
     const server = new FakeSongServer(verseSong());

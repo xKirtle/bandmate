@@ -185,7 +185,8 @@ export class FakeSongServer implements SongServer {
    * What a Timeline edit does, for the edits the fake models: the Loop's,
    * adding, changing and deleting a Track, and placing, pasting, moving,
    * splitting, renaming, setting the Gain of and deleting Clips of a Beat or a Sound
-   * on the Tracks there are. Others throw "not modelled".
+   * on the Tracks there are. A Track changed or a Clip renamed that isn't
+   * there is refused, as the server refuses it. Others throw "not modelled".
    */
   #edited(edit: Edit): (tl: Timeline) => Timeline {
     const place = (tl: Timeline, trackId: number, clip: NewClip) =>
@@ -208,6 +209,7 @@ export class FakeSongServer implements SongServer {
           return { ...tl, tracks: [...tl.tracks, track] };
         };
       case 'updateTrack': {
+        if (!this.timeline.tracks.some((t) => t.id === edit.trackId)) throw notFound();
         const { name, ...levels } = edit.changes;
         const changes = name === undefined ? levels : { ...levels, name: name.trim() };
         return (tl) => ({
@@ -266,6 +268,7 @@ export class FakeSongServer implements SongServer {
       case 'setClipFades':
         return (tl) => changedClip(tl, edit.clipId, { fadeIn: edit.fadeIn, fadeOut: edit.fadeOut });
       case 'renameClip':
+        if (!this.timeline.tracks.some((t) => t.clips.some((c) => c.id === edit.clipId))) throw notFound();
         return (tl) => changedClip(tl, edit.clipId, { name: edit.name.trim() || null });
       case 'deleteClip':
         return (tl) => withoutClips(tl, [edit.clipId]);
@@ -537,6 +540,9 @@ export class FakeSongServer implements SongServer {
     this.timeline = { ...this.timeline, version, updatedAt };
   }
 }
+
+/** What the server answers a change to a Track or Clip that isn't there. */
+const notFound = () => new ApiError(404, 'not found');
 
 const noSuchTrack = () => new ApiError(400, "there's no such Track on this Timeline");
 

@@ -263,13 +263,16 @@ export class TimelineEditing {
    * A Track's name, typed in place (see typedField.svelte.ts). What's
    * saved is the name on the Timeline as shown, so a name sent shows at
    * once. A blank one goes back to the name saved, as a Track needs one.
+   * Once the Track's gone, e.g. its adding undone, what's typed is dropped.
    */
   trackName(trackId: number): TypedField<string> {
+    const track = () => this.#timeline.tracks.find((t) => t.id === trackId);
     return new TypedField({
-      saved: () => this.#timeline.tracks.find((t) => t.id === trackId)?.name ?? '',
+      saved: () => track()?.name ?? '',
       format: (name) => name,
       parse: (typed) => (typed.trim() ? { value: typed.trim() } : 'back'),
       commit: (name) => this.edit({ kind: 'updateTrack', trackId, changes: { name } }),
+      exists: () => track() !== undefined,
       typing: this.#saves.typing,
     });
   }
@@ -279,11 +282,13 @@ export class TimelineEditing {
    * own name, so it goes by its source's again.
    */
   clipName(clipId: number): TypedField<string | null> {
+    const clip = () => this.#timeline.tracks.flatMap((t) => t.clips).find((c) => c.id === clipId);
     return new TypedField<string | null>({
-      saved: () => this.#timeline.tracks.flatMap((t) => t.clips).find((c) => c.id === clipId)?.name ?? null,
+      saved: () => clip()?.name ?? null,
       format: (name) => name ?? '',
       parse: (typed) => ({ value: typed.trim() || null }),
       commit: (name) => this.edit({ kind: 'renameClip', clipId, name: name ?? '' }),
+      exists: () => clip() !== undefined,
       typing: this.#saves.typing,
     });
   }

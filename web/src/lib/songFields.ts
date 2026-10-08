@@ -116,6 +116,7 @@ export function masterFields(masterId: number, options: MasterFieldsOptions): Ma
       saved: () => options.master()?.[detail] ?? '',
       parse,
       commit: (value) => options.change((at) => options.update(at, masterId, { [detail]: value })),
+      exists: () => options.master() !== undefined,
       typing: options.typing,
     });
 
