@@ -184,7 +184,7 @@ export class FakeSongServer implements SongServer {
   /**
    * What a Timeline edit does, for the edits the fake models: the Loop's,
    * adding, changing and deleting a Track, and placing, pasting, moving,
-   * splitting, setting the Gain of and deleting Clips of a Beat or a Sound
+   * splitting, renaming, setting the Gain of and deleting Clips of a Beat or a Sound
    * on the Tracks there are. Others throw "not modelled".
    */
   #edited(edit: Edit): (tl: Timeline) => Timeline {
@@ -207,11 +207,14 @@ export class FakeSongServer implements SongServer {
           const track: Track = { id: this.#nextTrackId++, name, volume: 0, muted: false, soloed: false, clips: [] };
           return { ...tl, tracks: [...tl.tracks, track] };
         };
-      case 'updateTrack':
+      case 'updateTrack': {
+        const { name, ...levels } = edit.changes;
+        const changes = name === undefined ? levels : { ...levels, name: name.trim() };
         return (tl) => ({
           ...tl,
-          tracks: tl.tracks.map((t) => (t.id === edit.trackId ? { ...t, ...edit.changes } : t)),
+          tracks: tl.tracks.map((t) => (t.id === edit.trackId ? { ...t, ...changes } : t)),
         });
+      }
       case 'deleteTrack':
         return (tl) => ({ ...tl, tracks: tl.tracks.filter((t) => t.id !== edit.trackId) });
       case 'placeClip':
@@ -264,6 +267,14 @@ export class FakeSongServer implements SongServer {
           tracks: tl.tracks.map((t) => ({
             ...t,
             clips: t.clips.map((c) => (c.id === edit.clipId ? { ...c, gain: edit.gain } : c)),
+          })),
+        });
+      case 'renameClip':
+        return (tl) => ({
+          ...tl,
+          tracks: tl.tracks.map((t) => ({
+            ...t,
+            clips: t.clips.map((c) => (c.id === edit.clipId ? { ...c, name: edit.name.trim() || null } : c)),
           })),
         });
       case 'deleteClip':

@@ -595,7 +595,6 @@
     bind:this={timelinePanel}
     bind:height={timelineHeight}
     song={shown}
-    {timeline}
     {saves}
     {setBpm}
     onPlayhead={(at) => (playhead = at)}

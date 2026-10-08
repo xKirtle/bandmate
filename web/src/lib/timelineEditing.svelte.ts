@@ -5,6 +5,17 @@
 // - The freeze: while a recording or a Merge is under way, the Timeline
 //   can't be edited, but for a Track's mute, solo or volume (see freeze.ts).
 //   The Timeline reads it to disable its controls and refuse drags.
+// - The Timeline as shown, which the Timeline draws and plays: the Timeline
+//   as saved, with the values of edits on their way and of previews on top,
+//   for the edits that set values on a Track or a Clip already there (see
+//   ShownEdit). A preview is a value shown without being sent, e.g. a
+//   fader's level while it's dragged, refused whenever the same edit would
+//   be. Which value shows goes by field, e.g. a Track's volume: an edit's
+//   stops showing once its save resolves, saved or failed, unless something
+//   newer for that field is showing, and a preview gives way to the next
+//   preview or edit of that field. A refresh replacing the Song drops them
+//   all; undo and redo leave them be. What's worked out to send (Merge
+//   rendering, the Cue-move offer, undo) goes by the Timeline as saved.
 // - What follows an edit: Clips it adds are selected, and a Track it adds
 //   chosen. An undo says where to return the playhead to, and the Timeline
 //   seeks there, as playback is its own.
@@ -19,7 +30,7 @@
 // - Merge and Sound import, the rarer edits whose audio the browser makes
 //   (see the audio port below). Each is kept to undo as placing what it
 //   made, so redoing it never renders or uploads anything again.
-import type { Song, SoundImport, Timeline } from './api';
+import type { Song, SoundImport, Timeline, Track } from './api';
 import { addedTrack } from './chosenTrack';
 import type { DragSave } from './clipDrag.svelte';
 import { sameCues } from './cueChanges';
@@ -57,6 +68,23 @@ interface MadeOffer {
 
 /** An audio file decoded and named, ready to import as a Sound onto a Track. */
 export type PreparedSound = Omit<SoundImport, 'trackId'>;
+
+/**
+ * The edits shown before they're saved: those setting values on a Track or
+ * a Clip already on the Timeline, which the browser makes exactly as the
+ * server will.
+ */
+export type ShownEdit = Extract<Edit, { kind: 'updateTrack' | 'renameClip' }>;
+
+/** Sets one field of a Track or a Clip on a Timeline to the value an edit gives it. */
+type SetField = (timeline: Timeline) => Timeline;
+
+/** A value shown over the Timeline as saved, for one field of a Track or a Clip. */
+interface ShownValue {
+  show: SetField;
+  /** The edit or preview it came from, by identity: only that one stops it showing. */
+  from: object;
+}
 
 /** The audio the browser makes for an edit: the browser's own, or a fake of it. */
 export interface TimelineAudio {
@@ -101,6 +129,18 @@ export class TimelineEditing {
   #imports: Promise<void> = Promise.resolve();
   /** What the files imported refused said, until a new import or a Merge. */
   #error = $state<string | null>(null);
+  /**
+   * The values shown over the Timeline as saved, by field, e.g. "track 3
+   * volume", and which Song they were set over: they go once a refresh
+   * replaces it.
+   */
+  #shown = $state.raw<{ over: number; values: ReadonlyMap<string, ShownValue> }>({ over: 0, values: new Map() });
+  /** The values shown over the Song as it is now. */
+  #values = $derived.by(() =>
+    this.#shown.over === this.#saves.replaced ? this.#shown.values : new Map<string, ShownValue>(),
+  );
+  /** The Timeline as shown: as saved, with the values of edits on their way and of previews on top. */
+  #timeline = $derived.by(() => [...this.#values.values()].reduce((tl, v) => v.show(tl), this.#saves.timeline));
   /** The offer made last, while the Timeline as saved and the Cues as shown are still the ones it was made for. */
   #standing = $derived.by(() => {
     const made = this.#made;
@@ -132,10 +172,46 @@ export class TimelineEditing {
    */
   edit = async (e: Edit): Promise<Edited | null> => {
     if (this.frozen && !editsWhileRecording(e)) return null;
-    const edited = await this.#saves.edit($state.snapshot(e) as Edit);
+    const sent = $state.snapshot(e) as Edit;
+    const fields = shownFields(sent);
+    this.#show(fields, sent);
+    const edited = await this.#saves.edit(sent);
+    this.#unshow(fields, sent);
     if (edited) this.#follow(e, edited);
     return edited;
   };
+
+  /** The Timeline as shown: the Timeline as saved, with the values of edits on their way and of previews on top. */
+  get timeline(): Timeline {
+    return this.#timeline;
+  }
+
+  /**
+   * Shows an edit's values without sending it, e.g. a fader's level while
+   * it's dragged, until the next preview or edit of the same field.
+   * Refused whenever the same edit would be. Returns whether it's shown.
+   */
+  preview = (e: ShownEdit): boolean => {
+    if (this.frozen && !editsWhileRecording(e)) return false;
+    const previewed = $state.snapshot(e) as Edit;
+    this.#show(shownFields(previewed), previewed);
+    return true;
+  };
+
+  /** Shows values over the Timeline as saved, each in place of any shown for its field. */
+  #show(fields: Map<string, SetField>, from: object) {
+    if (fields.size === 0) return;
+    const values = new Map(this.#values);
+    for (const [field, show] of fields) values.set(field, { show, from });
+    this.#shown = { over: this.#saves.replaced, values };
+  }
+
+  /** Stops showing the values an edit or preview set, but for those newer ones showing since. */
+  #unshow(fields: Map<string, SetField>, from: object) {
+    const values = new Map(this.#values);
+    for (const field of fields.keys()) if (values.get(field)?.from === from) values.delete(field);
+    if (values.size !== this.#values.size) this.#shown = { over: this.#saves.replaced, values };
+  }
 
   /**
    * What follows an edit once it's saved: a paste or a Selection Duplicate
@@ -363,4 +439,36 @@ export class TimelineEditing {
   close() {
     clearTimeout(this.#offerTimer);
   }
+}
+
+/** How an edit sets each field it shows a value for, by field, or none for an edit that isn't shown before it's saved. */
+function shownFields(e: Edit): Map<string, SetField> {
+  const fields = new Map<string, SetField>();
+  if (e.kind === 'updateTrack') {
+    const { name, ...levels } = e.changes;
+    // As the server saves it, which refuses a blank one.
+    const named = name?.trim();
+    const changes: Partial<Track> = named ? { ...levels, name: named } : levels;
+    for (const [key, value] of Object.entries(changes)) {
+      if (value === undefined) continue;
+      fields.set(`track ${e.trackId} ${key}`, (tl) => withTrack(tl, e.trackId, { [key]: value }));
+    }
+  } else if (e.kind === 'renameClip') {
+    // A blank name clears the Clip's own, as the server saves it.
+    const name = e.name.trim() || null;
+    fields.set(`clip ${e.clipId} name`, (tl) => ({
+      ...tl,
+      tracks: tl.tracks.map((t) =>
+        t.clips.some((c) => c.id === e.clipId)
+          ? { ...t, clips: t.clips.map((c) => (c.id === e.clipId ? { ...c, name } : c)) }
+          : t,
+      ),
+    }));
+  }
+  return fields;
+}
+
+/** A Timeline with changes made to a Track, if it's there. */
+function withTrack(tl: Timeline, trackId: number, changes: Partial<Track>): Timeline {
+  return { ...tl, tracks: tl.tracks.map((t) => (t.id === trackId ? { ...t, ...changes } : t)) };
 }
