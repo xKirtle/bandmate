@@ -7,7 +7,8 @@ import { isModifier, skipsSnapping } from './timelineKeys';
 // their edges, and the drag is moved again to where the pointer is as they
 // go. A drag with a modifier, e.g. the Shift that skips snapping, also
 // hears it pressed or let go mid-drag, where the pointer last was. The
-// Clip drag and the Loop drag both go through it, each with its own.
+// Clip drag, the Loop drag and the box drawn over empty lane space all go
+// through it, each with its own.
 
 /** Where the pointer is for a drag on the Timeline, as the Timeline measures it. */
 export interface PointerAt {
@@ -49,15 +50,21 @@ export class PointerFollow<At> {
   #scroll: EdgeScroll;
   /** Where the pointer last moved to, for a modifier mid-drag. */
   #last: Point | null = null;
+  /** The only pointer followed, where it's one; others are ignored. */
+  #pointerId: number | undefined;
 
   constructor(drag: FollowedDrag<At>, scroll: EdgeScroll) {
     this.#drag = drag;
     this.#scroll = scroll;
   }
 
-  /** Starts following the pointer, once the drag is pressed. */
-  start() {
+  /**
+   * Starts following the pointer, once the drag is pressed: only the one
+   * with `pointerId`, where given, e.g. not a second finger, or else any.
+   */
+  start(pointerId?: number) {
     this.#last = null;
+    this.#pointerId = pointerId;
     window.addEventListener('pointermove', this.#move);
     window.addEventListener('pointerup', this.#up);
     window.addEventListener('pointercancel', this.#cancel);
@@ -76,7 +83,22 @@ export class PointerFollow<At> {
     window.removeEventListener('keyup', this.#modifierKey);
   }
 
+  /**
+   * Takes the pointer as moved to a point, e.g. where a finger is held
+   * still once its long press draws a box, so the lanes scroll along from
+   * there.
+   */
+  moveTo(point: Point) {
+    this.#move(point);
+  }
+
+  /** Whether an event is from another pointer than the one followed. */
+  #other(point: Point): boolean {
+    return this.#pointerId !== undefined && 'pointerId' in point && point.pointerId !== this.#pointerId;
+  }
+
   #move = (point: Point) => {
+    if (this.#other(point)) return;
     // Scrolling along at an edge moves it too, with no keys to go by.
     const free = 'shiftKey' in point ? skipsSnapping(point as PointerEvent) : undefined;
     this.#last = { clientX: point.clientX, clientY: point.clientY };
@@ -84,11 +106,13 @@ export class PointerFollow<At> {
   };
 
   #up = (event: PointerEvent) => {
+    if (this.#other(event)) return;
     this.stop();
     this.#drag.up(event);
   };
 
   #cancel = (event: PointerEvent) => {
+    if (this.#other(event)) return;
     this.stop();
     this.#drag.cancel(event);
   };
