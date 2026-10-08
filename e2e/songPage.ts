@@ -15,6 +15,10 @@ export async function heroSong(bandmate: Bandmate): Promise<Song> {
 /** The docked Timeline. */
 export const timeline = (page: Page) => page.getByRole('region', { name: 'Timeline' });
 
+/** A Track's header on the Timeline, by its name, e.g. "Lead vox": it's current while it's the Chosen Track. */
+export const trackHead = (page: Page, name: string) =>
+  timeline(page).getByRole('group', { name: `Track ${name}`, exact: true });
+
 /** The Timeline's ruler, whose value is the playhead, in whole seconds. */
 export const ruler = (page: Page) => timeline(page).getByRole('slider', { name: 'Position' });
 
