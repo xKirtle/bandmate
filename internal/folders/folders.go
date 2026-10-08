@@ -141,25 +141,6 @@ func (s *Store) Rename(ctx context.Context, id int64, name string) (Folder, erro
 	return s.Get(ctx, id)
 }
 
-// SongIDs lists the ids of the Songs in a Folder: none if there's no such
-// Folder.
-func (s *Store) SongIDs(ctx context.Context, id int64) ([]int64, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id FROM songs WHERE folder_id = ? ORDER BY id`, id)
-	if err != nil {
-		return nil, fmt.Errorf("listing folder's songs: %w", err)
-	}
-	defer rows.Close()
-	var ids []int64
-	for rows.Next() {
-		var songID int64
-		if err := rows.Scan(&songID); err != nil {
-			return nil, err
-		}
-		ids = append(ids, songID)
-	}
-	return ids, rows.Err()
-}
-
 // Delete removes a Folder, leaving any Songs still in it in none.
 func (s *Store) Delete(ctx context.Context, id int64) error {
 	res, err := s.db.ExecContext(ctx, `DELETE FROM folders WHERE id = ?`, id)

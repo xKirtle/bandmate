@@ -454,12 +454,9 @@ func (s *Store) DeleteSong(ctx context.Context, id int64, based Version) error {
 		return err
 	}
 	defer tx.Rollback()
-	owned := songfiles.Owned()
-	ids := make([][]int64, len(owned))
-	for i, k := range owned {
-		if ids[i], err = songFileIDs(ctx, tx, k, id); err != nil {
-			return err
-		}
+	files := ownedFiles{}
+	if err := files.add(ctx, tx, id); err != nil {
+		return err
 	}
 	res, err := tx.ExecContext(ctx, `DELETE FROM songs WHERE id = ? AND (?2 = 0 OR version = ?2)`, id, based)
 	if err != nil {
@@ -471,15 +468,101 @@ func (s *Store) DeleteSong(ctx context.Context, id int64, based Version) error {
 	if err := tx.Commit(); err != nil {
 		return err
 	}
-	// A file left behind only takes space, so failures are logged.
-	for i, k := range owned {
-		for _, file := range ids[i] {
-			if err := s.songFiles[k.Dir].Remove(file); err != nil {
-				log.Printf("deleting %s/%d: %v", k.Dir, file, err)
+	s.remove(files)
+	return nil
+}
+
+// AnyCount skips DeleteFolderWithSongs's check of how many Songs the Folder
+// holds.
+const AnyCount = -1
+
+// DeleteFolderWithSongs removes a Folder and every Song in it, each as
+// DeleteSong does, all at once: if any of it fails, nothing is deleted. With
+// a count other than AnyCount, the number of Songs the user was asked about,
+// it deletes nothing unless the Folder still holds that many, so none filed
+// into it since goes unseen. A missing Folder is ErrNotFound.
+func (s *Store) DeleteFolderWithSongs(ctx context.Context, folderID int64, count int) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var name string
+	err = tx.QueryRowContext(ctx, `SELECT name FROM folders WHERE id = ?`, folderID).Scan(&name)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("reading folder: %w", err)
+	}
+	var ids []int64
+	err = query(ctx, tx, `SELECT id FROM songs WHERE folder_id = ?`, []any{folderID}, func(rows *sql.Rows) error {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+		ids = append(ids, id)
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("listing folder's songs: %w", err)
+	}
+	if count != AnyCount && len(ids) != count {
+		return conflict(fmt.Sprintf("“%s” now holds %s, not %d", name, songCount(len(ids)), count))
+	}
+	files := ownedFiles{}
+	for _, id := range ids {
+		if err := files.add(ctx, tx, id); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM songs WHERE folder_id = ?`, folderID); err != nil {
+		return fmt.Errorf("deleting folder's songs: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM folders WHERE id = ?`, folderID); err != nil {
+		return fmt.Errorf("deleting folder: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	s.remove(files)
+	return nil
+}
+
+// songCount says how many Songs there are: "1 Song", "3 Songs".
+func songCount(n int) string {
+	if n == 1 {
+		return "1 Song"
+	}
+	return fmt.Sprintf("%d Songs", n)
+}
+
+// ownedFiles holds the ids of files Songs own, by their kind's directory:
+// those to remove once the Songs are deleted.
+type ownedFiles map[string][]int64
+
+// add adds the files of every kind the Song with id owns.
+func (o ownedFiles) add(ctx context.Context, tx *sql.Tx, id int64) error {
+	for _, k := range songfiles.Owned() {
+		ids, err := songFileIDs(ctx, tx, k, id)
+		if err != nil {
+			return err
+		}
+		o[k.Dir] = append(o[k.Dir], ids...)
+	}
+	return nil
+}
+
+// remove removes files once the Songs owning them are deleted. A file left
+// behind only takes space, so failures are logged.
+func (s *Store) remove(files ownedFiles) {
+	for dir, ids := range files {
+		for _, file := range ids {
+			if err := s.songFiles[dir].Remove(file); err != nil {
+				log.Printf("deleting %s/%d: %v", dir, file, err)
 			}
 		}
 	}
-	return nil
 }
 
 // songFileIDs lists the ids of a Song's files of kind k.

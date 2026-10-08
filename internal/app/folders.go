@@ -2,7 +2,6 @@ package app
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -70,8 +69,8 @@ func (a *App) renameFolder(w http.ResponseWriter, r *http.Request) {
 // too, each as deleting a Song does; otherwise, or with ?songs=keep, they're
 // kept, in no Folder. With &count=N, the Songs are deleted only if the
 // Folder still holds N, the number the user was asked about, so none filed
-// into it since go unseen. Songs are deleted one by one before the Folder,
-// so if one fails, the Folder is left holding the rest, to try again.
+// into it since go unseen. The Folder and its Songs go all at once, or not
+// at all.
 func (a *App) deleteFolder(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
@@ -87,7 +86,7 @@ func (a *App) deleteFolder(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, `songs must be "keep" or "delete"`)
 		return
 	}
-	count := -1
+	count := lyricsheet.AnyCount
 	if text := query.Get("count"); text != "" {
 		n, err := strconv.Atoi(text)
 		if err != nil || n < 0 {
@@ -97,42 +96,15 @@ func (a *App) deleteFolder(w http.ResponseWriter, r *http.Request) {
 		count = n
 	}
 	if deleteSongs {
-		f, err := a.folders.Get(r.Context(), id)
-		if err != nil {
-			writeFolderError(w, err)
+		if err := a.songs.DeleteFolderWithSongs(r.Context(), id, count); err != nil {
+			writeDomainError(w, err)
 			return
 		}
-		if count >= 0 && f.Songs != count {
-			writeError(w, http.StatusConflict, fmt.Sprintf("“%s” now holds %s, not %d", f.Name, songCount(f.Songs), count))
-			return
-		}
-		songIDs, err := a.folders.SongIDs(r.Context(), id)
-		if err != nil {
-			writeFolderError(w, err)
-			return
-		}
-		for _, songID := range songIDs {
-			// One already gone, say deleted meanwhile, is as good as deleted.
-			err := a.songs.DeleteSong(r.Context(), songID, lyricsheet.AnyVersion)
-			if err != nil && !errors.Is(err, lyricsheet.ErrNotFound) {
-				writeDomainError(w, err)
-				return
-			}
-		}
-	}
-	if err := a.folders.Delete(r.Context(), id); err != nil {
+	} else if err := a.folders.Delete(r.Context(), id); err != nil {
 		writeFolderError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// songCount says how many Songs there are: "1 Song", "3 Songs".
-func songCount(n int) string {
-	if n == 1 {
-		return "1 Song"
-	}
-	return fmt.Sprintf("%d Songs", n)
 }
 
 // moveSongToFolder puts a Song into a Folder, or, with a null folderId,
