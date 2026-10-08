@@ -923,12 +923,11 @@
   });
 
   // Dragging from empty lane space draws a box, selecting the Clips it
-  // touches, and a click there is an insertion point, through BoxDrag (see
-  // boxDrag.svelte.ts). The Timeline measures it, follows the pointer,
-  // scrolling the lanes along near their edges as a Clip dragged does,
-  // and moves the playhead and chooses the Track a click asks for. A
-  // finger draws a box only once held still for a long press, which the
-  // Timeline times, and a second finger, e.g. pinching, gives it up.
+  // touches, and a click there is an insertion point: see
+  // boxDrag.svelte.ts. Here it's measured, the pointer followed, the lanes
+  // scrolled along near their edges, a finger's long press timed and a
+  // second finger heard, and the playhead moved and the Track chosen as a
+  // click asks.
   const boxDrag = new BoxDrag({ selection, frozen: () => frozen });
   /** The pointer pressing empty lane space, the only one followed. */
   let boxPointer = 0;

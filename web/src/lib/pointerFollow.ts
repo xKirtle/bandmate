@@ -50,7 +50,7 @@ export class PointerFollow<At> {
   #scroll: EdgeScroll;
   /** Where the pointer last moved to, for a modifier mid-drag. */
   #last: Point | null = null;
-  /** The only pointer followed, where it's one; others are ignored. */
+  /** The pointer followed, where only one is, e.g. not a second finger; undefined, any. */
   #pointerId: number | undefined;
 
   constructor(drag: FollowedDrag<At>, scroll: EdgeScroll) {
@@ -93,12 +93,12 @@ export class PointerFollow<At> {
   }
 
   /** Whether an event is from another pointer than the one followed. */
-  #other(point: Point): boolean {
+  #notFollowed(point: Point): boolean {
     return this.#pointerId !== undefined && 'pointerId' in point && point.pointerId !== this.#pointerId;
   }
 
   #move = (point: Point) => {
-    if (this.#other(point)) return;
+    if (this.#notFollowed(point)) return;
     // Scrolling along at an edge moves it too, with no keys to go by.
     const free = 'shiftKey' in point ? skipsSnapping(point as PointerEvent) : undefined;
     this.#last = { clientX: point.clientX, clientY: point.clientY };
@@ -106,13 +106,13 @@ export class PointerFollow<At> {
   };
 
   #up = (event: PointerEvent) => {
-    if (this.#other(event)) return;
+    if (this.#notFollowed(event)) return;
     this.stop();
     this.#drag.up(event);
   };
 
   #cancel = (event: PointerEvent) => {
-    if (this.#other(event)) return;
+    if (this.#notFollowed(event)) return;
     this.stop();
     this.#drag.cancel(event);
   };
