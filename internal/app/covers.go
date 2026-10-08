@@ -7,6 +7,7 @@ import (
 
 	"github.com/xKirtle/bandmate/internal/audio"
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
+	"github.com/xKirtle/bandmate/internal/songversion"
 )
 
 // A Cover is part of the Song, like a Master: adding, replacing, adjusting
@@ -22,19 +23,19 @@ func (a *App) replaceCover(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) removeCover(w http.ResponseWriter, r *http.Request) {
-	a.changeSheet(w, r, nil, func(id int64, based lyricsheet.Version) (lyricsheet.Song, error) {
+	a.changeSheet(w, r, nil, func(id int64, based songversion.Version) (lyricsheet.Song, error) {
 		return a.songs.RemoveCover(r.Context(), id, based)
 	})
 }
 
 // coverPut gives a Song a Cover: Store.AddCover or Store.ReplaceCover.
-type coverPut func(ctx context.Context, songID int64, based lyricsheet.Version, details lyricsheet.CoverDetails,
+type coverPut func(ctx context.Context, songID int64, based songversion.Version, details lyricsheet.CoverDetails,
 	pictures map[lyricsheet.CoverPicture]lyricsheet.UploadedPicture) (lyricsheet.Song, error)
 
 // putCover reads a Cover's pictures and details and gives them to put.
 func (a *App) putCover(w http.ResponseWriter, r *http.Request, put coverPut) {
 	var details lyricsheet.CoverDetails
-	a.readCover(w, r, lyricsheet.CoverPictures, &details, func(id int64, based lyricsheet.Version, pictures map[lyricsheet.CoverPicture]lyricsheet.UploadedPicture) (lyricsheet.Song, error) {
+	a.readCover(w, r, lyricsheet.CoverPictures, &details, func(id int64, based songversion.Version, pictures map[lyricsheet.CoverPicture]lyricsheet.UploadedPicture) (lyricsheet.Song, error) {
 		return put(r.Context(), id, based, details, pictures)
 	})
 }
@@ -46,7 +47,7 @@ func (a *App) adjustCoverCrop(w http.ResponseWriter, r *http.Request) {
 		Cover int64                `json:"cover"`
 		Crop  lyricsheet.CoverCrop `json:"crop"`
 	}
-	a.readCover(w, r, lyricsheet.SquarePictures, &details, func(id int64, based lyricsheet.Version, pictures map[lyricsheet.CoverPicture]lyricsheet.UploadedPicture) (lyricsheet.Song, error) {
+	a.readCover(w, r, lyricsheet.SquarePictures, &details, func(id int64, based songversion.Version, pictures map[lyricsheet.CoverPicture]lyricsheet.UploadedPicture) (lyricsheet.Song, error) {
 		return a.songs.AdjustCoverCrop(r.Context(), id, based, details.Cover, details.Crop, pictures)
 	})
 }
@@ -54,7 +55,7 @@ func (a *App) adjustCoverCrop(w http.ResponseWriter, r *http.Request) {
 // readCover reads the given pictures of a Cover and its details, decoded
 // into details, and answers with the Song change makes with them.
 func (a *App) readCover(w http.ResponseWriter, r *http.Request, pictures []lyricsheet.CoverPicture, details any,
-	change func(id int64, based lyricsheet.Version, pictures map[lyricsheet.CoverPicture]lyricsheet.UploadedPicture) (lyricsheet.Song, error)) {
+	change func(id int64, based songversion.Version, pictures map[lyricsheet.CoverPicture]lyricsheet.UploadedPicture) (lyricsheet.Song, error)) {
 	id, ok := songID(w, r)
 	if !ok {
 		return

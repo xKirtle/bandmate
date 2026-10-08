@@ -7,7 +7,7 @@ import (
 
 	"github.com/xKirtle/bandmate/internal/audio"
 	"github.com/xKirtle/bandmate/internal/domain"
-	"github.com/xKirtle/bandmate/internal/lyricsheet"
+	"github.com/xKirtle/bandmate/internal/songversion"
 )
 
 // SplitClips cuts each of the Clips in two at a time on the Timeline,
@@ -18,7 +18,7 @@ import (
 // each shortened to end at the cut, which gets no Fade. A Clip of Takes
 // splits like a Duplicate: the right half gets copies of its Takes,
 // sharing their files. If any can't be split, none is.
-func (s *Store) SplitClips(ctx context.Context, songID int64, based lyricsheet.Version, clipIDs []int64,
+func (s *Store) SplitClips(ctx context.Context, songID int64, based songversion.Version, clipIDs []int64,
 	at float64) (Timeline, error) {
 	if len(clipIDs) == 0 {
 		return Timeline{}, domain.Invalid("clipIds are required")

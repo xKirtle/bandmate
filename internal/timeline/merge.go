@@ -11,7 +11,7 @@ import (
 
 	"github.com/xKirtle/bandmate/internal/audio"
 	"github.com/xKirtle/bandmate/internal/domain"
-	"github.com/xKirtle/bandmate/internal/lyricsheet"
+	"github.com/xKirtle/bandmate/internal/songversion"
 )
 
 // A Merge turns Clips, on any Tracks, into one Clip of a new Sound, whose
@@ -54,7 +54,7 @@ type ClipMerge struct {
 // added there, and can't overlap a Clip left on it. Their Takes are
 // detached, as deleting them does. The file is kept if the Merge is made,
 // and discarded otherwise.
-func (s *Store) MergeClips(ctx context.Context, songID int64, based lyricsheet.Version, m ClipMerge,
+func (s *Store) MergeClips(ctx context.Context, songID int64, based songversion.Version, m ClipMerge,
 	file *audio.Received) (Timeline, error) {
 	defer file.Discard()
 	if len(m.ClipIDs) < 2 {
@@ -157,7 +157,7 @@ func (m ClipMerge) landingTrack(ctx context.Context, tx *sql.Tx, songID int64) (
 // added, in order, before the Clips are placed, for them to go on: e.g. the
 // Track a Merge added for its Clip. If any can't be deleted, added or
 // placed, nothing changes.
-func (s *Store) ReplaceClips(ctx context.Context, songID int64, based lyricsheet.Version, clipIDs, trackIDs []int64,
+func (s *Store) ReplaceClips(ctx context.Context, songID int64, based songversion.Version, clipIDs, trackIDs []int64,
 	newTracks []TrackAt, clips []PlacedClip) (Timeline, error) {
 	if len(clipIDs) == 0 {
 		return Timeline{}, domain.Invalid("clipIds are required")

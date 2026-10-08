@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/xKirtle/bandmate/internal/domain"
-	"github.com/xKirtle/bandmate/internal/lyricsheet"
+	"github.com/xKirtle/bandmate/internal/songversion"
 	"github.com/xKirtle/bandmate/internal/timeline"
 )
 
@@ -31,7 +31,7 @@ func (a *App) addBeatToTimeline(w http.ResponseWriter, r *http.Request) {
 		TrackID *int64 `json:"trackId"`
 		BeatID  *int64 `json:"beatId"`
 	}
-	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+	a.changeTimeline(w, r, &req, func(id int64, based songversion.Version) (timeline.Timeline, error) {
 		if req.TrackID == nil || req.BeatID == nil {
 			return timeline.Timeline{}, domain.Invalid("trackId and beatId are required")
 		}
@@ -45,14 +45,14 @@ func (a *App) updateTrack(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var changes timeline.TrackChanges
-	a.changeTimeline(w, r, &changes, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+	a.changeTimeline(w, r, &changes, func(id int64, based songversion.Version) (timeline.Timeline, error) {
 		return a.timelines.UpdateTrack(r.Context(), id, based, trackID, changes)
 	})
 }
 
 func (a *App) addTrack(w http.ResponseWriter, r *http.Request) {
 	var req timeline.NewTrack
-	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+	a.changeTimeline(w, r, &req, func(id int64, based songversion.Version) (timeline.Timeline, error) {
 		return a.timelines.AddTrack(r.Context(), id, based, req)
 	})
 }
@@ -62,7 +62,7 @@ func (a *App) deleteTrack(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	a.changeTimeline(w, r, nil, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+	a.changeTimeline(w, r, nil, func(id int64, based songversion.Version) (timeline.Timeline, error) {
 		return a.timelines.DeleteTrack(r.Context(), id, based, trackID)
 	})
 }
@@ -71,7 +71,7 @@ func (a *App) reorderTracks(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Tracks []int64 `json:"tracks"`
 	}
-	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+	a.changeTimeline(w, r, &req, func(id int64, based songversion.Version) (timeline.Timeline, error) {
 		return a.timelines.ReorderTracks(r.Context(), id, based, req.Tracks)
 	})
 }
@@ -82,7 +82,7 @@ func (a *App) setLoop(w http.ResponseWriter, r *http.Request) {
 		End   *float64 `json:"end"`
 		On    bool     `json:"on"`
 	}
-	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+	a.changeTimeline(w, r, &req, func(id int64, based songversion.Version) (timeline.Timeline, error) {
 		if req.Start == nil || req.End == nil {
 			return timeline.Timeline{}, domain.Invalid("start and end are required")
 		}
@@ -94,7 +94,7 @@ func (a *App) switchLoop(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		On *bool `json:"on"`
 	}
-	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+	a.changeTimeline(w, r, &req, func(id int64, based songversion.Version) (timeline.Timeline, error) {
 		if req.On == nil {
 			return timeline.Timeline{}, domain.Invalid("on is required")
 		}
@@ -103,7 +103,7 @@ func (a *App) switchLoop(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) clearLoop(w http.ResponseWriter, r *http.Request) {
-	a.changeTimeline(w, r, nil, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+	a.changeTimeline(w, r, nil, func(id int64, based songversion.Version) (timeline.Timeline, error) {
 		return a.timelines.ClearLoop(r.Context(), id, based)
 	})
 }
@@ -113,7 +113,7 @@ func (a *App) moveClip(w http.ResponseWriter, r *http.Request) {
 		TrackID *int64   `json:"trackId"`
 		Start   *float64 `json:"start"`
 	}
-	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based lyricsheet.Version, clipID int64) (timeline.Timeline, error) {
+	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based songversion.Version, clipID int64) (timeline.Timeline, error) {
 		if req.TrackID == nil || req.Start == nil {
 			return timeline.Timeline{}, domain.Invalid("trackId and start are required")
 		}
@@ -125,7 +125,7 @@ func (a *App) moveClips(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Clips []timeline.ClipMove `json:"clips"`
 	}
-	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+	a.changeTimeline(w, r, &req, func(id int64, based songversion.Version) (timeline.Timeline, error) {
 		return a.timelines.MoveClips(r.Context(), id, based, req.Clips)
 	})
 }
@@ -139,7 +139,7 @@ func (a *App) trimClip(w http.ResponseWriter, r *http.Request) {
 		FadeIn  *float64 `json:"fadeIn"`
 		FadeOut *float64 `json:"fadeOut"`
 	}
-	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based lyricsheet.Version, clipID int64) (timeline.Timeline, error) {
+	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based songversion.Version, clipID int64) (timeline.Timeline, error) {
 		if req.Offset == nil || req.Length == nil {
 			return timeline.Timeline{}, domain.Invalid("offset and length are required")
 		}
@@ -204,7 +204,7 @@ func placedClips(cs []clipToPlace) ([]timeline.PlacedClip, error) {
 
 func (a *App) placeClip(w http.ResponseWriter, r *http.Request) {
 	var req clipToPlace
-	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+	a.changeTimeline(w, r, &req, func(id int64, based songversion.Version) (timeline.Timeline, error) {
 		p, err := req.placed()
 		if err != nil {
 			return timeline.Timeline{}, err
@@ -221,7 +221,7 @@ func (a *App) placeClips(w http.ResponseWriter, r *http.Request) {
 		NewTracks []newTrack    `json:"newTracks"`
 		Clips     []clipToPlace `json:"clips"`
 	}
-	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+	a.changeTimeline(w, r, &req, func(id int64, based songversion.Version) (timeline.Timeline, error) {
 		clips, err := placedClips(req.Clips)
 		if err != nil {
 			return timeline.Timeline{}, err
@@ -234,7 +234,7 @@ func (a *App) renameClip(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name *string `json:"name"`
 	}
-	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based lyricsheet.Version, clipID int64) (timeline.Timeline, error) {
+	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based songversion.Version, clipID int64) (timeline.Timeline, error) {
 		if req.Name == nil {
 			return timeline.Timeline{}, domain.Invalid("name is required")
 		}
@@ -246,7 +246,7 @@ func (a *App) setClipGain(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Gain *float64 `json:"gain"`
 	}
-	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based lyricsheet.Version, clipID int64) (timeline.Timeline, error) {
+	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based songversion.Version, clipID int64) (timeline.Timeline, error) {
 		if req.Gain == nil {
 			return timeline.Timeline{}, domain.Invalid("gain is required")
 		}
@@ -259,7 +259,7 @@ func (a *App) setClipFades(w http.ResponseWriter, r *http.Request) {
 		FadeIn  *float64 `json:"fadeIn"`
 		FadeOut *float64 `json:"fadeOut"`
 	}
-	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based lyricsheet.Version, clipID int64) (timeline.Timeline, error) {
+	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based songversion.Version, clipID int64) (timeline.Timeline, error) {
 		if req.FadeIn == nil || req.FadeOut == nil {
 			return timeline.Timeline{}, domain.Invalid("fadeIn and fadeOut are required")
 		}
@@ -311,7 +311,7 @@ func (a *App) pasteClips(w http.ResponseWriter, r *http.Request) {
 		NewTracks []newTrack    `json:"newTracks"`
 		Clips     []clipToPaste `json:"clips"`
 	}
-	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+	a.changeTimeline(w, r, &req, func(id int64, based songversion.Version) (timeline.Timeline, error) {
 		clips := make([]timeline.ClipCopy, len(req.Clips))
 		for i, c := range req.Clips {
 			copied, err := c.copied()
@@ -330,7 +330,7 @@ func (a *App) deleteClips(w http.ResponseWriter, r *http.Request) {
 		// TrackIDs are Tracks to delete too, e.g. those a paste added.
 		TrackIDs []int64 `json:"trackIds"`
 	}
-	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+	a.changeTimeline(w, r, &req, func(id int64, based songversion.Version) (timeline.Timeline, error) {
 		return a.timelines.DeleteClips(r.Context(), id, based, req.ClipIDs, req.TrackIDs)
 	})
 }
@@ -370,7 +370,7 @@ func (a *App) replaceClips(w http.ResponseWriter, r *http.Request) {
 		NewTracks []timeline.TrackAt `json:"newTracks"`
 		Clips     []clipToPlace      `json:"clips"`
 	}
-	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+	a.changeTimeline(w, r, &req, func(id int64, based songversion.Version) (timeline.Timeline, error) {
 		clips, err := placedClips(req.Clips)
 		if err != nil {
 			return timeline.Timeline{}, err
@@ -384,7 +384,7 @@ func (a *App) splitClips(w http.ResponseWriter, r *http.Request) {
 		ClipIDs []int64  `json:"clipIds"`
 		At      *float64 `json:"at"`
 	}
-	a.changeTimeline(w, r, &req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+	a.changeTimeline(w, r, &req, func(id int64, based songversion.Version) (timeline.Timeline, error) {
 		if req.At == nil {
 			return timeline.Timeline{}, domain.Invalid("at is required")
 		}
@@ -399,12 +399,12 @@ func (a *App) deleteClip(w http.ResponseWriter, r *http.Request) {
 // changeClip is changeTimeline for a change to the Clip in the request's
 // path.
 func (a *App) changeClip(w http.ResponseWriter, r *http.Request, req any,
-	change func(ctx context.Context, songID int64, based lyricsheet.Version, clipID int64) (timeline.Timeline, error)) {
+	change func(ctx context.Context, songID int64, based songversion.Version, clipID int64) (timeline.Timeline, error)) {
 	clipID, ok := pathID(w, r, "clipID")
 	if !ok {
 		return
 	}
-	a.changeTimeline(w, r, req, func(id int64, based lyricsheet.Version) (timeline.Timeline, error) {
+	a.changeTimeline(w, r, req, func(id int64, based songversion.Version) (timeline.Timeline, error) {
 		return change(r.Context(), id, based, clipID)
 	})
 }
@@ -413,7 +413,7 @@ func (a *App) changeClip(w http.ResponseWriter, r *http.Request, req any,
 // the request body, if any, into req, runs the change and writes the resulting
 // Timeline.
 func (a *App) changeTimeline(w http.ResponseWriter, r *http.Request, req any,
-	change func(songID int64, based lyricsheet.Version) (timeline.Timeline, error)) {
+	change func(songID int64, based songversion.Version) (timeline.Timeline, error)) {
 	id, ok := songID(w, r)
 	if !ok {
 		return

@@ -12,6 +12,7 @@ import (
 	"github.com/xKirtle/bandmate/internal/audio"
 	"github.com/xKirtle/bandmate/internal/domain"
 	"github.com/xKirtle/bandmate/internal/songfiles"
+	"github.com/xKirtle/bandmate/internal/songversion"
 )
 
 // Cover is a Song's picture, shown as a square chosen from it. The browser
@@ -112,19 +113,19 @@ var pictureTypes = map[string]bool{"image/jpeg": true, "image/png": true, "image
 // UploadedPicture for each of CoverPictures. The pictures are kept if the Cover is
 // added, and discarded otherwise. A Song with a Cover can't be given
 // another.
-func (s *Store) AddCover(ctx context.Context, songID int64, based Version, details CoverDetails, pictures map[CoverPicture]UploadedPicture) (Song, error) {
+func (s *Store) AddCover(ctx context.Context, songID int64, based songversion.Version, details CoverDetails, pictures map[CoverPicture]UploadedPicture) (Song, error) {
 	return s.putCover(ctx, songID, based, details, pictures, false)
 }
 
 // ReplaceCover gives a Song with a Cover a new one in its place, as
 // AddCover does, and deletes the old one's files. No past Covers are kept.
-func (s *Store) ReplaceCover(ctx context.Context, songID int64, based Version, details CoverDetails, pictures map[CoverPicture]UploadedPicture) (Song, error) {
+func (s *Store) ReplaceCover(ctx context.Context, songID int64, based songversion.Version, details CoverDetails, pictures map[CoverPicture]UploadedPicture) (Song, error) {
 	return s.putCover(ctx, songID, based, details, pictures, true)
 }
 
 // putCover adds a Cover to a Song, replacing the one it has if replace is
 // set, and refusing to otherwise.
-func (s *Store) putCover(ctx context.Context, songID int64, based Version, details CoverDetails, pictures map[CoverPicture]UploadedPicture, replace bool) (Song, error) {
+func (s *Store) putCover(ctx context.Context, songID int64, based songversion.Version, details CoverDetails, pictures map[CoverPicture]UploadedPicture, replace bool) (Song, error) {
 	return s.swapCover(ctx, songID, based, CoverPictures, pictures, func(tx *sql.Tx) (int64, newCover, error) {
 		if msg := details.problem(); msg != "" {
 			return 0, newCover{}, domain.Invalid(msg)
@@ -149,7 +150,7 @@ func (s *Store) putCover(ctx context.Context, songID int64, based Version, detai
 // discarded otherwise. The browser made them from the Cover with id from, so
 // they're refused if the Song's Cover is another by now. The original is
 // kept as it is.
-func (s *Store) AdjustCoverCrop(ctx context.Context, songID int64, based Version, from int64, crop CoverCrop, pictures map[CoverPicture]UploadedPicture) (Song, error) {
+func (s *Store) AdjustCoverCrop(ctx context.Context, songID int64, based songversion.Version, from int64, crop CoverCrop, pictures map[CoverPicture]UploadedPicture) (Song, error) {
 	return s.swapCover(ctx, songID, based, SquarePictures, pictures, func(tx *sql.Tx) (int64, newCover, error) {
 		var c newCover
 		var old int64
@@ -191,7 +192,7 @@ type newCover struct {
 // pictures are kept if the Cover is, and discarded otherwise, and the old
 // Cover's files are deleted. The new Cover always gets a new id, so its
 // pictures' addresses change.
-func (s *Store) swapCover(ctx context.Context, songID int64, based Version, uploaded []CoverPicture,
+func (s *Store) swapCover(ctx context.Context, songID int64, based songversion.Version, uploaded []CoverPicture,
 	pictures map[CoverPicture]UploadedPicture, find func(tx *sql.Tx) (int64, newCover, error)) (Song, error) {
 	for _, p := range uploaded {
 		defer pictures[p].File.Discard()
@@ -255,7 +256,7 @@ func typesOf(uploaded []CoverPicture, pictures map[CoverPicture]UploadedPicture)
 }
 
 // RemoveCover deletes a Song's Cover and its files.
-func (s *Store) RemoveCover(ctx context.Context, songID int64, based Version) (Song, error) {
+func (s *Store) RemoveCover(ctx context.Context, songID int64, based songversion.Version) (Song, error) {
 	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
 		id, err := coverID(ctx, tx, songID)
 		if err != nil {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/xKirtle/bandmate/internal/lyricsheet"
+	"github.com/xKirtle/bandmate/internal/songversion"
 	"github.com/xKirtle/bandmate/internal/timeline"
 )
 
@@ -103,7 +103,7 @@ func (a *App) retake(w http.ResponseWriter, r *http.Request) {
 // e.g. to undo or redo a Retake.
 func (a *App) setTakes(w http.ResponseWriter, r *http.Request) {
 	var req timeline.ClipTakes
-	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based lyricsheet.Version, clipID int64) (timeline.Timeline, error) {
+	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based songversion.Version, clipID int64) (timeline.Timeline, error) {
 		return a.timelines.SetTakes(ctx, id, based, clipID, req)
 	})
 }
@@ -113,7 +113,7 @@ func (a *App) chooseTake(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		TakeID int64 `json:"takeId"`
 	}
-	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based lyricsheet.Version, clipID int64) (timeline.Timeline, error) {
+	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based songversion.Version, clipID int64) (timeline.Timeline, error) {
 		return a.timelines.ChooseTake(ctx, id, based, clipID, req.TakeID)
 	})
 }
@@ -125,7 +125,7 @@ func (a *App) deleteTake(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	a.changeClip(w, r, nil, func(ctx context.Context, id int64, based lyricsheet.Version, clipID int64) (timeline.Timeline, error) {
+	a.changeClip(w, r, nil, func(ctx context.Context, id int64, based songversion.Version, clipID int64) (timeline.Timeline, error) {
 		return a.timelines.DeleteTake(ctx, id, based, clipID, takeID)
 	})
 }
@@ -144,7 +144,7 @@ func (a *App) nudgeTake(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Nudge float64 `json:"nudge"`
 	}
-	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based lyricsheet.Version, clipID int64) (timeline.Timeline, error) {
+	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based songversion.Version, clipID int64) (timeline.Timeline, error) {
 		return a.timelines.NudgeTake(ctx, id, based, clipID, takeID, req.Nudge)
 	})
 }

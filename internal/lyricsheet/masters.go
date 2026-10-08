@@ -12,6 +12,7 @@ import (
 
 	"github.com/xKirtle/bandmate/internal/audio"
 	"github.com/xKirtle/bandmate/internal/domain"
+	"github.com/xKirtle/bandmate/internal/songversion"
 )
 
 // Master is a finished recording of a Song made elsewhere, attached to the
@@ -51,7 +52,7 @@ var errMasterNameRequired = domain.Invalid("a Master's name is required")
 // first Master is its main one. The file is kept if the Master is added,
 // and discarded otherwise. The Song's Status is left alone: whether it is
 // finished is for the user to say.
-func (s *Store) AddMaster(ctx context.Context, songID int64, based Version, details MasterDetails, up audio.Upload, file *audio.Received) (Song, error) {
+func (s *Store) AddMaster(ctx context.Context, songID int64, based songversion.Version, details MasterDetails, up audio.Upload, file *audio.Received) (Song, error) {
 	defer file.Discard()
 	if msg := up.Problem(); msg != "" {
 		return Song{}, domain.Invalid(msg)
@@ -143,7 +144,7 @@ type MasterChanges struct {
 }
 
 // UpdateMaster changes a Master's name or notes.
-func (s *Store) UpdateMaster(ctx context.Context, songID int64, based Version, masterID int64, changes MasterChanges) (Song, error) {
+func (s *Store) UpdateMaster(ctx context.Context, songID int64, based songversion.Version, masterID int64, changes MasterChanges) (Song, error) {
 	var sets []string
 	var args []any
 	if c := changes.Name; c.Set {
@@ -171,7 +172,7 @@ func (s *Store) UpdateMaster(ctx context.Context, songID int64, based Version, m
 
 // MakeMainMaster makes a Master the Song's main one, in place of the one
 // before.
-func (s *Store) MakeMainMaster(ctx context.Context, songID int64, based Version, masterID int64) (Song, error) {
+func (s *Store) MakeMainMaster(ctx context.Context, songID int64, based songversion.Version, masterID int64) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		if err := findMaster(ctx, tx, songID, masterID); err != nil {
 			return err
@@ -189,7 +190,7 @@ func (s *Store) MakeMainMaster(ctx context.Context, songID int64, based Version,
 
 // DeleteMaster removes a Master and its file. If it was the main Master,
 // the earliest added of the others becomes main.
-func (s *Store) DeleteMaster(ctx context.Context, songID int64, based Version, masterID int64) (Song, error) {
+func (s *Store) DeleteMaster(ctx context.Context, songID int64, based songversion.Version, masterID int64) (Song, error) {
 	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
 		res, err := tx.ExecContext(ctx, `DELETE FROM masters WHERE id = ? AND song_id = ?`, masterID, songID)
 		if err != nil {

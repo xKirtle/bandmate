@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
+	"github.com/xKirtle/bandmate/internal/songversion"
 )
 
 func (a *App) listSongs(w http.ResponseWriter, r *http.Request) {
@@ -138,10 +139,10 @@ func readJSON(w http.ResponseWriter, r *http.Request, v any) bool {
 // basedOn reads the Song version a write was based on from the If-Match
 // header, as an entity tag like "3". Without the header, the write applies
 // to whatever version the Song is at.
-func basedOn(w http.ResponseWriter, r *http.Request) (lyricsheet.Version, bool) {
+func basedOn(w http.ResponseWriter, r *http.Request) (songversion.Version, bool) {
 	header := r.Header.Get("If-Match")
 	if header == "" || header == "*" {
-		return lyricsheet.AnyVersion, true
+		return songversion.Any, true
 	}
 	digits, opened := strings.CutPrefix(header, `"`)
 	digits, closed := strings.CutSuffix(digits, `"`)
@@ -150,7 +151,7 @@ func basedOn(w http.ResponseWriter, r *http.Request) (lyricsheet.Version, bool) 
 		writeError(w, http.StatusBadRequest, `If-Match must be a Song version, like "3"`)
 		return 0, false
 	}
-	return lyricsheet.Version(version), true
+	return songversion.Version(version), true
 }
 
 // songID parses the {id} path parameter, answering 404 if it isn't a number.
