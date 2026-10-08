@@ -16,7 +16,7 @@
   import Square from '@lucide/svelte/icons/square';
   import Undo2 from '@lucide/svelte/icons/undo-2';
   import X from '@lucide/svelte/icons/x';
-  import { onDestroy, tick, untrack } from 'svelte';
+  import { onDestroy, onMount, tick, untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { innerHeight } from 'svelte/reactivity/window';
   import {
@@ -47,6 +47,7 @@
   import { clipSources, clipTitle, fileStart, playing } from './clipSource';
   import { formatCue } from './cues';
   import type { Saves } from './saves.svelte';
+  import type { SyncMode } from './syncMode.svelte';
   import { editHint, type Freeze } from './freeze';
   import { draggedFiles, fileDropTrack, type TrackRow } from './fileDrop';
   import { keyHints } from './keyHints';
@@ -140,8 +141,7 @@
     saves,
     setBpm,
     onPlayhead,
-    onLoop,
-    syncing = false,
+    syncMode,
     onRecording,
     height = $bindable(0),
   }: {
@@ -152,11 +152,12 @@
     setBpm: (bpm: number) => void;
     /** Hears where playback is, in seconds, every frame while playing, then null once it stops. */
     onPlayhead?: (at: number | null) => void;
-    /** Hears whether the Loop is on, whenever that changes, e.g. to keep Sync mode off while it is. */
-    onLoop?: (on: boolean) => void;
-    /** Whether the Lyric Sheet is in Sync mode, which recording can't start in. */
-    syncing?: boolean;
-    /** Hears whether a recording is on, whenever that changes, e.g. to keep Sync mode off while it is. */
+    /**
+     * Sync mode, which recording can't start in. The Timeline attaches its
+     * Loop, recording, Clips and playhead to it while it's mounted.
+     */
+    syncMode: SyncMode;
+    /** Hears whether a recording is on, whenever that changes, e.g. to keep the Song from being deleted meanwhile. */
     onRecording?: (on: boolean) => void;
     /** How tall the docked Timeline is, in pixels, e.g. for the page to keep clear of it. */
     height?: number;
@@ -595,22 +596,32 @@
   }
 
   /** Where the playhead is, playing or paused, in seconds to the millisecond, e.g. to cue a Line at. */
-  export function playheadAt(): number {
+  function playheadAt(): number {
     return transport.playheadAt();
   }
 
-  /**
-   * Switches the Loop off, if it's on, e.g. as Sync mode comes on: playback
-   * goes on without it at once, and with it again if that fails.
-   */
-  export function stopLoop() {
-    if (loopOn) editing.edit({ kind: 'switchLoop', on: false });
-  }
-
-  // Sync mode and the Loop are exclusive: see the Lyric Sheet.
-  $effect(() => {
-    onLoop?.(loopOn);
-  });
+  // Sync mode reads the Loop, recording, the Clips and the playhead while
+  // the Timeline's mounted: see syncMode.svelte.ts. Coming on, it switches
+  // the Loop off: playback goes on without it at once, and with it again if
+  // that fails.
+  onMount(() =>
+    syncMode.attach({
+      get loopOn() {
+        return loopOn;
+      },
+      stopLoop: () => {
+        if (loopOn) editing.edit({ kind: 'switchLoop', on: false });
+      },
+      get recording() {
+        return recording;
+      },
+      // As saved, as the Lyric Sheet's Cue gutter reads them.
+      get hasClips() {
+        return saves.timeline.tracks.some((t) => t.clips.length > 0);
+      },
+      playheadAt,
+    }),
+  );
 
   /** Adds a Beat to the chosen Track, after its last Clip or at 0:00. */
   async function addBeat(beat: Beat) {
@@ -816,7 +827,7 @@
     recorder.phase === null &&
       freeze !== 'merging' &&
       playerState === 'stopped' &&
-      !syncing &&
+      !syncMode.on &&
       !calibrating &&
       !recorder.recovering &&
       editable.current,
@@ -2085,7 +2096,7 @@
         aria-keyshortcuts={hints.aria(shortcuts.record.keys)}
         title={capturing
           ? hints.withKeys('Stop recording', [...shortcuts.record.keys, ...shortcuts.playPause.keys])
-          : syncing
+          : syncMode.on
             ? 'Leave Sync mode to record'
             : playerState !== 'stopped'
               ? 'Stop playback to record'
