@@ -168,6 +168,7 @@
               label={lineLabel}
               save={(cue) => gutter.save(line, cue)}
               typing={editing.typing}
+              section={sectionId}
               next={() => gutter.next(line.id)}
               play={gutter.play}
               current={line.id === cueing.current}

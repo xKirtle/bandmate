@@ -29,6 +29,7 @@
     syncing = false,
     outOfOrder = null,
     typing,
+    section,
   }: {
     /** In seconds, or null without a Cue. */
     cue: number | null;
@@ -38,6 +39,8 @@
     save: (cue: number | null) => void;
     /** Puts the time being typed on Saves' list of edits being typed, until the function returned is called. */
     typing: (entry: Typing) => () => void;
+    /** The Section whose Line it is, which the time being typed is in. */
+    section?: number;
     /** Given, Enter goes on to the next field; it answers whether there was one. */
     next?: () => boolean;
     /** Given, a ▶ before the time plays from the Cue. */
@@ -67,6 +70,7 @@
     parse: (typed) => typedCue(typed, cue),
     commit: (at) => save(at),
     typing: untrack(() => typing),
+    section: untrack(() => section),
   });
   onDestroy(field.destroy);
 

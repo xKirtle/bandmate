@@ -108,6 +108,15 @@ describe('TypedField', () => {
     expect(saves.unsaved).toBe(false);
   });
 
+  it('is on the list again when typed in after it was destroyed, e.g. its field shown again', async () => {
+    const { saves, field } = await keyField();
+    field.destroy();
+    field.shown = 'Am';
+    expect(saves.unsaved).toBe(true);
+    field.cancel();
+    expect(saves.unsaved).toBe(false);
+  });
+
   it('drops what’s typed when destroyed if its parse refuses it', async () => {
     const { saves, field, committed } = await keyField();
     field.shown = 'H';
@@ -247,18 +256,15 @@ describe('TypedField, a Cue’s time', () => {
 });
 
 describe('Saves, the list of edits being typed', () => {
-  it('says which Section holds an edit being typed', async () => {
+  it('reports unsaved edits while an edit on it isn’t saved, until it leaves', async () => {
     const server = new FakeSongServer();
     const saves = await savesFor(server);
-    const entry = { unsaved: false, section: 3 };
-    const leave = saves.typing(entry);
-    saves.typing({ unsaved: true });
-    expect(saves.unsavedIn(3)).toBe(false);
-    entry.unsaved = true;
-    expect(saves.unsavedIn(3)).toBe(true);
-    expect(saves.unsavedIn(4)).toBe(false);
-    leave();
-    expect(saves.unsavedIn(3)).toBe(false);
+    const label = { unsaved: false, section: 3 };
+    const leave = saves.typing(label);
+    expect(saves.unsaved).toBe(false);
+    label.unsaved = true;
     expect(saves.unsaved).toBe(true);
+    leave();
+    expect(saves.unsaved).toBe(false);
   });
 });

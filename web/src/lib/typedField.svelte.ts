@@ -14,9 +14,10 @@
 // - Destroyed, e.g. as the page goes, it commits what's typed, dropping it
 //   if its rule refuses it.
 //
-// While what it shows differs from what's saved, it's on Saves' list of
-// edits being typed, so the Song has unsaved edits: closing the tab asks
-// first, and a refresh doesn't replace what's typed.
+// Typed in, it goes on Saves' list of edits being typed, until destroyed.
+// While what it shows differs from what's saved, the Song has unsaved
+// edits: closing the tab asks first, and a refresh doesn't replace what's
+// typed.
 import type { Typing } from './saves.svelte';
 
 /** What a field's rule makes of what's typed: a value to save, going back to what's saved, or a message to show. */
@@ -50,13 +51,13 @@ export class TypedField<T> implements Typing {
   /** What's typed that's been sent, while its save is on its way. */
   #sending: string | null = null;
   #message = $state<string | null>(null);
-  #leave: () => void;
+  /** Takes it off Saves' list: set once typed in, until destroyed. */
+  #leave: (() => void) | null = null;
   readonly section?: number;
 
   constructor(options: TypedFieldOptions<T>) {
     this.#options = options;
     this.section = options.section;
-    this.#leave = options.typing(this);
   }
 
   /** What the field shows: what's typed, or what's saved. */
@@ -115,11 +116,14 @@ export class TypedField<T> implements Typing {
   /** Commits what's typed, dropping it if refused, and leaves Saves' list. */
   destroy = () => {
     if (!this.commit()) this.cancel();
-    this.#leave();
+    this.#leave?.();
+    this.#leave = null;
   };
 
+  /** Shows what's typed, or with null what's saved; typed in, it's on Saves' list. */
   #type(typed: string | null) {
     this.#typed = this.#shownTyped = typed;
+    if (typed !== null) this.#leave ??= this.#options.typing(this);
   }
 
   #back(): true {

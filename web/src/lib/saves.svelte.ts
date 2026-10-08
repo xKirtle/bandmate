@@ -160,11 +160,6 @@ export class Saves {
     );
   }
 
-  /** Whether an edit being typed in a Section isn't saved yet. */
-  unsavedIn(sectionId: number): boolean {
-    return this.#typing.some((t) => t.section === sectionId && t.unsaved);
-  }
-
   /**
    * Puts an edit being typed, e.g. a field typed in place, on the list
    * whose edits not saved yet the Song has, until the function returned is

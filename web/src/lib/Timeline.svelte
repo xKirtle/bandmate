@@ -386,11 +386,11 @@
   }
 
   /**
-   * Commits what's typed in a name's field as the field goes, which doesn't
-   * blur it, e.g. as the Timeline collapses or the page goes.
+   * Commits what's typed in a name's field as the field goes, e.g. as the
+   * Timeline collapses or the page goes, which needn't blur it first.
    */
-  function committedOnLeaving(name: { destroy: () => void }): Attachment {
-    return () => name.destroy;
+  function committedAsItGoes(field: { destroy: () => void }): Attachment {
+    return () => field.destroy;
   }
 
   function startRename(track: Track) {
@@ -2179,7 +2179,7 @@
                   onkeydown={(e) => nameKey(track, e)}
                   onblur={() => endRename(track, true)}
                   {@attach focusField}
-                  {@attach committedOnLeaving(renaming.name)}
+                  {@attach committedAsItGoes(renaming.name)}
                 />
               {:else}
                 <button
@@ -2403,7 +2403,7 @@
                           onkeydown={(e) => clipNameKey(clip, e)}
                           onblur={() => endClipRename(clip, true)}
                           {@attach focusField}
-                          {@attach committedOnLeaving(renamingClip.name)}
+                          {@attach committedAsItGoes(renamingClip.name)}
                         />
                       {:else}
                         <span class="clip-title">{title}</span>
