@@ -76,9 +76,13 @@ export type PreparedSound = Omit<SoundImport, 'trackId'>;
  */
 export type ShownEdit = Extract<Edit, { kind: 'updateTrack' | 'renameClip' }>;
 
-/** A value shown over the Timeline as saved, for one field of a Track or a Clip, and the edit or preview it came from. */
+/** Sets one field of a Track or a Clip on a Timeline to the value an edit gives it. */
+type SetField = (timeline: Timeline) => Timeline;
+
+/** A value shown over the Timeline as saved, for one field of a Track or a Clip. */
 interface ShownValue {
-  show: (timeline: Timeline) => Timeline;
+  show: SetField;
+  /** The edit or preview it came from, by identity: only that one stops it showing. */
   from: object;
 }
 
@@ -195,7 +199,7 @@ export class TimelineEditing {
   };
 
   /** Shows values over the Timeline as saved, each in place of any shown for its field. */
-  #show(fields: Map<string, ShownValue['show']>, from: object) {
+  #show(fields: Map<string, SetField>, from: object) {
     if (fields.size === 0) return;
     const values = new Map(this.#values);
     for (const [field, show] of fields) values.set(field, { show, from });
@@ -203,7 +207,7 @@ export class TimelineEditing {
   }
 
   /** Stops showing the values an edit or preview set, but for those newer ones showing since. */
-  #unshow(fields: Map<string, ShownValue['show']>, from: object) {
+  #unshow(fields: Map<string, SetField>, from: object) {
     const values = new Map(this.#values);
     for (const field of fields.keys()) if (values.get(field)?.from === from) values.delete(field);
     if (values.size !== this.#values.size) this.#shown = { over: this.#saves.replaced, values };
@@ -438,8 +442,8 @@ export class TimelineEditing {
 }
 
 /** How an edit sets each field it shows a value for, by field, or none for an edit that isn't shown before it's saved. */
-function shownFields(e: Edit): Map<string, (timeline: Timeline) => Timeline> {
-  const fields = new Map<string, (timeline: Timeline) => Timeline>();
+function shownFields(e: Edit): Map<string, SetField> {
+  const fields = new Map<string, SetField>();
   if (e.kind === 'updateTrack') {
     const { name, ...levels } = e.changes;
     // As the server saves it, which refuses a blank one.

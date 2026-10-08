@@ -292,7 +292,7 @@
   // playback already goes on without it.
   let switchingOff = $state(false);
   const loopOn = $derived((timeline.loop?.on ?? false) && !switchingOff);
-  // The Loop playback repeats: the saved one, while it's on.
+  // The Loop playback repeats, while it's on.
   const playingLoop = $derived<Loop | null>(loopOn ? { start: timeline.loop!.start, end: timeline.loop!.end } : null);
   // Matches the upright phone's layout below, which hides editing.
   const editable = new MediaQuery(`(min-width: 40.0625rem), ${fullScreenQuery}`);
