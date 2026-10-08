@@ -350,6 +350,101 @@ describe('Timeline editing, the Timeline as shown', () => {
   });
 });
 
+describe('Timeline editing, the Loop as shown', () => {
+  /** Editing a Timeline with a Loop from 0 to 10 s, switched on. */
+  const looped = async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { saves, editing } = await editingFor(server);
+    await editing.edit({ kind: 'setLoop', loop: { start: 0, end: 10, on: true } });
+    return { server, saves, editing };
+  };
+
+  it('shows a Loop set, switched and cleared until each is saved', async () => {
+    const { server, saves, editing } = await looped();
+    const release = server.holdNextAnswer();
+    const setting = editing.edit({ kind: 'setLoop', loop: { start: 4, end: 8, on: true } });
+    expect(editing.timeline.loop).toEqual({ start: 4, end: 8, on: true });
+    expect(saves.timeline.loop).toEqual({ start: 0, end: 10, on: true });
+    const switching = editing.edit({ kind: 'switchLoop', on: false });
+    expect(editing.timeline.loop).toEqual({ start: 4, end: 8, on: false });
+    release();
+    await setting;
+    expect(editing.timeline.loop).toEqual({ start: 4, end: 8, on: false });
+    await switching;
+    expect(server.timeline.loop).toEqual({ start: 4, end: 8, on: false });
+    expect(editing.timeline).toBe(saves.timeline);
+
+    const clearRelease = server.holdNextAnswer();
+    const clearing = editing.edit({ kind: 'clearLoop' });
+    expect(editing.timeline.loop).toBeNull();
+    expect(saves.timeline.loop).not.toBeNull();
+    clearRelease();
+    await clearing;
+    expect(server.timeline.loop).toBeNull();
+    expect(editing.timeline).toBe(saves.timeline);
+  });
+
+  it('goes back to the Loop as saved when its save fails', async () => {
+    const { server, saves, editing } = await looped();
+    server.failNext(1);
+    const setting = editing.edit({ kind: 'setLoop', loop: { start: 4, end: 8, on: true } });
+    expect(editing.timeline.loop).toEqual({ start: 4, end: 8, on: true });
+    expect(await setting).toBeNull();
+    expect(editing.timeline.loop).toEqual({ start: 0, end: 10, on: true });
+    expect(editing.timeline).toBe(saves.timeline);
+  });
+
+  it('keeps showing a second Loop set before the first is saved, once the first is', async () => {
+    const { server, saves, editing } = await looped();
+    const release = server.holdNextAnswer();
+    const first = editing.edit({ kind: 'setLoop', loop: { start: 2, end: 6, on: true } });
+    const second = editing.edit({ kind: 'setLoop', loop: { start: 12, end: 16, on: true } });
+    expect(editing.timeline.loop).toEqual({ start: 12, end: 16, on: true });
+    release();
+    await first;
+    expect(saves.timeline.loop).toEqual({ start: 2, end: 6, on: true });
+    expect(editing.timeline.loop).toEqual({ start: 12, end: 16, on: true });
+    await second;
+    expect(server.timeline.loop).toEqual({ start: 12, end: 16, on: true });
+    expect(editing.timeline).toBe(saves.timeline);
+  });
+
+  it('plays without the Loop at once as it’s switched off, and with it again if that fails', async () => {
+    const { server, editing } = await looped();
+    server.failNext(1);
+    const switching = editing.edit({ kind: 'switchLoop', on: false });
+    expect(editing.timeline.loop?.on).toBe(false);
+    expect(await switching).toBeNull();
+    expect(editing.timeline.loop?.on).toBe(true);
+  });
+
+  it('keeps a switch sent over a Loop set showing the set’s stretch until the switch resolves, if the set fails', async () => {
+    const { server, saves, editing } = await looped();
+    server.failNext(1);
+    const setting = editing.edit({ kind: 'setLoop', loop: { start: 4, end: 8, on: true } });
+    const release = server.holdNextAnswer();
+    const switching = editing.edit({ kind: 'switchLoop', on: false });
+    expect(editing.timeline.loop).toEqual({ start: 4, end: 8, on: false });
+    expect(await setting).toBeNull();
+    expect(editing.timeline.loop).toEqual({ start: 4, end: 8, on: false });
+    release();
+    await switching;
+    expect(server.timeline.loop).toEqual({ start: 0, end: 10, on: false });
+    expect(editing.timeline).toBe(saves.timeline);
+  });
+
+  it('refuses setting, switching and clearing the Loop while frozen', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { editing, state } = await editingFor(server);
+    state.recording = true;
+    expect(await editing.edit({ kind: 'setLoop', loop: { start: 4, end: 8, on: true } })).toBeNull();
+    expect(await editing.edit({ kind: 'switchLoop', on: true })).toBeNull();
+    expect(editing.preview({ kind: 'clearLoop' })).toBe(false);
+    expect(editing.timeline.loop).toBeNull();
+    expect(server.landed).toBe(0);
+  });
+});
+
 describe('Timeline editing, undo and redo', () => {
   it('does nothing with nothing to undo or redo, and nothing queued', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
