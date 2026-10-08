@@ -15,6 +15,10 @@ export async function heroSong(bandmate: Bandmate): Promise<Song> {
 /** The docked Timeline. */
 export const timeline = (page: Page) => page.getByRole('region', { name: 'Timeline' });
 
+/** A Track's header on the Timeline, by its name, e.g. "Lead vox": it's current while it's the Chosen Track. */
+export const trackHead = (page: Page, name: string) =>
+  timeline(page).getByRole('group', { name: `Track ${name}`, exact: true });
+
 /** The Timeline's ruler, whose value is the playhead, in whole seconds. */
 export const ruler = (page: Page) => timeline(page).getByRole('slider', { name: 'Position' });
 
@@ -103,6 +107,11 @@ export async function drag(page: Page, from: Point, by: Point) {
   await page.mouse.move(from.x + by.x / 2, from.y + by.y / 2, { steps: 5 });
   await page.mouse.move(from.x + by.x, from.y + by.y, { steps: 5 });
   await page.mouse.up();
+}
+
+/** Drags from one point on the page to another. */
+export async function dragTo(page: Page, from: Point, to: Point) {
+  await drag(page, from, { x: to.x - from.x, y: to.y - from.y });
 }
 
 /** The middle of something on screen. */
