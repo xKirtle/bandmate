@@ -822,6 +822,38 @@ test("two tabs on one Song: the other tab's next edit marks it Stale, and Reload
   expect(asked).toEqual(['Reload the Song? Edits that weren’t saved here will be lost.']);
 });
 
+test("a Master's name and notes typed stay, unsaved, when refused as the Song changed elsewhere", async ({
+  page,
+  bandmate,
+}) => {
+  const song = await bandmate.song({ title: 'Anthem' });
+  await bandmate.master(song.id, 'Studio');
+  await bandmate.master(song.id, 'Live');
+  await page.goto(`/songs/${song.id}`);
+  // On desktop, the Masters start folded away. Their toggle, a <summary>,
+  // has no role or name of its own in Chromium, so it's found by its text.
+  await page.getByRole('group').getByText('Masters', { exact: true }).filter({ visible: true }).click();
+  const live = page.getByRole('region', { name: 'Masters' }).getByRole('article', { name: 'Live' });
+  await expect(live.getByRole('textbox', { name: 'Name' })).toHaveValue('Live');
+
+  // Another tab changes the Song, then this one renames the Master, and is refused.
+  await bandmate.retitle(song.id, 'Ballad');
+  await live.getByRole('textbox', { name: 'Name' }).fill('Live at the Roxy');
+  await live.getByRole('textbox', { name: 'Name' }).press('Enter');
+  await expect(page.getByRole('alert').filter({ hasText: 'This Song changed elsewhere' })).toBeVisible();
+  // What's typed stays where it was typed, to copy out, and so do notes typed after.
+  await live.getByRole('textbox', { name: 'Notes' }).fill('Crowd too loud.');
+  await live.getByRole('textbox', { name: 'Notes' }).blur();
+  await expect(live.getByRole('textbox', { name: 'Name' })).toHaveValue('Live at the Roxy');
+  await expect(live.getByRole('textbox', { name: 'Notes' })).toHaveValue('Crowd too loud.');
+  expect(await warnsOnLeaving(page)).toBe(true);
+  const saved = (await bandmate.getSong(song.id)).masters as { name: string; notes: string }[];
+  expect(saved.map(({ name, notes }) => ({ name, notes }))).toEqual([
+    { name: 'Studio', notes: '' },
+    { name: 'Live', notes: '' },
+  ]);
+});
+
 test('coming back to a tab with nothing unsaved shows a change made in another', async ({ page, bandmate }) => {
   const song = await bandmate.song({ title: 'Anthem' });
   const other = await page.context().newPage();

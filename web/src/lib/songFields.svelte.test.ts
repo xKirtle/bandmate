@@ -167,7 +167,7 @@ async function secondMaster() {
   const refused: string[] = [];
   const fields = masterFields(2, {
     master: () => saves.saved.masters.find((m) => m.id === 2),
-    change: saves.change,
+    submit: saves.submit,
     typing: saves.typing,
     update,
     refuse: (message) => refused.push(message),
@@ -198,18 +198,43 @@ describe('masterFields', () => {
     expect(server.landed).toBe(0);
   });
 
-  it('shows what’s saved again once a save fails, or is refused as the Song changed elsewhere', async () => {
-    const { server, fields } = await secondMaster();
-    server.failNext(1);
+  it('shows what’s saved again once a save fails', async () => {
+    const { server, saves, fields } = await secondMaster();
+    server.failNext(2);
     fields.name.shown = 'Demo';
     fields.name.commit();
+    fields.notes.shown = 'Rough';
+    fields.notes.commit();
     await settled();
     expect(fields.name.shown).toBe('Live');
+    expect(fields.notes.shown).toBe('');
+    expect(saves.saveError).not.toBeNull();
+    expect(saves.stale).toBe(false);
+    expect(saves.unsaved).toBe(false);
+  });
+
+  it('keeps a name typed, unsaved, when refused as the Song changed elsewhere', async () => {
+    const { server, saves, fields, saved } = await secondMaster();
+    server.changeElsewhere();
+    fields.name.shown = ' Demo ';
+    fields.name.commit();
+    await settled();
+    expect(saves.stale).toBe(true);
+    expect(fields.name.shown).toBe('Demo');
+    expect(saves.unsaved).toBe(true);
+    expect(saved().name).toBe('Live');
+  });
+
+  it('keeps notes typed, unsaved, when refused as the Song changed elsewhere', async () => {
+    const { server, saves, fields, saved } = await secondMaster();
     server.changeElsewhere();
     fields.notes.shown = 'Rough';
     fields.notes.commit();
     await settled();
-    expect(fields.notes.shown).toBe('');
+    expect(saves.stale).toBe(true);
+    expect(fields.notes.shown).toBe('Rough');
+    expect(saves.unsaved).toBe(true);
+    expect(saved().notes).toBe('');
   });
 
   it('drops what’s typed, sending nothing, once the Master’s removed', async () => {

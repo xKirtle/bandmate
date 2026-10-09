@@ -2,7 +2,7 @@
   import { untrack } from 'svelte';
   import { api, type Master, type Song, type SongAt, type Status } from './api';
   import AudioPlayer from './AudioPlayer.svelte';
-  import type { Typing } from './saves.svelte';
+  import type { Submitted, Typing } from './saves.svelte';
   import { masterFields, type MasterFields } from './songFields';
   import type { Mode } from './songMode';
   import { cancelOnEscape, committedAsItGoes, leaveOnEscape } from './typedField.svelte';
@@ -13,7 +13,7 @@
   let {
     song,
     mode,
-    change,
+    submit,
     typing,
     setStatus,
     recording = false,
@@ -21,8 +21,8 @@
     song: Song;
     /** The Song page's mode: in Read mode the Masters only play. */
     mode: Mode;
-    /** Sends a change to the Song; resolves to whether it succeeded. */
-    change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
+    /** Sends a change to the Song; resolves to how it ended, e.g. refused as the Song changed elsewhere. */
+    submit: (op: (at: SongAt) => Promise<Song>) => Promise<Submitted>;
     /** Puts a name or notes being typed on Saves' list of edits being typed. */
     typing: (entry: Typing) => () => void;
     /** Changes the Song's Status, as its own Status control would. */
@@ -30,6 +30,9 @@
     /** Whether the Timeline is recording, which no Master plays over. */
     recording?: boolean;
   } = $props();
+
+  /** Sends a change to the Song; resolves to whether it was saved. */
+  const change = (op: (at: SongAt) => Promise<Song>) => submit(op).then((ended) => ended === 'saved');
 
   let maxUploadBytes = $state(Infinity);
   let busy = $state<string | null>(null);
@@ -71,7 +74,7 @@
     if (!f) {
       f = masterFields(m.id, {
         master: () => song.masters.find((s) => s.id === m.id),
-        change: untrack(() => change),
+        submit: untrack(() => submit),
         typing: untrack(() => typing),
         update: api.updateMaster,
         refuse: (message) => (error = message),
