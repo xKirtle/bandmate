@@ -2,8 +2,9 @@
   import { onDestroy } from 'svelte';
   import { clickTime, formatOffset, Measuring, minHits, noReading, steadyOver, type Reading } from './calibration';
   import CalibrationTaps from './CalibrationTaps.svelte';
-  import { Capture, CaptureError, frameAt } from './capture';
+  import { Capture, CaptureError, frameAt, openInput } from './capture';
   import Dialog from './Dialog.svelte';
+  import OffsetField from './OffsetField.svelte';
   import { channelName, inputName, sameInput, type InputChoice } from './inputSettings';
   import { RecordedInput } from './recordedInput.svelte';
   import { calibrations } from './sharedCalibration.svelte';
@@ -14,7 +15,8 @@
   // with them. Each tap is measured as it's heard, and the running average
   // shown, with how steady it's been and a graph of the taps, so they can
   // stop once it reads steady. Use this keeps the average for the Input it
-  // was measured on; Cancel, or closing it, keeps nothing. Offered before an
+  // was measured on; Cancel, or closing it, keeps nothing. An offset already
+  // known can be typed instead, for the Input it names. Offered before an
   // Input's first recording, where it can be skipped, for that Input, to
   // record straight away; also run from the recording settings and Settings,
   // where a listed Input is measured as itself or not at all.
@@ -44,6 +46,10 @@
   const expected = $derived(exact ? input : recorded.current);
   const calibrated = $derived(measuring ?? expected);
   const name = $derived(calibrated ? channelName(calibrated.label, calibrated.channel) : inputName(input));
+  // Its Latency Offset now, to type from.
+  const offset = $derived(
+    measuring || exact ? calibrations.of(measuring ?? input).offset : recorded.calibration.offset,
+  );
 
   let dialog = $state<HTMLDialogElement>();
   let phase = $state<'ready' | 'measuring' | 'done'>('ready');
@@ -51,8 +57,8 @@
   let clicking = $state(false);
   // What's been measured so far, while measuring.
   let reading = $state.raw<Reading>(noReading);
-  // The Latency Offset kept, and how many taps it's from, once used.
-  let kept = $state.raw<{ offset: number; taps: number } | null>(null);
+  // The Latency Offset kept, once used, and how many taps it's from, or that it was typed.
+  let kept = $state.raw<{ offset: number; taps: number } | { offset: number; typed: true } | null>(null);
   let error = $state<string | null>(null);
   let record = false;
 
@@ -148,8 +154,41 @@
       return;
     }
     // Applied even where storage can't keep it, until reload.
-    calibrations.set(measuring, { offset: average, offered: true });
+    calibrations.keep(measuring, average);
     kept = { offset: average, taps: counted };
+    phase = 'done';
+  }
+
+  /**
+   * Keeps an offset typed as the Latency Offset of the Input calibrated, as
+   * if measured. Where that isn't known for sure, e.g. the default input, or
+   * one chosen that may be unplugged, it's opened a moment to find out,
+   * as only opening an Input says which it is.
+   */
+  async function keepTyped(typed: number) {
+    stopMeasuring();
+    const mine = generation;
+    error = null;
+    let which = measuring ?? (exact ? input : null);
+    if (!which) {
+      try {
+        const opened = await openInput($state.snapshot(input));
+        for (const track of opened.stream.getTracks()) track.stop();
+        if (mine !== generation) return;
+        which = opened.input;
+        if (which) calibrations.opened($state.snapshot(input), which);
+      } catch (e) {
+        if (mine === generation) fail(e);
+        return;
+      }
+    }
+    if (!which) {
+      fail(new CaptureError("The browser didn't say which input it is, so nothing was kept."));
+      return;
+    }
+    measuring = which;
+    calibrations.keep(which, typed);
+    kept = { offset: typed, typed: true };
     phase = 'done';
   }
 
@@ -232,9 +271,17 @@
     <p class="problem" role="alert">{error}</p>
   {:else if kept}
     <p role="status">
-      The Latency Offset of {name} is <strong class="tabular">{formatOffset(kept.offset)}</strong>, from
-      {taps(kept.taps)}. New Takes from it are placed earlier by it; Takes already recorded stay where they are.
+      The Latency Offset of {name} is
+      <strong class="tabular">{formatOffset(kept.offset)}</strong>{#if 'taps' in kept}, from
+        {taps(kept.taps)}{/if}. New Takes from it are placed earlier by it; Takes already recorded stay where they are.
     </p>
+  {/if}
+
+  {#if phase !== 'measuring'}
+    <div class="typed">
+      <p class="muted">Or, if you know it, type it in whole milliseconds.</p>
+      <OffsetField {name} {offset} onSet={keepTyped} />
+    </div>
   {/if}
 
   {#if offer && !kept}
@@ -276,6 +323,11 @@
   }
   .muted {
     font-size: var(--text-md);
+  }
+  .typed {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
   }
   .actions {
     display: flex;

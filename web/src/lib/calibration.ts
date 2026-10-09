@@ -279,6 +279,21 @@ export function formatOffset(seconds: number): string {
   return `${Math.round(seconds * 1000)} ms`;
 }
 
+/** The largest Latency Offset that can be typed, in milliseconds. */
+export const maxTypedOffset = 500;
+
+/**
+ * A Latency Offset typed in whole milliseconds, in seconds; null where it
+ * isn't a whole number from 0 to maxTypedOffset, so a slip of the keyboard
+ * can't set something absurd.
+ */
+export function typedOffset(text: string): number | null {
+  const typed = text.trim();
+  if (!/^\d+$/.test(typed)) return null;
+  const ms = Number(typed);
+  return ms <= maxTypedOffset ? ms / 1000 : null;
+}
+
 /** The Latency Offset, to show at a glance: "12 ms, calibrated", or "Not calibrated". */
 export function offsetSummary(offset: number | null): string {
   return offset === null ? 'Not calibrated' : `${formatOffset(offset)}, calibrated`;

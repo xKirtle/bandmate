@@ -160,6 +160,14 @@ export class InputCalibrations {
   }
 
   /**
+   * Keeps an Input's Latency Offset, measured or typed: either way it's
+   * calibrated, so calibration isn't offered before its next recording.
+   */
+  keep(input: InputChoice, offset: number) {
+    this.set(input, { offset, offered: true });
+  }
+
+  /**
    * Every Input with a Latency Offset on this device, connected or not, by
    * name, each with the label its device had when calibrated: those only
    * skipped have none to list.
