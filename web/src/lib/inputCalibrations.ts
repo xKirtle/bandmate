@@ -137,14 +137,30 @@ export class InputCalibrations {
   }
 
   /**
-   * Says which Input the default input turned out to be, as it's opened:
-   * the one offset kept before moves to it, unless it has its own.
+   * The calibration to show for a choice, given the Input it looks to
+   * record from, if that can be told, without opening it: with the default
+   * chosen, an Input without one of its own shows the one offset kept
+   * before, which it will have if it turns out to be the default once
+   * opened.
    */
-  defaultIs(input: InputChoice) {
+  shownFor(choice: InputChoice, input: InputId | null): Calibration {
+    const { inputs } = this.#setting.value;
+    if (choice.deviceId !== '') return this.of(input);
+    return input && inputs.some((i) => same(i, input)) ? this.of(input) : this.of(null);
+  }
+
+  /**
+   * Says which Input was opened for a choice. With the default chosen, the
+   * one offset kept before moves to it, unless it has its own.
+   */
+  opened(choice: InputChoice, input: InputChoice) {
     const { inputs, unclaimed } = this.#setting.value;
-    if (!unclaimed) return;
+    if (choice.deviceId !== '' || !unclaimed) return;
     const own = inputs.some((i) => same(i, input));
-    this.#setting.set({ inputs, unclaimed: null });
-    if (!own) this.set(input, unclaimed);
+    const { deviceId, label, channel } = input;
+    this.#setting.set({
+      inputs: own ? inputs : [...inputs, { deviceId, label, channel, ...unclaimed }],
+      unclaimed: null,
+    });
   }
 }

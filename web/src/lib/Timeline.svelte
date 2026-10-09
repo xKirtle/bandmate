@@ -194,7 +194,7 @@
     input: capturedInput(
       audioContext,
       () => $state.snapshot(chosenInput.value),
-      (input) => calibrations.defaultIs(input),
+      (choice, input) => calibrations.opened(choice, input),
     ),
     keeping: browserKeeping,
     calibrations,
@@ -831,9 +831,9 @@
   // Whether calibration was just skipped, to say where to run it later.
   let skipped = $state(false);
 
-  // The Input recording would open, and its Latency Offset, to show.
+  // The Latency Offset of the Input recording would open, to show.
   const recordedInput = new RecordedInput(() => chosenInput.value);
-  const offset = $derived(calibrations.of(recordedInput.current).offset);
+  const offset = $derived(recordedInput.calibration.offset);
 
   function calibrateChosen() {
     calibrating = { offer: false, input: $state.snapshot(chosenInput.value) };

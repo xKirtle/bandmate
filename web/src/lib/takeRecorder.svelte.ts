@@ -19,8 +19,9 @@
 // offered in its place, until it's calibrated or skipped.
 //
 // The Timeline decides when Record is offered, and draws what's recorded;
-// the recorder does the rest, through its ports: Transport, playing along, the
-// chosen Input, each Input's calibration, and the copy kept in the browser. Saving goes through the
+// the recorder does the rest, through its ports: Transport, playing along,
+// the chosen Input, each Input's calibration, and the copy kept in the
+// browser. Saving goes through the
 // Song's Saves, whose refreshes are held from the start of a recording
 // until its Take is saved, as the Timeline it's made against has to stay
 // as it is.
@@ -107,21 +108,18 @@ export interface TakeUploads {
   retake(at: SongAt, clipId: number, wav: Blob, captured: Captured): Promise<Timeline>;
 }
 
-/**
- * The chosen Input, captured on context. Opening the default input tells
- * found which Input it is.
- */
+/** The chosen Input, captured on context, telling onOpened which Input it opened for the choice. */
 export function capturedInput(
   context: () => AudioContext,
   choice: () => InputChoice,
-  found: (input: InputChoice) => void,
+  onOpened: (choice: InputChoice, input: InputChoice) => void,
 ): TakeInput {
   return {
     problem: inputProblem,
     open: async () => {
       const chosen = choice();
       const capture = await Capture.open(context(), chosen);
-      if (capture.opened && chosen.deviceId === '') found(capture.opened);
+      if (capture.opened) onOpened(chosen, capture.opened);
       return {
         gone: capture.gone,
         input: capture.opened,

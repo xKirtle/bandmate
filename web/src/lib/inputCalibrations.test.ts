@@ -28,6 +28,7 @@ const fresh = { offset: null, offered: false };
 const mic = { deviceId: 'mic', label: 'Scarlett Solo USB', channel: 0 };
 const guitar = { deviceId: 'mic', label: 'Scarlett Solo USB', channel: 1 };
 const laptop = { deviceId: 'laptop', label: 'Built-in Microphone', channel: 0 };
+const defaultChoice = { deviceId: '', label: '', channel: 0 };
 
 describe('InputCalibrations', () => {
   it('is uncalibrated and not yet offered for every Input on a new device', () => {
@@ -72,7 +73,7 @@ describe('InputCalibrations', () => {
   it('gives the offset of the Input the default input is, once known, never one kept for "default"', () => {
     const { calibrations } = setup();
     calibrations.set(mic, { offset: 0.021, offered: true });
-    calibrations.defaultIs(laptop);
+    calibrations.opened(defaultChoice, laptop);
     expect(calibrations.of(laptop)).toEqual(fresh);
     expect(calibrations.of(mic)).toEqual({ offset: 0.021, offered: true });
   });
@@ -103,12 +104,12 @@ describe('InputCalibrations', () => {
       expect(calibrations.of(null)).toEqual({ offset: 0.021, offered: true });
       expect(reloaded().of(null)).toEqual({ offset: 0.021, offered: true });
 
-      calibrations.defaultIs(laptop);
+      calibrations.opened(defaultChoice, laptop);
       expect(calibrations.of(laptop)).toEqual({ offset: 0.021, offered: true });
       expect(calibrations.of(null)).toEqual(fresh);
 
       // Once given, the default turning out to be another Input moves it no more.
-      calibrations.defaultIs(mic);
+      calibrations.opened(defaultChoice, mic);
       expect(calibrations.of(mic)).toEqual(fresh);
       expect(reloaded().of(laptop)).toEqual({ offset: 0.021, offered: true });
     });
@@ -116,8 +117,28 @@ describe('InputCalibrations', () => {
     it('never replaces an offset the Input the default turns out to be has of its own', () => {
       const { calibrations } = setup(before(0.021, true));
       calibrations.set(laptop, { offset: 0.04, offered: true });
-      calibrations.defaultIs(laptop);
+      calibrations.opened(defaultChoice, laptop);
       expect(calibrations.of(laptop)).toEqual({ offset: 0.04, offered: true });
+    });
+
+    it('keeps it for the default while an Input chosen is opened', () => {
+      const { calibrations } = setup(before(0.021, true));
+      calibrations.opened(mic, mic);
+      expect(calibrations.of(mic)).toEqual(fresh);
+      expect(calibrations.of(null)).toEqual({ offset: 0.021, offered: true });
+    });
+
+    it('is shown, with the default chosen, for the Input the default looks to be, until one is opened', () => {
+      const { calibrations } = setup(before(0.021, true));
+      expect(calibrations.shownFor(defaultChoice, laptop)).toEqual({ offset: 0.021, offered: true });
+      expect(calibrations.shownFor(defaultChoice, null)).toEqual({ offset: 0.021, offered: true });
+      // Never for an Input chosen.
+      expect(calibrations.shownFor(mic, mic)).toEqual(fresh);
+      // Nor in place of an offset the Input has of its own.
+      calibrations.set(laptop, { offset: 0.04, offered: true });
+      expect(calibrations.shownFor(defaultChoice, laptop)).toEqual({ offset: 0.04, offered: true });
+      // Looking moves nothing.
+      expect(calibrations.of(null)).toEqual({ offset: 0.021, offered: true });
     });
 
     it('moves nothing from a device that had nothing kept', () => {

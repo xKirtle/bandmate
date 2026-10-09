@@ -80,8 +80,9 @@
       const opened = await Capture.open(context, $state.snapshot(input));
       if (mine !== generation) return opened.close();
       capture = opened;
-      measuring = opened.opened;
-      if (measuring && input.deviceId === '') calibrations.defaultIs(measuring);
+      // Where the browser doesn't say which Input it opened, the one it looked to be.
+      measuring = opened.opened ?? expected.current;
+      if (opened.opened) calibrations.opened($state.snapshot(input), opened.opened);
       // A moment on, so the first click is scheduled clear of now.
       const from = context.currentTime + 0.1;
       const times = clickTimes();
@@ -98,7 +99,11 @@
       const samples = await opened.stop(from);
       capture = null;
       if (mine !== generation) return;
-      result = measureOffset(samples, opened.sampleRate, times);
+      const found = measureOffset(samples, opened.sampleRate, times);
+      if (found.ok && !measuring) {
+        throw new CaptureError("The browser didn't say which input it measured, so nothing was kept.");
+      }
+      result = found;
       // Applied even where storage can't keep it, until reload.
       if (result.ok && measuring) calibrations.set(measuring, { offset: result.offset, offered: true });
     } catch (e) {

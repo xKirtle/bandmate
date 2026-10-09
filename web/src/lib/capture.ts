@@ -238,11 +238,6 @@ export class InputLevel {
     return this.input.gone;
   }
 
-  /** The Input opened: the one chosen, or the one the default is; null where the browser doesn't say. */
-  get opened(): InputChoice | null {
-    return this.input.input;
-  }
-
   /** The latency the browser reports for the input, in seconds. */
   get latency(): number {
     return reportedLatency(this.context, this.input);

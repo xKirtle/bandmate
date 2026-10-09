@@ -13,7 +13,6 @@
   import SettingsPage from '../lib/SettingsPage.svelte';
   import { appearance } from '../lib/sharedAppearance.svelte';
   import { RecordedInput } from '../lib/recordedInput.svelte';
-  import { calibrations } from '../lib/sharedCalibration.svelte';
   import { input } from '../lib/sharedInput.svelte';
   import { leftHanded } from '../lib/sharedLeftHanded.svelte';
 
@@ -24,9 +23,9 @@
   // leaving the tab closes both.
   let changingInput = $state(false);
   let calibrating = $state(false);
-  // The Input recording would open, and its Latency Offset, to show.
+  // The Latency Offset of the Input recording would open, to show.
   const recordedInput = new RecordedInput(() => input.value);
-  const offset = $derived(calibrations.of(recordedInput.current).offset);
+  const offset = $derived(recordedInput.calibration.offset);
 
   // Narrowed past where recording is offered, the picker goes for good, so
   // widening again never opens the Input unasked.
