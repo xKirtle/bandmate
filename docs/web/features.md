@@ -113,15 +113,22 @@ Sing over your beat, right in the browser, in full quality.
 4. **Input**: every input connected to this device, each channel of an audio interface on its own, its channel first. Pick the one you record from. Each device remembers its own.
 5. **Level**: of the input you picked. Sing your loudest, and keep the meter out of the red. Here it's in the red, from a test tone.
 
-**Calibrate** each input in **Settings → Recording**, so your takes land on the beat: it measures how late a click reaches that input on this device. Hands-free is the most exact: rest your headphones on the mic, turn the volume up, and it hears the clicks itself, or tap along on the mic in time with them. If you already know an input's latency, choose **Type it** instead. Bandmate also offers to calibrate the first time you record from an input, where you can skip it and record straight away.
-
-<img src="@screenshots/calibrating.webp" alt="Calibrating an input hands-free in Settings → Recording: the metronome swings as each click is heard, then the result is saved">
-
 The take menu is the **⋯** on a take. The inputs to record from are behind the timeline's mic button, at the end of its row, or **Record from…** in the timeline's **⋯** when the window's too narrow for it.
 
 ::: info
 Recording only works when you open Bandmate on `localhost` or over HTTPS: browsers don't allow the microphone anywhere else. See [Security](/self-hosting#security) for putting Bandmate behind HTTPS.
 :::
+
+### Calibrate
+
+Calibrate each input in **Settings → Recording**, so your takes land on the beat. There are two ways:
+
+- **Hands-free**, the most accurate: rest your headphones on the mic and turn the volume up, and the mic hears the clicks itself.
+- **Tap along**: tap or clap on the mic in time with the clicks.
+
+<img src="@screenshots/calibrating.webp" alt="Calibrating an input hands-free in Settings → Recording: the metronome swings as each click is heard, then the result is saved">
+
+If you know an input's latency already, you can **Type it** in instead, though measuring it is more accurate. Bandmate also offers to calibrate before your first take on an input.
 
 ## Keyboard shortcuts
 
@@ -160,7 +167,7 @@ A Backup restores into the same version of Bandmate or a newer one. To copy ever
 
 - **This device**: what each device keeps for itself.
   - **Appearance**: three colour palettes, Terracotta (the default), Ink and Olive, each in light and dark. Follow your system's light or dark, or pick one. More palettes may come.
-  - **Recording**: every input on this device, each channel of an audio interface on its own, with its latency or "Not calibrated" or "Skipped". Pick the one you record from, or open any of them to see its level, calibrate it as in [Record](#record) without recording from it, or type its latency. Inputs that aren't plugged in keep their latency, listed under **Not connected**, to forget.
+  - **Recording**: every input on this device, each channel of an audio interface on its own, with its latency or "Not calibrated" or "Skipped". Pick the one you record from, or open any of them to see its level, calibrate it as in [Calibrate](#calibrate) without recording from it, or type its latency. Inputs that aren't plugged in keep their latency, listed under **Not connected**, to forget.
   - **Chord diagrams**: flip them for left-handed playing.
 - **Backups**: see [Backups](#backups).
 - **About**: the version you're running, what changed in it, whether a newer one is out, and the yt-dlp in use.
