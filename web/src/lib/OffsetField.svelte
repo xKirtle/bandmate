@@ -3,8 +3,10 @@
 
   // An Input's Latency Offset, typed in whole milliseconds, for one already
   // known, e.g. from another app or a Take that's clearly off: set with
-  // Enter or Set, kept like a calibrated one. A value outside 0 to 500 ms,
-  // or not a whole number of them, is refused, and nothing is kept.
+  // Enter or Set, kept like a calibrated one. A value outside 0 to
+  // maxTypedOffset ms, or not a whole number of them, is refused, and
+  // nothing is kept. It shows the offset there is again whenever that
+  // changes, e.g. calibrated in another tab.
   let {
     name,
     offset,
@@ -21,12 +23,14 @@
   const id = $props.id();
   // What's typed, starting from the offset there is, and again whenever it changes.
   let typed = $derived(offset === null ? '' : String(Math.round(offset * 1000)));
-  let refused = $state(false);
+  // What was refused, so it's refused only until what's typed changes.
+  let refusedText = $state<string | null>(null);
+  const refused = $derived(refusedText === typed);
 
   function onsubmit(e: SubmitEvent) {
     e.preventDefault();
     const set = typedOffset(typed);
-    refused = set === null;
+    refusedText = set === null ? typed : null;
     if (set !== null) onSet(set);
   }
 </script>
@@ -45,10 +49,7 @@
       aria-invalid={refused ? 'true' : undefined}
       aria-describedby={refused ? `${id}-refused` : undefined}
       value={typed}
-      oninput={(e) => {
-        typed = e.currentTarget.value;
-        refused = false;
-      }}
+      oninput={(e) => (typed = e.currentTarget.value)}
     />
     <span class="unit" aria-hidden="true">ms</span>
     <button type="submit" class="button quiet" aria-label="Set the Latency Offset of {name}">Set</button>

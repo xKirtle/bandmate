@@ -143,14 +143,7 @@
                     <span class="name">{name}</span>
                     {#if unplugged}<span class="hint">Not connected</span>{/if}
                     <!-- Its offset, to type, even unplugged. -->
-                    <OffsetField
-                      {name}
-                      offset={listed.offset}
-                      onSet={(offset) => {
-                        const { deviceId, label, channel } = listed;
-                        calibrations.set({ deviceId, label, channel }, { offset, offered: true });
-                      }}
-                    />
+                    <OffsetField {name} offset={listed.offset} onSet={(offset) => calibrations.keep(listed, offset)} />
                   </div>
                   <div class="row-actions">
                     <!-- Only a connected one can be measured. -->

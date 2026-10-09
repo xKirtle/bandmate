@@ -693,3 +693,22 @@ test('a Latency Offset typed in Settings is kept for its Input, leaving Takes wh
   expect(offsets).toHaveLength(2);
   expect(offsets[1]).toBeCloseTo(0.048, 3);
 });
+
+test('a Latency Offset typed for the default input is kept for the Input it turns out to be', async ({ page }) => {
+  await page.goto('/settings');
+  const recording = page.getByRole('region', { name: 'Recording' });
+  const offset = recording.getByRole('definition').nth(1);
+  await expect(offset).toHaveText('Not calibrated');
+
+  await recording.getByRole('button', { name: 'Calibrate', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Calibrate the latency' });
+  await dialog.getByRole('spinbutton', { name: /^Latency Offset of .+, in ms$/ }).fill('33');
+  await dialog.getByRole('button', { name: /^Set the Latency Offset of / }).click();
+  await expect(dialog.getByRole('status')).toContainText(/^The Latency Offset of .+ · Input 1 is 33 ms\./);
+  await dialog.getByRole('button', { name: 'Done' }).click();
+
+  await expect(offset).toHaveText('33 ms, calibrated');
+  const list = recording.getByRole('list', { name: 'Calibrated inputs' });
+  await expect(list.getByRole('listitem')).toHaveCount(1);
+  await expect(list.getByRole('spinbutton', { name: /· Input 1, in ms$/ })).toHaveValue('33');
+});

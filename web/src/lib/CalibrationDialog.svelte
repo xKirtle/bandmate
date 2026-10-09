@@ -2,7 +2,7 @@
   import { onDestroy } from 'svelte';
   import { clickTime, formatOffset, Measuring, minHits, noReading, steadyOver, type Reading } from './calibration';
   import CalibrationTaps from './CalibrationTaps.svelte';
-  import { Capture, CaptureError, frameAt } from './capture';
+  import { Capture, CaptureError, frameAt, openInput } from './capture';
   import Dialog from './Dialog.svelte';
   import OffsetField from './OffsetField.svelte';
   import { channelName, inputName, sameInput, type InputChoice } from './inputSettings';
@@ -46,6 +46,10 @@
   const expected = $derived(exact ? input : recorded.current);
   const calibrated = $derived(measuring ?? expected);
   const name = $derived(calibrated ? channelName(calibrated.label, calibrated.channel) : inputName(input));
+  // Its Latency Offset now, to type from.
+  const offset = $derived(
+    measuring || exact ? calibrations.of(measuring ?? input).offset : recorded.calibration.offset,
+  );
 
   let dialog = $state<HTMLDialogElement>();
   let phase = $state<'ready' | 'measuring' | 'done'>('ready');
@@ -53,8 +57,8 @@
   let clicking = $state(false);
   // What's been measured so far, while measuring.
   let reading = $state.raw<Reading>(noReading);
-  // The Latency Offset kept, and how many taps it's from, once used, or null taps where it was typed.
-  let kept = $state.raw<{ offset: number; taps: number | null } | null>(null);
+  // The Latency Offset kept, once used, and how many taps it's from, or that it was typed.
+  let kept = $state.raw<{ offset: number; taps: number } | { offset: number; typed: true } | null>(null);
   let error = $state<string | null>(null);
   let record = false;
 
@@ -150,17 +154,41 @@
       return;
     }
     // Applied even where storage can't keep it, until reload.
-    calibrations.set(measuring, { offset: average, offered: true });
+    calibrations.keep(measuring, average);
     kept = { offset: average, taps: counted };
     phase = 'done';
   }
 
-  /** Keeps an offset typed as the Latency Offset of the Input it names, as if calibrated. */
-  function type(offset: number) {
-    if (!calibrated) return;
-    calibrations.set(calibrated, { offset, offered: true });
-    kept = { offset, taps: null };
+  /**
+   * Keeps an offset typed as the Latency Offset of the Input calibrated, as
+   * if measured. Where that isn't known for sure, e.g. the default input, or
+   * one chosen that may be unplugged, it's opened a moment to find out,
+   * as only opening an Input says which it is.
+   */
+  async function keepTyped(typed: number) {
+    stopMeasuring();
+    const mine = generation;
     error = null;
+    let which = measuring ?? (exact ? input : null);
+    if (!which) {
+      try {
+        const opened = await openInput($state.snapshot(input));
+        for (const track of opened.stream.getTracks()) track.stop();
+        if (mine !== generation) return;
+        which = opened.input;
+        if (which) calibrations.opened($state.snapshot(input), which);
+      } catch (e) {
+        if (mine === generation) fail(e);
+        return;
+      }
+    }
+    if (!which) {
+      fail(new CaptureError("The browser didn't say which input it is, so nothing was kept."));
+      return;
+    }
+    measuring = which;
+    calibrations.keep(which, typed);
+    kept = { offset: typed, typed: true };
     phase = 'done';
   }
 
@@ -244,16 +272,15 @@
   {:else if kept}
     <p role="status">
       The Latency Offset of {name} is
-      <strong class="tabular">{formatOffset(kept.offset)}</strong>{#if kept.taps !== null}, from
+      <strong class="tabular">{formatOffset(kept.offset)}</strong>{#if 'taps' in kept}, from
         {taps(kept.taps)}{/if}. New Takes from it are placed earlier by it; Takes already recorded stay where they are.
     </p>
   {/if}
 
-  <!-- Only for an Input it can name, e.g. not the default before the browser allows the microphone. -->
-  {#if phase !== 'measuring' && calibrated}
+  {#if phase !== 'measuring'}
     <div class="typed">
       <p class="muted">Or, if you know it, type it in whole milliseconds.</p>
-      <OffsetField {name} offset={calibrations.of(calibrated).offset} onSet={type} />
+      <OffsetField {name} {offset} onSet={keepTyped} />
     </div>
   {/if}
 
