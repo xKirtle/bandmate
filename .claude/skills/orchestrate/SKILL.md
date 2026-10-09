@@ -44,12 +44,12 @@ Dev servers: if you run any, use ports <ports>. The orchestrator's stack holds :
 
 1. Read the issue and its comments: `gh issue view <N> --comments`.
 2. Branch from the latest origin/main: `git fetch origin && git switch -c <prefix>/<N>-<slug> origin/main`, using the repo's branch naming. Install dependencies if the worktree has none. If a local branch with that name already exists, check it before you reuse it.
-3. Read `.claude/skills/implement/SKILL.md` and follow it fully for issue #<N>, including its code review. Fix what the review finds. Invoke the skills it names (such as `tdd` and `code-review`) with the Skill tool.
+3. Read `.claude/skills/implement/SKILL.md` and follow it fully for issue #<N>, including its code review. Fix what the review finds. Invoke the skills it names (such as `tdd` and `code-review`) with the Skill tool. Where your change alters what the docs site describes (the wiki, from `docs/web/`), update it there and build it as CONTRIBUTING says.
 4. If the issue's wording is ambiguous, or conflicts with the domain docs or the existing code, stop and hand back. Meet CONTRIBUTING's rules as written; where the change can't, hand back the same way rather than adding an exception. Give the exact ambiguity, the options, your recommendation, and what is committed or pushed so far. Everything the issue states clearly, carry on with.
 5. Push the branch. Open a PR against main with `gh pr create`, write its body with the `pr` skill, and have it close the issue.
 6. Tick the acceptance criteria your PR fulfils. Edit the issue body with `gh issue edit <N> --body-file`, keeping the temp file outside the repo. Change only those `- [ ]` to `- [x]`.
 7. (Default) Leave the PR unmerged, because it gets reviewed by hand.
 7. (Auto-merge) Leave the PR unmerged; the orchestrator merges it once CI is green. If you are later sent a CI failure, fix it on the same branch and push.
 
-Final report: the branch, the PR URL, a summary of the changes, the check results (paste the actual output), which acceptance criteria you ticked and which you left unticked (with reasons), any review findings you didn't fix and why, and any open questions.
+Final report: the branch, the PR URL, a summary of the changes, the check results (paste the actual output), which acceptance criteria you ticked and which you left unticked (with reasons), any review findings you didn't fix and why, what you changed on the docs site (or why nothing needed it), and any open questions.
 ```
