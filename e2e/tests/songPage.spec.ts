@@ -1047,26 +1047,26 @@ test.describe('with touch', () => {
     const cdp = await page.context().newCDPSession(page);
 
     /**
-     * Drags the fader with one finger from a point, `by` pixels across to
-     * each stop in turn, while another finger taps elsewhere after the first.
+     * Drags the fader with one finger from a point, `tapAt` pixels across,
+     * where another finger taps elsewhere, then on to `thenTo` pixels across
+     * from the point, and lets go.
      */
-    async function dragWhileTapping(from: Point, ...stops: number[]) {
+    async function dragWhileTapping(from: Point, tapAt: number, thenTo: number) {
       await touch(cdp, 'touchStart', from);
       let at = from.x;
-      for (const [i, by] of stops.entries()) {
-        const to = from.x + by;
+      for (const to of [from.x + tapAt, from.x + thenTo]) {
         for (let step = 1; step <= 5; step++)
           await touch(cdp, 'touchMove', { x: at + ((to - at) * step) / 5, y: from.y });
-        at = to;
-        if (i === 0) {
-          await touch(cdp, 'touchStart', { x: at, y: from.y }, other);
+        if (at === from.x) {
+          await touch(cdp, 'touchStart', { x: to, y: from.y }, other);
           await touch(cdp, 'touchEnd', other);
         }
+        at = to;
       }
       await touch(cdp, 'touchEnd');
     }
 
-    // Dragged left, then further left, it sends its level once.
+    // Dragged left, then further left, it sends its volume once.
     await dragWhileTapping(middle, -20, -40);
     await expect.poll(volume).toBeLessThan(0);
     const dragged = String(await volume());
