@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
+	"reflect"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -91,9 +92,10 @@ const (
 
 // failStatements injects a database fault: from now until the test ends, the
 // database fails every statement of the given kind on table, with an error
-// that isn't a domain error, so the request making it fails partway. It's
-// how a test shows, through the API, what a failure the API can't cause
-// does, e.g. that a change failing partway changes nothing.
+// that isn't a domain error, so the request making one fails there, partway
+// through if it has written anything already. It's how a test shows, through
+// the API, what a failure the API can't cause does, e.g. that a change
+// failing partway changes nothing.
 func (ts *testServer) failStatements(kind statement, table string) {
 	ts.t.Helper()
 	trigger := fmt.Sprintf("injected_fault_%s_%s", strings.ToLower(string(kind)), table)
@@ -192,6 +194,18 @@ func expectError(t *testing.T, r response, status int, msg string) {
 	r.JSON(t, &e)
 	if e.Error != msg {
 		t.Errorf("error = %q, want %q", e.Error, msg)
+	}
+}
+
+// expectReply fails the test unless the response has the given status and
+// its JSON body is exactly want.
+func expectReply(t *testing.T, r response, status int, want map[string]any) {
+	t.Helper()
+	expectStatus(t, r, status)
+	var body map[string]any
+	r.JSON(t, &body)
+	if !reflect.DeepEqual(body, want) {
+		t.Errorf("body = %v, want %v", body, want)
 	}
 }
 

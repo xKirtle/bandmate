@@ -4,22 +4,9 @@ import (
 	"bytes"
 	"log"
 	"net/http"
-	"reflect"
 	"strings"
 	"testing"
 )
-
-// expectReply fails the test unless the response has the given status and
-// its JSON body is exactly want.
-func expectReply(t *testing.T, r response, status int, want map[string]any) {
-	t.Helper()
-	expectStatus(t, r, status)
-	var body map[string]any
-	r.JSON(t, &body)
-	if !reflect.DeepEqual(body, want) {
-		t.Errorf("body = %v, want %v", body, want)
-	}
-}
 
 // A request the server can't act on as sent answers 400 with why, and
 // nothing else.
@@ -60,7 +47,7 @@ func TestAConflictAnswers409WithItsCodeAndDetails(t *testing.T) {
 
 // An error that isn't one the request could have avoided, e.g. the database
 // failing, is logged and answers 500 without saying what went wrong.
-func TestAnErrorThatIsntTheRequestsIsLoggedAndAnswers500(t *testing.T) {
+func TestAnErrorTheRequestCouldntAvoidIsLoggedAndAnswers500(t *testing.T) {
 	ts := newTestServer(t)
 	var logs bytes.Buffer
 	was := log.Writer()
