@@ -64,19 +64,18 @@ Paste a link to a video or track on YouTube, SoundCloud, Bandcamp or [any other 
 
 Every song has a timeline: its beat, your takes and any other audio, laid out on tracks and played together.
 
-<img src="@screenshots/timeline-labelled.png" alt="A song's Timeline, numbered 1 to 11 to match the list below it">
+<img src="@screenshots/timeline-labelled.png" alt="A song's Timeline, numbered 1 to 10 to match the list below it">
 
 1. **Play**, or jump to the start or the end. Click the ruler to move the playhead.
 2. **Loop**: repeat a stretch while you write or rehearse.
 3. **The stretch it repeats**: drag along the top of the ruler to set it.
 4. **Record** a take, see [Record](#record).
-5. **Not calibrated**: set up the input you record from so takes land on the beat, see [Record](#record).
-6. **Undo and redo** any change on the timeline.
-7. **More**: import other audio, mix the song down, and recording settings.
-8. **Add a beat** from your library, or **a track**.
-9. **A track**, with its own volume, mute and solo. New takes go on the highlighted one: click a track's name to choose it.
-10. **A beat**: drag it to move it, or its ends to trim it. The file itself is never changed.
-11. **A take**, selected. Its **⋯** menu records it again or picks another take, see [Record](#record).
+5. **Undo and redo** any change on the timeline.
+6. **More**: import other audio, mix the song down, and recording settings.
+7. **Add a beat** from your library, or **a track**.
+8. **A track**, with its own volume, mute and solo. New takes go on the highlighted one: click a track's name to choose it.
+9. **A beat**: drag it to move it, or its ends to trim it. The file itself is never changed.
+10. **A take**, selected. Its **⋯** menu records it again or picks another take, see [Record](#record).
 
 A clip's **⋯** menu sets its **tempo** and **pitch**, each on its own or both together: slow a beat down to write over it, or move it a couple of semitones to suit your voice. Select several clips to change them all at once. The file itself is never changed, so you can always set them again, or reset them.
 
@@ -101,15 +100,16 @@ Sing over your beat, right in the browser, in full quality.
 
 <div class="pair">
 <img src="@screenshots/take-menu-labelled.png" alt="A take's menu on the Timeline, numbered 1 to 3 to match the list below it">
-<img src="@screenshots/recording-settings-labelled.png" alt="Recording settings, numbered 4 to 6 to match the list below it">
+<img src="@screenshots/recording-settings-labelled.png" alt="Recording settings, numbered 4 to 7 to match the list below it">
 </div>
 
 1. **Retake**: record the part again. Every take is kept. If you've changed the clip's tempo or pitch, reset them first.
 2. **Takes**: choose the take the song plays.
 3. **Nudge**: shift a take by a few milliseconds, so it sits on the beat.
-4. **Input**: your microphone or audio interface, and its channel. Each device remembers its own.
-5. **Level**: sing your loudest, and keep the meter out of the red. Here it's in the red, from a test tone.
-6. **Calibrate**: measure how late a click reaches your input, once for each input on each device, so your takes land on the beat. By default it's hands-free: rest your headphones on the mic, turn the volume up, and the mic hears the clicks itself, which is the most exact. If your headphones can't reach the mic, tap or clap on it in time with the clicks you hear instead. A metronome swings upright as each click is heard, with your taps marked around the average. It finishes by itself once the average is known well enough, saying how widely your taps spread and how precise the average is so far, or choose **Finish now** once 6 taps agree. **Save** the result, shown against the old latency. **Pause** never throws your taps away: start over, finish, change the method or quit from there. If you already know an input's latency, from another app, say, type it in milliseconds beside it in Settings instead. An audio interface's inputs can each have their own delay, so switching between them keeps each one's. Bandmate offers it the first time you record from an input.
+4. **Input**: every input on this device, the same list as in Settings, each channel of an audio interface on its own. Pick the one you record from. Each device remembers its own.
+5. **Latency**: each input's latency, or "Not calibrated" or "Skipped". Press it to open that input, to see its level, calibrate it or type its latency, without recording from it.
+6. **Level**: sing your loudest, and keep the meter out of the red. Here it's in the red, from a test tone.
+7. **Calibrate**: measure how late a click reaches your input, once for each input on each device, so your takes land on the beat. By default it's hands-free: rest your headphones on the mic, turn the volume up, and the mic hears the clicks itself, which is the most exact. If your headphones can't reach the mic, tap or clap on it in time with the clicks you hear instead. A metronome swings upright as each click is heard, with your taps marked around the average. It finishes by itself once the average is known well enough, saying how widely your taps spread and how precise the average is so far, or choose **Finish now** once 6 taps agree. **Save** the result, shown against the old latency. **Pause** never throws your taps away: start over, finish, change the method or quit from there. If you already know an input's latency, from another app, say, choose **Type it** beside it in the recording settings or Settings, and type it in milliseconds instead. An audio interface's inputs can each have their own delay, so switching between them keeps each one's. Bandmate offers it the first time you record from an input, where you can skip it and record straight away, or **Save and record** in one go.
 
 The take menu is the **⋯** on a take. Recording settings is in the timeline's **⋯** menu.
 

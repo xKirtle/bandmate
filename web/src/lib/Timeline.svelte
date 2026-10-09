@@ -84,7 +84,6 @@
   import { mixdownEnd } from './mixdown';
   import { deviceStorage } from './deviceStorage';
   import type { InputChoice } from './inputSettings';
-  import { RecordedInput } from './recordedInput.svelte';
   import { calibrations } from './sharedCalibration.svelte';
   import { input as chosenInput } from './sharedInput.svelte';
   import { clampHeight, defaultHeight, grownHeight, heightBounds, readHeight, storeHeight } from './timelineHeight';
@@ -814,18 +813,15 @@
   // device's tabs: offered before an Input's first recording, where the
   // Clip to retake, by id, waits for it, with the latency the browser
   // reports for the Input, to skip with; or run from the recording settings
-  // for the chosen Input.
-  let calibrating = $state<{ offer: { reported: number } | null; input: InputChoice; retaking?: number } | null>(null);
+  // for any Input listed, exactly as that Input where it's a device's channel.
+  let calibrating = $state<{
+    offer: { reported: number } | null;
+    input: InputChoice;
+    exact?: boolean;
+    retaking?: number;
+  } | null>(null);
   // Whether calibration was just skipped, to say where to run it later.
   let skipped = $state(false);
-
-  // The Latency Offset of the Input recording would open, to show.
-  const recordedInput = new RecordedInput(() => chosenInput.value);
-  const offset = $derived(recordedInput.calibration.offset);
-
-  function calibrateChosen() {
-    calibrating = { offer: null, input: $state.snapshot(chosenInput.value) };
-  }
 
   function calibrationClosed(record: boolean) {
     const { retaking } = calibrating ?? {};
@@ -2052,18 +2048,8 @@
       <InputSettings
         bind:this={inputSettings}
         disabled={recording || !editable.current}
-        {offset}
-        onCalibrate={calibrateChosen}
+        onCalibrate={(input, exact) => (calibrating = { offer: null, input, exact })}
       />
-      {#if offset === null && !recording}
-        <button
-          type="button"
-          class="not-calibrated edit-only"
-          disabled={!canRecord}
-          title="Takes are placed by the latency the browser reports until it's calibrated. Calibrate it now, or any time from Recording settings… in the ⋯ menu."
-          onclick={calibrateChosen}>Not calibrated</button
-        >
-      {/if}
       <!-- On one line full-screen, cut short with the whole of it in the title. -->
       {#if recorder.phase === 'starting'}
         {@render status('Opening the microphone…')}
@@ -2682,6 +2668,7 @@
 {#if calibrating}
   <CalibrationSheet
     input={calibrating.input}
+    exact={calibrating.exact}
     offer={calibrating.offer}
     onSkip={() => (skipped = true)}
     onClose={calibrationClosed}
@@ -3211,19 +3198,6 @@
   }
   .toggle.record[aria-pressed='true'] .record-dot {
     color: inherit;
-  }
-  .not-calibrated {
-    padding: var(--space-1) var(--space-2);
-    border: 1px dashed var(--warning);
-    border-radius: var(--radius-sm);
-    background: none;
-    color: var(--warning);
-    font-size: var(--text-sm);
-    cursor: pointer;
-  }
-  .not-calibrated:disabled {
-    opacity: 0.5;
-    cursor: default;
   }
   .input-note,
   .merge-note {
