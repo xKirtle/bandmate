@@ -388,10 +388,14 @@ async function number(page, places, { first = 1, into } = {}) {
     .filter({ has: page.getByRole("radio", { checked: true }) });
   const meter = picker.getByRole("meter", { name: "Level" });
   const meterBox = await meter.boundingBox();
+  // Beside the Input's name, and past the device's under it, which the
+  // number would cover otherwise.
+  const name = await textEnd(chosen.locator(".input-name .line").first());
+  const under = await textEnd(chosen.locator(".input-name .is"));
   await number(
     page,
     [
-      await textEnd(chosen.locator(".input-name .line").first()),
+      { x: Math.max(name.x, under.x), y: name.y },
       // On the meter itself, near its end, clear of the text around it.
       {
         x: meterBox.x + meterBox.width - 64,
