@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { openInput, samplesFrom, watchInputs } from './capture';
 
 describe('samplesFrom', () => {
@@ -22,37 +22,51 @@ describe('samplesFrom', () => {
 });
 
 describe('watchInputs', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  // A browser that opens an input and lists one device, firing no event as it does, as Firefox does.
-  function browser() {
-    const track = { getSettings: () => ({ channelCount: 1, deviceId: 'mic' }) };
+  // A browser that opens an input, or fails to, and lists one device, firing
+  // no event as it does, as Firefox does.
+  let opens = true;
+  const track = { getSettings: () => ({ channelCount: 1, deviceId: 'mic' }) };
+  beforeEach(() => {
+    opens = true;
     vi.stubGlobal('navigator', {
       mediaDevices: {
-        getUserMedia: async () => ({ getAudioTracks: () => [track] }),
+        getUserMedia: async () => {
+          if (!opens) throw new DOMException('Not allowed', 'NotAllowedError');
+          return { getAudioTracks: () => [track] };
+        },
         enumerateDevices: async () => [{ kind: 'audioinput', deviceId: 'mic', groupId: 'g', label: 'Mic' }],
         addEventListener: () => {},
         removeEventListener: () => {},
       },
     });
-  }
-
-  it('calls back once an input opens, as Firefox only then names every input, saying nothing', async () => {
-    browser();
-    const changed = vi.fn();
-    const stop = watchInputs(changed);
-    await openInput({ deviceId: '', label: '', channel: 0 });
-    expect(changed).toHaveBeenCalledTimes(1);
+  });
+  // Stops the watching each test starts, even where it fails.
+  let stop = () => {};
+  afterEach(() => {
     stop();
+    vi.unstubAllGlobals();
+  });
+  const defaultInput = { deviceId: '', label: '', channel: 0 };
+
+  it('calls back once an input opens, as Firefox only then names every input, without saying so', async () => {
+    const changed = vi.fn();
+    stop = watchInputs(changed);
+    await openInput(defaultInput);
+    expect(changed).toHaveBeenCalledTimes(1);
+  });
+
+  it("doesn't call back when an input fails to open", async () => {
+    opens = false;
+    const changed = vi.fn();
+    stop = watchInputs(changed);
+    await expect(openInput(defaultInput)).rejects.toThrow();
+    expect(changed).not.toHaveBeenCalled();
   });
 
   it('stops calling back once stopped', async () => {
-    browser();
     const changed = vi.fn();
     watchInputs(changed)();
-    await openInput({ deviceId: '', label: '', channel: 0 });
+    await openInput(defaultInput);
     expect(changed).not.toHaveBeenCalled();
   });
 });

@@ -73,6 +73,7 @@ const wantedChannels = 8;
 // Hears each input opened: Firefox names every input once one is, firing no
 // event as it does, so they're told again then.
 const inputsOpened = new EventTarget();
+const opened = 'open';
 
 /** An input opened, with which of its channels is used. */
 export interface OpenInput {
@@ -125,7 +126,7 @@ export async function openInput(choice: InputChoice): Promise<OpenInput> {
   const devices = await listInputs();
   const { channel, gone } = resolveInput(fellBack ? [] : devices, choice, channels);
   const input = inputRecorded(devices, { ...choice, deviceId: gone ? '' : choice.deviceId, channel }, settings);
-  inputsOpened.dispatchEvent(new Event('open'));
+  inputsOpened.dispatchEvent(new Event(opened));
   return { stream, channels, channel, gone, input };
 }
 
@@ -157,7 +158,7 @@ export function watchInputs(changed: () => void): () => void {
   let live = true;
   const devices = navigator.mediaDevices;
   devices?.addEventListener('devicechange', changed);
-  inputsOpened.addEventListener('open', changed);
+  inputsOpened.addEventListener(opened, changed);
   let permission: PermissionStatus | undefined;
   navigator.permissions
     ?.query({ name: 'microphone' as PermissionName })
@@ -170,7 +171,7 @@ export function watchInputs(changed: () => void): () => void {
   return () => {
     live = false;
     devices?.removeEventListener('devicechange', changed);
-    inputsOpened.removeEventListener('open', changed);
+    inputsOpened.removeEventListener(opened, changed);
     permission?.removeEventListener('change', changed);
   };
 }
