@@ -25,10 +25,10 @@
   // or claps on it with the clicks they hear. Then clicks play, a metronome
   // swinging upright as each is heard, and each tap is measured as it's
   // heard, until the average is known well enough, or the user finishes
-  // early, once enough count. Pause never leaves:
-  // it offers Start over, Finish, Change method or Quit. The result shows
-  // the change from the Input's offset there was, or the browser's
-  // estimate, and nothing is kept until Save. Offered before an Input's
+  // early, once enough count. Pause never leaves: it offers Start over,
+  // Finish, Change method or Quit. The result shows the change from the
+  // Input's offset there was, or the browser's estimate, and nothing is
+  // kept until Save. Offered before an Input's
   // first recording, where it can be skipped for that Input, to record
   // straight away with the browser's estimate; also run from the recording
   // settings and Settings, where a listed Input is measured as itself or not
@@ -187,22 +187,24 @@
     const now = performance.now();
     marks = next.taps.map((tap, i) => ({ ...tap, at: marks[i]?.at ?? now }));
     reading = next;
-    const { finished, usable } = verdict(next);
-    if (!finished) return;
+    if (!judged.finished) return;
     if (usable) finish();
     // Heard all it listens for, with too few agreeing to keep.
     else
-      fail(
-        new CaptureError(
-          `Only ${next.counted} of ${taps(next.taps.length)} agreed, too few to measure. Try again, or change the calibration method.`,
-        ),
+      stopWith(
+        `Only ${next.counted} of ${taps(next.taps.length)} agreed, too few to measure. Try again, or change the calibration method.`,
       );
   }
 
   /** Back to the method, saying why it stopped. */
   function fail(e: unknown) {
+    stopWith(e instanceof CaptureError ? e.message : `Couldn't calibrate (${(e as Error).message}).`);
+  }
+
+  /** Back to the method, with a message. */
+  function stopWith(message: string) {
     stopMeasuring();
-    error = e instanceof CaptureError ? e.message : `Couldn't calibrate (${(e as Error).message}).`;
+    error = message;
     step = 'setup';
   }
 
@@ -302,8 +304,8 @@
   });
 
   const taps = (n: number) => `${n} ${n === 1 ? 'tap' : 'taps'}`;
-  // A spread or precision, in whole milliseconds; as none from a single tap.
-  const ms = (seconds: number | null) => `${Math.round((seconds ?? 0) * 1000)} ms`;
+  // A spread or precision, in whole milliseconds, signed ±; not yet known from fewer than 2 taps.
+  const ms = (seconds: number | null) => (seconds === null ? '±… ms' : `±${Math.round(seconds * 1000)} ms`);
 </script>
 
 <svelte:window onkeydowncapture={onkeydown} />
@@ -383,13 +385,13 @@
       >
         <div style:width="{judged.progress * 100}%"></div>
       </div>
-      <p class="muted">
+      <p class="muted tabular">
         {#if step === 'paused'}
           {taps(reading.taps.length)} so far.
         {:else if !usable}
           Finding the taps: {Math.min(reading.counted, minHits)} of {minHits}
         {:else}
-          Your taps spread ±{ms(reading.spread)} · average good to ±{ms(reading.precision)}, finishing at ±{ms(
+          Your taps spread {ms(reading.spread)} · average good to {ms(reading.precision)}, finishing at {ms(
             finishingAt,
           )}
         {/if}
@@ -422,7 +424,7 @@
         {:else if reported !== null}
           The browser guessed {formatOffset(reported)}.
         {/if}
-        From {taps(reading.counted)} spread ±{ms(reading.spread)}: good to ±{ms(reading.precision)}.
+        From {taps(reading.counted)} spread {ms(reading.spread)}: good to {ms(reading.precision)}.
       </p>
       <p class="muted">New Takes from it are placed earlier by it; Takes already recorded stay where they are.</p>
     </div>

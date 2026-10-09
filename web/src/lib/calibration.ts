@@ -4,9 +4,9 @@
 // (hands-free), or the user taps or claps on it along with them (tap along);
 // each click's hit is found in what the input captured as it's heard, those
 // that don't fit are left out, and the rest averaged, until the average is
-// known well enough (see verdict) or the user ends it. Each Input has its own, kept on this device (see
-// inputCalibrations.ts). Until an Input's calibrated, the latency the
-// browser reports stands in.
+// known well enough (see verdict) or the user ends it. Each Input has its
+// own, kept on this device (see inputCalibrations.ts). Until an Input's
+// calibrated, the latency the browser reports stands in.
 
 /** How many hits it takes to measure: fewer and it fails. */
 export const minHits = 6;
@@ -75,11 +75,11 @@ const ofTypical = 0.25;
  * dropped. Fails with fewer than minHits left. Never less than no delay.
  */
 export function measureOffset(samples: Float32Array, sampleRate: number, times: readonly number[]): Measurement {
-  return summarise(findTaps(samples, sampleRate, times));
+  return summarise(readTaps(samples, sampleRate, times));
 }
 
 /** What each click's hit reads, in click order; a click with none has no Tap. */
-function findTaps(samples: Float32Array, sampleRate: number, times: readonly number[]): Reading {
+function readTaps(samples: Float32Array, sampleRate: number, times: readonly number[]): Reading {
   const windows = times.map((click, i) => ({
     click,
     from: click - earliest,
@@ -104,7 +104,7 @@ export function readingOf(delays: readonly number[]): Reading {
   const taps = delays.map((delay) => ({ delay, counted: Math.abs(delay - middle) <= agreement }));
   const kept = taps.filter((t) => t.counted).map((t) => t.delay);
   const counted = kept.length;
-  if (counted === 0) return { taps, average: null, counted, spread: null, precision: null };
+  if (counted === 0) return { ...noReading, taps };
   const mean = kept.reduce((sum, d) => sum + d, 0) / counted;
   const spread = counted < 2 ? null : Math.sqrt(kept.reduce((sum, d) => sum + (d - mean) ** 2, 0) / (counted - 1));
   return {
@@ -138,10 +138,10 @@ export interface Verdict {
 
 /** The verdict on a reading. */
 export function verdict({ taps, counted, average, precision }: Reading): Verdict {
-  const precise = counted >= fewestToFinish && precision !== null && precision <= finishingAt;
-  const finished = precise || counted >= mostCounted || taps.length >= mostHeard;
+  // How near the average is to precise enough, from 1 once it is; nowhere, from too few taps.
   const byPrecision =
     counted >= fewestToFinish && precision !== null ? finishingAt / Math.max(precision, finishingAt) : 0;
+  const finished = byPrecision === 1 || counted >= mostCounted || taps.length >= mostHeard;
   return {
     usable: counted >= minHits && average !== null,
     finished,
@@ -190,7 +190,7 @@ export class Measuring {
     const clicks = this.#clicks;
     for (let heard = this.#heardTo(this.#clicks); heard <= this.#length; heard = this.#heardTo(this.#clicks)) {
       this.#clicks++;
-      this.#reading = findTaps(this.#samples.subarray(0, heard), this.sampleRate, clickTimes(this.#clicks));
+      this.#reading = readTaps(this.#samples.subarray(0, heard), this.sampleRate, clickTimes(this.#clicks));
     }
     return this.#clicks > clicks;
   }

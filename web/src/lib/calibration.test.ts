@@ -182,7 +182,7 @@ describe('readingOf', () => {
   });
 });
 
-/** Delays alternating early and late of 100 ms by deviation, n of them: loose taps. */
+/** Loose taps: n delays, alternately deviation early and late of 100 ms. */
 const loose = (n: number, deviation: number) =>
   Array.from({ length: n }, (_, i) => 0.1 + (i % 2 ? deviation : -deviation));
 
@@ -221,7 +221,7 @@ describe('verdict', () => {
     expect(readingOf(scattered(40)).counted).toBe(20);
   });
 
-  it('shows progress toward finishing, never back', () => {
+  it('shows how near it is to finishing, by whichever bound is nearest', () => {
     expect(verdict(readingOf([])).progress).toBe(0);
     expect(verdict(readingOf(loose(12, 0.04))).progress).toBeCloseTo(0.5, 6);
     expect(verdict(readingOf(loose(20, 0.04))).progress).toBeCloseTo(20 / 24, 6);
