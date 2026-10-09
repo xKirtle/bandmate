@@ -46,6 +46,8 @@ type clip struct {
 	Name *string `json:"name"`
 	// Gain is in dB, 0 until it's set.
 	Gain float64 `json:"gain"`
+	// Tempo is a ratio of as recorded, 1 until it's set.
+	Tempo float64 `json:"tempo"`
 	// FadeIn and FadeOut are in seconds, 0 until they're set.
 	FadeIn       float64 `json:"fadeIn"`
 	FadeOut      float64 `json:"fadeOut"`
@@ -156,7 +158,7 @@ func TestABeatOnAnEmptyTrackStartsAt0(t *testing.T) {
 		t.Fatalf("tracks = %q, want %q, no Track added", trackNames(got), want)
 	}
 	tr := got.Tracks[1]
-	wantClips := []clip{{ID: firstClipID(tr), BeatID: b.ID, Takes: []take{}, Start: 0, Offset: 0, Length: 95.5}}
+	wantClips := []clip{{ID: firstClipID(tr), BeatID: b.ID, Tempo: 1, Takes: []take{}, Start: 0, Offset: 0, Length: 95.5}}
 	if !reflect.DeepEqual(tr.Clips, wantClips) {
 		t.Errorf("clips = %+v, want %+v", tr.Clips, wantClips)
 	}

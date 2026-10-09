@@ -79,7 +79,7 @@ func (s *Store) ImportSound(ctx context.Context, songID int64, based songversion
 			return err
 		}
 		changes.Keep(file, soundID)
-		return addClip(ctx, tx, songID, imp.TrackID, NewClip{SoundID: &soundID, Start: start, Length: a.Duration})
+		return addClip(ctx, tx, songID, imp.TrackID, NewClip{SoundID: &soundID, Tempo: 1, Start: start, Length: a.Duration})
 	})
 }
 

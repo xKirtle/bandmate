@@ -116,7 +116,7 @@ func (s *Store) MergeClips(ctx context.Context, songID int64, based songversion.
 			return err
 		}
 		changes.Keep(file, soundID)
-		return addClip(ctx, tx, songID, trackID, NewClip{SoundID: &soundID, Start: start, Length: length})
+		return addClip(ctx, tx, songID, trackID, NewClip{SoundID: &soundID, Tempo: 1, Start: start, Length: length})
 	})
 }
 
