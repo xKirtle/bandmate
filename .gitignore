@@ -20,3 +20,6 @@ web/dist/*
 
 # Agent worktrees
 .claude/worktrees/
+
+# Personal Claude Code settings
+.claude/settings.local.json
