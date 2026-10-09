@@ -48,7 +48,7 @@ class Capture extends AudioWorkletProcessor {
 registerProcessor('bandmate-capture', Capture);
 `;
 
-import { resolveInput, type InputChoice } from './inputSettings';
+import { inputRecorded, resolveInput, type InputChoice } from './inputSettings';
 
 // Added to a context once.
 const loaded = new WeakMap<BaseAudioContext, Promise<void>>();
@@ -79,6 +79,8 @@ export interface OpenInput {
   channel: number;
   /** The name of the device chosen when it isn't connected, so the default is used instead; null otherwise. */
   gone: string | null;
+  /** The Input opened: the one chosen, or the one the default is; null where the browser doesn't say. */
+  input: InputChoice | null;
 }
 
 /**
@@ -113,13 +115,32 @@ export async function openInput(choice: InputChoice): Promise<OpenInput> {
   } catch (e) {
     throw new CaptureError(inputError(e as Error));
   }
-  const channels = stream.getAudioTracks()[0]?.getSettings().channelCount || 1;
+  const settings = stream.getAudioTracks()[0]?.getSettings();
+  const channels = settings?.channelCount || 1;
   // Only once allowed does the browser tell the inputs apart.
-  const devices = fellBack
-    ? []
-    : (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput');
-  const { channel, gone } = resolveInput(devices, choice, channels);
-  return { stream, channels, channel, gone };
+  const devices = await listInputs();
+  const { channel, gone } = resolveInput(fellBack ? [] : devices, choice, channels);
+  const input = inputRecorded(devices, { ...choice, deviceId: gone ? '' : choice.deviceId, channel }, settings);
+  return { stream, channels, channel, gone, input };
+}
+
+/** The audio inputs the browser lists, or none where it can't. */
+async function listInputs(): Promise<MediaDeviceInfo[]> {
+  try {
+    return (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput');
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The Input recording from a choice would open, as far as can be told
+ * without opening it: null where it can't, e.g. for the default input,
+ * before the browser allows the microphone.
+ */
+export async function whichInput(choice: InputChoice): Promise<InputChoice | null> {
+  if (!navigator.mediaDevices?.enumerateDevices) return choice.deviceId === '' ? null : choice;
+  return inputRecorded(await listInputs(), choice);
 }
 
 /** Why an input couldn't be opened, in words to show. */
@@ -307,6 +328,11 @@ export class Capture {
   /** The name of the device chosen when it isn't connected, so the default is captured instead; null otherwise. */
   get gone(): string | null {
     return this.input.gone;
+  }
+
+  /** The Input captured: the one chosen, or the one the default is; null where the browser doesn't say. */
+  get opened(): InputChoice | null {
+    return this.input.input;
   }
 
   /** The rate samples are captured at: the context's, which is the device's. */

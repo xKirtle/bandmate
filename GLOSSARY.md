@@ -203,7 +203,7 @@ A way of syncing a Song's Lines while the Timeline plays: as each Line starts, m
 _Avoid_: Tap mode, record mode
 
 **Latency Offset**:
-The delay between what the user heard and what the mic captured, the full round trip, measured by calibration once per device, since it belongs to the hardware chain: a click plays, the user taps or claps on the mic along with it, and the delays are averaged. Calibration is offered before a device's first recording, and can be skipped and run later from the recording settings or Settings; until then, the latency the browser reports stands in. Each Take is placed earlier by the offset it was recorded with and keeps it, so recalibrating never moves it, and it can be nudged by hand.
+The delay between what the user heard and what the mic captured, the full round trip, measured by calibration once per Input on each device, since it belongs to the hardware chain and each input of an interface can reach the browser with a different delay: a click plays, the user taps or claps on the mic along with it, and the delays are averaged. Calibration names the Input it measures. It's offered before an Input's first recording, and can be skipped for that Input and run later from the recording settings or Settings; until then, the latency the browser reports stands in. An Input keeps its offset while its device is unplugged. Each Take is placed earlier by the offset it was recorded with and keeps it, so recalibrating never moves it, and it can be nudged by hand.
 _Avoid_: Delay, lag
 
 **Nudge**:
@@ -211,7 +211,7 @@ How far a Take has been moved by hand from where it was recorded, on top of its 
 _Avoid_: Shift, slip, offset (the Latency Offset is something else)
 
 **Input**:
-What a Take is recorded from: an audio device and one of its channels (e.g. "Scarlett 2i2 · Input 1"), since Takes are mono. Chosen once per device, like the Latency Offset; where the device chosen isn't connected, the default input is used, and said so. A device's channels are its inputs, never Tracks.
+What a Take is recorded from: an audio device and one of its channels (e.g. "Scarlett 2i2 · Input 1"), since Takes are mono. Chosen once per device; where the device chosen isn't connected, the default input is used, and said so. Each Input has its own Latency Offset; the default input's is that of the Input it turns out to be. A device's channels are its inputs, never Tracks.
 _Avoid_: Mic (unless it is one), source
 
 **Master**:
@@ -233,7 +233,7 @@ The browser, on a computer or phone, that Bandmate is opened in. What's kept "on
 _Avoid_: Browser (in the UI), machine
 
 **Device Setting**:
-A choice the user makes on purpose about how Bandmate works on this Device, whatever the Song: the Palette, light or dark, the Input, the Latency Offset and left-handed Chord diagrams. Every one is listed together in Settings, even when it's also changed where it's used. What's simply remembered from last time, like a volume, a step or a Song's Transpose, isn't one.
+A choice the user makes on purpose about how Bandmate works on this Device, whatever the Song: the Palette, light or dark, the Input, each Input's Latency Offset and left-handed Chord diagrams. Every one is listed together in Settings, even when it's also changed where it's used. What's simply remembered from last time, like a volume, a step or a Song's Transpose, isn't one.
 _Avoid_: Preference, local setting
 
 **Palette**:

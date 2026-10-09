@@ -70,7 +70,7 @@ Every song has a timeline: its beat, your takes and any other audio, laid out on
 2. **Loop**: repeat a stretch while you write or rehearse.
 3. **The stretch it repeats**: drag along the top of the ruler to set it.
 4. **Record** a take, see [Record](#record).
-5. **Not calibrated**: set this device up so takes land on the beat, see [Record](#record).
+5. **Not calibrated**: set up the input you record from so takes land on the beat, see [Record](#record).
 6. **Undo and redo** any change on the timeline.
 7. **More**: import other audio, mix the song down, and recording settings.
 8. **Add a beat** from your library, or **a track**.
@@ -109,7 +109,7 @@ Sing over your beat, right in the browser, in full quality.
 3. **Nudge**: shift a take by a few milliseconds, so it sits on the beat.
 4. **Input**: your microphone or audio interface, and its channel. Each device remembers its own.
 5. **Level**: sing your loudest, and keep the meter out of the red. Here it's in the red, from a test tone.
-6. **Calibrate**: tap or clap along to a click, once on each device, so your takes land on the beat. Bandmate offers it the first time you record.
+6. **Calibrate**: tap or clap along to a click, once for each input on each device, so your takes land on the beat. An audio interface's inputs can each have their own delay, so switching between them keeps each one's. Bandmate offers it the first time you record from an input.
 
 The take menu is the **⋯** on a take. Recording settings is in the timeline's **⋯** menu.
 

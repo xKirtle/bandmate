@@ -6,8 +6,8 @@
 
   // The recording settings, opened from the transport row's ⋯: the Input
   // picker, to choose what to record from on this device, with a live level
-  // meter of it while they're open; and the Latency Offset, calibrated or
-  // not, with calibration to run again.
+  // meter of it while they're open; and the chosen Input's Latency Offset,
+  // calibrated or not, with calibration of it to run again.
 
   let {
     disabled = false,
@@ -16,9 +16,9 @@
   }: {
     /** Keeps them from opening, and closes them, e.g. while recording. */
     disabled?: boolean;
-    /** The Latency Offset calibrated on this device, in seconds, or null. */
+    /** The Latency Offset calibrated for the chosen Input, in seconds, or null. */
     offset: number | null;
-    /** Asks for calibration to run. */
+    /** Asks for calibration of the chosen Input to run. */
     onCalibrate: () => void;
   } = $props();
 

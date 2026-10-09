@@ -75,6 +75,49 @@ export function resolveInput(
   return { deviceId: choice.deviceId, channel, gone: null };
 }
 
+/** An audio input as the browser lists it. */
+export interface ListedInput {
+  deviceId: string;
+  groupId: string;
+  label: string;
+}
+
+/** The browser's own stand-ins for the default input, which Chrome lists beside the device it is. */
+const standIns = ['default', 'communications'];
+
+/**
+ * The Input a choice records from, among the inputs the browser lists: the
+ * Input chosen while its device is connected, or else that channel of the
+ * device the default input is (Input 1, where the one chosen is gone).
+ * Opened is what the browser says an input opened as the default came from.
+ * Null where it can't tell which device the default is, e.g. before the
+ * browser allows the microphone, as it lists no ids till then.
+ */
+export function inputRecorded(
+  listed: readonly ListedInput[],
+  choice: InputChoice,
+  opened: { deviceId?: string; groupId?: string } = {},
+): InputChoice | null {
+  const devices = listed.filter((d) => d.deviceId !== '' && !standIns.includes(d.deviceId));
+  const at = (device: ListedInput | undefined, channel: number) =>
+    device ? { deviceId: device.deviceId, label: device.label, channel } : null;
+  if (choice.deviceId !== '') {
+    if (devices.length === 0) return choice;
+    const chosen = devices.find((d) => d.deviceId === choice.deviceId);
+    if (chosen) return at(chosen, choice.channel);
+  }
+  const channel = choice.deviceId === '' ? choice.channel : 0;
+  // Firefox and Safari say which device opened, and list the default first;
+  // Chrome says "default", with the group its stand-in shares with the device.
+  const group = opened.groupId || listed.find((d) => d.deviceId === 'default')?.groupId;
+  return at(
+    devices.find((d) => d.deviceId === opened.deviceId) ??
+      (group ? devices.find((d) => d.groupId === group) : undefined) ??
+      devices[0],
+    channel,
+  );
+}
+
 /** A device's name to show: its label, without the USB ids some browsers add. */
 export function deviceName(label: string): string {
   return label.replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i, '').trim() || 'Unnamed input';

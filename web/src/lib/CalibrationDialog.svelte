@@ -3,29 +3,38 @@
   import { clickCount, clickTimes, formatOffset, measureOffset, type Measurement } from './calibration';
   import { Capture, CaptureError } from './capture';
   import Dialog from './Dialog.svelte';
-  import { input } from './sharedInput.svelte';
+  import { channelName, inputName, type InputChoice } from './inputSettings';
+  import { RecordedInput } from './recordedInput.svelte';
+  import { calibrations } from './sharedCalibration.svelte';
   import { audioContext } from './timelinePlayer';
 
-  // Calibrates the Latency Offset in a dialog: clicks play, the user taps
-  // or claps on the mic along with them, and the delay found is shown and
-  // kept. Offered before a device's first recording, where it can be
-  // skipped to record straight away; also run from the recording settings
+  // Calibrates an Input's Latency Offset in a dialog, naming the Input:
+  // clicks play, the user taps or claps on the mic along with them, and the
+  // delay found is shown, and kept for the Input it was measured on. Offered
+  // before an Input's first recording, where it can be skipped, for that
+  // Input, to record straight away; also run from the recording settings
   // and Settings.
   let {
+    input,
     offer = false,
-    onCalibrated,
     onSkip,
     onClose,
   }: {
+    /** The Input to calibrate, as chosen: the default input is calibrated as the Input it turns out to be. */
+    input: InputChoice;
     /** Whether it's offered before recording, so it can be skipped, and records once done. */
     offer?: boolean;
-    /** Hears the offset measured, in seconds, to keep. */
-    onCalibrated: (offset: number) => void;
     /** Hears calibration skipped, to record straight away. */
     onSkip?: () => void;
     /** Hears it closed, and whether to record now. */
     onClose: (record: boolean) => void;
   } = $props();
+
+  // The Input measured, once it's open; until then, the one it will be, where that can be told.
+  let measuring = $state.raw<InputChoice | null>(null);
+  const expected = new RecordedInput(() => input);
+  const calibrated = $derived(measuring ?? expected.current);
+  const name = $derived(calibrated ? channelName(calibrated.label, calibrated.channel) : inputName(input));
 
   let dialog = $state<HTMLDialogElement>();
   let phase = $state<'ready' | 'measuring' | 'done'>('ready');
@@ -68,9 +77,12 @@
     error = null;
     try {
       await resumed;
-      const opened = await Capture.open(context, $state.snapshot(input.value));
+      const opened = await Capture.open(context, $state.snapshot(input));
       if (mine !== generation) return opened.close();
       capture = opened;
+      // Where the browser doesn't say which Input it opened, the one it looked to be.
+      measuring = opened.opened ?? expected.current;
+      if (opened.opened) calibrations.opened($state.snapshot(input), opened.opened);
       // A moment on, so the first click is scheduled clear of now.
       const from = context.currentTime + 0.1;
       const times = clickTimes();
@@ -87,8 +99,13 @@
       const samples = await opened.stop(from);
       capture = null;
       if (mine !== generation) return;
-      result = measureOffset(samples, opened.sampleRate, times);
-      if (result.ok) onCalibrated(result.offset);
+      const found = measureOffset(samples, opened.sampleRate, times);
+      if (found.ok && !measuring) {
+        throw new CaptureError("The browser didn't say which input it measured, so nothing was kept.");
+      }
+      result = found;
+      // Applied even where storage can't keep it, until reload.
+      if (result.ok && measuring) calibrations.set(measuring, { offset: result.offset, offered: true });
     } catch (e) {
       if (mine !== generation) return;
       stopMeasuring();
@@ -112,6 +129,14 @@
     capture = null;
   }
 
+  /** Skips calibrating the Input, so it isn't offered again, and records. */
+  function skip() {
+    const skipped = calibrated ?? input;
+    calibrations.set(skipped, { ...calibrations.of(skipped), offered: true });
+    onSkip?.();
+    close(true);
+  }
+
   function close(andRecord = false) {
     record = andRecord;
     dialog?.close();
@@ -129,8 +154,13 @@
 <Dialog bind:dialog title="Calibrate the latency" dismissible={() => phase !== 'measuring'} {onclose}>
   {#if phase === 'ready'}
     <p>
-      {offer ? 'Before your first recording on this device, measure' : 'Measure'} how late your voice reaches the recording
-      after the Beat plays, so Takes line up with it.
+      {#if offer}
+        Before the first recording from <strong>{name}</strong>, measure how late your voice reaches the recording after
+        the Beat plays, so Takes line up with it.
+      {:else}
+        Measure how late your voice reaches the recording from <strong>{name}</strong> after the Beat plays, so Takes line
+        up with it.
+      {/if}
     </p>
     <p>
       With the headphones or speakers you record with, tap or clap on the mic along with {clickCount} clicks. It takes about
@@ -144,8 +174,8 @@
     <p class="problem" role="alert">{error}</p>
   {:else if measured}
     <p role="status">
-      The Latency Offset is <strong class="tabular">{formatOffset(measured.offset)}</strong>, from {measured.hits} of {clickCount}
-      taps. New Takes are placed earlier by it; Takes already recorded stay where they are.
+      The Latency Offset of {name} is <strong class="tabular">{formatOffset(measured.offset)}</strong>, from {measured.hits}
+      of {clickCount} taps. New Takes from it are placed earlier by it; Takes already recorded stay where they are.
     </p>
   {:else if result}
     <p class="problem" role="alert">
@@ -174,14 +204,7 @@
       <button type="button" class="button primary" onclick={measure}>Try again</button>
     {/if}
     {#if offer && !measured && phase !== 'measuring'}
-      <button
-        type="button"
-        class="button"
-        onclick={() => {
-          onSkip?.();
-          close(true);
-        }}>Skip and record</button
-      >
+      <button type="button" class="button" onclick={skip}>Skip and record</button>
     {/if}
   </div>
 </Dialog>

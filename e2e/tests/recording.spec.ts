@@ -26,8 +26,12 @@ test.use({
       writeFileSync(tone, toneWav('tone.wav', 0.5).buffer);
       try {
         await use({
-          // As playwright.config.ts picks it.
+          // As playwright.config.ts picks it. Playwright's own is the full
+          // Chromium, not its headless shell, which gives the fake inputs new
+          // ids on every page load, as no browser does, so an Input's Latency
+          // Offset wouldn't outlast a reload.
           executablePath: process.env.CHROMIUM || undefined,
+          channel: process.env.CHROMIUM ? undefined : 'chromium',
           args: [
             '--use-fake-device-for-media-stream',
             '--use-fake-ui-for-media-stream',
@@ -51,6 +55,8 @@ interface Take {
   number: number;
   duration: number;
   latencyOffset: number;
+  /** Where it starts in its Clip's source span, in seconds: not 0 for a Retake with another Latency Offset. */
+  position: number;
 }
 
 /** A Clip of Takes, in seconds, with the Takes the shared Clip leaves to tests to read. */
@@ -79,7 +85,7 @@ async function open(page: Page, songId: number) {
   await expect(recordButton(page)).toBeEnabled();
 }
 
-/** The calibration offered before a device's first recording. */
+/** The calibration offered before an Input's first recording. */
 const calibrationOffer = (page: Page) => page.getByRole('dialog', { name: 'Calibrate the latency' });
 
 /** Skips the calibration offered, to record straight away. */
@@ -97,7 +103,7 @@ async function playheadPast(page: Page, time: number) {
 /**
  * Records until the playhead is past `until`, in seconds, then stops,
  * waiting for the Take to save. With skip, skips the calibration offered
- * first, as before a device's first recording.
+ * first, as before an Input's first recording.
  */
 async function record(page: Page, start: () => Promise<void>, until: number, { skip = false } = {}) {
   await start();
@@ -135,8 +141,8 @@ function expectWholeTake(c: Clip) {
   const take = c.takes.find((t) => t.id === c.activeTakeId);
   if (!take) throw new Error(`Clip ${c.id} has no active Take`);
   // Every Take here starts at 0:05 or later, so its lead-in is never cut short at 0:00.
-  expect(c.offset).toBeCloseTo(leadIn + take.latencyOffset, 2);
-  expect(c.offset + c.length).toBeCloseTo(take.duration, 2);
+  expect(c.offset - take.position).toBeCloseTo(leadIn + take.latencyOffset, 2);
+  expect(c.offset + c.length - take.position).toBeCloseTo(take.duration, 2);
 }
 
 test('calibration offered before the first recording can be skipped, and is not offered again', async ({
@@ -150,6 +156,9 @@ test('calibration offered before the first recording can be skipped, and is not 
   await recordButton(page).click();
   const offer = calibrationOffer(page);
   await expect(offer).toBeVisible();
+  // Of the Input the default input is, by name.
+  await expect(offer).toContainText(/Before the first recording from .+ · Input 1,/);
+  await expect(offer).not.toContainText('Default input');
   await skipCalibration(page);
 
   // Skipped, it records straight away, saying where to calibrate later.
@@ -172,6 +181,34 @@ test('calibration offered before the first recording can be skipped, and is not 
   await expect(offer).toHaveCount(0);
   await expect(clip(page, 'Take 1')).toHaveCount(2);
   expect(await clipsOn(bandmate, song.id, 'Track 1')).toHaveLength(2);
+});
+
+test("the Latency Offset calibrated before Inputs had their own becomes the chosen Input's", async ({
+  page,
+  bandmate,
+}) => {
+  const song = await bandmate.song({ title: 'Anthem' });
+  // As an earlier Bandmate kept it, with the default input chosen.
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem('seeded')) {
+      localStorage.setItem('bandmate.latency', JSON.stringify({ offset: 0.05, offered: true }));
+      sessionStorage.setItem('seeded', '1');
+    }
+  });
+  await open(page, song.id);
+
+  // The default input's Input has it: not offered, and placed by it.
+  await expect(timeline(page).getByRole('button', { name: 'Not calibrated' })).toHaveCount(0);
+  await seek(page, 5);
+  await record(page, () => recordButton(page).click(), 5 + 2);
+  await expect(calibrationOffer(page)).toHaveCount(0);
+  const [made] = await clipsOn(bandmate, song.id, 'Track 1');
+  expect(made.takes[0].latencyOffset).toBeCloseTo(0.05, 3);
+
+  // Kept so after a reload.
+  await page.reload();
+  await expect(recordButton(page)).toBeEnabled();
+  await expect(timeline(page).getByRole('button', { name: 'Not calibrated' })).toHaveCount(0);
 });
 
 test('a Take records on the Chosen Track at the playhead, or after its last Clip', async ({ page, bandmate }) => {
