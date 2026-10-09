@@ -323,6 +323,8 @@ export class Capture {
   // The samples received so far, each batch with the frame it starts at.
   #batches: Batch[] = [];
   #sink: ((batch: Batch) => void) | null = null;
+  // Whether batches go to the sink alone.
+  #handed = false;
   #stopped: Promise<void>;
 
   private constructor(
@@ -335,7 +337,7 @@ export class Capture {
       node.port.onmessage = ({ data }) => {
         if (data.done) resolve();
         else {
-          this.#batches.push(data);
+          if (!this.#handed) this.#batches.push(data);
           this.#sink?.(data);
         }
       };
@@ -392,6 +394,17 @@ export class Capture {
   keep(sink: (batch: Batch) => void) {
     for (const batch of this.#batches) sink(batch);
     this.#sink = sink;
+  }
+
+  /**
+   * Hands sink every batch captured, those so far and each one after,
+   * keeping none itself, so what's captured for a long while takes no room
+   * twice: stop() then returns nothing.
+   */
+  hand(sink: (batch: Batch) => void) {
+    this.keep(sink);
+    this.#batches = [];
+    this.#handed = true;
   }
 
   /**

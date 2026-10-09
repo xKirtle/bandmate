@@ -93,6 +93,36 @@ async function skipCalibration(page: Page) {
   await calibrationOffer(page).getByRole('button', { name: 'Skip and record' }).click();
 }
 
+/**
+ * Has the microphone hear calibration's clicks, delay seconds after they
+ * play, as if from speakers beside it, in place of the fake microphone's
+ * tone: each click is a tap, so calibration measures the delay.
+ */
+async function hearClicks(page: Page, delay: number) {
+  await page.addInitScript((delay) => {
+    // What each AudioContext hears, through a delay.
+    const heard = new WeakMap<BaseAudioContext, DelayNode>();
+    const ear = (context: BaseAudioContext) => {
+      let node = heard.get(context);
+      if (!node) {
+        node = context.createDelay(1);
+        node.delayTime.value = delay;
+        heard.set(context, node);
+      }
+      return node;
+    };
+    // A click plays through a gain straight to the speakers.
+    const connect = AudioNode.prototype.connect as (this: AudioNode, ...args: unknown[]) => AudioNode;
+    AudioNode.prototype.connect = function (this: AudioNode, ...args: unknown[]) {
+      if (args[0] === this.context.destination && this instanceof GainNode) connect.call(this, ear(this.context));
+      return connect.apply(this, args);
+    } as typeof AudioNode.prototype.connect;
+    AudioContext.prototype.createMediaStreamSource = function (this: AudioContext) {
+      return ear(this) as unknown as MediaStreamAudioSourceNode;
+    };
+  }, delay);
+}
+
 /** Waits for the playhead to pass a time, in seconds, e.g. while recording. */
 async function playheadPast(page: Page, time: number) {
   await expect
@@ -181,6 +211,73 @@ test('calibration offered before the first recording can be skipped, and is not 
   await expect(offer).toHaveCount(0);
   await expect(clip(page, 'Take 1')).toHaveCount(2);
   expect(await clipsOn(bandmate, song.id, 'Track 1')).toHaveLength(2);
+});
+
+test('calibration measures each tap as it is heard, until Use this keeps the average', async ({ page, bandmate }) => {
+  const song = await bandmate.song({ title: 'Anthem' });
+  await hearClicks(page, 0.025);
+  await open(page, song.id);
+  await seek(page, 5);
+  await recordButton(page).click();
+  const offer = calibrationOffer(page);
+  await offer.getByRole('button', { name: 'Start' }).click();
+
+  const useThis = offer.getByRole('button', { name: 'Use this' });
+  const reading = offer.getByRole('status');
+  await expect(reading).toHaveText(/^25 ms, from [1-5] taps?$/, { timeout: 10_000 });
+  await expect(useThis).toBeDisabled();
+  await expect(offer).toContainText('It takes 6 taps in time with the clicks.');
+  // From 6 taps, it can be used; from 10, it says how steady it's been.
+  await expect(useThis).toBeEnabled({ timeout: 10_000 });
+  await expect(reading).toHaveText(/^25 ms, from ([6-9]|\d\d) taps$/);
+  await expect(offer).toContainText('Steady: ±0 ms over the last 10', { timeout: 10_000 });
+  await expect(offer.getByRole('img', { name: /^Each tap's delay: \d+ taps, averaging 25 ms$/ })).toBeVisible();
+  // It never stops on its own.
+  await page.waitForTimeout(2_000);
+  await expect(useThis).toBeEnabled();
+
+  await useThis.click();
+  await expect(offer.getByRole('status')).toContainText(
+    /The Latency Offset of .+ · Input 1 is 25 ms, from\s+\d+ taps\./,
+  );
+  await offer.getByRole('button', { name: 'Record' }).click();
+  await expect(offer).toBeHidden();
+  await expect(stopButton(page)).toBeVisible();
+  await playheadPast(page, 5 + 1);
+  await stopButton(page).click();
+  await expect(recordButton(page)).toBeEnabled();
+  const [made] = await clipsOn(bandmate, song.id, 'Track 1');
+  expect(made.takes[0].latencyOffset).toBeCloseTo(0.025, 3);
+  await expect(timeline(page).getByRole('button', { name: 'Not calibrated' })).toHaveCount(0);
+});
+
+test('calibration cancelled or closed keeps the offset there was', async ({ page, bandmate }) => {
+  const song = await bandmate.song({ title: 'Anthem' });
+  await hearClicks(page, 0.025);
+  await open(page, song.id);
+  const offer = calibrationOffer(page);
+  const useThis = offer.getByRole('button', { name: 'Use this' });
+
+  await recordButton(page).click();
+  await offer.getByRole('button', { name: 'Start' }).click();
+  await expect(useThis).toBeEnabled({ timeout: 15_000 });
+  await offer.getByRole('button', { name: 'Cancel' }).click();
+  await expect(offer).toBeHidden();
+  await expect(stopButton(page)).toHaveCount(0);
+  await expect(timeline(page).getByRole('button', { name: 'Not calibrated' })).toBeVisible();
+
+  // Closed, likewise; and still offered before the first recording, after a reload.
+  await recordButton(page).click();
+  await offer.getByRole('button', { name: 'Start' }).click();
+  await expect(useThis).toBeEnabled({ timeout: 15_000 });
+  await page.keyboard.press('Escape');
+  await expect(offer).toBeHidden();
+  await expect(stopButton(page)).toHaveCount(0);
+  await expect(timeline(page).getByRole('button', { name: 'Not calibrated' })).toBeVisible();
+  await page.reload();
+  await expect(recordButton(page)).toBeEnabled();
+  await recordButton(page).click();
+  await expect(offer).toContainText('Before the first recording from');
 });
 
 test("the Latency Offset calibrated before Inputs had their own becomes the chosen Input's", async ({
@@ -451,8 +548,9 @@ test('Settings lists each calibrated Input, to calibrate again, whether or not c
   await expect(dialog).toContainText(`from ${secondName} after`);
   await dialog.getByRole('button', { name: 'Start' }).click();
   // The fake microphone's tone has no taps to hear, so nothing is measured,
-  // but it's the second that was listened to.
-  await expect(dialog.getByRole('alert')).toContainText('No taps were heard', { timeout: 20_000 });
+  // but it's the second that's listened to.
+  await expect(dialog.getByRole('status')).toHaveText('Tap along with the clicks');
+  await expect(dialog.getByRole('button', { name: 'Use this' })).toBeDisabled();
   expect(await page.evaluate(() => (window as unknown as { opened: string[] }).opened)).toEqual([second.deviceId]);
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
