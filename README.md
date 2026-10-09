@@ -53,6 +53,8 @@ docker run -d --name bandmate --restart unless-stopped \
 
 Then open http://localhost:8080. The repo's [`compose.yaml`](compose.yaml) is the full version, with a health check.
 
+To run it without Docker, from a ready-made binary or one you build yourself, see [Without Docker](https://xkirtle.github.io/bandmate/self-hosting#without-docker) in the self-hosting guide.
+
 > [!WARNING]
 > Bandmate has no login: anything that can reach it can read and change every Song. Anywhere beyond your own machine, put it behind a reverse proxy that handles HTTPS and authentication. Recording also needs HTTPS, or localhost, for the microphone.
 

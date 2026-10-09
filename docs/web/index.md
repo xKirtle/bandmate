@@ -83,6 +83,15 @@ docker run -d --name bandmate --restart unless-stopped \
   ghcr.io/xkirtle/bandmate:latest
 ```
 
+```sh [Binary]
+# Linux or macOS. Swap linux-amd64 for linux-arm64, darwin-arm64 or darwin-amd64.
+mkdir bandmate && cd bandmate
+curl -fsSL https://github.com/xKirtle/bandmate/releases/latest/download/bandmate-linux-amd64.tar.gz | tar -xz
+./bandmate
+```
+
 :::
 
 Then open http://localhost:8080. The full Compose file, with a health check, and every setting are in the [self-hosting guide](/self-hosting). Bandmate has no login, so before using it anywhere beyond your own machine, read [Security](/self-hosting#security).
+
+Docker is the easiest way to run it, because the image includes yt-dlp, ffmpeg and QuickJS, which adding a Beat from a link needs. The binary does everything else on its own: to add Beats from links, install those three yourself, as [Without Docker](/self-hosting#without-docker) shows.
