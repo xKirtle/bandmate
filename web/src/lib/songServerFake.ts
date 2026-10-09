@@ -286,6 +286,12 @@ export class FakeSongServer implements SongServer {
               fadeOut: c.fadeOut * scale,
             });
           }, tl);
+      case 'setClipPitches':
+        return (tl) =>
+          edit.pitches.reduce((t, { clipId, pitch }) => {
+            if (!t.tracks.some((tr) => tr.clips.some((c) => c.id === clipId))) throw notFound();
+            return changedClip(t, clipId, { pitch });
+          }, tl);
       case 'renameClip':
         if (!this.timeline.tracks.some((t) => t.clips.some((c) => c.id === edit.clipId))) throw notFound();
         return (tl) => changedClip(tl, edit.clipId, { name: edit.name.trim() || null });
@@ -401,6 +407,7 @@ export class FakeSongServer implements SongServer {
       name: placed.name ?? null,
       gain: placed.gain ?? 0,
       tempo: placed.tempo ?? 1,
+      pitch: placed.pitch ?? 0,
       fadeIn: placed.fadeIn ?? 0,
       fadeOut: placed.fadeOut ?? 0,
       takes: [],
@@ -576,9 +583,9 @@ function changedClip(tl: Timeline, clipId: number, changes: Partial<Clip>): Time
   };
 }
 
-/** What a Clip of a Beat or a Sound plays, and its own name, Gain and Tempo, to place a Clip of the same. */
+/** What a Clip of a Beat or a Sound plays, and its own name, Gain, Tempo and Pitch, to place a Clip of the same. */
 function sourceOf(clip: Clip): OwnOfClip & ({ beatId: number } | { soundId: number }) {
-  const own = { name: clip.name ?? undefined, gain: clip.gain, tempo: clip.tempo };
+  const own = { name: clip.name ?? undefined, gain: clip.gain, tempo: clip.tempo, pitch: clip.pitch };
   return clip.beatId !== null ? { ...own, beatId: clip.beatId } : { ...own, soundId: clip.soundId! };
 }
 

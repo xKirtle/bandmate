@@ -19,6 +19,7 @@ const clip = (id: number, beatId: number, name: string | null = null): Clip => (
   name,
   gain: 0,
   tempo: 1,
+  pitch: 0,
   fadeIn: 0,
   fadeOut: 0,
   takes: [],
@@ -49,6 +50,7 @@ const takeClip = (id: number, takes: Take[], active = takes[0].id, name: string 
   name,
   gain: 0,
   tempo: 1,
+  pitch: 0,
   fadeIn: 0,
   fadeOut: 0,
   takes,
@@ -75,6 +77,7 @@ const soundClip = (id: number, soundId: number, name: string | null = null): Cli
   name,
   gain: 0,
   tempo: 1,
+  pitch: 0,
   fadeIn: 0,
   fadeOut: 0,
   takes: [],
@@ -145,7 +148,16 @@ describe('clipSources of Sounds', () => {
     const tl = timeline([c], [], [sound(4)]);
     expect(fileStart(c)).toBe(0);
     expect(playing(tl, clipSources(tl))).toEqual([
-      { start: 50, offset: 1, length: 4, tempo: 1, source: '/api/songs/1/sounds/4/audio', trackId: 1, gainFactor: 1 },
+      {
+        start: 50,
+        offset: 1,
+        length: 4,
+        tempo: 1,
+        pitch: 0,
+        source: '/api/songs/1/sounds/4/audio',
+        trackId: 1,
+        gainFactor: 1,
+      },
     ]);
   });
 });
@@ -239,11 +251,31 @@ describe('playing', () => {
         offset: 2,
         length: 10,
         tempo: 1,
+        pitch: 0,
         source: '/api/beats/7/audio?v=beat-7.mp3-1000-90',
         trackId: 1,
         gainFactor: 1,
       },
-      { start: 30, offset: 2, length: 10, tempo: 1, source: '/api/songs/1/takes/3/audio', trackId: 1, gainFactor: 1 },
+      {
+        start: 30,
+        offset: 2,
+        length: 10,
+        tempo: 1,
+        pitch: 0,
+        source: '/api/songs/1/takes/3/audio',
+        trackId: 1,
+        gainFactor: 1,
+      },
+    ]);
+  });
+
+  it('plays each Clip at its Pitch, alone or with its Tempo, over the same stretch of the Timeline', () => {
+    const moved = { ...clip(1, 7), pitch: -2 };
+    const both = { ...takeClip(2, [take(3, { duration: 12 })]), tempo: 0.5, pitch: 3, length: 20 };
+    const t = timeline([moved, both], [beat(7)]);
+    expect(playing(t, clipSources(t))).toMatchObject([
+      { start: 5, offset: 2, length: 10, tempo: 1, pitch: -2 },
+      { start: 30, offset: 2, length: 20, tempo: 0.5, pitch: 3 },
     ]);
   });
 

@@ -196,6 +196,7 @@ describe('schedule of a Take Clip', () => {
     name: null,
     gain: 0,
     tempo: 1,
+    pitch: 0,
     fadeIn: 0,
     fadeOut: 0,
     takes: [

@@ -2,7 +2,7 @@
 // the device's rate, sounding as playback would. It's built with the same
 // pieces playback is (schedule, and TrackMix for the Clip → Track wiring),
 // on an offline context that mixes as fast as it can and resamples each
-// Clip's decoded audio itself, stretched to its Tempo as playback has it.
+// Clip's decoded audio itself, stretched to its Tempo and Pitch as playback has it.
 // It's never normalised: what it clips, the file clips too, and a note
 // says so.
 import type { TimelineLoop } from './api';
@@ -31,7 +31,7 @@ export interface MixdownPlan {
   end: number;
   /** Each Track's gain by id, from its volume, mute and solo. */
   gains: Map<number, number>;
-  /** Loads a Clip's audio, stretched to its Tempo, e.g. the player's, which keeps it for playback. */
+  /** Loads a Clip's audio, stretched to its Tempo and Pitch, e.g. the player's, which keeps it for playback. */
   load: LoadClipAudio;
   /** Cancels it: it then rejects with the signal's reason. */
   signal: AbortSignal;
@@ -52,7 +52,7 @@ export async function mixDown(plan: MixdownPlan): Promise<AudioBuffer> {
   const playing = schedule(clips, start).filter((s) => s.delay < length);
   signal.throwIfAborted();
   onProgress({ step: 'loading' });
-  // Each source at each Tempo once, waiting for every one to be stretched.
+  // Each source at each Tempo and Pitch once, waiting for every one to be stretched.
   const audio = [...new Map(playing.map((s) => [clipAudioKey(s.clip), s.clip])).values()];
   const loaded = await untilCancelled(Promise.all(audio.map(load)), signal);
   const buffers = new Map(audio.map((clip, i) => [clipAudioKey(clip), loaded[i]]));

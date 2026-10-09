@@ -1,7 +1,7 @@
 import type { Clip } from './api';
 import { maxGain, minGain } from './clipGain';
+import { maxPitch, minPitch } from './clipPitch';
 import { maxTempo, minTempo, tempoPercent } from './clipTempo';
-import { stretches } from './stretch';
 import { activeTake } from './clipSource';
 import { editHint, type Freeze } from './freeze';
 import type { MenuAction } from './menu';
@@ -16,17 +16,18 @@ import Layers from '@lucide/svelte/icons/layers';
 import Merge from '@lucide/svelte/icons/merge';
 import MoveHorizontal from '@lucide/svelte/icons/move-horizontal';
 import Pencil from '@lucide/svelte/icons/pencil';
+import Piano from '@lucide/svelte/icons/piano';
 import Scissors from '@lucide/svelte/icons/scissors';
 import SquareSplitHorizontal from '@lucide/svelte/icons/square-split-horizontal';
 import X from '@lucide/svelte/icons/x';
 
 // A Clip's menu, opened by its ⋯, right-click, the Menu key, Shift+F10 or a
 // long press: its entries, in the order they're listed. Deleting a Clip,
-// setting its Gain or Tempo, or choosing, nudging, deleting and clearing its Takes,
+// setting its Gain, Tempo or Pitch, or choosing, nudging, deleting and clearing its Takes,
 // don't ask first: they can be undone, and a deleted Take is only detached.
 // Split at playhead is always listed, but off while the playhead crosses
-// no Clip it would split. Retake is off for a Clip whose Tempo isn't 100%,
-// as a Take is recorded as it's sung.
+// no Clip it would split. Retake is off for a Clip whose Tempo isn't 100%
+// or whose Pitch isn't 0, as a Take is recorded as it's sung.
 // While recording, the entries that edit are shown off, and only the
 // downloads run.
 
@@ -66,6 +67,8 @@ export type ClipRun = {
   setGain: (gain: number) => void;
   /** Sets the Tempo of the Clip, and every other selected, in percent. */
   setTempo: (percent: number) => void;
+  /** Sets the Pitch of the Clip, and every other selected, in semitones. */
+  setPitch: (semitones: number) => void;
   /** Copies the Clip to the Clipboard. */
   copy: () => void;
   /** Copies the Clip to the Clipboard, then deletes it. */
@@ -90,7 +93,8 @@ export function clipActions(clip: Clip, state: ClipMenuState, run: ClipRun): Men
       title: 'How much louder or quieter the Clip plays, in dB; or drag its gain line',
       field: { value: clip.gain, unit: 'dB', step: 0.5, shiftStep: 3, min: minGain, max: maxGain, set: run.setGain },
     }),
-    edit(tempoAction(clip.tempo, run.setTempo)),
+    edit(tempoAction(clip.tempo, clip.tempo !== 1, run.setTempo)),
+    edit(pitchAction(clip.pitch, clip.pitch !== 0, run.setPitch)),
     ...clipboardActions(edit, state, run.copy, run.cut),
     edit({ icon: CopyPlus, label: 'Duplicate', run: run.duplicate }),
     edit(splitAction(state, 'Move the playhead into the Clip to split it', run.split)),
@@ -108,12 +112,15 @@ export function clipActions(clip: Clip, state: ClipMenuState, run: ClipRun): Men
   ];
 }
 
-/** The Tempo entry, typed in whole percent, starting at tempo, with a reset to 100%. */
-function tempoAction(tempo: number, set: (percent: number) => void): MenuAction {
+/**
+ * The Tempo entry, typed in whole percent, starting at tempo, with a reset
+ * to 100% offered while `changed`.
+ */
+function tempoAction(tempo: number, changed: boolean, set: (percent: number) => void): MenuAction {
   return {
     icon: Gauge,
     label: 'Tempo',
-    title: 'How fast the Clip plays, in percent of as recorded, without changing its pitch',
+    title: 'How fast the Clip plays, in percent of as recorded, without changing its Pitch',
     field: {
       value: tempoPercent(tempo),
       unit: '%',
@@ -121,7 +128,29 @@ function tempoAction(tempo: number, set: (percent: number) => void): MenuAction 
       shiftStep: 10,
       min: tempoPercent(minTempo),
       max: tempoPercent(maxTempo),
-      reset: { value: 100, label: 'Reset to 100%' },
+      reset: { value: 100, label: 'Reset to 100%', offered: changed },
+      set,
+    },
+  };
+}
+
+/**
+ * The Pitch entry, typed in whole semitones, starting at pitch, with a
+ * reset to 0 offered while `changed`.
+ */
+function pitchAction(pitch: number, changed: boolean, set: (semitones: number) => void): MenuAction {
+  return {
+    icon: Piano,
+    label: 'Pitch',
+    title: 'How many semitones the Clip is moved up or down, without changing its Tempo',
+    field: {
+      value: pitch,
+      unit: 'st',
+      step: 1,
+      shiftStep: 12,
+      min: minPitch,
+      max: maxPitch,
+      reset: { value: 0, label: 'Reset to 0 st', offered: changed },
       set,
     },
   };
@@ -169,6 +198,8 @@ export type SelectionRun = {
   deleteClips: () => void;
   /** Sets the Tempo of every one of them, in percent. */
   setTempo: (percent: number) => void;
+  /** Sets the Pitch of every one of them, in semitones. */
+  setPitch: (semitones: number) => void;
 };
 
 /** What the Selection menu needs to know besides how many Clips are selected. */
@@ -179,6 +210,12 @@ export type SelectionMenuState = Pick<ClipMenuState, 'frozen' | 'copyKeys' | 'cu
   canMerge: boolean;
   /** The Tempo of the Clip the menu opened on, as a ratio, which its Tempo entry starts at. */
   tempo: number;
+  /** The Pitch of the Clip the menu opened on, which its Pitch entry starts at. */
+  pitch: number;
+  /** Any of them isn't at 100%, so the Tempo entry offers its reset. */
+  tempoChanged: boolean;
+  /** Any of them isn't at 0 semitones, so the Pitch entry offers its reset. */
+  pitchChanged: boolean;
 };
 
 /**
@@ -189,7 +226,8 @@ export function selectionActions(count: number, run: SelectionRun, state: Select
   const edit = editing(state.frozen);
   const howMany = `${count} Clip${count === 1 ? '' : 's'}`;
   return [
-    edit(tempoAction(state.tempo, run.setTempo)),
+    edit(tempoAction(state.tempo, state.tempoChanged, run.setTempo)),
+    edit(pitchAction(state.pitch, state.pitchChanged, run.setPitch)),
     ...clipboardActions(edit, state, run.copyClips, run.cutClips),
     edit({ icon: CopyPlus, label: `Duplicate ${howMany}`, run: run.duplicateClips }),
     edit(splitAction(state, 'Move the playhead into a selected Clip to split it', run.splitClips)),
@@ -198,6 +236,20 @@ export function selectionActions(count: number, run: SelectionRun, state: Select
       : []),
     edit({ icon: X, label: `Delete ${howMany}`, run: run.deleteClips }),
   ];
+}
+
+/** Retake's title, and off, saying what to set back, while the Clip's Tempo or Pitch is changed. */
+function retakeOff({ tempo, pitch }: Clip): { title: string; disabled?: true } {
+  const setBack =
+    tempo !== 1 && pitch !== 0
+      ? 'the Tempo back to 100% and the Pitch to 0'
+      : tempo !== 1
+        ? 'the Tempo back to 100%'
+        : pitch !== 0
+          ? 'the Pitch back to 0'
+          : null;
+  if (setBack === null) return { title: 'Record another Take into this Clip' };
+  return { title: `Set ${setBack} to retake this Clip`, disabled: true };
 }
 
 function takeActions(clip: Clip, state: ClipMenuState, run: ClipRun): MenuAction[] {
@@ -217,10 +269,9 @@ function takeActions(clip: Clip, state: ClipMenuState, run: ClipRun): MenuAction
             icon: CircleDot,
             label: 'Retake',
             run: run.retake,
-            // A Take is recorded as it's sung, so only lines up in a Clip at 100%.
-            ...(stretches(clip)
-              ? { title: 'Set the Tempo back to 100% to retake this Clip', disabled: true }
-              : { title: 'Record another Take into this Clip' }),
+            // A Take is recorded as it's sung, so only lines up in a Clip
+            // at 100% and 0 semitones.
+            ...retakeOff(clip),
           },
         ]
       : []),

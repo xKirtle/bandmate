@@ -110,6 +110,7 @@
   import { browserKeeping, capturedInput, TakeRecorder } from './takeRecorder.svelte';
   import { clampGain, formatGain, gainLineAt, heardPeak } from './clipGain';
   import { formatTempo, tempoOf } from './clipTempo';
+  import { formatPitch, pitchOf, stretchBadge } from './clipPitch';
   import { fadeName, fitFades, formatFade, isFadeEnd, shapedPeak, type FadeEnd } from './clipFade';
 
   // The Timeline, docked under the Lyric Sheet: its Tracks and Clips, and
@@ -289,7 +290,7 @@
   const tracksShown = $derived(!collapsed || fullScreen.current);
   const resizable = $derived(!collapsed && !fullScreen.current);
 
-  // Decode, and stretch to each Clip's Tempo, in the background, so playing
+  // Decode, and stretch to each Clip's Tempo and Pitch, in the background, so playing
   // can start right away. A Clip whose audio is still being stretched shows
   // it's being prepared, by its audio's key (see clipAudioKey).
   const preparing = new SvelteSet<string>();
@@ -1529,10 +1530,14 @@
           mergeClips: mergeSelection,
           deleteClips: removeSelection,
           setTempo: (percent) => setTempo(selection.ids, percent),
+          setPitch: (semitones) => setPitch(selection.ids, semitones),
         },
         {
           frozen: freeze,
           tempo: clip.tempo,
+          pitch: clip.pitch,
+          tempoChanged: clips.some((c) => selection.has(c.id) && c.tempo !== 1),
+          pitchChanged: clips.some((c) => selection.has(c.id) && c.pitch !== 0),
           canMerge: mergeTarget(timeline.tracks, selection.ids) !== null,
           canSplit: splitTargets(timeline.tracks, selection.ids, chosen, playheadAt()).length > 0,
           ...menuKeys(),
@@ -1562,6 +1567,7 @@
         // To the tenth, as a drag sets it.
         setGain: (gain) => editing.edit({ kind: 'setClipGain', clipId, gain: clampGain(gain) }),
         setTempo: (percent) => setTempo(new Set([clipId]), percent),
+        setPitch: (semitones) => setPitch(new Set([clipId]), semitones),
         copy: () => copyClips(new Set([clip.id])),
         cut: () => cutClip(clip),
         duplicate: () => duplicate(clip),
@@ -1580,6 +1586,16 @@
     const tempo = tempoOf(percent);
     const tempos = clips.filter((c) => clipIds.has(c.id) && c.tempo !== tempo).map((c) => ({ clipId: c.id, tempo }));
     if (tempos.length > 0) editing.edit({ kind: 'setClipTempos', tempos });
+  }
+
+  /**
+   * Sets the Pitch of the Clips clipIds, from semitones typed, as one step:
+   * those it changes, in Timeline order.
+   */
+  function setPitch(clipIds: ReadonlySet<number>, semitones: number) {
+    const pitch = pitchOf(semitones);
+    const pitches = clips.filter((c) => clipIds.has(c.id) && c.pitch !== pitch).map((c) => ({ clipId: c.id, pitch }));
+    if (pitches.length > 0) editing.edit({ kind: 'setClipPitches', pitches });
   }
 
   /** The keys that copy, cut and split, as the Clip and Selection menus name them. */
@@ -2336,10 +2352,11 @@
                   {@const wave = waveWindow(view, at.start, at.length)}
                   {@const title = titleOf(clip)}
                   {@const isSelected = selection.has(clip.id)}
-                  <!-- Its audio still being stretched to its Tempo, which playing waits for. -->
+                  <!-- Its audio still being stretched to its Tempo and Pitch, which playing waits for. -->
                   {@const isPreparing = preparing.has(
-                    clipAudioKey({ source: sources.of(clip).audio, tempo: clip.tempo }),
+                    clipAudioKey({ source: sources.of(clip).audio, tempo: clip.tempo, pitch: clip.pitch }),
                   )}
+                  {@const stretched = stretchBadge(clip)}
                   {@const extent = `${formatDuration(at.start)} to ${formatDuration(at.start + at.length)}`}
                   <!-- As trimmed, so a trim being dragged shortens them to fit, as saving it will. -->
                   {@const fades = fitFades(clip, at.length)}
@@ -2361,11 +2378,11 @@
                     role="group"
                     aria-label="{title}{isSelected ? ', selected' : ''}, {extent}{clip.gain !== 0
                       ? `, ${formatGain(clip.gain)}`
-                      : ''}{clip.tempo !== 1 ? `, Tempo ${formatTempo(clip.tempo)}` : ''}{isPreparing
-                      ? ', being prepared'
-                      : ''}{fades.fadeIn > 0 ? `, fade in ${formatFade(fades.fadeIn)}` : ''}{fades.fadeOut > 0
-                      ? `, fade out ${formatFade(fades.fadeOut)}`
-                      : ''}"
+                      : ''}{clip.tempo !== 1 ? `, Tempo ${formatTempo(clip.tempo)}` : ''}{clip.pitch !== 0
+                      ? `, Pitch ${formatPitch(clip.pitch)}`
+                      : ''}{isPreparing ? ', being prepared' : ''}{fades.fadeIn > 0
+                      ? `, fade in ${formatFade(fades.fadeIn)}`
+                      : ''}{fades.fadeOut > 0 ? `, fade out ${formatFade(fades.fadeOut)}` : ''}"
                     tabindex={editable.current ? 0 : undefined}
                     aria-keyshortcuts={editable.current
                       ? hints.aria(frozen ? shortcuts.clipMenu.keys : clipKeys)
@@ -2394,14 +2411,15 @@
                       {#if clip.gain !== 0}
                         <span class="clip-gain">{formatGain(clip.gain)}</span>
                       {/if}
-                      {#if clip.tempo !== 1}
-                        <span class="clip-tempo" title="Tempo: plays at {formatTempo(clip.tempo)} of as recorded"
-                          >{formatTempo(clip.tempo)}</span
+                      {#if stretched}
+                        <span class="clip-stretch" title="Its Tempo and Pitch, changed from as recorded"
+                          >{stretched}</span
                         >
                       {/if}
                       {#if isPreparing}
-                        <span class="clip-preparing" title="Stretching its audio to its Tempo; playing waits for it"
-                          >Preparing…</span
+                        <span
+                          class="clip-preparing"
+                          title="Stretching its audio to its Tempo and Pitch; playing waits for it">Preparing…</span
                         >
                       {/if}
                       <span class="clip-actions clip-menu edit-only">
@@ -3515,10 +3533,10 @@
   .gain-tip.below {
     transform: translate(-50%, 20%);
   }
-  /* A Clip's Gain, when it isn't 0 dB, its Tempo, when it isn't 100%, and
-     that its audio is being stretched to its Tempo. */
+  /* A Clip's Gain, when it isn't 0 dB, its Tempo and Pitch, when either is
+     changed, and that its audio is being stretched to them. */
   .clip-gain,
-  .clip-tempo,
+  .clip-stretch,
   .clip-preparing {
     flex-shrink: 0;
     padding: 0 calc(0.25 * var(--timeline-rem));

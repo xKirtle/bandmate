@@ -1,5 +1,5 @@
 // Plays the Timeline: every Clip's audio is fetched, decoded into memory,
-// stretched to its Tempo (see stretch.ts) and scheduled on one
+// stretched to its Tempo and Pitch (see stretch.ts) and scheduled on one
 // AudioContext, so Tracks stay sample-accurate with each other (ADR 0006). Each Clip plays at its Gain, shaped by its Fades,
 // through its Track's own gain, which follows the Track's volume, mute and
 // solo live: wired by TrackMix, which a Mixdown and a Merge build their
@@ -11,12 +11,14 @@ import { sourceLength, timelineAt, timelineLength } from './clipTime';
 import { hotKept } from './hotKept';
 import { playAlone, release } from './playback';
 import { positionAt, repeats, schedule, type Loop, type Placed } from './schedule';
-import { stretch, stretches } from './stretch';
+import { stretch, stretches, type StretchedBy } from './stretch';
 
 /** A Clip to play, with where its source's audio is fetched from, the Track it's on, its Gain and its Fades. */
 export interface PlayableClip extends Placed {
   /** How fast it plays its source, which its audio is stretched to. */
   tempo: number;
+  /** How many semitones its audio is moved, which it's stretched to too. */
+  pitch: number;
   source: string;
   trackId: number;
   /** Its Gain, as a factor of its audio, applied before its Track's. */
@@ -27,12 +29,12 @@ export interface PlayableClip extends Placed {
 
 export type PlayerState = 'stopped' | 'loading' | 'playing';
 
-/** What a Clip's audio is, as it plays on the Timeline: its source, stretched to its Tempo. */
-export type ClipAudio = Pick<PlayableClip, 'source' | 'tempo'>;
+/** What a Clip's audio is, as it plays on the Timeline: its source, stretched to its Tempo and Pitch. */
+export type ClipAudio = Pick<PlayableClip, 'source' | 'tempo' | 'pitch'>;
 
-/** Tells apart a Clip's audio as it plays, by its source and its Tempo. */
-export function clipAudioKey({ source, tempo }: ClipAudio): string {
-  return `${tempo} ${source}`;
+/** Tells apart a Clip's audio as it plays, by its source, its Tempo and its Pitch. */
+export function clipAudioKey({ source, tempo, pitch }: ClipAudio): string {
+  return `${tempo} ${pitch} ${source}`;
 }
 
 /** Loads a Clip's audio as it plays on the Timeline, e.g. the player's, which keeps it for playback. */
@@ -153,7 +155,7 @@ const scheduleEvery = 500;
 
 export class TimelinePlayer {
   // Each source decoded, and each Clip's audio as it plays, stretched to its
-  // Tempo, by clipAudioKey, and those of them ready to play.
+  // Tempo and Pitch, by clipAudioKey, and those of them ready to play.
   #buffers = new Map<string, Promise<AudioBuffer>>();
   #stretched = new Map<string, Promise<AudioBuffer>>();
   #ready = new Set<string>();
@@ -184,14 +186,14 @@ export class TimelinePlayer {
 
   /**
    * Fetches and decodes a Clip's source, and stretches it to the Clip's
-   * Tempo, in the background, once for each source and Tempo.
+   * Tempo and Pitch, in the background, once for each source, Tempo and Pitch.
    */
   load(clip: ClipAudio): Promise<AudioBuffer> {
     const key = clipAudioKey(clip);
     let buffer = this.#stretched.get(key);
     if (!buffer) {
       const decoded = this.#decode(clip.source);
-      buffer = stretches(clip) ? decoded.then((d) => stretched(d, clip.tempo)) : decoded;
+      buffer = stretches(clip) ? decoded.then((d) => stretched(d, clip)) : decoded;
       buffer.then(
         () => this.#ready.add(key),
         // A failed load is tried again next time.
@@ -352,10 +354,10 @@ export class TimelinePlayer {
   }
 }
 
-/** Decoded audio stretched to play at a Tempo, as a buffer of its own. */
-async function stretched(decoded: AudioBuffer, tempo: number): Promise<AudioBuffer> {
+/** Decoded audio stretched to play at a Tempo and a Pitch, as a buffer of its own. */
+async function stretched(decoded: AudioBuffer, how: StretchedBy): Promise<AudioBuffer> {
   const channels = Array.from({ length: decoded.numberOfChannels }, (_, i) => decoded.getChannelData(i));
-  const out = await stretch({ channels, sampleRate: decoded.sampleRate }, { tempo });
+  const out = await stretch({ channels, sampleRate: decoded.sampleRate }, how);
   const buffer = new AudioBuffer({
     numberOfChannels: out.length,
     length: Math.max(1, out[0].length),

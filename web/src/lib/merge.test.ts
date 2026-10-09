@@ -10,6 +10,7 @@ const clip = (id: number, start: number, more: Partial<Clip> = {}): Clip => ({
   name: null,
   gain: 0,
   tempo: 1,
+  pitch: 0,
   fadeIn: 0,
   fadeOut: 0,
   takes: [],
@@ -205,6 +206,7 @@ describe('mergedClips', () => {
         offset: 3,
         length: 8,
         tempo: 1,
+        pitch: 0,
         source: '/api/beats/100/audio?v=beat.mp3-1-60',
         trackId: 1,
         gainFactor: 0.1,
@@ -215,11 +217,21 @@ describe('mergedClips', () => {
         offset: 0,
         length: 4,
         tempo: 1,
+        pitch: 0,
         source: '/api/songs/1/takes/41/audio',
         trackId: 1,
         gainFactor: 1,
       },
-      { start: 40, offset: 0, length: 10, tempo: 1, source: '/api/songs/1/sounds/30/audio', trackId: 1, gainFactor: 1 },
+      {
+        start: 40,
+        offset: 0,
+        length: 10,
+        tempo: 1,
+        pitch: 0,
+        source: '/api/songs/1/sounds/30/audio',
+        trackId: 1,
+        gainFactor: 1,
+      },
     ]);
   });
 });

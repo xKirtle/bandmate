@@ -143,7 +143,16 @@ export function playing(timeline: Timeline, sources: ClipSources, silent: number
     t.clips.flatMap((c) => {
       const h = c.id === silent ? null : heard(c);
       if (!h) return [];
-      return [{ ...h, source: sources.of(c).audio, trackId: t.id, gainFactor: gainFactor(c.gain), ...fadesOf(c) }];
+      return [
+        {
+          ...h,
+          source: sources.of(c).audio,
+          trackId: t.id,
+          pitch: c.pitch,
+          gainFactor: gainFactor(c.gain),
+          ...fadesOf(c),
+        },
+      ];
     }),
   );
 }
@@ -168,19 +177,20 @@ export function clipTitle(clip: Clip, source: ClipSource): string {
 
 /**
  * What a Clip has of its own, as placing or pasting it gives them: its
- * name, its Gain, its Tempo and its Fades, each left out while it has none.
+ * name, its Gain, its Tempo, its Pitch and its Fades, each left out while it has none.
  */
 export function ownOf(clip: Clip): OwnOfClip {
   return {
     ...(clip.name !== null ? { name: clip.name } : {}),
     ...(clip.gain !== 0 ? { gain: clip.gain } : {}),
     ...(clip.tempo !== 1 ? { tempo: clip.tempo } : {}),
+    ...(clip.pitch !== 0 ? { pitch: clip.pitch } : {}),
     ...(clip.fadeIn !== 0 ? { fadeIn: clip.fadeIn } : {}),
     ...(clip.fadeOut !== 0 ? { fadeOut: clip.fadeOut } : {}),
   };
 }
 
-/** What places a Clip back as it is: its source, trim, name, Gain, Tempo and Fades, without its id. */
+/** What places a Clip back as it is: its source, trim, name, Gain, Tempo, Pitch and Fades, without its id. */
 export function placementOf(clip: Clip): NewClip {
   const { start, offset, length } = clip;
   const own = ownOf(clip);
