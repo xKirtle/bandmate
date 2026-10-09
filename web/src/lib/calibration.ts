@@ -1,12 +1,12 @@
 // Calibrating the Latency Offset: the full round trip from the Beat being
 // played to the voice reaching the file, through this device's outputs and
-// input. Clicks play until the user ends it, and the mic hears them, from
-// headphones resting on it (hands-free), or the user taps or claps on it
-// along with them (tap along); each click's hit is found in what the input
-// captured as it's heard, those that don't fit are left out, and the rest
-// averaged. Each Input has its own, kept on this device (see
-// inputCalibrations.ts). Until an Input's calibrated, the latency the
-// browser reports stands in.
+// input. Clicks play, and the mic hears them, from headphones resting on it
+// (hands-free), or the user taps or claps on it along with them (tap along);
+// each click's hit is found in what the input captured as it's heard, those
+// that don't fit are left out, and the rest averaged, until the average is
+// known well enough (see verdict) or the user ends it. Each Input has its
+// own, kept on this device (see inputCalibrations.ts). Until an Input's
+// calibrated, the latency the browser reports stands in.
 
 /** How many hits it takes to measure: fewer and it fails. */
 export const minHits = 6;
@@ -29,15 +29,22 @@ export function clickTimes(count: number): number[] {
 /** What measuring found: the average delay, in seconds, or a failure; with how many hits it counted. */
 export type Measurement = { ok: true; offset: number; hits: number } | { ok: false; hits: number };
 
-/** What a calibration reads so far: each tap, the average of those that count, and how many do. */
+/**
+ * What a calibration reads so far: each tap; the average of those that
+ * count, and how many do; how widely they spread, as their standard
+ * deviation; and how precisely their average is known, as its standard
+ * error. In seconds; spread and precision are null from fewer than 2.
+ */
 export interface Reading {
   taps: readonly Tap[];
   average: number | null;
   counted: number;
+  spread: number | null;
+  precision: number | null;
 }
 
 /** A reading of no taps yet. */
-export const noReading: Reading = { taps: [], average: null, counted: 0 };
+export const noReading: Reading = { taps: [], average: null, counted: 0, spread: null, precision: null };
 
 /** A click's hit: its delay after the click, in seconds, and whether it's near enough the others to count. */
 export interface Tap {
@@ -50,8 +57,9 @@ const earliest = 0.05;
 const latest = 0.4;
 // How close together two hits can be: closer, and it's one hit ringing on.
 const refractory = 0.1;
-// How far a hit can be from the others' median and still count, in seconds.
-const agreement = 0.03;
+// How far a hit can be from the others' median and still count, in seconds:
+// wide enough for a hand's taps, which typically spread 20 to 25 ms.
+const agreement = 0.05;
 // The quietest a hit can be, and how far above the input's hiss, and how
 // near a typical hit's level, it must reach. Typical is the median of the
 // loudest moment around each click, so one loud bump can't drown the rest.
@@ -67,11 +75,11 @@ const ofTypical = 0.25;
  * dropped. Fails with fewer than minHits left. Never less than no delay.
  */
 export function measureOffset(samples: Float32Array, sampleRate: number, times: readonly number[]): Measurement {
-  return summarise(findTaps(samples, sampleRate, times));
+  return summarise(readTaps(samples, sampleRate, times));
 }
 
-/** Each click's hit, in click order, with whether it counts; a click with none has no Tap. */
-function findTaps(samples: Float32Array, sampleRate: number, times: readonly number[]): Tap[] {
+/** What each click's hit reads, in click order; a click with none has no Tap. */
+function readTaps(samples: Float32Array, sampleRate: number, times: readonly number[]): Reading {
   const windows = times.map((click, i) => ({
     click,
     from: click - earliest,
@@ -84,23 +92,68 @@ function findTaps(samples: Float32Array, sampleRate: number, times: readonly num
     const hit = onsets.find((at) => at >= from && at < until);
     if (hit !== undefined) delays.push(hit - click);
   }
-  if (delays.length === 0) return [];
-  const middle = median(delays);
-  return delays.map((delay) => ({ delay, counted: Math.abs(delay - middle) <= agreement }));
+  return readingOf(delays);
 }
 
-/** The average delay of the Taps that count, never less than no delay; null with none. */
-function averageOf(taps: readonly Tap[]): number | null {
-  const kept = taps.filter((t) => t.counted);
-  if (kept.length === 0) return null;
-  return Math.max(0, kept.reduce((sum, t) => sum + t.delay, 0) / kept.length);
+/**
+ * What taps heard with these delays read, in seconds, in order: those near
+ * enough their median count, and their average is never less than no delay.
+ */
+export function readingOf(delays: readonly number[]): Reading {
+  const middle = delays.length ? median(delays) : 0;
+  const taps = delays.map((delay) => ({ delay, counted: Math.abs(delay - middle) <= agreement }));
+  const kept = taps.filter((t) => t.counted).map((t) => t.delay);
+  const counted = kept.length;
+  if (counted === 0) return { ...noReading, taps };
+  const mean = kept.reduce((sum, d) => sum + d, 0) / counted;
+  const spread = counted < 2 ? null : Math.sqrt(kept.reduce((sum, d) => sum + (d - mean) ** 2, 0) / (counted - 1));
+  return {
+    taps,
+    average: Math.max(0, mean),
+    counted,
+    spread,
+    precision: spread === null ? null : spread / Math.sqrt(counted),
+  };
 }
 
-/** What some Taps measure: their average, from minHits that count. */
-function summarise(taps: readonly Tap[]): Measurement {
-  const hits = taps.filter((t) => t.counted).length;
-  const offset = averageOf(taps);
-  return hits < minHits || offset === null ? { ok: false, hits } : { ok: true, offset, hits };
+/** How precisely the average must be known to finish, in seconds. */
+export const finishingAt = 0.004;
+// The fewest counted taps it finishes from by precision; and the most it
+// counts, or hears, before finishing anyway.
+const fewestToFinish = 10;
+const mostCounted = 24;
+const mostHeard = 40;
+
+/**
+ * Whether a reading is enough to keep, once minHits count; whether it's
+ * finished, once its average is known to finishingAt from fewestToFinish
+ * taps, or mostCounted count, or mostHeard are heard, whichever is first;
+ * and how near it is to finishing, from 0 to 1, by whichever is nearest.
+ */
+export interface Verdict {
+  usable: boolean;
+  finished: boolean;
+  progress: number;
+}
+
+/** The verdict on a reading. */
+export function verdict({ taps, counted, average, precision }: Reading): Verdict {
+  // How near the average is to precise enough, from 1 once it is; nowhere, from too few taps.
+  const byPrecision =
+    counted >= fewestToFinish && precision !== null ? finishingAt / Math.max(precision, finishingAt) : 0;
+  const finished = byPrecision === 1 || counted >= mostCounted || taps.length >= mostHeard;
+  return {
+    usable: counted >= minHits && average !== null,
+    finished,
+    progress: finished ? 1 : Math.min(1, Math.max(counted / mostCounted, taps.length / mostHeard, byPrecision)),
+  };
+}
+
+/** What a reading measures: its average, from minHits that count. */
+function summarise({ average, counted }: Reading): Measurement {
+  return counted < minHits || average === null
+    ? { ok: false, hits: counted }
+    : { ok: true, offset: average, hits: counted };
 }
 
 /**
@@ -116,7 +169,7 @@ export class Measuring {
   #length = 0;
   // How many clicks have been measured.
   #clicks = 0;
-  #taps: Tap[] = [];
+  #reading = noReading;
 
   constructor(private sampleRate: number) {}
 
@@ -137,7 +190,7 @@ export class Measuring {
     const clicks = this.#clicks;
     for (let heard = this.#heardTo(this.#clicks); heard <= this.#length; heard = this.#heardTo(this.#clicks)) {
       this.#clicks++;
-      this.#taps = findTaps(this.#samples.subarray(0, heard), this.sampleRate, clickTimes(this.#clicks));
+      this.#reading = readTaps(this.#samples.subarray(0, heard), this.sampleRate, clickTimes(this.#clicks));
     }
     return this.#clicks > clicks;
   }
@@ -147,29 +200,14 @@ export class Measuring {
     return Math.ceil((clickTime(i) + latest) * this.sampleRate);
   }
 
-  /** All it reads so far, at once. */
+  /** All it reads so far. */
   get reading(): Reading {
-    return { taps: this.taps, average: this.average, counted: this.counted };
+    return this.#reading;
   }
 
   /** What's measured so far, as measureOffset would find it. */
   get result(): Measurement {
-    return summarise(this.#taps);
-  }
-
-  /** Each hit heard so far, in order, with whether it counts. */
-  get taps(): readonly Tap[] {
-    return this.#taps;
-  }
-
-  /** The average delay of the taps that count, in seconds; null with none. */
-  get average(): number | null {
-    return averageOf(this.#taps);
-  }
-
-  /** How many taps count. */
-  get counted(): number {
-    return this.#taps.filter((t) => t.counted).length;
+    return summarise(this.#reading);
   }
 }
 

@@ -221,7 +221,7 @@ test('calibration offered before the first recording can be skipped, and is not 
   expect(await clipsOn(bandmate, song.id, 'Track 1')).toHaveLength(2);
 });
 
-test('calibration is hands-free by default, measures each tap as it is heard, and Save and record keeps it', async ({
+test('calibration is hands-free by default, measures each tap as it is heard, finishes by itself, and Save and record keeps it', async ({
   page,
   bandmate,
 }) => {
@@ -250,18 +250,21 @@ test('calibration is hands-free by default, measures each tap as it is heard, an
   await expect(finish).toHaveCount(0);
   await expect(offer).toContainText(/Finding the taps: [1-5] of 6/);
   await expect(finish).toBeVisible({ timeout: 10_000 });
-  await expect(reading).toHaveText(/^25 ms, from ([6-9]|\d\d) taps$/);
+  await expect(reading).toHaveText(/^25 ms, from [6-9] taps$/);
+  // Then it says how far the taps spread, and how precisely their average is
+  // known so far, against the precision it finishes at.
+  await expect(offer).toContainText(/Your taps spread ±\d+ ms · average good to ±\d+ ms, finishing at ±4 ms/);
   // The metronome marks the taps around the average.
   await expect(
     offer.getByRole('img', { name: /^Metronome, .+, with \d+ taps marked around the average$/ }),
   ).toBeVisible();
-  // It never stops on its own yet.
-  await page.waitForTimeout(2_000);
-  await expect(finish).toBeVisible();
 
-  await finish.click();
-  // Nothing is kept yet: the result is shown against the browser's estimate.
-  await expect(offer.getByRole('status')).toContainText(/^25 ms\s*The browser guessed \d+ ms\. From \d+ taps\./);
+  // Hearing the clicks exactly, it finishes by itself from 10 taps. Nothing
+  // is kept yet: the result is shown against the browser's estimate.
+  await expect(offer.getByRole('status')).toContainText(
+    /^25 ms\s*The browser guessed \d+ ms\. From 10 taps spread ±\d+ ms: good to ±\d+ ms\./,
+    { timeout: 10_000 },
+  );
   await offer.getByRole('button', { name: 'Save and record' }).click();
   await expect(offer).toBeHidden();
   await expect(stopButton(page)).toBeVisible();
@@ -758,8 +761,11 @@ test("calibration's result shows the offset there was, and only Save keeps the n
     await recording.getByRole('button', { name: 'Calibrate again', exact: true }).click();
     await expect(dialog).toContainText(`${first.label} · Input 1`);
     await dialog.getByRole('button', { name: 'Start' }).click();
-    await dialog.getByRole('button', { name: 'Finish now' }).click({ timeout: 15_000 });
-    await expect(dialog.getByRole('status')).toContainText(/^25 ms\s*Was 21 ms: \+4 ms\. From \d+ taps\./);
+    // It finishes by itself.
+    await expect(dialog.getByRole('status')).toContainText(
+      /^25 ms\s*Was 21 ms: \+4 ms\. From \d+ taps spread ±\d+ ms: good to ±\d+ ms\./,
+      { timeout: 20_000 },
+    );
   }
 
   // Discarded, the offset there was stays.
