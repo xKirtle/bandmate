@@ -1,8 +1,18 @@
 // In-memory fakes of TakeRecorder's ports, for testing it without browser
 // audio or storage: a player on a clock that's set, an Input that captures
-// what it's told to, and a store of unsaved Takes.
+// what it's told to, a store of unsaved Takes, and each Input's calibration.
+import type { Calibration } from './calibration';
 import { CaptureError, frameAt, samplesFrom, type Batch } from './capture';
-import type { KeptTake, OpenedInput, TakeInput, TakeKeeping, TakePlayer } from './takeRecorder.svelte';
+import type { InputId } from './inputCalibrations';
+import type { InputChoice } from './inputSettings';
+import type {
+  KeptTake,
+  OpenedInput,
+  TakeCalibrations,
+  TakeInput,
+  TakeKeeping,
+  TakePlayer,
+} from './takeRecorder.svelte';
 import type { UnsavedTake } from './unsavedTakes';
 
 /** A player whose playback starts at the context time given, or never, when told it's stopped meanwhile. */
@@ -29,8 +39,27 @@ export class FakePlayer implements TakePlayer {
   }
 }
 
+/** Two Inputs of one interface: its mic and its instrument jack. */
+export const mic: InputChoice = { deviceId: 'scarlett', label: 'Scarlett Solo USB', channel: 0 };
+export const guitar: InputChoice = { deviceId: 'scarlett', label: 'Scarlett Solo USB', channel: 1 };
+
+/** Each Input's calibration, as set, and every other Input's the same. */
+export class FakeCalibrations implements TakeCalibrations {
+  #set = new Map<string, Calibration>();
+
+  constructor(public others: Calibration) {}
+
+  of(input: InputId | null): Calibration {
+    return (input && this.#set.get(`${input.deviceId}/${input.channel}`)) || this.others;
+  }
+
+  set(input: InputId, calibration: Calibration) {
+    this.#set.set(`${input.deviceId}/${input.channel}`, calibration);
+  }
+}
+
 /**
- * An Input capturing at a rate, placed by a Latency Offset, that can be gone, have a
+ * An Input capturing at a rate, from the Input it records from, with the latency the browser reports, that can be gone, have a
  * problem known before trying, fail to open, or be held opening until
  * released. Once open, sing captures what's sung.
  */
@@ -41,12 +70,14 @@ export class FakeInput implements TakeInput {
   gone: string | null = null;
   /** Why it fails to open, if it does. */
   failing: string | null = null;
+  /** The Input it records from: the one chosen, or the default's. */
+  recordsFrom: InputChoice | null = mic;
   opened: FakeOpenedInput | null = null;
   #holding: Promise<void> | null = null;
 
   constructor(
     readonly sampleRate = 100,
-    readonly latencyOffset = 0,
+    public reported = 0,
   ) {}
 
   problem(): Promise<string | null> {
@@ -63,7 +94,7 @@ export class FakeInput implements TakeInput {
   async open(): Promise<OpenedInput> {
     if (this.failing) throw new CaptureError(this.failing);
     await this.#holding;
-    this.opened = new FakeOpenedInput(this.sampleRate, this.latencyOffset, this.gone);
+    this.opened = new FakeOpenedInput(this.sampleRate, this.recordsFrom, this.reported, this.gone);
     return this.opened;
   }
 }
@@ -76,7 +107,8 @@ export class FakeOpenedInput implements OpenedInput {
 
   constructor(
     readonly sampleRate: number,
-    readonly latencyOffset: number,
+    readonly input: InputChoice | null,
+    readonly reported: number,
     readonly gone: string | null,
   ) {}
 

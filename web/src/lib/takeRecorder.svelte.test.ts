@@ -3,7 +3,7 @@ import type { Clip, Track } from './api';
 import { Saves } from './saves.svelte';
 import { emptySong, FakeSongServer } from './songServerFake';
 import { TakeRecorder, type TakeRecorderOptions } from './takeRecorder.svelte';
-import { FakeInput, FakeKeeping, FakePlayer } from './takeRecorderFakes';
+import { FakeCalibrations, FakeInput, FakeKeeping, FakePlayer, guitar, mic } from './takeRecorderFakes';
 
 /** The context time the fake player starts playback at. */
 const startedAt = 10;
@@ -55,13 +55,24 @@ async function setup(tracks: Track[] = [track(1), track(2)], options: Partial<Ta
   const player = new FakePlayer(startedAt);
   const input = new FakeInput();
   const keeping = new FakeKeeping();
+  // Every Input the fake records from is calibrated, unless a test says otherwise.
+  const calibrations = new FakeCalibrations({ offset: 0, offered: true });
   /** The errors the recorder said, in order. */
   const errors: string[] = [];
   const onError = (message: string) => errors.push(message);
-  const recorder = new TakeRecorder({ saves, player, input, keeping, uploads: server, onError, ...options });
+  const recorder = new TakeRecorder({
+    saves,
+    player,
+    input,
+    keeping,
+    calibrations,
+    uploads: server,
+    onError,
+    ...options,
+  });
   /** Sings for seconds from the start of playback, lead-in included. */
   const sing = (seconds: number) => input.opened!.sing(startedAt, seconds);
-  return { server, saves, player, input, keeping, recorder, errors, sing };
+  return { server, saves, player, input, keeping, calibrations, recorder, errors, sing };
 }
 
 /** Lets everything waiting on the fakes run. */
@@ -162,6 +173,64 @@ describe('TakeRecorder', () => {
     expect(player.played).toEqual([]);
     expect(keeping.takes).toEqual([]);
     expect(server.timeline.tracks[0].clips).toEqual([]);
+  });
+
+  it('places a Take by the Latency Offset of the Input it was recorded from', async () => {
+    const { server, input, recorder, sing, calibrations } = await setup();
+    calibrations.set(mic, { offset: 0.03, offered: true });
+    calibrations.set(guitar, { offset: 0.05, offered: true });
+    input.reported = 0.01;
+
+    input.recordsFrom = guitar;
+    await recorder.start({ trackId: 1, playhead: 5 });
+    sing(4);
+    await recorder.stop();
+    input.recordsFrom = mic;
+    await recorder.start({ trackId: 2, playhead: 5 });
+    sing(4);
+    await recorder.stop();
+
+    expect(server.timeline.tracks[0].clips[0].takes[0].latencyOffset).toBe(0.05);
+    expect(server.timeline.tracks[1].clips[0].takes[0].latencyOffset).toBe(0.03);
+  });
+
+  it('places a Take from an Input whose calibration was skipped by the latency the browser reports', async () => {
+    const { server, input, recorder, sing, calibrations } = await setup();
+    calibrations.set(guitar, { offset: null, offered: true });
+    input.recordsFrom = guitar;
+    input.reported = 0.01;
+
+    await recorder.start({ trackId: 1, playhead: 5 });
+    sing(4);
+    await recorder.stop();
+
+    expect(server.timeline.tracks[0].clips[0].takes[0].latencyOffset).toBe(0.01);
+  });
+
+  it("offers calibration of an Input before its first recording, and records nothing till it's calibrated or skipped", async () => {
+    const offers: unknown[] = [];
+    const { server, input, player, keeping, recorder, errors, calibrations } = await setup(undefined, {
+      onUncalibrated: (offered, start) => offers.push({ offered, start }),
+    });
+    calibrations.others = { offset: null, offered: false };
+    calibrations.set(mic, { offset: 0.03, offered: true });
+    input.recordsFrom = guitar;
+
+    await recorder.start({ trackId: 1, playhead: 5, retake: 7 });
+
+    expect(offers).toEqual([{ offered: guitar, start: { trackId: 1, playhead: 5, retake: 7 } }]);
+    expect(recorder.phase).toBeNull();
+    expect(input.opened!.closed).toBe(true);
+    expect(player.played).toEqual([]);
+    expect(keeping.takes).toEqual([]);
+    expect(errors).toEqual([]);
+    expect(server.timeline.tracks[0].clips).toEqual([]);
+
+    // Skipped, it records.
+    calibrations.set(guitar, { offset: null, offered: true });
+    await recorder.start({ trackId: 1, playhead: 5 });
+    expect(recorder.phase).toBe('recording');
+    expect(offers).toHaveLength(1);
   });
 
   it("records from the default Input, and says so, when the one chosen isn't connected", async () => {

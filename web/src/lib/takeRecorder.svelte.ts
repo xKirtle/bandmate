@@ -13,16 +13,23 @@
 // whose upload just failed, are offered back, to keep, placed as they would
 // have been (see recovery.ts), or to discard.
 //
+// A Take is placed by the Latency Offset of the Input it's recorded from,
+// once that Input's open, so the default input's is that of the Input it
+// turns out to be. Before an Input's first recording, calibration is
+// offered in its place, until it's calibrated or skipped.
+//
 // The Timeline decides when Record is offered, and draws what's recorded;
 // the recorder does the rest, through its ports: Transport, playing along, the
-// chosen Input, and the copy kept in the browser. Saving goes through the
+// chosen Input, each Input's calibration, and the copy kept in the browser. Saving goes through the
 // Song's Saves, whose refreshes are held from the start of a recording
 // until its Take is saved, as the Timeline it's made against has to stay
 // as it is.
 import type { Captured, SongAt, TakePlacement, Timeline } from './api';
+import { appliedOffset, type Calibration } from './calibration';
 import { Capture, CaptureError, frameAt, inputProblem, type Batch } from './capture';
 import { addedTrack } from './chosenTrack';
 import { settingTakes } from './history';
+import type { InputCalibrations } from './inputCalibrations';
 import type { InputChoice } from './inputSettings';
 import { LiveWave } from './liveWave';
 import { peaks as peaksOf } from './peaks';
@@ -53,9 +60,11 @@ export interface TakeInput {
 export interface OpenedInput {
   /** The name of the Input chosen when it isn't connected, so the default is captured instead; null otherwise. */
   readonly gone: string | null;
+  /** The Input it records from: the one chosen, or the one the default is; null where that can't be told. */
+  readonly input: InputChoice | null;
   readonly sampleRate: number;
-  /** The Latency Offset a Take captured from it is placed by, in seconds. */
-  readonly latencyOffset: number;
+  /** The latency the browser reports for it, in seconds, which stands in for an uncalibrated Latency Offset. */
+  readonly reported: number;
   /** Hands sink every batch captured, those so far and each one after. */
   keep(sink: (batch: Batch) => void): void;
   /** Stops capturing, and returns what was captured from context time from on. */
@@ -89,26 +98,35 @@ export interface TakeKeeping {
   whileHeld<T>(id: string, upload: () => Promise<T>): Promise<T | null>;
 }
 
+/** Each Input's calibration: those kept on this device, or a fake of them. */
+export type TakeCalibrations = Pick<InputCalibrations, 'of'>;
+
 /** The api calls saving a Take makes: the api module's, or the fake Song server's. */
 export interface TakeUploads {
   recordTake(at: SongAt, wav: Blob, placement: TakePlacement): Promise<Timeline>;
   retake(at: SongAt, clipId: number, wav: Blob, captured: Captured): Promise<Timeline>;
 }
 
-/** The chosen Input, captured on context, placed by the Latency Offset offset gives for the latency it reports. */
+/**
+ * The chosen Input, captured on context. Opening the default input tells
+ * found which Input it is.
+ */
 export function capturedInput(
   context: () => AudioContext,
   choice: () => InputChoice,
-  offset: (reported: number) => number,
+  found: (input: InputChoice) => void,
 ): TakeInput {
   return {
     problem: inputProblem,
     open: async () => {
-      const capture = await Capture.open(context(), choice());
+      const chosen = choice();
+      const capture = await Capture.open(context(), chosen);
+      if (capture.opened && chosen.deviceId === '') found(capture.opened);
       return {
         gone: capture.gone,
+        input: capture.opened,
         sampleRate: capture.sampleRate,
-        latencyOffset: offset(capture.latency),
+        reported: capture.latency,
         keep: (sink) => capture.keep(sink),
         stop: (from) => capture.stop(from),
         close: () => capture.close(),
@@ -150,7 +168,14 @@ export interface TakeRecorderOptions {
   player: TakePlayer;
   input: TakeInput;
   keeping: TakeKeeping;
+  calibrations: TakeCalibrations;
   uploads: TakeUploads;
+  /**
+   * Hears that an Input was never calibrated nor skipped, before its first
+   * recording, so nothing was recorded: to offer calibration of it, and
+   * start again once it's calibrated or skipped.
+   */
+  onUncalibrated?: (input: InputChoice, start: Start) => void;
   /** Hears the id of a Track added for an unsaved Take, e.g. to choose it. */
   onTrackAdded?: (trackId: number) => void;
   /** Hears why a recording, or keeping unsaved Takes, failed, e.g. to show it. */
@@ -186,7 +211,9 @@ export class TakeRecorder {
   #player: TakePlayer;
   #input: TakeInput;
   #keeping: TakeKeeping;
+  #calibrations: TakeCalibrations;
   #uploads: TakeUploads;
+  #onUncalibrated: (input: InputChoice, start: Start) => void;
   #onTrackAdded: (trackId: number) => void;
   #onError: (message: string) => void;
 
@@ -202,7 +229,9 @@ export class TakeRecorder {
     this.#player = options.player;
     this.#input = options.input;
     this.#keeping = options.keeping;
+    this.#calibrations = options.calibrations;
     this.#uploads = options.uploads;
+    this.#onUncalibrated = options.onUncalibrated ?? (() => {});
     this.#onTrackAdded = options.onTrackAdded ?? (() => {});
     this.#onError = options.onError ?? (() => {});
   }
@@ -224,9 +253,11 @@ export class TakeRecorder {
   /**
    * Records a Take onto a Track, or into a Clip of Takes for a Retake. It
    * opens the Input first, and only then places the Take, on the Timeline
-   * as saved.
+   * as saved. An Input never calibrated nor skipped records nothing: it's
+   * told of, to offer calibration of it first.
    */
-  async start({ trackId: chosen, playhead, retake }: Start): Promise<void> {
+  async start(start: Start): Promise<void> {
+    const { trackId: chosen, playhead, retake } = start;
     if (this.phase !== null || this.#closed) return;
     this.phase = 'starting';
     this.clipId = retake ?? null;
@@ -241,8 +272,15 @@ export class TakeRecorder {
       const trouble = await this.#input.problem();
       if (trouble) throw new CaptureError(trouble);
       const input = (recording.input = await this.#input.open());
-      if (input.gone) this.inputNote = `${input.gone} isn't connected, so recording from the default input.`;
       if (this.#closed) throw new CaptureError('The Timeline closed before recording started.');
+      const calibration = this.#calibrations.of(input.input);
+      if (input.input && uncalibrated(calibration)) {
+        input.close();
+        this.#done();
+        this.#onUncalibrated(input.input, start);
+        return;
+      }
+      if (input.gone) this.inputNote = `${input.gone} isn't connected, so recording from the default input.`;
       // Placed once the Input's open, in case the Timeline changed meanwhile.
       const { tracks } = this.#saves.timeline;
       const target = retake !== undefined && tracks.find((t) => t.clips.some((c) => c.id === retake));
@@ -258,7 +296,7 @@ export class TakeRecorder {
         clipId: this.clipId,
         takes: clip ? takesAt(clip) : [],
         plan,
-        latencyOffset: input.latencyOffset,
+        latencyOffset: appliedOffset(calibration, input.reported),
       };
       const first = frameAt(startedAt, input.sampleRate);
       const kept = this.#keeping.keep({
@@ -457,4 +495,9 @@ export class TakeRecorder {
     this.#release?.();
     this.#release = null;
   }
+}
+
+/** Whether an Input was never calibrated, nor calibration skipped for it. */
+function uncalibrated(calibration: Calibration): boolean {
+  return calibration.offset === null && !calibration.offered;
 }

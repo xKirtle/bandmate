@@ -5,6 +5,7 @@ import {
   deviceName,
   inputKey,
   inputName,
+  inputRecorded,
   inputSetting,
   meterLevel,
   readInput,
@@ -151,6 +152,58 @@ describe('resolveInput', () => {
       gone: null,
     });
     expect(resolveInput([scarlett], { deviceId: 'abc', label: '', channel: 1 }, 2).channel).toBe(1);
+  });
+});
+
+describe('inputRecorded', () => {
+  // As Chrome lists them, with its stand-ins for the default input.
+  const mic = { deviceId: 'abc', groupId: 'g1', label: 'Scarlett 2i2 USB (1235:8210)' };
+  const builtIn = { deviceId: 'def', groupId: 'g2', label: 'Built-in Microphone' };
+  const chrome = [
+    { deviceId: 'default', groupId: 'g1', label: 'Default - Scarlett 2i2 USB (1235:8210)' },
+    { deviceId: 'communications', groupId: 'g2', label: 'Communications - Built-in Microphone' },
+    builtIn,
+    mic,
+  ];
+  const defaultChoice = { deviceId: '', label: '', channel: 1 };
+
+  it('is the Input chosen while its device is connected, by the label it has now', () => {
+    expect(inputRecorded(chrome, { deviceId: 'abc', label: 'Old name', channel: 1 })).toEqual({
+      deviceId: 'abc',
+      label: mic.label,
+      channel: 1,
+    });
+  });
+
+  it('is, with the default chosen, the device the default is, never "default"', () => {
+    // Chrome says so by the group its stand-in shares with the device.
+    expect(inputRecorded(chrome, defaultChoice)).toEqual({ deviceId: 'abc', label: mic.label, channel: 1 });
+    // Firefox and Safari list the default first.
+    expect(inputRecorded([builtIn, mic], defaultChoice)).toEqual({ deviceId: 'def', label: builtIn.label, channel: 1 });
+  });
+
+  it('is the device the browser says the default opened from, once it has', () => {
+    expect(inputRecorded([builtIn, mic], defaultChoice, { deviceId: 'abc' })).toMatchObject({ deviceId: 'abc' });
+    // Chrome says "default", and the group.
+    expect(inputRecorded(chrome, defaultChoice, { deviceId: 'default', groupId: 'g2' })).toMatchObject({
+      deviceId: 'def',
+    });
+  });
+
+  it("is the default's Input 1 when the device chosen isn't connected", () => {
+    expect(inputRecorded([builtIn], { deviceId: 'abc', label: 'Scarlett', channel: 1 })).toEqual({
+      deviceId: 'def',
+      label: builtIn.label,
+      channel: 0,
+    });
+  });
+
+  it("is the Input chosen as it was kept, or unknown for the default, before the browser lists the devices' ids", () => {
+    const unlisted = [{ deviceId: '', groupId: '', label: '' }];
+    const chosen = { deviceId: 'abc', label: 'Scarlett', channel: 1 };
+    expect(inputRecorded(unlisted, chosen)).toEqual(chosen);
+    expect(inputRecorded(unlisted, defaultChoice)).toBeNull();
+    expect(inputRecorded([], defaultChoice)).toBeNull();
   });
 });
 

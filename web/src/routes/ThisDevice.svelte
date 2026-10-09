@@ -12,7 +12,8 @@
   import { inputName } from '../lib/inputSettings';
   import SettingsPage from '../lib/SettingsPage.svelte';
   import { appearance } from '../lib/sharedAppearance.svelte';
-  import { calibration } from '../lib/sharedCalibration.svelte';
+  import { RecordedInput } from '../lib/recordedInput.svelte';
+  import { calibrations } from '../lib/sharedCalibration.svelte';
   import { input } from '../lib/sharedInput.svelte';
   import { leftHanded } from '../lib/sharedLeftHanded.svelte';
 
@@ -23,6 +24,9 @@
   // leaving the tab closes both.
   let changingInput = $state(false);
   let calibrating = $state(false);
+  // The Input recording would open, and its Latency Offset, to show.
+  const recordedInput = new RecordedInput(() => input.value);
+  const offset = $derived(calibrations.of(recordedInput.current).offset);
 
   // Narrowed past where recording is offered, the picker goes for good, so
   // widening again never opens the Input unasked.
@@ -79,7 +83,7 @@
           </div>
           <div>
             <dt>Latency Offset</dt>
-            <dd class="tabular">{offsetSummary(calibration.value.offset)}</dd>
+            <dd class="tabular">{offsetSummary(offset)}</dd>
           </div>
         </dl>
         {#if changingInput}
@@ -101,7 +105,7 @@
             onclick={() => {
               changingInput = false;
               calibrating = true;
-            }}>{calibration.value.offset !== null ? 'Calibrate again' : 'Calibrate'}</button
+            }}>{offset !== null ? 'Calibrate again' : 'Calibrate'}</button
           >
         </div>
       </section>
@@ -127,10 +131,7 @@
 </SettingsPage>
 
 {#if calibrating}
-  <CalibrationDialog
-    onCalibrated={(offset) => calibration.set({ offset, offered: true })}
-    onClose={() => (calibrating = false)}
-  />
+  <CalibrationDialog input={$state.snapshot(input.value)} onClose={() => (calibrating = false)} />
 {/if}
 
 <style>

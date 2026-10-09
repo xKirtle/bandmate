@@ -2,10 +2,9 @@
 // played to the voice reaching the file, through this device's outputs and
 // input. A click plays and the user taps or claps on the mic along with
 // it; the hits are found in what the input captured, those that don't fit
-// are dropped, and the rest averaged. The offset is kept on this device,
-// like the input chosen, since it belongs to the hardware here, not to any
-// Song. Until it's calibrated, the latency the browser reports stands in.
-import type { DeviceSettingStorage } from './deviceSetting.svelte';
+// are dropped, and the rest averaged. Each Input has its own, kept on this
+// device (see inputCalibrations.ts). Until an Input's calibrated, the
+// latency the browser reports stands in.
 
 /** How many clicks a calibration plays. */
 export const clickCount = 12;
@@ -100,43 +99,11 @@ function median(values: ArrayLike<number>): number {
   return sorted.length % 2 ? sorted[half] : (sorted[half - 1] + sorted[half]) / 2;
 }
 
-/** The Latency Offset on this device: null until calibrated, and whether calibration was offered yet. */
+/** An Input's Latency Offset: null until calibrated, and whether calibration was offered for it yet. */
 export interface Calibration {
   offset: number | null;
   offered: boolean;
 }
-
-/** Where it's kept on this device. */
-export const calibrationKey = 'bandmate.latency';
-
-/** The calibration kept on this device, or none. */
-export function readCalibration(storage: Storage | undefined): Calibration {
-  try {
-    const { offset, offered } = JSON.parse(storage?.getItem(calibrationKey) ?? 'null') ?? {};
-    return {
-      offset: typeof offset === 'number' && Number.isFinite(offset) && offset >= 0 ? offset : null,
-      offered: offered === true,
-    };
-  } catch {
-    return { offset: null, offered: false };
-  }
-}
-
-/** Keeps the calibration on this device: an offset measured, or calibration skipped. */
-export function storeCalibration(storage: Storage | undefined, calibration: Calibration) {
-  try {
-    storage?.setItem(calibrationKey, JSON.stringify(calibration));
-  } catch {
-    // Not kept, e.g. in a private window; it still applies until reload.
-  }
-}
-
-/** The Latency Offset, and whether calibration was offered, as a Device Setting is kept on this device. */
-export const calibrationSetting = {
-  key: calibrationKey,
-  read: readCalibration,
-  store: storeCalibration,
-} satisfies DeviceSettingStorage<Calibration>;
 
 /** The offset to apply to a Take: the one calibrated, or else the latency the browser reports. */
 export function appliedOffset(calibration: Calibration, reported: number): number {

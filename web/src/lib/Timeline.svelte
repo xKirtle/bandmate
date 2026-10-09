@@ -82,9 +82,10 @@
   import CalibrationDialog from './CalibrationDialog.svelte';
   import MixdownDialog from './MixdownDialog.svelte';
   import { mixdownEnd } from './mixdown';
-  import { appliedOffset } from './calibration';
   import { deviceStorage } from './deviceStorage';
-  import { calibration } from './sharedCalibration.svelte';
+  import type { InputChoice } from './inputSettings';
+  import { RecordedInput } from './recordedInput.svelte';
+  import { calibrations } from './sharedCalibration.svelte';
   import { input as chosenInput } from './sharedInput.svelte';
   import { clampHeight, defaultHeight, grownHeight, heightBounds, readHeight, storeHeight } from './timelineHeight';
   import { fullScreenQuery } from './timelineLayout';
@@ -193,10 +194,12 @@
     input: capturedInput(
       audioContext,
       () => $state.snapshot(chosenInput.value),
-      (reported) => appliedOffset(calibration.value, reported),
+      (input) => calibrations.defaultIs(input),
     ),
     keeping: browserKeeping,
+    calibrations,
     uploads: api,
+    onUncalibrated: (input, { retake }) => (calibrating = { offer: true, input, retaking: retake }),
     onTrackAdded: (trackId) => choose({ kind: 'add', trackId }),
     onError: (message) => showError(message),
   });
@@ -820,21 +823,20 @@
     };
   });
 
-  // Calibration while it runs, of the Latency Offset shared by this
-  // device's tabs: offered before the first recording here, where the Clip
-  // to retake waits for it, or run from the recording settings.
-  let calibrating = $state<{ offer: boolean; retaking?: Clip } | null>(null);
+  // Calibration while it runs, of an Input's Latency Offset, shared by this
+  // device's tabs: offered before an Input's first recording, where the
+  // Clip to retake, by id, waits for it, or run from the recording settings
+  // for the chosen Input.
+  let calibrating = $state<{ offer: boolean; input: InputChoice; retaking?: number } | null>(null);
   // Whether calibration was just skipped, to say where to run it later.
   let skipped = $state(false);
 
-  function storeCalibrated(offset: number) {
-    // Applied even where storage can't keep it, until reload.
-    calibration.set({ offset, offered: true });
-  }
+  // The Input recording would open, and its Latency Offset, to show.
+  const recordedInput = new RecordedInput(() => chosenInput.value);
+  const offset = $derived(calibrations.of(recordedInput.current).offset);
 
-  function skipOffer() {
-    calibration.set({ ...calibration.value, offered: true });
-    skipped = true;
+  function calibrateChosen() {
+    calibrating = { offer: false, input: $state.snapshot(chosenInput.value) };
   }
 
   function calibrationClosed(record: boolean) {
@@ -859,23 +861,19 @@
 
   /**
    * Records a Take onto the chosen Track, or with retaking, into that Clip
-   * of Takes.
+   * of Takes. Before an Input's first recording, the recorder has
+   * calibration offered first.
    */
-  function startRecording(retaking?: Clip) {
+  function startRecording(retaking?: number) {
     // No Retake while several Clips are selected, e.g. selected while
     // calibration, offered first, ran.
-    if (!canRecord || (retaking && selection.size > 1)) return;
-    // Calibration is offered first, the first time on this device.
-    if (!calibration.value.offered && calibration.value.offset === null) {
-      calibrating = { offer: true, retaking };
-      return;
-    }
+    if (!canRecord || (retaking !== undefined && selection.size > 1)) return;
     showError(null);
     // Resumed right away, while the key press or click still counts.
     audioContext()
       .resume()
       .catch(() => {});
-    recorder.start({ trackId: chosen, playhead: position, retake: retaking?.id });
+    recorder.start({ trackId: chosen, playhead: position, retake: retaking });
   }
 
   async function stopRecording() {
@@ -1557,7 +1555,7 @@
         frozen: freeze,
       },
       {
-        retake: () => startRecording(clip),
+        retake: () => startRecording(clip.id),
         chooseTake: (takeId) => editing.edit({ kind: 'chooseTake', clipId, takeId }),
         deleteTake: (takeId) => editing.edit({ kind: 'deleteTake', clipId, takeId }),
         nudgeTake: (takeId, ms) => editing.edit({ kind: 'nudgeTake', clipId, takeId, nudge: ms / 1000 }),
@@ -2066,16 +2064,16 @@
       <InputSettings
         bind:this={inputSettings}
         disabled={recording || !editable.current}
-        offset={calibration.value.offset}
-        onCalibrate={() => (calibrating = { offer: false })}
+        {offset}
+        onCalibrate={calibrateChosen}
       />
-      {#if calibration.value.offset === null && !recording}
+      {#if offset === null && !recording}
         <button
           type="button"
           class="not-calibrated edit-only"
           disabled={!canRecord}
           title="Takes are placed by the latency the browser reports until it's calibrated. Calibrate it now, or any time from Recording settings… in the ⋯ menu."
-          onclick={() => (calibrating = { offer: false })}>Not calibrated</button
+          onclick={calibrateChosen}>Not calibrated</button
         >
       {/if}
       <!-- On one line full-screen, cut short with the whole of it in the title. -->
@@ -2695,9 +2693,9 @@
 
 {#if calibrating}
   <CalibrationDialog
+    input={calibrating.input}
     offer={calibrating.offer}
-    onCalibrated={storeCalibrated}
-    onSkip={skipOffer}
+    onSkip={() => (skipped = true)}
     onClose={calibrationClosed}
   />
 {/if}
