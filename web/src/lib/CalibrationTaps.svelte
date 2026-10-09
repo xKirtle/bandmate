@@ -4,7 +4,9 @@
   // Draws a calibration's taps as they're heard: a dot for each tap's delay,
   // in the order tapped, later delays higher, and the average they make as a
   // line across. A tap left out of the average is a hollow, muted ring, so a
-  // stray stands out and the taps can be seen to level out.
+  // stray stands out and the taps can be seen to level out. The height spans
+  // the taps that count, so a stray far off doesn't flatten them: one beyond
+  // it sits at the top or bottom edge.
   let { taps, average }: { taps: readonly Tap[]; average: number | null } = $props();
 
   let width = $state(0);
@@ -21,7 +23,9 @@
   // How many taps the width holds before it squeezes them closer.
   const leastSlots = 2 * steadyOver;
 
-  const delays = $derived([...taps.map((t) => t.delay), ...(average === null ? [] : [average])]);
+  // The delays the height spans: those that count, or all of them while none do.
+  const spanned = $derived(taps.some((t) => t.counted) ? taps.filter((t) => t.counted) : taps);
+  const delays = $derived([...spanned.map((t) => t.delay), ...(average === null ? [] : [average])]);
   const range = $derived.by(() => {
     if (delays.length === 0) return { low: 0, high: leastSpan };
     let low = Math.min(...delays) - margin;
@@ -31,7 +35,10 @@
     return { low, high };
   });
   const x = (i: number) => inset + (i * (width - 2 * inset)) / Math.max(1, Math.max(taps.length, leastSlots) - 1);
-  const y = (delay: number) => height - inset - ((delay - range.low) / (range.high - range.low)) * (height - 2 * inset);
+  const y = (delay: number) => {
+    const share = Math.min(1, Math.max(0, (delay - range.low) / (range.high - range.low)));
+    return height - inset - share * (height - 2 * inset);
+  };
   const left = $derived(taps.filter((t) => !t.counted).length);
   const label = $derived(
     `Each tap's delay: ${taps.length} ${taps.length === 1 ? 'tap' : 'taps'}` +
