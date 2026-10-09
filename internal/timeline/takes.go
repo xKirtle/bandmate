@@ -192,7 +192,7 @@ func (s *Store) Retake(ctx context.Context, songID int64, based songversion.Vers
 		if take.end() <= p.start+tolerance {
 			return 0, errTakeTooEarly
 		}
-		if err := startSpanEarlier(ctx, tx, clipID, &p, (p.start-p.offset)-take.start); err != nil {
+		if err := startSpanEarlier(ctx, tx, clipID, &p, -p.sourceAt(take.start)); err != nil {
 			return 0, err
 		}
 		var next sql.NullFloat64
@@ -209,7 +209,7 @@ func (s *Store) Retake(ctx context.Context, songID int64, based songversion.Vers
 		if err != nil {
 			return 0, err
 		}
-		takeID, err := take.insert(ctx, tx, songID, number, take.start-(p.start-p.offset))
+		takeID, err := take.insert(ctx, tx, songID, number, p.sourceAt(take.start))
 		if err != nil {
 			return 0, err
 		}

@@ -7,7 +7,7 @@
 // scheduled a little ahead as they come round, each starting exactly as the
 // one before ends.
 import { fadeCurves, type PlacedFades } from './clipFade';
-import { sourceLength, timelineAt } from './clipTime';
+import { sourceLength, timelineAt, timelineLength } from './clipTime';
 import { hotKept } from './hotKept';
 import { playAlone, release } from './playback';
 import { positionAt, repeats, schedule, type Loop, type Placed } from './schedule';
@@ -54,8 +54,10 @@ export class TrackMix {
 
   /**
    * Plays part of a Clip's audio on its Track, at the Clip's Gain, shaped by
-   * its Fades: from `from` seconds into its buffer, for duration seconds of
-   * the Timeline, starting at context time `at`.
+   * its Fades: from `from` seconds into its source, for duration seconds of
+   * the Timeline, starting at context time `at`. Its buffer is its source's
+   * audio as the Clip plays it on the Timeline, so a second of the buffer
+   * is a second of the Timeline.
    */
   play(buffer: AudioBuffer, clip: PlayableClip, at: number, from: number, duration: number): AudioBufferSourceNode {
     const node = this.#context.createBufferSource();
@@ -70,7 +72,7 @@ export class TrackMix {
       node.connect(gain).connect(track);
       node.addEventListener('ended', () => gain.disconnect());
     }
-    node.start(at, from, sourceLength(clip, duration));
+    node.start(at, timelineLength(clip, from), duration);
     return node;
   }
 

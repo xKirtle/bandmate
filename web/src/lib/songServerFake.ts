@@ -420,7 +420,7 @@ export class FakeSongServer implements SongServer {
       this.timeline = withClips(this.timeline, track.id, (cs) =>
         cs.map((c) => {
           if (c.id !== clipId) return c;
-          const take = this.#take(captured, captured.captureStart - captured.latencyOffset - (c.start - c.offset));
+          const take = this.#take(captured, sourceAt(c, captured.captureStart - captured.latencyOffset));
           return { ...c, takes: [...c.takes, take], activeTakeId: take.id };
         }),
       );

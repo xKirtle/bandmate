@@ -40,5 +40,5 @@ func (p placement) timelineLength(seconds float64) float64 {
 
 // sourceEnd is where in its source a Clip stops playing.
 func (p placement) sourceEnd() float64 {
-	return p.sourceAt(p.start + p.length)
+	return p.offset + p.sourceLength(p.length)
 }
