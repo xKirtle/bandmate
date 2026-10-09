@@ -66,8 +66,8 @@
   const defaultRecorded = new RecordedInput(() => defaultChoice);
 
   // The audio devices connected, with how many channels each is known to
-  // have; null while which they are can't be told. Told again as they come
-  // and go, and once the browser allows the microphone.
+  // have; null while which they are can't be told. Told again whenever
+  // watchInputs says what the browser says of them may have changed.
   let devices = $state.raw<ConnectedDevice[] | null>(null);
   $effect(() => {
     let live = true;
