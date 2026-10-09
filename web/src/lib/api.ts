@@ -383,12 +383,18 @@ export interface Clip {
    */
   gain: number;
   /**
-   * How fast it plays its audio, without changing its pitch, as a ratio of
+   * How fast it plays its audio, without changing its Pitch, as a ratio of
    * as recorded, whichever Take is active: from minTempo to maxTempo (see
    * clipTempo), 1 until it's set. Its length is Timeline time, so it plays
    * length × tempo seconds of its source (see clipTime).
    */
   tempo: number;
+  /**
+   * How many semitones its audio is moved up or down, without changing its
+   * Tempo, whichever Take is active: a whole number from minPitch to
+   * maxPitch (see clipPitch), 0 until it's set. It never changes its length.
+   */
+  pitch: number;
   /**
    * How long it rises from silence at its start, and falls to silence at its
    * end, in seconds from that edge as trimmed: 0 for no Fade. Together they
@@ -432,14 +438,21 @@ export interface Take {
   peaks?: number[];
 }
 
-/** What a Clip has of its own, each left out while it has none: its name, its Gain, its Tempo and its Fades. */
-export type OwnOfClip = { name?: string; gain?: number; tempo?: number; fadeIn?: number; fadeOut?: number };
+/** What a Clip has of its own, each left out while it has none: its name, its Gain, its Tempo, its Pitch and its Fades. */
+export type OwnOfClip = {
+  name?: string;
+  gain?: number;
+  tempo?: number;
+  pitch?: number;
+  fadeIn?: number;
+  fadeOut?: number;
+};
 
 /**
  * A stretch of a Beat or a Sound, or of detached Takes, to place on a Track,
  * e.g. a deleted Clip brought back, or a recording or import redone, with its
  * name if it has one, its Gain, 0 dB if not given, its Tempo, 100% if not
- * given, and its Fades, none if not given.
+ * given, its Pitch, 0 if not given, and its Fades, none if not given.
  */
 export type NewClip = Pick<Clip, 'start' | 'offset' | 'length'> &
   OwnOfClip &
@@ -528,6 +541,12 @@ export type MergeOnto = { trackId: number } | { newTrack: TrackAt };
  * together, 100 peaks per second, and the Track their Clip goes on.
  */
 export type ClipMerge = { clipIds: number[]; peaks: number[] } & MergeOnto;
+
+/** The Pitch to set on one of several Clips at once, in whole semitones. */
+export interface ClipPitch {
+  clipId: number;
+  pitch: number;
+}
 
 /** The Tempo to set on one of several Clips at once, as a ratio of as recorded. */
 export interface ClipTempo {
@@ -1125,7 +1144,14 @@ export const api = {
   /** Sets how long a Clip fades in from its start and out to its end, in seconds; 0 for none. */
   setClipFades: (at: SongAt, clipId: number, fades: ClipFades) =>
     request<Timeline>('PUT', `/songs/${at.id}/timeline/clips/${clipId}/fades`, fades, at),
-  /** Copies a Clip, name, Gain, Tempo, Fades and all, right after itself, or after its Track's last Clip if that's taken. */
+  /**
+   * Sets how many semitones each of several Clips' audio is moved up or
+   * down, in one step, from minPitch to maxPitch. Nothing else about them
+   * changes.
+   */
+  setClipPitches: (at: SongAt, clips: ClipPitch[]) =>
+    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/pitch`, { clips }, at),
+  /** Copies a Clip, name, Gain, Tempo, Pitch, Fades and all, right after itself, or after its Track's last Clip if that's taken. */
   duplicateClip: (at: SongAt, clipId: number) =>
     request<Timeline>('POST', `/songs/${at.id}/timeline/clips/${clipId}/duplicate`, undefined, at),
   /** Removes a Clip from the Timeline; its Beat stays in the Beat Library, and its Takes are detached. */

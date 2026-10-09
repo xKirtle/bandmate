@@ -1,4 +1,4 @@
-// A Clip's Tempo: how fast it plays its audio, without changing its pitch,
+// A Clip's Tempo: how fast it plays its audio, without changing its Pitch,
 // as a ratio of as recorded. It's kept as a ratio, from 0.5 to 2, and typed
 // and shown as a whole percentage, e.g. "92%". Plain arithmetic, so the
 // Timeline only has to show and set it.

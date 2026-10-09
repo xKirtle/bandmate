@@ -10,6 +10,7 @@ const clip = (id: number, start: number, more: Partial<Clip> = {}): Clip => ({
   name: null,
   gain: 0,
   tempo: 1,
+  pitch: 0,
   fadeIn: 0,
   fadeOut: 0,
   takes: [],
@@ -429,6 +430,45 @@ describe('History', () => {
 
     // Redone by the Clip's new id, the new Track added again.
     expect(h.nextRedo()).toEqual({ kind: 'setClipTempos', tempos: [{ clipId: 9, tempo: 0.5 }] });
+  });
+
+  it("undoes setting Clips' Pitch by setting each back, in one step", () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0), clip(6, 30, { pitch: 3 })])]);
+    const t1 = timeline([track(1, [clip(5, 0, { pitch: -2 }), clip(6, 30, { pitch: -2 })])]);
+    const edit: Edit = {
+      kind: 'setClipPitches',
+      pitches: [
+        { clipId: 5, pitch: -2 },
+        { clipId: 6, pitch: -2 },
+      ],
+    };
+    h.record(edit, t0, t1);
+
+    expect(h.nextUndo()).toEqual({
+      kind: 'setClipPitches',
+      pitches: [
+        { clipId: 5, pitch: 0 },
+        { clipId: 6, pitch: 3 },
+      ],
+    });
+    h.undone(t1, t0);
+    expect(h.nextRedo()).toEqual(edit);
+  });
+
+  it('places a Clip back at its Pitch, and sets its Pitch by its new id', () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0, { pitch: -2 })])]);
+    h.record({ kind: 'setClipPitches', pitches: [{ clipId: 5, pitch: -2 }] }, timeline([track(1, [clip(5, 0)])]), t0);
+    h.record({ kind: 'deleteClip', clipId: 5 }, t0, timeline([track(1)]));
+
+    expect(h.nextUndo()).toEqual({
+      kind: 'placeClip',
+      trackId: 1,
+      clip: { beatId: 100, pitch: -2, start: 0, offset: 0, length: 10 },
+    });
+    h.undone(timeline([track(1)]), timeline([track(1, [clip(9, 0, { pitch: -2 })])]));
+    expect(h.nextUndo()).toEqual({ kind: 'setClipPitches', pitches: [{ clipId: 9, pitch: 0 }] });
   });
 
   it('places a Clip back at its Tempo', () => {

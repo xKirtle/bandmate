@@ -21,6 +21,7 @@ group('clipActions', () => {
     name: null,
     gain: 0,
     tempo: 1,
+    pitch: 0,
     fadeIn: 0,
     fadeOut: 0,
     takes: [],
@@ -55,6 +56,7 @@ group('clipActions', () => {
     rename: () => {},
     setGain: () => {},
     setTempo: () => {},
+    setPitch: () => {},
     copy: () => {},
     cut: () => {},
     duplicate: () => {},
@@ -69,6 +71,7 @@ group('clipActions', () => {
       'Rename',
       'Gain',
       'Tempo',
+      'Pitch',
       'Copy',
       'Cut',
       'Duplicate',
@@ -79,6 +82,7 @@ group('clipActions', () => {
       'Rename',
       'Gain',
       'Tempo',
+      'Pitch',
       'Copy',
       'Cut',
       'Duplicate',
@@ -97,6 +101,7 @@ group('clipActions', () => {
       'Rename',
       'Gain',
       'Tempo',
+      'Pitch',
       'Copy',
       'Cut',
       'Duplicate',
@@ -116,6 +121,7 @@ group('clipActions', () => {
       'Rename',
       'Gain',
       'Tempo',
+      'Pitch',
       'Copy',
       'Cut',
       'Duplicate',
@@ -136,6 +142,7 @@ group('clipActions', () => {
       rename: () => ran.push('rename'),
       setGain: (dB) => ran.push(`gain ${dB}`),
       setTempo: (percent) => ran.push(`tempo ${percent}`),
+      setPitch: (semitones) => ran.push(`pitch ${semitones}`),
       copy: () => ran.push('copy'),
       cut: () => ran.push('cut'),
       duplicate: () => ran.push('duplicate'),
@@ -159,6 +166,7 @@ group('clipActions', () => {
       'rename',
       'gain 5',
       'tempo 5',
+      'pitch 5',
       'copy',
       'cut',
       'duplicate',
@@ -201,6 +209,7 @@ group('clipActions', () => {
       ['Rename', hint],
       ['Gain', hint],
       ['Tempo', hint],
+      ['Pitch', hint],
       ['Copy', hint],
       ['Cut', hint],
       ['Duplicate', hint],
@@ -209,6 +218,7 @@ group('clipActions', () => {
       ['Rename', hint],
       ['Gain', hint],
       ['Tempo', hint],
+      ['Pitch', hint],
       ['Copy', hint],
       ['Cut', hint],
       ['Duplicate', hint],
@@ -223,6 +233,7 @@ group('clipActions', () => {
       { label: 'Rename' },
       { label: 'Gain' },
       { label: 'Tempo' },
+      { label: 'Pitch' },
       { label: 'Copy', title: 'Or Ctrl+C' },
       { label: 'Cut', title: 'Or Ctrl+X' },
       { label: 'Duplicate' },
@@ -249,6 +260,40 @@ group('clipActions', () => {
       min: 50,
       max: 200,
       reset: { value: 100, label: 'Reset to 100%' },
+    });
+  });
+
+  it('takes an exact Pitch in whole semitones, from −12 to +12, starting at the Clip’s, with a reset to 0', () => {
+    const entry = clipActions({ ...beatClip, pitch: -2 }, state, run).find((a) => a.label === 'Pitch')!;
+    expect('field' in entry && entry.field).toMatchObject({
+      value: -2,
+      unit: 'st',
+      step: 1,
+      min: -12,
+      max: 12,
+      reset: { value: 0, label: 'Reset to 0 st', offered: true },
+    });
+  });
+
+  it('offers each reset only while the Clip isn’t there already', () => {
+    const field = (label: string) => {
+      const entry = clipActions(beatClip, state, run).find((a) => a.label === label)!;
+      return 'field' in entry ? entry.field : null;
+    };
+    expect(field('Tempo')?.reset?.offered).toBe(false);
+    expect(field('Pitch')?.reset?.offered).toBe(false);
+  });
+
+  it('turns Retake off, saying why, while the Clip’s Pitch isn’t 0', () => {
+    expect(clipActions({ ...oneTake, pitch: 2 }, state, run).find((a) => a.label === 'Retake')).toMatchObject({
+      disabled: true,
+      title: 'Set the Pitch back to 0 to retake this Clip',
+    });
+    expect(
+      clipActions({ ...oneTake, tempo: 0.8, pitch: 2 }, state, run).find((a) => a.label === 'Retake'),
+    ).toMatchObject({
+      disabled: true,
+      title: 'Set the Tempo back to 100% and the Pitch to 0 to retake this Clip',
     });
   });
 
@@ -285,9 +330,13 @@ group('selectionActions', () => {
     mergeClips: () => {},
     deleteClips: () => {},
     setTempo: () => {},
+    setPitch: () => {},
   };
   const state = {
     tempo: 1,
+    pitch: 0,
+    tempoChanged: false,
+    pitchChanged: false,
     frozen: null,
     copyKeys: 'Ctrl+C',
     cutKeys: 'Ctrl+X',
@@ -298,11 +347,27 @@ group('selectionActions', () => {
   const labels = (count: number) => selectionActions(count, run, state).map((a) => a.label);
 
   it('offers copying, cutting, duplicating, splitting and deleting every selected Clip, naming how many it duplicates and deletes', () => {
-    expect(labels(3)).toEqual(['Tempo', 'Copy', 'Cut', 'Duplicate 3 Clips', 'Split at playhead', 'Delete 3 Clips']);
+    expect(labels(3)).toEqual([
+      'Tempo',
+      'Pitch',
+      'Copy',
+      'Cut',
+      'Duplicate 3 Clips',
+      'Split at playhead',
+      'Delete 3 Clips',
+    ]);
   });
 
   it('names one Clip as one', () => {
-    expect(labels(1)).toEqual(['Tempo', 'Copy', 'Cut', 'Duplicate 1 Clip', 'Split at playhead', 'Delete 1 Clip']);
+    expect(labels(1)).toEqual([
+      'Tempo',
+      'Pitch',
+      'Copy',
+      'Cut',
+      'Duplicate 1 Clip',
+      'Split at playhead',
+      'Delete 1 Clip',
+    ]);
   });
 
   it('copies, cuts, duplicates, splits, merges or deletes them when picked', () => {
@@ -317,6 +382,7 @@ group('selectionActions', () => {
         mergeClips: () => picked.push('merge'),
         deleteClips: () => picked.push('delete'),
         setTempo: (percent) => picked.push(`tempo ${percent}`),
+        setPitch: (semitones) => picked.push(`pitch ${semitones}`),
       },
       { ...state, canMerge: true },
     );
@@ -324,12 +390,13 @@ group('selectionActions', () => {
       if ('run' in entry) entry.run();
       else if ('field' in entry) entry.field.set(80);
     }
-    expect(picked).toEqual(['tempo 80', 'copy', 'cut', 'duplicate', 'split', 'merge', 'delete']);
+    expect(picked).toEqual(['tempo 80', 'pitch 80', 'copy', 'cut', 'duplicate', 'split', 'merge', 'delete']);
   });
 
   it('offers merging them only where they can be merged', () => {
     expect(selectionActions(2, run, { ...state, canMerge: true }).map((a) => a.label)).toEqual([
       'Tempo',
+      'Pitch',
       'Copy',
       'Cut',
       'Duplicate 2 Clips',
@@ -343,6 +410,7 @@ group('selectionActions', () => {
   it('names the keys that copy and cut, where there are keys to name', () => {
     expect(selectionActions(2, run, state)).toMatchObject([
       { label: 'Tempo' },
+      { label: 'Pitch' },
       { label: 'Copy', title: 'Or Ctrl+C' },
       { label: 'Cut', title: 'Or Ctrl+X' },
       { label: 'Duplicate 2 Clips' },
@@ -350,13 +418,14 @@ group('selectionActions', () => {
       { label: 'Delete 2 Clips' },
     ]);
     const noKeys = selectionActions(2, run, { ...state, copyKeys: null, cutKeys: null, splitKeys: null });
-    expect(noKeys.slice(1).map((a) => a.title)).toEqual([undefined, undefined, undefined, undefined, undefined]);
+    expect(noKeys.slice(2).map((a) => a.title)).toEqual([undefined, undefined, undefined, undefined, undefined]);
   });
 
   it('turns every entry off while recording, saying why', () => {
     const hint = 'Stop recording to edit';
     expect(selectionActions(2, run, { ...state, frozen: 'recording' })).toMatchObject([
       { label: 'Tempo', disabled: true, title: hint },
+      { label: 'Pitch', disabled: true, title: hint },
       { label: 'Copy', disabled: true, title: hint },
       { label: 'Cut', disabled: true, title: hint },
       { label: 'Duplicate 2 Clips', disabled: true, title: hint },
@@ -368,6 +437,26 @@ group('selectionActions', () => {
   it('sets the Tempo of every one of them, starting at the Tempo of the Clip it opened on', () => {
     const entry = selectionActions(2, run, { ...state, tempo: 1.5 }).find((a) => a.label === 'Tempo')!;
     expect('field' in entry && entry.field).toMatchObject({ value: 150, unit: '%', min: 50, max: 200 });
+  });
+
+  it('sets the Pitch of every one of them, starting at the Pitch of the Clip it opened on', () => {
+    const entry = selectionActions(2, run, { ...state, pitch: 3 }).find((a) => a.label === 'Pitch')!;
+    expect('field' in entry && entry.field).toMatchObject({ value: 3, unit: 'st', min: -12, max: 12 });
+  });
+
+  it('offers each reset while any of them is changed, whichever Clip it opened on', () => {
+    const resets = (changed: { tempoChanged: boolean; pitchChanged: boolean }) =>
+      selectionActions(2, run, { ...state, ...changed }).flatMap((a) =>
+        'field' in a ? [[a.label, a.field.reset?.offered]] : [],
+      );
+    expect(resets({ tempoChanged: true, pitchChanged: false })).toEqual([
+      ['Tempo', true],
+      ['Pitch', false],
+    ]);
+    expect(resets({ tempoChanged: false, pitchChanged: true })).toEqual([
+      ['Tempo', false],
+      ['Pitch', true],
+    ]);
   });
 
   it('turns Split at playhead off, saying why, while the playhead crosses none of them', () => {

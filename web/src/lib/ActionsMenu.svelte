@@ -181,9 +181,11 @@
     if (value !== field.value) field.set(value);
   }
 
-  // Its reset goes away once it's used, so focus goes back to the field.
+  // Set even where the field shows it already, as it may set several,
+  // e.g. the Selection's Clips. Its reset goes away once it's used, so
+  // focus goes back to the field.
   function resetField(value: number) {
-    setField(value);
+    field?.set(value);
     input?.focus();
   }
 
@@ -295,8 +297,8 @@
             />
             {field.unit}
           </label>
-          <!-- Back to where it started out, e.g. a Tempo's 100%, while it's anything else. -->
-          {#if field.reset && field.value !== field.reset.value}
+          <!-- Back to where it started out, e.g. a Tempo's 100%, while there's anything to set back. -->
+          {#if field.reset?.offered}
             {@const reset = field.reset}
             <button type="button" role="menuitem" tabindex="-1" onclick={() => resetField(reset.value)}>
               <span class="entry-icon" aria-hidden="true"><RotateCcw /></span>

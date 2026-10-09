@@ -78,6 +78,8 @@ Every song has a timeline: its beat, your takes and any other audio, laid out on
 10. **A beat**: drag it to move it, or its ends to trim it. The file itself is never changed.
 11. **A take**, selected. Its **⋯** menu records it again or picks another take, see [Record](#record).
 
+A clip's **⋯** menu sets its **tempo** and **pitch**, each on its own or both together: slow a beat down to write over it, or move it a couple of semitones to suit your voice. Select several clips to change them all at once. The file itself is never changed, so you can always set them again, or reset them.
+
 Zoom in with Ctrl and the scroll wheel, or by pinching.
 
 ## Sync
@@ -102,7 +104,7 @@ Sing over your beat, right in the browser, in full quality.
 <img src="@screenshots/recording-settings-labelled.png" alt="Recording settings, numbered 4 to 6 to match the list below it">
 </div>
 
-1. **Retake**: record the part again. Every take is kept.
+1. **Retake**: record the part again. Every take is kept. If you've changed the clip's tempo or pitch, reset them first.
 2. **Takes**: choose the take the song plays.
 3. **Nudge**: shift a take by a few milliseconds, so it sits on the beat.
 4. **Input**: your microphone or audio interface, and its channel. Each device remembers its own.

@@ -286,6 +286,7 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("POST /api/songs/{id}/timeline/clips/merge", a.mergeClips)
 	mux.HandleFunc("POST /api/songs/{id}/timeline/clips/replace", a.replaceClips)
 	mux.HandleFunc("POST /api/songs/{id}/timeline/clips/split", a.splitClips)
+	mux.HandleFunc("POST /api/songs/{id}/timeline/clips/pitch", a.setClipPitches)
 	mux.HandleFunc("POST /api/songs/{id}/timeline/clips/tempo", a.setClipTempos)
 	mux.HandleFunc("POST /api/songs/{id}/timeline/clips/{clipID}/move", a.moveClip)
 	mux.HandleFunc("POST /api/songs/{id}/timeline/clips/{clipID}/trim", a.trimClip)

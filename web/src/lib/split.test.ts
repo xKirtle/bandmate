@@ -9,6 +9,7 @@ const clip = (id: number, start: number, length = 10): Clip => ({
   name: null,
   gain: 0,
   tempo: 1,
+  pitch: 0,
   fadeIn: 0,
   fadeOut: 0,
   takes: [],

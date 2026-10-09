@@ -15,6 +15,7 @@ const beatClip = (id: number, start: number, end: number): Clip => ({
   name: null,
   gain: 0,
   tempo: 1,
+  pitch: 0,
   fadeIn: 0,
   fadeOut: 0,
   takes: [],
@@ -760,6 +761,34 @@ describe('Timeline editing, a Clip’s Gain and Fades as shown', () => {
 });
 
 describe('Timeline editing, undo and redo', () => {
+  it('sets the Pitch of several Clips as one step, undone together, leaving their lengths', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { editing } = await editingFor(server);
+    await editing.edit({
+      kind: 'setClipPitches',
+      pitches: [
+        { clipId: 1, pitch: -2 },
+        { clipId: 2, pitch: -2 },
+      ],
+    });
+    const pitches = () => server.timeline.tracks[0].clips.map((c) => [c.start, c.length, c.pitch]);
+    expect(pitches()).toEqual([
+      [0, 10, -2],
+      [20, 10, -2],
+    ]);
+
+    await editing.undo();
+    expect(pitches()).toEqual([
+      [0, 10, 0],
+      [20, 10, 0],
+    ]);
+    await editing.redo();
+    expect(pitches()).toEqual([
+      [0, 10, -2],
+      [20, 10, -2],
+    ]);
+  });
+
   it('sets the Tempo of several Clips as one step, undone together', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
     const { editing } = await editingFor(server);

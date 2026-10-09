@@ -25,6 +25,7 @@ const takeClip = (id: number, start: number, length: number, takeId = id * 10): 
   name: null,
   gain: 0,
   tempo: 1,
+  pitch: 0,
   fadeIn: 0,
   fadeOut: 0,
   takes: [
