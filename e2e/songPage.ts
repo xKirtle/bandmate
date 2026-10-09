@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page } from '@playwright/test';
+import { expect, type CDPSession, type Locator, type Page } from '@playwright/test';
 import type { Bandmate, Clip, Song } from './bandmate';
 
 // The Song page, as its tests find it: the Timeline and its Clips, the Lyric
@@ -112,6 +112,24 @@ export async function drag(page: Page, from: Point, by: Point) {
 /** Drags from one point on the page to another. */
 export async function dragTo(page: Page, from: Point, to: Point) {
   await drag(page, from, { x: to.x - from.x, y: to.y - from.y });
+}
+
+/** A finger touching the screen: where it is, and which finger, 0 unless said. */
+export interface Finger extends Point {
+  id?: number;
+}
+
+/**
+ * Sends touches as the browser's own touch events: fingers put down or moved
+ * to points, or lifted. A lift lifts the fingers given, or every finger if
+ * none is. Playwright's touchscreen only taps, so a finger held and dragged
+ * is sent this way.
+ */
+export async function touch(cdp: CDPSession, type: 'touchStart' | 'touchMove' | 'touchEnd', ...fingers: Finger[]) {
+  await cdp.send('Input.dispatchTouchEvent', {
+    type,
+    touchPoints: fingers.map(({ x, y, id = 0 }) => ({ x, y, id })),
+  });
 }
 
 /** The middle of something on screen. */
