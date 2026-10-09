@@ -70,6 +70,11 @@ export class CaptureError extends Error {}
 // How many channels to ask an input for: as many as it has, up to this.
 const wantedChannels = 8;
 
+// Hears each input opened: Firefox names every input once one is, firing no
+// event as it does, so they're told again then.
+const inputsOpened = new EventTarget();
+const opened = 'open';
+
 /** An input opened, with which of its channels is used. */
 export interface OpenInput {
   stream: MediaStream;
@@ -121,6 +126,7 @@ export async function openInput(choice: InputChoice): Promise<OpenInput> {
   const devices = await listInputs();
   const { channel, gone } = resolveInput(fellBack ? [] : devices, choice, channels);
   const input = inputRecorded(devices, { ...choice, deviceId: gone ? '' : choice.deviceId, channel }, settings);
+  inputsOpened.dispatchEvent(new Event(opened));
   return { stream, channels, channel, gone, input };
 }
 
@@ -144,14 +150,15 @@ export async function whichInput(choice: InputChoice): Promise<InputChoice | nul
 }
 
 /**
- * Calls back as audio inputs come and go, and as the browser allows or
- * blocks the microphone, which changes what it says of them; returns what
- * stops it.
+ * Calls back as audio inputs come and go, as the browser allows or blocks
+ * the microphone, and as an input opens, each of which can change what it
+ * says of them; returns what stops it.
  */
 export function watchInputs(changed: () => void): () => void {
   let live = true;
   const devices = navigator.mediaDevices;
   devices?.addEventListener('devicechange', changed);
+  inputsOpened.addEventListener(opened, changed);
   let permission: PermissionStatus | undefined;
   navigator.permissions
     ?.query({ name: 'microphone' as PermissionName })
@@ -164,6 +171,7 @@ export function watchInputs(changed: () => void): () => void {
   return () => {
     live = false;
     devices?.removeEventListener('devicechange', changed);
+    inputsOpened.removeEventListener(opened, changed);
     permission?.removeEventListener('change', changed);
   };
 }
