@@ -6,7 +6,6 @@ import {
   Measuring,
   minHits,
   offsetChange,
-  offsetSummary,
   readingOf,
   typedOffset,
   verdict,
@@ -148,6 +147,15 @@ describe('Measuring', () => {
     expect(whole.reading.counted).toBe(12);
   });
 
+  it('counts each click played once its window has been heard, though nothing was', () => {
+    const samples = recording(length, []);
+    const measuring = new Measuring(rate);
+    expect(measuring.hear(samples.subarray(0, heardTo(4)), 0)).toBe(true);
+    expect(measuring.reading).toMatchObject({ clicks: 5, taps: [], counted: 0 });
+    measuring.hear(samples.subarray(heardTo(4)), heardTo(4));
+    expect(measuring.reading.clicks).toBe(clicks.length);
+  });
+
   it('leaves taps far from the rest out of the average, keeping them in order', () => {
     const claps = heard(0.04);
     claps[1] = clicks[1] + 0.25;
@@ -213,16 +221,31 @@ describe('verdict', () => {
     expect(verdict(readingOf(loose(24, 0.024)))).toMatchObject({ finished: true, progress: 1 });
   });
 
-  it('finishes at 40 taps heard, though fewer count and their average is not yet precise', () => {
+  it('finishes at 40 clicks played, whatever was heard', () => {
     // Half the taps 180 or 220 ms late, and half far off them, at 0 or 400 ms.
     const scattered = (n: number) => Array.from({ length: n }, (_, i) => [0, 0.18, 0.22, 0.4][i % 4]);
     expect(verdict(readingOf(scattered(39)))).toMatchObject({ usable: true, finished: false });
     expect(verdict(readingOf(scattered(40)))).toMatchObject({ finished: true, progress: 1 });
     expect(readingOf(scattered(40)).counted).toBe(20);
+    // The mic heard nothing, or too little to measure.
+    expect(verdict(readingOf([], 39))).toMatchObject({ usable: false, finished: false });
+    expect(verdict(readingOf([], 40))).toMatchObject({
+      usable: false,
+      finished: true,
+      progress: 1,
+      heardEnough: false,
+    });
+    expect(verdict(readingOf(loose(5, 0.01), 40))).toMatchObject({ usable: false, finished: true, heardEnough: false });
+    // Heard enough, but too few agreed.
+    const disagreeing = [0, 0.2, 0.4, 0.2, 0, 0.4];
+    expect(verdict(readingOf(disagreeing, 40))).toMatchObject({ usable: false, finished: true, heardEnough: true });
+    // Enough agreed, though most clicks went unheard.
+    expect(verdict(readingOf(loose(7, 0.02), 40))).toMatchObject({ usable: true, finished: true });
   });
 
   it('shows how near it is to finishing, by whichever bound is nearest', () => {
     expect(verdict(readingOf([])).progress).toBe(0);
+    expect(verdict(readingOf([], 20)).progress).toBeCloseTo(0.5, 6);
     expect(verdict(readingOf(loose(12, 0.04))).progress).toBeCloseTo(0.5, 6);
     expect(verdict(readingOf(loose(20, 0.04))).progress).toBeCloseTo(20 / 24, 6);
   });
@@ -242,17 +265,6 @@ describe('appliedOffset', () => {
     expect(appliedOffset({ offset: 0.031, offered: true }, 0.012)).toBe(0.031);
     expect(appliedOffset({ offset: 0, offered: true }, 0.012)).toBe(0);
     expect(appliedOffset({ offset: null, offered: true }, 0.012)).toBe(0.012);
-  });
-});
-
-describe('offsetSummary', () => {
-  it('is the offset calibrated, in whole milliseconds', () => {
-    expect(offsetSummary(0.0123)).toBe('12 ms, calibrated');
-    expect(offsetSummary(0)).toBe('0 ms, calibrated');
-  });
-
-  it('says so until calibrated', () => {
-    expect(offsetSummary(null)).toBe('Not calibrated');
   });
 });
 
