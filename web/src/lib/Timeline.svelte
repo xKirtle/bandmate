@@ -10,11 +10,9 @@
   import Pencil from '@lucide/svelte/icons/pencil';
   import Play from '@lucide/svelte/icons/play';
   import Plus from '@lucide/svelte/icons/plus';
-  import Redo2 from '@lucide/svelte/icons/redo-2';
   import SkipBack from '@lucide/svelte/icons/skip-back';
   import SkipForward from '@lucide/svelte/icons/skip-forward';
   import Square from '@lucide/svelte/icons/square';
-  import Undo2 from '@lucide/svelte/icons/undo-2';
   import X from '@lucide/svelte/icons/x';
   import { onDestroy, onMount, tick, untrack } from 'svelte';
   import { MediaQuery, SvelteSet } from 'svelte/reactivity';
@@ -76,7 +74,7 @@
   import { prepareUpload } from './upload';
   import { formatDuration } from './time';
   import { tracksDropped, type TrackDrop } from './trackDrag';
-  import { foldCount, transportActions, type TransportAction } from './transportMenu';
+  import { foldedActions, transportActions, type TransportAction } from './transportMenu';
   import { TrackDragging } from './trackDragging.svelte';
   import InputPicker from './InputPicker.svelte';
   import CalibrationSheet from './CalibrationSheet.svelte';
@@ -721,6 +719,14 @@
         merging: freeze === 'merging',
         chosenTrack: timeline.tracks.find((t) => t.id === chosen)?.name ?? 'the Chosen Track',
         hasClips: clips.length > 0,
+        undo: {
+          can: saves.canUndo && !frozen,
+          title: editHint(freeze, hints.withKeys('Undo', shortcuts.undo.keys)),
+        },
+        redo: {
+          can: saves.canRedo && !frozen,
+          title: editHint(freeze, hints.withKeys('Redo', shortcuts.redo.keys)),
+        },
       },
       {
         importAudio: () => importInput.click(),
@@ -728,6 +734,8 @@
         recordFrom: () => {
           if (transportMore) foldedPicker?.openBy(transportMore.triggerElement());
         },
+        undo,
+        redo,
       },
     ),
   );
@@ -735,9 +743,10 @@
   // each takes with its gap, in px, measured by `measuresRoom`.
   let actionRoom = $state(Infinity);
   let actionWidth = $state(0);
-  const folded = $derived(transportList.slice(0, foldCount(transportList.length, actionRoom, actionWidth)));
-  // Those on the row: the mic beside Record, the others after Undo and Redo.
+  const folded = $derived(foldedActions(transportList, actionRoom, actionWidth));
+  // Those on the row, Undo and Redo first, then the others, the mic last.
   const onRow = $derived(transportList.filter((a) => !folded.includes(a)));
+  const historyOnRow = $derived(onRow.filter((a) => a.key === 'undo' || a.key === 'redo'));
   const micOnRow = $derived(onRow.find((a) => a.key === 'recordFrom'));
 
   /**
@@ -1955,25 +1964,18 @@
 <svelte:window onkeydown={keydown} onpagehide={() => recorder.flush()} ondragover={refuseFiles} ondrop={refuseFiles} />
 
 {#snippet undoRedo()}
-  <span class="history edit-only">
-    <button
-      type="button"
-      class="icon"
-      onclick={undo}
-      disabled={!saves.canUndo || frozen}
-      aria-label="Undo"
-      aria-keyshortcuts={hints.aria(shortcuts.undo.keys)}
-      title={editHint(freeze, hints.withKeys('Undo', shortcuts.undo.keys))}><Undo2 /></button
-    >
-    <button
-      type="button"
-      class="icon"
-      onclick={redo}
-      disabled={!saves.canRedo || frozen}
-      aria-label="Redo"
-      aria-keyshortcuts={hints.aria(shortcuts.redo.keys)}
-      title={editHint(freeze, hints.withKeys('Redo', shortcuts.redo.keys))}><Redo2 /></button
-    >
+  <span class="history edit-only foldable">
+    {#each historyOnRow as action (action.key)}
+      <button
+        type="button"
+        class="icon"
+        onclick={action.run}
+        disabled={action.disabled}
+        aria-label={action.label}
+        aria-keyshortcuts={hints.aria(shortcuts[action.key as 'undo' | 'redo'].keys)}
+        title={action.title}><action.icon /></button
+      >
+    {/each}
   </span>
 {/snippet}
 
@@ -2085,11 +2087,6 @@
           >{#if capturing}<Square />{:else}<Circle />{/if}</span
         >{capturing ? 'Stop' : 'Record'}</button
       >
-      {#if micOnRow}
-        <span class="edit-only foldable">
-          <InputPicker disabled={micOnRow.disabled} title={micOnRow.title} />
-        </span>
-      {/if}
       <input
         class="visually-hidden"
         type="file"
@@ -2114,9 +2111,11 @@
         {@render status('Loading audio…')}
       {/if}
       <span class="spacer"></span>
-      {@render undoRedo()}
+      {#if historyOnRow.length}
+        {@render undoRedo()}
+      {/if}
       {#each onRow as action (action.key)}
-        {#if action.key !== 'recordFrom'}
+        {#if action.key === 'importAudio' || action.key === 'mixDown'}
           <button
             type="button"
             class="icon foldable"
@@ -2127,6 +2126,11 @@
           >
         {/if}
       {/each}
+      {#if micOnRow}
+        <span class="mic edit-only foldable">
+          <InputPicker disabled={micOnRow.disabled} title={micOnRow.title} />
+        </span>
+      {/if}
       {#if folded.length}
         {@const mic = folded.find((a) => a.key === 'recordFrom')}
         <span class="transport-more foldable">
@@ -3273,6 +3277,8 @@
     opacity: 0.5;
     cursor: default;
   }
+  /* Flex, so neither stands taller than the button in it, as an inline box would. */
+  .mic,
   .transport-more {
     display: inline-flex;
   }

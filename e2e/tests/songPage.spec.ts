@@ -543,7 +543,7 @@ test('a Sound imported with Import audio… goes in a new Clip after the Chosen 
 /** What the transport row offers as it shows now: on it, and folded into its ⋯. */
 async function transportShows(page: Page) {
   const row = timeline(page);
-  const names = ['Import audio…', 'Mix down…', 'Input to record from'];
+  const names = ['Import audio…', 'Mix down…', 'Input to record from', 'Undo', 'Redo'];
   const onRow: string[] = [];
   for (const name of names) if (await row.getByRole('button', { name, exact: true }).isVisible()) onRow.push(name);
   const more = row.getByRole('button', { name: 'More Timeline actions' });
@@ -555,7 +555,7 @@ async function transportShows(page: Page) {
 }
 
 /** What the transport row offers, once it offers each of its `count` actions once, as it does when it has settled. */
-async function transportOffers(page: Page, count = 3) {
+async function transportOffers(page: Page, count = 5) {
   let offers = await transportShows(page);
   await expect
     .poll(async () => {
@@ -566,7 +566,7 @@ async function transportOffers(page: Page, count = 3) {
   return offers;
 }
 
-test("the transport row's actions sit on it where there's room, and fold into its ⋯ as it narrows: Import audio first, then Mix down, then the mic", async ({
+test("the transport row's actions sit on it where there's room, and fold into its ⋯ as it narrows: Import audio first, then Mix down, then the mic, then Undo and Redo together", async ({
   page,
   bandmate,
 }) => {
@@ -574,7 +574,7 @@ test("the transport row's actions sit on it where there's room, and fold into it
   await page.goto(`/songs/${song.id}`);
   const row = timeline(page);
 
-  // Wide, all three are on the row, each saying what it does, and there's no ⋯.
+  // Wide, all five are on the row, each saying what it does, and there's no ⋯.
   await expect(row.getByRole('button', { name: 'Import audio…' })).toHaveAttribute(
     'title',
     'Import an audio file as a Sound onto Lead vox',
@@ -592,12 +592,18 @@ test("the transport row's actions sit on it where there's room, and fold into it
   for (let width = 1440; width >= 660; width -= 20) {
     await page.setViewportSize({ width, height: 900 });
     const { folded } = await transportOffers(page);
-    const order = ['Import audio…', 'Mix down…', 'Record from…'];
+    const order = ['Import audio…', 'Mix down…', 'Record from…', 'Undo', 'Redo'];
     expect(folded, `at ${width}px`).toEqual(order.slice(0, folded.length));
     if (folded.join() !== seen.at(-1)?.join()) seen.push(folded);
   }
-  // Import audio folds with Mix down, as the ⋯ takes as much room as it would alone.
-  expect(seen).toEqual([[], ['Import audio…', 'Mix down…'], ['Import audio…', 'Mix down…', 'Record from…']]);
+  // Import audio folds with Mix down, as the ⋯ takes as much room as it
+  // would alone, and Undo with Redo.
+  expect(seen).toEqual([
+    [],
+    ['Import audio…', 'Mix down…'],
+    ['Import audio…', 'Mix down…', 'Record from…'],
+    ['Import audio…', 'Mix down…', 'Record from…', 'Undo', 'Redo'],
+  ]);
 
   // A folded action does what it does on the row.
   await row.getByRole('button', { name: 'More Timeline actions' }).click();
@@ -611,7 +617,7 @@ test('held sideways, the full-screen Timeline folds its actions too, and upright
 }) => {
   const song = await heroSong(bandmate);
   const row = timeline(page);
-  // A small phone held sideways: the row on one line, too narrow for all three.
+  // A small phone held sideways: the row on one line, too narrow for all five.
   await page.setViewportSize({ width: 667, height: 375 });
   await page.goto(`/songs/${song.id}`);
   await expect(row.getByRole('button', { name: 'Play', exact: true })).toBeVisible();

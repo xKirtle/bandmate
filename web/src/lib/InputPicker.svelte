@@ -157,6 +157,10 @@
 </span>
 
 <style>
+  /* Flex, so it stands no taller than its button, as an inline box would. */
+  .input-picker {
+    display: inline-flex;
+  }
   .panel {
     width: min(22rem, calc(100vw - 2rem));
     max-height: calc(100dvh - 2rem);
