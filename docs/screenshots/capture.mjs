@@ -18,16 +18,21 @@ if (!hero)
   );
 const heroURL = `${base}/songs/${hero.id}`;
 
-const browser = await chromium.launch({
-  executablePath: process.env.CHROMIUM ?? "/usr/bin/chromium",
-  args: [
-    // The Timeline plays without a click first.
-    "--autoplay-policy=no-user-gesture-required",
-    // A fake microphone, playing a tone, for the mic button's level meter.
-    "--use-fake-device-for-media-stream",
-    "--use-fake-ui-for-media-stream",
-  ],
-});
+/** Launches Chromium, with a fake microphone playing a tone, or the audio file given. */
+function launch(micFile) {
+  return chromium.launch({
+    executablePath: process.env.CHROMIUM ?? "/usr/bin/chromium",
+    args: [
+      // The Timeline plays without a click first.
+      "--autoplay-policy=no-user-gesture-required",
+      "--use-fake-device-for-media-stream",
+      "--use-fake-ui-for-media-stream",
+      ...(micFile ? [`--use-file-for-fake-audio-capture=${micFile}`] : []),
+    ],
+  });
+}
+// Its fake microphone's tone fills the mic button's level meter.
+const browser = await launch();
 // Shot at twice the CSS pixels, so the images stay sharp on HiDPI screens.
 const desktop = {
   viewport: { width: 1440, height: 900 },
@@ -70,6 +75,54 @@ async function scrollToLyricSheet(page) {
 /** Starts the Timeline playing, from where the playhead is. */
 async function play(page) {
   await page.getByRole("button", { name: "Play", exact: true }).click();
+}
+
+/**
+ * Starts recording the page as name's frames, from Chromium's screencast,
+ * which sends a frame each time the page paints, stamped with when it
+ * painted; each frame shows until the next. Resolves to stop(), which
+ * stops it and gives the frames, each with its time on the clock.
+ */
+async function screencast(page, name) {
+  const shot = [];
+  const cdp = await page.context().newCDPSession(page);
+  cdp.on("Page.screencastFrame", ({ data, metadata, sessionId }) => {
+    const file = join(work, `${name}-${shot.length}.png`);
+    writeFileSync(file, Buffer.from(data, "base64"));
+    shot.push({ file, time: metadata.timestamp * 1000 });
+    cdp.send("Page.screencastFrameAck", { sessionId }).catch(() => {});
+  });
+  await cdp.send("Page.startScreencast", { format: "png" });
+  return async () => {
+    await cdp.send("Page.stopScreencast");
+    return shot;
+  };
+}
+
+/**
+ * Makes name.webp, an animated WebP that loops, of the frames on screen from
+ * start to end, times on the clock, at fps and width px wide.
+ */
+function animate(shot, name, { start, end, fps = 30, width = 1400 }) {
+  // From the frame on screen at the start to the last before the end.
+  const first = shot.findLastIndex(({ time }) => time <= start);
+  const frames = shot
+    .slice(Math.max(first, 0))
+    .filter(({ time }) => time < end);
+  frames[0].time = start;
+  const list = frames.map(
+    ({ file, time }, i) =>
+      `file '${file}'\nduration ${((frames[i + 1]?.time ?? end) - time) / 1000}\n`,
+  );
+  const listed = join(work, `${name}.txt`);
+  writeFileSync(listed, list.join("") + `file '${frames.at(-1).file}'\n`);
+  execFileSync("ffmpeg", [
+    ...["-y", "-loglevel", "error", "-f", "concat", "-safe", "0"],
+    ...["-i", listed],
+    ...["-vf", `fps=${fps},scale=${width}:-1:flags=lanczos`],
+    ...["-c:v", "libwebp_anim", "-lossless", "1", "-compression_level", "6"],
+    ...["-loop", "0", join(out, `${name}.webp`)],
+  ]);
 }
 
 // The hero Song in Write mode, with the Timeline open.
@@ -528,18 +581,8 @@ const phone = {
   const start = at(64);
   const end = at(71.5);
 
-  // Chromium's screencast sends a frame each time the page paints, stamped
-  // with when it painted. Each frame shows until the next.
-  const shot = [];
-  const cdp = await page.context().newCDPSession(page);
-  cdp.on("Page.screencastFrame", ({ data, metadata, sessionId }) => {
-    const file = join(work, `frame-${shot.length}.png`);
-    writeFileSync(file, Buffer.from(data, "base64"));
-    shot.push({ file, time: metadata.timestamp * 1000 });
-    cdp.send("Page.screencastFrameAck", { sessionId }).catch(() => {});
-  });
   await page.waitForTimeout(start - 500 - Date.now());
-  await cdp.send("Page.startScreencast", { format: "png" });
+  const stop = await screencast(page, "sync-mode");
 
   // Cue three Bridge Lines a bar (2.5 s) apart, from 1:05, and stop with
   // the fourth up next: once every Line is cued, the first comes up next,
@@ -549,39 +592,98 @@ const phone = {
     await page.keyboard.press("Enter");
   }
   await page.waitForTimeout(end - Date.now());
-  await cdp.send("Page.stopScreencast");
+  const shot = await stop();
   await page.context().close();
+  animate(shot, "sync-mode", { start, end });
+}
 
-  // From the frame on screen at the start to the last before the end.
-  const first = shot.findLastIndex(({ time }) => time <= start);
-  const frames = shot
-    .slice(Math.max(first, 0))
-    .filter(({ time }) => time < end);
-  frames[0].time = start;
-  const list = frames.map(
-    ({ file, time }, i) =>
-      `file '${file}'\nduration ${((frames[i + 1]?.time ?? end) - time) / 1000}\n`,
+// Calibrating an Input hands-free, from Settings → Recording, as an animated
+// WebP. Its own Chromium's fake microphone hears a click every 0.75 s, as
+// often as calibrating plays them, each a few ms off, as a real mic hears
+// them, so it measures and finishes as it would for real.
+{
+  const rate = 48000;
+  const every = 0.75;
+  // Where in each 0.75 s the click is heard: as the file plays from when
+  // the fake microphone opens, it measures about 45 ms, give or take 10.
+  const heard = 0.13;
+  const count = 40;
+  const length = Math.round(every * count * rate);
+  const jitter = Array.from(
+    { length: count },
+    () => (Math.random() - 0.5) * 0.008,
   );
-  writeFileSync(
-    join(work, "frames.txt"),
-    list.join("") + `file '${frames.at(-1).file}'\n`,
+  const wav = Buffer.alloc(44 + length * 2);
+  wav.write("RIFF", 0);
+  wav.writeUInt32LE(36 + length * 2, 4);
+  wav.write("WAVEfmt ", 8);
+  // PCM, mono, 16-bit.
+  wav.writeUInt32LE(16, 16);
+  wav.writeUInt16LE(1, 20);
+  wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(rate, 24);
+  wav.writeUInt32LE(rate * 2, 28);
+  wav.writeUInt16LE(2, 32);
+  wav.writeUInt16LE(16, 34);
+  wav.write("data", 36);
+  wav.writeUInt32LE(length * 2, 40);
+  for (let i = 0; i < length; i++) {
+    const n = Math.floor(i / rate / every);
+    const since = ((i / rate) % every) - heard - jitter[n];
+    // A short decaying 1.5 kHz click, over a little hiss.
+    const click =
+      since >= 0 && since < 0.03
+        ? Math.sin(2 * Math.PI * 1500 * since) * Math.exp(-since * 150) * 0.8
+        : 0;
+    const hiss = (Math.random() - 0.5) * 0.002;
+    wav.writeInt16LE(Math.round((click + hiss) * 32767), 44 + i * 2);
+  }
+  const clicks = join(work, "clicks.wav");
+  writeFileSync(clicks, wav);
+
+  const clicking = await launch(clicks);
+  const context = await clicking.newContext({
+    ...desktop,
+    viewport: { width: 1100, height: 800 },
+  });
+  const page = await context.newPage();
+  await page.goto(`${base}/settings`);
+  await page.waitForLoadState("networkidle");
+  const recording = page.getByRole("region", { name: "Recording" });
+  const top = (await recording.boundingBox()).y;
+  // Clear of the page's sticky heading, and short of its end, which moves
+  // up as the open sheet stops the Input's level meter, scrolling the page.
+  await page.evaluate(
+    (y) =>
+      window.scrollTo(
+        0,
+        Math.min(
+          y - 96,
+          document.documentElement.scrollHeight - innerHeight - 80,
+        ),
+      ),
+    top,
   );
-  execFileSync("ffmpeg", [
-    ...[
-      "-y",
-      "-loglevel",
-      "error",
-      "-f",
-      "concat",
-      "-safe",
-      "0",
-      "-i",
-      join(work, "frames.txt"),
-    ],
-    ...["-vf", "fps=30,scale=1400:-1:flags=lanczos"],
-    ...["-c:v", "libwebp_anim", "-lossless", "1", "-compression_level", "6"],
-    ...["-loop", "0", join(out, "sync-mode.webp")],
-  ]);
+  await page.waitForTimeout(500);
+
+  const stop = await screencast(page, "calibrating");
+  const start = Date.now();
+  await page.waitForTimeout(1500);
+  await recording
+    .getByRole("button", { name: "Calibrate", exact: true })
+    .click();
+  const sheet = page.getByRole("dialog");
+  await page.waitForTimeout(2000);
+  await sheet.getByRole("button", { name: "Start", exact: true }).click();
+  const save = sheet.getByRole("button", { name: "Save", exact: true });
+  await save.waitFor({ timeout: 40_000 });
+  await page.waitForTimeout(2500);
+  await save.click();
+  await page.waitForTimeout(2000);
+  const end = Date.now();
+  const shot = await stop();
+  await clicking.close();
+  animate(shot, "calibrating", { start, end, fps: 20, width: 1200 });
 }
 
 await browser.close();
