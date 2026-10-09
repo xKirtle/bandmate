@@ -96,3 +96,21 @@ test("on a desktop, a Backup's Restore and Download stay beside its ⋯", async 
   await demoRow(page).getByRole('button', { name: /^More actions/ }).click();
   await expect(page.getByRole('menu').getByRole('menuitem')).toHaveText(['Rename…', 'Delete…']);
 });
+
+test("at 320px, the card's buttons go under its heading, still on the right, and nothing scrolls sideways", async ({
+  page,
+  bandmate,
+}) => {
+  await bandmate.restoreDemo();
+  await page.setViewportSize({ width: 320, height: 700 });
+
+  await page.goto('/settings/backups');
+
+  const heading = (await card(page).getByRole('heading', { name: 'Backups' }).boundingBox())!;
+  const button = (await newBackup(page).boundingBox())!;
+  const edge = (await card(page).boundingBox())!;
+  expect(button.y).toBeGreaterThanOrEqual(heading.y + heading.height);
+  // Against the card's right edge, but for its padding.
+  expect(edge.x + edge.width - (button.x + button.width)).toBeLessThan(24);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+});
