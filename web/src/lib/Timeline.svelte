@@ -78,7 +78,7 @@
   import { tracksDropped, type TrackDrop } from './trackDrag';
   import { transportActions } from './transportMenu';
   import { TrackDragging } from './trackDragging.svelte';
-  import InputSettings from './InputSettings.svelte';
+  import InputPicker from './InputPicker.svelte';
   import CalibrationSheet from './CalibrationSheet.svelte';
   import MixdownDialog from './MixdownDialog.svelte';
   import { mixdownEnd } from './mixdown';
@@ -703,11 +703,8 @@
   }
 
   // The transport row's ⋯, for its occasional actions, and what they open:
-  // the file picker for Import audio…, the Mixdown dialog, and the
-  // recording settings, placed by the ⋯.
+  // the file picker for Import audio…, and the Mixdown dialog.
   let importInput: HTMLInputElement;
-  let inputSettings: InputSettings;
-  let transportMore = $state<HTMLElement>();
   let mixingDown = $state(false);
   const transportMenu = $derived(
     transportActions(
@@ -723,10 +720,6 @@
       {
         importAudio: () => importInput.click(),
         mixDown: () => (mixingDown = true),
-        // Chosen from the ⋯, so it's there to place them by.
-        recordingSettings: () => {
-          if (transportMore) inputSettings.openSettings(transportMore);
-        },
       },
     ),
   );
@@ -812,12 +805,10 @@
   // Calibration while it runs, of an Input's Latency Offset, shared by this
   // device's tabs: offered before an Input's first recording, where the
   // Clip to retake, by id, waits for it, with the latency the browser
-  // reports for the Input, to skip with; or run from the recording settings
-  // for any Input listed, exactly as that Input where it's a device's channel.
+  // reports for the Input, to skip with. Run for any Input, it's Settings'.
   let calibrating = $state<{
-    offer: { reported: number } | null;
+    offer: { reported: number };
     input: InputChoice;
-    exact?: boolean;
     retaking?: number;
   } | null>(null);
   // Whether calibration was just skipped, to say where to run it later.
@@ -2036,6 +2027,12 @@
           >{#if capturing}<Square />{:else}<Circle />{/if}</span
         >{capturing ? 'Stop' : 'Record'}</button
       >
+      <span class="edit-only">
+        <InputPicker
+          disabled={recording || !editable.current}
+          title={recording ? 'Stop recording to pick the Input to record from' : 'Pick the Input to record from'}
+        />
+      </span>
       <input
         class="visually-hidden"
         type="file"
@@ -2045,11 +2042,6 @@
         bind:this={importInput}
         onchange={importPicked}
       />
-      <InputSettings
-        bind:this={inputSettings}
-        disabled={recording || !editable.current}
-        onCalibrate={(input, exact) => (calibrating = { offer: null, input, exact })}
-      />
       <!-- On one line full-screen, cut short with the whole of it in the title. -->
       {#if recorder.phase === 'starting'}
         {@render status('Opening the microphone…')}
@@ -2058,7 +2050,7 @@
       {:else if recording && recorder.inputNote}
         {@render status(recorder.inputNote, 'input-note')}
       {:else if recording && skipped}
-        {@render status('Calibrate the latency any time from Recording settings… in the ⋯ menu.')}
+        {@render status('Calibrate the latency any time in Settings → Recording.')}
       {:else if editing.importing}
         {@render status(editing.importing)}
       {:else if playerState === 'loading'}
@@ -2066,7 +2058,7 @@
       {/if}
       <span class="spacer"></span>
       {@render undoRedo()}
-      <span class="transport-more" bind:this={transportMore}>
+      <span class="transport-more">
         <ActionsMenu label="More Timeline actions" entries={transportMenu} />
       </span>
       <button
@@ -2668,7 +2660,6 @@
 {#if calibrating}
   <CalibrationSheet
     input={calibrating.input}
-    exact={calibrating.exact}
     offer={calibrating.offer}
     onSkip={() => (skipped = true)}
     onClose={calibrationClosed}

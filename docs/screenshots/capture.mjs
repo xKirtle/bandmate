@@ -23,7 +23,7 @@ const browser = await chromium.launch({
   args: [
     // The Timeline plays without a click first.
     "--autoplay-policy=no-user-gesture-required",
-    // A fake microphone, playing a tone, for Recording settings' level meter.
+    // A fake microphone, playing a tone, for the mic button's level meter.
     "--use-fake-device-for-media-stream",
     "--use-fake-ui-for-media-stream",
   ],
@@ -296,6 +296,10 @@ async function number(page, places, { first = 1, into } = {}) {
       timeline.getByRole("button", { name: "Record", exact: true }),
       row,
     ),
+    await above(
+      timeline.getByRole("button", { name: "Input to record from" }),
+      row,
+    ),
     await above(timeline.getByRole("button", { name: "Undo" }), row),
     await above(
       timeline.getByRole("button", { name: "More Timeline actions" }),
@@ -371,42 +375,35 @@ async function number(page, places, { first = 1, into } = {}) {
   await page.context().close();
 }
 
-// Recording settings, from the Timeline's menu: the Input list, with the
-// Input recorded from open, hearing Chromium's fake microphone.
+// The mic button's popover: the Inputs to record from, the one recorded
+// from metering Chromium's fake microphone.
 {
   const page = await open(heroURL, { ...desktop, permissions: ["microphone"] });
   const timeline = page.getByRole("region", { name: "Timeline" });
-  await timeline.getByRole("button", { name: "More Timeline actions" }).click();
-  await page.getByRole("menuitem", { name: /^Recording settings/ }).click();
-  const settings = page.getByRole("dialog", { name: "Recording settings" });
-  await settings.waitFor();
+  await timeline.getByRole("button", { name: "Input to record from" }).click();
+  const picker = page.getByRole("dialog", { name: "Input to record from" });
+  await picker.waitFor();
   // Long enough for the level meter to move.
   await page.waitForTimeout(1500);
-  const chosen = settings
+  const chosen = picker
     .getByRole("listitem")
     .filter({ has: page.getByRole("radio", { checked: true }) });
-  const pill = await chosen
-    .getByRole("button", { name: /ms$|calibrated$|Skipped$/ })
-    .boundingBox();
-  const calibrate = settings.getByRole("button", { name: /^Calibrate/ });
-  // The open row's margin, past the radios, where its level and Calibrate are numbered.
-  const margin = (await leftOf(calibrate)).x;
-  const meter = await settings
-    .getByRole("meter", { name: "Level" })
-    .boundingBox();
+  const meter = picker.getByRole("meter", { name: "Level" });
+  const meterBox = await meter.boundingBox();
   await number(
     page,
     [
-      await textEnd(chosen.locator(".name")),
-      // On the Latency Offset's top-left corner.
-      { x: pill.x - 16, y: pill.y },
-      { x: margin, y: meter.y + meter.height / 2 },
-      await leftOf(calibrate),
+      await textEnd(chosen.locator(".input-name .line").first()),
+      // On the meter itself, near its end, clear of the text around it.
+      {
+        x: meterBox.x + meterBox.width - 64,
+        y: meterBox.y + meterBox.height / 2,
+      },
     ],
-    { first: 4, into: settings },
+    { first: 4, into: picker },
   );
-  const box = await settings.boundingBox();
-  await save(page, "recording-settings-labelled", {
+  const box = await picker.boundingBox();
+  await save(page, "input-picker-labelled", {
     clip: { x: box.x, y: box.y, width: box.width, height: box.height },
   });
   await page.context().close();

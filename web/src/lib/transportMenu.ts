@@ -1,12 +1,11 @@
 import type { MenuAction } from './menu';
 import Download from '@lucide/svelte/icons/download';
-import Mic from '@lucide/svelte/icons/mic';
 import Upload from '@lucide/svelte/icons/upload';
 
 // The transport row's ⋯: its occasional actions, in the order they're
-// listed. Those that edit the Timeline, or set up recording, apply only
-// where it's shown in full, so on a transport-only Timeline, e.g. an
-// upright phone, Mix down… is the only one offered.
+// listed. Import audio… edits the Timeline, so it applies only where it's
+// shown in full: on a transport-only Timeline, e.g. an upright phone,
+// Mix down… is the only one offered.
 
 /** What the Timeline is doing, which decides what the ⋯ offers. */
 export type TransportState = {
@@ -26,7 +25,6 @@ export type TransportState = {
 export type TransportRun = {
   importAudio: () => void;
   mixDown: () => void;
-  recordingSettings: () => void;
 };
 
 /** The entries of the transport row's ⋯: always at least Mix down…. */
@@ -53,14 +51,5 @@ export function transportActions(state: TransportState, run: TransportRun): Menu
     disabled: !state.hasClips || state.recording,
     run: run.mixDown,
   };
-  const recordingSettings: MenuAction = {
-    icon: Mic,
-    label: 'Recording settings…',
-    title: state.recording
-      ? 'Stop recording to change the recording settings'
-      : 'Every Input on this device, to record from, check the level of, or calibrate',
-    disabled: state.recording,
-    run: run.recordingSettings,
-  };
-  return state.fullTimeline ? [importAudio, mixDown, recordingSettings] : [mixDown];
+  return state.fullTimeline ? [importAudio, mixDown] : [mixDown];
 }

@@ -5,7 +5,7 @@
 import { formatOffset, type Calibration } from './calibration';
 import type { InputCalibration } from './inputCalibrations';
 import type { ConnectedDevice } from './capture';
-import { channelName, sameInput, type InputChoice } from './inputSettings';
+import { byDeviceThenChannel, channelName, sameInput, type InputChoice } from './inputSettings';
 
 /** An Input listed, with its name to show and its calibration. */
 export interface InputRow {
@@ -18,7 +18,7 @@ const uncalibrated: Calibration = { offset: null, offered: false };
 
 /**
  * Every Input connected, each channel of each device in the browser's
- * order, then every Input kept whose device isn't, by name. A device has
+ * order, then every Input kept whose device isn't, by device then channel. A device has
  * at least as many channels as any of its Inputs kept. Where it can't be
  * told which devices are connected (null), e.g. before the browser allows
  * the microphone, the Inputs kept are listed as connected, and the one
@@ -38,10 +38,10 @@ export function listInputs(
     };
   };
   const keptRow = ({ deviceId, label, channel }: InputCalibration) => row({ deviceId, label, channel });
-  const byName = (a: InputRow, b: InputRow) => a.name.localeCompare(b.name);
+  const byDevice = (a: InputRow, b: InputRow) => byDeviceThenChannel(a.input, b.input);
   if (devices === null) {
     const unkept = chosen && chosen.deviceId !== '' && !kept.some((k) => sameInput(k, chosen)) ? [row(chosen)] : [];
-    return { connected: [...kept.map(keptRow), ...unkept].sort(byName), notConnected: [] };
+    return { connected: [...kept.map(keptRow), ...unkept].sort(byDevice), notConnected: [] };
   }
 
   const connected = devices.flatMap(({ deviceId, label, channels }) => {
@@ -51,7 +51,7 @@ export function listInputs(
   const notConnected = kept
     .filter((k) => !devices.some((d) => d.deviceId === k.deviceId))
     .map(keptRow)
-    .sort(byName);
+    .sort(byDevice);
   return { connected, notConnected };
 }
 

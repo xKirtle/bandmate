@@ -10,9 +10,9 @@ describe('listInputs', () => {
     const { connected, notConnected } = listInputs([scarlett, laptop], []);
 
     expect(connected.map((row) => row.name)).toEqual([
-      'Scarlett 2i2 USB · Input 1',
-      'Scarlett 2i2 USB · Input 2',
-      'Built-in Microphone · Input 1',
+      'Input 1 · Scarlett 2i2 USB',
+      'Input 2 · Scarlett 2i2 USB',
+      'Input 1 · Built-in Microphone',
     ]);
     expect(connected[1].input).toEqual({ deviceId: 'scarlett', label: scarlett.label, channel: 1 });
     expect(connected.map((row) => row.calibration)).toEqual([fresh, fresh, fresh]);
@@ -38,9 +38,9 @@ describe('listInputs', () => {
     );
 
     expect(connected.map((row) => row.name)).toEqual([
-      'Built-in Microphone · Input 1',
-      'Built-in Microphone · Input 2',
-      'Built-in Microphone · Input 3',
+      'Input 1 · Built-in Microphone',
+      'Input 2 · Built-in Microphone',
+      'Input 3 · Built-in Microphone',
     ]);
     expect(statusOf(connected[2].calibration)).toBe('30 ms');
   });
@@ -55,10 +55,10 @@ describe('listInputs', () => {
       ],
     );
 
-    expect(connected.map((row) => row.name)).toEqual(['Built-in Microphone · Input 1']);
+    expect(connected.map((row) => row.name)).toEqual(['Input 1 · Built-in Microphone']);
     expect(notConnected.map((row) => [row.name, statusOf(row.calibration)])).toEqual([
-      ['Blue Yeti · Input 1', 'Skipped'],
-      ['Scarlett 2i2 USB · Input 2', '45 ms'],
+      ['Input 1 · Blue Yeti', 'Skipped'],
+      ['Input 2 · Scarlett 2i2 USB', '45 ms'],
     ]);
     expect(notConnected[1].input).toEqual({ deviceId: 'scarlett', label: scarlett.label, channel: 1 });
   });
@@ -68,7 +68,7 @@ describe('listInputs', () => {
       { deviceId: 'scarlett', label: scarlett.label, channel: 1, offset: 0.045, offered: true },
     ]);
 
-    expect(connected.map((row) => row.name)).toEqual(['Scarlett 2i2 USB · Input 2']);
+    expect(connected.map((row) => row.name)).toEqual(['Input 2 · Scarlett 2i2 USB']);
     expect(notConnected).toEqual([]);
   });
 
@@ -77,8 +77,8 @@ describe('listInputs', () => {
     const kept = [{ deviceId: 'scarlett', label: scarlett.label, channel: 1, offset: 0.045, offered: true }];
 
     expect(listInputs(null, kept, chosen).connected.map((row) => row.name)).toEqual([
-      'Built-in Microphone · Input 1',
-      'Scarlett 2i2 USB · Input 2',
+      'Input 1 · Built-in Microphone',
+      'Input 2 · Scarlett 2i2 USB',
     ]);
     expect(listInputs(null, [], { deviceId: '', label: '', channel: 0 }).connected).toEqual([]);
     expect(listInputs([scarlett], [], chosen).notConnected).toEqual([]);
