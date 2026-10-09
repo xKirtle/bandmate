@@ -173,8 +173,8 @@ func (s *Store) addTake(ctx context.Context, songID int64, based songversion.Ver
 // span, the span is taken back to where it starts, the Takes already there
 // staying where they are on the Timeline. The Clip grows to where it ends,
 // but never past the next Clip on its Track: the rest is kept, hidden, to
-// trim into view once there's room. Only a Clip at a Tempo of 100% can be
-// retaken. The file is kept if the Take is added, and discarded otherwise.
+// trim into view once there's room. Only a Clip at a Tempo of 100% and a
+// Pitch of 0 can be retaken. The file is kept if the Take is added, and discarded otherwise.
 func (s *Store) Retake(ctx context.Context, songID int64, based songversion.Version, clipID int64, c Captured, file *audio.Received) (Timeline, error) {
 	defer file.Discard()
 	take, err := readTake(file, c)
@@ -190,9 +190,12 @@ func (s *Store) Retake(ctx context.Context, songID int64, based songversion.Vers
 			return 0, domain.Invalid("only a Clip of Takes can be retaken")
 		}
 		// A Take is recorded as it's sung, so it only lines up in a Clip
-		// that plays its audio as recorded.
+		// that plays its audio as recorded, in time and in tune.
 		if p.tempo != 1 {
 			return 0, domain.Invalid("set the Clip's Tempo back to 100% to retake it")
+		}
+		if p.pitch != 0 {
+			return 0, domain.Invalid("set the Clip's Pitch back to 0 to retake it")
 		}
 		if take.end() <= p.start+tolerance {
 			return 0, errTakeTooEarly

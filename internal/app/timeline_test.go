@@ -48,6 +48,8 @@ type clip struct {
 	Gain float64 `json:"gain"`
 	// Tempo is a ratio of as recorded, 1 until it's set.
 	Tempo float64 `json:"tempo"`
+	// Pitch is in semitones, 0 until it's set.
+	Pitch float64 `json:"pitch"`
 	// FadeIn and FadeOut are in seconds, 0 until they're set.
 	FadeIn       float64 `json:"fadeIn"`
 	FadeOut      float64 `json:"fadeOut"`
