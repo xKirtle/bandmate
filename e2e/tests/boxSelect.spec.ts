@@ -1,6 +1,6 @@
-import type { CDPSession, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { expect, test } from '../fixtures';
-import { clip, dragTo, heroSong, playhead, seek, timeline, trackHead, type Point } from '../songPage';
+import { clip, dragTo, heroSong, playhead, seek, timeline, touch, trackHead, type Point } from '../songPage';
 
 // Drawing a box over Tracks to select Clips, and clicking empty space along
 // a Track, on the demo Backup's hero Song, with the mouse and with touch. Its
@@ -63,15 +63,6 @@ async function playheadX(page: Page): Promise<number> {
   const box = await timeline(page).locator('.playhead').boundingBox();
   if (!box) throw new Error("The playhead's line is not on screen");
   return box.x + box.width / 2;
-}
-
-/**
- * Sends a finger's touch as the browser's own touch event: down or moved to
- * a point, or lifted. Playwright's touchscreen only taps, so a finger held
- * and dragged is sent this way.
- */
-async function touch(cdp: CDPSession, type: 'touchStart' | 'touchMove' | 'touchEnd', at?: Point) {
-  await cdp.send('Input.dispatchTouchEvent', { type, touchPoints: at ? [{ x: at.x, y: at.y }] : [] });
 }
 
 /** Opens a Song's page, with its Timeline's Clips shown. */

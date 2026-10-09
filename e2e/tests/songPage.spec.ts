@@ -22,7 +22,9 @@ import {
   serverClips,
   serverCues,
   timeline,
+  touch,
   warnsOnLeaving,
+  type Point,
 } from '../songPage';
 
 // The Song page, and how it saves: Clips edited on the Timeline and undone,
@@ -1022,6 +1024,71 @@ test('a Track’s fader let go where it started sends nothing, so an undo of its
   await expect(fader).toHaveValue('0');
   // The undo's is the only save since.
   expect(saves).toEqual([expect.stringMatching(/^PATCH .*\/tracks\/\d+$/)]);
+});
+
+test.describe('with touch', () => {
+  test.use({ hasTouch: true });
+
+  test('a Track’s fader is let go only by the finger dragging it, not another one lifted meanwhile', async ({
+    page,
+    bandmate,
+  }) => {
+    const song = await bandmate.song({ title: 'Anthem' });
+    await page.goto(`/songs/${song.id}`);
+    const fader = timeline(page).getByRole('slider', { name: 'Volume of Track 1' });
+    const undo = timeline(page).getByRole('button', { name: 'Undo' });
+    const volume = async () => (await bandmate.timeline(song.id)).tracks[0].volume;
+    const saves: string[] = [];
+    page.on('request', (r) => r.method() !== 'GET' && saves.push(`${r.method()} ${r.url()}`));
+    // At 0 dB, the fader's thumb is in its middle.
+    const middle = await middleOf(fader);
+    // A second finger taps the Lyric Sheet's hint, which a tap leaves alone.
+    const other = { ...(await middleOf(page.getByText('No Sections here yet.'))), id: 1 };
+    const cdp = await page.context().newCDPSession(page);
+
+    /**
+     * Drags the fader with one finger from a point, `tapAt` pixels across,
+     * where another finger taps elsewhere, then on to `thenTo` pixels across
+     * from the point, and lets go.
+     */
+    async function dragWhileTapping(from: Point, tapAt: number, thenTo: number) {
+      await touch(cdp, 'touchStart', from);
+      let at = from.x;
+      for (const to of [from.x + tapAt, from.x + thenTo]) {
+        for (let step = 1; step <= 5; step++)
+          await touch(cdp, 'touchMove', { x: at + ((to - at) * step) / 5, y: from.y });
+        if (at === from.x) {
+          await touch(cdp, 'touchStart', { x: to, y: from.y }, other);
+          await touch(cdp, 'touchEnd', other);
+        }
+        at = to;
+      }
+      await touch(cdp, 'touchEnd');
+    }
+
+    // Dragged left, then further left, it sends its volume once.
+    await dragWhileTapping(middle, -20, -40);
+    await expect.poll(volume).toBeLessThan(0);
+    const dragged = String(await volume());
+    await expect(fader).toHaveValue(dragged);
+
+    // Dragged away and back, and let go where it started, it sends nothing.
+    // The browser sets a fader to where it's pressed, so pressing there again keeps it.
+    await dragWhileTapping({ x: middle.x - 40, y: middle.y }, 20, 0);
+    await expect(fader).toHaveValue(dragged);
+
+    // So one undo takes the whole first drag back, and its save and the
+    // drag's are the only ones.
+    await undo.click();
+    await expect.poll(volume).toBe(0);
+    await expect(fader).toHaveValue('0');
+    await expect(undo).toBeDisabled();
+    expect(saves).toEqual([
+      expect.stringMatching(/^PATCH .*\/tracks\/\d+$/),
+      expect.stringMatching(/^PATCH .*\/tracks\/\d+$/),
+    ]);
+    await cdp.detach();
+  });
 });
 
 test('a Track name typed and then left with Back is saved', async ({ page, bandmate }) => {

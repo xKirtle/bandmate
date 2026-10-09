@@ -368,13 +368,16 @@
   // A fader's volume is sent once it's let go (see TimelineEditing.letGoFader).
   // The browser says so with a change, but not for one let go where it
   // started, which only the pointer's release tells, so either lets go of it.
+  // Only the pointer that pressed it lets it go, not another finger lifted
+  // while it's dragged, so one drag sends one edit.
   /** Stops waiting for the fader pressed to be let go, if one is. */
   let ungrab = () => {};
 
-  function grabFader(trackId: number, fader: HTMLInputElement) {
+  function grabFader(trackId: number, fader: HTMLInputElement, pointerId: number) {
     ungrab();
     // It may be let go anywhere on the page, or the pointer lost.
-    const release = () => {
+    const release = (e: PointerEvent) => {
+      if (e.pointerId !== pointerId) return;
       ungrab();
       editing.letGoFader(trackId, Number(fader.value));
     };
@@ -2198,7 +2201,7 @@
                 title="{formatVolume(track.volume)} (double-click for 0 dB)"
                 oninput={(e) => editing.moveFader(track.id, Number(e.currentTarget.value))}
                 onchange={(e) => editing.letGoFader(track.id, Number(e.currentTarget.value))}
-                onpointerdown={(e) => grabFader(track.id, e.currentTarget)}
+                onpointerdown={(e) => grabFader(track.id, e.currentTarget, e.pointerId)}
                 ondblclick={() => setLevels(track, { volume: 0 })}
               />
             </div>
