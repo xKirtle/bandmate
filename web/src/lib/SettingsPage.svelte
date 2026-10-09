@@ -19,7 +19,9 @@
       <a href={t.href} aria-current={t.id === tab ? 'page' : undefined}>{t.label}</a>
     {/each}
   </nav>
-  {@render children()}
+  <div class="content">
+    {@render children()}
+  </div>
 </main>
 
 <style>
@@ -34,5 +36,10 @@
   .tabs {
     margin-bottom: var(--space-4);
     border-bottom: 1px solid var(--border);
+  }
+  /* Every tab's content shares one width, so switching tabs doesn't make
+     the page jump on a wide window. The header and tabs span the page. */
+  .content {
+    max-width: var(--settings-max-width);
   }
 </style>

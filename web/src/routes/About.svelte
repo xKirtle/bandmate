@@ -398,13 +398,11 @@
 </SettingsPage>
 
 <style>
-  /* Kept narrow enough not to stretch across a wide window, at the page's
-     left edge like the other pages' content. On desktop, the identity and
-     System information cards sit side by side, above the tabbed card. */
+  /* On desktop, the identity and System information cards sit side by
+     side, above the tabbed card. */
   .about {
     display: grid;
     gap: var(--space-4);
-    max-width: 64rem;
   }
   @media (min-width: 65.5rem) {
     .about {

@@ -17,6 +17,9 @@
      of a Lyric Sheet Section without its Cue gutter. */
   --side-width: 22rem;
   --side-max-width: 48rem;
+  /* The widest a Settings tab's content grows, at the page's left edge, so
+     switching tabs never changes the width. */
+  --settings-max-width: 64rem;
   /* A Song's Cover: small in lists, larger in the Song page header. */
   --cover-list: 2.75rem;
   --cover-header: 8rem;
