@@ -22,7 +22,7 @@
   import { api, type Beat, type Clip, type Song, type Timeline, type Track, type TrackChanges } from './api';
   import ActionsMenu from './ActionsMenu.svelte';
   import BeatPicker from './BeatPicker.svelte';
-  import { inputProblem } from './capture';
+  import { inputProblem, watchInputs } from './capture';
   import { chosenTrack, readChosen, storeChosen, type ChoiceEvent } from './chosenTrack';
   import { ClipDrag, type ClipGrip, type ClipMeasure, type DragAt } from './clipDrag.svelte';
   import { LoopDrag } from './loopDrag.svelte';
@@ -807,20 +807,7 @@
 
   $effect(() => {
     checkInput();
-    const devices = navigator.mediaDevices;
-    devices?.addEventListener('devicechange', checkInput);
-    let permission: PermissionStatus | undefined;
-    navigator.permissions
-      ?.query({ name: 'microphone' as PermissionName })
-      .then((status) => {
-        permission = status;
-        status.addEventListener('change', checkInput);
-      })
-      .catch(() => {});
-    return () => {
-      devices?.removeEventListener('devicechange', checkInput);
-      permission?.removeEventListener('change', checkInput);
-    };
+    return watchInputs(checkInput);
   });
 
   // Calibration while it runs, of an Input's Latency Offset, shared by this

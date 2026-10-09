@@ -383,3 +383,92 @@ test("Sync mode can't be switched on while recording, and can once it stops", as
   await expect(sync).toBeEnabled();
   await expect(sync).toHaveAttribute('aria-pressed', 'false');
 });
+
+test('Settings lists each calibrated Input, to calibrate again, whether or not chosen, or forget', async ({
+  page,
+  bandmate,
+}) => {
+  const song = await bandmate.song({ title: 'Anthem' });
+  await page.goto('/settings');
+  const [first, second] = await page.evaluate(async () =>
+    (await navigator.mediaDevices.enumerateDevices())
+      .filter((d) => d.kind === 'audioinput' && d.deviceId !== 'default')
+      .map(({ deviceId, label }) => ({ deviceId, label, channel: 0 })),
+  );
+  // The first fake input chosen; it and the second calibrated, and a
+  // Scarlett Solo's Input 2 calibrated before it was unplugged.
+  const unplugged = { deviceId: 'unplugged', label: 'Scarlett Solo USB (1235:8211)', channel: 1 };
+  await page.evaluate(
+    ({ first, second, unplugged }) => {
+      localStorage.setItem('bandmate.input', JSON.stringify(first));
+      localStorage.setItem(
+        'bandmate.latencyOffsets',
+        JSON.stringify({
+          inputs: [
+            { ...unplugged, offset: 0.045, offered: true },
+            { ...second, offset: 0.034, offered: true },
+            { ...first, offset: 0.021, offered: true },
+          ],
+          unclaimed: null,
+        }),
+      );
+    },
+    { first, second, unplugged },
+  );
+  // Which inputs the page opens, by the device asked for.
+  await page.addInitScript(() => {
+    const opened: string[] = ((window as unknown as { opened: string[] }).opened = []);
+    const open = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia = (constraints) => {
+      const audio = constraints?.audio;
+      const asked = typeof audio === 'object' ? (audio.deviceId as ConstrainDOMStringParameters)?.exact : undefined;
+      opened.push(typeof asked === 'string' ? asked : 'default');
+      return open(constraints);
+    };
+  });
+  await page.reload();
+
+  const recording = page.getByRole('region', { name: 'Recording' });
+  const offset = recording.getByRole('definition').nth(1);
+  const list = recording.getByRole('list', { name: 'Calibrated inputs' });
+  const item = (name: string) => list.getByRole('listitem').filter({ hasText: name });
+  const firstName = `${first.label} · Input 1`;
+  const secondName = `${second.label} · Input 1`;
+  // By name, with its offset, an unplugged one saying so.
+  await expect(list.getByRole('listitem')).toHaveCount(3);
+  await expect(list.getByRole('listitem').first()).toContainText(firstName);
+  await expect(item(firstName)).toContainText('21 ms');
+  await expect(item(secondName)).toContainText('34 ms');
+  await expect(item(secondName)).not.toContainText('Not connected');
+  await expect(item('Scarlett Solo USB · Input 2')).toContainText('45 ms · Not connected');
+  // Unplugged, it can't be measured, only forgotten.
+  await expect(item('Scarlett Solo USB · Input 2').getByRole('button')).toHaveText(['Forget']);
+  await expect(offset).toHaveText('21 ms, calibrated');
+
+  // Calibrating one not chosen measures it, not the one chosen.
+  await list.getByRole('button', { name: `Calibrate ${secondName} again` }).click();
+  const dialog = page.getByRole('dialog', { name: 'Calibrate the latency' });
+  await expect(dialog).toContainText(`from ${secondName} after`);
+  await dialog.getByRole('button', { name: 'Start' }).click();
+  // The fake microphone's tone has no taps to hear, so nothing is measured,
+  // but it's the second that was listened to.
+  await expect(dialog.getByRole('alert')).toContainText('No taps were heard', { timeout: 20_000 });
+  expect(await page.evaluate(() => (window as unknown as { opened: string[] }).opened)).toEqual([second.deviceId]);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(item(secondName)).toContainText('34 ms');
+  await expect(offset).toHaveText('21 ms, calibrated');
+
+  // Forgotten, an Input is uncalibrated, and offered calibration before its next recording.
+  await list.getByRole('button', { name: `Forget ${firstName}` }).click();
+  await expect(item(firstName)).toHaveCount(0);
+  await expect(offset).toHaveText('Not calibrated');
+  await list.getByRole('button', { name: 'Forget Scarlett Solo USB · Input 2' }).click();
+  await expect(list.getByRole('listitem')).toHaveCount(1);
+  await page.reload();
+  await expect(list.getByRole('listitem')).toHaveCount(1);
+
+  await open(page, song.id);
+  await recordButton(page).click();
+  await expect(calibrationOffer(page)).toContainText(`Before the first recording from ${firstName},`);
+});

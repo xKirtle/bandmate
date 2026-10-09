@@ -154,7 +154,7 @@ A Backup restores into the same version of Bandmate or a newer one. To copy ever
 
 - **This device**: what each device keeps for itself.
   - **Appearance**: three colour palettes, Terracotta (the default), Ink and Olive, each in light and dark. Follow your system's light or dark, or pick one. More palettes may come.
-  - **Recording**: your input and its calibration, as in [Record](#record).
+  - **Recording**: your input and its calibration, as in [Record](#record), and every input calibrated on this device, plugged in or not, to calibrate again or forget.
   - **Chord diagrams**: flip them for left-handed playing.
 - **Backups**: see [Backups](#backups).
 - **About**: the version you're running, what changed in it, whether a newer one is out, and the yt-dlp in use.

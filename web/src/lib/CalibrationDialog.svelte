@@ -3,7 +3,7 @@
   import { clickCount, clickTimes, formatOffset, measureOffset, type Measurement } from './calibration';
   import { Capture, CaptureError } from './capture';
   import Dialog from './Dialog.svelte';
-  import { channelName, inputName, type InputChoice } from './inputSettings';
+  import { channelName, inputName, sameInput, type InputChoice } from './inputSettings';
   import { RecordedInput } from './recordedInput.svelte';
   import { calibrations } from './sharedCalibration.svelte';
   import { audioContext } from './timelinePlayer';
@@ -13,15 +13,18 @@
   // delay found is shown, and kept for the Input it was measured on. Offered
   // before an Input's first recording, where it can be skipped, for that
   // Input, to record straight away; also run from the recording settings
-  // and Settings.
+  // and Settings, where a listed Input is measured as itself or not at all.
   let {
     input,
+    exact = false,
     offer = false,
     onSkip,
     onClose,
   }: {
     /** The Input to calibrate, as chosen: the default input is calibrated as the Input it turns out to be. */
     input: InputChoice;
+    /** Whether only that Input is measured: where it can't be opened, e.g. unplugged, the default isn't measured in its place. */
+    exact?: boolean;
     /** Whether it's offered before recording, so it can be skipped, and records once done. */
     offer?: boolean;
     /** Hears calibration skipped, to record straight away. */
@@ -32,8 +35,10 @@
 
   // The Input measured, once it's open; until then, the one it will be, where that can be told.
   let measuring = $state.raw<InputChoice | null>(null);
-  const expected = new RecordedInput(() => input);
-  const calibrated = $derived(measuring ?? expected.current);
+  const recorded = new RecordedInput(() => input);
+  // The Input it looks to measure: only ever the one given, where it's exact.
+  const expected = $derived(exact ? input : recorded.current);
+  const calibrated = $derived(measuring ?? expected);
   const name = $derived(calibrated ? channelName(calibrated.label, calibrated.channel) : inputName(input));
 
   let dialog = $state<HTMLDialogElement>();
@@ -81,7 +86,15 @@
       if (mine !== generation) return opened.close();
       capture = opened;
       // Where the browser doesn't say which Input it opened, the one it looked to be.
-      measuring = opened.opened ?? expected.current;
+      const which =
+        opened.opened ??
+        (exact && (opened.gone || opened.channel !== input.channel) ? null : $state.snapshot(expected));
+      if (exact && (!which || !sameInput(which, input))) {
+        throw new CaptureError(
+          `${name} couldn't be opened, so nothing was measured. Check its device is connected and has that input.`,
+        );
+      }
+      measuring = which;
       if (opened.opened) calibrations.opened($state.snapshot(input), opened.opened);
       // A moment on, so the first click is scheduled clear of now.
       const from = context.currentTime + 0.1;

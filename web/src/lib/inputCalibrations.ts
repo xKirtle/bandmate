@@ -12,13 +12,16 @@
 // the default input chosen, to the Input the default turns out to be.
 import type { Calibration } from './calibration';
 import { DeviceSetting, type DeviceSettingStorage } from './deviceSetting.svelte';
-import { inputKey, readInput, type InputChoice } from './inputSettings';
+import { channelName, inputKey, readInput, type InputChoice } from './inputSettings';
 
 /** An Input, by its device's id and channel, as its calibration is kept. */
 export type InputId = Pick<InputChoice, 'deviceId' | 'channel'>;
 
 /** An Input's calibration, with the device's label when it was kept. */
 export type InputCalibration = InputChoice & Calibration;
+
+/** An Input with a Latency Offset. */
+export type CalibratedInput = InputCalibration & { offset: number };
 
 /** Every Input's calibration kept on this device. */
 interface Calibrations {
@@ -134,6 +137,27 @@ export class InputCalibrations {
       inputs: [...inputs.filter((i) => !same(i, input)), { deviceId, label, channel, ...calibration }],
       unclaimed,
     });
+  }
+
+  /**
+   * Every Input with a Latency Offset on this device, connected or not, by
+   * name, each with the label its device had when calibrated: those only
+   * skipped have none to list.
+   */
+  get calibrated(): CalibratedInput[] {
+    return this.#setting.value.inputs
+      .filter((i): i is CalibratedInput => i.offset !== null)
+      .sort((a, b) => channelName(a.label, a.channel).localeCompare(channelName(b.label, b.channel)));
+  }
+
+  /** Forgets an Input's offset, so it's uncalibrated, and calibration is offered before its next recording. */
+  forget(input: InputId) {
+    const { inputs, unclaimed } = this.#setting.value;
+    const others = inputs.filter((i) => !same(i, input));
+    // While the one offset kept before waits for the default input, the
+    // Input stays, uncalibrated, so it can't take that one in its place.
+    const kept = unclaimed ? inputs.filter((i) => same(i, input)).map((i) => ({ ...i, ...uncalibrated })) : [];
+    this.#setting.set({ inputs: [...others, ...kept], unclaimed });
   }
 
   /**
