@@ -170,7 +170,6 @@
   ul {
     margin: 0;
     padding: 0;
-    border-top: 1px solid var(--border);
     list-style: none;
   }
   li {
@@ -182,6 +181,7 @@
   .name {
     flex: 1;
     min-width: 0;
+    font-size: var(--text-md);
   }
   .meter {
     /* Lined up with the name, past the radio. */
