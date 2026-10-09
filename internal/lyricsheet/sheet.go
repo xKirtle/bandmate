@@ -166,7 +166,8 @@ func query(ctx context.Context, q domain.Queryer, stmt string, args []any, row f
 }
 
 // change runs one change on a Song through songversion.Change and returns
-// the Song as committed.
+// the Song as committed. If the Song is no longer at the version the change
+// was based on, or fn fails, nothing changes.
 func (s *Store) change(ctx context.Context, songID int64, based songversion.Version, fn func(tx *sql.Tx) error) (Song, error) {
 	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges) error {
 		return fn(tx)

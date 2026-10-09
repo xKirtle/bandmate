@@ -127,8 +127,8 @@ func TestDeletingANonMainMasterKeepsTheMainOne(t *testing.T) {
 	}
 }
 
-// Deleting the main Master that fails partway, once it's deleted and while
-// another is made main, changes nothing and removes no file.
+// Deleting the main Master can fail partway: its row is gone, but making
+// another Master main fails. Then nothing changes and no file is removed.
 func TestDeletingAMasterThatFailsPartwayDeletesNothing(t *testing.T) {
 	ts := newTestServer(t)
 	s := ts.songWithMasters()

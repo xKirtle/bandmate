@@ -1540,7 +1540,9 @@ func isFree(ctx context.Context, tx *sql.Tx, clipID int64, p placement) (bool, e
 }
 
 // change runs one change to a Song's Timeline through songversion.Change
-// and returns the updated Timeline, read within the change.
+// and returns the updated Timeline, read within the change. If the Song is
+// no longer at the version the change was based on, or fn fails, nothing
+// changes.
 func (s *Store) change(ctx context.Context, songID int64, based songversion.Version, fn func(tx *sql.Tx) error) (Timeline, error) {
 	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges) error {
 		return fn(tx)
@@ -1552,7 +1554,7 @@ func (s *Store) change(ctx context.Context, songID int64, based songversion.Vers
 func (s *Store) changeWithFiles(ctx context.Context, songID int64, based songversion.Version,
 	fn func(tx *sql.Tx, changes *audio.FileChanges) error) (Timeline, error) {
 	var tl Timeline
-	err := songversion.Change(ctx, s.db, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
+	if err := songversion.Change(ctx, s.db, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) (err error) {
 		if err := fn(tx, changes); err != nil {
 			return err
 		}
@@ -1560,11 +1562,9 @@ func (s *Store) changeWithFiles(ctx context.Context, songID int64, based songver
 		if err := markUnusedSounds(ctx, tx, songID); err != nil {
 			return err
 		}
-		var err error
 		tl, err = read(ctx, tx, songID)
 		return err
-	})
-	if err != nil {
+	}); err != nil {
 		return Timeline{}, err
 	}
 	return tl, nil
