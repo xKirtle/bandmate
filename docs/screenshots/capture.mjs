@@ -389,9 +389,17 @@ async function number(page, places, { first = 1, into } = {}) {
     .getByRole("listitem")
     .filter({ has: page.getByRole("radio", { checked: true }) });
   const meter = picker.getByRole("meter", { name: "Level" });
+  const meterBox = await meter.boundingBox();
   await number(
     page,
-    [await textEnd(chosen.locator(".input-name").first()), await leftOf(meter)],
+    [
+      await textEnd(chosen.locator(".input-name .line").first()),
+      // On the meter itself, near its end, clear of the text around it.
+      {
+        x: meterBox.x + meterBox.width - 64,
+        y: meterBox.y + meterBox.height / 2,
+      },
+    ],
     { first: 4, into: picker },
   );
   const box = await picker.boundingBox();
