@@ -20,6 +20,7 @@ group('clipActions', () => {
     soundId: null,
     name: null,
     gain: 0,
+    tempo: 1,
     fadeIn: 0,
     fadeOut: 0,
     takes: [],
@@ -53,6 +54,7 @@ group('clipActions', () => {
     downloadTake: () => {},
     rename: () => {},
     setGain: () => {},
+    setTempo: () => {},
     copy: () => {},
     cut: () => {},
     duplicate: () => {},
@@ -66,6 +68,7 @@ group('clipActions', () => {
     expect(labels(beatClip)).toEqual([
       'Rename',
       'Gain',
+      'Tempo',
       'Copy',
       'Cut',
       'Duplicate',
@@ -75,6 +78,7 @@ group('clipActions', () => {
     expect(labels(soundClip)).toEqual([
       'Rename',
       'Gain',
+      'Tempo',
       'Copy',
       'Cut',
       'Duplicate',
@@ -92,6 +96,7 @@ group('clipActions', () => {
       'Download Take',
       'Rename',
       'Gain',
+      'Tempo',
       'Copy',
       'Cut',
       'Duplicate',
@@ -110,6 +115,7 @@ group('clipActions', () => {
       'Download Take',
       'Rename',
       'Gain',
+      'Tempo',
       'Copy',
       'Cut',
       'Duplicate',
@@ -129,6 +135,7 @@ group('clipActions', () => {
       downloadTake: (id) => ran.push(`download take ${id}`),
       rename: () => ran.push('rename'),
       setGain: (dB) => ran.push(`gain ${dB}`),
+      setTempo: (percent) => ran.push(`tempo ${percent}`),
       copy: () => ran.push('copy'),
       cut: () => ran.push('cut'),
       duplicate: () => ran.push('duplicate'),
@@ -151,6 +158,7 @@ group('clipActions', () => {
       'download take 11',
       'rename',
       'gain 5',
+      'tempo 5',
       'copy',
       'cut',
       'duplicate',
@@ -192,6 +200,7 @@ group('clipActions', () => {
       ['Clear inactive Takes', hint],
       ['Rename', hint],
       ['Gain', hint],
+      ['Tempo', hint],
       ['Copy', hint],
       ['Cut', hint],
       ['Duplicate', hint],
@@ -199,6 +208,7 @@ group('clipActions', () => {
       ['Delete Clip', hint],
       ['Rename', hint],
       ['Gain', hint],
+      ['Tempo', hint],
       ['Copy', hint],
       ['Cut', hint],
       ['Duplicate', hint],
@@ -212,6 +222,7 @@ group('clipActions', () => {
     expect(clipActions(beatClip, state, run)).toMatchObject([
       { label: 'Rename' },
       { label: 'Gain' },
+      { label: 'Tempo' },
       { label: 'Copy', title: 'Or Ctrl+C' },
       { label: 'Cut', title: 'Or Ctrl+X' },
       { label: 'Duplicate' },
@@ -228,6 +239,24 @@ group('clipActions', () => {
   it('takes an exact Gain in dB, from −36 to +36, starting at the Clip’s', () => {
     const entry = clipActions({ ...beatClip, gain: -4.5 }, state, run).find((a) => a.label === 'Gain')!;
     expect('field' in entry && entry.field).toMatchObject({ value: -4.5, unit: 'dB', min: -36, max: 36 });
+  });
+
+  it('takes an exact Tempo in percent, from 50% to 200%, starting at the Clip’s, with a reset to 100%', () => {
+    const entry = clipActions({ ...beatClip, tempo: 0.92 }, state, run).find((a) => a.label === 'Tempo')!;
+    expect('field' in entry && entry.field).toMatchObject({
+      value: 92,
+      unit: '%',
+      min: 50,
+      max: 200,
+      reset: { value: 100, label: 'Reset to 100%' },
+    });
+  });
+
+  it('turns Retake off, saying why, while the Clip’s Tempo isn’t 100%', () => {
+    expect(clipActions({ ...oneTake, tempo: 0.8 }, state, run).find((a) => a.label === 'Retake')).toMatchObject({
+      disabled: true,
+      title: 'Set the Tempo back to 100% to retake this Clip',
+    });
   });
 
   it('leaves every entry on while not recording', () => {
@@ -255,8 +284,10 @@ group('selectionActions', () => {
     splitClips: () => {},
     mergeClips: () => {},
     deleteClips: () => {},
+    setTempo: () => {},
   };
   const state = {
+    tempo: 1,
     frozen: null,
     copyKeys: 'Ctrl+C',
     cutKeys: 'Ctrl+X',
@@ -267,11 +298,11 @@ group('selectionActions', () => {
   const labels = (count: number) => selectionActions(count, run, state).map((a) => a.label);
 
   it('offers copying, cutting, duplicating, splitting and deleting every selected Clip, naming how many it duplicates and deletes', () => {
-    expect(labels(3)).toEqual(['Copy', 'Cut', 'Duplicate 3 Clips', 'Split at playhead', 'Delete 3 Clips']);
+    expect(labels(3)).toEqual(['Tempo', 'Copy', 'Cut', 'Duplicate 3 Clips', 'Split at playhead', 'Delete 3 Clips']);
   });
 
   it('names one Clip as one', () => {
-    expect(labels(1)).toEqual(['Copy', 'Cut', 'Duplicate 1 Clip', 'Split at playhead', 'Delete 1 Clip']);
+    expect(labels(1)).toEqual(['Tempo', 'Copy', 'Cut', 'Duplicate 1 Clip', 'Split at playhead', 'Delete 1 Clip']);
   });
 
   it('copies, cuts, duplicates, splits, merges or deletes them when picked', () => {
@@ -285,15 +316,20 @@ group('selectionActions', () => {
         splitClips: () => picked.push('split'),
         mergeClips: () => picked.push('merge'),
         deleteClips: () => picked.push('delete'),
+        setTempo: (percent) => picked.push(`tempo ${percent}`),
       },
       { ...state, canMerge: true },
     );
-    for (const entry of entries) if ('run' in entry) entry.run();
-    expect(picked).toEqual(['copy', 'cut', 'duplicate', 'split', 'merge', 'delete']);
+    for (const entry of entries) {
+      if ('run' in entry) entry.run();
+      else if ('field' in entry) entry.field.set(80);
+    }
+    expect(picked).toEqual(['tempo 80', 'copy', 'cut', 'duplicate', 'split', 'merge', 'delete']);
   });
 
   it('offers merging them only where they can be merged', () => {
     expect(selectionActions(2, run, { ...state, canMerge: true }).map((a) => a.label)).toEqual([
+      'Tempo',
       'Copy',
       'Cut',
       'Duplicate 2 Clips',
@@ -306,6 +342,7 @@ group('selectionActions', () => {
 
   it('names the keys that copy and cut, where there are keys to name', () => {
     expect(selectionActions(2, run, state)).toMatchObject([
+      { label: 'Tempo' },
       { label: 'Copy', title: 'Or Ctrl+C' },
       { label: 'Cut', title: 'Or Ctrl+X' },
       { label: 'Duplicate 2 Clips' },
@@ -313,18 +350,24 @@ group('selectionActions', () => {
       { label: 'Delete 2 Clips' },
     ]);
     const noKeys = selectionActions(2, run, { ...state, copyKeys: null, cutKeys: null, splitKeys: null });
-    expect(noKeys.map((a) => a.title)).toEqual([undefined, undefined, undefined, undefined, undefined]);
+    expect(noKeys.slice(1).map((a) => a.title)).toEqual([undefined, undefined, undefined, undefined, undefined]);
   });
 
   it('turns every entry off while recording, saying why', () => {
     const hint = 'Stop recording to edit';
     expect(selectionActions(2, run, { ...state, frozen: 'recording' })).toMatchObject([
+      { label: 'Tempo', disabled: true, title: hint },
       { label: 'Copy', disabled: true, title: hint },
       { label: 'Cut', disabled: true, title: hint },
       { label: 'Duplicate 2 Clips', disabled: true, title: hint },
       { label: 'Split at playhead', disabled: true, title: hint },
       { label: 'Delete 2 Clips', disabled: true, title: hint },
     ]);
+  });
+
+  it('sets the Tempo of every one of them, starting at the Tempo of the Clip it opened on', () => {
+    const entry = selectionActions(2, run, { ...state, tempo: 1.5 }).find((a) => a.label === 'Tempo')!;
+    expect('field' in entry && entry.field).toMatchObject({ value: 150, unit: '%', min: 50, max: 200 });
   });
 
   it('turns Split at playhead off, saying why, while the playhead crosses none of them', () => {

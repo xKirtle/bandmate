@@ -11,6 +11,7 @@ function clip(id: number, start: number, end: number): Clip {
     soundId: null,
     name: null,
     gain: 0,
+    tempo: 1,
     fadeIn: 0,
     fadeOut: 0,
     takes: [],

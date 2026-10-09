@@ -12,6 +12,7 @@ const clip = (source: string, trackId: number, start: number, end: number): Play
   start,
   offset: 0,
   length: end - start,
+  tempo: 1,
   gainFactor: 1,
 });
 

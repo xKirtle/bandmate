@@ -18,6 +18,7 @@ function clip(id: number, start: number, end: number, take?: { nudge: number }):
     soundId: null,
     name: null,
     gain: 0,
+    tempo: 1,
     fadeIn: 0,
     fadeOut: 0,
     takes: take
@@ -299,7 +300,7 @@ describe('ClipDrag', () => {
 
       drag.move(at(12));
 
-      expect(drag.shown[0].at).toEqual({ start: 12, offset: 2, length: 8 });
+      expect(drag.shown[0].at).toEqual({ start: 12, offset: 2, length: 8, tempo: 1 });
       expect(drag.release()).toEqual({ edit: { kind: 'trimClip', clipId: 1, offset: 2, length: 8 }, moved: null });
     });
 

@@ -17,7 +17,7 @@ import { playing, type ClipSources } from './clipSource';
 import { mixdownRate, mixDown } from './mixdown';
 import { trackGains } from './mixer';
 import { peaks } from './peaks';
-import type { PlayableClip } from './timelinePlayer';
+import type { LoadClipAudio, PlayableClip } from './timelinePlayer';
 import { isFree } from './trackPlacement';
 import { encodeWav } from './wav';
 
@@ -96,7 +96,7 @@ export interface MergedAudio {
 export async function renderMerge(
   clips: readonly PlayableClip[],
   target: MergeTarget,
-  load: (source: string) => Promise<AudioBuffer>,
+  load: LoadClipAudio,
 ): Promise<MergedAudio> {
   const audio = await mixDown({
     clips,

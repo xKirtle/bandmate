@@ -1,5 +1,6 @@
 import type { Clip } from './api';
 import { maxGain, minGain } from './clipGain';
+import { maxTempo, minTempo, tempoPercent } from './clipTempo';
 import { activeTake } from './clipSource';
 import { editHint, type Freeze } from './freeze';
 import type { MenuAction } from './menu';
@@ -7,6 +8,7 @@ import CircleDot from '@lucide/svelte/icons/circle-dot';
 import Copy from '@lucide/svelte/icons/copy';
 import CopyPlus from '@lucide/svelte/icons/copy-plus';
 import Eraser from '@lucide/svelte/icons/eraser';
+import Gauge from '@lucide/svelte/icons/gauge';
 import Diff from '@lucide/svelte/icons/diff';
 import Download from '@lucide/svelte/icons/download';
 import Layers from '@lucide/svelte/icons/layers';
@@ -19,10 +21,11 @@ import X from '@lucide/svelte/icons/x';
 
 // A Clip's menu, opened by its ⋯, right-click, the Menu key, Shift+F10 or a
 // long press: its entries, in the order they're listed. Deleting a Clip,
-// setting its Gain, or choosing, nudging, deleting and clearing its Takes,
+// setting its Gain or Tempo, or choosing, nudging, deleting and clearing its Takes,
 // don't ask first: they can be undone, and a deleted Take is only detached.
 // Split at playhead is always listed, but off while the playhead crosses
-// no Clip it would split.
+// no Clip it would split. Retake is off for a Clip whose Tempo isn't 100%,
+// as a Take is recorded as it's sung.
 // While recording, the entries that edit are shown off, and only the
 // downloads run.
 
@@ -60,6 +63,8 @@ export type ClipRun = {
   rename: () => void;
   /** Sets the Clip's Gain, in dB. */
   setGain: (gain: number) => void;
+  /** Sets the Tempo of the Clip, and every other selected, in percent. */
+  setTempo: (percent: number) => void;
   /** Copies the Clip to the Clipboard. */
   copy: () => void;
   /** Copies the Clip to the Clipboard, then deletes it. */
@@ -84,6 +89,7 @@ export function clipActions(clip: Clip, state: ClipMenuState, run: ClipRun): Men
       title: 'How much louder or quieter the Clip plays, in dB; or drag its gain line',
       field: { value: clip.gain, unit: 'dB', step: 0.5, shiftStep: 3, min: minGain, max: maxGain, set: run.setGain },
     }),
+    edit(tempoAction(clip.tempo, run.setTempo)),
     ...clipboardActions(edit, state, run.copy, run.cut),
     edit({ icon: CopyPlus, label: 'Duplicate', run: run.duplicate }),
     edit(splitAction(state, 'Move the playhead into the Clip to split it', run.split)),
@@ -99,6 +105,25 @@ export function clipActions(clip: Clip, state: ClipMenuState, run: ClipRun): Men
       : []),
     edit({ icon: X, label: 'Delete Clip', run: run.deleteClip }),
   ];
+}
+
+/** The Tempo entry, typed in whole percent, starting at tempo, with a reset to 100%. */
+function tempoAction(tempo: number, set: (percent: number) => void): MenuAction {
+  return {
+    icon: Gauge,
+    label: 'Tempo',
+    title: 'How fast the Clip plays, in percent of as recorded, without changing its pitch',
+    field: {
+      value: tempoPercent(tempo),
+      unit: '%',
+      step: 1,
+      shiftStep: 10,
+      min: tempoPercent(minTempo),
+      max: tempoPercent(maxTempo),
+      reset: { value: 100, label: 'Reset to 100%' },
+      set,
+    },
+  };
 }
 
 /** Marks an entry that edits as off while frozen, saying why. */
@@ -141,6 +166,8 @@ export type SelectionRun = {
   /** Merges them into one Clip of a new Sound. */
   mergeClips: () => void;
   deleteClips: () => void;
+  /** Sets the Tempo of every one of them, in percent. */
+  setTempo: (percent: number) => void;
 };
 
 /** What the Selection menu needs to know besides how many Clips are selected. */
@@ -149,6 +176,8 @@ export type SelectionMenuState = Pick<ClipMenuState, 'frozen' | 'copyKeys' | 'cu
   canSplit: boolean;
   /** They can be merged: two or more, on any Tracks. */
   canMerge: boolean;
+  /** The Tempo of the Clip the menu opened on, as a ratio, which its Tempo entry starts at. */
+  tempo: number;
 };
 
 /**
@@ -159,6 +188,7 @@ export function selectionActions(count: number, run: SelectionRun, state: Select
   const edit = editing(state.frozen);
   const howMany = `${count} Clip${count === 1 ? '' : 's'}`;
   return [
+    edit(tempoAction(state.tempo, run.setTempo)),
     ...clipboardActions(edit, state, run.copyClips, run.cutClips),
     edit({ icon: CopyPlus, label: `Duplicate ${howMany}`, run: run.duplicateClips }),
     edit(splitAction(state, 'Move the playhead into a selected Clip to split it', run.splitClips)),
@@ -181,7 +211,17 @@ function takeActions(clip: Clip, state: ClipMenuState, run: ClipRun): MenuAction
   const several = takes.length > 1;
   return [
     ...(canRecord
-      ? [{ icon: CircleDot, label: 'Retake', title: 'Record another Take into this Clip', run: run.retake }]
+      ? [
+          clip.tempo === 1
+            ? { icon: CircleDot, label: 'Retake', title: 'Record another Take into this Clip', run: run.retake }
+            : {
+                icon: CircleDot,
+                label: 'Retake',
+                title: 'Set the Tempo back to 100% to retake this Clip',
+                disabled: true,
+                run: run.retake,
+              },
+        ]
       : []),
     ...(several
       ? [

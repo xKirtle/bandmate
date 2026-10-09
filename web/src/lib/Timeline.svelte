@@ -17,7 +17,7 @@
   import Undo2 from '@lucide/svelte/icons/undo-2';
   import X from '@lucide/svelte/icons/x';
   import { onDestroy, onMount, tick, untrack } from 'svelte';
-  import { MediaQuery } from 'svelte/reactivity';
+  import { MediaQuery, SvelteSet } from 'svelte/reactivity';
   import { innerHeight } from 'svelte/reactivity/window';
   import { api, type Beat, type Clip, type Song, type Timeline, type Track, type TrackChanges } from './api';
   import ActionsMenu from './ActionsMenu.svelte';
@@ -88,7 +88,8 @@
   import { input as chosenInput } from './sharedInput.svelte';
   import { clampHeight, defaultHeight, grownHeight, heightBounds, readHeight, storeHeight } from './timelineHeight';
   import { fullScreenQuery } from './timelineLayout';
-  import { audioContext, TimelinePlayer, type PlayableClip } from './timelinePlayer';
+  import { audioContext, clipAudioKey, TimelinePlayer, type PlayableClip } from './timelinePlayer';
+  import { stretches } from './stretch';
   import { Transport } from './transport.svelte';
   import {
     edgeSpeed,
@@ -108,6 +109,7 @@
   import { clipping, tileBars } from './liveWave';
   import { browserKeeping, capturedInput, TakeRecorder } from './takeRecorder.svelte';
   import { clampGain, formatGain, gainLineAt, heardPeak } from './clipGain';
+  import { formatTempo, tempoOf } from './clipTempo';
   import { fadeName, fitFades, formatFade, isFadeEnd, shapedPeak, type FadeEnd } from './clipFade';
 
   // The Timeline, docked under the Lyric Sheet: its Tracks and Clips, and
@@ -228,7 +230,7 @@
       },
       // Loading each source as the player does, which keeps it for playback.
       renderMerge: (before, target) =>
-        renderMerge(mergedClips(before, sources, target.clipIds), target, (s) => player.load(s)),
+        renderMerge(mergedClips(before, sources, target.clipIds), target, (c) => player.load(c)),
     },
   });
   onDestroy(() => editing.close());
@@ -287,9 +289,21 @@
   const tracksShown = $derived(!collapsed || fullScreen.current);
   const resizable = $derived(!collapsed && !fullScreen.current);
 
-  // Decode in the background, so playing can start right away.
+  // Decode, and stretch to each Clip's Tempo, in the background, so playing
+  // can start right away. A Clip whose audio is still being stretched shows
+  // it's being prepared, by its audio's key (see clipAudioKey).
+  const preparing = new SvelteSet<string>();
   $effect(() => {
-    for (const c of playable) player.load(c.source).catch(() => {});
+    for (const c of playable) {
+      const loading = player.load(c);
+      const key = clipAudioKey(c);
+      if (stretches(c) && !player.ready(c) && !untrack(() => preparing.has(key))) {
+        preparing.add(key);
+        loading.finally(() => preparing.delete(key)).catch(() => {});
+      } else {
+        loading.catch(() => {});
+      }
+    }
   });
 
   $effect(() => {
@@ -1514,9 +1528,11 @@
           splitClips: () => splitAtPlayhead(),
           mergeClips: mergeSelection,
           deleteClips: removeSelection,
+          setTempo: (percent) => setTempo(selection.ids, percent),
         },
         {
           frozen: freeze,
+          tempo: clip.tempo,
           canMerge: mergeTarget(timeline.tracks, selection.ids) !== null,
           canSplit: splitTargets(timeline.tracks, selection.ids, chosen, playheadAt()).length > 0,
           ...menuKeys(),
@@ -1545,6 +1561,7 @@
         rename: () => startClipRename(clip),
         // To the tenth, as a drag sets it.
         setGain: (gain) => editing.edit({ kind: 'setClipGain', clipId, gain: clampGain(gain) }),
+        setTempo: (percent) => setTempo(new Set([clipId]), percent),
         copy: () => copyClips(new Set([clip.id])),
         cut: () => cutClip(clip),
         duplicate: () => duplicate(clip),
@@ -1553,6 +1570,16 @@
         deleteClip: () => remove(clip),
       },
     );
+  }
+
+  /**
+   * Sets the Tempo of the Clips clipIds, from a percentage typed, as one
+   * step: those it changes, in Timeline order.
+   */
+  function setTempo(clipIds: ReadonlySet<number>, percent: number) {
+    const tempo = tempoOf(percent);
+    const tempos = clips.filter((c) => clipIds.has(c.id) && c.tempo !== tempo).map((c) => ({ clipId: c.id, tempo }));
+    if (tempos.length > 0) editing.edit({ kind: 'setClipTempos', tempos });
   }
 
   /** The keys that copy, cut and split, as the Clip and Selection menus name them. */
@@ -2309,6 +2336,10 @@
                   {@const wave = waveWindow(view, at.start, at.length)}
                   {@const title = titleOf(clip)}
                   {@const isSelected = selection.has(clip.id)}
+                  <!-- Its audio still being stretched to its Tempo, which playing waits for. -->
+                  {@const isPreparing = preparing.has(
+                    clipAudioKey({ source: sources.of(clip).audio, tempo: clip.tempo }),
+                  )}
                   {@const extent = `${formatDuration(at.start)} to ${formatDuration(at.start + at.length)}`}
                   <!-- As trimmed, so a trim being dragged shortens them to fit, as saving it will. -->
                   {@const fades = fitFades(clip, at.length)}
@@ -2330,6 +2361,8 @@
                     role="group"
                     aria-label="{title}{isSelected ? ', selected' : ''}, {extent}{clip.gain !== 0
                       ? `, ${formatGain(clip.gain)}`
+                      : ''}{clip.tempo !== 1 ? `, Tempo ${formatTempo(clip.tempo)}` : ''}{isPreparing
+                      ? ', being prepared'
                       : ''}{fades.fadeIn > 0 ? `, fade in ${formatFade(fades.fadeIn)}` : ''}{fades.fadeOut > 0
                       ? `, fade out ${formatFade(fades.fadeOut)}`
                       : ''}"
@@ -2360,6 +2393,16 @@
                       {/if}
                       {#if clip.gain !== 0}
                         <span class="clip-gain">{formatGain(clip.gain)}</span>
+                      {/if}
+                      {#if clip.tempo !== 1}
+                        <span class="clip-tempo" title="Tempo: plays at {formatTempo(clip.tempo)} of as recorded"
+                          >{formatTempo(clip.tempo)}</span
+                        >
+                      {/if}
+                      {#if isPreparing}
+                        <span class="clip-preparing" title="Stretching its audio to its Tempo; playing waits for it"
+                          >Preparing…</span
+                        >
                       {/if}
                       <span class="clip-actions clip-menu edit-only">
                         <ActionsMenu
@@ -2648,7 +2691,7 @@
     songTitle={song.title}
     end={mixdownEnd(clips)}
     loop={timeline.loop && { ...timeline.loop, on: loopOn }}
-    plan={() => ({ clips: playable, gains: trackGains(timeline.tracks), load: (source) => player.load(source) })}
+    plan={() => ({ clips: playable, gains: trackGains(timeline.tracks), load: (c) => player.load(c) })}
     onStart={() => transport.stop()}
     onClose={() => (mixingDown = false)}
   />
@@ -3472,8 +3515,11 @@
   .gain-tip.below {
     transform: translate(-50%, 20%);
   }
-  /* A Clip's Gain, when it isn't 0 dB. */
-  .clip-gain {
+  /* A Clip's Gain, when it isn't 0 dB, its Tempo, when it isn't 100%, and
+     that its audio is being stretched to its Tempo. */
+  .clip-gain,
+  .clip-tempo,
+  .clip-preparing {
     flex-shrink: 0;
     padding: 0 calc(0.25 * var(--timeline-rem));
     color: var(--text-muted);

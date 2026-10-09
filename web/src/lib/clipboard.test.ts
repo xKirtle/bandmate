@@ -8,6 +8,7 @@ const clip = (id: number, start: number, length = 10, more: Partial<Clip> = {}):
   soundId: null,
   name: null,
   gain: 0,
+  tempo: 1,
   fadeIn: 0,
   fadeOut: 0,
   takes: [],

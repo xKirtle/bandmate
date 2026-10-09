@@ -18,6 +18,7 @@ const clip = (id: number, beatId: number, name: string | null = null): Clip => (
   soundId: null,
   name,
   gain: 0,
+  tempo: 1,
   fadeIn: 0,
   fadeOut: 0,
   takes: [],
@@ -47,6 +48,7 @@ const takeClip = (id: number, takes: Take[], active = takes[0].id, name: string 
   soundId: null,
   name,
   gain: 0,
+  tempo: 1,
   fadeIn: 0,
   fadeOut: 0,
   takes,
@@ -72,6 +74,7 @@ const soundClip = (id: number, soundId: number, name: string | null = null): Cli
   soundId,
   name,
   gain: 0,
+  tempo: 1,
   fadeIn: 0,
   fadeOut: 0,
   takes: [],
@@ -142,7 +145,7 @@ describe('clipSources of Sounds', () => {
     const tl = timeline([c], [], [sound(4)]);
     expect(fileStart(c)).toBe(0);
     expect(playing(tl, clipSources(tl))).toEqual([
-      { start: 50, offset: 1, length: 4, source: '/api/songs/1/sounds/4/audio', trackId: 1, gainFactor: 1 },
+      { start: 50, offset: 1, length: 4, tempo: 1, source: '/api/songs/1/sounds/4/audio', trackId: 1, gainFactor: 1 },
     ]);
   });
 });
@@ -195,22 +198,27 @@ describe('fileStart', () => {
 
 describe('heard', () => {
   it("is a Beat Clip's placement as it is", () => {
-    expect(heard(clip(1, 7))).toEqual({ start: 5, offset: 2, length: 10 });
+    expect(heard(clip(1, 7))).toEqual({ start: 5, offset: 2, length: 10, tempo: 1 });
   });
 
   it('plays a Take from as far into its file as the Clip is trimmed', () => {
     // The Take fills the span from 0 for 12s: the Clip plays 2s to 12s of it.
-    expect(heard(takeClip(1, [take(3, { duration: 12 })]))).toEqual({ start: 30, offset: 2, length: 10 });
+    expect(heard(takeClip(1, [take(3, { duration: 12 })]))).toEqual({ start: 30, offset: 2, length: 10, tempo: 1 });
   });
 
   it('starts a Take that starts later in the span where it comes in', () => {
     // It comes in 5s into the span, 3s into the Clip, and plays to the Clip's end.
-    expect(heard(takeClip(1, [take(3, { position: 5, duration: 20 })]))).toEqual({ start: 33, offset: 0, length: 7 });
+    expect(heard(takeClip(1, [take(3, { position: 5, duration: 20 })]))).toEqual({
+      start: 33,
+      offset: 0,
+      length: 7,
+      tempo: 1,
+    });
   });
 
   it("stops a Take that ends before the Clip does, and plays its active Take's only", () => {
     const c = takeClip(1, [take(3, { duration: 20 }), take(4, { position: 1, duration: 6 })], 4);
-    expect(heard(c)).toEqual({ start: 30, offset: 1, length: 5 });
+    expect(heard(c)).toEqual({ start: 30, offset: 1, length: 5, tempo: 1 });
   });
 
   it('plays nothing of a Take trimmed out of the Clip', () => {
@@ -226,8 +234,16 @@ describe('playing', () => {
 
   it('plays what every Clip holds, from its audio, on its Track', () => {
     expect(playing(tl, clipSources(tl))).toEqual([
-      { start: 5, offset: 2, length: 10, source: '/api/beats/7/audio?v=beat-7.mp3-1000-90', trackId: 1, gainFactor: 1 },
-      { start: 30, offset: 2, length: 10, source: '/api/songs/1/takes/3/audio', trackId: 1, gainFactor: 1 },
+      {
+        start: 5,
+        offset: 2,
+        length: 10,
+        tempo: 1,
+        source: '/api/beats/7/audio?v=beat-7.mp3-1000-90',
+        trackId: 1,
+        gainFactor: 1,
+      },
+      { start: 30, offset: 2, length: 10, tempo: 1, source: '/api/songs/1/takes/3/audio', trackId: 1, gainFactor: 1 },
     ]);
   });
 

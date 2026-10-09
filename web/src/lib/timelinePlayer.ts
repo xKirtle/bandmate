@@ -1,5 +1,5 @@
-// Plays the Timeline: every Clip's audio is fetched, decoded into memory and
-// scheduled on one AudioContext, so Tracks stay sample-accurate with each
+// Plays the Timeline: every Clip's audio is fetched, decoded into memory,
+// stretched to its Tempo (see stretch.ts) and scheduled on one AudioContext, so Tracks stay sample-accurate with each
 // other (ADR 0006). Each Clip plays at its Gain, shaped by its Fades,
 // through its Track's own gain, which follows the Track's volume, mute and
 // solo live: wired by TrackMix, which a Mixdown and a Merge build their
@@ -11,9 +11,12 @@ import { sourceLength, timelineAt, timelineLength } from './clipTime';
 import { hotKept } from './hotKept';
 import { playAlone, release } from './playback';
 import { positionAt, repeats, schedule, type Loop, type Placed } from './schedule';
+import { stretch, stretches } from './stretch';
 
 /** A Clip to play, with where its source's audio is fetched from, the Track it's on, its Gain and its Fades. */
 export interface PlayableClip extends Placed {
+  /** How fast it plays its source, which its audio is stretched to. */
+  tempo: number;
   source: string;
   trackId: number;
   /** Its Gain, as a factor of its audio, applied before its Track's. */
@@ -23,6 +26,17 @@ export interface PlayableClip extends Placed {
 }
 
 export type PlayerState = 'stopped' | 'loading' | 'playing';
+
+/** What a Clip's audio is, as it plays on the Timeline: its source, stretched to its Tempo. */
+export type ClipAudio = Pick<PlayableClip, 'source' | 'tempo'>;
+
+/** Tells apart a Clip's audio as it plays, by its source and its Tempo. */
+export function clipAudioKey({ source, tempo }: ClipAudio): string {
+  return `${tempo} ${source}`;
+}
+
+/** Loads a Clip's audio as it plays on the Timeline, e.g. the player's, which keeps it for playback. */
+export type LoadClipAudio = (clip: ClipAudio) => Promise<AudioBuffer>;
 
 // One clock for the whole app, which recording captures on too. Created on
 // first use: browsers let it decode right away, and only need a user
@@ -138,7 +152,11 @@ const lookahead = 2;
 const scheduleEvery = 500;
 
 export class TimelinePlayer {
+  // Each source decoded, and each Clip's audio as it plays, stretched to its
+  // Tempo, by clipAudioKey, and those of them ready to play.
   #buffers = new Map<string, Promise<AudioBuffer>>();
+  #stretched = new Map<string, Promise<AudioBuffer>>();
+  #ready = new Set<string>();
   #nodes = new Set<AudioBufferSourceNode>();
   // Each Track's gain by id, and what applies it while playing.
   #gains = new Map<number, number>();
@@ -164,8 +182,33 @@ export class TimelinePlayer {
     return this.#state;
   }
 
-  /** Fetches and decodes a source in the background, once. */
-  load(source: string): Promise<AudioBuffer> {
+  /**
+   * Fetches and decodes a Clip's source, and stretches it to the Clip's
+   * Tempo, in the background, once for each source and Tempo.
+   */
+  load(clip: ClipAudio): Promise<AudioBuffer> {
+    const key = clipAudioKey(clip);
+    let buffer = this.#stretched.get(key);
+    if (!buffer) {
+      const decoded = this.#decode(clip.source);
+      buffer = stretches(clip) ? decoded.then((d) => stretched(d, clip.tempo)) : decoded;
+      buffer.then(
+        () => this.#ready.add(key),
+        // A failed load is tried again next time.
+        () => this.#stretched.delete(key),
+      );
+      this.#stretched.set(key, buffer);
+    }
+    return buffer;
+  }
+
+  /** Whether a Clip's audio is loaded and stretched, ready to play. */
+  ready(clip: ClipAudio): boolean {
+    return this.#ready.has(clipAudioKey(clip));
+  }
+
+  /** Fetches and decodes a source, once. */
+  #decode(source: string): Promise<AudioBuffer> {
     let buffer = this.#buffers.get(source);
     if (!buffer) {
       buffer = fetch(source)
@@ -219,7 +262,7 @@ export class TimelinePlayer {
     let buffers: AudioBuffer[];
     try {
       await resumed;
-      buffers = await Promise.all(clips.map((c) => this.load(c.source)));
+      buffers = await Promise.all(clips.map((c) => this.load(c)));
     } catch (e) {
       if (generation === this.#generation) this.#setState('stopped');
       throw e;
@@ -285,6 +328,8 @@ export class TimelinePlayer {
     this.stop();
     release(this);
     this.#buffers.clear();
+    this.#stretched.clear();
+    this.#ready.clear();
   }
 
   #silence() {
@@ -305,4 +350,17 @@ export class TimelinePlayer {
     this.#state = state;
     this.onState(state);
   }
+}
+
+/** Decoded audio stretched to play at a Tempo, as a buffer of its own. */
+async function stretched(decoded: AudioBuffer, tempo: number): Promise<AudioBuffer> {
+  const channels = Array.from({ length: decoded.numberOfChannels }, (_, i) => decoded.getChannelData(i));
+  const out = await stretch({ channels, sampleRate: decoded.sampleRate }, { tempo });
+  const buffer = new AudioBuffer({
+    numberOfChannels: out.length,
+    length: Math.max(1, out[0].length),
+    sampleRate: decoded.sampleRate,
+  });
+  out.forEach((samples, i) => buffer.copyToChannel(samples as Float32Array<ArrayBuffer>, i));
+  return buffer;
 }

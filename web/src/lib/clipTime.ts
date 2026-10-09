@@ -3,14 +3,13 @@
 // source's duration are time in its audio. It plays its audio at a rate:
 // how many seconds of its source it plays for each second of the Timeline.
 // Everything that crosses between the two goes through here, so the rate
-// is the one place a Clip's speed is decided. For now every Clip plays its
-// audio as recorded, at rate 1.
+// is the one place a Clip's speed is decided: its Tempo.
 
 import type { Placed } from './schedule';
 
 /** How many seconds of its source a Clip plays for each second of the Timeline. */
-function rate(_clip: Placed): number {
-  return 1;
+function rate(clip: Placed): number {
+  return clip.tempo ?? 1;
 }
 
 /** Where in its source a Clip is at time t on the Timeline, in seconds; before its start or past its end too. */
