@@ -540,11 +540,9 @@ test('a Sound imported with Import audio… goes in a new Clip after the Chosen 
     .toMatchObject({ soundId: imported.soundId, start: 27, length: 2 });
 });
 
-/** What the transport row offers, once it has settled: on it, and folded into its ⋯. */
-async function transportOffers(page: Page) {
+/** What the transport row offers as it shows now: on it, and folded into its ⋯. */
+async function transportShows(page: Page) {
   const row = timeline(page);
-  // Measured as it resizes, then drawn again.
-  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
   const names = ['Import audio…', 'Mix down…', 'Input to record from'];
   const onRow: string[] = [];
   for (const name of names) if (await row.getByRole('button', { name, exact: true }).isVisible()) onRow.push(name);
@@ -554,6 +552,18 @@ async function transportOffers(page: Page) {
   const folded = await page.getByRole('menu', { name: 'More Timeline actions' }).getByRole('menuitem').allTextContents();
   await page.keyboard.press('Escape');
   return { onRow, folded: folded.map((t) => t.trim()) };
+}
+
+/** What the transport row offers, once it offers each of its `count` actions once, as it does when it has settled. */
+async function transportOffers(page: Page, count = 3) {
+  let offers = await transportShows(page);
+  await expect
+    .poll(async () => {
+      offers = await transportShows(page);
+      return offers.onRow.length + offers.folded.length;
+    })
+    .toBe(count);
+  return offers;
 }
 
 test("the transport row's actions sit on it where there's room, and fold into its ⋯ as it narrows: Import audio first, then Mix down, then the mic", async ({
@@ -581,8 +591,7 @@ test("the transport row's actions sit on it where there's room, and fold into it
   const seen: string[][] = [];
   for (let width = 1440; width >= 660; width -= 20) {
     await page.setViewportSize({ width, height: 900 });
-    const { onRow, folded } = await transportOffers(page);
-    expect(onRow.length + folded.length, `at ${width}px`).toBe(3);
+    const { folded } = await transportOffers(page);
     const order = ['Import audio…', 'Mix down…', 'Record from…'];
     expect(folded, `at ${width}px`).toEqual(order.slice(0, folded.length));
     if (folded.join() !== seen.at(-1)?.join()) seen.push(folded);
@@ -606,14 +615,12 @@ test('held sideways, the full-screen Timeline folds its actions too, and upright
   await page.setViewportSize({ width: 667, height: 375 });
   await page.goto(`/songs/${song.id}`);
   await expect(row.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
-  const sideways = await transportOffers(page);
-  expect(sideways.folded.length).toBeGreaterThan(0);
-  expect(sideways.onRow.length + sideways.folded.length).toBe(3);
+  expect((await transportOffers(page)).folded.length).toBeGreaterThan(0);
 
   // Upright, the transport row alone: Mix down, and nothing to fold.
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(row.getByRole('button', { name: 'Mix down…' })).toBeVisible();
-  expect(await transportOffers(page)).toEqual({ onRow: ['Mix down…'], folded: [] });
+  expect(await transportOffers(page, 1)).toEqual({ onRow: ['Mix down…'], folded: [] });
 });
 
 test('a Clip moved over Cues offers to move them, naming how many, which moves them, and another edit withdraws the offer', async ({

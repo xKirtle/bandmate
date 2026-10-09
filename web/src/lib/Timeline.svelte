@@ -709,7 +709,7 @@
   let importInput: HTMLInputElement;
   let mixingDown = $state(false);
   // The ⋯, and the Inputs to record from, folded into it, which open by it.
-  let transportMore = $state<HTMLElement>();
+  let transportMore = $state<ActionsMenu>();
   let foldedPicker = $state<InputPicker>();
   const transportList = $derived(
     transportActions(
@@ -726,8 +726,7 @@
         importAudio: () => importInput.click(),
         mixDown: () => (mixingDown = true),
         recordFrom: () => {
-          const more = transportMore?.querySelector('button');
-          if (more) foldedPicker?.openBy(more);
+          if (transportMore) foldedPicker?.openBy(transportMore.triggerElement());
         },
       },
     ),
@@ -737,14 +736,16 @@
   let actionRoom = $state(Infinity);
   let actionWidth = $state(0);
   const folded = $derived(transportList.slice(0, foldCount(transportList.length, actionRoom, actionWidth)));
-  /** The action on the row, unless it's folded into the ⋯ or not offered. */
-  const onRow = (key: TransportAction['key']) => transportList.find((a) => a.key === key && !folded.includes(a));
+  // Those on the row: the mic beside Record, the others after Undo and Redo.
+  const onRow = $derived(transportList.filter((a) => !folded.includes(a)));
+  const micOnRow = $derived(onRow.find((a) => a.key === 'recordFrom'));
 
   /**
    * Measures the room the transport row leaves for its actions and the ⋯
    * (each `.foldable`), again as it or anything on it changes size: its
    * width, less everything else on it and the gaps between them. A message
-   * gives way, so it takes no room, and neither does the spacer.
+   * takes no room, giving way where the row is on one line and otherwise
+   * wrapping, as before, and neither does the spacer.
    */
   function measuresRoom(row: HTMLElement) {
     const measure = () => {
@@ -2084,10 +2085,9 @@
           >{#if capturing}<Square />{:else}<Circle />{/if}</span
         >{capturing ? 'Stop' : 'Record'}</button
       >
-      {#if onRow('recordFrom')}
-        {@const mic = onRow('recordFrom')!}
-        <span class="mic edit-only foldable">
-          <InputPicker disabled={recording || !editable.current} title={mic.title} />
+      {#if micOnRow}
+        <span class="edit-only foldable">
+          <InputPicker disabled={micOnRow.disabled} title={micOnRow.title} />
         </span>
       {/if}
       <input
@@ -2115,9 +2115,8 @@
       {/if}
       <span class="spacer"></span>
       {@render undoRedo()}
-      {#each ['importAudio', 'mixDown'] as const as key (key)}
-        {@const action = onRow(key)}
-        {#if action}
+      {#each onRow as action (action.key)}
+        {#if action.key !== 'recordFrom'}
           <button
             type="button"
             class="icon foldable"
@@ -2129,10 +2128,11 @@
         {/if}
       {/each}
       {#if folded.length}
-        <span class="transport-more foldable" bind:this={transportMore}>
-          <ActionsMenu label="More Timeline actions" entries={folded} />
-          {#if folded.some((a) => a.key === 'recordFrom')}
-            <InputPicker bind:this={foldedPicker} button={false} disabled={recording} />
+        {@const mic = folded.find((a) => a.key === 'recordFrom')}
+        <span class="transport-more foldable">
+          <ActionsMenu bind:this={transportMore} label="More Timeline actions" entries={folded} />
+          {#if mic}
+            <InputPicker bind:this={foldedPicker} button={false} disabled={mic.disabled} />
           {/if}
         </span>
       {/if}
@@ -3276,9 +3276,8 @@
   .transport-more {
     display: inline-flex;
   }
-  /* The mic button, and the ⋯, as big as the row's other actions. */
-  .mic :global(.icon),
-  .transport-more :global(.icon) {
+  /* The mic button, and the ⋯, from components of their own, as big as the row's other icon buttons. */
+  .transport :global(.icon) {
     width: var(--touch);
     height: var(--touch);
     border-radius: calc(0.5 * var(--timeline-rem));
