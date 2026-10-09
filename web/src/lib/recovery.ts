@@ -9,6 +9,7 @@
 // it was recorded, rather than on one holding other things. What it
 // captured stays in step with where its Clip starts.
 import type { Take } from './api';
+import { timelineAt } from './clipTime';
 import { recordingPlan, sungPastStart, type RecordingPlan } from './recording';
 import type { Placed } from './schedule';
 import { isFree } from './trackPlacement';
@@ -47,7 +48,7 @@ type PlacedClip = Placed & {
 
 /** The Timeline time each of a Clip's Takes was recorded to start at, before any nudge. */
 export function takesAt(clip: PlacedClip): { id: number; at: number }[] {
-  return clip.takes.map((t) => ({ id: t.id, at: clip.start - clip.offset + t.position - t.nudge }));
+  return clip.takes.map((t) => ({ id: t.id, at: timelineAt(clip, t.position - t.nudge) }));
 }
 
 /**

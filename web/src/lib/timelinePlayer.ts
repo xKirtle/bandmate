@@ -7,6 +7,7 @@
 // scheduled a little ahead as they come round, each starting exactly as the
 // one before ends.
 import { fadeCurves, type PlacedFades } from './clipFade';
+import { sourceLength, timelineAt, timelineLength } from './clipTime';
 import { hotKept } from './hotKept';
 import { playAlone, release } from './playback';
 import { positionAt, repeats, schedule, type Loop, type Placed } from './schedule';
@@ -53,8 +54,10 @@ export class TrackMix {
 
   /**
    * Plays part of a Clip's audio on its Track, at the Clip's Gain, shaped by
-   * its Fades: duration seconds of buffer, from `from` seconds into it,
-   * starting at context time `at`.
+   * its Fades: from `from` seconds into its source, for duration seconds of
+   * the Timeline, starting at context time `at`. Its buffer is its source's
+   * audio as the Clip plays it on the Timeline, so a second of the buffer
+   * is a second of the Timeline.
    */
   play(buffer: AudioBuffer, clip: PlayableClip, at: number, from: number, duration: number): AudioBufferSourceNode {
     const node = this.#context.createBufferSource();
@@ -69,13 +72,14 @@ export class TrackMix {
       node.connect(gain).connect(track);
       node.addEventListener('ended', () => gain.disconnect());
     }
-    node.start(at, from, duration);
+    node.start(at, timelineLength(clip, from), duration);
     return node;
   }
 
   /**
-   * Has a Clip's own gain follow its Gain and its Fades, over the duration
-   * seconds of its audio played from `from` seconds in, at context time `at`.
+   * Has a Clip's own gain follow its Gain and its Fades, over duration
+   * seconds of the Timeline, its audio played from `from` seconds in, at
+   * context time `at`.
    */
   #shape(gain: AudioParam, clip: PlayableClip, at: number, from: number, duration: number) {
     if (!clip.fades) {
@@ -83,7 +87,7 @@ export class TrackMix {
       return;
     }
     // Where on the Timeline what's played starts.
-    const t = clip.start + from - clip.offset;
+    const t = timelineAt(clip, from);
     const { initial, curves } = fadeCurves(clip.fades, t, duration);
     // A curve starting right away starts at the initial gain itself, and
     // nothing else may be set while one runs.
@@ -246,7 +250,7 @@ export class TimelinePlayer {
       if (late >= s.duration) continue;
       const buffer = buffers[clipIndex.get(s.clip)!];
       const at = this.#startedAt + s.delay + late;
-      const node = this.#mix.play(buffer, s.clip, at, s.from + late, s.duration - late);
+      const node = this.#mix.play(buffer, s.clip, at, s.from + sourceLength(s.clip, late), s.duration - late);
       // Let go of each once it's played, as a Loop keeps adding more.
       node.onended = () => {
         node.disconnect();
