@@ -59,7 +59,8 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 ## A Clip's tempo and pitch
 
 - Change the tempo or the pitch of a Clip already on the Timeline, say a Beat that's a little too fast, or in a key that doesn't suit the voice. Unlike Playback speed, it changes the Clip itself, not how the whole Timeline is heard; unlike Transpose, it moves the audio, not the Chords shown.
-- Whether tempo and pitch change separately or together, whether it's kept on the Clip like its Gain or renders new audio, which sources it works on (Beats, Sounds, Takes), and whether the Song's key and BPM follow it, are for the spec.
+- Tempo and pitch change independently: either one alone, without touching the other, or both at once.
+- Whether it's kept on the Clip like its Gain or renders new audio, which sources it works on (Beats, Sounds, Takes), and whether the Song's key and BPM follow it, are for the spec.
 
 ## Printing a Song
 
