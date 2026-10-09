@@ -4,7 +4,7 @@
 // decoded audio (ADR 0006). The stretching is a transient-aware phase
 // vocoder (@audio/stretch-transient), which keeps the attacks of drums and
 // plucks, then a resample to exactly the length the Tempo gives: it plays
-// the stretched audio faster or slower by the Pitch, which moves its pitch,
+// the stretched audio faster or slower by the Pitch, which moves its frequencies,
 // and corrects the vocoder rounding its hops to whole samples. It goes a
 // second of audio at a time, pausing between, so the page carries on
 // meanwhile.
@@ -48,7 +48,7 @@ export async function stretch(audio: DecodedAudio, how: StretchedBy, pause: Paus
   const { channels, sampleRate } = audio;
   if (!stretches(how)) return [...channels];
   // Stretched by the Pitch's ratio too, keeping its pitch, then played that
-  // much faster in the resample, which moves its pitch and leaves its length
+  // much faster in the resample, which moves its frequencies and leaves its length
   // as the Tempo has it.
   const ratio = 2 ** (how.pitch / 12);
   const factor = ratio / how.tempo;
@@ -84,9 +84,14 @@ const tableDensity = 256;
 /**
  * Samples resampled to a length, through a low-pass that keeps what's
  * squeezed in from folding back as noise when it's shortened. It pauses
- * after each `every` samples written.
+ * after each `pauseEvery` samples written.
  */
-async function resampled(samples: Float32Array, length: number, every: number, pause: Pause): Promise<Float32Array> {
+async function resampled(
+  samples: Float32Array,
+  length: number,
+  pauseEvery: number,
+  pause: Pause,
+): Promise<Float32Array> {
   if (samples.length === length || samples.length === 0) return samples;
   const step = samples.length / length;
   // Just under half the rate it's played at, so no frequency folds back.
@@ -104,7 +109,7 @@ async function resampled(samples: Float32Array, length: number, every: number, p
       sum += samples[j] * (table[k] + (table[k + 1] - table[k]) * (x - k));
     }
     out[i] = sum;
-    if ((i + 1) % every === 0) await pause();
+    if ((i + 1) % pauseEvery === 0) await pause();
   }
   return out;
 }

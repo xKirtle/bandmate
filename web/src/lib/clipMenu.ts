@@ -239,7 +239,7 @@ export function selectionActions(count: number, run: SelectionRun, state: Select
 }
 
 /** Retake's title, and off, saying what to set back, while the Clip's Tempo or Pitch is changed. */
-function retakeOff({ tempo, pitch }: Clip): { title: string; disabled?: true } {
+function retakeState({ tempo, pitch }: Clip): { title: string; disabled?: true } {
   const setBack =
     tempo !== 1 && pitch !== 0
       ? 'the Tempo back to 100% and the Pitch to 0'
@@ -271,7 +271,7 @@ function takeActions(clip: Clip, state: ClipMenuState, run: ClipRun): MenuAction
             run: run.retake,
             // A Take is recorded as it's sung, so only lines up in a Clip
             // at 100% and 0 semitones.
-            ...retakeOff(clip),
+            ...retakeState(clip),
           },
         ]
       : []),

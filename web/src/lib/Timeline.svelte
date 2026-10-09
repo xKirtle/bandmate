@@ -2356,7 +2356,7 @@
                   {@const isPreparing = preparing.has(
                     clipAudioKey({ source: sources.of(clip).audio, tempo: clip.tempo, pitch: clip.pitch }),
                   )}
-                  {@const stretched = stretchBadge(clip)}
+                  {@const badge = stretchBadge(clip)}
                   {@const extent = `${formatDuration(at.start)} to ${formatDuration(at.start + at.length)}`}
                   <!-- As trimmed, so a trim being dragged shortens them to fit, as saving it will. -->
                   {@const fades = fitFades(clip, at.length)}
@@ -2411,10 +2411,8 @@
                       {#if clip.gain !== 0}
                         <span class="clip-gain">{formatGain(clip.gain)}</span>
                       {/if}
-                      {#if stretched}
-                        <span class="clip-stretch" title="Its Tempo and Pitch, changed from as recorded"
-                          >{stretched}</span
-                        >
+                      {#if badge}
+                        <span class="clip-stretch" title="Its Tempo and Pitch, changed from as recorded">{badge}</span>
                       {/if}
                       {#if isPreparing}
                         <span
