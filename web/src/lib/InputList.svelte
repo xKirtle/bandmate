@@ -1,6 +1,14 @@
 <script lang="ts">
-  import { CaptureError, connectedDevices, identifyInput, watchInputs, type InputLevel } from './capture';
-  import { listInputs, statusOf, type ConnectedDevice, type InputRow } from './inputList';
+  import type { Calibration } from './calibration';
+  import {
+    connectedDevices,
+    identifyInput,
+    openProblem,
+    watchInputs,
+    type ConnectedDevice,
+    type InputLevel,
+  } from './capture';
+  import { listInputs, statusOf } from './inputList';
   import { channelName, deviceName, type InputChoice } from './inputSettings';
   import LevelMeter from './LevelMeter.svelte';
   import OffsetField from './OffsetField.svelte';
@@ -15,8 +23,8 @@
   // opens its row, at first the Input recorded from: only that Input is
   // open, for its level meter, and the row offers Calibrate, which never
   // changes the Input recorded from, and Type it. Then, under "Not
-  // connected", every Input kept whose device isn't, to forget. In Settings'
-  // Recording card and the Timeline's recording settings alike.
+  // connected", every Input kept whose device isn't, to forget. It leaves
+  // calibrating to whatever shows it, e.g. Settings' Recording card.
 
   let {
     metering = true,
@@ -33,6 +41,22 @@
 
   const id = $props.id();
 
+  /** A connected row: the default input, or a device's channel. */
+  interface Row {
+    /** Tells it from the others while it's listed. */
+    key: string;
+    name: string;
+    /** The Input the default input looks to be, to show under its name; null for any other. */
+    is: string | null;
+    calibration: Calibration;
+    /** The Input to choose, meter and calibrate, as chosen. */
+    input: InputChoice;
+    /** Whether it's calibrated as that Input exactly, rather than as the Input it turns out to be. */
+    exact: boolean;
+    /** Whether it's the Input recorded from. */
+    chosen: boolean;
+  }
+
   const defaultInput: InputChoice = { deviceId: '', label: '', channel: 0 };
   // The Input chosen on this device, in this tab or another.
   const choice = $derived(input.value);
@@ -40,7 +64,6 @@
   const defaultChoice = $derived(choice.deviceId === '' ? choice : defaultInput);
   // The Input the default input looks to be, and its calibration.
   const defaultRecorded = new RecordedInput(() => defaultChoice);
-  const defaultShown = $derived(defaultRecorded.calibration);
 
   // The audio devices connected, with how many channels each is known to
   // have; null while which they are can't be told. Told again as they come
@@ -49,8 +72,8 @@
   $effect(() => {
     let live = true;
     const check = async () => {
-      const listed = await connectedDevices();
-      if (live) devices = listed;
+      const found = await connectedDevices();
+      if (live) devices = found;
     };
     void check();
     const unwatch = watchInputs(check);
@@ -61,35 +84,52 @@
   });
   // How many channels a device turned out to have once opened, where the browser didn't say before.
   let learned = $state<Record<string, number>>({});
-  const rows = $derived(
+  const listed = $derived(
     listInputs(
       devices?.map((d) => ({ ...d, channels: Math.max(d.channels, learned[d.deviceId] ?? 0) })) ?? null,
       calibrations.kept,
+      choice,
     ),
   );
 
-  const key = (row: InputChoice) => `${row.deviceId} ${row.channel}`;
-  const defaultKey = 'default';
-  const chosenKey = $derived(choice.deviceId === '' ? defaultKey : key(choice));
   // The device chosen when it isn't connected, so the default input is recorded from.
   const chosenGone = $derived(
     choice.deviceId !== '' && devices !== null && !devices.some((d) => d.deviceId === choice.deviceId)
       ? deviceName(choice.label)
       : null,
   );
-  // The row opened: until one is, the Input recorded from; null, none.
-  let opened = $state<string | null | undefined>(undefined);
-  const openKey = $derived(
-    opened !== undefined ? opened : rows.connected.some((row) => key(row.input) === chosenKey) ? chosenKey : defaultKey,
-  );
+  const keyOf = (input: InputChoice) => JSON.stringify([input.deviceId, input.channel]);
+  const rows: Row[] = $derived([
+    {
+      key: 'default',
+      name: 'Default input',
+      is: defaultRecorded.current ? channelName(defaultRecorded.current.label, defaultRecorded.current.channel) : null,
+      calibration: defaultRecorded.calibration,
+      input: defaultChoice,
+      exact: false,
+      chosen: choice.deviceId === '' || chosenGone !== null,
+    },
+    ...listed.connected.map((row) => ({
+      key: keyOf(row.input),
+      name: row.name,
+      is: null,
+      calibration: row.calibration,
+      input: row.input,
+      exact: true,
+      chosen: keyOf(row.input) === keyOf(choice),
+    })),
+  ]);
+
+  // The row the user opened, by its key, or null for none; until they open
+  // one, the row of the Input recorded from is open.
+  let userOpened = $state<string | null | undefined>(undefined);
+  const openKey = $derived(userOpened !== undefined ? userOpened : (rows.find((row) => row.chosen)?.key ?? 'default'));
   // The open row's Type it, while it's shown, and why an offset typed wasn't kept.
   let typing = $state(false);
   let typeProblem = $state<string | null>(null);
-  // The Input the default input turned out to be, as metered.
-  let defaultIs = $state.raw<InputChoice | null>(null);
 
-  function open(rowKey: string) {
-    opened = openKey === rowKey ? null : rowKey;
+  function toggle(row: Row) {
+    userOpened = openKey === row.key ? null : row.key;
     typing = false;
     typeProblem = null;
   }
@@ -100,73 +140,31 @@
   }
 
   /**
-   * Keeps an offset typed for the default input as that of the Input it
-   * is, as only opening it says for sure: the one metered, or else it's
-   * opened a moment to find out.
+   * Keeps an offset typed for a row's Input, as a calibrated one is. For
+   * the default input, it's that of the Input it is, which only opening it
+   * says for sure, so it's opened a moment to find out.
    */
-  async function typeForDefault(offset: number) {
+  async function type(row: Row, offset: number) {
     typeProblem = null;
-    let which = defaultIs;
-    if (!which) {
+    const given = $state.snapshot(row.input);
+    let which: InputChoice | null = given;
+    if (!row.exact) {
       try {
-        which = await identifyInput($state.snapshot(defaultChoice));
+        which = await identifyInput(given);
       } catch (e) {
-        typeProblem = e instanceof CaptureError ? e.message : `Couldn't open the input (${(e as Error).message}).`;
+        typeProblem = openProblem(e);
         return;
       }
+      if (!which) {
+        typeProblem = "The browser didn't say which input it is, so nothing was kept.";
+        return;
+      }
+      calibrations.opened(given, which);
     }
-    if (!which) {
-      typeProblem = "The browser didn't say which input it is, so nothing was kept.";
-      return;
-    }
-    calibrations.opened($state.snapshot(defaultChoice), which);
     calibrations.keep(which, offset);
     typing = false;
   }
-
-  function typeFor(row: InputRow, offset: number) {
-    calibrations.keep(row.input, offset);
-    typing = false;
-  }
 </script>
-
-{#snippet details(
-  rowKey: string,
-  name: string,
-  offset: number | null,
-  meterInput: InputChoice,
-  onLevel: (level: InputLevel | null) => void,
-  calibrate: () => void,
-  onSet: (offset: number) => void,
-)}
-  <div class="more" id="{id}-{rowKey}">
-    {#if metering}
-      <LevelMeter input={meterInput} onOpen={onLevel} />
-    {/if}
-    <div class="actions">
-      <button type="button" class="button primary" onclick={calibrate}
-        >{offset !== null ? 'Calibrate again' : 'Calibrate'}</button
-      >
-      <button type="button" class="button" aria-expanded={typing} onclick={() => (typing = !typing)}>Type it</button>
-    </div>
-    {#if typing}
-      <OffsetField {name} {offset} {onSet} />
-      {#if typeProblem}<p class="error" role="alert">{typeProblem}</p>{/if}
-    {/if}
-  </div>
-{/snippet}
-
-{#snippet status(rowKey: string, text: string, uncalibrated: boolean)}
-  <button
-    type="button"
-    class="chip status tabular"
-    class:uncalibrated
-    aria-expanded={openKey === rowKey}
-    aria-controls="{id}-{rowKey}"
-    aria-describedby="{id}-{rowKey}-name"
-    onclick={() => open(rowKey)}>{text}</button
-  >
-{/snippet}
 
 <div class="input-list">
   {#if chosenGone}
@@ -175,78 +173,65 @@
   <fieldset class="choice-group">
     <legend class="visually-hidden">Record from</legend>
     <ul aria-label="Inputs">
-      <li class:open={openKey === defaultKey}>
-        <div class="line">
-          <label class="choice-row">
-            <input
-              type="radio"
-              name="{id}-record-from"
-              checked={choice.deviceId === ''}
-              onchange={() => input.set(defaultInput)}
-            />
-            <span class="name" id="{id}-{defaultKey}-name"
-              >Default input{#if defaultRecorded.current}<span class="is"
-                  >{channelName(defaultRecorded.current.label, defaultRecorded.current.channel)}</span
-                >{/if}</span
-            >
-          </label>
-          {@render status(defaultKey, statusOf(defaultShown), defaultShown.offset === null)}
-        </div>
-        {#if openKey === defaultKey}
-          {@render details(
-            defaultKey,
-            'Default input',
-            defaultShown.offset,
-            defaultChoice,
-            (level) => {
-              learn(level);
-              defaultIs = level?.opened ?? null;
-            },
-            () => onCalibrate($state.snapshot(defaultChoice), false),
-            typeForDefault,
-          )}
-        {/if}
-      </li>
-      {#each rows.connected as row (key(row.input))}
-        {@const rowKey = key(row.input)}
-        <li class:open={openKey === rowKey}>
+      {#each rows as row, i (row.key)}
+        {@const open = openKey === row.key}
+        <li>
           <div class="line">
             <label class="choice-row">
               <input
                 type="radio"
                 name="{id}-record-from"
-                checked={chosenKey === rowKey}
-                onchange={() => input.set($state.snapshot(row.input))}
+                checked={row.chosen}
+                onchange={() => input.set(row.exact ? $state.snapshot(row.input) : defaultInput)}
               />
-              <span class="name" id="{id}-{rowKey}-name">{row.name}</span>
+              <span class="name" id="{id}-{i}-name"
+                >{row.name}{#if row.is}<span class="is">{row.is}</span>{/if}</span
+              >
             </label>
-            {@render status(rowKey, statusOf(row.calibration), row.calibration.offset === null)}
+            <button
+              type="button"
+              class="chip status tabular"
+              class:uncalibrated={row.calibration.offset === null}
+              aria-expanded={open}
+              aria-controls="{id}-{i}"
+              aria-describedby="{id}-{i}-name"
+              onclick={() => toggle(row)}>{statusOf(row.calibration)}</button
+            >
           </div>
-          {#if openKey === rowKey}
-            {@render details(
-              rowKey,
-              row.name,
-              row.calibration.offset,
-              row.input,
-              learn,
-              () => onCalibrate($state.snapshot(row.input), true),
-              (offset) => typeFor(row, offset),
-            )}
+          {#if open}
+            <div class="more" id="{id}-{i}">
+              {#if metering}
+                <LevelMeter input={row.input} onOpen={learn} />
+              {/if}
+              <div class="actions">
+                <button
+                  type="button"
+                  class="button primary"
+                  onclick={() => onCalibrate($state.snapshot(row.input), row.exact)}
+                  >{row.calibration.offset !== null ? 'Calibrate again' : 'Calibrate'}</button
+                >
+                <button type="button" class="button" aria-expanded={typing} onclick={() => (typing = !typing)}
+                  >Type it</button
+                >
+              </div>
+              {#if typing}
+                <OffsetField name={row.name} offset={row.calibration.offset} onSet={(offset) => type(row, offset)} />
+                {#if typeProblem}<p class="error" role="alert">{typeProblem}</p>{/if}
+              {/if}
+            </div>
           {/if}
         </li>
       {/each}
     </ul>
   </fieldset>
-  {#if rows.notConnected.length > 0}
+  {#if listed.notConnected.length > 0}
     <h3 id="{id}-not-connected">Not connected</h3>
     <ul aria-labelledby="{id}-not-connected">
-      {#each rows.notConnected as row (key(row.input))}
+      {#each listed.notConnected as row (keyOf(row.input))}
         <li>
           <div class="line">
             <span class="name">{row.name}</span>
-            <span class="pill tabular" class:uncalibrated={row.calibration.offset === null}
-              >{statusOf(row.calibration)}</span
-            >
+            <span class="badge tag tabular">{statusOf(row.calibration)}</span>
             <button
               type="button"
               class="button"
@@ -297,15 +282,9 @@
     font-size: var(--text-sm);
   }
   .status,
-  .pill {
+  .badge {
     flex: none;
     white-space: nowrap;
-  }
-  .pill {
-    padding: var(--space-1) var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-full);
-    font-size: var(--text-md);
   }
   .uncalibrated {
     color: var(--text-muted);

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount, untrack } from 'svelte';
-  import { CaptureError, InputLevel } from './capture';
+  import { InputLevel, openProblem } from './capture';
   import { meterLevel, sameInput, type InputChoice } from './inputSettings';
   import { audioContext } from './timelinePlayer';
 
@@ -67,7 +67,7 @@
       frame = requestAnimationFrame(step);
     } catch (e) {
       if (mine !== generation) return;
-      problem = e instanceof CaptureError ? e.message : `Couldn't open the input (${(e as Error).message}).`;
+      problem = openProblem(e);
     }
     opening = false;
     onOpen?.(level);

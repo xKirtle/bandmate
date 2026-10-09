@@ -4,14 +4,8 @@
 // skipped, whose device isn't connected, to forget.
 import { formatOffset, type Calibration } from './calibration';
 import type { InputCalibration } from './inputCalibrations';
-import { channelName, type InputChoice } from './inputSettings';
-
-/** An audio device connected, with how many channels it's known to have. */
-export interface ConnectedDevice {
-  deviceId: string;
-  label: string;
-  channels: number;
-}
+import type { ConnectedDevice } from './capture';
+import { channelName, sameInput, type InputChoice } from './inputSettings';
 
 /** An Input listed, with its name to show and its calibration. */
 export interface InputRow {
@@ -22,18 +16,18 @@ export interface InputRow {
 
 const uncalibrated: Calibration = { offset: null, offered: false };
 
-const sameInput = (a: InputChoice, b: InputChoice) => a.deviceId === b.deviceId && a.channel === b.channel;
-
 /**
  * Every Input connected, each channel of each device in the browser's
  * order, then every Input kept whose device isn't, by name. A device has
  * at least as many channels as any of its Inputs kept. Where it can't be
  * told which devices are connected (null), e.g. before the browser allows
- * the microphone, the Inputs kept are listed as connected.
+ * the microphone, the Inputs kept are listed as connected, and the one
+ * chosen with them, so it's listed whether or not it's kept.
  */
 export function listInputs(
   devices: readonly ConnectedDevice[] | null,
   kept: readonly InputCalibration[],
+  chosen: InputChoice | null = null,
 ): { connected: InputRow[]; notConnected: InputRow[] } {
   const row = (input: InputChoice): InputRow => {
     const found = kept.find((k) => sameInput(k, input));
@@ -45,7 +39,10 @@ export function listInputs(
   };
   const keptRow = ({ deviceId, label, channel }: InputCalibration) => row({ deviceId, label, channel });
   const byName = (a: InputRow, b: InputRow) => a.name.localeCompare(b.name);
-  if (devices === null) return { connected: kept.map(keptRow).sort(byName), notConnected: [] };
+  if (devices === null) {
+    const unkept = chosen && chosen.deviceId !== '' && !kept.some((k) => sameInput(k, chosen)) ? [row(chosen)] : [];
+    return { connected: [...kept.map(keptRow), ...unkept].sort(byName), notConnected: [] };
+  }
 
   const connected = devices.flatMap(({ deviceId, label, channels }) => {
     const known = Math.max(channels, ...kept.filter((k) => k.deviceId === deviceId).map((k) => k.channel + 1));

@@ -48,7 +48,6 @@ class Capture extends AudioWorkletProcessor {
 registerProcessor('bandmate-capture', Capture);
 `;
 
-import type { ConnectedDevice } from './inputList';
 import { inputRecorded, resolveInput, standIns, type InputChoice } from './inputSettings';
 
 // Added to a context once.
@@ -169,6 +168,13 @@ export function watchInputs(changed: () => void): () => void {
   };
 }
 
+/** An audio device connected, with how many channels it's known to have. */
+export interface ConnectedDevice {
+  deviceId: string;
+  label: string;
+  channels: number;
+}
+
 /**
  * The audio devices connected, apart from the browser's own stand-ins for
  * the default, each with how many channels the browser says it has (1
@@ -204,6 +210,11 @@ export async function identifyInput(choice: InputChoice): Promise<InputChoice | 
   const opened = await openInput(choice);
   release(opened.stream);
   return opened.input;
+}
+
+/** Why an Input couldn't be opened, from what opening it threw, in words to show. */
+export function openProblem(e: unknown): string {
+  return e instanceof CaptureError ? e.message : `Couldn't open the input (${(e as Error).message}).`;
 }
 
 /** Why an input couldn't be opened, in words to show. */
