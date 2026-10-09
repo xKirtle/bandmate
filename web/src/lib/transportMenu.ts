@@ -1,11 +1,14 @@
 import type { MenuAction } from './menu';
 import Download from '@lucide/svelte/icons/download';
+import Mic from '@lucide/svelte/icons/mic';
 import Upload from '@lucide/svelte/icons/upload';
 
-// The transport row's ⋯: its occasional actions, in the order they're
-// listed. Import audio… edits the Timeline, so it applies only where it's
-// shown in full: on a transport-only Timeline, e.g. an upright phone,
-// Mix down… is the only one offered.
+// The transport row's actions, icon buttons on it where there's room, and
+// otherwise folded into its ⋯, in the order they fold: Import audio…, which
+// a file dropped on a Track does too, then Mix down…, then the mic, used
+// most. Import audio… and the mic are for the full Timeline: on a
+// transport-only one, e.g. an upright phone, Mix down… is the only one
+// offered.
 
 /** What the Timeline is doing, which decides what the ⋯ offers. */
 export type TransportState = {
@@ -21,15 +24,21 @@ export type TransportState = {
   hasClips: boolean;
 };
 
-/** What each entry does. */
+/** What each action does. */
 export type TransportRun = {
   importAudio: () => void;
   mixDown: () => void;
+  /** Opens the mic button's popover, of the Inputs to record from, by the ⋯. */
+  recordFrom: () => void;
 };
 
-/** The entries of the transport row's ⋯: always at least Mix down…. */
-export function transportActions(state: TransportState, run: TransportRun): MenuAction[] {
-  const importAudio: MenuAction = {
+/** One of the transport row's actions, named by what it runs. */
+export type TransportAction = MenuAction & { key: keyof TransportRun; run: () => void };
+
+/** The transport row's actions, in the order they fold: always at least Mix down…. */
+export function transportActions(state: TransportState, run: TransportRun): TransportAction[] {
+  const importAudio: TransportAction = {
+    key: 'importAudio',
     icon: Upload,
     label: 'Import audio…',
     title: state.recording
@@ -40,7 +49,8 @@ export function transportActions(state: TransportState, run: TransportRun): Menu
     disabled: state.importing || state.recording || state.merging,
     run: run.importAudio,
   };
-  const mixDown: MenuAction = {
+  const mixDown: TransportAction = {
+    key: 'mixDown',
     icon: Download,
     label: 'Mix down…',
     title: state.recording
@@ -51,5 +61,28 @@ export function transportActions(state: TransportState, run: TransportRun): Menu
     disabled: !state.hasClips || state.recording,
     run: run.mixDown,
   };
-  return state.fullTimeline ? [importAudio, mixDown] : [mixDown];
+  const recordFrom: TransportAction = {
+    key: 'recordFrom',
+    icon: Mic,
+    label: 'Record from…',
+    title: state.recording ? 'Stop recording to pick the Input to record from' : 'Pick the Input to record from',
+    disabled: state.recording,
+    run: run.recordFrom,
+  };
+  return state.fullTimeline ? [importAudio, mixDown, recordFrom] : [mixDown];
+}
+
+/**
+ * How many of `count` actions fold into the ⋯, the first first, with `room`
+ * px for them on the row, each, and the ⋯, taking `each` px with its gap:
+ * the fewest that leave room for the rest and the ⋯, or, where none do, all
+ * of them. As the ⋯ takes a place of its own, folding just one gains
+ * nothing, so a lone action never folds, and the first folds with the second.
+ */
+export function foldCount(count: number, room: number, each: number): number {
+  if (count * each <= room || count === 1) return 0;
+  for (let folded = 1; folded < count; folded++) {
+    if ((count - folded + 1) * each <= room) return folded;
+  }
+  return count;
 }

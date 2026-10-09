@@ -144,6 +144,11 @@
     else if (!open) show('first');
   }
 
+  /** Its trigger, e.g. for what it opens to be placed by. */
+  export function triggerElement(): HTMLElement {
+    return triggerButton;
+  }
+
   function close() {
     open = false;
     triggerButton.focus();

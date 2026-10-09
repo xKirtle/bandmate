@@ -753,12 +753,6 @@ test("the Timeline's mic button picks the Input recorded from among those connec
   );
   await open(page, song.id);
 
-  // The ⋯ no longer sets recording up: the mic button picks the Input.
-  await timeline(page).getByRole('button', { name: 'More Timeline actions' }).click();
-  await expect(page.getByRole('menuitem', { name: 'Import audio…' })).toBeVisible();
-  await expect(page.getByRole('menuitem', { name: /^Recording settings/ })).toHaveCount(0);
-  await page.keyboard.press('Escape');
-
   const picker = await openInputPicker(page);
   const connected = picker.getByRole('list', { name: 'Inputs' });
   const firstName = `Input 1 · ${first.label}`;
@@ -806,6 +800,57 @@ test("the Timeline's mic button picks the Input recorded from among those connec
   // Settings has it picked too.
   await page.goto('/settings');
   await expect(inputList(page).radio(secondName)).toBeChecked();
+});
+
+test("folded into the transport row's ⋯, the mic is Record from…, which opens the Inputs to record from by the ⋯, and is disabled while recording", async ({
+  page,
+  bandmate,
+}) => {
+  const song = await bandmate.song({ title: 'Anthem' });
+  // Too narrow for any of the transport row's actions.
+  await page.setViewportSize({ width: 680, height: 900 });
+  await open(page, song.id);
+  await expect(micButton(page)).toHaveCount(0);
+  const more = timeline(page).getByRole('button', { name: 'More Timeline actions' });
+
+  await more.click();
+  const recordFrom = page.getByRole('menuitem', { name: 'Record from…' });
+  await expect(recordFrom).toHaveAttribute('title', 'Pick the Input to record from');
+  await recordFrom.click();
+  const picker = page.getByRole('dialog', { name: 'Input to record from' });
+  await expect(picker).toBeVisible();
+  await expect(picker.getByRole('radio', { checked: true })).toBeFocused();
+  // By the ⋯, just over it, as the Timeline sits at the foot of the window:
+  // placed again as the picked Input's meter opens.
+  await expect
+    .poll(async () => {
+      const [panel, by] = [(await picker.boundingBox())!, (await more.boundingBox())!];
+      const over = by.y - (panel.y + panel.height);
+      return over >= 0 && over < 8 && panel.x < by.x + by.width && panel.x + panel.width > by.x;
+    })
+    .toBe(true);
+  // Picking another makes it the one recorded from.
+  // The default input is picked, and listed first.
+  const other = picker.getByRole('radio').nth(1);
+  await other.check();
+  await expect(other).toBeChecked();
+  await page.keyboard.press('Escape');
+  await expect(picker).toBeHidden();
+  await expect(more).toBeFocused();
+
+  // While recording, it says why it can't be used.
+  await recordButton(page).click();
+  await skipCalibration(page);
+  await expect(stopButton(page)).toBeVisible();
+  await more.click();
+  await expect(recordFrom).toHaveAttribute('aria-disabled', 'true');
+  await expect(recordFrom).toHaveAttribute('title', 'Stop recording to pick the Input to record from');
+  // Chosen anyway, as a screen reader may, it opens nothing.
+  await recordFrom.click({ force: true });
+  await expect(picker).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await stopButton(page).click();
+  await expect(recordButton(page)).toBeEnabled();
 });
 
 test('recording from an uncalibrated Input picked with the mic button offers calibration first', async ({
