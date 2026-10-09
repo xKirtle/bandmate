@@ -1,5 +1,5 @@
 import type { Calibration } from './calibration';
-import { whichInput } from './capture';
+import { watchInputs, whichInput } from './capture';
 import type { InputChoice } from './inputSettings';
 import { calibrations } from './sharedCalibration.svelte';
 
@@ -29,21 +29,10 @@ export class RecordedInput {
         if (live) this.current = input;
       };
       void check();
-      const devices = navigator.mediaDevices;
-      devices?.addEventListener('devicechange', check);
-      let permission: PermissionStatus | undefined;
-      navigator.permissions
-        ?.query({ name: 'microphone' as PermissionName })
-        .then((status) => {
-          if (!live) return;
-          permission = status;
-          status.addEventListener('change', check);
-        })
-        .catch(() => {});
+      const unwatch = watchInputs(check);
       return () => {
         live = false;
-        devices?.removeEventListener('devicechange', check);
-        permission?.removeEventListener('change', check);
+        unwatch();
       };
     });
   }

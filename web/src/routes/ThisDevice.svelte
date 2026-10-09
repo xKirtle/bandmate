@@ -8,7 +8,7 @@
   import { palettes, themeChoices } from '../lib/appearance';
   import { formatOffset, offsetSummary } from '../lib/calibration';
   import CalibrationDialog from '../lib/CalibrationDialog.svelte';
-  import { connectedDevices } from '../lib/capture';
+  import { connectedDevices, watchInputs } from '../lib/capture';
   import InputPicker from '../lib/InputPicker.svelte';
   import { channelName, inputName, type InputChoice } from '../lib/inputSettings';
   import SettingsPage from '../lib/SettingsPage.svelte';
@@ -34,6 +34,7 @@
   // while that can't be told. Told again as they come and go, and once the
   // browser allows the microphone.
   let connected = $state.raw<Set<string> | null>(null);
+  const calibrated = $derived(calibrations.calibrated);
   $effect(() => {
     let live = true;
     const check = async () => {
@@ -41,21 +42,10 @@
       if (live) connected = ids;
     };
     void check();
-    const devices = navigator.mediaDevices;
-    devices?.addEventListener('devicechange', check);
-    let permission: PermissionStatus | undefined;
-    navigator.permissions
-      ?.query({ name: 'microphone' as PermissionName })
-      .then((status) => {
-        if (!live) return;
-        permission = status;
-        status.addEventListener('change', check);
-      })
-      .catch(() => {});
+    const unwatch = watchInputs(check);
     return () => {
       live = false;
-      devices?.removeEventListener('devicechange', check);
-      permission?.removeEventListener('change', check);
+      unwatch();
     };
   });
 
@@ -139,12 +129,12 @@
             }}>{offset !== null ? 'Calibrate again' : 'Calibrate'}</button
           >
         </div>
-        {#if calibrations.calibrated.length > 0}
+        {#if calibrated.length > 0}
           <!-- Every Input calibrated on this device, connected or not, to calibrate again or forget. -->
           <div class="calibrated">
             <h3 id="calibrated-heading">Calibrated inputs</h3>
             <ul aria-labelledby="calibrated-heading">
-              {#each calibrations.calibrated as listed (`${listed.deviceId} ${listed.channel}`)}
+              {#each calibrated as listed (`${listed.deviceId} ${listed.channel}`)}
                 {@const name = channelName(listed.label, listed.channel)}
                 {@const unplugged = connected !== null && !connected.has(listed.deviceId)}
                 <li>

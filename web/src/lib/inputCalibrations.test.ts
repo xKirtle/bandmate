@@ -172,6 +172,18 @@ describe('InputCalibrations', () => {
       expect(calibrations.of(null)).toEqual({ offset: 0.021, offered: true });
     });
 
+    it('is never given to an Input forgotten, which is offered calibration again', () => {
+      const { calibrations } = setup(before(0.021, true));
+      // Calibrated from Settings without opening the default, then forgotten.
+      calibrations.set(laptop, { offset: 0.04, offered: true });
+      calibrations.forget(laptop);
+      expect(calibrations.shownFor(defaultChoice, laptop)).toEqual(fresh);
+      expect(calibrations.calibrated).toEqual([]);
+
+      calibrations.opened(defaultChoice, laptop);
+      expect(calibrations.of(laptop)).toEqual(fresh);
+    });
+
     it('moves nothing from a device that had nothing kept', () => {
       const { calibrations } = setup({ 'bandmate.input': JSON.stringify(mic) });
       expect(calibrations.of(mic)).toEqual(fresh);

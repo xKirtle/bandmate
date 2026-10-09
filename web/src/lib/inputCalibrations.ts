@@ -147,16 +147,17 @@ export class InputCalibrations {
   get calibrated(): CalibratedInput[] {
     return this.#setting.value.inputs
       .filter((i): i is CalibratedInput => i.offset !== null)
-      .sort(
-        (a, b) =>
-          channelName(a.label, a.channel).localeCompare(channelName(b.label, b.channel)) || a.channel - b.channel,
-      );
+      .sort((a, b) => channelName(a.label, a.channel).localeCompare(channelName(b.label, b.channel)));
   }
 
   /** Forgets an Input's offset, so it's uncalibrated, and calibration is offered before its next recording. */
   forget(input: InputId) {
     const { inputs, unclaimed } = this.#setting.value;
-    this.#setting.set({ inputs: inputs.filter((i) => !same(i, input)), unclaimed });
+    const others = inputs.filter((i) => !same(i, input));
+    // While the one offset kept before waits for the default input, the
+    // Input stays, uncalibrated, so it can't take that one in its place.
+    const kept = unclaimed ? inputs.filter((i) => same(i, input)).map((i) => ({ ...i, ...uncalibrated })) : [];
+    this.#setting.set({ inputs: [...others, ...kept], unclaimed });
   }
 
   /**

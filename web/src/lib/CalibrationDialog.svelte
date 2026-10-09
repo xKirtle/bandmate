@@ -35,8 +35,10 @@
 
   // The Input measured, once it's open; until then, the one it will be, where that can be told.
   let measuring = $state.raw<InputChoice | null>(null);
-  const expected = new RecordedInput(() => input);
-  const calibrated = $derived(measuring ?? (exact ? input : expected.current));
+  const recorded = new RecordedInput(() => input);
+  // The Input it looks to measure: only ever the one given, where it's exact.
+  const expected = $derived(exact ? input : recorded.current);
+  const calibrated = $derived(measuring ?? expected);
   const name = $derived(calibrated ? channelName(calibrated.label, calibrated.channel) : inputName(input));
 
   let dialog = $state<HTMLDialogElement>();
@@ -84,9 +86,13 @@
       if (mine !== generation) return opened.close();
       capture = opened;
       // Where the browser doesn't say which Input it opened, the one it looked to be.
-      const which = opened.opened ?? (exact ? (opened.gone ? null : input) : expected.current);
+      const which =
+        opened.opened ??
+        (exact && (opened.gone || opened.channel !== input.channel) ? null : $state.snapshot(expected));
       if (exact && (!which || !sameInput(which, input))) {
-        throw new CaptureError(`${name} couldn't be opened, so nothing was measured. Check it's connected.`);
+        throw new CaptureError(
+          `${name} couldn't be opened, so nothing was measured. Check its device is connected and has that input.`,
+        );
       }
       measuring = which;
       if (opened.opened) calibrations.opened($state.snapshot(input), opened.opened);

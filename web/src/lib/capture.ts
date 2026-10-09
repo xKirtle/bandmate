@@ -144,6 +144,31 @@ export async function whichInput(choice: InputChoice): Promise<InputChoice | nul
 }
 
 /**
+ * Calls back as audio inputs come and go, and as the browser allows or
+ * blocks the microphone, which changes what it says of them; returns what
+ * stops it.
+ */
+export function watchInputs(changed: () => void): () => void {
+  let live = true;
+  const devices = navigator.mediaDevices;
+  devices?.addEventListener('devicechange', changed);
+  let permission: PermissionStatus | undefined;
+  navigator.permissions
+    ?.query({ name: 'microphone' as PermissionName })
+    .then((status) => {
+      if (!live) return;
+      permission = status;
+      status.addEventListener('change', changed);
+    })
+    .catch(() => {});
+  return () => {
+    live = false;
+    devices?.removeEventListener('devicechange', changed);
+    permission?.removeEventListener('change', changed);
+  };
+}
+
+/**
  * The ids of the audio devices connected, to tell whether an Input's is:
  * null where that can't be told, e.g. before the browser allows the
  * microphone, as it lists no ids till then.
@@ -341,6 +366,11 @@ export class Capture {
   /** The name of the device chosen when it isn't connected, so the default is captured instead; null otherwise. */
   get gone(): string | null {
     return this.input.gone;
+  }
+
+  /** The channel captured, from 0: the one chosen, or the first where the input hasn't that many. */
+  get channel(): number {
+    return this.input.channel;
   }
 
   /** The Input captured: the one chosen, or the one the default is; null where the browser doesn't say. */
