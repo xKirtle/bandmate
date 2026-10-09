@@ -110,9 +110,11 @@
     stroke: var(--text-muted);
     stroke-width: 1;
   }
-  .nut,
-  .finger {
+  .nut {
     fill: var(--text);
+  }
+  .finger {
+    fill: var(--accent);
   }
   .open,
   .muted {
