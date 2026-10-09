@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appliedOffset, clickTimes, measureOffset, minHits, offsetSummary } from './calibration';
+import { appliedOffset, clickTimes, measureOffset, Measuring, minHits, offsetSummary } from './calibration';
 
 const rate = 48000;
 
@@ -98,6 +98,84 @@ describe('measureOffset', () => {
   it('never measures less than no delay', () => {
     const found = measureOffset(recording(length, heard(-0.015)), rate, clicks);
     expect(found.ok && found.offset).toBe(0);
+  });
+});
+
+/** Where click i's window closes, in samples: once heard to there, its tap is measured. */
+const heardTo = (i: number) => Math.ceil((clicks[i] + 0.4) * rate);
+
+describe('Measuring', () => {
+  it('measures each tap as it is heard, as the whole recording so far would be', () => {
+    // A little early and late, a click missed, a stray between clicks, and one far off.
+    const claps = clicks.map((t, i) => t + 0.05 + [0.01, -0.01, 0.005, -0.005][i % 4]).filter((_, i) => i !== 2);
+    claps.push(clicks[4] + 0.6);
+    claps[6] = clicks[7] + 0.3;
+    const samples = recording(length, claps);
+    const measuring = new Measuring(rate);
+    let at = 0;
+    for (let i = 0; i < clicks.length; i++) {
+      // Not measured until its window has been heard.
+      expect(measuring.hear(samples.subarray(at, heardTo(i) - 1), at)).toBe(false);
+      at = heardTo(i) - 1;
+      expect(measuring.result).toEqual(measureOffset(samples.subarray(0, at), rate, clicks.slice(0, i)));
+      expect(measuring.hear(samples.subarray(at, heardTo(i)), at)).toBe(true);
+      at = heardTo(i);
+      expect(measuring.result).toEqual(measureOffset(samples.subarray(0, at), rate, clicks.slice(0, i + 1)));
+    }
+    expect(measuring.result).toMatchObject({ ok: true, hits: 10 });
+  });
+
+  it('measures the same however the samples arrive', () => {
+    const samples = recording(length, heard(0.03));
+    const whole = new Measuring(rate);
+    whole.hear(samples, 0);
+    const batched = new Measuring(rate);
+    for (let at = 0; at < samples.length; at += 4096) batched.hear(samples.subarray(at, at + 4096), at);
+    expect(batched.result).toEqual(whole.result);
+    expect(batched.taps).toEqual(whole.taps);
+    expect(whole.average).toBeCloseTo(0.03, 3);
+    expect(whole.counted).toBe(12);
+  });
+
+  it('leaves taps far from the rest out of the average, keeping them in order', () => {
+    const claps = heard(0.04);
+    claps[1] = clicks[1] + 0.25;
+    const measuring = new Measuring(rate);
+    measuring.hear(recording(length, claps), 0);
+    expect(measuring.taps.map((t) => t.counted)).toEqual(clicks.map((_, i) => i !== 1));
+    expect(measuring.taps[1].delay).toBeCloseTo(0.25, 3);
+    expect(measuring.average).toBeCloseTo(0.04, 3);
+    expect(measuring.counted).toBe(11);
+  });
+
+  it('says how far the average moved over the last 10 taps, once there are 10', () => {
+    const many = clickTimes(14);
+    // Ten taps 40 ms late, then 62, 40, 40 and 40.
+    const claps = many.map((t, i) => t + (i === 10 ? 0.062 : 0.04));
+    const samples = recording(many.at(-1)! + 1, claps);
+    const measuring = new Measuring(rate);
+    const steady: (number | null)[] = [];
+    let at = 0;
+    for (let i = 0; i < many.length; i++) {
+      const to = Math.ceil((many[i] + 0.4) * rate);
+      measuring.hear(samples.subarray(at, to), at);
+      at = to;
+      steady.push(measuring.steady);
+    }
+    expect(steady.slice(0, 9)).toEqual(Array(9).fill(null));
+    expect(steady[9]).toBeCloseTo(0, 3);
+    // The average went from 40 to 42 ms, then back down to 41.5: ±1 ms.
+    expect(measuring.average).toBeCloseTo(0.0415, 3);
+    expect(steady[10]).toBeCloseTo(0.001, 3);
+    expect(steady[13]).toBeCloseTo(0.001, 3);
+  });
+
+  it('counts only clicks with a tap towards the last 10', () => {
+    const claps = heard(0.04).filter((_, i) => i % 2 === 0);
+    const measuring = new Measuring(rate);
+    measuring.hear(recording(length, claps), 0);
+    expect(measuring.counted).toBe(6);
+    expect(measuring.steady).toBeNull();
   });
 });
 

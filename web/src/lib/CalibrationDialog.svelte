@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { clickCount, clickTimes, formatOffset, measureOffset, type Measurement } from './calibration';
-  import { Capture, CaptureError } from './capture';
+  import { clickTime, formatOffset, Measuring, minHits, steadyOver, type Tap } from './calibration';
+  import CalibrationTaps from './CalibrationTaps.svelte';
+  import { Capture, CaptureError, frameAt } from './capture';
   import Dialog from './Dialog.svelte';
   import { channelName, inputName, sameInput, type InputChoice } from './inputSettings';
   import { RecordedInput } from './recordedInput.svelte';
@@ -9,11 +10,14 @@
   import { audioContext } from './timelinePlayer';
 
   // Calibrates an Input's Latency Offset in a dialog, naming the Input:
-  // clicks play, the user taps or claps on the mic along with them, and the
-  // delay found is shown, and kept for the Input it was measured on. Offered
-  // before an Input's first recording, where it can be skipped, for that
-  // Input, to record straight away; also run from the recording settings
-  // and Settings, where a listed Input is measured as itself or not at all.
+  // clicks play until the user ends it, and they tap or clap on the mic along
+  // with them. Each tap is measured as it's heard, and the running average
+  // shown, with how steady it's been and a graph of the taps, so they can
+  // stop once it reads steady. Use this keeps the average for the Input it
+  // was measured on; Cancel, or closing it, keeps nothing. Offered before an
+  // Input's first recording, where it can be skipped, for that Input, to
+  // record straight away; also run from the recording settings and Settings,
+  // where a listed Input is measured as itself or not at all.
   let {
     input,
     exact = false,
@@ -43,19 +47,31 @@
 
   let dialog = $state<HTMLDialogElement>();
   let phase = $state<'ready' | 'measuring' | 'done'>('ready');
-  // Which click is playing, from 1, while measuring.
-  let currentClick = $state(0);
-  let result = $state<Measurement | null>(null);
+  // Whether the first click has played, while measuring.
+  let clicking = $state(false);
+  // What's been measured so far, while measuring.
+  let reading = $state.raw<{ taps: readonly Tap[]; average: number | null; counted: number; steady: number | null }>({
+    taps: [],
+    average: null,
+    counted: 0,
+    steady: null,
+  });
+  // The Latency Offset kept, and how many taps it's from, once used.
+  let kept = $state.raw<{ offset: number; taps: number } | null>(null);
   let error = $state<string | null>(null);
   let record = false;
 
   let capture: Capture | null = null;
-  let clickNodes: OscillatorNode[] = [];
+  let clickNodes = new Set<OscillatorNode>();
   let timer = 0;
   // Each measuring, so one cancelled finds nothing to show.
   let generation = 0;
 
   onDestroy(stopMeasuring);
+
+  // How far ahead clicks are scheduled, and how often more are, in seconds.
+  const ahead = 1;
+  const scheduleEvery = 0.25;
 
   /** Plays a click at a context time: a short, bright blip. */
   function playClick(context: AudioContext, at: number) {
@@ -67,7 +83,8 @@
     tone.connect(gain).connect(context.destination);
     tone.start(at);
     tone.stop(at + 0.05);
-    clickNodes.push(tone);
+    clickNodes.add(tone);
+    tone.onended = () => clickNodes.delete(tone);
   }
 
   async function measure() {
@@ -77,8 +94,9 @@
     stopMeasuring();
     const mine = generation;
     phase = 'measuring';
-    currentClick = 0;
-    result = null;
+    clicking = false;
+    reading = { taps: [], average: null, counted: 0, steady: null };
+    kept = null;
     error = null;
     try {
       await resumed;
@@ -98,32 +116,46 @@
       if (opened.opened) calibrations.opened($state.snapshot(input), opened.opened);
       // A moment on, so the first click is scheduled clear of now.
       const from = context.currentTime + 0.1;
-      const times = clickTimes();
-      for (const t of times) playClick(context, from + t);
-      timer = window.setInterval(() => {
-        const played = times.filter((t) => from + t <= context.currentTime).length;
-        currentClick = Math.max(1, played);
-      }, 50);
-      // Until the last click's hit has had time to be heard.
-      const end = from + times.at(-1)! + 0.6;
-      await new Promise((resolve) => setTimeout(resolve, (end - context.currentTime) * 1000));
-      if (mine !== generation) return;
-      window.clearInterval(timer);
-      const samples = await opened.stop(from);
-      capture = null;
-      if (mine !== generation) return;
-      const found = measureOffset(samples, opened.sampleRate, times);
-      if (found.ok && !measuring) {
-        throw new CaptureError("The browser didn't say which input it measured, so nothing was kept.");
-      }
-      result = found;
-      // Applied even where storage can't keep it, until reload.
-      if (result.ok && measuring) calibrations.set(measuring, { offset: result.offset, offered: true });
+      const first = frameAt(from, opened.sampleRate);
+      const meter = new Measuring(opened.sampleRate);
+      opened.hand(({ frame, samples }) => {
+        const skip = Math.max(0, first - frame);
+        if (skip >= samples.length || !meter.hear(samples.subarray(skip), frame + skip - first)) return;
+        const { taps, average, counted, steady } = meter;
+        reading = { taps, average, counted, steady };
+      });
+      // Clicks, one after another, until it's ended.
+      let next = 0;
+      const schedule = () => {
+        for (; from + clickTime(next) < context.currentTime + ahead; next++) playClick(context, from + clickTime(next));
+        clicking = context.currentTime >= from + clickTime(0);
+      };
+      schedule();
+      timer = window.setInterval(schedule, scheduleEvery * 1000);
     } catch (e) {
       if (mine !== generation) return;
-      stopMeasuring();
-      error = e instanceof CaptureError ? e.message : `Couldn't calibrate (${(e as Error).message}).`;
+      fail(e);
     }
+  }
+
+  function fail(e: unknown) {
+    stopMeasuring();
+    error = e instanceof CaptureError ? e.message : `Couldn't calibrate (${(e as Error).message}).`;
+    phase = 'done';
+  }
+
+  /** Ends measuring, keeping the average as the Latency Offset of the Input measured. */
+  function use() {
+    const { average, counted } = reading;
+    stopMeasuring();
+    if (average === null || counted < minHits) return;
+    if (!measuring) {
+      fail(new CaptureError("The browser didn't say which input it measured, so nothing was kept."));
+      return;
+    }
+    // Applied even where storage can't keep it, until reload.
+    calibrations.set(measuring, { offset: average, offered: true });
+    kept = { offset: average, taps: counted };
     phase = 'done';
   }
 
@@ -137,7 +169,7 @@
         // Not started yet, or already done.
       }
     }
-    clickNodes = [];
+    clickNodes = new Set();
     capture?.close();
     capture = null;
   }
@@ -160,7 +192,7 @@
     onClose(record);
   }
 
-  const measured = $derived(result?.ok ? result : null);
+  const taps = (n: number) => `${n} ${n === 1 ? 'tap' : 'taps'}`;
 </script>
 
 <!-- A click outside closes it, but never while measuring. -->
@@ -176,28 +208,39 @@
       {/if}
     </p>
     <p>
-      With the headphones or speakers you record with, tap or clap on the mic along with {clickCount} clicks. It takes about
-      ten seconds.
+      With the headphones or speakers you record with, tap or clap on the mic along with the clicks. Keep going until
+      the average holds steady, then use it.
     </p>
   {:else if phase === 'measuring'}
-    <p class="count" role="status" aria-live="polite">
-      {currentClick === 0 ? 'Get ready…' : `Click ${currentClick} of ${clickCount}: tap along`}
+    <p class="reading" role="status" aria-live="polite">
+      {#if !clicking}
+        Get ready…
+      {:else if reading.average === null}
+        Tap along with the clicks
+      {:else}
+        <strong>{formatOffset(reading.average)}</strong>, from {taps(reading.counted)}
+      {/if}
     </p>
+    <p class="muted">
+      {#if reading.counted < minHits}
+        It takes {minHits} taps in time with the clicks.
+      {:else if reading.steady === null}
+        Keep tapping until it holds steady.
+      {:else}
+        Steady: ±{formatOffset(reading.steady)} over the last {steadyOver}
+      {/if}
+    </p>
+    <CalibrationTaps taps={reading.taps} average={reading.average} />
   {:else if error}
     <p class="problem" role="alert">{error}</p>
-  {:else if measured}
+  {:else if kept}
     <p role="status">
-      The Latency Offset of {name} is <strong class="tabular">{formatOffset(measured.offset)}</strong>, from {measured.hits}
-      of {clickCount} taps. New Takes from it are placed earlier by it; Takes already recorded stay where they are.
-    </p>
-  {:else if result}
-    <p class="problem" role="alert">
-      {result.hits === 0 ? 'No taps were heard' : `Only ${result.hits} taps were heard in time with the clicks`}, so
-      nothing was measured. Tap or clap firmly, close to the mic, once with each click, and try again.
+      The Latency Offset of {name} is <strong class="tabular">{formatOffset(kept.offset)}</strong>, from
+      {taps(kept.taps)}. New Takes from it are placed earlier by it; Takes already recorded stay where they are.
     </p>
   {/if}
 
-  {#if offer && !measured}
+  {#if offer && !kept}
     <p class="muted">Skipped, it can be run any time from Recording settings… in the Timeline's ⋯ menu.</p>
   {/if}
 
@@ -205,8 +248,9 @@
     {#if phase === 'ready'}
       <button type="button" class="button primary" onclick={measure}>Start</button>
     {:else if phase === 'measuring'}
+      <button type="button" class="button primary" disabled={reading.counted < minHits} onclick={use}>Use this</button>
       <button type="button" class="button" onclick={() => close()}>Cancel</button>
-    {:else if measured}
+    {:else if kept}
       {#if offer}
         <button type="button" class="button primary" onclick={() => close(true)}>Record</button>
       {:else}
@@ -216,7 +260,7 @@
     {:else}
       <button type="button" class="button primary" onclick={measure}>Try again</button>
     {/if}
-    {#if offer && !measured && phase !== 'measuring'}
+    {#if offer && !kept && phase !== 'measuring'}
       <button type="button" class="button" onclick={skip}>Skip and record</button>
     {/if}
   </div>
@@ -226,7 +270,7 @@
   p {
     margin: 0;
   }
-  .count {
+  .reading {
     font-size: var(--text-xl);
     font-variant-numeric: tabular-nums;
   }

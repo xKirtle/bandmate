@@ -109,7 +109,7 @@ Sing over your beat, right in the browser, in full quality.
 3. **Nudge**: shift a take by a few milliseconds, so it sits on the beat.
 4. **Input**: your microphone or audio interface, and its channel. Each device remembers its own.
 5. **Level**: sing your loudest, and keep the meter out of the red. Here it's in the red, from a test tone.
-6. **Calibrate**: tap or clap along to a click, once for each input on each device, so your takes land on the beat. An audio interface's inputs can each have their own delay, so switching between them keeps each one's. Bandmate offers it the first time you record from an input.
+6. **Calibrate**: tap or clap along to a click, once for each input on each device, so your takes land on the beat. The click keeps going, with the average so far and a graph of your taps, until you choose **Use this** once it holds steady. An audio interface's inputs can each have their own delay, so switching between them keeps each one's. Bandmate offers it the first time you record from an input.
 
 The take menu is the **⋯** on a take. Recording settings is in the timeline's **⋯** menu.
 

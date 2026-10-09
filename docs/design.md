@@ -134,7 +134,7 @@ A transition or animation names both, such as `transition: transform var(--durat
 
 ### Icons
 
-[Lucide](https://lucide.dev), everywhere: no Unicode glyphs or hand-drawn SVGs as icons, so icons look the same on every platform and never turn into emoji. The only SVGs drawn by hand are drawings, not icons: Chord diagrams, waveforms, a Clip's Fades, and Bandmate's mark.
+[Lucide](https://lucide.dev), everywhere: no Unicode glyphs or hand-drawn SVGs as icons, so icons look the same on every platform and never turn into emoji. The only SVGs drawn by hand are drawings, not icons: Chord diagrams, waveforms, a Clip's Fades, Bandmate's mark, and calibration's graph of its taps.
 
 - **Import each icon on its own**, from `@lucide/svelte/icons/<name>`, never from the package's index, so only the icons used are bundled. `icons.test.ts` fails an import of the whole set, and an inline `<svg>` outside the drawings. An icon passed around, like a menu entry's, is typed `Icon` from `icons.ts`.
 - **An icon is as big as the text it's in** (`.lucide-icon` in `app.css` sizes it at `1em`), so its size comes from a font-size token: an icon button's `--text-xl`, or `--text-lg` on desktop, a menu entry's text, a badge's `--text-xs`. To make one bigger than the text beside it, set a font size from the scale on the icon. Don't set a width or height.
@@ -251,3 +251,4 @@ A disabled button fades; a disabled quiet one turns muted instead.
 | `--checkbox`                           | A checkbox or radio button, a touch bigger than the browser draws it     |
 | `--mark-rail`, `--mark-large`          | Bandmate's mark: atop the nav rail, and in About                         |
 | `--cue-slot`, `--cue-button`           | A Cue's slot in the gutter, wide enough for "⚠ 12:34.5"; its ▶ or ✕      |
+| `--tap-graph`                          | The height of calibration's graph of each tap's delay                    |
