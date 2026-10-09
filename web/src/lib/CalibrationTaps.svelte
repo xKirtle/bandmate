@@ -39,10 +39,10 @@
     const share = Math.min(1, Math.max(0, (delay - range.low) / (range.high - range.low)));
     return height - inset - share * (height - 2 * inset);
   };
-  const left = $derived(taps.filter((t) => !t.counted).length);
+  const leftOut = $derived(taps.filter((t) => !t.counted).length);
   const label = $derived(
     `Each tap's delay: ${taps.length} ${taps.length === 1 ? 'tap' : 'taps'}` +
-      (left ? `, ${left} left out of the average` : '') +
+      (leftOut ? `, ${leftOut} left out of the average` : '') +
       (average === null ? '' : `, averaging ${formatOffset(average)}`),
   );
 </script>
@@ -54,7 +54,7 @@
         <line class="average" x1={inset} x2={width - inset} y1={y(average)} y2={y(average)} />
       {/if}
       {#each taps as tap, i (i)}
-        <circle class={tap.counted ? 'counted' : 'left'} cx={x(i)} cy={y(tap.delay)} r={dot}>
+        <circle class={tap.counted ? 'counted' : 'left-out'} cx={x(i)} cy={y(tap.delay)} r={dot}>
           <title>Tap {i + 1}: {formatOffset(tap.delay)}{tap.counted ? '' : ', left out'}</title>
         </circle>
       {/each}
@@ -82,7 +82,7 @@
     stroke: var(--surface-1);
     stroke-width: 1;
   }
-  .left {
+  .left-out {
     fill: none;
     stroke: var(--text-muted);
     stroke-width: 1.5;

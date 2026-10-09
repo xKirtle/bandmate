@@ -28,6 +28,17 @@ export function clickTimes(count: number): number[] {
 /** What measuring found: the average delay, in seconds, or a failure; with how many hits it counted. */
 export type Measurement = { ok: true; offset: number; hits: number } | { ok: false; hits: number };
 
+/** What a calibration reads so far: each tap, the average of those that count, how many do, and how steady it is. */
+export interface Reading {
+  taps: readonly Tap[];
+  average: number | null;
+  counted: number;
+  steady: number | null;
+}
+
+/** A reading of no taps yet. */
+export const noReading: Reading = { taps: [], average: null, counted: 0, steady: null };
+
 /** A click's hit: its delay after the click, in seconds, and whether it's near enough the others to count. */
 export interface Tap {
   delay: number;
@@ -106,14 +117,18 @@ export class Measuring {
   // How many clicks have been measured.
   #clicks = 0;
   #taps: Tap[] = [];
-  // The average after each click that was tapped, to tell how steady it is.
+  // The average as each tap was heard, one for each tap, to tell how steady
+  // it is. A click that finds more than one new tap at once (one a quiet
+  // start hid) gives each the same average; one that finds fewer drops the
+  // averages past them.
   #averages: (number | null)[] = [];
 
   constructor(private sampleRate: number) {}
 
   /**
-   * Hears samples captured from sample at on, counted from when capture
-   * started; returns whether that measured another click.
+   * Hears more samples, the first of them at index at in the recording
+   * (counted from when capture started); returns whether that let another
+   * click be measured.
    */
   hear(samples: Float32Array, at: number): boolean {
     const end = at + samples.length;
@@ -127,9 +142,10 @@ export class Measuring {
     const clicks = this.#clicks;
     for (let heard = this.#heardTo(this.#clicks); heard <= this.#length; heard = this.#heardTo(this.#clicks)) {
       this.#clicks++;
-      const before = this.#taps.length;
       this.#taps = findTaps(this.#samples.subarray(0, heard), this.sampleRate, clickTimes(this.#clicks));
-      if (this.#taps.length > before) this.#averages.push(averageOf(this.#taps));
+      const average = averageOf(this.#taps);
+      this.#averages.length = Math.min(this.#averages.length, this.#taps.length);
+      while (this.#averages.length < this.#taps.length) this.#averages.push(average);
     }
     return this.#clicks > clicks;
   }
@@ -137,6 +153,11 @@ export class Measuring {
   /** How many samples it takes for click i's hit to have had time to be heard. */
   #heardTo(i: number): number {
     return Math.ceil((clickTime(i) + latest) * this.sampleRate);
+  }
+
+  /** All it reads so far, at once. */
+  get reading(): Reading {
+    return { taps: this.taps, average: this.average, counted: this.counted, steady: this.steady };
   }
 
   /** What's measured so far, as measureOffset would find it. */

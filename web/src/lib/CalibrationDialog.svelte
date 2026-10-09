@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { clickTime, formatOffset, Measuring, minHits, steadyOver, type Tap } from './calibration';
+  import { clickTime, formatOffset, Measuring, minHits, noReading, steadyOver, type Reading } from './calibration';
   import CalibrationTaps from './CalibrationTaps.svelte';
   import { Capture, CaptureError, frameAt } from './capture';
   import Dialog from './Dialog.svelte';
@@ -50,12 +50,7 @@
   // Whether the first click has played, while measuring.
   let clicking = $state(false);
   // What's been measured so far, while measuring.
-  let reading = $state.raw<{ taps: readonly Tap[]; average: number | null; counted: number; steady: number | null }>({
-    taps: [],
-    average: null,
-    counted: 0,
-    steady: null,
-  });
+  let reading = $state.raw<Reading>(noReading);
   // The Latency Offset kept, and how many taps it's from, once used.
   let kept = $state.raw<{ offset: number; taps: number } | null>(null);
   let error = $state<string | null>(null);
@@ -95,7 +90,7 @@
     const mine = generation;
     phase = 'measuring';
     clicking = false;
-    reading = { taps: [], average: null, counted: 0, steady: null };
+    reading = noReading;
     kept = null;
     error = null;
     try {
@@ -121,8 +116,7 @@
       opened.hand(({ frame, samples }) => {
         const skip = Math.max(0, first - frame);
         if (skip >= samples.length || !meter.hear(samples.subarray(skip), frame + skip - first)) return;
-        const { taps, average, counted, steady } = meter;
-        reading = { taps, average, counted, steady };
+        reading = meter.reading;
       });
       // Clicks, one after another, until it's ended.
       let next = 0;
@@ -148,7 +142,7 @@
   function use() {
     const { average, counted } = reading;
     stopMeasuring();
-    if (average === null || counted < minHits) return;
+    if (!usable(reading) || average === null) return;
     if (!measuring) {
       fail(new CaptureError("The browser didn't say which input it measured, so nothing was kept."));
       return;
@@ -191,6 +185,9 @@
     stopMeasuring();
     onClose(record);
   }
+
+  /** Whether a reading has enough taps that agree to keep. */
+  const usable = (r: Reading) => r.counted >= minHits;
 
   const taps = (n: number) => `${n} ${n === 1 ? 'tap' : 'taps'}`;
 </script>
@@ -248,7 +245,7 @@
     {#if phase === 'ready'}
       <button type="button" class="button primary" onclick={measure}>Start</button>
     {:else if phase === 'measuring'}
-      <button type="button" class="button primary" disabled={reading.counted < minHits} onclick={use}>Use this</button>
+      <button type="button" class="button primary" disabled={!usable(reading)} onclick={use}>Use this</button>
       <button type="button" class="button" onclick={() => close()}>Cancel</button>
     {:else if kept}
       {#if offer}
