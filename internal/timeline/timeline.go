@@ -1539,9 +1539,8 @@ func isFree(ctx context.Context, tx *sql.Tx, clipID int64, p placement) (bool, e
 	return n == 0, nil
 }
 
-// change runs one change to a Song's Timeline in a transaction, marks the
-// Song as edited, and returns the updated Timeline. If the Song is no longer
-// at the version the change was based on, or fn fails, nothing changes.
+// change runs one change to a Song's Timeline through songversion.Change
+// and returns the updated Timeline, read within the change.
 func (s *Store) change(ctx context.Context, songID int64, based songversion.Version, fn func(tx *sql.Tx) error) (Timeline, error) {
 	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges) error {
 		return fn(tx)
@@ -1549,31 +1548,26 @@ func (s *Store) change(ctx context.Context, songID int64, based songversion.Vers
 }
 
 // changeWithFiles is change for a change with files to keep, link or
-// remove, which fn adds to changes. They're changed only once the change is
-// committed.
+// remove, which fn adds to changes.
 func (s *Store) changeWithFiles(ctx context.Context, songID int64, based songversion.Version,
 	fn func(tx *sql.Tx, changes *audio.FileChanges) error) (Timeline, error) {
-	tx, err := s.db.BeginTx(ctx, nil)
+	var tl Timeline
+	err := songversion.Change(ctx, s.db, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
+		if err := fn(tx, changes); err != nil {
+			return err
+		}
+		// Any change can leave a Sound unused, or, by undo, use it again.
+		if err := markUnusedSounds(ctx, tx, songID); err != nil {
+			return err
+		}
+		var err error
+		tl, err = read(ctx, tx, songID)
+		return err
+	})
 	if err != nil {
 		return Timeline{}, err
 	}
-	defer tx.Rollback()
-	if err := songversion.Touch(ctx, tx, songID, based); err != nil {
-		return Timeline{}, err
-	}
-	var changes audio.FileChanges
-	if err := fn(tx, &changes); err != nil {
-		return Timeline{}, err
-	}
-	// Any change can leave a Sound unused, or, by undo, use it again.
-	if err := markUnusedSounds(ctx, tx, songID); err != nil {
-		return Timeline{}, err
-	}
-	tl, err := read(ctx, tx, songID)
-	if err != nil {
-		return Timeline{}, err
-	}
-	return tl, changes.Commit(tx.Commit)
+	return tl, nil
 }
 
 // query runs a query and calls row for each result row.
