@@ -1,0 +1,76 @@
+name: Binaries
+
+# Attaches Bandmate's binary, for Linux and macOS on amd64 and arm64, to each
+# GitHub Release once it's published. Not on the tag push: CONTRIBUTING's
+# "Cutting a release" publishes the Release only after CI has published the
+# image, so the binaries follow it. Each is the binary the image runs, with
+# the SPA embedded and the same version stamps, but without the yt-dlp,
+# ffmpeg and QuickJS the image bundles (ADR 0016): outside the image,
+# Bandmate runs whichever yt-dlp is on the PATH.
+#
+# The asset names have no version in them, so
+# releases/latest/download/<asset> always gets the newest. A run started by
+# hand rebuilds a release's binaries and replaces them, if a run failed.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release's tag, e.g. v0.4.0
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  binaries:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ env.TAG }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # The Go binary embeds web/dist, so build it first.
+      - name: Build the SPA
+        working-directory: web
+        run: npm ci && npm run build
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      # Pure Go SQLite, so no cgo, and every platform builds from here. The
+      # stamps match the image's: the tag, its commit, and this repository.
+      - name: Build the binaries
+        run: |
+          mkdir -p dist
+          for platform in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
+            os=${platform%/*} arch=${platform#*/}
+            out="build/$os-$arch"
+            mkdir -p "$out"
+            CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -ldflags="-s -w \
+              -X github.com/xKirtle/bandmate/internal/build.version=$TAG \
+              -X github.com/xKirtle/bandmate/internal/build.revision=$(git rev-parse HEAD) \
+              -X github.com/xKirtle/bandmate/internal/build.sourceURL=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+              -o "$out/bandmate" ./cmd/bandmate
+            cp LICENSE "$out/"
+            tar -czf "dist/bandmate-$os-$arch.tar.gz" -C "$out" bandmate LICENSE
+          done
+          (cd dist && sha256sum -- *.tar.gz > SHA256SUMS)
+
+      # --clobber replaces the assets a failed or earlier run left.
+      - name: Attach them to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" dist/* --clobber

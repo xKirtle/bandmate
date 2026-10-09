@@ -170,3 +170,11 @@ Tag first, and publish the GitHub Release only once CI has published the image. 
    ```
 
    The notes list the pull requests merged since the last release, grouped by their labels ([.github/release.yml](.github/release.yml)). Read them before publishing, because About, in Settings, shows them. Where they read poorly, write the notes by hand and pass `--notes-file` instead. v0.4.0 is one of those: it's the first release, and most earlier pull requests have no label.
+
+5. Publishing the release starts the [Binaries workflow](.github/workflows/binaries.yml), which attaches Bandmate's binary for Linux and macOS, on amd64 and arm64, and a `SHA256SUMS` file to it. Each binary is the one the image runs, without the programs the image bundles. Check that all five assets arrived:
+
+   ```sh
+   gh release view vX.Y.Z --json assets --jq '.assets[].name'
+   ```
+
+   If the workflow fails, fix the cause and run it again for the tag: `gh workflow run binaries.yml -f tag=vX.Y.Z`. It replaces whatever assets the failed run left.
