@@ -12,7 +12,7 @@
 // the default input chosen, to the Input the default turns out to be.
 import type { Calibration } from './calibration';
 import { DeviceSetting, type DeviceSettingStorage } from './deviceSetting.svelte';
-import { channelName, inputKey, readInput, type InputChoice } from './inputSettings';
+import { byDeviceThenChannel, inputKey, readInput, type InputChoice } from './inputSettings';
 
 /** An Input, by its device's id and channel, as its calibration is kept. */
 export type InputId = Pick<InputChoice, 'deviceId' | 'channel'>;
@@ -165,14 +165,12 @@ export class InputCalibrations {
   }
 
   /**
-   * Every Input kept on this device, connected or not, by name, each with
+   * Every Input kept on this device, connected or not, by device then channel, each with
    * the label its device had when kept: those calibrated, and those whose
    * calibration was skipped.
    */
   get kept(): InputCalibration[] {
-    return this.#setting.value.inputs
-      .filter((i) => i.offset !== null || i.offered)
-      .sort((a, b) => channelName(a.label, a.channel).localeCompare(channelName(b.label, b.channel)));
+    return this.#setting.value.inputs.filter((i) => i.offset !== null || i.offered).sort(byDeviceThenChannel);
   }
 
   /** Forgets an Input's offset, so it's uncalibrated, and calibration is offered before its next recording. */

@@ -1,20 +1,12 @@
 <script lang="ts">
-  import type { Calibration } from './calibration';
-  import {
-    connectedDevices,
-    identifyInput,
-    openProblem,
-    watchInputs,
-    type ConnectedDevice,
-    type InputLevel,
-  } from './capture';
-  import { listInputs, statusOf } from './inputList';
-  import { channelName, deviceName, type InputChoice } from './inputSettings';
+  import { identifyInput, openProblem } from './capture';
+  import { statusOf } from './inputList';
+  import InputName from './InputName.svelte';
+  import { InputRows, type ConnectedRow } from './inputRows.svelte';
+  import type { InputChoice } from './inputSettings';
   import LevelMeter from './LevelMeter.svelte';
   import OffsetField from './OffsetField.svelte';
-  import { RecordedInput } from './recordedInput.svelte';
   import { calibrations } from './sharedCalibration.svelte';
-  import { input } from './sharedInput.svelte';
 
   // The Input list: every Input on this device, to choose the one recorded
   // from and to calibrate any of them. First the default input, then each
@@ -41,84 +33,8 @@
 
   const id = $props.id();
 
-  /** A connected row: the default input, or a device's channel. */
-  interface Row {
-    /** Tells it from the others while it's listed. */
-    key: string;
-    name: string;
-    /** The Input the default input looks to be, to show under its name; null for any other. */
-    is: string | null;
-    calibration: Calibration;
-    /** The Input to choose, meter and calibrate, as chosen. */
-    input: InputChoice;
-    /** Whether it's calibrated as that Input exactly, rather than as the Input it turns out to be. */
-    exact: boolean;
-    /** Whether it's the Input recorded from. */
-    chosen: boolean;
-  }
-
-  const defaultInput: InputChoice = { deviceId: '', label: '', channel: 0 };
-  // The Input chosen on this device, in this tab or another.
-  const choice = $derived(input.value);
-  // The default input, as chosen where it is, e.g. a channel of it chosen before Inputs were listed.
-  const defaultChoice = $derived(choice.deviceId === '' ? choice : defaultInput);
-  // The Input the default input looks to be, and its calibration.
-  const defaultRecorded = new RecordedInput(() => defaultChoice);
-
-  // The audio devices connected, with how many channels each is known to
-  // have; null while which they are can't be told. Told again whenever
-  // watchInputs says what the browser says of them may have changed.
-  let devices = $state.raw<ConnectedDevice[] | null>(null);
-  $effect(() => {
-    let live = true;
-    const check = async () => {
-      const found = await connectedDevices();
-      if (live) devices = found;
-    };
-    void check();
-    const unwatch = watchInputs(check);
-    return () => {
-      live = false;
-      unwatch();
-    };
-  });
-  // How many channels a device turned out to have once opened, where the browser didn't say before.
-  let learned = $state<Record<string, number>>({});
-  const listed = $derived(
-    listInputs(
-      devices?.map((d) => ({ ...d, channels: Math.max(d.channels, learned[d.deviceId] ?? 0) })) ?? null,
-      calibrations.kept,
-      choice,
-    ),
-  );
-
-  // The device chosen when it isn't connected, so the default input is recorded from.
-  const chosenGone = $derived(
-    choice.deviceId !== '' && devices !== null && !devices.some((d) => d.deviceId === choice.deviceId)
-      ? deviceName(choice.label)
-      : null,
-  );
-  const keyOf = (input: InputChoice) => JSON.stringify([input.deviceId, input.channel]);
-  const rows: Row[] = $derived([
-    {
-      key: 'default',
-      name: 'Default input',
-      is: defaultRecorded.current ? channelName(defaultRecorded.current.label, defaultRecorded.current.channel) : null,
-      calibration: defaultRecorded.calibration,
-      input: defaultChoice,
-      exact: false,
-      chosen: choice.deviceId === '' || chosenGone !== null,
-    },
-    ...listed.connected.map((row) => ({
-      key: keyOf(row.input),
-      name: row.name,
-      is: null,
-      calibration: row.calibration,
-      input: row.input,
-      exact: true,
-      chosen: keyOf(row.input) === keyOf(choice),
-    })),
-  ]);
+  const inputs = new InputRows();
+  const rows = $derived(inputs.connected);
 
   // The row the user opened, by its key, or null for none; until they open
   // one, the row of the Input recorded from is open.
@@ -128,15 +44,10 @@
   let typing = $state(false);
   let typeProblem = $state<string | null>(null);
 
-  function toggle(row: Row) {
+  function toggle(row: ConnectedRow) {
     userOpened = openKey === row.key ? null : row.key;
     typing = false;
     typeProblem = null;
-  }
-
-  function learn(level: InputLevel | null) {
-    const deviceId = level?.opened?.deviceId;
-    if (level && deviceId) learned[deviceId] = Math.max(learned[deviceId] ?? 0, level.channels);
   }
 
   /**
@@ -144,7 +55,7 @@
    * the default input, it's that of the Input it is, which only opening it
    * says for sure, so it's opened a moment to find out.
    */
-  async function type(row: Row, offset: number) {
+  async function type(row: ConnectedRow, offset: number) {
     typeProblem = null;
     const given = $state.snapshot(row.input);
     let which: InputChoice | null = given;
@@ -167,8 +78,8 @@
 </script>
 
 <div class="input-list">
-  {#if chosenGone}
-    <p class="notice" role="status">{chosenGone} isn't connected, so the default input is used.</p>
+  {#if inputs.chosenGone}
+    <p class="notice" role="status">{inputs.chosenGone} isn't connected, so the default input is used.</p>
   {/if}
   <fieldset class="choice-group">
     <legend class="visually-hidden">Record from</legend>
@@ -178,14 +89,11 @@
         <li>
           <div class="line">
             <label class="choice-row">
-              <input
-                type="radio"
-                name="{id}-record-from"
-                checked={row.chosen}
-                onchange={() => input.set(row.exact ? $state.snapshot(row.input) : defaultInput)}
-              />
+              <input type="radio" name="{id}-record-from" checked={row.chosen} onchange={() => inputs.choose(row)} />
               <span class="name" id="{id}-{i}-name"
-                >{row.name}{#if row.is}<span class="is">{row.is}</span>{/if}</span
+                ><InputName name={row.name} channel={row.channel} />{#if row.is}<span class="is"
+                    ><InputName name="" channel={row.is} /></span
+                  >{/if}</span
               >
             </label>
             <button
@@ -201,7 +109,7 @@
           {#if open}
             <div class="more" id="{id}-{i}">
               {#if metering}
-                <LevelMeter input={row.input} onOpen={learn} />
+                <LevelMeter input={row.input} onOpen={(level) => inputs.learn(level)} />
               {/if}
               <div class="actions">
                 <button
@@ -224,13 +132,13 @@
       {/each}
     </ul>
   </fieldset>
-  {#if listed.notConnected.length > 0}
+  {#if inputs.notConnected.length > 0}
     <h3 id="{id}-not-connected">Not connected</h3>
     <ul aria-labelledby="{id}-not-connected">
-      {#each listed.notConnected as row (keyOf(row.input))}
+      {#each inputs.notConnected as row (JSON.stringify([row.input.deviceId, row.input.channel]))}
         <li>
           <div class="line">
-            <span class="name">{row.name}</span>
+            <span class="name"><InputName name={row.name} channel={row.input} /></span>
             <span class="badge tag tabular">{statusOf(row.calibration)}</span>
             <button
               type="button"
@@ -273,7 +181,6 @@
   .name {
     flex: 1;
     min-width: 0;
-    overflow-wrap: anywhere;
   }
   /* What the default input is, under its name. */
   .is {

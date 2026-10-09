@@ -1,7 +1,8 @@
 // The input a recording captures: a device, and one channel of it, since
 // Takes are mono and an interface usually has two inputs. It's chosen in
-// the recording settings and kept on this device, like its Latency Offset,
-// since it belongs to the hardware here, not to any Song.
+// Settings, or with the Timeline's mic button, and kept on this device,
+// like its Latency Offset, since it belongs to the hardware here, not to
+// any Song.
 import type { DeviceSettingStorage } from './deviceSetting.svelte';
 
 /** The input chosen: a device, by id ('' for the default), and a channel of it, from 0. */
@@ -123,9 +124,23 @@ export function deviceName(label: string): string {
   return label.replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i, '').trim() || 'Unnamed input';
 }
 
-/** A channel's name to show, e.g. "Scarlett 2i2 · Input 1". */
+/**
+ * A channel's name to show, e.g. "Input 1 · Scarlett 2i2": the channel
+ * leads, as it's what tells a device's Inputs apart where a long device
+ * name is cut short.
+ */
 export function channelName(label: string, channel: number): string {
-  return `${deviceName(label)} · Input ${channel + 1}`;
+  return `${channelNumber(channel)} · ${deviceName(label)}`;
+}
+
+/** A channel of a device, as it leads its name, e.g. "Input 1": counted from 1. */
+export function channelNumber(channel: number): string {
+  return `Input ${channel + 1}`;
+}
+
+/** Orders Inputs by their device's name, then each device's by channel. */
+export function byDeviceThenChannel(a: { label: string; channel: number }, b: { label: string; channel: number }) {
+  return deviceName(a.label).localeCompare(deviceName(b.label)) || a.channel - b.channel;
 }
 
 /**

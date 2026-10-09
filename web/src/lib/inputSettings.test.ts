@@ -217,16 +217,16 @@ describe('deviceName and channelName', () => {
     expect(deviceName('')).toBe('Unnamed input');
   });
 
-  it('names a channel after its device, counting from 1', () => {
-    expect(channelName('Scarlett 2i2 USB (1235:8210)', 0)).toBe('Scarlett 2i2 USB · Input 1');
-    expect(channelName('Scarlett 2i2 USB (1235:8210)', 1)).toBe('Scarlett 2i2 USB · Input 2');
+  it('names a channel by its number, counting from 1, then its device, so what tells them apart leads', () => {
+    expect(channelName('Scarlett 2i2 USB (1235:8210)', 0)).toBe('Input 1 · Scarlett 2i2 USB');
+    expect(channelName('Scarlett 2i2 USB (1235:8210)', 1)).toBe('Input 2 · Scarlett 2i2 USB');
   });
 });
 
 describe('inputName', () => {
   it('names the Input chosen by the label it had when chosen, and its channel', () => {
     expect(inputName({ deviceId: 'abc', label: 'Scarlett 2i2 USB (1235:8210)', channel: 1 })).toBe(
-      'Scarlett 2i2 USB · Input 2',
+      'Input 2 · Scarlett 2i2 USB',
     );
   });
 
@@ -235,7 +235,7 @@ describe('inputName', () => {
   });
 
   it("names the default input's channel past its first", () => {
-    expect(inputName({ deviceId: '', label: '', channel: 1 })).toBe('Default input · Input 2');
+    expect(inputName({ deviceId: '', label: '', channel: 1 })).toBe('Input 2 · Default input');
   });
 });
 

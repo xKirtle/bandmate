@@ -357,7 +357,7 @@
       <p class="error" role="alert">{error}</p>
     {/if}
     {#if offer}
-      <p class="muted">Skipped, it can be run any time from Recording settings… in the Timeline's ⋯ menu.</p>
+      <p class="muted">Skipped, it can be run any time in Settings → Recording.</p>
     {/if}
     <div class="actions" bind:this={actions}>
       <button type="button" class="button primary" onclick={measure}>Start</button>
