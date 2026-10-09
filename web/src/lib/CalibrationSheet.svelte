@@ -189,11 +189,20 @@
     reading = next;
     if (!judged.finished) return;
     if (usable) finish();
-    // Heard all it listens for, with too few agreeing to keep.
-    else
-      stopWith(
-        `Only ${next.counted} of ${taps(next.taps.length)} agreed, too few to measure. Try again, or change the calibration method.`,
-      );
+    else stopWith(tooFew(next));
+  }
+
+  /** Why a reading that played all its clicks can't be kept: the mic heard too little, or too few of what it heard agreed. */
+  function tooFew({ clicks, taps: heard, counted }: Reading): string {
+    if (heard.length >= minHits)
+      return `Only ${counted} of ${taps(heard.length)} agreed, too few to measure. Try again, or change the calibration method.`;
+    const what =
+      method === 'handsFree' ? `${heard.length} of ${clicks} clicks` : `${taps(heard.length)} in ${clicks} clicks`;
+    const advice =
+      method === 'handsFree'
+        ? 'Turn the volume up, or change the calibration method.'
+        : 'Try again, or change the calibration method.';
+    return `The mic heard only ${what}, too little to measure. ${advice}`;
   }
 
   /** Back to the method, saying why it stopped. */
