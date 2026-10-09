@@ -153,7 +153,7 @@ group('clipActions', () => {
     for (const entry of entries) {
       if ('run' in entry) entry.run();
       else if ('choices' in entry) for (const choice of entry.choices) choice.run();
-      else entry.field.set(5);
+      else if ('field' in entry) entry.field.set(5);
     }
     expect(ran).toEqual([
       'retake',

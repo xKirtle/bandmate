@@ -156,7 +156,8 @@
 
   // `byKeyboard` when it's chosen with Enter or Space rather than clicked.
   function choose(entry: MenuAction | MenuChoice, byKeyboard: boolean) {
-    if ('disabled' in entry && entry.disabled) return;
+    // A download is a link, which follows itself.
+    if ('download' in entry || ('disabled' in entry && entry.disabled)) return;
     if ('choices' in entry || 'field' in entry) {
       pick(entry, byKeyboard);
       return;
@@ -327,20 +328,44 @@
       {:else}
         <!-- By place: a list of Sections can name two alike. -->
         {#each entries as entry, i (i)}
-          <button
-            type="button"
-            role="menuitem"
-            tabindex="-1"
-            aria-haspopup={'choices' in entry ? 'menu' : undefined}
-            aria-disabled={('disabled' in entry && entry.disabled) || undefined}
-            title={'title' in entry ? entry.title : undefined}
-            onclick={(e) => choose(entry, keyboardClick(e))}
-          >
-            {#if 'icon' in entry}
+          {#if 'download' in entry}
+            <!-- A real link, so the browser downloads it as it would from a
+                 button-styled one. It closes the menu once the click has
+                 started the download: gone any sooner, the link wouldn't. -->
+            <a
+              role="menuitem"
+              tabindex="-1"
+              href={entry.download}
+              download
+              title={entry.title}
+              onclick={() => setTimeout(close)}
+              onkeydown={(e) => {
+                // Space chooses it, as it does the other entries, buttons.
+                if (e.key === ' ') {
+                  e.preventDefault();
+                  e.currentTarget.click();
+                }
+              }}
+            >
               <span class="entry-icon" aria-hidden="true"><entry.icon /></span>
-            {/if}
-            {entry.label}
-          </button>
+              {entry.label}
+            </a>
+          {:else}
+            <button
+              type="button"
+              role="menuitem"
+              tabindex="-1"
+              aria-haspopup={'choices' in entry ? 'menu' : undefined}
+              aria-disabled={('disabled' in entry && entry.disabled) || undefined}
+              title={'title' in entry ? entry.title : undefined}
+              onclick={(e) => choose(entry, keyboardClick(e))}
+            >
+              {#if 'icon' in entry}
+                <span class="entry-icon" aria-hidden="true"><entry.icon /></span>
+              {/if}
+              {entry.label}
+            </button>
+          {/if}
         {/each}
       {/if}
     </div>
@@ -385,6 +410,7 @@
     color: var(--text);
     font: inherit;
     text-align: left;
+    text-decoration: none;
     white-space: nowrap;
     cursor: pointer;
   }

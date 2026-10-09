@@ -5,11 +5,15 @@
   // here or another install, can be uploaded to join them, picked or
   // dropped, several at once. Songs can be restored from each that holds
   // some. Each can be renamed, or deleted after confirming; nothing deletes
-  // one otherwise.
+  // one otherwise. On a phone, a Backup's Restore and Download fold into its
+  // ⋯, with Rename and Delete.
+  import ArchiveRestore from '@lucide/svelte/icons/archive-restore';
+  import Download from '@lucide/svelte/icons/download';
   import Pencil from '@lucide/svelte/icons/pencil';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import X from '@lucide/svelte/icons/x';
   import { onDestroy, tick } from 'svelte';
+  import { MediaQuery } from 'svelte/reactivity';
   import ActionsMenu from '../lib/ActionsMenu.svelte';
   import { api, type Backup } from '../lib/api';
   import { automaticName, backupName, backupSize } from '../lib/backups';
@@ -66,6 +70,11 @@
     (list) => (backups = list),
     (e: Error) => (loadError = e.message),
   );
+
+  // Wider than a phone, as where the Timeline can be edited, a Backup's
+  // Restore and Download are buttons beside its ⋯; on a phone they fold
+  // into it.
+  const wide = new MediaQuery('min-width: 40.0625rem');
 
   const timeFormat = new Intl.DateTimeFormat(undefined, { timeStyle: 'short' });
 
@@ -149,8 +158,18 @@
     }
   }
 
+  /** Whether a Backup holds anything to restore: Songs or Beats. */
+  const restorable = (backup: Backup) => backup.songs > 0 || backup.beats > 0;
+
+  /** A Backup's ⋯: Rename… and Delete…, after Restore… and Download on a phone. */
   function actions(backup: Backup): MenuAction[] {
+    const folded: MenuAction[] = [];
+    if (!wide.current) {
+      if (restorable(backup)) folded.push({ icon: ArchiveRestore, label: 'Restore…', run: () => (restoring = backup) });
+      folded.push({ icon: Download, label: 'Download', download: api.backupDownloadUrl(backup.id) });
+    }
     return [
+      ...folded,
       { icon: Pencil, label: 'Rename…', run: () => (renaming = backup) },
       { icon: Trash2, label: 'Delete…', run: () => remove(backup) },
     ];
@@ -242,20 +261,22 @@
               </span>
             </div>
             <div class="row-actions">
-              {#if backup.songs > 0 || backup.beats > 0}
-                <button
-                  type="button"
+              {#if wide.current}
+                {#if restorable(backup)}
+                  <button
+                    type="button"
+                    class="button"
+                    onclick={() => (restoring = backup)}
+                    aria-label="Restore from {backupName(backup)}">Restore</button
+                  >
+                {/if}
+                <a
                   class="button"
-                  onclick={() => (restoring = backup)}
-                  aria-label="Restore from {backupName(backup)}">Restore</button
+                  href={api.backupDownloadUrl(backup.id)}
+                  download
+                  aria-label="Download {backupName(backup)}">Download</a
                 >
               {/if}
-              <a
-                class="button"
-                href={api.backupDownloadUrl(backup.id)}
-                download
-                aria-label="Download {backupName(backup)}">Download</a
-              >
               <ActionsMenu label="More actions for {backupName(backup)}" entries={actions(backup)} />
             </div>
           </li>

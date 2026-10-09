@@ -60,3 +60,39 @@ test("Upload and New Backup don't show when the Backups fail to load", async ({ 
   await expect(upload(page)).toHaveCount(0);
   await expect(newBackup(page)).toHaveCount(0);
 });
+
+/** The demo Backup's row, by its name, which says it holds everything. */
+const demoRow = (page: Page) => card(page).getByRole('listitem').filter({ hasText: 'Everything' });
+
+test("on a phone, a Backup's Restore and Download fold into its ⋯", async ({ page, bandmate }) => {
+  await bandmate.restoreDemo();
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  await page.goto('/settings/backups');
+
+  await expect(demoRow(page).getByRole('button', { name: /^Restore/ })).toHaveCount(0);
+  await expect(demoRow(page).getByRole('link', { name: /^Download/ })).toHaveCount(0);
+  await demoRow(page).getByRole('button', { name: /^More actions/ }).click();
+  const menu = page.getByRole('menu');
+  await expect(menu.getByRole('menuitem')).toHaveText(['Restore…', 'Download', 'Rename…', 'Delete…']);
+
+  // Download is still a link that downloads the Backup's file.
+  const download = page.waitForEvent('download');
+  await menu.getByRole('menuitem', { name: 'Download' }).click();
+  expect((await download).suggestedFilename()).toMatch(/\.bandmate$/);
+
+  await demoRow(page).getByRole('button', { name: /^More actions/ }).click();
+  await page.getByRole('menu').getByRole('menuitem', { name: 'Restore…' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+});
+
+test("on a desktop, a Backup's Restore and Download stay beside its ⋯", async ({ page, bandmate }) => {
+  await bandmate.restoreDemo();
+
+  await page.goto('/settings/backups');
+
+  await expect(demoRow(page).getByRole('button', { name: /^Restore/ })).toBeVisible();
+  await expect(demoRow(page).getByRole('link', { name: /^Download/ })).toBeVisible();
+  await demoRow(page).getByRole('button', { name: /^More actions/ }).click();
+  await expect(page.getByRole('menu').getByRole('menuitem')).toHaveText(['Rename…', 'Delete…']);
+});
