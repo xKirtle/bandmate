@@ -1,6 +1,16 @@
 <script lang="ts">
   import { onDestroy, tick } from 'svelte';
-  import { clickTime, formatOffset, Measuring, minHits, noReading, offsetChange, type Reading } from './calibration';
+  import {
+    clickTime,
+    finishingAt,
+    formatOffset,
+    Measuring,
+    minHits,
+    noReading,
+    offsetChange,
+    verdict,
+    type Reading,
+  } from './calibration';
   import { Capture, CaptureError, frameAt } from './capture';
   import Dialog from './Dialog.svelte';
   import { channelName, inputName, sameInput, type InputChoice } from './inputSettings';
@@ -14,7 +24,8 @@
   // clicks from headphones resting on it, or tap along, where the user taps
   // or claps on it with the clicks they hear. Then clicks play, a metronome
   // swinging upright as each is heard, and each tap is measured as it's
-  // heard, until the user finishes, once enough count. Pause never leaves:
+  // heard, until the average is known well enough, or the user finishes
+  // early, once enough count. Pause never leaves:
   // it offers Start over, Finish, Change method or Quit. The result shows
   // the change from the Input's offset there was, or the browser's
   // estimate, and nothing is kept until Save. Offered before an Input's
@@ -88,8 +99,9 @@
   const ahead = 1;
   const scheduleEvery = 0.25;
 
-  /** Whether a reading has enough taps that agree to keep. */
-  const usable = $derived(reading.counted >= minHits && reading.average !== null);
+  // Whether the reading has enough taps that agree to keep, and how near it is to finishing by itself.
+  const judged = $derived(verdict(reading));
+  const usable = $derived(judged.usable);
 
   /** The context time being heard from the speakers now, as the browser says. */
   function heardNow(): number {
@@ -169,11 +181,22 @@
     }
   }
 
-  /** Takes a new reading, marking each tap new in it as heard now. */
+  /** Takes a new reading, marking each tap new in it as heard now, and finishes once it's known well enough. */
   function heard(next: Reading) {
+    if (step !== 'measure') return;
     const now = performance.now();
     marks = next.taps.map((tap, i) => ({ ...tap, at: marks[i]?.at ?? now }));
     reading = next;
+    const { finished, usable } = verdict(next);
+    if (!finished) return;
+    if (usable) finish();
+    // Heard all it listens for, with too few agreeing to keep.
+    else
+      fail(
+        new CaptureError(
+          `Only ${next.counted} of ${taps(next.taps.length)} agreed, too few to measure. Try again, or change the calibration method.`,
+        ),
+      );
   }
 
   /** Back to the method, saying why it stopped. */
@@ -279,6 +302,8 @@
   });
 
   const taps = (n: number) => `${n} ${n === 1 ? 'tap' : 'taps'}`;
+  // A spread or precision, in whole milliseconds; as none from a single tap.
+  const ms = (seconds: number | null) => `${Math.round((seconds ?? 0) * 1000)} ms`;
 </script>
 
 <svelte:window onkeydowncapture={onkeydown} />
@@ -351,12 +376,12 @@
       <div
         class="progress"
         role="progressbar"
-        aria-label="Taps found"
+        aria-label="Progress to finishing"
         aria-valuemin="0"
-        aria-valuemax={minHits}
-        aria-valuenow={Math.min(reading.counted, minHits)}
+        aria-valuemax="100"
+        aria-valuenow={Math.round(judged.progress * 100)}
       >
-        <div style:width="{(Math.min(reading.counted, minHits) / minHits) * 100}%"></div>
+        <div style:width="{judged.progress * 100}%"></div>
       </div>
       <p class="muted">
         {#if step === 'paused'}
@@ -364,7 +389,9 @@
         {:else if !usable}
           Finding the taps: {Math.min(reading.counted, minHits)} of {minHits}
         {:else}
-          Enough to finish. More taps make it more exact.
+          Your taps spread ±{ms(reading.spread)} · average good to ±{ms(reading.precision)}, finishing at ±{ms(
+            finishingAt,
+          )}
         {/if}
       </p>
     </div>
@@ -395,7 +422,7 @@
         {:else if reported !== null}
           The browser guessed {formatOffset(reported)}.
         {/if}
-        From {taps(reading.counted)}.
+        From {taps(reading.counted)} spread ±{ms(reading.spread)}: good to ±{ms(reading.precision)}.
       </p>
       <p class="muted">New Takes from it are placed earlier by it; Takes already recorded stay where they are.</p>
     </div>

@@ -7,7 +7,9 @@ import {
   minHits,
   offsetChange,
   offsetSummary,
+  readingOf,
   typedOffset,
+  verdict,
 } from './calibration';
 
 const rate = 48000;
@@ -141,9 +143,9 @@ describe('Measuring', () => {
     const batched = new Measuring(rate);
     for (let at = 0; at < samples.length; at += 4096) batched.hear(samples.subarray(at, at + 4096), at);
     expect(batched.result).toEqual(whole.result);
-    expect(batched.taps).toEqual(whole.taps);
-    expect(whole.average).toBeCloseTo(0.03, 3);
-    expect(whole.counted).toBe(12);
+    expect(batched.reading).toEqual(whole.reading);
+    expect(whole.reading.average).toBeCloseTo(0.03, 3);
+    expect(whole.reading.counted).toBe(12);
   });
 
   it('leaves taps far from the rest out of the average, keeping them in order', () => {
@@ -151,10 +153,78 @@ describe('Measuring', () => {
     claps[1] = clicks[1] + 0.25;
     const measuring = new Measuring(rate);
     measuring.hear(recording(length, claps), 0);
-    expect(measuring.taps.map((t) => t.counted)).toEqual(clicks.map((_, i) => i !== 1));
-    expect(measuring.taps[1].delay).toBeCloseTo(0.25, 3);
-    expect(measuring.average).toBeCloseTo(0.04, 3);
-    expect(measuring.counted).toBe(11);
+    const { taps, average, counted } = measuring.reading;
+    expect(taps.map((t) => t.counted)).toEqual(clicks.map((_, i) => i !== 1));
+    expect(taps[1].delay).toBeCloseTo(0.25, 3);
+    expect(average).toBeCloseTo(0.04, 3);
+    expect(counted).toBe(11);
+  });
+});
+
+describe('readingOf', () => {
+  it('counts taps within 50 ms of the median, and leaves out ones farther', () => {
+    const found = readingOf([0.1, 0.1, 0.14, 0.1, 0.04, 0.1]);
+    expect(found.taps.map((t) => t.counted)).toEqual([true, true, true, true, false, true]);
+    expect(found.counted).toBe(5);
+    expect(found.average).toBeCloseTo(0.108, 6);
+  });
+
+  it("reports the counted taps' spread, and how precisely their average is known", () => {
+    // Mean 0.1, deviations ±0.02 and 0: a sample standard deviation of 0.02.
+    const found = readingOf([0.08, 0.1, 0.12, 0.3]);
+    expect(found.spread).toBeCloseTo(0.02, 6);
+    expect(found.precision).toBeCloseTo(0.02 / Math.sqrt(3), 6);
+  });
+
+  it('has no spread or precision from fewer than 2 counted taps', () => {
+    expect(readingOf([0.1])).toMatchObject({ counted: 1, spread: null, precision: null });
+    expect(readingOf([])).toMatchObject({ counted: 0, average: null, spread: null, precision: null });
+  });
+});
+
+/** Delays alternating early and late of 100 ms by deviation, n of them: loose taps. */
+const loose = (n: number, deviation: number) =>
+  Array.from({ length: n }, (_, i) => 0.1 + (i % 2 ? deviation : -deviation));
+
+describe('verdict', () => {
+  it('finishes loose taps once their average is known to ±4 ms, from at least 10', () => {
+    // Spread about ±11 ms: good to ±4 ms by 8 taps, but not finished before 10.
+    expect(verdict(readingOf(loose(9, 0.01)))).toMatchObject({ usable: true, finished: false });
+    expect(verdict(readingOf(loose(10, 0.01)))).toMatchObject({ usable: true, finished: true, progress: 1 });
+    // Spread about ±20 ms: good to ±4 ms only once 25 taps count, so the cap of 24 finishes first.
+    expect(verdict(readingOf(loose(16, 0.02)))).toMatchObject({ finished: false });
+  });
+
+  it('finishes taps spread ±15 ms by precision, before the cap', () => {
+    // Over 14 taps, good to about ±4.2 ms; over 16, about ±3.9 ms.
+    expect(verdict(readingOf(loose(14, 0.015))).finished).toBe(false);
+    expect(verdict(readingOf(loose(16, 0.015))).finished).toBe(true);
+  });
+
+  it('is usable, but not finished, from 6 counted taps however exact', () => {
+    expect(verdict(readingOf(loose(5, 0)))).toMatchObject({ usable: false, finished: false });
+    expect(verdict(readingOf(loose(6, 0)))).toMatchObject({ usable: true, finished: false });
+    expect(verdict(readingOf(loose(9, 0)))).toMatchObject({ usable: true, finished: false });
+  });
+
+  it('finishes at 24 counted taps, however loose', () => {
+    // Spread about ±24 ms: good to only about ±5 ms by then.
+    expect(verdict(readingOf(loose(23, 0.024))).finished).toBe(false);
+    expect(verdict(readingOf(loose(24, 0.024)))).toMatchObject({ finished: true, progress: 1 });
+  });
+
+  it('finishes at 40 taps heard, though fewer count and their average is not yet precise', () => {
+    // Half the taps 180 or 220 ms late, and half far off them, at 0 or 400 ms.
+    const scattered = (n: number) => Array.from({ length: n }, (_, i) => [0, 0.18, 0.22, 0.4][i % 4]);
+    expect(verdict(readingOf(scattered(39)))).toMatchObject({ usable: true, finished: false });
+    expect(verdict(readingOf(scattered(40)))).toMatchObject({ finished: true, progress: 1 });
+    expect(readingOf(scattered(40)).counted).toBe(20);
+  });
+
+  it('shows progress toward finishing, never back', () => {
+    expect(verdict(readingOf([])).progress).toBe(0);
+    expect(verdict(readingOf(loose(12, 0.04))).progress).toBeCloseTo(0.5, 6);
+    expect(verdict(readingOf(loose(20, 0.04))).progress).toBeCloseTo(20 / 24, 6);
   });
 });
 
