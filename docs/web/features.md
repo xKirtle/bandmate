@@ -148,7 +148,7 @@ Keep copies of your work, and move it between installs.
 1. **Upload** a Backup, made by this Bandmate or another.
 2. **New Backup**: of the songs you choose, your beat library, or both.
 3. **A Backup**, with when it was made and its size.
-4. **Restore** what you pick from it, or download it to keep it somewhere safe. Where a song is already here, you choose to replace it or keep both.
+4. **Restore** what you pick from it, or download it to keep it somewhere safe. Where a song is already here, you choose to replace it or keep both. On a phone, Restore and Download are in the Backup's ⋯ menu.
 
 A Backup restores into the same version of Bandmate or a newer one. To copy everything at once, see [copying the data folder](/self-hosting#copying-the-data-folder).
 

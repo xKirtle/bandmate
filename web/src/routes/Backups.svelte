@@ -5,11 +5,15 @@
   // here or another install, can be uploaded to join them, picked or
   // dropped, several at once. Songs can be restored from each that holds
   // some. Each can be renamed, or deleted after confirming; nothing deletes
-  // one otherwise.
+  // one otherwise. On a phone, a Backup's Restore and Download fold into its
+  // ⋯, with Rename and Delete.
+  import ArchiveRestore from '@lucide/svelte/icons/archive-restore';
+  import Download from '@lucide/svelte/icons/download';
   import Pencil from '@lucide/svelte/icons/pencil';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import X from '@lucide/svelte/icons/x';
   import { onDestroy, tick } from 'svelte';
+  import { MediaQuery } from 'svelte/reactivity';
   import ActionsMenu from '../lib/ActionsMenu.svelte';
   import { api, type Backup } from '../lib/api';
   import { automaticName, backupName, backupSize } from '../lib/backups';
@@ -66,6 +70,11 @@
     (list) => (backups = list),
     (e: Error) => (loadError = e.message),
   );
+
+  // Wider than a phone, as where the Timeline can be edited, a Backup's
+  // Restore and Download are buttons beside its ⋯; on a phone they fold
+  // into it.
+  const wide = new MediaQuery('min-width: 40.0625rem');
 
   const timeFormat = new Intl.DateTimeFormat(undefined, { timeStyle: 'short' });
 
@@ -149,8 +158,18 @@
     }
   }
 
+  /** Whether a Backup holds anything to restore: Songs or Beats. */
+  const restorable = (backup: Backup) => backup.songs > 0 || backup.beats > 0;
+
+  /** A Backup's ⋯: Rename… and Delete…, after Restore… and Download on a phone. */
   function actions(backup: Backup): MenuAction[] {
+    const folded: MenuAction[] = [];
+    if (!wide.current) {
+      if (restorable(backup)) folded.push({ icon: ArchiveRestore, label: 'Restore…', run: () => (restoring = backup) });
+      folded.push({ icon: Download, label: 'Download', download: api.backupDownloadUrl(backup.id) });
+    }
     return [
+      ...folded,
       { icon: Pencil, label: 'Rename…', run: () => (renaming = backup) },
       { icon: Trash2, label: 'Delete…', run: () => remove(backup) },
     ];
@@ -166,97 +185,105 @@
 {/snippet}
 
 <SettingsPage tab="backups">
-  {#snippet barActions()}
-    <div class="bar-actions">
-      <label class="button">
-        Upload
-        <input class="visually-hidden" type="file" accept=".bandmate" multiple onchange={pick} />
-      </label>
-      <button type="button" class="button primary" onclick={() => (making = true)}>New Backup</button>
-    </div>
-  {/snippet}
-  {#if error}
-    <div class="message" role="alert">
-      <span class="error">{error}</span>
-      {@render dismiss(() => (error = null))}
-    </div>
-  {/if}
-  {#if uploads.failures.length > 0}
-    <div class="message" role="alert">
-      <span class="error">{failedNote(uploads.failures)}</span>
-      {@render dismiss(() => uploads.dismissFailures())}
-    </div>
-  {/if}
-  {#if uploads.current}
-    {@const { file, progress } = uploads.current}
-    <div class="message">
-      <!-- The percentage is left out of what's announced, so a screen reader
-           says each step once; the bar tells how far it has got. -->
-      <span class="muted">
-        <span role="status">{progress.step === 'sending' ? `Uploading “${file}”…` : `Checking “${file}”…`}</span>
-        {#if progress.step === 'sending'}<span class="tabular" aria-hidden="true"
-            >{Math.floor(progress.sent * 100)}%</span
-          >{/if}
-        {#if uploads.count}<span class="tabular">· {uploads.count.at} of {uploads.count.of}</span>{/if}
-      </span>
-      <!-- Without a value while checking: how long that takes isn't known. -->
-      {#if progress.step === 'sending'}
-        <progress max="1" value={progress.sent} aria-label="How much of the Backup has been sent"></progress>
-        <button type="button" class="button" onclick={() => uploads.cancel()}>Cancel</button>
-      {:else}
-        <progress aria-label="Checking the Backup"></progress>
+  <section class="card" aria-labelledby="backups-heading">
+    <div class="head">
+      <h2 id="backups-heading">Backups</h2>
+      <!-- Only once there's a list for them to add to. -->
+      {#if backups !== null}
+        <div class="head-actions">
+          <label class="button">
+            Upload
+            <input class="visually-hidden" type="file" accept=".bandmate" multiple onchange={pick} />
+          </label>
+          <button type="button" class="button primary" onclick={() => (making = true)}>New Backup</button>
+        </div>
       {/if}
     </div>
-  {:else if uploaded}
-    <div class="message">
-      <span class="muted" role="status">{uploaded}</span>
-      {@render dismiss(() => (uploaded = null))}
-    </div>
-  {/if}
-  {#if loadError}
-    <p class="error" role="alert">{loadError}</p>
-  {:else if backups === null}
-    <p class="muted">Loading…</p>
-  {:else if backups.length === 0}
-    <div class="empty">
-      <p>No Backups yet.</p>
-      <p class="muted">
-        A Backup is a copy of chosen Songs and Beats, kept here to restore from, and downloadable as one file to keep
-        elsewhere. Upload or drop one downloaded before, here or on another install, to restore from it.
-      </p>
-    </div>
-  {:else}
-    <ul class="backups" bind:this={list}>
-      {#each backups as backup (backup.id)}
-        <li data-backup={backup.id} class:highlighted={highlighted.includes(backup.id)}>
-          <div class="about">
-            <span class="name">{backupName(backup)}</span>
-            <span class="muted details">
-              {#if backup.name}{automaticName(backup)} ·{/if}
-              Made at {timeFormat.format(new Date(backup.createdAt))} · {backupSize(backup.size)}
-            </span>
-          </div>
-          <div class="row-actions">
-            {#if backup.songs > 0 || backup.beats > 0}
-              <button
-                type="button"
-                class="button"
-                onclick={() => (restoring = backup)}
-                aria-label="Restore from {backupName(backup)}">Restore</button
-              >
-            {/if}
-            <a
-              class="button"
-              href={api.backupDownloadUrl(backup.id)}
-              download
-              aria-label="Download {backupName(backup)}">Download</a
-            >
-            <ActionsMenu label="More actions for {backupName(backup)}" entries={actions(backup)} />
-          </div>
-        </li>
-      {/each}
-    </ul>
-  {/if}
+    {#if error}
+      <div class="message" role="alert">
+        <span class="error">{error}</span>
+        {@render dismiss(() => (error = null))}
+      </div>
+    {/if}
+    {#if uploads.failures.length > 0}
+      <div class="message" role="alert">
+        <span class="error">{failedNote(uploads.failures)}</span>
+        {@render dismiss(() => uploads.dismissFailures())}
+      </div>
+    {/if}
+    {#if uploads.current}
+      {@const { file, progress } = uploads.current}
+      <div class="message">
+        <!-- The percentage is left out of what's announced, so a screen reader
+             says each step once; the bar tells how far it has got. -->
+        <span class="muted">
+          <span role="status">{progress.step === 'sending' ? `Uploading “${file}”…` : `Checking “${file}”…`}</span>
+          {#if progress.step === 'sending'}<span class="tabular" aria-hidden="true"
+              >{Math.floor(progress.sent * 100)}%</span
+            >{/if}
+          {#if uploads.count}<span class="tabular">· {uploads.count.at} of {uploads.count.of}</span>{/if}
+        </span>
+        <!-- Without a value while checking: how long that takes isn't known. -->
+        {#if progress.step === 'sending'}
+          <progress max="1" value={progress.sent} aria-label="How much of the Backup has been sent"></progress>
+          <button type="button" class="button" onclick={() => uploads.cancel()}>Cancel</button>
+        {:else}
+          <progress aria-label="Checking the Backup"></progress>
+        {/if}
+      </div>
+    {:else if uploaded}
+      <div class="message">
+        <span class="muted" role="status">{uploaded}</span>
+        {@render dismiss(() => (uploaded = null))}
+      </div>
+    {/if}
+    {#if loadError}
+      <p class="error" role="alert">{loadError}</p>
+    {:else if backups === null}
+      <p class="muted">Loading…</p>
+    {:else if backups.length === 0}
+      <div class="empty">
+        <p>No Backups yet.</p>
+        <p class="muted">
+          A Backup is a copy of chosen Songs and Beats, kept here to restore from, and downloadable as one file to keep
+          elsewhere. Upload or drop one downloaded before, here or on another install, to restore from it.
+        </p>
+      </div>
+    {:else}
+      <ul class="backups" bind:this={list}>
+        {#each backups as backup (backup.id)}
+          <li data-backup={backup.id} class:highlighted={highlighted.includes(backup.id)}>
+            <div class="about">
+              <span class="name">{backupName(backup)}</span>
+              <span class="muted details">
+                {#if backup.name}{automaticName(backup)} ·{/if}
+                Made at {timeFormat.format(new Date(backup.createdAt))} · {backupSize(backup.size)}
+              </span>
+            </div>
+            <div class="row-actions">
+              {#if wide.current}
+                {#if restorable(backup)}
+                  <button
+                    type="button"
+                    class="button"
+                    onclick={() => (restoring = backup)}
+                    aria-label="Restore from {backupName(backup)}">Restore</button
+                  >
+                {/if}
+                <a
+                  class="button"
+                  href={api.backupDownloadUrl(backup.id)}
+                  download
+                  aria-label="Download {backupName(backup)}">Download</a
+                >
+              {/if}
+              <ActionsMenu label="More actions for {backupName(backup)}" entries={actions(backup)} />
+            </div>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </section>
 </SettingsPage>
 
 {#if making}
@@ -272,12 +299,39 @@
 {/if}
 
 <style>
-  .bar-actions {
+  /* Everything sits in from the card's edges, but its rows run to them, so
+     a highlight fills the row. */
+  .head,
+  .message,
+  .card > p,
+  .empty {
+    padding-inline: var(--space-4);
+  }
+  /* Where they don't fit beside the heading, as on a phone, the buttons go
+     under it, still on the right. */
+  .head {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-4);
+    padding-block: var(--space-4);
+  }
+  h2 {
+    margin: 0;
+    font-size: var(--text-lg);
+  }
+  .head-actions {
+    display: flex;
+    flex: none;
     gap: var(--space-2);
     margin-left: auto;
   }
-  /* A message over the list, with what goes with it: an upload's bar and
+  /* Loading, or why it couldn't. */
+  .card > p {
+    margin: 0;
+    padding-bottom: var(--space-4);
+  }
+  /* A message between the header and the list, with what goes with it: an upload's bar and
      Cancel, or the x that dismisses it. */
   .message {
     display: flex;
@@ -306,7 +360,6 @@
   .backups {
     margin: 0;
     padding: 0;
-    border-top: 1px solid var(--border);
     list-style: none;
   }
   li {
@@ -316,9 +369,16 @@
     flex-wrap: wrap;
     justify-content: space-between;
     gap: var(--space-2) var(--space-4);
-    padding: var(--space-3) 0;
-    border-bottom: 1px solid var(--border);
+    padding: var(--space-3) var(--space-4);
     transition: background-color var(--duration-base) var(--ease);
+  }
+  /* Rows are divided from each other; the card's own border edges the last. */
+  li + li {
+    border-top: 1px solid var(--border);
+  }
+  /* So the last row's highlight follows the card's corners. */
+  li:last-child {
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
   }
   /* The Backups just uploaded, for a moment. */
   li.highlighted {
@@ -345,8 +405,8 @@
     margin-left: auto;
   }
   .empty {
+    padding-block: var(--space-4) var(--space-8);
     text-align: center;
-    padding: var(--space-8) 0;
   }
   .empty p {
     margin: 0 0 var(--space-2);

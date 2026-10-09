@@ -37,7 +37,8 @@ export function opensMenu(e: KeyPress): boolean {
  * An entry in an Actions menu, e.g. a ⋯ one, also shown as an icon button
  * where there's room for one. It runs at once, or, with `choices`, opens a list to pick one from
  * in the menu, e.g. which Section to add to, or with `field`, a number to set, e.g. a nudge;
- * such an entry shows only in ⋯.
+ * such an entry shows only in ⋯. With `download`, it's a link that downloads that address,
+ * e.g. a Backup's file, as the button it stands in for does.
  */
 export type MenuAction = {
   /** Beside the label in the menu, and alone on its icon button. */
@@ -48,7 +49,7 @@ export type MenuAction = {
   title?: string;
   /** Shown but unavailable, e.g. while what it does can't be done. */
   disabled?: boolean;
-} & ({ run: () => void } | { choices: MenuChoice[] } | { field: MenuField });
+} & ({ run: () => void } | { choices: MenuChoice[] } | { field: MenuField } | { download: string });
 
 /**
  * One of a menu entry's choices. With `checked`, the choices are a set of
