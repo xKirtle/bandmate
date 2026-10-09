@@ -100,8 +100,8 @@ async function clickOutside(page: Page) {
   await page.mouse.click(5, 5);
 }
 
-/** The status pill the transport row once had for an uncalibrated Input, which is gone. */
-const notCalibratedPill = (page: Page) => timeline(page).getByRole('button', { name: 'Not calibrated' });
+/** An Input's status pill in an Input list, which opens its row: "21 ms", "Not calibrated" or "Skipped". */
+const inputStatus = { name: /^(\d+ ms|Not calibrated|Skipped)$/ };
 
 /** Opens the Timeline's ⋯ → Recording settings, and gives its popover. */
 async function openRecordingSettings(page: Page) {
@@ -112,13 +112,13 @@ async function openRecordingSettings(page: Page) {
   return settings;
 }
 
-/** The status pill of the chosen Input's row in the recording settings: "21 ms", "Not calibrated" or "Skipped". */
+/** The status pill of the chosen Input's row in the recording settings. */
 const chosenStatus = (settings: Locator) =>
   settings
     .getByRole('list', { name: 'Inputs' })
     .getByRole('listitem')
     .filter({ has: settings.page().getByRole('radio', { checked: true }) })
-    .getByRole('button', { name: /^(\d+ ms|Not calibrated|Skipped)$/ });
+    .getByRole('button', inputStatus);
 
 /**
  * Has the microphone hear calibration's clicks, delay seconds after they
@@ -153,9 +153,7 @@ async function hearClicks(page: Page, delay: number) {
 /** Waits for the playhead to pass a time, in seconds, e.g. while recording. */
 async function playheadPast(page: Page, time: number) {
   await expect
-    .poll(async () => Number(await ruler(page).getAttribute('aria-valuenow')), {
-      timeout: 15_000,
-    })
+    .poll(async () => Number(await ruler(page).getAttribute('aria-valuenow')), { timeout: 15_000 })
     .toBeGreaterThan(time);
 }
 
@@ -211,7 +209,7 @@ test('calibration offered before the first recording can be skipped, and is not 
   const song = await bandmate.song({ title: 'Anthem' });
   await open(page, song.id);
   // Nothing in the transport row says it's uncalibrated: Record offers calibration.
-  await expect(notCalibratedPill(page)).toHaveCount(0);
+  await expect(timeline(page).getByRole('button', { name: 'Not calibrated' })).toHaveCount(0);
 
   await recordButton(page).click();
   const offer = calibrationOffer(page);
@@ -231,9 +229,11 @@ test('calibration offered before the first recording can be skipped, and is not 
   await playheadPast(page, leadIn);
   await stopButton(page).click();
   await expect(clip(page, 'Take 1')).toBeVisible();
-  // Still uncalibrated, so the latency the browser reports places Takes, and
-  // the recording settings say it was skipped.
-  await expect(notCalibratedPill(page)).toHaveCount(0);
+  // Still uncalibrated, so the latency the browser reports as the Input opens
+  // places Takes (it varies from one opening to the next), and the recording
+  // settings say it was skipped.
+  const [skipped] = await clipsOn(bandmate, song.id, 'Track 1');
+  expect(skipped.takes[0].latencyOffset).toBeGreaterThan(0);
   const settings = await openRecordingSettings(page);
   await expect(chosenStatus(settings)).toHaveText('Skipped');
   await page.keyboard.press('Escape');
@@ -259,16 +259,12 @@ test('calibration is hands-free by default, measures each tap as it is heard, fi
   await seek(page, 5);
   await recordButton(page).click();
   const offer = calibrationOffer(page);
-  const handsFree = offer.getByRole('radio', {
-    name: /^Hands-free: rest your headphones on the mic/,
-  });
+  const handsFree = offer.getByRole('radio', { name: /^Hands-free: rest your headphones on the mic/ });
   await expect(handsFree).toBeChecked();
   await expect(offer).toContainText('Turn the volume up for the test, so the mic hears each click clearly.');
   // Tap along points at the clicks heard, and the tip goes with hands-free.
   await offer
-    .getByRole('radio', {
-      name: 'Tap along: tap or clap on the mic in time with the clicks you hear',
-    })
+    .getByRole('radio', { name: 'Tap along: tap or clap on the mic in time with the clicks you hear' })
     .check();
   await expect(offer).not.toContainText('Turn the volume up');
   await handsFree.check();
@@ -278,9 +274,7 @@ test('calibration is hands-free by default, measures each tap as it is heard, fi
   await expect(offer.getByRole('button', { name: 'Close' })).toHaveCount(0);
   const finish = offer.getByRole('button', { name: 'Finish now' });
   const reading = offer.getByRole('status');
-  await expect(reading).toHaveText(/^25 ms, from [1-5] taps?$/, {
-    timeout: 10_000,
-  });
+  await expect(reading).toHaveText(/^25 ms, from [1-5] taps?$/, { timeout: 10_000 });
   await expect(finish).toHaveCount(0);
   await expect(offer).toContainText(/Finding the taps: [1-5] of 6/);
   await expect(finish).toBeVisible({ timeout: 10_000 });
@@ -290,9 +284,7 @@ test('calibration is hands-free by default, measures each tap as it is heard, fi
   await expect(offer).toContainText(/Your taps spread ±\d+ ms · average good to ±\d+ ms, finishing at ±4 ms/);
   // The metronome marks the taps around the average.
   await expect(
-    offer.getByRole('img', {
-      name: /^Metronome, .+, with \d+ taps marked around the average$/,
-    }),
+    offer.getByRole('img', { name: /^Metronome, .+, with \d+ taps marked around the average$/ }),
   ).toBeVisible();
 
   // Hearing the clicks exactly, it finishes by itself from 10 taps. Nothing
@@ -620,11 +612,8 @@ function inputList(page: Page) {
     notConnected: recording.getByRole('list', { name: 'Not connected' }),
     row,
     radio: (name: string) => connected.getByRole('radio', { name, exact: true }),
-    /** A row's status pill, which opens it: "21 ms", "Not calibrated" or "Skipped". */
-    pill: (name: string | RegExp) =>
-      row(name).getByRole('button', {
-        name: /^(\d+ ms|Not calibrated|Skipped)$/,
-      }),
+    /** A row's status pill, which opens it. */
+    pill: (name: string | RegExp) => row(name).getByRole('button', inputStatus),
   };
 }
 
@@ -751,14 +740,10 @@ test("the Timeline's recording settings list every Input, to record from, meter,
     localStorage.setItem('bandmate.input', JSON.stringify(first));
     localStorage.setItem(
       'bandmate.latencyOffsets',
-      JSON.stringify({
-        inputs: [{ ...first, offset: 0.021, offered: true }],
-        unclaimed: null,
-      }),
+      JSON.stringify({ inputs: [{ ...first, offset: 0.021, offered: true }], unclaimed: null }),
     );
   }, first);
   await open(page, song.id);
-  await expect(notCalibratedPill(page)).toHaveCount(0);
 
   const settings = await openRecordingSettings(page);
   const connected = settings.getByRole('list', { name: 'Inputs' });
@@ -766,10 +751,7 @@ test("the Timeline's recording settings list every Input, to record from, meter,
   const secondName = `${second.label} · Input 1`;
   const row = (name: string) =>
     connected.getByRole('listitem').filter({ has: page.getByRole('radio', { name, exact: true }) });
-  const pill = (name: string) =>
-    row(name).getByRole('button', {
-      name: /^(\d+ ms|Not calibrated|Skipped)$/,
-    });
+  const pill = (name: string) => row(name).getByRole('button', inputStatus);
   // The same list as Settings': the default input, then each fake input's channels.
   await expect(connected.getByRole('listitem').first()).toContainText('Default input');
   await expect(connected.getByRole('radio', { name: firstName, exact: true })).toBeChecked();
@@ -784,9 +766,7 @@ test("the Timeline's recording settings list every Input, to record from, meter,
   await pill(secondName).click();
   await expect(row(secondName).getByRole('meter', { name: 'Level' })).toBeVisible();
   await row(secondName).getByRole('button', { name: 'Type it' }).click();
-  const field = row(secondName).getByRole('spinbutton', {
-    name: `Latency Offset of ${secondName}, in ms`,
-  });
+  const field = row(secondName).getByRole('spinbutton', { name: `Latency Offset of ${secondName}, in ms` });
   await field.fill('30');
   await field.press('Enter');
   await expect(pill(secondName)).toHaveText('30 ms');
@@ -919,9 +899,7 @@ test('a Latency Offset typed for the default input is kept for the Input it turn
   });
   expect(['', 'default']).not.toContain(kept.inputs[0].deviceId);
   await expect(list.pill(`${kept.inputs[0].label} · Input 1`)).toHaveText('33 ms');
-  const pills = list.connected.getByRole('button', {
-    name: /^(\d+ ms|Not calibrated|Skipped)$/,
-  });
+  const pills = list.connected.getByRole('button', inputStatus);
   await expect(pills.filter({ hasText: '33 ms' })).toHaveCount(2);
 });
 
