@@ -830,7 +830,8 @@ test("a Master's name and notes typed stay, unsaved, when refused as the Song ch
   await bandmate.master(song.id, 'Studio');
   await bandmate.master(song.id, 'Live');
   await page.goto(`/songs/${song.id}`);
-  // On desktop, the Masters start folded away.
+  // On desktop, the Masters start folded away. Their toggle, a <summary>,
+  // has no role or name of its own in Chromium, so it's found by its text.
   await page.getByRole('group').getByText('Masters', { exact: true }).filter({ visible: true }).click();
   const live = page.getByRole('region', { name: 'Masters' }).getByRole('article', { name: 'Live' });
   await expect(live.getByRole('textbox', { name: 'Name' })).toHaveValue('Live');

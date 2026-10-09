@@ -13,7 +13,6 @@
   let {
     song,
     mode,
-    change,
     submit,
     typing,
     setStatus,
@@ -22,9 +21,7 @@
     song: Song;
     /** The Song page's mode: in Read mode the Masters only play. */
     mode: Mode;
-    /** Sends a change to the Song; resolves to whether it succeeded. */
-    change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
-    /** Sends a change to the Song like change, resolving to how it ended, e.g. refused as stale. */
+    /** Sends a change to the Song; resolves to how it ended, e.g. refused as the Song changed elsewhere. */
     submit: (op: (at: SongAt) => Promise<Song>) => Promise<Submitted>;
     /** Puts a name or notes being typed on Saves' list of edits being typed. */
     typing: (entry: Typing) => () => void;
@@ -33,6 +30,9 @@
     /** Whether the Timeline is recording, which no Master plays over. */
     recording?: boolean;
   } = $props();
+
+  /** Sends a change to the Song; resolves to whether it was saved. */
+  const change = (op: (at: SongAt) => Promise<Song>) => submit(op).then((ended) => ended === 'saved');
 
   let maxUploadBytes = $state(Infinity);
   let busy = $state<string | null>(null);
