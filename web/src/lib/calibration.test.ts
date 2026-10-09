@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { appliedOffset, clickTimes, measureOffset, Measuring, minHits, offsetSummary } from './calibration';
+import {
+  appliedOffset,
+  clickTimes,
+  measureOffset,
+  Measuring,
+  minHits,
+  offsetSummary,
+  typedOffset,
+} from './calibration';
 
 const rate = 48000;
 
@@ -204,5 +212,17 @@ describe('offsetSummary', () => {
 
   it('says so until calibrated', () => {
     expect(offsetSummary(null)).toBe('Not calibrated');
+  });
+});
+
+describe('typedOffset', () => {
+  it('is a whole number of milliseconds typed, in seconds', () => {
+    expect(typedOffset('14')).toBe(0.014);
+    expect(typedOffset(' 0 ')).toBe(0);
+    expect(typedOffset('500')).toBe(0.5);
+  });
+
+  it('refuses what is outside 0 to 500 ms, or not a whole number of them', () => {
+    for (const text of ['501', '-1', '12.5', '', 'abc', '1e2']) expect(typedOffset(text)).toBeNull();
   });
 });

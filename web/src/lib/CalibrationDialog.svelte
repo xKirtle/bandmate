@@ -4,6 +4,7 @@
   import CalibrationTaps from './CalibrationTaps.svelte';
   import { Capture, CaptureError, frameAt } from './capture';
   import Dialog from './Dialog.svelte';
+  import OffsetField from './OffsetField.svelte';
   import { channelName, inputName, sameInput, type InputChoice } from './inputSettings';
   import { RecordedInput } from './recordedInput.svelte';
   import { calibrations } from './sharedCalibration.svelte';
@@ -14,7 +15,8 @@
   // with them. Each tap is measured as it's heard, and the running average
   // shown, with how steady it's been and a graph of the taps, so they can
   // stop once it reads steady. Use this keeps the average for the Input it
-  // was measured on; Cancel, or closing it, keeps nothing. Offered before an
+  // was measured on; Cancel, or closing it, keeps nothing. An offset already
+  // known can be typed instead, for the Input it names. Offered before an
   // Input's first recording, where it can be skipped, for that Input, to
   // record straight away; also run from the recording settings and Settings,
   // where a listed Input is measured as itself or not at all.
@@ -51,8 +53,8 @@
   let clicking = $state(false);
   // What's been measured so far, while measuring.
   let reading = $state.raw<Reading>(noReading);
-  // The Latency Offset kept, and how many taps it's from, once used.
-  let kept = $state.raw<{ offset: number; taps: number } | null>(null);
+  // The Latency Offset kept, and how many taps it's from, once used, or null taps where it was typed.
+  let kept = $state.raw<{ offset: number; taps: number | null } | null>(null);
   let error = $state<string | null>(null);
   let record = false;
 
@@ -153,6 +155,15 @@
     phase = 'done';
   }
 
+  /** Keeps an offset typed as the Latency Offset of the Input it names, as if calibrated. */
+  function type(offset: number) {
+    if (!calibrated) return;
+    calibrations.set(calibrated, { offset, offered: true });
+    kept = { offset, taps: null };
+    error = null;
+    phase = 'done';
+  }
+
   function stopMeasuring() {
     generation++;
     window.clearInterval(timer);
@@ -232,9 +243,18 @@
     <p class="problem" role="alert">{error}</p>
   {:else if kept}
     <p role="status">
-      The Latency Offset of {name} is <strong class="tabular">{formatOffset(kept.offset)}</strong>, from
-      {taps(kept.taps)}. New Takes from it are placed earlier by it; Takes already recorded stay where they are.
+      The Latency Offset of {name} is
+      <strong class="tabular">{formatOffset(kept.offset)}</strong>{#if kept.taps !== null}, from
+        {taps(kept.taps)}{/if}. New Takes from it are placed earlier by it; Takes already recorded stay where they are.
     </p>
+  {/if}
+
+  <!-- Only for an Input it can name, e.g. not the default before the browser allows the microphone. -->
+  {#if phase !== 'measuring' && calibrated}
+    <div class="typed">
+      <p class="muted">Or, if you know it, type it in whole milliseconds.</p>
+      <OffsetField {name} offset={calibrations.of(calibrated).offset} onSet={type} />
+    </div>
   {/if}
 
   {#if offer && !kept}
@@ -276,6 +296,11 @@
   }
   .muted {
     font-size: var(--text-md);
+  }
+  .typed {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
   }
   .actions {
     display: flex;

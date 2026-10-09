@@ -6,10 +6,11 @@
   // are the same setting here.
   import { MediaQuery } from 'svelte/reactivity';
   import { palettes, themeChoices } from '../lib/appearance';
-  import { formatOffset, offsetSummary } from '../lib/calibration';
+  import { offsetSummary } from '../lib/calibration';
   import CalibrationDialog from '../lib/CalibrationDialog.svelte';
   import { connectedDevices, watchInputs } from '../lib/capture';
   import InputPicker from '../lib/InputPicker.svelte';
+  import OffsetField from '../lib/OffsetField.svelte';
   import { channelName, inputName, type InputChoice } from '../lib/inputSettings';
   import SettingsPage from '../lib/SettingsPage.svelte';
   import { appearance } from '../lib/sharedAppearance.svelte';
@@ -130,7 +131,7 @@
           >
         </div>
         {#if calibrated.length > 0}
-          <!-- Every Input calibrated on this device, connected or not, to calibrate again or forget. -->
+          <!-- Every Input calibrated on this device, connected or not, its offset to type, calibrate again or forget. -->
           <div class="calibrated">
             <h3 id="calibrated-heading">Calibrated inputs</h3>
             <ul aria-labelledby="calibrated-heading">
@@ -140,7 +141,16 @@
                 <li>
                   <div class="about">
                     <span class="name">{name}</span>
-                    <span class="hint tabular">{formatOffset(listed.offset)}{unplugged ? ' · Not connected' : ''}</span>
+                    {#if unplugged}<span class="hint">Not connected</span>{/if}
+                    <!-- Its offset, to type, even unplugged. -->
+                    <OffsetField
+                      {name}
+                      offset={listed.offset}
+                      onSet={(offset) => {
+                        const { deviceId, label, channel } = listed;
+                        calibrations.set({ deviceId, label, channel }, { offset, offered: true });
+                      }}
+                    />
                   </div>
                   <div class="row-actions">
                     <!-- Only a connected one can be measured. -->
@@ -260,6 +270,7 @@
     display: flex;
     flex: 1 1 10rem;
     flex-direction: column;
+    gap: var(--space-1);
     min-width: 0;
   }
   .name {

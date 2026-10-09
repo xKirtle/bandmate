@@ -280,6 +280,48 @@ test('calibration cancelled or closed keeps the offset there was', async ({ page
   await expect(offer).toContainText('Before the first recording from');
 });
 
+test('a Latency Offset typed in calibration is kept for its Input, as if calibrated', async ({ page, bandmate }) => {
+  const song = await bandmate.song({ title: 'Anthem' });
+  await open(page, song.id);
+  await seek(page, 5);
+  await recordButton(page).click();
+  const offer = calibrationOffer(page);
+  const field = offer.getByRole('spinbutton', { name: /^Latency Offset of .+ · Input 1, in ms$/ });
+  const set = offer.getByRole('button', { name: /^Set the Latency Offset of / });
+
+  // Outside 0 to 500 ms, or not whole, it's refused, and nothing is kept.
+  for (const typed of ['501', '12.5']) {
+    await field.fill(typed);
+    await set.click();
+    await expect(offer.getByRole('alert')).toHaveText('Type a whole number of ms, from 0 to 500.');
+    await expect(field).toHaveAttribute('aria-invalid', 'true');
+  }
+  await expect(offer.getByRole('button', { name: 'Skip and record' })).toBeVisible();
+
+  await field.fill('40');
+  await field.press('Enter');
+  await expect(offer.getByRole('status')).toContainText(/^The Latency Offset of .+ · Input 1 is 40 ms\./);
+  await offer.getByRole('button', { name: 'Record' }).click();
+  await expect(offer).toBeHidden();
+  await expect(stopButton(page)).toBeVisible();
+  await playheadPast(page, 5 + 1);
+  await stopButton(page).click();
+  await expect(recordButton(page)).toBeEnabled();
+  const [made] = await clipsOn(bandmate, song.id, 'Track 1');
+  expect(made.takes[0].latencyOffset).toBeCloseTo(0.04, 3);
+
+  // Counted as calibrated: not offered before the next recording, even after a reload.
+  await page.reload();
+  await expect(recordButton(page)).toBeEnabled();
+  await expect(timeline(page).getByRole('button', { name: 'Not calibrated' })).toHaveCount(0);
+  await seek(page, 10);
+  await record(page, () => recordButton(page).click(), 10 + 1);
+  await expect(offer).toHaveCount(0);
+  const takes = (await clipsOn(bandmate, song.id, 'Track 1')).map((c) => c.takes[0].latencyOffset);
+  expect(takes).toHaveLength(2);
+  for (const offset of takes) expect(offset).toBeCloseTo(0.04, 3);
+});
+
 test("the Latency Offset calibrated before Inputs had their own becomes the chosen Input's", async ({
   page,
   bandmate,
@@ -529,17 +571,21 @@ test('Settings lists each calibrated Input, to calibrate again, whether or not c
   const offset = recording.getByRole('definition').nth(1);
   const list = recording.getByRole('list', { name: 'Calibrated inputs' });
   const item = (name: string) => list.getByRole('listitem').filter({ hasText: name });
+  const typed = (name: string) => list.getByRole('spinbutton', { name: `Latency Offset of ${name}, in ms` });
   const firstName = `${first.label} · Input 1`;
   const secondName = `${second.label} · Input 1`;
   // By name, with its offset, an unplugged one saying so.
   await expect(list.getByRole('listitem')).toHaveCount(3);
   await expect(list.getByRole('listitem').first()).toContainText(firstName);
-  await expect(item(firstName)).toContainText('21 ms');
-  await expect(item(secondName)).toContainText('34 ms');
+  await expect(typed(firstName)).toHaveValue('21');
+  await expect(typed(secondName)).toHaveValue('34');
   await expect(item(secondName)).not.toContainText('Not connected');
-  await expect(item('Scarlett Solo USB · Input 2')).toContainText('45 ms · Not connected');
-  // Unplugged, it can't be measured, only forgotten.
-  await expect(item('Scarlett Solo USB · Input 2').getByRole('button')).toHaveText(['Forget']);
+  await expect(typed('Scarlett Solo USB · Input 2')).toHaveValue('45');
+  await expect(item('Scarlett Solo USB · Input 2')).toContainText('Not connected');
+  // Unplugged, it can't be measured, only typed or forgotten.
+  await expect(item('Scarlett Solo USB · Input 2').getByRole('button', { name: /again|Forget/ })).toHaveText([
+    'Forget',
+  ]);
   await expect(offset).toHaveText('21 ms, calibrated');
 
   // Calibrating one not chosen measures it, not the one chosen.
@@ -554,7 +600,7 @@ test('Settings lists each calibrated Input, to calibrate again, whether or not c
   expect(await page.evaluate(() => (window as unknown as { opened: string[] }).opened)).toEqual([second.deviceId]);
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
-  await expect(item(secondName)).toContainText('34 ms');
+  await expect(typed(secondName)).toHaveValue('34');
   await expect(offset).toHaveText('21 ms, calibrated');
 
   // Forgotten, an Input is uncalibrated, and offered calibration before its next recording.
@@ -569,4 +615,81 @@ test('Settings lists each calibrated Input, to calibrate again, whether or not c
   await open(page, song.id);
   await recordButton(page).click();
   await expect(calibrationOffer(page)).toContainText(`Before the first recording from ${firstName},`);
+});
+
+test('a Latency Offset typed in Settings is kept for its Input, leaving Takes where they are', async ({
+  page,
+  bandmate,
+}) => {
+  const song = await bandmate.song({ title: 'Anthem' });
+  await page.goto('/settings');
+  const [first, second] = await page.evaluate(async () =>
+    (await navigator.mediaDevices.enumerateDevices())
+      .filter((d) => d.kind === 'audioinput' && d.deviceId !== 'default')
+      .map(({ deviceId, label }) => ({ deviceId, label, channel: 0 })),
+  );
+  // The first fake input chosen; it and the second calibrated.
+  await page.evaluate(
+    ({ first, second }) => {
+      localStorage.setItem('bandmate.input', JSON.stringify(first));
+      localStorage.setItem(
+        'bandmate.latencyOffsets',
+        JSON.stringify({
+          inputs: [
+            { ...first, offset: 0.021, offered: true },
+            { ...second, offset: 0.034, offered: true },
+          ],
+          unclaimed: null,
+        }),
+      );
+    },
+    { first, second },
+  );
+
+  // A Take recorded with the first's offset.
+  await open(page, song.id);
+  await seek(page, 5);
+  await record(page, () => recordButton(page).click(), 5 + 1);
+  const [before] = await clipsOn(bandmate, song.id, 'Track 1');
+  expect(before.takes[0].latencyOffset).toBeCloseTo(0.021, 3);
+
+  await page.goto('/settings');
+  const recording = page.getByRole('region', { name: 'Recording' });
+  const offset = recording.getByRole('definition').nth(1);
+  const list = recording.getByRole('list', { name: 'Calibrated inputs' });
+  const firstName = `${first.label} · Input 1`;
+  const secondName = `${second.label} · Input 1`;
+  const typed = (name: string) => list.getByRole('spinbutton', { name: `Latency Offset of ${name}, in ms` });
+  const set = (name: string) => list.getByRole('button', { name: `Set the Latency Offset of ${name}` });
+
+  // Outside 0 to 500 ms, it's refused, and nothing is kept.
+  await typed(firstName).fill('501');
+  await set(firstName).click();
+  await expect(list.getByRole('alert')).toHaveText('Type a whole number of ms, from 0 to 500.');
+  await expect(offset).toHaveText('21 ms, calibrated');
+
+  // Typed, it's that Input's alone, and kept after a reload.
+  await typed(firstName).fill('48');
+  await typed(firstName).press('Enter');
+  await expect(list.getByRole('alert')).toHaveCount(0);
+  await expect(offset).toHaveText('48 ms, calibrated');
+  await typed(secondName).fill('0');
+  await set(secondName).click();
+  await page.reload();
+  await expect(typed(firstName)).toHaveValue('48');
+  await expect(typed(secondName)).toHaveValue('0');
+  await expect(offset).toHaveText('48 ms, calibrated');
+
+  // The Take keeps the offset it was recorded with; the next is placed by the one typed.
+  const [after] = await clipsOn(bandmate, song.id, 'Track 1');
+  expect(after.takes[0].latencyOffset).toBeCloseTo(0.021, 3);
+  expect(after.start).toBe(before.start);
+  expect(after.offset).toBe(before.offset);
+  await open(page, song.id);
+  await seek(page, 10);
+  await record(page, () => recordButton(page).click(), 10 + 1);
+  await expect(calibrationOffer(page)).toHaveCount(0);
+  const offsets = (await clipsOn(bandmate, song.id, 'Track 1')).map((c) => c.takes[0].latencyOffset);
+  expect(offsets).toHaveLength(2);
+  expect(offsets[1]).toBeCloseTo(0.048, 3);
 });
