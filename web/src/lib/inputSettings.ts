@@ -83,7 +83,7 @@ export interface ListedInput {
 }
 
 /** The browser's own stand-ins for the default input, which Chrome lists beside the device it is. */
-const standIns = ['default', 'communications'];
+export const standIns = ['default', 'communications'];
 
 /**
  * The Input a choice records from, among the inputs the browser lists: the

@@ -48,7 +48,8 @@ class Capture extends AudioWorkletProcessor {
 registerProcessor('bandmate-capture', Capture);
 `;
 
-import { inputRecorded, resolveInput, type InputChoice } from './inputSettings';
+import type { ConnectedDevice } from './inputList';
+import { inputRecorded, resolveInput, standIns, type InputChoice } from './inputSettings';
 
 // Added to a context once.
 const loaded = new WeakMap<BaseAudioContext, Promise<void>>();
@@ -169,16 +170,40 @@ export function watchInputs(changed: () => void): () => void {
 }
 
 /**
- * The ids of the audio devices connected, to tell whether an Input's is:
- * null where that can't be told, e.g. before the browser allows the
- * microphone, as it lists no ids till then.
+ * The audio devices connected, apart from the browser's own stand-ins for
+ * the default, each with how many channels the browser says it has (1
+ * where it doesn't say): null where which they are can't be told, e.g.
+ * before the browser allows the microphone, as it lists no ids till then.
  */
-export async function connectedDevices(): Promise<Set<string> | null> {
+export async function connectedDevices(): Promise<ConnectedDevice[] | null> {
   if (!navigator.mediaDevices?.enumerateDevices) return null;
   const listed = await listInputs();
   // Listed without ids, they're there, but which they are can't be told.
   if (listed.some((d) => d.deviceId === '')) return null;
-  return new Set(listed.map((d) => d.deviceId));
+  return listed
+    .filter((d) => !standIns.includes(d.deviceId))
+    .map((d) => ({ deviceId: d.deviceId, label: d.label, channels: channelsOf(d) }));
+}
+
+/** How many channels a device has, where the browser says, as Chrome does; 1 where it doesn't. */
+function channelsOf(device: MediaDeviceInfo): number {
+  try {
+    const max = (device as InputDeviceInfo).getCapabilities?.().channelCount?.max;
+    return typeof max === 'number' && max >= 1 ? Math.min(max, wantedChannels) : 1;
+  } catch {
+    return 1;
+  }
+}
+
+/**
+ * The Input a choice opens, found by opening it a moment, as only opening
+ * the default input says which Input it is: null where the browser doesn't
+ * say. Fails with a CaptureError to show.
+ */
+export async function identifyInput(choice: InputChoice): Promise<InputChoice | null> {
+  const opened = await openInput(choice);
+  release(opened.stream);
+  return opened.input;
 }
 
 /** Why an input couldn't be opened, in words to show. */
@@ -279,6 +304,11 @@ export class InputLevel {
   /** The latency the browser reports for the input, in seconds. */
   get latency(): number {
     return reportedLatency(this.context, this.input);
+  }
+
+  /** The Input opened: the one chosen, or the one the default is; null where the browser doesn't say. */
+  get opened(): InputChoice | null {
+    return this.input.input;
   }
 
   /** The latest samples of the channel used. */

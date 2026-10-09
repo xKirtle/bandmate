@@ -52,7 +52,7 @@
       oninput={(e) => (typed = e.currentTarget.value)}
     />
     <span class="unit" aria-hidden="true">ms</span>
-    <button type="submit" class="button quiet" aria-label="Set the Latency Offset of {name}">Set</button>
+    <button type="submit" class="button" aria-label="Set the Latency Offset of {name}">Set</button>
   </div>
   {#if refused}
     <p class="error" id="{id}-refused" role="alert">Type a whole number of ms, from 0 to {maxTypedOffset}.</p>
