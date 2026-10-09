@@ -140,7 +140,7 @@ Tests import `test` and `expect` from `e2e/fixtures.ts`, and:
 
 ### Versions
 
-A release with any new feature bumps the minor version (v0.4.0 to v0.5.0), and one with only fixes bumps the patch (v0.4.0 to v0.4.1). `no-release-notes` pull requests don't count, whatever else they're labelled: a release of only those isn't worth cutting. Versions aren't tied to the [roadmap](docs/roadmap.md): whatever has merged since the last release goes out together. v1.0.0 isn't planned yet.
+A release with any new feature bumps the minor version (v0.4.0 to v0.5.0), and one with only fixes bumps the patch (v0.4.0 to v0.4.1). A release with a database migration bumps the minor too, whatever its pull requests are labelled: pulling the previous image doesn't undo a migration, and a patch should be one a self-hoster can drop in and back out of. `no-release-notes` pull requests don't count, whatever else they're labelled: a release of only those isn't worth cutting. Versions aren't tied to the [roadmap](docs/roadmap.md): whatever has merged since the last release goes out together. v1.0.0 isn't planned yet.
 
 ### Cutting a release
 
