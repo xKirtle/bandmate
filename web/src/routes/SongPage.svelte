@@ -519,7 +519,15 @@
           >
             {#if part === 'masters'}
               <summary><FoldChevron />{song.masters.length > 1 ? 'Masters' : 'Master'}</summary>
-              <Masters {song} {mode} change={saves.change} typing={saves.typing} {setStatus} {recording} />
+              <Masters
+                {song}
+                {mode}
+                change={saves.change}
+                submit={saves.submit}
+                typing={saves.typing}
+                {setStatus}
+                {recording}
+              />
             {:else}
               <summary><FoldChevron />Scrapbook</summary>
               <Scrapbook {song} {drag} {editing} />

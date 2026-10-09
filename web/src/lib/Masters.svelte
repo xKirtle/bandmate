@@ -2,7 +2,7 @@
   import { untrack } from 'svelte';
   import { api, type Master, type Song, type SongAt, type Status } from './api';
   import AudioPlayer from './AudioPlayer.svelte';
-  import type { Typing } from './saves.svelte';
+  import type { Submitted, Typing } from './saves.svelte';
   import { masterFields, type MasterFields } from './songFields';
   import type { Mode } from './songMode';
   import { cancelOnEscape, committedAsItGoes, leaveOnEscape } from './typedField.svelte';
@@ -14,6 +14,7 @@
     song,
     mode,
     change,
+    submit,
     typing,
     setStatus,
     recording = false,
@@ -23,6 +24,8 @@
     mode: Mode;
     /** Sends a change to the Song; resolves to whether it succeeded. */
     change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
+    /** Sends a change to the Song like change, resolving to how it ended, e.g. refused as stale. */
+    submit: (op: (at: SongAt) => Promise<Song>) => Promise<Submitted>;
     /** Puts a name or notes being typed on Saves' list of edits being typed. */
     typing: (entry: Typing) => () => void;
     /** Changes the Song's Status, as its own Status control would. */
@@ -71,7 +74,7 @@
     if (!f) {
       f = masterFields(m.id, {
         master: () => song.masters.find((s) => s.id === m.id),
-        change: untrack(() => change),
+        submit: untrack(() => submit),
         typing: untrack(() => typing),
         update: api.updateMaster,
         refuse: (message) => (error = message),

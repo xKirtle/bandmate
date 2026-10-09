@@ -91,6 +91,21 @@ export class Bandmate {
     return song;
   }
 
+  /**
+   * Adds a Master to a Song, named, as Add Master does. Its file isn't real
+   * audio, which the server never decodes, so it doesn't play.
+   */
+  master(songId: number, name: string): Promise<Song> {
+    return json<Song>(
+      this.api.post(`/api/songs/${songId}/masters`, {
+        multipart: {
+          details: JSON.stringify({ name, duration: 2.5, peaks: [0.1, 0.5, 1, 0.25] }),
+          file: { name: `${name}.mp3`, mimeType: 'audio/mpeg', buffer: Buffer.from(`ID3 not really an mp3: ${name}`) },
+        },
+      }),
+    );
+  }
+
   /** Renames a Song, as another tab would. */
   retitle(id: number, title: string): Promise<Song> {
     return json<Song>(this.api.patch(`/api/songs/${id}`, { data: { title } }));

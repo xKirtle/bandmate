@@ -3,7 +3,7 @@
 // rule for what's typed.
 import type { Master, MasterChanges, Song, SongAt, SongChanges } from './api';
 import { customTuningField } from './customTuning';
-import type { Saves, Typing } from './saves.svelte';
+import type { Saves, Submitted, Typing } from './saves.svelte';
 import { TypedField, type Parsed, type TypedFieldOptions } from './typedField.svelte';
 
 /** Sends a change to the Song's Details, as the api's updateSong does. */
@@ -88,8 +88,8 @@ export type UpdateMaster = (at: SongAt, masterId: number, changes: MasterChanges
 export interface MasterFieldsOptions {
   /** The Master as saved, while the Song has it. */
   master: () => Master | undefined;
-  /** Sends a change to the Song; resolves to whether it was saved. */
-  change: (op: (at: SongAt) => Promise<Song>) => Promise<boolean>;
+  /** Sends a change to the Song; resolves to how it ended (see Saves.submit). */
+  submit: (op: (at: SongAt) => Promise<Song>) => Promise<Submitted>;
   /** Puts an edit on Saves' list of edits being typed (see Saves.typing). */
   typing: (entry: Typing) => () => void;
   /** Sends a change to the Master, against the Song as saved. */
@@ -107,16 +107,16 @@ export interface MasterFields {
 /**
  * A Master's name and notes as fields typed in place. A name is saved
  * trimmed; a blank one is refused, saying why, and goes back to what's
- * saved. The notes are saved as typed. A save that fails, or is refused as
- * the Song changed elsewhere, shows what's saved again. Once the Master's
- * removed, what's typed is dropped.
+ * saved. The notes are saved as typed. A save that fails shows what's saved
+ * again; refused as the Song changed elsewhere, what's typed stays, to copy
+ * out. Once the Master's removed, what's typed is dropped.
  */
 export function masterFields(masterId: number, options: MasterFieldsOptions): MasterFields {
   const field = (detail: 'name' | 'notes', parse: (typed: string) => Parsed<string>) =>
     textField({
       saved: () => options.master()?.[detail] ?? '',
       parse,
-      commit: (value) => options.change((at) => options.update(at, masterId, { [detail]: value })),
+      commit: (value) => options.submit((at) => options.update(at, masterId, { [detail]: value })),
       exists: () => options.master() !== undefined,
       typing: options.typing,
     });
