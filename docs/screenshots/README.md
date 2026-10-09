@@ -16,6 +16,7 @@ The screenshots in the README and on the docs site, `docs/web/`, taken in the da
 | `phone-lyric-sheet.png` | The hero Song in Read mode on a phone                          |
 | `read-mode.png`         | The hero Song in Read mode, with the Line playing highlighted  |
 | `sync-mode.webp`        | Sync mode cueing the Bridge's Lines, animated                  |
+| `calibrating.webp` | Calibrating the default input hands-free in Settings → Recording, from Calibrate to Save, animated. Chromium's fake microphone hears a click file the script writes, so it measures and finishes as it would for real |
 
 The demo content is lorem ipsum, kept in the Backup [`demo.bandmate`](demo.bandmate) beside this file: a hero Song with Chords, a Chord Line, a second Alternate of the Chorus with words of its own, Cues, a Scrapbook Section, a click-track Beat and two Takes, and six other Songs across every Status, one of them in the Folder "Album 2025". Restoring it is also a quick way to fill a dev stack with Songs that have Timelines.
 
@@ -52,7 +53,7 @@ When the UI changes and the screenshots go stale, restore the demo into a fresh 
    npm run capture
    ```
 
-   It drives Chromium at `/usr/bin/chromium` (set `CHROMIUM` to use another) against `http://localhost:8080` (set `BANDMATE_URL` to use another), and writes the images here. The animation is recorded from Chromium's screencast, timed against the Timeline playing, so leave the machine idle while it runs, about half a minute.
+   It drives Chromium at `/usr/bin/chromium` (set `CHROMIUM` to use another) against `http://localhost:8080` (set `BANDMATE_URL` to use another), and writes the images here. The animations are recorded from Chromium's screencast, timed against the Timeline playing and the calibration's clicks, so leave the machine idle while it runs, about a minute.
 
 Capturing leaves the Bridge cued, so restore again from step 1 before capturing again.
 
