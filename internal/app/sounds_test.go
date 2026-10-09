@@ -161,6 +161,24 @@ func TestAnImportThatCantBeUsedIsRefusedAndKeepsNothing(t *testing.T) {
 	}
 }
 
+// An import that fails partway, once its Sound is added and its file set to
+// be kept, changes nothing and keeps no file.
+func TestAnImportThatFailsPartwayKeepsNothing(t *testing.T) {
+	ts := newTestServer(t)
+	s, tl := songWithVocalTrack(t, ts)
+	ts.failStatements(inserts, "clips")
+
+	expectStatus(t, ts.importSound(s.ID, soundFile("hum.m4a", "Hum", tl.Tracks[1].ID, 3)),
+		http.StatusInternalServerError)
+
+	if read := ts.getTimeline(s.ID); !reflect.DeepEqual(read, tl) {
+		t.Errorf("timeline = %+v, want it unchanged: %+v", read, tl)
+	}
+	if files := soundFiles(t, ts); len(files) != 0 {
+		t.Errorf("sound files = %q, want none kept", files)
+	}
+}
+
 // soundFiles lists the files stored for Sounds in the data directory.
 func soundFiles(t *testing.T, ts *testServer) []string {
 	t.Helper()

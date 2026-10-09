@@ -165,9 +165,9 @@ func query(ctx context.Context, q domain.Queryer, stmt string, args []any, row f
 	return rows.Err()
 }
 
-// change runs one change on a Song in a transaction, marks the Song as edited
-// with a new version, and returns the updated Song. If the Song is no longer
-// at the version the change was based on, or fn fails, nothing changes.
+// change runs one change on a Song through songversion.Change and returns
+// the Song as committed. If the Song is no longer at the version the change
+// was based on, or fn fails, nothing changes.
 func (s *Store) change(ctx context.Context, songID int64, based songversion.Version, fn func(tx *sql.Tx) error) (Song, error) {
 	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges) error {
 		return fn(tx)
@@ -175,23 +175,10 @@ func (s *Store) change(ctx context.Context, songID int64, based songversion.Vers
 }
 
 // changeWithFiles is change for a change with files to keep, link or
-// remove, which fn adds to changes. They're changed only once the change is
-// committed.
+// remove, which fn adds to changes.
 func (s *Store) changeWithFiles(ctx context.Context, songID int64, based songversion.Version,
 	fn func(tx *sql.Tx, changes *audio.FileChanges) error) (Song, error) {
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return Song{}, err
-	}
-	defer tx.Rollback()
-	if err := songversion.Touch(ctx, tx, songID, based); err != nil {
-		return Song{}, err
-	}
-	var changes audio.FileChanges
-	if err := fn(tx, &changes); err != nil {
-		return Song{}, err
-	}
-	if err := changes.Commit(tx.Commit); err != nil {
+	if err := songversion.Change(ctx, s.db, songID, based, fn); err != nil {
 		return Song{}, err
 	}
 	return s.GetSong(ctx, songID)

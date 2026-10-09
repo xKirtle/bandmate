@@ -1,7 +1,8 @@
 // Package songversion is a Song's version: what every change to a Song is
 // based on, how a change moves it on, and the refusal of a change based on
 // one that's out of date. Every package that changes part of a Song uses it,
-// so none of them needs another's just for the version.
+// so none of them needs another's just for the version. Change is the one
+// step such a change runs through.
 package songversion
 
 import (
@@ -11,8 +12,32 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/xKirtle/bandmate/internal/audio"
 	"github.com/xKirtle/bandmate/internal/domain"
 )
+
+// Change runs one change to a Song in a transaction on db: it marks the
+// Song as edited with a new version, runs fn, and commits. fn adds to
+// changes any files to keep, link or remove, which are changed only once the
+// change is committed. If the Song is no longer at the version the change
+// was based on (ErrStale), or fn or the commit fails, nothing changes, in
+// the database or on disk.
+func Change(ctx context.Context, db *sql.DB, songID int64, based Version,
+	fn func(tx *sql.Tx, changes *audio.FileChanges) error) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := touch(ctx, tx, songID, based); err != nil {
+		return err
+	}
+	var changes audio.FileChanges
+	if err := fn(tx, &changes); err != nil {
+		return err
+	}
+	return changes.Commit(tx.Commit)
+}
 
 // Version counts the changes to a Song: its metadata, Status, Lyric Sheet or
 // Timeline. It only guards against overwriting newer work, and is no
@@ -40,10 +65,10 @@ func Expect(based, current Version) error {
 	return nil
 }
 
-// Touch marks a Song as edited within tx, giving it a new version. It fails
+// touch marks a Song as edited within tx, giving it a new version. It fails
 // with ErrStale if the Song is no longer at the version the change was based
 // on, and domain.ErrNotFound if there is no such Song.
-func Touch(ctx context.Context, tx *sql.Tx, songID int64, based Version) error {
+func touch(ctx context.Context, tx *sql.Tx, songID int64, based Version) error {
 	res, err := tx.ExecContext(ctx,
 		`UPDATE songs SET updated_at = ?, version = version + 1 WHERE id = ? AND (?3 = 0 OR version = ?3)`,
 		time.Now().UTC().Format(domain.TimeFormat), songID, based)

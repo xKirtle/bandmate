@@ -127,6 +127,37 @@ func TestDeletingANonMainMasterKeepsTheMainOne(t *testing.T) {
 	}
 }
 
+// Deleting the main Master can fail partway: its row is gone, but making
+// another Master main fails. Then nothing changes and no file is removed.
+func TestDeletingAMasterThatFailsPartwayDeletesNothing(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.songWithMasters()
+	files := masterFiles(t, ts)
+	ts.failStatements(updates, "masters")
+
+	expectStatus(t, ts.Do(http.MethodDelete, masterPath(s.ID, mainMaster(t, s).ID), nil),
+		http.StatusInternalServerError)
+
+	if read := ts.getSong(s.ID); !reflect.DeepEqual(read, s) {
+		t.Errorf("song = %+v, want it unchanged: %+v", read, s)
+	}
+	if got := masterFiles(t, ts); !reflect.DeepEqual(got, files) {
+		t.Errorf("master files on disk = %q, want all of %q", got, files)
+	}
+}
+
+// mainMaster returns a Song's main Master.
+func mainMaster(t *testing.T, s song) master {
+	t.Helper()
+	for _, m := range s.Masters {
+		if m.Main {
+			return m
+		}
+	}
+	t.Fatalf("masters = %+v, want a main one", s.Masters)
+	return master{}
+}
+
 func TestAMastersNameAndNotesCanBeEdited(t *testing.T) {
 	ts := newTestServer(t)
 	s := ts.uploadMaster(ts.createSong("Night Drive").ID, fakeAudio("mix3.wav"))
