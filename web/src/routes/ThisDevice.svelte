@@ -6,13 +6,15 @@
   // are the same setting here.
   import { MediaQuery } from 'svelte/reactivity';
   import { palettes, themeChoices } from '../lib/appearance';
-  import { offsetSummary } from '../lib/calibration';
+  import { formatOffset, offsetSummary } from '../lib/calibration';
   import CalibrationDialog from '../lib/CalibrationDialog.svelte';
+  import { connectedDevices } from '../lib/capture';
   import InputPicker from '../lib/InputPicker.svelte';
-  import { inputName } from '../lib/inputSettings';
+  import { channelName, inputName, type InputChoice } from '../lib/inputSettings';
   import SettingsPage from '../lib/SettingsPage.svelte';
   import { appearance } from '../lib/sharedAppearance.svelte';
   import { RecordedInput } from '../lib/recordedInput.svelte';
+  import { calibrations } from '../lib/sharedCalibration.svelte';
   import { input } from '../lib/sharedInput.svelte';
   import { leftHanded } from '../lib/sharedLeftHanded.svelte';
 
@@ -22,10 +24,40 @@
   // Whether the Input picker is shown, with the Input open for its meter;
   // leaving the tab closes both.
   let changingInput = $state(false);
-  let calibrating = $state(false);
+  // The Input being calibrated: the one chosen, or one listed, measured as itself only.
+  let calibrating = $state.raw<{ input: InputChoice; exact: boolean } | null>(null);
   // The Latency Offset of the Input recording would open, to show.
   const recordedInput = new RecordedInput(() => input.value);
   const offset = $derived(recordedInput.calibration.offset);
+
+  // The audio devices connected, to say which listed Inputs aren't; null
+  // while that can't be told. Told again as they come and go, and once the
+  // browser allows the microphone.
+  let connected = $state.raw<Set<string> | null>(null);
+  $effect(() => {
+    let live = true;
+    const check = async () => {
+      const ids = await connectedDevices();
+      if (live) connected = ids;
+    };
+    void check();
+    const devices = navigator.mediaDevices;
+    devices?.addEventListener('devicechange', check);
+    let permission: PermissionStatus | undefined;
+    navigator.permissions
+      ?.query({ name: 'microphone' as PermissionName })
+      .then((status) => {
+        if (!live) return;
+        permission = status;
+        status.addEventListener('change', check);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+      devices?.removeEventListener('devicechange', check);
+      permission?.removeEventListener('change', check);
+    };
+  });
 
   // Narrowed past where recording is offered, the picker goes for good, so
   // widening again never opens the Input unasked.
@@ -103,10 +135,49 @@
             class="button"
             onclick={() => {
               changingInput = false;
-              calibrating = true;
+              calibrating = { input: $state.snapshot(input.value), exact: false };
             }}>{offset !== null ? 'Calibrate again' : 'Calibrate'}</button
           >
         </div>
+        {#if calibrations.calibrated.length > 0}
+          <!-- Every Input calibrated on this device, connected or not, to calibrate again or forget. -->
+          <div class="calibrated">
+            <h3 id="calibrated-heading">Calibrated inputs</h3>
+            <ul aria-labelledby="calibrated-heading">
+              {#each calibrations.calibrated as listed (`${listed.deviceId} ${listed.channel}`)}
+                {@const name = channelName(listed.label, listed.channel)}
+                {@const unplugged = connected !== null && !connected.has(listed.deviceId)}
+                <li>
+                  <div class="about">
+                    <span class="name">{name}</span>
+                    <span class="hint tabular">{formatOffset(listed.offset)}{unplugged ? ' · Not connected' : ''}</span>
+                  </div>
+                  <div class="row-actions">
+                    <!-- Only a connected one can be measured. -->
+                    {#if !unplugged}
+                      <button
+                        type="button"
+                        class="button"
+                        aria-label="Calibrate {name} again"
+                        onclick={() => {
+                          changingInput = false;
+                          const { deviceId, label, channel } = listed;
+                          calibrating = { input: { deviceId, label, channel }, exact: true };
+                        }}>Calibrate again</button
+                      >
+                    {/if}
+                    <button
+                      type="button"
+                      class="button"
+                      aria-label="Forget {name}"
+                      onclick={() => calibrations.forget(listed)}>Forget</button
+                    >
+                  </div>
+                </li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
       </section>
     {/if}
 
@@ -130,7 +201,7 @@
 </SettingsPage>
 
 {#if calibrating}
-  <CalibrationDialog input={$state.snapshot(input.value)} onClose={() => (calibrating = false)} />
+  <CalibrationDialog input={calibrating.input} exact={calibrating.exact} onClose={() => (calibrating = null)} />
 {/if}
 
 <style>
@@ -169,6 +240,46 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
+  }
+  .calibrated {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  h3 {
+    margin: 0;
+    font-size: var(--text-md);
+  }
+  ul {
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--border);
+    list-style: none;
+  }
+  li {
+    display: flex;
+    align-items: center;
+    /* Where the name would be squeezed, as at phone width, the buttons go under it. */
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-4);
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .about {
+    display: flex;
+    flex: 1 1 10rem;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .name {
+    overflow-wrap: anywhere;
+  }
+  .row-actions {
+    display: flex;
+    flex: none;
+    gap: var(--space-1);
+    margin-left: auto;
   }
   .hint {
     color: var(--text-muted);

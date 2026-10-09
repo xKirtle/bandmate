@@ -70,6 +70,37 @@ describe('InputCalibrations', () => {
     expect(reloaded().of({ deviceId: 'mic', channel: 0 })).toEqual({ offset: 0.021, offered: true });
   });
 
+  it('lists every Input with an offset by name, with the label it was calibrated with, but none only skipped', () => {
+    const { calibrations, reloaded } = setup();
+    calibrations.set(guitar, { offset: 0.034, offered: true });
+    calibrations.set(laptop, { offset: null, offered: true });
+    calibrations.set(mic, { offset: 0.021, offered: true });
+    const usb = { deviceId: 'usb', label: 'Blue Yeti', channel: 0 };
+    calibrations.set(usb, { offset: 0.012, offered: true });
+    // Recalibrated, it stays where it was in the list.
+    calibrations.set(guitar, { offset: 0.03, offered: true });
+
+    const listed = [
+      { ...usb, offset: 0.012, offered: true },
+      { ...mic, offset: 0.021, offered: true },
+      { ...guitar, offset: 0.03, offered: true },
+    ];
+    expect(calibrations.calibrated).toEqual(listed);
+    expect(reloaded().calibrated).toEqual(listed);
+  });
+
+  it('forgets an Input, so it is uncalibrated and offered again, keeping the others', () => {
+    const { calibrations, reloaded } = setup();
+    calibrations.set(mic, { offset: 0.021, offered: true });
+    calibrations.set(guitar, { offset: 0.034, offered: true });
+    calibrations.forget({ deviceId: 'mic', channel: 0 });
+
+    expect(calibrations.of(mic)).toEqual(fresh);
+    expect(calibrations.of(guitar)).toEqual({ offset: 0.034, offered: true });
+    expect(reloaded().of(mic)).toEqual(fresh);
+    expect(reloaded().calibrated).toEqual([{ ...guitar, offset: 0.034, offered: true }]);
+  });
+
   it('gives the offset of the Input the default input is, once known, never one kept for "default"', () => {
     const { calibrations } = setup();
     calibrations.set(mic, { offset: 0.021, offered: true });
