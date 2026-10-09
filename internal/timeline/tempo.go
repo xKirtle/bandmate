@@ -1,8 +1,10 @@
 package timeline
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"slices"
 
@@ -24,7 +26,8 @@ type ClipTempo struct {
 // Track moves, keeping its start, onto a new Track right below its own,
 // named as a Merge names one; those from one Track that no longer fit share
 // such a Track where they fit together, else another goes below it. Clips
-// that still fit stay put, and nothing else moves. If any Tempo can't be
+// that still fit stay put, counting the room those moving away leave, and
+// nothing else moves. If any Tempo can't be
 // set, none is.
 func (s *Store) SetClipTempos(ctx context.Context, songID int64, based songversion.Version, tempos []ClipTempo) (Timeline, error) {
 	if len(tempos) == 0 {
@@ -39,39 +42,39 @@ func (s *Store) SetClipTempos(ctx context.Context, songID int64, based songversi
 		}
 	}
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		type changed struct {
+		type scaled struct {
 			clipID int64
 			p      placement
 		}
-		var moving []changed
-		for _, t := range tempos {
+		changed := make([]scaled, len(tempos))
+		for i, t := range tempos {
 			p, err := clipPlacement(ctx, tx, songID, t.ClipID)
 			if err != nil {
 				return err
 			}
-			p = p.atTempo(t.Tempo)
-			fits, err := fitsBeforeNext(ctx, tx, t.ClipID, p)
+			changed[i] = scaled{t.ClipID, p.atTempo(t.Tempo)}
+		}
+		// Latest first, so one that moves away leaves room for the one
+		// before it.
+		slices.SortStableFunc(changed, func(a, b scaled) int { return cmp.Compare(b.p.start, a.p.start) })
+		var moving []scaled
+		leaving := []int64{}
+		for _, c := range changed {
+			fits, err := fitsBeforeNext(ctx, tx, c.clipID, leaving, c.p)
 			if err != nil {
 				return err
 			}
 			if !fits {
-				moving = append(moving, changed{t.ClipID, p})
+				moving = append(moving, c)
+				leaving = append(leaving, c.clipID)
 				continue
 			}
-			if err := store(ctx, tx, t.ClipID, p); err != nil {
+			if err := store(ctx, tx, c.clipID, c.p); err != nil {
 				return err
 			}
 		}
 		// In Timeline order, so each new Track takes the earliest that fit.
-		slices.SortStableFunc(moving, func(a, b changed) int {
-			if a.p.start < b.p.start {
-				return -1
-			}
-			if a.p.start > b.p.start {
-				return 1
-			}
-			return 0
-		})
+		slices.Reverse(moving)
 		// The new Tracks below each Track, top to bottom.
 		below := map[int64][]int64{}
 		for _, m := range moving {
@@ -115,11 +118,16 @@ func (p placement) atTempo(tempo float64) placement {
 }
 
 // fitsBeforeNext tells whether a Clip placed as p ends by the start of the
-// next Clip on its Track, if there is one, as the Track is now.
-func fitsBeforeNext(ctx context.Context, tx *sql.Tx, clipID int64, p placement) (bool, error) {
+// next Clip on its Track, if there is one, leaving out those leaving it.
+func fitsBeforeNext(ctx context.Context, tx *sql.Tx, clipID int64, leaving []int64, p placement) (bool, error) {
+	ids, err := json.Marshal(leaving)
+	if err != nil {
+		return false, err
+	}
 	var next sql.NullFloat64
-	if err := tx.QueryRowContext(ctx, `SELECT MIN(start) FROM clips WHERE track_id = ? AND id != ? AND start > ?`,
-		p.trackID, clipID, p.start+tolerance).Scan(&next); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT MIN(start) FROM clips WHERE track_id = ? AND id != ? AND start > ?
+			AND id NOT IN (SELECT value FROM json_each(?))`,
+		p.trackID, clipID, p.start+tolerance, string(ids)).Scan(&next); err != nil {
 		return false, fmt.Errorf("finding the next clip: %w", err)
 	}
 	return !next.Valid || p.start+p.length <= next.Float64+tolerance, nil

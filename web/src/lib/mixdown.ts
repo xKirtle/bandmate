@@ -2,8 +2,9 @@
 // the device's rate, sounding as playback would. It's built with the same
 // pieces playback is (schedule, and TrackMix for the Clip → Track wiring),
 // on an offline context that mixes as fast as it can and resamples each
-// Clip's decoded audio itself, stretched to its Tempo as playback has it. It's never normalised: what it clips, the file
-// clips too, and a note says so.
+// Clip's decoded audio itself, stretched to its Tempo as playback has it.
+// It's never normalised: what it clips, the file clips too, and a note
+// says so.
 import type { TimelineLoop } from './api';
 import { schedule, type Placed } from './schedule';
 import { toTheSecond } from './time';

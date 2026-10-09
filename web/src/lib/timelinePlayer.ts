@@ -1,6 +1,6 @@
 // Plays the Timeline: every Clip's audio is fetched, decoded into memory,
-// stretched to its Tempo (see stretch.ts) and scheduled on one AudioContext, so Tracks stay sample-accurate with each
-// other (ADR 0006). Each Clip plays at its Gain, shaped by its Fades,
+// stretched to its Tempo (see stretch.ts) and scheduled on one
+// AudioContext, so Tracks stay sample-accurate with each other (ADR 0006). Each Clip plays at its Gain, shaped by its Fades,
 // through its Track's own gain, which follows the Track's volume, mute and
 // solo live: wired by TrackMix, which a Mixdown and a Merge build their
 // graph with too, so they sound as playback would. A Loop's repeats are

@@ -183,18 +183,38 @@ func TestSlowedClipsFromOneTrackShareANewTrackWhereTheyFit(t *testing.T) {
 
 func TestSlowedClipsThatDontFitTogetherGetANewTrackEach(t *testing.T) {
 	ts := newTestServer(t)
-	s, ids := threeOnOneTrack(t, ts, 0, 11, 22)
+	s, ids := threeOnOneTrack(t, ts, 0, 12, 22)
+	// A 2-second Clip between the first two.
+	b := ts.getTimeline(s.ID).Beats[0]
+	tl := timelineChange(t, ts.placeClip(s.ID, map[string]any{
+		"trackId": ts.getTimeline(s.ID).Tracks[0].ID, "beatId": b.ID, "start": 10, "offset": 0, "length": 2,
+	}))
+	short := tl.Tracks[0].Clips[1].ID
 
 	got := timelineChange(t, ts.setClipTempos(s.ID, clipTempo{ids[0], 0.5}, clipTempo{ids[1], 0.5}))
 
 	if want := []string{"Track 1", "Track 3", "Track 4", "Adlibs"}; !reflect.DeepEqual(trackNames(got), want) {
 		t.Fatalf("tracks = %q, want two new Tracks below Track 1, in order", trackNames(got))
 	}
-	if a, b := clipAt(got, ids[0]), clipAt(got, ids[1]); a != "1:0+20@0" || b != "2:11+20@0" {
+	if a, b := clipAt(got, ids[0]), clipAt(got, ids[1]); a != "1:0+20@0" || b != "2:12+20@0" {
 		t.Errorf("slowed clips = %s and %s, want one on each new Track", a, b)
 	}
-	if at := clipAt(got, ids[2]); at != "0:22+10@0" {
-		t.Errorf("last clip = %s, want it where it was", at)
+	if a, b := clipAt(got, short), clipAt(got, ids[2]); a != "0:10+2@0" || b != "0:22+10@0" {
+		t.Errorf("other clips = %s and %s, want them where they were", a, b)
+	}
+}
+
+func TestASlowedClipFitsWhereTheNextOneMovedAwayFrom(t *testing.T) {
+	ts := newTestServer(t)
+	s, ids := threeOnOneTrack(t, ts, 0, 10, 20)
+
+	got := timelineChange(t, ts.setClipTempos(s.ID, clipTempo{ids[0], 0.5}, clipTempo{ids[1], 0.5}))
+
+	if at := clipAt(got, ids[1]); at != "1:10+20@0" {
+		t.Errorf("second clip = %s, want it on a new Track, as it runs into the third", at)
+	}
+	if at := clipAt(got, ids[0]); at != "0:0+20@0" {
+		t.Errorf("first clip = %s, want it where it was, with room up to the third now", at)
 	}
 }
 

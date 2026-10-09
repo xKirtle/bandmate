@@ -1,6 +1,7 @@
 import type { Clip } from './api';
 import { maxGain, minGain } from './clipGain';
 import { maxTempo, minTempo, tempoPercent } from './clipTempo';
+import { stretches } from './stretch';
 import { activeTake } from './clipSource';
 import { editHint, type Freeze } from './freeze';
 import type { MenuAction } from './menu';
@@ -212,15 +213,15 @@ function takeActions(clip: Clip, state: ClipMenuState, run: ClipRun): MenuAction
   return [
     ...(canRecord
       ? [
-          clip.tempo === 1
-            ? { icon: CircleDot, label: 'Retake', title: 'Record another Take into this Clip', run: run.retake }
-            : {
-                icon: CircleDot,
-                label: 'Retake',
-                title: 'Set the Tempo back to 100% to retake this Clip',
-                disabled: true,
-                run: run.retake,
-              },
+          {
+            icon: CircleDot,
+            label: 'Retake',
+            run: run.retake,
+            // A Take is recorded as it's sung, so only lines up in a Clip at 100%.
+            ...(stretches(clip)
+              ? { title: 'Set the Tempo back to 100% to retake this Clip', disabled: true }
+              : { title: 'Record another Take into this Clip' }),
+          },
         ]
       : []),
     ...(several

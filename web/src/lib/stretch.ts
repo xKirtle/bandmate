@@ -7,6 +7,7 @@
 // samples. It goes a second of audio at a time, pausing between, so the page
 // carries on meanwhile.
 import transient from '@audio/stretch-transient';
+import type { Clip } from './api';
 
 /** Decoded audio, one array of samples per channel. */
 export interface DecodedAudio {
@@ -14,13 +15,11 @@ export interface DecodedAudio {
   sampleRate: number;
 }
 
-/** How a Clip's audio is stretched: its Tempo, as a ratio of as recorded. */
-export interface Stretch {
-  tempo: number;
-}
+/** What a Clip's audio is stretched by: its Tempo, as a ratio of as recorded. */
+export type StretchedBy = Pick<Clip, 'tempo'>;
 
 /** Whether stretching changes audio at all. */
-export function stretches({ tempo }: Stretch): boolean {
+export function stretches({ tempo }: StretchedBy): boolean {
   return tempo !== 1;
 }
 
@@ -40,7 +39,7 @@ const nextTask: Pause = () =>
   });
 
 /** Audio played at a Tempo, each channel as long as the Tempo makes it; as it is at 100%. */
-export async function stretch(audio: DecodedAudio, how: Stretch, pause: Pause = nextTask): Promise<Float32Array[]> {
+export async function stretch(audio: DecodedAudio, how: StretchedBy, pause: Pause = nextTask): Promise<Float32Array[]> {
   const { channels, sampleRate } = audio;
   if (!stretches(how)) return [...channels];
   const factor = 1 / how.tempo;

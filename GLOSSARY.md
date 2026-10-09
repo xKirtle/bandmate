@@ -164,7 +164,7 @@ _Avoid_: Clip volume, level (volume is a Track's)
 
 **Tempo**:
 How fast a Clip plays its audio, as a percentage of as recorded, from 50% to 200%, without changing its pitch. It belongs to the Clip, not to a Take, and the audio file is never touched: the browser stretches the decoded audio, so playback, a Merge and a Mixdown all hear it. Changing it keeps the Clip's start and the stretch of audio it plays, so its length on the Timeline scales, and its trims and Fades stay on the same audio. A Clip slowed until it would run into the next Clip on its Track moves, keeping its start, onto a new Track right below its own, which slowed Clips from that Track share where they fit together; nothing else moves. A Take's Nudge stays in the recording's own time, and a Clip that isn't at 100% can't be retaken. The Song's Key and BPM, and its Cues, never follow it.
-_Avoid_: Speed (Playback speed is the whole Timeline's), stretch, rate
+_Avoid_: Speed (Playback speed is the whole Timeline's)
 
 **Fade**:
 A Clip rising from silence at its start (a fade in) or falling to silence at its end (a fade out), over a length measured from that edge as trimmed, so trimming the Clip carries the Fade with the edge. A Clip's two Fades together never run longer than the Clip. Playback, a Merge and a Mixdown all hear them.
