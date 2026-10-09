@@ -70,7 +70,7 @@ describe('InputCalibrations', () => {
     expect(reloaded().of({ deviceId: 'mic', channel: 0 })).toEqual({ offset: 0.021, offered: true });
   });
 
-  it('lists every Input with an offset by name, with the label it was calibrated with, but none only skipped', () => {
+  it('lists every Input kept, calibrated or skipped, by name, with the label it was kept with', () => {
     const { calibrations, reloaded } = setup();
     calibrations.set(guitar, { offset: 0.034, offered: true });
     calibrations.set(laptop, { offset: null, offered: true });
@@ -82,11 +82,12 @@ describe('InputCalibrations', () => {
 
     const listed = [
       { ...usb, offset: 0.012, offered: true },
+      { ...laptop, offset: null, offered: true },
       { ...mic, offset: 0.021, offered: true },
       { ...guitar, offset: 0.03, offered: true },
     ];
-    expect(calibrations.calibrated).toEqual(listed);
-    expect(reloaded().calibrated).toEqual(listed);
+    expect(calibrations.kept).toEqual(listed);
+    expect(reloaded().kept).toEqual(listed);
   });
 
   it('forgets an Input, so it is uncalibrated and offered again, keeping the others', () => {
@@ -98,7 +99,7 @@ describe('InputCalibrations', () => {
     expect(calibrations.of(mic)).toEqual(fresh);
     expect(calibrations.of(guitar)).toEqual({ offset: 0.034, offered: true });
     expect(reloaded().of(mic)).toEqual(fresh);
-    expect(reloaded().calibrated).toEqual([{ ...guitar, offset: 0.034, offered: true }]);
+    expect(reloaded().kept).toEqual([{ ...guitar, offset: 0.034, offered: true }]);
   });
 
   it('gives the offset of the Input the default input is, once known, never one kept for "default"', () => {
@@ -178,7 +179,7 @@ describe('InputCalibrations', () => {
       calibrations.set(laptop, { offset: 0.04, offered: true });
       calibrations.forget(laptop);
       expect(calibrations.shownFor(defaultChoice, laptop)).toEqual(fresh);
-      expect(calibrations.calibrated).toEqual([]);
+      expect(calibrations.kept).toEqual([]);
 
       calibrations.opened(defaultChoice, laptop);
       expect(calibrations.of(laptop)).toEqual(fresh);

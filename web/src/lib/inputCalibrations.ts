@@ -20,9 +20,6 @@ export type InputId = Pick<InputChoice, 'deviceId' | 'channel'>;
 /** An Input's calibration, with the device's label when it was kept. */
 export type InputCalibration = InputChoice & Calibration;
 
-/** An Input with a Latency Offset. */
-export type CalibratedInput = InputCalibration & { offset: number };
-
 /** Every Input's calibration kept on this device. */
 interface Calibrations {
   inputs: InputCalibration[];
@@ -168,13 +165,13 @@ export class InputCalibrations {
   }
 
   /**
-   * Every Input with a Latency Offset on this device, connected or not, by
-   * name, each with the label its device had when calibrated: those only
-   * skipped have none to list.
+   * Every Input kept on this device, connected or not, by name, each with
+   * the label its device had when kept: those calibrated, and those whose
+   * calibration was skipped.
    */
-  get calibrated(): CalibratedInput[] {
+  get kept(): InputCalibration[] {
     return this.#setting.value.inputs
-      .filter((i): i is CalibratedInput => i.offset !== null)
+      .filter((i) => i.offset !== null || i.offered)
       .sort((a, b) => channelName(a.label, a.channel).localeCompare(channelName(b.label, b.channel)));
   }
 

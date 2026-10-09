@@ -6,55 +6,18 @@
   // are the same setting here.
   import { MediaQuery } from 'svelte/reactivity';
   import { palettes, themeChoices } from '../lib/appearance';
-  import { offsetSummary } from '../lib/calibration';
   import CalibrationSheet from '../lib/CalibrationSheet.svelte';
-  import { connectedDevices, watchInputs } from '../lib/capture';
-  import InputPicker from '../lib/InputPicker.svelte';
-  import OffsetField from '../lib/OffsetField.svelte';
-  import { channelName, inputName, type InputChoice } from '../lib/inputSettings';
+  import InputList from '../lib/InputList.svelte';
+  import type { InputChoice } from '../lib/inputSettings';
   import SettingsPage from '../lib/SettingsPage.svelte';
   import { appearance } from '../lib/sharedAppearance.svelte';
-  import { RecordedInput } from '../lib/recordedInput.svelte';
-  import { calibrations } from '../lib/sharedCalibration.svelte';
-  import { input } from '../lib/sharedInput.svelte';
   import { leftHanded } from '../lib/sharedLeftHanded.svelte';
 
   // Recording is offered only as wide as the Timeline offers editing, so
   // the Recording card is too. Narrower, it goes, closing the Input with it.
   const recordingOffered = new MediaQuery('min-width: 40.0625rem');
-  // Whether the Input picker is shown, with the Input open for its meter;
-  // leaving the tab closes both.
-  let changingInput = $state(false);
-  // The Input being calibrated: the one chosen, or one listed, measured as itself only.
+  // The Input being calibrated: the default input as the Input it turns out to be, or a listed one exactly.
   let calibrating = $state.raw<{ input: InputChoice; exact: boolean } | null>(null);
-  // The Latency Offset of the Input recording would open, to show.
-  const recordedInput = new RecordedInput(() => input.value);
-  const offset = $derived(recordedInput.calibration.offset);
-
-  // The audio devices connected, to say which listed Inputs aren't; null
-  // while that can't be told. Told again as they come and go, and once the
-  // browser allows the microphone.
-  let connected = $state.raw<Set<string> | null>(null);
-  const calibrated = $derived(calibrations.calibrated);
-  $effect(() => {
-    let live = true;
-    const check = async () => {
-      const ids = await connectedDevices();
-      if (live) connected = ids;
-    };
-    void check();
-    const unwatch = watchInputs(check);
-    return () => {
-      live = false;
-      unwatch();
-    };
-  });
-
-  // Narrowed past where recording is offered, the picker goes for good, so
-  // widening again never opens the Input unasked.
-  $effect(() => {
-    if (!recordingOffered.current) changingInput = false;
-  });
 </script>
 
 <SettingsPage tab="device">
@@ -97,80 +60,8 @@
     {#if recordingOffered.current}
       <section class="card" aria-labelledby="recording-heading">
         <h2 id="recording-heading">Recording</h2>
-        <!-- At a glance, without opening the Input. -->
-        <dl class="summary">
-          <div>
-            <dt>Input</dt>
-            <dd>{inputName(input.value)}</dd>
-          </div>
-          <div>
-            <dt>Latency Offset</dt>
-            <dd class="tabular">{offsetSummary(offset)}</dd>
-          </div>
-        </dl>
-        {#if changingInput}
-          <div id="input-picker">
-            <InputPicker />
-          </div>
-        {/if}
-        <div class="actions">
-          <button
-            type="button"
-            class="button"
-            aria-expanded={changingInput}
-            aria-controls="input-picker"
-            onclick={() => (changingInput = !changingInput)}>{changingInput ? 'Done' : 'Change input'}</button
-          >
-          <button
-            type="button"
-            class="button"
-            onclick={() => {
-              changingInput = false;
-              calibrating = { input: $state.snapshot(input.value), exact: false };
-            }}>{offset !== null ? 'Calibrate again' : 'Calibrate'}</button
-          >
-        </div>
-        {#if calibrated.length > 0}
-          <!-- Every Input calibrated on this device, connected or not, its offset to type, calibrate again or forget. -->
-          <div class="calibrated">
-            <h3 id="calibrated-heading">Calibrated inputs</h3>
-            <ul aria-labelledby="calibrated-heading">
-              {#each calibrated as listed (`${listed.deviceId} ${listed.channel}`)}
-                {@const name = channelName(listed.label, listed.channel)}
-                {@const unplugged = connected !== null && !connected.has(listed.deviceId)}
-                <li>
-                  <div class="about">
-                    <span class="name">{name}</span>
-                    {#if unplugged}<span class="hint">Not connected</span>{/if}
-                    <!-- Its offset, to type, even unplugged. -->
-                    <OffsetField {name} offset={listed.offset} onSet={(offset) => calibrations.keep(listed, offset)} />
-                  </div>
-                  <div class="row-actions">
-                    <!-- Only a connected one can be measured. -->
-                    {#if !unplugged}
-                      <button
-                        type="button"
-                        class="button"
-                        aria-label="Calibrate {name} again"
-                        onclick={() => {
-                          changingInput = false;
-                          const { deviceId, label, channel } = listed;
-                          calibrating = { input: { deviceId, label, channel }, exact: true };
-                        }}>Calibrate again</button
-                      >
-                    {/if}
-                    <button
-                      type="button"
-                      class="button"
-                      aria-label="Forget {name}"
-                      onclick={() => calibrations.forget(listed)}>Forget</button
-                    >
-                  </div>
-                </li>
-              {/each}
-            </ul>
-          </div>
-        {/if}
+        <!-- Every Input on this device, to record from, calibrate, type an offset for, or forget. -->
+        <InputList metering={!calibrating} onCalibrate={(input, exact) => (calibrating = { input, exact })} />
       </section>
     {/if}
 
@@ -215,65 +106,6 @@
   h2 {
     margin: 0;
     font-size: var(--text-lg);
-  }
-  .summary {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    margin: 0;
-  }
-  dt {
-    color: var(--text-muted);
-    font-size: var(--text-sm);
-  }
-  dd {
-    margin: 0;
-  }
-  .actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-  }
-  .calibrated {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-  h3 {
-    margin: 0;
-    font-size: var(--text-md);
-  }
-  ul {
-    margin: 0;
-    padding: 0;
-    border-top: 1px solid var(--border);
-    list-style: none;
-  }
-  li {
-    display: flex;
-    align-items: center;
-    /* Where the name would be squeezed, as at phone width, the buttons go under it. */
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: var(--space-2) var(--space-4);
-    padding: var(--space-2) 0;
-    border-bottom: 1px solid var(--border);
-  }
-  .about {
-    display: flex;
-    flex: 1 1 10rem;
-    flex-direction: column;
-    gap: var(--space-1);
-    min-width: 0;
-  }
-  .name {
-    overflow-wrap: anywhere;
-  }
-  .row-actions {
-    display: flex;
-    flex: none;
-    gap: var(--space-1);
-    margin-left: auto;
   }
   .hint {
     color: var(--text-muted);
