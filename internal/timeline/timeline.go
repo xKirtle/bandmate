@@ -707,12 +707,13 @@ func (s *Store) TrimClip(ctx context.Context, songID int64, based songversion.Ve
 		if err != nil {
 			return err
 		}
-		if err := checkTrim(offset, length, duration); err != nil {
+		trimmed := p
+		trimmed.offset, trimmed.length = offset, length
+		if err := checkTrim(trimmed, duration); err != nil {
 			return err
 		}
 		offset = max(offset, 0)
-		p.start += offset - p.offset
-		p.offset, p.length = offset, length
+		p.start, p.offset, p.length = p.timelineAt(offset), offset, length
 		if fades != nil {
 			if err := fades.check(length); err != nil {
 				return err
@@ -723,15 +724,15 @@ func (s *Store) TrimClip(ctx context.Context, songID int64, based songversion.Ve
 	})
 }
 
-// checkTrim checks that a Clip playing length seconds of a source from
-// offset stays within the source's duration.
-func checkTrim(offset, length, duration float64) error {
+// checkTrim checks that a Clip placed as p, its offset as asked for, plays
+// within its source, duration seconds long.
+func checkTrim(p placement, duration float64) error {
 	switch {
-	case offset < -tolerance:
+	case p.offset < -tolerance:
 		return domain.Invalid("a Clip can't start before its source does")
-	case length <= 0:
+	case p.length <= 0:
 		return domain.Invalid("a Clip must play for some time")
-	case offset+length > duration+tolerance:
+	case p.sourceEnd() > duration+tolerance:
 		return domain.Invalid("a Clip can't play past the end of its source")
 	}
 	return nil
@@ -978,7 +979,9 @@ func addClip(ctx context.Context, tx *sql.Tx, songID, trackID int64, c NewClip) 
 	if err != nil {
 		return err
 	}
-	if err := checkTrim(c.Offset, c.Length, duration); err != nil {
+	p := placement{trackID: trackID, source: src, name: clipName(c.Name), gain: c.Gain,
+		start: c.Start, offset: c.Offset, length: c.Length}
+	if err := checkTrim(p, duration); err != nil {
 		return err
 	}
 	if c.Start < -tolerance {
@@ -991,8 +994,7 @@ func addClip(ctx context.Context, tx *sql.Tx, songID, trackID int64, c NewClip) 
 	if err := fades.check(c.Length); err != nil {
 		return err
 	}
-	p := placement{trackID: trackID, source: src, name: clipName(c.Name), gain: c.Gain, fades: fades,
-		start: max(c.Start, 0), offset: max(c.Offset, 0), length: c.Length}
+	p.fades, p.start, p.offset = fades, max(c.Start, 0), max(c.Offset, 0)
 	free, err := isFree(ctx, tx, 0, p)
 	if err != nil {
 		return err

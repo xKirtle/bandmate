@@ -18,6 +18,7 @@ import {
   type Timeline,
   type Track,
 } from './api';
+import { sourceAt } from './clipTime';
 import { withCueChange, type CueChange } from './cueChanges';
 import { linesByRow } from './cues';
 import type { Edit } from './history';
@@ -255,7 +256,7 @@ export class FakeSongServer implements SongServer {
               const right = this.#clip({
                 ...sourceOf(c),
                 start: edit.at,
-                offset: c.offset + cut,
+                offset: sourceAt(c, edit.at),
                 length: c.length - cut,
               });
               return [{ ...c, length: cut }, right];

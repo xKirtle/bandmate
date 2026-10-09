@@ -12,6 +12,7 @@
 import { api, type Clip, type NewClip, type OwnOfClip, type Take, type Timeline } from './api';
 import type { PlacedFades } from './clipFade';
 import { gainFactor } from './clipGain';
+import { sourceAt, timelineAt } from './clipTime';
 import type { Placed } from './schedule';
 import type { PlayableClip } from './timelinePlayer';
 
@@ -124,12 +125,11 @@ export function fileStart(clip: Clip): number {
 export function heard(clip: Clip): Placed | null {
   const take = activeTake(clip);
   if (!take) return { start: clip.start, offset: clip.offset, length: clip.length };
-  // Where the span starts, and the Take in it, on the Timeline.
-  const origin = clip.start - clip.offset;
-  const start = Math.max(clip.start, origin + take.position);
-  const end = Math.min(clip.start + clip.length, origin + take.position + take.duration);
+  // Where the Take starts and ends in the span, on the Timeline.
+  const start = Math.max(clip.start, timelineAt(clip, take.position));
+  const end = Math.min(clip.start + clip.length, timelineAt(clip, take.position + take.duration));
   if (end <= start) return null;
-  return { start, offset: start - origin - take.position, length: end - start };
+  return { start, offset: sourceAt(clip, start) - take.position, length: end - start };
 }
 
 /**

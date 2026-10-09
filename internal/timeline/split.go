@@ -50,7 +50,7 @@ func (s *Store) splitClip(ctx context.Context, tx *sql.Tx, changes *audio.FileCh
 		return domain.Invalid("a Clip is only split where the playhead crosses it")
 	}
 	right := p
-	right.start, right.offset, right.length = at, p.offset+cut, p.length-cut
+	right.start, right.offset, right.length = at, p.sourceAt(at), p.length-cut
 	right.fades = Fades{In: 0, Out: min(p.fades.Out, right.length)}
 	left := p
 	left.length = cut

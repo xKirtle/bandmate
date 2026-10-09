@@ -313,14 +313,15 @@ func (s *Store) SetTakes(ctx context.Context, songID int64, based songversion.Ve
 		if err != nil {
 			return err
 		}
-		if err := checkTrim(ct.Offset, ct.Length, duration); err != nil {
+		p.start, p.offset, p.length = ct.Start, ct.Offset, ct.Length
+		if err := checkTrim(p, duration); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE clips SET active_take_id = ? WHERE id = ?`,
 			*ct.ActiveTakeID, clipID); err != nil {
 			return fmt.Errorf("setting takes: %w", err)
 		}
-		p.start, p.offset, p.length = ct.Start, max(ct.Offset, 0), ct.Length
+		p.offset = max(ct.Offset, 0)
 		if fades != nil {
 			if err := fades.check(ct.Length); err != nil {
 				return err
@@ -386,7 +387,7 @@ func (s *Store) NudgeTake(ctx context.Context, songID int64, based songversion.V
 		if err != nil {
 			return err
 		}
-		if p.offset+p.length > end+tolerance {
+		if p.sourceEnd() > end+tolerance {
 			return domain.Invalid("the Clip would play past where its Takes end; trim it first")
 		}
 		return place(ctx, tx, clipID, p)
@@ -497,11 +498,11 @@ func keepTakes(ctx context.Context, tx *sql.Tx, songID, clipID int64, p placemen
 		return err
 	}
 	if end <= p.offset+tolerance {
-		back := p.offset - max(0, end-p.length)
-		p.start -= back
-		p.offset -= back
+		// Its audio stays where it is on the Timeline.
+		offset := max(0, end-p.sourceLength(p.length))
+		p.start, p.offset = p.timelineAt(offset), offset
 	}
-	p.length = min(p.length, end-p.offset)
+	p.length = min(p.length, p.timelineLength(end-p.offset))
 	if err := setActiveTake(ctx, tx, clipID, p.source.activeTakeID.Int64); err != nil {
 		return err
 	}

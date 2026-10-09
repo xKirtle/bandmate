@@ -1,6 +1,7 @@
 // What the Timeline plays from a given time: which Clip plays which part of
 // its source, and when. Plain arithmetic, so playback only has to follow it.
 
+import { sourceAt } from './clipTime';
 import { lastCue, type CuedSong } from './cues';
 
 /** Where a Clip sits on the Timeline and which part of its source it plays, in seconds. */
@@ -17,7 +18,7 @@ export interface Scheduled<C extends Placed> {
   delay: number;
   /** Where in its source the Clip starts playing, in seconds. */
   from: number;
-  /** How long it plays, in seconds. */
+  /** How long it plays, in seconds of the Timeline. */
   duration: number;
 }
 
@@ -64,7 +65,7 @@ export function schedule<C extends Placed>(
       const start = Math.max(clip.start, from);
       const end = Math.min(clip.start + clip.length, to);
       if (end <= start) continue;
-      result.push({ clip, delay: at + start - from, from: clip.offset + start - clip.start, duration: end - start });
+      result.push({ clip, delay: at + start - from, from: sourceAt(clip, start), duration: end - start });
     }
   };
   if (!repeats(t, loop)) {

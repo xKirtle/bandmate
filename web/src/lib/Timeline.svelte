@@ -30,6 +30,7 @@
   import { BoxDrag, type BoxAt } from './boxDrag.svelte';
   import { guideLanes, reachAt } from './snapping';
   import { clipSources, clipTitle, fileStart, playing } from './clipSource';
+  import { sourceAt, sourceLength } from './clipTime';
   import { formatCue } from './cues';
   import type { Saves } from './saves.svelte';
   import type { SyncMode } from './syncMode.svelte';
@@ -1847,11 +1848,24 @@
   }
 
   /**
-   * A stretch of the waveform of what a Clip plays, from offset seconds in,
-   * as count bars over drawn seconds. Past heard seconds in, trimmed off
-   * the Clip, it's silent.
+   * A stretch of the waveform of what a Clip, placed at `at`, plays: from
+   * `from` seconds of the Timeline after its start, as count bars over
+   * drawn seconds of the Timeline. Past `to` seconds after its start,
+   * trimmed off the Clip, it's silent.
    */
-  function clipShape(clip: Clip, offset: number, heard: number, drawn: number, count: number): number[] {
+  function clipShape(clip: Clip, at: Placed, from: number, to: number, drawn: number, count: number): number[] {
+    // The same stretch, in its source.
+    const offset = sourceAt(at, at.start + from);
+    const heard = sourceLength(at, to - from);
+    return sourceShape(clip, offset, heard, sourceLength(at, drawn), count);
+  }
+
+  /**
+   * A stretch of the waveform of what a Clip plays, from offset seconds into
+   * its source, as count bars over drawn seconds of it. Past heard seconds
+   * in, trimmed off the Clip, it's silent.
+   */
+  function sourceShape(clip: Clip, offset: number, heard: number, drawn: number, count: number): number[] {
     const all = peaks[sources.of(clip).key] ?? [];
     // The audio file starts this far into the source, silent before it.
     const lead = Math.round(fileStart(clip) * peaksPerSecond);
@@ -2368,7 +2382,7 @@
                           preserveAspectRatio="none"
                           aria-hidden="true"
                         >
-                          {#each clipShape(clip, at.offset + wave.from, wave.to - wave.from, (wave.bars * barWidth) / view.scale, wave.bars) as peak, i (i)}
+                          {#each clipShape(clip, at, wave.from, wave.to, (wave.bars * barWidth) / view.scale, wave.bars) as peak, i (i)}
                             <!-- Drawn as it sounds, at the Clip's Gain, shaped by its Fades. -->
                             {@const t = wave.from + ((i + 0.5) * barWidth) / view.scale}
                             {@const height = Math.max(

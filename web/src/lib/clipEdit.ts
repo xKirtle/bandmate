@@ -5,6 +5,7 @@
 
 import type { Clip, ClipMove } from './api';
 import { activeTake } from './clipSource';
+import { sourceAt, sourceLength, timelineAt } from './clipTime';
 import type { Placed } from './schedule';
 
 /** The shortest a Clip can be trimmed to, in seconds. */
@@ -35,10 +36,10 @@ export function clampTrimStart(clip: Placed, others: readonly Placed[], desired:
   // Neighbours are told apart by where they start, so one touching the Clip
   // still counts when rounding leaves its end a hair past the Clip's start.
   const before = others.filter((c) => c.start < clip.start);
-  const earliest = Math.max(0, clip.start - clip.offset, ...before.map(endOf));
+  const earliest = Math.max(0, timelineAt(clip, 0), ...before.map(endOf));
   const start = Math.min(Math.max(desired, earliest), end - minClipLength);
   // Rounding could otherwise take the trim a hair before the source's start.
-  return { start, offset: Math.max(0, clip.offset + (start - clip.start)), length: end - start };
+  return { start, offset: Math.max(0, sourceAt(clip, start)), length: end - start };
 }
 
 /**
@@ -48,7 +49,7 @@ export function clampTrimStart(clip: Placed, others: readonly Placed[], desired:
 export function clampTrimEnd(clip: Placed, others: readonly Placed[], sourceDuration: number, desired: number): Placed {
   const end = clip.start + clip.length;
   const latest = Math.min(
-    clip.start + sourceDuration - clip.offset,
+    timelineAt(clip, sourceDuration),
     ...others.filter((c) => c.start > clip.start).map((c) => c.start),
   );
   const newEnd = Math.max(Math.min(desired, latest), clip.start + minClipLength);
@@ -138,11 +139,12 @@ function gaps(clips: readonly OnTrack[]): Range[] {
 
 /**
  * The nudge its active Take gets when a Clip of Takes is Alt+dragged by
- * seconds, from the nudge it has, in whole milliseconds.
+ * seconds of the Timeline, from the nudge it has, in whole milliseconds of
+ * the recording.
  */
 export function draggedNudge(clip: Clip, seconds: number): number {
   const take = activeTake(clip)!;
-  return Math.round((take.nudge + seconds) * 1000) / 1000;
+  return Math.round((take.nudge + sourceLength(clip, seconds)) * 1000) / 1000;
 }
 
 /**
