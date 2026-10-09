@@ -192,7 +192,7 @@
     width: 1.125rem;
     height: 1.125rem;
     border-radius: var(--radius-full);
-    background: var(--text);
+    background: var(--accent);
   }
   button:focus-visible {
     outline: 2px solid var(--accent);

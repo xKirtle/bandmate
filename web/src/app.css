@@ -299,6 +299,39 @@ label.button:has(input:focus-visible) {
   cursor: pointer;
 }
 
+/* A button or chip shifts a little from its own colour while a pointer is
+   over it: a box rises one surface, the accent and a quiet button's text lean
+   towards --text (darker in light, lighter in dark, so text on the accent
+   keeps its contrast), danger takes a faint tint. Only to a pointer that can
+   hover, as with the icon button, so a tap leaves nothing behind. */
+.button,
+.chip {
+  transition:
+    background-color var(--duration-fast) var(--ease),
+    border-color var(--duration-fast) var(--ease),
+    color var(--duration-fast) var(--ease);
+}
+@media (hover: hover) {
+  .button:hover:not(:disabled, .disabled),
+  .chip:hover:not(:disabled) {
+    background: var(--surface-2);
+  }
+  .button.danger:hover:not(:disabled, .disabled) {
+    background: color-mix(in srgb, var(--danger) 10%, var(--surface-1));
+  }
+  .button.primary:hover:not(:disabled, .disabled),
+  .button.toggle[aria-pressed='true']:hover:not(:disabled),
+  .chip[aria-pressed='true']:hover:not(:disabled),
+  .chip.picked:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--accent) 85%, var(--text));
+    background: color-mix(in srgb, var(--accent) 85%, var(--text));
+  }
+  .button.quiet:hover:not(:disabled) {
+    background: none;
+    color: color-mix(in srgb, var(--accent) 75%, var(--text));
+  }
+}
+
 /* A list page's filter bar: its filter buttons, wrapping onto more rows
    where there's no room. */
 .filter-bar {
@@ -359,6 +392,9 @@ label.button:has(input:focus-visible) {
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease),
+    color var(--duration-fast) var(--ease);
 }
 .tabs > :where(a) {
   display: inline-flex;
@@ -368,6 +404,14 @@ label.button:has(input:focus-visible) {
 .tabs > :where([aria-selected='true'], [aria-current='page']) {
   border-bottom-color: var(--accent);
   color: var(--text);
+}
+/* A tab not chosen brightens under a pointer that can hover, its underline
+   hinted in the border colour. */
+@media (hover: hover) {
+  .tabs > :where([role='tab']:not([aria-selected='true']):hover, a:not([aria-current='page']):hover) {
+    border-bottom-color: var(--border);
+    color: var(--text);
+  }
 }
 
 /* A field's label above it, quieter than what's typed. */

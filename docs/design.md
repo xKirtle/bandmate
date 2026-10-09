@@ -220,7 +220,7 @@ The recurring components are written once, and a screen reaches for them rather 
 | Danger    | `.button.danger`         | Deletes or overwrites, after asking: Delete, Replace and restore. Primary's place when it's the one |
 | Toggle    | `.button.toggle`         | On or off, with `aria-pressed`: filled with the accent while on, e.g. Sync lyrics, Left-handed     |
 
-A disabled button fades; a disabled quiet one turns muted instead.
+A disabled button fades; a disabled quiet one turns muted instead. Under a pointer that can hover, a button or chip shifts a little from its own colour, fading over `--duration-fast`: a box rises to `--surface-2`, the accent (primary, a toggle that's on, a picked chip) and a quiet button's text lean towards `--text`, and danger takes a faint tint of `--danger`. A disabled one doesn't react, and a touch screen never sees it, so a tap leaves nothing behind.
 
 **The icon button**, `.icon`, is a square of `--control` showing one Lucide icon at `--text-xl` (`--text-lg` on desktop), muted and boxless until a pointer that can hover is over it, so a tap on a touch screen leaves no box behind. It's for an action an icon says on its own, such as a dialog's close, a Section's ⋯ or Undo, and always has an `aria-label`. The Timeline's own buttons are in its scale instead.
 
@@ -230,7 +230,7 @@ A disabled button fades; a disabled quiet one turns muted instead.
 
 **Cards** are flat: `.card` is a `--surface-1` panel with a border and `--radius-lg`, on the page, never floating. It holds a Section, the Chord Finder, About's sections, and the Beat Library's add and batch forms. Two relatives aren't cards: the Scrapbook is a dashed outline with no fill, since Sections are dropped into it, and its Sections are cards inside it; and on desktop the Song page's side parts, its Masters and the Scrapbook, are each a card that folds.
 
-**Tabs** are a `.tabs` row over what they switch between, each tab muted until it's chosen, then underlined in the accent and in `--text`. They're buttons in a tablist (`role="tab"`, `aria-selected`) where switching stays on the page, like the Chord Finder's and About's, and links (`aria-current="page"`) where each tab has its own address, like Settings' This device, Backups and About. A component adds only where the row sits, such as its border or a phone's tighter tabs. `components.test.ts` fails a component that styles `[role='tab']` itself.
+**Tabs** are a `.tabs` row over what they switch between, each tab muted until it's chosen, then underlined in the accent and in `--text`; under a pointer that can hover, a tab not chosen brightens to `--text` over an underline in `--border`. They're buttons in a tablist (`role="tab"`, `aria-selected`) where switching stays on the page, like the Chord Finder's and About's, and links (`aria-current="page"`) where each tab has its own address, like Settings' This device, Backups and About. A component adds only where the row sits, such as its border or a phone's tighter tabs. `components.test.ts` fails a component that styles `[role='tab']` itself.
 
 **Folds** are a `<details>` whose `<summary>` starts with `FoldChevron`, which turns from pointing right to down as it opens. `app.css` takes away the browser's own marker and rings a focused summary. About's release notes and dependency lists fold, and on desktop so do the Song page's side parts.
 
