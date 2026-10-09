@@ -247,6 +247,7 @@ A disabled button fades; a disabled quiet one turns muted instead.
 | `--rail-width`, `--tabbar-height`      | The navigation: a nav rail on wide windows, a tab bar on narrow ones     |
 | `--tabbar-space`, `--nav-bottom-space` | What the tab bar, or the navigation, takes from the bottom of the window |
 | `--side-width`, `--side-max-width`     | A desktop side column, such as the Song page's Scrapbook                 |
+| `--settings-max-width`                 | The widest a Settings tab's content grows, the same for every tab        |
 | `--cover-list`, `--cover-header`       | A Song's Cover in lists and in the Song page header                      |
 | `--checkbox`                           | A checkbox or radio button, a touch bigger than the browser draws it     |
 | `--mark-rail`, `--mark-large`          | Bandmate's mark: atop the nav rail, and in About                         |
