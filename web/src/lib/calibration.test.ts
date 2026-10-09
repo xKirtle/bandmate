@@ -229,8 +229,16 @@ describe('verdict', () => {
     expect(readingOf(scattered(40)).counted).toBe(20);
     // The mic heard nothing, or too little to measure.
     expect(verdict(readingOf([], 39))).toMatchObject({ usable: false, finished: false });
-    expect(verdict(readingOf([], 40))).toMatchObject({ usable: false, finished: true, progress: 1 });
-    expect(verdict(readingOf(loose(3, 0.01), 40))).toMatchObject({ usable: false, finished: true });
+    expect(verdict(readingOf([], 40))).toMatchObject({
+      usable: false,
+      finished: true,
+      progress: 1,
+      heardEnough: false,
+    });
+    expect(verdict(readingOf(loose(5, 0.01), 40))).toMatchObject({ usable: false, finished: true, heardEnough: false });
+    // Heard enough, but too few agreed.
+    const disagreeing = [0, 0.2, 0.4, 0.2, 0, 0.4];
+    expect(verdict(readingOf(disagreeing, 40))).toMatchObject({ usable: false, finished: true, heardEnough: true });
     // Enough agreed, though most clicks went unheard.
     expect(verdict(readingOf(loose(7, 0.02), 40))).toMatchObject({ usable: true, finished: true });
   });

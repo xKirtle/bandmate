@@ -5,9 +5,9 @@
 // each click's hit is found in what the input captured as it's heard, those
 // that don't fit are left out, and the rest averaged, until the average is
 // known well enough, or enough clicks have played (see verdict), or the
-// user ends it. Each Input has its
-// own, kept on this device (see inputCalibrations.ts). Until an Input's
-// calibrated, the latency the browser reports stands in.
+// user ends it. Each Input has its own, kept on this device (see
+// inputCalibrations.ts). Until an Input's calibrated, the latency the
+// browser reports stands in.
 
 /** How many hits it takes to measure: fewer and it fails. */
 export const minHits = 6;
@@ -99,9 +99,9 @@ function readTaps(samples: Float32Array, sampleRate: number, times: readonly num
 }
 
 /**
- * What taps heard with these delays read, in seconds, in order, after a
- * number of clicks, by default one for each: those near enough their median
- * count, and their average is never less than no delay.
+ * What taps heard with these delays read, in seconds, in order, and how many
+ * clicks have played, by default one per delay: taps near enough their
+ * median count, and their average is never less than no delay.
  */
 export function readingOf(delays: readonly number[], clicks = delays.length): Reading {
   const middle = delays.length ? median(delays) : 0;
@@ -131,25 +131,28 @@ const mostCounted = 24;
 const mostClicks = 40;
 
 /**
- * Whether a reading is enough to keep, once minHits count; whether it's
+ * Whether a reading is enough to keep, once minHits count; whether the mic
+ * heard enough to measure, once minHits are heard, counted or not; whether it's
  * finished, once its average is known to finishingAt from fewestToFinish
  * taps, or mostCounted count, or mostClicks have played, whichever is first;
  * and how near it is to finishing, from 0 to 1, by whichever is nearest.
  */
 export interface Verdict {
   usable: boolean;
+  heardEnough: boolean;
   finished: boolean;
   progress: number;
 }
 
 /** The verdict on a reading. */
-export function verdict({ clicks, counted, average, precision }: Reading): Verdict {
+export function verdict({ clicks, taps, counted, average, precision }: Reading): Verdict {
   // How near the average is to precise enough, from 1 once it is; nowhere, from too few taps.
   const byPrecision =
     counted >= fewestToFinish && precision !== null ? finishingAt / Math.max(precision, finishingAt) : 0;
   const finished = byPrecision === 1 || counted >= mostCounted || clicks >= mostClicks;
   return {
     usable: counted >= minHits && average !== null,
+    heardEnough: taps.length >= minHits,
     finished,
     progress: finished ? 1 : Math.min(1, Math.max(counted / mostCounted, clicks / mostClicks, byPrecision)),
   };
