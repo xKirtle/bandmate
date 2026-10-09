@@ -2,7 +2,7 @@
   import { identifyInput, openProblem } from './capture';
   import { statusOf } from './inputList';
   import InputName from './InputName.svelte';
-  import { InputRows, type ConnectedRow } from './inputRows.svelte';
+  import { InputRows, keyOf, type ConnectedRow } from './inputRows.svelte';
   import type { InputChoice } from './inputSettings';
   import LevelMeter from './LevelMeter.svelte';
   import OffsetField from './OffsetField.svelte';
@@ -91,9 +91,7 @@
             <label class="choice-row">
               <input type="radio" name="{id}-record-from" checked={row.chosen} onchange={() => inputs.choose(row)} />
               <span class="name" id="{id}-{i}-name"
-                ><InputName name={row.name} channel={row.channel} />{#if row.is}<span class="is"
-                    ><InputName name="" channel={row.is} /></span
-                  >{/if}</span
+                ><InputName name={row.name} channel={row.channel} is={row.is} /></span
               >
             </label>
             <button
@@ -135,7 +133,7 @@
   {#if inputs.notConnected.length > 0}
     <h3 id="{id}-not-connected">Not connected</h3>
     <ul aria-labelledby="{id}-not-connected">
-      {#each inputs.notConnected as row (JSON.stringify([row.input.deviceId, row.input.channel]))}
+      {#each inputs.notConnected as row (keyOf(row.input))}
         <li>
           <div class="line">
             <span class="name"><InputName name={row.name} channel={row.input} /></span>
@@ -181,12 +179,6 @@
   .name {
     flex: 1;
     min-width: 0;
-  }
-  /* What the default input is, under its name. */
-  .is {
-    display: block;
-    color: var(--text-muted);
-    font-size: var(--text-sm);
   }
   .status,
   .badge {

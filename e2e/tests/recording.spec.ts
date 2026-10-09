@@ -158,9 +158,7 @@ async function hearClicks(page: Page, delay: number) {
 /** Waits for the playhead to pass a time, in seconds, e.g. while recording. */
 async function playheadPast(page: Page, time: number) {
   await expect
-    .poll(async () => Number(await ruler(page).getAttribute('aria-valuenow')), {
-      timeout: 15_000,
-    })
+    .poll(async () => Number(await ruler(page).getAttribute('aria-valuenow')), { timeout: 15_000 })
     .toBeGreaterThan(time);
 }
 
@@ -262,16 +260,12 @@ test('calibration is hands-free by default, measures each tap as it is heard, fi
   await seek(page, 5);
   await recordButton(page).click();
   const offer = calibrationOffer(page);
-  const handsFree = offer.getByRole('radio', {
-    name: /^Hands-free: rest your headphones on the mic/,
-  });
+  const handsFree = offer.getByRole('radio', { name: /^Hands-free: rest your headphones on the mic/ });
   await expect(handsFree).toBeChecked();
   await expect(offer).toContainText('Turn the volume up for the test, so the mic hears each click clearly.');
   // Tap along points at the clicks heard, and the tip goes with hands-free.
   await offer
-    .getByRole('radio', {
-      name: 'Tap along: tap or clap on the mic in time with the clicks you hear',
-    })
+    .getByRole('radio', { name: 'Tap along: tap or clap on the mic in time with the clicks you hear' })
     .check();
   await expect(offer).not.toContainText('Turn the volume up');
   await handsFree.check();
@@ -281,9 +275,7 @@ test('calibration is hands-free by default, measures each tap as it is heard, fi
   await expect(offer.getByRole('button', { name: 'Close' })).toHaveCount(0);
   const finish = offer.getByRole('button', { name: 'Finish now' });
   const reading = offer.getByRole('status');
-  await expect(reading).toHaveText(/^25 ms, from [1-5] taps?$/, {
-    timeout: 10_000,
-  });
+  await expect(reading).toHaveText(/^25 ms, from [1-5] taps?$/, { timeout: 10_000 });
   await expect(finish).toHaveCount(0);
   await expect(offer).toContainText(/Finding the taps: [1-5] of 6/);
   await expect(finish).toBeVisible({ timeout: 10_000 });
@@ -293,9 +285,7 @@ test('calibration is hands-free by default, measures each tap as it is heard, fi
   await expect(offer).toContainText(/Your taps spread ±\d+ ms · average good to ±\d+ ms, finishing at ±4 ms/);
   // The metronome marks the taps around the average.
   await expect(
-    offer.getByRole('img', {
-      name: /^Metronome, .+, with \d+ taps marked around the average$/,
-    }),
+    offer.getByRole('img', { name: /^Metronome, .+, with \d+ taps marked around the average$/ }),
   ).toBeVisible();
 
   // Hearing the clicks exactly, it finishes by itself from 10 taps. Nothing

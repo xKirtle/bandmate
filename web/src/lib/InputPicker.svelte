@@ -123,11 +123,7 @@
             <li>
               <label class="choice-row">
                 <input type="radio" name="{id}-record-from" checked={row.chosen} onchange={() => inputs.choose(row)} />
-                <span class="name"
-                  ><InputName name={row.name} channel={row.channel} />{#if row.is}<span class="is"
-                      ><InputName name="" channel={row.is} /></span
-                    >{/if}</span
-                >
+                <span class="name"><InputName name={row.name} channel={row.channel} is={row.is} /></span>
               </label>
               {#if row.chosen}
                 <div class="meter">
@@ -165,12 +161,6 @@
   .name {
     flex: 1;
     min-width: 0;
-  }
-  /* What the default input is, under its name. */
-  .is {
-    display: block;
-    color: var(--text-muted);
-    font-size: var(--text-sm);
   }
   .meter {
     /* Lined up with the name, past the radio. */

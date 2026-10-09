@@ -138,8 +138,11 @@ export function channelNumber(channel: number): string {
   return `Input ${channel + 1}`;
 }
 
+/** A device's channel, by the device's label, as an Input's name says it. */
+export type DeviceChannel = Pick<InputChoice, 'label' | 'channel'>;
+
 /** Orders Inputs by their device's name, then each device's by channel. */
-export function byDeviceThenChannel(a: { label: string; channel: number }, b: { label: string; channel: number }) {
+export function byDeviceThenChannel(a: DeviceChannel, b: DeviceChannel) {
   return deviceName(a.label).localeCompare(deviceName(b.label)) || a.channel - b.channel;
 }
 

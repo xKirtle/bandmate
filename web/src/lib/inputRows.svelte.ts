@@ -1,7 +1,7 @@
 import type { Calibration } from './calibration';
 import { connectedDevices, watchInputs, type ConnectedDevice, type InputLevel } from './capture';
 import { listInputs, type InputRow } from './inputList';
-import { deviceName, type InputChoice } from './inputSettings';
+import { deviceName, type DeviceChannel, type InputChoice } from './inputSettings';
 import { RecordedInput } from './recordedInput.svelte';
 import { calibrations } from './sharedCalibration.svelte';
 import { input } from './sharedInput.svelte';
@@ -20,9 +20,9 @@ export interface ConnectedRow {
   /** Its name in full, e.g. "Input 1 · Scarlett 2i2", or "Default input". */
   name: string;
   /** Its channel and device, to show the channel first and cut the device short; null for the default input. */
-  channel: { label: string; channel: number } | null;
+  channel: DeviceChannel | null;
   /** The Input the default input looks to be, to show under its name; null for any other. */
-  is: { label: string; channel: number } | null;
+  is: DeviceChannel | null;
   calibration: Calibration;
   /** The Input to choose, meter and calibrate, as chosen. */
   input: InputChoice;
@@ -33,7 +33,8 @@ export interface ConnectedRow {
 }
 
 const defaultInput: InputChoice = { deviceId: '', label: '', channel: 0 };
-const keyOf = (input: InputChoice) => JSON.stringify([input.deviceId, input.channel]);
+/** Tells an Input from the others listed: its device and channel. */
+export const keyOf = (input: InputChoice) => JSON.stringify([input.deviceId, input.channel]);
 
 export class InputRows {
   // The Input chosen on this device, in this tab or another.
