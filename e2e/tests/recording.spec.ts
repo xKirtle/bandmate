@@ -26,8 +26,12 @@ test.use({
       writeFileSync(tone, toneWav('tone.wav', 0.5).buffer);
       try {
         await use({
-          // As playwright.config.ts picks it.
+          // As playwright.config.ts picks it. Playwright's own is the full
+          // Chromium, not its headless shell, which gives the fake inputs new
+          // ids on every page load, as no browser does, so an Input's Latency
+          // Offset wouldn't outlast a reload.
           executablePath: process.env.CHROMIUM || undefined,
+          channel: process.env.CHROMIUM ? undefined : 'chromium',
           args: [
             '--use-fake-device-for-media-stream',
             '--use-fake-ui-for-media-stream',
@@ -51,6 +55,8 @@ interface Take {
   number: number;
   duration: number;
   latencyOffset: number;
+  /** Where it starts in its Clip's source span, in seconds: not 0 for a Retake with another Latency Offset. */
+  position: number;
 }
 
 /** A Clip of Takes, in seconds, with the Takes the shared Clip leaves to tests to read. */
@@ -135,8 +141,8 @@ function expectWholeTake(c: Clip) {
   const take = c.takes.find((t) => t.id === c.activeTakeId);
   if (!take) throw new Error(`Clip ${c.id} has no active Take`);
   // Every Take here starts at 0:05 or later, so its lead-in is never cut short at 0:00.
-  expect(c.offset).toBeCloseTo(leadIn + take.latencyOffset, 2);
-  expect(c.offset + c.length).toBeCloseTo(take.duration, 2);
+  expect(c.offset - take.position).toBeCloseTo(leadIn + take.latencyOffset, 2);
+  expect(c.offset + c.length - take.position).toBeCloseTo(take.duration, 2);
 }
 
 test('calibration offered before the first recording can be skipped, and is not offered again', async ({
