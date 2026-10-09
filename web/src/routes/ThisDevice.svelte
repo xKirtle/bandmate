@@ -7,7 +7,7 @@
   import { MediaQuery } from 'svelte/reactivity';
   import { palettes, themeChoices } from '../lib/appearance';
   import { offsetSummary } from '../lib/calibration';
-  import CalibrationDialog from '../lib/CalibrationDialog.svelte';
+  import CalibrationSheet from '../lib/CalibrationSheet.svelte';
   import { connectedDevices, watchInputs } from '../lib/capture';
   import InputPicker from '../lib/InputPicker.svelte';
   import OffsetField from '../lib/OffsetField.svelte';
@@ -194,7 +194,7 @@
 </SettingsPage>
 
 {#if calibrating}
-  <CalibrationDialog input={calibrating.input} exact={calibrating.exact} onClose={() => (calibrating = null)} />
+  <CalibrationSheet input={calibrating.input} exact={calibrating.exact} onClose={() => (calibrating = null)} />
 {/if}
 
 <style>

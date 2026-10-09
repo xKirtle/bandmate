@@ -1,19 +1,20 @@
 // Calibrating the Latency Offset: the full round trip from the Beat being
 // played to the voice reaching the file, through this device's outputs and
-// input. Clicks play until the user ends it, and they tap or clap on the mic
-// along with them; each click's hit is found in what the input captured as
-// it's heard, those that don't fit are left out, and the rest averaged. Each
-// Input has its own, kept on this device (see inputCalibrations.ts). Until an
-// Input's calibrated, the latency the browser reports stands in.
+// input. Clicks play until the user ends it, and the mic hears them, from
+// headphones resting on it (hands-free), or the user taps or claps on it
+// along with them (tap along); each click's hit is found in what the input
+// captured as it's heard, those that don't fit are left out, and the rest
+// averaged. Each Input has its own, kept on this device (see
+// inputCalibrations.ts). Until an Input's calibrated, the latency the
+// browser reports stands in.
 
 /** How many hits it takes to measure: fewer and it fails. */
 export const minHits = 6;
-/** How many taps the average must hold steady over. */
-export const steadyOver = 10;
 
-// Before the first click, to get ready, and between clicks, in seconds.
+// Before the first click, to get ready, in seconds.
 const readyTime = 1.5;
-const clickEvery = 0.75;
+/** Between clicks, in seconds. */
+export const clickEvery = 0.75;
 
 /** When click i plays, from 0, in seconds from when capture starts. */
 export function clickTime(i: number): number {
@@ -28,16 +29,15 @@ export function clickTimes(count: number): number[] {
 /** What measuring found: the average delay, in seconds, or a failure; with how many hits it counted. */
 export type Measurement = { ok: true; offset: number; hits: number } | { ok: false; hits: number };
 
-/** What a calibration reads so far: each tap, the average of those that count, how many do, and how steady it is. */
+/** What a calibration reads so far: each tap, the average of those that count, and how many do. */
 export interface Reading {
   taps: readonly Tap[];
   average: number | null;
   counted: number;
-  steady: number | null;
 }
 
 /** A reading of no taps yet. */
-export const noReading: Reading = { taps: [], average: null, counted: 0, steady: null };
+export const noReading: Reading = { taps: [], average: null, counted: 0 };
 
 /** A click's hit: its delay after the click, in seconds, and whether it's near enough the others to count. */
 export interface Tap {
@@ -117,11 +117,6 @@ export class Measuring {
   // How many clicks have been measured.
   #clicks = 0;
   #taps: Tap[] = [];
-  // The average as each tap was heard, one for each tap, to tell how steady
-  // it is. A click that finds more than one new tap at once (one a quiet
-  // start hid) gives each the same average; one that finds fewer drops the
-  // averages past them.
-  #averages: (number | null)[] = [];
 
   constructor(private sampleRate: number) {}
 
@@ -143,9 +138,6 @@ export class Measuring {
     for (let heard = this.#heardTo(this.#clicks); heard <= this.#length; heard = this.#heardTo(this.#clicks)) {
       this.#clicks++;
       this.#taps = findTaps(this.#samples.subarray(0, heard), this.sampleRate, clickTimes(this.#clicks));
-      const average = averageOf(this.#taps);
-      this.#averages.length = Math.min(this.#averages.length, this.#taps.length);
-      while (this.#averages.length < this.#taps.length) this.#averages.push(average);
     }
     return this.#clicks > clicks;
   }
@@ -157,7 +149,7 @@ export class Measuring {
 
   /** All it reads so far, at once. */
   get reading(): Reading {
-    return { taps: this.taps, average: this.average, counted: this.counted, steady: this.steady };
+    return { taps: this.taps, average: this.average, counted: this.counted };
   }
 
   /** What's measured so far, as measureOffset would find it. */
@@ -178,18 +170,6 @@ export class Measuring {
   /** How many taps count. */
   get counted(): number {
     return this.#taps.filter((t) => t.counted).length;
-  }
-
-  /**
-   * How far the average has moved over the last steadyOver taps, in
-   * seconds either side of the middle of where it's been; null until there
-   * are that many, each with an average.
-   */
-  get steady(): number | null {
-    const last = this.#averages.slice(-steadyOver);
-    if (last.length < steadyOver || last.some((a) => a === null)) return null;
-    const averages = last as number[];
-    return (Math.max(...averages) - Math.min(...averages)) / 2;
   }
 }
 
@@ -277,6 +257,12 @@ export function appliedOffset(calibration: Calibration, reported: number): numbe
 /** An offset to show, in whole milliseconds: "23 ms". */
 export function formatOffset(seconds: number): string {
   return `${Math.round(seconds * 1000)} ms`;
+}
+
+/** How far a new offset is from an old one, in whole milliseconds, signed: "+4 ms", "−3 ms", "±0 ms". */
+export function offsetChange(offset: number, was: number): string {
+  const ms = Math.round(offset * 1000) - Math.round(was * 1000);
+  return ms === 0 ? '±0 ms' : `${ms > 0 ? '+' : '−'}${Math.abs(ms)} ms`;
 }
 
 /** The largest Latency Offset that can be typed, in milliseconds. */

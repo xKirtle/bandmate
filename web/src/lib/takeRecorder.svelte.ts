@@ -171,9 +171,10 @@ export interface TakeRecorderOptions {
   /**
    * Hears that an Input was never calibrated nor skipped, before its first
    * recording, so nothing was recorded: to offer calibration of it, and
-   * start again once it's calibrated or skipped.
+   * start again once it's calibrated or skipped; with the latency the
+   * browser reports for it, in seconds, which stands in where it's skipped.
    */
-  onUncalibrated?: (input: InputChoice, start: Start) => void;
+  onUncalibrated?: (input: InputChoice, start: Start, reported: number) => void;
   /** Hears the id of a Track added for an unsaved Take, e.g. to choose it. */
   onTrackAdded?: (trackId: number) => void;
   /** Hears why a recording, or keeping unsaved Takes, failed, e.g. to show it. */
@@ -211,7 +212,7 @@ export class TakeRecorder {
   #keeping: TakeKeeping;
   #calibrations: TakeCalibrations;
   #uploads: TakeUploads;
-  #onUncalibrated: (input: InputChoice, start: Start) => void;
+  #onUncalibrated: (input: InputChoice, start: Start, reported: number) => void;
   #onTrackAdded: (trackId: number) => void;
   #onError: (message: string) => void;
 
@@ -275,7 +276,7 @@ export class TakeRecorder {
       if (input.input && uncalibrated(calibration)) {
         input.close();
         this.#done();
-        this.#onUncalibrated(input.input, start);
+        this.#onUncalibrated(input.input, start, input.reported);
         return;
       }
       if (input.gone) this.inputNote = `${input.gone} isn't connected, so recording from the default input.`;

@@ -210,15 +210,17 @@ describe('TakeRecorder', () => {
   it("offers calibration of an Input before its first recording, and records nothing till it's calibrated or skipped", async () => {
     const offers: unknown[] = [];
     const { server, input, player, keeping, recorder, errors, calibrations } = await setup(undefined, {
-      onUncalibrated: (offered, start) => offers.push({ offered, start }),
+      onUncalibrated: (offered, start, reported) => offers.push({ offered, start, reported }),
     });
     calibrations.others = { offset: null, offered: false };
     calibrations.set(mic, { offset: 0.03, offered: true });
     input.recordsFrom = guitar;
+    input.reported = 0.012;
 
     await recorder.start({ trackId: 1, playhead: 5, retake: 7 });
 
-    expect(offers).toEqual([{ offered: guitar, start: { trackId: 1, playhead: 5, retake: 7 } }]);
+    // With the latency the browser reports for it, which skipping uses.
+    expect(offers).toEqual([{ offered: guitar, start: { trackId: 1, playhead: 5, retake: 7 }, reported: 0.012 }]);
     expect(recorder.phase).toBeNull();
     expect(input.opened!.closed).toBe(true);
     expect(player.played).toEqual([]);

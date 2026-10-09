@@ -5,6 +5,7 @@ import {
   measureOffset,
   Measuring,
   minHits,
+  offsetChange,
   offsetSummary,
   typedOffset,
 } from './calibration';
@@ -155,36 +156,6 @@ describe('Measuring', () => {
     expect(measuring.average).toBeCloseTo(0.04, 3);
     expect(measuring.counted).toBe(11);
   });
-
-  it('says how far the average moved over the last 10 taps, once there are 10', () => {
-    const many = clickTimes(14);
-    // Ten taps 40 ms late, then 62, 40, 40 and 40.
-    const claps = many.map((t, i) => t + (i === 10 ? 0.062 : 0.04));
-    const samples = recording(many.at(-1)! + 1, claps);
-    const measuring = new Measuring(rate);
-    const steady: (number | null)[] = [];
-    let at = 0;
-    for (let i = 0; i < many.length; i++) {
-      const to = Math.ceil((many[i] + 0.4) * rate);
-      measuring.hear(samples.subarray(at, to), at);
-      at = to;
-      steady.push(measuring.steady);
-    }
-    expect(steady.slice(0, 9)).toEqual(Array(9).fill(null));
-    expect(steady[9]).toBeCloseTo(0, 3);
-    // The average went from 40 to 42 ms, then back down to 41.5: ±1 ms.
-    expect(measuring.average).toBeCloseTo(0.0415, 3);
-    expect(steady[10]).toBeCloseTo(0.001, 3);
-    expect(steady[13]).toBeCloseTo(0.001, 3);
-  });
-
-  it('counts only clicks with a tap towards the last 10', () => {
-    const claps = heard(0.04).filter((_, i) => i % 2 === 0);
-    const measuring = new Measuring(rate);
-    measuring.hear(recording(length, claps), 0);
-    expect(measuring.counted).toBe(6);
-    expect(measuring.steady).toBeNull();
-  });
 });
 
 describe('clickTimes', () => {
@@ -212,6 +183,14 @@ describe('offsetSummary', () => {
 
   it('says so until calibrated', () => {
     expect(offsetSummary(null)).toBe('Not calibrated');
+  });
+});
+
+describe('offsetChange', () => {
+  it('is how far a new offset is from the old one, in whole milliseconds, signed', () => {
+    expect(offsetChange(0.025, 0.021)).toBe('+4 ms');
+    expect(offsetChange(0.018, 0.0214)).toBe('−3 ms');
+    expect(offsetChange(0.0251, 0.025)).toBe('±0 ms');
   });
 });
 
