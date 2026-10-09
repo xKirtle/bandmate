@@ -14,6 +14,7 @@ const beatClip = (id: number, start: number, end: number): Clip => ({
   soundId: null,
   name: null,
   gain: 0,
+  tempo: 1,
   fadeIn: 0,
   fadeOut: 0,
   takes: [],
@@ -759,6 +760,34 @@ describe('Timeline editing, a Clip’s Gain and Fades as shown', () => {
 });
 
 describe('Timeline editing, undo and redo', () => {
+  it('sets the Tempo of several Clips as one step, undone together', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { editing } = await editingFor(server);
+    await editing.edit({
+      kind: 'setClipTempos',
+      tempos: [
+        { clipId: 1, tempo: 0.8 },
+        { clipId: 2, tempo: 0.8 },
+      ],
+    });
+    const lengths = () => server.timeline.tracks[0].clips.map((c) => [c.start, c.length, c.tempo]);
+    expect(lengths()).toEqual([
+      [0, 12.5, 0.8],
+      [20, 12.5, 0.8],
+    ]);
+
+    await editing.undo();
+    expect(lengths()).toEqual([
+      [0, 10, 1],
+      [20, 10, 1],
+    ]);
+    await editing.redo();
+    expect(lengths()).toEqual([
+      [0, 12.5, 0.8],
+      [20, 12.5, 0.8],
+    ]);
+  });
+
   it('does nothing with nothing to undo or redo, and nothing queued', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
     const { editing } = await editingFor(server);

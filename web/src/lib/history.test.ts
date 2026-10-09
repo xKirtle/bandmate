@@ -9,6 +9,7 @@ const clip = (id: number, start: number, more: Partial<Clip> = {}): Clip => ({
   soundId: null,
   name: null,
   gain: 0,
+  tempo: 1,
   fadeIn: 0,
   fadeOut: 0,
   takes: [],
@@ -384,6 +385,62 @@ describe('History', () => {
     expect(h.nextUndo()).toEqual({ kind: 'setClipGain', clipId: 5, gain: 0 });
     h.undone(t1, t0);
     expect(h.nextRedo()).toEqual({ kind: 'setClipGain', clipId: 5, gain: 3 });
+  });
+
+  it("undoes setting Clips' Tempo by setting each back, in one step", () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0), clip(6, 30, { tempo: 1.25, length: 8 })])]);
+    const t1 = timeline([
+      track(1, [clip(5, 0, { tempo: 0.8, length: 12.5 }), clip(6, 30, { tempo: 0.8, length: 12.5 })]),
+    ]);
+    const edit: Edit = {
+      kind: 'setClipTempos',
+      tempos: [
+        { clipId: 5, tempo: 0.8 },
+        { clipId: 6, tempo: 0.8 },
+      ],
+    };
+    h.record(edit, t0, t1);
+
+    expect(h.nextUndo()).toEqual({
+      kind: 'setClipTempos',
+      tempos: [
+        { clipId: 5, tempo: 1 },
+        { clipId: 6, tempo: 1.25 },
+      ],
+    });
+    h.undone(t1, t0);
+    expect(h.nextRedo()).toEqual(edit);
+  });
+
+  it('undoes a Tempo that moved a Clip onto a new Track by placing it back as it was and deleting the Track', () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0), clip(6, 15)])]);
+    const t1 = timeline([track(1, [clip(6, 15)]), track(3, [clip(5, 0, { tempo: 0.5, length: 20 })])]);
+    h.record({ kind: 'setClipTempos', tempos: [{ clipId: 5, tempo: 0.5 }] }, t0, t1);
+
+    expect(h.nextUndo()).toEqual({
+      kind: 'replaceClips',
+      clipIds: [5],
+      trackIds: [3],
+      clips: [{ trackId: 1, clip: { beatId: 100, start: 0, offset: 0, length: 10 } }],
+    });
+    h.undone(t1, timeline([track(1, [clip(9, 0), clip(6, 15)])]));
+
+    // Redone by the Clip's new id, the new Track added again.
+    expect(h.nextRedo()).toEqual({ kind: 'setClipTempos', tempos: [{ clipId: 9, tempo: 0.5 }] });
+  });
+
+  it('places a Clip back at its Tempo', () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0, { tempo: 0.5, length: 20 })])]);
+    h.record({ kind: 'deleteClip', clipId: 5 }, t0, timeline([track(1)]));
+
+    expect(h.nextUndo()).toEqual({
+      kind: 'placeClip',
+      trackId: 1,
+      clip: { beatId: 100, tempo: 0.5, start: 0, offset: 0, length: 20 },
+    });
   });
 
   it('undoes deleting a Clip by placing it back at its Gain, and sets its Gain by its new id', () => {

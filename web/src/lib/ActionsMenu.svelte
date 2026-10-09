@@ -2,6 +2,7 @@
   import Check from '@lucide/svelte/icons/check';
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
+  import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
   import { tick, type Snippet } from 'svelte';
   import { keyHints } from './keyHints';
   import {
@@ -180,6 +181,12 @@
     if (value !== field.value) field.set(value);
   }
 
+  // Its reset goes away once it's used, so focus goes back to the field.
+  function resetField(value: number) {
+    setField(value);
+    input?.focus();
+  }
+
   // The field keeps its keys, but for Escape and Tab, which leave the menu.
   function onFieldKey(e: KeyboardEvent) {
     if (!field) return;
@@ -288,6 +295,14 @@
             />
             {field.unit}
           </label>
+          <!-- Back to where it started out, e.g. a Tempo's 100%, while it's anything else. -->
+          {#if field.reset && field.value !== field.reset.value}
+            {@const reset = field.reset}
+            <button type="button" role="menuitem" tabindex="-1" onclick={() => resetField(reset.value)}>
+              <span class="entry-icon" aria-hidden="true"><RotateCcw /></span>
+              {reset.label}
+            </button>
+          {/if}
         {/if}
         {#each 'choices' in picking ? picking.choices : [] as choice, i (i)}
           <button

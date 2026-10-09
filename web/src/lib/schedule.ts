@@ -4,11 +4,16 @@
 import { sourceAt } from './clipTime';
 import { lastCue, type CuedSong } from './cues';
 
-/** Where a Clip sits on the Timeline and which part of its source it plays, in seconds. */
+/**
+ * Where a Clip sits on the Timeline and which part of its source it plays,
+ * in seconds, and its Tempo, which says how much of its source that is.
+ */
 export interface Placed {
   start: number;
   offset: number;
   length: number;
+  /** How fast it plays its source, as a ratio of as recorded (see clipTime); 100% if left out. */
+  tempo?: number;
 }
 
 /** One Clip to play, from the moment playback starts. */

@@ -3,6 +3,7 @@ import {
   type Clip,
   type ClipFades,
   type ClipMove,
+  type ClipTempo,
   type ClipTakes,
   type CueValue,
   type NewClip,
@@ -27,12 +28,17 @@ import { rightHalves } from './split';
 // like any other edit.
 //
 // A deleted Clip, or a copied one redone, is placed back with its name,
-// Gain and Fades, if it has them; a rename is undone by giving the Clip back
+// Gain, Tempo and Fades, if it has them; a rename is undone by giving the Clip back
 // its old name, or a blank one to clear it, and setting its Gain or its
 // Fades by setting the old ones back. A trim, or a change to a Clip's Takes,
 // can shorten its Fades to fit, so it's undone by setting them back with it.
 //
 // Clips deleted together are placed back together, as one edit.
+//
+// Setting Clips' Tempo is undone by setting each one's back, which scales
+// its length and Fades back as they were. One that moved onto a new Track,
+// slowed into the next Clip, is undone instead by replacing the Clips as
+// they were, the new Tracks deleted, in one step.
 //
 // An edit that brings back a deleted Clip or Track gets it a new id. The
 // edits kept that name the old id are then changed to name the new one.
@@ -96,6 +102,8 @@ export type Edit =
   | { kind: 'setClipGain'; clipId: number; gain: number }
   /** In seconds; 0 for none. */
   | { kind: 'setClipFades'; clipId: number; fadeIn: number; fadeOut: number }
+  /** Each a ratio of as recorded, all in one step. */
+  | { kind: 'setClipTempos'; tempos: ClipTempo[] }
   | { kind: 'deleteClip'; clipId: number }
   /** Clips deleted at once, and Tracks with them, e.g. those a paste added. */
   | { kind: 'deleteClips'; clipIds: number[]; trackIds?: number[] }
@@ -376,6 +384,17 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
       const { fadeIn, fadeOut } = clip;
       return { edit: { kind: 'setClipFades', clipId: clip.id, fadeIn, fadeOut }, adds: none };
     }
+    case 'setClipTempos': {
+      const clipIds = edit.tempos.map((t) => t.clipId);
+      const { tracks } = added(before, after);
+      if (tracks.length === 0) {
+        const tempos = clipIds.map((clipId) => ({ clipId, tempo: findClip(before, clipId).clip.tempo }));
+        return { edit: { kind: 'setClipTempos', tempos }, adds: none };
+      }
+      // Some moved onto Tracks it added.
+      const back = placingBackAll(before, clipIds);
+      return { edit: { kind: 'replaceClips', clipIds, trackIds: tracks, clips: back.clips }, adds: back.adds };
+    }
     case 'deleteClip':
       return placingBack(before, edit.clipId);
     case 'deleteClips': {
@@ -600,6 +619,8 @@ function remap(edit: HistoryEdit, ids: IdMaps): HistoryEdit {
       };
     case 'splitClips':
       return { ...edit, clipIds: edit.clipIds.map(ids.clip) };
+    case 'setClipTempos':
+      return { ...edit, tempos: edit.tempos.map((t) => ({ ...t, clipId: ids.clip(t.clipId) })) };
     case 'deleteClips':
       return edit.trackIds
         ? { ...edit, clipIds: edit.clipIds.map(ids.clip), trackIds: edit.trackIds.map(ids.track) }
@@ -667,6 +688,8 @@ export function sendEdit(at: SongAt, edit: Edit): Promise<Timeline> {
       return api.setClipGain(at, edit.clipId, edit.gain);
     case 'setClipFades':
       return api.setClipFades(at, edit.clipId, { fadeIn: edit.fadeIn, fadeOut: edit.fadeOut });
+    case 'setClipTempos':
+      return api.setClipTempos(at, edit.tempos);
     case 'duplicateClip':
       return api.duplicateClip(at, edit.clipId);
     case 'deleteClip':

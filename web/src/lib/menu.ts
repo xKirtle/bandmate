@@ -69,6 +69,8 @@ export type MenuField = {
   /** The least and most it can be, if it's limited, e.g. a Gain; typed or stepped past, it stops there. */
   min?: number;
   max?: number;
+  /** What it goes back to, e.g. a Tempo's 100%, offered under it while it's anything else. */
+  reset?: { value: number; label: string };
   set: (value: number) => void;
 };
 

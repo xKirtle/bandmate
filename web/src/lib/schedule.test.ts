@@ -37,6 +37,26 @@ describe('schedule', () => {
   });
 });
 
+describe('schedule at a Tempo', () => {
+  // The trimmed Clip slowed to 50%: 20 seconds of the Timeline play the
+  // same 10 seconds of its Beat, from 2s in.
+  const slowed = { ...trimmed, length: 20, tempo: 0.5 };
+
+  it("plays a slowed Clip's audio over twice as long on the Timeline", () => {
+    expect(schedule([slowed], 0)).toEqual([{ clip: slowed, delay: 5, from: 2, duration: 20 }]);
+  });
+
+  it('starts a slowed Clip under way from half as far into its source', () => {
+    expect(schedule([slowed], 9)).toEqual([{ clip: slowed, delay: 0, from: 4, duration: 16 }]);
+  });
+
+  it('at 100% plays as recorded', () => {
+    expect(schedule([{ ...trimmed, tempo: 1 }], 8.5)).toEqual([
+      { clip: { ...trimmed, tempo: 1 }, delay: 0, from: 5.5, duration: 6.5 },
+    ]);
+  });
+});
+
 describe('timelineEnd', () => {
   // A Verse whose inactive Alternate has Line 50 and active one Line 60.
   // Its Lines have the Cues given, by Line id.
@@ -175,6 +195,7 @@ describe('schedule of a Take Clip', () => {
     soundId: null,
     name: null,
     gain: 0,
+    tempo: 1,
     fadeIn: 0,
     fadeOut: 0,
     takes: [
@@ -200,6 +221,24 @@ describe('schedule of a Take Clip', () => {
     const played = heard(clip)!;
     expect(schedule([played], 25)).toEqual([{ clip: played, delay: 5, from: 1, duration: 10 }]);
     expect(schedule([played], 34)).toEqual([{ clip: played, delay: 0, from: 5, duration: 6 }]);
+  });
+
+  it('plays a slowed Take, nudged in its own time, from where the Clip is in it', () => {
+    // At 50%, the 10s Clip covers 5s of its span; the Take is nudged half a second later.
+    const slowed: Clip = {
+      ...clip,
+      tempo: 0.5,
+      takes: [{ ...clip.takes[0], position: 1.5, nudge: 0.5 }],
+    };
+    const played = heard(slowed)!;
+    expect(played).toEqual({ start: 30, offset: 0.5, length: 10, tempo: 0.5 });
+    expect(schedule([played], 34)).toEqual([{ clip: played, delay: 0, from: 2.5, duration: 6 }]);
+  });
+
+  it('starts a slowed Take that comes in partway through the Clip where it comes in on the Timeline', () => {
+    const slowed: Clip = { ...clip, tempo: 0.5, takes: [{ ...clip.takes[0], position: 4 }] };
+    // The span reaches the Take's start 2s in, 4s along the Timeline.
+    expect(heard(slowed)).toEqual({ start: 34, offset: 0, length: 6, tempo: 0.5 });
   });
 
   it('leaves the Clip being retaken out, and schedules the rest as usual', () => {

@@ -2,13 +2,14 @@
 // the device's rate, sounding as playback would. It's built with the same
 // pieces playback is (schedule, and TrackMix for the Clip → Track wiring),
 // on an offline context that mixes as fast as it can and resamples each
-// Clip's decoded audio itself. It's never normalised: what it clips, the file
-// clips too, and a note says so.
+// Clip's decoded audio itself, stretched to its Tempo as playback has it.
+// It's never normalised: what it clips, the file clips too, and a note
+// says so.
 import type { TimelineLoop } from './api';
 import { schedule, type Placed } from './schedule';
 import { toTheSecond } from './time';
 import type { Mp3Kbps } from './mp3';
-import { TrackMix, type PlayableClip } from './timelinePlayer';
+import { clipAudioKey, TrackMix, type LoadClipAudio, type PlayableClip } from './timelinePlayer';
 import { atFullScale, type WavBits } from './wav';
 
 /** A Mixdown's sample rate, in Hz. */
@@ -30,8 +31,8 @@ export interface MixdownPlan {
   end: number;
   /** Each Track's gain by id, from its volume, mute and solo. */
   gains: Map<number, number>;
-  /** Fetches and decodes a Clip's source, e.g. the player's, which keeps it for playback. */
-  load: (source: string) => Promise<AudioBuffer>;
+  /** Loads a Clip's audio, stretched to its Tempo, e.g. the player's, which keeps it for playback. */
+  load: LoadClipAudio;
   /** Cancels it: it then rejects with the signal's reason. */
   signal: AbortSignal;
   onProgress: (progress: MixdownProgress) => void;
@@ -51,9 +52,10 @@ export async function mixDown(plan: MixdownPlan): Promise<AudioBuffer> {
   const playing = schedule(clips, start).filter((s) => s.delay < length);
   signal.throwIfAborted();
   onProgress({ step: 'loading' });
-  const sources = [...new Set(playing.map((s) => s.clip.source))];
-  const loaded = await untilCancelled(Promise.all(sources.map(load)), signal);
-  const buffers = new Map(sources.map((source, i) => [source, loaded[i]]));
+  // Each source at each Tempo once, waiting for every one to be stretched.
+  const audio = [...new Map(playing.map((s) => [clipAudioKey(s.clip), s.clip])).values()];
+  const loaded = await untilCancelled(Promise.all(audio.map(load)), signal);
+  const buffers = new Map(audio.map((clip, i) => [clipAudioKey(clip), loaded[i]]));
 
   const context = new OfflineAudioContext({
     numberOfChannels: channels,
@@ -62,7 +64,7 @@ export async function mixDown(plan: MixdownPlan): Promise<AudioBuffer> {
   });
   const mix = new TrackMix(context, gains);
   for (const s of playing) {
-    mix.play(buffers.get(s.clip.source)!, s.clip, s.delay, s.from, Math.min(s.duration, length - s.delay));
+    mix.play(buffers.get(clipAudioKey(s.clip))!, s.clip, s.delay, s.from, Math.min(s.duration, length - s.delay));
   }
 
   // It pauses at each step to say how far it's got, and only carries on if

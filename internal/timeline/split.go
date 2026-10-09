@@ -14,7 +14,7 @@ import (
 // which must cross each, not touch its edge. The Clip becomes the left
 // half, ending at the cut, and a new Clip the right half, from the cut on,
 // so playing across the cut is as before. Both keep the Clip's source,
-// name and Gain; the left keeps the fade in and the right the fade out,
+// name, Gain and Tempo; the left keeps the fade in and the right the fade out,
 // each shortened to end at the cut, which gets no Fade. A Clip of Takes
 // splits like a Duplicate: the right half gets copies of its Takes,
 // sharing their files. If any can't be split, none is.

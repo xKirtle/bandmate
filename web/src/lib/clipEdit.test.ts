@@ -167,6 +167,23 @@ describe('clampTrimStart', () => {
   });
 });
 
+describe('trimming a Clip at a Tempo', () => {
+  // 0:22-0:42 in the gap at 50%, playing 5s-15s of a 20s Beat.
+  const slowed = { start: 22, offset: 5, length: 20, tempo: 0.5 };
+
+  it('moves the trim into its source half as far as its start moves along the Timeline', () => {
+    expect(clampTrimStart(slowed, [], 26)).toEqual({ start: 26, offset: 7, length: 16, tempo: 0.5 });
+  });
+
+  it('stops at the start of the source, as far back as it is on the Timeline', () => {
+    expect(clampTrimStart(slowed, [], 0)).toEqual({ start: 12, offset: 0, length: 30, tempo: 0.5 });
+  });
+
+  it('stops at the end of the source, as far on as it is on the Timeline', () => {
+    expect(clampTrimEnd(slowed, [], 20, 80)).toEqual({ start: 22, offset: 5, length: 30, tempo: 0.5 });
+  });
+});
+
 describe('clampTrimEnd', () => {
   const clip = { start: 22, offset: 5, length: 10 };
 
@@ -212,6 +229,7 @@ describe('nudging', () => {
     soundId: null,
     name: null,
     gain: 0,
+    tempo: 1,
     fadeIn: 0,
     fadeOut: 0,
     takes: [take(3), take(4, { nudge: 0.02 })],

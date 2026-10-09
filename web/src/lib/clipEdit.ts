@@ -39,7 +39,7 @@ export function clampTrimStart(clip: Placed, others: readonly Placed[], desired:
   const earliest = Math.max(0, timelineAt(clip, 0), ...before.map(endOf));
   const start = Math.min(Math.max(desired, earliest), end - minClipLength);
   // Rounding could otherwise take the trim a hair before the source's start.
-  return { start, offset: Math.max(0, sourceAt(clip, start)), length: end - start };
+  return { start, offset: Math.max(0, sourceAt(clip, start)), length: end - start, tempo: clip.tempo };
 }
 
 /**
@@ -53,7 +53,7 @@ export function clampTrimEnd(clip: Placed, others: readonly Placed[], sourceDura
     ...others.filter((c) => c.start > clip.start).map((c) => c.start),
   );
   const newEnd = Math.max(Math.min(desired, latest), clip.start + minClipLength);
-  return { start: clip.start, offset: clip.offset, length: newEnd - clip.start };
+  return { start: clip.start, offset: clip.offset, length: newEnd - clip.start, tempo: clip.tempo };
 }
 
 /** The Tracks of a Timeline, for the Clips on them and where they are. */

@@ -122,14 +122,15 @@ export function fileStart(clip: Clip): number {
  * Beat or a Sound, and for a Take, only where the Take has audio within it.
  * Null if none of it does.
  */
-export function heard(clip: Clip): Placed | null {
+export function heard(clip: Clip): Required<Placed> | null {
   const take = activeTake(clip);
-  if (!take) return { start: clip.start, offset: clip.offset, length: clip.length };
+  const { tempo } = clip;
+  if (!take) return { start: clip.start, offset: clip.offset, length: clip.length, tempo };
   // Where the Take starts and ends in the span, on the Timeline.
   const start = Math.max(clip.start, timelineAt(clip, take.position));
   const end = Math.min(clip.start + clip.length, timelineAt(clip, take.position + take.duration));
   if (end <= start) return null;
-  return { start, offset: sourceAt(clip, start) - take.position, length: end - start };
+  return { start, offset: sourceAt(clip, start) - take.position, length: end - start, tempo };
 }
 
 /**
@@ -167,18 +168,19 @@ export function clipTitle(clip: Clip, source: ClipSource): string {
 
 /**
  * What a Clip has of its own, as placing or pasting it gives them: its
- * name, its Gain and its Fades, each left out while it has none.
+ * name, its Gain, its Tempo and its Fades, each left out while it has none.
  */
 export function ownOf(clip: Clip): OwnOfClip {
   return {
     ...(clip.name !== null ? { name: clip.name } : {}),
     ...(clip.gain !== 0 ? { gain: clip.gain } : {}),
+    ...(clip.tempo !== 1 ? { tempo: clip.tempo } : {}),
     ...(clip.fadeIn !== 0 ? { fadeIn: clip.fadeIn } : {}),
     ...(clip.fadeOut !== 0 ? { fadeOut: clip.fadeOut } : {}),
   };
 }
 
-/** What places a Clip back as it is: its source, trim, name, Gain and Fades, without its id. */
+/** What places a Clip back as it is: its source, trim, name, Gain, Tempo and Fades, without its id. */
 export function placementOf(clip: Clip): NewClip {
   const { start, offset, length } = clip;
   const own = ownOf(clip);

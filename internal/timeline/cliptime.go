@@ -6,12 +6,12 @@ package timeline
 // how many seconds of its source it plays for each second of the Timeline.
 // Everything that crosses between the two goes through here, as the
 // browser's clipTime does, so the rate is the one place a Clip's speed is
-// decided. For now every Clip plays its audio as recorded, at rate 1.
+// decided: its Tempo.
 
 // rate is how many seconds of its source a Clip plays for each second of
 // the Timeline.
 func (p placement) rate() float64 {
-	return 1
+	return p.tempo
 }
 
 // sourceAt is where in its source a Clip is at time t on the Timeline, in

@@ -271,6 +271,21 @@ export class FakeSongServer implements SongServer {
         return (tl) => changedClip(tl, edit.clipId, { gain: edit.gain });
       case 'setClipFades':
         return (tl) => changedClip(tl, edit.clipId, { fadeIn: edit.fadeIn, fadeOut: edit.fadeOut });
+      case 'setClipTempos':
+        // Each keeps its start and audio, its length and Fades scaling.
+        // Moving one slowed into the next onto a new Track isn't modelled.
+        return (tl) =>
+          edit.tempos.reduce((t, { clipId, tempo }) => {
+            const c = t.tracks.flatMap((tr) => tr.clips).find((c) => c.id === clipId);
+            if (!c) throw notFound();
+            const scale = c.tempo / tempo;
+            return changedClip(t, clipId, {
+              tempo,
+              length: c.length * scale,
+              fadeIn: c.fadeIn * scale,
+              fadeOut: c.fadeOut * scale,
+            });
+          }, tl);
       case 'renameClip':
         if (!this.timeline.tracks.some((t) => t.clips.some((c) => c.id === edit.clipId))) throw notFound();
         return (tl) => changedClip(tl, edit.clipId, { name: edit.name.trim() || null });
@@ -385,6 +400,7 @@ export class FakeSongServer implements SongServer {
       soundId: 'soundId' in placed ? placed.soundId : null,
       name: placed.name ?? null,
       gain: placed.gain ?? 0,
+      tempo: placed.tempo ?? 1,
       fadeIn: placed.fadeIn ?? 0,
       fadeOut: placed.fadeOut ?? 0,
       takes: [],
@@ -560,9 +576,9 @@ function changedClip(tl: Timeline, clipId: number, changes: Partial<Clip>): Time
   };
 }
 
-/** What a Clip of a Beat or a Sound plays, and its own name and Gain, to place a Clip of the same. */
+/** What a Clip of a Beat or a Sound plays, and its own name, Gain and Tempo, to place a Clip of the same. */
 function sourceOf(clip: Clip): OwnOfClip & ({ beatId: number } | { soundId: number }) {
-  const own = { name: clip.name ?? undefined, gain: clip.gain };
+  const own = { name: clip.name ?? undefined, gain: clip.gain, tempo: clip.tempo };
   return clip.beatId !== null ? { ...own, beatId: clip.beatId } : { ...own, soundId: clip.soundId! };
 }
 
