@@ -101,6 +101,24 @@ const calibrationsSetting = {
   store: storeCalibrations,
 } satisfies DeviceSettingStorage<Calibrations>;
 
+// An Input is found by its device's id alone, never by its name, as Chrome,
+// Firefox and Safari each keep a device's id for a site between visits once
+// the site has recorded from it, which calibrating does:
+// - The Media Capture spec says it MUST then be kept, and changed only when
+//   the site's other storage is cleared, or never kept where the site can't
+//   keep cookies (https://w3c.github.io/mediacapture-main/#dom-mediadeviceinfo-deviceid).
+// - Chrome keeps the site's salt for its ids in a database in the profile
+//   (components/media_device_salt/media_device_salt_service.cc).
+// - Firefox keeps the site's key for its ids on disk once it has recorded
+//   (PersistPrincipalKey in dom/media/MediaManager.cpp, kept in
+//   enumerate_devices.txt by dom/media/systemservices/MediaParent.cpp).
+// - Safari keeps the site's salt for its ids on disk, with its website data
+//   (Source/WebKit/UIProcess/DeviceIdHashSaltStorage.cpp); only a
+//   Continuity Camera's is per page, and that's never an Input.
+// A private window gives new ids each time, but forgets these offsets with
+// them, as clearing the site's data does: no offset outlives its device's id.
+// (Playwright's headless Chromium shell gives new ids on every load, but
+// it's only for tests.)
 const same = (a: InputId, b: InputId) => a.deviceId === b.deviceId && a.channel === b.channel;
 
 /**
