@@ -296,7 +296,6 @@ async function number(page, places, { first = 1, into } = {}) {
       timeline.getByRole("button", { name: "Record", exact: true }),
       row,
     ),
-    await above(timeline.getByRole("button", { name: "Not calibrated" }), row),
     await above(timeline.getByRole("button", { name: "Undo" }), row),
     await above(
       timeline.getByRole("button", { name: "More Timeline actions" }),
@@ -372,8 +371,8 @@ async function number(page, places, { first = 1, into } = {}) {
   await page.context().close();
 }
 
-// Recording settings, from the Timeline's menu, hearing Chromium's fake
-// microphone.
+// Recording settings, from the Timeline's menu: the Input list, with the
+// Input recorded from open, hearing Chromium's fake microphone.
 {
   const page = await open(heroURL, { ...desktop, permissions: ["microphone"] });
   const timeline = page.getByRole("region", { name: "Timeline" });
@@ -383,12 +382,26 @@ async function number(page, places, { first = 1, into } = {}) {
   await settings.waitFor();
   // Long enough for the level meter to move.
   await page.waitForTimeout(1500);
+  const chosen = settings
+    .getByRole("listitem")
+    .filter({ has: page.getByRole("radio", { checked: true }) });
+  const pill = await chosen
+    .getByRole("button", { name: /ms$|calibrated$|Skipped$/ })
+    .boundingBox();
+  const calibrate = settings.getByRole("button", { name: /^Calibrate/ });
+  // The open row's margin, past the radios, where its level and Calibrate are numbered.
+  const margin = (await leftOf(calibrate)).x;
+  const meter = await settings
+    .getByRole("meter", { name: "Level" })
+    .boundingBox();
   await number(
     page,
     [
-      await textEnd(settings.getByText("Input", { exact: true })),
-      await textEnd(settings.getByText(/out of the red/)),
-      await rightOf(settings.getByRole("button", { name: /^Calibrate/ })),
+      await textEnd(chosen.locator(".name")),
+      // On the Latency Offset's top-left corner.
+      { x: pill.x - 16, y: pill.y },
+      { x: margin, y: meter.y + meter.height / 2 },
+      await leftOf(calibrate),
     ],
     { first: 4, into: settings },
   );

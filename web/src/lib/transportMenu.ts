@@ -58,7 +58,7 @@ export function transportActions(state: TransportState, run: TransportRun): Menu
     label: 'Recording settings…',
     title: state.recording
       ? 'Stop recording to change the recording settings'
-      : 'The input to record from, its level, and the Latency Offset',
+      : 'Every Input on this device, to record from, check the level of, or calibrate',
     disabled: state.recording,
     run: run.recordingSettings,
   };
