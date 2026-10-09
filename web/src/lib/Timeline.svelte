@@ -76,7 +76,7 @@
   import { prepareUpload } from './upload';
   import { formatDuration } from './time';
   import { tracksDropped, type TrackDrop } from './trackDrag';
-  import { transportActions } from './transportMenu';
+  import { foldCount, transportActions, type TransportAction } from './transportMenu';
   import { TrackDragging } from './trackDragging.svelte';
   import InputPicker from './InputPicker.svelte';
   import CalibrationSheet from './CalibrationSheet.svelte';
@@ -702,11 +702,16 @@
     if (file && chosen !== null) importFiles([file], chosen);
   }
 
-  // The transport row's ⋯, for its occasional actions, and what they open:
-  // the file picker for Import audio…, and the Mixdown dialog.
+  // The transport row's occasional actions, icon buttons on it where there's
+  // room, and what they open: the file picker for Import audio…, the
+  // Mixdown dialog, and the mic button's Inputs to record from. Where the
+  // row is too narrow, they fold into its ⋯, the first first.
   let importInput: HTMLInputElement;
   let mixingDown = $state(false);
-  const transportMenu = $derived(
+  // The ⋯, and the Inputs to record from, folded into it, which open by it.
+  let transportMore = $state<HTMLElement>();
+  let foldedPicker = $state<InputPicker>();
+  const transportList = $derived(
     transportActions(
       {
         // Only there can the Timeline be edited.
@@ -720,9 +725,61 @@
       {
         importAudio: () => importInput.click(),
         mixDown: () => (mixingDown = true),
+        recordFrom: () => {
+          const more = transportMore?.querySelector('button');
+          if (more) foldedPicker?.openBy(more);
+        },
       },
     ),
   );
+  // The room the transport row leaves for its actions and the ⋯, and what
+  // each takes with its gap, in px, measured by `measuresRoom`.
+  let actionRoom = $state(Infinity);
+  let actionWidth = $state(0);
+  const folded = $derived(transportList.slice(0, foldCount(transportList.length, actionRoom, actionWidth)));
+  /** The action on the row, unless it's folded into the ⋯ or not offered. */
+  const onRow = (key: TransportAction['key']) => transportList.find((a) => a.key === key && !folded.includes(a));
+
+  /**
+   * Measures the room the transport row leaves for its actions and the ⋯
+   * (each `.foldable`), again as it or anything on it changes size: its
+   * width, less everything else on it and the gaps between them. A message
+   * gives way, so it takes no room, and neither does the spacer.
+   */
+  function measuresRoom(row: HTMLElement) {
+    const measure = () => {
+      const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
+      let used = 0;
+      let items = 0;
+      for (const child of row.children) {
+        const style = getComputedStyle(child);
+        if (child.matches('.foldable') || style.display === 'none' || style.position === 'absolute') continue;
+        items++;
+        if (!child.matches('.status, .spacer')) used += child.getBoundingClientRect().width;
+      }
+      // Each is as wide as Play.
+      const play = row.querySelector('.play');
+      actionWidth = (play?.getBoundingClientRect().width ?? 0) + gap;
+      actionRoom = Math.floor(row.clientWidth - used - gap * Math.max(0, items - 1));
+    };
+    const resizes = new ResizeObserver(measure);
+    const observeAll = () => {
+      resizes.disconnect();
+      resizes.observe(row);
+      for (const child of row.children) resizes.observe(child);
+    };
+    // What's on it changes, e.g. a message showing.
+    const changes = new MutationObserver(() => {
+      observeAll();
+      measure();
+    });
+    changes.observe(row, { childList: true });
+    observeAll();
+    return () => {
+      resizes.disconnect();
+      changes.disconnect();
+    };
+  }
 
   // Audio files dragged from outside the page onto a Track are imported
   // onto it, and onto the Chosen Track below the last Track: only which
@@ -1974,7 +2031,7 @@
     ></div>
   {/if}
   <div class="inner">
-    <div class="transport">
+    <div class="transport" {@attach measuresRoom}>
       <span class="playback">
         {@render toStartOrEnd('back')}
         <button
@@ -2027,12 +2084,12 @@
           >{#if capturing}<Square />{:else}<Circle />{/if}</span
         >{capturing ? 'Stop' : 'Record'}</button
       >
-      <span class="edit-only">
-        <InputPicker
-          disabled={recording || !editable.current}
-          title={recording ? 'Stop recording to pick the Input to record from' : 'Pick the Input to record from'}
-        />
-      </span>
+      {#if onRow('recordFrom')}
+        {@const mic = onRow('recordFrom')!}
+        <span class="mic edit-only foldable">
+          <InputPicker disabled={recording || !editable.current} title={mic.title} />
+        </span>
+      {/if}
       <input
         class="visually-hidden"
         type="file"
@@ -2058,9 +2115,27 @@
       {/if}
       <span class="spacer"></span>
       {@render undoRedo()}
-      <span class="transport-more">
-        <ActionsMenu label="More Timeline actions" entries={transportMenu} />
-      </span>
+      {#each ['importAudio', 'mixDown'] as const as key (key)}
+        {@const action = onRow(key)}
+        {#if action}
+          <button
+            type="button"
+            class="icon foldable"
+            onclick={action.run}
+            disabled={action.disabled}
+            aria-label={action.label}
+            title={action.title}><action.icon /></button
+          >
+        {/if}
+      {/each}
+      {#if folded.length}
+        <span class="transport-more foldable" bind:this={transportMore}>
+          <ActionsMenu label="More Timeline actions" entries={folded} />
+          {#if folded.some((a) => a.key === 'recordFrom')}
+            <InputPicker bind:this={foldedPicker} button={false} disabled={recording} />
+          {/if}
+        </span>
+      {/if}
       <button
         type="button"
         class="icon collapse-toggle"
@@ -3200,6 +3275,14 @@
   }
   .transport-more {
     display: inline-flex;
+  }
+  /* The mic button, and the ⋯, as big as the row's other actions. */
+  .mic :global(.icon),
+  .transport-more :global(.icon) {
+    width: var(--touch);
+    height: var(--touch);
+    border-radius: calc(0.5 * var(--timeline-rem));
+    font-size: calc(1.25 * var(--timeline-rem));
   }
   .ruler {
     position: relative;

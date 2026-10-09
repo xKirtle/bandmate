@@ -301,10 +301,8 @@ async function number(page, places, { first = 1, into } = {}) {
       row,
     ),
     await above(timeline.getByRole("button", { name: "Undo" }), row),
-    await above(
-      timeline.getByRole("button", { name: "More Timeline actions" }),
-      row,
-    ),
+    await above(timeline.getByRole("button", { name: "Import audio…" }), row),
+    await above(timeline.getByRole("button", { name: "Mix down…" }), row),
     await corner(timeline.getByRole("button", { name: "Add a Track" })),
     await onLeft(timeline.getByRole("group", { name: "Track Lead vox" })),
     await corner(timeline.getByRole("group", { name: /^Lorem Click/ })),

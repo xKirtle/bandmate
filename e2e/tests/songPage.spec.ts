@@ -498,11 +498,10 @@ test('a Sound imported with Import audio… goes in a new Clip after the Chosen 
   const redo = timeline(page).getByRole('button', { name: 'Redo' });
   await expect(clip(page, 'Take 2')).toHaveAccessibleName('Take 2, 0:04 to 0:25');
 
-  /** Imports a file with Import audio…, from the transport row's ⋯. */
+  /** Imports a file with Import audio…, on the transport row. */
   async function importAudio(name: string) {
-    await timeline(page).getByRole('button', { name: 'More Timeline actions' }).click();
     const chooser = page.waitForEvent('filechooser');
-    await page.getByRole('menuitem', { name: 'Import audio…' }).click();
+    await timeline(page).getByRole('button', { name: 'Import audio…' }).click();
     await (await chooser).setFiles(toneWav(name, 2));
   }
 
@@ -539,6 +538,82 @@ test('a Sound imported with Import audio… goes in a new Clip after the Chosen 
   await expect
     .poll(async () => (await serverClips(bandmate, song.id, 'Lead vox'))[2])
     .toMatchObject({ soundId: imported.soundId, start: 27, length: 2 });
+});
+
+/** What the transport row offers, once it has settled: on it, and folded into its ⋯. */
+async function transportOffers(page: Page) {
+  const row = timeline(page);
+  // Measured as it resizes, then drawn again.
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+  const names = ['Import audio…', 'Mix down…', 'Input to record from'];
+  const onRow: string[] = [];
+  for (const name of names) if (await row.getByRole('button', { name, exact: true }).isVisible()) onRow.push(name);
+  const more = row.getByRole('button', { name: 'More Timeline actions' });
+  if (!(await more.isVisible())) return { onRow, folded: [] };
+  await more.click();
+  const folded = await page.getByRole('menu', { name: 'More Timeline actions' }).getByRole('menuitem').allTextContents();
+  await page.keyboard.press('Escape');
+  return { onRow, folded: folded.map((t) => t.trim()) };
+}
+
+test("the transport row's actions sit on it where there's room, and fold into its ⋯ as it narrows: Import audio first, then Mix down, then the mic", async ({
+  page,
+  bandmate,
+}) => {
+  const song = await heroSong(bandmate);
+  await page.goto(`/songs/${song.id}`);
+  const row = timeline(page);
+
+  // Wide, all three are on the row, each saying what it does, and there's no ⋯.
+  await expect(row.getByRole('button', { name: 'Import audio…' })).toHaveAttribute(
+    'title',
+    'Import an audio file as a Sound onto Lead vox',
+  );
+  await expect(row.getByRole('button', { name: 'Mix down…' })).toHaveAttribute(
+    'title',
+    'Download the Timeline, or its Loop, as one audio file',
+  );
+  await expect(row.getByRole('button', { name: 'Input to record from' })).toBeVisible();
+  await expect(row.getByRole('button', { name: 'More Timeline actions' })).toHaveCount(0);
+
+  // Narrowing, each width offers each action once, on the row or in the ⋯,
+  // which lists only what folded, and they fold in order.
+  const seen: string[][] = [];
+  for (let width = 1440; width >= 660; width -= 20) {
+    await page.setViewportSize({ width, height: 900 });
+    const { onRow, folded } = await transportOffers(page);
+    expect(onRow.length + folded.length, `at ${width}px`).toBe(3);
+    const order = ['Import audio…', 'Mix down…', 'Record from…'];
+    expect(folded, `at ${width}px`).toEqual(order.slice(0, folded.length));
+    if (folded.join() !== seen.at(-1)?.join()) seen.push(folded);
+  }
+  // Import audio folds with Mix down, as the ⋯ takes as much room as it would alone.
+  expect(seen).toEqual([[], ['Import audio…', 'Mix down…'], ['Import audio…', 'Mix down…', 'Record from…']]);
+
+  // A folded action does what it does on the row.
+  await row.getByRole('button', { name: 'More Timeline actions' }).click();
+  await page.getByRole('menuitem', { name: 'Mix down…' }).click();
+  await expect(page.getByRole('dialog', { name: 'Mix down' })).toBeVisible();
+});
+
+test('held sideways, the full-screen Timeline folds its actions too, and upright, it offers only Mix down, on the row', async ({
+  page,
+  bandmate,
+}) => {
+  const song = await heroSong(bandmate);
+  const row = timeline(page);
+  // A small phone held sideways: the row on one line, too narrow for all three.
+  await page.setViewportSize({ width: 667, height: 375 });
+  await page.goto(`/songs/${song.id}`);
+  await expect(row.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
+  const sideways = await transportOffers(page);
+  expect(sideways.folded.length).toBeGreaterThan(0);
+  expect(sideways.onRow.length + sideways.folded.length).toBe(3);
+
+  // Upright, the transport row alone: Mix down, and nothing to fold.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(row.getByRole('button', { name: 'Mix down…' })).toBeVisible();
+  expect(await transportOffers(page)).toEqual({ onRow: ['Mix down…'], folded: [] });
 });
 
 test('a Clip moved over Cues offers to move them, naming how many, which moves them, and another edit withdraws the offer', async ({

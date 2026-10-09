@@ -4,23 +4,27 @@
   import InputName from './InputName.svelte';
   import { InputRows } from './inputRows.svelte';
   import LevelMeter from './LevelMeter.svelte';
-  import { placeBeside } from './popover';
+  import { placeBeside, type PopoverAlign } from './popover';
 
   // The Timeline's mic button, and the popover it opens to pick the Input
   // recorded from: every Input connected, the default input and each
   // channel of each device, with a radio on each, as in Settings. The one
   // picked meters its level, to check it's the right one. Setting Inputs up,
   // calibrating them, typing an offset or forgetting one, is left to
-  // Settings.
+  // Settings. Folded into the transport row's ⋯, it has no button of its
+  // own, and opens by the ⋯ instead.
 
   let {
     disabled = false,
     title,
+    button: hasButton = true,
   }: {
     /** Keeps it from opening, and closes it, e.g. while recording. */
     disabled?: boolean;
     /** What the button says over it, e.g. why it's disabled. */
-    title: string;
+    title?: string;
+    /** Whether it shows its button, or only opens with `openBy`. */
+    button?: boolean;
   } = $props();
 
   const id = $props.id();
@@ -28,13 +32,24 @@
 
   let open = $state(false);
   let root: HTMLElement;
-  let button: HTMLButtonElement;
+  let button = $state<HTMLButtonElement>();
   let panel = $state<HTMLElement>();
+  // What it opened by, its button or the ⋯, which it's placed by, and
+  // which takes focus back as it closes; and which of its edges it lines up with.
+  let anchor: HTMLElement | undefined;
+  let align: PopoverAlign = 'start';
   // Between the button and the panel, in px.
   const gap = 4;
 
-  async function show() {
-    if (disabled) return;
+  /** Opens it by `by`, e.g. the ⋯ it's folded into, lined up with its end. */
+  export function openBy(by: HTMLElement) {
+    void show(by, 'end');
+  }
+
+  async function show(by: HTMLElement | undefined = button, edge: PopoverAlign = 'start') {
+    if (disabled || !by) return;
+    anchor = by;
+    align = edge;
     open = true;
     await tick();
     if (!panel) return;
@@ -43,9 +58,9 @@
     (panel.querySelector<HTMLElement>('input[type="radio"]:checked') ?? panel).focus();
   }
 
-  // Under the button, or over it where there's no room below.
+  // Under what it opened by, or over it where there's no room below.
   function place() {
-    if (panel) placeBeside(panel, button, gap, 'start');
+    if (panel && anchor) placeBeside(panel, anchor, gap, align);
   }
 
   // Placed again as it grows or shrinks, e.g. as the Input picked opens its level meter.
@@ -60,7 +75,7 @@
   function hide(refocus = true) {
     if (!open) return;
     open = false;
-    if (refocus) button.focus();
+    if (refocus) anchor?.focus();
   }
 
   function onPanelKey(e: KeyboardEvent) {
@@ -92,17 +107,19 @@
 <svelte:window onpointerdowncapture={onWindowPointer} onresize={() => open && place()} />
 
 <span class="input-picker" bind:this={root} onfocusout={onFocusOut}>
-  <button
-    type="button"
-    class="icon"
-    bind:this={button}
-    {disabled}
-    aria-label="Input to record from"
-    aria-haspopup="dialog"
-    aria-expanded={open}
-    {title}
-    onclick={() => (open ? hide() : show())}><Mic /></button
-  >
+  {#if hasButton}
+    <button
+      type="button"
+      class="icon"
+      bind:this={button}
+      {disabled}
+      aria-label="Input to record from"
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      {title}
+      onclick={() => (open ? hide() : show())}><Mic /></button
+    >
+  {/if}
   {#if open}
     <div
       class="popover panel"
