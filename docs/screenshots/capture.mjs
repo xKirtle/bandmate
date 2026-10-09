@@ -435,23 +435,26 @@ async function number(page, places, { first = 1, into } = {}) {
   await page.context().close();
 }
 
-// Settings' Backups, holding the demo Backup restored from.
+// Settings' Backups, its card holding the demo Backup restored from.
 {
   const page = await open(`${base}/settings/backups`);
   const backup = page.getByRole("listitem").first();
   await number(page, [
-    await below(page.getByText("Upload", { exact: true })),
-    await below(page.getByRole("button", { name: "New Backup" })),
+    // In the card's header, clear of the row under it.
+    await leftOf(page.getByText("Upload", { exact: true })),
+    await corner(page.getByRole("button", { name: "New Backup" })),
     await textEnd(backup.locator("strong, b, h3, span").first()),
     await leftOf(backup.getByRole("button", { name: /^Restore/ })),
   ]);
-  const list = await page.getByRole("list").first().boundingBox();
+  const card = await page
+    .getByRole("region", { name: "Backups" })
+    .boundingBox();
   await save(page, "backups-labelled", {
     clip: {
-      x: list.x - 24,
+      x: card.x - 24,
       y: 0,
-      width: list.width + 48,
-      height: list.y + list.height + 32,
+      width: card.width + 48,
+      height: card.y + card.height + 32,
     },
   });
   await page.context().close();
