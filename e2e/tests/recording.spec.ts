@@ -85,12 +85,19 @@ async function open(page: Page, songId: number) {
   await expect(recordButton(page)).toBeEnabled();
 }
 
-/** The calibration offered before an Input's first recording. */
+/** The calibration sheet, as offered before an Input's first recording, or opened to calibrate one. */
 const calibrationOffer = (page: Page) => page.getByRole('dialog', { name: 'Calibrate the latency' });
 
-/** Skips the calibration offered, to record straight away. */
+/** Skips the calibration offered, to record straight away with the browser's estimate. */
 async function skipCalibration(page: Page) {
-  await calibrationOffer(page).getByRole('button', { name: 'Skip and record' }).click();
+  await calibrationOffer(page)
+    .getByRole('button', { name: /^Skip, use the browser's \d+ ms$/ })
+    .click();
+}
+
+/** Clicks the backdrop, outside the dialog. */
+async function clickOutside(page: Page) {
+  await page.mouse.click(5, 5);
 }
 
 /**
@@ -186,9 +193,10 @@ test('calibration offered before the first recording can be skipped, and is not 
   await recordButton(page).click();
   const offer = calibrationOffer(page);
   await expect(offer).toBeVisible();
-  // Of the Input the default input is, by name.
-  await expect(offer).toContainText(/Before the first recording from .+ · Input 1,/);
+  // Of the Input the default input is, by name, with no Input to pick.
+  await expect(offer).toContainText(/ · Input 1\s*Before the first recording from it,/);
   await expect(offer).not.toContainText('Default input');
+  await expect(offer.getByRole('radio', { name: /Input/ })).toHaveCount(0);
   await skipCalibration(page);
 
   // Skipped, it records straight away, saying where to calibrate later.
@@ -213,34 +221,48 @@ test('calibration offered before the first recording can be skipped, and is not 
   expect(await clipsOn(bandmate, song.id, 'Track 1')).toHaveLength(2);
 });
 
-test('calibration measures each tap as it is heard, until Use this keeps the average', async ({ page, bandmate }) => {
+test('calibration is hands-free by default, measures each tap as it is heard, and Save and record keeps it', async ({
+  page,
+  bandmate,
+}) => {
   const song = await bandmate.song({ title: 'Anthem' });
   await hearClicks(page, 0.025);
   await open(page, song.id);
   await seek(page, 5);
   await recordButton(page).click();
   const offer = calibrationOffer(page);
+  const handsFree = offer.getByRole('radio', { name: /^Hands-free: rest your headphones on the mic/ });
+  await expect(handsFree).toBeChecked();
+  await expect(offer).toContainText('Turn the volume up for the test, so the mic hears each click clearly.');
+  // Tap along points at the clicks heard, and the tip goes with hands-free.
+  await offer
+    .getByRole('radio', { name: 'Tap along: tap or clap on the mic in time with the clicks you hear' })
+    .check();
+  await expect(offer).not.toContainText('Turn the volume up');
+  await handsFree.check();
   await offer.getByRole('button', { name: 'Start' }).click();
 
-  const useThis = offer.getByRole('button', { name: 'Use this' });
+  // Measuring, the close button goes, and Finish now comes once 6 taps count.
+  await expect(offer.getByRole('button', { name: 'Close' })).toHaveCount(0);
+  const finish = offer.getByRole('button', { name: 'Finish now' });
   const reading = offer.getByRole('status');
   await expect(reading).toHaveText(/^25 ms, from [1-5] taps?$/, { timeout: 10_000 });
-  await expect(useThis).toBeDisabled();
-  await expect(offer).toContainText('It takes 6 taps in time with the clicks.');
-  // From 6 taps, it can be used; from 10, it says how steady it's been.
-  await expect(useThis).toBeEnabled({ timeout: 10_000 });
+  await expect(finish).toHaveCount(0);
+  await expect(offer).toContainText(/Finding the taps: [1-5] of 6/);
+  await expect(finish).toBeVisible({ timeout: 10_000 });
   await expect(reading).toHaveText(/^25 ms, from ([6-9]|\d\d) taps$/);
-  await expect(offer).toContainText('Steady: ±0 ms over the last 10', { timeout: 10_000 });
-  await expect(offer.getByRole('img', { name: /^Each tap's delay: \d+ taps, averaging 25 ms$/ })).toBeVisible();
-  // It never stops on its own.
+  // The metronome marks the taps around the average.
+  await expect(
+    offer.getByRole('img', { name: /^Metronome, .+, with \d+ taps marked around the average$/ }),
+  ).toBeVisible();
+  // It never stops on its own yet.
   await page.waitForTimeout(2_000);
-  await expect(useThis).toBeEnabled();
+  await expect(finish).toBeVisible();
 
-  await useThis.click();
-  await expect(offer.getByRole('status')).toContainText(
-    /The Latency Offset of .+ · Input 1 is 25 ms, from\s+\d+ taps\./,
-  );
-  await offer.getByRole('button', { name: 'Record' }).click();
+  await finish.click();
+  // Nothing is kept yet: the result is shown against the browser's estimate.
+  await expect(offer.getByRole('status')).toContainText(/^25 ms\s*The browser guessed \d+ ms\. From \d+ taps\./);
+  await offer.getByRole('button', { name: 'Save and record' }).click();
   await expect(offer).toBeHidden();
   await expect(stopButton(page)).toBeVisible();
   await playheadPast(page, 5 + 1);
@@ -251,75 +273,80 @@ test('calibration measures each tap as it is heard, until Use this keeps the ave
   await expect(timeline(page).getByRole('button', { name: 'Not calibrated' })).toHaveCount(0);
 });
 
-test('calibration cancelled or closed keeps the offset there was', async ({ page, bandmate }) => {
+test('Pause, or Esc, pauses calibration without closing it; Quit keeps the offset there was', async ({
+  page,
+  bandmate,
+}) => {
   const song = await bandmate.song({ title: 'Anthem' });
   await hearClicks(page, 0.025);
   await open(page, song.id);
   const offer = calibrationOffer(page);
-  const useThis = offer.getByRole('button', { name: 'Use this' });
+  const reading = offer.getByRole('status');
+  const finish = offer.getByRole('button', { name: 'Finish now' });
 
   await recordButton(page).click();
   await offer.getByRole('button', { name: 'Start' }).click();
-  await expect(useThis).toBeEnabled({ timeout: 15_000 });
-  await offer.getByRole('button', { name: 'Cancel' }).click();
+  await expect(finish).toBeVisible({ timeout: 15_000 });
+  // Measuring, a click outside never closes it.
+  await clickOutside(page);
+  await expect(finish).toBeVisible();
+
+  // Paused, it can be finished with what's measured, started over, or quit.
+  await offer.getByRole('button', { name: 'Pause' }).click();
+  await expect(reading).toHaveText('Paused');
+  await expect(offer.getByRole('button', { name: 'Finish with 25 ms' })).toBeVisible();
+  // Paused, neither Esc nor a click outside closes it.
+  await page.keyboard.press('Escape');
+  await clickOutside(page);
+  await page.keyboard.press('Escape');
+  await expect(reading).toHaveText('Paused');
+
+  // Started over, it measures from no taps.
+  await offer.getByRole('button', { name: 'Start over' }).click();
+  await expect(finish).toHaveCount(0);
+  await expect(reading).not.toHaveText('Paused');
+  await expect(finish).toBeVisible({ timeout: 15_000 });
+  // Esc pauses, too.
+  await page.keyboard.press('Escape');
+  await expect(reading).toHaveText('Paused');
+
+  // The method can be changed, back on the first step.
+  await offer.getByRole('button', { name: 'Change method' }).click();
+  await expect(offer.getByRole('radio', { name: /^Tap along/ })).toBeVisible();
+  await offer.getByRole('radio', { name: /^Tap along/ }).check();
+  await offer.getByRole('button', { name: 'Start' }).click();
+  await offer.getByRole('button', { name: 'Pause' }).click();
+
+  // Quit keeps nothing, and records nothing.
+  await offer.getByRole('button', { name: 'Quit' }).click();
   await expect(offer).toBeHidden();
   await expect(stopButton(page)).toHaveCount(0);
   await expect(timeline(page).getByRole('button', { name: 'Not calibrated' })).toBeVisible();
-
-  // Closed, likewise; and still offered before the first recording, after a reload.
+  // Still offered before the first recording, after a reload.
+  await page.reload();
+  await expect(recordButton(page)).toBeEnabled();
   await recordButton(page).click();
-  await offer.getByRole('button', { name: 'Start' }).click();
-  await expect(useThis).toBeEnabled({ timeout: 15_000 });
+  await expect(offer).toContainText('Before the first recording from it,');
+});
+
+test('a click outside, or Esc, closes calibration before measuring starts', async ({ page, bandmate }) => {
+  const song = await bandmate.song({ title: 'Anthem' });
+  await open(page, song.id);
+  const offer = calibrationOffer(page);
+  const notCalibrated = timeline(page).getByRole('button', { name: 'Not calibrated' });
+
+  await notCalibrated.click();
+  await expect(offer.getByRole('button', { name: 'Start' })).toBeVisible();
+  // Not offered before recording, so there's no skipping it.
+  await expect(offer.getByRole('button', { name: /^Skip/ })).toHaveCount(0);
+  await clickOutside(page);
+  await expect(offer).toBeHidden();
+
+  await notCalibrated.click();
+  await expect(offer.getByRole('button', { name: 'Start' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(offer).toBeHidden();
   await expect(stopButton(page)).toHaveCount(0);
-  await expect(timeline(page).getByRole('button', { name: 'Not calibrated' })).toBeVisible();
-  await page.reload();
-  await expect(recordButton(page)).toBeEnabled();
-  await recordButton(page).click();
-  await expect(offer).toContainText('Before the first recording from');
-});
-
-test('a Latency Offset typed in calibration is kept for its Input, as if calibrated', async ({ page, bandmate }) => {
-  const song = await bandmate.song({ title: 'Anthem' });
-  await open(page, song.id);
-  await seek(page, 5);
-  await recordButton(page).click();
-  const offer = calibrationOffer(page);
-  const field = offer.getByRole('spinbutton', { name: /^Latency Offset of .+ · Input 1, in ms$/ });
-  const set = offer.getByRole('button', { name: /^Set the Latency Offset of / });
-
-  // Outside 0 to 500 ms, or not whole, it's refused, and nothing is kept.
-  for (const typed of ['501', '12.5']) {
-    await field.fill(typed);
-    await set.click();
-    await expect(offer.getByRole('alert')).toHaveText('Type a whole number of ms, from 0 to 500.');
-    await expect(field).toHaveAttribute('aria-invalid', 'true');
-  }
-  await expect(offer.getByRole('button', { name: 'Skip and record' })).toBeVisible();
-
-  await field.fill('40');
-  await field.press('Enter');
-  await expect(offer.getByRole('status')).toContainText(/^The Latency Offset of .+ · Input 1 is 40 ms\./);
-  await offer.getByRole('button', { name: 'Record' }).click();
-  await expect(offer).toBeHidden();
-  await expect(stopButton(page)).toBeVisible();
-  await playheadPast(page, 5 + 1);
-  await stopButton(page).click();
-  await expect(recordButton(page)).toBeEnabled();
-  const [made] = await clipsOn(bandmate, song.id, 'Track 1');
-  expect(made.takes[0].latencyOffset).toBeCloseTo(0.04, 3);
-
-  // Counted as calibrated: not offered before the next recording, even after a reload.
-  await page.reload();
-  await expect(recordButton(page)).toBeEnabled();
-  await expect(timeline(page).getByRole('button', { name: 'Not calibrated' })).toHaveCount(0);
-  await seek(page, 10);
-  await record(page, () => recordButton(page).click(), 10 + 1);
-  await expect(offer).toHaveCount(0);
-  const takes = (await clipsOn(bandmate, song.id, 'Track 1')).map((c) => c.takes[0].latencyOffset);
-  expect(takes).toHaveLength(2);
-  for (const offset of takes) expect(offset).toBeCloseTo(0.04, 3);
 });
 
 test("the Latency Offset calibrated before Inputs had their own becomes the chosen Input's", async ({
@@ -460,7 +487,10 @@ test('a Take whose save fails is offered back, and kept after a reload', async (
   const song = await bandmate.song({ title: 'Anthem' });
   await open(page, song.id);
   await seek(page, 5);
-  const fault = await failRequests(page, { method: 'POST', url: `**/api/songs/${song.id}/timeline/takes` });
+  const fault = await failRequests(page, {
+    method: 'POST',
+    url: `**/api/songs/${song.id}/timeline/takes`,
+  });
 
   await record(page, () => recordButton(page).click(), 5 + 2, { skip: true });
 
@@ -536,7 +566,11 @@ test('Settings lists each calibrated Input, to calibrate again, whether or not c
   );
   // The first fake input chosen; it and the second calibrated, and a
   // Scarlett Solo's Input 2 calibrated before it was unplugged.
-  const unplugged = { deviceId: 'unplugged', label: 'Scarlett Solo USB (1235:8211)', channel: 1 };
+  const unplugged = {
+    deviceId: 'unplugged',
+    label: 'Scarlett Solo USB (1235:8211)',
+    channel: 1,
+  };
   await page.evaluate(
     ({ first, second, unplugged }) => {
       localStorage.setItem('bandmate.input', JSON.stringify(first));
@@ -591,14 +625,15 @@ test('Settings lists each calibrated Input, to calibrate again, whether or not c
   // Calibrating one not chosen measures it, not the one chosen.
   await list.getByRole('button', { name: `Calibrate ${secondName} again` }).click();
   const dialog = page.getByRole('dialog', { name: 'Calibrate the latency' });
-  await expect(dialog).toContainText(`from ${secondName} after`);
+  await expect(dialog).toContainText(secondName);
   await dialog.getByRole('button', { name: 'Start' }).click();
-  // The fake microphone's tone has no taps to hear, so nothing is measured,
-  // but it's the second that's listened to.
-  await expect(dialog.getByRole('status')).toHaveText('Tap along with the clicks');
-  await expect(dialog.getByRole('button', { name: 'Use this' })).toBeDisabled();
+  // The fake microphone's tone has no clicks to hear, so nothing is
+  // measured, but it's the second that's listened to.
+  await expect(dialog.getByRole('status')).toHaveText('Listening for the clicks…', { timeout: 10_000 });
+  await expect(dialog.getByRole('button', { name: 'Finish now' })).toHaveCount(0);
   expect(await page.evaluate(() => (window as unknown as { opened: string[] }).opened)).toEqual([second.deviceId]);
-  await page.keyboard.press('Escape');
+  await dialog.getByRole('button', { name: 'Pause' }).click();
+  await dialog.getByRole('button', { name: 'Quit' }).click();
   await expect(dialog).toBeHidden();
   await expect(typed(secondName)).toHaveValue('34');
   await expect(offset).toHaveText('21 ms, calibrated');
@@ -614,7 +649,7 @@ test('Settings lists each calibrated Input, to calibrate again, whether or not c
 
   await open(page, song.id);
   await recordButton(page).click();
-  await expect(calibrationOffer(page)).toContainText(`Before the first recording from ${firstName},`);
+  await expect(calibrationOffer(page)).toContainText(`${firstName} Before the first recording from it,`);
 });
 
 test('a Latency Offset typed in Settings is kept for its Input, leaving Takes where they are', async ({
@@ -694,21 +729,51 @@ test('a Latency Offset typed in Settings is kept for its Input, leaving Takes wh
   expect(offsets[1]).toBeCloseTo(0.048, 3);
 });
 
-test('a Latency Offset typed for the default input is kept for the Input it turns out to be', async ({ page }) => {
+test("calibration's result shows the offset there was, and only Save keeps the new one", async ({ page }) => {
   await page.goto('/settings');
+  const [first] = await page.evaluate(async () =>
+    (await navigator.mediaDevices.enumerateDevices())
+      .filter((d) => d.kind === 'audioinput' && d.deviceId !== 'default')
+      .map(({ deviceId, label }) => ({ deviceId, label, channel: 0 })),
+  );
+  // The first fake input chosen, and calibrated at 21 ms.
+  await page.evaluate((first) => {
+    localStorage.setItem('bandmate.input', JSON.stringify(first));
+    localStorage.setItem(
+      'bandmate.latencyOffsets',
+      JSON.stringify({
+        inputs: [{ ...first, offset: 0.021, offered: true }],
+        unclaimed: null,
+      }),
+    );
+  }, first);
+  await hearClicks(page, 0.025);
+  await page.reload();
+
   const recording = page.getByRole('region', { name: 'Recording' });
   const offset = recording.getByRole('definition').nth(1);
-  await expect(offset).toHaveText('Not calibrated');
-
-  await recording.getByRole('button', { name: 'Calibrate', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Calibrate the latency' });
-  await dialog.getByRole('spinbutton', { name: /^Latency Offset of .+, in ms$/ }).fill('33');
-  await dialog.getByRole('button', { name: /^Set the Latency Offset of / }).click();
-  await expect(dialog.getByRole('status')).toContainText(/^The Latency Offset of .+ · Input 1 is 33 ms\./);
-  await dialog.getByRole('button', { name: 'Done' }).click();
+  /** Calibrates the chosen Input, up to its result. */
+  async function measure() {
+    await recording.getByRole('button', { name: 'Calibrate again', exact: true }).click();
+    await expect(dialog).toContainText(`${first.label} · Input 1`);
+    await dialog.getByRole('button', { name: 'Start' }).click();
+    await dialog.getByRole('button', { name: 'Finish now' }).click({ timeout: 15_000 });
+    await expect(dialog.getByRole('status')).toContainText(/^25 ms\s*Was 21 ms: \+4 ms\. From \d+ taps\./);
+  }
 
-  await expect(offset).toHaveText('33 ms, calibrated');
-  const list = recording.getByRole('list', { name: 'Calibrated inputs' });
-  await expect(list.getByRole('listitem')).toHaveCount(1);
-  await expect(list.getByRole('spinbutton', { name: /· Input 1, in ms$/ })).toHaveValue('33');
+  // Discarded, the offset there was stays.
+  await measure();
+  await expect(offset).toHaveText('21 ms, calibrated');
+  await dialog.getByRole('button', { name: 'Discard' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(offset).toHaveText('21 ms, calibrated');
+
+  // Saved, the new one is kept, after a reload too.
+  await measure();
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(offset).toHaveText('25 ms, calibrated');
+  await page.reload();
+  await expect(offset).toHaveText('25 ms, calibrated');
 });

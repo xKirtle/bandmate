@@ -79,7 +79,7 @@
   import { transportActions } from './transportMenu';
   import { TrackDragging } from './trackDragging.svelte';
   import InputSettings from './InputSettings.svelte';
-  import CalibrationDialog from './CalibrationDialog.svelte';
+  import CalibrationSheet from './CalibrationSheet.svelte';
   import MixdownDialog from './MixdownDialog.svelte';
   import { mixdownEnd } from './mixdown';
   import { deviceStorage } from './deviceStorage';
@@ -199,7 +199,7 @@
     keeping: browserKeeping,
     calibrations,
     uploads: api,
-    onUncalibrated: (input, { retake }) => (calibrating = { offer: true, input, retaking: retake }),
+    onUncalibrated: (input, { retake }, reported) => (calibrating = { offer: { reported }, input, retaking: retake }),
     onTrackAdded: (trackId) => choose({ kind: 'add', trackId }),
     onError: (message) => showError(message),
   });
@@ -812,9 +812,10 @@
 
   // Calibration while it runs, of an Input's Latency Offset, shared by this
   // device's tabs: offered before an Input's first recording, where the
-  // Clip to retake, by id, waits for it, or run from the recording settings
+  // Clip to retake, by id, waits for it, with the latency the browser
+  // reports for the Input, to skip with; or run from the recording settings
   // for the chosen Input.
-  let calibrating = $state<{ offer: boolean; input: InputChoice; retaking?: number } | null>(null);
+  let calibrating = $state<{ offer: { reported: number } | null; input: InputChoice; retaking?: number } | null>(null);
   // Whether calibration was just skipped, to say where to run it later.
   let skipped = $state(false);
 
@@ -823,7 +824,7 @@
   const offset = $derived(recordedInput.calibration.offset);
 
   function calibrateChosen() {
-    calibrating = { offer: false, input: $state.snapshot(chosenInput.value) };
+    calibrating = { offer: null, input: $state.snapshot(chosenInput.value) };
   }
 
   function calibrationClosed(record: boolean) {
@@ -2679,7 +2680,7 @@
 </section>
 
 {#if calibrating}
-  <CalibrationDialog
+  <CalibrationSheet
     input={calibrating.input}
     offer={calibrating.offer}
     onSkip={() => (skipped = true)}
