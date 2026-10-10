@@ -127,15 +127,27 @@ type App struct {
 	handler        http.Handler
 }
 
-// New opens the database in cfg.DataDir, migrates it, and builds the HTTP
-// handler. It returns a *Refused, having changed nothing, if the database
-// was migrated by a newer Bandmate.
+// New opens the database in cfg.DataDir, takes an Upgrade copy of it if it
+// has migrations pending, migrates it, and builds the HTTP handler. It
+// returns a *Refused, having migrated nothing, if the database was migrated
+// by a newer Bandmate or the Upgrade copy couldn't be taken.
 func New(cfg Config) (*App, error) {
-	conn, err := db.OpenNoNewer(context.Background(), cfg.DataDir)
-	if errors.Is(err, db.ErrNewer) {
-		return nil, refusedNewer(err)
+	running := cfg.Build
+	if running == (build.Info{}) {
+		running = build.Current()
 	}
-	if err != nil {
+	now := time.Now
+	if cfg.Now != nil {
+		now = cfg.Now
+	}
+	conn, err := db.OpenToRun(context.Background(), cfg.DataDir, running.Version, now())
+	var copyErr *db.UpgradeCopyError
+	switch {
+	case errors.Is(err, db.ErrNewer):
+		return nil, refusedNewer(err)
+	case errors.As(err, &copyErr):
+		return nil, refusedUpgradeCopy(copyErr)
+	case err != nil:
 		return nil, err
 	}
 	songFiles := map[string]*audio.Files{}
@@ -149,10 +161,6 @@ func New(cfg Config) (*App, error) {
 	masterFiles := songFiles[songfiles.Masters.Dir]
 	takeFiles := songFiles[songfiles.Takes.Dir]
 	soundFiles := songFiles[songfiles.Sounds.Dir]
-	now := time.Now
-	if cfg.Now != nil {
-		now = cfg.Now
-	}
 	backupStore, err := backups.Open(conn, cfg.DataDir, now)
 	if err != nil {
 		conn.Close()
@@ -173,7 +181,7 @@ func New(cfg Config) (*App, error) {
 		coverFiles:  lyricsheet.CoverFilesIn(songFiles),
 		maxUpload:   cfg.MaxUploadBytes,
 		maxCover:    cfg.MaxCoverBytes,
-		build:       cfg.Build,
+		build:       running,
 		spa:         cfg.SPA,
 	}
 	if a.maxUpload <= 0 {
@@ -181,9 +189,6 @@ func New(cfg Config) (*App, error) {
 	}
 	if a.maxCover <= 0 {
 		a.maxCover = DefaultMaxCoverBytes
-	}
-	if a.build == (build.Info{}) {
-		a.build = build.Current()
 	}
 	a.startedAt = now()
 	a.dependencies = shipped(cfg.GoModules, cfg.SPA, cfg.ProgramsManifest)

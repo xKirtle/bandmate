@@ -162,7 +162,7 @@ New features bump the middle number, and fixes alone the last one, as [CONTRIBUT
 docker compose pull && docker compose up -d
 ```
 
-Bandmate updates its database by itself when it starts.
+Bandmate updates its database by itself when it starts. Before it does, it copies the database alone, without audio or Covers, into the `upgrade-copies` folder in the data folder, and keeps the newest three copies there. If it can't take the copy, it doesn't update the database or start: every page shows why until you fix it and start Bandmate again.
 
 **To roll back**, run the older tag. If the newer version changed the database, put back the copy of the data folder you made before upgrading too: an older Bandmate can't undo a newer one's changes. Started on a database a newer Bandmate changed, it refuses to run: it changes nothing, and every page shows why until you put the copy back or run the newer Bandmate again.
 

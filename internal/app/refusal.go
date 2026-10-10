@@ -4,6 +4,8 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+
+	"github.com/xKirtle/bandmate/internal/db"
 )
 
 // UpgradeGuide is the self-hosting guide's section on upgrading and rolling
@@ -30,6 +32,18 @@ func refusedNewer(err error) *Refused {
 	return &Refused{
 		Reason: "The database was changed by a newer Bandmate, which this older one can't run on. " +
 			"Run the newer Bandmate again, or roll back as the upgrade guide says.",
+		Err: err,
+	}
+}
+
+// refusedUpgradeCopy is the refusal of a database whose Upgrade copy
+// couldn't be taken, so it wasn't migrated: without the copy, the upgrade
+// couldn't be rolled back.
+func refusedUpgradeCopy(err *db.UpgradeCopyError) *Refused {
+	return &Refused{
+		Reason: "Bandmate couldn't copy the database before upgrading it, so it hasn't upgraded it (" +
+			err.Err.Error() + "). Make sure Bandmate can write to the upgrade-copies folder of its data folder " +
+			"and that the disk has room, then start it again.",
 		Err: err,
 	}
 }

@@ -76,8 +76,10 @@ var songTables = []songTable{
 }
 
 // notCopied are the tables holding nothing of a Song: the schema's own
-// bookkeeping, and the Backups.
-var notCopied = map[string]bool{"schema_migrations": true, "sqlite_sequence": true, "backups": true}
+// bookkeeping, the Bandmate that last ran on the database, and the Backups.
+var notCopied = map[string]bool{
+	"schema_migrations": true, "sqlite_sequence": true, "bandmate_version": true, "backups": true,
+}
 
 // copyAttempts is how often a Song's copy, or the Beat Library's, is tried
 // before giving up: a file removed between reading the rows and keeping
