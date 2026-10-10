@@ -11,6 +11,7 @@
     nameIt,
     qualities,
     roots,
+    sounds,
     suggest,
     type FinderContext,
     type Frets,
@@ -18,6 +19,7 @@
     type Voicing,
   } from './chordFinder';
   import Fretboard from './Fretboard.svelte';
+  import HearButton from './HearButton.svelte';
   import { leftHanded } from './sharedLeftHanded.svelte';
   import { preferredVoicings } from './sharedPreferredVoicings.svelte';
   import Picker from './Picker.svelte';
@@ -280,21 +282,24 @@
                 <li class:preferred>
                   <ChordDiagram {voicing} name={found.name} />
                   <span class="rank muted">{preferred ? 'Preferred' : rank + 1}</span>
-                  {#if preferred}
-                    <button
-                      type="button"
-                      class="button prefer"
-                      title="Stop preferring this Voicing, putting the best-ranked one first again"
-                      onclick={() => prefer(null)}>Clear</button
-                    >
-                  {:else}
-                    <button
-                      type="button"
-                      class="button prefer"
-                      title="Show this Voicing of {found.name} first in this tuning"
-                      onclick={() => prefer(voicing)}>Prefer</button
-                    >
-                  {/if}
+                  <div class="voicing-actions">
+                    <HearButton chord={found.name} pitches={sounds(voicing.frets, finderContext)} />
+                    {#if preferred}
+                      <button
+                        type="button"
+                        class="button prefer"
+                        title="Stop preferring this Voicing, putting the best-ranked one first again"
+                        onclick={() => prefer(null)}>Clear</button
+                      >
+                    {:else}
+                      <button
+                        type="button"
+                        class="button prefer"
+                        title="Show this Voicing of {found.name} first in this tuning"
+                        onclick={() => prefer(voicing)}>Prefer</button
+                      >
+                    {/if}
+                  </div>
                 </li>
               {/each}
             </ol>
@@ -505,6 +510,14 @@
   .preferred .rank {
     color: var(--text);
     font-weight: 600;
+  }
+  /* Hear and Prefer, side by side under the diagram, or one over the other on the narrowest phones. */
+  .voicing-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
   }
   .prefer {
     min-height: 2rem;

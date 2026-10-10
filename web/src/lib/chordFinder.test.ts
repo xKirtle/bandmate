@@ -6,6 +6,7 @@ import {
   qualities,
   readTuning,
   roots,
+  sounds,
   keyName,
   keys,
   standard,
@@ -581,6 +582,25 @@ function palette(key: string): string[] | null {
   const s = suggest(key);
   return s.kind === 'key' ? s.chords.map((c) => `${c.numeral} ${c.chord}`) : null;
 }
+
+describe('the pitches a Voicing sounds', () => {
+  it("are its strings' pitches in the tuning, low string to high, as MIDI note numbers", () => {
+    // E major: E2 B2 E3 G#3 B3 E4.
+    expect(sounds(shape('022100'), context)).toEqual([40, 47, 52, 56, 59, 64]);
+  });
+
+  it('skip muted strings', () => {
+    // C major: C3 E3 G3 C4 E4.
+    expect(sounds(shape('x32010'), context)).toEqual([48, 52, 55, 60, 64]);
+    expect(sounds(shape('xx0232'), context)).toEqual([50, 57, 62, 66]);
+    expect(sounds(shape('xxxxxx'), context)).toEqual([]);
+  });
+
+  it('follow the tuning in use', () => {
+    // D5 in Drop D: D2 A2 D3.
+    expect(sounds(shape('000xxx'), { tuning: readTuning('Drop D')! })).toEqual([38, 45, 50]);
+  });
+});
 
 describe('suggesting from a Key', () => {
   it("gives a major Key's Chords with their Roman numerals: G", () => {
