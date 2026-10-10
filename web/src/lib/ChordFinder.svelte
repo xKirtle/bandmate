@@ -110,6 +110,9 @@
   const nothingPlaced = (): Frets => context.tuning.map(() => null);
   let placed = $state(nothingPlaced());
   const named = $derived(nameIt(placed, context));
+  // Hearing it strums it even when it reads as no Chord.
+  const placedPlucks = $derived(plucks(placed, context));
+  const placedName = $derived(named.kind === 'chord' ? named.readings[0] : 'this Chord shape');
 
   /** Opens a reading in Look up, with focus on its tab. */
   function openInLookUp(reading: string) {
@@ -341,7 +344,10 @@
           </div>
           <div class="board">
             <Fretboard bind:frets={placed} />
-            <button type="button" class="button clear" onclick={() => (placed = nothingPlaced())}>Clear</button>
+            <div class="board-actions">
+              <HearButton chord={placedName} plucks={placedPlucks} />
+              <button type="button" class="button clear" onclick={() => (placed = nothingPlaced())}>Clear</button>
+            </div>
           </div>
         </div>
       {:else}
@@ -599,7 +605,11 @@
       align-self: flex-start;
     }
   }
-  .clear {
+  /* Hear and Clear, side by side under the fretboard, at its right. */
+  .board-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
     align-self: flex-end;
   }
   /* Suggest: the Key and the Chord picked after, side by side. */

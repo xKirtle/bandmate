@@ -34,7 +34,7 @@ And this is Read mode, here on a phone: the chords over the words, and how to pl
 The **Chords** page, in the side bar, helps with chords away from any song, on guitar, in standard tuning or any other.
 
 - **Look up** a chord by name, like Cmaj7 or D/F#, and see the ways to play it, best first. Press the speaker to hear one strummed, in the tuning you picked. Prefer one, and that's the shape Read mode shows you.
-- **Name it**: put your fingers on the fretboard, and Bandmate tells you which chord you're playing.
+- **Name it**: put your fingers on the fretboard, and Bandmate tells you which chord you're playing. Press the speaker to hear the shape strummed, even one that isn't a chord.
 - **Suggest**: pick a key, and see the chords that belong in it, the ones borrowed from other keys, and what usually comes after a chord. Each one shows a way to play it: the one you prefer, or else the best. Press the speaker to hear it strummed. **More Voicings** opens it in Look up, with the other ways.
 - Left-handed? One switch flips every diagram.
 
