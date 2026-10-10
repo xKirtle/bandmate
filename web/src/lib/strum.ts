@@ -24,9 +24,6 @@ const sustain = 0.996;
 /** The strum still ringing, if any: what a new one cuts off. */
 let ringing: { gain: GainNode; sources: AudioBufferSourceNode[] } | null = null;
 
-/** Each pitch's pluck, made once per sample rate. */
-const plucks = new Map<string, AudioBuffer>();
-
 /**
  * Strums pitches once, downwards: the first pitch first, each next one a
  * short gap after. Pitches are MIDI note numbers, the lowest string's first.
@@ -81,16 +78,15 @@ function cutOff(context: AudioContext) {
   }
 }
 
-/** A pitch's pluck at the context's sample rate, made the first time it's asked for. */
+/**
+ * A pluck of a pitch at the context's sample rate. Made afresh each time, a
+ * few milliseconds' work, so no two strums sound quite the same, as on a
+ * real guitar.
+ */
 function pluck(context: BaseAudioContext, pitch: number): AudioBuffer {
-  const key = `${context.sampleRate}:${pitch}`;
-  let buffer = plucks.get(key);
-  if (!buffer) {
-    const samples = pluckSamples(440 * 2 ** ((pitch - 69) / 12), context.sampleRate);
-    buffer = context.createBuffer(1, samples.length, context.sampleRate);
-    buffer.copyToChannel(samples, 0);
-    plucks.set(key, buffer);
-  }
+  const samples = pluckSamples(440 * 2 ** ((pitch - 69) / 12), context.sampleRate);
+  const buffer = context.createBuffer(1, samples.length, context.sampleRate);
+  buffer.copyToChannel(samples, 0);
   return buffer;
 }
 

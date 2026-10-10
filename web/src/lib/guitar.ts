@@ -148,8 +148,8 @@ export function diagramStartFret(voicing: Voicing, rows: number): number {
 }
 
 /**
- * The pitches a shape on a guitar sounds, as MIDI note numbers, low string
- * to high, muted strings skipped.
+ * The pitches frets on a guitar sound, as MIDI note numbers, low string to
+ * high, muted strings skipped.
  */
 export function guitarPitches(frets: readonly (number | null)[], tuning: readonly number[]): number[] {
   return frets.flatMap((fret, string) => (fret === null ? [] : [tuning[string] + fret]));

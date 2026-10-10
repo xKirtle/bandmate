@@ -6,21 +6,14 @@
   let {
     chord,
     pitches,
-    disabled = false,
   }: {
     /** The Chord's name, for the button's label. */
     chord: string;
     /** The pitches to strum, as MIDI note numbers, low string to high (see the Chord Finder's sounds). */
     pitches: readonly number[];
-    disabled?: boolean;
   } = $props();
 </script>
 
-<button
-  type="button"
-  class="icon"
-  aria-label="Hear {chord}"
-  title="Hear {chord}"
-  {disabled}
-  onclick={() => strum(pitches)}><Volume2 /></button
+<button type="button" class="icon" aria-label="Hear {chord}" title="Hear {chord}" onclick={() => strum(pitches)}
+  ><Volume2 /></button
 >

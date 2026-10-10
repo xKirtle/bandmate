@@ -151,9 +151,8 @@ export function nameIt(frets: Frets, context: FinderContext): NameIt {
 }
 
 /**
- * The pitches a Voicing, or a shape placed in Name it, sounds in the
- * Finder's tuning, as MIDI note numbers: low string to high, muted strings
- * skipped. What hearing it strums.
+ * The pitches a Voicing's frets sound in the Finder's tuning, as MIDI note
+ * numbers: low string to high, muted strings skipped. What hearing it strums.
  */
 export function sounds(frets: Frets, context: FinderContext): number[] {
   return guitarPitches(frets, context.tuning);
