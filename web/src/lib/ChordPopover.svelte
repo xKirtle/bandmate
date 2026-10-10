@@ -18,6 +18,8 @@
   // Clear goes back to the top-ranked one: the device's preference the Chord
   // Finder keeps, so the Chart and the Chord Finder follow at once. That's
   // allowed in Read mode, as it's a device setting, not an edit to the Song.
+  // Hear, beside it, strums the one showing in the Song's tuning, as the Chart
+  // draws it: the capo changes nothing, as a Chord names the shape fingered.
   // A Chord or tuning that can't be read says so instead.
   // Opened by hovering a Chord in a Line with a pointer, tapping it on a touch
   // screen, or clicking a diagram in the Chart. It opens over the Line, on
@@ -30,6 +32,8 @@
   import type { Song } from './api';
   import ChordDiagram from './ChordDiagram.svelte';
   import { chartTuning, chartVoicings } from './chordChart';
+  import { plucks } from './chordFinder';
+  import HearButton from './HearButton.svelte';
   import { popoverLeft, popoverTop } from './popover';
   import { preferredVoicings } from './sharedPreferredVoicings.svelte';
 
@@ -181,15 +185,20 @@
           ><ChevronRight /></button
         >
       </div>
-      <!-- One button, so focus stays on it as Prefer turns to Clear. -->
-      <button
-        type="button"
-        class="button prefer"
-        title={isPreferred
-          ? 'Stop preferring this Voicing, putting the top-ranked one first again'
-          : `Show this Voicing of ${opened.name} first in this tuning, here and on the Chords page`}
-        onclick={prefer}>{isPreferred ? 'Clear' : 'Prefer'}</button
-      >
+      <div class="actions">
+        {#if tuning}
+          <HearButton chord={opened.name} plucks={plucks(voicing.frets, { tuning })} />
+        {/if}
+        <!-- One button, so focus stays on it as Prefer turns to Clear. -->
+        <button
+          type="button"
+          class="button prefer"
+          title={isPreferred
+            ? 'Stop preferring this Voicing, putting the top-ranked one first again'
+            : `Show this Voicing of ${opened.name} first in this tuning, here and on the Chords page`}
+          onclick={prefer}>{isPreferred ? 'Clear' : 'Prefer'}</button
+        >
+      </div>
     {:else}
       <p class="muted note">
         {#if found.kind === 'unreadable-tuning'}
@@ -242,8 +251,15 @@
     color: var(--text);
     font-weight: 600;
   }
-  .prefer {
+  /* Hear, then Prefer filling the rest of the popover's width. */
+  .actions {
+    display: flex;
     align-self: stretch;
+    align-items: center;
+    gap: var(--space-1);
+  }
+  .prefer {
+    flex: 1;
     font-size: var(--text-md);
   }
   .note {
