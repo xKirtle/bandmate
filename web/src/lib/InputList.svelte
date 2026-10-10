@@ -12,8 +12,9 @@
   // from and to calibrate any of them. First the default input, then each
   // channel of each device connected, each with a radio to record from it
   // and a pill with its Latency Offset, or why it has none. Pressing a pill
-  // opens its row, at first the Input recorded from: only that Input is
-  // open, for its level meter, and the row offers Calibrate, which never
+  // opens its row, at first the Input recorded from, with its level meter,
+  // idle until Test input opens the Input, and only while the row stays
+  // open and isn't calibrating. The row offers Calibrate too, which never
   // changes the Input recorded from, and Type it. Then, under "Not
   // connected", every Input kept whose device isn't, to forget. It leaves
   // calibrating to whatever shows it, e.g. Settings' Recording card.
@@ -107,7 +108,12 @@
           {#if open}
             <div class="more" id="{id}-{i}">
               {#if metering}
-                <LevelMeter input={row.input} onOpen={(level) => inputs.learn(level)} />
+                <LevelMeter
+                  input={row.input}
+                  onDemand
+                  allowed={inputs.allowed}
+                  onOpen={(level) => inputs.learn(level)}
+                />
               {/if}
               <div class="actions">
                 <button

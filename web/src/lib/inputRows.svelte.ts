@@ -47,6 +47,8 @@ export class InputRows {
   // The audio devices connected, with how many channels each is known to
   // have; null while which they are can't be told.
   #devices = $state.raw<ConnectedDevice[] | null>(null);
+  // Whether which they are has been asked yet, so the microphone is taken as allowed till then.
+  #told = $state(false);
   // How many channels a device turned out to have once opened, where the browser didn't say before.
   #learned = $state<Record<string, number>>({});
   #listed = $derived(
@@ -62,7 +64,9 @@ export class InputRows {
       let live = true;
       const check = async () => {
         const found = await connectedDevices();
-        if (live) this.#devices = found;
+        if (!live) return;
+        this.#devices = found;
+        this.#told = true;
       };
       void check();
       const unwatch = watchInputs(check);
@@ -72,6 +76,13 @@ export class InputRows {
       };
     });
   }
+
+  /**
+   * Whether the browser says which inputs are connected, by name, as it
+   * does once the microphone is allowed: till then, opening one asks for
+   * it. Taken as allowed until the browser has been asked.
+   */
+  readonly allowed = $derived(this.#devices !== null || !this.#told);
 
   /** The device chosen when it isn't connected, so the default input is recorded from; null otherwise. */
   readonly chosenGone = $derived(

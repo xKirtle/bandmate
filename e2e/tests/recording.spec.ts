@@ -596,6 +596,28 @@ async function fakeInputs(page: Page) {
   );
 }
 
+/**
+ * Watches which inputs the page opens, by the device asked for, as
+ * window.opened, and how many it holds open now, as window.live().
+ */
+async function watchOpenings(page: Page) {
+  await page.addInitScript(() => {
+    const w = window as unknown as { opened: string[]; live: () => number };
+    const opened: string[] = (w.opened = []);
+    const streams: MediaStream[] = [];
+    w.live = () => streams.filter((s) => s.getTracks().some((t) => t.readyState === 'live')).length;
+    const open = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia = async (constraints) => {
+      const audio = constraints?.audio;
+      const asked = typeof audio === 'object' ? (audio.deviceId as ConstrainDOMStringParameters)?.exact : undefined;
+      opened.push(typeof asked === 'string' ? asked : 'default');
+      const stream = await open(constraints);
+      streams.push(stream);
+      return stream;
+    };
+  });
+}
+
 /** Settings' Input list, in its Recording card. */
 function inputList(page: Page) {
   const recording = page.getByRole('region', { name: 'Recording' });
@@ -647,17 +669,7 @@ test('Settings lists every Input, connected or not, to record from, calibrate wh
     },
     { first, second, unplugged },
   );
-  // Which inputs the page opens, by the device asked for.
-  await page.addInitScript(() => {
-    const opened: string[] = ((window as unknown as { opened: string[] }).opened = []);
-    const open = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-    navigator.mediaDevices.getUserMedia = (constraints) => {
-      const audio = constraints?.audio;
-      const asked = typeof audio === 'object' ? (audio.deviceId as ConstrainDOMStringParameters)?.exact : undefined;
-      opened.push(typeof asked === 'string' ? asked : 'default');
-      return open(constraints);
-    };
-  });
+  await watchOpenings(page);
   await page.reload();
   const opened = () => page.evaluate(() => (window as unknown as { opened: string[] }).opened);
 
@@ -676,17 +688,41 @@ test('Settings lists every Input, connected or not, to record from, calibrate wh
   await expect(list.notConnected.getByRole('listitem')).toContainText('Input 2 · Scarlett Solo USB');
   await expect(list.notConnected.getByRole('listitem')).toContainText('45 ms');
 
-  // The Input recorded from is chosen, and open, metering it.
+  // The Input recorded from is chosen, and open, its meter idle: nothing
+  // is opened until Test input is pressed, though the microphone is allowed.
   await expect(list.radio(firstName)).toBeChecked();
   await expect(list.pill(firstName)).toHaveAttribute('aria-expanded', 'true');
   await expect(list.row(firstName).getByRole('meter', { name: 'Level' })).toBeVisible();
-  await expect.poll(opened).toEqual([first.deviceId]);
+  await expect(list.row(firstName)).toContainText("Set your interface's gain");
+  const testInput = (name: string) => list.row(name).getByRole('button', { name: 'Test input', exact: true });
+  const stop = (name: string) => list.row(name).getByRole('button', { name: 'Stop', exact: true });
+  await expect(testInput(firstName)).toBeVisible();
+  expect(await opened()).toEqual([]);
 
-  // Its pill opens another, metering that one in its place.
+  // Test input meters it, and becomes Stop, which closes it, the button as wide either way.
+  const idleWidth = (await testInput(firstName).boundingBox())!.width;
+  await testInput(firstName).click();
+  await expect.poll(opened).toEqual([first.deviceId]);
+  await expect(stop(firstName)).toBeVisible();
+  await expect(list.row(firstName).getByRole('meter', { name: 'Level' })).not.toHaveAttribute('aria-valuenow', '0');
+  expect((await stop(firstName).boundingBox())!.width).toBe(idleWidth);
+  const live = () => page.evaluate(() => (window as unknown as { live: () => number }).live());
+  await expect.poll(live).toBe(1);
+  await stop(firstName).click();
+  await expect(testInput(firstName)).toBeVisible();
+  await expect.poll(live).toBe(0);
+
+  // Another's pill opens it idle, and closes the one tested in the first.
+  await testInput(firstName).click();
+  await expect.poll(live).toBe(1);
   await list.pill(secondName).click();
   await expect(list.row(secondName).getByRole('meter', { name: 'Level' })).toBeVisible();
   await expect(list.row(firstName).getByRole('meter')).toHaveCount(0);
-  await expect.poll(opened).toEqual([first.deviceId, second.deviceId]);
+  await expect(testInput(secondName)).toBeVisible();
+  await expect.poll(live).toBe(0);
+  await testInput(secondName).click();
+  await expect.poll(opened).toEqual([first.deviceId, first.deviceId, second.deviceId]);
+  await expect.poll(live).toBe(1);
 
   // Calibrating one not recorded from measures it, and leaves the choice alone.
   await list.row(secondName).getByRole('button', { name: 'Calibrate again', exact: true }).click();
@@ -703,6 +739,9 @@ test('Settings lists every Input, connected or not, to record from, calibrate wh
   await expect(dialog).toBeHidden();
   await expect(list.pill(secondName)).toHaveText('34 ms');
   await expect(list.radio(firstName)).toBeChecked();
+  // Calibrating over, its meter is idle again.
+  await expect(list.row(secondName).getByRole('button', { name: 'Test input', exact: true })).toBeVisible();
+  await expect.poll(live).toBe(0);
 
   // The radio changes the Input recorded from, kept after a reload.
   await list.radio(secondName).check();
@@ -725,6 +764,74 @@ test('Settings lists every Input, connected or not, to record from, calibrate wh
     "Scarlett Solo USB isn't connected, so the default input is used.",
   );
   await expect(list.connected.getByRole('radio', { name: /^Default input/ })).toBeChecked();
+});
+
+test.describe('before the microphone is allowed', () => {
+  test.use({ permissions: [] });
+
+  test("Settings' Input list asks for the microphone only once Test input is pressed", async ({ page }) => {
+    // Chromium's fake microphone lists its inputs by name whatever was
+    // allowed, so they're listed as a browser does before it's asked:
+    // without ids, until an input is opened.
+    await page.addInitScript(() => {
+      let asked = false;
+      const open = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+      navigator.mediaDevices.getUserMedia = (constraints) => {
+        asked = true;
+        return open(constraints);
+      };
+      const list = navigator.mediaDevices.enumerateDevices.bind(navigator.mediaDevices);
+      navigator.mediaDevices.enumerateDevices = async () =>
+        asked
+          ? list()
+          : (await list()).map(
+              (d) =>
+                ({
+                  ...d.toJSON(),
+                  deviceId: '',
+                  groupId: '',
+                  label: '',
+                }) as MediaDeviceInfo,
+            );
+    });
+    await watchOpenings(page);
+    await page.goto('/settings');
+    const opened = () => page.evaluate(() => (window as unknown as { opened: string[] }).opened);
+    const row = inputList(page).row(/^Default input/);
+
+    // The default input's row is open, its meter idle, saying the microphone will be asked for.
+    await expect(row.getByRole('meter', { name: 'Level' })).toBeVisible();
+    await expect(row).toContainText('Test input asks for the microphone');
+    const testInput = row.getByRole('button', {
+      name: 'Test input',
+      exact: true,
+    });
+    await expect(testInput).toBeVisible();
+    expect(await opened()).toEqual([]);
+
+    // Pressed, it asks, and meters the input.
+    await testInput.click();
+    await expect.poll(opened).toEqual(['default']);
+    await expect(row.getByRole('button', { name: 'Stop', exact: true })).toBeVisible();
+    await expect(row).toContainText("Set your interface's gain");
+  });
+});
+
+test("a blocked microphone says so in Settings' Input list, offering Test input again", async ({ page }) => {
+  await page.addInitScript(() => {
+    navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException('Denied', 'NotAllowedError'));
+  });
+  await page.goto('/settings');
+  const row = inputList(page).row(/^Default input/);
+  const testInput = row.getByRole('button', {
+    name: 'Test input',
+    exact: true,
+  });
+  await testInput.click();
+  await expect(row.getByRole('alert')).toHaveText(
+    "Bandmate isn't allowed to use the microphone. Allow it in the browser's site settings.",
+  );
+  await expect(testInput).toBeVisible();
 });
 
 test("the Timeline's mic button picks the Input recorded from among those connected, metering it", async ({
