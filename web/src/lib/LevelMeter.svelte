@@ -15,6 +15,7 @@
   let {
     input,
     onDemand = false,
+    paused = false,
     allowed = true,
     onOpen,
   }: {
@@ -24,6 +25,8 @@
     onDemand?: boolean;
     /** Whether the browser has allowed the microphone, so opening the Input won't ask for it. */
     allowed?: boolean;
+    /** On demand, whether Test input waits, e.g. while the Input is being calibrated: it's idle meanwhile. */
+    paused?: boolean;
     /** Hears each opening of it: the Input open, or null where it couldn't be opened. */
     onOpen?: (level: InputLevel | null) => void;
   } = $props();
@@ -138,6 +141,11 @@
     if (metered && !sameInput(given, metered)) untrack(meter);
   });
 
+  // Paused, it's idle, and stays so once it isn't.
+  $effect(() => {
+    if (paused) untrack(stop);
+  });
+
   onMount(() => {
     navigator.mediaDevices?.addEventListener('devicechange', onDeviceChange);
     if (!onDemand) meter();
@@ -172,6 +180,7 @@
       <button
         type="button"
         class="button test"
+        disabled={paused}
         onclick={() => {
           if (testing) stop();
           else meter();
