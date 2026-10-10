@@ -8,7 +8,7 @@
     chord,
     plucks,
   }: {
-    /** The Chord's name, for the button's label, or "this shape" for one placed in Name it that reads as none. */
+    /** The Chord's name, for the button's label, or "this Chord shape" for one placed in Name it that reads as none. */
     chord: string;
     /** What to strum, low string to high: the Chord Finder's plucks. With none, as in Name it with nothing placed, it's disabled. */
     plucks: readonly Pluck[];

@@ -112,7 +112,7 @@
   const named = $derived(nameIt(placed, context));
   // Hearing it strums it even when it reads as no Chord.
   const placedPlucks = $derived(plucks(placed, context));
-  const placedName = $derived(named.kind === 'chord' ? named.readings[0] : 'this shape');
+  const placedName = $derived(named.kind === 'chord' ? named.readings[0] : 'this Chord shape');
 
   /** Opens a reading in Look up, with focus on its tab. */
   function openInLookUp(reading: string) {
