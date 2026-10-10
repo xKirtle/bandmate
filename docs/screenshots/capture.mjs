@@ -651,8 +651,7 @@ const phone = {
   await page.waitForLoadState("networkidle");
   const recording = page.getByRole("region", { name: "Recording" });
   const top = (await recording.boundingBox()).y;
-  // Clear of the page's sticky heading, and short of its end, which moves
-  // up as the open sheet stops the Input's level meter, scrolling the page.
+  // Clear of the page's sticky heading, and short of its end.
   await page.evaluate(
     (y) =>
       window.scrollTo(

@@ -9,20 +9,22 @@
   import { calibrations } from './sharedCalibration.svelte';
 
   // The Input list: every Input on this device, to choose the one recorded
-  // from and to calibrate any of them. First the default input, then each
-  // channel of each device connected, each with a radio to record from it
-  // and a pill with its Latency Offset, or why it has none. Pressing a pill
-  // opens its row, at first the Input recorded from: only that Input is
-  // open, for its level meter, and the row offers Calibrate, which never
-  // changes the Input recorded from, and Type it. Then, under "Not
-  // connected", every Input kept whose device isn't, to forget. It leaves
-  // calibrating to whatever shows it, e.g. Settings' Recording card.
+  // from and to calibrate any of them. Above it, the level meter of the
+  // Input recorded from, idle until Test input opens it; choosing another
+  // while it's metering meters that one instead. Then the default input,
+  // then each channel of each device connected, each with a radio to record
+  // from it and a pill with its Latency Offset, or why it has none. Pressing
+  // a pill opens its row, at first the Input recorded from, offering
+  // Calibrate, which never changes the Input recorded from, and Type it.
+  // Then, under "Not connected", every Input kept whose device isn't, to
+  // forget. It leaves calibrating to whatever shows it, e.g. Settings'
+  // Recording card.
 
   let {
     metering = true,
     onCalibrate,
   }: {
-    /** Whether the open row meters its Input; not while it's being calibrated, which opens it itself. */
+    /** Whether the level meter is shown; not while an Input is being calibrated, which opens it itself. */
     metering?: boolean;
     /**
      * Asks for an Input to be calibrated: the default input as the Input it
@@ -35,6 +37,8 @@
 
   const inputs = new InputRows();
   const rows = $derived(inputs.connected);
+  // The row of the Input recorded from, whose Input the level meter meters.
+  const chosen = $derived(rows.find((row) => row.chosen) ?? rows[0]);
 
   // The row the user opened, by its key, or null for none; until they open
   // one, the row of the Input recorded from is open.
@@ -78,6 +82,16 @@
 </script>
 
 <div class="input-list">
+  <!-- Kept in place while calibrating, idle, so nothing below it moves. -->
+  <div class="level">
+    <LevelMeter
+      input={chosen.input}
+      onDemand
+      paused={!metering}
+      allowed={inputs.microphoneAllowed}
+      onOpen={(level) => inputs.learn(level)}
+    />
+  </div>
   {#if inputs.chosenGone}
     <p class="notice" role="status">{inputs.chosenGone} isn't connected, so the default input is used.</p>
   {/if}
@@ -106,9 +120,6 @@
           </div>
           {#if open}
             <div class="more" id="{id}-{i}">
-              {#if metering}
-                <LevelMeter input={row.input} onOpen={(level) => inputs.learn(level)} />
-              {/if}
               <div class="actions">
                 <button
                   type="button"
@@ -156,6 +167,9 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
+  }
+  .level {
+    margin-bottom: var(--space-2);
   }
   ul {
     margin: 0;

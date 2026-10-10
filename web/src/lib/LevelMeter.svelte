@@ -6,25 +6,37 @@
 
   // An Input's live level meter and Clip light, to set the interface's gain
   // by, with what's wrong where it can't be opened. It opens the Input as
-  // it's shown, asking for the microphone if it hasn't been allowed, opens
-  // another in its place as it's given one, and closes it as it goes. The
-  // meter draws one gradient, green to red, across its whole width, and
-  // shows it up to the level.
+  // it's shown, asking for the microphone if it hasn't been allowed, or, on
+  // demand, only once Test input is pressed, idle till then and again once
+  // Stop is. While it's metering, it opens another in its place as it's
+  // given one, and it closes it as it goes. The meter draws one gradient,
+  // green to red, across its whole width, and shows it up to the level.
 
   let {
     input,
+    onDemand = false,
+    paused = false,
+    allowed = true,
     onOpen,
   }: {
     /** The Input to meter, as chosen: the default input meters the Input it turns out to be. */
     input: InputChoice;
+    /** Whether it waits for Test input to open the Input, rather than opening it as it's shown. */
+    onDemand?: boolean;
+    /** Whether the browser has allowed the microphone, so opening the Input won't ask for it. */
+    allowed?: boolean;
+    /** On demand, whether Test input waits, e.g. while the Input is being calibrated: it's idle meanwhile. */
+    paused?: boolean;
     /** Hears each opening of it: the Input open, or null where it couldn't be opened. */
     onOpen?: (level: InputLevel | null) => void;
   } = $props();
 
   const id = $props.id();
 
-  // The one metered, to open another given in its place.
+  // The one metered, to open another given in its place; null while idle.
   let metered: InputChoice | null = null;
+  // Whether it's metering, or opening the Input to: on demand, from Test input till Stop.
+  let testing = $state(false);
   let level = $state.raw<InputLevel | null>(null);
   // The audio device chosen when it isn't connected, so the default is metered instead.
   let gone = $state<string | null>(null);
@@ -48,6 +60,7 @@
   async function meter() {
     const mine = ++generation;
     closeLevel();
+    testing = true;
     opening = true;
     problem = null;
     // Resumed while the click that showed the meter still counts.
@@ -68,9 +81,21 @@
     } catch (e) {
       if (mine !== generation) return;
       problem = openProblem(e);
+      // On demand, it's idle again, with Test input to try again.
+      if (onDemand) stop();
     }
     opening = false;
     onOpen?.(level);
+  }
+
+  /** Closes the Input, leaving the meter idle, and any problem opening it shown. */
+  function stop() {
+    generation++;
+    closeLevel();
+    metered = null;
+    testing = false;
+    opening = false;
+    gone = null;
   }
 
   function step(time: number) {
@@ -96,6 +121,8 @@
   // An input plugged in or out: the one given opened again if it's the
   // one that went or came back, or if opening it failed.
   async function onDeviceChange() {
+    // Idle, it's left so: a test never starts on its own.
+    if (!testing) return;
     let present = true;
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
@@ -103,7 +130,8 @@
     } catch {
       // Can't tell, so it's left as it is, unless it failed.
     }
-    if (problem || (gone !== null) === present) meter();
+    // Asked again, as Stop may have been pressed while the devices were listed.
+    if (testing && (problem || (gone !== null) === present)) meter();
   }
 
   // Another Input given, e.g. chosen in another tab: it's metered in place of the one before.
@@ -113,21 +141,38 @@
     if (metered && !sameInput(given, metered)) untrack(meter);
   });
 
+  // Paused, it's idle, and stays so once it isn't.
+  $effect(() => {
+    if (paused) untrack(stop);
+  });
+
   onMount(() => {
     navigator.mediaDevices?.addEventListener('devicechange', onDeviceChange);
-    meter();
+    if (!onDemand) meter();
   });
 
   onDestroy(() => {
-    generation++;
-    closeLevel();
-    metered = null;
+    stop();
     navigator.mediaDevices?.removeEventListener('devicechange', onDeviceChange);
   });
 </script>
 
 <div class="level-meter">
-  <div class="level">
+  <div class="level" class:idle={onDemand && !testing} class:on-demand={onDemand}>
+    {#if onDemand}
+      <!-- First, in the accent while idle to be seen, plain while it meters.
+           As wide either way, both labels in one cell, so the row never shifts. -->
+      <button
+        type="button"
+        class="button test"
+        class:primary={!testing}
+        disabled={paused}
+        onclick={() => {
+          if (testing) stop();
+          else meter();
+        }}><span class:shown={!testing}>Test input</span><span class:shown={testing}>Stop</span></button
+      >
+    {/if}
     <span id="{id}-level">Level</span>
     <div
       class="meter"
@@ -151,6 +196,8 @@
     <p class="problem" role="alert">{problem}</p>
   {:else if gone}
     <p class="notice" role="status">{gone} isn't connected, so the default input is used.</p>
+  {:else if !testing && !allowed}
+    <p class="muted">Test input asks for the microphone. Allowing it also lets the browser list your inputs by name.</p>
   {:else}
     <p class="muted">Set your interface's gain so the loudest part stays out of the red.</p>
   {/if}
@@ -168,7 +215,10 @@
     align-items: center;
     gap: var(--space-2);
   }
-  .level > span:first-child {
+  .level.on-demand {
+    grid-template-columns: auto auto 1fr auto;
+  }
+  .level > span:first-of-type {
     color: var(--text-muted);
     font-size: var(--text-md);
   }
@@ -177,6 +227,10 @@
     overflow: hidden;
     border-radius: var(--radius-sm);
     background: var(--surface-2);
+  }
+  /* Idle, the meter's greyed until Test input is pressed. */
+  .idle .meter {
+    opacity: 0.6;
   }
   .meter-fill {
     height: 100%;
@@ -197,6 +251,16 @@
     background: var(--danger);
     color: var(--bg);
     opacity: 1;
+  }
+  .test {
+    display: grid;
+  }
+  .test > span {
+    grid-area: 1 / 1;
+    visibility: hidden;
+  }
+  .test > .shown {
+    visibility: visible;
   }
   p {
     margin: 0;
