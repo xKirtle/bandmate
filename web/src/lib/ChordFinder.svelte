@@ -20,6 +20,7 @@
   } from './chordFinder';
   import Fretboard from './Fretboard.svelte';
   import HearButton from './HearButton.svelte';
+  import ArpeggiateButton from './ArpeggiateButton.svelte';
   import { leftHanded } from './sharedLeftHanded.svelte';
   import { preferredVoicings } from './sharedPreferredVoicings.svelte';
   import Picker from './Picker.svelte';
@@ -110,7 +111,7 @@
   const nothingPlaced = (): Frets => context.tuning.map(() => null);
   let placed = $state(nothingPlaced());
   const named = $derived(nameIt(placed, context));
-  // Hearing it strums it even when it reads as no Chord.
+  // Hearing or arpeggiating it plays it even when it reads as no Chord.
   const placedPlucks = $derived(plucks(placed, context));
   const placedName = $derived(named.kind === 'chord' ? named.readings[0] : 'this Chord shape');
 
@@ -155,9 +156,11 @@
         </p>
         <p class="reason muted">{s.reason}</p>
         {#if voicing}
+          {@const sounds = plucks(voicing.frets, finderContext)}
           <ChordDiagram {voicing} name={s.chord} />
           <div class="voicing-actions">
-            <HearButton chord={s.chord} plucks={plucks(voicing.frets, finderContext)} />
+            <HearButton chord={s.chord} plucks={sounds} />
+            <ArpeggiateButton chord={s.chord} plucks={sounds} />
             <button
               type="button"
               class="button quiet more"
@@ -285,11 +288,13 @@
               {#each shown as voicing, i (page * pageSize + i)}
                 {@const rank = page * pageSize + i}
                 {@const preferred = found.preferred && rank === 0}
+                {@const sounds = plucks(voicing.frets, finderContext)}
                 <li class:preferred>
                   <ChordDiagram {voicing} name={found.name} />
                   <span class="rank muted">{preferred ? 'Preferred' : rank + 1}</span>
                   <div class="voicing-actions">
-                    <HearButton chord={found.name} plucks={plucks(voicing.frets, finderContext)} />
+                    <HearButton chord={found.name} plucks={sounds} />
+                    <ArpeggiateButton chord={found.name} plucks={sounds} />
                     {#if preferred}
                       <button
                         type="button"
@@ -346,6 +351,7 @@
             <Fretboard bind:frets={placed} />
             <div class="board-actions">
               <HearButton chord={placedName} plucks={placedPlucks} />
+              <ArpeggiateButton chord={placedName} plucks={placedPlucks} />
               <button type="button" class="button clear" onclick={() => (placed = nothingPlaced())}>Clear</button>
             </div>
           </div>
@@ -520,7 +526,7 @@
     color: var(--text);
     font-weight: 600;
   }
-  /* A Voicing's buttons under its diagram, side by side, or one over the other on the narrowest phones. */
+  /* A Voicing's buttons under its diagram, side by side, wrapping onto a second line where the card is narrow, as on a phone. */
   .voicing-actions {
     display: flex;
     flex-wrap: wrap;
@@ -605,7 +611,7 @@
       align-self: flex-start;
     }
   }
-  /* Hear and Clear, side by side under the fretboard, at its right. */
+  /* Hear, Arpeggiate and Clear, side by side under the fretboard, at its right. */
   .board-actions {
     display: flex;
     align-items: center;

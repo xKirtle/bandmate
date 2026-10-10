@@ -6,8 +6,8 @@
 // (plucks), so this knows nothing about a guitar's strings or frets.
 //
 // It plays on the app's one audio context, made on the first press, as
-// browsers require. A new strum cuts off one still ringing: strums never
-// layer.
+// browsers require. A new strum or arpeggio cuts off whatever still rings:
+// they never layer.
 
 import type { Pluck } from './chordFinder';
 import { audioContext } from './timelinePlayer';
@@ -16,6 +16,8 @@ import { audioContext } from './timelinePlayer';
 const ringFor = 3;
 /** The gap between one string and the next in a strum, in seconds. */
 const strumGap = 0.03;
+/** The gap between one string and the next in an arpeggio, in seconds: slow enough to hear each note. */
+const arpeggioGap = 0.175;
 /** The fixed volume of a strum, low enough that six strings together don't clip. */
 const volume = 0.3;
 /** How quickly a strum cut off falls silent, in seconds, so it ends without a click. */
@@ -25,16 +27,25 @@ const pickLevel = 0.3;
 /** How much of a string's sound each pass round the loop keeps: the closer to 1, the longer it rings. */
 const sustain = 0.996;
 
-/** The strum still ringing, if any: what a new one cuts off. */
+/** The strum or arpeggio still ringing, if any: what a new one cuts off. */
 let ringing: { gain: GainNode; sources: AudioBufferSourceNode[] } | null = null;
 
 /**
  * Strums once, downwards: the first pluck first, each next one a short gap
  * after, as the Chord Finder's plucks lists them, lowest string first. Cuts
- * off a strum still ringing.
+ * off whatever still rings.
  */
 export function strum(plucks: readonly Pluck[]): void {
   play(plucks, strumGap);
+}
+
+/**
+ * Arpeggiates: plucks each string once, lowest first, as the Chord Finder's
+ * plucks lists them, far enough apart to hear each note, each left ringing.
+ * Cuts off whatever still rings.
+ */
+export function arpeggiate(plucks: readonly Pluck[]): void {
+  play(plucks, arpeggioGap);
 }
 
 /** Plays plucks one after another, `gap` seconds apart, each left ringing, cutting off whatever still rings. */
@@ -64,7 +75,7 @@ function play(plucks: readonly Pluck[], gap: number): void {
   };
 }
 
-/** Fades out the strum still ringing, quickly enough to sound cut off, slowly enough not to click. */
+/** Fades out the strum or arpeggio still ringing, quickly enough to sound cut off, slowly enough not to click. */
 function cutOff(context: AudioContext) {
   if (!ringing) return;
   const { gain, sources } = ringing;

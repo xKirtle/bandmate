@@ -95,7 +95,7 @@ _Avoid_: Zoom, font size, text size
 The key a Song is written in, one of its Details. Like a Chord, with a capo on it names the shapes fingered, not the pitch that sounds: capo 2 in G sounds in A.
 
 **Chord Finder**:
-A built-in reference for Chords: look up how to play one, name one from the notes placed on an Instrument, and get Chords that go well with a Chord or a Key. A Voicing can be heard there, strummed. It has its own page and isn't opened from a Song. The user picks the tuning, and the last one picked is kept on each device. It has no capo: a Chord names the shape fingered, so a capo changes nothing about how it is played. It holds nothing of the user's. The app titles its page and navigation label Chords.
+A built-in reference for Chords: look up how to play one, name one from the notes placed on an Instrument, and get Chords that go well with a Chord or a Key. A Voicing can be heard there, strummed or one string at a time. It has its own page and isn't opened from a Song. The user picks the tuning, and the last one picked is kept on each device. It has no capo: a Chord names the shape fingered, so a capo changes nothing about how it is played. It holds nothing of the user's. The app titles its page and navigation label Chords.
 _Avoid_: Chord Library (a library holds the user's things, like the Beat Library)
 
 **Voicing**:
