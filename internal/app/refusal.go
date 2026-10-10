@@ -27,13 +27,15 @@ func (r *Refused) Error() string { return r.Reason }
 
 func (r *Refused) Unwrap() error { return r.Err }
 
-// refusedNewer is the refusal of a database a newer Bandmate migrated.
-func refusedNewer(err error) *Refused {
-	return &Refused{
-		Reason: "The database was changed by a newer Bandmate, which this older one can't run on. " +
-			"Run the newer Bandmate again, or roll back as the upgrade guide says.",
-		Err: err,
+// refusedNewer is the refusal of a database a newer Bandmate migrated. It
+// names rollBackTo, the Upgrade copy this Bandmate can run, if there is one.
+func refusedNewer(err error, rollBackTo string) *Refused {
+	reason := "The database was changed by a newer Bandmate, which this older one can't run on. " +
+		"Run the newer Bandmate again, or roll back as the upgrade guide says."
+	if rollBackTo != "" {
+		reason += " An Upgrade copy this Bandmate can run is in the data folder: " + rollBackTo + "."
 	}
+	return &Refused{Reason: reason, Err: err}
 }
 
 // refusedUpgradeCopy is the refusal of a database whose Upgrade copy

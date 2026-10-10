@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -231,6 +232,23 @@ func upgradeCopyPath(dir, from string, now time.Time) (string, error) {
 // pruneUpgradeCopies deletes all but the newest upgradeCopiesKept Upgrade
 // copies in dir, newest by when they were taken, and names those it deleted.
 func pruneUpgradeCopies(dir string) ([]string, error) {
+	copies, err := upgradeCopiesNewestFirst(dir)
+	if err != nil {
+		return nil, err
+	}
+	var deleted []string
+	for _, name := range copies[min(len(copies), upgradeCopiesKept):] {
+		if err := os.Remove(filepath.Join(dir, name)); err != nil {
+			return deleted, err
+		}
+		deleted = append(deleted, name)
+	}
+	return deleted, nil
+}
+
+// upgradeCopiesNewestFirst names the Upgrade copies in dir, newest first by
+// when they were taken.
+func upgradeCopiesNewestFirst(dir string) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
@@ -256,12 +274,102 @@ func pruneUpgradeCopies(dir string) ([]string, error) {
 		}
 		return copies[i].name > copies[j].name
 	})
-	var deleted []string
-	for _, c := range copies[min(len(copies), upgradeCopiesKept):] {
-		if err := os.Remove(filepath.Join(dir, c.name)); err != nil {
-			return deleted, err
-		}
-		deleted = append(deleted, c.name)
+	names := make([]string, len(copies))
+	for i, c := range copies {
+		names[i] = c.name
 	}
-	return deleted, nil
+	return names, nil
+}
+
+// UpgradeCopyToRollBackTo names the Upgrade copy in dataDir this Bandmate
+// can run, to roll back to from a database a newer Bandmate changed, as a
+// slash-separated path within dataDir, e.g. upgrade-copies/before-0.14.2.db.
+// It's the newest whose migrations are exactly those this Bandmate knows,
+// or else the newest with only some of them, which it would upgrade. It
+// tells them by the migrations each records, not by its name. With none,
+// it's "". Copies are only read: each is opened read-only and as immutable,
+// so nothing is written beside it.
+func UpgradeCopyToRollBackTo(ctx context.Context, dataDir string) (string, error) {
+	dir := filepath.Join(dataDir, upgradeCopies)
+	copies, err := upgradeCopiesNewestFirst(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	known, err := knownMigrations()
+	if err != nil {
+		return "", err
+	}
+	isKnown := make(map[string]bool, len(known))
+	for _, name := range known {
+		isKnown[name] = true
+	}
+	behind := ""
+	for _, name := range copies {
+		applied, err := migrationsIn(ctx, filepath.Join(dir, name))
+		if err != nil {
+			// A copy that can't be read can't be run either.
+			continue
+		}
+		runnable := len(applied) > 0
+		for _, m := range applied {
+			runnable = runnable && isKnown[m]
+		}
+		switch {
+		case !runnable:
+		case len(applied) == len(known):
+			return upgradeCopies + "/" + name, nil
+		case behind == "":
+			behind = upgradeCopies + "/" + name
+		}
+	}
+	return behind, nil
+}
+
+// migrationsIn names the migrations the database file at path records,
+// reading it only.
+func migrationsIn(ctx context.Context, path string) ([]string, error) {
+	uri, err := readOnlyURI(path)
+	if err != nil {
+		return nil, err
+	}
+	conn, err := sql.Open("sqlite", uri)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	rows, err := conn.QueryContext(ctx, `SELECT name FROM schema_migrations`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var names []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		names = append(names, name)
+	}
+	return names, rows.Err()
+}
+
+// readOnlyURI is the URI that opens the database file at path read-only
+// and as immutable, so SQLite neither writes to it nor leaves a -wal or
+// -shm file beside it. The path is escaped, so a # or ? in it stays part
+// of the path.
+func readOnlyURI(path string) (string, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	p := filepath.ToSlash(abs)
+	if !strings.HasPrefix(p, "/") {
+		// A Windows path starts with its drive, e.g. C:/.
+		p = "/" + p
+	}
+	u := url.URL{Scheme: "file", Path: p, RawQuery: "mode=ro&immutable=1"}
+	return u.String(), nil
 }

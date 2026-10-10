@@ -180,7 +180,7 @@ Then set `BANDMATE_IMAGE=ghcr.io/xkirtle/bandmate:0.14.2` in `.env` and run `doc
 
 **If Bandmate won't start**, every page and its log say why:
 
-- **The database is from a newer Bandmate**, e.g. after running an older version without putting its copy back. Run the newer version again, or roll back as above.
+- **The database is from a newer Bandmate**, e.g. after running an older version without putting its copy back. Run the newer version again, or roll back as above. If one of your Upgrade copies will run on this version, the page names it.
 - **Bandmate couldn't save the copy.** Your database is untouched. Check the disk isn't full and that `data` is owned by the user Bandmate runs as (`PUID` and `PGID`), then run `docker compose restart`.
 
 **Without Docker**, upgrade by stopping Bandmate, [downloading](#downloading-it) the new release over the old program (or [building](#building-it-yourself) the newer tag), and starting it again. Roll back the same way as above, running the older release's program instead.
