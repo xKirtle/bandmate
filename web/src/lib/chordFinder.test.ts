@@ -602,6 +602,12 @@ describe('what hearing a Voicing plucks', () => {
     expect(pitches('xxxxxx')).toEqual([]);
   });
 
+  it('plucks a shape that reads as no Chord too', () => {
+    // x344xx reads as no Chord: C3 F#3 B3. x3x5xx sounds one note twice: C3 C4.
+    expect(pitches('x344xx')).toEqual([48, 54, 59]);
+    expect(pitches('x3x5xx')).toEqual([48, 60]);
+  });
+
   it('follows the tuning in use', () => {
     // D5 in Drop D: D2 A2 D3.
     expect(pitches('000xxx', { tuning: readTuning('Drop D')! })).toEqual([38, 45, 50]);
