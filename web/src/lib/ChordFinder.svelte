@@ -514,7 +514,7 @@
     color: var(--text);
     font-weight: 600;
   }
-  /* Hear beside Prefer, or beside More Voicings in Suggest, under the diagram; one over the other on the narrowest phones. */
+  /* A Voicing's buttons under its diagram, side by side, or one over the other on the narrowest phones. */
   .voicing-actions {
     display: flex;
     flex-wrap: wrap;
