@@ -147,12 +147,32 @@ export function diagramStartFret(voicing: Voicing, rows: number): number {
   return fretted.length === 0 || Math.max(...fretted) <= rows ? 1 : Math.min(...fretted);
 }
 
+/** One string plucked: its pitch, and how bright it sounds. */
+export interface Pluck {
+  /** As a MIDI note number. */
+  pitch: number;
+  /** From dark, near 0, to bright, 1: the open top string. */
+  brightness: number;
+}
+
+/** How much darker a string sounds an octave up the neck: a shorter length rings with fewer overtones. */
+const octaveUpDarkens = 0.5;
+
 /**
- * The pitches frets on a guitar sound, as MIDI note numbers, low string to
- * high, muted strings skipped.
+ * What strumming frets on a guitar plucks, low string to high, muted
+ * strings skipped: each string's pitch, and how bright it sounds. A thicker
+ * string sounds darker than a thinner one, and a string darker the higher up
+ * the neck it's fretted, so the same note sounds warmer on a thicker string
+ * up the neck than open on a thin one.
  */
-export function guitarPitches(frets: readonly (number | null)[], tuning: readonly number[]): number[] {
-  return frets.flatMap((fret, string) => (fret === null ? [] : [tuning[string] + fret]));
+export function guitarPlucks(frets: readonly (number | null)[], tuning: readonly number[]): Pluck[] {
+  const thinnest = Math.max(1, tuning.length - 1);
+  return frets.flatMap((fret, string) => {
+    if (fret === null) return [];
+    // The thickest string at 0.4, the thinnest at 1.
+    const byString = 0.4 + 0.6 * (string / thinnest);
+    return [{ pitch: tuning[string] + fret, brightness: byString * octaveUpDarkens ** (fret / 12) }];
+  });
 }
 
 /**
@@ -160,5 +180,5 @@ export function guitarPitches(frets: readonly (number | null)[], tuning: readonl
  * low string to high.
  */
 export function guitarNotes(frets: readonly (number | null)[], tuning: readonly number[]): number[] {
-  return guitarPitches(frets, tuning).map((pitch) => pitch % 12);
+  return guitarPlucks(frets, tuning).map((p) => p.pitch % 12);
 }

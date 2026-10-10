@@ -9,9 +9,9 @@
     keys,
     lookUp,
     nameIt,
+    plucks,
     qualities,
     roots,
-    sounds,
     suggest,
     type FinderContext,
     type Frets,
@@ -283,7 +283,7 @@
                   <ChordDiagram {voicing} name={found.name} />
                   <span class="rank muted">{preferred ? 'Preferred' : rank + 1}</span>
                   <div class="voicing-actions">
-                    <HearButton chord={found.name} pitches={sounds(voicing.frets, finderContext)} />
+                    <HearButton chord={found.name} plucks={plucks(voicing.frets, finderContext)} />
                     {#if preferred}
                       <button
                         type="button"
