@@ -109,6 +109,16 @@ export function lookUp(name: string, context: FinderContext): LookUp {
   };
 }
 
+/**
+ * The Voicing Look up shows first for a Chord name, and Suggest draws for a
+ * Chord it suggests: the user's preferred one in the tuning, else the
+ * best-ranked. Null when it has no Voicing up to the 12th fret, or can't be read.
+ */
+export function firstVoicing(name: string, context: FinderContext): Voicing | null {
+  const found = lookUp(name, context);
+  return found.kind === 'chord' ? (found.voicings[0] ?? null) : null;
+}
+
 /** A Chord name, tidied as Look up reads it (CMaj7 reads as Cmaj7, F♯- as F#m), or null if it can't be read. */
 export function chordName(text: string): string | null {
   return readChord(text)?.name ?? null;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  firstVoicing,
   lookUp,
   nameIt,
   qualities,
@@ -330,6 +331,26 @@ describe('a preferred Voicing', () => {
       expect(found.voicings.map((v) => written(v.frets))).toEqual(voicingsOf('G'));
       expect(found.preferred).toBe(false);
     }
+  });
+});
+
+describe('the Voicing a suggestion draws', () => {
+  const drawn = (chord: string, ctx: FinderContext) => {
+    const v = firstVoicing(chord, ctx);
+    return v && written(v.frets);
+  };
+
+  it('is the preferred Voicing of the Chord in the tuning', () => {
+    expect(drawn('G', { tuning: standard, preferred: { G: [3, 5, 5, 4, 3, 3] } })).toBe('355433');
+  });
+
+  it('is the best-ranked Voicing with none preferred, or one that is no Voicing of the Chord', () => {
+    expect(drawn('G', context)).toBe('320003');
+    expect(drawn('G', { tuning: standard, preferred: { G: [0, 0, 0, 0, 0, 0] } })).toBe('320003');
+  });
+
+  it('is none for a Chord with no Voicing up to the 12th fret in the tuning', () => {
+    expect(drawn('C', { tuning: [40, 40, 40, 40, 40, 40] })).toBeNull();
   });
 });
 
