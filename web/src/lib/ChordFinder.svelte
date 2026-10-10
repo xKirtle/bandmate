@@ -156,11 +156,11 @@
         </p>
         <p class="reason muted">{s.reason}</p>
         {#if voicing}
-          {@const sounds = plucks(voicing.frets, finderContext)}
+          {@const voicingPlucks = plucks(voicing.frets, finderContext)}
           <ChordDiagram {voicing} name={s.chord} />
           <div class="voicing-actions">
-            <HearButton chord={s.chord} plucks={sounds} />
-            <ArpeggiateButton chord={s.chord} plucks={sounds} />
+            <HearButton chord={s.chord} plucks={voicingPlucks} />
+            <ArpeggiateButton chord={s.chord} plucks={voicingPlucks} />
             <button
               type="button"
               class="button quiet more"
@@ -288,13 +288,13 @@
               {#each shown as voicing, i (page * pageSize + i)}
                 {@const rank = page * pageSize + i}
                 {@const preferred = found.preferred && rank === 0}
-                {@const sounds = plucks(voicing.frets, finderContext)}
+                {@const voicingPlucks = plucks(voicing.frets, finderContext)}
                 <li class:preferred>
                   <ChordDiagram {voicing} name={found.name} />
                   <span class="rank muted">{preferred ? 'Preferred' : rank + 1}</span>
                   <div class="voicing-actions">
-                    <HearButton chord={found.name} plucks={sounds} />
-                    <ArpeggiateButton chord={found.name} plucks={sounds} />
+                    <HearButton chord={found.name} plucks={voicingPlucks} />
+                    <ArpeggiateButton chord={found.name} plucks={voicingPlucks} />
                     {#if preferred}
                       <button
                         type="button"

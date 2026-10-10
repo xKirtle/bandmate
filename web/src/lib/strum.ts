@@ -18,9 +18,9 @@ const ringFor = 3;
 const strumGap = 0.03;
 /** The gap between one string and the next in an arpeggio, in seconds: slow enough to hear each note. */
 const arpeggioGap = 0.175;
-/** The fixed volume of a strum, low enough that six strings together don't clip. */
+/** The fixed volume of a strum or arpeggio, low enough that six strings together don't clip. */
 const volume = 0.3;
-/** How quickly a strum cut off falls silent, in seconds, so it ends without a click. */
+/** How quickly a strum or arpeggio cut off falls silent, in seconds, so it ends without a click. */
 const cutOffIn = 0.03;
 /** How loud a pick starts, as the noise's RMS level, before the strum's volume. */
 const pickLevel = 0.3;
