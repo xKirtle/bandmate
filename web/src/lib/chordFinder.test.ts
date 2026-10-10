@@ -344,7 +344,7 @@ describe('the Voicing a suggestion draws', () => {
     expect(drawn('G', { tuning: standard, preferred: { G: [3, 5, 5, 4, 3, 3] } })).toBe('355433');
   });
 
-  it('is the best-ranked Voicing with none preferred, or one that is no Voicing of the Chord', () => {
+  it('is the best-ranked Voicing when none is preferred, or the preferred one is no Voicing of the Chord', () => {
     expect(drawn('G', context)).toBe('320003');
     expect(drawn('G', { tuning: standard, preferred: { G: [0, 0, 0, 0, 0, 0] } })).toBe('320003');
   });

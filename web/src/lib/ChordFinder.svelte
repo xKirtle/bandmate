@@ -61,10 +61,10 @@
   // name that could be read.
   let name = $state('C');
   let picked = $state<{ root: string; quality: string; bass: string | null }>({ root: 'C', quality: '', bass: null });
-  // The tuning, with the user's preferred Voicings in it: what Look up lists
-  // first, and what Suggest draws.
-  const withPreferred = $derived({ ...context, preferred: preferredVoicings.of(context.tuning) });
-  const found = $derived(lookUp(name, withPreferred));
+  // The Finder's context with the user's preferred Voicings in its tuning:
+  // what Look up lists first, and what Suggest draws.
+  const finderContext = $derived({ ...context, preferred: preferredVoicings.of(context.tuning) });
+  const found = $derived(lookUp(name, finderContext));
 
   /** How many Voicings show at once; the rest are a page away. */
   const pageSize = 8;
@@ -142,7 +142,7 @@
 {#snippet suggestions(list: Suggestion[], label: string)}
   <ul class="voicings suggestions" aria-label={label}>
     {#each list as s (s.numeral + s.chord)}
-      {@const voicing = firstVoicing(s.chord, withPreferred)}
+      {@const voicing = firstVoicing(s.chord, finderContext)}
       <li>
         <p class="suggested-chord">
           <span class="numeral muted">{s.numeral}</span>
@@ -151,16 +151,23 @@
         <p class="reason muted">{s.reason}</p>
         {#if voicing}
           <ChordDiagram {voicing} name={s.chord} />
+          <button
+            type="button"
+            class="button quiet more"
+            aria-label="More Voicings of {s.chord}"
+            title="See every Voicing of {s.chord} in Look up"
+            onclick={() => openInLookUp(s.chord)}>More Voicings</button
+          >
         {:else}
           <p class="no-voicing muted">No Voicing up to the 12th fret</p>
+          <button
+            type="button"
+            class="button quiet more"
+            aria-label="Look up {s.chord}"
+            title="Look up {s.chord}"
+            onclick={() => openInLookUp(s.chord)}>Look up</button
+          >
         {/if}
-        <button
-          type="button"
-          class="button quiet more"
-          aria-label={voicing ? `More Voicings of ${s.chord}` : `Look up ${s.chord}`}
-          title={voicing ? `See every Voicing of ${s.chord} in Look up` : `Look up ${s.chord}`}
-          onclick={() => openInLookUp(s.chord)}>{voicing ? 'More Voicings' : 'Look up'}</button
-        >
       </li>
     {/each}
   </ul>
