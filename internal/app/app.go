@@ -144,7 +144,12 @@ func New(cfg Config) (*App, error) {
 	var copyErr *db.UpgradeCopyError
 	switch {
 	case errors.Is(err, db.ErrNewer):
-		return nil, refusedNewer(err)
+		// Naming a copy only helps, so failing to look still refuses.
+		rollBackTo, lookErr := db.UpgradeCopyToRollBackTo(context.Background(), cfg.DataDir)
+		if lookErr != nil {
+			log.Printf("looking for an upgrade copy to roll back to: %v", lookErr)
+		}
+		return nil, refusedNewer(err, rollBackTo)
 	case errors.As(err, &copyErr):
 		return nil, refusedUpgradeCopy(copyErr)
 	case err != nil:

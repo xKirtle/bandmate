@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"net/http"
@@ -293,6 +294,10 @@ func TestAnUpgradeCopyThatCantBeTakenRefusesTheUpgrade(t *testing.T) {
 	if !strings.Contains(page, "couldn&#39;t copy the database before upgrading it") {
 		t.Errorf("page = %q, want it to say the database couldn't be copied", page)
 	}
+	const guide = `then start it again. See the <a href="https://xkirtle.github.io/bandmate/self-hosting#upgrading-and-rolling-back">upgrade guide</a>.</p>`
+	if !strings.Contains(page, guide) {
+		t.Errorf("page = %q, want its reason to end linking the upgrade guide: %q", page, guide)
+	}
 }
 
 func TestAnUpgradeCopyRollsBack(t *testing.T) {
@@ -326,5 +331,159 @@ func TestAnUpgradeCopyRollsBack(t *testing.T) {
 	}
 	if got := songTitlesIn(t, filepath.Join(older, db.FileName)); !reflect.DeepEqual(got, []string{"Night Drive"}) {
 		t.Errorf("rolled back songs = %v, want Night Drive", got)
+	}
+}
+
+// newerInstall is a data directory a newer Bandmate ran on: its database
+// records a migration this Bandmate doesn't know.
+func newerInstall(t *testing.T) string {
+	t.Helper()
+	dir := dataBefore(t, "")
+	damage(t, dir, `INSERT INTO schema_migrations (name) VALUES ('9999_from_the_future')`)
+	return dir
+}
+
+// putUpgradeCopy copies the database in the data directory from into
+// dataDir as an Upgrade copy called name, taken at the time at.
+func putUpgradeCopy(t *testing.T, dataDir, name, from string, at time.Time) {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(from, db.FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dataDir, "upgrade-copies", name)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(path, at, at); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// refusalPage is the page a refused Bandmate on dataDir serves.
+func refusalPage(t *testing.T, dataDir string) string {
+	t.Helper()
+	res, err := http.Get(startRefused(t, dataDir).URL + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return readBody(t, res)
+}
+
+// newerReason is the paragraph of the refusal page giving the reason a
+// refused newer database gives, with or without an Upgrade copy.
+const newerReason = "<p>The database was changed by a newer Bandmate, which this older one can&#39;t run on. " +
+	`Run the newer Bandmate again, or roll back using the <a href="https://xkirtle.github.io/bandmate/self-hosting#upgrading-and-rolling-back">upgrade guide</a>.</p>`
+
+// upgradeCopyFound is the paragraph of the refusal page naming the Upgrade
+// copy at path.
+func upgradeCopyFound(path string) string {
+	return "<p>An Upgrade copy that can be used with this Bandmate version has been found at <code>" + path + "</code>.</p>"
+}
+
+func TestARefusedNewerDatabaseNamesTheUpgradeCopyThisBandmateCanRun(t *testing.T) {
+	dir := newerInstall(t)
+	putUpgradeCopy(t, dir, "before-0.14.2.db", dataBefore(t, ""), upgradedOn)
+	putUpgradeCopy(t, dir, "before-0.16.0.db", newerInstall(t), upgradedOn.Add(time.Hour))
+
+	page := refusalPage(t, dir)
+
+	if want := newerReason + "\n" + upgradeCopyFound("upgrade-copies/before-0.14.2.db"); !strings.Contains(page, want) {
+		t.Errorf("page = %q, want today's reason, then a paragraph naming upgrade-copies/before-0.14.2.db: %q", page, want)
+	}
+	if strings.Contains(page, "before-0.16.0.db") {
+		t.Errorf("page = %q, want it not to name the copy a newer Bandmate changed", page)
+	}
+}
+
+func TestARefusedNewerDatabaseNamesTheNewestCopyThisBandmateCanRun(t *testing.T) {
+	t.Run("matching its migrations, before newer ones behind them", func(t *testing.T) {
+		dir := newerInstall(t)
+		putUpgradeCopy(t, dir, "before-0.14.1.db", dataBefore(t, ""), upgradedOn)
+		putUpgradeCopy(t, dir, "before-0.14.2.db", dataBefore(t, ""), upgradedOn.Add(time.Hour))
+		putUpgradeCopy(t, dir, "before-0.14.3.db", dataBefore(t, "0040_clip_pitch"), upgradedOn.Add(2*time.Hour))
+
+		if page := refusalPage(t, dir); !strings.Contains(page, upgradeCopyFound("upgrade-copies/before-0.14.2.db")) {
+			t.Errorf("page = %q, want it to name upgrade-copies/before-0.14.2.db", page)
+		}
+	})
+	t.Run("behind its migrations, with none matching them", func(t *testing.T) {
+		dir := newerInstall(t)
+		putUpgradeCopy(t, dir, "before-0.13.0.db", dataBefore(t, "0039_clip_tempo"), upgradedOn)
+		putUpgradeCopy(t, dir, "before-0.14.0.db", dataBefore(t, "0040_clip_pitch"), upgradedOn.Add(time.Hour))
+		putUpgradeCopy(t, dir, "before-0.16.0.db", newerInstall(t), upgradedOn.Add(2*time.Hour))
+
+		if page := refusalPage(t, dir); !strings.Contains(page, upgradeCopyFound("upgrade-copies/before-0.14.0.db")) {
+			t.Errorf("page = %q, want it to name upgrade-copies/before-0.14.0.db", page)
+		}
+	})
+}
+
+func TestARefusedNewerDatabaseNamesACopyNamedByDate(t *testing.T) {
+	dir := newerInstall(t)
+	putUpgradeCopy(t, dir, "before-0.14.2.db", newerInstall(t), upgradedOn)
+	putUpgradeCopy(t, dir, "before-2026-10-10.db", dataBefore(t, ""), upgradedOn.Add(-time.Hour))
+
+	if page := refusalPage(t, dir); !strings.Contains(page, upgradeCopyFound("upgrade-copies/before-2026-10-10.db")) {
+		t.Errorf("page = %q, want it to name upgrade-copies/before-2026-10-10.db", page)
+	}
+}
+
+func TestARefusedNewerDatabaseOnlyReadsTheUpgradeCopies(t *testing.T) {
+	dir := newerInstall(t)
+	putUpgradeCopy(t, dir, "before-0.14.2.db", dataBefore(t, ""), upgradedOn)
+	putUpgradeCopy(t, dir, "before-0.16.0.db", newerInstall(t), upgradedOn.Add(time.Hour))
+	before := map[string][]byte{}
+	for _, name := range upgradeCopies(t, dir) {
+		data, err := os.ReadFile(filepath.Join(dir, "upgrade-copies", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		before[name] = data
+	}
+
+	refusalPage(t, dir)
+
+	if got, want := upgradeCopies(t, dir), []string{"before-0.14.2.db", "before-0.16.0.db"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("upgrade copies folder = %v, want only %v, with no -wal or -shm beside them", got, want)
+	}
+	for name, data := range before {
+		after, err := os.ReadFile(filepath.Join(dir, "upgrade-copies", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(after, data) {
+			t.Errorf("%s changed, want it only read", name)
+		}
+	}
+}
+
+func TestARefusedNewerDatabaseWithNoCopyItCanRunSaysWhatItDid(t *testing.T) {
+	for name, put := range map[string]func(dir string){
+		"no folder": func(string) {},
+		"only newer or unreadable copies": func(dir string) {
+			putUpgradeCopy(t, dir, "before-0.16.0.db", newerInstall(t), upgradedOn)
+			notADatabase := t.TempDir()
+			if err := os.WriteFile(filepath.Join(notADatabase, db.FileName), []byte("not a database"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			putUpgradeCopy(t, dir, "before-0.16.1.db", notADatabase, upgradedOn.Add(time.Hour))
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := newerInstall(t)
+			put(dir)
+
+			page := refusalPage(t, dir)
+			if !strings.Contains(page, newerReason) {
+				t.Errorf("page = %q, want today's reason, %q", page, newerReason)
+			}
+			if strings.Contains(page, "Upgrade copy") {
+				t.Errorf("page = %q, want it to name no Upgrade copy", page)
+			}
+		})
 	}
 }

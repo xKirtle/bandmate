@@ -78,7 +78,9 @@ func TestADatabaseAnOlderBandmateMigratedStillStarts(t *testing.T) {
 }
 
 func TestARefusedBandmateAnswersEveryPageWithTheReason(t *testing.T) {
-	srv := refusedServer(t, &app.Refused{Reason: "The database was changed by a newer Bandmate."})
+	srv := refusedServer(t, &app.Refused{Reason: "The database was changed by a newer Bandmate. Roll back using the"})
+	const want = `<p>The database was changed by a newer Bandmate. Roll back using the ` +
+		`<a href="https://xkirtle.github.io/bandmate/self-hosting#upgrading-and-rolling-back">upgrade guide</a>.</p>`
 
 	for _, path := range []string{"/", "/songs/4", "/api/songs", "/assets/app.js"} {
 		res, err := http.Get(srv.URL + path)
@@ -92,11 +94,11 @@ func TestARefusedBandmateAnswersEveryPageWithTheReason(t *testing.T) {
 		if got := res.Header.Get("Content-Type"); got != "text/html; charset=utf-8" {
 			t.Errorf("%s: content type = %q, want an HTML page", path, got)
 		}
-		if !strings.Contains(page, "The database was changed by a newer Bandmate.") {
-			t.Errorf("%s: page = %q, want the reason", path, page)
+		if !strings.Contains(page, want) {
+			t.Errorf("%s: page = %q, want the reason, linking the upgrade guide: %q", path, page, want)
 		}
-		if !strings.Contains(page, `href="https://xkirtle.github.io/bandmate/self-hosting#upgrading-and-rolling-back"`) {
-			t.Errorf("%s: page = %q, want a link to the upgrade guide", path, page)
+		if n := strings.Count(page, "<a "); n != 1 {
+			t.Errorf("%s: page has %d links, want only the reason's", path, n)
 		}
 	}
 }
@@ -114,7 +116,7 @@ func TestARefusedBandmateEscapesItsReason(t *testing.T) {
 }
 
 func TestARefusedBandmateIsUnhealthy(t *testing.T) {
-	srv := refusedServer(t, &app.Refused{Reason: "The database was changed by a newer Bandmate."})
+	srv := refusedServer(t, &app.Refused{Reason: "The database was changed by a newer Bandmate. Roll back using the"})
 
 	res, err := http.Get(srv.URL + "/api/health")
 	if err != nil {
