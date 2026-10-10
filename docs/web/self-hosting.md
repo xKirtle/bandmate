@@ -103,7 +103,7 @@ Distributions' packages of yt-dlp can fall behind the sites it downloads from. I
 
 ### Health check
 
-The Compose file checks Bandmate is healthy with `bandmate healthcheck`. For your own monitoring, `GET /api/health` returns `200 {"status":"ok"}` while Bandmate can reach its database.
+The Compose file checks Bandmate is healthy with `bandmate healthcheck`. For your own monitoring, `GET /api/health` returns `200 {"status":"ok"}` while Bandmate can reach its database, and `503` while it can't, or while it refuses to start, e.g. on a database a newer Bandmate changed.
 
 ## Configuration
 
