@@ -302,58 +302,42 @@ func UpgradeCopyToRollBackTo(ctx context.Context, dataDir string) (string, error
 	if err != nil {
 		return "", err
 	}
-	isKnown := make(map[string]bool, len(known))
-	for _, name := range known {
-		isKnown[name] = true
-	}
 	behind := ""
 	for _, name := range copies {
-		applied, err := migrationsIn(ctx, filepath.Join(dir, name))
-		if err != nil {
-			// A copy that can't be read can't be run either.
+		path := upgradeCopies + "/" + name
+		applied, err := runnableMigrations(ctx, filepath.Join(dir, name))
+		if err != nil || applied == 0 {
+			// A copy that can't be read, or that a newer Bandmate changed,
+			// can't be run.
 			continue
 		}
-		runnable := len(applied) > 0
-		for _, m := range applied {
-			runnable = runnable && isKnown[m]
+		if applied == len(known) {
+			return path, nil
 		}
-		switch {
-		case !runnable:
-		case len(applied) == len(known):
-			return upgradeCopies + "/" + name, nil
-		case behind == "":
-			behind = upgradeCopies + "/" + name
+		if behind == "" {
+			behind = path
 		}
 	}
 	return behind, nil
 }
 
-// migrationsIn names the migrations the database file at path records,
-// reading it only.
-func migrationsIn(ctx context.Context, path string) ([]string, error) {
+// runnableMigrations counts the migrations applied to the database file at
+// path, reading it only. It fails with ErrNewer if one is a migration this
+// Bandmate doesn't know.
+func runnableMigrations(ctx context.Context, path string) (int, error) {
 	uri, err := readOnlyURI(path)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	conn, err := sql.Open("sqlite", uri)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	defer conn.Close()
-	rows, err := conn.QueryContext(ctx, `SELECT name FROM schema_migrations`)
-	if err != nil {
-		return nil, err
+	if err := refuseNewer(ctx, conn); err != nil {
+		return 0, err
 	}
-	defer rows.Close()
-	var names []string
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
-			return nil, err
-		}
-		names = append(names, name)
-	}
-	return names, rows.Err()
+	return appliedMigrations(ctx, conn)
 }
 
 // readOnlyURI is the URI that opens the database file at path read-only

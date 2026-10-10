@@ -339,8 +339,8 @@ func newerInstall(t *testing.T) string {
 	return dir
 }
 
-// putUpgradeCopy puts the database of the data directory from in dataDir's
-// Upgrade copies, named name and taken at.
+// putUpgradeCopy copies the database in the data directory from into
+// dataDir as an Upgrade copy called name, taken at the time at.
 func putUpgradeCopy(t *testing.T, dataDir, name, from string, at time.Time) {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(from, db.FileName))
