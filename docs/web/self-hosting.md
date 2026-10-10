@@ -166,6 +166,16 @@ Bandmate updates its database by itself when it starts. Before it does, it takes
 
 When Bandmate doesn't know which version it's upgrading from, the copy is named by the date instead, e.g. `before-2026-10-10.db`. That happens on the first upgrade to a Bandmate that takes Upgrade copies, since older ones didn't record their version, and after running a development build (`:edge` or `:sha-<short>`), which isn't a version you could pull. If that name is taken, e.g. after upgrading from the same version twice, the date and time are added, e.g. `before-0.14.2-2026-10-10-153012.db`, and a date-named copy gets the time, e.g. `before-2026-10-10-153012.db`, so no copy is ever replaced.
 
+Bandmate's log says what an upgrade did, before the line saying it's listening: where it put the Upgrade copy, each older one it deleted, and the database changes it applied, e.g.
+
+```
+copied the database to /data/upgrade-copies/before-0.14.2.db before upgrading it
+deleted the older upgrade copy before-0.12.0.db, to keep the newest 3
+upgraded the database: applied 0041_bandmate_version
+```
+
+A start that doesn't change the database adds nothing to the log, and a new install logs only that it set up a new database. To read the log, run `docker compose logs bandmate`.
+
 An Upgrade copy holds the database alone: Songs, Beats and everything else Bandmate keeps, but not the audio, Covers or Backup files, which stay in the data folder as they are. To copy everything, [copy the data folder](#copying-the-data-folder).
 
 **To roll back**, stop Bandmate, put the Upgrade copy in place of the database, and run the version it's named after. Everything done since that upgrade is lost, including audio and Covers deleted since. For example, back to 0.14.2:
