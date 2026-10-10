@@ -89,6 +89,8 @@ npm install
 npm run dev     # http://localhost:5173/bandmate/
 ```
 
+Write it for the person using or running Bandmate: what they can do, what they'll see, and what to do when something goes wrong. Leave out how it works inside (edge cases in how things are named, the order things happen in, file and table names they never touch, why the code does what it does) unless they need it to act. Test each sentence: would a reader do or decide anything differently without it? If not, cut it; the code, the glossary and the ADRs hold the rest. E.g. the upgrade guide says where the Upgrade copy is and how to roll back with it, not how a name that's already taken is changed.
+
 A pull request that touches it builds it, which fails on a dead link. A release tag deploys it to GitHub Pages ([docs.yml](.github/workflows/docs.yml)), so it describes the latest release rather than `main`.
 
 ### Screenshots
