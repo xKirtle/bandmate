@@ -153,13 +153,16 @@
         <p class="reason muted">{s.reason}</p>
         {#if voicing}
           <ChordDiagram {voicing} name={s.chord} />
-          <button
-            type="button"
-            class="button quiet more"
-            aria-label="More Voicings of {s.chord}"
-            title="See every Voicing of {s.chord} in Look up"
-            onclick={() => openInLookUp(s.chord)}>More Voicings</button
-          >
+          <div class="voicing-actions">
+            <HearButton chord={s.chord} plucks={plucks(voicing.frets, finderContext)} />
+            <button
+              type="button"
+              class="button quiet more"
+              aria-label="More Voicings of {s.chord}"
+              title="See every Voicing of {s.chord} in Look up"
+              onclick={() => openInLookUp(s.chord)}>More Voicings</button
+            >
+          </div>
         {:else}
           <p class="no-voicing muted">No Voicing up to the 12th fret</p>
           <button
@@ -511,7 +514,7 @@
     color: var(--text);
     font-weight: 600;
   }
-  /* Hear and Prefer, side by side under the diagram, or one over the other on the narrowest phones. */
+  /* Hear beside Prefer, or beside More Voicings in Suggest, under the diagram; one over the other on the narrowest phones. */
   .voicing-actions {
     display: flex;
     flex-wrap: wrap;

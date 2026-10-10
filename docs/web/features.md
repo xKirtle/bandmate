@@ -35,7 +35,7 @@ The **Chords** page, in the side bar, helps with chords away from any song, on g
 
 - **Look up** a chord by name, like Cmaj7 or D/F#, and see the ways to play it, best first. Press the speaker to hear one strummed, in the tuning you picked. Prefer one, and that's the shape Read mode shows you.
 - **Name it**: put your fingers on the fretboard, and Bandmate tells you which chord you're playing.
-- **Suggest**: pick a key, and see the chords that belong in it, the ones borrowed from other keys, and what usually comes after a chord. Each one shows a way to play it: the one you prefer, or else the best. **More Voicings** opens it in Look up, with the other ways.
+- **Suggest**: pick a key, and see the chords that belong in it, the ones borrowed from other keys, and what usually comes after a chord. Each one shows a way to play it: the one you prefer, or else the best. Press the speaker to hear it strummed. **More Voicings** opens it in Look up, with the other ways.
 - Left-handed? One switch flips every diagram.
 
 ## Listen
