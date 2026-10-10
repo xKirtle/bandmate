@@ -90,13 +90,9 @@ func refuseNewer(ctx context.Context, conn *sql.DB) error {
 	if ok, err := hasTable(ctx, conn, "schema_migrations"); err != nil || !ok {
 		return err
 	}
-	known, err := fs.Glob(migrations, "migrations/*.sql")
+	names, err := knownMigrations()
 	if err != nil {
 		return err
-	}
-	names := make([]string, len(known))
-	for i, path := range known {
-		names[i] = strings.TrimSuffix(filepath.Base(path), ".sql")
 	}
 	list, err := json.Marshal(names)
 	if err != nil {
@@ -111,6 +107,20 @@ func refuseNewer(ctx context.Context, conn *sql.DB) error {
 		return ErrNewer
 	}
 	return nil
+}
+
+// knownMigrations names the migrations this Bandmate knows, in the order
+// they're applied.
+func knownMigrations() ([]string, error) {
+	paths, err := fs.Glob(migrations, "migrations/*.sql")
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, len(paths))
+	for i, path := range paths {
+		names[i] = strings.TrimSuffix(filepath.Base(path), ".sql")
+	}
+	return names, nil
 }
 
 // migrate applies every embedded migration not yet recorded in

@@ -137,8 +137,16 @@ func TestUpgradingLeavesACopyOfTheDatabaseAsItWasBeforeMigrating(t *testing.T) {
 	if got := songTitlesIn(t, copied); !reflect.DeepEqual(got, []string{"Night Drive"}) {
 		t.Errorf("copy's songs = %v, want Night Drive", got)
 	}
-	if got := schemaOf(t, filepath.Join(dir, db.FileName)); got != "0040_clip_pitch" {
-		t.Errorf("database's schema = %s, want it migrated to 0040_clip_pitch", got)
+	ts := startTestServer(t, dir)
+	res := ts.Do(http.MethodGet, "/api/about", nil)
+	expectStatus(t, res, http.StatusOK)
+	var a about
+	res.JSON(t, &a)
+	if want := latestMigration(t); a.Schema.Migration != want {
+		t.Errorf("database's schema = %s, want it migrated to %s", a.Schema.Migration, want)
+	}
+	if got := ts.listSongs(); len(got) != 1 || got[0].Title != "Night Drive" {
+		t.Errorf("songs = %+v, want Night Drive, upgraded", got)
 	}
 }
 
@@ -206,6 +214,20 @@ func TestAnUpgradeCopyWhoseNameIsTakenAddsTheTime(t *testing.T) {
 		upgradeTo(t, dir, "v0.15.0")
 
 		want := []string{"before-0.14.2-2026-10-10-143005.db", "before-0.14.2.db", "before-2026-10-10.db"}
+		if got := upgradeCopies(t, dir); !reflect.DeepEqual(got, want) {
+			t.Errorf("upgrade copies = %v, want %v", got, want)
+		}
+	})
+	t.Run("with the time too", func(t *testing.T) {
+		dir := olderInstall(t, "0040_clip_pitch")
+		upgradeTo(t, dir, "dev")
+		laterReleaseBrings0040(t, dir)
+		upgradeTo(t, dir, "dev")
+		laterReleaseBrings0040(t, dir)
+
+		upgradeTo(t, dir, "dev")
+
+		want := []string{"before-2026-10-10-143005-2.db", "before-2026-10-10-143005.db", "before-2026-10-10.db"}
 		if got := upgradeCopies(t, dir); !reflect.DeepEqual(got, want) {
 			t.Errorf("upgrade copies = %v, want %v", got, want)
 		}

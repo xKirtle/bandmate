@@ -15,13 +15,13 @@ import (
 	"time"
 )
 
-// UpgradeCopies is the folder of the data directory that holds the Upgrade
+// upgradeCopies is the folder of the data directory that holds the Upgrade
 // copies: each a copy of the database as it was before a newer Bandmate
 // migrated it, to roll back to.
-const UpgradeCopies = "upgrade-copies"
+const upgradeCopies = "upgrade-copies"
 
-// UpgradeCopiesKept is how many Upgrade copies are kept, the newest.
-const UpgradeCopiesKept = 3
+// upgradeCopiesKept is how many Upgrade copies are kept, the newest.
+const upgradeCopiesKept = 3
 
 // UpgradeCopyError means the Upgrade copy couldn't be taken, so nothing
 // was migrated.
@@ -38,8 +38,8 @@ func (e *UpgradeCopyError) Unwrap() error { return e.Err }
 // on, as it starts. It's OpenNoNewer, taking an Upgrade copy before
 // migrating a database that already has migrations applied, and recording
 // running as the Bandmate that last ran on the database. If the copy can't
-// be taken it migrates nothing and fails with an *UpgradeCopyError. The copy is
-// named after the release the database last ran on, or, if none is
+// be taken it migrates nothing and fails with an *UpgradeCopyError. The
+// copy is named after the release the database last ran on, or, if none is
 // recorded, after now.
 func OpenToRun(ctx context.Context, dataDir, running string, now time.Time) (*sql.DB, error) {
 	conn, err := open(dataDir)
@@ -62,7 +62,7 @@ func openToRun(ctx context.Context, conn *sql.DB, dataDir, running string, now t
 		return err
 	}
 	if upgrading {
-		if err := takeUpgradeCopy(ctx, conn, filepath.Join(dataDir, UpgradeCopies), now); err != nil {
+		if err := takeUpgradeCopy(ctx, conn, filepath.Join(dataDir, upgradeCopies), now); err != nil {
 			return &UpgradeCopyError{Err: err}
 		}
 	}
@@ -83,7 +83,7 @@ func upgrading(ctx context.Context, conn *sql.DB) (bool, error) {
 	if err := conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM schema_migrations`).Scan(&applied); err != nil {
 		return false, fmt.Errorf("reading the schema: %w", err)
 	}
-	known, err := fs.Glob(migrations, "migrations/*.sql")
+	known, err := knownMigrations()
 	if err != nil {
 		return false, err
 	}
@@ -104,12 +104,6 @@ func hasTable(ctx context.Context, conn *sql.DB, name string) (bool, error) {
 // recordVersion records version as the Bandmate that last ran on the
 // database, which names the next Upgrade copy.
 func recordVersion(ctx context.Context, conn *sql.DB, version string) error {
-	if _, err := conn.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS bandmate_version (
-		id INTEGER PRIMARY KEY CHECK (id = 1),
-		version TEXT NOT NULL
-	)`); err != nil {
-		return fmt.Errorf("recording the version: %w", err)
-	}
 	if _, err := conn.ExecContext(ctx, `INSERT INTO bandmate_version (id, version) VALUES (1, ?)
 		ON CONFLICT (id) DO UPDATE SET version = excluded.version`, version); err != nil {
 		return fmt.Errorf("recording the version: %w", err)
@@ -118,7 +112,8 @@ func recordVersion(ctx context.Context, conn *sql.DB, version string) error {
 }
 
 // recordedVersion is the Bandmate that last ran on the database, or empty
-// if none is recorded.
+// if none is recorded, as a Bandmate from before 0041_bandmate_version
+// records none.
 func recordedVersion(ctx context.Context, conn *sql.DB) (string, error) {
 	if ok, err := hasTable(ctx, conn, "bandmate_version"); err != nil || !ok {
 		return "", err
@@ -139,7 +134,7 @@ func recordedVersion(ctx context.Context, conn *sql.DB) (string, error) {
 var release = regexp.MustCompile(`^v(\d+\.\d+\.\d+)$`)
 
 // takeUpgradeCopy copies the database, as it is, into dir, then deletes all
-// but the newest UpgradeCopiesKept copies there.
+// but the newest upgradeCopiesKept copies there.
 func takeUpgradeCopy(ctx context.Context, conn *sql.DB, dir string, now time.Time) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
@@ -148,16 +143,8 @@ func takeUpgradeCopy(ctx context.Context, conn *sql.DB, dir string, now time.Tim
 	if err != nil {
 		return err
 	}
-	// A date names a copy of a database no release is recorded as running
-	// on, and the time is added when that name is taken.
-	name, again := "before-"+now.Format("2006-01-02"), now.Format("-150405")
-	if m := release.FindStringSubmatch(from); m != nil {
-		name, again = "before-"+m[1], now.Format("-2006-01-02-150405")
-	}
-	path := filepath.Join(dir, name+".db")
-	if _, err := os.Stat(path); err == nil {
-		path = filepath.Join(dir, name+again+".db")
-	} else if !errors.Is(err, fs.ErrNotExist) {
+	path, err := upgradeCopyPath(dir, from, now)
+	if err != nil {
 		return err
 	}
 	// VACUUM INTO reads through the connection, the WAL included, so the
@@ -181,7 +168,34 @@ func takeUpgradeCopy(ctx context.Context, conn *sql.DB, dir string, now time.Tim
 	return nil
 }
 
-// pruneUpgradeCopies deletes all but the newest UpgradeCopiesKept Upgrade
+// upgradeCopyPath is where in dir the Upgrade copy of a database the
+// Bandmate from last ran on goes: named after that release, or after now's
+// date if from isn't one. Should the name be taken, now's time is added
+// (and the date, to a release's name), then a number, so no earlier copy is
+// replaced.
+func upgradeCopyPath(dir, from string, now time.Time) (string, error) {
+	name, timed := "before-"+now.Format("2006-01-02"), now.Format("-150405")
+	if m := release.FindStringSubmatch(from); m != nil {
+		name, timed = "before-"+m[1], now.Format("-2006-01-02-150405")
+	}
+	candidates := []string{name, name + timed}
+	for n := 2; n < 100; n++ {
+		candidates = append(candidates, fmt.Sprintf("%s%s-%d", name, timed, n))
+	}
+	for _, c := range candidates {
+		path := filepath.Join(dir, c+".db")
+		_, err := os.Stat(path)
+		if errors.Is(err, fs.ErrNotExist) {
+			return path, nil
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+	return "", fmt.Errorf("every name for the copy is taken, up to %s", candidates[len(candidates)-1])
+}
+
+// pruneUpgradeCopies deletes all but the newest upgradeCopiesKept Upgrade
 // copies in dir, newest by when they were taken.
 func pruneUpgradeCopies(dir string) error {
 	entries, err := os.ReadDir(dir)
@@ -209,7 +223,7 @@ func pruneUpgradeCopies(dir string) error {
 		}
 		return copies[i].name > copies[j].name
 	})
-	for _, c := range copies[min(len(copies), UpgradeCopiesKept):] {
+	for _, c := range copies[min(len(copies), upgradeCopiesKept):] {
 		if err := os.Remove(filepath.Join(dir, c.name)); err != nil {
 			return err
 		}
