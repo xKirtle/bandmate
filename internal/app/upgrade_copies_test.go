@@ -369,6 +369,17 @@ func refusalPage(t *testing.T, dataDir string) string {
 	return readBody(t, res)
 }
 
+// newerReason is the paragraph of the refusal page giving the reason a
+// refused newer database gives, with or without an Upgrade copy.
+const newerReason = "<p>The database was changed by a newer Bandmate, which this older one can&#39;t run on. " +
+	"Run the newer Bandmate again, or roll back as the upgrade guide says.</p>"
+
+// upgradeCopyFound is the paragraph of the refusal page naming the Upgrade
+// copy at path.
+func upgradeCopyFound(path string) string {
+	return "<p>An Upgrade copy that can be used with this Bandmate version has been found at <code>" + path + "</code>.</p>"
+}
+
 func TestARefusedNewerDatabaseNamesTheUpgradeCopyThisBandmateCanRun(t *testing.T) {
 	dir := newerInstall(t)
 	putUpgradeCopy(t, dir, "before-0.14.2.db", dataBefore(t, ""), upgradedOn)
@@ -376,8 +387,8 @@ func TestARefusedNewerDatabaseNamesTheUpgradeCopyThisBandmateCanRun(t *testing.T
 
 	page := refusalPage(t, dir)
 
-	if !strings.Contains(page, "upgrade-copies/before-0.14.2.db") {
-		t.Errorf("page = %q, want it to name upgrade-copies/before-0.14.2.db", page)
+	if want := newerReason + "\n" + upgradeCopyFound("upgrade-copies/before-0.14.2.db"); !strings.Contains(page, want) {
+		t.Errorf("page = %q, want today's reason, then a paragraph naming upgrade-copies/before-0.14.2.db: %q", page, want)
 	}
 	if strings.Contains(page, "before-0.16.0.db") {
 		t.Errorf("page = %q, want it not to name the copy a newer Bandmate changed", page)
@@ -391,7 +402,7 @@ func TestARefusedNewerDatabaseNamesTheNewestCopyThisBandmateCanRun(t *testing.T)
 		putUpgradeCopy(t, dir, "before-0.14.2.db", dataBefore(t, ""), upgradedOn.Add(time.Hour))
 		putUpgradeCopy(t, dir, "before-0.14.3.db", dataBefore(t, "0040_clip_pitch"), upgradedOn.Add(2*time.Hour))
 
-		if page := refusalPage(t, dir); !strings.Contains(page, "upgrade-copies/before-0.14.2.db.") {
+		if page := refusalPage(t, dir); !strings.Contains(page, upgradeCopyFound("upgrade-copies/before-0.14.2.db")) {
 			t.Errorf("page = %q, want it to name upgrade-copies/before-0.14.2.db", page)
 		}
 	})
@@ -401,7 +412,7 @@ func TestARefusedNewerDatabaseNamesTheNewestCopyThisBandmateCanRun(t *testing.T)
 		putUpgradeCopy(t, dir, "before-0.14.0.db", dataBefore(t, "0040_clip_pitch"), upgradedOn.Add(time.Hour))
 		putUpgradeCopy(t, dir, "before-0.16.0.db", newerInstall(t), upgradedOn.Add(2*time.Hour))
 
-		if page := refusalPage(t, dir); !strings.Contains(page, "upgrade-copies/before-0.14.0.db.") {
+		if page := refusalPage(t, dir); !strings.Contains(page, upgradeCopyFound("upgrade-copies/before-0.14.0.db")) {
 			t.Errorf("page = %q, want it to name upgrade-copies/before-0.14.0.db", page)
 		}
 	})
@@ -412,7 +423,7 @@ func TestARefusedNewerDatabaseNamesACopyNamedByDate(t *testing.T) {
 	putUpgradeCopy(t, dir, "before-0.14.2.db", newerInstall(t), upgradedOn)
 	putUpgradeCopy(t, dir, "before-2026-10-10.db", dataBefore(t, ""), upgradedOn.Add(-time.Hour))
 
-	if page := refusalPage(t, dir); !strings.Contains(page, "upgrade-copies/before-2026-10-10.db.") {
+	if page := refusalPage(t, dir); !strings.Contains(page, upgradeCopyFound("upgrade-copies/before-2026-10-10.db")) {
 		t.Errorf("page = %q, want it to name upgrade-copies/before-2026-10-10.db", page)
 	}
 }
@@ -447,8 +458,6 @@ func TestARefusedNewerDatabaseOnlyReadsTheUpgradeCopies(t *testing.T) {
 }
 
 func TestARefusedNewerDatabaseWithNoCopyItCanRunSaysWhatItDid(t *testing.T) {
-	const reason = "The database was changed by a newer Bandmate, which this older one can&#39;t run on. " +
-		"Run the newer Bandmate again, or roll back as the upgrade guide says.</p>"
 	for name, put := range map[string]func(dir string){
 		"no folder": func(string) {},
 		"only newer or unreadable copies": func(dir string) {
@@ -464,8 +473,12 @@ func TestARefusedNewerDatabaseWithNoCopyItCanRunSaysWhatItDid(t *testing.T) {
 			dir := newerInstall(t)
 			put(dir)
 
-			if page := refusalPage(t, dir); !strings.Contains(page, "<p>"+reason) {
-				t.Errorf("page = %q, want only today's reason, %q", page, reason)
+			page := refusalPage(t, dir)
+			if !strings.Contains(page, newerReason) {
+				t.Errorf("page = %q, want today's reason, %q", page, newerReason)
+			}
+			if strings.Contains(page, "Upgrade copy") {
+				t.Errorf("page = %q, want it to name no Upgrade copy", page)
 			}
 		})
 	}

@@ -76,7 +76,11 @@ func run(addr, dataDir string, maxUploadBytes int64, updateCheckOff, addFromLink
 	var handler http.Handler
 	switch {
 	case errors.As(err, &refused):
-		log.Printf("bandmate %s can't start (see %s): %s", describe(running), app.UpgradeGuide, refused.Reason)
+		why := refused.Reason
+		if found := refused.UpgradeCopyFound(); found != "" {
+			why += " " + found
+		}
+		log.Printf("bandmate %s can't start (see %s): %s", describe(running), app.UpgradeGuide, why)
 		handler = app.RefusalHandler(refused)
 	case err != nil:
 		return err

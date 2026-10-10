@@ -19,6 +19,9 @@ const UpgradeGuide = "https://xkirtle.github.io/bandmate/self-hosting#upgrading-
 type Refused struct {
 	// Reason says what's wrong, in a sentence or two for a self-hoster.
 	Reason string
+	// UpgradeCopy is the Upgrade copy this Bandmate can run, to roll back
+	// to, as a path within the data directory, if there is one.
+	UpgradeCopy string
 	// Err is what caused it, if anything did.
 	Err error
 }
@@ -27,15 +30,28 @@ func (r *Refused) Error() string { return r.Reason }
 
 func (r *Refused) Unwrap() error { return r.Err }
 
-// refusedNewer is the refusal of a database a newer Bandmate migrated. It
-// names rollBackTo, the Upgrade copy this Bandmate can run, if there is one.
-func refusedNewer(err error, rollBackTo string) *Refused {
-	reason := "The database was changed by a newer Bandmate, which this older one can't run on. " +
-		"Run the newer Bandmate again, or roll back as the upgrade guide says."
-	if rollBackTo != "" {
-		reason += " An Upgrade copy this Bandmate can run is in the data folder: " + rollBackTo + "."
+// upgradeCopyFound starts the sentence naming a refusal's Upgrade copy,
+// which ends with its path.
+const upgradeCopyFound = "An Upgrade copy that can be used with this Bandmate version has been found at "
+
+// UpgradeCopyFound is the sentence naming the Upgrade copy this Bandmate
+// can run, for the log, or "" if there's none.
+func (r *Refused) UpgradeCopyFound() string {
+	if r.UpgradeCopy == "" {
+		return ""
 	}
-	return &Refused{Reason: reason, Err: err}
+	return upgradeCopyFound + r.UpgradeCopy + "."
+}
+
+// refusedNewer is the refusal of a database a newer Bandmate migrated. It
+// names upgradeCopy, the Upgrade copy this Bandmate can run, if there is one.
+func refusedNewer(err error, upgradeCopy string) *Refused {
+	return &Refused{
+		Reason: "The database was changed by a newer Bandmate, which this older one can't run on. " +
+			"Run the newer Bandmate again, or roll back as the upgrade guide says.",
+		UpgradeCopy: upgradeCopy,
+		Err:         err,
+	}
 }
 
 // refusedUpgradeCopy is the refusal of a database whose Upgrade copy
@@ -51,8 +67,9 @@ func refusedUpgradeCopy(err *db.UpgradeCopyError) *Refused {
 }
 
 // RefusalHandler serves a refused Bandmate: one page, the same for every
-// path, saying why and linking the upgrade guide, and an unhealthy health
-// check. It serves no app and no API.
+// path, saying why, naming the Upgrade copy to roll back to if there is
+// one, and linking the upgrade guide, and an unhealthy health check. It
+// serves no app and no API.
 func RefusalHandler(r *Refused) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if req.URL.Path == "/api/health" {
@@ -62,7 +79,8 @@ func RefusalHandler(r *Refused) http.Handler {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
 		w.WriteHeader(http.StatusServiceUnavailable)
-		if err := refusalPage.Execute(w, struct{ Reason, Guide string }{r.Reason, UpgradeGuide}); err != nil {
+		page := struct{ Reason, UpgradeCopy, Found, Guide string }{r.Reason, r.UpgradeCopy, upgradeCopyFound, UpgradeGuide}
+		if err := refusalPage.Execute(w, page); err != nil {
 			log.Printf("writing the refusal page: %v", err)
 		}
 	})
@@ -81,12 +99,14 @@ var refusalPage = template.Must(template.New("refusal").Parse(`<!doctype html>
 <style>
 body { font-family: system-ui, sans-serif; font-size: 1rem; line-height: 1.5; max-width: 40rem; margin: 0 auto; padding: 2rem 1rem; }
 h1 { font-size: 1.5rem; }
+code { overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
 <h1>Bandmate can't start</h1>
 <p>{{.Reason}}</p>
-<p><a href="{{.Guide}}">Upgrading and rolling back</a>, in the self-hosting guide</p>
+{{with .UpgradeCopy}}<p>{{$.Found}}<code>{{.}}</code>.</p>
+{{end}}<p><a href="{{.Guide}}">Upgrading and rolling back</a>, in the self-hosting guide</p>
 </body>
 </html>
 `))
