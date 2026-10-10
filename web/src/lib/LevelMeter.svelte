@@ -159,6 +159,20 @@
 
 <div class="level-meter">
   <div class="level" class:idle={onDemand && !testing} class:on-demand={onDemand}>
+    {#if onDemand}
+      <!-- First, in the accent while idle to be seen, plain while it meters.
+           As wide either way, both labels in one cell, so the row never shifts. -->
+      <button
+        type="button"
+        class="button test"
+        class:primary={!testing}
+        disabled={paused}
+        onclick={() => {
+          if (testing) stop();
+          else meter();
+        }}><span class:shown={!testing}>Test input</span><span class:shown={testing}>Stop</span></button
+      >
+    {/if}
     <span id="{id}-level">Level</span>
     <div
       class="meter"
@@ -175,18 +189,6 @@
     <span class="clip" class:on={clipping} aria-hidden={!clipping} title="The input clipped: turn its gain down"
       >Clip</span
     >
-    {#if onDemand}
-      <!-- As wide either way, both labels in one cell, so the row never shifts. -->
-      <button
-        type="button"
-        class="button test"
-        disabled={paused}
-        onclick={() => {
-          if (testing) stop();
-          else meter();
-        }}><span class:shown={!testing}>Test input</span><span class:shown={testing}>Stop</span></button
-      >
-    {/if}
   </div>
   {#if opening}
     <p class="muted" role="status">Opening the input…</p>
@@ -214,9 +216,9 @@
     gap: var(--space-2);
   }
   .level.on-demand {
-    grid-template-columns: auto 1fr auto auto;
+    grid-template-columns: auto auto 1fr auto;
   }
-  .level > span:first-child {
+  .level > span:first-of-type {
     color: var(--text-muted);
     font-size: var(--text-md);
   }
