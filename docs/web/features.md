@@ -29,6 +29,8 @@ And this is Read mode, here on a phone: the chords over the words, and how to pl
 
 <img class="phone" src="@screenshots/phone-lyric-sheet.png" alt="A song in Read mode on a phone, with the chord shapes at the top">
 
+Hover or tap a chord, or tap its shape at the top, to step through the other ways to play it, and prefer one. Press the speaker to hear the shape strummed, in the song's tuning. It plays the shape as you'd finger it, so the capo doesn't change it, and it plays over the song if that's playing.
+
 ## Chords
 
 The **Chords** page, in the side bar, helps with chords away from any song, on guitar, in standard tuning or any other.
