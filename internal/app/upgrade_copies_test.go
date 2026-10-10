@@ -294,6 +294,10 @@ func TestAnUpgradeCopyThatCantBeTakenRefusesTheUpgrade(t *testing.T) {
 	if !strings.Contains(page, "couldn&#39;t copy the database before upgrading it") {
 		t.Errorf("page = %q, want it to say the database couldn't be copied", page)
 	}
+	const guide = `then start it again. See the <a href="https://xkirtle.github.io/bandmate/self-hosting#upgrading-and-rolling-back">upgrade guide</a>.</p>`
+	if !strings.Contains(page, guide) {
+		t.Errorf("page = %q, want its reason to end linking the upgrade guide: %q", page, guide)
+	}
 }
 
 func TestAnUpgradeCopyRollsBack(t *testing.T) {
@@ -372,7 +376,7 @@ func refusalPage(t *testing.T, dataDir string) string {
 // newerReason is the paragraph of the refusal page giving the reason a
 // refused newer database gives, with or without an Upgrade copy.
 const newerReason = "<p>The database was changed by a newer Bandmate, which this older one can&#39;t run on. " +
-	"Run the newer Bandmate again, or roll back as the upgrade guide says.</p>"
+	`Run the newer Bandmate again, or roll back using the <a href="https://xkirtle.github.io/bandmate/self-hosting#upgrading-and-rolling-back">upgrade guide</a>.</p>`
 
 // upgradeCopyFound is the paragraph of the refusal page naming the Upgrade
 // copy at path.

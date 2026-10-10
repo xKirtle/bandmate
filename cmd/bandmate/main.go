@@ -76,7 +76,7 @@ func run(addr, dataDir string, maxUploadBytes int64, updateCheckOff, addFromLink
 	var handler http.Handler
 	switch {
 	case errors.As(err, &refused):
-		why := refused.Reason
+		why := refused.Error()
 		if found := refused.UpgradeCopyFound(); found != "" {
 			why += " " + found
 		}
