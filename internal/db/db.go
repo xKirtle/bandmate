@@ -87,13 +87,8 @@ func open(dataDir string) (*sql.DB, error) {
 // refuseNewer returns ErrNewer if the database records a migration this
 // Bandmate doesn't know.
 func refuseNewer(ctx context.Context, conn *sql.DB) error {
-	var tables int
-	if err := conn.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'`).Scan(&tables); err != nil {
-		return fmt.Errorf("reading the schema: %w", err)
-	}
-	if tables == 0 {
-		return nil
+	if ok, err := hasTable(ctx, conn, "schema_migrations"); err != nil || !ok {
+		return err
 	}
 	known, err := fs.Glob(migrations, "migrations/*.sql")
 	if err != nil {
