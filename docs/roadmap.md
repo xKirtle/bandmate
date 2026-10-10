@@ -42,11 +42,6 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 - A first-time walkthrough of Bandmate. It can be dismissed, and taken again whenever the user wants.
 - It comes with a demo Song and Beat to work through, created when the user asks for them, from audio built into the binary. A migration would add them to every existing install on upgrade, and a Beat's audio is a file in the data directory, not a row, so SQL alone can't ship it. Created on request, a deleted demo can be added again. The Beat's audio needs a licence that allows shipping it.
 
-## Hear a Chord in the Chord Finder
-
-- A synthesised strum of a Voicing being looked up, or of a suggested Chord, to hear it before playing it. The sound is made in the browser, like the rest of the Chord Finder, with no samples to download.
-- Which Voicing a suggested Chord is strummed with, and whether it can be arpeggiated too, are for the spec.
-
 ## Playback speed
 
 - Slow the Timeline down, or speed it up, without changing its pitch, for learning a part, especially over a Loop.

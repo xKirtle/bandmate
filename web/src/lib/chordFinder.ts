@@ -12,7 +12,7 @@ import {
   suggestFromKey,
   type Suggestion,
 } from './chordTheory';
-import { guitarNotes, guitarVoicings, type Voicing } from './guitar';
+import { guitarNotes, guitarPlucks, guitarVoicings, type Pluck, type Voicing } from './guitar';
 import {
   guitarTuningName,
   guitarTuningNotes,
@@ -23,7 +23,7 @@ import {
 } from './guitarTuning';
 
 export { qualities, roots, type Quality, type Suggestion } from './chordTheory';
-export type { Voicing } from './guitar';
+export type { Pluck, Voicing } from './guitar';
 
 /** Standard tuning, its strings' pitches low to high, as MIDI note numbers (E2 A2 D3 G3 B3 E4). */
 export const standard: readonly number[] = standardTuning;
@@ -148,6 +148,15 @@ export function nameIt(frets: Frets, context: FinderContext): NameIt {
   const chords = nameNotes(sounding);
   const notes = spellNotes(sounding, chords[0] ?? null);
   return chords.length ? { kind: 'chord', readings: chords.map((c) => c.name), notes } : { kind: 'none', notes };
+}
+
+/**
+ * What hearing a Voicing's frets plucks in the Finder's tuning, low string
+ * to high, muted strings skipped: each string's pitch, and how bright it
+ * sounds for the string and fret it's played on. What a strum plays.
+ */
+export function plucks(frets: Frets, context: FinderContext): Pluck[] {
+  return guitarPlucks(frets, context.tuning);
 }
 
 function sameFrets(a: Frets, b: Frets): boolean {
