@@ -4,6 +4,7 @@
   import { tick } from 'svelte';
   import ChordDiagram from './ChordDiagram.svelte';
   import {
+    firstVoicing,
     keyName,
     keys,
     lookUp,
@@ -60,7 +61,10 @@
   // name that could be read.
   let name = $state('C');
   let picked = $state<{ root: string; quality: string; bass: string | null }>({ root: 'C', quality: '', bass: null });
-  const found = $derived(lookUp(name, { ...context, preferred: preferredVoicings.of(context.tuning) }));
+  // The Finder's context with the user's preferred Voicings in its tuning:
+  // what Look up lists first, and what Suggest draws.
+  const finderContext = $derived({ ...context, preferred: preferredVoicings.of(context.tuning) });
+  const found = $derived(lookUp(name, finderContext));
 
   /** How many Voicings show at once; the rest are a page away. */
   const pageSize = 8;
@@ -136,19 +140,34 @@
 </script>
 
 {#snippet suggestions(list: Suggestion[], label: string)}
-  <ul class="suggestions" aria-label={label}>
+  <ul class="voicings suggestions" aria-label={label}>
     {#each list as s (s.numeral + s.chord)}
+      {@const voicing = firstVoicing(s.chord, finderContext)}
       <li>
-        <button
-          type="button"
-          class="suggestion"
-          title="Look up how to play {s.chord}"
-          onclick={() => openInLookUp(s.chord)}
-        >
+        <p class="suggested-chord">
           <span class="numeral muted">{s.numeral}</span>
           <span class="suggested">{s.chord}</span>
-          <span class="reason muted">{s.reason}</span>
-        </button>
+        </p>
+        <p class="reason muted">{s.reason}</p>
+        {#if voicing}
+          <ChordDiagram {voicing} name={s.chord} />
+          <button
+            type="button"
+            class="button quiet more"
+            aria-label="More Voicings of {s.chord}"
+            title="See every Voicing of {s.chord} in Look up"
+            onclick={() => openInLookUp(s.chord)}>More Voicings</button
+          >
+        {:else}
+          <p class="no-voicing muted">No Voicing up to the 12th fret</p>
+          <button
+            type="button"
+            class="button quiet more"
+            aria-label="Look up {s.chord}"
+            title="Look up {s.chord}"
+            onclick={() => openInLookUp(s.chord)}>Look up</button
+          >
+        {/if}
       </li>
     {/each}
   </ul>
@@ -582,38 +601,17 @@
     margin: 0;
     font-size: var(--text-lg);
   }
-  /* Two suggestions a row on a phone, four on desktop. */
-  .suggestions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
+  /* Each suggestion is a card like a Voicing's in Look up, its diagram under its numeral, Chord and reason. */
+  .suggestions li {
+    justify-content: space-between;
+    text-align: center;
   }
-  @container finder (min-width: 40rem) {
-    .suggestions {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-  }
-  .suggestion {
-    display: grid;
-    grid-template-columns: auto 1fr;
+  .suggested-chord {
+    display: flex;
+    flex-wrap: wrap;
     align-items: baseline;
-    gap: var(--space-1) var(--space-2);
-    width: 100%;
-    height: 100%;
-    padding: var(--space-2) var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    background: var(--bg);
-    color: var(--text);
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-  }
-  .suggestion:hover {
-    border-color: var(--accent);
+    justify-content: center;
+    gap: 0 var(--space-2);
   }
   .numeral {
     font-size: var(--text-sm);
@@ -623,8 +621,17 @@
     font-size: var(--text-xl);
     font-weight: 600;
   }
-  .reason {
-    grid-column: 1 / -1;
+  .reason,
+  .no-voicing {
+    font-size: var(--text-sm);
+  }
+  .no-voicing {
+    flex: 1;
+    display: flex;
+    align-items: center;
+  }
+  .more {
+    min-height: 2rem;
     font-size: var(--text-sm);
   }
   .pager {
