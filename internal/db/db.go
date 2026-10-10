@@ -137,8 +137,11 @@ func migrateBefore(ctx context.Context, conn *sql.DB, stop string) error {
 	return err
 }
 
-// applyPending is migrateBefore, naming the migrations it applied, in the
-// order it applied them.
+// applyPending applies the embedded migrations not yet recorded in
+// schema_migrations, in file name order, each in its own transaction,
+// stopping short of the migration named stop and those after it, or
+// applying them all if stop is "". It names those it applied, in order,
+// even when one fails.
 func applyPending(ctx context.Context, conn *sql.DB, stop string) ([]string, error) {
 	if _, err := conn.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
 		name TEXT PRIMARY KEY,

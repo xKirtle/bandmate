@@ -59,7 +59,7 @@ func openToRun(ctx context.Context, conn *sql.DB, dataDir, running string, now t
 	if err := refuseNewer(ctx, conn); err != nil {
 		return err
 	}
-	applied, err := appliedMigrations(ctx, conn)
+	alreadyApplied, err := appliedMigrations(ctx, conn)
 	if err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func openToRun(ctx context.Context, conn *sql.DB, dataDir, running string, now t
 	}
 	// refuseNewer has checked every applied migration is a known one, so
 	// fewer applied than known means some are pending.
-	upgrading := applied > 0 && applied < len(known)
+	upgrading := alreadyApplied > 0 && alreadyApplied < len(known)
 	if upgrading {
 		path, err := takeUpgradeCopy(ctx, conn, filepath.Join(dataDir, upgradeCopies), now)
 		if err != nil {
@@ -85,14 +85,19 @@ func openToRun(ctx context.Context, conn *sql.DB, dataDir, running string, now t
 			log.Printf("deleting older upgrade copies: %v", err)
 		}
 	}
-	names, err := applyPending(ctx, conn, "")
+	applied, err := applyPending(ctx, conn, "")
 	if err != nil {
+		// Each migration commits by itself, so those before the failed one
+		// stay applied.
+		if len(applied) > 0 {
+			log.Printf("upgraded the database partway: applied %s", describeMigrations(applied))
+		}
 		return err
 	}
 	switch {
 	case upgrading:
-		log.Printf("upgraded the database: applied %s", describeMigrations(names))
-	case applied == 0:
+		log.Printf("upgraded the database: applied %s", describeMigrations(applied))
+	case alreadyApplied == 0:
 		log.Printf("set up a new database in %s", filepath.Join(dataDir, FileName))
 	}
 	return recordVersion(ctx, conn, running)
