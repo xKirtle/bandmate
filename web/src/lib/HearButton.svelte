@@ -7,14 +7,11 @@
   let {
     chord,
     plucks,
-    disabled = false,
   }: {
-    /** The Chord's name, for the button's label. */
+    /** The Chord's name, for the button's label, or "this shape" for one placed in Name it that reads as none. */
     chord: string;
-    /** What to strum, low string to high: the Chord Finder's plucks of the Voicing. */
+    /** What to strum, low string to high: the Chord Finder's plucks. With none, as in Name it with nothing placed, it's disabled. */
     plucks: readonly Pluck[];
-    /** Whether there's nothing to hear yet, as in Name it with nothing placed. */
-    disabled?: boolean;
   } = $props();
 </script>
 
@@ -23,6 +20,6 @@
   class="icon"
   aria-label="Hear {chord}"
   title="Hear {chord}"
-  {disabled}
+  disabled={plucks.length === 0}
   onclick={() => strum(plucks)}><Volume2 /></button
 >
