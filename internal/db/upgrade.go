@@ -40,7 +40,9 @@ func (e *UpgradeCopyError) Unwrap() error { return e.Err }
 // running as the Bandmate that last ran on the database. If the copy can't
 // be taken it migrates nothing and fails with an *UpgradeCopyError. The
 // copy is named after the release the database last ran on, or, if none is
-// recorded, after now.
+// recorded, after now. It logs an upgrade: where the copy went, which older
+// copies it deleted, and which migrations it applied. On a new database it
+// logs only that it set one up, and on one with nothing to migrate nothing.
 func OpenToRun(ctx context.Context, dataDir, running string, now time.Time) (*sql.DB, error) {
 	conn, err := open(dataDir)
 	if err != nil {
@@ -57,38 +59,74 @@ func openToRun(ctx context.Context, conn *sql.DB, dataDir, running string, now t
 	if err := refuseNewer(ctx, conn); err != nil {
 		return err
 	}
-	upgrading, err := upgrading(ctx, conn)
+	alreadyApplied, err := appliedMigrations(ctx, conn)
 	if err != nil {
 		return err
 	}
+	known, err := knownMigrations()
+	if err != nil {
+		return err
+	}
+	// refuseNewer has checked every applied migration is a known one, so
+	// fewer applied than known means some are pending.
+	upgrading := alreadyApplied > 0 && alreadyApplied < len(known)
 	if upgrading {
-		if err := takeUpgradeCopy(ctx, conn, filepath.Join(dataDir, upgradeCopies), now); err != nil {
+		path, err := takeUpgradeCopy(ctx, conn, filepath.Join(dataDir, upgradeCopies), now)
+		if err != nil {
 			return &UpgradeCopyError{Err: err}
 		}
+		log.Printf("copied the database to %s before upgrading it", path)
+		// Only tidying, so it never stops Bandmate starting.
+		deleted, err := pruneUpgradeCopies(filepath.Dir(path))
+		for _, name := range deleted {
+			log.Printf("deleted the older upgrade copy %s, to keep the newest %d", name, upgradeCopiesKept)
+		}
+		if err != nil {
+			log.Printf("deleting older upgrade copies: %v", err)
+		}
 	}
-	if err := migrate(ctx, conn); err != nil {
+	applied, err := applyPending(ctx, conn, "")
+	if err != nil {
+		// Each migration commits by itself, so those before the failed one
+		// stay applied.
+		if len(applied) > 0 {
+			log.Printf("upgraded the database partway: applied %s", describeMigrations(applied))
+		}
 		return err
+	}
+	switch {
+	case upgrading:
+		log.Printf("upgraded the database: applied %s", describeMigrations(applied))
+	case alreadyApplied == 0:
+		log.Printf("set up a new database in %s", filepath.Join(dataDir, FileName))
 	}
 	return recordVersion(ctx, conn, running)
 }
 
-// upgrading tells whether the database has migrations applied and others
-// pending: whether starting changes how an existing install's data is
-// stored.
-func upgrading(ctx context.Context, conn *sql.DB) (bool, error) {
+// migrationsNamed is how many applied migrations the log names one by one;
+// more are summed up by their count, first and last.
+const migrationsNamed = 5
+
+// describeMigrations tells the log which migrations an upgrade applied:
+// each by name, or, when there are many, their count, first and last.
+func describeMigrations(names []string) string {
+	if len(names) <= migrationsNamed {
+		return strings.Join(names, ", ")
+	}
+	return fmt.Sprintf("%d migrations, %s to %s", len(names), names[0], names[len(names)-1])
+}
+
+// appliedMigrations counts the migrations applied to the database: none
+// on a new one.
+func appliedMigrations(ctx context.Context, conn *sql.DB) (int, error) {
 	if ok, err := hasTable(ctx, conn, "schema_migrations"); err != nil || !ok {
-		return false, err
+		return 0, err
 	}
 	var applied int
 	if err := conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM schema_migrations`).Scan(&applied); err != nil {
-		return false, fmt.Errorf("reading the schema: %w", err)
+		return 0, fmt.Errorf("reading the schema: %w", err)
 	}
-	known, err := knownMigrations()
-	if err != nil {
-		return false, err
-	}
-	// refuseNewer has checked every applied migration is a known one.
-	return applied > 0 && applied < len(known), nil
+	return applied, nil
 }
 
 // hasTable tells whether the database has the table name.
@@ -133,39 +171,34 @@ func recordedVersion(ctx context.Context, conn *sql.DB) (string, error) {
 // its v. A dev build or a bare commit isn't a version one could pull.
 var release = regexp.MustCompile(`^v(\d+\.\d+\.\d+)$`)
 
-// takeUpgradeCopy copies the database, as it is, into dir, then deletes all
-// but the newest upgradeCopiesKept copies there.
-func takeUpgradeCopy(ctx context.Context, conn *sql.DB, dir string, now time.Time) error {
+// takeUpgradeCopy copies the database, as it is, into dir, and says where.
+func takeUpgradeCopy(ctx context.Context, conn *sql.DB, dir string, now time.Time) (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
+		return "", err
 	}
 	from, err := recordedVersion(ctx, conn)
 	if err != nil {
-		return err
+		return "", err
 	}
 	path, err := upgradeCopyPath(dir, from, now)
 	if err != nil {
-		return err
+		return "", err
 	}
 	// VACUUM INTO reads through the connection, the WAL included, so the
 	// copy is consistent. It's renamed into place once whole.
 	partial := filepath.Join(dir, "."+filepath.Base(path)+".partial")
 	if err := os.Remove(partial); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return err
+		return "", err
 	}
 	if _, err := conn.ExecContext(ctx, `VACUUM INTO ?`, partial); err != nil {
 		os.Remove(partial)
-		return err
+		return "", err
 	}
 	if err := os.Rename(partial, path); err != nil {
 		os.Remove(partial)
-		return err
+		return "", err
 	}
-	// Only tidying, so it never stops Bandmate starting.
-	if err := pruneUpgradeCopies(dir); err != nil {
-		log.Printf("deleting older upgrade copies: %v", err)
-	}
-	return nil
+	return path, nil
 }
 
 // upgradeCopyPath is where in dir the Upgrade copy of a database the
@@ -196,11 +229,11 @@ func upgradeCopyPath(dir, from string, now time.Time) (string, error) {
 }
 
 // pruneUpgradeCopies deletes all but the newest upgradeCopiesKept Upgrade
-// copies in dir, newest by when they were taken.
-func pruneUpgradeCopies(dir string) error {
+// copies in dir, newest by when they were taken, and names those it deleted.
+func pruneUpgradeCopies(dir string) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	type taken struct {
 		name string
@@ -213,7 +246,7 @@ func pruneUpgradeCopies(dir string) error {
 		}
 		info, err := e.Info()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		copies = append(copies, taken{e.Name(), info.ModTime()})
 	}
@@ -223,10 +256,12 @@ func pruneUpgradeCopies(dir string) error {
 		}
 		return copies[i].name > copies[j].name
 	})
+	var deleted []string
 	for _, c := range copies[min(len(copies), upgradeCopiesKept):] {
 		if err := os.Remove(filepath.Join(dir, c.name)); err != nil {
-			return err
+			return deleted, err
 		}
+		deleted = append(deleted, c.name)
 	}
-	return nil
+	return deleted, nil
 }
