@@ -156,21 +156,40 @@ New features bump the middle number, and fixes alone the last one, as [CONTRIBUT
 
 ### Upgrading and rolling back
 
-**To upgrade**, first [copy the data folder](#copying-the-data-folder), then:
+**To upgrade**, pull the new image and start it:
 
 ```sh
 docker compose pull && docker compose up -d
 ```
 
-Bandmate updates its database by itself when it starts. Before it does, it copies the database alone, without audio or Covers, into the `upgrade-copies` folder in the data folder, and keeps the newest three copies there. If it can't take the copy, it doesn't update the database or start: every page shows why until you fix it and start Bandmate again.
+Bandmate updates its database by itself when it starts. Before it does, it takes an **Upgrade copy**: a copy of the database as it was, in the `upgrade-copies` folder of the data folder, named after the version it's upgrading from, e.g. `before-0.14.2.db`. That's the version to run with it, to roll back. Bandmate keeps the newest three Upgrade copies and deletes older ones. It takes none on a new install, nor when the new version doesn't change the database.
 
-**To roll back**, run the older tag. If the newer version changed the database, put back the copy of the data folder you made before upgrading too: an older Bandmate can't undo a newer one's changes. Started on a database a newer Bandmate changed, it refuses to run: it changes nothing, and every page shows why until you put the copy back or run the newer Bandmate again.
+When Bandmate doesn't know which version it's upgrading from, the copy is named by the date instead, e.g. `before-2026-10-10.db`. That happens on the first upgrade to a Bandmate that takes Upgrade copies, since older ones didn't record their version, and after running a development build (`:edge` or `:sha-<short>`), which isn't a version you could pull. If that name is taken, e.g. after upgrading from the same version twice, the date and time are added, e.g. `before-0.14.2-2026-10-10-153012.db`, and a date-named copy gets the time, e.g. `before-2026-10-10-153012.db`, so no copy is ever replaced.
 
-**Without Docker**, upgrade by stopping Bandmate, copying the data folder, and [downloading](#downloading-it) the new release over the old program, or checking out the newer tag and [building it again](#building-it-yourself), then starting it again. To roll back, download an older release's file from `https://github.com/xKirtle/bandmate/releases/download/vX.Y.Z/`, and put the data folder back as above.
+An Upgrade copy holds the database alone: Songs, Beats and everything else Bandmate keeps, but not the audio, Covers or Backup files, which stay in the data folder as they are. To copy everything, [copy the data folder](#copying-the-data-folder).
+
+**To roll back**, stop Bandmate, put the Upgrade copy in place of the database, and run the version it's named after. Everything done since that upgrade is lost, including audio and Covers deleted since. For example, back to 0.14.2:
+
+```sh
+docker compose down
+mkdir newer-database && mv data/bandmate.db* newer-database/
+cp data/upgrade-copies/before-0.14.2.db data/bandmate.db
+```
+
+Run these as the user that owns `data`, so Bandmate can still write to the database. Moving every `bandmate.db*` file takes the database's `-wal` and `-shm` files with it, if there are any, so none is left to mix with the copy, and keeps the newer database in case you upgrade again. Then pin the older version, by setting `BANDMATE_IMAGE=ghcr.io/xkirtle/bandmate:0.14.2` in `.env`, and start it with `docker compose up -d`.
+
+To go back further, use an older copy, with the version it's named after. A date-named copy says no version: run the one you ran before that day's upgrade. A Bandmate from before Upgrade copies doesn't check what it's started on, and runs on a newer database without saying so, so going back to one, always put its copy back first. If an upgrade took no Upgrade copy, it didn't change the database: run the older tag, with nothing to put back.
+
+**If Bandmate can't start** on its data folder, it changes nothing and keeps running, so Docker doesn't restart it in a loop, but every page says why, its log says the same, and the [health check](#health-check) fails. It's one of two reasons:
+
+- **The database was changed by a newer Bandmate.** An older Bandmate was started on a database a newer one had changed, e.g. by running the older tag without putting an Upgrade copy back. Run the newer Bandmate again, or roll back as above.
+- **Bandmate couldn't copy the database before upgrading it.** It couldn't take the Upgrade copy, so it hasn't changed the database, and the page says what failed. Usually Bandmate can't write to the `upgrade-copies` folder, which, like the rest of `data`, must be owned by the user it runs as (`PUID` and `PGID`), or the disk is full. Put that right and start Bandmate again, with `docker compose restart`. Until then, you can still run the version you upgraded from.
+
+**Without Docker**, upgrade by stopping Bandmate, [downloading](#downloading-it) the new release over the old program, or checking out the newer tag and [building it again](#building-it-yourself), then starting it again. To roll back, stop it, put the Upgrade copy in place as above, and run the older release's program, from `https://github.com/xKirtle/bandmate/releases/download/vX.Y.Z/`.
 
 ### Copying the data folder
 
-Stop Bandmate, so nothing is mid-write, and copy `data`. It holds everything: the database, audio, Covers and Backups. Do this before every upgrade, so you can roll back. To back up only some Songs or Beats, from the app, see [Backups](/features#backups).
+Stop Bandmate, so nothing is mid-write, and copy `data`. It holds everything: the database, audio, Covers, Backups and Upgrade copies. It's the way to copy everything, as an Upgrade copy leaves audio and Covers out. To back up only some Songs or Beats, from the app, see [Backups](/features#backups).
 
 ## Mounting your own yt-dlp
 

@@ -29,10 +29,6 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 
 - From the audio itself, to pre-fill the Beat's details at upload.
 
-## A backup before migrating
-
-- Copy the database before a release's migrations run, so rolling back never depends on remembering to take a backup first.
-
 ## Real-time sync between tabs and devices
 
 - Today a tab refetches the Song when it becomes visible again, and a write based on an old version is rejected.
