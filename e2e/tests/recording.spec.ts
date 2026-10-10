@@ -740,7 +740,7 @@ test('Settings lists every Input, connected or not, to record from, calibrate wh
   await expect(list.pill(secondName)).toHaveText('34 ms');
   await expect(list.radio(firstName)).toBeChecked();
   // Calibrating over, its meter is idle again.
-  await expect(list.row(secondName).getByRole('button', { name: 'Test input', exact: true })).toBeVisible();
+  await expect(testInput(secondName)).toBeVisible();
   await expect.poll(live).toBe(0);
 
   // The radio changes the Input recorded from, kept after a reload.

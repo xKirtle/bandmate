@@ -82,7 +82,7 @@ export class InputRows {
    * does once the microphone is allowed: till then, opening one asks for
    * it. Taken as allowed until the browser has been asked.
    */
-  readonly allowed = $derived(this.#devices !== null || !this.#told);
+  readonly microphoneAllowed = $derived(this.#devices !== null || !this.#told);
 
   /** The device chosen when it isn't connected, so the default input is recorded from; null otherwise. */
   readonly chosenGone = $derived(

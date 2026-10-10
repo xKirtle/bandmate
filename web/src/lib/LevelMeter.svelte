@@ -127,6 +127,7 @@
     } catch {
       // Can't tell, so it's left as it is, unless it failed.
     }
+    // Asked again, as Stop may have been pressed while the devices were listed.
     if (testing && (problem || (gone !== null) === present)) meter();
   }
 

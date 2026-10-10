@@ -111,7 +111,7 @@
                 <LevelMeter
                   input={row.input}
                   onDemand
-                  allowed={inputs.allowed}
+                  allowed={inputs.microphoneAllowed}
                   onOpen={(level) => inputs.learn(level)}
                 />
               {/if}
