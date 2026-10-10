@@ -103,7 +103,7 @@ Distributions' packages of yt-dlp can fall behind the sites it downloads from. I
 
 ### Health check
 
-The Compose file checks Bandmate is healthy with `bandmate healthcheck`. For your own monitoring, `GET /api/health` returns `200 {"status":"ok"}` while Bandmate can reach its database.
+The Compose file checks Bandmate is healthy with `bandmate healthcheck`. For your own monitoring, `GET /api/health` returns `200 {"status":"ok"}` while Bandmate can reach its database, and `503` while it can't, or while it refuses to start, e.g. on a database a newer Bandmate changed.
 
 ## Configuration
 
@@ -164,7 +164,7 @@ docker compose pull && docker compose up -d
 
 Bandmate updates its database by itself when it starts.
 
-**To roll back**, run the older tag. If the newer version changed the database, put back the copy of the data folder you made before upgrading too: an older Bandmate can't undo a newer one's changes.
+**To roll back**, run the older tag. If the newer version changed the database, put back the copy of the data folder you made before upgrading too: an older Bandmate can't undo a newer one's changes. Started on a database a newer Bandmate changed, it refuses to run: it changes nothing, and every page shows why until you put the copy back or run the newer Bandmate again.
 
 **Without Docker**, upgrade by stopping Bandmate, copying the data folder, and [downloading](#downloading-it) the new release over the old program, or checking out the newer tag and [building it again](#building-it-yourself), then starting it again. To roll back, download an older release's file from `https://github.com/xKirtle/bandmate/releases/download/vX.Y.Z/`, and put the data folder back as above.
 

@@ -247,3 +247,7 @@ _Avoid_: Export, archive, Snapshot (a Snapshot is a copy of one Song's Lyric She
 **Restore**:
 Bringing back Songs and Beats picked from a Backup. A Song brings the Beats its Clips use, so those Beats can't be left out while it's picked. Where a Song or Beat is already in Bandmate (the same one, even from another install, never just one with the same name or, for a Beat, the same audio), the user chooses to replace it or keep both, the restored one added alongside. A restored Song goes into the Folder of the same name, made if there's none, and carries the Tags of the same names, made if there are none, in place of any it had. A Restore only adds and replaces: it never deletes what the Backup doesn't hold.
 _Avoid_: Import (importing brings an audio file in as a Sound)
+
+**Upgrade copy**:
+A copy of the whole install's Songs, Beats and everything else Bandmate keeps, apart from audio and Covers, taken by Bandmate itself just before a newer Bandmate changes how they're stored, so the install can go back to the older Bandmate. Going back to one loses everything done since that upgrade. Only the newest three are kept. It's never taken on a new install, nor when nothing changes.
+_Avoid_: Backup (a Backup holds chosen Songs and Beats, to Restore from), Snapshot

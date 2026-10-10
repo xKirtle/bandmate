@@ -71,14 +71,23 @@ func run(addr, dataDir string, maxUploadBytes int64, updateCheckOff, addFromLink
 		UpdateCheckOff: updateCheckOff, ProgramsManifest: bundledProgramsManifest,
 		AddFromLinkOff: addFromLinkOff,
 	})
-	if err != nil {
+	// A refused start serves its reason in place of the app: see app.Refused.
+	var refused *app.Refused
+	var handler http.Handler
+	switch {
+	case errors.As(err, &refused):
+		log.Printf("bandmate %s can't start (see %s): %s", describe(running), app.UpgradeGuide, refused.Reason)
+		handler = app.RefusalHandler(refused)
+	case err != nil:
 		return err
+	default:
+		defer a.Close()
+		handler = a.Handler()
 	}
-	defer a.Close()
 
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           a.Handler(),
+		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"io/fs"
 	"log"
 	"net/http"
@@ -127,9 +128,13 @@ type App struct {
 }
 
 // New opens the database in cfg.DataDir, migrates it, and builds the HTTP
-// handler.
+// handler. It returns a *Refused, having changed nothing, if the database
+// was migrated by a newer Bandmate.
 func New(cfg Config) (*App, error) {
-	conn, err := db.Open(context.Background(), cfg.DataDir)
+	conn, err := db.OpenNoNewer(context.Background(), cfg.DataDir)
+	if errors.Is(err, db.ErrNewer) {
+		return nil, refusedNewer(err)
+	}
 	if err != nil {
 		return nil, err
 	}
