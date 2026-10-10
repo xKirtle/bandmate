@@ -133,41 +133,50 @@ func migrate(ctx context.Context, conn *sql.DB) error {
 // those after it, or applying them all if stop is "". It lets a test put
 // data in an older schema and see a migration carry it over.
 func migrateBefore(ctx context.Context, conn *sql.DB, stop string) error {
+	_, err := applyPending(ctx, conn, stop)
+	return err
+}
+
+// applyPending is migrateBefore, naming the migrations it applied, in the
+// order it applied them.
+func applyPending(ctx context.Context, conn *sql.DB, stop string) ([]string, error) {
 	if _, err := conn.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
 		name TEXT PRIMARY KEY,
 		applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 	)`); err != nil {
-		return fmt.Errorf("creating schema_migrations: %w", err)
+		return nil, fmt.Errorf("creating schema_migrations: %w", err)
 	}
 
 	// Glob returns names in lexical order, which is the order to apply them.
 	names, err := fs.Glob(migrations, "migrations/*.sql")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	var applied []string
 	for _, path := range names {
 		name := strings.TrimSuffix(filepath.Base(path), ".sql")
 		if stop != "" && name >= stop {
 			break
 		}
-		var applied int
+		var done int
 		if err := conn.QueryRowContext(ctx,
-			`SELECT COUNT(*) FROM schema_migrations WHERE name = ?`, name).Scan(&applied); err != nil {
-			return fmt.Errorf("checking migration %s: %w", name, err)
+			`SELECT COUNT(*) FROM schema_migrations WHERE name = ?`, name).Scan(&done); err != nil {
+			return applied, fmt.Errorf("checking migration %s: %w", name, err)
 		}
-		if applied > 0 {
+		if done > 0 {
 			continue
 		}
 		script, err := migrations.ReadFile(path)
 		if err != nil {
-			return err
+			return applied, err
 		}
 		if err := apply(ctx, conn, name, string(script)); err != nil {
-			return fmt.Errorf("applying migration %s: %w", name, err)
+			return applied, fmt.Errorf("applying migration %s: %w", name, err)
 		}
+		applied = append(applied, name)
 	}
-	return nil
+	return applied, nil
 }
 
 // Description is what a bug report needs to know about the database.
