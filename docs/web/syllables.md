@@ -4,7 +4,7 @@ In Write mode, Bandmate counts the syllables of each line as you type, so you ca
 
 ## Where the counts show
 
-Each line's count sits in a muted column to the left of the line, so the counts line up down a section and you can compare them at a glance. A line that wraps shows its count on its first row.
+Each line's count sits in a muted column to the left of the line, so the counts line up down a section and you can compare them at a glance.
 
 The counts also show beside each line when you choose between a section's [alternates](/features#write), and on the cards in the Scrapbook, so you can see whether a loose idea fits a section before you move it in.
 
@@ -33,4 +33,4 @@ Bandmate counts in the languages set in the song's details, which start as Engli
 
 ## Offline
 
-Everything is worked out on your device, from a dictionary built into Bandmate, so the counts keep up with your typing and work without an internet connection. The first time you write a song in a language, your browser downloads its dictionary from your Bandmate, about a megabyte, and keeps it. While Writing aids is off, it downloads nothing.
+The counts need no internet connection: the dictionary comes with Bandmate. The first time you write a song in a language, your browser downloads that dictionary from your Bandmate, about a megabyte, once. While Writing aids is off, it downloads nothing.

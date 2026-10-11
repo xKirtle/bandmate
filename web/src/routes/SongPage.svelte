@@ -35,7 +35,8 @@
   import { chordsInRead } from '../lib/chordChart';
   import { songChordsShown } from '../lib/chordsShown';
   import { songTranspose } from '../lib/sharedTranspose.svelte';
-  import { fetchLanguageData, languageData, writingAids } from '../lib/sharedWritingAids.svelte';
+  import { writingAids } from '../lib/sharedWritingAids.svelte';
+  import { fetchLanguageData, languageData } from '../lib/languageData.svelte';
   import { lyricsLanguage, type SyllableCounter } from '../lib/lyricsLanguage';
   import { timeAgo } from '../lib/time';
 
@@ -101,13 +102,13 @@
   // Each Line's Syllable Count, in Write mode while the writing aids are on,
   // worked out here from the data of the Song's Languages: only then is
   // that fetched, once for as long as the page is open.
-  const aiding = $derived(writing && writingAids.value);
+  const showingAids = $derived(writing && writingAids.value);
   $effect(() => {
-    if (aiding) fetchLanguageData(languages);
+    if (showingAids) fetchLanguageData(languages);
   });
   const lyrics = $derived(lyricsLanguage(languageData()));
   const syllables: SyllableCounter | undefined = $derived.by(() => {
-    if (!aiding) return undefined;
+    if (!showingAids) return undefined;
     const counting = languages;
     return (text) => lyrics.syllableCount(text, counting);
   });

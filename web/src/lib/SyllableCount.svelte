@@ -7,6 +7,8 @@
   import type { SyllableCount } from './lyricsLanguage';
 
   let { count }: { count: SyllableCount | null } = $props();
+
+  const syllables = (n: number) => `${n} ${n === 1 ? 'syllable' : 'syllables'}`;
 </script>
 
 <span class="syllables" aria-hidden="true">
@@ -14,9 +16,8 @@
     <span
       class="number"
       title={count.estimate
-        ? `About ${count.count} syllables: a word Bandmate doesn't know was guessed from its spelling`
-        : `${count.count} ${count.count === 1 ? 'syllable' : 'syllables'}`}
-      >{count.estimate ? '~' : ''}{count.count}</span
+        ? `About ${syllables(count.count)}: a word Bandmate doesn't know was guessed from its spelling`
+        : syllables(count.count)}>{count.estimate ? '~' : ''}{count.count}</span
     >
   {/if}
 </span>

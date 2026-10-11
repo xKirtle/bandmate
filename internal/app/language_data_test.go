@@ -60,6 +60,21 @@ func TestLanguageDataTheBrowserKeptIsntSentAgain(t *testing.T) {
 	expectStatus(t, res, http.StatusNotModified)
 }
 
+func TestLanguageDataSentCompressedOrNotIsTaggedApart(t *testing.T) {
+	ts := newTestServer(t)
+	plain := ts.DoRaw(http.MethodGet, "/api/languages/en", http.Header{"Accept-Encoding": {"identity"}}, nil)
+	gzipped := ts.DoRaw(http.MethodGet, "/api/languages/en", http.Header{"Accept-Encoding": {"gzip"}}, nil)
+
+	if plain.Header.Get("ETag") == gzipped.Header.Get("ETag") {
+		t.Errorf("plain and gzipped data share the ETag %s", plain.Header.Get("ETag"))
+	}
+	res := ts.DoRaw(http.MethodGet, "/api/languages/en", http.Header{
+		"Accept-Encoding": {"gzip"},
+		"If-None-Match":   {`"other", W/` + gzipped.Header.Get("ETag")},
+	}, nil)
+	expectStatus(t, res, http.StatusNotModified)
+}
+
 func TestALanguageBandmateHasNoDataForIsNotFound(t *testing.T) {
 	ts := newTestServer(t)
 

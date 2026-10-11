@@ -73,6 +73,7 @@ export function lyricsLanguage(data: readonly LanguageData[]) {
      */
     syllableCount(text: string, languages: readonly string[]): SyllableCount | null {
       const loaded = languages.flatMap((code) => byCode.get(code) ?? []);
+      // Every Language Bandmate has data for has its rules for guessing; English's stand in for one that has none yet.
       const first = guessers[languages[0]] ?? guessers.en;
       if (loaded.length === 0) return null;
       const words = wordsOf(lyricsOf(text));

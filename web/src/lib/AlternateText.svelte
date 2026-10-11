@@ -91,8 +91,8 @@
   // The rows of the text box as typed, each with the saved Line it is. Until
   // typing is saved, a row may be matched to the wrong Line; the save
   // matches them for real. A row's Syllable Count is of its text as typed.
-  const backed = $derived(!!cueing || !!syllables);
-  const rows = $derived(backed ? text.split('\n') : []);
+  const hasBackdrop = $derived(!!cueing || !!syllables);
+  const rows = $derived(hasBackdrop ? text.split('\n') : []);
   const rowLines = $derived(cueing ? linesByRow(text, alternate.lines) : []);
 
   // The row under the pointer, so its Line's gutter shows its ✕. The text box
@@ -121,7 +121,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="line-field"
-  class:backed
+  class:backdropped={hasBackdrop}
   class:with-counts={syllables}
   class:with-gutter={cueing?.gutter}
   class:syncing={cueing?.sync}
@@ -129,7 +129,7 @@
   onpointermove={cueing?.gutter ? pointed : undefined}
   onpointerleave={() => (hoveredRow = null)}
 >
-  {#if backed}
+  {#if hasBackdrop}
     <div class="backdrop"></div>
     {#each rows as row, i (i)}
       {@const line = rowLines[i]}
@@ -227,7 +227,7 @@
      Counts take a column before it, the gutter one after. Its own stacking
      context keeps the text box's and rows' z-index inside it, so they never
      draw over the sticky header or Timeline. */
-  .line-field.backed {
+  .line-field.backdropped {
     --inset-block: calc(var(--space-2) + 1px);
     isolation: isolate;
     display: grid;
@@ -244,12 +244,12 @@
   .line-field.with-counts.with-gutter {
     grid-template-columns: var(--count-slot) [text-start] minmax(0, 1fr) [text-end] auto;
   }
-  .backed .text {
+  .backdropped .text {
     grid-area: 1 / text-start / -1 / text-end;
     z-index: 2;
     background: transparent;
   }
-  .backed .text,
+  .backdropped .text,
   .row {
     white-space: pre-wrap;
     overflow-wrap: break-word;
