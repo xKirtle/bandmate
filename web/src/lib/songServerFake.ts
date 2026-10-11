@@ -43,6 +43,7 @@ export function emptySong(fields: Partial<Song> = {}): Song {
     bpm: null,
     capo: null,
     tuning: '',
+    languages: ['en'],
     notes: '',
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',

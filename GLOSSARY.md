@@ -7,7 +7,7 @@ A personal songwriting companion: write and structure lyrics with chords, then r
 ### Songs
 
 **Song**:
-The unit of work: one piece of music being written, with its Lyric Sheet, Timeline, Cover and metadata (key, BPM, capo, tuning, notes).
+The unit of work: one piece of music being written, with its Lyric Sheet, Timeline, Cover and metadata (key, BPM, capo, tuning, Languages, notes).
 _Avoid_: Project, track (a Track is something else)
 
 **As shown**:

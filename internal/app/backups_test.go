@@ -159,7 +159,7 @@ func (ts *testServer) fullSong(t *testing.T, beatID int64) song {
 	s := ts.cuedChorusWithTwoAlternates()
 	ts.updateSong(s.ID, map[string]any{
 		"title": "Night Drive", "status": "drafting", "key": "Am", "bpm": 92, "capo": 2,
-		"tuning": "Drop D", "notes": "Slow down the bridge",
+		"tuning": "Drop D", "languages": []string{"en"}, "notes": "Slow down the bridge",
 	})
 	scrap := ts.addToScrapbook(s.ID, "Ideas")
 	ts.setText(s.ID, scrap.Sections[len(scrap.Sections)-1].Alternates[0].ID, "headlights [G]on")

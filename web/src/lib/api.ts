@@ -18,6 +18,8 @@ export interface Song {
   bpm: number | null;
   capo: number | null;
   tuning: string;
+  /** The ISO 639-1 codes of the languages its Lines are sung in, in the user's order: always at least one. */
+  languages: string[];
   notes: string;
   createdAt: string;
   updatedAt: string;
@@ -167,7 +169,9 @@ export const commonKeys: readonly string[] = [
 ];
 
 /** A partial update: only the fields present change; "" or null clears one. */
-export type SongChanges = Partial<Pick<Song, 'title' | 'status' | 'key' | 'bpm' | 'capo' | 'tuning' | 'notes'>>;
+export type SongChanges = Partial<
+  Pick<Song, 'title' | 'status' | 'key' | 'bpm' | 'capo' | 'tuning' | 'languages' | 'notes'>
+>;
 
 /** Narrows the Song list. */
 export interface SongFilter {

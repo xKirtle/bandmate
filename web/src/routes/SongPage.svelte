@@ -17,6 +17,7 @@
   import TagsField from '../lib/TagsField.svelte';
   import Timeline from '../lib/Timeline.svelte';
   import TuningField from '../lib/TuningField.svelte';
+  import LanguagesField from '../lib/LanguagesField.svelte';
   import { LyricSheetEditing } from '../lib/lyricSheetEditing.svelte';
   import { Saves } from '../lib/saves.svelte';
   import { detailFields, type DetailFields } from '../lib/songFields';
@@ -69,6 +70,9 @@
   // A Status picked, shown until its save ends.
   let statusSent = $state<Status | null>(null);
   const status = $derived(statusSent ?? song?.status ?? 'idea');
+  // The Languages picked, shown until their save ends.
+  let languagesSent = $state<string[] | null>(null);
+  const languages = $derived(languagesSent ?? song?.languages ?? []);
   const title = $derived(details?.title.shown ?? '');
   let loadError = $state<string | null>(null);
   let deleting = $state(false);
@@ -232,6 +236,13 @@
     statusSent = next;
     await saves.submit((at) => api.updateSong(at, { status: next }));
     if (statusSent === next) statusSent = null;
+  }
+
+  async function setLanguages(next: string[]) {
+    if (!saves) return;
+    languagesSent = next;
+    await saves.submit((at) => api.updateSong(at, { languages: next }));
+    if (languagesSent === next) languagesSent = null;
   }
 
   // The title wraps in Write mode as it does in Read mode, so switching
@@ -442,6 +453,15 @@
                   oncommit={() => details?.tuning.commit()}
                   oninvalid={saves.report}
                   customNotes={details.customTuning}
+                />
+              </div>
+              <div class="field languages">
+                <span id="song-languages-label">Languages</span>
+                <LanguagesField
+                  id="song-languages"
+                  labelledby="song-languages-label"
+                  value={languages}
+                  onchange={setLanguages}
                 />
               </div>
               {@render notesToggle()}
@@ -727,6 +747,11 @@
   .tuning {
     flex: 0 1 auto;
     min-width: 6rem;
+  }
+  /* Room for a Language's name beside the ▾, growing to fit several. */
+  .languages {
+    flex: 0 1 auto;
+    min-width: 7rem;
   }
   .notes-toggle {
     gap: var(--space-2);
