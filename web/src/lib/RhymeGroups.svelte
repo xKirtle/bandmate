@@ -42,7 +42,7 @@
 {#if !word}
   <p class="muted message">Rhymes show here for the word at the cursor as you write.</p>
 {:else if noRhymesIn}
-  <p class="muted message">Bandmate doesn’t suggest Rhymes in {noRhymesIn} yet.</p>
+  <p class="muted message">No Rhymes in {noRhymesIn} yet.</p>
 {:else if loading}
   <p class="muted message">Loading…</p>
 {:else if !rhymes}
