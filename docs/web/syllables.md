@@ -34,7 +34,7 @@ Rhymes are suggested for the word at the cursor in the line you're writing, or f
 Each rhyme shows its syllable count beside it, and those nearest your word in syllables come first, so you can pick one that fits the meter. The suggestions are only there to read: clicking one never changes your lyrics.
 
 - **English rhymes** come from the dictionary, so a word it doesn't know gets none.
-- **Portuguese rhymes** come from a Portuguese word list that comes with Bandmate, with the forms words are sung in, like plurals and verb tenses. Any Portuguese word gets them: its stressed syllable is found by Portuguese spelling rules, so "coração" rhymes with "canção" and "saudade" with "cidade". Endings spelt apart but said alike rhyme too, like "dança" and "cansa".
+- **Portuguese rhymes** come from a Portuguese word list, plurals and verb tenses included, and any Portuguese word gets them: "coração" rhymes with "canção", and "saudade" with "cidade". Endings spelt differently but said alike rhyme too, like "dança" and "cansa".
 
 In a song with more than one language, a word's rhymes are in the language it's read in (see [Languages](#languages)), never mixing the two. To see rhymes for it in another of the song's languages, pick that language above the rhymes in the Rhymes card.
 

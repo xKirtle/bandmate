@@ -34,7 +34,7 @@ export function portugueseSound(word: string): Sound | null {
   const letters = [...word.replace(/'/g, '')];
   const nuclei = syllableVowels(letters);
   if (nuclei.length === 0) return null;
-  const stressed = stressedSyllable(letters.join(''), letters, nuclei);
+  const stressed = stressedSyllable(letters, nuclei);
   const ending = letters.slice(nuclei[stressed]).join('');
   return {
     count: nuclei.length,
@@ -62,7 +62,7 @@ function syllableVowels(letters: readonly string[]): number[] {
 }
 
 /** Which of a word's syllables, counted from 0, is stressed. */
-function stressedSyllable(word: string, letters: readonly string[], nuclei: readonly number[]): number {
+function stressedSyllable(letters: readonly string[], nuclei: readonly number[]): number {
   const lastWhere = <T>(list: readonly T[], test: (item: T) => boolean) => {
     for (let i = list.length - 1; i >= 0; i--) if (test(list[i])) return i;
     return -1;
@@ -77,7 +77,7 @@ function stressedSyllable(word: string, letters: readonly string[], nuclei: read
   const nasal = marked('ãõ');
   if (nasal >= 0) return nasal;
   const last = nuclei.length - 1;
-  return /([aeo]s?|am|em|ens)$/.test(word) ? Math.max(0, last - 1) : last;
+  return /([aeo]s?|am|em|ens)$/.test(letters.join('')) ? Math.max(0, last - 1) : last;
 }
 
 /** A vowel without its acute, grave or circumflex accent, which make it open or closed; a tilde, nasal, stays. */

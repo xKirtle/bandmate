@@ -27,8 +27,8 @@ import (
 // to build from. Keep dictionariesVersion in languagedata.go in step with it.
 const dictionariesCommit = "fe49c662796b47cb19732d18114610a58848f5cb"
 
-// word is a word as it's kept: lower-case Portuguese letters only.
-var word = regexp.MustCompile(`^[a-záàâãéêíóôõúüç]+$`)
+// keptWord matches a word as it's kept: lower-case Portuguese letters only.
+var keptWord = regexp.MustCompile(`^[a-záàâãéêíóôõúüç]+$`)
 
 // rare is the morphology of a suffix whose forms are left out.
 var rare = regexp.MustCompile(`T=(pic|pmp|fc|ip)\b|P=2,N=p`)
@@ -134,7 +134,7 @@ func expand(dic io.Reader, suffixes map[rune][]suffix) ([]string, error) {
 	for sc.Scan() {
 		entry, _, _ := strings.Cut(sc.Text(), "\t")
 		stem, flags, _ := strings.Cut(entry, "/")
-		if !word.MatchString(stem) {
+		if !keptWord.MatchString(stem) {
 			continue
 		}
 		seen[stem] = true
@@ -143,7 +143,7 @@ func expand(dic io.Reader, suffixes map[rune][]suffix) ([]string, error) {
 				if !strings.HasSuffix(stem, s.strip) || (s.condition != nil && !s.condition.MatchString(stem)) {
 					continue
 				}
-				if form := strings.TrimSuffix(stem, s.strip) + s.add; word.MatchString(form) {
+				if form := strings.TrimSuffix(stem, s.strip) + s.add; keptWord.MatchString(form) {
 					seen[form] = true
 				}
 			}

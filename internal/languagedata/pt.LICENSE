@@ -2,7 +2,10 @@ pt.txt.gz is made from the European Portuguese Hunspell dictionary, as
 LibreOffice ships it (https://github.com/LibreOffice/dictionaries, pt_PT).
 Bandmate uses it under the GNU Lesser General Public License, version 2.1
 (https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html), one of the
-licences its authors offer it under. Their notices follow.
+licences its authors offer it under. Section 3 of that licence lets it be
+used under the GNU General Public License instead, which is why it can
+ship in Bandmate, under the GNU Affero General Public License, version 3.
+Their notices follow.
 
 From README_pt_PT.txt:
 
