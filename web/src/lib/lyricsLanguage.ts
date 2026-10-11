@@ -85,12 +85,16 @@ const spellingRules: Record<string, (word: string) => number | null> = {
   pt: portugueseSyllables,
 };
 
+function isSpellingRules(code: string): boolean {
+  return code in spellingRules;
+}
+
 /**
- * Whether a Language is read from data the binary serves, which the page
- * fetches first: a dictionary Language is, a spelling-rules one isn't.
+ * Whether a Language needs data the binary serves, which the page fetches
+ * first: a dictionary Language does, a spelling-rules one doesn't.
  */
-export function readFromData(code: string): boolean {
-  return !(code in spellingRules);
+export function needsData(code: string): boolean {
+  return !isSpellingRules(code);
 }
 
 /**
@@ -106,13 +110,13 @@ export function lyricsLanguage(data: readonly LanguageData[]) {
    * that knows it, in order, or else by the first of their spelling rules;
    * null when none of them reads it.
    */
-  function read(word: string, languages: readonly string[]): number | null {
+  function readWord(word: string, languages: readonly string[]): number | null {
     for (const code of languages) {
       const pronunciations = byCode.get(code)?.pronunciations;
       const known = pronunciations?.get(word) ?? pronunciations?.get(trimApostrophes(word));
       if (known) return vowels(known[0]);
     }
-    const rules = languages.find((code) => code in spellingRules);
+    const rules = languages.find(isSpellingRules);
     return rules ? spellingRules[rules](word) : null;
   }
 
@@ -125,23 +129,23 @@ export function lyricsLanguage(data: readonly LanguageData[]) {
      * meanwhile.
      */
     syllableCount(text: string, languages: readonly string[]): SyllableCount | null {
-      if (languages.length === 0 || languages.some((code) => readFromData(code) && !byCode.has(code))) return null;
+      if (languages.length === 0 || languages.some((code) => needsData(code) && !byCode.has(code))) return null;
       const words = wordsOf(lyricsOf(text).lyrics);
       if (words.length === 0) return null;
       // Every Language Bandmate counts in has its rules for guessing; English's stand in for one that has none yet.
       const first = guessers[languages[0]] ?? guessers.en;
       // A number's words, as said in the first Language, are read in that Language.
-      const spoken = (word: string) => read(word, languages.slice(0, 1)) ?? first.letters(word);
+      const countSaid = (word: string) => readWord(word, languages.slice(0, 1)) ?? first.letters(word);
       let count = 0;
       let estimate = false;
       for (const { word } of words) {
-        const known = /\d/.test(word) ? null : read(word, languages);
+        const known = /\d/.test(word) ? null : readWord(word, languages);
         if (known !== null) {
           count += known;
           continue;
         }
         estimate = true;
-        count += guess(word, first, spoken);
+        count += guess(word, first, countSaid);
       }
       return { count, estimate };
     },
@@ -189,11 +193,11 @@ export function lyricsLanguage(data: readonly LanguageData[]) {
 }
 
 /** A word no Language reads, guessed: its numbers read aloud, its letters by the Language's rules. */
-function guess(word: string, guesser: Guesser, spoken: (word: string) => number): number {
+function guess(word: string, guesser: Guesser, countSaid: (word: string) => number): number {
   let count = 0;
   for (const run of word.match(/\d+|[^\d]+/g) ?? []) {
     if (/\d/.test(run)) {
-      for (const said of guesser.number(run)) count += spoken(said);
+      for (const said of guesser.number(run)) count += countSaid(said);
     } else {
       count += guesser.letters(run);
     }

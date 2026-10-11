@@ -109,6 +109,15 @@ describe('syllableCount in Portuguese', () => {
     ['Uruguai', 3], // u-ru-guai
     ['frequente', 3], // fre-quen-te
     ['partiu', 2], // par-tiu
+    ['traição', 3], // tra-i-ção: before ç
+    ['intuição', 4], // in-tu-i-ção
+    ['instituição', 5], // ins-ti-tu-i-ção
+    ['eleição', 3], // e-lei-ção: but a diphthong after e
+    ['reunião', 4], // re-u-ni-ão: a hiatus some words start with
+    ['proibido', 4], // pro-i-bi-do
+    ['suicídio', 5], // su-i-cí-di-o
+    ['miudinho', 4], // mi-u-di-nho
+    ['cairá', 3], // ca-i-rá
   ];
 
   it.each(words)('counts “%s” as %i', (word, syllables) => {
@@ -121,7 +130,7 @@ describe('syllableCount in Portuguese', () => {
   });
 
   it('reads accents however they were typed, and words joined by an apostrophe', () => {
-    expect(portuguese('coração')).toEqual({ count: 3, estimate: false });
+    expect(portuguese('coração'.normalize('NFD'))).toEqual({ count: 3, estimate: false });
     expect(portuguese('copo d’água')).toEqual({ count: 4, estimate: false });
   });
 

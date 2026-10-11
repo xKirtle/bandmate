@@ -10,10 +10,11 @@ function isVowel(letter: string | undefined): boolean {
 
 /**
  * A Portuguese word's syllables as written: one for each vowel that isn't a
- * glide in a diphthong, or a silent u. Null for a word with no vowel.
+ * glide in a diphthong, or a silent u. The word comes as the lyrics language
+ * module looks words up: composed, in lower case. Null for one with no vowel.
  */
 export function portugueseSyllables(word: string): number | null {
-  const letters = [...word.normalize('NFC').toLowerCase().replace(/['’‘]/g, '')];
+  const letters = [...word.replace(/'/g, '')];
   let count = 0;
   let afterGlide = false;
   letters.forEach((letter, i) => {
@@ -39,10 +40,18 @@ function isGlide(letters: readonly string[], i: number): boolean {
   // and not after itself: noite, pais, saudade, but voo, xiita.
   if (!'iuy'.includes(letter) || before === letter) return false;
   // Before nh, or a consonant of l, m, n, r or z that ends the syllable, it's
-  // a hiatus: rainha, ainda, cair, ruim, juiz, but reino.
+  // a hiatus: rainha, ainda, cair, ruim, juiz, but reino. So it is before ç
+  // after an a or u, as in traição and intuição, but not eleição; and in
+  // words starting as some do, such as reunião and proibido.
   const rest = letters.slice(i + 1).join('');
-  return !/^nh/.test(rest) && !new RegExp(`^[lmnrz](?![${vowels}])`).test(rest);
+  if (/^nh/.test(rest) || new RegExp(`^[lmnrz](?![${vowels}])`).test(rest)) return false;
+  if (rest.startsWith('ç') && (before === 'a' || before === 'u')) return false;
+  const word = letters.join('');
+  return !hiatusStarts.some((start) => i < start.length && word.startsWith(start));
 }
+
+/** Starts of words whose last two vowels make a hiatus that no other rule finds. */
+const hiatusStarts = ['reun', 'proib', 'suic', 'druid', 'miud', 'cair', 'sair'];
 
 const ones = [
   'zero',

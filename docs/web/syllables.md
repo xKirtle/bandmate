@@ -20,7 +20,7 @@ Read mode doesn't show them: it stays as it was, to play from.
 
 ## Estimates
 
-In an English song, a word the dictionary doesn't know, like slang, a name or "skrrt", is guessed from its spelling. A number in digits, like "24", is counted as it's usually said in the song's first language. Either way, the line's count shows as an estimate, such as `~7`, so you know not to trust it exactly.
+A word Bandmate can't read, like slang, a name or "skrrt" in an English song, or a word with no vowel in a Portuguese one, is guessed from its spelling. A number in digits, like "24", is counted as it's usually said in the song's first language. Either way, the line's count shows as an estimate, such as `~7`, so you know not to trust it exactly.
 
 The counts are only numbers: nothing flags a line whose meter doesn't match, as you may change the meter on purpose.
 
@@ -44,7 +44,7 @@ Where they show depends on how wide the window is:
 
 Bandmate counts in the languages set in the song's details, which start as English. It knows English and Portuguese.
 
-A song can be in both. Then each word is read in the language it belongs to: a word the English dictionary knows is counted as English, and any other word by Portuguese spelling rules, whichever order the languages are in. So a Portuguese word that's also an English one, such as "casa", is counted as English, which usually gives the same count.
+A song can be in both. Then each word is read in the language it belongs to: a word the English dictionary knows is counted as English, and any other word by Portuguese spelling rules, whichever order the languages are in. So a Portuguese word the English dictionary also lists is counted as English, and its count may be off: "eu" counts two, as the letters E.U.
 
 ## Turning them off
 

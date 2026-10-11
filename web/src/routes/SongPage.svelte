@@ -39,7 +39,7 @@
   import { fetchLanguageData, hasLanguageData, languageData } from '../lib/languageData.svelte';
   import {
     lyricsLanguage,
-    readFromData,
+    needsData,
     type CaretAt,
     type CaretListener,
     type SyllableCounter,
@@ -113,7 +113,7 @@
   // that fetched, once for as long as the page is open.
   const showingAids = $derived(writing && writingAids.value);
   $effect(() => {
-    if (showingAids) fetchLanguageData(languages.filter(readFromData));
+    if (showingAids) fetchLanguageData(languages.filter(needsData));
   });
   const lyrics = $derived(lyricsLanguage(languageData()));
   const syllables: SyllableCounter | undefined = $derived.by(() => {
@@ -121,9 +121,10 @@
     const counting = languages;
     return (text) => lyrics.syllableCount(text, counting);
   });
-  // Rhymes, while the writing aids show. The strip's are for the word at the caret of the Line that
-  // has focus. The card's are for that word too, kept once the caret
-  // leaves, or for one typed into it, until the caret moves in a Line again.
+  // Rhymes, while the writing aids show. The strip's are for the word at
+  // the caret of the Line that has focus. The card's are for that word too,
+  // kept once the caret leaves, or for one typed into it, until the caret
+  // moves in a Line again.
   let caret = $state<CaretAt | null>(null);
   let cardWord = $state<string | null>(null);
   const heardCaret: CaretListener = (at) => {
@@ -137,7 +138,7 @@
   // Only a dictionary Language suggests Rhymes for now, so they're in the
   // Song's first dictionary Language, and there are none in a Song that has
   // none, such as one sung only in Portuguese.
-  const rhymesLanguage = $derived(languages.find(readFromData) ?? null);
+  const rhymesLanguage = $derived(languages.find(needsData) ?? null);
   const rhymesLoading = $derived(rhymesLanguage !== null && !hasLanguageData(rhymesLanguage));
   const noRhymesIn = $derived(rhymesLanguage === null ? languagesLabel(languages) : null);
   const rhymesFor = (word: string | null) =>

@@ -85,7 +85,7 @@ type Language string
 var Languages = []Language{"en", "pt"}
 
 // checkLanguages refuses a Song's Languages unless there's at least one,
-// each is one Bandmate has data for, and none is listed twice.
+// each is one of Languages, and none is listed twice.
 func checkLanguages(languages []Language) error {
 	if len(languages) == 0 {
 		return domain.Invalid("a Song needs at least one language")
