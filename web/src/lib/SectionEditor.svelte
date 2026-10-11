@@ -7,6 +7,8 @@
   import { tick, untrack, type Snippet } from 'svelte';
   import ActionsMenu from './ActionsMenu.svelte';
   import AlternateText, { type Cueing } from './AlternateText.svelte';
+  import type { SyllableCounter } from './lyricsLanguage';
+  import SyllableCount from './SyllableCount.svelte';
   import { suggestedLabels, type Alternate, type Section } from './api';
   import Combobox from './Combobox.svelte';
   import type { LyricSheetEditing } from './lyricSheetEditing.svelte';
@@ -26,6 +28,7 @@
     cueing,
     drag,
     places = [],
+    syllables,
   }: {
     section: Section;
     /** Focus the Label when this becomes true, e.g. for a Section just added. */
@@ -44,6 +47,8 @@
     drag?: SectionDragging;
     /** Where in the Lyric Sheet an inactive Alternate can be moved to, as a Section of its own. */
     places?: Place[];
+    /** Given, each Line's Syllable Count shows beside it, in the text box and the Alternates' cards. */
+    syllables?: SyllableCounter;
   } = $props();
 
   // The server guarantees exactly one active Alternate.
@@ -290,8 +295,9 @@
                 <ActionsMenu label="More actions for {name}" entries={alternateActions(alt)} />
               {/if}
             </div>
-            <div class="lines" id="lines-{section.id}-{alt.id}">
+            <div class="lines" class:counted={syllables} id="lines-{section.id}-{alt.id}">
               {#each alt.lines as line (line.id)}
+                {#if syllables}<SyllableCount count={syllables(line.text)} />{/if}
                 <p>{line.text || ' '}</p>
               {:else}
                 <p class="muted">No Lines yet.</p>
@@ -314,7 +320,7 @@
     </div>
   {:else}
     {#key active.id}
-      <AlternateText alternate={active} sectionId={section.id} label="Lines" {editing} {cueing} />
+      <AlternateText alternate={active} sectionId={section.id} label="Lines" {editing} {cueing} {syllables} />
     {/key}
   {/if}
 </article>
@@ -483,6 +489,16 @@
   .lines p {
     margin: 0;
     white-space: pre-wrap;
+  }
+  /* Each Line's Syllable Count in a column before it, as in the text box. */
+  .lines.counted {
+    display: grid;
+    grid-template-columns: var(--count-slot) minmax(0, 1fr);
+    column-gap: var(--space-2);
+    align-items: start;
+  }
+  .lines.counted > .muted {
+    grid-column: 1 / -1;
   }
   .choosing-actions {
     display: flex;

@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/xKirtle/bandmate/internal/build"
+	"github.com/xKirtle/bandmate/internal/languagedata"
 )
 
 // webDependencies is the SPA build's manifest of the node_modules packages in
@@ -16,17 +17,19 @@ const webDependencies = "dependencies.json"
 
 // dependencies is the third-party packages that ship in Bandmate, as the
 // About page lists them: the Go modules the binary is built from, the web
-// packages in the SPA's bundle, and the programs bundled beside them in the
-// image.
+// packages in the SPA's bundle, the programs bundled beside them in the
+// image, and the data built into the binary, such as the dictionaries
+// syllables are counted from.
 type dependencies struct {
 	Go       []build.Dependency `json:"go"`
 	Web      []build.Dependency `json:"web"`
 	Programs []build.Dependency `json:"programs"`
+	Data     []build.Dependency `json:"data"`
 }
 
 // shipped is what ships: goModules, else the binary's own, the web packages
 // the built SPA recorded, if any, and the programs the image's build recorded
-// in programsManifest, if any.
+// in programsManifest, if any, and the data built into the binary.
 func shipped(goModules []build.Dependency, spa fs.FS, programsManifest string) dependencies {
 	if goModules == nil {
 		goModules = build.GoModules()
@@ -36,6 +39,7 @@ func shipped(goModules []build.Dependency, spa fs.FS, programsManifest string) d
 		Go:       listedGoModules(goModules),
 		Web:      recorded("the web app's dependencies", func() ([]byte, error) { return fs.ReadFile(spa, webDependencies) }),
 		Programs: recorded("the bundled programs", func() ([]byte, error) { return os.ReadFile(programsManifest) }),
+		Data:     languagedata.Credits(),
 	}
 }
 

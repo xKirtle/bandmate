@@ -58,6 +58,8 @@
   import { songChordsShown } from './chordsShown';
   import { lyricSize } from './sharedLyricSize.svelte';
   import { songTranspose } from './sharedTranspose.svelte';
+  import type { SyllableCounter } from './lyricsLanguage';
+  import { writingAids } from './sharedWritingAids.svelte';
 
   let {
     song,
@@ -70,6 +72,7 @@
     playFrom,
     recording = false,
     syncMode,
+    syllables,
   }: {
     song: Song;
     /** The Song page's mode: Write edits the raw text; Read shows Chords above the lyrics. */
@@ -98,6 +101,8 @@
     recording?: boolean;
     /** Sync mode, which the Lyric Sheet draws, and sends its switching, cueing and picking through. */
     syncMode: SyncMode;
+    /** Given, as in Write mode while the writing aids are on, each Line's Syllable Count shows beside it. */
+    syllables?: SyllableCounter;
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
@@ -396,6 +401,17 @@
         title="Clear every Cue in the Song">Clear all Cues</button
       >
     {/if}
+    {#if mode === 'write'}
+      <!-- Clicked, it keeps focus where it was, so Space then plays rather than switching them back off. -->
+      <button
+        type="button"
+        class="button toggle"
+        aria-pressed={writingAids.value}
+        onpointerdown={(e) => e.preventDefault()}
+        onclick={() => writingAids.set(!writingAids.value)}
+        title="Writing aids: count each Line's syllables as you write">Writing aids</button
+      >
+    {/if}
     {#if mode === 'write' && wide.current}
       <!-- Clicked, it keeps focus where it was, so Space then plays rather than switching it back off. -->
       <button
@@ -498,6 +514,7 @@
               autofocus={added === section.id}
               {editing}
               cueing={cueingFor(section)}
+              {syllables}
               more={sectionActions(section, i)}
               {drag}
               places={placesOut}

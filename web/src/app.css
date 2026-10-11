@@ -33,6 +33,9 @@
      and ✕ are each --cue-button wide, and the time takes the rest. */
   --cue-slot: 8.5rem;
   --cue-button: 1.25rem;
+  /* The column of Syllable Counts before each Line in Write mode: wide
+     enough for "~99", so the counts line up down a Section. */
+  --count-slot: 1.75rem;
   /* The height of calibration's metronome. */
   --metronome: 12rem;
 

@@ -2,8 +2,8 @@
   // Settings' This device tab: every Device Setting, the choices about how
   // Bandmate works on this device rather than any Song. Each applies at once,
   // in every one of this device's tabs, and is kept on this device. Those
-  // also changed where they're used, like Left-handed in the Chord Finder,
-  // are the same setting here.
+  // also changed where they're used, like Left-handed in the Chord Finder or
+  // the writing aids in the Lyric Sheet, are the same setting here.
   import { MediaQuery } from 'svelte/reactivity';
   import { palettes, themeChoices } from '../lib/appearance';
   import CalibrationSheet from '../lib/CalibrationSheet.svelte';
@@ -12,6 +12,7 @@
   import SettingsPage from '../lib/SettingsPage.svelte';
   import { appearance } from '../lib/sharedAppearance.svelte';
   import { leftHanded } from '../lib/sharedLeftHanded.svelte';
+  import { writingAids } from '../lib/sharedWritingAids.svelte';
 
   // Recording is offered only as wide as the Timeline offers editing, so
   // the Recording card is too. Narrower, it goes, closing the Input with it.
@@ -64,6 +65,25 @@
         <InputList metering={!calibrating} onCalibrate={(input, exact) => (calibrating = { input, exact })} />
       </section>
     {/if}
+
+    <section class="card" aria-labelledby="writing-heading">
+      <h2 id="writing-heading">Writing</h2>
+      <fieldset class="choice-group">
+        <label class="choice-row">
+          <input
+            type="checkbox"
+            role="switch"
+            checked={writingAids.value}
+            onchange={(e) => writingAids.set(e.currentTarget.checked)}
+            aria-describedby="writing-aids-note"
+          />
+          <span>Writing aids</span>
+        </label>
+        <p id="writing-aids-note" class="choice-under hint">
+          Counts each Line's syllables in Write mode, for every Song. Also in the Lyric Sheet's toolbar.
+        </p>
+      </fieldset>
+    </section>
 
     <section class="card" aria-labelledby="chord-diagrams-heading">
       <h2 id="chord-diagrams-heading">Chord diagrams</h2>

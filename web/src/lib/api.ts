@@ -665,13 +665,15 @@ export interface AboutInfo {
   details: string;
   /** The third-party packages that ship in Bandmate: the Go modules the
       server is built from, the web packages in the SPA's bundle, and the
-      programs bundled beside them in the image (none outside it). */
-  dependencies: { go: Dependency[]; web: Dependency[]; programs: Dependency[] };
+      programs bundled beside them in the image (none outside it), and the
+      data built into the binary, such as the dictionaries syllables are
+      counted from. */
+  dependencies: { go: Dependency[]; web: Dependency[]; programs: Dependency[]; data: Dependency[] };
 }
 
-/** A third-party package or program that ships in Bandmate. */
+/** A third-party package, program or set of data that ships in Bandmate. */
 export interface Dependency {
-  /** A Go module's path, a web package's name, or a program's name. */
+  /** A Go module's path, a web package's name, a program's name, or the data's. */
   name: string;
   version: string;
   /** Its SPDX identifier, e.g. MIT, or "Unknown" when it couldn't be identified. */
@@ -827,6 +829,8 @@ function onTracks(clips: readonly (PlacedClip | PastedClip)[]) {
 export const api = {
   getConfig: () => request<ServerConfig>('GET', '/config'),
   getAbout: () => request<AboutInfo>('GET', '/about'),
+  /** A Language's data, as text, to count syllables from: large, so the browser keeps it. */
+  getLanguageData: (code: string) => answer(fetch(`/api/languages/${encodeURIComponent(code)}`), (res) => res.text()),
   /** Asks GitHub, unless the server recently has, so it's slower than the rest of About. */
   getAboutReleases: () => request<ReleasesReport>('GET', '/about/releases'),
   /** Runs yt-dlp the first time, so it can be slower than the rest of About. */
