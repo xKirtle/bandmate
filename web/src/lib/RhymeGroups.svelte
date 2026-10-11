@@ -10,6 +10,7 @@
     word,
     rhymes,
     loading,
+    noRhymesIn,
     row = false,
     limit,
   }: {
@@ -19,6 +20,8 @@
     rhymes: Rhymes | null;
     /** Whether the Language's data is still on its way. */
     loading: boolean;
+    /** The Song's Languages, named, when Bandmate suggests Rhymes in none of them. */
+    noRhymesIn: string | null;
     /** Whether they take one row. */
     row?: boolean;
     /** The most of each group shown, nearest the word in syllables first. */
@@ -38,6 +41,8 @@
 
 {#if !word}
   <p class="muted message">Rhymes show here for the word at the cursor as you write.</p>
+{:else if noRhymesIn}
+  <p class="muted message">Bandmate doesn’t suggest Rhymes in {noRhymesIn} yet.</p>
 {:else if loading}
   <p class="muted message">Loading…</p>
 {:else if !rhymes}

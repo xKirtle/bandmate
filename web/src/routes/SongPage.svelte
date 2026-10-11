@@ -37,7 +37,14 @@
   import { songTranspose } from '../lib/sharedTranspose.svelte';
   import { writingAids } from '../lib/sharedWritingAids.svelte';
   import { fetchLanguageData, hasLanguageData, languageData } from '../lib/languageData.svelte';
-  import { lyricsLanguage, type CaretAt, type CaretListener, type SyllableCounter } from '../lib/lyricsLanguage';
+  import {
+    lyricsLanguage,
+    readFromData,
+    type CaretAt,
+    type CaretListener,
+    type SyllableCounter,
+  } from '../lib/lyricsLanguage';
+  import { languagesLabel } from '../lib/languages';
   import RhymesCard from '../lib/RhymesCard.svelte';
   import RhymesStrip from '../lib/RhymesStrip.svelte';
   import { timeAgo } from '../lib/time';
@@ -106,7 +113,7 @@
   // that fetched, once for as long as the page is open.
   const showingAids = $derived(writing && writingAids.value);
   $effect(() => {
-    if (showingAids) fetchLanguageData(languages);
+    if (showingAids) fetchLanguageData(languages.filter(readFromData));
   });
   const lyrics = $derived(lyricsLanguage(languageData()));
   const syllables: SyllableCounter | undefined = $derived.by(() => {
@@ -114,8 +121,7 @@
     const counting = languages;
     return (text) => lyrics.syllableCount(text, counting);
   });
-  // Rhymes, while the writing aids show, for now in the Song's first
-  // Language. The strip's are for the word at the caret of the Line that
+  // Rhymes, while the writing aids show. The strip's are for the word at the caret of the Line that
   // has focus. The card's are for that word too, kept once the caret
   // leaves, or for one typed into it, until the caret moves in a Line again.
   let caret = $state<CaretAt | null>(null);
@@ -128,8 +134,14 @@
   const onCaret = $derived(showingAids ? heardCaret : undefined);
   const lineFocused = $derived(showingAids && caret !== null);
   const caretWord = $derived(caret && lyrics.wordAt(caret.text, caret.caret));
-  const rhymesLoading = $derived(!hasLanguageData(languages[0]));
-  const rhymesFor = (word: string | null) => (showingAids && word ? lyrics.rhymes(word, languages[0]) : null);
+  // Only a dictionary Language suggests Rhymes for now, so they're in the
+  // Song's first dictionary Language, and there are none in a Song that has
+  // none, such as one sung only in Portuguese.
+  const rhymesLanguage = $derived(languages.find(readFromData) ?? null);
+  const rhymesLoading = $derived(rhymesLanguage !== null && !hasLanguageData(rhymesLanguage));
+  const noRhymesIn = $derived(rhymesLanguage === null ? languagesLabel(languages) : null);
+  const rhymesFor = (word: string | null) =>
+    showingAids && word && rhymesLanguage ? lyrics.rhymes(word, rhymesLanguage) : null;
   // The Details as Read mode shows them, with the key the Chords are shown in.
   const summary = $derived(
     details
@@ -584,6 +596,7 @@
                 setWord={(w) => (cardWord = w)}
                 rhymes={rhymesFor(cardWord)}
                 loading={rhymesLoading}
+                {noRhymesIn}
               />
             {:else}
               <summary><FoldChevron />Scrapbook</summary>
@@ -624,7 +637,7 @@
 {/if}
 
 {#if lineFocused && !desktop.current}
-  <RhymesStrip word={caretWord} rhymes={rhymesFor(caretWord)} loading={rhymesLoading} {timelineHeight} />
+  <RhymesStrip word={caretWord} rhymes={rhymesFor(caretWord)} loading={rhymesLoading} {noRhymesIn} {timelineHeight} />
 {/if}
 
 {#if showingShortcuts}

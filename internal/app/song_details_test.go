@@ -204,15 +204,26 @@ func TestASongsLanguagesCanBeSetAndAreKept(t *testing.T) {
 	ts := newTestServer(t)
 	created := ts.createSong("Midnight Drive")
 
-	got := ts.updateSong(created.ID, map[string]any{"languages": []string{"en"}, "key": "Am"})
+	got := ts.updateSong(created.ID, map[string]any{"languages": []string{"pt", "en"}, "key": "Am"})
 
 	want := created
-	want.Key, want.Version, want.UpdatedAt = "Am", got.Version, got.UpdatedAt
+	want.Key, want.Languages, want.Version, want.UpdatedAt = "Am", []string{"pt", "en"}, got.Version, got.UpdatedAt
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("song after setting its languages = %+v, want %+v", got, want)
 	}
-	if read := ts.getSong(created.ID); !reflect.DeepEqual(read.Languages, []string{"en"}) {
-		t.Errorf("languages read back = %q, want English", read.Languages)
+	if read := ts.getSong(created.ID); !reflect.DeepEqual(read.Languages, []string{"pt", "en"}) {
+		t.Errorf("languages read back = %q, want Portuguese, then English", read.Languages)
+	}
+}
+
+func TestASongCanBeSungInPortugueseAlone(t *testing.T) {
+	ts := newTestServer(t)
+	created := ts.createSong("Saudade")
+
+	ts.updateSong(created.ID, map[string]any{"languages": []string{"pt"}})
+
+	if read := ts.getSong(created.ID); !reflect.DeepEqual(read.Languages, []string{"pt"}) {
+		t.Errorf("languages read back = %q, want Portuguese", read.Languages)
 	}
 }
 

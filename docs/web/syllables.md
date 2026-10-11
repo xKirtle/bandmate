@@ -15,11 +15,12 @@ Read mode doesn't show them: it stays as it was, to play from.
 - **Chords aren't**: `[Am]Hello` counts as two syllables.
 - **A line of chords alone, or a blank line,** gets no count.
 - **A hyphenated word** counts as its parts: "ooh-ooh" counts like "ooh ooh".
-- **Words** are looked up in the [CMU Pronouncing Dictionary](https://github.com/cmusphinx/cmudict), which knows over 130,000 English words.
+- **English words** are looked up in the [CMU Pronouncing Dictionary](https://github.com/cmusphinx/cmudict), which knows over 130,000 of them.
+- **Portuguese words** are counted by Portuguese spelling rules, syllable by syllable as they're written: "coração" counts three, "saudade" three and "dia" two. Words aren't run together where one ends in a vowel and the next starts with one, so count those you sing as one syllable yourself.
 
 ## Estimates
 
-A word the dictionary doesn't know, like slang, a name or "skrrt", is guessed from its spelling. A number in digits, like "24", is counted as it's usually said. Either way, the line's count shows as an estimate, such as `~7`, so you know not to trust it exactly.
+In an English song, a word the dictionary doesn't know, like slang, a name or "skrrt", is guessed from its spelling. A number in digits, like "24", is counted as it's usually said in the song's first language. Either way, the line's count shows as an estimate, such as `~7`, so you know not to trust it exactly.
 
 The counts are only numbers: nothing flags a line whose meter doesn't match, as you may change the meter on purpose.
 
@@ -32,6 +33,8 @@ Rhymes are suggested for the word at the cursor in the line you're writing, or f
 
 Each rhyme shows its syllable count beside it, and those nearest your word in syllables come first, so you can pick one that fits the meter. The suggestions are only there to read: clicking one never changes your lyrics. A word the dictionary doesn't know gets no rhymes.
 
+Rhymes are only in English for now. A song that's in English and Portuguese gets English rhymes, and one sung only in Portuguese gets none.
+
 Where they show depends on how wide the window is:
 
 - **On a wide window**, a **Rhymes** card sits beside the lyric sheet, above the Scrapbook. It folds away like the Scrapbook, and keeps showing the last word once you click elsewhere. To look up any other word, type it into its field.
@@ -39,7 +42,9 @@ Where they show depends on how wide the window is:
 
 ## Languages
 
-Bandmate counts and rhymes in the languages set in the song's details, which start as English. For now, English is the only one it knows.
+Bandmate counts in the languages set in the song's details, which start as English. It knows English and Portuguese.
+
+A song can be in both. Then each word is read in the language it belongs to: a word the English dictionary knows is counted as English, and any other word by Portuguese spelling rules, whichever order the languages are in. So a Portuguese word that's also an English one, such as "casa", is counted as English, which usually gives the same count.
 
 ## Turning them off
 
@@ -47,4 +52,4 @@ Bandmate counts and rhymes in the languages set in the song's details, which sta
 
 ## Offline
 
-The counts and rhymes need no internet connection: the dictionary comes with Bandmate. The first time you write a song in a language, your browser downloads that dictionary from your Bandmate, about a megabyte, once. While Writing aids is off, it downloads nothing.
+The counts and rhymes need no internet connection: the dictionary comes with Bandmate. The first time you write a song in English, your browser downloads the dictionary from your Bandmate, about a megabyte, once. Portuguese needs no download. While Writing aids is off, it downloads nothing.

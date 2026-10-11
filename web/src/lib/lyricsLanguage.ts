@@ -2,9 +2,13 @@
 // the word at the caret, worked out in the browser from each Language's
 // data, which the binary serves (ADR 0018).
 // A Line's Chords are left out, a hyphenated word counts as its parts, and
-// each word is read in the first of the Song's Languages that knows it; one
-// that none knows, or a number in digits, is guessed from its spelling in
-// the Song's first Language, and the count marked as an estimate.
+// each word is read by the first of the Song's dictionary Languages that
+// knows it, in the Song's order, or else by the first of its spelling-rules
+// Languages, which reads any word with a vowel. One that none of them reads,
+// or a number in digits, is guessed in the Song's first Language, and the
+// count marked as an estimate.
+
+import { portugueseNumber, portugueseSyllables } from './portuguese';
 
 /** A Language's data, read from what the binary serves for it. */
 export interface LanguageData {
@@ -60,7 +64,7 @@ export function readLanguageData(code: string, text: string): LanguageData {
   return { code, pronunciations };
 }
 
-/** What a Language does with a word no Language of the Song knows. */
+/** What a Language does with a word no Language of the Song reads. */
 interface Guesser {
   /** A word's syllables guessed from its letters. */
   letters: (word: string) => number;
@@ -70,7 +74,24 @@ interface Guesser {
 
 const guessers: Record<string, Guesser> = {
   en: { letters: guessEnglish, number: englishNumber },
+  pt: { letters: (word) => portugueseSyllables(word) ?? 1, number: portugueseNumber },
 };
+
+/**
+ * The spelling-rules Languages: each counts a word's syllables from how it's
+ * written, with no data, or gives null for a word it can't read.
+ */
+const spellingRules: Record<string, (word: string) => number | null> = {
+  pt: portugueseSyllables,
+};
+
+/**
+ * Whether a Language is read from data the binary serves, which the page
+ * fetches first: a dictionary Language is, a spelling-rules one isn't.
+ */
+export function readFromData(code: string): boolean {
+  return !(code in spellingRules);
+}
 
 /**
  * The lyrics language work over the Languages whose data has been read: a
@@ -80,39 +101,47 @@ const guessers: Record<string, Guesser> = {
 export function lyricsLanguage(data: readonly LanguageData[]) {
   const byCode = new Map(data.map((d) => [d.code, d]));
 
-  /** A word's syllables from the first of the Languages that knows it, or null. */
-  function lookUp(word: string, languages: readonly LanguageData[]): number | null {
-    for (const language of languages) {
-      const known = language.pronunciations.get(word) ?? language.pronunciations.get(trimApostrophes(word));
+  /**
+   * A word's syllables, read by the first of these Languages' dictionaries
+   * that knows it, in order, or else by the first of their spelling rules;
+   * null when none of them reads it.
+   */
+  function read(word: string, languages: readonly string[]): number | null {
+    for (const code of languages) {
+      const pronunciations = byCode.get(code)?.pronunciations;
+      const known = pronunciations?.get(word) ?? pronunciations?.get(trimApostrophes(word));
       if (known) return vowels(known[0]);
     }
-    return null;
+    const rules = languages.find((code) => code in spellingRules);
+    return rules ? spellingRules[rules](word) : null;
   }
 
   return {
     /**
      * A Line's Syllable Count, from its text as written with Chords inline,
      * in a Song sung in `languages`, in order. Null for a Chord Line, a
-     * blank Line or one with no words, and until one of the Languages has
-     * its data.
+     * blank Line or one with no words, and until each of its dictionary
+     * Languages has its data, so no word is read by the wrong Language
+     * meanwhile.
      */
     syllableCount(text: string, languages: readonly string[]): SyllableCount | null {
-      const loaded = languages.flatMap((code) => byCode.get(code) ?? []);
-      // Every Language Bandmate has data for has its rules for guessing; English's stand in for one that has none yet.
-      const first = guessers[languages[0]] ?? guessers.en;
-      if (loaded.length === 0) return null;
+      if (languages.length === 0 || languages.some((code) => readFromData(code) && !byCode.has(code))) return null;
       const words = wordsOf(lyricsOf(text).lyrics);
       if (words.length === 0) return null;
+      // Every Language Bandmate counts in has its rules for guessing; English's stand in for one that has none yet.
+      const first = guessers[languages[0]] ?? guessers.en;
+      // A number's words, as said in the first Language, are read in that Language.
+      const spoken = (word: string) => read(word, languages.slice(0, 1)) ?? first.letters(word);
       let count = 0;
       let estimate = false;
       for (const { word } of words) {
-        const known = /\d/.test(word) ? null : lookUp(word, loaded);
+        const known = /\d/.test(word) ? null : read(word, languages);
         if (known !== null) {
           count += known;
           continue;
         }
         estimate = true;
-        count += guess(word, first, (w) => lookUp(w, loaded));
+        count += guess(word, first, spoken);
       }
       return { count, estimate };
     },
@@ -159,12 +188,12 @@ export function lyricsLanguage(data: readonly LanguageData[]) {
   };
 }
 
-/** A word no Language knows, guessed: its numbers read aloud, its letters by the Language's rules. */
-function guess(word: string, guesser: Guesser, lookUp: (word: string) => number | null): number {
+/** A word no Language reads, guessed: its numbers read aloud, its letters by the Language's rules. */
+function guess(word: string, guesser: Guesser, spoken: (word: string) => number): number {
   let count = 0;
   for (const run of word.match(/\d+|[^\d]+/g) ?? []) {
     if (/\d/.test(run)) {
-      for (const spoken of guesser.number(run)) count += lookUp(spoken) ?? guesser.letters(spoken);
+      for (const said of guesser.number(run)) count += spoken(said);
     } else {
       count += guesser.letters(run);
     }
@@ -177,9 +206,9 @@ function vowels(phones: readonly string[]): number {
   return phones.filter((p) => /\d$/.test(p)).length;
 }
 
-/** A word as it's looked up: in lower case, its curly apostrophes straight, none at either end. */
+/** A word as it's looked up: its accents composed, in lower case, its curly apostrophes straight, none at either end. */
 function normalWord(word: string): string {
-  return trimApostrophes(word.toLowerCase().replace(/[’‘]/g, "'"));
+  return trimApostrophes(word.normalize('NFC').toLowerCase().replace(/[’‘]/g, "'"));
 }
 
 function trimApostrophes(word: string): string {

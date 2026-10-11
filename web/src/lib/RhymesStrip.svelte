@@ -13,6 +13,7 @@
     word,
     rhymes,
     loading,
+    noRhymesIn,
     timelineHeight,
   }: {
     /** The word Rhymes are for, or null while there's none. */
@@ -20,6 +21,8 @@
     rhymes: Rhymes | null;
     /** Whether the Language's data is still on its way. */
     loading: boolean;
+    /** The Song's Languages, named, when Bandmate suggests Rhymes in none of them. */
+    noRhymesIn: string | null;
     /** How tall the docked Timeline is, in pixels, to sit above it. */
     timelineHeight: number;
   } = $props();
@@ -33,7 +36,7 @@
   onpointerdown={(e) => e.preventDefault()}
 >
   {#if word}<strong class="word">{word}</strong>{/if}
-  <RhymeGroups {word} {rhymes} {loading} row limit={40} />
+  <RhymeGroups {word} {rhymes} {loading} {noRhymesIn} row limit={40} />
 </aside>
 
 <style>
