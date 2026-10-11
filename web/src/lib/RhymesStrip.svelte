@@ -4,28 +4,22 @@
   // caret, scrolled sideways. It sits above the docked Timeline and the
   // navigation, or above the on-screen keyboard while that's up. Pressing
   // on it leaves focus in the Line, so the keyboard stays up and the strip
-  // stays.
-  import type { Rhymes } from './lyricsLanguage';
+  // stays. In a Song of several Languages, they're in the one the word is
+  // read in.
+  import type { RhymeLookup } from './rhymeLookup';
   import RhymeGroups from './RhymeGroups.svelte';
   import { keyboardInset } from './keyboardInset.svelte';
 
   let {
-    word,
-    rhymes,
-    loading,
-    noRhymesIn,
+    lookup,
     timelineHeight,
   }: {
-    /** The word Rhymes are for, or null while there's none. */
-    word: string | null;
-    rhymes: Rhymes | null;
-    /** Whether the Language's data is still on its way. */
-    loading: boolean;
-    /** The Song's Languages, named, when Bandmate suggests Rhymes in none of them. */
-    noRhymesIn: string | null;
+    lookup: RhymeLookup;
     /** How tall the docked Timeline is, in pixels, to sit above it. */
     timelineHeight: number;
   } = $props();
+
+  const word = $derived(lookup.word);
 </script>
 
 <aside
@@ -36,7 +30,7 @@
   onpointerdown={(e) => e.preventDefault()}
 >
   {#if word}<strong class="word">{word}</strong>{/if}
-  <RhymeGroups {word} {rhymes} {loading} {noRhymesIn} row limit={40} />
+  <RhymeGroups {lookup} row limit={40} />
 </aside>
 
 <style>

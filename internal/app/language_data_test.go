@@ -94,3 +94,29 @@ func TestAboutCreditsTheDataThatShips(t *testing.T) {
 		t.Errorf("CMU Pronouncing Dictionary = %+v, want a version and BSD-2-Clause", d)
 	}
 }
+
+func TestPortugueseWordsAreServedFromTheBinary(t *testing.T) {
+	ts := newTestServer(t)
+
+	res := ts.Do(http.MethodGet, "/api/languages/pt", nil)
+
+	expectStatus(t, res, http.StatusOK)
+	// Words, with the forms they're sung in, to suggest Rhymes from.
+	for _, word := range []string{"coração", "canção", "amores", "cantava"} {
+		if !strings.Contains(string(res.Body), "\n"+word+"\n") {
+			t.Errorf("Portuguese data doesn't hold %q", word)
+		}
+	}
+}
+
+func TestAboutCreditsThePortugueseWordList(t *testing.T) {
+	got := getDependencies(t, func(*app.Config) {})
+
+	i := slices.IndexFunc(got.Data, func(d dependency) bool { return strings.Contains(d.Name, "Portuguese") })
+	if i < 0 {
+		t.Fatalf("data = %+v, want the Portuguese word list", got.Data)
+	}
+	if d := got.Data[i]; d.Version == "" || !strings.Contains(d.License, "LGPL-2.1") {
+		t.Errorf("Portuguese word list = %+v, want a version and a licence that offers LGPL-2.1", d)
+	}
+}

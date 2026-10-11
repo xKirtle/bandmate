@@ -4,30 +4,21 @@
   // reference only: nothing here can be clicked, so a Rhyme never goes into
   // the Lyric Sheet. Wrapped onto as many rows as they take, as in the
   // Rhymes card, or on one row, as in the strip, which scrolls it sideways.
-  import type { Rhymes } from './lyricsLanguage';
+  import type { RhymeLookup } from './rhymeLookup';
 
   let {
-    word,
-    rhymes,
-    loading,
-    noRhymesIn,
+    lookup,
     row = false,
     limit,
   }: {
-    /** The word Rhymes are for, or null while there's none. */
-    word: string | null;
-    /** The word's Rhymes, or null when its Language doesn't know it. */
-    rhymes: Rhymes | null;
-    /** Whether the Language's data is still on its way. */
-    loading: boolean;
-    /** The Song's Languages, named, when Bandmate suggests Rhymes in none of them. */
-    noRhymesIn: string | null;
+    lookup: RhymeLookup;
     /** Whether they take one row. */
     row?: boolean;
     /** The most of each group shown, nearest the word in syllables first. */
     limit: number;
   } = $props();
 
+  const { word, rhymes, loading } = $derived(lookup);
   const groups = $derived(
     rhymes
       ? [
@@ -41,8 +32,6 @@
 
 {#if !word}
   <p class="muted message">Rhymes show here for the word at the cursor as you write.</p>
-{:else if noRhymesIn}
-  <p class="muted message">No Rhymes in {noRhymesIn} yet.</p>
 {:else if loading}
   <p class="muted message">Loading…</p>
 {:else if !rhymes}

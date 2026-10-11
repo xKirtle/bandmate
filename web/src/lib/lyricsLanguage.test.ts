@@ -3,11 +3,17 @@ import { gunzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { lyricsLanguage, readLanguageData } from './lyricsLanguage';
 
-// English as the binary serves it: the CMU Pronouncing Dictionary.
-const english = readLanguageData(
-  'en',
-  gunzipSync(readFileSync(new URL('../../../internal/languagedata/en.txt.gz', import.meta.url))).toString('utf8'),
-);
+// Each Language's data as the binary serves it: for English, the CMU
+// Pronouncing Dictionary; for Portuguese, a word list.
+const served = (code: string) =>
+  readLanguageData(
+    code,
+    gunzipSync(readFileSync(new URL(`../../../internal/languagedata/${code}.txt.gz`, import.meta.url))).toString(
+      'utf8',
+    ),
+  );
+const english = served('en');
+const portugueseWords = served('pt');
 const lyrics = lyricsLanguage([english]);
 const count = (line: string) => lyrics.syllableCount(line, ['en']);
 
@@ -208,6 +214,91 @@ describe('rhymes', () => {
   it('gives no Rhymes for a word the Language does not know, or one without its data', () => {
     expect(rhymes('skrrt')).toBeNull();
     expect(lyricsLanguage([]).rhymes('night', 'en')).toBeNull();
+  });
+});
+
+describe('rhymes in Portuguese', () => {
+  const both = lyricsLanguage([english, portugueseWords]);
+  const rhymes = (word: string) => both.rhymes(word, 'pt');
+  const words = (list: { word: string }[]) => list.map((r) => r.word);
+
+  it('gives perfect Rhymes from the word list, each with its Syllable Count', () => {
+    const { perfect } = rhymes('coração')!;
+    expect(perfect).toContainEqual({ word: 'canção', count: 2 });
+    expect(perfect).toContainEqual({ word: 'paixão', count: 2 });
+    expect(perfect).toContainEqual({ word: 'mão', count: 1 });
+    expect(perfect).toContainEqual({ word: 'solidão', count: 3 });
+  });
+
+  it('gives near Rhymes, matching only the vowels, apart from the perfect ones', () => {
+    const { perfect, near } = rhymes('amor')!;
+    expect(perfect).toContainEqual({ word: 'flor', count: 1 });
+    expect(near).toContainEqual({ word: 'sol', count: 1 });
+    expect(near).toContainEqual({ word: 'voz', count: 1 });
+    expect(words(near)).not.toContain('flor');
+    expect(words(perfect)).not.toContain('sol');
+  });
+
+  it('matches from the stressed syllable, as the spelling rules find it', () => {
+    // On the next to last syllable: a word ending in a, e or o, or in am, em or ens.
+    expect(words(rhymes('saudade')!.perfect)).toContain('cidade');
+    expect(words(rhymes('noite')!.perfect)).toContain('afoite');
+    // On the last: any other ending.
+    expect(words(rhymes('cantar')!.perfect)).toContain('mar');
+    expect(words(rhymes('aqui')!.perfect)).toContain('ali');
+    // Where an accent marks it.
+    expect(words(rhymes('história')!.perfect)).toContain('glória');
+    expect(words(rhymes('café')!.perfect)).toContain('pé');
+    expect(words(rhymes('história')!.perfect)).not.toContain('ria');
+  });
+
+  it('matches endings spelt apart but said alike', () => {
+    expect(words(rhymes('dança')!.perfect)).toContain('cansa');
+    expect(words(rhymes('beleza')!.perfect)).toContain('mesa');
+    expect(words(rhymes('praça')!.perfect)).toContain('massa');
+    expect(words(rhymes('você')!.perfect)).toContain('porquê');
+  });
+
+  it('reads a word the list lacks by the rules, however its accents were typed', () => {
+    expect(words(rhymes('saudadezinha')!.perfect)).toContain('rainha');
+    expect(rhymes('coração'.normalize('NFD'))).toEqual(rhymes('coração'));
+  });
+
+  it('lists the Rhymes nearest the word in syllables first, and leaves out the word itself', () => {
+    const { perfect, near } = rhymes('Coração')!;
+    const counts = perfect.map((r) => r.count);
+    expect(counts.slice(0, 5)).toEqual([3, 3, 3, 3, 3]);
+    expect([...perfect, ...near].map((r) => r.word)).not.toContain('coração');
+  });
+
+  it('gives no Rhymes for a word with no vowel to read, or without the word list', () => {
+    expect(rhymes('hmm')).toBeNull();
+    expect(rhymes('24')).toBeNull();
+    expect(lyrics.rhymes('coração', 'pt')).toBeNull();
+  });
+
+  it("leaves Portuguese counts to the spelling rules, so they don't wait for the word list", () => {
+    expect(lyricsLanguage([]).syllableCount('coração', ['pt'])).toEqual({ count: 3, estimate: false });
+  });
+});
+
+describe('languageOf', () => {
+  const both = lyricsLanguage([english, portugueseWords]);
+
+  it('gives the Language a word is read in, so its Rhymes start there', () => {
+    expect(both.languageOf('night', ['pt', 'en'])).toBe('en');
+    expect(both.languageOf('Saudade', ['en', 'pt'])).toBe('pt');
+    expect(both.languageOf('coração', ['pt'])).toBe('pt');
+  });
+
+  it("gives the Song's first Language for a word none of them reads", () => {
+    expect(both.languageOf('24', ['pt', 'en'])).toBe('pt');
+    expect(both.languageOf('skrrt', ['en'])).toBe('en');
+  });
+
+  it('gives none until the dictionary Languages have their data', () => {
+    expect(lyricsLanguage([portugueseWords]).languageOf('saudade', ['en', 'pt'])).toBeNull();
+    expect(both.languageOf('night', [])).toBeNull();
   });
 });
 

@@ -31,9 +31,12 @@ Rhymes are suggested for the word at the cursor in the line you're writing, or f
 - **Perfect rhymes** come first: they sound the same from the word's last stressed vowel to its end, like "night" and "tonight".
 - **Near rhymes** follow, in a group of their own: only their vowels match from there, like "night" and "life".
 
-Each rhyme shows its syllable count beside it, and those nearest your word in syllables come first, so you can pick one that fits the meter. The suggestions are only there to read: clicking one never changes your lyrics. A word the dictionary doesn't know gets no rhymes.
+Each rhyme shows its syllable count beside it, and those nearest your word in syllables come first, so you can pick one that fits the meter. The suggestions are only there to read: clicking one never changes your lyrics.
 
-Rhymes are only in English for now. A song that's in English and Portuguese gets English rhymes, and one sung only in Portuguese gets none.
+- **English rhymes** come from the dictionary, so a word it doesn't know gets none.
+- **Portuguese rhymes** come from a Portuguese word list, plurals and verb tenses included, and any Portuguese word gets them: "coração" rhymes with "canção", and "saudade" with "cidade". Endings spelt differently but said alike rhyme too, like "dança" and "cansa".
+
+In a song with more than one language, a word's rhymes are in the language it's read in (see [Languages](#languages)), never mixing the two. To see rhymes for it in another of the song's languages, pick that language above the rhymes in the Rhymes card.
 
 Where they show depends on how wide the window is:
 
@@ -52,4 +55,4 @@ A song can be in both. Then each word is read in the language it belongs to: a w
 
 ## Offline
 
-The counts and rhymes need no internet connection: the dictionary comes with Bandmate. The first time you write a song in English, your browser downloads the dictionary from your Bandmate, about a megabyte, once. Portuguese needs no download. While Writing aids is off, it downloads nothing.
+The counts and rhymes need no internet connection: the dictionary comes with Bandmate. The first time you write a song in English, your browser downloads the dictionary from your Bandmate, about a megabyte, once. The first time you write one in Portuguese, it downloads the Portuguese word list the same way, a little under a megabyte. While Writing aids is off, it downloads nothing.
