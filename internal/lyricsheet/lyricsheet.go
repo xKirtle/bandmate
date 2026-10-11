@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"slices"
 	"strings"
 	"time"
 
@@ -55,13 +56,16 @@ type Song struct {
 	Status  Status              `json:"status"`
 	// Key, BPM, Capo and Tuning record how to play the Song. Empty text and
 	// nil numbers mean "not set".
-	Key       string    `json:"key"`
-	BPM       *int      `json:"bpm"`
-	Capo      *int      `json:"capo"`
-	Tuning    string    `json:"tuning"`
-	Notes     string    `json:"notes"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	Key    string `json:"key"`
+	BPM    *int   `json:"bpm"`
+	Capo   *int   `json:"capo"`
+	Tuning string `json:"tuning"`
+	// Languages are those the Song's Lines are sung in, as the user ordered
+	// them: always at least one, each one of Languages.
+	Languages []Language `json:"languages"`
+	Notes     string     `json:"notes"`
+	CreatedAt time.Time  `json:"createdAt"`
+	UpdatedAt time.Time  `json:"updatedAt"`
 	LyricSheet
 	// Masters are in the order they were added.
 	Masters []Master `json:"masters"`
@@ -69,6 +73,33 @@ type Song struct {
 	Cover *Cover `json:"cover"`
 	// Tags are the names of the Tags the Song carries, by name ignoring case.
 	Tags []string `json:"tags"`
+}
+
+// Language is a language a Song's Lines can be sung in, by its ISO 639-1
+// code, e.g. "en".
+type Language string
+
+// Languages lists every Language Bandmate has data for, and so can count
+// and rhyme in. A Song's Languages are picked from them.
+var Languages = []Language{"en"}
+
+// checkLanguages refuses a Song's Languages unless there's at least one,
+// each is one Bandmate has data for, and none is listed twice.
+func checkLanguages(languages []Language) error {
+	if len(languages) == 0 {
+		return domain.Invalid("a Song needs at least one language")
+	}
+	seen := map[Language]bool{}
+	for _, l := range languages {
+		if !slices.Contains(Languages, l) {
+			return domain.Invalid(fmt.Sprintf("there's no language %q", l))
+		}
+		if seen[l] {
+			return domain.Invalid(fmt.Sprintf("%q is listed twice", l))
+		}
+		seen[l] = true
+	}
+	return nil
 }
 
 // SongSummary is a Song as shown in the Song list.
@@ -195,12 +226,12 @@ func insertSong(ctx context.Context, tx *sql.Tx, title string, folderID *int64) 
 func (s *Store) GetSong(ctx context.Context, id int64) (Song, error) {
 	var song Song
 	var bpm, capo sql.NullInt64
-	var created, updated, tags string
+	var languages, created, updated, tags string
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, version, title, status, song_key, bpm, capo, tuning, notes, created_at, updated_at, `+songTags+`
+		`SELECT id, version, title, status, song_key, bpm, capo, tuning, languages, notes, created_at, updated_at, `+songTags+`
 		 FROM songs WHERE id = ?`, id).
-		Scan(&song.ID, &song.Version, &song.Title, &song.Status, &song.Key, &bpm, &capo, &song.Tuning, &song.Notes,
-			&created, &updated, &tags)
+		Scan(&song.ID, &song.Version, &song.Title, &song.Status, &song.Key, &bpm, &capo, &song.Tuning, &languages,
+			&song.Notes, &created, &updated, &tags)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Song{}, domain.ErrNotFound
 	}
@@ -208,6 +239,9 @@ func (s *Store) GetSong(ctx context.Context, id int64) (Song, error) {
 		return Song{}, fmt.Errorf("reading song: %w", err)
 	}
 	song.BPM, song.Capo = intOrNil(bpm), intOrNil(capo)
+	if err := json.Unmarshal([]byte(languages), &song.Languages); err != nil {
+		return Song{}, fmt.Errorf("reading song's languages: %w", err)
+	}
 	if song.CreatedAt, err = domain.ParseTime(created); err != nil {
 		return Song{}, err
 	}
@@ -338,7 +372,9 @@ type SongChanges struct {
 	BPM    domain.Change[*int]   `json:"bpm"`
 	Capo   domain.Change[*int]   `json:"capo"`
 	Tuning domain.Change[string] `json:"tuning"`
-	Notes  domain.Change[string] `json:"notes"`
+	// Languages replaces the Song's Languages with these, in this order.
+	Languages domain.Change[[]Language] `json:"languages"`
+	Notes     domain.Change[string]     `json:"notes"`
 }
 
 // UpdateSong applies changes to a Song. Every change is validated before
@@ -379,6 +415,16 @@ func (s *Store) UpdateSong(ctx context.Context, id int64, based songversion.Vers
 	}
 	if c := changes.Tuning; c.Set {
 		set("tuning", strings.TrimSpace(c.Value))
+	}
+	if c := changes.Languages; c.Set {
+		if err := checkLanguages(c.Value); err != nil {
+			return Song{}, err
+		}
+		languages, err := json.Marshal(c.Value)
+		if err != nil {
+			return Song{}, err
+		}
+		set("languages", string(languages))
 	}
 	if c := changes.Notes; c.Set {
 		set("notes", c.Value)

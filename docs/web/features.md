@@ -16,7 +16,7 @@ Write lyrics the way you would in a notebook, with the chords right where you pl
 <img src="@screenshots/write-mode-labelled.png" alt="A song in Write mode, numbered 1 to 9 to match the list below it">
 
 1. **Status**: where the song is at: an idea, a draft, or finished.
-2. **Song details**: its key, tempo, capo and tuning, and notes of your own.
+2. **Song details**: its key, tempo, capo and tuning, the languages it's sung in, and notes of your own.
 3. **Write and Read**: Read mode shows the song large and uncluttered, to play from. Finished songs open in it.
 4. **A section**: one part of the song, named however you like: a verse, a chorus, a hook. Move sections around, or repeat one wherever it comes back.
 5. **Chords**: typed in brackets right before the syllable they land on, even mid-word. Read mode shows them above the words.

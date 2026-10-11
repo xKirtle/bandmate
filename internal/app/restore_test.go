@@ -378,8 +378,9 @@ func TestABackupMadeByAnOlderBandmateRestores(t *testing.T) {
 		t.Fatalf("restored = %+v, want Night Drive", restored)
 	}
 	s := ts.getSong(restored[0].ID)
-	if s.Status != "drafting" || s.Key != "Am" || s.Version != 7 || len(s.Sections) != 1 {
-		t.Errorf("song = %+v, want it as backed up", s)
+	if s.Status != "drafting" || s.Key != "Am" || s.Version != 7 || len(s.Sections) != 1 ||
+		!reflect.DeepEqual(s.Languages, []string{"en"}) {
+		t.Errorf("song = %+v, want it as backed up, sung in English", s)
 	}
 	if got := s.Sections[0].Alternates[0].Lines; len(got) != 1 || got[0].Text != "Drive, [Am]drive" || got[0].Cue == nil || *got[0].Cue != 4 {
 		t.Errorf("lines = %+v, want the cued Line", got)
