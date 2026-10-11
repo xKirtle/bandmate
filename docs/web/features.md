@@ -25,7 +25,7 @@ Write lyrics the way you would in a notebook, with the chords right where you pl
 8. **Line timings**: when each line starts in the song, set as you [sync](#sync). They appear once the [timeline](#timeline) has some audio on it: a beat, a take or another sound.
 9. **Scrapbook**: sections that aren't in the song: leftovers and ideas to come back to.
 
-Each line also shows how many syllables it has, to the left of it, so you can keep the meter as you write. See [Syllable counts](/syllables).
+Each line also shows how many syllables it has, to the left of it, so you can keep the meter as you write, and Bandmate suggests rhymes for the word you're writing. See [Syllable counts and rhymes](/syllables).
 
 And this is Read mode, here on a phone: the chords over the words, and how to play each one at the top. The button at the top right sets the text size, hides or transposes the chords, and shows or pins the chord shapes.
 
@@ -173,7 +173,7 @@ A Backup restores into the same version of Bandmate or a newer one. To copy ever
 - **This device**: what each device keeps for itself.
   - **Appearance**: three colour palettes, Terracotta (the default), Ink and Olive, each in light and dark. Follow your system's light or dark, or pick one. More palettes may come.
   - **Recording**: every input on this device, each channel of an audio interface on its own, with its latency or "Not calibrated" or "Skipped". Pick the one you record from, and check its level with **Test input** above the list: Bandmate only listens while it's on, and asks for the microphone the first time. Open any of them to calibrate it as in [Calibrate](#calibrate) without recording from it, or type its latency. Inputs that aren't plugged in keep their latency, listed under **Not connected**, to forget.
-  - **Writing**: turn the [syllable counts](/syllables) on or off.
+  - **Writing**: turn the [syllable counts and rhymes](/syllables) on or off.
   - **Chord diagrams**: flip them for left-handed playing.
 - **Backups**: see [Backups](#backups).
 - **About**: the version you're running, what changed in it, whether a newer one is out, the yt-dlp in use, and the packages and data that ship in Bandmate, with their licenses.

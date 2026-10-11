@@ -8,7 +8,7 @@
   import type { SectionDragging } from './sectionDragging.svelte';
   import ActionsMenu from './ActionsMenu.svelte';
   import SectionEditor from './SectionEditor.svelte';
-  import type { SyllableCounter } from './lyricsLanguage';
+  import type { CaretListener, SyllableCounter } from './lyricsLanguage';
   import SyllableCount from './SyllableCount.svelte';
   import { card, describe, labelOf, places, putBackActions, sectionsInArrangement } from './sections';
 
@@ -17,6 +17,7 @@
     drag,
     editing,
     syllables,
+    onCaret,
   }: {
     song: Song;
     /** The drag of a Section, shared with the Lyric Sheet. */
@@ -29,6 +30,8 @@
     editing: LyricSheetEditing;
     /** Given, as in Write mode while the writing aids are on, each Line's Syllable Count shows beside it. */
     syllables?: SyllableCounter;
+    /** Given, as in Write mode while the writing aids are on, hears where the caret is in the open Section's Lines, to suggest Rhymes. */
+    onCaret?: CaretListener;
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
@@ -162,6 +165,7 @@
               {drag}
               places={placesBack}
               {syllables}
+              {onCaret}
             >
               {#snippet grip()}
                 {@render dragGrip(section.id)}

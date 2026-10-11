@@ -32,16 +32,19 @@ export function detailsSummary(
 }
 
 /** A part of the Song page kept beside the Lyric Sheet on desktop, and after it on narrower windows. */
-export type SidePart = 'scrapbook' | 'masters';
+export type SidePart = 'rhymes' | 'scrapbook' | 'masters';
 
 /**
  * The side column's parts in order, and whether each starts open on desktop.
  * Write mode gives the Scrapbook the room, with the Masters folded away
- * beneath it; Read mode has no Scrapbook, so the Masters show.
+ * beneath it, and Rhymes above it while they show, nearest the top so they
+ * stay in sight as the Lines are written; Read mode has no Scrapbook or
+ * Rhymes, so the Masters show.
  */
-export function sideParts(mode: Mode): { part: SidePart; open: boolean }[] {
+export function sideParts(mode: Mode, { rhymes = false } = {}): { part: SidePart; open: boolean }[] {
   return mode === 'write'
     ? [
+        ...(rhymes ? [{ part: 'rhymes' as const, open: true }] : []),
         { part: 'scrapbook', open: true },
         { part: 'masters', open: false },
       ]

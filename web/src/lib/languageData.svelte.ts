@@ -13,6 +13,11 @@ export function languageData(): LanguageData[] {
   return [...fetched.values()];
 }
 
+/** Whether a Language's data has been fetched. */
+export function hasLanguageData(code: string): boolean {
+  return fetched.has(code);
+}
+
 /** Fetches the data of each of these Languages not fetched yet. One that fails is asked for again next time. */
 export function fetchLanguageData(codes: readonly string[]) {
   for (const code of codes) {

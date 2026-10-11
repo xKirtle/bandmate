@@ -54,4 +54,16 @@ describe('sideParts', () => {
   it('shows only the Masters, open, in Read mode', () => {
     expect(sideParts('read')).toEqual([{ part: 'masters', open: true }]);
   });
+
+  it('puts Rhymes first, open, in Write mode when they show', () => {
+    expect(sideParts('write', { rhymes: true })).toEqual([
+      { part: 'rhymes', open: true },
+      { part: 'scrapbook', open: true },
+      { part: 'masters', open: false },
+    ]);
+  });
+
+  it('never shows Rhymes in Read mode', () => {
+    expect(sideParts('read', { rhymes: true })).toEqual([{ part: 'masters', open: true }]);
+  });
 });
