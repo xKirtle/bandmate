@@ -9,7 +9,8 @@
   // A Song's Languages in its Details: a field naming them, in order, that
   // opens a checklist of every Language Bandmate has data for, those picked
   // first, each with arrows to move it up or down the order. The last one
-  // picked can't be unticked, as a Song is always sung in at least one.
+  // picked can't be unticked, as a Song is always sung in at least one. A
+  // line under the list says why those are the only ones offered.
   let {
     id,
     labelledby,
@@ -123,7 +124,7 @@
       bind:this={panel}
       onkeydown={onPanelKey}
     >
-      <fieldset class="choice-group">
+      <fieldset class="choice-group" aria-describedby="{id}-hint">
         <legend class="visually-hidden">Languages</legend>
         {#each choices as choice, i (choice.code)}
           <div class="row" data-language={choice.code}>
@@ -159,6 +160,9 @@
           </div>
         {/each}
       </fieldset>
+      <p id="{id}-hint" class="hint muted">
+        Bandmate counts syllables and suggests rhymes in these languages, so only they can be picked for now.
+      </p>
     </div>
   {/if}
 </div>
@@ -209,6 +213,12 @@
     flex: 1;
     min-width: 0;
     padding-inline-end: var(--space-2);
+  }
+  /* Wraps under the list rather than widening the panel. */
+  .hint {
+    max-width: 16rem;
+    margin: var(--space-1) 0 0;
+    font-size: var(--text-sm);
   }
   .name {
     min-width: 0;
