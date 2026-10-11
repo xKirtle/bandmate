@@ -103,7 +103,7 @@
   <button
     {id}
     type="button"
-    class="trigger"
+    class="trigger field-box"
     bind:this={button}
     aria-labelledby="{labelledby} {id}"
     aria-haspopup="dialog"
@@ -168,7 +168,7 @@
     display: flex;
     min-width: 0;
   }
-  /* Looks like the other Details' fields, as a Picker does. */
+  /* Looks like the other Details' fields (.field-box), as a Picker does. */
   .trigger {
     flex: 1;
     display: flex;
@@ -176,19 +176,7 @@
     gap: var(--space-2);
     min-width: 0;
     min-height: var(--control);
-    padding: 0 var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    background: var(--surface-1);
-    color: var(--text);
-    /* Matches the fields' size, which keeps iOS from zooming on theirs. */
-    font-size: var(--text-field);
-    font-weight: 400;
     cursor: pointer;
-  }
-  .trigger:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
   }
   /* Several Languages are cut short rather than overflowing a phone. */
   .value {

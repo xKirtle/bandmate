@@ -135,7 +135,7 @@
     {...rest}
     {id}
     bind:this={field}
-    class={['trigger', trigger ? 'custom' : 'boxed']}
+    class={['trigger', trigger ? 'custom' : 'boxed field-box']}
     role="combobox"
     tabindex="0"
     aria-haspopup="listbox"
@@ -201,17 +201,9 @@
     cursor: pointer;
     user-select: none;
   }
-  /* Looks like the other fields. */
+  /* Looks like the other fields (.field-box). */
   .boxed {
     gap: var(--space-2);
-    padding: 0 var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    background: var(--surface-1);
-    color: var(--text);
-    /* Matches the fields' size, which keeps iOS from zooming on theirs. */
-    font-size: var(--text-field);
-    font-weight: 400;
   }
   .value {
     flex: 1;

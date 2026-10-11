@@ -475,6 +475,19 @@ select {
   font-size: var(--text-field);
 }
 
+/* A field drawn by script in place of a native one, e.g. a Picker's trigger,
+   looks like the native fields: at their size, which keeps iOS from zooming
+   on theirs. */
+.field-box {
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--text);
+  font-size: var(--text-field);
+  font-weight: 400;
+}
+
 /* A fold's summary draws its own chevron, FoldChevron. */
 summary {
   list-style: none;
