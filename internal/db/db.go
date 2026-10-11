@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -72,8 +73,11 @@ func open(dataDir string) (*sql.DB, error) {
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return nil, fmt.Errorf("creating data directory: %w", err)
 	}
-	dsn := "file:" + filepath.Join(dataDir, FileName) +
-		"?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
+	dsn, err := fileURI(filepath.Join(dataDir, FileName),
+		"_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)")
+	if err != nil {
+		return nil, fmt.Errorf("opening database: %w", err)
+	}
 	conn, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
@@ -82,6 +86,23 @@ func open(dataDir string) (*sql.DB, error) {
 	// "database is locked" errors for a single-user app.
 	conn.SetMaxOpenConns(1)
 	return conn, nil
+}
+
+// fileURI is the file: URI of the database file at path, with query
+// appended. The path is escaped, so a # or ? in it stays part of the path
+// rather than starting the URI's fragment or query.
+func fileURI(path, query string) (string, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	p := filepath.ToSlash(abs)
+	if !strings.HasPrefix(p, "/") {
+		// A Windows path starts with its drive, e.g. C:/.
+		p = "/" + p
+	}
+	u := url.URL{Scheme: "file", Path: p, RawQuery: query}
+	return u.String(), nil
 }
 
 // refuseNewer returns ErrNewer if the database records a migration this

@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -735,4 +736,51 @@ func TestASongCanBeShelvedKeepingEverythingThatHangsOffIt(t *testing.T) {
 	// A new Song still gets an identity, so its trigger came back too.
 	exec(t, conn, `INSERT INTO songs (title, created_at, updated_at) VALUES ('Neon', '', '')`)
 	expectDistinctIdentities(t, "Song", identities(t, conn, "songs"))
+}
+
+func TestTheDatabaseStaysInADataDirectoryWhosePathHoldsAHashOrQuestionMark(t *testing.T) {
+	parent := t.TempDir()
+	dataDir := filepath.Join(parent, "band#1", "take?2", "data")
+	conn, err := Open(context.Background(), dataDir)
+	if err != nil {
+		t.Fatalf("opening database: %v", err)
+	}
+	defer conn.Close()
+
+	if _, err := os.Stat(filepath.Join(dataDir, FileName)); err != nil {
+		t.Errorf("no database file inside the data directory: %v", err)
+	}
+	cutShort := filepath.Join(parent, "band")
+	if _, err := os.Stat(cutShort); !os.IsNotExist(err) {
+		t.Errorf("a file was created at the cut-short path %s", cutShort)
+	}
+}
+
+func TestOpenTurnsOnForeignKeysWALAndABusyTimeout(t *testing.T) {
+	conn, err := Open(context.Background(), t.TempDir())
+	if err != nil {
+		t.Fatalf("opening database: %v", err)
+	}
+	defer conn.Close()
+
+	var foreignKeys, busyTimeout int
+	var journalMode string
+	if err := conn.QueryRow(`PRAGMA foreign_keys`).Scan(&foreignKeys); err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.QueryRow(`PRAGMA journal_mode`).Scan(&journalMode); err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.QueryRow(`PRAGMA busy_timeout`).Scan(&busyTimeout); err != nil {
+		t.Fatal(err)
+	}
+	if foreignKeys != 1 {
+		t.Errorf("foreign_keys = %d, want 1", foreignKeys)
+	}
+	if journalMode != "wal" {
+		t.Errorf("journal_mode = %q, want wal", journalMode)
+	}
+	if busyTimeout != 5000 {
+		t.Errorf("busy_timeout = %d, want 5000", busyTimeout)
+	}
 }

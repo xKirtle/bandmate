@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -345,15 +344,5 @@ func runnableMigrations(ctx context.Context, path string) (int, error) {
 // -shm file beside it. The path is escaped, so a # or ? in it stays part
 // of the path.
 func readOnlyURI(path string) (string, error) {
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return "", err
-	}
-	p := filepath.ToSlash(abs)
-	if !strings.HasPrefix(p, "/") {
-		// A Windows path starts with its drive, e.g. C:/.
-		p = "/" + p
-	}
-	u := url.URL{Scheme: "file", Path: p, RawQuery: "mode=ro&immutable=1"}
-	return u.String(), nil
+	return fileURI(path, "mode=ro&immutable=1")
 }
