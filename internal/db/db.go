@@ -76,7 +76,7 @@ func open(dataDir string) (*sql.DB, error) {
 	dsn, err := fileURI(filepath.Join(dataDir, FileName),
 		"_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)")
 	if err != nil {
-		return nil, fmt.Errorf("opening database: %w", err)
+		return nil, fmt.Errorf("resolving database path: %w", err)
 	}
 	conn, err := sql.Open("sqlite", dsn)
 	if err != nil {

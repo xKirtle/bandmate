@@ -341,8 +341,7 @@ func runnableMigrations(ctx context.Context, path string) (int, error) {
 
 // readOnlyURI is the URI that opens the database file at path read-only
 // and as immutable, so SQLite neither writes to it nor leaves a -wal or
-// -shm file beside it. The path is escaped, so a # or ? in it stays part
-// of the path.
+// -shm file beside it.
 func readOnlyURI(path string) (string, error) {
 	return fileURI(path, "mode=ro&immutable=1")
 }
