@@ -37,7 +37,9 @@
   import { songTranspose } from '../lib/sharedTranspose.svelte';
   import { writingAids } from '../lib/sharedWritingAids.svelte';
   import { fetchLanguageData, languageData } from '../lib/languageData.svelte';
-  import { lyricsLanguage, type SyllableCounter } from '../lib/lyricsLanguage';
+  import { lyricsLanguage, type CaretListener, type SyllableCounter } from '../lib/lyricsLanguage';
+  import RhymesCard from '../lib/RhymesCard.svelte';
+  import RhymesStrip from '../lib/RhymesStrip.svelte';
   import { timeAgo } from '../lib/time';
 
   let { id }: { id: number } = $props();
@@ -112,6 +114,21 @@
     const counting = languages;
     return (text) => lyrics.syllableCount(text, counting);
   });
+  // Rhymes for a word, while the writing aids show: the word at the caret
+  // of the Line being written, kept once the caret leaves, or one typed into
+  // the Rhymes card, until the caret moves in a Line again. For now in the
+  // Song's first Language.
+  let caret = $state<{ text: string; caret: number } | null>(null);
+  let rhymeWord = $state<string | null>(null);
+  const followCaret: CaretListener = (at) => {
+    caret = at;
+    const word = at && lyrics.wordAt(at.text, at.caret);
+    if (word) rhymeWord = word;
+  };
+  const onCaret = $derived(showingAids ? followCaret : undefined);
+  const lineFocused = $derived(showingAids && caret !== null);
+  const rhymesLoading = $derived(!languageData().some((d) => d.code === languages[0]));
+  const rhymes = $derived(showingAids && rhymeWord ? lyrics.rhymes(rhymeWord, languages[0]) : null);
   // The Details as Read mode shows them, with the key the Chords are shown in.
   const summary = $derived(
     details
@@ -136,11 +153,12 @@
 
   // Desktop puts the Scrapbook and Masters in a column beside the Lyric
   // Sheet, as sections that open and close, each as sideParts starts it on
-  // each visit until it's toggled. Narrower windows show them after the
-  // Lyric Sheet, always open. Keyed by name, switching moves them rather
-  // than rebuilding them.
+  // each visit until it's toggled, with the Rhymes card while the writing
+  // aids show. Narrower windows show the Scrapbook and Masters after the
+  // Lyric Sheet, always open, and the Rhymes strip while a Line has focus.
+  // Keyed by name, switching moves them rather than rebuilding them.
   const desktop = new MediaQuery('min-width: 80rem');
-  const parts = $derived(sideParts(mode));
+  const parts = $derived(sideParts(mode, { rhymes: desktop.current && showingAids }));
   // Parts opened or closed by hand, per mode.
   let toggledParts = $state<Partial<Record<`${Mode}-${SidePart}`, boolean>>>({});
 
@@ -538,6 +556,7 @@
           {recording}
           {syncMode}
           {syllables}
+          {onCaret}
           hasClips={timeline?.tracks.some((t) => t.clips.length > 0) ?? false}
         />
       </div>
@@ -557,9 +576,12 @@
             {#if part === 'masters'}
               <summary><FoldChevron />{song.masters.length > 1 ? 'Masters' : 'Master'}</summary>
               <Masters {song} {mode} submit={saves.submit} typing={saves.typing} {setStatus} {recording} />
+            {:else if part === 'rhymes'}
+              <summary><FoldChevron />Rhymes</summary>
+              <RhymesCard word={rhymeWord} setWord={(w) => (rhymeWord = w)} {rhymes} loading={rhymesLoading} />
             {:else}
               <summary><FoldChevron />Scrapbook</summary>
-              <Scrapbook {song} {drag} {editing} {syllables} />
+              <Scrapbook {song} {drag} {editing} {syllables} {onCaret} />
             {/if}
           </details>
         {/each}
@@ -593,6 +615,10 @@
     {syncMode}
     onRecording={(on) => (recording = on)}
   />
+{/if}
+
+{#if lineFocused && !desktop.current}
+  <RhymesStrip word={rhymeWord} {rhymes} loading={rhymesLoading} {timelineHeight} />
 {/if}
 
 {#if showingShortcuts}

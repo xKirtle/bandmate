@@ -61,3 +61,72 @@ describe('syllableCount', () => {
     expect(lyricsLanguage([]).syllableCount('Hello', ['en'])).toBeNull();
   });
 });
+
+describe('rhymes', () => {
+  const rhymes = (word: string) => lyrics.rhymes(word, 'en');
+
+  it('gives perfect Rhymes, each with its Syllable Count', () => {
+    const { perfect } = rhymes('night')!;
+    expect(perfect).toContainEqual({ word: 'bright', count: 1 });
+    expect(perfect).toContainEqual({ word: 'tonight', count: 2 });
+    expect(perfect).toContainEqual({ word: 'satellite', count: 3 });
+  });
+
+  it('gives near Rhymes, matching only the vowels, apart from the perfect ones', () => {
+    const { perfect, near } = rhymes('night')!;
+    expect(near).toContainEqual({ word: 'life', count: 1 });
+    expect(near).toContainEqual({ word: 'surprise', count: 2 });
+    expect(near.map((r) => r.word)).not.toContain('bright');
+    expect(perfect.map((r) => r.word)).not.toContain('life');
+  });
+
+  it('matches from the last stressed vowel', () => {
+    const { perfect, near } = rhymes('happy')!;
+    expect(perfect).toContainEqual({ word: 'snappy', count: 2 });
+    expect(perfect.map((r) => r.word)).not.toContain('sunny');
+    expect(near).toContainEqual({ word: 'sadly', count: 2 });
+  });
+
+  it('lists the Rhymes nearest the word in syllables first', () => {
+    const counts = rhymes('night')!.perfect.map((r) => r.count);
+    expect(counts.slice(0, 5)).toEqual([1, 1, 1, 1, 1]);
+    expect(counts).toEqual([...counts].sort((a, b) => a - b));
+  });
+
+  it('leaves out the word itself', () => {
+    const { perfect, near } = rhymes('Night')!;
+    expect([...perfect, ...near].map((r) => r.word)).not.toContain('night');
+  });
+
+  it('gives no Rhymes for a word the Language does not know, or one without its data', () => {
+    expect(rhymes('skrrt')).toBeNull();
+    expect(lyricsLanguage([]).rhymes('night', 'en')).toBeNull();
+  });
+});
+
+describe('wordAt', () => {
+  const at = (marked: string) => lyrics.wordAt(marked.replace('|', ''), marked.indexOf('|'));
+
+  it('gives the word at the caret', () => {
+    expect(at('Hello dark|ness my old friend')).toBe('darkness');
+    expect(at('Hello |darkness')).toBe('darkness');
+    expect(at('Hello darkness|')).toBe('darkness');
+  });
+
+  it("gives the Line's last word when the caret is past it", () => {
+    expect(at('Hello darkness, my old friend. |')).toBe('friend');
+  });
+
+  it('reads only the Line the caret is on', () => {
+    expect(at('Hello darkness\nmy old fr|iend\nagain')).toBe('friend');
+    expect(at('Hello darkness\n|')).toBeNull();
+  });
+
+  it('leaves Chords out, and parts hyphenated words', () => {
+    expect(at('Hello [Am]|')).toBe('hello');
+    expect(at('[Am]|')).toBeNull();
+    expect(at('Hel[Am]lo dark[C]ness|')).toBe('darkness');
+    expect(at('Hel[A|m]lo')).toBe('hello');
+    expect(at('ooh-a|ah')).toBe('aah');
+  });
+});

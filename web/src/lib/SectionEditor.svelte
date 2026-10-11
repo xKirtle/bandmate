@@ -7,7 +7,7 @@
   import { tick, untrack, type Snippet } from 'svelte';
   import ActionsMenu from './ActionsMenu.svelte';
   import AlternateText, { type Cueing } from './AlternateText.svelte';
-  import type { SyllableCounter } from './lyricsLanguage';
+  import type { CaretListener, SyllableCounter } from './lyricsLanguage';
   import SyllableCount from './SyllableCount.svelte';
   import { suggestedLabels, type Alternate, type Section } from './api';
   import Combobox from './Combobox.svelte';
@@ -29,6 +29,7 @@
     drag,
     places = [],
     syllables,
+    onCaret,
   }: {
     section: Section;
     /** Focus the Label when this becomes true, e.g. for a Section just added. */
@@ -49,6 +50,8 @@
     places?: Place[];
     /** Given, each Line's Syllable Count shows beside it, in the text box and the Alternates' cards. */
     syllables?: SyllableCounter;
+    /** Given, hears where the caret is in the text box, to suggest Rhymes for the word at it. */
+    onCaret?: CaretListener;
   } = $props();
 
   // The server guarantees exactly one active Alternate.
@@ -320,7 +323,7 @@
     </div>
   {:else}
     {#key active.id}
-      <AlternateText alternate={active} sectionId={section.id} label="Lines" {editing} {cueing} {syllables} />
+      <AlternateText alternate={active} sectionId={section.id} label="Lines" {editing} {cueing} {syllables} {onCaret} />
     {/key}
   {/if}
 </article>

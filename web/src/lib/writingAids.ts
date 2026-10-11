@@ -1,4 +1,5 @@
-// Whether Write mode shows its writing aids: each Line's Syllable Count. A
+// Whether Write mode shows its writing aids: each Line's Syllable Count and
+// Rhymes for the word being written. A
 // choice about how Bandmate works on this device, not about any Song: it's
 // kept on this device, and is on until turned off here. While it's off, no
 // Language's data is fetched.

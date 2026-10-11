@@ -1,0 +1,122 @@
+<script lang="ts">
+  // A word's Rhymes, perfect ones first, then near ones in a group of their
+  // own, each with its Syllable Count; or why there are none. They're for
+  // reference only: nothing here can be clicked, so a Rhyme never goes into
+  // the Lyric Sheet. Wrapped onto as many rows as they take, as in the
+  // Rhymes card, or on one row, as in the strip, which scrolls it sideways.
+  import type { Rhymes } from './lyricsLanguage';
+
+  let {
+    word,
+    rhymes,
+    loading,
+    row = false,
+    limit,
+  }: {
+    /** The word Rhymes are for, or null while there's none. */
+    word: string | null;
+    /** The word's Rhymes, or null when its Language doesn't know it. */
+    rhymes: Rhymes | null;
+    /** Whether the Language's data is still on its way. */
+    loading: boolean;
+    /** Whether they take one row. */
+    row?: boolean;
+    /** The most of each group shown, nearest the word in syllables first. */
+    limit: number;
+  } = $props();
+
+  const groups = $derived(
+    rhymes
+      ? [
+          { name: 'Perfect', list: rhymes.perfect.slice(0, limit) },
+          { name: 'Near', list: rhymes.near.slice(0, limit) },
+        ]
+      : [],
+  );
+  const syllables = (n: number) => (n === 1 ? 'syllable' : 'syllables');
+</script>
+
+{#if !word}
+  <p class="muted message">Rhymes show here for the word at the caret as you write.</p>
+{:else if loading}
+  <p class="muted message">Loading…</p>
+{:else if !rhymes}
+  <p class="muted message">No Rhymes for “{word}”: Bandmate doesn’t know how it sounds.</p>
+{:else}
+  <div class="groups" class:row>
+    {#each groups as { name, list } (name)}
+      <div class="group">
+        <h3 class="name">{name}</h3>
+        {#if list.length > 0}
+          <ul>
+            {#each list as rhyme (rhyme.word)}
+              <li>
+                {rhyme.word}
+                <span class="count">{rhyme.count}<span class="visually-hidden"> {syllables(rhyme.count)}</span></span>
+              </li>
+            {/each}
+          </ul>
+        {:else}
+          <p class="muted none">None</p>
+        {/if}
+      </div>
+    {/each}
+  </div>
+{/if}
+
+<style>
+  .message {
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+  .groups {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+  .name {
+    margin: 0 0 var(--space-1);
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    font-weight: 600;
+  }
+  ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  li {
+    font-size: var(--text-md);
+    white-space: nowrap;
+  }
+  .count {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    font-variant-numeric: tabular-nums;
+  }
+  .none {
+    margin: 0;
+    font-size: var(--text-md);
+  }
+  /* One row: each group's name before its Rhymes, the groups side by side. */
+  .groups.row {
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--space-4);
+  }
+  .row .group,
+  .row ul {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: baseline;
+  }
+  .row .group {
+    gap: var(--space-2);
+  }
+  .row .name {
+    margin: 0;
+  }
+</style>

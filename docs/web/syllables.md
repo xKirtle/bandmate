@@ -1,6 +1,6 @@
-# Syllable counts
+# Syllable counts and rhymes
 
-In Write mode, Bandmate counts the syllables of each line as you type, so you can keep the meter without counting on your fingers: check that verse 2 sings like verse 1, or that an alternate fits where the one it competes with sat.
+In Write mode, Bandmate counts the syllables of each line as you type, so you can keep the meter without counting on your fingers: check that verse 2 sings like verse 1, or that an alternate fits where the one it competes with sat. It also suggests rhymes for the word you're writing, so you needn't look them up elsewhere.
 
 ## Where the counts show
 
@@ -23,14 +23,28 @@ A word the dictionary doesn't know, like slang, a name or "skrrt", is guessed fr
 
 The counts are only numbers: nothing flags a line whose meter doesn't match, as you may change the meter on purpose.
 
+## Rhymes
+
+Rhymes are suggested for the word at the cursor in the line you're writing, or for the line's last word once the cursor is past it.
+
+- **Perfect rhymes** come first: they sound the same from the word's last stressed vowel to its end, like "night" and "tonight".
+- **Near rhymes** follow, in a group of their own: only their vowels match from there, like "night" and "life".
+
+Each rhyme shows its syllable count beside it, and those nearest your word in syllables come first, so you can pick one that fits the meter. The suggestions are only there to read: clicking one never changes your lyrics. A word the dictionary doesn't know gets no rhymes.
+
+Where they show depends on how wide the window is:
+
+- **On a wide window**, a **Rhymes** card sits beside the lyric sheet, above the Scrapbook. It folds away like the Scrapbook, and keeps showing the last word once you click elsewhere. To look up any other word, type it into its field.
+- **On a phone, a tablet or a smaller window**, a strip of rhymes docks at the bottom of the screen while you're typing a line, above the on-screen keyboard. Swipe it sideways for more. It goes once you leave the line.
+
 ## Languages
 
-Bandmate counts in the languages set in the song's details, which start as English. For now, English is the only one it counts.
+Bandmate counts and rhymes in the languages set in the song's details, which start as English. For now, English is the only one it knows.
 
 ## Turning them off
 
-**Writing aids**, in the lyric sheet's toolbar in Write mode, turns the counts on and off, for every song. It's on to start with. Each device keeps its own choice, which is also in **Settings**, under **This device**.
+**Writing aids**, in the lyric sheet's toolbar in Write mode, turns the counts and rhymes on and off together, for every song. It's on to start with. Each device keeps its own choice, which is also in **Settings**, under **This device**.
 
 ## Offline
 
-The counts need no internet connection: the dictionary comes with Bandmate. The first time you write a song in a language, your browser downloads that dictionary from your Bandmate, about a megabyte, once. While Writing aids is off, it downloads nothing.
+The counts and rhymes need no internet connection: the dictionary comes with Bandmate. The first time you write a song in a language, your browser downloads that dictionary from your Bandmate, about a megabyte, once. While Writing aids is off, it downloads nothing.

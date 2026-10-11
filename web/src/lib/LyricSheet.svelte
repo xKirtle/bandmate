@@ -58,7 +58,7 @@
   import { songChordsShown } from './chordsShown';
   import { lyricSize } from './sharedLyricSize.svelte';
   import { songTranspose } from './sharedTranspose.svelte';
-  import type { SyllableCounter } from './lyricsLanguage';
+  import type { CaretListener, SyllableCounter } from './lyricsLanguage';
   import { writingAids } from './sharedWritingAids.svelte';
 
   let {
@@ -73,6 +73,7 @@
     recording = false,
     syncMode,
     syllables,
+    onCaret,
   }: {
     song: Song;
     /** The Song page's mode: Write edits the raw text; Read shows Chords above the lyrics. */
@@ -103,6 +104,8 @@
     syncMode: SyncMode;
     /** Given, as in Write mode while the writing aids are on, each Line's Syllable Count shows beside it. */
     syllables?: SyllableCounter;
+    /** Given, as in Write mode while the writing aids are on, hears where the caret is in a Section's Lines, to suggest Rhymes. */
+    onCaret?: CaretListener;
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
@@ -409,7 +412,7 @@
         aria-pressed={writingAids.value}
         onpointerdown={(e) => e.preventDefault()}
         onclick={() => writingAids.set(!writingAids.value)}
-        title="Writing aids: count each Line's syllables as you write">Writing aids</button
+        title="Writing aids: count each Line's syllables and suggest Rhymes as you write">Writing aids</button
       >
     {/if}
     {#if mode === 'write' && wide.current}
@@ -515,6 +518,7 @@
               {editing}
               cueing={cueingFor(section)}
               {syllables}
+              {onCaret}
               more={sectionActions(section, i)}
               {drag}
               places={placesOut}
