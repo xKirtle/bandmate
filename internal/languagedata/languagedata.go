@@ -26,6 +26,22 @@ var english []byte
 // en.txt.gz was built from, shortened.
 const cmudictVersion = "7479086"
 
+// pt.txt.gz is Portuguese's: the words of the European Portuguese Hunspell
+// dictionary, with the forms they're sung in, one a line, gzipped, under
+// the licence in pt.LICENSE, which the About page names. Portuguese is
+// counted by its spelling rules, so the page needs it only to suggest
+// Rhymes from. It's committed, so every build has it: to take a newer
+// dictionary, change dictionariesCommit in ./ptwords, and
+// dictionariesVersion here, then run `go generate ./internal/languagedata`.
+//
+//go:generate go run ./ptwords
+//go:embed pt.txt.gz
+var portuguese []byte
+
+// dictionariesVersion is the commit of github.com/LibreOffice/dictionaries
+// that pt.txt.gz was built from, shortened.
+const dictionariesVersion = "fe49c66"
+
 // Data is one Language's data as the page fetches it: gzipped text, with a
 // tag that changes whenever it does.
 type Data struct {
@@ -35,6 +51,7 @@ type Data struct {
 
 var byCode = map[string]Data{
 	"en": withTag(english),
+	"pt": withTag(portuguese),
 }
 
 func withTag(gzipped []byte) Data {
@@ -54,5 +71,6 @@ func Of(code string) (Data, bool) {
 func Credits() []build.Dependency {
 	return []build.Dependency{
 		{Name: "CMU Pronouncing Dictionary", Version: cmudictVersion, License: "BSD-2-Clause"},
+		{Name: "Hunspell dictionary for European Portuguese", Version: dictionariesVersion, License: "GPL-2.0-only OR LGPL-2.1-only OR MPL-1.1"},
 	}
 }

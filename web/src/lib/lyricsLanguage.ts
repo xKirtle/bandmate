@@ -8,7 +8,7 @@
 // or a number in digits, is guessed in the Song's first Language, and the
 // count marked as an estimate.
 
-import { portugueseNumber, portugueseSyllables } from './portuguese';
+import { portugueseNumber, portugueseSound, portugueseSyllables } from './portuguese';
 
 /** A Language's data, read from what the binary serves for it. */
 export interface LanguageData {
@@ -16,6 +16,8 @@ export interface LanguageData {
   code: string;
   /** A dictionary Language's pronunciations of each word it knows, in lower case, the first the usual one. */
   pronunciations: ReadonlyMap<string, readonly string[][]>;
+  /** A spelling-rules Language's words, in lower case, to suggest Rhymes from. */
+  words: readonly string[];
 }
 
 /** A Line's Syllable Count, and whether a word in it was guessed. */
@@ -51,9 +53,20 @@ export interface CaretAt {
 /** A Song's Syllable Counts: a Line's from its text as written, or null when it gets none. */
 export type SyllableCounter = (text: string) => SyllableCount | null;
 
-/** Reads a dictionary Language's data as served: one pronunciation a line, "hello HH AH0 L OW1". */
+/**
+ * Reads a Language's data as served: a dictionary Language's, one
+ * pronunciation a line, "hello HH AH0 L OW1"; a spelling-rules Language's,
+ * one word a line.
+ */
 export function readLanguageData(code: string, text: string): LanguageData {
   const pronunciations = new Map<string, string[][]>();
+  if (isSpellingRules(code)) {
+    const words = text
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((word) => word !== '');
+    return { code, pronunciations, words };
+  }
   for (const line of text.split('\n')) {
     const [word, ...phones] = line.trim().split(/\s+/);
     if (!word || phones.length === 0) continue;
@@ -61,7 +74,7 @@ export function readLanguageData(code: string, text: string): LanguageData {
     if (known) known.push(phones);
     else pronunciations.set(word, [phones]);
   }
-  return { code, pronunciations };
+  return { code, pronunciations, words: [] };
 }
 
 /** What a Language does with a word no Language of the Song reads. */
@@ -78,11 +91,17 @@ const guessers: Record<string, Guesser> = {
 };
 
 /**
- * The spelling-rules Languages: each counts a word's syllables from how it's
- * written, with no data, or gives null for a word it can't read.
+ * The spelling-rules Languages' rules, which read a word from how it's
+ * written, or give null for one they can't read: its syllables, and how it
+ * ends with them, to find its Rhymes.
  */
-const spellingRules: Record<string, (word: string) => number | null> = {
-  pt: portugueseSyllables,
+interface SpellingRules {
+  syllables: (word: string) => number | null;
+  sound: (word: string) => Sound | null;
+}
+
+const spellingRules: Record<string, SpellingRules> = {
+  pt: { syllables: portugueseSyllables, sound: portugueseSound },
 };
 
 function isSpellingRules(code: string): boolean {
@@ -90,10 +109,11 @@ function isSpellingRules(code: string): boolean {
 }
 
 /**
- * Whether a Language needs data the binary serves, which the page fetches
- * first: a dictionary Language does, a spelling-rules one doesn't.
+ * Whether a Language's words are read from its data, so not until it has
+ * it: a dictionary Language's are. A spelling-rules Language's data is only
+ * to suggest Rhymes from.
  */
-export function needsData(code: string): boolean {
+function readsFromData(code: string): boolean {
   return !isSpellingRules(code);
 }
 
@@ -102,23 +122,30 @@ export function needsData(code: string): boolean {
  * Language of a Song not among them reads no words, and a Song none of whose
  * Languages is among them gets no counts.
  */
+export type LyricsLanguage = ReturnType<typeof lyricsLanguage>;
+
 export function lyricsLanguage(data: readonly LanguageData[]) {
   const byCode = new Map(data.map((d) => [d.code, d]));
 
   /**
-   * A word's syllables, read by the first of these Languages' dictionaries
-   * that knows it, in order, or else by the first of their spelling rules;
-   * null when none of them reads it.
+   * A word read by the first of these Languages' dictionaries that knows
+   * it, in order, or else by the first of their spelling rules: the
+   * Language that read it, and its syllables. Null when none of them reads it.
    */
-  function readWord(word: string, languages: readonly string[]): number | null {
+  function readWord(word: string, languages: readonly string[]): { language: string; count: number } | null {
     for (const code of languages) {
       const pronunciations = byCode.get(code)?.pronunciations;
       const known = pronunciations?.get(word) ?? pronunciations?.get(trimApostrophes(word));
-      if (known) return vowels(known[0]);
+      if (known) return { language: code, count: vowels(known[0]) };
     }
     const rules = languages.find(isSpellingRules);
-    return rules ? spellingRules[rules](word) : null;
+    const count = rules ? spellingRules[rules].syllables(word) : null;
+    return rules && count !== null ? { language: rules, count } : null;
   }
+
+  /** Whether these Languages can read words: each that reads from its data has it. */
+  const canRead = (languages: readonly string[]) =>
+    languages.length > 0 && languages.every((code) => !readsFromData(code) || byCode.has(code));
 
   return {
     /**
@@ -129,19 +156,19 @@ export function lyricsLanguage(data: readonly LanguageData[]) {
      * meanwhile.
      */
     syllableCount(text: string, languages: readonly string[]): SyllableCount | null {
-      if (languages.length === 0 || languages.some((code) => needsData(code) && !byCode.has(code))) return null;
+      if (!canRead(languages)) return null;
       const words = wordsOf(lyricsOf(text).lyrics);
       if (words.length === 0) return null;
       // Every Language Bandmate counts in has its rules for guessing; English's stand in for one that has none yet.
       const first = guessers[languages[0]] ?? guessers.en;
       // A number's words, as said in the first Language, are read in that Language.
-      const countSaid = (word: string) => readWord(word, languages.slice(0, 1)) ?? first.letters(word);
+      const countSaid = (word: string) => readWord(word, languages.slice(0, 1))?.count ?? first.letters(word);
       let count = 0;
       let estimate = false;
       for (const { word } of words) {
         const known = /\d/.test(word) ? null : readWord(word, languages);
         if (known !== null) {
-          count += known;
+          count += known.count;
           continue;
         }
         estimate = true;
@@ -150,20 +177,37 @@ export function lyricsLanguage(data: readonly LanguageData[]) {
       return { count, estimate };
     },
 
+    /** Whether a Language's data has been read, so it can suggest Rhymes. */
+    hasData(language: string): boolean {
+      return byCode.has(language);
+    },
+
+    /**
+     * The Language a word of a Song sung in `languages` is read in: the
+     * first of the Song's dictionary Languages that knows it, or else its
+     * first spelling-rules Language, or, for a word neither reads, its first
+     * Language. Null until each of its dictionary Languages has its data.
+     */
+    languageOf(word: string, languages: readonly string[]): string | null {
+      if (!canRead(languages)) return null;
+      return readWord(normalWord(word), languages)?.language ?? languages[0];
+    },
+
     /**
      * A word's Rhymes in a Language: perfect ones sound the same from the
      * word's last stressed vowel to its end, near ones only have the same
-     * vowels from there. Null for a word the Language doesn't know, and
-     * until it has its data.
+     * vowels from there. Null for a word the Language can't read, and until
+     * it has its data. A dictionary Language reads the words it knows and
+     * suggests from them; a spelling-rules Language reads any word by its
+     * rules and suggests from its word list.
      */
     rhymes(word: string, language: string): Rhymes | null {
       const data = byCode.get(language);
       const asked = normalWord(word);
-      const phones = data?.pronunciations.get(asked)?.[0];
-      const ending = phones && endingOf(phones);
-      if (!data || !phones || !ending) return null;
+      const sound = data && soundOf(data, asked);
+      if (!data || !sound) return null;
+      const { count, ending } = sound;
       const index = rhymeIndex(data);
-      const count = vowels(phones);
       const perfect = (index.bySounds.get(ending.sounds) ?? []).filter((c) => c.rhyme.word !== asked);
       const near = (index.byVowels.get(ending.vowels) ?? []).filter(
         (c) => c.ending.sounds !== ending.sounds && c.rhyme.word !== asked,
@@ -255,8 +299,8 @@ function wordsOf(lyrics: string): Word[] {
   return words;
 }
 
-/** How a pronunciation ends, from its last stressed vowel. */
-interface Ending {
+/** How a word ends, from its last stressed vowel, as its Rhymes are found. */
+export interface Ending {
   /** Its sounds, stress aside. */
   sounds: string;
   /** Only its vowels. */
@@ -283,13 +327,31 @@ function endingOf(phones: readonly string[]): Ending | null {
   };
 }
 
+/** How a word sounds, as far as its Rhymes go: its syllables, and how it ends. */
+export interface Sound {
+  count: number;
+  ending: Ending;
+}
+
+/**
+ * How a Language says a word: by its usual pronunciation in a dictionary
+ * Language, or by a spelling-rules one's rules. Null for one it can't read.
+ */
+function soundOf(data: LanguageData, word: string): Sound | null {
+  const rules = spellingRules[data.code];
+  if (rules) return rules.sound(word);
+  const phones = data.pronunciations.get(word)?.[0];
+  const ending = phones && endingOf(phones);
+  return phones && ending ? { count: vowels(phones), ending } : null;
+}
+
 /** A word that may be suggested as a Rhyme, and how it ends. */
 interface Candidate {
   rhyme: Rhyme;
   ending: Ending;
 }
 
-/** A dictionary Language's words by how they end, to find Rhymes among. */
+/** A Language's words by how they end, to find Rhymes among. */
 interface RhymeIndex {
   bySounds: Map<string, Candidate[]>;
   byVowels: Map<string, Candidate[]>;
@@ -298,19 +360,21 @@ interface RhymeIndex {
 const rhymeIndexes = new WeakMap<LanguageData, RhymeIndex>();
 
 /**
- * A Language's Rhyme index, built the first time it's asked for. Only words
- * of letters are suggested, not possessives or abbreviations, each by its
- * usual pronunciation.
+ * A Language's Rhyme index, built the first time it's asked for, from the
+ * words its dictionary knows or its word list. Only words of letters are
+ * suggested, not possessives or abbreviations.
  */
 function rhymeIndex(data: LanguageData): RhymeIndex {
   let index = rhymeIndexes.get(data);
   if (index) return index;
   index = { bySounds: new Map(), byVowels: new Map() };
-  for (const [word, [phones]] of data.pronunciations) {
+  const words = isSpellingRules(data.code) ? data.words : data.pronunciations.keys();
+  for (const word of words) {
     if (!/^\p{L}+$/u.test(word)) continue;
-    const ending = endingOf(phones);
-    if (!ending) continue;
-    const candidate = { rhyme: { word, count: vowels(phones) }, ending };
+    const sound = soundOf(data, word);
+    if (!sound) continue;
+    const { count, ending } = sound;
+    const candidate = { rhyme: { word, count }, ending };
     for (const [map, key] of [
       [index.bySounds, ending.sounds],
       [index.byVowels, ending.vowels],
