@@ -860,6 +860,11 @@
       grid-column: span 2;
       min-width: 0;
     }
+    /* Its grid column, not the row's minimum, sets its width: a phone's
+       third of the row is narrower than that, and it would overflow it. */
+    .languages {
+      min-width: 0;
+    }
     .key :global(input),
     .bpm input,
     .capo input {
