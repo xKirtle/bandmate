@@ -36,7 +36,13 @@ export interface Rhymes {
  * Hears where the caret is in an Alternate's text box, `caret` characters
  * into its text, to find the word at it; null once no text box has focus.
  */
-export type CaretListener = (at: { text: string; caret: number } | null) => void;
+export type CaretListener = (at: CaretAt | null) => void;
+
+/** Where the caret is in a text box: `caret` characters into its `text`. */
+export interface CaretAt {
+  text: string;
+  caret: number;
+}
 
 /** A Song's Syllable Counts: a Line's from its text as written, or null when it gets none. */
 export type SyllableCounter = (text: string) => SyllableCount | null;
@@ -119,15 +125,15 @@ export function lyricsLanguage(data: readonly LanguageData[]) {
      */
     rhymes(word: string, language: string): Rhymes | null {
       const data = byCode.get(language);
-      const own = trimApostrophes(word.toLowerCase().replace(/[’‘]/g, "'"));
-      const phones = data?.pronunciations.get(own)?.[0];
+      const asked = normalWord(word);
+      const phones = data?.pronunciations.get(asked)?.[0];
       const ending = phones && endingOf(phones);
       if (!data || !phones || !ending) return null;
       const index = rhymeIndex(data);
       const count = vowels(phones);
-      const perfect = (index.bySounds.get(ending.sounds) ?? []).filter((c) => c.rhyme.word !== own);
+      const perfect = (index.bySounds.get(ending.sounds) ?? []).filter((c) => c.rhyme.word !== asked);
       const near = (index.byVowels.get(ending.vowels) ?? []).filter(
-        (c) => c.ending.sounds !== ending.sounds && c.rhyme.word !== own,
+        (c) => c.ending.sounds !== ending.sounds && c.rhyme.word !== asked,
       );
       return { perfect: byCloseness(perfect, count, ending), near: byCloseness(near, count, ending) };
     },
@@ -171,6 +177,11 @@ function vowels(phones: readonly string[]): number {
   return phones.filter((p) => /\d$/.test(p)).length;
 }
 
+/** A word as it's looked up: in lower case, its curly apostrophes straight, none at either end. */
+function normalWord(word: string): string {
+  return trimApostrophes(word.toLowerCase().replace(/[’‘]/g, "'"));
+}
+
 function trimApostrophes(word: string): string {
   return word.replace(/^'+|'+$/g, '');
 }
@@ -195,19 +206,18 @@ function lyricsOf(text: string, place = 0): { lyrics: string; place: number } {
   return { lyrics, place: moved };
 }
 
-/** A word of a Line, in lower case, and where it starts and ends in the Line. */
+/** A word of a Line, as it's looked up, and where it starts in the Line. */
 interface Word {
   word: string;
   start: number;
-  end: number;
 }
 
 /** A Line's words: a hyphen, a dash or any other mark between letters parts them. */
 function wordsOf(lyrics: string): Word[] {
   const words: Word[] = [];
-  for (const match of lyrics.replace(/[’‘]/g, "'").matchAll(/[\p{L}\p{M}\p{N}']+/gu)) {
-    const word = trimApostrophes(match[0].toLowerCase());
-    if (/[\p{L}\p{N}]/u.test(word)) words.push({ word, start: match.index, end: match.index + match[0].length });
+  for (const match of lyrics.matchAll(/[\p{L}\p{M}\p{N}'’‘]+/gu)) {
+    const word = normalWord(match[0]);
+    if (/[\p{L}\p{N}]/u.test(word)) words.push({ word, start: match.index });
   }
   return words;
 }
@@ -288,12 +298,12 @@ function rhymeIndex(data: LanguageData): RhymeIndex {
  */
 function byCloseness(candidates: Candidate[], count: number, ending: Ending): Rhyme[] {
   const apart = (c: Candidate) => Math.abs(c.rhyme.count - count);
-  const longer = (c: Candidate) => Math.abs(c.ending.length - ending.length);
+  const lengthApart = (c: Candidate) => Math.abs(c.ending.length - ending.length);
   return candidates
     .sort(
       (a, b) =>
         apart(a) - apart(b) ||
-        longer(a) - longer(b) ||
+        lengthApart(a) - lengthApart(b) ||
         a.rhyme.count - b.rhyme.count ||
         a.rhyme.word.localeCompare(b.rhyme.word),
     )

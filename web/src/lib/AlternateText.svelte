@@ -86,6 +86,8 @@
 
   function followCaret(el: HTMLTextAreaElement) {
     if (!onCaret) return;
+    // Told straight away too, e.g. as the writing aids come on with the box focused.
+    tellCaret();
     document.addEventListener('selectionchange', tellCaret);
     return () => {
       document.removeEventListener('selectionchange', tellCaret);

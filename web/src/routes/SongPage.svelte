@@ -36,8 +36,8 @@
   import { songChordsShown } from '../lib/chordsShown';
   import { songTranspose } from '../lib/sharedTranspose.svelte';
   import { writingAids } from '../lib/sharedWritingAids.svelte';
-  import { fetchLanguageData, languageData } from '../lib/languageData.svelte';
-  import { lyricsLanguage, type CaretListener, type SyllableCounter } from '../lib/lyricsLanguage';
+  import { fetchLanguageData, hasLanguageData, languageData } from '../lib/languageData.svelte';
+  import { lyricsLanguage, type CaretAt, type CaretListener, type SyllableCounter } from '../lib/lyricsLanguage';
   import RhymesCard from '../lib/RhymesCard.svelte';
   import RhymesStrip from '../lib/RhymesStrip.svelte';
   import { timeAgo } from '../lib/time';
@@ -114,21 +114,22 @@
     const counting = languages;
     return (text) => lyrics.syllableCount(text, counting);
   });
-  // Rhymes for a word, while the writing aids show: the word at the caret
-  // of the Line being written, kept once the caret leaves, or one typed into
-  // the Rhymes card, until the caret moves in a Line again. For now in the
-  // Song's first Language.
-  let caret = $state<{ text: string; caret: number } | null>(null);
-  let rhymeWord = $state<string | null>(null);
-  const followCaret: CaretListener = (at) => {
+  // Rhymes, while the writing aids show, for now in the Song's first
+  // Language. The strip's are for the word at the caret of the Line that
+  // has focus. The card's are for that word too, kept once the caret
+  // leaves, or for one typed into it, until the caret moves in a Line again.
+  let caret = $state<CaretAt | null>(null);
+  let cardWord = $state<string | null>(null);
+  const heardCaret: CaretListener = (at) => {
     caret = at;
     const word = at && lyrics.wordAt(at.text, at.caret);
-    if (word) rhymeWord = word;
+    if (word) cardWord = word;
   };
-  const onCaret = $derived(showingAids ? followCaret : undefined);
+  const onCaret = $derived(showingAids ? heardCaret : undefined);
   const lineFocused = $derived(showingAids && caret !== null);
-  const rhymesLoading = $derived(!languageData().some((d) => d.code === languages[0]));
-  const rhymes = $derived(showingAids && rhymeWord ? lyrics.rhymes(rhymeWord, languages[0]) : null);
+  const caretWord = $derived(caret && lyrics.wordAt(caret.text, caret.caret));
+  const rhymesLoading = $derived(!hasLanguageData(languages[0]));
+  const rhymesFor = (word: string | null) => (showingAids && word ? lyrics.rhymes(word, languages[0]) : null);
   // The Details as Read mode shows them, with the key the Chords are shown in.
   const summary = $derived(
     details
@@ -578,7 +579,12 @@
               <Masters {song} {mode} submit={saves.submit} typing={saves.typing} {setStatus} {recording} />
             {:else if part === 'rhymes'}
               <summary><FoldChevron />Rhymes</summary>
-              <RhymesCard word={rhymeWord} setWord={(w) => (rhymeWord = w)} {rhymes} loading={rhymesLoading} />
+              <RhymesCard
+                word={cardWord}
+                setWord={(w) => (cardWord = w)}
+                rhymes={rhymesFor(cardWord)}
+                loading={rhymesLoading}
+              />
             {:else}
               <summary><FoldChevron />Scrapbook</summary>
               <Scrapbook {song} {drag} {editing} {syllables} {onCaret} />
@@ -618,7 +624,7 @@
 {/if}
 
 {#if lineFocused && !desktop.current}
-  <RhymesStrip word={rhymeWord} {rhymes} loading={rhymesLoading} {timelineHeight} />
+  <RhymesStrip word={caretWord} rhymes={rhymesFor(caretWord)} loading={rhymesLoading} {timelineHeight} />
 {/if}
 
 {#if showingShortcuts}

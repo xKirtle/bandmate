@@ -1,8 +1,7 @@
 // Whether Write mode shows its writing aids: each Line's Syllable Count and
-// Rhymes for the word being written. A
-// choice about how Bandmate works on this device, not about any Song: it's
-// kept on this device, and is on until turned off here. While it's off, no
-// Language's data is fetched.
+// Rhymes for the word being written. A choice about how Bandmate works on
+// this device, not about any Song: it's kept on this device, and is on
+// until turned off here. While it's off, no Language's data is fetched.
 import type { DeviceSettingStorage } from './deviceSetting.svelte';
 
 /** Where turning the writing aids off is kept on this device. */

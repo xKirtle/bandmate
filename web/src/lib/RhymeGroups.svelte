@@ -37,7 +37,7 @@
 </script>
 
 {#if !word}
-  <p class="muted message">Rhymes show here for the word at the caret as you write.</p>
+  <p class="muted message">Rhymes show here for the word at the cursor as you write.</p>
 {:else if loading}
   <p class="muted message">Loading…</p>
 {:else if !rhymes}
