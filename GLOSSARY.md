@@ -94,6 +94,18 @@ _Avoid_: Zoom, font size, text size
 **Key**:
 The key a Song is written in, one of its Details. Like a Chord, with a capo on it names the shapes fingered, not the pitch that sounds: capo 2 in G sounds in A.
 
+**Languages**:
+The languages a Song's Lines are sung in, one of its Details; a Song that mixes them has several, and each word is read in whichever of them knows it.
+_Avoid_: Locale
+
+**Syllable Count**:
+How many syllables a Line sings, shown beside it in Write mode to keep the meter matching across verses and between Alternates. A word Bandmate doesn't know is guessed from its spelling, and a count with a guess in it shows as an estimate.
+_Avoid_: Meter, syllables
+
+**Rhyme**:
+A word whose ending sounds like another's: perfect when its last stressed vowel and everything after it sound the same, near when only the vowels do.
+_Avoid_: Slant rhyme (say near Rhyme)
+
 **Chord Finder**:
 A built-in reference for Chords: look up how to play one, name one from the notes placed on an Instrument, and get Chords that go well with a Chord or a Key. A Voicing can be heard there, strummed or one string at a time. It has its own page and isn't opened from a Song. The user picks the tuning, and the last one picked is kept on each device. It has no capo: a Chord names the shape fingered, so a capo changes nothing about how it is played. It holds nothing of the user's. The app titles its page and navigation label Chords.
 _Avoid_: Chord Library (a library holds the user's things, like the Beat Library)
