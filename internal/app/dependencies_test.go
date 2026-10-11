@@ -26,6 +26,7 @@ type dependencies struct {
 	Go       []dependency `json:"go"`
 	Web      []dependency `json:"web"`
 	Programs []dependency `json:"programs"`
+	Data     []dependency `json:"data"`
 }
 
 func getDependencies(t *testing.T, configure func(*app.Config)) dependencies {

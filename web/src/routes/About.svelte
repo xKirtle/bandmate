@@ -94,7 +94,8 @@
   const releaseCount = $derived(releases?.check === 'ok' ? ` (${releases.releases.length})` : '');
 
   /** The Dependencies tab's lists, Go's first, each with what it says when
-      it lists none. Programs ship only in Bandmate's image. */
+      it lists none. Programs ship only in Bandmate's image. Data, such as the
+      dictionaries syllables are counted from, is built into the binary. */
   const dependencyLists = $derived(
     about
       ? [
@@ -106,6 +107,7 @@
             items: about.dependencies.programs,
             none: "None bundled: this Bandmate isn't running from its image.",
           },
+          { id: 'data', label: 'Data', items: about.dependencies.data, none: 'None recorded in this build.' },
         ]
       : [],
   );
@@ -364,7 +366,7 @@
           {:else if aboutError}
             <p class="error" role="alert">Couldn't load the dependencies: {aboutError}</p>
           {:else if about}
-            <p class="muted">The third-party packages and programs that ship in Bandmate, with their licenses.</p>
+            <p class="muted">The third-party packages, programs and data that ship in Bandmate, with their licenses.</p>
             <!-- Like the release notes, each list folds away; all start open. -->
             {#each dependencyLists as list (list.id)}
               <details class="dependencies" open>

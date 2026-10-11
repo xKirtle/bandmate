@@ -257,4 +257,5 @@ A disabled button fades; a disabled quiet one turns muted instead. Under a point
 | `--checkbox`                           | A checkbox or radio button, a touch bigger than the browser draws it     |
 | `--mark-rail`, `--mark-large`          | Bandmate's mark: atop the nav rail, and in About                         |
 | `--cue-slot`, `--cue-button`           | A Cue's slot in the gutter, wide enough for "⚠ 12:34.5"; its ▶ or ✕      |
+| `--count-slot`                         | A Line's Syllable Count, in a column before it, wide enough for "~99"    |
 | `--metronome`                          | The height of calibration's metronome                                    |

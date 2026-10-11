@@ -325,6 +325,7 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("GET /api/config", a.config)
 	mux.HandleFunc("GET /api/about", a.about)
 	mux.HandleFunc("GET /api/about/releases", a.aboutReleases)
+	mux.HandleFunc("GET /api/languages/{code}", a.languageData)
 	mux.HandleFunc("GET /api/beats", a.listBeats)
 	mux.HandleFunc("POST /api/beats", a.addBeat)
 	mux.HandleFunc("GET /api/beats/{id}", a.getBeat)

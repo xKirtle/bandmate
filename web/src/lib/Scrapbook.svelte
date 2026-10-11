@@ -8,12 +8,15 @@
   import type { SectionDragging } from './sectionDragging.svelte';
   import ActionsMenu from './ActionsMenu.svelte';
   import SectionEditor from './SectionEditor.svelte';
+  import type { SyllableCounter } from './lyricsLanguage';
+  import SyllableCount from './SyllableCount.svelte';
   import { card, describe, labelOf, places, putBackActions, sectionsInArrangement } from './sections';
 
   let {
     song,
     drag,
     editing,
+    syllables,
   }: {
     song: Song;
     /** The drag of a Section, shared with the Lyric Sheet. */
@@ -24,6 +27,8 @@
      * editor while they aren't saved.
      */
     editing: LyricSheetEditing;
+    /** Given, as in Write mode while the writing aids are on, each Line's Syllable Count shows beside it. */
+    syllables?: SyllableCounter;
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
@@ -156,6 +161,7 @@
               more={[{ icon: Trash2, label: 'Delete for good', run: () => remove(section.id) }]}
               {drag}
               places={placesBack}
+              {syllables}
             >
               {#snippet grip()}
                 {@render dragGrip(section.id)}
@@ -181,7 +187,13 @@
                   {/if}
                 </span>
                 {#each shown.lines as line, i (i)}
-                  <span class="line">{line || ' '}</span>
+                  {#if syllables}
+                    <span class="counted-line"
+                      ><SyllableCount count={syllables(line)} /><span class="line">{line || ' '}</span></span
+                    >
+                  {:else}
+                    <span class="line">{line || ' '}</span>
+                  {/if}
                 {:else}
                   <span class="line muted">No Lines yet.</span>
                 {/each}
@@ -302,6 +314,12 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: pre;
+  }
+  /* Each Line's Syllable Count in a column before it, as in the editor. */
+  .counted-line {
+    display: grid;
+    grid-template-columns: var(--count-slot) minmax(0, 1fr);
+    column-gap: var(--space-2);
   }
   .more {
     font-size: var(--text-sm);

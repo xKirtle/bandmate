@@ -35,6 +35,8 @@
   import { chordsInRead } from '../lib/chordChart';
   import { songChordsShown } from '../lib/chordsShown';
   import { songTranspose } from '../lib/sharedTranspose.svelte';
+  import { fetchLanguageData, languageData, writingAids } from '../lib/sharedWritingAids.svelte';
+  import { lyricsLanguage, type SyllableCounter } from '../lib/lyricsLanguage';
   import { timeAgo } from '../lib/time';
 
   let { id }: { id: number } = $props();
@@ -96,6 +98,19 @@
   const transpose = $derived(
     song && chordsInRead(song) === 'shown' && songChordsShown.of(id) ? songTranspose.of(id) : 0,
   );
+  // Each Line's Syllable Count, in Write mode while the writing aids are on,
+  // worked out here from the data of the Song's Languages: only then is
+  // that fetched, once for as long as the page is open.
+  const aiding = $derived(writing && writingAids.value);
+  $effect(() => {
+    if (aiding) fetchLanguageData(languages);
+  });
+  const lyrics = $derived(lyricsLanguage(languageData()));
+  const syllables: SyllableCounter | undefined = $derived.by(() => {
+    if (!aiding) return undefined;
+    const counting = languages;
+    return (text) => lyrics.syllableCount(text, counting);
+  });
   // The Details as Read mode shows them, with the key the Chords are shown in.
   const summary = $derived(
     details
@@ -521,6 +536,7 @@
           playFrom={(at) => timelinePanel?.playFrom(at)}
           {recording}
           {syncMode}
+          {syllables}
           hasClips={timeline?.tracks.some((t) => t.clips.length > 0) ?? false}
         />
       </div>
@@ -542,7 +558,7 @@
               <Masters {song} {mode} submit={saves.submit} typing={saves.typing} {setStatus} {recording} />
             {:else}
               <summary><FoldChevron />Scrapbook</summary>
-              <Scrapbook {song} {drag} {editing} />
+              <Scrapbook {song} {drag} {editing} {syllables} />
             {/if}
           </details>
         {/each}
