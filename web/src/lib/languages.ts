@@ -1,15 +1,18 @@
 // The Languages a Song's Lines can be sung in, by their ISO 639-1 codes,
 // and picking a Song's: an ordered list, never empty. The server keeps the
-// same list, and refuses a Language not on it.
+// same list (lyricsheet.Languages), and refuses a Language not on it.
 
-/** A Language Bandmate has data for, to count and rhyme in. */
+/** A Language Bandmate counts syllables in. */
 export interface LanguageInfo {
   code: string;
   name: string;
 }
 
-/** Every Language Bandmate has data for, as the picker lists them. */
-export const languages: readonly LanguageInfo[] = [{ code: 'en', name: 'English' }];
+/** Every Language Bandmate counts syllables in, as the picker lists them. */
+export const languages: readonly LanguageInfo[] = [
+  { code: 'en', name: 'English' },
+  { code: 'pt', name: 'Portuguese' },
+];
 
 /** A Language's name, or its code as it is if Bandmate has none for it. */
 export function languageName(code: string, known: readonly LanguageInfo[] = languages): string {
@@ -28,7 +31,7 @@ export interface LanguageChoice extends LanguageInfo {
 
 /**
  * The Languages the picker offers: those picked first, in the Song's order,
- * then the rest as Bandmate lists them. Only those Bandmate has data for.
+ * then the rest as Bandmate lists them. Only those Bandmate counts in.
  */
 export function languageChoices(
   picked: readonly string[],

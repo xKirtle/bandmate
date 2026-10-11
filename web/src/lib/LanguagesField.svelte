@@ -161,7 +161,7 @@
         {/each}
       </fieldset>
       <p id="{id}-hint" class="hint muted">
-        Bandmate counts syllables and suggests rhymes in these languages, so only they can be picked for now.
+        Bandmate counts syllables in these languages, so only they can be picked for now.
       </p>
     </div>
   {/if}

@@ -8,8 +8,11 @@ const known = [
 ];
 
 describe('languages', () => {
-  it('offers English, the only Language Bandmate has data for so far', () => {
-    expect(languages).toEqual([{ code: 'en', name: 'English' }]);
+  it('offers English and Portuguese, the Languages Bandmate counts syllables in', () => {
+    expect(languages).toEqual([
+      { code: 'en', name: 'English' },
+      { code: 'pt', name: 'Portuguese' },
+    ]);
   });
 });
 

@@ -11,6 +11,7 @@
     setWord,
     rhymes,
     loading,
+    noRhymesIn,
   }: {
     /** The word Rhymes are for, or null while there's none. */
     word: string | null;
@@ -19,6 +20,8 @@
     rhymes: Rhymes | null;
     /** Whether the Language's data is still on its way. */
     loading: boolean;
+    /** The Song's Languages, named, when Bandmate suggests Rhymes in none of them. */
+    noRhymesIn: string | null;
   } = $props();
 </script>
 
@@ -36,7 +39,7 @@
     />
   </label>
   <div class="results">
-    <RhymeGroups {word} {rhymes} {loading} limit={60} />
+    <RhymeGroups {word} {rhymes} {loading} {noRhymesIn} limit={60} />
   </div>
 </section>
 

@@ -62,6 +62,113 @@ describe('syllableCount', () => {
   });
 });
 
+describe('syllableCount in Portuguese', () => {
+  // Portuguese needs no data: it's counted by its spelling rules, as written.
+  const portuguese = (line: string) => lyricsLanguage([]).syllableCount(line, ['pt']);
+
+  // Each word's written syllables, as a Portuguese dictionary splits them.
+  const words: [string, number][] = [
+    ['amor', 2], // a-mor
+    ['casa', 2], // ca-sa
+    ['coração', 3], // co-ra-ção: a nasal diphthong
+    ['corações', 3], // co-ra-ções
+    ['mãe', 1], // mãe
+    ['pão', 1], // pão
+    ['cantam', 2], // can-tam
+    ['também', 2], // tam-bém
+    ['noite', 2], // noi-te: a diphthong
+    ['saudade', 3], // sau-da-de
+    ['europeu', 3], // eu-ro-peu
+    ['chapéu', 2], // cha-péu
+    ['herói', 2], // he-rói
+    ['muito', 2], // mui-to
+    ['praia', 2], // prai-a
+    ['areia', 3], // a-rei-a
+    ['dia', 2], // di-a: a hiatus
+    ['rua', 2], // ru-a
+    ['história', 4], // his-tó-ri-a
+    ['poeta', 3], // po-e-ta
+    ['coelho', 3], // co-e-lho
+    ['teatro', 3], // te-a-tro
+    ['voo', 2], // vo-o
+    ['saúde', 3], // sa-ú-de: an accent makes a hiatus
+    ['país', 2], // pa-ís
+    ['pais', 1], // pais
+    ['ruído', 3], // ru-í-do
+    ['rainha', 3], // ra-i-nha: before nh
+    ['ainda', 3], // a-in-da: before a closing n
+    ['cair', 2], // ca-ir: before a closing r
+    ['ruim', 2], // ru-im
+    ['juiz', 2], // ju-iz
+    ['reino', 2], // rei-no: an n that opens the next syllable
+    ['quero', 2], // que-ro: a silent u
+    ['guitarra', 3], // gui-tar-ra
+    ['quando', 2], // quan-do
+    ['água', 2], // á-gua
+    ['iguais', 2], // i-guais
+    ['Uruguai', 3], // u-ru-guai
+    ['frequente', 3], // fre-quen-te
+    ['partiu', 2], // par-tiu
+    ['traição', 3], // tra-i-ção: before ç
+    ['intuição', 4], // in-tu-i-ção
+    ['instituição', 5], // ins-ti-tu-i-ção
+    ['eleição', 3], // e-lei-ção: but a diphthong after e
+    ['reunião', 4], // re-u-ni-ão: a hiatus some words start with
+    ['proibido', 4], // pro-i-bi-do
+    ['suicídio', 5], // su-i-cí-di-o
+    ['miudinho', 4], // mi-u-di-nho
+    ['cairá', 3], // ca-i-rá
+  ];
+
+  it.each(words)('counts “%s” as %i', (word, syllables) => {
+    expect(portuguese(word)).toEqual({ count: syllables, estimate: false });
+  });
+
+  it('counts a Line, leaving its Chords out', () => {
+    expect(portuguese('[Am]Eu sei que vou te a[C]mar')).toEqual({ count: 7, estimate: false });
+    expect(portuguese('Por toda a minha vida')).toEqual({ count: 8, estimate: false });
+  });
+
+  it('reads accents however they were typed, and words joined by an apostrophe', () => {
+    expect(portuguese('coração'.normalize('NFD'))).toEqual({ count: 3, estimate: false });
+    expect(portuguese('copo d’água')).toEqual({ count: 4, estimate: false });
+  });
+
+  it('counts a number in digits as it is said in Portuguese, as an estimate', () => {
+    expect(portuguese('7')).toEqual({ count: 2, estimate: true }); // se-te
+    expect(portuguese('24 horas')).toEqual({ count: 7, estimate: true }); // vin-te e qua-tro ho-ras
+    expect(portuguese('1999')).toEqual({ count: 12, estimate: true }); // mil no-ve-cen-tos e no-ven-ta e no-ve
+  });
+
+  it('guesses a word with no vowel to read, as an estimate', () => {
+    expect(portuguese('hmm')).toEqual({ count: 1, estimate: true });
+  });
+});
+
+describe('syllableCount in a Song of several Languages', () => {
+  const mixed = (line: string, languages: string[]) => lyrics.syllableCount(line, languages);
+
+  it('reads a word the English dictionary knows as English, whatever the order', () => {
+    // "love" is one syllable in English, but two read by Portuguese spelling (lo-ve).
+    expect(mixed('love', ['en', 'pt'])).toEqual({ count: 1, estimate: false });
+    expect(mixed('love', ['pt', 'en'])).toEqual({ count: 1, estimate: false });
+  });
+
+  it('reads any other word by Portuguese spelling rules, not as an estimate', () => {
+    expect(mixed('saudade', ['en', 'pt'])).toEqual({ count: 3, estimate: false });
+    expect(mixed('I love saudade', ['pt', 'en'])).toEqual({ count: 5, estimate: false });
+  });
+
+  it("reads digits in the Song's first Language, as an estimate", () => {
+    expect(mixed('7', ['en', 'pt'])).toEqual({ count: 2, estimate: true }); // sev-en
+    expect(mixed('24', ['pt', 'en'])).toEqual({ count: 5, estimate: true }); // vin-te e qua-tro
+  });
+
+  it('counts nothing until the English dictionary has its data', () => {
+    expect(lyricsLanguage([]).syllableCount('saudade', ['en', 'pt'])).toBeNull();
+  });
+});
+
 describe('rhymes', () => {
   const rhymes = (word: string) => lyrics.rhymes(word, 'en');
 
