@@ -39,12 +39,6 @@ The **Rhymes** button suggests rhymes for the word you're writing. It's there on
 - Download a rhyming dictionary for each language you write in, in **Settings → Rhyming dictionaries**, on each device you write on.
 - A song's rhymes are in the languages set in its details.
 
-Where the rhymes come from:
-
-- **English**: the [CMU Pronouncing Dictionary](https://github.com/cmusphinx/cmudict), under the [BSD-2-Clause license](https://github.com/cmusphinx/cmudict/blob/master/LICENSE).
-- **Portuguese**: LibreOffice's [Hunspell dictionary for European Portuguese](https://github.com/LibreOffice/dictionaries/tree/master/pt_PT), under the [LGPL-2.1](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html).
-- **The order**, most common words first: [FrequencyWords](https://github.com/hermitdave/FrequencyWords) by Hermit Dave, from the [OpenSubtitles 2018 corpus](https://opus.nlpl.eu/legacy/OpenSubtitles-v2018.php), under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
-
 Want rhymes in your language? See [Adding a rhyming language](https://github.com/xKirtle/bandmate/blob/main/CONTRIBUTING.md#adding-a-rhyming-language).
 
 ## Chords
