@@ -248,7 +248,7 @@ func TestASongCanBeSungInPortugueseAlone(t *testing.T) {
 
 func TestSongsMadeBeforeLanguagesAreSungInEnglish(t *testing.T) {
 	dir := t.TempDir()
-	old, err := db.OpenBefore(context.Background(), dir, "0042_song_languages")
+	old, err := db.OpenBefore(context.Background(), dir, "0044_song_languages")
 	if err != nil {
 		t.Fatal(err)
 	}
