@@ -3,18 +3,78 @@ import { gunzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { lyricsLanguage, readLanguageData } from './lyricsLanguage';
 
-// Each Language's data as the binary serves it: for English, the CMU
-// Pronouncing Dictionary; for Portuguese, a word list.
+const built = (file: string) =>
+  gunzipSync(readFileSync(new URL(`../../../internal/languagedata/${file}`, import.meta.url))).toString('utf8');
+// Each Language's data as the binary serves it: its dictionary (for
+// English, the CMU Pronouncing Dictionary; for Portuguese, a word list),
+// then its ranks, its words most common first.
 const served = (code: string) =>
-  readLanguageData(
-    code,
-    gunzipSync(readFileSync(new URL(`../../../internal/languagedata/${code}.txt.gz`, import.meta.url))).toString(
-      'utf8',
-    ),
-  );
+  readLanguageData(code, `${built(`${code}.txt.gz`)}#ranks\n${built(`${code}.ranks.txt.gz`)}`);
+// As a device kept it before the ranks shipped: the dictionary alone.
+const unranked = (code: string) => readLanguageData(code, built(`${code}.txt.gz`));
 const english = served('en');
 const portugueseWords = served('pt');
 const lyrics = lyricsLanguage([english]);
+
+describe('the order of Rhymes', () => {
+  const words = (list: { word: string }[]) => list.map((r) => r.word);
+  // A dictionary of a few words, "long" the most common and "strong" the least of those ranked.
+  const dictionary = (lines: string[]) =>
+    lyricsLanguage([
+      readLanguageData(
+        'en',
+        [
+          'wrong R AO1 NG',
+          'long L AO1 NG',
+          'song S AO1 NG',
+          'strong S T R AO1 NG',
+          'belong B IH0 L AO1 NG',
+          'prolong P R OW0 L AO1 NG',
+          'aung AO1 NG',
+          'cong K AO1 NG',
+          'gone G AO1 N',
+          'dog D AO1 G',
+          'boss B AO1 S',
+          ...lines,
+        ].join('\n'),
+      ),
+    ]);
+  const ranked = dictionary(['#ranks', 'long', 'gone', 'song', 'belong', 'dog', 'strong']);
+
+  it('lists common words first, perfect and near Rhymes alike', () => {
+    const { perfect, near } = ranked.rhymes('wrong', 'en')!;
+    expect(words(perfect).slice(0, 4)).toEqual(['long', 'song', 'belong', 'strong']);
+    expect(words(near).slice(0, 2)).toEqual(['gone', 'dog']);
+  });
+
+  it('lists words it has no rank for after every ranked one, nearest in syllables, then alphabetically', () => {
+    const { perfect, near } = ranked.rhymes('wrong', 'en')!;
+    expect(words(perfect).slice(4)).toEqual(['aung', 'cong', 'prolong']);
+    expect(words(near).slice(2)).toEqual(['boss']);
+  });
+
+  it('orders by syllables, then alphabetically, without ranks, as a dictionary kept before they shipped is', () => {
+    const { perfect } = dictionary([]).rhymes('wrong', 'en')!;
+    expect(words(perfect)).toEqual(['aung', 'cong', 'long', 'song', 'strong', 'belong', 'prolong']);
+  });
+
+  it('lists the common Rhymes of “wrong” before names and rare words', () => {
+    const first = words(lyrics.rhymes('wrong', 'en')!.perfect.slice(0, 5));
+    expect(first).toEqual(expect.arrayContaining(['long', 'song', 'strong']));
+    expect(first).not.toContain('aung');
+    expect(first).not.toContain('cong');
+  });
+
+  it('ranks Portuguese words spelt as before the spelling reform by their new spelling', () => {
+    const both = lyricsLanguage([english, portugueseWords]);
+    const first = words(both.rhymes('coração', 'pt')!.perfect.slice(0, 10));
+    expect(first).toEqual(expect.arrayContaining(['não', 'então', 'mão']));
+    // "ação" is said mostly as "acção" in the subtitles, and outranks rarer words once that counts.
+    const perfect = words(both.rhymes('canção', 'pt')!.perfect);
+    expect(perfect.indexOf('ação')).toBeLessThan(perfect.indexOf('aldeão'));
+  });
+});
+
 describe('rhymes', () => {
   const rhymes = (word: string) => lyrics.rhymes(word, 'en');
 
@@ -41,8 +101,10 @@ describe('rhymes', () => {
     expect(near).toContainEqual({ word: 'sadly', count: 2 });
   });
 
-  it('lists the Rhymes nearest the word in syllables first', () => {
-    const counts = rhymes('night')!.perfect.map((r) => r.count);
+  it('lists the Rhymes nearest the word in syllables first, among words it has no rank for', () => {
+    const counts = lyricsLanguage([unranked('en')])
+      .rhymes('night', 'en')!
+      .perfect.map((r) => r.count);
     expect(counts.slice(0, 5)).toEqual([1, 1, 1, 1, 1]);
     expect(counts).toEqual([...counts].sort((a, b) => a - b));
   });
@@ -107,10 +169,12 @@ describe('rhymes in Portuguese', () => {
     expect(rhymes('coração'.normalize('NFD'))).toEqual(rhymes('coração'));
   });
 
-  it('lists the Rhymes nearest the word in syllables first, and leaves out the word itself', () => {
-    const { perfect, near } = rhymes('Coração')!;
-    const counts = perfect.map((r) => r.count);
+  it('lists the Rhymes nearest the word in syllables first among words it has no rank for, and leaves out the word itself', () => {
+    const counts = lyricsLanguage([unranked('pt')])
+      .rhymes('coração', 'pt')!
+      .perfect.map((r) => r.count);
     expect(counts.slice(0, 5)).toEqual([3, 3, 3, 3, 3]);
+    const { perfect, near } = rhymes('Coração')!;
     expect([...perfect, ...near].map((r) => r.word)).not.toContain('coração');
   });
 

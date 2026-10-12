@@ -1,0 +1,27 @@
+en.ranks.txt.gz is made from FrequencyWords by Hermit Dave
+(https://github.com/hermitdave/FrequencyWords), its English list of the
+50,000 most common words, content/2018/en/en_50k.txt, at commit
+525f9b560de45753a5ea01069454e72e9aa541c6. FrequencyWords is built from the
+OpenSubtitles 2018 corpus of OPUS
+(https://opus.nlpl.eu/legacy/OpenSubtitles-v2018.php), with subtitles from
+http://www.opensubtitles.org/:
+
+  P. Lison and J. Tiedemann, 2016, OpenSubtitles2016: Extracting Large
+  Parallel Corpora from Movie and TV Subtitles. In Proceedings of the 10th
+  International Conference on Language Resources and Evaluation (LREC 2016).
+  https://aclanthology.org/L16-1147/
+
+FrequencyWords' content is licensed under the Creative Commons
+Attribution-ShareAlike 4.0 International licence (CC BY-SA 4.0), as its
+README says ("CC-by-sa-4.0 for content").
+
+Modified: filtered to the words of the CMU Pronouncing Dictionary
+(en.txt.gz) and converted to ranks, most common first, one a line. Common
+contractions, which the list splits at their apostrophe ("don't" as "don"
+and "'t"), are given counts by a hand-written mapping, and the fragments
+only ever theirs are left out. The program that does this is
+frequencywords/main.go, beside this file.
+
+en.ranks.txt.gz is licensed under the Creative Commons Attribution-ShareAlike
+4.0 International licence: https://creativecommons.org/licenses/by-sa/4.0/
+It comes with no warranties.
