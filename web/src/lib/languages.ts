@@ -31,7 +31,7 @@ export interface LanguageChoice extends LanguageInfo {
 export function languageChoices(picked: readonly string[], known: readonly LanguageInfo[]): LanguageChoice[] {
   const first = picked.flatMap((code) => known.filter((l) => l.code === code));
   const rest = known.filter((l) => !picked.includes(l.code));
-  const choice = (l: LanguageInfo, on: boolean): LanguageChoice => ({ code: l.code, name: l.name, picked: on });
+  const choice = (l: LanguageInfo, picked: boolean): LanguageChoice => ({ code: l.code, name: l.name, picked });
   return [...first.map((l) => choice(l, true)), ...rest.map((l) => choice(l, false))];
 }
 

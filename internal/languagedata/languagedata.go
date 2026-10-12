@@ -39,7 +39,7 @@ type Language struct {
 }
 
 // registry is every Language Bandmate rhymes in, in the order the page
-// lists them: by name.
+// lists them: keep them by name.
 var registry = []Language{
 	{
 		Code:       "en",

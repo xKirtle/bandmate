@@ -1058,10 +1058,10 @@ test('the Languages picker offers the Languages Bandmate lists, by name, those p
   page,
   bandmate,
 }) => {
-  // Bandmate lists one more Language than it ships with.
+  // Bandmate lists one more Language than it ships with, one it will never have.
   await page.route('**/api/languages', async (route) => {
     const listed = await (await route.fetch()).json();
-    await route.fulfill({ json: [...listed, { code: 'es', name: 'Spanish', size: 1000 }] });
+    await route.fulfill({ json: [...listed, { code: 'tlh', name: 'Klingon', size: 1000 }] });
   });
   const song = await bandmate.song({ title: 'Saudade', languages: ['pt', 'en'] });
   await page.goto(`/songs/${song.id}`);
@@ -1072,8 +1072,8 @@ test('the Languages picker offers the Languages Bandmate lists, by name, those p
 
   const picker = page.getByRole('dialog', { name: 'Languages' });
   await expect(picker.getByRole('checkbox')).toHaveCount(3);
-  await expect(picker.getByRole('group', { name: 'Languages' })).toContainText(/Portuguese.*English.*Spanish/);
-  await expect(picker.getByRole('checkbox', { name: 'Spanish' })).not.toBeChecked();
+  await expect(picker.getByRole('group', { name: 'Languages' })).toContainText(/Portuguese.*English.*Klingon/);
+  await expect(picker.getByRole('checkbox', { name: 'Klingon' })).not.toBeChecked();
   await picker.getByRole('checkbox', { name: 'Portuguese' }).uncheck();
   await expect.poll(async () => (await bandmate.getSong(song.id)).languages).toEqual(['en']);
 });

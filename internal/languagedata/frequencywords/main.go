@@ -1,14 +1,14 @@
-// Command frequencywords builds each Language's ranks, en.ranks.txt.gz and
-// pt.ranks.txt.gz, from FrequencyWords by Hermit Dave at a pinned commit:
-// how often each word is said in the OpenSubtitles 2018 corpus, a list for
-// each Language of its 50,000 most common words. Each Language's ranks are
-// the words of its list its dictionary has, most common first, one a line,
-// so the page can suggest common Rhymes first. They're built from the
-// Language's dictionary, en.txt.gz or pt.txt.gz, so go generate runs it
+// Command frequencywords builds the ranks of each Language in ranked below,
+// <code>.ranks.txt.gz, from FrequencyWords by Hermit Dave at a pinned
+// commit: how often each word is said in the OpenSubtitles 2018 corpus, a
+// list for each Language of its 50,000 most common words. Each Language's
+// ranks are the words of its list its dictionary has, most common first,
+// one a line, so the page can suggest common Rhymes first. They're built
+// from the Language's dictionary, <code>.txt.gz, so go generate runs it
 // after those, in internal/languagedata, and it needs network access.
 //
-// The lists count words as the subtitles spell them, so two Languages need
-// a hand:
+// The lists count words as the subtitles spell them, so a Language may need
+// a hand, as two do:
 //
 //   - English: the lists split a contraction at its apostrophe, so "don't"
 //     is counted as "don" and "'t". A contraction takes its count from
@@ -116,34 +116,50 @@ type contraction struct {
 	fragment, like string
 }
 
+// rankedLanguage is a Language whose ranks are built: its ISO 639-1 code,
+// how its dictionary is read, and the hand its list needs, if any.
+type rankedLanguage struct {
+	code string
+	// wordOf is the word on a line of its dictionary: pronouncingDictionary
+	// or wordList.
+	wordOf func(line string) string
+	// adapt fixes its list's counts to match its dictionary; nil when they
+	// match already.
+	adapt func(counts map[string]int, words map[string]bool) error
+}
+
+// ranked is every Language whose ranks are built, one a line.
+var ranked = []rankedLanguage{
+	{"en", pronouncingDictionary, countContractions},
+	{"pt", wordList, foldOldSpellings},
+}
+
+// pronouncingDictionary is the word on a pronouncing dictionary's line,
+// "hello HH AH0 L OW1".
+func pronouncingDictionary(line string) string {
+	word, _, _ := strings.Cut(line, " ")
+	return word
+}
+
+// wordList is the word on a word list's line, which is the line.
+func wordList(line string) string { return line }
+
 func main() {
-	english, err := dictionaryWords("en.txt.gz", func(line string) string {
-		word, _, _ := strings.Cut(line, " ")
-		return word
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	portuguese, err := dictionaryWords("pt.txt.gz", func(line string) string { return line })
-	if err != nil {
-		log.Fatal(err)
-	}
-	for _, l := range []struct {
-		code  string
-		words map[string]bool
-		adapt func(counts map[string]int, words map[string]bool) error
-	}{
-		{"en", english, countContractions},
-		{"pt", portuguese, foldOldSpellings},
-	} {
+	for _, l := range ranked {
+		words, err := dictionaryWords(l.code+".txt.gz", l.wordOf)
+		if err != nil {
+			log.Fatal(err)
+		}
 		counts, err := fetchCounts(l.code)
 		if err != nil {
 			log.Fatal(err)
 		}
-		if err := l.adapt(counts, l.words); err != nil {
-			log.Fatal(err)
+		if l.adapt != nil {
+			if err := l.adapt(counts, words); err != nil {
+				log.Fatal(err)
+			}
 		}
-		if err := writeRanks(l.code+".ranks.txt.gz", ranked(counts, l.words)); err != nil {
+		if err := writeRanks(l.code+".ranks.txt.gz", rankedWords(counts, words)); err != nil {
 			log.Fatal(err)
 		}
 	}
@@ -249,9 +265,9 @@ func foldOldSpellings(counts map[string]int, words map[string]bool) error {
 	return nil
 }
 
-// ranked lists the counted words the dictionary has, most common first,
+// rankedWords lists the counted words the dictionary has, most common first,
 // alphabetically among equals.
-func ranked(counts map[string]int, words map[string]bool) []string {
+func rankedWords(counts map[string]int, words map[string]bool) []string {
 	var list []string
 	for word := range counts {
 		if words[word] {

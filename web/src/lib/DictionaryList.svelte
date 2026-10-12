@@ -10,7 +10,6 @@
   // until one is.
 
   const id = $props.id();
-  listedLanguages.load(); // Again, if Bandmate couldn't be reached before.
 
   /** Why the last Download or Remove of a Language failed. */
   let problem = $state<{ code: string; message: string } | null>(null);

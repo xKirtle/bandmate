@@ -83,7 +83,7 @@ A Language needs:
 Each step, with the file it touches, all in `internal/languagedata` unless it says otherwise:
 
 1. **The data.** Write a generator, a `main` package in its own folder, like `ptwords/main.go`, that downloads the dictionary at a pinned commit and writes `<code>.txt.gz`: one pronunciation or one word a line, gzipped. Add its `//go:generate` and `//go:embed` lines to `languagedata.go`, before FrequencyWords', as the ranks are built from it, with a version constant kept in step with the pinned commit.
-2. **The ranks.** Add the Language to the list in `frequencywords/main.go`, which writes `<code>.ranks.txt.gz`, with whatever its list needs to match the dictionary, as Portuguese's old spellings do. Embed it in `languagedata.go`.
+2. **The ranks.** Add a line for the Language to `ranked` in `frequencywords/main.go`, which writes `<code>.ranks.txt.gz`: its code, how its dictionary is read (`pronouncingDictionary` or `wordList`), and whatever its list needs to match the dictionary, as Portuguese's old spellings do, or nil. Embed it in `languagedata.go`.
 3. **The registry.** Add the Language to `registry` in `languagedata.go`: its ISO 639-1 code, its name in English, its data and ranks, and its dictionary's credit, which About lists. That's the one list: a Song can be sung in it, and the Languages picker and Settings offer it, from there.
 4. **The licences.** Add `<code>.LICENSE`, and `<code>.ranks.LICENSE` if it has ranks, beside the data, as `pt.LICENSE` and `pt.ranks.LICENSE` do: where it came from, what was changed, and its licence's notice. Where a dictionary is offered under several licences, name the one Bandmate takes, and give that in the credit.
 5. **The spelling rules**, if it has no pronouncing dictionary. Write them in a module of their own in `web/src/lib`, like `portuguese.ts`, and add them to `spellingRules` in `web/src/lib/lyricsLanguage.ts`.
@@ -96,7 +96,7 @@ go generate ./internal/languagedata   # downloads the dictionaries and lists, so
 
 and commit what it writes.
 
-Add tests, as for Portuguese: in `internal/app/language_data_test.go`, that the data is served and holds some of its words, that its ranks start with its most common ones, and that About credits it; and in `web/src/lib/lyricsLanguage.test.ts`, some of its Rhymes and their Syllable Counts, and, for spelling rules, the words whose stress they find.
+Add tests, as for Portuguese: in `internal/app/language_data_test.go`, that the data is served and holds some of its words, that its ranks start with its most common ones, and that About credits it, and add it to the Languages listed there; and in `web/src/lib/lyricsLanguage.test.ts`, some of its Rhymes and their Syllable Counts, and, for spelling rules, the words whose stress they find.
 
 ### Docker
 
