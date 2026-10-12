@@ -25,7 +25,6 @@ export default defineConfig({
         text: 'Bandmate',
         items: [
           { text: 'Features', link: '/features' },
-          { text: 'Rhymes', link: '/rhymes' },
           { text: 'Self-hosting', link: '/self-hosting' },
         ],
       },

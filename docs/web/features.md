@@ -13,7 +13,7 @@ Every song is in one list. Search it by title, filter it by status, tag or wheth
 
 Write lyrics the way you would in a notebook, with the chords right where you play them.
 
-<img src="@screenshots/write-mode-labelled.png" alt="A song in Write mode, numbered 1 to 9 to match the list below it">
+<img src="@screenshots/write-mode-labelled.png" alt="A song in Write mode, numbered 1 to 10 to match the list below it">
 
 1. **Status**: where the song is at: an idea, a draft, or finished.
 2. **Song details**: its key, tempo, capo and tuning, the languages it's sung in, and notes of your own. Languages offers only those Bandmate suggests rhymes in, English and Portuguese, so others aren't on the list yet.
@@ -24,14 +24,28 @@ Write lyrics the way you would in a notebook, with the chords right where you pl
 7. **Alternates**: other versions of a section. Write a few, and pick the one the song uses. The others wait here until you change your mind.
 8. **Line timings**: when each line starts in the song, set as you [sync](#sync). They appear once the [timeline](#timeline) has some audio on it: a beat, a take or another sound.
 9. **Scrapbook**: sections that aren't in the song: leftovers and ideas to come back to.
-
-On a wide window, Bandmate also suggests rhymes for the word you're writing: download a rhyming dictionary in **Settings → Rhyming dictionaries**, then turn them on with **Rhymes** in the lyric sheet's toolbar. See [Rhymes](/rhymes).
+10. **Rhymes**: suggestions for the word you're writing. See [Rhymes](#rhymes).
 
 And this is Read mode, here on a phone: the chords over the words, and how to play each one at the top. The button at the top right sets the text size, hides or transposes the chords, and shows or pins the chord shapes.
 
 <img class="phone" src="@screenshots/phone-lyric-sheet.png" alt="A song in Read mode on a phone, with the chord shapes at the top">
 
 Hover or tap a chord, or tap its shape at the top, to step through the other ways to play it, and prefer one. Press the speaker to hear the shape strummed, in the song's tuning. It plays the shape as you'd finger it, so the capo doesn't change it, and it plays over the song if that's playing.
+
+### Rhymes
+
+The **Rhymes** button suggests rhymes for the word you're writing. It's there on a wide window, like a desktop's, and can't be on while you [sync](#sync).
+
+- Download a rhyming dictionary for each language you write in, in **Settings → Rhyming dictionaries**, on each device you write on.
+- A song's rhymes are in the languages set in its details.
+
+Where the rhymes come from:
+
+- **English**: the [CMU Pronouncing Dictionary](https://github.com/cmusphinx/cmudict), under the [BSD-2-Clause license](https://github.com/cmusphinx/cmudict/blob/master/LICENSE).
+- **Portuguese**: LibreOffice's [Hunspell dictionary for European Portuguese](https://github.com/LibreOffice/dictionaries/tree/master/pt_PT), under the [LGPL-2.1](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html).
+- **The order**, most common words first: [FrequencyWords](https://github.com/hermitdave/FrequencyWords) by Hermit Dave, from the [OpenSubtitles 2018 corpus](https://opus.nlpl.eu/legacy/OpenSubtitles-v2018.php), under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+
+Want rhymes in your language? See [Adding a rhyming language](https://github.com/xKirtle/bandmate/blob/main/CONTRIBUTING.md#adding-a-rhyming-language).
 
 ## Chords
 
@@ -173,7 +187,7 @@ A Backup restores into the same version of Bandmate or a newer one. To copy ever
 - **This device**: what each device keeps for itself.
   - **Appearance**: three colour palettes, Terracotta (the default), Ink and Olive, each in light and dark. Follow your system's light or dark, or pick one. More palettes may come.
   - **Recording**: every input on this device, each channel of an audio interface on its own, with its latency or "Not calibrated" or "Skipped". Pick the one you record from, and check its level with **Test input** above the list: Bandmate only listens while it's on, and asks for the microphone the first time. Open any of them to calibrate it as in [Calibrate](#calibrate) without recording from it, or type its latency. Inputs that aren't plugged in keep their latency, listed under **Not connected**, to forget.
-  - **Rhyming dictionaries**: English and Portuguese, each with its download size. Download the ones you write in, so [Rhymes](/rhymes#downloading-a-rhyming-dictionary) can suggest words in them, or remove one you no longer need.
+  - **Rhyming dictionaries**: English and Portuguese, each with its download size. Download the ones you write in, so [Rhymes](#rhymes) can suggest words in them, or remove one you no longer need.
   - **Chord diagrams**: flip them for left-handed playing.
 - **Backups**: see [Backups](#backups).
 - **About**: the version you're running, what changed in it, whether a newer one is out, the yt-dlp in use, and the packages and data that ship in Bandmate, with their licenses.
