@@ -32,7 +32,7 @@ describe('lookUpRhymes', () => {
     expect(lookUpRhymes(both, 'coração', ['pt'], 'en').language).toBe('pt');
   });
 
-  it('is loading while the dictionaries downloaded are on their way', () => {
+  it('is loading while the downloaded dictionaries are on their way', () => {
     const lookup = lookUpRhymes(lyricsLanguage([english]), 'coração', ['en', 'pt'], null, true);
     expect(lookup).toMatchObject({ word: 'coração', rhymes: null, loading: true });
   });

@@ -31,7 +31,7 @@
   const named = (codes: readonly string[], type: 'conjunction' | 'disjunction') =>
     new Intl.ListFormat('en', { type }).format(codes.map((code) => languageName(code)));
   /** The rhyming dictionaries to download: "the Portuguese rhyming dictionary", or "dictionaries" for several. */
-  const toDownload = (codes: readonly string[]) =>
+  const dictionariesOf = (codes: readonly string[]) =>
     `the ${named(codes, 'conjunction')} rhyming ${codes.length === 1 ? 'dictionary' : 'dictionaries'}`;
   // Where rhyming dictionaries are downloaded: Settings' Writing card.
   const settings = '/settings#writing';
@@ -41,8 +41,8 @@
   <p class="muted message">Loading…</p>
 {:else if toSetUp.length > 0 && notIn.length > 0}
   <p class="muted message">
-    Not in {named(notIn, 'disjunction')}. <a href={settings}>Download {toDownload(toSetUp)} in Settings</a> to look it up
-    there.
+    Not in {named(notIn, 'disjunction')}. <a href={settings}>Download {dictionariesOf(toSetUp)} in Settings</a> to look it
+    up there.
   </p>
 {:else if toSetUp.length > 0 && language}
   <p class="muted message">
@@ -50,7 +50,7 @@
   </p>
 {:else if toSetUp.length > 0}
   <p class="muted message">
-    Rhymes need a dictionary on this device. <a href={settings}>Download {toDownload(toSetUp)} in Settings</a>
+    Rhymes need a dictionary on this device. <a href={settings}>Download {dictionariesOf(toSetUp)} in Settings</a>
   </p>
 {:else if !word}
   <p class="muted message">Rhymes show here for the word at the cursor as you write.</p>

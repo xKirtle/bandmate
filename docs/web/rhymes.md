@@ -8,7 +8,7 @@ Rhymes come from a rhyming dictionary for each language, which you download to e
 
 Dictionaries download from your Bandmate server, not the internet, so you don't need an internet connection.
 
-Until you download one, Bandmate downloads nothing, and the Rhymes card links to Settings to download it.
+Bandmate downloads no dictionary until you ask it to, and the Rhymes card links to Settings to download one.
 
 ## Turning them on
 

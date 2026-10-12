@@ -75,7 +75,7 @@
       <h2 id="writing-heading">Writing</h2>
       <p class="hint intro">
         Rhymes are suggested in the languages whose rhyming dictionaries you download here. They download from your
-        Bandmate server, not the internet, and stay on this device, so Rhymes work offline.
+        Bandmate server, so no internet connection is needed, and are kept on this device, so Rhymes work offline too.
       </p>
       <DictionaryList />
     </section>

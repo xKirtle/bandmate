@@ -1,7 +1,7 @@
 // The rhyming dictionaries downloaded to this device: each Language's data,
-// downloaded from Bandmate only when the user downloads it in Settings, and
-// kept in the browser, so Rhymes work offline and after a reload. One set
-// up is read in when it's first used on a page, and asks Bandmate once a
+// downloaded from Bandmate only when the user asks for it in Settings, and
+// kept in the browser, so Rhymes work offline and after a reload. One
+// downloaded is read in when it's first used on a page, and asks Bandmate once a
 // visit whether its data changed since, taking the new data if so.
 //
 // What's kept is the Language's data as Bandmate serves it, with the tag
@@ -23,7 +23,7 @@ export interface StoredDictionary extends SetUpDictionary {
   text: string;
 }
 
-/** Where the dictionaries downloaded are kept: the browser's IndexedDB, in the app. */
+/** Where the downloaded dictionaries are kept: the browser's IndexedDB, in the app. */
 export interface DictionaryStore {
   list(): Promise<SetUpDictionary[]>;
   get(code: string): Promise<StoredDictionary | undefined>;
@@ -49,7 +49,7 @@ export class RhymingDictionaries {
   #download: Download;
   #now: () => Date;
   #changed: () => void;
-  /** The dictionaries downloaded, by Language, with when each was last updated, once listed. */
+  /** The downloaded dictionaries, by Language, with when each was last updated, once listed. */
   #setUp = new SvelteMap<string, string>();
   #listed = $state(false);
   /** How many times this page has kept or removed one, so a list read meanwhile is read again. */
@@ -128,7 +128,7 @@ export class RhymingDictionaries {
     return codes.some((code) => this.#setUp.has(code) && !this.#loaded.has(code) && !this.#failed.has(code));
   }
 
-  /** Reads in the dictionaries downloaded of these Languages, each once, then checks with Bandmate that it's current. */
+  /** Reads in these Languages' downloaded dictionaries, each once, then checks with Bandmate that it's current. */
   use(codes: readonly string[]) {
     for (const code of codes) {
       if (!this.#setUp.has(code) || this.#asked.has(code)) continue;

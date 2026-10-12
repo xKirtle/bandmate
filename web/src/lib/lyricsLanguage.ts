@@ -4,8 +4,9 @@
 // device, which the binary serves (ADR 0018). A Line's Chords aren't words,
 // a hyphenated word is read as its parts, and each word is read in the
 // first of the Song's Languages, in the Song's order, whose downloaded
-// dictionary has it. Every Language brings a word list, a dictionary Language's with each
-// word's pronunciation, so membership decides, however many there are.
+// dictionary has it. Every Language brings a word list, a dictionary
+// Language's with each word's pronunciation, so membership decides, however
+// many there are.
 
 import { portugueseSound } from './portuguese';
 

@@ -12,7 +12,7 @@ export interface RhymeLookup {
   language: string | null;
   /** The word's Rhymes, or null when there are none to show. */
   rhymes: Rhymes | null;
-  /** Whether the dictionaries downloaded are still on their way. */
+  /** Whether the downloaded dictionaries are still on their way. */
   loading: boolean;
   /** The Song's Languages whose dictionaries to download in Settings for the word to be looked up in them. */
   toSetUp: string[];
@@ -23,7 +23,7 @@ export interface RhymeLookup {
 /**
  * Rhymes for a word of a Song sung in `languages`: in `picked`, when it's
  * one of them, or else in the Language the word is read in. `loading` says
- * the dictionaries downloaded aren't all read yet, so nothing can be told.
+ * the downloaded dictionaries aren't all read yet, so nothing can be told.
  */
 export function lookUpRhymes(
   lyrics: LyricsLanguage,

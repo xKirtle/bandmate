@@ -38,7 +38,7 @@ function countDownloads(page: Page) {
   return asked;
 }
 
-test('nothing is downloaded until a dictionary is, and the card links to Settings', async ({
+test('nothing is downloaded until a dictionary is asked for, and the card links to Settings', async ({
   page,
   bandmate,
 }) => {
@@ -56,7 +56,7 @@ test('nothing is downloaded until a dictionary is, and the card links to Setting
   await expect(dictionary(page, 'English')).toContainText('KB');
 });
 
-test('a dictionary downloaded gives Rhymes, after a reload and without Bandmate', async ({ page, bandmate }) => {
+test('a downloaded dictionary gives Rhymes, after a reload and without Bandmate', async ({ page, bandmate }) => {
   const song = await bandmate.song({ title: 'Anthem' });
   await download(page, 'English');
 
