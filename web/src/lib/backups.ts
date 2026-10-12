@@ -1,5 +1,5 @@
 // How Backups are named, sized and asked for in Settings' Backups tab.
-import type { Backup, BackupContents, BackupPicks, BackupPresent } from './api';
+import type { Backup, BackupContents, BackupPeriod, BackupPicks, BackupPresent, BackupSchedule } from './api';
 import { formatSize } from './upload';
 
 // Spelled out rather than left to the locale, which may shorten September
@@ -197,6 +197,38 @@ export function replaceConfirmation(songs: BackupPresent[], beats: BackupPresent
     `Replace ${counts.join(' and ')} with the Backup’s ${one ? 'version' : 'versions'}?\n\n${named.join('\n')}\n\n` +
     `${lost.join(' ')} This can’t be undone.`
   );
+}
+
+/** How often the schedule can make a Scheduled Backup, as the Scheduled Backups card offers it. */
+export const periods: readonly { id: BackupPeriod; label: string }[] = [
+  { id: 'daily', label: 'Daily' },
+  { id: 'weekly', label: 'Weekly' },
+  { id: 'monthly', label: 'Monthly' },
+];
+
+/** The fewest and most Scheduled Backups the schedule can keep. */
+export const fewestKept = 1;
+export const mostKept = 30;
+
+/** How many Scheduled Backups to keep, one more or one fewer, from 1 to 30. */
+export function stepKeep(keep: number, by: 1 | -1): number {
+  return Math.min(mostKept, Math.max(fewestKept, keep + by));
+}
+
+/**
+ * While the schedule is on and keeps fewer than there are, that the oldest
+ * of them go when the next one is made, since keeping fewer deletes nothing
+ * itself; otherwise null.
+ */
+export function extrasNote(
+  schedule: Pick<BackupSchedule, 'on' | 'keep'>,
+  backups: readonly Pick<Backup, 'scheduled'>[],
+): string | null {
+  const extras = backups.filter((b) => b.scheduled).length - schedule.keep;
+  if (!schedule.on || extras <= 0) return null;
+  return extras === 1
+    ? 'The oldest Scheduled Backup goes when the next one is made.'
+    : `The ${extras} oldest Scheduled Backups go when the next one is made.`;
 }
 
 /** A Backup's size: "8 KB" under a megabyte, where "0.0 MB" would say nothing, and "4.2 MB" from there. */

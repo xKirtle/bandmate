@@ -207,6 +207,7 @@ describe('addedNote', () => {
     beatLibrary: false,
     size: 8192,
     name: '',
+    scheduled: false,
   };
 
   it('names the Backup one upload added, and the file it came from', () => {

@@ -31,6 +31,8 @@ type backup struct {
 	Size int64 `json:"size"`
 	// Name is the name of its own it's been given, "" for none.
 	Name string `json:"name"`
+	// Scheduled tells whether the schedule made it.
+	Scheduled bool `json:"scheduled"`
 }
 
 func backupPath(id int64) string {

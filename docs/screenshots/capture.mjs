@@ -492,11 +492,13 @@ async function number(page, places, { first = 1, into } = {}) {
   await page.context().close();
 }
 
-// Settings' Backups, its card holding the demo Backup restored from.
+// Settings' Backups: the Scheduled Backups card, over the card holding the
+// demo Backup restored from.
 {
   const page = await open(`${base}/settings/backups`);
   const backup = page.getByRole("listitem").first();
   await number(page, [
+    await textEnd(page.getByRole("heading", { name: "Scheduled Backups" })),
     // In the card's header, clear of the row under it.
     await leftOf(page.getByText("Upload", { exact: true })),
     await corner(page.getByRole("button", { name: "New Backup" })),
@@ -504,7 +506,7 @@ async function number(page, places, { first = 1, into } = {}) {
     await leftOf(backup.getByRole("button", { name: /^Restore/ })),
   ]);
   const card = await page
-    .getByRole("region", { name: "Backups" })
+    .getByRole("region", { name: "Backups", exact: true })
     .boundingBox();
   await save(page, "backups-labelled", {
     clip: {
