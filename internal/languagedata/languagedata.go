@@ -77,56 +77,70 @@ type Data struct {
 	ETag    string
 }
 
-// sources is each Language's dictionary and ranks, each gzipped.
-var sources = map[string][2][]byte{
-	"en": {english, englishRanks},
-	"pt": {portuguese, portugueseRanks},
+// source is what a Language's data is joined from, each part gzipped.
+type source struct {
+	dictionary, ranks []byte
 }
 
-// byCode is each Language's data, joined from its sources the first time
+var sources = map[string]source{
+	"en": {dictionary: english, ranks: englishRanks},
+	"pt": {dictionary: portuguese, ranks: portugueseRanks},
+}
+
+// byCode is each Language's data, joined from its source the first time
 // any is asked for, as gzipping it takes a moment.
 var byCode = sync.OnceValue(func() map[string]Data {
 	data := make(map[string]Data, len(sources))
 	for code, s := range sources {
-		data[code] = withTag(joined(s[0], s[1]))
+		gzipped, err := s.joined()
+		if err != nil {
+			panic("languagedata: can't read the embedded " + code + " data; run go generate ./internal/languagedata: " + err.Error())
+		}
+		data[code] = Data{Gzipped: gzipped, ETag: s.tag()}
 	}
 	return data
 })
 
-// joined is a Language's dictionary, a "#ranks" line and its ranks,
+// joined is the Language's dictionary, a "#ranks" line and its ranks,
 // gzipped as one, as a browser reads a single gzip stream.
-func joined(dictionary, ranks []byte) []byte {
+func (s source) joined() ([]byte, error) {
 	var out bytes.Buffer
 	zw, err := gzip.NewWriterLevel(&out, gzip.BestCompression)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	gunzipTo(zw, dictionary)
+	if err := gunzipTo(zw, s.dictionary); err != nil {
+		return nil, err
+	}
 	if _, err := io.WriteString(zw, "#ranks\n"); err != nil {
-		panic(err)
+		return nil, err
 	}
-	gunzipTo(zw, ranks)
+	if err := gunzipTo(zw, s.ranks); err != nil {
+		return nil, err
+	}
 	if err := zw.Close(); err != nil {
-		panic(err)
+		return nil, err
 	}
-	return out.Bytes()
+	return out.Bytes(), nil
 }
 
-// gunzipTo writes embedded gzipped data to w, uncompressed. It's built
-// into the binary, so data that can't be read is a broken build.
-func gunzipTo(w io.Writer, gzipped []byte) {
+// gunzipTo writes gzipped data to w, uncompressed.
+func gunzipTo(w io.Writer, gzipped []byte) error {
 	zr, err := gzip.NewReader(bytes.NewReader(gzipped))
 	if err != nil {
-		panic("languagedata: can't read embedded data; run go generate ./internal/languagedata: " + err.Error())
+		return err
 	}
-	if _, err := io.Copy(w, zr); err != nil {
-		panic("languagedata: can't read embedded data; run go generate ./internal/languagedata: " + err.Error())
-	}
+	_, err = io.Copy(w, zr)
+	return err
 }
 
-func withTag(gzipped []byte) Data {
-	sum := sha256.Sum256(gzipped)
-	return Data{Gzipped: gzipped, ETag: `"` + hex.EncodeToString(sum[:8]) + `"`}
+// tag is a tag of the Language's data, which changes whenever its parts
+// do, but not when a newer Go gzips the same text differently.
+func (s source) tag() string {
+	h := sha256.New()
+	h.Write(s.dictionary)
+	h.Write(s.ranks)
+	return `"` + hex.EncodeToString(h.Sum(nil)[:8]) + `"`
 }
 
 // Codes are the ISO 639-1 codes of every Language Bandmate has data for, in order.
@@ -158,7 +172,9 @@ func Credits() []build.Dependency {
 				{Text: "CC BY-SA 4.0", URL: "https://creativecommons.org/licenses/by-sa/4.0/"},
 				{Text: ", built from the "},
 				{Text: "OpenSubtitles 2018 corpus", URL: "https://opus.nlpl.eu/legacy/OpenSubtitles-v2018.php"},
-				{Text: " (OPUS; "},
+				{Text: " ("},
+				{Text: "OPUS", URL: "https://opus.nlpl.eu/"},
+				{Text: "; "},
 				{Text: "P. Lison & J. Tiedemann, 2016", URL: "https://aclanthology.org/L16-1147/"},
 				{Text: "), with subtitles from "},
 				{Text: "opensubtitles.org", URL: "https://www.opensubtitles.org/"},

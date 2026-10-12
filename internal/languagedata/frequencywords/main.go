@@ -218,7 +218,9 @@ func countContractions(counts map[string]int, words map[string]bool) error {
 		counts[word] = n
 	}
 	for _, c := range contractions {
-		delete(counts, c.fragment)
+		if c.fragment != "" {
+			delete(counts, c.fragment)
+		}
 	}
 	return nil
 }
@@ -231,14 +233,18 @@ var silent = regexp.MustCompile(`[cp]([cçt])`)
 // foldOldSpellings gives an old spelling's count to its new one, when
 // only the new one is a dictionary word: "acção"'s to "ação".
 func foldOldSpellings(counts map[string]int, words map[string]bool) error {
-	for word, n := range counts {
+	reformed := map[string]string{}
+	for word := range counts {
 		if words[word] {
 			continue
 		}
-		if reformed := silent.ReplaceAllString(word, "$1"); reformed != word && words[reformed] {
-			counts[reformed] += n
-			delete(counts, word)
+		if r := silent.ReplaceAllString(word, "$1"); r != word && words[r] {
+			reformed[word] = r
 		}
+	}
+	for old, r := range reformed {
+		counts[r] += counts[old]
+		delete(counts, old)
 	}
 	return nil
 }

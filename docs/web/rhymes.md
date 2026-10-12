@@ -23,7 +23,7 @@ It shows rhymes for the word at the cursor in the line you're writing, or for th
 - **Perfect rhymes** come first: they sound the same from the word's last stressed vowel to its end, like "night" and "tonight".
 - **Near rhymes** follow, in a group of their own: only their vowels match from there, like "night" and "life".
 
-In each group, the most common words come first, so "wrong" suggests "long", "song" and "strong" before rare words and names. How common a word is comes from [FrequencyWords](https://github.com/hermitdave/FrequencyWords), which counts how often each word is said in film and TV subtitles. Words too rare to be counted come last, those nearest your word in syllables first.
+In each group, the most common words come first, so "wrong" suggests "long", "song" and "strong" before rare words and names. How common a word is comes from [FrequencyWords](https://github.com/hermitdave/FrequencyWords), which counts how often each word is said in film and TV subtitles. Words too rare to be counted come last.
 
 Each rhyme shows how many syllables it has, so you can pick one that fits the meter. The suggestions are only there to read: clicking one never changes your lyrics.
 
