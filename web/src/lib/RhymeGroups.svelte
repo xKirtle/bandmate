@@ -1,10 +1,10 @@
 <script lang="ts">
   // A word's Rhymes, perfect ones first, then near ones in a group of their
   // own, each with its Syllable Count; or why there are none, such as a
-  // Language not set up on this device, with a link to set it up in
-  // Settings. Rhymes guessed from the word's spelling say so. They're for
-  // reference only: no Rhyme can be clicked, so one never goes into the
-  // Lyric Sheet. Wrapped onto as many rows as they take.
+  // Language whose dictionary isn't downloaded to this device, with a link
+  // to download it in Settings. Rhymes guessed from the word's spelling say
+  // so. They're for reference only: no Rhyme can be clicked, so one never
+  // goes into the Lyric Sheet. Wrapped onto as many rows as they take.
   import { languageName } from './languages';
   import type { RhymeLookup } from './rhymeLookup';
 
@@ -30,7 +30,10 @@
   /** Languages named in a list: "English and Portuguese", or with "or". */
   const named = (codes: readonly string[], type: 'conjunction' | 'disjunction') =>
     new Intl.ListFormat('en', { type }).format(codes.map((code) => languageName(code)));
-  // Where Languages are set up: Settings' Writing card.
+  /** The rhyming dictionaries to download: "the Portuguese rhyming dictionary", or "dictionaries" for several. */
+  const dictionariesOf = (codes: readonly string[]) =>
+    `the ${named(codes, 'conjunction')} rhyming ${codes.length === 1 ? 'dictionary' : 'dictionaries'}`;
+  // Where rhyming dictionaries are downloaded: Settings' Writing card.
   const settings = '/settings#writing';
 </script>
 
@@ -38,16 +41,16 @@
   <p class="muted message">Loading…</p>
 {:else if toSetUp.length > 0 && notIn.length > 0}
   <p class="muted message">
-    Not in {named(notIn, 'disjunction')}. <a href={settings}>Set up {named(toSetUp, 'conjunction')} in Settings</a> to look
-    it up there.
+    Not in {named(notIn, 'disjunction')}. <a href={settings}>Download {dictionariesOf(toSetUp)} in Settings</a> to look it
+    up there.
   </p>
 {:else if toSetUp.length > 0 && language}
   <p class="muted message">
-    {languageName(language)} isn’t set up on this device. <a href={settings}>Set up in Settings</a>
+    {languageName(language)} isn’t downloaded on this device. <a href={settings}>Download it in Settings</a>
   </p>
 {:else if toSetUp.length > 0}
   <p class="muted message">
-    Rhymes need a dictionary on this device. <a href={settings}>Set up {named(toSetUp, 'conjunction')} in Settings</a>
+    Rhymes need a dictionary on this device. <a href={settings}>Download {dictionariesOf(toSetUp)} in Settings</a>
   </p>
 {:else if !word}
   <p class="muted message">Rhymes show here for the word at the cursor as you write.</p>

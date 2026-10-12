@@ -1,11 +1,12 @@
 // The lyrics language work: a word's Rhymes, each with its Syllable Count,
 // the Language a word is read in, and the word at the caret, worked out in
-// the browser from the dictionary of each Language set up on this device,
-// which the binary serves (ADR 0018). A Line's Chords aren't words, a
-// hyphenated word is read as its parts, and each word is read in the first
-// of the Song's Languages, in the Song's order, whose set-up dictionary has
-// it. Every Language brings a word list, a dictionary Language's with each
-// word's pronunciation, so membership decides, however many there are.
+// the browser from the dictionary of each Language downloaded to this
+// device, which the binary serves (ADR 0018). A Line's Chords aren't words,
+// a hyphenated word is read as its parts, and each word is read in the
+// first of the Song's Languages, in the Song's order, whose downloaded
+// dictionary has it. Every Language brings a word list, a dictionary
+// Language's with each word's pronunciation, so membership decides, however
+// many there are.
 
 import { portugueseSound } from './portuguese';
 
@@ -108,9 +109,9 @@ function wordList(data: LanguageData): { has(word: string): boolean } {
 }
 
 /**
- * The lyrics language work over the Languages whose dictionaries are set up
- * on this device: a Language of a Song not among them is never guessed at,
- * and suggests no Rhymes.
+ * The lyrics language work over the Languages whose dictionaries are
+ * downloaded to this device: a Language of a Song not among them is never
+ * guessed at, and suggests no Rhymes.
  */
 export type LyricsLanguage = ReturnType<typeof lyricsLanguage>;
 
@@ -118,14 +119,14 @@ export function lyricsLanguage(dictionaries: readonly LanguageData[]) {
   const byCode = new Map(dictionaries.map((d) => [d.code, d]));
   const lists = new Map(dictionaries.map((d) => [d.code, wordList(d)]));
 
-  /** Whether a Language's dictionary is set up and has a word, as it's looked up. */
+  /** Whether a Language's dictionary is downloaded and has a word, as it's looked up. */
   function has(code: string, word: string): boolean {
     const list = lists.get(code);
     return !!list && (list.has(word) || list.has(trimApostrophes(word)));
   }
 
   return {
-    /** Whether a Language's dictionary is set up, so it can suggest Rhymes. */
+    /** Whether a Language's dictionary is downloaded, so it can suggest Rhymes. */
     isSetUp(language: string): boolean {
       return byCode.has(language);
     },
@@ -133,9 +134,10 @@ export function lyricsLanguage(dictionaries: readonly LanguageData[]) {
     /**
      * The Language a word of a Song sung in `languages` is read in: the
      * first of them, in the Song's order, whose dictionary has it. A word
-     * in none, once every one of them is set up, is an unknown word, read
-     * in the first with spelling rules, or else the first. Null while the
-     * word is in none and some aren't set up, as those are never guessed at.
+     * in none, once every one of them is downloaded, is an unknown word,
+     * read in the first with spelling rules, or else the first. Null while
+     * the word is in none and some aren't downloaded, as those are never
+     * guessed at.
      */
     languageOf(word: string, languages: readonly string[]): string | null {
       const asked = normalWord(word);
@@ -150,7 +152,7 @@ export function lyricsLanguage(dictionaries: readonly LanguageData[]) {
      * word's last stressed vowel to its end, near ones only have the same
      * vowels from there. A word its dictionary has is read from it; one it
      * lacks, by its spelling rules if it has them, its Rhymes then a guess.
-     * Null for a word it can't read, and when it isn't set up. They're
+     * Null for a word it can't read, and when it isn't downloaded. They're
      * suggested from the words its dictionary has.
      */
     rhymes(word: string, language: string): Rhymes | null {

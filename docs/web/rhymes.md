@@ -2,11 +2,13 @@
 
 In Write mode, Bandmate can suggest rhymes for the word you're writing, so you needn't look them up elsewhere.
 
-## Setting up dictionaries
+## Downloading a rhyming dictionary
 
-Rhymes come from a dictionary for each language, which you set up on each device you write on: open **Settings → Writing**, on the This device tab, and click **Set up** beside each language you write in. It lists each one's download size, whether it's set up on this device, and when it was last updated. **Remove** takes one off the device.
+Rhymes come from a rhyming dictionary for each language, which you download to each device you write on: open **Settings → Writing**, on the This device tab, and click **Download** beside each language you write in. It lists each one's download size, whether it's downloaded to this device, and when it was last updated. **Remove** takes one off the device.
 
-Until you set one up, Bandmate downloads nothing, and the Rhymes card links to Settings to set it up.
+Dictionaries download from your Bandmate server, not the internet, so you don't need an internet connection.
+
+Bandmate downloads no dictionary until you ask it to, and the Rhymes card links to Settings to download one.
 
 ## Turning them on
 
@@ -32,17 +34,17 @@ Each rhyme shows how many syllables it has, so you can pick one that fits the me
 
 ## Languages
 
-Bandmate suggests rhymes in the languages set in the song's details, which start as English. It knows English and Portuguese. You can pick either for a song, whether or not its dictionary is set up on this device.
+Bandmate suggests rhymes in the languages set in the song's details, which start as English. It knows English and Portuguese. You can pick either for a song, whether or not its dictionary is downloaded to this device.
 
 A song can be in both. Then a word's rhymes are in the first of the song's languages, in their order, whose dictionary has the word, never mixing the two. So with English first, a word both dictionaries have, like "eu", gets English rhymes, and with Portuguese first, Portuguese ones. To see rhymes for a word in another of the song's languages, pick that language above the rhymes in the Rhymes card.
 
 A word in none of the dictionaries:
 
-- **When all the song's languages are set up**, it gets rhymes guessed from its spelling, in Portuguese if the song is in Portuguese, and the card says they're a guess. A song only in English has none for it.
-- **When some aren't set up**, Bandmate doesn't guess: the card says which dictionaries it isn't in, and links to Settings to set up the others, so you can look it up there.
+- **When all the song's languages are downloaded**, it gets rhymes guessed from its spelling, in Portuguese if the song is in Portuguese, and the card says they're a guess. A song only in English has none for it.
+- **When some aren't downloaded**, Bandmate doesn't guess: the card says which dictionaries it isn't in, and links to Settings to download the others, so you can look it up there.
 
-In the Rhymes card, a language that isn't set up shows a link to Settings in place of rhymes.
+In the Rhymes card, a language that isn't downloaded shows a link to Settings in place of rhymes.
 
 ## Offline
 
-Rhymes need no internet connection: the dictionaries come with Bandmate. Setting one up downloads it from your Bandmate once, about a megabyte, and your browser keeps it, so rhymes work offline and after you reload. When you upgrade Bandmate and a dictionary has changed, it updates itself the next time you use it.
+Each dictionary is about a megabyte, and your browser keeps it once it's downloaded, so rhymes work offline and after you reload. When you upgrade Bandmate and a dictionary has changed, it updates itself the next time you use it.

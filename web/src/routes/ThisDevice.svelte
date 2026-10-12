@@ -74,8 +74,8 @@
     <section class="card" id="writing" aria-labelledby="writing-heading">
       <h2 id="writing-heading">Writing</h2>
       <p class="hint intro">
-        Rhymes are suggested in the languages whose dictionaries are set up here. Each is downloaded from Bandmate when
-        you set it up and kept on this device, so Rhymes work offline.
+        Rhymes are suggested in the languages whose rhyming dictionaries you download here. They download from your
+        Bandmate server, so no internet connection is needed, and are kept on this device, so Rhymes work offline too.
       </p>
       <DictionaryList />
     </section>

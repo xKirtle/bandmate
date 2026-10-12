@@ -107,9 +107,9 @@
   const desktop = new MediaQuery('min-width: 80rem');
   const rhymeMode = new RhymeMode({ mode: () => mode, wide: () => desktop.current, sync: syncMode });
   // Rhymes, while Rhyme mode is on, worked out here from the dictionaries of
-  // the Song's Languages set up on this device: only then are they read in,
+  // the Song's Languages downloaded to this device: only then are they read in,
   // once for as long as the page is open, and nothing is downloaded for a
-  // Language that isn't set up. The card's are for the word at the caret of
+  // Language that isn't downloaded. The card's are for the word at the caret of
   // the Line that has focus, kept once the caret leaves, or for one typed
   // into it, until the caret moves in a Line again. They're in the Language
   // the word is read in, or in another of the Song's Languages picked for it.

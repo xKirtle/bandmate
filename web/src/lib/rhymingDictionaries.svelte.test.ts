@@ -54,7 +54,7 @@ const words = (dictionaries: RhymingDictionaries, code: string) => [
 ];
 
 describe('rhyming dictionaries', () => {
-  it("downloads nothing for a Language that isn't set up, even once it's used", async () => {
+  it("downloads nothing for a Language until asked to, even once it's used", async () => {
     const server = new FakeServer();
     const dictionaries = page(new FakeStore(), server);
     await settle();
@@ -67,7 +67,7 @@ describe('rhyming dictionaries', () => {
     expect(dictionaries.loading(['en', 'pt'])).toBe(false);
   });
 
-  it('is loading until it has read which are set up', async () => {
+  it('is loading until it has read which are downloaded', async () => {
     const dictionaries = page(new FakeStore(), new FakeServer());
     expect(dictionaries.loading(['en'])).toBe(true);
     await settle();
@@ -139,7 +139,7 @@ describe('rhyming dictionaries', () => {
     expect(reloaded.updatedAt('en')).toBe(setUpAt);
   });
 
-  it("removes one, so it's no longer set up, nor kept", async () => {
+  it("removes one, so it's no longer downloaded, nor kept", async () => {
     const store = new FakeStore();
     const dictionaries = page(store, new FakeServer());
     await dictionaries.setUp('en');
@@ -170,9 +170,9 @@ describe('rhyming dictionaries', () => {
     expect(words(reloaded, 'en')).toEqual(['night']);
   });
 
-  it('keeps one set up while it was listing which are', async () => {
+  it('keeps one downloaded while it was listing which are', async () => {
     const store = new FakeStore();
-    // The list as it was before setting up, answered only once that's done.
+    // The list as it was before downloading, answered only once that's done.
     const stale = store.list();
     let listed!: () => void;
     const list = store.list.bind(store);
@@ -188,7 +188,7 @@ describe('rhyming dictionaries', () => {
     expect(dictionaries.isSetUp('en')).toBe(true);
   });
 
-  it("isn't set up when its download fails", async () => {
+  it("isn't downloaded when its download fails", async () => {
     const server = new FakeServer();
     server.offline = true;
     const dictionaries = page(new FakeStore(), server);

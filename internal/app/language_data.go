@@ -13,7 +13,7 @@ import (
 	"github.com/xKirtle/bandmate/internal/languagedata"
 )
 
-// languageDownload is a Language as the page lists it to set up: how much
+// languageDownload is a Language as the page lists it to download: how much
 // a browser downloads to, compressed.
 type languageDownload struct {
 	Code string `json:"code"`

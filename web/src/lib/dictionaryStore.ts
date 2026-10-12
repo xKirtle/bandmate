@@ -1,5 +1,5 @@
-// The rhyming dictionaries set up on this device, kept in the browser's
-// IndexedDB, as unsavedTakes.ts keeps recordings: which are set up, and
+// The rhyming dictionaries downloaded to this device, kept in the browser's
+// IndexedDB, as unsavedTakes.ts keeps recordings: which are downloaded, and
 // apart from that, the data of each, so listing them doesn't read it all.
 import { done } from './indexedDb';
 import type { DictionaryStore, SetUpDictionary, StoredDictionary } from './rhymingDictionaries.svelte';
