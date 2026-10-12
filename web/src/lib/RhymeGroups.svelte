@@ -7,6 +7,7 @@
   // goes into the Lyric Sheet. Wrapped onto as many rows as they take.
   import { languageName } from './languages';
   import type { RhymeLookup } from './rhymeLookup';
+  import { listedLanguages } from './sharedLanguages.svelte';
 
   let {
     lookup,
@@ -29,7 +30,7 @@
   const syllables = (n: number) => (n === 1 ? 'syllable' : 'syllables');
   /** Languages named in a list: "English and Portuguese", or with "or". */
   const named = (codes: readonly string[], type: 'conjunction' | 'disjunction') =>
-    new Intl.ListFormat('en', { type }).format(codes.map((code) => languageName(code)));
+    new Intl.ListFormat('en', { type }).format(codes.map((code) => languageName(code, listedLanguages.list)));
   /** The rhyming dictionaries to download: "the Portuguese rhyming dictionary", or "dictionaries" for several. */
   const dictionariesOf = (codes: readonly string[]) =>
     `the ${named(codes, 'conjunction')} rhyming ${codes.length === 1 ? 'dictionary' : 'dictionaries'}`;
@@ -46,7 +47,8 @@
   </p>
 {:else if toSetUp.length > 0 && language}
   <p class="muted message">
-    {languageName(language)} isn’t downloaded on this device. <a href={settings}>Download it in Settings</a>
+    {languageName(language, listedLanguages.list)} isn’t downloaded on this device.
+    <a href={settings}>Download it in Settings</a>
   </p>
 {:else if toSetUp.length > 0}
   <p class="muted message">
@@ -59,7 +61,7 @@
 {:else}
   {#if rhymes.guess && language}
     <p class="muted message guess">
-      Guessed from its spelling: the {languageName(language)} dictionary doesn’t have “{word}”.
+      Guessed from its spelling: the {languageName(language, listedLanguages.list)} dictionary doesn’t have “{word}”.
     </p>
   {/if}
   <div class="groups">

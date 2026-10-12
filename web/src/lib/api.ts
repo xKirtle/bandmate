@@ -637,10 +637,13 @@ export interface Fetched {
   size: number;
 }
 
-/** A Language whose rhyming dictionary can be downloaded, and how much a browser downloads to. */
-export interface LanguageDownload {
+/** A Language Bandmate rhymes in: one a Song can be sung in, whose rhyming dictionary can be downloaded. */
+export interface ListedLanguage {
+  /** Its ISO 639-1 code, e.g. "en". */
   code: string;
-  /** In bytes, compressed. */
+  /** Its name, in English, e.g. "English". */
+  name: string;
+  /** How much a browser downloads to download its rhyming dictionary, in bytes, compressed. */
   size: number;
 }
 
@@ -863,8 +866,8 @@ function onTracks(clips: readonly (PlacedClip | PastedClip)[]) {
 export const api = {
   getConfig: () => request<ServerConfig>('GET', '/config'),
   getAbout: () => request<AboutInfo>('GET', '/about'),
-  /** Every Language whose rhyming dictionary can be downloaded, with its download size. */
-  getLanguages: () => request<LanguageDownload[]>('GET', '/languages'),
+  /** Every Language Bandmate rhymes in, in order, with its name and download size. */
+  getLanguages: () => request<ListedLanguage[]>('GET', '/languages'),
   getLanguageData,
   /** Asks GitHub, unless the server recently has, so it's slower than the rest of About. */
   getAboutReleases: () => request<ReleasesReport>('GET', '/about/releases'),

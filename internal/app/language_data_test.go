@@ -75,7 +75,7 @@ func TestLanguageDataSentCompressedOrNotIsTaggedApart(t *testing.T) {
 	expectStatus(t, res, http.StatusNotModified)
 }
 
-func TestEachLanguageIsListedWithItsDownloadSize(t *testing.T) {
+func TestEachLanguageIsListedWithItsNameAndDownloadSize(t *testing.T) {
 	ts := newTestServer(t)
 
 	res := ts.Do(http.MethodGet, "/api/languages", nil)
@@ -83,15 +83,16 @@ func TestEachLanguageIsListedWithItsDownloadSize(t *testing.T) {
 	expectStatus(t, res, http.StatusOK)
 	var got []struct {
 		Code string `json:"code"`
+		Name string `json:"name"`
 		Size int    `json:"size"`
 	}
 	res.JSON(t, &got)
-	codes := make([]string, len(got))
+	named := make([]string, len(got))
 	for i, l := range got {
-		codes[i] = l.Code
+		named[i] = l.Code + " " + l.Name
 	}
-	if !slices.Equal(codes, []string{"en", "pt"}) {
-		t.Fatalf("languages = %v, want en and pt", codes)
+	if !slices.Equal(named, []string{"en English", "pt Portuguese"}) {
+		t.Fatalf("languages = %v, want English and Portuguese", named)
 	}
 	// What a browser downloads, compressed, to set each up.
 	en := ts.DoRaw(http.MethodGet, "/api/languages/en", http.Header{"Accept-Encoding": {"gzip"}}, nil)
@@ -141,8 +142,9 @@ func TestAboutCreditsThePortugueseWordList(t *testing.T) {
 	if i < 0 {
 		t.Fatalf("data = %+v, want the Portuguese word list", got.Data)
 	}
-	if d := got.Data[i]; d.Version == "" || !strings.Contains(d.License, "LGPL-2.1") {
-		t.Errorf("Portuguese word list = %+v, want a version and a licence that offers LGPL-2.1", d)
+	// Of the licences it's offered under, the one Bandmate takes it under, as pt.LICENSE says.
+	if d := got.Data[i]; d.Version == "" || d.License != "LGPL-2.1-only" {
+		t.Errorf("Portuguese word list = %+v, want a version and LGPL-2.1-only", d)
 	}
 }
 

@@ -216,6 +216,25 @@ func TestASongsLanguagesCanBeSetAndAreKept(t *testing.T) {
 	}
 }
 
+func TestASongCanBeSungInEveryLanguageListed(t *testing.T) {
+	ts := newTestServer(t)
+	created := ts.createSong("Babel")
+	var listed []struct {
+		Code string `json:"code"`
+	}
+	ts.Do(http.MethodGet, "/api/languages", nil).JSON(t, &listed)
+	codes := make([]string, len(listed))
+	for i, l := range listed {
+		codes[i] = l.Code
+	}
+
+	ts.updateSong(created.ID, map[string]any{"languages": codes})
+
+	if read := ts.getSong(created.ID); !reflect.DeepEqual(read.Languages, codes) {
+		t.Errorf("languages read back = %q, want every one listed, %q", read.Languages, codes)
+	}
+}
+
 func TestASongCanBeSungInPortugueseAlone(t *testing.T) {
 	ts := newTestServer(t)
 	created := ts.createSong("Saudade")

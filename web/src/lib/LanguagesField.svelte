@@ -5,9 +5,10 @@
   import { tick } from 'svelte';
   import { languageChoices, languagesLabel, moveLanguage, pickLanguage } from './languages';
   import { placeBeside } from './popover';
+  import { listedLanguages } from './sharedLanguages.svelte';
 
   // A Song's Languages in its Details: a field naming them, in order, that
-  // opens a checklist of every Language Bandmate has data for, those picked
+  // opens a checklist of every Language Bandmate lists, those picked
   // first, each with arrows to move it up or down the order. The last one
   // picked can't be unticked, as a Song is always sung in at least one. A
   // line under the list says why those are the only ones offered.
@@ -26,7 +27,7 @@
     onchange: (languages: string[]) => void;
   } = $props();
 
-  const choices = $derived(languageChoices(value));
+  const choices = $derived(languageChoices(value, listedLanguages.list));
   const picked = $derived(choices.filter((c) => c.picked).length);
 
   let open = $state(false);
@@ -37,6 +38,7 @@
   const gap = 4;
 
   async function show() {
+    listedLanguages.load(); // Again, if Bandmate couldn't be reached before.
     open = true;
     await tick();
     if (!panel) return;
@@ -111,7 +113,7 @@
     aria-expanded={open}
     onclick={() => (open ? close() : show())}
   >
-    <span class="value">{languagesLabel(value)}</span>
+    <span class="value">{languagesLabel(value, listedLanguages.list)}</span>
     <span class="chevron" aria-hidden="true"><ChevronDown /></span>
   </button>
   {#if open}

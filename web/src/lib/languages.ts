@@ -1,6 +1,7 @@
 // The Languages a Song's Lines can be sung in, by their ISO 639-1 codes,
-// and picking a Song's: an ordered list, never empty. The server keeps the
-// same list (lyricsheet.Languages), and refuses a Language not on it.
+// and picking a Song's: an ordered list, never empty. Bandmate lists those
+// it rhymes in (sharedLanguages.svelte.ts), and refuses a Language not on
+// its list; the page keeps none of its own.
 
 /** A Language Bandmate suggests Rhymes in. */
 export interface LanguageInfo {
@@ -8,19 +9,13 @@ export interface LanguageInfo {
   name: string;
 }
 
-/** Every Language Bandmate suggests Rhymes in, as the picker lists them. */
-export const languages: readonly LanguageInfo[] = [
-  { code: 'en', name: 'English' },
-  { code: 'pt', name: 'Portuguese' },
-];
-
-/** A Language's name, or its code as it is if Bandmate has none for it. */
-export function languageName(code: string, known: readonly LanguageInfo[] = languages): string {
+/** A Language's name, or its code as it is if `known` has none for it. */
+export function languageName(code: string, known: readonly LanguageInfo[]): string {
   return known.find((l) => l.code === code)?.name ?? code;
 }
 
 /** A Song's Languages named, in their order, e.g. "English, Portuguese". */
-export function languagesLabel(picked: readonly string[], known: readonly LanguageInfo[] = languages): string {
+export function languagesLabel(picked: readonly string[], known: readonly LanguageInfo[]): string {
   return picked.map((code) => languageName(code, known)).join(', ');
 }
 
@@ -33,13 +28,11 @@ export interface LanguageChoice extends LanguageInfo {
  * The Languages the picker offers: those picked first, in the Song's order,
  * then the rest as Bandmate lists them. Only those Bandmate rhymes in.
  */
-export function languageChoices(
-  picked: readonly string[],
-  known: readonly LanguageInfo[] = languages,
-): LanguageChoice[] {
+export function languageChoices(picked: readonly string[], known: readonly LanguageInfo[]): LanguageChoice[] {
   const first = picked.flatMap((code) => known.filter((l) => l.code === code));
   const rest = known.filter((l) => !picked.includes(l.code));
-  return [...first.map((l) => ({ ...l, picked: true })), ...rest.map((l) => ({ ...l, picked: false }))];
+  const choice = (l: LanguageInfo, picked: boolean): LanguageChoice => ({ code: l.code, name: l.name, picked });
+  return [...first.map((l) => choice(l, true)), ...rest.map((l) => choice(l, false))];
 }
 
 /**
