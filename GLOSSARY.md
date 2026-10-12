@@ -95,7 +95,7 @@ _Avoid_: Zoom, font size, text size
 The key a Song is written in, one of its Details. Like a Chord, with a capo on it names the shapes fingered, not the pitch that sounds: capo 2 in G sounds in A.
 
 **Languages**:
-The languages a Song's Lines are sung in, one of its Details; a Song that mixes them has several, and each word is read in the first of them, in the Song's order, whose rhyming dictionary set up on this Device has it. Any Language Bandmate rhymes in can be picked, set up or not; one that isn't set up is never guessed at.
+The languages a Song's Lines are sung in, one of its Details; a Song that mixes them has several, and each word is read in the first of them, in the Song's order, whose rhyming dictionary downloaded to this Device has it. Any Language Bandmate rhymes in can be picked, downloaded or not; one that isn't downloaded is never guessed at.
 _Avoid_: Locale
 
 **Syllable Count**:
@@ -249,7 +249,7 @@ The browser, on a computer or phone, that Bandmate is opened in. What's kept "on
 _Avoid_: Browser (in the UI), machine
 
 **Device Setting**:
-A choice the user makes on purpose about how Bandmate works on this Device, whatever the Song: the Palette, light or dark, the Input, each Input's Latency Offset, the rhyming dictionaries set up and left-handed Chord diagrams. Every one is listed together in Settings, even when it's also changed where it's used. What's simply remembered from last time, like a volume, a step or a Song's Transpose, isn't one.
+A choice the user makes on purpose about how Bandmate works on this Device, whatever the Song: the Palette, light or dark, the Input, each Input's Latency Offset, the rhyming dictionaries downloaded and left-handed Chord diagrams. Every one is listed together in Settings, even when it's also changed where it's used. What's simply remembered from last time, like a volume, a step or a Song's Transpose, isn't one.
 _Avoid_: Preference, local setting
 
 **Palette**:

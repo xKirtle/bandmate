@@ -114,7 +114,7 @@ describe('rhymes', () => {
     expect([...perfect, ...near].map((r) => r.word)).not.toContain('night');
   });
 
-  it('gives no Rhymes for a word the dictionary does not have, or when it is not set up', () => {
+  it('gives no Rhymes for a word the dictionary does not have, or when it is not downloaded', () => {
     expect(rhymes('skrrt')).toBeNull();
     expect(lyricsLanguage([]).rhymes('night', 'en')).toBeNull();
   });
@@ -178,7 +178,7 @@ describe('rhymes in Portuguese', () => {
     expect([...perfect, ...near].map((r) => r.word)).not.toContain('coração');
   });
 
-  it('gives no Rhymes for a word with no vowel to read, or when the word list is not set up', () => {
+  it('gives no Rhymes for a word with no vowel to read, or when the word list is not downloaded', () => {
     expect(rhymes('hmm')).toBeNull();
     expect(rhymes('24')).toBeNull();
     expect(lyrics.rhymes('coração', 'pt')).toBeNull();
@@ -269,7 +269,7 @@ describe('languageOf', () => {
     expect(both.languageOf('mar', ['pt', 'en'])).toBe('pt');
   });
 
-  it("gives the first Language with spelling rules for a word in no dictionary, once all of the Song's are set up", () => {
+  it("gives the first Language with spelling rules for a word in no dictionary, once all of the Song's are downloaded", () => {
     expect(both.languageOf('saudadezinha', ['en', 'pt'])).toBe('pt');
     expect(both.languageOf('24', ['en', 'pt'])).toBe('pt');
   });
@@ -278,7 +278,7 @@ describe('languageOf', () => {
     expect(both.languageOf('skrrt', ['en'])).toBe('en');
   });
 
-  it("never guesses at a Language that isn't set up", () => {
+  it("never guesses at a Language that isn't downloaded", () => {
     const englishOnly = lyricsLanguage([english]);
     expect(englishOnly.languageOf('night', ['pt', 'en'])).toBe('en');
     expect(englishOnly.languageOf('saudade', ['en', 'pt'])).toBeNull();

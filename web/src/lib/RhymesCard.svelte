@@ -4,8 +4,8 @@
   // into its field. The page decides the word; typing here changes it until
   // the caret moves in a Line again. In a Song of several Languages, tabs
   // switch among them, starting at the one the word is read in. One whose
-  // dictionary isn't set up on this device shows a link to set it up in
-  // Settings in place of Rhymes.
+  // dictionary isn't downloaded to this device shows a link to download it
+  // in Settings in place of Rhymes.
   import { languageName } from './languages';
   import type { RhymeLookup } from './rhymeLookup';
   import RhymeGroups from './RhymeGroups.svelte';

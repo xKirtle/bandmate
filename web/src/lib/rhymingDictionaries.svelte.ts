@@ -1,5 +1,5 @@
-// The rhyming dictionaries set up on this device: each Language's data,
-// downloaded from Bandmate only when the user sets it up in Settings, and
+// The rhyming dictionaries downloaded to this device: each Language's data,
+// downloaded from Bandmate only when the user downloads it in Settings, and
 // kept in the browser, so Rhymes work offline and after a reload. One set
 // up is read in when it's first used on a page, and asks Bandmate once a
 // visit whether its data changed since, taking the new data if so.
@@ -10,10 +10,10 @@
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { readLanguageData, type LanguageData } from './lyricsLanguage';
 
-/** A dictionary set up on this device: its Language, and when its data last changed here. */
+/** A dictionary downloaded to this device: its Language, and when its data last changed here. */
 export interface SetUpDictionary {
   code: string;
-  /** When it was set up or last refreshed, as an ISO time. */
+  /** When it was downloaded or last refreshed, as an ISO time. */
   updatedAt: string;
 }
 
@@ -23,7 +23,7 @@ export interface StoredDictionary extends SetUpDictionary {
   text: string;
 }
 
-/** Where the dictionaries set up are kept: the browser's IndexedDB, in the app. */
+/** Where the dictionaries downloaded are kept: the browser's IndexedDB, in the app. */
 export interface DictionaryStore {
   list(): Promise<SetUpDictionary[]>;
   get(code: string): Promise<StoredDictionary | undefined>;
@@ -38,9 +38,9 @@ export interface DictionaryStore {
 export type Download = (code: string, etag?: string) => Promise<{ etag: string; text: string } | null>;
 
 export interface RhymingDictionariesOptions {
-  /** The time now, as a dictionary is set up or refreshed. */
+  /** The time now, as a dictionary is downloaded or refreshed. */
   now?: () => Date;
-  /** Tells this device's other tabs a dictionary was set up, refreshed or removed. */
+  /** Tells this device's other tabs a dictionary was downloaded, refreshed or removed. */
   changed?: () => void;
 }
 
@@ -49,12 +49,12 @@ export class RhymingDictionaries {
   #download: Download;
   #now: () => Date;
   #changed: () => void;
-  /** The dictionaries set up, by Language, with when each was last updated, once listed. */
+  /** The dictionaries downloaded, by Language, with when each was last updated, once listed. */
   #setUp = new SvelteMap<string, string>();
   #listed = $state(false);
   /** How many times this page has kept or removed one, so a list read meanwhile is read again. */
   #edits = 0;
-  /** Those being set up. */
+  /** Those being downloaded. */
   #settingUp = new SvelteSet<string>();
   /** Those read in on this page, and when each was last updated as read. */
   #loaded = new SvelteMap<string, { data: LanguageData; updatedAt: string }>();
@@ -78,7 +78,7 @@ export class RhymingDictionaries {
   }
 
   /**
-   * Reads again which dictionaries are set up, as another tab changed them:
+   * Reads again which dictionaries are downloaded, as another tab changed them:
    * one removed or refreshed there is read in again, or dropped.
    */
   async relist(): Promise<void> {
@@ -99,17 +99,17 @@ export class RhymingDictionaries {
     this.#listed = true;
   }
 
-  /** Whether a Language's dictionary is set up on this device. */
+  /** Whether a Language's dictionary is downloaded to this device. */
   isSetUp(code: string): boolean {
     return this.#setUp.has(code);
   }
 
-  /** When a Language's dictionary was set up or last refreshed here, as an ISO time, if it's set up. */
+  /** When a Language's dictionary was downloaded or last refreshed here, as an ISO time, if it's downloaded. */
   updatedAt(code: string): string | undefined {
     return this.#setUp.get(code);
   }
 
-  /** Whether a Language's dictionary is being set up. */
+  /** Whether a Language's dictionary is being downloaded. */
   settingUp(code: string): boolean {
     return this.#settingUp.has(code);
   }
@@ -121,14 +121,14 @@ export class RhymingDictionaries {
 
   /**
    * Whether these Languages' dictionaries aren't all known yet: until it's
-   * read which are set up, and while one set up is being read in.
+   * read which are downloaded, and while one downloaded is being read in.
    */
   loading(codes: readonly string[]): boolean {
     if (!this.#listed) return true;
     return codes.some((code) => this.#setUp.has(code) && !this.#loaded.has(code) && !this.#failed.has(code));
   }
 
-  /** Reads in the dictionaries set up of these Languages, each once, then checks with Bandmate that it's current. */
+  /** Reads in the dictionaries downloaded of these Languages, each once, then checks with Bandmate that it's current. */
   use(codes: readonly string[]) {
     for (const code of codes) {
       if (!this.#setUp.has(code) || this.#asked.has(code)) continue;

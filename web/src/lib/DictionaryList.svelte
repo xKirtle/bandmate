@@ -5,9 +5,9 @@
   import { formatSmallSize } from './upload';
 
   // The rhyming dictionaries, in Settings' Writing card: every Language
-  // Bandmate rhymes in, each with its download size, whether it's set up on
-  // this device and when it was last updated, to set up or remove. Any
-  // number can be set up at once. Nothing is downloaded until one is.
+  // Bandmate rhymes in, each with its download size, whether it's downloaded
+  // to this device and when it was last updated, to download or remove. Any
+  // number can be downloaded at once. Nothing is downloaded until one is.
 
   const id = $props.id();
 
@@ -18,7 +18,7 @@
     () => {}, // Offline, say: the list shows without sizes.
   );
 
-  /** Why the last Set up or Remove of a Language failed. */
+  /** Why the last Download or Remove of a Language failed. */
   let problem = $state<{ code: string; message: string } | null>(null);
 
   const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
@@ -39,11 +39,11 @@
     }
   }
 
-  /** What's said of a Language under its name: whether it's set up, when it was updated, and its size. */
+  /** What's said of a Language under its name: whether it's downloaded, when it was updated, and its size. */
   function details(code: string): string {
     const updatedAt = dictionaries.updatedAt(code);
     const size = sizes[code] !== undefined ? formatSmallSize(sizes[code]) : null;
-    const state = updatedAt ? `Set up, updated ${dateFormat.format(new Date(updatedAt))}` : 'Not set up';
+    const state = updatedAt ? `Downloaded, updated ${dateFormat.format(new Date(updatedAt))}` : 'Not downloaded';
     return [state, size].filter(Boolean).join(' · ');
   }
 </script>
@@ -72,12 +72,12 @@
             disabled={settingUp}
             aria-describedby="{id}-{i}-name {id}-{i}-details"
             onclick={() => act(language.code, (code) => dictionaries.setUp(code))}
-            >{settingUp ? 'Setting up…' : 'Set up'}</button
+            >{settingUp ? 'Downloading…' : 'Download'}</button
           >
         {/if}
       </div>
       {#if problem?.code === language.code}
-        <p class="error" role="alert">Couldn’t {setUp ? 'remove' : 'set up'} {language.name}. {problem.message}</p>
+        <p class="error" role="alert">Couldn’t {setUp ? 'remove' : 'download'} {language.name}. {problem.message}</p>
       {/if}
     </li>
   {/each}

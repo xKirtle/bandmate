@@ -637,7 +637,7 @@ export interface Fetched {
   size: number;
 }
 
-/** A Language whose rhyming dictionary can be set up, and how much a browser downloads to. */
+/** A Language whose rhyming dictionary can be downloaded, and how much a browser downloads to. */
 export interface LanguageDownload {
   code: string;
   /** In bytes, compressed. */
@@ -863,7 +863,7 @@ function onTracks(clips: readonly (PlacedClip | PastedClip)[]) {
 export const api = {
   getConfig: () => request<ServerConfig>('GET', '/config'),
   getAbout: () => request<AboutInfo>('GET', '/about'),
-  /** Every Language whose rhyming dictionary can be set up, with its download size. */
+  /** Every Language whose rhyming dictionary can be downloaded, with its download size. */
   getLanguages: () => request<LanguageDownload[]>('GET', '/languages'),
   getLanguageData,
   /** Asks GitHub, unless the server recently has, so it's slower than the rest of About. */

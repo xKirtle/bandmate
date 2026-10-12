@@ -1,6 +1,6 @@
 // Which Rhymes the Rhymes card shows: for a word, in one of the Song's
 // Languages, which starts as the one the word is read in, or why there are
-// none, such as a Language whose dictionary isn't set up on this device.
+// none, such as a Language whose dictionary isn't downloaded to this device.
 
 import type { LyricsLanguage, Rhymes } from './lyricsLanguage';
 
@@ -12,18 +12,18 @@ export interface RhymeLookup {
   language: string | null;
   /** The word's Rhymes, or null when there are none to show. */
   rhymes: Rhymes | null;
-  /** Whether the dictionaries set up are still on their way. */
+  /** Whether the dictionaries downloaded are still on their way. */
   loading: boolean;
-  /** The Song's Languages to set up in Settings for the word to be looked up in them. */
+  /** The Song's Languages whose dictionaries to download in Settings for the word to be looked up in them. */
   toSetUp: string[];
-  /** The Song's set-up Languages whose dictionaries don't have the word, while some others aren't set up. */
+  /** The Song's downloaded Languages whose dictionaries don't have the word, while some others aren't downloaded. */
   notIn: string[];
 }
 
 /**
  * Rhymes for a word of a Song sung in `languages`: in `picked`, when it's
  * one of them, or else in the Language the word is read in. `loading` says
- * the dictionaries set up aren't all read yet, so nothing can be told.
+ * the dictionaries downloaded aren't all read yet, so nothing can be told.
  */
 export function lookUpRhymes(
   lyrics: LyricsLanguage,

@@ -1,9 +1,9 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from '../fixtures';
 
-// Rhyming dictionaries, set up on each device in Settings' Writing card:
+// Rhyming dictionaries, downloaded to each device in Settings' Writing card:
 // nothing downloaded until one is, Rhymes from those that are, kept across
-// reloads, and the Rhymes card's links to set up the rest.
+// reloads, and the Rhymes card's links to download the rest.
 
 /** The Rhymes card, in the side column while Rhyme mode is on. */
 const rhymesCard = (page: Page) => page.getByRole('region', { name: 'Rhymes', exact: true });
@@ -21,11 +21,11 @@ async function lookUp(page: Page, songId: number, word: string) {
   await rhymesCard(page).getByRole('searchbox', { name: 'Rhymes for' }).fill(word);
 }
 
-/** Sets up a Language's dictionary in Settings. */
-async function setUp(page: Page, name: string) {
+/** Downloads a Language's rhyming dictionary in Settings. */
+async function download(page: Page, name: string) {
   await page.goto('/settings');
-  await dictionary(page, name).getByRole('button', { name: 'Set up' }).click();
-  await expect(dictionary(page, name)).toContainText('Set up, updated');
+  await dictionary(page, name).getByRole('button', { name: 'Download', exact: true }).click();
+  await expect(dictionary(page, name)).toContainText('Downloaded, updated');
 }
 
 /** Counts the downloads of Language data the page asks for. */
@@ -38,7 +38,7 @@ function countDownloads(page: Page) {
   return asked;
 }
 
-test('nothing is downloaded until a dictionary is set up, and the card links to Settings', async ({
+test('nothing is downloaded until a dictionary is, and the card links to Settings', async ({
   page,
   bandmate,
 }) => {
@@ -47,18 +47,18 @@ test('nothing is downloaded until a dictionary is set up, and the card links to 
 
   await lookUp(page, song.id, 'night');
 
-  const link = rhymesCard(page).getByRole('link', { name: 'Set up English in Settings' });
+  const link = rhymesCard(page).getByRole('link', { name: 'Download the English rhyming dictionary in Settings' });
   await expect(link).toBeVisible();
   expect(asked).toEqual([]);
   await link.click();
   await expect(page).toHaveURL(/\/settings#writing$/);
-  await expect(dictionary(page, 'English')).toContainText('Not set up');
+  await expect(dictionary(page, 'English')).toContainText('Not downloaded');
   await expect(dictionary(page, 'English')).toContainText('KB');
 });
 
-test('a dictionary set up gives Rhymes, after a reload and without Bandmate', async ({ page, bandmate }) => {
+test('a dictionary downloaded gives Rhymes, after a reload and without Bandmate', async ({ page, bandmate }) => {
   const song = await bandmate.song({ title: 'Anthem' });
-  await setUp(page, 'English');
+  await download(page, 'English');
 
   await lookUp(page, song.id, 'night');
   await expect(
@@ -76,34 +76,34 @@ test('a dictionary set up gives Rhymes, after a reload and without Bandmate', as
   ).toBeVisible();
 });
 
-test('a dictionary removed is set up no more', async ({ page, bandmate }) => {
+test('a dictionary removed is downloaded no more', async ({ page, bandmate }) => {
   const song = await bandmate.song({ title: 'Anthem' });
-  await setUp(page, 'English');
+  await download(page, 'English');
 
   await dictionary(page, 'English').getByRole('button', { name: 'Remove' }).click();
-  await expect(dictionary(page, 'English')).toContainText('Not set up');
+  await expect(dictionary(page, 'English')).toContainText('Not downloaded');
 
   await lookUp(page, song.id, 'night');
-  await expect(rhymesCard(page).getByRole('link', { name: 'Set up English in Settings' })).toBeVisible();
+  await expect(rhymesCard(page).getByRole('link', { name: 'Download the English rhyming dictionary in Settings' })).toBeVisible();
 });
 
-test("a word in no set-up dictionary asks to set up the Song's other Languages", async ({ page, bandmate }) => {
+test("a word in no downloaded dictionary asks to download the Song's other Languages", async ({ page, bandmate }) => {
   const song = await bandmate.song({ title: 'Saudade', languages: ['en', 'pt'] });
-  await setUp(page, 'English');
+  await download(page, 'English');
 
   await lookUp(page, song.id, 'saudade');
 
   await expect(rhymesCard(page)).toContainText('Not in English.');
-  await expect(rhymesCard(page).getByRole('link', { name: 'Set up Portuguese in Settings' })).toBeVisible();
+  await expect(rhymesCard(page).getByRole('link', { name: 'Download the Portuguese rhyming dictionary in Settings' })).toBeVisible();
 });
 
-test("the Language switch links to Settings for a Language that isn't set up", async ({ page, bandmate }) => {
+test("the Language switch links to Settings for a Language that isn't downloaded", async ({ page, bandmate }) => {
   const song = await bandmate.song({ title: 'Saudade', languages: ['en', 'pt'] });
-  await setUp(page, 'English');
+  await download(page, 'English');
 
   await lookUp(page, song.id, 'night');
   await rhymesCard(page).getByRole('tab', { name: 'Portuguese' }).click();
 
-  await expect(rhymesCard(page)).toContainText('Portuguese isn’t set up on this device.');
-  await expect(rhymesCard(page).getByRole('link', { name: 'Set up in Settings' })).toBeVisible();
+  await expect(rhymesCard(page)).toContainText('Portuguese isn’t downloaded on this device.');
+  await expect(rhymesCard(page).getByRole('link', { name: 'Download it in Settings' })).toBeVisible();
 });
