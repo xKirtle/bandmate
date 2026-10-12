@@ -25,7 +25,7 @@ Write lyrics the way you would in a notebook, with the chords right where you pl
 8. **Line timings**: when each line starts in the song, set as you [sync](#sync). They appear once the [timeline](#timeline) has some audio on it: a beat, a take or another sound.
 9. **Scrapbook**: sections that aren't in the song: leftovers and ideas to come back to.
 
-On a wide window, **Rhymes** in the lyric sheet's toolbar suggests rhymes for the word you're writing. See [Rhymes](/rhymes).
+On a wide window, Bandmate also suggests rhymes for the word you're writing: turn them on with **Rhymes** in the lyric sheet's toolbar. See [Rhymes](/rhymes).
 
 And this is Read mode, here on a phone: the chords over the words, and how to play each one at the top. The button at the top right sets the text size, hides or transposes the chords, and shows or pins the chord shapes.
 

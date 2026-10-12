@@ -1,14 +1,14 @@
 # Rhymes
 
-In Write mode, Bandmate suggests rhymes for the word you're writing, so you needn't look them up elsewhere.
+In Write mode, Bandmate can suggest rhymes for the word you're writing, so you needn't look them up elsewhere.
 
 ## Turning them on
 
 Click **Rhymes**, beside **Sync lyrics** in the lyric sheet's toolbar, and click it again when you're done. Rhymes need a wide window, like a desktop's: on a phone, a tablet or a smaller window, the button isn't there.
 
-Rhymes start off each time you open a song, and go off when you switch to Read mode or the window gets too narrow. They can't be on while you [sync lyrics](/features#sync): turning one on turns the other off. Recording and the loop leave them on.
+Rhymes start off each time you open a song, and go off when you switch to Read mode or the window gets too narrow. They can't be on while you [sync lyrics](/features#sync): turning one on turns the other off.
 
-While they're on, a **Rhymes** card sits beside the lyric sheet, above the Scrapbook. It folds away like the Scrapbook. Writing works just as it does with them off.
+While they're on, a **Rhymes** card sits beside the lyric sheet, above the Scrapbook. It folds away like the Scrapbook.
 
 It shows rhymes for the word at the cursor in the line you're writing, or for the line's last word once the cursor is past it, and keeps showing that word once you click elsewhere. To look up any other word, type it into its field.
 

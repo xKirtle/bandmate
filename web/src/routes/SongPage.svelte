@@ -1,6 +1,6 @@
 <script lang="ts">
   import Keyboard from '@lucide/svelte/icons/keyboard';
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { api, commonKeys, type Song, type Status } from '../lib/api';
   import Combobox from '../lib/Combobox.svelte';
@@ -112,9 +112,8 @@
   // focus, kept once the caret leaves, or for one typed into it, until the
   // caret moves in a Line again. They're in the Language the word is read
   // in, or in another of the Song's Languages picked for it.
-  const showingRhymes = $derived(rhymeMode.on);
   $effect(() => {
-    if (showingRhymes) fetchLanguageData(languages);
+    if (rhymeMode.on) fetchLanguageData(languages);
   });
   const lyrics = $derived(lyricsLanguage(languageData()));
   let cardWord = $state<string | null>(null);
@@ -127,8 +126,8 @@
     const word = at && lyrics.wordAt(at.text, at.caret);
     if (word) setCardWord(word);
   };
-  const onCaret = $derived(showingRhymes ? heardCaret : undefined);
-  const cardRhymes = $derived(lookUpRhymes(lyrics, showingRhymes ? cardWord : null, languages, cardLanguage));
+  const onCaret = $derived(rhymeMode.on ? heardCaret : undefined);
+  const cardRhymes = $derived(lookUpRhymes(lyrics, rhymeMode.on ? cardWord : null, languages, cardLanguage));
   // The Details as Read mode shows them, with the key the Chords are shown in.
   const summary = $derived(
     details
@@ -157,9 +156,13 @@
   // Narrower windows show the Scrapbook and Masters after the Lyric Sheet,
   // always open. Keyed by name, switching moves them rather than rebuilding
   // them.
-  const parts = $derived(sideParts(mode, { rhymes: showingRhymes }));
+  const parts = $derived(sideParts(mode, { rhymes: rhymeMode.on }));
   // Parts opened or closed by hand, per mode.
   let toggledParts = $state<Partial<Record<`${Mode}-${SidePart}`, boolean>>>({});
+  // The Rhymes card is open each time Rhyme mode comes on, however it was left.
+  $effect(() => {
+    if (!rhymeMode.on) untrack(() => delete toggledParts['write-rhymes']);
+  });
 
   function partOpen(part: SidePart, startsOpen: boolean): boolean {
     return !desktop.current || (toggledParts[`${mode}-${part}`] ?? startsOpen);

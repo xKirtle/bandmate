@@ -26,7 +26,7 @@
      * editor while they aren't saved.
      */
     editing: LyricSheetEditing;
-    /** Given, as in Write mode while Rhymes show, hears where the caret is in the open Section's Lines, to suggest Rhymes. */
+    /** Given, as in Rhyme mode, hears where the caret is in the open Section's Lines, to suggest Rhymes. */
     onCaret?: CaretListener;
   } = $props();
 

@@ -39,6 +39,19 @@ test('the Rhymes card shows only in Rhyme mode, for the word at the caret', asyn
   await expect(rhymesCard(page)).toHaveCount(0);
 });
 
+test('the Rhymes card comes back open each time Rhyme mode comes on', async ({ page, bandmate }) => {
+  const song = await bandmate.song({ title: 'Anthem' });
+  await page.goto(`/songs/${song.id}`);
+  await rhymesOn(page);
+  await page.locator('summary', { hasText: 'Rhymes' }).click();
+  await expect(rhymesCard(page)).toBeHidden();
+
+  await rhymesButton(page).click();
+  await rhymesOn(page);
+
+  await expect(rhymesCard(page)).toBeVisible();
+});
+
 test('switching Rhyme mode on switches Sync mode off, and the other way round', async ({ page, bandmate }) => {
   const song = await heroSong(bandmate);
   await page.goto(`/songs/${song.id}`);

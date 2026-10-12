@@ -215,7 +215,7 @@ A way of syncing a Song's Lines while the Timeline plays: as each Line starts, m
 _Avoid_: Tap mode, record mode
 
 **Rhyme mode**:
-A way of writing with Rhymes suggested for the word at the caret, in any Lyric text box: the Lyric Sheet's Lines, the Alternates view or a Section in the Scrapbook, keeping the last word once the caret leaves. Only in Rhyme mode does the Rhymes card show; editing works as it does without it, and a suggested Rhyme is only for reference. It's only on in Write mode on a desktop-wide window, and Rhyme mode and Sync mode are never on together: switching one on switches the other off. Recording and the Loop leave it on. Each visit to a Song starts with it off, and leaving Write mode or the window narrowing ends it, until it's switched on again.
+A way of writing with Rhymes suggested for the word at the caret, as it's written: in the Lyric Sheet's Lines, a Section's Alternates or a Section in the Scrapbook, keeping the last word once the caret leaves. Only in Rhyme mode does the Rhymes card show; editing works as it does without it, and a suggested Rhyme is only for reference. It's only on in Write mode on a wide window, like a desktop's, and Rhyme mode and Sync mode are never on together: switching one on switches the other off. Recording and the Loop leave it on. Each visit to a Song starts with it off, and leaving Write mode or the window narrowing ends it, until it's switched on again.
 _Avoid_: Writing aids, rhyme helper
 
 **Latency Offset**:
