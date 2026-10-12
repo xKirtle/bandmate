@@ -1,18 +1,18 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from '../fixtures';
 
-// Rhyming dictionaries, downloaded to each device in Settings' Writing card:
+// Rhyming dictionaries, downloaded to each device in Settings' Rhyming dictionaries card:
 // nothing downloaded until one is, Rhymes from those that are, kept across
 // reloads, and the Rhymes card's links to download the rest.
 
 /** The Rhymes card, in the side column while Rhyme mode is on. */
 const rhymesCard = (page: Page) => page.getByRole('region', { name: 'Rhymes', exact: true });
 
-/** Settings' Writing card. */
-const writingCard = (page: Page) => page.getByRole('region', { name: 'Writing' });
+/** Settings' Rhyming dictionaries card. */
+const dictionariesCard = (page: Page) => page.getByRole('region', { name: 'Rhyming dictionaries' });
 
-/** A Language's row in the Writing card. */
-const dictionary = (page: Page, name: string) => writingCard(page).getByRole('listitem').filter({ hasText: name });
+/** A Language's row in the Rhyming dictionaries card. */
+const dictionary = (page: Page, name: string) => dictionariesCard(page).getByRole('listitem').filter({ hasText: name });
 
 /** Opens a Song in Rhyme mode, and looks up a word in the Rhymes card. */
 async function lookUp(page: Page, songId: number, word: string) {
@@ -51,7 +51,7 @@ test('nothing is downloaded until a dictionary is asked for, and the card links 
   await expect(link).toBeVisible();
   expect(asked).toEqual([]);
   await link.click();
-  await expect(page).toHaveURL(/\/settings#writing$/);
+  await expect(page).toHaveURL(/\/settings#rhyming-dictionaries$/);
   await expect(dictionary(page, 'English')).toContainText('Not downloaded');
   await expect(dictionary(page, 'English')).toContainText('KB');
 });

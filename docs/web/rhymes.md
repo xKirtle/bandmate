@@ -4,9 +4,9 @@ In Write mode, Bandmate can suggest rhymes for the word you're writing, so you n
 
 ## Downloading a rhyming dictionary
 
-Rhymes come from a rhyming dictionary for each language, which you download to each device you write on: open **Settings → Writing**, on the This device tab, and click **Download** beside each language you write in. It lists each one's download size, whether it's downloaded to this device, and when it was last updated. **Remove** takes one off the device.
+Rhymes come from a rhyming dictionary for each language, which you download to each device you write on: open **Settings → Rhyming dictionaries**, on the This device tab, and click **Download** beside each language you write in. It lists each one's download size, whether it's downloaded to this device, and when it was last updated. **Remove** takes one off the device.
 
-Dictionaries download from your Bandmate server, not the internet, so you don't need an internet connection.
+Dictionaries download from your Bandmate server.
 
 Bandmate downloads no dictionary until you ask it to, and the Rhymes card links to Settings to download one.
 
