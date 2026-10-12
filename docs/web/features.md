@@ -16,7 +16,7 @@ Write lyrics the way you would in a notebook, with the chords right where you pl
 <img src="@screenshots/write-mode-labelled.png" alt="A song in Write mode, numbered 1 to 10 to match the list below it">
 
 1. **Status**: where the song is at: an idea, a draft, or finished.
-2. **Song details**: its key, tempo, capo and tuning, the languages it's sung in, and notes of your own. Languages offers only those Bandmate suggests rhymes in, English and Portuguese, so others aren't on the list yet.
+2. **Song details**: its key, tempo, capo and tuning, the languages it's sung in, and notes of your own. Languages offers only those Bandmate suggests [rhymes](#rhymes) in, English and Portuguese, so others aren't on the list yet.
 3. **Write and Read**: Read mode shows the song large and uncluttered, to play from. Finished songs open in it.
 4. **A section**: one part of the song, named however you like: a verse, a chorus, a hook. Move sections around, or repeat one wherever it comes back.
 5. **Chords**: typed in brackets right before the syllable they land on, even mid-word. Read mode shows them above the words.
@@ -38,12 +38,6 @@ The **Rhymes** button suggests rhymes for the word you're writing. It's there on
 
 - Download a rhyming dictionary for each language you write in, in **Settings → Rhyming dictionaries**, on each device you write on.
 - A song's rhymes are in the languages set in its details.
-
-Where the rhymes come from:
-
-- **English**: the [CMU Pronouncing Dictionary](https://github.com/cmusphinx/cmudict), under the [BSD-2-Clause license](https://github.com/cmusphinx/cmudict/blob/master/LICENSE).
-- **Portuguese**: LibreOffice's [Hunspell dictionary for European Portuguese](https://github.com/LibreOffice/dictionaries/tree/master/pt_PT), under the [LGPL-2.1](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html).
-- **The order**, most common words first: [FrequencyWords](https://github.com/hermitdave/FrequencyWords) by Hermit Dave, from the [OpenSubtitles 2018 corpus](https://opus.nlpl.eu/legacy/OpenSubtitles-v2018.php), under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
 
 Want rhymes in your language? See [Adding a rhyming language](https://github.com/xKirtle/bandmate/blob/main/CONTRIBUTING.md#adding-a-rhyming-language).
 
