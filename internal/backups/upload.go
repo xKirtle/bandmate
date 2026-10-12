@@ -45,7 +45,7 @@ func (s *Store) Upload(ctx context.Context, body io.Reader) (Backup, error) {
 		return Backup{}, err
 	}
 	b.Size = size
-	return s.keep(ctx, file.Name(), b)
+	return s.keep(ctx, file.Name(), b, "")
 }
 
 // check reads the Backup's file at path whole, refusing it if it isn't a

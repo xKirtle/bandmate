@@ -8,6 +8,8 @@ If a `gh` command fails with `HTTP 403: GitHub GraphQL is not available`, use it
 
 The arguments are the issues to work through, plus any instructions. Work the issues in the order given, unless the user says otherwise. By default each PR is reviewed by hand. If the user says PRs can be merged once their checks pass, run in **auto-merge mode**.
 
+If the work is on a **feature branch** (the user names one), run in **feature-branch mode**: read `docs/agents/feature-branches.md` first, and follow the "Feature-branch mode" section below wherever it differs. Either gate (by hand or auto-merge) still applies.
+
 You are the orchestrator: you delegate, relay and gate, and each sub-agent does the implementing. Exactly one sub-agent works at a time. A gate separates each issue from the next: the user's go-ahead by default, or a green, merged PR in auto-merge mode.
 
 ## Dev servers
@@ -53,3 +55,14 @@ Dev servers: if you run any, use ports <ports>. The orchestrator's stack holds :
 
 Final report: the branch, the PR URL, a summary of the changes, the check results (paste the actual output), which acceptance criteria you ticked and which you left unticked (with reasons), any review findings you didn't fix and why, what you changed on the docs site (or why nothing needed it), and any open questions.
 ```
+
+## Feature-branch mode
+
+The issues are the feature's tickets, worked in the order given. No ticket gets a PR, and each stays open after it merges into the feature branch, so a ticket counts as done for this run once you've merged it.
+
+- **Dev stack:** run it from the main checkout on the feature branch, not `main`, and refresh it after every ticket merges, pulling the feature branch instead of `main`.
+- **Brief:** use the brief below with these replacements. Step 2 branches from `origin/feature/<slug>` in place of `origin/main`. Steps 5 to 7 become: "Merge the latest `origin/feature/<slug>` into your branch, run the fast checks `docs/agents/feature-branches.md` lists, fix what fails, and push your branch. Leave the merge and the issue to the orchestrator." The final report gives the diffstat against `origin/feature/<slug>` in place of the PR URL, and says which acceptance criteria the branch meets.
+- **Gate:** by default, the user reviews the ticket branch's diff (`git diff origin/feature/<slug>...<branch>`) and says when to merge. In auto-merge mode, merge once the sub-agent's pasted fast checks pass; send failures back to it. The guard on rule files (`CONTRIBUTING.md`, `AGENTS.md`, `docs/agents/`, `docs/adr/`) applies to the branch's diff the same way.
+- **Merge:** in the main checkout, on the feature branch, `git pull --ff-only`, `git merge --no-ff <branch> -m "Merge #<N>: <ticket title>"`, and push. Mark the ticket done as `docs/agents/feature-branches.md` says: tick the criteria the sub-agent reported met, and comment the merge. Then refresh the stack, and remove the sub-agent's worktree and branches as step 5 of the loop says, plus the pushed ticket branch with `git push origin --delete <branch>`.
+
+Once the queue is empty, say so. Landing the feature on `main`, or dropping it, is the user's call.

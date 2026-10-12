@@ -95,13 +95,16 @@ const (
 // that isn't a domain error, so the request making one fails there, partway
 // through if it has written anything already. It's how a test shows, through
 // the API, what a failure the API can't cause does, e.g. that a change
-// failing partway changes nothing.
-func (ts *testServer) failStatements(kind statement, table string) {
+// failing partway changes nothing. Calling what it returns ends the fault
+// sooner, e.g. to show what's tried again once a passing fault has passed.
+func (ts *testServer) failStatements(kind statement, table string) (stop func()) {
 	ts.t.Helper()
 	trigger := fmt.Sprintf("injected_fault_%s_%s", strings.ToLower(string(kind)), table)
 	ts.exec(fmt.Sprintf(`CREATE TRIGGER %s BEFORE %s ON %s
 		BEGIN SELECT RAISE(ABORT, 'injected fault: %s on %s'); END`, trigger, kind, table, kind, table))
-	ts.t.Cleanup(func() { ts.exec("DROP TRIGGER " + trigger) })
+	stop = func() { ts.exec("DROP TRIGGER IF EXISTS " + trigger) }
+	ts.t.Cleanup(stop)
+	return stop
 }
 
 // exec runs a statement straight on the database.

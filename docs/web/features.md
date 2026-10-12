@@ -165,14 +165,25 @@ On a Mac, ⌘ works wherever Ctrl does. Choosing your own keys is coming soon.
 
 Keep copies of your work, and move it between installs.
 
-<img src="@screenshots/backups-labelled.png" alt="Settings' Backups, numbered 1 to 4 to match the list below it">
+<img src="@screenshots/backups-labelled.png" alt="Settings' Backups, numbered 1 to 5 to match the list below it">
 
-1. **Upload** a Backup, made by this Bandmate or another.
-2. **New Backup**: of the songs you choose, your beat library, or both.
-3. **A Backup**, with when it was made and its size.
-4. **Restore** what you pick from it, or download it to keep it somewhere safe. Where a song is already here, you choose to replace it or keep both. On a phone, Restore and Download are in the Backup's ⋯ menu.
+1. **Scheduled Backups**: have Bandmate back up everything on its own. See [below](#scheduled-backups).
+2. **Upload** a Backup, made by this Bandmate or another.
+3. **New Backup**: of the songs you choose, your beat library, or both.
+4. **A Backup**, with when it was made and its size.
+5. **Restore** what you pick from it, or download it to keep it somewhere safe. Where a song is already here, you choose to replace it or keep both. On a phone, Restore and Download are in the Backup's ⋯ menu.
 
 A Backup restores into the same version of Bandmate or a newer one. To copy everything at once, see [copying the data folder](/self-hosting#copying-the-data-folder).
+
+### Scheduled Backups
+
+Turn on **Make Backups on a schedule**, choose daily, weekly or monthly, and Bandmate backs up everything on its own, each time that long has passed since its last Scheduled Backup. The first is made as soon as you turn the schedule on. Turning it off and on again doesn't make an extra one: the next still comes a day, week or month after the last. If Bandmate was off when one came due, it makes one when it starts, just one however long it was off. If nothing has changed in your Songs or Beats since the last one, and you haven't deleted it, Bandmate skips it, so a quiet month doesn't push out older Backups that differ, and looks again a day, week or month later. The schedule is the same from every device.
+
+Each is marked **Scheduled** in the list, and you can restore, download, rename or delete it like any other. Bandmate keeps only the newest Scheduled Backups, as many as you choose from 1 to 30, and deletes the oldest when a new one is made. Backups you make or upload are never deleted. Choosing fewer, or turning the schedule off, deletes nothing at once: the extras go when the next one is made.
+
+To hold on to a Scheduled Backup, say one from before a big change, choose **Keep** in its ⋯ menu. It's then like a Backup you made: no longer marked Scheduled, not counted among those kept, and never deleted unless you delete it.
+
+Under the settings, the card says when the last Scheduled Backup was made, that nothing has changed since, or that there's nothing to back up. If one couldn't be made, for example because the disk is full, the card says why, as does Bandmate's log. Fix the cause and Bandmate makes it at its next try, within the hour.
 
 ## Settings
 

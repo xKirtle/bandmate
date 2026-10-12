@@ -2,11 +2,15 @@ import type { Page } from '@playwright/test';
 import { failRequests, holdRequests } from '../faults';
 import { expect, test } from '../fixtures';
 
-// Settings' Backups: one card, its header holding Upload and New Backup once
-// the Backups have loaded, over the upload messages and the list.
+// Settings' Backups: the Scheduled Backups card, over the Backups card, its
+// header holding Upload and New Backup once the Backups have loaded, over the
+// upload messages and the list.
 
 /** The Backups card, labelled by its heading. */
-const card = (page: Page) => page.getByRole('region', { name: 'Backups' });
+const card = (page: Page) => page.getByRole('region', { name: 'Backups', exact: true });
+
+/** The Scheduled Backups card, labelled by its heading. */
+const scheduleCard = (page: Page) => page.getByRole('region', { name: 'Scheduled Backups' });
 
 /** The card's Upload, a file input behind a label that looks like a button. */
 const upload = (page: Page) => card(page).getByText('Upload', { exact: true });
@@ -113,4 +117,63 @@ test("at 320px, the card's buttons go under its heading, still on the right, and
   // Against the card's right edge, but for its padding.
   expect(edge.x + edge.width - (button.x + button.width)).toBeLessThan(24);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+});
+
+test('turning on Scheduled Backups makes one at once, marked Scheduled, says so, and the schedule is kept', async ({
+  page,
+  bandmate,
+}) => {
+  await bandmate.song({ title: 'Night Drive' });
+
+  await page.goto('/settings/backups');
+
+  const on = scheduleCard(page).getByRole('switch', { name: 'Make Backups on a schedule' });
+  const keep = scheduleCard(page).getByRole('group', { name: 'How many to keep' });
+  await expect(on).not.toBeChecked();
+  await expect(scheduleCard(page).getByRole('radio', { name: 'Weekly' })).toBeChecked();
+  await expect(keep).toContainText('4');
+
+  await scheduleCard(page).getByRole('radio', { name: 'Daily' }).check();
+  await keep.getByRole('button', { name: 'Keep one more' }).click();
+  await expect(keep).toContainText('5');
+  await on.check();
+
+  const row = card(page).getByRole('listitem');
+  await expect(row).toHaveCount(1);
+  await expect(row.getByText('Scheduled', { exact: true })).toBeVisible();
+  await expect(row).toContainText('Everything');
+  await expect(scheduleCard(page).getByText('Last made just now.')).toBeVisible();
+
+  await page.reload();
+  await expect(on).toBeChecked();
+  await expect(scheduleCard(page).getByRole('radio', { name: 'Daily' })).toBeChecked();
+  await expect(keep).toContainText('5');
+});
+
+test('keeping a Scheduled Backup takes away its Scheduled badge and its Keep', async ({ page, bandmate }) => {
+  await bandmate.song({ title: 'Night Drive' });
+  await page.goto('/settings/backups');
+  await scheduleCard(page).getByRole('switch', { name: 'Make Backups on a schedule' }).check();
+  const row = card(page).getByRole('listitem');
+  await expect(row.getByText('Scheduled', { exact: true })).toBeVisible();
+
+  await row.getByRole('button', { name: /^More actions/ }).click();
+  await expect(page.getByRole('menu').getByRole('menuitem')).toHaveText(['Keep', 'Rename…', 'Delete…']);
+  await page.getByRole('menu').getByRole('menuitem', { name: 'Keep' }).click();
+  await expect(row.getByText('Scheduled', { exact: true })).toHaveCount(0);
+
+  await page.reload();
+  await expect(row).toContainText('Everything');
+  await expect(row.getByText('Scheduled', { exact: true })).toHaveCount(0);
+  await row.getByRole('button', { name: /^More actions/ }).click();
+  await expect(page.getByRole('menu').getByRole('menuitem')).toHaveText(['Rename…', 'Delete…']);
+});
+
+test('an uploaded Backup is not marked Scheduled', async ({ page, bandmate }) => {
+  await bandmate.restoreDemo();
+
+  await page.goto('/settings/backups');
+
+  await expect(demoRow(page)).toBeVisible();
+  await expect(demoRow(page).getByText('Scheduled', { exact: true })).toHaveCount(0);
 });

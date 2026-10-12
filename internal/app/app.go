@@ -207,6 +207,7 @@ func New(cfg Config) (*App, error) {
 		Now:      now,
 	})
 	if err != nil {
+		a.backups.Close()
 		conn.Close()
 		return nil, err
 	}
@@ -230,6 +231,7 @@ func (a *App) Handler() http.Handler { return a.handler }
 // Close releases the database.
 func (a *App) Close() error {
 	a.fetches.Close()
+	a.backups.Close()
 	return a.db.Close()
 }
 
@@ -344,8 +346,11 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("GET /api/backups", a.listBackups)
 	mux.HandleFunc("POST /api/backups", a.makeBackup)
 	mux.HandleFunc("POST /api/backups/upload", a.uploadBackup)
+	mux.HandleFunc("GET /api/backups/schedule", a.backupSchedule)
+	mux.HandleFunc("PUT /api/backups/schedule", a.setBackupSchedule)
 	mux.HandleFunc("PATCH /api/backups/{id}", a.renameBackup)
 	mux.HandleFunc("DELETE /api/backups/{id}", a.deleteBackup)
+	mux.HandleFunc("POST /api/backups/{id}/keep", a.keepBackup)
 	mux.HandleFunc("GET /api/backups/{id}/file", a.backupFile)
 	mux.HandleFunc("GET /api/backups/{id}/songs", a.backupSongs)
 	mux.HandleFunc("GET /api/backups/{id}/beats", a.backupBeats)

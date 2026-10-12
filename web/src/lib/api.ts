@@ -240,6 +240,48 @@ export interface Backup {
   size: number;
   /** A name of its own, shown in place of the automatic one; "" when it has none. */
   name: string;
+  /**
+   * Whether it's a Scheduled Backup, which the schedule deletes once it's no
+   * longer among the newest it keeps; false once it's kept.
+   */
+  scheduled: boolean;
+}
+
+/** How often the schedule makes a Scheduled Backup. */
+export type BackupPeriod = 'daily' | 'weekly' | 'monthly';
+
+/**
+ * The schedule Scheduled Backups are made on, kept in Bandmate so it's the
+ * same from every device: each is a Backup of Everything, made once a
+ * period has passed since the last, unless nothing has changed since,
+ * keeping only the newest `keep`.
+ */
+export interface BackupSchedule {
+  on: boolean;
+  period: BackupPeriod;
+  keep: number;
+  /**
+   * Whether a Scheduled Backup is due now, so one is being made: while it's
+   * on, when the schedule has never tried to make one, its last try failed,
+   * or a period has passed since its last try that didn’t fail.
+   * Left out when it's set, as are the status fields below.
+   */
+  due: boolean;
+  /** When the schedule last made a Scheduled Backup, as an ISO time; null if it never has. */
+  lastMadeAt: string | null;
+  /** The schedule's last try at one; null if it hasn't tried. */
+  last: BackupScheduleTry | null;
+}
+
+/**
+ * A try at a Scheduled Backup: when, as an ISO time, and whether it made
+ * one, made none as nothing had changed since the last or as there was
+ * nothing to back up, or failed, and why.
+ */
+export interface BackupScheduleTry {
+  at: string;
+  outcome: 'made' | 'unchanged' | 'empty' | 'failed';
+  error?: string;
 }
 
 /**
@@ -939,6 +981,19 @@ export const api = {
     upload<Backup>('/backups/upload', file, options),
   /** Gives a Backup a name of its own, or with a blank one, clears it back to the automatic one. */
   renameBackup: (id: number, name: string) => request<Backup>('PATCH', `/backups/${id}`, { name }),
+  /**
+   * Keeps a Scheduled Backup: makes it an ordinary Backup for good, which
+   * the schedule neither counts among those it keeps nor deletes.
+   */
+  keepBackup: (id: number) => request<Backup>('POST', `/backups/${id}/keep`),
+  /** The schedule Scheduled Backups are made on. */
+  backupSchedule: () => request<BackupSchedule>('GET', '/backups/schedule'),
+  /**
+   * Sets the schedule, answering at once with whether a Scheduled Backup is
+   * due, as one is when it's first turned on: if so, it's made in the background.
+   */
+  setBackupSchedule: ({ on, period, keep }: Pick<BackupSchedule, 'on' | 'period' | 'keep'>) =>
+    request<BackupSchedule>('PUT', '/backups/schedule', { on, period, keep }),
   /** Deletes a Backup and its file. */
   deleteBackup: (id: number) => request<null>('DELETE', `/backups/${id}`),
   /** Where a Backup's file downloads from, as one file. */

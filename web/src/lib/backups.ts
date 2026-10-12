@@ -1,5 +1,6 @@
 // How Backups are named, sized and asked for in Settings' Backups tab.
-import type { Backup, BackupContents, BackupPicks, BackupPresent } from './api';
+import type { Backup, BackupContents, BackupPeriod, BackupPicks, BackupPresent, BackupSchedule } from './api';
+import { timeAgo } from './time';
 import { formatSmallSize } from './upload';
 
 // Spelled out rather than left to the locale, which may shorten September
@@ -197,6 +198,79 @@ export function replaceConfirmation(songs: BackupPresent[], beats: BackupPresent
     `Replace ${counts.join(' and ')} with the Backup’s ${one ? 'version' : 'versions'}?\n\n${named.join('\n')}\n\n` +
     `${lost.join(' ')} This can’t be undone.`
   );
+}
+
+/** How often the schedule can make a Scheduled Backup, as the Scheduled Backups card offers it. */
+export const periods: readonly { id: BackupPeriod; label: string }[] = [
+  { id: 'daily', label: 'Daily' },
+  { id: 'weekly', label: 'Weekly' },
+  { id: 'monthly', label: 'Monthly' },
+];
+
+/** The fewest and most Scheduled Backups the schedule can keep. */
+export const fewestKept = 1;
+export const mostKept = 30;
+
+/** How many Scheduled Backups to keep, one more or one fewer, from 1 to 30. */
+export function stepKeep(keep: number, by: 1 | -1): number {
+  return Math.min(mostKept, Math.max(fewestKept, keep + by));
+}
+
+/**
+ * While the schedule is on and keeps fewer than there are, that the oldest
+ * of them go when the next one is made, since keeping fewer deletes nothing
+ * itself; otherwise null.
+ */
+export function extrasNote(
+  schedule: Pick<BackupSchedule, 'on' | 'keep'>,
+  backups: readonly Pick<Backup, 'scheduled'>[],
+): string | null {
+  const extras = backups.filter((b) => b.scheduled).length - schedule.keep;
+  if (!schedule.on || extras <= 0) return null;
+  return extras === 1
+    ? 'The oldest Scheduled Backup goes when the next one is made.'
+    : `The ${extras} oldest Scheduled Backups go when the next one is made.`;
+}
+
+/**
+ * How the schedule is doing, as the Scheduled Backups card says it under
+ * its settings: when it last made one, that nothing has changed since, that
+ * there's nothing to back up, or that its last try failed, when and why,
+ * which is `failed` so it's shown as an error, and while it's on, that it's
+ * tried again; null before it has tried to make one.
+ */
+export function scheduleStatus(
+  schedule: Pick<BackupSchedule, 'on' | 'lastMadeAt' | 'last'>,
+  now = Date.now(),
+): { text: string; failed: boolean } | null {
+  const { on, last, lastMadeAt } = schedule;
+  if (!last) return null;
+  switch (last.outcome) {
+    case 'made':
+      return { text: `Last made ${timeAgo(last.at, now)}.`, failed: false };
+    case 'unchanged':
+      // The schedule has always made one before finding nothing changed.
+      return {
+        text: lastMadeAt
+          ? `Nothing has changed since the last one, made ${timeAgo(lastMadeAt, now)}.`
+          : 'Nothing has changed since the last one.',
+        failed: false,
+      };
+    case 'empty':
+      return { text: 'There’s nothing to back up.', failed: false };
+    case 'failed':
+      return {
+        text:
+          `Couldn’t make one ${timeAgo(last.at, now)} (${last.error}).` +
+          (on ? ' Bandmate tries again within the hour.' : ''),
+        failed: true,
+      };
+  }
+}
+
+/** Whether a Backup holds anything to restore: Songs or Beats. */
+export function restorable(backup: Pick<Backup, 'songs' | 'beats'>): boolean {
+  return backup.songs > 0 || backup.beats > 0;
 }
 
 /** A Backup's size, as any size that may be small is written. */

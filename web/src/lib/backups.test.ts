@@ -5,10 +5,13 @@ import {
   backupSize,
   beatsBrought,
   broughtNote,
+  extrasNote,
   newBackup,
   replaceConfirmation,
   restoredName,
   restorePicks,
+  scheduleStatus,
+  stepKeep,
 } from './backups';
 
 // 18:30 on 4 Oct 2026, in the time zone the tests run in.
@@ -323,5 +326,96 @@ describe('restorePicks', () => {
     expect(restorePicks({ ...opened, picked: new Set([3]), pickedBeats: new Set() }, held)).toEqual({
       missing: 'Pick a Beat, or untick the Beat Library.',
     });
+  });
+});
+
+describe('stepKeep', () => {
+  it('keeps one more or one fewer Scheduled Backup', () => {
+    expect(stepKeep(4, 1)).toBe(5);
+    expect(stepKeep(4, -1)).toBe(3);
+  });
+
+  it('keeps from 1 to 30', () => {
+    expect(stepKeep(1, -1)).toBe(1);
+    expect(stepKeep(30, 1)).toBe(30);
+  });
+});
+
+describe('extrasNote', () => {
+  const scheduled = { scheduled: true };
+  const handMade = { scheduled: false };
+
+  it('says the oldest Scheduled Backups beyond those kept go with the next one', () => {
+    expect(extrasNote({ on: true, keep: 2 }, [scheduled, scheduled, scheduled, handMade])).toBe(
+      'The oldest Scheduled Backup goes when the next one is made.',
+    );
+    expect(extrasNote({ on: true, keep: 1 }, [scheduled, scheduled, scheduled, handMade, handMade])).toBe(
+      'The 2 oldest Scheduled Backups go when the next one is made.',
+    );
+  });
+
+  it('says nothing while no more are kept than the schedule keeps, or while it is off', () => {
+    expect(extrasNote({ on: true, keep: 2 }, [scheduled, scheduled, handMade, handMade])).toBeNull();
+    expect(extrasNote({ on: false, keep: 1 }, [scheduled, scheduled])).toBeNull();
+  });
+});
+
+describe('scheduleStatus', () => {
+  const now = new Date(2026, 9, 12, 9, 0).getTime();
+  const daysAgo = (days: number) => new Date(now - days * 24 * 3600 * 1000).toISOString();
+
+  it('says when the last Scheduled Backup was made', () => {
+    expect(
+      scheduleStatus({ on: true, lastMadeAt: daysAgo(3), last: { at: daysAgo(3), outcome: 'made' } }, now),
+    ).toEqual({
+      text: 'Last made 3 days ago.',
+      failed: false,
+    });
+  });
+
+  it('says nothing has changed since the last, and when that was made', () => {
+    expect(
+      scheduleStatus({ on: true, lastMadeAt: daysAgo(14), last: { at: daysAgo(7), outcome: 'unchanged' } }, now),
+    ).toEqual({
+      text: 'Nothing has changed since the last one, made 2 weeks ago.',
+      failed: false,
+    });
+  });
+
+  it('says there is nothing to back up when the last try made none for that, whether or not one was made before', () => {
+    const empty = { at: daysAgo(1), outcome: 'empty' } as const;
+    expect(scheduleStatus({ on: true, lastMadeAt: null, last: empty }, now)).toEqual({
+      text: 'There’s nothing to back up.',
+      failed: false,
+    });
+    expect(scheduleStatus({ on: true, lastMadeAt: daysAgo(14), last: empty }, now)).toEqual({
+      text: 'There’s nothing to back up.',
+      failed: false,
+    });
+  });
+
+  it('says the last try failed, when and why, and that it is tried again', () => {
+    expect(
+      scheduleStatus(
+        { on: true, lastMadeAt: daysAgo(7), last: { at: daysAgo(1), outcome: 'failed', error: 'the disk is full' } },
+        now,
+      ),
+    ).toEqual({
+      text: 'Couldn’t make one yesterday (the disk is full). Bandmate tries again within the hour.',
+      failed: true,
+    });
+  });
+
+  it('promises no new try while the schedule is off', () => {
+    expect(
+      scheduleStatus(
+        { on: false, lastMadeAt: null, last: { at: daysAgo(1), outcome: 'failed', error: 'the disk is full' } },
+        now,
+      ),
+    ).toEqual({ text: 'Couldn’t make one yesterday (the disk is full).', failed: true });
+  });
+
+  it('says nothing before the schedule has tried to make one', () => {
+    expect(scheduleStatus({ on: true, lastMadeAt: null, last: null }, now)).toBeNull();
   });
 });
