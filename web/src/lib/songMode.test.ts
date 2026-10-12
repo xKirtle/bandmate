@@ -55,7 +55,7 @@ describe('sideParts', () => {
     expect(sideParts('read')).toEqual([{ part: 'masters', open: true }]);
   });
 
-  it('puts Rhymes first, open, in Write mode when they show', () => {
+  it('puts Rhymes first, open, in Write mode while Rhyme mode is on', () => {
     expect(sideParts('write', { rhymes: true })).toEqual([
       { part: 'rhymes', open: true },
       { part: 'scrapbook', open: true },

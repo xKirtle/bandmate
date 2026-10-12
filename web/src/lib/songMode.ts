@@ -37,7 +37,7 @@ export type SidePart = 'rhymes' | 'scrapbook' | 'masters';
 /**
  * The side column's parts in order, and whether each starts open on desktop.
  * Write mode gives the Scrapbook the room, with the Masters folded away
- * beneath it, and Rhymes above it while they show, nearest the top so they
+ * beneath it, and Rhymes above it in Rhyme mode, nearest the top so they
  * stay in sight as the Lines are written; Read mode has no Scrapbook or
  * Rhymes, so the Masters show.
  */
