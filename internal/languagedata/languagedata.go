@@ -29,8 +29,8 @@ const cmudictVersion = "7479086"
 // pt.txt.gz is Portuguese's: the words of the European Portuguese Hunspell
 // dictionary, with the forms they're sung in, one a line, gzipped, under
 // the licence in pt.LICENSE, which the About page names. Portuguese words
-// are read by its spelling rules, so the page needs it only to suggest
-// Rhymes from. It's committed, so every build has it: to take a newer
+// are read by their spelling, so the page needs it only to suggest Rhymes
+// from. It's committed, so every build has it: to take a newer
 // dictionary, change dictionariesCommit in ./ptwords, and
 // dictionariesVersion here, then run `go generate ./internal/languagedata`.
 //

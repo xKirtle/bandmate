@@ -99,7 +99,7 @@ The languages a Song's Lines are sung in, one of its Details; a Song that mixes 
 _Avoid_: Locale
 
 **Syllable Count**:
-How many syllables a suggested Rhyme has, shown beside it to help pick one that fits the meter. Lines get none: singers run words together, so a Line's written syllables mislead.
+How many syllables a suggested Rhyme has, shown beside it to help pick one that fits the meter. Lines don't get one.
 _Avoid_: Meter, syllables
 
 **Rhyme**:
