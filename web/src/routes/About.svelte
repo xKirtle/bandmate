@@ -95,7 +95,7 @@
 
   /** The Dependencies tab's lists, Go's first, each with what it says when
       it lists none. Programs ship only in Bandmate's image. Data, such as the
-      dictionaries syllables are counted from, is built into the binary. */
+      dictionaries Rhymes are found in, is built into the binary. */
   const dependencyLists = $derived(
     about
       ? [

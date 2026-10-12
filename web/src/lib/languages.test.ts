@@ -8,7 +8,7 @@ const known = [
 ];
 
 describe('languages', () => {
-  it('offers English and Portuguese, the Languages Bandmate counts syllables in', () => {
+  it('offers English and Portuguese, the Languages Bandmate suggests Rhymes in', () => {
     expect(languages).toEqual([
       { code: 'en', name: 'English' },
       { code: 'pt', name: 'Portuguese' },

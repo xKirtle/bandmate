@@ -25,7 +25,7 @@ export default defineConfig({
         text: 'Bandmate',
         items: [
           { text: 'Features', link: '/features' },
-          { text: 'Syllable counts and rhymes', link: '/syllables' },
+          { text: 'Rhymes', link: '/rhymes' },
           { text: 'Self-hosting', link: '/self-hosting' },
         ],
       },

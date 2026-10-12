@@ -2,18 +2,14 @@
   // A word's Rhymes, perfect ones first, then near ones in a group of their
   // own, each with its Syllable Count; or why there are none. They're for
   // reference only: nothing here can be clicked, so a Rhyme never goes into
-  // the Lyric Sheet. Wrapped onto as many rows as they take, as in the
-  // Rhymes card, or on one row, as in the strip, which scrolls it sideways.
+  // the Lyric Sheet. Wrapped onto as many rows as they take.
   import type { RhymeLookup } from './rhymeLookup';
 
   let {
     lookup,
-    row = false,
     limit,
   }: {
     lookup: RhymeLookup;
-    /** Whether they take one row. */
-    row?: boolean;
     /** The most of each group shown, nearest the word in syllables first. */
     limit: number;
   } = $props();
@@ -37,7 +33,7 @@
 {:else if !rhymes}
   <p class="muted message">No Rhymes for “{word}”: Bandmate doesn’t know how it sounds.</p>
 {:else}
-  <div class="groups" class:row>
+  <div class="groups">
     {#each groups as { name, list } (name)}
       <div class="group">
         <h3 class="name">{name}</h3>
@@ -94,23 +90,5 @@
   .none {
     margin: 0;
     font-size: var(--text-md);
-  }
-  /* One row: each group's name before its Rhymes, the groups side by side. */
-  .groups.row {
-    flex-direction: row;
-    align-items: baseline;
-    gap: var(--space-4);
-  }
-  .row .group,
-  .row ul {
-    display: flex;
-    flex-wrap: nowrap;
-    align-items: baseline;
-  }
-  .row .group {
-    gap: var(--space-2);
-  }
-  .row .name {
-    margin: 0;
   }
 </style>

@@ -12,7 +12,7 @@ import (
 	"github.com/xKirtle/bandmate/internal/app"
 )
 
-// The page counts syllables itself, from each Language's data, which the
+// The page finds Rhymes itself, in each Language's data, which the
 // binary carries and serves (ADR 0018).
 
 func TestEnglishDataIsServedFromTheBinary(t *testing.T) {

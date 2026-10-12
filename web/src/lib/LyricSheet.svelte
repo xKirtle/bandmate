@@ -58,7 +58,7 @@
   import { songChordsShown } from './chordsShown';
   import { lyricSize } from './sharedLyricSize.svelte';
   import { songTranspose } from './sharedTranspose.svelte';
-  import type { CaretListener, SyllableCounter } from './lyricsLanguage';
+  import type { CaretListener } from './lyricsLanguage';
   import { writingAids } from './sharedWritingAids.svelte';
 
   let {
@@ -72,7 +72,6 @@
     playFrom,
     recording = false,
     syncMode,
-    syllables,
     onCaret,
   }: {
     song: Song;
@@ -102,9 +101,7 @@
     recording?: boolean;
     /** Sync mode, which the Lyric Sheet draws, and sends its switching, cueing and picking through. */
     syncMode: SyncMode;
-    /** Given, as in Write mode while the writing aids are on, each Line's Syllable Count shows beside it. */
-    syllables?: SyllableCounter;
-    /** Given, as in Write mode while the writing aids are on, hears where the caret is in a Section's Lines, to suggest Rhymes. */
+    /** Given, as in Write mode while Rhymes show, hears where the caret is in a Section's Lines, to suggest Rhymes. */
     onCaret?: CaretListener;
   } = $props();
 
@@ -159,6 +156,8 @@
   // Cues are edited in Write mode, on wider screens only, and only once
   // there's something to cue to or a Cue already set.
   const wide = new MediaQuery('min-width: 40.0625rem');
+  // Rhymes are offered only on a desktop-wide window, so their toggle is too.
+  const desktop = new MediaQuery('min-width: 80rem');
   const canCue = $derived(wide.current && (hasClips || hasCues(song)));
   // Playing from a Cue's ▶, or a cued Line in Read mode, leads into it.
   const leadInto = $derived(playFrom && ((cue: number) => playFrom(leadIn(cue))));
@@ -404,7 +403,7 @@
         title="Clear every Cue in the Song">Clear all Cues</button
       >
     {/if}
-    {#if mode === 'write'}
+    {#if mode === 'write' && desktop.current}
       <!-- Clicked, it keeps focus where it was, so Space then plays rather than switching them back off. -->
       <button
         type="button"
@@ -412,7 +411,7 @@
         aria-pressed={writingAids.value}
         onpointerdown={(e) => e.preventDefault()}
         onclick={() => writingAids.set(!writingAids.value)}
-        title="Writing aids: count each Line's syllables and suggest Rhymes as you write">Writing aids</button
+        title="Writing aids: suggest Rhymes for the word you're writing">Writing aids</button
       >
     {/if}
     {#if mode === 'write' && wide.current}
@@ -517,7 +516,6 @@
               autofocus={added === section.id}
               {editing}
               cueing={cueingFor(section)}
-              {syllables}
               {onCaret}
               more={sectionActions(section, i)}
               {drag}

@@ -37,10 +37,9 @@
   import { songTranspose } from '../lib/sharedTranspose.svelte';
   import { writingAids } from '../lib/sharedWritingAids.svelte';
   import { fetchLanguageData, languageData } from '../lib/languageData.svelte';
-  import { lyricsLanguage, type CaretAt, type CaretListener, type SyllableCounter } from '../lib/lyricsLanguage';
+  import { lyricsLanguage, type CaretListener } from '../lib/lyricsLanguage';
   import { lookUpRhymes } from '../lib/rhymeLookup';
   import RhymesCard from '../lib/RhymesCard.svelte';
-  import RhymesStrip from '../lib/RhymesStrip.svelte';
   import { timeAgo } from '../lib/time';
 
   let { id }: { id: number } = $props();
@@ -102,25 +101,19 @@
   const transpose = $derived(
     song && chordsInRead(song) === 'shown' && songChordsShown.of(id) ? songTranspose.of(id) : 0,
   );
-  // Each Line's Syllable Count, in Write mode while the writing aids are on,
-  // worked out here from the data of the Song's Languages: only then is
-  // that fetched, once for as long as the page is open.
-  const showingAids = $derived(writing && writingAids.value);
+  // Rhymes, in Write mode on a desktop-wide window while the writing aids
+  // are on, worked out here from the data of the Song's Languages: only then
+  // is that fetched, once for as long as the page is open. Narrower, nothing
+  // about Rhymes shows. The card's are for the word at the caret of the Line
+  // that has focus, kept once the caret leaves, or for one typed into it,
+  // until the caret moves in a Line again. They're in the Language the word
+  // is read in, or in another of the Song's Languages picked for it.
+  const desktop = new MediaQuery('min-width: 80rem');
+  const showingRhymes = $derived(writing && desktop.current && writingAids.value);
   $effect(() => {
-    if (showingAids) fetchLanguageData(languages);
+    if (showingRhymes) fetchLanguageData(languages);
   });
   const lyrics = $derived(lyricsLanguage(languageData()));
-  const syllables: SyllableCounter | undefined = $derived.by(() => {
-    if (!showingAids) return undefined;
-    const counting = languages;
-    return (text) => lyrics.syllableCount(text, counting);
-  });
-  // Rhymes, while the writing aids show. The strip's are for the word at
-  // the caret of the Line that has focus. The card's are for that word too,
-  // kept once the caret leaves, or for one typed into it, until the caret
-  // moves in a Line again. They're in the Language each word is read in,
-  // or, on the card, in another of the Song's Languages picked for its word.
-  let caret = $state<CaretAt | null>(null);
   let cardWord = $state<string | null>(null);
   let cardLanguage = $state<string | null>(null);
   function setCardWord(word: string | null) {
@@ -128,15 +121,11 @@
     cardWord = word;
   }
   const heardCaret: CaretListener = (at) => {
-    caret = at;
     const word = at && lyrics.wordAt(at.text, at.caret);
     if (word) setCardWord(word);
   };
-  const onCaret = $derived(showingAids ? heardCaret : undefined);
-  const lineFocused = $derived(showingAids && caret !== null);
-  const caretWord = $derived(caret && lyrics.wordAt(caret.text, caret.caret));
-  const cardRhymes = $derived(lookUpRhymes(lyrics, showingAids ? cardWord : null, languages, cardLanguage));
-  const stripRhymes = $derived(lookUpRhymes(lyrics, showingAids ? caretWord : null, languages));
+  const onCaret = $derived(showingRhymes ? heardCaret : undefined);
+  const cardRhymes = $derived(lookUpRhymes(lyrics, showingRhymes ? cardWord : null, languages, cardLanguage));
   // The Details as Read mode shows them, with the key the Chords are shown in.
   const summary = $derived(
     details
@@ -161,12 +150,11 @@
 
   // Desktop puts the Scrapbook and Masters in a column beside the Lyric
   // Sheet, as sections that open and close, each as sideParts starts it on
-  // each visit until it's toggled, with the Rhymes card while the writing
-  // aids show. Narrower windows show the Scrapbook and Masters after the
-  // Lyric Sheet, always open, and the Rhymes strip while a Line has focus.
-  // Keyed by name, switching moves them rather than rebuilding them.
-  const desktop = new MediaQuery('min-width: 80rem');
-  const parts = $derived(sideParts(mode, { rhymes: desktop.current && showingAids }));
+  // each visit until it's toggled, with the Rhymes card while Rhymes show.
+  // Narrower windows show the Scrapbook and Masters after the Lyric Sheet,
+  // always open. Keyed by name, switching moves them rather than rebuilding
+  // them.
+  const parts = $derived(sideParts(mode, { rhymes: showingRhymes }));
   // Parts opened or closed by hand, per mode.
   let toggledParts = $state<Partial<Record<`${Mode}-${SidePart}`, boolean>>>({});
 
@@ -563,7 +551,6 @@
           playFrom={(at) => timelinePanel?.playFrom(at)}
           {recording}
           {syncMode}
-          {syllables}
           {onCaret}
           hasClips={timeline?.tracks.some((t) => t.clips.length > 0) ?? false}
         />
@@ -594,7 +581,7 @@
               />
             {:else}
               <summary><FoldChevron />Scrapbook</summary>
-              <Scrapbook {song} {drag} {editing} {syllables} {onCaret} />
+              <Scrapbook {song} {drag} {editing} {onCaret} />
             {/if}
           </details>
         {/each}
@@ -628,10 +615,6 @@
     {syncMode}
     onRecording={(on) => (recording = on)}
   />
-{/if}
-
-{#if lineFocused && !desktop.current}
-  <RhymesStrip lookup={stripRhymes} {timelineHeight} />
 {/if}
 
 {#if showingShortcuts}

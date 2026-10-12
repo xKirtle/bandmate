@@ -1,9 +1,9 @@
-// Which Rhymes the Rhymes card and strip show: for a word, in one of the
+// Which Rhymes the Rhymes card shows: for a word, in one of the
 // Song's Languages, which starts as the one the word is read in.
 
 import type { LyricsLanguage, Rhymes } from './lyricsLanguage';
 
-/** A word's Rhymes as the card and the strip show them. */
+/** A word's Rhymes as the card shows them. */
 export interface RhymeLookup {
   /** The word Rhymes are for, or null while there's none. */
   word: string | null;
