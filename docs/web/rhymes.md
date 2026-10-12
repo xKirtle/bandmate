@@ -1,12 +1,14 @@
 # Rhymes
 
-In Write mode, Bandmate suggests rhymes for the word you're writing, so you needn't look them up elsewhere.
+In Write mode, Bandmate can suggest rhymes for the word you're writing, so you needn't look them up elsewhere.
 
-Rhymes need a wide window, like a desktop's: on a phone, a tablet or a smaller window, they don't show.
+## Turning them on
 
-## Where they show
+Click **Rhymes**, beside **Sync lyrics** in the lyric sheet's toolbar, and click it again when you're done. Rhymes need a wide window, like a desktop's: on a phone, a tablet or a smaller window, the button isn't there.
 
-A **Rhymes** card sits beside the lyric sheet, above the Scrapbook. It folds away like the Scrapbook.
+Rhymes start off each time you open a song, and go off when you switch to Read mode or the window gets too narrow. They can't be on while you [sync lyrics](/features#sync): turning one on turns the other off.
+
+While they're on, a **Rhymes** card sits beside the lyric sheet, above the Scrapbook. It folds away like the Scrapbook.
 
 It shows rhymes for the word at the cursor in the line you're writing, or for the line's last word once the cursor is past it, and keeps showing that word once you click elsewhere. To look up any other word, type it into its field.
 
@@ -26,10 +28,6 @@ Bandmate suggests rhymes in the languages set in the song's details, which start
 
 A song can be in both. Then a word's rhymes are in the language it belongs to, never mixing the two: a word the English dictionary knows is read as English, and any other word as Portuguese, whichever order the languages are in. So a Portuguese word the English dictionary also lists, like "eu", gets English rhymes. To see rhymes for a word in another of the song's languages, pick that language above the rhymes in the Rhymes card.
 
-## Turning them off
-
-**Writing aids**, in the lyric sheet's toolbar in Write mode, turns the rhymes on and off, for every song. It's on to start with. Each device keeps its own choice, which is also in **Settings**, under **This device**.
-
 ## Offline
 
-Rhymes need no internet connection: the dictionary comes with Bandmate. The first time you write a song in English, your browser downloads the dictionary from your Bandmate, about a megabyte, once. The first time you write one in Portuguese, it downloads the Portuguese word list the same way, a little under a megabyte. While Writing aids is off, or the window is too narrow for rhymes, it downloads nothing.
+Rhymes need no internet connection: the dictionary comes with Bandmate. The first time you turn rhymes on in a song in English, your browser downloads the dictionary from your Bandmate, about a megabyte, once. The first time you turn them on in one in Portuguese, it downloads the Portuguese word list the same way, a little under a megabyte. Until you turn rhymes on, it downloads nothing.

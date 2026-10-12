@@ -53,13 +53,13 @@
   import { shortcuts } from './shortcuts';
   import { cuesNextLine } from './syncKeys';
   import type { SyncMode } from './syncMode.svelte';
+  import type { RhymeMode } from './rhymeMode.svelte';
   import { inTextField } from './textField';
   import { deviceStorage } from './deviceStorage';
   import { songChordsShown } from './chordsShown';
   import { lyricSize } from './sharedLyricSize.svelte';
   import { songTranspose } from './sharedTranspose.svelte';
   import type { CaretListener } from './lyricsLanguage';
-  import { writingAids } from './sharedWritingAids.svelte';
 
   let {
     song,
@@ -72,6 +72,7 @@
     playFrom,
     recording = false,
     syncMode,
+    rhymeMode,
     onCaret,
   }: {
     song: Song;
@@ -101,7 +102,9 @@
     recording?: boolean;
     /** Sync mode, which the Lyric Sheet draws, and sends its switching, cueing and picking through. */
     syncMode: SyncMode;
-    /** Given, as in Write mode while Rhymes show, hears where the caret is in a Section's Lines, to suggest Rhymes. */
+    /** Rhyme mode, whose toggle the Lyric Sheet draws, where it can be on. */
+    rhymeMode: RhymeMode;
+    /** Given, as in Rhyme mode, hears where the caret is in a Section's Lines, to suggest Rhymes. */
     onCaret?: CaretListener;
   } = $props();
 
@@ -156,8 +159,6 @@
   // Cues are edited in Write mode, on wider screens only, and only once
   // there's something to cue to or a Cue already set.
   const wide = new MediaQuery('min-width: 40.0625rem');
-  // Rhymes are offered only on a desktop-wide window, so their toggle is too.
-  const desktop = new MediaQuery('min-width: 80rem');
   const canCue = $derived(wide.current && (hasClips || hasCues(song)));
   // Playing from a Cue's ▶, or a cued Line in Read mode, leads into it.
   const leadInto = $derived(playFrom && ((cue: number) => playFrom(leadIn(cue))));
@@ -403,15 +404,15 @@
         title="Clear every Cue in the Song">Clear all Cues</button
       >
     {/if}
-    {#if mode === 'write' && desktop.current}
-      <!-- Clicked, it keeps focus where it was, so Space then plays rather than switching them back off. -->
+    {#if rhymeMode.canBeOn}
+      <!-- Clicked, it keeps focus where it was, so the caret stays on the word it suggests Rhymes for. -->
       <button
         type="button"
         class="button toggle"
-        aria-pressed={writingAids.value}
+        aria-pressed={rhymeMode.on}
         onpointerdown={(e) => e.preventDefault()}
-        onclick={() => writingAids.set(!writingAids.value)}
-        title="Writing aids: suggest Rhymes for the word you're writing">Writing aids</button
+        onclick={() => rhymeMode.switch()}
+        title="Suggest Rhymes for the word at the cursor">Rhymes</button
       >
     {/if}
     {#if mode === 'write' && wide.current}

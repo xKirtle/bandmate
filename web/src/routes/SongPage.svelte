@@ -1,6 +1,6 @@
 <script lang="ts">
   import Keyboard from '@lucide/svelte/icons/keyboard';
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { api, commonKeys, type Song, type Status } from '../lib/api';
   import Combobox from '../lib/Combobox.svelte';
@@ -23,6 +23,7 @@
   import { detailFields, type DetailFields } from '../lib/songFields';
   import { cancelOnEscape, committedAsItGoes, leaveOnEscape } from '../lib/typedField.svelte';
   import { SyncMode } from '../lib/syncMode.svelte';
+  import { RhymeMode } from '../lib/rhymeMode.svelte';
   import { songServer } from '../lib/songServer';
   import { takeNewFlag } from '../lib/newSong';
   import { navigate, replaceSearch, router } from '../lib/router.svelte';
@@ -35,7 +36,6 @@
   import { chordsInRead } from '../lib/chordChart';
   import { songChordsShown } from '../lib/chordsShown';
   import { songTranspose } from '../lib/sharedTranspose.svelte';
-  import { writingAids } from '../lib/sharedWritingAids.svelte';
   import { fetchLanguageData, languageData } from '../lib/languageData.svelte';
   import { lyricsLanguage, type CaretListener } from '../lib/lyricsLanguage';
   import { lookUpRhymes } from '../lib/rhymeLookup';
@@ -101,17 +101,19 @@
   const transpose = $derived(
     song && chordsInRead(song) === 'shown' && songChordsShown.of(id) ? songTranspose.of(id) : 0,
   );
-  // Rhymes, in Write mode on a desktop-wide window while the writing aids
-  // are on, worked out here from the data of the Song's Languages: only then
-  // is that fetched, once for as long as the page is open. Narrower, nothing
-  // about Rhymes shows. The card's are for the word at the caret of the Line
-  // that has focus, kept once the caret leaves, or for one typed into it,
-  // until the caret moves in a Line again. They're in the Language the word
-  // is read in, or in another of the Song's Languages picked for it.
+  // Rhyme mode, which the Lyric Sheet draws the toggle of: see
+  // rhymeMode.svelte.ts. Like the side column, it's only on a desktop-wide
+  // window, and Sync mode and it are never on together.
   const desktop = new MediaQuery('min-width: 80rem');
-  const showingRhymes = $derived(writing && desktop.current && writingAids.value);
+  const rhymeMode = new RhymeMode({ mode: () => mode, wide: () => desktop.current, sync: syncMode });
+  // Rhymes, while Rhyme mode is on, worked out here from the data of the
+  // Song's Languages: only then is that fetched, once for as long as the page
+  // is open. The card's are for the word at the caret of the Line that has
+  // focus, kept once the caret leaves, or for one typed into it, until the
+  // caret moves in a Line again. They're in the Language the word is read
+  // in, or in another of the Song's Languages picked for it.
   $effect(() => {
-    if (showingRhymes) fetchLanguageData(languages);
+    if (rhymeMode.on) fetchLanguageData(languages);
   });
   const lyrics = $derived(lyricsLanguage(languageData()));
   let cardWord = $state<string | null>(null);
@@ -124,8 +126,8 @@
     const word = at && lyrics.wordAt(at.text, at.caret);
     if (word) setCardWord(word);
   };
-  const onCaret = $derived(showingRhymes ? heardCaret : undefined);
-  const cardRhymes = $derived(lookUpRhymes(lyrics, showingRhymes ? cardWord : null, languages, cardLanguage));
+  const onCaret = $derived(rhymeMode.on ? heardCaret : undefined);
+  const cardRhymes = $derived(lookUpRhymes(lyrics, rhymeMode.on ? cardWord : null, languages, cardLanguage));
   // The Details as Read mode shows them, with the key the Chords are shown in.
   const summary = $derived(
     details
@@ -150,13 +152,17 @@
 
   // Desktop puts the Scrapbook and Masters in a column beside the Lyric
   // Sheet, as sections that open and close, each as sideParts starts it on
-  // each visit until it's toggled, with the Rhymes card while Rhymes show.
+  // each visit until it's toggled, with the Rhymes card in Rhyme mode.
   // Narrower windows show the Scrapbook and Masters after the Lyric Sheet,
   // always open. Keyed by name, switching moves them rather than rebuilding
   // them.
-  const parts = $derived(sideParts(mode, { rhymes: showingRhymes }));
+  const parts = $derived(sideParts(mode, { rhymes: rhymeMode.on }));
   // Parts opened or closed by hand, per mode.
   let toggledParts = $state<Partial<Record<`${Mode}-${SidePart}`, boolean>>>({});
+  // The Rhymes card is open each time Rhyme mode comes on, however it was left.
+  $effect(() => {
+    if (!rhymeMode.on) untrack(() => delete toggledParts['write-rhymes']);
+  });
 
   function partOpen(part: SidePart, startsOpen: boolean): boolean {
     return !desktop.current || (toggledParts[`${mode}-${part}`] ?? startsOpen);
@@ -551,6 +557,7 @@
           playFrom={(at) => timelinePanel?.playFrom(at)}
           {recording}
           {syncMode}
+          {rhymeMode}
           {onCaret}
           hasClips={timeline?.tracks.some((t) => t.clips.length > 0) ?? false}
         />
