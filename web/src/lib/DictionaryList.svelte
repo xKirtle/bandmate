@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { api, ApiError } from './api';
+  import { api } from './api';
   import { languages } from './languages';
   import { rhymingDictionaries as dictionaries } from './sharedRhymingDictionaries.svelte';
   import { formatSmallSize } from './upload';
@@ -13,12 +13,10 @@
 
   // Each Language's download size, by its code, once Bandmate says.
   let sizes = $state<Record<string, number>>({});
-  $effect(() => {
-    api.getLanguages().then(
-      (list) => (sizes = Object.fromEntries(list.map((l) => [l.code, l.size]))),
-      () => {}, // Offline, say: the list shows without sizes.
-    );
-  });
+  api.getLanguages().then(
+    (list) => (sizes = Object.fromEntries(list.map((l) => [l.code, l.size]))),
+    () => {}, // Offline, say: the list shows without sizes.
+  );
 
   /** Why the last Set up or Remove of a Language failed. */
   let problem = $state<{ code: string; message: string } | null>(null);
@@ -30,8 +28,13 @@
     try {
       await action(code);
     } catch (e) {
+      // The browser's store fails with a DOMException, as where it keeps nothing.
       const message =
-        e instanceof ApiError ? e.message : "This browser can't keep it, as happens in some private windows.";
+        e instanceof DOMException
+          ? "This browser can't keep it, as happens in some private windows."
+          : e instanceof Error
+            ? e.message
+            : String(e);
       problem = { code, message };
     }
   }

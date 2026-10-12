@@ -107,11 +107,11 @@ export type LyricsLanguage = ReturnType<typeof lyricsLanguage>;
 
 export function lyricsLanguage(dictionaries: readonly LanguageData[]) {
   const byCode = new Map(dictionaries.map((d) => [d.code, d]));
-  const wordLists = new Map(dictionaries.map((d) => [d.code, wordList(d)]));
+  const lists = new Map(dictionaries.map((d) => [d.code, wordList(d)]));
 
   /** Whether a Language's dictionary is set up and has a word, as it's looked up. */
   function has(code: string, word: string): boolean {
-    const list = wordLists.get(code);
+    const list = lists.get(code);
     return !!list && (list.has(word) || list.has(trimApostrophes(word)));
   }
 

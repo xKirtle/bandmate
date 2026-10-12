@@ -4,7 +4,7 @@ In Write mode, Bandmate can suggest rhymes for the word you're writing, so you n
 
 ## Setting up dictionaries
 
-Rhymes come from a dictionary for each language, which you set up on each device you write on: open **Settings → This device → Writing**, and click **Set up** beside each language you write in. It lists each one's download size, whether it's set up on this device, and when it was last updated. **Remove** takes one off the device.
+Rhymes come from a dictionary for each language, which you set up on each device you write on: open **Settings → Writing**, on the This device tab, and click **Set up** beside each language you write in. It lists each one's download size, whether it's set up on this device, and when it was last updated. **Remove** takes one off the device.
 
 Until you set one up, Bandmate downloads nothing, and the Rhymes card links to Settings to set it up.
 

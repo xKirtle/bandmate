@@ -37,24 +37,39 @@ export interface DictionaryStore {
  */
 export type Download = (code: string, etag?: string) => Promise<{ etag: string; text: string } | null>;
 
+export interface RhymingDictionariesOptions {
+  /** The time now, as a dictionary is set up or refreshed. */
+  now?: () => Date;
+  /** Tells this device's other tabs a dictionary was set up, refreshed or removed. */
+  changed?: () => void;
+}
+
 export class RhymingDictionaries {
   #store: DictionaryStore;
   #download: Download;
   #now: () => Date;
   #changed: () => void;
-  /** The dictionaries set up, by Language, once listed. */
+  /** The dictionaries set up, by Language, with when each was last updated, once listed. */
   #setUp = new SvelteMap<string, string>();
   #listed = $state(false);
+  /** How many times this page has kept or removed one, so a list read meanwhile is read again. */
+  #edits = 0;
+  /** Those being set up. */
   #settingUp = new SvelteSet<string>();
   /** Those read in on this page, and when each was last updated as read. */
   #loaded = new SvelteMap<string, { data: LanguageData; updatedAt: string }>();
-  /** Those asked to be read in, so each is read once, and whether Bandmate was asked about it this visit. */
+  /** Those asked to be read in, so each is read once. */
   #asked = new Set<string>();
+  /** Those Bandmate was asked about this visit, whether their data changed. */
   #checked = new Set<string>();
+  /** Those that couldn't be read in, kept or downloaded again, so aren't waited for. */
   #failed = new SvelteSet<string>();
 
-  /** `changed` tells this device's other tabs a dictionary was set up, refreshed or removed. */
-  constructor(store: DictionaryStore, download: Download, now = () => new Date(), changed: () => void = () => {}) {
+  constructor(
+    store: DictionaryStore,
+    download: Download,
+    { now = () => new Date(), changed = () => {} }: RhymingDictionariesOptions = {},
+  ) {
     this.#store = store;
     this.#download = download;
     this.#now = now;
@@ -66,13 +81,16 @@ export class RhymingDictionaries {
    * Reads again which dictionaries are set up, as another tab changed them:
    * one removed or refreshed there is read in again, or dropped.
    */
-  async relist() {
+  async relist(): Promise<void> {
     let listed: SetUpDictionary[] = [];
+    const edits = this.#edits;
     try {
       listed = await this.#store.list();
     } catch {
       // The browser keeps none, e.g. in a private window that refuses it.
     }
+    // One kept or removed here meanwhile may be missing from the list.
+    if (edits !== this.#edits) return this.relist();
     this.#setUp.clear();
     for (const { code, updatedAt } of listed) this.#setUp.set(code, updatedAt);
     for (const [code, { updatedAt }] of this.#loaded) {
@@ -119,12 +137,21 @@ export class RhymingDictionaries {
     }
   }
 
+  /** Reads in what's kept of a dictionary, or, where that can't be read, downloads it again. */
   async #read(code: string) {
+    let kept;
     try {
-      const kept = await this.#store.get(code);
-      if (!kept) throw new Error(`${code} isn't kept`);
-      this.#take(kept);
-      await this.#refresh(kept);
+      kept = await this.#store.get(code);
+    } catch {
+      // Downloaded again below.
+    }
+    try {
+      if (kept) {
+        this.#take(kept);
+        await this.#refresh(kept);
+      } else {
+        await this.setUp(code);
+      }
     } catch {
       this.#asked.delete(code);
       this.#failed.add(code);
@@ -159,6 +186,7 @@ export class RhymingDictionaries {
   }
 
   async #keep(dictionary: StoredDictionary) {
+    this.#edits++;
     await this.#store.put(dictionary);
     this.#setUp.set(dictionary.code, dictionary.updatedAt);
     this.#failed.delete(dictionary.code);
@@ -172,6 +200,7 @@ export class RhymingDictionaries {
 
   /** Removes a Language's dictionary from this device. */
   async remove(code: string) {
+    this.#edits++;
     await this.#store.remove(code);
     this.#setUp.delete(code);
     this.#forget(code);

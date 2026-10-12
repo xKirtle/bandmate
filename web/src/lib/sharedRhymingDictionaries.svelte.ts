@@ -9,8 +9,8 @@ import { RhymingDictionaries } from './rhymingDictionaries.svelte';
 
 const tabs = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('bandmate.rhymingDictionaries');
 
-export const rhymingDictionaries = new RhymingDictionaries(dictionaryStore, api.getLanguageData, undefined, () =>
-  tabs?.postMessage('changed'),
-);
+export const rhymingDictionaries = new RhymingDictionaries(dictionaryStore, api.getLanguageData, {
+  changed: () => tabs?.postMessage('changed'),
+});
 
 tabs?.addEventListener('message', () => void rhymingDictionaries.relist());

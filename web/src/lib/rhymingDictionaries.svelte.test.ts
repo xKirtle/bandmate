@@ -42,7 +42,7 @@ let clock = 0;
 const now = () => new Date(Date.UTC(2026, 9, 12, 12, clock++));
 
 function page(store: FakeStore, server: FakeServer) {
-  return new RhymingDictionaries(store, server.download, now);
+  return new RhymingDictionaries(store, server.download, { now });
 }
 
 /** Lets the store's and server's answers come in. */
@@ -151,6 +151,41 @@ describe('rhyming dictionaries', () => {
     expect(dictionaries.isSetUp('en')).toBe(false);
     expect(dictionaries.loaded).toEqual([]);
     expect(store.kept.has('en')).toBe(false);
+  });
+
+  it("downloads it again when what's kept can't be read", async () => {
+    const store = new FakeStore();
+    const server = new FakeServer();
+    await page(store, server).setUp('en');
+    store.get = async () => {
+      throw new Error('IndexedDB broke');
+    };
+
+    const reloaded = page(store, server);
+    await settle();
+    reloaded.use(['en']);
+    await settle();
+    await settle();
+
+    expect(words(reloaded, 'en')).toEqual(['night']);
+  });
+
+  it('keeps one set up while it was listing which are', async () => {
+    const store = new FakeStore();
+    // The list as it was before setting up, answered only once that's done.
+    const stale = store.list();
+    let listed!: () => void;
+    const list = store.list.bind(store);
+    store.list = () => new Promise((resolve) => (listed = () => resolve(stale)));
+    const dictionaries = page(store, new FakeServer());
+    store.list = list;
+
+    await dictionaries.setUp('en');
+    listed();
+    await settle();
+    await settle();
+
+    expect(dictionaries.isSetUp('en')).toBe(true);
   });
 
   it("isn't set up when its download fails", async () => {

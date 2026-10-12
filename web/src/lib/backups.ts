@@ -199,7 +199,5 @@ export function replaceConfirmation(songs: BackupPresent[], beats: BackupPresent
   );
 }
 
-/** A Backup's size: "8 KB" under a megabyte, where "0.0 MB" would say nothing, and "4.2 MB" from there. */
-export function backupSize(bytes: number): string {
-  return formatSmallSize(bytes);
-}
+/** A Backup's size, as any size that may be small is written. */
+export const backupSize = formatSmallSize;
