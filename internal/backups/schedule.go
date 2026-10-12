@@ -68,7 +68,7 @@ const (
 	// Made means it made one.
 	Made Outcome = "made"
 	// Unchanged means it made none, as no Song or Beat had changed since it
-	// last made one.
+	// last made one, or there was nothing to back up.
 	Unchanged Outcome = "unchanged"
 	// Failed means it couldn't make one, so it's tried again at the next
 	// check.
@@ -97,39 +97,48 @@ func (s *Store) Schedule(ctx context.Context) (Schedule, error) {
 	return sch, err
 }
 
-// schedule returns the schedule, and whether no Song or Beat has changed
-// since it last made a Scheduled Backup.
-func (s *Store) schedule(ctx context.Context) (sch Schedule, unchanged bool, err error) {
+// schedule returns the schedule, and why a Scheduled Backup due now would be
+// skipped, as the log says it, or "" if it wouldn't: when there's nothing to
+// back up, or when no Song or Beat has changed since the schedule last made
+// one and that one, kept or not, hasn't been deleted.
+func (s *Store) schedule(ctx context.Context) (sch Schedule, skip string, err error) {
 	sch = DefaultSchedule
 	var lastMade, triedAt, outcome, failure sql.NullString
-	var changes int64
-	var changesWhenMade sql.NullInt64
+	var unchanged, empty bool
 	err = s.db.QueryRowContext(ctx, `SELECT turned_on, period, keep, last_made_at, tried_at, outcome, failure,
-		changes, changes_when_made FROM backup_schedule WHERE id = 1`).
-		Scan(&sch.On, &sch.Period, &sch.Keep, &lastMade, &triedAt, &outcome, &failure, &changes, &changesWhenMade)
+		changes_when_made IS changes AND EXISTS (SELECT 1 FROM backups WHERE id = last_made_id),
+		NOT EXISTS (SELECT 1 FROM songs) AND NOT EXISTS (SELECT 1 FROM beats)
+		FROM backup_schedule WHERE id = 1`).
+		Scan(&sch.On, &sch.Period, &sch.Keep, &lastMade, &triedAt, &outcome, &failure, &unchanged, &empty)
 	if errors.Is(err, sql.ErrNoRows) {
-		return DefaultSchedule, false, nil
+		return DefaultSchedule, "", nil
 	}
 	if err != nil {
-		return sch, false, fmt.Errorf("reading the backup schedule: %w", err)
+		return sch, "", fmt.Errorf("reading the backup schedule: %w", err)
 	}
 	if lastMade.Valid {
 		t, err := domain.ParseTime(lastMade.String)
 		if err != nil {
-			return sch, false, err
+			return sch, "", err
 		}
 		sch.LastMadeAt = &t
 	}
 	if triedAt.Valid {
 		t, err := domain.ParseTime(triedAt.String)
 		if err != nil {
-			return sch, false, err
+			return sch, "", err
 		}
 		sch.Last = &Try{At: t, Outcome: Outcome(outcome.String), Error: failure.String}
 	}
 	sch.Due = sch.On && (sch.Last == nil || sch.Last.Outcome == Failed ||
 		!s.now().Before(sch.Period.endsAfter(sch.Last.At)))
-	return sch, changesWhenMade.Valid && changesWhenMade.Int64 == changes, nil
+	switch {
+	case empty:
+		skip = "there's nothing to back up"
+	case unchanged:
+		skip = "nothing has changed since the last"
+	}
+	return sch, skip, nil
 }
 
 // changeTables are the tables whose every added, changed or deleted row
@@ -228,16 +237,17 @@ func (s *Store) runSchedule(ctx context.Context) {
 }
 
 // CheckSchedule makes a Scheduled Backup of Everything if one is due (see
-// Schedule.Due). However many periods have passed, it makes one. If no Song
-// or Beat has changed since it last made one, it makes none, and the next
-// is due a period from now. Once one is made, the oldest Scheduled Backups
+// Schedule.Due). However many periods have passed, it makes one. If there's
+// nothing to back up, or no Song or Beat has changed since it last made one
+// and that one hasn't been deleted, it makes none, and the next is due a
+// period from now. Once one is made, the oldest Scheduled Backups
 // beyond the number kept are deleted. A Backup that couldn't be made is
 // logged, and tried again at the next check. Each try is recorded, for the
 // schedule's status.
 func (s *Store) CheckSchedule(ctx context.Context) {
 	s.scheduling.Lock()
 	defer s.scheduling.Unlock()
-	sch, unchanged, err := s.schedule(ctx)
+	sch, skip, err := s.schedule(ctx)
 	if err != nil {
 		log.Printf("checking for a Scheduled Backup: %v", err)
 		return
@@ -245,8 +255,8 @@ func (s *Store) CheckSchedule(ctx context.Context) {
 	if !sch.Due {
 		return
 	}
-	if unchanged {
-		log.Printf("made no Scheduled Backup, as nothing has changed since the last")
+	if skip != "" {
+		log.Printf("made no Scheduled Backup, as %s", skip)
 		s.recordTry(ctx, Unchanged, "")
 		return
 	}

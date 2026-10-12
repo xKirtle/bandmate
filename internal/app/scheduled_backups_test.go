@@ -443,6 +443,45 @@ func TestAFailedScheduledBackupIsReportedAndTriedAgainAtTheNextCheck(t *testing.
 	}
 }
 
+func TestWithNothingToBackUpNoScheduledBackupIsMadeUntilAPeriodLater(t *testing.T) {
+	clock := newScheduleClock()
+	ts := newTestServerWith(t, func(c *app.Config) { c.Now = clock.Now })
+
+	ts.setSchedule(backupSchedule{On: true, Period: "weekly", Keep: 4})
+	ts.app.CheckBackupSchedule()
+
+	s := ts.schedule()
+	if s.Due || s.Last == nil || s.Last.Outcome != "unchanged" || !s.Last.At.Equal(clock.Now()) ||
+		s.Last.Error != "" || s.LastMadeAt != nil {
+		t.Fatalf("schedule = %+v, last = %+v, want nothing to back up now, never made, not due", s, s.Last)
+	}
+
+	ts.createSong("Night Drive")
+	clock.Advance(6 * 24 * time.Hour)
+	ts.app.CheckBackupSchedule()
+	if list := ts.listBackups(); len(list) != 0 {
+		t.Fatalf("within the week, backups = %+v, want none", list)
+	}
+	clock.Advance(24 * time.Hour)
+	ts.app.CheckBackupSchedule()
+	if list := ts.listBackups(); len(list) != 1 || !list[0].Scheduled {
+		t.Errorf("a week later, with a Song, backups = %+v, want a Scheduled Backup", list)
+	}
+}
+
+func TestAScheduledBackupDeletedIsMadeAgainThoughNothingHasChanged(t *testing.T) {
+	clock := newScheduleClock()
+	ts := scheduledServer(t, clock, backupSchedule{On: true, Period: "weekly", Keep: 4})
+	expectStatus(t, ts.Do(http.MethodDelete, backupPath(ts.listBackups()[0].ID), nil), http.StatusNoContent)
+
+	clock.Advance(7 * 24 * time.Hour)
+	ts.app.CheckBackupSchedule()
+
+	if list := ts.listBackups(); len(list) != 1 || !list[0].Scheduled {
+		t.Errorf("backups = %+v, want a new Scheduled Backup", list)
+	}
+}
+
 func TestSweepingWhatUndoKeptAtStartUpIsNoChange(t *testing.T) {
 	// Undo's leftovers are swept by when they were left, by the real clock.
 	clock := &testClock{now: time.Now().UTC()}

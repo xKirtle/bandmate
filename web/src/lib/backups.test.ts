@@ -382,6 +382,12 @@ describe('scheduleStatus', () => {
     });
   });
 
+  it('says there is nothing to back up yet when none was made, as there was nothing', () => {
+    expect(scheduleStatus({ on: true, lastMadeAt: null, last: { at: daysAgo(1), outcome: 'unchanged' } }, now)).toEqual(
+      { text: 'There’s nothing to back up yet.', failed: false },
+    );
+  });
+
   it('says the last try failed, when and why, and that it is tried again', () => {
     expect(
       scheduleStatus(

@@ -381,7 +381,7 @@ func (s *Store) distinctExisting(ctx context.Context, table string, ids []int64,
 }
 
 // keep stores the Backup's file, made at path, under the id its row gets.
-// A Scheduled Backup records that the schedule made one, when, and the
+// A Scheduled Backup records that the schedule made it, when, and the
 // schedule's count of changes as it began, which other Backups ignore.
 func (s *Store) keep(ctx context.Context, path string, b Backup, changes int64) (Backup, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -396,14 +396,14 @@ func (s *Store) keep(ctx context.Context, path string, b Backup, changes int64) 
 	if err != nil {
 		return b, err
 	}
-	if b.Scheduled {
-		if _, err := tx.ExecContext(ctx, `UPDATE backup_schedule SET last_made_at = ?1, changes_when_made = ?2,
-			tried_at = ?1, outcome = 'made', failure = NULL`, made, changes); err != nil {
-			return b, err
-		}
-	}
 	if b.ID, err = res.LastInsertId(); err != nil {
 		return b, err
+	}
+	if b.Scheduled {
+		if _, err := tx.ExecContext(ctx, `UPDATE backup_schedule SET last_made_at = ?1, last_made_id = ?2,
+			changes_when_made = ?3, tried_at = ?1, outcome = 'made', failure = NULL`, made, b.ID, changes); err != nil {
+			return b, err
+		}
 	}
 	if err := os.Rename(path, s.path(b.ID)); err != nil {
 		return b, fmt.Errorf("keeping backup: %w", err)
