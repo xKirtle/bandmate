@@ -23,11 +23,11 @@ type backupSchedule struct {
 	// LastMadeAt is when the schedule last made a Scheduled Backup.
 	LastMadeAt *time.Time `json:"lastMadeAt,omitempty"`
 	// Last is the schedule's last try at one, nil if it hasn't tried.
-	Last *scheduleAttempt `json:"last,omitempty"`
+	Last *scheduleTry `json:"last,omitempty"`
 }
 
-// scheduleAttempt is the schedule's last try at a Scheduled Backup.
-type scheduleAttempt struct {
+// scheduleTry is the schedule's last try at a Scheduled Backup.
+type scheduleTry struct {
 	At time.Time `json:"at"`
 	// Outcome is "made", "unchanged" or "failed".
 	Outcome string `json:"outcome"`
@@ -365,14 +365,14 @@ func TestAnyChangeToASongOrBeatMakesTheNextScheduledBackup(t *testing.T) {
 		}},
 		{"a Song added", func(ts *testServer, _ song, _ beat) { ts.createSong("Low Tide") }},
 		{"a Song deleted", func(ts *testServer, s song, _ beat) {
-			expectStatus(t, ts.Do(http.MethodDelete, songPath(s.ID), nil), http.StatusNoContent)
+			expectStatus(ts.t, ts.Do(http.MethodDelete, songPath(s.ID), nil), http.StatusNoContent)
 		}},
 		{"a Section added", func(ts *testServer, s song, _ beat) { ts.addSection(s.ID, map[string]any{"label": "Verse"}) }},
 		{"a Beat added", func(ts *testServer, _ song, _ beat) {
 			ts.uploadBeat(fakeAudio("low.mp3").with(map[string]any{"title": "Low"}))
 		}},
 		{"a Beat's details changed", func(ts *testServer, _ song, b beat) {
-			expectStatus(t, ts.Do(http.MethodPatch, beatPath(b.ID), map[string]any{"title": "Darker Trap"}), http.StatusOK)
+			expectStatus(ts.t, ts.Do(http.MethodPatch, beatPath(b.ID), map[string]any{"title": "Darker Trap"}), http.StatusOK)
 		}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
@@ -440,5 +440,27 @@ func TestAFailedScheduledBackupIsReportedAndTriedAgainAtTheNextCheck(t *testing.
 	}
 	if last := ts.schedule().Last; last.Outcome != "made" || last.Error != "" {
 		t.Errorf("last = %+v, want made, with no error", last)
+	}
+}
+
+func TestSweepingWhatUndoKeptAtStartUpIsNoChange(t *testing.T) {
+	// Undo's leftovers are swept by when they were left, by the real clock.
+	clock := &testClock{now: time.Now().UTC()}
+	ts := newTestServerWith(t, func(c *app.Config) { c.Now = clock.Now })
+	s, _, c := songWithSound(t, ts)
+	timelineChange(t, ts.deleteClip(s.ID, c.ID))
+	ts.setSchedule(backupSchedule{On: true, Period: "daily", Keep: 4})
+	ts.waitForBackups(1)
+
+	ts.Stop()
+	clock.Advance(2 * 24 * time.Hour)
+	ts = startTestServer(t, ts.DataDir, func(cfg *app.Config) { cfg.Now = clock.Now })
+	expectStatus(t, ts.Do(http.MethodGet, soundPath(s.ID, *c.SoundID), nil), http.StatusNotFound)
+	// The check at start-up may come before the sweep or after it.
+	clock.Advance(2 * 24 * time.Hour)
+	ts.app.CheckBackupSchedule()
+
+	if list := ts.listBackups(); len(list) != 1 {
+		t.Errorf("backups = %+v, want still 1, as the Sound swept is in none", list)
 	}
 }

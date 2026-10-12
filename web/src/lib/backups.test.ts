@@ -365,14 +365,18 @@ describe('scheduleStatus', () => {
   const daysAgo = (days: number) => new Date(now - days * 24 * 3600 * 1000).toISOString();
 
   it('says when the last Scheduled Backup was made', () => {
-    expect(scheduleStatus({ lastMadeAt: daysAgo(3), last: { at: daysAgo(3), outcome: 'made' } }, now)).toEqual({
+    expect(
+      scheduleStatus({ on: true, lastMadeAt: daysAgo(3), last: { at: daysAgo(3), outcome: 'made' } }, now),
+    ).toEqual({
       text: 'Last made 3 days ago.',
       failed: false,
     });
   });
 
   it('says nothing has changed since the last, and when that was made', () => {
-    expect(scheduleStatus({ lastMadeAt: daysAgo(14), last: { at: daysAgo(7), outcome: 'unchanged' } }, now)).toEqual({
+    expect(
+      scheduleStatus({ on: true, lastMadeAt: daysAgo(14), last: { at: daysAgo(7), outcome: 'unchanged' } }, now),
+    ).toEqual({
       text: 'Nothing has changed since the last one, made 2 weeks ago.',
       failed: false,
     });
@@ -381,7 +385,7 @@ describe('scheduleStatus', () => {
   it('says the last try failed, when and why, and that it is tried again', () => {
     expect(
       scheduleStatus(
-        { lastMadeAt: daysAgo(7), last: { at: daysAgo(1), outcome: 'failed', error: 'the disk is full' } },
+        { on: true, lastMadeAt: daysAgo(7), last: { at: daysAgo(1), outcome: 'failed', error: 'the disk is full' } },
         now,
       ),
     ).toEqual({
@@ -390,7 +394,16 @@ describe('scheduleStatus', () => {
     });
   });
 
+  it('promises no new try while the schedule is off', () => {
+    expect(
+      scheduleStatus(
+        { on: false, lastMadeAt: null, last: { at: daysAgo(1), outcome: 'failed', error: 'the disk is full' } },
+        now,
+      ),
+    ).toEqual({ text: 'Couldn’t make one yesterday (the disk is full).', failed: true });
+  });
+
   it('says nothing before the schedule has tried to make one', () => {
-    expect(scheduleStatus({ lastMadeAt: null, last: null }, now)).toBeNull();
+    expect(scheduleStatus({ on: true, lastMadeAt: null, last: null }, now)).toBeNull();
   });
 });

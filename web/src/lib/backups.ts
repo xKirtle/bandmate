@@ -236,13 +236,14 @@ export function extrasNote(
  * How the schedule is doing, as the Scheduled Backups card says it under
  * its settings: when it last made one, that nothing has changed since, or
  * that its last try failed, when and why, which is `failed` so it's shown as
- * an error; null before it has tried to make one.
+ * an error, and while it's on, that it's tried again; null before it has
+ * tried to make one.
  */
 export function scheduleStatus(
-  schedule: Pick<BackupSchedule, 'lastMadeAt' | 'last'>,
+  schedule: Pick<BackupSchedule, 'on' | 'lastMadeAt' | 'last'>,
   now = Date.now(),
 ): { text: string; failed: boolean } | null {
-  const { last, lastMadeAt } = schedule;
+  const { on, last, lastMadeAt } = schedule;
   if (!last) return null;
   switch (last.outcome) {
     case 'made':
@@ -256,7 +257,9 @@ export function scheduleStatus(
       };
     case 'failed':
       return {
-        text: `Couldn’t make one ${timeAgo(last.at, now)} (${last.error}). Bandmate tries again within the hour.`,
+        text:
+          `Couldn’t make one ${timeAgo(last.at, now)} (${last.error}).` +
+          (on ? ' Bandmate tries again within the hour.' : ''),
         failed: true,
       };
   }

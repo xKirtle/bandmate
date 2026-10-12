@@ -58,7 +58,7 @@ type Schedule struct {
 	// it never has.
 	LastMadeAt *time.Time `json:"lastMadeAt"`
 	// Last is the schedule's last try at one, nil if it hasn't tried.
-	Last *Attempt `json:"last"`
+	Last *Try `json:"last"`
 }
 
 // Outcome is how a try at a Scheduled Backup ended.
@@ -75,9 +75,9 @@ const (
 	Failed Outcome = "failed"
 )
 
-// Attempt is a try at a Scheduled Backup: when, how it ended, and, if it
+// Try is a try at a Scheduled Backup: when, how it ended, and, if it
 // failed, why.
-type Attempt struct {
+type Try struct {
 	At      time.Time `json:"at"`
 	Outcome Outcome   `json:"outcome"`
 	Error   string    `json:"error,omitempty"`
@@ -125,7 +125,7 @@ func (s *Store) schedule(ctx context.Context) (sch Schedule, unchanged bool, err
 		if err != nil {
 			return sch, false, err
 		}
-		sch.Last = &Attempt{At: t, Outcome: Outcome(outcome.String), Error: failure.String}
+		sch.Last = &Try{At: t, Outcome: Outcome(outcome.String), Error: failure.String}
 	}
 	sch.Due = sch.On && (sch.Last == nil || sch.Last.Outcome == Failed ||
 		!s.now().Before(sch.Period.endsAfter(sch.Last.At)))
@@ -146,6 +146,14 @@ func changeTables() []string {
 	return tables
 }
 
+// sweptUnseen picks, for a table whose rows kept only for undo are swept at
+// start-up, the rows a Backup holds, so sweeping the others, which no
+// Backup holds, isn't a change.
+var sweptUnseen = map[string]string{
+	"takes":  "OLD.detached_at IS NULL",
+	"sounds": "OLD.unused_since IS NULL",
+}
+
 // countChanges makes the database count every change to a Song or Beat in
 // the schedule's changes, so whether anything has changed since the last
 // Scheduled Backup is one comparison, however much there is. Its triggers
@@ -154,8 +162,13 @@ func changeTables() []string {
 func countChanges(ctx context.Context, conn *sql.DB) error {
 	for _, table := range changeTables() {
 		for _, op := range []string{"INSERT", "UPDATE", "DELETE"} {
+			when := "TRUE"
+			if held, ok := sweptUnseen[table]; ok && op == "DELETE" {
+				when = held
+			}
 			_, err := conn.ExecContext(ctx, fmt.Sprintf(`CREATE TRIGGER IF NOT EXISTS "count_change_%[1]s_%[2]s"
-				AFTER %[2]s ON "%[1]s" BEGIN UPDATE backup_schedule SET changes = changes + 1; END`, table, op))
+				AFTER %[2]s ON "%[1]s" WHEN %[3]s
+				BEGIN UPDATE backup_schedule SET changes = changes + 1; END`, table, op, when))
 			if err != nil {
 				return fmt.Errorf("counting changes to %s: %w", table, err)
 			}
