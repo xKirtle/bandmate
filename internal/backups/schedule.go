@@ -20,16 +20,18 @@ const (
 	Monthly Period = "monthly"
 )
 
-// after is when a period that starts at t ends.
-func (p Period) after(t time.Time) time.Time {
-	switch p {
-	case Daily:
-		return t.AddDate(0, 0, 1)
-	case Monthly:
-		return t.AddDate(0, 1, 0)
-	default:
-		return t.AddDate(0, 0, 7)
-	}
+// periodLength is how long each Period is, in months and days, so a monthly
+// one ends on the same day of the next month.
+var periodLength = map[Period]struct{ months, days int }{
+	Daily:   {0, 1},
+	Weekly:  {0, 7},
+	Monthly: {1, 0},
+}
+
+// endsAfter is when a period that starts at t ends.
+func (p Period) endsAfter(t time.Time) time.Time {
+	l := periodLength[p]
+	return t.AddDate(0, l.months, l.days)
 }
 
 // The fewest and most Scheduled Backups the schedule can keep.
@@ -85,9 +87,7 @@ func (s *Store) readSchedule(ctx context.Context) (Schedule, time.Time, error) {
 // Neither turning it off nor keeping fewer deletes a Backup: the extras go
 // when the next one is made.
 func (s *Store) SetSchedule(ctx context.Context, sch Schedule) (Schedule, error) {
-	switch sch.Period {
-	case Daily, Weekly, Monthly:
-	default:
+	if _, ok := periodLength[sch.Period]; !ok {
 		return Schedule{}, domain.Invalid("a schedule is daily, weekly or monthly")
 	}
 	if sch.Keep < MinKeep || sch.Keep > MaxKeep {
@@ -140,7 +140,7 @@ func (s *Store) CheckSchedule(ctx context.Context) {
 		log.Printf("checking for a Scheduled Backup: %v", err)
 		return
 	}
-	if !sch.On || (!lastMade.IsZero() && s.now().Before(sch.Period.after(lastMade))) {
+	if !sch.On || (!lastMade.IsZero() && s.now().Before(sch.Period.endsAfter(lastMade))) {
 		return
 	}
 	b, err := s.make(ctx, Contents{AllSongs: true, BeatLibrary: true}, true)

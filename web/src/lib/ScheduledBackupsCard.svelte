@@ -23,8 +23,10 @@
   let schedule = $state<BackupSchedule | null>(null);
   let loadError = $state<string | null>(null);
   let error = $state<string | null>(null);
-  /** How many changes have been sent, so only the latest one's answer is shown. */
+  /** How many changes have been made, so only the latest one's answer is shown. */
   let sent = 0;
+  /** The change being saved, which the next waits for, so the server saves them in the order they were made. */
+  let saving: Promise<unknown> = Promise.resolve();
 
   api.backupSchedule().then(
     (s) => (schedule = s),
@@ -39,8 +41,10 @@
     schedule = next;
     error = null;
     const mine = ++sent;
+    const save = saving.then(() => api.setBackupSchedule(next));
+    saving = save.catch(() => {});
     try {
-      const saved = await api.setBackupSchedule(next);
+      const saved = await save;
       if (mine === sent) schedule = saved;
       if (saved.on && !was.on) onTurnedOn();
     } catch (e) {

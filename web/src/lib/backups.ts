@@ -231,7 +231,7 @@ export function extrasNote(
     : `The ${extras} oldest Scheduled Backups go when the next one is made.`;
 }
 
-/** A Backup's size:"8 KB" under a megabyte, where "0.0 MB" would say nothing, and "4.2 MB" from there. */
+/** A Backup's size: "8 KB" under a megabyte, where "0.0 MB" would say nothing, and "4.2 MB" from there. */
 export function backupSize(bytes: number): string {
   return bytes < 1 << 20 ? `${Math.ceil(bytes / 1024)} KB` : formatSize(bytes);
 }

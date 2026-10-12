@@ -167,9 +167,9 @@ A Backup restores into the same version of Bandmate or a newer one. To copy ever
 
 ### Scheduled Backups
 
-Turn on **Make Backups on a schedule**, choose daily, weekly or monthly, and Bandmate backs up everything on its own: once straight away, then again each time that long has passed since the last one. If Bandmate was off when one came due, it makes one when it starts, just one however long it was off. The schedule is the same from every device.
+Turn on **Make Backups on a schedule**, choose daily, weekly or monthly, and Bandmate backs up everything on its own: the first time straight away, then again each time that long has passed since the last one. If Bandmate was off when one came due, it makes one when it starts, just one however long it was off. The schedule is the same from every device.
 
-Each is marked **Scheduled** in the list, and you can restore, download, rename or delete it like any other. Bandmate keeps only the newest Scheduled Backups, as many as you choose from 1 to 30, and deletes the oldest when a new one is made. Backups you make or upload are never deleted. Keeping fewer, or turning the schedule off, deletes nothing at once: the extras go when the next one is made. To keep a Scheduled Backup for good, download it.
+Each is marked **Scheduled** in the list, and you can restore, download, rename or delete it like any other. Bandmate keeps only the newest Scheduled Backups, as many as you choose from 1 to 30, and deletes the oldest when a new one is made. Backups you make or upload are never deleted. Keeping fewer, or turning the schedule off, deletes nothing at once: the extras go when the next one is made. To keep a copy that's never deleted, download it.
 
 If one doesn't appear when you expect it, check Bandmate's log: a Scheduled Backup that couldn't be made, for example because the disk is full, says why there, and is tried again within the hour.
 

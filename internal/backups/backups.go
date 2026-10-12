@@ -171,10 +171,11 @@ func (s *Store) Rename(ctx context.Context, id int64, name string) (Backup, erro
 	return s.get(ctx, id)
 }
 
-// Delete deletes a Backup and its file, freeing its space. Nothing else
-// deletes a Backup, but the schedule deleting its oldest Scheduled Backups. Its row goes only once its file has, so a Backup still
-// listed can always be deleted again, and one gone from the list has freed
-// its space.
+// Delete deletes a Backup and its file, freeing its space. It's how the user
+// deletes one, and how the schedule deletes its oldest Scheduled Backups;
+// nothing else deletes a Backup. Its row goes only once its file has, so a
+// Backup still listed can always be deleted again, and one gone from the
+// list has freed its space.
 func (s *Store) Delete(ctx context.Context, id int64) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
