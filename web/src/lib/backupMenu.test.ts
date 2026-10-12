@@ -8,6 +8,9 @@ group('backupActions', () => {
   const run = { restore: () => {}, keep: () => {}, rename: () => {}, remove: () => {} };
   const labels = (backup: typeof ordinary, wide: boolean) =>
     backupActions(backup, { wide, download: '/api/backups/7/file' }, run).map((a) => a.label);
+  /** The action labelled `label` in a Backup's ⋯. */
+  const action = (label: string, backup: typeof ordinary, wide: boolean, runs = run) =>
+    backupActions(backup, { wide, download: '/api/backups/7/file' }, runs).find((a) => a.label === label);
 
   it('offers Rename… and Delete… beside Restore and Download, and Restore… and Download in ⋯ on a phone', () => {
     expect(labels(ordinary, true)).toEqual(['Rename…', 'Delete…']);
@@ -17,15 +20,16 @@ group('backupActions', () => {
   it('offers Keep, with the lock, for a Scheduled Backup only', () => {
     expect(labels(scheduled, true)).toEqual(['Keep', 'Rename…', 'Delete…']);
     expect(labels(scheduled, false)).toEqual(['Restore…', 'Download', 'Keep', 'Rename…', 'Delete…']);
-    const keep = backupActions(scheduled, { wide: true, download: '' }, run)[0];
-    expect(keep.icon).toBe(Lock);
-    expect(keep.title).toBe('Keep it, so it’s never deleted automatically');
+    expect(action('Keep', scheduled, true)).toMatchObject({
+      icon: Lock,
+      title: 'Keep it, so it’s never deleted automatically',
+    });
   });
 
   it('runs Keep', () => {
     let kept = false;
-    const keep = backupActions(scheduled, { wide: true, download: '' }, { ...run, keep: () => (kept = true) })[0];
-    if ('run' in keep) keep.run();
+    const keep = action('Keep', scheduled, true, { ...run, keep: () => (kept = true) });
+    if (keep && 'run' in keep) keep.run();
     expect(kept).toBe(true);
   });
 
@@ -34,7 +38,6 @@ group('backupActions', () => {
   });
 
   it('downloads the Backup’s file from Download', () => {
-    const download = backupActions(ordinary, { wide: false, download: '/api/backups/7/file' }, run)[1];
-    expect(download).toMatchObject({ label: 'Download', download: '/api/backups/7/file' });
+    expect(action('Download', ordinary, false)).toMatchObject({ download: '/api/backups/7/file' });
   });
 });

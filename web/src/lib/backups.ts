@@ -268,6 +268,11 @@ export function scheduleStatus(
   }
 }
 
+/** Whether a Backup holds anything to restore: Songs or Beats. */
+export function restorable(backup: Pick<Backup, 'songs' | 'beats'>): boolean {
+  return backup.songs > 0 || backup.beats > 0;
+}
+
 /** A Backup's size: "8 KB" under a megabyte, where "0.0 MB" would say nothing, and "4.2 MB" from there. */
 export function backupSize(bytes: number): string {
   return bytes < 1 << 20 ? `${Math.ceil(bytes / 1024)} KB` : formatSize(bytes);

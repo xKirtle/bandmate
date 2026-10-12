@@ -15,7 +15,7 @@
   import { MediaQuery } from 'svelte/reactivity';
   import ActionsMenu from '../lib/ActionsMenu.svelte';
   import { api, type Backup } from '../lib/api';
-  import { automaticName, backupName, backupSize } from '../lib/backups';
+  import { automaticName, backupName, backupSize, restorable } from '../lib/backups';
   import { backupActions } from '../lib/backupMenu';
   import { addedNote, BackupUploads, failedNote } from '../lib/backupUploads.svelte';
   import FileDrop from '../lib/FileDrop.svelte';
@@ -180,9 +180,6 @@
       error = `Couldn't keep “${backupName(backup)}” (${(e as Error).message})`;
     }
   }
-
-  /** Whether a Backup holds anything to restore: Songs or Beats. */
-  const restorable = (backup: Backup) => backup.songs > 0 || backup.beats > 0;
 
   const actions = (backup: Backup) =>
     backupActions(

@@ -4,6 +4,7 @@ import Lock from '@lucide/svelte/icons/lock';
 import Pencil from '@lucide/svelte/icons/pencil';
 import Trash2 from '@lucide/svelte/icons/trash-2';
 import type { Backup } from './api';
+import { restorable } from './backups';
 import type { MenuAction } from './menu';
 
 // A Backup's ⋯ in Settings' Backups tab. Wider than a phone, its Restore
@@ -15,6 +16,7 @@ import type { MenuAction } from './menu';
 export type BackupRun = {
   /** Opens Restore, to pick what to bring back from it. */
   restore: () => void;
+  /** Keeps a Scheduled Backup, making it ordinary. */
   keep: () => void;
   /** Opens Rename. */
   rename: () => void;
@@ -34,8 +36,7 @@ export function backupActions(
 ): MenuAction[] {
   const actions: MenuAction[] = [];
   if (!wide) {
-    if (backup.songs > 0 || backup.beats > 0)
-      actions.push({ icon: ArchiveRestore, label: 'Restore…', run: run.restore });
+    if (restorable(backup)) actions.push({ icon: ArchiveRestore, label: 'Restore…', run: run.restore });
     actions.push({ icon: Download, label: 'Download', download });
   }
   if (backup.scheduled) {

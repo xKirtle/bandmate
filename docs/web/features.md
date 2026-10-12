@@ -171,7 +171,7 @@ Turn on **Make Backups on a schedule**, choose daily, weekly or monthly, and Ban
 
 Each is marked **Scheduled** in the list, and you can restore, download, rename or delete it like any other. Bandmate keeps only the newest Scheduled Backups, as many as you choose from 1 to 30, and deletes the oldest when a new one is made. Backups you make or upload are never deleted. Choosing fewer, or turning the schedule off, deletes nothing at once: the extras go when the next one is made.
 
-To hold on to a Scheduled Backup, say one from before a big change, choose **Keep** in its ⋯ menu. It's then like a Backup you made: no longer marked Scheduled, not counted among those kept, and never deleted unless you delete it. Keeping the newest doesn't bring the next one sooner, or make a copy of it.
+To hold on to a Scheduled Backup, say one from before a big change, choose **Keep** in its ⋯ menu. It's then like a Backup you made: no longer marked Scheduled, not counted among those kept, and never deleted unless you delete it.
 
 Under the settings, the card says when the last Scheduled Backup was made, that nothing has changed since, or that there's nothing to back up. If one couldn't be made, for example because the disk is full, the card says why, as does Bandmate's log. Fix the cause and Bandmate makes it at its next try, within the hour.
 

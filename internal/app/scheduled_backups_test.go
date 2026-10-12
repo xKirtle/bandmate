@@ -606,6 +606,16 @@ func TestKeepingTheNewestScheduledBackupMakesNoneSoonerOrIdentical(t *testing.T)
 	}
 }
 
+func TestKeepingAnOrdinaryBackupChangesNothing(t *testing.T) {
+	ts := newTestServer(t)
+	ts.createSong("Night Drive")
+	made := ts.backUp(map[string]any{"allSongs": true})
+
+	if kept := ts.keepBackup(made.ID); kept != made {
+		t.Errorf("kept = %+v, want it as it was, %+v", kept, made)
+	}
+}
+
 func TestKeepingABackupThatIsntThereIsNotFound(t *testing.T) {
 	ts := newTestServer(t)
 
