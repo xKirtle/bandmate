@@ -24,7 +24,7 @@ Write lyrics the way you would in a notebook, with the chords right where you pl
 7. **Alternates**: other versions of a section. Write a few, and pick the one the song uses. The others wait here until you change your mind.
 8. **Line timings**: when each line starts in the song, set as you [sync](#sync). They appear once the [timeline](#timeline) has some audio on it: a beat, a take or another sound.
 9. **Scrapbook**: sections that aren't in the song: leftovers and ideas to come back to.
-10. **Rhymes**: suggests rhymes for the word you're writing, see [Rhymes](#rhymes).
+10. **Rhymes**: suggestions for the word you're writing. See [Rhymes](#rhymes).
 
 And this is Read mode, here on a phone: the chords over the words, and how to play each one at the top. The button at the top right sets the text size, hides or transposes the chords, and shows or pins the chord shapes.
 
@@ -34,16 +34,16 @@ Hover or tap a chord, or tap its shape at the top, to step through the other way
 
 ### Rhymes
 
-On a wide window, like a desktop's, the **Rhymes** button suggests rhymes for the word you're writing. On a phone, a tablet or a smaller window, it isn't there.
+The **Rhymes** button suggests rhymes for the word you're writing. It's there on a wide window, like a desktop's, and can't be on while you [sync](#sync).
 
 - Download a rhyming dictionary for each language you write in, in **Settings → Rhyming dictionaries**, on each device you write on.
 - A song's rhymes are in the languages set in its details.
 
 Where the rhymes come from:
 
-- **English**: the [CMU Pronouncing Dictionary](https://github.com/cmusphinx/cmudict), under the [BSD-2-Clause licence](https://github.com/cmusphinx/cmudict/blob/master/LICENSE).
+- **English**: the [CMU Pronouncing Dictionary](https://github.com/cmusphinx/cmudict), under the [BSD-2-Clause license](https://github.com/cmusphinx/cmudict/blob/master/LICENSE).
 - **Portuguese**: LibreOffice's [Hunspell dictionary for European Portuguese](https://github.com/LibreOffice/dictionaries/tree/master/pt_PT), under the [LGPL-2.1](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html).
-- **Their order**, common words first: [FrequencyWords](https://github.com/hermitdave/FrequencyWords) by Hermit Dave, from the [OpenSubtitles 2018 corpus](https://opus.nlpl.eu/legacy/OpenSubtitles-v2018.php), under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+- **The order**, most common words first: [FrequencyWords](https://github.com/hermitdave/FrequencyWords) by Hermit Dave, from the [OpenSubtitles 2018 corpus](https://opus.nlpl.eu/legacy/OpenSubtitles-v2018.php), under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
 
 Want rhymes in your language? See [Adding a rhyming language](https://github.com/xKirtle/bandmate/blob/main/CONTRIBUTING.md#adding-a-rhyming-language).
 
