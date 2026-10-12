@@ -163,9 +163,11 @@ export class Bandmate {
 
   /**
    * Empties Bandmate: every Song (and with them their Tags), Folder, Beat and
-   * Backup. Each test starts with it, as the worker's server is shared.
+   * Backup, with the Backup schedule as on a new install. Each test starts
+   * with it, as the worker's server is shared.
    */
   async wipe(): Promise<void> {
+    await ok(this.api.put('/api/backups/schedule', { data: { on: false, period: 'weekly', keep: 4 } }));
     for (const folder of await this.folders()) {
       await ok(this.api.delete(`/api/folders/${folder.id}?songs=delete`));
     }

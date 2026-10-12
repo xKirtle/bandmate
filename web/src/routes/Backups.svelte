@@ -4,9 +4,11 @@
   // own, with its size, and downloadable as one file. A downloaded one, from
   // here or another install, can be uploaded to join them, picked or
   // dropped, several at once. Songs can be restored from each that holds
-  // some. Each can be renamed, or deleted after confirming; nothing deletes
-  // one otherwise. On a phone, a Backup's Restore and Download fold into its
-  // ⋯, with Rename and Delete.
+  // some. Each can be renamed, or deleted after confirming. Above them, the
+  // Scheduled Backups card sets the schedule Bandmate makes Backups of
+  // Everything on, marked Scheduled in the list; the schedule deletes only
+  // its own oldest ones, and nothing else deletes one. On a phone, a Backup's
+  // Restore and Download fold into its ⋯, with Rename and Delete.
   import ArchiveRestore from '@lucide/svelte/icons/archive-restore';
   import Download from '@lucide/svelte/icons/download';
   import Pencil from '@lucide/svelte/icons/pencil';
@@ -24,6 +26,7 @@
   import NewBackupDialog from '../lib/NewBackupDialog.svelte';
   import RenameBackupDialog from '../lib/RenameBackupDialog.svelte';
   import RestoreBackupDialog from '../lib/RestoreBackupDialog.svelte';
+  import ScheduledBackupsCard from '../lib/ScheduledBackupsCard.svelte';
   import SettingsPage from '../lib/SettingsPage.svelte';
 
   let backups = $state<Backup[] | null>(null);
@@ -52,11 +55,42 @@
   const highlightFor = 2000;
   let list = $state<HTMLUListElement>();
 
+  /** Looks for the Scheduled Backup being made in the background, until it's listed. */
+  let watchTimer: ReturnType<typeof setTimeout> | undefined;
+  /** How often, in ms, and how many times, to look for it: for a few minutes, as a big one takes a while. */
+  const watchEvery = 2000;
+  const watchTimes = 90;
+
   // Switching Settings tabs, or leaving Settings, stops the uploads quietly.
   onDestroy(() => {
     uploads.stop();
     clearTimeout(highlightTimer);
+    clearTimeout(watchTimer);
   });
+
+  /**
+   * Once the schedule is turned on, a Scheduled Backup is made in the
+   * background, so the list is read again until a new one shows, with
+   * the oldest beyond those kept gone.
+   */
+  function watchForScheduled() {
+    clearTimeout(watchTimer);
+    const known = new Set((backups ?? []).filter((b) => b.scheduled).map((b) => b.id));
+    let left = watchTimes;
+    const look = async () => {
+      try {
+        const list = await api.listBackups();
+        if (list.some((b) => b.scheduled && !known.has(b.id))) {
+          backups = list;
+          return;
+        }
+      } catch {
+        // Looked for again, as listing failing once says nothing.
+      }
+      if (--left > 0) watchTimer = setTimeout(look, watchEvery);
+    };
+    watchTimer = setTimeout(look, watchEvery);
+  }
 
   // Closing or reloading the page would stop the uploads, so ask first.
   function warnBeforeUnload(event: BeforeUnloadEvent) {
@@ -185,105 +219,109 @@
 {/snippet}
 
 <SettingsPage tab="backups">
-  <section class="card" aria-labelledby="backups-heading">
-    <div class="head">
-      <h2 id="backups-heading">Backups</h2>
-      <!-- Only once there's a list for them to add to. -->
-      {#if backups !== null}
-        <div class="head-actions">
-          <label class="button">
-            Upload
-            <input class="visually-hidden" type="file" accept=".bandmate" multiple onchange={pick} />
-          </label>
-          <button type="button" class="button primary" onclick={() => (making = true)}>New Backup</button>
-        </div>
-      {/if}
-    </div>
-    {#if error}
-      <div class="message" role="alert">
-        <span class="error">{error}</span>
-        {@render dismiss(() => (error = null))}
-      </div>
-    {/if}
-    {#if uploads.failures.length > 0}
-      <div class="message" role="alert">
-        <span class="error">{failedNote(uploads.failures)}</span>
-        {@render dismiss(() => uploads.dismissFailures())}
-      </div>
-    {/if}
-    {#if uploads.current}
-      {@const { file, progress } = uploads.current}
-      <div class="message">
-        <!-- The percentage is left out of what's announced, so a screen reader
-             says each step once; the bar tells how far it has got. -->
-        <span class="muted">
-          <span role="status">{progress.step === 'sending' ? `Uploading “${file}”…` : `Checking “${file}”…`}</span>
-          {#if progress.step === 'sending'}<span class="tabular" aria-hidden="true"
-              >{Math.floor(progress.sent * 100)}%</span
-            >{/if}
-          {#if uploads.count}<span class="tabular">· {uploads.count.at} of {uploads.count.of}</span>{/if}
-        </span>
-        <!-- Without a value while checking: how long that takes isn't known. -->
-        {#if progress.step === 'sending'}
-          <progress max="1" value={progress.sent} aria-label="How much of the Backup has been sent"></progress>
-          <button type="button" class="button" onclick={() => uploads.cancel()}>Cancel</button>
-        {:else}
-          <progress aria-label="Checking the Backup"></progress>
+  <div class="cards">
+    <ScheduledBackupsCard {backups} onTurnedOn={watchForScheduled} />
+    <section class="card" aria-labelledby="backups-heading">
+      <div class="head">
+        <h2 id="backups-heading">Backups</h2>
+        <!-- Only once there's a list for them to add to. -->
+        {#if backups !== null}
+          <div class="head-actions">
+            <label class="button">
+              Upload
+              <input class="visually-hidden" type="file" accept=".bandmate" multiple onchange={pick} />
+            </label>
+            <button type="button" class="button primary" onclick={() => (making = true)}>New Backup</button>
+          </div>
         {/if}
       </div>
-    {:else if uploaded}
-      <div class="message">
-        <span class="muted" role="status">{uploaded}</span>
-        {@render dismiss(() => (uploaded = null))}
-      </div>
-    {/if}
-    {#if loadError}
-      <p class="error" role="alert">{loadError}</p>
-    {:else if backups === null}
-      <p class="muted">Loading…</p>
-    {:else if backups.length === 0}
-      <div class="empty">
-        <p>No Backups yet.</p>
-        <p class="muted">
-          A Backup is a copy of chosen Songs and Beats, kept here to restore from, and downloadable as one file to keep
-          elsewhere. Upload or drop one downloaded before, here or on another install, to restore from it.
-        </p>
-      </div>
-    {:else}
-      <ul class="backups" bind:this={list}>
-        {#each backups as backup (backup.id)}
-          <li data-backup={backup.id} class:highlighted={highlighted.includes(backup.id)}>
-            <div class="about">
-              <span class="name">{backupName(backup)}</span>
-              <span class="muted details">
-                {#if backup.name}{automaticName(backup)} ·{/if}
-                Made at {timeFormat.format(new Date(backup.createdAt))} · {backupSize(backup.size)}
-              </span>
-            </div>
-            <div class="row-actions">
-              {#if wide.current}
-                {#if restorable(backup)}
-                  <button
-                    type="button"
+      {#if error}
+        <div class="message" role="alert">
+          <span class="error">{error}</span>
+          {@render dismiss(() => (error = null))}
+        </div>
+      {/if}
+      {#if uploads.failures.length > 0}
+        <div class="message" role="alert">
+          <span class="error">{failedNote(uploads.failures)}</span>
+          {@render dismiss(() => uploads.dismissFailures())}
+        </div>
+      {/if}
+      {#if uploads.current}
+        {@const { file, progress } = uploads.current}
+        <div class="message">
+          <!-- The percentage is left out of what's announced, so a screen reader
+             says each step once; the bar tells how far it has got. -->
+          <span class="muted">
+            <span role="status">{progress.step === 'sending' ? `Uploading “${file}”…` : `Checking “${file}”…`}</span>
+            {#if progress.step === 'sending'}<span class="tabular" aria-hidden="true"
+                >{Math.floor(progress.sent * 100)}%</span
+              >{/if}
+            {#if uploads.count}<span class="tabular">· {uploads.count.at} of {uploads.count.of}</span>{/if}
+          </span>
+          <!-- Without a value while checking: how long that takes isn't known. -->
+          {#if progress.step === 'sending'}
+            <progress max="1" value={progress.sent} aria-label="How much of the Backup has been sent"></progress>
+            <button type="button" class="button" onclick={() => uploads.cancel()}>Cancel</button>
+          {:else}
+            <progress aria-label="Checking the Backup"></progress>
+          {/if}
+        </div>
+      {:else if uploaded}
+        <div class="message">
+          <span class="muted" role="status">{uploaded}</span>
+          {@render dismiss(() => (uploaded = null))}
+        </div>
+      {/if}
+      {#if loadError}
+        <p class="error" role="alert">{loadError}</p>
+      {:else if backups === null}
+        <p class="muted">Loading…</p>
+      {:else if backups.length === 0}
+        <div class="empty">
+          <p>No Backups yet.</p>
+          <p class="muted">
+            A Backup is a copy of chosen Songs and Beats, kept here to restore from, and downloadable as one file to
+            keep elsewhere. Upload or drop one downloaded before, here or on another install, to restore from it.
+          </p>
+        </div>
+      {:else}
+        <ul class="backups" bind:this={list}>
+          {#each backups as backup (backup.id)}
+            <li data-backup={backup.id} class:highlighted={highlighted.includes(backup.id)}>
+              <div class="about">
+                <span class="name">{backupName(backup)}</span>
+                <span class="muted details">
+                  {#if backup.name}{automaticName(backup)} ·{/if}
+                  Made at {timeFormat.format(new Date(backup.createdAt))} · {backupSize(backup.size)}
+                  {#if backup.scheduled}<span class="badge scheduled">Scheduled</span>{/if}
+                </span>
+              </div>
+              <div class="row-actions">
+                {#if wide.current}
+                  {#if restorable(backup)}
+                    <button
+                      type="button"
+                      class="button"
+                      onclick={() => (restoring = backup)}
+                      aria-label="Restore from {backupName(backup)}">Restore</button
+                    >
+                  {/if}
+                  <a
                     class="button"
-                    onclick={() => (restoring = backup)}
-                    aria-label="Restore from {backupName(backup)}">Restore</button
+                    href={api.backupDownloadUrl(backup.id)}
+                    download
+                    aria-label="Download {backupName(backup)}">Download</a
                   >
                 {/if}
-                <a
-                  class="button"
-                  href={api.backupDownloadUrl(backup.id)}
-                  download
-                  aria-label="Download {backupName(backup)}">Download</a
-                >
-              {/if}
-              <ActionsMenu label="More actions for {backupName(backup)}" entries={actions(backup)} />
-            </div>
-          </li>
-        {/each}
-      </ul>
-    {/if}
-  </section>
+                <ActionsMenu label="More actions for {backupName(backup)}" entries={actions(backup)} />
+              </div>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </section>
+  </div>
 </SettingsPage>
 
 {#if making}
@@ -396,6 +434,18 @@
   }
   .details {
     font-size: var(--text-md);
+  }
+  .cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  /* A Backup the schedule made, and will delete once it's no longer among
+     the newest it keeps: muted, as it's only a fact about it. */
+  .scheduled {
+    margin-left: var(--space-1);
+    background: var(--surface-2);
+    color: var(--text-muted);
   }
   .row-actions {
     display: flex;

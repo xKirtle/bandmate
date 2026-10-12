@@ -5,10 +5,12 @@ import {
   backupSize,
   beatsBrought,
   broughtNote,
+  extrasNote,
   newBackup,
   replaceConfirmation,
   restoredName,
   restorePicks,
+  stepKeep,
 } from './backups';
 
 // 18:30 on 4 Oct 2026, in the time zone the tests run in.
@@ -323,5 +325,36 @@ describe('restorePicks', () => {
     expect(restorePicks({ ...opened, picked: new Set([3]), pickedBeats: new Set() }, held)).toEqual({
       missing: 'Pick a Beat, or untick the Beat Library.',
     });
+  });
+});
+
+describe('stepKeep', () => {
+  it('keeps one more or one fewer Scheduled Backup', () => {
+    expect(stepKeep(4, 1)).toBe(5);
+    expect(stepKeep(4, -1)).toBe(3);
+  });
+
+  it('keeps from 1 to 30', () => {
+    expect(stepKeep(1, -1)).toBe(1);
+    expect(stepKeep(30, 1)).toBe(30);
+  });
+});
+
+describe('extrasNote', () => {
+  const scheduled = { scheduled: true };
+  const handMade = { scheduled: false };
+
+  it('says the oldest Scheduled Backups beyond those kept go with the next one', () => {
+    expect(extrasNote({ on: true, keep: 2 }, [scheduled, scheduled, scheduled, handMade])).toBe(
+      'The oldest Scheduled Backup goes when the next one is made.',
+    );
+    expect(extrasNote({ on: true, keep: 1 }, [scheduled, scheduled, scheduled, handMade, handMade])).toBe(
+      'The 2 oldest Scheduled Backups go when the next one is made.',
+    );
+  });
+
+  it('says nothing while no more are kept than the schedule keeps, or while it is off', () => {
+    expect(extrasNote({ on: true, keep: 2 }, [scheduled, scheduled, handMade, handMade])).toBeNull();
+    expect(extrasNote({ on: false, keep: 1 }, [scheduled, scheduled])).toBeNull();
   });
 });

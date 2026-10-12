@@ -236,6 +236,22 @@ export interface Backup {
   size: number;
   /** A name of its own, shown in place of the automatic one; "" when it has none. */
   name: string;
+  /** Whether the schedule made it, and deletes it once it's no longer among the newest it keeps. */
+  scheduled: boolean;
+}
+
+/** How often the schedule makes a Scheduled Backup. */
+export type BackupPeriod = 'daily' | 'weekly' | 'monthly';
+
+/**
+ * The schedule Scheduled Backups are made on, kept in Bandmate so it's the
+ * same from every device: each is a Backup of Everything, made once a
+ * period has passed since the last, keeping only the newest `keep`.
+ */
+export interface BackupSchedule {
+  on: boolean;
+  period: BackupPeriod;
+  keep: number;
 }
 
 /**
@@ -893,6 +909,13 @@ export const api = {
     upload<Backup>('/backups/upload', file, options),
   /** Gives a Backup a name of its own, or with a blank one, clears it back to the automatic one. */
   renameBackup: (id: number, name: string) => request<Backup>('PATCH', `/backups/${id}`, { name }),
+  /** The schedule Scheduled Backups are made on. */
+  backupSchedule: () => request<BackupSchedule>('GET', '/backups/schedule'),
+  /**
+   * Sets the schedule, answering at once. While it's on, a Scheduled Backup
+   * that's due, as one is when it's first turned on, is made in the background.
+   */
+  setBackupSchedule: (schedule: BackupSchedule) => request<BackupSchedule>('PUT', '/backups/schedule', schedule),
   /** Deletes a Backup and its file. */
   deleteBackup: (id: number) => request<null>('DELETE', `/backups/${id}`),
   /** Where a Backup's file downloads from, as one file. */

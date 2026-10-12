@@ -57,10 +57,6 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 - Both work offline, from data built into the binary, with no network needed. English comes first, from the CMU Pronouncing Dictionary. Each language is data Bandmate loads, so others can follow: by spelling rules where a language is spelled as it sounds, or from Wiktionary's pronunciations.
 - A Song's Details gain its languages, more than one if it mixes them. How a Line in a mixed Song picks its language (each word looked up in each of the Song's languages, or a language set per Section) is for the spec.
 
-## Scheduled Backups
-
-- Backups made on a schedule (say, Everything weekly), not only when the user makes one. Scheduled ones can keep only the last N, which hand-made Backups never do: nothing deletes a Backup the user made.
-
 ## Track colours
 
 - Each Track gets a muted colour of its own, assigned automatically from a small palette in the visual identity's tokens, so Clips on different Tracks can be told apart at a glance. Today every Clip is in the one accent colour.

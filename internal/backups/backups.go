@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/xKirtle/bandmate/internal/audio"
@@ -61,6 +62,9 @@ type Backup struct {
 	// Name is a name of its own, shown in place of the automatic one made
 	// from when it was made and what it holds; "" when it has none.
 	Name string `json:"name"`
+	// Scheduled tells whether the schedule made it, so it's deleted once
+	// it's no longer among the newest the schedule keeps.
+	Scheduled bool `json:"scheduled"`
 }
 
 // Contents is what a new Backup holds: every Song, the Songs picked, or
@@ -86,10 +90,20 @@ type Store struct {
 	dataDir string
 	dir     string
 	now     func() time.Time
+	// scheduling is held while checking for a Scheduled Backup, so two
+	// checks never make one each.
+	scheduling sync.Mutex
+	// wake asks for a check for a Scheduled Backup now.
+	wake chan struct{}
+	// stopSchedule stops the checks, and scheduleDone is closed once they
+	// have.
+	stopSchedule context.CancelFunc
+	scheduleDone chan struct{}
 }
 
 // Open returns the Backups kept in dataDir, whose database is conn. Backups
-// left half-made by a crash are removed.
+// left half-made by a crash are removed. It starts checking for a Scheduled
+// Backup that's due, at once and then hourly, until it's closed.
 func Open(conn *sql.DB, dataDir string, now func() time.Time) (*Store, error) {
 	dir := filepath.Join(dataDir, Dir)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -102,7 +116,19 @@ func Open(conn *sql.DB, dataDir string, now func() time.Time) (*Store, error) {
 	for _, path := range leftovers {
 		os.RemoveAll(path)
 	}
-	return &Store{db: conn, dataDir: dataDir, dir: dir, now: now}, nil
+	s := &Store{db: conn, dataDir: dataDir, dir: dir, now: now,
+		wake: make(chan struct{}, 1), scheduleDone: make(chan struct{})}
+	ctx, stop := context.WithCancel(context.Background())
+	s.stopSchedule = stop
+	go s.runSchedule(ctx)
+	return s, nil
+}
+
+// Close stops checking for Scheduled Backups, stopping one being made, and
+// returns once it has.
+func (s *Store) Close() {
+	s.stopSchedule()
+	<-s.scheduleDone
 }
 
 // List returns the Backups, newest first.
@@ -146,7 +172,7 @@ func (s *Store) Rename(ctx context.Context, id int64, name string) (Backup, erro
 }
 
 // Delete deletes a Backup and its file, freeing its space. Nothing else
-// deletes a Backup. Its row goes only once its file has, so a Backup still
+// deletes a Backup, but the schedule deleting its oldest Scheduled Backups. Its row goes only once its file has, so a Backup still
 // listed can always be deleted again, and one gone from the list has freed
 // its space.
 func (s *Store) Delete(ctx context.Context, id int64) error {
@@ -169,12 +195,12 @@ func (s *Store) Delete(ctx context.Context, id int64) error {
 }
 
 // backupColumns are what a Backup is read from, in scanBackup's order.
-const backupColumns = `id, songs, all_songs, beats, beat_library, size, created_at, name`
+const backupColumns = `id, songs, all_songs, beats, beat_library, size, created_at, name, scheduled`
 
 func scanBackup(row interface{ Scan(...any) error }) (Backup, error) {
 	var b Backup
 	var created string
-	if err := row.Scan(&b.ID, &b.Songs, &b.AllSongs, &b.Beats, &b.BeatLibrary, &b.Size, &created, &b.Name); err != nil {
+	if err := row.Scan(&b.ID, &b.Songs, &b.AllSongs, &b.Beats, &b.BeatLibrary, &b.Size, &created, &b.Name, &b.Scheduled); err != nil {
 		return b, err
 	}
 	t, err := domain.ParseTime(created)
@@ -217,6 +243,12 @@ func (s *Store) path(id int64) string {
 // locked while it's made. A Song or Beat deleted while it's made is left
 // out.
 func (s *Store) Make(ctx context.Context, contents Contents) (Backup, error) {
+	return s.make(ctx, contents, false)
+}
+
+// make makes a Backup of contents, by hand or a Scheduled Backup, and keeps
+// it.
+func (s *Store) make(ctx context.Context, contents Contents, scheduled bool) (Backup, error) {
 	songIDs, err := s.songsIn(ctx, contents)
 	if err != nil {
 		return Backup{}, err
@@ -239,7 +271,7 @@ func (s *Store) Make(ctx context.Context, contents Contents) (Backup, error) {
 		return Backup{}, domain.Invalid("the Songs and Beats picked have been deleted")
 	}
 	b := Backup{CreatedAt: s.now().UTC(), Songs: held.songs, AllSongs: contents.AllSongs,
-		Beats: held.beats, BeatLibrary: contents.BeatLibrary}
+		Beats: held.beats, BeatLibrary: contents.BeatLibrary, Scheduled: scheduled}
 	file, err := os.CreateTemp(s.dir, makingPrefix+"*"+FileExtension)
 	if err != nil {
 		return Backup{}, fmt.Errorf("making backup: %w", err)
@@ -336,17 +368,24 @@ func (s *Store) distinctExisting(ctx context.Context, table string, ids []int64,
 }
 
 // keep stores the Backup's file, made at path, under the id its row gets.
+// A Scheduled Backup records when the schedule last made one.
 func (s *Store) keep(ctx context.Context, path string, b Backup) (Backup, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return b, err
 	}
 	defer tx.Rollback()
-	res, err := tx.ExecContext(ctx, `INSERT INTO backups (songs, all_songs, beats, beat_library, size, created_at)
-		VALUES (?, ?, ?, ?, ?, ?)`,
-		b.Songs, b.AllSongs, b.Beats, b.BeatLibrary, b.Size, b.CreatedAt.Format(domain.TimeFormat))
+	made := b.CreatedAt.Format(domain.TimeFormat)
+	res, err := tx.ExecContext(ctx, `INSERT INTO backups (songs, all_songs, beats, beat_library, size, created_at, scheduled)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		b.Songs, b.AllSongs, b.Beats, b.BeatLibrary, b.Size, made, b.Scheduled)
 	if err != nil {
 		return b, err
+	}
+	if b.Scheduled {
+		if _, err := tx.ExecContext(ctx, `UPDATE backup_schedule SET last_made_at = ?`, made); err != nil {
+			return b, err
+		}
 	}
 	if b.ID, err = res.LastInsertId(); err != nil {
 		return b, err

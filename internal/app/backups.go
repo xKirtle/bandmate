@@ -43,6 +43,33 @@ func (a *App) uploadBackup(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, b)
 }
 
+// backupSchedule tells the schedule Scheduled Backups are made on, the same
+// from every device.
+func (a *App) backupSchedule(w http.ResponseWriter, r *http.Request) {
+	s, err := a.backups.Schedule(r.Context())
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, s)
+}
+
+// setBackupSchedule sets the schedule, answering at once: while it's on, a
+// Scheduled Backup that's due, as one is when it's first turned on, is made
+// in the background.
+func (a *App) setBackupSchedule(w http.ResponseWriter, r *http.Request) {
+	var req backups.Schedule
+	if !readJSON(w, r, &req) {
+		return
+	}
+	s, err := a.backups.SetSchedule(r.Context(), req)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, s)
+}
+
 func (a *App) backupFile(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
