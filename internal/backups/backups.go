@@ -116,9 +116,6 @@ func Open(conn *sql.DB, dataDir string, now func() time.Time) (*Store, error) {
 	for _, path := range leftovers {
 		os.RemoveAll(path)
 	}
-	if err := countChanges(context.Background(), conn); err != nil {
-		return nil, err
-	}
 	s := &Store{db: conn, dataDir: dataDir, dir: dir, now: now,
 		wake: make(chan struct{}, 1), scheduleDone: make(chan struct{})}
 	ctx, stop := context.WithCancel(context.Background())
@@ -247,21 +244,13 @@ func (s *Store) path(id int64) string {
 // locked while it's made. A Song or Beat deleted while it's made is left
 // out.
 func (s *Store) Make(ctx context.Context, contents Contents) (Backup, error) {
-	return s.make(ctx, contents, false)
+	return s.make(ctx, contents, "")
 }
 
-// make makes a Backup of contents, by hand or a Scheduled Backup, and keeps
-// it.
-func (s *Store) make(ctx context.Context, contents Contents, scheduled bool) (Backup, error) {
-	// A change made while a Scheduled Backup is made may be missing from
-	// it, so it counts as one made since.
-	var changes int64
-	if scheduled {
-		err := s.db.QueryRowContext(ctx, `SELECT changes FROM backup_schedule`).Scan(&changes)
-		if err != nil {
-			return Backup{}, fmt.Errorf("reading the changes since the last Scheduled Backup: %w", err)
-		}
-	}
+// make makes a Backup of contents and keeps it: by hand if scheduledAs is
+// "", or else a Scheduled Backup, whose contents had scheduledAs as their
+// fingerprint as it began.
+func (s *Store) make(ctx context.Context, contents Contents, scheduledAs string) (Backup, error) {
 	songIDs, err := s.songsIn(ctx, contents)
 	if err != nil {
 		return Backup{}, err
@@ -284,7 +273,7 @@ func (s *Store) make(ctx context.Context, contents Contents, scheduled bool) (Ba
 		return Backup{}, domain.Invalid("the Songs and Beats picked have been deleted")
 	}
 	b := Backup{CreatedAt: s.now().UTC(), Songs: held.songs, AllSongs: contents.AllSongs,
-		Beats: held.beats, BeatLibrary: contents.BeatLibrary, Scheduled: scheduled}
+		Beats: held.beats, BeatLibrary: contents.BeatLibrary, Scheduled: scheduledAs != ""}
 	file, err := os.CreateTemp(s.dir, makingPrefix+"*"+FileExtension)
 	if err != nil {
 		return Backup{}, fmt.Errorf("making backup: %w", err)
@@ -299,7 +288,7 @@ func (s *Store) make(ctx context.Context, contents Contents, scheduled bool) (Ba
 	if err != nil {
 		return Backup{}, fmt.Errorf("packing backup: %w", err)
 	}
-	return s.keep(ctx, file.Name(), b, changes)
+	return s.keep(ctx, file.Name(), b, scheduledAs)
 }
 
 // songsIn lists the ids of the Songs contents picks, refusing a pick of
@@ -381,9 +370,9 @@ func (s *Store) distinctExisting(ctx context.Context, table string, ids []int64,
 }
 
 // keep stores the Backup's file, made at path, under the id its row gets.
-// A Scheduled Backup records that the schedule made it, when, and the
-// schedule's count of changes as it began, which other Backups ignore.
-func (s *Store) keep(ctx context.Context, path string, b Backup, changes int64) (Backup, error) {
+// A Scheduled Backup records that the schedule made it, when, and its
+// contents' fingerprint, which other Backups don't have.
+func (s *Store) keep(ctx context.Context, path string, b Backup, fingerprint string) (Backup, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return b, err
@@ -401,7 +390,7 @@ func (s *Store) keep(ctx context.Context, path string, b Backup, changes int64) 
 	}
 	if b.Scheduled {
 		if _, err := tx.ExecContext(ctx, `UPDATE backup_schedule SET last_made_at = ?1, last_made_id = ?2,
-			changes_when_made = ?3, tried_at = ?1, outcome = 'made', failure = NULL`, made, b.ID, changes); err != nil {
+			made_fingerprint = ?3, tried_at = ?1, outcome = 'made', failure = NULL`, made, b.ID, fingerprint); err != nil {
 			return b, err
 		}
 	}

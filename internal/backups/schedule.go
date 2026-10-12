@@ -97,93 +97,54 @@ func (s *Store) Schedule(ctx context.Context) (Schedule, error) {
 	return sch, err
 }
 
-// schedule returns the schedule, and why a Scheduled Backup due now would be
-// skipped, as the log says it, or "" if it wouldn't: when there's nothing to
-// back up, or when no Song or Beat has changed since the schedule last made
-// one and that one, kept or not, hasn't been deleted.
-func (s *Store) schedule(ctx context.Context) (sch Schedule, skip string, err error) {
+// lastMade is what a due Scheduled Backup is compared with, to tell whether
+// to skip it.
+type lastMade struct {
+	// empty tells whether there's nothing to back up: no Song and no Beat.
+	empty bool
+	// there tells whether the Backup the schedule last made, kept or not,
+	// hasn't been deleted.
+	there bool
+	// fingerprint is the fingerprint of what it held, "" if the schedule
+	// never made one.
+	fingerprint string
+}
+
+// schedule returns the schedule, and what a Scheduled Backup due now is
+// compared with.
+func (s *Store) schedule(ctx context.Context) (sch Schedule, last lastMade, err error) {
 	sch = DefaultSchedule
-	var lastMade, triedAt, outcome, failure sql.NullString
-	var unchanged, empty bool
+	var lastMadeAt, triedAt, outcome, failure, fingerprint sql.NullString
 	err = s.db.QueryRowContext(ctx, `SELECT turned_on, period, keep, last_made_at, tried_at, outcome, failure,
-		changes_when_made IS changes AND EXISTS (SELECT 1 FROM backups WHERE id = last_made_id),
+		made_fingerprint, EXISTS (SELECT 1 FROM backups WHERE id = last_made_id),
 		NOT EXISTS (SELECT 1 FROM songs) AND NOT EXISTS (SELECT 1 FROM beats)
 		FROM backup_schedule WHERE id = 1`).
-		Scan(&sch.On, &sch.Period, &sch.Keep, &lastMade, &triedAt, &outcome, &failure, &unchanged, &empty)
+		Scan(&sch.On, &sch.Period, &sch.Keep, &lastMadeAt, &triedAt, &outcome, &failure,
+			&fingerprint, &last.there, &last.empty)
 	if errors.Is(err, sql.ErrNoRows) {
-		return DefaultSchedule, "", nil
+		return DefaultSchedule, last, nil
 	}
 	if err != nil {
-		return sch, "", fmt.Errorf("reading the backup schedule: %w", err)
+		return sch, last, fmt.Errorf("reading the backup schedule: %w", err)
 	}
-	if lastMade.Valid {
-		t, err := domain.ParseTime(lastMade.String)
+	last.fingerprint = fingerprint.String
+	if lastMadeAt.Valid {
+		t, err := domain.ParseTime(lastMadeAt.String)
 		if err != nil {
-			return sch, "", err
+			return sch, last, err
 		}
 		sch.LastMadeAt = &t
 	}
 	if triedAt.Valid {
 		t, err := domain.ParseTime(triedAt.String)
 		if err != nil {
-			return sch, "", err
+			return sch, last, err
 		}
 		sch.Last = &Try{At: t, Outcome: Outcome(outcome.String), Error: failure.String}
 	}
 	sch.Due = sch.On && (sch.Last == nil || sch.Last.Outcome == Failed ||
 		!s.now().Before(sch.Period.endsAfter(sch.Last.At)))
-	switch {
-	case empty:
-		skip = "there's nothing to back up"
-	case unchanged:
-		skip = "nothing has changed since the last"
-	}
-	return sch, skip, nil
-}
-
-// changeTables are the tables whose every added, changed or deleted row
-// counts as a change to a Song or Beat: those a Backup copies.
-func changeTables() []string {
-	seen := map[string]bool{}
-	var tables []string
-	for _, t := range songTables {
-		if !seen[t.name] {
-			seen[t.name] = true
-			tables = append(tables, t.name)
-		}
-	}
-	return tables
-}
-
-// sweptUnseen picks, for a table whose rows kept only for undo are swept at
-// start-up, the rows a Backup holds, so sweeping the others, which no
-// Backup holds, isn't a change.
-var sweptUnseen = map[string]string{
-	"takes":  "OLD.detached_at IS NULL",
-	"sounds": "OLD.unused_since IS NULL",
-}
-
-// countChanges makes the database count every change to a Song or Beat in
-// the schedule's changes, so whether anything has changed since the last
-// Scheduled Backup is one comparison, however much there is. Its triggers
-// are made each time Bandmate starts, as a migration that rebuilds a table
-// drops that table's.
-func countChanges(ctx context.Context, conn *sql.DB) error {
-	for _, table := range changeTables() {
-		for _, op := range []string{"INSERT", "UPDATE", "DELETE"} {
-			when := "TRUE"
-			if held, ok := sweptUnseen[table]; ok && op == "DELETE" {
-				when = held
-			}
-			_, err := conn.ExecContext(ctx, fmt.Sprintf(`CREATE TRIGGER IF NOT EXISTS "count_change_%[1]s_%[2]s"
-				AFTER %[2]s ON "%[1]s" WHEN %[3]s
-				BEGIN UPDATE backup_schedule SET changes = changes + 1; END`, table, op, when))
-			if err != nil {
-				return fmt.Errorf("counting changes to %s: %w", table, err)
-			}
-		}
-	}
-	return nil
+	return sch, last, nil
 }
 
 // SetSchedule sets the schedule Scheduled Backups are made on, and returns
@@ -247,7 +208,7 @@ func (s *Store) runSchedule(ctx context.Context) {
 func (s *Store) CheckSchedule(ctx context.Context) {
 	s.scheduling.Lock()
 	defer s.scheduling.Unlock()
-	sch, skip, err := s.schedule(ctx)
+	sch, last, err := s.schedule(ctx)
 	if err != nil {
 		log.Printf("checking for a Scheduled Backup: %v", err)
 		return
@@ -255,17 +216,32 @@ func (s *Store) CheckSchedule(ctx context.Context) {
 	if !sch.Due {
 		return
 	}
-	if skip != "" {
-		log.Printf("made no Scheduled Backup, as %s", skip)
+	if last.empty {
+		log.Printf("made no Scheduled Backup, as there's nothing to back up")
 		s.recordTry(ctx, Unchanged, "")
 		return
 	}
-	b, err := s.make(ctx, Contents{AllSongs: true, BeatLibrary: true}, true)
-	if err != nil {
+	failed := func(err error) {
 		if ctx.Err() == nil {
 			log.Printf("making a Scheduled Backup failed, to be tried again within an hour: %v", err)
 			s.recordTry(ctx, Failed, failureReason(err))
 		}
+	}
+	// Worked out before the Backup is made, so a change made meanwhile,
+	// which it may miss, makes the next one differ.
+	fingerprint, err := s.fingerprint(ctx)
+	if err != nil {
+		failed(err)
+		return
+	}
+	if last.there && fingerprint == last.fingerprint {
+		log.Printf("made no Scheduled Backup, as nothing has changed since the last")
+		s.recordTry(ctx, Unchanged, "")
+		return
+	}
+	b, err := s.make(ctx, Contents{AllSongs: true, BeatLibrary: true}, fingerprint)
+	if err != nil {
+		failed(err)
 		return
 	}
 	log.Printf("made Scheduled Backup %d (%d Songs, %d Beats)", b.ID, b.Songs, b.Beats)

@@ -397,6 +397,25 @@ func TestAnyChangeToASongOrBeatMakesTheNextScheduledBackup(t *testing.T) {
 	}
 }
 
+func TestRenamingASongsFolderMakesTheNextScheduledBackup(t *testing.T) {
+	clock := newScheduleClock()
+	ts := newTestServerWith(t, func(c *app.Config) { c.Now = clock.Now })
+	s := ts.createSong("Night Drive")
+	f := ts.createFolder("Demos")
+	expectStatus(t, ts.moveSong(s.ID, &f.ID), http.StatusNoContent)
+	ts.setSchedule(backupSchedule{On: true, Period: "daily", Keep: 4})
+	ts.waitForBackups(1)
+
+	// Only the Folder's row changes, not the Song's.
+	expectStatus(t, ts.renameFolder(f.ID, "Old Demos"), http.StatusOK)
+	clock.Advance(24 * time.Hour)
+	ts.app.CheckBackupSchedule()
+
+	if list := ts.listBackups(); len(list) != 2 {
+		t.Errorf("backups = %+v, want 2", list)
+	}
+}
+
 func TestTheScheduleSaysWhenItLastMadeOne(t *testing.T) {
 	clock := newScheduleClock()
 	ts := scheduledServer(t, clock, backupSchedule{On: true, Period: "weekly", Keep: 4})
