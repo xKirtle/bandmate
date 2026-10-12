@@ -8,6 +8,8 @@ If a `gh` command fails with `HTTP 403: GitHub GraphQL is not available`, use it
 
 The arguments are the issues to work through, plus any instructions. Work the issues in the order given, unless the user says otherwise. By default each PR is reviewed by hand. If the user says PRs can be merged once their checks pass, run in **auto-merge mode**.
 
+If the work is on a **feature branch** (the user names one, or the argument is a spec whose `## Steps` list holds the work), run in **feature-branch mode**: read `docs/agents/feature-branches.md` first, and follow the "Feature-branch mode" section below wherever it differs. Either gate (by hand or auto-merge) still applies.
+
 You are the orchestrator: you delegate, relay and gate, and each sub-agent does the implementing. Exactly one sub-agent works at a time. A gate separates each issue from the next: the user's go-ahead by default, or a green, merged PR in auto-merge mode.
 
 ## Dev servers
@@ -53,3 +55,14 @@ Dev servers: if you run any, use ports <ports>. The orchestrator's stack holds :
 
 Final report: the branch, the PR URL, a summary of the changes, the check results (paste the actual output), which acceptance criteria you ticked and which you left unticked (with reasons), any review findings you didn't fix and why, what you changed on the docs site (or why nothing needed it), and any open questions.
 ```
+
+## Feature-branch mode
+
+The queue is the spec's unticked Steps, in list order, skipping any whose blockers aren't ticked. Read the list again before each step, since the user may edit it mid-run. No step gets an issue or a PR.
+
+- **Dev stack:** run it from the main checkout on the feature branch, not `main`, and refresh it after every step merges, pulling the feature branch instead of `main`.
+- **Brief:** use the brief below with these replacements. Name the spec `#<S>` and the step by its title in place of issue `#<N>`. Step 1 reads the spec and its comments. Step 2 branches from `origin/feature/<slug>` as `step/<slug>-<step-slug>`. Steps 5 to 7 become: "Merge the latest `origin/feature/<slug>` into your branch, run the fast checks `docs/agents/feature-branches.md` lists, fix what fails, and push your branch. Leave the merge to the orchestrator." The final report gives the step branch and the diffstat against `origin/feature/<slug>` in place of the PR, and drops the acceptance criteria.
+- **Gate:** by default, the user reviews the step branch's diff (`git diff origin/feature/<slug>...<step-branch>`) and says when to merge. In auto-merge mode, merge once the sub-agent's pasted fast checks pass; send failures back to it. The guard on rule files (`CONTRIBUTING.md`, `AGENTS.md`, `docs/agents/`, `docs/adr/`) applies to the step's diff the same way.
+- **Merge:** in the main checkout, on the feature branch, `git pull --ff-only`, `git merge --no-ff <step-branch> -m "Merge step: <step title>"`, and push. Tick the step in the spec's body with `gh issue edit <S> --body-file`, keeping the temp file outside the repo. Then refresh the stack, and remove the sub-agent's worktree and branches as step 5 of the loop says, plus the pushed step branch with `git push origin --delete <step-branch>`.
+
+Once every step is ticked, say so. Landing the feature on `main`, or dropping it, is the user's call.
