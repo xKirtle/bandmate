@@ -4,7 +4,7 @@
   import { rhymingDictionaries as dictionaries } from './sharedRhymingDictionaries.svelte';
   import { formatSmallSize } from './upload';
 
-  // The rhyming dictionaries, in Settings' Writing card: every Language
+  // The rhyming dictionaries, in Settings' Rhyming dictionaries card: every Language
   // Bandmate rhymes in, each with its download size, whether it's downloaded
   // to this device and when it was last updated, to download or remove. Any
   // number can be downloaded at once. Nothing is downloaded until one is.

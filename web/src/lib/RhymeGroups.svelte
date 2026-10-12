@@ -33,8 +33,8 @@
   /** The rhyming dictionaries to download: "the Portuguese rhyming dictionary", or "dictionaries" for several. */
   const dictionariesOf = (codes: readonly string[]) =>
     `the ${named(codes, 'conjunction')} rhyming ${codes.length === 1 ? 'dictionary' : 'dictionaries'}`;
-  // Where rhyming dictionaries are downloaded: Settings' Writing card.
-  const settings = '/settings#writing';
+  // Where rhyming dictionaries are downloaded: Settings' Rhyming dictionaries card.
+  const settings = '/settings#rhyming-dictionaries';
 </script>
 
 {#if loading}
