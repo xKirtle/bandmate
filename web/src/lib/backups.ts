@@ -1,5 +1,6 @@
 // How Backups are named, sized and asked for in Settings' Backups tab.
 import type { Backup, BackupContents, BackupPeriod, BackupPicks, BackupPresent, BackupSchedule } from './api';
+import { timeAgo } from './time';
 import { formatSize } from './upload';
 
 // Spelled out rather than left to the locale, which may shorten September
@@ -229,6 +230,42 @@ export function extrasNote(
   return extras === 1
     ? 'The oldest Scheduled Backup goes when the next one is made.'
     : `The ${extras} oldest Scheduled Backups go when the next one is made.`;
+}
+
+/**
+ * How the schedule is doing, as the Scheduled Backups card says it under
+ * its settings: when it last made one, that nothing has changed since, that
+ * there's nothing to back up, or that its last try failed, when and why,
+ * which is `failed` so it's shown as an error, and while it's on, that it's
+ * tried again; null before it has tried to make one.
+ */
+export function scheduleStatus(
+  schedule: Pick<BackupSchedule, 'on' | 'lastMadeAt' | 'last'>,
+  now = Date.now(),
+): { text: string; failed: boolean } | null {
+  const { on, last, lastMadeAt } = schedule;
+  if (!last) return null;
+  switch (last.outcome) {
+    case 'made':
+      return { text: `Last made ${timeAgo(last.at, now)}.`, failed: false };
+    case 'unchanged':
+      // The schedule has always made one before finding nothing changed.
+      return {
+        text: lastMadeAt
+          ? `Nothing has changed since the last one, made ${timeAgo(lastMadeAt, now)}.`
+          : 'Nothing has changed since the last one.',
+        failed: false,
+      };
+    case 'empty':
+      return { text: 'There’s nothing to back up.', failed: false };
+    case 'failed':
+      return {
+        text:
+          `Couldn’t make one ${timeAgo(last.at, now)} (${last.error}).` +
+          (on ? ' Bandmate tries again within the hour.' : ''),
+        failed: true,
+      };
+  }
 }
 
 /** A Backup's size: "8 KB" under a megabyte, where "0.0 MB" would say nothing, and "4.2 MB" from there. */

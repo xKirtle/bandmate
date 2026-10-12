@@ -246,7 +246,8 @@ export type BackupPeriod = 'daily' | 'weekly' | 'monthly';
 /**
  * The schedule Scheduled Backups are made on, kept in Bandmate so it's the
  * same from every device: each is a Backup of Everything, made once a
- * period has passed since the last, keeping only the newest `keep`.
+ * period has passed since the last, unless nothing has changed since,
+ * keeping only the newest `keep`.
  */
 export interface BackupSchedule {
   on: boolean;
@@ -254,10 +255,26 @@ export interface BackupSchedule {
   keep: number;
   /**
    * Whether a Scheduled Backup is due now, so one is being made: while it's
-   * on, when the schedule has never made one, or a period has passed since
-   * it last did. Left out when it's set.
+   * on, when the schedule has never tried to make one, its last try failed,
+   * or a period has passed since its last try that didn’t fail.
+   * Left out when it's set, as are the status fields below.
    */
   due: boolean;
+  /** When the schedule last made a Scheduled Backup, as an ISO time; null if it never has. */
+  lastMadeAt: string | null;
+  /** The schedule's last try at one; null if it hasn't tried. */
+  last: BackupScheduleTry | null;
+}
+
+/**
+ * A try at a Scheduled Backup: when, as an ISO time, and whether it made
+ * one, made none as nothing had changed since the last or as there was
+ * nothing to back up, or failed, and why.
+ */
+export interface BackupScheduleTry {
+  at: string;
+  outcome: 'made' | 'unchanged' | 'empty' | 'failed';
+  error?: string;
 }
 
 /**
@@ -921,7 +938,7 @@ export const api = {
    * Sets the schedule, answering at once with whether a Scheduled Backup is
    * due, as one is when it's first turned on: if so, it's made in the background.
    */
-  setBackupSchedule: ({ on, period, keep }: Omit<BackupSchedule, 'due'>) =>
+  setBackupSchedule: ({ on, period, keep }: Pick<BackupSchedule, 'on' | 'period' | 'keep'>) =>
     request<BackupSchedule>('PUT', '/backups/schedule', { on, period, keep }),
   /** Deletes a Backup and its file. */
   deleteBackup: (id: number) => request<null>('DELETE', `/backups/${id}`),
