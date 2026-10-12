@@ -3,7 +3,9 @@
   // the word at the caret of the Line being written, or for any word typed
   // into its field. The page decides the word; typing here changes it until
   // the caret moves in a Line again. In a Song of several Languages, tabs
-  // switch among them, starting at the one the word is read in.
+  // switch among them, starting at the one the word is read in. One whose
+  // dictionary isn't set up on this device shows a link to set it up in
+  // Settings in place of Rhymes.
   import { languageName } from './languages';
   import type { RhymeLookup } from './rhymeLookup';
   import RhymeGroups from './RhymeGroups.svelte';
@@ -65,7 +67,7 @@
           role="tab"
           aria-selected={lookup.language === code}
           aria-controls="rhymes-panel"
-          tabindex={lookup.language === code ? 0 : -1}
+          tabindex={lookup.language === code || (!lookup.language && i === 0) ? 0 : -1}
           onclick={() => pickLanguage(code)}
           onkeydown={(e) => tabKey(e, i)}
         >

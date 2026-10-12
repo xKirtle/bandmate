@@ -13,10 +13,29 @@ import (
 	"github.com/xKirtle/bandmate/internal/languagedata"
 )
 
+// languageDownload is a Language as the page lists it to set up: how much
+// a browser downloads to, compressed.
+type languageDownload struct {
+	Code string `json:"code"`
+	Size int    `json:"size"`
+}
+
+// listLanguages lists every Language Bandmate has data for, with its
+// download size, which Settings shows beside it to set it up.
+func (a *App) listLanguages(w http.ResponseWriter, r *http.Request) {
+	codes := languagedata.Codes()
+	list := make([]languageDownload, len(codes))
+	for i, code := range codes {
+		data, _ := languagedata.Of(code)
+		list[i] = languageDownload{Code: code, Size: len(data.Gzipped)}
+	}
+	writeJSON(w, http.StatusOK, list)
+}
+
 // languageData serves a Language's data, which the page finds Rhymes in
-// itself (ADR 0018). It's sent gzipped to a browser that takes it, as
-// every browser does, and with an ETag, so the browser keeps it and asks
-// only whether it changed.
+// itself (ADR 0018), once the user sets it up on a device. It's sent
+// gzipped to a browser that takes it, as every browser does, and with an
+// ETag, so the page keeps it and asks only whether it changed.
 func (a *App) languageData(w http.ResponseWriter, r *http.Request) {
 	code := r.PathValue("code")
 	data, ok := languagedata.Of(code)

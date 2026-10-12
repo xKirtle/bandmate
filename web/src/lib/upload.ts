@@ -32,6 +32,11 @@ export function formatSize(bytes: number): string {
   return mb >= 10 ? `${Math.round(mb)} MB` : `${mb.toFixed(1)} MB`;
 }
 
+/** A size that may be small: "8 KB" under a megabyte, where "0.0 MB" would say nothing, and "4.2 MB" from there. */
+export function formatSmallSize(bytes: number): string {
+  return bytes < 1 << 20 ? `${Math.ceil(bytes / 1024)} KB` : formatSize(bytes);
+}
+
 /**
  * Checks a file is small enough to upload and decodes it. Fails with a
  * message to show if it can't be uploaded.

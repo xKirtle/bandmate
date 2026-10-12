@@ -3,10 +3,11 @@
   // Bandmate works on this device rather than any Song. Each applies at once,
   // in every one of this device's tabs, and is kept on this device. Those
   // also changed where they're used, like Left-handed in the Chord Finder,
-  // are the same setting here.
+  // are the same setting here. Writing sets up the rhyming dictionaries.
   import { MediaQuery } from 'svelte/reactivity';
   import { palettes, themeChoices } from '../lib/appearance';
   import CalibrationSheet from '../lib/CalibrationSheet.svelte';
+  import DictionaryList from '../lib/DictionaryList.svelte';
   import InputList from '../lib/InputList.svelte';
   import type { InputChoice } from '../lib/inputSettings';
   import SettingsPage from '../lib/SettingsPage.svelte';
@@ -18,6 +19,11 @@
   const recordingOffered = new MediaQuery('min-width: 40.0625rem');
   // The Input being calibrated: the default input as the Input it turns out to be, or a listed one exactly.
   let calibrating = $state.raw<{ input: InputChoice; exact: boolean } | null>(null);
+
+  // A link to a card, such as the Rhymes card's to Writing, opens at it.
+  $effect(() => {
+    if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView({ block: 'start' });
+  });
 </script>
 
 <SettingsPage tab="device">
@@ -65,6 +71,15 @@
       </section>
     {/if}
 
+    <section class="card" id="writing" aria-labelledby="writing-heading">
+      <h2 id="writing-heading">Writing</h2>
+      <p class="hint intro">
+        Rhymes are suggested in the languages whose dictionaries are set up here. Each is downloaded from Bandmate when
+        you set it up and kept on this device, so Rhymes work offline.
+      </p>
+      <DictionaryList />
+    </section>
+
     <section class="card" aria-labelledby="chord-diagrams-heading">
       <h2 id="chord-diagrams-heading">Chord diagrams</h2>
       <fieldset class="choice-group">
@@ -89,6 +104,9 @@
 {/if}
 
 <style>
+  .intro {
+    margin: 0;
+  }
   .kept {
     margin: 0 0 var(--space-4);
   }

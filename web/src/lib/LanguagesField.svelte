@@ -160,9 +160,7 @@
           </div>
         {/each}
       </fieldset>
-      <p id="{id}-hint" class="hint muted">
-        Bandmate suggests rhymes in these languages, so only they can be picked for now.
-      </p>
+      <p id="{id}-hint" class="hint muted">Bandmate suggests rhymes in these languages.</p>
     </div>
   {/if}
 </div>

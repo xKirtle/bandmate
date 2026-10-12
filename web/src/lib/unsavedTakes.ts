@@ -8,6 +8,7 @@
 // While a tab records or uploads one, it holds a lock named after it, so
 // another tab open on the same Song doesn't offer it back meanwhile.
 import { samplesFrom, type Batch } from './capture';
+import { done } from './indexedDb';
 import type { Unsaved } from './recovery';
 
 /** A recording kept in the browser, and where it was going. */
@@ -43,21 +44,6 @@ function open(): Promise<IDBDatabase> {
     throw e;
   });
   return opened;
-}
-
-/** Waits for a request, or for a transaction to finish. */
-function done<T>(request: IDBRequest<T>): Promise<T>;
-function done(transaction: IDBTransaction): Promise<void>;
-function done<T>(r: IDBRequest<T> | IDBTransaction): Promise<T | void> {
-  return new Promise((resolve, reject) => {
-    if (r instanceof IDBTransaction) {
-      r.oncomplete = () => resolve();
-      r.onabort = r.onerror = () => reject(r.error);
-    } else {
-      r.onsuccess = () => resolve(r.result);
-      r.onerror = () => reject(r.error);
-    }
-  });
 }
 
 function lockName(id: string): string {

@@ -7,6 +7,8 @@ import (
 	"crypto/sha256"
 	_ "embed"
 	"encoding/hex"
+	"maps"
+	"slices"
 
 	"github.com/xKirtle/bandmate/internal/build"
 )
@@ -57,6 +59,11 @@ var byCode = map[string]Data{
 func withTag(gzipped []byte) Data {
 	sum := sha256.Sum256(gzipped)
 	return Data{Gzipped: gzipped, ETag: `"` + hex.EncodeToString(sum[:8]) + `"`}
+}
+
+// Codes are the ISO 639-1 codes of every Language Bandmate has data for, in order.
+func Codes() []string {
+	return slices.Sorted(maps.Keys(byCode))
 }
 
 // Of is the data of the Language with an ISO 639-1 code, and whether

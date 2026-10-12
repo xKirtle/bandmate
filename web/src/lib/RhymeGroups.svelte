@@ -1,8 +1,11 @@
 <script lang="ts">
   // A word's Rhymes, perfect ones first, then near ones in a group of their
-  // own, each with its Syllable Count; or why there are none. They're for
-  // reference only: nothing here can be clicked, so a Rhyme never goes into
-  // the Lyric Sheet. Wrapped onto as many rows as they take.
+  // own, each with its Syllable Count; or why there are none, such as a
+  // Language not set up on this device, with a link to set it up in
+  // Settings. Rhymes guessed from the word's spelling say so. They're for
+  // reference only: no Rhyme can be clicked, so one never goes into the
+  // Lyric Sheet. Wrapped onto as many rows as they take.
+  import { languageName } from './languages';
   import type { RhymeLookup } from './rhymeLookup';
 
   let {
@@ -14,7 +17,7 @@
     limit: number;
   } = $props();
 
-  const { word, rhymes, loading } = $derived(lookup);
+  const { word, language, rhymes, loading, toSetUp, notIn } = $derived(lookup);
   const groups = $derived(
     rhymes
       ? [
@@ -24,15 +27,38 @@
       : [],
   );
   const syllables = (n: number) => (n === 1 ? 'syllable' : 'syllables');
+  /** Languages named in a list: "English and Portuguese", or with "or". */
+  const named = (codes: readonly string[], type: 'conjunction' | 'disjunction') =>
+    new Intl.ListFormat('en', { type }).format(codes.map((code) => languageName(code)));
+  // Where Languages are set up: Settings' Writing card.
+  const settings = '/settings#writing';
 </script>
 
-{#if !word}
-  <p class="muted message">Rhymes show here for the word at the cursor as you write.</p>
-{:else if loading}
+{#if loading}
   <p class="muted message">Loading…</p>
+{:else if toSetUp.length > 0 && notIn.length > 0}
+  <p class="muted message">
+    Not in {named(notIn, 'disjunction')}. <a href={settings}>Set up {named(toSetUp, 'conjunction')} in Settings</a> to look
+    it up there.
+  </p>
+{:else if toSetUp.length > 0 && language}
+  <p class="muted message">
+    {languageName(language)} isn’t set up on this device. <a href={settings}>Set up in Settings</a>
+  </p>
+{:else if toSetUp.length > 0}
+  <p class="muted message">
+    Rhymes need a dictionary on this device. <a href={settings}>Set up {named(toSetUp, 'conjunction')} in Settings</a>
+  </p>
+{:else if !word}
+  <p class="muted message">Rhymes show here for the word at the cursor as you write.</p>
 {:else if !rhymes}
   <p class="muted message">No Rhymes for “{word}”: Bandmate doesn’t know how it sounds.</p>
 {:else}
+  {#if rhymes.guess && language}
+    <p class="muted message guess">
+      Guessed from its spelling: the {languageName(language)} dictionary doesn’t have “{word}”.
+    </p>
+  {/if}
   <div class="groups">
     {#each groups as { name, list } (name)}
       <div class="group">
@@ -58,6 +84,9 @@
   .message {
     margin: 0;
     font-size: var(--text-sm);
+  }
+  .guess {
+    margin-bottom: var(--space-3);
   }
   .groups {
     display: flex;

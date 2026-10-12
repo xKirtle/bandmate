@@ -75,6 +75,31 @@ func TestLanguageDataSentCompressedOrNotIsTaggedApart(t *testing.T) {
 	expectStatus(t, res, http.StatusNotModified)
 }
 
+func TestEachLanguageIsListedWithItsDownloadSize(t *testing.T) {
+	ts := newTestServer(t)
+
+	res := ts.Do(http.MethodGet, "/api/languages", nil)
+
+	expectStatus(t, res, http.StatusOK)
+	var got []struct {
+		Code string `json:"code"`
+		Size int    `json:"size"`
+	}
+	res.JSON(t, &got)
+	codes := make([]string, len(got))
+	for i, l := range got {
+		codes[i] = l.Code
+	}
+	if !slices.Equal(codes, []string{"en", "pt"}) {
+		t.Fatalf("languages = %v, want en and pt", codes)
+	}
+	// What a browser downloads, compressed, to set each up.
+	en := ts.DoRaw(http.MethodGet, "/api/languages/en", http.Header{"Accept-Encoding": {"gzip"}}, nil)
+	if got[0].Size != len(en.Body) {
+		t.Errorf("English size = %d, want the %d bytes downloaded", got[0].Size, len(en.Body))
+	}
+}
+
 func TestALanguageBandmateHasNoDataForIsNotFound(t *testing.T) {
 	ts := newTestServer(t)
 

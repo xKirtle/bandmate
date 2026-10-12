@@ -19,7 +19,8 @@ describe('rhymes', () => {
   const rhymes = (word: string) => lyrics.rhymes(word, 'en');
 
   it('gives perfect Rhymes, each with its Syllable Count', () => {
-    const { perfect } = rhymes('night')!;
+    const { perfect, guess } = rhymes('night')!;
+    expect(guess).toBe(false);
     expect(perfect).toContainEqual({ word: 'bright', count: 1 });
     expect(perfect).toContainEqual({ word: 'tonight', count: 2 });
     expect(perfect).toContainEqual({ word: 'satellite', count: 3 });
@@ -51,7 +52,7 @@ describe('rhymes', () => {
     expect([...perfect, ...near].map((r) => r.word)).not.toContain('night');
   });
 
-  it('gives no Rhymes for a word the Language does not know, or one without its data', () => {
+  it('gives no Rhymes for a word the dictionary does not have, or when it is not set up', () => {
     expect(rhymes('skrrt')).toBeNull();
     expect(lyricsLanguage([]).rhymes('night', 'en')).toBeNull();
   });
@@ -99,8 +100,10 @@ describe('rhymes in Portuguese', () => {
     expect(words(rhymes('você')!.perfect)).toContain('porquê');
   });
 
-  it('reads a word the list lacks by the rules, however its accents were typed', () => {
+  it('reads a word the list lacks by the rules, however its accents were typed, as a guess', () => {
     expect(words(rhymes('saudadezinha')!.perfect)).toContain('rainha');
+    expect(rhymes('saudadezinha')!.guess).toBe(true);
+    expect(rhymes('coração')!.guess).toBe(false);
     expect(rhymes('coração'.normalize('NFD'))).toEqual(rhymes('coração'));
   });
 
@@ -111,7 +114,7 @@ describe('rhymes in Portuguese', () => {
     expect([...perfect, ...near].map((r) => r.word)).not.toContain('coração');
   });
 
-  it('gives no Rhymes for a word with no vowel to read, or without the word list', () => {
+  it('gives no Rhymes for a word with no vowel to read, or when the word list is not set up', () => {
     expect(rhymes('hmm')).toBeNull();
     expect(rhymes('24')).toBeNull();
     expect(lyrics.rhymes('coração', 'pt')).toBeNull();
@@ -190,20 +193,46 @@ describe("each Portuguese Rhyme's Syllable Count", () => {
 describe('languageOf', () => {
   const both = lyricsLanguage([english, portugueseWords]);
 
-  it('gives the Language a word is read in, so its Rhymes start there', () => {
+  it("gives the first of the Song's Languages whose dictionary has the word, in the Song's order", () => {
     expect(both.languageOf('night', ['pt', 'en'])).toBe('en');
     expect(both.languageOf('Saudade', ['en', 'pt'])).toBe('pt');
     expect(both.languageOf('coração', ['pt'])).toBe('pt');
   });
 
-  it("gives the Song's first Language for a word none of them reads", () => {
-    expect(both.languageOf('24', ['pt', 'en'])).toBe('pt');
+  it("settles a word in both dictionaries by the Song's order", () => {
+    expect(both.languageOf('eu', ['pt', 'en'])).toBe('pt');
+    expect(both.languageOf('eu', ['en', 'pt'])).toBe('en');
+    expect(both.languageOf('mar', ['pt', 'en'])).toBe('pt');
+  });
+
+  it("gives the first Language with spelling rules for a word in no dictionary, once all of the Song's are set up", () => {
+    expect(both.languageOf('saudadezinha', ['en', 'pt'])).toBe('pt');
+    expect(both.languageOf('24', ['en', 'pt'])).toBe('pt');
+  });
+
+  it("gives the Song's first Language for a word in no dictionary when none of its Languages has spelling rules", () => {
     expect(both.languageOf('skrrt', ['en'])).toBe('en');
   });
 
-  it('gives none until the dictionary Languages have their data', () => {
-    expect(lyricsLanguage([portugueseWords]).languageOf('saudade', ['en', 'pt'])).toBeNull();
+  it("never guesses at a Language that isn't set up", () => {
+    const englishOnly = lyricsLanguage([english]);
+    expect(englishOnly.languageOf('night', ['pt', 'en'])).toBe('en');
+    expect(englishOnly.languageOf('saudade', ['en', 'pt'])).toBeNull();
+    expect(englishOnly.languageOf('saudadezinha', ['pt'])).toBeNull();
+    expect(lyricsLanguage([portugueseWords]).languageOf('night', ['en', 'pt'])).toBeNull();
+    expect(lyricsLanguage([portugueseWords]).languageOf('saudade', ['en', 'pt'])).toBe('pt');
+  });
+
+  it('gives none for a Song without Languages', () => {
     expect(both.languageOf('night', [])).toBeNull();
+  });
+});
+
+describe('isSetUp', () => {
+  it('tells the Languages whose dictionaries it was given', () => {
+    const portugueseOnly = lyricsLanguage([portugueseWords]);
+    expect(portugueseOnly.isSetUp('pt')).toBe(true);
+    expect(portugueseOnly.isSetUp('en')).toBe(false);
   });
 });
 
