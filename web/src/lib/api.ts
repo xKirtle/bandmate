@@ -236,7 +236,10 @@ export interface Backup {
   size: number;
   /** A name of its own, shown in place of the automatic one; "" when it has none. */
   name: string;
-  /** Whether the schedule made it, and deletes it once it's no longer among the newest it keeps. */
+  /**
+   * Whether it's a Scheduled Backup, which the schedule deletes once it's no
+   * longer among the newest it keeps; false once it's kept.
+   */
   scheduled: boolean;
 }
 
@@ -932,6 +935,11 @@ export const api = {
     upload<Backup>('/backups/upload', file, options),
   /** Gives a Backup a name of its own, or with a blank one, clears it back to the automatic one. */
   renameBackup: (id: number, name: string) => request<Backup>('PATCH', `/backups/${id}`, { name }),
+  /**
+   * Keeps a Scheduled Backup: makes it an ordinary Backup for good, which
+   * the schedule neither counts among those it keeps nor deletes.
+   */
+  keepBackup: (id: number) => request<Backup>('POST', `/backups/${id}/keep`),
   /** The schedule Scheduled Backups are made on. */
   backupSchedule: () => request<BackupSchedule>('GET', '/backups/schedule'),
   /**

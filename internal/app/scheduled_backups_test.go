@@ -541,3 +541,73 @@ func TestSweepingWhatUndoKeptAtStartUpIsNoChange(t *testing.T) {
 		t.Errorf("backups = %+v, want still 1, as the Sound swept is in none", list)
 	}
 }
+
+// keepBackup keeps a Scheduled Backup, and returns it as it's answered.
+func (ts *testServer) keepBackup(id int64) backup {
+	ts.t.Helper()
+	res := ts.Do(http.MethodPost, backupPath(id)+"/keep", nil)
+	expectStatus(ts.t, res, http.StatusOK)
+	var b backup
+	res.JSON(ts.t, &b)
+	return b
+}
+
+func TestAKeptScheduledBackupIsOrdinaryAndNeverDeletedByTheSchedule(t *testing.T) {
+	clock := newScheduleClock()
+	ts := scheduledServer(t, clock, backupSchedule{On: true, Period: "daily", Keep: 1})
+	first := ts.listBackups()[0]
+
+	kept := ts.keepBackup(first.ID)
+	if kept.ID != first.ID || kept.Scheduled {
+		t.Fatalf("kept = %+v, want backup %d, no longer scheduled", kept, first.ID)
+	}
+
+	// Not counted in keep: with keep 1, the next two leave it, and the newest.
+	var newest int64
+	for i := range 2 {
+		ts.createSong(fmt.Sprintf("Song %d", i))
+		clock.Advance(24 * time.Hour)
+		ts.app.CheckBackupSchedule()
+		newest = scheduledIDs(ts.listBackups())[0]
+	}
+	list := ts.listBackups()
+	if got := scheduledIDs(list); !slices.Equal(got, []int64{newest}) {
+		t.Errorf("scheduled backups = %v, want only the newest, %d", got, newest)
+	}
+	if !slices.ContainsFunc(list, func(b backup) bool { return b.ID == first.ID && !b.Scheduled }) {
+		t.Errorf("backups = %+v, want the kept one, %d, still there and not scheduled", list, first.ID)
+	}
+}
+
+func TestKeepingTheNewestScheduledBackupMakesNoneSoonerOrIdentical(t *testing.T) {
+	clock := newScheduleClock()
+	ts := scheduledServer(t, clock, backupSchedule{On: true, Period: "weekly", Keep: 4})
+	made := clock.Now()
+	ts.keepBackup(ts.listBackups()[0].ID)
+
+	s := ts.schedule()
+	if s.Due || s.LastMadeAt == nil || !s.LastMadeAt.Equal(made) {
+		t.Errorf("schedule = %+v, want not due, the last made at %v", s, made)
+	}
+	clock.Advance(7*24*time.Hour - time.Minute)
+	ts.app.CheckBackupSchedule()
+	if list := ts.listBackups(); len(list) != 1 {
+		t.Fatalf("within the week, backups = %+v, want only the kept one", list)
+	}
+
+	// A week on, nothing has changed since the one kept: none is made.
+	clock.Advance(time.Minute)
+	ts.app.CheckBackupSchedule()
+	if list := ts.listBackups(); len(list) != 1 {
+		t.Errorf("a week on, backups = %+v, want only the kept one", list)
+	}
+	if last := ts.schedule().Last; last == nil || last.Outcome != "unchanged" {
+		t.Errorf("last = %+v, want nothing changed", last)
+	}
+}
+
+func TestKeepingABackupThatIsntThereIsNotFound(t *testing.T) {
+	ts := newTestServer(t)
+
+	expectStatus(t, ts.Do(http.MethodPost, backupPath(99)+"/keep", nil), http.StatusNotFound)
+}

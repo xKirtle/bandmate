@@ -150,6 +150,25 @@ test('turning on Scheduled Backups makes one at once, marked Scheduled, says so,
   await expect(keep).toContainText('5');
 });
 
+test('keeping a Scheduled Backup takes away its Scheduled badge and its Keep', async ({ page, bandmate }) => {
+  await bandmate.song({ title: 'Night Drive' });
+  await page.goto('/settings/backups');
+  await scheduleCard(page).getByRole('switch', { name: 'Make Backups on a schedule' }).check();
+  const row = card(page).getByRole('listitem');
+  await expect(row.getByText('Scheduled', { exact: true })).toBeVisible();
+
+  await row.getByRole('button', { name: /^More actions/ }).click();
+  await expect(page.getByRole('menu').getByRole('menuitem')).toHaveText(['Keep', 'Rename…', 'Delete…']);
+  await page.getByRole('menu').getByRole('menuitem', { name: 'Keep' }).click();
+  await expect(row.getByText('Scheduled', { exact: true })).toHaveCount(0);
+
+  await page.reload();
+  await expect(row).toContainText('Everything');
+  await expect(row.getByText('Scheduled', { exact: true })).toHaveCount(0);
+  await row.getByRole('button', { name: /^More actions/ }).click();
+  await expect(page.getByRole('menu').getByRole('menuitem')).toHaveText(['Rename…', 'Delete…']);
+});
+
 test('an uploaded Backup is not marked Scheduled', async ({ page, bandmate }) => {
   await bandmate.restoreDemo();
 

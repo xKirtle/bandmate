@@ -348,6 +348,7 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("PUT /api/backups/schedule", a.setBackupSchedule)
 	mux.HandleFunc("PATCH /api/backups/{id}", a.renameBackup)
 	mux.HandleFunc("DELETE /api/backups/{id}", a.deleteBackup)
+	mux.HandleFunc("POST /api/backups/{id}/keep", a.keepBackup)
 	mux.HandleFunc("GET /api/backups/{id}/file", a.backupFile)
 	mux.HandleFunc("GET /api/backups/{id}/songs", a.backupSongs)
 	mux.HandleFunc("GET /api/backups/{id}/beats", a.backupBeats)
