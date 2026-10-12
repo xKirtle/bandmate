@@ -51,7 +51,7 @@ type Schedule struct {
 	Keep   int    `json:"keep"`
 	// Due tells whether a Scheduled Backup is due now, while it's on: when
 	// the schedule has never tried to make one, its last try failed, or a
-	// Period has passed since it last made one or found nothing changed.
+	// Period has passed since its last try that didn't fail.
 	// It, and the status below, are ignored when the schedule is set.
 	Due bool `json:"due"`
 	// LastMadeAt is when the schedule last made a Scheduled Backup, nil if
@@ -68,8 +68,10 @@ const (
 	// Made means it made one.
 	Made Outcome = "made"
 	// Unchanged means it made none, as no Song or Beat had changed since it
-	// last made one, or there was nothing to back up.
+	// last made one.
 	Unchanged Outcome = "unchanged"
+	// Empty means it made none, as there was no Song and no Beat to back up.
+	Empty Outcome = "empty"
 	// Failed means it couldn't make one, so it's tried again at the next
 	// check.
 	Failed Outcome = "failed"
@@ -218,7 +220,7 @@ func (s *Store) CheckSchedule(ctx context.Context) {
 	}
 	if last.empty {
 		log.Printf("made no Scheduled Backup, as there's nothing to back up")
-		s.recordTry(ctx, Unchanged, "")
+		s.recordTry(ctx, Empty, "")
 		return
 	}
 	failed := func(err error) {

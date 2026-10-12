@@ -29,7 +29,7 @@ type backupSchedule struct {
 // scheduleTry is the schedule's last try at a Scheduled Backup.
 type scheduleTry struct {
 	At time.Time `json:"at"`
-	// Outcome is "made", "unchanged" or "failed".
+	// Outcome is "made", "unchanged", "empty" or "failed".
 	Outcome string `json:"outcome"`
 	// Error is why it failed.
 	Error string `json:"error"`
@@ -470,7 +470,7 @@ func TestWithNothingToBackUpNoScheduledBackupIsMadeUntilAPeriodLater(t *testing.
 	ts.app.CheckBackupSchedule()
 
 	s := ts.schedule()
-	if s.Due || s.Last == nil || s.Last.Outcome != "unchanged" || !s.Last.At.Equal(clock.Now()) ||
+	if s.Due || s.Last == nil || s.Last.Outcome != "empty" || !s.Last.At.Equal(clock.Now()) ||
 		s.Last.Error != "" || s.LastMadeAt != nil {
 		t.Fatalf("schedule = %+v, last = %+v, want nothing to back up now, never made, not due", s, s.Last)
 	}
@@ -485,6 +485,25 @@ func TestWithNothingToBackUpNoScheduledBackupIsMadeUntilAPeriodLater(t *testing.
 	ts.app.CheckBackupSchedule()
 	if list := ts.listBackups(); len(list) != 1 || !list[0].Scheduled {
 		t.Errorf("a week later, with a Song, backups = %+v, want a Scheduled Backup", list)
+	}
+}
+
+func TestOnceEverythingIsDeletedTheScheduleSaysThereIsNothingToBackUp(t *testing.T) {
+	clock := newScheduleClock()
+	ts := scheduledServer(t, clock, backupSchedule{On: true, Period: "weekly", Keep: 4})
+	made := clock.Now()
+	expectStatus(t, ts.Do(http.MethodDelete, songPath(ts.listSongs()[0].ID), nil), http.StatusNoContent)
+
+	clock.Advance(7 * 24 * time.Hour)
+	ts.app.CheckBackupSchedule()
+
+	s := ts.schedule()
+	if s.Due || s.Last == nil || s.Last.Outcome != "empty" || !s.Last.At.Equal(clock.Now()) ||
+		s.LastMadeAt == nil || !s.LastMadeAt.Equal(made) {
+		t.Errorf("schedule = %+v, last = %+v, want nothing to back up now, not due, the last made at %v", s, s.Last, made)
+	}
+	if list := ts.listBackups(); len(list) != 1 {
+		t.Errorf("backups = %+v, want still 1", list)
 	}
 }
 

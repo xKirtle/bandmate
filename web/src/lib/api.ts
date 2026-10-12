@@ -256,7 +256,7 @@ export interface BackupSchedule {
   /**
    * Whether a Scheduled Backup is due now, so one is being made: while it's
    * on, when the schedule has never tried to make one, its last try failed,
-   * or a period has passed since it last made one or found nothing changed.
+   * or a period has passed since its last try that didn’t fail.
    * Left out when it's set, as are the status fields below.
    */
   due: boolean;
@@ -268,11 +268,12 @@ export interface BackupSchedule {
 
 /**
  * A try at a Scheduled Backup: when, as an ISO time, and whether it made
- * one, made none as nothing had changed since the last, or failed, and why.
+ * one, made none as nothing had changed since the last or as there was
+ * nothing to back up, or failed, and why.
  */
 export interface BackupScheduleTry {
   at: string;
-  outcome: 'made' | 'unchanged' | 'failed';
+  outcome: 'made' | 'unchanged' | 'empty' | 'failed';
   error?: string;
 }
 

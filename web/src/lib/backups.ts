@@ -234,11 +234,10 @@ export function extrasNote(
 
 /**
  * How the schedule is doing, as the Scheduled Backups card says it under
- * its settings: when it last made one, that nothing has changed since (or,
- * having never made one, that there's nothing to back up), or that its last
- * try failed, when and why, which is `failed` so it's shown as
- * an error, and while it's on, that it's tried again; null before it has
- * tried to make one.
+ * its settings: when it last made one, that nothing has changed since, that
+ * there's nothing to back up, or that its last try failed, when and why,
+ * which is `failed` so it's shown as an error, and while it's on, that it's
+ * tried again; null before it has tried to make one.
  */
 export function scheduleStatus(
   schedule: Pick<BackupSchedule, 'on' | 'lastMadeAt' | 'last'>,
@@ -250,12 +249,15 @@ export function scheduleStatus(
     case 'made':
       return { text: `Last made ${timeAgo(last.at, now)}.`, failed: false };
     case 'unchanged':
+      // The schedule has always made one before finding nothing changed.
       return {
         text: lastMadeAt
           ? `Nothing has changed since the last one, made ${timeAgo(lastMadeAt, now)}.`
-          : 'There’s nothing to back up yet.',
+          : 'Nothing has changed since the last one.',
         failed: false,
       };
+    case 'empty':
+      return { text: 'There’s nothing to back up.', failed: false };
     case 'failed':
       return {
         text:

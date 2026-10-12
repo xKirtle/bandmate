@@ -7,13 +7,13 @@
 -- which counts as changed.
 --
 -- tried_at, outcome and failure are the schedule's last try at one: when, and
--- whether it made one, made none as nothing had changed (or there was nothing
--- to back up), or failed and why. The next is due a period after a try that
+-- whether it made one, made none as nothing had changed or there was nothing
+-- to back up, or failed and why. The next is due a period after a try that
 -- didn't fail.
 ALTER TABLE backup_schedule ADD COLUMN last_made_id INTEGER;
 ALTER TABLE backup_schedule ADD COLUMN made_fingerprint TEXT;
 ALTER TABLE backup_schedule ADD COLUMN tried_at TEXT;
-ALTER TABLE backup_schedule ADD COLUMN outcome TEXT CHECK (outcome IN ('made', 'unchanged', 'failed'));
+ALTER TABLE backup_schedule ADD COLUMN outcome TEXT CHECK (outcome IN ('made', 'unchanged', 'empty', 'failed'));
 ALTER TABLE backup_schedule ADD COLUMN failure TEXT;
 
 UPDATE backup_schedule SET tried_at = last_made_at, outcome = 'made' WHERE last_made_at IS NOT NULL;

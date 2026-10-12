@@ -382,10 +382,16 @@ describe('scheduleStatus', () => {
     });
   });
 
-  it('says there is nothing to back up yet when none was made, as there was nothing', () => {
-    expect(scheduleStatus({ on: true, lastMadeAt: null, last: { at: daysAgo(1), outcome: 'unchanged' } }, now)).toEqual(
-      { text: 'There’s nothing to back up yet.', failed: false },
-    );
+  it('says there is nothing to back up when the last try made none for that, whether or not one was made before', () => {
+    const empty = { at: daysAgo(1), outcome: 'empty' } as const;
+    expect(scheduleStatus({ on: true, lastMadeAt: null, last: empty }, now)).toEqual({
+      text: 'There’s nothing to back up.',
+      failed: false,
+    });
+    expect(scheduleStatus({ on: true, lastMadeAt: daysAgo(14), last: empty }, now)).toEqual({
+      text: 'There’s nothing to back up.',
+      failed: false,
+    });
   });
 
   it('says the last try failed, when and why, and that it is tried again', () => {
