@@ -230,6 +230,7 @@ type song struct {
 	BPM         *int      `json:"bpm"`
 	Capo        *int      `json:"capo"`
 	Tuning      string    `json:"tuning"`
+	Languages   []string  `json:"languages"`
 	Notes       string    `json:"notes"`
 	CreatedAt   string    `json:"createdAt"`
 	UpdatedAt   string    `json:"updatedAt"`

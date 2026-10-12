@@ -94,7 +94,8 @@
   const releaseCount = $derived(releases?.check === 'ok' ? ` (${releases.releases.length})` : '');
 
   /** The Dependencies tab's lists, Go's first, each with what it says when
-      it lists none. Programs ship only in Bandmate's image. */
+      it lists none. Programs ship only in Bandmate's image. Data, such as the
+      dictionaries Rhymes are found in, is built into the binary. */
   const dependencyLists = $derived(
     about
       ? [
@@ -106,6 +107,7 @@
             items: about.dependencies.programs,
             none: "None bundled: this Bandmate isn't running from its image.",
           },
+          { id: 'data', label: 'Data', items: about.dependencies.data, none: 'None recorded in this build.' },
         ]
       : [],
   );
@@ -364,7 +366,7 @@
           {:else if aboutError}
             <p class="error" role="alert">Couldn't load the dependencies: {aboutError}</p>
           {:else if about}
-            <p class="muted">The third-party packages and programs that ship in Bandmate, with their licenses.</p>
+            <p class="muted">The third-party packages, programs and data that ship in Bandmate, with their licenses.</p>
             <!-- Like the release notes, each list folds away; all start open. -->
             {#each dependencyLists as list (list.id)}
               <details class="dependencies" open>
@@ -382,6 +384,12 @@
                         <span class="dependency-license">
                           {#if d.url}<a href={d.url}>{d.license}</a>{:else}{d.license}{/if}
                         </span>
+                        {#if d.credit}
+                          <p class="muted dependency-credit">
+                            {#each d.credit as part, i (i)}{#if part.url}<a href={part.url}>{part.text}</a
+                                >{:else}{part.text}{/if}{/each}
+                          </p>
+                        {/if}
                       </li>
                     {/each}
                   </ul>
@@ -634,6 +642,12 @@
   .dependency-license {
     margin-left: auto;
     white-space: nowrap;
+  }
+  /* The attribution a license asks for, on a line of its own below. */
+  .dependency-credit {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: var(--text-md);
   }
   .card .dependency-none {
     padding: 0 0 var(--space-4) var(--space-6);

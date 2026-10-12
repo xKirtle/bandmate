@@ -1,10 +1,13 @@
 package app_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
+
+	"github.com/xKirtle/bandmate/internal/db"
 )
 
 func TestSongStatusCanChangeBetweenAnyStatuses(t *testing.T) {
@@ -97,10 +100,11 @@ func TestNewSongHasNoMetadata(t *testing.T) {
 
 	got := ts.createSong("Bare")
 
-	want := song{ID: got.ID, Version: got.Version, Title: "Bare", Status: "idea", CreatedAt: got.CreatedAt, UpdatedAt: got.UpdatedAt,
+	want := song{ID: got.ID, Version: got.Version, Title: "Bare", Status: "idea", Languages: []string{"en"},
+		CreatedAt: got.CreatedAt, UpdatedAt: got.UpdatedAt,
 		Arrangement: []int64{}, Sections: []section{}, Scrapbook: []int64{}, Masters: []master{}, Tags: []string{}}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("new song = %+v, want no key, BPM, capo, tuning, notes, Sections, Masters or Tags", got)
+		t.Errorf("new song = %+v, want it sung in English, with no key, BPM, capo, tuning, notes, Sections, Masters or Tags", got)
 	}
 }
 
@@ -148,6 +152,10 @@ func TestInvalidMetadataIsRejected(t *testing.T) {
 		"capo off neck":      {map[string]any{"capo": 25}, "capo must be between 0 and 24"},
 		"fractional BPM":     {map[string]any{"bpm": 92.5}, "request body must be valid JSON"},
 		"BPM as a string":    {map[string]any{"bpm": "fast"}, "request body must be valid JSON"},
+		"no languages":       {map[string]any{"languages": []string{}}, "a Song needs at least one language"},
+		"null languages":     {map[string]any{"languages": nil}, "a Song needs at least one language"},
+		"unknown language":   {map[string]any{"languages": []string{"en", "xx"}}, `there's no language "xx"`},
+		"language twice":     {map[string]any{"languages": []string{"en", "en"}}, `"en" is listed twice`},
 		"misspelt field":     {map[string]any{"stauts": "finished"}, `unknown field "stauts"`},
 		"dropped showCues":   {map[string]any{"showCues": false}, `unknown field "showCues"`},
 		"dropped showChords": {map[string]any{"showChords": false}, `unknown field "showChords"`},
@@ -190,4 +198,71 @@ func TestDeletingUnknownSongIsNotFound(t *testing.T) {
 	res := ts.Do(http.MethodDelete, "/api/songs/999", nil)
 
 	expectStatus(t, res, http.StatusNotFound)
+}
+
+func TestASongsLanguagesCanBeSetAndAreKept(t *testing.T) {
+	ts := newTestServer(t)
+	created := ts.createSong("Midnight Drive")
+
+	got := ts.updateSong(created.ID, map[string]any{"languages": []string{"pt", "en"}, "key": "Am"})
+
+	want := created
+	want.Key, want.Languages, want.Version, want.UpdatedAt = "Am", []string{"pt", "en"}, got.Version, got.UpdatedAt
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("song after setting its languages = %+v, want %+v", got, want)
+	}
+	if read := ts.getSong(created.ID); !reflect.DeepEqual(read.Languages, []string{"pt", "en"}) {
+		t.Errorf("languages read back = %q, want Portuguese, then English", read.Languages)
+	}
+}
+
+func TestASongCanBeSungInEveryLanguageListed(t *testing.T) {
+	ts := newTestServer(t)
+	created := ts.createSong("Babel")
+	var listed []struct {
+		Code string `json:"code"`
+	}
+	ts.Do(http.MethodGet, "/api/languages", nil).JSON(t, &listed)
+	codes := make([]string, len(listed))
+	for i, l := range listed {
+		codes[i] = l.Code
+	}
+
+	ts.updateSong(created.ID, map[string]any{"languages": codes})
+
+	if read := ts.getSong(created.ID); !reflect.DeepEqual(read.Languages, codes) {
+		t.Errorf("languages read back = %q, want every one listed, %q", read.Languages, codes)
+	}
+}
+
+func TestASongCanBeSungInPortugueseAlone(t *testing.T) {
+	ts := newTestServer(t)
+	created := ts.createSong("Saudade")
+
+	ts.updateSong(created.ID, map[string]any{"languages": []string{"pt"}})
+
+	if read := ts.getSong(created.ID); !reflect.DeepEqual(read.Languages, []string{"pt"}) {
+		t.Errorf("languages read back = %q, want Portuguese", read.Languages)
+	}
+}
+
+func TestSongsMadeBeforeLanguagesAreSungInEnglish(t *testing.T) {
+	dir := t.TempDir()
+	old, err := db.OpenBefore(context.Background(), dir, "0044_song_languages")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := old.Exec(`INSERT INTO songs (id, title, status, version, created_at, updated_at)
+		VALUES (3, 'Old Song', 'drafting', 4, '2025-01-02T03:04:05.000000000Z', '2025-01-02T03:04:05.000000000Z')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := old.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	ts := startTestServer(t, dir)
+
+	if got := ts.getSong(3); got.Title != "Old Song" || !reflect.DeepEqual(got.Languages, []string{"en"}) {
+		t.Errorf("song = %+v, want Old Song, sung in English", got)
+	}
 }

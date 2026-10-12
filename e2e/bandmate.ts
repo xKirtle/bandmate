@@ -75,6 +75,8 @@ export interface NewSong {
   status?: Status;
   folder?: Folder;
   tags?: string[];
+  /** The Languages its Lines are sung in, in order. */
+  languages?: string[];
 }
 
 /** The worker's Bandmate, through its HTTP API: what's in it, and making more. */
@@ -82,10 +84,10 @@ export class Bandmate {
   constructor(private readonly api: APIRequestContext) {}
 
   /** Makes a Song, as New Song does, then gives it what's asked for. */
-  async song({ title, status, folder, tags }: NewSong = {}): Promise<Song> {
+  async song({ title, status, folder, tags, languages }: NewSong = {}): Promise<Song> {
     let song = await json<Song>(this.api.post('/api/songs', { data: { folderId: folder?.id ?? null } }));
-    if (title !== undefined || status !== undefined) {
-      song = await json<Song>(this.api.patch(`/api/songs/${song.id}`, { data: { title, status } }));
+    if (title !== undefined || status !== undefined || languages !== undefined) {
+      song = await json<Song>(this.api.patch(`/api/songs/${song.id}`, { data: { title, status, languages } }));
     }
     if (tags) await json(this.api.put(`/api/songs/${song.id}/tags`, { data: { tags } }));
     return song;

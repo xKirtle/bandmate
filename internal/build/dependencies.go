@@ -27,6 +27,16 @@ type Dependency struct {
 	License string `json:"license"`
 	// URL is where to look up a license that couldn't be identified.
 	URL string `json:"url,omitempty"`
+	// Credit is the attribution its licence asks for, where that's more
+	// than its name, such as the data it was built from: a sentence, in
+	// parts, some of them links.
+	Credit []Link `json:"credit,omitempty"`
+}
+
+// Link is a part of a Credit: text, and where it links to, if anywhere.
+type Link struct {
+	Text string `json:"text"`
+	URL  string `json:"url,omitempty"`
 }
 
 // UnknownLicense is a License that couldn't be identified.

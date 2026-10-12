@@ -13,10 +13,10 @@ Every song is in one list. Search it by title, filter it by status, tag or wheth
 
 Write lyrics the way you would in a notebook, with the chords right where you play them.
 
-<img src="@screenshots/write-mode-labelled.png" alt="A song in Write mode, numbered 1 to 9 to match the list below it">
+<img src="@screenshots/write-mode-labelled.png" alt="A song in Write mode, numbered 1 to 10 to match the list below it">
 
 1. **Status**: where the song is at: an idea, a draft, or finished.
-2. **Song details**: its key, tempo, capo and tuning, and notes of your own.
+2. **Song details**: its key, tempo, capo and tuning, the languages it's sung in, and notes of your own. Languages offers only those Bandmate suggests [rhymes](#rhymes) in, so others aren't on the list yet.
 3. **Write and Read**: Read mode shows the song large and uncluttered, to play from. Finished songs open in it.
 4. **A section**: one part of the song, named however you like: a verse, a chorus, a hook. Move sections around, or repeat one wherever it comes back.
 5. **Chords**: typed in brackets right before the syllable they land on, even mid-word. Read mode shows them above the words.
@@ -24,12 +24,22 @@ Write lyrics the way you would in a notebook, with the chords right where you pl
 7. **Alternates**: other versions of a section. Write a few, and pick the one the song uses. The others wait here until you change your mind.
 8. **Line timings**: when each line starts in the song, set as you [sync](#sync). They appear once the [timeline](#timeline) has some audio on it: a beat, a take or another sound.
 9. **Scrapbook**: sections that aren't in the song: leftovers and ideas to come back to.
+10. **Rhymes**: suggestions for the word you're writing. See [Rhymes](#rhymes).
 
 And this is Read mode, here on a phone: the chords over the words, and how to play each one at the top. The button at the top right sets the text size, hides or transposes the chords, and shows or pins the chord shapes.
 
 <img class="phone" src="@screenshots/phone-lyric-sheet.png" alt="A song in Read mode on a phone, with the chord shapes at the top">
 
 Hover or tap a chord, or tap its shape at the top, to step through the other ways to play it, and prefer one. Press the speaker to hear the shape strummed, in the song's tuning. It plays the shape as you'd finger it, so the capo doesn't change it, and it plays over the song if that's playing.
+
+### Rhymes
+
+The **Rhymes** button suggests rhymes for the word you're writing. It's there on a wide window, like a desktop's, and can't be on while you [sync](#sync).
+
+- Download a rhyming dictionary for each language you write in, in **Settings → Rhyming dictionaries**, on each device you write on.
+- A song's rhymes are in the languages set in its details.
+
+Want rhymes in your language? See [Adding a rhyming language](https://github.com/xKirtle/bandmate/blob/main/CONTRIBUTING.md#adding-a-rhyming-language).
 
 ## Chords
 
@@ -182,9 +192,10 @@ Under the settings, the card says when the last Scheduled Backup was made, that 
 - **This device**: what each device keeps for itself.
   - **Appearance**: three colour palettes, Terracotta (the default), Ink and Olive, each in light and dark. Follow your system's light or dark, or pick one. More palettes may come.
   - **Recording**: every input on this device, each channel of an audio interface on its own, with its latency or "Not calibrated" or "Skipped". Pick the one you record from, and check its level with **Test input** above the list: Bandmate only listens while it's on, and asks for the microphone the first time. Open any of them to calibrate it as in [Calibrate](#calibrate) without recording from it, or type its latency. Inputs that aren't plugged in keep their latency, listed under **Not connected**, to forget.
+  - **Rhyming dictionaries**: one for each language Bandmate suggests rhymes in, each with its download size. Download the ones you write in, so [Rhymes](#rhymes) can suggest words in them, or remove one you no longer need.
   - **Chord diagrams**: flip them for left-handed playing.
 - **Backups**: see [Backups](#backups).
-- **About**: the version you're running, what changed in it, whether a newer one is out, and the yt-dlp in use.
+- **About**: the version you're running, what changed in it, whether a newer one is out, the yt-dlp in use, and the packages and data that ship in Bandmate, with their licenses.
 
 ## What's next
 

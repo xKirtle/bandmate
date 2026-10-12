@@ -1,6 +1,6 @@
 <script lang="ts">
   import Keyboard from '@lucide/svelte/icons/keyboard';
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { api, commonKeys, type Song, type Status } from '../lib/api';
   import Combobox from '../lib/Combobox.svelte';
@@ -17,11 +17,13 @@
   import TagsField from '../lib/TagsField.svelte';
   import Timeline from '../lib/Timeline.svelte';
   import TuningField from '../lib/TuningField.svelte';
+  import LanguagesField from '../lib/LanguagesField.svelte';
   import { LyricSheetEditing } from '../lib/lyricSheetEditing.svelte';
   import { Saves } from '../lib/saves.svelte';
   import { detailFields, type DetailFields } from '../lib/songFields';
   import { cancelOnEscape, committedAsItGoes, leaveOnEscape } from '../lib/typedField.svelte';
   import { SyncMode } from '../lib/syncMode.svelte';
+  import { RhymeMode } from '../lib/rhymeMode.svelte';
   import { songServer } from '../lib/songServer';
   import { takeNewFlag } from '../lib/newSong';
   import { navigate, replaceSearch, router } from '../lib/router.svelte';
@@ -34,6 +36,10 @@
   import { chordsInRead } from '../lib/chordChart';
   import { songChordsShown } from '../lib/chordsShown';
   import { songTranspose } from '../lib/sharedTranspose.svelte';
+  import { rhymingDictionaries } from '../lib/sharedRhymingDictionaries.svelte';
+  import { lyricsLanguage, type CaretListener } from '../lib/lyricsLanguage';
+  import { lookUpRhymes } from '../lib/rhymeLookup';
+  import RhymesCard from '../lib/RhymesCard.svelte';
   import { timeAgo } from '../lib/time';
 
   let { id }: { id: number } = $props();
@@ -69,6 +75,9 @@
   // A Status picked, shown until its save ends.
   let statusSent = $state<Status | null>(null);
   const status = $derived(statusSent ?? song?.status ?? 'idea');
+  // The Languages picked, shown until their save ends.
+  let languagesSent = $state<string[] | null>(null);
+  const languages = $derived(languagesSent ?? song?.languages ?? []);
   const title = $derived(details?.title.shown ?? '');
   let loadError = $state<string | null>(null);
   let deleting = $state(false);
@@ -91,6 +100,42 @@
   // shows none, e.g. when only the Scrapbook has Chords.
   const transpose = $derived(
     song && chordsInRead(song) === 'shown' && songChordsShown.of(id) ? songTranspose.of(id) : 0,
+  );
+  // Rhyme mode, which the Lyric Sheet draws the toggle of: see
+  // rhymeMode.svelte.ts. Like the side column, it's only on a desktop-wide
+  // window, and Sync mode and it are never on together.
+  const desktop = new MediaQuery('min-width: 80rem');
+  const rhymeMode = new RhymeMode({ mode: () => mode, wide: () => desktop.current, sync: syncMode });
+  // Rhymes, while Rhyme mode is on, worked out here from the dictionaries of
+  // the Song's Languages downloaded to this device: only then are they read in,
+  // once for as long as the page is open, and nothing is downloaded for a
+  // Language that isn't downloaded. The card's are for the word at the caret of
+  // the Line that has focus, kept once the caret leaves, or for one typed
+  // into it, until the caret moves in a Line again. They're in the Language
+  // the word is read in, or in another of the Song's Languages picked for it.
+  $effect(() => {
+    if (rhymeMode.on) rhymingDictionaries.use(languages);
+  });
+  const lyrics = $derived(lyricsLanguage(rhymingDictionaries.loaded));
+  let cardWord = $state<string | null>(null);
+  let cardLanguage = $state<string | null>(null);
+  function setCardWord(word: string | null) {
+    if (word !== cardWord) cardLanguage = null;
+    cardWord = word;
+  }
+  const heardCaret: CaretListener = (at) => {
+    const word = at && lyrics.wordAt(at.text, at.caret);
+    if (word) setCardWord(word);
+  };
+  const onCaret = $derived(rhymeMode.on ? heardCaret : undefined);
+  const cardRhymes = $derived(
+    lookUpRhymes(
+      lyrics,
+      rhymeMode.on ? cardWord : null,
+      languages,
+      cardLanguage,
+      rhymingDictionaries.loading(languages),
+    ),
   );
   // The Details as Read mode shows them, with the key the Chords are shown in.
   const summary = $derived(
@@ -116,13 +161,17 @@
 
   // Desktop puts the Scrapbook and Masters in a column beside the Lyric
   // Sheet, as sections that open and close, each as sideParts starts it on
-  // each visit until it's toggled. Narrower windows show them after the
-  // Lyric Sheet, always open. Keyed by name, switching moves them rather
-  // than rebuilding them.
-  const desktop = new MediaQuery('min-width: 80rem');
-  const parts = $derived(sideParts(mode));
+  // each visit until it's toggled, with the Rhymes card in Rhyme mode.
+  // Narrower windows show the Scrapbook and Masters after the Lyric Sheet,
+  // always open. Keyed by name, switching moves them rather than rebuilding
+  // them.
+  const parts = $derived(sideParts(mode, { rhymes: rhymeMode.on }));
   // Parts opened or closed by hand, per mode.
   let toggledParts = $state<Partial<Record<`${Mode}-${SidePart}`, boolean>>>({});
+  // The Rhymes card is open each time Rhyme mode comes on, however it was left.
+  $effect(() => {
+    if (!rhymeMode.on) untrack(() => delete toggledParts['write-rhymes']);
+  });
 
   function partOpen(part: SidePart, startsOpen: boolean): boolean {
     return !desktop.current || (toggledParts[`${mode}-${part}`] ?? startsOpen);
@@ -232,6 +281,13 @@
     statusSent = next;
     await saves.submit((at) => api.updateSong(at, { status: next }));
     if (statusSent === next) statusSent = null;
+  }
+
+  async function setLanguages(next: string[]) {
+    if (!saves) return;
+    languagesSent = next;
+    await saves.submit((at) => api.updateSong(at, { languages: next }));
+    if (languagesSent === next) languagesSent = null;
   }
 
   // The title wraps in Write mode as it does in Read mode, so switching
@@ -444,6 +500,15 @@
                   customNotes={details.customTuning}
                 />
               </div>
+              <div class="field languages">
+                <span id="song-languages-label">Languages</span>
+                <LanguagesField
+                  id="song-languages"
+                  labelledby="song-languages-label"
+                  value={languages}
+                  onchange={setLanguages}
+                />
+              </div>
               {@render notesToggle()}
             </div>
             <div class="field tags">
@@ -501,6 +566,8 @@
           playFrom={(at) => timelinePanel?.playFrom(at)}
           {recording}
           {syncMode}
+          {rhymeMode}
+          {onCaret}
           hasClips={timeline?.tracks.some((t) => t.clips.length > 0) ?? false}
         />
       </div>
@@ -520,9 +587,17 @@
             {#if part === 'masters'}
               <summary><FoldChevron />{song.masters.length > 1 ? 'Masters' : 'Master'}</summary>
               <Masters {song} {mode} submit={saves.submit} typing={saves.typing} {setStatus} {recording} />
+            {:else if part === 'rhymes'}
+              <summary><FoldChevron />Rhymes</summary>
+              <RhymesCard
+                lookup={cardRhymes}
+                setWord={setCardWord}
+                {languages}
+                pickLanguage={(code) => (cardLanguage = code)}
+              />
             {:else}
               <summary><FoldChevron />Scrapbook</summary>
-              <Scrapbook {song} {drag} {editing} />
+              <Scrapbook {song} {drag} {editing} {onCaret} />
             {/if}
           </details>
         {/each}
@@ -728,6 +803,11 @@
     flex: 0 1 auto;
     min-width: 6rem;
   }
+  /* Room for a Language's name beside the ▾, growing to fit several. */
+  .languages {
+    flex: 0 1 auto;
+    min-width: 7rem;
+  }
   .notes-toggle {
     gap: var(--space-2);
   }
@@ -816,6 +896,11 @@
     }
     .tuning {
       grid-column: span 2;
+      min-width: 0;
+    }
+    /* Its grid column, not the row's minimum, sets its width: a phone's
+       third of the row is narrower than that, and it would overflow it. */
+    .languages {
       min-width: 0;
     }
     .key :global(input),

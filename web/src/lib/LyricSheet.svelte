@@ -53,11 +53,13 @@
   import { shortcuts } from './shortcuts';
   import { cuesNextLine } from './syncKeys';
   import type { SyncMode } from './syncMode.svelte';
+  import type { RhymeMode } from './rhymeMode.svelte';
   import { inTextField } from './textField';
   import { deviceStorage } from './deviceStorage';
   import { songChordsShown } from './chordsShown';
   import { lyricSize } from './sharedLyricSize.svelte';
   import { songTranspose } from './sharedTranspose.svelte';
+  import type { CaretListener } from './lyricsLanguage';
 
   let {
     song,
@@ -70,6 +72,8 @@
     playFrom,
     recording = false,
     syncMode,
+    rhymeMode,
+    onCaret,
   }: {
     song: Song;
     /** The Song page's mode: Write edits the raw text; Read shows Chords above the lyrics. */
@@ -98,6 +102,10 @@
     recording?: boolean;
     /** Sync mode, which the Lyric Sheet draws, and sends its switching, cueing and picking through. */
     syncMode: SyncMode;
+    /** Rhyme mode, whose toggle the Lyric Sheet draws, where it can be on. */
+    rhymeMode: RhymeMode;
+    /** Given, as in Rhyme mode, hears where the caret is in a Section's Lines, to suggest Rhymes. */
+    onCaret?: CaretListener;
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
@@ -396,6 +404,17 @@
         title="Clear every Cue in the Song">Clear all Cues</button
       >
     {/if}
+    {#if rhymeMode.canBeOn}
+      <!-- Clicked, it keeps focus where it was, so the caret stays on the word it suggests Rhymes for. -->
+      <button
+        type="button"
+        class="button toggle"
+        aria-pressed={rhymeMode.on}
+        onpointerdown={(e) => e.preventDefault()}
+        onclick={() => rhymeMode.switch()}
+        title="Suggest Rhymes for the word at the cursor">Rhymes</button
+      >
+    {/if}
     {#if mode === 'write' && wide.current}
       <!-- Clicked, it keeps focus where it was, so Space then plays rather than switching it back off. -->
       <button
@@ -498,6 +517,7 @@
               autofocus={added === section.id}
               {editing}
               cueing={cueingFor(section)}
+              {onCaret}
               more={sectionActions(section, i)}
               {drag}
               places={placesOut}

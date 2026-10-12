@@ -1,7 +1,7 @@
 // How Backups are named, sized and asked for in Settings' Backups tab.
 import type { Backup, BackupContents, BackupPeriod, BackupPicks, BackupPresent, BackupSchedule } from './api';
 import { timeAgo } from './time';
-import { formatSize } from './upload';
+import { formatSmallSize } from './upload';
 
 // Spelled out rather than left to the locale, which may shorten September
 // to "Sept".
@@ -273,7 +273,5 @@ export function restorable(backup: Pick<Backup, 'songs' | 'beats'>): boolean {
   return backup.songs > 0 || backup.beats > 0;
 }
 
-/** A Backup's size: "8 KB" under a megabyte, where "0.0 MB" would say nothing, and "4.2 MB" from there. */
-export function backupSize(bytes: number): string {
-  return bytes < 1 << 20 ? `${Math.ceil(bytes / 1024)} KB` : formatSize(bytes);
-}
+/** A Backup's size, as any size that may be small is written. */
+export const backupSize = formatSmallSize;

@@ -8,12 +8,14 @@
   import type { SectionDragging } from './sectionDragging.svelte';
   import ActionsMenu from './ActionsMenu.svelte';
   import SectionEditor from './SectionEditor.svelte';
+  import type { CaretListener } from './lyricsLanguage';
   import { card, describe, labelOf, places, putBackActions, sectionsInArrangement } from './sections';
 
   let {
     song,
     drag,
     editing,
+    onCaret,
   }: {
     song: Song;
     /** The drag of a Section, shared with the Lyric Sheet. */
@@ -24,6 +26,8 @@
      * editor while they aren't saved.
      */
     editing: LyricSheetEditing;
+    /** Given, as in Rhyme mode, hears where the caret is in the open Section's Lines, to suggest Rhymes. */
+    onCaret?: CaretListener;
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
@@ -156,6 +160,7 @@
               more={[{ icon: Trash2, label: 'Delete for good', run: () => remove(section.id) }]}
               {drag}
               places={placesBack}
+              {onCaret}
             >
               {#snippet grip()}
                 {@render dragGrip(section.id)}

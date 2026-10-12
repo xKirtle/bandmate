@@ -7,6 +7,7 @@
   import { tick, untrack, type Snippet } from 'svelte';
   import ActionsMenu from './ActionsMenu.svelte';
   import AlternateText, { type Cueing } from './AlternateText.svelte';
+  import type { CaretListener } from './lyricsLanguage';
   import { suggestedLabels, type Alternate, type Section } from './api';
   import Combobox from './Combobox.svelte';
   import type { LyricSheetEditing } from './lyricSheetEditing.svelte';
@@ -26,6 +27,7 @@
     cueing,
     drag,
     places = [],
+    onCaret,
   }: {
     section: Section;
     /** Focus the Label when this becomes true, e.g. for a Section just added. */
@@ -44,6 +46,8 @@
     drag?: SectionDragging;
     /** Where in the Lyric Sheet an inactive Alternate can be moved to, as a Section of its own. */
     places?: Place[];
+    /** Given, hears where the caret is in the text box, to suggest Rhymes for the word at it. */
+    onCaret?: CaretListener;
   } = $props();
 
   // The server guarantees exactly one active Alternate.
@@ -314,7 +318,7 @@
     </div>
   {:else}
     {#key active.id}
-      <AlternateText alternate={active} sectionId={section.id} label="Lines" {editing} {cueing} />
+      <AlternateText alternate={active} sectionId={section.id} label="Lines" {editing} {cueing} {onCaret} />
     {/key}
   {/if}
 </article>

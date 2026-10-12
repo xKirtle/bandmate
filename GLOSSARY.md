@@ -7,7 +7,7 @@ A personal songwriting companion: write and structure lyrics with chords, then r
 ### Songs
 
 **Song**:
-The unit of work: one piece of music being written, with its Lyric Sheet, Timeline, Cover and metadata (key, BPM, capo, tuning, notes).
+The unit of work: one piece of music being written, with its Lyric Sheet, Timeline, Cover and metadata (key, BPM, capo, tuning, Languages, notes).
 _Avoid_: Project, track (a Track is something else)
 
 **As shown**:
@@ -93,6 +93,18 @@ _Avoid_: Zoom, font size, text size
 
 **Key**:
 The key a Song is written in, one of its Details. Like a Chord, with a capo on it names the shapes fingered, not the pitch that sounds: capo 2 in G sounds in A.
+
+**Languages**:
+The languages a Song's Lines are sung in, one of its Details; a Song that mixes them has several, and each word is read in the first of them, in the Song's order, whose rhyming dictionary downloaded to this Device has it. Any Language Bandmate rhymes in can be picked, downloaded or not; one that isn't downloaded is never guessed at.
+_Avoid_: Locale
+
+**Syllable Count**:
+How many syllables a suggested Rhyme has, shown beside it to help pick one that fits the meter. Lines don't get one.
+_Avoid_: Meter, syllables
+
+**Rhyme**:
+A word whose ending sounds like another's: perfect when its last stressed vowel and everything after it sound the same, near when only the vowels do.
+_Avoid_: Slant rhyme (say near Rhyme)
 
 **Chord Finder**:
 A built-in reference for Chords: look up how to play one, name one from the notes placed on an Instrument, and get Chords that go well with a Chord or a Key. A Voicing can be heard there, strummed or one string at a time. It has its own page and isn't opened from a Song. The user picks the tuning, and the last one picked is kept on each device. It has no capo: a Chord names the shape fingered, so a capo changes nothing about how it is played. It holds nothing of the user's. The app titles its page and navigation label Chords.
@@ -199,8 +211,12 @@ A link from one Line to a time on the Timeline; a Line has at most one. A Sectio
 _Avoid_: Timestamp, sync point, marker
 
 **Sync mode**:
-A way of syncing a Song's Lines while the Timeline plays: as each Line starts, marking it "Now" cues it at the playhead, and the Line after it comes up next, cued or not, so a run of Lines can be retaken. Clicking a Line makes it the next one; with none clicked or just cued, the next one is the first Line without a Cue, or the first Line once every Line is cued. There's always a next Line. The Line playing is followed as usual, except that the next Line's own Cue is ignored until it's cued again, so the Line being retaken only becomes the one playing when it's marked "Now". Which Line is next never depends on where playback is, so playback can start anywhere, and playing from a Cue leaves the next Line where it is. Sync mode needs a Clip on the Timeline, and Sync mode and the Loop are never on together. Sync mode is only for cueing, so changing the lyrics ends it, playback carrying on: changing the Arrangement or a Section in it, moving a Section between the Scrapbook and the Arrangement, opening or adding a Section in the Scrapbook, or opening a Section's Alternates. Working with Cues never does, whether one Line's, a Section's or every one.
+A way of syncing a Song's Lines while the Timeline plays: as each Line starts, marking it "Now" cues it at the playhead, and the Line after it comes up next, cued or not, so a run of Lines can be retaken. Clicking a Line makes it the next one; with none clicked or just cued, the next one is the first Line without a Cue, or the first Line once every Line is cued. There's always a next Line. The Line playing is followed as usual, except that the next Line's own Cue is ignored until it's cued again, so the Line being retaken only becomes the one playing when it's marked "Now". Which Line is next never depends on where playback is, so playback can start anywhere, and playing from a Cue leaves the next Line where it is. Sync mode needs a Clip on the Timeline, and Sync mode and the Loop are never on together, nor Sync mode and Rhyme mode. Sync mode is only for cueing, so changing the lyrics ends it, playback carrying on: changing the Arrangement or a Section in it, moving a Section between the Scrapbook and the Arrangement, opening or adding a Section in the Scrapbook, or opening a Section's Alternates. Working with Cues never does, whether one Line's, a Section's or every one.
 _Avoid_: Tap mode, record mode
+
+**Rhyme mode**:
+A way of writing with Rhymes suggested for the word at the caret, as it's written: in the Lyric Sheet's Lines, a Section's Alternates or a Section in the Scrapbook, keeping the last word once the caret leaves. Only in Rhyme mode does the Rhymes card show; editing works as it does without it, and a suggested Rhyme is only for reference. It's only on in Write mode on a wide window, like a desktop's, and Rhyme mode and Sync mode are never on together: switching one on switches the other off. Recording and the Loop leave it on. Each visit to a Song starts with it off, and leaving Write mode or the window narrowing ends it, until it's switched on again.
+_Avoid_: Writing aids, rhyme helper
 
 **Latency Offset**:
 The delay between what the user heard and what the mic captured, the full round trip, measured by calibration once per Input on each device, since it belongs to the hardware chain and each input of an interface can reach the browser with a different delay. Calibration is a sheet opened for one Input, which it names. Clicks play, and each one's delay is measured as the mic hears it and averaged with the rest, leaving out those far from the others, while a metronome swings upright as each click is heard. There are two calibration methods: hands-free, the default, where headphones rest on the mic so it hears the clicks itself, which is the most exact; and tap along, where the user taps or claps on the mic in time with the clicks they hear. Calibration finishes by itself once the average is known to within 4 ms, from at least 10 taps that agree, or once 24 agree, or once 40 clicks have played, about 30 seconds, whether the mic heard them or not, whichever comes first; it can be finished early once 6 agree. Stopped with fewer than 6 agreeing, it goes back to the calibration method, saying the mic heard too little, or too few of what it heard agreed. A tap agrees when it's within 50 ms of the others' median, loose enough for tapping by hand. Pause keeps the sheet open, to start over, finish, change the method or quit. The result shows the change from the offset there was, or the browser's estimate, and only Save keeps it: Quit or Discard keep the offset there was. It's offered before an Input's first recording, and can be skipped for that Input and run later from Settings; until then, the latency the browser reports stands in. An offset already known can be typed instead, in whole milliseconds from 0 to 500, beside the Input in Settings, and is kept as a calibrated one is. An Input keeps its offset while its device is unplugged, until it's forgotten in Settings, which lists every Input: the default input and each channel of each device connected, to record from or calibrate, then those not connected that have an offset or were skipped, to forget. The Timeline's mic button lists those connected, only to pick the one recorded from. Each Take is placed earlier by the offset it was recorded with and keeps it, so recalibrating never moves it, and it can be nudged by hand.
@@ -233,7 +249,7 @@ The browser, on a computer or phone, that Bandmate is opened in. What's kept "on
 _Avoid_: Browser (in the UI), machine
 
 **Device Setting**:
-A choice the user makes on purpose about how Bandmate works on this Device, whatever the Song: the Palette, light or dark, the Input, each Input's Latency Offset and left-handed Chord diagrams. Every one is listed together in Settings, even when it's also changed where it's used. What's simply remembered from last time, like a volume, a step or a Song's Transpose, isn't one.
+A choice the user makes on purpose about how Bandmate works on this Device, whatever the Song: the Palette, light or dark, the Input, each Input's Latency Offset, the rhyming dictionaries downloaded and left-handed Chord diagrams. Every one is listed together in Settings, even when it's also changed where it's used. What's simply remembered from last time, like a volume, a step or a Song's Transpose, isn't one.
 _Avoid_: Preference, local setting
 
 **Palette**:

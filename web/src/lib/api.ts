@@ -18,6 +18,8 @@ export interface Song {
   bpm: number | null;
   capo: number | null;
   tuning: string;
+  /** The ISO 639-1 codes of the languages its Lines are sung in, in the user's order: always at least one. */
+  languages: string[];
   notes: string;
   createdAt: string;
   updatedAt: string;
@@ -167,7 +169,9 @@ export const commonKeys: readonly string[] = [
 ];
 
 /** A partial update: only the fields present change; "" or null clears one. */
-export type SongChanges = Partial<Pick<Song, 'title' | 'status' | 'key' | 'bpm' | 'capo' | 'tuning' | 'notes'>>;
+export type SongChanges = Partial<
+  Pick<Song, 'title' | 'status' | 'key' | 'bpm' | 'capo' | 'tuning' | 'languages' | 'notes'>
+>;
 
 /** Narrows the Song list. */
 export interface SongFilter {
@@ -675,6 +679,22 @@ export interface Fetched {
   size: number;
 }
 
+/** A Language Bandmate rhymes in: one a Song can be sung in, whose rhyming dictionary can be downloaded. */
+export interface ListedLanguage {
+  /** Its ISO 639-1 code, e.g. "en". */
+  code: string;
+  /** Its name, in English, e.g. "English". */
+  name: string;
+  /** How much a browser downloads to download its rhyming dictionary, in bytes, compressed. */
+  size: number;
+}
+
+/** A Language's data as Bandmate serves it, and the tag that changes along with it. */
+export interface LanguageDataDownload {
+  etag: string;
+  text: string;
+}
+
 /** Everything About shows that's known without going online. */
 export interface AboutInfo {
   /** The running version: the release tag, else the short commit, else "dev". */
@@ -703,19 +723,23 @@ export interface AboutInfo {
   details: string;
   /** The third-party packages that ship in Bandmate: the Go modules the
       server is built from, the web packages in the SPA's bundle, and the
-      programs bundled beside them in the image (none outside it). */
-  dependencies: { go: Dependency[]; web: Dependency[]; programs: Dependency[] };
+      programs bundled beside them in the image (none outside it), and the
+      data built into the binary, such as the dictionaries Rhymes are found
+      in. */
+  dependencies: { go: Dependency[]; web: Dependency[]; programs: Dependency[]; data: Dependency[] };
 }
 
-/** A third-party package or program that ships in Bandmate. */
+/** A third-party package, program or set of data that ships in Bandmate. */
 export interface Dependency {
-  /** A Go module's path, a web package's name, or a program's name. */
+  /** A Go module's path, a web package's name, a program's name, or the data's. */
   name: string;
   version: string;
   /** Its SPDX identifier, e.g. MIT, or "Unknown" when it couldn't be identified. */
   license: string;
   /** Where to look up a license that couldn't be identified. */
   url?: string;
+  /** The attribution its license asks for, where that's more than its name: a sentence, in parts, some of them links. */
+  credit?: { text: string; url?: string }[];
 }
 
 /** The yt-dlp that fetches links: the image's own (or one mounted over it), or the copy Update yt-dlp keeps in the data folder, whichever is newer. */
@@ -833,6 +857,25 @@ async function answer<T>(sent: Promise<Response>, read?: (res: Response) => Prom
   return data as T;
 }
 
+/**
+ * A Language's data, as text, to find Rhymes in: or null when it's still
+ * that tagged `etag`. Not left in the browser's cache, as it's kept apart.
+ */
+async function getLanguageData(code: string, etag?: string): Promise<LanguageDataDownload | null> {
+  let res: Response;
+  try {
+    res = await fetch(`/api/languages/${encodeURIComponent(code)}`, {
+      cache: 'no-store',
+      headers: etag ? { 'If-None-Match': etag } : undefined,
+    });
+  } catch {
+    throw new ApiError(0, "Can't reach Bandmate. Check your connection.");
+  }
+  // Not ok, so told apart before answer reads it as a failure.
+  if (res.status === 304) return null;
+  return answer(Promise.resolve(res), async (r) => ({ etag: r.headers.get('ETag') ?? '', text: await r.text() }));
+}
+
 /** A Cover's pictures and details, as the server takes them. */
 function coverForm(cover: PreparedCover): FormData {
   const form = new FormData();
@@ -865,6 +908,9 @@ function onTracks(clips: readonly (PlacedClip | PastedClip)[]) {
 export const api = {
   getConfig: () => request<ServerConfig>('GET', '/config'),
   getAbout: () => request<AboutInfo>('GET', '/about'),
+  /** Every Language Bandmate rhymes in, in order, with its name and download size. */
+  getLanguages: () => request<ListedLanguage[]>('GET', '/languages'),
+  getLanguageData,
   /** Asks GitHub, unless the server recently has, so it's slower than the rest of About. */
   getAboutReleases: () => request<ReleasesReport>('GET', '/about/releases'),
   /** Runs yt-dlp the first time, so it can be slower than the rest of About. */

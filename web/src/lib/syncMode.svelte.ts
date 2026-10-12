@@ -11,6 +11,9 @@
 //   Loop off, and the Loop coming on, however it does (switched on, set by
 //   dragging, brought back by an undo), ends it.
 // - Recording starting ends it, and the Timeline refuses Record while it's on.
+// - It and Rhyme mode are never on together, which Rhyme mode keeps (see
+//   rhymeMode.svelte.ts): Rhyme mode coming on ends it, and it coming on
+//   ends Rhyme mode.
 // - Changing the lyrics ends it, through Lyric Sheet editing calling end().
 // - Once ended, for whatever reason, it stays off until switched on again,
 //   even when what ended it changes back.

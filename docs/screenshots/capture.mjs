@@ -281,6 +281,7 @@ async function number(page, places, { first = 1, into } = {}) {
       page.getByRole("button", { name: /^Cue for Line 1 of Verse 1/ }),
     ),
     await textEnd(scrapbook),
+    await below(page.getByRole("button", { name: "Rhymes", exact: true })),
   ]);
 
   // From the nav rail to the Scrapbook's edge, down to the Chorus's foot.

@@ -48,6 +48,7 @@
   import { keyHints } from './keyHints';
   import type { LyricSheetEditing } from './lyricSheetEditing.svelte';
   import { shortcuts } from './shortcuts';
+  import type { CaretListener } from './lyricsLanguage';
 
   let {
     alternate,
@@ -55,6 +56,7 @@
     label,
     editing,
     cueing,
+    onCaret,
   }: {
     alternate: Alternate;
     /** The Section whose editor the text box is in. */
@@ -65,7 +67,29 @@
     editing: LyricSheetEditing;
     /** Given, the Lines get a backdrop behind the text box to highlight and cue them. */
     cueing?: Cueing;
+    /** Given, hears where the caret is in the text box while it has focus, and null once it hasn't. */
+    onCaret?: CaretListener;
   } = $props();
+
+  // Where the caret is, told as it moves while the text box has focus, by
+  // typing, clicking or the arrow keys, and that it's gone once it hasn't,
+  // as when the box goes with focus in it, which doesn't blur it.
+  let textEl = $state<HTMLTextAreaElement>();
+
+  function tellCaret() {
+    if (textEl && document.activeElement === textEl) onCaret?.({ text: textEl.value, caret: textEl.selectionStart });
+  }
+
+  function followCaret(el: HTMLTextAreaElement) {
+    if (!onCaret) return;
+    // Told straight away too, e.g. as Rhymes come on with the box focused.
+    tellCaret();
+    document.addEventListener('selectionchange', tellCaret);
+    return () => {
+      document.removeEventListener('selectionchange', tellCaret);
+      if (document.activeElement === el) onCaret?.(null);
+    };
+  }
 
   // Saves always go to the Alternate this box was made for; a different
   // Alternate gets its own box.
@@ -190,12 +214,23 @@
     class="text"
     bind:value={() => text, box.type}
     readonly={!!cueing?.sync}
-    onfocus={box.focus}
-    onblur={box.blur}
+    bind:this={textEl}
+    onfocus={() => {
+      box.focus();
+      tellCaret();
+    }}
+    onblur={() => {
+      box.blur();
+      onCaret?.(null);
+    }}
+    oninput={tellCaret}
+    onkeyup={tellCaret}
+    onpointerup={tellCaret}
     rows="3"
     placeholder="Write the Lines here, one per line"
     autocapitalize="sentences"
-    {@attach fitText}></textarea>
+    {@attach fitText}
+    {@attach followCaret}></textarea>
 </div>
 
 <style>
