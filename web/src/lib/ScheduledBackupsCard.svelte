@@ -4,23 +4,24 @@
   // kept in Bandmate, so it's the same from every device, and each change
   // is saved at once. Neither turning it off nor keeping fewer deletes a
   // Backup, so keeping fewer than there are says the extras go with the
-  // next one.
+  // next one. Under them, a status line says how the schedule is doing.
+  import { onDestroy } from 'svelte';
   import Minus from '@lucide/svelte/icons/minus';
   import Plus from '@lucide/svelte/icons/plus';
   import { api, type Backup, type BackupSchedule } from './api';
-  import { extrasNote, fewestKept, mostKept, periods, stepKeep } from './backups';
+  import { extrasNote, fewestKept, mostKept, periods, scheduleStatus, stepKeep } from './backups';
 
   let {
     backups,
-    onDue,
+    onMade,
   }: {
     /** The Backups listed, to tell how many Scheduled Backups there are; null while they load. */
     backups: readonly Backup[] | null;
     /**
-     * Called once a change makes a Scheduled Backup due, as turning the
-     * schedule on for the first time does, since one is then made in the background.
+     * Called once a Scheduled Backup that a change made due, as turning the
+     * schedule on for the first time does, has been made in the background.
      */
-    onDue: () => void;
+    onMade: () => void;
   } = $props();
 
   let schedule = $state<BackupSchedule | null>(null);
@@ -30,6 +31,40 @@
   let sent = 0;
   /** The change being saved, which the next waits for, so the server saves them in the order they were made. */
   let saving: Promise<unknown> = Promise.resolve();
+
+  /** Looks for the end of the try at a Scheduled Backup being made in the background. */
+  let watchTimer: ReturnType<typeof setTimeout> | undefined;
+  /** How often, in ms, and how many times, to look: for a few minutes, as a big one takes a while. */
+  const watchEvery = 2000;
+  const watchTimes = 90;
+
+  // Switching Settings tabs, or leaving Settings, stops looking.
+  onDestroy(() => clearTimeout(watchTimer));
+
+  /**
+   * Once a change makes a Scheduled Backup due, it's tried in the
+   * background, so the schedule is read again until the try after `before`
+   * shows in its status: made, nothing changed, or failed.
+   */
+  function watchTry(before: BackupSchedule['last']) {
+    clearTimeout(watchTimer);
+    let left = watchTimes;
+    const look = async () => {
+      try {
+        const s = await api.backupSchedule();
+        if (s.last && s.last.at !== before?.at) {
+          // Only the status: a change made meanwhile stays as it is.
+          if (schedule) schedule = { ...schedule, due: s.due, last: s.last, lastMadeAt: s.lastMadeAt };
+          if (s.last.outcome === 'made') onMade();
+          return;
+        }
+      } catch {
+        // Looked for again, as reading it failing once says nothing.
+      }
+      if (--left > 0) watchTimer = setTimeout(look, watchEvery);
+    };
+    watchTimer = setTimeout(look, watchEvery);
+  }
 
   api.backupSchedule().then(
     (s) => (schedule = s),
@@ -49,7 +84,7 @@
     try {
       const saved = await save;
       if (mine === sent) schedule = saved;
-      if (saved.due) onDue();
+      if (saved.due) watchTry(saved.last);
     } catch (e) {
       if (mine !== sent) return;
       schedule = was;
@@ -58,6 +93,7 @@
   }
 
   const note = $derived(schedule && backups ? extrasNote(schedule, backups) : null);
+  const status = $derived(schedule && scheduleStatus(schedule));
 </script>
 
 <section class="card" aria-labelledby="schedule-heading">
@@ -121,6 +157,9 @@
     </div>
     {#if note}
       <p class="hint" role="status">{note}</p>
+    {/if}
+    {#if status}
+      <p class={status.failed ? 'error' : 'hint'} role="status">{status.text}</p>
     {/if}
     {#if error}
       <p class="error" role="alert">{error}</p>

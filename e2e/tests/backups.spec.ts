@@ -119,7 +119,7 @@ test("at 320px, the card's buttons go under its heading, still on the right, and
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 });
 
-test('turning on Scheduled Backups makes one at once, marked Scheduled, and the schedule is kept', async ({
+test('turning on Scheduled Backups makes one at once, marked Scheduled, says so, and the schedule is kept', async ({
   page,
   bandmate,
 }) => {
@@ -142,6 +142,7 @@ test('turning on Scheduled Backups makes one at once, marked Scheduled, and the 
   await expect(row).toHaveCount(1);
   await expect(row.getByText('Scheduled', { exact: true })).toBeVisible();
   await expect(row).toContainText('Everything');
+  await expect(scheduleCard(page).getByText('Last made just now.')).toBeVisible();
 
   await page.reload();
   await expect(on).toBeChecked();

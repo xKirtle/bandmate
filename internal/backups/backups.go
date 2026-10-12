@@ -116,6 +116,9 @@ func Open(conn *sql.DB, dataDir string, now func() time.Time) (*Store, error) {
 	for _, path := range leftovers {
 		os.RemoveAll(path)
 	}
+	if err := countChanges(context.Background(), conn); err != nil {
+		return nil, err
+	}
 	s := &Store{db: conn, dataDir: dataDir, dir: dir, now: now,
 		wake: make(chan struct{}, 1), scheduleDone: make(chan struct{})}
 	ctx, stop := context.WithCancel(context.Background())
@@ -250,6 +253,15 @@ func (s *Store) Make(ctx context.Context, contents Contents) (Backup, error) {
 // make makes a Backup of contents, by hand or a Scheduled Backup, and keeps
 // it.
 func (s *Store) make(ctx context.Context, contents Contents, scheduled bool) (Backup, error) {
+	// A change made while a Scheduled Backup is made may be missing from
+	// it, so it counts as one made since.
+	var changes int64
+	if scheduled {
+		err := s.db.QueryRowContext(ctx, `SELECT changes FROM backup_schedule`).Scan(&changes)
+		if err != nil {
+			return Backup{}, fmt.Errorf("reading the changes since the last Scheduled Backup: %w", err)
+		}
+	}
 	songIDs, err := s.songsIn(ctx, contents)
 	if err != nil {
 		return Backup{}, err
@@ -287,7 +299,7 @@ func (s *Store) make(ctx context.Context, contents Contents, scheduled bool) (Ba
 	if err != nil {
 		return Backup{}, fmt.Errorf("packing backup: %w", err)
 	}
-	return s.keep(ctx, file.Name(), b)
+	return s.keep(ctx, file.Name(), b, changes)
 }
 
 // songsIn lists the ids of the Songs contents picks, refusing a pick of
@@ -369,8 +381,9 @@ func (s *Store) distinctExisting(ctx context.Context, table string, ids []int64,
 }
 
 // keep stores the Backup's file, made at path, under the id its row gets.
-// A Scheduled Backup records when the schedule last made one.
-func (s *Store) keep(ctx context.Context, path string, b Backup) (Backup, error) {
+// A Scheduled Backup records that the schedule made one, when, and the
+// schedule's count of changes as it began, which other Backups ignore.
+func (s *Store) keep(ctx context.Context, path string, b Backup, changes int64) (Backup, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return b, err
@@ -384,7 +397,8 @@ func (s *Store) keep(ctx context.Context, path string, b Backup) (Backup, error)
 		return b, err
 	}
 	if b.Scheduled {
-		if _, err := tx.ExecContext(ctx, `UPDATE backup_schedule SET last_made_at = ?`, made); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE backup_schedule SET last_made_at = ?1, changes_when_made = ?2,
+			tried_at = ?1, outcome = 'made', failure = NULL`, made, changes); err != nil {
 			return b, err
 		}
 	}

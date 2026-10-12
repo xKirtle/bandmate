@@ -55,42 +55,23 @@
   const highlightFor = 2000;
   let list = $state<HTMLUListElement>();
 
-  /** Looks for the Scheduled Backup being made in the background, until it's listed. */
-  let watchTimer: ReturnType<typeof setTimeout> | undefined;
-  /** How often, in ms, and how many times, to look for it: for a few minutes, as a big one takes a while. */
-  const watchEvery = 2000;
-  const watchTimes = 90;
-
   // Switching Settings tabs, or leaving Settings, stops the uploads quietly.
   onDestroy(() => {
     uploads.stop();
     clearTimeout(highlightTimer);
-    clearTimeout(watchTimer);
   });
 
   /**
-   * Once a change to the schedule makes a Scheduled Backup due, as turning
-   * it on for the first time does, one is made in the background, so the
-   * list is read again until a new one shows, with the oldest beyond those
-   * kept gone.
+   * Once a change to the schedule has had a Scheduled Backup made in the
+   * background, as turning it on for the first time does, the list is read
+   * again to show it, with the oldest beyond those kept gone.
    */
-  function watchForScheduled() {
-    clearTimeout(watchTimer);
-    const known = new Set((backups ?? []).filter((b) => b.scheduled).map((b) => b.id));
-    let left = watchTimes;
-    const look = async () => {
-      try {
-        const list = await api.listBackups();
-        if (list.some((b) => b.scheduled && !known.has(b.id))) {
-          backups = list;
-          return;
-        }
-      } catch {
-        // Looked for again, as listing failing once says nothing.
-      }
-      if (--left > 0) watchTimer = setTimeout(look, watchEvery);
-    };
-    watchTimer = setTimeout(look, watchEvery);
+  async function showScheduled() {
+    try {
+      backups = await api.listBackups();
+    } catch {
+      // It shows the next time the list is read, as failing once says nothing.
+    }
   }
 
   // Closing or reloading the page would stop the uploads, so ask first.
@@ -221,7 +202,7 @@
 
 <SettingsPage tab="backups">
   <div class="cards">
-    <ScheduledBackupsCard {backups} onDue={watchForScheduled} />
+    <ScheduledBackupsCard {backups} onMade={showScheduled} />
     <section class="card" aria-labelledby="backups-heading">
       <div class="head">
         <h2 id="backups-heading">Backups</h2>

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"syscall"
 	"time"
 
 	"github.com/xKirtle/bandmate/internal/domain"
@@ -42,15 +43,44 @@ const (
 
 // Schedule is when Scheduled Backups are made, for the whole install: each
 // is a Backup of Everything, made once a Period has passed since the
-// schedule last made one, and only the newest Keep of them are kept.
+// schedule last made one, unless nothing has changed since, and only the
+// newest Keep of them are kept.
 type Schedule struct {
 	On     bool   `json:"on"`
 	Period Period `json:"period"`
 	Keep   int    `json:"keep"`
 	// Due tells whether a Scheduled Backup is due now, while it's on: when
-	// the schedule has never made one, or a Period has passed since it last
-	// did. It's ignored when the schedule is set.
+	// the schedule has never tried to make one, its last try failed, or a
+	// Period has passed since it last made one or found nothing changed.
+	// It, and the status below, are ignored when the schedule is set.
 	Due bool `json:"due"`
+	// LastMadeAt is when the schedule last made a Scheduled Backup, nil if
+	// it never has.
+	LastMadeAt *time.Time `json:"lastMadeAt"`
+	// Last is the schedule's last try at one, nil if it hasn't tried.
+	Last *Attempt `json:"last"`
+}
+
+// Outcome is how a try at a Scheduled Backup ended.
+type Outcome string
+
+const (
+	// Made means it made one.
+	Made Outcome = "made"
+	// Unchanged means it made none, as no Song or Beat had changed since it
+	// last made one.
+	Unchanged Outcome = "unchanged"
+	// Failed means it couldn't make one, so it's tried again at the next
+	// check.
+	Failed Outcome = "failed"
+)
+
+// Attempt is a try at a Scheduled Backup: when, how it ended, and, if it
+// failed, why.
+type Attempt struct {
+	At      time.Time `json:"at"`
+	Outcome Outcome   `json:"outcome"`
+	Error   string    `json:"error,omitempty"`
 }
 
 // DefaultSchedule is the schedule until it's first set: off.
@@ -60,27 +90,78 @@ var DefaultSchedule = Schedule{On: false, Period: Weekly, Keep: 4}
 // that's due, besides at start-up and when the schedule is set.
 const CheckEvery = time.Hour
 
-// Schedule returns the schedule Scheduled Backups are made on, and whether
-// one is due now.
+// Schedule returns the schedule Scheduled Backups are made on, whether one
+// is due now, and how the last try at one went.
 func (s *Store) Schedule(ctx context.Context) (Schedule, error) {
-	sch := DefaultSchedule
-	var lastMade sql.NullString
-	err := s.db.QueryRowContext(ctx, `SELECT turned_on, period, keep, last_made_at FROM backup_schedule WHERE id = 1`).
-		Scan(&sch.On, &sch.Period, &sch.Keep, &lastMade)
+	sch, _, err := s.schedule(ctx)
+	return sch, err
+}
+
+// schedule returns the schedule, and whether no Song or Beat has changed
+// since it last made a Scheduled Backup.
+func (s *Store) schedule(ctx context.Context) (sch Schedule, unchanged bool, err error) {
+	sch = DefaultSchedule
+	var lastMade, triedAt, outcome, failure sql.NullString
+	var changes int64
+	var changesWhenMade sql.NullInt64
+	err = s.db.QueryRowContext(ctx, `SELECT turned_on, period, keep, last_made_at, tried_at, outcome, failure,
+		changes, changes_when_made FROM backup_schedule WHERE id = 1`).
+		Scan(&sch.On, &sch.Period, &sch.Keep, &lastMade, &triedAt, &outcome, &failure, &changes, &changesWhenMade)
 	if errors.Is(err, sql.ErrNoRows) {
-		return DefaultSchedule, nil
+		return DefaultSchedule, false, nil
 	}
 	if err != nil {
-		return sch, fmt.Errorf("reading the backup schedule: %w", err)
+		return sch, false, fmt.Errorf("reading the backup schedule: %w", err)
 	}
-	var last time.Time
 	if lastMade.Valid {
-		if last, err = domain.ParseTime(lastMade.String); err != nil {
-			return sch, err
+		t, err := domain.ParseTime(lastMade.String)
+		if err != nil {
+			return sch, false, err
+		}
+		sch.LastMadeAt = &t
+	}
+	if triedAt.Valid {
+		t, err := domain.ParseTime(triedAt.String)
+		if err != nil {
+			return sch, false, err
+		}
+		sch.Last = &Attempt{At: t, Outcome: Outcome(outcome.String), Error: failure.String}
+	}
+	sch.Due = sch.On && (sch.Last == nil || sch.Last.Outcome == Failed ||
+		!s.now().Before(sch.Period.endsAfter(sch.Last.At)))
+	return sch, changesWhenMade.Valid && changesWhenMade.Int64 == changes, nil
+}
+
+// changeTables are the tables whose every added, changed or deleted row
+// counts as a change to a Song or Beat: those a Backup copies.
+func changeTables() []string {
+	seen := map[string]bool{}
+	var tables []string
+	for _, t := range songTables {
+		if !seen[t.name] {
+			seen[t.name] = true
+			tables = append(tables, t.name)
 		}
 	}
-	sch.Due = sch.On && (last.IsZero() || !s.now().Before(sch.Period.endsAfter(last)))
-	return sch, nil
+	return tables
+}
+
+// countChanges makes the database count every change to a Song or Beat in
+// the schedule's changes, so whether anything has changed since the last
+// Scheduled Backup is one comparison, however much there is. Its triggers
+// are made each time Bandmate starts, as a migration that rebuilds a table
+// drops that table's.
+func countChanges(ctx context.Context, conn *sql.DB) error {
+	for _, table := range changeTables() {
+		for _, op := range []string{"INSERT", "UPDATE", "DELETE"} {
+			_, err := conn.ExecContext(ctx, fmt.Sprintf(`CREATE TRIGGER IF NOT EXISTS "count_change_%[1]s_%[2]s"
+				AFTER %[2]s ON "%[1]s" BEGIN UPDATE backup_schedule SET changes = changes + 1; END`, table, op))
+			if err != nil {
+				return fmt.Errorf("counting changes to %s: %w", table, err)
+			}
+		}
+	}
+	return nil
 }
 
 // SetSchedule sets the schedule Scheduled Backups are made on, and returns
@@ -133,15 +214,17 @@ func (s *Store) runSchedule(ctx context.Context) {
 	}
 }
 
-// CheckSchedule makes a Scheduled Backup of Everything if one is due: while
-// the schedule is on, when it has never made one, or a period has passed
-// since it last made one. However many periods have passed, it makes one.
-// Then the oldest Scheduled Backups beyond the number kept are deleted. A
-// Backup that couldn't be made is logged, and tried again at the next check.
+// CheckSchedule makes a Scheduled Backup of Everything if one is due (see
+// Schedule.Due). However many periods have passed, it makes one. If no Song
+// or Beat has changed since it last made one, it makes none, and the next
+// is due a period from now. Once one is made, the oldest Scheduled Backups
+// beyond the number kept are deleted. A Backup that couldn't be made is
+// logged, and tried again at the next check. Each try is recorded, for the
+// schedule's status.
 func (s *Store) CheckSchedule(ctx context.Context) {
 	s.scheduling.Lock()
 	defer s.scheduling.Unlock()
-	sch, err := s.Schedule(ctx)
+	sch, unchanged, err := s.schedule(ctx)
 	if err != nil {
 		log.Printf("checking for a Scheduled Backup: %v", err)
 		return
@@ -149,10 +232,16 @@ func (s *Store) CheckSchedule(ctx context.Context) {
 	if !sch.Due {
 		return
 	}
+	if unchanged {
+		log.Printf("made no Scheduled Backup, as nothing has changed since the last")
+		s.recordTry(ctx, Unchanged, "")
+		return
+	}
 	b, err := s.make(ctx, Contents{AllSongs: true, BeatLibrary: true}, true)
 	if err != nil {
 		if ctx.Err() == nil {
 			log.Printf("making a Scheduled Backup failed, to be tried again within an hour: %v", err)
+			s.recordTry(ctx, Failed, failureReason(err))
 		}
 		return
 	}
@@ -160,6 +249,26 @@ func (s *Store) CheckSchedule(ctx context.Context) {
 	if err := s.pruneScheduled(ctx); err != nil {
 		log.Printf("deleting old Scheduled Backups: %v", err)
 	}
+}
+
+// recordTry records a try at a Scheduled Backup that made none: when, how it
+// ended, and why if it failed. One made is recorded as it's kept.
+func (s *Store) recordTry(ctx context.Context, outcome Outcome, failure string) {
+	_, err := s.db.ExecContext(ctx, `UPDATE backup_schedule SET tried_at = ?, outcome = ?, failure = NULLIF(?, '')`,
+		s.now().UTC().Format(domain.TimeFormat), outcome, failure)
+	if err != nil {
+		log.Printf("recording the try at a Scheduled Backup: %v", err)
+	}
+}
+
+// failureReason is why a Scheduled Backup couldn't be made, as the
+// schedule's status says it: in words for a full disk, the likeliest thing
+// to stop one, and as the error says otherwise.
+func failureReason(err error) string {
+	if errors.Is(err, syscall.ENOSPC) {
+		return "the disk is full"
+	}
+	return err.Error()
 }
 
 // pruneScheduled deletes the oldest Scheduled Backups beyond the number the
