@@ -384,6 +384,12 @@
                         <span class="dependency-license">
                           {#if d.url}<a href={d.url}>{d.license}</a>{:else}{d.license}{/if}
                         </span>
+                        {#if d.credit}
+                          <p class="muted dependency-credit">
+                            {#each d.credit as part, i (i)}{#if part.url}<a href={part.url}>{part.text}</a
+                                >{:else}{part.text}{/if}{/each}
+                          </p>
+                        {/if}
                       </li>
                     {/each}
                   </ul>
@@ -636,6 +642,12 @@
   .dependency-license {
     margin-left: auto;
     white-space: nowrap;
+  }
+  /* The attribution a license asks for, on a line of its own below. */
+  .dependency-credit {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: var(--text-md);
   }
   .card .dependency-none {
     padding: 0 0 var(--space-4) var(--space-6);

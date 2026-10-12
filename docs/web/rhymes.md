@@ -23,7 +23,9 @@ It shows rhymes for the word at the cursor in the line you're writing, or for th
 - **Perfect rhymes** come first: they sound the same from the word's last stressed vowel to its end, like "night" and "tonight".
 - **Near rhymes** follow, in a group of their own: only their vowels match from there, like "night" and "life".
 
-Each rhyme shows how many syllables it has, and those nearest your word in syllables come first, so you can pick one that fits the meter. The suggestions are only there to read: clicking one never changes your lyrics.
+In each group, the most common words come first, so "wrong" suggests "long", "song" and "strong" before rare words and names. How common a word is comes from [FrequencyWords](https://github.com/hermitdave/FrequencyWords), which counts how often each word is said in film and TV subtitles. Words too rare to be counted come last, those nearest your word in syllables first.
+
+Each rhyme shows how many syllables it has, so you can pick one that fits the meter. The suggestions are only there to read: clicking one never changes your lyrics.
 
 - **English rhymes** come from the [CMU Pronouncing Dictionary](https://github.com/cmusphinx/cmudict), which knows over 130,000 words, so a word it doesn't know gets none.
 - **Portuguese rhymes** come from a Portuguese word list, plurals and verb tenses included, and any Portuguese word gets them: "coração" rhymes with "canção", and "saudade" with "cidade". Endings spelt differently but said alike rhyme too, like "dança" and "cansa". Their syllables are counted as they're written: "coração" has three, and "dia" two.
@@ -43,4 +45,4 @@ In the Rhymes card, a language that isn't set up shows a link to Settings in pla
 
 ## Offline
 
-Rhymes need no internet connection: the dictionaries come with Bandmate. Setting one up downloads it from your Bandmate once, under a megabyte, and your browser keeps it, so rhymes work offline and after you reload. When you upgrade Bandmate and a dictionary has changed, it updates itself the next time you use it.
+Rhymes need no internet connection: the dictionaries come with Bandmate. Setting one up downloads it from your Bandmate once, about a megabyte, and your browser keeps it, so rhymes work offline and after you reload. When you upgrade Bandmate and a dictionary has changed, it updates itself the next time you use it.

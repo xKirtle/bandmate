@@ -17,6 +17,8 @@ export interface LanguageData {
   pronunciations: ReadonlyMap<string, readonly string[][]>;
   /** A spelling-rules Language's words, in lower case, to suggest Rhymes from. */
   words: readonly string[];
+  /** How common each word it ranks is, 0 the most common. Those it doesn't rank are rarer than all. */
+  ranks: ReadonlyMap<string, number>;
 }
 
 /** A word suggested as a Rhyme, and its Syllable Count. */
@@ -25,7 +27,7 @@ export interface Rhyme {
   count: number;
 }
 
-/** A word's Rhymes: perfect ones, then near ones, each nearest the word in syllables first. */
+/** A word's Rhymes: perfect ones, then near ones, each the most common first. */
 export interface Rhymes {
   perfect: Rhyme[];
   near: Rhyme[];
@@ -46,27 +48,34 @@ export interface CaretAt {
 }
 
 /**
- * Reads a Language's data as served: a dictionary Language's, one
- * pronunciation a line, "hello HH AH0 L OW1"; a spelling-rules Language's,
- * one word a line.
+ * Reads a Language's data as served: its dictionary, then a "#ranks" line,
+ * then its ranks. A dictionary Language's dictionary is one pronunciation a
+ * line, "hello HH AH0 L OW1"; a spelling-rules Language's, one word a line.
+ * Its ranks are words, the most common first, one a line. Data kept before
+ * the ranks shipped has none.
  */
 export function readLanguageData(code: string, text: string): LanguageData {
+  const [dictionary, rankText = ''] = text.split(/^#ranks$/m, 2);
+  const ranks = new Map<string, number>();
+  for (const word of linesOf(rankText)) if (!ranks.has(word)) ranks.set(word, ranks.size);
   const pronunciations = new Map<string, string[][]>();
-  if (isSpellingRules(code)) {
-    const words = text
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((word) => word !== '');
-    return { code, pronunciations, words };
-  }
-  for (const line of text.split('\n')) {
+  if (isSpellingRules(code)) return { code, pronunciations, words: linesOf(dictionary), ranks };
+  for (const line of dictionary.split('\n')) {
     const [word, ...phones] = line.trim().split(/\s+/);
     if (!word || phones.length === 0) continue;
     const known = pronunciations.get(word);
     if (known) known.push(phones);
     else pronunciations.set(word, [phones]);
   }
-  return { code, pronunciations, words: [] };
+  return { code, pronunciations, words: [], ranks };
+}
+
+/** A text's lines that aren't blank, trimmed. */
+function linesOf(text: string): string[] {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '');
 }
 
 /**
@@ -155,9 +164,10 @@ export function lyricsLanguage(dictionaries: readonly LanguageData[]) {
       const near = (index.byVowels.get(ending.vowels) ?? []).filter(
         (c) => c.ending.sounds !== ending.sounds && c.rhyme.word !== asked,
       );
+      const order = inOrder(data.ranks, count, ending);
       return {
-        perfect: byCloseness(perfect, count, ending),
-        near: byCloseness(near, count, ending),
+        perfect: order(perfect),
+        near: order(near),
         guess: !has(language, asked),
       };
     },
@@ -323,20 +333,25 @@ function rhymeIndex(data: LanguageData): RhymeIndex {
 }
 
 /**
- * Rhymes in order: nearest the word in syllables first, then nearest in how
- * many sounds they end with, so a near Rhyme's ending is about as long as
- * the word's, then fewer syllables before more, then alphabetically.
+ * Rhymes in order: the most common first, and those the Language doesn't
+ * rank after all it does. Among equals, nearest the word in syllables
+ * first, then nearest in how many sounds they end with, so a near Rhyme's
+ * ending is about as long as the word's, then fewer syllables before more,
+ * then alphabetically.
  */
-function byCloseness(candidates: Candidate[], count: number, ending: Ending): Rhyme[] {
+function inOrder(ranks: ReadonlyMap<string, number>, count: number, ending: Ending) {
+  const rank = (c: Candidate) => ranks.get(c.rhyme.word) ?? ranks.size;
   const apart = (c: Candidate) => Math.abs(c.rhyme.count - count);
   const lengthApart = (c: Candidate) => Math.abs(c.ending.length - ending.length);
-  return candidates
-    .sort(
-      (a, b) =>
-        apart(a) - apart(b) ||
-        lengthApart(a) - lengthApart(b) ||
-        a.rhyme.count - b.rhyme.count ||
-        a.rhyme.word.localeCompare(b.rhyme.word),
-    )
-    .map((c) => c.rhyme);
+  return (candidates: Candidate[]): Rhyme[] =>
+    candidates
+      .sort(
+        (a, b) =>
+          rank(a) - rank(b) ||
+          apart(a) - apart(b) ||
+          lengthApart(a) - lengthApart(b) ||
+          a.rhyme.count - b.rhyme.count ||
+          a.rhyme.word.localeCompare(b.rhyme.word),
+      )
+      .map((c) => c.rhyme);
 }

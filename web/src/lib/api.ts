@@ -693,6 +693,8 @@ export interface Dependency {
   license: string;
   /** Where to look up a license that couldn't be identified. */
   url?: string;
+  /** The attribution its license asks for, where that's more than its name: a sentence, in parts, some of them links. */
+  credit?: { text: string; url?: string }[];
 }
 
 /** The yt-dlp that fetches links: the image's own (or one mounted over it), or the copy Update yt-dlp keeps in the data folder, whichever is newer. */

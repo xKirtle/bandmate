@@ -145,3 +145,71 @@ func TestAboutCreditsThePortugueseWordList(t *testing.T) {
 		t.Errorf("Portuguese word list = %+v, want a version and a licence that offers LGPL-2.1", d)
 	}
 }
+
+// ranksOf is the words a Language's data ranks, most common first: the
+// lines after its "#ranks" line.
+func ranksOf(t *testing.T, body []byte) []string {
+	t.Helper()
+	_, ranks, ok := strings.Cut(string(body), "\n#ranks\n")
+	if !ok {
+		t.Fatal("the data has no ranks")
+	}
+	return strings.Fields(ranks)
+}
+
+func TestEachLanguagesDataRanksItsWordsMostCommonFirst(t *testing.T) {
+	ts := newTestServer(t)
+
+	en := ranksOf(t, ts.Do(http.MethodGet, "/api/languages/en", nil).Body)
+	pt := ranksOf(t, ts.Do(http.MethodGet, "/api/languages/pt", nil).Body)
+
+	if !slices.Equal(en[:3], []string{"you", "i", "the"}) {
+		t.Errorf("English ranks start %v, want you, i, the", en[:3])
+	}
+	if !slices.Contains(en, "don't") || slices.Contains(en, "don") {
+		t.Error(`English ranks "don't" by "don"'s count, so not "don" itself`)
+	}
+	// The subtitles' old spellings count as the dictionary's new ones.
+	if !slices.Contains(pt, "ação") || slices.Contains(pt, "acção") {
+		t.Error(`Portuguese ranks "ação", counting "acção", and not "acção"`)
+	}
+}
+
+func TestAboutCreditsTheWordFrequencies(t *testing.T) {
+	got := getDependencies(t, func(*app.Config) {})
+
+	i := slices.IndexFunc(got.Data, func(d dependency) bool { return strings.Contains(d.Name, "FrequencyWords") })
+	if i < 0 {
+		t.Fatalf("data = %+v, want FrequencyWords", got.Data)
+	}
+	if d := got.Data[i]; d.Version == "" || d.License != "CC-BY-SA-4.0" {
+		t.Errorf("FrequencyWords = %+v, want a version and CC-BY-SA-4.0", d)
+	}
+	// Its licence asks for an attribution, and OpenSubtitles for a link to opensubtitles.org.
+	res := newTestServer(t).Do(http.MethodGet, "/api/about", nil)
+	var about struct {
+		Dependencies struct {
+			Data []struct {
+				Credit []struct {
+					Text string `json:"text"`
+					URL  string `json:"url"`
+				} `json:"credit"`
+			} `json:"data"`
+		} `json:"dependencies"`
+	}
+	res.JSON(t, &about)
+	var credit strings.Builder
+	links := map[string]string{}
+	for _, part := range about.Dependencies.Data[i].Credit {
+		credit.WriteString(part.Text)
+		links[part.Text] = part.URL
+	}
+	for _, want := range []string{"Hermit Dave", "CC BY-SA 4.0", "OpenSubtitles 2018", "Lison & J. Tiedemann, 2016"} {
+		if !strings.Contains(credit.String(), want) {
+			t.Errorf("FrequencyWords' credit %q doesn't name %q", credit.String(), want)
+		}
+	}
+	if !strings.Contains(links["opensubtitles.org"], "opensubtitles.org") {
+		t.Errorf("FrequencyWords' credit doesn't link to opensubtitles.org: %v", links)
+	}
+}
