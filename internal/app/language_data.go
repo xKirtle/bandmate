@@ -13,21 +13,24 @@ import (
 	"github.com/xKirtle/bandmate/internal/languagedata"
 )
 
-// languageDownload is a Language as the page lists it to download: how much
-// a browser downloads to, compressed.
-type languageDownload struct {
+// listedLanguage is a Language as the page lists it, to pick for a Song or
+// to download: its name, and how much a browser downloads to set it up,
+// compressed.
+type listedLanguage struct {
 	Code string `json:"code"`
+	Name string `json:"name"`
 	Size int    `json:"size"`
 }
 
-// listLanguages lists every Language Bandmate has data for, with its
-// download size, which Settings shows beside it to set it up.
+// listLanguages lists every Language Bandmate rhymes in, in order, which
+// the page offers for a Song's Languages and, with its download size, in
+// Settings.
 func (a *App) listLanguages(w http.ResponseWriter, r *http.Request) {
-	codes := languagedata.Codes()
-	list := make([]languageDownload, len(codes))
-	for i, code := range codes {
-		data, _ := languagedata.Of(code)
-		list[i] = languageDownload{Code: code, Size: len(data.Gzipped)}
+	languages := languagedata.List()
+	list := make([]listedLanguage, len(languages))
+	for i, l := range languages {
+		data, _ := languagedata.Of(l.Code)
+		list[i] = listedLanguage{Code: l.Code, Name: l.Name, Size: len(data.Gzipped)}
 	}
 	writeJSON(w, http.StatusOK, list)
 }

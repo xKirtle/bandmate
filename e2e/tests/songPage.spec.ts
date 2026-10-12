@@ -1054,6 +1054,30 @@ test('the Details and Tags save as they are edited', async ({ page, bandmate }) 
   await expect(details.getByRole('list', { name: 'Tags' }).getByRole('listitem')).toHaveText(['loud']);
 });
 
+test('the Languages picker offers the Languages Bandmate lists, by name, those picked first', async ({
+  page,
+  bandmate,
+}) => {
+  // Bandmate lists one more Language than it ships with.
+  await page.route('**/api/languages', async (route) => {
+    const listed = await (await route.fetch()).json();
+    await route.fulfill({ json: [...listed, { code: 'es', name: 'Spanish', size: 1000 }] });
+  });
+  const song = await bandmate.song({ title: 'Saudade', languages: ['pt', 'en'] });
+  await page.goto(`/songs/${song.id}`);
+  const field = page.getByRole('region', { name: 'Details' }).getByRole('button', { name: /^Languages/ });
+
+  await expect(field).toHaveText('Portuguese, English');
+  await field.click();
+
+  const picker = page.getByRole('dialog', { name: 'Languages' });
+  await expect(picker.getByRole('checkbox')).toHaveCount(3);
+  await expect(picker.getByRole('group', { name: 'Languages' })).toContainText(/Portuguese.*English.*Spanish/);
+  await expect(picker.getByRole('checkbox', { name: 'Spanish' })).not.toBeChecked();
+  await picker.getByRole('checkbox', { name: 'Portuguese' }).uncheck();
+  await expect.poll(async () => (await bandmate.getSong(song.id)).languages).toEqual(['en']);
+});
+
 test('a failed Details save puts the field back, and the next change clears its error', async ({ page, bandmate }) => {
   const song = await bandmate.song({ title: 'Anthem' });
   await page.goto(`/songs/${song.id}`);

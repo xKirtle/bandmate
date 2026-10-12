@@ -12,12 +12,12 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"slices"
 	"strings"
 	"time"
 
 	"github.com/xKirtle/bandmate/internal/audio"
 	"github.com/xKirtle/bandmate/internal/domain"
+	"github.com/xKirtle/bandmate/internal/languagedata"
 	"github.com/xKirtle/bandmate/internal/songfiles"
 	"github.com/xKirtle/bandmate/internal/songversion"
 	"github.com/xKirtle/bandmate/internal/tags"
@@ -76,23 +76,18 @@ type Song struct {
 }
 
 // Language is a language a Song's Lines can be sung in, by its ISO 639-1
-// code, e.g. "en".
+// code, e.g. "en": one Bandmate rhymes in, as languagedata registers them.
 type Language string
 
-// Languages lists every Language Bandmate can suggest Rhymes in: English
-// from its dictionary, Portuguese by its spelling rules. A Song's Languages
-// are picked from them. The page lists them too, in web/src/lib/languages.ts.
-var Languages = []Language{"en", "pt"}
-
 // checkLanguages refuses a Song's Languages unless there's at least one,
-// each is one of Languages, and none is listed twice.
+// each is one Bandmate rhymes in, and none is listed twice.
 func checkLanguages(languages []Language) error {
 	if len(languages) == 0 {
 		return domain.Invalid("a Song needs at least one language")
 	}
 	seen := map[Language]bool{}
 	for _, l := range languages {
-		if !slices.Contains(Languages, l) {
+		if !languagedata.Has(string(l)) {
 			return domain.Invalid(fmt.Sprintf("there's no language %q", l))
 		}
 		if seen[l] {

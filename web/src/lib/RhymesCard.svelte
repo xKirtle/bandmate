@@ -8,6 +8,7 @@
   // in Settings in place of Rhymes.
   import { languageName } from './languages';
   import type { RhymeLookup } from './rhymeLookup';
+  import { listedLanguages } from './sharedLanguages.svelte';
   import RhymeGroups from './RhymeGroups.svelte';
 
   let {
@@ -71,7 +72,7 @@
           onclick={() => pickLanguage(code)}
           onkeydown={(e) => tabKey(e, i)}
         >
-          {languageName(code)}
+          {languageName(code, listedLanguages.list)}
         </button>
       {/each}
     </div>

@@ -1,22 +1,16 @@
 <script lang="ts">
-  import { api } from './api';
-  import { languages } from './languages';
+  import { listedLanguages } from './sharedLanguages.svelte';
   import { rhymingDictionaries as dictionaries } from './sharedRhymingDictionaries.svelte';
   import { formatSmallSize } from './upload';
 
   // The rhyming dictionaries, in Settings' Rhyming dictionaries card: every Language
-  // Bandmate rhymes in, each with its download size, whether it's downloaded
-  // to this device and when it was last updated, to download or remove. Any
-  // number can be downloaded at once. Nothing is downloaded until one is.
+  // Bandmate rhymes in, as it lists them, each with its download size, whether
+  // it's downloaded to this device and when it was last updated, to download
+  // or remove. Any number can be downloaded at once. Nothing is downloaded
+  // until one is.
 
   const id = $props.id();
-
-  // Each Language's download size, by its code, once Bandmate says.
-  let sizes = $state<Record<string, number>>({});
-  api.getLanguages().then(
-    (list) => (sizes = Object.fromEntries(list.map((l) => [l.code, l.size]))),
-    () => {}, // Offline, say: the list shows without sizes.
-  );
+  listedLanguages.load(); // Again, if Bandmate couldn't be reached before.
 
   /** Why the last Download or Remove of a Language failed. */
   let problem = $state<{ code: string; message: string } | null>(null);
@@ -40,23 +34,22 @@
   }
 
   /** What's said of a Language under its name: whether it's downloaded, when it was updated, and its size. */
-  function details(code: string): string {
+  function details(code: string, size: number): string {
     const updatedAt = dictionaries.updatedAt(code);
-    const size = sizes[code] !== undefined ? formatSmallSize(sizes[code]) : null;
     const state = updatedAt ? `Downloaded, updated ${dateFormat.format(new Date(updatedAt))}` : 'Not downloaded';
-    return [state, size].filter(Boolean).join(' · ');
+    return `${state} · ${formatSmallSize(size)}`;
   }
 </script>
 
 <ul aria-label="Rhyming dictionaries">
-  {#each languages as language, i (language.code)}
+  {#each listedLanguages.list as language, i (language.code)}
     {@const setUp = dictionaries.isSetUp(language.code)}
     {@const settingUp = dictionaries.settingUp(language.code)}
     <li>
       <div class="line">
         <div class="about">
           <span class="name" id="{id}-{i}-name">{language.name}</span>
-          <span class="details tabular" id="{id}-{i}-details">{details(language.code)}</span>
+          <span class="details tabular" id="{id}-{i}-details">{details(language.code, language.size)}</span>
         </div>
         {#if setUp}
           <button

@@ -1,28 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { languageChoices, languageName, languages, languagesLabel, moveLanguage, pickLanguage } from './languages';
+import { languageChoices, languageName, languagesLabel, moveLanguage, pickLanguage } from './languages';
 
+// The Languages as Bandmate lists them, with their download sizes.
 const known = [
-  { code: 'en', name: 'English' },
-  { code: 'pt', name: 'Portuguese' },
-  { code: 'es', name: 'Spanish' },
+  { code: 'en', name: 'English', size: 1 },
+  { code: 'pt', name: 'Portuguese', size: 1 },
+  { code: 'es', name: 'Spanish', size: 1 },
 ];
 
-describe('languages', () => {
-  it('offers English and Portuguese, the Languages Bandmate suggests Rhymes in', () => {
-    expect(languages).toEqual([
-      { code: 'en', name: 'English' },
-      { code: 'pt', name: 'Portuguese' },
-    ]);
-  });
-});
-
 describe('languageName', () => {
-  it('names a Language Bandmate has data for', () => {
-    expect(languageName('en')).toBe('English');
+  it('names a Language Bandmate lists', () => {
+    expect(languageName('es', known)).toBe('Spanish');
   });
 
-  it('shows a code it has no name for as it is', () => {
-    expect(languageName('xx')).toBe('xx');
+  it('shows a code Bandmate has no name for, or has yet to list, as it is', () => {
+    expect(languageName('xx', known)).toBe('xx');
+    expect(languageName('en', [])).toBe('en');
   });
 });
 
