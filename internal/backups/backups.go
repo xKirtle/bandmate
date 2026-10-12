@@ -62,8 +62,9 @@ type Backup struct {
 	// Name is a name of its own, shown in place of the automatic one made
 	// from when it was made and what it holds; "" when it has none.
 	Name string `json:"name"`
-	// Scheduled tells whether the schedule made it, so it's deleted once
-	// it's no longer among the newest the schedule keeps.
+	// Scheduled tells whether it's a Scheduled Backup, so it's deleted once
+	// it's no longer among the newest the schedule keeps. Keeping it clears
+	// this for good.
 	Scheduled bool `json:"scheduled"`
 }
 
@@ -164,6 +165,21 @@ func (s *Store) Rename(ctx context.Context, id int64, name string) (Backup, erro
 	res, err := s.db.ExecContext(ctx, `UPDATE backups SET name = ? WHERE id = ?`, strings.TrimSpace(name), id)
 	if err != nil {
 		return Backup{}, fmt.Errorf("renaming backup: %w", err)
+	}
+	if err := domain.ExpectOneRow(res); err != nil {
+		return Backup{}, err
+	}
+	return s.get(ctx, id)
+}
+
+// Keep makes a Scheduled Backup an ordinary one for good, so the schedule
+// neither counts it among those it keeps nor deletes it. It doesn't change
+// when the schedule next makes one. Keeping an ordinary Backup changes
+// nothing.
+func (s *Store) Keep(ctx context.Context, id int64) (Backup, error) {
+	res, err := s.db.ExecContext(ctx, `UPDATE backups SET scheduled = 0 WHERE id = ?`, id)
+	if err != nil {
+		return Backup{}, fmt.Errorf("keeping backup: %w", err)
 	}
 	if err := domain.ExpectOneRow(res); err != nil {
 		return Backup{}, err

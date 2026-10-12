@@ -7,21 +7,18 @@
   // some. Each can be renamed, or deleted after confirming. Above them, the
   // Scheduled Backups card sets the schedule Bandmate makes Backups of
   // Everything on, marked Scheduled in the list; the schedule deletes only
-  // its own oldest ones, and nothing else deletes one. On a phone, a Backup's
-  // Restore and Download fold into its ⋯, with Rename and Delete.
-  import ArchiveRestore from '@lucide/svelte/icons/archive-restore';
-  import Download from '@lucide/svelte/icons/download';
-  import Pencil from '@lucide/svelte/icons/pencil';
-  import Trash2 from '@lucide/svelte/icons/trash-2';
+  // its own oldest ones, and nothing else deletes one. A Scheduled Backup
+  // can be kept, making it ordinary. On a phone, a Backup's Restore and
+  // Download fold into its ⋯, with Keep, Rename and Delete.
   import X from '@lucide/svelte/icons/x';
   import { onDestroy, tick } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import ActionsMenu from '../lib/ActionsMenu.svelte';
   import { api, type Backup } from '../lib/api';
-  import { automaticName, backupName, backupSize } from '../lib/backups';
+  import { automaticName, backupName, backupSize, restorable } from '../lib/backups';
+  import { backupActions } from '../lib/backupMenu';
   import { addedNote, BackupUploads, failedNote } from '../lib/backupUploads.svelte';
   import FileDrop from '../lib/FileDrop.svelte';
-  import type { MenuAction } from '../lib/menu';
   import { scrollBehavior } from '../lib/motion';
   import NewBackupDialog from '../lib/NewBackupDialog.svelte';
   import RenameBackupDialog from '../lib/RenameBackupDialog.svelte';
@@ -174,22 +171,27 @@
     }
   }
 
-  /** Whether a Backup holds anything to restore: Songs or Beats. */
-  const restorable = (backup: Backup) => backup.songs > 0 || backup.beats > 0;
-
-  /** A Backup's ⋯: Rename… and Delete…, after Restore… and Download on a phone. */
-  function actions(backup: Backup): MenuAction[] {
-    const folded: MenuAction[] = [];
-    if (!wide.current) {
-      if (restorable(backup)) folded.push({ icon: ArchiveRestore, label: 'Restore…', run: () => (restoring = backup) });
-      folded.push({ icon: Download, label: 'Download', download: api.backupDownloadUrl(backup.id) });
+  async function keep(backup: Backup) {
+    error = null;
+    try {
+      const kept = await api.keepBackup(backup.id);
+      backups = (backups ?? []).map((b) => (b.id === kept.id ? kept : b));
+    } catch (e) {
+      error = `Couldn't keep “${backupName(backup)}” (${(e as Error).message})`;
     }
-    return [
-      ...folded,
-      { icon: Pencil, label: 'Rename…', run: () => (renaming = backup) },
-      { icon: Trash2, label: 'Delete…', run: () => remove(backup) },
-    ];
   }
+
+  const actions = (backup: Backup) =>
+    backupActions(
+      backup,
+      { wide: wide.current, download: api.backupDownloadUrl(backup.id) },
+      {
+        restore: () => (restoring = backup),
+        keep: () => keep(backup),
+        rename: () => (renaming = backup),
+        remove: () => remove(backup),
+      },
+    );
 </script>
 
 <svelte:window onbeforeunload={warnBeforeUnload} />

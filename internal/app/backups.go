@@ -101,6 +101,19 @@ func (a *App) renameBackup(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, b)
 }
 
+func (a *App) keepBackup(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	b, err := a.backups.Keep(r.Context(), id)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, b)
+}
+
 func (a *App) deleteBackup(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
