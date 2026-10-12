@@ -80,8 +80,8 @@
           <span>Writing aids</span>
         </label>
         <p id="writing-aids-note" class="choice-under hint">
-          Counts each Line's syllables and suggests Rhymes in Write mode, for every Song. Also in the Lyric Sheet's
-          toolbar.
+          Suggests Rhymes for the word you're writing in Write mode, for every Song, on a wide window. Also in the Lyric
+          Sheet's toolbar.
         </p>
       </fieldset>
     </section>

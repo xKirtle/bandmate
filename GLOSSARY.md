@@ -99,7 +99,7 @@ The languages a Song's Lines are sung in, one of its Details; a Song that mixes 
 _Avoid_: Locale
 
 **Syllable Count**:
-How many syllables a Line sings, shown beside it in Write mode to keep the meter matching across verses and between Alternates. A word Bandmate doesn't know is guessed from its spelling, and a count with a guess in it shows as an estimate.
+How many syllables a suggested Rhyme has, shown beside it to help pick one that fits the meter. Lines get none: singers run words together, so a Line's written syllables mislead.
 _Avoid_: Meter, syllables
 
 **Rhyme**:
@@ -245,7 +245,7 @@ The browser, on a computer or phone, that Bandmate is opened in. What's kept "on
 _Avoid_: Browser (in the UI), machine
 
 **Device Setting**:
-A choice the user makes on purpose about how Bandmate works on this Device, whatever the Song: the Palette, light or dark, the Input, each Input's Latency Offset, left-handed Chord diagrams and Write mode's writing aids (Syllable Counts and Rhymes). Every one is listed together in Settings, even when it's also changed where it's used. What's simply remembered from last time, like a volume, a step or a Song's Transpose, isn't one.
+A choice the user makes on purpose about how Bandmate works on this Device, whatever the Song: the Palette, light or dark, the Input, each Input's Latency Offset, left-handed Chord diagrams and Write mode's writing aids (Rhymes). Every one is listed together in Settings, even when it's also changed where it's used. What's simply remembered from last time, like a volume, a step or a Song's Transpose, isn't one.
 _Avoid_: Preference, local setting
 
 **Palette**:

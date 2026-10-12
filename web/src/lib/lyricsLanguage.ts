@@ -1,14 +1,12 @@
-// The lyrics language work: a Line's Syllable Count, a word's Rhymes and
-// the word at the caret, worked out in the browser from each Language's
-// data, which the binary serves (ADR 0018).
-// A Line's Chords are left out, a hyphenated word counts as its parts, and
+// The lyrics language work: a word's Rhymes, each with its Syllable Count,
+// the Language a word is read in, and the word at the caret, worked out in
+// the browser from each Language's data, which the binary serves (ADR 0018).
+// A Line's Chords aren't words, a hyphenated word is read as its parts, and
 // each word is read by the first of the Song's dictionary Languages that
 // knows it, in the Song's order, or else by the first of its spelling-rules
-// Languages, which reads any word with a vowel. One that none of them reads,
-// or a number in digits, is guessed in the Song's first Language, and the
-// count marked as an estimate.
+// Languages, which reads any word with a vowel.
 
-import { portugueseNumber, portugueseSound, portugueseSyllables } from './portuguese';
+import { portugueseSound } from './portuguese';
 
 /** A Language's data, read from what the binary serves for it. */
 export interface LanguageData {
@@ -18,12 +16,6 @@ export interface LanguageData {
   pronunciations: ReadonlyMap<string, readonly string[][]>;
   /** A spelling-rules Language's words, in lower case, to suggest Rhymes from. */
   words: readonly string[];
-}
-
-/** A Line's Syllable Count, and whether a word in it was guessed. */
-export interface SyllableCount {
-  count: number;
-  estimate: boolean;
 }
 
 /** A word suggested as a Rhyme, and its Syllable Count. */
@@ -50,9 +42,6 @@ export interface CaretAt {
   caret: number;
 }
 
-/** A Song's Syllable Counts: a Line's from its text as written, or null when it gets none. */
-export type SyllableCounter = (text: string) => SyllableCount | null;
-
 /**
  * Reads a Language's data as served: a dictionary Language's, one
  * pronunciation a line, "hello HH AH0 L OW1"; a spelling-rules Language's,
@@ -77,31 +66,13 @@ export function readLanguageData(code: string, text: string): LanguageData {
   return { code, pronunciations, words: [] };
 }
 
-/** What a Language does with a word no Language of the Song reads. */
-interface Guesser {
-  /** A word's syllables guessed from its letters. */
-  letters: (word: string) => number;
-  /** A number in digits as it's read aloud, in words. */
-  number: (digits: string) => string[];
-}
-
-const guessers: Record<string, Guesser> = {
-  en: { letters: guessEnglish, number: englishNumber },
-  pt: { letters: (word) => portugueseSyllables(word) ?? 1, number: portugueseNumber },
-};
-
 /**
  * The spelling-rules Languages' rules, which read a word from how it's
- * written, or give null for one they can't read: its syllables, and how it
- * ends with them, to find its Rhymes.
+ * written: its syllables, and how it ends with them, to find its Rhymes.
+ * Null for one they can't read.
  */
-interface SpellingRules {
-  syllables: (word: string) => number | null;
-  sound: (word: string) => Sound | null;
-}
-
-const spellingRules: Record<string, SpellingRules> = {
-  pt: { syllables: portugueseSyllables, sound: portugueseSound },
+const spellingRules: Record<string, (word: string) => Sound | null> = {
+  pt: portugueseSound,
 };
 
 function isSpellingRules(code: string): boolean {
@@ -119,8 +90,7 @@ function readsFromData(code: string): boolean {
 
 /**
  * The lyrics language work over the Languages whose data has been read: a
- * Language of a Song not among them reads no words, and a Song none of whose
- * Languages is among them gets no counts.
+ * Language of a Song not among them reads no words, and suggests no Rhymes.
  */
 export type LyricsLanguage = ReturnType<typeof lyricsLanguage>;
 
@@ -128,19 +98,17 @@ export function lyricsLanguage(data: readonly LanguageData[]) {
   const byCode = new Map(data.map((d) => [d.code, d]));
 
   /**
-   * A word read by the first of these Languages' dictionaries that knows
-   * it, in order, or else by the first of their spelling rules: the
-   * Language that read it, and its syllables. Null when none of them reads it.
+   * The Language a word is read in: the first of these Languages'
+   * dictionaries that knows it, in order, or else the first of their
+   * spelling rules. Null when none of them reads it.
    */
-  function readWord(word: string, languages: readonly string[]): { language: string; count: number } | null {
+  function readWord(word: string, languages: readonly string[]): string | null {
     for (const code of languages) {
       const pronunciations = byCode.get(code)?.pronunciations;
-      const known = pronunciations?.get(word) ?? pronunciations?.get(trimApostrophes(word));
-      if (known) return { language: code, count: vowels(known[0]) };
+      if (pronunciations?.has(word) || pronunciations?.has(trimApostrophes(word))) return code;
     }
     const rules = languages.find(isSpellingRules);
-    const count = rules ? spellingRules[rules].syllables(word) : null;
-    return rules && count !== null ? { language: rules, count } : null;
+    return rules && spellingRules[rules](word) ? rules : null;
   }
 
   /** Whether these Languages can read words: each that reads from its data has it. */
@@ -148,35 +116,6 @@ export function lyricsLanguage(data: readonly LanguageData[]) {
     languages.length > 0 && languages.every((code) => !readsFromData(code) || byCode.has(code));
 
   return {
-    /**
-     * A Line's Syllable Count, from its text as written with Chords inline,
-     * in a Song sung in `languages`, in order. Null for a Chord Line, a
-     * blank Line or one with no words, and until each of its dictionary
-     * Languages has its data, so no word is read by the wrong Language
-     * meanwhile.
-     */
-    syllableCount(text: string, languages: readonly string[]): SyllableCount | null {
-      if (!canRead(languages)) return null;
-      const words = wordsOf(lyricsOf(text).lyrics);
-      if (words.length === 0) return null;
-      // Every Language Bandmate counts in has its rules for guessing; English's stand in for one that has none yet.
-      const first = guessers[languages[0]] ?? guessers.en;
-      // A number's words, as said in the first Language, are read in that Language.
-      const countSaid = (word: string) => readWord(word, languages.slice(0, 1))?.count ?? first.letters(word);
-      let count = 0;
-      let estimate = false;
-      for (const { word } of words) {
-        const known = /\d/.test(word) ? null : readWord(word, languages);
-        if (known !== null) {
-          count += known.count;
-          continue;
-        }
-        estimate = true;
-        count += guess(word, first, countSaid);
-      }
-      return { count, estimate };
-    },
-
     /** Whether a Language's data has been read, so it can suggest Rhymes. */
     hasData(language: string): boolean {
       return byCode.has(language);
@@ -190,7 +129,7 @@ export function lyricsLanguage(data: readonly LanguageData[]) {
      */
     languageOf(word: string, languages: readonly string[]): string | null {
       if (!canRead(languages)) return null;
-      return readWord(normalWord(word), languages)?.language ?? languages[0];
+      return readWord(normalWord(word), languages) ?? languages[0];
     },
 
     /**
@@ -234,19 +173,6 @@ export function lyricsLanguage(data: readonly LanguageData[]) {
       return before;
     },
   };
-}
-
-/** A word no Language reads, guessed: its numbers read aloud, its letters by the Language's rules. */
-function guess(word: string, guesser: Guesser, countSaid: (word: string) => number): number {
-  let count = 0;
-  for (const run of word.match(/\d+|[^\d]+/g) ?? []) {
-    if (/\d/.test(run)) {
-      for (const said of guesser.number(run)) count += countSaid(said);
-    } else {
-      count += guesser.letters(run);
-    }
-  }
-  return count;
 }
 
 /** How many vowels, so syllables, a pronunciation has: its phones that carry a stress. */
@@ -339,7 +265,7 @@ export interface Sound {
  */
 function soundOf(data: LanguageData, word: string): Sound | null {
   const rules = spellingRules[data.code];
-  if (rules) return rules.sound(word);
+  if (rules) return rules(word);
   const phones = data.pronunciations.get(word)?.[0];
   const ending = phones && endingOf(phones);
   return phones && ending ? { count: vowels(phones), ending } : null;
@@ -405,64 +331,4 @@ function byCloseness(candidates: Candidate[], count: number, ending: Ending): Rh
         a.rhyme.word.localeCompare(b.rhyme.word),
     )
     .map((c) => c.rhyme);
-}
-
-/** An English word's syllables guessed from its spelling: its groups of vowels, less a silent e. */
-function guessEnglish(word: string): number {
-  const w = word.toLowerCase().replace(/'/g, '');
-  let groups = (w.match(/[aeiouy]+/g) ?? []).length;
-  if (groups > 1 && /[^aeiouy]e$/.test(w) && !/[^aeiouy]le$/.test(w)) groups--;
-  else if (groups > 1 && /[^aeiouytd]ed$/.test(w)) groups--;
-  else if (groups > 1 && /[^aeiouysxzhgc]es$/.test(w)) groups--;
-  return Math.max(1, groups);
-}
-
-const ones = [
-  'zero',
-  'one',
-  'two',
-  'three',
-  'four',
-  'five',
-  'six',
-  'seven',
-  'eight',
-  'nine',
-  'ten',
-  'eleven',
-  'twelve',
-  'thirteen',
-  'fourteen',
-  'fifteen',
-  'sixteen',
-  'seventeen',
-  'eighteen',
-  'nineteen',
-];
-const tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
-
-function belowHundred(n: number): string[] {
-  if (n < 20) return [ones[n]];
-  return n % 10 === 0 ? [tens[Math.floor(n / 10)]] : [tens[Math.floor(n / 10)], ones[n % 10]];
-}
-
-function belowThousand(n: number): string[] {
-  if (n < 100) return belowHundred(n);
-  const rest = n % 100;
-  return [ones[Math.floor(n / 100)], 'hundred', ...(rest ? ['and', ...belowHundred(rest)] : [])];
-}
-
-/** A number in English words: a year as a year ("nineteen ninety nine"), a long one digit by digit. */
-function englishNumber(digits: string): string[] {
-  const n = Number(digits);
-  if (digits.length > 1 && digits.startsWith('0')) return [...digits].map((d) => ones[Number(d)]);
-  if (n < 1000) return belowThousand(n);
-  if (digits.length === 4) {
-    const [high, low] = [Math.floor(n / 100), n % 100];
-    if (high % 10 !== 0 && low !== 0) return [...belowHundred(high), ...(low < 10 ? ['oh'] : []), ...belowHundred(low)];
-    if (high % 10 !== 0) return [...belowHundred(high), 'hundred'];
-    const rest = n % 1000;
-    return [ones[Math.floor(n / 1000)], 'thousand', ...(rest ? belowThousand(rest) : [])];
-  }
-  return [...digits].map((d) => ones[Number(d)]);
 }

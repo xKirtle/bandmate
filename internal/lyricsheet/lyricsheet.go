@@ -79,7 +79,7 @@ type Song struct {
 // code, e.g. "en".
 type Language string
 
-// Languages lists every Language Bandmate can count syllables in: English
+// Languages lists every Language Bandmate can suggest Rhymes in: English
 // from its dictionary, Portuguese by its spelling rules. A Song's Languages
 // are picked from them. The page lists them too, in web/src/lib/languages.ts.
 var Languages = []Language{"en", "pt"}

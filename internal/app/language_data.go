@@ -13,8 +13,8 @@ import (
 	"github.com/xKirtle/bandmate/internal/languagedata"
 )
 
-// languageData serves a Language's data, which the page counts syllables
-// from itself (ADR 0018). It's sent gzipped to a browser that takes it, as
+// languageData serves a Language's data, which the page finds Rhymes in
+// itself (ADR 0018). It's sent gzipped to a browser that takes it, as
 // every browser does, and with an ETag, so the browser keeps it and asks
 // only whether it changed.
 func (a *App) languageData(w http.ResponseWriter, r *http.Request) {

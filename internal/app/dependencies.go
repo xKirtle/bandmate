@@ -19,7 +19,7 @@ const webDependencies = "dependencies.json"
 // About page lists them: the Go modules the binary is built from, the web
 // packages in the SPA's bundle, the programs bundled beside them in the
 // image, and the data built into the binary, such as the dictionaries
-// syllables are counted from.
+// Rhymes are found in.
 type dependencies struct {
 	Go       []build.Dependency `json:"go"`
 	Web      []build.Dependency `json:"web"`

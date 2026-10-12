@@ -48,8 +48,7 @@
   import { keyHints } from './keyHints';
   import type { LyricSheetEditing } from './lyricSheetEditing.svelte';
   import { shortcuts } from './shortcuts';
-  import type { CaretListener, SyllableCounter } from './lyricsLanguage';
-  import SyllableCount from './SyllableCount.svelte';
+  import type { CaretListener } from './lyricsLanguage';
 
   let {
     alternate,
@@ -57,7 +56,6 @@
     label,
     editing,
     cueing,
-    syllables,
     onCaret,
   }: {
     alternate: Alternate;
@@ -69,8 +67,6 @@
     editing: LyricSheetEditing;
     /** Given, the Lines get a backdrop behind the text box to highlight and cue them. */
     cueing?: Cueing;
-    /** Given, each Line's Syllable Count shows in a column to the left of the text box. */
-    syllables?: SyllableCounter;
     /** Given, hears where the caret is in the text box while it has focus, and null once it hasn't. */
     onCaret?: CaretListener;
   } = $props();
@@ -86,7 +82,7 @@
 
   function followCaret(el: HTMLTextAreaElement) {
     if (!onCaret) return;
-    // Told straight away too, e.g. as the writing aids come on with the box focused.
+    // Told straight away too, e.g. as Rhymes come on with the box focused.
     tellCaret();
     document.addEventListener('selectionchange', tellCaret);
     return () => {
@@ -113,9 +109,8 @@
 
   // The rows of the text box as typed, each with the saved Line it is. Until
   // typing is saved, a row may be matched to the wrong Line; the save
-  // matches them for real. A row's Syllable Count is of its text as typed.
-  const hasBackdrop = $derived(!!cueing || !!syllables);
-  const rows = $derived(hasBackdrop ? text.split('\n') : []);
+  // matches them for real.
+  const rows = $derived(cueing ? text.split('\n') : []);
   const rowLines = $derived(cueing ? linesByRow(text, alternate.lines) : []);
 
   // The row under the pointer, so its Line's gutter shows its ✕. The text box
@@ -136,31 +131,26 @@
 
 <label class="visually-hidden" for="text-{alternate.id}">{label}</label>
 <!-- The backdrop renders the rows again behind the text box, wrapping them
-     the same way, so each row's highlight, Cue and Syllable Count line up
-     with its text, the count on a wrapped row's first line. The
+     the same way, so each row's highlight and Cue line up with its text. The
      text box sits on top and takes every click, so it never plays, except
      in Sync mode, where clicks go through it to the rows to pick them. -->
 <!-- Hovering only shows a Line's ✕; the keyboard reaches it in the gutter slot. -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="line-field"
-  class:backdropped={hasBackdrop}
-  class:with-counts={syllables}
+  class:cued={cueing}
   class:with-gutter={cueing?.gutter}
   class:syncing={cueing?.sync}
   style:--rows={rows.length}
   onpointermove={cueing?.gutter ? pointed : undefined}
   onpointerleave={() => (hoveredRow = null)}
 >
-  {#if hasBackdrop}
+  {#if cueing}
     <div class="backdrop"></div>
     {#each rows as row, i (i)}
       {@const line = rowLines[i]}
       {@const gridRow = i + 2}
-      {#if syllables}
-        <div class="count" style:grid-row={gridRow}><SyllableCount count={syllables(row)} /></div>
-      {/if}
-      {#if cueing && line}
+      {#if line}
         <!-- Sync mode skips Chord Lines, so only Lines with words are picked. -->
         {@const sync = cueing.sync && !isBlank(line) && !line.chordLine ? cueing.sync : undefined}
         <!-- Picking a Line is also in its gutter slot, which takes the keyboard. -->
@@ -181,7 +171,7 @@
       {:else}
         <div bind:this={rowEls[i]} class="row" style:grid-row={gridRow} aria-hidden="true">{row || ' '}</div>
       {/if}
-      {#if cueing?.gutter && line && !isBlank(line)}
+      {#if cueing.gutter && line && !isBlank(line)}
         {@const gutter = cueing.gutter}
         {@const sync = cueing.sync}
         {@const lineLabel = `Line ${alternate.lines.indexOf(line) + 1}${gutter.labelSuffix}`}
@@ -257,47 +247,40 @@
   }
   /* One grid row per row of text, between rows as tall as the text box's
      top and bottom border and padding. The text box spans them all, and the
-     last takes whatever the text box's minimum height adds. The Syllable
-     Counts take a column before it, the gutter one after. Its own stacking
+     last takes whatever the text box's minimum height adds. Its own stacking
      context keeps the text box's and rows' z-index inside it, so they never
      draw over the sticky header or Timeline. */
-  .line-field.backdropped {
+  .line-field.cued {
     --inset-block: calc(var(--space-2) + 1px);
     isolation: isolate;
     display: grid;
-    grid-template-columns: [text-start] minmax(0, 1fr) [text-end];
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: var(--inset-block) repeat(var(--rows), auto) minmax(var(--inset-block), 1fr);
     column-gap: var(--space-2);
   }
   .line-field.with-gutter {
-    grid-template-columns: [text-start] minmax(0, 1fr) [text-end] auto;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
-  .line-field.with-counts {
-    grid-template-columns: var(--count-slot) [text-start] minmax(0, 1fr) [text-end];
-  }
-  .line-field.with-counts.with-gutter {
-    grid-template-columns: var(--count-slot) [text-start] minmax(0, 1fr) [text-end] auto;
-  }
-  .backdropped .text {
-    grid-area: 1 / text-start / -1 / text-end;
+  .cued .text {
+    grid-area: 1 / 1 / -1 / 2;
     z-index: 2;
     background: transparent;
   }
-  .backdropped .text,
+  .cued .text,
   .row {
     white-space: pre-wrap;
     overflow-wrap: break-word;
   }
   /* The text box's background, behind the rows. */
   .backdrop {
-    grid-area: 1 / text-start / -1 / text-end;
+    grid-area: 1 / 1 / -1 / 2;
     border-radius: var(--radius-md);
     background: var(--bg);
   }
   /* Set like the text box's text, so it wraps the same; its text is never
      seen, only its highlight. */
   .row {
-    grid-column: text-start / text-end;
+    grid-column: 1;
     z-index: 1;
     margin-inline: 1px;
     padding-inline: var(--space-3);
@@ -321,14 +304,6 @@
     pointer-events: auto;
     cursor: pointer;
   }
-  /* A row's Syllable Count, set like its text, so it's centred on the
-     first line of it, however many lines the row wraps to. */
-  .count {
-    grid-column: 1;
-    align-self: start;
-    font-size: var(--lyric-write);
-    line-height: var(--leading-content);
-  }
   /* As wide as a Cue's ▶, time and ✕, so the gutter doesn't shift as it moves on. */
   .now {
     width: var(--cue-slot);
@@ -346,7 +321,7 @@
   /* Takes no height, so however tall its field, the rows stay as tall as
      their text. */
   .gutter {
-    grid-column: text-end / -1;
+    grid-column: 2;
     align-self: start;
     height: 0;
   }

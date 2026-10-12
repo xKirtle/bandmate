@@ -12,23 +12,14 @@ function isVowel(letter: string | undefined): boolean {
 }
 
 /**
- * A Portuguese word's syllables as written: one for each vowel that isn't a
- * glide in a diphthong, or a silent u. The word comes as the lyrics language
- * module looks words up: composed, in lower case. Null for one with no vowel.
- */
-export function portugueseSyllables(word: string): number | null {
-  const count = syllableVowels([...word.replace(/'/g, '')]).length;
-  return count > 0 ? count : null;
-}
-
-/**
- * How a Portuguese word sounds, as its Rhymes are found: its syllables, as
- * portugueseSyllables counts them, and how it ends, from the vowel of its
- * stressed syllable. The spelling rules find that syllable: an acute or
- * circumflex accent marks it, or else a tilde; or else a word ending in a,
- * e or o, alone or before s, or in am, em or ens, is stressed on its next
- * to last syllable, and any other on its last. The word comes as for
- * portugueseSyllables. Null for one with no vowel.
+ * How a Portuguese word sounds, as its Rhymes are found: its syllables as
+ * written, one for each vowel that isn't a glide in a diphthong, or a silent
+ * u; and how it ends, from the vowel of its stressed syllable. The spelling
+ * rules find that syllable: an acute or circumflex accent marks it, or else
+ * a tilde; or else a word ending in a, e or o, alone or before s, or in am,
+ * em or ens, is stressed on its next to last syllable, and any other on its
+ * last. The word comes as the lyrics language module looks words up:
+ * composed, in lower case. Null for one with no vowel.
  */
 export function portugueseSound(word: string): Sound | null {
   const letters = [...word.replace(/'/g, '')];
@@ -143,63 +134,3 @@ const closingConsonant = new RegExp(`^[lmnrz](?![${vowels}])`);
 
 /** Starts of words whose last two vowels make a hiatus that no other rule finds. */
 const hiatusStarts = ['reun', 'proib', 'suic', 'druid', 'miud', 'cair', 'sair'];
-
-const ones = [
-  'zero',
-  'um',
-  'dois',
-  'três',
-  'quatro',
-  'cinco',
-  'seis',
-  'sete',
-  'oito',
-  'nove',
-  'dez',
-  'onze',
-  'doze',
-  'treze',
-  'catorze',
-  'quinze',
-  'dezasseis',
-  'dezassete',
-  'dezoito',
-  'dezanove',
-];
-const tens = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'];
-const hundreds = [
-  '',
-  'cento',
-  'duzentos',
-  'trezentos',
-  'quatrocentos',
-  'quinhentos',
-  'seiscentos',
-  'setecentos',
-  'oitocentos',
-  'novecentos',
-];
-
-function belowHundred(n: number): string[] {
-  if (n < 20) return [ones[n]];
-  return n % 10 === 0 ? [tens[Math.floor(n / 10)]] : [tens[Math.floor(n / 10)], 'e', ones[n % 10]];
-}
-
-function belowThousand(n: number): string[] {
-  if (n < 100) return belowHundred(n);
-  if (n === 100) return ['cem'];
-  const rest = n % 100;
-  return [hundreds[Math.floor(n / 100)], ...(rest ? ['e', ...belowHundred(rest)] : [])];
-}
-
-/** A number in Portuguese words ("mil novecentos e noventa e nove"); a long one, digit by digit. */
-export function portugueseNumber(digits: string): string[] {
-  const n = Number(digits);
-  if ((digits.length > 1 && digits.startsWith('0')) || n >= 1_000_000) return [...digits].map((d) => ones[Number(d)]);
-  if (n < 1000) return belowThousand(n);
-  const thousands = Math.floor(n / 1000);
-  const rest = n % 1000;
-  const head = thousands === 1 ? ['mil'] : [...belowThousand(thousands), 'mil'];
-  if (rest === 0) return head;
-  return rest < 100 || rest % 100 === 0 ? [...head, 'e', ...belowThousand(rest)] : [...head, ...belowThousand(rest)];
-}

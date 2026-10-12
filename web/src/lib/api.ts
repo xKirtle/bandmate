@@ -666,8 +666,8 @@ export interface AboutInfo {
   /** The third-party packages that ship in Bandmate: the Go modules the
       server is built from, the web packages in the SPA's bundle, and the
       programs bundled beside them in the image (none outside it), and the
-      data built into the binary, such as the dictionaries syllables are
-      counted from. */
+      data built into the binary, such as the dictionaries Rhymes are found
+      in. */
   dependencies: { go: Dependency[]; web: Dependency[]; programs: Dependency[]; data: Dependency[] };
 }
 
@@ -829,7 +829,7 @@ function onTracks(clips: readonly (PlacedClip | PastedClip)[]) {
 export const api = {
   getConfig: () => request<ServerConfig>('GET', '/config'),
   getAbout: () => request<AboutInfo>('GET', '/about'),
-  /** A Language's data, as text, to count syllables from: large, so the browser keeps it. */
+  /** A Language's data, as text, to find Rhymes in: large, so the browser keeps it. */
   getLanguageData: (code: string) => answer(fetch(`/api/languages/${encodeURIComponent(code)}`), (res) => res.text()),
   /** Asks GitHub, unless the server recently has, so it's slower than the rest of About. */
   getAboutReleases: () => request<ReleasesReport>('GET', '/about/releases'),

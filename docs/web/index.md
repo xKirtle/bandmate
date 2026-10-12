@@ -50,7 +50,7 @@ On a computer, everything fits on one screen, and a tablet gets the very same, b
 - **Play from Read mode**, and listen back to your takes.
 - **Turn the phone sideways**, and the timeline fills the screen, to edit and record on.
 
-Syncing lyrics to the music, and keyboard shortcuts, need a bigger screen.
+Syncing lyrics to the music, rhymes and keyboard shortcuts need a bigger screen.
 
 <div class="phones">
 <img src="@screenshots/phone-song-list.png" alt="The Songs page on a phone, listing every song with its status">

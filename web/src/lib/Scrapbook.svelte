@@ -8,15 +8,13 @@
   import type { SectionDragging } from './sectionDragging.svelte';
   import ActionsMenu from './ActionsMenu.svelte';
   import SectionEditor from './SectionEditor.svelte';
-  import type { CaretListener, SyllableCounter } from './lyricsLanguage';
-  import SyllableCount from './SyllableCount.svelte';
+  import type { CaretListener } from './lyricsLanguage';
   import { card, describe, labelOf, places, putBackActions, sectionsInArrangement } from './sections';
 
   let {
     song,
     drag,
     editing,
-    syllables,
     onCaret,
   }: {
     song: Song;
@@ -28,9 +26,7 @@
      * editor while they aren't saved.
      */
     editing: LyricSheetEditing;
-    /** Given, as in Write mode while the writing aids are on, each Line's Syllable Count shows beside it. */
-    syllables?: SyllableCounter;
-    /** Given, as in Write mode while the writing aids are on, hears where the caret is in the open Section's Lines, to suggest Rhymes. */
+    /** Given, as in Write mode while Rhymes show, hears where the caret is in the open Section's Lines, to suggest Rhymes. */
     onCaret?: CaretListener;
   } = $props();
 
@@ -164,7 +160,6 @@
               more={[{ icon: Trash2, label: 'Delete for good', run: () => remove(section.id) }]}
               {drag}
               places={placesBack}
-              {syllables}
               {onCaret}
             >
               {#snippet grip()}
@@ -191,13 +186,7 @@
                   {/if}
                 </span>
                 {#each shown.lines as line, i (i)}
-                  {#if syllables}
-                    <span class="counted-line"
-                      ><SyllableCount count={syllables(line)} /><span class="line">{line || ' '}</span></span
-                    >
-                  {:else}
-                    <span class="line">{line || ' '}</span>
-                  {/if}
+                  <span class="line">{line || ' '}</span>
                 {:else}
                   <span class="line muted">No Lines yet.</span>
                 {/each}
@@ -318,12 +307,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: pre;
-  }
-  /* Each Line's Syllable Count in a column before it, as in the editor. */
-  .counted-line {
-    display: grid;
-    grid-template-columns: var(--count-slot) minmax(0, 1fr);
-    column-gap: var(--space-2);
   }
   .more {
     font-size: var(--text-sm);
