@@ -1,10 +1,11 @@
 // The lyrics language work: a word's Rhymes, each with its Syllable Count,
 // the Language a word is read in, and the word at the caret, worked out in
-// the browser from each Language's data, which the binary serves (ADR 0018).
-// A Line's Chords aren't words, a hyphenated word is read as its parts, and
-// each word is read by the first of the Song's dictionary Languages that
-// knows it, in the Song's order, or else by the first of its spelling-rules
-// Languages, which reads any word with a vowel.
+// the browser from the dictionary of each Language set up on this device,
+// which the binary serves (ADR 0018). A Line's Chords aren't words, a
+// hyphenated word is read as its parts, and each word is read in the first
+// of the Song's Languages, in the Song's order, whose set-up dictionary has
+// it. Every Language brings a word list, a dictionary Language's with each
+// word's pronunciation, so membership decides, however many there are.
 
 import { portugueseSound } from './portuguese';
 
@@ -28,6 +29,8 @@ export interface Rhyme {
 export interface Rhymes {
   perfect: Rhyme[];
   near: Rhyme[];
+  /** Whether they're guessed from the word's spelling, as the Language's dictionary doesn't have it. */
+  guess: boolean;
 }
 
 /**
@@ -79,66 +82,67 @@ function isSpellingRules(code: string): boolean {
   return code in spellingRules;
 }
 
+const wordLists = new WeakMap<LanguageData, ReadonlySet<string> | ReadonlyMap<string, unknown>>();
+
 /**
- * Whether a Language's words are read from its data, so not until it has
- * it: a dictionary Language's are. A spelling-rules Language's data is only
- * to suggest Rhymes from.
+ * The words a Language's dictionary has, which decide the Language a word
+ * is read in: a dictionary Language's words with a pronunciation, or a
+ * spelling-rules Language's word list.
  */
-function readsFromData(code: string): boolean {
-  return !isSpellingRules(code);
+function wordList(data: LanguageData): { has(word: string): boolean } {
+  let list = wordLists.get(data);
+  if (!list) {
+    list = isSpellingRules(data.code) ? new Set(data.words) : data.pronunciations;
+    wordLists.set(data, list);
+  }
+  return list;
 }
 
 /**
- * The lyrics language work over the Languages whose data has been read: a
- * Language of a Song not among them reads no words, and suggests no Rhymes.
+ * The lyrics language work over the Languages whose dictionaries are set up
+ * on this device: a Language of a Song not among them is never guessed at,
+ * and suggests no Rhymes.
  */
 export type LyricsLanguage = ReturnType<typeof lyricsLanguage>;
 
-export function lyricsLanguage(data: readonly LanguageData[]) {
-  const byCode = new Map(data.map((d) => [d.code, d]));
+export function lyricsLanguage(dictionaries: readonly LanguageData[]) {
+  const byCode = new Map(dictionaries.map((d) => [d.code, d]));
+  const wordLists = new Map(dictionaries.map((d) => [d.code, wordList(d)]));
 
-  /**
-   * The Language a word is read in: the first of these Languages'
-   * dictionaries that knows it, in order, or else the first of their
-   * spelling rules. Null when none of them reads it.
-   */
-  function readWord(word: string, languages: readonly string[]): string | null {
-    for (const code of languages) {
-      const pronunciations = byCode.get(code)?.pronunciations;
-      if (pronunciations?.has(word) || pronunciations?.has(trimApostrophes(word))) return code;
-    }
-    const rules = languages.find(isSpellingRules);
-    return rules && spellingRules[rules](word) ? rules : null;
+  /** Whether a Language's dictionary is set up and has a word, as it's looked up. */
+  function has(code: string, word: string): boolean {
+    const list = wordLists.get(code);
+    return !!list && (list.has(word) || list.has(trimApostrophes(word)));
   }
 
-  /** Whether these Languages can read words: each that reads from its data has it. */
-  const canRead = (languages: readonly string[]) =>
-    languages.length > 0 && languages.every((code) => !readsFromData(code) || byCode.has(code));
-
   return {
-    /** Whether a Language's data has been read, so it can suggest Rhymes. */
-    hasData(language: string): boolean {
+    /** Whether a Language's dictionary is set up, so it can suggest Rhymes. */
+    isSetUp(language: string): boolean {
       return byCode.has(language);
     },
 
     /**
      * The Language a word of a Song sung in `languages` is read in: the
-     * first of the Song's dictionary Languages that knows it, or else its
-     * first spelling-rules Language, or, for a word neither reads, its first
-     * Language. Null until each of its dictionary Languages has its data.
+     * first of them, in the Song's order, whose dictionary has it. A word
+     * in none, once every one of them is set up, is an unknown word, read
+     * in the first with spelling rules, or else the first. Null while the
+     * word is in none and some aren't set up, as those are never guessed at.
      */
     languageOf(word: string, languages: readonly string[]): string | null {
-      if (!canRead(languages)) return null;
-      return readWord(normalWord(word), languages) ?? languages[0];
+      const asked = normalWord(word);
+      const known = languages.find((code) => has(code, asked));
+      if (known) return known;
+      if (languages.length === 0 || !languages.every((code) => byCode.has(code))) return null;
+      return languages.find(isSpellingRules) ?? languages[0];
     },
 
     /**
      * A word's Rhymes in a Language: perfect ones sound the same from the
      * word's last stressed vowel to its end, near ones only have the same
-     * vowels from there. Null for a word the Language can't read, and until
-     * it has its data. A dictionary Language reads the words it knows and
-     * suggests from them; a spelling-rules Language reads any word by its
-     * rules and suggests from its word list.
+     * vowels from there. A word its dictionary has is read from it; one it
+     * lacks, by its spelling rules if it has them, its Rhymes then a guess.
+     * Null for a word it can't read, and when it isn't set up. They're
+     * suggested from the words its dictionary has.
      */
     rhymes(word: string, language: string): Rhymes | null {
       const data = byCode.get(language);
@@ -151,7 +155,11 @@ export function lyricsLanguage(data: readonly LanguageData[]) {
       const near = (index.byVowels.get(ending.vowels) ?? []).filter(
         (c) => c.ending.sounds !== ending.sounds && c.rhyme.word !== asked,
       );
-      return { perfect: byCloseness(perfect, count, ending), near: byCloseness(near, count, ending) };
+      return {
+        perfect: byCloseness(perfect, count, ending),
+        near: byCloseness(near, count, ending),
+        guess: !has(language, asked),
+      };
     },
 
     /**

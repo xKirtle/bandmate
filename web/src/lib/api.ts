@@ -637,6 +637,19 @@ export interface Fetched {
   size: number;
 }
 
+/** A Language whose rhyming dictionary can be set up, and how much a browser downloads to. */
+export interface LanguageDownload {
+  code: string;
+  /** In bytes, compressed. */
+  size: number;
+}
+
+/** A Language's data as Bandmate serves it, and the tag that changes along with it. */
+export interface LanguageDataDownload {
+  etag: string;
+  text: string;
+}
+
 /** Everything About shows that's known without going online. */
 export interface AboutInfo {
   /** The running version: the release tag, else the short commit, else "dev". */
@@ -797,6 +810,25 @@ async function answer<T>(sent: Promise<Response>, read?: (res: Response) => Prom
   return data as T;
 }
 
+/**
+ * A Language's data, as text, to find Rhymes in: or null when it's still
+ * that tagged `etag`. Not left in the browser's cache, as it's kept apart.
+ */
+async function getLanguageData(code: string, etag?: string): Promise<LanguageDataDownload | null> {
+  let res: Response;
+  try {
+    res = await fetch(`/api/languages/${encodeURIComponent(code)}`, {
+      cache: 'no-store',
+      headers: etag ? { 'If-None-Match': etag } : undefined,
+    });
+  } catch {
+    throw new ApiError(0, "Can't reach Bandmate. Check your connection.");
+  }
+  // Not ok, so told apart before answer reads it as a failure.
+  if (res.status === 304) return null;
+  return answer(Promise.resolve(res), async (r) => ({ etag: r.headers.get('ETag') ?? '', text: await r.text() }));
+}
+
 /** A Cover's pictures and details, as the server takes them. */
 function coverForm(cover: PreparedCover): FormData {
   const form = new FormData();
@@ -829,8 +861,9 @@ function onTracks(clips: readonly (PlacedClip | PastedClip)[]) {
 export const api = {
   getConfig: () => request<ServerConfig>('GET', '/config'),
   getAbout: () => request<AboutInfo>('GET', '/about'),
-  /** A Language's data, as text, to find Rhymes in: large, so the browser keeps it. */
-  getLanguageData: (code: string) => answer(fetch(`/api/languages/${encodeURIComponent(code)}`), (res) => res.text()),
+  /** Every Language whose rhyming dictionary can be set up, with its download size. */
+  getLanguages: () => request<LanguageDownload[]>('GET', '/languages'),
+  getLanguageData,
   /** Asks GitHub, unless the server recently has, so it's slower than the rest of About. */
   getAboutReleases: () => request<ReleasesReport>('GET', '/about/releases'),
   /** Runs yt-dlp the first time, so it can be slower than the rest of About. */

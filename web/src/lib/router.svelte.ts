@@ -71,5 +71,5 @@ export function interceptLinks(event: MouseEvent) {
   const url = new URL(link.href);
   if (url.origin !== location.origin) return;
   event.preventDefault();
-  navigate(url.pathname + url.search);
+  navigate(url.pathname + url.search + url.hash);
 }

@@ -36,7 +36,7 @@
   import { chordsInRead } from '../lib/chordChart';
   import { songChordsShown } from '../lib/chordsShown';
   import { songTranspose } from '../lib/sharedTranspose.svelte';
-  import { fetchLanguageData, languageData } from '../lib/languageData.svelte';
+  import { rhymingDictionaries } from '../lib/sharedRhymingDictionaries.svelte';
   import { lyricsLanguage, type CaretListener } from '../lib/lyricsLanguage';
   import { lookUpRhymes } from '../lib/rhymeLookup';
   import RhymesCard from '../lib/RhymesCard.svelte';
@@ -106,16 +106,17 @@
   // window, and Sync mode and it are never on together.
   const desktop = new MediaQuery('min-width: 80rem');
   const rhymeMode = new RhymeMode({ mode: () => mode, wide: () => desktop.current, sync: syncMode });
-  // Rhymes, while Rhyme mode is on, worked out here from the data of the
-  // Song's Languages: only then is that fetched, once for as long as the page
-  // is open. The card's are for the word at the caret of the Line that has
-  // focus, kept once the caret leaves, or for one typed into it, until the
-  // caret moves in a Line again. They're in the Language the word is read
-  // in, or in another of the Song's Languages picked for it.
+  // Rhymes, while Rhyme mode is on, worked out here from the dictionaries of
+  // the Song's Languages set up on this device: only then are they read in,
+  // once for as long as the page is open, and nothing is downloaded for a
+  // Language that isn't set up. The card's are for the word at the caret of
+  // the Line that has focus, kept once the caret leaves, or for one typed
+  // into it, until the caret moves in a Line again. They're in the Language
+  // the word is read in, or in another of the Song's Languages picked for it.
   $effect(() => {
-    if (rhymeMode.on) fetchLanguageData(languages);
+    if (rhymeMode.on) rhymingDictionaries.use(languages);
   });
-  const lyrics = $derived(lyricsLanguage(languageData()));
+  const lyrics = $derived(lyricsLanguage(rhymingDictionaries.loaded));
   let cardWord = $state<string | null>(null);
   let cardLanguage = $state<string | null>(null);
   function setCardWord(word: string | null) {
@@ -127,7 +128,15 @@
     if (word) setCardWord(word);
   };
   const onCaret = $derived(rhymeMode.on ? heardCaret : undefined);
-  const cardRhymes = $derived(lookUpRhymes(lyrics, rhymeMode.on ? cardWord : null, languages, cardLanguage));
+  const cardRhymes = $derived(
+    lookUpRhymes(
+      lyrics,
+      rhymeMode.on ? cardWord : null,
+      languages,
+      cardLanguage,
+      rhymingDictionaries.loading(languages),
+    ),
+  );
   // The Details as Read mode shows them, with the key the Chords are shown in.
   const summary = $derived(
     details
