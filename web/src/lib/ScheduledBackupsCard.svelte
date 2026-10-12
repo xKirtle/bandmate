@@ -12,12 +12,15 @@
 
   let {
     backups,
-    onTurnedOn,
+    onDue,
   }: {
     /** The Backups listed, to tell how many Scheduled Backups there are; null while they load. */
     backups: readonly Backup[] | null;
-    /** Called once the schedule is turned on, as a Scheduled Backup is then made in the background. */
-    onTurnedOn: () => void;
+    /**
+     * Called once a change makes a Scheduled Backup due, as turning the
+     * schedule on for the first time does, since one is then made in the background.
+     */
+    onDue: () => void;
   } = $props();
 
   let schedule = $state<BackupSchedule | null>(null);
@@ -46,7 +49,7 @@
     try {
       const saved = await save;
       if (mine === sent) schedule = saved;
-      if (saved.on && !was.on) onTurnedOn();
+      if (saved.due) onDue();
     } catch (e) {
       if (mine !== sent) return;
       schedule = was;

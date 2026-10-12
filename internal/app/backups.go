@@ -54,9 +54,9 @@ func (a *App) backupSchedule(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s)
 }
 
-// setBackupSchedule sets the schedule, answering at once: while it's on, a
-// Scheduled Backup that's due, as one is when it's first turned on, is made
-// in the background.
+// setBackupSchedule sets the schedule, answering at once with whether a
+// Scheduled Backup is due, as one is when it's first turned on: if so, it's
+// made in the background.
 func (a *App) setBackupSchedule(w http.ResponseWriter, r *http.Request) {
 	var req backups.Schedule
 	if !readJSON(w, r, &req) {

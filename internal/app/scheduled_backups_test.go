@@ -15,6 +15,9 @@ type backupSchedule struct {
 	On     bool   `json:"on"`
 	Period string `json:"period"`
 	Keep   int    `json:"keep"`
+	// Due tells whether a Scheduled Backup is due now, so one is being made;
+	// it's left out of what's set.
+	Due bool `json:"due,omitempty"`
 }
 
 const schedulePath = "/api/backups/schedule"
@@ -28,16 +31,55 @@ func (ts *testServer) schedule() backupSchedule {
 	return s
 }
 
-// setSchedule sets the schedule, and checks it's answered with what was set.
-func (ts *testServer) setSchedule(s backupSchedule) {
+// setSchedule sets the schedule, checks it's answered with what was set, and
+// returns the answer, which says whether a Scheduled Backup is due.
+func (ts *testServer) setSchedule(s backupSchedule) backupSchedule {
 	ts.t.Helper()
 	res := ts.Do(http.MethodPut, schedulePath, s)
 	expectStatus(ts.t, res, http.StatusOK)
 	var got backupSchedule
 	res.JSON(ts.t, &got)
-	if got != s {
-		ts.t.Fatalf("schedule set = %+v, want %+v", got, s)
+	if set := (backupSchedule{On: got.On, Period: got.Period, Keep: got.Keep}); set != s {
+		ts.t.Fatalf("schedule set = %+v, want %+v", set, s)
 	}
+	return got
+}
+
+func TestTheScheduleSaysWhenTurningItOnMakesOneAtOnce(t *testing.T) {
+	clock := newScheduleClock()
+	ts := newTestServerWith(t, func(c *app.Config) { c.Now = clock.Now })
+	ts.createSong("Night Drive")
+	weekly := backupSchedule{On: true, Period: "weekly", Keep: 4}
+	off := backupSchedule{On: false, Period: "weekly", Keep: 4}
+
+	if !ts.setSchedule(weekly).Due {
+		t.Fatal("turned on for the first time, a Scheduled Backup isn't due")
+	}
+	ts.waitForBackups(1)
+	if ts.schedule().Due {
+		t.Error("once one is made, another is due")
+	}
+
+	// Turned off and on again within the week: none is made.
+	if ts.setSchedule(off).Due {
+		t.Error("turned off, a Scheduled Backup is due")
+	}
+	clock.Advance(6 * 24 * time.Hour)
+	if ts.setSchedule(weekly).Due {
+		t.Error("turned on again within the week, a Scheduled Backup is due")
+	}
+	ts.app.CheckBackupSchedule()
+	if list := ts.listBackups(); len(list) != 1 {
+		t.Errorf("backups = %+v, want still 1", list)
+	}
+
+	// A week after the last: one is.
+	ts.setSchedule(off)
+	clock.Advance(24 * time.Hour)
+	if !ts.setSchedule(weekly).Due {
+		t.Error("turned on a week after the last one, a Scheduled Backup isn't due")
+	}
+	ts.waitForBackups(2)
 }
 
 // waitForBackups waits, as a user would watch the list, until n Backups are

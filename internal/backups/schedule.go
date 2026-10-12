@@ -47,6 +47,10 @@ type Schedule struct {
 	On     bool   `json:"on"`
 	Period Period `json:"period"`
 	Keep   int    `json:"keep"`
+	// Due tells whether a Scheduled Backup is due now, while it's on: when
+	// the schedule has never made one, or a Period has passed since it last
+	// did. It's ignored when the schedule is set.
+	Due bool `json:"due"`
 }
 
 // DefaultSchedule is the schedule until it's first set: off.
@@ -56,34 +60,32 @@ var DefaultSchedule = Schedule{On: false, Period: Weekly, Keep: 4}
 // that's due, besides at start-up and when the schedule is set.
 const CheckEvery = time.Hour
 
-// Schedule returns the schedule Scheduled Backups are made on.
+// Schedule returns the schedule Scheduled Backups are made on, and whether
+// one is due now.
 func (s *Store) Schedule(ctx context.Context) (Schedule, error) {
-	sch, _, err := s.readSchedule(ctx)
-	return sch, err
-}
-
-// readSchedule returns the schedule and when it last made a Scheduled
-// Backup, the zero time if it never has.
-func (s *Store) readSchedule(ctx context.Context) (Schedule, time.Time, error) {
 	sch := DefaultSchedule
 	var lastMade sql.NullString
 	err := s.db.QueryRowContext(ctx, `SELECT turned_on, period, keep, last_made_at FROM backup_schedule WHERE id = 1`).
 		Scan(&sch.On, &sch.Period, &sch.Keep, &lastMade)
 	if errors.Is(err, sql.ErrNoRows) {
-		return DefaultSchedule, time.Time{}, nil
+		return DefaultSchedule, nil
 	}
 	if err != nil {
-		return sch, time.Time{}, fmt.Errorf("reading the backup schedule: %w", err)
+		return sch, fmt.Errorf("reading the backup schedule: %w", err)
 	}
-	if !lastMade.Valid {
-		return sch, time.Time{}, nil
+	var last time.Time
+	if lastMade.Valid {
+		if last, err = domain.ParseTime(lastMade.String); err != nil {
+			return sch, err
+		}
 	}
-	t, err := domain.ParseTime(lastMade.String)
-	return sch, t, err
+	sch.Due = sch.On && (last.IsZero() || !s.now().Before(sch.Period.endsAfter(last)))
+	return sch, nil
 }
 
-// SetSchedule sets the schedule Scheduled Backups are made on. While it's
-// on, a check for one that's due follows at once, in the background.
+// SetSchedule sets the schedule Scheduled Backups are made on, and returns
+// it, saying whether one is due. If one is, it's made at once, in the
+// background.
 // Neither turning it off nor keeping fewer deletes a Backup: the extras go
 // when the next one is made.
 func (s *Store) SetSchedule(ctx context.Context, sch Schedule) (Schedule, error) {
@@ -99,14 +101,18 @@ func (s *Store) SetSchedule(ctx context.Context, sch Schedule) (Schedule, error)
 	if err != nil {
 		return Schedule{}, fmt.Errorf("setting the backup schedule: %w", err)
 	}
-	if sch.On {
+	set, err := s.Schedule(ctx)
+	if err != nil {
+		return set, err
+	}
+	if set.Due {
 		// One wake waiting is enough: the check reads the latest schedule.
 		select {
 		case s.wake <- struct{}{}:
 		default:
 		}
 	}
-	return sch, nil
+	return set, nil
 }
 
 // runSchedule checks for a Scheduled Backup that's due at once, then every
@@ -135,12 +141,12 @@ func (s *Store) runSchedule(ctx context.Context) {
 func (s *Store) CheckSchedule(ctx context.Context) {
 	s.scheduling.Lock()
 	defer s.scheduling.Unlock()
-	sch, lastMade, err := s.readSchedule(ctx)
+	sch, err := s.Schedule(ctx)
 	if err != nil {
 		log.Printf("checking for a Scheduled Backup: %v", err)
 		return
 	}
-	if !sch.On || (!lastMade.IsZero() && s.now().Before(sch.Period.endsAfter(lastMade))) {
+	if !sch.Due {
 		return
 	}
 	b, err := s.make(ctx, Contents{AllSongs: true, BeatLibrary: true}, true)
@@ -159,7 +165,7 @@ func (s *Store) CheckSchedule(ctx context.Context) {
 // pruneScheduled deletes the oldest Scheduled Backups beyond the number the
 // schedule keeps, unless it was turned off meanwhile.
 func (s *Store) pruneScheduled(ctx context.Context) error {
-	sch, _, err := s.readSchedule(ctx)
+	sch, err := s.Schedule(ctx)
 	if err != nil || !sch.On {
 		return err
 	}

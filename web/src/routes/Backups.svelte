@@ -69,9 +69,10 @@
   });
 
   /**
-   * Once the schedule is turned on, a Scheduled Backup is made in the
-   * background, so the list is read again until a new one shows, with
-   * the oldest beyond those kept gone.
+   * Once a change to the schedule makes a Scheduled Backup due, as turning
+   * it on for the first time does, one is made in the background, so the
+   * list is read again until a new one shows, with the oldest beyond those
+   * kept gone.
    */
   function watchForScheduled() {
     clearTimeout(watchTimer);
@@ -220,7 +221,7 @@
 
 <SettingsPage tab="backups">
   <div class="cards">
-    <ScheduledBackupsCard {backups} onTurnedOn={watchForScheduled} />
+    <ScheduledBackupsCard {backups} onDue={watchForScheduled} />
     <section class="card" aria-labelledby="backups-heading">
       <div class="head">
         <h2 id="backups-heading">Backups</h2>

@@ -252,6 +252,12 @@ export interface BackupSchedule {
   on: boolean;
   period: BackupPeriod;
   keep: number;
+  /**
+   * Whether a Scheduled Backup is due now, so one is being made: while it's
+   * on, when the schedule has never made one, or a period has passed since
+   * it last did. Left out when it's set.
+   */
+  due: boolean;
 }
 
 /**
@@ -912,10 +918,11 @@ export const api = {
   /** The schedule Scheduled Backups are made on. */
   backupSchedule: () => request<BackupSchedule>('GET', '/backups/schedule'),
   /**
-   * Sets the schedule, answering at once. While it's on, a Scheduled Backup
-   * that's due, as one is when it's first turned on, is made in the background.
+   * Sets the schedule, answering at once with whether a Scheduled Backup is
+   * due, as one is when it's first turned on: if so, it's made in the background.
    */
-  setBackupSchedule: (schedule: BackupSchedule) => request<BackupSchedule>('PUT', '/backups/schedule', schedule),
+  setBackupSchedule: ({ on, period, keep }: Omit<BackupSchedule, 'due'>) =>
+    request<BackupSchedule>('PUT', '/backups/schedule', { on, period, keep }),
   /** Deletes a Backup and its file. */
   deleteBackup: (id: number) => request<null>('DELETE', `/backups/${id}`),
   /** Where a Backup's file downloads from, as one file. */
