@@ -16,7 +16,7 @@ Write lyrics the way you would in a notebook, with the chords right where you pl
 <img src="@screenshots/write-mode-labelled.png" alt="A song in Write mode, numbered 1 to 10 to match the list below it">
 
 1. **Status**: where the song is at: an idea, a draft, or finished.
-2. **Song details**: its key, tempo, capo and tuning, the languages it's sung in, and notes of your own. Languages offers only those Bandmate suggests [rhymes](#rhymes) in, English and Portuguese, so others aren't on the list yet.
+2. **Song details**: its key, tempo, capo and tuning, the languages it's sung in, and notes of your own. Languages offers only those Bandmate suggests [rhymes](#rhymes) in, so others aren't on the list yet.
 3. **Write and Read**: Read mode shows the song large and uncluttered, to play from. Finished songs open in it.
 4. **A section**: one part of the song, named however you like: a verse, a chorus, a hook. Move sections around, or repeat one wherever it comes back.
 5. **Chords**: typed in brackets right before the syllable they land on, even mid-word. Read mode shows them above the words.
@@ -181,7 +181,7 @@ A Backup restores into the same version of Bandmate or a newer one. To copy ever
 - **This device**: what each device keeps for itself.
   - **Appearance**: three colour palettes, Terracotta (the default), Ink and Olive, each in light and dark. Follow your system's light or dark, or pick one. More palettes may come.
   - **Recording**: every input on this device, each channel of an audio interface on its own, with its latency or "Not calibrated" or "Skipped". Pick the one you record from, and check its level with **Test input** above the list: Bandmate only listens while it's on, and asks for the microphone the first time. Open any of them to calibrate it as in [Calibrate](#calibrate) without recording from it, or type its latency. Inputs that aren't plugged in keep their latency, listed under **Not connected**, to forget.
-  - **Rhyming dictionaries**: English and Portuguese, each with its download size. Download the ones you write in, so [Rhymes](#rhymes) can suggest words in them, or remove one you no longer need.
+  - **Rhyming dictionaries**: one for each language Bandmate suggests rhymes in, each with its download size. Download the ones you write in, so [Rhymes](#rhymes) can suggest words in them, or remove one you no longer need.
   - **Chord diagrams**: flip them for left-handed playing.
 - **Backups**: see [Backups](#backups).
 - **About**: the version you're running, what changed in it, whether a newer one is out, the yt-dlp in use, and the packages and data that ship in Bandmate, with their licenses.
