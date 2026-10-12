@@ -6,7 +6,7 @@ Issues and specs live in GitHub Issues on xKirtle/bandmate, managed with the `gh
 
 Every change gets an issue before its PR, even a quick win whose spec is already a roadmap entry, so the work stays visible. Make issues with the `to-tickets` skill.
 
-On a **feature branch** (a feature the user may not keep, built on `feature/<slug>`), steps get no issue or PR, only a line in the feature's spec. See `docs/agents/feature-branches.md`.
+On a **feature branch** (a feature the user may not keep, built on `feature/<slug>`), tickets get no PR of their own: they land on the branch, and the feature's one PR to `main` closes them. See `docs/agents/feature-branches.md`.
 
 ### Triage labels
 

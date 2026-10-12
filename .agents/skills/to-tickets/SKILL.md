@@ -61,11 +61,10 @@ Publish the approved tickets. **How** depends on the tracker `/setup-matt-pocock
 
 - **Local files** → write one file per ticket under `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01` in dependency order (blockers first). Each file's "Blocked by" lists the numbers/titles it depends on. Use the per-ticket file template below: one ticket per file, never a single combined file.
 - **A real issue tracker (GitHub, Linear, …)** → publish one issue per ticket in dependency order (blockers first) so each ticket's blocking edges can reference real identifiers. Use the platform's native blocking / sub-issue relationship where it has one; otherwise set each ticket's "Blocked by" to the blocking issues. Apply the `ready-for-agent` triage label unless instructed otherwise; the tickets are agent-grabbable by construction.
-- **A feature branch** (the work is built on one, as the repo's `docs/agents/feature-branches.md` describes) → publish no issues. Write the tickets into the parent spec's body as a `## Steps` task list, in dependency order: one `- [ ] **<title>**: <what it delivers>. Blocked by: <step titles, or none>.` per ticket. This is the one case where you modify the parent.
 
 Work the **frontier**: any ticket whose blockers are all done. For a purely linear chain that means top to bottom.
 
-Leave any parent issue open and as it was, apart from a feature branch's Steps list.
+Do NOT close or modify any parent issue.
 
 <local-ticket-template>
 
