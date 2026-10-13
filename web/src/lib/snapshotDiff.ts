@@ -15,19 +15,31 @@ export interface LineRow {
   differs: boolean;
 }
 
+/** A side of the comparison: the Snapshot's, or the Song's now. */
+export type Side = 'then' | 'now';
+
 /** One row of Sections: a Section on either side or both, its active Alternate's Lines lined up. */
 export interface SectionRow {
   then?: Section;
   now?: Section;
+  /** The side it's on alone, if it's on one side only. */
+  only?: Side;
   /** On both sides, with a Label that changed. */
   labelDiffers: boolean;
   lines: LineRow[];
 }
 
-/** The Lyric Sheet's Sections, then the Scrapbook's, each lined up. */
+/** The Lyric Sheet's or the Scrapbook's Sections, lined up. */
+export interface Part {
+  rows: SectionRow[];
+  /** The sides with no Sections in it. */
+  emptyOn: Side[];
+}
+
+/** The Lyric Sheet, then the Scrapbook. */
 export interface Comparison {
-  arrangement: SectionRow[];
-  scrapbook: SectionRow[];
+  arrangement: Part;
+  scrapbook: Part;
 }
 
 /** A Snapshot's sheet beside the Song's now, the Lyric Sheet with the Lyric Sheet, the Scrapbook with the Scrapbook. */
@@ -45,10 +57,11 @@ function sectionsOf(sheet: Sheet, ids: number[]): Section[] {
 
 const linesOf = (section: Section | undefined) => activeAlternate(section)?.lines ?? [];
 
-function compareList(then: Section[], now: Section[]): SectionRow[] {
-  return lineUp(then, now).map(([t, n]) => ({
+function compareList(then: Section[], now: Section[]): Part {
+  const rows = lineUp(then, now).map(([t, n]) => ({
     then: t,
     now: n,
+    only: !n ? ('then' as const) : !t ? ('now' as const) : undefined,
     labelDiffers: !!t && !!n && t.label !== n.label,
     lines: lineUp(linesOf(t), linesOf(n)).map(([tl, nl]) => ({
       then: tl,
@@ -56,6 +69,10 @@ function compareList(then: Section[], now: Section[]): SectionRow[] {
       differs: !tl || !nl || tl.text !== nl.text,
     })),
   }));
+  const emptyOn: Side[] = [];
+  if (then.length === 0) emptyOn.push('then');
+  if (now.length === 0) emptyOn.push('now');
+  return { rows, emptyOn };
 }
 
 /**

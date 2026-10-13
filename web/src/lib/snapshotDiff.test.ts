@@ -36,19 +36,20 @@ const verse = section(1, 'Verse', [line(10, 'One'), line(11, 'Two'), line(12, 'T
 describe('compareSheets', () => {
   it('lines up a Song that is the same, nothing differing', () => {
     const { arrangement, scrapbook } = compareSheets(sheet([verse]), sheet([verse]));
-    expect(sides(arrangement)).toEqual([['Verse', 'Verse']]);
-    expect(rows(arrangement[0])).toEqual([
+    expect(sides(arrangement.rows)).toEqual([['Verse', 'Verse']]);
+    expect(arrangement.rows[0].only).toBeUndefined();
+    expect(rows(arrangement.rows[0])).toEqual([
       ['One', 'One', false],
       ['Two', 'Two', false],
       ['Three', 'Three', false],
     ]);
-    expect(arrangement[0].labelDiffers).toBe(false);
-    expect(scrapbook).toEqual([]);
+    expect(arrangement.rows[0].labelDiffers).toBe(false);
+    expect(scrapbook).toEqual({ rows: [], emptyOn: ['then', 'now'] });
   });
 
   it('marks a Line whose text changed, on the same row', () => {
     const now = section(1, 'Verse', [line(10, 'One'), line(11, 'Tw[G]o'), line(12, 'Three')]);
-    expect(rows(compareSheets(sheet([verse]), sheet([now])).arrangement[0])).toEqual([
+    expect(rows(compareSheets(sheet([verse]), sheet([now])).arrangement.rows[0])).toEqual([
       ['One', 'One', false],
       ['Two', 'Tw[G]o', true],
       ['Three', 'Three', false],
@@ -57,12 +58,12 @@ describe('compareSheets', () => {
 
   it("doesn't count a Line whose Cue alone changed", () => {
     const now = section(1, 'Verse', [line(10, 'One', 4.5), line(11, 'Two'), line(12, 'Three')]);
-    expect(rows(compareSheets(sheet([verse]), sheet([now])).arrangement[0])[0]).toEqual(['One', 'One', false]);
+    expect(rows(compareSheets(sheet([verse]), sheet([now])).arrangement.rows[0])[0]).toEqual(['One', 'One', false]);
   });
 
   it('shows a Line only in the Snapshot on its side alone, where it was', () => {
     const now = section(1, 'Verse', [line(10, 'One'), line(12, 'Three')]);
-    expect(rows(compareSheets(sheet([verse]), sheet([now])).arrangement[0])).toEqual([
+    expect(rows(compareSheets(sheet([verse]), sheet([now])).arrangement.rows[0])).toEqual([
       ['One', 'One', false],
       ['Two', '', true],
       ['Three', 'Three', false],
@@ -77,7 +78,7 @@ describe('compareSheets', () => {
       line(12, 'Three'),
       line(14, 'Four'),
     ]);
-    expect(rows(compareSheets(sheet([verse]), sheet([now])).arrangement[0])).toEqual([
+    expect(rows(compareSheets(sheet([verse]), sheet([now])).arrangement.rows[0])).toEqual([
       ['', 'Zero', true],
       ['One', 'One', false],
       ['Two', 'Two', false],
@@ -88,7 +89,7 @@ describe('compareSheets', () => {
 
   it('matches Lines by id, not by text', () => {
     const now = section(1, 'Verse', [line(10, 'One'), line(15, 'Two'), line(12, 'Three')]);
-    expect(rows(compareSheets(sheet([verse]), sheet([now])).arrangement[0])).toEqual([
+    expect(rows(compareSheets(sheet([verse]), sheet([now])).arrangement.rows[0])).toEqual([
       ['One', 'One', false],
       ['Two', '', true],
       ['', 'Two', true],
@@ -98,7 +99,7 @@ describe('compareSheets', () => {
 
   it('shows a Line that moved on each side where it is, as differing', () => {
     const now = section(1, 'Verse', [line(10, 'One'), line(12, 'Three'), line(11, 'Two')]);
-    const lined = rows(compareSheets(sheet([verse]), sheet([now])).arrangement[0]);
+    const lined = rows(compareSheets(sheet([verse]), sheet([now])).arrangement.rows[0]);
     expect(lined.filter(([, , differs]) => !differs)).toHaveLength(2);
     expect(lined.filter(([then]) => then).map(([then]) => then)).toEqual(['One', 'Two', 'Three']);
     expect(lined.filter(([, now]) => now).map(([, now]) => now)).toEqual(['One', 'Three', 'Two']);
@@ -112,7 +113,7 @@ describe('compareSheets', () => {
         { id: 101, name: 'B', active: true, lines: [line(16, 'Uno')] },
       ],
     };
-    expect(rows(compareSheets(sheet([verse]), sheet([now])).arrangement[0])).toEqual([
+    expect(rows(compareSheets(sheet([verse]), sheet([now])).arrangement.rows[0])).toEqual([
       ['One', '', true],
       ['Two', '', true],
       ['Three', '', true],
@@ -122,7 +123,7 @@ describe('compareSheets', () => {
 
   it('marks a Label that changed', () => {
     const now = { ...verse, label: 'Verse 1' };
-    const [row] = compareSheets(sheet([verse]), sheet([now])).arrangement;
+    const [row] = compareSheets(sheet([verse]), sheet([now])).arrangement.rows;
     expect(sides([row])).toEqual([['Verse', 'Verse 1']]);
     expect(row.labelDiffers).toBe(true);
   });
@@ -130,31 +131,35 @@ describe('compareSheets', () => {
   it('shows a Section only in the Snapshot on its side alone, every Line differing', () => {
     const chorus = section(2, 'Chorus', [line(20, 'La')]);
     const { arrangement } = compareSheets(sheet([verse, chorus]), sheet([verse]));
-    expect(sides(arrangement)).toEqual([
+    expect(sides(arrangement.rows)).toEqual([
       ['Verse', 'Verse'],
       ['Chorus', ''],
     ]);
-    expect(rows(arrangement[1])).toEqual([['La', '', true]]);
+    expect(arrangement.rows[1].only).toBe('then');
+    expect(rows(arrangement.rows[1])).toEqual([['La', '', true]]);
   });
 
   it('shows a Section only now on its side alone, where it is', () => {
     const intro = section(3, 'Intro', [line(30, 'Hey')]);
     const { arrangement } = compareSheets(sheet([verse]), sheet([intro, verse]));
-    expect(sides(arrangement)).toEqual([
+    expect(sides(arrangement.rows)).toEqual([
       ['', 'Intro'],
       ['Verse', 'Verse'],
     ]);
-    expect(rows(arrangement[0])).toEqual([['', 'Hey', true]]);
+    expect(arrangement.rows[0].only).toBe('now');
+    expect(rows(arrangement.rows[0])).toEqual([['', 'Hey', true]]);
   });
 
   it('compares the Scrapbook too, and a Section moved out of the Lyric Sheet into it is on each side where it is', () => {
     const idea = section(4, 'Idea', [line(40, 'Maybe')]);
     const { arrangement, scrapbook } = compareSheets(sheet([verse], [idea]), sheet([], [verse, idea]));
-    expect(sides(arrangement)).toEqual([['Verse', '']]);
-    expect(sides(scrapbook)).toEqual([
+    expect(sides(arrangement.rows)).toEqual([['Verse', '']]);
+    expect(arrangement.emptyOn).toEqual(['now']);
+    expect(sides(scrapbook.rows)).toEqual([
       ['', 'Verse'],
       ['Idea', 'Idea'],
     ]);
-    expect(rows(scrapbook[1])).toEqual([['Maybe', 'Maybe', false]]);
+    expect(scrapbook.emptyOn).toEqual([]);
+    expect(rows(scrapbook.rows[1])).toEqual([['Maybe', 'Maybe', false]]);
   });
 });

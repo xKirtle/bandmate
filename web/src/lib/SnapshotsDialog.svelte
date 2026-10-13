@@ -1,9 +1,9 @@
 <script lang="ts">
   // The Snapshots dialog, opened from Write mode: a Song's Snapshots, newest
   // first, beside the one chosen, read-only and set beside the Song as it is
-  // now, with Restore at its foot. ‹ ›
-  // and ↑ ↓ step to the older or newer one. On a phone, the list comes
-  // first, then the Snapshot over it, with a way back to the list.
+  // now, with Restore at its foot. ‹ › and ↑ ↓ step to the older or newer
+  // one. On a phone, the list comes first, then the Snapshot over it, with a
+  // way back to the list.
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import Lock from '@lucide/svelte/icons/lock';
@@ -16,13 +16,13 @@
 
   let {
     songId,
-    now: nowSheet,
+    current,
     restore,
     onClose,
   }: {
     songId: number;
     /** The Song's Lyric Sheet and Scrapbook as saved, to set each Snapshot beside. */
-    now: Sheet;
+    current: Sheet;
     /** Restores a Snapshot, resolving once it's saved or not. */
     restore: (snapshotId: number) => Promise<unknown>;
     onClose: () => void;
@@ -204,7 +204,7 @@
           </div>
           <div class="snapshot-scroll">
             {#if snapshot}
-              <ThenAndNow then={snapshot.sheet} now={nowSheet} when={snapshotWhen(chosen.takenAt, now)} />
+              <ThenAndNow then={snapshot.sheet} now={current} when={snapshotWhen(chosen.takenAt, now)} />
             {:else if readError}
               <p class="error" role="alert">{readError}</p>
             {:else}

@@ -30,9 +30,10 @@ test('an older Snapshot shows a Line that differs from now, and restoring it cha
   // The Line as it was, beside the Line now, each marked as differing; the
   // Line that's the same isn't.
   await expect(dialog.getByText('This Snapshot, Today')).toBeVisible();
-  await expect(dialog.locator('.differs', { hasText: 'Waves in the dark' })).toBeVisible();
-  await expect(dialog.locator('.differs', { hasText: 'Lights on the water' })).toBeVisible();
-  await expect(dialog.locator('.differs', { hasText: 'Salt on the window' })).toHaveCount(0);
+  await expect(dialog.getByText(/^Differs:\s*Waves in the dark$/)).toBeVisible();
+  await expect(dialog.getByText(/^Differs:\s*Lights on the water$/)).toBeVisible();
+  await expect(dialog.getByText('Salt on the window', { exact: true })).toHaveCount(2);
+  await expect(dialog.getByText(/^Differs:\s*Salt on the window$/)).toHaveCount(0);
 
   await dialog.getByRole('button', { name: 'Restore this Snapshot' }).click();
   await expect(dialog).toBeHidden();

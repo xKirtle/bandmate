@@ -657,7 +657,7 @@
   {@const restoring = editing}
   <SnapshotsDialog
     songId={id}
-    now={song}
+    current={song}
     restore={(snapshotId) => restoring.change({ kind: 'restoreSnapshot', snapshotId })}
     onClose={() => (showingSnapshots = false)}
   />

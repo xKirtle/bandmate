@@ -7,11 +7,9 @@
   // Chords above the words, and can be selected and copied. Below 44rem of
   // its own width, the columns become two tabs, each hiding what's only on
   // the other side.
-  import type { Line } from './api';
+  import type { Snippet } from 'svelte';
   import ChordedLine from './ChordedLine.svelte';
-  import { compareSheets, type SectionRow, type Sheet } from './snapshotDiff';
-
-  type Side = 'then' | 'now';
+  import { compareSheets, type SectionRow, type Sheet, type Side } from './snapshotDiff';
 
   let {
     then,
@@ -31,18 +29,18 @@
 
   const comparison = $derived(compareSheets(then, now));
   const parts = $derived([
-    { name: 'Lyric Sheet', rows: comparison.arrangement, empty: 'No Sections in the Lyric Sheet.' },
-    { name: 'Scrapbook', rows: comparison.scrapbook, empty: 'Nothing in the Scrapbook.' },
+    { name: 'Lyric Sheet', ...comparison.arrangement, empty: 'No Sections in the Lyric Sheet.' },
+    { name: 'Scrapbook', ...comparison.scrapbook, empty: 'Nothing in the Scrapbook.' },
   ]);
   const sides: Side[] = ['then', 'now'];
   const names: Record<Side, string> = { then: 'This Snapshot', now: 'Now' };
 </script>
 
-{#snippet lineCell(side: Side, line: Line | undefined, differs: boolean)}
-  {#if line}
+<!-- One side of a row: what's on that side, or a gap holding its place. -->
+{#snippet cell(side: Side, content: Snippet | false, differs = false)}
+  {#if content}
     <div class="cell {side}" class:differs>
-      {#if differs}<span class="visually-hidden">Differs:</span>{/if}
-      <ChordedLine {line} sizes="body" />
+      {#if differs}<span class="visually-hidden">Differs:</span>{/if}{@render content()}
     </div>
   {:else}
     <div class="cell {side} empty"></div>
@@ -50,32 +48,31 @@
 {/snippet}
 
 {#snippet sectionRow(row: SectionRow)}
-  {@const only = !row.now ? 'then' : !row.then ? 'now' : null}
-  <section class="grid" class:only-then={only === 'then'} class:only-now={only === 'now'}>
+  <section
+    class="grid"
+    class:only-then={row.only === 'then'}
+    class:only-now={row.only === 'now'}
+    aria-label={(row.then ?? row.now)?.label || undefined}
+  >
     {#if row.then?.label || row.now?.label}
       {#each sides as side (side)}
         {@const section = row[side]}
-        {#if section}
-          <h4 class="cell {side}" class:differs={row.labelDiffers}>
-            {#if row.labelDiffers}<span class="visually-hidden">Differs:</span>{/if}{section.label}
-          </h4>
-        {:else}
-          <div class="cell {side} empty"></div>
-        {/if}
+        {#snippet label()}<h4>{section?.label}</h4>{/snippet}
+        {@render cell(side, !!section && label, row.labelDiffers)}
       {/each}
     {/if}
     {#if row.lines.length === 0}
       {#each sides as side (side)}
-        {#if row[side]}
-          <p class="cell {side} muted">No Lines yet.</p>
-        {:else}
-          <div class="cell {side} empty"></div>
-        {/if}
+        {#snippet none()}<p class="muted">No Lines yet.</p>{/snippet}
+        {@render cell(side, !!row[side] && none)}
       {/each}
     {/if}
     {#each row.lines as l, i (i)}
-      {@render lineCell('then', l.then, l.differs)}
-      {@render lineCell('now', l.now, l.differs)}
+      {#each sides as side (side)}
+        {@const line = l[side]}
+        {#snippet chorded()}{#if line}<ChordedLine {line} sizes="body" />{/if}{/snippet}
+        {@render cell(side, !!line && chorded, l.differs)}
+      {/each}
     {/each}
   </section>
 {/snippet}
@@ -101,14 +98,11 @@
         {#if part.rows.length === 0}
           <p class="muted">{part.empty}</p>
         {:else}
-          {#if part.rows.every((r) => !r.then) || part.rows.every((r) => !r.now)}
+          {#if part.emptyOn.length > 0}
             <div class="grid">
               {#each sides as side (side)}
-                {#if part.rows.every((r) => !r[side])}
-                  <p class="cell {side} muted">{part.empty}</p>
-                {:else}
-                  <div class="cell {side} empty"></div>
-                {/if}
+                {#snippet empty()}<p class="muted">{part.empty}</p>{/snippet}
+                {@render cell(side, part.emptyOn.includes(side) && empty)}
               {/each}
             </div>
           {/if}
@@ -130,11 +124,6 @@
   .part {
     display: flex;
     flex-direction: column;
-  }
-  .view {
-    gap: var(--space-6);
-  }
-  .part {
     gap: var(--space-6);
   }
   /* Which column is which stays in view as the Snapshot scrolls. */
@@ -165,7 +154,8 @@
     font-size: var(--text-sm);
     font-weight: 600;
   }
-  /* A Label heads its Lines, muted as in Read mode. */
+  /* A Label heads its Lines, muted as in Read mode. A blank one beside one
+     that isn't still holds its row. */
   h4 {
     min-height: 1lh;
     margin: 0 0 var(--space-1);
