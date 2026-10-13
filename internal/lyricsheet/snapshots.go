@@ -420,8 +420,8 @@ func restoreSheet(ctx context.Context, tx *sql.Tx, songID int64, held heldSheet)
 }
 
 // sectionName names a Section as the Song page lists it: by its Label, else
-// its active Alternate's first Line with words, else as one without a
-// Label.
+// its active Alternate's first Line with words. One with neither has no
+// name.
 func sectionName(ctx context.Context, tx *sql.Tx, sectionID int64) (string, error) {
 	var label string
 	if err := tx.QueryRowContext(ctx, `SELECT label FROM sections WHERE id = ?`, sectionID).Scan(&label); err != nil {
@@ -445,9 +445,6 @@ func sectionName(ctx context.Context, tx *sql.Tx, sectionID int64) (string, erro
 		})
 	if err != nil {
 		return "", fmt.Errorf("reading section's lines: %w", err)
-	}
-	if first == "" {
-		return "Section without a Label", nil
 	}
 	return first, nil
 }

@@ -142,7 +142,7 @@ export interface SnapshotSummary {
   id: number;
   takenAt: string;
   reason: SnapshotReason;
-  /** For one taken before a deletion, what was deleted, named as the Song page names it. */
+  /** For one taken before a deletion, what was deleted, named as the Song page names it; none for a Section with no Label and no words. */
   deleted?: string;
 }
 

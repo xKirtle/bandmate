@@ -307,6 +307,16 @@ func TestASectionWithoutALabelIsNamedByItsFirstLine(t *testing.T) {
 	}
 }
 
+func TestASectionWithNoLabelAndNoWordsHasNoName(t *testing.T) {
+	ts, clock, s := snapshotServer(t, "City lights")
+	s = ts.addToScrapbook(s.ID, "")
+	clock.Advance(time.Minute)
+	ts.lyricSheetChange(http.MethodDelete, sectionPath(s.ID, s.Scrapbook[0]), nil)
+	if got := ts.listSnapshots(s.ID)[0]; got.Reason != "deleting" || got.Deleted != "" {
+		t.Errorf("snapshot = %+v, want one before deleting, naming nothing", got)
+	}
+}
+
 func TestASectionThatCantBeDeletedTakesNoSnapshot(t *testing.T) {
 	ts, clock, s := snapshotServer(t, "City lights")
 	clock.Advance(time.Minute)

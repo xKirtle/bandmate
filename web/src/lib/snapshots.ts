@@ -24,7 +24,8 @@ export function snapshotWhen(takenAt: string, now = new Date()): string {
 
 /** Why a Snapshot was taken, where that's worth saying: not before an editing session, as most are. */
 export function snapshotReason({ reason, deleted }: Pick<SnapshotSummary, 'reason' | 'deleted'>): string | null {
-  if (reason === 'deleting') return `Before deleting “${deleted}”`;
+  // Only a Section with no Label and no words has no name.
+  if (reason === 'deleting') return deleted ? `Before deleting “${deleted}”` : 'Before deleting a Section';
   return reason === 'restoring' ? 'Before restoring' : null;
 }
 
