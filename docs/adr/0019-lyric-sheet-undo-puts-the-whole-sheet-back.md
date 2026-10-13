@@ -1,0 +1,7 @@
+# Lyric Sheet Undo puts the whole sheet back
+
+Undo keeps one history for the Song page: the Lyric Sheet and Scrapbook, the Timeline and Cues, newest first (#989). A Timeline step holds the edit that reverses it, but a Lyric Sheet step holds the whole Lyric Sheet and Scrapbook as they were before the change and after it, and undoing or redoing it puts that copy back in one call that keeps every row's id. Because steps are undone strictly in order, every later step has already been undone by then, so the copy is exact.
+
+A reverse for each kind of change, as the Timeline has, would need a new call on the server for most of them: bringing back a deleted Alternate with its Lines, ids and Cues, or splitting Alternates added to another Section back out into the Section they came from, recreating side effects such as an empty Section being deleted rather than moved to the Scrapbook. Rows brought back under new ids would also have to be followed through every later step, Cue steps included. Undoing a Snapshot restore needs the whole sheet put back anyway, and an Alternate's text is already saved whole. A sheet is a few KB, so holding two copies a step costs little.
+
+The cost is a rule: every change to the Lyric Sheet or Scrapbook must be a step in the history, or the history must be cleared, as it is when the Song turns out to have changed elsewhere. A change made outside it would be silently undone by putting an older copy back. Moving to reverses for each kind of change later would mean writing all of them, server and browser.
