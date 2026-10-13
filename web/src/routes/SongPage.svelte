@@ -653,10 +653,11 @@
   <ShortcutsDialog onClose={() => (showingShortcuts = false)} />
 {/if}
 
-{#if showingSnapshots && editing}
+{#if showingSnapshots && editing && song}
   {@const restoring = editing}
   <SnapshotsDialog
     songId={id}
+    now={song}
     restore={(snapshotId) => restoring.change({ kind: 'restoreSnapshot', snapshotId })}
     onClose={() => (showingSnapshots = false)}
   />

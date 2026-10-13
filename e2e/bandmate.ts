@@ -28,6 +28,20 @@ export interface Song {
   [field: string]: unknown;
 }
 
+/** A Section of the Lyric Sheet or the Scrapbook, as a Song has it. */
+export interface Section {
+  id: number;
+  label: string;
+  alternates: { id: number; active: boolean; lines: { id: number; text: string }[] }[];
+}
+
+/** A Song's Lyric Sheet and Scrapbook, as GET /api/songs/{id} has them. */
+export interface Sheet {
+  arrangement: number[];
+  scrapbook: number[];
+  sections: Section[];
+}
+
 export interface Folder {
   id: number;
   name: string;
@@ -111,6 +125,22 @@ export class Bandmate {
   /** Renames a Song, as another tab would. */
   retitle(id: number, title: string): Promise<Song> {
     return json<Song>(this.api.patch(`/api/songs/${id}`, { data: { title } }));
+  }
+
+  /** Adds a Section to the end of a Song's Lyric Sheet, or of its Scrapbook, as Add Section does. */
+  addSection(songId: number, label: string, to: 'arrangement' | 'scrapbook' = 'arrangement'): Promise<Sheet> {
+    const path = to === 'arrangement' ? 'sections' : 'scrapbook';
+    return json<Sheet>(this.api.post(`/api/songs/${songId}/${path}`, { data: { label } }));
+  }
+
+  /** Sets an Alternate's Lines, one per line of text, as typing them does. */
+  setLines(songId: number, alternateId: number, text: string): Promise<Sheet> {
+    return json<Sheet>(this.api.put(`/api/songs/${songId}/alternates/${alternateId}/text`, { data: { text } }));
+  }
+
+  /** Deletes a Scrapbook Section, as its Delete does. */
+  deleteSection(songId: number, sectionId: number): Promise<Sheet> {
+    return json<Sheet>(this.api.delete(`/api/songs/${songId}/sections/${sectionId}`));
   }
 
   /** Makes an empty Folder. */
