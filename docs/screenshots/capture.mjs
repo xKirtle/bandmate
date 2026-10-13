@@ -520,6 +520,22 @@ async function number(page, places, { first = 1, into } = {}) {
   await page.context().close();
 }
 
+// The Songs page: the Folders, then the Songs in none.
+{
+  const page = await open(base);
+  const table = await page.getByRole("table").boundingBox();
+  // Down to just below the list, without the empty page under it.
+  await save(page, "song-list", {
+    clip: {
+      x: 0,
+      y: 0,
+      width: desktop.viewport.width,
+      height: table.y + table.height + 32,
+    },
+  });
+  await page.context().close();
+}
+
 // A phone, held upright.
 const phone = {
   colorScheme: "dark",

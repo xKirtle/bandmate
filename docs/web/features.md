@@ -6,6 +6,8 @@ Bandmate follows a song from the first idea to a rough recording. Here's what yo
 
 Every song is in one list. Search it by title, filter it by status, tag or whether a song has a finished recording, and sort it by title, status, key, tempo or when you last edited it.
 
+<img src="@screenshots/song-list.png" alt="The Songs page: two folders, then the songs in neither, each with its status, key and tempo">
+
 - **Folders** keep songs together, like an EP's. A song sits in one folder at most: drag it onto a folder, or move it from its menu. Deleting a folder asks whether to keep its songs or delete them too.
 - **Tags** mark songs with whatever matters to you, like "Album 2023", and a song can have as many as you like. Pick several in the filter to see the songs that have all of them.
 
