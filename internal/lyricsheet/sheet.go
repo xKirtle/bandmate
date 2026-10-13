@@ -223,21 +223,28 @@ func toScrapbookEnd(ctx context.Context, tx *sql.Tx, songID, sectionID int64) er
 	return nil
 }
 
-// DeleteSection permanently deletes a Section in the Scrapbook, with its
-// Alternates and Lines. A Section still in the Arrangement can't be deleted.
+// DeleteSection deletes a Section in the Scrapbook, with its Alternates and
+// Lines, having taken a Snapshot naming it first. A Section still in the
+// Arrangement can't be deleted.
 func (s *Store) DeleteSection(ctx context.Context, songID int64, based songversion.Version, sectionID int64) (Song, error) {
-	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeBefore(ctx, songID, based, BeforeDeleting, func(tx *sql.Tx) (string, func() error, error) {
 		pos, err := findSection(ctx, tx, songID, sectionID)
 		if err != nil {
-			return err
+			return "", nil, err
 		}
 		if pos.Valid {
-			return domain.Conflict("only a Section in the Scrapbook can be deleted; remove it from the Arrangement first")
+			return "", nil, domain.Conflict("only a Section in the Scrapbook can be deleted; remove it from the Arrangement first")
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM sections WHERE id = ?`, sectionID); err != nil {
-			return fmt.Errorf("deleting section: %w", err)
+		name, err := sectionName(ctx, tx, sectionID)
+		if err != nil {
+			return "", nil, err
 		}
-		return nil
+		return name, func() error {
+			if _, err := tx.ExecContext(ctx, `DELETE FROM sections WHERE id = ?`, sectionID); err != nil {
+				return fmt.Errorf("deleting section: %w", err)
+			}
+			return nil
+		}, nil
 	})
 }
 

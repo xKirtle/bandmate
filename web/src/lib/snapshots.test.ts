@@ -28,6 +28,10 @@ describe('why a Snapshot was taken', () => {
     expect(snapshotReason({ reason: 'restoring' })).toBe('Before restoring');
   });
 
+  it('names what was deleted for one taken before a deletion', () => {
+    expect(snapshotReason({ reason: 'deleting', deleted: 'Verse 3' })).toBe('Before deleting “Verse 3”');
+  });
+
   it('says nothing for one taken before an editing session, as most are', () => {
     expect(snapshotReason({ reason: 'editing' })).toBeNull();
   });

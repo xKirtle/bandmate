@@ -23,7 +23,8 @@ export function snapshotWhen(takenAt: string, now = new Date()): string {
 }
 
 /** Why a Snapshot was taken, where that's worth saying: not before an editing session, as most are. */
-export function snapshotReason({ reason }: Pick<SnapshotSummary, 'reason'>): string | null {
+export function snapshotReason({ reason, deleted }: Pick<SnapshotSummary, 'reason' | 'deleted'>): string | null {
+  if (reason === 'deleting') return `Before deleting “${deleted}”`;
   return reason === 'restoring' ? 'Before restoring' : null;
 }
 
