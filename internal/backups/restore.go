@@ -596,10 +596,8 @@ func giveIDs(ctx context.Context, tx *sql.Tx, columns map[string][]string, picks
 		if !slices.Contains(columns[t.name], "id") {
 			continue
 		}
-		var next int64
-		if err := tx.QueryRowContext(ctx, fmt.Sprintf(`SELECT MAX(
-			COALESCE((SELECT MAX(id) FROM main.%[1]s), 0),
-			COALESCE((SELECT seq FROM main.sqlite_sequence WHERE name = '%[1]s'), 0))`, t.name)).Scan(&next); err != nil {
+		next, err := lastUsedID(ctx, tx, t.name)
+		if err != nil {
 			return err
 		}
 		hasIdentity := slices.Contains(columns[t.name], "identity")
@@ -809,12 +807,9 @@ func remapSnapshots(ctx context.Context, tx *sql.Tx) error {
 			return id, nil
 		}
 		if _, ok := last[table]; !ok {
-			if err := tx.QueryRowContext(ctx, fmt.Sprintf(`SELECT MAX(
-				COALESCE((SELECT MAX(id) FROM main.%[1]s), 0),
-				COALESCE((SELECT seq FROM main.sqlite_sequence WHERE name = '%[1]s'), 0))`, table)).Scan(&id); err != nil {
+			if last[table], err = lastUsedID(ctx, tx, table); err != nil {
 				return 0, err
 			}
-			last[table] = id
 			fresh[table] = map[int64]int64{}
 		}
 		last[table]++
@@ -824,29 +819,41 @@ func remapSnapshots(ctx context.Context, tx *sql.Tx) error {
 	for _, h := range snapshots {
 		sheet, err := lyricsheet.RemapSnapshotSheet(h.sheet, newID)
 		if err != nil {
-			return err
+			return fmt.Errorf("snapshot %d: %w", h.id, err)
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE main.snapshots SET sheet = ? WHERE id = ?`, sheet, h.id); err != nil {
 			return err
 		}
 	}
 	for table, id := range last {
-		res, err := tx.ExecContext(ctx, `UPDATE main.sqlite_sequence SET seq = MAX(seq, ?1) WHERE name = ?2`, id, table)
-		if err != nil {
-			return err
-		}
-		n, err := res.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if n > 0 {
-			continue
-		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO main.sqlite_sequence (name, seq) VALUES (?, ?)`, table, id); err != nil {
+		if err := moveSequencePast(ctx, tx, table, id); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// lastUsedID is the highest id table has used, held now or not.
+func lastUsedID(ctx context.Context, tx *sql.Tx, table string) (int64, error) {
+	var id int64
+	err := tx.QueryRowContext(ctx, fmt.Sprintf(`SELECT MAX(
+		COALESCE((SELECT MAX(id) FROM main.%[1]s), 0),
+		COALESCE((SELECT seq FROM main.sqlite_sequence WHERE name = '%[1]s'), 0))`, table)).Scan(&id)
+	return id, err
+}
+
+// moveSequencePast makes table's sequence at least id, so no row added
+// later takes an id up to it.
+func moveSequencePast(ctx context.Context, tx *sql.Tx, table string, id int64) error {
+	res, err := tx.ExecContext(ctx, `UPDATE main.sqlite_sequence SET seq = MAX(seq, ?1) WHERE name = ?2`, id, table)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err != nil || n > 0 {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO main.sqlite_sequence (name, seq) VALUES (?, ?)`, table, id)
+	return err
 }
 
 // foreignKeys maps each column of table referring to another table's rows

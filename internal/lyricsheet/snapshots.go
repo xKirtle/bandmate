@@ -146,10 +146,10 @@ func (h heldSheet) lyricSheet() LyricSheet {
 	return sheet
 }
 
-// RemapSnapshotSheet gives each Section, Alternate and Line a Snapshot's
-// sheet holds, as stored, the id newID gives it, by the table holding such
-// rows ("sections", "alternates" or "lines") and its id in the sheet. A
-// Restore of a Backup uses it, as the rows it restores get fresh ids.
+// RemapSnapshotSheet changes each id in a Snapshot's sheet, as stored, to
+// newID(table, id), table being the one holding such rows: "sections",
+// "alternates" or "lines". A Restore of a Backup uses it, as the rows it
+// restores get fresh ids.
 func RemapSnapshotSheet(sheet string, newID func(table string, old int64) (int64, error)) (string, error) {
 	var held heldSheet
 	if err := json.Unmarshal([]byte(sheet), &held); err != nil {
