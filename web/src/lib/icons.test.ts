@@ -48,4 +48,45 @@ describe('icons', () => {
     const drawn = files.filter(({ code }) => /<svg[\s>]/.test(code)).map(({ path }) => path);
     expect(drawn.sort()).toEqual(drawings);
   });
+
+  describe("match docs/design.md's icon table", () => {
+    const imported = new Set(
+      files.flatMap(({ code }) =>
+        [...code.matchAll(/\b(?:from|import\s*\()\s*['"]@lucide\/svelte\/icons\/([a-z0-9-]+)(?:\.js)?['"]/g)].map(
+          (m) => m[1],
+        ),
+      ),
+    );
+
+    // The backticked names in each row's Icon column, under "### Icons".
+    const design = readFileSync(join(src, '../../docs/design.md'), 'utf8');
+    const section = design.match(/^### Icons\n([\s\S]*?)(?=^#{1,3} |(?![\s\S]))/m)?.[1] ?? '';
+    const table = section.match(/^\|\s*Icon\s*\|\s*For\s*\|\n\|[-\s|]+\|\n((?:\|.*\|\n?)*)/m)?.[1];
+    const rows = (table ?? '')
+      .trim()
+      .split('\n')
+      .map((row) => [...(row.split('|')[1] ?? '').matchAll(/`([^`]+)`/g)].map((m) => m[1]));
+    const listed = rows.flat();
+    // Without the table, say so, rather than call every icon missing.
+    const readTable = () =>
+      expect(listed.length, "couldn't read the icon table under docs/design.md's ### Icons").toBeGreaterThan(0);
+
+    it('gives every imported icon a row', () => {
+      readTable();
+      const missing = [...imported].filter((name) => !listed.includes(name)).sort();
+      expect(missing, 'imported, so each needs a row in the icon table').toEqual([]);
+    });
+
+    it('lists only icons that are imported', () => {
+      readTable();
+      const unused = listed.filter((name) => !imported.has(name)).sort();
+      expect(unused, 'imported nowhere, so remove each from the icon table').toEqual([]);
+    });
+
+    it('puts each icon in one row', () => {
+      readTable();
+      const twice = [...new Set(listed.filter((name, i) => listed.indexOf(name) !== i))].sort();
+      expect(twice, 'in more than one row of the icon table: one icon, one meaning').toEqual([]);
+    });
+  });
 });
