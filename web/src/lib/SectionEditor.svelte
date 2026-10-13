@@ -123,7 +123,9 @@
   }
 
   async function remove(alt: Alternate) {
-    const ok = confirm(`Delete ${alternateName(section, alt)} for good?\n\nIts Lines go with it. It can't be undone.`);
+    const ok = confirm(
+      `Delete ${alternateName(section, alt)}?\n\nIts Lines go with it. You can undo it from Snapshots.`,
+    );
     if (!ok) return;
     // Its ⋯ goes with it: the keyboard carries on from the active card.
     if (await editing.change({ kind: 'deleteAlternate', alternateId: alt.id })) radio(active.id)?.focus();

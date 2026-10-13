@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/xKirtle/bandmate/internal/domain"
@@ -25,6 +26,9 @@ type SnapshotReason string
 const (
 	// BeforeEditing is a Snapshot taken before an editing session.
 	BeforeEditing SnapshotReason = "editing"
+	// BeforeDeleting is a Snapshot taken just before deleting a Scrapbook
+	// Section or an Alternate, which it names.
+	BeforeDeleting SnapshotReason = "deleting"
 	// BeforeRestoring is a Snapshot taken before a restore.
 	BeforeRestoring SnapshotReason = "restoring"
 )
@@ -34,6 +38,9 @@ type SnapshotSummary struct {
 	ID      int64          `json:"id"`
 	TakenAt time.Time      `json:"takenAt"`
 	Reason  SnapshotReason `json:"reason"`
+	// Deleted names the Section or Alternate deleted just after a Snapshot
+	// taken BeforeDeleting, as the Song page names it.
+	Deleted string `json:"deleted,omitempty"`
 }
 
 // Snapshot is a copy of a Song's Lyric Sheet and Scrapbook as they were.
@@ -182,16 +189,35 @@ func (s *Store) snapshotIfChanged(ctx context.Context, tx *sql.Tx, songID int64,
 	if bytes.Equal(newest, encoded) {
 		return nil
 	}
-	return insertSnapshot(ctx, tx, songID, now, BeforeEditing, encoded)
+	return insertSnapshot(ctx, tx, songID, now, BeforeEditing, "", encoded)
 }
 
-// takeSnapshot takes a Snapshot of the sheet as it is, for reason.
-func takeSnapshot(ctx context.Context, tx *sql.Tx, songID int64, now time.Time, reason SnapshotReason) error {
-	encoded, _, err := encodeSheet(ctx, tx, songID)
-	if err != nil {
-		return err
-	}
-	return insertSnapshot(ctx, tx, songID, now, reason, encoded)
+// changeBefore is change for a change to the Lyric Sheet or Scrapbook
+// that always takes a Snapshot of the sheet first, for reason: before
+// deleting something, or before a restore. check checks the change can be
+// made and names what it deletes, if anything, then do makes it. The
+// Snapshot stands in for one an editing session would take, as it holds
+// the same sheet.
+func (s *Store) changeBefore(ctx context.Context, songID int64, based songversion.Version, reason SnapshotReason,
+	check func(tx *sql.Tx) (deleted string, do func() error, err error)) (Song, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		deleted, do, err := check(tx)
+		if err != nil {
+			return err
+		}
+		encoded, _, err := encodeSheet(ctx, tx, songID)
+		if err != nil {
+			return err
+		}
+		now := s.now().UTC()
+		if err := insertSnapshot(ctx, tx, songID, now, reason, deleted, encoded); err != nil {
+			return err
+		}
+		if err := do(); err != nil {
+			return err
+		}
+		return markSheetChanged(ctx, tx, songID, now)
+	})
 }
 
 // encodeSheet reads a Song's sheet as a Snapshot stores it, and how many
@@ -205,9 +231,13 @@ func encodeSheet(ctx context.Context, tx *sql.Tx, songID int64) (encoded []byte,
 	return encoded, len(sheet.Sections), err
 }
 
-func insertSnapshot(ctx context.Context, tx *sql.Tx, songID int64, now time.Time, reason SnapshotReason, sheet []byte) error {
-	if _, err := tx.ExecContext(ctx, `INSERT INTO snapshots (song_id, taken_at, reason, sheet) VALUES (?, ?, ?, ?)`,
-		songID, now.Format(domain.TimeFormat), reason, string(sheet)); err != nil {
+// insertSnapshot keeps sheet as a Snapshot taken at now, for reason, naming
+// what was deleted, if anything.
+func insertSnapshot(ctx context.Context, tx *sql.Tx, songID int64, now time.Time, reason SnapshotReason, deleted string,
+	sheet []byte) error {
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO snapshots (song_id, taken_at, reason, deleted, sheet) VALUES (?, ?, ?, NULLIF(?, ''), ?)`,
+		songID, now.Format(domain.TimeFormat), reason, deleted, string(sheet)); err != nil {
 		return fmt.Errorf("taking a snapshot: %w", err)
 	}
 	return nil
@@ -224,11 +254,12 @@ func (s *Store) ListSnapshots(ctx context.Context, songID int64) ([]SnapshotSumm
 		return nil, domain.ErrNotFound
 	}
 	list := []SnapshotSummary{}
-	err := query(ctx, s.db, `SELECT id, taken_at, reason FROM snapshots WHERE song_id = ? ORDER BY taken_at DESC, id DESC`,
+	err := query(ctx, s.db, `SELECT id, taken_at, reason, COALESCE(deleted, '') FROM snapshots
+		WHERE song_id = ? ORDER BY taken_at DESC, id DESC`,
 		[]any{songID}, func(rows *sql.Rows) error {
 			var sum SnapshotSummary
 			var at string
-			if err := rows.Scan(&sum.ID, &at, &sum.Reason); err != nil {
+			if err := rows.Scan(&sum.ID, &at, &sum.Reason, &sum.Deleted); err != nil {
 				return err
 			}
 			var err error
@@ -256,8 +287,9 @@ func (s *Store) GetSnapshot(ctx context.Context, songID, snapshotID int64) (Snap
 func findSnapshot(ctx context.Context, q domain.Queryer, songID, snapshotID int64) (Snapshot, heldSheet, error) {
 	var snap Snapshot
 	var at, sheet string
-	err := q.QueryRowContext(ctx, `SELECT id, taken_at, reason, sheet FROM snapshots WHERE id = ? AND song_id = ?`,
-		snapshotID, songID).Scan(&snap.ID, &at, &snap.Reason, &sheet)
+	err := q.QueryRowContext(ctx, `SELECT id, taken_at, reason, COALESCE(deleted, ''), sheet FROM snapshots
+		WHERE id = ? AND song_id = ?`,
+		snapshotID, songID).Scan(&snap.ID, &at, &snap.Reason, &snap.Deleted, &sheet)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Snapshot{}, heldSheet{}, domain.ErrNotFound
 	}
@@ -281,19 +313,12 @@ func findSnapshot(ctx context.Context, q domain.Queryer, songID, snapshotID int6
 // are never reused, and a Line brought back gets the Cue it had; rows the
 // Snapshot doesn't hold are deleted, Cues and all.
 func (s *Store) RestoreSnapshot(ctx context.Context, songID int64, based songversion.Version, snapshotID int64) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeBefore(ctx, songID, based, BeforeRestoring, func(tx *sql.Tx) (string, func() error, error) {
 		_, held, err := findSnapshot(ctx, tx, songID, snapshotID)
 		if err != nil {
-			return err
+			return "", nil, err
 		}
-		now := s.now().UTC()
-		if err := takeSnapshot(ctx, tx, songID, now, BeforeRestoring); err != nil {
-			return err
-		}
-		if err := restoreSheet(ctx, tx, songID, held); err != nil {
-			return err
-		}
-		return markSheetChanged(ctx, tx, songID, now)
+		return "", func() error { return restoreSheet(ctx, tx, songID, held) }, nil
 	})
 }
 
@@ -392,4 +417,51 @@ func restoreSheet(ctx context.Context, tx *sql.Tx, songID int64, held heldSheet)
 		}
 	}
 	return nil
+}
+
+// sectionName names a Section as the Song page lists it: by its Label, else
+// its active Alternate's first Line with words. One with neither has no
+// name.
+func sectionName(ctx context.Context, tx *sql.Tx, sectionID int64) (string, error) {
+	var label string
+	if err := tx.QueryRowContext(ctx, `SELECT label FROM sections WHERE id = ?`, sectionID).Scan(&label); err != nil {
+		return "", fmt.Errorf("reading section: %w", err)
+	}
+	if label != "" {
+		return label, nil
+	}
+	first := ""
+	err := query(ctx, tx, `SELECT l.text FROM lines l JOIN alternates a ON a.id = l.alternate_id
+		WHERE a.section_id = ? AND a.active = 1 ORDER BY l.position`,
+		[]any{sectionID}, func(rows *sql.Rows) error {
+			var text string
+			if err := rows.Scan(&text); err != nil {
+				return err
+			}
+			if lyrics := strings.TrimSpace(newLine(0, text, sql.NullInt64{}).Lyrics); first == "" {
+				first = lyrics
+			}
+			return nil
+		})
+	if err != nil {
+		return "", fmt.Errorf("reading section's lines: %w", err)
+	}
+	return first, nil
+}
+
+// alternateName names an Alternate as the Song page does: by its name,
+// else by its place among its Section's, e.g. "Alternate 2".
+func alternateName(ctx context.Context, tx *sql.Tx, sectionID, alternateID int64) (string, error) {
+	var name string
+	var place int
+	err := tx.QueryRowContext(ctx, `SELECT name,
+		(SELECT COUNT(*) FROM alternates b WHERE b.section_id = ? AND b.id <= a.id)
+		FROM alternates a WHERE a.id = ?`, sectionID, alternateID).Scan(&name, &place)
+	if err != nil {
+		return "", fmt.Errorf("reading alternate: %w", err)
+	}
+	if name != "" {
+		return name, nil
+	}
+	return fmt.Sprintf("Alternate %d", place), nil
 }

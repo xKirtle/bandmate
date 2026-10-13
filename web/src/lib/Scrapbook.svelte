@@ -137,7 +137,7 @@
   function remove(sectionId: number) {
     const section = sections.get(sectionId);
     if (!section) return;
-    const ok = confirm(`Delete ${describe(section)} for good?\n\nIts Lines go with it. It can't be undone.`);
+    const ok = confirm(`Delete ${describe(section)}?\n\nIts Lines go with it. You can undo it from Snapshots.`);
     if (ok) editing.change({ kind: 'deleteSection', sectionId }).then(closed(sectionId));
   }
 </script>
@@ -157,7 +157,7 @@
               {section}
               autofocus={focusing === section.id}
               {editing}
-              more={[{ icon: Trash2, label: 'Delete for good', run: () => remove(section.id) }]}
+              more={[{ icon: Trash2, label: 'Delete', run: () => remove(section.id) }]}
               {drag}
               places={placesBack}
               {onCaret}

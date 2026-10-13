@@ -14,7 +14,7 @@ export type LyricSheetChange =
   | { kind: 'removeFromArrangement'; sectionId: number }
   /** A Section's Alternates made anew in another Section in the Arrangement, inactive; the Section added goes. */
   | { kind: 'addToSection'; sectionId: number; targetId: number }
-  /** A Section in the Scrapbook deleted for good. */
+  /** A Section in the Scrapbook deleted, after a Snapshot of the sheet as it was. */
   | { kind: 'deleteSection'; sectionId: number }
   /** A Section's Label set, or removed with "". */
   | { kind: 'setSectionLabel'; sectionId: number; label: string }
@@ -24,7 +24,7 @@ export type LyricSheetChange =
   | { kind: 'renameAlternate'; alternateId: number; name: string }
   /** An Alternate made the active one of its Section. */
   | { kind: 'activateAlternate'; alternateId: number }
-  /** An inactive Alternate deleted for good. */
+  /** An inactive Alternate deleted, after a Snapshot of the sheet as it was. */
   | { kind: 'deleteAlternate'; alternateId: number }
   /** An inactive Alternate made anew as a Section of its own, in the Scrapbook. */
   | { kind: 'moveAlternateToScrapbook'; alternateId: number }

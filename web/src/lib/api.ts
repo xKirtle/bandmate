@@ -134,14 +134,16 @@ export interface CueValue {
 /** The Song a write goes to, at the version it was based on. */
 export type SongAt = Pick<Song, 'id' | 'version'>;
 
-/** Why a Snapshot was taken: before an editing session, or before a restore. */
-export type SnapshotReason = 'editing' | 'restoring';
+/** Why a Snapshot was taken: before an editing session, before deleting a Scrapbook Section or an Alternate, or before a restore. */
+export type SnapshotReason = 'editing' | 'deleting' | 'restoring';
 
 /** A Snapshot as listed: when it was taken, and why. */
 export interface SnapshotSummary {
   id: number;
   takenAt: string;
   reason: SnapshotReason;
+  /** For one taken before a deletion, what was deleted, named as the Song page names it; none for a Section with no Label and no words. */
+  deleted?: string;
 }
 
 /** A copy of a Song's Lyric Sheet and Scrapbook as they were, which Bandmate takes on its own. */

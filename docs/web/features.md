@@ -45,7 +45,7 @@ Want rhymes in your language? See [Adding a rhyming language](https://github.com
 
 ### Snapshots
 
-Bandmate keeps copies of a song's lyrics and Scrapbook as they were, on its own, so you can get back to how a song was before you changed it. It takes one each time you start editing again after 10 minutes or more away, unless nothing has changed since the last.
+Bandmate keeps copies of a song's lyrics and Scrapbook as they were, on its own, so you can get back to how a song was before you changed it. It takes one each time you start editing again after 10 minutes or more away, unless nothing has changed since the last. It also takes one just before you delete a section from the Scrapbook, or one of a section's alternates, marked with what you deleted, such as "Before deleting “Verse 3”", so a deletion you regret can be undone by restoring it.
 
 In Write mode, the clock button beside Write and Read opens them, newest first. Pick one to see its lyrics and Scrapbook, and step to the one before or after with ‹ › or the ↑ ↓ keys. You can select and copy a line from it, to take back just that line.
 
