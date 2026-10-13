@@ -69,6 +69,7 @@ test('on a phone, the tabs keep one row and the Left-handed switch sits under th
   const tuningBox = (await tuning(page).boundingBox())!;
   const switchBox = (await leftHanded(page).boundingBox())!;
   expect(switchBox.y).toBeGreaterThanOrEqual(tuningBox.y + tuningBox.height);
+  expect(switchBox.y - (tuningBox.y + tuningBox.height)).toBeLessThan(32);
   // And above the Chord Finder's card.
   expect(switchBox.y).toBeLessThan((await tabs.first().boundingBox())!.y);
   // Only the switch and its label take a tap, not the rest of the line.

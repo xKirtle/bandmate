@@ -71,6 +71,13 @@
     gap: var(--space-3);
     margin: 0 0 var(--space-4);
   }
+  .field {
+    min-width: 0;
+  }
+  .tuning {
+    flex: 1 1 16rem;
+    max-width: 24rem;
+  }
   /* Stacked, so only the switch and its label take a tap, not the line's width. */
   @media (width < 40rem) {
     .setup {
@@ -81,13 +88,6 @@
       flex: none;
       width: 100%;
     }
-  }
-  .field {
-    min-width: 0;
-  }
-  .tuning {
-    flex: 1 1 16rem;
-    max-width: 24rem;
   }
   .error {
     margin: calc(-1 * var(--space-2)) 0 var(--space-4);
