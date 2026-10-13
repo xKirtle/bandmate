@@ -146,6 +146,48 @@ func (h heldSheet) lyricSheet() LyricSheet {
 	return sheet
 }
 
+// RemapSnapshotSheet changes each id in a Snapshot's sheet, as stored, to
+// newID(table, id), table being the one holding such rows: "sections",
+// "alternates" or "lines". A Restore of a Backup uses it, as the rows it
+// restores get fresh ids.
+func RemapSnapshotSheet(sheet string, newID func(table string, old int64) (int64, error)) (string, error) {
+	var held heldSheet
+	if err := json.Unmarshal([]byte(sheet), &held); err != nil {
+		return "", fmt.Errorf("reading snapshot's sheet: %w", err)
+	}
+	remap := func(table string, id *int64) error {
+		n, err := newID(table, *id)
+		*id = n
+		return err
+	}
+	for _, order := range [][]int64{held.Arrangement, held.Scrapbook} {
+		for i := range order {
+			if err := remap("sections", &order[i]); err != nil {
+				return "", err
+			}
+		}
+	}
+	for i := range held.Sections {
+		sec := &held.Sections[i]
+		if err := remap("sections", &sec.ID); err != nil {
+			return "", err
+		}
+		for j := range sec.Alternates {
+			alt := &sec.Alternates[j]
+			if err := remap("alternates", &alt.ID); err != nil {
+				return "", err
+			}
+			for k := range alt.Lines {
+				if err := remap("lines", &alt.Lines[k].ID); err != nil {
+					return "", err
+				}
+			}
+		}
+	}
+	encoded, err := json.Marshal(held)
+	return string(encoded), err
+}
+
 // changeSheet is change for a change to the Lyric Sheet or Scrapbook, as
 // opposed to their Cues alone: the first one 10 minutes or more after the
 // one before starts an editing session, so a Snapshot of the sheet as it

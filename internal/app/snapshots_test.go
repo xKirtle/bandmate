@@ -255,18 +255,51 @@ func TestARestoreBasedOnAnOldVersionIsRejectedAsStale(t *testing.T) {
 	}
 }
 
-func TestABackupLeavesSnapshotsOut(t *testing.T) {
-	ts, clock, s := snapshotServer(t, "City lights")
+func TestASnapshotRestoredFromABackupKeepsCuesAsAnyOther(t *testing.T) {
+	ts, clock, s := snapshotServer(t, "City lights\nFading out")
+	verse := s.Sections[0].Alternates[0]
+	city := verse.Lines[0].ID
+	ts.setLineCue(s.ID, city, 1)
+	ts.setLineCue(s.ID, verse.Lines[1].ID, 2)
 	clock.Advance(time.Hour)
-	ts.setLabel(s.ID, s.Sections[0].ID, "Verse 1")
+	ts.setText(s.ID, verse.ID, "City lights")
+	ts.setLineCue(s.ID, city, 5)
 	b := ts.backUp(map[string]any{"songs": []int64{s.ID}})
 
 	restored := ts.restore(b.ID, ts.backupSongs(b.ID)[0].ID)
 	if len(restored) != 1 || restored[0].ID == s.ID {
 		t.Fatalf("restored = %+v, want the Song kept alongside", restored)
 	}
-	if list := ts.listSnapshots(restored[0].ID); len(list) != 0 {
-		t.Errorf("snapshots = %+v, want none restored", list)
+	// Lines added since take ids of their own, never one a Snapshot
+	// restored from the Backup holds.
+	ts.setText(s.ID, verse.ID, "City lights\nNeon rain\nFalling")
+
+	for _, id := range []int64{restored[0].ID, s.ID} {
+		now := ts.getSong(id)
+		list := ts.listSnapshots(id)
+		if len(list) != 1 || list[0].Reason != "editing" {
+			t.Fatalf("song %d's snapshots = %+v, want the one taken before editing", id, list)
+		}
+		held := ts.getSnapshot(id, list[0].ID).Sheet
+		if len(held.Sections) != 1 || held.Sections[0].ID != now.Sections[0].ID ||
+			held.Sections[0].Alternates[0].ID != now.Sections[0].Alternates[0].ID ||
+			held.Sections[0].Alternates[0].Lines[0].ID != now.Sections[0].Alternates[0].Lines[0].ID {
+			t.Fatalf("song %d's snapshot holds %+v, want the ids of its own Verse, %+v", id, held, now.Sections)
+		}
+		res := ts.restoreSnapshot(id, now.Version, list[0].ID)
+		expectStatus(t, res, http.StatusOK)
+		var after song
+		res.JSON(t, &after)
+		alt := after.Sections[0].Alternates[0]
+		if lines := activeLines(after.Sections[0]); fmt.Sprint(lines) != "[City lights Fading out]" {
+			t.Fatalf("song %d's verse = %q, want it as the Snapshot holds it", id, lines)
+		}
+		if alt.Lines[0].ID != now.Sections[0].Alternates[0].Lines[0].ID {
+			t.Errorf("song %d's City lights = %d, want it kept, %d", id, alt.Lines[0].ID, now.Sections[0].Alternates[0].Lines[0].ID)
+		}
+		if cues := cuesOf(after.Sections[0]); len(cues) != 2 || cues[alt.Lines[0].ID] != 5 || cues[alt.Lines[1].ID] != 2 {
+			t.Errorf("song %d's cues = %v, want City lights's as it is now, 5, and Fading out's back as it was, 2", id, cues)
+		}
 	}
 }
 

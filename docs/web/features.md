@@ -53,7 +53,7 @@ Snapshots thin out as they age, so months of history stay short enough to look t
 
 **Restore this Snapshot** makes your lyrics and Scrapbook the Snapshot's. What you have now is kept as a Snapshot first, marked "Before restoring", so you can go back. Lines that are still there keep their timings as they are now, and lines it brings back get the timings they had.
 
-Backups don't hold Snapshots yet.
+A [Backup](#backups) of a song holds its Snapshots, kept or not, so restoring the Backup, here or on another install, brings them back too.
 
 ## Chords
 
