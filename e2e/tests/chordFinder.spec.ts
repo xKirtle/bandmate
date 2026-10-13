@@ -38,3 +38,45 @@ test('custom tuning notes that can’t be read say so, and are kept to fix', asy
   );
   await expect(notes(page)).toHaveValue('C G D');
 });
+
+// The first string Name it's fretboard draws: the low one, or the high one mirrored.
+const firstString = (page: Page) =>
+  page.getByRole('group', { name: 'Fretboard' }).getByRole('button', { name: /string: / }).first();
+const leftHanded = (page: Page) => page.getByRole('switch', { name: 'Left-handed' });
+
+test('the Left-handed switch beside the tuning mirrors the fretboard, and is the one in Settings', async ({ page }) => {
+  await page.goto('/chords');
+  await page.getByRole('tab', { name: 'Name it' }).click();
+  await expect(firstString(page)).toHaveAccessibleName(/^6th string/);
+
+  await leftHanded(page).check();
+  await expect(firstString(page)).toHaveAccessibleName(/^1st string/);
+
+  await page.goto('/settings');
+  await expect(leftHanded(page)).toBeChecked();
+  await leftHanded(page).uncheck();
+  await page.goto('/chords');
+  await expect(leftHanded(page)).not.toBeChecked();
+});
+
+test('on a phone, the tabs keep one row and the Left-handed switch sits under the tuning', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto('/chords');
+  const tabs = page.getByRole('tab');
+  const tops = await Promise.all((await tabs.all()).map(async (t) => (await t.boundingBox())!.y));
+  expect(new Set(tops).size).toBe(1);
+
+  const tuningBox = (await tuning(page).boundingBox())!;
+  const switchBox = (await leftHanded(page).boundingBox())!;
+  expect(switchBox.y).toBeGreaterThanOrEqual(tuningBox.y + tuningBox.height);
+  // And above the Chord Finder's card.
+  expect(switchBox.y).toBeLessThan((await tabs.first().boundingBox())!.y);
+  // Only the switch and its label take a tap, not the rest of the line.
+  const row = (await page.locator('label', { has: leftHanded(page) }).boundingBox())!;
+  expect(row.width).toBeLessThan(200);
+
+  // A custom tuning's notes stay with the tuning, above the switch.
+  await pickCustomTuning(page);
+  const notesBox = (await notes(page).boundingBox())!;
+  expect((await leftHanded(page).boundingBox())!.y).toBeGreaterThanOrEqual(notesBox.y + notesBox.height);
+});

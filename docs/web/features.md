@@ -49,7 +49,7 @@ The **Chords** page, in the side bar, helps with chords away from any song, on g
 - **Name it**: put your fingers on the fretboard, and Bandmate tells you which chord you're playing. Press the speaker to hear the shape strummed, even one that isn't a chord.
 - **Suggest**: pick a key, and see the chords that belong in it, the ones borrowed from other keys, and what usually comes after a chord. Each one shows a way to play it: the one you prefer, or else the best. Press the speaker to hear it strummed. **More Voicings** opens it in Look up, with the other ways.
 - Beside each speaker, the rising bars arpeggiate the shape: they play it one string at a time, low to high, so you can hear each note.
-- Left-handed? One switch flips every diagram.
+- Left-handed? The switch by the tuning flips every diagram, and the fretboard too.
 
 ## Listen
 
