@@ -350,7 +350,6 @@ async function number(page, places, { first = 1, into } = {}) {
       timeline.getByRole("button", { name: "Record", exact: true }),
       row,
     ),
-    await above(timeline.getByRole("button", { name: "Undo" }), row),
     await above(timeline.getByRole("button", { name: "Import audio…" }), row),
     await above(timeline.getByRole("button", { name: "Mix down…" }), row),
     await above(

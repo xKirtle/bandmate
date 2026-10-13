@@ -44,6 +44,12 @@ export const loopBar = (page: Page) => timeline(page).getByTitle('Drag to set a 
 export const loopEdge = (page: Page, edge: 'start' | 'end') =>
   timeline(page).getByTitle(`Drag to move the Loop's ${edge}`);
 
+/** The Song page header's Undo button, which undoes the Song's latest edit. */
+export const undoButton = (page: Page) => page.getByRole('button', { name: 'Undo', exact: true });
+
+/** The Song page header's Redo button. */
+export const redoButton = (page: Page) => page.getByRole('button', { name: 'Redo', exact: true });
+
 /** The Lyric Sheet's Sync lyrics switch, which switches Sync mode on and off. */
 export const syncButton = (page: Page) => page.getByRole('button', { name: 'Sync lyrics' });
 

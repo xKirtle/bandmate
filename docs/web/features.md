@@ -91,22 +91,23 @@ Paste a link to a video or track on YouTube, SoundCloud, Bandcamp or [any other 
 
 Every song has a timeline: its beat, your takes and any other audio, laid out on tracks and played together.
 
-<img src="@screenshots/timeline-labelled.png" alt="A song's Timeline, numbered 1 to 12 to match the list below it">
+<img src="@screenshots/timeline-labelled.png" alt="A song's Timeline, numbered 1 to 11 to match the list below it">
 
 1. **Play**, or jump to the start or the end. Click the ruler to move the playhead.
 2. **Loop**: repeat a stretch while you write or rehearse.
 3. **The stretch it repeats**: drag along the top of the ruler to set it.
 4. **Record** a take, see [Record](#record).
-5. **Undo and redo** any change on the timeline.
-6. **Import audio**: add an audio file to the highlighted track. Dropping a file onto a track does the same.
-7. **Mix down**: download the song, or its loop, as one audio file.
-8. **Input**: pick the input you record from, see [Record](#record).
-9. **Add a beat** from your library, or **a track**.
-10. **A track**, with its own volume, mute and solo. New takes go on the highlighted one: click a track's name to choose it.
-11. **A beat**: drag it to move it, or its ends to trim it. The file itself is never changed.
-12. **A take**, selected. Its **⋯** menu records it again or picks another take, see [Record](#record).
+5. **Import audio**: add an audio file to the highlighted track. Dropping a file onto a track does the same.
+6. **Mix down**: download the song, or its loop, as one audio file.
+7. **Input**: pick the input you record from, see [Record](#record).
+8. **Add a beat** from your library, or **a track**.
+9. **A track**, with its own volume, mute and solo. New takes go on the highlighted one: click a track's name to choose it.
+10. **A beat**: drag it to move it, or its ends to trim it. The file itself is never changed.
+11. **A take**, selected. Its **⋯** menu records it again or picks another take, see [Record](#record).
 
-In a narrower window, Import audio, Mix down, the input and then undo and redo fold into a **⋯** at the end of the row, which lists just the ones that don't fit; the input is **Record from…** there. On a phone held upright, the timeline only plays, and offers just Mix down.
+In a narrower window, Import audio, Mix down and then the input fold into a **⋯** at the end of the row, which lists just the ones that don't fit; the input is **Record from…** there. On a phone held upright, the timeline only plays, and offers just Mix down.
+
+**Undo** and **Redo** are at the top of the song's page, beside Write and Read. Undo takes back your latest change to the timeline or a line's timing, one at a time, and Redo makes it again. They work in Read mode and on a phone too, even on a change you made in a wider window. While you record a take, or a merge is being made, they're off.
 
 A clip's **⋯** menu sets its **tempo** and **pitch**, each on its own or both together: slow a beat down to write over it, or move it a couple of semitones to suit your voice. Select several clips to change them all at once. The file itself is never changed, so you can always set them again, or reset them.
 

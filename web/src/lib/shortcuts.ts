@@ -58,13 +58,13 @@ export const shortcuts = {
   undo: {
     name: 'Undo',
     group: 'Timeline editing',
-    description: 'Undoes the last edit to the Timeline or a Cue.',
+    description: 'Undoes the last edit to the Song.',
     keys: [{ key: 'z', mod: true }],
   },
   redo: {
     name: 'Redo',
     group: 'Timeline editing',
-    description: 'Redoes the last edit undone.',
+    description: 'Redoes the last edit to the Song that was undone.',
     keys: [
       { key: 'z', mod: true, shift: true },
       { key: 'y', mod: true },

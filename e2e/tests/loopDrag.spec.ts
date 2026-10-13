@@ -1,7 +1,18 @@
 import type { Page } from '@playwright/test';
 import type { Bandmate, Loop } from '../bandmate';
 import { expect, test } from '../fixtures';
-import { clip, dragTo, heroSong, loopBar, loopButton, loopEdge, middleOf, timeline, type Point } from '../songPage';
+import {
+  clip,
+  dragTo,
+  heroSong,
+  loopBar,
+  loopButton,
+  loopEdge,
+  middleOf,
+  timeline,
+  type Point,
+  undoButton,
+} from '../songPage';
 
 // Dragging the Loop along the top of the ruler, on the demo Backup's hero
 // Song: marking a new one, moving its edges, snapping them to Clips' edges
@@ -150,7 +161,7 @@ test('a click on the top of the ruler, or a drag shorter than the shortest Loop,
   const song = await heroSong(bandmate);
   await bandmate.setLoop(song.id, { start: 70, end: 80, on: false });
   await open(page, song.id);
-  const undo = timeline(page).getByRole('button', { name: 'Undo' });
+  const undo = undoButton(page);
   const before = await bandmate.timeline(song.id);
   // A save of the Loop it already has wouldn't change what the server holds, so saves are counted too.
   const saves: string[] = [];

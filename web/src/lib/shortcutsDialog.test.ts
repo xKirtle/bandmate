@@ -57,6 +57,12 @@ group('dialogGroups', () => {
     expect(dialogGroups(shortcuts, 'mac')[0].rows[2].keys).toEqual([['Home'], ['End']]);
   });
 
+  it("says Undo and Redo are the Song's, not just the Timeline's", () => {
+    const [undo, redo] = dialogGroups(shortcuts, 'other')[1].rows;
+    expect(undo).toMatchObject({ name: 'Undo', description: 'Undoes the last edit to the Song.' });
+    expect(redo).toMatchObject({ name: 'Redo', description: 'Redoes the last edit to the Song that was undone.' });
+  });
+
   it('lists nudging a Cue under Timeline editing, saying it works in Write mode', () => {
     const editing = dialogGroups(shortcuts, 'other')[1];
     expect(editing.group).toBe('Timeline editing');

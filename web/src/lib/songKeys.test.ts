@@ -1,6 +1,6 @@
 import { describe as group, expect, it } from 'vitest';
 import type { KeyDown } from './shortcuts';
-import { opensShortcuts, songKey, type SongKeyContext } from './songKeys';
+import { opensShortcuts, songKey, undoKey, type SongKeyContext, type UndoKeyContext } from './songKeys';
 
 const press = (key: string, mods: Partial<Omit<KeyDown, 'key'>> = {}): KeyDown => ({
   key,
@@ -147,33 +147,55 @@ group('Home and End', () => {
 });
 
 group('Undo and redo', () => {
+  // The Song page at rest, for its Undo and Redo keys.
+  const calm: UndoKeyContext = { dialogOpen: false, inTextField: false, frozen: false };
+
   it('undo with Ctrl+Z or ⌘Z', () => {
-    expect(songKey(press('z', { ctrlKey: true }), idle)).toBe('undo');
-    expect(songKey(press('z', { metaKey: true }), idle)).toBe('undo');
+    expect(undoKey(press('z', { ctrlKey: true }), calm)).toBe('undo');
+    expect(undoKey(press('z', { metaKey: true }), calm)).toBe('undo');
   });
 
   it('redo with Ctrl+Shift+Z or ⌘⇧Z', () => {
-    expect(songKey(press('Z', { ctrlKey: true, shiftKey: true }), idle)).toBe('redo');
-    expect(songKey(press('Z', { metaKey: true, shiftKey: true }), idle)).toBe('redo');
+    expect(undoKey(press('Z', { ctrlKey: true, shiftKey: true }), calm)).toBe('redo');
+    expect(undoKey(press('Z', { metaKey: true, shiftKey: true }), calm)).toBe('redo');
   });
 
-  it('are left alone with Alt, handled already, typed, or on a read-only Timeline', () => {
-    expect(songKey(press('z', { ctrlKey: true, altKey: true }), idle)).toBeNull();
-    expect(songKey(press('z', { ctrlKey: true, defaultPrevented: true }), idle)).toBeNull();
-    expect(songKey(press('z', { ctrlKey: true }), { ...idle, inTextField: true })).toBeNull();
-    expect(songKey(press('z', { ctrlKey: true }), { ...idle, editable: false })).toBeNull();
+  it('redo with Ctrl+Y or ⌘Y, on every platform', () => {
+    expect(undoKey(press('y', { ctrlKey: true }), calm)).toBe('redo');
+    expect(undoKey(press('y', { metaKey: true }), calm)).toBe('redo');
   });
 
-  it('wait while recording, which undo would take the place of', () => {
-    expect(songKey(press('z', { ctrlKey: true }), { ...idle, recording: true, canRecord: false })).toBeNull();
+  it('are left alone with Alt, handled already, or typed, where the field undoes its own typing', () => {
+    expect(undoKey(press('z', { ctrlKey: true, altKey: true }), calm)).toBeNull();
+    expect(undoKey(press('z', { ctrlKey: true, defaultPrevented: true }), calm)).toBeNull();
+    expect(undoKey(press('z', { ctrlKey: true }), { ...calm, inTextField: true })).toBeNull();
   });
 
-  it('wait while a Beat is picked, the Latency Offset calibrated or a Mixdown made', () => {
-    expect(songKey(press('z', { ctrlKey: true }), { ...idle, busy: true })).toBeNull();
+  it('are off while recording or merging, when the Song stays as it is', () => {
+    expect(undoKey(press('z', { ctrlKey: true }), { ...calm, frozen: true })).toBeNull();
+    expect(undoKey(press('y', { ctrlKey: true }), { ...calm, frozen: true })).toBeNull();
+  });
+
+  it('are left to an open dialog, e.g. picking a Beat or making a Mixdown', () => {
+    expect(undoKey(press('z', { ctrlKey: true }), { ...calm, dialogOpen: true })).toBeNull();
+    expect(undoKey(press('Z', { ctrlKey: true, shiftKey: true }), { ...calm, dialogOpen: true })).toBeNull();
+    expect(undoKey(press('y', { ctrlKey: true }), { ...calm, dialogOpen: true })).toBeNull();
   });
 
   it('need Ctrl or ⌘', () => {
-    expect(songKey(press('z'), idle)).toBeNull();
+    expect(undoKey(press('z'), calm)).toBeNull();
+  });
+
+  it("Mod+Shift+Y, Ctrl+⌘Y and Ctrl+⌘Z don't", () => {
+    expect(undoKey(press('Y', { ctrlKey: true, shiftKey: true }), calm)).toBeNull();
+    expect(undoKey(press('Y', { metaKey: true, shiftKey: true }), calm)).toBeNull();
+    expect(undoKey(press('y', { ctrlKey: true, metaKey: true }), calm)).toBeNull();
+    expect(undoKey(press('z', { ctrlKey: true, metaKey: true }), calm)).toBeNull();
+  });
+
+  it("aren't the Timeline's keys any more, so a phone or Read mode undoes too", () => {
+    expect(songKey(press('z', { ctrlKey: true }), idle)).toBeNull();
+    expect(songKey(press('y', { ctrlKey: true }), idle)).toBeNull();
   });
 });
 
@@ -182,28 +204,13 @@ group('Exact modifiers', () => {
     expect(songKey(press(' ', { shiftKey: true }), idle)).toBeNull();
     expect(songKey(press('R', { shiftKey: true }), idle)).toBeNull();
   });
-
-  it('Mod+Y redoes, as Ctrl+Y or ⌘Y, on every platform', () => {
-    expect(songKey(press('y', { ctrlKey: true }), idle)).toBe('redo');
-    expect(songKey(press('y', { metaKey: true }), idle)).toBe('redo');
-  });
-
-  it("Mod+Shift+Y, Ctrl+⌘Y and Ctrl+⌘Z don't", () => {
-    expect(songKey(press('Y', { ctrlKey: true, shiftKey: true }), idle)).toBeNull();
-    expect(songKey(press('Y', { metaKey: true, shiftKey: true }), idle)).toBeNull();
-    expect(songKey(press('y', { ctrlKey: true, metaKey: true }), idle)).toBeNull();
-    expect(songKey(press('z', { ctrlKey: true, metaKey: true }), idle)).toBeNull();
-  });
 });
 
 group('An open dialog', () => {
-  it('stops Space, R, undo and redo', () => {
+  it('stops Space and R', () => {
     const open = { ...idle, dialogOpen: true };
     expect(songKey(press(' '), open)).toBeNull();
     expect(songKey(press('r'), open)).toBeNull();
-    expect(songKey(press('z', { ctrlKey: true }), open)).toBeNull();
-    expect(songKey(press('Z', { ctrlKey: true, shiftKey: true }), open)).toBeNull();
-    expect(songKey(press('y', { ctrlKey: true }), open)).toBeNull();
   });
 });
 
