@@ -6,6 +6,7 @@
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import Lock from '@lucide/svelte/icons/lock';
+  import { SvelteSet } from 'svelte/reactivity';
   import { api, type Snapshot, type SnapshotSummary } from './api';
   import Dialog from './Dialog.svelte';
   import SnapshotSheet from './SnapshotSheet.svelte';
@@ -33,6 +34,8 @@
   let showing = $state(false);
   let restoring = $state(false);
   let keepError = $state<string | null>(null);
+  /** The Snapshots being kept or un-kept, whose Keep waits till that's saved. */
+  const keeping = new SvelteSet<number>();
   const uid = $props.id();
 
   const chosen = $derived(list?.[index] ?? null);
@@ -75,12 +78,15 @@
   async function keep(s: SnapshotSummary) {
     const kept = !s.kept;
     keepError = null;
+    keeping.add(s.id);
     s.kept = kept;
     try {
       await api.keepSnapshot(songId, s.id, kept);
     } catch (e) {
       s.kept = !kept;
       keepError = failed(e);
+    } finally {
+      keeping.delete(s.id);
     }
   }
 
@@ -129,8 +135,7 @@
         {#each snapshotGroups(list, now) as group, g (group.name)}
           <h3 id="{uid}-group-{g}">{group.name}</h3>
           <ul aria-labelledby="{uid}-group-{g}">
-            {#each group.items as s (s.id)}
-              {@const i = list.indexOf(s)}
+            {#each group.items as { snapshot: s, index: i } (s.id)}
               {@const why = snapshotReason(s)}
               <li>
                 <button
@@ -152,6 +157,7 @@
                   type="button"
                   class="icon snapshot-keep"
                   aria-pressed={s.kept}
+                  disabled={keeping.has(s.id)}
                   aria-label="Keep"
                   title={s.kept ? 'Kept: it’s never thinned' : 'Keep it, so it’s never thinned'}
                   onclick={() => keep(s)}><Lock /></button

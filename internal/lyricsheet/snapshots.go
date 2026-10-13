@@ -21,14 +21,23 @@ import (
 const EditingSession = 10 * time.Minute
 
 // Snapshots are thinned as they age, each time one is taken: every one
-// younger than ThinDaily stays, then the newest of each day until
-// ThinWeekly, then the newest of each week. A day is a day in UTC, and a
-// week an ISO week, Monday to Sunday, so which one is the newest of its day
-// or week never changes as they age. A kept Snapshot is never thinned.
+// younger than KeepAllFor stays, then the newest of each day while younger
+// than KeepDailyFor, then the newest of each week. A day is a day in UTC,
+// and a week an ISO week, Monday to Sunday, so which one is the newest of
+// its day or week never changes as they age. A kept Snapshot is never
+// thinned. The Snapshots dialog groups them by the same ages.
 const (
-	ThinDaily  = 24 * time.Hour
-	ThinWeekly = ThinDaily + 30*24*time.Hour
+	KeepAllFor   = 24 * time.Hour
+	KeepDailyFor = KeepAllFor + 30*24*time.Hour
 )
+
+// thinSpan is a day or a week of which only the newest Snapshot is kept.
+type thinSpan struct {
+	weekly bool
+	// year and n are the day's year and day of the year, or the ISO week's
+	// year and number.
+	year, n int
+}
 
 // SnapshotReason says why a Snapshot was taken.
 type SnapshotReason string
@@ -256,10 +265,10 @@ func insertSnapshot(ctx context.Context, tx *sql.Tx, songID int64, now time.Time
 }
 
 // thinSnapshots deletes the Song's Snapshots not kept that aren't the
-// newest of their day or week, as ThinDaily and ThinWeekly say.
+// newest of their day or week, as KeepAllFor and KeepDailyFor say.
 func thinSnapshots(ctx context.Context, tx *sql.Tx, songID int64, now time.Time) error {
 	var thinned []int64
-	newest := map[string]bool{}
+	newest := map[thinSpan]bool{}
 	err := query(ctx, tx, `SELECT id, taken_at FROM snapshots WHERE song_id = ? AND NOT kept
 		ORDER BY taken_at DESC, id DESC`,
 		[]any{songID}, func(rows *sql.Rows) error {
@@ -272,15 +281,15 @@ func thinSnapshots(ctx context.Context, tx *sql.Tx, songID int64, now time.Time)
 			if err != nil {
 				return err
 			}
-			var span string
-			switch age := now.Sub(taken); {
-			case age < ThinDaily:
+			var span thinSpan
+			switch age, utc := now.Sub(taken), taken.UTC(); {
+			case age < KeepAllFor:
 				return nil
-			case age < ThinWeekly:
-				span = "day " + taken.UTC().Format(time.DateOnly)
+			case age < KeepDailyFor:
+				span = thinSpan{year: utc.Year(), n: utc.YearDay()}
 			default:
-				year, week := taken.UTC().ISOWeek()
-				span = fmt.Sprintf("week %d-%d", year, week)
+				year, week := utc.ISOWeek()
+				span = thinSpan{weekly: true, year: year, n: week}
 			}
 			if newest[span] {
 				thinned = append(thinned, id)

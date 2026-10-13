@@ -29,33 +29,31 @@ export function snapshotReason({ reason, deleted }: Pick<SnapshotSummary, 'reaso
   return reason === 'restoring' ? 'Before restoring' : null;
 }
 
-/** A run of the Snapshots, named for how thinned it is. */
+/** A run of the Snapshots, named for how thinned it is, each with its place in the whole list. */
 export interface SnapshotGroup {
   name: string;
-  items: SnapshotSummary[];
+  items: { snapshot: SnapshotSummary; index: number }[];
 }
 
 const dayMs = 24 * 3600 * 1000;
-/** How old a Snapshot gets before only the newest of each week is kept, as the server thins them: a day, then a month. */
-const weeklyAfterMs = 31 * dayMs;
+/** The ages at which Bandmate thins Snapshots, as the server's KeepAllFor and KeepDailyFor: a day, then a month. */
+const keepAllForMs = dayMs;
+const keepDailyForMs = keepAllForMs + 30 * dayMs;
 
 /**
- * A list of Snapshots, newest first, grouped as Bandmate thins them: today's, then those of the month before, kept one a
- * day, then older ones, kept one a week. A group with none is left out.
+ * A list of Snapshots, newest first, grouped by age as Bandmate thins them: those of the last 24 hours, all kept; then
+ * those of the month before, kept one a day; then older ones, kept one a week. A group with none is left out.
  */
 export function snapshotGroups(list: SnapshotSummary[], now = new Date()): SnapshotGroup[] {
   const groups: SnapshotGroup[] = [];
-  for (const s of list) {
-    const taken = new Date(s.takenAt);
-    const name = sameDay(taken, now)
-      ? 'Today'
-      : now.getTime() - taken.getTime() < weeklyAfterMs
-        ? 'Daily, for a month'
-        : 'Weekly, before that';
+  list.forEach((snapshot, index) => {
+    const age = now.getTime() - new Date(snapshot.takenAt).getTime();
+    const name =
+      age < keepAllForMs ? 'Last 24 hours' : age < keepDailyForMs ? 'Daily, for a month' : 'Weekly, before that';
     const last = groups.at(-1);
-    if (last?.name === name) last.items.push(s);
-    else groups.push({ name, items: [s] });
-  }
+    if (last?.name === name) last.items.push({ snapshot, index });
+    else groups.push({ name, items: [{ snapshot, index }] });
+  });
   return groups;
 }
 

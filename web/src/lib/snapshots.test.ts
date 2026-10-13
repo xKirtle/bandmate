@@ -44,25 +44,49 @@ describe('why a Snapshot was taken', () => {
 
 describe('grouping the Snapshots as they’re thinned', () => {
   const taken = (id: number, takenAt: string): SnapshotSummary => ({ id, takenAt, reason: 'editing', kept: false });
+  // A time so many days and minutes before now, whatever the time zone's clock changes.
+  const ago = (days: number, minutes = 0) =>
+    new Date(now.getTime() - (days * 24 * 60 + minutes) * 60_000).toISOString();
 
-  it('puts today’s first, then the daily ones for a month, then the weekly ones', () => {
+  it('puts the last 24 hours’ first, then the daily ones for a month, then the weekly ones', () => {
     const list = [
-      taken(5, at(2026, 10, 13, 9, 5)),
-      taken(4, at(2026, 10, 13, 0, 10)),
-      taken(3, at(2026, 10, 12, 23, 59)),
-      taken(2, at(2026, 9, 13, 19, 0)),
-      taken(1, at(2026, 9, 1, 12, 0)),
+      taken(6, ago(0, 5)),
+      taken(5, ago(0, 24 * 60 - 1)),
+      taken(4, ago(1)),
+      taken(3, ago(31, -1)),
+      taken(2, ago(31)),
+      taken(1, ago(60)),
     ];
     expect(snapshotGroups(list, now)).toEqual([
-      { name: 'Today', items: [list[0], list[1]] },
-      { name: 'Daily, for a month', items: [list[2], list[3]] },
-      { name: 'Weekly, before that', items: [list[4]] },
+      {
+        name: 'Last 24 hours',
+        items: [
+          { snapshot: list[0], index: 0 },
+          { snapshot: list[1], index: 1 },
+        ],
+      },
+      {
+        name: 'Daily, for a month',
+        items: [
+          { snapshot: list[2], index: 2 },
+          { snapshot: list[3], index: 3 },
+        ],
+      },
+      {
+        name: 'Weekly, before that',
+        items: [
+          { snapshot: list[4], index: 4 },
+          { snapshot: list[5], index: 5 },
+        ],
+      },
     ]);
   });
 
   it('leaves out a group with none', () => {
-    const list = [taken(1, at(2026, 8, 1, 12, 0))];
-    expect(snapshotGroups(list, now)).toEqual([{ name: 'Weekly, before that', items: list }]);
+    const list = [taken(1, ago(70))];
+    expect(snapshotGroups(list, now)).toEqual([
+      { name: 'Weekly, before that', items: [{ snapshot: list[0], index: 0 }] },
+    ]);
   });
 });
 
