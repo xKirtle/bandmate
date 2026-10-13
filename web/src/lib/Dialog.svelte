@@ -16,6 +16,7 @@
     dismissible,
     sheet = false,
     stack = true,
+    fill = false,
     dialog = $bindable(),
     children,
     ...rest
@@ -31,6 +32,8 @@
     sheet?: boolean;
     /** Spaces what it holds evenly, as a column; off, it flows as written. */
     stack?: boolean;
+    /** What it holds takes all the height its head leaves, e.g. parts that scroll on their own. */
+    fill?: boolean;
     /** The dialog element, to close it. */
     dialog?: HTMLDialogElement;
     children: Snippet;
@@ -45,6 +48,7 @@
   bind:this={dialog}
   {@attach (el) => (dismissible ? closeOnBackdrop(dismissible)(el) : undefined)}
   class:sheet
+  class:fill
   aria-labelledby="{id}-title"
   {...rest}
 >
@@ -63,7 +67,7 @@
       >
     {/if}
   </header>
-  <div class="body" class:stack>
+  <div class="body" class:stack class:fill>
     {@render children()}
   </div>
 </dialog>
@@ -119,6 +123,14 @@
     margin: 0;
     font-size: var(--text-xl);
     overflow-wrap: anywhere;
+  }
+  dialog.fill[open] {
+    display: flex;
+    flex-direction: column;
+  }
+  .body.fill {
+    flex: 1;
+    min-height: 0;
   }
   .stack {
     display: flex;

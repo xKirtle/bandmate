@@ -125,17 +125,21 @@ type Store struct {
 	songFiles   map[string]*audio.Files
 	masterFiles *audio.Files
 	coverFiles  CoverFiles
+	// now tells the time, e.g. when a Snapshot is taken.
+	now func() time.Time
 }
 
 // NewStore returns a Store backed by db, keeping the files of each kind a
 // Song has, from Masters' audio to Covers' pictures, in songFiles, by the
-// kind's directory: one for each of songfiles.Kinds.
-func NewStore(db *sql.DB, songFiles map[string]*audio.Files) *Store {
+// kind's directory: one for each of songfiles.Kinds. now tells the time,
+// e.g. when a Snapshot is taken.
+func NewStore(db *sql.DB, songFiles map[string]*audio.Files, now func() time.Time) *Store {
 	return &Store{
 		db:          db,
 		songFiles:   songFiles,
 		masterFiles: songFiles[songfiles.Masters.Dir],
 		coverFiles:  CoverFilesIn(songFiles),
+		now:         now,
 	}
 }
 
@@ -247,7 +251,7 @@ func (s *Store) GetSong(ctx context.Context, id int64) (Song, error) {
 	if song.Tags, err = decodeTags(tags); err != nil {
 		return Song{}, err
 	}
-	if song.LyricSheet, err = s.loadLyricSheet(ctx, id); err != nil {
+	if song.LyricSheet, err = loadLyricSheet(ctx, s.db, id); err != nil {
 		return Song{}, err
 	}
 	if song.Masters, err = loadMasters(ctx, s.db, id); err != nil {

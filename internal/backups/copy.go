@@ -53,6 +53,9 @@ var songTables = []songTable{
 	{name: "alternates", where: `section_id IN (SELECT id FROM src.sections WHERE song_id = ?1)`},
 	{name: "lines", where: `alternate_id IN (SELECT a.id FROM src.alternates a
 		JOIN src.sections s ON s.id = a.section_id WHERE s.song_id = ?1)`},
+	// Every Snapshot, kept or not, the ids inside each one's sheet remapped
+	// on a Restore (see remapSnapshots).
+	{name: "snapshots", where: `song_id = ?1`},
 	{name: "masters", where: `song_id = ?1`},
 	{name: "covers", where: `song_id = ?1`},
 	{name: "loops", where: `song_id = ?1`},

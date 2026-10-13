@@ -43,12 +43,15 @@ func (ts *testServer) restore(id int64, songs ...int64) []restoredSong {
 }
 
 // songCopy is all of a Song a test can read through the API: its Lyric
-// Sheet and Details, its Timeline, the Beats its Clips use, and every audio
-// file and picture it plays or shows, with each id renumbered by where it
-// first appears, so a copy with fresh ids reads the same.
+// Sheet and Details, its Snapshots with the sheets they hold, its Timeline,
+// the Beats its Clips use, and every audio file and picture it plays or
+// shows, with each id renumbered by where it first appears, so a copy with
+// fresh ids reads the same. The Song and its Snapshots are renumbered
+// together, so a Snapshot reads the same only if it holds the Song's rows
+// by their ids in the Song.
 type songCopy struct {
-	Song, Timeline, Beats any
-	Files                 map[string][]byte
+	Song, Snapshots, Timeline, Beats any
+	Files                            map[string][]byte
 }
 
 // readSongCopy reads the Song with id as a songCopy.
@@ -61,7 +64,16 @@ func (ts *testServer) readSongCopy(id int64) songCopy {
 		return res.Body
 	}
 	c := songCopy{Files: map[string][]byte{}}
-	c.Song = idsRenumbered(ts.t, get(songPath(id)))
+	snapshots := []json.RawMessage{}
+	for _, snap := range ts.listSnapshots(id) {
+		snapshots = append(snapshots, get(fmt.Sprintf("%s/snapshots/%d", songPath(id), snap.ID)))
+	}
+	both, err := json.Marshal(map[string]any{"song": json.RawMessage(get(songPath(id))), "snapshots": snapshots})
+	if err != nil {
+		ts.t.Fatal(err)
+	}
+	renumbered := idsRenumbered(ts.t, both).(map[string]any)
+	c.Song, c.Snapshots = renumbered["song"], renumbered["snapshots"]
 	c.Timeline = idsRenumbered(ts.t, get(timelinePath(id)))
 	s, tl := ts.getSong(id), ts.getTimeline(id)
 	for i, m := range s.Masters {
@@ -99,7 +111,8 @@ func expectSameSong(t *testing.T, want, got songCopy) {
 	for _, part := range []struct {
 		name      string
 		want, got any
-	}{{"song", want.Song, got.Song}, {"timeline", want.Timeline, got.Timeline}, {"beats", want.Beats, got.Beats}} {
+	}{{"song", want.Song, got.Song}, {"snapshots", want.Snapshots, got.Snapshots},
+		{"timeline", want.Timeline, got.Timeline}, {"beats", want.Beats, got.Beats}} {
 		if !reflect.DeepEqual(part.want, part.got) {
 			w, _ := json.Marshal(part.want)
 			g, _ := json.Marshal(part.got)

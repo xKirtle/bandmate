@@ -539,7 +539,7 @@ describe('Lyric Sheet editing, the structure of the Lyric Sheet', () => {
 describe('Lyric Sheet editing, Sync mode', () => {
   // Every change the GLOSSARY says ends Sync mode: to the Arrangement or a
   // Section, moving a Section or an Alternate between the Scrapbook and the
-  // Arrangement, and adding a Section in the Scrapbook.
+  // Arrangement, adding a Section in the Scrapbook, and restoring a Snapshot.
   const ending: LyricSheetChange[] = [
     { kind: 'addSection' },
     { kind: 'duplicateSection', sectionId: 1 },
@@ -555,6 +555,7 @@ describe('Lyric Sheet editing, Sync mode', () => {
     { kind: 'moveAlternateToArrangement', alternateId: 1, position: 0 },
     { kind: 'addToScrapbook' },
     { kind: 'addToArrangement', sectionId: 2, position: 0 },
+    { kind: 'restoreSnapshot', snapshotId: 1 },
   ];
 
   it.each(ending.map((c) => [c.kind, c] as const))('ends it as %s is asked for', async (_, change) => {

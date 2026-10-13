@@ -153,12 +153,17 @@ func expectSame(t *testing.T, want, got *testServer, path string) {
 }
 
 // fullSong is a Song with something in every part of it: Details and Status,
-// a Lyric Sheet with Alternates and Cues, a Scrapbook, a Master, a Cover,
-// and a Timeline with a mixed Track, a Loop, and Clips of a Beat, a Take and
-// a Sound.
+// a Lyric Sheet with Alternates and Cues, a Scrapbook, Snapshots, a kept
+// one holding a Section since deleted, a Master, a Cover, and a Timeline
+// with a mixed Track, a Loop, and Clips of a Beat, a Take and a Sound.
 func (ts *testServer) fullSong(t *testing.T, beatID int64) song {
 	t.Helper()
 	s := ts.cuedChorusWithTwoAlternates()
+	dropped := ts.addToScrapbook(s.ID, "Dropped")
+	droppedID := dropped.Scrapbook[0]
+	ts.setText(s.ID, sectionsByID(dropped)[droppedID].Alternates[0].ID, "neon [C]rain")
+	ts.lyricSheetChange(http.MethodDelete, sectionPath(s.ID, droppedID), nil)
+	expectStatus(t, ts.keepSnapshot(s.ID, ts.listSnapshots(s.ID)[0].ID, true), http.StatusOK)
 	ts.updateSong(s.ID, map[string]any{
 		"title": "Night Drive", "status": "drafting", "key": "Am", "bpm": 92, "capo": 2,
 		"tuning": "Drop D", "languages": []string{"pt", "en"}, "notes": "Slow down the bridge",
@@ -192,6 +197,10 @@ func TestABackedUpSongHoldsEverythingThatBelongsToIt(t *testing.T) {
 	}
 	expectStatus(t, held.Do(http.MethodGet, songPath(other.ID), nil), http.StatusNotFound)
 	expectSame(t, ts, held, songPath(s.ID))
+	expectSame(t, ts, held, songPath(s.ID)+"/snapshots")
+	for _, snap := range ts.listSnapshots(s.ID) {
+		expectSame(t, ts, held, fmt.Sprintf("%s/snapshots/%d", songPath(s.ID), snap.ID))
+	}
 	expectSame(t, ts, held, timelinePath(s.ID))
 	if got := beatTitles(held.listBeats()); !reflect.DeepEqual(got, []string{"Used"}) {
 		t.Errorf("beats in the backup = %q, want only the one its Clip uses", got)

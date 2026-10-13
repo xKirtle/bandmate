@@ -2,7 +2,7 @@
   import type { Attachment } from 'svelte/attachments';
   import type { Section, Song } from './api';
   import type { ChordOpener } from './ChordPopover.svelte';
-  import { layoutLine } from './chords';
+  import ChordedLine from './ChordedLine.svelte';
   import type { Position } from './cues';
   import { follower, lineKey, sectionKey, topLine } from './follow';
   import { usualLyricSize } from './lyricSize';
@@ -156,26 +156,7 @@
               title={onClick ? 'Play from here' : undefined}
               onclick={onClick ? () => click(onClick) : undefined}
             >
-              {#if showChords && line.chords.length > 0}
-                <div class="line" class:chord-line={line.chordLine}>
-                  {#each layoutLine(line, transpose, song.key) as word, w (w)}
-                    <span class="word">
-                      {#each word as piece, p (p)}
-                        <span class="piece" class:snug={piece.snug}>
-                          <span class="chord"
-                            >{#each piece.chords as name, c (c)}{#if c > 0}{' '}{/if}<span {@attach opens(name)}
-                                >{name}</span
-                              >{/each}</span
-                          >
-                          <span class="lyric">{piece.text || ' '}</span>
-                        </span>
-                      {/each}
-                    </span>
-                  {/each}
-                </div>
-              {:else}
-                <p class="line plain">{line.lyrics || ' '}</p>
-              {/if}
+              <ChordedLine {line} {showChords} {transpose} songKey={song.key} chord={opens} />
             </div>
           </div>
         {/each}
@@ -232,51 +213,5 @@
   }
   .clickable {
     cursor: pointer;
-  }
-  .line {
-    font-size: var(--lyric-read-line);
-    line-height: var(--lyric-read-leading);
-  }
-  .plain {
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
-  /* Words wrap as wholes, each carrying its Chords above it. */
-  .line:not(.plain) {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    margin-top: var(--space-1);
-  }
-  /* A word wider than the screen wraps inside rather than overflowing. */
-  .word {
-    display: inline-flex;
-    flex-wrap: wrap;
-    max-width: 100%;
-    white-space: break-spaces;
-    overflow-wrap: anywhere;
-  }
-  .piece {
-    display: inline-flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-  /* A piece with no Chord holds a Chord's height, so the lyrics stay level. */
-  .chord {
-    min-height: 1lh;
-    color: var(--accent);
-    font-size: var(--lyric-read-chord);
-    font-weight: 700;
-  }
-  .chord:not(:empty) {
-    padding-right: var(--space-2);
-  }
-  /* Chords between words sit over the whitespace as typed, widening it only
-     as far as their names need. */
-  .snug > .chord {
-    padding-right: 0;
-  }
-  .chord-line .lyric {
-    display: none;
   }
 </style>

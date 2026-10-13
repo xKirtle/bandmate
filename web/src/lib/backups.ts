@@ -1,11 +1,7 @@
 // How Backups are named, sized and asked for in Settings' Backups tab.
 import type { Backup, BackupContents, BackupPeriod, BackupPicks, BackupPresent, BackupSchedule } from './api';
-import { timeAgo } from './time';
+import { shortMonths, timeAgo } from './time';
 import { formatSmallSize } from './upload';
-
-// Spelled out rather than left to the locale, which may shorten September
-// to "Sept".
-const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** A Backup's name: the one of its own it was given, or else the automatic one. */
 export function backupName(backup: Pick<Backup, 'createdAt' | 'name'> & Contents): string {
@@ -18,7 +14,7 @@ export function backupName(backup: Pick<Backup, 'createdAt' | 'name'> & Contents
  */
 export function automaticName(backup: Pick<Backup, 'createdAt'> & Contents): string {
   const made = new Date(backup.createdAt);
-  const day = `${made.getDate()} ${months[made.getMonth()]} ${made.getFullYear()}`;
+  const day = `${made.getDate()} ${shortMonths[made.getMonth()]} ${made.getFullYear()}`;
   return `${day} · ${contentsName(backup)}`;
 }
 

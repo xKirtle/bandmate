@@ -14,7 +14,7 @@ export type LyricSheetChange =
   | { kind: 'removeFromArrangement'; sectionId: number }
   /** A Section's Alternates made anew in another Section in the Arrangement, inactive; the Section added goes. */
   | { kind: 'addToSection'; sectionId: number; targetId: number }
-  /** A Section in the Scrapbook deleted for good. */
+  /** A Section in the Scrapbook deleted, after a Snapshot of the sheet as it was. */
   | { kind: 'deleteSection'; sectionId: number }
   /** A Section's Label set, or removed with "". */
   | { kind: 'setSectionLabel'; sectionId: number; label: string }
@@ -24,7 +24,7 @@ export type LyricSheetChange =
   | { kind: 'renameAlternate'; alternateId: number; name: string }
   /** An Alternate made the active one of its Section. */
   | { kind: 'activateAlternate'; alternateId: number }
-  /** An inactive Alternate deleted for good. */
+  /** An inactive Alternate deleted, after a Snapshot of the sheet as it was. */
   | { kind: 'deleteAlternate'; alternateId: number }
   /** An inactive Alternate made anew as a Section of its own, in the Scrapbook. */
   | { kind: 'moveAlternateToScrapbook'; alternateId: number }
@@ -35,7 +35,9 @@ export type LyricSheetChange =
   /** A Section in the Scrapbook put back into the Arrangement, at position. */
   | { kind: 'addToArrangement'; sectionId: number; position?: number }
   /** An Alternate's Lines replaced with the lines of text. */
-  | { kind: 'replaceAlternateText'; alternateId: number; text: string };
+  | { kind: 'replaceAlternateText'; alternateId: number; text: string }
+  /** The Lyric Sheet and Scrapbook made a Snapshot's, once a Snapshot of them is taken. */
+  | { kind: 'restoreSnapshot'; snapshotId: number };
 
 const lyricSheetChangeKinds: ReadonlySet<string> = new Set<LyricSheetChange['kind']>([
   'addSection',
@@ -54,6 +56,7 @@ const lyricSheetChangeKinds: ReadonlySet<string> = new Set<LyricSheetChange['kin
   'addToScrapbook',
   'addToArrangement',
   'replaceAlternateText',
+  'restoreSnapshot',
 ]);
 
 /** Whether a change is to the Lyric Sheet. */
@@ -96,5 +99,7 @@ export function sendLyricSheetChange(at: SongAt, change: LyricSheetChange): Prom
       return api.addToArrangement(at, change.sectionId, change.position);
     case 'replaceAlternateText':
       return api.replaceAlternateText(at, change.alternateId, change.text);
+    case 'restoreSnapshot':
+      return api.restoreSnapshot(at, change.snapshotId);
   }
 }

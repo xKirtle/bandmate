@@ -134,6 +134,26 @@ export interface CueValue {
 /** The Song a write goes to, at the version it was based on. */
 export type SongAt = Pick<Song, 'id' | 'version'>;
 
+/** Why a Snapshot was taken: before an editing session, before deleting a Scrapbook Section or an Alternate, or before a restore. */
+export type SnapshotReason = 'editing' | 'deleting' | 'restoring';
+
+/** A Snapshot as listed: when it was taken, and why. */
+export interface SnapshotSummary {
+  id: number;
+  takenAt: string;
+  reason: SnapshotReason;
+  /** For one taken before a deletion, what was deleted, named as the Song page names it; none for a Section with no Label and no words. */
+  deleted?: string;
+  /** Whether the user Kept it, so it's never thinned. */
+  kept: boolean;
+}
+
+/** A copy of a Song's Lyric Sheet and Scrapbook as they were, which Bandmate takes on its own. */
+export interface Snapshot extends SnapshotSummary {
+  /** The Lyric Sheet and Scrapbook it holds, with their ids, as a Song's are. */
+  sheet: Pick<Song, 'arrangement' | 'sections' | 'scrapbook'>;
+}
+
 /** Labels offered as suggestions; any text is allowed. */
 export const suggestedLabels: readonly string[] = [
   'Intro',
@@ -1146,6 +1166,20 @@ export const api = {
   /** Permanently deletes an inactive Alternate. */
   deleteAlternate: (at: SongAt, alternateId: number) =>
     request<Song>('DELETE', `/songs/${at.id}/alternates/${alternateId}`, undefined, at),
+  /** A Song's Snapshots, newest first, without their sheets. */
+  listSnapshots: (songId: number) => request<SnapshotSummary[]>('GET', `/songs/${songId}/snapshots`),
+  /** One of a Song's Snapshots, with the Lyric Sheet and Scrapbook it holds. */
+  getSnapshot: (songId: number, snapshotId: number) =>
+    request<Snapshot>('GET', `/songs/${songId}/snapshots/${snapshotId}`),
+  /** Keeps a Snapshot, so it's never thinned, or un-keeps it; this changes nothing of the Song. */
+  keepSnapshot: (songId: number, snapshotId: number, kept: boolean) =>
+    request<SnapshotSummary>('PATCH', `/songs/${songId}/snapshots/${snapshotId}`, { kept }),
+  /**
+   * Makes the Lyric Sheet and Scrapbook a Snapshot's, taking a Snapshot of them first. Lines still there keep their
+   * Cues as they are; Lines brought back get the Cues they had.
+   */
+  restoreSnapshot: (at: SongAt, snapshotId: number) =>
+    request<Song>('POST', `/songs/${at.id}/snapshots/${snapshotId}/restore`, undefined, at),
   /** Attaches a finished recording; the Song's first Master is its main one. */
   addMaster: (at: SongAt, file: File, decoded: DecodedAudio) =>
     request<Song>('POST', `/songs/${at.id}/masters`, audioForm(file, decoded), at),

@@ -15,7 +15,7 @@ import (
 // copy of the active Alternate's Lines and their Cues, and makes it the active
 // one. The one it copied keeps its own Cues, dormant (ADR 0007).
 func (s *Store) AddAlternate(ctx context.Context, songID int64, based songversion.Version, sectionID int64, name string) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
 		if _, err := findSection(ctx, tx, songID, sectionID); err != nil {
 			return err
 		}
@@ -45,7 +45,7 @@ func (s *Store) AddAlternate(ctx context.Context, songID int64, based songversio
 
 // RenameAlternate changes an Alternate's name. A blank name removes it.
 func (s *Store) RenameAlternate(ctx context.Context, songID int64, based songversion.Version, alternateID int64, name string) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
 		if _, _, err := findAlternate(ctx, tx, songID, alternateID); err != nil {
 			return err
 		}
@@ -60,7 +60,7 @@ func (s *Store) RenameAlternate(ctx context.Context, songID int64, based songver
 // ActivateAlternate makes an Alternate the only active one of its Section, so
 // the Section shows it.
 func (s *Store) ActivateAlternate(ctx context.Context, songID int64, based songversion.Version, alternateID int64) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
 		sectionID, _, err := findAlternate(ctx, tx, songID, alternateID)
 		if err != nil {
 			return err
@@ -84,29 +84,36 @@ func activate(ctx context.Context, tx *sql.Tx, sectionID, alternateID int64) err
 	return nil
 }
 
-// DeleteAlternate permanently deletes an inactive Alternate and its Lines.
-// The active Alternate, and so a Section's last one, can't be deleted.
+// DeleteAlternate deletes an inactive Alternate and its Lines, having taken
+// a Snapshot naming it first. The active Alternate, and so a Section's last
+// one, can't be deleted.
 func (s *Store) DeleteAlternate(ctx context.Context, songID int64, based songversion.Version, alternateID int64) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeBefore(ctx, songID, based, BeforeDeleting, func(tx *sql.Tx) (string, func() error, error) {
 		sectionID, active, err := findAlternate(ctx, tx, songID, alternateID)
 		if err != nil {
-			return err
+			return "", nil, err
 		}
 		var count int
 		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM alternates WHERE section_id = ?`,
 			sectionID).Scan(&count); err != nil {
-			return err
+			return "", nil, err
 		}
 		if count == 1 {
-			return domain.Conflict("a Section's last Alternate can't be deleted")
+			return "", nil, domain.Conflict("a Section's last Alternate can't be deleted")
 		}
 		if active {
-			return domain.Conflict("the active Alternate can't be deleted; activate another one first")
+			return "", nil, domain.Conflict("the active Alternate can't be deleted; activate another one first")
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM alternates WHERE id = ?`, alternateID); err != nil {
-			return fmt.Errorf("deleting alternate: %w", err)
+		name, err := alternateName(ctx, tx, sectionID, alternateID)
+		if err != nil {
+			return "", nil, err
 		}
-		return nil
+		return name, func() error {
+			if _, err := tx.ExecContext(ctx, `DELETE FROM alternates WHERE id = ?`, alternateID); err != nil {
+				return fmt.Errorf("deleting alternate: %w", err)
+			}
+			return nil
+		}, nil
 	})
 }
 
@@ -116,7 +123,7 @@ func (s *Store) DeleteAlternate(ctx context.Context, songID int64, based songver
 // the new Section is put back (ADR 0010). The active Alternate can't be
 // moved.
 func (s *Store) MoveAlternateToScrapbook(ctx context.Context, songID int64, based songversion.Version, alternateID int64) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
 		newID, err := moveAlternateOut(ctx, tx, songID, alternateID)
 		if err != nil {
 			return err
@@ -131,7 +138,7 @@ func (s *Store) MoveAlternateToScrapbook(ctx context.Context, songID int64, base
 // it's now the Section's active Alternate (ADR 0010). The active Alternate
 // can't be moved.
 func (s *Store) MoveAlternateToArrangement(ctx context.Context, songID int64, based songversion.Version, alternateID int64, position int) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
 		newID, err := moveAlternateOut(ctx, tx, songID, alternateID)
 		if err != nil {
 			return err
@@ -183,7 +190,7 @@ func moveAlternateOut(ctx context.Context, tx *sql.Tx, songID, alternateID int64
 // keep their ids and their Cues, dormant until their Alternate is made
 // active (ADR 0010).
 func (s *Store) AddToSection(ctx context.Context, songID int64, based songversion.Version, addedID, sectionID int64) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
 		addedAt, err := findSection(ctx, tx, songID, addedID)
 		if err != nil {
 			return err
