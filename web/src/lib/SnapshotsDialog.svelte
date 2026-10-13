@@ -5,10 +5,12 @@
   // first, then the Snapshot over it, with a way back to the list.
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import Lock from '@lucide/svelte/icons/lock';
+  import { SvelteSet } from 'svelte/reactivity';
   import { api, type Snapshot, type SnapshotSummary } from './api';
   import Dialog from './Dialog.svelte';
   import SnapshotSheet from './SnapshotSheet.svelte';
-  import { snapshotReason, snapshotWhen, stepSnapshot, type SnapshotStep } from './snapshots';
+  import { snapshotGroups, snapshotReason, snapshotWhen, stepSnapshot, type SnapshotStep } from './snapshots';
 
   let {
     songId,
@@ -31,6 +33,10 @@
   /** On a phone, the chosen Snapshot shows over the list. */
   let showing = $state(false);
   let restoring = $state(false);
+  let keepError = $state<string | null>(null);
+  /** The Snapshots being kept or un-kept, whose Keep waits till that's saved. */
+  const keeping = new SvelteSet<number>();
+  const uid = $props.id();
 
   const chosen = $derived(list?.[index] ?? null);
   const snapshot = $derived(chosen ? (read[chosen.id] ?? null) : null);
@@ -66,6 +72,22 @@
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
     e.preventDefault();
     step(e.key === 'ArrowDown' ? 'older' : 'newer');
+  }
+
+  /** Keeps a Snapshot, or un-keeps it, showing it at once and putting it back if that fails. */
+  async function keep(s: SnapshotSummary) {
+    const kept = !s.kept;
+    keepError = null;
+    keeping.add(s.id);
+    s.kept = kept;
+    try {
+      await api.keepSnapshot(songId, s.id, kept);
+    } catch (e) {
+      s.kept = !kept;
+      keepError = failed(e);
+    } finally {
+      keeping.delete(s.id);
+    }
   }
 
   async function restoreChosen() {
@@ -108,28 +130,43 @@
     </p>
   {:else}
     <div class="snapshots" class:showing>
-      <ul class="snapshot-list" aria-label="Snapshots, newest first">
-        {#each list as s, i (s.id)}
-          {@const why = snapshotReason(s)}
-          <li>
-            <button
-              type="button"
-              class="snapshot-pick"
-              aria-current={i === index ? 'true' : undefined}
-              onclick={() => {
-                index = i;
-                showing = true;
-              }}
-              {@attach (el) => {
-                if (i === index) inView(el);
-              }}
-            >
-              <span class="tabular">{snapshotWhen(s.takenAt, now)}</span>
-              {#if why}<span class="snapshot-why">{why}</span>{/if}
-            </button>
-          </li>
+      <div class="snapshot-list">
+        {#if keepError}<p class="error" role="alert">{keepError}</p>{/if}
+        {#each snapshotGroups(list, now) as group, g (group.name)}
+          <h3 id="{uid}-group-{g}">{group.name}</h3>
+          <ul aria-labelledby="{uid}-group-{g}">
+            {#each group.items as { snapshot: s, index: i } (s.id)}
+              {@const why = snapshotReason(s)}
+              <li>
+                <button
+                  type="button"
+                  class="snapshot-pick"
+                  aria-current={i === index ? 'true' : undefined}
+                  onclick={() => {
+                    index = i;
+                    showing = true;
+                  }}
+                  {@attach (el) => {
+                    if (i === index) inView(el);
+                  }}
+                >
+                  <span class="tabular">{snapshotWhen(s.takenAt, now)}</span>
+                  {#if why}<span class="snapshot-why">{why}</span>{/if}
+                </button>
+                <button
+                  type="button"
+                  class="icon snapshot-keep"
+                  aria-pressed={s.kept}
+                  disabled={keeping.has(s.id)}
+                  aria-label="Keep"
+                  title={s.kept ? 'Kept: it’s never thinned' : 'Keep it, so it’s never thinned'}
+                  onclick={() => keep(s)}><Lock /></button
+                >
+              </li>
+            {/each}
+          </ul>
         {/each}
-      </ul>
+      </div>
       {#if chosen}
         <div class="snapshot-preview">
           <div class="snapshot-head">
@@ -195,17 +232,35 @@
     height: 100%;
   }
   .snapshot-list {
-    margin: 0;
     padding: 0 var(--space-2) 0 0;
     border-right: 1px solid var(--border);
-    list-style: none;
     overflow: auto;
+  }
+  .snapshot-list h3 {
+    margin: var(--space-3) 0 var(--space-1);
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+  .snapshot-list h3:first-of-type {
+    margin-top: 0;
+  }
+  .snapshot-list ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .snapshot-list li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
   }
   .snapshot-pick {
     display: flex;
+    flex: 1;
     flex-direction: column;
     align-items: flex-start;
-    width: 100%;
+    min-width: 0;
     padding: var(--space-2) var(--space-3);
     border: 0;
     border-radius: var(--radius-sm);
@@ -222,6 +277,10 @@
   .snapshot-why {
     color: var(--text-muted);
     font-size: var(--text-sm);
+  }
+  /* A kept Snapshot's lock is in the accent, as a toggle that's on. */
+  .snapshot-keep[aria-pressed='true'] {
+    color: var(--accent);
   }
   .snapshot-preview {
     display: flex;

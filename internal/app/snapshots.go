@@ -3,6 +3,7 @@ package app
 import (
 	"net/http"
 
+	"github.com/xKirtle/bandmate/internal/domain"
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
 	"github.com/xKirtle/bandmate/internal/songversion"
 )
@@ -34,6 +35,35 @@ func (a *App) getSnapshot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	snap, err := a.songs.GetSnapshot(r.Context(), id, snapshotID)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, snap)
+}
+
+// keepSnapshot keeps one of a Song's Snapshots, so it's never thinned, or
+// un-keeps it, and answers with it as listed.
+func (a *App) keepSnapshot(w http.ResponseWriter, r *http.Request) {
+	id, ok := songID(w, r)
+	if !ok {
+		return
+	}
+	snapshotID, ok := pathID(w, r, "snapshotID")
+	if !ok {
+		return
+	}
+	var req struct {
+		Kept *bool `json:"kept"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	if req.Kept == nil {
+		writeDomainError(w, domain.Invalid("kept is required"))
+		return
+	}
+	snap, err := a.songs.KeepSnapshot(r.Context(), id, snapshotID, *req.Kept)
 	if err != nil {
 		writeDomainError(w, err)
 		return

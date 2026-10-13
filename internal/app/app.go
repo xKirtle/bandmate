@@ -277,6 +277,7 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("PUT /api/songs/{id}/alternates/{alternateID}/text", a.replaceAlternateText)
 	mux.HandleFunc("GET /api/songs/{id}/snapshots", a.listSnapshots)
 	mux.HandleFunc("GET /api/songs/{id}/snapshots/{snapshotID}", a.getSnapshot)
+	mux.HandleFunc("PATCH /api/songs/{id}/snapshots/{snapshotID}", a.keepSnapshot)
 	mux.HandleFunc("POST /api/songs/{id}/snapshots/{snapshotID}/restore", a.restoreSnapshot)
 	mux.HandleFunc("POST /api/songs/{id}/masters", a.addMaster)
 	mux.HandleFunc("GET /api/songs/{id}/masters/{masterID}", a.getMaster)

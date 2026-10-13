@@ -20,6 +20,25 @@ import (
 // Snapshot first.
 const EditingSession = 10 * time.Minute
 
+// Snapshots are thinned as they age, each time one is taken: every one
+// younger than KeepAllFor stays, then the newest of each day while younger
+// than KeepDailyFor, then the newest of each week. A day is a day in UTC,
+// and a week an ISO week, Monday to Sunday, so which one is the newest of
+// its day or week never changes as they age. A kept Snapshot is never
+// thinned. The Snapshots dialog groups them by the same ages.
+const (
+	KeepAllFor   = 24 * time.Hour
+	KeepDailyFor = KeepAllFor + 30*24*time.Hour
+)
+
+// thinSpan is a day or a week of which only the newest Snapshot is kept.
+type thinSpan struct {
+	weekly bool
+	// year and n are the day's year and day of the year, or the ISO week's
+	// year and number.
+	year, n int
+}
+
 // SnapshotReason says why a Snapshot was taken.
 type SnapshotReason string
 
@@ -41,6 +60,8 @@ type SnapshotSummary struct {
 	// Deleted names the Section or Alternate deleted just after a Snapshot
 	// taken BeforeDeleting, as the Song page names it.
 	Deleted string `json:"deleted,omitempty"`
+	// Kept is true for one the user Kept, which is never thinned.
+	Kept bool `json:"kept"`
 }
 
 // Snapshot is a copy of a Song's Lyric Sheet and Scrapbook as they were.
@@ -232,7 +253,7 @@ func encodeSheet(ctx context.Context, tx *sql.Tx, songID int64) (encoded []byte,
 }
 
 // insertSnapshot keeps sheet as a Snapshot taken at now, for reason, naming
-// what was deleted, if anything.
+// what was deleted, if anything, then thins the Song's Snapshots.
 func insertSnapshot(ctx context.Context, tx *sql.Tx, songID int64, now time.Time, reason SnapshotReason, deleted string,
 	sheet []byte) error {
 	if _, err := tx.ExecContext(ctx,
@@ -240,7 +261,70 @@ func insertSnapshot(ctx context.Context, tx *sql.Tx, songID int64, now time.Time
 		songID, now.Format(domain.TimeFormat), reason, deleted, string(sheet)); err != nil {
 		return fmt.Errorf("taking a snapshot: %w", err)
 	}
+	return thinSnapshots(ctx, tx, songID, now)
+}
+
+// thinSnapshots deletes the Song's Snapshots not kept that aren't the
+// newest of their day or week, as KeepAllFor and KeepDailyFor say.
+func thinSnapshots(ctx context.Context, tx *sql.Tx, songID int64, now time.Time) error {
+	var thinned []int64
+	newest := map[thinSpan]bool{}
+	err := query(ctx, tx, `SELECT id, taken_at FROM snapshots WHERE song_id = ? AND NOT kept
+		ORDER BY taken_at DESC, id DESC`,
+		[]any{songID}, func(rows *sql.Rows) error {
+			var id int64
+			var at string
+			if err := rows.Scan(&id, &at); err != nil {
+				return err
+			}
+			taken, err := domain.ParseTime(at)
+			if err != nil {
+				return err
+			}
+			var span thinSpan
+			switch age, utc := now.Sub(taken), taken.UTC(); {
+			case age < KeepAllFor:
+				return nil
+			case age < KeepDailyFor:
+				span = thinSpan{year: utc.Year(), n: utc.YearDay()}
+			default:
+				year, week := utc.ISOWeek()
+				span = thinSpan{weekly: true, year: year, n: week}
+			}
+			if newest[span] {
+				thinned = append(thinned, id)
+			}
+			newest[span] = true
+			return nil
+		})
+	if err != nil {
+		return fmt.Errorf("reading snapshots to thin: %w", err)
+	}
+	for _, id := range thinned {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM snapshots WHERE id = ?`, id); err != nil {
+			return fmt.Errorf("thinning snapshots: %w", err)
+		}
+	}
 	return nil
+}
+
+// KeepSnapshot keeps one of a Song's Snapshots, so it's never thinned, or
+// un-keeps it, so it's thinned like the rest the next time one is taken.
+// It changes nothing of the Song, so isn't based on its version.
+func (s *Store) KeepSnapshot(ctx context.Context, songID, snapshotID int64, kept bool) (SnapshotSummary, error) {
+	res, err := s.db.ExecContext(ctx, `UPDATE snapshots SET kept = ? WHERE id = ? AND song_id = ?`, kept, snapshotID, songID)
+	if err != nil {
+		return SnapshotSummary{}, fmt.Errorf("keeping snapshot: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return SnapshotSummary{}, fmt.Errorf("keeping snapshot: %w", err)
+	}
+	if n == 0 {
+		return SnapshotSummary{}, domain.ErrNotFound
+	}
+	snap, _, err := findSnapshot(ctx, s.db, songID, snapshotID)
+	return snap.SnapshotSummary, err
 }
 
 // ListSnapshots lists a Song's Snapshots, newest first, without their
@@ -254,12 +338,12 @@ func (s *Store) ListSnapshots(ctx context.Context, songID int64) ([]SnapshotSumm
 		return nil, domain.ErrNotFound
 	}
 	list := []SnapshotSummary{}
-	err := query(ctx, s.db, `SELECT id, taken_at, reason, COALESCE(deleted, '') FROM snapshots
+	err := query(ctx, s.db, `SELECT id, taken_at, reason, COALESCE(deleted, ''), kept FROM snapshots
 		WHERE song_id = ? ORDER BY taken_at DESC, id DESC`,
 		[]any{songID}, func(rows *sql.Rows) error {
 			var sum SnapshotSummary
 			var at string
-			if err := rows.Scan(&sum.ID, &at, &sum.Reason, &sum.Deleted); err != nil {
+			if err := rows.Scan(&sum.ID, &at, &sum.Reason, &sum.Deleted, &sum.Kept); err != nil {
 				return err
 			}
 			var err error
@@ -287,9 +371,9 @@ func (s *Store) GetSnapshot(ctx context.Context, songID, snapshotID int64) (Snap
 func findSnapshot(ctx context.Context, q domain.Queryer, songID, snapshotID int64) (Snapshot, heldSheet, error) {
 	var snap Snapshot
 	var at, sheet string
-	err := q.QueryRowContext(ctx, `SELECT id, taken_at, reason, COALESCE(deleted, ''), sheet FROM snapshots
+	err := q.QueryRowContext(ctx, `SELECT id, taken_at, reason, COALESCE(deleted, ''), kept, sheet FROM snapshots
 		WHERE id = ? AND song_id = ?`,
-		snapshotID, songID).Scan(&snap.ID, &at, &snap.Reason, &snap.Deleted, &sheet)
+		snapshotID, songID).Scan(&snap.ID, &at, &snap.Reason, &snap.Deleted, &snap.Kept, &sheet)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Snapshot{}, heldSheet{}, domain.ErrNotFound
 	}

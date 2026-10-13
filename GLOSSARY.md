@@ -122,7 +122,7 @@ _Avoid_: Chord strip, chord diagrams, chords used
 What a Voicing is played on. Only the guitar for now; others, like a piano, can follow.
 
 **Snapshot**:
-A copy of a Song's Lyric Sheet and Scrapbook as they were, which Bandmate takes on its own: before each editing session, the first change to them 10 minutes or more after the one before, unless nothing has changed since the newest one; just before deleting a Scrapbook Section or an Alternate, naming it; and before every restore. Restoring one makes the Lyric Sheet and Scrapbook the Snapshot's, keeping what was there as a Snapshot first; a Line still there keeps its Cue as it is now, and a Line brought back gets the Cue it had. Snapshots can't be named, renamed or deleted by hand.
+A copy of a Song's Lyric Sheet and Scrapbook as they were, which Bandmate takes on its own: before each editing session, the first change to them 10 minutes or more after the one before, unless nothing has changed since the newest one; just before deleting a Scrapbook Section or an Alternate, naming it; and before every restore. Restoring one makes the Lyric Sheet and Scrapbook the Snapshot's, keeping what was there as a Snapshot first; a Line still there keeps its Cue as it is now, and a Line brought back gets the Cue it had. Snapshots are thinned as they age, each time one is taken: every one from the last day stays, then the newest of each day for the month before, then the newest of each week. The user can Keep one, and a kept Snapshot is never thinned. Snapshots can't be named, renamed or deleted by hand.
 _Avoid_: Version, revision, backup
 
 ### Timeline

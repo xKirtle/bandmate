@@ -16,6 +16,7 @@ type snapshotSummary struct {
 	TakenAt string `json:"takenAt"`
 	Reason  string `json:"reason"`
 	Deleted string `json:"deleted"`
+	Kept    bool   `json:"kept"`
 }
 
 // snapshot is one Snapshot with the Lyric Sheet and Scrapbook it holds.
