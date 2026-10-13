@@ -144,6 +144,8 @@ export interface SnapshotSummary {
   reason: SnapshotReason;
   /** For one taken before a deletion, what was deleted, named as the Song page names it; none for a Section with no Label and no words. */
   deleted?: string;
+  /** Whether the user Kept it, so it's never thinned. */
+  kept: boolean;
 }
 
 /** A copy of a Song's Lyric Sheet and Scrapbook as they were, which Bandmate takes on its own. */
@@ -1169,6 +1171,9 @@ export const api = {
   /** One of a Song's Snapshots, with the Lyric Sheet and Scrapbook it holds. */
   getSnapshot: (songId: number, snapshotId: number) =>
     request<Snapshot>('GET', `/songs/${songId}/snapshots/${snapshotId}`),
+  /** Keeps a Snapshot, so it's never thinned, or un-keeps it; this changes nothing of the Song. */
+  keepSnapshot: (songId: number, snapshotId: number, kept: boolean) =>
+    request<SnapshotSummary>('PATCH', `/songs/${songId}/snapshots/${snapshotId}`, { kept }),
   /**
    * Makes the Lyric Sheet and Scrapbook a Snapshot's, taking a Snapshot of them first. Lines still there keep their
    * Cues as they are; Lines brought back get the Cues they had.

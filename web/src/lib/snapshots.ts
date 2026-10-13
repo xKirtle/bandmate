@@ -29,6 +29,36 @@ export function snapshotReason({ reason, deleted }: Pick<SnapshotSummary, 'reaso
   return reason === 'restoring' ? 'Before restoring' : null;
 }
 
+/** A run of the Snapshots, named for how thinned it is. */
+export interface SnapshotGroup {
+  name: string;
+  items: SnapshotSummary[];
+}
+
+const dayMs = 24 * 3600 * 1000;
+/** How old a Snapshot gets before only the newest of each week is kept, as the server thins them: a day, then a month. */
+const weeklyAfterMs = 31 * dayMs;
+
+/**
+ * A list of Snapshots, newest first, grouped as Bandmate thins them: today's, then those of the month before, kept one a
+ * day, then older ones, kept one a week. A group with none is left out.
+ */
+export function snapshotGroups(list: SnapshotSummary[], now = new Date()): SnapshotGroup[] {
+  const groups: SnapshotGroup[] = [];
+  for (const s of list) {
+    const taken = new Date(s.takenAt);
+    const name = sameDay(taken, now)
+      ? 'Today'
+      : now.getTime() - taken.getTime() < weeklyAfterMs
+        ? 'Daily, for a month'
+        : 'Weekly, before that';
+    const last = groups.at(-1);
+    if (last?.name === name) last.items.push(s);
+    else groups.push({ name, items: [s] });
+  }
+  return groups;
+}
+
 /** The Snapshot one older or newer than the one at index, in a list of count, newest first; at either end, it stays. */
 export function stepSnapshot(index: number, to: SnapshotStep, count: number): number {
   return Math.max(0, Math.min(count - 1, index + (to === 'older' ? 1 : -1)));

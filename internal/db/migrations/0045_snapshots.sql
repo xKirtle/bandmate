@@ -9,13 +9,15 @@
 -- taken before, as the Song page names it: a Section by its Label, else its
 -- first Line, and an Alternate by its name, else its place, e.g.
 -- 'Alternate 2'. It's NULL for the other reasons, and for a Section with no
--- Label and no words.
+-- Label and no words. kept is 1 for one the user Kept, which thinning
+-- never deletes.
 CREATE TABLE snapshots (
 	id       INTEGER PRIMARY KEY AUTOINCREMENT,
 	song_id  INTEGER NOT NULL REFERENCES songs (id) ON DELETE CASCADE,
 	taken_at TEXT    NOT NULL,
 	reason   TEXT    NOT NULL,
 	deleted  TEXT,
+	kept     INTEGER NOT NULL DEFAULT 0,
 	sheet    TEXT    NOT NULL
 );
 
