@@ -58,33 +58,34 @@ describe('icons', () => {
       ),
     );
 
-    // The backticked names in each row's Icon column, under "### Icons".
+    // The backticked names in each row's Icon column, under "### Icons"
+    // (up to the next heading, or the end: "(?![\s\S])", as "$" means a
+    // line's end here).
     const design = readFileSync(join(src, '../../docs/design.md'), 'utf8');
     const section = design.match(/^### Icons\n([\s\S]*?)(?=^#{1,3} |(?![\s\S]))/m)?.[1] ?? '';
     const table = section.match(/^\|\s*Icon\s*\|\s*For\s*\|\n\|[-\s|]+\|\n((?:\|.*\|\n?)*)/m)?.[1];
-    const rows = (table ?? '')
+    const listed = (table ?? '')
       .trim()
       .split('\n')
-      .map((row) => [...(row.split('|')[1] ?? '').matchAll(/`([^`]+)`/g)].map((m) => m[1]));
-    const listed = rows.flat();
+      .flatMap((row) => [...(row.split('|')[1] ?? '').matchAll(/`([^`]+)`/g)].map((m) => m[1]));
     // Without the table, say so, rather than call every icon missing.
-    const readTable = () =>
+    const expectTableRead = () =>
       expect(listed.length, "couldn't read the icon table under docs/design.md's ### Icons").toBeGreaterThan(0);
 
     it('gives every imported icon a row', () => {
-      readTable();
+      expectTableRead();
       const missing = [...imported].filter((name) => !listed.includes(name)).sort();
       expect(missing, 'imported, so each needs a row in the icon table').toEqual([]);
     });
 
     it('lists only icons that are imported', () => {
-      readTable();
+      expectTableRead();
       const unused = listed.filter((name) => !imported.has(name)).sort();
       expect(unused, 'imported nowhere, so remove each from the icon table').toEqual([]);
     });
 
     it('puts each icon in one row', () => {
-      readTable();
+      expectTableRead();
       const twice = [...new Set(listed.filter((name, i) => listed.indexOf(name) !== i))].sort();
       expect(twice, 'in more than one row of the icon table: one icon, one meaning').toEqual([]);
     });
