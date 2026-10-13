@@ -325,7 +325,7 @@
   /**
    * Undoes the Song's latest edit, e.g. from the Song page header or its
    * key, whether or not the Timeline can be edited here: on a phone and in
-   * Read mode too. Not while frozen.
+   * Read mode too. While frozen it does nothing (see TimelineEditing.undo).
    */
   export async function undo() {
     // Undoing a new Take returns the playhead to where its Clip starts, to

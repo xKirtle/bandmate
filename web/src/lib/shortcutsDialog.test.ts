@@ -5,12 +5,17 @@ import { dialogGroups } from './shortcutsDialog';
 group('dialogGroups', () => {
   it('lists every Shortcut in its group, in order, with its description and keys', () => {
     const groups = dialogGroups(shortcuts, 'other');
-    expect(groups.map((g) => g.group)).toEqual(['Playback & recording', 'Timeline editing', 'Sync mode', 'Mouse']);
+    expect(groups.map((g) => g.group)).toEqual([
+      'Playback & recording',
+      'Song editing',
+      'Timeline editing',
+      'Sync mode',
+      'Mouse',
+    ]);
     expect(groups.map((g) => g.rows.map((r) => r.name))).toEqual([
       ['Play or pause', 'Record', 'Go to the start or end'],
+      ['Undo', 'Redo'],
       [
-        'Undo',
-        'Redo',
         'Delete a Clip',
         "Open a Clip's menu",
         'Seek back or forward 5 s',
@@ -47,26 +52,28 @@ group('dialogGroups', () => {
   });
 
   it('names each key as this platform does, each way of a two-way Shortcut on its own', () => {
-    const editing = (on: 'mac' | 'other') => dialogGroups(shortcuts, on)[1].rows;
-    expect(editing('mac')[1].keys).toEqual([['⌘⇧Z', '⌘Y']]);
-    expect(editing('other')[1].keys).toEqual([['Ctrl+Shift+Z', 'Ctrl+Y']]);
-    expect(editing('other')[4].keys).toEqual([
+    const songEditing = (on: 'mac' | 'other') => dialogGroups(shortcuts, on)[1].rows;
+    expect(songEditing('mac')[1].keys).toEqual([['⌘⇧Z', '⌘Y']]);
+    expect(songEditing('other')[1].keys).toEqual([['Ctrl+Shift+Z', 'Ctrl+Y']]);
+    expect(dialogGroups(shortcuts, 'other')[2].rows[2].keys).toEqual([
       ['←', '↓'],
       ['→', '↑'],
     ]);
     expect(dialogGroups(shortcuts, 'mac')[0].rows[2].keys).toEqual([['Home'], ['End']]);
   });
 
-  it("says Undo and Redo are the Song's, not just the Timeline's", () => {
-    const [undo, redo] = dialogGroups(shortcuts, 'other')[1].rows;
+  it("lists Undo and Redo as the Song's, under Song editing, not the Timeline's", () => {
+    const songEditing = dialogGroups(shortcuts, 'other')[1];
+    expect(songEditing.group).toBe('Song editing');
+    const [undo, redo] = songEditing.rows;
     expect(undo).toMatchObject({ name: 'Undo', description: 'Undoes the last edit to the Song.' });
     expect(redo).toMatchObject({ name: 'Redo', description: 'Redoes the last edit to the Song that was undone.' });
   });
 
   it('lists nudging a Cue under Timeline editing, saying it works in Write mode', () => {
-    const editing = dialogGroups(shortcuts, 'other')[1];
+    const editing = dialogGroups(shortcuts, 'other')[2];
     expect(editing.group).toBe('Timeline editing');
-    expect(editing.rows[6]).toEqual({
+    expect(editing.rows[4]).toEqual({
       name: 'Nudge a Cue by 0.1 s',
       description: 'Moves the focused Cue time 0.1 seconds earlier or later, in Write mode.',
       keys: [['Alt+↓'], ['Alt+↑']],

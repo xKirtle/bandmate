@@ -82,6 +82,7 @@
   // that can't be made there now. They're off entirely while a recording or
   // a Merge keeps the Song as it is, as the Timeline says.
   let freeze = $state<Freeze>(null);
+  const frozen = $derived(freeze !== null);
   // A Status picked, shown until its save ends.
   let statusSent = $state<Status | null>(null);
   const status = $derived(statusSent ?? song?.status ?? 'idea');
@@ -216,7 +217,7 @@
       showingShortcuts = true;
       return;
     }
-    const undoing = undoKey(event, { ...place, frozen: freeze !== null });
+    const undoing = undoKey(event, { ...place, frozen });
     if (!undoing) return;
     event.preventDefault();
     if (undoing === 'undo') timelinePanel?.undo();
@@ -449,7 +450,7 @@
                 type="button"
                 class="button tool"
                 onclick={() => timelinePanel?.undo()}
-                disabled={!saves.canUndo || freeze !== null}
+                disabled={!saves.canUndo || frozen}
                 aria-label="Undo"
                 aria-keyshortcuts={hints.aria(shortcuts.undo.keys)}
                 title={editHint(freeze, hints.withKeys('Undo', shortcuts.undo.keys))}
@@ -460,7 +461,7 @@
                 type="button"
                 class="button tool"
                 onclick={() => timelinePanel?.redo()}
-                disabled={!saves.canRedo || freeze !== null}
+                disabled={!saves.canRedo || frozen}
                 aria-label="Redo"
                 aria-keyshortcuts={hints.aria(shortcuts.redo.keys)}
                 title={editHint(freeze, hints.withKeys('Redo', shortcuts.redo.keys))}

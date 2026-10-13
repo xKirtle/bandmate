@@ -1,7 +1,7 @@
 import { matches, shortcuts, shortcutsDialogKeys, way, type KeyDown } from './shortcuts';
 import type { KeyPlace } from './keyPlace';
 
-/** The Timeline's Song-wide Shortcuts, which work wherever focus is on the Song page. */
+/** The Timeline's Shortcuts that work wherever focus is on the Song page, e.g. Space to play. */
 export type SongKey = 'playPause' | 'record' | 'start' | 'end' | 'split';
 
 /** Where a key was pressed, and what the Song page is doing. */
