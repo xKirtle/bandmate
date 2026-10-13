@@ -183,7 +183,7 @@ func TestRestoringASnapshotMakesTheSheetAndScrapbookItsKeepingCuesOnLinesStillTh
 
 	// The Snapshot to restore, then the changes it undoes.
 	clock.Advance(time.Hour)
-	ts.setText(s.ID, verse.Alternates[0].ID, "City lights\nNew line")
+	ts.setText(s.ID, verse.Alternates[0].ID, "City lights")
 	snap := ts.listSnapshots(s.ID)[0]
 	ts.lyricSheetChange(http.MethodDelete, alternatePath(s.ID, slower), nil)
 	ts.lyricSheetChange(http.MethodDelete, sectionPath(s.ID, idea), nil)
@@ -206,6 +206,9 @@ func TestRestoringASnapshotMakesTheSheetAndScrapbookItsKeepingCuesOnLinesStillTh
 	if lines := activeLines(got[verse.ID]); fmt.Sprint(lines) != "[City lights Fading out]" {
 		t.Errorf("verse = %q, want its Lines as the Snapshot holds them", lines)
 	}
+	if ids := lineIDs(got[verse.ID].Alternates[0]); fmt.Sprint(ids) != fmt.Sprint([]int64{city, fading}) {
+		t.Errorf("line ids = %v, want City lights's kept and Fading out's back", ids)
+	}
 	if alts := got[verse.ID].Alternates; len(alts) != 2 || alts[1].ID != slower || alts[1].Name != "Slower" || alts[1].Active || !alts[0].Active {
 		t.Errorf("alternates = %+v, want Slower back, inactive, with its id", alts)
 	}
@@ -213,8 +216,9 @@ func TestRestoringASnapshotMakesTheSheetAndScrapbookItsKeepingCuesOnLinesStillTh
 		t.Errorf("idea = %q, want it back", lines)
 	}
 	want := map[int64]float64{city: 5, fading: 2}
-	if cues := cuesOf(got[verse.ID]); len(cues) != 4 || cues[city] != 5 || cues[fading] != 2 {
-		t.Errorf("cues = %v, want City lights's as it is now, %v, Fading out's as it was, %v, and Slower's copies back", cues, want[city], want[fading])
+	if cues := cuesOf(got[verse.ID]); len(cues) != 4 || cues[city] != want[city] || cues[fading] != want[fading] {
+		t.Errorf("cues = %v, want City lights's as it is now, %v, Fading out's, deleted and brought back, as it was, %v, and Slower's copies back",
+			cues, want[city], want[fading])
 	}
 	if got := ts.getSong(s.ID); !reflect.DeepEqual(got.Sections, after.Sections) {
 		t.Errorf("song = %+v, want it as the restore answered", got)
@@ -229,7 +233,7 @@ func TestRestoringASnapshotMakesTheSheetAndScrapbookItsKeepingCuesOnLinesStillTh
 		t.Errorf("sheet = %+v, want the Verse and the Bridge, as they were before restoring", held)
 	}
 	sectionLabeled(t, held.Sections, "Bridge")
-	if lines := activeLines(sectionLabeled(t, held.Sections, "Verse")); fmt.Sprint(lines) != "[City lights New line]" {
+	if lines := activeLines(sectionLabeled(t, held.Sections, "Verse")); fmt.Sprint(lines) != "[City lights]" {
 		t.Errorf("verse = %q, want it as it was before restoring", lines)
 	}
 }

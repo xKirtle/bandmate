@@ -74,8 +74,8 @@ type heldLine struct {
 	CueMs *int64 `json:"cueMs,omitempty"`
 }
 
-// hold is the part of a Lyric Sheet a Snapshot keeps.
-func hold(sheet LyricSheet) heldSheet {
+// toHeld is the part of a Lyric Sheet a Snapshot keeps.
+func toHeld(sheet LyricSheet) heldSheet {
 	held := heldSheet{Arrangement: sheet.Arrangement, Scrapbook: sheet.Scrapbook, Sections: []heldSection{}}
 	for _, sec := range sheet.Sections {
 		hs := heldSection{ID: sec.ID, Label: sec.Label, Alternates: []heldAlternate{}}
@@ -169,15 +169,8 @@ func markSheetChanged(ctx context.Context, tx *sql.Tx, songID int64, now time.Ti
 // snapshotIfChanged takes a Snapshot before an editing session, unless the
 // sheet has no Sections or is the same as the newest Snapshot's.
 func (s *Store) snapshotIfChanged(ctx context.Context, tx *sql.Tx, songID int64, now time.Time) error {
-	sheet, err := loadLyricSheet(ctx, tx, songID)
-	if err != nil {
-		return err
-	}
-	if len(sheet.Sections) == 0 {
-		return nil
-	}
-	encoded, err := json.Marshal(hold(sheet))
-	if err != nil {
+	encoded, sections, err := encodeSheet(ctx, tx, songID)
+	if err != nil || sections == 0 {
 		return err
 	}
 	var newest []byte
@@ -194,15 +187,22 @@ func (s *Store) snapshotIfChanged(ctx context.Context, tx *sql.Tx, songID int64,
 
 // takeSnapshot takes a Snapshot of the sheet as it is, for reason.
 func takeSnapshot(ctx context.Context, tx *sql.Tx, songID int64, now time.Time, reason SnapshotReason) error {
-	sheet, err := loadLyricSheet(ctx, tx, songID)
-	if err != nil {
-		return err
-	}
-	encoded, err := json.Marshal(hold(sheet))
+	encoded, _, err := encodeSheet(ctx, tx, songID)
 	if err != nil {
 		return err
 	}
 	return insertSnapshot(ctx, tx, songID, now, reason, encoded)
+}
+
+// encodeSheet reads a Song's sheet as a Snapshot stores it, and how many
+// Sections it has.
+func encodeSheet(ctx context.Context, tx *sql.Tx, songID int64) (encoded []byte, sections int, err error) {
+	sheet, err := loadLyricSheet(ctx, tx, songID)
+	if err != nil {
+		return nil, 0, err
+	}
+	encoded, err = json.Marshal(toHeld(sheet))
+	return encoded, len(sheet.Sections), err
 }
 
 func insertSnapshot(ctx context.Context, tx *sql.Tx, songID int64, now time.Time, reason SnapshotReason, sheet []byte) error {
@@ -322,16 +322,16 @@ func restoreSheet(ctx context.Context, tx *sql.Tx, songID int64, held heldSheet)
 		WHERE section_id IN (SELECT id FROM sections WHERE song_id = ?)`, songID); err != nil {
 		return fmt.Errorf("clearing active alternates: %w", err)
 	}
-	// still reports whether a row is there now, taking it off the rows to
-	// delete.
-	still := func(there map[int64]bool, id int64) bool {
+	// claim takes a row the Snapshot holds off those to delete, reporting
+	// whether it's there now.
+	claim := func(there map[int64]bool, id int64) bool {
 		ok := there[id]
 		delete(there, id)
 		return ok
 	}
 	for _, sec := range held.Sections {
 		stmt := `INSERT INTO sections (label, song_id, id) VALUES (?, ?, ?)`
-		if still(sections, sec.ID) {
+		if claim(sections, sec.ID) {
 			stmt = `UPDATE sections SET label = ? WHERE song_id = ? AND id = ?`
 		}
 		if _, err := tx.ExecContext(ctx, stmt, sec.Label, songID, sec.ID); err != nil {
@@ -339,14 +339,14 @@ func restoreSheet(ctx context.Context, tx *sql.Tx, songID int64, held heldSheet)
 		}
 		for _, alt := range sec.Alternates {
 			stmt := `INSERT INTO alternates (section_id, name, id) VALUES (?, ?, ?)`
-			if still(alternates, alt.ID) {
+			if claim(alternates, alt.ID) {
 				stmt = `UPDATE alternates SET section_id = ?, name = ? WHERE id = ?`
 			}
 			if _, err := tx.ExecContext(ctx, stmt, sec.ID, alt.Name, alt.ID); err != nil {
 				return fmt.Errorf("restoring alternate: %w", err)
 			}
 			for pos, l := range alt.Lines {
-				if still(lines, l.ID) {
+				if claim(lines, l.ID) {
 					_, err = tx.ExecContext(ctx, `UPDATE lines SET alternate_id = ?, position = ?, text = ? WHERE id = ?`,
 						alt.ID, pos, l.Text, l.ID)
 				} else {

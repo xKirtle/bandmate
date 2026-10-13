@@ -3,7 +3,7 @@
   // active Alternate, its Lines drawn as Read mode draws them, Chords above
   // the words. Its text can be selected and copied.
   import type { Section, Snapshot } from './api';
-  import { layoutLine } from './chords';
+  import ChordedLine from './ChordedLine.svelte';
   import { activeAlternate } from './sections';
 
   let { sheet }: { sheet: Snapshot['sheet'] } = $props();
@@ -23,22 +23,7 @@
       <p class="muted">No Lines yet.</p>
     {/if}
     {#each lines as line (line.id)}
-      {#if line.chords.length > 0}
-        <div class="line chorded" class:chord-line={line.chordLine}>
-          {#each layoutLine(line) as word, w (w)}
-            <span class="word">
-              {#each word as piece, p (p)}
-                <span class="piece" class:snug={piece.snug}>
-                  <span class="chord">{piece.chords.join(' ')}</span>
-                  <span class="lyric">{piece.text || ' '}</span>
-                </span>
-              {/each}
-            </span>
-          {/each}
-        </div>
-      {:else}
-        <p class="line plain">{line.lyrics || ' '}</p>
-      {/if}
+      <ChordedLine {line} sizes="body" />
     {/each}
   </section>
 {/snippet}
@@ -84,47 +69,5 @@
   }
   .section p {
     margin: 0;
-  }
-  .line {
-    font-size: var(--text-lg);
-    line-height: var(--leading-content);
-  }
-  .plain {
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
-  /* Words wrap as wholes, each carrying its Chords above it. */
-  .chorded {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-  }
-  .word {
-    display: inline-flex;
-    flex-wrap: wrap;
-    max-width: 100%;
-    white-space: break-spaces;
-    overflow-wrap: anywhere;
-  }
-  .piece {
-    display: inline-flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-  /* A piece with no Chord holds a Chord's height, so the lyrics stay level. */
-  .chord {
-    min-height: 1lh;
-    color: var(--accent);
-    font-size: var(--text-md);
-    font-weight: 700;
-  }
-  .chord:not(:empty) {
-    padding-right: var(--space-2);
-  }
-  .snug > .chord {
-    padding-right: 0;
-  }
-  .chord-line .lyric {
-    display: none;
   }
 </style>

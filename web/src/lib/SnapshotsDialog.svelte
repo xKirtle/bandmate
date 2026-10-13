@@ -8,7 +8,7 @@
   import { api, type Snapshot, type SnapshotSummary } from './api';
   import Dialog from './Dialog.svelte';
   import SnapshotSheet from './SnapshotSheet.svelte';
-  import { snapshotReason, snapshotWhen, stepSnapshot } from './snapshots';
+  import { snapshotReason, snapshotWhen, stepSnapshot, type SnapshotStep } from './snapshots';
 
   let {
     songId,
@@ -58,7 +58,7 @@
     );
   });
 
-  function step(to: 'older' | 'newer') {
+  function step(to: SnapshotStep) {
     if (list) index = stepSnapshot(index, to, list.length);
   }
 
@@ -71,8 +71,11 @@
   async function restoreChosen() {
     if (!chosen) return;
     restoring = true;
-    await restore(chosen.id);
-    dialog?.close();
+    try {
+      await restore(chosen.id);
+    } finally {
+      dialog?.close();
+    }
   }
 
   /** Keeps the chosen Snapshot's row in view as ↑ ↓ step through the list. */
@@ -100,8 +103,8 @@
     <p class="muted">Loading…</p>
   {:else if list.length === 0}
     <p class="muted">
-      No Snapshots yet. Bandmate takes one of the Lyric Sheet and Scrapbook before each editing session, once there's
-      something written.
+      No Snapshots yet. Bandmate takes one of the Lyric Sheet and Scrapbook before each editing session, once a Song has
+      a Section.
     </p>
   {:else}
     <div class="snapshots" class:showing>

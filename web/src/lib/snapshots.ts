@@ -1,8 +1,9 @@
 // How the Snapshots dialog names and steps through a Song's Snapshots.
 import type { SnapshotSummary } from './api';
+import { shortMonths } from './time';
 
-// Spelled out rather than left to the locale, as Backups' names are.
-const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** Which way to step through the Snapshots: down the list, or up it. */
+export type SnapshotStep = 'older' | 'newer';
 
 const sameDay = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
@@ -18,7 +19,7 @@ export function snapshotWhen(takenAt: string, now = new Date()): string {
   if (sameDay(taken, now)) return `Today, ${time}`;
   if (sameDay(taken, yesterday)) return `Yesterday, ${time}`;
   const year = taken.getFullYear() === now.getFullYear() ? '' : ` ${taken.getFullYear()}`;
-  return `${taken.getDate()} ${months[taken.getMonth()]}${year}, ${time}`;
+  return `${taken.getDate()} ${shortMonths[taken.getMonth()]}${year}, ${time}`;
 }
 
 /** Why a Snapshot was taken, where that's worth saying: not before an editing session, as most are. */
@@ -27,6 +28,6 @@ export function snapshotReason({ reason }: Pick<SnapshotSummary, 'reason'>): str
 }
 
 /** The Snapshot one older or newer than the one at index, in a list of count, newest first; at either end, it stays. */
-export function stepSnapshot(index: number, to: 'older' | 'newer', count: number): number {
+export function stepSnapshot(index: number, to: SnapshotStep, count: number): number {
   return Math.max(0, Math.min(count - 1, index + (to === 'older' ? 1 : -1)));
 }

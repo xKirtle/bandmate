@@ -122,7 +122,7 @@ _Avoid_: Chord strip, chord diagrams, chords used
 What a Voicing is played on. Only the guitar for now; others, like a piano, can follow.
 
 **Snapshot**:
-A copy of a Song's Lyric Sheet and Scrapbook as they were, which Bandmate takes on its own: before each editing session, the first change to them 10 minutes or more after the one before, and before a restore, but not when nothing has changed since the newest one. Restoring one makes the Lyric Sheet and Scrapbook the Snapshot's, keeping what was there as a Snapshot first; a Line still there keeps its Cue as it is now, and a Line brought back gets the Cue it had. Snapshots can't be named, renamed or deleted by hand.
+A copy of a Song's Lyric Sheet and Scrapbook as they were, which Bandmate takes on its own: before each editing session, the first change to them 10 minutes or more after the one before, unless nothing has changed since the newest one; and before every restore. Restoring one makes the Lyric Sheet and Scrapbook the Snapshot's, keeping what was there as a Snapshot first; a Line still there keeps its Cue as it is now, and a Line brought back gets the Cue it had. Snapshots can't be named, renamed or deleted by hand.
 _Avoid_: Version, revision, backup
 
 ### Timeline
@@ -258,7 +258,7 @@ _Avoid_: Theme (light or dark is the theme), skin, colour scheme
 
 **Backup**:
 A copy of chosen Songs and Beats, kept in Bandmate to restore from, and downloadable as one file to keep elsewhere or move to another install. A Song's copy holds everything that belongs to the Song, from its Lyric Sheet and Snapshots to its Timeline, Cover and Masters, along with the Folder it sits in, its Tags, and the Beats its Clips use, so those Beats can't be left out while it's chosen; one holding every Beat holds the Beat Library. Nothing kept on each device goes in it. A Backup made by an older Bandmate can be restored by a newer one, never the other way round.
-_Avoid_: Export, archive, Snapshot (a Snapshot is a copy of one Song's Lyric Sheet)
+_Avoid_: Export, archive, Snapshot (a Snapshot is a copy of one Song's Lyric Sheet and Scrapbook)
 
 **Scheduled Backup**:
 A Backup of Everything that Bandmate makes on its own, daily, weekly or monthly, once the user turns the schedule on. None is made when nothing has changed since the last. Only the newest few are kept, as many as the user chooses, and older ones are deleted as new ones are made. Keeping one turns it into an ordinary Backup, which nothing deletes but the user.
