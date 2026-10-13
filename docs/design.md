@@ -224,7 +224,7 @@ The recurring components are written once, and a screen reaches for them rather 
 | Secondary | `.button`                | Every other action: Cancel, Back, Clear all Cues. Also a link, or a `<label>` round a file input, which takes `.disabled` while it can't be used |
 | Quiet     | `.button.quiet`          | A light action beside a list or a fact, in accent text with no box: Choose all, Clear, About's Update to a newer yt-dlp |
 | Danger    | `.button.danger`         | Deletes or overwrites, after asking: Delete, Replace and restore. Primary's place when it's the one |
-| Toggle    | `.button.toggle`         | On or off, with `aria-pressed`: filled with the accent while on, e.g. Sync lyrics, Left-handed     |
+| Toggle    | `.button.toggle`         | On or off, with `aria-pressed`: filled with the accent while on, e.g. Sync lyrics, Rhymes          |
 
 A disabled button fades; a disabled quiet one turns muted instead. Under a pointer that can hover, a button or chip shifts a little from its own colour, fading over `--duration-fast`: a box rises to `--surface-2`, the accent (primary, a toggle that's on, a picked chip) and a quiet button's text lean towards `--text`, and danger takes a faint tint of `--danger`. A disabled one doesn't react, and a touch screen never sees it, so a tap leaves nothing behind.
 

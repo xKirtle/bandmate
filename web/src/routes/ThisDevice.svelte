@@ -2,8 +2,8 @@
   // Settings' This device tab: every Device Setting, the choices about how
   // Bandmate works on this device rather than any Song. Each applies at once,
   // in every one of this device's tabs, and is kept on this device. Those
-  // also changed where they're used, like Left-handed in the Chord Finder,
-  // are the same setting here. Writing sets up the rhyming dictionaries.
+  // also changed where they're used, like the Input in the Timeline, are
+  // the same setting here. Writing sets up the rhyming dictionaries.
   import { MediaQuery } from 'svelte/reactivity';
   import { palettes, themeChoices } from '../lib/appearance';
   import CalibrationSheet from '../lib/CalibrationSheet.svelte';

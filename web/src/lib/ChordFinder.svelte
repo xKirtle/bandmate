@@ -21,7 +21,6 @@
   import Fretboard from './Fretboard.svelte';
   import HearButton from './HearButton.svelte';
   import ArpeggiateButton from './ArpeggiateButton.svelte';
-  import { leftHanded } from './sharedLeftHanded.svelte';
   import { preferredVoicings } from './sharedPreferredVoicings.svelte';
   import Picker from './Picker.svelte';
 
@@ -185,31 +184,22 @@
 {/snippet}
 
 <div class="card finder">
-  <div class="tab-bar">
-    <div class="tabs" role="tablist" aria-label="Chords">
-      {#each tabs as t, i (t.id)}
-        <button
-          bind:this={tabButtons[i]}
-          id="finder-tab-{t.id}"
-          type="button"
-          role="tab"
-          aria-selected={tab === t.id}
-          aria-controls="finder-panel-{t.id}"
-          tabindex={tab === t.id ? 0 : -1}
-          onclick={() => (tab = t.id)}
-          onkeydown={(e) => tabKey(e, i)}
-        >
-          {t.label}
-        </button>
-      {/each}
-    </div>
-    <button
-      type="button"
-      class="button toggle"
-      aria-pressed={leftHanded.value}
-      onclick={() => leftHanded.set(!leftHanded.value)}
-      title="Mirror the diagrams and the fretboard for a left-handed player">Left-handed</button
-    >
+  <div class="tabs" role="tablist" aria-label="Chords">
+    {#each tabs as t, i (t.id)}
+      <button
+        bind:this={tabButtons[i]}
+        id="finder-tab-{t.id}"
+        type="button"
+        role="tab"
+        aria-selected={tab === t.id}
+        aria-controls="finder-panel-{t.id}"
+        tabindex={tab === t.id ? 0 : -1}
+        onclick={() => (tab = t.id)}
+        onkeydown={(e) => tabKey(e, i)}
+      >
+        {t.label}
+      </button>
+    {/each}
   </div>
 
   {#each tabs as t (t.id)}
@@ -223,7 +213,7 @@
     >
       {#if t.id === 'look-up'}
         <div class="pick">
-          <div class="field name">
+          <div class="field">
             <label for="finder-name">Chord</label>
             <input
               id="finder-name"
@@ -233,7 +223,7 @@
               autocomplete="off"
               autocapitalize="off"
               spellcheck="false"
-              placeholder="e.g. Cmaj7 or D/F#"
+              placeholder="e.g. Cmaj7"
             />
           </div>
           <div class="field">
@@ -411,21 +401,9 @@
   .finder {
     container: finder / inline-size;
   }
-  /* The tabs, and the left-handed setting at the end, on its own line on a narrow phone. */
-  .tab-bar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-1) var(--space-2);
+  .tabs {
     padding: 0 var(--space-2);
     border-bottom: 1px solid var(--border);
-  }
-  .toggle {
-    min-height: 2rem;
-    margin-left: auto;
-    padding: 0 var(--space-3);
-    font-size: var(--text-sm);
   }
   .panel {
     display: flex;
@@ -449,14 +427,6 @@
   @container finder (min-width: 40rem) {
     .pick {
       grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr));
-    }
-  }
-  .name {
-    grid-column: 1 / -1;
-  }
-  @container finder (min-width: 40rem) {
-    .name {
-      grid-column: auto;
     }
   }
   .field {
