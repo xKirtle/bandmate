@@ -22,7 +22,7 @@ It's built for one songwriter, and runs on your own machine or homelab. There ar
 - **Sync** your lyrics to the music: tap along to mark when each line starts, and they light up and scroll as the song plays.
 - **Record** takes over your beat in the browser, in full quality, and keep every one until you pick one.
 
-If you'd like to see more, check out the [wiki](https://xkirtle.github.io/bandmate/features).
+If you'd like to see more, check out the [wiki](https://xkirtle.github.io/bandmate/).
 
 ## Quickstart
 
