@@ -213,7 +213,7 @@
     >
       {#if t.id === 'look-up'}
         <div class="pick">
-          <div class="field name">
+          <div class="field">
             <label for="finder-name">Chord</label>
             <input
               id="finder-name"
@@ -223,7 +223,7 @@
               autocomplete="off"
               autocapitalize="off"
               spellcheck="false"
-              placeholder="e.g. Cmaj7 or D/F#"
+              placeholder="e.g. Cmaj7"
             />
           </div>
           <div class="field">
@@ -427,14 +427,6 @@
   @container finder (min-width: 40rem) {
     .pick {
       grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr));
-    }
-  }
-  .name {
-    grid-column: 1 / -1;
-  }
-  @container finder (min-width: 40rem) {
-    .name {
-      grid-column: auto;
     }
   }
   .field {

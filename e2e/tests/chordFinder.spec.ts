@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { expect, test } from '../fixtures';
 import { customTuningNotes as notes, pickCustomTuning, warnsOnLeaving } from '../songPage';
 
@@ -44,40 +44,35 @@ const firstString = (page: Page) =>
   page.getByRole('group', { name: 'Fretboard' }).getByRole('button', { name: /string: / }).first();
 const leftHanded = (page: Page) => page.getByRole('switch', { name: 'Left-handed' });
 
-test('the Left-handed switch beside the tuning mirrors the fretboard, and is the one in Settings', async ({ page }) => {
+test('Left-handed, set in Settings, mirrors the fretboard: the Chord Finder has no switch of its own', async ({
+  page,
+}) => {
   await page.goto('/chords');
   await page.getByRole('tab', { name: 'Name it' }).click();
   await expect(firstString(page)).toHaveAccessibleName(/^6th string/);
-
-  await leftHanded(page).check();
-  await expect(firstString(page)).toHaveAccessibleName(/^1st string/);
+  await expect(leftHanded(page)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Left-handed' })).toHaveCount(0);
 
   await page.goto('/settings');
-  await expect(leftHanded(page)).toBeChecked();
-  await leftHanded(page).uncheck();
+  await leftHanded(page).check();
   await page.goto('/chords');
-  await expect(leftHanded(page)).not.toBeChecked();
+  await page.getByRole('tab', { name: 'Name it' }).click();
+  await expect(firstString(page)).toHaveAccessibleName(/^1st string/);
 });
 
-test('on a phone, the tabs keep one row and the Left-handed switch sits under the tuning', async ({ page }) => {
+// Each line a row of things starts on, top to bottom.
+async function lines(boxes: Locator) {
+  return new Set(await Promise.all((await boxes.all()).map(async (b) => Math.round((await b.boundingBox())!.y))))
+    .size;
+}
+
+test('on a phone, the tabs keep one row and Look up’s fields fit on two', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto('/chords');
-  const tabs = page.getByRole('tab');
-  const tops = await Promise.all((await tabs.all()).map(async (t) => (await t.boundingBox())!.y));
-  expect(new Set(tops).size).toBe(1);
+  expect(await lines(page.getByRole('tab'))).toBe(1);
 
-  const tuningBox = (await tuning(page).boundingBox())!;
-  const switchBox = (await leftHanded(page).boundingBox())!;
-  expect(switchBox.y).toBeGreaterThanOrEqual(tuningBox.y + tuningBox.height);
-  expect(switchBox.y - (tuningBox.y + tuningBox.height)).toBeLessThan(32);
-  // And above the Chord Finder's card.
-  expect(switchBox.y).toBeLessThan((await tabs.first().boundingBox())!.y);
-  // Only the switch and its label take a tap, not the rest of the line.
-  const row = (await page.locator('label', { has: leftHanded(page) }).boundingBox())!;
-  expect(row.width).toBeLessThan(200);
-
-  // A custom tuning's notes stay with the tuning, above the switch.
-  await pickCustomTuning(page);
-  const notesBox = (await notes(page).boundingBox())!;
-  expect((await leftHanded(page).boundingBox())!.y).toBeGreaterThanOrEqual(notesBox.y + notesBox.height);
+  const lookUp = page.getByRole('tabpanel', { name: 'Look up' });
+  const fields = lookUp.getByRole('textbox', { name: 'Chord' }).or(lookUp.getByRole('combobox'));
+  await expect(fields).toHaveCount(4);
+  expect(await lines(fields)).toBe(2);
 });
