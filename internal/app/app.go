@@ -44,8 +44,8 @@ type Config struct {
 	// build.Current().
 	Build build.Info
 	// Now tells the time at startup, when Takes detached, and Sounds no
-	// Clip has used, for more than DetachedTakesKept are removed. Nil means
-	// time.Now.
+	// Clip has used, for more than DetachedTakesKept are removed, and when
+	// a Snapshot is taken. Nil means time.Now.
 	Now func() time.Time
 	// UpdateCheckOff stops the About page asking GitHub for releases, both
 	// Bandmate's and yt-dlp's latest.
@@ -173,7 +173,7 @@ func New(cfg Config) (*App, error) {
 	}
 	a := &App{
 		db:          conn,
-		songs:       lyricsheet.NewStore(conn, songFiles),
+		songs:       lyricsheet.NewStore(conn, songFiles, now),
 		beats:       beats.NewStore(conn, beatFiles),
 		folders:     folders.NewStore(conn),
 		tags:        tags.NewStore(conn),
@@ -275,6 +275,9 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("POST /api/songs/{id}/alternates/{alternateID}/scrapbook", a.moveAlternateToScrapbook)
 	mux.HandleFunc("POST /api/songs/{id}/alternates/{alternateID}/arrangement", a.moveAlternateToArrangement)
 	mux.HandleFunc("PUT /api/songs/{id}/alternates/{alternateID}/text", a.replaceAlternateText)
+	mux.HandleFunc("GET /api/songs/{id}/snapshots", a.listSnapshots)
+	mux.HandleFunc("GET /api/songs/{id}/snapshots/{snapshotID}", a.getSnapshot)
+	mux.HandleFunc("POST /api/songs/{id}/snapshots/{snapshotID}/restore", a.restoreSnapshot)
 	mux.HandleFunc("POST /api/songs/{id}/masters", a.addMaster)
 	mux.HandleFunc("GET /api/songs/{id}/masters/{masterID}", a.getMaster)
 	mux.HandleFunc("PATCH /api/songs/{id}/masters/{masterID}", a.updateMaster)

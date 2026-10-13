@@ -43,6 +43,16 @@ The **Rhymes** button suggests rhymes for the word you're writing. It's there on
 
 Want rhymes in your language? See [Adding a rhyming language](https://github.com/xKirtle/bandmate/blob/main/CONTRIBUTING.md#adding-a-rhyming-language).
 
+### Snapshots
+
+Bandmate keeps copies of a song's lyrics and Scrapbook as they were, on its own, so you can get back to how a song was before you changed it. It takes one each time you start editing again after 10 minutes or more away, unless nothing has changed since the last.
+
+In Write mode, the clock button beside Write and Read opens them, newest first. Pick one to see its lyrics and Scrapbook, and step to the one before or after with ‹ › or the ↑ ↓ keys. You can select and copy a line from it, to take back just that line.
+
+**Restore this Snapshot** makes your lyrics and Scrapbook the Snapshot's. What you have now is kept as a Snapshot first, marked "Before restoring", so you can go back. Lines that are still there keep their timings as they are now, and lines it brings back get the timings they had.
+
+Backups don't hold Snapshots yet.
+
 ## Chords
 
 The **Chords** page, in the side bar, helps with chords away from any song, on guitar, in standard tuning or any other.

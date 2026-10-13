@@ -35,7 +35,9 @@ export type LyricSheetChange =
   /** A Section in the Scrapbook put back into the Arrangement, at position. */
   | { kind: 'addToArrangement'; sectionId: number; position?: number }
   /** An Alternate's Lines replaced with the lines of text. */
-  | { kind: 'replaceAlternateText'; alternateId: number; text: string };
+  | { kind: 'replaceAlternateText'; alternateId: number; text: string }
+  /** The Lyric Sheet and Scrapbook made a Snapshot's, once a Snapshot of them is taken. */
+  | { kind: 'restoreSnapshot'; snapshotId: number };
 
 const lyricSheetChangeKinds: ReadonlySet<string> = new Set<LyricSheetChange['kind']>([
   'addSection',
@@ -54,6 +56,7 @@ const lyricSheetChangeKinds: ReadonlySet<string> = new Set<LyricSheetChange['kin
   'addToScrapbook',
   'addToArrangement',
   'replaceAlternateText',
+  'restoreSnapshot',
 ]);
 
 /** Whether a change is to the Lyric Sheet. */
@@ -96,5 +99,7 @@ export function sendLyricSheetChange(at: SongAt, change: LyricSheetChange): Prom
       return api.addToArrangement(at, change.sectionId, change.position);
     case 'replaceAlternateText':
       return api.replaceAlternateText(at, change.alternateId, change.text);
+    case 'restoreSnapshot':
+      return api.restoreSnapshot(at, change.snapshotId);
   }
 }

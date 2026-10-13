@@ -1,4 +1,5 @@
 <script lang="ts">
+  import History from '@lucide/svelte/icons/history';
   import Keyboard from '@lucide/svelte/icons/keyboard';
   import { onDestroy, untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
@@ -30,6 +31,7 @@
   import { keyboardAndMouse, keyHints } from '../lib/keyHints';
   import { shortcutsDialogKeys } from '../lib/shortcuts';
   import ShortcutsDialog from '../lib/ShortcutsDialog.svelte';
+  import SnapshotsDialog from '../lib/SnapshotsDialog.svelte';
   import { keyPlace } from '../lib/keyPlace';
   import { opensShortcuts } from '../lib/songKeys';
   import { detailsSummary, openingMode, sideParts, type Mode, type SidePart } from '../lib/songMode';
@@ -194,6 +196,8 @@
   // keyboard and mouse, so the button never shows on a phone or a narrow
   // window, though ? still opens the dialog there.
   let showingShortcuts = $state(false);
+  // The Snapshots dialog, opened from Write mode only.
+  let showingSnapshots = $state(false);
   const hints = keyHints();
 
   function openShortcutsOnKey(event: KeyboardEvent) {
@@ -425,10 +429,22 @@
                 <label class="mode"><input type="radio" name="song-mode" value="write" bind:group={mode} />Write</label>
                 <label class="mode"><input type="radio" name="song-mode" value="read" bind:group={mode} />Read</label>
               </fieldset>
+              {#if writing}
+                <button
+                  type="button"
+                  class="button tool"
+                  onclick={() => (showingSnapshots = true)}
+                  aria-label="Snapshots"
+                  aria-haspopup="dialog"
+                  title="Snapshots"
+                >
+                  <History />
+                </button>
+              {/if}
               {#if keyboardAndMouse()}
                 <button
                   type="button"
-                  class="button shortcuts"
+                  class="button tool"
                   onclick={() => (showingShortcuts = true)}
                   aria-label="Keyboard shortcuts"
                   aria-haspopup="dialog"
@@ -637,6 +653,15 @@
   <ShortcutsDialog onClose={() => (showingShortcuts = false)} />
 {/if}
 
+{#if showingSnapshots && editing}
+  {@const restoring = editing}
+  <SnapshotsDialog
+    songId={id}
+    restore={(snapshotId) => restoring.change({ kind: 'restoreSnapshot', snapshotId })}
+    onClose={() => (showingSnapshots = false)}
+  />
+{/if}
+
 <style>
   /* The title and its heading wrap alike and are as tall as each other,
      one line being --title-line, so switching mode doesn't shift the page. */
@@ -694,13 +719,13 @@
     flex: 1;
     min-width: 0;
   }
-  /* The mode switch, then the shortcuts button. */
+  /* The mode switch, then the Snapshots and shortcuts buttons. */
   .head-tools {
     display: flex;
     flex: none;
     gap: var(--space-2);
   }
-  .shortcuts {
+  .tool {
     width: var(--control);
     padding: 0;
     font-size: var(--text-xl);
