@@ -53,7 +53,7 @@ Snapshots thin out as they age, so months of history stay short enough to look t
 
 **Restore this Snapshot** makes your lyrics and Scrapbook the Snapshot's. What you have now is kept as a Snapshot first, marked "Before restoring", so you can go back. Lines that are still there keep their timings as they are now, and lines it brings back get the timings they had.
 
-Backups don't hold Snapshots yet.
+A [Backup](#backups) of a song holds its Snapshots, kept or not, so restoring the Backup, here or on another install, brings them back too, and restoring one of them keeps timings just the same.
 
 ## Chords
 
@@ -186,6 +186,8 @@ Keep copies of your work, and move it between installs.
 3. **New Backup**: of the songs you choose, your beat library, or both.
 4. **A Backup**, with when it was made and its size.
 5. **Restore** what you pick from it, or download it to keep it somewhere safe. Where a song is already here, you choose to replace it or keep both. On a phone, Restore and Download are in the Backup's ⋯ menu.
+
+A Backup holds each song in it whole, its [Snapshots](#snapshots) too.
 
 A Backup restores into the same version of Bandmate or a newer one. To copy everything at once, see [copying the data folder](/self-hosting#copying-the-data-folder).
 

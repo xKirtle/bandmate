@@ -20,6 +20,7 @@ import (
 
 	"github.com/xKirtle/bandmate/internal/db"
 	"github.com/xKirtle/bandmate/internal/domain"
+	"github.com/xKirtle/bandmate/internal/lyricsheet"
 	"github.com/xKirtle/bandmate/internal/songfiles"
 )
 
@@ -549,6 +550,9 @@ func (s *Store) copyIn(ctx context.Context, staging string, picks Picks, replace
 			return Restored{}, fmt.Errorf("restoring %s: %w", t.name, err)
 		}
 	}
+	if err := remapSnapshots(ctx, tx); err != nil {
+		return Restored{}, fmt.Errorf("restoring snapshots: %w", err)
+	}
 	linked, err := s.linkFilesIn(ctx, tx, staging)
 	defer func() {
 		if err != nil {
@@ -754,6 +758,91 @@ func copyTableIn(ctx context.Context, tx *sql.Tx, t songTable, columns []string,
 	}
 	for _, song := range songs {
 		if _, err := tx.ExecContext(ctx, insert+` WHERE `+t.where, song); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// remapSnapshots gives the Sections, Alternates and Lines inside each
+// restored Snapshot's sheet the ids the restored rows got, so restoring the
+// Snapshot keeps a Line still there, and its Cue as it is now, as for any
+// other. A row the Backup doesn't hold, deleted after the Snapshot was
+// taken, gets a fresh id, the same in every Snapshot holding it, and its
+// table's sequence moves past that id, so no row added later takes it and
+// restoring the Snapshot brings the row back under it, as ids are never
+// reused.
+func remapSnapshots(ctx context.Context, tx *sql.Tx) error {
+	type held struct {
+		id    int64
+		sheet string
+	}
+	rows, err := tx.QueryContext(ctx, `SELECT s.id, s.sheet FROM main.snapshots s
+		JOIN temp.restored k ON k.tbl = 'snapshots' AND k.new = s.id ORDER BY s.id`)
+	if err != nil {
+		return err
+	}
+	var snapshots []held
+	for rows.Next() {
+		var h held
+		if err := rows.Scan(&h.id, &h.sheet); err != nil {
+			rows.Close()
+			return err
+		}
+		snapshots = append(snapshots, h)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	// The fresh ids given to rows the Backup doesn't hold, by table and
+	// their ids in the Backup, and the last one given in each table.
+	fresh := map[string]map[int64]int64{}
+	last := map[string]int64{}
+	newID := func(table string, old int64) (int64, error) {
+		var id int64
+		err := tx.QueryRowContext(ctx, `SELECT new FROM temp.restored WHERE tbl = ? AND old = ?`, table, old).Scan(&id)
+		if !errors.Is(err, sql.ErrNoRows) {
+			return id, err
+		}
+		if id, ok := fresh[table][old]; ok {
+			return id, nil
+		}
+		if _, ok := last[table]; !ok {
+			if err := tx.QueryRowContext(ctx, fmt.Sprintf(`SELECT MAX(
+				COALESCE((SELECT MAX(id) FROM main.%[1]s), 0),
+				COALESCE((SELECT seq FROM main.sqlite_sequence WHERE name = '%[1]s'), 0))`, table)).Scan(&id); err != nil {
+				return 0, err
+			}
+			last[table] = id
+			fresh[table] = map[int64]int64{}
+		}
+		last[table]++
+		fresh[table][old] = last[table]
+		return last[table], nil
+	}
+	for _, h := range snapshots {
+		sheet, err := lyricsheet.RemapSnapshotSheet(h.sheet, newID)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE main.snapshots SET sheet = ? WHERE id = ?`, sheet, h.id); err != nil {
+			return err
+		}
+	}
+	for table, id := range last {
+		res, err := tx.ExecContext(ctx, `UPDATE main.sqlite_sequence SET seq = MAX(seq, ?1) WHERE name = ?2`, id, table)
+		if err != nil {
+			return err
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if n > 0 {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO main.sqlite_sequence (name, seq) VALUES (?, ?)`, table, id); err != nil {
 			return err
 		}
 	}

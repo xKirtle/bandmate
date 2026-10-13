@@ -53,6 +53,9 @@ var songTables = []songTable{
 	{name: "alternates", where: `section_id IN (SELECT id FROM src.sections WHERE song_id = ?1)`},
 	{name: "lines", where: `alternate_id IN (SELECT a.id FROM src.alternates a
 		JOIN src.sections s ON s.id = a.section_id WHERE s.song_id = ?1)`},
+	// Kept or not. The ids inside each one's sheet are remapped on a
+	// Restore (see remapSnapshots).
+	{name: "snapshots", where: `song_id = ?1`},
 	{name: "masters", where: `song_id = ?1`},
 	{name: "covers", where: `song_id = ?1`},
 	{name: "loops", where: `song_id = ?1`},
@@ -77,12 +80,10 @@ var songTables = []songTable{
 
 // notCopied are the tables holding nothing of a Song: the schema's own
 // bookkeeping, the Bandmate that last ran on the database, the Backups and
-// their schedule. Snapshots are left out of Backups for now, though they
-// belong to a Song: a Restore would have to give the ids inside each one's
-// sheet the restored rows' new ids, which it doesn't do yet (#985).
+// their schedule.
 var notCopied = map[string]bool{
 	"schema_migrations": true, "sqlite_sequence": true, "bandmate_version": true, "backups": true,
-	"backup_schedule": true, "snapshots": true,
+	"backup_schedule": true,
 }
 
 // copyAttempts is how often a Song's copy, or the Beat Library's, is tried
