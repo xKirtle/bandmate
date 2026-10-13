@@ -11,6 +11,7 @@ The screenshots in the README and on the docs site, `docs/web/`, taken in the da
 | `input-picker-labelled.png` | The mic button's popover, the default input picked and hearing Chromium's fake microphone, numbered 4 and 5: Input and Level |
 | `beat-library-labelled.png` | The Beat Library, numbered: Add from link, the search, the Beat's title, its producer, the Song using it and Edit |
 | `backups-labelled.png` | Settings' Backups holding the demo Backup, numbered: Scheduled Backups, Upload, New Backup, the Backup and Restore |
+| `song-list.png` | The Songs page on desktop: both Folders, then the Songs in none, down to just below the list |
 | `phone-song-list.png` | The Songs page on a phone: both Folders, then the Songs in none |
 | `phone-timeline.png` | The hero Song on a phone held sideways, the Timeline filling the screen |
 | `phone-lyric-sheet.png` | The hero Song in Read mode on a phone                          |
