@@ -16,6 +16,7 @@ import {
   serverLoopOn,
   syncButton,
   timeline,
+  undoButton,
 } from '../songPage';
 
 // Sync mode on the Song page, on the demo Backup's hero Song, whose Lines
@@ -87,7 +88,7 @@ test('the Loop brought back by an undo ends Sync mode', async ({ page, bandmate 
   await expect(loopButton(page)).toHaveAttribute('aria-pressed', 'false');
   await expect.poll(() => serverLoopOn(bandmate, song.id)).toBe(false);
 
-  await timeline(page).getByRole('button', { name: 'Undo' }).click();
+  await undoButton(page).click();
 
   await expect(loopButton(page)).toHaveAttribute('aria-pressed', 'true');
   await expect(syncButton(page)).toHaveAttribute('aria-pressed', 'false');

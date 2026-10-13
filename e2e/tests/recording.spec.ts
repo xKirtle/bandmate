@@ -6,7 +6,7 @@ import type { Bandmate, Clip as SharedClip } from '../bandmate';
 import { toneWav } from '../beats';
 import { failRequests } from '../faults';
 import { expect, test } from '../fixtures';
-import { heroSong, recordButton, seek, syncButton } from '../songPage';
+import { heroSong, recordButton, redoButton, seek, syncButton, undoButton } from '../songPage';
 
 // Recording Takes on the Song page's Timeline, from Chromium's fake
 // microphone, which captures a half-second 440 Hz tone on a loop. The tests
@@ -560,12 +560,35 @@ test('undoing a new Take takes it away and returns the playhead to where it star
   // The playhead stopped where the recording did.
   await playheadPast(page, 5);
 
-  await timeline(page).getByRole('button', { name: 'Undo' }).click();
+  await undoButton(page).click();
 
   await expect(clip(page, 'Take 1')).toHaveCount(0);
   await expect(ruler(page)).toHaveAttribute('aria-valuenow', '5');
   await expect(ruler(page)).toHaveAttribute('aria-valuetext', /^0:05 of /);
   expect(await clipsOn(bandmate, song.id, 'Track 1')).toEqual([]);
+});
+
+test("the header's Undo and Redo are off while recording, saying why, and Ctrl+Z undoes nothing", async ({
+  page,
+  bandmate,
+}) => {
+  const song = await heroSong(bandmate);
+  await open(page, song.id);
+  // An edit to undo: the Take's Clip deleted.
+  await clip(page, 'Take 2').focus();
+  await page.keyboard.press('Delete');
+  await expect(clip(page, 'Take 2')).toHaveCount(0);
+  await expect(undoButton(page)).toBeEnabled();
+
+  await recordButton(page).click();
+  await skipCalibration(page);
+  await expect(stopButton(page)).toBeVisible();
+  await expect(undoButton(page)).toBeDisabled();
+  await expect(undoButton(page)).toHaveAttribute('title', 'Stop recording to edit');
+  await expect(redoButton(page)).toBeDisabled();
+  await expect(redoButton(page)).toHaveAttribute('title', 'Stop recording to edit');
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect(clip(page, 'Take 2')).toHaveCount(0);
 });
 
 test("Sync mode can't be switched on while recording, and can once it stops", async ({ page, bandmate }) => {

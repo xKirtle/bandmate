@@ -12,7 +12,7 @@
 export type Key = { key: string; mod?: boolean; alt?: boolean; shift?: boolean };
 
 /** Where a Shortcut is listed in the shortcuts dialog. */
-export type ShortcutGroup = 'Playback & recording' | 'Timeline editing' | 'Sync mode' | 'Mouse';
+export type ShortcutGroup = 'Playback & recording' | 'Song editing' | 'Timeline editing' | 'Sync mode' | 'Mouse';
 
 type Described = {
   name: string;
@@ -57,14 +57,14 @@ export const shortcuts = {
   },
   undo: {
     name: 'Undo',
-    group: 'Timeline editing',
-    description: 'Undoes the last edit to the Timeline or a Cue.',
+    group: 'Song editing',
+    description: 'Undoes the last edit to the Song.',
     keys: [{ key: 'z', mod: true }],
   },
   redo: {
     name: 'Redo',
-    group: 'Timeline editing',
-    description: 'Redoes the last edit undone.',
+    group: 'Song editing',
+    description: 'Redoes the last edit to the Song that was undone.',
     keys: [
       { key: 'z', mod: true, shift: true },
       { key: 'y', mod: true },

@@ -115,9 +115,9 @@
   // playback with each Track's volume, mute and solo, and the Loop. Editing
   // (adding Beats and Sounds, adding, renaming, reordering and deleting
   // Tracks, moving, trimming, renaming, duplicating and deleting Clips,
-  // setting and clearing the Loop, and undoing and redoing all of it along
-  // with mixing and Cue edits) is only offered on wider screens; on a phone
-  // it only plays, mixes and switches the Loop on and off. On both it zooms
+  // and setting and clearing the Loop) is only offered on wider screens; on
+  // a phone it only plays, mixes and switches the Loop on and off, though
+  // the Song page's Undo still undoes its edits there. On both it zooms
   // and scrolls, and follows the playhead while playing. While the Loop is
   // on, playback that reaches its end goes back to its start. Recording a
   // Take onto the chosen Track is offered where editing is, and mixing it
@@ -129,6 +129,7 @@
     onPlayhead,
     syncMode,
     onRecording,
+    onFreeze,
     height = $bindable(0),
   }: {
     song: Song;
@@ -145,6 +146,8 @@
     syncMode: SyncMode;
     /** Hears whether a recording is on, whenever that changes, e.g. to keep the Song from being deleted meanwhile. */
     onRecording?: (on: boolean) => void;
+    /** Hears why the Timeline can't be edited, whenever that changes: a recording or a Merge under way, or null. */
+    onFreeze?: (freeze: Freeze) => void;
     /** How tall the docked Timeline is, in pixels, e.g. for the page to keep clear of it. */
     height?: number;
   } = $props();
@@ -319,7 +322,12 @@
     }
   });
 
-  async function undo() {
+  /**
+   * Undoes the Song's latest edit, e.g. from the Song page header or its
+   * key, whether or not the Timeline can be edited here: on a phone and in
+   * Read mode too. While frozen it does nothing (see TimelineEditing.undo).
+   */
+  export async function undo() {
     // Undoing a new Take returns the playhead to where its Clip starts, to
     // record again from. Once the Clip's gone, it's a seek like any other:
     // playing, playback jumps there, superseding the restart the Clip's
@@ -328,7 +336,8 @@
     if (at !== null) seekTo(at);
   }
 
-  async function redo() {
+  /** Redoes the Song's latest edit undone, like undo. */
+  export async function redo() {
     await editing.redo();
   }
 
@@ -366,9 +375,7 @@
       keyActedOnPage();
       seekTo(startOrEnd(shortcut === 'start' ? 'back' : 'forward', length));
     } else if (shortcut === 'record') switchRecording();
-    else if (shortcut === 'split') splitAtPlayhead();
-    else if (shortcut === 'undo') undo();
-    else redo();
+    else splitAtPlayhead();
   }
 
   // Changes to a Track's levels are shown and heard right away, before
@@ -719,14 +726,6 @@
         merging: freeze === 'merging',
         chosenTrack: timeline.tracks.find((t) => t.id === chosen)?.name ?? 'the Chosen Track',
         hasClips: clips.length > 0,
-        undo: {
-          can: saves.canUndo && !frozen,
-          title: editHint(freeze, hints.withKeys('Undo', shortcuts.undo.keys)),
-        },
-        redo: {
-          can: saves.canRedo && !frozen,
-          title: editHint(freeze, hints.withKeys('Redo', shortcuts.redo.keys)),
-        },
       },
       {
         importAudio: () => importInput.click(),
@@ -734,8 +733,6 @@
         recordFrom: () => {
           if (transportMore) foldedPicker?.openBy(transportMore.triggerElement());
         },
-        undo,
-        redo,
       },
     ),
   );
@@ -744,9 +741,8 @@
   let actionRoom = $state(Infinity);
   let actionWidth = $state(0);
   const folded = $derived(foldedActions(transportList, actionRoom, actionWidth));
-  // Those on the row, Undo and Redo first, then the others, the mic last.
+  // Those on the row, the mic last.
   const onRow = $derived(transportList.filter((a) => !folded.includes(a)));
-  const historyOnRow = $derived(onRow.filter((a) => a.key === 'undo' || a.key === 'redo'));
   const micOnRow = $derived(onRow.find((a) => a.key === 'recordFrom'));
 
   /**
@@ -899,6 +895,10 @@
 
   $effect(() => {
     onRecording?.(recording);
+  });
+
+  $effect(() => {
+    onFreeze?.(freeze);
   });
 
   /**
@@ -1963,22 +1963,6 @@
 <!-- A tab closing mid-recording writes what it hasn't yet, to offer it back. -->
 <svelte:window onkeydown={keydown} onpagehide={() => recorder.flush()} ondragover={refuseFiles} ondrop={refuseFiles} />
 
-{#snippet undoRedo()}
-  <span class="history edit-only foldable">
-    {#each historyOnRow as action (action.key)}
-      <button
-        type="button"
-        class="icon"
-        onclick={action.run}
-        disabled={action.disabled}
-        aria-label={action.label}
-        aria-keyshortcuts={hints.aria(shortcuts[action.key as 'undo' | 'redo'].keys)}
-        title={action.title}><action.icon /></button
-      >
-    {/each}
-  </span>
-{/snippet}
-
 {#snippet toStartOrEnd(going: Way)}
   {@const keys = shortcuts.startOrEnd[going]}
   {@const text = going === 'back' ? 'Go to the start' : 'Go to the end'}
@@ -2111,9 +2095,6 @@
         {@render status('Loading audio…')}
       {/if}
       <span class="spacer"></span>
-      {#if historyOnRow.length}
-        {@render undoRedo()}
-      {/if}
       {#each onRow as action (action.key)}
         {#if action.key === 'importAudio' || action.key === 'mixDown'}
           <button
@@ -2833,13 +2814,6 @@
     flex-wrap: wrap;
     align-items: center;
     gap: calc(0.5 * var(--timeline-rem)) calc(0.75 * var(--timeline-rem));
-  }
-  .history {
-    display: flex;
-  }
-  .history button:disabled {
-    opacity: 0.35;
-    cursor: default;
   }
   .spacer {
     flex: 1;
