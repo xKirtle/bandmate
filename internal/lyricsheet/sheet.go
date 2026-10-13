@@ -71,8 +71,8 @@ func newLine(id int64, text string, cueMs sql.NullInt64) Line {
 	return line
 }
 
-// loadLyricSheet reads a Song's whole Lyric Sheet.
-func (s *Store) loadLyricSheet(ctx context.Context, songID int64) (LyricSheet, error) {
+// loadLyricSheet reads a Song's whole Lyric Sheet through q.
+func loadLyricSheet(ctx context.Context, q domain.Queryer, songID int64) (LyricSheet, error) {
 	sheet := LyricSheet{Arrangement: []int64{}, Sections: []Section{}, Scrapbook: []int64{}}
 	sectionAt := map[int64]int{}
 	type place struct{ section, alternate int }
@@ -81,7 +81,7 @@ func (s *Store) loadLyricSheet(ctx context.Context, songID int64) (LyricSheet, e
 	// Where each Section is in the Arrangement, or else in the Scrapbook.
 	arrangementAt := map[int64]int64{}
 	scrapbookAt := map[int64]int64{}
-	err := query(ctx, s.db, `SELECT id, label, position, scrapbook_position FROM sections WHERE song_id = ? ORDER BY id`,
+	err := query(ctx, q, `SELECT id, label, position, scrapbook_position FROM sections WHERE song_id = ? ORDER BY id`,
 		[]any{songID}, func(rows *sql.Rows) error {
 			sec := Section{Alternates: []Alternate{}}
 			var pos sql.NullInt64
@@ -104,7 +104,7 @@ func (s *Store) loadLyricSheet(ctx context.Context, songID int64) (LyricSheet, e
 		return LyricSheet{}, fmt.Errorf("reading sections: %w", err)
 	}
 
-	err = query(ctx, s.db, `SELECT a.id, a.section_id, a.name, a.active
+	err = query(ctx, q, `SELECT a.id, a.section_id, a.name, a.active
 		FROM alternates a JOIN sections s ON s.id = a.section_id
 		WHERE s.song_id = ? ORDER BY a.id`,
 		[]any{songID}, func(rows *sql.Rows) error {
@@ -122,7 +122,7 @@ func (s *Store) loadLyricSheet(ctx context.Context, songID int64) (LyricSheet, e
 		return LyricSheet{}, fmt.Errorf("reading alternates: %w", err)
 	}
 
-	err = query(ctx, s.db, `SELECT l.id, l.alternate_id, l.text, l.cue_ms
+	err = query(ctx, q, `SELECT l.id, l.alternate_id, l.text, l.cue_ms
 		FROM lines l JOIN alternates a ON a.id = l.alternate_id JOIN sections s ON s.id = a.section_id
 		WHERE s.song_id = ? ORDER BY l.alternate_id, l.position`,
 		[]any{songID}, func(rows *sql.Rows) error {
@@ -188,7 +188,7 @@ func (s *Store) changeWithFiles(ctx context.Context, songID int64, based songver
 // Alternate at position in the Arrangement. A nil position adds it at the
 // end.
 func (s *Store) AddSection(ctx context.Context, songID int64, based songversion.Version, label string, position *int) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
 		pos, err := arrangementPosition(ctx, tx, songID, position)
 		if err != nil {
 			return err
@@ -204,7 +204,7 @@ func (s *Store) AddSection(ctx context.Context, songID int64, based songversion.
 // AddToScrapbook creates a Section with the given Label and its first
 // (active) Alternate, outside the Arrangement, so it starts in the Scrapbook.
 func (s *Store) AddToScrapbook(ctx context.Context, songID int64, based songversion.Version, label string) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
 		sectionID, _, err := insertSection(ctx, tx, songID, label)
 		if err != nil {
 			return err
@@ -226,7 +226,7 @@ func toScrapbookEnd(ctx context.Context, tx *sql.Tx, songID, sectionID int64) er
 // DeleteSection permanently deletes a Section in the Scrapbook, with its
 // Alternates and Lines. A Section still in the Arrangement can't be deleted.
 func (s *Store) DeleteSection(ctx context.Context, songID int64, based songversion.Version, sectionID int64) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
 		pos, err := findSection(ctx, tx, songID, sectionID)
 		if err != nil {
 			return err
@@ -262,7 +262,7 @@ func insertSection(ctx context.Context, tx *sql.Tx, songID int64, label string) 
 // appears at most once (ADR 0010), so one already in the Arrangement is
 // refused: a Duplicate of it can be added instead.
 func (s *Store) AddToArrangement(ctx context.Context, songID int64, based songversion.Version, sectionID int64, position *int) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
 		at, err := findSection(ctx, tx, songID, sectionID)
 		if err != nil {
 			return err
@@ -283,7 +283,7 @@ func (s *Store) AddToArrangement(ctx context.Context, songID int64, based songve
 // (names, Lines and Chords, the same one active), but none of its Cues, as
 // the copy is sung at another time. A nil position adds it at the end.
 func (s *Store) DuplicateSection(ctx context.Context, songID int64, based songversion.Version, sectionID int64, position *int) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
 		if _, err := findSection(ctx, tx, songID, sectionID); err != nil {
 			return err
 		}
@@ -305,7 +305,7 @@ func (s *Store) DuplicateSection(ctx context.Context, songID int64, based songve
 // nothing to keep. It keeps its Cues, dormant ones included, for when it's
 // put back (ADR 0010).
 func (s *Store) RemoveFromArrangement(ctx context.Context, songID int64, based songversion.Version, sectionID int64) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
 		pos, err := findSection(ctx, tx, songID, sectionID)
 		if err != nil {
 			return err
@@ -476,7 +476,7 @@ func placeSection(ctx context.Context, tx *sql.Tx, songID, sectionID int64, pos 
 
 // SetSectionLabel changes a Section's Label. A blank Label removes it.
 func (s *Store) SetSectionLabel(ctx context.Context, songID int64, based songversion.Version, sectionID int64, label string) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx, `UPDATE sections SET label = ? WHERE id = ? AND song_id = ?`,
 			cleanLabel(label), sectionID, songID)
 		if err != nil {
@@ -489,7 +489,7 @@ func (s *Store) SetSectionLabel(ctx context.Context, songID int64, based songver
 // ReorderArrangement puts the Sections in a Song's Arrangement in the given
 // order, which must list every one of them exactly once.
 func (s *Store) ReorderArrangement(ctx context.Context, songID int64, based songversion.Version, order []int64) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
 		current := map[int64]bool{}
 		err := query(ctx, tx, `SELECT id FROM sections WHERE song_id = ? AND position IS NOT NULL`, []any{songID},
 			func(rows *sql.Rows) error {
