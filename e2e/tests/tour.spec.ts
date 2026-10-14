@@ -8,12 +8,12 @@ import { expect, test } from '../fixtures';
 const card = (page: Page) => page.getByRole('dialog');
 const next = (page: Page) => card(page).getByRole('button', { name: /^(Next|Finish)$/ });
 
-/** Takes the Tour from About, and waits for its first step. */
-async function takeTour(page: Page) {
+/** Takes the Tour from About, and waits for its first step, timeout ms at most. */
+async function takeTour(page: Page, timeout?: number) {
   await page.goto('/settings/about');
   await page.getByRole('button', { name: 'Take the Tour' }).click();
   await expect(page).toHaveURL(/\/songs\/demo$/);
-  await expect(card(page).getByRole('heading', { name: 'Sections' })).toBeVisible();
+  await expect(card(page).getByRole('heading', { name: 'Sections' })).toBeVisible({ timeout });
 }
 
 test('About offers the Tour beside Source code and Report a bug', async ({ page }) => {
@@ -34,17 +34,15 @@ test('About offers no Tour on a phone', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Take the Tour' })).toHaveCount(0);
 });
 
-test('the first step shows about as fast as a Song opens, without an error', async ({ page }) => {
+test('the Tour’s steps show as fast as a Song opens, with nothing going wrong under them', async ({ page }) => {
+  // An endless update loop under the Tour showed as an error here, and, in a
+  // slower development build, as seconds of "Loading…".
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto('/settings/about');
-  await page.getByRole('button', { name: 'Take the Tour' }).click();
 
-  // A Song opens in well under a second: the Tour's first step doesn't keep
-  // its taker on "Loading…" any longer.
-  await expect(card(page).getByRole('heading', { name: 'Sections' })).toBeVisible({ timeout: 1500 });
+  await takeTour(page, 1_500);
   await next(page).click();
-  await expect(card(page).getByRole('heading', { name: 'Lines' })).toBeVisible({ timeout: 1500 });
+  await expect(card(page).getByRole('heading', { name: 'Lines' })).toBeVisible({ timeout: 1_500 });
   expect(errors).toEqual([]);
 });
 

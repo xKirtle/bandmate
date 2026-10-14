@@ -36,8 +36,9 @@
     const name = step.control;
     let frame = 0;
     const follow = () => {
-      // Written, never read: reading control here would make this effect
-      // depend on it, and its teardown's write would start it over, forever.
+      // control is written here, never read: reading it would make this
+      // effect depend on it, and its teardown's write would start it over,
+      // forever.
       const found = name ? document.querySelector<HTMLElement>(`[data-tour="${name}"]`) : null;
       control = found;
       const now = found?.getBoundingClientRect() ?? null;
