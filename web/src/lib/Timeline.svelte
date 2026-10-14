@@ -30,7 +30,7 @@
   import { clipSources, clipTitle, fileStart, playing } from './clipSource';
   import { sourceAt, sourceLength } from './clipTime';
   import { formatCue } from './cues';
-  import type { Saves } from './saves.svelte';
+  import type { Saves, Undone } from './saves.svelte';
   import type { SyncMode } from './syncMode.svelte';
   import { editHint, type Freeze } from './freeze';
   import { draggedFiles, fileDropTrack, type TrackRow } from './fileDrop';
@@ -326,19 +326,21 @@
    * Undoes the Song's latest edit, e.g. from the Song page header or its
    * key, whether or not the Timeline can be edited here: on a phone and in
    * Read mode too. While frozen it does nothing (see TimelineEditing.undo).
+   * Resolves to what it did, or null if nothing.
    */
-  export async function undo() {
+  export async function undo(): Promise<Undone | null> {
     // Undoing a new Take returns the playhead to where its Clip starts, to
     // record again from. Once the Clip's gone, it's a seek like any other:
     // playing, playback jumps there, superseding the restart the Clip's
     // going started.
-    const at = await editing.undo();
-    if (at !== null) seekTo(at);
+    const undone = await editing.undo();
+    if (undone && undone.playhead !== null) seekTo(undone.playhead);
+    return undone;
   }
 
   /** Redoes the Song's latest edit undone, like undo. */
-  export async function redo() {
-    await editing.redo();
+  export function redo(): Promise<Undone | null> {
+    return editing.redo();
   }
 
   // Tooltips name a Shortcut's keys as this platform does, e.g. ⌘Z on a

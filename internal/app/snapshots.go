@@ -82,3 +82,13 @@ func (a *App) restoreSnapshot(w http.ResponseWriter, r *http.Request) {
 		return a.songs.RestoreSnapshot(r.Context(), id, based, snapshotID)
 	})
 }
+
+// putSheetBack makes a Song's Lyric Sheet and Scrapbook the copy given, as
+// Undo and Redo put them back, taking no Snapshot of its own, and answers
+// with the Song.
+func (a *App) putSheetBack(w http.ResponseWriter, r *http.Request) {
+	var sheet lyricsheet.LyricSheet
+	a.changeSheet(w, r, &sheet, func(id int64, based songversion.Version) (lyricsheet.Song, error) {
+		return a.songs.PutSheetBack(r.Context(), id, based, sheet)
+	})
+}

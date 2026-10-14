@@ -44,7 +44,7 @@ import { importEach } from './fileDrop';
 import { editsWhileRecording, type Freeze } from './freeze';
 import { addedClips, mergingAdded, placingAdded, restorable, type Edit } from './history';
 import { mergeTarget, mergeWarning, type MergedAudio, type MergeTarget } from './merge';
-import type { Edited, Saves } from './saves.svelte';
+import type { Edited, Saves, Undone } from './saves.svelte';
 import type { Selection } from './selection.svelte';
 import { rightHalves } from './split';
 import { TypedField } from './typedField.svelte';
@@ -530,25 +530,29 @@ export class TimelineEditing {
   /**
    * Undoes the latest edit, once those queued before it land, unless
    * frozen, or with nothing to undo and nothing queued. Clips it brings
-   * back together are selected again. Resolves to where to return the
-   * playhead to: where a new Take undone started, unless a recording
-   * started since. Null to leave it where it is.
+   * back together are selected again. Resolves to what it did, or null if
+   * nothing: its playhead says where to return the playhead to, where a
+   * new Take undone started, unless a recording started since.
    */
-  undo = async (): Promise<number | null> => {
+  undo = async (): Promise<Undone | null> => {
     if (!this.undoes) return null;
     this.#mergeNote = null;
     const undone = await this.#saves.undo();
     if (!undone) return null;
     if (undone.reselect) this.#selection.selectEdited(undone.reselect);
-    return undone.playhead !== null && !this.#recording() ? undone.playhead : null;
+    return this.#recording() ? { ...undone, playhead: null } : undone;
   };
 
-  /** Redoes the latest edit undone, unless frozen; a Merge or a Split redone selects what it did again. */
-  redo = async (): Promise<void> => {
-    if (!this.redoes) return;
+  /**
+   * Redoes the latest edit undone, unless frozen; a Merge or a Split redone
+   * selects what it did again. Resolves to what it did, or null if nothing.
+   */
+  redo = async (): Promise<Undone | null> => {
+    if (!this.redoes) return null;
     this.#mergeNote = null;
     const redone = await this.#saves.redo();
     if (redone?.reselect) this.#selection.selectEdited(redone.reselect);
+    return redone;
   };
 
   /** Stops the Cue-move offer's timer, e.g. as the Timeline goes. */

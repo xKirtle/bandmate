@@ -336,6 +336,131 @@ describe('Saves, undo', () => {
   });
 });
 
+describe('Saves, undo on the Lyric Sheet', () => {
+  const loop = (start: number, end: number) => ({ kind: 'setLoop', loop: { start, end, on: true } }) as const;
+
+  /** A Song of a Verse, a Chorus and a Bridge in the Lyric Sheet, and an Idea in the Scrapbook, each of one Line. */
+  const sheetSong = () =>
+    emptySong({
+      arrangement: [1, 2, 4],
+      scrapbook: [3],
+      sections: ['Verse', 'Chorus', 'Idea', 'Bridge'].map((label, i) => ({
+        id: i + 1,
+        label,
+        alternates: [
+          {
+            id: i + 1,
+            name: '',
+            active: true,
+            lines: [{ id: 10 + i, text: label, lyrics: label, chords: [], chordLine: false, cue: null }],
+          },
+        ],
+      })),
+    });
+  const labels = (song: Song) => ({
+    arrangement: song.arrangement.map((id) => song.sections.find((s) => s.id === id)!.label),
+    scrapbook: song.scrapbook.map((id) => song.sections.find((s) => s.id === id)!.label),
+  });
+
+  it('undoes and redoes Lyric Sheet changes strictly in order with Timeline and Cue edits', async () => {
+    const server = new FakeSongServer(sheetSong());
+    const saves = await savesFor(server);
+    await saves.edit(loop(0, 4));
+    await saves.changeLyricSheet({ kind: 'reorderArrangement', order: [2, 4, 1] });
+    await saves.cue(setCue(10, 1.5), 'the Cue of Line 1');
+    await saves.changeLyricSheet({ kind: 'deleteSection', sectionId: 3 });
+
+    expect(await saves.undo()).toMatchObject({ section: 3, reselect: null, playhead: null });
+    expect(labels(saves.song)).toEqual({ arrangement: ['Chorus', 'Bridge', 'Verse'], scrapbook: ['Idea'] });
+    expect(cueOf(saves.song, 10)).toBe(1.5);
+    await saves.undo();
+    expect(cueOf(saves.song, 10)).toBeNull();
+    expect(await saves.undo()).toMatchObject({ section: 1 });
+    expect(labels(server.song)).toEqual({ arrangement: ['Verse', 'Chorus', 'Bridge'], scrapbook: ['Idea'] });
+    expect(saves.timeline.loop).toMatchObject({ start: 0, end: 4 });
+    expect((await saves.undo())?.section).toBeUndefined();
+    expect(saves.timeline.loop).toBeNull();
+    expect(saves.canUndo).toBe(false);
+
+    await saves.redo();
+    expect(await saves.redo()).toMatchObject({ section: 1 });
+    await saves.redo();
+    // The Idea's gone again, and the Scrapbook holds nothing to show.
+    expect(await saves.redo()).toMatchObject({ section: null });
+    expect(labels(server.song)).toEqual({ arrangement: ['Chorus', 'Bridge', 'Verse'], scrapbook: [] });
+    expect(cueOf(server.song, 10)).toBe(1.5);
+    expect(saves.canRedo).toBe(false);
+  });
+
+  it('brings back what a change deleted under its ids, with its Cues', async () => {
+    const server = new FakeSongServer(sheetSong());
+    const saves = await savesFor(server);
+    await saves.cue(setCue(10, 2), 'the Cue of Line 1');
+    await saves.changeLyricSheet({ kind: 'removeFromArrangement', sectionId: 1 });
+    await saves.changeLyricSheet({ kind: 'deleteSection', sectionId: 1 });
+    await saves.undo();
+    await saves.undo();
+    expect(server.song.sections.map((s) => s.id)).toEqual([1, 2, 3, 4]);
+    expect(labels(server.song)).toEqual({ arrangement: ['Verse', 'Chorus', 'Bridge'], scrapbook: ['Idea'] });
+    expect(cueOf(server.song, 10)).toBe(2);
+  });
+
+  it('gives the Section now where one undone was, in the Lyric Sheet or the Scrapbook, or none when none is left there', async () => {
+    const server = new FakeSongServer(emptySong());
+    const saves = await savesFor(server);
+    await saves.changeLyricSheet({ kind: 'addToScrapbook' });
+    await saves.changeLyricSheet({ kind: 'addSection' });
+    await saves.changeLyricSheet({ kind: 'addSection' });
+    expect(await saves.undo()).toMatchObject({ section: 2 });
+    // The Section in the Scrapbook doesn't stand for one gone from the Lyric Sheet.
+    expect(await saves.undo()).toMatchObject({ section: null });
+  });
+
+  it('empties Redo with a new change', async () => {
+    const server = new FakeSongServer(sheetSong());
+    const saves = await savesFor(server);
+    await saves.changeLyricSheet({ kind: 'reorderArrangement', order: [2, 4, 1] });
+    await saves.undo();
+    expect(saves.canRedo).toBe(true);
+    await saves.changeLyricSheet({ kind: 'setSectionLabel', sectionId: 1, label: 'Verse 1' });
+    expect(saves.canRedo).toBe(false);
+    await saves.undo();
+    expect(labels(server.song).arrangement).toEqual(['Verse', 'Chorus', 'Bridge']);
+    expect(saves.canUndo).toBe(false);
+  });
+
+  it('keeps no step for a change that changed nothing', async () => {
+    const server = new FakeSongServer(sheetSong());
+    const saves = await savesFor(server);
+    await saves.changeLyricSheet({ kind: 'reorderArrangement', order: [1, 2, 4] });
+    expect(saves.canUndo).toBe(false);
+  });
+
+  it('forgets every step when a Lyric Sheet change is refused because the Song changed elsewhere', async () => {
+    const server = new FakeSongServer(sheetSong());
+    const saves = await savesFor(server);
+    await saves.edit(loop(0, 4));
+    await saves.changeLyricSheet({ kind: 'reorderArrangement', order: [2, 4, 1] });
+    server.changeElsewhere();
+    expect(await saves.changeLyricSheet({ kind: 'deleteSection', sectionId: 3 })).toBe(false);
+    expect(saves.stale).toBe(true);
+    expect(saves.canUndo).toBe(false);
+    expect(await saves.undo()).toBeNull();
+  });
+
+  it('waits for the Lyric Sheet changes queued before it, then undoes the latest', async () => {
+    const server = new FakeSongServer(sheetSong());
+    const saves = await savesFor(server);
+    const release = server.holdNextAnswer();
+    const changing = saves.changeLyricSheet({ kind: 'reorderArrangement', order: [2, 4, 1] });
+    const undoing = saves.undo();
+    release();
+    expect(await changing).toBe(true);
+    expect(await undoing).toMatchObject({ section: 1 });
+    expect(labels(server.song).arrangement).toEqual(['Verse', 'Chorus', 'Bridge']);
+  });
+});
+
 describe('Saves, undo on Clips', () => {
   /** A Track of a Beat's Clips, each 2 seconds long, starting where given. */
   const track = (...starts: number[]): Track => ({

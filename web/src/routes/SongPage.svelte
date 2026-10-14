@@ -3,7 +3,7 @@
   import Keyboard from '@lucide/svelte/icons/keyboard';
   import Redo2 from '@lucide/svelte/icons/redo-2';
   import Undo2 from '@lucide/svelte/icons/undo-2';
-  import { onDestroy, untrack } from 'svelte';
+  import { onDestroy, tick, untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { api, commonKeys, type Song, type Status } from '../lib/api';
   import Combobox from '../lib/Combobox.svelte';
@@ -22,7 +22,8 @@
   import TuningField from '../lib/TuningField.svelte';
   import LanguagesField from '../lib/LanguagesField.svelte';
   import { LyricSheetEditing } from '../lib/lyricSheetEditing.svelte';
-  import { Saves } from '../lib/saves.svelte';
+  import { Saves, type Undone } from '../lib/saves.svelte';
+  import { scrollBehavior } from '../lib/motion';
   import { detailFields, type DetailFields } from '../lib/songFields';
   import { cancelOnEscape, committedAsItGoes, leaveOnEscape } from '../lib/typedField.svelte';
   import { SyncMode } from '../lib/syncMode.svelte';
@@ -220,8 +221,32 @@
     const undoing = undoKey(event, { ...place, frozen });
     if (!undoing) return;
     event.preventDefault();
-    if (undoing === 'undo') timelinePanel?.undo();
-    else timelinePanel?.redo();
+    if (undoing === 'undo') undo();
+    else redo();
+  }
+
+  // Undo and Redo go through the Timeline, which follows what they did
+  // there. A Lyric Sheet change undone or redone ends Sync mode, as any
+  // change to the lyrics does, and shows the Section it changed, opening
+  // the Scrapbook's fold for one there, without moving focus.
+  async function undo() {
+    showUndone((await timelinePanel?.undo()) ?? null);
+  }
+
+  async function redo() {
+    showUndone((await timelinePanel?.redo()) ?? null);
+  }
+
+  async function showUndone(undone: Undone | null) {
+    if (undone?.section === undefined) return;
+    syncMode.end();
+    const sectionId = undone.section;
+    if (sectionId === null || !song) return;
+    if (song.scrapbook.includes(sectionId) && desktop.current && writing) toggledParts['write-scrapbook'] = true;
+    await tick();
+    document
+      .querySelector(`[data-section="${sectionId}"]`)
+      ?.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() });
   }
 
   // How tall the docked Timeline is, which the side column stops above.
@@ -449,7 +474,7 @@
               <button
                 type="button"
                 class="button tool"
-                onclick={() => timelinePanel?.undo()}
+                onclick={undo}
                 disabled={!saves.canUndo || frozen}
                 aria-label="Undo"
                 aria-keyshortcuts={hints.aria(shortcuts.undo.keys)}
@@ -460,7 +485,7 @@
               <button
                 type="button"
                 class="button tool"
-                onclick={() => timelinePanel?.redo()}
+                onclick={redo}
                 disabled={!saves.canRedo || frozen}
                 aria-label="Redo"
                 aria-keyshortcuts={hints.aria(shortcuts.redo.keys)}

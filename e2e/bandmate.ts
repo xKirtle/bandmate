@@ -153,6 +153,11 @@ export class Bandmate {
     return json<Song>(this.api.get(`/api/songs/${id}`));
   }
 
+  /** A Song's Snapshots, newest first: why each was taken. */
+  snapshots(songId: number): Promise<{ id: number; reason: string }[]> {
+    return json<{ id: number; reason: string }[]>(this.api.get(`/api/songs/${songId}/snapshots`));
+  }
+
   /** A Song's Timeline, as it is now. */
   timeline(songId: number): Promise<Timeline> {
     return json<Timeline>(this.api.get(`/api/songs/${songId}/timeline`));
