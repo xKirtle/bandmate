@@ -25,11 +25,13 @@
 // for the edits queued before it. A save refused as the Song changed
 // elsewhere, or a refresh bringing in a change made elsewhere, forgets them
 // all. Undoing a Lyric Sheet change puts the whole sheet back, so every
-// change to it has to be kept, or the history forgotten (ADR 0019).
+// change to it has to be kept, or the history forgotten (ADR 0019); the
+// changes one visit to a text field saves, one after another, are kept as
+// one.
 import { ApiError, type Song, type Timeline } from './api';
 import { sameCues, savedRetrying, withCueChange, type CueChange } from './cueChanges';
 import { History, restorable, type Edit, type HistoryEdit } from './history';
-import { changedSection, type LyricSheetChange } from './lyricSheetChanges';
+import { changedSection, type LyricSheetChange, type Visit } from './lyricSheetChanges';
 import { waitFor, type SongServer, type Wait } from './songServer';
 
 /** How a save ended: saved, failed, refused as the Song changed elsewhere, or never sent as the Song's being deleted. */
@@ -163,6 +165,11 @@ export class Saves {
     return this.pending > 0 || this.#unsavedCues.length > 0 || this.#typing.some((t) => t.unsaved);
   }
 
+  /** Whether an edit being typed into a Section, on the list, isn't saved yet. */
+  get unsavedInSections(): boolean {
+    return this.#typing.some((t) => t.section !== undefined && t.unsaved);
+  }
+
   /**
    * Puts an edit being typed, e.g. a field typed in place, on the list
    * whose edits not saved yet the Song has, until the function returned is
@@ -197,14 +204,18 @@ export class Saves {
    */
   change = (op: (saved: Song) => Promise<Song>): Promise<boolean> => this.submit(op).then((ended) => ended === 'saved');
 
-  /** Queues a Lyric Sheet change, named by its kind, like change, and keeps it to undo. */
-  changeLyricSheet = (change: LyricSheetChange): Promise<boolean> => {
+  /**
+   * Queues a Lyric Sheet change, named by its kind, like change, and keeps
+   * it to undo: given the visit to a text field that typed it, as one step
+   * with the changes that visit saved just before it.
+   */
+  changeLyricSheet = (change: LyricSheetChange, visit?: Visit): Promise<boolean> => {
     this.#undoablesQueued++;
     return this.#turn(
       async (saved) => ({ before: saved, after: await this.#server.apply(saved, change) }),
       ({ before, after }) => {
         this.#saved = after;
-        this.#history.recordSheet(before, after);
+        this.#history.recordSheet(before, after, visit);
         this.#showHistory();
       },
       (ended) => {

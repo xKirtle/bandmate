@@ -639,3 +639,136 @@ describe('Lyric Sheet editing, saving waiting text first', () => {
     expect(textOf(server.song)).toBe('One\nTwo\nThree');
   });
 });
+
+describe('Lyric Sheet editing, undoing what was typed', () => {
+  it("undoes a visit to an Alternate's text box as one step, saved however often, and redoes it", async () => {
+    const server = new FakeSongServer(verseSong());
+    const { saves, editing } = await editingFor(server);
+    const box = editing.textBox(1, 1);
+    box.focus();
+    box.type('One\nTwo\nThr');
+    await vi.advanceTimersByTimeAsync(800);
+    box.type('One\nTwo\nThree');
+    await vi.advanceTimersByTimeAsync(800);
+    box.type('One\nTwo\nThree\nFour');
+    box.blur();
+    await settled();
+    expect(server.landed).toBe(3);
+
+    await saves.undo();
+    expect(textOf(server.song)).toBe('One\nTwo');
+    expect(box.text).toBe('One\nTwo');
+    expect(saves.canUndo).toBe(false);
+    await saves.redo();
+    expect(textOf(server.song)).toBe('One\nTwo\nThree\nFour');
+  });
+
+  it("undoes a visit to a Section's Label or an Alternate's name as one step, committed however often", async () => {
+    const server = new FakeSongServer(verseSong());
+    const { saves, editing } = await editingFor(server);
+    const label = editing.sectionLabel(1);
+    label.focus();
+    label.shown = 'Chorus';
+    label.commit();
+    await settled();
+    label.shown = 'Chorus 2';
+    label.commit();
+    await settled();
+    const name = editing.alternateName(1, 1);
+    name.focus();
+    name.shown = 'Dark';
+    name.commit();
+    await settled();
+    name.shown = 'Darker';
+    name.commit();
+    await settled();
+
+    await saves.undo();
+    expect(server.song.sections[0]).toMatchObject({ label: 'Chorus 2', alternates: [{ name: '' }] });
+    await saves.undo();
+    expect(server.song.sections[0].label).toBe('Verse');
+    expect(saves.canUndo).toBe(false);
+    await saves.redo();
+    await saves.redo();
+    expect(server.song.sections[0]).toMatchObject({ label: 'Chorus 2', alternates: [{ name: 'Darker' }] });
+  });
+
+  it('undoes the typing not saved yet of a visit left just before undoing, as Undo pressed in a field does', async () => {
+    const server = new FakeSongServer(verseSong());
+    const { saves, editing } = await editingFor(server);
+    await editing.change({ kind: 'setSectionLabel', sectionId: 1, label: 'Chorus' });
+    const name = editing.alternateName(1, 1);
+    name.focus();
+    name.shown = 'Darker';
+    const box = editing.textBox(1, 1);
+    box.focus();
+    box.type('One\nTwo\nThree');
+    expect(editing.unsaved).toBe(true);
+    // Leaving the text box saves its typing, which Undo then undoes.
+    box.blur();
+    await saves.undo();
+    expect(textOf(server.song)).toBe('One\nTwo');
+    expect(server.song.sections[0].label).toBe('Chorus');
+    expect(editing.unsaved).toBe(true);
+    name.commit();
+    await saves.undo();
+    expect(server.song.sections[0].alternates[0].name).toBe('');
+    expect(editing.unsaved).toBe(false);
+  });
+
+  it('keeps each visit to a field as a step of its own', async () => {
+    const server = new FakeSongServer(verseSong());
+    const { saves, editing } = await editingFor(server);
+    const box = editing.textBox(1, 1);
+    box.focus();
+    box.type('One\nTwo\nThree');
+    box.blur();
+    await settled();
+    box.focus();
+    box.type('One\nTwo\nThree\nFour');
+    box.blur();
+    await settled();
+    await saves.undo();
+    expect(textOf(server.song)).toBe('One\nTwo\nThree');
+    expect(saves.canUndo).toBe(true);
+  });
+
+  it('keeps no step for a visit that leaves the text as it was, though saved meanwhile', async () => {
+    const server = new FakeSongServer(verseSong());
+    const { saves, editing } = await editingFor(server);
+    await editing.change({ kind: 'setSectionLabel', sectionId: 1, label: 'Chorus' });
+    await saves.undo();
+    const box = editing.textBox(1, 1);
+    box.focus();
+    box.type('One\nTwo\nThree');
+    await vi.advanceTimersByTimeAsync(800);
+    box.type('One\nTwo');
+    box.blur();
+    await settled();
+    expect(server.landed).toBe(4);
+    expect(saves.canUndo).toBe(false);
+    // As any change, it emptied Redo.
+    expect(saves.canRedo).toBe(false);
+  });
+
+  it('keeps a visit apart from a change made during it, e.g. a Cue in Sync mode, each undone in order', async () => {
+    const server = new FakeSongServer(verseSong());
+    const { saves, editing } = await editingFor(server);
+    const box = editing.textBox(1, 1);
+    box.focus();
+    box.type('One\nTwo\nThree');
+    await vi.advanceTimersByTimeAsync(800);
+    await saves.cue({ kind: 'setLineCue', lineId: 10, cue: 1 }, 'the Cue of Line 1 of Verse');
+    box.type('One\nTwo\nThree\nFour');
+    box.blur();
+    await settled();
+    await saves.undo();
+    expect(textOf(server.song)).toBe('One\nTwo\nThree');
+    expect(server.song.sections[0].alternates[0].lines[0].cue).toBe(1);
+    await saves.undo();
+    expect(server.song.sections[0].alternates[0].lines[0].cue).toBeNull();
+    await saves.undo();
+    expect(textOf(server.song)).toBe('One\nTwo');
+    expect(saves.canUndo).toBe(false);
+  });
+});

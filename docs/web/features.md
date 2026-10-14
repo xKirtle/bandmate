@@ -109,6 +109,8 @@ In a narrower window, Import audio, Mix down and then the input fold into a **â‹
 
 **Undo** and **Redo** are at the top of the song's page, beside Write and Read. Undo takes back your latest change to the song, one at a time, whether to its sections, alternates and Scrapbook, the timeline or a line's timing, and Redo makes it again. They work in Read mode and on a phone too, even on a change you made in a wider window, until you leave the song. While you record a take, or a merge is being made, they're off. Undoing a change to the lyrics stops syncing.
 
+Typing in a section's lines, its label or an alternate's name can be undone once you leave the box: everything you typed there, from clicking in to clicking out, comes back as it was in one go. While you're still in the box, Ctrl+Z undoes your typing a bit at a time, as in any text box. Clicking Undo while you're typing takes back what you've typed since you clicked in.
+
 A clip's **â‹¯** menu sets its **tempo** and **pitch**, each on its own or both together: slow a beat down to write over it, or move it a couple of semitones to suit your voice. Select several clips to change them all at once. The file itself is never changed, so you can always set them again, or reset them.
 
 Zoom in with Ctrl and the scroll wheel, or by pinching.

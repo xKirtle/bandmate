@@ -18,9 +18,11 @@
 // (see typedField.svelte.ts), and saves an Alternate's text as typed into
 // its text box (see TextBox). Each goes on Saves' list of edits being
 // typed, with its Section, which answers whether a Section holds edits not
-// saved yet, and how much has been typed into it.
+// saved yet, and how much has been typed into it. Each is undone a visit at
+// a time: what one visit to the field saves, from going into it to leaving
+// it, however often, is one step.
 import type { Song } from './api';
-import type { LyricSheetChange } from './lyricSheetChanges';
+import { newVisit, type LyricSheetChange, type Visit } from './lyricSheetChanges';
 import type { Saves, Typing } from './saves.svelte';
 import { TypedField } from './typedField.svelte';
 
@@ -41,15 +43,16 @@ export class LyricSheetEditing {
    * Queues a change to the Lyric Sheet, ending Sync mode for it, and
    * sending first the Lines text waiting in Alternates it makes anew.
    * Resolves to whether it was saved; a caller's code up to its next await
-   * runs before the next change starts.
+   * runs before the next change starts. Given the visit to a text field that
+   * typed it, it's undone as one step with the visit's other changes.
    */
-  change = (change: LyricSheetChange): Promise<boolean> => {
+  change = (change: LyricSheetChange, visit?: Visit): Promise<boolean> => {
     if (endsSyncMode(change)) this.#endSyncMode();
     const remade = sectionRemadeBy(change);
     if (remade !== null) {
       for (const entry of this.#saves.typingIn(remade)) if (entry instanceof TextBox) entry.saveNow();
     }
-    return this.#saves.changeLyricSheet(change);
+    return this.#saves.changeLyricSheet(change, visit);
   };
 
   /** Hears a Section in the Scrapbook being opened in its editor. */
@@ -70,6 +73,15 @@ export class LyricSheetEditing {
     return this.#saves.typingIn(sectionId).some((t) => t.unsaved);
   }
 
+  /**
+   * Whether any Section's editor holds edits not saved yet: leaving its
+   * field saves them, so they're the next edit to undo, as Undo pressed in
+   * a field does.
+   */
+  get unsaved(): boolean {
+    return this.#saves.unsavedInSections;
+  }
+
   /** How many edits have been typed into a Section's editor, e.g. to tell when typing carries on. */
   typedIn(sectionId: number): number {
     return this.#saves.typedIn(sectionId);
@@ -79,7 +91,7 @@ export class LyricSheetEditing {
   typing = (entry: Typing): (() => void) => this.#saves.typing(entry);
 
   /** A Section's Label, typed in place. It's saved trimmed; blank, the Section goes by its place. */
-  sectionLabel(sectionId: number): TypedField<string> {
+  sectionLabel(sectionId: number): SheetField {
     return this.#trimmedField(
       sectionId,
       () => this.#saves.song.sections.find((s) => s.id === sectionId)?.label,
@@ -88,7 +100,7 @@ export class LyricSheetEditing {
   }
 
   /** An Alternate's name, typed in place, in a Section's editor. It's saved trimmed; blank removes it. */
-  alternateName(alternateId: number, sectionId: number): TypedField<string> {
+  alternateName(alternateId: number, sectionId: number): SheetField {
     return this.#trimmedField(
       sectionId,
       () => this.#saves.song.sections.flatMap((s) => s.alternates).find((a) => a.id === alternateId)?.name,
@@ -105,23 +117,24 @@ export class LyricSheetEditing {
     sectionId: number,
     saved: () => string | undefined,
     change: (text: string) => LyricSheetChange,
-  ): TypedField<string> {
-    return new TypedField<string>({
+  ): SheetField {
+    const field: SheetField = new SheetField({
       saved: () => saved() ?? '',
       format: (text) => text,
       parse: (typed) => ({ value: typed.trim() }),
-      commit: (text) => this.change(change(text)),
+      commit: (text) => this.change(change(text), field.visit),
       exists: () => saved() !== undefined,
       typing: this.#saves.typing,
       section: sectionId,
     });
+    return field;
   }
 
   /** The text box of an Alternate's Lines, in a Section's editor. Saves always go to that Alternate. */
   textBox(alternateId: number, sectionId: number): TextBox {
     return new TextBox(
       () => this.#saves.song,
-      (text) => this.change({ kind: 'replaceAlternateText', alternateId, text }),
+      (text, visit) => this.change({ kind: 'replaceAlternateText', alternateId, text }, visit),
       this.#saves.typing,
       alternateId,
       sectionId,
@@ -147,6 +160,24 @@ function sectionRemadeBy(change: LyricSheetChange): number | null {
 }
 
 /**
+ * A Section's Label or an Alternate's name, typed in place: what one visit
+ * to it commits, however often, is undone as one step.
+ */
+export class SheetField extends TypedField<string> {
+  #visit = newVisit();
+
+  /** The visit to the field its commits come from. */
+  get visit(): Visit {
+    return this.#visit;
+  }
+
+  /** Hears the field being focused, which starts a new visit to it. */
+  focus = () => {
+    this.#visit = newVisit();
+  };
+}
+
+/**
  * An Alternate's text as its text box shows it. What's typed is saved
  * once typing pauses, on blur, and as the box closes. While the box is
  * focused, or holds text waiting, on its way or failed to save, it keeps
@@ -160,7 +191,7 @@ function sectionRemadeBy(change: LyricSheetChange): number | null {
  */
 export class TextBox implements Typing {
   #song: () => Song;
-  #send: (text: string) => Promise<boolean>;
+  #send: (text: string, visit: Visit) => Promise<boolean>;
   #typing: (entry: Typing) => () => void;
   #alternateId: number;
   readonly section: number;
@@ -182,10 +213,12 @@ export class TextBox implements Typing {
   #edits = $state(0);
   /** Takes it off Saves' list: set once typed in, until it's closed and settled. */
   #leave: (() => void) | null = null;
+  /** The visit to the box its saves come from, undone as one step: a new one each time it's focused. */
+  #visit = newVisit();
 
   constructor(
     song: () => Song,
-    send: (text: string) => Promise<boolean>,
+    send: (text: string, visit: Visit) => Promise<boolean>,
     typing: (entry: Typing) => () => void,
     alternateId: number,
     section: number,
@@ -222,6 +255,7 @@ export class TextBox implements Typing {
 
   focus = () => {
     this.#focused = true;
+    this.#visit = newVisit();
     this.#hold();
   };
 
@@ -270,7 +304,7 @@ export class TextBox implements Typing {
       const previous = this.#sent;
       this.#sent = text;
       this.#inFlight++;
-      this.#failed = !(await this.#send(text));
+      this.#failed = !(await this.#send(text, this.#visit));
       this.#inFlight--;
       if (this.#failed) this.#sent = previous;
     }
