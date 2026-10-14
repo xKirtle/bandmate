@@ -1354,7 +1354,9 @@ test('custom tuning notes that can’t be read are dropped for another tuning pi
   await page.getByRole('option', { name: 'Drop D' }).click();
   await expect(customTuningNotes(page)).toHaveCount(0);
   await expect.poll(async () => (await bandmate.getSong(song.id)).tuning).toBe('Drop D');
-  expect(await warnsOnLeaving(page)).toBe(false);
+  // The page counts the save as unsaved until its answer comes back, which
+  // can be just after the Song changed on the server.
+  await expect.poll(() => warnsOnLeaving(page)).toBe(false);
 });
 
 test('custom tuning notes typed and then left behind are saved', async ({ page, bandmate }) => {
