@@ -148,7 +148,9 @@ export interface SnapshotSummary {
   kept: boolean;
 }
 
-/** A copy of a Song's Lyric Sheet and Scrapbook as they were, which Bandmate takes on its own. */
+/** A Song's Lyric Sheet and Scrapbook, as a Song has them. */
+export type Sheet = Pick<Song, 'arrangement' | 'sections' | 'scrapbook'>;
+
 /**
  * A copy of a Song's Lyric Sheet and Scrapbook as Undo and Redo put it
  * back (ADR 0019): only what's written, with every id.
@@ -168,9 +170,10 @@ export interface SheetCopy {
   }[];
 }
 
+/** A copy of a Song's Lyric Sheet and Scrapbook as they were, which Bandmate takes on its own. */
 export interface Snapshot extends SnapshotSummary {
   /** The Lyric Sheet and Scrapbook it holds, with their ids, as a Song's are. */
-  sheet: Pick<Song, 'arrangement' | 'sections' | 'scrapbook'>;
+  sheet: Sheet;
 }
 
 /** Labels offered as suggestions; any text is allowed. */

@@ -308,7 +308,7 @@ export class FakeSongServer implements SongServer {
 
   /**
    * What a Lyric Sheet change does, for the changes the fake models: adding
-   * a Section to the Arrangement, reordering it, taking one out of it,
+   * a Section to the Arrangement or the Scrapbook, reordering the Arrangement, taking one out of it,
    * deleting one in the Scrapbook, adding one to another, setting its
    * Label, renaming an Alternate, replacing an Alternate's text, and
    * putting the sheet back.
@@ -326,6 +326,15 @@ export class FakeSongServer implements SongServer {
           const arrangement = [...song.arrangement];
           arrangement.splice(change.position ?? arrangement.length, 0, section.id);
           return { ...song, arrangement, sections: [...song.sections, section] };
+        };
+      case 'addToScrapbook':
+        return (song) => {
+          const section: Section = {
+            id: this.#nextSectionId++,
+            label: '',
+            alternates: [{ id: this.#nextAlternateId++, name: '', active: true, lines: [] }],
+          };
+          return { ...song, scrapbook: [...song.scrapbook, section.id], sections: [...song.sections, section] };
         };
       case 'removeFromArrangement':
         // It goes to the end of the Scrapbook, or is deleted if nothing is written in it.

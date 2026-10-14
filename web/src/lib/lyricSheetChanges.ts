@@ -1,6 +1,6 @@
 // Changes to the Lyric Sheet, each named by its kind, as Lyric Sheet editing
 // (see lyricSheetEditing.svelte.ts) sends them through Saves.
-import { api, type SheetCopy, type Song, type SongAt } from './api';
+import { api, type Sheet, type SheetCopy, type Song, type SongAt } from './api';
 
 /** A change to the Lyric Sheet, as the intent sent to the API. */
 export type LyricSheetChange =
@@ -110,7 +110,7 @@ export function sendLyricSheetChange(at: SongAt, change: LyricSheetChange): Prom
 }
 
 /** A copy of a Song's Lyric Sheet and Scrapbook, to put back. */
-export function sheetCopy(song: Pick<Song, 'arrangement' | 'scrapbook' | 'sections'>): SheetCopy {
+export function sheetCopy(song: Sheet): SheetCopy {
   return {
     arrangement: [...song.arrangement],
     scrapbook: [...song.scrapbook],
@@ -127,14 +127,12 @@ export function sheetCopy(song: Pick<Song, 'arrangement' | 'scrapbook' | 'sectio
   };
 }
 
-type Sheet = Pick<Song, 'arrangement' | 'scrapbook' | 'sections'>;
-
 /**
  * The Section a Lyric Sheet change, undone or redone, changed, as it left
  * the sheet, to show: one written differently or brought back, else one
  * moved between the Lyric Sheet and the Scrapbook, else the one moved
- * within either, else, for one gone, the one now where it was. Null when
- * no Section is left to show.
+ * within either, else, for one gone, the one now where it was, in the
+ * Lyric Sheet or the Scrapbook as it was. Null when none is left there.
  */
 export function changedSection(from: Sheet, to: Sheet): number | null {
   const written = (sheet: Sheet) =>
@@ -157,16 +155,19 @@ export function changedSection(from: Sheet, to: Sheet): number | null {
     return after.find((id) => without(before, id) === without(after, id)) ?? after.find((id, i) => before[i] !== id)!;
   }
 
-  // Only gone: the Section after it, or else before it, in the order it was in.
-  const order = [...from.arrangement, ...from.scrapbook];
-  const gone = order.findIndex((id) => !now.has(id));
-  if (gone < 0) return null;
-  return (
-    order.slice(gone + 1).find((id) => now.has(id)) ??
-    order
-      .slice(0, gone)
-      .reverse()
-      .find((id) => now.has(id)) ??
-    null
-  );
+  // Only gone: the Section after it, or else before it, where it was.
+  for (const order of [from.arrangement, from.scrapbook]) {
+    const gone = order.findIndex((id) => !now.has(id));
+    if (gone < 0) continue;
+    const after = order.slice(gone + 1).find((id) => now.has(id));
+    return (
+      after ??
+      order
+        .slice(0, gone)
+        .reverse()
+        .find((id) => now.has(id)) ??
+      null
+    );
+  }
+  return null;
 }

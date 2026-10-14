@@ -30,7 +30,7 @@ func (s *Store) PutSheetBack(ctx context.Context, songID int64, based songversio
 }
 
 // checkSheet checks a copy is a sheet: each Section in exactly one of the
-// Arrangement and the Scrapbook, once, each with exactly one active
+// Lyric Sheet and the Scrapbook, once, each with exactly one active
 // Alternate, no id held twice, each Line one line of text, and each Cue one
 // a Line can have.
 func checkSheet(sheet LyricSheet) error {

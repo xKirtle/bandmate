@@ -385,8 +385,8 @@ describe('Saves, undo on the Lyric Sheet', () => {
     await saves.redo();
     expect(await saves.redo()).toMatchObject({ section: 1 });
     await saves.redo();
-    // The Idea's gone again: the Verse, last in the Lyric Sheet before it, stands for it.
-    expect(await saves.redo()).toMatchObject({ section: 1 });
+    // The Idea's gone again, and the Scrapbook holds nothing to show.
+    expect(await saves.redo()).toMatchObject({ section: null });
     expect(labels(server.song)).toEqual({ arrangement: ['Chorus', 'Bridge', 'Verse'], scrapbook: [] });
     expect(cueOf(server.song, 10)).toBe(1.5);
     expect(saves.canRedo).toBe(false);
@@ -405,12 +405,14 @@ describe('Saves, undo on the Lyric Sheet', () => {
     expect(cueOf(server.song, 10)).toBe(2);
   });
 
-  it('gives the Section now where one undone was, or none when none is left', async () => {
+  it('gives the Section now where one undone was, in the Lyric Sheet or the Scrapbook, or none when none is left there', async () => {
     const server = new FakeSongServer(emptySong());
     const saves = await savesFor(server);
+    await saves.changeLyricSheet({ kind: 'addToScrapbook' });
     await saves.changeLyricSheet({ kind: 'addSection' });
     await saves.changeLyricSheet({ kind: 'addSection' });
-    expect(await saves.undo()).toMatchObject({ section: 1 });
+    expect(await saves.undo()).toMatchObject({ section: 2 });
+    // The Section in the Scrapbook doesn't stand for one gone from the Lyric Sheet.
     expect(await saves.undo()).toMatchObject({ section: null });
   });
 

@@ -24,8 +24,8 @@
 // one history (see history.ts), in the order they were made. An undo waits
 // for the edits queued before it. A save refused as the Song changed
 // elsewhere, or a refresh bringing in a change made elsewhere, forgets them
-// all: every change to the Lyric Sheet is kept, as undoing one puts the
-// whole sheet back (ADR 0019).
+// all. Undoing a Lyric Sheet change puts the whole sheet back, so every
+// change to it has to be kept, or the history forgotten (ADR 0019).
 import { ApiError, type Song, type Timeline } from './api';
 import { sameCues, savedRetrying, withCueChange, type CueChange } from './cueChanges';
 import { History, restorable, type Edit, type HistoryEdit } from './history';
@@ -340,6 +340,7 @@ export class Saves {
    * as it was.
    */
   async #send(at: Song, edit: HistoryEdit): Promise<Timeline | Song> {
+    // Apart, as apply takes a Lyric Sheet change and a Timeline edit apart.
     if (edit.kind === 'putSheetBack') return this.#server.apply(at, edit);
     if (edit.kind !== 'restoreCues') return this.#server.apply(at, edit);
     const cues = restorable(edit.cues, at);
