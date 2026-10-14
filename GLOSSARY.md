@@ -277,7 +277,7 @@ A copy of the whole install's Songs, Beats and everything else Bandmate keeps, a
 _Avoid_: Backup (a Backup holds chosen Songs and Beats, to Restore from), Snapshot
 
 **Tour**:
-A guided look at Bandmate's core loop on the Demo Song, from Sections, Lines and Chords to the Demo Beat on the Timeline and where a Take is recorded, one step at a time, each spotlighting a real control. It only shows: there's nothing to do in it but read on. A new install with no Songs offers it on a wide window, until it's taken or turned down on any Device. It can be ended at any step, or taken again later from About.
+A guided look at Bandmate's core loop on the Demo Song, from Sections, Lines and Chords to the Demo Beat on the Timeline and where a Take is recorded, one step at a time, each spotlighting a real control. It only shows: there's nothing to do in it but read on. A new install with no Songs offers it on a wide window, until it's taken or turned down on any Device. It can be ended at any step, or taken again later from the Songs page.
 _Avoid_: Tutorial, walkthrough, onboarding
 
 **Demo Song**:

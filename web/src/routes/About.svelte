@@ -16,12 +16,6 @@
   import BrandMark from '../lib/BrandMark.svelte';
   import FoldChevron from '../lib/FoldChevron.svelte';
   import SettingsPage from '../lib/SettingsPage.svelte';
-  import { MediaQuery } from 'svelte/reactivity';
-  import { takeTour } from '../lib/theTour';
-  import { tourFits } from '../lib/tour.svelte';
-
-  // The Tour needs a wide window, so it's offered only on one.
-  const tourOffered = new MediaQuery(tourFits);
 
   // The version and its source link come from /api/config, which doesn't
   // need the database, so they show even if the system facts can't be read.
@@ -208,9 +202,6 @@
         <ul class="links">
           <li><a href={config.sourceUrl}>Source code</a></li>
           <li><a href={config.bugReportUrl}>Report a bug</a></li>
-          {#if tourOffered.current}
-            <li><button type="button" class="button quiet take-tour" onclick={takeTour}>Take the Tour</button></li>
-          {/if}
         </ul>
       {:else if error}
         <p class="error" role="alert">Couldn't load the version: {error}</p>
@@ -468,10 +459,6 @@
     margin: var(--space-2) 0;
     padding: 0;
     list-style: none;
-  }
-  /* A button among the links, set as one. */
-  .take-tour {
-    font: inherit;
   }
 
   .system {
