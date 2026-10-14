@@ -2,6 +2,7 @@
   import { listedLanguages } from './sharedLanguages.svelte';
   import { rhymingDictionaries as dictionaries } from './sharedRhymingDictionaries.svelte';
   import { formatSmallSize } from './upload';
+  import { formatDay } from './time';
 
   // The rhyming dictionaries, in Settings' Rhyming dictionaries card: every Language
   // Bandmate rhymes in, as it lists them, each with its download size, whether
@@ -13,8 +14,6 @@
 
   /** Why the last Download or Remove of a Language failed. */
   let problem = $state<{ code: string; message: string } | null>(null);
-
-  const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
 
   async function act(code: string, action: (code: string) => Promise<void>) {
     problem = null;
@@ -35,7 +34,7 @@
   /** What's said of a Language under its name: whether it's downloaded, when it was updated, and its size. */
   function details(code: string, size: number): string {
     const updatedAt = dictionaries.updatedAt(code);
-    const state = updatedAt ? `Downloaded, updated ${dateFormat.format(new Date(updatedAt))}` : 'Not downloaded';
+    const state = updatedAt ? `Downloaded, updated ${formatDay(updatedAt)}` : 'Not downloaded';
     return `${state} · ${formatSmallSize(size)}`;
   }
 </script>

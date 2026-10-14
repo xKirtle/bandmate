@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,6 +14,9 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
+
+	"github.com/xKirtle/bandmate/internal/app"
 )
 
 // backup is a Backup as the API lists it.
@@ -66,6 +70,35 @@ func (ts *testServer) downloadBackup(id int64) response {
 	res := ts.Do(http.MethodGet, backupPath(id)+"/file", nil)
 	expectStatus(ts.t, res, http.StatusOK)
 	return res
+}
+
+// savedAs is the name a downloaded file is offered to save under.
+func savedAs(t *testing.T, r response) string {
+	t.Helper()
+	_, params, err := mime.ParseMediaType(r.Header.Get("Content-Disposition"))
+	if err != nil {
+		t.Fatalf("reading Content-Disposition %q: %v", r.Header.Get("Content-Disposition"), err)
+	}
+	return params["filename"]
+}
+
+func TestABackupsFileIsNamedForWhenItWasMadeWhereItsDownloaded(t *testing.T) {
+	clock := &testClock{now: time.Date(2026, 10, 4, 9, 30, 0, 0, time.UTC)}
+	ts := newTestServerWith(t, func(c *app.Config) { c.Now = clock.Now })
+	made := ts.backUp(map[string]any{"songs": []int64{ts.createSong("Night Drive").ID}})
+
+	for zone, want := range map[string]string{
+		"Pacific/Auckland":  "Bandmate Backup 2026-10-04 22-30-00.bandmate",
+		"America/New_York":  "Bandmate Backup 2026-10-04 05-30-00.bandmate",
+		"":                  "Bandmate Backup 2026-10-04 09-30-00.bandmate",
+		"Mars/Olympus_Mons": "Bandmate Backup 2026-10-04 09-30-00.bandmate",
+	} {
+		res := ts.Do(http.MethodGet, backupPath(made.ID)+"/file?zone="+zone, nil)
+		expectStatus(t, res, http.StatusOK)
+		if got := savedAs(t, res); got != want {
+			t.Errorf("zone %q: saved as %q, want %q", zone, got, want)
+		}
+	}
 }
 
 func TestThereAreNoBackupsAtFirst(t *testing.T) {

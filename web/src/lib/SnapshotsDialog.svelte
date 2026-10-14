@@ -12,7 +12,8 @@
   import Dialog from './Dialog.svelte';
   import { type Sheet } from './snapshotDiff';
   import ThenAndNow from './ThenAndNow.svelte';
-  import { snapshotGroups, snapshotReason, snapshotWhen, stepSnapshot, type SnapshotStep } from './snapshots';
+  import { snapshotGroups, snapshotReason, stepSnapshot, type SnapshotStep } from './snapshots';
+  import { formatWhen } from './time';
 
   let {
     songId,
@@ -155,7 +156,7 @@
                     if (i === index) inView(el);
                   }}
                 >
-                  <span class="tabular">{snapshotWhen(s.takenAt, now)}</span>
+                  <span class="tabular">{formatWhen(s.takenAt, now)}</span>
                   {#if why}<span class="snapshot-why">{why}</span>{/if}
                 </button>
                 <button
@@ -190,7 +191,7 @@
               onclick={() => step('older')}><ChevronLeft /></button
             >
             <div class="snapshot-when">
-              <strong class="tabular">{snapshotWhen(chosen.takenAt, now)}</strong>
+              <strong class="tabular">{formatWhen(chosen.takenAt, now)}</strong>
               {#if snapshotReason(chosen)}<span class="snapshot-why">{snapshotReason(chosen)}</span>{/if}
             </div>
             <button
@@ -204,7 +205,7 @@
           </div>
           <div class="snapshot-scroll">
             {#if snapshot}
-              <ThenAndNow then={snapshot.sheet} now={current} when={snapshotWhen(chosen.takenAt, now)} />
+              <ThenAndNow then={snapshot.sheet} now={current} when={formatWhen(chosen.takenAt, now)} />
             {:else if readError}
               <p class="error" role="alert">{readError}</p>
             {:else}

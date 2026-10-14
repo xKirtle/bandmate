@@ -855,8 +855,15 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * The browser's time zone, e.g. "Europe/Lisbon", sent with every request so a
+ * day the server works out, like a Snapshot's, is the user's (ADR 0021).
+ */
+const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+const zoneHeaders = (): Record<string, string> => ({ 'Bandmate-Time-Zone': timeZone() });
+
 async function request<T>(method: string, path: string, body?: unknown, at?: SongAt): Promise<T> {
-  const headers: Record<string, string> = {};
+  const headers = zoneHeaders();
   // The browser sets a form's Content-Type itself, with its boundary, and a
   // file's from its type. Either is sent as it is.
   const asIs = body instanceof FormData || body instanceof Blob;
@@ -876,7 +883,7 @@ async function request<T>(method: string, path: string, body?: unknown, at?: Son
  * been sent, and stopping if the signal aborts, which fails with an AbortError.
  */
 function upload<T>(path: string, file: Blob, options: UploadOptions = {}): Promise<T> {
-  return answer<T>(sendWithProgress('POST', `/api${path}`, file, options));
+  return answer<T>(sendWithProgress('POST', `/api${path}`, file, options, zoneHeaders()));
 }
 
 /**
@@ -908,7 +915,7 @@ async function getLanguageData(code: string, etag?: string): Promise<LanguageDat
   try {
     res = await fetch(`/api/languages/${encodeURIComponent(code)}`, {
       cache: 'no-store',
-      headers: etag ? { 'If-None-Match': etag } : undefined,
+      headers: etag ? { ...zoneHeaders(), 'If-None-Match': etag } : zoneHeaders(),
     });
   } catch {
     throw new ApiError(0, "Can't reach Bandmate. Check your connection.");
@@ -989,7 +996,7 @@ export const api = {
     answer<Fetched>(
       fetch('/api/fetches', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...zoneHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ link }),
         signal,
       }),
@@ -999,7 +1006,9 @@ export const api = {
    * preview it. Aborting the signal stops reading it, failing with an AbortError.
    */
   fetchedAudio: async (fetched: Fetched, signal: AbortSignal): Promise<File> => {
-    const audio = await answer(fetch(`/api/fetches/${fetched.id}/audio`, { signal }), (res) => res.blob());
+    const audio = await answer(fetch(`/api/fetches/${fetched.id}/audio`, { headers: zoneHeaders(), signal }), (res) =>
+      res.blob(),
+    );
     return new File([audio], fetched.fileName, { type: fetched.contentType });
   },
   /** Deletes a fetched file nobody's adding, rather than leaving it to expire. */
@@ -1039,7 +1048,8 @@ export const api = {
   /** Deletes a Backup and its file. */
   deleteBackup: (id: number) => request<null>('DELETE', `/backups/${id}`),
   /** Where a Backup's file downloads from, as one file. */
-  backupDownloadUrl: (id: number) => `/api/backups/${id}/file`,
+  /** A link can't send a header, so it carries the time zone the file's named in. */
+  backupDownloadUrl: (id: number) => `/api/backups/${id}/file?zone=${encodeURIComponent(timeZone())}`,
   /** The Songs a Backup holds, by title, with their ids in it. */
   backupSongs: (id: number) => request<BackupSong[]>('GET', `/backups/${id}/songs`),
   /** The Beats a Backup holds, by title, with their ids in it and the Songs it holds using each. */

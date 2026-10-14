@@ -1,6 +1,6 @@
 // How Backups are named, sized and asked for in Settings' Backups tab.
 import type { Backup, BackupContents, BackupPeriod, BackupPicks, BackupPresent, BackupSchedule } from './api';
-import { shortMonths, timeAgo } from './time';
+import { formatDay, timeAgo } from './time';
 import { formatSmallSize } from './upload';
 
 /** A Backup's name: the one of its own it was given, or else the automatic one. */
@@ -13,9 +13,7 @@ export function backupName(backup: Pick<Backup, 'createdAt' | 'name'> & Contents
  * and what it holds: "4 Oct 2026 · 3 Songs", "4 Oct 2026 · Everything".
  */
 export function automaticName(backup: Pick<Backup, 'createdAt'> & Contents): string {
-  const made = new Date(backup.createdAt);
-  const day = `${made.getDate()} ${shortMonths[made.getMonth()]} ${made.getFullYear()}`;
-  return `${day} · ${contentsName(backup)}`;
+  return `${formatDay(backup.createdAt)} · ${contentsName(backup)}`;
 }
 
 /**

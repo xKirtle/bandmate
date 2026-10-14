@@ -22,10 +22,11 @@ const EditingSession = 10 * time.Minute
 
 // Snapshots are thinned as they age, each time one is taken: every one
 // younger than KeepAllFor stays, then the newest of each day while younger
-// than KeepDailyFor, then the newest of each week. A day is a day in UTC,
-// and a week an ISO week, Monday to Sunday, so which one is the newest of
-// its day or week never changes as they age. A kept Snapshot is never
-// thinned. The Snapshots dialog groups them by the same ages.
+// than KeepDailyFor, then the newest of each week. A day is the date the
+// Snapshot was taken on where the change that took it was made (ADR 0021),
+// and a week that date's ISO week, Monday to Sunday, so which one is the
+// newest of its day or week never changes as they age. A kept Snapshot is
+// never thinned. The Snapshots dialog groups them by the same ages.
 const (
 	KeepAllFor   = 24 * time.Hour
 	KeepDailyFor = KeepAllFor + 30*24*time.Hour
@@ -294,13 +295,14 @@ func encodeSheet(ctx context.Context, tx *sql.Tx, songID int64) (encoded []byte,
 	return encoded, len(sheet.Sections), err
 }
 
-// insertSnapshot keeps sheet as a Snapshot taken at now, for reason, naming
-// what was deleted, if anything, then thins the Song's Snapshots.
+// insertSnapshot keeps sheet as a Snapshot taken at now, on the date it is
+// in the time zone of the change taking it, for reason, naming what was
+// deleted, if anything, then thins the Song's Snapshots.
 func insertSnapshot(ctx context.Context, tx *sql.Tx, songID int64, now time.Time, reason SnapshotReason, deleted string,
 	sheet []byte) error {
 	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO snapshots (song_id, taken_at, reason, deleted, sheet) VALUES (?, ?, ?, NULLIF(?, ''), ?)`,
-		songID, now.Format(domain.TimeFormat), reason, deleted, string(sheet)); err != nil {
+		`INSERT INTO snapshots (song_id, taken_at, taken_on, reason, deleted, sheet) VALUES (?, ?, ?, ?, NULLIF(?, ''), ?)`,
+		songID, now.Format(domain.TimeFormat), now.In(domain.Zone(ctx)).Format(time.DateOnly), reason, deleted, string(sheet)); err != nil {
 		return fmt.Errorf("taking a snapshot: %w", err)
 	}
 	return thinSnapshots(ctx, tx, songID, now)
@@ -311,26 +313,30 @@ func insertSnapshot(ctx context.Context, tx *sql.Tx, songID int64, now time.Time
 func thinSnapshots(ctx context.Context, tx *sql.Tx, songID int64, now time.Time) error {
 	var thinned []int64
 	newest := map[thinSpan]bool{}
-	err := query(ctx, tx, `SELECT id, taken_at FROM snapshots WHERE song_id = ? AND NOT kept
+	err := query(ctx, tx, `SELECT id, taken_at, taken_on FROM snapshots WHERE song_id = ? AND NOT kept
 		ORDER BY taken_at DESC, id DESC`,
 		[]any{songID}, func(rows *sql.Rows) error {
 			var id int64
-			var at string
-			if err := rows.Scan(&id, &at); err != nil {
+			var at, on string
+			if err := rows.Scan(&id, &at, &on); err != nil {
 				return err
 			}
 			taken, err := domain.ParseTime(at)
 			if err != nil {
 				return err
 			}
+			day, err := time.Parse(time.DateOnly, on)
+			if err != nil {
+				return fmt.Errorf("parsing the date snapshot %d was taken on: %w", id, err)
+			}
 			var span thinSpan
-			switch age, utc := now.Sub(taken), taken.UTC(); {
+			switch age := now.Sub(taken); {
 			case age < KeepAllFor:
 				return nil
 			case age < KeepDailyFor:
-				span = thinSpan{year: utc.Year(), n: utc.YearDay()}
+				span = thinSpan{year: day.Year(), n: day.YearDay()}
 			default:
-				year, week := utc.ISOWeek()
+				year, week := day.ISOWeek()
 				span = thinSpan{weekly: true, year: year, n: week}
 			}
 			if newest[span] {

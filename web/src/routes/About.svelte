@@ -16,6 +16,7 @@
   import BrandMark from '../lib/BrandMark.svelte';
   import FoldChevron from '../lib/FoldChevron.svelte';
   import SettingsPage from '../lib/SettingsPage.svelte';
+  import { formatDay } from '../lib/time';
 
   // The version and its source link come from /api/config, which doesn't
   // need the database, so they show even if the system facts can't be read.
@@ -124,9 +125,6 @@
     return () => clearInterval(timer);
   });
 
-  /** "2026-09-29", from an RFC 3339 time. */
-  const day = (iso: string) => iso.slice(0, 10);
-
   let copyStatus = $state<'copied' | 'failed' | null>(null);
   let copyStatusTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -223,7 +221,7 @@
           <dd>
             {#if about.revision}
               <code title={about.revision}>{about.revision.slice(0, 7)}</code>
-              {#if about.commitTime}<span class="muted date">({day(about.commitTime)})</span>{/if}
+              {#if about.commitTime}<span class="muted date">({formatDay(about.commitTime)})</span>{/if}
             {:else}
               <span class="muted">Unknown</span>
             {/if}
@@ -265,7 +263,7 @@
           <dt>Schema</dt>
           <dd>
             <code>{about.schema.migration}</code>
-            <span class="muted date">({day(about.schema.appliedAt)})</span>
+            <span class="muted date">({formatDay(about.schema.appliedAt)})</span>
           </dd>
           <dt>Uptime</dt>
           <dd>{uptime(about.startedAt, now)}</dd>
@@ -324,7 +322,7 @@
                         <FoldChevron />
                         <span class="release-tag">{r.tag}</span>
                         {#if r.name && r.name !== r.tag}<span class="release-name">{r.name}</span>{/if}
-                        <span class="muted date">{day(r.publishedAt)}</span>
+                        <span class="muted date">{formatDay(r.publishedAt)}</span>
                         {#if r.running}<span class="badge badge-running">Running</span>{/if}
                       </summary>
                       <div class="release-body">

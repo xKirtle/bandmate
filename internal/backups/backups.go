@@ -247,7 +247,10 @@ func (s *Store) Serve(w http.ResponseWriter, r *http.Request, id int64) error {
 	}
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	audio.OfferToSave(w, "Bandmate Backup "+b.CreatedAt.Format("2006-01-02 15-04-05")+" UTC"+FileExtension)
+	// Named for when it was made where it's downloaded, as the Backups page
+	// shows it.
+	made := b.CreatedAt.In(domain.Zone(r.Context()))
+	audio.OfferToSave(w, "Bandmate Backup "+made.Format("2006-01-02 15-04-05")+FileExtension)
 	http.ServeContent(w, r, "", info.ModTime(), file)
 	return nil
 }
