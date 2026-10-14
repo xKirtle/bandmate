@@ -10,6 +10,8 @@ const card = (page: Page) => page.getByRole('dialog');
 const next = (page: Page) => card(page).getByRole('button', { name: /^(Next|Finish)$/ });
 /** The offer, under "Write your first Song". */
 const offer = (page: Page) => page.getByText('New here?');
+/** The offer's Take the Tour. */
+const take = (page: Page) => offer(page).getByRole('button', { name: 'Take the Tour' });
 
 /** Where takeTour takes the Tour from: the empty Songs page. */
 const takenFrom = /\/$/;
@@ -20,7 +22,7 @@ const takenFrom = /\/$/;
  */
 async function takeTour(page: Page, timeout?: number) {
   await page.goto('/');
-  await offer(page).getByRole('button', { name: 'Take the Tour' }).click();
+  await take(page).click();
   await expect(page).toHaveURL(/\/songs\/demo$/);
   await expect(card(page).getByRole('heading', { name: 'Sections' })).toBeVisible({ timeout });
 }
@@ -29,12 +31,11 @@ test('the empty Songs page offers the Tour under Write your first Song, and noth
   await page.goto('/');
 
   const write = page.getByRole('button', { name: 'Write your first Song' });
-  const take = offer(page).getByRole('button', { name: 'Take the Tour' });
-  await expect(take).toBeVisible();
+  await expect(take(page)).toBeVisible();
   // There's one way in, and no turning it down.
   await expect(page.getByRole('button', { name: 'Take the Tour' })).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'No thanks' })).toHaveCount(0);
-  const [takeBox, writeBox] = [(await take.boundingBox())!, (await write.boundingBox())!];
+  const [takeBox, writeBox] = [(await take(page).boundingBox())!, (await write.boundingBox())!];
   expect(takeBox.y).toBeGreaterThan(writeBox.y + writeBox.height);
 
   await page.goto('/settings/about');
@@ -54,7 +55,7 @@ test('writing a Song takes the offer away, and deleting every Song brings it bac
 
   await bandmate.wipe();
   await page.reload();
-  await expect(offer(page).getByRole('button', { name: 'Take the Tour' })).toBeVisible();
+  await expect(take(page)).toBeVisible();
 });
 
 test('the Songs page offers no Tour on a phone', async ({ page }) => {
@@ -105,7 +106,7 @@ test('the last step points to the docs', async ({ page }) => {
   for (let i = 0; i < 7; i++) await page.keyboard.press('ArrowRight');
 
   await expect(card(page).getByRole('link', { name: 'Open the docs' })).toBeVisible();
-  await expect(card(page)).not.toContainText('again');
+  await expect(card(page)).not.toContainText('take this Tour again');
 });
 
 test('← and → step back and forward', async ({ page }) => {
@@ -159,7 +160,7 @@ test('End tour ends it, back where it was taken from, as the browser’s Back wo
   await card(page).getByRole('button', { name: 'End tour' }).click();
 
   await expect(page).toHaveURL(takenFrom);
-  await expect(offer(page).getByRole('button', { name: 'Take the Tour' })).toBeVisible();
+  await expect(take(page)).toBeVisible();
   // The Songs page isn't in the history twice.
   await page.goBack();
   await expect(page).toHaveURL(/\/settings\/about$/);

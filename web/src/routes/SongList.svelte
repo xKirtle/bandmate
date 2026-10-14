@@ -57,8 +57,7 @@
   // svelte-ignore state_referenced_locally
   const query = new SongListQuery(api, songListViewFromParams(new URLSearchParams(router.search)), folderId);
 
-  // While there are no Songs, the empty Songs page offers the Tour, on a wide
-  // window only.
+  // Whether the window is wide enough for the Tour, which is offered on no other.
   const tourFitsWindow = new MediaQuery(tourFits);
 
   const sorted = $derived(query.songs && sortSongs(query.songs, query.view.sort));
@@ -357,6 +356,7 @@
         <button type="button" class="button primary" disabled={creating} onclick={createSong}>
           {creating ? 'Creating…' : 'Write your first Song'}
         </button>
+        <!-- While there are no Songs, the empty page offers the Tour: its only way in. -->
         {#if tourFitsWindow.current}
           <p class="tour-offer muted">
             New here?
