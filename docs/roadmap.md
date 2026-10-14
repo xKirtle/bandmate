@@ -31,11 +31,6 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 
 - Show the playhead, the Line highlight and Sync mode's "Now" where the audio is heard, by the output latency the browser reports. It's unnoticeable through an interface, but 150–250 ms late over Bluetooth. A tap test to correct it, only if the reported figure proves off.
 
-## A tutorial
-
-- A first-time walkthrough of Bandmate. It can be dismissed, and taken again whenever the user wants.
-- It comes with a demo Song and Beat to work through, created when the user asks for them, from audio built into the binary. A migration would add them to every existing install on upgrade, and a Beat's audio is a file in the data directory, not a row, so SQL alone can't ship it. Created on request, a deleted demo can be added again. The Beat's audio needs a licence that allows shipping it.
-
 ## Playback speed
 
 - Slow the Timeline down, or speed it up, without changing its pitch, for learning a part, especially over a Loop.
