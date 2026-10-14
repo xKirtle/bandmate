@@ -277,11 +277,11 @@ A copy of the whole install's Songs, Beats and everything else Bandmate keeps, a
 _Avoid_: Backup (a Backup holds chosen Songs and Beats, to Restore from), Snapshot
 
 **Tour**:
-A guided walk through Bandmate's core loop on the Demo Song, from writing Lines and Chords to playing the Demo Beat and where a Take is recorded, one step at a time on the real controls. It's offered once, the first time a new install with no Songs is opened on a wide window, and can be skipped at any step or taken again later.
+A guided look at Bandmate's core loop on the Demo Song, from Sections, Lines and Chords to the Demo Beat on the Timeline and where a Take is recorded, one step at a time, each spotlighting a real control. It only shows: there's nothing to do in it but read on. It's offered once, the first time a new install with no Songs is opened on a wide window, and can be ended at any step or taken again later.
 _Avoid_: Tutorial, walkthrough, onboarding
 
 **Demo Song**:
-A Song built into Bandmate for the Tour to work through, with its Timeline holding the Demo Beat. It isn't one of the user's Songs: it never shows among them, nor goes into a Backup, and it's put back as it was built each time the Tour starts, losing what was done to it.
+A Song built into Bandmate for the Tour to show, with its Timeline holding the Demo Beat. It isn't one of the user's Songs: it's seen only during the Tour and never changed, never shows among them, and never goes into a Backup.
 _Avoid_: Sample Song, example
 
 **Demo Beat**:
