@@ -68,9 +68,7 @@ Configuration, updating and the rest are in the [self-hosting guide](https://xki
 - [Contributing](CONTRIBUTING.md): reporting bugs, sharing ideas, and building Bandmate
 - [Security policy](SECURITY.md): reporting a vulnerability
 
-## How it's built
-
-Bandmate is built by one maintainer working closely with AI coding agents, mostly Claude Code. Every change starts as a spec in an issue and lands through a reviewed pull request, tested by unit and end-to-end tests in CI. [AGENTS.md](AGENTS.md) holds the conventions both follow.
+Bandmate is developed with heavy AI assistance, held to the same rules as every contribution: see [Contributing](CONTRIBUTING.md).
 
 ## License
 
