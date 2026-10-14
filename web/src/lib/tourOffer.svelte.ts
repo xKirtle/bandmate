@@ -2,11 +2,12 @@
 // first Song", on a new install, until it's taken or turned down. Whether
 // it's been offered is the server's, for the whole install, so a choice on
 // one Device holds on every other.
+import type { TourOffered } from './api';
 
 /** The calls the offer goes through: the api, or a fake of it. */
 export interface TourOfferSource {
-  tour: () => Promise<{ offered: boolean }>;
-  markTourOffered: () => Promise<{ offered: boolean }>;
+  tourOffered: () => Promise<TourOffered>;
+  markTourOffered: () => Promise<TourOffered>;
 }
 
 export class TourOffer {
@@ -29,7 +30,7 @@ export class TourOffer {
    */
   async load() {
     try {
-      this.#offered = (await this.#source.tour()).offered;
+      this.#offered = (await this.#source.tourOffered()).offered;
     } catch {
       this.#offered = null;
     }

@@ -83,7 +83,7 @@ var songTables = []songTable{
 // their schedule, and whether the Tour was offered.
 var notCopied = map[string]bool{
 	"schema_migrations": true, "sqlite_sequence": true, "bandmate_version": true, "backups": true,
-	"backup_schedule": true, "tour": true,
+	"backup_schedule": true, "tour_offered": true,
 }
 
 // copyAttempts is how often a Song's copy, or the Beat Library's, is tried

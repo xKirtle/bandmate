@@ -8,8 +8,8 @@ type tourOffer struct {
 	Offered bool `json:"offered"`
 }
 
-// tourState tells whether the Tour has been offered.
-func (a *App) tourState(w http.ResponseWriter, r *http.Request) {
+// tourOffered tells whether the Tour has been offered.
+func (a *App) tourOffered(w http.ResponseWriter, r *http.Request) {
 	offered, err := a.tour.Offered(r.Context())
 	if err != nil {
 		writeDomainError(w, err)

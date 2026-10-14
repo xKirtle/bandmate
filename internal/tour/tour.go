@@ -1,11 +1,10 @@
-// Package tour keeps what the server knows of the Tour: whether it's been
+// Package tour keeps all the server knows of the Tour: whether it's been
 // offered on the empty Songs page. The Tour itself is held in the browser.
 package tour
 
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 )
 
@@ -19,10 +18,7 @@ func NewStore(db *sql.DB) *Store { return &Store{db: db} }
 // turned down from the offer, or upgraded from before the Tour with Songs.
 func (s *Store) Offered(ctx context.Context) (bool, error) {
 	var offered bool
-	err := s.db.QueryRowContext(ctx, `SELECT offered FROM tour WHERE id = 1`).Scan(&offered)
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
-	}
+	err := s.db.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM tour_offered)`).Scan(&offered)
 	if err != nil {
 		return false, fmt.Errorf("reading whether the Tour was offered: %w", err)
 	}
@@ -31,9 +27,7 @@ func (s *Store) Offered(ctx context.Context) (bool, error) {
 
 // MarkOffered marks the Tour offered, for good.
 func (s *Store) MarkOffered(ctx context.Context) error {
-	_, err := s.db.ExecContext(ctx, `INSERT INTO tour (id, offered) VALUES (1, 1)
-		ON CONFLICT (id) DO UPDATE SET offered = 1`)
-	if err != nil {
+	if _, err := s.db.ExecContext(ctx, `INSERT OR IGNORE INTO tour_offered (id) VALUES (1)`); err != nil {
 		return fmt.Errorf("marking the Tour offered: %w", err)
 	}
 	return nil

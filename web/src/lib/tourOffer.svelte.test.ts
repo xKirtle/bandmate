@@ -12,7 +12,7 @@ function fakeServer(offered: boolean) {
     failing: false,
     marks: 0,
     source: {
-      tour: () => Promise.resolve({ offered: server.offered }),
+      tourOffered: () => Promise.resolve({ offered: server.offered }),
       markTourOffered: () => {
         server.marks++;
         if (server.failing) return Promise.reject(new ApiError(500, 'database unreachable'));
@@ -63,7 +63,7 @@ describe('the offer of the Tour', () => {
   it("doesn't show if that can't be read", async () => {
     const offer = new TourOffer(
       {
-        tour: () => Promise.reject(new ApiError(500, 'database unreachable')),
+        tourOffered: () => Promise.reject(new ApiError(500, 'database unreachable')),
         markTourOffered: () => Promise.reject(),
       },
       () => {},
