@@ -43,7 +43,6 @@
   import { MediaQuery } from 'svelte/reactivity';
   import { takeTour } from '../lib/theTour';
   import { tourFits } from '../lib/tour.svelte';
-  import { TourOffer } from '../lib/tourOffer.svelte';
 
   let {
     folderId,
@@ -58,12 +57,9 @@
   // svelte-ignore state_referenced_locally
   const query = new SongListQuery(api, songListViewFromParams(new URLSearchParams(router.search)), folderId);
 
-  // A new install's empty Songs page offers the Tour, on a wide window only;
-  // otherwise the header has it, beside the title, for taking again.
-  const tourOffer = new TourOffer(api, takeTour);
+  // While there are no Songs, the empty Songs page offers the Tour, on a wide
+  // window only.
   const tourFitsWindow = new MediaQuery(tourFits);
-  // svelte-ignore state_referenced_locally
-  if (folderId === undefined) tourOffer.load();
 
   const sorted = $derived(query.songs && sortSongs(query.songs, query.view.sort));
   const filtered = $derived(isSongListFiltered(query.view));
@@ -71,12 +67,6 @@
   // whatever the Songs are sorted by, but for while the list is every Song.
   const sortedFolders = $derived(query.folders ? sortFolders(query.folders) : []);
   const listedFolders = $derived(folderId === undefined && !query.acrossFolders ? sortedFolders : []);
-  // The page as the Tour's offer and the header's Take the Tour go by it.
-  const songsPage = $derived({
-    loaded: query.error !== null || (query.songs !== null && query.folders !== null),
-    empty: !query.anySongs && listedFolders.length === 0,
-    wide: tourFitsWindow.current,
-  });
   const folderNames = $derived(new Map(query.folders?.map((f) => [f.id, f.name])));
   const folder = $derived(folderId === undefined ? undefined : query.folders?.find((f) => f.id === folderId));
   const folderMissing = $derived(folderId !== undefined && query.folders !== null && !folder);
@@ -259,9 +249,6 @@
 <header class="bar list-bar" bind:this={header}>
   {#if folderId === undefined}
     <h1>Songs</h1>
-    {#if tourOffer.headerShows(songsPage)}
-      <button type="button" class="button quiet" onclick={takeTour}>Take the Tour</button>
-    {/if}
   {:else}
     <div class="trail">
       <a class="up" class:drop-target={dragging.aimsAt(null)} href={topHref} {...songTarget(null)}>Songs</a>
@@ -370,16 +357,11 @@
         <button type="button" class="button primary" disabled={creating} onclick={createSong}>
           {creating ? 'Creating…' : 'Write your first Song'}
         </button>
-        {#if tourOffer.shows(songsPage)}
+        {#if tourFitsWindow.current}
           <p class="tour-offer muted">
             New here?
-            <button type="button" class="button quiet" onclick={() => tourOffer.take()}>Take the Tour</button>
-            ·
-            <button type="button" class="button quiet" onclick={() => tourOffer.decline()}>No thanks</button>
+            <button type="button" class="button quiet" onclick={takeTour}>Take the Tour</button>
           </p>
-          {#if tourOffer.error}
-            <p class="error" role="alert">{tourOffer.error}</p>
-          {/if}
         {/if}
       {:else}
         <p>No Songs in this Folder yet.</p>
