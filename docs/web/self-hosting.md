@@ -142,17 +142,18 @@ Bandmate only goes online when you do something that needs it:
 
 ### Image tags
 
-`:latest` is the newest release, and what most installs want. To control when you update, pin a version instead, by setting `BANDMATE_IMAGE`, e.g. `BANDMATE_IMAGE=ghcr.io/xkirtle/bandmate:0.4`.
+`:latest` is the newest release, and what most installs want. To control when you update, pin a version instead, by setting `BANDMATE_IMAGE`, e.g. `BANDMATE_IMAGE=ghcr.io/xkirtle/bandmate:1`.
 
 | Tag            | What you get                                                                  |
 | -------------- | ----------------------------------------------------------------------------- |
 | `:latest`      | The newest release                                                            |
-| `:X.Y`         | Fixes for that version, but no new features, e.g. `:0.4`                      |
-| `:X.Y.Z`       | Exactly one release, e.g. `:0.4.0`. It never changes                          |
+| `:X`           | New features and fixes, but never a breaking change, e.g. `:1`. From 1.0 on   |
+| `:X.Y`         | Fixes for that version, but no new features, e.g. `:1.4`                      |
+| `:X.Y.Z`       | Exactly one release, e.g. `:1.4.0`. It never changes                          |
 | `:edge`        | The latest development build, ahead of any release. It can change at any time |
 | `:sha-<short>` | One development build, by its commit, e.g. `:sha-1a2b3c4`                     |
 
-New features bump the middle number, and fixes alone the last one, as [CONTRIBUTING.md](https://github.com/xKirtle/bandmate/blob/main/CONTRIBUTING.md#versions) describes.
+A breaking change bumps the first number, new features the middle one, and fixes alone the last one, as [CONTRIBUTING.md](https://github.com/xKirtle/bandmate/blob/main/CONTRIBUTING.md#versions) describes. A breaking change is one that stops your data folder upgrading in place, stops a Backup restoring into a newer Bandmate, changes what an image tag or a `BANDMATE_*` setting means, or adds logins to Bandmate.
 
 ### Upgrading and rolling back
 
