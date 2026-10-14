@@ -32,7 +32,10 @@ async function newOffer(server: ReturnType<typeof fakeServer>) {
   return { offer, taken: () => taken };
 }
 
-const empty = { anySongs: false, wide: true };
+/** The Songs page with nothing on it, Song or Folder, on a wide window. */
+const empty = { empty: true, wide: true };
+/** The Songs page with something on it, on a wide window. */
+const listing = { empty: false, wide: true };
 
 describe('the offer of the Tour', () => {
   it('shows on a new install with no Songs, on a wide window', async () => {
@@ -42,12 +45,12 @@ describe('the offer of the Tour', () => {
 
   it("doesn't show on a phone", async () => {
     const { offer } = await newOffer(fakeServer(false));
-    expect(offer.shows({ anySongs: false, wide: false })).toBe(false);
+    expect(offer.shows({ empty: true, wide: false })).toBe(false);
   });
 
-  it("doesn't show once a Song exists", async () => {
+  it("doesn't show once the page lists anything, a Song or a Folder", async () => {
     const { offer } = await newOffer(fakeServer(false));
-    expect(offer.shows({ anySongs: true, wide: true })).toBe(false);
+    expect(offer.shows(listing)).toBe(false);
   });
 
   it("doesn't show once it's been offered", async () => {
@@ -121,35 +124,40 @@ describe('the offer of the Tour', () => {
 });
 
 describe('the Songs page header’s Take the Tour', () => {
-  it('shows on a wide window once Songs exist', async () => {
+  /** The page as loaded, its list read or failed to be. */
+  const loaded = (page: { empty: boolean; wide: boolean }) => ({ ...page, loaded: true });
+
+  it('shows on a wide window once the page lists something', async () => {
     const { offer } = await newOffer(fakeServer(false));
-    expect(offer.headerShows({ anySongs: true, wide: true })).toBe(true);
+    expect(offer.headerShows(loaded(listing))).toBe(true);
   });
 
   it('shows on an empty install once the Tour has been offered', async () => {
     const { offer } = await newOffer(fakeServer(true));
-    expect(offer.headerShows(empty)).toBe(true);
+    expect(offer.headerShows(loaded(empty))).toBe(true);
   });
 
   it('doesn’t show while the offer does, which has the Tour already', async () => {
     const { offer } = await newOffer(fakeServer(false));
-    expect(offer.headerShows(empty)).toBe(false);
+    expect(offer.headerShows(loaded(empty))).toBe(false);
   });
 
   it('shows once the offer is turned down', async () => {
     const { offer } = await newOffer(fakeServer(false));
     await offer.decline();
-    expect(offer.headerShows(empty)).toBe(true);
+    expect(offer.headerShows(loaded(empty))).toBe(true);
   });
 
   it('doesn’t show on a phone', async () => {
     const { offer } = await newOffer(fakeServer(true));
-    expect(offer.headerShows({ anySongs: true, wide: false })).toBe(false);
+    expect(offer.headerShows(loaded({ empty: false, wide: false }))).toBe(false);
   });
 
-  it('doesn’t show until it’s known whether the offer shows, so it doesn’t blink out as the offer comes', () => {
+  it('doesn’t show until it’s known whether the offer does, so it doesn’t blink out as the offer comes', async () => {
     const offer = new TourOffer(fakeServer(false).source, () => {});
-    expect(offer.headerShows({ anySongs: true, wide: true })).toBe(false);
+    expect(offer.headerShows(loaded(listing))).toBe(false);
+    await offer.load();
+    expect(offer.headerShows({ ...empty, loaded: false })).toBe(false);
   });
 
   it('shows if whether it’s been offered can’t be read, the offer not showing', async () => {
@@ -161,6 +169,6 @@ describe('the Songs page header’s Take the Tour', () => {
       () => {},
     );
     await offer.load();
-    expect(offer.headerShows(empty)).toBe(true);
+    expect(offer.headerShows(loaded(empty))).toBe(true);
   });
 });

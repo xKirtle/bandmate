@@ -5,6 +5,14 @@
 // Tour, for taking again.
 import type { TourOffered } from './api';
 
+/** The Songs page, as the offer and the header's Take the Tour go by it. */
+export interface SongsPage {
+  /** Whether it shows nothing, no Song and no Folder: its empty state, where the offer goes. */
+  empty: boolean;
+  /** Whether the window is wide enough for the Tour. */
+  wide: boolean;
+}
+
 /** The calls the offer goes through: the api, or a fake of it. */
 export interface TourOfferSource {
   tourOffered: () => Promise<TourOffered>;
@@ -14,10 +22,13 @@ export interface TourOfferSource {
 export class TourOffer {
   readonly #source: TourOfferSource;
   readonly #takeTour: () => void;
-  /** Whether it's been offered; null until that's known, when it isn't shown. */
+  /**
+   * Whether it's been offered; null until that's read, or if it can't be,
+   * when it isn't shown.
+   */
   #offered = $state<boolean | null>(null);
   /** Whether reading that has finished, read or not. */
-  #loaded = $state(false);
+  #read = $state(false);
   /** Why taking or turning it down failed, shown beside it. */
   error = $state<string | null>(null);
 
@@ -37,23 +48,25 @@ export class TourOffer {
     } catch {
       this.#offered = null;
     }
-    this.#loaded = true;
+    this.#read = true;
   }
 
   /**
-   * Whether the empty Songs page shows it: if it hasn't been offered, there
-   * are no Songs, and the window is wide enough for the Tour.
+   * Whether the Songs page shows it: if it hasn't been offered, the page is
+   * empty, and the window is wide enough for the Tour.
    */
-  shows({ anySongs, wide }: { anySongs: boolean; wide: boolean }) {
-    return this.#offered === false && !anySongs && wide;
+  shows({ empty, wide }: SongsPage) {
+    return this.#offered === false && empty && wide;
   }
 
   /**
    * Whether the Songs page's header shows Take the Tour: on a wide window,
-   * while the offer doesn't, once it's known whether the offer does.
+   * while the offer doesn't, once it's known whether the offer does: once
+   * it's read whether it's been offered, and the page has loaded its list,
+   * or failed to.
    */
-  headerShows({ anySongs, wide }: { anySongs: boolean; wide: boolean }) {
-    return this.#loaded && wide && !this.shows({ anySongs, wide });
+  headerShows({ loaded, ...page }: SongsPage & { loaded: boolean }) {
+    return this.#read && loaded && page.wide && !this.shows(page);
   }
 
   /** Take the Tour: marks it offered, then takes it. */

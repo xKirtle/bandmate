@@ -15,9 +15,9 @@ const header = (page: Page) => page.getByRole('banner');
 const takenFrom = /\/\?q=light$/;
 
 /**
- * Takes the Tour from the Songs page's header, searched for its one Song, which
- * keeps the offer from showing there instead, and waits for its first step,
- * timeout ms at most.
+ * Takes the Tour from the Songs page's header, with a Song in Bandmate, so
+ * that it isn't offered on the empty page instead, and the page searched, as
+ * somewhere to come back to; waits for its first step, timeout ms at most.
  */
 async function takeTour(page: Page, bandmate: Bandmate, timeout?: number) {
   await bandmate.song({ title: 'Morning Light' });
@@ -34,7 +34,7 @@ test('the Songs page offers the Tour beside its title, and About doesn’t', asy
   const take = header(page).getByRole('button', { name: 'Take the Tour' });
   const title = header(page).getByRole('heading', { name: 'Songs' });
   await expect(take).toBeVisible();
-  // On the same line, just after the title.
+  // On the same line, just after the title, not off at the bar's far end.
   const [takeBox, titleBox] = [(await take.boundingBox())!, (await title.boundingBox())!];
   expect(takeBox.y + takeBox.height / 2).toBeCloseTo(titleBox.y + titleBox.height / 2, -1);
   expect(takeBox.x).toBeGreaterThan(titleBox.x + titleBox.width);
@@ -54,16 +54,22 @@ test('the Songs page offers no Tour on a phone', async ({ page, bandmate }) => {
   await expect(page.getByRole('button', { name: 'Take the Tour' })).toHaveCount(0);
 });
 
-test('a new install’s offer has the Tour, not the header, until it’s turned down', async ({ page }) => {
-  // The worker's Bandmate is a new install: nothing has turned the offer down yet.
+test('a new install’s empty page offers the Tour, not the header, and with a Folder on it, the header does', async ({
+  page,
+  bandmate,
+}) => {
+  // The worker's Bandmate is a new install, whose offer nothing in the suite
+  // takes or turns down: that's for good, and wiping Bandmate doesn't undo it.
   await page.goto('/');
 
   const offer = page.getByText('New here?');
   await expect(offer.getByRole('button', { name: 'Take the Tour' })).toBeVisible();
   await expect(header(page).getByRole('button', { name: 'Take the Tour' })).toHaveCount(0);
 
-  await offer.getByRole('button', { name: 'No thanks' }).click();
+  await bandmate.folder('Demos');
+  await page.reload();
 
+  await expect(page.getByRole('link', { name: 'Demos' })).toBeVisible();
   await expect(offer).toHaveCount(0);
   await expect(header(page).getByRole('button', { name: 'Take the Tour' })).toBeVisible();
 });
