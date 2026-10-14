@@ -17,6 +17,31 @@ export function popoverTop(
   return Math.max(gap, over);
 }
 
+/**
+ * Where a popover `size` big goes, `gap` px beside what it points at: to its
+ * right, or its left, centred on it but kept inside the window; or, for
+ * something too wide for either, such as the docked Timeline, over it, or
+ * under it when there's no room above, lined up with its start.
+ */
+export function popoverBeside(
+  anchor: { left: number; right: number; top: number; bottom: number },
+  size: { width: number; height: number },
+  viewport: { width: number; height: number },
+  gap: number,
+): { left: number; top: number } {
+  const { width, height } = size;
+  let left = anchor.right + gap;
+  if (left + width > viewport.width - gap) left = anchor.left - gap - width;
+  if (left < gap) {
+    return {
+      left: Math.max(gap, Math.min(anchor.left, viewport.width - gap - width)),
+      top: popoverTop(anchor, height, viewport.height, gap, 'over'),
+    };
+  }
+  const middle = (anchor.top + anchor.bottom) / 2 - height / 2;
+  return { left, top: Math.max(gap, Math.min(middle, viewport.height - gap - height)) };
+}
+
 /** Which edge of what a popover opens from it lines up with: its start, or its end. */
 export type PopoverAlign = 'start' | 'end';
 

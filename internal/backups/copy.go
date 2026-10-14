@@ -79,8 +79,8 @@ var songTables = []songTable{
 }
 
 // notCopied are the tables holding nothing of a Song: the schema's own
-// bookkeeping, the Bandmate that last ran on the database, the Backups and
-// their schedule.
+// bookkeeping, the Bandmate that last ran on the database, and the Backups
+// and their schedule.
 var notCopied = map[string]bool{
 	"schema_migrations": true, "sqlite_sequence": true, "bandmate_version": true, "backups": true,
 	"backup_schedule": true,
@@ -96,7 +96,7 @@ var errFileGone = errors.New("a file was removed while it was backed up")
 
 // beatLibraryTables picks every Beat: the whole Beat Library, some of which
 // may already be in the Backup from a Song.
-var beatLibraryTables = []songTable{{name: "beats", shared: true, where: `TRUE`}}
+var beatLibraryTables = []songTable{{name: "beats", shared: true, where: `NOT demo`}}
 
 // beatLibraryFiles lists the files the Beat Library's rows use.
 var beatLibraryFiles = []songfiles.Kind{{Dir: songfiles.Beats.Dir, Table: songfiles.Beats.Table, IDs: `SELECT id FROM main.beats`}}

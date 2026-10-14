@@ -173,7 +173,7 @@ func (s *Store) read(ctx context.Context, id int64) (Beat, string, error) {
 // List returns the Beats whose title or producer contains query, ignoring
 // case, most recently added first. Their peaks are left out.
 func (s *Store) List(ctx context.Context, query string) ([]Beat, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT `+columns+` FROM beats ORDER BY created_at DESC, id DESC`)
+	rows, err := s.db.QueryContext(ctx, `SELECT `+columns+` FROM beats WHERE NOT demo ORDER BY created_at DESC, id DESC`)
 	if err != nil {
 		return nil, fmt.Errorf("listing beats: %w", err)
 	}

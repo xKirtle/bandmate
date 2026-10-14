@@ -28,6 +28,7 @@
     drag,
     places = [],
     onCaret,
+    tour,
   }: {
     section: Section;
     /** Focus the Label when this becomes true, e.g. for a Section just added. */
@@ -48,6 +49,8 @@
     places?: Place[];
     /** Given, hears where the caret is in the text box, to suggest Rhymes for the word at it. */
     onCaret?: CaretListener;
+    /** Given, names the Section for the Tour to spotlight: its head and its Lines, as `data-tour` `<tour>-head` and `<tour>-lines`. */
+    tour?: string;
   } = $props();
 
   // The server guarantees exactly one active Alternate.
@@ -195,7 +198,7 @@
 {/snippet}
 
 <article class="card section" aria-label={labelOf(section)}>
-  <div class="head">
+  <div class="head" data-tour={tour && `${tour}-head`}>
     {@render grip?.()}
     <label class="visually-hidden" for="label-{section.id}">Label</label>
     <Combobox
@@ -320,7 +323,15 @@
     </div>
   {:else}
     {#key active.id}
-      <AlternateText alternate={active} sectionId={section.id} label="Lines" {editing} {cueing} {onCaret} />
+      <AlternateText
+        alternate={active}
+        sectionId={section.id}
+        label="Lines"
+        {editing}
+        {cueing}
+        {onCaret}
+        tour={tour && `${tour}-lines`}
+      />
     {/key}
   {/if}
 </article>

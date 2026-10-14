@@ -40,6 +40,9 @@
   import TagLine from '../lib/TagLine.svelte';
   import TagsDialog from '../lib/TagsDialog.svelte';
   import { timeAgo } from '../lib/time';
+  import { MediaQuery } from 'svelte/reactivity';
+  import { takeTour } from '../lib/theTour';
+  import { tourFits } from '../lib/tour.svelte';
 
   let {
     folderId,
@@ -53,6 +56,9 @@
   // Folder open never changes: App makes a new Song list for each.
   // svelte-ignore state_referenced_locally
   const query = new SongListQuery(api, songListViewFromParams(new URLSearchParams(router.search)), folderId);
+
+  // Whether the window is wide enough for the Tour, which is offered on no other.
+  const tourFitsWindow = new MediaQuery(tourFits);
 
   const sorted = $derived(query.songs && sortSongs(query.songs, query.view.sort));
   const filtered = $derived(isSongListFiltered(query.view));
@@ -350,6 +356,13 @@
         <button type="button" class="button primary" disabled={creating} onclick={createSong}>
           {creating ? 'Creating…' : 'Write your first Song'}
         </button>
+        <!-- While there are no Songs, the empty page offers the Tour: its only way in. -->
+        {#if tourFitsWindow.current}
+          <p class="tour-offer muted">
+            New here?
+            <button type="button" class="button quiet" onclick={takeTour}>Take the Tour</button>
+          </p>
+        {/if}
       {:else}
         <p>No Songs in this Folder yet.</p>
         <button type="button" class="button primary" disabled={creating} onclick={createSong}>
@@ -729,6 +742,18 @@
   .empty {
     text-align: center;
     padding: var(--space-8) 0;
+  }
+  /* The Tour's offer: a quiet line under the empty state's button. */
+  .tour-offer {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: var(--space-1);
+    margin: var(--space-6) 0 0;
+    font-size: var(--text-sm);
+  }
+  .tour-offer .button {
+    font-size: inherit;
   }
 
   /* Desktop shows a table, narrower windows the list. */

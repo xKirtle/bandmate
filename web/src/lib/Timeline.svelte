@@ -1989,6 +1989,7 @@
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <section
   class="timeline"
+  data-tour="timeline"
   aria-label="Timeline"
   bind:offsetHeight={height}
   onkeydown={timelineKeyDown}
@@ -2053,6 +2054,7 @@
       <button
         type="button"
         class="toggle record edit-only"
+        data-tour="record"
         aria-pressed={capturing}
         disabled={!capturing && !canRecord}
         onclick={switchRecording}
@@ -2374,7 +2376,7 @@
                 onpointerdown={laneDown}
                 oncontextmenu={laneContextMenu}
               >
-                {#each placed as { clip, at, editing } (clip.id)}
+                {#each placed as { clip, at, editing }, c (clip.id)}
                   {@const wave = waveWindow(view, at.start, at.length)}
                   {@const title = titleOf(clip)}
                   {@const isSelected = selection.has(clip.id)}
@@ -2387,10 +2389,12 @@
                   <!-- As trimmed, so a trim being dragged shortens them to fit, as saving it will. -->
                   {@const fades = fitFades(clip, at.length)}
                   <!-- Focusable for its Delete and menu keys; pointer dragging has no key equivalent yet, and its actions are in its menu. -->
+                  <!-- The Tour spotlights the first Track's first Clip: on the Demo Song, the Demo Beat's. -->
                   <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
                   <div
                     id="clip-{clip.id}"
                     class="clip"
+                    data-tour={t === 0 && c === 0 ? 'clip' : undefined}
                     class:editing
                     class:moving={editing && clipDrag.mode === 'move'}
                     class:nudging={editing && clipDrag.mode === 'nudge'}

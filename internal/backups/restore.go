@@ -192,6 +192,13 @@ func (s *Store) Restore(ctx context.Context, id int64, picks Picks, replace Repl
 		return Restored{}, err
 	}
 	defer r.close()
+	return s.restore(ctx, r, picks, replace, false)
+}
+
+// restore brings back what picks names from the opened Backup r, as Restore
+// does. If demo is set, what it brings back is the Demo, replacing the one
+// in Bandmate (see PutDemoBack).
+func (s *Store) restore(ctx context.Context, r *openedBackup, picks Picks, replace Replace, demo bool) (Restored, error) {
 	picked, err := r.pick(ctx, picks)
 	if err != nil {
 		return Restored{}, err
@@ -214,7 +221,7 @@ func (s *Store) Restore(ctx context.Context, id int64, picks Picks, replace Repl
 	if err := r.closeDB(); err != nil {
 		return Restored{}, err
 	}
-	return s.copyIn(ctx, r.staging, picked, replace)
+	return s.copyIn(ctx, r.staging, picked, replace, demo)
 }
 
 // pick checks picks names Songs and Beats the Backup holds, at least one,
@@ -495,8 +502,9 @@ func (r *openedBackup) unpackFiles(ctx context.Context, files []songfiles.Kind, 
 // copyIn copies what picks names from the Backup's database in staging
 // into the live one in one transaction, with fresh ids, but for the Songs
 // and Beats replace lists, linking in their unpacked files under those ids,
-// and returns what it copied in.
-func (s *Store) copyIn(ctx context.Context, staging string, picks Picks, replace Replace) (restored Restored, err error) {
+// and returns what it copied in. If demo is set, it first deletes the Demo
+// in Bandmate, and marks what it copies in as the Demo.
+func (s *Store) copyIn(ctx context.Context, staging string, picks Picks, replace Replace, demo bool) (restored Restored, err error) {
 	conn, err := s.db.Conn(ctx)
 	if err != nil {
 		return Restored{}, err
@@ -537,6 +545,12 @@ func (s *Store) copyIn(ctx context.Context, staging string, picks Picks, replace
 	if _, err := tx.ExecContext(ctx, `PRAGMA defer_foreign_keys = ON`); err != nil {
 		return Restored{}, err
 	}
+	var demoFiles []string
+	if demo {
+		if demoFiles, err = clearDemo(ctx, tx); err != nil {
+			return Restored{}, err
+		}
+	}
 	if err := giveIDs(ctx, tx, columns, picks, replace); err != nil {
 		return Restored{}, err
 	}
@@ -552,6 +566,11 @@ func (s *Store) copyIn(ctx context.Context, staging string, picks Picks, replace
 	}
 	if err := remapSnapshots(ctx, tx); err != nil {
 		return Restored{}, fmt.Errorf("restoring snapshots: %w", err)
+	}
+	if demo {
+		if err := markDemo(ctx, tx); err != nil {
+			return Restored{}, err
+		}
 	}
 	linked, err := s.linkFilesIn(ctx, tx, staging)
 	defer func() {
@@ -577,9 +596,15 @@ func (s *Store) copyIn(ctx context.Context, staging string, picks Picks, replace
 	if err := tx.Commit(); err != nil {
 		return Restored{}, err
 	}
-	for _, f := range replacedFiles {
-		if err := os.Remove(filepath.Join(s.dataDir, f)); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			log.Printf("removing %s of a replaced song: %v", f, err)
+	for _, f := range append(replacedFiles, demoFiles...) {
+		// A row copied in may have taken the id of one cleared, and its
+		// file is in that place now.
+		path := filepath.Join(s.dataDir, f)
+		if slices.Contains(linked, path) {
+			continue
+		}
+		if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			log.Printf("removing %s of a song or beat cleared: %v", f, err)
 		}
 	}
 	return restored, nil
@@ -668,6 +693,20 @@ func clearReplacedSongs(ctx context.Context, tx *sql.Tx) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	files, err := filesOwnedBy(ctx, tx, ids)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM main.songs
+		WHERE id IN (SELECT new FROM temp.restored WHERE tbl = 'songs' AND replaced)`); err != nil {
+		return nil, fmt.Errorf("clearing replaced songs: %w", err)
+	}
+	return files, nil
+}
+
+// filesOwnedBy lists the files of every kind the Songs with ids own, as
+// paths in the data directory.
+func filesOwnedBy(ctx context.Context, tx *sql.Tx, ids []int64) ([]string, error) {
 	var files []string
 	for _, id := range ids {
 		for _, f := range songfiles.Owned() {
@@ -676,15 +715,17 @@ func clearReplacedSongs(ctx context.Context, tx *sql.Tx) ([]string, error) {
 				return nil, err
 			}
 			for _, o := range owned {
-				files = append(files, filepath.Join(filepath.FromSlash(f.Dir), strconv.FormatInt(o, 10)))
+				files = append(files, dataPath(f, o))
 			}
 		}
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM main.songs
-		WHERE id IN (SELECT new FROM temp.restored WHERE tbl = 'songs' AND replaced)`); err != nil {
-		return nil, fmt.Errorf("clearing replaced songs: %w", err)
-	}
 	return files, nil
+}
+
+// dataPath is where the file of kind f kept under id is, in the data
+// directory.
+func dataPath(f songfiles.Kind, id int64) string {
+	return filepath.Join(filepath.FromSlash(f.Dir), strconv.FormatInt(id, 10))
 }
 
 // copyTableIn copies the rows of table t given ids, or, for a table without
@@ -715,6 +756,9 @@ func copyTableIn(ctx context.Context, tx *sql.Tx, t songTable, columns []string,
 			values[i] = freshID(references[c], c)
 		case c == "name" && t.matchedBy != "":
 			values[i] = `COALESCE(k.matched_name, r.name)`
+		case c == "demo":
+			// Only the Demo is the Demo, marked once it's in.
+			values[i] = `0`
 		case c == "identity":
 			values[i] = `CASE WHEN k.kept_both THEN NULL ELSE r.identity END`
 		case c == "title" && keepsBoth:
