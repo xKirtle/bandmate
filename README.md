@@ -68,6 +68,8 @@ Configuration, updating and the rest are in the [self-hosting guide](https://xki
 - [Contributing](CONTRIBUTING.md): reporting bugs, sharing ideas, and building Bandmate
 - [Security policy](SECURITY.md): reporting a vulnerability
 
+Bandmate is developed with heavy AI assistance, held to the same rules as every contribution: see [Contributing](CONTRIBUTING.md).
+
 ## License
 
 [GNU Affero General Public License v3.0](LICENSE). If you run a modified Bandmate as a service that others use over a network, you must offer them its source code. The image also bundles yt-dlp, ffmpeg and QuickJS under their own licenses, as the [self-hosting guide](https://xkirtle.github.io/bandmate/self-hosting#licenses) lists.
