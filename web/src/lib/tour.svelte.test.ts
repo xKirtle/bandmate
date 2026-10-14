@@ -23,7 +23,7 @@ describe('the Tour', () => {
 
   it('opens the Demo Song at step 1 when taken', () => {
     const { tour, went } = newTour();
-    tour.start('/settings/about');
+    tour.start('/');
     expect(tour.running).toBe(true);
     expect(tour.step.title).toBe('Sections');
     expect(tour.count).toBe('1 of 8');
@@ -63,10 +63,10 @@ describe('the Tour', () => {
 
   it('ends at Finish, going back to where it was taken from', () => {
     const { tour, went } = newTour();
-    tour.start('/settings/about');
+    tour.start('/');
     for (let i = 0; i < 8; i++) tour.next();
     expect(tour.running).toBe(false);
-    expect(went.at(-1)).toEqual({ to: '/settings/about', back: true });
+    expect(went.at(-1)).toEqual({ to: '/', back: true });
   });
 
   it('ends part-way (End tour, Esc, or a window narrowed to phone width), going back to where it was taken from', () => {
@@ -80,7 +80,7 @@ describe('the Tour', () => {
 
   it('ends without going anywhere once the Demo Song is left', () => {
     const { tour, went } = newTour();
-    tour.start('/settings/about');
+    tour.start('/');
     tour.next();
     tour.stop();
     expect(tour.running).toBe(false);

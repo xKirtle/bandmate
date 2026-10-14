@@ -6,7 +6,7 @@ Bandmate follows a song from the first idea to a rough recording. Here's what yo
 
 New to Bandmate? The Tour is a quick look at its core: a song's sections, lines and chords, the timeline with a beat on it, and recording a take. It shows them on a demo song built into Bandmate, which never appears among your songs or beats, or in your backups.
 
-While a new Bandmate has no songs yet, the Songs page offers it under **Write your first Song**: **Take the Tour**, or **No thanks**. Either way, the offer is gone for good, on every device. Take it whenever you like from **Settings › About**, with **Take the Tour**. Both are on a computer or tablet only: the Tour needs a wide window.
+While a new Bandmate has no songs yet, the Songs page offers it under **Write your first Song**: **Take the Tour**, or **No thanks**. Either way, the offer is gone for good, on every device. Any other time, take it with **Take the Tour**, beside the **Songs** title. Both are on a computer or tablet only: the Tour needs a wide window.
 
 Each step lights up one part of the page and says what it is. The page under it is only for looking at, so a stray click or key changes nothing. Go on with **Next** or →, and back with **Back** or ←. **End tour** or Esc ends it at any step, and **Finish** at the last: either way, you're back where you took it from.
 
@@ -220,7 +220,7 @@ Under the settings, the card says when the last Scheduled Backup was made, that 
   - **Rhyming dictionaries**: one for each language Bandmate suggests rhymes in, each with its download size. Download the ones you write in, so [Rhymes](#rhymes) can suggest words in them, or remove one you no longer need.
   - **Chord diagrams**: flip them for left-handed playing.
 - **Backups**: see [Backups](#backups).
-- **About**: the [Tour](#the-tour), the version you're running, what changed in it, whether a newer one is out, the yt-dlp in use, and the packages and data that ship in Bandmate, with their licenses.
+- **About**: the version you're running, what changed in it, whether a newer one is out, the yt-dlp in use, and the packages and data that ship in Bandmate, with their licenses.
 
 ## What's next
 

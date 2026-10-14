@@ -58,7 +58,8 @@
   // svelte-ignore state_referenced_locally
   const query = new SongListQuery(api, songListViewFromParams(new URLSearchParams(router.search)), folderId);
 
-  // A new install's empty Songs page offers the Tour, on a wide window only.
+  // A new install's empty Songs page offers the Tour, on a wide window only;
+  // otherwise the header has it, beside the title, for taking again.
   const tourOffer = new TourOffer(api, takeTour);
   const tourFitsWindow = new MediaQuery(tourFits);
   // svelte-ignore state_referenced_locally
@@ -252,6 +253,9 @@
 <header class="bar list-bar" bind:this={header}>
   {#if folderId === undefined}
     <h1>Songs</h1>
+    {#if query.songs !== null && tourOffer.headerShows({ anySongs: query.anySongs, wide: tourFitsWindow.current })}
+      <button type="button" class="button quiet" onclick={takeTour}>Take the Tour</button>
+    {/if}
   {:else}
     <div class="trail">
       <a class="up" class:drop-target={dragging.aimsAt(null)} href={topHref} {...songTarget(null)}>Songs</a>

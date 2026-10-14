@@ -119,3 +119,48 @@ describe('the offer of the Tour', () => {
     expect(offer.error).toBeNull();
   });
 });
+
+describe('the Songs page header’s Take the Tour', () => {
+  it('shows on a wide window once Songs exist', async () => {
+    const { offer } = await newOffer(fakeServer(false));
+    expect(offer.headerShows({ anySongs: true, wide: true })).toBe(true);
+  });
+
+  it('shows on an empty install once the Tour has been offered', async () => {
+    const { offer } = await newOffer(fakeServer(true));
+    expect(offer.headerShows(empty)).toBe(true);
+  });
+
+  it('doesn’t show while the offer does, which has the Tour already', async () => {
+    const { offer } = await newOffer(fakeServer(false));
+    expect(offer.headerShows(empty)).toBe(false);
+  });
+
+  it('shows once the offer is turned down', async () => {
+    const { offer } = await newOffer(fakeServer(false));
+    await offer.decline();
+    expect(offer.headerShows(empty)).toBe(true);
+  });
+
+  it('doesn’t show on a phone', async () => {
+    const { offer } = await newOffer(fakeServer(true));
+    expect(offer.headerShows({ anySongs: true, wide: false })).toBe(false);
+  });
+
+  it('doesn’t show until it’s known whether the offer shows, so it doesn’t blink out as the offer comes', () => {
+    const offer = new TourOffer(fakeServer(false).source, () => {});
+    expect(offer.headerShows({ anySongs: true, wide: true })).toBe(false);
+  });
+
+  it('shows if whether it’s been offered can’t be read, the offer not showing', async () => {
+    const offer = new TourOffer(
+      {
+        tourOffered: () => Promise.reject(new ApiError(500, 'database unreachable')),
+        markTourOffered: () => Promise.reject(),
+      },
+      () => {},
+    );
+    await offer.load();
+    expect(offer.headerShows(empty)).toBe(true);
+  });
+});

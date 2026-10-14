@@ -1,7 +1,8 @@
 // The Tour's offer on the empty Songs page: a quiet line under "Write your
 // first Song", on a new install, until it's taken or turned down. Whether
 // it's been offered is the server's, for the whole install, so a choice on
-// one Device holds on every other.
+// one Device holds on every other. Otherwise the Songs page's header has the
+// Tour, for taking again.
 import type { TourOffered } from './api';
 
 /** The calls the offer goes through: the api, or a fake of it. */
@@ -15,6 +16,8 @@ export class TourOffer {
   readonly #takeTour: () => void;
   /** Whether it's been offered; null until that's known, when it isn't shown. */
   #offered = $state<boolean | null>(null);
+  /** Whether reading that has finished, read or not. */
+  #loaded = $state(false);
   /** Why taking or turning it down failed, shown beside it. */
   error = $state<string | null>(null);
 
@@ -26,7 +29,7 @@ export class TourOffer {
 
   /**
    * Reads whether it's been offered. If that can't be read, it isn't shown:
-   * it's only an offer, and About has the Tour too.
+   * it's only an offer, and the header has the Tour too.
    */
   async load() {
     try {
@@ -34,6 +37,7 @@ export class TourOffer {
     } catch {
       this.#offered = null;
     }
+    this.#loaded = true;
   }
 
   /**
@@ -42,6 +46,14 @@ export class TourOffer {
    */
   shows({ anySongs, wide }: { anySongs: boolean; wide: boolean }) {
     return this.#offered === false && !anySongs && wide;
+  }
+
+  /**
+   * Whether the Songs page's header shows Take the Tour: on a wide window,
+   * while the offer doesn't, once it's known whether the offer does.
+   */
+  headerShows({ anySongs, wide }: { anySongs: boolean; wide: boolean }) {
+    return this.#loaded && wide && !this.shows({ anySongs, wide });
   }
 
   /** Take the Tour: marks it offered, then takes it. */

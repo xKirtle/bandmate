@@ -58,7 +58,7 @@ export const steps: readonly Step[] = [
   },
   {
     title: 'That’s the core of it',
-    text: 'Alternates, the Scrapbook, the Chord Finder, Snapshots, Folders, Tags and Backups are all in the docs. You can take this Tour again any time from Settings › About.',
+    text: 'Alternates, the Scrapbook, the Chord Finder, Snapshots, Folders, Tags and Backups are all in the docs. You can take this Tour again any time from the Songs page.',
     link: { href: 'https://xkirtle.github.io/bandmate/features', text: 'Open the docs' },
   },
 ];

@@ -1,4 +1,4 @@
-// The one Tour the app takes, from About, going round the app's own router.
+// The one Tour the app takes, from the Songs page, going round the app's own router.
 import { navigate, router } from './router.svelte';
 import { Tour } from './tour.svelte';
 
