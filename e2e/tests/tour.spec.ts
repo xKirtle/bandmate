@@ -34,6 +34,20 @@ test('About offers no Tour on a phone', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Take the Tour' })).toHaveCount(0);
 });
 
+test('the first step shows about as fast as a Song opens, without an error', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/settings/about');
+  await page.getByRole('button', { name: 'Take the Tour' }).click();
+
+  // A Song opens in well under a second: the Tour's first step doesn't keep
+  // its taker on "Loading…" any longer.
+  await expect(card(page).getByRole('heading', { name: 'Sections' })).toBeVisible({ timeout: 1500 });
+  await next(page).click();
+  await expect(card(page).getByRole('heading', { name: 'Lines' })).toBeVisible({ timeout: 1500 });
+  expect(errors).toEqual([]);
+});
+
 test('every step spotlights its control on the Demo Song, through to Finish', async ({ page }) => {
   await takeTour(page);
 
