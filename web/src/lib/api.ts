@@ -149,6 +149,25 @@ export interface SnapshotSummary {
 }
 
 /** A copy of a Song's Lyric Sheet and Scrapbook as they were, which Bandmate takes on its own. */
+/**
+ * A copy of a Song's Lyric Sheet and Scrapbook as Undo and Redo put it
+ * back (ADR 0019): only what's written, with every id.
+ */
+export interface SheetCopy {
+  arrangement: number[];
+  scrapbook: number[];
+  sections: {
+    id: number;
+    label: string;
+    alternates: {
+      id: number;
+      name: string;
+      active: boolean;
+      lines: { id: number; text: string; cue: number | null }[];
+    }[];
+  }[];
+}
+
 export interface Snapshot extends SnapshotSummary {
   /** The Lyric Sheet and Scrapbook it holds, with their ids, as a Song's are. */
   sheet: Pick<Song, 'arrangement' | 'sections' | 'scrapbook'>;
@@ -1180,6 +1199,11 @@ export const api = {
    */
   restoreSnapshot: (at: SongAt, snapshotId: number) =>
     request<Song>('POST', `/songs/${at.id}/snapshots/${snapshotId}/restore`, undefined, at),
+  /**
+   * Makes the Lyric Sheet and Scrapbook the copy given, as Undo and Redo put them back, taking no Snapshot of its own.
+   * Rows still there keep their ids, and Lines their Cues as they are; rows brought back get their ids and Cues back.
+   */
+  putSheetBack: (at: SongAt, sheet: SheetCopy) => request<Song>('PUT', `/songs/${at.id}/sheet`, sheet, at),
   /** Attaches a finished recording; the Song's first Master is its main one. */
   addMaster: (at: SongAt, file: File, decoded: DecodedAudio) =>
     request<Song>('POST', `/songs/${at.id}/masters`, audioForm(file, decoded), at),

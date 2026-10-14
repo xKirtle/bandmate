@@ -308,9 +308,10 @@ export class FakeSongServer implements SongServer {
 
   /**
    * What a Lyric Sheet change does, for the changes the fake models: adding
-   * a Section to the Arrangement, taking one out of it, deleting one in the
-   * Scrapbook, adding one to another, setting its Label, renaming an
-   * Alternate, and replacing an Alternate's text.
+   * a Section to the Arrangement, reordering it, taking one out of it,
+   * deleting one in the Scrapbook, adding one to another, setting its
+   * Label, renaming an Alternate, replacing an Alternate's text, and
+   * putting the sheet back.
    * Others throw "not modelled".
    */
   #changed(change: LyricSheetChange): (song: Song) => Song {
@@ -368,6 +369,34 @@ export class FakeSongServer implements SongServer {
         });
       case 'replaceAlternateText':
         return (song) => this.#withText(song, change.alternateId, change.text);
+      case 'reorderArrangement':
+        return (song) => ({ ...song, arrangement: [...change.order] });
+      case 'putSheetBack':
+        // A Line still there keeps its Cue as it is, as on the server.
+        return (song) => {
+          const cues = new Map(
+            song.sections.flatMap((s) => s.alternates.flatMap((a) => a.lines.map((l) => [l.id, l.cue]))),
+          );
+          const { arrangement, scrapbook, sections } = structuredClone(change.sheet);
+          return {
+            ...song,
+            arrangement,
+            scrapbook,
+            sections: sections.map((s) => ({
+              ...s,
+              alternates: s.alternates.map((a) => ({
+                ...a,
+                lines: a.lines.map((l) => ({
+                  ...l,
+                  lyrics: l.text,
+                  chords: [],
+                  chordLine: false,
+                  cue: cues.has(l.id) ? cues.get(l.id)! : l.cue,
+                })),
+              })),
+            })),
+          };
+        };
       default:
         throw notModelled(change);
     }

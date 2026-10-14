@@ -11,6 +11,7 @@ import {
   type NewTrack,
   type PastedClip,
   type PlacedClip,
+  type Song,
   type SongAt,
   type Timeline,
   type TimelineLoop,
@@ -20,13 +21,19 @@ import {
 } from './api';
 import { placementOf } from './clipSource';
 import { isBlank, type CuedSong } from './cues';
+import { sheetCopy, type LyricSheetChange } from './lyricSheetChanges';
 import { rightHalves } from './split';
 
-// Undo and redo for Timeline edits and Cue edits, kept in the browser while
-// the page is open, in one history. Each edit is kept as data, with the
-// edit that undoes it, worked out from the Timeline, or for a Cue edit the
-// Song, before and after it. Undoing and redoing send those through the API
-// like any other edit.
+// Undo and redo for Timeline edits, Cue edits and Lyric Sheet changes,
+// kept in the browser while the page is open, in one history. Each edit is
+// kept as data, with the edit that undoes it, worked out from the Timeline,
+// or for a Cue edit the Song, before and after it. Undoing and redoing send
+// those through the API like any other edit.
+//
+// A Lyric Sheet change is kept instead as the whole Lyric Sheet and
+// Scrapbook before and after it, each put back whole, every row under its
+// id (ADR 0019). Steps are undone strictly newest first, so the copy put
+// back is exact.
 //
 // A deleted Clip, or a copied one redone, is placed back with its name,
 // Gain, Tempo, Pitch and Fades, if it has them; a rename is undone by giving the Clip back
@@ -134,8 +141,11 @@ export interface CueEdit {
   cues: CueValue[];
 }
 
-/** An edit kept to undo or redo: to the Timeline, or to the Cues. */
-export type HistoryEdit = Edit | CueEdit;
+/** The Lyric Sheet and Scrapbook put back as they were, to undo or redo a change to them (ADR 0019). */
+export type SheetEdit = Extract<LyricSheetChange, { kind: 'putSheetBack' }>;
+
+/** An edit kept to undo or redo: to the Timeline, to the Cues, or to the Lyric Sheet. */
+export type HistoryEdit = Edit | CueEdit | SheetEdit;
 
 /** Ids of Tracks and Clips, each in Timeline order. */
 interface Ids {
@@ -200,6 +210,23 @@ export class History {
     this.#undo.push({
       undo: { edit: { kind: 'restoreCues', cues: changed.map((c) => c.was) }, adds: none },
       redo: { edit: { kind: 'restoreCues', cues: changed.map((c) => c.now) }, adds: none },
+    });
+    this.#redo = [];
+  }
+
+  /**
+   * Keeps a change to the Lyric Sheet or Scrapbook that turned before into
+   * after, to undo, unless it changed neither: as the whole sheet before
+   * and after it, each put back whole (ADR 0019).
+   */
+  recordSheet(before: Song, after: Song): void {
+    const was = sheetCopy(before);
+    const now = sheetCopy(after);
+    if (JSON.stringify(was) === JSON.stringify(now)) return;
+    const none: Ids = { tracks: [], clips: [] };
+    this.#undo.push({
+      undo: { edit: { kind: 'putSheetBack', sheet: was }, adds: none },
+      redo: { edit: { kind: 'putSheetBack', sheet: now }, adds: none },
     });
     this.#redo = [];
   }
@@ -550,8 +577,8 @@ function cueValues(song: CuedSong): Map<number, CueValue> {
 /**
  * The Cues that can still be restored in a Song: those whose Line is still
  * in it, wherever it is, as the Scrapbook keeps Cues too (ADR 0010), and, to
- * be given a Cue, isn't blank. The rest went with a Lyric Sheet change
- * since, which can't be undone, so they're left out rather than stop undo.
+ * be given a Cue, isn't blank. The rest can't take one back, so they're left
+ * out rather than stop undo.
  */
 export function restorable(cues: readonly CueValue[], song: CuedSong): CueValue[] {
   const lines = new Map(song.sections.flatMap((s) => s.alternates.flatMap((a) => a.lines.map((l) => [l.id, l]))));
@@ -599,6 +626,7 @@ function remapStep(step: Step, ids: IdMaps): Step {
 function remap(edit: HistoryEdit, ids: IdMaps): HistoryEdit {
   switch (edit.kind) {
     case 'restoreCues':
+    case 'putSheetBack':
     case 'addTrack':
     case 'setLoop':
     case 'switchLoop':

@@ -20,14 +20,16 @@
 // asks first and a refresh doesn't replace the Song. An edit typed into a
 // Section carries it, so the list also says what's typed into each Section.
 //
-// Timeline edits and Cue changes are kept to undo, in one history (see
-// history.ts), in the order they were made. An undo waits for the edits
-// queued before it. A save refused as the Song changed elsewhere, or a
-// refresh bringing in a change made elsewhere, forgets them all.
+// Timeline edits, Cue changes and Lyric Sheet changes are kept to undo, in
+// one history (see history.ts), in the order they were made. An undo waits
+// for the edits queued before it. A save refused as the Song changed
+// elsewhere, or a refresh bringing in a change made elsewhere, forgets them
+// all: every change to the Lyric Sheet is kept, as undoing one puts the
+// whole sheet back (ADR 0019).
 import { ApiError, type Song, type Timeline } from './api';
 import { sameCues, savedRetrying, withCueChange, type CueChange } from './cueChanges';
 import { History, restorable, type Edit, type HistoryEdit } from './history';
-import type { LyricSheetChange } from './lyricSheetChanges';
+import { changedSection, type LyricSheetChange } from './lyricSheetChanges';
 import { waitFor, type SongServer, type Wait } from './songServer';
 
 /** How a save ended: saved, failed, refused as the Song changed elsewhere, or never sent as the Song's being deleted. */
@@ -45,6 +47,11 @@ export interface Undone extends Edited {
   reselect: number[] | null;
   /** Where to return the playhead to: where a new Take undone started. Null to leave it where it is. */
   playhead: number | null;
+  /**
+   * For a Lyric Sheet change undone or redone, the Section it changed, to
+   * show, or null if none is left to; undefined for other edits.
+   */
+  section?: number | null;
 }
 
 /**
@@ -190,9 +197,22 @@ export class Saves {
    */
   change = (op: (saved: Song) => Promise<Song>): Promise<boolean> => this.submit(op).then((ended) => ended === 'saved');
 
-  /** Queues a Lyric Sheet change, named by its kind, like change. */
-  changeLyricSheet = (change: LyricSheetChange): Promise<boolean> =>
-    this.change((saved) => this.#server.apply(saved, change));
+  /** Queues a Lyric Sheet change, named by its kind, like change, and keeps it to undo. */
+  changeLyricSheet = (change: LyricSheetChange): Promise<boolean> => {
+    this.#undoablesQueued++;
+    return this.#turn(
+      async (saved) => ({ before: saved, after: await this.#server.apply(saved, change) }),
+      ({ before, after }) => {
+        this.#saved = after;
+        this.#history.recordSheet(before, after);
+        this.#showHistory();
+      },
+      (ended) => {
+        this.#undoablesQueued--;
+        return ended === 'saved';
+      },
+    );
+  };
 
   /** Queues a change like change, resolving to how it ended. */
   submit = (op: (saved: Song) => Promise<Song>): Promise<Submitted> =>
@@ -298,10 +318,15 @@ export class Saves {
         if (!sent) return;
         const { step, before, after } = sent;
         let timeline = before;
+        let section: number | null | undefined;
         if ('tracks' in after) this.#showTimeline((timeline = after));
-        // A Cue edit leaves the Timeline as it was.
-        else this.#saved = after;
+        // A Cue edit or a Lyric Sheet change leaves the Timeline as it was.
+        else {
+          if (step.edit.kind === 'putSheetBack') section = changedSection(this.#saved, after);
+          this.#saved = after;
+        }
         undone = step.done({ before, after: timeline });
+        if (section !== undefined) undone = { ...undone, section };
         this.#showHistory();
       },
       () => undone,
@@ -315,6 +340,7 @@ export class Saves {
    * as it was.
    */
   async #send(at: Song, edit: HistoryEdit): Promise<Timeline | Song> {
+    if (edit.kind === 'putSheetBack') return this.#server.apply(at, edit);
     if (edit.kind !== 'restoreCues') return this.#server.apply(at, edit);
     const cues = restorable(edit.cues, at);
     return cues.length > 0 ? this.#server.apply(at, { kind: 'restoreCues', cues }) : at;

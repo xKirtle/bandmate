@@ -45,13 +45,13 @@ Want rhymes in your language? See [Adding a rhyming language](https://github.com
 
 ### Snapshots
 
-Bandmate keeps copies of a song's lyrics and Scrapbook as they were, on its own, so you can get back to how a song was before you changed it. It takes one each time you start editing again after 10 minutes or more away, unless nothing has changed since the last. It also takes one just before you delete a section from the Scrapbook, or one of a section's alternates, marked with what you deleted, such as "Before deleting “Verse 3”", so a deletion you regret can be undone by restoring it.
+Bandmate keeps copies of a song's lyrics and Scrapbook as they were, on its own, so you can get back to how a song was before you changed it. It takes one each time you start editing again after 10 minutes or more away, unless nothing has changed since the last. It also takes one just before you delete a section from the Scrapbook, or one of a section's alternates, marked with what you deleted, such as "Before deleting “Verse 3”". Deleting doesn't ask first: Undo brings it back while you're still on the song, and restoring that Snapshot does after you've left.
 
 In Write mode, the clock button beside Write and Read opens them, newest first. Pick one to see its lyrics and Scrapbook beside the song as it is now, line by line, so it's plain what restoring it would change: a line that differs is highlighted on both sides, and a section that's only in the Snapshot, or only there now, shows on its side alone. Lines show their chords above the words, as Read mode does. Where there isn't room for both side by side, such as on a phone, **This Snapshot** and **Now** are two tabs. Step to the one before or after with ‹ › or the ↑ ↓ keys. You can select and copy a line from it, to take back just that line.
 
 Snapshots thin out as they age, so months of history stay short enough to look through: every one from the last day stays, then one a day for a month, then one a week. The list is grouped the same way: the last 24 hours, then daily, then weekly. To keep one for good, such as the version you played at an open mic, press the lock beside it to **Keep** it, and it's never thinned. Press the lock again to let it thin out like the rest.
 
-**Restore this Snapshot** makes your lyrics and Scrapbook the Snapshot's. What you have now is kept as a Snapshot first, marked "Before restoring", so you can go back. Lines that are still there keep their timings as they are now, and lines it brings back get the timings they had.
+**Restore this Snapshot** makes your lyrics and Scrapbook the Snapshot's. What you have now is kept as a Snapshot first, marked "Before restoring", so you can go back, and Undo takes the restore back too. Lines that are still there keep their timings as they are now, and lines it brings back get the timings they had.
 
 A [Backup](#backups) of a song holds its Snapshots, kept or not, so restoring the Backup, here or on another install, brings them back too.
 
@@ -107,7 +107,7 @@ Every song has a timeline: its beat, your takes and any other audio, laid out on
 
 In a narrower window, Import audio, Mix down and then the input fold into a **⋯** at the end of the row, which lists just the ones that don't fit; the input is **Record from…** there. On a phone held upright, the timeline only plays, and offers just Mix down.
 
-**Undo** and **Redo** are at the top of the song's page, beside Write and Read. Undo takes back your latest change to the timeline or a line's timing, one at a time, and Redo makes it again. They work in Read mode and on a phone too, even on a change you made in a wider window. While you record a take, or a merge is being made, they're off.
+**Undo** and **Redo** are at the top of the song's page, beside Write and Read. Undo takes back your latest change to the song, one at a time, whether to its sections, alternates and Scrapbook, the timeline or a line's timing, and Redo makes it again. They work in Read mode and on a phone too, even on a change you made in a wider window, until you leave the song. While you record a take, or a merge is being made, they're off. Undoing a change to the lyrics stops syncing.
 
 A clip's **⋯** menu sets its **tempo** and **pitch**, each on its own or both together: slow a beat down to write over it, or move it a couple of semitones to suit your voice. Select several clips to change them all at once. The file itself is never changed, so you can always set them again, or reset them.
 

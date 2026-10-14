@@ -9,7 +9,7 @@
   import ActionsMenu from './ActionsMenu.svelte';
   import SectionEditor from './SectionEditor.svelte';
   import type { CaretListener } from './lyricsLanguage';
-  import { card, describe, labelOf, places, putBackActions, sectionsInArrangement } from './sections';
+  import { card, labelOf, places, putBackActions, sectionsInArrangement } from './sections';
 
   let {
     song,
@@ -134,11 +134,9 @@
     };
   }
 
+  // Deleting doesn't ask first: Undo brings it back, and Snapshots do after leaving.
   function remove(sectionId: number) {
-    const section = sections.get(sectionId);
-    if (!section) return;
-    const ok = confirm(`Delete ${describe(section)}?\n\nIts Lines go with it. You can undo it from Snapshots.`);
-    if (ok) editing.change({ kind: 'deleteSection', sectionId }).then(closed(sectionId));
+    editing.change({ kind: 'deleteSection', sectionId }).then(closed(sectionId));
   }
 </script>
 
@@ -151,7 +149,7 @@
   {#if scrapbook.length > 0}
     <ul class="list">
       {#each scrapbook as section (section.id)}
-        <li class:dragged={drag.section === section.id}>
+        <li class:dragged={drag.section === section.id} data-section={section.id}>
           {#if open === section.id}
             <SectionEditor
               {section}
