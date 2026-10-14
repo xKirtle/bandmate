@@ -25,7 +25,6 @@ import (
 	"github.com/xKirtle/bandmate/internal/songfiles"
 	"github.com/xKirtle/bandmate/internal/tags"
 	"github.com/xKirtle/bandmate/internal/timeline"
-	"github.com/xKirtle/bandmate/internal/tour"
 )
 
 // Config is everything needed to build the app.
@@ -94,8 +93,6 @@ type App struct {
 	folders *folders.Store
 	// tags mark Songs with names of the user's own.
 	tags *tags.Store
-	// tour knows whether the Tour has been offered on the empty Songs page.
-	tour *tour.Store
 	// backups makes and keeps Backups, in the data directory.
 	backups *backups.Store
 	// timelines owns Songs' Timelines, which are kept apart from the Song
@@ -180,7 +177,6 @@ func New(cfg Config) (*App, error) {
 		beats:       beats.NewStore(conn, beatFiles),
 		folders:     folders.NewStore(conn),
 		tags:        tags.NewStore(conn),
-		tour:        tour.NewStore(conn),
 		backups:     backupStore,
 		timelines:   timeline.NewStore(conn, takeFiles, soundFiles),
 		beatFiles:   beatFiles,
@@ -334,8 +330,6 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("GET /api/songs/{id}/sounds/{soundID}", a.getSound)
 	mux.HandleFunc("GET /api/songs/{id}/sounds/{soundID}/audio", a.soundAudio)
 	mux.HandleFunc("POST /api/demo", a.putDemoBack)
-	mux.HandleFunc("GET /api/tour", a.tourOffered)
-	mux.HandleFunc("POST /api/tour/offered", a.markTourOffered)
 	mux.HandleFunc("GET /api/config", a.config)
 	mux.HandleFunc("GET /api/about", a.about)
 	mux.HandleFunc("GET /api/about/releases", a.aboutReleases)

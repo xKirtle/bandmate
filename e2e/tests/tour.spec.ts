@@ -1,88 +1,80 @@
 import type { Page } from '@playwright/test';
-import type { Bandmate } from '../bandmate';
 import { expect, test } from '../fixtures';
 
-// The Tour: taken from the Songs page, it shows the Demo Song, one control at
-// a time in a spotlight, with a card beside it, and blocks the page under it.
+// The Tour: offered on the empty Songs page while there are no Songs, it
+// shows the Demo Song, one control at a time in a spotlight, with a card
+// beside it, and blocks the page under it.
 
 /** The step's card. */
 const card = (page: Page) => page.getByRole('dialog');
 const next = (page: Page) => card(page).getByRole('button', { name: /^(Next|Finish)$/ });
-/** The Songs page's header, beside whose title the Tour is taken. */
-const header = (page: Page) => page.getByRole('banner');
+/** The offer, under "Write your first Song". */
+const offer = (page: Page) => page.getByText('New here?');
+/** The offer's Take the Tour. */
+const take = (page: Page) => offer(page).getByRole('button', { name: 'Take the Tour' });
 
-/** Where takeTour takes the Tour from: the Songs page, searched. */
-const takenFrom = /\/\?q=light$/;
+/** Where takeTour takes the Tour from: the empty Songs page. */
+const takenFrom = /\/$/;
 
 /**
- * Takes the Tour from the Songs page's header, with a Song in Bandmate, so
- * that it isn't offered on the empty page instead, and the page searched, as
- * somewhere to come back to; waits for its first step, timeout ms at most.
+ * Takes the Tour from the empty Songs page's offer, and waits for its first
+ * step, timeout ms at most.
  */
-async function takeTour(page: Page, bandmate: Bandmate, timeout?: number) {
-  await bandmate.song({ title: 'Morning Light' });
-  await page.goto('/?q=light');
-  await header(page).getByRole('button', { name: 'Take the Tour' }).click();
+async function takeTour(page: Page, timeout?: number) {
+  await page.goto('/');
+  await take(page).click();
   await expect(page).toHaveURL(/\/songs\/demo$/);
   await expect(card(page).getByRole('heading', { name: 'Sections' })).toBeVisible({ timeout });
 }
 
-test('the Songs page offers the Tour beside its title, and About doesn’t', async ({ page, bandmate }) => {
-  await bandmate.song({ title: 'Morning Light' });
+test('the empty Songs page offers the Tour under Write your first Song, and nothing else does', async ({ page }) => {
   await page.goto('/');
 
-  const take = header(page).getByRole('button', { name: 'Take the Tour' });
-  const title = header(page).getByRole('heading', { name: 'Songs' });
-  await expect(take).toBeVisible();
-  // On the same line, just after the title, not off at the bar's far end.
-  const [takeBox, titleBox] = [(await take.boundingBox())!, (await title.boundingBox())!];
-  expect(takeBox.y + takeBox.height / 2).toBeCloseTo(titleBox.y + titleBox.height / 2, -1);
-  expect(takeBox.x).toBeGreaterThan(titleBox.x + titleBox.width);
-  expect(takeBox.x).toBeLessThan(titleBox.x + titleBox.width + 100);
+  const write = page.getByRole('button', { name: 'Write your first Song' });
+  await expect(take(page)).toBeVisible();
+  // There's one way in, and no turning it down.
+  await expect(page.getByRole('button', { name: 'Take the Tour' })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'No thanks' })).toHaveCount(0);
+  const [takeBox, writeBox] = [(await take(page).boundingBox())!, (await write.boundingBox())!];
+  expect(takeBox.y).toBeGreaterThan(writeBox.y + writeBox.height);
 
   await page.goto('/settings/about');
   await expect(page.getByRole('link', { name: 'Source code' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Take the Tour' })).toHaveCount(0);
 });
 
-test('the Songs page offers no Tour on a phone', async ({ page, bandmate }) => {
-  await bandmate.song({ title: 'Morning Light' });
+test('writing a Song takes the offer away, and deleting every Song brings it back', async ({ page, bandmate }) => {
+  await page.goto('/');
+  await expect(offer(page)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Write your first Song' }).click();
+  await expect(page).toHaveURL(/\/songs\/\d+/);
+  await page.goto('/');
+  await expect(page.getByRole('link', { name: 'Untitled Song' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Take the Tour' })).toHaveCount(0);
+
+  await bandmate.wipe();
+  await page.reload();
+  await expect(take(page)).toBeVisible();
+});
+
+test('the Songs page offers no Tour on a phone', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
 
-  await expect(page.getByRole('link', { name: 'Morning Light' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Write your first Song' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Take the Tour' })).toHaveCount(0);
 });
 
-test('a new install’s empty page offers the Tour, not the header, and with a Folder on it, the header does', async ({
-  page,
-  bandmate,
-}) => {
-  // The worker's Bandmate is a new install, whose offer nothing in the suite
-  // takes or turns down: that's for good, and wiping Bandmate doesn't undo it.
-  await page.goto('/');
-
-  const offer = page.getByText('New here?');
-  await expect(offer.getByRole('button', { name: 'Take the Tour' })).toBeVisible();
-  await expect(header(page).getByRole('button', { name: 'Take the Tour' })).toHaveCount(0);
-
-  await bandmate.folder('Demos');
-  await page.reload();
-
-  await expect(page.getByRole('link', { name: 'Demos' })).toBeVisible();
-  await expect(offer).toHaveCount(0);
-  await expect(header(page).getByRole('button', { name: 'Take the Tour' })).toBeVisible();
-});
-
-test('the Tour’s steps show about as fast as a Song opens', async ({ page, bandmate }) => {
+test('the Tour’s steps show about as fast as a Song opens', async ({ page }) => {
   // No seconds of "Loading…" before a step.
-  await takeTour(page, bandmate, 3_000);
+  await takeTour(page, 3_000);
   await next(page).click();
   await expect(card(page).getByRole('heading', { name: 'Lines' })).toBeVisible({ timeout: 3_000 });
 });
 
-test('every step spotlights its control on the Demo Song, through to Finish', async ({ page, bandmate }) => {
-  await takeTour(page, bandmate);
+test('every step spotlights its control on the Demo Song, through to Finish', async ({ page }) => {
+  await takeTour(page);
 
   const titles = [
     'Sections',
@@ -109,16 +101,16 @@ test('every step spotlights its control on the Demo Song, through to Finish', as
   await expect(card(page)).toHaveCount(0);
 });
 
-test('the last step points to the docs and to the Songs page', async ({ page, bandmate }) => {
-  await takeTour(page, bandmate);
+test('the last step points to the docs', async ({ page }) => {
+  await takeTour(page);
   for (let i = 0; i < 7; i++) await page.keyboard.press('ArrowRight');
 
   await expect(card(page).getByRole('link', { name: 'Open the docs' })).toBeVisible();
-  await expect(card(page)).toContainText('take this Tour again any time from the Songs page');
+  await expect(card(page)).not.toContainText('take this Tour again');
 });
 
-test('← and → step back and forward', async ({ page, bandmate }) => {
-  await takeTour(page, bandmate);
+test('← and → step back and forward', async ({ page }) => {
+  await takeTour(page);
 
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('ArrowRight');
@@ -128,8 +120,8 @@ test('← and → step back and forward', async ({ page, bandmate }) => {
   await expect(next(page)).toBeFocused();
 });
 
-test('the page under the Tour is blocked: clicks, Tab and Shortcuts don’t reach it', async ({ page, bandmate }) => {
-  await takeTour(page, bandmate);
+test('the page under the Tour is blocked: clicks, Tab and Shortcuts don’t reach it', async ({ page }) => {
+  await takeTour(page);
   const label = page.locator('[data-tour="first-section-head"] input');
   const play = page.locator('[data-tour="timeline"] button.play');
 
@@ -151,8 +143,8 @@ test('the page under the Tour is blocked: clicks, Tab and Shortcuts don’t reac
   await expect(card(page).getByRole('heading', { name: 'Sections' })).toBeVisible();
 });
 
-test('Esc ends the Tour, back where it was taken from', async ({ page, bandmate }) => {
-  await takeTour(page, bandmate);
+test('Esc ends the Tour, back where it was taken from', async ({ page }) => {
+  await takeTour(page);
   await page.keyboard.press('ArrowRight');
 
   await page.keyboard.press('Escape');
@@ -161,22 +153,21 @@ test('Esc ends the Tour, back where it was taken from', async ({ page, bandmate 
   await expect(card(page)).toHaveCount(0);
 });
 
-test('End tour ends it, back where it was taken from, as the browser’s Back would', async ({ page, bandmate }) => {
+test('End tour ends it, back where it was taken from, as the browser’s Back would', async ({ page }) => {
   await page.goto('/settings/about');
-  await takeTour(page, bandmate);
+  await takeTour(page);
 
   await card(page).getByRole('button', { name: 'End tour' }).click();
 
   await expect(page).toHaveURL(takenFrom);
-  await expect(page.getByRole('searchbox')).toHaveValue('light');
-  await expect(header(page).getByRole('button', { name: 'Take the Tour' })).toBeVisible();
+  await expect(take(page)).toBeVisible();
   // The Songs page isn't in the history twice.
   await page.goBack();
   await expect(page).toHaveURL(/\/settings\/about$/);
 });
 
-test('narrowing the window to a phone’s ends it', async ({ page, bandmate }) => {
-  await takeTour(page, bandmate);
+test('narrowing the window to a phone’s ends it', async ({ page }) => {
+  await takeTour(page);
 
   await page.setViewportSize({ width: 390, height: 844 });
 
@@ -184,8 +175,8 @@ test('narrowing the window to a phone’s ends it', async ({ page, bandmate }) =
   await expect(card(page)).toHaveCount(0);
 });
 
-test('leaving the Demo Song ends it, and coming back to it lands on the Songs page', async ({ page, bandmate }) => {
-  await takeTour(page, bandmate);
+test('leaving the Demo Song ends it, and coming back to it lands on the Songs page', async ({ page }) => {
+  await takeTour(page);
 
   await page.goBack();
   await expect(page).toHaveURL(takenFrom);
@@ -196,11 +187,11 @@ test('leaving the Demo Song ends it, and coming back to it lands on the Songs pa
   await expect(page.getByRole('heading', { name: 'Songs' })).toBeVisible();
 });
 
-test('the Demo Song’s address outside a Tour, a reload included, lands on the Songs page', async ({ page, bandmate }) => {
+test('the Demo Song’s address outside a Tour, a reload included, lands on the Songs page', async ({ page }) => {
   await page.goto('/songs/demo');
   await expect(page).toHaveURL(/\/$/);
 
-  await takeTour(page, bandmate);
+  await takeTour(page);
   await page.reload();
   await expect(page).toHaveURL(/\/$/);
   await expect(card(page)).toHaveCount(0);

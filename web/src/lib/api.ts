@@ -838,11 +838,6 @@ export interface Release {
 export type ReleaseNote =
   { badge?: 'new' | 'fix' | 'docs'; title: string; url: string; number: number } | { text: string };
 
-/** Whether the Tour has been offered on the empty Songs page, the same on every Device. */
-export interface TourOffered {
-  offered: boolean;
-}
-
 /** A failed request, carrying the server's readable message. */
 export class ApiError extends Error {
   constructor(
@@ -1077,10 +1072,6 @@ export const api = {
   getSong: (id: number) => request<Song>('GET', `/songs/${id}`),
   /** Puts the Demo back as built into Bandmate, replacing the one there, and answers with the Demo Song. */
   putDemoBack: () => request<Song>('POST', '/demo'),
-  /** Whether the Tour has been offered on the empty Songs page, for the whole install. */
-  tourOffered: () => request<TourOffered>('GET', '/tour'),
-  /** Marks the Tour offered, as taking it or saying No thanks from the offer does: it's never offered again. */
-  markTourOffered: () => request<TourOffered>('POST', '/tour/offered'),
   /** Creates a Song, titled "Untitled Song" by the server, in the Folder with folderId, or in none. */
   createSong: (folderId: number | null = null) => request<Song>('POST', '/songs', { folderId }),
   /** Every Folder, by name. */
