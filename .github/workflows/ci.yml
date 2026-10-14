@@ -285,8 +285,9 @@ jobs:
     steps:
       - uses: docker/setup-buildx-action@v4
 
-      # Tags a version tag vX.Y.Z as X.Y.Z, X.Y and latest (latest=auto adds
-      # it to semver tags, but not to pre-releases), and the default branch,
+      # Tags a version tag vX.Y.Z as X.Y.Z, X.Y, X and latest (latest=auto
+      # adds it to semver tags, but not to pre-releases; X starts at v1.0.0,
+      # since 0.x makes no promises across minors), and the default branch,
       # main, as edge and sha-<short>. Also makes the OCI labels, among them
       # version (the first of those tags: X.Y.Z or edge), source (which links
       # the GHCR package to this repository) and revision.
@@ -297,6 +298,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }}
             type=edge
             type=sha,enable={{is_default_branch}}
 
