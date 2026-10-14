@@ -2,6 +2,12 @@
 
 Bandmate follows a song from the first idea to a rough recording. Here's what you can do with it.
 
+## The Tour
+
+New to Bandmate? The Tour is a quick look at its core: a song's sections, lines and chords, the timeline with a beat on it, and recording a take. It shows them on a demo song built into Bandmate, which never appears among your songs or beats, or in your backups.
+
+Take it from **Settings › About**, with **Take the Tour**, on a computer or tablet: it needs a wide window. Each step lights up one part of the page and says what it is. The page under it is only for looking at, so a stray click or key changes nothing. Go on with **Next** or →, and back with **Back** or ←. **End tour** or Esc ends it at any step, and **Finish** at the last: either way, you're back where you took it from. Take it again whenever you like.
+
 ## Your songs
 
 Every song is in one list. Search it by title, filter it by status, tag or whether a song has a finished recording, and sort it by title, status, key, tempo or when you last edited it.
@@ -212,7 +218,7 @@ Under the settings, the card says when the last Scheduled Backup was made, that 
   - **Rhyming dictionaries**: one for each language Bandmate suggests rhymes in, each with its download size. Download the ones you write in, so [Rhymes](#rhymes) can suggest words in them, or remove one you no longer need.
   - **Chord diagrams**: flip them for left-handed playing.
 - **Backups**: see [Backups](#backups).
-- **About**: the version you're running, what changed in it, whether a newer one is out, the yt-dlp in use, and the packages and data that ship in Bandmate, with their licenses.
+- **About**: the [Tour](#the-tour), the version you're running, what changed in it, whether a newer one is out, the yt-dlp in use, and the packages and data that ship in Bandmate, with their licenses.
 
 ## What's next
 
