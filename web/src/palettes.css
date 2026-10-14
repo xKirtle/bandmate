@@ -41,6 +41,9 @@
 :root {
   /* Dims what's behind a dialog, or outside a Cover's crop. */
   --scrim: rgb(0 0 0 / 0.4);
+  /* Dims the page round a spotlight, such as the Tour's: darker than the
+     scrim, which barely shows on the dark theme. */
+  --dim: rgb(0 0 0 / 0.6);
   /* Drawn on a scrim, whatever the theme, e.g. the Cover crop's frame. */
   --on-scrim: white;
   /* Lifts a floating layer (a popover, menu or floating bar) off the page. */

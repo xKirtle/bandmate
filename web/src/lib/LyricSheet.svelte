@@ -521,6 +521,7 @@
               more={sectionActions(section, i)}
               {drag}
               places={placesOut}
+              tour={i === 0 ? 'first-section' : i === song.arrangement.length - 1 ? 'last-section' : undefined}
             >
               {#snippet grip()}
                 {#if drag.on}

@@ -11,6 +11,8 @@
   import About from './routes/About.svelte';
   import NotFound from './routes/NotFound.svelte';
   import MainNav from './lib/MainNav.svelte';
+  import TourSpotlight from './lib/TourSpotlight.svelte';
+  import { demoPath } from './lib/tour.svelte';
 
   const songMatch = $derived(router.path.match(/^\/songs\/(\d+)$/));
   const folderMatch = $derived(router.path.match(/^\/folders\/(\d+)$/));
@@ -46,7 +48,7 @@
       <About />
     {:else if moved}
       <!-- On its way to where it moved. -->
-    {:else if router.path === '/songs/demo'}
+    {:else if router.path === demoPath}
       <DemoSong />
     {:else if songMatch}
       {#key songMatch[1]}
@@ -56,4 +58,5 @@
       <NotFound />
     {/if}
   </div>
+  <TourSpotlight />
 </div>

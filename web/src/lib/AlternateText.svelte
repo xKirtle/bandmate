@@ -57,6 +57,7 @@
     editing,
     cueing,
     onCaret,
+    tour,
   }: {
     alternate: Alternate;
     /** The Section whose editor the text box is in. */
@@ -69,6 +70,8 @@
     cueing?: Cueing;
     /** Given, hears where the caret is in the text box while it has focus, and null once it hasn't. */
     onCaret?: CaretListener;
+    /** Given, names the text box for the Tour to spotlight, as its `data-tour`. */
+    tour?: string;
   } = $props();
 
   // Where the caret is, told as it moves while the text box has focus, by
@@ -138,6 +141,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="line-field"
+  data-tour={tour}
   class:cued={cueing}
   class:with-gutter={cueing?.gutter}
   class:syncing={cueing?.sync}

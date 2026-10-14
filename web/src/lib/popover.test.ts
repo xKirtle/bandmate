@@ -1,5 +1,5 @@
 import { describe as group, expect, it } from 'vitest';
-import { popoverLeft, popoverSide, popoverTop } from './popover';
+import { popoverBeside, popoverLeft, popoverSide, popoverTop } from './popover';
 
 group('popoverSide', () => {
   it('opens it after the point when there is room', () => {
@@ -63,5 +63,35 @@ group('popoverLeft', () => {
       expect(popoverLeft(at(700), 400, 1000, 4, 'start')).toBe(596);
       expect(popoverLeft(at(300), 400, 1000, 4, 'end')).toBe(4);
     });
+  });
+});
+
+group('popoverBeside', () => {
+  const card = { width: 400, height: 200 };
+  const window = { width: 1600, height: 900 };
+
+  it('places it to the right of what it points at, centred on it', () => {
+    const head = { left: 300, right: 900, top: 300, bottom: 340 };
+    expect(popoverBeside(head, card, window, 24)).toEqual({ left: 924, top: 220 });
+  });
+
+  it('places it to the left when there is no room to the right', () => {
+    const head = { left: 800, right: 1300, top: 300, bottom: 340 };
+    expect(popoverBeside(head, card, window, 24)).toEqual({ left: 376, top: 220 });
+  });
+
+  it('keeps it inside the window top and bottom', () => {
+    const button = { left: 100, right: 140, top: 860, bottom: 890 };
+    expect(popoverBeside(button, card, window, 24)).toEqual({ left: 164, top: 676 });
+  });
+
+  it('places it over something as wide as the window, lined up with its start', () => {
+    const timeline = { left: 80, right: 1600, top: 500, bottom: 900 };
+    expect(popoverBeside(timeline, card, window, 24)).toEqual({ left: 80, top: 276 });
+  });
+
+  it('places it under something as wide as the window with no room over it', () => {
+    const sheet = { left: 80, right: 1600, top: 100, bottom: 300 };
+    expect(popoverBeside(sheet, card, window, 24)).toEqual({ left: 80, top: 324 });
   });
 });
