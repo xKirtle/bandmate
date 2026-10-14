@@ -275,3 +275,15 @@ _Avoid_: Import (importing brings an audio file in as a Sound)
 **Upgrade copy**:
 A copy of the whole install's Songs, Beats and everything else Bandmate keeps, apart from audio and Covers, taken by Bandmate itself just before a newer Bandmate changes how they're stored, so the install can go back to the older Bandmate. Going back to one loses everything done since that upgrade. Only the newest three are kept. It's never taken on a new install, nor when nothing changes.
 _Avoid_: Backup (a Backup holds chosen Songs and Beats, to Restore from), Snapshot
+
+**Tour**:
+A guided walk through Bandmate's core loop on the Demo Song, from writing Lines and Chords to playing the Demo Beat and where a Take is recorded, one step at a time on the real controls. It's offered once, the first time a new install with no Songs is opened on a wide window, and can be skipped at any step or taken again later.
+_Avoid_: Tutorial, walkthrough, onboarding
+
+**Demo Song**:
+A Song built into Bandmate for the Tour to work through, with its Timeline holding the Demo Beat. It isn't one of the user's Songs: it never shows among them, nor goes into a Backup, and it's put back as it was built each time the Tour starts, losing what was done to it.
+_Avoid_: Sample Song, example
+
+**Demo Beat**:
+The Beat built into Bandmate that the Demo Song's Timeline uses. Like the Demo Song, it isn't the user's: it never shows in the Beat Library or goes into a Backup.
+_Avoid_: Sample Beat
