@@ -8,10 +8,24 @@ const shortMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Se
 const sameDay = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
-/** The local day of a time, e.g. "4 Oct 2026". */
-export function formatDay(iso: string): string {
-  const day = new Date(iso);
-  return `${day.getDate()} ${shortMonths[day.getMonth()]} ${day.getFullYear()}`;
+/**
+ * A local day in the order the locale puts it, with the month spelled as the
+ * app spells it where the locale spells one: "4 Oct 2026", "Oct 4, 2026", "4/10/2026".
+ */
+function localDay(date: Date, locale: string | undefined, withYear: boolean): string {
+  const parts = new Intl.DateTimeFormat(locale, {
+    day: 'numeric',
+    month: 'short',
+    year: withYear ? 'numeric' : undefined,
+  }).formatToParts(date);
+  return parts
+    .map(({ type, value }) => (type === 'month' && /\D/.test(value) ? shortMonths[date.getMonth()] : value))
+    .join('');
+}
+
+/** The local day of a time, in the order the locale puts it: "4 Oct 2026" or "Oct 4, 2026". */
+export function formatDay(iso: string, locale?: string): string {
+  return localDay(new Date(iso), locale, true);
 }
 
 /** The local time of day, to the minute, in 12 or 24 hours as the locale counts them: "09:05" or "9:05 AM". */
@@ -21,7 +35,8 @@ export function formatTime(iso: string, locale?: string): string {
 
 /**
  * A local time, to the minute, with its day as near as it is to now:
- * "Today, 09:05", "Yesterday, 23:59", "4 Sep, 14:00", or "31 Dec 2025, 08:30" in another year.
+ * "Today, 09:05", "Yesterday, 23:59", "4 Sep, 14:00", or "31 Dec 2025, 08:30" in another year,
+ * the day in the order the locale puts it.
  */
 export function formatWhen(iso: string, now = new Date(), locale?: string): string {
   const when = new Date(iso);
@@ -29,8 +44,7 @@ export function formatWhen(iso: string, now = new Date(), locale?: string): stri
   const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
   if (sameDay(when, now)) return `Today, ${time}`;
   if (sameDay(when, yesterday)) return `Yesterday, ${time}`;
-  const year = when.getFullYear() === now.getFullYear() ? '' : ` ${when.getFullYear()}`;
-  return `${when.getDate()} ${shortMonths[when.getMonth()]}${year}, ${time}`;
+  return `${localDay(when, locale, when.getFullYear() !== now.getFullYear())}, ${time}`;
 }
 
 const units: [Intl.RelativeTimeFormatUnit, number][] = [

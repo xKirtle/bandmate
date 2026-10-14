@@ -14,9 +14,17 @@ const at = (y: number, m: number, d: number, h: number, min: number) => new Date
 const now = new Date(2026, 9, 13, 18, 30);
 
 group('formatDay', () => {
-  it('says the local day, its month spelled out', () => {
-    expect(formatDay(at(2026, 9, 4, 0, 10))).toBe('4 Sep 2026');
-    expect(formatDay(at(2025, 12, 31, 23, 50))).toBe('31 Dec 2025');
+  it('says the local day in the order the locale puts it', () => {
+    expect(formatDay(at(2026, 9, 4, 0, 10), 'en-GB')).toBe('4 Sep 2026');
+    expect(formatDay(at(2025, 12, 31, 23, 50), 'en-US')).toBe('Dec 31, 2025');
+  });
+
+  it("spells the month as the app does, not the locale's way", () => {
+    expect(formatDay(at(2026, 9, 4, 0, 10), 'en-GB')).not.toContain('Sept');
+  });
+
+  it('leaves a month the locale writes as a number as it is', () => {
+    expect(formatDay(at(2026, 9, 4, 0, 10), 'pt-PT')).toBe('4/09/2026');
   });
 });
 
@@ -43,6 +51,10 @@ group('formatWhen', () => {
   it('says the day for one earlier this year, and the year too for another', () => {
     expect(formatWhen(at(2026, 9, 4, 14, 0), now, 'en-GB')).toBe('4 Sep, 14:00');
     expect(formatWhen(at(2025, 12, 31, 8, 30), now, 'en-GB')).toBe('31 Dec 2025, 08:30');
+  });
+
+  it('puts the day in the order the locale does', () => {
+    expect(formatWhen(at(2026, 9, 4, 14, 0), now, 'en-US')).toMatch(/^Sep 4, 2:00\sPM$/);
   });
 
   it('says the time as the locale counts hours', () => {

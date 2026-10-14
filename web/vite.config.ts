@@ -6,6 +6,11 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import type { Dependency } from './src/lib/api';
 import { licenseOf, packageDir } from './src/lib/dependencyManifest';
 
+// Tests run in British English, whatever the machine's locale, so a date the
+// app formats reads "4 Oct 2026" and a time "09:05". The test workers, started
+// after this, take their locale from LANG.
+if (process.env.VITEST) process.env.LANG = 'en_GB.UTF-8';
+
 /** Writes dependencies.json into the build: every node_modules package whose
     code ends up in the bundle, measured from the bundle itself, with its
     version and license from its own package.json. The Go binary embeds it
