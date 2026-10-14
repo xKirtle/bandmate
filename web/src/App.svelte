@@ -3,6 +3,7 @@
   import { movedTo, settingsTabAt } from './lib/nav';
   import SongList from './routes/SongList.svelte';
   import SongPage from './routes/SongPage.svelte';
+  import DemoSong from './routes/DemoSong.svelte';
   import BeatLibrary from './routes/BeatLibrary.svelte';
   import ChordFinderPage from './routes/ChordFinderPage.svelte';
   import Backups from './routes/Backups.svelte';
@@ -45,6 +46,8 @@
       <About />
     {:else if moved}
       <!-- On its way to where it moved. -->
+    {:else if router.path === '/songs/demo'}
+      <DemoSong />
     {:else if songMatch}
       {#key songMatch[1]}
         <SongPage id={Number(songMatch[1])} />
