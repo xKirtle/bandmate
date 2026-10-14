@@ -1070,6 +1070,8 @@ export const api = {
     return request<SongSummary[]>('GET', query ? `/songs?${query}` : '/songs');
   },
   getSong: (id: number) => request<Song>('GET', `/songs/${id}`),
+  /** Puts the Demo back as built into Bandmate, replacing the one there, and answers with the Demo Song. */
+  putDemoBack: () => request<Song>('POST', '/demo'),
   /** Creates a Song, titled "Untitled Song" by the server, in the Folder with folderId, or in none. */
   createSong: (folderId: number | null = null) => request<Song>('POST', '/songs', { folderId }),
   /** Every Folder, by name. */

@@ -329,6 +329,7 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("POST /api/songs/{id}/timeline/sounds", a.importSound)
 	mux.HandleFunc("GET /api/songs/{id}/sounds/{soundID}", a.getSound)
 	mux.HandleFunc("GET /api/songs/{id}/sounds/{soundID}/audio", a.soundAudio)
+	mux.HandleFunc("POST /api/demo", a.putDemoBack)
 	mux.HandleFunc("GET /api/config", a.config)
 	mux.HandleFunc("GET /api/about", a.about)
 	mux.HandleFunc("GET /api/about/releases", a.aboutReleases)

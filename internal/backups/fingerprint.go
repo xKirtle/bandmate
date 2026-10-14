@@ -50,7 +50,7 @@ func (s *Store) fingerprint(ctx context.Context) (string, error) {
 		return "", err
 	}
 	defer tx.Rollback()
-	songIDs, err := queryIDs(ctx, tx, `SELECT id FROM src.songs ORDER BY id`)
+	songIDs, err := queryIDs(ctx, tx, `SELECT id FROM src.songs WHERE NOT demo ORDER BY id`)
 	if err != nil {
 		return "", err
 	}

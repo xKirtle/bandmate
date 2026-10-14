@@ -54,7 +54,7 @@ func Fold(name string) string { return strings.ToLower(strings.TrimSpace(name)) 
 // List returns every Tag, by name ignoring case.
 func (s *Store) List(ctx context.Context) ([]Tag, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT t.id, t.name,
-		(SELECT COUNT(*) FROM song_tags st WHERE st.tag_id = t.id)
+		(SELECT COUNT(*) FROM song_tags st JOIN songs s ON s.id = st.song_id WHERE st.tag_id = t.id AND NOT s.demo)
 		FROM tags t ORDER BY t.folded, t.id`)
 	if err != nil {
 		return nil, fmt.Errorf("listing tags: %w", err)

@@ -36,7 +36,7 @@ func NewStore(db *sql.DB) *Store { return &Store{db: db} }
 // spaces around it.
 func fold(name string) string { return strings.ToLower(strings.TrimSpace(name)) }
 
-const selectFolders = `SELECT f.id, f.name, (SELECT COUNT(*) FROM songs s WHERE s.folder_id = f.id) FROM folders f`
+const selectFolders = `SELECT f.id, f.name, (SELECT COUNT(*) FROM songs s WHERE s.folder_id = f.id AND NOT s.demo) FROM folders f`
 
 // List returns every Folder, by name ignoring case.
 func (s *Store) List(ctx context.Context) ([]Folder, error) {

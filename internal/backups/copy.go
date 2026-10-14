@@ -96,7 +96,7 @@ var errFileGone = errors.New("a file was removed while it was backed up")
 
 // beatLibraryTables picks every Beat: the whole Beat Library, some of which
 // may already be in the Backup from a Song.
-var beatLibraryTables = []songTable{{name: "beats", shared: true, where: `TRUE`}}
+var beatLibraryTables = []songTable{{name: "beats", shared: true, where: `NOT demo`}}
 
 // beatLibraryFiles lists the files the Beat Library's rows use.
 var beatLibraryFiles = []songfiles.Kind{{Dir: songfiles.Beats.Dir, Table: songfiles.Beats.Table, IDs: `SELECT id FROM main.beats`}}
