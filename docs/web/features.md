@@ -6,7 +6,9 @@ Bandmate follows a song from the first idea to a rough recording. Here's what yo
 
 New to Bandmate? The Tour is a quick look at its core: a song's sections, lines and chords, the timeline with a beat on it, and recording a take. It shows them on a demo song built into Bandmate, which never appears among your songs or beats, or in your backups.
 
-Take it from **Settings › About**, with **Take the Tour**, on a computer or tablet: it needs a wide window. Each step lights up one part of the page and says what it is. The page under it is only for looking at, so a stray click or key changes nothing. Go on with **Next** or →, and back with **Back** or ←. **End tour** or Esc ends it at any step, and **Finish** at the last: either way, you're back where you took it from. Take it again whenever you like.
+While a new Bandmate has no songs yet, the Songs page offers it under **Write your first Song**: **Take the Tour**, or **No thanks**. Either way, the offer is gone for good, on every device. Take it whenever you like from **Settings › About**, with **Take the Tour**. Both are on a computer or tablet only: the Tour needs a wide window.
+
+Each step lights up one part of the page and says what it is. The page under it is only for looking at, so a stray click or key changes nothing. Go on with **Next** or →, and back with **Back** or ←. **End tour** or Esc ends it at any step, and **Finish** at the last: either way, you're back where you took it from.
 
 ## Your songs
 
