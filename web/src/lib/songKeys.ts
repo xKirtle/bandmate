@@ -1,8 +1,8 @@
 import { matches, shortcuts, shortcutsDialogKeys, way, type KeyDown } from './shortcuts';
 import type { KeyPlace } from './keyPlace';
 
-/** The Song-wide Shortcuts, which work wherever focus is on the Song page. */
-export type SongKey = 'playPause' | 'record' | 'start' | 'end' | 'undo' | 'redo' | 'split';
+/** The Timeline's Shortcuts that work wherever focus is on the Song page, e.g. Space to play. */
+export type SongKey = 'playPause' | 'record' | 'start' | 'end' | 'split';
 
 /** Where a key was pressed, and what the Song page is doing. */
 export type SongKeyContext = KeyPlace & {
@@ -39,11 +39,6 @@ export function songKey(e: KeyDown, at: SongKeyContext): SongKey | null {
     if (at.inTextField || at.ownsHomeEnd) return null;
     return going === 'back' ? 'start' : 'end';
   }
-  if (matches(e, shortcuts.undo.keys) || matches(e, shortcuts.redo.keys)) {
-    // Not while recording, which undo would take the place of.
-    if (!at.editable || at.inTextField || at.recording) return null;
-    return matches(e, shortcuts.undo.keys) ? 'undo' : 'redo';
-  }
   if (matches(e, shortcuts.record.keys)) {
     if (e.repeat || at.inTextField || (!at.capturing && !at.canRecord)) return null;
     return 'record';
@@ -53,6 +48,25 @@ export function songKey(e: KeyDown, at: SongKeyContext): SongKey | null {
     if (e.repeat || !at.editable || at.inTextField || at.recording) return null;
     return 'split';
   }
+  return null;
+}
+
+/** Where Undo's or Redo's key was pressed, and whether the Song can change now. */
+export type UndoKeyContext = KeyPlace & {
+  /** A recording or a Merge is under way, which keeps the Song as it is. */
+  frozen: boolean;
+};
+
+/**
+ * Whether a key press undoes or redoes the Song's latest edit, if either:
+ * anywhere on the Song page, in Read mode and on a phone too, but not in a
+ * text field, whose own typing it undoes, nor in a dialog, nor while a
+ * recording or a Merge keeps the Song as it is. Null leaves the key to the page.
+ */
+export function undoKey(e: KeyDown, at: UndoKeyContext): 'undo' | 'redo' | null {
+  if (e.defaultPrevented || at.dialogOpen || at.inTextField || at.frozen) return null;
+  if (matches(e, shortcuts.undo.keys)) return 'undo';
+  if (matches(e, shortcuts.redo.keys)) return 'redo';
   return null;
 }
 

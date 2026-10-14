@@ -1,7 +1,9 @@
 <script lang="ts">
   import History from '@lucide/svelte/icons/history';
   import Keyboard from '@lucide/svelte/icons/keyboard';
-  import { onDestroy, untrack } from 'svelte';
+  import Redo2 from '@lucide/svelte/icons/redo-2';
+  import Undo2 from '@lucide/svelte/icons/undo-2';
+  import { onDestroy, tick, untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { api, commonKeys, type Song, type Status } from '../lib/api';
   import Combobox from '../lib/Combobox.svelte';
@@ -20,7 +22,8 @@
   import TuningField from '../lib/TuningField.svelte';
   import LanguagesField from '../lib/LanguagesField.svelte';
   import { LyricSheetEditing } from '../lib/lyricSheetEditing.svelte';
-  import { Saves } from '../lib/saves.svelte';
+  import { Saves, type Undone } from '../lib/saves.svelte';
+  import { scrollBehavior } from '../lib/motion';
   import { detailFields, type DetailFields } from '../lib/songFields';
   import { cancelOnEscape, committedAsItGoes, leaveOnEscape } from '../lib/typedField.svelte';
   import { SyncMode } from '../lib/syncMode.svelte';
@@ -29,11 +32,13 @@
   import { takeNewFlag } from '../lib/newSong';
   import { navigate, replaceSearch, router } from '../lib/router.svelte';
   import { keyboardAndMouse, keyHints } from '../lib/keyHints';
-  import { shortcutsDialogKeys } from '../lib/shortcuts';
+  import { shortcuts, shortcutsDialogKeys } from '../lib/shortcuts';
+  import { editHint, type Freeze } from '../lib/freeze';
   import ShortcutsDialog from '../lib/ShortcutsDialog.svelte';
   import SnapshotsDialog from '../lib/SnapshotsDialog.svelte';
   import { keyPlace } from '../lib/keyPlace';
-  import { opensShortcuts } from '../lib/songKeys';
+  import { inTextField } from '../lib/textField';
+  import { opensShortcuts, undoKey } from '../lib/songKeys';
   import { detailsSummary, openingMode, sideParts, type Mode, type SidePart } from '../lib/songMode';
   import { chordsInRead } from '../lib/chordChart';
   import { songChordsShown } from '../lib/chordsShown';
@@ -74,6 +79,12 @@
   // asks first, and changes made elsewhere wait to be shown (the Timeline's
   // recorder holds Saves' refreshes).
   let recording = $state(false);
+  // Undo and Redo, in the header and on their keys, are the Song's: they
+  // reverse its latest edit, in either mode and on a phone too, even one
+  // that can't be made there now. They're off entirely while a recording or
+  // a Merge keeps the Song as it is, as the Timeline says.
+  let freeze = $state<Freeze>(null);
+  const frozen = $derived(freeze !== null);
   // A Status picked, shown until its save ends.
   let statusSent = $state<Status | null>(null);
   const status = $derived(statusSent ?? song?.status ?? 'idea');
@@ -200,11 +211,54 @@
   let showingSnapshots = $state(false);
   const hints = keyHints();
 
-  function openShortcutsOnKey(event: KeyboardEvent) {
-    const opens = opensShortcuts(event, keyPlace(event));
-    if (!opens || !song) return;
+  function keydown(event: KeyboardEvent) {
+    if (!song) return;
+    const place = keyPlace(event);
+    if (opensShortcuts(event, place)) {
+      event.preventDefault();
+      showingShortcuts = true;
+      return;
+    }
+    const undoing = undoKey(event, { ...place, frozen });
+    if (!undoing) return;
     event.preventDefault();
-    showingShortcuts = true;
+    if (undoing === 'undo') undo();
+    else redo();
+  }
+
+  // Undo and Redo go through the Timeline, which follows what they did
+  // there. A Lyric Sheet change undone or redone ends Sync mode, as any
+  // change to the lyrics does, and shows the Section it changed, opening
+  // the Scrapbook's fold for one there, without moving focus.
+  //
+  // Pressed while in a text field, they leave it first, saving what's
+  // typed: one visit's typing is a step, kept as the field is left, so
+  // Undo undoes it, rather than have it land after what's put back.
+  async function undo() {
+    leaveTextField();
+    showUndone((await timelinePanel?.undo()) ?? null);
+  }
+
+  async function redo() {
+    leaveTextField();
+    showUndone((await timelinePanel?.redo()) ?? null);
+  }
+
+  function leaveTextField() {
+    const field = document.activeElement;
+    if (field instanceof HTMLElement && inTextField(field)) field.blur();
+  }
+
+  async function showUndone(undone: Undone | null) {
+    if (undone?.section === undefined) return;
+    syncMode.end();
+    const sectionId = undone.section;
+    if (sectionId === null || !song) return;
+    if (song.scrapbook.includes(sectionId) && desktop.current && writing) toggledParts['write-scrapbook'] = true;
+    await tick();
+    document
+      .querySelector(`[data-section="${sectionId}"]`)
+      ?.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() });
   }
 
   // How tall the docked Timeline is, which the side column stops above.
@@ -366,7 +420,7 @@
   </button>
 {/snippet}
 
-<svelte:window onbeforeunload={warnBeforeUnload} onkeydown={openShortcutsOnKey} />
+<svelte:window onbeforeunload={warnBeforeUnload} onkeydown={keydown} />
 <svelte:document onvisibilitychange={refreshOnReturn} />
 
 <main class="page" style:--timeline-height="{timelineHeight}px">
@@ -429,6 +483,28 @@
                 <label class="mode"><input type="radio" name="song-mode" value="write" bind:group={mode} />Write</label>
                 <label class="mode"><input type="radio" name="song-mode" value="read" bind:group={mode} />Read</label>
               </fieldset>
+              <button
+                type="button"
+                class="button tool"
+                onclick={undo}
+                disabled={!(saves.canUndo || saves.unsavedInSections) || frozen}
+                aria-label="Undo"
+                aria-keyshortcuts={hints.aria(shortcuts.undo.keys)}
+                title={editHint(freeze, hints.withKeys('Undo', shortcuts.undo.keys))}
+              >
+                <Undo2 />
+              </button>
+              <button
+                type="button"
+                class="button tool"
+                onclick={redo}
+                disabled={!saves.canRedo || frozen}
+                aria-label="Redo"
+                aria-keyshortcuts={hints.aria(shortcuts.redo.keys)}
+                title={editHint(freeze, hints.withKeys('Redo', shortcuts.redo.keys))}
+              >
+                <Redo2 />
+              </button>
               {#if writing}
                 <button
                   type="button"
@@ -646,6 +722,7 @@
     onPlayhead={(at) => (playhead = at)}
     {syncMode}
     onRecording={(on) => (recording = on)}
+    onFreeze={(f) => (freeze = f)}
   />
 {/if}
 
@@ -720,7 +797,7 @@
     flex: 1;
     min-width: 0;
   }
-  /* The mode switch, then the Snapshots and shortcuts buttons. */
+  /* The mode switch, then Undo and Redo, the Snapshots and shortcuts buttons. */
   .head-tools {
     display: flex;
     flex: none;

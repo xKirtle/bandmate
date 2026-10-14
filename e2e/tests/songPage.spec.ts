@@ -25,6 +25,8 @@ import {
   touch,
   warnsOnLeaving,
   type Point,
+  undoButton,
+  redoButton,
 } from '../songPage';
 
 // The Song page, and how it saves: Clips edited on the Timeline and undone,
@@ -50,8 +52,8 @@ test('a Clip moved, trimmed and deleted is undone and redone a step at a time', 
   const song = await heroSong(bandmate);
   await page.goto(`/songs/${song.id}`);
   const take = clip(page, 'Take 2');
-  const undo = timeline(page).getByRole('button', { name: 'Undo' });
-  const redo = timeline(page).getByRole('button', { name: 'Redo' });
+  const undo = undoButton(page);
+  const redo = redoButton(page);
   await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
   await expect(undo).toBeDisabled();
 
@@ -111,11 +113,88 @@ test('a Clip moved, trimmed and deleted is undone and redone a step at a time', 
   await expect(redo).toBeDisabled();
 });
 
+test("Undo and Redo are the Song page header's, in Read mode too, and not the Timeline's", async ({
+  page,
+  bandmate,
+}) => {
+  const song = await heroSong(bandmate);
+  await page.goto(`/songs/${song.id}`);
+  const take = clip(page, 'Take 2');
+  await expect(undoButton(page)).toBeDisabled();
+  await expect(redoButton(page)).toBeDisabled();
+  // Beside Snapshots, not on the Timeline's transport row.
+  await expect(timeline(page).getByRole('button', { name: /^(Undo|Redo)$/ })).toHaveCount(0);
+  await expect(undoButton(page)).toBeInViewport();
+
+  await take.focus();
+  await page.keyboard.press('Delete');
+  await expect.poll(() => serverClips(bandmate, song.id, 'Lead vox')).toEqual([]);
+
+  // Read mode can't delete a Clip, but still undoes the delete.
+  await page.getByRole('radio', { name: 'Read' }).check();
+  await undoButton(page).click();
+  await expect(take).toBeVisible();
+  await expect.poll(() => serverClips(bandmate, song.id, 'Lead vox')).toMatchObject([{ start: 4, length: 21 }]);
+  await redoButton(page).click();
+  await expect(take).toHaveCount(0);
+  await expect.poll(() => serverClips(bandmate, song.id, 'Lead vox')).toEqual([]);
+});
+
+test('on a phone, the header undoes and redoes a Timeline edit made while wide, and so do its keys outside a text field or a dialog', async ({
+  page,
+  bandmate,
+}) => {
+  const song = await heroSong(bandmate);
+  await page.goto(`/songs/${song.id}`);
+  const take = clip(page, 'Take 2');
+  const placed = [{ start: 4, length: 21 }];
+  await take.focus();
+  await page.keyboard.press('Delete');
+  await expect.poll(() => serverClips(bandmate, song.id, 'Lead vox')).toEqual([]);
+
+  // Narrowed to a phone held upright, where the Timeline only plays.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(undoButton(page)).toBeInViewport();
+  await expect(redoButton(page)).toBeInViewport();
+
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect.poll(() => serverClips(bandmate, song.id, 'Lead vox')).toMatchObject(placed);
+  await expect(undoButton(page)).toBeDisabled();
+  await page.keyboard.press('ControlOrMeta+y');
+  await expect.poll(() => serverClips(bandmate, song.id, 'Lead vox')).toEqual([]);
+  await expect(undoButton(page)).toBeEnabled();
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect.poll(() => serverClips(bandmate, song.id, 'Lead vox')).toMatchObject(placed);
+  await expect(redoButton(page)).toBeEnabled();
+  await page.keyboard.press('ControlOrMeta+Shift+z');
+  await expect.poll(() => serverClips(bandmate, song.id, 'Lead vox')).toEqual([]);
+  await expect(redoButton(page)).toBeDisabled();
+
+  // In a text field, Ctrl+Z is the field's own, and in a dialog, the dialog's.
+  const title = page.getByRole('textbox', { name: 'Title' });
+  await title.focus();
+  await page.keyboard.press('ControlOrMeta+z');
+  await title.blur();
+  await page.getByRole('button', { name: 'Snapshots' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+z');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toBeHidden();
+  // Neither undid the delete: the header's Undo is the one to.
+  await page.waitForTimeout(500);
+  expect(await serverClips(bandmate, song.id, 'Lead vox')).toEqual([]);
+  await undoButton(page).click();
+  await expect.poll(() => serverClips(bandmate, song.id, 'Lead vox')).toMatchObject(placed);
+  await expect(undoButton(page)).toBeDisabled();
+  await redoButton(page).click();
+  await expect.poll(() => serverClips(bandmate, song.id, 'Lead vox')).toEqual([]);
+});
+
 test("a Clip's gain line dragged up sets its Gain, and an undo brings it back", async ({ page, bandmate }) => {
   const song = await heroSong(bandmate);
   await page.goto(`/songs/${song.id}`);
   const take = clip(page, 'Take 2');
-  const undo = timeline(page).getByRole('button', { name: 'Undo' });
+  const undo = undoButton(page);
   await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
 
   // At 0 dB the line's halfway down the waveform, which runs from −36 dB at
@@ -143,7 +222,7 @@ test("a Clip's fade dot dragged in sets its Fade, and an undo brings it back", a
   const song = await heroSong(bandmate);
   await page.goto(`/songs/${song.id}`);
   const take = clip(page, 'Take 2');
-  const undo = timeline(page).getByRole('button', { name: 'Undo' });
+  const undo = undoButton(page);
   await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
 
   // The fade in's dot, dragged in to the Clip's middle, fades it in over half its 21 s.
@@ -171,7 +250,7 @@ test('a Clip of Takes Alt+dragged nudges its active Take, the Clip staying put, 
   const song = await heroSong(bandmate);
   await page.goto(`/songs/${song.id}`);
   const take = clip(page, 'Take 2');
-  const undo = timeline(page).getByRole('button', { name: 'Undo' });
+  const undo = undoButton(page);
   await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
   const [before] = (await serverClips(bandmate, song.id, 'Lead vox')) as TakesClip[];
   expect(activeNudge(before)).toBe(0);
@@ -211,7 +290,7 @@ test('a Clip dragged in a Selection of several moves them all by as much, and on
   await page.goto(`/songs/${song.id}`);
   const take = clip(page, 'Take 2');
   const beatClip = clip(page, 'Lorem Click');
-  const undo = timeline(page).getByRole('button', { name: 'Undo' });
+  const undo = undoButton(page);
   await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
 
   // Take 2 clicked, then the Beat's Clip added with Mod+click.
@@ -245,7 +324,7 @@ test('a Clip pressed and let go without dragging is selected, and nothing is sav
   const song = await heroSong(bandmate);
   await page.goto(`/songs/${song.id}`);
   const take = clip(page, 'Take 2');
-  const undo = timeline(page).getByRole('button', { name: 'Undo' });
+  const undo = undoButton(page);
   await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
   const before = await bandmate.timeline(song.id);
   const saves: string[] = [];
@@ -269,7 +348,7 @@ test('Clips selected by drawing a box are deleted with Delete, and one undo brin
   await page.goto(`/songs/${song.id}`);
   const click = clip(page, 'Lorem Click');
   const take = clip(page, 'Take 2');
-  const undo = timeline(page).getByRole('button', { name: 'Undo' });
+  const undo = undoButton(page);
   await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
 
   // A box drawn from the empty Lead vox lane before Take 2, up over the
@@ -319,8 +398,8 @@ test('a Split selects and focuses the right half of each Clip it cuts, so Delete
   await page.goto(`/songs/${song.id}`);
   const take = clip(page, 'Take 2');
   const beatClip = clip(page, 'Lorem Click');
-  const undo = timeline(page).getByRole('button', { name: 'Undo' });
-  const redo = timeline(page).getByRole('button', { name: 'Redo' });
+  const undo = undoButton(page);
+  const redo = redoButton(page);
   await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
 
   // The playhead at 0:10, across Take 2 and the Beat's Clip, 5 s at a time.
@@ -417,8 +496,8 @@ test('Selected Clips merged become one Clip, selected, its Track chosen, and und
   const take = clip(page, 'Take 2');
   const beatClip = clip(page, 'Lorem Click');
   const merged = clip(page, 'Merged Clip');
-  const undo = timeline(page).getByRole('button', { name: 'Undo' });
-  const redo = timeline(page).getByRole('button', { name: 'Redo' });
+  const undo = undoButton(page);
+  const redo = redoButton(page);
   const beat = timeline(page).getByRole('group', { name: 'Track Beat' });
   const leadVox = timeline(page).getByRole('group', { name: 'Track Lead vox' });
   await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
@@ -494,8 +573,8 @@ test('a Sound imported with Import audio… goes in a new Clip after the Chosen 
   await page.goto(`/songs/${song.id}`);
   const first = clip(page, 'night drive');
   const second = clip(page, 'night ride');
-  const undo = timeline(page).getByRole('button', { name: 'Undo' });
-  const redo = timeline(page).getByRole('button', { name: 'Redo' });
+  const undo = undoButton(page);
+  const redo = redoButton(page);
   await expect(clip(page, 'Take 2')).toHaveAccessibleName('Take 2, 0:04 to 0:25');
 
   /** Imports a file with Import audio…, on the transport row. */
@@ -543,19 +622,22 @@ test('a Sound imported with Import audio… goes in a new Clip after the Chosen 
 /** What the transport row offers as it shows now: on it, and folded into its ⋯. */
 async function transportShows(page: Page) {
   const row = timeline(page);
-  const names = ['Import audio…', 'Mix down…', 'Input to record from', 'Undo', 'Redo'];
+  const names = ['Import audio…', 'Mix down…', 'Input to record from'];
   const onRow: string[] = [];
   for (const name of names) if (await row.getByRole('button', { name, exact: true }).isVisible()) onRow.push(name);
   const more = row.getByRole('button', { name: 'More Timeline actions' });
   if (!(await more.isVisible())) return { onRow, folded: [] };
   await more.click();
-  const folded = await page.getByRole('menu', { name: 'More Timeline actions' }).getByRole('menuitem').allTextContents();
+  const folded = await page
+    .getByRole('menu', { name: 'More Timeline actions' })
+    .getByRole('menuitem')
+    .allTextContents();
   await page.keyboard.press('Escape');
   return { onRow, folded: folded.map((t) => t.trim()) };
 }
 
 /** What the transport row offers, once it offers each of its `count` actions once, as it does when it has settled. */
-async function transportOffers(page: Page, count = 5) {
+async function transportOffers(page: Page, count = 3) {
   let offers = await transportShows(page);
   await expect
     .poll(async () => {
@@ -566,7 +648,7 @@ async function transportOffers(page: Page, count = 5) {
   return offers;
 }
 
-test("the transport row's actions sit on it where there's room, and fold into its ⋯ as it narrows: Import audio first, then Mix down, then the mic, then Undo and Redo together", async ({
+test("the transport row's actions sit on it where there's room, and fold into its ⋯ as it narrows: Import audio first, then Mix down, then the mic", async ({
   page,
   bandmate,
 }) => {
@@ -574,7 +656,7 @@ test("the transport row's actions sit on it where there's room, and fold into it
   await page.goto(`/songs/${song.id}`);
   const row = timeline(page);
 
-  // Wide, all five are on the row, each saying what it does, and there's no ⋯.
+  // Wide, all three are on the row, each saying what it does, and there's no ⋯.
   await expect(row.getByRole('button', { name: 'Import audio…' })).toHaveAttribute(
     'title',
     'Import an audio file as a Sound onto Lead vox',
@@ -592,18 +674,13 @@ test("the transport row's actions sit on it where there's room, and fold into it
   for (let width = 1440; width >= 660; width -= 20) {
     await page.setViewportSize({ width, height: 900 });
     const { folded } = await transportOffers(page);
-    const order = ['Import audio…', 'Mix down…', 'Record from…', 'Undo', 'Redo'];
+    const order = ['Import audio…', 'Mix down…', 'Record from…'];
     expect(folded, `at ${width}px`).toEqual(order.slice(0, folded.length));
     if (folded.join() !== seen.at(-1)?.join()) seen.push(folded);
   }
   // Import audio folds with Mix down, as the ⋯ takes as much room as it
-  // would alone, and Undo with Redo.
-  expect(seen).toEqual([
-    [],
-    ['Import audio…', 'Mix down…'],
-    ['Import audio…', 'Mix down…', 'Record from…'],
-    ['Import audio…', 'Mix down…', 'Record from…', 'Undo', 'Redo'],
-  ]);
+  // would alone. Undo and Redo never fold: they're the Song page header's.
+  expect(seen).toEqual([[], ['Import audio…', 'Mix down…'], ['Import audio…', 'Mix down…', 'Record from…']]);
 
   // A folded action does what it does on the row.
   await row.getByRole('button', { name: 'More Timeline actions' }).click();
@@ -617,8 +694,8 @@ test('held sideways, the full-screen Timeline folds its actions too, and upright
 }) => {
   const song = await heroSong(bandmate);
   const row = timeline(page);
-  // A small phone held sideways: the row on one line, too narrow for all five.
-  await page.setViewportSize({ width: 667, height: 375 });
+  // A small phone held sideways: the row on one line, too narrow for all three.
+  await page.setViewportSize({ width: 568, height: 320 });
   await page.goto(`/songs/${song.id}`);
   await expect(row.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
   expect((await transportOffers(page)).folded.length).toBeGreaterThan(0);
@@ -709,8 +786,8 @@ test('Cue edits are undone in order with the Clip edits around them', async ({ p
   const song = await heroSong(bandmate);
   await page.goto(`/songs/${song.id}`);
   const take = clip(page, 'Take 2');
-  const undo = timeline(page).getByRole('button', { name: 'Undo' });
-  const redo = timeline(page).getByRole('button', { name: 'Redo' });
+  const undo = undoButton(page);
+  const redo = redoButton(page);
   await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
 
   // A Clip moved, then the Cues it spans moved with it, then a Cue nudged.
@@ -1107,7 +1184,7 @@ test('a Track’s fader let go where it started sends nothing, so an undo of its
   const song = await bandmate.song({ title: 'Anthem' });
   await page.goto(`/songs/${song.id}`);
   const fader = timeline(page).getByRole('slider', { name: 'Volume of Track 1' });
-  const undo = timeline(page).getByRole('button', { name: 'Undo' });
+  const undo = undoButton(page);
   const volume = async () => (await bandmate.timeline(song.id)).tracks[0].volume;
 
   // Let go anywhere but where it started, it sends its level. The browser
@@ -1148,7 +1225,7 @@ test.describe('with touch', () => {
     const song = await bandmate.song({ title: 'Anthem' });
     await page.goto(`/songs/${song.id}`);
     const fader = timeline(page).getByRole('slider', { name: 'Volume of Track 1' });
-    const undo = timeline(page).getByRole('button', { name: 'Undo' });
+    const undo = undoButton(page);
     const volume = async () => (await bandmate.timeline(song.id)).tracks[0].volume;
     const saves: string[] = [];
     page.on('request', (r) => r.method() !== 'GET' && saves.push(`${r.method()} ${r.url()}`));

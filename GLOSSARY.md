@@ -14,6 +14,10 @@ _Avoid_: Project, track (a Track is something else)
 A Song, its Timeline or its Cues as the page shows them: as saved, with each edit still on its way on top, and any value being adjusted, such as a fader being dragged. An edit shows at once and stays shown until its save is done. If the save fails, what's saved shows again. **As saved** is what the server holds.
 _Avoid_: optimistic, pending, draft
 
+**Undo**:
+Reversing the Song's latest edits on this visit to it, newest first, whether to the Lyric Sheet and Scrapbook, the Timeline or a Cue; **Redo** makes them again, until a new edit is made. Typing in one visit to a text field is one edit. It lasts until leaving the Song, or until the Song is found to have changed elsewhere.
+_Avoid_: Snapshot (a Snapshot outlasts the visit), revert
+
 **Folder**:
 A named place on the Songs page that keeps some Songs together, like an EP's, so a growing list stays in order. A Song sits in one Folder at most, or in none, and Folders don't hold other Folders. A Folder is only a name: deleting it can leave its Songs in no Folder, or delete them too.
 _Avoid_: Album (a release), Playlist, Collection, Group

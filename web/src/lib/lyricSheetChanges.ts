@@ -1,6 +1,6 @@
 // Changes to the Lyric Sheet, each named by its kind, as Lyric Sheet editing
 // (see lyricSheetEditing.svelte.ts) sends them through Saves.
-import { api, type Song, type SongAt } from './api';
+import { api, type Sheet, type SheetCopy, type Song, type SongAt } from './api';
 
 /** A change to the Lyric Sheet, as the intent sent to the API. */
 export type LyricSheetChange =
@@ -37,7 +37,9 @@ export type LyricSheetChange =
   /** An Alternate's Lines replaced with the lines of text. */
   | { kind: 'replaceAlternateText'; alternateId: number; text: string }
   /** The Lyric Sheet and Scrapbook made a Snapshot's, once a Snapshot of them is taken. */
-  | { kind: 'restoreSnapshot'; snapshotId: number };
+  | { kind: 'restoreSnapshot'; snapshotId: number }
+  /** The Lyric Sheet and Scrapbook made a copy of them as they were, as Undo and Redo put them back. */
+  | { kind: 'putSheetBack'; sheet: SheetCopy };
 
 const lyricSheetChangeKinds: ReadonlySet<string> = new Set<LyricSheetChange['kind']>([
   'addSection',
@@ -57,7 +59,17 @@ const lyricSheetChangeKinds: ReadonlySet<string> = new Set<LyricSheetChange['kin
   'addToArrangement',
   'replaceAlternateText',
   'restoreSnapshot',
+  'putSheetBack',
 ]);
+
+/**
+ * One visit to a text field in the Lyric Sheet, from going into it to
+ * leaving it: the changes it saves are kept to undo as one step.
+ */
+export type FieldVisit = symbol;
+
+/** A new visit to a text field. */
+export const newFieldVisit = (): FieldVisit => Symbol('visit');
 
 /** Whether a change is to the Lyric Sheet. */
 export function isLyricSheetChange(change: { kind: string }): change is LyricSheetChange {
@@ -101,5 +113,70 @@ export function sendLyricSheetChange(at: SongAt, change: LyricSheetChange): Prom
       return api.replaceAlternateText(at, change.alternateId, change.text);
     case 'restoreSnapshot':
       return api.restoreSnapshot(at, change.snapshotId);
+    case 'putSheetBack':
+      return api.putSheetBack(at, change.sheet);
   }
+}
+
+/** A copy of a Song's Lyric Sheet and Scrapbook, to put back. */
+export function sheetCopy(song: Sheet): SheetCopy {
+  return {
+    arrangement: [...song.arrangement],
+    scrapbook: [...song.scrapbook],
+    sections: song.sections.map((s) => ({
+      id: s.id,
+      label: s.label,
+      alternates: s.alternates.map((a) => ({
+        id: a.id,
+        name: a.name,
+        active: a.active,
+        lines: a.lines.map((l) => ({ id: l.id, text: l.text, cue: l.cue })),
+      })),
+    })),
+  };
+}
+
+/**
+ * The Section a Lyric Sheet change, undone or redone, changed, as it left
+ * the sheet, to show: one written differently or brought back, else one
+ * moved between the Lyric Sheet and the Scrapbook, else the one moved
+ * within either, else, for one gone, the one now where it was, in the
+ * Lyric Sheet or the Scrapbook as it was. Null when none is left there.
+ */
+export function changedSection(from: Sheet, to: Sheet): number | null {
+  const written = (sheet: Sheet) =>
+    new Map(sheet.sections.map((s) => [s.id, JSON.stringify(sheetCopy({ ...sheet, sections: [s] }).sections[0])]));
+  const was = written(from);
+  const shown = [...to.arrangement, ...to.scrapbook];
+  const now = written(to);
+  const rewritten = shown.find((id) => was.get(id) !== now.get(id));
+  if (rewritten !== undefined) return rewritten;
+
+  const inScrapbook = (sheet: Sheet, id: number) => sheet.scrapbook.includes(id);
+  const crossed = shown.find((id) => inScrapbook(from, id) !== inScrapbook(to, id));
+  if (crossed !== undefined) return crossed;
+
+  for (const list of ['arrangement', 'scrapbook'] as const) {
+    const before = from[list].filter((id) => now.has(id));
+    const after = to[list];
+    if (before.join() === after.join()) continue;
+    const without = (order: number[], id: number) => order.filter((other) => other !== id).join();
+    return after.find((id) => without(before, id) === without(after, id)) ?? after.find((id, i) => before[i] !== id)!;
+  }
+
+  // Only gone: the Section after it, or else before it, where it was.
+  for (const order of [from.arrangement, from.scrapbook]) {
+    const gone = order.findIndex((id) => !now.has(id));
+    if (gone < 0) continue;
+    const after = order.slice(gone + 1).find((id) => now.has(id));
+    return (
+      after ??
+      order
+        .slice(0, gone)
+        .reverse()
+        .find((id) => now.has(id)) ??
+      null
+    );
+  }
+  return null;
 }

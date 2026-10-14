@@ -927,7 +927,7 @@ describe('Timeline editing, what follows an edit', () => {
     const { saves, editing } = await editingFor(server);
     await recordTake(server, saves, 12);
     expect(clipIdsOn(server, 2)).toHaveLength(1);
-    expect(await editing.undo()).toBe(12);
+    expect(await editing.undo()).toMatchObject({ playhead: 12 });
     expect(clipIdsOn(server, 2)).toEqual([]);
   });
 
@@ -941,7 +941,7 @@ describe('Timeline editing, what follows an edit', () => {
     await vi.advanceTimersByTimeAsync(0);
     state.recording = true;
     release();
-    expect(await undoing).toBeNull();
+    expect(await undoing).toMatchObject({ playhead: null });
     expect(clipIdsOn(server, 2)).toEqual([]);
   });
 });

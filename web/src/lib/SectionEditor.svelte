@@ -10,12 +10,12 @@
   import type { CaretListener } from './lyricsLanguage';
   import { suggestedLabels, type Alternate, type Section } from './api';
   import Combobox from './Combobox.svelte';
-  import type { LyricSheetEditing } from './lyricSheetEditing.svelte';
+  import type { LyricSheetEditing, SheetField } from './lyricSheetEditing.svelte';
   import type { MenuAction } from './menu';
   import type { Drop } from './sectionDrag';
   import type { SectionDragging } from './sectionDragging.svelte';
   import { activeAlternate, alternateName, alternatesLabel, labelOf, type Place } from './sections';
-  import { cancelOnEscape, committedAsItGoes, type TypedField } from './typedField.svelte';
+  import { cancelOnEscape, committedAsItGoes } from './typedField.svelte';
 
   let {
     section,
@@ -54,11 +54,12 @@
   const active = $derived(activeAlternate(section)!);
 
   // The Label and the Alternates' names, typed in place: each saves on
-  // change, which comes just before blur, and as its field goes.
+  // change, which comes just before blur, and as its field goes. What one
+  // visit to a field saves is undone as one step.
   const label = untrack(() => editing.sectionLabel(section.id));
-  const names = new Map<number, TypedField<string>>();
+  const names = new Map<number, SheetField>();
 
-  function nameOf(alt: Alternate): TypedField<string> {
+  function nameOf(alt: Alternate): SheetField {
     let name = names.get(alt.id);
     if (!name) {
       name = editing.alternateName(alt.id, section.id);
@@ -122,11 +123,8 @@
     choose(alt);
   }
 
+  // Deleting doesn't ask first: Undo brings it back, and Snapshots do after leaving.
   async function remove(alt: Alternate) {
-    const ok = confirm(
-      `Delete ${alternateName(section, alt)}?\n\nIts Lines go with it. You can undo it from Snapshots.`,
-    );
-    if (!ok) return;
     // Its ⋯ goes with it: the keyboard carries on from the active card.
     if (await editing.change({ kind: 'deleteAlternate', alternateId: alt.id })) radio(active.id)?.focus();
   }
@@ -210,6 +208,7 @@
       onpick={() => label.commit()}
       onrevert={() => label.cancel()}
       onchange={() => label.commit()}
+      onfocus={label.focus}
       placeholder="Label"
       autocomplete="off"
       autocapitalize="words"
@@ -286,6 +285,7 @@
                 bind:value={typedName.shown}
                 {@attach committedAsItGoes(typedName)}
                 onchange={() => typedName.commit()}
+                onfocus={typedName.focus}
                 onkeydown={cancelOnEscape(typedName)}
                 placeholder={name}
                 autocomplete="off"

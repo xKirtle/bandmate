@@ -1,4 +1,6 @@
+import type { Sheet } from '../bandmate';
 import { expect, test } from '../fixtures';
+import { redoButton, undoButton } from '../songPage';
 
 // A Song's Snapshots, opened from Write mode: an older one set beside the
 // Song as it is now, then restored.
@@ -37,7 +39,21 @@ test('an older Snapshot shows a Line that differs from now, and restoring it cha
 
   await dialog.getByRole('button', { name: 'Restore this Snapshot' }).click();
   await expect(dialog).toBeHidden();
-  await expect(page.getByRole('article', { name: 'Verse' }).getByRole('textbox').first()).toHaveValue(
-    'Salt on the window\nWaves in the dark',
-  );
+  const lines = page.getByRole('article', { name: 'Verse' }).getByRole('textbox').first();
+  await expect(lines).toHaveValue('Salt on the window\nWaves in the dark');
+  const taken = (await bandmate.snapshots(song.id)).length;
+
+  // Undo puts back the sheet from before the restore, taking no Snapshot;
+  // Redo restores it again.
+  await undoButton(page).click();
+  await expect(lines).toHaveValue('Salt on the window\nLights on the water');
+  await expect
+    .poll(async () => {
+      const { sections } = (await bandmate.getSong(song.id)) as unknown as Sheet;
+      return sections[0].alternates[0].lines.map((l) => l.text);
+    })
+    .toEqual(['Salt on the window', 'Lights on the water']);
+  expect(await bandmate.snapshots(song.id)).toHaveLength(taken);
+  await redoButton(page).click();
+  await expect(lines).toHaveValue('Salt on the window\nWaves in the dark');
 });

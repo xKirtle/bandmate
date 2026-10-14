@@ -1,14 +1,12 @@
 import type { MenuAction } from './menu';
 import Download from '@lucide/svelte/icons/download';
 import Mic from '@lucide/svelte/icons/mic';
-import Redo2 from '@lucide/svelte/icons/redo-2';
-import Undo2 from '@lucide/svelte/icons/undo-2';
 import Upload from '@lucide/svelte/icons/upload';
 
 // The transport row's actions, icon buttons on it where there's room, and
 // otherwise folded into its ⋯, in the order they fold: Import audio…, which
-// a file dropped on a Track does too, then Mix down…, then the mic, then
-// Undo and Redo, used most and which their keys do too, folding together.
+// a file dropped on a Track does too, then Mix down…, then the mic. Undo
+// and Redo aren't among them: they're the Song's, in the Song page header.
 // All but Mix down… are for the full Timeline: on a transport-only one,
 // e.g. an upright phone, Mix down… is the only one offered.
 
@@ -24,10 +22,6 @@ export type TransportState = {
   chosenTrack: string;
   /** The Timeline has Clips, which a Mixdown needs. */
   hasClips: boolean;
-  /** Whether there's an edit to undo, and what Undo says over its button, e.g. why it's disabled. */
-  undo: { can: boolean; title?: string };
-  /** The same for Redo. */
-  redo: { can: boolean; title?: string };
 };
 
 /** What each action does. */
@@ -36,8 +30,6 @@ export type TransportRun = {
   mixDown: () => void;
   /** Opens the mic button's popover, of the Inputs to record from, by the ⋯. */
   recordFrom: () => void;
-  undo: () => void;
-  redo: () => void;
 };
 
 /** One of the transport row's actions, named by what it runs. */
@@ -77,34 +69,12 @@ export function transportActions(state: TransportState, run: TransportRun): Tran
     disabled: state.recording,
     run: run.recordFrom,
   };
-  const undo: TransportAction = {
-    key: 'undo',
-    icon: Undo2,
-    label: 'Undo',
-    title: state.undo.title,
-    disabled: !state.undo.can,
-    run: run.undo,
-  };
-  const redo: TransportAction = {
-    key: 'redo',
-    icon: Redo2,
-    label: 'Redo',
-    title: state.redo.title,
-    disabled: !state.redo.can,
-    run: run.redo,
-  };
-  return state.fullTimeline ? [importAudio, mixDown, recordFrom, undo, redo] : [mixDown];
+  return state.fullTimeline ? [importAudio, mixDown, recordFrom] : [mixDown];
 }
 
-/**
- * Those of `actions` that fold into the ⋯, the first first, as many as
- * `foldCount` says for `room` and `each`, except that Undo never folds
- * without Redo.
- */
+/** Those of `actions` that fold into the ⋯, the first first, as many as `foldCount` says for `room` and `each`. */
 export function foldedActions(actions: TransportAction[], room: number, each: number): TransportAction[] {
-  let count = foldCount(actions.length, room, each);
-  if (actions[count - 1]?.key === 'undo') count++;
-  return actions.slice(0, count);
+  return actions.slice(0, foldCount(actions.length, room, each));
 }
 
 /**
