@@ -8,6 +8,7 @@
   import Minus from '@lucide/svelte/icons/minus';
   import Plus from '@lucide/svelte/icons/plus';
   import X from '@lucide/svelte/icons/x';
+  import { tick } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import type { Cueing } from './AlternateText.svelte';
   import type { Line, Section, Song } from './api';
@@ -275,8 +276,16 @@
     syncMode.cue();
   }
 
-  // The Section just added or duplicated, whose Label gets focus.
+  // The Section just added or duplicated, whose Label gets focus once, as
+  // it shows. Forgotten then: the same Section brought back later, by an
+  // Undo or Redo, comes back without taking focus.
   let added = $state<number | null>(null);
+
+  async function focusAdded(sectionId: number | null) {
+    added = sectionId;
+    await tick();
+    added = null;
+  }
   // Where the Song has Chords, as Read mode shows it: only the Arrangement's
   // active Alternates count.
   const chords = $derived(chordsInRead(song));
@@ -302,14 +311,14 @@
 
   async function add(position: number) {
     if (await editing.change({ kind: 'addSection', position })) {
-      added = song.arrangement[position] ?? null;
+      await focusAdded(song.arrangement[position] ?? null);
     }
   }
 
   /** Duplicates a Section at position in the Arrangement, or at the end. */
   async function duplicate(sectionId: number, position?: number) {
     if (await editing.change({ kind: 'duplicateSection', sectionId, position })) {
-      added = (position === undefined ? song.arrangement.at(-1) : song.arrangement[position]) ?? null;
+      await focusAdded((position === undefined ? song.arrangement.at(-1) : song.arrangement[position]) ?? null);
     }
   }
 
