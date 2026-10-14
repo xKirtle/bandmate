@@ -40,6 +40,10 @@
   import TagLine from '../lib/TagLine.svelte';
   import TagsDialog from '../lib/TagsDialog.svelte';
   import { timeAgo } from '../lib/time';
+  import { MediaQuery } from 'svelte/reactivity';
+  import { takeTour } from '../lib/theTour';
+  import { tourFits } from '../lib/tour.svelte';
+  import { TourOffer } from '../lib/tourOffer.svelte';
 
   let {
     folderId,
@@ -53,6 +57,12 @@
   // Folder open never changes: App makes a new Song list for each.
   // svelte-ignore state_referenced_locally
   const query = new SongListQuery(api, songListViewFromParams(new URLSearchParams(router.search)), folderId);
+
+  // A new install's empty Songs page offers the Tour, on a wide window only.
+  const tourOffer = new TourOffer(api, takeTour);
+  const tourFitsWindow = new MediaQuery(tourFits);
+  // svelte-ignore state_referenced_locally
+  if (folderId === undefined) tourOffer.load();
 
   const sorted = $derived(query.songs && sortSongs(query.songs, query.view.sort));
   const filtered = $derived(isSongListFiltered(query.view));
@@ -350,6 +360,17 @@
         <button type="button" class="button primary" disabled={creating} onclick={createSong}>
           {creating ? 'Creating…' : 'Write your first Song'}
         </button>
+        {#if tourOffer.shows({ anySongs: query.anySongs, wide: tourFitsWindow.current })}
+          <p class="tour-offer muted">
+            New here?
+            <button type="button" class="button quiet" onclick={() => tourOffer.take()}>Take the Tour</button>
+            ·
+            <button type="button" class="button quiet" onclick={() => tourOffer.decline()}>No thanks</button>
+          </p>
+          {#if tourOffer.error}
+            <p class="error" role="alert">{tourOffer.error}</p>
+          {/if}
+        {/if}
       {:else}
         <p>No Songs in this Folder yet.</p>
         <button type="button" class="button primary" disabled={creating} onclick={createSong}>
@@ -729,6 +750,18 @@
   .empty {
     text-align: center;
     padding: var(--space-8) 0;
+  }
+  /* The Tour's offer: a quiet line under the empty state's button. */
+  .tour-offer {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: var(--space-1);
+    margin: var(--space-6) 0 0;
+    font-size: var(--text-sm);
+  }
+  .tour-offer .button {
+    font-size: inherit;
   }
 
   /* Desktop shows a table, narrower windows the list. */
