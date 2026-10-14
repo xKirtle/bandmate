@@ -596,20 +596,15 @@ func (s *Store) copyIn(ctx context.Context, staging string, picks Picks, replace
 	if err := tx.Commit(); err != nil {
 		return Restored{}, err
 	}
-	for _, f := range replacedFiles {
-		if err := os.Remove(filepath.Join(s.dataDir, f)); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			log.Printf("removing %s of a replaced song: %v", f, err)
-		}
-	}
-	for _, f := range demoFiles {
-		// The new Demo may have taken an id the old one had, and its file
-		// is in that place now.
+	for _, f := range append(replacedFiles, demoFiles...) {
+		// A row copied in may have taken the id of one cleared, and its
+		// file is in that place now.
 		path := filepath.Join(s.dataDir, f)
 		if slices.Contains(linked, path) {
 			continue
 		}
 		if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			log.Printf("removing %s of the old demo: %v", f, err)
+			log.Printf("removing %s of a song or beat cleared: %v", f, err)
 		}
 	}
 	return restored, nil
@@ -698,6 +693,20 @@ func clearReplacedSongs(ctx context.Context, tx *sql.Tx) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	files, err := filesOwnedBy(ctx, tx, ids)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM main.songs
+		WHERE id IN (SELECT new FROM temp.restored WHERE tbl = 'songs' AND replaced)`); err != nil {
+		return nil, fmt.Errorf("clearing replaced songs: %w", err)
+	}
+	return files, nil
+}
+
+// filesOwnedBy lists the files of every kind the Songs with ids own, as
+// paths in the data directory.
+func filesOwnedBy(ctx context.Context, tx *sql.Tx, ids []int64) ([]string, error) {
 	var files []string
 	for _, id := range ids {
 		for _, f := range songfiles.Owned() {
@@ -706,15 +715,17 @@ func clearReplacedSongs(ctx context.Context, tx *sql.Tx) ([]string, error) {
 				return nil, err
 			}
 			for _, o := range owned {
-				files = append(files, filepath.Join(filepath.FromSlash(f.Dir), strconv.FormatInt(o, 10)))
+				files = append(files, dataPath(f, o))
 			}
 		}
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM main.songs
-		WHERE id IN (SELECT new FROM temp.restored WHERE tbl = 'songs' AND replaced)`); err != nil {
-		return nil, fmt.Errorf("clearing replaced songs: %w", err)
-	}
 	return files, nil
+}
+
+// dataPath is where the file of kind f kept under id is, in the data
+// directory.
+func dataPath(f songfiles.Kind, id int64) string {
+	return filepath.Join(filepath.FromSlash(f.Dir), strconv.FormatInt(id, 10))
 }
 
 // copyTableIn copies the rows of table t given ids, or, for a table without

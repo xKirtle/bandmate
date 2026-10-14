@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,9 +26,9 @@ func (ts *testServer) putDemoBack() song {
 }
 
 // demoBeat is the Beat the Demo Song's Timeline plays.
-func (ts *testServer) demoBeat(demo song) int64 {
+func (ts *testServer) demoBeat(demoSong song) int64 {
 	ts.t.Helper()
-	tl := ts.getTimeline(demo.ID)
+	tl := ts.getTimeline(demoSong.ID)
 	for _, tr := range tl.Tracks {
 		for _, c := range tr.Clips {
 			if c.BeatID != 0 {
@@ -39,26 +40,47 @@ func (ts *testServer) demoBeat(demo song) int64 {
 	return 0
 }
 
+// linesOf is the text of a Section's active Alternate's Lines.
+func linesOf(sec section) []string {
+	for _, a := range sec.Alternates {
+		if a.Active {
+			var lines []string
+			for _, l := range a.Lines {
+				lines = append(lines, l.Text)
+			}
+			return lines
+		}
+	}
+	return nil
+}
+
 func TestPuttingTheDemoBackRestoresTheDemoSongWithTheDemoBeatOnItsTimeline(t *testing.T) {
 	ts := newTestServer(t)
 
-	demo := ts.putDemoBack()
+	demoSong := ts.putDemoBack()
 
-	if demo.Title != "Paper Boats" {
-		t.Errorf("Demo Song's title = %q, want Paper Boats", demo.Title)
+	if demoSong.Title != "Paper Boats" {
+		t.Errorf("Demo Song's title = %q, want Paper Boats", demoSong.Title)
 	}
-	sections := sectionsByID(demo)
+	sections := sectionsByID(demoSong)
 	var labels []string
-	for _, id := range demo.Arrangement {
+	for _, id := range demoSong.Arrangement {
 		labels = append(labels, sections[id].Label)
 	}
 	if want := []string{"Verse", "Chorus", "Verse 2", "Chorus"}; !reflect.DeepEqual(labels, want) {
-		t.Errorf("Demo Song's Arrangement = %v, want %v", labels, want)
+		t.Fatalf("Demo Song's Arrangement = %v, want %v", labels, want)
 	}
-	if got := ts.getSong(demo.ID); got.ID != demo.ID || got.Title != demo.Title {
-		t.Errorf("reading the Demo Song = %+v, want the one answered, %+v", got, demo)
+	verse, chorus, again := sections[demoSong.Arrangement[0]], sections[demoSong.Arrangement[1]], sections[demoSong.Arrangement[3]]
+	if first := verse.Alternates[0].Lines[0]; !strings.HasPrefix(first.Text, "[Am]Folded") || len(first.Chords) == 0 {
+		t.Errorf("the Verse's first Line = %+v, want it to start [Am]Folded, as the Tour quotes", first)
 	}
-	beatID := ts.demoBeat(demo)
+	if again.ID == chorus.ID || !reflect.DeepEqual(linesOf(again), linesOf(chorus)) {
+		t.Errorf("the last Chorus = %+v, want a Duplicate of the first, %+v", again, chorus)
+	}
+	if got := ts.getSong(demoSong.ID); got.ID != demoSong.ID || got.Title != demoSong.Title {
+		t.Errorf("reading the Demo Song = %+v, want the one answered, %+v", got, demoSong)
+	}
+	beatID := ts.demoBeat(demoSong)
 	b := ts.getBeat(beatID)
 	if b.Duration <= 0 || len(b.Peaks) == 0 {
 		t.Errorf("Demo Beat = %+v, want its duration and peaks", b)
@@ -91,6 +113,20 @@ func TestPuttingTheDemoBackAgainReplacesThePreviousDemo(t *testing.T) {
 	}
 	if files := audioFiles(t, ts); len(files) != 1 {
 		t.Errorf("audio files = %v, want only the Demo Beat's", files)
+	}
+}
+
+func TestADemoBeatASongOfTheUsersUsesBecomesTheirsWhenTheDemoIsPutBack(t *testing.T) {
+	ts := newTestServer(t)
+	first := ts.demoBeat(ts.putDemoBack())
+	mine := ts.createSong("Night Drive")
+	// As the Beat Picker can't, since it never lists the Demo Beat.
+	expectStatus(t, ts.addBeatToSong(mine.ID, first), http.StatusOK)
+
+	ts.putDemoBack()
+
+	if got := ts.listBeats(); len(got) != 1 || got[0].ID != first {
+		t.Errorf("Beat Library = %+v, want the old Demo Beat, as Night Drive uses it", got)
 	}
 }
 
@@ -135,14 +171,14 @@ func TestARestoreNeverTakesTheDemoForWhatsAlreadyInBandmate(t *testing.T) {
 
 func TestTheDemoNeverGoesIntoABackup(t *testing.T) {
 	ts := newTestServer(t)
-	demo := ts.putDemoBack()
-	demoBeat := ts.demoBeat(demo)
+	demoSong := ts.putDemoBack()
+	demoBeat := ts.demoBeat(demoSong)
 
 	expectError(t, ts.Do(http.MethodPost, "/api/backups", map[string]any{"allSongs": true}),
 		http.StatusBadRequest, "there are no Songs to back up")
 	expectError(t, ts.Do(http.MethodPost, "/api/backups", map[string]any{"allSongs": true, "beatLibrary": true}),
 		http.StatusBadRequest, "there's nothing to back up")
-	expectError(t, ts.Do(http.MethodPost, "/api/backups", map[string]any{"songs": []int64{demo.ID}}),
+	expectError(t, ts.Do(http.MethodPost, "/api/backups", map[string]any{"songs": []int64{demoSong.ID}}),
 		http.StatusBadRequest, "a Song picked doesn't exist")
 	expectError(t, ts.Do(http.MethodPost, "/api/backups", map[string]any{"beats": []int64{demoBeat}}),
 		http.StatusBadRequest, "a Beat picked doesn't exist")
@@ -202,10 +238,10 @@ func TestTheDemoSongAndDemoBeatNeverShowAmongTheUsersSongsAndBeats(t *testing.T)
 	expectStatus(t, ts.moveSong(mine.ID, &demos.ID), http.StatusNoContent)
 	ts.tagSong(mine.ID, "paper")
 	ts.uploadBeat(fakeAudio("trap.mp3").with(map[string]any{"title": "Demo Trap"}))
-	demo := ts.putDemoBack()
+	demoSong := ts.putDemoBack()
 	// Filed and tagged, as the Tour never does, it still doesn't show.
-	expectStatus(t, ts.moveSong(demo.ID, &demos.ID), http.StatusNoContent)
-	ts.tagSong(demo.ID, "paper")
+	expectStatus(t, ts.moveSong(demoSong.ID, &demos.ID), http.StatusNoContent)
+	ts.tagSong(demoSong.ID, "paper")
 
 	for query, want := range map[string][]string{
 		"":          {"Paper Planes"},

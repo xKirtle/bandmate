@@ -5,8 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strconv"
 
 	"github.com/xKirtle/bandmate/internal/songfiles"
 )
@@ -22,6 +20,7 @@ func (s *Store) PutDemoBack(ctx context.Context, file []byte) (int64, error) {
 	// Two at once would each delete the Demo before restoring their own.
 	s.demo.Lock()
 	defer s.demo.Unlock()
+	// Named as a Backup being made, so one left by a crash is removed.
 	f, err := os.CreateTemp(s.dir, makingPrefix+"*"+FileExtension)
 	if err != nil {
 		return 0, fmt.Errorf("putting the demo back: %w", err)
@@ -56,37 +55,32 @@ func (s *Store) PutDemoBack(ctx context.Context, file []byte) (int64, error) {
 // clearDemo deletes the Demo Song, with everything it owns, and the Demo
 // Beat, and returns the files they had, as paths in the data directory, to
 // remove once that's committed. A Demo Beat a Song of the user's somehow
-// uses is kept.
+// uses is theirs from then on, so it's kept, and shows in the Beat Library.
 func clearDemo(ctx context.Context, tx *sql.Tx) ([]string, error) {
 	songs, err := queryIDs(ctx, tx, `SELECT id FROM main.songs WHERE demo`)
 	if err != nil {
 		return nil, err
 	}
-	var files []string
-	for _, id := range songs {
-		for _, f := range songfiles.Owned() {
-			owned, err := queryIDs(ctx, tx, f.IDs, id)
-			if err != nil {
-				return nil, err
-			}
-			for _, o := range owned {
-				files = append(files, filepath.Join(filepath.FromSlash(f.Dir), strconv.FormatInt(o, 10)))
-			}
-		}
+	files, err := filesOwnedBy(ctx, tx, songs)
+	if err != nil {
+		return nil, err
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM main.songs WHERE demo`); err != nil {
 		return nil, fmt.Errorf("clearing the demo song: %w", err)
 	}
-	beats, err := queryIDs(ctx, tx, `SELECT id FROM main.beats WHERE demo
-		AND id NOT IN (SELECT beat_id FROM main.clips WHERE beat_id IS NOT NULL)`)
+	if _, err := tx.ExecContext(ctx, `UPDATE main.beats SET demo = 0
+		WHERE demo AND id IN (SELECT beat_id FROM main.clips WHERE beat_id IS NOT NULL)`); err != nil {
+		return nil, fmt.Errorf("keeping the demo beat a song uses: %w", err)
+	}
+	beats, err := queryIDs(ctx, tx, `SELECT id FROM main.beats WHERE demo`)
 	if err != nil {
 		return nil, err
 	}
 	for _, id := range beats {
-		files = append(files, filepath.Join(filepath.FromSlash(songfiles.Beats.Dir), strconv.FormatInt(id, 10)))
-		if _, err := tx.ExecContext(ctx, `DELETE FROM main.beats WHERE id = ?`, id); err != nil {
-			return nil, fmt.Errorf("clearing the demo beat: %w", err)
-		}
+		files = append(files, dataPath(songfiles.Beats, id))
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM main.beats WHERE demo`); err != nil {
+		return nil, fmt.Errorf("clearing the demo beat: %w", err)
 	}
 	return files, nil
 }
