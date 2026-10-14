@@ -784,3 +784,34 @@ func TestOpenTurnsOnForeignKeysWALAndABusyTimeout(t *testing.T) {
 		t.Errorf("busy_timeout = %d, want 5000", busyTimeout)
 	}
 }
+
+func TestExistingSnapshotsAreTakenOnTheirDateInUTC(t *testing.T) {
+	conn := openBefore(t, "0047_snapshot_dates")
+	exec(t, conn,
+		`INSERT INTO songs (id, title, created_at, updated_at) VALUES (1, 'City Lights', '', '')`,
+		`INSERT INTO snapshots (id, song_id, taken_at, reason, sheet) VALUES
+			(1, 1, '2026-10-19T23:30:00.000000000Z', 'editing', '{}'),
+			(2, 1, '2026-10-20T00:10:00.000000000Z', 'editing', '{}')`,
+	)
+
+	if err := migrate(context.Background(), conn); err != nil {
+		t.Fatalf("migrating: %v", err)
+	}
+
+	var on []string
+	rows, err := conn.Query(`SELECT taken_on FROM snapshots ORDER BY id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var day string
+		if err := rows.Scan(&day); err != nil {
+			t.Fatal(err)
+		}
+		on = append(on, day)
+	}
+	if want := []string{"2026-10-19", "2026-10-20"}; !reflect.DeepEqual(on, want) {
+		t.Errorf("snapshots taken on %v, want %v", on, want)
+	}
+}

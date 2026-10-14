@@ -1,5 +1,36 @@
+// Every date and time the app shows goes through formatDay, formatTime or
+// formatWhen, in the browser's time zone: the user's day, wherever the server is.
+
 /** Months as dates show them, spelled out rather than left to the locale, which may shorten September to "Sept". */
-export const shortMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const shortMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+const sameDay = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+/** The local day of a time, e.g. "4 Oct 2026". */
+export function formatDay(iso: string): string {
+  const day = new Date(iso);
+  return `${day.getDate()} ${shortMonths[day.getMonth()]} ${day.getFullYear()}`;
+}
+
+/** The local time of day, to the minute, in 12 or 24 hours as the locale counts them: "09:05" or "9:05 AM". */
+export function formatTime(iso: string, locale?: string): string {
+  return new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(new Date(iso));
+}
+
+/**
+ * A local time, to the minute, with its day as near as it is to now:
+ * "Today, 09:05", "Yesterday, 23:59", "4 Sep, 14:00", or "31 Dec 2025, 08:30" in another year.
+ */
+export function formatWhen(iso: string, now = new Date(), locale?: string): string {
+  const when = new Date(iso);
+  const time = formatTime(iso, locale);
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  if (sameDay(when, now)) return `Today, ${time}`;
+  if (sameDay(when, yesterday)) return `Yesterday, ${time}`;
+  const year = when.getFullYear() === now.getFullYear() ? '' : ` ${when.getFullYear()}`;
+  return `${when.getDate()} ${shortMonths[when.getMonth()]}${year}, ${time}`;
+}
 
 const units: [Intl.RelativeTimeFormatUnit, number][] = [
   ['year', 365 * 24 * 3600],

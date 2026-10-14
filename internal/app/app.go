@@ -18,6 +18,7 @@ import (
 	"github.com/xKirtle/bandmate/internal/beats"
 	"github.com/xKirtle/bandmate/internal/build"
 	"github.com/xKirtle/bandmate/internal/db"
+	"github.com/xKirtle/bandmate/internal/domain"
 	"github.com/xKirtle/bandmate/internal/fetches"
 	"github.com/xKirtle/bandmate/internal/folders"
 	"github.com/xKirtle/bandmate/internal/lyricsheet"
@@ -366,7 +367,26 @@ func (a *App) routes() http.Handler {
 		writeError(w, http.StatusNotFound, "not found")
 	})
 	mux.Handle("/", spaHandler(a.spa))
-	return mux
+	return inUsersZone(mux)
+}
+
+// ZoneHeader names the time zone of the Device a request comes from, e.g.
+// "Europe/Lisbon", which the SPA sends with every request. A link the
+// browser follows, like a download, can't send it, so carries it as the
+// zone query parameter instead.
+const ZoneHeader = "Bandmate-Time-Zone"
+
+// inUsersZone gives each request's context the time zone it says it comes
+// from, or UTC if it names none or one that isn't known, so a day or a time
+// the server works out is the user's (ADR 0021).
+func inUsersZone(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		name := r.Header.Get(ZoneHeader)
+		if name == "" {
+			name = r.URL.Query().Get("zone")
+		}
+		next.ServeHTTP(w, r.WithContext(domain.WithZone(r.Context(), domain.ParseZone(name))))
+	})
 }
 
 func (a *App) health(w http.ResponseWriter, r *http.Request) {

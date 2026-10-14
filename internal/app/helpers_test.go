@@ -35,6 +35,9 @@ type testServer struct {
 	DataDir string
 	app     *app.App
 	srv     *httptest.Server
+	// zone, when set, is the time zone every request says it's sent from,
+	// as the SPA says the browser's.
+	zone string
 }
 
 // newTestServer starts a server with a fresh, empty data directory.
@@ -172,6 +175,9 @@ func (ts *testServer) DoRaw(method, path string, header http.Header, body io.Rea
 	req, err := http.NewRequest(method, ts.srv.URL+path, body)
 	if err != nil {
 		ts.t.Fatalf("building request: %v", err)
+	}
+	if ts.zone != "" {
+		req.Header.Set("Bandmate-Time-Zone", ts.zone)
 	}
 	for name, values := range header {
 		req.Header[name] = values

@@ -7,6 +7,7 @@
   import type { Mode } from './songMode';
   import { cancelOnEscape, committedAsItGoes, leaveOnEscape } from './typedField.svelte';
   import { prepareUpload } from './upload';
+  import { formatDay } from './time';
 
   // A Song's Masters: finished recordings made elsewhere. The page is made
   // for one; names and the main marker only show once there's a second.
@@ -114,8 +115,6 @@
     if (!confirm(`Delete ${what} and its file?\n\nThis can't be undone.`)) return;
     change((at) => api.deleteMaster(at, m.id));
   }
-
-  const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
 </script>
 
 <section class="masters" aria-labelledby="masters-heading">
@@ -195,7 +194,7 @@
       {/if}
 
       <div class="facts">
-        <span class="muted">Added <time datetime={m.addedAt}>{dateFormat.format(new Date(m.addedAt))}</time></span>
+        <span class="muted">Added <time datetime={m.addedAt}>{formatDay(m.addedAt)}</time></span>
         <span class="spacer"></span>
         <a class="button" href={api.masterDownloadUrl(song.id, m.id)} download={m.fileName}>Download</a>
         {#if writing}

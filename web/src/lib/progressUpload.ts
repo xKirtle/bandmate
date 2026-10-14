@@ -27,6 +27,7 @@ export function sendWithProgress(
   url: string,
   body: XMLHttpRequestBodyInit,
   { onProgress, signal }: UploadOptions = {},
+  headers: Record<string, string> = {},
 ): Promise<Response> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
@@ -35,6 +36,7 @@ export function sendWithProgress(
     }
     const xhr = new XMLHttpRequest();
     xhr.open(method, url);
+    for (const [name, value] of Object.entries(headers)) xhr.setRequestHeader(name, value);
 
     xhr.upload.addEventListener('progress', (event) => {
       const { loaded, total } = event as ProgressEvent;

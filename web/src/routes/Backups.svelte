@@ -25,6 +25,7 @@
   import RestoreBackupDialog from '../lib/RestoreBackupDialog.svelte';
   import ScheduledBackupsCard from '../lib/ScheduledBackupsCard.svelte';
   import SettingsPage from '../lib/SettingsPage.svelte';
+  import { formatTime } from '../lib/time';
 
   let backups = $state<Backup[] | null>(null);
   let loadError = $state<string | null>(null);
@@ -88,8 +89,6 @@
   // Restore and Download are buttons beside its ⋯; on a phone they fold
   // into it.
   const wide = new MediaQuery('min-width: 40.0625rem');
-
-  const timeFormat = new Intl.DateTimeFormat(undefined, { timeStyle: 'short' });
 
   function showMade(backup: Backup) {
     uploaded = null;
@@ -277,7 +276,7 @@
                 <span class="name">{backupName(backup)}</span>
                 <span class="muted details">
                   {#if backup.name}{automaticName(backup)} ·{/if}
-                  Made at {timeFormat.format(new Date(backup.createdAt))} · {backupSize(backup.size)}
+                  Made at {formatTime(backup.createdAt)} · {backupSize(backup.size)}
                   {#if backup.scheduled}<span class="badge scheduled">Scheduled</span>{/if}
                 </span>
               </div>

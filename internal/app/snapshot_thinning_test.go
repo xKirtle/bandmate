@@ -97,6 +97,37 @@ func TestOnlyTheNewestOfEachWeekIsKeptAfterAMonth(t *testing.T) {
 	}
 }
 
+// lateNightThenMorning takes a Snapshot late on Monday 19 October and one
+// early the next morning in New Zealand (UTC+13), both on Monday in UTC,
+// then one two days later, which thins them.
+func lateNightThenMorning(st *snapshotTaker) {
+	st.takeAt(on(time.October, 19, 9, 0))  // Monday 22:00 in Auckland
+	st.takeAt(on(time.October, 19, 19, 0)) // Tuesday 08:00 in Auckland
+	st.takeAt(on(time.October, 21, 23, 0)) // Thursday 12:00 in Auckland
+}
+
+func TestADayIsTheDayWhereTheSnapshotWasTaken(t *testing.T) {
+	st := newSnapshotTaker(t)
+	st.ts.zone = "Pacific/Auckland"
+	lateNightThenMorning(st)
+
+	if got := fmt.Sprint(st.taken()); got != "[Oct 21 23:00 Oct 19 19:00 Oct 19 09:00]" {
+		t.Errorf("snapshots taken = %s, want Monday night's and Tuesday morning's, as they're two days in Auckland", got)
+	}
+}
+
+func TestADayIsAUTCDayWhenTheTimeZoneIsUnknown(t *testing.T) {
+	for _, zone := range []string{"", "Mars/Olympus_Mons", "Local"} {
+		st := newSnapshotTaker(t)
+		st.ts.zone = zone
+		lateNightThenMorning(st)
+
+		if got := fmt.Sprint(st.taken()); got != "[Oct 21 23:00 Oct 19 19:00]" {
+			t.Errorf("zone %q: snapshots taken = %s, want only the newest of Monday in UTC", zone, got)
+		}
+	}
+}
+
 func TestAKeptSnapshotIsNeverThinnedUntilItsUnkept(t *testing.T) {
 	st := newSnapshotTaker(t)
 	st.takeAt(on(time.October, 13, 10, 0))
