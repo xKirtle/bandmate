@@ -2,7 +2,7 @@
 
 [`demo.bandmate`](demo.bandmate) is the Demo the Tour shows (ADR 0020): a one-Song Backup holding the Demo Song, "Paper Boats", with its Lyric Sheet and Timeline, and the Demo Beat its Clip plays. The binary embeds it. Each time a Tour starts, Bandmate restores it over the Demo it holds, marks what it restored as the Demo, and leaves that out of every list, count and Backup of the user's Songs and Beats.
 
-For now it's a placeholder (#1005 replaces it): the lyrics are the draft from #1005, and the Demo Beat is a generated 8-bar loop in A minor at 90 BPM.
+The Demo Beat is a generated 8-bar loop in A minor at 90 BPM. The Tour only shows, so it's never played.
 
 ## What it must hold
 
