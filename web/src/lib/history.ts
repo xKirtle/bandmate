@@ -11,6 +11,7 @@ import {
   type NewTrack,
   type PastedClip,
   type PlacedClip,
+  type SheetCopy,
   type Song,
   type SongAt,
   type Timeline,
@@ -21,7 +22,7 @@ import {
 } from './api';
 import { placementOf } from './clipSource';
 import { isBlank, type CuedSong } from './cues';
-import { sheetCopy, type LyricSheetChange } from './lyricSheetChanges';
+import { sheetCopy, type LyricSheetChange, type FieldVisit } from './lyricSheetChanges';
 import { rightHalves } from './split';
 
 // Undo and redo for Timeline edits, Cue edits and Lyric Sheet changes,
@@ -166,6 +167,8 @@ interface Entry {
   redo: Step;
   /** For a new Take, where its Clip starts, to return the playhead to on undoing it. */
   undoPlayhead?: number;
+  /** For a Lyric Sheet change typed into a text field, the visit to it that typed it. */
+  visit?: FieldVisit;
 }
 
 export class History {
@@ -217,16 +220,34 @@ export class History {
   /**
    * Keeps a change to the Lyric Sheet or Scrapbook that turned before into
    * after, to undo, unless it changed neither: as the whole sheet before
-   * and after it, each put back whole (ADR 0019).
+   * and after it, each put back whole (ADR 0019). The changes one visit to
+   * a text field saves, one after another, are kept as one.
    */
-  recordSheet(before: Song, after: Song): void {
+  recordSheet(before: Song, after: Song, visit?: FieldVisit): void {
     const was = sheetCopy(before);
     const now = sheetCopy(after);
-    if (JSON.stringify(was) === JSON.stringify(now)) return;
     const none: Ids = { tracks: [], clips: [] };
+    const top = this.#undo.at(-1);
+    // Saved again in the same visit to a text field, straight on from its
+    // step: still one step, from the sheet before the visit, gone if the
+    // text is back as it was.
+    if (
+      visit !== undefined &&
+      top?.visit === visit &&
+      top.undo.edit.kind === 'putSheetBack' &&
+      top.redo.edit.kind === 'putSheetBack' &&
+      same(top.redo.edit.sheet, was)
+    ) {
+      if (same(top.undo.edit.sheet, now)) this.#undo.pop();
+      else top.redo = { edit: { kind: 'putSheetBack', sheet: now }, adds: none };
+      this.#redo = [];
+      return;
+    }
+    if (same(was, now)) return;
     this.#undo.push({
       undo: { edit: { kind: 'putSheetBack', sheet: was }, adds: none },
       redo: { edit: { kind: 'putSheetBack', sheet: now }, adds: none },
+      visit,
     });
     this.#redo = [];
   }
@@ -303,6 +324,11 @@ export class History {
     }
     return ids;
   }
+}
+
+/** Whether two copies of the Lyric Sheet and Scrapbook are the same. */
+function same(a: SheetCopy, b: SheetCopy): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 /**

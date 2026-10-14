@@ -37,6 +37,7 @@
   import ShortcutsDialog from '../lib/ShortcutsDialog.svelte';
   import SnapshotsDialog from '../lib/SnapshotsDialog.svelte';
   import { keyPlace } from '../lib/keyPlace';
+  import { inTextField } from '../lib/textField';
   import { opensShortcuts, undoKey } from '../lib/songKeys';
   import { detailsSummary, openingMode, sideParts, type Mode, type SidePart } from '../lib/songMode';
   import { chordsInRead } from '../lib/chordChart';
@@ -229,12 +230,23 @@
   // there. A Lyric Sheet change undone or redone ends Sync mode, as any
   // change to the lyrics does, and shows the Section it changed, opening
   // the Scrapbook's fold for one there, without moving focus.
+  //
+  // Pressed while in a text field, they leave it first, saving what's
+  // typed: one visit's typing is a step, kept as the field is left, so
+  // Undo undoes it, rather than have it land after what's put back.
   async function undo() {
+    leaveTextField();
     showUndone((await timelinePanel?.undo()) ?? null);
   }
 
   async function redo() {
+    leaveTextField();
     showUndone((await timelinePanel?.redo()) ?? null);
+  }
+
+  function leaveTextField() {
+    const field = document.activeElement;
+    if (field instanceof HTMLElement && inTextField(field)) field.blur();
   }
 
   async function showUndone(undone: Undone | null) {
@@ -475,7 +487,7 @@
                 type="button"
                 class="button tool"
                 onclick={undo}
-                disabled={!saves.canUndo || frozen}
+                disabled={!(saves.canUndo || saves.unsavedInSections) || frozen}
                 aria-label="Undo"
                 aria-keyshortcuts={hints.aria(shortcuts.undo.keys)}
                 title={editHint(freeze, hints.withKeys('Undo', shortcuts.undo.keys))}
