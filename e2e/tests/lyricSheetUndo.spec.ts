@@ -102,6 +102,8 @@ test("Ctrl+Z in a text box undoes its own typing, even with none left, and outsi
   const sections = page.getByRole('article');
   await page.getByRole('button', { name: 'Add Section' }).click();
   await expect(sections).toHaveCount(2);
+  // Its Label takes focus as it's added.
+  await expect(sections.nth(1).getByLabel('Label', { exact: true })).toBeFocused();
   await expect.poll(() => serverSections(bandmate, song.id)).toBe(2);
 
   const lines = page.getByRole('article', { name: 'Chorus' }).getByRole('textbox', { name: 'Lines' });
@@ -133,7 +135,11 @@ test("Ctrl+Z in a text box undoes its own typing, even with none left, and outsi
   await expect(sections).toHaveCount(1);
   await expect(undoButton(page)).toBeDisabled();
 
+  // The Section added comes back without taking focus, unlike when it was
+  // added, so the next Ctrl+Y is the Song's too.
   await page.keyboard.press('ControlOrMeta+y');
+  await expect(sections).toHaveCount(2);
+  await expect(page.locator('body')).toBeFocused();
   await page.keyboard.press('ControlOrMeta+y');
   await expect(lines).toHaveValue('Lanterns on the quay, still');
   await expect(sections).toHaveCount(2);

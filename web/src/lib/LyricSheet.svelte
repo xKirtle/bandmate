@@ -8,6 +8,7 @@
   import Minus from '@lucide/svelte/icons/minus';
   import Plus from '@lucide/svelte/icons/plus';
   import X from '@lucide/svelte/icons/x';
+  import { tick } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import type { Cueing } from './AlternateText.svelte';
   import type { Line, Section, Song } from './api';
@@ -275,8 +276,18 @@
     syncMode.cue();
   }
 
-  // The Section just added or duplicated, whose Label gets focus.
-  let added = $state<number | null>(null);
+  // The Section just added or duplicated, whose Label gets focus as it
+  // shows, and only then: the same Section brought back later, by an Undo
+  // or a Redo, comes back without taking focus.
+  let focusing = $state<number | null>(null);
+
+  /** Focuses the Label of the Section just added, which shows by the next tick, as the Song is replaced once the change is saved. */
+  async function focusAdded(sectionId: number | null) {
+    focusing = sectionId;
+    await tick();
+    focusing = null;
+  }
+
   // Where the Song has Chords, as Read mode shows it: only the Arrangement's
   // active Alternates count.
   const chords = $derived(chordsInRead(song));
@@ -302,14 +313,14 @@
 
   async function add(position: number) {
     if (await editing.change({ kind: 'addSection', position })) {
-      added = song.arrangement[position] ?? null;
+      await focusAdded(song.arrangement[position] ?? null);
     }
   }
 
   /** Duplicates a Section at position in the Arrangement, or at the end. */
   async function duplicate(sectionId: number, position?: number) {
     if (await editing.change({ kind: 'duplicateSection', sectionId, position })) {
-      added = (position === undefined ? song.arrangement.at(-1) : song.arrangement[position]) ?? null;
+      await focusAdded((position === undefined ? song.arrangement.at(-1) : song.arrangement[position]) ?? null);
     }
   }
 
@@ -521,7 +532,7 @@
           >
             <SectionEditor
               {section}
-              autofocus={added === section.id}
+              autofocus={focusing === section.id}
               {editing}
               cueing={cueingFor(section)}
               {onCaret}
