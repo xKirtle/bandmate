@@ -170,7 +170,14 @@ Tests import `test` and `expect` from `e2e/fixtures.ts`, and:
 
 ### Versions
 
-A release with any new feature bumps the minor version (v0.4.0 to v0.5.0), and one with only fixes bumps the patch (v0.4.0 to v0.4.1). A release with a database migration bumps the minor too, whatever its pull requests are labelled: pulling the previous image doesn't undo a migration, and a patch should be one a self-hoster can drop in and back out of. `no-release-notes` pull requests don't count, whatever else they're labelled: a release of only those isn't worth cutting. Versions aren't tied to the [roadmap](docs/roadmap.md): whatever has merged since the last release goes out together. v1.0.0 isn't planned yet.
+A release with any new feature bumps the minor version (v1.4.0 to v1.5.0), and one with only fixes bumps the patch (v1.4.0 to v1.4.1). A release with a database migration bumps the minor too, whatever its pull requests are labelled: pulling the previous image doesn't undo a migration, and a patch should be one a self-hoster can drop in and back out of. `no-release-notes` pull requests don't count, whatever else they're labelled: a release of only those isn't worth cutting. Versions aren't tied to the [roadmap](docs/roadmap.md): whatever has merged since the last release goes out together. v1.0.0 is the one exception: it marks the roadmap entries wanted for it, Snapshots (#985) and a tutorial (#986), being done, and is when Bandmate is announced.
+
+From v1.0.0 on, every release in a major version keeps these promises to self-hosters, and a release that breaks one bumps the major version instead (v1.4.0 to v2.0.0):
+
+- The data folder upgrades in place: Bandmate updates its database itself when it starts, keeping an Upgrade copy to roll back to.
+- A Backup restores into the Bandmate that made it, or a newer one.
+- The image tags and the `BANDMATE_*` settings keep their meaning.
+- Bandmate stays single-user, with authentication at the reverse proxy ([ADR 0002](docs/adr/0002-single-user-auth-at-proxy.md)).
 
 ### Cutting a release
 
@@ -184,10 +191,10 @@ Tag first, and publish the GitHub Release only once CI has published the image. 
    git push origin vX.Y.Z
    ```
 
-   The tag triggers CI, which tests it and publishes the image tagged `X.Y.Z`, `X.Y` and `latest`.
+   The tag triggers CI, which tests it and publishes the image tagged `X.Y.Z`, `X.Y`, `X` (from v1.0.0 on) and `latest`.
 
 2. Watch the run with `gh run watch`. If it fails, nothing public has changed: delete the tag (`git push origin :vX.Y.Z && git tag -d vX.Y.Z`), fix the cause on `main`, and tag again.
-3. Check that `X.Y.Z`, `X.Y` and `latest` show the same digest:
+3. Check that `X.Y.Z`, `X.Y`, `X` and `latest` show the same digest:
 
    ```sh
    docker buildx imagetools inspect ghcr.io/xkirtle/bandmate:X.Y.Z

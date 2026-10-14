@@ -15,7 +15,7 @@ For each PR merged since the tag, note its label and the issue it closes, and ro
 
 ## 3. Pick the version
 
-Apply CONTRIBUTING's "Versions" to the PRs' labels: any `enhancement` bumps the minor, only `bug` and `documentation` bump the patch, and a PR labelled `no-release-notes` doesn't count, whatever else it's labelled. A database migration since the last tag bumps the minor too, whatever the labels.
+Apply CONTRIBUTING's "Versions" to the PRs' labels: any `enhancement` bumps the minor, only `bug` and `documentation` bump the patch, and a PR labelled `no-release-notes` doesn't count, whatever else it's labelled. A database migration since the last tag bumps the minor too, whatever the labels. A change that breaks one of the promises "Versions" lists bumps the major, and is named in the verdict.
 
 ## 4. Clear the roadmap
 
