@@ -286,7 +286,7 @@ const NoFolder int64 = 0
 
 // ListSongs returns the Songs matching filter, most recently edited first.
 func (s *Store) ListSongs(ctx context.Context, filter SongFilter) ([]SongSummary, error) {
-	conditions, args := []string{"1"}, []any{}
+	conditions, args := []string{"NOT demo"}, []any{}
 	var placeholders []string
 	for _, status := range filter.Statuses {
 		if status == "" {

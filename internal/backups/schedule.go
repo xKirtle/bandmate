@@ -119,7 +119,7 @@ func (s *Store) schedule(ctx context.Context) (sch Schedule, last lastMade, err 
 	var lastMadeAt, triedAt, outcome, failure, fingerprint sql.NullString
 	err = s.db.QueryRowContext(ctx, `SELECT turned_on, period, keep, last_made_at, tried_at, outcome, failure,
 		made_fingerprint, EXISTS (SELECT 1 FROM backups WHERE id = last_made_id),
-		NOT EXISTS (SELECT 1 FROM songs) AND NOT EXISTS (SELECT 1 FROM beats)
+		NOT EXISTS (SELECT 1 FROM songs WHERE NOT demo) AND NOT EXISTS (SELECT 1 FROM beats WHERE NOT demo)
 		FROM backup_schedule WHERE id = 1`).
 		Scan(&sch.On, &sch.Period, &sch.Keep, &lastMadeAt, &triedAt, &outcome, &failure,
 			&fingerprint, &last.there, &last.empty)

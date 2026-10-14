@@ -94,6 +94,8 @@ type Store struct {
 	// scheduling is held while checking for a Scheduled Backup, so two
 	// checks never make one each.
 	scheduling sync.Mutex
+	// demo is held while the Demo is put back.
+	demo sync.Mutex
 	// wake asks for a check for a Scheduled Backup now.
 	wake chan struct{}
 	// stopSchedule stops the checks, and scheduleDone is closed once they
@@ -316,7 +318,7 @@ func (s *Store) songsIn(ctx context.Context, contents Contents) ([]int64, error)
 		return ids, err
 	}
 	var beats int
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM beats`).Scan(&beats); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM beats WHERE NOT demo`).Scan(&beats); err != nil {
 		return nil, err
 	}
 	if beats == 0 {
@@ -332,7 +334,7 @@ func (s *Store) songsPicked(ctx context.Context, contents Contents) ([]int64, er
 		if len(contents.Songs) > 0 {
 			return nil, domain.Invalid("pick all Songs or some, not both")
 		}
-		ids, err := queryIDs(ctx, s.db, `SELECT id FROM songs ORDER BY id`)
+		ids, err := queryIDs(ctx, s.db, `SELECT id FROM songs WHERE NOT demo ORDER BY id`)
 		if err != nil {
 			return nil, err
 		}
@@ -374,7 +376,7 @@ func (s *Store) distinctExisting(ctx context.Context, table string, ids []int64,
 		}
 		seen[id] = true
 		var exists int
-		if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM `+table+` WHERE id = ?`, id).Scan(&exists); err != nil {
+		if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM `+table+` WHERE id = ? AND NOT demo`, id).Scan(&exists); err != nil {
 			return nil, err
 		}
 		if exists == 0 {
