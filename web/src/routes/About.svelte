@@ -125,8 +125,6 @@
     return () => clearInterval(timer);
   });
 
-  /** "2026-09-29", from an RFC 3339 time. */
-
   let copyStatus = $state<'copied' | 'failed' | null>(null);
   let copyStatusTimer: ReturnType<typeof setTimeout> | undefined;
 

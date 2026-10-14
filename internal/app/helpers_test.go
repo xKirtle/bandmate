@@ -177,7 +177,7 @@ func (ts *testServer) DoRaw(method, path string, header http.Header, body io.Rea
 		ts.t.Fatalf("building request: %v", err)
 	}
 	if ts.zone != "" {
-		req.Header.Set("Bandmate-Time-Zone", ts.zone)
+		req.Header.Set(app.ZoneHeader, ts.zone)
 	}
 	for name, values := range header {
 		req.Header[name] = values

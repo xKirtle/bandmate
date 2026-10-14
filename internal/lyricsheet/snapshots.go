@@ -25,8 +25,8 @@ const EditingSession = 10 * time.Minute
 // than KeepDailyFor, then the newest of each week. A day is the date the
 // Snapshot was taken on where the change that took it was made (ADR 0021),
 // and a week that date's ISO week, Monday to Sunday, so which one is the
-// newest of its day or week never changes as they age. A kept Snapshot is never
-// thinned. The Snapshots dialog groups them by the same ages.
+// newest of its day or week never changes as they age. A kept Snapshot is
+// never thinned. The Snapshots dialog groups them by the same ages.
 const (
 	KeepAllFor   = 24 * time.Hour
 	KeepDailyFor = KeepAllFor + 30*24*time.Hour
@@ -221,7 +221,7 @@ func (s *Store) startEditing(ctx context.Context, tx *sql.Tx, songID int64) erro
 		starts = now.Sub(at) >= EditingSession
 	}
 	if starts {
-		if err := s.snapshotIfChanged(ctx, tx, songID, now.In(domain.Zone(ctx))); err != nil {
+		if err := s.snapshotIfChanged(ctx, tx, songID, now); err != nil {
 			return err
 		}
 	}
@@ -274,7 +274,7 @@ func (s *Store) changeBefore(ctx context.Context, songID int64, based songversio
 			return err
 		}
 		now := s.now().UTC()
-		if err := insertSnapshot(ctx, tx, songID, now.In(domain.Zone(ctx)), reason, deleted, encoded); err != nil {
+		if err := insertSnapshot(ctx, tx, songID, now, reason, deleted, encoded); err != nil {
 			return err
 		}
 		if err := do(); err != nil {
@@ -295,14 +295,14 @@ func encodeSheet(ctx context.Context, tx *sql.Tx, songID int64) (encoded []byte,
 	return encoded, len(sheet.Sections), err
 }
 
-// insertSnapshot keeps sheet as a Snapshot taken at now, in the time zone
-// where the change taking it was made, for reason, naming what was deleted,
-// if anything, then thins the Song's Snapshots.
+// insertSnapshot keeps sheet as a Snapshot taken at now, on the date it is
+// in the time zone of the change taking it, for reason, naming what was
+// deleted, if anything, then thins the Song's Snapshots.
 func insertSnapshot(ctx context.Context, tx *sql.Tx, songID int64, now time.Time, reason SnapshotReason, deleted string,
 	sheet []byte) error {
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO snapshots (song_id, taken_at, taken_on, reason, deleted, sheet) VALUES (?, ?, ?, ?, NULLIF(?, ''), ?)`,
-		songID, now.UTC().Format(domain.TimeFormat), now.Format(time.DateOnly), reason, deleted, string(sheet)); err != nil {
+		songID, now.Format(domain.TimeFormat), now.In(domain.Zone(ctx)).Format(time.DateOnly), reason, deleted, string(sheet)); err != nil {
 		return fmt.Errorf("taking a snapshot: %w", err)
 	}
 	return thinSnapshots(ctx, tx, songID, now)

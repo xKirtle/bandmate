@@ -1,5 +1,6 @@
-// Every date and time the app shows goes through formatDay, formatTime or
-// formatWhen, in the browser's time zone: the user's day, wherever the server is.
+// Every date and time of day the app shows goes through formatDay, formatTime
+// or formatWhen, in the browser's time zone: the user's day, wherever the
+// server is. How long ago something was, as timeAgo says it, needs no zone.
 
 /** Months as dates show them, spelled out rather than left to the locale, which may shorten September to "Sept". */
 const shortMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
