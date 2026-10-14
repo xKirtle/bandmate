@@ -63,19 +63,27 @@ export const steps: readonly Step[] = [
   },
 ];
 
+/** The window the Tour needs: a wide one. It isn't offered on a phone, and ends if narrowed to one. */
+export const tourFits = 'min-width: 40.0625rem';
+
 /** Where the Demo Song's page is: it shows the Demo only while a Tour runs. */
 export const demoPath = '/songs/demo';
 
 export class Tour {
-  readonly #go: (to: string, replace: boolean) => void;
+  readonly #go: (to: string) => void;
+  readonly #goBack: (to: string) => void;
   /** Where it was taken from, to go back to as it ends; null while it isn't running. */
   #from = $state<string | null>(null);
   /** The step showing, from 0. */
   #at = $state(0);
 
-  /** go goes to an in-app address, in place of the page's history entry with replace. */
-  constructor({ go }: { go: (to: string, replace: boolean) => void }) {
+  /**
+   * go goes to an in-app address; goBack goes back to `to`, the page the Tour
+   * was taken from, the one before the Demo Song's in the history.
+   */
+  constructor({ go, goBack }: { go: (to: string) => void; goBack: (to: string) => void }) {
     this.#go = go;
+    this.#goBack = goBack;
   }
 
   get running() {
@@ -105,7 +113,7 @@ export class Tour {
   start(from: string) {
     this.#from = from;
     this.#at = 0;
-    this.#go(demoPath, false);
+    this.#go(demoPath);
   }
 
   /** Next: the next step, or on the last, Finish, which ends it. */
@@ -119,16 +127,16 @@ export class Tour {
     if (this.running && this.#at > 0) this.#at--;
   }
 
-  /** Ends it, going back to where it was taken from in place of the Demo Song. */
+  /** Ends it, going back to where it was taken from. */
   end() {
     const from = this.#from;
     if (from === null) return;
     this.#from = null;
-    this.#go(from, true);
+    this.#goBack(from);
   }
 
-  /** Ends it where it is, e.g. once the Demo Song has been left. */
-  left() {
+  /** Ends it without going anywhere, e.g. once the Demo Song has been left. */
+  stop() {
     this.#from = null;
   }
 }

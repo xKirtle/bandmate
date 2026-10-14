@@ -114,13 +114,17 @@ test('Esc ends the Tour, back where it was taken from', async ({ page }) => {
   await expect(card(page)).toHaveCount(0);
 });
 
-test('End tour ends it, back where it was taken from', async ({ page }) => {
+test('End tour ends it, back where it was taken from, as the browser’s Back would', async ({ page }) => {
+  await page.goto('/');
   await takeTour(page);
 
   await card(page).getByRole('button', { name: 'End tour' }).click();
 
   await expect(page).toHaveURL(/\/settings\/about$/);
   await expect(page.getByRole('button', { name: 'Take the Tour' })).toBeVisible();
+  // About isn't in the history twice.
+  await page.goBack();
+  await expect(page).toHaveURL(/\/$/);
 });
 
 test('narrowing the window to a phone’s ends it', async ({ page }) => {

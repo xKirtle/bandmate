@@ -24,7 +24,7 @@
       (e: Error) => {
         error = e.message;
         // Nothing to show: the Tour ends, leaving the page free to go elsewhere.
-        tour.left();
+        tour.stop();
       },
     );
   }

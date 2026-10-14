@@ -4,22 +4,22 @@
   // beside it. The Tour only shows, so the page under it is blocked: every
   // click is caught, the spotlit control's too, the rest of the app is inert,
   // and keys go to the Tour before the page's Shortcuts. Mounted once, in App.
-  import { tick } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { router } from './router.svelte';
   import { popoverBeside } from './popover';
   import { scrollBehavior } from './motion';
-  import { demoPath, steps } from './tour.svelte';
+  import { demoPath, steps, tourFits } from './tour.svelte';
   import { tour } from './theTour';
 
   // The Tour needs a wide window: narrowed to a phone's, it ends.
-  const wide = new MediaQuery('min-width: 40.0625rem');
+  const wide = new MediaQuery(tourFits);
   const onDemo = $derived(router.path === demoPath);
   const showing = $derived(tour.running && onDemo);
 
   // Leaving the Demo Song, e.g. with the browser's Back, ends it where it is.
   $effect(() => {
-    if (tour.running && !onDemo) tour.left();
+    if (tour.running && !onDemo) tour.stop();
   });
   $effect(() => {
     if (tour.running && !wide.current) tour.end();
@@ -37,7 +37,15 @@
     let frame = 0;
     const follow = () => {
       control = name ? document.querySelector<HTMLElement>(`[data-tour="${name}"]`) : null;
-      rect = control?.getBoundingClientRect() ?? null;
+      const now = control?.getBoundingClientRect() ?? null;
+      // Only a move redraws the spotlight and the card.
+      if (
+        !sameRect(
+          now,
+          untrack(() => rect),
+        )
+      )
+        rect = now;
       frame = requestAnimationFrame(follow);
     };
     follow();
@@ -47,6 +55,11 @@
       rect = null;
     };
   });
+
+  function sameRect(a: DOMRect | null, b: DOMRect | null) {
+    if (!a || !b) return a === b;
+    return a.left === b.left && a.top === b.top && a.width === b.width && a.height === b.height;
+  }
 
   // Each step brings its control into view once it's there. The Timeline is
   // docked at the window's foot, so what's in it is always in view.
@@ -94,8 +107,8 @@
         event.preventDefault();
         const controls = [...(card?.querySelectorAll<HTMLElement>('button, a[href]') ?? [])];
         const at = controls.indexOf(document.activeElement as HTMLElement);
-        const step = event.shiftKey ? -1 : 1;
-        controls.at((at + step) % controls.length)?.focus();
+        const by = event.shiftKey ? -1 : 1;
+        controls[(at + by + controls.length) % controls.length]?.focus();
       } else if (!card?.contains(event.target as Node)) {
         event.preventDefault();
       }
@@ -105,7 +118,9 @@
     return () => removeEventListener('keydown', keydown, { capture: true });
   });
 
-  // The card, in the top layer, beside the control, which it waits for.
+  // The card, in the top layer, beside the control, which it waits for, gap
+  // px from it and from the window's edges.
+  const gap = 24;
   const placed = $derived(!step.control || !!rect);
   $effect(() => {
     if (!card || !rect) return;
@@ -118,8 +133,6 @@
     card.style.left = `${at.left}px`;
     card.style.top = `${at.top}px`;
   });
-  // How far the card sits from the spotlight, and the window's edges.
-  const gap = 24;
 
   // Focus sits on Next at every step, once the card shows.
   let next = $state<HTMLButtonElement>();

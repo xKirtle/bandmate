@@ -313,6 +313,13 @@
     }
   }
 
+  /** What the Tour calls the Section at index, which it spotlights the first and last of. */
+  function tourName(index: number) {
+    if (index === 0) return 'first-section';
+    if (index === song.arrangement.length - 1) return 'last-section';
+    return undefined;
+  }
+
   function move(index: number, by: -1 | 1) {
     const order = moveTo(song.arrangement, index, index + by);
     editing.change({ kind: 'reorderArrangement', order });
@@ -521,7 +528,7 @@
               more={sectionActions(section, i)}
               {drag}
               places={placesOut}
-              tour={i === 0 ? 'first-section' : i === song.arrangement.length - 1 ? 'last-section' : undefined}
+              tour={tourName(i)}
             >
               {#snippet grip()}
                 {#if drag.on}
