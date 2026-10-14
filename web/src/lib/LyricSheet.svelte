@@ -276,16 +276,18 @@
     syncMode.cue();
   }
 
-  // The Section just added or duplicated, whose Label gets focus once, as
-  // it shows. Forgotten then: the same Section brought back later, by an
-  // Undo or Redo, comes back without taking focus.
-  let added = $state<number | null>(null);
+  // The Section just added or duplicated, whose Label gets focus as it
+  // shows, and only then: the same Section brought back later, by an Undo
+  // or a Redo, comes back without taking focus.
+  let focusing = $state<number | null>(null);
 
+  /** Focuses the Label of the Section just added, which shows by the next tick, as the Song is replaced once the change is saved. */
   async function focusAdded(sectionId: number | null) {
-    added = sectionId;
+    focusing = sectionId;
     await tick();
-    added = null;
+    focusing = null;
   }
+
   // Where the Song has Chords, as Read mode shows it: only the Arrangement's
   // active Alternates count.
   const chords = $derived(chordsInRead(song));
@@ -530,7 +532,7 @@
           >
             <SectionEditor
               {section}
-              autofocus={added === section.id}
+              autofocus={focusing === section.id}
               {editing}
               cueing={cueingFor(section)}
               {onCaret}

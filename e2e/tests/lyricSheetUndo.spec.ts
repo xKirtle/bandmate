@@ -135,8 +135,8 @@ test("Ctrl+Z in a text box undoes its own typing, even with none left, and outsi
   await expect(sections).toHaveCount(1);
   await expect(undoButton(page)).toBeDisabled();
 
-  // The Section added comes back without taking focus, as it did when it
-  // was added, so the next Ctrl+Y is the Song's too.
+  // The Section added comes back without taking focus, unlike when it was
+  // added, so the next Ctrl+Y is the Song's too.
   await page.keyboard.press('ControlOrMeta+y');
   await expect(sections).toHaveCount(2);
   await expect(page.locator('body')).toBeFocused();
