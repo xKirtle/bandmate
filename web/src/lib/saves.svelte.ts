@@ -31,7 +31,7 @@
 import { ApiError, type Song, type Timeline } from './api';
 import { sameCues, savedRetrying, withCueChange, type CueChange } from './cueChanges';
 import { History, restorable, type Edit, type HistoryEdit } from './history';
-import { changedSection, type LyricSheetChange, type Visit } from './lyricSheetChanges';
+import { changedSection, type LyricSheetChange, type FieldVisit } from './lyricSheetChanges';
 import { waitFor, type SongServer, type Wait } from './songServer';
 
 /** How a save ended: saved, failed, refused as the Song changed elsewhere, or never sent as the Song's being deleted. */
@@ -165,7 +165,11 @@ export class Saves {
     return this.pending > 0 || this.#unsavedCues.length > 0 || this.#typing.some((t) => t.unsaved);
   }
 
-  /** Whether an edit being typed into a Section, on the list, isn't saved yet. */
+  /**
+   * Whether an edit being typed into a Section, on the list, isn't saved
+   * yet: leaving its field saves it, so it's the next edit to undo, as Undo
+   * pressed in a field does.
+   */
   get unsavedInSections(): boolean {
     return this.#typing.some((t) => t.section !== undefined && t.unsaved);
   }
@@ -209,7 +213,7 @@ export class Saves {
    * it to undo: given the visit to a text field that typed it, as one step
    * with the changes that visit saved just before it.
    */
-  changeLyricSheet = (change: LyricSheetChange, visit?: Visit): Promise<boolean> => {
+  changeLyricSheet = (change: LyricSheetChange, visit?: FieldVisit): Promise<boolean> => {
     this.#undoablesQueued++;
     return this.#turn(
       async (saved) => ({ before: saved, after: await this.#server.apply(saved, change) }),

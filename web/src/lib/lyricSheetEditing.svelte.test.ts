@@ -693,7 +693,7 @@ describe('Lyric Sheet editing, undoing what was typed', () => {
     expect(server.song.sections[0]).toMatchObject({ label: 'Chorus 2', alternates: [{ name: 'Darker' }] });
   });
 
-  it('undoes the typing not saved yet of a visit left just before undoing, as Undo pressed in a field does', async () => {
+  it('undoes the typing not saved yet of a visit left just before undoing, each field as left', async () => {
     const server = new FakeSongServer(verseSong());
     const { saves, editing } = await editingFor(server);
     await editing.change({ kind: 'setSectionLabel', sectionId: 1, label: 'Chorus' });
@@ -703,17 +703,17 @@ describe('Lyric Sheet editing, undoing what was typed', () => {
     const box = editing.textBox(1, 1);
     box.focus();
     box.type('One\nTwo\nThree');
-    expect(editing.unsaved).toBe(true);
+    expect(saves.unsavedInSections).toBe(true);
     // Leaving the text box saves its typing, which Undo then undoes.
     box.blur();
     await saves.undo();
     expect(textOf(server.song)).toBe('One\nTwo');
     expect(server.song.sections[0].label).toBe('Chorus');
-    expect(editing.unsaved).toBe(true);
+    expect(saves.unsavedInSections).toBe(true);
     name.commit();
     await saves.undo();
     expect(server.song.sections[0].alternates[0].name).toBe('');
-    expect(editing.unsaved).toBe(false);
+    expect(saves.unsavedInSections).toBe(false);
   });
 
   it('keeps each visit to a field as a step of its own', async () => {

@@ -22,7 +22,7 @@ import {
 } from './api';
 import { placementOf } from './clipSource';
 import { isBlank, type CuedSong } from './cues';
-import { sheetCopy, type LyricSheetChange, type Visit } from './lyricSheetChanges';
+import { sheetCopy, type LyricSheetChange, type FieldVisit } from './lyricSheetChanges';
 import { rightHalves } from './split';
 
 // Undo and redo for Timeline edits, Cue edits and Lyric Sheet changes,
@@ -168,7 +168,7 @@ interface Entry {
   /** For a new Take, where its Clip starts, to return the playhead to on undoing it. */
   undoPlayhead?: number;
   /** For a Lyric Sheet change typed into a text field, the visit to it that typed it. */
-  visit?: Visit;
+  visit?: FieldVisit;
 }
 
 export class History {
@@ -223,10 +223,9 @@ export class History {
    * and after it, each put back whole (ADR 0019). The changes one visit to
    * a text field saves, one after another, are kept as one.
    */
-  recordSheet(before: Song, after: Song, visit?: Visit): void {
+  recordSheet(before: Song, after: Song, visit?: FieldVisit): void {
     const was = sheetCopy(before);
     const now = sheetCopy(after);
-    const same = (a: SheetCopy, b: SheetCopy) => JSON.stringify(a) === JSON.stringify(b);
     const none: Ids = { tracks: [], clips: [] };
     const top = this.#undo.at(-1);
     // Saved again in the same visit to a text field, straight on from its
@@ -325,6 +324,11 @@ export class History {
     }
     return ids;
   }
+}
+
+/** Whether two copies of the Lyric Sheet and Scrapbook are the same. */
+function same(a: SheetCopy, b: SheetCopy): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 /**

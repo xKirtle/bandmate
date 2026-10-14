@@ -487,7 +487,7 @@
                 type="button"
                 class="button tool"
                 onclick={undo}
-                disabled={!(saves.canUndo || editing.unsaved) || frozen}
+                disabled={!(saves.canUndo || saves.unsavedInSections) || frozen}
                 aria-label="Undo"
                 aria-keyshortcuts={hints.aria(shortcuts.undo.keys)}
                 title={editHint(freeze, hints.withKeys('Undo', shortcuts.undo.keys))}

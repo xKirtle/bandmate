@@ -66,10 +66,10 @@ const lyricSheetChangeKinds: ReadonlySet<string> = new Set<LyricSheetChange['kin
  * One visit to a text field in the Lyric Sheet, from going into it to
  * leaving it: the changes it saves are kept to undo as one step.
  */
-export type Visit = symbol;
+export type FieldVisit = symbol;
 
 /** A new visit to a text field. */
-export const newVisit = (): Visit => Symbol('visit');
+export const newFieldVisit = (): FieldVisit => Symbol('visit');
 
 /** Whether a change is to the Lyric Sheet. */
 export function isLyricSheetChange(change: { kind: string }): change is LyricSheetChange {

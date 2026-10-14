@@ -22,7 +22,7 @@
 // a time: what one visit to the field saves, from going into it to leaving
 // it, however often, is one step.
 import type { Song } from './api';
-import { newVisit, type LyricSheetChange, type Visit } from './lyricSheetChanges';
+import { newFieldVisit, type LyricSheetChange, type FieldVisit } from './lyricSheetChanges';
 import type { Saves, Typing } from './saves.svelte';
 import { TypedField } from './typedField.svelte';
 
@@ -46,7 +46,7 @@ export class LyricSheetEditing {
    * runs before the next change starts. Given the visit to a text field that
    * typed it, it's undone as one step with the visit's other changes.
    */
-  change = (change: LyricSheetChange, visit?: Visit): Promise<boolean> => {
+  change = (change: LyricSheetChange, visit?: FieldVisit): Promise<boolean> => {
     if (endsSyncMode(change)) this.#endSyncMode();
     const remade = sectionRemadeBy(change);
     if (remade !== null) {
@@ -71,15 +71,6 @@ export class LyricSheetEditing {
    */
   unsavedIn(sectionId: number): boolean {
     return this.#saves.typingIn(sectionId).some((t) => t.unsaved);
-  }
-
-  /**
-   * Whether any Section's editor holds edits not saved yet: leaving its
-   * field saves them, so they're the next edit to undo, as Undo pressed in
-   * a field does.
-   */
-  get unsaved(): boolean {
-    return this.#saves.unsavedInSections;
   }
 
   /** How many edits have been typed into a Section's editor, e.g. to tell when typing carries on. */
@@ -164,16 +155,16 @@ function sectionRemadeBy(change: LyricSheetChange): number | null {
  * to it commits, however often, is undone as one step.
  */
 export class SheetField extends TypedField<string> {
-  #visit = newVisit();
+  #visit = newFieldVisit();
 
   /** The visit to the field its commits come from. */
-  get visit(): Visit {
+  get visit(): FieldVisit {
     return this.#visit;
   }
 
   /** Hears the field being focused, which starts a new visit to it. */
   focus = () => {
-    this.#visit = newVisit();
+    this.#visit = newFieldVisit();
   };
 }
 
@@ -191,7 +182,7 @@ export class SheetField extends TypedField<string> {
  */
 export class TextBox implements Typing {
   #song: () => Song;
-  #send: (text: string, visit: Visit) => Promise<boolean>;
+  #send: (text: string, visit: FieldVisit) => Promise<boolean>;
   #typing: (entry: Typing) => () => void;
   #alternateId: number;
   readonly section: number;
@@ -214,11 +205,11 @@ export class TextBox implements Typing {
   /** Takes it off Saves' list: set once typed in, until it's closed and settled. */
   #leave: (() => void) | null = null;
   /** The visit to the box its saves come from, undone as one step: a new one each time it's focused. */
-  #visit = newVisit();
+  #visit = newFieldVisit();
 
   constructor(
     song: () => Song,
-    send: (text: string, visit: Visit) => Promise<boolean>,
+    send: (text: string, visit: FieldVisit) => Promise<boolean>,
     typing: (entry: Typing) => () => void,
     alternateId: number,
     section: number,
@@ -255,7 +246,7 @@ export class TextBox implements Typing {
 
   focus = () => {
     this.#focused = true;
-    this.#visit = newVisit();
+    this.#visit = newFieldVisit();
     this.#hold();
   };
 
