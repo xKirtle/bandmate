@@ -1,4 +1,4 @@
-pt.ranks.txt.gz is made from FrequencyWords by Hermit Dave
+pt-PT.ranks.txt.gz is made from FrequencyWords by Hermit Dave
 (https://github.com/hermitdave/FrequencyWords), its European Portuguese list
 of the 50,000 most common words, content/2018/pt/pt_50k.txt, at commit
 525f9b560de45753a5ea01069454e72e9aa541c6. FrequencyWords is built from the
@@ -15,12 +15,12 @@ FrequencyWords' content is licensed under the Creative Commons
 Attribution-ShareAlike 4.0 International licence (CC BY-SA 4.0), as its
 README says ("CC-by-sa-4.0 for content").
 
-Modified: filtered to the words of the Portuguese word list (pt.txt.gz) and
+Modified: filtered to the words of the Portuguese word list (pt-PT.txt.gz) and
 converted to ranks, most common first, one a line. A word spelt as before
 the 1990 spelling reform ("acção", "óptimo") has its count added to its new
 spelling ("ação", "ótimo"), when only the new one is in the word list. The
 program that does this is frequencywords/main.go, beside this file.
 
-pt.ranks.txt.gz is licensed under the Creative Commons Attribution-ShareAlike
+pt-PT.ranks.txt.gz is licensed under the Creative Commons Attribution-ShareAlike
 4.0 International licence: https://creativecommons.org/licenses/by-sa/4.0/
 It comes with no warranties.

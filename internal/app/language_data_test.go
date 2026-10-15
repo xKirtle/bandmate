@@ -91,8 +91,8 @@ func TestEachLanguageIsListedWithItsNameAndDownloadSize(t *testing.T) {
 	for i, l := range got {
 		named[i] = l.Code + " " + l.Name
 	}
-	if !slices.Equal(named, []string{"en English", "pt Portuguese"}) {
-		t.Fatalf("languages = %v, want English and Portuguese", named)
+	if !slices.Equal(named, []string{"en English", "pt-PT Portuguese (Portugal)"}) {
+		t.Fatalf("languages = %v, want English and Portuguese (Portugal)", named)
 	}
 	// What a browser downloads, compressed, to set each up.
 	en := ts.DoRaw(http.MethodGet, "/api/languages/en", http.Header{"Accept-Encoding": {"gzip"}}, nil)
@@ -107,6 +107,14 @@ func TestALanguageBandmateHasNoDataForIsNotFound(t *testing.T) {
 	res := ts.Do(http.MethodGet, "/api/languages/xx", nil)
 
 	expectError(t, res, http.StatusNotFound, "there's no language \"xx\"")
+}
+
+func TestPortugueseIsNoLongerALanguageOfItsOwn(t *testing.T) {
+	ts := newTestServer(t)
+
+	res := ts.Do(http.MethodGet, "/api/languages/pt", nil)
+
+	expectError(t, res, http.StatusNotFound, "there's no language \"pt\"")
 }
 
 func TestAboutCreditsTheDataThatShips(t *testing.T) {
@@ -124,7 +132,7 @@ func TestAboutCreditsTheDataThatShips(t *testing.T) {
 func TestPortugueseWordsAreServedFromTheBinary(t *testing.T) {
 	ts := newTestServer(t)
 
-	res := ts.Do(http.MethodGet, "/api/languages/pt", nil)
+	res := ts.Do(http.MethodGet, "/api/languages/pt-PT", nil)
 
 	expectStatus(t, res, http.StatusOK)
 	// Words, with the forms they're sung in, to suggest Rhymes from.
@@ -142,7 +150,7 @@ func TestAboutCreditsThePortugueseWordList(t *testing.T) {
 	if i < 0 {
 		t.Fatalf("data = %+v, want the Portuguese word list", got.Data)
 	}
-	// Of the licences it's offered under, the one Bandmate takes it under, as pt.LICENSE says.
+	// Of the licences it's offered under, the one Bandmate takes it under, as pt-PT.LICENSE says.
 	if d := got.Data[i]; d.Version == "" || d.License != "LGPL-2.1-only" {
 		t.Errorf("Portuguese word list = %+v, want a version and LGPL-2.1-only", d)
 	}
@@ -163,7 +171,7 @@ func TestEachLanguagesDataRanksItsWordsMostCommonFirst(t *testing.T) {
 	ts := newTestServer(t)
 
 	en := ranksOf(t, ts.Do(http.MethodGet, "/api/languages/en", nil).Body)
-	pt := ranksOf(t, ts.Do(http.MethodGet, "/api/languages/pt", nil).Body)
+	pt := ranksOf(t, ts.Do(http.MethodGet, "/api/languages/pt-PT", nil).Body)
 
 	if !slices.Equal(en[:3], []string{"you", "i", "the"}) {
 		t.Errorf("English ranks start %v, want you, i, the", en[:3])

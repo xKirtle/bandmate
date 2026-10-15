@@ -1,6 +1,6 @@
-// Command ptwords builds Portuguese's data, pt.txt.gz, from the European
-// Portuguese Hunspell dictionary that LibreOffice ships, at a pinned
-// commit: one word a line, to suggest Rhymes from. Each of the
+// Command ptwords builds Portuguese (Portugal)'s data, pt-PT.txt.gz, from
+// the European Portuguese Hunspell dictionary that LibreOffice ships, at a
+// pinned commit: one word a line, to suggest Rhymes from. Each of the
 // dictionary's words is kept with the forms its suffixes make (plurals,
 // genders, a verb's tenses), but not the forms its prefixes make, nor the
 // verb tenses rarely sung (the imperfect and future subjunctive, the
@@ -73,7 +73,7 @@ func main() {
 	if err := zw.Close(); err != nil {
 		log.Fatal(err)
 	}
-	if err := os.WriteFile("pt.txt.gz", out.Bytes(), 0o644); err != nil {
+	if err := os.WriteFile("pt-PT.txt.gz", out.Bytes(), 0o644); err != nil {
 		log.Fatal(err)
 	}
 }

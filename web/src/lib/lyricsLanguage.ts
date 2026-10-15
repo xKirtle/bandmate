@@ -12,7 +12,7 @@ import { portugueseSound } from './portuguese';
 
 /** A Language's data, read from what the binary serves for it. */
 export interface LanguageData {
-  /** The Language's ISO 639-1 code, e.g. "en". */
+  /** The Language's BCP 47 code, e.g. "en" or "pt-PT". */
   code: string;
   /** A dictionary Language's pronunciations of each word it knows, in lower case, the first the usual one. */
   pronunciations: ReadonlyMap<string, readonly string[][]>;
@@ -85,7 +85,7 @@ function linesOf(text: string): string[] {
  * Null for one they can't read.
  */
 const spellingRules: Record<string, (word: string) => Sound | null> = {
-  pt: portugueseSound,
+  'pt-PT': portugueseSound,
 };
 
 function isSpellingRules(code: string): boolean {
