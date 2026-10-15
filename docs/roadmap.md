@@ -49,4 +49,5 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 
 - Every rhyming dictionary but English's turns each word into how it's said before pairing Rhymes, so a Rhyme is matched on its sounds, as the glossary defines it. English is the exception because its dictionary came with pronunciations, so it goes by sound already. The Portuguese one pairs words by how they're written, so "depois" and "heróis" come up as perfect Rhymes, though "ois" and the open "óis" sound quite different.
 - European and Brazilian Portuguese sound different, so they're separate Languages, each with a dictionary of its own.
-- Where each Language's pronunciations come from is for the spec.
+- Candidate sources for the pronunciations: WikiPron, Wiktionary's pronunciations split by Language and variant (Brazil and Portugal apart), likely CC BY-SA; ipa-dict, MIT; the Montreal Forced Aligner's dictionaries, with both Portugueses; and eSpeak NG, GPL-3, which works a pronunciation out from spelling for any word, run once when the dictionary is built. One idea: Wiktionary's pronunciation where there is one, as it gets open and closed vowels right, and eSpeak NG's for the rest.
+- Which sources each Language uses, how their licences are credited, and how much bigger each Language's download gets, are for the spec.
