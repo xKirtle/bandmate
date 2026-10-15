@@ -63,10 +63,14 @@ describe('lookUpRhymes', () => {
     expect(lookUpRhymes(none, null, ['en'])).toMatchObject({ word: null, toSetUp: ['en'] });
   });
 
-  it("guesses an unknown word's Rhymes from spelling rules once every Language is downloaded", () => {
-    const lookup = lookUpRhymes(both, 'saudadezinha', ['en', 'pt-PT']);
-    expect(lookup.language).toBe('pt-PT');
-    expect(lookup.rhymes?.guess).toBe(true);
+  it("has no Rhymes for a word in none of the Song's dictionaries, read in its first Language, once every one is downloaded", () => {
+    expect(lookUpRhymes(both, 'saudadezinha', ['en', 'pt-PT'])).toMatchObject({
+      language: 'en',
+      rhymes: null,
+      toSetUp: [],
+      notIn: [],
+    });
+    expect(lookUpRhymes(both, 'saudadezinha', ['pt-PT', 'en'])).toMatchObject({ language: 'pt-PT', rhymes: null });
   });
 
   it("has no Rhymes for a word the Language can't read, without loading", () => {

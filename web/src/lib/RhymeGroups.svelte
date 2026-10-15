@@ -2,8 +2,8 @@
   // A word's Rhymes, perfect ones first, then near ones in a group of their
   // own, each with its Syllable Count; or why there are none, such as a
   // Language whose dictionary isn't downloaded to this device, with a link
-  // to download it in Settings. Rhymes guessed from the word's spelling say
-  // so. They're for reference only: no Rhyme can be clicked, so one never
+  // to download it in Settings, or a word the dictionary doesn't have.
+  // They're for reference only: no Rhyme can be clicked, so one never
   // goes into the Lyric Sheet. Wrapped onto as many rows as they take.
   import { languageName } from './languages';
   import type { RhymeLookup } from './rhymeLookup';
@@ -57,13 +57,10 @@
 {:else if !word}
   <p class="muted message">Rhymes show here for the word at the cursor as you write.</p>
 {:else if !rhymes}
-  <p class="muted message">No Rhymes for “{word}”: Bandmate doesn’t know how it sounds.</p>
+  <p class="muted message">
+    No Rhymes: “{word}” isn’t in the {language ? `${languageName(language, listedLanguages.list)} ` : ''}dictionary.
+  </p>
 {:else}
-  {#if rhymes.guess && language}
-    <p class="muted message guess">
-      Guessed from its spelling: the {languageName(language, listedLanguages.list)} dictionary doesn’t have “{word}”.
-    </p>
-  {/if}
   <div class="groups">
     {#each groups as { name, list } (name)}
       <div class="group">
@@ -89,9 +86,6 @@
   .message {
     margin: 0;
     font-size: var(--text-sm);
-  }
-  .guess {
-    margin-bottom: var(--space-3);
   }
   .groups {
     display: flex;

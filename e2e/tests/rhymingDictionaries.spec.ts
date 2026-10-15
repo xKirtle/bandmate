@@ -101,6 +101,18 @@ test("a word in no downloaded dictionary asks to download the Song's other Langu
   ).toBeVisible();
 });
 
+test("a word in none of the Song's dictionaries has no Rhymes, and says so", async ({ page, bandmate }) => {
+  const song = await bandmate.song({ title: 'Saudade', languages: ['pt-PT', 'en'] });
+  await download(page, 'English');
+  await download(page, 'Portuguese (Portugal)');
+
+  await lookUp(page, song.id, 'saudadezinha');
+
+  await expect(rhymesCard(page)).toContainText('No Rhymes: “saudadezinha” isn’t in the Portuguese (Portugal) dictionary.');
+  await rhymesCard(page).getByRole('tab', { name: 'English' }).click();
+  await expect(rhymesCard(page)).toContainText('No Rhymes: “saudadezinha” isn’t in the English dictionary.');
+});
+
 test("the Language switch links to Settings for a Language that isn't downloaded", async ({ page, bandmate }) => {
   const song = await bandmate.song({ title: 'Saudade', languages: ['en', 'pt-PT'] });
   await download(page, 'English');
