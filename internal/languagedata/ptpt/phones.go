@@ -87,8 +87,9 @@ type segment struct {
 
 // phonesOf is a word's pronunciation in the phone set, from eSpeak NG's
 // IPA for it. Not ok for a word eSpeak NG read as another language's, as
-// it does a loanword such as "copyright", or with a sound Portuguese
-// doesn't have, as it reads an abbreviation such as "sr" letter by letter.
+// it does a loanword such as "copyright", with a sound Portuguese doesn't
+// have, or with more syllables than the word has vowels, as it reads a
+// word of one letter, such as "é", by the letter's name.
 func phonesOf(word, ipa string) (phones []string, ok bool, err error) {
 	if strings.Contains(ipa, "(") {
 		return nil, false, nil
@@ -129,7 +130,42 @@ func phonesOf(word, ipa string) (phones []string, ok bool, err error) {
 	segs = nasalizeBeforeConsonant(segs)
 	segs = joinNasalDiphthongs(segs)
 	segs = readVowelBeforeW(word, segs)
-	return withStress(segs), true, nil
+	phones = withStress(segs)
+	if syllables(phones) > vowelLetters(word) {
+		// eSpeak NG spelt it out, as it says a word of one letter by its
+		// name, such as "é" as "é agudo".
+		return nil, false, nil
+	}
+	return openStressedIX(phones), true, nil
+}
+
+// vowelLetters is how many vowels a word is written with, more than it can
+// have syllables.
+func vowelLetters(word string) int {
+	n := 0
+	for _, r := range word {
+		if strings.ContainsRune("aeiouyáàâãéêíóôõúü", r) {
+			n++
+		}
+	}
+	return n
+}
+
+// openStressedIX reads a stressed IX in a word of more than one syllable as
+// EH. Portuguese stresses ɨ only in a word of one syllable said unstressed
+// in a sentence, as "de" and "me", but eSpeak NG writes it for the
+// stressed e of some longer words, as in "depressa" and "interessa", which
+// are said with an open e. Wiktionary then corrects any said closed.
+func openStressedIX(phones []string) []string {
+	if syllables(phones) < 2 {
+		return phones
+	}
+	for i, p := range phones {
+		if p == "IX1" {
+			phones[i] = "EH1"
+		}
+	}
+	return phones
 }
 
 // nasalize makes a vowel nasal, reporting whether it can be. eSpeak NG

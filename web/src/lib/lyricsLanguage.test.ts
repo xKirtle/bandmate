@@ -176,6 +176,22 @@ describe('rhymes in Portuguese (Portugal)', () => {
     ['gostas', 'costas'],
     ['olho', 'piolho'],
     ['esse', 'desse'],
+    ['ser', 'prazer'], // a stressed e, closed, not the ɨ of "de"
+    ['ter', 'viver'],
+    ['depressa', 'pressa'],
+    ['interesse', 'stress'],
+    ['me', 'te'], // "deixa-me" and "compra-me"
+    ['se', 'te'],
+    ['é', 'pé'], // words of one letter, not the letters' names
+    ['à', 'lá'],
+    ['fixe', 'lixe'],
+    ['desculpe', 'culpe'], // forms made with a prefix
+    ['desligar', 'ligar'],
+    ['desligar', 'cantar'],
+    ['disser', 'quiser'], // the future subjunctive
+    ['fizesse', 'tivesse'], // the imperfect subjunctive
+    ['estar', 'mar'],
+    ['terá', 'será'],
   ];
 
   it.each(rhyming)('makes “%s” and “%s” perfect Rhymes', (word, partner) => {
@@ -196,6 +212,8 @@ describe('rhymes in Portuguese (Portugal)', () => {
     ['fim', 'vi'],
     ['bom', 'avô'],
     ['um', 'tu'],
+    ['ser', 'mulher'], // closed e and open e
+    ['fecha', 'flecha'],
   ];
 
   it.each(notRhyming)('keeps “%s” and “%s” from being perfect Rhymes', (word, other) => {
@@ -273,6 +291,11 @@ describe("each Portuguese (Portugal) Rhyme's Syllable Count", () => {
     ['eleição', 3], // e-lei-ção
     ['cantaram', 3], // can-ta-ram
     ['seriámos', 4], // se-ri-á-mos
+    ['é', 1], // é, not "é agudo"
+    ['à', 1], // à, not "à grave"
+    ['fixe', 2], // fi-xe
+    ['desconhecido', 5], // des-co-nhe-ci-do
+    ['fizéssemos', 4], // fi-zés-se-mos
   ];
 
   it.each(words)('counts “%s” as %i, from its pronunciation', (word, syllables) => {

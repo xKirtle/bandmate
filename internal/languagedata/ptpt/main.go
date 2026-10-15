@@ -6,7 +6,7 @@
 // LibreOffice ships it (hunspell.go). eSpeak NG says each one (espeak.go),
 // and its IPA is written in one phone set (phones.go). Where Wiktionary has
 // the word, as WikiPron scraped it, its readings settle whether the stressed
-// vowel is open or closed (wiktionary.go). Then overrides.txt, checked by
+// vowel is open or closed, or an e eSpeak NG says as ɨ (wiktionary.go). Then overrides.txt, checked by
 // hand, corrects the rest, and picks the usual reading of a word spelt the
 // same as another. Each word has one pronunciation, the most usual.
 //
