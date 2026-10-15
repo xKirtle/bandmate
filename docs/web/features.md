@@ -48,6 +48,7 @@ The **Rhymes** button suggests rhymes for the word you're writing. It's there on
 
 - Download a rhyming dictionary for each language you write in, in **Settings → Rhyming dictionaries**, on each device you write on.
 - A song's rhymes are in the languages set in its details.
+- Rhymes go by how words sound, not how they're spelt. A word that isn't in the dictionary, like a made-up one, gets none.
 
 Want rhymes in your language? See [Adding a rhyming language](https://github.com/xKirtle/bandmate/blob/main/CONTRIBUTING.md#adding-a-rhyming-language).
 

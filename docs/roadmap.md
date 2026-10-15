@@ -45,12 +45,6 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 - Each Track gets a muted colour of its own, assigned automatically from a small palette in the visual identity's tokens, so Clips on different Tracks can be told apart at a glance. Today every Clip is in the one accent colour.
 - The colours stay muted so the Timeline doesn't take on the busy look of a DAW. Whether the user can pick a Track's colour, and how the Chosen Track still stands out, are for the spec.
 
-## Rhymes by sound, not spelling
-
-- Every rhyming dictionary but English's turns each word into how it's said before pairing Rhymes, so a Rhyme is matched on its sounds, as the glossary defines it. English is the exception because its dictionary came with pronunciations, so it goes by sound already. The Portuguese one pairs words by how they're written, so "depois" and "heróis" come up as perfect Rhymes, though "ois" and the open "óis" sound quite different.
-- Candidate sources for the pronunciations: WikiPron, Wiktionary's pronunciations split by Language and variant (Brazil and Portugal apart), likely CC BY-SA; ipa-dict, MIT, with Brazilian Portuguese but not European, and gaps (no "depois"); the Montreal Forced Aligner's dictionaries, with both Portugueses; and eSpeak NG, GPL-3, which works a pronunciation out from spelling for any word, run once when the dictionary is built. One idea: Wiktionary's pronunciation where there is one, as it gets open and closed vowels right, and eSpeak NG's for the rest.
-- It's a fix within Bandmate, like English's: Portuguese's pronunciations are built into the binary as English's are, by a builder in `internal/languagedata`, and the page's Portuguese spelling rules go. It needs none of the language data project below. Specced in #1015, for Portuguese (Portugal) only.
-
 ## A language data project
 
 - A someday idea, only worth it if a community grows around Bandmate and asks for Languages one maintainer can't look after; until then, Languages are added in Bandmate, as CONTRIBUTING's "Adding a rhyming language" says.

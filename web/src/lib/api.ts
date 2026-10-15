@@ -18,7 +18,7 @@ export interface Song {
   bpm: number | null;
   capo: number | null;
   tuning: string;
-  /** The ISO 639-1 codes of the languages its Lines are sung in, in the user's order: always at least one. */
+  /** The BCP 47 codes of the languages its Lines are sung in, in the user's order: always at least one. */
   languages: string[];
   notes: string;
   createdAt: string;
@@ -723,7 +723,7 @@ export interface Fetched {
 
 /** A Language Bandmate rhymes in: one a Song can be sung in, whose rhyming dictionary can be downloaded. */
 export interface ListedLanguage {
-  /** Its ISO 639-1 code, e.g. "en". */
+  /** Its BCP 47 code, e.g. "en" or "pt-PT". */
   code: string;
   /** Its name, in English, e.g. "English". */
   name: string;

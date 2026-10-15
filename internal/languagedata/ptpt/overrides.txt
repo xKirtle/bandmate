@@ -1,0 +1,67 @@
+# Pronunciations of Portuguese (Portugal) checked by hand, which take the
+# place of those eSpeak NG and Wiktionary give: "word PHONES", one a line,
+# in the phone set phones.go names. Each is the word's usual pronunciation,
+# as it's sung; a word spelt the same as another is given the one songs use
+# most. go generate ./internal/languagedata applies them.
+
+# Spelt as another word that's said apart: the one songs use most.
+esse E1 S IX0 # "that", not the letter s
+este E1 SH T IX0 # "this", not the east
+olho O1 LH U0 # an eye, not "I look"
+gosto G OH1 SH T U0 # "I like", not a taste
+molho M O1 LH U0 # a sauce, not "I wet"
+
+# Said unstressed, as words of their own: "the" and "and", not letters.
+o U0
+e I0
+a AX0
+
+# Words of one letter, which eSpeak NG says by the letter's name: "é" as
+# "é agudo", "à" as "à grave".
+é EH1 # "is", as "pé" without the p
+à A1 # "to the", as "lá"
+
+# Left out as an abbreviation, of "exemplo", but sung as "my ex".
+ex EY1 SH
+
+# The e of "fechar" is closed when stressed, as eSpeak NG says the e of
+# "desejo", though it says it as ɨ, which is read open, and Wiktionary
+# gives both.
+fecha F E1 SH AX0
+fecham F E1 SH ANW0
+fechas F E1 SH AX0 SH
+feche F E1 SH IX0
+fechem F E1 SH ANY0
+feches F E1 SH IX0 SH
+fecho F E1 SH U0
+fechos F E1 SH U0 SH
+desfecha D IX2 SH F E1 SH AX0
+desfecham D IX2 SH F E1 SH ANW0
+desfechas D IX2 SH F E1 SH AX0 SH
+desfeche D IX2 SH F E1 SH IX0
+desfechem D IX2 SH F E1 SH ANY0
+desfeches D IX2 SH F E1 SH IX0 SH
+desfechos D IX2 SH F E1 SH U0 SH
+
+# Open or closed wrong in eSpeak NG, and not in Wiktionary.
+gostas G OH1 SH T AX0 SH
+consegues K UN2 S EH1 G IX0 SH
+solta S OH1 L T AX0
+soltas S OH1 L T AX0 SH
+ideia I2 D EY1 AX0
+ideias I2 D EY1 AX0 SH
+
+# Said wrong in eSpeak NG.
+foste F O1 SH T IX0
+fixe F I1 SH IX0 # "cool", stressed on its first syllable
+stress SH T R EH1 S IX0 # as "stresse", not with the ɨ of "de"
+
+# Their stressed a said as the ɐ of "cama" in eSpeak NG, so "estar"
+# wouldn't rhyme with "mar".
+estar IX0 SH T A1 R
+estará IX0 SH T AX0 R A1
+estava IX0 SH T A1 V AX0
+estavam IX0 SH T A1 V ANW0
+estávamos IX0 SH T A1 V AX0 M U0 SH
+terá T IX0 R A1
+terás T IX0 R A1 SH

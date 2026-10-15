@@ -116,13 +116,13 @@ type contraction struct {
 	fragment, like string
 }
 
-// rankedLanguage is a Language whose ranks are built: its ISO 639-1 code,
-// how its dictionary is read, and the hand its list needs, if any.
+// rankedLanguage is a Language whose ranks are built: its BCP 47 code,
+// FrequencyWords' list for it, and the hand its list needs, if any.
 type rankedLanguage struct {
 	code string
-	// wordOf is the word on a line of its dictionary: pronouncingDictionary
-	// or wordList.
-	wordOf func(line string) string
+	// frequencyWordsList is FrequencyWords' name for its list, e.g. "pt"
+	// for Portuguese (Portugal)'s.
+	frequencyWordsList string
 	// adapt fixes its list's counts to match its dictionary; nil when they
 	// match already.
 	adapt func(counts map[string]int, words map[string]bool) error
@@ -130,27 +130,17 @@ type rankedLanguage struct {
 
 // ranked is every Language whose ranks are built, one a line.
 var ranked = []rankedLanguage{
-	{"en", pronouncingDictionary, countContractions},
-	{"pt", wordList, foldOldSpellings},
+	{"en", "en", countContractions},
+	{"pt-PT", "pt", foldOldSpellings},
 }
-
-// pronouncingDictionary is the word on a pronouncing dictionary's line,
-// "hello HH AH0 L OW1".
-func pronouncingDictionary(line string) string {
-	word, _, _ := strings.Cut(line, " ")
-	return word
-}
-
-// wordList is the word on a word list's line, which is the line.
-func wordList(line string) string { return line }
 
 func main() {
 	for _, l := range ranked {
-		words, err := dictionaryWords(l.code+".txt.gz", l.wordOf)
+		words, err := dictionaryWords(l.code + ".txt.gz")
 		if err != nil {
 			log.Fatal(err)
 		}
-		counts, err := fetchCounts(l.code)
+		counts, err := fetchCounts(l.frequencyWordsList)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -165,9 +155,9 @@ func main() {
 	}
 }
 
-// dictionaryWords reads the words a Language's data has, wordOf finding
-// each line's.
-func dictionaryWords(path string, wordOf func(line string) string) (map[string]bool, error) {
+// dictionaryWords reads the words a Language's pronouncing dictionary has,
+// each the first on its line, "hello HH AH0 L OW1".
+func dictionaryWords(path string) (map[string]bool, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -180,17 +170,17 @@ func dictionaryWords(path string, wordOf func(line string) string) (map[string]b
 	words := map[string]bool{}
 	sc := bufio.NewScanner(zr)
 	for sc.Scan() {
-		if word := wordOf(sc.Text()); word != "" {
+		if word, _, _ := strings.Cut(sc.Text(), " "); word != "" {
 			words[word] = true
 		}
 	}
 	return words, sc.Err()
 }
 
-// fetchCounts reads a Language's list of its 50,000 most common words,
-// each "word count".
-func fetchCounts(code string) (map[string]int, error) {
-	url := "https://raw.githubusercontent.com/hermitdave/FrequencyWords/" + frequencyWordsCommit + "/content/2018/" + code + "/" + code + "_50k.txt"
+// fetchCounts reads FrequencyWords' list, by its name, of a language's
+// 50,000 most common words, each "word count".
+func fetchCounts(list string) (map[string]int, error) {
+	url := "https://raw.githubusercontent.com/hermitdave/FrequencyWords/" + frequencyWordsCommit + "/content/2018/" + list + "/" + list + "_50k.txt"
 	res, err := http.Get(url)
 	if err != nil {
 		return nil, err

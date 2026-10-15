@@ -75,8 +75,9 @@ type Song struct {
 	Tags []string `json:"tags"`
 }
 
-// Language is a language a Song's Lines can be sung in, by its ISO 639-1
-// code, e.g. "en": one Bandmate rhymes in, as languagedata registers them.
+// Language is a language a Song's Lines can be sung in, by its BCP 47
+// code, e.g. "en" or "pt-PT": one Bandmate rhymes in, as languagedata
+// registers them.
 type Language string
 
 // checkLanguages refuses a Song's Languages unless there's at least one,

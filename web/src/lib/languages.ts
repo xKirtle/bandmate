@@ -1,4 +1,4 @@
-// The Languages a Song's Lines can be sung in, by their ISO 639-1 codes,
+// The Languages a Song's Lines can be sung in, by their BCP 47 codes,
 // and picking a Song's: an ordered list, never empty. Bandmate lists those
 // it rhymes in (sharedLanguages.svelte.ts), and refuses a Language not on
 // its list; the page keeps none of its own.
@@ -14,7 +14,7 @@ export function languageName(code: string, known: readonly LanguageInfo[]): stri
   return known.find((l) => l.code === code)?.name ?? code;
 }
 
-/** A Song's Languages named, in their order, e.g. "English, Portuguese". */
+/** A Song's Languages named, in their order, e.g. "English, Portuguese (Portugal)". */
 export function languagesLabel(picked: readonly string[], known: readonly LanguageInfo[]): string {
   return picked.map((code) => languageName(code, known)).join(', ');
 }

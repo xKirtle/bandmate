@@ -72,21 +72,21 @@ The image also bundles three programs, for adding a Beat from a link ([ADR 0016]
 
 ### Adding a rhyming language
 
-Bandmate suggests Rhymes in the Languages it has data for, and won't take on every language itself: bring yours. Open an issue for it first, as for any change. Portuguese is the worked example to follow: a Language without a pronouncing dictionary, read by its spelling.
+Bandmate suggests Rhymes in the Languages it has data for, and won't take on every language itself: bring yours. Open an issue for it first, as for any change.
 
-A Language needs:
+Rhymes match how words sound, never how they're spelt ([ADR 0022](docs/adr/0022-rhymes-match-pronunciations-never-spelling.md)), so a Language needs:
 
-- **A word list or a pronouncing dictionary**, under a licence that lets it ship in an AGPL-3.0 program. A pronouncing dictionary writes each pronunciation as the CMU Pronouncing Dictionary does: phones, with a stress digit on each vowel.
+- **A pronouncing dictionary**, under a licence that lets it ship in an AGPL-3.0 program: each word with its pronunciation, as the CMU Pronouncing Dictionary writes English's: phones, with a stress digit on each vowel (1 for the stressed one, 2 for one stressed less, 0 for the rest). Its phones must keep apart the sounds a rhyme hears in that language, such as an open vowel from a closed one. One pronunciation a word is enough: its most usual one. A word the dictionary lacks gets no Rhymes.
 - **Word frequencies** from [FrequencyWords](https://github.com/hermitdave/FrequencyWords), if it has a list for the language, so common Rhymes come first. Without one, they come nearest the word in syllables first, then alphabetically.
-- **Spelling rules**, if it has no pronouncing dictionary: how to find a word's syllables and its rhyming part, from its last stressed vowel to its end, from how it's written.
+
+Where no ready-made pronouncing dictionary exists, generate one, as Portuguese (Portugal)'s is: the worked example to follow. Its generator, `internal/languagedata/ptpt`, takes the words of the European Portuguese Hunspell dictionary, with every form its prefixes and suffixes make but those said to vós, has [eSpeak NG](https://github.com/espeak-ng/espeak-ng) say each one, and writes eSpeak NG's IPA in one phone set (`phones.go`), which keeps open vowels apart from closed ones, and nasal from oral. eSpeak NG works a pronunciation out from spelling, so it slips on some vowels: where Wiktionary has the word, as [WikiPron](https://github.com/CUNY-CL/wikipron) gathers it, its reading settles whether the stressed vowel is open or closed, or an e eSpeak NG says as ɨ (`wiktionary.go`). Then `overrides.txt`, checked by hand, corrects the rest, and picks the usual reading of a word spelt the same as another, as "olho" (an eye, or "I look"). A list of word pairs that must and mustn't rhyme, in the tests, checks the result: when one fails, correct the word in `overrides.txt`.
 
 Each step, with the file it touches, all in `internal/languagedata` unless it says otherwise:
 
-1. **The data.** Write a generator, a `main` package in its own folder, like `ptwords/main.go`, that downloads the dictionary at a pinned commit and writes `<code>.txt.gz`: one pronunciation or one word a line, gzipped. Add its `//go:generate` and `//go:embed` lines to `languagedata.go`, before FrequencyWords', as the ranks are built from it, with a version constant kept in step with the pinned commit.
-2. **The ranks.** Add a line for the Language to `ranked` in `frequencywords/main.go`, which writes `<code>.ranks.txt.gz`: its code, how its dictionary is read (`pronouncingDictionary` or `wordList`), and whatever its list needs to match the dictionary, as Portuguese's old spellings do, or nil. Embed it in `languagedata.go`.
-3. **The registry.** Add the Language to `registry` in `languagedata.go`: its ISO 639-1 code, its name in English, its data and ranks, and its dictionary's credit, which About lists. That's the one list: a Song can be sung in it, and the Languages picker and Settings offer it, from there.
-4. **The licences.** Add `<code>.LICENSE`, and `<code>.ranks.LICENSE` if it has ranks, beside the data, as `pt.LICENSE` and `pt.ranks.LICENSE` do: where it came from, what was changed, and its licence's notice. Where a dictionary is offered under several licences, name the one Bandmate takes, and give that in the credit.
-5. **The spelling rules**, if it has no pronouncing dictionary. Write them in a module of their own in `web/src/lib`, like `portuguese.ts`, and add them to `spellingRules` in `web/src/lib/lyricsLanguage.ts`.
+1. **The data.** Write a generator, a `main` package in its own folder, like `cmudict/main.go`, or `ptpt` for a generated dictionary, that downloads its sources at pinned versions and writes `<code>.txt.gz`: one word a line, then its phones, gzipped. Add its `//go:generate` and `//go:embed` lines to `languagedata.go`, before FrequencyWords', as the ranks are built from it, with a version constant kept in step with each pin.
+2. **The ranks.** Add a line for the Language to `ranked` in `frequencywords/main.go`, which writes `<code>.ranks.txt.gz`: its code, FrequencyWords' name for its list, which may differ from its code, as `pt` does from `pt-PT`, and whatever its list needs to match the dictionary, as Portuguese's old spellings do, or nil. Embed it in `languagedata.go`.
+3. **The registry.** Add the Language to `registry` in `languagedata.go`: its BCP 47 code, naming where it's spoken if it's a variant that sounds different, as `pt-PT` does, its name in English, its data and ranks, and the credits of what its dictionary is made from, which About lists. That's the one list: a Song can be sung in it, and the Languages picker and Settings offer it, from there.
+4. **The licences.** Add `<code>.LICENSE`, and `<code>.ranks.LICENSE` if it has ranks, beside the data, as `pt-PT.LICENSE` and `pt-PT.ranks.LICENSE` do: where each source came from, what was changed, and each licence's notice. Where a source is offered under several licences, name the one Bandmate takes, and give that in the credit.
 
 Build the data with
 
@@ -94,9 +94,20 @@ Build the data with
 go generate ./internal/languagedata   # downloads the dictionaries and lists, so it needs network access
 ```
 
-and commit what it writes.
+and commit what it writes. Builds and CI use the committed files, so only regenerating needs what a generator runs. Portuguese (Portugal)'s needs eSpeak NG at the version `ptpt/espeak.go` pins: `espeak-ng` installed, or any command that runs it, such as a container's, in `ESPEAK_NG`:
 
-Add tests, as for Portuguese: in `internal/app/language_data_test.go`, that the data is served and holds some of its words, that its ranks start with its most common ones, and that About credits it, and add it to the Languages listed there; and in `web/src/lib/lyricsLanguage.test.ts`, some of its Rhymes and their Syllable Counts, and, for spelling rules, the words whose stress they find.
+```sh
+docker build -t espeak-ng - <<'EOF'
+FROM alpine:3.20
+RUN apk add --no-cache espeak-ng
+ENTRYPOINT ["espeak-ng"]
+EOF
+ESPEAK_NG="docker run --rm -i espeak-ng" go generate ./internal/languagedata
+```
+
+To rebuild only some of the data, name their generators: `go generate -run 'cmudict|frequencywords' ./internal/languagedata` needs no eSpeak NG.
+
+Add tests, as for Portuguese (Portugal): in `internal/app/language_data_test.go`, that the data is served and holds some of its pronunciations, that its ranks start with its most common ones, and that About credits what it's made from, and add it to the Languages listed there; and in `web/src/lib/lyricsLanguage.test.ts`, some of its Rhymes and their Syllable Counts, and the pairs of words that must and mustn't be perfect Rhymes.
 
 ### Docker
 

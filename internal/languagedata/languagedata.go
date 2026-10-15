@@ -21,21 +21,23 @@ import (
 
 // Language is a Language Bandmate rhymes in.
 type Language struct {
-	// Code is its ISO 639-1 code, e.g. "en", which a Song's Languages name
-	// it by.
+	// Code is its BCP 47 code, e.g. "en" or "pt-PT", which a Song's
+	// Languages name it by. A variant of a language that sounds different
+	// is a Language of its own, its code naming where it's spoken.
 	Code string
 	// Name is its name in English, as the page shows it.
 	Name string
 	// dictionary is its data, gzipped: a pronouncing dictionary, one
-	// pronunciation a line ("hello HH AH0 L OW1"), or a word list, one word
-	// a line, for a Language the page reads by its spelling rules.
+	// pronunciation a line ("hello HH AH0 L OW1"), as Rhymes match how
+	// words sound (ADR 0022).
 	dictionary []byte
 	// ranks are the words of its dictionary most said, most common first,
 	// one a line, gzipped, which the page suggests common Rhymes first by;
 	// nil for a Language FrequencyWords has no list for.
 	ranks []byte
-	// credit is its dictionary's, as the About page lists it.
-	credit build.Dependency
+	// credits are what its dictionary is made from, as the About page
+	// lists them.
+	credits []build.Dependency
 }
 
 // registry is every Language Bandmate rhymes in, in the order the page
@@ -46,16 +48,46 @@ var registry = []Language{
 		Name:       "English",
 		dictionary: english,
 		ranks:      englishRanks,
-		credit:     build.Dependency{Name: "CMU Pronouncing Dictionary", Version: cmudictVersion, License: "BSD-2-Clause"},
+		credits:    []build.Dependency{{Name: "CMU Pronouncing Dictionary", Version: cmudictVersion, License: "BSD-2-Clause"}},
 	},
 	{
-		Code:       "pt",
-		Name:       "Portuguese",
+		Code:       "pt-PT",
+		Name:       "Portuguese (Portugal)",
 		dictionary: portuguese,
 		ranks:      portugueseRanks,
-		// Offered under GPL-2.0, LGPL-2.1 or MPL-1.1; Bandmate takes it
-		// under LGPL-2.1, as pt.LICENSE says.
-		credit: build.Dependency{Name: "Hunspell dictionary for European Portuguese", Version: dictionariesVersion, License: "LGPL-2.1-only"},
+		credits: []build.Dependency{
+			// The word list. Offered under GPL-2.0, LGPL-2.1 or MPL-1.1;
+			// Bandmate takes it under LGPL-2.1, as pt-PT.LICENSE says.
+			{Name: "Hunspell dictionary for European Portuguese", Version: dictionariesVersion, License: "LGPL-2.1-only"},
+			// The pronunciations.
+			{
+				Name:    "eSpeak NG",
+				Version: espeakVersion,
+				License: "GPL-3.0-or-later",
+				Credit: []build.Link{
+					{Text: "Portuguese (Portugal) pronunciations made by "},
+					{Text: "eSpeak NG", URL: "https://github.com/espeak-ng/espeak-ng"},
+					{Text: "."},
+				},
+			},
+			// The stressed vowels corrected.
+			{
+				Name:    "Wiktionary, via WikiPron",
+				Version: wikipronVersion,
+				License: "CC-BY-SA-4.0",
+				Credit: []build.Link{
+					{Text: "Portuguese (Portugal) stressed vowels corrected from "},
+					{Text: "Wiktionary", URL: "https://en.wiktionary.org/"},
+					{Text: "'s pronunciations, by its contributors, "},
+					{Text: "CC BY-SA 4.0", URL: "https://creativecommons.org/licenses/by-sa/4.0/"},
+					{Text: ", as "},
+					{Text: "WikiPron", URL: "https://github.com/CUNY-CL/wikipron"},
+					{Text: " gathers them ("},
+					{Text: "J. L. Lee et al., 2020", URL: "https://aclanthology.org/2020.lrec-1.521/"},
+					{Text: ")."},
+				},
+			},
+		},
 	},
 }
 
@@ -74,26 +106,38 @@ var english []byte
 // en.txt.gz was built from, shortened.
 const cmudictVersion = "7479086"
 
-// pt.txt.gz is Portuguese's: the words of the European Portuguese Hunspell
-// dictionary, with the forms they're sung in, one a line, gzipped, under
-// the licence in pt.LICENSE, which the About page names. Portuguese words
-// are read by their spelling, so the page needs it only to suggest Rhymes
-// from. It's committed, so every build has it: to take a newer
-// dictionary, change dictionariesCommit in ./ptwords, and
-// dictionariesVersion here, then run `go generate ./internal/languagedata`.
+// pt-PT.txt.gz is Portuguese (Portugal)'s: a pronouncing dictionary in
+// English's layout, one word a line with its usual pronunciation ("amor AX0
+// M O1 R"), gzipped, under the licence in pt-PT.LICENSE, which the About
+// page names. No such dictionary exists ready-made, so ./ptpt generates it
+// (ADR 0022): eSpeak NG says each word of the European Portuguese Hunspell
+// dictionary, with the forms it's sung in; Wiktionary, as WikiPron gathers
+// it, corrects whether its stressed vowel is open or closed; and
+// ./ptpt/overrides.txt, checked by hand, corrects the rest. It's committed,
+// so every build has it, and only regenerating it needs eSpeak NG: to take
+// a newer source, change its pin in ./ptpt, and its version here, then run
+// `go generate ./internal/languagedata`, as CONTRIBUTING.md says.
 //
-//go:generate go run ./ptwords
-//go:embed pt.txt.gz
+//go:generate go run ./ptpt
+//go:embed pt-PT.txt.gz
 var portuguese []byte
 
 // dictionariesVersion is the commit of github.com/LibreOffice/dictionaries
-// that pt.txt.gz was built from, shortened.
+// whose word list pt-PT.txt.gz has, shortened.
 const dictionariesVersion = "fe49c66"
 
-// en.ranks.txt.gz and pt.ranks.txt.gz are each Language's ranks: the words
+// espeakVersion is the version of eSpeak NG that made pt-PT.txt.gz's
+// pronunciations.
+const espeakVersion = "1.51.1"
+
+// wikipronVersion is the commit of github.com/CUNY-CL/wikipron whose
+// Wiktionary data corrected pt-PT.txt.gz's stressed vowels, shortened.
+const wikipronVersion = "d282e84"
+
+// en.ranks.txt.gz and pt-PT.ranks.txt.gz are each Language's ranks: the words
 // its dictionary has among the 50,000 most said in the OpenSubtitles 2018
 // corpus, as FrequencyWords counts them, most common first, one a line,
-// gzipped, under the licences in en.ranks.LICENSE and pt.ranks.LICENSE,
+// gzipped, under the licences in en.ranks.LICENSE and pt-PT.ranks.LICENSE,
 // which the About page names. The page suggests common Rhymes first by
 // them. They're built from the dictionaries above, so after them, and
 // committed, so every build has them: to take newer lists, change
@@ -104,7 +148,7 @@ const dictionariesVersion = "fe49c66"
 //go:embed en.ranks.txt.gz
 var englishRanks []byte
 
-//go:embed pt.ranks.txt.gz
+//go:embed pt-PT.ranks.txt.gz
 var portugueseRanks []byte
 
 // frequencyWordsVersion is the commit of github.com/hermitdave/FrequencyWords
@@ -183,13 +227,13 @@ func List() []Language {
 	return append([]Language(nil), registry...)
 }
 
-// Has reports whether Bandmate rhymes in the Language with an ISO 639-1
+// Has reports whether Bandmate rhymes in the Language with a BCP 47
 // code, so a Song can be sung in it.
 func Has(code string) bool {
 	return slices.ContainsFunc(registry, func(l Language) bool { return l.Code == code })
 }
 
-// Of is the data of the Language with an ISO 639-1 code, and whether
+// Of is the data of the Language with a BCP 47 code, and whether
 // Bandmate has any for it.
 func Of(code string) (Data, bool) {
 	d, ok := byCode()[code]
@@ -200,9 +244,9 @@ func Of(code string) (Data, bool) {
 // beside the packages: whose it is, which version, and its licence. Each
 // Language's dictionary, then the word frequencies they're ranked by.
 func Credits() []build.Dependency {
-	credits := make([]build.Dependency, 0, len(registry)+1)
+	var credits []build.Dependency
 	for _, l := range registry {
-		credits = append(credits, l.credit)
+		credits = append(credits, l.credits...)
 	}
 	return append(credits, build.Dependency{
 		Name:    "FrequencyWords by Hermit Dave",

@@ -4,7 +4,7 @@ import { languageChoices, languageName, languagesLabel, moveLanguage, pickLangua
 // The Languages as Bandmate lists them, with their download sizes.
 const known = [
   { code: 'en', name: 'English', size: 1 },
-  { code: 'pt', name: 'Portuguese', size: 1 },
+  { code: 'pt-PT', name: 'Portuguese (Portugal)', size: 1 },
   { code: 'es', name: 'Spanish', size: 1 },
 ];
 
@@ -21,7 +21,7 @@ describe('languageName', () => {
 
 describe('languagesLabel', () => {
   it("names a Song's Languages in their order", () => {
-    expect(languagesLabel(['pt', 'en'], known)).toBe('Portuguese, English');
+    expect(languagesLabel(['pt-PT', 'en'], known)).toBe('Portuguese (Portugal), English');
   });
 });
 
@@ -30,22 +30,22 @@ describe('languageChoices', () => {
     expect(languageChoices(['es', 'en'], known)).toEqual([
       { code: 'es', name: 'Spanish', picked: true },
       { code: 'en', name: 'English', picked: true },
-      { code: 'pt', name: 'Portuguese', picked: false },
+      { code: 'pt-PT', name: 'Portuguese (Portugal)', picked: false },
     ]);
   });
 
   it('leaves out a Language picked that Bandmate has no data for', () => {
-    expect(languageChoices(['xx', 'en'], known).map((c) => c.code)).toEqual(['en', 'pt', 'es']);
+    expect(languageChoices(['xx', 'en'], known).map((c) => c.code)).toEqual(['en', 'pt-PT', 'es']);
   });
 });
 
 describe('pickLanguage', () => {
   it('adds a Language ticked after those already picked', () => {
-    expect(pickLanguage(['pt'], 'en', true)).toEqual(['pt', 'en']);
+    expect(pickLanguage(['pt-PT'], 'en', true)).toEqual(['pt-PT', 'en']);
   });
 
   it('takes a Language unticked out, keeping the others in order', () => {
-    expect(pickLanguage(['es', 'pt', 'en'], 'pt', false)).toEqual(['es', 'en']);
+    expect(pickLanguage(['es', 'pt-PT', 'en'], 'pt-PT', false)).toEqual(['es', 'en']);
   });
 
   it('keeps the last Language picked, as a Song always has one', () => {
@@ -59,12 +59,12 @@ describe('pickLanguage', () => {
 
 describe('moveLanguage', () => {
   it('moves a Language a place earlier or later', () => {
-    expect(moveLanguage(['en', 'pt', 'es'], 'pt', -1)).toEqual(['pt', 'en', 'es']);
-    expect(moveLanguage(['en', 'pt', 'es'], 'pt', 1)).toEqual(['en', 'es', 'pt']);
+    expect(moveLanguage(['en', 'pt-PT', 'es'], 'pt-PT', -1)).toEqual(['pt-PT', 'en', 'es']);
+    expect(moveLanguage(['en', 'pt-PT', 'es'], 'pt-PT', 1)).toEqual(['en', 'es', 'pt-PT']);
   });
 
   it('leaves the order as it is at either end', () => {
-    expect(moveLanguage(['en', 'pt'], 'en', -1)).toEqual(['en', 'pt']);
-    expect(moveLanguage(['en', 'pt'], 'pt', 1)).toEqual(['en', 'pt']);
+    expect(moveLanguage(['en', 'pt-PT'], 'en', -1)).toEqual(['en', 'pt-PT']);
+    expect(moveLanguage(['en', 'pt-PT'], 'pt-PT', 1)).toEqual(['en', 'pt-PT']);
   });
 });
