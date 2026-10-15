@@ -21,8 +21,9 @@ import (
 
 // Language is a Language Bandmate rhymes in.
 type Language struct {
-	// Code is its ISO 639-1 code, e.g. "en", which a Song's Languages name
-	// it by.
+	// Code is its BCP 47 code, e.g. "en" or "pt-PT", which a Song's
+	// Languages name it by. A variant of a language that sounds different
+	// is a Language of its own, its code naming where it's spoken.
 	Code string
 	// Name is its name in English, as the page shows it.
 	Name string
@@ -49,12 +50,12 @@ var registry = []Language{
 		credit:     build.Dependency{Name: "CMU Pronouncing Dictionary", Version: cmudictVersion, License: "BSD-2-Clause"},
 	},
 	{
-		Code:       "pt",
-		Name:       "Portuguese",
+		Code:       "pt-PT",
+		Name:       "Portuguese (Portugal)",
 		dictionary: portuguese,
 		ranks:      portugueseRanks,
 		// Offered under GPL-2.0, LGPL-2.1 or MPL-1.1; Bandmate takes it
-		// under LGPL-2.1, as pt.LICENSE says.
+		// under LGPL-2.1, as pt-PT.LICENSE says.
 		credit: build.Dependency{Name: "Hunspell dictionary for European Portuguese", Version: dictionariesVersion, License: "LGPL-2.1-only"},
 	},
 }
@@ -74,26 +75,26 @@ var english []byte
 // en.txt.gz was built from, shortened.
 const cmudictVersion = "7479086"
 
-// pt.txt.gz is Portuguese's: the words of the European Portuguese Hunspell
-// dictionary, with the forms they're sung in, one a line, gzipped, under
-// the licence in pt.LICENSE, which the About page names. Portuguese words
-// are read by their spelling, so the page needs it only to suggest Rhymes
+// pt-PT.txt.gz is Portuguese (Portugal)'s: the words of the European
+// Portuguese Hunspell dictionary, with the forms they're sung in, one a
+// line, gzipped, under the licence in pt-PT.LICENSE, which the About page
+// names. Portuguese words are read by their spelling, so the page needs it only to suggest Rhymes
 // from. It's committed, so every build has it: to take a newer
 // dictionary, change dictionariesCommit in ./ptwords, and
 // dictionariesVersion here, then run `go generate ./internal/languagedata`.
 //
 //go:generate go run ./ptwords
-//go:embed pt.txt.gz
+//go:embed pt-PT.txt.gz
 var portuguese []byte
 
 // dictionariesVersion is the commit of github.com/LibreOffice/dictionaries
-// that pt.txt.gz was built from, shortened.
+// that pt-PT.txt.gz was built from, shortened.
 const dictionariesVersion = "fe49c66"
 
-// en.ranks.txt.gz and pt.ranks.txt.gz are each Language's ranks: the words
+// en.ranks.txt.gz and pt-PT.ranks.txt.gz are each Language's ranks: the words
 // its dictionary has among the 50,000 most said in the OpenSubtitles 2018
 // corpus, as FrequencyWords counts them, most common first, one a line,
-// gzipped, under the licences in en.ranks.LICENSE and pt.ranks.LICENSE,
+// gzipped, under the licences in en.ranks.LICENSE and pt-PT.ranks.LICENSE,
 // which the About page names. The page suggests common Rhymes first by
 // them. They're built from the dictionaries above, so after them, and
 // committed, so every build has them: to take newer lists, change
@@ -104,7 +105,7 @@ const dictionariesVersion = "fe49c66"
 //go:embed en.ranks.txt.gz
 var englishRanks []byte
 
-//go:embed pt.ranks.txt.gz
+//go:embed pt-PT.ranks.txt.gz
 var portugueseRanks []byte
 
 // frequencyWordsVersion is the commit of github.com/hermitdave/FrequencyWords
@@ -183,13 +184,13 @@ func List() []Language {
 	return append([]Language(nil), registry...)
 }
 
-// Has reports whether Bandmate rhymes in the Language with an ISO 639-1
+// Has reports whether Bandmate rhymes in the Language with a BCP 47
 // code, so a Song can be sung in it.
 func Has(code string) bool {
 	return slices.ContainsFunc(registry, func(l Language) bool { return l.Code == code })
 }
 
-// Of is the data of the Language with an ISO 639-1 code, and whether
+// Of is the data of the Language with a BCP 47 code, and whether
 // Bandmate has any for it.
 func Of(code string) (Data, bool) {
 	d, ok := byCode()[code]

@@ -155,6 +155,7 @@ func TestInvalidMetadataIsRejected(t *testing.T) {
 		"no languages":       {map[string]any{"languages": []string{}}, "a Song needs at least one language"},
 		"null languages":     {map[string]any{"languages": nil}, "a Song needs at least one language"},
 		"unknown language":   {map[string]any{"languages": []string{"en", "xx"}}, `there's no language "xx"`},
+		"Portuguese as pt":   {map[string]any{"languages": []string{"pt"}}, `there's no language "pt"`},
 		"language twice":     {map[string]any{"languages": []string{"en", "en"}}, `"en" is listed twice`},
 		"misspelt field":     {map[string]any{"stauts": "finished"}, `unknown field "stauts"`},
 		"dropped showCues":   {map[string]any{"showCues": false}, `unknown field "showCues"`},
@@ -204,14 +205,14 @@ func TestASongsLanguagesCanBeSetAndAreKept(t *testing.T) {
 	ts := newTestServer(t)
 	created := ts.createSong("Midnight Drive")
 
-	got := ts.updateSong(created.ID, map[string]any{"languages": []string{"pt", "en"}, "key": "Am"})
+	got := ts.updateSong(created.ID, map[string]any{"languages": []string{"pt-PT", "en"}, "key": "Am"})
 
 	want := created
-	want.Key, want.Languages, want.Version, want.UpdatedAt = "Am", []string{"pt", "en"}, got.Version, got.UpdatedAt
+	want.Key, want.Languages, want.Version, want.UpdatedAt = "Am", []string{"pt-PT", "en"}, got.Version, got.UpdatedAt
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("song after setting its languages = %+v, want %+v", got, want)
 	}
-	if read := ts.getSong(created.ID); !reflect.DeepEqual(read.Languages, []string{"pt", "en"}) {
+	if read := ts.getSong(created.ID); !reflect.DeepEqual(read.Languages, []string{"pt-PT", "en"}) {
 		t.Errorf("languages read back = %q, want Portuguese, then English", read.Languages)
 	}
 }
@@ -235,14 +236,14 @@ func TestASongCanBeSungInEveryLanguageListed(t *testing.T) {
 	}
 }
 
-func TestASongCanBeSungInPortugueseAlone(t *testing.T) {
+func TestASongCanBeSungInPortuguesePortugalAlone(t *testing.T) {
 	ts := newTestServer(t)
 	created := ts.createSong("Saudade")
 
-	ts.updateSong(created.ID, map[string]any{"languages": []string{"pt"}})
+	ts.updateSong(created.ID, map[string]any{"languages": []string{"pt-PT"}})
 
-	if read := ts.getSong(created.ID); !reflect.DeepEqual(read.Languages, []string{"pt"}) {
-		t.Errorf("languages read back = %q, want Portuguese", read.Languages)
+	if read := ts.getSong(created.ID); !reflect.DeepEqual(read.Languages, []string{"pt-PT"}) {
+		t.Errorf("languages read back = %q, want Portuguese (Portugal)", read.Languages)
 	}
 }
 

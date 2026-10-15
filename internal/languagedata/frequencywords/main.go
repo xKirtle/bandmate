@@ -116,10 +116,14 @@ type contraction struct {
 	fragment, like string
 }
 
-// rankedLanguage is a Language whose ranks are built: its ISO 639-1 code,
-// how its dictionary is read, and the hand its list needs, if any.
+// rankedLanguage is a Language whose ranks are built: its BCP 47 code,
+// FrequencyWords' list for it, how its dictionary is read, and the hand
+// its list needs, if any.
 type rankedLanguage struct {
 	code string
+	// list is FrequencyWords' name for its list, e.g. "pt" for Portuguese
+	// (Portugal)'s.
+	list string
 	// wordOf is the word on a line of its dictionary: pronouncingDictionary
 	// or wordList.
 	wordOf func(line string) string
@@ -130,8 +134,8 @@ type rankedLanguage struct {
 
 // ranked is every Language whose ranks are built, one a line.
 var ranked = []rankedLanguage{
-	{"en", pronouncingDictionary, countContractions},
-	{"pt", wordList, foldOldSpellings},
+	{"en", "en", pronouncingDictionary, countContractions},
+	{"pt-PT", "pt", wordList, foldOldSpellings},
 }
 
 // pronouncingDictionary is the word on a pronouncing dictionary's line,
@@ -150,7 +154,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		counts, err := fetchCounts(l.code)
+		counts, err := fetchCounts(l.list)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -187,10 +191,10 @@ func dictionaryWords(path string, wordOf func(line string) string) (map[string]b
 	return words, sc.Err()
 }
 
-// fetchCounts reads a Language's list of its 50,000 most common words,
-// each "word count".
-func fetchCounts(code string) (map[string]int, error) {
-	url := "https://raw.githubusercontent.com/hermitdave/FrequencyWords/" + frequencyWordsCommit + "/content/2018/" + code + "/" + code + "_50k.txt"
+// fetchCounts reads FrequencyWords' list, by its name, of a language's
+// 50,000 most common words, each "word count".
+func fetchCounts(list string) (map[string]int, error) {
+	url := "https://raw.githubusercontent.com/hermitdave/FrequencyWords/" + frequencyWordsCommit + "/content/2018/" + list + "/" + list + "_50k.txt"
 	res, err := http.Get(url)
 	if err != nil {
 		return nil, err

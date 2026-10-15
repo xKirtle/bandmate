@@ -10,15 +10,39 @@ const dataStore = 'data';
 
 let opened: Promise<IDBDatabase> | null = null;
 
+/**
+ * Codes kept under before Languages were named by their BCP 47 codes: a
+ * dictionary kept under one is its Language's old data, so it's removed,
+ * and the Language it became counts as not downloaded until it's downloaded.
+ */
+const oldCodes = ['pt'];
+
 function open(): Promise<IDBDatabase> {
   opened ??= new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(dbName, 1);
-    request.onupgradeneeded = () => {
+    const request = indexedDB.open(dbName, 2);
+    request.onupgradeneeded = ({ oldVersion }) => {
       const db = request.result;
-      db.createObjectStore(setUpStore, { keyPath: 'code' });
-      db.createObjectStore(dataStore, { keyPath: 'code' });
+      if (oldVersion < 1) {
+        db.createObjectStore(setUpStore, { keyPath: 'code' });
+        db.createObjectStore(dataStore, { keyPath: 'code' });
+      }
+      if (oldVersion < 2) {
+        const tx = request.transaction!;
+        for (const code of oldCodes) {
+          tx.objectStore(setUpStore).delete(code);
+          tx.objectStore(dataStore).delete(code);
+        }
+      }
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const db = request.result;
+      // A newer Bandmate in another tab upgrades it: let it, and open it anew next time.
+      db.onversionchange = () => {
+        db.close();
+        opened = null;
+      };
+      resolve(db);
+    };
     request.onerror = () => reject(request.error);
   }).catch((e) => {
     opened = null;

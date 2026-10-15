@@ -28,10 +28,10 @@
       : [],
   );
   const syllables = (n: number) => (n === 1 ? 'syllable' : 'syllables');
-  /** Languages named in a list: "English and Portuguese", or with "or". */
+  /** Languages named in a list: "English and Portuguese (Portugal)", or with "or". */
   const named = (codes: readonly string[], type: 'conjunction' | 'disjunction') =>
     new Intl.ListFormat('en', { type }).format(codes.map((code) => languageName(code, listedLanguages.list)));
-  /** The rhyming dictionaries to download: "the Portuguese rhyming dictionary", or "dictionaries" for several. */
+  /** The rhyming dictionaries to download: "the Portuguese (Portugal) rhyming dictionary", or "dictionaries" for several. */
   const dictionariesOf = (codes: readonly string[]) =>
     `the ${named(codes, 'conjunction')} rhyming ${codes.length === 1 ? 'dictionary' : 'dictionaries'}`;
   // Where rhyming dictionaries are downloaded: Settings' Rhyming dictionaries card.

@@ -13,7 +13,7 @@ const served = (code: string) =>
 // As a device kept it before the ranks shipped: the dictionary alone.
 const unranked = (code: string) => readLanguageData(code, built(`${code}.txt.gz`));
 const english = served('en');
-const portugueseWords = served('pt');
+const portugueseWords = served('pt-PT');
 const lyrics = lyricsLanguage([english]);
 
 describe('the order of Rhymes', () => {
@@ -67,10 +67,10 @@ describe('the order of Rhymes', () => {
 
   it('ranks Portuguese words spelt as before the spelling reform by their new spelling', () => {
     const both = lyricsLanguage([english, portugueseWords]);
-    const first = words(both.rhymes('coração', 'pt')!.perfect.slice(0, 10));
+    const first = words(both.rhymes('coração', 'pt-PT')!.perfect.slice(0, 10));
     expect(first).toEqual(expect.arrayContaining(['não', 'então', 'mão']));
     // "ação" is said mostly as "acção" in the subtitles, and outranks rarer words once that counts.
-    const perfect = words(both.rhymes('canção', 'pt')!.perfect);
+    const perfect = words(both.rhymes('canção', 'pt-PT')!.perfect);
     expect(perfect.indexOf('ação')).toBeLessThan(perfect.indexOf('aldeão'));
   });
 });
@@ -122,7 +122,7 @@ describe('rhymes', () => {
 
 describe('rhymes in Portuguese', () => {
   const both = lyricsLanguage([english, portugueseWords]);
-  const rhymes = (word: string) => both.rhymes(word, 'pt');
+  const rhymes = (word: string) => both.rhymes(word, 'pt-PT');
   const words = (list: { word: string }[]) => list.map((r) => r.word);
 
   it('gives perfect Rhymes from the word list, each with its Syllable Count', () => {
@@ -170,8 +170,8 @@ describe('rhymes in Portuguese', () => {
   });
 
   it('lists the Rhymes nearest the word in syllables first among words it has no rank for, and leaves out the word itself', () => {
-    const counts = lyricsLanguage([unranked('pt')])
-      .rhymes('coração', 'pt')!
+    const counts = lyricsLanguage([unranked('pt-PT')])
+      .rhymes('coração', 'pt-PT')!
       .perfect.map((r) => r.count);
     expect(counts.slice(0, 5)).toEqual([3, 3, 3, 3, 3]);
     const { perfect, near } = rhymes('Coração')!;
@@ -181,7 +181,7 @@ describe('rhymes in Portuguese', () => {
   it('gives no Rhymes for a word with no vowel to read, or when the word list is not downloaded', () => {
     expect(rhymes('hmm')).toBeNull();
     expect(rhymes('24')).toBeNull();
-    expect(lyrics.rhymes('coração', 'pt')).toBeNull();
+    expect(lyrics.rhymes('coração', 'pt-PT')).toBeNull();
   });
 });
 
@@ -189,9 +189,9 @@ describe("each Portuguese Rhyme's Syllable Count", () => {
   const both = lyricsLanguage([english, portugueseWords]);
   // A word's count as it shows beside it among the Rhymes of a word it rhymes with.
   const countAsRhyme = (word: string) => {
-    const { perfect, near } = both.rhymes(word, 'pt')!;
+    const { perfect, near } = both.rhymes(word, 'pt-PT')!;
     const partner = [...perfect, ...near][0].word;
-    const rhymes = both.rhymes(partner, 'pt')!;
+    const rhymes = both.rhymes(partner, 'pt-PT')!;
     return [...rhymes.perfect, ...rhymes.near].find((r) => r.word === word)?.count;
   };
 
@@ -258,20 +258,20 @@ describe('languageOf', () => {
   const both = lyricsLanguage([english, portugueseWords]);
 
   it("gives the first of the Song's Languages whose dictionary has the word, in the Song's order", () => {
-    expect(both.languageOf('night', ['pt', 'en'])).toBe('en');
-    expect(both.languageOf('Saudade', ['en', 'pt'])).toBe('pt');
-    expect(both.languageOf('coração', ['pt'])).toBe('pt');
+    expect(both.languageOf('night', ['pt-PT', 'en'])).toBe('en');
+    expect(both.languageOf('Saudade', ['en', 'pt-PT'])).toBe('pt-PT');
+    expect(both.languageOf('coração', ['pt-PT'])).toBe('pt-PT');
   });
 
   it("settles a word in both dictionaries by the Song's order", () => {
-    expect(both.languageOf('eu', ['pt', 'en'])).toBe('pt');
-    expect(both.languageOf('eu', ['en', 'pt'])).toBe('en');
-    expect(both.languageOf('mar', ['pt', 'en'])).toBe('pt');
+    expect(both.languageOf('eu', ['pt-PT', 'en'])).toBe('pt-PT');
+    expect(both.languageOf('eu', ['en', 'pt-PT'])).toBe('en');
+    expect(both.languageOf('mar', ['pt-PT', 'en'])).toBe('pt-PT');
   });
 
   it("gives the first Language with spelling rules for a word in no dictionary, once all of the Song's are downloaded", () => {
-    expect(both.languageOf('saudadezinha', ['en', 'pt'])).toBe('pt');
-    expect(both.languageOf('24', ['en', 'pt'])).toBe('pt');
+    expect(both.languageOf('saudadezinha', ['en', 'pt-PT'])).toBe('pt-PT');
+    expect(both.languageOf('24', ['en', 'pt-PT'])).toBe('pt-PT');
   });
 
   it("gives the Song's first Language for a word in no dictionary when none of its Languages has spelling rules", () => {
@@ -280,11 +280,11 @@ describe('languageOf', () => {
 
   it("never guesses at a Language that isn't downloaded", () => {
     const englishOnly = lyricsLanguage([english]);
-    expect(englishOnly.languageOf('night', ['pt', 'en'])).toBe('en');
-    expect(englishOnly.languageOf('saudade', ['en', 'pt'])).toBeNull();
-    expect(englishOnly.languageOf('saudadezinha', ['pt'])).toBeNull();
-    expect(lyricsLanguage([portugueseWords]).languageOf('night', ['en', 'pt'])).toBeNull();
-    expect(lyricsLanguage([portugueseWords]).languageOf('saudade', ['en', 'pt'])).toBe('pt');
+    expect(englishOnly.languageOf('night', ['pt-PT', 'en'])).toBe('en');
+    expect(englishOnly.languageOf('saudade', ['en', 'pt-PT'])).toBeNull();
+    expect(englishOnly.languageOf('saudadezinha', ['pt-PT'])).toBeNull();
+    expect(lyricsLanguage([portugueseWords]).languageOf('night', ['en', 'pt-PT'])).toBeNull();
+    expect(lyricsLanguage([portugueseWords]).languageOf('saudade', ['en', 'pt-PT'])).toBe('pt-PT');
   });
 
   it('gives none for a Song without Languages', () => {
@@ -295,7 +295,7 @@ describe('languageOf', () => {
 describe('isSetUp', () => {
   it('tells the Languages whose dictionaries it was given', () => {
     const portugueseOnly = lyricsLanguage([portugueseWords]);
-    expect(portugueseOnly.isSetUp('pt')).toBe(true);
+    expect(portugueseOnly.isSetUp('pt-PT')).toBe(true);
     expect(portugueseOnly.isSetUp('en')).toBe(false);
   });
 });

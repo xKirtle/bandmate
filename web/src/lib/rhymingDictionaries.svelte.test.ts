@@ -59,12 +59,12 @@ describe('rhyming dictionaries', () => {
     const dictionaries = page(new FakeStore(), server);
     await settle();
 
-    dictionaries.use(['en', 'pt']);
+    dictionaries.use(['en', 'pt-PT']);
     await settle();
 
     expect(server.asked).toEqual([]);
     expect(dictionaries.isSetUp('en')).toBe(false);
-    expect(dictionaries.loading(['en', 'pt'])).toBe(false);
+    expect(dictionaries.loading(['en', 'pt-PT'])).toBe(false);
   });
 
   it('is loading until it has read which are downloaded', async () => {
