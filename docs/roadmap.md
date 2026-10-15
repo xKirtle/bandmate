@@ -47,5 +47,6 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 
 ## Rhymes by sound, not spelling
 
-- Every rhyming dictionary turns each word into how it's said before pairing Rhymes, so a Rhyme is matched on its sounds, as the glossary defines it. The English one does this already, since its dictionary came with pronunciations; the Portuguese one pairs words by how they're written, so "depois" and "heróis" come up as perfect Rhymes, though "ois" and the open "óis" sound quite different.
-- Whether every Language goes by sound or only those whose spelling misleads, where each Language's pronunciations come from, and whether European and Brazilian Portuguese get a dictionary each, are for the spec.
+- Every rhyming dictionary but English's turns each word into how it's said before pairing Rhymes, so a Rhyme is matched on its sounds, as the glossary defines it. English is the exception because its dictionary came with pronunciations, so it goes by sound already. The Portuguese one pairs words by how they're written, so "depois" and "heróis" come up as perfect Rhymes, though "ois" and the open "óis" sound quite different.
+- European and Brazilian Portuguese sound different, so they're separate Languages, each with a dictionary of its own.
+- Where each Language's pronunciations come from is for the spec.
