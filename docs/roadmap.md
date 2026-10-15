@@ -44,3 +44,8 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 
 - Each Track gets a muted colour of its own, assigned automatically from a small palette in the visual identity's tokens, so Clips on different Tracks can be told apart at a glance. Today every Clip is in the one accent colour.
 - The colours stay muted so the Timeline doesn't take on the busy look of a DAW. Whether the user can pick a Track's colour, and how the Chosen Track still stands out, are for the spec.
+
+## Rhymes by sound, not spelling
+
+- Every rhyming dictionary turns each word into how it's said before pairing Rhymes, so a Rhyme is matched on its sounds, as the glossary defines it. The English one does this already, since its dictionary came with pronunciations; the Portuguese one pairs words by how they're written, so "depois" and "heróis" come up as perfect Rhymes, though "ois" and the open "óis" sound quite different.
+- Whether every Language goes by sound or only those whose spelling misleads, where each Language's pronunciations come from, and whether European and Brazilian Portuguese get a dictionary each, are for the spec.
