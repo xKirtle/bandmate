@@ -129,28 +129,9 @@ func expand(dic io.Reader, affixes map[rune][]affix) ([]string, error) {
 		if !keptWord.MatchString(stem) || vos.MatchString(morphology) || notAWord.MatchString(morphology) {
 			continue
 		}
-		suffixed := []string{stem}
-		for _, flag := range flags {
-			for _, a := range affixes[flag] {
-				if form, ok := a.apply(stem); ok && !a.prefix {
-					suffixed = append(suffixed, form)
-				}
-			}
-		}
+		suffixed := append([]string{stem}, affixed([]string{stem}, flags, affixes, false)...)
 		// One prefix at most, on the word or any of its suffixed forms.
-		forms := slices.Clone(suffixed)
-		for _, flag := range flags {
-			for _, a := range affixes[flag] {
-				if !a.prefix {
-					continue
-				}
-				for _, form := range suffixed {
-					if prefixed, ok := a.apply(form); ok {
-						forms = append(forms, prefixed)
-					}
-				}
-			}
-		}
+		forms := append(suffixed, affixed(suffixed, flags, affixes, true)...)
 		for _, form := range forms {
 			if keptWord.MatchString(form) {
 				seen[form] = true
@@ -158,4 +139,23 @@ func expand(dic io.Reader, affixes map[rune][]affix) ([]string, error) {
 		}
 	}
 	return slices.Sorted(maps.Keys(seen)), sc.Err()
+}
+
+// affixed is the forms that the prefixes, or else the suffixes, of a
+// word's flags make of each of words.
+func affixed(words []string, flags string, affixes map[rune][]affix, prefix bool) []string {
+	var forms []string
+	for _, flag := range flags {
+		for _, a := range affixes[flag] {
+			if a.prefix != prefix {
+				continue
+			}
+			for _, word := range words {
+				if form, ok := a.apply(word); ok {
+					forms = append(forms, form)
+				}
+			}
+		}
+	}
+	return forms
 }

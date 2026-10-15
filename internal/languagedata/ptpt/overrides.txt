@@ -24,8 +24,9 @@ a AX0
 # Left out as an abbreviation, of "exemplo", but sung as "my ex".
 ex EY1 SH
 
-# The e of "fechar" is closed when stressed, though eSpeak NG opens it,
-# and Wiktionary gives both.
+# The e of "fechar" is closed when stressed, as eSpeak NG says the e of
+# "desejo", though it says it as ɨ, which is read open, and Wiktionary
+# gives both.
 fecha F E1 SH AX0
 fecham F E1 SH ANW0
 fechas F E1 SH AX0 SH

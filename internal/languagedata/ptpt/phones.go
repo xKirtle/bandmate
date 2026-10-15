@@ -144,7 +144,7 @@ func phonesOf(word, ipa string) (phones []string, ok bool, err error) {
 func vowelLetters(word string) int {
 	n := 0
 	for _, r := range word {
-		if strings.ContainsRune("aeiouyáàâãéêíóôõúü", r) {
+		if strings.ContainsRune("aeiouyáàâãèéêíóôõúü", r) {
 			n++
 		}
 	}

@@ -32,8 +32,8 @@ func wiktionaryReadings() (map[string][][]string, error) {
 }
 
 // readingsOf are the vowels Wiktionary may say a stressed vowel as, by
-// the phone each is: an e or o open or closed, and the ɨ eSpeak NG says for
-// the e of "ser" and "ter", as it rightly does for "de" and "me".
+// the phone each is: an e or o open or closed, and an e eSpeak NG says as
+// ɨ. That's right for "de" and "me", but not for "ser" and "ter".
 var readingsOf = map[string]map[string]string{
 	"E": {"e": "E", "ɛ": "EH"}, "EH": {"e": "E", "ɛ": "EH"},
 	"O": {"o": "O", "ɔ": "OH"}, "OH": {"o": "O", "ɔ": "OH"},
