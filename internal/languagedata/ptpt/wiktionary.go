@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"slices"
 	"strings"
 	"unicode/utf8"
 )
@@ -30,18 +31,17 @@ func wiktionaryReadings() (map[string][][]string, error) {
 	return readings, sc.Err()
 }
 
-// openOrClosed is the e or o of a stressed vowel, open or closed, and the
-// vowel it is the other way.
-var openOrClosed = map[string]string{
-	"E": "EH", "EH": "E",
-	"O": "OH", "OH": "O",
-	"EY": "EHY", "EHY": "EY",
-	"EW": "EHW", "EHW": "EW",
-	"OY": "OHY", "OHY": "OY",
+// readingsOf are the vowels Wiktionary may say a stressed vowel as, by
+// the phone each is: an e or o open or closed, and an e eSpeak NG says as
+// ɨ. That's right for "de" and "me", but not for "ser" and "ter".
+var readingsOf = map[string]map[string]string{
+	"E": {"e": "E", "ɛ": "EH"}, "EH": {"e": "E", "ɛ": "EH"},
+	"O": {"o": "O", "ɔ": "OH"}, "OH": {"o": "O", "ɔ": "OH"},
+	"EY": {"e": "EY", "ɛ": "EHY"}, "EHY": {"e": "EY", "ɛ": "EHY"},
+	"EW": {"e": "EW", "ɛ": "EHW"}, "EHW": {"e": "EW", "ɛ": "EHW"},
+	"OY": {"o": "OY", "ɔ": "OHY"}, "OHY": {"o": "OY", "ɔ": "OHY"},
+	"IX": {"ɨ": "IX", "e": "E", "ɛ": "EH"},
 }
-
-// wiktionaryVowels are Wiktionary's e and o, by whether they're open.
-var wiktionaryVowels = map[string]bool{"e": false, "ɛ": true, "o": false, "ɔ": true}
 
 // accentOf is the accent written on an e or o, by whether it's open.
 var accentOf = map[string]map[bool]rune{"E": {true: 'é', false: 'ê'}, "O": {true: 'ó', false: 'ô'}}
@@ -51,12 +51,13 @@ func isOpen(phone string) bool {
 	return strings.HasPrefix(phone, "EH") || strings.HasPrefix(phone, "OH")
 }
 
-// withWiktionaryVowel corrects whether the stressed e or o of a word's
-// phones is open or closed, which eSpeak NG sometimes gets wrong, by
-// Wiktionary's readings of it, as people wrote them. Only a reading with as
-// many syllables says which vowel is stressed. Where none of them says the
-// stressed vowel is as eSpeak NG has it, the first one's is taken, unless
-// the word's accent says eSpeak NG has it right, as é in "anéis" does.
+// withWiktionaryVowel corrects the stressed vowel of a word's phones, which
+// eSpeak NG sometimes gets wrong, by Wiktionary's readings of it, as people
+// wrote them: whether an e or o is open or closed, and an e eSpeak NG says
+// as ɨ. Only a reading with as many syllables says which vowel is stressed.
+// Where none of them says the stressed vowel is as eSpeak NG has it, the
+// first one's is taken, unless the word's accent says eSpeak NG has it
+// right, as é in "anéis" does.
 func withWiktionaryVowel(word string, phones []string, readings [][]string) []string {
 	stressed, nth := -1, 0
 	for i, p := range phones {
@@ -73,30 +74,25 @@ func withWiktionaryVowel(word string, phones []string, readings [][]string) []st
 		return phones
 	}
 	phone := strings.TrimSuffix(phones[stressed], "1")
-	other, ok := openOrClosed[phone]
+	options, ok := readingsOf[phone]
 	if !ok || strings.ContainsRune(word, accentOf[phone[:1]][isOpen(phone)]) {
 		return phones
 	}
-	var said []bool
+	var said []string
 	for _, r := range readings {
 		nuclei := wiktionaryNuclei(r)
 		if len(nuclei) != syllables(phones) {
 			continue
 		}
-		if open, ok := wiktionaryVowels[nuclei[nth]]; ok {
-			said = append(said, open)
+		if p, ok := options[nuclei[nth]]; ok {
+			said = append(said, p)
 		}
 	}
-	if len(said) == 0 {
+	if len(said) == 0 || slices.Contains(said, phone) {
 		return phones
 	}
-	for _, open := range said {
-		if open == isOpen(phone) {
-			return phones
-		}
-	}
 	corrected := append([]string(nil), phones...)
-	corrected[stressed] = other + "1"
+	corrected[stressed] = said[0] + "1"
 	return corrected
 }
 
