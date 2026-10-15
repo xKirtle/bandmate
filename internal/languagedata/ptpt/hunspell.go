@@ -1,30 +1,18 @@
-// Command ptwords builds Portuguese (Portugal)'s data, pt-PT.txt.gz, from
-// the European Portuguese Hunspell dictionary that LibreOffice ships, at a
-// pinned commit: one word a line, to suggest Rhymes from. Each of the
-// dictionary's words is kept with the forms its suffixes make (plurals,
-// genders, a verb's tenses), but not the forms its prefixes make, nor the
-// verb tenses rarely sung (the imperfect and future subjunctive, the
-// pluperfect, the personal infinitive, and vós). Only words written in
-// lower-case letters are kept, so no names or abbreviations. go generate
-// runs it in internal/languagedata, so it needs network access.
 package main
 
 import (
 	"bufio"
 	"bytes"
-	"compress/gzip"
 	"fmt"
 	"io"
-	"log"
-	"net/http"
-	"os"
 	"regexp"
 	"slices"
 	"strings"
 )
 
 // dictionariesCommit is the commit of github.com/LibreOffice/dictionaries
-// to build from. Keep dictionariesVersion in languagedata.go in step with it.
+// to take the word list from. Keep dictionariesVersion in languagedata.go in
+// step with it.
 const dictionariesCommit = "fe49c662796b47cb19732d18114610a58848f5cb"
 
 // keptWord matches a word as it's kept: lower-case Portuguese letters only.
@@ -40,54 +28,27 @@ type suffix struct {
 	condition  *regexp.Regexp
 }
 
-func main() {
+// hunspellWords is the word list: the European Portuguese Hunspell
+// dictionary's words, each with the forms its suffixes make (plurals,
+// genders, a verb's tenses), but not the forms its prefixes make, nor the
+// verb tenses rarely sung (the imperfect and future subjunctive, the
+// pluperfect, the personal infinitive, and vós). Only words written in
+// lower-case letters are kept, so no names or abbreviations. Sorted.
+func hunspellWords() ([]string, error) {
 	base := "https://raw.githubusercontent.com/LibreOffice/dictionaries/" + dictionariesCommit + "/pt_PT/pt_PT"
 	aff, err := fetch(base + ".aff")
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	dic, err := fetch(base + ".dic")
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	suffixes, err := readSuffixes(bytes.NewReader(aff))
 	if err != nil {
-		log.Fatal(err)
-	}
-	words, err := expand(bytes.NewReader(dic), suffixes)
-	if err != nil {
-		log.Fatal(err)
-	}
-	// Without a name or time in its header, the same text always gzips the
-	// same, so regenerating changes nothing unless the dictionary did.
-	var out bytes.Buffer
-	zw, err := gzip.NewWriterLevel(&out, gzip.BestCompression)
-	if err != nil {
-		log.Fatal(err)
-	}
-	for _, w := range words {
-		if _, err := fmt.Fprintln(zw, w); err != nil {
-			log.Fatal(err)
-		}
-	}
-	if err := zw.Close(); err != nil {
-		log.Fatal(err)
-	}
-	if err := os.WriteFile("pt-PT.txt.gz", out.Bytes(), 0o644); err != nil {
-		log.Fatal(err)
-	}
-}
-
-func fetch(url string) ([]byte, error) {
-	res, err := http.Get(url)
-	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fetching %s: %s", url, res.Status)
-	}
-	return io.ReadAll(res.Body)
+	return expand(bytes.NewReader(dic), suffixes)
 }
 
 // readSuffixes reads the affix file's suffix rules by their flag, leaving

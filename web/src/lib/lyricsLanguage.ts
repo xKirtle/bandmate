@@ -4,20 +4,16 @@
 // device, which the binary serves (ADR 0018). A Line's Chords aren't words,
 // a hyphenated word is read as its parts, and each word is read in the
 // first of the Song's Languages, in the Song's order, whose downloaded
-// dictionary has it. Every Language brings a word list, a dictionary
-// Language's with each word's pronunciation, so membership decides, however
-// many there are.
-
-import { portugueseSound } from './portuguese';
+// dictionary has it. Every Language's dictionary is a pronouncing one, so
+// Rhymes match how words sound, never how they're spelt (ADR 0022): a word
+// none of them has gets no Rhymes.
 
 /** A Language's data, read from what the binary serves for it. */
 export interface LanguageData {
   /** The Language's BCP 47 code, e.g. "en" or "pt-PT". */
   code: string;
-  /** A dictionary Language's pronunciations of each word it knows, in lower case, the first the usual one. */
+  /** Its pronunciations of each word it knows, in lower case, the first the usual one. */
   pronunciations: ReadonlyMap<string, readonly string[][]>;
-  /** A spelling-rules Language's words, in lower case, to suggest Rhymes from. */
-  words: readonly string[];
   /** How common each word it ranks is, 0 the most common. Those it doesn't rank are rarer than all. */
   ranks: ReadonlyMap<string, number>;
 }
@@ -32,8 +28,6 @@ export interface Rhyme {
 export interface Rhymes {
   perfect: Rhyme[];
   near: Rhyme[];
-  /** Whether they're guessed from the word's spelling, as the Language's dictionary doesn't have it. */
-  guess: boolean;
 }
 
 /**
@@ -49,18 +43,19 @@ export interface CaretAt {
 }
 
 /**
- * Reads a Language's data as served: its dictionary, then a "#ranks" line,
- * then its ranks. A dictionary Language's dictionary is one pronunciation a
- * line, "hello HH AH0 L OW1"; a spelling-rules Language's, one word a line.
- * Its ranks are words, the most common first, one a line. Data kept before
- * the ranks shipped has none.
+ * Reads a Language's data as served: its dictionary, one pronunciation a
+ * line, "hello HH AH0 L OW1", then a "#ranks" line, then its ranks: words,
+ * the most common first, one a line. Data kept before the ranks shipped has
+ * none.
  */
 export function readLanguageData(code: string, text: string): LanguageData {
   const [dictionary, rankText = ''] = text.split(/^#ranks$/m, 2);
   const ranks = new Map<string, number>();
-  for (const word of linesOf(rankText)) if (!ranks.has(word)) ranks.set(word, ranks.size);
+  for (const line of rankText.split('\n')) {
+    const word = line.trim();
+    if (word && !ranks.has(word)) ranks.set(word, ranks.size);
+  }
   const pronunciations = new Map<string, string[][]>();
-  if (isSpellingRules(code)) return { code, pronunciations, words: linesOf(dictionary), ranks };
   for (const line of dictionary.split('\n')) {
     const [word, ...phones] = line.trim().split(/\s+/);
     if (!word || phones.length === 0) continue;
@@ -68,44 +63,7 @@ export function readLanguageData(code: string, text: string): LanguageData {
     if (known) known.push(phones);
     else pronunciations.set(word, [phones]);
   }
-  return { code, pronunciations, words: [], ranks };
-}
-
-/** A text's lines that aren't blank, trimmed. */
-function linesOf(text: string): string[] {
-  return text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line !== '');
-}
-
-/**
- * The spelling-rules Languages' rules, which read a word from how it's
- * written: its syllables, and how it ends with them, to find its Rhymes.
- * Null for one they can't read.
- */
-const spellingRules: Record<string, (word: string) => Sound | null> = {
-  'pt-PT': portugueseSound,
-};
-
-function isSpellingRules(code: string): boolean {
-  return code in spellingRules;
-}
-
-const wordLists = new WeakMap<LanguageData, ReadonlySet<string> | ReadonlyMap<string, unknown>>();
-
-/**
- * The words a Language's dictionary has, which decide the Language a word
- * is read in: a dictionary Language's words with a pronunciation, or a
- * spelling-rules Language's word list.
- */
-function wordList(data: LanguageData): { has(word: string): boolean } {
-  let list = wordLists.get(data);
-  if (!list) {
-    list = isSpellingRules(data.code) ? new Set(data.words) : data.pronunciations;
-    wordLists.set(data, list);
-  }
-  return list;
+  return { code, pronunciations, ranks };
 }
 
 /**
@@ -117,12 +75,11 @@ export type LyricsLanguage = ReturnType<typeof lyricsLanguage>;
 
 export function lyricsLanguage(dictionaries: readonly LanguageData[]) {
   const byCode = new Map(dictionaries.map((d) => [d.code, d]));
-  const lists = new Map(dictionaries.map((d) => [d.code, wordList(d)]));
 
   /** Whether a Language's dictionary is downloaded and has a word, as it's looked up. */
   function has(code: string, word: string): boolean {
-    const list = lists.get(code);
-    return !!list && (list.has(word) || list.has(trimApostrophes(word)));
+    const known = byCode.get(code)?.pronunciations;
+    return !!known && (known.has(word) || known.has(trimApostrophes(word)));
   }
 
   return {
@@ -135,25 +92,22 @@ export function lyricsLanguage(dictionaries: readonly LanguageData[]) {
      * The Language a word of a Song sung in `languages` is read in: the
      * first of them, in the Song's order, whose dictionary has it. A word
      * in none, once every one of them is downloaded, is an unknown word,
-     * read in the first with spelling rules, or else the first. Null while
-     * the word is in none and some aren't downloaded, as those are never
-     * guessed at.
+     * read in the first. Null while the word is in none and some aren't
+     * downloaded, as those are never guessed at.
      */
     languageOf(word: string, languages: readonly string[]): string | null {
       const asked = normalWord(word);
       const known = languages.find((code) => has(code, asked));
       if (known) return known;
       if (languages.length === 0 || !languages.every((code) => byCode.has(code))) return null;
-      return languages.find(isSpellingRules) ?? languages[0];
+      return languages[0];
     },
 
     /**
      * A word's Rhymes in a Language: perfect ones sound the same from the
      * word's last stressed vowel to its end, near ones only have the same
-     * vowels from there. A word its dictionary has is read from it; one it
-     * lacks, by its spelling rules if it has them, its Rhymes then a guess.
-     * Null for a word it can't read, and when it isn't downloaded. They're
-     * suggested from the words its dictionary has.
+     * vowels from there. They're suggested from the words its dictionary
+     * has. Null for a word it doesn't have, and when it isn't downloaded.
      */
     rhymes(word: string, language: string): Rhymes | null {
       const data = byCode.get(language);
@@ -167,11 +121,7 @@ export function lyricsLanguage(dictionaries: readonly LanguageData[]) {
         (c) => c.ending.sounds !== ending.sounds && c.rhyme.word !== asked,
       );
       const order = inOrder(data.ranks, count, ending);
-      return {
-        perfect: order(perfect),
-        near: order(near),
-        guess: !has(language, asked),
-      };
+      return { perfect: order(perfect), near: order(near) };
     },
 
     /**
@@ -274,18 +224,13 @@ function endingOf(phones: readonly string[]): Ending | null {
 }
 
 /** How a word sounds, as far as its Rhymes go: its syllables, and how it ends. */
-export interface Sound {
+interface Sound {
   count: number;
   ending: Ending;
 }
 
-/**
- * How a Language says a word: by its usual pronunciation in a dictionary
- * Language, or by a spelling-rules one's rules. Null for one it can't read.
- */
+/** How a Language says a word, by its usual pronunciation. Null for one its dictionary doesn't have. */
 function soundOf(data: LanguageData, word: string): Sound | null {
-  const rules = spellingRules[data.code];
-  if (rules) return rules(word);
   const phones = data.pronunciations.get(word)?.[0];
   const ending = phones && endingOf(phones);
   return phones && ending ? { count: vowels(phones), ending } : null;
@@ -307,15 +252,14 @@ const rhymeIndexes = new WeakMap<LanguageData, RhymeIndex>();
 
 /**
  * A Language's Rhyme index, built the first time it's asked for, from the
- * words its dictionary knows or its word list. Only words of letters are
- * suggested, not possessives or abbreviations.
+ * words its dictionary knows. Only words of letters are suggested, not
+ * possessives or abbreviations.
  */
 function rhymeIndex(data: LanguageData): RhymeIndex {
   let index = rhymeIndexes.get(data);
   if (index) return index;
   index = { bySounds: new Map(), byVowels: new Map() };
-  const words = isSpellingRules(data.code) ? data.words : data.pronunciations.keys();
-  for (const word of words) {
+  for (const word of data.pronunciations.keys()) {
     if (!/^\p{L}+$/u.test(word)) continue;
     const sound = soundOf(data, word);
     if (!sound) continue;

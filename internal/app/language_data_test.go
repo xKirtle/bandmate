@@ -129,30 +129,47 @@ func TestAboutCreditsTheDataThatShips(t *testing.T) {
 	}
 }
 
-func TestPortugueseWordsAreServedFromTheBinary(t *testing.T) {
+func TestPortuguesePronunciationsAreServedFromTheBinary(t *testing.T) {
 	ts := newTestServer(t)
 
 	res := ts.Do(http.MethodGet, "/api/languages/pt-PT", nil)
 
 	expectStatus(t, res, http.StatusOK)
-	// Words, with the forms they're sung in, to suggest Rhymes from.
-	for _, word := range []string{"coração", "canção", "amores", "cantava"} {
-		if !strings.Contains(string(res.Body), "\n"+word+"\n") {
-			t.Errorf("Portuguese data doesn't hold %q", word)
+	// Words, with the forms they're sung in, and how each is said, as
+	// English's are: an open vowel apart from a closed one.
+	for _, line := range []string{
+		"amor AX0 M O1 R",
+		"avó AX0 V OH1",
+		"avô AX0 V O1",
+		"coração K U2 R AX0 S ANW1",
+		"cantaram K AN2 T A1 R ANW0",
+	} {
+		if !strings.Contains(string(res.Body), "\n"+line+"\n") {
+			t.Errorf("Portuguese (Portugal) data doesn't hold %q", line)
 		}
 	}
 }
 
-func TestAboutCreditsThePortugueseWordList(t *testing.T) {
+func TestAboutCreditsWhatThePortugueseDictionaryIsMadeFrom(t *testing.T) {
 	got := getDependencies(t, func(*app.Config) {})
 
-	i := slices.IndexFunc(got.Data, func(d dependency) bool { return strings.Contains(d.Name, "Portuguese") })
-	if i < 0 {
-		t.Fatalf("data = %+v, want the Portuguese word list", got.Data)
-	}
-	// Of the licences it's offered under, the one Bandmate takes it under, as pt-PT.LICENSE says.
-	if d := got.Data[i]; d.Version == "" || d.License != "LGPL-2.1-only" {
-		t.Errorf("Portuguese word list = %+v, want a version and LGPL-2.1-only", d)
+	for _, want := range []dependency{
+		// The word list, under the one of the licences it's offered under
+		// that Bandmate takes it under, as pt-PT.LICENSE says.
+		{Name: "Hunspell dictionary for European Portuguese", License: "LGPL-2.1-only"},
+		// The pronunciations.
+		{Name: "eSpeak NG", License: "GPL-3.0-or-later"},
+		// The stressed vowels corrected.
+		{Name: "Wiktionary, via WikiPron", License: "CC-BY-SA-4.0"},
+	} {
+		i := slices.IndexFunc(got.Data, func(d dependency) bool { return d.Name == want.Name })
+		if i < 0 {
+			t.Errorf("data = %+v, want %s", got.Data, want.Name)
+			continue
+		}
+		if d := got.Data[i]; d.Version == "" || d.License != want.License {
+			t.Errorf("%s = %+v, want a version and %s", want.Name, d, want.License)
+		}
 	}
 }
 

@@ -1,0 +1,24 @@
+# Pronunciations of Portuguese (Portugal) checked by hand, which take the
+# place of those eSpeak NG and Wiktionary give: "word PHONES", one a line,
+# in the phone set phones.go names. Each is the word's usual pronunciation,
+# as it's sung; a word spelt the same as another is given the one songs use
+# most. go generate ./internal/languagedata applies them.
+
+# Spelt as another word that's said apart: the one songs use most.
+esse E1 S IX0 # "that", not the letter s
+este E1 SH T IX0 # "this", not the east
+olho O1 LH U0 # an eye, not "I look"
+gosto G OH1 SH T U0 # "I like", not a taste
+
+# Said unstressed, as words of their own: "the" and "and", not letters.
+o U0
+e I0
+
+# Open or closed wrong in eSpeak NG, and not in Wiktionary.
+gostas G OH1 SH T AX0 SH
+consegues K UN2 S EH1 G IX0 SH
+ideia I2 D EY1 AX0
+ideias I2 D EY1 AX0 SH
+
+# Said wrong in eSpeak NG.
+foste F O1 SH T IX0
