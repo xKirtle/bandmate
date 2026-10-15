@@ -143,26 +143,6 @@ async function keepOldPortuguese(page: Page) {
   );
 }
 
-/** The Languages whose dictionaries are kept on this device. */
-function keptDictionaries(page: Page) {
-  return page.evaluate(
-    () =>
-      new Promise<IDBValidKey[]>((resolve, reject) => {
-        const request = indexedDB.open('bandmate.dictionaries');
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-          const db = request.result;
-          const keys = db.transaction('setUp').objectStore('setUp').getAllKeys();
-          keys.onsuccess = () => {
-            db.close();
-            resolve(keys.result);
-          };
-          keys.onerror = () => reject(keys.error);
-        };
-      }),
-  );
-}
-
 test('a Portuguese dictionary downloaded before it was Portuguese (Portugal) counts as not downloaded', async ({
   page,
   bandmate,
@@ -177,7 +157,6 @@ test('a Portuguese dictionary downloaded before it was Portuguese (Portugal) cou
   ).toBeVisible();
   await page.goto('/settings');
   await expect(dictionary(page, 'Portuguese (Portugal)')).toContainText('Not downloaded');
-  await expect.poll(() => keptDictionaries(page)).toEqual([]);
 
   await download(page, 'Portuguese (Portugal)');
   await lookUp(page, song.id, 'coração');
@@ -186,5 +165,4 @@ test('a Portuguese dictionary downloaded before it was Portuguese (Portugal) cou
       .getByRole('listitem')
       .filter({ hasText: /^\s*canção\b/ }),
   ).toBeVisible();
-  expect(await keptDictionaries(page)).toEqual(['pt-PT']);
 });

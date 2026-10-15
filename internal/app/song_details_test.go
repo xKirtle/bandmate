@@ -213,7 +213,7 @@ func TestASongsLanguagesCanBeSetAndAreKept(t *testing.T) {
 		t.Fatalf("song after setting its languages = %+v, want %+v", got, want)
 	}
 	if read := ts.getSong(created.ID); !reflect.DeepEqual(read.Languages, []string{"pt-PT", "en"}) {
-		t.Errorf("languages read back = %q, want Portuguese, then English", read.Languages)
+		t.Errorf("languages read back = %q, want Portuguese (Portugal), then English", read.Languages)
 	}
 }
 

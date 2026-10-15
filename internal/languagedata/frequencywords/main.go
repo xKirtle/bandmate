@@ -121,9 +121,9 @@ type contraction struct {
 // its list needs, if any.
 type rankedLanguage struct {
 	code string
-	// list is FrequencyWords' name for its list, e.g. "pt" for Portuguese
-	// (Portugal)'s.
-	list string
+	// frequencyWordsList is FrequencyWords' name for its list, e.g. "pt"
+	// for Portuguese (Portugal)'s.
+	frequencyWordsList string
 	// wordOf is the word on a line of its dictionary: pronouncingDictionary
 	// or wordList.
 	wordOf func(line string) string
@@ -154,7 +154,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		counts, err := fetchCounts(l.list)
+		counts, err := fetchCounts(l.frequencyWordsList)
 		if err != nil {
 			log.Fatal(err)
 		}
