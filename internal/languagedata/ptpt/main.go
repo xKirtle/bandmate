@@ -104,11 +104,29 @@ func override(dictionary map[string][]string, text string) error {
 // isPhone reports whether p is one of the phone set's: a vowel with its
 // stress, or a consonant.
 func isPhone(p string) bool {
-	if vowel, ok := strings.CutSuffix(p, p[len(p)-1:]); ok && strings.ContainsAny(p[len(p)-1:], "012") {
-		return slices.Contains(slices.Collect(maps.Values(vowelPhones)), vowel) ||
-			slices.Contains(slices.Collect(maps.Values(nasalDiphthongOf)), vowel)
+	if last := p[len(p)-1:]; strings.ContainsAny(last, "012") {
+		return vowels[strings.TrimSuffix(p, last)]
 	}
-	return slices.Contains(slices.Collect(maps.Values(consonantPhones)), p)
+	return consonants[p]
+}
+
+// vowels and consonants are the phone set's, vowels without their stress.
+var vowels, consonants = phoneSet()
+
+func phoneSet() (vowels, consonants map[string]bool) {
+	vowels, consonants = map[string]bool{}, map[string]bool{}
+	for _, v := range vowelPhones {
+		vowels[v] = true
+	}
+	for _, v := range nasalDiphthongOf {
+		vowels[v] = true
+	}
+	for _, c := range consonantPhones {
+		for _, phone := range strings.Fields(c) {
+			consonants[phone] = true
+		}
+	}
+	return vowels, consonants
 }
 
 // write writes the dictionary, a word a line, sorted, gzipped. Without a

@@ -105,7 +105,7 @@ func withWiktionaryVowel(word string, phones []string, readings [][]string) []st
 func wiktionaryNuclei(reading []string) []string {
 	var nuclei []string
 	for _, p := range reading {
-		if first, _ := utf8.DecodeRuneInString(p); strings.ContainsRune("aɐeɛioɔuɨøyɜə", first) && p != "i̯" {
+		if first, _ := utf8.DecodeRuneInString(p); strings.ContainsRune("aɐeɛioɔuɨøyɜə", first) && !strings.ContainsRune(p, '\u032f') {
 			nuclei = append(nuclei, p)
 		}
 	}

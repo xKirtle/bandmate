@@ -164,6 +164,7 @@ describe('rhymes in Portuguese (Portugal)', () => {
     ['cantar', 'mar'],
     ['sol', 'farol'],
     ['azul', 'sul'],
+    ['solta', 'volta'],
     ['céu', 'chapéu'],
     ['fim', 'jardim'],
     ['um', 'nenhum'],
@@ -258,6 +259,12 @@ describe("each Portuguese (Portugal) Rhyme's Syllable Count", () => {
     ['saúde', 3], // sa-ú-de
     ['país', 2], // pa-ís
     ['pais', 1], // pais
+    ['rainha', 3], // ra-i-nha
+    ['ainda', 3], // a-in-da
+    ['cair', 2], // ca-ir
+    ['ruim', 2], // ru-im
+    ['juiz', 2], // ju-iz
+    ['reino', 2], // rei-no
     ['quero', 2], // que-ro: a silent u
     ['guitarra', 3], // gui-tar-ra
     ['quando', 2], // quan-do

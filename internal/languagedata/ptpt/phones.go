@@ -126,9 +126,9 @@ func phonesOf(word, ipa string) (phones []string, ok bool, err error) {
 			return nil, false, nil
 		}
 	}
-	segs = nasalizeBeforeM(segs)
+	segs = nasalizeBeforeConsonant(segs)
 	segs = joinNasalDiphthongs(segs)
-	segs = readOu(word, segs)
+	segs = readVowelBeforeW(word, segs)
 	return withStress(segs), true, nil
 }
 
@@ -148,10 +148,10 @@ func nasalize(s *segment) bool {
 	return ok && s.vowel
 }
 
-// nasalizeBeforeM reads a vowel eSpeak NG writes with an m or n after it,
+// nasalizeBeforeConsonant reads a vowel eSpeak NG writes with an m or n after it,
 // before a consonant, or with an m at the end, as nasal, as Portuguese
 // spells and says it: "tempo", "com", "quem".
-func nasalizeBeforeM(segs []segment) []segment {
+func nasalizeBeforeConsonant(segs []segment) []segment {
 	var out []segment
 	for i, s := range segs {
 		if (s.phone == "M" || s.phone == "N") && len(out) > 0 && closesSyllable(s.phone, segs[i+1:]) &&
@@ -202,15 +202,16 @@ func endsButForS(rest []segment) bool {
 	return len(rest) == 0 || (len(rest) == 1 && (rest[0].phone == "SH" || rest[0].phone == "S" || rest[0].phone == "Z" || rest[0].phone == "ZH"))
 }
 
-// spelledOuOrUl finds where a word is spelled ou, or ul before no vowel
-// (an lh is a sound of its own).
-var spelledOuOrUl = regexp.MustCompile(`ou|ul(?:[^aeiouáàâãéêíóôõúh]|$)`)
+// spelledBeforeW finds where a word is spelled ou, or ul or ol before no
+// vowel (an lh is a sound of its own).
+var spelledBeforeW = regexp.MustCompile(`ou|[uo]l(?:[^aeiouáàâãéêíóôõúh]|$)`)
 
-// readOu reads eSpeak NG's o or u with a w after it, before no vowel. It
-// writes so the ou of "cantou" and "sou", said o in Portugal, and the ul of
-// "azul". Each is read from the spelling it's said from, in turn: an ou is
-// O, an ul U and L. When they can't be matched, every one is O.
-func readOu(word string, segs []segment) []segment {
+// readVowelBeforeW reads eSpeak NG's o or u with a w after it, before no
+// vowel. It writes so the ou of "cantou" and "sou", said o in Portugal, and
+// the ul of "azul" and ol of "solta". Each is read from the spelling it's
+// said from, in turn: an ou is O, an ul U and L, an ol O and L. When they
+// can't be matched, every one is O.
+func readVowelBeforeW(word string, segs []segment) []segment {
 	var at []int
 	for i := 0; i+1 < len(segs); i++ {
 		if (segs[i].phone == "O" || segs[i].phone == "U") && segs[i+1].phone == "W" && !(i+2 < len(segs) && segs[i+2].vowel) {
@@ -220,15 +221,15 @@ func readOu(word string, segs []segment) []segment {
 	if len(at) == 0 {
 		return segs
 	}
-	spelled := spelledOuOrUl.FindAllString(word, -1)
+	spelled := spelledBeforeW.FindAllString(word, -1)
 	out := append([]segment(nil), segs[:at[0]]...)
 	for n, i := range at {
 		vowel := segs[i]
-		if len(spelled) == len(at) && strings.HasPrefix(spelled[n], "ul") {
-			vowel.phone = "U"
+		vowel.phone = "O"
+		if len(spelled) == len(at) && strings.HasSuffix(spelled[n][:2], "l") {
+			vowel.phone = strings.ToUpper(spelled[n][:1])
 			out = append(out, vowel, segment{phone: "L"})
 		} else {
-			vowel.phone = "O"
 			out = append(out, vowel)
 		}
 		end := len(segs)

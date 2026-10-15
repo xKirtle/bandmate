@@ -9,6 +9,7 @@ esse E1 S IX0 # "that", not the letter s
 este E1 SH T IX0 # "this", not the east
 olho O1 LH U0 # an eye, not "I look"
 gosto G OH1 SH T U0 # "I like", not a taste
+molho M O1 LH U0 # a sauce, not "I wet"
 
 # Said unstressed, as words of their own: "the" and "and", not letters.
 o U0
@@ -17,6 +18,8 @@ e I0
 # Open or closed wrong in eSpeak NG, and not in Wiktionary.
 gostas G OH1 SH T AX0 SH
 consegues K UN2 S EH1 G IX0 SH
+solta S OH1 L T AX0
+soltas S OH1 L T AX0 SH
 ideia I2 D EY1 AX0
 ideias I2 D EY1 AX0 SH
 
