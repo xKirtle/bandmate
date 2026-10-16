@@ -19,6 +19,7 @@ import {
   type Track,
 } from './api';
 import { sourceAt } from './clipTime';
+import { isFree } from './trackPlacement';
 import { withCueChange, type CueChange } from './cueChanges';
 import { linesByRow } from './cues';
 import type { Edit } from './history';
@@ -188,9 +189,10 @@ export class FakeSongServer implements SongServer {
 
   /**
    * What a Timeline edit does, for the edits the fake models: the Loop's,
-   * adding, changing and deleting a Track, and placing, pasting, moving,
-   * splitting, renaming, setting the Gain of and deleting Clips of a Beat or a Sound
-   * on the Tracks there are. A Track changed or a Clip renamed that isn't
+   * adding, changing and deleting a Track, and placing, pasting (adding
+   * Tracks at the bottom for rows past the last), duplicating, moving,
+   * splitting, renaming, setting the Gain of and deleting Clips of a Beat
+   * or a Sound. A Track changed or a Clip renamed that isn't
    * there is refused, as the server refuses it. Others throw "not modelled".
    */
   #edited(edit: Edit): (tl: Timeline) => Timeline {
@@ -210,8 +212,7 @@ export class FakeSongServer implements SongServer {
       case 'addTrack':
         return (tl) => {
           const { name } = edit.track;
-          const track: Track = { id: this.#nextTrackId++, name, volume: 0, muted: false, soloed: false, clips: [] };
-          return { ...tl, tracks: [...tl.tracks, track] };
+          return { ...tl, tracks: [...tl.tracks, emptyTrack(this.#nextTrackId++, name)] };
         };
       case 'updateTrack': {
         if (!this.timeline.tracks.some((t) => t.id === edit.trackId)) throw notFound();
@@ -237,12 +238,34 @@ export class FakeSongServer implements SongServer {
         return (tl) => placed.reduce((t, c) => place(t, c.trackId, c.clip), withoutClips(tl, replaced));
       }
       case 'pasteClips': {
-        if (edit.newTracks.length > 0) throw notModelled(edit);
+        // Tracks it adds go at the bottom first, for Clips that run past the last.
         const pasted = edit.clips.map((c) => {
-          if (!('trackId' in c) || 'takes' in c.clip) throw notModelled(edit);
-          return { trackId: c.trackId, clip: c.clip as NewClip };
+          if ('takes' in c.clip) throw notModelled(edit);
+          return { on: c, clip: c.clip as NewClip };
         });
-        return (tl) => pasted.reduce((t, c) => place(t, c.trackId, c.clip), tl);
+        return (tl) => {
+          const added = edit.newTracks.map(({ name }) => emptyTrack(this.#nextTrackId++, name));
+          const withAdded = { ...tl, tracks: [...tl.tracks, ...added] };
+          return pasted.reduce(
+            (t, { on, clip }) => place(t, 'trackId' in on ? on.trackId : added[on.newTrack].id, clip),
+            withAdded,
+          );
+        };
+      }
+      case 'duplicateClip': {
+        // Right after the Clip, or after its Track's last Clip if something is in the way.
+        return (tl) => {
+          const track = tl.tracks.find((t) => t.clips.some((c) => c.id === edit.clipId));
+          if (!track) throw notFound();
+          const clip = track.clips.find((c) => c.id === edit.clipId)!;
+          if (clip.activeTakeId !== null) throw notModelled(edit);
+          const after = { start: clip.start + clip.length, end: clip.start + 2 * clip.length };
+          const start = isFree(track.clips, after)
+            ? after.start
+            : Math.max(...track.clips.map((c) => c.start + c.length));
+          const { fadeIn, fadeOut, offset, length } = clip;
+          return place(tl, track.id, { ...sourceOf(clip), fadeIn, fadeOut, start, offset, length });
+        };
       }
       case 'splitClips':
         // Each Clip keeps its id as its left half; its right half is a new
@@ -298,9 +321,14 @@ export class FakeSongServer implements SongServer {
         return (tl) => changedClip(tl, edit.clipId, { name: edit.name.trim() || null });
       case 'deleteClip':
         return (tl) => withoutClips(tl, [edit.clipId]);
-      case 'deleteClips':
-        if (edit.trackIds) throw notModelled(edit);
-        return (tl) => withoutClips(tl, edit.clipIds);
+      case 'deleteClips': {
+        // Then the Tracks trackIds, with whatever is left on them.
+        const trackIds = edit.trackIds ?? [];
+        return (tl) => {
+          const without = withoutClips(tl, edit.clipIds);
+          return { ...without, tracks: without.tracks.filter((t) => !trackIds.includes(t.id)) };
+        };
+      }
       default:
         throw notModelled(edit);
     }
@@ -613,6 +641,11 @@ const notFound = () => new ApiError(404, 'not found');
 const noSuchTrack = () => new ApiError(400, "there's no such Track on this Timeline");
 
 const notModelled = (change: Edit | LyricSheetChange) => new Error(`${change.kind} is not modelled`);
+
+/** A new Track, empty, at 0 dB, neither muted nor soloed. */
+function emptyTrack(id: number, name: string): Track {
+  return { id, name, volume: 0, muted: false, soloed: false, clips: [] };
+}
 
 /** A Timeline with changes made to a Clip, if it's there. */
 function changedClip(tl: Timeline, clipId: number, changes: Partial<Clip>): Timeline {
