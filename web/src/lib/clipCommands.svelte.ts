@@ -55,6 +55,12 @@ export type ClipCommand = { target: ClipTarget } & (
 
 export type ClipCommandKind = ClipCommand['kind'];
 
+/** The commands that act on one Clip: on the Selection, only while it's one Clip. */
+const oneClipKinds = ['gain', 'chooseTake', 'deleteTake', 'nudgeTake', 'clearInactiveTakes'] as const;
+type OneClipCommand = Extract<ClipCommand, { kind: (typeof oneClipKinds)[number] }>;
+const onOneClip = (kind: ClipCommandKind): kind is OneClipCommand['kind'] =>
+  (oneClipKinds as readonly ClipCommandKind[]).includes(kind);
+
 /**
  * Why a command can't run now: the Timeline is frozen, the target covers
  * no Clip, or not exactly one for a command on one Clip, the playhead
@@ -107,7 +113,7 @@ export class ClipCommands {
     return this.#tracks.flatMap((t) => t.clips.filter((c) => ids.has(c.id)));
   };
 
-  /** The Clips a Split at the playhead would cut, in Timeline order. */
+  /** The Clips a Split at the playhead would split, in Timeline order. */
   #splitting(target: ClipTarget): number[] {
     return splitTargets(this.#tracks, this.#idsOf(target), this.#chosen(), this.#playhead());
   }
@@ -115,6 +121,10 @@ export class ClipCommands {
   /** Whether a command can run now on a target: null if it can, else why not. */
   can = (kind: ClipCommandKind, target: ClipTarget): ClipCommandBlock | null => {
     if (this.#editing.frozen) return 'frozen';
+    if (onOneClip(kind)) {
+      const clips = this.clipsOf(target);
+      return clips.length === 0 ? 'noClips' : clips.length > 1 ? 'notOneClip' : null;
+    }
     switch (kind) {
       case 'paste':
         return this.#clipboard.clips.length === 0 ? 'nothingToPaste' : null;
@@ -124,14 +134,6 @@ export class ClipCommands {
         return target.kind === 'selection' && mergeTarget(this.#tracks, this.#selection.ids) !== null
           ? null
           : 'cantMerge';
-      case 'gain':
-      case 'chooseTake':
-      case 'deleteTake':
-      case 'nudgeTake':
-      case 'clearInactiveTakes': {
-        const clips = this.clipsOf(target);
-        return clips.length === 0 ? 'noClips' : clips.length > 1 ? 'notOneClip' : null;
-      }
       default:
         return this.clipsOf(target).length === 0 ? 'noClips' : null;
     }
@@ -155,6 +157,7 @@ export class ClipCommands {
         this.#copy(target);
         return ran(await this.#delete(target));
       case 'paste': {
+        // A Song always has a Track, so there's always a Chosen Track.
         const pasted = paste(this.#clipboard, this.#tracks, this.#playhead(), this.#chosen()!);
         return pasted ? ran(await this.#editing.edit({ kind: 'pasteClips', ...pasted })) : null;
       }
@@ -190,10 +193,7 @@ export class ClipCommands {
   };
 
   /** The edit of a command on one Clip. */
-  #oneClipEdit(
-    command: Extract<ClipCommand, { kind: 'gain' | 'chooseTake' | 'deleteTake' | 'nudgeTake' | 'clearInactiveTakes' }>,
-    clipId: number,
-  ): Edit {
+  #oneClipEdit(command: OneClipCommand, clipId: number): Edit {
     switch (command.kind) {
       case 'gain':
         // To the tenth, as a drag sets it.

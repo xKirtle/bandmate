@@ -34,7 +34,7 @@ import X from '@lucide/svelte/icons/x';
 //
 // The Clip and Selection commands run through Clip commands (see
 // clipCommands.svelte.ts), which say whether each can run now; the menu
-// words why one can't. The page runs the rest: Retake, Rename and the
+// says why one is off while frozen, or with nothing to split. The page runs the rest: Retake, Rename and the
 // downloads.
 
 /** The Clip commands a menu runs, and asks whether each can run now. */
