@@ -198,7 +198,8 @@ export class TimelineEditing {
     const fields = this.#fieldsOf(sent);
     this.#show(fields, sent);
     this.#onTheirWay.add(sent);
-    const edited = await this.#saves.edit(sent);
+    // Undoing it selects again what's selected now, if it's an edit that selects.
+    const edited = await this.#saves.edit(sent, this.#selection.ids);
     this.#onTheirWay.delete(sent);
     this.#unshow(fields, sent);
     if (edited) this.#follow(e, edited);
@@ -440,7 +441,7 @@ export class TimelineEditing {
         });
         note = mergeWarning(target.silent);
         return { timeline: after, kept: mergingAdded(before, after, target.clipIds) };
-      })
+      }, clipIds)
       .finally(() => (this.#merging = false));
     if (!made) return false;
     const [mergedId] = addedClips(made.before, made.after);

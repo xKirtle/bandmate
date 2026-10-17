@@ -1522,3 +1522,84 @@ describe('History of Splits', () => {
     expect(h.nextUndo()).toMatchObject({ kind: 'replaceClips', clipIds: [25, 27, 26, 28] });
   });
 });
+
+describe('History of the Selection', () => {
+  it('selects again, on undoing a Split, the Clips selected before it, those it split under their new ids', () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0), clip(6, 20)]), track(2, [clip(7, 0)])]);
+    const t1 = timeline([
+      track(1, [clip(5, 0, { length: 4 }), clip(8, 4, { offset: 4, length: 6 }), clip(6, 20)]),
+      track(2, [clip(7, 0, { length: 4 }), clip(9, 4, { offset: 4, length: 6 })]),
+    ]);
+
+    // All three selected, the playhead over two of them.
+    h.record({ kind: 'splitClips', clipIds: [5, 7], at: 4 }, t0, t1, [5, 6, 7]);
+
+    const t2 = timeline([track(1, [clip(10, 0), clip(6, 20)]), track(2, [clip(11, 0)])]);
+    expect(h.undone(t1, t2)).toEqual([10, 6, 11]);
+    // Redone, it selects the right halves, as the Split did.
+    const t3 = timeline([
+      track(1, [clip(12, 0, { length: 4 }), clip(13, 4, { offset: 4, length: 6 }), clip(6, 20)]),
+      track(2, [clip(14, 0, { length: 4 }), clip(15, 4, { offset: 4, length: 6 })]),
+    ]);
+    expect(h.redone(t2, t3)).toEqual([13, 15]);
+  });
+
+  it('selects again, on undoing a Delete, the Clips selected before it, leaving out any no longer on the Timeline', () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0), clip(6, 20)]), track(2, [clip(7, 0)])]);
+    const t1 = timeline([track(1, [clip(6, 20)]), track(2)]);
+
+    // Clip 4 was selected, but is gone.
+    h.record({ kind: 'deleteClips', clipIds: [5, 7] }, t0, t1, [4, 5, 6, 7]);
+
+    const t2 = timeline([track(1, [clip(10, 0), clip(6, 20)]), track(2, [clip(11, 0)])]);
+    expect(h.undone(t1, t2)).toEqual([10, 6, 11]);
+  });
+
+  it('selects again, on undoing a Merge, the Clips selected before it', () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0), clip(6, 20)]), track(2, [clip(7, 12)])]);
+    const t1 = timeline([track(1, [clip(8, 0, { beatId: null, soundId: 3, length: 22 }), clip(6, 20)]), track(2)]);
+
+    h.record(mergingAdded(t0, t1, [5, 7]), t0, t1, [5, 7]);
+
+    const t2 = timeline([track(1, [clip(10, 0), clip(6, 20)]), track(2, [clip(11, 12)])]);
+    expect(h.undone(t1, t2)).toEqual([10, 11]);
+  });
+
+  it('selects again, on undoing a paste, the Clips selected before it', () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0)])]);
+    const t1 = timeline([track(1, [clip(5, 0), clip(8, 20)])]);
+    const pasted = { beatId: 100, start: 20, offset: 0, length: 10 };
+
+    h.record({ kind: 'pasteClips', clips: [{ trackId: 1, clip: pasted }], newTracks: [] }, t0, t1, [5]);
+
+    expect(h.undone(t1, t0)).toEqual([5]);
+  });
+
+  it('follows the Clips selected before a step to their new ids, once undoing a later step brings them back', () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0), clip(6, 20)])]);
+    const t1 = timeline([track(1, [clip(5, 0), clip(6, 20, { length: 4 }), clip(7, 24, { offset: 4, length: 6 })])]);
+    const t2 = timeline([track(1, [clip(6, 20, { length: 4 }), clip(7, 24, { offset: 4, length: 6 })])]);
+    h.record({ kind: 'splitClips', clipIds: [6], at: 24 }, t0, t1, [5, 6]);
+    h.record({ kind: 'deleteClips', clipIds: [5] }, t1, t2, [5]);
+
+    // Clip 5 comes back as 9.
+    const t3 = timeline([track(1, [clip(9, 0), clip(6, 20, { length: 4 }), clip(7, 24, { offset: 4, length: 6 })])]);
+    expect(h.undone(t2, t3)).toEqual([9]);
+    expect(h.undone(t3, timeline([track(1, [clip(9, 0), clip(10, 20)])]))).toEqual([9, 10]);
+  });
+
+  it('leaves the Selection as it is on undoing a step that doesn’t select', () => {
+    const h = new History();
+    const t0 = timeline([track(1, [clip(5, 0)]), track(2)]);
+    const t1 = timeline([track(1), track(2, [clip(5, 12)])]);
+
+    h.record({ kind: 'moveClip', clipId: 5, trackId: 2, start: 12 }, t0, t1, [5]);
+
+    expect(h.undone(t1, t0)).toBeNull();
+  });
+});
