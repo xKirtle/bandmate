@@ -7,7 +7,7 @@
   const variants = [
     { key: 'current', name: 'Today (unchanged)' },
     { key: 'A', name: 'Card on This device + outline' },
-    { key: 'B', name: 'Own Shortcuts tab · list + panel' },
+    { key: 'B', name: 'Own Shortcuts tab · accordion' },
     { key: 'C', name: 'Edit in the shortcuts dialog' },
   ];
 
