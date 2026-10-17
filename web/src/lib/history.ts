@@ -83,6 +83,12 @@ import { rightHalves } from './split';
 // redone by replacing the Clip with both halves as they were, the right
 // half's Takes brought back, so redoing never copies Takes again.
 //
+// Undoing a paste, or an edit undone by bringing back Clips together (a
+// Delete of several, a Merge, a Split), selects again the Clips selected
+// as it was made, followed to their new ids, but for any no longer on the
+// Timeline. Redoing a Merge selects its Clip again, and a Split its right
+// halves, as they did.
+//
 // Undoing a new Take returns the playhead to where its Clip starts, so
 // recording again starts from the same place. That's where it started when
 // recorded too, as every edit since is undone first.
@@ -156,7 +162,11 @@ interface Ids {
 interface Step {
   edit: HistoryEdit;
   adds: Ids;
-  /** The Clips of adds that doing it selects, e.g. a Merge's Clip or a Split's right halves. */
+  /**
+   * The Clips that doing it selects: for a redo, of adds, e.g. a Merge's
+   * Clip or a Split's right halves; for an undo, those selected before the
+   * edit, those it brings back named as adds names them.
+   */
   selects?: number[];
 }
 
@@ -173,9 +183,13 @@ export class History {
   #undo: Entry[] = [];
   #redo: Entry[] = [];
 
-  /** Keeps an edit that turned before into after, to undo, unless it changed nothing. */
-  record(edit: Edit, before: Timeline, after: Timeline): void {
-    this.#keep(edit, before, after);
+  /**
+   * Keeps an edit that turned before into after, to undo, unless it changed
+   * nothing, with the Clips selected as it was made, to select again on
+   * undoing it, if it's one that selects (see reselects).
+   */
+  record(edit: Edit, before: Timeline, after: Timeline, selected?: Iterable<number>): void {
+    this.#keep(edit, before, after, selected);
   }
 
   /**
@@ -190,9 +204,11 @@ export class History {
   }
 
   /** Keeps an edit that turned before into after, unless it changed nothing, giving what it kept. */
-  #keep(edit: Edit, before: Timeline, after: Timeline): Entry | null {
+  #keep(edit: Edit, before: Timeline, after: Timeline, selected?: Iterable<number>): Entry | null {
     if (content(before) === content(after)) return null;
-    const entry: Entry = { undo: inverse(edit, before, after), redo: redoing(edit, before, after) };
+    const undo = inverse(edit, before, after);
+    if (selected && reselects(edit, undo.edit)) undo.selects = [...selected];
+    const entry: Entry = { undo, redo: redoing(edit, before, after) };
     this.#undo.push(entry);
     this.#redo = [];
     return entry;
@@ -270,17 +286,24 @@ export class History {
 
   /**
    * Notes that nextUndo's edit was sent, turning before into after, and
-   * gives the new ids of the Clips it brought back. A Cue edit leaves the
+   * gives the ids of the Clips to select again, if the edit undone selects
+   * (see reselects): those selected before it, by their ids now, but for
+   * any no longer on the Timeline; or, if it was kept without them, those
+   * it brought back. Null if it selects none. A Cue edit leaves the
    * Timeline as it was, so is given it as both.
    */
-  undone(before: Timeline, after: Timeline): number[] {
+  undone(before: Timeline, after: Timeline): number[] | null {
     const entry = this.#undo.pop();
-    if (!entry) return [];
+    if (!entry) return null;
     this.#redo.push(entry);
     // Read as sent: following the new ids remaps the entry too.
     const sent = entry.undo;
     const ids = this.#follow(sent, before, after);
-    return sent.adds.clips.map(ids.clip);
+    if (sent.selects) {
+      const present = clipIds(after);
+      return sent.selects.map(ids.clip).filter((id) => present.has(id));
+    }
+    return bringsBack(sent.edit) ? sent.adds.clips.map(ids.clip) : null;
   }
 
   /**
@@ -322,6 +345,20 @@ export class History {
     }
     return ids;
   }
+}
+
+/**
+ * Whether undoing edit, by the edit undo, selects again: a paste, or an
+ * edit undone by bringing back Clips together, e.g. a Delete of several, a
+ * Merge or a Split.
+ */
+function reselects(edit: Edit, undo: HistoryEdit): boolean {
+  return edit.kind === 'pasteClips' || bringsBack(undo);
+}
+
+/** Whether an edit brings back Clips together, so selects them, as undoing a Delete of several, a Merge or a Split does. */
+function bringsBack(edit: HistoryEdit): boolean {
+  return edit.kind === 'placeClips' || edit.kind === 'replaceClips';
 }
 
 /** Whether two copies of the Lyric Sheet and Scrapbook are the same. */

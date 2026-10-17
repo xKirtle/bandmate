@@ -834,6 +834,7 @@ describe('Timeline editing, what follows an edit', () => {
   it('selects the right halves a Split made, and says to select the whole Clip once undone, and the right half again once redone', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
     const { saves, editing, selection } = await editingFor(server);
+    selection.apply({ kind: 'click', clipId: 1 });
     await editing.edit({ kind: 'splitClips', clipIds: [1], at: 4 });
     const [left, right] = server.timeline.tracks[0].clips;
     expect(left).toMatchObject({ id: 1, start: 0, length: 4 });
@@ -847,6 +848,48 @@ describe('Timeline editing, what follows an edit', () => {
     const [, again] = server.timeline.tracks[0].clips;
     expect(again).toMatchObject({ start: 4, length: 6 });
     expect(redone?.reselect).toEqual([again.id]);
+  });
+
+  // Three Clips, the playhead at 4 s over two of them.
+  const threeClips = () => [track(1, [beatClip(1, 0, 10), beatClip(2, 20, 30)]), track(2, [beatClip(3, 2, 8)])];
+
+  it('says to select every Clip selected before a Split once undone, and only its right halves once redone', async () => {
+    const server = new FakeSongServer(emptySong(), threeClips());
+    const { saves, editing, selection } = await editingFor(server);
+    selection.apply({ kind: 'all' });
+    await editing.edit({ kind: 'splitClips', clipIds: [1, 3], at: 4 });
+    const undone = await saves.undo();
+    const [first, second] = clipIdsOn(server, 1);
+    const [third] = clipIdsOn(server, 2);
+    expect(second).toBe(2);
+    expect(undone?.reselect).toEqual([first, 2, third]);
+    const redone = await saves.redo();
+    const [, firstRight] = clipIdsOn(server, 1);
+    const [, thirdRight] = clipIdsOn(server, 2);
+    expect(redone?.reselect).toEqual([firstRight, thirdRight]);
+  });
+
+  it('says to select every Clip selected before a Delete once undone', async () => {
+    const server = new FakeSongServer(emptySong(), threeClips());
+    const { saves, editing, selection } = await editingFor(server);
+    selection.apply({ kind: 'all' });
+    await editing.edit({ kind: 'deleteClips', clipIds: [1, 2, 3] });
+    const undone = await saves.undo();
+    expect(undone?.reselect).toEqual([...clipIdsOn(server, 1), ...clipIdsOn(server, 2)]);
+    expect(undone?.reselect).toHaveLength(3);
+  });
+
+  it('says to select the Clips selected before a paste once undone', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { saves, editing, selection } = await editingFor(server);
+    selection.apply({ kind: 'click', clipId: 2 });
+    await editing.edit({
+      kind: 'pasteClips',
+      clips: [{ trackId: 1, clip: { beatId: 1, start: 40, offset: 0, length: 5 } }],
+      newTracks: [],
+    });
+    const undone = await saves.undo();
+    expect(undone?.reselect).toEqual([2]);
   });
 
   it('leaves the Selection as it is after an edit adding nothing', async () => {
@@ -1146,6 +1189,18 @@ describe('Timeline editing, a Merge', () => {
     expect(saves.saveError).toBe("The Clips to merge aren't all on the Timeline any more.");
     expect(audio.rendered).toBe(0);
     expect(clipIdsByTrack(server)).toEqual([[1, 2], []]);
+  });
+
+  it('says to select the Clips it merged once undone', async () => {
+    const server = new FakeSongServer(emptySong(), mergeTracks());
+    const { saves, editing, selection } = await editingFor(server);
+    selection.selectEdited([1, 3]);
+    await editing.merge();
+    const undone = await saves.undo();
+    const [first, kept] = clipIdsOn(server, 1);
+    const [third] = clipIdsOn(server, 2);
+    expect(kept).toBe(2);
+    expect(undone?.reselect).toEqual([first, third]);
   });
 
   it('is redone without rendering it again, selecting its Clip', async () => {

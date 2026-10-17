@@ -45,7 +45,12 @@ export interface Edited {
 
 /** What an undo or redo did, and what the Timeline goes back to with it. */
 export interface Undone extends Edited {
-  /** The Clips to select again: Clips deleted together, brought back, a Merge redone, or a Split redone's right halves. Null to leave the Selection as it is. */
+  /**
+   * The Clips to select again: undoing a paste, or Clips brought back
+   * together, e.g. by undoing a Delete, a Merge or a Split, those selected
+   * before it; redoing a Merge, its Clip, or a Split, its right halves.
+   * Null to leave the Selection as it is.
+   */
   reselect: number[] | null;
   /** Where to return the playhead to: where a new Take undone started. Null to leave it where it is. */
   playhead: number | null;
@@ -244,21 +249,27 @@ export class Saves {
 
   /**
    * Queues a Timeline edit, made against the Timeline as saved when its
-   * turn comes, and keeps it to undo. Resolves to what it did, or null if
-   * it wasn't saved.
+   * turn comes, and keeps it to undo, with the Clips selected as it was
+   * made, if given, to select again on undoing it. Resolves to what it
+   * did, or null if it wasn't saved.
    */
-  edit = (edit: Edit): Promise<Edited | null> =>
-    this.make(async (at) => ({ timeline: await this.#server.apply(at, edit), kept: edit }));
+  edit = (edit: Edit, selected?: Iterable<number>): Promise<Edited | null> =>
+    this.make(async (at) => ({ timeline: await this.#server.apply(at, edit), kept: edit }), selected);
 
   /**
    * Queues a rarer edit to the Timeline that the caller makes itself, e.g.
    * importing a Sound, saving a Take or a Merge. Its work runs in its turn,
    * against the Song and Timeline as saved then, with the Song on the
-   * server to write through, and says how it's kept to undo. Resolves to
-   * what it did, or null if it wasn't saved, e.g. when the work throws,
-   * whose message becomes the save error.
+   * server to write through, and says how it's kept to undo, with the
+   * Clips selected as it was made, if given, like edit. Resolves to what
+   * it did, or null if it wasn't saved, e.g. when the work throws, whose
+   * message becomes the save error.
    */
-  make = (work: (at: Song, timeline: Timeline, server: SongServer) => Promise<Made>): Promise<Edited | null> => {
+  make = (
+    work: (at: Song, timeline: Timeline, server: SongServer) => Promise<Made>,
+    selected?: Iterable<number>,
+  ): Promise<Edited | null> => {
+    const selectedThen = selected && [...selected];
     let edited: Edited | null = null;
     this.#undoablesQueued++;
     return this.#turn(
@@ -266,7 +277,7 @@ export class Saves {
       ({ timeline, kept }) => {
         const before = this.timeline;
         if (kept === 'take') this.#history.recordTake(before, timeline);
-        else this.#history.record(kept, before, timeline);
+        else this.#history.record(kept, before, timeline, selectedThen);
         this.#showHistory();
         this.#showTimeline(timeline);
         edited = { before, after: timeline };
@@ -296,9 +307,8 @@ export class Saves {
       return {
         edit,
         done: ({ before, after }) => {
-          const back = this.#history.undone(before, after);
-          // Clips deleted together come back as they were, selected.
-          const reselect = edit.kind === 'placeClips' || edit.kind === 'replaceClips' ? back : null;
+          // What to select again, if anything (see History.undone).
+          const reselect = this.#history.undone(before, after);
           return { before, after, reselect, playhead };
         },
       };

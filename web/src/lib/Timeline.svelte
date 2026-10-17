@@ -332,8 +332,9 @@
 
   // The Song's Undo and Redo are the Song page's (see songUndo.svelte.ts),
   // whether or not the Timeline can be edited here: on a phone and in Read
-  // mode too. The Timeline follows what they did: the Clips brought back
-  // together, or a Merge or a Split redone, are selected, and the Merge note
+  // mode too. The Timeline follows what they did: undoing a paste, or
+  // bringing Clips back together, selects again what was selected before
+  // it, a Merge or a Split redone selects what it made, and the Merge note
   // goes. Undoing a new Take returns the playhead to where its Clip
   // started, to record again from. Once the Clip's gone, it's a seek like
   // any other: playing, playback jumps there, superseding the restart the
