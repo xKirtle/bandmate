@@ -3,7 +3,7 @@
   // each group a card, each Shortcut a fold: closed, its name and keys;
   // open, what it does, where it works, and its keys to rebind.
   import FoldChevron from '../FoldChevron.svelte';
-  import { bindings, changed, changedCount, fresh, grouped, label, resetAll } from './engine.svelte';
+  import { bindings, changed, changedCount, clearMessage, fresh, grouped, label, resetAll } from './engine.svelte';
   import KeysEditor from './KeysEditor.svelte';
 
   let query = $state('');
@@ -51,7 +51,14 @@
     <section class="card" aria-label={group}>
       <h2>{group}</h2>
       {#each entries as e (e.id)}
-        <details open={!!fresh[e.id] || undefined}>
+        <!-- Closing a fold clears its message. -->
+        <details
+          data-shortcut={e.id}
+          open={!!fresh[e.id] || undefined}
+          ontoggle={(ev) => {
+            if (!ev.currentTarget.open) clearMessage(e.id);
+          }}
+        >
           <summary>
             <FoldChevron />
             <span class="name">{e.name}</span>

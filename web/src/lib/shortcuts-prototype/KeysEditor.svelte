@@ -3,8 +3,11 @@
   // ("Press a key…", Esc cancels), with Remove, Add key and Reset.
   import X from '@lucide/svelte/icons/x';
   import {
+    allEntries,
     bindings,
     changed,
+    clearMessage,
+    holders,
     fresh,
     gestureWords,
     keyFrom,
@@ -24,7 +27,7 @@
   const gesture = $derived(bindings[entry.id].flatMap((w) => w.keys)[0]?.key ?? 'drag');
 
   function start(way: number, index: number) {
-    delete messages[entry.id];
+    clearMessage(entry.id);
     capturing = { way, index };
   }
 
@@ -33,13 +36,32 @@
     e.preventDefault();
     e.stopPropagation();
     if (e.key === 'Escape' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
-      capturing = null;
+      stop();
       return;
     }
     const key = keyFrom(e, entry, gesture);
     if (!key) return;
-    setKey(entry.id, capturing.way, capturing.index, key);
+    // A refused key keeps it listening, the reason shown, for another try.
+    if (setKey(entry.id, capturing.way, capturing.index, key)) capturing = null;
+  }
+
+  // Stops listening and clears the reason, unless focus went to the
+  // message's own link.
+  function stop(e?: FocusEvent) {
     capturing = null;
+    if (!(e?.relatedTarget as HTMLElement | null)?.closest('.message')) clearMessage(entry.id);
+  }
+
+  const holderName = $derived(allEntries().find((x) => x.id === holders[entry.id])?.name);
+
+  // Opens the Shortcut holding the key, to free it there.
+  function reveal(id: string) {
+    clearMessage(entry.id);
+    const fold = document.querySelector<HTMLDetailsElement>(`[data-shortcut="${id}"]`);
+    if (!fold) return;
+    fold.open = true;
+    fold.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    fold.querySelector('summary')?.focus({ preventScroll: true });
   }
 </script>
 
@@ -76,7 +98,7 @@
               class="key"
               class:capturing={capturing?.way === w && capturing.index === i}
               onclick={() => start(w, i)}
-              onblur={() => (capturing = null)}
+              onblur={stop}
               title={entry.mouse ? 'Press a modifier: Shift, Alt or Ctrl/⌘' : 'Press a key'}
             >
               {capturing?.way === w && capturing.index === i ? 'Press a key…' : label(key)}
@@ -93,7 +115,7 @@
           class="add"
           class:capturing={capturing?.way === w && capturing.index === way.keys.length}
           onclick={() => start(w, way.keys.length)}
-          onblur={() => (capturing = null)}
+          onblur={stop}
         >
           {capturing?.way === w && capturing.index === way.keys.length
             ? entry.mouse
@@ -114,7 +136,11 @@
     <button type="button" class="button quiet reset" onclick={() => resetOne(entry.id)}>Reset</button>
   {/if}
   {#if messages[entry.id]}
-    <span class="message" class:new={fresh[entry.id]} role="status">{messages[entry.id]}</span>
+    <span class="message" class:new={fresh[entry.id]} role="status"
+      >{messages[entry.id]}{#if holderName}{" "}
+        <button type="button" class="holder" onclick={() => reveal(holders[entry.id])}>{holderName}</button
+        >.{/if}</span
+    >
   {/if}
 </div>
 
@@ -242,6 +268,17 @@
   }
   .start .message {
     text-align: start;
+  }
+  /* The Shortcut holding a refused key, as a link to it. */
+  .holder {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
   }
   .message.new {
     color: var(--accent);

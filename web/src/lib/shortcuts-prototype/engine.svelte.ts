@@ -66,6 +66,14 @@ export const bindings = $state<Record<string, Way[]>>(
 /** A message per Shortcut: the last refusal, or a note. */
 export const messages = $state<Record<string, string>>({});
 
+/** For a refusal, the Shortcut that holds the key, so the message can lead to it. */
+export const holders = $state<Record<string, string>>({});
+
+export function clearMessage(id: string) {
+  delete messages[id];
+  delete holders[id];
+}
+
 export function allEntries(): Entry[] {
   return entries;
 }
@@ -148,18 +156,19 @@ export function setKey(id: string, way: number, index: number, key: Key): boolea
   }
   const taken = holder(key, { id, way, index });
   if (taken) {
-    messages[id] = `${label(key)} is already used by ${taken.name}.`;
+    messages[id] = `${label(key)} is already used by`;
+    holders[id] = taken.id;
     return false;
   }
   bindings[id][way].keys[index] = key;
-  delete messages[id];
+  clearMessage(id);
   delete fresh[id];
   return true;
 }
 
 export function removeKey(id: string, way: number, index: number) {
   bindings[id][way].keys.splice(index, 1);
-  delete messages[id];
+  clearMessage(id);
 }
 
 export function changed(id: string): boolean {
@@ -177,18 +186,19 @@ export function resetOne(id: string): boolean {
     for (const k of w.keys) {
       const taken = holder(k, null);
       if (taken && taken.id !== id) {
-        messages[id] = `Can't reset: ${label(k)} is used by ${taken.name}.`;
+        messages[id] = `Can't reset: ${label(k)} is used by`;
+        holders[id] = taken.id;
         return false;
       }
     }
   bindings[id] = clone(defaultsOf(id));
-  delete messages[id];
+  clearMessage(id);
   return true;
 }
 
 export function resetAll() {
   for (const e of entries) bindings[e.id] = clone(defaultsOf(e.id));
-  for (const id of Object.keys(messages)) delete messages[id];
+  for (const id of Object.keys(messages)) clearMessage(id);
 }
 
 /** Shortcuts marked new: a later release added them and their default was taken. */
