@@ -369,7 +369,7 @@ func (s *Store) NudgeTake(ctx context.Context, songID int64, based songversion.V
 		}
 		return nil
 	}
-	return s.changeRewording(ctx, songID, based, reword, func(tx *sql.Tx, _ *audio.FileChanges) error {
+	return s.changeRewording(ctx, songID, based, reword, func(tx *sql.Tx, _ *audio.FileChanges, _ Timeline) error {
 		p, err := takeClip(ctx, tx, songID, clipID)
 		if err != nil {
 			return err
