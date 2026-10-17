@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { currentPage, listAt, movedTo, pages, pinned, settingsTabAt, settingsTabs } from './nav';
+import {
+  currentPage,
+  hiddenTabOpens,
+  listAt,
+  movedTo,
+  pages,
+  pinned,
+  settingsTabAt,
+  settingsTabHref,
+  settingsTabs,
+  shownSettingsTabs,
+} from './nav';
 
 describe('currentPage', () => {
   it('marks Songs on the Song list, inside a Folder, and on every page of a Song', () => {
@@ -18,6 +29,7 @@ describe('currentPage', () => {
 
   it('marks Settings on every one of its tabs', () => {
     expect(currentPage('/settings')).toBe('settings');
+    expect(currentPage('/settings/shortcuts')).toBe('settings');
     expect(currentPage('/settings/backups')).toBe('settings');
     expect(currentPage('/settings/about')).toBe('settings');
   });
@@ -75,9 +87,10 @@ describe('pinned', () => {
 });
 
 describe('settingsTabs', () => {
-  it('are This device, Backups and About, in that order, each at its own address', () => {
+  it('are This device, Shortcuts, Backups and About, in that order, each at its own address', () => {
     expect(settingsTabs.map((t) => [t.label, t.href])).toEqual([
       ['This device', '/settings'],
+      ['Shortcuts', '/settings/shortcuts'],
       ['Backups', '/settings/backups'],
       ['About', '/settings/about'],
     ]);
@@ -87,6 +100,7 @@ describe('settingsTabs', () => {
 describe('settingsTabAt', () => {
   it('is the Settings tab at a path', () => {
     expect(settingsTabAt('/settings')).toBe('device');
+    expect(settingsTabAt('/settings/shortcuts')).toBe('shortcuts');
     expect(settingsTabAt('/settings/backups')).toBe('backups');
     expect(settingsTabAt('/settings/about')).toBe('about');
   });
@@ -95,6 +109,36 @@ describe('settingsTabAt', () => {
     expect(settingsTabAt('/')).toBeUndefined();
     expect(settingsTabAt('/backups')).toBeUndefined();
     expect(settingsTabAt('/settings/nowhere')).toBeUndefined();
+  });
+});
+
+describe('settingsTabHref', () => {
+  it("is a Settings tab's address", () => {
+    expect(settingsTabHref('device')).toBe('/settings');
+    expect(settingsTabHref('shortcuts')).toBe('/settings/shortcuts');
+  });
+});
+
+describe('shownSettingsTabs', () => {
+  it('shows every tab with a keyboard and mouse', () => {
+    expect(shownSettingsTabs(true).map((t) => t.id)).toEqual(['device', 'shortcuts', 'backups', 'about']);
+  });
+
+  it('leaves out Shortcuts on a phone or a narrow window, as the shortcuts button is', () => {
+    expect(shownSettingsTabs(false).map((t) => t.id)).toEqual(['device', 'backups', 'about']);
+  });
+});
+
+describe('hiddenTabOpens', () => {
+  it('opens This device at the Shortcuts address on a phone or a narrow window', () => {
+    expect(hiddenTabOpens('/settings/shortcuts', false)).toBe('/settings');
+  });
+
+  it('is none for a tab that is shown', () => {
+    expect(hiddenTabOpens('/settings/shortcuts', true)).toBeUndefined();
+    expect(hiddenTabOpens('/settings', false)).toBeUndefined();
+    expect(hiddenTabOpens('/settings/backups', false)).toBeUndefined();
+    expect(hiddenTabOpens('/songs/3', false)).toBeUndefined();
   });
 });
 

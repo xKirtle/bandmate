@@ -11,7 +11,7 @@
  */
 export type Key = { key: string; mod?: boolean; alt?: boolean; shift?: boolean };
 
-/** Where a Shortcut is listed in the shortcuts dialog. */
+/** Where a Shortcut is listed, in the shortcuts dialog and Settings' Shortcuts tab. */
 export type ShortcutGroup = 'Playback & recording' | 'Song editing' | 'Timeline editing' | 'Sync mode' | 'Mouse';
 
 type Described = {
@@ -19,6 +19,8 @@ type Described = {
   group: ShortcutGroup;
   /** One line, saying what it does. */
   description: string;
+  /** Where it works, finishing "Works in …", e.g. "the ruler, once it has focus." */
+  worksIn: string;
 };
 
 /**
@@ -33,25 +35,28 @@ export type OneWay = { keys: readonly Key[] };
 /** The keys of a Shortcut that goes back or forward, e.g. seeking, or of a control's own two-way keys, e.g. a number box's ↓/↑. */
 export type TwoWay = { back: readonly Key[]; forward: readonly Key[] };
 
-/** Every Shortcut on the Song page, in the order the shortcuts dialog lists them. */
+/** Every Shortcut on the Song page, in the order the shortcuts dialog and the Shortcuts tab list them. */
 export const shortcuts = {
   playPause: {
     name: 'Play or pause',
     group: 'Playback & recording',
     description: 'Plays or pauses the Timeline, or stops a recording.',
+    worksIn:
+      'any part of the Song page but a dialog, or a control that takes Space itself, like a text field or a checkbox.',
     keys: [{ key: ' ' }],
   },
   record: {
     name: 'Record',
     group: 'Playback & recording',
     description: 'Records a Take on the Chosen Track, or stops recording.',
+    worksIn: 'any part of the Song page but a text field or a dialog.',
     keys: [{ key: 'r' }],
   },
   startOrEnd: {
     name: 'Go to the start or end',
     group: 'Playback & recording',
-    description:
-      'Moves the playhead to the start or the end, from anywhere but a text field, a list, a slider, a menu or a dialog.',
+    description: 'Moves the playhead to the start or the end.',
+    worksIn: 'any part of the Song page but a text field, a list, a slider, a menu or a dialog.',
     back: [{ key: 'Home' }],
     forward: [{ key: 'End' }],
   },
@@ -59,40 +64,54 @@ export const shortcuts = {
     name: 'Undo',
     group: 'Song editing',
     description: 'Undoes the last edit to the Song.',
+    worksIn: 'any part of the Song page but a text field or a dialog, in Read mode too.',
     keys: [{ key: 'z', mod: true }],
   },
   redo: {
     name: 'Redo',
     group: 'Song editing',
     description: 'Redoes the last edit to the Song that was undone.',
+    worksIn: 'any part of the Song page but a text field or a dialog, in Read mode too.',
     keys: [
       { key: 'z', mod: true, shift: true },
       { key: 'y', mod: true },
     ],
   },
+  showShortcuts: {
+    name: 'Show the Shortcuts',
+    group: 'Song editing',
+    description: 'Opens the shortcuts dialog, which lists every Shortcut.',
+    worksIn: 'any part of the Song page but a text field or a dialog.',
+    // The keyboard button opens the dialog too, whatever this key is.
+    keys: [{ key: '?' }],
+  },
   deleteClip: {
     name: 'Delete a Clip',
     group: 'Timeline editing',
     description: 'Deletes the selected Clips, or, on a focused Clip outside the Selection, that Clip alone.',
+    worksIn: 'the Timeline, outside a text field.',
     keys: [{ key: 'Delete' }, { key: 'Backspace' }],
   },
   clipMenu: {
     name: "Open a Clip's menu",
     group: 'Timeline editing',
     description: "Opens the focused Clip's ⋯ menu.",
+    worksIn: 'a focused Clip.',
     keys: [{ key: 'F10', shift: true }, { key: 'ContextMenu' }],
   },
   seek: {
     name: 'Seek back or forward 5 s',
     group: 'Timeline editing',
-    description: 'Moves the playhead 5 seconds, from the ruler.',
+    description: 'Moves the playhead 5 seconds.',
+    worksIn: 'the ruler, once it has focus.',
     back: [{ key: 'ArrowLeft' }, { key: 'ArrowDown' }],
     forward: [{ key: 'ArrowRight' }, { key: 'ArrowUp' }],
   },
   seekFar: {
     name: 'Seek back or forward 15 s',
     group: 'Timeline editing',
-    description: 'Moves the playhead 15 seconds, from the ruler.',
+    description: 'Moves the playhead 15 seconds.',
+    worksIn: 'the ruler, once it has focus.',
     back: [
       { key: 'ArrowLeft', shift: true },
       { key: 'ArrowDown', shift: true },
@@ -105,32 +124,37 @@ export const shortcuts = {
   nudgeCue: {
     name: 'Nudge a Cue by 0.1 s',
     group: 'Timeline editing',
-    description: 'Moves the focused Cue time 0.1 seconds earlier or later, in Write mode.',
+    description: 'Moves the focused Cue time 0.1 seconds earlier or later.',
+    worksIn: 'a focused Cue time, in Write mode.',
     back: [{ key: 'ArrowDown', alt: true }],
     forward: [{ key: 'ArrowUp', alt: true }],
   },
   selectAll: {
     name: 'Select every Clip',
     group: 'Timeline editing',
-    description: 'Selects every Clip, from the Timeline, outside a text field.',
+    description: 'Selects every Clip.',
+    worksIn: 'the Timeline, outside a text field.',
     keys: [{ key: 'a', mod: true }],
   },
   clearSelection: {
     name: 'Clear the Selection',
     group: 'Timeline editing',
-    description: 'Clears the Selection, from the Timeline, so no Clip is selected.',
+    description: 'Clears the Selection, so no Clip is selected.',
+    worksIn: 'the Timeline, outside a text field.',
     keys: [{ key: 'Escape' }],
   },
   copyClips: {
     name: 'Copy the Selection',
     group: 'Timeline editing',
-    description: 'Copies every selected Clip, from the Timeline, outside a text field, to paste on this Song.',
+    description: 'Copies every selected Clip, to paste on this Song.',
+    worksIn: 'the Timeline, outside a text field.',
     keys: [{ key: 'c', mod: true }],
   },
   cutClips: {
     name: 'Cut the Selection',
     group: 'Timeline editing',
-    description: 'Copies every selected Clip, from the Timeline, outside a text field, then deletes them.',
+    description: 'Copies every selected Clip, then deletes them.',
+    worksIn: 'the Timeline, outside a text field.',
     keys: [{ key: 'x', mod: true }],
   },
   pasteClips: {
@@ -138,68 +162,69 @@ export const shortcuts = {
     group: 'Timeline editing',
     description:
       'Pastes the Clips last copied or cut at the playhead on the Chosen Track, both of which a click on empty lane space sets, or later where they fit, and selects them.',
+    worksIn: 'the Timeline, outside a text field.',
     keys: [{ key: 'v', mod: true }],
   },
   splitClips: {
     name: 'Split at the playhead',
     group: 'Timeline editing',
     description:
-      "Splits each selected Clip the playhead crosses in two there, or with none selected, the Chosen Track's Clip under it, outside a text field.",
+      "Splits each selected Clip the playhead crosses in two there, or with none selected, the Chosen Track's Clip under it.",
+    worksIn: 'any part of the Song page but a text field or a dialog, while editing and not recording.',
     keys: [{ key: 's' }],
   },
   cueNextLine: {
     name: 'Cue the next Line',
     group: 'Sync mode',
     description: 'Cues the next Line at the playhead.',
+    worksIn: 'Sync mode, in any part of the Song page but a text field, a dialog or a menu.',
     keys: [{ key: 'Enter' }],
   },
   toggleClip: {
     name: 'Add or remove a Clip',
     group: 'Mouse',
     description: 'Adds the Clip clicked to the Selection, or takes it out, leaving the Chosen Track as it is.',
+    worksIn: 'a Clip on the Timeline.',
     keys: [{ key: 'click', mod: true }],
   },
   boxSelect: {
     name: 'Select Clips with a box',
     group: 'Mouse',
-    description:
-      'Selects every Clip the box drawn over empty lane space touches, leaving the Chosen Track and the playhead as they are.',
+    description: 'Selects every Clip the box drawn touches, leaving the Chosen Track and the playhead as they are.',
+    worksIn: 'empty lane space on the Timeline.',
     keys: [{ key: 'drag' }],
   },
   addBox: {
     name: 'Add Clips with a box',
     group: 'Mouse',
-    description: 'Adds every Clip the box drawn over empty lane space touches to the Selection.',
+    description: 'Adds every Clip the box drawn touches to the Selection.',
+    worksIn: 'empty lane space on the Timeline.',
     keys: [{ key: 'drag', mod: true }],
   },
   nudgeTake: {
     name: 'Nudge a Take inside its Clip',
     group: 'Mouse',
     description: 'Moves the Take inside the Clip being dragged, keeping the Clip where it is.',
+    worksIn: 'a Clip being dragged.',
     keys: [{ key: 'drag', alt: true }],
   },
   skipSnapping: {
     name: 'Skip snapping',
     group: 'Mouse',
     description: 'Lets a Clip or the Loop being dragged go anywhere, snapping to nothing.',
+    worksIn: 'a Clip or the Loop being dragged.',
     keys: [{ key: 'drag', shift: true }],
   },
   zoom: {
     name: 'Zoom the Timeline',
     group: 'Mouse',
     description: 'Zooms the Timeline in or out around the pointer.',
+    worksIn: "the Timeline's lanes and its scroll bar.",
     // A trackpad's pinch zooms too, whatever these are: a browser sends
     // it as a Ctrl wheel event.
     keys: [{ key: 'wheel', mod: true }],
   },
 } as const satisfies Record<string, Shortcut>;
-
-/**
- * The key that opens the shortcuts dialog. It's the dialog's own key, so
- * the dialog doesn't list it: its button's tooltip names it. Rebinding
- * Shortcuts would need to count it as taken.
- */
-export const shortcutsDialogKeys: readonly Key[] = [{ key: '?' }];
 
 /** A key press, or a mouse action given as `click`, `drag` or `wheel`. */
 export type KeyPress = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'>;

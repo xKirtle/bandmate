@@ -1,10 +1,10 @@
 import { describe as group, expect, it } from 'vitest';
 import { shortcuts, type Shortcut } from './shortcuts';
-import { dialogGroups, searchGroups } from './shortcutsDialog';
+import { listGroups, searchGroups } from './shortcutList';
 
-group('dialogGroups', () => {
-  it('lists every Shortcut in its group, in order, with its description and keys', () => {
-    const groups = dialogGroups(shortcuts, 'other');
+group('listGroups', () => {
+  it('lists every Shortcut in its group, in order, with what it does, where it works and its keys', () => {
+    const groups = listGroups(shortcuts, 'other');
     expect(groups.map((g) => g.group)).toEqual([
       'Playback & recording',
       'Song editing',
@@ -14,7 +14,7 @@ group('dialogGroups', () => {
     ]);
     expect(groups.map((g) => g.rows.map((r) => r.name))).toEqual([
       ['Play or pause', 'Record', 'Go to the start or end'],
-      ['Undo', 'Redo'],
+      ['Undo', 'Redo', 'Show the Shortcuts'],
       [
         'Delete a Clip',
         "Open a Clip's menu",
@@ -41,29 +41,30 @@ group('dialogGroups', () => {
     expect(groups[0].rows[1]).toEqual({
       name: 'Record',
       description: 'Records a Take on the Chosen Track, or stops recording.',
+      worksIn: 'Works in any part of the Song page but a text field or a dialog.',
       keys: [['R']],
     });
     expect(groups[0].rows[2]).toEqual({
       name: 'Go to the start or end',
-      description:
-        'Moves the playhead to the start or the end, from anywhere but a text field, a list, a slider, a menu or a dialog.',
+      description: 'Moves the playhead to the start or the end.',
+      worksIn: 'Works in any part of the Song page but a text field, a list, a slider, a menu or a dialog.',
       keys: [['Home'], ['End']],
     });
   });
 
   it('names each key as this platform does, each way of a two-way Shortcut on its own', () => {
-    const songEditing = (on: 'mac' | 'other') => dialogGroups(shortcuts, on)[1].rows;
+    const songEditing = (on: 'mac' | 'other') => listGroups(shortcuts, on)[1].rows;
     expect(songEditing('mac')[1].keys).toEqual([['⌘⇧Z', '⌘Y']]);
     expect(songEditing('other')[1].keys).toEqual([['Ctrl+Shift+Z', 'Ctrl+Y']]);
-    expect(dialogGroups(shortcuts, 'other')[2].rows[2].keys).toEqual([
+    expect(listGroups(shortcuts, 'other')[2].rows[2].keys).toEqual([
       ['←', '↓'],
       ['→', '↑'],
     ]);
-    expect(dialogGroups(shortcuts, 'mac')[0].rows[2].keys).toEqual([['Home'], ['End']]);
+    expect(listGroups(shortcuts, 'mac')[0].rows[2].keys).toEqual([['Home'], ['End']]);
   });
 
   it("lists Undo and Redo as the Song's, under Song editing, not the Timeline's", () => {
-    const songEditing = dialogGroups(shortcuts, 'other')[1];
+    const songEditing = listGroups(shortcuts, 'other')[1];
     expect(songEditing.group).toBe('Song editing');
     const [undo, redo] = songEditing.rows;
     expect(undo).toMatchObject({ name: 'Undo', description: 'Undoes the last edit to the Song.' });
@@ -71,12 +72,23 @@ group('dialogGroups', () => {
   });
 
   it('lists nudging a Cue under Timeline editing, saying it works in Write mode', () => {
-    const editing = dialogGroups(shortcuts, 'other')[2];
+    const editing = listGroups(shortcuts, 'other')[2];
     expect(editing.group).toBe('Timeline editing');
     expect(editing.rows[4]).toEqual({
       name: 'Nudge a Cue by 0.1 s',
-      description: 'Moves the focused Cue time 0.1 seconds earlier or later, in Write mode.',
+      description: 'Moves the focused Cue time 0.1 seconds earlier or later.',
+      worksIn: 'Works in a focused Cue time, in Write mode.',
       keys: [['Alt+↓'], ['Alt+↑']],
+    });
+  });
+
+  it('lists the key that opens the shortcuts dialog as a Shortcut of its own, under Song editing', () => {
+    const songEditing = listGroups(shortcuts, 'other')[1];
+    expect(songEditing.rows[2]).toEqual({
+      name: 'Show the Shortcuts',
+      description: 'Opens the shortcuts dialog, which lists every Shortcut.',
+      worksIn: 'Works in any part of the Song page but a text field or a dialog.',
+      keys: [['?']],
     });
   });
 
@@ -86,23 +98,34 @@ group('dialogGroups', () => {
         name: 'Loop',
         group: 'Playback & recording',
         description: 'Turns the Loop on or off.',
+        worksIn: 'the Timeline.',
         keys: [{ key: 'l' }],
       },
       zoomToFit: {
         name: 'Zoom to fit',
         group: 'Mouse',
         description: 'Fits the whole Timeline in view.',
+        worksIn: 'the lanes.',
         keys: [{ key: 'wheel', alt: true }],
       },
     };
-    expect(dialogGroups(list, 'other')).toEqual([
+    expect(listGroups(list, 'other')).toEqual([
       {
         group: 'Playback & recording',
-        rows: [{ name: 'Loop', description: 'Turns the Loop on or off.', keys: [['L']] }],
+        rows: [
+          { name: 'Loop', description: 'Turns the Loop on or off.', worksIn: 'Works in the Timeline.', keys: [['L']] },
+        ],
       },
       {
         group: 'Mouse',
-        rows: [{ name: 'Zoom to fit', description: 'Fits the whole Timeline in view.', keys: [['Alt+wheel']] }],
+        rows: [
+          {
+            name: 'Zoom to fit',
+            description: 'Fits the whole Timeline in view.',
+            worksIn: 'Works in the lanes.',
+            keys: [['Alt+wheel']],
+          },
+        ],
       },
     ]);
   });
@@ -110,7 +133,7 @@ group('dialogGroups', () => {
 
 group('searchGroups', () => {
   const found = (query: string, on: 'mac' | 'other' = 'other') =>
-    searchGroups(dialogGroups(shortcuts, on), query).flatMap((g) => g.rows.map((r) => r.name));
+    searchGroups(listGroups(shortcuts, on), query).flatMap((g) => g.rows.map((r) => r.name));
 
   it('finds a Shortcut by its name, whatever the case', () => {
     expect(found('SPLIT')).toEqual(['Split at the playhead']);
@@ -140,6 +163,14 @@ group('searchGroups', () => {
     expect(found('pointer')).toEqual(['Zoom the Timeline']);
   });
 
+  it('finds a Shortcut by where it works', () => {
+    expect(found('ruler')).toEqual(['Seek back or forward 5 s', 'Seek back or forward 15 s']);
+  });
+
+  it('finds the key that opens the shortcuts dialog', () => {
+    expect(found('?')).toEqual(['Show the Shortcuts']);
+  });
+
   it('finds only the Shortcuts every word typed matches, in its name, description or keys', () => {
     expect(found('add  box ')).toEqual(['Add Clips with a box']);
     expect(found('ctrl shift')).toEqual(['Redo']);
@@ -147,13 +178,13 @@ group('searchGroups', () => {
   });
 
   it('keeps the groups a match is in, in order, and leaves out the rest', () => {
-    const groups = searchGroups(dialogGroups(shortcuts, 'other'), 'undo');
+    const groups = searchGroups(listGroups(shortcuts, 'other'), 'undo');
     expect(groups.map((g) => [g.group, g.rows.map((r) => r.name)])).toEqual([['Song editing', ['Undo', 'Redo']]]);
-    expect(searchGroups(dialogGroups(shortcuts, 'other'), 'wheel').map((g) => g.group)).toEqual(['Mouse']);
+    expect(searchGroups(listGroups(shortcuts, 'other'), 'wheel').map((g) => g.group)).toEqual(['Mouse']);
   });
 
   it('leaves no group when nothing matches, and every one when the search is blank', () => {
-    const all = dialogGroups(shortcuts, 'other');
+    const all = listGroups(shortcuts, 'other');
     expect(searchGroups(all, 'metronome')).toEqual([]);
     expect(searchGroups(all, '')).toEqual(all);
     expect(searchGroups(all, '   ')).toEqual(all);

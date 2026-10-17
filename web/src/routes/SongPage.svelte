@@ -33,7 +33,7 @@
   import { takeNewFlag } from '../lib/newSong';
   import { navigate, replaceSearch, router } from '../lib/router.svelte';
   import { keyboardAndMouse, keyHints } from '../lib/keyHints';
-  import { shortcuts, shortcutsDialogKeys } from '../lib/shortcuts';
+  import { shortcuts } from '../lib/shortcuts';
   import { editHint, type Freeze } from '../lib/freeze';
   import ShortcutsDialog from '../lib/ShortcutsDialog.svelte';
   import SnapshotsDialog from '../lib/SnapshotsDialog.svelte';
@@ -517,8 +517,8 @@
                   onclick={() => (showingShortcuts = true)}
                   aria-label="Keyboard shortcuts"
                   aria-haspopup="dialog"
-                  aria-keyshortcuts={hints.aria(shortcutsDialogKeys)}
-                  title={hints.withKeys('Keyboard shortcuts', shortcutsDialogKeys)}
+                  aria-keyshortcuts={hints.aria(shortcuts.showShortcuts.keys)}
+                  title={hints.withKeys('Keyboard shortcuts', shortcuts.showShortcuts.keys)}
                 >
                   <Keyboard />
                 </button>

@@ -41,6 +41,7 @@ export const pinned = [
 /** Settings' tabs, each at its own address: This device at Settings' own. */
 export const settingsTabs = [
   { id: 'device', href: '/settings', label: 'This device' },
+  { id: 'shortcuts', href: '/settings/shortcuts', label: 'Shortcuts' },
   { id: 'backups', href: '/settings/backups', label: 'Backups' },
   { id: 'about', href: '/settings/about', label: 'About' },
 ] as const;
@@ -49,6 +50,31 @@ export type SettingsTab = (typeof settingsTabs)[number]['id'];
 /** The Settings tab at a path, or none outside Settings. */
 export function settingsTabAt(path: string): SettingsTab | undefined {
   return settingsTabs.find((tab) => tab.href === path)?.id;
+}
+
+/**
+ * The Settings tabs shown: every one with a keyboard and mouse, and all but
+ * Shortcuts on a phone or a narrow window, where the shortcuts button
+ * isn't shown either.
+ */
+export function shownSettingsTabs(keyboardAndMouse: boolean): (typeof settingsTabs)[number][] {
+  return settingsTabs.filter((tab) => keyboardAndMouse || tab.id !== 'shortcuts');
+}
+
+/**
+ * Where the address of a Settings tab that isn't shown opens instead: This
+ * device, for Shortcuts on a phone or a narrow window. None for any other
+ * address.
+ */
+export function hiddenTabOpens(path: string, keyboardAndMouse: boolean): string | undefined {
+  const tab = settingsTabAt(path);
+  if (!tab || shownSettingsTabs(keyboardAndMouse).some((t) => t.id === tab)) return undefined;
+  return settingsTabHref('device');
+}
+
+/** A Settings tab's address, e.g. /settings/shortcuts for Shortcuts. */
+export function settingsTabHref(id: SettingsTab): string {
+  return settingsTabs.find((tab) => tab.id === id)!.href;
 }
 
 /** Where Backups and About were pages of their own, before they were Settings' tabs. */

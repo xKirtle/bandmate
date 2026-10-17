@@ -1,4 +1,4 @@
-import { matches, shortcuts, shortcutsDialogKeys, way, type KeyDown } from './shortcuts';
+import { matches, shortcuts, way, type KeyDown } from './shortcuts';
 import type { KeyPlace } from './keyPlace';
 
 /** The Timeline's Shortcuts that work wherever focus is on the Song page, e.g. Space to play. */
@@ -68,5 +68,5 @@ export function undoKey(e: KeyDown, at: KeyPlace): 'undo' | 'redo' | null {
 /** Whether a key press opens the shortcuts dialog: ?, unless it's typed or a dialog is open. */
 export function opensShortcuts(e: KeyDown, at: KeyPlace): boolean {
   if (e.defaultPrevented || e.repeat || at.dialogOpen || at.inTextField) return false;
-  return matches(e, shortcutsDialogKeys);
+  return matches(e, shortcuts.showShortcuts.keys);
 }

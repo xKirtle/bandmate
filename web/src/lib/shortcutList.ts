@@ -1,9 +1,11 @@
 import { keysLabel, type Key, type Platform, type Shortcut, type ShortcutGroup } from './shortcuts';
 
-/** A Shortcut as the shortcuts dialog lists it. */
-export type DialogRow = {
+/** A Shortcut as the shortcuts dialog and Settings' Shortcuts tab list it. */
+export type ListRow = {
   name: string;
   description: string;
+  /** Where it works, as a sentence: "Works in the ruler, once it has focus." */
+  worksIn: string;
   /**
    * Its keys as the platform names them: one list for a one-way Shortcut,
    * and for a two-way one, its keys going back, then forward.
@@ -11,22 +13,24 @@ export type DialogRow = {
   keys: string[][];
 };
 
-/** One of the dialog's groups, headed by where its Shortcuts work. */
-export type DialogGroup = { group: ShortcutGroup; rows: DialogRow[] };
+/** One of the list's groups, headed by where its Shortcuts work. */
+export type ListGroup = { group: ShortcutGroup; rows: ListRow[] };
 
 /**
- * The shortcuts dialog's contents: every Shortcut in `list`, in its group,
- * the groups and the Shortcuts in each in the list's order.
+ * The Shortcuts as the shortcuts dialog and the Shortcuts tab list them:
+ * every Shortcut in `list`, in its group, the groups and the Shortcuts in
+ * each in the list's order.
  */
-export function dialogGroups(list: Record<string, Shortcut>, on: Platform): DialogGroup[] {
+export function listGroups(list: Record<string, Shortcut>, on: Platform): ListGroup[] {
   const labels = (keys: readonly Key[]) => keys.map((key) => keysLabel([key], on));
-  const groups: DialogGroup[] = [];
+  const groups: ListGroup[] = [];
   for (const shortcut of Object.values(list)) {
     let group = groups.find((g) => g.group === shortcut.group);
     if (!group) groups.push((group = { group: shortcut.group, rows: [] }));
     group.rows.push({
       name: shortcut.name,
       description: shortcut.description,
+      worksIn: `Works in ${shortcut.worksIn}`,
       keys: 'keys' in shortcut ? [labels(shortcut.keys)] : [labels(shortcut.back), labels(shortcut.forward)],
     });
   }
@@ -56,16 +60,18 @@ function spelledOut(label: string): string[] {
 }
 
 /**
- * The dialog's groups as a search leaves them: only the Shortcuts whose
- * name, description or keys, as the rows name them or a Mac's modifiers
- * spelt out, hold every word of `query`, ignoring case, and only the
- * groups left with one. An empty search leaves every Shortcut.
+ * The list's groups as a search leaves them: only the Shortcuts whose
+ * name, description, where they work or keys, as the rows name them or a
+ * Mac's modifiers spelt out, hold every word of `query`, ignoring case, and
+ * only the groups left with one. An empty search leaves every Shortcut.
  */
-export function searchGroups(groups: readonly DialogGroup[], query: string): DialogGroup[] {
+export function searchGroups(groups: readonly ListGroup[], query: string): ListGroup[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  const matches = (row: DialogRow) => {
+  const matches = (row: ListRow) => {
     // A line each, so a word can't match across two.
-    const text = [row.name, row.description, ...row.keys.flat().flatMap(spelledOut)].join('\n').toLowerCase();
+    const text = [row.name, row.description, row.worksIn, ...row.keys.flat().flatMap(spelledOut)]
+      .join('\n')
+      .toLowerCase();
     return words.every((word) => text.includes(word));
   };
   return groups.map(({ group, rows }) => ({ group, rows: rows.filter(matches) })).filter(({ rows }) => rows.length > 0);

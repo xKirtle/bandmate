@@ -171,7 +171,7 @@ If you know an input's latency already, you can **Type it** in instead, though m
 
 ## Keyboard shortcuts
 
-On a song's page, press **?**, or the keyboard button by Write and Read, to see every shortcut. Type in the search at its top to find one by what it does or by its keys, like "split" or "Space". The ones you'll use most:
+On a song's page, press **?**, or the keyboard button by Write and Read, to see every shortcut. Type in the search at its top to find one by what it does or by its keys, like "split" or "Space", or press **Change keys** for **Settings → Shortcuts**, which lists them too. The ones you'll use most:
 
 | Keys | What they do |
 | --- | --- |
@@ -213,13 +213,14 @@ Under the settings, the card says when the last Scheduled Backup was made, that 
 
 ## Settings
 
-**Settings**, at the foot of the side bar, has three tabs:
+**Settings**, at the foot of the side bar, has four tabs:
 
 - **This device**: what each device keeps for itself.
   - **Appearance**: three colour palettes, Terracotta (the default), Ink and Olive, each in light and dark. Follow your system's light or dark, or pick one. More palettes may come.
   - **Recording**: every input on this device, each channel of an audio interface on its own, with its latency or "Not calibrated" or "Skipped". Pick the one you record from, and check its level with **Test input** above the list: Bandmate only listens while it's on, and asks for the microphone the first time. Open any of them to calibrate it as in [Calibrate](#calibrate) without recording from it, or type its latency. Inputs that aren't plugged in keep their latency, listed under **Not connected**, to forget.
   - **Rhyming dictionaries**: one for each language Bandmate suggests rhymes in, each with its download size. Download the ones you write in, so [Rhymes](#rhymes) can suggest words in them, or remove one you no longer need.
   - **Chord diagrams**: flip them for left-handed playing.
+- **Shortcuts**: every [keyboard shortcut](#keyboard-shortcuts), with its keys. Open one to see what it does and where it works, or search them as in the shortcuts list. Shown only on a bigger screen.
 - **Backups**: see [Backups](#backups).
 - **About**: the version you're running, what changed in it, whether a newer one is out, the yt-dlp in use, and the packages and data that ship in Bandmate, with their licenses.
 
