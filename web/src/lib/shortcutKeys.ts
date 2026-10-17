@@ -1,7 +1,8 @@
 /**
  * The Shortcuts' keys as the user rebinds them, a Device Setting: which
  * keys each Shortcut has on this device, choosing, removing and resetting
- * them, and how they're kept. Keys are unique across the Song page, so a
+ * them, or for a mouse Shortcut, the modifiers held with its gesture, and
+ * how they're kept. Keys are unique across the Song page, so a
  * key another Shortcut has is refused, never swapped or taken from it.
  * Only what differs from the defaults is kept, so a Shortcut a later
  * release adds gets its default keys, but those the user has given
@@ -11,12 +12,14 @@
 import type { DeviceSettingStorage } from './deviceSetting.svelte';
 import {
   keysLabel,
+  modifiers,
   pressedKey,
   sameKey,
   shiftCounts,
   shortcuts,
   type Key,
   type KeyPress,
+  type Modifier,
   type OneWay,
   type Platform,
   type Shortcut,
@@ -89,8 +92,52 @@ export function isMouse(id: ShortcutId): boolean {
   return allOf(defaultKeyset, id).some((key) => mouseKeys.includes(key.key));
 }
 
+/** Whether a Shortcut is the mouse's with nothing held, e.g. the plain drag that selects with a box, which can't be changed. */
+export function isFixed(id: ShortcutId): boolean {
+  return isMouse(id) && allOf(defaultKeyset, id).every((key) => !key.mod && !key.alt && !key.shift);
+}
+
+/** A mouse action: a click, a drag or a turn of the wheel. */
+export type Gesture = 'click' | 'drag' | 'wheel';
+
+/** What a mouse Shortcut is held with: its gesture, and whether each modifier is held. */
+export type Held = { gesture: Gesture } & Record<Modifier, boolean>;
+
+/** What a mouse Shortcut is held with in `keys`: its gesture, never changed, and its modifiers, none if it has no key. */
+export function heldWith(keys: Keyset, id: ShortcutId): Held {
+  const gesture = keysIn(defaultKeyset, id, 'keys')[0].key as Gesture;
+  const key: Key = keysIn(keys, id, 'keys')[0] ?? { key: gesture };
+  return { gesture, mod: !!key.mod, alt: !!key.alt, shift: !!key.shift };
+}
+
+/**
+ * Turns a modifier a mouse Shortcut is held with on or off, its gesture
+ * kept. Turning off the last is refused, as the plain gesture does
+ * something else, and so is a combination another Shortcut has, as a key.
+ */
+export function toggleModifier(current: ShortcutKeys, id: ShortcutId, modifier: Modifier): Choice {
+  const { gesture, ...held } = heldWith(current.keys, id);
+  held[modifier] = !held[modifier];
+  const key: Key = { key: gesture };
+  for (const m of modifiers) if (held[m]) key[m] = true;
+  if (!key.mod && !key.alt && !key.shift) return { ok: false, refusal: { kind: 'bare', key } };
+  return choose(current, { id, list: 'keys', index: 0 }, key);
+}
+
 // Keys pressed only with others, which keep it waiting for one that isn't.
-const modifiers = ['Shift', 'Control', 'Alt', 'AltGraph', 'Meta', 'OS', 'Super', 'Hyper', 'Fn', 'FnLock', 'CapsLock'];
+const modifierKeys = [
+  'Shift',
+  'Control',
+  'Alt',
+  'AltGraph',
+  'Meta',
+  'OS',
+  'Super',
+  'Hyper',
+  'Fn',
+  'FnLock',
+  'CapsLock',
+];
 // Presses that name no key: an accent to come, or one an input method takes.
 const unnamed = ['Dead', 'Unidentified', 'Process'];
 
@@ -100,7 +147,7 @@ const unnamed = ['Dead', 'Unidentified', 'Process'];
  * the key, or with a Mac's Option, the one at its place (see pressedKey).
  */
 export function keyChosen(pressed: KeyPress): Key | null {
-  if (modifiers.includes(pressed.key)) return null;
+  if (modifierKeys.includes(pressed.key)) return null;
   let name = pressedKey(pressed);
   if (unnamed.includes(name)) return null;
   if (name.length === 1 && name.toLowerCase() !== name.toUpperCase()) name = name.toLowerCase();
@@ -112,9 +159,12 @@ export function keyChosen(pressed: KeyPress): Key | null {
   return key;
 }
 
-/** Why a key can't be chosen: what holds it, or what it's kept for. */
+/** Why a key can't be chosen: what holds it, what it's kept for, or, for a mouse Shortcut, that nothing would be held. */
 export type Refusal =
-  { kind: 'taken'; key: Key; by: ShortcutId } | { kind: 'own'; key: Key } | { kind: KeptFor; key: Key };
+  | { kind: 'taken'; key: Key; by: ShortcutId }
+  | { kind: 'own'; key: Key }
+  | { kind: KeptFor; key: Key }
+  | { kind: 'bare'; key: Key };
 
 /** What a key no Shortcut can have is kept for: moving between controls, cancelling, pressing buttons, or the browser. */
 type KeptFor = 'tab' | 'escape' | 'presses' | 'browser';
@@ -214,6 +264,8 @@ export function seen(current: ShortcutKeys, id: ShortcutId): ShortcutKeys {
   return current.fresh.includes(id) ? { ...current, fresh: current.fresh.filter((f) => f !== id) } : current;
 }
 
+const gestureNouns: Record<Gesture, string> = { click: 'click', drag: 'drag', wheel: 'scroll' };
+
 /**
  * Why a key was refused, in a sentence, naming the Shortcut that has it,
  * if one does, after the text: "S is already used by", then "Split at the
@@ -238,6 +290,11 @@ export function refusalMessage(
       return { text: `${name} can't be chosen on its own: it presses buttons. Hold a modifier with it.`, by: null };
     case 'browser':
       return { text: `${name} can't be chosen: the browser keeps it.`, by: null };
+    case 'bare':
+      return {
+        text: `Needs at least one modifier: a plain ${gestureNouns[refusal.key.key as Gesture]} does something else.`,
+        by: null,
+      };
   }
 }
 

@@ -473,6 +473,33 @@ group('Keys as rebound', () => {
     expect(timelineKey(press('ArrowUp', { shiftKey: true }), { ...at, ownsArrows: true })).toBeNull();
   });
 
+  it('click, drag and turn the wheel with the modifiers chosen', () => {
+    rebind({
+      toggleClip: { keys: [{ key: 'click', alt: true }] },
+      addBox: { keys: [{ key: 'drag', shift: true }] },
+      nudgeTake: { keys: [{ key: 'drag', mod: true, alt: true }] },
+      skipSnapping: { keys: [{ key: 'drag', alt: true }] },
+      zoom: { keys: [{ key: 'wheel', shift: true }] },
+    });
+    expect(togglesSelection(held({ altKey: true }))).toBe(true);
+    expect(togglesSelection(held({ ctrlKey: true }))).toBe(false);
+    expect(addsBox(held({ shiftKey: true }))).toBe(true);
+    expect(addsBox(held({ metaKey: true }))).toBe(false);
+    expect(nudges(held({ metaKey: true, altKey: true }))).toBe(true);
+    expect(nudges(held({ altKey: true }))).toBe(false);
+    expect(skipsSnapping(held({ altKey: true }))).toBe(true);
+    expect(skipsSnapping(held({ shiftKey: true }))).toBe(false);
+    expect(zooms(held({ shiftKey: true }))).toBe(true);
+    expect(zooms(held({ metaKey: true }))).toBe(false);
+  });
+
+  it('zoom on a pinch, a Ctrl wheel event, whatever modifiers zooming is given', () => {
+    rebind({ zoom: { keys: [{ key: 'wheel', alt: true }] } });
+    expect(zooms(held({ ctrlKey: true }))).toBe(true);
+    rebind({ zoom: { keys: [] } });
+    expect(zooms(held({ ctrlKey: true }))).toBe(true);
+  });
+
   it('seek the ruler with the keys chosen', () => {
     rebind({ seek: { back: [{ key: 'j' }], forward: [{ key: 'l' }] } });
     expect(rulerSeek(press('j'), 60)).toBe(55);

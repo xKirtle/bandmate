@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from '../fixtures';
+import { clip, gainLine, heroSong } from '../songPage';
 
 // Settings' Shortcuts tab: every Shortcut, in its group's card, each a fold
 // opening to what it does and where it works, with the shortcuts dialog's
@@ -239,4 +240,74 @@ test('the Song page uses and names the keys as rebound', async ({ page, bandmate
   await expect(dialog.getByRole('listitem').filter({ hasText: 'Show the Shortcuts' }).locator('kbd')).toHaveText([
     'Shift+K',
   ]);
+});
+
+test("a mouse Shortcut changes only what's held, at least one modifier, none another holds", async ({ page }) => {
+  await page.goto('/settings/shortcuts');
+  await open(page, 'Add Clips with a box');
+  const addBox = fold(page, 'Add Clips with a box');
+  const held = addBox.getByRole('group', { name: 'Held with the mouse' });
+  await expect(held).toHaveText(/^Hold\s*Ctrl\s*Alt\s*Shift\s*and drag$/);
+  const ctrl = held.getByRole('button', { name: 'Ctrl' });
+  const alt = held.getByRole('button', { name: 'Alt' });
+  const shift = held.getByRole('button', { name: 'Shift' });
+  await expect(ctrl).toHaveAttribute('aria-pressed', 'true');
+  await expect(alt).toHaveAttribute('aria-pressed', 'false');
+
+  await ctrl.click();
+  await expect(addBox.getByRole('status')).toHaveText('Needs at least one modifier: a plain drag does something else.');
+  await expect(ctrl).toHaveAttribute('aria-pressed', 'true');
+
+  // Modifiers combine, and the next one taken clears the message.
+  await alt.click();
+  await expect(addBox.getByRole('status')).toHaveCount(0);
+  await expect(addBox.locator('summary kbd')).toHaveText(['Ctrl+Alt+drag']);
+  await expect(addBox.locator('summary')).toContainText('Changed');
+
+  // Alt alone is how a Take is nudged.
+  await ctrl.click();
+  await expect(addBox.getByRole('status')).toHaveText('Alt+drag is already used by Nudge a Take inside its Clip.');
+  await page.keyboard.press('Escape');
+  await expect(addBox.getByRole('status')).toHaveCount(0);
+  await ctrl.click();
+  await addBox.getByRole('button', { name: 'Nudge a Take inside its Clip' }).click();
+  await expect(fold(page, 'Nudge a Take inside its Clip')).toHaveAttribute('open', '');
+
+  await shift.click();
+  await addBox.getByRole('button', { name: 'Reset' }).click();
+  await expect(addBox.locator('summary kbd')).toHaveText(['Ctrl+drag']);
+
+  // The plain drag that selects with a box is shown, but can't be changed.
+  await open(page, 'Select Clips with a box');
+  const box = fold(page, 'Select Clips with a box');
+  await expect(box.getByText("Can't be changed")).toBeVisible();
+  await expect(box.getByRole('button')).toHaveCount(0);
+});
+
+test('the Song page clicks and drags with the modifiers as rebound, and names them', async ({ page, bandmate }) => {
+  const song = await heroSong(bandmate);
+  await page.goto('/settings/shortcuts');
+  await open(page, 'Add or remove a Clip');
+  const toggleClip = fold(page, 'Add or remove a Clip');
+  await toggleClip.getByRole('button', { name: 'Alt' }).click();
+  await toggleClip.getByRole('button', { name: 'Ctrl' }).click();
+  await expect(toggleClip.locator('summary kbd')).toHaveText(['Alt+click']);
+  await open(page, 'Skip snapping');
+  await fold(page, 'Skip snapping').getByRole('button', { name: 'Ctrl' }).click();
+
+  await page.goto(`/songs/${song.id}`);
+  const take = clip(page, 'Take 2');
+  const beat = clip(page, 'Lorem Click');
+  await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
+  await expect(gainLine(take)).toHaveAttribute('title', /with Ctrl\+Shift for fine steps/);
+
+  await beat.click();
+  await expect(beat).toHaveAccessibleName(/^Lorem Click, selected, /);
+  // Ctrl no longer adds a Clip: it selects it alone.
+  await take.click({ modifiers: ['ControlOrMeta'] });
+  await expect(take).toHaveAccessibleName(/^Take 2, selected, /);
+  await expect(beat).not.toHaveAccessibleName(/, selected, /);
+  await beat.click({ modifiers: ['Alt'] });
+  await expect(beat).toHaveAccessibleName(/^Lorem Click, selected, /);
+  await expect(take).toHaveAccessibleName(/^Take 2, selected, /);
 });

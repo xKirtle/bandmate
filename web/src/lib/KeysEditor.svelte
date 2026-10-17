@@ -1,26 +1,36 @@
 <script lang="ts">
-  // One keyboard Shortcut's keys, in its fold in Settings' Shortcuts tab:
-  // each a button that, clicked, waits for the next key pressed ("Press a
-  // key…", Esc cancels), with an x to take it off, then Add key. A two-way
-  // Shortcut's Back and Forward keys are listed on their own. A key that's
-  // refused says why under them, naming the Shortcut that has it as a
-  // button leading there, and it keeps waiting for another try. The message
-  // goes on the next key taken, on Esc, or once focus leaves, unless it's
-  // to that button; the fold unmounts this as it closes, which clears it too.
+  // One Shortcut's keys, in its fold in Settings' Shortcuts tab. A keyboard
+  // Shortcut's are each a button that, clicked, waits for the next key
+  // pressed ("Press a key…", Esc cancels), with an x to take it off, then
+  // Add key. A two-way Shortcut's Back and Forward keys are listed on their
+  // own. A mouse Shortcut changes only what's held, never its gesture:
+  // "Hold Ctrl Alt Shift and drag", each modifier a toggle, at least one
+  // on; the plain drag that selects with a box can't be changed at all. A
+  // key or a modifier that's refused says why under them, naming the
+  // Shortcut that has it as a button leading there, and a key keeps waiting
+  // for another try. The message goes on the next key or modifier taken, on
+  // Esc, or once focus leaves, unless it's to that button; the fold
+  // unmounts this as it closes, which clears it too.
   import Plus from '@lucide/svelte/icons/plus';
   import X from '@lucide/svelte/icons/x';
   import { tick } from 'svelte';
   import { shortcutKeys } from './sharedShortcutKeys.svelte';
-  import { keysLabel, platform, shortcuts, type Key } from './shortcuts';
+  import { keysLabel, modifierName, modifiers, platform, shortcuts, type Key, type Modifier } from './shortcuts';
   import {
     choose,
+    defaultKeyset,
+    heldWith,
     isChanged,
+    isFixed,
+    isMouse,
     keyChosen,
     keysIn,
     listsOf,
     refusalMessage,
     removeKey,
     reset,
+    toggleModifier,
+    type Gesture,
     type KeyList,
     type ShortcutId,
     type Slot,
@@ -36,6 +46,9 @@
   let message = $state<{ text: string; by: ShortcutId | null } | null>(null);
 
   const lists = $derived(listsOf(id));
+  /** What a mouse Shortcut is held with, or null for a keyboard one, or the plain drag. */
+  const held = $derived(isMouse(id) && !isFixed(id) ? heldWith(shortcutKeys.value.keys, id) : null);
+  const gestures: Record<Gesture, string> = { click: 'click', drag: 'drag', wheel: 'scroll the wheel' };
   const names: Record<KeyList, string> = { keys: 'Keys', back: 'Back', forward: 'Forward' };
   const label = (key: Key) => keysLabel([key], on);
   const isListening = (list: KeyList, index: number) => listening?.list === list && listening.index === index;
@@ -95,6 +108,16 @@
     root?.querySelector<HTMLElement>(`[data-add="${list}"]`)?.focus();
   }
 
+  function toggle(modifier: Modifier) {
+    const choice = toggleModifier(shortcutKeys.value, id, modifier);
+    if (choice.ok) {
+      shortcutKeys.set(choice.keys);
+      message = null;
+    } else {
+      message = refusalMessage(choice.refusal, on);
+    }
+  }
+
   function resetKeys() {
     const choice = reset(shortcutKeys.value, id);
     if (choice.ok) {
@@ -105,8 +128,8 @@
     }
   }
 
-  // Esc clears a message from Reset or the Shortcut it names too, as it
-  // does a refused key's while waiting (see onkeydown).
+  // Esc clears a message from a modifier, Reset or the Shortcut it names
+  // too, as it does a refused key's while waiting (see onkeydown).
   function escape(event: KeyboardEvent) {
     if (event.key === 'Escape' && message && !listening) message = null;
   }
@@ -118,49 +141,71 @@
 </script>
 
 <div class="editor" bind:this={root} {onfocusout}>
-  <div class="lists" class:two-way={lists.length > 1}>
-    {#each lists as list (list)}
-      {@const keys = keysIn(shortcutKeys.value.keys, id, list)}
-      <div class="list" role="group" aria-labelledby="{uid}-{list}">
-        <span class="way" class:visually-hidden={lists.length === 1} id="{uid}-{list}">{names[list]}</span>
-        <span class="keys">
-          {#each keys as key, k (k)}
-            <span class="key" class:listening={isListening(list, k)}>
-              <button
-                type="button"
-                class="rebind"
-                aria-label={isListening(list, k) ? 'Press a key' : `Change ${label(key)}`}
-                aria-describedby={message ? `${uid}-message` : undefined}
-                onclick={() => listen(list, k)}
-                {onkeydown}
-                {onkeyup}>{isListening(list, k) ? 'Press a key…' : label(key)}</button
-              >
-              <button
-                type="button"
-                class="remove"
-                aria-label="Remove {label(key)}"
-                title="Remove"
-                onclick={() => remove(list, k)}><X /></button
-              >
-            </span>
-          {:else}
-            <span class="none">No key</span>
-          {/each}
-          <button
-            type="button"
-            class="add"
-            class:listening={isListening(list, keys.length)}
-            data-add={list}
-            aria-describedby={message ? `${uid}-message` : undefined}
-            onclick={() => listen(list, keys.length)}
-            {onkeydown}
-            {onkeyup}
-            >{#if isListening(list, keys.length)}Press a key…{:else}<Plus /> Add key{/if}</button
-          >
-        </span>
-      </div>
-    {/each}
-  </div>
+  {#if isFixed(id)}
+    <p class="fixed">
+      <kbd>{keysLabel(keysIn(defaultKeyset, id, 'keys'), on)}</kbd>
+      <span class="hint">Can't be changed</span>
+    </p>
+  {:else if held}
+    <div class="held" role="group" aria-label="Held with the mouse">
+      <span>Hold</span>
+      {#each modifiers as modifier (modifier)}
+        <button
+          type="button"
+          class="button toggle"
+          aria-pressed={held[modifier]}
+          aria-describedby={message ? `${uid}-message` : undefined}
+          onclick={() => toggle(modifier)}
+          onkeydown={escape}>{modifierName(modifier, on)}</button
+        >
+      {/each}
+      <span>and {gestures[held.gesture]}</span>
+    </div>
+  {:else}
+    <div class="lists" class:two-way={lists.length > 1}>
+      {#each lists as list (list)}
+        {@const keys = keysIn(shortcutKeys.value.keys, id, list)}
+        <div class="list" role="group" aria-labelledby="{uid}-{list}">
+          <span class="way" class:visually-hidden={lists.length === 1} id="{uid}-{list}">{names[list]}</span>
+          <span class="keys">
+            {#each keys as key, k (k)}
+              <span class="key" class:listening={isListening(list, k)}>
+                <button
+                  type="button"
+                  class="rebind"
+                  aria-label={isListening(list, k) ? 'Press a key' : `Change ${label(key)}`}
+                  aria-describedby={message ? `${uid}-message` : undefined}
+                  onclick={() => listen(list, k)}
+                  {onkeydown}
+                  {onkeyup}>{isListening(list, k) ? 'Press a key…' : label(key)}</button
+                >
+                <button
+                  type="button"
+                  class="remove"
+                  aria-label="Remove {label(key)}"
+                  title="Remove"
+                  onclick={() => remove(list, k)}><X /></button
+                >
+              </span>
+            {:else}
+              <span class="none">No key</span>
+            {/each}
+            <button
+              type="button"
+              class="add"
+              class:listening={isListening(list, keys.length)}
+              data-add={list}
+              aria-describedby={message ? `${uid}-message` : undefined}
+              onclick={() => listen(list, keys.length)}
+              {onkeydown}
+              {onkeyup}
+              >{#if isListening(list, keys.length)}Press a key…{:else}<Plus /> Add key{/if}</button
+            >
+          </span>
+        </div>
+      {/each}
+    </div>
+  {/if}
   {#if message}
     <p class="message" id="{uid}-message" role="status">
       {message.text}{#if message.by}
@@ -282,6 +327,32 @@
     cursor: pointer;
   }
   .reset {
+    font-size: var(--text-sm);
+  }
+  /* A mouse Shortcut's modifiers, a toggle each, in a sentence: "Hold Ctrl Alt Shift and drag". */
+  .held {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  /* The plain drag, as a key that can't be changed. */
+  .fixed {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    margin: 0;
+  }
+  .fixed kbd {
+    padding: 0 var(--space-2);
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-1);
+    font: inherit;
+  }
+  .hint {
+    color: var(--text-muted);
     font-size: var(--text-sm);
   }
 </style>

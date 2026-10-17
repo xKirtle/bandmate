@@ -1,6 +1,7 @@
 import { MediaQuery } from 'svelte/reactivity';
 import {
   ariaKeyShortcuts,
+  heldLabel,
   keysLabel,
   platform,
   twoWayLabel,
@@ -51,6 +52,11 @@ export class KeyHints {
   /** Names `keys` as this platform does, e.g. "⌘Z", or null on a phone or a narrow window. */
   label(keys: readonly Key[]): string | null {
     return this.#keyboardAndMouse() ? keysLabel(keys, this.#on) : null;
+  }
+
+  /** Names only what's held with a mouse Shortcut's keys, e.g. "Shift", or null on a phone or a narrow window, or if it has none. */
+  held(keys: readonly Key[]): string | null {
+    return this.#keyboardAndMouse() && keys.length > 0 ? heldLabel(keys, this.#on) : null;
   }
 
   /** Names two-way keys, e.g. a Shortcut's, "⌥↓ or ⌥↑", back first unless asked otherwise, or null on a phone or a narrow window. */

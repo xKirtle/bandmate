@@ -212,14 +212,15 @@ export const shortcuts = {
   skipSnapping: {
     name: 'Skip snapping',
     group: 'Mouse',
-    description: 'Lets a Clip or the Loop being dragged go anywhere, snapping to nothing.',
-    worksIn: 'a Clip or the Loop being dragged.',
+    description:
+      "Lets a Clip or the Loop being dragged go anywhere, snapping to nothing, or a Clip's gain line move in fine steps.",
+    worksIn: 'a Clip, its gain line or the Loop being dragged.',
     keys: [{ key: 'drag', shift: true }],
   },
   zoom: {
     name: 'Zoom the Timeline',
     group: 'Mouse',
-    description: 'Zooms the Timeline in or out around the pointer.',
+    description: 'Zooms the Timeline in or out around the pointer. Pinching always zooms too.',
     worksIn: "the Timeline's lanes and its scroll bar.",
     // A trackpad's pinch zooms too, whatever these are: a browser sends
     // it as a Ctrl wheel event.
@@ -349,6 +350,29 @@ function keyLabel(key: Key, on: Platform): string {
 /** Names `keys` for a platform, e.g. "⌘⇧Z or ⌘Y" on a Mac and "Ctrl+Shift+Z or Ctrl+Y" elsewhere. */
 export function keysLabel(keys: readonly Key[], on: Platform): string {
   return keys.map((key) => keyLabel(key, on)).join(' or ');
+}
+
+/** A modifier a key or a mouse Shortcut is held with: Mod (Ctrl or ⌘), Alt (⌥) or Shift (⇧). */
+export type Modifier = 'mod' | 'alt' | 'shift';
+
+/** Every modifier, in the order they're named. */
+export const modifiers: readonly Modifier[] = ['mod', 'alt', 'shift'];
+
+/** Names a modifier for a platform: in words, and with its symbol on a Mac, e.g. "⌥ Option". */
+export function modifierName(modifier: Modifier, on: Platform): string {
+  if (on === 'mac') return { mod: '⌘ Cmd', alt: '⌥ Option', shift: '⇧ Shift' }[modifier];
+  return { mod: 'Ctrl', alt: 'Alt', shift: 'Shift' }[modifier];
+}
+
+/** Names only what's held with each of a mouse Shortcut's keys, e.g. "Shift", or "⇧" on a Mac. */
+export function heldLabel(keys: readonly Key[], on: Platform): string {
+  return keys
+    .map((key) =>
+      on === 'mac'
+        ? (key.mod ? '⌘' : '') + (key.alt ? '⌥' : '') + (key.shift ? '⇧' : '')
+        : [key.mod && 'Ctrl', key.alt && 'Alt', key.shift && 'Shift'].filter(Boolean).join('+'),
+    )
+    .join(' or ');
 }
 
 /** Which of a two-way Shortcut's ways is named first. */

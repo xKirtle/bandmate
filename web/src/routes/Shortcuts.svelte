@@ -2,7 +2,7 @@
   // Settings' Shortcuts tab: every Shortcut on the Song page, in its group's
   // card, each a fold showing its name, whether it's changed or new, and its
   // keys as rebound on this device, and opening to what it does, where it
-  // works and, for a keyboard Shortcut, its keys to change (KeysEditor).
+  // works and its keys to change (KeysEditor).
   // The same search as the shortcuts dialog's narrows them down, and Reset
   // to defaults beside it puts every Shortcut back. Shortcuts are for a
   // keyboard and mouse, so a phone or a narrow window opens This device at
@@ -14,15 +14,7 @@
   import SettingsPage from '../lib/SettingsPage.svelte';
   import { shortcutKeys } from '../lib/sharedShortcutKeys.svelte';
   import { platform } from '../lib/shortcuts';
-  import {
-    anyChanged,
-    defaultShortcutKeys,
-    isChanged,
-    isMouse,
-    seen,
-    withKeys,
-    type ShortcutId,
-  } from '../lib/shortcutKeys';
+  import { anyChanged, defaultShortcutKeys, isChanged, seen, withKeys, type ShortcutId } from '../lib/shortcutKeys';
   import { listGroups, searchGroups } from '../lib/shortcutList';
   import ShortcutSearch from '../lib/ShortcutSearch.svelte';
 
@@ -87,7 +79,7 @@
             <div class="body">
               <p>{row.description}</p>
               <p class="hint">{row.worksIn}</p>
-              {#if opened.has(id) && !isMouse(id)}
+              {#if opened.has(id)}
                 <KeysEditor {id} onreveal={reveal} />
               {/if}
             </div>

@@ -21,6 +21,13 @@ group('KeyHints', () => {
     expect(phone().label(shortcuts.cueNextLine.keys)).toBeNull();
   });
 
+  it("names what's held with a mouse Shortcut only with a keyboard and mouse", () => {
+    expect(desktop('mac').held(shortcuts.skipSnapping.keys)).toBe('⇧');
+    expect(desktop().held(shortcuts.addBox.keys)).toBe('Ctrl');
+    expect(desktop().held([])).toBeNull();
+    expect(phone().held(shortcuts.skipSnapping.keys)).toBeNull();
+  });
+
   it("names a two-way Shortcut's keys only with a keyboard and mouse", () => {
     expect(desktop('mac').twoWay(shortcuts.nudgeCue)).toBe('⌥↓ or ⌥↑');
     expect(desktop().twoWay(shortcuts.nudgeCue, 'forward')).toBe('Alt+↑ or Alt+↓');
