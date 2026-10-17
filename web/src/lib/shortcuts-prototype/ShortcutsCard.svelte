@@ -19,7 +19,7 @@
   <p class="hint">
     The keys used on a Song page. Click a key, then press the one you want; Esc cancels. Each key does one thing.
   </p>
-  <input class="field" type="search" placeholder="Search by name or key, e.g. Record or Shift" bind:value={query} />
+  <input type="search" aria-label="Search Shortcuts" placeholder="Search by name or key, e.g. Record or Shift" bind:value={query} />
   {#each groups as { group, entries } (group)}
     <!-- Subtitles stay in the outline while searching; their ids don't move. -->
     <div class="group">

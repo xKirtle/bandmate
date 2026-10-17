@@ -45,10 +45,10 @@
 <div class="editor" class:start={align === 'start'}>
   {#each bindings[entry.id] as way, w (w)}
     <div class="way">
-      {#if way.label}<span class="muted">{way.label}</span>{/if}
+      {#if way.label}<span class="muted way-label">{way.label}</span>{/if}
       {#each way.keys as key, i (i)}
         {#if i > 0}<span class="muted">or</span>{/if}
-        <span class="chip" class:fixed={entry.fixed}>
+        <span class="keychip" class:fixed={entry.fixed}>
           {#if entry.fixed}
             <kbd>{label(key)}</kbd>
           {:else}
@@ -122,49 +122,83 @@
   .muted {
     color: var(--text-muted);
   }
+  /* Back and Forward take one width, so their keys line up. */
+  .way-label {
+    min-width: 4.5rem;
+  }
   .small {
     font-size: var(--text-sm);
   }
-  .chip {
+  /* A key you can click to rebind: outlined in a tint of the accent, its
+     name in the accent, so it reads as a control beside plain labels. */
+  .keychip {
     display: inline-flex;
-    align-items: stretch;
-    border: 1px solid var(--border);
-    border-bottom-width: 2px;
+    align-items: center;
+    height: 1.75rem;
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
     border-radius: var(--radius-sm);
     background: var(--surface-1);
+    line-height: 1;
   }
-  .chip button,
+  .keychip.fixed {
+    border-color: var(--border);
+  }
+  .keychip button,
   .add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
     border: 0;
     background: none;
-    color: inherit;
     font: inherit;
+    line-height: 1;
     cursor: pointer;
   }
   .key {
     padding: 0 var(--space-2);
+    color: var(--accent);
+    font-weight: 600;
     white-space: nowrap;
   }
-  .remove {
-    display: grid;
-    place-items: center;
-    padding: 0 var(--space-1);
-    border-left: 1px solid var(--border) !important;
-    color: var(--text-muted) !important;
+  .keychip .remove {
+    width: 1.75rem;
+    padding: 0;
+    border-left: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+    color: var(--text-muted);
+  }
+  @media (hover: hover) {
+    .key:hover,
+    .keychip .remove:hover {
+      background: var(--surface-2);
+    }
+    .keychip .remove:hover {
+      color: var(--text);
+    }
+    .add:hover {
+      color: var(--text);
+    }
   }
   .add {
+    height: 1.75rem;
     padding: 0 var(--space-2);
-    border: 1px dashed var(--border);
+    border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--border));
     border-radius: var(--radius-sm);
-    color: var(--text-muted);
+    color: var(--accent);
   }
   .capturing {
     outline: 2px solid var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent) !important;
     color: var(--accent);
   }
   kbd {
+    display: inline-flex;
+    align-items: center;
+    height: 100%;
     padding: 0 var(--space-2);
+    color: var(--text-muted);
     font: inherit;
+    line-height: 1;
     white-space: nowrap;
   }
   .reset {

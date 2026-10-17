@@ -34,8 +34,8 @@
   <div class="top">
     <input
       bind:this={search}
-      class="field"
       type="search"
+      aria-label="Search Shortcuts"
       placeholder="Search by name or key, e.g. Record or Shift"
       bind:value={query}
     />

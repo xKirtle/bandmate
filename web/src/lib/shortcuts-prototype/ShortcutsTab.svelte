@@ -39,8 +39,8 @@
 </script>
 
 <p class="hint kept">Kept on this device. Each key does one thing, anywhere on a Song page.</p>
-<div class="bar">
-  <input class="field" type="search" placeholder="Search by name or key, e.g. Record or Shift" bind:value={query} />
+<div class="search-row">
+  <input type="search" aria-label="Search Shortcuts" placeholder="Search by name or key, e.g. Record or Shift" bind:value={query} />
   <button type="button" class="button quiet" disabled={changedCount() === 0} onclick={resetAll}
     >Reset to defaults</button
   >
@@ -84,13 +84,13 @@
     color: var(--text-muted);
     font-size: var(--text-sm);
   }
-  .bar {
+  .search-row {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
     margin-bottom: var(--space-4);
   }
-  .bar input {
+  .search-row input {
     flex: 1 1 16rem;
   }
   .cards {
@@ -133,7 +133,11 @@
     margin-left: auto;
   }
   kbd {
+    display: inline-flex;
+    align-items: center;
+    height: 1.5rem;
     padding: 0 var(--space-2);
+    line-height: 1;
     border: 1px solid var(--border);
     border-bottom-width: 2px;
     border-radius: var(--radius-sm);
