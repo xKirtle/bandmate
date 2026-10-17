@@ -165,8 +165,12 @@ export type Refusal =
   | { kind: KeptFor; key: Key }
   | { kind: 'bare'; key: Key };
 
-/** What a key no Shortcut can have is kept for: moving between controls, cancelling, pressing buttons, or the browser. */
-type KeptFor = 'tab' | 'escape' | 'presses' | 'browser';
+/**
+ * What a key no Shortcut can have is kept for: moving between controls,
+ * cancelling, pressing buttons, the browser, or, for Shift alone with the
+ * wheel, scrolling the Timeline sideways.
+ */
+type KeptFor = 'tab' | 'escape' | 'presses' | 'browser' | 'sideways';
 
 /** The keys after a key is chosen, or why it's refused. */
 export type Choice = { ok: true; keys: ShortcutKeys } | { ok: false; refusal: Refusal };
@@ -182,6 +186,7 @@ function kept(key: Key): KeptFor | null {
   if (key.key === 'Tab') return 'tab';
   if (key.key === 'Escape') return 'escape';
   if (bare && (key.key === 'Enter' || key.key === ' ')) return 'presses';
+  if (key.key === 'wheel' && key.shift && !key.mod && !key.alt) return 'sideways';
   return null;
 }
 
@@ -289,6 +294,8 @@ export function refusalMessage(
       return { text: `${name} can't be chosen on its own: it presses buttons. Hold a modifier with it.`, by: null };
     case 'browser':
       return { text: `${name} can't be chosen: the browser keeps it.`, by: null };
+    case 'sideways':
+      return { text: `${name} can't be chosen: it scrolls the Timeline sideways.`, by: null };
     case 'bare':
       return {
         text: `Needs at least one modifier: a plain ${isGesture(refusal.key.key) ? gestureNouns[refusal.key.key] : refusal.key.key} does something else.`,

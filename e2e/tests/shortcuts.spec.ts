@@ -281,6 +281,14 @@ test("a mouse Shortcut changes only what's held, at least one modifier, none ano
   await open(page, 'Select Clips with a box');
   const box = fold(page, 'Select Clips with a box');
   await expect(box.getByText("Can't be changed")).toBeVisible();
+
+  // Shift alone with the wheel scrolls the Timeline sideways.
+  await open(page, 'Zoom the Timeline');
+  const zoom = fold(page, 'Zoom the Timeline');
+  await zoom.getByRole('button', { name: 'Shift' }).click();
+  await zoom.getByRole('button', { name: 'Ctrl' }).click();
+  await expect(zoom.getByRole('status')).toHaveText("Shift+wheel can't be chosen: it scrolls the Timeline sideways.");
+  await expect(zoom.locator('summary kbd')).toHaveText(['Ctrl+Shift+wheel']);
   await expect(box.getByRole('button')).toHaveCount(0);
 });
 
