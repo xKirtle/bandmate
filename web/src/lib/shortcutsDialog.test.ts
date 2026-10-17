@@ -119,11 +119,21 @@ group('searchGroups', () => {
   it('finds a Shortcut by its keys as this platform names them', () => {
     expect(found('Ctrl+Z')).toEqual(['Undo']);
     expect(found('⌘Z', 'mac')).toEqual(['Undo']);
-    expect(found('Ctrl+Z', 'mac')).toEqual([]);
     expect(found('Shift')).toEqual(['Redo', "Open a Clip's menu", 'Seek back or forward 15 s', 'Skip snapping']);
     expect(found('Backspace')).toEqual(['Delete a Clip']);
     expect(found('Shift+F10')).toEqual(["Open a Clip's menu"]);
     expect(found('Home')).toEqual(['Go to the start or end']);
+  });
+
+  it("finds a Shortcut on a Mac by its modifiers' names as well as their symbols", () => {
+    const withShift = ['Redo', "Open a Clip's menu", 'Seek back or forward 15 s', 'Skip snapping'];
+    expect(found('shift', 'mac')).toEqual(withShift);
+    expect(found('⇧', 'mac')).toEqual(withShift);
+    expect(found('Shift+F10', 'mac')).toEqual(["Open a Clip's menu"]);
+    for (const mod of ['Cmd+Z', 'Command+Z', 'Ctrl+Z', 'Control+Z']) expect(found(mod, 'mac')).toEqual(['Undo']);
+    expect(found('cmd+shift+z', 'mac')).toEqual(['Redo']);
+    expect(found('option', 'mac')).toEqual(['Nudge a Cue by 0.1 s', 'Nudge a Take inside its Clip']);
+    expect(found('Alt+drag', 'mac')).toEqual(['Nudge a Take inside its Clip']);
   });
 
   it('finds a Shortcut by its description', () => {

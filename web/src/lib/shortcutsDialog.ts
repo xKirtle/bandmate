@@ -33,17 +33,39 @@ export function dialogGroups(list: Record<string, Shortcut>, on: Platform): Dial
   return groups;
 }
 
+// A Mac's modifier symbols, each with the names it's searched by. Mod is
+// Ctrl or ⌘ on any platform, so ⌘ answers to Ctrl too.
+const modifierNames: Record<string, readonly string[]> = {
+  '⌘': ['Cmd', 'Command', 'Ctrl', 'Control'],
+  '⌥': ['Option', 'Alt'],
+  '⇧': ['Shift'],
+};
+
+/**
+ * A key's label spelt out, for a search: a Mac's "⌘⇧Z" as "Cmd+Shift+Z",
+ * "Command+Shift+Z", "Ctrl+Shift+Z" and so on, as hard-to-type symbols
+ * would otherwise be the only way to find it. Any other label stands as it is.
+ */
+function spelledOut(label: string): string[] {
+  const mods = [...label.slice(0, label.search(/[^⌘⌥⇧]|$/))];
+  if (mods.length === 0) return [label];
+  const name = label.slice(mods.length).replace(/^\+/, '');
+  let spellings = [[] as string[]];
+  for (const mod of mods) spellings = spellings.flatMap((s) => modifierNames[mod].map((n) => [...s, n]));
+  return [label, ...spellings.map((s) => [...s, name].join('+'))];
+}
+
 /**
  * The dialog's groups as a search leaves them: only the Shortcuts whose
- * name, description or keys, as the rows name them, hold every word of
- * `query`, ignoring case, and only the groups left with one. An empty
- * search leaves every Shortcut.
+ * name, description or keys, as the rows name them or a Mac's modifiers
+ * spelt out, hold every word of `query`, ignoring case, and only the
+ * groups left with one. An empty search leaves every Shortcut.
  */
 export function searchGroups(groups: readonly DialogGroup[], query: string): DialogGroup[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   const matches = (row: DialogRow) => {
     // A line each, so a word can't match across two.
-    const text = [row.name, row.description, ...row.keys.flat()].join('\n').toLowerCase();
+    const text = [row.name, row.description, ...row.keys.flat().flatMap(spelledOut)].join('\n').toLowerCase();
     return words.every((word) => text.includes(word));
   };
   return groups.map(({ group, rows }) => ({ group, rows: rows.filter(matches) })).filter(({ rows }) => rows.length > 0);
