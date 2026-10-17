@@ -33,7 +33,7 @@
   import { takeNewFlag } from '../lib/newSong';
   import { navigate, replaceSearch, router } from '../lib/router.svelte';
   import { keyboardAndMouse, keyHints } from '../lib/keyHints';
-  import { shortcuts } from '../lib/shortcuts';
+  import { rebound } from '../lib/shortcutKeys';
   import { editHint, type Freeze } from '../lib/freeze';
   import ShortcutsDialog from '../lib/ShortcutsDialog.svelte';
   import SnapshotsDialog from '../lib/SnapshotsDialog.svelte';
@@ -213,6 +213,8 @@
   // The Snapshots dialog, opened from Write mode only.
   let showingSnapshots = $state(false);
   const hints = keyHints();
+  // Every Shortcut's keys, as rebound on this device, for the buttons' hints.
+  const shortcuts = $derived(rebound());
 
   function keydown(event: KeyboardEvent) {
     if (!song) return;

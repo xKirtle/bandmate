@@ -27,7 +27,8 @@ export function menuKey(key: string, current: number, count: number): number | '
 
 /**
  * Whether a key opens a menu from what has focus, as it would a context
- * menu: the Menu key, or Shift+F10.
+ * menu: the Menu key, or Shift+F10. They're a ⋯ button's own keys,
+ * whatever keys open a Clip's menu on this device (see timelineKey).
  */
 export function opensMenu(e: KeyPress): boolean {
   return matches(e, shortcuts.clipMenu.keys);

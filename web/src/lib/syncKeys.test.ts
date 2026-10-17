@@ -1,4 +1,5 @@
-import { describe as group, expect, it } from 'vitest';
+import { afterEach, describe as group, expect, it } from 'vitest';
+import { defaultKeyset, followKeys, type Keyset } from './shortcutKeys';
 import type { KeyDown } from './shortcuts';
 import { cuesNextLine, type CueNextContext } from './syncKeys';
 
@@ -14,7 +15,7 @@ const press = (key: string, mods: Partial<Omit<KeyDown, 'key'>> = {}): KeyDown =
 });
 
 // Sync mode on, with focus on the Lyric Sheet, e.g. on a button.
-const syncing: CueNextContext = { syncing: true, inTextField: false, inDialogOrMenu: false };
+const syncing: CueNextContext = { syncing: true, inTextField: false, inDialogOrMenu: false, ownsArrows: false };
 
 group('Enter', () => {
   it('cues the next Line in Sync mode', () => {
@@ -45,5 +46,22 @@ group('Enter', () => {
   it('is the only key that cues', () => {
     expect(cuesNextLine(press(' '), syncing)).toBe(false);
     expect(cuesNextLine(press('n'), syncing)).toBe(false);
+  });
+});
+
+group('Keys as rebound', () => {
+  afterEach(() => followKeys(() => defaultKeyset));
+  const rebind = (changes: Partial<Keyset>) => followKeys(() => ({ ...defaultKeyset, ...changes }));
+
+  it('cue with the key chosen on this device', () => {
+    rebind({ cueNextLine: { keys: [{ key: 'n' }] } });
+    expect(cuesNextLine(press('n'), syncing)).toBe(true);
+    expect(cuesNextLine(press('Enter'), syncing)).toBe(false);
+  });
+
+  it('leave an arrow chosen to a focused control that uses it', () => {
+    rebind({ cueNextLine: { keys: [{ key: 'ArrowDown' }] } });
+    expect(cuesNextLine(press('ArrowDown'), syncing)).toBe(true);
+    expect(cuesNextLine(press('ArrowDown'), { ...syncing, ownsArrows: true })).toBe(false);
   });
 });

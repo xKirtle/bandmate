@@ -1,5 +1,6 @@
-import { matches, shortcuts, way, type KeyDown } from './shortcuts';
-import type { KeyPlace } from './keyPlace';
+import { matches, way, type KeyDown } from './shortcuts';
+import { rebound } from './shortcutKeys';
+import { ownArrow, type KeyPlace } from './keyPlace';
 
 /** The Timeline's Shortcuts that work wherever focus is on the Song page, e.g. Space to play. */
 export type SongKey = 'playPause' | 'record' | 'start' | 'end' | 'split';
@@ -29,14 +30,16 @@ export type SongKeyContext = KeyPlace & {
 export function songKey(e: KeyDown, at: SongKeyContext): SongKey | null {
   // A dialog's keys are for what's in it, e.g. the shortcuts dialog.
   if (e.defaultPrevented || at.busy || at.dialogOpen) return null;
+  if (ownKey(e, at)) return null;
+  const shortcuts = rebound();
   if (matches(e, shortcuts.playPause.keys)) {
-    return e.repeat || at.ownsSpace ? null : 'playPause';
+    return e.repeat || at.inTextField ? null : 'playPause';
   }
   const going = way(e, shortcuts.startOrEnd);
   if (going) {
     // Even held down or recording, so the page never scrolls instead,
     // though a recording keeps the playhead where it started.
-    if (at.inTextField || at.ownsHomeEnd) return null;
+    if (at.inTextField) return null;
     return going === 'back' ? 'start' : 'end';
   }
   if (matches(e, shortcuts.record.keys)) {
@@ -51,6 +54,13 @@ export function songKey(e: KeyDown, at: SongKeyContext): SongKey | null {
   return null;
 }
 
+/** Whether a key is the control's own there, Space, Home, End or an arrow, whichever Shortcut has it. */
+function ownKey(e: KeyDown, at: SongKeyContext): boolean {
+  if (e.key === ' ') return at.ownsSpace;
+  if (e.key === 'Home' || e.key === 'End') return at.ownsHomeEnd;
+  return ownArrow(e, at);
+}
+
 /**
  * Whether a key press is Undo's or Redo's key, if either: anywhere on the
  * Song page, in Read mode and on a phone too, but not in a text field,
@@ -59,14 +69,14 @@ export function songKey(e: KeyDown, at: SongKeyContext): SongKey | null {
  * leaves the key to the page.
  */
 export function undoKey(e: KeyDown, at: KeyPlace): 'undo' | 'redo' | null {
-  if (e.defaultPrevented || at.dialogOpen || at.inTextField) return null;
-  if (matches(e, shortcuts.undo.keys)) return 'undo';
-  if (matches(e, shortcuts.redo.keys)) return 'redo';
+  if (e.defaultPrevented || at.dialogOpen || at.inTextField || ownArrow(e, at)) return null;
+  if (matches(e, rebound().undo.keys)) return 'undo';
+  if (matches(e, rebound().redo.keys)) return 'redo';
   return null;
 }
 
-/** Whether a key press opens the shortcuts dialog: ?, unless it's typed or a dialog is open. */
+/** Whether a key press opens the shortcuts dialog: its key, ? unless rebound, unless it's typed or a dialog is open. */
 export function opensShortcuts(e: KeyDown, at: KeyPlace): boolean {
-  if (e.defaultPrevented || e.repeat || at.dialogOpen || at.inTextField) return false;
-  return matches(e, shortcuts.showShortcuts.keys);
+  if (e.defaultPrevented || e.repeat || at.dialogOpen || at.inTextField || ownArrow(e, at)) return false;
+  return matches(e, rebound().showShortcuts.keys);
 }

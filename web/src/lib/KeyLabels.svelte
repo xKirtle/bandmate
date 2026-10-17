@@ -1,19 +1,26 @@
 <script lang="ts">
   // A listed Shortcut's keys, as plain key labels: for a two-way one, its
-  // keys going back, then forward, a line each (see shortcutList.ts).
+  // keys going back, then forward, a line each (see shortcutList.ts). A
+  // Shortcut, or a way, with no key says so.
   let { keys }: { keys: string[][] } = $props();
 </script>
 
 <span class="keys">
-  {#each keys as labels, w (w)}
-    <span class="way">
-      {#if w > 0}<span class="visually-hidden">, then</span>{/if}
-      {#each labels as key, k (k)}
-        {#if k > 0}<span class="muted">or</span>{/if}
-        <kbd>{key}</kbd>
-      {/each}
-    </span>
-  {/each}
+  {#if keys.every((labels) => labels.length === 0)}
+    <span class="muted">No key</span>
+  {:else}
+    {#each keys as labels, w (w)}
+      <span class="way">
+        {#if w > 0}<span class="visually-hidden">, then</span>{/if}
+        {#each labels as key, k (k)}
+          {#if k > 0}<span class="muted">or</span>{/if}
+          <kbd>{key}</kbd>
+        {:else}
+          <span class="muted">No key</span>
+        {/each}
+      </span>
+    {/each}
+  {/if}
 </span>
 
 <style>

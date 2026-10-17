@@ -45,9 +45,10 @@
   import { timelineEnd, type Loop, type Placed } from './schedule';
   import { nameSound } from './soundName';
   import { inTextField } from './textField';
-  import { keyPlace } from './keyPlace';
+  import { keyPlace, ownsArrows } from './keyPlace';
   import { songKey } from './songKeys';
-  import { allKeys, shortcuts, type Way } from './shortcuts';
+  import { allKeys, type Way } from './shortcuts';
+  import { rebound } from './shortcutKeys';
   import { clipActions, selectionActions } from './clipMenu';
   import { mergedClips, renderMerge } from './merge';
   import { Selection } from './selection.svelte';
@@ -348,9 +349,11 @@
   // Tooltips name a Shortcut's keys as this platform does, e.g. ⌘Z on a
   // Mac, but only with a keyboard and mouse.
   const hints = keyHints();
+  // Every Shortcut's keys, as rebound on this device.
+  const shortcuts = $derived(rebound());
   // What a focused Clip and the ruler declare as their keys.
-  const clipKeys = [...shortcuts.deleteClip.keys, ...shortcuts.clipMenu.keys];
-  const rulerKeys = allKeys([shortcuts.seek, shortcuts.seekFar, shortcuts.startOrEnd]);
+  const clipKeys = $derived([...shortcuts.deleteClip.keys, ...shortcuts.clipMenu.keys]);
+  const rulerKeys = $derived(allKeys([shortcuts.seek, shortcuts.seekFar, shortcuts.startOrEnd]));
 
   function keydown(event: KeyboardEvent) {
     if (trackDrag.current && event.key === 'Escape') {
@@ -1135,6 +1138,7 @@
       selected: selection.size,
       focusedClip: clip && { inSelection: selection.has(clip.id) },
       draggingTrack: trackDrag.current !== null,
+      ownsArrows: ownsArrows(event.target),
     });
     if (!action) return;
     event.preventDefault();

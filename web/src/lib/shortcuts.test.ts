@@ -31,6 +31,21 @@ group('matches', () => {
     expect(matches(press('r'), [{ key: 'r', shift: true }])).toBe(false);
   });
 
+  it('follows the letter printed on the key, whichever place it has', () => {
+    // On AZERTY, the key labelled A sits where QWERTY has Q.
+    expect(matches(press('a', { code: 'KeyQ' }), [{ key: 'a' }])).toBe(true);
+    expect(matches(press('a', { code: 'KeyQ' }), [{ key: 'q' }])).toBe(false);
+  });
+
+  it("falls back to the key's place where a Mac's Option turns a letter into a symbol", () => {
+    expect(matches(press('®', { altKey: true, code: 'KeyR' }), [{ key: 'r', alt: true }])).toBe(true);
+    // Option's dead keys, e.g. ⌥E's accent, too.
+    expect(matches(press('Dead', { altKey: true, code: 'KeyE' }), [{ key: 'e', alt: true }])).toBe(true);
+    expect(matches(press('®', { altKey: true, code: 'KeyR' }), [{ key: 'r' }])).toBe(false);
+    // Without Option, a symbol is the symbol typed.
+    expect(matches(press('é', { code: 'Digit2' }), [{ key: '2' }])).toBe(false);
+  });
+
   it('matches a letter whether or not Caps Lock is on', () => {
     expect(matches(press('R'), [{ key: 'r' }])).toBe(true);
   });

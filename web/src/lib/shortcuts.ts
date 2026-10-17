@@ -1,7 +1,8 @@
 /**
- * The Song page's Shortcuts, the one place their keys are defined. Handlers
- * ask it whether a key is a Shortcut's, and keep their own guards, e.g.
- * against key repeat or typing in a text field.
+ * The Song page's Shortcuts, the one place they and their default keys are
+ * defined. Handlers ask it whether a key is one of a Shortcut's keys as
+ * rebound on this device (see shortcutKeys.ts), and keep their own guards,
+ * e.g. against key repeat or typing in a text field.
  */
 
 /**
@@ -226,8 +227,13 @@ export const shortcuts = {
   },
 } as const satisfies Record<string, Shortcut>;
 
-/** A key press, or a mouse action given as `click`, `drag` or `wheel`. */
-export type KeyPress = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'>;
+/**
+ * A key press, or a mouse action given as `click`, `drag` or `wheel`, and
+ * where the key pressed sits on the keyboard (`KeyboardEvent.code`), if
+ * it's a key.
+ */
+export type KeyPress = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'> &
+  Partial<Pick<KeyboardEvent, 'code'>>;
 
 /**
  * A key press as a handler hears it: whether it's a held key's repeat, and
@@ -236,12 +242,26 @@ export type KeyPress = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altK
 export type KeyDown = KeyPress & Pick<KeyboardEvent, 'repeat' | 'defaultPrevented'>;
 
 /** Letters, and keys that name themselves, e.g. Space and ArrowLeft, which Shift doesn't change. */
-function shiftCounts(key: string): boolean {
+export function shiftCounts(key: string): boolean {
   return key.length > 1 || key === ' ' || key.toLowerCase() !== key.toUpperCase();
 }
 
+const isLetter = (key: string) => key.length === 1 && key.toLowerCase() !== key.toUpperCase();
+
+/**
+ * The key a press stands for, without its modifiers: the letter printed
+ * on it, so on AZERTY the key labelled A is A. Where a Mac's Option turns
+ * a letter into a symbol (⌥R types ®) or an accent to come, it's the
+ * letter at the key's place instead.
+ */
+export function pressedKey(pressed: KeyPress): string {
+  const place = /^Key([A-Z])$/.exec(pressed.code ?? '');
+  if (pressed.altKey && place && !isLetter(pressed.key)) return place[1].toLowerCase();
+  return pressed.key;
+}
+
 function same(pressed: KeyPress, key: Key): boolean {
-  if (pressed.key.toLowerCase() !== key.key.toLowerCase()) return false;
+  if (pressedKey(pressed).toLowerCase() !== key.key.toLowerCase()) return false;
   // Mod is one modifier: Ctrl or ⌘, not both.
   if (pressed.ctrlKey && pressed.metaKey) return false;
   if ((pressed.ctrlKey || pressed.metaKey) !== !!key.mod) return false;
@@ -249,6 +269,13 @@ function same(pressed: KeyPress, key: Key): boolean {
   // A symbol, e.g. the ? that opens the shortcuts dialog, may take Shift
   // to type, which is then part of it.
   return !shiftCounts(key.key) || pressed.shiftKey === !!key.shift;
+}
+
+/** Whether two keys are one, with the same modifiers, e.g. two Shortcuts' keys. */
+export function sameKey(a: Key, b: Key): boolean {
+  if (a.key.toLowerCase() !== b.key.toLowerCase()) return false;
+  if (!!a.mod !== !!b.mod || !!a.alt !== !!b.alt) return false;
+  return !shiftCounts(a.key) || !!a.shift === !!b.shift;
 }
 
 /** Whether a key press is one of `keys`, with exactly its modifiers. */
