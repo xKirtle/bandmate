@@ -13,6 +13,21 @@
   import SettingsPage from '../lib/SettingsPage.svelte';
   import { appearance } from '../lib/sharedAppearance.svelte';
   import { leftHanded } from '../lib/sharedLeftHanded.svelte';
+  // PROTOTYPE, throwaway (Rebinding Shortcuts): where Shortcuts are rebound, by ?variant=.
+  import { keyboardAndMouse } from '../lib/keyHints';
+  import { router } from '../lib/router.svelte';
+  import { proto, type Variant } from '../lib/shortcuts-prototype/engine.svelte';
+  import Outline from '../lib/shortcuts-prototype/Outline.svelte';
+  import PrototypeBar from '../lib/shortcuts-prototype/PrototypeBar.svelte';
+  import ShortcutsCard from '../lib/shortcuts-prototype/ShortcutsCard.svelte';
+  import ShortcutsTab from '../lib/shortcuts-prototype/ShortcutsTab.svelte';
+  import SummaryCard from '../lib/shortcuts-prototype/SummaryCard.svelte';
+  const protoParams = $derived(new URLSearchParams(router.search));
+  const protoVariant = $derived(import.meta.env.DEV ? (protoParams.get('variant') ?? 'current') : 'current');
+  $effect(() => {
+    proto.variant = protoVariant as Variant;
+  });
+  let cardsEl = $state<HTMLElement>();
 
   // Recording is offered only as wide as the Timeline offers editing, so
   // the Recording card is too. Narrower, it goes, closing the Input with it.
@@ -26,9 +41,16 @@
   });
 </script>
 
-<SettingsPage tab="device">
+{#snippet outline()}
+  <Outline root={() => cardsEl} />
+{/snippet}
+
+<SettingsPage tab="device" aside={protoVariant === 'A' ? outline : undefined}>
+  {#if protoVariant === 'B' && protoParams.get('tab') === 'shortcuts'}
+    <ShortcutsTab />
+  {:else}
   <p class="kept hint">Kept on this device.</p>
-  <div class="cards">
+  <div class="cards" bind:this={cardsEl}>
     <section class="card" aria-labelledby="appearance-heading">
       <h2 id="appearance-heading">Appearance</h2>
       <fieldset class="choice-group">
@@ -96,8 +118,19 @@
         <p id="left-handed-note" class="choice-under hint">Mirrors every Chord diagram, high string on the left.</p>
       </fieldset>
     </section>
+
+    {#if protoVariant === 'A' && keyboardAndMouse()}
+      <ShortcutsCard />
+    {:else if protoVariant === 'C' && keyboardAndMouse()}
+      <SummaryCard />
+    {/if}
   </div>
+  {/if}
 </SettingsPage>
+
+{#if import.meta.env.DEV}
+  <PrototypeBar />
+{/if}
 
 {#if calibrating}
   <CalibrationSheet input={calibrating.input} exact={calibrating.exact} onClose={() => (calibrating = null)} />

@@ -1,20 +1,25 @@
 <script lang="ts">
+  // PROTOTYPE, throwaway (Rebinding Shortcuts): the dialog searches, shows the
+  // keys as rebound, and "Change keys" goes where the variant says: This
+  // device's card (A), the Shortcuts tab (B), or edits right here (C).
   import { onMount } from 'svelte';
   import Dialog from './Dialog.svelte';
-  import { platform, shortcuts } from './shortcuts';
-  import { dialogGroups } from './shortcutsDialog';
+  import { bindings, changedCount, grouped, label, proto, resetAll } from './shortcuts-prototype/engine.svelte';
+  import KeysEditor from './shortcuts-prototype/KeysEditor.svelte';
 
-  // Every Shortcut on the Song page, in its group, with its keys as this
-  // platform names them. All are listed wherever they work, e.g. Sync mode's
-  // while it's off: each group's heading says where.
-  let { onClose }: { onClose: () => void } = $props();
+  let { onClose, editing = false }: { onClose: () => void; editing?: boolean } = $props();
 
   let dialog = $state<HTMLDialogElement>();
-  const groups = dialogGroups(shortcuts, platform());
+  let search = $state<HTMLInputElement>();
+  let query = $state('');
+  // svelte-ignore state_referenced_locally
+  let edit = $state(editing);
+  const groups = $derived(grouped(query));
+  const changeHref = $derived(
+    proto.variant === 'B' ? '/settings?variant=B&tab=shortcuts' : `/settings?variant=${proto.variant}#shortcuts`,
+  );
 
-  // It takes focus itself, not its ✕, so Space scrolls the list rather
-  // than closing it, as arrows do.
-  onMount(() => dialog?.focus());
+  onMount(() => search?.focus());
 </script>
 
 <Dialog
@@ -26,36 +31,77 @@
   --dialog-width="40rem"
   --dialog-gap="var(--space-4)"
 >
-  {#each groups as { group, rows }, g (group)}
+  <div class="top">
+    <input
+      bind:this={search}
+      class="field"
+      type="search"
+      placeholder="Search by name or key, e.g. Record or Shift"
+      bind:value={query}
+    />
+    {#if proto.variant === 'C'}
+      {#if edit}
+        <button type="button" class="button quiet" disabled={changedCount() === 0} onclick={resetAll}
+          >Reset to defaults</button
+        >
+        <button type="button" class="button primary" onclick={() => (edit = false)}>Done</button>
+      {:else}
+        <button type="button" class="button" onclick={() => (edit = true)}>Change keys</button>
+      {/if}
+    {:else if proto.variant !== 'current'}
+      <a class="button" href={changeHref} onclick={onClose}>Change keys</a>
+    {/if}
+  </div>
+  {#if edit}
+    <p class="muted hint">Click a key, then press the one you want; Esc cancels. Kept on this device.</p>
+  {/if}
+  {#each groups as { group, entries }, g (group)}
     <section aria-labelledby="shortcuts-group-{g}">
       <h3 id="shortcuts-group-{g}">{group}</h3>
       <ul>
-        {#each rows as row (row.name)}
+        {#each entries as entry (entry.id)}
           <li>
             <div class="what">
-              <span class="name">{row.name}</span>
-              <span class="muted">{row.description}</span>
+              <span class="name">{entry.name}</span>
+              <span class="muted">{entry.description}</span>
             </div>
-            <!-- A two-way Shortcut's keys back, then forward, a line each. -->
-            <span class="keys">
-              {#each row.keys as labels, w (w)}
-                <span class="way">
-                  {#if w > 0}<span class="visually-hidden">, then</span>{/if}
-                  {#each labels as key, k (k)}
-                    {#if k > 0}<span class="muted">or</span>{/if}
-                    <kbd>{key}</kbd>
-                  {/each}
-                </span>
-              {/each}
-            </span>
+            {#if edit}
+              <KeysEditor {entry} />
+            {:else}
+              <span class="keys">
+                {#each bindings[entry.id] as way, w (w)}
+                  <span class="way">
+                    {#each way.keys as key, k (k)}
+                      {#if k > 0}<span class="muted">or</span>{/if}
+                      <kbd>{label(key)}</kbd>
+                    {:else}
+                      <span class="muted">No key</span>
+                    {/each}
+                  </span>
+                {/each}
+              </span>
+            {/if}
           </li>
         {/each}
       </ul>
     </section>
+  {:else}
+    <p class="muted">No Shortcuts match.</p>
   {/each}
 </Dialog>
 
 <style>
+  .top {
+    display: flex;
+    gap: var(--space-2);
+  }
+  .top input {
+    flex: 1;
+  }
+  .hint {
+    margin: 0;
+    font-size: var(--text-sm);
+  }
   h3 {
     margin: 0 0 var(--space-1);
     font-size: var(--text-md);
