@@ -6,7 +6,10 @@
     bindings,
     changed,
     fresh,
+    gestureWords,
     keyFrom,
+    modifierLabel,
+    toggleModifier,
     label,
     messages,
     removeKey,
@@ -43,6 +46,22 @@
 <svelte:window onkeydowncapture={onkeydown} />
 
 <div class="editor" class:start={align === 'start'}>
+  {#if entry.mouse && !entry.fixed}
+    <!-- A mouse Shortcut's gesture never changes: only what's held with it. -->
+    {@const key = bindings[entry.id][0].keys[0]}
+    <div class="way hold" role="group" aria-label="Modifiers held">
+      <span>Hold</span>
+      {#each ['mod', 'alt', 'shift'] as const as m (m)}
+        <button
+          type="button"
+          class="button toggle modifier"
+          aria-pressed={!!key[m]}
+          onclick={() => toggleModifier(entry.id, m)}>{modifierLabel(m)}</button
+        >
+      {/each}
+      <span>and {gestureWords(key.key)}</span>
+    </div>
+  {:else}
   {#each bindings[entry.id] as way, w (w)}
     <div class="way">
       {#if way.label}<span class="muted way-label">{way.label}</span>{/if}
@@ -87,6 +106,7 @@
       {/if}
     </div>
   {/each}
+  {/if}
   {#if entry.fixed}
     <span class="muted small">Can't be changed</span>
   {/if}
@@ -123,6 +143,14 @@
     color: var(--text-muted);
   }
   /* Back and Forward take one width, so their keys line up. */
+  .hold {
+    gap: var(--space-2);
+  }
+  .modifier {
+    min-height: 1.75rem;
+    padding: 0 var(--space-3);
+    font-size: var(--text-sm);
+  }
   .way-label {
     min-width: 4.5rem;
   }

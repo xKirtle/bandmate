@@ -233,3 +233,30 @@ export function grouped(q: string): Group[] {
 export function allGroups(): ShortcutGroup[] {
   return [...new Set(entries.map((e) => e.group))];
 }
+
+export type Modifier = 'mod' | 'alt' | 'shift';
+
+/** A modifier as this platform names it. */
+export function modifierLabel(m: Modifier): string {
+  if (on === 'mac') return { mod: '⌘ Cmd', alt: '⌥ Option', shift: '⇧ Shift' }[m];
+  return { mod: 'Ctrl', alt: 'Alt', shift: 'Shift' }[m];
+}
+
+/** The gesture a mouse Shortcut's key names, in words. */
+export function gestureWords(gesture: string): string {
+  return { click: 'click', drag: 'drag', wheel: 'scroll the wheel' }[gesture] ?? gesture;
+}
+
+/**
+ * Turns one modifier of a mouse Shortcut on or off, keeping its gesture. At
+ * least one stays: with none, it'd be a plain click or drag.
+ */
+export function toggleModifier(id: string, m: Modifier): boolean {
+  const current = bindings[id][0].keys[0];
+  const next: Key = { ...current, [m]: current[m] ? undefined : true };
+  if (!next.mod && !next.alt && !next.shift) {
+    messages[id] = `Needs at least one modifier: a plain ${gestureWords(current.key)} does something else.`;
+    return false;
+  }
+  return setKey(id, 0, 0, next);
+}
