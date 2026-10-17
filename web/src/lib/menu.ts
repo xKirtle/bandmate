@@ -1,6 +1,7 @@
 import type { Icon } from './icons';
 import type { KeyHints } from './keyHints';
-import { matches, shortcuts, stepBy, type KeyPress, type TwoWay } from './shortcuts';
+import { matches, stepBy, type KeyPress, type TwoWay } from './shortcuts';
+import { rebound } from './shortcutKeys';
 
 /**
  * What a key does in an open menu of `count` entries, with entry `current`
@@ -30,7 +31,7 @@ export function menuKey(key: string, current: number, count: number): number | '
  * menu: the Menu key, or Shift+F10.
  */
 export function opensMenu(e: KeyPress): boolean {
-  return matches(e, shortcuts.clipMenu.keys);
+  return matches(e, rebound().clipMenu.keys);
 }
 
 /**

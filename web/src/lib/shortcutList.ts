@@ -2,6 +2,8 @@ import { keysLabel, type Key, type Platform, type Shortcut, type ShortcutGroup }
 
 /** A Shortcut as the shortcuts dialog and Settings' Shortcuts tab list it. */
 export type ListRow = {
+  /** Its key in the list, e.g. `record`. */
+  id: string;
   name: string;
   description: string;
   /** Where it works, as a sentence: "Works in the ruler, once it has focus." */
@@ -24,10 +26,11 @@ export type ListGroup = { group: ShortcutGroup; rows: ListRow[] };
 export function listGroups(list: Record<string, Shortcut>, on: Platform): ListGroup[] {
   const labels = (keys: readonly Key[]) => keys.map((key) => keysLabel([key], on));
   const groups: ListGroup[] = [];
-  for (const shortcut of Object.values(list)) {
+  for (const [id, shortcut] of Object.entries(list)) {
     let group = groups.find((g) => g.group === shortcut.group);
     if (!group) groups.push((group = { group: shortcut.group, rows: [] }));
     group.rows.push({
+      id,
       name: shortcut.name,
       description: shortcut.description,
       worksIn: `Works in ${shortcut.worksIn}`,

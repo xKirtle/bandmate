@@ -4,11 +4,12 @@
   import KeyLabels from './KeyLabels.svelte';
   import { keyboardAndMouse } from './keyHints';
   import { settingsTabHref } from './nav';
-  import { platform, shortcuts } from './shortcuts';
+  import { platform } from './shortcuts';
+  import { rebound, withKeys } from './shortcutKeys';
   import { listGroups, searchGroups } from './shortcutList';
   import ShortcutSearch from './ShortcutSearch.svelte';
 
-  // Every Shortcut on the Song page, in its group, with its keys as this
+  // Every Shortcut on the Song page, in its group, with its keys as rebound on this device, as this
   // platform names them. All are listed wherever they work, e.g. Sync mode's
   // while it's off: each says where. A search at the top narrows them down
   // by name, what they do, where they work or key, and Change keys beside
@@ -20,7 +21,7 @@
   let dialog = $state<HTMLDialogElement>();
   let search = $state<HTMLInputElement>();
   let query = $state('');
-  const all = listGroups(shortcuts, platform());
+  const all = $derived(listGroups(withKeys(rebound()), platform()));
   const groups = $derived(searchGroups(all, query));
 
   // The cursor starts in the search, to type straight away. The page's

@@ -3,7 +3,9 @@
  * and should act now.
  */
 
-import { matches, shortcuts, type KeyDown } from './shortcuts';
+import { ownArrow } from './keyPlace';
+import { matches, type KeyDown } from './shortcuts';
+import { rebound } from './shortcutKeys';
 
 /** Where a key was pressed, and whether Sync mode is on. */
 export type CueNextContext = {
@@ -12,6 +14,8 @@ export type CueNextContext = {
   inTextField: boolean;
   /** It was pressed in a dialog or a ⋯ menu, whose Enter is for what's in it. */
   inDialogOrMenu: boolean;
+  /** The arrows there are the control's own, e.g. a number box's. */
+  ownsArrows: boolean;
 };
 
 /**
@@ -19,6 +23,6 @@ export type CueNextContext = {
  * anywhere but a text field, a dialog or a ⋯ menu, even on a button.
  */
 export function cuesNextLine(e: KeyDown, at: CueNextContext): boolean {
-  if (!matches(e, shortcuts.cueNextLine.keys) || e.repeat) return false;
-  return at.syncing && !e.defaultPrevented && !at.inTextField && !at.inDialogOrMenu;
+  if (!matches(e, rebound().cueNextLine.keys) || e.repeat) return false;
+  return at.syncing && !e.defaultPrevented && !at.inTextField && !at.inDialogOrMenu && !ownArrow(e, at);
 }

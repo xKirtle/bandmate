@@ -47,7 +47,8 @@
   import { rowAt, type GutterField } from './gutter';
   import { keyHints } from './keyHints';
   import type { LyricSheetEditing } from './lyricSheetEditing.svelte';
-  import { shortcuts } from './shortcuts';
+  import { sameKey } from './shortcuts';
+  import { rebound } from './shortcutKeys';
   import type { CaretListener } from './lyricsLanguage';
 
   let {
@@ -129,7 +130,9 @@
   // The Now button names its keys as this platform does, but only with a
   // keyboard and mouse.
   const hints = keyHints();
-  const cueNextKeys = shortcuts.cueNextLine.keys;
+  const cueNextKeys = $derived(rebound().cueNextLine.keys);
+  // Now shows the Enter key while Enter cues, as it does unless rebound.
+  const cuesOnEnter = $derived(cueNextKeys.some((key) => sameKey(key, { key: 'Enter' })));
 </script>
 
 <label class="visually-hidden" for="text-{alternate.id}">{label}</label>
@@ -189,7 +192,8 @@
               onclick={sync.now}
               aria-label="Cue {lineLabel} now"
               aria-keyshortcuts={hints.aria(cueNextKeys)}
-              title={hints.withKeys('Cue this Line at the playhead', cueNextKeys)}>Now <CornerDownLeft /></button
+              title={hints.withKeys('Cue this Line at the playhead', cueNextKeys)}
+              >Now{#if cuesOnEnter}{' '}<CornerDownLeft />{/if}</button
             >
           {:else}
             <CueField

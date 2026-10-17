@@ -1,5 +1,6 @@
 import { describe as group, expect, it } from 'vitest';
 import { shortcuts, type Shortcut } from './shortcuts';
+import { defaultKeyset, withKeys } from './shortcutKeys';
 import { listGroups, searchGroups } from './shortcutList';
 
 group('listGroups', () => {
@@ -39,12 +40,14 @@ group('listGroups', () => {
       ],
     ]);
     expect(groups[0].rows[1]).toEqual({
+      id: 'record',
       name: 'Record',
       description: 'Records a Take on the Chosen Track, or stops recording.',
       worksIn: 'Works in any part of the Song page but a text field or a dialog.',
       keys: [['R']],
     });
     expect(groups[0].rows[2]).toEqual({
+      id: 'startOrEnd',
       name: 'Go to the start or end',
       description: 'Moves the playhead to the start or the end.',
       worksIn: 'Works in any part of the Song page but a text field, a list, a slider, a menu or a dialog.',
@@ -75,6 +78,7 @@ group('listGroups', () => {
     const editing = listGroups(shortcuts, 'other')[2];
     expect(editing.group).toBe('Timeline editing');
     expect(editing.rows[4]).toEqual({
+      id: 'nudgeCue',
       name: 'Nudge a Cue by 0.1 s',
       description: 'Moves the focused Cue time 0.1 seconds earlier or later.',
       worksIn: 'Works in a focused Cue time, in Write mode.',
@@ -85,11 +89,19 @@ group('listGroups', () => {
   it('lists the key that opens the shortcuts dialog as a Shortcut of its own, under Song editing', () => {
     const songEditing = listGroups(shortcuts, 'other')[1];
     expect(songEditing.rows[2]).toEqual({
+      id: 'showShortcuts',
       name: 'Show the Shortcuts',
       description: 'Opens the shortcuts dialog, which lists every Shortcut.',
       worksIn: 'Works in any part of the Song page but a text field or a dialog.',
       keys: [['?']],
     });
+  });
+
+  it('names the keys as rebound on this device', () => {
+    const keys = withKeys({ ...defaultKeyset, record: { keys: [{ key: 't' }] }, splitClips: { keys: [] } });
+    const rows = listGroups(keys, 'other').flatMap((g) => g.rows);
+    expect(rows.find((r) => r.id === 'record')?.keys).toEqual([['T']]);
+    expect(rows.find((r) => r.id === 'splitClips')?.keys).toEqual([[]]);
   });
 
   it('lists a Shortcut added to the list, and leaves out a group with none', () => {
@@ -113,13 +125,20 @@ group('listGroups', () => {
       {
         group: 'Playback & recording',
         rows: [
-          { name: 'Loop', description: 'Turns the Loop on or off.', worksIn: 'Works in the Timeline.', keys: [['L']] },
+          {
+            id: 'loop',
+            name: 'Loop',
+            description: 'Turns the Loop on or off.',
+            worksIn: 'Works in the Timeline.',
+            keys: [['L']],
+          },
         ],
       },
       {
         group: 'Mouse',
         rows: [
           {
+            id: 'zoomToFit',
             name: 'Zoom to fit',
             description: 'Fits the whole Timeline in view.',
             worksIn: 'Works in the lanes.',

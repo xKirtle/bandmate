@@ -185,7 +185,9 @@ On a song's page, press **?**, or the keyboard button by Write and Read, to see 
 | Enter | In Sync mode, mark the next line as starting now |
 | Ctrl+scroll | Zoom the timeline |
 
-On a Mac, ⌘ works wherever Ctrl does. Choosing your own keys is coming soon.
+These are the defaults. To change a shortcut's keys, open it in **Settings → Shortcuts**: click one of its keys and press the one you want, or **Add key** to give it another, or remove a key with its ×. Esc cancels. A key another shortcut already has is refused, with a link to that shortcut so you can free the key there first, and so are keys the browser or the page needs, like Tab or Ctrl+W. **Reset** puts one shortcut back, and **Reset to defaults** puts them all back. Your keys are kept on each device, so each keyboard you use can have its own.
+
+On a Mac, ⌘ works wherever Ctrl does.
 
 ## Backups
 
@@ -220,7 +222,7 @@ Under the settings, the card says when the last Scheduled Backup was made, that 
   - **Recording**: every input on this device, each channel of an audio interface on its own, with its latency or "Not calibrated" or "Skipped". Pick the one you record from, and check its level with **Test input** above the list: Bandmate only listens while it's on, and asks for the microphone the first time. Open any of them to calibrate it as in [Calibrate](#calibrate) without recording from it, or type its latency. Inputs that aren't plugged in keep their latency, listed under **Not connected**, to forget.
   - **Rhyming dictionaries**: one for each language Bandmate suggests rhymes in, each with its download size. Download the ones you write in, so [Rhymes](#rhymes) can suggest words in them, or remove one you no longer need.
   - **Chord diagrams**: flip them for left-handed playing.
-- **Shortcuts**: every [keyboard shortcut](#keyboard-shortcuts), with its keys. Open one to see what it does and where it works, or search them as in the shortcuts list. Shown only on a bigger screen.
+- **Shortcuts**: every [keyboard shortcut](#keyboard-shortcuts), with its keys. Open one to see what it does and where it works, and to [change its keys](#keyboard-shortcuts), or search them as in the shortcuts list. Shown only on a bigger screen.
 - **Backups**: see [Backups](#backups).
 - **About**: the version you're running, what changed in it, whether a newer one is out, the yt-dlp in use, and the packages and data that ship in Bandmate, with their licenses.
 

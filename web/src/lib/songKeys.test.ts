@@ -1,6 +1,7 @@
-import { describe as group, expect, it } from 'vitest';
+import { afterEach, describe as group, expect, it } from 'vitest';
 import type { KeyDown } from './shortcuts';
 import type { KeyPlace } from './keyPlace';
+import { defaultKeyset, followKeys, type Keyset } from './shortcutKeys';
 import { opensShortcuts, songKey, undoKey, type SongKeyContext } from './songKeys';
 
 const press = (key: string, mods: Partial<Omit<KeyDown, 'key'>> = {}): KeyDown => ({
@@ -21,6 +22,7 @@ const idle: SongKeyContext = {
   inTextField: false,
   ownsSpace: false,
   ownsHomeEnd: false,
+  ownsArrows: false,
   editable: true,
   recording: false,
   capturing: false,
@@ -149,7 +151,7 @@ group('Home and End', () => {
 
 group('Undo and redo', () => {
   // The Song page at rest, for its Undo and Redo keys.
-  const calm: KeyPlace = { dialogOpen: false, inTextField: false };
+  const calm: KeyPlace = { dialogOpen: false, inTextField: false, ownsArrows: false };
 
   it('undo with Ctrl+Z or ⌘Z', () => {
     expect(undoKey(press('z', { ctrlKey: true }), calm)).toBe('undo');
@@ -210,8 +212,45 @@ group('An open dialog', () => {
   });
 });
 
+group('Keys as rebound', () => {
+  afterEach(() => followKeys(() => defaultKeyset));
+  const rebind = (changes: Partial<Keyset>) => followKeys(() => ({ ...defaultKeyset, ...changes }));
+
+  it('acts on the keys chosen on this device, and no longer on the defaults', () => {
+    rebind({ record: { keys: [{ key: 't' }] }, undo: { keys: [{ key: 'u', alt: true }] } });
+    expect(songKey(press('t'), idle)).toBe('record');
+    expect(songKey(press('r'), idle)).toBeNull();
+    expect(undoKey(press('u', { altKey: true }), idle)).toBe('undo');
+    expect(undoKey(press('z', { ctrlKey: true }), idle)).toBeNull();
+  });
+
+  it('opens the shortcuts dialog with no key at all once it has none', () => {
+    rebind({ showShortcuts: { keys: [] } });
+    expect(opensShortcuts(press('?'), idle)).toBe(false);
+  });
+
+  it('leaves arrows chosen to a focused control that uses them, e.g. a number box or a list', () => {
+    rebind({
+      record: { keys: [{ key: 'ArrowUp' }] },
+      undo: { keys: [{ key: 'ArrowLeft', alt: true }] },
+      showShortcuts: { keys: [{ key: 'ArrowDown', shift: true }] },
+    });
+    expect(songKey(press('ArrowUp'), idle)).toBe('record');
+    expect(songKey(press('ArrowUp'), { ...idle, ownsArrows: true })).toBeNull();
+    expect(undoKey(press('ArrowLeft', { altKey: true }), { ...idle, ownsArrows: true })).toBeNull();
+    expect(opensShortcuts(press('ArrowDown', { shiftKey: true }), { ...idle, ownsArrows: true })).toBe(false);
+    expect(opensShortcuts(press('ArrowDown', { shiftKey: true }), idle)).toBe(true);
+  });
+
+  it('leaves Home, End and Space chosen to a focused control that uses them, as their own Shortcuts do', () => {
+    rebind({ startOrEnd: { back: [{ key: 'b' }], forward: [{ key: 'e' }] }, record: { keys: [{ key: 'Home' }] } });
+    expect(songKey(press('Home'), idle)).toBe('record');
+    expect(songKey(press('Home'), { ...idle, ownsHomeEnd: true })).toBeNull();
+  });
+});
+
 group('?', () => {
-  const nowhere = { dialogOpen: false, inTextField: false };
+  const nowhere = { dialogOpen: false, inTextField: false, ownsArrows: false };
 
   it('opens the shortcuts dialog, typed with Shift or on a key of its own', () => {
     expect(opensShortcuts(press('?', { shiftKey: true }), nowhere)).toBe(true);

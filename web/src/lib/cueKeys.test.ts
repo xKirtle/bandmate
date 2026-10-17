@@ -1,4 +1,5 @@
-import { describe as group, expect, it } from 'vitest';
+import { afterEach, describe as group, expect, it } from 'vitest';
+import { defaultKeyset, followKeys, type Keyset } from './shortcutKeys';
 import { cueNudge, cueNudgeHint } from './cueKeys';
 import { KeyHints } from './keyHints';
 import type { KeyPress } from './shortcuts';
@@ -62,5 +63,18 @@ group('The nudge hint', () => {
 
   it('names no keys on a phone or a narrow window', () => {
     expect(cueNudgeHint(new KeyHints('other', () => false), writing)).toEqual({ label: null, aria: undefined });
+  });
+});
+
+group('Keys as rebound', () => {
+  afterEach(() => followKeys(() => defaultKeyset));
+  const rebind = (changes: Partial<Keyset>) => followKeys(() => ({ ...defaultKeyset, ...changes }));
+
+  it('nudge and name the keys chosen on this device', () => {
+    rebind({ nudgeCue: { back: [{ key: ',' }], forward: [{ key: '.' }] } });
+    expect(cueNudge(press('.'), writing)).toBe(1);
+    expect(cueNudge(press(','), writing)).toBe(-1);
+    expect(cueNudge(press('ArrowUp', { altKey: true }), writing)).toBeNull();
+    expect(cueNudgeHint(new KeyHints('other', () => true), writing)).toEqual({ label: '. or ,', aria: '. ,' });
   });
 });
