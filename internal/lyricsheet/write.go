@@ -48,14 +48,19 @@ func cloneSheet(sheet LyricSheet) LyricSheet {
 		for j := range sec.Alternates {
 			alt := &sec.Alternates[j]
 			alt.Lines = slices.Clone(alt.Lines)
-			for k := range alt.Lines {
-				l := &alt.Lines[k]
-				l.Chords = slices.Clone(l.Chords)
-				l.Cue = copyCue(l.Cue)
+			for k, l := range alt.Lines {
+				alt.Lines[k] = cloneLine(l)
 			}
 		}
 	}
 	return clone
+}
+
+// cloneLine is a copy of a Line sharing nothing with it.
+func cloneLine(l Line) Line {
+	l.Chords = slices.Clone(l.Chords)
+	l.Cue = copyCue(l.Cue)
+	return l
 }
 
 // copyCue is a copy of a Cue, nil for none.
