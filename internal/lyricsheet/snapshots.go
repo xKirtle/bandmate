@@ -461,31 +461,21 @@ func (s *Store) RestoreSnapshot(ctx context.Context, songID int64, based songver
 // sectionName names a Section as the Song page lists it: by its Label, else
 // its active Alternate's first Line with words. One with neither has no
 // name.
-func sectionName(ctx context.Context, tx *sql.Tx, sectionID int64) (string, error) {
-	var label string
-	if err := tx.QueryRowContext(ctx, `SELECT label FROM sections WHERE id = ?`, sectionID).Scan(&label); err != nil {
-		return "", fmt.Errorf("reading section: %w", err)
+func sectionName(sec Section) string {
+	if sec.Label != "" {
+		return sec.Label
 	}
-	if label != "" {
-		return label, nil
-	}
-	first := ""
-	err := query(ctx, tx, `SELECT l.text FROM lines l JOIN alternates a ON a.id = l.alternate_id
-		WHERE a.section_id = ? AND a.active = 1 ORDER BY l.position`,
-		[]any{sectionID}, func(rows *sql.Rows) error {
-			var text string
-			if err := rows.Scan(&text); err != nil {
-				return err
+	for _, alt := range sec.Alternates {
+		if !alt.Active {
+			continue
+		}
+		for _, l := range alt.Lines {
+			if lyrics := strings.TrimSpace(l.Lyrics); lyrics != "" {
+				return lyrics
 			}
-			if lyrics := strings.TrimSpace(newLine(0, text, sql.NullInt64{}).Lyrics); first == "" {
-				first = lyrics
-			}
-			return nil
-		})
-	if err != nil {
-		return "", fmt.Errorf("reading section's lines: %w", err)
+		}
 	}
-	return first, nil
+	return ""
 }
 
 // alternateName names an Alternate as the Song page does: by its name,
