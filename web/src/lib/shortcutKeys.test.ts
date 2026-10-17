@@ -211,6 +211,19 @@ group('choosing what is held with the mouse', () => {
     expect(refused(mod, 'nudgeTake', 'alt')).toEqual({ kind: 'taken', key: { key: 'drag', mod: true }, by: 'addBox' });
   });
 
+  it('refuses Shift alone with the wheel, which scrolls the Timeline sideways', () => {
+    const shift = toggled(defaultShortcutKeys, 'zoom', 'shift');
+    expect(refused(shift, 'zoom', 'mod')).toEqual({ kind: 'sideways', key: { key: 'wheel', shift: true } });
+    expect(refusalMessage(refused(shift, 'zoom', 'mod'), 'other')).toEqual({
+      text: "Shift+wheel can't be chosen: it scrolls the Timeline sideways.",
+      by: null,
+    });
+    expect(toggled(shift, 'zoom', 'alt').keys.zoom.keys).toEqual([{ key: 'wheel', mod: true, alt: true, shift: true }]);
+    // Shift with a drag is free to choose.
+    const shiftClick = toggled(toggled(defaultShortcutKeys, 'toggleClip', 'shift'), 'toggleClip', 'mod');
+    expect(shiftClick.keys.toggleClip.keys).toEqual([{ key: 'click', shift: true }]);
+  });
+
   it('takes a combination another gesture holds', () => {
     const alt = toggled(defaultShortcutKeys, 'toggleClip', 'alt');
     expect(toggled(alt, 'toggleClip', 'mod').keys.toggleClip.keys).toEqual([{ key: 'click', alt: true }]);
