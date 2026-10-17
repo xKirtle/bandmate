@@ -53,6 +53,9 @@ func (a *App) updateTrack(w http.ResponseWriter, r *http.Request) {
 func (a *App) addTrack(w http.ResponseWriter, r *http.Request) {
 	var req timeline.NewTrack
 	a.changeTimeline(w, r, &req, func(id int64, based songversion.Version) (timeline.Timeline, error) {
+		for i := range req.Clips {
+			req.Clips[i].ClipPlayback = req.Clips[i].ClipPlayback.WithDefaults()
+		}
 		return a.timelines.AddTrack(r.Context(), id, based, req)
 	})
 }
@@ -177,13 +180,7 @@ type clipToPlace struct {
 	BeatID   *int64  `json:"beatId"`
 	SoundID  *int64  `json:"soundId"`
 	Name     *string `json:"name"`
-	Gain     float64 `json:"gain"`
-	// Tempo is a ratio of as recorded, 1 if not given.
-	Tempo *float64 `json:"tempo"`
-	// Pitch is in semitones, 0 if not given.
-	Pitch        float64  `json:"pitch"`
-	FadeIn       float64  `json:"fadeIn"`
-	FadeOut      float64  `json:"fadeOut"`
+	timeline.ClipPlayback
 	TakeIDs      []int64  `json:"takeIds"`
 	ActiveTakeID *int64   `json:"activeTakeId"`
 	Start        *float64 `json:"start"`
@@ -200,16 +197,12 @@ func (c clipToPlace) placed() (timeline.PlacedClip, error) {
 	if (c.TrackID == nil && c.NewTrack == nil) || c.Start == nil || c.Offset == nil || c.Length == nil {
 		return timeline.PlacedClip{}, domain.Invalid("trackId or newTrack, start, offset and length are required")
 	}
-	tempo := 1.0
-	if c.Tempo != nil {
-		tempo = *c.Tempo
-	}
 	on := timeline.OnTrack{NewTrack: c.NewTrack}
 	if c.TrackID != nil {
 		on.TrackID = *c.TrackID
 	}
 	return timeline.PlacedClip{OnTrack: on, NewClip: timeline.NewClip{
-		BeatID: c.BeatID, SoundID: c.SoundID, Name: c.Name, Gain: c.Gain, Tempo: tempo, Pitch: c.Pitch, FadeIn: c.FadeIn, FadeOut: c.FadeOut,
+		BeatID: c.BeatID, SoundID: c.SoundID, Name: c.Name, ClipPlayback: c.ClipPlayback.WithDefaults(),
 		TakeIDs: c.TakeIDs, ActiveTakeID: c.ActiveTakeID,
 		Start: *c.Start, Offset: *c.Offset, Length: *c.Length,
 	}}, nil
@@ -327,8 +320,7 @@ func (c clipToPaste) copied() (timeline.ClipCopy, error) {
 	if err != nil {
 		return timeline.ClipCopy{}, err
 	}
-	return timeline.ClipCopy{OnTrack: p.OnTrack, BeatID: p.BeatID, SoundID: p.SoundID, Name: p.Name, Gain: p.Gain, Tempo: p.Tempo, Pitch: p.Pitch,
-		FadeIn: p.FadeIn, FadeOut: p.FadeOut,
+	return timeline.ClipCopy{OnTrack: p.OnTrack, BeatID: p.BeatID, SoundID: p.SoundID, Name: p.Name, ClipPlayback: p.ClipPlayback,
 		Takes: c.Takes, ActiveTakeID: p.ActiveTakeID, Start: p.Start, Offset: p.Offset, Length: p.Length}, nil
 }
 

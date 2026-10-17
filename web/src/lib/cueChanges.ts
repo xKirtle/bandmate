@@ -5,7 +5,7 @@
 // the Song the change was shown on. This makes each change as the server
 // does, for the moment until it's saved; the server's Song then replaces it.
 
-import { api, ApiError, type CueValue, type Song, type SongAt } from './api';
+import type { CueValue } from './api';
 import { maxCue, type CuedLine, type CuedSong } from './cues';
 
 /** A change to the Cues, as the intent sent to the API. */
@@ -79,44 +79,4 @@ export function sameCues(a: CuedSong, b: CuedSong): boolean {
   const cues = (s: CuedSong) =>
     JSON.stringify(s.sections.flatMap((x) => x.alternates.flatMap((alt) => alt.lines.map((l) => [l.id, l.cue]))));
   return cues(a) === cues(b);
-}
-
-/** Sends a Cue change, returning the Song it leaves. */
-export function sendCueChange(at: SongAt, change: CueChange): Promise<Song> {
-  switch (change.kind) {
-    case 'setLineCue':
-      return change.cue === null ? api.clearLineCue(at, change.lineId) : api.setLineCue(at, change.lineId, change.cue);
-    case 'clearSectionCues':
-      return api.clearSectionCues(at, change.sectionId);
-    case 'clearCues':
-      return api.clearCues(at);
-    case 'shiftCues':
-      return api.shiftCues(at, change.start, change.end, change.by);
-    case 'restoreCues':
-      return api.restoreCues(at, change.cues);
-  }
-}
-
-/** How long to wait before each try again, in milliseconds: a few seconds in all. */
-const retryWaits = [500, 1000, 2000];
-
-/**
- * What a save saved, trying it again quietly for a few seconds while it
- * fails on the network or the server, which may well pass. A refusal, e.g.
- * as the Song changed elsewhere, would only fail again, so it fails at once,
- * as does the last try.
- */
-export async function savedRetrying<T>(
-  save: () => Promise<T>,
-  wait: (ms: number) => Promise<void> = (ms) => new Promise((done) => setTimeout(done, ms)),
-): Promise<T> {
-  for (const ms of retryWaits) {
-    try {
-      return await save();
-    } catch (e) {
-      if (!(e instanceof ApiError && (e.status === 0 || e.status >= 500))) throw e;
-    }
-    await wait(ms);
-  }
-  return save();
 }

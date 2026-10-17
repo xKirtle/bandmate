@@ -1,6 +1,7 @@
 import { describe as group, expect, it } from 'vitest';
 import type { KeyDown } from './shortcuts';
-import { opensShortcuts, songKey, undoKey, type SongKeyContext, type UndoKeyContext } from './songKeys';
+import type { KeyPlace } from './keyPlace';
+import { opensShortcuts, songKey, undoKey, type SongKeyContext } from './songKeys';
 
 const press = (key: string, mods: Partial<Omit<KeyDown, 'key'>> = {}): KeyDown => ({
   key,
@@ -148,7 +149,7 @@ group('Home and End', () => {
 
 group('Undo and redo', () => {
   // The Song page at rest, for its Undo and Redo keys.
-  const calm: UndoKeyContext = { dialogOpen: false, inTextField: false, frozen: false };
+  const calm: KeyPlace = { dialogOpen: false, inTextField: false };
 
   it('undo with Ctrl+Z or ⌘Z', () => {
     expect(undoKey(press('z', { ctrlKey: true }), calm)).toBe('undo');
@@ -169,11 +170,6 @@ group('Undo and redo', () => {
     expect(undoKey(press('z', { ctrlKey: true, altKey: true }), calm)).toBeNull();
     expect(undoKey(press('z', { ctrlKey: true, defaultPrevented: true }), calm)).toBeNull();
     expect(undoKey(press('z', { ctrlKey: true }), { ...calm, inTextField: true })).toBeNull();
-  });
-
-  it('are off while recording or merging, when the Song stays as it is', () => {
-    expect(undoKey(press('z', { ctrlKey: true }), { ...calm, frozen: true })).toBeNull();
-    expect(undoKey(press('y', { ctrlKey: true }), { ...calm, frozen: true })).toBeNull();
   });
 
   it('are left to an open dialog, e.g. picking a Beat or making a Mixdown', () => {

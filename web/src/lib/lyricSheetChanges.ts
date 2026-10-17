@@ -1,6 +1,6 @@
 // Changes to the Lyric Sheet, each named by its kind, as Lyric Sheet editing
 // (see lyricSheetEditing.svelte.ts) sends them through Saves.
-import { api, type Sheet, type SheetCopy, type Song, type SongAt } from './api';
+import type { Sheet, SheetCopy, Song } from './api';
 
 /** A change to the Lyric Sheet, as the intent sent to the API. */
 export type LyricSheetChange =
@@ -74,48 +74,6 @@ export const newFieldVisit = (): FieldVisit => Symbol('visit');
 /** Whether a change is to the Lyric Sheet. */
 export function isLyricSheetChange(change: { kind: string }): change is LyricSheetChange {
   return lyricSheetChangeKinds.has(change.kind);
-}
-
-/** Sends a Lyric Sheet change through the api, returning the Song it leaves. */
-export function sendLyricSheetChange(at: SongAt, change: LyricSheetChange): Promise<Song> {
-  switch (change.kind) {
-    case 'addSection':
-      return api.addSection(at, { position: change.position });
-    case 'duplicateSection':
-      return api.duplicateSection(at, change.sectionId, change.position);
-    case 'reorderArrangement':
-      return api.reorderArrangement(at, change.order);
-    case 'removeFromArrangement':
-      return api.removeFromArrangement(at, change.sectionId);
-    case 'addToSection':
-      return api.addToSection(at, change.sectionId, change.targetId);
-    case 'deleteSection':
-      return api.deleteSection(at, change.sectionId);
-    case 'setSectionLabel':
-      return api.setSectionLabel(at, change.sectionId, change.label);
-    case 'addAlternate':
-      return api.addAlternate(at, change.sectionId);
-    case 'renameAlternate':
-      return api.renameAlternate(at, change.alternateId, change.name);
-    case 'activateAlternate':
-      return api.activateAlternate(at, change.alternateId);
-    case 'deleteAlternate':
-      return api.deleteAlternate(at, change.alternateId);
-    case 'moveAlternateToScrapbook':
-      return api.moveAlternateToScrapbook(at, change.alternateId);
-    case 'moveAlternateToArrangement':
-      return api.moveAlternateToArrangement(at, change.alternateId, change.position);
-    case 'addToScrapbook':
-      return api.addToScrapbook(at);
-    case 'addToArrangement':
-      return api.addToArrangement(at, change.sectionId, change.position);
-    case 'replaceAlternateText':
-      return api.replaceAlternateText(at, change.alternateId, change.text);
-    case 'restoreSnapshot':
-      return api.restoreSnapshot(at, change.snapshotId);
-    case 'putSheetBack':
-      return api.putSheetBack(at, change.sheet);
-  }
 }
 
 /** A copy of a Song's Lyric Sheet and Scrapbook, to put back. */

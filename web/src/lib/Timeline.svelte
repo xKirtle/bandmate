@@ -30,7 +30,8 @@
   import { clipSources, clipTitle, fileStart, playing } from './clipSource';
   import { sourceAt, sourceLength } from './clipTime';
   import { formatCue } from './cues';
-  import type { Saves, Undone } from './saves.svelte';
+  import type { Saves } from './saves.svelte';
+  import type { SongUndo } from './songUndo.svelte';
   import type { SyncMode } from './syncMode.svelte';
   import { editHint, type Freeze } from './freeze';
   import { draggedFiles, fileDropTrack, type TrackRow } from './fileDrop';
@@ -48,19 +49,11 @@
   import { songKey } from './songKeys';
   import { allKeys, shortcuts, type Way } from './shortcuts';
   import { clipActions, selectionActions } from './clipMenu';
-  import { mergeTarget, mergedClips, renderMerge } from './merge';
-  import { rightHalfOf, splitTargets } from './split';
-  import { Selection, type ClipIds } from './selection.svelte';
+  import { mergedClips, renderMerge } from './merge';
+  import { Selection } from './selection.svelte';
+  import { ClipCommands, type ClipCommand, type ClipCommandRan, type ClipTarget } from './clipCommands.svelte';
   import { TimelineEditing } from './timelineEditing.svelte';
   import { committedAsItGoes, type TypedField } from './typedField.svelte';
-  import {
-    copy,
-    duplicate as duplicatePlacement,
-    emptyClipboard,
-    paste,
-    type Clipboard,
-    type Paste,
-  } from './clipboard';
   import {
     addsBox,
     nudges,
@@ -106,9 +99,9 @@
   import { barWidth, bars } from './waveform';
   import { clipping, tileBars } from './liveWave';
   import { browserKeeping, capturedInput, TakeRecorder } from './takeRecorder.svelte';
-  import { clampGain, formatGain, gainLineAt, heardPeak } from './clipGain';
-  import { formatTempo, tempoOf } from './clipTempo';
-  import { formatPitch, pitchOf, stretchBadge } from './clipPitch';
+  import { formatGain, gainLineAt, heardPeak } from './clipGain';
+  import { formatTempo } from './clipTempo';
+  import { formatPitch, stretchBadge } from './clipPitch';
   import { fadeName, fitFades, formatFade, isFadeEnd, shapedPeak, type FadeEnd } from './clipFade';
 
   // The Timeline, docked under the Lyric Sheet: its Tracks and Clips, and
@@ -125,6 +118,7 @@
   let {
     song,
     saves,
+    songUndo,
     setBpm,
     onPlayhead,
     syncMode,
@@ -135,6 +129,8 @@
     song: Song;
     /** The Song's saves, which the Timeline's edits and Cue changes go through. */
     saves: Saves;
+    /** The Song's Undo and Redo, whose results the Timeline follows. */
+    songUndo: SongUndo;
     /** Sets the Song's BPM. */
     setBpm: (bpm: number) => void;
     /** Hears where playback is, in seconds, every frame while playing, then null once it stops. */
@@ -238,6 +234,17 @@
     },
   });
   onDestroy(() => editing.close());
+
+  // Every Clip and Selection command, from the keys, the Clip menu and the
+  // Selection menu alike, runs through Clip commands (see
+  // clipCommands.svelte.ts), which owns the Clipboard. The Timeline only
+  // names the command and what it's for, and moves focus after a Split.
+  const commands: ClipCommands = new ClipCommands({
+    editing,
+    selection,
+    playhead: () => playheadAt(),
+    chosen: () => chosen,
+  });
   // The Timeline as shown, which it draws and plays: as saved, with the
   // values of edits on their way, and values being adjusted, on top, e.g.
   // a fader's level while it's dragged, or a name until it's saved.
@@ -322,26 +329,21 @@
     }
   });
 
-  /**
-   * Undoes the Song's latest edit, e.g. from the Song page header or its
-   * key, whether or not the Timeline can be edited here: on a phone and in
-   * Read mode too. While frozen it does nothing (see TimelineEditing.undo).
-   * Resolves to what it did, or null if nothing.
-   */
-  export async function undo(): Promise<Undone | null> {
-    // Undoing a new Take returns the playhead to where its Clip starts, to
-    // record again from. Once the Clip's gone, it's a seek like any other:
-    // playing, playback jumps there, superseding the restart the Clip's
-    // going started.
-    const undone = await editing.undo();
-    if (undone && undone.playhead !== null) seekTo(undone.playhead);
-    return undone;
-  }
-
-  /** Redoes the Song's latest edit undone, like undo. */
-  export function redo(): Promise<Undone | null> {
-    return editing.redo();
-  }
+  // The Song's Undo and Redo are the Song page's (see songUndo.svelte.ts),
+  // whether or not the Timeline can be edited here: on a phone and in Read
+  // mode too. The Timeline follows what they did: the Clips brought back
+  // together, or a Merge or a Split redone, are selected, and the Merge note
+  // goes. Undoing a new Take returns the playhead to where its Clip
+  // started, to record again from. Once the Clip's gone, it's a seek like
+  // any other: playing, playback jumps there, superseding the restart the
+  // Clip's going started.
+  $effect(() =>
+    songUndo.follow((undone) => {
+      if (undone.reselect) selection.selectEdited(undone.reselect);
+      if (undone.playhead !== null) seekTo(undone.playhead);
+      editing.dismissMergeNote();
+    }),
+  );
 
   // Tooltips name a Shortcut's keys as this platform does, e.g. ⌘Z on a
   // Mac, but only with a keyboard and mouse.
@@ -377,7 +379,7 @@
       keyActedOnPage();
       seekTo(startOrEnd(shortcut === 'start' ? 'back' : 'forward', length));
     } else if (shortcut === 'record') switchRecording();
-    else splitAtPlayhead();
+    else void runCommand({ kind: 'split', target: selected });
   }
 
   // Changes to a Track's levels are shown and heard right away, before
@@ -1094,51 +1096,30 @@
   }
   onDestroy(boxDone);
 
-  // The Clipboard: the Clips last copied or cut from the Selection, as they
-  // were then. Like the Selection, it's never kept, so leaving the Song
-  // drops it, and undo and redo never change it.
-  let clipboard = $state.raw<Clipboard>(emptyClipboard);
+  /** The Selection, as a command's target. */
+  const selected: ClipTarget = { kind: 'selection' };
 
-  /** Copies the Selection to the Clipboard; with none, the Clipboard stays as it was. */
-  function copySelection() {
-    copyClips(selection.ids);
-  }
-
-  /** Copies these Clips to the Clipboard; with none, the Clipboard stays as it was. */
-  function copyClips(clipIds: ClipIds) {
-    clipboard = copy(timeline.tracks, clipIds) ?? clipboard;
+  /** A Clip, as a command's target. */
+  function clipTarget(clip: Clip): ClipTarget {
+    return { kind: 'clip', clipId: clip.id };
   }
 
   /**
-   * Cuts the Selection: copies it to the Clipboard, then deletes it, as one
-   * edit to undo, which leaves the Clipboard as it is. A cut Clip of Takes
-   * pastes from its Takes, which deleting only detaches.
+   * Runs a Clip command. Pressing Merge clears what the Timeline said
+   * before. A Split gets the Clip that has focus, and moves focus to its
+   * right half, so Delete then trims off what's after the playhead, not the
+   * left half alone; unless focus moved on from it since.
    */
-  function cutSelection() {
-    copySelection();
-    removeSelection();
-  }
-
-  /** Cuts a Clip alone, from its menu: copies it, then deletes it, as one edit to undo. */
-  function cutClip(clip: Clip) {
-    copyClips(new Set([clip.id]));
-    remove(clip);
-  }
-
-  /**
-   * Pastes the Clipboard at the playhead on the Chosen Track, or later
-   * where it fits, the playhead staying where it is, adding Tracks at the
-   * bottom for rows that run past the last, and selects the Clips pasted.
-   */
-  function pasteClipboard() {
-    if (chosen === null) return; // Never: a Song always has a Track.
-    const pasted = paste(clipboard, timeline.tracks, playheadAt(), chosen);
-    if (pasted) pasteAndSelect(pasted);
-  }
-
-  /** Makes the Clips of a paste, or a Selection Duplicate, as one edit, and selects them. */
-  function pasteAndSelect(pasted: Paste) {
-    editing.edit({ kind: 'pasteClips', ...pasted });
+  async function runCommand(command: ClipCommand): Promise<ClipCommandRan | null> {
+    if (command.kind === 'merge' && commands.can('merge', command.target) === null) showError(null);
+    if (command.kind !== 'split') return commands.run(command);
+    const focused = focusedClip(document.activeElement)?.id;
+    const ran = await commands.run({ ...command, focused });
+    const focus = ran?.focus ?? null;
+    if (focus !== null && document.activeElement?.id === `clip-${focused}`) {
+      tick().then(() => document.getElementById(`clip-${focus}`)?.focus());
+    }
+    return ran;
   }
 
   // The Selection's and a focused Clip's keys, pressed anywhere in the
@@ -1163,16 +1144,16 @@
       case 'selectAll':
         return selection.apply({ kind: 'all' });
       case 'deleteSelection':
-        return removeSelection();
+        return void runCommand({ kind: 'delete', target: selected });
       case 'copy':
-        return copySelection();
+        return void runCommand({ kind: 'copy', target: selected });
       case 'cut':
-        return cutSelection();
+        return void runCommand({ kind: 'cut', target: selected });
       case 'paste':
-        return pasteClipboard();
+        return void runCommand({ kind: 'paste', target: selected });
       // Only ever given with a focused Clip.
       case 'deleteClip':
-        return clip && remove(clip);
+        return clip && void runCommand({ kind: 'delete', target: clipTarget(clip) });
       case 'clipMenu':
         return clip && openClipMenu(clip, event.target as HTMLElement);
       default:
@@ -1441,44 +1422,6 @@
   }
   onDestroy(stopListening);
 
-  function duplicate(clip: Clip) {
-    editing.edit({ kind: 'duplicateClip', clipId: clip.id });
-  }
-
-  /**
-   * Duplicates the selected Clips onto their Tracks, right after the
-   * Selection ends or later where they all fit, as one edit, and selects
-   * the copies. It leaves the Clipboard as it is.
-   */
-  function duplicateSelection() {
-    const copies = duplicatePlacement(timeline.tracks, selection.ids);
-    if (copies) pasteAndSelect(copies);
-  }
-
-  /**
-   * Splits Clips in two at the playhead, as one edit, and selects the
-   * right half of each: the selected Clips it crosses, or with none selected,
-   * the Chosen Track's Clip under it; or, given, only those of clipIds it
-   * crosses. With nothing to split, nothing happens. Focus on a Clip it
-   * splits moves to its right half, so Delete then trims off what's after
-   * the playhead, not the left half alone.
-   */
-  function splitAtPlayhead(clipIds?: ReadonlySet<number>) {
-    if (frozen) return;
-    const at = playheadAt();
-    const splitting = splitTargets(timeline.tracks, clipIds ?? selection.ids, chosen, at);
-    if (splitting.length === 0) return;
-    const focused = focusedClip(document.activeElement)?.id;
-    editing.edit({ kind: 'splitClips', clipIds: splitting, at }).then((edited) => {
-      // Focus stays put while recording, as the Selection does, and once
-      // it's moved on from the Clip since.
-      if (!edited || focused === undefined || !splitting.includes(focused) || recording) return;
-      if (document.activeElement?.id !== `clip-${focused}`) return;
-      const right = rightHalfOf(edited.before, edited.after, focused);
-      if (right !== null) tick().then(() => document.getElementById(`clip-${right}`)?.focus());
-    });
-  }
-
   // A Clip is renamed in place, like a Track: double-clicked, or from its
   // menu. A blank name clears its own, so it goes by its source's again
   // (see TimelineEditing.clipName). Until a new name is saved, it's shown.
@@ -1516,7 +1459,7 @@
     if (event.target instanceof Element && event.target.closest('.trim, .fade-dot')) return;
     // Its gain line resets the Gain instead.
     if (event.target instanceof Element && event.target.closest('.gain-line')) {
-      if (clip.gain !== 0 && !frozen) editing.edit({ kind: 'setClipGain', clipId: clip.id, gain: 0 });
+      if (clip.gain !== 0) void runCommand({ kind: 'gain', target: clipTarget(clip), gain: 0 });
       return;
     }
     startClipRename(clip);
@@ -1525,27 +1468,6 @@
   /** Whether an event came from the field a Clip's name is typed in. */
   function inClipName(target: EventTarget | null): boolean {
     return target instanceof Element && target.closest('.clip-name') !== null;
-  }
-
-  // Deleting doesn't ask first: it can be undone, and the Beat stays in the
-  // Beat Library.
-  function remove(clip: Clip) {
-    editing.edit({ kind: 'deleteClip', clipId: clip.id });
-  }
-
-  /**
-   * Merges the selected Clips into one Clip of a new Sound: see Timeline
-   * editing. Pressing it clears what the Timeline said before.
-   */
-  function mergeSelection() {
-    if (!editing.mergeable) return;
-    showError(null);
-    void editing.merge();
-  }
-
-  /** Deletes the selected Clips, as one edit. */
-  function removeSelection() {
-    editing.edit({ kind: 'deleteClips', clipIds: [...selection.ids] });
   }
 
   // Each Clip's menu, opened by its ⋯, right-click, the Menu key, Shift+F10
@@ -1561,32 +1483,10 @@
   }
 
   function clipMenuActions(clip: Clip): MenuAction[] {
+    const menuCommands = { run: runCommand, can: commands.can, clipsOf: commands.clipsOf };
     if (selection.menuFor(clip.id) === 'selection') {
-      return selectionActions(
-        selection.size,
-        {
-          copyClips: copySelection,
-          cutClips: cutSelection,
-          duplicateClips: duplicateSelection,
-          splitClips: () => splitAtPlayhead(),
-          mergeClips: mergeSelection,
-          deleteClips: removeSelection,
-          setTempo: (percent) => setTempo(selection.ids, percent),
-          setPitch: (semitones) => setPitch(selection.ids, semitones),
-        },
-        {
-          frozen: freeze,
-          tempo: clip.tempo,
-          pitch: clip.pitch,
-          tempoChanged: clips.some((c) => selection.has(c.id) && c.tempo !== 1),
-          pitchChanged: clips.some((c) => selection.has(c.id) && c.pitch !== 0),
-          canMerge: mergeTarget(timeline.tracks, selection.ids) !== null,
-          canSplit: splitTargets(timeline.tracks, selection.ids, chosen, playheadAt()).length > 0,
-          ...menuKeys(),
-        },
-      );
+      return selectionActions(clip, { frozen: freeze, ...menuKeys() }, menuCommands);
     }
-    const clipId = clip.id;
     return clipActions(
       clip,
       {
@@ -1594,50 +1494,17 @@
         soundName: clip.soundId === null ? null : sources.of(clip).title,
         nudgeKeys: hints.label(shortcuts.nudgeTake.keys),
         ...menuKeys(),
-        canSplit: splitTargets(timeline.tracks, new Set([clipId]), chosen, playheadAt()).length > 0,
         selected: selection.size,
         frozen: freeze,
       },
+      menuCommands,
       {
         retake: () => startRecording(clip.id),
-        chooseTake: (takeId) => editing.edit({ kind: 'chooseTake', clipId, takeId }),
-        deleteTake: (takeId) => editing.edit({ kind: 'deleteTake', clipId, takeId }),
-        nudgeTake: (takeId, ms) => editing.edit({ kind: 'nudgeTake', clipId, takeId, nudge: ms / 1000 }),
-        clearInactiveTakes: () => editing.edit({ kind: 'clearInactiveTakes', clipId }),
         downloadTake: (takeId) => download(api.takeDownloadUrl(timeline.songId, takeId)),
         rename: () => startClipRename(clip),
-        // To the tenth, as a drag sets it.
-        setGain: (gain) => editing.edit({ kind: 'setClipGain', clipId, gain: clampGain(gain) }),
-        setTempo: (percent) => setTempo(new Set([clipId]), percent),
-        setPitch: (semitones) => setPitch(new Set([clipId]), semitones),
-        copy: () => copyClips(new Set([clip.id])),
-        cut: () => cutClip(clip),
-        duplicate: () => duplicate(clip),
-        split: () => splitAtPlayhead(new Set([clipId])),
         downloadSound: (soundId) => download(api.soundDownloadUrl(timeline.songId, soundId)),
-        deleteClip: () => remove(clip),
       },
     );
-  }
-
-  /**
-   * Sets the Tempo of the Clips clipIds, from a percentage typed, as one
-   * step: those it changes, in Timeline order.
-   */
-  function setTempo(clipIds: ReadonlySet<number>, percent: number) {
-    const tempo = tempoOf(percent);
-    const tempos = clips.filter((c) => clipIds.has(c.id) && c.tempo !== tempo).map((c) => ({ clipId: c.id, tempo }));
-    if (tempos.length > 0) editing.edit({ kind: 'setClipTempos', tempos });
-  }
-
-  /**
-   * Sets the Pitch of the Clips clipIds, from semitones typed, as one step:
-   * those it changes, in Timeline order.
-   */
-  function setPitch(clipIds: ReadonlySet<number>, semitones: number) {
-    const pitch = pitchOf(semitones);
-    const pitches = clips.filter((c) => clipIds.has(c.id) && c.pitch !== pitch).map((c) => ({ clipId: c.id, pitch }));
-    if (pitches.length > 0) editing.edit({ kind: 'setClipPitches', pitches });
   }
 
   /** The keys that copy, cut and split, as the Clip and Selection menus name them. */

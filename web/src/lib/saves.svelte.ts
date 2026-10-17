@@ -29,10 +29,10 @@
 // changes one visit to a text field saves, one after another, are kept as
 // one.
 import { ApiError, type Song, type Timeline } from './api';
-import { sameCues, savedRetrying, withCueChange, type CueChange } from './cueChanges';
+import { sameCues, withCueChange, type CueChange } from './cueChanges';
 import { History, restorable, type Edit, type HistoryEdit } from './history';
 import { changedSection, type LyricSheetChange, type FieldVisit } from './lyricSheetChanges';
-import { waitFor, type SongServer, type Wait } from './songServer';
+import { savedRetrying, waitFor, type SongServer, type Wait } from './songServer';
 
 /** How a save ended: saved, failed, refused as the Song changed elsewhere, or never sent as the Song's being deleted. */
 export type Submitted = 'saved' | 'failed' | 'stale' | 'closed';
@@ -125,7 +125,7 @@ export class Saves {
   // elsewhere, they'd no longer undo what they did, so they're forgotten.
   #history = new History();
   /** Undoable edits queued, which an undo waits for. */
-  #undoablesQueued = 0;
+  #undoablesQueued = $state(0);
   /**
    * Counts the Cue edits that failed, so were taken back: an undo pressed
    * for one before it failed has nothing to undo, rather than undoing the
@@ -163,6 +163,11 @@ export class Saves {
   /** Whether anything isn't saved yet: saves on their way, Cue changes, or edits being typed. */
   get unsaved(): boolean {
     return this.pending > 0 || this.#unsavedCues.length > 0 || this.#typing.some((t) => t.unsaved);
+  }
+
+  /** How many edits kept to undo are queued or on their way, which an undo waits for. */
+  get undoablesQueued(): number {
+    return this.#undoablesQueued;
   }
 
   /**
@@ -274,16 +279,17 @@ export class Saves {
   };
 
   /**
-   * Undoes the latest edit, once the edits queued before it are saved.
+   * Undoes the latest edit, once the edits queued before it are saved,
+   * unless stillWanted then says not, e.g. as the Song froze meanwhile.
    * Resolves to what it did, or null if there was nothing to undo or it
    * wasn't saved. An undo pressed for a Cue edit that then failed, so was
    * taken back, undoes nothing.
    */
-  undo = (): Promise<Undone | null> => {
+  undo = (stillWanted: () => boolean = () => true): Promise<Undone | null> => {
     if (!this.canUndo && this.#undoablesQueued === 0) return Promise.resolve(null);
     const failedBefore = this.#cueEditsFailed;
     return this.#step(() => {
-      if (this.#cueEditsFailed !== failedBefore) return null;
+      if (!stillWanted() || this.#cueEditsFailed !== failedBefore) return null;
       const edit = this.#history.nextUndo();
       if (!edit) return null;
       const playhead = this.#history.nextUndoPlayhead();
@@ -300,9 +306,10 @@ export class Saves {
   };
 
   /** Redoes the latest edit undone, like undo. */
-  redo = (): Promise<Undone | null> => {
+  redo = (stillWanted: () => boolean = () => true): Promise<Undone | null> => {
     if (!this.canRedo) return Promise.resolve(null);
     return this.#step(() => {
+      if (!stillWanted()) return null;
       const edit = this.#history.nextRedo();
       if (!edit) return null;
       return {

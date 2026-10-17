@@ -56,7 +56,7 @@ func (s *Store) ImportSound(ctx context.Context, songID int64, based songversion
 	if err != nil {
 		return Timeline{}, err
 	}
-	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
+	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges, before Timeline) error {
 		if err := findTrack(ctx, tx, songID, imp.TrackID); errors.Is(err, domain.ErrNotFound) {
 			return domain.Invalid("there's no such Track on this Timeline")
 		} else if err != nil {
@@ -74,12 +74,9 @@ func (s *Store) ImportSound(ctx context.Context, songID int64, based songversion
 		if err != nil {
 			return err
 		}
-		start, err := trackEnd(ctx, tx, imp.TrackID)
-		if err != nil {
-			return err
-		}
 		changes.Keep(file, soundID)
-		return addClip(ctx, tx, songID, imp.TrackID, NewClip{SoundID: &soundID, Tempo: 1, Start: start, Length: a.Duration})
+		start := trackEnd(before.track(imp.TrackID))
+		return addClip(ctx, tx, songID, imp.TrackID, NewClip{SoundID: &soundID, ClipPlayback: asRecorded(), Start: start, Length: a.Duration})
 	})
 }
 

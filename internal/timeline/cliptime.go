@@ -11,7 +11,7 @@ package timeline
 // rate is how many seconds of its source a Clip plays for each second of
 // the Timeline.
 func (p placement) rate() float64 {
-	return p.tempo
+	return p.Tempo
 }
 
 // sourceAt is where in its source a Clip is at time t on the Timeline, in

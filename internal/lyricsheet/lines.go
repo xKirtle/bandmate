@@ -3,7 +3,6 @@ package lyricsheet
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"strings"
 
 	"github.com/xKirtle/bandmate/internal/songversion"
@@ -14,55 +13,35 @@ import (
 // Lines edited in place keep their ids, removed Lines are deleted, and only
 // Lines that are really new get new ids.
 func (s *Store) ReplaceAlternateText(ctx context.Context, songID int64, based songversion.Version, alternateID int64, text string) (Song, error) {
-	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
-		if _, _, err := findAlternate(ctx, tx, songID, alternateID); err != nil {
-			return err
-		}
-		var oldIDs []int64
-		var oldTexts []string
-		err := query(ctx, tx, `SELECT id, text FROM lines WHERE alternate_id = ? ORDER BY position`,
-			[]any{alternateID}, func(rows *sql.Rows) error {
-				var id int64
-				var text string
-				if err := rows.Scan(&id, &text); err != nil {
-					return err
-				}
-				oldIDs, oldTexts = append(oldIDs, id), append(oldTexts, text)
-				return nil
-			})
-		if err != nil {
-			return fmt.Errorf("reading lines: %w", err)
-		}
-
-		newTexts := splitLines(text)
-		keeps := matchLines(oldTexts, newTexts)
-		kept := map[int]bool{}
-		for _, k := range keeps {
-			kept[k] = true
-		}
-		for i, id := range oldIDs {
-			if kept[i] {
-				continue
-			}
-			if _, err := tx.ExecContext(ctx, `DELETE FROM lines WHERE id = ?`, id); err != nil {
-				return fmt.Errorf("removing line: %w", err)
-			}
-		}
-		for i, k := range keeps {
-			var err error
-			if k < 0 {
-				_, err = tx.ExecContext(ctx, `INSERT INTO lines (alternate_id, position, text) VALUES (?, ?, ?)`,
-					alternateID, i, newTexts[i])
-			} else {
-				_, err = tx.ExecContext(ctx, `UPDATE lines SET position = ?, text = ? WHERE id = ?`,
-					i, newTexts[i], oldIDs[k])
-			}
-			if err != nil {
-				return fmt.Errorf("saving line: %w", err)
-			}
-		}
-		return nil
+	return s.changeSheetWith(ctx, songID, based, func(sheet LyricSheet, ids *ids) (LyricSheet, error) {
+		return replaceAlternateText(sheet, ids, alternateID, text)
 	})
+}
+
+// replaceAlternateText is ReplaceAlternateText's change to the sheet. A Line
+// that keeps its identity keeps its Cue too; a new Line has none.
+func replaceAlternateText(sheet LyricSheet, ids *ids, alternateID int64, text string) (LyricSheet, error) {
+	sec, i, err := sheetAlternate(sheet, alternateID)
+	if err != nil {
+		return LyricSheet{}, err
+	}
+	old := sec.Alternates[i].Lines
+	oldTexts := make([]string, len(old))
+	for k, l := range old {
+		oldTexts[k] = l.Text
+	}
+	newTexts := splitLines(text)
+	lines := make([]Line, len(newTexts))
+	for k, keep := range matchLines(oldTexts, newTexts) {
+		if keep < 0 {
+			lines[k] = newLine(ids.line(), newTexts[k], sql.NullInt64{})
+			continue
+		}
+		lines[k] = newLine(old[keep].ID, newTexts[k], sql.NullInt64{})
+		lines[k].Cue = copyCue(old[keep].Cue)
+	}
+	sec.Alternates[i].Lines = lines
+	return sheet, nil
 }
 
 // matchLines works out which old Line each new Line is, returning for each

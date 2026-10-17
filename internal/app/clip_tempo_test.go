@@ -83,6 +83,19 @@ func TestSlowingAClipKeepsItsStartAndAudioAndScalesItsLengthAndFades(t *testing.
 	}
 }
 
+func TestAClipPlacedAtATempoOf0IsPlacedAt100Percent(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+
+	got := timelineChange(t, ts.placeClip(p.song.ID, map[string]any{
+		"trackId": p.tl.Tracks[1].ID, "beatId": p.long.ID, "tempo": 0, "start": 0, "offset": 0, "length": 10,
+	}))
+
+	if c := got.Tracks[1].Clips[0]; c.Tempo != 1 {
+		t.Errorf("clip = %+v, want it at 100%%, as a Clip placed with no Tempo", c)
+	}
+}
+
 func TestAClipsTempoGoesFrom50To200Percent(t *testing.T) {
 	ts := newTestServer(t)
 	p := placeTwoClips(t, ts)

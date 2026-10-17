@@ -450,150 +450,40 @@ func (s *Store) RestoreSnapshot(ctx context.Context, songID int64, based songver
 		if err != nil {
 			return "", nil, err
 		}
-		return "", func() error { return restoreSheet(ctx, tx, songID, held) }, nil
+		return "", func() error {
+			return editSheet(ctx, tx, songID, func(current LyricSheet, _ *ids) (LyricSheet, error) {
+				return keepCurrentCues(current, held.lyricSheet()), nil
+			})
+		}, nil
 	})
-}
-
-// restoreSheet makes a Song's Lyric Sheet and Scrapbook those held.
-func restoreSheet(ctx context.Context, tx *sql.Tx, songID int64, held heldSheet) error {
-	current, err := loadLyricSheet(ctx, tx, songID)
-	if err != nil {
-		return err
-	}
-	sections, alternates, lines := map[int64]bool{}, map[int64]bool{}, map[int64]bool{}
-	for _, sec := range current.Sections {
-		sections[sec.ID] = true
-		for _, alt := range sec.Alternates {
-			alternates[alt.ID] = true
-			for _, l := range alt.Lines {
-				lines[l.ID] = true
-			}
-		}
-	}
-	// Out of the Arrangement and inactive for now, so nothing clashes as
-	// rows move; each gets its place, and the active ones, at the end.
-	if _, err := tx.ExecContext(ctx, `UPDATE sections SET position = NULL WHERE song_id = ?`, songID); err != nil {
-		return fmt.Errorf("clearing the arrangement: %w", err)
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE alternates SET active = 0
-		WHERE section_id IN (SELECT id FROM sections WHERE song_id = ?)`, songID); err != nil {
-		return fmt.Errorf("clearing active alternates: %w", err)
-	}
-	// claim takes a row the Snapshot holds off those to delete, reporting
-	// whether it's there now.
-	claim := func(there map[int64]bool, id int64) bool {
-		ok := there[id]
-		delete(there, id)
-		return ok
-	}
-	for _, sec := range held.Sections {
-		stmt := `INSERT INTO sections (label, song_id, id) VALUES (?, ?, ?)`
-		if claim(sections, sec.ID) {
-			stmt = `UPDATE sections SET label = ? WHERE song_id = ? AND id = ?`
-		}
-		if _, err := tx.ExecContext(ctx, stmt, sec.Label, songID, sec.ID); err != nil {
-			return fmt.Errorf("restoring section: %w", err)
-		}
-		for _, alt := range sec.Alternates {
-			stmt := `INSERT INTO alternates (section_id, name, id) VALUES (?, ?, ?)`
-			if claim(alternates, alt.ID) {
-				stmt = `UPDATE alternates SET section_id = ?, name = ? WHERE id = ?`
-			}
-			if _, err := tx.ExecContext(ctx, stmt, sec.ID, alt.Name, alt.ID); err != nil {
-				return fmt.Errorf("restoring alternate: %w", err)
-			}
-			for pos, l := range alt.Lines {
-				if claim(lines, l.ID) {
-					_, err = tx.ExecContext(ctx, `UPDATE lines SET alternate_id = ?, position = ?, text = ? WHERE id = ?`,
-						alt.ID, pos, l.Text, l.ID)
-				} else {
-					_, err = tx.ExecContext(ctx, `INSERT INTO lines (alternate_id, position, text, cue_ms, id) VALUES (?, ?, ?, ?, ?)`,
-						alt.ID, pos, l.Text, l.CueMs, l.ID)
-				}
-				if err != nil {
-					return fmt.Errorf("restoring line: %w", err)
-				}
-			}
-		}
-	}
-	// What's left isn't held: Lines first, then Alternates and Sections, so
-	// a delete cascades only to rows going too.
-	for _, gone := range []struct {
-		table string
-		ids   map[int64]bool
-	}{{"lines", lines}, {"alternates", alternates}, {"sections", sections}} {
-		for id := range gone.ids {
-			if _, err := tx.ExecContext(ctx, `DELETE FROM `+gone.table+` WHERE id = ?`, id); err != nil {
-				return fmt.Errorf("deleting from %s: %w", gone.table, err)
-			}
-		}
-	}
-	for _, sec := range held.Sections {
-		for _, alt := range sec.Alternates {
-			if !alt.Active {
-				continue
-			}
-			if _, err := tx.ExecContext(ctx, `UPDATE alternates SET active = 1 WHERE id = ?`, alt.ID); err != nil {
-				return fmt.Errorf("making alternate active: %w", err)
-			}
-		}
-	}
-	for pos, id := range held.Arrangement {
-		if _, err := tx.ExecContext(ctx, `UPDATE sections SET position = ? WHERE id = ?`, pos, id); err != nil {
-			return fmt.Errorf("restoring the arrangement: %w", err)
-		}
-	}
-	for pos, id := range held.Scrapbook {
-		if _, err := tx.ExecContext(ctx, `UPDATE sections SET scrapbook_position = ? WHERE id = ?`, pos+1, id); err != nil {
-			return fmt.Errorf("restoring the scrapbook: %w", err)
-		}
-	}
-	return nil
 }
 
 // sectionName names a Section as the Song page lists it: by its Label, else
 // its active Alternate's first Line with words. One with neither has no
 // name.
-func sectionName(ctx context.Context, tx *sql.Tx, sectionID int64) (string, error) {
-	var label string
-	if err := tx.QueryRowContext(ctx, `SELECT label FROM sections WHERE id = ?`, sectionID).Scan(&label); err != nil {
-		return "", fmt.Errorf("reading section: %w", err)
+func sectionName(sec Section) string {
+	if sec.Label != "" {
+		return sec.Label
 	}
-	if label != "" {
-		return label, nil
-	}
-	first := ""
-	err := query(ctx, tx, `SELECT l.text FROM lines l JOIN alternates a ON a.id = l.alternate_id
-		WHERE a.section_id = ? AND a.active = 1 ORDER BY l.position`,
-		[]any{sectionID}, func(rows *sql.Rows) error {
-			var text string
-			if err := rows.Scan(&text); err != nil {
-				return err
+	for _, alt := range sec.Alternates {
+		if !alt.Active {
+			continue
+		}
+		for _, l := range alt.Lines {
+			if lyrics := strings.TrimSpace(l.Lyrics); lyrics != "" {
+				return lyrics
 			}
-			if lyrics := strings.TrimSpace(newLine(0, text, sql.NullInt64{}).Lyrics); first == "" {
-				first = lyrics
-			}
-			return nil
-		})
-	if err != nil {
-		return "", fmt.Errorf("reading section's lines: %w", err)
+		}
 	}
-	return first, nil
+	return ""
 }
 
 // alternateName names an Alternate as the Song page does: by its name,
-// else by its place among its Section's, e.g. "Alternate 2".
-func alternateName(ctx context.Context, tx *sql.Tx, sectionID, alternateID int64) (string, error) {
-	var name string
-	var place int
-	err := tx.QueryRowContext(ctx, `SELECT name,
-		(SELECT COUNT(*) FROM alternates b WHERE b.section_id = ? AND b.id <= a.id)
-		FROM alternates a WHERE a.id = ?`, sectionID, alternateID).Scan(&name, &place)
-	if err != nil {
-		return "", fmt.Errorf("reading alternate: %w", err)
+// else by its place among its Section's, e.g. "Alternate 2". i is its
+// index in sec's Alternates.
+func alternateName(sec Section, i int) string {
+	if name := sec.Alternates[i].Name; name != "" {
+		return name
 	}
-	if name != "" {
-		return name, nil
-	}
-	return fmt.Sprintf("Alternate %d", place), nil
+	return fmt.Sprintf("Alternate %d", i+1)
 }
