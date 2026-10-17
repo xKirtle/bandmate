@@ -1,7 +1,8 @@
 // Package timeline owns a Song's Timeline: its Tracks and the Clips on them.
 // All its rules live here; the HTTP layer only maps requests onto these
-// operations. Every change marks the Song as edited and returns the full,
-// updated Timeline.
+// operations. Every change marks the Song as edited, is checked once
+// against the placement rules (checkLayout), and returns the full, updated
+// Timeline.
 package timeline
 
 import (
@@ -581,8 +582,13 @@ func (s *Store) ClearLoop(ctx context.Context, songID int64, based songversion.V
 // at a neighbour's end as the browser worked it out.
 const tolerance = 1e-6
 
-// errOverlap is refusing a Clip where another already plays on its Track.
-var errOverlap = domain.Conflict("Clips can't overlap on a Track")
+// roundedToZero is a time, or 0:00 for one rounded a hair below it.
+func roundedToZero(t float64) float64 {
+	if t < 0 && t >= -tolerance {
+		return 0
+	}
+	return t
+}
 
 // placement is where a Clip is, what it plays, what it's named, its Gain,
 // its Tempo, its Pitch and its Fades, as stored. Its Fades are shortened to fit as it's stored.
@@ -601,8 +607,8 @@ type placement struct {
 }
 
 // source is what a Clip plays: a Beat, a Sound, or Takes, of which it
-// plays the active one. The Timeline's rules ask it how long it is rather
-// than reaching for a Clip's Beat, Sound or Takes.
+// plays the active one. Operations ask it how long it is rather than
+// reaching for a Clip's Beat, Sound or Takes.
 type source struct {
 	beatID  sql.NullInt64
 	soundID sql.NullInt64
@@ -616,17 +622,15 @@ type source struct {
 // Takes ends, whichever is active.
 func (src source) duration(ctx context.Context, tx *sql.Tx) (float64, error) {
 	if src.activeTakeID.Valid {
-		var end float64
-		for _, id := range src.takeIDs {
-			var e float64
-			// A Take nudged earlier still reaches where it ended before.
-			if err := tx.QueryRowContext(ctx, `SELECT position + duration + MAX(0, -nudge) FROM takes WHERE id = ?`, id).
-				Scan(&e); err != nil {
+		takes := make([]Take, len(src.takeIDs))
+		for i, id := range src.takeIDs {
+			t := &takes[i]
+			if err := tx.QueryRowContext(ctx, `SELECT position, duration, nudge FROM takes WHERE id = ?`, id).
+				Scan(&t.Position, &t.Duration, &t.Nudge); err != nil {
 				return 0, fmt.Errorf("reading take: %w", err)
 			}
-			end = max(end, e)
 		}
-		return end, nil
+		return takesEnd(takes), nil
 	}
 	var duration float64
 	if src.soundID.Valid {
@@ -654,12 +658,12 @@ func (s *Store) MoveClip(ctx context.Context, songID int64, based songversion.Ve
 		if err != nil {
 			return err
 		}
-		return place(ctx, tx, clipID, p)
+		return store(ctx, tx, clipID, p)
 	})
 }
 
 // movedTo is where one of the Song's Clips would be, moved to start at a
-// time on a Track, if that's on the Song's Timeline.
+// time on a Track, if the Track is on the Song's Timeline.
 func movedTo(ctx context.Context, tx *sql.Tx, songID, clipID, trackID int64, start float64) (placement, error) {
 	p, err := clipPlacement(ctx, tx, songID, clipID)
 	if err != nil {
@@ -669,7 +673,7 @@ func movedTo(ctx context.Context, tx *sql.Tx, songID, clipID, trackID int64, sta
 		return placement{}, err
 	}
 	p.trackID, p.start = trackID, start
-	return onTimeline(p)
+	return p, nil
 }
 
 // ClipMove is where one Clip of several moved at once goes: a Track and a
@@ -681,10 +685,10 @@ type ClipMove struct {
 }
 
 // MoveClips moves several Clips at once, each to start at a time on a Track
-// of the same Timeline, keeping its trim. Each is checked where it lands
-// against the Timeline as the whole move leaves it, so Clips moved together
-// may pass each other's old places, but none can overlap another Clip.
-// If any can't go where it's moved, none moves.
+// of the same Timeline, keeping its trim. The Timeline is checked as the
+// whole move leaves it, so Clips moved together may pass each other's old
+// places, but none can overlap another Clip. If any can't go where it's
+// moved, none moves.
 func (s *Store) MoveClips(ctx context.Context, songID int64, based songversion.Version, moves []ClipMove) (Timeline, error) {
 	if len(moves) == 0 {
 		return Timeline{}, domain.Invalid("clips are required")
@@ -697,20 +701,12 @@ func (s *Store) MoveClips(ctx context.Context, songID int64, based songversion.V
 		seen[m.ClipID] = true
 	}
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		placed := make([]placement, len(moves))
-		for i, m := range moves {
+		for _, m := range moves {
 			p, err := movedTo(ctx, tx, songID, m.ClipID, m.TrackID, m.Start)
 			if err != nil {
 				return err
 			}
 			if err := store(ctx, tx, m.ClipID, p); err != nil {
-				return err
-			}
-			placed[i] = p
-		}
-		// Only once every Clip is where it's going.
-		for i, m := range moves {
-			if err := checkFree(ctx, tx, m.ClipID, placed[i]); err != nil {
 				return err
 			}
 		}
@@ -731,16 +727,7 @@ func (s *Store) TrimClip(ctx context.Context, songID int64, based songversion.Ve
 		if err != nil {
 			return err
 		}
-		duration, err := p.source.duration(ctx, tx)
-		if err != nil {
-			return err
-		}
-		trimmed := p
-		trimmed.offset, trimmed.length = offset, length
-		if err := checkTrim(trimmed, duration); err != nil {
-			return err
-		}
-		offset = max(offset, 0)
+		offset = roundedToZero(offset)
 		p.start, p.offset, p.length = p.timelineAt(offset), offset, length
 		if fades != nil {
 			if err := fades.check(length); err != nil {
@@ -748,22 +735,8 @@ func (s *Store) TrimClip(ctx context.Context, songID int64, based songversion.Ve
 			}
 			p.fades = *fades
 		}
-		return place(ctx, tx, clipID, p)
+		return store(ctx, tx, clipID, p)
 	})
-}
-
-// checkTrim checks that a Clip placed as p, its offset as asked for, plays
-// within its source, duration seconds long.
-func checkTrim(p placement, duration float64) error {
-	switch {
-	case p.offset < -tolerance:
-		return domain.Invalid("a Clip can't start before its source does")
-	case p.length <= 0:
-		return domain.Invalid("a Clip must play for some time")
-	case p.sourceEnd() > duration+tolerance:
-		return domain.Invalid("a Clip can't play past the end of its source")
-	}
-	return nil
 }
 
 // NewClip is a stretch of a Beat or a Sound, or of detached Takes, to
@@ -984,7 +957,6 @@ func (s *Store) PlaceClips(ctx context.Context, songID int64, based songversion.
 			if err != nil {
 				return err
 			}
-			// Each placed is there for the next to be checked against.
 			if err := placeOnTrack(ctx, tx, songID, trackID, c.NewClip); err != nil {
 				return err
 			}
@@ -1012,31 +984,19 @@ func findTrackToPlaceOn(ctx context.Context, tx *sql.Tx, songID, trackID int64) 
 	return nil
 }
 
-// addClip adds a new Clip to a Track of the Song, if it stays within its
-// source, starts on the Timeline and is clear of the Clips already there.
-// Takes it's given are attached to it.
+// addClip adds a new Clip to a Track of the Song, unchecked where: the
+// change it's part of checks the Timeline it leaves. Takes it's given are
+// attached to it.
 func addClip(ctx context.Context, tx *sql.Tx, songID, trackID int64, c NewClip) error {
 	src, err := newSource(ctx, tx, songID, c)
 	if err != nil {
 		return err
 	}
-	duration, err := src.duration(ctx, tx)
-	if err != nil {
-		return err
-	}
-	p := placement{trackID: trackID, source: src, name: clipName(c.Name), gain: c.Gain, tempo: c.Tempo,
-		pitch: c.Pitch, start: c.Start, offset: c.Offset, length: c.Length}
 	if err := checkTempo(c.Tempo); err != nil {
 		return err
 	}
 	if err := checkPitch(c.Pitch); err != nil {
 		return err
-	}
-	if err := checkTrim(p, duration); err != nil {
-		return err
-	}
-	if c.Start < -tolerance {
-		return domain.Invalid("a Clip can't start before 0:00")
 	}
 	if err := checkGain(c.Gain); err != nil {
 		return err
@@ -1045,14 +1005,8 @@ func addClip(ctx context.Context, tx *sql.Tx, songID, trackID int64, c NewClip) 
 	if err := fades.check(c.Length); err != nil {
 		return err
 	}
-	p.fades, p.start, p.offset = fades, max(c.Start, 0), max(c.Offset, 0)
-	free, err := isFree(ctx, tx, 0, p)
-	if err != nil {
-		return err
-	}
-	if !free {
-		return errOverlap
-	}
+	p := placement{trackID: trackID, source: src, name: clipName(c.Name), gain: c.Gain, tempo: c.Tempo,
+		pitch: c.Pitch, fades: fades, start: c.Start, offset: c.Offset, length: c.Length}
 	clipID, err := insertClip(ctx, tx, p)
 	if err != nil {
 		return err
@@ -1073,7 +1027,10 @@ func newSource(ctx context.Context, tx *sql.Tx, songID int64, c NewClip) (source
 	case given != 1:
 		return source{}, domain.Invalid("a Clip plays one of a Beat, a Sound or Takes")
 	case c.BeatID != nil:
-		return source{beatID: sql.NullInt64{Int64: *c.BeatID, Valid: true}}, nil
+		src := source{beatID: sql.NullInt64{Int64: *c.BeatID, Valid: true}}
+		// Only a Beat in the Beat Library has a duration.
+		_, err := src.duration(ctx, tx)
+		return src, err
 	case c.SoundID != nil:
 		if err := findSound(ctx, tx, songID, *c.SoundID); err != nil {
 			return source{}, err
@@ -1135,9 +1092,13 @@ func attachTakes(ctx context.Context, tx *sql.Tx, clipID int64, takeIDs []int64)
 	return nil
 }
 
-// insertClip stores a new Clip as placed, without checking where, and
-// returns its id.
+// insertClip stores a new Clip as placed, without checking where, its
+// Fades shortened to fit, and returns its id.
 func insertClip(ctx context.Context, tx *sql.Tx, p placement) (int64, error) {
+	p, err := storable(0, p)
+	if err != nil {
+		return 0, err
+	}
 	fades := p.fades.fitted(p.length)
 	res, err := tx.ExecContext(ctx,
 		`INSERT INTO clips (track_id, beat_id, sound_id, name, gain, tempo, pitch, fade_in, fade_out, active_take_id,
@@ -1268,7 +1229,6 @@ func (s *Store) PasteClips(ctx context.Context, songID int64, based songversion.
 				}
 				nc.TakeIDs, nc.ActiveTakeID = ids, &active
 			}
-			// Each pasted is there for the next to be checked against.
 			if err := placeOnTrack(ctx, tx, songID, trackID, nc); err != nil {
 				return err
 			}
@@ -1536,45 +1496,13 @@ func clipPlacement(ctx context.Context, tx *sql.Tx, songID, clipID int64) (place
 	return p, nil
 }
 
-// place stores a Clip's new placement, if it starts on the Timeline and is
-// clear of the other Clips on its Track.
-func place(ctx context.Context, tx *sql.Tx, clipID int64, p placement) error {
-	p, err := onTimeline(p)
-	if err != nil {
-		return err
-	}
-	if err := checkFree(ctx, tx, clipID, p); err != nil {
-		return err
-	}
-	return store(ctx, tx, clipID, p)
-}
-
-// onTimeline is p, if it starts on the Timeline, a start rounded a hair
-// before 0:00 taken as 0:00.
-func onTimeline(p placement) (placement, error) {
-	if p.start < -tolerance {
-		return placement{}, domain.Invalid("a Clip can't start before 0:00")
-	}
-	p.start = max(p.start, 0)
-	return p, nil
-}
-
-// checkFree refuses p if its stretch of its Track isn't clear of Clips
-// other than clipID.
-func checkFree(ctx context.Context, tx *sql.Tx, clipID int64, p placement) error {
-	free, err := isFree(ctx, tx, clipID, p)
-	if err != nil {
-		return err
-	}
-	if !free {
-		return errOverlap
-	}
-	return nil
-}
-
-// store writes a Clip's placement and Tempo, unchecked, its Fades
-// shortened to fit.
+// store writes a Clip's placement and Tempo, without checking where, its
+// Fades shortened to fit.
 func store(ctx context.Context, tx *sql.Tx, clipID int64, p placement) error {
+	p, err := storable(clipID, p)
+	if err != nil {
+		return err
+	}
 	fades := p.fades.fitted(p.length)
 	if _, err := tx.ExecContext(ctx, `UPDATE clips SET track_id = ?, start = ?, source_offset = ?, length = ?,
 			tempo = ?, fade_in = ?, fade_out = ? WHERE id = ?`,
@@ -1611,8 +1539,23 @@ func (s *Store) change(ctx context.Context, songID int64, based songversion.Vers
 // remove, which fn adds to changes.
 func (s *Store) changeWithFiles(ctx context.Context, songID int64, based songversion.Version,
 	fn func(tx *sql.Tx, changes *audio.FileChanges) error) (Timeline, error) {
+	return s.changeRewording(ctx, songID, based, nil, fn)
+}
+
+// changeRewording is changeWithFiles, its refusal for breaking a placement
+// rule in reword's words, unless reword is nil or gives nil, when it's in
+// the rule's own.
+//
+// It's the one path every change to a Timeline takes: the Timeline is read
+// before fn runs and after, and checkLayout checks what fn left.
+func (s *Store) changeRewording(ctx context.Context, songID int64, based songversion.Version,
+	reword func(violation) error, fn func(tx *sql.Tx, changes *audio.FileChanges) error) (Timeline, error) {
 	var tl Timeline
-	if err := songversion.Change(ctx, s.db, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) (err error) {
+	if err := songversion.Change(ctx, s.db, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
+		before, err := read(ctx, tx, songID)
+		if err != nil {
+			return err
+		}
 		if err := fn(tx, changes); err != nil {
 			return err
 		}
@@ -1620,8 +1563,18 @@ func (s *Store) changeWithFiles(ctx context.Context, songID int64, based songver
 		if err := markUnusedSounds(ctx, tx, songID); err != nil {
 			return err
 		}
-		tl, err = read(ctx, tx, songID)
-		return err
+		if tl, err = read(ctx, tx, songID); err != nil {
+			return err
+		}
+		if v := checkLayout(before, tl); v != nil {
+			if reword != nil {
+				if err := reword(*v); err != nil {
+					return err
+				}
+			}
+			return v.err()
+		}
+		return nil
 	}); err != nil {
 		return Timeline{}, err
 	}
