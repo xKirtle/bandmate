@@ -307,7 +307,7 @@ export class Saves {
       return {
         edit,
         done: ({ before, after }) => {
-          // A paste undone, or Clips brought back together, select what was selected before.
+          // What to select again, if anything (see History.undone).
           const reselect = this.#history.undone(before, after);
           return { before, after, reselect, playhead };
         },

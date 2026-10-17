@@ -1543,6 +1543,9 @@ describe('History of the Selection', () => {
       track(2, [clip(14, 0, { length: 4 }), clip(15, 4, { offset: 4, length: 6 })]),
     ]);
     expect(h.redone(t2, t3)).toEqual([13, 15]);
+    // Undone again, the Clips it split come back with new ids once more.
+    const t4 = timeline([track(1, [clip(16, 0), clip(6, 20)]), track(2, [clip(17, 0)])]);
+    expect(h.undone(t3, t4)).toEqual([16, 6, 17]);
   });
 
   it('selects again, on undoing a Delete, the Clips selected before it, leaving out any no longer on the Timeline', () => {
