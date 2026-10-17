@@ -30,7 +30,8 @@
   import { clipSources, clipTitle, fileStart, playing } from './clipSource';
   import { sourceAt, sourceLength } from './clipTime';
   import { formatCue } from './cues';
-  import type { Saves, Undone } from './saves.svelte';
+  import type { Saves } from './saves.svelte';
+  import type { SongUndo } from './songUndo.svelte';
   import type { SyncMode } from './syncMode.svelte';
   import { editHint, type Freeze } from './freeze';
   import { draggedFiles, fileDropTrack, type TrackRow } from './fileDrop';
@@ -117,6 +118,7 @@
   let {
     song,
     saves,
+    songUndo,
     setBpm,
     onPlayhead,
     syncMode,
@@ -127,6 +129,8 @@
     song: Song;
     /** The Song's saves, which the Timeline's edits and Cue changes go through. */
     saves: Saves;
+    /** The Song's Undo and Redo, whose results the Timeline follows. */
+    songUndo: SongUndo;
     /** Sets the Song's BPM. */
     setBpm: (bpm: number) => void;
     /** Hears where playback is, in seconds, every frame while playing, then null once it stops. */
@@ -325,26 +329,21 @@
     }
   });
 
-  /**
-   * Undoes the Song's latest edit, e.g. from the Song page header or its
-   * key, whether or not the Timeline can be edited here: on a phone and in
-   * Read mode too. While frozen it does nothing (see TimelineEditing.undo).
-   * Resolves to what it did, or null if nothing.
-   */
-  export async function undo(): Promise<Undone | null> {
-    // Undoing a new Take returns the playhead to where its Clip starts, to
-    // record again from. Once the Clip's gone, it's a seek like any other:
-    // playing, playback jumps there, superseding the restart the Clip's
-    // going started.
-    const undone = await editing.undo();
-    if (undone && undone.playhead !== null) seekTo(undone.playhead);
-    return undone;
-  }
-
-  /** Redoes the Song's latest edit undone, like undo. */
-  export function redo(): Promise<Undone | null> {
-    return editing.redo();
-  }
+  // The Song's Undo and Redo are the Song page's (see songUndo.svelte.ts),
+  // whether or not the Timeline can be edited here: on a phone and in Read
+  // mode too. The Timeline follows what they did: the Clips brought back
+  // together, or a Merge or a Split redone, are selected, and the Merge note
+  // goes. Undoing a new Take returns the playhead to where its Clip
+  // started, to record again from. Once the Clip's gone, it's a seek like
+  // any other: playing, playback jumps there, superseding the restart the
+  // Clip's going started.
+  $effect(() =>
+    songUndo.follow((undone) => {
+      if (undone.reselect) selection.selectEdited(undone.reselect);
+      if (undone.playhead !== null) seekTo(undone.playhead);
+      editing.dismissMergeNote();
+    }),
+  );
 
   // Tooltips name a Shortcut's keys as this platform does, e.g. ⌘Z on a
   // Mac, but only with a keyboard and mouse.

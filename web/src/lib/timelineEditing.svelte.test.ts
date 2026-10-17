@@ -180,24 +180,6 @@ describe('Timeline editing, the freeze', () => {
     expect(await failing).toBe(false);
     expect(editing.frozen).toBe(false);
   });
-
-  it('refuses undo and redo while frozen', async () => {
-    const server = new FakeSongServer(emptySong(), twoTracks());
-    const { saves, editing, state } = await editingFor(server);
-    await editing.edit({ kind: 'deleteClip', clipId: 1 });
-    await editing.undo();
-    state.recording = true;
-    await editing.redo();
-    expect(clipIdsOn(server, 1)).toHaveLength(2);
-    expect(saves.canRedo).toBe(true);
-    state.recording = false;
-    await editing.redo();
-    state.recording = true;
-    await editing.undo();
-    expect(saves.canUndo).toBe(true);
-    expect(clipIdsOn(server, 1)).toEqual([2]);
-    expect(server.landed).toBe(3);
-  });
 });
 
 /** A Track on the Timeline as shown. */
@@ -340,13 +322,13 @@ describe('Timeline editing, the Timeline as shown', () => {
 
   it('leaves what’s shown alone through an undo and a redo', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
-    const { editing } = await editingFor(server);
+    const { saves, editing } = await editingFor(server);
     await editing.edit({ kind: 'updateTrack', trackId: 1, changes: { volume: -6 } });
     editing.adjust({ kind: 'updateTrack', trackId: 1, changes: { volume: -9 } });
-    await editing.undo();
+    await saves.undo();
     expect(server.timeline.tracks[0].volume).toBe(0);
     expect(shownTrack(editing, 1).volume).toBe(-9);
-    await editing.redo();
+    await saves.redo();
     expect(server.timeline.tracks[0].volume).toBe(-6);
     expect(shownTrack(editing, 1).volume).toBe(-9);
   });
@@ -377,12 +359,12 @@ describe('Timeline editing, a Track’s fader', () => {
 
   it('shows an undo of a Track’s volume at once after its fader was let go where it started', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
-    const { editing } = await editingFor(server);
+    const { saves, editing } = await editingFor(server);
     await editing.edit({ kind: 'updateTrack', trackId: 1, changes: { volume: -6 } });
     editing.moveFader(1, -9);
     editing.moveFader(1, -6);
     await editing.letGoFader(1, -6);
-    await editing.undo();
+    await saves.undo();
     expect(server.timeline.tracks[0].volume).toBe(0);
     expect(shownTrack(editing, 1).volume).toBe(0);
   });
@@ -534,7 +516,7 @@ describe('Timeline editing, Track and Clip names typed', () => {
     await editing.edit({ kind: 'addTrack', track: { name: 'Track 3' } });
     const name = editing.trackName(3);
     name.shown = 'Bass';
-    await editing.undo();
+    await saves.undo();
     const sent = server.sent;
     name.destroy();
     await answered();
@@ -763,7 +745,7 @@ describe('Timeline editing, a Clip’s Gain and Fades as shown', () => {
 describe('Timeline editing, undo and redo', () => {
   it('sets the Pitch of several Clips as one step, undone together, leaving their lengths', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
-    const { editing } = await editingFor(server);
+    const { saves, editing } = await editingFor(server);
     await editing.edit({
       kind: 'setClipPitches',
       pitches: [
@@ -777,12 +759,12 @@ describe('Timeline editing, undo and redo', () => {
       [20, 10, -2],
     ]);
 
-    await editing.undo();
+    await saves.undo();
     expect(pitches()).toEqual([
       [0, 10, 0],
       [20, 10, 0],
     ]);
-    await editing.redo();
+    await saves.redo();
     expect(pitches()).toEqual([
       [0, 10, -2],
       [20, 10, -2],
@@ -791,7 +773,7 @@ describe('Timeline editing, undo and redo', () => {
 
   it('sets the Tempo of several Clips as one step, undone together', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
-    const { editing } = await editingFor(server);
+    const { saves, editing } = await editingFor(server);
     await editing.edit({
       kind: 'setClipTempos',
       tempos: [
@@ -805,52 +787,16 @@ describe('Timeline editing, undo and redo', () => {
       [20, 12.5, 0.8],
     ]);
 
-    await editing.undo();
+    await saves.undo();
     expect(lengths()).toEqual([
       [0, 10, 1],
       [20, 10, 1],
     ]);
-    await editing.redo();
+    await saves.redo();
     expect(lengths()).toEqual([
       [0, 12.5, 0.8],
       [20, 12.5, 0.8],
     ]);
-  });
-
-  it('does nothing with nothing to undo or redo, and nothing queued', async () => {
-    const server = new FakeSongServer(emptySong(), twoTracks());
-    const { editing } = await editingFor(server);
-    expect(editing.undoes).toBe(false);
-    expect(editing.redoes).toBe(false);
-    await editing.undo();
-    await editing.redo();
-    expect(server.landed).toBe(0);
-    // Once an edit is queued, undo has something to wait for.
-    const deleting = editing.edit({ kind: 'deleteClip', clipId: 1 });
-    expect(editing.undoes).toBe(true);
-    await deleting;
-  });
-
-  it('undoes an edit still queued, once it lands', async () => {
-    const server = new FakeSongServer(emptySong(), twoTracks());
-    const { editing } = await editingFor(server);
-    const deleting = editing.edit({ kind: 'deleteClip', clipId: 2 });
-    const undoing = editing.undo();
-    await Promise.all([deleting, undoing]);
-    expect(server.timeline.tracks[0].clips.map((c) => c.start)).toEqual([0, 20]);
-  });
-
-  it('reselects Clips deleted together as they come back, and lets redo take them again', async () => {
-    const server = new FakeSongServer(emptySong(), twoTracks());
-    const { editing, selection } = await editingFor(server);
-    await editing.edit({ kind: 'deleteClips', clipIds: [1, 2] });
-    expect(selection.size).toBe(0);
-    await editing.undo();
-    const back = clipIdsOn(server, 1);
-    expect(back).toHaveLength(2);
-    expect([...selection.ids]).toEqual(back);
-    await editing.redo();
-    expect(clipIdsOn(server, 1)).toEqual([]);
   });
 });
 
@@ -885,22 +831,22 @@ describe('Timeline editing, what follows an edit', () => {
     expect([...selection.ids]).toEqual([copy]);
   });
 
-  it('selects the right halves a Split made, the whole Clip once undone, and the right half again once redone', async () => {
+  it('selects the right halves a Split made, and says to select the whole Clip once undone, and the right half again once redone', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
-    const { editing, selection } = await editingFor(server);
+    const { saves, editing, selection } = await editingFor(server);
     await editing.edit({ kind: 'splitClips', clipIds: [1], at: 4 });
     const [left, right] = server.timeline.tracks[0].clips;
     expect(left).toMatchObject({ id: 1, start: 0, length: 4 });
     expect(right).toMatchObject({ start: 4, offset: 4, length: 6 });
     expect([...selection.ids]).toEqual([right.id]);
-    await editing.undo();
+    const undone = await saves.undo();
     const [whole] = server.timeline.tracks[0].clips;
     expect(whole).toMatchObject({ start: 0, length: 10 });
-    expect([...selection.ids]).toEqual([whole.id]);
-    await editing.redo();
+    expect(undone?.reselect).toEqual([whole.id]);
+    const redone = await saves.redo();
     const [, again] = server.timeline.tracks[0].clips;
     expect(again).toMatchObject({ start: 4, length: 6 });
-    expect([...selection.ids]).toEqual([again.id]);
+    expect(redone?.reselect).toEqual([again.id]);
   });
 
   it('leaves the Selection as it is after an edit adding nothing', async () => {
@@ -920,29 +866,6 @@ describe('Timeline editing, what follows an edit', () => {
     expect(state.chosen).toEqual([3]);
     await editing.edit({ kind: 'deleteClip', clipId: 1 });
     expect(state.chosen).toEqual([3]);
-  });
-
-  it('says to return the playhead to where a new Take undone started', async () => {
-    const server = new FakeSongServer(emptySong(), twoTracks());
-    const { saves, editing } = await editingFor(server);
-    await recordTake(server, saves, 12);
-    expect(clipIdsOn(server, 2)).toHaveLength(1);
-    expect(await editing.undo()).toMatchObject({ playhead: 12 });
-    expect(clipIdsOn(server, 2)).toEqual([]);
-  });
-
-  it('says to leave the playhead be, undoing a new Take, when a recording started since', async () => {
-    const server = new FakeSongServer(emptySong(), twoTracks());
-    const { saves, editing, state } = await editingFor(server);
-    await recordTake(server, saves, 12);
-    // Pressed before the recording started, and landing after.
-    const release = server.holdNextAnswer();
-    const undoing = editing.undo();
-    await vi.advanceTimersByTimeAsync(0);
-    state.recording = true;
-    release();
-    expect(await undoing).toMatchObject({ playhead: null });
-    expect(clipIdsOn(server, 2)).toEqual([]);
   });
 });
 
@@ -1076,9 +999,9 @@ describe('Timeline editing, the Cue-move offer', () => {
 
   it('is withdrawn by an undo', async () => {
     const server = new FakeSongServer(cuedSong(), twoTracks());
-    const { editing } = await editingFor(server);
+    const { saves, editing } = await editingFor(server);
     await editing.saveDrag(clipOneMoved(server));
-    await editing.undo();
+    await saves.undo();
     expect(editing.cueOffer).toBeNull();
     expect(server.timeline.tracks[0].clips[0].start).toBe(0);
   });
@@ -1164,7 +1087,7 @@ describe('Timeline editing, a Merge', () => {
     expect(editing.mergeNote).toBeNull();
   });
 
-  it('takes the Merge note away at the next Merge’s press, or an undo', async () => {
+  it('takes the Merge note away at the next Merge’s press', async () => {
     const tracks = mergeTracks();
     tracks[1].muted = true;
     const server = new FakeSongServer(emptySong(), tracks);
@@ -1179,23 +1102,6 @@ describe('Timeline editing, a Merge', () => {
     expect(editing.mergeNote).toBeNull();
     await merging;
     expect(editing.mergeNote).toBeNull();
-
-    // Back to before both, then merged again, and undone. The Clips come
-    // back with new ids each time.
-    const firstAndThird = () => [clipIdsOn(server, 1)[0], ...clipIdsOn(server, 2)];
-    await editing.undo();
-    await editing.undo();
-    selection.selectEdited(firstAndThird());
-    await editing.merge();
-    expect(editing.mergeNote).toBe(note);
-    await editing.undo();
-    expect(editing.mergeNote).toBeNull();
-
-    // Merged again, a redo with nothing to redo leaves it.
-    selection.selectEdited(firstAndThird());
-    await editing.merge();
-    await editing.redo();
-    expect(editing.mergeNote).toBe(note);
   });
 
   it('changes nothing when it fails to render, and says why', async () => {
@@ -1244,18 +1150,17 @@ describe('Timeline editing, a Merge', () => {
 
   it('is redone without rendering it again, selecting its Clip', async () => {
     const server = new FakeSongServer(emptySong(), mergeTracks());
-    const { editing, selection, audio } = await editingFor(server);
+    const { saves, editing, selection, audio } = await editingFor(server);
     selection.selectEdited([1, 3]);
     await editing.merge();
     const [merged] = server.timeline.tracks[0].clips;
-    await editing.undo();
+    await saves.undo();
     expect(server.timeline.tracks.map((t) => t.clips.map((c) => c.start))).toEqual([[0, 20], [12]]);
-    selection.selectEdited([]);
-    await editing.redo();
+    const redone = await saves.redo();
     const [again] = server.timeline.tracks[0].clips;
     expect(again).toMatchObject({ soundId: merged.soundId, start: 0, length: 15 });
     expect(server.timeline.tracks[1].clips).toEqual([]);
-    expect([...selection.ids]).toEqual([again.id]);
+    expect(redone?.reselect).toEqual([again.id]);
     expect(audio.rendered).toBe(1);
     expect(server.timeline.sounds).toHaveLength(1);
   });
@@ -1363,12 +1268,12 @@ describe('Timeline editing, a Sound import', () => {
 
   it('is redone without uploading the file again', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
-    const { editing } = await editingFor(server);
+    const { saves, editing } = await editingFor(server);
     await editing.importFiles([audioFile('night drive.wav')], 2);
     const [imported] = server.timeline.tracks[1].clips;
-    await editing.undo();
+    await saves.undo();
     expect(server.timeline.tracks[1].clips).toEqual([]);
-    await editing.redo();
+    await saves.redo();
     expect(server.timeline.tracks[1].clips).toMatchObject([{ soundId: imported.soundId, start: 0, length: 2 }]);
     expect(server.timeline.sounds).toHaveLength(1);
   });
