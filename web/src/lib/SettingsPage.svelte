@@ -1,9 +1,11 @@
 <script lang="ts">
   // Settings: its header, and its tabs over what the open one holds. Each
   // tab is a link to its own address, so Back, a reload and a link all open
-  // it.
+  // it. Shortcuts is for a keyboard and mouse, so a phone or a narrow
+  // window doesn't show its tab.
   import type { Snippet } from 'svelte';
-  import { settingsTabs, type SettingsTab } from './nav';
+  import { keyboardAndMouse } from './keyHints';
+  import { shownSettingsTabs, type SettingsTab } from './nav';
 
   let { tab, children }: { tab: SettingsTab; children: Snippet } = $props();
 </script>
@@ -14,7 +16,7 @@
 
 <main class="page">
   <nav class="tabs" aria-label="Settings">
-    {#each settingsTabs as t (t.id)}
+    {#each shownSettingsTabs(keyboardAndMouse()) as t (t.id)}
       <a href={t.href} aria-current={t.id === tab ? 'page' : undefined}>{t.label}</a>
     {/each}
   </nav>

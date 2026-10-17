@@ -51,10 +51,11 @@
   } from './sections';
   import type { Mode } from './songMode';
   import { readShiftStep, shiftSteps, storeShiftStep, type ShiftStep } from './shiftStep';
-  import { shortcuts } from './shortcuts';
+  import { rebound } from './shortcutKeys';
   import { cuesNextLine } from './syncKeys';
   import type { SyncMode } from './syncMode.svelte';
   import type { RhymeMode } from './rhymeMode.svelte';
+  import { ownsArrows } from './keyPlace';
   import { inTextField } from './textField';
   import { deviceStorage } from './deviceStorage';
   import { songChordsShown } from './chordsShown';
@@ -260,7 +261,7 @@
   // with a keyboard and mouse: on a phone or a narrow window, Now is the
   // way to cue.
   const hints = keyHints();
-  const cueNextLabel = $derived(hints.label(shortcuts.cueNextLine.keys));
+  const cueNextLabel = $derived(hints.label(rebound().cueNextLine.keys));
   const cueNextWays = $derived(cueNextLabel ? `${cueNextLabel} or Now` : 'Now');
 
   // In Sync mode, Enter cues anywhere but a text field or a dialog, even on
@@ -270,6 +271,7 @@
       syncing: syncMode.on,
       inTextField: inTextField(event.target),
       inDialogOrMenu: event.target instanceof Element && !!event.target.closest('dialog, [role="menu"]'),
+      ownsArrows: ownsArrows(event.target),
     };
     if (!cuesNextLine(event, at)) return;
     event.preventDefault();

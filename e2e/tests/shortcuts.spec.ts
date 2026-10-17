@@ -1,0 +1,321 @@
+import type { Page } from '@playwright/test';
+import { expect, test } from '../fixtures';
+import { clip, gainLine, heroSong } from '../songPage';
+
+// Settings' Shortcuts tab: every Shortcut, in its group's card, each a fold
+// opening to what it does and where it works, with the shortcuts dialog's
+// search. The dialog's Change keys leads to it. Shortcuts are for a
+// keyboard and mouse, so a phone opens This device at its address.
+
+test('the Shortcuts tab lists every Shortcut in its group, each a fold opening to what it does and where', async ({
+  page,
+}) => {
+  await page.goto('/settings');
+  await page.getByRole('navigation', { name: 'Settings' }).getByRole('link', { name: 'Shortcuts' }).click();
+  await expect(page).toHaveURL(/\/settings\/shortcuts$/);
+  await expect(page.getByText('Kept on this device. Each key does one thing, anywhere on a Song page.')).toBeVisible();
+
+  const editing = page.getByRole('region', { name: 'Timeline editing' });
+  const seek = editing.locator('details', {
+    hasText: 'Seek back or forward 5 s',
+  });
+  await expect(seek.getByText('Moves the playhead 5 seconds.')).toBeHidden();
+  await seek.getByText('Seek back or forward 5 s').click();
+  await expect(seek.getByText('Moves the playhead 5 seconds.')).toBeVisible();
+  await expect(seek.getByText('Works in the ruler, once it has focus.')).toBeVisible();
+
+  // ? opens the shortcuts dialog, and is listed as a Shortcut of its own.
+  const show = page.getByRole('region', { name: 'Song editing' }).locator('details', { hasText: 'Show the Shortcuts' });
+  await expect(show.locator('kbd')).toHaveText(['?']);
+});
+
+test("the Shortcuts tab's search narrows them down as the dialog's does", async ({ page }) => {
+  await page.goto('/settings/shortcuts');
+  const search = page.getByRole('searchbox', {
+    name: 'Search Shortcuts by name, what they do or key',
+  });
+  await search.fill('split');
+  await expect(page.locator('summary')).toHaveText([/Split at the playhead/]);
+  await expect(page.getByRole('region')).toHaveCount(1);
+  await search.fill('metronome');
+  await expect(page.getByText('No Shortcuts match.')).toBeVisible();
+});
+
+test("the shortcuts dialog's Change keys opens the Shortcuts tab", async ({ page, bandmate }) => {
+  const song = await bandmate.song({ title: 'Anthem' });
+  await page.goto(`/songs/${song.id}`);
+  await page.getByRole('button', { name: 'Keyboard shortcuts' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+  await expect(dialog.getByText('Show the Shortcuts')).toBeVisible();
+  await dialog.getByRole('link', { name: 'Change keys' }).click();
+  await expect(page).toHaveURL(/\/settings\/shortcuts$/);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('on a phone, Settings has no Shortcuts tab, and its address opens This device', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/settings/shortcuts');
+  await expect(page).toHaveURL(/\/settings$/);
+  const tabs = page.getByRole('navigation', { name: 'Settings' }).getByRole('link');
+  await expect(tabs).toHaveText(['This device', 'Backups', 'About']);
+});
+
+/** A Shortcut's fold in the Shortcuts tab, by its name. */
+const fold = (page: Page, name: string) =>
+  page.locator('details', { has: page.locator('summary .name', { hasText: new RegExp(`^${name}$`) }) });
+
+/** Opens a Shortcut's fold. */
+async function open(page: Page, name: string) {
+  await fold(page, name).locator('summary').click();
+}
+
+test("a key is changed by clicking it and pressing another, Esc cancelling, and it's kept on this device", async ({
+  page,
+}) => {
+  await page.goto('/settings/shortcuts');
+  await open(page, 'Record');
+  const record = fold(page, 'Record');
+
+  // Esc cancels, leaving it as it was.
+  await record.getByRole('button', { name: 'Change R' }).click();
+  await expect(record.getByRole('button', { name: 'Press a key' })).toBeFocused();
+  await page.keyboard.press('Shift');
+  await expect(record.getByRole('button', { name: 'Press a key' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(record.getByRole('button', { name: 'Change R' })).toBeVisible();
+  await expect(record.locator('summary')).not.toContainText('Changed');
+
+  await record.getByRole('button', { name: 'Change R' }).click();
+  await page.keyboard.press('Shift+T');
+  await expect(record.getByRole('button', { name: 'Change Shift+T' })).toBeVisible();
+  await expect(record.locator('summary')).toContainText('Changed');
+  await expect(record.locator('summary kbd')).toHaveText(['Shift+T']);
+
+  // A second key, then none at all.
+  await record.getByRole('button', { name: 'Add key' }).click();
+  await page.keyboard.press('k');
+  await expect(record.locator('summary kbd')).toHaveText(['Shift+T', 'K']);
+  await record.getByRole('button', { name: 'Remove Shift+T' }).click();
+  await record.getByRole('button', { name: 'Remove K' }).click();
+  await expect(record.locator('summary')).toContainText('No key');
+
+  await page.reload();
+  await expect(fold(page, 'Record').locator('summary')).toContainText('No key');
+  await expect(fold(page, 'Record').locator('summary')).toContainText('Changed');
+});
+
+test("a two-way Shortcut's Back and Forward keys change on their own", async ({ page }) => {
+  await page.goto('/settings/shortcuts');
+  await open(page, 'Go to the start or end');
+  const ends = fold(page, 'Go to the start or end');
+  await ends.getByRole('group', { name: 'Forward' }).getByRole('button', { name: 'Change End' }).click();
+  await page.keyboard.press('Alt+e');
+  await expect(ends.getByRole('group', { name: 'Forward' }).getByRole('button', { name: /^Change/ })).toHaveText([
+    'Alt+E',
+  ]);
+  await expect(ends.getByRole('group', { name: 'Back' }).getByRole('button', { name: /^Change/ })).toHaveText([
+    'Home',
+  ]);
+});
+
+test('a key another Shortcut has is refused, naming it, and the name leads there', async ({ page }) => {
+  await page.goto('/settings/shortcuts');
+  await open(page, 'Record');
+  const record = fold(page, 'Record');
+  await record.getByRole('button', { name: 'Change R' }).click();
+  await page.keyboard.press('s');
+  await expect(record.getByRole('status')).toHaveText('S is already used by Split at the playhead.');
+
+  // It keeps listening: a key that can't be chosen says why, and the next one taken clears it.
+  await page.keyboard.press('Tab');
+  await expect(record.getByRole('status')).toHaveText("Tab can't be chosen: it moves between controls.");
+  await page.keyboard.press('ControlOrMeta+w');
+  await expect(record.getByRole('status')).toContainText("can't be chosen: the browser keeps it.");
+  await page.keyboard.press('Enter');
+  await expect(record.getByRole('status')).toContainText("Enter can't be chosen on its own");
+  await page.keyboard.press('Escape');
+  await expect(record.getByRole('status')).toHaveCount(0);
+
+  await record.getByRole('button', { name: 'Change R' }).click();
+  await page.keyboard.press('s');
+  await record.getByRole('button', { name: 'Split at the playhead' }).click();
+  const split = fold(page, 'Split at the playhead');
+  await expect(split).toHaveAttribute('open', '');
+  await expect(split.locator('summary')).toBeFocused();
+  await expect(record.getByRole('status')).toHaveCount(0);
+});
+
+test('a refusal clears once focus leaves, or its fold closes', async ({ page }) => {
+  await page.goto('/settings/shortcuts');
+  await open(page, 'Undo');
+  const undo = fold(page, 'Undo');
+  await undo.getByRole('button', { name: /^Change/ }).click();
+  await page.keyboard.press('s');
+  await expect(undo.getByRole('status')).toBeVisible();
+  await page.getByRole('searchbox').click();
+  await expect(undo.getByRole('status')).toHaveCount(0);
+
+  await undo.getByRole('button', { name: /^Change/ }).click();
+  await page.keyboard.press('s');
+  await expect(undo.getByRole('status')).toBeVisible();
+  await undo.locator('summary').click();
+  await undo.locator('summary').click();
+  await expect(undo.getByRole('status')).toHaveCount(0);
+});
+
+test("a Shortcut's Reset is refused while another has its default, and Reset to defaults puts every one back", async ({
+  page,
+}) => {
+  await page.goto('/settings/shortcuts');
+  await open(page, 'Split at the playhead');
+  const split = fold(page, 'Split at the playhead');
+  await split.getByRole('button', { name: 'Change S' }).click();
+  await page.keyboard.press('k');
+  await open(page, 'Record');
+  const record = fold(page, 'Record');
+  await record.getByRole('button', { name: 'Change R' }).click();
+  await page.keyboard.press('s');
+  await expect(record.locator('summary kbd')).toHaveText(['S']);
+
+  await split.getByRole('button', { name: 'Reset' }).click();
+  await expect(split.getByRole('status')).toHaveText("Can't reset: S is used by Record.");
+  await page.keyboard.press('Escape');
+  await expect(split.getByRole('status')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Reset to defaults' }).click();
+  await expect(record.locator('summary kbd')).toHaveText(['R']);
+  await expect(split.locator('summary kbd')).toHaveText(['S']);
+  await expect(page.getByText('Changed')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Reset to defaults' })).toBeDisabled();
+});
+
+test("keys changed show in the device's other tabs at once", async ({ page, context }) => {
+  await page.goto('/settings/shortcuts');
+  const other = await context.newPage();
+  await other.goto('/settings/shortcuts');
+  await open(page, 'Record');
+  await fold(page, 'Record').getByRole('button', { name: 'Change R' }).click();
+  await page.keyboard.press('t');
+  await expect(fold(other, 'Record').locator('summary kbd')).toHaveText(['T']);
+});
+
+test('a Shortcut whose default the user already took arrives with no key, marked New until opened', async ({
+  page,
+}) => {
+  // As though Record came in a later release, after Undo was given R.
+  await page.goto('/settings/shortcuts');
+  await page.evaluate(() =>
+    localStorage.setItem('bandmate.shortcutKeys', JSON.stringify({ keys: { undo: { keys: [{ key: 'r' }] } } })),
+  );
+  await page.reload();
+  const record = fold(page, 'Record');
+  await expect(record.locator('summary')).toContainText('New');
+  await expect(record.locator('summary')).toContainText('No key');
+  await expect(fold(page, 'Undo').locator('summary kbd')).toHaveText(['R']);
+  await open(page, 'Record');
+  await expect(record.locator('summary')).not.toContainText('New');
+  await page.reload();
+  await expect(fold(page, 'Record').locator('summary')).not.toContainText('New');
+  await expect(fold(page, 'Record').locator('summary')).toContainText('No key');
+});
+
+test('the Song page uses and names the keys as rebound', async ({ page, bandmate }) => {
+  const song = await bandmate.song({ title: 'Anthem' });
+  await page.goto('/settings/shortcuts');
+  await open(page, 'Show the Shortcuts');
+  await fold(page, 'Show the Shortcuts').getByRole('button', { name: 'Change ?' }).click();
+  await page.keyboard.press('Shift+K');
+  await open(page, 'Undo');
+  await fold(page, 'Undo').getByRole('button', { name: /^Change/ }).click();
+  await page.keyboard.press('Alt+u');
+
+  await page.goto(`/songs/${song.id}`);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toHaveAttribute('title', /\(Alt\+U\)$/);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toHaveAttribute('aria-keyshortcuts', 'Alt+U');
+  await page.keyboard.press('Shift+/');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.keyboard.press('Shift+K');
+  const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('listitem').filter({ hasText: 'Show the Shortcuts' }).locator('kbd')).toHaveText([
+    'Shift+K',
+  ]);
+});
+
+test("a mouse Shortcut changes only what's held, at least one modifier, none another holds", async ({ page }) => {
+  await page.goto('/settings/shortcuts');
+  await open(page, 'Add Clips with a box');
+  const addBox = fold(page, 'Add Clips with a box');
+  const held = addBox.getByRole('group', { name: 'Held with the mouse' });
+  await expect(held).toHaveText(/^Hold\s*Ctrl\s*Alt\s*Shift\s*and drag$/);
+  const ctrl = held.getByRole('button', { name: 'Ctrl' });
+  const alt = held.getByRole('button', { name: 'Alt' });
+  const shift = held.getByRole('button', { name: 'Shift' });
+  await expect(ctrl).toHaveAttribute('aria-pressed', 'true');
+  await expect(alt).toHaveAttribute('aria-pressed', 'false');
+
+  await ctrl.click();
+  await expect(addBox.getByRole('status')).toHaveText('Needs at least one modifier: a plain drag does something else.');
+  await expect(ctrl).toHaveAttribute('aria-pressed', 'true');
+
+  // Modifiers combine, and the next one taken clears the message.
+  await alt.click();
+  await expect(addBox.getByRole('status')).toHaveCount(0);
+  await expect(addBox.locator('summary kbd')).toHaveText(['Ctrl+Alt+drag']);
+  await expect(addBox.locator('summary')).toContainText('Changed');
+
+  // Alt alone is how a Take is nudged.
+  await ctrl.click();
+  await expect(addBox.getByRole('status')).toHaveText('Alt+drag is already used by Nudge a Take inside its Clip.');
+  await page.keyboard.press('Escape');
+  await expect(addBox.getByRole('status')).toHaveCount(0);
+  await ctrl.click();
+  await addBox.getByRole('button', { name: 'Nudge a Take inside its Clip' }).click();
+  await expect(fold(page, 'Nudge a Take inside its Clip')).toHaveAttribute('open', '');
+
+  await shift.click();
+  await addBox.getByRole('button', { name: 'Reset' }).click();
+  await expect(addBox.locator('summary kbd')).toHaveText(['Ctrl+drag']);
+
+  // The plain drag that selects with a box is shown, but can't be changed.
+  await open(page, 'Select Clips with a box');
+  const box = fold(page, 'Select Clips with a box');
+  await expect(box.getByText("Can't be changed")).toBeVisible();
+
+  // Shift alone with the wheel scrolls the Timeline sideways.
+  await open(page, 'Zoom the Timeline');
+  const zoom = fold(page, 'Zoom the Timeline');
+  await zoom.getByRole('button', { name: 'Shift' }).click();
+  await zoom.getByRole('button', { name: 'Ctrl' }).click();
+  await expect(zoom.getByRole('status')).toHaveText("Shift+wheel can't be chosen: it scrolls the Timeline sideways.");
+  await expect(zoom.locator('summary kbd')).toHaveText(['Ctrl+Shift+wheel']);
+  await expect(box.getByRole('button')).toHaveCount(0);
+});
+
+test('the Song page clicks and drags with the modifiers as rebound, and names them', async ({ page, bandmate }) => {
+  const song = await heroSong(bandmate);
+  await page.goto('/settings/shortcuts');
+  await open(page, 'Add or remove a Clip');
+  const toggleClip = fold(page, 'Add or remove a Clip');
+  await toggleClip.getByRole('button', { name: 'Alt' }).click();
+  await toggleClip.getByRole('button', { name: 'Ctrl' }).click();
+  await expect(toggleClip.locator('summary kbd')).toHaveText(['Alt+click']);
+  await open(page, 'Skip snapping');
+  await fold(page, 'Skip snapping').getByRole('button', { name: 'Ctrl' }).click();
+
+  await page.goto(`/songs/${song.id}`);
+  const take = clip(page, 'Take 2');
+  const beat = clip(page, 'Lorem Click');
+  await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
+  await expect(gainLine(take)).toHaveAttribute('title', /with Ctrl\+Shift for fine steps/);
+
+  await beat.click();
+  await expect(beat).toHaveAccessibleName(/^Lorem Click, selected, /);
+  // Ctrl no longer adds a Clip: it selects it alone.
+  await take.click({ modifiers: ['ControlOrMeta'] });
+  await expect(take).toHaveAccessibleName(/^Take 2, selected, /);
+  await expect(beat).not.toHaveAccessibleName(/, selected, /);
+  await beat.click({ modifiers: ['Alt'] });
+  await expect(beat).toHaveAccessibleName(/^Lorem Click, selected, /);
+  await expect(take).toHaveAccessibleName(/^Take 2, selected, /);
+});

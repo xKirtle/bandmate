@@ -253,7 +253,7 @@ The browser, on a computer or phone, that Bandmate is opened in. What's kept "on
 _Avoid_: Browser (in the UI), machine
 
 **Device Setting**:
-A choice the user makes on purpose about how Bandmate works on this Device, whatever the Song: the Palette, light or dark, the Input, each Input's Latency Offset, the rhyming dictionaries downloaded and left-handed Chord diagrams. Every one is listed together in Settings, even when it's also changed where it's used. What's simply remembered from last time, like a volume, a step or a Song's Transpose, isn't one.
+A choice the user makes on purpose about how Bandmate works on this Device, whatever the Song: the Palette, light or dark, the Input, each Input's Latency Offset, the rhyming dictionaries downloaded, left-handed Chord diagrams and the Shortcuts' keys. Every one is listed together in Settings' This device, even when it's also changed where it's used, except the Shortcuts' keys, which are listed in Settings' Shortcuts tab. What's simply remembered from last time, like a volume, a step or a Song's Transpose, isn't one.
 _Avoid_: Preference, local setting
 
 **Palette**:

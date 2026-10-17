@@ -4,9 +4,10 @@
  * and the modifiers held while dragging or turning the wheel.
  */
 
-import { opensMenu } from './menu';
 import type { Freeze } from './freeze';
-import { matches, shortcuts, stepBy, type Key, type KeyDown, type KeyPress, type Way } from './shortcuts';
+import { ownArrow } from './keyPlace';
+import { matches, stepBy, type Key, type KeyDown, type KeyPress, type Way } from './shortcuts';
+import { rebound } from './shortcutKeys';
 
 /** The modifiers held with a pointer or wheel event, or a key press. */
 export type Modifiers = Omit<KeyPress, 'key'>;
@@ -41,6 +42,8 @@ export type TimelineKeyContext = {
   focusedClip: { inSelection: boolean } | null;
   /** A Track is being dragged by its grip. */
   draggingTrack: boolean;
+  /** The arrows there are the control's own, e.g. a slider's or a number box's. */
+  ownsArrows: boolean;
 };
 
 /**
@@ -49,14 +52,14 @@ export type TimelineKeyContext = {
  */
 export function timelineKey(e: KeyDown, at: TimelineKeyContext): TimelineKey | null {
   // A text field's, a menu's or a dialog's keys are their own.
-  if (e.defaultPrevented || at.inTextField || at.inMenuOrDialog) return null;
+  if (e.defaultPrevented || at.inTextField || at.inMenuOrDialog || ownArrow(e, at)) return null;
   // Nor while a Track is dragged, which Esc then cancels.
   if (at.draggingTrack) return null;
   // Deleting, copying, cutting and pasting go with editing, so not on a
   // phone, nor while recording or merging.
   const edits = at.editable && at.freeze === null;
-  const deletes = matches(e, shortcuts.deleteClip.keys);
-  if (at.focusedClip && opensMenu(e)) {
+  const deletes = matches(e, rebound().deleteClip.keys);
+  if (at.focusedClip && matches(e, rebound().clipMenu.keys)) {
     // Even while recording or merging, with its edits off.
     return at.editable ? 'clipMenu' : null;
   }
@@ -66,25 +69,25 @@ export function timelineKey(e: KeyDown, at: TimelineKeyContext): TimelineKey | n
     if (!edits) return null;
     return at.focusedClip.inSelection ? 'deleteSelection' : 'deleteClip';
   }
-  if (matches(e, shortcuts.clearSelection.keys)) return at.selected > 0 ? 'clearSelection' : null;
-  if (matches(e, shortcuts.selectAll.keys)) return at.editable ? 'selectAll' : null;
-  if (matches(e, shortcuts.pasteClips.keys)) return edits ? 'paste' : null;
+  if (matches(e, rebound().clearSelection.keys)) return at.selected > 0 ? 'clearSelection' : null;
+  if (matches(e, rebound().selectAll.keys)) return at.editable ? 'selectAll' : null;
+  if (matches(e, rebound().pasteClips.keys)) return edits ? 'paste' : null;
   // These act on the Selection, even from a focused Clip outside it.
   if (!edits || at.selected === 0) return null;
   if (deletes) return 'deleteSelection';
-  if (matches(e, shortcuts.copyClips.keys)) return 'copy';
-  if (matches(e, shortcuts.cutClips.keys)) return 'cut';
+  if (matches(e, rebound().copyClips.keys)) return 'copy';
+  if (matches(e, rebound().cutClips.keys)) return 'cut';
   return null;
 }
 
 /** Whether a box drawn over empty lane space with these modifiers adds the Clips it touches to the Selection, rather than replacing it. */
 export function addsBox(e: Modifiers): boolean {
-  return matches(mouse('drag', e), shortcuts.addBox.keys);
+  return matches(mouse('drag', e), rebound().addBox.keys);
 }
 
 /** Whether a Clip clicked with these modifiers is added to the Selection or taken out, rather than selected alone. */
 export function togglesSelection(e: Modifiers): boolean {
-  return matches(mouse('click', e), shortcuts.toggleClip.keys);
+  return matches(mouse('click', e), rebound().toggleClip.keys);
 }
 
 /**
@@ -93,8 +96,8 @@ export function togglesSelection(e: Modifiers): boolean {
  */
 export function rulerSeek(e: KeyPress, position: number): number | null {
   const by = stepBy(e, [
-    [shortcuts.seek, 5],
-    [shortcuts.seekFar, 15],
+    [rebound().seek, 5],
+    [rebound().seekFar, 15],
   ]);
   return by === null ? null : position + by;
 }
@@ -111,12 +114,12 @@ export function isModifier(key: string): boolean {
 
 /** Whether a Clip dragged with these modifiers nudges its active Take inside it, rather than moving. */
 export function nudges(e: Modifiers): boolean {
-  return matches(mouse('drag', e), shortcuts.nudgeTake.keys);
+  return matches(mouse('drag', e), rebound().nudgeTake.keys);
 }
 
 /** Whether a Clip or the Loop dragged with these modifiers goes anywhere, snapping to nothing. */
 export function skipsSnapping(e: Modifiers): boolean {
-  return matches(mouse('drag', e), shortcuts.skipSnapping.keys);
+  return matches(mouse('drag', e), rebound().skipSnapping.keys);
 }
 
 /**
@@ -124,6 +127,6 @@ export function skipsSnapping(e: Modifiers): boolean {
  * its keys, or as a trackpad's pinch, which a browser sends as Ctrl+wheel
  * and which zooms whatever its keys are.
  */
-export function zooms(e: Modifiers, keys: readonly Key[] = shortcuts.zoom.keys): boolean {
+export function zooms(e: Modifiers, keys: readonly Key[] = rebound().zoom.keys): boolean {
   return e.ctrlKey || matches(mouse('wheel', e), keys);
 }

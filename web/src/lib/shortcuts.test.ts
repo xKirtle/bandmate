@@ -2,8 +2,11 @@ import { describe as group, expect, it } from 'vitest';
 import {
   allKeys,
   ariaKeyShortcuts,
+  heldLabel,
   keysLabel,
+  modifierName,
   matches,
+  modifiers,
   shortcuts,
   stepBy,
   twoWayLabel,
@@ -29,6 +32,21 @@ group('matches', () => {
     expect(matches(press('r', { ctrlKey: true }), [{ key: 'r' }])).toBe(false);
     expect(matches(press('R', { shiftKey: true }), [{ key: 'r', shift: true }])).toBe(true);
     expect(matches(press('r'), [{ key: 'r', shift: true }])).toBe(false);
+  });
+
+  it('follows the letter printed on the key, whichever place it has', () => {
+    // On AZERTY, the key labelled A sits where QWERTY has Q.
+    expect(matches(press('a', { code: 'KeyQ' }), [{ key: 'a' }])).toBe(true);
+    expect(matches(press('a', { code: 'KeyQ' }), [{ key: 'q' }])).toBe(false);
+  });
+
+  it("falls back to the key's place where a Mac's Option turns a letter into a symbol", () => {
+    expect(matches(press('®', { altKey: true, code: 'KeyR' }), [{ key: 'r', alt: true }])).toBe(true);
+    // Option's dead keys, e.g. ⌥E's accent, too.
+    expect(matches(press('Dead', { altKey: true, code: 'KeyE' }), [{ key: 'e', alt: true }])).toBe(true);
+    expect(matches(press('®', { altKey: true, code: 'KeyR' }), [{ key: 'r' }])).toBe(false);
+    // Without Option, a symbol is the symbol typed.
+    expect(matches(press('é', { code: 'Digit2' }), [{ key: '2' }])).toBe(false);
   });
 
   it('matches a letter whether or not Caps Lock is on', () => {
@@ -109,6 +127,30 @@ group('keysLabel', () => {
   });
 });
 
+group('heldLabel', () => {
+  it("names only what's held with a mouse Shortcut, as the platform does", () => {
+    expect(heldLabel([{ key: 'drag', shift: true }], 'other')).toBe('Shift');
+    expect(heldLabel([{ key: 'drag', mod: true, alt: true }], 'other')).toBe('Ctrl+Alt');
+    expect(heldLabel([{ key: 'drag', mod: true, alt: true }], 'mac')).toBe('⌘⌥');
+    expect(
+      heldLabel(
+        [
+          { key: 'click', mod: true },
+          { key: 'click', shift: true },
+        ],
+        'mac',
+      ),
+    ).toBe('⌘ or ⇧');
+  });
+});
+
+group('modifierName', () => {
+  it('names a modifier in words, with its symbol on a Mac', () => {
+    expect(modifiers.map((m) => modifierName(m, 'other'))).toEqual(['Ctrl', 'Alt', 'Shift']);
+    expect(modifiers.map((m) => modifierName(m, 'mac'))).toEqual(['⌘ Cmd', '⌥ Option', '⇧ Shift']);
+  });
+});
+
 group('The list', () => {
   const label = (keys: readonly Key[]) => keysLabel(keys, 'other');
   const listed = Object.values(shortcuts).map((s) => ({
@@ -124,6 +166,7 @@ group('The list', () => {
       { name: 'Go to the start or end', group: 'Playback & recording', keys: 'Home / End' },
       { name: 'Undo', group: 'Song editing', keys: 'Ctrl+Z' },
       { name: 'Redo', group: 'Song editing', keys: 'Ctrl+Shift+Z or Ctrl+Y' },
+      { name: 'Show the Shortcuts', group: 'Song editing', keys: '?' },
       { name: 'Delete a Clip', group: 'Timeline editing', keys: 'Delete or Backspace' },
       { name: "Open a Clip's menu", group: 'Timeline editing', keys: 'Shift+F10 or Menu' },
       { name: 'Seek back or forward 5 s', group: 'Timeline editing', keys: '← or ↓ / → or ↑' },
@@ -155,6 +198,10 @@ group('The list', () => {
 
   it('describes every Shortcut in one line', () => {
     for (const s of Object.values(shortcuts)) expect(s.description).toMatch(/^[^\n]+\.$/);
+  });
+
+  it('says in one line where every Shortcut works, finishing "Works in …"', () => {
+    for (const s of Object.values(shortcuts)) expect(s.worksIn).toMatch(/^[^\n]+\.$/);
   });
 });
 

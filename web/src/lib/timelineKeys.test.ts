@@ -1,4 +1,5 @@
-import { describe as group, expect, it } from 'vitest';
+import { afterEach, describe as group, expect, it } from 'vitest';
+import { defaultKeyset, followKeys, type Keyset } from './shortcutKeys';
 import type { KeyDown } from './shortcuts';
 import {
   addsBox,
@@ -182,6 +183,7 @@ group('timelineKey', () => {
     selected: 2,
     focusedClip: null,
     draggingTrack: false,
+    ownsArrows: false,
   };
 
   group('Esc', () => {
@@ -435,5 +437,73 @@ group('timelineKey', () => {
       expect(timelineKey(k, idle)).toBeNull();
       expect(timelineKey(k, focused)).toBeNull();
     }
+  });
+});
+
+group('Keys as rebound', () => {
+  afterEach(() => followKeys(() => defaultKeyset));
+  const rebind = (changes: Partial<Keyset>) => followKeys(() => ({ ...defaultKeyset, ...changes }));
+  const at: TimelineKeyContext = {
+    inTextField: false,
+    inMenuOrDialog: false,
+    editable: true,
+    freeze: null,
+    selected: 2,
+    focusedClip: { inSelection: true },
+    draggingTrack: false,
+    ownsArrows: false,
+  };
+
+  it("act on the keys chosen on this device for the Timeline's Shortcuts", () => {
+    rebind({
+      copyClips: { keys: [{ key: 'k' }] },
+      deleteClip: { keys: [{ key: 'd', shift: true }] },
+      clipMenu: { keys: [{ key: 'm', alt: true }] },
+    });
+    expect(timelineKey(press('k'), at)).toBe('copy');
+    expect(timelineKey(press('c', { ctrlKey: true }), at)).toBeNull();
+    expect(timelineKey(press('D', { shiftKey: true }), at)).toBe('deleteSelection');
+    expect(timelineKey(press('Delete'), at)).toBeNull();
+    expect(timelineKey(press('m', { altKey: true }), at)).toBe('clipMenu');
+  });
+
+  it('leave arrows chosen to a focused control that uses them', () => {
+    rebind({ selectAll: { keys: [{ key: 'ArrowUp', shift: true }] } });
+    expect(timelineKey(press('ArrowUp', { shiftKey: true }), at)).toBe('selectAll');
+    expect(timelineKey(press('ArrowUp', { shiftKey: true }), { ...at, ownsArrows: true })).toBeNull();
+  });
+
+  it('click, drag and turn the wheel with the modifiers chosen', () => {
+    rebind({
+      toggleClip: { keys: [{ key: 'click', alt: true }] },
+      addBox: { keys: [{ key: 'drag', shift: true }] },
+      nudgeTake: { keys: [{ key: 'drag', mod: true, alt: true }] },
+      skipSnapping: { keys: [{ key: 'drag', alt: true }] },
+      zoom: { keys: [{ key: 'wheel', shift: true }] },
+    });
+    expect(togglesSelection(held({ altKey: true }))).toBe(true);
+    expect(togglesSelection(held({ ctrlKey: true }))).toBe(false);
+    expect(addsBox(held({ shiftKey: true }))).toBe(true);
+    expect(addsBox(held({ metaKey: true }))).toBe(false);
+    expect(nudges(held({ metaKey: true, altKey: true }))).toBe(true);
+    expect(nudges(held({ altKey: true }))).toBe(false);
+    expect(skipsSnapping(held({ altKey: true }))).toBe(true);
+    expect(skipsSnapping(held({ shiftKey: true }))).toBe(false);
+    expect(zooms(held({ shiftKey: true }))).toBe(true);
+    expect(zooms(held({ metaKey: true }))).toBe(false);
+  });
+
+  it('zoom on a pinch, a Ctrl wheel event, whatever modifiers zooming is given', () => {
+    rebind({ zoom: { keys: [{ key: 'wheel', alt: true }] } });
+    expect(zooms(held({ ctrlKey: true }))).toBe(true);
+    rebind({ zoom: { keys: [] } });
+    expect(zooms(held({ ctrlKey: true }))).toBe(true);
+  });
+
+  it('seek the ruler with the keys chosen', () => {
+    rebind({ seek: { back: [{ key: 'j' }], forward: [{ key: 'l' }] } });
+    expect(rulerSeek(press('j'), 60)).toBe(55);
+    expect(rulerSeek(press('l'), 60)).toBe(65);
+    expect(rulerSeek(press('ArrowLeft'), 60)).toBeNull();
   });
 });
