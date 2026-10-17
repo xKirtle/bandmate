@@ -3,9 +3,8 @@ package lyricsheet
 import (
 	"context"
 	"database/sql"
-	"errors"
-	"fmt"
 	"math"
+	"slices"
 	"strings"
 
 	"github.com/xKirtle/bandmate/internal/domain"
@@ -38,72 +37,79 @@ func (s *Store) SetLineCue(ctx context.Context, songID int64, based songversion.
 	if err != nil {
 		return Song{}, err
 	}
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		// A Line in the Scrapbook keeps the Cue it had (ADR 0010), but isn't
-		// given a new one there.
-		_, inArrangement, err := findLine(ctx, tx, songID, lineID)
-		if err != nil {
-			return err
-		}
-		if !inArrangement {
-			return domain.Conflict("a Line in the Scrapbook can't be given a Cue")
-		}
-		return writeLineCue(ctx, tx, songID, lineID, sql.NullInt64{Int64: ms, Valid: true})
+	return s.changeCuesWith(ctx, songID, based, func(sheet LyricSheet) (LyricSheet, error) {
+		return setLineCue(sheet, lineID, ms)
 	})
+}
+
+// setLineCue is SetLineCue's change to the sheet, for a Cue of ms
+// milliseconds.
+func setLineCue(sheet LyricSheet, lineID, ms int64) (LyricSheet, error) {
+	sec, _, err := sheetLine(sheet, lineID)
+	if err != nil {
+		return LyricSheet{}, err
+	}
+	// A Line in the Scrapbook keeps the Cue it had (ADR 0010), but isn't
+	// given a new one there.
+	if !slices.Contains(sheet.Arrangement, sec.ID) {
+		return LyricSheet{}, domain.Conflict("a Line in the Scrapbook can't be given a Cue")
+	}
+	return restoreCues(sheet, []lineCue{{lineID: lineID, ms: sql.NullInt64{Int64: ms, Valid: true}}})
 }
 
 // ClearLineCue removes a Line's Cue.
 func (s *Store) ClearLineCue(ctx context.Context, songID int64, based songversion.Version, lineID int64) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		return writeLineCue(ctx, tx, songID, lineID, sql.NullInt64{})
+	return s.changeCuesWith(ctx, songID, based, func(sheet LyricSheet) (LyricSheet, error) {
+		return clearLineCue(sheet, lineID)
 	})
 }
 
-// writeLineCue sets or, with a null ms, clears the Cue of one of a Song's
-// Lines, wherever it is. To be given a Cue, the Line can't be blank.
-func writeLineCue(ctx context.Context, tx *sql.Tx, songID, lineID int64, ms sql.NullInt64) error {
-	text, _, err := findLine(ctx, tx, songID, lineID)
-	if err != nil {
-		return err
-	}
-	if ms.Valid && blank(text) {
-		return domain.Invalid("a blank Line can't have a Cue")
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE lines SET cue_ms = ? WHERE id = ?`, ms, lineID); err != nil {
-		return fmt.Errorf("writing line cue: %w", err)
-	}
-	return nil
+// clearLineCue is ClearLineCue's change to the sheet.
+func clearLineCue(sheet LyricSheet, lineID int64) (LyricSheet, error) {
+	return restoreCues(sheet, []lineCue{{lineID: lineID}})
 }
 
 // ClearSectionCues removes the Cues of all a Section's Lines, dormant ones
 // included.
 func (s *Store) ClearSectionCues(ctx context.Context, songID int64, based songversion.Version, sectionID int64) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		if _, err := findSection(ctx, tx, songID, sectionID); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `UPDATE lines SET cue_ms = NULL WHERE cue_ms IS NOT NULL AND alternate_id IN
-			(SELECT id FROM alternates WHERE section_id = ?)`, sectionID); err != nil {
-			return fmt.Errorf("clearing line cues: %w", err)
-		}
-		return nil
+	return s.changeCuesWith(ctx, songID, based, func(sheet LyricSheet) (LyricSheet, error) {
+		return clearSectionCues(sheet, sectionID)
 	})
+}
+
+// clearSectionCues is ClearSectionCues's change to the sheet.
+func clearSectionCues(sheet LyricSheet, sectionID int64) (LyricSheet, error) {
+	sec, err := sheetSection(sheet, sectionID)
+	if err != nil {
+		return LyricSheet{}, err
+	}
+	clearSection(sec)
+	return sheet, nil
+}
+
+// clearSection removes the Cues of all a Section's Lines.
+func clearSection(sec *Section) {
+	for _, alt := range sec.Alternates {
+		for i := range alt.Lines {
+			alt.Lines[i].Cue = nil
+		}
+	}
 }
 
 // ClearCues removes every Cue in a Song, dormant ones included.
 func (s *Store) ClearCues(ctx context.Context, songID int64, based songversion.Version) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `UPDATE lines SET cue_ms = NULL
-			WHERE cue_ms IS NOT NULL AND id IN (`+songLines+`)`, songID); err != nil {
-			return fmt.Errorf("clearing line cues: %w", err)
-		}
-		return nil
+	return s.changeCuesWith(ctx, songID, based, func(sheet LyricSheet) (LyricSheet, error) {
+		return clearCues(sheet), nil
 	})
 }
 
-// songLines selects the ids of all a Song's Lines, given the Song's id.
-const songLines = `SELECT l.id FROM lines l JOIN alternates a ON a.id = l.alternate_id
-	JOIN sections s ON s.id = a.section_id WHERE s.song_id = ?`
+// clearCues is ClearCues's change to the sheet.
+func clearCues(sheet LyricSheet) LyricSheet {
+	for i := range sheet.Sections {
+		clearSection(&sheet.Sections[i])
+	}
+	return sheet
+}
 
 // CueValue is one Cue to restore: a Line's. A nil Cue means none.
 type CueValue struct {
@@ -116,25 +122,44 @@ type CueValue struct {
 // changed, e.g. to undo it, so a Line in the Scrapbook may be given back
 // the Cue it kept there.
 func (s *Store) RestoreCues(ctx context.Context, songID int64, based songversion.Version, values []CueValue) (Song, error) {
-	ms := make([]sql.NullInt64, len(values))
+	cues := make([]lineCue, len(values))
 	for i, v := range values {
+		cues[i].lineID = v.LineID
 		if v.Cue == nil {
 			continue
 		}
-		m, err := cueMillis(*v.Cue)
+		ms, err := cueMillis(*v.Cue)
 		if err != nil {
 			return Song{}, err
 		}
-		ms[i] = sql.NullInt64{Int64: m, Valid: true}
+		cues[i].ms = sql.NullInt64{Int64: ms, Valid: true}
 	}
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		for i, v := range values {
-			if err := writeLineCue(ctx, tx, songID, v.LineID, ms[i]); err != nil {
-				return err
-			}
-		}
-		return nil
+	return s.changeCuesWith(ctx, songID, based, func(sheet LyricSheet) (LyricSheet, error) {
+		return restoreCues(sheet, cues)
 	})
+}
+
+// lineCue is a Cue to give a Line, in milliseconds, or, null, none.
+type lineCue struct {
+	lineID int64
+	ms     sql.NullInt64
+}
+
+// restoreCues is RestoreCues's change to the sheet: each Cue is given in
+// turn, wherever its Line is, so a Line given two has the last. To be given
+// a Cue, a Line can't be blank.
+func restoreCues(sheet LyricSheet, cues []lineCue) (LyricSheet, error) {
+	for _, c := range cues {
+		_, l, err := sheetLine(sheet, c.lineID)
+		if err != nil {
+			return LyricSheet{}, err
+		}
+		if c.ms.Valid && blank(l.Text) {
+			return LyricSheet{}, domain.Invalid("a blank Line can't have a Cue")
+		}
+		l.Cue = cueOf(c.ms)
+	}
+	return sheet, nil
 }
 
 // ShiftCues moves every Cue in a Song that lies in [start, end), in
@@ -146,29 +171,47 @@ func (s *Store) ShiftCues(ctx context.Context, songID int64, based songversion.V
 		return Song{}, domain.Invalid("the span must end after it starts")
 	}
 	startMs, endMs := millis(start), millis(end)
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		var low, high sql.NullInt64
-		err := tx.QueryRowContext(ctx, `SELECT MIN(cue_ms), MAX(cue_ms) FROM lines
-			WHERE id IN (`+songLines+`) AND cue_ms >= ? AND cue_ms < ?`, songID, startMs, endMs).Scan(&low, &high)
-		if err != nil {
-			return fmt.Errorf("finding cues to shift: %w", err)
-		}
-		if !low.Valid {
-			return nil
-		}
-		// Checked in seconds, as a shift far out of range overflows milliseconds.
-		for _, ms := range []int64{low.Int64, high.Int64} {
-			if _, err := cueMillis(float64(ms)/1000 + by); err != nil {
-				return err
+	return s.changeCuesWith(ctx, songID, based, func(sheet LyricSheet) (LyricSheet, error) {
+		return shiftCues(sheet, startMs, endMs, by)
+	})
+}
+
+// shiftCues is ShiftCues's change to the sheet, for the span [startMs,
+// endMs) in milliseconds.
+func shiftCues(sheet LyricSheet, startMs, endMs int64, by float64) (LyricSheet, error) {
+	delta := millis(by)
+	for _, sec := range sheet.Sections {
+		for _, alt := range sec.Alternates {
+			for i, l := range alt.Lines {
+				if l.Cue == nil {
+					continue
+				}
+				ms := millis(*l.Cue)
+				if ms < startMs || ms >= endMs {
+					continue
+				}
+				// Checked in seconds, as a shift far out of range overflows
+				// milliseconds.
+				if _, err := cueMillis(float64(ms)/1000 + by); err != nil {
+					return LyricSheet{}, err
+				}
+				alt.Lines[i].Cue = cueOf(sql.NullInt64{Int64: ms + delta, Valid: true})
 			}
 		}
-		delta := millis(by)
-		if _, err := tx.ExecContext(ctx, `UPDATE lines SET cue_ms = cue_ms + ?
-			WHERE id IN (`+songLines+`) AND cue_ms >= ? AND cue_ms < ?`,
-			delta, songID, startMs, endMs); err != nil {
-			return fmt.Errorf("shifting line cues: %w", err)
-		}
-		return nil
+	}
+	return sheet, nil
+}
+
+// changeCuesWith is change for a change to Cues alone, made by edit, a
+// pure change to the whole sheet, which editSheet checks and writes. Unlike
+// a change to the sheet itself, it starts no editing session, so takes no
+// Snapshot.
+func (s *Store) changeCuesWith(ctx context.Context, songID int64, based songversion.Version,
+	edit func(sheet LyricSheet) (LyricSheet, error)) (Song, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		return editSheet(ctx, tx, songID, func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
+			return edit(sheet)
+		})
 	})
 }
 
@@ -178,16 +221,20 @@ func millis(seconds float64) int64 {
 	return int64(math.Round(seconds * 1000))
 }
 
-// findLine checks a Line belongs to one of a Song's Sections, and returns
-// its text and whether its Section is in the Arrangement.
-func findLine(ctx context.Context, tx *sql.Tx, songID, lineID int64) (text string, inArrangement bool, err error) {
-	err = tx.QueryRowContext(ctx, `SELECT l.text, s.position IS NOT NULL
-		FROM lines l JOIN alternates a ON a.id = l.alternate_id JOIN sections s ON s.id = a.section_id
-		WHERE l.id = ? AND s.song_id = ?`, lineID, songID).Scan(&text, &inArrangement)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", false, domain.ErrNotFound
+// sheetLine is one of a sheet's Lines, by id, with the Section it's in, to
+// read or change in place: domain.ErrNotFound if it isn't the sheet's.
+func sheetLine(sheet LyricSheet, lineID int64) (*Section, *Line, error) {
+	for i := range sheet.Sections {
+		sec := &sheet.Sections[i]
+		for _, alt := range sec.Alternates {
+			for j := range alt.Lines {
+				if alt.Lines[j].ID == lineID {
+					return sec, &alt.Lines[j], nil
+				}
+			}
+		}
 	}
-	return text, inArrangement, err
+	return nil, nil, domain.ErrNotFound
 }
 
 // blank is whether a Line's text is empty or only spaces, so has nothing to

@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -63,12 +62,16 @@ type Line struct {
 // newLine builds a Line from its stored text and Cue.
 func newLine(id int64, text string, cueMs sql.NullInt64) Line {
 	lyrics, chords := parseLine(text)
-	line := Line{ID: id, Text: text, Lyrics: lyrics, Chords: chords, ChordLine: isChordLine(lyrics, chords)}
-	if cueMs.Valid {
-		cue := float64(cueMs.Int64) / 1000
-		line.Cue = &cue
+	return Line{ID: id, Text: text, Lyrics: lyrics, Chords: chords, ChordLine: isChordLine(lyrics, chords), Cue: cueOf(cueMs)}
+}
+
+// cueOf is a Line's Cue, in seconds, from its milliseconds: nil for none.
+func cueOf(ms sql.NullInt64) *float64 {
+	if !ms.Valid {
+		return nil
 	}
-	return line
+	cue := float64(ms.Int64) / 1000
+	return &cue
 }
 
 // loadLyricSheet reads a Song's whole Lyric Sheet through q.
@@ -405,17 +408,6 @@ func sectionEmpty(sec Section) bool {
 		}
 	}
 	return true
-}
-
-// findSection checks a Section belongs to a Song and returns its position
-// in the Arrangement, which is null while it's in the Scrapbook.
-func findSection(ctx context.Context, tx *sql.Tx, songID, sectionID int64) (pos sql.NullInt64, err error) {
-	err = tx.QueryRowContext(ctx, `SELECT position FROM sections WHERE id = ? AND song_id = ?`,
-		sectionID, songID).Scan(&pos)
-	if errors.Is(err, sql.ErrNoRows) {
-		return sql.NullInt64{}, domain.ErrNotFound
-	}
-	return pos, err
 }
 
 // SetSectionLabel changes a Section's Label. A blank Label removes it.
