@@ -23,6 +23,7 @@
   import LanguagesField from '../lib/LanguagesField.svelte';
   import { LyricSheetEditing } from '../lib/lyricSheetEditing.svelte';
   import { Saves, type Undone } from '../lib/saves.svelte';
+  import { SongUndo } from '../lib/songUndo.svelte';
   import { scrollBehavior } from '../lib/motion';
   import { detailFields, type DetailFields } from '../lib/songFields';
   import { cancelOnEscape, committedAsItGoes, leaveOnEscape } from '../lib/typedField.svelte';
@@ -61,6 +62,9 @@
   // Every save the page and its panels make goes through Saves, made once
   // the Song's loaded.
   let saves = $state<Saves | null>(null);
+  // The Song's Undo and Redo, in the header and on their keys, made with
+  // Saves: see songUndo.svelte.ts.
+  let songUndo = $state<SongUndo | null>(null);
   // Every change to the Lyric Sheet goes through Lyric Sheet editing, on top
   // of Saves, which ends Sync mode as the lyrics change.
   let editing = $state<LyricSheetEditing | null>(null);
@@ -84,7 +88,6 @@
   // that can't be made there now. They're off entirely while a recording or
   // a Merge keeps the Song as it is, as the Timeline says.
   let freeze = $state<Freeze>(null);
-  const frozen = $derived(freeze !== null);
   // A Status picked, shown until its save ends.
   let statusSent = $state<Status | null>(null);
   const status = $derived(statusSent ?? song?.status ?? 'idea');
@@ -219,38 +222,28 @@
       showingShortcuts = true;
       return;
     }
-    const undoing = undoKey(event, { ...place, frozen });
-    if (!undoing) return;
+    const undoing = undoKey(event, place);
+    if (!undoing || !songUndo) return;
     event.preventDefault();
-    if (undoing === 'undo') undo();
-    else redo();
+    if (undoing === 'undo') songUndo.undo();
+    else songUndo.redo();
   }
 
-  // Undo and Redo go through the Timeline, which follows what they did
-  // there. A Lyric Sheet change undone or redone ends Sync mode, as any
-  // change to the lyrics does, and shows the Section it changed, opening
-  // the Scrapbook's fold for one there, without moving focus.
-  //
-  // Pressed while in a text field, they leave it first, saving what's
-  // typed: one visit's typing is a step, kept as the field is left, so
-  // Undo undoes it, rather than have it land after what's put back.
-  async function undo() {
-    leaveTextField();
-    showUndone((await timelinePanel?.undo()) ?? null);
-  }
-
-  async function redo() {
-    leaveTextField();
-    showUndone((await timelinePanel?.redo()) ?? null);
-  }
-
+  // Pressed while in a text field, Undo and Redo leave it first, saving
+  // what's typed: one visit's typing is a step, kept as the field is left.
   function leaveTextField() {
     const field = document.activeElement;
     if (field instanceof HTMLElement && inTextField(field)) field.blur();
   }
 
-  async function showUndone(undone: Undone | null) {
-    if (undone?.section === undefined) return;
+  // The page follows what an undo or a redo did, as the Timeline does. A
+  // Lyric Sheet change undone or redone ends Sync mode, as any change to
+  // the lyrics does, and shows the Section it changed, opening the
+  // Scrapbook's fold for one there, without moving focus.
+  $effect(() => songUndo?.follow((undone) => void showUndone(undone)));
+
+  async function showUndone(undone: Undone) {
+    if (undone.section === undefined) return;
     syncMode.end();
     const sectionId = undone.section;
     if (sectionId === null || !song) return;
@@ -269,6 +262,7 @@
     Promise.all([server.getSong(), server.getTimeline()]).then(
       ([s, tl]) => {
         saves = new Saves({ server, song: s, timeline: tl, onReplace });
+        songUndo = new SongUndo({ saves, freeze: () => freeze, leaveField: leaveTextField });
         editing = new LyricSheetEditing(saves, () => syncMode.end());
         details = detailFields(saves, api.updateSong);
         tags = s.tags;
@@ -486,8 +480,8 @@
               <button
                 type="button"
                 class="button tool"
-                onclick={undo}
-                disabled={!(saves.canUndo || saves.unsavedInSections) || frozen}
+                onclick={() => songUndo?.undo()}
+                disabled={!songUndo?.undoes}
                 aria-label="Undo"
                 aria-keyshortcuts={hints.aria(shortcuts.undo.keys)}
                 title={editHint(freeze, hints.withKeys('Undo', shortcuts.undo.keys))}
@@ -497,8 +491,8 @@
               <button
                 type="button"
                 class="button tool"
-                onclick={redo}
-                disabled={!saves.canRedo || frozen}
+                onclick={() => songUndo?.redo()}
+                disabled={!songUndo?.redoes}
                 aria-label="Redo"
                 aria-keyshortcuts={hints.aria(shortcuts.redo.keys)}
                 title={editHint(freeze, hints.withKeys('Redo', shortcuts.redo.keys))}
@@ -712,12 +706,13 @@
   {/if}
 </main>
 
-{#if saves && shown && timeline}
+{#if saves && songUndo && shown && timeline}
   <Timeline
     bind:this={timelinePanel}
     bind:height={timelineHeight}
     song={shown}
     {saves}
+    {songUndo}
     {setBpm}
     onPlayhead={(at) => (playhead = at)}
     {syncMode}

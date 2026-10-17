@@ -51,20 +51,15 @@ export function songKey(e: KeyDown, at: SongKeyContext): SongKey | null {
   return null;
 }
 
-/** Where Undo's or Redo's key was pressed, and whether the Song can change now. */
-export type UndoKeyContext = KeyPlace & {
-  /** A recording or a Merge is under way, which keeps the Song as it is. */
-  frozen: boolean;
-};
-
 /**
- * Whether a key press undoes or redoes the Song's latest edit, if either:
- * anywhere on the Song page, in Read mode and on a phone too, but not in a
- * text field, whose own typing it undoes, nor in a dialog, nor while a
- * recording or a Merge keeps the Song as it is. Null leaves the key to the page.
+ * Whether a key press is Undo's or Redo's key, if either: anywhere on the
+ * Song page, in Read mode and on a phone too, but not in a text field,
+ * whose own typing it undoes, nor in a dialog. Whether there's anything to
+ * undo or redo is the Song undo's to say (see songUndo.svelte.ts). Null
+ * leaves the key to the page.
  */
-export function undoKey(e: KeyDown, at: UndoKeyContext): 'undo' | 'redo' | null {
-  if (e.defaultPrevented || at.dialogOpen || at.inTextField || at.frozen) return null;
+export function undoKey(e: KeyDown, at: KeyPlace): 'undo' | 'redo' | null {
+  if (e.defaultPrevented || at.dialogOpen || at.inTextField) return null;
   if (matches(e, shortcuts.undo.keys)) return 'undo';
   if (matches(e, shortcuts.redo.keys)) return 'redo';
   return null;

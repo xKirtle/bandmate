@@ -1,5 +1,5 @@
-// Timeline editing: every edit the Timeline makes, and its undo and redo,
-// made once per Timeline on top of Saves, which keeps them to undo. The
+// Timeline editing: every edit the Timeline makes, made once per Timeline
+// on top of Saves, which keeps them to undo (see songUndo.svelte.ts). The
 // Timeline only draws and sends intents; this keeps the rules around them.
 //
 // - The freeze: while a recording or a Merge is under way, the Timeline
@@ -22,8 +22,7 @@
 //   redo leave them be. What's worked out to send (Merge rendering, the
 //   Cue-move offer, undo) goes by the Timeline as saved.
 // - What follows an edit: Clips it adds are selected, and a Track it adds
-//   chosen. An undo says where to return the playhead to, and the Timeline
-//   seeks there, as playback is its own.
+//   chosen.
 // - The Cue-move offer: Cues are Timeline times and stay put, but those the
 //   Clips moved spanned may belong with them, so moving them along is
 //   offered, as a step of its own, for a few seconds. It stands only while
@@ -44,7 +43,7 @@ import { importEach } from './fileDrop';
 import { editsWhileRecording, type Freeze } from './freeze';
 import { addedClips, mergingAdded, placingAdded, restorable, type Edit } from './history';
 import { mergeTarget, mergeWarning, type MergedAudio, type MergeTarget } from './merge';
-import type { Edited, Saves, Undone } from './saves.svelte';
+import type { Edited, Saves } from './saves.svelte';
 import type { Selection } from './selection.svelte';
 import { rightHalves } from './split';
 import { TypedField } from './typedField.svelte';
@@ -451,7 +450,7 @@ export class TimelineEditing {
     return true;
   };
 
-  /** Which Tracks the last Merge left silent, muted or left out by a solo, until it's dismissed, the next Merge, or an undo or redo. */
+  /** Which Tracks the last Merge left silent, muted or left out by a solo, until it's dismissed, e.g. as an undo or redo lands, or the next Merge. */
   get mergeNote(): string | null {
     return this.#mergeNote;
   }
@@ -513,47 +512,6 @@ export class TimelineEditing {
   dismissError() {
     this.#error = null;
   }
-
-  /**
-   * Whether pressing undo would do anything: not while frozen, and not with
-   * nothing to undo, nor any save queued that could be.
-   */
-  get undoes(): boolean {
-    return !this.frozen && (this.#saves.canUndo || this.#saves.pending > 0);
-  }
-
-  /** Whether pressing redo would do anything: not while frozen, and not with nothing to redo. */
-  get redoes(): boolean {
-    return !this.frozen && this.#saves.canRedo;
-  }
-
-  /**
-   * Undoes the latest edit, once those queued before it land, unless
-   * frozen, or with nothing to undo and nothing queued. Clips it brings
-   * back together are selected again. Resolves to what it did, or null if
-   * nothing: its playhead says where to return the playhead to, where a
-   * new Take undone started, unless a recording started since.
-   */
-  undo = async (): Promise<Undone | null> => {
-    if (!this.undoes) return null;
-    this.#mergeNote = null;
-    const undone = await this.#saves.undo();
-    if (!undone) return null;
-    if (undone.reselect) this.#selection.selectEdited(undone.reselect);
-    return this.#recording() ? { ...undone, playhead: null } : undone;
-  };
-
-  /**
-   * Redoes the latest edit undone, unless frozen; a Merge or a Split redone
-   * selects what it did again. Resolves to what it did, or null if nothing.
-   */
-  redo = async (): Promise<Undone | null> => {
-    if (!this.redoes) return null;
-    this.#mergeNote = null;
-    const redone = await this.#saves.redo();
-    if (redone?.reselect) this.#selection.selectEdited(redone.reselect);
-    return redone;
-  };
 
   /** Stops the Cue-move offer's timer, e.g. as the Timeline goes. */
   close() {
