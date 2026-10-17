@@ -4,7 +4,9 @@ import {
   anyChanged,
   choose,
   defaultShortcutKeys,
+  heldWith,
   isChanged,
+  isFixed,
   keyChosen,
   readShortcutKeys,
   refusalMessage,
@@ -13,6 +15,7 @@ import {
   seen,
   shortcutKeysKey,
   storeShortcutKeys,
+  toggleModifier,
   type Refusal,
   type ShortcutKeys,
   type Slot,
@@ -144,6 +147,92 @@ group('the key a press chooses', () => {
 
   it("is the letter at the key's place where a Mac's Option makes a symbol", () => {
     expect(keyChosen(press('®', { altKey: true, code: 'KeyR' }))).toEqual({ key: 'r', alt: true });
+  });
+});
+
+group('choosing what is held with the mouse', () => {
+  /** The keys after toggling, failing the test if it was refused. */
+  function toggled(...args: Parameters<typeof toggleModifier>): ShortcutKeys {
+    const choice = toggleModifier(...args);
+    if (!choice.ok) throw new Error(`refused: ${JSON.stringify(choice.refusal)}`);
+    return choice.keys;
+  }
+  const refused = (...args: Parameters<typeof toggleModifier>): Refusal => {
+    const choice = toggleModifier(...args);
+    if (choice.ok) throw new Error('chosen');
+    return choice.refusal;
+  };
+
+  it('turns a modifier on or off, keeping the gesture', () => {
+    const both = toggled(defaultShortcutKeys, 'skipSnapping', 'alt');
+    expect(both.keys.skipSnapping.keys).toEqual([{ key: 'drag', shift: true, alt: true }]);
+    const three = toggled(both, 'skipSnapping', 'mod');
+    const modAlt = toggled(three, 'skipSnapping', 'shift');
+    expect(modAlt.keys.skipSnapping.keys).toEqual([{ key: 'drag', mod: true, alt: true }]);
+  });
+
+  it('names what is held for each modifier', () => {
+    expect(heldWith(defaultShortcutKeys.keys, 'toggleClip')).toEqual({
+      gesture: 'click',
+      mod: true,
+      alt: false,
+      shift: false,
+    });
+    expect(heldWith(defaultShortcutKeys.keys, 'zoom').gesture).toBe('wheel');
+  });
+
+  it('refuses turning off the last modifier, as a plain gesture does something else', () => {
+    expect(refused(defaultShortcutKeys, 'skipSnapping', 'shift')).toEqual({
+      kind: 'bare',
+      key: { key: 'drag' },
+    });
+    expect(refusalMessage(refused(defaultShortcutKeys, 'toggleClip', 'mod'), 'other')).toEqual({
+      text: 'Needs at least one modifier: a plain click does something else.',
+      by: null,
+    });
+    expect(refusalMessage(refused(defaultShortcutKeys, 'zoom', 'mod'), 'other').text).toBe(
+      'Needs at least one modifier: a plain scroll does something else.',
+    );
+  });
+
+  it('refuses a combination another mouse Shortcut holds with the same gesture, naming it', () => {
+    const off = toggled(defaultShortcutKeys, 'skipSnapping', 'alt');
+    expect(refused(off, 'skipSnapping', 'shift')).toEqual({
+      kind: 'taken',
+      key: { key: 'drag', alt: true },
+      by: 'nudgeTake',
+    });
+    expect(refusalMessage(refused(off, 'skipSnapping', 'shift'), 'mac')).toEqual({
+      text: '⌥+drag is already used by',
+      by: 'nudgeTake',
+    });
+    // Wherever each works: Ctrl+drag adds Clips with a box, on empty lane space.
+    const mod = toggled(defaultShortcutKeys, 'nudgeTake', 'mod');
+    expect(refused(mod, 'nudgeTake', 'alt')).toEqual({ kind: 'taken', key: { key: 'drag', mod: true }, by: 'addBox' });
+  });
+
+  it('takes a combination another gesture holds', () => {
+    const alt = toggled(defaultShortcutKeys, 'toggleClip', 'alt');
+    expect(toggled(alt, 'toggleClip', 'mod').keys.toggleClip.keys).toEqual([{ key: 'click', alt: true }]);
+  });
+
+  it('gives a mouse Shortcut left without a key its gesture with the modifier turned on', () => {
+    const none = removeKey(defaultShortcutKeys, { id: 'zoom', list: 'keys', index: 0 });
+    expect(heldWith(none.keys, 'zoom')).toEqual({ gesture: 'wheel', mod: false, alt: false, shift: false });
+    expect(toggled(none, 'zoom', 'alt').keys.zoom.keys).toEqual([{ key: 'wheel', alt: true }]);
+  });
+
+  it('marks it changed, and resets it, as a key', () => {
+    const alt = toggled(defaultShortcutKeys, 'toggleClip', 'alt');
+    expect(isChanged(alt.keys, 'toggleClip')).toBe(true);
+    const back = reset(alt, 'toggleClip');
+    expect(back.ok && back.keys.keys.toggleClip.keys).toEqual([{ key: 'click', mod: true }]);
+  });
+
+  it('keeps the plain drag that selects with a box as it is', () => {
+    expect(isFixed('boxSelect')).toBe(true);
+    expect(isFixed('addBox')).toBe(false);
+    expect(isFixed('record')).toBe(false);
   });
 });
 

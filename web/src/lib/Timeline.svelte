@@ -354,6 +354,8 @@
   // What a focused Clip and the ruler declare as their keys.
   const clipKeys = $derived([...shortcuts.deleteClip.keys, ...shortcuts.clipMenu.keys]);
   const rulerKeys = $derived(allKeys([shortcuts.seek, shortcuts.seekFar, shortcuts.startOrEnd]));
+  // What's held to drag a gain line in fine steps: what skips snapping.
+  const fineKeys = $derived(hints.held(shortcuts.skipSnapping.keys));
 
   function keydown(event: KeyboardEvent) {
     if (trackDrag.current && event.key === 'Escape') {
@@ -1351,16 +1353,18 @@
       const finger = { clientX: event.clientX, clientY: event.clientY };
       pressTimer = setTimeout(() => openClipMenu(clip, element, finger), longPressDelay);
     }
-    // Its body moves it, or with Alt held nudges its active Take; an edge
-    // trims it; its gain line sets its Gain, and a fade dot its Fade.
+    // Its body moves it, or, with what nudges a Take held (Alt by
+    // default), nudges its active Take; an edge trims it; its gain line
+    // sets its Gain, and a fade dot its Fade.
     const keys = { free: skipsSnapping(event), toggles, nudges: nudges(event) };
     clipDrag.press(clip, grip, clipDragAt(event), keys, measureClip(element, grip));
     clipFollow.start();
   }
 
   // The pointer followed for a Clip drag. A modifier pressed or let go
-  // mid-drag, e.g. the Shift that skips snapping, or drags the gain line
-  // finely, goes there and then, without waiting for the pointer to move.
+  // mid-drag, e.g. the one that skips snapping (Shift by default), or
+  // drags the gain line finely, goes there and then, without waiting for
+  // the pointer to move.
   const clipFollow = new PointerFollow<DragAt>(
     {
       at: clipDragAt,
@@ -2370,7 +2374,7 @@
                         aria-hidden="true"
                         title={editHint(
                           freeze,
-                          `Gain ${formatGain(clip.gain)}: drag to change it, with Shift for fine steps, or double-click for 0 dB`,
+                          `Gain ${formatGain(clip.gain)}: drag to change it${fineKeys ? `, with ${fineKeys} for fine steps` : ''}, or double-click for 0 dB`,
                         )}
                         onpointerdown={(e) => editDown(e, clip, 'gain')}
                       ></span>

@@ -212,14 +212,15 @@ export const shortcuts = {
   skipSnapping: {
     name: 'Skip snapping',
     group: 'Mouse',
-    description: 'Lets a Clip or the Loop being dragged go anywhere, snapping to nothing.',
-    worksIn: 'a Clip or the Loop being dragged.',
+    description:
+      "Lets a Clip or the Loop being dragged go anywhere, snapping to nothing, or a Clip's gain line move in fine steps.",
+    worksIn: 'a Clip, its gain line or the Loop being dragged.',
     keys: [{ key: 'drag', shift: true }],
   },
   zoom: {
     name: 'Zoom the Timeline',
     group: 'Mouse',
-    description: 'Zooms the Timeline in or out around the pointer.',
+    description: 'Zooms the Timeline in or out around the pointer. Pinching always zooms too.',
     worksIn: "the Timeline's lanes and its scroll bar.",
     // A trackpad's pinch zooms too, whatever these are: a browser sends
     // it as a Ctrl wheel event.
@@ -328,7 +329,20 @@ const names: Record<string, string> = {
   Escape: 'Esc',
 };
 
-const mouse = ['click', 'drag', 'wheel'];
+/** A mouse action a mouse Shortcut's key names: a click, a drag or a turn of the wheel. */
+export type Gesture = 'click' | 'drag' | 'wheel';
+
+const gestures: readonly string[] = ['click', 'drag', 'wheel'] satisfies Gesture[];
+
+/** Whether a key is a mouse action, rather than a key on the keyboard. */
+export function isGesture(key: string): key is Gesture {
+  return gestures.includes(key);
+}
+
+/** Whether a key is held with no modifier at all. */
+export function holdsNothing(key: Key): boolean {
+  return !key.mod && !key.alt && !key.shift;
+}
 
 /** A key's own name, without its modifiers, e.g. Z, Space or ArrowLeft. */
 function keyName(key: Key): string {
@@ -336,19 +350,40 @@ function keyName(key: Key): string {
   return key.key.length === 1 ? key.key.toUpperCase() : key.key;
 }
 
+/** The modifiers a key is held with, as a platform names them: "⌘⇧" on a Mac, "Ctrl+Shift" elsewhere. */
+function modsLabel(key: Key, on: Platform): string {
+  if (on === 'mac') return (key.mod ? '⌘' : '') + (key.alt ? '⌥' : '') + (key.shift ? '⇧' : '');
+  return [key.mod && 'Ctrl', key.alt && 'Alt', key.shift && 'Shift'].filter(Boolean).join('+');
+}
+
 function keyLabel(key: Key, on: Platform): string {
   const name = names[key.key] ?? keyName(key);
-  if (on === 'mac') {
-    const mods = (key.mod ? '⌘' : '') + (key.alt ? '⌥' : '') + (key.shift ? '⇧' : '');
-    // "⌥drag" would read as one word.
-    return mods && mouse.includes(key.key) ? `${mods}+${name}` : mods + name;
-  }
-  return [key.mod && 'Ctrl', key.alt && 'Alt', key.shift && 'Shift', name].filter(Boolean).join('+');
+  const mods = modsLabel(key, on);
+  if (!mods) return name;
+  // On a Mac, "⌥drag" would read as one word.
+  return on === 'mac' && !isGesture(key.key) ? mods + name : `${mods}+${name}`;
 }
 
 /** Names `keys` for a platform, e.g. "⌘⇧Z or ⌘Y" on a Mac and "Ctrl+Shift+Z or Ctrl+Y" elsewhere. */
 export function keysLabel(keys: readonly Key[], on: Platform): string {
   return keys.map((key) => keyLabel(key, on)).join(' or ');
+}
+
+/** A modifier a key or a mouse Shortcut is held with: Mod (Ctrl or ⌘), Alt (⌥) or Shift (⇧). */
+export type Modifier = 'mod' | 'alt' | 'shift';
+
+/** Every modifier, in the order they're named. */
+export const modifiers: readonly Modifier[] = ['mod', 'alt', 'shift'];
+
+/** Names a modifier for a platform: in words, and with its symbol on a Mac, e.g. "⌥ Option". */
+export function modifierName(modifier: Modifier, on: Platform): string {
+  if (on === 'mac') return { mod: '⌘ Cmd', alt: '⌥ Option', shift: '⇧ Shift' }[modifier];
+  return { mod: 'Ctrl', alt: 'Alt', shift: 'Shift' }[modifier];
+}
+
+/** Names only what's held with each of a mouse Shortcut's keys, e.g. "Shift", or "⇧" on a Mac. */
+export function heldLabel(keys: readonly Key[], on: Platform): string {
+  return keys.map((key) => modsLabel(key, on)).join(' or ');
 }
 
 /** Which of a two-way Shortcut's ways is named first. */

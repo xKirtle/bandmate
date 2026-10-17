@@ -2,8 +2,11 @@ import { describe as group, expect, it } from 'vitest';
 import {
   allKeys,
   ariaKeyShortcuts,
+  heldLabel,
   keysLabel,
+  modifierName,
   matches,
+  modifiers,
   shortcuts,
   stepBy,
   twoWayLabel,
@@ -121,6 +124,30 @@ group('keysLabel', () => {
     expect(keysLabel([{ key: 'drag', alt: true }], 'mac')).toBe('⌥+drag');
     expect(keysLabel([{ key: 'wheel', mod: true }], 'mac')).toBe('⌘+wheel');
     expect(keysLabel([{ key: 'wheel', mod: true }], 'other')).toBe('Ctrl+wheel');
+  });
+});
+
+group('heldLabel', () => {
+  it("names only what's held with a mouse Shortcut, as the platform does", () => {
+    expect(heldLabel([{ key: 'drag', shift: true }], 'other')).toBe('Shift');
+    expect(heldLabel([{ key: 'drag', mod: true, alt: true }], 'other')).toBe('Ctrl+Alt');
+    expect(heldLabel([{ key: 'drag', mod: true, alt: true }], 'mac')).toBe('⌘⌥');
+    expect(
+      heldLabel(
+        [
+          { key: 'click', mod: true },
+          { key: 'click', shift: true },
+        ],
+        'mac',
+      ),
+    ).toBe('⌘ or ⇧');
+  });
+});
+
+group('modifierName', () => {
+  it('names a modifier in words, with its symbol on a Mac', () => {
+    expect(modifiers.map((m) => modifierName(m, 'other'))).toEqual(['Ctrl', 'Alt', 'Shift']);
+    expect(modifiers.map((m) => modifierName(m, 'mac'))).toEqual(['⌘ Cmd', '⌥ Option', '⇧ Shift']);
   });
 });
 
