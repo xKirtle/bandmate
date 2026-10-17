@@ -228,7 +228,7 @@ func (s *Store) Retake(ctx context.Context, songID int64, based songversion.Vers
 			takeID, clipID); err != nil {
 			return 0, fmt.Errorf("retaking clip: %w", err)
 		}
-		return takeID, place(ctx, tx, clipID, p)
+		return takeID, store(ctx, tx, clipID, p)
 	})
 }
 
@@ -316,27 +316,18 @@ func (s *Store) SetTakes(ctx context.Context, songID int64, based songversion.Ve
 		if err := markDetached(ctx, tx, songID); err != nil {
 			return err
 		}
-		src := source{activeTakeID: sql.NullInt64{Int64: *ct.ActiveTakeID, Valid: true}, takeIDs: ids}
-		duration, err := src.duration(ctx, tx)
-		if err != nil {
-			return err
-		}
-		p.start, p.offset, p.length = ct.Start, ct.Offset, ct.Length
-		if err := checkTrim(p, duration); err != nil {
-			return err
-		}
 		if _, err := tx.ExecContext(ctx, `UPDATE clips SET active_take_id = ? WHERE id = ?`,
 			*ct.ActiveTakeID, clipID); err != nil {
 			return fmt.Errorf("setting takes: %w", err)
 		}
-		p.offset = max(ct.Offset, 0)
+		p.start, p.offset, p.length = ct.Start, ct.Offset, ct.Length
 		if fades != nil {
 			if err := fades.check(ct.Length); err != nil {
 				return err
 			}
 			p.fades = *fades
 		}
-		return place(ctx, tx, clipID, p)
+		return store(ctx, tx, clipID, p)
 	})
 }
 
@@ -370,7 +361,15 @@ func (s *Store) NudgeTake(ctx context.Context, songID int64, based songversion.V
 	if err := checkNudge(nudge); err != nil {
 		return Timeline{}, err
 	}
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	// Only a Clip trimmed out to its Take nudged later can play past where
+	// its Takes end once the Take is nudged back.
+	reword := func(v violation) error {
+		if v.rule == rulePastSource && v.clipID == clipID {
+			return domain.Invalid("the Clip would play past where its Takes end; trim it first")
+		}
+		return nil
+	}
+	return s.changeRewording(ctx, songID, based, reword, func(tx *sql.Tx, _ *audio.FileChanges) error {
 		p, err := takeClip(ctx, tx, songID, clipID)
 		if err != nil {
 			return err
@@ -391,14 +390,7 @@ func (s *Store) NudgeTake(ctx context.Context, songID int64, based songversion.V
 			position, nudge, takeID); err != nil {
 			return fmt.Errorf("nudging take: %w", err)
 		}
-		end, err := p.source.duration(ctx, tx)
-		if err != nil {
-			return err
-		}
-		if p.sourceEnd() > end+tolerance {
-			return domain.Invalid("the Clip would play past where its Takes end; trim it first")
-		}
-		return place(ctx, tx, clipID, p)
+		return store(ctx, tx, clipID, p)
 	})
 }
 
@@ -514,7 +506,7 @@ func keepTakes(ctx context.Context, tx *sql.Tx, songID, clipID int64, p placemen
 	if err := setActiveTake(ctx, tx, clipID, p.source.activeTakeID.Int64); err != nil {
 		return err
 	}
-	return place(ctx, tx, clipID, p)
+	return store(ctx, tx, clipID, p)
 }
 
 // SweepDetachedTakes removes the Takes detached before a time, of every

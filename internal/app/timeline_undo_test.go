@@ -56,6 +56,8 @@ func TestAPlacedClipFollowsTheTimelinesRules(t *testing.T) {
 			http.StatusBadRequest, "a Clip can't play past the end of its source"},
 		"before its source": {map[string]any{"trackId": beatTrack, "beatId": p.short.ID, "start": 60, "offset": -1, "length": 5},
 			http.StatusBadRequest, "a Clip can't start before its source does"},
+		"for less than no time": {map[string]any{"trackId": beatTrack, "beatId": p.short.ID, "start": 60, "offset": 0, "length": -1},
+			http.StatusBadRequest, "a Clip must play for some time"},
 		"for no time": {map[string]any{"trackId": beatTrack, "beatId": p.short.ID, "start": 60, "offset": 0, "length": 0},
 			http.StatusBadRequest, "a Clip must play for some time"},
 		"of an unknown Beat": {map[string]any{"trackId": beatTrack, "beatId": 999, "start": 60, "offset": 0, "length": 5},

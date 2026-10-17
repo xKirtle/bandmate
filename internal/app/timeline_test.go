@@ -738,6 +738,7 @@ func TestATrimCantGoBeyondItsSource(t *testing.T) {
 		"before its start": {-1, 10, "a Clip can't start before its source does"},
 		"past its end":     {5, 15.5, "a Clip can't play past the end of its source"},
 		"to nothing":       {5, 0, "a Clip must play for some time"},
+		"to less":          {5, -1, "a Clip must play for some time"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			expectError(t, ts.trimClip(p.song.ID, p.second, c.offset, c.length), http.StatusBadRequest, c.msg)
