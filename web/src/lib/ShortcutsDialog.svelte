@@ -41,13 +41,13 @@
   --dialog-gap="var(--space-4)"
 >
   <search>
-    <label class="visually-hidden" for="{uid}-search">Search Shortcuts by name or key</label>
+    <label class="visually-hidden" for="{uid}-search">Search Shortcuts by name, what they do or key</label>
     <input
       bind:this={search}
       bind:value={query}
       id="{uid}-search"
       type="search"
-      placeholder="Search by name or key"
+      placeholder="Search by name, what it does or key"
       autocomplete="off"
       enterkeyhint="search"
       {onkeydown}
@@ -58,8 +58,7 @@
        nothing in it takes focus. -->
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
   <div class="results" role="region" aria-label="Shortcuts" tabindex="0">
-    {#each groups as { group, rows } (group)}
-      {@const g = all.findIndex((a) => a.group === group)}
+    {#each groups as { group, rows }, g (group)}
       <section aria-labelledby="{uid}-group-{g}">
         <h3 id="{uid}-group-{g}">{group}</h3>
         <ul>
