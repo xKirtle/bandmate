@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 
 	"github.com/xKirtle/bandmate/internal/domain"
 	"github.com/xKirtle/bandmate/internal/songversion"
@@ -18,71 +17,45 @@ import (
 // no Snapshot of its own, but starts an editing session like any change
 // to the sheet. A copy that isn't a sheet of this Song is refused.
 func (s *Store) PutSheetBack(ctx context.Context, songID int64, based songversion.Version, sheet LyricSheet) (Song, error) {
-	if err := checkSheet(sheet); err != nil {
-		return Song{}, err
-	}
 	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
 		if err := checkSheetIDs(ctx, tx, songID, sheet); err != nil {
 			return err
 		}
-		return restoreSheet(ctx, tx, songID, toHeld(sheet))
+		return editSheet(ctx, tx, songID, func(current LyricSheet, _ *ids) (LyricSheet, error) {
+			// The copy comes from outside, so it's checked as given too,
+			// Cues it won't put back included.
+			if err := checkChange(current, sheet); err != nil {
+				return LyricSheet{}, err
+			}
+			return keepCurrentCues(current, sheet), nil
+		})
 	})
 }
 
-// checkSheet checks a copy is a sheet: each Section in exactly one of the
-// Lyric Sheet and the Scrapbook, once, each with exactly one active
-// Alternate, no id held twice, each Line one line of text, and each Cue one
-// a Line can have.
-func checkSheet(sheet LyricSheet) error {
-	placed := map[int64]int{}
-	for _, id := range append(append([]int64{}, sheet.Arrangement...), sheet.Scrapbook...) {
-		placed[id]++
-	}
-	seen := map[string]map[int64]bool{"sections": {}, "alternates": {}, "lines": {}}
-	once := func(table string, id int64) error {
-		if id <= 0 || seen[table][id] {
-			return domain.Invalid(fmt.Sprintf("each of the sheet's %s needs an id of its own", table))
-		}
-		seen[table][id] = true
-		return nil
-	}
-	for _, sec := range sheet.Sections {
-		if err := once("sections", sec.ID); err != nil {
-			return err
-		}
-		if placed[sec.ID] != 1 {
-			return domain.Invalid("each Section must be in exactly one of the Lyric Sheet and the Scrapbook, once")
-		}
-		active := 0
+// keepCurrentCues is a copy of a sheet as it was, put back over current,
+// with each Line still in current given the Cue it has there: Cues' own
+// history is kept in the browser. A Line the copy brings back keeps the
+// Cue it had.
+func keepCurrentCues(current, copied LyricSheet) LyricSheet {
+	cues := map[int64]*float64{}
+	for _, sec := range current.Sections {
 		for _, alt := range sec.Alternates {
-			if err := once("alternates", alt.ID); err != nil {
-				return err
-			}
-			if alt.Active {
-				active++
-			}
 			for _, l := range alt.Lines {
-				if err := once("lines", l.ID); err != nil {
-					return err
-				}
-				if strings.ContainsAny(l.Text, "\r\n") {
-					return domain.Invalid("a Line's text can't hold a line break")
-				}
-				if l.Cue != nil {
-					if _, err := cueMillis(*l.Cue); err != nil {
-						return err
-					}
+				cues[l.ID] = l.Cue
+			}
+		}
+	}
+	sheet := cloneSheet(copied)
+	for _, sec := range sheet.Sections {
+		for _, alt := range sec.Alternates {
+			for i, l := range alt.Lines {
+				if cue, there := cues[l.ID]; there {
+					alt.Lines[i].Cue = copyCue(cue)
 				}
 			}
 		}
-		if active != 1 {
-			return domain.Invalid("each Section must have exactly one active Alternate")
-		}
 	}
-	if len(placed) != len(sheet.Sections) {
-		return domain.Invalid("each Section must be in exactly one of the Lyric Sheet and the Scrapbook, once")
-	}
-	return nil
+	return sheet
 }
 
 // checkSheetIDs checks a copy's ids are this Song's, or held by no row now,
