@@ -716,8 +716,8 @@ type NewClip struct {
 	SoundID *int64 `json:"soundId"`
 	// Name is its own name, if it has one.
 	Name *string `json:"name"`
-	// ClipPlayback is checked as it's placed. A request's needs its
-	// defaults filled in first.
+	// ClipPlayback is checked as it's placed. One a request gives has its
+	// defaults filled in where the request is read (WithDefaults).
 	ClipPlayback
 	TakeIDs      []int64 `json:"takeIds"`
 	ActiveTakeID *int64  `json:"activeTakeId"`

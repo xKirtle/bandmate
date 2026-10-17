@@ -78,7 +78,7 @@ func (p placement) atTempo(tempo float64) placement {
 	scale := tempoScale(p.Tempo, tempo)
 	p.Tempo = tempo
 	p.length *= scale
-	p.FadeIn, p.FadeOut = p.FadeIn*scale, p.FadeOut*scale
+	p.setFades(Fades{In: p.FadeIn * scale, Out: p.FadeOut * scale})
 	return p
 }
 
