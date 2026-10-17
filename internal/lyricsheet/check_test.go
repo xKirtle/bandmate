@@ -31,10 +31,10 @@ func alternate(id int64, active bool, lines ...Line) Alternate {
 
 func TestCheckChange(t *testing.T) {
 	const (
-		errPlaced = "each Section must be in exactly one of the Lyric Sheet and the Scrapbook, once"
-		errActive = "each Section must have exactly one active Alternate"
-		errBreak  = "a Line's text can't hold a line break"
-		errLate   = "a Cue can't be more than 24 hours into the Timeline"
+		wantPlaced = "each Section must be in exactly one of the Lyric Sheet and the Scrapbook, once"
+		wantActive = "each Section must have exactly one active Alternate"
+		wantBreak  = "a Line's text can't hold a line break"
+		wantLate   = "a Cue can't be more than 24 hours into the Timeline"
 	)
 	verse := section(1, alternate(1, true, line(1, "Hello", nil)))
 	chorus := section(2, alternate(2, true, line(2, "Sing", nil)))
@@ -53,25 +53,25 @@ func TestCheckChange(t *testing.T) {
 			name:   "a Section in both the Arrangement and the Scrapbook",
 			before: before,
 			after:  LyricSheet{Arrangement: []int64{1, 2}, Scrapbook: []int64{2}, Sections: before.Sections},
-			want:   errPlaced,
+			want:   wantPlaced,
 		},
 		{
 			name:   "a Section in neither",
 			before: before,
 			after:  LyricSheet{Arrangement: []int64{1}, Scrapbook: []int64{}, Sections: before.Sections},
-			want:   errPlaced,
+			want:   wantPlaced,
 		},
 		{
 			name:   "a Section twice in the Arrangement",
 			before: before,
 			after:  LyricSheet{Arrangement: []int64{1, 2, 1}, Scrapbook: []int64{}, Sections: before.Sections},
-			want:   errPlaced,
+			want:   wantPlaced,
 		},
 		{
 			name:   "a Section placed that isn't in the sheet",
 			before: before,
 			after:  LyricSheet{Arrangement: []int64{1, 3}, Scrapbook: []int64{2}, Sections: before.Sections},
-			want:   errPlaced,
+			want:   wantPlaced,
 		},
 		{
 			name:   "a new Section with an id already held",
@@ -90,13 +90,13 @@ func TestCheckChange(t *testing.T) {
 			name:   "a second Alternate made active",
 			before: before,
 			after:  sheetOf(1, section(1, alternate(1, true, line(1, "Hello", nil)), alternate(3, true)), chorus),
-			want:   errActive,
+			want:   wantActive,
 		},
 		{
 			name:   "a Section's active Alternate moved out of it",
 			before: before,
 			after:  sheetOf(1, section(1), section(2, alternate(2, true, line(2, "Sing", nil)), alternate(1, false, line(1, "Hello", nil)))),
-			want:   errActive,
+			want:   wantActive,
 		},
 		{
 			name:   "a Section stored with no active Alternate, left alone",
@@ -107,7 +107,7 @@ func TestCheckChange(t *testing.T) {
 			name:   "a Line written with a line break",
 			before: before,
 			after:  sheetOf(1, section(1, alternate(1, true, line(1, "Hel\nlo", nil))), chorus),
-			want:   errBreak,
+			want:   wantBreak,
 		},
 		{
 			name:   "a Line stored with a line break, left alone",
@@ -118,7 +118,7 @@ func TestCheckChange(t *testing.T) {
 			name:   "a Cue set past 24 hours",
 			before: before,
 			after:  sheetOf(1, section(1, alternate(1, true, line(1, "Hello", cue(maxCue+1)))), chorus),
-			want:   errLate,
+			want:   wantLate,
 		},
 		{
 			name:   "a Cue stored past 24 hours, left alone",

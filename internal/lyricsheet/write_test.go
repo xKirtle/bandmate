@@ -17,7 +17,7 @@ func cue(seconds float64) *float64 { return &seconds }
 func line(id int64, text string, cue *float64) Line {
 	var ms sql.NullInt64
 	if cue != nil {
-		ms = sql.NullInt64{Int64: int64(*cue * 1000), Valid: true}
+		ms = sql.NullInt64{Int64: millis(*cue), Valid: true}
 	}
 	return newLine(id, text, ms)
 }
@@ -78,6 +78,7 @@ func TestWriteSheetRoundTrip(t *testing.T) {
 			}},
 			{ID: 2, Label: "Chorus", Alternates: []Alternate{
 				{ID: 3, Active: true, Lines: []Line{line(4, "Sing it", cue(8))}},
+				{ID: 7, Name: "Quiet", Lines: []Line{line(8, "Hum it", nil)}},
 			}},
 			{ID: 3, Label: "Bridge", Alternates: []Alternate{
 				{ID: 4, Active: true, Lines: []Line{line(5, "Spare", nil)}},
@@ -105,9 +106,11 @@ func TestWriteSheetRoundTrip(t *testing.T) {
 					line(3, "Good[Em]bye", cue(2.25)),
 				}},
 			}},
-			// Out to the Scrapbook, with a new Alternate made active.
+			// Out to the Scrapbook, with a new Alternate made active, the
+			// deleted Bridge's moved in, and "Quiet" deleted.
 			{ID: 2, Label: "Chorus", Alternates: []Alternate{
 				{ID: 3, Lines: []Line{line(4, "Sing it", cue(8))}},
+				{ID: 4, Lines: []Line{}},
 				{ID: 6, Active: true, Lines: []Line{line(7, "Sing it louder", nil)}},
 			}},
 			// New, first in the Arrangement.

@@ -37,20 +37,13 @@ func (s *Store) PutSheetBack(ctx context.Context, songID int64, based songversio
 // history is kept in the browser. A Line the copy brings back keeps the
 // Cue it had.
 func keepCurrentCues(current, copied LyricSheet) LyricSheet {
-	cues := map[int64]*float64{}
-	for _, sec := range current.Sections {
-		for _, alt := range sec.Alternates {
-			for _, l := range alt.Lines {
-				cues[l.ID] = l.Cue
-			}
-		}
-	}
+	now := indexSheet(current).lines
 	sheet := cloneSheet(copied)
 	for _, sec := range sheet.Sections {
 		for _, alt := range sec.Alternates {
 			for i, l := range alt.Lines {
-				if cue, there := cues[l.ID]; there {
-					alt.Lines[i].Cue = copyCue(cue)
+				if was, there := now[l.ID]; there {
+					alt.Lines[i].Cue = copyCue(was.Cue)
 				}
 			}
 		}

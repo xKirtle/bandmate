@@ -20,11 +20,11 @@ func editSheet(ctx context.Context, tx *sql.Tx, songID int64,
 	if err != nil {
 		return err
 	}
-	ids, err := storedIDs(ctx, tx)
+	newIDs, err := storedIDs(ctx, tx)
 	if err != nil {
 		return err
 	}
-	after, err := edit(cloneSheet(before), ids)
+	after, err := edit(cloneSheet(before), newIDs)
 	if err != nil {
 		return err
 	}
