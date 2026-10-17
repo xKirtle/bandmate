@@ -4,7 +4,7 @@ import { keysLabel, type Key, type Platform, type Shortcut, type ShortcutGroup }
 export type ListRow = {
   name: string;
   description: string;
-  /** Where it works, finishing "Works in …". */
+  /** Where it works, as a sentence: "Works in the ruler, once it has focus." */
   worksIn: string;
   /**
    * Its keys as the platform names them: one list for a one-way Shortcut,
@@ -30,7 +30,7 @@ export function listGroups(list: Record<string, Shortcut>, on: Platform): ListGr
     group.rows.push({
       name: shortcut.name,
       description: shortcut.description,
-      worksIn: shortcut.worksIn,
+      worksIn: `Works in ${shortcut.worksIn}`,
       keys: 'keys' in shortcut ? [labels(shortcut.keys)] : [labels(shortcut.back), labels(shortcut.forward)],
     });
   }

@@ -41,13 +41,13 @@ group('listGroups', () => {
     expect(groups[0].rows[1]).toEqual({
       name: 'Record',
       description: 'Records a Take on the Chosen Track, or stops recording.',
-      worksIn: 'any part of the Song page but a text field or a dialog.',
+      worksIn: 'Works in any part of the Song page but a text field or a dialog.',
       keys: [['R']],
     });
     expect(groups[0].rows[2]).toEqual({
       name: 'Go to the start or end',
       description: 'Moves the playhead to the start or the end.',
-      worksIn: 'any part of the Song page but a text field, a list, a slider, a menu or a dialog.',
+      worksIn: 'Works in any part of the Song page but a text field, a list, a slider, a menu or a dialog.',
       keys: [['Home'], ['End']],
     });
   });
@@ -77,7 +77,7 @@ group('listGroups', () => {
     expect(editing.rows[4]).toEqual({
       name: 'Nudge a Cue by 0.1 s',
       description: 'Moves the focused Cue time 0.1 seconds earlier or later.',
-      worksIn: 'a focused Cue time, in Write mode.',
+      worksIn: 'Works in a focused Cue time, in Write mode.',
       keys: [['Alt+↓'], ['Alt+↑']],
     });
   });
@@ -87,7 +87,7 @@ group('listGroups', () => {
     expect(songEditing.rows[2]).toEqual({
       name: 'Show the Shortcuts',
       description: 'Opens the shortcuts dialog, which lists every Shortcut.',
-      worksIn: 'any part of the Song page but a text field or a dialog.',
+      worksIn: 'Works in any part of the Song page but a text field or a dialog.',
       keys: [['?']],
     });
   });
@@ -112,7 +112,9 @@ group('listGroups', () => {
     expect(listGroups(list, 'other')).toEqual([
       {
         group: 'Playback & recording',
-        rows: [{ name: 'Loop', description: 'Turns the Loop on or off.', worksIn: 'the Timeline.', keys: [['L']] }],
+        rows: [
+          { name: 'Loop', description: 'Turns the Loop on or off.', worksIn: 'Works in the Timeline.', keys: [['L']] },
+        ],
       },
       {
         group: 'Mouse',
@@ -120,7 +122,7 @@ group('listGroups', () => {
           {
             name: 'Zoom to fit',
             description: 'Fits the whole Timeline in view.',
-            worksIn: 'the lanes.',
+            worksIn: 'Works in the lanes.',
             keys: [['Alt+wheel']],
           },
         ],

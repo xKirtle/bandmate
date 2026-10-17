@@ -2,8 +2,8 @@
   // Settings' Shortcuts tab: every Shortcut on the Song page, in its group's
   // card, each a fold showing its name and keys, and opening to what it
   // does and where it works. The same search as the shortcuts dialog's
-  // narrows them down. A keyboard and mouse's alone, so a phone or a narrow
-  // window opens This device at its address instead (see nav.ts).
+  // narrows them down. Shortcuts are for a keyboard and mouse, so a phone or
+  // a narrow window opens This device at its address instead (see nav.ts).
   import FoldChevron from '../lib/FoldChevron.svelte';
   import KeyLabels from '../lib/KeyLabels.svelte';
   import SettingsPage from '../lib/SettingsPage.svelte';
@@ -35,7 +35,7 @@
             </summary>
             <div class="body">
               <p>{row.description}</p>
-              <p class="hint">Works in {row.worksIn}</p>
+              <p class="hint">{row.worksIn}</p>
             </div>
           </details>
         {/each}
@@ -76,8 +76,8 @@
     font-size: var(--text-sm);
   }
   details {
-    /* FoldChevron's icon, as big as the text it's in. */
-    --chevron: 1em;
+    /* As wide as FoldChevron's icon, which is as big as the text it's in. */
+    --chevron-width: 1em;
     border-top: 1px solid var(--border);
   }
   summary {
@@ -96,7 +96,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-1);
-    padding: 0 0 var(--space-3) calc(var(--chevron) + var(--space-2));
+    padding: 0 0 var(--space-3) calc(var(--chevron-width) + var(--space-2));
   }
   .body p {
     margin: 0;

@@ -3,6 +3,7 @@
   import Dialog from './Dialog.svelte';
   import KeyLabels from './KeyLabels.svelte';
   import { keyboardAndMouse } from './keyHints';
+  import { settingsTabHref } from './nav';
   import { platform, shortcuts } from './shortcuts';
   import { listGroups, searchGroups } from './shortcutList';
   import ShortcutSearch from './ShortcutSearch.svelte';
@@ -48,7 +49,7 @@
   <div class="top">
     <ShortcutSearch bind:value={query} bind:input={search} {onkeydown} />
     {#if keyboardAndMouse()}
-      <a class="button" href="/settings/shortcuts">Change keys</a>
+      <a class="button" href={settingsTabHref('shortcuts')}>Change keys</a>
     {/if}
   </div>
   <!-- Its own scroll, so the search stays put as the list scrolls and
@@ -64,7 +65,7 @@
             <li>
               <div class="what">
                 <span class="name">{row.name}</span>
-                <span class="muted">{row.description} Works in {row.worksIn}</span>
+                <span class="muted">{row.description} {row.worksIn}</span>
               </div>
               <KeyLabels keys={row.keys} />
             </li>

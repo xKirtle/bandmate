@@ -2,8 +2,8 @@ import { expect, test } from '../fixtures';
 
 // Settings' Shortcuts tab: every Shortcut, in its group's card, each a fold
 // opening to what it does and where it works, with the shortcuts dialog's
-// search. The dialog's Change keys leads to it. A keyboard and mouse's
-// alone, so a phone opens This device at its address.
+// search. The dialog's Change keys leads to it. Shortcuts are for a
+// keyboard and mouse, so a phone opens This device at its address.
 
 test('the Shortcuts tab lists every Shortcut in its group, each a fold opening to what it does and where', async ({
   page,

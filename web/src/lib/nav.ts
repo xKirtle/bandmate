@@ -69,7 +69,12 @@ export function shownSettingsTabs(keyboardAndMouse: boolean): (typeof settingsTa
 export function hiddenTabOpens(path: string, keyboardAndMouse: boolean): string | undefined {
   const tab = settingsTabAt(path);
   if (!tab || shownSettingsTabs(keyboardAndMouse).some((t) => t.id === tab)) return undefined;
-  return settingsTabs[0].href;
+  return settingsTabHref('device');
+}
+
+/** A Settings tab's address, e.g. /settings/shortcuts for Shortcuts. */
+export function settingsTabHref(id: SettingsTab): string {
+  return settingsTabs.find((tab) => tab.id === id)!.href;
 }
 
 /** Where Backups and About were pages of their own, before they were Settings' tabs. */

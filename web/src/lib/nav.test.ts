@@ -7,6 +7,7 @@ import {
   pages,
   pinned,
   settingsTabAt,
+  settingsTabHref,
   settingsTabs,
   shownSettingsTabs,
 } from './nav';
@@ -108,6 +109,13 @@ describe('settingsTabAt', () => {
     expect(settingsTabAt('/')).toBeUndefined();
     expect(settingsTabAt('/backups')).toBeUndefined();
     expect(settingsTabAt('/settings/nowhere')).toBeUndefined();
+  });
+});
+
+describe('settingsTabHref', () => {
+  it("is a Settings tab's address", () => {
+    expect(settingsTabHref('device')).toBe('/settings');
+    expect(settingsTabHref('shortcuts')).toBe('/settings/shortcuts');
   });
 });
 
