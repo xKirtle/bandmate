@@ -184,8 +184,8 @@ func (s *Store) changeWithFiles(ctx context.Context, songID int64, based songver
 	return s.GetSong(ctx, songID)
 }
 
-// changeSheetWith is changeSheet for a change made as a pure change to the
-// sheet, edit, which editSheet checks and writes.
+// changeSheetWith is changeSheet for a change made by edit, a pure change
+// to the whole sheet, which editSheet checks and writes.
 func (s *Store) changeSheetWith(ctx context.Context, songID int64, based songversion.Version,
 	edit func(sheet LyricSheet, ids *ids) (LyricSheet, error)) (Song, error) {
 	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
@@ -223,6 +223,7 @@ func newSection(ids *ids, label string) Section {
 
 // placeAt is an Arrangement with a Section not in it put at position, the
 // ones from there on moving down by one. A nil position puts it at the end.
+// It may reuse arrangement's array, as a pure change's sheet is a copy.
 func placeAt(arrangement []int64, sectionID int64, position *int) ([]int64, error) {
 	pos := len(arrangement)
 	if position != nil {
@@ -274,7 +275,7 @@ func (s *Store) DeleteSection(ctx context.Context, songID int64, based songversi
 			name = sectionName(*sec)
 		}
 		// A refusal comes before the Snapshot is taken.
-		if _, err := deleteSection(sheet, sectionID); err != nil {
+		if _, err := deleteSection(cloneSheet(sheet), sectionID); err != nil {
 			return "", nil, err
 		}
 		return name, func() error {
@@ -325,8 +326,8 @@ func addToArrangement(sheet LyricSheet, sectionID int64, position *int) (LyricSh
 	return sheet, nil
 }
 
-// sheetSection is one of a sheet's Sections, by id: domain.ErrNotFound if
-// it isn't the sheet's.
+// sheetSection is one of a sheet's Sections, by id, to read or change in
+// place: domain.ErrNotFound if it isn't the sheet's.
 func sheetSection(sheet LyricSheet, sectionID int64) (*Section, error) {
 	for i := range sheet.Sections {
 		if sheet.Sections[i].ID == sectionID {
@@ -336,7 +337,7 @@ func sheetSection(sheet LyricSheet, sectionID int64) (*Section, error) {
 	return nil, domain.ErrNotFound
 }
 
-// without is ids with id taken out.
+// without is ids with id taken out, reusing ids' array.
 func without(ids []int64, id int64) []int64 {
 	return slices.DeleteFunc(ids, func(i int64) bool { return i == id })
 }

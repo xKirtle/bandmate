@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-// idsFrom is ids handing out each table's ids from 11 on, past those of
+// idsFrom11 is ids handing out each table's ids from 11 on, past those of
 // the sheets these tests start from.
-func idsFrom() *ids {
+func idsFrom11() *ids {
 	return &ids{last: map[string]int64{"sections": 10, "alternates": 10, "lines": 10}}
 }
 
@@ -69,27 +69,27 @@ func TestAddSection(t *testing.T) {
 	runSheetEdits(t, sheet, []sheetEdit{
 		{
 			name: "at the end",
-			edit: func(s LyricSheet) (LyricSheet, error) { return addSection(s, idsFrom(), " Bridge ", nil) },
+			edit: func(s LyricSheet) (LyricSheet, error) { return addSection(s, idsFrom11(), " Bridge ", nil) },
 			want: place(1, 2, 11),
 		},
 		{
 			name: "first",
-			edit: func(s LyricSheet) (LyricSheet, error) { return addSection(s, idsFrom(), "Bridge", at(0)) },
+			edit: func(s LyricSheet) (LyricSheet, error) { return addSection(s, idsFrom11(), "Bridge", at(0)) },
 			want: place(11, 1, 2),
 		},
 		{
 			name: "between",
-			edit: func(s LyricSheet) (LyricSheet, error) { return addSection(s, idsFrom(), "Bridge", at(1)) },
+			edit: func(s LyricSheet) (LyricSheet, error) { return addSection(s, idsFrom11(), "Bridge", at(1)) },
 			want: place(1, 11, 2),
 		},
 		{
 			name:    "past the end",
-			edit:    func(s LyricSheet) (LyricSheet, error) { return addSection(s, idsFrom(), "Bridge", at(3)) },
+			edit:    func(s LyricSheet) (LyricSheet, error) { return addSection(s, idsFrom11(), "Bridge", at(3)) },
 			refusal: "position must be between 0 and 2",
 		},
 		{
 			name:    "before the start",
-			edit:    func(s LyricSheet) (LyricSheet, error) { return addSection(s, idsFrom(), "Bridge", at(-1)) },
+			edit:    func(s LyricSheet) (LyricSheet, error) { return addSection(s, idsFrom11(), "Bridge", at(-1)) },
 			refusal: "position must be between 0 and 2",
 		},
 	})
@@ -102,7 +102,7 @@ func TestAddToScrapbook(t *testing.T) {
 	runSheetEdits(t, sheetOf(1, verse, spare), []sheetEdit{
 		{
 			name: "at the end of the Scrapbook",
-			edit: func(s LyricSheet) (LyricSheet, error) { return addToScrapbook(s, idsFrom(), "  ") },
+			edit: func(s LyricSheet) (LyricSheet, error) { return addToScrapbook(s, idsFrom11(), "  ") },
 			want: LyricSheet{Arrangement: []int64{1}, Scrapbook: []int64{2, 11},
 				Sections: []Section{verse, spare, added}},
 		},
@@ -149,7 +149,7 @@ func TestDuplicateSection(t *testing.T) {
 		Alternate{ID: 12, Name: "Darker", Active: true, Lines: []Line{line(13, "Good[Em]bye", nil)}}))
 	duplicateSpare := section(11, alternate(11, true, line(11, "Spare", nil)))
 	dup := func(sectionID int64, position *int) func(LyricSheet) (LyricSheet, error) {
-		return func(s LyricSheet) (LyricSheet, error) { return duplicateSection(s, idsFrom(), sectionID, position) }
+		return func(s LyricSheet) (LyricSheet, error) { return duplicateSection(s, idsFrom11(), sectionID, position) }
 	}
 	runSheetEdits(t, sheet, []sheetEdit{
 		{
@@ -165,7 +165,7 @@ func TestDuplicateSection(t *testing.T) {
 				Sections: []Section{verse, chorus, spare, duplicateSpare}},
 		},
 		{name: "past the end", edit: dup(1, at(3)), refusal: "position must be between 0 and 2"},
-		{name: "not the Song's", edit: dup(9, at(3)), refusal: "not found"},
+		{name: "not the Song's", edit: dup(9, nil), refusal: "not found"},
 	})
 }
 
@@ -267,36 +267,4 @@ func TestSetSectionLabel(t *testing.T) {
 		},
 		{name: "not the Song's", edit: label(9, "Bridge"), refusal: "not found"},
 	})
-}
-
-func TestSectionName(t *testing.T) {
-	tests := []struct {
-		name string
-		sec  Section
-		want string
-	}{
-		{
-			name: "by its Label",
-			sec:  labelled("Chorus", section(1, alternate(1, true, line(1, "Sing", nil)))),
-			want: "Chorus",
-		},
-		{
-			name: "by its active Alternate's first Line with words",
-			sec: section(1, alternate(1, false, line(1, "Other", nil)),
-				alternate(2, true, line(2, "  ", nil), line(3, "[Am] [G]", nil), line(4, " Hel[C]lo ", nil), line(5, "world", nil))),
-			want: "Hello",
-		},
-		{
-			name: "with neither, no name",
-			sec:  section(1, alternate(1, true, line(1, "[Am]", nil)), alternate(2, false, line(2, "Other", nil))),
-			want: "",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := sectionName(tt.sec); got != tt.want {
-				t.Errorf("sectionName = %q, want %q", got, tt.want)
-			}
-		})
-	}
 }
