@@ -32,3 +32,19 @@ export function dialogGroups(list: Record<string, Shortcut>, on: Platform): Dial
   }
   return groups;
 }
+
+/**
+ * The dialog's groups as a search leaves them: only the Shortcuts whose
+ * name, description or keys, as the rows name them, hold every word of
+ * `query`, ignoring case, and only the groups left with one. An empty
+ * search leaves every Shortcut.
+ */
+export function searchGroups(groups: readonly DialogGroup[], query: string): DialogGroup[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const matches = (row: DialogRow) => {
+    // A line each, so a word can't match across two.
+    const text = [row.name, row.description, ...row.keys.flat()].join('\n').toLowerCase();
+    return words.every((word) => text.includes(word));
+  };
+  return groups.map(({ group, rows }) => ({ group, rows: rows.filter(matches) })).filter(({ rows }) => rows.length > 0);
+}

@@ -1,6 +1,6 @@
 import { describe as group, expect, it } from 'vitest';
 import { shortcuts, type Shortcut } from './shortcuts';
-import { dialogGroups } from './shortcutsDialog';
+import { dialogGroups, searchGroups } from './shortcutsDialog';
 
 group('dialogGroups', () => {
   it('lists every Shortcut in its group, in order, with its description and keys', () => {
@@ -105,5 +105,47 @@ group('dialogGroups', () => {
         rows: [{ name: 'Zoom to fit', description: 'Fits the whole Timeline in view.', keys: [['Alt+wheel']] }],
       },
     ]);
+  });
+});
+
+group('searchGroups', () => {
+  const found = (query: string, on: 'mac' | 'other' = 'other') =>
+    searchGroups(dialogGroups(shortcuts, on), query).flatMap((g) => g.rows.map((r) => r.name));
+
+  it('finds a Shortcut by its name, whatever the case', () => {
+    expect(found('SPLIT')).toEqual(['Split at the playhead']);
+  });
+
+  it('finds a Shortcut by its keys as this platform names them', () => {
+    expect(found('Ctrl+Z')).toEqual(['Undo']);
+    expect(found('⌘Z', 'mac')).toEqual(['Undo']);
+    expect(found('Ctrl+Z', 'mac')).toEqual([]);
+    expect(found('Shift')).toEqual(['Redo', "Open a Clip's menu", 'Seek back or forward 15 s', 'Skip snapping']);
+    expect(found('Backspace')).toEqual(['Delete a Clip']);
+    expect(found('Shift+F10')).toEqual(["Open a Clip's menu"]);
+    expect(found('Home')).toEqual(['Go to the start or end']);
+  });
+
+  it('finds a Shortcut by its description', () => {
+    expect(found('pointer')).toEqual(['Zoom the Timeline']);
+  });
+
+  it('finds only the Shortcuts every word typed matches, in its name, description or keys', () => {
+    expect(found('add  box ')).toEqual(['Add Clips with a box']);
+    expect(found('ctrl shift')).toEqual(['Redo']);
+    expect(found('shift drag snapping')).toEqual(['Skip snapping']);
+  });
+
+  it('keeps the groups a match is in, in order, and leaves out the rest', () => {
+    const groups = searchGroups(dialogGroups(shortcuts, 'other'), 'undo');
+    expect(groups.map((g) => [g.group, g.rows.map((r) => r.name)])).toEqual([['Song editing', ['Undo', 'Redo']]]);
+    expect(searchGroups(dialogGroups(shortcuts, 'other'), 'wheel').map((g) => g.group)).toEqual(['Mouse']);
+  });
+
+  it('leaves no group when nothing matches, and every one when the search is blank', () => {
+    const all = dialogGroups(shortcuts, 'other');
+    expect(searchGroups(all, 'metronome')).toEqual([]);
+    expect(searchGroups(all, '')).toEqual(all);
+    expect(searchGroups(all, '   ')).toEqual(all);
   });
 });
