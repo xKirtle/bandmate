@@ -3,7 +3,6 @@ package lyricsheet
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -254,18 +253,6 @@ func movedOutLabel(label, name string) string {
 		return label + name
 	}
 	return label + " · " + name
-}
-
-// findAlternate returns the Section of one of a Song's Alternates and whether
-// it is the active one.
-func findAlternate(ctx context.Context, tx *sql.Tx, songID, alternateID int64) (sectionID int64, active bool, err error) {
-	err = tx.QueryRowContext(ctx, `SELECT a.section_id, a.active FROM alternates a
-		JOIN sections s ON s.id = a.section_id WHERE a.id = ? AND s.song_id = ?`,
-		alternateID, songID).Scan(&sectionID, &active)
-	if errors.Is(err, sql.ErrNoRows) {
-		return 0, false, domain.ErrNotFound
-	}
-	return sectionID, active, err
 }
 
 // cleanName trims an Alternate's name; blank means no name.
