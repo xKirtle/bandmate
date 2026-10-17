@@ -52,7 +52,7 @@ func (s *Store) SetClipTempos(ctx context.Context, songID int64, based songversi
 		// The new Tracks added below each Track, top to bottom.
 		added := map[int64][]int64{}
 		for _, m := range tempoMoves(before, tempos) {
-			if m.below > len(added[m.from]) {
+			if m.newTrack == len(added[m.from]) {
 				trackID, err := addTrackBelow(ctx, tx, songID, lastOr(added[m.from], m.from))
 				if err != nil {
 					return err
@@ -60,7 +60,7 @@ func (s *Store) SetClipTempos(ctx context.Context, songID int64, based songversi
 				added[m.from] = append(added[m.from], trackID)
 			}
 			p := scaled[m.clipID]
-			p.trackID = added[m.from][m.below-1]
+			p.trackID = added[m.from][m.newTrack]
 			scaled[m.clipID] = p
 		}
 		for _, t := range tempos {
@@ -75,11 +75,17 @@ func (s *Store) SetClipTempos(ctx context.Context, songID int64, based songversi
 // atTempo is p played at another Tempo: from the same start, the same
 // stretch of its source, so its length, and its Fades, scale.
 func (p placement) atTempo(tempo float64) placement {
-	scale := p.tempo / tempo
+	scale := tempoScale(p.tempo, tempo)
 	p.tempo = tempo
 	p.length *= scale
 	p.fades = Fades{In: p.fades.In * scale, Out: p.fades.Out * scale}
 	return p
+}
+
+// tempoScale is how much a Clip's length scales by, playing the same
+// stretch of its source, when its Tempo goes from one to another.
+func tempoScale(from, to float64) float64 {
+	return from / to
 }
 
 // addTrackBelow adds an empty Track right below one of the Song's, named

@@ -59,13 +59,13 @@ func fitsBeforeNext(t Track, c Clip, leaving []int64) bool {
 	return !overlapsAnother(later, c)
 }
 
-// tempoMove is a Clip slowed until it runs into the next on its Track,
-// from, going onto a new Track right below it: the below-th, counting from
-// 1, of those added below from, top to bottom.
+// tempoMove is a Clip slowed until it runs into the next Clip on its Track,
+// from. It goes onto one of the new Tracks added right below from: the
+// newTrack-th of them, top to bottom, counting from 0.
 type tempoMove struct {
-	clipID int64
-	from   int64
-	below  int
+	clipID   int64
+	from     int64
+	newTrack int
 }
 
 // tempoMoves is where those of tl's Clips that tempos slows into the next
@@ -80,8 +80,7 @@ func tempoMoves(tl Timeline, tempos []ClipTempo) []tempoMove {
 	var changed []retimed
 	for _, t := range tempos {
 		if track, c, ok := tl.clip(t.ClipID); ok {
-			// Scaled as atTempo scales it.
-			c.Length *= c.Tempo / t.Tempo
+			c.Length *= tempoScale(c.Tempo, t.Tempo)
 			changed = append(changed, retimed{track, c})
 		}
 	}
@@ -110,7 +109,7 @@ func tempoMoves(tl Timeline, tempos []ClipTempo) []tempoMove {
 		}
 		tracks[i] = append(tracks[i], m.clip)
 		below[m.from.ID] = tracks
-		moves = append(moves, tempoMove{clipID: m.clip.ID, from: m.from.ID, below: i + 1})
+		moves = append(moves, tempoMove{clipID: m.clip.ID, from: m.from.ID, newTrack: i})
 	}
 	return moves
 }
