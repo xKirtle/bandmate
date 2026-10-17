@@ -1,20 +1,25 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import Dialog from './Dialog.svelte';
+  import KeyLabels from './KeyLabels.svelte';
+  import { keyboardAndMouse } from './keyHints';
   import { platform, shortcuts } from './shortcuts';
-  import { dialogGroups, searchGroups } from './shortcutsDialog';
+  import { listGroups, searchGroups } from './shortcutList';
+  import ShortcutSearch from './ShortcutSearch.svelte';
 
   // Every Shortcut on the Song page, in its group, with its keys as this
   // platform names them. All are listed wherever they work, e.g. Sync mode's
-  // while it's off: each group's heading says where. A search at the top
-  // narrows them down by name, description or key.
+  // while it's off: each says where. A search at the top narrows them down
+  // by name, what they do, where they work or key, and Change keys beside
+  // it leads to Settings' Shortcuts tab, which isn't shown on a phone or a
+  // narrow window, so neither is the link.
   let { onClose }: { onClose: () => void } = $props();
 
   const uid = $props.id();
   let dialog = $state<HTMLDialogElement>();
   let search = $state<HTMLInputElement>();
   let query = $state('');
-  const all = dialogGroups(shortcuts, platform());
+  const all = listGroups(shortcuts, platform());
   const groups = $derived(searchGroups(all, query));
 
   // The cursor starts in the search, to type straight away. The page's
@@ -40,19 +45,12 @@
   --dialog-height="min(48rem, calc(100dvh - 2rem))"
   --dialog-gap="var(--space-4)"
 >
-  <search>
-    <label class="visually-hidden" for="{uid}-search">Search Shortcuts by name, what they do or key</label>
-    <input
-      bind:this={search}
-      bind:value={query}
-      id="{uid}-search"
-      type="search"
-      placeholder="Search by name, what it does or key"
-      autocomplete="off"
-      enterkeyhint="search"
-      {onkeydown}
-    />
-  </search>
+  <div class="top">
+    <ShortcutSearch bind:value={query} bind:input={search} {onkeydown} />
+    {#if keyboardAndMouse()}
+      <a class="button" href="/settings/shortcuts">Change keys</a>
+    {/if}
+  </div>
   <!-- Its own scroll, so the search stays put as the list scrolls and
        narrows. Tab reaches it, for arrows and Space to scroll it, since
        nothing in it takes focus. -->
@@ -66,20 +64,9 @@
             <li>
               <div class="what">
                 <span class="name">{row.name}</span>
-                <span class="muted">{row.description}</span>
+                <span class="muted">{row.description} Works in {row.worksIn}</span>
               </div>
-              <!-- A two-way Shortcut's keys back, then forward, a line each. -->
-              <span class="keys">
-                {#each row.keys as labels, w (w)}
-                  <span class="way">
-                    {#if w > 0}<span class="visually-hidden">, then</span>{/if}
-                    {#each labels as key, k (k)}
-                      {#if k > 0}<span class="muted">or</span>{/if}
-                      <kbd>{key}</kbd>
-                    {/each}
-                  </span>
-                {/each}
-              </span>
+              <KeyLabels keys={row.keys} />
             </li>
           {/each}
         </ul>
@@ -91,9 +78,9 @@
 </Dialog>
 
 <style>
-  search {
+  .top {
     display: flex;
-    flex-direction: column;
+    gap: var(--space-2);
   }
   .results {
     display: flex;
@@ -135,30 +122,5 @@
   }
   .what .muted {
     font-size: var(--text-md);
-  }
-  .keys {
-    display: flex;
-    flex: none;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: var(--space-1);
-    max-width: 50%;
-    font-size: var(--text-md);
-  }
-  .way {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: flex-end;
-    gap: var(--space-1);
-  }
-  kbd {
-    padding: 0 var(--space-2);
-    border: 1px solid var(--border);
-    border-bottom-width: 2px;
-    border-radius: var(--radius-sm);
-    background: var(--surface-1);
-    font: inherit;
-    white-space: nowrap;
   }
 </style>

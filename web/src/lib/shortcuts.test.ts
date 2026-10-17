@@ -124,6 +124,7 @@ group('The list', () => {
       { name: 'Go to the start or end', group: 'Playback & recording', keys: 'Home / End' },
       { name: 'Undo', group: 'Song editing', keys: 'Ctrl+Z' },
       { name: 'Redo', group: 'Song editing', keys: 'Ctrl+Shift+Z or Ctrl+Y' },
+      { name: 'Show the Shortcuts', group: 'Song editing', keys: '?' },
       { name: 'Delete a Clip', group: 'Timeline editing', keys: 'Delete or Backspace' },
       { name: "Open a Clip's menu", group: 'Timeline editing', keys: 'Shift+F10 or Menu' },
       { name: 'Seek back or forward 5 s', group: 'Timeline editing', keys: '← or ↓ / → or ↑' },
@@ -155,6 +156,10 @@ group('The list', () => {
 
   it('describes every Shortcut in one line', () => {
     for (const s of Object.values(shortcuts)) expect(s.description).toMatch(/^[^\n]+\.$/);
+  });
+
+  it('says in one line where every Shortcut works, finishing "Works in …"', () => {
+    for (const s of Object.values(shortcuts)) expect(s.worksIn).toMatch(/^[^\n]+\.$/);
   });
 });
 
