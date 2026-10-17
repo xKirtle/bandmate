@@ -8,7 +8,6 @@ package timeline
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -71,23 +70,7 @@ type Clip struct {
 	// Name is the Clip's own name, or nil until it's named, when it goes by
 	// its source's.
 	Name *string `json:"name"`
-	// Gain is how much louder or quieter it plays, in dB, before its Track's
-	// volume applies: from MinGain to MaxGain, 0 until it's set.
-	Gain float64 `json:"gain"`
-	// Tempo is how fast it plays its audio, without changing its Pitch, as a
-	// ratio of as recorded: from MinTempo to MaxTempo, 1 until it's set. Its
-	// Length is Timeline time, so it plays Length × Tempo seconds of its
-	// source.
-	Tempo float64 `json:"tempo"`
-	// Pitch is how many semitones its audio is moved up or down, without
-	// changing its Tempo: a whole number from MinPitch to MaxPitch, 0 until
-	// it's set. It never changes its Length.
-	Pitch float64 `json:"pitch"`
-	// FadeIn and FadeOut are how long it rises from silence at its start
-	// and falls to silence at its end, in seconds, each measured from that
-	// edge as trimmed: 0 for none. Together they never run longer than it.
-	FadeIn  float64 `json:"fadeIn"`
-	FadeOut float64 `json:"fadeOut"`
+	ClipPlayback
 	// Takes are a Clip of Takes' Takes, by number, and ActiveTakeID the one
 	// it plays. A Clip of a Beat has none.
 	Takes        []Take `json:"takes"`
@@ -326,7 +309,7 @@ func (s *Store) AddBeat(ctx context.Context, songID int64, based songversion.Ver
 			return err
 		}
 		start := trackEnd(before.track(trackID))
-		return addClip(ctx, tx, songID, trackID, NewClip{BeatID: &beatID, Tempo: 1, Start: start, Length: duration})
+		return addClip(ctx, tx, songID, trackID, NewClip{BeatID: &beatID, ClipPlayback: asRecorded(), Start: start, Length: duration})
 	})
 }
 
@@ -576,17 +559,14 @@ func roundedToZero(t float64) float64 {
 	return t
 }
 
-// placement is where a Clip is, what it plays, what it's named, its Gain,
-// its Tempo, its Pitch and its Fades, as stored. Its Fades are shortened to fit as it's stored.
+// placement is where a Clip is, what it plays, what it's named and how it
+// plays it, as stored. Its Fades are shortened to fit as it's stored.
 type placement struct {
 	trackID int64
 	source  source
 	// name is null for a Clip that isn't named.
-	name   sql.NullString
-	gain   float64
-	tempo  float64
-	pitch  float64
-	fades  Fades
+	name sql.NullString
+	ClipPlayback
 	start  float64
 	offset float64
 	length float64
@@ -719,7 +699,7 @@ func (s *Store) TrimClip(ctx context.Context, songID int64, based songversion.Ve
 			if err := fades.check(length); err != nil {
 				return err
 			}
-			p.fades = *fades
+			p.setFades(*fades)
 		}
 		return store(ctx, tx, clipID, p)
 	})
@@ -736,33 +716,14 @@ type NewClip struct {
 	SoundID *int64 `json:"soundId"`
 	// Name is its own name, if it has one.
 	Name *string `json:"name"`
-	// Gain is in dB, 0 if not given.
-	Gain float64 `json:"gain"`
-	// Tempo is a ratio of as recorded, from MinTempo to MaxTempo: 1 for a
-	// Clip as recorded.
-	Tempo float64 `json:"tempo"`
-	// Pitch is in whole semitones, from MinPitch to MaxPitch, 0 if not given.
-	Pitch float64 `json:"pitch"`
-	// FadeIn and FadeOut are in seconds, 0 if not given.
-	FadeIn       float64 `json:"fadeIn"`
-	FadeOut      float64 `json:"fadeOut"`
+	// ClipPlayback is checked as it's placed. One a request gives has its
+	// defaults filled in where the request is read (WithDefaults).
+	ClipPlayback
 	TakeIDs      []int64 `json:"takeIds"`
 	ActiveTakeID *int64  `json:"activeTakeId"`
 	Start        float64 `json:"start"`
 	Offset       float64 `json:"offset"`
 	Length       float64 `json:"length"`
-}
-
-// UnmarshalJSON reads a NewClip as a request gives it, at a Tempo of 1 if
-// it gives none.
-func (c *NewClip) UnmarshalJSON(data []byte) error {
-	type given NewClip
-	g := given{Tempo: 1}
-	if err := json.Unmarshal(data, &g); err != nil {
-		return err
-	}
-	*c = NewClip(g)
-	return nil
 }
 
 // PlaceClip places a stretch of a Beat or a Sound, or of detached Takes, on
@@ -978,21 +939,11 @@ func addClip(ctx context.Context, tx *sql.Tx, songID, trackID int64, c NewClip) 
 	if err != nil {
 		return err
 	}
-	if err := checkTempo(c.Tempo); err != nil {
+	if err := c.ClipPlayback.check(c.Length); err != nil {
 		return err
 	}
-	if err := checkPitch(c.Pitch); err != nil {
-		return err
-	}
-	if err := checkGain(c.Gain); err != nil {
-		return err
-	}
-	fades := Fades{In: c.FadeIn, Out: c.FadeOut}
-	if err := fades.check(c.Length); err != nil {
-		return err
-	}
-	p := placement{trackID: trackID, source: src, name: clipName(c.Name), gain: c.Gain, tempo: c.Tempo,
-		pitch: c.Pitch, fades: fades, start: c.Start, offset: c.Offset, length: c.Length}
+	p := placement{trackID: trackID, source: src, name: clipName(c.Name), ClipPlayback: c.ClipPlayback,
+		start: c.Start, offset: c.Offset, length: c.Length}
 	clipID, err := insertClip(ctx, tx, p)
 	if err != nil {
 		return err
@@ -1085,12 +1036,12 @@ func insertClip(ctx context.Context, tx *sql.Tx, p placement) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	fades := p.fades.fitted(p.length)
+	fades := p.fades().fitted(p.length)
 	res, err := tx.ExecContext(ctx,
 		`INSERT INTO clips (track_id, beat_id, sound_id, name, gain, tempo, pitch, fade_in, fade_out, active_take_id,
 				start, source_offset, length)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.trackID, p.source.beatID, p.source.soundID, p.name, p.gain, p.tempo, p.pitch, fades.In, fades.Out, p.source.activeTakeID,
+		p.trackID, p.source.beatID, p.source.soundID, p.name, p.Gain, p.Tempo, p.Pitch, fades.In, fades.Out, p.source.activeTakeID,
 		p.start, p.offset, p.length)
 	if err != nil {
 		return 0, fmt.Errorf("adding clip: %w", err)
@@ -1146,14 +1097,7 @@ type ClipCopy struct {
 	SoundID *int64
 	// Name is its own name, if it had one.
 	Name *string
-	// Gain is in dB.
-	Gain float64
-	// Tempo is a ratio of as recorded.
-	Tempo float64
-	// Pitch is in semitones.
-	Pitch float64
-	// FadeIn and FadeOut are in seconds.
-	FadeIn, FadeOut float64
+	ClipPlayback
 	// Takes are a Clip of Takes', and ActiveTakeID the one of them it plays.
 	Takes        []TakeAt
 	ActiveTakeID *int64
@@ -1197,8 +1141,8 @@ func (s *Store) PasteClips(ctx context.Context, songID int64, based songversion.
 			if err != nil {
 				return err
 			}
-			nc := NewClip{BeatID: c.BeatID, SoundID: c.SoundID, Name: c.Name, Gain: c.Gain, Tempo: c.Tempo, Pitch: c.Pitch,
-				FadeIn: c.FadeIn, FadeOut: c.FadeOut, Start: c.Start, Offset: c.Offset, Length: c.Length}
+			nc := NewClip{BeatID: c.BeatID, SoundID: c.SoundID, Name: c.Name, ClipPlayback: c.ClipPlayback,
+				Start: c.Start, Offset: c.Offset, Length: c.Length}
 			if len(c.Takes) > 0 {
 				ids, active, err := s.copyTakesAt(ctx, tx, changes, songID, c.Takes, *c.ActiveTakeID)
 				if err != nil {
@@ -1459,7 +1403,7 @@ func clipPlacement(ctx context.Context, tx *sql.Tx, songID, clipID int64) (place
 			c.active_take_id, c.start, c.source_offset, c.length
 		FROM clips c JOIN tracks t ON t.id = c.track_id
 		WHERE c.id = ? AND t.song_id = ?`, clipID, songID).
-		Scan(&p.trackID, &p.source.beatID, &p.source.soundID, &p.name, &p.gain, &p.tempo, &p.pitch, &p.fades.In, &p.fades.Out,
+		Scan(&p.trackID, &p.source.beatID, &p.source.soundID, &p.name, &p.Gain, &p.Tempo, &p.Pitch, &p.FadeIn, &p.FadeOut,
 			&p.source.activeTakeID, &p.start, &p.offset, &p.length)
 	if errors.Is(err, sql.ErrNoRows) {
 		return placement{}, domain.ErrNotFound
@@ -1489,10 +1433,10 @@ func store(ctx context.Context, tx *sql.Tx, clipID int64, p placement) error {
 	if err != nil {
 		return err
 	}
-	fades := p.fades.fitted(p.length)
+	fades := p.fades().fitted(p.length)
 	if _, err := tx.ExecContext(ctx, `UPDATE clips SET track_id = ?, start = ?, source_offset = ?, length = ?,
 			tempo = ?, fade_in = ?, fade_out = ? WHERE id = ?`,
-		p.trackID, p.start, p.offset, p.length, p.tempo, fades.In, fades.Out, clipID); err != nil {
+		p.trackID, p.start, p.offset, p.length, p.Tempo, fades.In, fades.Out, clipID); err != nil {
 		return fmt.Errorf("placing clip: %w", err)
 	}
 	return nil

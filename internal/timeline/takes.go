@@ -71,7 +71,7 @@ func (s *Store) RecordTake(ctx context.Context, songID int64, based songversion.
 		if err != nil {
 			return 0, err
 		}
-		c := NewClip{TakeIDs: []int64{takeID}, ActiveTakeID: &takeID, Tempo: 1, Start: start, Offset: offset, Length: length}
+		c := NewClip{TakeIDs: []int64{takeID}, ActiveTakeID: &takeID, ClipPlayback: asRecorded(), Start: start, Offset: offset, Length: length}
 		return takeID, addClip(ctx, tx, songID, rec.TrackID, c)
 	})
 }
@@ -191,10 +191,10 @@ func (s *Store) Retake(ctx context.Context, songID int64, based songversion.Vers
 		}
 		// A Take is recorded as it's sung, so it only lines up in a Clip
 		// that plays its audio as recorded, in time and in tune.
-		if p.tempo != 1 {
+		if p.Tempo != 1 {
 			return 0, domain.Invalid("set the Clip's Tempo back to 100% to retake it")
 		}
-		if p.pitch != 0 {
+		if p.Pitch != 0 {
 			return 0, domain.Invalid("set the Clip's Pitch back to 0 to retake it")
 		}
 		if take.end() <= p.start+tolerance {
@@ -325,7 +325,7 @@ func (s *Store) SetTakes(ctx context.Context, songID int64, based songversion.Ve
 			if err := fades.check(ct.Length); err != nil {
 				return err
 			}
-			p.fades = *fades
+			p.setFades(*fades)
 		}
 		return store(ctx, tx, clipID, p)
 	})

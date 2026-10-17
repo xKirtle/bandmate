@@ -75,10 +75,10 @@ func (s *Store) SetClipTempos(ctx context.Context, songID int64, based songversi
 // atTempo is p played at another Tempo: from the same start, the same
 // stretch of its source, so its length, and its Fades, scale.
 func (p placement) atTempo(tempo float64) placement {
-	scale := tempoScale(p.tempo, tempo)
-	p.tempo = tempo
+	scale := tempoScale(p.Tempo, tempo)
+	p.Tempo = tempo
 	p.length *= scale
-	p.fades = Fades{In: p.fades.In * scale, Out: p.fades.Out * scale}
+	p.setFades(Fades{In: p.FadeIn * scale, Out: p.FadeOut * scale})
 	return p
 }
 
