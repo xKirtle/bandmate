@@ -137,7 +137,7 @@ func TestCheckLayoutClips(t *testing.T) {
 	tests := []struct {
 		name  string
 		after Clip
-		want  layoutRule
+		want  placementRule
 	}{
 		{"a Clip at 0:00", beatClip(1, 0, 4), 0},
 		{"a Clip a rounding hair before 0:00", beatClip(1, -tolerance/2, 4), 0},
@@ -162,7 +162,6 @@ func TestCheckLayoutClips(t *testing.T) {
 		{"a Clip with Fades that fit", faded(beatClip(1, 0, 4), 1, 3), 0},
 		{"a Clip with Fades a rounding hair too long", faded(beatClip(1, 0, 4), 1, 3+tolerance/2), 0},
 		{"a Clip with Fades that don't fit", faded(beatClip(1, 0, 4), 2, 3), ruleFadesFit},
-		{"a Clip with a Fade shorter than nothing", faded(beatClip(1, 0, 4), -1, 0), ruleFadesFit},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -1373,17 +1373,26 @@ func FadesGiven(in, out *float64) (*Fades, error) {
 	return &Fades{In: *in, Out: *out}, nil
 }
 
-// check checks that Fades are each at least nothing, and together no
-// longer than a Clip length seconds long.
+// check checks that Fades are each at least nothing, and fit a Clip length
+// seconds long. A Clip playing for no time is refused for that instead.
 func (f Fades) check(length float64) error {
 	switch {
 	case f.In < 0 || f.Out < 0:
 		return domain.Invalid("a Fade can't be shorter than nothing")
-	case f.In+f.Out > length+tolerance:
-		return domain.Invalid("a Clip's Fades can't together run longer than it")
+	case length > 0 && !f.fit(length):
+		return errFadesTooLong
 	}
 	return nil
 }
+
+// fit tells whether Fades together run no longer than a Clip length
+// seconds long.
+func (f Fades) fit(length float64) bool {
+	return f.In+f.Out <= length+tolerance
+}
+
+// errFadesTooLong refuses Fades that don't fit their Clip.
+var errFadesTooLong = domain.Invalid("a Clip's Fades can't together run longer than it")
 
 // fitted is the Fades of a Clip now length seconds long: as they are, if
 // they fit, or else each shortened by the same share, to meet. The web

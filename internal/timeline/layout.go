@@ -1,6 +1,7 @@
 package timeline
 
 import (
+	"fmt"
 	"slices"
 
 	"github.com/xKirtle/bandmate/internal/domain"
@@ -12,14 +13,14 @@ import (
 // the Timeline as it is before and after, and refuses the change if it
 // breaks a rule.
 
-// layoutRule is one of the rules every Clip on the Timeline keeps.
-type layoutRule int
+// placementRule is one of the rules every Clip on the Timeline keeps.
+type placementRule int
 
 // The placement rules. Times within the tolerance of a limit are taken as
 // at it, absorbing rounding.
 const (
 	// ruleOnTimeline: a Clip starts on the Timeline, at 0:00 or later.
-	ruleOnTimeline layoutRule = iota + 1
+	ruleOnTimeline placementRule = iota + 1
 	// ruleNoOverlap: no two Clips on a Track overlap. Touching edges is fine.
 	ruleNoOverlap
 	// ruleBeforeSource, ruleNoLength and rulePastSource keep a Clip within
@@ -28,15 +29,15 @@ const (
 	ruleBeforeSource
 	ruleNoLength
 	rulePastSource
-	// ruleFadesFit: a Clip's Fades are each at least nothing, and together
-	// no longer than it.
+	// ruleFadesFit: a Clip's Fades together run no longer than it. (The
+	// database refuses a Fade shorter than nothing.)
 	ruleFadesFit
 )
 
 // violation is a placement rule a change broke, and the Clip it broke it
 // on: 0 for one a change was about to add.
 type violation struct {
-	rule   layoutRule
+	rule   placementRule
 	clipID int64
 }
 
@@ -54,9 +55,10 @@ func (v violation) err() error {
 		return domain.Invalid("a Clip must play for some time")
 	case rulePastSource:
 		return domain.Invalid("a Clip can't play past the end of its source")
-	default:
-		return domain.Invalid("a Clip's Fades can't together run longer than it")
+	case ruleFadesFit:
+		return errFadesTooLong
 	}
+	panic(fmt.Sprintf("no such placement rule: %d", v.rule))
 }
 
 // checkLayout checks the Clips a change made or altered, taking the
@@ -73,7 +75,7 @@ func checkLayout(before, after Timeline) *violation {
 	}
 	for _, t := range after.Tracks {
 		for _, c := range t.Clips {
-			if old, ok := was[c.ID]; ok && old.sameLayout(placed{t.ID, c}) {
+			if old, ok := was[c.ID]; ok && old.samePlacement(placed{t.ID, c}) {
 				continue
 			}
 			if rule := clipRule(after, t, c); rule != 0 {
@@ -86,14 +88,14 @@ func checkLayout(before, after Timeline) *violation {
 
 // clipRule is the first placement rule c, on t on the Timeline tl, breaks,
 // or 0 for none.
-func clipRule(tl Timeline, t Track, c Clip) layoutRule {
+func clipRule(tl Timeline, t Track, c Clip) placementRule {
 	if rule := storedRule(c.Start, c.Offset, c.Length); rule != 0 {
 		return rule
 	}
 	switch {
 	case (placement{tempo: c.Tempo, offset: c.Offset, length: c.Length}).sourceEnd() > sourceDuration(tl, c)+tolerance:
 		return rulePastSource
-	case c.FadeIn < 0 || c.FadeOut < 0 || c.FadeIn+c.FadeOut > c.Length+tolerance:
+	case !(Fades{In: c.FadeIn, Out: c.FadeOut}).fit(c.Length):
 		return ruleFadesFit
 	case overlapsAnother(t, c):
 		return ruleNoOverlap
@@ -105,7 +107,7 @@ func clipRule(tl Timeline, t Track, c Clip) layoutRule {
 // playing length seconds of it from offset in its source, breaks of those
 // the database holds too, or 0 for none: it starts on the Timeline, and
 // where its source does or later, and plays for some time.
-func storedRule(start, offset, length float64) layoutRule {
+func storedRule(start, offset, length float64) placementRule {
 	switch {
 	case offset < -tolerance:
 		return ruleBeforeSource
@@ -166,10 +168,10 @@ type placed struct {
 	clip    Clip
 }
 
-// sameLayout tells whether a Clip is placed as it was: on the same Track,
+// samePlacement tells whether a Clip is placed as it was: on the same Track,
 // at the same place, playing the same stretch of the same source at the
 // same Tempo, with the same Fades. Its name, Gain and Pitch don't count.
-func (p placed) sameLayout(q placed) bool {
+func (p placed) samePlacement(q placed) bool {
 	a, b := p.clip, q.clip
 	return p.trackID == q.trackID &&
 		a.Start == b.Start && a.Offset == b.Offset && a.Length == b.Length && a.Tempo == b.Tempo &&
