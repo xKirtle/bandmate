@@ -105,6 +105,12 @@
     }
   }
 
+  // Esc clears a message from Reset or the Shortcut it names too, as it
+  // does a refused key's while waiting (see onkeydown).
+  function escape(event: KeyboardEvent) {
+    if (event.key === 'Escape' && message && !listening) message = null;
+  }
+
   function reveal(by: ShortcutId) {
     message = null;
     onreveal(by);
@@ -158,13 +164,13 @@
   {#if message}
     <p class="message" id="{uid}-message" role="status">
       {message.text}{#if message.by}
-        {@const by = message.by}{' '}<button type="button" class="holder" onclick={() => reveal(by)}
+        {@const by = message.by}{' '}<button type="button" class="holder" onclick={() => reveal(by)} onkeydown={escape}
           >{shortcuts[by].name}</button
         >.{/if}
     </p>
   {/if}
   {#if isChanged(shortcutKeys.value.keys, id)}
-    <button type="button" class="button quiet reset" onclick={resetKeys}>Reset</button>
+    <button type="button" class="button quiet reset" onclick={resetKeys} onkeydown={escape}>Reset</button>
   {/if}
 </div>
 

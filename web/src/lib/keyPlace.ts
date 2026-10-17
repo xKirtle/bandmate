@@ -20,9 +20,9 @@ export function keyPlace(event: Event): KeyPlace {
 }
 
 // Controls whose arrows move within them: a slider, a list, a menu, a
-// tab list, radio buttons, a ⋯ that opens its menu with them.
+// tab list, radio buttons, a ⋯ or a field that opens its menu or list with them.
 const arrowControls =
-  '[role="slider"], [role="spinbutton"], [role="listbox"], [role="combobox"], [role="menu"], [role="tablist"], [role="radiogroup"], [aria-haspopup], dialog';
+  '[role="slider"], [role="spinbutton"], [role="listbox"], [role="combobox"], [role="menu"], [role="tablist"], [role="radiogroup"], [aria-haspopup="true"], [aria-haspopup="menu"], [aria-haspopup="listbox"], dialog';
 
 /**
  * Whether the arrows pressed there are the control's own: a text field's,

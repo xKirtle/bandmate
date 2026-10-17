@@ -1,7 +1,6 @@
 import type { Icon } from './icons';
 import type { KeyHints } from './keyHints';
-import { matches, stepBy, type KeyPress, type TwoWay } from './shortcuts';
-import { rebound } from './shortcutKeys';
+import { matches, shortcuts, stepBy, type KeyPress, type TwoWay } from './shortcuts';
 
 /**
  * What a key does in an open menu of `count` entries, with entry `current`
@@ -28,10 +27,11 @@ export function menuKey(key: string, current: number, count: number): number | '
 
 /**
  * Whether a key opens a menu from what has focus, as it would a context
- * menu: the Menu key, or Shift+F10.
+ * menu: the Menu key, or Shift+F10. They're a ⋯ button's own keys,
+ * whatever keys open a Clip's menu on this device (see timelineKey).
  */
 export function opensMenu(e: KeyPress): boolean {
-  return matches(e, rebound().clipMenu.keys);
+  return matches(e, shortcuts.clipMenu.keys);
 }
 
 /**

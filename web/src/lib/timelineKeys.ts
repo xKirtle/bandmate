@@ -4,7 +4,6 @@
  * and the modifiers held while dragging or turning the wheel.
  */
 
-import { opensMenu } from './menu';
 import type { Freeze } from './freeze';
 import { ownArrow } from './keyPlace';
 import { matches, stepBy, type Key, type KeyDown, type KeyPress, type Way } from './shortcuts';
@@ -60,7 +59,7 @@ export function timelineKey(e: KeyDown, at: TimelineKeyContext): TimelineKey | n
   // phone, nor while recording or merging.
   const edits = at.editable && at.freeze === null;
   const deletes = matches(e, rebound().deleteClip.keys);
-  if (at.focusedClip && opensMenu(e)) {
+  if (at.focusedClip && matches(e, rebound().clipMenu.keys)) {
     // Even while recording or merging, with its edits off.
     return at.editable ? 'clipMenu' : null;
   }

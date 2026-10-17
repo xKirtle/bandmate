@@ -33,13 +33,13 @@ export function songKey(e: KeyDown, at: SongKeyContext): SongKey | null {
   if (ownKey(e, at)) return null;
   const shortcuts = rebound();
   if (matches(e, shortcuts.playPause.keys)) {
-    return e.repeat || at.ownsSpace ? null : 'playPause';
+    return e.repeat || at.inTextField ? null : 'playPause';
   }
   const going = way(e, shortcuts.startOrEnd);
   if (going) {
     // Even held down or recording, so the page never scrolls instead,
     // though a recording keeps the playhead where it started.
-    if (at.inTextField || at.ownsHomeEnd) return null;
+    if (at.inTextField) return null;
     return going === 'back' ? 'start' : 'end';
   }
   if (matches(e, shortcuts.record.keys)) {

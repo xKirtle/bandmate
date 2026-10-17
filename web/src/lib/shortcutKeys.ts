@@ -67,6 +67,11 @@ export function listsOf(id: ShortcutId): KeyList[] {
   return 'keys' in shortcuts[id] ? ['keys'] : ['back', 'forward'];
 }
 
+/** A Shortcut's keys from its lists, in `listsOf`'s order. */
+function fromLists(id: ShortcutId, lists: readonly (readonly Key[])[]): OneWay | TwoWay {
+  return 'keys' in shortcuts[id] ? { keys: lists[0] } : { back: lists[0], forward: lists[1] };
+}
+
 /** A Shortcut's keys in one of its lists. */
 export function keysIn(keys: Keyset, id: ShortcutId, list: KeyList): readonly Key[] {
   return (keys[id] as Partial<Record<KeyList, readonly Key[]>>)[list] ?? [];
@@ -279,7 +284,7 @@ export function readShortcutKeys(storage: Storage | undefined): ShortcutKeys {
     if (typeof value !== 'object' || value === null) continue;
     const lists = listsOf(id).map((list) => readList((value as Record<string, unknown>)[list]));
     if (lists.some((l) => l === null)) continue;
-    keys[id] = 'keys' in defaultKeyset[id] ? { keys: lists[0]! } : { back: lists[0]!, forward: lists[1]! };
+    keys[id] = fromLists(id, lists as Key[][]);
     changed.add(id);
   }
   const fresh = new Set(Array.isArray(kept.fresh) ? ids.filter((id) => (kept.fresh as unknown[]).includes(id)) : []);
@@ -287,9 +292,12 @@ export function readShortcutKeys(storage: Storage | undefined): ShortcutKeys {
   const given = ids.filter((id) => changed.has(id)).flatMap((id) => allOf(keys as Keyset, id));
   for (const id of ids) {
     if (changed.has(id)) continue;
-    const free = (list: KeyList) => keysIn(keys as Keyset, id, list).filter((k) => !given.some((g) => sameKey(g, k)));
-    if (allOf(keys as Keyset, id).every((k) => !given.some((g) => sameKey(g, k)))) continue;
-    keys[id] = 'keys' in defaultKeyset[id] ? { keys: free('keys') } : { back: free('back'), forward: free('forward') };
+    const isGiven = (key: Key) => given.some((g) => sameKey(g, key));
+    if (!allOf(keys as Keyset, id).some(isGiven)) continue;
+    keys[id] = fromLists(
+      id,
+      listsOf(id).map((list) => keysIn(keys as Keyset, id, list).filter((key) => !isGiven(key))),
+    );
     fresh.add(id);
   }
   return { keys: keys as Keyset, fresh: ids.filter((id) => fresh.has(id)) };
@@ -318,7 +326,8 @@ export const shortcutKeysSetting = {
 } satisfies DeviceSettingStorage<ShortcutKeys>;
 
 // Where every handler and hint finds the keys: the defaults, until the
-// app has them follow this device's (see sharedShortcutKeys.svelte.ts).
+// app has them follow this device's: main.ts imports
+// sharedShortcutKeys.svelte.ts, which does, before anything is mounted.
 let source: () => Keyset = () => defaultKeyset;
 
 /** Every Shortcut's keys as rebound on this device, which every handler matches and every hint names. */

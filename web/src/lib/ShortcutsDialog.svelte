@@ -9,8 +9,9 @@
   import { listGroups, searchGroups } from './shortcutList';
   import ShortcutSearch from './ShortcutSearch.svelte';
 
-  // Every Shortcut on the Song page, in its group, with its keys as rebound on this device, as this
-  // platform names them. All are listed wherever they work, e.g. Sync mode's
+  // Every Shortcut on the Song page, in its group, with its keys as
+  // rebound on this device, as this platform names them. All are listed
+  // wherever they work, e.g. Sync mode's
   // while it's off: each says where. A search at the top narrows them down
   // by name, what they do, where they work or key, and Change keys beside
   // it leads to Settings' Shortcuts tab, which isn't shown on a phone or a

@@ -178,6 +178,8 @@ test("a Shortcut's Reset is refused while another has its default, and Reset to 
 
   await split.getByRole('button', { name: 'Reset' }).click();
   await expect(split.getByRole('status')).toHaveText("Can't reset: S is used by Record.");
+  await page.keyboard.press('Escape');
+  await expect(split.getByRole('status')).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Reset to defaults' }).click();
   await expect(record.locator('summary kbd')).toHaveText(['R']);

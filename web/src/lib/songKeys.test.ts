@@ -247,6 +247,14 @@ group('Keys as rebound', () => {
     expect(songKey(press('Home'), idle)).toBe('record');
     expect(songKey(press('Home'), { ...idle, ownsHomeEnd: true })).toBeNull();
   });
+
+  it("act where Space, Home or End would be the control's, once their Shortcuts have other keys, but not in a text field", () => {
+    rebind({ playPause: { keys: [{ key: 'p' }] }, startOrEnd: { back: [{ key: 'b' }], forward: [{ key: 'e' }] } });
+    expect(songKey(press('p'), { ...idle, ownsSpace: true })).toBe('playPause');
+    expect(songKey(press('e'), { ...idle, ownsHomeEnd: true })).toBe('end');
+    expect(songKey(press('p'), { ...idle, ownsSpace: true, inTextField: true })).toBeNull();
+    expect(songKey(press('b'), { ...idle, ownsHomeEnd: true, inTextField: true })).toBeNull();
+  });
 });
 
 group('?', () => {
