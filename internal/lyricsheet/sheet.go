@@ -196,6 +196,19 @@ func (s *Store) changeSheetWith(ctx context.Context, songID int64, based songver
 	})
 }
 
+// changeCuesWith is change for a change to Cues alone, made by edit, a
+// pure change to the whole sheet, which editSheet checks and writes. Unlike
+// a change to the sheet itself, it starts no editing session, so takes no
+// Snapshot.
+func (s *Store) changeCuesWith(ctx context.Context, songID int64, based songversion.Version,
+	edit func(sheet LyricSheet) (LyricSheet, error)) (Song, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		return editSheet(ctx, tx, songID, func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
+			return edit(sheet)
+		})
+	})
+}
+
 // AddSection creates a Section with the given Label and its first (active)
 // Alternate at position in the Arrangement. A nil position adds it at the
 // end.

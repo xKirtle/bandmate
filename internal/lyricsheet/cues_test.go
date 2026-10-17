@@ -16,8 +16,8 @@ func cueSheet() (sheet LyricSheet, verse, chorus, spare Section) {
 	return sheetOf(2, verse, chorus, spare), verse, chorus, spare
 }
 
-// ms is a Cue in milliseconds, as an edit is given it.
-func ms(n int64) sql.NullInt64 { return sql.NullInt64{Int64: n, Valid: true} }
+// msCue is a Cue in milliseconds, as an edit is given it.
+func msCue(n int64) sql.NullInt64 { return sql.NullInt64{Int64: n, Valid: true} }
 
 func TestSetLineCue(t *testing.T) {
 	sheet, verse, chorus, spare := cueSheet()
@@ -57,47 +57,47 @@ func TestSetLineCue(t *testing.T) {
 
 func TestClearLineCue(t *testing.T) {
 	sheet, verse, chorus, spare := cueSheet()
-	clear := func(lineID int64) func(LyricSheet) (LyricSheet, error) {
+	clearOf := func(lineID int64) func(LyricSheet) (LyricSheet, error) {
 		return func(s LyricSheet) (LyricSheet, error) { return clearLineCue(s, lineID) }
 	}
 	runSheetEdits(t, sheet, []sheetEdit{
 		{
 			name: "a Line's",
-			edit: clear(1),
+			edit: clearOf(1),
 			want: sheetOf(2, section(1,
 				alternate(1, true, line(1, "Hello", nil), line(2, "  ", nil), line(3, "world", nil)),
 				verse.Alternates[1]), chorus, spare),
 		},
 		{
 			name: "a Line's in the Scrapbook",
-			edit: clear(7),
+			edit: clearOf(7),
 			want: sheetOf(2, verse, chorus, section(3, alternate(4, true, line(7, "Idea", nil), line(8, "more", nil)))),
 		},
-		{name: "a Line with none", edit: clear(3), want: sheet},
-		{name: "not the Song's", edit: clear(9), refusal: "not found"},
+		{name: "a Line with none", edit: clearOf(3), want: sheet},
+		{name: "not the Song's", edit: clearOf(9), refusal: "not found"},
 	})
 }
 
 func TestClearSectionCues(t *testing.T) {
 	sheet, _, chorus, spare := cueSheet()
-	clear := func(sectionID int64) func(LyricSheet) (LyricSheet, error) {
+	clearOf := func(sectionID int64) func(LyricSheet) (LyricSheet, error) {
 		return func(s LyricSheet) (LyricSheet, error) { return clearSectionCues(s, sectionID) }
 	}
 	runSheetEdits(t, sheet, []sheetEdit{
 		{
 			name: "every Line's, dormant ones included",
-			edit: clear(1),
+			edit: clearOf(1),
 			want: sheetOf(2, section(1,
 				alternate(1, true, line(1, "Hello", nil), line(2, "  ", nil), line(3, "world", nil)),
 				alternate(2, false, line(4, "Old", nil))), chorus, spare),
 		},
 		{
 			name: "in the Scrapbook",
-			edit: clear(3),
+			edit: clearOf(3),
 			want: sheetOf(2, sheet.Sections[0], chorus,
 				section(3, alternate(4, true, line(7, "Idea", nil), line(8, "more", nil)))),
 		},
-		{name: "not the Song's", edit: clear(9), refusal: "not found"},
+		{name: "not the Song's", edit: clearOf(9), refusal: "not found"},
 	})
 }
 
@@ -124,7 +124,7 @@ func TestRestoreCues(t *testing.T) {
 	runSheetEdits(t, sheet, []sheetEdit{
 		{
 			name: "each to its value or none, the rest left alone",
-			edit: restore(lineCue{lineID: 3, ms: ms(3000)}, lineCue{lineID: 5}),
+			edit: restore(lineCue{lineID: 3, ms: msCue(3000)}, lineCue{lineID: 5}),
 			want: sheetOf(2, section(1,
 				alternate(1, true, line(1, "Hello", cue(1)), line(2, "  ", nil), line(3, "world", cue(3))),
 				verse.Alternates[1]),
@@ -134,19 +134,19 @@ func TestRestoreCues(t *testing.T) {
 		{
 			// It puts back what another Cue edit changed (ADR 0010).
 			name: "a Line in the Scrapbook given back its Cue",
-			edit: restore(lineCue{lineID: 8, ms: ms(21000)}),
+			edit: restore(lineCue{lineID: 8, ms: msCue(21000)}),
 			want: sheetOf(2, verse, chorus,
 				section(3, alternate(4, true, line(7, "Idea", cue(20)), line(8, "more", cue(21))))),
 		},
 		{
 			name: "the same Line twice, the last one standing",
-			edit: restore(lineCue{lineID: 1, ms: ms(4000)}, lineCue{lineID: 1}),
+			edit: restore(lineCue{lineID: 1, ms: msCue(4000)}, lineCue{lineID: 1}),
 			want: sheetOf(2, section(1,
 				alternate(1, true, line(1, "Hello", nil), line(2, "  ", nil), line(3, "world", nil)),
 				verse.Alternates[1]), chorus, sheet.Sections[2]),
 		},
 		{name: "none", edit: restore(), want: sheet},
-		{name: "a blank Line", edit: restore(lineCue{lineID: 2, ms: ms(1000)}), refusal: "a blank Line can't have a Cue"},
+		{name: "a blank Line", edit: restore(lineCue{lineID: 2, ms: msCue(1000)}), refusal: "a blank Line can't have a Cue"},
 		{name: "not the Song's", edit: restore(lineCue{lineID: 1}, lineCue{lineID: 9}), refusal: "not found"},
 	})
 }

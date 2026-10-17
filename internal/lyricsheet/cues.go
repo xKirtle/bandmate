@@ -89,9 +89,10 @@ func clearSectionCues(sheet LyricSheet, sectionID int64) (LyricSheet, error) {
 
 // clearSection removes the Cues of all a Section's Lines.
 func clearSection(sec *Section) {
-	for _, alt := range sec.Alternates {
-		for i := range alt.Lines {
-			alt.Lines[i].Cue = nil
+	for i := range sec.Alternates {
+		alt := &sec.Alternates[i]
+		for j := range alt.Lines {
+			alt.Lines[j].Cue = nil
 		}
 	}
 }
@@ -180,9 +181,12 @@ func (s *Store) ShiftCues(ctx context.Context, songID int64, based songversion.V
 // endMs) in milliseconds.
 func shiftCues(sheet LyricSheet, startMs, endMs int64, by float64) (LyricSheet, error) {
 	delta := millis(by)
-	for _, sec := range sheet.Sections {
-		for _, alt := range sec.Alternates {
-			for i, l := range alt.Lines {
+	for i := range sheet.Sections {
+		sec := &sheet.Sections[i]
+		for j := range sec.Alternates {
+			alt := &sec.Alternates[j]
+			for k := range alt.Lines {
+				l := &alt.Lines[k]
 				if l.Cue == nil {
 					continue
 				}
@@ -195,24 +199,11 @@ func shiftCues(sheet LyricSheet, startMs, endMs int64, by float64) (LyricSheet, 
 				if _, err := cueMillis(float64(ms)/1000 + by); err != nil {
 					return LyricSheet{}, err
 				}
-				alt.Lines[i].Cue = cueOf(sql.NullInt64{Int64: ms + delta, Valid: true})
+				l.Cue = cueOf(sql.NullInt64{Int64: ms + delta, Valid: true})
 			}
 		}
 	}
 	return sheet, nil
-}
-
-// changeCuesWith is change for a change to Cues alone, made by edit, a
-// pure change to the whole sheet, which editSheet checks and writes. Unlike
-// a change to the sheet itself, it starts no editing session, so takes no
-// Snapshot.
-func (s *Store) changeCuesWith(ctx context.Context, songID int64, based songversion.Version,
-	edit func(sheet LyricSheet) (LyricSheet, error)) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		return editSheet(ctx, tx, songID, func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
-			return edit(sheet)
-		})
-	})
 }
 
 // millis turns seconds into whole milliseconds, as Cues are kept, without
@@ -226,10 +217,11 @@ func millis(seconds float64) int64 {
 func sheetLine(sheet LyricSheet, lineID int64) (*Section, *Line, error) {
 	for i := range sheet.Sections {
 		sec := &sheet.Sections[i]
-		for _, alt := range sec.Alternates {
-			for j := range alt.Lines {
-				if alt.Lines[j].ID == lineID {
-					return sec, &alt.Lines[j], nil
+		for j := range sec.Alternates {
+			alt := &sec.Alternates[j]
+			for k := range alt.Lines {
+				if alt.Lines[k].ID == lineID {
+					return sec, &alt.Lines[k], nil
 				}
 			}
 		}
