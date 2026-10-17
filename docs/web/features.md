@@ -171,7 +171,7 @@ If you know an input's latency already, you can **Type it** in instead, though m
 
 ## Keyboard shortcuts
 
-On a song's page, press **?**, or the keyboard button by Write and Read, to see every shortcut. The ones you'll use most:
+On a song's page, press **?**, or the keyboard button by Write and Read, to see every shortcut. Type in the search at its top to find one by what it does or by its keys, like "split" or "Space". The ones you'll use most:
 
 | Keys | What they do |
 | --- | --- |
