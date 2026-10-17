@@ -317,7 +317,7 @@ func read(ctx context.Context, tx *sql.Tx, songID int64) (Timeline, error) {
 // AddBeat places the whole of a Beat on a Track of the Song, after its last
 // Clip, or at 0:00 if it has none.
 func (s *Store) AddBeat(ctx context.Context, songID int64, based songversion.Version, trackID, beatID int64) (Timeline, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges, before Timeline) error {
 		if err := findTrack(ctx, tx, songID, trackID); err != nil {
 			return err
 		}
@@ -325,23 +325,9 @@ func (s *Store) AddBeat(ctx context.Context, songID int64, based songversion.Ver
 		if err != nil {
 			return err
 		}
-		start, err := trackEnd(ctx, tx, trackID)
-		if err != nil {
-			return err
-		}
+		start := trackEnd(before.track(trackID))
 		return addClip(ctx, tx, songID, trackID, NewClip{BeatID: &beatID, Tempo: 1, Start: start, Length: duration})
 	})
-}
-
-// trackEnd is where a Track's last Clip ends, or 0:00 if it has none: where
-// a Clip added to it goes.
-func trackEnd(ctx context.Context, tx *sql.Tx, trackID int64) (float64, error) {
-	var end float64
-	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(start + length), 0) FROM clips WHERE track_id = ?`,
-		trackID).Scan(&end); err != nil {
-		return 0, fmt.Errorf("finding the end of the track: %w", err)
-	}
-	return end, nil
 }
 
 // TrackChanges is a partial update to a Track's name and levels.
@@ -1116,22 +1102,13 @@ func insertClip(ctx context.Context, tx *sql.Tx, p placement) (int64, error) {
 // Tempo, Pitch and Fades, right after it on its Track, or after the Track's last Clip if something is in
 // the way. A Clip of Takes gets copies of its Takes, sharing their files.
 func (s *Store) DuplicateClip(ctx context.Context, songID int64, based songversion.Version, clipID int64) (Timeline, error) {
-	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
+	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges, before Timeline) error {
 		p, err := clipPlacement(ctx, tx, songID, clipID)
 		if err != nil {
 			return err
 		}
-		p.start += p.length
-		free, err := isFree(ctx, tx, 0, p)
-		if err != nil {
-			return err
-		}
-		if !free {
-			if err := tx.QueryRowContext(ctx, `SELECT MAX(start + length) FROM clips WHERE track_id = ?`,
-				p.trackID).Scan(&p.start); err != nil {
-				return fmt.Errorf("finding the end of the track: %w", err)
-			}
-		}
+		t, c, _ := before.clip(clipID)
+		p.start = duplicateStart(t, c)
 		return s.insertCopy(ctx, tx, changes, p)
 	})
 }
@@ -1521,25 +1498,12 @@ func store(ctx context.Context, tx *sql.Tx, clipID int64, p placement) error {
 	return nil
 }
 
-// isFree tells whether p's stretch of its Track is clear of Clips other than
-// clipID (0 for a new Clip). Touching a neighbour's edge is fine.
-func isFree(ctx context.Context, tx *sql.Tx, clipID int64, p placement) (bool, error) {
-	var n int
-	err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM clips
-		WHERE track_id = ? AND id != ? AND start < ? AND start + length > ?`,
-		p.trackID, clipID, p.start+p.length-tolerance, p.start+tolerance).Scan(&n)
-	if err != nil {
-		return false, fmt.Errorf("checking for overlaps: %w", err)
-	}
-	return n == 0, nil
-}
-
 // change runs one change to a Song's Timeline through songversion.Change
 // and returns the updated Timeline, read within the change. If the Song is
 // no longer at the version the change was based on, or fn fails, nothing
 // changes.
 func (s *Store) change(ctx context.Context, songID int64, based songversion.Version, fn func(tx *sql.Tx) error) (Timeline, error) {
-	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges) error {
+	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges, _ Timeline) error {
 		return fn(tx)
 	})
 }
@@ -1548,24 +1512,34 @@ func (s *Store) change(ctx context.Context, songID int64, based songversion.Vers
 // remove, which fn adds to changes.
 func (s *Store) changeWithFiles(ctx context.Context, songID int64, based songversion.Version,
 	fn func(tx *sql.Tx, changes *audio.FileChanges) error) (Timeline, error) {
+	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges, _ Timeline) error {
+		return fn(tx, changes)
+	})
+}
+
+// changeFrom is changeWithFiles for a change that looks at the Timeline it
+// starts from, before, e.g. to find room for a Clip.
+func (s *Store) changeFrom(ctx context.Context, songID int64, based songversion.Version,
+	fn func(tx *sql.Tx, changes *audio.FileChanges, before Timeline) error) (Timeline, error) {
 	return s.changeRewording(ctx, songID, based, nil, fn)
 }
 
-// changeRewording is changeWithFiles, its refusal for breaking a placement
-// rule in reword's words, unless reword is nil or gives nil, when it's in
-// the rule's own.
+// changeRewording is changeFrom, its refusal for breaking a placement rule
+// in reword's words, unless reword is nil or gives nil, when it's in the
+// rule's own.
 //
 // It's the one path every change to a Timeline takes: the Timeline is read
-// before fn runs and after, and checkLayout checks what fn left.
+// before fn runs, which is handed it, and after, and checkLayout checks
+// what fn left.
 func (s *Store) changeRewording(ctx context.Context, songID int64, based songversion.Version,
-	reword func(violation) error, fn func(tx *sql.Tx, changes *audio.FileChanges) error) (Timeline, error) {
+	reword func(violation) error, fn func(tx *sql.Tx, changes *audio.FileChanges, before Timeline) error) (Timeline, error) {
 	var tl Timeline
 	if err := songversion.Change(ctx, s.db, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
 		before, err := read(ctx, tx, songID)
 		if err != nil {
 			return err
 		}
-		if err := fn(tx, changes); err != nil {
+		if err := fn(tx, changes, before); err != nil {
 			return err
 		}
 		// Any change can leave a Sound unused, or, by undo, use it again.

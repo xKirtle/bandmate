@@ -1,13 +1,12 @@
 package timeline
 
 import (
-	"cmp"
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"slices"
 
+	"github.com/xKirtle/bandmate/internal/audio"
 	"github.com/xKirtle/bandmate/internal/domain"
 	"github.com/xKirtle/bandmate/internal/songversion"
 )
@@ -41,65 +40,31 @@ func (s *Store) SetClipTempos(ctx context.Context, songID int64, based songversi
 			return Timeline{}, err
 		}
 	}
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		type scaled struct {
-			clipID int64
-			p      placement
-		}
-		changed := make([]scaled, len(tempos))
-		for i, t := range tempos {
+	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges, before Timeline) error {
+		scaled := make(map[int64]placement, len(tempos))
+		for _, t := range tempos {
 			p, err := clipPlacement(ctx, tx, songID, t.ClipID)
 			if err != nil {
 				return err
 			}
-			changed[i] = scaled{t.ClipID, p.atTempo(t.Tempo)}
+			scaled[t.ClipID] = p.atTempo(t.Tempo)
 		}
-		// Latest first, so one that moves away leaves room for the one
-		// before it.
-		slices.SortStableFunc(changed, func(a, b scaled) int { return cmp.Compare(b.p.start, a.p.start) })
-		var moving []scaled
-		leaving := []int64{}
-		for _, c := range changed {
-			fits, err := fitsBeforeNext(ctx, tx, c.clipID, leaving, c.p)
-			if err != nil {
-				return err
-			}
-			if !fits {
-				moving = append(moving, c)
-				leaving = append(leaving, c.clipID)
-				continue
-			}
-			if err := store(ctx, tx, c.clipID, c.p); err != nil {
-				return err
-			}
-		}
-		// In Timeline order, so each new Track takes the earliest that fit.
-		slices.Reverse(moving)
-		// The new Tracks below each Track, top to bottom.
-		below := map[int64][]int64{}
-		for _, m := range moving {
-			from := m.p.trackID
-			landed := false
-			for _, trackID := range below[from] {
-				m.p.trackID = trackID
-				free, err := isFree(ctx, tx, m.clipID, m.p)
+		// The new Tracks added below each Track, top to bottom.
+		added := map[int64][]int64{}
+		for _, m := range tempoMoves(before, tempos) {
+			if m.newTrack == len(added[m.from]) {
+				trackID, err := addTrackBelow(ctx, tx, songID, lastOr(added[m.from], m.from))
 				if err != nil {
 					return err
 				}
-				if free {
-					landed = true
-					break
-				}
+				added[m.from] = append(added[m.from], trackID)
 			}
-			if !landed {
-				trackID, err := addTrackBelow(ctx, tx, songID, lastOr(below[from], from))
-				if err != nil {
-					return err
-				}
-				below[from] = append(below[from], trackID)
-				m.p.trackID = trackID
-			}
-			if err := store(ctx, tx, m.clipID, m.p); err != nil {
+			p := scaled[m.clipID]
+			p.trackID = added[m.from][m.newTrack]
+			scaled[m.clipID] = p
+		}
+		for _, t := range tempos {
+			if err := store(ctx, tx, t.ClipID, scaled[t.ClipID]); err != nil {
 				return err
 			}
 		}
@@ -110,27 +75,17 @@ func (s *Store) SetClipTempos(ctx context.Context, songID int64, based songversi
 // atTempo is p played at another Tempo: from the same start, the same
 // stretch of its source, so its length, and its Fades, scale.
 func (p placement) atTempo(tempo float64) placement {
-	scale := p.tempo / tempo
+	scale := tempoScale(p.tempo, tempo)
 	p.tempo = tempo
 	p.length *= scale
 	p.fades = Fades{In: p.fades.In * scale, Out: p.fades.Out * scale}
 	return p
 }
 
-// fitsBeforeNext tells whether a Clip placed as p ends by the start of the
-// next Clip on its Track, if there is one, leaving out those leaving it.
-func fitsBeforeNext(ctx context.Context, tx *sql.Tx, clipID int64, leaving []int64, p placement) (bool, error) {
-	ids, err := json.Marshal(leaving)
-	if err != nil {
-		return false, err
-	}
-	var next sql.NullFloat64
-	if err := tx.QueryRowContext(ctx, `SELECT MIN(start) FROM clips WHERE track_id = ? AND id != ? AND start > ?
-			AND id NOT IN (SELECT value FROM json_each(?))`,
-		p.trackID, clipID, p.start+tolerance, string(ids)).Scan(&next); err != nil {
-		return false, fmt.Errorf("finding the next clip: %w", err)
-	}
-	return !next.Valid || p.start+p.length <= next.Float64+tolerance, nil
+// tempoScale is how much a Clip's length scales by, playing the same
+// stretch of its source, when its Tempo goes from one to another.
+func tempoScale(from, to float64) float64 {
+	return from / to
 }
 
 // addTrackBelow adds an empty Track right below one of the Song's, named
