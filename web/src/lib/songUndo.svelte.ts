@@ -12,9 +12,10 @@
 //   as a step of its own, so Undo undoes it rather than have it land after
 //   what's put back; waits for the saves queued; checks the freeze again;
 //   then undoes or redoes the step.
-// - What follows is the followers': the Timeline reselects Clips and seeks,
-//   the Song page shows the Section changed. Each gets the one result; if a
-//   recording started since Undo was pressed, it has no playhead.
+// - The followers act on what it did: the Timeline reselects Clips and
+//   seeks, the Song page shows the Section changed. Each gets the one
+//   result; if a recording started since Undo was pressed, it has no
+//   playhead.
 import type { Freeze } from './freeze';
 import type { Saves, Undone } from './saves.svelte';
 
@@ -65,12 +66,15 @@ export class SongUndo {
   };
 
   /** Undoes the Song's latest edit, if Undo can be pressed. Resolves to what it did, or null if nothing. */
-  undo = (): Promise<Undone | null> => this.#step(this.undoes, (go) => this.#saves.undo(go));
+  undo = (): Promise<Undone | null> => this.#step(this.undoes, (stillWanted) => this.#saves.undo(stillWanted));
 
   /** Redoes the Song's latest edit undone, like undo. */
-  redo = (): Promise<Undone | null> => this.#step(this.redoes, (go) => this.#saves.redo(go));
+  redo = (): Promise<Undone | null> => this.#step(this.redoes, (stillWanted) => this.#saves.redo(stillWanted));
 
-  async #step(pressable: boolean, send: (go: () => boolean) => Promise<Undone | null>): Promise<Undone | null> {
+  async #step(
+    pressable: boolean,
+    send: (stillWanted: () => boolean) => Promise<Undone | null>,
+  ): Promise<Undone | null> {
     if (!pressable) return null;
     this.#leaveField();
     // Saves waits for the saves queued, then asks whether to go on.

@@ -280,16 +280,16 @@ export class Saves {
 
   /**
    * Undoes the latest edit, once the edits queued before it are saved,
-   * unless go then says not to, e.g. as the Timeline froze meanwhile.
+   * unless stillWanted then says not, e.g. as the Song froze meanwhile.
    * Resolves to what it did, or null if there was nothing to undo or it
    * wasn't saved. An undo pressed for a Cue edit that then failed, so was
    * taken back, undoes nothing.
    */
-  undo = (go: () => boolean = () => true): Promise<Undone | null> => {
+  undo = (stillWanted: () => boolean = () => true): Promise<Undone | null> => {
     if (!this.canUndo && this.#undoablesQueued === 0) return Promise.resolve(null);
     const failedBefore = this.#cueEditsFailed;
     return this.#step(() => {
-      if (!go() || this.#cueEditsFailed !== failedBefore) return null;
+      if (!stillWanted() || this.#cueEditsFailed !== failedBefore) return null;
       const edit = this.#history.nextUndo();
       if (!edit) return null;
       const playhead = this.#history.nextUndoPlayhead();
@@ -306,10 +306,10 @@ export class Saves {
   };
 
   /** Redoes the latest edit undone, like undo. */
-  redo = (go: () => boolean = () => true): Promise<Undone | null> => {
+  redo = (stillWanted: () => boolean = () => true): Promise<Undone | null> => {
     if (!this.canRedo) return Promise.resolve(null);
     return this.#step(() => {
-      if (!go()) return null;
+      if (!stillWanted()) return null;
       const edit = this.#history.nextRedo();
       if (!edit) return null;
       return {

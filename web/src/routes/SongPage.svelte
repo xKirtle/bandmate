@@ -229,8 +229,7 @@
     else songUndo.redo();
   }
 
-  // Pressed while in a text field, Undo and Redo leave it first, saving
-  // what's typed: one visit's typing is a step, kept as the field is left.
+  // Undo and Redo leave the text field being typed in first (see songUndo.svelte.ts).
   function leaveTextField() {
     const field = document.activeElement;
     if (field instanceof HTMLElement && inTextField(field)) field.blur();
