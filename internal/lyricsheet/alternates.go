@@ -34,9 +34,8 @@ func addAlternate(sheet LyricSheet, ids *ids, sectionID int64, name string) (Lyr
 	from := sec.Alternates[active].Lines
 	added := Alternate{ID: ids.alternate(), Name: cleanName(name), Active: true, Lines: make([]Line, len(from))}
 	for i, l := range from {
-		copied := l
-		copied.ID, copied.Chords, copied.Cue = ids.line(), slices.Clone(l.Chords), copyCue(l.Cue)
-		added.Lines[i] = copied
+		added.Lines[i] = cloneLine(l)
+		added.Lines[i].ID = ids.line()
 	}
 	sec.Alternates[active].Active = false
 	sec.Alternates = append(sec.Alternates, added)
@@ -102,15 +101,16 @@ func (s *Store) DeleteAlternate(ctx context.Context, songID int64, based songver
 		if err != nil {
 			return "", nil, err
 		}
-		// A refusal comes before the Snapshot is taken.
-		if _, err := deleteAlternate(cloneSheet(sheet), alternateID); err != nil {
-			return "", nil, err
-		}
 		sec, i, err := sheetAlternate(sheet, alternateID)
 		if err != nil {
 			return "", nil, err
 		}
-		return alternateName(*sec, i), func() error {
+		name := alternateName(*sec, i)
+		// A refusal comes before the Snapshot is taken.
+		if _, err := deleteAlternate(cloneSheet(sheet), alternateID); err != nil {
+			return "", nil, err
+		}
+		return name, func() error {
 			return editSheet(ctx, tx, songID, func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
 				return deleteAlternate(sheet, alternateID)
 			})
@@ -186,7 +186,7 @@ func moveAlternateToArrangement(sheet LyricSheet, ids *ids, alternateID int64, p
 // Section of its own, as its active Alternate, not yet placed anywhere, and
 // returns the new Section's id. The new Section is labelled with the old
 // one's Label and the Alternate's name.
-func moveAlternateOut(sheet LyricSheet, ids *ids, alternateID int64) (LyricSheet, int64, error) {
+func moveAlternateOut(sheet LyricSheet, ids *ids, alternateID int64) (_ LyricSheet, newID int64, _ error) {
 	sec, i, err := sheetAlternate(sheet, alternateID)
 	if err != nil {
 		return LyricSheet{}, 0, err
