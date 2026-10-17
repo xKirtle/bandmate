@@ -251,16 +251,6 @@ func addToScrapbook(sheet LyricSheet, ids *ids, label string) (LyricSheet, error
 	return sheet, nil
 }
 
-// toScrapbookEnd puts a Section coming into the Scrapbook at its end.
-func toScrapbookEnd(ctx context.Context, tx *sql.Tx, songID, sectionID int64) error {
-	if _, err := tx.ExecContext(ctx, `UPDATE sections SET scrapbook_position =
-		(SELECT COALESCE(MAX(scrapbook_position), 0) + 1 FROM sections WHERE song_id = ?) WHERE id = ?`,
-		songID, sectionID); err != nil {
-		return fmt.Errorf("putting section at end of scrapbook: %w", err)
-	}
-	return nil
-}
-
 // DeleteSection deletes a Section in the Scrapbook, with its Alternates and
 // Lines, having taken a Snapshot naming it first. A Section still in the
 // Arrangement can't be deleted.
@@ -404,20 +394,6 @@ func removeFromArrangement(sheet LyricSheet, sectionID int64) (LyricSheet, error
 	return sheet, nil
 }
 
-// leaveArrangement takes the Section at pos out of the Arrangement, closing
-// the gap it leaves.
-func leaveArrangement(ctx context.Context, tx *sql.Tx, songID, sectionID, pos int64) error {
-	if _, err := tx.ExecContext(ctx, `UPDATE sections SET position = NULL WHERE id = ?`, sectionID); err != nil {
-		return fmt.Errorf("removing section from arrangement: %w", err)
-	}
-	if _, err := tx.ExecContext(ctx,
-		`UPDATE sections SET position = position - 1 WHERE song_id = ? AND position > ?`,
-		songID, pos); err != nil {
-		return fmt.Errorf("closing gap in arrangement: %w", err)
-	}
-	return nil
-}
-
 // sectionEmpty reports whether nothing is written in any of a Section's
 // Alternates: they have no Lines, or only blank ones.
 func sectionEmpty(sec Section) bool {
@@ -440,80 +416,6 @@ func findSection(ctx context.Context, tx *sql.Tx, songID, sectionID int64) (pos 
 		return sql.NullInt64{}, domain.ErrNotFound
 	}
 	return pos, err
-}
-
-// alternatesOf returns the ids of a Section's Alternates, in the order they
-// were created.
-func alternatesOf(ctx context.Context, tx *sql.Tx, sectionID int64) ([]int64, error) {
-	var alternates []int64
-	err := query(ctx, tx, `SELECT id FROM alternates WHERE section_id = ? ORDER BY id`,
-		[]any{sectionID}, func(rows *sql.Rows) error {
-			var id int64
-			err := rows.Scan(&id)
-			alternates = append(alternates, id)
-			return err
-		})
-	if err != nil {
-		return nil, fmt.Errorf("reading alternates: %w", err)
-	}
-	return alternates, nil
-}
-
-// copyLines copies all of an Alternate's Lines, without their Cues, into
-// another Alternate, and returns the id of each Line's copy by the id of the
-// Line.
-func copyLines(ctx context.Context, tx *sql.Tx, fromID, toID int64) (map[int64]int64, error) {
-	var lines []int64
-	err := query(ctx, tx, `SELECT id FROM lines WHERE alternate_id = ? ORDER BY position`,
-		[]any{fromID}, func(rows *sql.Rows) error {
-			var id int64
-			err := rows.Scan(&id)
-			lines = append(lines, id)
-			return err
-		})
-	if err != nil {
-		return nil, fmt.Errorf("reading lines: %w", err)
-	}
-	copies := make(map[int64]int64, len(lines))
-	for _, lineID := range lines {
-		copies[lineID], err = insert(ctx, tx, `INSERT INTO lines (alternate_id, position, text)
-			SELECT ?, position, text FROM lines WHERE id = ?`, toID, lineID)
-		if err != nil {
-			return nil, fmt.Errorf("copying line: %w", err)
-		}
-	}
-	return copies, nil
-}
-
-// arrangementPosition checks a position to insert at in a Song's
-// Arrangement. A nil position means the end.
-func arrangementPosition(ctx context.Context, tx *sql.Tx, songID int64, position *int) (int, error) {
-	var count int
-	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM sections WHERE song_id = ? AND position IS NOT NULL`,
-		songID).Scan(&count); err != nil {
-		return 0, err
-	}
-	if position == nil {
-		return count, nil
-	}
-	if *position < 0 || *position > count {
-		return 0, domain.Invalid(fmt.Sprintf("position must be between 0 and %d", count))
-	}
-	return *position, nil
-}
-
-// placeSection puts a Section not in the Arrangement at pos in it, moving
-// the ones from pos on down by one.
-func placeSection(ctx context.Context, tx *sql.Tx, songID, sectionID int64, pos int) error {
-	if _, err := tx.ExecContext(ctx,
-		`UPDATE sections SET position = position + 1 WHERE song_id = ? AND position >= ?`,
-		songID, pos); err != nil {
-		return fmt.Errorf("making room in arrangement: %w", err)
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE sections SET position = ? WHERE id = ?`, pos, sectionID); err != nil {
-		return fmt.Errorf("adding section to arrangement: %w", err)
-	}
-	return nil
 }
 
 // SetSectionLabel changes a Section's Label. A blank Label removes it.

@@ -479,18 +479,11 @@ func sectionName(sec Section) string {
 }
 
 // alternateName names an Alternate as the Song page does: by its name,
-// else by its place among its Section's, e.g. "Alternate 2".
-func alternateName(ctx context.Context, tx *sql.Tx, sectionID, alternateID int64) (string, error) {
-	var name string
-	var place int
-	err := tx.QueryRowContext(ctx, `SELECT name,
-		(SELECT COUNT(*) FROM alternates b WHERE b.section_id = ? AND b.id <= a.id)
-		FROM alternates a WHERE a.id = ?`, sectionID, alternateID).Scan(&name, &place)
-	if err != nil {
-		return "", fmt.Errorf("reading alternate: %w", err)
+// else by its place among its Section's, e.g. "Alternate 2". i is its
+// index in sec's Alternates.
+func alternateName(sec Section, i int) string {
+	if name := sec.Alternates[i].Name; name != "" {
+		return name
 	}
-	if name != "" {
-		return name, nil
-	}
-	return fmt.Sprintf("Alternate %d", place), nil
+	return fmt.Sprintf("Alternate %d", i+1)
 }

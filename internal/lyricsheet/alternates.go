@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/xKirtle/bandmate/internal/domain"
@@ -15,73 +16,81 @@ import (
 // copy of the active Alternate's Lines and their Cues, and makes it the active
 // one. The one it copied keeps its own Cues, dormant (ADR 0007).
 func (s *Store) AddAlternate(ctx context.Context, songID int64, based songversion.Version, sectionID int64, name string) (Song, error) {
-	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
-		if _, err := findSection(ctx, tx, songID, sectionID); err != nil {
-			return err
-		}
-		var activeID int64
-		if err := tx.QueryRowContext(ctx, `SELECT id FROM alternates WHERE section_id = ? AND active = 1`,
-			sectionID).Scan(&activeID); err != nil {
-			return fmt.Errorf("finding active alternate: %w", err)
-		}
-		altID, err := insert(ctx, tx, `INSERT INTO alternates (section_id, name) VALUES (?, ?)`,
-			sectionID, cleanName(name))
-		if err != nil {
-			return fmt.Errorf("adding alternate: %w", err)
-		}
-		lineCopies, err := copyLines(ctx, tx, activeID, altID)
-		if err != nil {
-			return err
-		}
-		for lineID, copyLineID := range lineCopies {
-			if _, err := tx.ExecContext(ctx, `UPDATE lines SET cue_ms = (SELECT cue_ms FROM lines WHERE id = ?)
-				WHERE id = ?`, lineID, copyLineID); err != nil {
-				return fmt.Errorf("copying line cue: %w", err)
-			}
-		}
-		return activate(ctx, tx, sectionID, altID)
+	return s.changeSheetWith(ctx, songID, based, func(sheet LyricSheet, ids *ids) (LyricSheet, error) {
+		return addAlternate(sheet, ids, sectionID, name)
 	})
+}
+
+// addAlternate is AddAlternate's change to the sheet.
+func addAlternate(sheet LyricSheet, ids *ids, sectionID int64, name string) (LyricSheet, error) {
+	sec, err := sheetSection(sheet, sectionID)
+	if err != nil {
+		return LyricSheet{}, err
+	}
+	active := slices.IndexFunc(sec.Alternates, func(a Alternate) bool { return a.Active })
+	if active < 0 {
+		return LyricSheet{}, fmt.Errorf("section %d has no active alternate", sectionID)
+	}
+	from := sec.Alternates[active].Lines
+	added := Alternate{ID: ids.alternate(), Name: cleanName(name), Active: true, Lines: make([]Line, len(from))}
+	for i, l := range from {
+		copied := l
+		copied.ID, copied.Chords, copied.Cue = ids.line(), slices.Clone(l.Chords), copyCue(l.Cue)
+		added.Lines[i] = copied
+	}
+	sec.Alternates[active].Active = false
+	sec.Alternates = append(sec.Alternates, added)
+	return sheet, nil
 }
 
 // RenameAlternate changes an Alternate's name. A blank name removes it.
 func (s *Store) RenameAlternate(ctx context.Context, songID int64, based songversion.Version, alternateID int64, name string) (Song, error) {
-	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
-		if _, _, err := findAlternate(ctx, tx, songID, alternateID); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `UPDATE alternates SET name = ? WHERE id = ?`,
-			cleanName(name), alternateID); err != nil {
-			return fmt.Errorf("renaming alternate: %w", err)
-		}
-		return nil
+	return s.changeSheetWith(ctx, songID, based, func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
+		return renameAlternate(sheet, alternateID, name)
 	})
+}
+
+// renameAlternate is RenameAlternate's change to the sheet.
+func renameAlternate(sheet LyricSheet, alternateID int64, name string) (LyricSheet, error) {
+	sec, i, err := sheetAlternate(sheet, alternateID)
+	if err != nil {
+		return LyricSheet{}, err
+	}
+	sec.Alternates[i].Name = cleanName(name)
+	return sheet, nil
 }
 
 // ActivateAlternate makes an Alternate the only active one of its Section, so
 // the Section shows it.
 func (s *Store) ActivateAlternate(ctx context.Context, songID int64, based songversion.Version, alternateID int64) (Song, error) {
-	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
-		sectionID, _, err := findAlternate(ctx, tx, songID, alternateID)
-		if err != nil {
-			return err
-		}
-		return activate(ctx, tx, sectionID, alternateID)
+	return s.changeSheetWith(ctx, songID, based, func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
+		return activateAlternate(sheet, alternateID)
 	})
 }
 
-// activate makes one of a Section's Alternates its only active one.
-func activate(ctx context.Context, tx *sql.Tx, sectionID, alternateID int64) error {
-	// The old one goes first: only one Alternate of a Section may be active
-	// at any moment.
-	if _, err := tx.ExecContext(ctx, `UPDATE alternates SET active = 0 WHERE section_id = ? AND id != ?`,
-		sectionID, alternateID); err != nil {
-		return fmt.Errorf("deactivating alternate: %w", err)
+// activateAlternate is ActivateAlternate's change to the sheet.
+func activateAlternate(sheet LyricSheet, alternateID int64) (LyricSheet, error) {
+	sec, active, err := sheetAlternate(sheet, alternateID)
+	if err != nil {
+		return LyricSheet{}, err
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE alternates SET active = 1 WHERE id = ?`,
-		alternateID); err != nil {
-		return fmt.Errorf("activating alternate: %w", err)
+	for i := range sec.Alternates {
+		sec.Alternates[i].Active = i == active
 	}
-	return nil
+	return sheet, nil
+}
+
+// sheetAlternate is one of a sheet's Alternates, by id, as the Section it's
+// in and its index there, to read or change in place: domain.ErrNotFound if
+// it isn't the sheet's.
+func sheetAlternate(sheet LyricSheet, alternateID int64) (*Section, int, error) {
+	for i := range sheet.Sections {
+		sec := &sheet.Sections[i]
+		if j := slices.IndexFunc(sec.Alternates, func(a Alternate) bool { return a.ID == alternateID }); j >= 0 {
+			return sec, j, nil
+		}
+	}
+	return nil, 0, domain.ErrNotFound
 }
 
 // DeleteAlternate deletes an inactive Alternate and its Lines, having taken
@@ -89,32 +98,40 @@ func activate(ctx context.Context, tx *sql.Tx, sectionID, alternateID int64) err
 // one, can't be deleted.
 func (s *Store) DeleteAlternate(ctx context.Context, songID int64, based songversion.Version, alternateID int64) (Song, error) {
 	return s.changeBefore(ctx, songID, based, BeforeDeleting, func(tx *sql.Tx) (string, func() error, error) {
-		sectionID, active, err := findAlternate(ctx, tx, songID, alternateID)
+		sheet, err := loadLyricSheet(ctx, tx, songID)
 		if err != nil {
 			return "", nil, err
 		}
-		var count int
-		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM alternates WHERE section_id = ?`,
-			sectionID).Scan(&count); err != nil {
+		// A refusal comes before the Snapshot is taken.
+		if _, err := deleteAlternate(cloneSheet(sheet), alternateID); err != nil {
 			return "", nil, err
 		}
-		if count == 1 {
-			return "", nil, domain.Conflict("a Section's last Alternate can't be deleted")
-		}
-		if active {
-			return "", nil, domain.Conflict("the active Alternate can't be deleted; activate another one first")
-		}
-		name, err := alternateName(ctx, tx, sectionID, alternateID)
+		sec, i, err := sheetAlternate(sheet, alternateID)
 		if err != nil {
 			return "", nil, err
 		}
-		return name, func() error {
-			if _, err := tx.ExecContext(ctx, `DELETE FROM alternates WHERE id = ?`, alternateID); err != nil {
-				return fmt.Errorf("deleting alternate: %w", err)
-			}
-			return nil
+		return alternateName(*sec, i), func() error {
+			return editSheet(ctx, tx, songID, func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
+				return deleteAlternate(sheet, alternateID)
+			})
 		}, nil
 	})
+}
+
+// deleteAlternate is DeleteAlternate's change to the sheet.
+func deleteAlternate(sheet LyricSheet, alternateID int64) (LyricSheet, error) {
+	sec, i, err := sheetAlternate(sheet, alternateID)
+	if err != nil {
+		return LyricSheet{}, err
+	}
+	if len(sec.Alternates) == 1 {
+		return LyricSheet{}, domain.Conflict("a Section's last Alternate can't be deleted")
+	}
+	if sec.Alternates[i].Active {
+		return LyricSheet{}, domain.Conflict("the active Alternate can't be deleted; activate another one first")
+	}
+	sec.Alternates = slices.Delete(sec.Alternates, i, i+1)
+	return sheet, nil
 }
 
 // MoveAlternateToScrapbook moves an inactive Alternate out of its Section
@@ -123,13 +140,20 @@ func (s *Store) DeleteAlternate(ctx context.Context, songID int64, based songver
 // the new Section is put back (ADR 0010). The active Alternate can't be
 // moved.
 func (s *Store) MoveAlternateToScrapbook(ctx context.Context, songID int64, based songversion.Version, alternateID int64) (Song, error) {
-	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
-		newID, err := moveAlternateOut(ctx, tx, songID, alternateID)
-		if err != nil {
-			return err
-		}
-		return toScrapbookEnd(ctx, tx, songID, newID)
+	return s.changeSheetWith(ctx, songID, based, func(sheet LyricSheet, ids *ids) (LyricSheet, error) {
+		return moveAlternateToScrapbook(sheet, ids, alternateID)
 	})
+}
+
+// moveAlternateToScrapbook is MoveAlternateToScrapbook's change to the
+// sheet.
+func moveAlternateToScrapbook(sheet LyricSheet, ids *ids, alternateID int64) (LyricSheet, error) {
+	sheet, newID, err := moveAlternateOut(sheet, ids, alternateID)
+	if err != nil {
+		return LyricSheet{}, err
+	}
+	sheet.Scrapbook = append(sheet.Scrapbook, newID)
+	return sheet, nil
 }
 
 // MoveAlternateToArrangement moves an inactive Alternate out of its Section
@@ -138,48 +162,44 @@ func (s *Store) MoveAlternateToScrapbook(ctx context.Context, songID int64, base
 // it's now the Section's active Alternate (ADR 0010). The active Alternate
 // can't be moved.
 func (s *Store) MoveAlternateToArrangement(ctx context.Context, songID int64, based songversion.Version, alternateID int64, position int) (Song, error) {
-	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
-		newID, err := moveAlternateOut(ctx, tx, songID, alternateID)
-		if err != nil {
-			return err
-		}
-		// The new Section isn't in the Arrangement yet, so it doesn't count.
-		pos, err := arrangementPosition(ctx, tx, songID, &position)
-		if err != nil {
-			return err
-		}
-		return placeSection(ctx, tx, songID, newID, pos)
+	return s.changeSheetWith(ctx, songID, based, func(sheet LyricSheet, ids *ids) (LyricSheet, error) {
+		return moveAlternateToArrangement(sheet, ids, alternateID, position)
 	})
 }
 
+// moveAlternateToArrangement is MoveAlternateToArrangement's change to the
+// sheet.
+func moveAlternateToArrangement(sheet LyricSheet, ids *ids, alternateID int64, position int) (LyricSheet, error) {
+	sheet, newID, err := moveAlternateOut(sheet, ids, alternateID)
+	if err != nil {
+		return LyricSheet{}, err
+	}
+	arrangement, err := placeAt(sheet.Arrangement, newID, &position)
+	if err != nil {
+		return LyricSheet{}, err
+	}
+	sheet.Arrangement = arrangement
+	return sheet, nil
+}
+
 // moveAlternateOut moves an inactive Alternate out of its Section into a new
-// Section of its own, not yet placed anywhere, and returns its id. The new
-// Section is labelled with the old one's Label and the Alternate's name.
-func moveAlternateOut(ctx context.Context, tx *sql.Tx, songID, alternateID int64) (int64, error) {
-	var label, name string
-	var active bool
-	err := tx.QueryRowContext(ctx, `SELECT s.label, a.name, a.active FROM alternates a
-		JOIN sections s ON s.id = a.section_id WHERE a.id = ? AND s.song_id = ?`,
-		alternateID, songID).Scan(&label, &name, &active)
-	if errors.Is(err, sql.ErrNoRows) {
-		return 0, domain.ErrNotFound
-	}
+// Section of its own, as its active Alternate, not yet placed anywhere, and
+// returns the new Section's id. The new Section is labelled with the old
+// one's Label and the Alternate's name.
+func moveAlternateOut(sheet LyricSheet, ids *ids, alternateID int64) (LyricSheet, int64, error) {
+	sec, i, err := sheetAlternate(sheet, alternateID)
 	if err != nil {
-		return 0, fmt.Errorf("reading alternate: %w", err)
+		return LyricSheet{}, 0, err
 	}
-	if active {
-		return 0, domain.Conflict("the active Alternate can't be moved out of its Section; activate another one first")
+	alt := sec.Alternates[i]
+	if alt.Active {
+		return LyricSheet{}, 0, domain.Conflict("the active Alternate can't be moved out of its Section; activate another one first")
 	}
-	newID, err := insert(ctx, tx, `INSERT INTO sections (song_id, label) VALUES (?, ?)`,
-		songID, movedOutLabel(label, name))
-	if err != nil {
-		return 0, fmt.Errorf("adding section: %w", err)
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE alternates SET section_id = ?, active = 1 WHERE id = ?`,
-		newID, alternateID); err != nil {
-		return 0, fmt.Errorf("moving alternate: %w", err)
-	}
-	return newID, nil
+	sec.Alternates = slices.Delete(sec.Alternates, i, i+1)
+	alt.Active = true
+	moved := Section{ID: ids.section(), Label: movedOutLabel(sec.Label, alt.Name), Alternates: []Alternate{alt}}
+	sheet.Sections = append(sheet.Sections, moved)
+	return sheet, moved.ID, nil
 }
 
 // AddToSection adds a Section, from the Scrapbook or the Lyric Sheet, to
@@ -190,49 +210,40 @@ func moveAlternateOut(ctx context.Context, tx *sql.Tx, songID, alternateID int64
 // keep their ids and their Cues, dormant until their Alternate is made
 // active (ADR 0010).
 func (s *Store) AddToSection(ctx context.Context, songID int64, based songversion.Version, addedID, sectionID int64) (Song, error) {
-	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
-		addedAt, err := findSection(ctx, tx, songID, addedID)
-		if err != nil {
-			return err
-		}
-		at, err := findSection(ctx, tx, songID, sectionID)
-		if err != nil {
-			return err
-		}
-		if addedID == sectionID {
-			return domain.Conflict("a Section can't be added to itself")
-		}
-		if !at.Valid {
-			return domain.Conflict("a Section can only be added to a Section in the Lyric Sheet")
-		}
-		if addedAt.Valid {
-			if err := leaveArrangement(ctx, tx, songID, addedID, addedAt.Int64); err != nil {
-				return err
-			}
-		}
-		alternates, err := alternatesOf(ctx, tx, addedID)
-		if err != nil {
-			return err
-		}
-		// Each is made anew, so it comes after the Section's own Alternates.
-		for _, altID := range alternates {
-			newID, err := insert(ctx, tx, `INSERT INTO alternates (section_id, name)
-				SELECT ?, CASE a.name WHEN '' THEN s.label ELSE a.name END
-				FROM alternates a JOIN sections s ON s.id = a.section_id WHERE a.id = ?`,
-				sectionID, altID)
-			if err != nil {
-				return fmt.Errorf("adding alternate: %w", err)
-			}
-			if _, err := tx.ExecContext(ctx, `UPDATE lines SET alternate_id = ? WHERE alternate_id = ?`,
-				newID, altID); err != nil {
-				return fmt.Errorf("moving lines: %w", err)
-			}
-		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM sections WHERE id = ?`, addedID); err != nil {
-			return fmt.Errorf("deleting added section: %w", err)
-		}
-		return nil
+	return s.changeSheetWith(ctx, songID, based, func(sheet LyricSheet, ids *ids) (LyricSheet, error) {
+		return addToSection(sheet, ids, addedID, sectionID)
 	})
+}
+
+// addToSection is AddToSection's change to the sheet.
+func addToSection(sheet LyricSheet, ids *ids, addedID, sectionID int64) (LyricSheet, error) {
+	added, err := sheetSection(sheet, addedID)
+	if err != nil {
+		return LyricSheet{}, err
+	}
+	sec, err := sheetSection(sheet, sectionID)
+	if err != nil {
+		return LyricSheet{}, err
+	}
+	if addedID == sectionID {
+		return LyricSheet{}, domain.Conflict("a Section can't be added to itself")
+	}
+	if !slices.Contains(sheet.Arrangement, sectionID) {
+		return LyricSheet{}, domain.Conflict("a Section can only be added to a Section in the Lyric Sheet")
+	}
+	// Each is made anew, so its id puts it after the Section's own
+	// Alternates.
+	for _, alt := range added.Alternates {
+		alt.ID, alt.Active = ids.alternate(), false
+		if alt.Name == "" {
+			alt.Name = added.Label
+		}
+		sec.Alternates = append(sec.Alternates, alt)
+	}
+	sheet.Arrangement = without(sheet.Arrangement, addedID)
+	sheet.Scrapbook = without(sheet.Scrapbook, addedID)
+	sheet.Sections = slices.DeleteFunc(sheet.Sections, func(s Section) bool { return s.ID == addedID })
+	return sheet, nil
 }
 
 // movedOutLabel is the Label of a Section made from an Alternate moved out
