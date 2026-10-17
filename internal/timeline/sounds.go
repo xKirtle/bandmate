@@ -76,7 +76,7 @@ func (s *Store) ImportSound(ctx context.Context, songID int64, based songversion
 		}
 		changes.Keep(file, soundID)
 		start := trackEnd(before.track(imp.TrackID))
-		return addClip(ctx, tx, songID, imp.TrackID, NewClip{SoundID: &soundID, Tempo: 1, Start: start, Length: a.Duration})
+		return addClip(ctx, tx, songID, imp.TrackID, NewClip{SoundID: &soundID, ClipPlayback: asRecorded(), Start: start, Length: a.Duration})
 	})
 }
 

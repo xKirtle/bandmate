@@ -51,10 +51,10 @@ func (s *Store) splitClip(ctx context.Context, tx *sql.Tx, changes *audio.FileCh
 	}
 	right := p
 	right.start, right.offset, right.length = at, p.sourceAt(at), p.length-cut
-	right.fades = Fades{In: 0, Out: min(p.fades.Out, right.length)}
+	right.setFades(Fades{In: 0, Out: min(p.FadeOut, right.length)})
 	left := p
 	left.length = cut
-	left.fades = Fades{In: min(p.fades.In, cut), Out: 0}
+	left.setFades(Fades{In: min(p.FadeIn, cut), Out: 0})
 	// The left half only shrinks, so it's clear of the others, and the
 	// right half plays where the Clip did.
 	if err := store(ctx, tx, clipID, left); err != nil {

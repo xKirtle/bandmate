@@ -93,9 +93,9 @@ func clipRule(tl Timeline, t Track, c Clip) placementRule {
 		return rule
 	}
 	switch {
-	case (placement{tempo: c.Tempo, offset: c.Offset, length: c.Length}).sourceEnd() > sourceDuration(tl, c)+tolerance:
+	case (placement{ClipPlayback: ClipPlayback{Tempo: c.Tempo}, offset: c.Offset, length: c.Length}).sourceEnd() > sourceDuration(tl, c)+tolerance:
 		return rulePastSource
-	case !(Fades{In: c.FadeIn, Out: c.FadeOut}).fit(c.Length):
+	case !c.fades().fit(c.Length):
 		return ruleFadesFit
 	case overlapsAnother(t, c):
 		return ruleNoOverlap
