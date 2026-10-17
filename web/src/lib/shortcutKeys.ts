@@ -11,6 +11,8 @@
 
 import type { DeviceSettingStorage } from './deviceSetting.svelte';
 import {
+  holdsNothing,
+  isGesture,
   keysLabel,
   modifiers,
   pressedKey,
@@ -18,6 +20,7 @@ import {
   shiftCounts,
   shortcuts,
   type Key,
+  type Gesture,
   type KeyPress,
   type Modifier,
   type OneWay,
@@ -85,26 +88,22 @@ function allOf(keys: Keyset, id: ShortcutId): readonly Key[] {
   return listsOf(id).flatMap((list) => keysIn(keys, id, list));
 }
 
-const mouseKeys = ['click', 'drag', 'wheel'];
-
 /** Whether a Shortcut is the mouse's, held with a click, drag or wheel, rather than a key's. */
 export function isMouse(id: ShortcutId): boolean {
-  return allOf(defaultKeyset, id).some((key) => mouseKeys.includes(key.key));
+  return allOf(defaultKeyset, id).some((key) => isGesture(key.key));
 }
 
 /** Whether a Shortcut is the mouse's with nothing held, e.g. the plain drag that selects with a box, which can't be changed. */
 export function isFixed(id: ShortcutId): boolean {
-  return isMouse(id) && allOf(defaultKeyset, id).every((key) => !key.mod && !key.alt && !key.shift);
+  return isMouse(id) && allOf(defaultKeyset, id).every(holdsNothing);
 }
-
-/** A mouse action: a click, a drag or a turn of the wheel. */
-export type Gesture = 'click' | 'drag' | 'wheel';
 
 /** What a mouse Shortcut is held with: its gesture, and whether each modifier is held. */
 export type Held = { gesture: Gesture } & Record<Modifier, boolean>;
 
 /** What a mouse Shortcut is held with in `keys`: its gesture, never changed, and its modifiers, none if it has no key. */
 export function heldWith(keys: Keyset, id: ShortcutId): Held {
+  // A mouse Shortcut's default key is its gesture.
   const gesture = keysIn(defaultKeyset, id, 'keys')[0].key as Gesture;
   const key: Key = keysIn(keys, id, 'keys')[0] ?? { key: gesture };
   return { gesture, mod: !!key.mod, alt: !!key.alt, shift: !!key.shift };
@@ -120,7 +119,7 @@ export function toggleModifier(current: ShortcutKeys, id: ShortcutId, modifier: 
   held[modifier] = !held[modifier];
   const key: Key = { key: gesture };
   for (const m of modifiers) if (held[m]) key[m] = true;
-  if (!key.mod && !key.alt && !key.shift) return { ok: false, refusal: { kind: 'bare', key } };
+  if (holdsNothing(key)) return { ok: false, refusal: { kind: 'bare', key } };
   return choose(current, { id, list: 'keys', index: 0 }, key);
 }
 
@@ -292,7 +291,7 @@ export function refusalMessage(
       return { text: `${name} can't be chosen: the browser keeps it.`, by: null };
     case 'bare':
       return {
-        text: `Needs at least one modifier: a plain ${gestureNouns[refusal.key.key as Gesture]} does something else.`,
+        text: `Needs at least one modifier: a plain ${isGesture(refusal.key.key) ? gestureNouns[refusal.key.key] : refusal.key.key} does something else.`,
         by: null,
       };
   }

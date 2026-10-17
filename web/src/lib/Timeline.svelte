@@ -1353,9 +1353,9 @@
       const finger = { clientX: event.clientX, clientY: event.clientY };
       pressTimer = setTimeout(() => openClipMenu(clip, element, finger), longPressDelay);
     }
-    // Its body moves it, or held as nudging a Take is (Alt by default)
-    // nudges its active Take; an edge trims it; its gain line sets its
-    // Gain, and a fade dot its Fade.
+    // Its body moves it, or, with what nudges a Take held (Alt by
+    // default), nudges its active Take; an edge trims it; its gain line
+    // sets its Gain, and a fade dot its Fade.
     const keys = { free: skipsSnapping(event), toggles, nudges: nudges(event) };
     clipDrag.press(clip, grip, clipDragAt(event), keys, measureClip(element, grip));
     clipFollow.start();

@@ -15,7 +15,16 @@
   import X from '@lucide/svelte/icons/x';
   import { tick } from 'svelte';
   import { shortcutKeys } from './sharedShortcutKeys.svelte';
-  import { keysLabel, modifierName, modifiers, platform, shortcuts, type Key, type Modifier } from './shortcuts';
+  import {
+    keysLabel,
+    modifierName,
+    modifiers,
+    platform,
+    shortcuts,
+    type Gesture,
+    type Key,
+    type Modifier,
+  } from './shortcuts';
   import {
     choose,
     defaultKeyset,
@@ -30,7 +39,6 @@
     removeKey,
     reset,
     toggleModifier,
-    type Gesture,
     type KeyList,
     type ShortcutId,
     type Slot,
@@ -46,8 +54,8 @@
   let message = $state<{ text: string; by: ShortcutId | null } | null>(null);
 
   const lists = $derived(listsOf(id));
-  /** What a mouse Shortcut is held with, or null for a keyboard one, or the plain drag. */
-  const held = $derived(isMouse(id) && !isFixed(id) ? heldWith(shortcutKeys.value.keys, id) : null);
+  /** What a mouse Shortcut is held with, or null for a keyboard one. */
+  const held = $derived(isMouse(id) ? heldWith(shortcutKeys.value.keys, id) : null);
   const gestures: Record<Gesture, string> = { click: 'click', drag: 'drag', wheel: 'scroll the wheel' };
   const names: Record<KeyList, string> = { keys: 'Keys', back: 'Back', forward: 'Forward' };
   const label = (key: Key) => keysLabel([key], on);
