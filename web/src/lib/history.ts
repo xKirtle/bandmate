@@ -1,24 +1,22 @@
-import {
-  api,
-  type Clip,
-  type ClipFades,
-  type ClipMove,
-  type ClipPitch,
-  type ClipTempo,
-  type ClipTakes,
-  type CueValue,
-  type NewClip,
-  type NewTrack,
-  type PastedClip,
-  type PlacedClip,
-  type SheetCopy,
-  type Song,
-  type SongAt,
-  type Timeline,
-  type TimelineLoop,
-  type TrackAt,
-  type TrackChanges,
-  type TrackToAdd,
+import type {
+  Clip,
+  ClipFades,
+  ClipMove,
+  ClipPitch,
+  ClipTempo,
+  ClipTakes,
+  CueValue,
+  NewClip,
+  NewTrack,
+  PastedClip,
+  PlacedClip,
+  SheetCopy,
+  Song,
+  Timeline,
+  TimelineLoop,
+  TrackAt,
+  TrackChanges,
+  TrackToAdd,
 } from './api';
 import { placementOf } from './clipSource';
 import { isBlank, type CuedSong } from './cues';
@@ -719,68 +717,4 @@ function findClip(tl: Timeline, clipId: number) {
     if (clip) return { track, clip };
   }
   throw new Error(`Clip ${clipId} isn't on the Timeline`);
-}
-
-/** Sends an edit to the Song's Timeline, returning the Timeline it leaves. */
-export function sendEdit(at: SongAt, edit: Edit): Promise<Timeline> {
-  switch (edit.kind) {
-    case 'addBeat':
-      return api.addBeatToTimeline(at, edit.trackId, edit.beatId);
-    case 'addTrack':
-      return api.addTrack(at, edit.track);
-    case 'updateTrack':
-      return api.updateTrack(at, edit.trackId, edit.changes);
-    case 'reorderTracks':
-      return api.reorderTracks(at, edit.order);
-    case 'deleteTrack':
-      return api.deleteTrack(at, edit.trackId);
-    case 'placeClip':
-      return api.placeClip(at, edit.trackId, edit.clip);
-    case 'placeClips':
-      return api.placeClips(at, edit.clips, edit.newTracks);
-    case 'pasteClips':
-      return api.pasteClips(at, edit.clips, edit.newTracks);
-    case 'moveClip':
-      return api.moveClip(at, edit.clipId, edit.trackId, edit.start);
-    case 'moveClips':
-      return api.moveClips(at, edit.moves);
-    case 'trimClip':
-      return api.trimClip(at, edit.clipId, edit.offset, edit.length, edit.fades);
-    case 'renameClip':
-      return api.renameClip(at, edit.clipId, edit.name);
-    case 'setClipGain':
-      return api.setClipGain(at, edit.clipId, edit.gain);
-    case 'setClipFades':
-      return api.setClipFades(at, edit.clipId, { fadeIn: edit.fadeIn, fadeOut: edit.fadeOut });
-    case 'setClipTempos':
-      return api.setClipTempos(at, edit.tempos);
-    case 'setClipPitches':
-      return api.setClipPitches(at, edit.pitches);
-    case 'duplicateClip':
-      return api.duplicateClip(at, edit.clipId);
-    case 'deleteClip':
-      return api.deleteClip(at, edit.clipId);
-    case 'deleteClips':
-      return api.deleteClips(at, edit.clipIds, edit.trackIds);
-    case 'replaceClips':
-      return api.replaceClips(at, edit.clipIds, edit.clips, edit.trackIds, edit.newTracks);
-    case 'splitClips':
-      return api.splitClips(at, edit.clipIds, edit.at);
-    case 'setTakes':
-      return api.setTakes(at, edit.clipId, edit.takes);
-    case 'chooseTake':
-      return api.chooseTake(at, edit.clipId, edit.takeId);
-    case 'nudgeTake':
-      return api.nudgeTake(at, edit.clipId, edit.takeId, edit.nudge);
-    case 'deleteTake':
-      return api.deleteTake(at, edit.clipId, edit.takeId);
-    case 'clearInactiveTakes':
-      return api.clearInactiveTakes(at, edit.clipId);
-    case 'setLoop':
-      return api.setLoop(at, edit.loop);
-    case 'switchLoop':
-      return api.switchLoop(at, edit.on);
-    case 'clearLoop':
-      return api.clearLoop(at);
-  }
 }

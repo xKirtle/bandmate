@@ -1,6 +1,9 @@
 // An in-memory SongServer, for testing Saves, and Lyric Sheet editing on top
 // of it, without the api: one Song and its Timeline, sharing a version, as
 // the server keeps them.
+//
+// The changes it makes are checked against the real server by
+// songServerContract.test.ts, which replays cases recorded from it.
 import {
   ApiError,
   type Captured,
@@ -21,7 +24,6 @@ import {
 import { sourceAt } from './clipTime';
 import { isFree } from './trackPlacement';
 import { withCueChange, type CueChange } from './cueChanges';
-import { linesByRow } from './cues';
 import type { Edit } from './history';
 import { isLyricSheetChange, type LyricSheetChange } from './lyricSheetChanges';
 import { peaksPerSecond } from './peaks';
@@ -32,6 +34,35 @@ import { isCueChange, type SongServer } from './songServer';
 export const networkError = () => new ApiError(0, "Can't reach Bandmate. Check your connection.");
 
 const staleError = () => new ApiError(409, 'The Song changed elsewhere', 'stale');
+
+/** The kind of a change the song server makes: to the Cues, the Lyric Sheet or the Timeline. */
+export type ChangeKind = (CueChange | LyricSheetChange | Edit)['kind'];
+
+/**
+ * The kinds of change the fake doesn't make, which apply refuses as not
+ * modelled rather than make them wrongly. Every other kind is checked
+ * against the real server, in songServerContract.test.ts, by a case
+ * recorded from it. To model one, take it off here and record a case for
+ * it in internal/app's song_server_contract_test.go.
+ */
+export const notModelledKinds: ReadonlySet<ChangeKind> = new Set<ChangeKind>([
+  'addBeat',
+  'reorderTracks',
+  'trimClip',
+  'setTakes',
+  'chooseTake',
+  'nudgeTake',
+  'deleteTake',
+  'clearInactiveTakes',
+  'duplicateSection',
+  'addAlternate',
+  'activateAlternate',
+  'deleteAlternate',
+  'moveAlternateToScrapbook',
+  'moveAlternateToArrangement',
+  'addToArrangement',
+  'restoreSnapshot',
+]);
 
 /** A Song with no Lines, Masters or Tags, at version 1. */
 export function emptySong(fields: Partial<Song> = {}): Song {
@@ -191,9 +222,11 @@ export class FakeSongServer implements SongServer {
    * What a Timeline edit does, for the edits the fake models: the Loop's,
    * adding, changing and deleting a Track, and placing, pasting (adding
    * Tracks at the bottom for rows past the last), duplicating, moving,
-   * splitting, renaming, setting the Gain of and deleting Clips of a Beat
-   * or a Sound. A Track changed or a Clip renamed that isn't
-   * there is refused, as the server refuses it. Others throw "not modelled".
+   * splitting, renaming, setting the Gain, Fades, Tempo and Pitch of and
+   * deleting Clips of a Beat or a Sound. A Track changed or a Clip renamed
+   * that isn't there is refused, as the server refuses it. The kinds
+   * notModelledKinds lists, and the shapes of others it doesn't make, e.g.
+   * placing a Clip of Takes, throw "not modelled".
    */
   #edited(edit: Edit): (tl: Timeline) => Timeline {
     const place = (tl: Timeline, trackId: number, clip: NewClip) =>
@@ -202,6 +235,7 @@ export class FakeSongServer implements SongServer {
       ...tl,
       tracks: tl.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => !ids.includes(c.id)) })),
     });
+    if (notModelledKinds.has(edit.kind)) throw notModelled(edit);
     switch (edit.kind) {
       case 'setLoop':
         return (tl) => ({ ...tl, loop: { ...edit.loop } });
@@ -209,11 +243,14 @@ export class FakeSongServer implements SongServer {
         return (tl) => ({ ...tl, loop: tl.loop && { ...tl.loop, on: edit.on } });
       case 'clearLoop':
         return (tl) => ({ ...tl, loop: null });
-      case 'addTrack':
+      case 'addTrack': {
+        // A Track brought back as it was, where it was, isn't modelled.
+        const { name, ...asItWas } = edit.track;
+        if (Object.keys(asItWas).length > 0) throw notModelled(edit);
         return (tl) => {
-          const { name } = edit.track;
           return { ...tl, tracks: [...tl.tracks, emptyTrack(this.#nextTrackId++, name)] };
         };
+      }
       case 'updateTrack': {
         if (!this.timeline.tracks.some((t) => t.id === edit.trackId)) throw notFound();
         const { name, ...levels } = edit.changes;
@@ -226,12 +263,13 @@ export class FakeSongServer implements SongServer {
       case 'deleteTrack':
         return (tl) => ({ ...tl, tracks: tl.tracks.filter((t) => t.id !== edit.trackId) });
       case 'placeClip':
+        if ('takeIds' in edit.clip) throw notModelled(edit);
         return (tl) => place(tl, edit.trackId, edit.clip);
       case 'placeClips':
       case 'replaceClips': {
         if (edit.newTracks || ('trackIds' in edit && edit.trackIds)) throw notModelled(edit);
         const placed = edit.clips.map((c) => {
-          if (!('trackId' in c)) throw notModelled(edit);
+          if (!('trackId' in c) || 'takeIds' in c.clip) throw notModelled(edit);
           return c;
         });
         const replaced = edit.kind === 'replaceClips' ? edit.clipIds : [];
@@ -268,22 +306,26 @@ export class FakeSongServer implements SongServer {
         };
       }
       case 'splitClips':
-        // Each Clip keeps its id as its left half; its right half is a new
-        // Clip. Fades and Takes aren't modelled.
+        // Each Clip keeps its id as its left half, keeping its Fade in, cut
+        // short at the cut; its right half is a new Clip, keeping its Fade
+        // out, likewise. A Clip of Takes isn't modelled.
         return (tl) => ({
           ...tl,
           tracks: tl.tracks.map((t) => ({
             ...t,
             clips: t.clips.flatMap((c) => {
               if (!edit.clipIds.includes(c.id)) return [c];
+              if (c.activeTakeId !== null) throw notModelled(edit);
               const cut = edit.at - c.start;
+              const length = c.length - cut;
               const right = this.#clip({
                 ...sourceOf(c),
                 start: edit.at,
                 offset: sourceAt(c, edit.at),
-                length: c.length - cut,
+                length,
+                fadeOut: Math.min(c.fadeOut, length),
               });
-              return [{ ...c, length: cut }, right];
+              return [{ ...c, length: cut, fadeIn: Math.min(c.fadeIn, cut), fadeOut: 0 }, right];
             }),
           })),
         });
@@ -298,6 +340,13 @@ export class FakeSongServer implements SongServer {
       case 'setClipTempos':
         // Each keeps its start and audio, its length and Fades scaling.
         // Moving one slowed into the next onto a new Track isn't modelled.
+        for (const { clipId, tempo } of edit.tempos) {
+          const track = this.timeline.tracks.find((t) => t.clips.some((c) => c.id === clipId));
+          const c = track?.clips.find((c) => c.id === clipId);
+          if (!track || !c) continue;
+          const end = c.start + (c.length * c.tempo) / tempo;
+          if (track.clips.some((o) => o.start > c.start && o.start < end)) throw notModelled(edit);
+        }
         return (tl) =>
           edit.tempos.reduce((t, { clipId, tempo }) => {
             const c = t.tracks.flatMap((tr) => tr.clips).find((c) => c.id === clipId);
@@ -339,10 +388,11 @@ export class FakeSongServer implements SongServer {
    * a Section to the Arrangement or the Scrapbook, reordering the Arrangement, taking one out of it,
    * deleting one in the Scrapbook, adding one to another, setting its
    * Label, renaming an Alternate, replacing an Alternate's text, and
-   * putting the sheet back.
-   * Others throw "not modelled".
+   * putting the sheet back. The kinds notModelledKinds lists throw "not
+   * modelled".
    */
   #changed(change: LyricSheetChange): (song: Song) => Song {
+    if (notModelledKinds.has(change.kind)) throw notModelled(change);
     switch (change.kind) {
       case 'addSection':
         return (song) => {
@@ -394,14 +444,14 @@ export class FakeSongServer implements SongServer {
       case 'setSectionLabel':
         return (song) => ({
           ...song,
-          sections: song.sections.map((s) => (s.id === change.sectionId ? { ...s, label: change.label } : s)),
+          sections: song.sections.map((s) => (s.id === change.sectionId ? { ...s, label: change.label.trim() } : s)),
         });
       case 'renameAlternate':
         return (song) => ({
           ...song,
           sections: song.sections.map((s) => ({
             ...s,
-            alternates: s.alternates.map((a) => (a.id === change.alternateId ? { ...a, name: change.name } : a)),
+            alternates: s.alternates.map((a) => (a.id === change.alternateId ? { ...a, name: change.name.trim() } : a)),
           })),
         });
       case 'replaceAlternateText':
@@ -440,24 +490,32 @@ export class FakeSongServer implements SongServer {
   }
 
   /**
-   * An Alternate's text replaced: a Line of each row, keeping the Line, and
-   * its Cue, of each row matched to one as the text box matches them. Its
-   * Chords aren't read.
+   * An Alternate's text replaced: a Line of each row but blank ones at the
+   * end, keeping the Line, and its Cue, of each row matched to one as the
+   * server matches them. Its Chords aren't read.
    */
   #withText(song: Song, alternateId: number, text: string): Song {
     const sections = song.sections.map((s) => ({
       ...s,
       alternates: s.alternates.map((a) => {
         if (a.id !== alternateId) return a;
-        const rows = text.split('\n');
-        const lines = linesByRow(text, a.lines).map((line, i) => ({
-          id: line?.id ?? this.#nextLineId++,
-          text: rows[i],
-          lyrics: rows[i],
-          chords: [],
-          chordLine: false,
-          cue: line?.cue ?? null,
-        }));
+        const rows = text.replaceAll('\r\n', '\n').split('\n');
+        while (rows.length > 0 && rows.at(-1)!.trim() === '') rows.pop();
+        const keeps = matchedLines(
+          a.lines.map((l) => l.text),
+          rows,
+        );
+        const lines = rows.map((row, i) => {
+          const line = keeps[i] < 0 ? null : a.lines[keeps[i]];
+          return {
+            id: line?.id ?? this.#nextLineId++,
+            text: row,
+            lyrics: row,
+            chords: [],
+            chordLine: false,
+            cue: line?.cue ?? null,
+          };
+        });
         return { ...a, lines };
       }),
     }));
@@ -642,9 +700,45 @@ const noSuchTrack = () => new ApiError(400, "there's no such Track on this Timel
 
 const notModelled = (change: Edit | LyricSheetChange) => new Error(`${change.kind} is not modelled`);
 
-/** A new Track, empty, at 0 dB, neither muted nor soloed. */
+/** A new Track, empty, at 0 dB, neither muted nor soloed, its name trimmed. */
 function emptyTrack(id: number, name: string): Track {
-  return { id, name, volume: 0, muted: false, soloed: false, clips: [] };
+  return { id, name: name.trim(), volume: 0, muted: false, soloed: false, clips: [] };
+}
+
+/**
+ * Which old Line each new row of text is, as the server matches them: the
+ * index of the old Line whose identity it keeps, or -1 for a new Line.
+ * Rows unchanged keep their Lines first, as the longest common subsequence
+ * of the old and new; between two of those, the rest are paired in order,
+ * as Lines edited in place, any left over of the old deleted and of the new
+ * added.
+ */
+function matchedLines(old: readonly string[], rows: readonly string[]): number[] {
+  // common[i][j]: how long the longest common subsequence of old[i:] and rows[j:] is.
+  const common = Array.from({ length: old.length + 1 }, () => new Array<number>(rows.length + 1).fill(0));
+  for (let i = old.length - 1; i >= 0; i--) {
+    for (let j = rows.length - 1; j >= 0; j--) {
+      common[i][j] = old[i] === rows[j] ? common[i + 1][j + 1] + 1 : Math.max(common[i + 1][j], common[i][j + 1]);
+    }
+  }
+  const keeps = new Array<number>(rows.length).fill(-1);
+  // Where the run of rows and Lines not yet matched starts.
+  let [gapOld, gapNew] = [0, 0];
+  const pairGap = (i: number, j: number) => {
+    for (let k = 0; gapNew + k < j; k++) keeps[gapNew + k] = gapOld + k < i ? gapOld + k : -1;
+  };
+  let [i, j] = [0, 0];
+  while (i < old.length && j < rows.length) {
+    if (old[i] === rows[j]) {
+      pairGap(i, j);
+      keeps[j] = i;
+      [i, j] = [i + 1, j + 1];
+      [gapOld, gapNew] = [i, j];
+    } else if (common[i + 1][j] >= common[i][j + 1]) i++;
+    else j++;
+  }
+  pairGap(old.length, rows.length);
+  return keeps;
 }
 
 /** A Timeline with changes made to a Clip, if it's there. */

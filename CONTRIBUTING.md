@@ -148,6 +148,8 @@ The tests go through the HTTP API only. `internal/app/helpers_test.go` starts th
 
 Vitest covers plain TypeScript modules in `web/src/lib` that don't touch the DOM or Web Audio, e.g. reducing decoded audio to waveform peaks. Their tests sit next to them as `*.test.ts`. A module whose runes run effects, e.g. `songListQuery.svelte.ts`, is tested in a `*.svelte.test.ts`: those run with Svelte's browser build, as its server build runs no effects. Components and audio playback are tested by hand.
 
+Unit tests of saving and editing a Song run against a fake of the server, `web/src/lib/songServerFake.ts`, which is checked against the real one. Each case in `internal/app/song_server_contract_test.go` sets a Song up through the API and makes one change, and the Song or Timeline before and after it are recorded to `internal/app/testdata/song_server_contract.json`. `songServerContract.test.ts` makes the same change on the fake and compares what it leaves. When the server changes what a change does, `go test` fails until the file is recorded again with `go test ./internal/app -run TestSongServerContract -update`, so review shows the change as a diff. Every kind of change has a case, or is in the fake's `notModelledKinds`, which it refuses; to model one, take it off that list and add a case.
+
 ### End-to-end tests
 
 The suite in [`e2e/`](e2e/) drives the real app in Chromium with [Playwright](https://playwright.dev/), and pins what the pages do, so a change that moves code behind them can't change it unnoticed. Run it before and after such a change:
