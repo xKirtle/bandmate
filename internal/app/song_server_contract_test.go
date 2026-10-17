@@ -263,7 +263,7 @@ func contractCases() []contractCase {
 		return change, sent
 	}
 	twoClipsOf := func(ts *testServer) twoClips { return placeTwoClips(ts.t, ts) }
-	// The second Track's id, "Adlibs", of placeTwoClips's Song.
+	// The ids of placeTwoClips's Tracks: the first, with both Clips, and "Adlibs", empty.
 	adlibs := func(p twoClips) int64 { return p.tl.Tracks[1].ID }
 	verse := func(p twoClips) int64 { return p.tl.Tracks[0].ID }
 
@@ -313,12 +313,8 @@ func contractCases() []contractCase {
 			for k, v := range (obj{"name": "Hook", "gain": -2, "tempo": 0.5, "pitch": 2, "fadeIn": 1, "fadeOut": 0.5}) {
 				clip[k] = v
 			}
-			sent := obj{"trackId": adlibs(p)}
-			for k, v := range clip {
-				sent[k] = v
-			}
-			return sends(p.song.ID, "placeClip", obj{"trackId": adlibs(p), "clip": clip},
-				http.MethodPost, "/timeline/clips", sent)
+			change, sent := onTrack(obj{"trackId": adlibs(p)}, clip)
+			return sends(p.song.ID, "placeClip", change, http.MethodPost, "/timeline/clips", sent)
 		}},
 		{"place several Clips at once", func(ts *testServer) contractChange {
 			p := twoClipsOf(ts)

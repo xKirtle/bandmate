@@ -138,7 +138,8 @@ function sheetOf(song: Song, id: Renumber) {
 /**
  * What the fake promises of a Timeline: its Tracks, top to bottom, with
  * their levels and Clips in the order they start, and its Loop. Which
- * Beats and Sounds the Clips play is worked out on the server, so isn't.
+ * Clips play which Beat or Sound, by its id, but the lists of the Beats
+ * and Sounds they play are worked out on the server, so aren't.
  */
 function timelineOf(tl: Timeline, id: Renumber) {
   return {
@@ -198,6 +199,7 @@ afterEach(() => {
 describe.each(cases.map((c) => [c.name, c] as const))('%s', (_, c) => {
   it('leaves what the server left', async () => {
     const fake = fakeOf(c);
+    // Any kind of change: apply's overloads each take one.
     const after = await fake.apply(songAt(c), c.change as Edit);
     expect(projected(c, after)).toEqual(projected(c, c.after));
   });
