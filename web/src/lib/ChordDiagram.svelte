@@ -14,8 +14,10 @@
   const rows = 5;
   const stringGap = 16;
   const fretGap = 20;
+  /** The starting fret's size, read at a glance even in the Chord Chart's small diagrams. */
+  const startSize = 14;
   /** Room on the left for the starting fret, and above for the open and muted marks. */
-  const left = 30;
+  const left = 38;
   /** How far the starting fret's right edge sits from the low string: clear of a barre's or dot's edge, 6 out. */
   const startGap = 10;
   const top = 20;
@@ -69,8 +71,13 @@
     <rect class="nut" x={left - 1} y={top - 3} width={neckWidth + 2} height="4" />
   {:else}
     <!-- Sized in the drawing's units, like the rest of it, so it scales with the diagram. -->
-    <text class="start" x={left - startGap} y={y(start)} font-size="10" text-anchor="end" dominant-baseline="central"
-      >{start}fr</text
+    <text
+      class="start"
+      x={left - startGap}
+      y={y(start)}
+      font-size={startSize}
+      text-anchor="end"
+      dominant-baseline="central">{start}fr</text
     >
   {/if}
 
