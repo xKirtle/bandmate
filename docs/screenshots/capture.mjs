@@ -264,7 +264,7 @@ async function number(page, places, { first = 1, into } = {}) {
   const intro = page.getByRole("article", { name: "Intro" });
   const verse = page.getByRole("article", { name: "Verse 1" });
   const chorus = page.getByRole("article", { name: "Chorus" });
-  const scrapbook = page.locator("summary", { hasText: "Scrapbook" });
+  const scrapbook = page.getByRole("tab", { name: "Scrapbook" });
   await chorus.getByRole("button", { name: /^Alternates/ }).click();
 
   await number(page, [
@@ -280,13 +280,16 @@ async function number(page, places, { first = 1, into } = {}) {
     await rightOf(
       page.getByRole("button", { name: /^Cue for Line 1 of Verse 1/ }),
     ),
-    await textEnd(scrapbook),
+    // In the Scrapbook's tab, clear of the Master's beside it.
+    await textEnd(
+      page.getByRole("tabpanel", { name: "Scrapbook" }).getByText("Hook idea"),
+    ),
     await below(page.getByRole("button", { name: "Rhymes", exact: true })),
   ]);
 
-  // From the nav rail to the Scrapbook's edge, down to the Chorus's foot.
+  // From the nav rail to the side card's edge, down to the Chorus's foot.
   const nav = await page.getByRole("navigation").first().boundingBox();
-  const side = await page.locator("details", { has: scrapbook }).boundingBox();
+  const side = await page.locator(".part", { has: scrapbook }).boundingBox();
   const end = await chorus.boundingBox();
   const left = nav.x + nav.width;
   await save(page, "write-mode-labelled", {
@@ -566,6 +569,8 @@ const phone = {
   const page = await open(heroURL, phone);
   await readMode(page);
   await scrollToLyricSheet(page);
+  // Off the Chord Chart, which the click into Read mode leaves it over.
+  await page.mouse.move(0, 0);
   await save(page, "phone-lyric-sheet");
   await page.context().close();
 }
@@ -597,15 +602,14 @@ const phone = {
   /** When the playhead reaches seconds on the Timeline, as a time on the clock. */
   const at = (seconds) => playing + (seconds - 59) * 1000;
   const start = at(64);
-  const end = at(71.5);
+  const end = at(74);
 
   await page.waitForTimeout(start - 500 - Date.now());
   const stop = await screencast(page, "sync-mode");
 
-  // Cue three Bridge Lines a bar (2.5 s) apart, from 1:05, and stop with
-  // the fourth up next: once every Line is cued, the first comes up next,
-  // and the Lyric Sheet scrolls back up to it.
-  for (const cue of [65, 67.5, 70].map(at)) {
+  // Cue the Bridge's four Lines a bar (2.5 s) apart, from 1:05. The last
+  // leaves nothing up next, so its Cue shows and the Lyric Sheet stays put.
+  for (const cue of [65, 67.5, 70, 72.5].map(at)) {
     await page.waitForTimeout(cue - Date.now());
     await page.keyboard.press("Enter");
   }
