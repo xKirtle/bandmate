@@ -5,7 +5,6 @@
   import CopyPlus from '@lucide/svelte/icons/copy-plus';
   import Eraser from '@lucide/svelte/icons/eraser';
   import GripVertical from '@lucide/svelte/icons/grip-vertical';
-  import Minus from '@lucide/svelte/icons/minus';
   import Plus from '@lucide/svelte/icons/plus';
   import X from '@lucide/svelte/icons/x';
   import { tick } from 'svelte';
@@ -32,8 +31,8 @@
   import ChordPopover from './ChordPopover.svelte';
   import LyricSheetView from './LyricSheetView.svelte';
   import ActionsMenu from './ActionsMenu.svelte';
+  import CuesMenu from './CuesMenu.svelte';
   import type { MenuAction } from './menu';
-  import Picker from './Picker.svelte';
   import ReadingMenu from './ReadingMenu.svelte';
   import type { LyricSheetEditing } from './lyricSheetEditing.svelte';
   import SectionEditor from './SectionEditor.svelte';
@@ -50,14 +49,12 @@
     sectionsInArrangement,
   } from './sections';
   import type { Mode } from './songMode';
-  import { readShiftStep, shiftSteps, storeShiftStep, type ShiftStep } from './shiftStep';
   import { rebound } from './shortcutKeys';
   import { cuesNextLine } from './syncKeys';
   import type { SyncMode } from './syncMode.svelte';
   import type { RhymeMode } from './rhymeMode.svelte';
   import { ownsArrows } from './keyPlace';
   import { inTextField } from './textField';
-  import { deviceStorage } from './deviceStorage';
   import { songChordsShown } from './chordsShown';
   import { lyricSize } from './sharedLyricSize.svelte';
   import { songTranspose } from './sharedTranspose.svelte';
@@ -164,21 +161,6 @@
   const canCue = $derived(wide.current && (hasClips || hasCues(song)));
   // Playing from a Cue's ▶, or a cued Line in Read mode, leads into it.
   const leadInto = $derived(playFrom && ((cue: number) => playFrom(leadIn(cue))));
-
-  // Shifting every Cue, dormant ones included, by a step: each click is one
-  // shift, saved at once and undone like any Cue edit. The step is
-  // remembered on this device.
-  let shiftStep = $state<ShiftStep>(readShiftStep(deviceStorage()));
-  const canShiftEarlier = $derived(canShiftCuesEarlier(song, shiftStep));
-
-  function chooseShiftStep(step: ShiftStep) {
-    shiftStep = step;
-    storeShiftStep(deviceStorage(), step);
-  }
-
-  function shiftEveryCue(by: number) {
-    changeCues({ kind: 'shiftCues', ...everyCue, by }, 'shifting every Cue');
-  }
 
   /** Sets or, with null, clears the Cue of a Line, as the gutter names it. */
   function setLineCue(line: Position, cue: number | null) {
@@ -415,15 +397,6 @@
     {#if mode === 'read'}
       <ReadingMenu {songId} {chords} />
     {/if}
-    {#if mode === 'write' && canCue && hasCues(song)}
-      <!-- Doesn't ask first: it can be undone. -->
-      <button
-        type="button"
-        class="button"
-        onclick={() => changeCues({ kind: 'clearCues' }, 'clearing every Cue')}
-        title="Clear every Cue in the Song">Clear all Cues</button
-      >
-    {/if}
     {#if rhymeMode.canBeOn}
       <!-- Clicked, it keeps focus where it was, so the caret stays on the word it suggests Rhymes for. -->
       <button
@@ -452,36 +425,11 @@
       >
     {/if}
     {#if mode === 'write' && canCue && hasCues(song)}
-      <div class="shift" role="group" aria-labelledby="shift-label">
-        <span id="shift-label">Shift Cues</span>
-        <Picker
-          id="shift-step"
-          class="shift-step"
-          aria-label="Step"
-          title="How far each click shifts every Cue"
-          options={shiftSteps}
-          value={shiftStep}
-          text={(step) => `${step} s`}
-          onpick={chooseShiftStep}
-        />
-        <button
-          type="button"
-          class="button shift-by"
-          disabled={!canShiftEarlier}
-          onclick={() => shiftEveryCue(-shiftStep)}
-          aria-label="Shift every Cue {shiftStep} s earlier"
-          title={canShiftEarlier
-            ? `Shift every Cue ${shiftStep} s earlier`
-            : `A Cue is closer to 0:00 than ${shiftStep} s`}><Minus /></button
-        >
-        <button
-          type="button"
-          class="button shift-by"
-          onclick={() => shiftEveryCue(shiftStep)}
-          aria-label="Shift every Cue {shiftStep} s later"
-          title="Shift every Cue {shiftStep} s later"><Plus /></button
-        >
-      </div>
+      <CuesMenu
+        shift={(by) => changeCues({ kind: 'shiftCues', ...everyCue, by }, 'shifting every Cue')}
+        clear={() => changeCues({ kind: 'clearCues' }, 'clearing every Cue')}
+        canShiftEarlier={(step) => canShiftCuesEarlier(song, step)}
+      />
     {/if}
     <p class="notice muted" role="status">{notice ?? ''}</p>
     {#if syncMode.hint}
@@ -608,19 +556,6 @@
   }
   .spacer {
     flex: 1;
-  }
-  .shift {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1);
-    margin-left: var(--space-2);
-  }
-  .shift :global(.shift-step) {
-    margin-left: var(--space-1);
-  }
-  .shift-by {
-    min-width: var(--control);
-    padding: 0;
   }
   .notice:empty {
     display: none;

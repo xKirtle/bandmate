@@ -1,4 +1,4 @@
-// How far the Lyric Sheet's Shift Cues controls move every Cue per click.
+// How far the Cues menu's shift moves every Cue per click.
 // The last step chosen is remembered on this device: a convenience, not
 // part of the Song.
 

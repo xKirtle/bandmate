@@ -1390,3 +1390,32 @@ test('custom tuning notes that can’t be read are dropped as they’re left beh
   expect(await warnsOnLeaving(page)).toBe(false);
   expect((await bandmate.getSong(song.id)).tuning).toBe('');
 });
+
+test('the Cues menu shifts every Cue by its step and clears them all, beside the Rhymes and Sync lyrics toggles', async ({
+  page,
+  bandmate,
+}) => {
+  const song = await heroSong(bandmate);
+  await page.goto(`/songs/${song.id}`);
+  const cues = page.getByRole('button', { name: 'Cues', exact: true });
+  const menu = page.getByRole('dialog', { name: 'Cues' });
+  expect(await serverCues(bandmate, song.id, 'Verse 1')).toEqual([5, 10, 15, 20]);
+
+  // Shifted a step later, 0.1 s until another is picked, the menu staying open.
+  await cues.click();
+  await expect(menu).toBeVisible();
+  await menu.getByRole('button', { name: 'Shift every Cue 0.1 s later' }).click();
+  await expect.poll(() => serverCues(bandmate, song.id, 'Verse 1')).toEqual([5.1, 10.1, 15.1, 20.1]);
+  await expect(menu).toBeVisible();
+
+  // Escape closes it, focus back on Cues.
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(cues).toBeFocused();
+
+  // Cleared, there's nothing left to shift or clear.
+  await cues.click();
+  await menu.getByRole('button', { name: 'Clear all Cues' }).click();
+  await expect.poll(() => serverCues(bandmate, song.id, 'Verse 1')).toEqual([null, null, null, null]);
+  await expect(cues).toHaveCount(0);
+});
