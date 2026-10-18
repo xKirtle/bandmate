@@ -33,8 +33,8 @@ test('deleting a Scrapbook Section asks nothing, and Ctrl+Z brings it back into 
   await expect(card).toHaveCount(0);
   await expect.poll(() => serverScrapbook(bandmate, song.id)).not.toContain(idea.id);
 
-  // The Scrapbook folded, and Sync mode on.
-  await page.locator('summary', { hasText: 'Scrapbook' }).click();
+  // The Master's tab showing instead of the Scrapbook's, and Sync mode on.
+  await page.getByRole('tab', { name: 'Master' }).click();
   await syncButton(page).click();
   await expect(syncButton(page)).toHaveAttribute('aria-pressed', 'true');
   await blur(page);

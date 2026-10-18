@@ -177,11 +177,40 @@
 
   // Desktop puts the Scrapbook and Masters in a column beside the Lyric
   // Sheet, as sections that open and close, each as sideParts starts it on
-  // each visit until it's toggled, with the Rhymes card in Rhyme mode.
-  // Narrower windows show the Scrapbook and Masters after the Lyric Sheet,
+  // each visit until it's toggled, with the Rhymes card in Rhyme mode; in
+  // Write mode the Scrapbook and Masters are tabs of one card instead (see
+  // sideTabs). Narrower windows show the Scrapbook and Masters after the Lyric Sheet,
   // always open. Keyed by name, switching moves them rather than rebuilding
   // them.
-  const parts = $derived(sideParts(mode, { rhymes: rhymeMode.on }));
+  const parts = $derived(
+    sideParts(mode, { rhymes: rhymeMode.on }).filter(({ part }) => !sideTabs || part === 'rhymes'),
+  );
+
+  // On desktop in Write mode, the Scrapbook and the Masters share one card,
+  // a tab each, rather than two that fold. A Section dragged over the card
+  // shows the Scrapbook, where it would drop.
+  const sideTabs = $derived(desktop.current && writing);
+  let sideTab = $state<'scrapbook' | 'masters'>('scrapbook');
+  let sideTabButtons = $state<HTMLButtonElement[]>([]);
+  const sideTabOrder = ['scrapbook', 'masters'] as const;
+  $effect(() => {
+    if (sideTabs && dropsOnScrapbook(drag.drop)) sideTab = 'scrapbook';
+  });
+
+  function sideTabKey(e: KeyboardEvent, i: number) {
+    const last = sideTabOrder.length - 1;
+    const moves: Record<string, number> = {
+      ArrowRight: i === last ? 0 : i + 1,
+      ArrowLeft: i === 0 ? last : i - 1,
+      Home: 0,
+      End: last,
+    };
+    const to = moves[e.key];
+    if (to === undefined) return;
+    e.preventDefault();
+    sideTab = sideTabOrder[to];
+    sideTabButtons[to]?.focus();
+  }
   // Parts opened or closed by hand, per mode.
   let toggledParts = $state<Partial<Record<`${Mode}-${SidePart}`, boolean>>>({});
   // The Rhymes card is open each time Rhyme mode comes on, however it was left.
@@ -248,7 +277,7 @@
     syncMode.end();
     const sectionId = undone.section;
     if (sectionId === null || !song) return;
-    if (song.scrapbook.includes(sectionId) && desktop.current && writing) toggledParts['write-scrapbook'] = true;
+    if (song.scrapbook.includes(sectionId) && sideTabs) sideTab = 'scrapbook';
     await tick();
     document
       .querySelector(`[data-section="${sectionId}"]`)
@@ -688,6 +717,47 @@
             {/if}
           </details>
         {/each}
+        {#if sideTabs}
+          <div
+            class="part tabbed"
+            class:drop-target={dropsOnScrapbook(drag.drop)}
+            {@attach (el) => drag.placeScrapbook(el)}
+          >
+            <div class="tabs" role="tablist" aria-label="Scrapbook and Masters">
+              {#each sideTabOrder as tab, i (tab)}
+                <button
+                  bind:this={sideTabButtons[i]}
+                  id="side-tab-{tab}"
+                  type="button"
+                  role="tab"
+                  aria-selected={sideTab === tab}
+                  aria-controls="side-panel-{tab}"
+                  tabindex={sideTab === tab ? 0 : -1}
+                  onclick={() => (sideTab = tab)}
+                  onkeydown={(e) => sideTabKey(e, i)}
+                >
+                  {tab === 'scrapbook' ? 'Scrapbook' : song.masters.length > 1 ? 'Masters' : 'Master'}
+                </button>
+              {/each}
+            </div>
+            <div
+              id="side-panel-scrapbook"
+              role="tabpanel"
+              aria-labelledby="side-tab-scrapbook"
+              hidden={sideTab !== 'scrapbook'}
+            >
+              <Scrapbook {song} {drag} {editing} {onCaret} />
+            </div>
+            <div
+              id="side-panel-masters"
+              role="tabpanel"
+              aria-labelledby="side-tab-masters"
+              hidden={sideTab !== 'masters'}
+            >
+              <Masters {song} {mode} submit={saves.submit} typing={saves.typing} {setStatus} {recording} />
+            </div>
+          </div>
+        {/if}
       </div>
 
       <!-- Last in the markup so it's reached last, though desktop shows it
@@ -1088,8 +1158,15 @@
       border-radius: var(--radius-lg);
       background: var(--surface-1);
     }
-    .part[open] {
+    .part[open],
+    .tabbed {
       padding: 0 var(--space-3) var(--space-3);
+    }
+    /* Its tabs sit where a card's toggle would. */
+    .tabbed > .tabs {
+      margin: 0 calc(-1 * var(--space-3)) var(--space-2);
+      padding: 0 var(--space-1);
+      border-bottom: 1px solid var(--border);
     }
     .part > summary {
       display: flex;
@@ -1119,7 +1196,8 @@
       display: none;
     }
     /* The section's box draws the edges. */
-    .part > :global(section) {
+    .part > :global(section),
+    .tabbed > [role='tabpanel'] > :global(section) {
       margin: 0;
       padding: 0;
       border: 0;
