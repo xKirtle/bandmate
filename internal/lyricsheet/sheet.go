@@ -187,33 +187,11 @@ func (s *Store) changeWithFiles(ctx context.Context, songID int64, based songver
 	return s.GetSong(ctx, songID)
 }
 
-// changeSheetWith is changeSheet for a change made by edit, a pure change
-// to the whole sheet, which editSheet checks and writes.
-func (s *Store) changeSheetWith(ctx context.Context, songID int64, based songversion.Version,
-	edit func(sheet LyricSheet, ids *ids) (LyricSheet, error)) (Song, error) {
-	return s.changeSheet(ctx, songID, based, func(tx *sql.Tx) error {
-		return editSheet(ctx, tx, songID, edit)
-	})
-}
-
-// changeCuesWith is change for a change to Cues alone, made by edit, a
-// pure change to the whole sheet, which editSheet checks and writes. Unlike
-// a change to the sheet itself, it starts no editing session, so takes no
-// Snapshot.
-func (s *Store) changeCuesWith(ctx context.Context, songID int64, based songversion.Version,
-	edit func(sheet LyricSheet) (LyricSheet, error)) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		return editSheet(ctx, tx, songID, func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
-			return edit(sheet)
-		})
-	})
-}
-
 // AddSection creates a Section with the given Label and its first (active)
 // Alternate at position in the Arrangement. A nil position adds it at the
 // end.
 func (s *Store) AddSection(ctx context.Context, songID int64, based songversion.Version, label string, position *int) (Song, error) {
-	return s.changeSheetWith(ctx, songID, based, func(sheet LyricSheet, ids *ids) (LyricSheet, error) {
+	return s.editSheet(ctx, songID, based, noReason, func(sheet LyricSheet, ids *ids) (LyricSheet, error) {
 		return addSection(sheet, ids, label, position)
 	})
 }
@@ -254,7 +232,7 @@ func placeAt(arrangement []int64, sectionID int64, position *int) ([]int64, erro
 // AddToScrapbook creates a Section with the given Label and its first
 // (active) Alternate, outside the Arrangement, so it starts in the Scrapbook.
 func (s *Store) AddToScrapbook(ctx context.Context, songID int64, based songversion.Version, label string) (Song, error) {
-	return s.changeSheetWith(ctx, songID, based, func(sheet LyricSheet, ids *ids) (LyricSheet, error) {
+	return s.editSheet(ctx, songID, based, noReason, func(sheet LyricSheet, ids *ids) (LyricSheet, error) {
 		return addToScrapbook(sheet, ids, label)
 	})
 }
@@ -271,24 +249,8 @@ func addToScrapbook(sheet LyricSheet, ids *ids, label string) (LyricSheet, error
 // Lines, having taken a Snapshot naming it first. A Section still in the
 // Arrangement can't be deleted.
 func (s *Store) DeleteSection(ctx context.Context, songID int64, based songversion.Version, sectionID int64) (Song, error) {
-	return s.changeBefore(ctx, songID, based, BeforeDeleting, func(tx *sql.Tx) (string, func() error, error) {
-		sheet, err := loadLyricSheet(ctx, tx, songID)
-		if err != nil {
-			return "", nil, err
-		}
-		name := ""
-		if sec, err := sheetSection(sheet, sectionID); err == nil {
-			name = sectionName(*sec)
-		}
-		// A refusal comes before the Snapshot is taken.
-		if _, err := deleteSection(cloneSheet(sheet), sectionID); err != nil {
-			return "", nil, err
-		}
-		return name, func() error {
-			return editSheet(ctx, tx, songID, func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
-				return deleteSection(sheet, sectionID)
-			})
-		}, nil
+	return s.editSheet(ctx, songID, based, BeforeDeleting, func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
+		return deleteSection(sheet, sectionID)
 	})
 }
 
@@ -310,7 +272,7 @@ func deleteSection(sheet LyricSheet, sectionID int64) (LyricSheet, error) {
 // appears at most once (ADR 0010), so one already in the Arrangement is
 // refused: a Duplicate of it can be added instead.
 func (s *Store) AddToArrangement(ctx context.Context, songID int64, based songversion.Version, sectionID int64, position *int) (Song, error) {
-	return s.changeSheetWith(ctx, songID, based, func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
+	return s.editSheet(ctx, songID, based, noReason, func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
 		return addToArrangement(sheet, sectionID, position)
 	})
 }
@@ -353,7 +315,7 @@ func without(ids []int64, id int64) []int64 {
 // (names, Lines and Chords, the same one active), but none of its Cues, as
 // the copy is sung at another time. A nil position adds it at the end.
 func (s *Store) DuplicateSection(ctx context.Context, songID int64, based songversion.Version, sectionID int64, position *int) (Song, error) {
-	return s.changeSheetWith(ctx, songID, based, func(sheet LyricSheet, ids *ids) (LyricSheet, error) {
+	return s.editSheet(ctx, songID, based, noReason, func(sheet LyricSheet, ids *ids) (LyricSheet, error) {
 		return duplicateSection(sheet, ids, sectionID, position)
 	})
 }
@@ -387,7 +349,7 @@ func duplicateSection(sheet LyricSheet, ids *ids, sectionID int64, position *int
 // nothing to keep. It keeps its Cues, dormant ones included, for when it's
 // put back (ADR 0010).
 func (s *Store) RemoveFromArrangement(ctx context.Context, songID int64, based songversion.Version, sectionID int64) (Song, error) {
-	return s.changeSheetWith(ctx, songID, based, func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
+	return s.editSheet(ctx, songID, based, noReason, func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
 		return removeFromArrangement(sheet, sectionID)
 	})
 }
@@ -425,7 +387,7 @@ func sectionEmpty(sec Section) bool {
 
 // SetSectionLabel changes a Section's Label. A blank Label removes it.
 func (s *Store) SetSectionLabel(ctx context.Context, songID int64, based songversion.Version, sectionID int64, label string) (Song, error) {
-	return s.changeSheetWith(ctx, songID, based, func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
+	return s.editSheet(ctx, songID, based, noReason, func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
 		return setSectionLabel(sheet, sectionID, label)
 	})
 }
@@ -443,7 +405,7 @@ func setSectionLabel(sheet LyricSheet, sectionID int64, label string) (LyricShee
 // ReorderArrangement puts the Sections in a Song's Arrangement in the given
 // order, which must list every one of them exactly once.
 func (s *Store) ReorderArrangement(ctx context.Context, songID int64, based songversion.Version, order []int64) (Song, error) {
-	return s.changeSheetWith(ctx, songID, based, func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
+	return s.editSheet(ctx, songID, based, noReason, func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
 		return reorderArrangement(sheet, order)
 	})
 }

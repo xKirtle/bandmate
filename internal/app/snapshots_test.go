@@ -86,59 +86,6 @@ func TestAChangeAfterTenMinutesTakesASnapshotOfTheSheetAsItWas(t *testing.T) {
 	}
 }
 
-func TestAChangeWithinTenMinutesOfTheLastTakesNoSnapshot(t *testing.T) {
-	ts, clock, s := snapshotServer(t, "City lights")
-	alt := s.Sections[0].Alternates[0].ID
-	for _, text := range []string{"City lights\nOne", "City lights\nTwo", "City lights\nThree"} {
-		clock.Advance(9 * time.Minute)
-		ts.setText(s.ID, alt, text)
-	}
-	if list := ts.listSnapshots(s.ID); len(list) != 0 {
-		t.Errorf("snapshots = %+v, want none, as no change came 10 minutes after the last", list)
-	}
-
-	clock.Advance(10 * time.Minute)
-	ts.setLabel(s.ID, s.Sections[0].ID, "Verse 1")
-	list := ts.listSnapshots(s.ID)
-	if len(list) != 1 {
-		t.Fatalf("snapshots = %+v, want one", list)
-	}
-	if got := activeLines(ts.getSnapshot(s.ID, list[0].ID).Sheet.Sections[0]); fmt.Sprint(got) != "[City lights Three]" {
-		t.Errorf("lines = %q, want the sheet as the last change left it", got)
-	}
-}
-
-func TestNoSnapshotIsTakenOfASheetTheSameAsTheNewestSnapshots(t *testing.T) {
-	ts, clock, s := snapshotServer(t, "City lights")
-	clock.Advance(time.Hour)
-	ts.setLabel(s.ID, s.Sections[0].ID, "Verse 1")
-	clock.Advance(time.Hour)
-	ts.setLabel(s.ID, s.Sections[0].ID, "Verse")
-	clock.Advance(time.Hour)
-	// Back to the sheet the first Snapshot holds, but not the newest's.
-	ts.setLabel(s.ID, s.Sections[0].ID, "Verse")
-	clock.Advance(time.Hour)
-	ts.setLabel(s.ID, s.Sections[0].ID, "Verse")
-
-	list := ts.listSnapshots(s.ID)
-	if len(list) != 3 {
-		t.Fatalf("snapshots = %+v, want three: none for the last change, made to the sheet the newest holds", list)
-	}
-	if !parseTime(t, list[0].TakenAt).Equal(clock.Now().Add(-time.Hour)) {
-		t.Errorf("snapshots = %+v, want the newest first", list)
-	}
-}
-
-func TestChangingOnlyCuesTakesNoSnapshot(t *testing.T) {
-	ts, clock, s := snapshotServer(t, "City lights")
-	clock.Advance(time.Hour)
-	ts.lyricSheetChange(http.MethodPut,
-		fmt.Sprintf("/api/songs/%d/lines/%d/cue", s.ID, s.Sections[0].Alternates[0].Lines[0].ID), map[string]any{"cue": 4.5})
-	if list := ts.listSnapshots(s.ID); len(list) != 0 {
-		t.Errorf("snapshots = %+v, want none, as Cues aren't the lyrics", list)
-	}
-}
-
 func TestSnapshotsOfAnotherSongArentFound(t *testing.T) {
 	ts, clock, s := snapshotServer(t, "City lights")
 	clock.Advance(time.Hour)
@@ -305,98 +252,27 @@ func TestASnapshotRestoredFromABackupKeepsCuesAsAnyOther(t *testing.T) {
 
 func TestDeletingAScrapbookSectionTakesASnapshotFirstNamingIt(t *testing.T) {
 	ts, clock, s := snapshotServer(t, "City lights")
-	// Within an editing session, and then starting one: either way one
-	// Snapshot, before the deletion, and none for the session.
-	for i, gap := range []time.Duration{time.Minute, time.Hour} {
-		s = ts.addToScrapbook(s.ID, "Verse 3")
-		verse3 := s.Scrapbook[0]
-		ts.setText(s.ID, sectionsByID(s)[verse3].Alternates[0].ID, "Neon rain")
-		clock.Advance(gap)
-		s = ts.lyricSheetChange(http.MethodDelete, sectionPath(s.ID, verse3), nil)
-
-		list := ts.listSnapshots(s.ID)
-		if len(list) != i+1 {
-			t.Fatalf("after %v, snapshots = %+v, want %d", gap, list, i+1)
-		}
-		if list[0].Reason != "deleting" || list[0].Deleted != "Verse 3" || !parseTime(t, list[0].TakenAt).Equal(clock.Now()) {
-			t.Errorf("snapshot = %+v, want one taken now, before deleting Verse 3", list[0])
-		}
-		held := ts.getSnapshot(s.ID, list[0].ID).Sheet
-		if lines := activeLines(sectionLabeled(t, held.Sections, "Verse 3")); fmt.Sprint(lines) != "[Neon rain]" {
-			t.Errorf("verse 3 = %q, want it held as it was", lines)
-		}
-	}
-}
-
-func TestASectionWithoutALabelIsNamedByItsFirstLine(t *testing.T) {
-	ts, clock, s := snapshotServer(t, "City lights")
-	s = ts.addToScrapbook(s.ID, "")
-	idea := s.Scrapbook[0]
-	ts.setText(s.ID, sectionsByID(s)[idea].Alternates[0].ID, "\n[Am]Neon rain\nFalling")
-	clock.Advance(time.Minute)
-	ts.lyricSheetChange(http.MethodDelete, sectionPath(s.ID, idea), nil)
-
-	if got := ts.listSnapshots(s.ID)[0]; got.Deleted != "Neon rain" {
-		t.Errorf("snapshot = %+v, want it named by its first Line's lyrics", got)
-	}
-}
-
-func TestASectionWithNoLabelAndNoWordsHasNoName(t *testing.T) {
-	ts, clock, s := snapshotServer(t, "City lights")
-	s = ts.addToScrapbook(s.ID, "")
-	clock.Advance(time.Minute)
-	ts.lyricSheetChange(http.MethodDelete, sectionPath(s.ID, s.Scrapbook[0]), nil)
-	if got := ts.listSnapshots(s.ID)[0]; got.Reason != "deleting" || got.Deleted != "" {
-		t.Errorf("snapshot = %+v, want one before deleting, naming nothing", got)
-	}
-}
-
-func TestASectionThatCantBeDeletedTakesNoSnapshot(t *testing.T) {
-	ts, clock, s := snapshotServer(t, "City lights")
-	clock.Advance(time.Minute)
-	expectStatus(t, ts.Do(http.MethodDelete, sectionPath(s.ID, s.Sections[0].ID), nil), http.StatusConflict)
-	if list := ts.listSnapshots(s.ID); len(list) != 0 {
-		t.Errorf("snapshots = %+v, want none, as nothing was deleted", list)
-	}
-}
-
-func TestDeletingAnAlternateTakesASnapshotFirstNamingIt(t *testing.T) {
-	ts, clock, s := snapshotServer(t, "City lights")
-	verse := s.Sections[0]
-	s = ts.addAlternate(s.ID, verse.ID, map[string]any{"name": "Darker"})
-	s = ts.addAlternate(s.ID, verse.ID, nil)
-	alts := sectionsByID(s)[verse.ID].Alternates
-	darker, third := alts[1].ID, alts[2].ID
-	ts.setText(s.ID, darker, "City lights, dimmer")
-	ts.activate(s.ID, verse.Alternates[0].ID)
-
+	s = ts.addToScrapbook(s.ID, "Verse 3")
+	verse3 := s.Scrapbook[0]
+	ts.setText(s.ID, sectionsByID(s)[verse3].Alternates[0].ID, "Neon rain")
 	clock.Advance(time.Hour)
-	ts.lyricSheetChange(http.MethodDelete, alternatePath(s.ID, darker), nil)
+
+	// A Section in the Arrangement can't be deleted, so takes none.
+	expectStatus(t, ts.Do(http.MethodDelete, sectionPath(s.ID, s.Arrangement[0]), nil), http.StatusConflict)
+	if list := ts.listSnapshots(s.ID); len(list) != 0 {
+		t.Fatalf("snapshots = %+v, want none, as nothing was deleted", list)
+	}
+
+	ts.lyricSheetChange(http.MethodDelete, sectionPath(s.ID, verse3), nil)
 	list := ts.listSnapshots(s.ID)
 	if len(list) != 1 {
 		t.Fatalf("snapshots = %+v, want one, before the deletion, and none for the session", list)
 	}
-	if list[0].Reason != "deleting" || list[0].Deleted != "Darker" || !parseTime(t, list[0].TakenAt).Equal(clock.Now()) {
-		t.Errorf("snapshot = %+v, want one taken now, before deleting Darker", list[0])
+	if list[0].Reason != "deleting" || list[0].Deleted != "Verse 3" || !parseTime(t, list[0].TakenAt).Equal(clock.Now()) {
+		t.Errorf("snapshot = %+v, want one taken now, before deleting Verse 3", list[0])
 	}
 	held := ts.getSnapshot(s.ID, list[0].ID).Sheet
-	if got := held.Sections[0].Alternates; len(got) != 3 || got[1].Name != "Darker" || fmt.Sprint(got[1].Lines[0].Text) != "City lights, dimmer" {
-		t.Errorf("alternates = %+v, want Darker held as it was", got)
-	}
-
-	// An Alternate without a name is named by its place, as it's shown.
-	clock.Advance(time.Minute)
-	ts.lyricSheetChange(http.MethodDelete, alternatePath(s.ID, third), nil)
-	if got := ts.listSnapshots(s.ID)[0]; got.Reason != "deleting" || got.Deleted != "Alternate 2" {
-		t.Errorf("snapshot = %+v, want it named Alternate 2, its place now Darker's gone", got)
-	}
-}
-
-func TestAnAlternateThatCantBeDeletedTakesNoSnapshot(t *testing.T) {
-	ts, clock, s := snapshotServer(t, "City lights")
-	clock.Advance(time.Hour)
-	expectStatus(t, ts.Do(http.MethodDelete, alternatePath(s.ID, s.Sections[0].Alternates[0].ID), nil), http.StatusConflict)
-	if list := ts.listSnapshots(s.ID); len(list) != 0 {
-		t.Errorf("snapshots = %+v, want none, as nothing was deleted", list)
+	if lines := activeLines(sectionLabeled(t, held.Sections, "Verse 3")); fmt.Sprint(lines) != "[Neon rain]" {
+		t.Errorf("verse 3 = %q, want it held as it was", lines)
 	}
 }

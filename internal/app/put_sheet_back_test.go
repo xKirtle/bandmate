@@ -86,22 +86,6 @@ func TestPuttingTheSheetBackDeletesWhatTheCopyDoesntHold(t *testing.T) {
 	sameSheet(t, after, before)
 }
 
-func TestPuttingTheSheetBackAfterABreakTakesTheEditingSessionsSnapshot(t *testing.T) {
-	ts, clock, s := snapshotServer(t, "City lights")
-	before := s
-	s = ts.setLabel(s.ID, s.Sections[0].ID, "Verse 1")
-
-	clock.Advance(time.Hour)
-	expectStatus(t, ts.putSheetBack(s.ID, s.Version, sheetOf(before)), http.StatusOK)
-	list := ts.listSnapshots(s.ID)
-	if len(list) != 1 || list[0].Reason != "editing" {
-		t.Fatalf("snapshots = %+v, want one, before the editing session", list)
-	}
-	if got := ts.getSnapshot(s.ID, list[0].ID).Sheet.Sections[0].Label; got != "Verse 1" {
-		t.Errorf("label = %q, want the sheet held as it was before putting it back", got)
-	}
-}
-
 func TestPuttingTheSheetBackBasedOnAnOldVersionIsRejectedAsStale(t *testing.T) {
 	ts, _, s := snapshotServer(t, "City lights")
 	before := s

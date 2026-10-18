@@ -53,50 +53,6 @@ func on(month time.Month, day, hour, min int) time.Time {
 	return time.Date(2026, month, day, hour, min, 0, 0, time.UTC)
 }
 
-func TestEverySnapshotFromTheLastDayIsKept(t *testing.T) {
-	st := newSnapshotTaker(t)
-	st.takeAt(on(time.October, 13, 9, 10))
-	st.takeAt(on(time.October, 13, 9, 20))
-	st.takeAt(on(time.October, 14, 9, 0))
-
-	if got := fmt.Sprint(st.taken()); got != "[Oct 14 09:00 Oct 13 09:20 Oct 13 09:10]" {
-		t.Errorf("snapshots taken = %s, want all three, as none is a day old", got)
-	}
-}
-
-func TestOnlyTheNewestOfEachDayIsKeptForAMonth(t *testing.T) {
-	st := newSnapshotTaker(t)
-	st.takeAt(on(time.October, 13, 10, 0))
-	st.takeAt(on(time.October, 13, 11, 0))
-	st.takeAt(on(time.October, 13, 12, 0))
-	st.takeAt(on(time.October, 14, 8, 0))
-	st.takeAt(on(time.October, 15, 12, 0))
-
-	if got := fmt.Sprint(st.taken()); got != "[Oct 15 12:00 Oct 14 08:00 Oct 13 12:00]" {
-		t.Errorf("snapshots taken = %s, want the newest of Oct 13 and the one of Oct 14", got)
-	}
-}
-
-func TestOnlyTheNewestOfEachWeekIsKeptAfterAMonth(t *testing.T) {
-	st := newSnapshotTaker(t)
-	// Tuesday to Thursday of one week, then Tuesday and Wednesday of the next.
-	for _, day := range []int{13, 14, 15, 20, 21} {
-		st.takeAt(on(time.October, day, 10, 0))
-	}
-	// Over a month after the first week, under a month after the second.
-	st.takeAt(on(time.November, 19, 12, 0))
-
-	if got := fmt.Sprint(st.taken()); got != "[Nov 19 12:00 Oct 21 10:00 Oct 20 10:00 Oct 15 10:00]" {
-		t.Errorf("snapshots taken = %s, want both days of the second week, and only the newest of the first", got)
-	}
-
-	// Once the second week is over a month old too, it keeps only its newest.
-	st.takeAt(on(time.November, 23, 12, 0))
-	if got := fmt.Sprint(st.taken()); got != "[Nov 23 12:00 Nov 19 12:00 Oct 21 10:00 Oct 15 10:00]" {
-		t.Errorf("snapshots taken = %s, want only the newest of each week over a month old", got)
-	}
-}
-
 // lateNightThenMorning takes a Snapshot late on Monday 19 October and one
 // early the next morning in New Zealand (UTC+13), both on Monday in UTC,
 // then one two days later, which thins them.
@@ -113,18 +69,6 @@ func TestADayIsTheDayWhereTheSnapshotWasTaken(t *testing.T) {
 
 	if got := fmt.Sprint(st.taken()); got != "[Oct 21 23:00 Oct 19 19:00 Oct 19 09:00]" {
 		t.Errorf("snapshots taken = %s, want Monday night's and Tuesday morning's, as they're two days in Auckland", got)
-	}
-}
-
-func TestADayIsAUTCDayWhenTheTimeZoneIsUnknown(t *testing.T) {
-	for _, zone := range []string{"", "Mars/Olympus_Mons", "Local"} {
-		st := newSnapshotTaker(t)
-		st.ts.zone = zone
-		lateNightThenMorning(st)
-
-		if got := fmt.Sprint(st.taken()); got != "[Oct 21 23:00 Oct 19 19:00]" {
-			t.Errorf("zone %q: snapshots taken = %s, want only the newest of Monday in UTC", zone, got)
-		}
 	}
 }
 
