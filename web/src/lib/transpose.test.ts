@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { transposeChord, transposeKey } from './transpose';
+import { commonKeys } from './api';
+import { readKey, transposeChord, transposeKey } from './transpose';
 
 describe('transposeChord', () => {
   it('moves the root by semitones', () => {
@@ -129,5 +130,13 @@ describe('transposeKey', () => {
   it("is null when the key can't be read, or isn't moved", () => {
     for (const key of ['', 'riff', 'am', 'H', 'Do', 'Fa#m', 'Sol']) expect(transposeKey(key, 2)).toBeNull();
     expect(transposeKey('G', 0)).toBeNull();
+  });
+});
+
+describe('the keys offered', () => {
+  it('are all 24, each read as Transpose reads a key, once', () => {
+    const read = commonKeys.map((k) => readKey(k));
+    expect(read.every((k) => k !== null)).toBe(true);
+    expect(new Set(read.map((k) => `${k!.tonic} ${k!.minor}`)).size).toBe(24);
   });
 });
