@@ -2,7 +2,9 @@
 // their usual size, apart from the Lyric Size. Like the Lyric Size, it's a
 // way of reading the Song, not an edit; it's about how far away the device
 // sits, so it's kept on this device for every Song, and is 100% until set
-// here. Below 70% a diagram's starting fret stops reading.
+// here. Like the Lyric Size, it's simply remembered, not a Device Setting
+// listed in Settings, though it's kept the same way. Below 70% a diagram's
+// starting fret stops reading.
 import type { DeviceSettingStorage } from './deviceSetting.svelte';
 
 /** The Chart Sizes, in percent, from smallest to largest. */

@@ -1,7 +1,7 @@
-// The Reading menu, in Read mode's header: the Lyric Size, whether the Chords
-// show, Transpose, the Chord Chart and its Chart Size, gathered behind one
-// button. Its rows
-// stay in place for every Song, a Chord row disabled where it can't apply.
+// The Reading menu, in Read mode's header: the Lyric Size, Transpose,
+// whether the Chords show, the Chord Chart and its Chart Size, gathered
+// behind one button. Its rows stay in place for every Song, a Chord row
+// disabled where it can't apply.
 
 import type { ChordsInRead } from './chordChart';
 import { transposeText } from './transposeAmount';
@@ -41,8 +41,8 @@ export function blockedRows({
     return { chords: why, transpose: why, chart: why, chartSize: why };
   }
   if (!chordsShown) {
-    const chart = 'Show the Chords to see the Chord Chart';
-    return { chords: null, transpose: 'Show the Chords to transpose them', chart, chartSize: chart };
+    const chartWhy = 'Show the Chords to see the Chord Chart';
+    return { chords: null, transpose: 'Show the Chords to transpose them', chart: chartWhy, chartSize: chartWhy };
   }
   const chartSize = chartShown ? null : 'Show the Chord Chart to size it';
   return { chords: null, transpose: null, chart: null, chartSize };

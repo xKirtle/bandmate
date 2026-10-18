@@ -22,9 +22,9 @@
   import { stepTranspose, transposeLimit, transposeText } from './transposeAmount';
 
   // Read mode's choices about how the Song reads, behind one button in the
-  // Lyric Sheet's header: the Lyric Size, whether the Chords show, Transpose,
-  // the Chord Chart's eye and pin, and its Chart Size. Each is kept on this
-  // device, as before.
+  // Lyric Sheet's header, in this order: the Lyric Size, Transpose, whether
+  // the Chords show, the Chord Chart's eye and pin, and its Chart Size. Each
+  // is kept on this device, as before.
   // It stays open while they change, and every Song has the same rows, a
   // Chord row disabled, saying why, where it can't apply.
 
@@ -37,7 +37,7 @@
     chords: ChordsInRead;
   } = $props();
 
-  const size = $derived(lyricSize.value);
+  const lyricPercent = $derived(lyricSize.value);
   const chordsShown = $derived(songChordsShown.of(songId));
   const transpose = $derived(songTranspose.of(songId));
   const transposeShown = $derived(transposeText(transpose));
@@ -135,45 +135,30 @@
         <button
           type="button"
           class="button step"
-          disabled={size <= smallestLyricSize}
-          onclick={() => lyricSize.set(stepLyricSize(size, -1))}
+          disabled={lyricPercent <= smallestLyricSize}
+          onclick={() => lyricSize.set(stepLyricSize(lyricPercent, -1))}
           aria-label="Make the lyrics smaller"
           title="Make the lyrics smaller"><AArrowDown /></button
         >
         <button
           type="button"
           class="button amount"
-          disabled={size === usualLyricSize}
+          disabled={lyricPercent === usualLyricSize}
           onclick={() => lyricSize.set(usualLyricSize)}
-          aria-label={size === usualLyricSize
+          aria-label={lyricPercent === usualLyricSize
             ? 'The lyrics show at their usual size'
-            : `Lyrics at ${size}%; show them at their usual size`}
-          title={size === usualLyricSize
+            : `Lyrics at ${lyricPercent}%; show them at their usual size`}
+          title={lyricPercent === usualLyricSize
             ? 'The lyrics show at their usual size'
-            : 'Show the lyrics at their usual size'}>{size}%</button
+            : 'Show the lyrics at their usual size'}>{lyricPercent}%</button
         >
         <button
           type="button"
           class="button step"
-          disabled={size >= largestLyricSize}
-          onclick={() => lyricSize.set(stepLyricSize(size, 1))}
+          disabled={lyricPercent >= largestLyricSize}
+          onclick={() => lyricSize.set(stepLyricSize(lyricPercent, 1))}
           aria-label="Make the lyrics larger"
           title="Make the lyrics larger"><AArrowUp /></button
-        >
-      </div>
-
-      <span id="reading-chords" class="name" class:blocked={blocked.chords} title={blocked.chords}>Chords</span>
-      <div class="controls" role="group" aria-labelledby="reading-chords">
-        <!-- An eye, crossed out while the Chords are hidden. -->
-        <button
-          type="button"
-          class="button toggle step"
-          aria-pressed={chords === 'shown' && chordsShown}
-          disabled={blocked.chords !== null}
-          onclick={() => songChordsShown.set(songId, !chordsShown)}
-          aria-label="Show the Chords"
-          title={blocked.chords ?? (chordsShown ? 'Hide the Chords' : 'Show the Chords')}
-          >{#if chords === 'shown' && chordsShown}<Eye />{:else}<EyeOff />{/if}</button
         >
       </div>
 
@@ -208,6 +193,21 @@
           onclick={() => songTranspose.set(songId, stepTranspose(transpose, 1))}
           aria-label="Transpose the Chords up a semitone"
           title={blocked.transpose ?? 'Transpose the Chords up a semitone'}><Plus /></button
+        >
+      </div>
+
+      <span id="reading-chords" class="name" class:blocked={blocked.chords} title={blocked.chords}>Chords</span>
+      <div class="controls" role="group" aria-labelledby="reading-chords">
+        <!-- An eye, crossed out while the Chords are hidden. -->
+        <button
+          type="button"
+          class="button toggle step"
+          aria-pressed={chords === 'shown' && chordsShown}
+          disabled={blocked.chords !== null}
+          onclick={() => songChordsShown.set(songId, !chordsShown)}
+          aria-label="Show the Chords"
+          title={blocked.chords ?? (chordsShown ? 'Hide the Chords' : 'Show the Chords')}
+          >{#if chords === 'shown' && chordsShown}<Eye />{:else}<EyeOff />{/if}</button
         >
       </div>
 
