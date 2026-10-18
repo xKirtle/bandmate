@@ -92,7 +92,11 @@ export class SyncMode {
   /** Whether Sync mode is on. */
   readonly on: boolean = $derived(this.#switchedOn && this.canBeOn && !this.#port?.loopOn);
 
-  /** The Line Sync mode cues next, while it's on, marked by a Now button in its gutter slot. */
+  /**
+   * The Line Sync mode cues next, while it's on, marked by a Now button in
+   * its gutter slot: none once the last Line is cued with every Line cued,
+   * until a Line is clicked.
+   */
   readonly next: NextLine | null = $derived.by(() => {
     const song = this.#options.song();
     return this.on && song ? nextLine(song, this.#from) : null;
@@ -141,9 +145,9 @@ export class SyncMode {
   }
 
   /**
-   * Cues the Line up next at the playhead. Its Cue shows at once, so it
-   * becomes the Line playing, as playback is already at its Cue, and the
-   * Line after it comes up next.
+   * Cues the Line up next at the playhead, if there is one. Its Cue shows
+   * at once, so it becomes the Line playing, as playback is already at its
+   * Cue, and the Line after it comes up next.
    */
   cue() {
     const line = this.next;

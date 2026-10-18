@@ -208,11 +208,13 @@ export type NextLine = Position;
 /**
  * The Line Sync mode cues next, in the order down the sheet: a Line picked
  * by clicking it, or else the one after the Line just cued, cued or not, so
- * a run of Lines can be retaken. With neither, or after the last Line, it's
- * the first Line without a Cue, or the first of the Arrangement once every
- * Line is cued; the Line just cued counts as cued, its Cue perhaps not saved
- * yet. It never depends on where playback is. Only Lines with words are cued:
- * never blank ones, nor Chord Lines. Null only without any such Line.
+ * a run of Lines can be retaken. With neither, it's the first Line without
+ * a Cue, or the first of the Arrangement once every Line is cued. After the
+ * last Line, it's the first Line without a Cue, the Line just cued counting
+ * as cued, its Cue perhaps not saved yet; once every Line is cued, there's
+ * none, so the last Line's new Cue shows, until a Line is clicked to retake
+ * it. It never depends on where playback is. Only Lines with words are
+ * cued: never blank ones, nor Chord Lines. Null too without any such Line.
  */
 export function nextLine(
   song: CuedSong<ChordedLine>,
@@ -224,11 +226,8 @@ export function nextLine(
   const at = (p: NextLine | null) => (p === null ? -1 : sheet.findIndex((q) => q.line === p.line));
   const pickedAt = at(picked);
   const cuedAt = at(cued);
-  const next =
-    sheet[pickedAt] ??
-    (cuedAt >= 0 ? sheet[cuedAt + 1] : undefined) ??
-    sheet.find((p, i) => !p.hasCue && i !== cuedAt) ??
-    sheet[0];
+  const uncued = sheet.find((p, i) => !p.hasCue && i !== cuedAt);
+  const next = sheet[pickedAt] ?? (cuedAt >= 0 ? (sheet[cuedAt + 1] ?? uncued) : (uncued ?? sheet[0]));
   return next ? { section: next.section, line: next.line } : null;
 }
 
