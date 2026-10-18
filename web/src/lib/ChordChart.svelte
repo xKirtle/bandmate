@@ -123,7 +123,7 @@
     overscroll-behavior-x: contain;
   }
   .row li {
-    flex: 0 0 4.5rem;
+    flex: 0 0 6.5rem;
   }
   /* A diagram under its Chord's name, which opens its popover. */
   .chord {
@@ -157,7 +157,7 @@
   .empty {
     box-sizing: border-box;
     width: 100%;
-    aspect-ratio: 120 / 126;
+    aspect-ratio: 128 / 126;
     border: 1px dashed var(--border);
     border-radius: var(--radius-sm);
   }
