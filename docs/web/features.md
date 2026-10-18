@@ -36,7 +36,7 @@ Write lyrics the way you would in a notebook, with the chords right where you pl
 9. **Scrapbook**: sections that aren't in the song: leftovers and ideas to come back to.
 10. **Rhymes**: suggestions for the word you're writing. See [Rhymes](#rhymes).
 
-And this is Read mode, here on a phone: the chords over the words, and how to play each one at the top. The button at the top right sets the text size, hides or transposes the chords, and shows or pins the chord shapes.
+And this is Read mode, here on a phone: the chords over the words, and how to play each one at the top. The button at the top right sets the text size, hides or transposes the chords, and shows, pins or resizes the chord shapes: larger to read them from a music stand further off, smaller to fit more on a phone. The chord shapes' size is separate from the text size, and both hold for every song on that device.
 
 <img class="phone" src="@screenshots/phone-lyric-sheet.png" alt="A song in Read mode on a phone, with the chord shapes at the top">
 

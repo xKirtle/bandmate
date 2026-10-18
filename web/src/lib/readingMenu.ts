@@ -1,5 +1,6 @@
 // The Reading menu, in Read mode's header: the Lyric Size, whether the Chords
-// show, Transpose and the Chord Chart, gathered behind one button. Its rows
+// show, Transpose, the Chord Chart and its Chart Size, gathered behind one
+// button. Its rows
 // stay in place for every Song, a Chord row disabled where it can't apply.
 
 import type { ChordsInRead } from './chordChart';
@@ -22,21 +23,27 @@ export function readingBadge({ chords, chordsShown, transpose }: ReadingChords &
 }
 
 /** Why each Chord row of the Reading menu is disabled, or null where it isn't. */
-export function blockedRows({ chords, chordsShown }: ReadingChords): {
+export function blockedRows({
+  chords,
+  chordsShown,
+  chartShown,
+}: ReadingChords & {
+  /** Whether the Chord Chart is shown on this device, by its eye. */
+  chartShown: boolean;
+}): {
   chords: string | null;
   transpose: string | null;
   chart: string | null;
+  chartSize: string | null;
 } {
   if (chords !== 'shown') {
     const why = chords === 'none' ? 'This Song has no Chords' : "No Chords in the Arrangement's active Alternates";
-    return { chords: why, transpose: why, chart: why };
+    return { chords: why, transpose: why, chart: why, chartSize: why };
   }
   if (!chordsShown) {
-    return {
-      chords: null,
-      transpose: 'Show the Chords to transpose them',
-      chart: 'Show the Chords to see the Chord Chart',
-    };
+    const chart = 'Show the Chords to see the Chord Chart';
+    return { chords: null, transpose: 'Show the Chords to transpose them', chart, chartSize: chart };
   }
-  return { chords: null, transpose: null, chart: null };
+  const chartSize = chartShown ? null : 'Show the Chord Chart to size it';
+  return { chords: null, transpose: null, chart: null, chartSize };
 }
