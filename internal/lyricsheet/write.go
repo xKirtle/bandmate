@@ -17,11 +17,11 @@ import (
 // Snapshot is worked out from the sheet before and after it (ADR 0024).
 
 // editSheet makes one change to a Song's Lyric Sheet and Scrapbook, as
-// every such change is made, Cues' included: edit makes it, a pure change
+// every such change is made, Cues included: edit makes it, a pure change
 // to a copy of the whole sheet, given ids for any rows it adds. reason is
 // BeforeDeleting or BeforeRestoring for a change that always takes a
-// Snapshot first, else "": whether the change takes one then is worked out
-// from the sheet before and after it, by decideSnapshot.
+// Snapshot first, else noReason: whether the change takes one then is
+// worked out from the sheet before and after it, by decideSnapshot.
 func (s *Store) editSheet(ctx context.Context, songID int64, based songversion.Version, reason SnapshotReason,
 	edit func(sheet LyricSheet, ids *ids) (LyricSheet, error)) (Song, error) {
 	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
@@ -52,12 +52,12 @@ func (s *Store) editSheetIn(ctx context.Context, tx *sql.Tx, songID int64, reaso
 	if err := checkTakenIDs(ctx, tx, songID, before, after, handed); err != nil {
 		return err
 	}
-	changedAt, newest, err := readSheetHistory(ctx, tx, songID)
+	history, err := readSheetHistory(ctx, tx, songID)
 	if err != nil {
 		return err
 	}
 	now := s.now().UTC()
-	decision := decideSnapshot(before, after, changedAt, newest, reason, now)
+	decision := decideSnapshot(before, after, history, reason, now)
 	if err := writeSheet(ctx, tx, songID, after); err != nil {
 		return err
 	}

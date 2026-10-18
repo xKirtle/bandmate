@@ -14,7 +14,7 @@ import (
 // copy of the active Alternate's Lines and their Cues, and makes it the active
 // one. The one it copied keeps its own Cues, dormant (ADR 0007).
 func (s *Store) AddAlternate(ctx context.Context, songID int64, based songversion.Version, sectionID int64, name string) (Song, error) {
-	return s.editSheet(ctx, songID, based, "", func(sheet LyricSheet, ids *ids) (LyricSheet, error) {
+	return s.editSheet(ctx, songID, based, noReason, func(sheet LyricSheet, ids *ids) (LyricSheet, error) {
 		return addAlternate(sheet, ids, sectionID, name)
 	})
 }
@@ -42,7 +42,7 @@ func addAlternate(sheet LyricSheet, ids *ids, sectionID int64, name string) (Lyr
 
 // RenameAlternate changes an Alternate's name. A blank name removes it.
 func (s *Store) RenameAlternate(ctx context.Context, songID int64, based songversion.Version, alternateID int64, name string) (Song, error) {
-	return s.editSheet(ctx, songID, based, "", func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
+	return s.editSheet(ctx, songID, based, noReason, func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
 		return renameAlternate(sheet, alternateID, name)
 	})
 }
@@ -60,7 +60,7 @@ func renameAlternate(sheet LyricSheet, alternateID int64, name string) (LyricShe
 // ActivateAlternate makes an Alternate the only active one of its Section, so
 // the Section shows it.
 func (s *Store) ActivateAlternate(ctx context.Context, songID int64, based songversion.Version, alternateID int64) (Song, error) {
-	return s.editSheet(ctx, songID, based, "", func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
+	return s.editSheet(ctx, songID, based, noReason, func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
 		return activateAlternate(sheet, alternateID)
 	})
 }
@@ -121,7 +121,7 @@ func deleteAlternate(sheet LyricSheet, alternateID int64) (LyricSheet, error) {
 // the new Section is put back (ADR 0010). The active Alternate can't be
 // moved.
 func (s *Store) MoveAlternateToScrapbook(ctx context.Context, songID int64, based songversion.Version, alternateID int64) (Song, error) {
-	return s.editSheet(ctx, songID, based, "", func(sheet LyricSheet, ids *ids) (LyricSheet, error) {
+	return s.editSheet(ctx, songID, based, noReason, func(sheet LyricSheet, ids *ids) (LyricSheet, error) {
 		return moveAlternateToScrapbook(sheet, ids, alternateID)
 	})
 }
@@ -143,7 +143,7 @@ func moveAlternateToScrapbook(sheet LyricSheet, ids *ids, alternateID int64) (Ly
 // it's now the Section's active Alternate (ADR 0010). The active Alternate
 // can't be moved.
 func (s *Store) MoveAlternateToArrangement(ctx context.Context, songID int64, based songversion.Version, alternateID int64, position int) (Song, error) {
-	return s.editSheet(ctx, songID, based, "", func(sheet LyricSheet, ids *ids) (LyricSheet, error) {
+	return s.editSheet(ctx, songID, based, noReason, func(sheet LyricSheet, ids *ids) (LyricSheet, error) {
 		return moveAlternateToArrangement(sheet, ids, alternateID, position)
 	})
 }
@@ -191,7 +191,7 @@ func moveAlternateOut(sheet LyricSheet, ids *ids, alternateID int64) (_ LyricShe
 // keep their ids and their Cues, dormant until their Alternate is made
 // active (ADR 0010).
 func (s *Store) AddToSection(ctx context.Context, songID int64, based songversion.Version, addedID, sectionID int64) (Song, error) {
-	return s.editSheet(ctx, songID, based, "", func(sheet LyricSheet, ids *ids) (LyricSheet, error) {
+	return s.editSheet(ctx, songID, based, noReason, func(sheet LyricSheet, ids *ids) (LyricSheet, error) {
 		return addToSection(sheet, ids, addedID, sectionID)
 	})
 }

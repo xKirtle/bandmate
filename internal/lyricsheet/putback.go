@@ -14,7 +14,7 @@ import (
 // no Snapshot of its own, but starts an editing session like any change
 // to the sheet. A copy that isn't a sheet of this Song is refused.
 func (s *Store) PutSheetBack(ctx context.Context, songID int64, based songversion.Version, sheet LyricSheet) (Song, error) {
-	return s.editSheet(ctx, songID, based, "", func(current LyricSheet, _ *ids) (LyricSheet, error) {
+	return s.editSheet(ctx, songID, based, noReason, func(current LyricSheet, _ *ids) (LyricSheet, error) {
 		// The copy comes from outside, so it's checked as given too, Cues
 		// it won't put back included.
 		if err := checkChange(current, sheet); err != nil {

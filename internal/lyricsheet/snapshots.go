@@ -53,6 +53,9 @@ const (
 	BeforeDeleting SnapshotReason = "deleting"
 	// BeforeRestoring is a Snapshot taken before a restore.
 	BeforeRestoring SnapshotReason = "restoring"
+	// noReason is the reason an edit other than deleting or restoring
+	// gives: whether it takes a Snapshot is worked out from the edit.
+	noReason SnapshotReason = ""
 )
 
 // SnapshotSummary is a Snapshot as listed: when it was taken, and why.
@@ -204,11 +207,19 @@ type snapshotDecision struct {
 	changed bool
 }
 
+// sheetHistory is what decideSnapshot needs of a sheet's past.
+type sheetHistory struct {
+	// changedAt is when the sheet last changed, zero if never.
+	changedAt time.Time
+	// newest is the sheet the newest Snapshot holds, as stored; nil if
+	// there's none.
+	newest []byte
+}
+
 // decideSnapshot works out whether a change from before to after takes a
-// Snapshot of before, and marks the sheet changed at now. changedAt is when
-// the sheet last changed, zero if never, and newest the newest Snapshot's
-// sheet, nil if there's none. reason is that given by the change, "" for
-// any but one before deleting or restoring:
+// Snapshot of before, and marks the sheet changed at now. reason is that
+// given by the change, noReason for any but one before deleting or
+// restoring:
 //
 //   - BeforeDeleting and BeforeRestoring always take one, standing in for
 //     the editing session's, and mark the sheet changed. One before
@@ -218,25 +229,19 @@ type snapshotDecision struct {
 //   - Any other change marks the sheet changed, and, if it starts an
 //     editing session, EditingSession or more after the last change, takes
 //     one BeforeEditing, unless before has no Sections or is the same as
-//     newest.
-func decideSnapshot(before, after LyricSheet, changedAt time.Time, newest *LyricSheet, reason SnapshotReason,
-	now time.Time) snapshotDecision {
+//     the newest Snapshot's.
+func decideSnapshot(before, after LyricSheet, history sheetHistory, reason SnapshotReason, now time.Time) snapshotDecision {
 	switch {
 	case reason == BeforeDeleting:
 		return snapshotDecision{take: true, reason: reason, deleted: deletedName(before, after), changed: true}
-	case reason != "":
+	case reason != noReason:
 		return snapshotDecision{take: true, reason: reason, changed: true}
 	case sameWords(before, after):
 		return snapshotDecision{}
 	}
-	starts := changedAt.IsZero() || now.Sub(changedAt) >= EditingSession
-	take := starts && len(before.Sections) > 0 && (newest == nil || !sameHeld(before, *newest))
+	starts := history.changedAt.IsZero() || now.Sub(history.changedAt) >= EditingSession
+	take := starts && len(before.Sections) > 0 && !bytes.Equal(encodeHeld(toHeld(before)), history.newest)
 	return snapshotDecision{take: take, reason: BeforeEditing, changed: true}
-}
-
-// sameHeld reports whether a Snapshot of a would hold the same as one of b.
-func sameHeld(a, b LyricSheet) bool {
-	return bytes.Equal(encodeHeld(toHeld(a)), encodeHeld(toHeld(b)))
 }
 
 // sameWords reports whether two sheets are the same but for their Cues.
@@ -288,33 +293,25 @@ func deletedName(before, after LyricSheet) string {
 	return names[0]
 }
 
-// readSheetHistory reads when a Song's sheet last changed, zero if never,
-// and the sheet its newest Snapshot holds, nil if it has none.
-func readSheetHistory(ctx context.Context, tx *sql.Tx, songID int64) (changedAt time.Time, newest *LyricSheet, err error) {
+// readSheetHistory reads a Song's sheetHistory.
+func readSheetHistory(ctx context.Context, tx *sql.Tx, songID int64) (sheetHistory, error) {
+	var history sheetHistory
 	var last sql.NullString
 	if err := tx.QueryRowContext(ctx, `SELECT sheet_changed_at FROM songs WHERE id = ?`, songID).Scan(&last); err != nil {
-		return time.Time{}, nil, fmt.Errorf("reading when the sheet last changed: %w", err)
+		return sheetHistory{}, fmt.Errorf("reading when the sheet last changed: %w", err)
 	}
 	if last.Valid {
-		if changedAt, err = domain.ParseTime(last.String); err != nil {
-			return time.Time{}, nil, err
+		var err error
+		if history.changedAt, err = domain.ParseTime(last.String); err != nil {
+			return sheetHistory{}, err
 		}
 	}
-	var sheet []byte
-	err = tx.QueryRowContext(ctx, `SELECT sheet FROM snapshots WHERE song_id = ? ORDER BY taken_at DESC, id DESC LIMIT 1`,
-		songID).Scan(&sheet)
-	if errors.Is(err, sql.ErrNoRows) {
-		return changedAt, nil, nil
+	err := tx.QueryRowContext(ctx, `SELECT sheet FROM snapshots WHERE song_id = ? ORDER BY taken_at DESC, id DESC LIMIT 1`,
+		songID).Scan(&history.newest)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return sheetHistory{}, fmt.Errorf("reading the newest snapshot: %w", err)
 	}
-	if err != nil {
-		return time.Time{}, nil, fmt.Errorf("reading the newest snapshot: %w", err)
-	}
-	var held heldSheet
-	if err := json.Unmarshal(sheet, &held); err != nil {
-		return time.Time{}, nil, fmt.Errorf("reading the newest snapshot's sheet: %w", err)
-	}
-	newestSheet := held.lyricSheet()
-	return changedAt, &newestSheet, nil
+	return history, nil
 }
 
 // markSheetChanged notes that a Song's sheet changed at now.

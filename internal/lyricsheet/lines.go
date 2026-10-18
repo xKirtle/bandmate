@@ -13,7 +13,7 @@ import (
 // Lines edited in place keep their ids, removed Lines are deleted, and only
 // Lines that are really new get new ids.
 func (s *Store) ReplaceAlternateText(ctx context.Context, songID int64, based songversion.Version, alternateID int64, text string) (Song, error) {
-	return s.editSheet(ctx, songID, based, "", func(sheet LyricSheet, ids *ids) (LyricSheet, error) {
+	return s.editSheet(ctx, songID, based, noReason, func(sheet LyricSheet, ids *ids) (LyricSheet, error) {
 		return replaceAlternateText(sheet, ids, alternateID, text)
 	})
 }

@@ -42,7 +42,7 @@ func TestDecideSnapshot(t *testing.T) {
 	}
 	none := snapshotDecision{}
 	editing := snapshotDecision{take: true, reason: BeforeEditing, changed: true}
-	noSnapshot := snapshotDecision{reason: BeforeEditing, changed: true}
+	noSnapshot := snapshotDecision{changed: true}
 	deleting := func(name string) snapshotDecision {
 		return snapshotDecision{take: true, reason: BeforeDeleting, deleted: name, changed: true}
 	}
@@ -181,11 +181,14 @@ func TestDecideSnapshot(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var changedAt time.Time
+			var history sheetHistory
 			if tt.history.changedAgo != 0 {
-				changedAt = now.Add(-tt.history.changedAgo)
+				history.changedAt = now.Add(-tt.history.changedAgo)
 			}
-			got := decideSnapshot(tt.before, tt.after, changedAt, tt.history.newest, tt.reason, now)
+			if tt.history.newest != nil {
+				history.newest = encodeHeld(toHeld(*tt.history.newest))
+			}
+			got := decideSnapshot(tt.before, tt.after, history, tt.reason, now)
 			if got.take != tt.want.take || got.changed != tt.want.changed ||
 				(got.take && (got.reason != tt.want.reason || got.deleted != tt.want.deleted)) {
 				t.Errorf("decision = %+v, want %+v", got, tt.want)
