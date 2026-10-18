@@ -5,7 +5,6 @@
  */
 
 import type { Freeze } from './freeze';
-import { ownArrow } from './keyPlace';
 import { matches, stepBy, type Key, type KeyDown, type KeyPress, type Way } from './shortcuts';
 import { rebound } from './shortcutKeys';
 
@@ -26,12 +25,10 @@ function mouse(key: 'click' | 'drag' | 'wheel', e: Modifiers): KeyPress {
 export type TimelineKey =
   'clearSelection' | 'selectAll' | 'deleteSelection' | 'deleteClip' | 'copy' | 'cut' | 'paste' | 'clipMenu';
 
-/** Where a key was pressed in the Timeline, and what the Timeline is doing. */
+/** Whether the key is the control's own where it was pressed, and what the Timeline is doing. */
 export type TimelineKeyContext = {
-  /** It was pressed in a text field, which takes typed keys. */
-  inTextField: boolean;
-  /** It was pressed in a ⋯ menu or a dialog, whose keys are for what's in it. */
-  inMenuOrDialog: boolean;
+  /** The key is the control's own there, e.g. a text field's or a ⋯ menu's: see `ownKey`. */
+  own: boolean;
   /** The Timeline can be edited, i.e. it isn't in Read mode or on a phone. */
   editable: boolean;
   /** Why the Timeline can't be edited now, if it can't. */
@@ -42,8 +39,6 @@ export type TimelineKeyContext = {
   focusedClip: { inSelection: boolean } | null;
   /** A Track is being dragged by its grip. */
   draggingTrack: boolean;
-  /** The arrows there are the control's own, e.g. a slider's or a number box's. */
-  ownsArrows: boolean;
 };
 
 /**
@@ -52,7 +47,7 @@ export type TimelineKeyContext = {
  */
 export function timelineKey(e: KeyDown, at: TimelineKeyContext): TimelineKey | null {
   // A text field's, a menu's or a dialog's keys are their own.
-  if (e.defaultPrevented || at.inTextField || at.inMenuOrDialog || ownArrow(e, at)) return null;
+  if (e.defaultPrevented || at.own) return null;
   // Nor while a Track is dragged, which Esc then cancels.
   if (at.draggingTrack) return null;
   // Deleting, copying, cutting and pasting go with editing, so not on a

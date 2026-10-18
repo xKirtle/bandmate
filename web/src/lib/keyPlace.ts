@@ -1,46 +1,46 @@
 import { inTextField } from './textField';
 
-/** Where a key was pressed, and whether a dialog had the page then. */
-export type KeyPlace = {
-  /** A dialog is open, e.g. the shortcuts dialog. */
-  dialogOpen: boolean;
-  /** It was pressed in a text field, which takes typed keys. */
-  inTextField: boolean;
-  /** The arrows there are the control's own, e.g. a number box's, a list's or a slider's. */
-  ownsArrows: boolean;
-};
+// Where every key is for what's in it: a dialog, a popover (e.g. the Cues
+// menu, Reading options or the Chord popover), a ⋯ menu, or a list, e.g. a
+// picker's or a combobox's.
+const keyOwners = 'dialog, [role="dialog"], [role="menu"], [role="listbox"]';
 
-/** Where a key on the Song page was pressed: whether a dialog is open, in a text field, or in a control that uses the arrows. */
-export function keyPlace(event: Event): KeyPlace {
-  return {
-    dialogOpen: document.querySelector('dialog[open]') !== null,
-    inTextField: inTextField(event.target),
-    ownsArrows: ownsArrows(event.target),
-  };
-}
-
-// Controls whose arrows move within them: a slider, a list, a menu, a
-// tab list, radio buttons, a ⋯ or a field that opens its menu or list with them.
+// Controls whose arrows move within them: a slider, a number box, a
+// combobox, a tab list, radio buttons, a ⋯ or a field that opens its menu
+// or list with them.
 const arrowControls =
-  '[role="slider"], [role="spinbutton"], [role="listbox"], [role="combobox"], [role="menu"], [role="tablist"], [role="radiogroup"], [aria-haspopup="true"], [aria-haspopup="menu"], [aria-haspopup="listbox"], dialog';
-
-/**
- * Whether the arrows pressed there are the control's own: a text field's,
- * a list's, a slider's or a number box's, a menu's or a tab list's, so a
- * Shortcut given an arrow leaves it to them, as Space, Home and End are.
- */
-export function ownsArrows(target: EventTarget | null): boolean {
-  if (inTextField(target) || target instanceof HTMLSelectElement) return true;
-  if (target instanceof HTMLInputElement && ['range', 'number', 'radio'].includes(target.type)) return true;
-  return target instanceof Element && target.closest(arrowControls) !== null;
-}
+  '[role="slider"], [role="spinbutton"], [role="combobox"], [role="tablist"], [role="radiogroup"], [aria-haspopup="true"], [aria-haspopup="menu"], [aria-haspopup="listbox"]';
 
 const arrows = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
 
 /**
- * Whether an arrow was pressed in a control that uses it, e.g. a number
- * box, which a Shortcut given that arrow leaves alone.
+ * Whether a key pressed on the Song page is the control's own where it was
+ * pressed, which every Shortcut then leaves to it, whatever its keys:
+ *
+ * - every key typed in a text field;
+ * - every key pressed in a dialog, a popover, a ⋯ menu or a list. It's
+ *   where the key was pressed that counts, not whether one is open: with a
+ *   popover open and focus left on the page, Space still plays;
+ * - Space on a select, a checkbox or a radio button, though on any other
+ *   button it plays or pauses, as focus a click left there shouldn't stop it;
+ * - Home and End on a select or a range slider, e.g. a Track's volume,
+ *   though not on the ruler, where they go to the start and the end;
+ * - an arrow in a control that moves with it, e.g. a number box, a slider
+ *   or a ⋯.
  */
-export function ownArrow(e: { key: string }, at: { ownsArrows: boolean }): boolean {
-  return at.ownsArrows && arrows.includes(e.key);
+export function ownKey(event: { key: string; target: EventTarget | null }): boolean {
+  const { key, target } = event;
+  if (inTextField(target)) return true;
+  if (!(target instanceof Element)) return false;
+  if (target.closest(keyOwners)) return true;
+  if (key === ' ') return target instanceof HTMLSelectElement || isInput(target, 'checkbox', 'radio');
+  if (key === 'Home' || key === 'End') return target instanceof HTMLSelectElement || isInput(target, 'range');
+  if (!arrows.includes(key)) return false;
+  if (target instanceof HTMLSelectElement || isInput(target, 'range', 'number', 'radio')) return true;
+  return target.closest(arrowControls) !== null;
+}
+
+/** Whether it's an input of one of these types. */
+function isInput(target: Element, ...types: string[]): boolean {
+  return target instanceof HTMLInputElement && types.includes(target.type);
 }

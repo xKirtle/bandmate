@@ -53,8 +53,7 @@
   import { cuesNextLine } from './syncKeys';
   import type { SyncMode } from './syncMode.svelte';
   import type { RhymeMode } from './rhymeMode.svelte';
-  import { ownsArrows } from './keyPlace';
-  import { inTextField } from './textField';
+  import { ownKey } from './keyPlace';
   import { songChordsShown } from './chordsShown';
   import { lyricSize } from './sharedLyricSize.svelte';
   import { songTranspose } from './sharedTranspose.svelte';
@@ -246,16 +245,11 @@
   const cueNextLabel = $derived(hints.label(rebound().cueNextLine.keys));
   const cueNextWays = $derived(cueNextLabel ? `${cueNextLabel} or Now` : 'Now');
 
-  // In Sync mode, Enter cues anywhere but a text field or a dialog, even on
-  // a button: syncing along shouldn't depend on where focus was left.
+  // In Sync mode, Enter cues anywhere but where it's the control's own, e.g. a
+  // text field or a popover, so even on a button: syncing along shouldn't
+  // depend on where focus was left.
   function cueKey(event: KeyboardEvent) {
-    const at = {
-      syncing: syncMode.on,
-      inTextField: inTextField(event.target),
-      inDialogOrMenu: event.target instanceof Element && !!event.target.closest('dialog, [role="menu"]'),
-      ownsArrows: ownsArrows(event.target),
-    };
-    if (!cuesNextLine(event, at)) return;
+    if (!cuesNextLine(event, { syncing: syncMode.on, own: ownKey(event) })) return;
     event.preventDefault();
     syncMode.cue();
   }
