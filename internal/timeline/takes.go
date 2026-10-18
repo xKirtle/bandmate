@@ -61,10 +61,8 @@ func (s *Store) RecordTake(ctx context.Context, songID int64, based songversion.
 	if length <= tolerance {
 		return Timeline{}, errTakeTooEarly
 	}
-	return s.addTake(ctx, songID, based, file, func(tx *sql.Tx) (int64, error) {
-		if err := findTrack(ctx, tx, songID, rec.TrackID); errors.Is(err, domain.ErrNotFound) {
-			return 0, domain.Invalid("there's no such Track on this Timeline")
-		} else if err != nil {
+	return s.addTake(ctx, songID, based, file, func(tx *sql.Tx, before Timeline) (int64, error) {
+		if err := before.trackToPlaceOn(rec.TrackID); err != nil {
 			return 0, err
 		}
 		takeID, err := take.insert(ctx, tx, songID, 1, take.start-(start-offset))
@@ -156,9 +154,9 @@ func (t newTake) insert(ctx context.Context, tx *sql.Tx, songID int64, number in
 // as file, and keeps the file under the id the change gives it, if it's
 // made. Otherwise the file is discarded.
 func (s *Store) addTake(ctx context.Context, songID int64, based songversion.Version, file *audio.Received,
-	add func(tx *sql.Tx) (int64, error)) (Timeline, error) {
-	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
-		takeID, err := add(tx)
+	add func(tx *sql.Tx, before Timeline) (int64, error)) (Timeline, error) {
+	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges, before Timeline) error {
+		takeID, err := add(tx, before)
 		if err != nil {
 			return err
 		}
@@ -181,11 +179,12 @@ func (s *Store) Retake(ctx context.Context, songID int64, based songversion.Vers
 	if err != nil {
 		return Timeline{}, err
 	}
-	return s.addTake(ctx, songID, based, file, func(tx *sql.Tx) (int64, error) {
-		p, err := clipPlacement(ctx, tx, songID, clipID)
-		if err != nil {
-			return 0, err
+	return s.addTake(ctx, songID, based, file, func(tx *sql.Tx, before Timeline) (int64, error) {
+		track, clip, ok := before.clip(clipID)
+		if !ok {
+			return 0, domain.ErrNotFound
 		}
+		p := placementOf(track.ID, clip)
 		if !p.source.activeTakeID.Valid {
 			return 0, domain.Invalid("only a Clip of Takes can be retaken")
 		}
@@ -203,16 +202,7 @@ func (s *Store) Retake(ctx context.Context, songID int64, based songversion.Vers
 		if err := startSpanEarlier(ctx, tx, clipID, &p, -p.sourceAt(take.start)); err != nil {
 			return 0, err
 		}
-		var next sql.NullFloat64
-		if err := tx.QueryRowContext(ctx, `SELECT MIN(start) FROM clips WHERE track_id = ? AND id != ? AND start >= ?`,
-			p.trackID, clipID, p.start+p.length-tolerance).Scan(&next); err != nil {
-			return 0, fmt.Errorf("finding the next clip: %w", err)
-		}
-		end := take.end()
-		if next.Valid {
-			end = min(end, next.Float64)
-		}
-		p.length = max(p.length, end-p.start)
+		p.length = grownTo(track, clip, take.end())
 		number, err := nextTakeNumber(ctx, tx, clipID)
 		if err != nil {
 			return 0, err
@@ -296,8 +286,8 @@ func (s *Store) SetTakes(ctx context.Context, songID int64, based songversion.Ve
 	if err != nil {
 		return Timeline{}, err
 	}
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		p, err := takeClip(ctx, tx, songID, clipID)
+	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges, before Timeline) error {
+		p, err := before.takeClip(clipID)
 		if err != nil {
 			return err
 		}
@@ -369,8 +359,8 @@ func (s *Store) NudgeTake(ctx context.Context, songID int64, based songversion.V
 		}
 		return nil
 	}
-	return s.changeRewording(ctx, songID, based, reword, func(tx *sql.Tx, _ *audio.FileChanges, _ Timeline) error {
-		p, err := takeClip(ctx, tx, songID, clipID)
+	return s.changeRewording(ctx, songID, based, reword, func(tx *sql.Tx, _ *audio.FileChanges, before Timeline) error {
+		p, err := before.takeClip(clipID)
 		if err != nil {
 			return err
 		}
@@ -402,10 +392,10 @@ func checkNudge(nudge float64) error {
 	return nil
 }
 
-// takeClip reads where one of the Song's Clips of Takes is and what it
-// plays.
-func takeClip(ctx context.Context, tx *sql.Tx, songID, clipID int64) (placement, error) {
-	p, err := clipPlacement(ctx, tx, songID, clipID)
+// takeClip is where one of tl's Clips of Takes is and what it plays,
+// refusing a Clip that has no Takes.
+func (tl Timeline) takeClip(clipID int64) (placement, error) {
+	p, err := tl.placement(clipID)
 	if err != nil {
 		return placement{}, err
 	}
@@ -418,8 +408,8 @@ func takeClip(ctx context.Context, tx *sql.Tx, songID, clipID int64) (placement,
 // ChooseTake makes one of a Clip's Takes the one it plays, through the same
 // window.
 func (s *Store) ChooseTake(ctx context.Context, songID int64, based songversion.Version, clipID, takeID int64) (Timeline, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		p, err := takeClip(ctx, tx, songID, clipID)
+	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges, before Timeline) error {
+		p, err := before.takeClip(clipID)
 		if err != nil {
 			return err
 		}
@@ -443,8 +433,8 @@ func setActiveTake(ctx context.Context, tx *sql.Tx, clipID, takeID int64) error 
 // active, and deleting the last deletes the Clip. The Clip's window shrinks
 // to the Takes left, as for keepTakes.
 func (s *Store) DeleteTake(ctx context.Context, songID int64, based songversion.Version, clipID, takeID int64) (Timeline, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		p, err := takeClip(ctx, tx, songID, clipID)
+	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges, before Timeline) error {
+		p, err := before.takeClip(clipID)
 		if err != nil {
 			return err
 		}
@@ -463,8 +453,8 @@ func (s *Store) DeleteTake(ctx context.Context, songID int64, based songversion.
 // be brought back by setting the Clip's Takes. The Clip's window shrinks to
 // the Take left, as for keepTakes.
 func (s *Store) ClearInactiveTakes(ctx context.Context, songID int64, based songversion.Version, clipID int64) (Timeline, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		p, err := takeClip(ctx, tx, songID, clipID)
+	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges, before Timeline) error {
+		p, err := before.takeClip(clipID)
 		if err != nil {
 			return err
 		}

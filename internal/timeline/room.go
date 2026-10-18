@@ -3,12 +3,16 @@ package timeline
 import (
 	"cmp"
 	"slices"
+
+	"github.com/xKirtle/bandmate/internal/domain"
 )
 
-// The searches for where a Clip fits look at the Timeline a change starts
-// from, never the database. They find a place rather than refuse one, and
-// test for overlaps as checkLayout does (overlapsAnother), which then
-// checks where they put it (ADR 0023).
+// Where a Clip is, what's next to it and where it fits are answered on the
+// Timeline a change starts from, which the change path hands every
+// operation, never the database (ADR 0023). The searches find a place
+// rather than refuse one, and test for overlaps as checkLayout does
+// (overlapsAnother), which then checks where they put it. Each question has
+// one answer, here: an operation grows no copy of its own.
 
 // track is the Track of tl with the id given, or a Track with no Clips if
 // there's none.
@@ -30,6 +34,44 @@ func (tl Timeline) clip(id int64) (Track, Clip, bool) {
 	return Track{}, Clip{}, false
 }
 
+// placement is where one of tl's Clips is and what it plays, as stored: the
+// value an operation changes and writes back, taken from the Timeline in
+// hand rather than read back a Clip at a time.
+func (tl Timeline) placement(clipID int64) (placement, error) {
+	t, c, ok := tl.clip(clipID)
+	if !ok {
+		return placement{}, domain.ErrNotFound
+	}
+	return placementOf(t.ID, c), nil
+}
+
+// placementOf is where c, on the Track with the id given, is and what it
+// plays, as stored.
+func placementOf(trackID int64, c Clip) placement {
+	p := placement{
+		trackID:      trackID,
+		source:       source{beatID: nullID(c.BeatID), soundID: nullID(c.SoundID), activeTakeID: nullID(c.ActiveTakeID)},
+		name:         clipName(c.Name),
+		ClipPlayback: c.ClipPlayback,
+		start:        c.Start,
+		offset:       c.Offset,
+		length:       c.Length,
+	}
+	for _, take := range c.Takes {
+		p.source.takeIDs = append(p.source.takeIDs, take.ID)
+	}
+	return p
+}
+
+// trackToPlaceOn refuses a Track a Clip is to go on that isn't one of tl's,
+// as findTrackToPlaceOn does for a Clip placed from outside the Timeline.
+func (tl Timeline) trackToPlaceOn(id int64) error {
+	if !slices.ContainsFunc(tl.Tracks, func(t Track) bool { return t.ID == id }) {
+		return domain.Invalid("there's no such Track on this Timeline")
+	}
+	return nil
+}
+
 // trackEnd is where t's last Clip ends, or 0:00 if it has none: where a
 // Clip added to it goes.
 func trackEnd(t Track) float64 {
@@ -48,6 +90,34 @@ func duplicateStart(t Track, c Clip) float64 {
 		return trackEnd(t)
 	}
 	return copied.Start
+}
+
+// nextStart is where the next Clip on t after c starts, if there's one: the
+// earliest start at or after where c ends, c itself left out, a rounding
+// hair of slack allowed.
+func nextStart(t Track, c Clip) (float64, bool) {
+	var next float64
+	found := false
+	for _, o := range t.Clips {
+		if o.ID == c.ID || o.Start < c.Start+c.Length-tolerance {
+			continue
+		}
+		if !found || o.Start < next {
+			next, found = o.Start, true
+		}
+	}
+	return next, found
+}
+
+// grownTo is how long c, on t, plays once it's grown to end at end: never
+// past the start of the next Clip on t, and never shorter than it is. It's
+// how far a Retake grows the Clip it goes into, the rest of the Take kept
+// hidden behind it (Retake).
+func grownTo(t Track, c Clip, end float64) float64 {
+	if next, ok := nextStart(t, c); ok {
+		end = min(end, next)
+	}
+	return max(c.Length, end-c.Start)
 }
 
 // fitsBeforeNext tells whether c, keeping its start on t, ends by the start

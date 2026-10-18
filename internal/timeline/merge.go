@@ -83,8 +83,8 @@ func (s *Store) MergeClips(ctx context.Context, songID int64, based songversion.
 	if err != nil {
 		return Timeline{}, err
 	}
-	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
-		start, end, err := mergedSpan(ctx, tx, songID, m.ClipIDs)
+	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges, before Timeline) error {
+		start, end, err := mergedSpan(before, m.ClipIDs)
 		if err != nil {
 			return err
 		}
@@ -99,7 +99,7 @@ func (s *Store) MergeClips(ctx context.Context, songID int64, based songversion.
 				return err
 			}
 		}
-		trackID, err := m.landingTrack(ctx, tx, songID)
+		trackID, err := m.landingTrack(ctx, tx, songID, before)
 		if err != nil {
 			return err
 		}
@@ -120,28 +120,29 @@ func (s *Store) MergeClips(ctx context.Context, songID int64, based songversion.
 	})
 }
 
-// mergedSpan is where on the Timeline the earliest of the Song's Clips
+// mergedSpan is where on the Timeline the earliest of tl's Clips merged
 // starts and the latest ends.
-func mergedSpan(ctx context.Context, tx *sql.Tx, songID int64, clipIDs []int64) (start, end float64, err error) {
+func mergedSpan(tl Timeline, clipIDs []int64) (start, end float64, err error) {
 	for i, id := range clipIDs {
-		p, err := clipPlacement(ctx, tx, songID, id)
-		if err != nil {
-			return 0, 0, err
+		_, c, ok := tl.clip(id)
+		if !ok {
+			return 0, 0, domain.ErrNotFound
 		}
 		if i == 0 {
-			start, end = p.start, p.start+p.length
+			start, end = c.Start, c.Start+c.Length
 			continue
 		}
-		start, end = min(start, p.start), max(end, p.start+p.length)
+		start, end = min(start, c.Start), max(end, c.Start+c.Length)
 	}
 	return start, end, nil
 }
 
-// landingTrack is the id of the Track a merged Clip goes on: the Song's Track m
-// names, or the new one, which it adds where m says.
-func (m ClipMerge) landingTrack(ctx context.Context, tx *sql.Tx, songID int64) (int64, error) {
+// landingTrack is the id of the Track a merged Clip goes on: the Track m
+// names, of the Timeline the Merge starts from, or the new one, which it
+// adds where m says.
+func (m ClipMerge) landingTrack(ctx context.Context, tx *sql.Tx, songID int64, before Timeline) (int64, error) {
 	if m.NewTrack == nil {
-		return *m.TrackID, findTrackToPlaceOn(ctx, tx, songID, *m.TrackID)
+		return *m.TrackID, before.trackToPlaceOn(*m.TrackID)
 	}
 	added, err := insertTracksAt(ctx, tx, songID, []TrackAt{*m.NewTrack})
 	if err != nil {

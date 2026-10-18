@@ -7,6 +7,7 @@ import (
 	"math"
 	"slices"
 
+	"github.com/xKirtle/bandmate/internal/audio"
 	"github.com/xKirtle/bandmate/internal/domain"
 	"github.com/xKirtle/bandmate/internal/songversion"
 )
@@ -37,10 +38,10 @@ func (s *Store) SetClipPitches(ctx context.Context, songID int64, based songvers
 			return Timeline{}, err
 		}
 	}
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges, before Timeline) error {
 		for _, p := range pitches {
-			if _, err := clipPlacement(ctx, tx, songID, p.ClipID); err != nil {
-				return err
+			if _, _, ok := before.clip(p.ClipID); !ok {
+				return domain.ErrNotFound
 			}
 			if _, err := tx.ExecContext(ctx, `UPDATE clips SET pitch = ? WHERE id = ?`, *p.Pitch, p.ClipID); err != nil {
 				return fmt.Errorf("setting pitch: %w", err)

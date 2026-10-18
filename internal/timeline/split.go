@@ -28,9 +28,9 @@ func (s *Store) SplitClips(ctx context.Context, songID int64, based songversion.
 			return Timeline{}, domain.Invalid("each Clip can only be split once")
 		}
 	}
-	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
+	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges, before Timeline) error {
 		for _, id := range clipIDs {
-			if err := s.splitClip(ctx, tx, changes, songID, id, at); err != nil {
+			if err := s.splitClip(ctx, tx, changes, before, id, at); err != nil {
 				return err
 			}
 		}
@@ -38,10 +38,12 @@ func (s *Store) SplitClips(ctx context.Context, songID int64, based songversion.
 	})
 }
 
-// splitClip cuts one of the Song's Clips in two at a time, as SplitClips
-// does, with the Take files to link added to changes.
-func (s *Store) splitClip(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, songID, clipID int64, at float64) error {
-	p, err := clipPlacement(ctx, tx, songID, clipID)
+// splitClip cuts one of the Clips of the Timeline a split starts from in
+// two at a time, as SplitClips does, with the Take files to link added to
+// changes.
+func (s *Store) splitClip(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, before Timeline,
+	clipID int64, at float64) error {
+	p, err := before.placement(clipID)
 	if err != nil {
 		return err
 	}
