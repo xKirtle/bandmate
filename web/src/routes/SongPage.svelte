@@ -821,6 +821,14 @@
     background: var(--surface-1);
     font-weight: 600;
     cursor: pointer;
+    transition: background-color var(--duration-fast) var(--ease);
+  }
+  /* The mode not chosen rises halfway to the chosen one's surface under a
+     pointer that can hover, so it never looks chosen. */
+  @media (hover: hover) {
+    .mode:hover:not(:has(input:checked, input:disabled)) {
+      background: color-mix(in srgb, var(--surface-2) 50%, var(--surface-1));
+    }
   }
   .mode + .mode {
     border-left: 1px solid var(--border);

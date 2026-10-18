@@ -488,6 +488,14 @@ select {
   color: var(--text);
   font-size: var(--text-field);
   font-weight: 400;
+  transition: background-color var(--duration-fast) var(--ease);
+}
+/* It opens something when pressed, so it rises one surface under a pointer
+   that can hover, as a button does. */
+@media (hover: hover) {
+  .field-box:hover:not(:disabled, [aria-disabled='true']) {
+    background: var(--surface-2);
+  }
 }
 
 /* A fold's summary draws its own chevron, FoldChevron. */
