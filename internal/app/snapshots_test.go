@@ -112,19 +112,19 @@ func TestNoSnapshotIsTakenOfASheetTheSameAsTheNewestSnapshots(t *testing.T) {
 	ts, clock, s := snapshotServer(t, "City lights")
 	clock.Advance(time.Hour)
 	ts.setLabel(s.ID, s.Sections[0].ID, "Verse 1")
-	clock.Advance(time.Hour)
+	clock.Advance(time.Minute)
+	// Back to the sheet the Snapshot holds.
 	ts.setLabel(s.ID, s.Sections[0].ID, "Verse")
 	clock.Advance(time.Hour)
-	// Back to the sheet the first Snapshot holds, but not the newest's.
-	ts.setLabel(s.ID, s.Sections[0].ID, "Verse")
+	ts.setLabel(s.ID, s.Sections[0].ID, "Chorus")
 	clock.Advance(time.Hour)
-	ts.setLabel(s.ID, s.Sections[0].ID, "Verse")
+	ts.setLabel(s.ID, s.Sections[0].ID, "Verse 2")
 
 	list := ts.listSnapshots(s.ID)
-	if len(list) != 3 {
-		t.Fatalf("snapshots = %+v, want three: none for the last change, made to the sheet the newest holds", list)
+	if len(list) != 2 {
+		t.Fatalf("snapshots = %+v, want two: none before Chorus, made to the sheet the newest holds", list)
 	}
-	if !parseTime(t, list[0].TakenAt).Equal(clock.Now().Add(-time.Hour)) {
+	if !parseTime(t, list[0].TakenAt).Equal(clock.Now()) {
 		t.Errorf("snapshots = %+v, want the newest first", list)
 	}
 }

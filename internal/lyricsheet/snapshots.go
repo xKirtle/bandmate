@@ -2,12 +2,14 @@ package lyricsheet
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 	"time"
 
@@ -189,43 +191,130 @@ func RemapSnapshotSheet(sheet string, newID func(table string, old int64) (int64
 	return string(encoded), err
 }
 
-// changeSheet is change for a change to the Lyric Sheet or Scrapbook, as
-// opposed to their Cues alone: the first one 10 minutes or more after the
-// one before starts an editing session, so a Snapshot of the sheet as it
-// was is taken first.
-func (s *Store) changeSheet(ctx context.Context, songID int64, based songversion.Version, fn func(tx *sql.Tx) error) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		if err := s.startEditing(ctx, tx, songID); err != nil {
-			return err
-		}
-		return fn(tx)
-	})
+// snapshotDecision is what a change to the Lyric Sheet and Scrapbook does
+// about Snapshots, as decideSnapshot works it out.
+type snapshotDecision struct {
+	// take is whether to take a Snapshot of the sheet before the change,
+	// for reason, naming what was deleted, if anything.
+	take    bool
+	reason  SnapshotReason
+	deleted string
+	// changed is whether the change marks when the sheet last changed,
+	// which an editing session is timed from.
+	changed bool
 }
 
-// startEditing takes a Snapshot of the sheet before a change to it, if the
-// change starts an editing session, and notes when the sheet changed. None
-// is taken of a sheet with no Sections, nor of one the same as the newest
-// Snapshot's.
-func (s *Store) startEditing(ctx context.Context, tx *sql.Tx, songID int64) error {
-	now := s.now().UTC()
+// decideSnapshot works out whether a change from before to after takes a
+// Snapshot of before, and marks the sheet changed at now. changedAt is when
+// the sheet last changed, zero if never, and newest the newest Snapshot's
+// sheet, nil if there's none. reason is that given by the change, "" for
+// any but one before deleting or restoring:
+//
+//   - BeforeDeleting and BeforeRestoring always take one, standing in for
+//     the editing session's, and mark the sheet changed. One before
+//     deleting names the Section or Alternate that's gone.
+//   - A change to Cues alone, before and after being the same but for
+//     their Cues, nothing changing included, does neither.
+//   - Any other change marks the sheet changed, and, if it starts an
+//     editing session, EditingSession or more after the last change, takes
+//     one BeforeEditing, unless before has no Sections or is the same as
+//     newest.
+func decideSnapshot(before, after LyricSheet, changedAt time.Time, newest *LyricSheet, reason SnapshotReason,
+	now time.Time) snapshotDecision {
+	switch {
+	case reason == BeforeDeleting:
+		return snapshotDecision{take: true, reason: reason, deleted: deletedName(before, after), changed: true}
+	case reason != "":
+		return snapshotDecision{take: true, reason: reason, changed: true}
+	case sameWords(before, after):
+		return snapshotDecision{}
+	}
+	starts := changedAt.IsZero() || now.Sub(changedAt) >= EditingSession
+	take := starts && len(before.Sections) > 0 && (newest == nil || !sameHeld(before, *newest))
+	return snapshotDecision{take: take, reason: BeforeEditing, changed: true}
+}
+
+// sameHeld reports whether a Snapshot of a would hold the same as one of b.
+func sameHeld(a, b LyricSheet) bool {
+	return bytes.Equal(encodeHeld(toHeld(a)), encodeHeld(toHeld(b)))
+}
+
+// sameWords reports whether two sheets are the same but for their Cues.
+func sameWords(a, b LyricSheet) bool {
+	return bytes.Equal(encodeHeld(withoutCues(toHeld(a))), encodeHeld(withoutCues(toHeld(b))))
+}
+
+// withoutCues is a held sheet with its Lines' Cues taken out, in place.
+func withoutCues(held heldSheet) heldSheet {
+	for _, sec := range held.Sections {
+		for _, alt := range sec.Alternates {
+			for i := range alt.Lines {
+				alt.Lines[i].CueMs = nil
+			}
+		}
+	}
+	return held
+}
+
+// encodeHeld is a held sheet as a Snapshot stores it.
+func encodeHeld(held heldSheet) []byte {
+	// A held sheet is plain slices, strings and numbers, which always
+	// encode.
+	encoded, _ := json.Marshal(held)
+	return encoded
+}
+
+// deletedName names what a change from before to after deleted, as the Song
+// page names it: the Section that's gone, else the Alternate that's gone
+// from a Section still there, by its place in the Section before. With
+// neither gone, or more than one, it names nothing.
+func deletedName(before, after LyricSheet) string {
+	now := sheetIDs(after)
+	var names []string
+	for _, sec := range before.Sections {
+		if !now["sections"][sec.ID] {
+			names = append(names, sectionName(sec))
+			continue
+		}
+		for i, alt := range sec.Alternates {
+			if !now["alternates"][alt.ID] {
+				names = append(names, alternateName(sec, i))
+			}
+		}
+	}
+	if len(names) != 1 {
+		return ""
+	}
+	return names[0]
+}
+
+// readSheetHistory reads when a Song's sheet last changed, zero if never,
+// and the sheet its newest Snapshot holds, nil if it has none.
+func readSheetHistory(ctx context.Context, tx *sql.Tx, songID int64) (changedAt time.Time, newest *LyricSheet, err error) {
 	var last sql.NullString
 	if err := tx.QueryRowContext(ctx, `SELECT sheet_changed_at FROM songs WHERE id = ?`, songID).Scan(&last); err != nil {
-		return fmt.Errorf("reading when the sheet last changed: %w", err)
+		return time.Time{}, nil, fmt.Errorf("reading when the sheet last changed: %w", err)
 	}
-	starts := !last.Valid
 	if last.Valid {
-		at, err := domain.ParseTime(last.String)
-		if err != nil {
-			return err
-		}
-		starts = now.Sub(at) >= EditingSession
-	}
-	if starts {
-		if err := s.snapshotIfChanged(ctx, tx, songID, now); err != nil {
-			return err
+		if changedAt, err = domain.ParseTime(last.String); err != nil {
+			return time.Time{}, nil, err
 		}
 	}
-	return markSheetChanged(ctx, tx, songID, now)
+	var sheet []byte
+	err = tx.QueryRowContext(ctx, `SELECT sheet FROM snapshots WHERE song_id = ? ORDER BY taken_at DESC, id DESC LIMIT 1`,
+		songID).Scan(&sheet)
+	if errors.Is(err, sql.ErrNoRows) {
+		return changedAt, nil, nil
+	}
+	if err != nil {
+		return time.Time{}, nil, fmt.Errorf("reading the newest snapshot: %w", err)
+	}
+	var held heldSheet
+	if err := json.Unmarshal(sheet, &held); err != nil {
+		return time.Time{}, nil, fmt.Errorf("reading the newest snapshot's sheet: %w", err)
+	}
+	newestSheet := held.lyricSheet()
+	return changedAt, &newestSheet, nil
 }
 
 // markSheetChanged notes that a Song's sheet changed at now.
@@ -237,123 +326,92 @@ func markSheetChanged(ctx context.Context, tx *sql.Tx, songID int64, now time.Ti
 	return nil
 }
 
-// snapshotIfChanged takes a Snapshot before an editing session, unless the
-// sheet has no Sections or is the same as the newest Snapshot's.
-func (s *Store) snapshotIfChanged(ctx context.Context, tx *sql.Tx, songID int64, now time.Time) error {
-	encoded, sections, err := encodeSheet(ctx, tx, songID)
-	if err != nil || sections == 0 {
-		return err
-	}
-	var newest []byte
-	err = tx.QueryRowContext(ctx, `SELECT sheet FROM snapshots WHERE song_id = ? ORDER BY taken_at DESC, id DESC LIMIT 1`,
-		songID).Scan(&newest)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("reading the newest snapshot: %w", err)
-	}
-	if bytes.Equal(newest, encoded) {
-		return nil
-	}
-	return insertSnapshot(ctx, tx, songID, now, BeforeEditing, "", encoded)
-}
-
-// changeBefore is change for a change to the Lyric Sheet or Scrapbook
-// that always takes a Snapshot of the sheet first, for reason: before
-// deleting something, or before a restore. check checks the change can be
-// made and names what it deletes, if anything, then do makes it. The
-// Snapshot stands in for one an editing session would take, as it holds
-// the same sheet.
-func (s *Store) changeBefore(ctx context.Context, songID int64, based songversion.Version, reason SnapshotReason,
-	check func(tx *sql.Tx) (deleted string, do func() error, err error)) (Song, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		deleted, do, err := check(tx)
-		if err != nil {
-			return err
-		}
-		encoded, _, err := encodeSheet(ctx, tx, songID)
-		if err != nil {
-			return err
-		}
-		now := s.now().UTC()
-		if err := insertSnapshot(ctx, tx, songID, now, reason, deleted, encoded); err != nil {
-			return err
-		}
-		if err := do(); err != nil {
-			return err
-		}
-		return markSheetChanged(ctx, tx, songID, now)
-	})
-}
-
-// encodeSheet reads a Song's sheet as a Snapshot stores it, and how many
-// Sections it has.
-func encodeSheet(ctx context.Context, tx *sql.Tx, songID int64) (encoded []byte, sections int, err error) {
-	sheet, err := loadLyricSheet(ctx, tx, songID)
-	if err != nil {
-		return nil, 0, err
-	}
-	encoded, err = json.Marshal(toHeld(sheet))
-	return encoded, len(sheet.Sections), err
-}
-
 // insertSnapshot keeps sheet as a Snapshot taken at now, on the date it is
 // in the time zone of the change taking it, for reason, naming what was
 // deleted, if anything, then thins the Song's Snapshots.
 func insertSnapshot(ctx context.Context, tx *sql.Tx, songID int64, now time.Time, reason SnapshotReason, deleted string,
-	sheet []byte) error {
+	sheet LyricSheet) error {
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO snapshots (song_id, taken_at, taken_on, reason, deleted, sheet) VALUES (?, ?, ?, ?, NULLIF(?, ''), ?)`,
-		songID, now.Format(domain.TimeFormat), now.In(domain.Zone(ctx)).Format(time.DateOnly), reason, deleted, string(sheet)); err != nil {
+		songID, now.Format(domain.TimeFormat), now.In(domain.Zone(ctx)).Format(time.DateOnly), reason, deleted,
+		string(encodeHeld(toHeld(sheet)))); err != nil {
 		return fmt.Errorf("taking a snapshot: %w", err)
 	}
-	return thinSnapshots(ctx, tx, songID, now)
-}
-
-// thinSnapshots deletes the Song's Snapshots not kept that aren't the
-// newest of their day or week, as KeepAllFor and KeepDailyFor say.
-func thinSnapshots(ctx context.Context, tx *sql.Tx, songID int64, now time.Time) error {
-	var thinned []int64
-	newest := map[thinSpan]bool{}
-	err := query(ctx, tx, `SELECT id, taken_at, taken_on FROM snapshots WHERE song_id = ? AND NOT kept
-		ORDER BY taken_at DESC, id DESC`,
-		[]any{songID}, func(rows *sql.Rows) error {
-			var id int64
-			var at, on string
-			if err := rows.Scan(&id, &at, &on); err != nil {
-				return err
-			}
-			taken, err := domain.ParseTime(at)
-			if err != nil {
-				return err
-			}
-			day, err := time.Parse(time.DateOnly, on)
-			if err != nil {
-				return fmt.Errorf("parsing the date snapshot %d was taken on: %w", id, err)
-			}
-			var span thinSpan
-			switch age := now.Sub(taken); {
-			case age < KeepAllFor:
-				return nil
-			case age < KeepDailyFor:
-				span = thinSpan{year: day.Year(), n: day.YearDay()}
-			default:
-				year, week := day.ISOWeek()
-				span = thinSpan{weekly: true, year: year, n: week}
-			}
-			if newest[span] {
-				thinned = append(thinned, id)
-			}
-			newest[span] = true
-			return nil
-		})
+	taken, err := readTaken(ctx, tx, songID)
 	if err != nil {
-		return fmt.Errorf("reading snapshots to thin: %w", err)
+		return err
 	}
-	for _, id := range thinned {
+	for _, id := range thinSnapshots(taken, now) {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM snapshots WHERE id = ?`, id); err != nil {
 			return fmt.Errorf("thinning snapshots: %w", err)
 		}
 	}
 	return nil
+}
+
+// takenSnapshot is a Snapshot as thinning reads it.
+type takenSnapshot struct {
+	id      int64
+	takenAt time.Time
+	// takenOn is the date it was taken on, where the change that took it
+	// was made (ADR 0021).
+	takenOn time.Time
+	kept    bool
+}
+
+// readTaken reads a Song's Snapshots as thinning reads them.
+func readTaken(ctx context.Context, tx *sql.Tx, songID int64) ([]takenSnapshot, error) {
+	var taken []takenSnapshot
+	err := query(ctx, tx, `SELECT id, taken_at, taken_on, kept FROM snapshots WHERE song_id = ?`,
+		[]any{songID}, func(rows *sql.Rows) error {
+			var t takenSnapshot
+			var at, on string
+			if err := rows.Scan(&t.id, &at, &on, &t.kept); err != nil {
+				return err
+			}
+			var err error
+			if t.takenAt, err = domain.ParseTime(at); err != nil {
+				return err
+			}
+			if t.takenOn, err = time.Parse(time.DateOnly, on); err != nil {
+				return fmt.Errorf("parsing the date snapshot %d was taken on: %w", t.id, err)
+			}
+			taken = append(taken, t)
+			return nil
+		})
+	if err != nil {
+		return nil, fmt.Errorf("reading snapshots to thin: %w", err)
+	}
+	return taken, nil
+}
+
+// thinSnapshots is the ids of the Snapshots to delete at now: those not
+// kept that aren't the newest of their day or week, as KeepAllFor and
+// KeepDailyFor say.
+func thinSnapshots(taken []takenSnapshot, now time.Time) []int64 {
+	newestFirst := slices.Clone(taken)
+	slices.SortFunc(newestFirst, func(a, b takenSnapshot) int {
+		return cmp.Or(b.takenAt.Compare(a.takenAt), cmp.Compare(b.id, a.id))
+	})
+	var thinned []int64
+	newest := map[thinSpan]bool{}
+	for _, t := range newestFirst {
+		var span thinSpan
+		switch age := now.Sub(t.takenAt); {
+		case t.kept, age < KeepAllFor:
+			continue
+		case age < KeepDailyFor:
+			span = thinSpan{year: t.takenOn.Year(), n: t.takenOn.YearDay()}
+		default:
+			year, week := t.takenOn.ISOWeek()
+			span = thinSpan{weekly: true, year: year, n: week}
+		}
+		if newest[span] {
+			thinned = append(thinned, t.id)
+		}
+		newest[span] = true
+	}
+	return thinned
 }
 
 // KeepSnapshot keeps one of a Song's Snapshots, so it's never thinned, or
@@ -445,16 +503,14 @@ func findSnapshot(ctx context.Context, q domain.Queryer, songID, snapshotID int6
 // are never reused, and a Line brought back gets the Cue it had; rows the
 // Snapshot doesn't hold are deleted, Cues and all.
 func (s *Store) RestoreSnapshot(ctx context.Context, songID int64, based songversion.Version, snapshotID int64) (Song, error) {
-	return s.changeBefore(ctx, songID, based, BeforeRestoring, func(tx *sql.Tx) (string, func() error, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
 		_, held, err := findSnapshot(ctx, tx, songID, snapshotID)
 		if err != nil {
-			return "", nil, err
+			return err
 		}
-		return "", func() error {
-			return editSheet(ctx, tx, songID, func(current LyricSheet, _ *ids) (LyricSheet, error) {
-				return keepCurrentCues(current, held.lyricSheet()), nil
-			})
-		}, nil
+		return s.editSheetIn(ctx, tx, songID, BeforeRestoring, func(current LyricSheet, _ *ids) (LyricSheet, error) {
+			return keepCurrentCues(current, held.lyricSheet()), nil
+		})
 	})
 }
 

@@ -37,7 +37,7 @@ func (s *Store) SetLineCue(ctx context.Context, songID int64, based songversion.
 	if err != nil {
 		return Song{}, err
 	}
-	return s.changeCuesWith(ctx, songID, based, func(sheet LyricSheet) (LyricSheet, error) {
+	return s.editSheet(ctx, songID, based, "", func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
 		return setLineCue(sheet, lineID, ms)
 	})
 }
@@ -59,7 +59,7 @@ func setLineCue(sheet LyricSheet, lineID, ms int64) (LyricSheet, error) {
 
 // ClearLineCue removes a Line's Cue.
 func (s *Store) ClearLineCue(ctx context.Context, songID int64, based songversion.Version, lineID int64) (Song, error) {
-	return s.changeCuesWith(ctx, songID, based, func(sheet LyricSheet) (LyricSheet, error) {
+	return s.editSheet(ctx, songID, based, "", func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
 		return clearLineCue(sheet, lineID)
 	})
 }
@@ -72,7 +72,7 @@ func clearLineCue(sheet LyricSheet, lineID int64) (LyricSheet, error) {
 // ClearSectionCues removes the Cues of all a Section's Lines, dormant ones
 // included.
 func (s *Store) ClearSectionCues(ctx context.Context, songID int64, based songversion.Version, sectionID int64) (Song, error) {
-	return s.changeCuesWith(ctx, songID, based, func(sheet LyricSheet) (LyricSheet, error) {
+	return s.editSheet(ctx, songID, based, "", func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
 		return clearSectionCues(sheet, sectionID)
 	})
 }
@@ -99,7 +99,7 @@ func clearSection(sec *Section) {
 
 // ClearCues removes every Cue in a Song, dormant ones included.
 func (s *Store) ClearCues(ctx context.Context, songID int64, based songversion.Version) (Song, error) {
-	return s.changeCuesWith(ctx, songID, based, func(sheet LyricSheet) (LyricSheet, error) {
+	return s.editSheet(ctx, songID, based, "", func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
 		return clearCues(sheet), nil
 	})
 }
@@ -135,7 +135,7 @@ func (s *Store) RestoreCues(ctx context.Context, songID int64, based songversion
 		}
 		cues[i].ms = sql.NullInt64{Int64: ms, Valid: true}
 	}
-	return s.changeCuesWith(ctx, songID, based, func(sheet LyricSheet) (LyricSheet, error) {
+	return s.editSheet(ctx, songID, based, "", func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
 		return restoreCues(sheet, cues)
 	})
 }
@@ -172,7 +172,7 @@ func (s *Store) ShiftCues(ctx context.Context, songID int64, based songversion.V
 		return Song{}, domain.Invalid("the span must end after it starts")
 	}
 	startMs, endMs := millis(start), millis(end)
-	return s.changeCuesWith(ctx, songID, based, func(sheet LyricSheet) (LyricSheet, error) {
+	return s.editSheet(ctx, songID, based, "", func(sheet LyricSheet, _ *ids) (LyricSheet, error) {
 		return shiftCues(sheet, startMs, endMs, by)
 	})
 }

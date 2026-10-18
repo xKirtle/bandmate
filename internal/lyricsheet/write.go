@@ -3,18 +3,35 @@ package lyricsheet
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"maps"
 	"slices"
+
+	"github.com/xKirtle/bandmate/internal/domain"
+	"github.com/xKirtle/bandmate/internal/songversion"
 )
 
 // Every change to a Lyric Sheet is a pure change to the whole sheet,
-// checked by checkChange and written by writeSheet (ADR 0024).
+// checked by checkChange and written by writeSheet, and whether it takes a
+// Snapshot is worked out from the sheet before and after it (ADR 0024).
 
-// editSheet makes one change to a Song's Lyric Sheet and Scrapbook within
-// tx: it loads the sheet, has edit make the change to it, checks what the
-// change leaves and writes it. edit is pure: it gets a copy of the sheet,
-// and ids for any rows it adds.
-func editSheet(ctx context.Context, tx *sql.Tx, songID int64,
+// editSheet makes one change to a Song's Lyric Sheet and Scrapbook, as
+// every such change is made, Cues' included: edit makes it, a pure change
+// to a copy of the whole sheet, given ids for any rows it adds. reason is
+// BeforeDeleting or BeforeRestoring for a change that always takes a
+// Snapshot first, else "": whether the change takes one then is worked out
+// from the sheet before and after it, by decideSnapshot.
+func (s *Store) editSheet(ctx context.Context, songID int64, based songversion.Version, reason SnapshotReason,
+	edit func(sheet LyricSheet, ids *ids) (LyricSheet, error)) (Song, error) {
+	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+		return s.editSheetIn(ctx, tx, songID, reason, edit)
+	})
+}
+
+// editSheetIn is editSheet within tx, for a change that reads something
+// else of the Song first, as a restore reads its Snapshot.
+func (s *Store) editSheetIn(ctx context.Context, tx *sql.Tx, songID int64, reason SnapshotReason,
 	edit func(sheet LyricSheet, ids *ids) (LyricSheet, error)) error {
 	before, err := loadLyricSheet(ctx, tx, songID)
 	if err != nil {
@@ -24,6 +41,7 @@ func editSheet(ctx context.Context, tx *sql.Tx, songID int64,
 	if err != nil {
 		return err
 	}
+	handed := maps.Clone(newIDs.last)
 	after, err := edit(cloneSheet(before), newIDs)
 	if err != nil {
 		return err
@@ -31,7 +49,85 @@ func editSheet(ctx context.Context, tx *sql.Tx, songID int64,
 	if err := checkChange(before, after); err != nil {
 		return err
 	}
-	return writeSheet(ctx, tx, songID, after)
+	if err := checkTakenIDs(ctx, tx, songID, before, after, handed); err != nil {
+		return err
+	}
+	changedAt, newest, err := readSheetHistory(ctx, tx, songID)
+	if err != nil {
+		return err
+	}
+	now := s.now().UTC()
+	decision := decideSnapshot(before, after, changedAt, newest, reason, now)
+	if err := writeSheet(ctx, tx, songID, after); err != nil {
+		return err
+	}
+	if decision.take {
+		if err := insertSnapshot(ctx, tx, songID, now, decision.reason, decision.deleted, before); err != nil {
+			return err
+		}
+	}
+	if !decision.changed {
+		return nil
+	}
+	return markSheetChanged(ctx, tx, songID, now)
+}
+
+// checkTakenIDs checks the ids a change put in the sheet that it didn't
+// hold before and the id source didn't hand out, the source having counted
+// up from handed: each must be held by no other Song's row, as a row
+// brought back was this Song's and has been deleted.
+func checkTakenIDs(ctx context.Context, tx *sql.Tx, songID int64, before, after LyricSheet,
+	handed map[string]int64) error {
+	held := sheetIDs(before)
+	for table, ids := range sheetIDs(after) {
+		for id := range ids {
+			if held[table][id] || id > handed[table] {
+				continue
+			}
+			if err := checkNotAnotherSongs(ctx, tx, songID, table, id); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// sheetIDs are the ids a sheet holds, by the table their rows are in.
+func sheetIDs(sheet LyricSheet) map[string]map[int64]bool {
+	ids := map[string]map[int64]bool{"sections": {}, "alternates": {}, "lines": {}}
+	for _, sec := range sheet.Sections {
+		ids["sections"][sec.ID] = true
+		for _, alt := range sec.Alternates {
+			ids["alternates"][alt.ID] = true
+			for _, l := range alt.Lines {
+				ids["lines"][l.ID] = true
+			}
+		}
+	}
+	return ids
+}
+
+// owners reads which Song holds a row of each sheet table, by its id.
+var owners = map[string]string{
+	"sections":   `SELECT song_id FROM sections WHERE id = ?`,
+	"alternates": `SELECT s.song_id FROM alternates a JOIN sections s ON s.id = a.section_id WHERE a.id = ?`,
+	"lines": `SELECT s.song_id FROM lines l JOIN alternates a ON a.id = l.alternate_id
+		JOIN sections s ON s.id = a.section_id WHERE l.id = ?`,
+}
+
+// checkNotAnotherSongs refuses an id of table held by another Song's row.
+func checkNotAnotherSongs(ctx context.Context, tx *sql.Tx, songID int64, table string, id int64) error {
+	var song int64
+	err := tx.QueryRowContext(ctx, owners[table], id).Scan(&song)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return nil
+	case err != nil:
+		return fmt.Errorf("checking the sheet's %s: %w", table, err)
+	case song != songID:
+		return domain.Invalid(fmt.Sprintf("the sheet holds %s of another Song", table))
+	}
+	return nil
 }
 
 // cloneSheet is a copy of a sheet sharing nothing with it, so a change to
