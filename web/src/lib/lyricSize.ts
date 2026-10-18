@@ -7,7 +7,7 @@
 import type { DeviceSettingStorage } from './deviceSetting.svelte';
 
 /** The Lyric Sizes, in percent, from smallest to largest. */
-export const lyricSizes = [80, 90, 100, 115, 130, 150, 175];
+export const lyricSizes = [50, 60, 70, 80, 90, 100, 115, 130, 150, 175];
 
 /** The Lyric Size the Lines, Chords and Labels usually show at, until set on this device. */
 export const usualLyricSize = 100;
@@ -39,7 +39,7 @@ export function storeLyricSize(storage: Storage | undefined, size: number) {
   }
 }
 
-/** The Lyric Size a step larger (by 1) or smaller (by −1), held from 80% to 175%. */
+/** The Lyric Size a step larger (by 1) or smaller (by −1), held from 50% to 175%. */
 export function stepLyricSize(size: number, by: number): number {
   const at = lyricSizes.indexOf(size) + by;
   return lyricSizes[Math.max(0, Math.min(lyricSizes.length - 1, at))];
