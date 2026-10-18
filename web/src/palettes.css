@@ -57,6 +57,13 @@
   --invalid-outline: inset 0 0 0 1px var(--danger);
 }
 
+/* On a dark page a shadow tinted like the text glows, so the dark theme
+   casts a black one instead, and raises a popover onto a lighter surface
+   too (app.css), as a shadow barely shows there. */
+:root[data-theme='dark'] {
+  --shadow-float: 0 0.5rem 1.5rem rgb(0 0 0 / 0.5);
+}
+
 /* Ink: fountain-pen blue on cream. */
 [data-palette='ink'] {
   --bg: #f8f5ee;

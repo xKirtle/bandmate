@@ -623,6 +623,12 @@ input[inputmode='decimal'] {
   box-shadow: var(--shadow-float);
 }
 
+/* In the dark theme, where its shadow barely shows, a popover is raised
+   onto the first surface too, a step lighter than the page. */
+:root[data-theme='dark'] .popover {
+  background: var(--surface-1);
+}
+
 /* The list a Combobox or Picker opens: a popover, with a ✓ beside the
    saved or picked option. */
 .option-list {

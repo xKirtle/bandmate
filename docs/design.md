@@ -56,6 +56,8 @@ Shared by every Palette, the scrim and the only shadows there are:
 
 A literal colour is written only in `palettes.css`, and a `box-shadow` is always one of these tokens: Stylelint fails anything else. A tint of a token, such as `color-mix(in srgb, var(--accent) 12%, transparent)`, is allowed.
 
+In the light theme a popover is on `--bg`, lifted by `--shadow-float`. In the dark theme, where a shadow barely shows, it's raised onto `--surface-1`, a step lighter than the page, and `--shadow-float` is black there: tinted like the text, it would glow.
+
 **Contrast floor**, in both themes of every Palette: 4.5:1 for all text, 3:1 for controls and anything else that carries meaning, and 7:1 for Lines in Read mode. Chords in Read mode are held to 4.5:1, since Terracotta's accent misses 7:1 and that was accepted. `palettes.test.ts` checks every meaningful pair, so a Palette that breaks the floor fails CI.
 
 ### Type
