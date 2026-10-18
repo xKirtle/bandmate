@@ -118,15 +118,7 @@
 </script>
 
 <section class="masters" aria-labelledby="masters-heading">
-  <div class="head">
-    <h2 id="masters-heading">{several ? 'Masters' : 'Master'}</h2>
-    {#if writing}
-      <label class="button" class:disabled={busy !== null}>
-        {song.masters.length > 0 ? 'Add another' : 'Add Master'}
-        <input class="visually-hidden" type="file" accept="audio/*" onchange={pick} disabled={busy !== null} />
-      </label>
-    {/if}
-  </div>
+  <h2 id="masters-heading">{several ? 'Masters' : 'Master'}</h2>
 
   {#if song.masters.length === 0 && !busy}
     <p class="hint muted">
@@ -204,6 +196,14 @@
     </article>
   {/each}
 
+  <!-- Last, as the Scrapbook's Add a Section is. -->
+  {#if writing}
+    <label class="button add" class:disabled={busy !== null}>
+      {song.masters.length > 0 ? 'Add another' : 'Add Master'}
+      <input class="visually-hidden" type="file" accept="audio/*" onchange={pick} disabled={busy !== null} />
+    </label>
+  {/if}
+
   {#if busy}
     <p class="muted" role="status">{busy}</p>
   {/if}
@@ -216,16 +216,13 @@
   .masters {
     margin-bottom: var(--space-8);
   }
-  .head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    margin-bottom: var(--space-3);
-  }
   h2 {
     font-size: var(--text-lg);
-    margin: 0;
+    margin: 0 0 var(--space-3);
+  }
+  .add {
+    width: 100%;
+    margin-top: var(--space-3);
   }
   .hint {
     margin: 0;
