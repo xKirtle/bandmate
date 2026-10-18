@@ -217,6 +217,32 @@ describe('Sync mode, the Line up next', () => {
     expect(syncMode.next).toEqual({ section: 1, line: 10 });
   });
 
+  it('has no Line up next once the last is cued, with every Line cued, until one is clicked', async () => {
+    const server = new FakeSongServer(verseSong([1, 2, 3, null]));
+    const { syncMode, saves, port } = await syncModeFor(server);
+    switchOn(syncMode);
+    expect(syncMode.next).toEqual({ section: 1, line: 13 });
+    port.playhead = 4.5;
+    syncMode.cue();
+    flushSync();
+    expect(cueOf(saves.song, 13)).toBe(4.5);
+    expect(syncMode.next).toBeNull();
+    await settled();
+    expect(syncMode.on).toBe(true);
+    expect(syncMode.next).toBeNull();
+
+    // Cueing again does nothing until a Line is clicked.
+    port.playhead = 6;
+    syncMode.cue();
+    flushSync();
+    expect(cueOf(saves.song, 13)).toBe(4.5);
+    syncMode.pick({ section: 1, line: 13 });
+    expect(syncMode.next).toEqual({ section: 1, line: 13 });
+    syncMode.cue();
+    flushSync();
+    expect(cueOf(saves.song, 13)).toBe(6);
+  });
+
   it('cues the Line up next at the playhead, and the Line after it comes up next, cued or not', async () => {
     const server = new FakeSongServer(verseSong([1, 2, 3, null]));
     const { syncMode, saves, port } = await syncModeFor(server);

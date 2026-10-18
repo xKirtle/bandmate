@@ -415,9 +415,20 @@ describe('nextLine', () => {
       expect(nextLine(partly, { cued: { section: 2, line: 21 } })).toEqual({ section: 1, line: 11 });
     });
 
-    it("after the last Line, takes it as cued while its Cue isn't saved yet", () => {
+    it("after the last Line, takes it as cued while its Cue isn't saved yet, leaving none next", () => {
       const unsaved = sheet(lines, [1, 2], { 10: 1, 11: 2, 20: 5 });
-      expect(nextLine(unsaved, { cued: { section: 2, line: 21 } })).toEqual({ section: 1, line: 10 });
+      expect(nextLine(unsaved, { cued: { section: 2, line: 21 } })).toBeNull();
+    });
+
+    it('after the last Line, is none once every Line is cued', () => {
+      const all = sheet(lines, [1, 2], { 10: 1, 11: 2, 20: 5, 21: 8 });
+      expect(nextLine(all, { cued: { section: 2, line: 21 } })).toBeNull();
+    });
+
+    it('after the last Line, is a Line clicked again', () => {
+      const all = sheet(lines, [1, 2], { 10: 1, 11: 2, 20: 5, 21: 8 });
+      const retake = { section: 2, line: 21 };
+      expect(nextLine(all, { cued: retake, picked: retake })).toEqual(retake);
     });
   });
 
