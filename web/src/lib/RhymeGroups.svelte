@@ -42,17 +42,20 @@
   <p class="muted message">Loading…</p>
 {:else if toSetUp.length > 0 && notIn.length > 0}
   <p class="muted message">
-    Not in {named(notIn, 'disjunction')}. <a href={settings}>Download {dictionariesOf(toSetUp)} in Settings</a> to look it
-    up there.
+    Not in {named(notIn, 'disjunction')}.
+    <span class="action"
+      ><a href={settings}>Download {dictionariesOf(toSetUp)} in Settings</a> to look it up there.</span
+    >
   </p>
 {:else if toSetUp.length > 0 && language}
   <p class="muted message">
     {languageName(language, listedLanguages.list)} isn’t downloaded on this device.
-    <a href={settings}>Download it in Settings</a>
+    <a class="action" href={settings}>Download it in Settings</a>
   </p>
 {:else if toSetUp.length > 0}
   <p class="muted message">
-    Rhymes need a dictionary on this device. <a href={settings}>Download {dictionariesOf(toSetUp)} in Settings</a>
+    Rhymes need a dictionary on this device.
+    <a class="action" href={settings}>Download {dictionariesOf(toSetUp)} in Settings</a>
   </p>
 {:else if !word}
   <p class="muted message">Rhymes show here for the word at the cursor as you write.</p>
@@ -86,6 +89,10 @@
   .message {
     margin: 0;
     font-size: var(--text-sm);
+  }
+  /* What to do about the message, on a line of its own. */
+  .action {
+    display: block;
   }
   .groups {
     display: flex;
