@@ -19,57 +19,24 @@
 //   started, to the Timeline as saved. A Loop switched keeps the stretch shown when it
 //   was, even if the set that stretch came from then fails, until the
 //   switch resolves. A refresh replacing the Song drops them all; undo and
-//   redo leave them be. What's worked out to send (Merge rendering, the
-//   Cue-move offer, undo) goes by the Timeline as saved.
+//   redo leave them be. What's worked out to send (Merge rendering, undo)
+//   goes by the Timeline as saved.
 // - What follows an edit: Clips it adds are selected, and a Track it adds
 //   chosen.
-// - The Cue-move offer: Cues are Timeline times and stay put, but those the
-//   Clips moved spanned may belong with them, so moving them along is
-//   offered, as a step of its own, for a few seconds. It stands only while
-//   the Timeline as saved and the Cues as shown are the ones it was made
-//   for, so whatever changes either, an edit, an undo, a Take or a Cue
-//   change, withdraws it once it lands. Ignoring it leaves them where they
-//   were: after recording, they usually belong to the vocal rather than
-//   the Beat.
 // - Merge and Sound import, the rarer edits whose audio the browser makes
 //   (see the audio port below). Each is kept to undo as placing what it
 //   made, so redoing it never renders or uploads anything again.
-import type { Clip, Song, SoundImport, Timeline, Track } from './api';
+import type { Clip, SoundImport, Timeline, Track } from './api';
 import { addedTrack } from './chosenTrack';
 import type { DragSave } from './clipDrag.svelte';
-import { sameCues } from './cueChanges';
-import { movedCues, type TimeSpan } from './cues';
 import { importEach } from './fileDrop';
 import { editsWhileRecording, type Freeze } from './freeze';
-import { addedClips, mergingAdded, placingAdded, restorable, type Edit } from './history';
+import { addedClips, mergingAdded, placingAdded, type Edit } from './history';
 import { mergeTarget, mergeWarning, type MergedAudio, type MergeTarget } from './merge';
 import type { Edited, Saves } from './saves.svelte';
 import type { Selection } from './selection.svelte';
 import { rightHalves } from './split';
 import { TypedField } from './typedField.svelte';
-
-/** How long the Cue-move offer stands, in milliseconds. */
-export const offerFor = 8000;
-
-/** The offer to move the Cues the Clips moved spanned along with them. */
-export interface CueOffer {
-  /** How far the Clips moved, in seconds: later if positive. */
-  by: number;
-  /** How many Cues would move. */
-  count: number;
-  /** How many Clips moved. */
-  clips: number;
-}
-
-/** A Cue-move offer, and what it was made for. */
-interface MadeOffer {
-  offer: CueOffer;
-  /** Where the Clips moved were, each from its start to its end, in seconds. */
-  spans: TimeSpan[];
-  /** The Timeline as saved, and the Song as shown, when it was made. */
-  timeline: Timeline;
-  song: Song;
-}
 
 /** An audio file decoded and named, ready to import as a Sound onto a Track. */
 export type PreparedSound = Omit<SoundImport, 'trackId'>;
@@ -129,9 +96,6 @@ export class TimelineEditing {
   #audio: TimelineAudio;
   /** Whether a Merge is under way, from pressing Merge until its Sound is saved or it fails. */
   #merging = $state(false);
-  /** The Cue-move offer made last, until it lapses or is answered. Raw, so the timer can tell it's still its own. */
-  #made = $state.raw<MadeOffer | null>(null);
-  #offerTimer: ReturnType<typeof setTimeout> | undefined;
   /** Which Tracks the last Merge left silent, until it's dismissed or the next Merge. */
   #mergeNote = $state<string | null>(null);
   /** What importing an audio file is doing, while it is. */
@@ -163,12 +127,6 @@ export class TimelineEditing {
    * way, and values being adjusted, on top.
    */
   #timeline = $derived.by(() => [...this.#values.values()].reduce((tl, v) => v.show(tl), this.#saves.timeline));
-  /** The offer made last, while the Timeline as saved and the Cues as shown are still the ones it was made for. */
-  #standing = $derived.by(() => {
-    const made = this.#made;
-    if (!made || made.timeline !== this.#saves.timeline || !sameCues(made.song, this.#saves.song)) return null;
-    return made;
-  });
 
   constructor(options: TimelineEditingOptions) {
     this.#saves = options.saves;
@@ -347,58 +305,8 @@ export class TimelineEditing {
     }
   }
 
-  /**
-   * Saves a Clip drag's edit, and for a move over Cues, offers to move
-   * them along. Resolves to whether it was saved.
-   */
-  saveDrag = async ({ edit, moved }: DragSave): Promise<boolean> => {
-    const edited = await this.edit(edit);
-    if (edited && moved) this.#offerMove(moved, edited.after);
-    return edited !== null;
-  };
-
-  /** Offers to move the Cues the Clips moved spanned, if any, made for the Timeline the move left. */
-  #offerMove({ clips, by }: NonNullable<DragSave['moved']>, timeline: Timeline) {
-    if (by === 0) return;
-    const spans = clips.map((c) => ({ start: c.start, end: c.start + c.length }));
-    const song = this.#saves.song;
-    const count = movedCues(song, spans, by).length;
-    if (count === 0) return;
-    const made: MadeOffer = { offer: { by, count, clips: clips.length }, spans, timeline, song };
-    this.#made = made;
-    clearTimeout(this.#offerTimer);
-    this.#offerTimer = setTimeout(() => {
-      if (this.#made === made) this.#made = null;
-    }, offerFor);
-  }
-
-  /** The offer to move the Cues the Clips just moved spanned, while it stands. */
-  get cueOffer(): CueOffer | null {
-    return this.#standing?.offer ?? null;
-  }
-
-  /**
-   * Accepts the Cue-move offer. One Clip's Cues move by its span, as the
-   * server finds them. Several Clips' are worked out from the Song as
-   * shown, Cue changes not saved yet included, and set, so each moves
-   * once, however many of the Clips spanned it. Either way, they move on
-   * screen at once.
-   */
-  moveCues() {
-    const made = this.#standing;
-    if (!made) return;
-    this.#made = null;
-    const { spans, offer } = made;
-    const what = `moving the Cues with ${offer.clips === 1 ? 'the Clip' : 'the Clips'}`;
-    const song = this.#saves.song;
-    if (spans.length === 1) void this.#saves.cue({ kind: 'shiftCues', ...spans[0], by: offer.by }, what);
-    else void this.#saves.cue({ kind: 'restoreCues', cues: restorable(movedCues(song, spans, offer.by), song) }, what);
-  }
-
-  /** Leaves the Cues where they are, dismissing the Cue-move offer. */
-  leaveCues() {
-    this.#made = null;
-  }
+  /** Saves a Clip drag's edit. Resolves to whether it was saved. */
+  saveDrag = async ({ edit }: DragSave): Promise<boolean> => (await this.edit(edit)) !== null;
 
   /** Whether the Clips selected can be merged now: two or more, all on the Timeline, while it isn't frozen. */
   get mergeable(): boolean {
@@ -512,11 +420,6 @@ export class TimelineEditing {
   /** Dismisses what the files imported refused said. */
   dismissError() {
     this.#error = null;
-  }
-
-  /** Stops the Cue-move offer's timer, e.g. as the Timeline goes. */
-  close() {
-    clearTimeout(this.#offerTimer);
   }
 }
 
