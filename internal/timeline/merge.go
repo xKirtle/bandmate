@@ -84,7 +84,7 @@ func (s *Store) MergeClips(ctx context.Context, songID int64, based songversion.
 		return Timeline{}, err
 	}
 	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges, before Timeline) error {
-		start, end, err := mergedSpan(before, m.ClipIDs)
+		start, end, err := before.mergedSpan(m.ClipIDs)
 		if err != nil {
 			return err
 		}
@@ -122,11 +122,11 @@ func (s *Store) MergeClips(ctx context.Context, songID int64, based songversion.
 
 // mergedSpan is where on the Timeline the earliest of tl's Clips merged
 // starts and the latest ends.
-func mergedSpan(tl Timeline, clipIDs []int64) (start, end float64, err error) {
+func (tl Timeline) mergedSpan(clipIDs []int64) (start, end float64, err error) {
 	for i, id := range clipIDs {
-		_, c, ok := tl.clip(id)
-		if !ok {
-			return 0, 0, domain.ErrNotFound
+		_, c, err := tl.findClip(id)
+		if err != nil {
+			return 0, 0, err
 		}
 		if i == 0 {
 			start, end = c.Start, c.Start+c.Length
@@ -142,7 +142,7 @@ func mergedSpan(tl Timeline, clipIDs []int64) (start, end float64, err error) {
 // adds where m says.
 func (m ClipMerge) landingTrack(ctx context.Context, tx *sql.Tx, songID int64, before Timeline) (int64, error) {
 	if m.NewTrack == nil {
-		return *m.TrackID, before.trackToPlaceOn(*m.TrackID)
+		return *m.TrackID, before.findTrackToPlaceOn(*m.TrackID)
 	}
 	added, err := insertTracksAt(ctx, tx, songID, []TrackAt{*m.NewTrack})
 	if err != nil {

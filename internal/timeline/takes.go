@@ -62,7 +62,7 @@ func (s *Store) RecordTake(ctx context.Context, songID int64, based songversion.
 		return Timeline{}, errTakeTooEarly
 	}
 	return s.addTake(ctx, songID, based, file, func(tx *sql.Tx, before Timeline) (int64, error) {
-		if err := before.trackToPlaceOn(rec.TrackID); err != nil {
+		if err := before.findTrackToPlaceOn(rec.TrackID); err != nil {
 			return 0, err
 		}
 		takeID, err := take.insert(ctx, tx, songID, 1, take.start-(start-offset))
@@ -180,9 +180,9 @@ func (s *Store) Retake(ctx context.Context, songID int64, based songversion.Vers
 		return Timeline{}, err
 	}
 	return s.addTake(ctx, songID, based, file, func(tx *sql.Tx, before Timeline) (int64, error) {
-		track, clip, ok := before.clip(clipID)
-		if !ok {
-			return 0, domain.ErrNotFound
+		track, clip, err := before.findClip(clipID)
+		if err != nil {
+			return 0, err
 		}
 		p := placementOf(track.ID, clip)
 		if !p.source.activeTakeID.Valid {

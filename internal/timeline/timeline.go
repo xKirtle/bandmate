@@ -635,7 +635,7 @@ func (tl Timeline) moved(clipID, trackID int64, start float64) (placement, error
 	if err != nil {
 		return placement{}, err
 	}
-	if err := tl.trackToPlaceOn(trackID); err != nil {
+	if err := tl.findTrackToPlaceOn(trackID); err != nil {
 		return placement{}, err
 	}
 	p.trackID, p.start = trackID, start
@@ -1065,9 +1065,9 @@ func insertClip(ctx context.Context, tx *sql.Tx, p placement) (int64, error) {
 // the way. A Clip of Takes gets copies of its Takes, sharing their files.
 func (s *Store) DuplicateClip(ctx context.Context, songID int64, based songversion.Version, clipID int64) (Timeline, error) {
 	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges, before Timeline) error {
-		t, c, ok := before.clip(clipID)
-		if !ok {
-			return domain.ErrNotFound
+		t, c, err := before.findClip(clipID)
+		if err != nil {
+			return err
 		}
 		p := placementOf(t.ID, c)
 		p.start = duplicateStart(t, c)
@@ -1272,9 +1272,9 @@ func checkGain(gain float64) error {
 // can't run longer than the Clip.
 func (s *Store) SetClipFades(ctx context.Context, songID int64, based songversion.Version, clipID int64, fades Fades) (Timeline, error) {
 	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges, before Timeline) error {
-		_, c, ok := before.clip(clipID)
-		if !ok {
-			return domain.ErrNotFound
+		_, c, err := before.findClip(clipID)
+		if err != nil {
+			return err
 		}
 		if err := fades.check(c.Length); err != nil {
 			return err

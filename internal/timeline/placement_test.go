@@ -9,14 +9,6 @@ type where struct {
 	start, offset, length float64
 }
 
-// errMessage is err's message, or "" for no error.
-func errMessage(err error) string {
-	if err == nil {
-		return ""
-	}
-	return err.Error()
-}
-
 // placedAt is where p puts its Clip.
 func placedAt(p placement) where {
 	return where{trackID: p.trackID, start: p.start, offset: p.offset, length: p.length}
@@ -33,7 +25,7 @@ func TestMoved(t *testing.T) {
 		trackID int64
 		start   float64
 		want    where
-		wantErr string
+		refusal string
 	}{
 		{
 			name: "a Clip moved against the next Clip on its Track",
@@ -49,22 +41,25 @@ func TestMoved(t *testing.T) {
 		{
 			name:   "a Clip that isn't on the Timeline",
 			clipID: 9, trackID: 1, start: 0,
-			wantErr: "not found",
+			refusal: "not found",
 		},
 		{
 			name:   "a Track that isn't on the Timeline",
 			clipID: 1, trackID: 9, start: 0,
-			wantErr: "there's no such Track on this Timeline",
+			refusal: "there's no such Track on this Timeline",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p, err := tl.moved(tt.clipID, tt.trackID, tt.start)
-			if err != nil || tt.wantErr != "" {
-				if got := errMessage(err); got != tt.wantErr {
-					t.Fatalf("moved error = %q, want %q", got, tt.wantErr)
+			if tt.refusal != "" {
+				if err == nil || err.Error() != tt.refusal {
+					t.Fatalf("moved error = %v, want %q", err, tt.refusal)
 				}
 				return
+			}
+			if err != nil {
+				t.Fatalf("moved error = %v", err)
 			}
 			if got := placedAt(p); got != tt.want {
 				t.Errorf("moved = %+v, want %+v", got, tt.want)
@@ -82,7 +77,7 @@ func TestTrimmed(t *testing.T) {
 		clipID         int64
 		offset, length float64
 		want           where
-		wantErr        string
+		refusal        string
 	}{
 		{
 			name: "trimmed at its start, which moves where it starts",
@@ -115,17 +110,20 @@ func TestTrimmed(t *testing.T) {
 		{
 			name:   "a Clip that isn't on the Timeline",
 			clipID: 9, offset: 0, length: 1,
-			wantErr: "not found",
+			refusal: "not found",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p, err := tl.trimmed(tt.clipID, tt.offset, tt.length)
-			if err != nil || tt.wantErr != "" {
-				if got := errMessage(err); got != tt.wantErr {
-					t.Fatalf("trimmed error = %q, want %q", got, tt.wantErr)
+			if tt.refusal != "" {
+				if err == nil || err.Error() != tt.refusal {
+					t.Fatalf("trimmed error = %v, want %q", err, tt.refusal)
 				}
 				return
+			}
+			if err != nil {
+				t.Fatalf("trimmed error = %v", err)
 			}
 			if got := placedAt(p); got != tt.want {
 				t.Errorf("trimmed = %+v, want %+v", got, tt.want)
@@ -140,11 +138,10 @@ func TestMergedSpan(t *testing.T) {
 		[]Clip{beatClip(3, 0, 4), beatClip(4, 50, 30)},
 	)
 	tests := []struct {
-		name        string
-		clipIDs     []int64
-		start, end  float64
-		wantErr     string
-		wantNoClips bool
+		name       string
+		clipIDs    []int64
+		start, end float64
+		refusal    string
 	}{
 		{
 			name:    "two Clips on one Track",
@@ -164,17 +161,20 @@ func TestMergedSpan(t *testing.T) {
 		{
 			name:    "a Clip that isn't on the Timeline",
 			clipIDs: []int64{1, 9},
-			wantErr: "not found",
+			refusal: "not found",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			start, end, err := mergedSpan(tl, tt.clipIDs)
-			if err != nil || tt.wantErr != "" {
-				if got := errMessage(err); got != tt.wantErr {
-					t.Fatalf("mergedSpan error = %q, want %q", got, tt.wantErr)
+			start, end, err := tl.mergedSpan(tt.clipIDs)
+			if tt.refusal != "" {
+				if err == nil || err.Error() != tt.refusal {
+					t.Fatalf("mergedSpan error = %v, want %q", err, tt.refusal)
 				}
 				return
+			}
+			if err != nil {
+				t.Fatalf("mergedSpan error = %v", err)
 			}
 			if start != tt.start || end != tt.end {
 				t.Errorf("mergedSpan = %g to %g, want %g to %g", start, end, tt.start, tt.end)
