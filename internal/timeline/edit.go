@@ -88,7 +88,11 @@ var timelineTables = []string{"tracks", "clips"}
 
 // ids hands out the ids of the rows a change to the Timeline adds, each one
 // past the last its table handed out, so writeTimeline inserts them as they
-// are. Its zero value is a plain counter from 1, for tests.
+// are. Every row a Clip placement edit adds takes its id from here, even one
+// bringing a deleted Clip or Track back, which comes back as a new one, so
+// the Timeline never holds an id another Song's row could hold.
+//
+// Its zero value is a plain counter from 1, for tests.
 type ids struct {
 	last map[string]int64
 }

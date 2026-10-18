@@ -65,8 +65,8 @@ func readClipSource(ctx context.Context, tx *sql.Tx, songID int64, c NewClip) (c
 	return clipSource{takes: takes, activeTakeID: c.ActiveTakeID}, nil
 }
 
-// clip is a new Clip, with the id given, playing src as c asks.
-func (src clipSource) clip(clipID int64, c NewClip) Clip {
+// placed is c as a Clip of the Timeline, with the id given, playing src.
+func (c NewClip) placed(clipID int64, src clipSource) Clip {
 	placed := Clip{ID: clipID, Name: c.Name, ClipPlayback: c.ClipPlayback, Takes: []Take{},
 		Start: c.Start, Offset: c.Offset, Length: c.Length}
 	switch {

@@ -106,6 +106,8 @@ func writeTimeline(ctx context.Context, tx *sql.Tx, songID int64, tl Timeline) e
 				was, there := takes[take.ID]
 				delete(takes, take.ID)
 				if !there {
+					// A Take's row is written once, with its audio, before
+					// an edit places it, so this is a bug, not a refusal.
 					return fmt.Errorf("take %d isn't one of the Song's", take.ID)
 				}
 				if want == was {

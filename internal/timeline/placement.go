@@ -34,7 +34,7 @@ func (tl Timeline) placingNew(trackID int64, c NewClip, src clipSource, clipID i
 		return Timeline{}, err
 	}
 	tl = tl.playing(src)
-	return tl.placing(trackID, asPlaced(src.clip(clipID, c))), nil
+	return tl.placing(trackID, asPlaced(c.placed(clipID, src))), nil
 }
 
 // addingTracks is tl with an empty Track of each of the names given, which
@@ -53,7 +53,7 @@ func (tl Timeline) addingTracks(names []string, ids *ids) (Timeline, []int64) {
 // moving is tl with one of its Clips moved to start at a time on one of its
 // Tracks, keeping its trim: what MoveClip leaves.
 func (tl Timeline) moving(clipID, trackID int64, start float64) (Timeline, error) {
-	_, c, err := tl.findClip(clipID)
+	was, c, err := tl.findClip(clipID)
 	if err != nil {
 		return Timeline{}, err
 	}
@@ -61,7 +61,7 @@ func (tl Timeline) moving(clipID, trackID int64, start float64) (Timeline, error
 		return Timeline{}, err
 	}
 	c.Start = start
-	return tl.replacing(trackID, asPlaced(c)), nil
+	return tl.replacing(was, trackID, asPlaced(c)), nil
 }
 
 // movingAll is tl with several Clips moved at once, each as moving moves
@@ -94,7 +94,7 @@ func (tl Timeline) trimming(clipID int64, offset, length float64, fades *Fades) 
 		}
 		c.setFades(*fades)
 	}
-	return tl.replacing(t.ID, asPlaced(c)), nil
+	return tl.replacing(t, t.ID, asPlaced(c)), nil
 }
 
 // duplicating is tl with a copy of one of its Clips, with the same trim,
@@ -155,10 +155,10 @@ func (tl Timeline) placing(trackID int64, c Clip) Timeline {
 	return tl.replacingTrack(t)
 }
 
-// replacing is tl with c in place of the Clip with its id, on the Track
-// with the id given, which may be another of tl's.
-func (tl Timeline) replacing(trackID int64, c Clip) Timeline {
-	was, _, _ := tl.clip(c.ID)
+// replacing is tl with c in place of the Clip with its id, which is on the
+// Track was, put on the Track with the id given, which may be another of
+// tl's.
+func (tl Timeline) replacing(was Track, trackID int64, c Clip) Timeline {
 	tl = tl.replacingTrack(withoutClip(was, c.ID))
 	return tl.placing(trackID, c)
 }
