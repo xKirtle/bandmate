@@ -34,7 +34,7 @@
   import { chartTuning, chartVoicings } from './chordChart';
   import { plucks } from './chordFinder';
   import HearButton from './HearButton.svelte';
-  import { popoverLeft, popoverTop } from './popover';
+  import { following, popoverLeft, popoverTop } from './popover';
   import { preferredVoicings } from './sharedPreferredVoicings.svelte';
 
   let { song }: { song: Song } = $props();
@@ -149,9 +149,8 @@
   }
 </script>
 
-<!-- Placed again as the page scrolls or resizes, so it stays with its Chord. -->
-<svelte:window onresize={place} onkeydown={onKey} />
-<svelte:document onscrollcapture={place} onpointerdowncapture={pressElsewhere} />
+<svelte:window onkeydown={onKey} />
+<svelte:document onpointerdowncapture={pressElsewhere} />
 
 {#if opened && found}
   <div
@@ -161,6 +160,7 @@
     aria-label="{opened.name} diagram"
     popover="manual"
     bind:this={box}
+    {@attach following(place)}
     onpointerenter={(e) => e.pointerType !== 'touch' && clearTimeout(leaveTimer)}
     onpointerleave={(e) => e.pointerType !== 'touch' && opener.leave()}
     onkeydown={stepKey}

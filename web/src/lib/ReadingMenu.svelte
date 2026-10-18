@@ -12,7 +12,7 @@
   import type { ChordsInRead } from './chordChart';
   import { songChordsShown } from './chordsShown';
   import { largestLyricSize, smallestLyricSize, stepLyricSize, usualLyricSize } from './lyricSize';
-  import { placeBeside } from './popover';
+  import { following, placeBeside } from './popover';
   import { blockedRows, readingBadge } from './readingMenu';
   import { chordChartState } from './sharedChordChartState.svelte';
   import { lyricSize } from './sharedLyricSize.svelte';
@@ -93,9 +93,10 @@
   }
 </script>
 
-<!-- Placed as it opens, and again as the window resizes. Scrolling leaves it
-     where it is: a change of Lyric Size scrolls to keep the Line in view. -->
-<svelte:window onpointerdowncapture={onWindowPointer} onresize={() => open && place()} />
+<!-- Placed as it opens, and again as the window resizes or the page scrolls,
+     so it stays with the button. Scrolling doesn't close it: a change of
+     Lyric Size scrolls to keep the Line in view. -->
+<svelte:window onpointerdowncapture={onWindowPointer} />
 
 <div class="reading" bind:this={root} onfocusout={onFocusOut}>
   <button
@@ -122,6 +123,7 @@
       tabindex="-1"
       popover="manual"
       bind:this={panel}
+      {@attach following(place)}
       onkeydown={onPanelKey}
     >
       <span id="reading-size" class="name">Lyric Size</span>

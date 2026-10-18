@@ -1,3 +1,5 @@
+import type { Attachment } from 'svelte/attachments';
+
 /**
  * The top of a popover `height` px tall, `gap` px from the field or button it
  * opens from: under it, or over it when there's no room below, but never off
@@ -67,6 +69,22 @@ export function popoverLeft(
  */
 export function popoverSide(point: number, size: number, viewport: number, gap: number): PopoverAlign {
   return point + size <= viewport - gap ? 'start' : 'end';
+}
+
+/**
+ * Keeps a popover with what it opens from: `place` runs again as the page,
+ * or anything on it, scrolls, and as the window resizes. Attached to the
+ * popover, it lasts as long as that's open.
+ */
+export function following(place: () => void): Attachment {
+  return () => {
+    document.addEventListener('scroll', place, { capture: true, passive: true });
+    window.addEventListener('resize', place);
+    return () => {
+      document.removeEventListener('scroll', place, { capture: true });
+      window.removeEventListener('resize', place);
+    };
+  };
 }
 
 /**

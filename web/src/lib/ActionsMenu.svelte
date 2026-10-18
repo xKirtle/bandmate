@@ -15,7 +15,7 @@
     type MenuChoice,
     type MenuField,
   } from './menu';
-  import { popoverLeft, popoverSide, popoverTop, type PopoverAlign } from './popover';
+  import { following, popoverLeft, popoverSide, popoverTop, type PopoverAlign } from './popover';
   import type { Point } from './press';
 
   let {
@@ -248,6 +248,14 @@
     if (open && !root.contains(e.target as Node)) open = false;
   }
 
+  // Opened under ⋯, it moves with it as the page scrolls or the window
+  // resizes. Opened at a point, it closes instead: the point would be left
+  // behind.
+  function followTrigger() {
+    if (point) dismiss();
+    else place();
+  }
+
   // Closes it without losing focus with it.
   function dismiss() {
     if (!open) return;
@@ -256,8 +264,7 @@
   }
 </script>
 
-<!-- It's placed once, when it opens: scrolling or resizing would leave it behind. -->
-<svelte:window onpointerdowncapture={onWindowPointer} onscroll={dismiss} onresize={dismiss} />
+<svelte:window onpointerdowncapture={onWindowPointer} />
 
 <div class="menu-root" bind:this={root}>
   <button
@@ -282,6 +289,7 @@
       tabindex="-1"
       popover="manual"
       bind:this={menu}
+      {@attach following(followTrigger)}
       onkeydown={onMenuKey}
     >
       {#if picking}

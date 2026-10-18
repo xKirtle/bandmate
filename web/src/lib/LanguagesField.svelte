@@ -4,7 +4,7 @@
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import { tick } from 'svelte';
   import { languageChoices, languagesLabel, moveLanguage, pickLanguage } from './languages';
-  import { placeBeside } from './popover';
+  import { following, placeBeside } from './popover';
   import { listedLanguages } from './sharedLanguages.svelte';
 
   // A Song's Languages in its Details: a field naming them, in order, that
@@ -95,12 +95,9 @@
   }
 </script>
 
-<!-- Placed as it opens, and again as the window resizes; scrolling would leave it behind. -->
-<svelte:window
-  onpointerdowncapture={onWindowPointer}
-  onresize={() => open && place()}
-  onscroll={() => (open = false)}
-/>
+<!-- Placed as it opens, and again as the page scrolls or the window resizes,
+     so it stays with the button. -->
+<svelte:window onpointerdowncapture={onWindowPointer} />
 
 <div class="languages-field" bind:this={root} onfocusout={onFocusOut}>
   <button
@@ -124,6 +121,7 @@
       tabindex="-1"
       popover="manual"
       bind:this={panel}
+      {@attach following(place)}
       onkeydown={onPanelKey}
     >
       <fieldset class="choice-group" aria-describedby="{id}-hint">

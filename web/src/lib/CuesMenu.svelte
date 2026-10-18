@@ -5,7 +5,7 @@
   import { tick } from 'svelte';
   import { deviceStorage } from './deviceStorage';
   import Picker from './Picker.svelte';
-  import { placeBeside } from './popover';
+  import { following, placeBeside } from './popover';
   import { readShiftStep, shiftSteps, storeShiftStep, type ShiftStep } from './shiftStep';
 
   // What's done to every Cue at once, behind one button at the end of the
@@ -83,7 +83,9 @@
   }
 </script>
 
-<svelte:window onpointerdowncapture={onWindowPointer} onresize={() => open && place()} />
+<!-- Placed as it opens, and again as the page scrolls or the window resizes,
+     so it stays with the button. -->
+<svelte:window onpointerdowncapture={onWindowPointer} />
 
 <div class="cues" bind:this={root} onfocusout={onFocusOut}>
   <button
@@ -103,6 +105,7 @@
       tabindex="-1"
       popover="manual"
       bind:this={panel}
+      {@attach following(place)}
       onkeydown={onPanelKey}
     >
       <span id="shift-label" class="name">Shift every Cue</span>

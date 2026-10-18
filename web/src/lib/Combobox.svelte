@@ -4,7 +4,7 @@
   import { tick } from 'svelte';
   import type { HTMLInputAttributes } from 'svelte/elements';
   import { comboboxKey, filterOptions, optionIndex } from './combobox';
-  import { placeUnder, revealSelected } from './popover';
+  import { following, placeUnder, revealSelected } from './popover';
 
   let {
     id,
@@ -124,10 +124,6 @@
   }
 </script>
 
-<!-- Placed again as the page scrolls or resizes, so it stays with the field. -->
-<svelte:window onresize={() => open && place()} />
-<svelte:document onscrollcapture={() => open && place()} />
-
 <div class="combobox">
   <input
     {...rest}
@@ -173,6 +169,7 @@
       tabindex="-1"
       popover="manual"
       bind:this={list}
+      {@attach following(place)}
       onmousedown={(e) => e.preventDefault()}
     >
       {#each shown as option, i (option)}
