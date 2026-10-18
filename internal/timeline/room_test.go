@@ -61,6 +61,61 @@ func TestDuplicateStart(t *testing.T) {
 	}
 }
 
+func TestGrownTo(t *testing.T) {
+	tests := []struct {
+		name  string
+		clips []Clip
+		// end is where the Clip is grown to end, as a Retake's Take does.
+		end  float64
+		want float64
+	}{
+		{
+			name:  "a Retake with nothing after it grows to the Take's end",
+			clips: []Clip{beatClip(1, 10, 5)},
+			end:   30,
+			want:  20,
+		},
+		{
+			name:  "a Retake capped by the next Clip on the Track",
+			clips: []Clip{beatClip(1, 10, 5), beatClip(2, 22, 5)},
+			end:   30,
+			want:  12,
+		},
+		{
+			name:  "a Retake reaching just short of the next Clip",
+			clips: []Clip{beatClip(1, 10, 5), beatClip(2, 40, 5)},
+			end:   30,
+			want:  20,
+		},
+		{
+			name:  "a Retake capped by the next Clip on the Track, not a later one",
+			clips: []Clip{beatClip(1, 10, 5), beatClip(2, 22, 5), beatClip(3, 50, 5)},
+			end:   60,
+			want:  12,
+		},
+		{
+			name:  "a Retake ending within the Clip, which keeps its length",
+			clips: []Clip{beatClip(1, 10, 5)},
+			end:   12,
+			want:  5,
+		},
+		{
+			name:  "a Clip touching the next, which can't grow",
+			clips: []Clip{beatClip(1, 10, 5), beatClip(2, 15, 5)},
+			end:   30,
+			want:  5,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			track := Track{ID: 1, Clips: tt.clips}
+			if got := grownTo(track, tt.clips[0], tt.end); got != tt.want {
+				t.Errorf("grownTo = %g, want %g", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestTempoMoves(t *testing.T) {
 	tests := []struct {
 		name   string

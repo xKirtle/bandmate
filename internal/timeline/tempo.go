@@ -43,7 +43,7 @@ func (s *Store) SetClipTempos(ctx context.Context, songID int64, based songversi
 	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges, before Timeline) error {
 		scaled := make(map[int64]placement, len(tempos))
 		for _, t := range tempos {
-			p, err := clipPlacement(ctx, tx, songID, t.ClipID)
+			p, err := before.placement(t.ClipID)
 			if err != nil {
 				return err
 			}

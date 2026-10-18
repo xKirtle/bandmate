@@ -619,8 +619,8 @@ func (src source) duration(ctx context.Context, tx *sql.Tx) (float64, error) {
 // MoveClip moves a Clip to start at a time on a Track of the same Timeline,
 // keeping its trim. It can't overlap a Clip already there.
 func (s *Store) MoveClip(ctx context.Context, songID int64, based songversion.Version, clipID, trackID int64, start float64) (Timeline, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		p, err := movedTo(ctx, tx, songID, clipID, trackID, start)
+	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges, before Timeline) error {
+		p, err := before.moved(clipID, trackID, start)
 		if err != nil {
 			return err
 		}
@@ -628,14 +628,14 @@ func (s *Store) MoveClip(ctx context.Context, songID int64, based songversion.Ve
 	})
 }
 
-// movedTo is where one of the Song's Clips would be, moved to start at a
-// time on a Track, if the Track is on the Song's Timeline.
-func movedTo(ctx context.Context, tx *sql.Tx, songID, clipID, trackID int64, start float64) (placement, error) {
-	p, err := clipPlacement(ctx, tx, songID, clipID)
+// moved is where one of tl's Clips goes, moved to start at a time on one of
+// tl's Tracks, keeping its trim.
+func (tl Timeline) moved(clipID, trackID int64, start float64) (placement, error) {
+	p, err := tl.placement(clipID)
 	if err != nil {
 		return placement{}, err
 	}
-	if err := findTrackToPlaceOn(ctx, tx, songID, trackID); err != nil {
+	if err := tl.findTrackToPlaceOn(trackID); err != nil {
 		return placement{}, err
 	}
 	p.trackID, p.start = trackID, start
@@ -666,9 +666,9 @@ func (s *Store) MoveClips(ctx context.Context, songID int64, based songversion.V
 		}
 		seen[m.ClipID] = true
 	}
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges, before Timeline) error {
 		for _, m := range moves {
-			p, err := movedTo(ctx, tx, songID, m.ClipID, m.TrackID, m.Start)
+			p, err := before.moved(m.ClipID, m.TrackID, m.Start)
 			if err != nil {
 				return err
 			}
@@ -688,13 +688,11 @@ func (s *Store) MoveClips(ctx context.Context, songID int64, based songversion.V
 // sets them, e.g. to undo the trim.
 func (s *Store) TrimClip(ctx context.Context, songID int64, based songversion.Version, clipID int64, offset, length float64,
 	fades *Fades) (Timeline, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		p, err := clipPlacement(ctx, tx, songID, clipID)
+	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges, before Timeline) error {
+		p, err := before.trimmed(clipID, offset, length)
 		if err != nil {
 			return err
 		}
-		offset = roundedToZero(offset)
-		p.start, p.offset, p.length = p.timelineAt(offset), offset, length
 		if fades != nil {
 			if err := fades.check(length); err != nil {
 				return err
@@ -703,6 +701,19 @@ func (s *Store) TrimClip(ctx context.Context, songID int64, based songversion.Ve
 		}
 		return store(ctx, tx, clipID, p)
 	})
+}
+
+// trimmed is where one of tl's Clips goes, playing length seconds of its
+// source from offset. Its audio stays where it is on the Timeline, so
+// trimming the start moves where the Clip starts.
+func (tl Timeline) trimmed(clipID int64, offset, length float64) (placement, error) {
+	p, err := tl.placement(clipID)
+	if err != nil {
+		return placement{}, err
+	}
+	offset = roundedToZero(offset)
+	p.start, p.offset, p.length = p.timelineAt(offset), offset, length
+	return p, nil
 }
 
 // NewClip is a stretch of a Beat or a Sound, or of detached Takes, to
@@ -1054,11 +1065,11 @@ func insertClip(ctx context.Context, tx *sql.Tx, p placement) (int64, error) {
 // the way. A Clip of Takes gets copies of its Takes, sharing their files.
 func (s *Store) DuplicateClip(ctx context.Context, songID int64, based songversion.Version, clipID int64) (Timeline, error) {
 	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges, before Timeline) error {
-		p, err := clipPlacement(ctx, tx, songID, clipID)
+		t, c, err := before.findClip(clipID)
 		if err != nil {
 			return err
 		}
-		t, c, _ := before.clip(clipID)
+		p := placementOf(t.ID, c)
 		p.start = duplicateStart(t, c)
 		return s.insertCopy(ctx, tx, changes, p)
 	})
@@ -1260,12 +1271,12 @@ func checkGain(gain float64) error {
 // falls to silence at its end, in seconds: 0 for no Fade. Together they
 // can't run longer than the Clip.
 func (s *Store) SetClipFades(ctx context.Context, songID int64, based songversion.Version, clipID int64, fades Fades) (Timeline, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		p, err := clipPlacement(ctx, tx, songID, clipID)
+	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges, before Timeline) error {
+		_, c, err := before.findClip(clipID)
 		if err != nil {
 			return err
 		}
-		if err := fades.check(p.length); err != nil {
+		if err := fades.check(c.Length); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE clips SET fade_in = ?, fade_out = ? WHERE id = ?`,
@@ -1336,6 +1347,14 @@ func clipName(name *string) sql.NullString {
 	return sql.NullString{String: n, Valid: n != ""}
 }
 
+// nullID is one of a Clip's optional ids as stored: null where it has none.
+func nullID(id *int64) sql.NullInt64 {
+	if id == nil {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: *id, Valid: true}
+}
+
 // DeleteClip removes a Clip from the Timeline. Its Beat stays in the Beat
 // Library, its Sound is kept a while for undo, and its Takes are detached,
 // to be placed again.
@@ -1394,36 +1413,6 @@ func deleteClip(ctx context.Context, tx *sql.Tx, songID, clipID int64) error {
 		return err
 	}
 	return markDetached(ctx, tx, songID)
-}
-
-// clipPlacement reads where one of the Song's Clips is and what it plays.
-func clipPlacement(ctx context.Context, tx *sql.Tx, songID, clipID int64) (placement, error) {
-	var p placement
-	err := tx.QueryRowContext(ctx, `SELECT c.track_id, c.beat_id, c.sound_id, c.name, c.gain, c.tempo, c.pitch, c.fade_in, c.fade_out,
-			c.active_take_id, c.start, c.source_offset, c.length
-		FROM clips c JOIN tracks t ON t.id = c.track_id
-		WHERE c.id = ? AND t.song_id = ?`, clipID, songID).
-		Scan(&p.trackID, &p.source.beatID, &p.source.soundID, &p.name, &p.Gain, &p.Tempo, &p.Pitch, &p.FadeIn, &p.FadeOut,
-			&p.source.activeTakeID, &p.start, &p.offset, &p.length)
-	if errors.Is(err, sql.ErrNoRows) {
-		return placement{}, domain.ErrNotFound
-	}
-	if err != nil {
-		return placement{}, fmt.Errorf("reading clip: %w", err)
-	}
-	err = query(ctx, tx, `SELECT id FROM takes WHERE clip_id = ? ORDER BY number, id`, []any{clipID},
-		func(rows *sql.Rows) error {
-			var id int64
-			if err := rows.Scan(&id); err != nil {
-				return err
-			}
-			p.source.takeIDs = append(p.source.takeIDs, id)
-			return nil
-		})
-	if err != nil {
-		return placement{}, fmt.Errorf("reading takes: %w", err)
-	}
-	return p, nil
 }
 
 // store writes a Clip's placement and Tempo, without checking where, its
