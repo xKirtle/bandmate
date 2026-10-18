@@ -19,6 +19,12 @@ describe('readLyricSize', () => {
     expect(readLyricSize(storage())).toBe(100);
   });
 
+  it('is the size kept on this device, from 50% to 175%', () => {
+    for (const size of [50, 60, 70, 80, 90, 115, 130, 150, 175]) {
+      expect(readLyricSize(storage({ [lyricSizeKey]: String(size) }))).toBe(size);
+    }
+  });
+
   it('is 100% without storage, or when it is blocked', () => {
     expect(readLyricSize(undefined)).toBe(100);
     expect(readLyricSize(storage({}, true))).toBe(100);
@@ -58,9 +64,16 @@ describe('stepLyricSize', () => {
     expect(stepLyricSize(90, -1)).toBe(80);
   });
 
-  it('is held from 80% to 175%', () => {
+  it('steps down below 80% in tens, to 50%', () => {
+    expect(stepLyricSize(80, -1)).toBe(70);
+    expect(stepLyricSize(70, -1)).toBe(60);
+    expect(stepLyricSize(60, -1)).toBe(50);
+    expect(stepLyricSize(50, 1)).toBe(60);
+  });
+
+  it('is held from 50% to 175%', () => {
     expect(stepLyricSize(175, 1)).toBe(175);
-    expect(stepLyricSize(80, -1)).toBe(80);
+    expect(stepLyricSize(50, -1)).toBe(50);
   });
 });
 
