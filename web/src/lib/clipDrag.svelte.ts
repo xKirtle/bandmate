@@ -97,10 +97,9 @@ export interface DraggedClip {
   at: Placed;
 }
 
-/** The edit a release saves, and for a move, which Clips moved and by how far, to offer moving their Cues. */
+/** The edit a release saves. */
 export interface DragSave {
   edit: Extract<Edit, { kind: 'moveClip' | 'moveClips' | 'trimClip' | 'nudgeTake' | 'setClipGain' | 'setClipFades' }>;
-  moved: { clips: Clip[]; by: number } | null;
 }
 
 /** The Timeline a Clip drag goes over. */
@@ -437,28 +436,22 @@ export class ClipDrag {
       case 'move':
         if (drag.moves) return this.#saveSelection(drag.moves);
         if (unchanged()) return null;
-        return {
-          edit: { kind: 'moveClip', clipId: clip.id, trackId, start: to.start },
-          moved: { clips: [clip], by: to.start - clip.start },
-        };
+        return { edit: { kind: 'moveClip', clipId: clip.id, trackId, start: to.start } };
       case 'start':
       case 'end':
         if (unchanged()) return null;
-        return { edit: { kind: 'trimClip', clipId: clip.id, offset: to.offset, length: to.length }, moved: null };
+        return { edit: { kind: 'trimClip', clipId: clip.id, offset: to.offset, length: to.length } };
       case 'nudge':
         if (drag.nudge === activeTake(clip)!.nudge) return null;
-        return {
-          edit: { kind: 'nudgeTake', clipId: clip.id, takeId: clip.activeTakeId!, nudge: drag.nudge },
-          moved: null,
-        };
+        return { edit: { kind: 'nudgeTake', clipId: clip.id, takeId: clip.activeTakeId!, nudge: drag.nudge } };
       case 'gain':
         if (drag.gain === clip.gain) return null;
-        return { edit: { kind: 'setClipGain', clipId: clip.id, gain: drag.gain }, moved: null };
+        return { edit: { kind: 'setClipGain', clipId: clip.id, gain: drag.gain } };
       case 'fadeIn':
       case 'fadeOut': {
         const { fadeIn, fadeOut } = drag.fades;
         if (fadeIn === clip.fadeIn && fadeOut === clip.fadeOut) return null;
-        return { edit: { kind: 'setClipFades', clipId: clip.id, fadeIn, fadeOut }, moved: null };
+        return { edit: { kind: 'setClipFades', clipId: clip.id, fadeIn, fadeOut } };
       }
     }
   }
@@ -468,10 +461,7 @@ export class ClipDrag {
     const clips = this.#placed();
     const from = moves.map((m) => clips.get(m.clipId)!);
     if (moves.every((m, i) => m.trackId === from[i].trackId && m.start === from[i].clip.start)) return null;
-    return {
-      edit: { kind: 'moveClips', moves },
-      moved: { clips: from.map((f) => f.clip), by: moves[0].start - from[0].clip.start },
-    };
+    return { edit: { kind: 'moveClips', moves } };
   }
 
   /**

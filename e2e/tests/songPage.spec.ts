@@ -706,48 +706,18 @@ test('held sideways, the full-screen Timeline folds its actions too, and upright
   expect(await transportOffers(page, 1)).toEqual({ onRow: ['Mix down…'], folded: [] });
 });
 
-test('a Clip moved over Cues offers to move them, naming how many, which moves them, and another edit withdraws the offer', async ({
-  page,
-  bandmate,
-}) => {
+test('a Clip moved over Cues leaves them where they are, offering nothing', async ({ page, bandmate }) => {
   const song = await heroSong(bandmate);
   await page.goto(`/songs/${song.id}`);
   const take = clip(page, 'Take 2');
-  const offer = timeline(page)
-    .getByRole('status')
-    .filter({ hasText: /^The Clip moved / });
-  const accept = offer.getByRole('button', { name: 'Move 4 Cues with it' });
   await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
   // Take 2, from 0:04 to 0:25, spans Verse 1's four Cues.
   expect(await serverCues(bandmate, song.id, 'Verse 1')).toEqual([5, 10, 15, 20]);
 
-  // Moved later, it offers to move those four with it.
   await dragClip(page, take, 100);
-  await expect(offer).toContainText(/^The Clip moved \d+:\d\d\.\d\s+later\./);
-  await expect(accept).toBeVisible();
   await expect.poll(async () => (await serverClips(bandmate, song.id, 'Lead vox'))[0].start).toBeGreaterThan(4);
-  const by = (await serverClips(bandmate, song.id, 'Lead vox'))[0].start - 4;
-
-  // Accepted, each moves by as much as the Clip, and the offer's gone.
-  await accept.click();
-  await expect(offer).toHaveCount(0);
-  await expect
-    .poll(() => serverCues(bandmate, song.id, 'Verse 1'))
-    .toEqual([5 + by, 10 + by, 15 + by, 20 + by].map((c) => expect.closeTo(c, 2)));
-  const moved = await serverCues(bandmate, song.id, 'Verse 1');
-
-  // Moved back earlier, it offers again, for the Cues it spans now;
-  // deleting the Beat's Clip withdraws it.
-  await dragClip(page, take, -100);
-  await expect(offer).toContainText(/^The Clip moved \d+:\d\d\.\d\s+earlier\./);
-  await expect(offer.getByRole('button', { name: /^Move \d+ Cues with it$/ })).toBeVisible();
-  await clip(page, 'Lorem Click').focus();
-  await page.keyboard.press('Delete');
-  await expect.poll(() => serverClips(bandmate, song.id, 'Beat')).toEqual([]);
-  await expect(take).toHaveCount(1);
-  expect(await serverClips(bandmate, song.id, 'Lead vox')).toHaveLength(1);
-  await expect(offer).toHaveCount(0);
-  expect(await serverCues(bandmate, song.id, 'Verse 1')).toEqual(moved);
+  await expect(timeline(page).getByRole('status').filter({ hasText: /moved/ })).toHaveCount(0);
+  expect(await serverCues(bandmate, song.id, 'Verse 1')).toEqual([5, 10, 15, 20]);
 });
 
 test('Home and End go to the start and the end with focus on the lanes, without scrolling the page, and a volume slider keeps its own', async ({
@@ -790,24 +760,18 @@ test('Cue edits are undone in order with the Clip edits around them', async ({ p
   const redo = redoButton(page);
   await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
 
-  // A Clip moved, then the Cues it spans moved with it, then a Cue nudged.
+  // A Clip moved, then two Cues nudged a tenth later, Verse 1's then the Chorus's.
   await dragClip(page, take, 100);
-  await timeline(page).getByRole('button', { name: 'Move 4 Cues with it' }).click();
-  await expect.poll(() => serverCues(bandmate, song.id, 'Verse 1')).not.toEqual([5, 10, 15, 20]);
+  await expect.poll(async () => (await serverClips(bandmate, song.id, 'Lead vox'))[0].start).toBeGreaterThan(4);
   const [moved] = await serverClips(bandmate, song.id, 'Lead vox');
-  const by = moved.start - 4;
-  expect((await serverCues(bandmate, song.id, 'Verse 1')).map((c) => c! - by)).toEqual([
-    expect.closeTo(5, 2),
-    expect.closeTo(10, 2),
-    expect.closeTo(15, 2),
-    expect.closeTo(20, 2),
-  ]);
-  await expect(cueOf(page, 'Line 1 of Verse 1')).not.toHaveAccessibleName(cueName('Line 1 of Verse 1', '0:05.0'));
+  await cueOf(page, 'Line 1 of Verse 1').focus();
+  await page.keyboard.press('Alt+ArrowUp');
+  await expect.poll(() => serverCues(bandmate, song.id, 'Verse 1')).toEqual([5.1, 10, 15, 20]);
   await cueOf(page, 'Line 1 of Chorus').focus();
   await page.keyboard.press('Alt+ArrowUp');
   await expect.poll(() => serverCues(bandmate, song.id, 'Chorus')).toEqual([25.1, 30, 35, 40]);
 
-  // Undone last first: the nudge, then the Cues moved, then the Clip.
+  // Undone last first: the Chorus's nudge, then Verse 1's, then the Clip.
   await undo.click();
   await expect(cueOf(page, 'Line 1 of Chorus')).toHaveAccessibleName(cueName('Line 1 of Chorus', '0:25.0'));
   await expect.poll(() => serverCues(bandmate, song.id, 'Chorus')).toEqual([25, 30, 35, 40]);
@@ -828,7 +792,7 @@ test('Cue edits are undone in order with the Clip edits around them', async ({ p
   await expect.poll(async () => (await serverClips(bandmate, song.id, 'Lead vox'))[0].start).toBe(moved.start);
   expect(await serverCues(bandmate, song.id, 'Verse 1')).toEqual([5, 10, 15, 20]);
   await redo.click();
-  await expect.poll(() => serverCues(bandmate, song.id, 'Verse 1')).not.toEqual([5, 10, 15, 20]);
+  await expect.poll(() => serverCues(bandmate, song.id, 'Verse 1')).toEqual([5.1, 10, 15, 20]);
   await redo.click();
   await expect.poll(() => serverCues(bandmate, song.id, 'Chorus')).toEqual([25.1, 30, 35, 40]);
   await expect(cueOf(page, 'Line 1 of Chorus')).toHaveAccessibleName(cueName('Line 1 of Chorus', '0:25.1'));

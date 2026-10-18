@@ -234,7 +234,6 @@
         renderMerge(mergedClips(before, sources, target.clipIds), target, (c) => player.load(c)),
     },
   });
-  onDestroy(() => editing.close());
 
   // Every Clip and Selection command, from the keys, the Clip menu and the
   // Selection menu alike, runs through Clip commands (see
@@ -2538,20 +2537,6 @@
       </div>
     </div>
 
-    {#if editing.cueOffer}
-      {@const offer = editing.cueOffer}
-      <div class="offer" role="status">
-        <span
-          >{offer.clips === 1 ? 'The Clip' : `The ${offer.clips} Clips`} moved {formatCue(Math.abs(offer.by))}
-          {offer.by > 0 ? 'later' : 'earlier'}.</span
-        >
-        <button type="button" class="button" onclick={() => editing.moveCues()}
-          >Move {offer.count}
-          {offer.count === 1 ? 'Cue' : 'Cues'} with {offer.clips === 1 ? 'it' : 'them'}</button
-        >
-        <button type="button" class="button" onclick={() => editing.leaveCues()}>Leave them</button>
-      </div>
-    {/if}
     {#if recorder.unsaved.length > 0}
       <div class="offer" role="status">
         <span>Recovered {recorder.unsaved.length} unsaved {recorder.unsaved.length === 1 ? 'Take' : 'Takes'}.</span>

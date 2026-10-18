@@ -79,10 +79,7 @@ async function commandsFor(server: FakeSongServer) {
       chosen: () => state.chosen,
     });
   });
-  disposers.push(() => {
-    editing.close();
-    dispose();
-  });
+  disposers.push(dispose);
   return { saves, editing, selection, commands, state };
 }
 

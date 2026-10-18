@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Clip, Song, Timeline, Track } from './api';
-import { ClipDrag, type DragAt, type DragSave } from './clipDrag.svelte';
+import { ClipDrag, type DragAt } from './clipDrag.svelte';
 import { Saves } from './saves.svelte';
 import { Selection } from './selection.svelte';
 import { emptySong, FakeSongServer } from './songServerFake';
 import type { MergeTarget } from './merge';
-import { offerFor, TimelineEditing, type PreparedSound, type TimelineAudio } from './timelineEditing.svelte';
+import { TimelineEditing, type PreparedSound, type TimelineAudio } from './timelineEditing.svelte';
 
 /** A Clip of Beat 1, from start to end seconds. */
 const beatClip = (id: number, start: number, end: number): Clip => ({
@@ -105,10 +105,7 @@ async function editingFor(server: FakeSongServer) {
       audio,
     });
   });
-  disposers.push(() => {
-    editing.close();
-    dispose();
-  });
+  disposers.push(dispose);
   return { saves, editing, selection, state, audio };
 }
 
@@ -705,9 +702,9 @@ describe('Timeline editing, a Clip’s Gain and Fades as shown', () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
     const { saves, editing } = await editingFor(server);
     server.failNext(1);
-    const gaining = editing.saveDrag({ edit: { kind: 'setClipGain', clipId: 1, gain: 10 }, moved: null });
+    const gaining = editing.saveDrag({ edit: { kind: 'setClipGain', clipId: 1, gain: 10 } });
     const release = server.holdNextAnswer();
-    const fading = editing.saveDrag({ edit: { kind: 'setClipFades', clipId: 1, fadeIn: 2, fadeOut: 3 }, moved: null });
+    const fading = editing.saveDrag({ edit: { kind: 'setClipFades', clipId: 1, fadeIn: 2, fadeOut: 3 } });
     expect(shownClip(editing, 1)).toMatchObject({ gain: 10, fadeIn: 2, fadeOut: 3 });
     expect(await gaining).toBe(false);
     expect(shownClip(editing, 1)).toMatchObject({ gain: 0, fadeIn: 2, fadeOut: 3 });
@@ -721,7 +718,7 @@ describe('Timeline editing, a Clip’s Gain and Fades as shown', () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
     const { saves, editing } = await editingFor(server);
     server.failNext(1);
-    const fading = editing.saveDrag({ edit: { kind: 'setClipFades', clipId: 1, fadeIn: 2, fadeOut: 0 }, moved: null });
+    const fading = editing.saveDrag({ edit: { kind: 'setClipFades', clipId: 1, fadeIn: 2, fadeOut: 0 } });
     expect(shownClip(editing, 1).fadeIn).toBe(2);
     expect(await fading).toBe(false);
     expect(shownClip(editing, 1).fadeIn).toBe(0);
@@ -909,168 +906,6 @@ describe('Timeline editing, what follows an edit', () => {
     expect(state.chosen).toEqual([3]);
     await editing.edit({ kind: 'deleteClip', clipId: 1 });
     expect(state.chosen).toEqual([3]);
-  });
-});
-
-/** Records a new Take on Track 2 from the start given, as the Take recorder saves one. */
-const recordTake = (server: FakeSongServer, saves: Saves, start: number) =>
-  saves.make(async (at) => ({
-    timeline: await server.recordTake(at, new Blob(), {
-      trackId: 2,
-      start,
-      captureStart: start,
-      latencyOffset: 0,
-      peaks: new Array(100).fill(0),
-    }),
-    kept: 'take',
-  }));
-
-/** A Song of one Section whose Lines 10, 11 and 12 are cued at 2 s and 5 s, in Clip 1, and 25 s, in Clip 2. */
-const cuedSong = () =>
-  emptySong({
-    arrangement: [1],
-    sections: [
-      {
-        id: 1,
-        label: 'Verse',
-        alternates: [
-          {
-            id: 1,
-            name: '',
-            active: true,
-            lines: [
-              [10, 2],
-              [11, 5],
-              [12, 25],
-            ].map(([id, cue]) => ({ id, text: `Line ${id}`, lyrics: `Line ${id}`, chords: [], chordLine: false, cue })),
-          },
-        ],
-      },
-    ],
-  });
-
-/** The Cues of Lines 10, 11 and 12, in order. */
-const cuesOf = (song: Song) => song.sections[0].alternates[0].lines.map((l) => l.cue);
-
-/** Clip 1 dragged 40 s later, as a Clip drag saves it. */
-const clipOneMoved = (server: FakeSongServer): DragSave => ({
-  edit: { kind: 'moveClip', clipId: 1, trackId: 1, start: 40 },
-  moved: { clips: [server.timeline.tracks[0].clips[0]], by: 40 },
-});
-
-/** Clip 2 dragged 40 s later, as a Clip drag saves it. */
-const clipTwoMoved = (server: FakeSongServer): DragSave => ({
-  edit: { kind: 'moveClip', clipId: 2, trackId: 1, start: 60 },
-  moved: { clips: server.timeline.tracks[0].clips.filter((c) => c.id === 2), by: 40 },
-});
-
-/** Clips 1 and 2 dragged 40 s later together, as a Clip drag saves them. */
-const bothMoved = (server: FakeSongServer): DragSave => ({
-  edit: {
-    kind: 'moveClips',
-    moves: [
-      { clipId: 1, trackId: 1, start: 40 },
-      { clipId: 2, trackId: 1, start: 60 },
-    ],
-  },
-  moved: { clips: server.timeline.tracks[0].clips, by: 40 },
-});
-
-describe('Timeline editing, the Cue-move offer', () => {
-  it('offers to move the Cues a Clip moved spanned, naming how many, and moves them by its span', async () => {
-    const server = new FakeSongServer(cuedSong(), twoTracks());
-    const { saves, editing } = await editingFor(server);
-    expect(await editing.saveDrag(clipOneMoved(server))).toBe(true);
-    expect(editing.cueOffer).toEqual({ by: 40, count: 2, clips: 1 });
-    editing.moveCues();
-    expect(editing.cueOffer).toBeNull();
-    // On screen at once, saved after.
-    expect(cuesOf(saves.song)).toEqual([42, 45, 25]);
-    await vi.advanceTimersByTimeAsync(0);
-    expect(cuesOf(server.song)).toEqual([42, 45, 25]);
-  });
-
-  it("offers to move several Clips' Cues, moving each once", async () => {
-    const server = new FakeSongServer(cuedSong(), twoTracks());
-    const { editing } = await editingFor(server);
-    await editing.saveDrag(bothMoved(server));
-    expect(editing.cueOffer).toEqual({ by: 40, count: 3, clips: 2 });
-    editing.moveCues();
-    await vi.advanceTimersByTimeAsync(0);
-    expect(cuesOf(server.song)).toEqual([42, 45, 65]);
-  });
-
-  it('offers nothing for a move spanning no Cue, or a drag that is not a move', async () => {
-    const server = new FakeSongServer(cuedSong(), [track(1, [beatClip(1, 30, 40)])]);
-    const { editing } = await editingFor(server);
-    await editing.saveDrag({
-      edit: { kind: 'moveClip', clipId: 1, trackId: 1, start: 50 },
-      moved: { clips: server.timeline.tracks[0].clips, by: 20 },
-    });
-    expect(editing.cueOffer).toBeNull();
-    expect(await editing.saveDrag({ edit: { kind: 'setClipGain', clipId: 1, gain: -3 }, moved: null })).toBe(true);
-    expect(editing.cueOffer).toBeNull();
-  });
-
-  it('lapses after 8 seconds, and can be left', async () => {
-    const server = new FakeSongServer(cuedSong(), twoTracks());
-    const { editing } = await editingFor(server);
-    await editing.saveDrag(clipOneMoved(server));
-    await vi.advanceTimersByTimeAsync(offerFor - 1);
-    expect(editing.cueOffer).not.toBeNull();
-    await vi.advanceTimersByTimeAsync(1);
-    expect(editing.cueOffer).toBeNull();
-    await editing.saveDrag(clipTwoMoved(server));
-    expect(editing.cueOffer).not.toBeNull();
-    editing.leaveCues();
-    expect(editing.cueOffer).toBeNull();
-    expect(cuesOf(server.song)).toEqual([2, 5, 25]);
-  });
-
-  it('is withdrawn when the next edit lands, not before', async () => {
-    const server = new FakeSongServer(cuedSong(), twoTracks());
-    const { editing } = await editingFor(server);
-    await editing.saveDrag(clipOneMoved(server));
-    const release = server.holdNextAnswer();
-    const renaming = editing.edit({ kind: 'updateTrack', trackId: 2, changes: { name: 'Vocals' } });
-    await vi.advanceTimersByTimeAsync(0);
-    expect(editing.cueOffer).not.toBeNull();
-    release();
-    await renaming;
-    expect(editing.cueOffer).toBeNull();
-  });
-
-  it('is withdrawn by an undo', async () => {
-    const server = new FakeSongServer(cuedSong(), twoTracks());
-    const { saves, editing } = await editingFor(server);
-    await editing.saveDrag(clipOneMoved(server));
-    await saves.undo();
-    expect(editing.cueOffer).toBeNull();
-    expect(server.timeline.tracks[0].clips[0].start).toBe(0);
-  });
-
-  it('is withdrawn by a Take saved', async () => {
-    const server = new FakeSongServer(cuedSong(), twoTracks());
-    const { saves, editing } = await editingFor(server);
-    await editing.saveDrag(clipOneMoved(server));
-    await recordTake(server, saves, 80);
-    expect(editing.cueOffer).toBeNull();
-  });
-
-  it('is withdrawn by a Cue change, e.g. from the Lyric Sheet, as soon as it shows', async () => {
-    const server = new FakeSongServer(cuedSong(), twoTracks());
-    const { saves, editing } = await editingFor(server);
-    await editing.saveDrag(clipOneMoved(server));
-    void saves.cue({ kind: 'setLineCue', lineId: 12, cue: 26 }, 'the Cue');
-    expect(editing.cueOffer).toBeNull();
-  });
-
-  it('stays through a change that leaves the Timeline and the Cues as they were', async () => {
-    const server = new FakeSongServer(cuedSong(), twoTracks());
-    const { saves, editing } = await editingFor(server);
-    await editing.saveDrag(clipOneMoved(server));
-    await saves.setTags(['Demo']);
-    expect(editing.cueOffer).toEqual({ by: 40, count: 2, clips: 1 });
   });
 });
 

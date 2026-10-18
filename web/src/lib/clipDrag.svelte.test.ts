@@ -226,7 +226,6 @@ describe('ClipDrag', () => {
       ]);
       expect(drag.release()).toEqual({
         edit: { kind: 'moveClip', clipId: 1, trackId: 1, start: 23 },
-        moved: { clips: [expect.objectContaining({ id: 1, start: 10 })], by: 13 },
       });
     });
 
@@ -270,7 +269,7 @@ describe('ClipDrag', () => {
       expect(shown.at).toMatchObject({ start: 25, length: 10 });
       expect(shown.trackId).toBe(2);
       expect(shown.clip.takes[0]).toMatchObject({ nudge: 0.5, position: 0.5 });
-      expect(drag.release()).toEqual({ edit: { kind: 'nudgeTake', clipId: 3, takeId: 103, nudge: 0.5 }, moved: null });
+      expect(drag.release()).toEqual({ edit: { kind: 'nudgeTake', clipId: 3, takeId: 103, nudge: 0.5 } });
     });
 
     it('moves a Clip of a Beat with Alt held, as it has no Take to nudge', () => {
@@ -302,7 +301,7 @@ describe('ClipDrag', () => {
       drag.move(at(12));
 
       expect(drag.shown[0].at).toEqual({ start: 12, offset: 2, length: 8, tempo: 1 });
-      expect(drag.release()).toEqual({ edit: { kind: 'trimClip', clipId: 1, offset: 2, length: 8 }, moved: null });
+      expect(drag.release()).toEqual({ edit: { kind: 'trimClip', clipId: 1, offset: 2, length: 8 } });
     });
 
     it('saves its end trimmed, stopping at the Clip after it', () => {
@@ -444,7 +443,6 @@ describe('ClipDrag', () => {
             { clipId: 3, trackId: 2, start: 27 },
           ],
         },
-        moved: { clips: [expect.objectContaining({ id: 1 }), expect.objectContaining({ id: 3 })], by: 2 },
       });
     });
 
@@ -498,7 +496,7 @@ describe('ClipDrag', () => {
       expect(drag.shown).toEqual([
         { clip: expect.objectContaining({ id: 1, gain: 10 }), trackId: 1, at: expect.objectContaining({ start: 10 }) },
       ]);
-      expect(drag.release()).toEqual({ edit: { kind: 'setClipGain', clipId: 1, gain: 10 }, moved: null });
+      expect(drag.release()).toEqual({ edit: { kind: 'setClipGain', clipId: 1, gain: 10 } });
     });
 
     it('lets go of the Clip on release, handing its Gain over to be shown until saved', () => {
@@ -603,7 +601,6 @@ describe('ClipDrag', () => {
       ]);
       expect(drag.release()).toEqual({
         edit: { kind: 'setClipFades', clipId: 1, fadeIn: 4, fadeOut: 0 },
-        moved: null,
       });
     });
 
