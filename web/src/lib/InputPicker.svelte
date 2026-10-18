@@ -4,7 +4,7 @@
   import InputName from './InputName.svelte';
   import { InputRows } from './inputRows.svelte';
   import LevelMeter from './LevelMeter.svelte';
-  import { placeBeside, type PopoverAlign } from './popover';
+  import { following, placeBeside, type PopoverAlign } from './popover';
 
   // The Timeline's mic button, and the popover it opens to pick the Input
   // recorded from: every Input connected, the default input and each
@@ -104,7 +104,9 @@
   onDestroy(() => hide(false));
 </script>
 
-<svelte:window onpointerdowncapture={onWindowPointer} onresize={() => open && place()} />
+<!-- Placed as it opens, and again as the page scrolls or the window resizes,
+     so it stays with what it opened by. -->
+<svelte:window onpointerdowncapture={onWindowPointer} />
 
 <span class="input-picker" bind:this={root} onfocusout={onFocusOut}>
   {#if hasButton}
@@ -128,6 +130,7 @@
       tabindex="-1"
       popover="manual"
       bind:this={panel}
+      {@attach following(place)}
       onkeydown={onPanelKey}
     >
       {#if inputs.chosenGone}

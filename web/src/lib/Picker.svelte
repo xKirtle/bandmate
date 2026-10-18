@@ -4,7 +4,7 @@
   import { tick, type Snippet } from 'svelte';
   import type { HTMLAttributes } from 'svelte/elements';
   import { pickerKey, typeaheadIndex } from './picker';
-  import { placeUnder, revealSelected } from './popover';
+  import { following, placeUnder, revealSelected } from './popover';
 
   // Picks a value from a list it draws itself, in place of a native select,
   // whose OS-drawn list looks nothing like the app. Follows the ARIA
@@ -126,10 +126,6 @@
   }
 </script>
 
-<!-- Placed again as the page scrolls or resizes, so it stays with the trigger. -->
-<svelte:window onresize={() => open && place()} />
-<svelte:document onscrollcapture={() => open && place()} />
-
 <div class={['picker', className]}>
   <div
     {...rest}
@@ -163,6 +159,7 @@
       tabindex="-1"
       popover="manual"
       bind:this={list}
+      {@attach following(place)}
       onmousedown={(e) => e.preventDefault()}
     >
       {#each options as o, i (i)}

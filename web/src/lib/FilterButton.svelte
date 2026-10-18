@@ -1,7 +1,7 @@
 <script lang="ts">
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import { tick, type Snippet } from 'svelte';
-  import { placeBeside } from './popover';
+  import { following, placeBeside } from './popover';
 
   // A filter in a list page's filter bar: a pill naming the filter, and what's
   // picked in it, that opens what it's picked with, e.g. a checklist, under it.
@@ -76,12 +76,9 @@
   }
 </script>
 
-<!-- Placed as it opens, and again as the window resizes; scrolling would leave it behind. -->
-<svelte:window
-  onpointerdowncapture={onWindowPointer}
-  onresize={() => open && place()}
-  onscroll={() => (open = false)}
-/>
+<!-- Placed as it opens, and again as the page scrolls or the window resizes,
+     so it stays with the button. -->
+<svelte:window onpointerdowncapture={onWindowPointer} />
 
 <div class="filter" bind:this={root} onfocusout={onFocusOut}>
   <button
@@ -104,6 +101,7 @@
       tabindex="-1"
       popover="manual"
       bind:this={panel}
+      {@attach following(place)}
       onkeydown={onPanelKey}
     >
       {@render children()}
