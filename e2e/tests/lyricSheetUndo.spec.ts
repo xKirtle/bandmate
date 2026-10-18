@@ -15,7 +15,7 @@ const serverScrapbook = async (bandmate: Bandmate, songId: number) =>
 /** Moves focus out of any text field, so Ctrl+Z is the Song's. */
 const blur = (page: Page) => page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
 
-test('deleting a Scrapbook Section asks nothing, and Ctrl+Z brings it back into view, its fold opened, ending Sync mode', async ({
+test('deleting a Scrapbook Section asks nothing, and Ctrl+Z brings it back into view, its tab shown, ending Sync mode', async ({
   page,
   bandmate,
 }) => {
