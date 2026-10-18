@@ -602,15 +602,14 @@ const phone = {
   /** When the playhead reaches seconds on the Timeline, as a time on the clock. */
   const at = (seconds) => playing + (seconds - 59) * 1000;
   const start = at(64);
-  const end = at(71.5);
+  const end = at(74);
 
   await page.waitForTimeout(start - 500 - Date.now());
   const stop = await screencast(page, "sync-mode");
 
-  // Cue three Bridge Lines a bar (2.5 s) apart, from 1:05, and stop with
-  // the fourth up next: once every Line is cued, the first comes up next,
-  // and the Lyric Sheet scrolls back up to it.
-  for (const cue of [65, 67.5, 70].map(at)) {
+  // Cue the Bridge's four Lines a bar (2.5 s) apart, from 1:05. The last
+  // leaves nothing up next, so its Cue shows and the Lyric Sheet stays put.
+  for (const cue of [65, 67.5, 70, 72.5].map(at)) {
     await page.waitForTimeout(cue - Date.now());
     await page.keyboard.press("Enter");
   }
