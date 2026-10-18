@@ -166,11 +166,12 @@
 </div>
 
 <style>
-  /* Sections well apart, so each reads as one block at a glance. */
+  /* Sections well apart, so each reads as one block at a glance, closer or
+     further with the Lyric Size. */
   .view {
     display: flex;
     flex-direction: column;
-    gap: var(--space-8);
+    gap: var(--lyric-read-section-gap);
     margin-bottom: var(--space-3);
   }
   /* Highlighted by a tint that bleeds a little past the text, so the text
