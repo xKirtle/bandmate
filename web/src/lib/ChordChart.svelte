@@ -39,8 +39,13 @@
     });
   });
 
-  // The Chart Size, as a fraction: every diagram scales by it, apart from the Lyric Size.
-  const size = $derived(chartSize.value / 100);
+  // The Chart Size, set on the page as a fraction, as the Lyric Size is: every
+  // diagram and its Chord's name (--chart-read-name) scale by it.
+  $effect(() => {
+    const page = document.documentElement;
+    page.style.setProperty('--chart-size', String(chartSize.value / 100));
+    return () => page.style.removeProperty('--chart-size');
+  });
   const shown = $derived(chordChartState.current.shown);
   const pinned = $derived(chordChartState.current.pinned);
 
@@ -59,13 +64,7 @@
 </script>
 
 {#if names.length > 0 && shown}
-  <section
-    class={['chart', { pinned }]}
-    aria-label="Chord Chart"
-    style:--chart-size={size}
-    bind:this={chart}
-    bind:clientHeight={height}
-  >
+  <section class={['chart', { pinned }]} aria-label="Chord Chart" bind:this={chart} bind:clientHeight={height}>
     {#if !tuning}
       <p class="muted note">
         The Song's tuning, “{song.tuning.trim()}”, can't be read, so the Chord Chart has no diagrams.
@@ -132,8 +131,9 @@
     overflow-x: auto;
     overscroll-behavior-x: contain;
   }
-  /* 6.5rem a Chord at 100%, scaled by the Chart Size: the diagram, its
-     starting fret drawn in its own units, scales with the width. */
+  /* 6.5rem a Chord at 100%, scaled by the Chart Size, as its name is: the
+     diagram, its starting fret drawn in its own units, scales with the
+     width. */
   .row li {
     flex: 0 0 calc(6.5rem * var(--chart-size));
   }
@@ -159,7 +159,7 @@
     max-width: 100%;
     overflow: hidden;
     color: var(--accent);
-    font-size: var(--text-lg);
+    font-size: var(--chart-read-name);
     font-weight: 700;
     text-overflow: ellipsis;
     white-space: nowrap;
