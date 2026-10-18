@@ -90,8 +90,15 @@
     flex: 1;
     flex-direction: column;
     gap: var(--space-4);
+    position: relative;
     min-height: 0;
+    /* Its scrollbar sits near the dialog's right edge, out in its padding,
+       with room between it and the list, held as the search narrows the
+       list to fit, so the rows don't shift. */
+    margin-right: calc(var(--space-1) - var(--space-4));
+    padding-right: var(--space-2);
     overflow: auto;
+    scrollbar-gutter: stable;
   }
   .results > p {
     margin: 0;
