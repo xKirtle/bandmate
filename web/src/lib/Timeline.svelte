@@ -27,8 +27,7 @@
   import { PointerFollow, type EdgeScroll, type PointerAt } from './pointerFollow';
   import { BoxDrag, type BoxAt } from './boxDrag.svelte';
   import { guideLanes, reachAt } from './snapping';
-  import { clipSources, clipTitle, fileStart, playing } from './clipSource';
-  import { sourceAt, sourceLength } from './clipTime';
+  import { clipSources, clipTitle, playing } from './clipSource';
   import { formatCue } from './cues';
   import type { Saves } from './saves.svelte';
   import type { SongUndo } from './songUndo.svelte';
@@ -38,7 +37,6 @@
   import { keyHints } from './keyHints';
   import { formatVolume, maxVolume, minVolume, trackGains } from './mixer';
   import type { MenuAction } from './menu';
-  import { peaksPerSecond } from './peaks';
   import { keyActedOnPage } from './pointerFocus';
   import { longPressDelay, type Point } from './press';
   import { retakeLength } from './recording';
@@ -96,13 +94,14 @@
     zoom,
     type View,
   } from './timelineView';
-  import { barWidth, bars } from './waveform';
+  import { barWidth } from './waveform';
   import { clipping, tileBars } from './liveWave';
   import { browserKeeping, capturedInput, TakeRecorder } from './takeRecorder.svelte';
-  import { formatGain, gainLineAt, heardPeak } from './clipGain';
+  import { formatGain, gainLineAt } from './clipGain';
+  import { clipBars } from './clipBars';
   import { formatTempo } from './clipTempo';
   import { formatPitch, stretchBadge } from './clipPitch';
-  import { fadeName, fitFades, formatFade, isFadeEnd, shapedPeak, type FadeEnd } from './clipFade';
+  import { fadeName, fitFades, formatFade, isFadeEnd, type FadeEnd } from './clipFade';
 
   // The Timeline, docked under the Lyric Sheet: its Tracks and Clips, and
   // playback with each Track's volume, mute and solo, and the Loop. Editing
@@ -1772,35 +1771,6 @@
   function percent(time: number): number {
     return span > 0 ? (time / span) * 100 : 0;
   }
-
-  /**
-   * A stretch of the waveform of what a Clip, placed at `at`, plays: from
-   * `from` seconds of the Timeline after its start, as count bars over
-   * drawn seconds of the Timeline. Past `to` seconds after its start,
-   * trimmed off the Clip, it's silent.
-   */
-  function clipShape(clip: Clip, at: Placed, from: number, to: number, drawn: number, count: number): number[] {
-    // The same stretch, in its source.
-    const offset = sourceAt(at, at.start + from);
-    const heard = sourceLength(at, to - from);
-    return sourceShape(clip, offset, heard, sourceLength(at, drawn), count);
-  }
-
-  /**
-   * A stretch of the waveform of what a Clip plays, from offset seconds into
-   * its source, as count bars over drawn seconds of it. Past heard seconds
-   * in, trimmed off the Clip, it's silent.
-   */
-  function sourceShape(clip: Clip, offset: number, heard: number, drawn: number, count: number): number[] {
-    const all = peaks[sources.of(clip).key] ?? [];
-    // The audio file starts this far into the source, silent before it.
-    const lead = Math.round(fileStart(clip) * peaksPerSecond);
-    const from = Math.floor(offset * peaksPerSecond);
-    const to = Math.max(from, Math.min(Math.ceil((offset + heard) * peaksPerSecond), lead + all.length));
-    const kept = Array.from({ length: to - from }, (_, i) => all[from + i - lead] ?? 0);
-    const silent = Math.max(0, Math.ceil((offset + drawn) * peaksPerSecond) - to);
-    return bars([...kept, ...new Array<number>(silent).fill(0)], count);
-  }
 </script>
 
 <!-- A tab closing mid-recording writes what it hasn't yet, to offer it back. -->
@@ -2312,21 +2282,9 @@
                           preserveAspectRatio="none"
                           aria-hidden="true"
                         >
-                          {#each clipShape(clip, at, wave.from, wave.to, (wave.bars * barWidth) / view.scale, wave.bars) as peak, i (i)}
-                            <!-- Drawn as it sounds, at the Clip's Gain, shaped by its Fades. -->
-                            {@const t = wave.from + ((i + 0.5) * barWidth) / view.scale}
-                            {@const height = Math.max(
-                              2,
-                              heardPeak(shapedPeak(peak, fades, at.length, t), clip.gain) * 100,
-                            )}
-                            <!-- A Take's clipping stays marked once it's saved; a Beat's or a Sound's isn't, often being mastered loud. -->
-                            <rect
-                              class:clipped={clip.activeTakeId !== null && peak >= clipping}
-                              x={i + 0.15}
-                              y={(100 - height) / 2}
-                              width="0.7"
-                              {height}
-                            />
+                          <!-- Drawn as it sounds, at the Clip's Gain, shaped by its Fades. -->
+                          {#each clipBars(clip, at, { from: wave.from, to: wave.to, drawn: (wave.bars * barWidth) / view.scale }, wave.bars, peaks[sources.of(clip).key] ?? []) as { height, clipped }, i (i)}
+                            <rect class:clipped x={i + 0.15} y={(100 - height) / 2} width="0.7" {height} />
                           {/each}
                         </svg>
                       {/if}
