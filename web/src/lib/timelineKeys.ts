@@ -5,6 +5,7 @@
  */
 
 import type { Freeze } from './freeze';
+import type { KeyAt } from './keyPlace';
 import { matches, stepBy, type Key, type KeyDown, type KeyPress, type Way } from './shortcuts';
 import { rebound } from './shortcutKeys';
 
@@ -26,9 +27,7 @@ export type TimelineKey =
   'clearSelection' | 'selectAll' | 'deleteSelection' | 'deleteClip' | 'copy' | 'cut' | 'paste' | 'clipMenu';
 
 /** Whether the key is the control's own where it was pressed, and what the Timeline is doing. */
-export type TimelineKeyContext = {
-  /** The key is the control's own there, e.g. a text field's or a ⋯ menu's: see `ownKey`. */
-  own: boolean;
+export type TimelineKeyContext = KeyAt & {
   /** The Timeline can be edited, i.e. it isn't in Read mode or on a phone. */
   editable: boolean;
   /** Why the Timeline can't be edited now, if it can't. */
@@ -46,7 +45,7 @@ export type TimelineKeyContext = {
  * now: null leaves the key to the page.
  */
 export function timelineKey(e: KeyDown, at: TimelineKeyContext): TimelineKey | null {
-  // A text field's, a menu's or a dialog's keys are their own.
+  // A key that's the control's own, e.g. a text field's or a ⋯ menu's, is left to it.
   if (e.defaultPrevented || at.own) return null;
   // Nor while a Track is dragged, which Esc then cancels.
   if (at.draggingTrack) return null;

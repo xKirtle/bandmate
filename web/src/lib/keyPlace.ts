@@ -13,6 +13,11 @@ const arrowControls =
 
 const arrows = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
 
+/** Whether the key is the control's own where it was pressed, which every Shortcut leaves to it: see `ownKey`. */
+export type KeyAt = {
+  own: boolean;
+};
+
 /**
  * Whether a key pressed on the Song page is the control's own where it was
  * pressed, which every Shortcut then leaves to it, whatever its keys:
@@ -33,11 +38,12 @@ export function ownKey(event: { key: string; target: EventTarget | null }): bool
   if (inTextField(target)) return true;
   if (!(target instanceof Element)) return false;
   if (target.closest(keyOwners)) return true;
-  if (key === ' ') return target instanceof HTMLSelectElement || isInput(target, 'checkbox', 'radio');
-  if (key === 'Home' || key === 'End') return target instanceof HTMLSelectElement || isInput(target, 'range');
+  // A select takes Space, Home, End and the arrows alike.
+  const select = target instanceof HTMLSelectElement;
+  if (key === ' ') return select || isInput(target, 'checkbox', 'radio');
+  if (key === 'Home' || key === 'End') return select || isInput(target, 'range');
   if (!arrows.includes(key)) return false;
-  if (target instanceof HTMLSelectElement || isInput(target, 'range', 'number', 'radio')) return true;
-  return target.closest(arrowControls) !== null;
+  return select || isInput(target, 'range', 'number', 'radio') || target.closest(arrowControls) !== null;
 }
 
 /** Whether it's an input of one of these types. */

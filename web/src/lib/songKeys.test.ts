@@ -124,7 +124,7 @@ group('Home and End', () => {
     expect(songKey(press('End'), { ...idle, own: true })).toBeNull();
   });
 
-  it('are left alone handled already, or with a modifier', () => {
+  it('are left alone when handled already, or with a modifier', () => {
     expect(songKey(press('Home', { defaultPrevented: true }), idle)).toBeNull();
     expect(songKey(press('Home', { shiftKey: true }), idle)).toBeNull();
     expect(songKey(press('End', { ctrlKey: true }), idle)).toBeNull();

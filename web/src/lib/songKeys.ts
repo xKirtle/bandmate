@@ -1,13 +1,9 @@
 import { matches, way, type KeyDown } from './shortcuts';
 import { rebound } from './shortcutKeys';
+import type { KeyAt } from './keyPlace';
 
 /** The Timeline's Shortcuts that work wherever focus is on the Song page, e.g. Space to play. */
 export type SongKey = 'playPause' | 'record' | 'start' | 'end' | 'split';
-
-/** Whether the key is the control's own where it was pressed, which every Shortcut leaves to it: see `ownKey`. */
-export type KeyAt = {
-  own: boolean;
-};
 
 /** Whether the key is the control's own where it was pressed, and what the Song page is doing. */
 export type SongKeyContext = KeyAt & {

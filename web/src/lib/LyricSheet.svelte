@@ -245,9 +245,9 @@
   const cueNextLabel = $derived(hints.label(rebound().cueNextLine.keys));
   const cueNextWays = $derived(cueNextLabel ? `${cueNextLabel} or Now` : 'Now');
 
-  // In Sync mode, Enter cues anywhere but where it's the control's own, e.g. a
-  // text field or a popover, so even on a button: syncing along shouldn't
-  // depend on where focus was left.
+  // In Sync mode, Enter cues on a button too, and anywhere else it isn't the
+  // control's own, e.g. a text field's or a popover's: syncing along
+  // shouldn't depend on where focus was left.
   function cueKey(event: KeyboardEvent) {
     if (!cuesNextLine(event, { syncing: syncMode.on, own: ownKey(event) })) return;
     event.preventDefault();

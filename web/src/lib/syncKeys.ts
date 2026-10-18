@@ -3,13 +3,13 @@
  * and should act now.
  */
 
+import type { KeyAt } from './keyPlace';
 import { matches, type KeyDown } from './shortcuts';
 import { rebound } from './shortcutKeys';
 
-/** Whether Sync mode is on, and whether the key is the control's own where it was pressed: see `ownKey`. */
-export type CueNextContext = {
+/** Whether the key is the control's own where it was pressed, and whether Sync mode is on. */
+export type CueNextContext = KeyAt & {
   syncing: boolean;
-  own: boolean;
 };
 
 /**
