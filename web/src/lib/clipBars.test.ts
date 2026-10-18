@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Clip, Take } from './api';
 import { clipBars } from './clipBars';
+import type { Placed } from './schedule';
+import { barWidth } from './waveform';
 
 // A Beat 4 seconds long, a peak every hundredth of a second: 0.1 loud
 // through its first second, 0.2 through its second, and so on.
@@ -40,6 +42,11 @@ const take: Take = {
   recordedAt: '',
 };
 const takes = { beatId: null, takes: [take], activeTakeId: take.id };
+
+/** A Clip's bars, from `from` to `to` seconds into it, as count bars over drawn seconds. */
+function draw(c: Clip, at: Placed, [from, to, drawn]: number[], count: number, peaks: readonly number[]) {
+  return clipBars(c, at, { from, to, bars: count }, (count * barWidth) / drawn, peaks);
+}
 
 describe('clipBars', () => {
   it.each([
@@ -123,9 +130,9 @@ describe('clipBars', () => {
       count: 4,
       want: [2, 2, 2, 2],
     },
-  ])('draws $name', ({ over, peaks = beat, stretch: [from, to, drawn], count, want }) => {
+  ])('draws $name', ({ over, peaks = beat, stretch, count, want }) => {
     const c = clip(over);
-    const heights = clipBars(c, c, { from, to, drawn }, count, peaks).map((b) => b.height);
+    const heights = draw(c, c, stretch, count, peaks).map((b) => b.height);
     expect(heights).toHaveLength(want.length);
     heights.forEach((h, i) => expect(h).toBeCloseTo(want[i], 2));
   });
@@ -133,15 +140,14 @@ describe('clipBars', () => {
   it('draws a Clip where it is placed, as while a trim is dragged', () => {
     const c = clip();
     const at = { start: 11, offset: 1, length: 2, tempo: 1 };
-    expect(clipBars(c, at, { from: 0, to: 2, drawn: 2 }, 2, beat).map((b) => b.height)).toEqual([20, 30]);
+    expect(draw(c, at, [0, 2, 2], 2, beat).map((b) => b.height)).toEqual([20, 30]);
   });
 
   it('marks where a Take clipped, but not a Beat, often mastered loud', () => {
     const loud = [1, 0.5].flatMap((p) => new Array<number>(100).fill(p));
-    const stretch = { from: 0, to: 2, drawn: 2 };
     const takeClip = clip({ ...takes, takes: [{ ...take, position: 0 }], length: 2 });
-    expect(clipBars(takeClip, takeClip, stretch, 2, loud).map((b) => b.clipped)).toEqual([true, false]);
+    expect(draw(takeClip, takeClip, [0, 2, 2], 2, loud).map((b) => b.clipped)).toEqual([true, false]);
     const beatClip = clip({ length: 2 });
-    expect(clipBars(beatClip, beatClip, stretch, 2, loud).map((b) => b.clipped)).toEqual([false, false]);
+    expect(draw(beatClip, beatClip, [0, 2, 2], 2, loud).map((b) => b.clipped)).toEqual([false, false]);
   });
 });

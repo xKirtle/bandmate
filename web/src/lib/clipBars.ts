@@ -10,18 +10,8 @@ import { sourceAt, sourceLength } from './clipTime';
 import { clipping } from './liveWave';
 import { peaksPerSecond } from './peaks';
 import type { Placed } from './schedule';
-import { bars } from './waveform';
-
-/**
- * A stretch of the Timeline over a Clip, in seconds from its start: drawn
- * seconds of it from `from`, of which past `to`, trimmed off the Clip, is
- * silent.
- */
-export interface BarStretch {
-  from: number;
-  to: number;
-  drawn: number;
-}
+import type { WaveWindow } from './timelineView';
+import { barWidth, bars } from './waveform';
 
 /** One bar of a Clip's waveform. */
 export interface ClipBar {
@@ -35,24 +25,21 @@ export interface ClipBar {
 const minHeight = 2;
 
 /**
- * A Clip's waveform, placed at `at`, over a stretch of the Timeline, as
- * count bars, from the peaks of its source: none while they load, or if
- * they couldn't, which draws it flat.
+ * A Clip's waveform, placed at `at`, over the stretch of it in a wave
+ * window, at a scale in pixels a second, from the peaks of its source:
+ * none while they load, or if they couldn't, which draws it flat.
  */
-export function clipBars(
-  clip: Clip,
-  at: Placed,
-  stretch: BarStretch,
-  count: number,
-  peaks: readonly number[],
-): ClipBar[] {
-  const { from, to, drawn } = stretch;
+export function clipBars(clip: Clip, at: Placed, wave: WaveWindow, scale: number, peaks: readonly number[]): ClipBar[] {
+  const { from, to, bars: count } = wave;
+  // How long a bar is, in seconds of the Timeline.
+  const bar = barWidth / scale;
+  // The same stretch, in its source.
   const shape = sourceShape(
     peaks,
     fileStart(clip),
     sourceAt(at, at.start + from),
     sourceLength(at, to - from),
-    sourceLength(at, drawn),
+    sourceLength(at, count * bar),
     count,
   );
   // As trimmed, so a trim being dragged shortens them to fit, as saving it will.
@@ -60,7 +47,7 @@ export function clipBars(
   const isTake = clip.activeTakeId !== null;
   return shape.map((peak, i) => {
     // Halfway across the bar, in seconds into the Clip.
-    const t = from + ((i + 0.5) * drawn) / count;
+    const t = from + (i + 0.5) * bar;
     return {
       height: Math.max(minHeight, heardPeak(shapedPeak(peak, fades, at.length, t), clip.gain) * 100),
       clipped: isTake && peak >= clipping,

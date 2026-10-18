@@ -117,6 +117,16 @@ export function ticks(v: View): number[] {
   return result;
 }
 
+/** The stretch of a Clip whose waveform is drawn, in seconds into it, a bar every barWidth pixels. */
+export interface WaveWindow {
+  /** Where it starts. */
+  from: number;
+  /** Where the Clip ends within it, or it does: past here is silent. */
+  to: number;
+  /** How many bars it's drawn as. */
+  bars: number;
+}
+
 /**
  * The stretch of a Clip, starting at start and length seconds long, whose
  * waveform is drawn: what's in view and half the width either side, so
@@ -124,7 +134,7 @@ export function ticks(v: View): number[] {
  * the Clip, a whole number of bars barWidth pixels wide counted from the
  * Clip's start, so bars stay put as it scrolls. Null when none of it is near.
  */
-export function waveWindow(v: View, start: number, length: number): { from: number; to: number; bars: number } | null {
+export function waveWindow(v: View, start: number, length: number): WaveWindow | null {
   const bar = barWidth / v.scale;
   const near = v.width / 2;
   // In bars from the Clip's start.

@@ -2283,7 +2283,7 @@
                           aria-hidden="true"
                         >
                           <!-- Drawn as it sounds, at the Clip's Gain, shaped by its Fades. -->
-                          {#each clipBars(clip, at, { from: wave.from, to: wave.to, drawn: (wave.bars * barWidth) / view.scale }, wave.bars, peaks[sources.of(clip).key] ?? []) as { height, clipped }, i (i)}
+                          {#each clipBars(clip, at, wave, view.scale, peaks[sources.of(clip).key] ?? []) as { height, clipped }, i (i)}
                             <rect class:clipped x={i + 0.15} y={(100 - height) / 2} width="0.7" {height} />
                           {/each}
                         </svg>
