@@ -176,14 +176,12 @@ group('addsBox', () => {
 group('timelineKey', () => {
   // A Timeline at rest on desktop: editable, not frozen, two Clips selected, none focused.
   const idle: TimelineKeyContext = {
-    inTextField: false,
-    inMenuOrDialog: false,
+    own: false,
     editable: true,
     freeze: null,
     selected: 2,
     focusedClip: null,
     draggingTrack: false,
-    ownsArrows: false,
   };
 
   group('Esc', () => {
@@ -200,9 +198,8 @@ group('timelineKey', () => {
       expect(timelineKey(press('Escape'), { ...idle, selected: 0 })).toBeNull();
     });
 
-    it('is left to a text field, a menu or a dialog, or to a Track dragged, which it cancels', () => {
-      expect(timelineKey(press('Escape'), { ...idle, inTextField: true })).toBeNull();
-      expect(timelineKey(press('Escape'), { ...idle, inMenuOrDialog: true })).toBeNull();
+    it("is left to the control where it's its own, e.g. a text field, a menu or a dialog, or to a Track dragged, which it cancels", () => {
+      expect(timelineKey(press('Escape'), { ...idle, own: true })).toBeNull();
       expect(timelineKey(press('Escape'), { ...idle, draggingTrack: true })).toBeNull();
     });
 
@@ -243,9 +240,8 @@ group('timelineKey', () => {
       expect(timelineKey(press('a', { ctrlKey: true }), { ...idle, editable: false })).toBeNull();
     });
 
-    it('is left to a text field, a menu or a dialog, or while a Track is dragged', () => {
-      expect(timelineKey(press('a', { ctrlKey: true }), { ...idle, inTextField: true })).toBeNull();
-      expect(timelineKey(press('a', { ctrlKey: true }), { ...idle, inMenuOrDialog: true })).toBeNull();
+    it("is left to the control where it's its own, e.g. a text field, a menu or a dialog, or while a Track is dragged", () => {
+      expect(timelineKey(press('a', { ctrlKey: true }), { ...idle, own: true })).toBeNull();
       expect(timelineKey(press('a', { ctrlKey: true }), { ...idle, draggingTrack: true })).toBeNull();
     });
 
@@ -306,9 +302,9 @@ group('timelineKey', () => {
       }
     });
 
-    it('is left to a text field, a menu or a dialog', () => {
-      expect(timelineKey(press('Backspace'), { ...idle, inTextField: true })).toBeNull();
-      expect(timelineKey(press('Delete'), { ...idle, inMenuOrDialog: true })).toBeNull();
+    it("is left to the control where it's its own, e.g. a text field, a menu or a dialog", () => {
+      expect(timelineKey(press('Backspace'), { ...idle, own: true })).toBeNull();
+      expect(timelineKey(press('Delete'), { ...idle, own: true })).toBeNull();
     });
 
     it('does nothing while a Track is dragged, from a focused Clip or not', () => {
@@ -358,10 +354,9 @@ group('timelineKey', () => {
       }
     });
 
-    it("is left to a text field, a menu or a dialog, whose clipboard keys are the browser's", () => {
+    it("is left to the control where it's its own, e.g. a text field, a menu or a dialog, whose clipboard keys are the browser's", () => {
       for (const k of [copy, cut, paste]) {
-        expect(timelineKey(k, { ...idle, inTextField: true })).toBeNull();
-        expect(timelineKey(k, { ...idle, inMenuOrDialog: true })).toBeNull();
+        expect(timelineKey(k, { ...idle, own: true })).toBeNull();
       }
     });
 
@@ -419,10 +414,9 @@ group('timelineKey', () => {
       for (const k of menuKeys) expect(timelineKey(k, { ...outside, editable: false })).toBeNull();
     });
 
-    it('is left to a text field, a menu or a dialog', () => {
+    it("is left to the control where it's its own, e.g. a text field, a menu or a dialog", () => {
       for (const k of menuKeys) {
-        expect(timelineKey(k, { ...outside, inTextField: true })).toBeNull();
-        expect(timelineKey(k, { ...outside, inMenuOrDialog: true })).toBeNull();
+        expect(timelineKey(k, { ...outside, own: true })).toBeNull();
       }
     });
 
@@ -444,14 +438,12 @@ group('Keys as rebound', () => {
   afterEach(() => followKeys(() => defaultKeyset));
   const rebind = (changes: Partial<Keyset>) => followKeys(() => ({ ...defaultKeyset, ...changes }));
   const at: TimelineKeyContext = {
-    inTextField: false,
-    inMenuOrDialog: false,
+    own: false,
     editable: true,
     freeze: null,
     selected: 2,
     focusedClip: { inSelection: true },
     draggingTrack: false,
-    ownsArrows: false,
   };
 
   it("act on the keys chosen on this device for the Timeline's Shortcuts", () => {
@@ -467,10 +459,10 @@ group('Keys as rebound', () => {
     expect(timelineKey(press('m', { altKey: true }), at)).toBe('clipMenu');
   });
 
-  it('leave arrows chosen to a focused control that uses them', () => {
+  it("leave arrows chosen to the control where they're its own", () => {
     rebind({ selectAll: { keys: [{ key: 'ArrowUp', shift: true }] } });
     expect(timelineKey(press('ArrowUp', { shiftKey: true }), at)).toBe('selectAll');
-    expect(timelineKey(press('ArrowUp', { shiftKey: true }), { ...at, ownsArrows: true })).toBeNull();
+    expect(timelineKey(press('ArrowUp', { shiftKey: true }), { ...at, own: true })).toBeNull();
   });
 
   it('click, drag and turn the wheel with the modifiers chosen', () => {

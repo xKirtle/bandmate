@@ -44,8 +44,7 @@
   import { retakeLength } from './recording';
   import { timelineEnd, type Loop, type Placed } from './schedule';
   import { nameSound } from './soundName';
-  import { inTextField } from './textField';
-  import { keyPlace, ownsArrows } from './keyPlace';
+  import { ownKey } from './keyPlace';
   import { songKey } from './songKeys';
   import { allKeys, type Way } from './shortcuts';
   import { rebound } from './shortcutKeys';
@@ -364,10 +363,8 @@
       return;
     }
     const shortcut = songKey(event, {
+      own: ownKey(event),
       busy: picking || calibrating !== null || mixingDown,
-      ...keyPlace(event),
-      ownsSpace: ownsSpace(event.target),
-      ownsHomeEnd: ownsHomeEnd(event.target),
       editable: editable.current,
       recording,
       capturing,
@@ -600,35 +597,6 @@
     if (recording) return;
     transport.playFrom(clamp(at));
     reveal(position);
-  }
-
-  /**
-   * Whether a space pressed there is its own: typed into a text field,
-   * opening a select, or ticking a checkbox or radio, which have no other
-   * key. Anywhere else it plays or pauses, even on a button, which a click
-   * leaves focused: playing along shouldn't depend on where focus was left.
-   */
-  function ownsSpace(target: EventTarget | null): boolean {
-    if (inTextField(target) || target instanceof HTMLSelectElement) return true;
-    if (target instanceof HTMLInputElement && (target.type === 'checkbox' || target.type === 'radio')) return true;
-    // Space in a dialog or a ⋯ menu is for what's in it.
-    return inMenuOrDialog(target);
-  }
-
-  /**
-   * Whether Home and End pressed there are its own: in a text field, a
-   * list (a select) or a slider, e.g. a Track's volume, or a ⋯ menu. The ruler isn't
-   * one: there they go to the start and the end as anywhere else.
-   */
-  function ownsHomeEnd(target: EventTarget | null): boolean {
-    if (inTextField(target) || target instanceof HTMLSelectElement) return true;
-    if (target instanceof HTMLInputElement && target.type === 'range') return true;
-    return inMenuOrDialog(target);
-  }
-
-  /** Whether a key was pressed in a dialog or a ⋯ menu, whose keys are for what's in it. */
-  function inMenuOrDialog(target: EventTarget | null): boolean {
-    return target instanceof Element && target.closest('dialog, [role="menu"]') !== null;
   }
 
   /** Where the playhead is, playing or paused, in seconds to the millisecond, e.g. to cue a Line at. */
@@ -1133,14 +1101,12 @@
   function timelineKeyDown(event: KeyboardEvent) {
     const clip = focusedClip(event.target);
     const action = timelineKey(event, {
-      inTextField: inTextField(event.target),
-      inMenuOrDialog: inMenuOrDialog(event.target),
+      own: ownKey(event),
       editable: editable.current,
       freeze,
       selected: selection.size,
       focusedClip: clip && { inSelection: selection.has(clip.id) },
       draggingTrack: trackDrag.current !== null,
-      ownsArrows: ownsArrows(event.target),
     });
     if (!action) return;
     event.preventDefault();

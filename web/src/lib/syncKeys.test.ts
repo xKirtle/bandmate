@@ -15,7 +15,7 @@ const press = (key: string, mods: Partial<Omit<KeyDown, 'key'>> = {}): KeyDown =
 });
 
 // Sync mode on, with focus on the Lyric Sheet, e.g. on a button.
-const syncing: CueNextContext = { syncing: true, inTextField: false, inDialogOrMenu: false, ownsArrows: false };
+const syncing: CueNextContext = { syncing: true, own: false };
 
 group('Enter', () => {
   it('cues the next Line in Sync mode', () => {
@@ -38,9 +38,8 @@ group('Enter', () => {
     expect(cuesNextLine(press('Enter', { shiftKey: true }), syncing)).toBe(false);
   });
 
-  it('is left to a text field, a dialog or a ⋯ menu', () => {
-    expect(cuesNextLine(press('Enter'), { ...syncing, inTextField: true })).toBe(false);
-    expect(cuesNextLine(press('Enter'), { ...syncing, inDialogOrMenu: true })).toBe(false);
+  it("is left to the control where it's its own, e.g. a text field, a popover or a ⋯ menu", () => {
+    expect(cuesNextLine(press('Enter'), { ...syncing, own: true })).toBe(false);
   });
 
   it('is the only key that cues', () => {
@@ -59,9 +58,9 @@ group('Keys as rebound', () => {
     expect(cuesNextLine(press('Enter'), syncing)).toBe(false);
   });
 
-  it('leave an arrow chosen to a focused control that uses it', () => {
+  it("leave an arrow chosen to the control where it's its own", () => {
     rebind({ cueNextLine: { keys: [{ key: 'ArrowDown' }] } });
     expect(cuesNextLine(press('ArrowDown'), syncing)).toBe(true);
-    expect(cuesNextLine(press('ArrowDown'), { ...syncing, ownsArrows: true })).toBe(false);
+    expect(cuesNextLine(press('ArrowDown'), { ...syncing, own: true })).toBe(false);
   });
 });

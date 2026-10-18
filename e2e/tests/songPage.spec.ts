@@ -1382,3 +1382,17 @@ test('the Cues menu shifts every Cue by its step and clears them all, beside the
   await expect.poll(() => serverCues(bandmate, song.id, 'Verse 1')).toEqual([null, null, null, null]);
   await expect(cues).toHaveCount(0);
 });
+
+test("Space on a button in the Cues menu presses it, and doesn't play the Song", async ({ page, bandmate }) => {
+  const song = await heroSong(bandmate);
+  await page.goto(`/songs/${song.id}`);
+  await page.getByRole('button', { name: 'Cues', exact: true }).click();
+  const clear = page.getByRole('dialog', { name: 'Cues' }).getByRole('button', { name: 'Clear all Cues' });
+  await clear.focus();
+
+  await page.keyboard.press('Space');
+
+  await expect.poll(() => serverCues(bandmate, song.id, 'Verse 1')).toEqual([null, null, null, null]);
+  await expect(timeline(page).getByRole('button', { name: 'Play', exact: true })).toBeVisible();
+  await expect(timeline(page).getByRole('slider', { name: 'Position' })).toHaveAttribute('aria-valuenow', '0');
+});
