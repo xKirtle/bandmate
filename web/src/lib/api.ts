@@ -191,21 +191,34 @@ export const suggestedLabels: readonly string[] = [
   'Outro',
 ];
 
-/** Keys offered as suggestions, for Songs and Beats; any text is allowed. */
+/**
+ * Keys offered as suggestions, for Songs and Beats: all 24, by tonic, each
+ * major then the minor on the same tonic, spelled with sharps only, so the
+ * list reads plainly. Any text is allowed, e.g. Bb for A#.
+ */
 export const commonKeys: readonly string[] = [
   'C',
   'Cm',
+  'C#',
+  'C#m',
   'D',
   'Dm',
+  'D#',
+  'D#m',
   'E',
   'Em',
   'F',
+  'Fm',
+  'F#',
   'F#m',
   'G',
   'Gm',
+  'G#',
+  'G#m',
   'A',
   'Am',
-  'Bb',
+  'A#',
+  'A#m',
   'B',
   'Bm',
 ];
