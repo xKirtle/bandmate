@@ -55,7 +55,9 @@ func writeTimeline(ctx context.Context, tx *sql.Tx, songID int64, tl Timeline) e
 	}
 
 	// Tracks first, so a Clip can go on one tl adds, and Clips before
-	// Takes, so a Take can go in a Clip it adds.
+	// Takes, so a Take can go in a Clip it adds. A Track's place is where
+	// tl holds it from the top, so the places a deleted Track left behind
+	// close up.
 	for i, t := range tl.Tracks {
 		want := storedTrack{name: t.Name, position: int64(i), volume: t.Volume, muted: t.Muted, soloed: t.Soloed}
 		was, there := tracks[t.ID]

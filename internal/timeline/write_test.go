@@ -130,6 +130,17 @@ func TestWriteTimelineRoundTrip(t *testing.T) {
 		t.Fatalf("after writing changed rows, loaded\n%+v\nwant\n%+v", got, second.Tracks)
 	}
 
+	// The Track left takes the place of the one that went, so the places
+	// deleting a Track left behind close up, top to bottom as the Timeline
+	// holds them.
+	var position int64
+	if err := conn.QueryRow(`SELECT position FROM tracks WHERE id = ?`, int64(2)).Scan(&position); err != nil {
+		t.Fatal(err)
+	}
+	if position != 0 {
+		t.Errorf("the Track left is %d from the top, want 0", position)
+	}
+
 	// The Take left out is out of its Clip, to be placed again.
 	var in sql.NullInt64
 	if err := conn.QueryRow(`SELECT clip_id FROM takes WHERE id = ?`, takes[0].ID).Scan(&in); err != nil {
