@@ -26,8 +26,8 @@ const shadows = {
   '/^(box|text)-shadow$/': ['none', '/^var\\(--(shadow-float|selected-outline|selected-edge|invalid-outline)\\)$/'],
 };
 
-// Type: a font size is one of the size or lyric tokens, or on the Timeline a
-// step of the same scale in its own unit, `--timeline-rem`. The `font`
+// Type: a font size is one of the size, lyric or Chord Chart tokens, or on
+// the Timeline a step of the same scale in its own unit, `--timeline-rem`. The `font`
 // shorthand only ever inherits, so it can't set a size of its own.
 // The steps are the --text-* sizes in app.css, in rem: keep them in step.
 const scaleSteps = '(0\\.75|0\\.8125|0\\.875|1|1\\.25|1\\.5)';
@@ -36,6 +36,7 @@ const type = {
     'inherit',
     '/^var\\(--text-(xs|sm|md|lg|xl|2xl|field)\\)$/',
     '/^var\\(--lyric-(write|read-line|read-chord|read-label)\\)$/',
+    '/^var\\(--chart-read-name\\)$/',
     '/^var\\(--timeline-rem\\)$/',
     `/^calc\\(${scaleSteps} \\* var\\(--timeline-rem\\)\\)$/`,
   ],

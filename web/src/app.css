@@ -63,6 +63,10 @@
   --lyric-read-label: var(--lyric-read-chord);
   --lyric-read-leading: 1.5;
   --lyric-read-section-gap: calc(var(--space-8) * var(--lyric-size));
+  /* The Chord names over the Chord Chart's diagrams, scaled with them by the
+     Chart Size, which the Chart sets on the page as a fraction: 1 at 100%. */
+  --chart-size: 1;
+  --chart-read-name: calc(var(--text-lg) * var(--chart-size));
 
   /* Spacing, in quarter-rem steps, for every gap, padding and margin. */
   --space-1: 0.25rem;

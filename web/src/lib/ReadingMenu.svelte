@@ -10,18 +10,21 @@
   import { tick } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import type { ChordsInRead } from './chordChart';
+  import { largestChartSize, smallestChartSize, stepChartSize, usualChartSize } from './chartSize';
   import { songChordsShown } from './chordsShown';
   import { largestLyricSize, smallestLyricSize, stepLyricSize, usualLyricSize } from './lyricSize';
   import { following, placeBeside } from './popover';
   import { blockedRows, readingBadge } from './readingMenu';
+  import { chartSize } from './sharedChartSize.svelte';
   import { chordChartState } from './sharedChordChartState.svelte';
   import { lyricSize } from './sharedLyricSize.svelte';
   import { songTranspose } from './sharedTranspose.svelte';
   import { stepTranspose, transposeLimit, transposeText } from './transposeAmount';
 
   // Read mode's choices about how the Song reads, behind one button in the
-  // Lyric Sheet's header: the Lyric Size, whether the Chords show, Transpose,
-  // and the Chord Chart's eye and pin. Each is kept on this device, as before.
+  // Lyric Sheet's header, in this order: the Lyric Size, Transpose, whether
+  // the Chords show, the Chord Chart's eye and pin, and its Chart Size. Each
+  // is kept on this device, as before.
   // It stays open while they change, and every Song has the same rows, a
   // Chord row disabled, saying why, where it can't apply.
 
@@ -34,13 +37,14 @@
     chords: ChordsInRead;
   } = $props();
 
-  const size = $derived(lyricSize.value);
+  const lyricPercent = $derived(lyricSize.value);
   const chordsShown = $derived(songChordsShown.of(songId));
   const transpose = $derived(songTranspose.of(songId));
   const transposeShown = $derived(transposeText(transpose));
   const chart = $derived(chordChartState.current);
   const badge = $derived(readingBadge({ chords, chordsShown, transpose }));
-  const blocked = $derived(blockedRows({ chords, chordsShown }));
+  const blocked = $derived(blockedRows({ chords, chordsShown, chartShown: chart.shown }));
+  const chartPercent = $derived(chartSize.value);
 
   // On a phone the button is its icon alone.
   const wide = new MediaQuery('min-width: 40.0625rem');
@@ -131,45 +135,30 @@
         <button
           type="button"
           class="button step"
-          disabled={size <= smallestLyricSize}
-          onclick={() => lyricSize.set(stepLyricSize(size, -1))}
+          disabled={lyricPercent <= smallestLyricSize}
+          onclick={() => lyricSize.set(stepLyricSize(lyricPercent, -1))}
           aria-label="Make the lyrics smaller"
           title="Make the lyrics smaller"><AArrowDown /></button
         >
         <button
           type="button"
           class="button amount"
-          disabled={size === usualLyricSize}
+          disabled={lyricPercent === usualLyricSize}
           onclick={() => lyricSize.set(usualLyricSize)}
-          aria-label={size === usualLyricSize
+          aria-label={lyricPercent === usualLyricSize
             ? 'The lyrics show at their usual size'
-            : `Lyrics at ${size}%; show them at their usual size`}
-          title={size === usualLyricSize
+            : `Lyrics at ${lyricPercent}%; show them at their usual size`}
+          title={lyricPercent === usualLyricSize
             ? 'The lyrics show at their usual size'
-            : 'Show the lyrics at their usual size'}>{size}%</button
+            : 'Show the lyrics at their usual size'}>{lyricPercent}%</button
         >
         <button
           type="button"
           class="button step"
-          disabled={size >= largestLyricSize}
-          onclick={() => lyricSize.set(stepLyricSize(size, 1))}
+          disabled={lyricPercent >= largestLyricSize}
+          onclick={() => lyricSize.set(stepLyricSize(lyricPercent, 1))}
           aria-label="Make the lyrics larger"
           title="Make the lyrics larger"><AArrowUp /></button
-        >
-      </div>
-
-      <span id="reading-chords" class="name" class:blocked={blocked.chords} title={blocked.chords}>Chords</span>
-      <div class="controls" role="group" aria-labelledby="reading-chords">
-        <!-- An eye, crossed out while the Chords are hidden. -->
-        <button
-          type="button"
-          class="button toggle step"
-          aria-pressed={chords === 'shown' && chordsShown}
-          disabled={blocked.chords !== null}
-          onclick={() => songChordsShown.set(songId, !chordsShown)}
-          aria-label="Show the Chords"
-          title={blocked.chords ?? (chordsShown ? 'Hide the Chords' : 'Show the Chords')}
-          >{#if chords === 'shown' && chordsShown}<Eye />{:else}<EyeOff />{/if}</button
         >
       </div>
 
@@ -207,6 +196,21 @@
         >
       </div>
 
+      <span id="reading-chords" class="name" class:blocked={blocked.chords} title={blocked.chords}>Chords</span>
+      <div class="controls" role="group" aria-labelledby="reading-chords">
+        <!-- An eye, crossed out while the Chords are hidden. -->
+        <button
+          type="button"
+          class="button toggle step"
+          aria-pressed={chords === 'shown' && chordsShown}
+          disabled={blocked.chords !== null}
+          onclick={() => songChordsShown.set(songId, !chordsShown)}
+          aria-label="Show the Chords"
+          title={blocked.chords ?? (chordsShown ? 'Hide the Chords' : 'Show the Chords')}
+          >{#if chords === 'shown' && chordsShown}<Eye />{:else}<EyeOff />{/if}</button
+        >
+      </div>
+
       <span id="reading-chart" class="name" class:blocked={blocked.chart} title={blocked.chart}>Chord Chart</span>
       <div class="controls" role="group" aria-labelledby="reading-chart">
         <!-- Hidden, the Chart keeps whether it's pinned for when it's shown. -->
@@ -230,6 +234,42 @@
           aria-label="Pin the Chord Chart to the top"
           title={blocked.chart ?? (chart.pinned ? 'Unpin the Chord Chart' : 'Pin the Chord Chart to the top')}
           ><Pin /></button
+        >
+      </div>
+
+      <span id="reading-chart-size" class="name" class:blocked={blocked.chartSize} title={blocked.chartSize}
+        >Chart Size</span
+      >
+      <div class="controls" role="group" aria-labelledby="reading-chart-size">
+        <button
+          type="button"
+          class="button step"
+          disabled={blocked.chartSize !== null || chartPercent <= smallestChartSize}
+          onclick={() => chartSize.set(stepChartSize(chartPercent, -1))}
+          aria-label="Make the Chord Chart smaller"
+          title={blocked.chartSize ?? 'Make the Chord Chart smaller'}><Minus /></button
+        >
+        <button
+          type="button"
+          class="button amount"
+          class:blocked={blocked.chartSize}
+          disabled={blocked.chartSize !== null || chartPercent === usualChartSize}
+          onclick={() => chartSize.set(usualChartSize)}
+          aria-label={chartPercent === usualChartSize
+            ? 'The Chord Chart shows at its usual size'
+            : `Chord Chart at ${chartPercent}%; show it at its usual size`}
+          title={blocked.chartSize ??
+            (chartPercent === usualChartSize
+              ? 'The Chord Chart shows at its usual size'
+              : 'Show the Chord Chart at its usual size')}>{chartPercent}%</button
+        >
+        <button
+          type="button"
+          class="button step"
+          disabled={blocked.chartSize !== null || chartPercent >= largestChartSize}
+          onclick={() => chartSize.set(stepChartSize(chartPercent, 1))}
+          aria-label="Make the Chord Chart larger"
+          title={blocked.chartSize ?? 'Make the Chord Chart larger'}><Plus /></button
         >
       </div>
     </div>

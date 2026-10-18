@@ -95,6 +95,10 @@ _Avoid_: Key change
 How large a Song's Lines, Chords and Labels show in Read mode, for reading at whatever distance the device sits, from a music stand or in the hand. Like Transpose, it's a way of reading the Song, not an edit; it's kept on each device and holds for every Song.
 _Avoid_: Zoom, font size, text size
 
+**Chart Size**:
+How large the Chord Chart's diagrams show in Read mode, for reading at whatever distance the device sits, apart from the Lyric Size. Like the Lyric Size, it's a way of reading the Song, not an edit; it's kept on each device and holds for every Song.
+_Avoid_: Zoom, diagram size
+
 **Key**:
 The key a Song is written in, one of its Details. Like a Chord, with a capo on it names the shapes fingered, not the pitch that sounds: capo 2 in G sounds in A.
 
@@ -119,7 +123,7 @@ One way to play a Chord on an Instrument: which strings and frets on a guitar, w
 _Avoid_: Shape, fingering, chord diagram (a diagram draws a Voicing)
 
 **Chord Chart**:
-How to play the Chords a Song shows, in Read mode: a diagram of a Voicing for each Chord in the Arrangement's active Alternates, as written or transposed, in the order they first appear, drawn for the Song's tuning. The user can hide or show it, and separately pin it so it stays at the top as the Lyric Sheet scrolls; a pinned Chart that's hidden comes back pinned when shown. Both choices are kept on each device, not on the Song, and hold for every Song. Hiding the Chords hides it too, whatever those choices. A Chord whose name or tuning can't be read gets no diagram rather than a guess.
+How to play the Chords a Song shows, in Read mode: a diagram of a Voicing for each Chord in the Arrangement's active Alternates, as written or transposed, in the order they first appear, drawn for the Song's tuning. The user can hide or show it, and separately pin it so it stays at the top as the Lyric Sheet scrolls; a pinned Chart that's hidden comes back pinned when shown. Both choices are kept on each device, not on the Song, and hold for every Song. How large its diagrams show is the Chart Size. Hiding the Chords hides it too, whatever those choices. A Chord whose name or tuning can't be read gets no diagram rather than a guess.
 _Avoid_: Chord strip, chord diagrams, chords used
 
 **Instrument**:

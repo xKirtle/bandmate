@@ -6,12 +6,14 @@
   // or has no Voicing, keeps its place as its name over an empty frame; a
   // tuning that can't be read gets no diagrams at all, rather than a guess.
   // Hidden, it isn't drawn at all; it's hidden, shown and pinned to the top
-  // of the window from the Reading menu, for every Song on this device.
+  // of the window from the Reading menu, for every Song on this device, and
+  // sized there by the Chart Size.
   // Clicking a diagram opens the Chord's popover.
   import type { Song } from './api';
   import ChordDiagram from './ChordDiagram.svelte';
   import type { ChordOpener } from './ChordPopover.svelte';
   import { chartChords, chartTuning, chartVoicing } from './chordChart';
+  import { chartSize } from './sharedChartSize.svelte';
   import { chordChartState } from './sharedChordChartState.svelte';
   import { preferredVoicings } from './sharedPreferredVoicings.svelte';
 
@@ -37,6 +39,13 @@
     });
   });
 
+  // The Chart Size, set on the page as a fraction, as the Lyric Size is: every
+  // diagram and its Chord's name (--chart-read-name) scale by it.
+  $effect(() => {
+    const page = document.documentElement;
+    page.style.setProperty('--chart-size', String(chartSize.value / 100));
+    return () => page.style.removeProperty('--chart-size');
+  });
   const shown = $derived(chordChartState.current.shown);
   const pinned = $derived(chordChartState.current.pinned);
 
@@ -122,8 +131,11 @@
     overflow-x: auto;
     overscroll-behavior-x: contain;
   }
+  /* 6.5rem a Chord at 100%, scaled by the Chart Size, as its name is: the
+     diagram, its starting fret drawn in its own units, scales with the
+     width. */
   .row li {
-    flex: 0 0 6.5rem;
+    flex: 0 0 calc(6.5rem * var(--chart-size));
   }
   /* A diagram under its Chord's name, which opens its popover. */
   .chord {
@@ -147,7 +159,7 @@
     max-width: 100%;
     overflow: hidden;
     color: var(--accent);
-    font-size: var(--text-lg);
+    font-size: var(--chart-read-name);
     font-weight: 700;
     text-overflow: ellipsis;
     white-space: nowrap;

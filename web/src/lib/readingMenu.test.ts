@@ -25,36 +25,46 @@ describe('readingBadge', () => {
 });
 
 describe('blockedRows', () => {
-  it('blocks nothing while a Song shows its Chords', () => {
-    expect(blockedRows({ chords: 'shown', chordsShown: true })).toEqual({
+  it('blocks nothing while a Song shows its Chords and the Chord Chart', () => {
+    expect(blockedRows({ chords: 'shown', chordsShown: true, chartShown: true })).toEqual({
       chords: null,
       transpose: null,
       chart: null,
+      chartSize: null,
     });
   });
 
   it('blocks Transpose and the Chord Chart, saying why, while the Chords are hidden', () => {
-    expect(blockedRows({ chords: 'shown', chordsShown: false })).toEqual({
+    const blocked = {
       chords: null,
       transpose: 'Show the Chords to transpose them',
       chart: 'Show the Chords to see the Chord Chart',
+      chartSize: 'Show the Chords to see the Chord Chart',
+    };
+    expect(blockedRows({ chords: 'shown', chordsShown: false, chartShown: true })).toEqual(blocked);
+    expect(blockedRows({ chords: 'shown', chordsShown: false, chartShown: false })).toEqual(blocked);
+  });
+
+  it('blocks only the Chart Size, saying why, while the Chord Chart is hidden', () => {
+    expect(blockedRows({ chords: 'shown', chordsShown: true, chartShown: false })).toEqual({
+      chords: null,
+      transpose: null,
+      chart: null,
+      chartSize: 'Show the Chord Chart to size it',
     });
   });
 
   it("blocks every Chord row, saying why, when only what Read mode doesn't show has Chords", () => {
     const why = "No Chords in the Arrangement's active Alternates";
-    const blocked = { chords: why, transpose: why, chart: why };
-    expect(blockedRows({ chords: 'elsewhere', chordsShown: true })).toEqual(blocked);
-    expect(blockedRows({ chords: 'elsewhere', chordsShown: false })).toEqual(blocked);
+    const blocked = { chords: why, transpose: why, chart: why, chartSize: why };
+    expect(blockedRows({ chords: 'elsewhere', chordsShown: true, chartShown: true })).toEqual(blocked);
+    expect(blockedRows({ chords: 'elsewhere', chordsShown: false, chartShown: false })).toEqual(blocked);
   });
 
   it('blocks every Chord row for a Song without Chords, whether or not they were hidden', () => {
-    const blocked = {
-      chords: 'This Song has no Chords',
-      transpose: 'This Song has no Chords',
-      chart: 'This Song has no Chords',
-    };
-    expect(blockedRows({ chords: 'none', chordsShown: true })).toEqual(blocked);
-    expect(blockedRows({ chords: 'none', chordsShown: false })).toEqual(blocked);
+    const why = 'This Song has no Chords';
+    const blocked = { chords: why, transpose: why, chart: why, chartSize: why };
+    expect(blockedRows({ chords: 'none', chordsShown: true, chartShown: true })).toEqual(blocked);
+    expect(blockedRows({ chords: 'none', chordsShown: false, chartShown: false })).toEqual(blocked);
   });
 });
