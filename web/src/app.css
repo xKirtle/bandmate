@@ -53,9 +53,9 @@
      keep its size. Read mode is read at arm's length, from a phone or a
      music stand, so it sets them larger, Chords above their Lines and each
      Section under its Label: a phone's size here, a tablet's or desktop's
-     below. Read mode's are scaled by the Lyric Size, which Read mode sets on
-     the page as a fraction: 1 at 100%, and so is the gap between its
-     Sections, the one spacing step that's scaled. */
+     below. Read mode's sizes, and the gap between its Sections (the one
+     spacing step that's scaled), are scaled by the Lyric Size, which Read
+     mode sets on the page as a fraction: 1 at 100%. */
   --lyric-write: var(--text-field);
   --lyric-size: 1;
   --lyric-read-line: calc(1.25rem * var(--lyric-size));

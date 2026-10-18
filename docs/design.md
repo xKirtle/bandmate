@@ -81,7 +81,7 @@ Content's line height is `--leading-content` (1.6), for Lines in Write mode and 
 | `--lyric-read-chord`   | Chords above their Lines in Read mode             |
 | `--lyric-read-label`   | A Section's Label in Read mode, bold and muted, at the Chords' size                       |
 | `--lyric-read-leading` | The line height of Lines, Chords and Labels in Read mode                          |
-| `--lyric-read-section-gap` | The gap between Sections in Read mode: `--space-8`, scaled by the Lyric Size |
+| `--lyric-read-section-gap` | The gap between Sections in Read mode: `--space-8`, scaled by the Lyric Size              |
 | `--lyric-size`         | The Lyric Size as a fraction, set on the page by Read mode: the Read mode sizes scale by it |
 
 **Read mode** is read at arm's length, from a phone or a music stand, so its lyric sizes are larger than Write mode's: Lines at 1.25rem and Chords at 1.0625rem on a phone, a step larger again from 40rem wide (a tablet or a desktop), at 1.5rem and 1.25rem. The Lyric Size scales Lines, Chords and Labels together from these, from 50% to 175%, for reading from wherever the device sits; the Chord Chart keeps its own size. Lines are in `--text`, held to 7:1, Chords in the accent, held to 4.5:1, and Labels in `--text-muted`, held to 4.5:1, set as written and bold: they're content too, but step back from the Lines they head. Sections sit `--space-8` apart at 100%, and the Lyric Size scales that gap too, so a smaller size fits more of the Song on screen. Its chrome stays quiet: the Lyric Sheet's heading is for screen readers only, and the Lyric Size, whether the Chords show, Transpose and the Chord Chart's eye and pin sit behind one Reading button at its head, which shows only how far the Chords are transposed, as a badge.
@@ -105,7 +105,7 @@ Quarter-rem steps for every gap, padding and margin. Tools take the small steps;
 
 `--gutter` and `--control` sit on top as layout tokens, and the safe-area insets join in through `max()` and `calc()`. A space that bleeds out, like a highlight past its text, is a step negated: `calc(-1 * var(--space-3))`. A space that squares something with a size, like text centred in a control or an indent past a checkbox, is a `calc()` over that size and the steps, with the size named in a custom property where it's set (`--checkbox`, `--icon-width`).
 
-A gap, padding or margin is never a literal length otherwise, and a step is never scaled, only negated: Stylelint fails both. The one step that is scaled is Read mode's gap between Sections, `--lyric-read-section-gap`, by the Lyric Size, since it's spacing in Read mode's content. The two exceptions are a hairline, 1px or less, such as one that squares something with a border, and `1lh`, a line of text's own height. In the Timeline the steps are in its own unit (below).
+A gap, padding or margin is never a literal length otherwise, and a step is never scaled, only negated: Stylelint fails both. The two exceptions are a hairline, 1px or less, such as one that squares something with a border, and `1lh`, a line of text's own height. One step is scaled, as content: Read mode's gap between Sections grows and shrinks with the Lyric Size, so a smaller size fits more of the Song on screen. It's scaled once, where `--lyric-read-section-gap` is set with the lyric sizes, and a gap only ever takes that token, so Stylelint still holds every gap to the rule. In the Timeline the steps are in its own unit (below).
 
 ### Radius
 
