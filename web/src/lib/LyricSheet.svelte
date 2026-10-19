@@ -53,7 +53,6 @@
   import { cuesNextLine } from './syncKeys';
   import type { SyncMode } from './syncMode.svelte';
   import type { RhymeMode } from './rhymeMode.svelte';
-  import { ownKey } from './keyPlace';
   import { songChordsShown } from './chordsShown';
   import { lyricSize } from './sharedLyricSize.svelte';
   import { songTranspose } from './sharedTranspose.svelte';
@@ -249,7 +248,7 @@
   // control's own, e.g. a text field's or a popover's: syncing along
   // shouldn't depend on where focus was left.
   function cueKey(event: KeyboardEvent) {
-    if (!cuesNextLine(event, { syncing: syncMode.on, own: ownKey(event) })) return;
+    if (!cuesNextLine(event, syncMode.on)) return;
     event.preventDefault();
     syncMode.cue();
   }

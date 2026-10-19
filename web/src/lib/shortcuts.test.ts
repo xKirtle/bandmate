@@ -196,6 +196,13 @@ group('The list', () => {
     expect(keysLabel(shortcuts.selectAll.keys, 'mac')).toBe('⌘A');
   });
 
+  it('has the Cue nudge alone go on while its keys are held', () => {
+    const repeating = Object.entries(shortcuts)
+      .filter(([, s]) => 'repeats' in s)
+      .map(([id]) => id);
+    expect(repeating).toEqual(['nudgeCue']);
+  });
+
   it('describes every Shortcut in one line', () => {
     for (const s of Object.values(shortcuts)) expect(s.description).toMatch(/^[^\n]+\.$/);
   });

@@ -1,9 +1,14 @@
-import { afterEach, describe as group, expect, it } from 'vitest';
-import type { KeyDown } from './shortcuts';
-import { defaultKeyset, followKeys, type Keyset } from './shortcutKeys';
+// @vitest-environment happy-dom
+// Deciding which Shortcut a press is asks where it was pressed, which reads
+// the page's elements.
+import { describe as group, expect, it } from 'vitest';
+import type { ShortcutPress } from './shortcutPress';
 import { opensShortcuts, songKey, undoKey, type SongKeyContext } from './songKeys';
 
-const press = (key: string, mods: Partial<Omit<KeyDown, 'key'>> = {}): KeyDown => ({
+// Which Shortcut a press is, where it was pressed and the repeat rule are
+// shortcutPress.ts's, and tested there: these are the rules about what each
+// Shortcut does on the Song page, and when.
+const press = (key: string, mods: Partial<Omit<ShortcutPress, 'key'>> = {}): ShortcutPress => ({
   key,
   ctrlKey: false,
   metaKey: false,
@@ -11,12 +16,12 @@ const press = (key: string, mods: Partial<Omit<KeyDown, 'key'>> = {}): KeyDown =
   shiftKey: false,
   repeat: false,
   defaultPrevented: false,
+  target: null,
   ...mods,
 });
 
-// A Song page at rest: the key not the control's own, nothing recording, a Take can be recorded.
+// A Song page at rest: nothing recording, a Take can be recorded.
 const idle: SongKeyContext = {
-  own: false,
   busy: false,
   editable: true,
   recording: false,
@@ -27,18 +32,6 @@ const idle: SongKeyContext = {
 group('Space', () => {
   it('plays or pauses', () => {
     expect(songKey(press(' '), idle)).toBe('playPause');
-  });
-
-  it('is left alone when held down, handled already, or with Ctrl, ⌘ or Alt', () => {
-    expect(songKey(press(' ', { repeat: true }), idle)).toBeNull();
-    expect(songKey(press(' ', { defaultPrevented: true }), idle)).toBeNull();
-    expect(songKey(press(' ', { ctrlKey: true }), idle)).toBeNull();
-    expect(songKey(press(' ', { metaKey: true }), idle)).toBeNull();
-    expect(songKey(press(' ', { altKey: true }), idle)).toBeNull();
-  });
-
-  it("is left to the control where it's its own, e.g. a text field, a checkbox or a popover", () => {
-    expect(songKey(press(' '), { ...idle, own: true })).toBeNull();
   });
 
   it('waits while a Beat is picked, the Latency Offset calibrated or a Mixdown made', () => {
@@ -55,9 +48,8 @@ group('Space', () => {
 });
 
 group('R', () => {
-  it('records, whether or not Caps Lock is on', () => {
+  it('records', () => {
     expect(songKey(press('r'), idle)).toBe('record');
-    expect(songKey(press('R'), idle)).toBe('record');
   });
 
   it('stops a recording', () => {
@@ -68,32 +60,17 @@ group('R', () => {
     expect(songKey(press('r'), { ...idle, canRecord: false })).toBeNull();
   });
 
-  it("is left alone when held down, handled already, the control's own, or with Ctrl, ⌘ or Alt", () => {
-    expect(songKey(press('r', { repeat: true }), idle)).toBeNull();
-    expect(songKey(press('r', { defaultPrevented: true }), idle)).toBeNull();
-    expect(songKey(press('r'), { ...idle, own: true })).toBeNull();
-    expect(songKey(press('r', { ctrlKey: true }), idle)).toBeNull();
-    expect(songKey(press('r', { metaKey: true }), idle)).toBeNull();
-    expect(songKey(press('r', { altKey: true }), idle)).toBeNull();
-  });
-
   it('waits while a Beat is picked, the Latency Offset calibrated or a Mixdown made', () => {
     expect(songKey(press('r'), { ...idle, busy: true })).toBeNull();
   });
 });
 
 group('S', () => {
-  it('splits at the playhead, whether or not Caps Lock is on', () => {
+  it('splits at the playhead', () => {
     expect(songKey(press('s'), idle)).toBe('split');
-    expect(songKey(press('S'), idle)).toBe('split');
   });
 
-  it("is left alone when held down, handled already, the control's own, with a modifier, or on a read-only Timeline", () => {
-    expect(songKey(press('s', { repeat: true }), idle)).toBeNull();
-    expect(songKey(press('s', { defaultPrevented: true }), idle)).toBeNull();
-    expect(songKey(press('s'), { ...idle, own: true })).toBeNull();
-    expect(songKey(press('s', { ctrlKey: true }), idle)).toBeNull();
-    expect(songKey(press('S', { shiftKey: true }), idle)).toBeNull();
+  it('is left alone on a read-only Timeline, e.g. on a phone', () => {
     expect(songKey(press('s'), { ...idle, editable: false })).toBeNull();
   });
 
@@ -109,28 +86,12 @@ group('Home and End', () => {
     expect(songKey(press('End'), idle)).toBe('end');
   });
 
-  it('go on going while held down, so the page never scrolls instead', () => {
-    expect(songKey(press('Home', { repeat: true }), idle)).toBe('start');
-    expect(songKey(press('End', { repeat: true }), idle)).toBe('end');
-  });
-
   it('work in Read mode and on a phone, since moving the playhead is no edit', () => {
     expect(songKey(press('Home'), { ...idle, editable: false })).toBe('start');
     expect(songKey(press('End'), { ...idle, editable: false })).toBe('end');
   });
 
-  it("are left to the control where they're its own, e.g. a text field or a volume slider", () => {
-    expect(songKey(press('Home'), { ...idle, own: true })).toBeNull();
-    expect(songKey(press('End'), { ...idle, own: true })).toBeNull();
-  });
-
-  it('are left alone when handled already, or with a modifier', () => {
-    expect(songKey(press('Home', { defaultPrevented: true }), idle)).toBeNull();
-    expect(songKey(press('Home', { shiftKey: true }), idle)).toBeNull();
-    expect(songKey(press('End', { ctrlKey: true }), idle)).toBeNull();
-  });
-
-  it('are taken while recording, so the page never scrolls, though the playhead stays', () => {
+  it('are taken while recording, though the playhead stays where it started', () => {
     expect(songKey(press('Home'), { ...idle, recording: true, capturing: true, canRecord: false })).toBe('start');
   });
 
@@ -140,111 +101,30 @@ group('Home and End', () => {
 });
 
 group('Undo and redo', () => {
-  // The Song page at rest, for its Undo and Redo keys.
-  const calm = { own: false };
-
   it('undo with Ctrl+Z or ⌘Z', () => {
-    expect(undoKey(press('z', { ctrlKey: true }), calm)).toBe('undo');
-    expect(undoKey(press('z', { metaKey: true }), calm)).toBe('undo');
+    expect(undoKey(press('z', { ctrlKey: true }))).toBe('undo');
+    expect(undoKey(press('z', { metaKey: true }))).toBe('undo');
   });
 
-  it('redo with Ctrl+Shift+Z or ⌘⇧Z', () => {
-    expect(undoKey(press('Z', { ctrlKey: true, shiftKey: true }), calm)).toBe('redo');
-    expect(undoKey(press('Z', { metaKey: true, shiftKey: true }), calm)).toBe('redo');
+  it('redo with Ctrl+Shift+Z or Ctrl+Y', () => {
+    expect(undoKey(press('Z', { ctrlKey: true, shiftKey: true }))).toBe('redo');
+    expect(undoKey(press('y', { ctrlKey: true }))).toBe('redo');
   });
 
-  it('redo with Ctrl+Y or ⌘Y, on every platform', () => {
-    expect(undoKey(press('y', { ctrlKey: true }), calm)).toBe('redo');
-    expect(undoKey(press('y', { metaKey: true }), calm)).toBe('redo');
-  });
-
-  it('are left alone with Alt, or handled already', () => {
-    expect(undoKey(press('z', { ctrlKey: true, altKey: true }), calm)).toBeNull();
-    expect(undoKey(press('z', { ctrlKey: true, defaultPrevented: true }), calm)).toBeNull();
-  });
-
-  it("are left to the control where they're its own, e.g. a text field undoing its own typing, or a popover", () => {
-    expect(undoKey(press('z', { ctrlKey: true }), { own: true })).toBeNull();
-    expect(undoKey(press('Z', { ctrlKey: true, shiftKey: true }), { own: true })).toBeNull();
-    expect(undoKey(press('y', { ctrlKey: true }), { own: true })).toBeNull();
-  });
-
-  it('need Ctrl or ⌘', () => {
-    expect(undoKey(press('z'), calm)).toBeNull();
-  });
-
-  it("Mod+Shift+Y, Ctrl+⌘Y and Ctrl+⌘Z don't", () => {
-    expect(undoKey(press('Y', { ctrlKey: true, shiftKey: true }), calm)).toBeNull();
-    expect(undoKey(press('Y', { metaKey: true, shiftKey: true }), calm)).toBeNull();
-    expect(undoKey(press('y', { ctrlKey: true, metaKey: true }), calm)).toBeNull();
-    expect(undoKey(press('z', { ctrlKey: true, metaKey: true }), calm)).toBeNull();
-  });
-
-  it("aren't the Timeline's keys any more, so a phone or Read mode undoes too", () => {
+  it("aren't the Timeline's keys, so a phone or Read mode undoes too", () => {
     expect(songKey(press('z', { ctrlKey: true }), idle)).toBeNull();
     expect(songKey(press('y', { ctrlKey: true }), idle)).toBeNull();
   });
 });
 
-group('Exact modifiers', () => {
-  it("Shift+Space doesn't play and Shift+R doesn't record", () => {
-    expect(songKey(press(' ', { shiftKey: true }), idle)).toBeNull();
-    expect(songKey(press('R', { shiftKey: true }), idle)).toBeNull();
-  });
-});
-
-group('Keys as rebound', () => {
-  afterEach(() => followKeys(() => defaultKeyset));
-  const rebind = (changes: Partial<Keyset>) => followKeys(() => ({ ...defaultKeyset, ...changes }));
-
-  it('acts on the keys chosen on this device, and no longer on the defaults', () => {
-    rebind({ record: { keys: [{ key: 't' }] }, undo: { keys: [{ key: 'u', alt: true }] } });
-    expect(songKey(press('t'), idle)).toBe('record');
-    expect(songKey(press('r'), idle)).toBeNull();
-    expect(undoKey(press('u', { altKey: true }), idle)).toBe('undo');
-    expect(undoKey(press('z', { ctrlKey: true }), idle)).toBeNull();
-  });
-
-  it('opens the shortcuts dialog with no key at all once it has none', () => {
-    rebind({ showShortcuts: { keys: [] } });
-    expect(opensShortcuts(press('?'), idle)).toBe(false);
-  });
-
-  it("leaves the keys chosen to the control where they're its own, as the defaults are", () => {
-    rebind({
-      record: { keys: [{ key: 'ArrowUp' }] },
-      undo: { keys: [{ key: 'ArrowLeft', alt: true }] },
-      showShortcuts: { keys: [{ key: 'ArrowDown', shift: true }] },
-    });
-    expect(songKey(press('ArrowUp'), idle)).toBe('record');
-    expect(songKey(press('ArrowUp'), { ...idle, own: true })).toBeNull();
-    expect(undoKey(press('ArrowLeft', { altKey: true }), { own: true })).toBeNull();
-    expect(opensShortcuts(press('ArrowDown', { shiftKey: true }), { own: true })).toBe(false);
-    expect(opensShortcuts(press('ArrowDown', { shiftKey: true }), idle)).toBe(true);
-  });
-});
-
 group('?', () => {
-  const nowhere = { own: false };
-
-  it('opens the shortcuts dialog, typed with Shift or on a key of its own', () => {
-    expect(opensShortcuts(press('?', { shiftKey: true }), nowhere)).toBe(true);
-    expect(opensShortcuts(press('?'), nowhere)).toBe(true);
+  it('opens the shortcuts dialog', () => {
+    expect(opensShortcuts(press('?', { shiftKey: true }))).toBe(true);
+    expect(opensShortcuts(press('?'))).toBe(true);
   });
 
-  it("is left to the control where it's its own, e.g. typed in a text field, or pressed in a dialog", () => {
-    expect(opensShortcuts(press('?', { shiftKey: true }), { own: true })).toBe(false);
-  });
-
-  it('is left alone when held down, or handled already', () => {
-    expect(opensShortcuts(press('?', { repeat: true }), nowhere)).toBe(false);
-    expect(opensShortcuts(press('?', { defaultPrevented: true }), nowhere)).toBe(false);
-  });
-
-  it('is only ? itself: not /, nor ? with Ctrl, ⌘ or Alt', () => {
-    expect(opensShortcuts(press('/'), nowhere)).toBe(false);
-    expect(opensShortcuts(press('?', { ctrlKey: true }), nowhere)).toBe(false);
-    expect(opensShortcuts(press('?', { metaKey: true }), nowhere)).toBe(false);
-    expect(opensShortcuts(press('?', { altKey: true }), nowhere)).toBe(false);
+  it('is the only key that opens it', () => {
+    expect(opensShortcuts(press('/'))).toBe(false);
+    expect(opensShortcuts(press(' '))).toBe(false);
   });
 });

@@ -20,6 +20,11 @@
 
   const uid = $props.id();
   let query = $state('');
+  // This tab lists the keys from the setting it rebinds, rather than from
+  // `rebound` as the shortcuts dialog does: it's where they're changed, so
+  // it shows the very value it edits, refusals and all. They're the same
+  // keys either way, as `rebound` follows this setting (see
+  // sharedShortcutKeys.svelte.ts).
   const all = $derived(listGroups(withKeys(shortcutKeys.value.keys), platform()));
   const groups = $derived(searchGroups(all, query));
   /** The Shortcuts whose folds are open, kept as the search hides and shows them. */
