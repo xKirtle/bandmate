@@ -1,6 +1,13 @@
-// Where a point on the page is on the Timeline: the time under it, the
-// Track whose lane it is over, and how far down the lanes it is. Every
-// pointer gesture on the lanes — seeking and scrubbing on the ruler,
+// Where something is on the Timeline, as the Timeline shows it now:
+//
+// - A point on the page: the time under it, kept on the ruler or running
+//   on past the end, the Track whose lane it is over, and how far down the
+//   lanes it is. Also a point along the scroll bar, which isn't in them.
+// - A Clip: the Track it's on.
+// - A length in pixels across the lanes, as a length of time, and a time
+//   asked for by hand, kept on the ruler.
+//
+// Every pointer gesture on the lanes — seeking and scrubbing on the ruler,
 // drawing a box, moving, trimming and fading a Clip, setting the Loop,
 // dropping files, and the scroll bar — asks here rather than measuring the
 // page itself.
@@ -9,7 +16,8 @@
 // which owns the lanes element and measures points into it, and off the
 // elements the Timeline draws a Track's lane, the Tracks area and the
 // scroll bar in. The Timeline keeps those references, as it keeps its
-// markup; this is the only thing that measures them.
+// markup; this is the only thing that measures them. The arithmetic of a
+// view stays in timelineView.ts, underneath both.
 import type { Clip, Track } from './api';
 import { fileDropTrack, type TrackRow } from './fileDrop';
 import { nearestRow } from './gripDragging.svelte';
