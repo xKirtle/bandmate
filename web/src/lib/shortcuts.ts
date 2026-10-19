@@ -1,8 +1,13 @@
 /**
  * The Song page's Shortcuts, the one place they and their default keys are
- * defined. Handlers ask it whether a key is one of a Shortcut's keys as
- * rebound on this device (see shortcutKeys.ts), and keep their own guards,
- * e.g. against key repeat or typing in a text field.
+ * defined, with whether each goes on while its keys are held. Which
+ * Shortcut a press is, by the keys as rebound on this device (see
+ * shortcutKeys.ts), is decided in one place from here (see
+ * shortcutPress.ts); handlers keep only what each Shortcut does and when.
+ *
+ * No two Shortcuts may hold the same key, which rebinding refuses: the
+ * three handlers the Song page listens with each hear every press, and
+ * only a key one Shortcut has keeps them from acting on one another's.
  */
 
 /**
@@ -22,6 +27,14 @@ type Described = {
   description: string;
   /** Where it works, finishing "Works in …", e.g. "the ruler, once it has focus." */
   worksIn: string;
+  /**
+   * Whether holding its keys down does it again and again. A Shortcut
+   * declares it where holding it is the point, like scanning the Song or
+   * walking a Cue into place, or where the key must be kept while it's
+   * held, so the browser doesn't act on the repeats instead. Every other
+   * one is done once, however long its keys are held.
+   */
+  repeats?: true;
 };
 
 /**
@@ -58,6 +71,9 @@ export const shortcuts = {
     group: 'Playback & recording',
     description: 'Moves the playhead to the start or the end.',
     worksIn: 'any part of the Song page but a text field, a list, a slider, a menu or a dialog.',
+    // Not to go to the start twice, which changes nothing, but to keep the
+    // key while it's held, so the browser never scrolls the page instead.
+    repeats: true,
     back: [{ key: 'Home' }],
     forward: [{ key: 'End' }],
   },
@@ -105,6 +121,8 @@ export const shortcuts = {
     group: 'Timeline editing',
     description: 'Moves the playhead 5 seconds.',
     worksIn: 'the ruler, once it has focus.',
+    // Held down, it scans the Song, 5 s a repeat.
+    repeats: true,
     back: [{ key: 'ArrowLeft' }, { key: 'ArrowDown' }],
     forward: [{ key: 'ArrowRight' }, { key: 'ArrowUp' }],
   },
@@ -113,6 +131,8 @@ export const shortcuts = {
     group: 'Timeline editing',
     description: 'Moves the playhead 15 seconds.',
     worksIn: 'the ruler, once it has focus.',
+    // Held down, it scans the Song faster, 15 s a repeat.
+    repeats: true,
     back: [
       { key: 'ArrowLeft', shift: true },
       { key: 'ArrowDown', shift: true },
@@ -127,6 +147,8 @@ export const shortcuts = {
     group: 'Timeline editing',
     description: 'Moves the focused Cue time 0.1 seconds earlier or later.',
     worksIn: 'a focused Cue time, in Write mode.',
+    // Held down, it goes on nudging: that's how a Cue is walked into place.
+    repeats: true,
     back: [{ key: 'ArrowDown', alt: true }],
     forward: [{ key: 'ArrowUp', alt: true }],
   },

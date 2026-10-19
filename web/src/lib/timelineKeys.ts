@@ -1,12 +1,13 @@
 /**
- * The Timeline's editing and mouse Shortcuts: the Selection's and a focused
- * Clip's keys, decided with all their guards in `timelineKey`, the ruler's arrows,
- * and the modifiers held while dragging or turning the wheel.
+ * The Timeline's editing and mouse Shortcuts: what the Selection's and a
+ * focused Clip's keys do, and when, the ruler's arrows, and the modifiers
+ * held while dragging or turning the wheel. Which Shortcut a key press is
+ * comes from shortcutPress.ts.
  */
 
 import type { Freeze } from './freeze';
-import type { KeyAt } from './keyPlace';
-import { matches, stepBy, type Key, type KeyDown, type KeyPress, type Way } from './shortcuts';
+import { pressedInControl, pressedOnPage, type ShortcutPress } from './shortcutPress';
+import { matches, type Key, type KeyPress, type Way } from './shortcuts';
 import { rebound } from './shortcutKeys';
 
 /** The modifiers held with a pointer or wheel event, or a key press. */
@@ -26,8 +27,8 @@ function mouse(key: 'click' | 'drag' | 'wheel', e: Modifiers): KeyPress {
 export type TimelineKey =
   'clearSelection' | 'selectAll' | 'deleteSelection' | 'deleteClip' | 'copy' | 'cut' | 'paste' | 'clipMenu';
 
-/** Whether the key is the control's own where it was pressed, and what the Timeline is doing. */
-export type TimelineKeyContext = KeyAt & {
+/** What the Timeline is doing, which says whether a Shortcut can act now. */
+export type TimelineKeyContext = {
   /** The Timeline can be edited, i.e. it isn't in Read mode or on a phone. */
   editable: boolean;
   /** Why the Timeline can't be edited now, if it can't. */
@@ -44,34 +45,39 @@ export type TimelineKeyContext = KeyAt & {
  * Which Timeline Shortcut a key press is, if any, and if it should act
  * now: null leaves the key to the page.
  */
-export function timelineKey(e: KeyDown, at: TimelineKeyContext): TimelineKey | null {
-  // A key that's the control's own, e.g. a text field's or a ⋯ menu's, is left to it.
-  if (e.defaultPrevented || at.own) return null;
-  // Nor while a Track is dragged, which Esc then cancels.
+export function timelineKey(e: ShortcutPress, at: TimelineKeyContext): TimelineKey | null {
+  // Not while a Track is dragged, which Esc then cancels.
   if (at.draggingTrack) return null;
   // Deleting, copying, cutting and pasting go with editing, so not on a
   // phone, nor while recording or merging.
   const edits = at.editable && at.freeze === null;
-  const deletes = matches(e, rebound().deleteClip.keys);
-  if (at.focusedClip && matches(e, rebound().clipMenu.keys)) {
-    // Even while recording or merging, with its edits off.
-    return at.editable ? 'clipMenu' : null;
+  const pressed = pressedOnPage(e);
+  switch (pressed?.id) {
+    case 'clipMenu':
+      // Only a focused Clip has one, and it opens even while recording or
+      // merging, with its edits off.
+      return at.focusedClip && at.editable ? 'clipMenu' : null;
+    case 'deleteClip':
+      if (!edits) return null;
+      // A focused Clip's Delete: the whole Selection if it's in it, else
+      // that Clip alone. From anywhere else in the Timeline, the Selection.
+      if (at.focusedClip) return at.focusedClip.inSelection ? 'deleteSelection' : 'deleteClip';
+      return at.selected > 0 ? 'deleteSelection' : null;
+    case 'clearSelection':
+      return at.selected > 0 ? 'clearSelection' : null;
+    case 'selectAll':
+      return at.editable ? 'selectAll' : null;
+    case 'pasteClips':
+      return edits ? 'paste' : null;
+    // Copying and cutting act on the Selection, even from a focused Clip
+    // outside it.
+    case 'copyClips':
+      return edits && at.selected > 0 ? 'copy' : null;
+    case 'cutClips':
+      return edits && at.selected > 0 ? 'cut' : null;
+    default:
+      return null;
   }
-  // A focused Clip's Delete: the whole Selection if it's in it, else that
-  // Clip alone.
-  if (at.focusedClip && deletes) {
-    if (!edits) return null;
-    return at.focusedClip.inSelection ? 'deleteSelection' : 'deleteClip';
-  }
-  if (matches(e, rebound().clearSelection.keys)) return at.selected > 0 ? 'clearSelection' : null;
-  if (matches(e, rebound().selectAll.keys)) return at.editable ? 'selectAll' : null;
-  if (matches(e, rebound().pasteClips.keys)) return edits ? 'paste' : null;
-  // These act on the Selection, even from a focused Clip outside it.
-  if (!edits || at.selected === 0) return null;
-  if (deletes) return 'deleteSelection';
-  if (matches(e, rebound().copyClips.keys)) return 'copy';
-  if (matches(e, rebound().cutClips.keys)) return 'cut';
-  return null;
 }
 
 /** Whether a box drawn over empty lane space with these modifiers adds the Clips it touches to the Selection, rather than replacing it. */
@@ -86,14 +92,15 @@ export function togglesSelection(e: Modifiers): boolean {
 
 /**
  * Where a key press on the ruler seeks to, from `position`, or null if it
- * doesn't. Home and End are Song-wide, so `songKey` decides them.
+ * doesn't: 5 s, or 15 s with Shift unless rebound. The ruler hears it in
+ * its own handler, the arrows being its own keys. Home and End are
+ * Song-wide, so `songKey` decides them.
  */
-export function rulerSeek(e: KeyPress, position: number): number | null {
-  const by = stepBy(e, [
-    [rebound().seek, 5],
-    [rebound().seekFar, 15],
-  ]);
-  return by === null ? null : position + by;
+export function rulerSeek(e: ShortcutPress, position: number): number | null {
+  const pressed = pressedInControl(e);
+  const by = pressed?.id === 'seek' ? 5 : pressed?.id === 'seekFar' ? 15 : null;
+  if (by === null || pressed?.way === null) return null;
+  return position + (pressed?.way === 'back' ? -by : by);
 }
 
 /** The start of a Timeline `length` long, going back, or its end, going forward: where its keys and its buttons go. */

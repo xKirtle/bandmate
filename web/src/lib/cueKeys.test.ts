@@ -1,15 +1,23 @@
-import { afterEach, describe as group, expect, it } from 'vitest';
-import { defaultKeyset, followKeys, type Keyset } from './shortcutKeys';
+// @vitest-environment happy-dom
+// Deciding which Shortcut a press is asks where it was pressed, which reads
+// the page's elements.
+import { describe as group, expect, it } from 'vitest';
 import { cueNudge, cueNudgeHint } from './cueKeys';
 import { KeyHints } from './keyHints';
-import type { KeyPress } from './shortcuts';
+import { rebind } from './shortcutKeysFake';
+import type { ShortcutPress } from './shortcutPress';
 
-const press = (key: string, mods: Partial<Omit<KeyPress, 'key'>> = {}): KeyPress => ({
+// Which Shortcut a press is, and that holding the keys goes on nudging,
+// are shortcutPress.ts's, and tested there.
+const press = (key: string, mods: Partial<Omit<ShortcutPress, 'key'>> = {}): ShortcutPress => ({
   key,
   ctrlKey: false,
   metaKey: false,
   altKey: false,
   shiftKey: false,
+  repeat: false,
+  defaultPrevented: false,
+  target: null,
   ...mods,
 });
 
@@ -28,24 +36,15 @@ group('Alt+↑/↓', () => {
     expect(cueNudge(press('ArrowDown', { altKey: true }), syncing)).toBeNull();
   });
 
-  it('needs Alt', () => {
+  it('goes on nudging while the keys are held', () => {
+    expect(cueNudge(press('ArrowUp', { altKey: true, repeat: true }), writing)).toBe(1);
+    expect(cueNudge(press('ArrowDown', { altKey: true, repeat: true }), writing)).toBe(-1);
+  });
+
+  it("is only the Cue nudge's keys: the plain arrows are the field's own", () => {
     expect(cueNudge(press('ArrowUp'), writing)).toBeNull();
-    expect(cueNudge(press('ArrowDown'), writing)).toBeNull();
-  });
-
-  it('is left alone with Ctrl or ⌘ as well', () => {
-    expect(cueNudge(press('ArrowUp', { altKey: true, ctrlKey: true }), writing)).toBeNull();
-    expect(cueNudge(press('ArrowDown', { altKey: true, metaKey: true }), writing)).toBeNull();
-  });
-
-  it('is left alone with Shift as well, its modifiers being exact', () => {
-    expect(cueNudge(press('ArrowUp', { altKey: true, shiftKey: true }), writing)).toBeNull();
-    expect(cueNudge(press('ArrowDown', { altKey: true, shiftKey: true }), writing)).toBeNull();
-  });
-
-  it('is only ↑ and ↓', () => {
     expect(cueNudge(press('ArrowLeft', { altKey: true }), writing)).toBeNull();
-    expect(cueNudge(press('ArrowRight', { altKey: true }), writing)).toBeNull();
+    expect(cueNudge(press('Enter'), writing)).toBeNull();
   });
 });
 
@@ -64,17 +63,9 @@ group('The nudge hint', () => {
   it('names no keys on a phone or a narrow window', () => {
     expect(cueNudgeHint(new KeyHints('other', () => false), writing)).toEqual({ label: null, aria: undefined });
   });
-});
 
-group('Keys as rebound', () => {
-  afterEach(() => followKeys(() => defaultKeyset));
-  const rebind = (changes: Partial<Keyset>) => followKeys(() => ({ ...defaultKeyset, ...changes }));
-
-  it('nudge and name the keys chosen on this device', () => {
+  it('names the keys chosen on this device', () => {
     rebind({ nudgeCue: { back: [{ key: ',' }], forward: [{ key: '.' }] } });
-    expect(cueNudge(press('.'), writing)).toBe(1);
-    expect(cueNudge(press(','), writing)).toBe(-1);
-    expect(cueNudge(press('ArrowUp', { altKey: true }), writing)).toBeNull();
-    expect(cueNudgeHint(new KeyHints('other', () => true), writing)).toEqual({ label: '. or ,', aria: '. ,' });
+    expect(cueNudgeHint(desktop(), writing)).toEqual({ label: '. or ,', aria: '. ,' });
   });
 });

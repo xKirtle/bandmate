@@ -13,11 +13,6 @@ const arrowControls =
 
 const arrows = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
 
-/** Whether the key is the control's own where it was pressed, which every Shortcut leaves to it: see `ownKey`. */
-export type KeyAt = {
-  own: boolean;
-};
-
 /**
  * Whether a key pressed on the Song page is the control's own where it was
  * pressed, which every Shortcut then leaves to it, whatever its keys:

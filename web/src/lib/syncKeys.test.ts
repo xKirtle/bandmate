@@ -1,9 +1,13 @@
-import { afterEach, describe as group, expect, it } from 'vitest';
-import { defaultKeyset, followKeys, type Keyset } from './shortcutKeys';
-import type { KeyDown } from './shortcuts';
-import { cuesNextLine, type CueNextContext } from './syncKeys';
+// @vitest-environment happy-dom
+// Deciding which Shortcut a press is asks where it was pressed, which reads
+// the page's elements.
+import { describe as group, expect, it } from 'vitest';
+import type { ShortcutPress } from './shortcutPress';
+import { cuesNextLine } from './syncKeys';
 
-const press = (key: string, mods: Partial<Omit<KeyDown, 'key'>> = {}): KeyDown => ({
+// Which Shortcut a press is, where it was pressed and the repeat rule are
+// shortcutPress.ts's, and tested there.
+const press = (key: string, mods: Partial<Omit<ShortcutPress, 'key'>> = {}): ShortcutPress => ({
   key,
   ctrlKey: false,
   metaKey: false,
@@ -11,56 +15,21 @@ const press = (key: string, mods: Partial<Omit<KeyDown, 'key'>> = {}): KeyDown =
   shiftKey: false,
   repeat: false,
   defaultPrevented: false,
+  target: null,
   ...mods,
 });
 
-// Sync mode on, with focus on the Lyric Sheet, e.g. on a button.
-const syncing: CueNextContext = { syncing: true, own: false };
-
 group('Enter', () => {
   it('cues the next Line in Sync mode', () => {
-    expect(cuesNextLine(press('Enter'), syncing)).toBe(true);
+    expect(cuesNextLine(press('Enter'), true)).toBe(true);
   });
 
   it('does nothing outside Sync mode', () => {
-    expect(cuesNextLine(press('Enter'), { ...syncing, syncing: false })).toBe(false);
-  });
-
-  it('is left alone when held down or handled already', () => {
-    expect(cuesNextLine(press('Enter', { repeat: true }), syncing)).toBe(false);
-    expect(cuesNextLine(press('Enter', { defaultPrevented: true }), syncing)).toBe(false);
-  });
-
-  it('is left alone with Ctrl, ⌘, Alt or Shift', () => {
-    expect(cuesNextLine(press('Enter', { ctrlKey: true }), syncing)).toBe(false);
-    expect(cuesNextLine(press('Enter', { metaKey: true }), syncing)).toBe(false);
-    expect(cuesNextLine(press('Enter', { altKey: true }), syncing)).toBe(false);
-    expect(cuesNextLine(press('Enter', { shiftKey: true }), syncing)).toBe(false);
-  });
-
-  it("is left to the control where it's its own, e.g. a text field, a popover or a ⋯ menu", () => {
-    expect(cuesNextLine(press('Enter'), { ...syncing, own: true })).toBe(false);
+    expect(cuesNextLine(press('Enter'), false)).toBe(false);
   });
 
   it('is the only key that cues', () => {
-    expect(cuesNextLine(press(' '), syncing)).toBe(false);
-    expect(cuesNextLine(press('n'), syncing)).toBe(false);
-  });
-});
-
-group('Keys as rebound', () => {
-  afterEach(() => followKeys(() => defaultKeyset));
-  const rebind = (changes: Partial<Keyset>) => followKeys(() => ({ ...defaultKeyset, ...changes }));
-
-  it('cue with the key chosen on this device', () => {
-    rebind({ cueNextLine: { keys: [{ key: 'n' }] } });
-    expect(cuesNextLine(press('n'), syncing)).toBe(true);
-    expect(cuesNextLine(press('Enter'), syncing)).toBe(false);
-  });
-
-  it("leave an arrow chosen to the control where it's its own", () => {
-    rebind({ cueNextLine: { keys: [{ key: 'ArrowDown' }] } });
-    expect(cuesNextLine(press('ArrowDown'), syncing)).toBe(true);
-    expect(cuesNextLine(press('ArrowDown'), { ...syncing, own: true })).toBe(false);
+    expect(cuesNextLine(press(' '), true)).toBe(false);
+    expect(cuesNextLine(press('n'), true)).toBe(false);
   });
 });

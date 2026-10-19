@@ -43,7 +43,6 @@
   import { retakeLength } from './recording';
   import { timelineEnd, type Loop, type Placed } from './schedule';
   import { nameSound } from './soundName';
-  import { ownKey } from './keyPlace';
   import { songKey } from './songKeys';
   import { allKeys, type Way } from './shortcuts';
   import { rebound } from './shortcutKeys';
@@ -373,7 +372,6 @@
       return;
     }
     const shortcut = songKey(event, {
-      own: ownKey(event),
       busy: picking || calibrating !== null || mixingDown,
       editable: editable.current,
       recording,
@@ -1071,7 +1069,6 @@
   function timelineKeyDown(event: KeyboardEvent) {
     const clip = focusedClip(event.target);
     const action = timelineKey(event, {
-      own: ownKey(event),
       editable: editable.current,
       freeze,
       selected: selection.size,

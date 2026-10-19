@@ -37,7 +37,6 @@
   import { editHint, type Freeze } from '../lib/freeze';
   import ShortcutsDialog from '../lib/ShortcutsDialog.svelte';
   import SnapshotsDialog from '../lib/SnapshotsDialog.svelte';
-  import { ownKey } from '../lib/keyPlace';
   import { inTextField } from '../lib/textField';
   import { opensShortcuts, undoKey } from '../lib/songKeys';
   import { detailsSummary, openingMode, sideParts, type Mode, type SidePart } from '../lib/songMode';
@@ -247,13 +246,12 @@
 
   function keydown(event: KeyboardEvent) {
     if (!song) return;
-    const at = { own: ownKey(event) };
-    if (opensShortcuts(event, at)) {
+    if (opensShortcuts(event)) {
       event.preventDefault();
       showingShortcuts = true;
       return;
     }
-    const undoing = undoKey(event, at);
+    const undoing = undoKey(event);
     if (!undoing || !songUndo) return;
     event.preventDefault();
     if (undoing === 'undo') songUndo.undo();
