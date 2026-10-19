@@ -8,17 +8,19 @@
   import ActionsMenu from './ActionsMenu.svelte';
   import AlternateText, { type Cueing } from './AlternateText.svelte';
   import type { CaretListener } from './lyricsLanguage';
-  import { suggestedLabels, type Alternate, type Section } from './api';
+  import { suggestedLabels, type Alternate, type Section, type Sheet } from './api';
   import Combobox from './Combobox.svelte';
   import type { LyricSheetEditing, SheetField } from './lyricSheetEditing.svelte';
   import type { MenuAction } from './menu';
   import type { Drop } from './sectionDrag';
   import type { SectionDragging } from './sectionDragging.svelte';
+  import { dropMove, sectionMove, type SectionMove } from './sectionMoves';
   import { activeAlternate, alternateName, alternatesLabel, labelOf, type Place } from './sections';
   import { cancelOnEscape, committedAsItGoes } from './typedField.svelte';
 
   let {
     section,
+    sheet,
     autofocus = false,
     editing,
     grip,
@@ -31,6 +33,8 @@
     tour,
   }: {
     section: Section;
+    /** The Lyric Sheet and Scrapbook the Section is in, which its Alternates are moved out into (see sectionMoves.ts). */
+    sheet: Sheet;
     /** Focus the Label when this becomes true, e.g. for a Section just added. */
     autofocus?: boolean;
     /** Makes the Section's changes, saves the Lines typed, and holds the edits typed here while they aren't saved. */
@@ -132,26 +136,21 @@
     if (await editing.change({ kind: 'deleteAlternate', alternateId: alt.id })) radio(active.id)?.focus();
   }
 
-  async function moveToScrapbook(alt: Alternate) {
+  /**
+   * Makes what moving an Alternate out comes to (see sectionMoves.ts). Such a
+   * move says nothing and leaves no editor behind, so there's nothing in it to
+   * say or to close.
+   */
+  async function moveAlternate(move: SectionMove | null) {
+    if (!move) return;
     // Its ⋯ goes with it: the keyboard carries on from the active card.
-    if (await editing.change({ kind: 'moveAlternateToScrapbook', alternateId: alt.id })) radio(active.id)?.focus();
-  }
-
-  async function moveToArrangement(alt: Alternate, position: number) {
-    // Its ⋯ goes with it: the keyboard carries on from the active card.
-    if (await editing.change({ kind: 'moveAlternateToArrangement', alternateId: alt.id, position })) {
-      radio(active.id)?.focus();
-    }
+    if (await editing.change(move.change)) radio(active.id)?.focus();
   }
 
   // Dragged by its card's grip, an inactive Alternate goes into a gap in the
-  // Lyric Sheet or onto the Scrapbook, as a Section of its own.
-  function dropAlternate(alt: Alternate) {
-    return (drop: Drop) => {
-      if ('alternateToArrangement' in drop) moveToArrangement(alt, drop.gap);
-      else if ('alternateToScrapbook' in drop) moveToScrapbook(alt);
-    };
-  }
+  // Lyric Sheet or onto the Scrapbook, as a Section of its own: where it lands
+  // says which, and the card hands it over as it is.
+  const dropAlternate = (drop: Drop) => moveAlternate(dropMove(sheet, drop));
 
   // What an inactive Alternate's ⋯ does.
   function alternateActions(alt: Alternate): MenuAction[] {
@@ -160,14 +159,20 @@
         icon: X,
         label: 'Move to the Scrapbook',
         title: 'Move to the Scrapbook: keep it as a Section of its own, with its Cues',
-        run: () => moveToScrapbook(alt),
+        run: () => moveAlternate(sectionMove(sheet, { alternateIntoScrapbook: alt.id })),
       },
     ];
     if (places.length > 0) {
       actions.push({
         icon: ArrowRightFromLine,
         label: 'Move to the Lyric Sheet…',
-        choices: places.map((place) => ({ label: place.name, run: () => moveToArrangement(alt, place.position) })),
+        choices: places.map((place) => ({
+          label: place.name,
+          run: () =>
+            moveAlternate(
+              sectionMove(sheet, { alternateIntoArrangement: { alternateId: alt.id, position: place.position } }),
+            ),
+        })),
       });
     }
     actions.push({ icon: Trash2, label: 'Delete', run: () => remove(alt) });
@@ -268,7 +273,7 @@
                   class="grip"
                   aria-hidden="true"
                   title="Drag into the Lyric Sheet or onto the Scrapbook, as a Section of its own; Esc cancels"
-                  {...drag.grip({ alternate: alt.id }, dropAlternate(alt))}><GripVertical /></span
+                  {...drag.grip({ alternate: alt.id }, dropAlternate)}><GripVertical /></span
                 >
               {/if}
               <input

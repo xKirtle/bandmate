@@ -6,6 +6,8 @@
   import type { LyricSheetEditing } from './lyricSheetEditing.svelte';
   import type { Drop } from './sectionDrag';
   import type { SectionDragging } from './sectionDragging.svelte';
+  import { dropMove, sectionMove, type SectionMove } from './sectionMoves';
+  import type { SheetNotice } from './sheetNotice.svelte';
   import ActionsMenu from './ActionsMenu.svelte';
   import SectionEditor from './SectionEditor.svelte';
   import type { CaretListener } from './lyricsLanguage';
@@ -16,6 +18,7 @@
     drag,
     editing,
     onCaret,
+    notice,
   }: {
     song: Song;
     /** The drag of a Section, shared with the Lyric Sheet. */
@@ -28,6 +31,8 @@
     editing: LyricSheetEditing;
     /** Given, as in Rhyme mode, hears where the caret is in the open Section's Lines, to suggest Rhymes. */
     onCaret?: CaretListener;
+    /** What the Lyric Sheet says about a Section just moved, which a Section moved out of here says too. */
+    notice: SheetNotice;
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
@@ -98,42 +103,38 @@
   function putBackMenu(sectionId: number) {
     return putBackActions(
       inArrangement,
-      (position) => editing.change({ kind: 'addToArrangement', sectionId, position }).then(closed(sectionId)),
-      (targetId) => addTo(sectionId, targetId),
+      (position) => apply(sectionMove(song, { intoArrangement: { sectionId, position } })),
+      (targetId) => apply(sectionMove(song, { ontoSection: { sectionId, targetId } })),
     );
-  }
-
-  // Everything still being typed in its editor is sent first, by Lyric Sheet
-  // editing, which leaves the caret where it is (see LyricSheetEditing.change).
-  function addTo(sectionId: number, targetId: number) {
-    editing.change({ kind: 'addToSection', sectionId, targetId }).then(closed(sectionId));
   }
 
   // On desktop, a Section is also dragged by its grip into a gap in the Lyric
   // Sheet, putting it back there, or onto a Section in it, adding it there,
-  // as "Put back…" does.
+  // as "Put back…" does. Where it lands and what that comes to is worked out
+  // in one place (see sectionMoves.ts), for the drag and the menu alike.
   function dropSection(drop: Drop) {
-    if ('putBack' in drop) {
-      const section = drop.putBack;
-      editing.change({ kind: 'addToArrangement', sectionId: section, position: drop.gap }).then(closed(section));
-    } else if ('addTo' in drop && 'section' in drop.addTo.dragged) {
-      const { dragged, arrangementAt } = drop.addTo;
-      const target = song.arrangement[arrangementAt];
-      if (target !== undefined) addTo(dragged.section, target);
-    }
+    apply(dropMove(song, drop));
   }
 
-  /** After a Section leaves the Scrapbook: should it come back, it does so as a card. */
-  function closed(sectionId: number) {
-    return (ok: boolean) => {
-      if (!ok || open !== sectionId) return;
-      open = null;
-    };
+  /**
+   * Makes a move's change, saying what it says in the Lyric Sheet once it's
+   * saved, and closing the editor of a Section that's left the Scrapbook:
+   * should it come back, it does so as a card. Everything still being typed in
+   * a Section remade is sent first, by Lyric Sheet editing, which leaves the
+   * caret where it is (see LyricSheetEditing.change).
+   */
+  async function apply(move: SectionMove | null) {
+    if (!move) return;
+    if (!(await editing.change(move.change))) return;
+    if (move.notice) notice.say(move.notice);
+    if (move.closes !== null && open === move.closes) open = null;
   }
 
-  // Deleting doesn't ask first: Undo brings it back, and Snapshots do after leaving.
-  function remove(sectionId: number) {
-    editing.change({ kind: 'deleteSection', sectionId }).then(closed(sectionId));
+  // Deleting doesn't ask first: Undo brings it back, and Snapshots do after
+  // leaving. It isn't a move out, so it says nothing.
+  async function remove(sectionId: number) {
+    if (!(await editing.change({ kind: 'deleteSection', sectionId }))) return;
+    if (open === sectionId) open = null;
   }
 </script>
 
@@ -150,6 +151,7 @@
           {#if open === section.id}
             <SectionEditor
               {section}
+              sheet={song}
               autofocus={focusing === section.id}
               {editing}
               more={[{ icon: Trash2, label: 'Delete', run: () => remove(section.id) }]}

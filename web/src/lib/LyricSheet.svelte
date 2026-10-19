@@ -36,18 +36,11 @@
   import ReadingMenu from './ReadingMenu.svelte';
   import type { LyricSheetEditing } from './lyricSheetEditing.svelte';
   import SectionEditor from './SectionEditor.svelte';
-  import { moveTo, type Drop } from './sectionDrag';
+  import type { Drop } from './sectionDrag';
   import type { SectionDragging } from './sectionDragging.svelte';
-  import {
-    activeAlternate,
-    addedNotice,
-    describe,
-    isEmpty,
-    lineName,
-    ofSection,
-    places,
-    sectionsInArrangement,
-  } from './sections';
+  import { dropMove, sectionMove, type SectionMove } from './sectionMoves';
+  import type { SheetNotice } from './sheetNotice.svelte';
+  import { activeAlternate, describe, isEmpty, lineName, ofSection, places, sectionsInArrangement } from './sections';
   import type { Mode } from './songMode';
   import { rebound } from './shortcutKeys';
   import { cuesNextLine } from './syncKeys';
@@ -71,6 +64,7 @@
     syncMode,
     rhymeMode,
     onCaret,
+    notice,
   }: {
     song: Song;
     /** The Song page's mode: Write edits the raw text; Read shows Chords above the lyrics. */
@@ -103,6 +97,8 @@
     rhymeMode: RhymeMode;
     /** Given, as in Rhyme mode, hears where the caret is in a Section's Lines, to suggest Rhymes. */
     onCaret?: CaretListener;
+    /** What the Lyric Sheet says about a Section just moved, which it shows, said from here and the Scrapbook alike. */
+    notice: SheetNotice;
   } = $props();
 
   const sections = $derived(new Map(song.sections.map((s) => [s.id, s])));
@@ -138,13 +134,16 @@
       actions.push({
         icon: ArrowLeftRight,
         label: 'Add as an Alternate of…',
-        choices: others.map((other) => ({ label: describe(other), run: () => addTo(section, other) })),
+        choices: others.map((other) => ({
+          label: describe(other),
+          run: () => apply(sectionMove(song, { ontoSection: { sectionId: section.id, targetId: other.id } })),
+        })),
       });
     }
     actions.push({
       icon: X,
       ...removal(section),
-      run: () => editing.change({ kind: 'removeFromArrangement', sectionId: section.id }),
+      run: () => apply(sectionMove(song, { outOfArrangement: section.id })),
     });
     return actions;
   }
@@ -309,8 +308,7 @@
   }
 
   function move(index: number, by: -1 | 1) {
-    const order = moveTo(song.arrangement, index, index + by);
-    editing.change({ kind: 'reorderArrangement', order });
+    apply(sectionMove(song, { within: { from: index, to: index + by } }));
   }
 
   // On desktop, a Section is also dragged by the grip on its header: within
@@ -323,49 +321,25 @@
   // added to.
   const dropOnto = $derived(drag.drop && 'addTo' in drag.drop ? drag.drop.addTo.arrangementAt : null);
 
+  // Where a Section dropped by its grip lands, and what that comes to, is
+  // worked out in one place (see sectionMoves.ts), as it is for the ↑ and ↓
+  // and the menu choices that move a Section from the keyboard.
   function dropSection(drop: Drop) {
-    if ('reorder' in drop) {
-      const { from, to } = drop.reorder;
-      const order = moveTo(song.arrangement, from, to);
-      editing.change({ kind: 'reorderArrangement', order });
-    } else if ('toScrapbook' in drop) {
-      toScrapbook(drop.toScrapbook);
-    } else if ('addTo' in drop && 'arrangementAt' in drop.addTo.dragged) {
-      const from = sections.get(song.arrangement[drop.addTo.dragged.arrangementAt]);
-      const to = sections.get(song.arrangement[drop.addTo.arrangementAt]);
-      if (from && to) addTo(from, to);
-    }
+    apply(dropMove(song, drop));
   }
 
-  // A Section added to another leaves the Lyric Sheet, its Alternates joining
-  // the other's, inactive, which a notice says: it isn't asked first, and
-  // it's undone by moving them to the Scrapbook and back.
-  //
-  // Everything still being typed in its editor is sent first, by Lyric Sheet
-  // editing, which leaves the caret where it is (see LyricSheetEditing.change).
-  async function addTo(section: Section, to: Section) {
-    const said = addedNotice(section, to);
-    if (await editing.change({ kind: 'addToSection', sectionId: section.id, targetId: to.id })) notice = said;
+  /**
+   * Makes a move's change, saying what it says once it's saved. A Section
+   * added to another, or taken out, isn't asked first: it's undone by moving
+   * it back. Everything still being typed in a Section remade is sent first,
+   * by Lyric Sheet editing, which leaves the caret where it is (see
+   * LyricSheetEditing.change).
+   */
+  async function apply(move: SectionMove | null) {
+    if (!move) return;
+    if (!(await editing.change(move.change))) return;
+    if (move.notice) notice.say(move.notice);
   }
-
-  // Dropped on the Scrapbook, a Section goes to its end, or isn't kept if
-  // nothing is written in it, which a notice says.
-  async function toScrapbook(index: number) {
-    const section = sections.get(song.arrangement[index]);
-    if (!section) return;
-    const empty = isEmpty(section);
-    const name = describe(section);
-    if ((await editing.change({ kind: 'removeFromArrangement', sectionId: section.id })) && empty) {
-      notice = `Nothing was written in ${name}, so it wasn't kept.`;
-    }
-  }
-
-  let notice = $state<string | null>(null);
-  $effect(() => {
-    if (!notice) return;
-    const shown = setTimeout(() => (notice = null), 5000);
-    return () => clearTimeout(shown);
-  });
 
   function onKey(event: KeyboardEvent) {
     if (drag.current && event.key === 'Escape') {
@@ -421,7 +395,7 @@
         canShiftEarlier={(step) => canShiftCuesEarlier(song, step)}
       />
     {/if}
-    <p class="notice muted" role="status">{notice ?? ''}</p>
+    <p class="notice muted" role="status">{notice.text ?? ''}</p>
     {#if syncMode.hint}
       <p class="sync-hint muted">
         Play, then press {cueNextWays} as each Line starts. Click a Line to start from it.
@@ -472,6 +446,7 @@
           >
             <SectionEditor
               {section}
+              sheet={song}
               autofocus={focusing === section.id}
               {editing}
               cueing={cueingFor(section)}

@@ -12,6 +12,7 @@
   import Masters from '../lib/Masters.svelte';
   import Scrapbook from '../lib/Scrapbook.svelte';
   import { dropsOnScrapbook } from '../lib/sectionDrag';
+  import { SheetNotice } from '../lib/sheetNotice.svelte';
   import { SectionDragging } from '../lib/sectionDragging.svelte';
   import EditCover from '../lib/EditCover.svelte';
   import SongCover from '../lib/SongCover.svelte';
@@ -234,6 +235,9 @@
     () => desktop.current && writing,
     () => (song ? `${song.arrangement}|${song.scrapbook}` : ''),
   );
+  // What the Lyric Sheet says about a Section just moved: the Lyric Sheet
+  // shows it, and a Section moved out of the Scrapbook says it there too.
+  const notice = new SheetNotice();
   // The shortcuts dialog, opened by its button or ?. Shortcuts are for a
   // keyboard and mouse, so the button never shows on a phone or a narrow
   // window, though ? still opens the dialog there.
@@ -682,6 +686,7 @@
           {syncMode}
           {rhymeMode}
           {onCaret}
+          {notice}
           hasClips={timeline?.tracks.some((t) => t.clips.length > 0) ?? false}
         />
       </div>
@@ -711,7 +716,7 @@
               />
             {:else}
               <summary><FoldChevron />Scrapbook</summary>
-              <Scrapbook {song} {drag} {editing} {onCaret} />
+              <Scrapbook {song} {drag} {editing} {onCaret} {notice} />
             {/if}
           </details>
         {/each}
@@ -744,7 +749,7 @@
               aria-labelledby="side-tab-scrapbook"
               hidden={sideTab !== 'scrapbook'}
             >
-              <Scrapbook {song} {drag} {editing} {onCaret} />
+              <Scrapbook {song} {drag} {editing} {onCaret} {notice} />
             </div>
             <div
               id="side-panel-masters"
