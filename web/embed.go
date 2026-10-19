@@ -7,8 +7,9 @@ import (
 	"io/fs"
 )
 
-// dist always contains .gitkeep, so the binary builds even before the SPA
-// has been built.
+// dist/.gitkeep is tracked in the repository, so all:dist always matches
+// something and the binary builds on a fresh clone, before the SPA has been
+// built.
 //
 //go:embed all:dist
 var dist embed.FS
