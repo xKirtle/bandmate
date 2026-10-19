@@ -10,9 +10,15 @@
 //   which may still be on its way as Sync mode comes on. Opening a Section
 //   in the Scrapbook, or a Section's Alternates, ends it too. Cue changes
 //   don't go through here, so never end it.
-// - Adding a Section to another makes its Alternates anew, so the Lines
-//   text still waiting in their text boxes is sent first, while it can
-//   still land on them.
+// - Adding a Section to another makes its Alternates anew, an unnamed one
+//   taking the Section's Label as its name, so everything being typed in
+//   that Section is sent first, while it can still land on it: its Label,
+//   its Alternates' names and the Lines text still waiting in their text
+//   boxes alike. A drag doesn't leave the field it started from, and
+//   nothing here leaves it for the user: what's typed is sent where it is,
+//   so the caret stays put, and a field being typed in anywhere else is
+//   left alone. What a field's own rule refuses isn't sent, and goes with
+//   the Section, as it would have on leaving the field.
 //
 // It makes a Section's Label and an Alternate's name fields typed in place
 // (see typedField.svelte.ts), and saves an Alternate's text as typed into
@@ -41,7 +47,8 @@ export class LyricSheetEditing {
 
   /**
    * Queues a change to the Lyric Sheet, ending Sync mode for it, and
-   * sending first the Lines text waiting in Alternates it makes anew.
+   * sending first everything being typed in a Section whose Alternates it
+   * makes anew.
    * Resolves to whether it was saved; a caller's code up to its next await
    * runs before the next change starts. Given the visit to a text field that
    * typed it, it's undone as one step with the visit's other changes.
@@ -50,7 +57,7 @@ export class LyricSheetEditing {
     if (endsSyncMode(change)) this.#endSyncMode();
     const remade = sectionRemadeBy(change);
     if (remade !== null) {
-      for (const entry of this.#saves.typingIn(remade)) if (entry instanceof TextBox) entry.saveNow();
+      for (const entry of this.#saves.typingIn(remade)) entry.saveNow();
     }
     return this.#saves.changeLyricSheet(change, visit);
   };
@@ -142,9 +149,11 @@ function endsSyncMode(change: LyricSheetChange): boolean {
 }
 
 /**
- * The Section whose Alternates a change makes anew, so text sent to them
- * after it would be lost: one added to another. (Moving an Alternate out
- * makes it anew too, but only an inactive one, which has no text box.)
+ * The Section whose Alternates a change makes anew, so anything sent to
+ * them after it would be lost: one added to another. (Moving an Alternate
+ * out makes that one anew too, but only an inactive one, which has no text
+ * box; its name, typed on its card, is left as it was, saved as the card is
+ * left.)
  */
 function sectionRemadeBy(change: LyricSheetChange): number | null {
   return change.kind === 'addToSection' ? change.sectionId : null;
@@ -276,7 +285,7 @@ export class TextBox implements Typing {
     this.#settle();
   };
 
-  /** Saves at once what's waiting or failed last time, e.g. before its Alternate is made anew. */
+  /** Saves at once what's waiting or failed last time, e.g. before its Alternate is made anew (see Typing). */
   saveNow() {
     if (this.#timer !== undefined || this.#failed) void this.#save();
   }

@@ -87,6 +87,21 @@ describe('TypedField', () => {
     expect(field.message).toBeNull();
   });
 
+  it('sends what’s typed now, asked to, and keeps it with its message if its parse refuses it', async () => {
+    const { server, saves, field } = await keyField();
+    field.shown = 'Am';
+    field.saveNow();
+    await settled();
+    expect(server.song.key).toBe('Am');
+    expect(saves.unsaved).toBe(false);
+    field.shown = 'H';
+    field.saveNow();
+    await settled();
+    expect(server.song.key).toBe('Am');
+    expect(field.shown).toBe('H');
+    expect(field.message).toBe('H isn’t a Key');
+  });
+
   it('cancels what’s typed, showing what’s saved again', async () => {
     const { saves, field, committed } = await keyField();
     field.shown = 'H';
@@ -336,7 +351,7 @@ describe('Saves, the list of edits being typed', () => {
   it('reports unsaved edits while an edit on it isn’t saved, until it leaves', async () => {
     const server = new FakeSongServer();
     const saves = await savesFor(server);
-    const label = { unsaved: false, typed: 0, section: 3 };
+    const label = { unsaved: false, typed: 0, section: 3, saveNow: () => {} };
     const leave = saves.typing(label);
     expect(saves.unsaved).toBe(false);
     label.unsaved = true;

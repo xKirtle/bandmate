@@ -103,12 +103,9 @@
     );
   }
 
+  // Everything still being typed in its editor is sent first, by Lyric Sheet
+  // editing, which leaves the caret where it is (see LyricSheetEditing.change).
   function addTo(sectionId: number, targetId: number) {
-    // Its Alternates are made anew in the Section they join, and an unnamed
-    // one is named after its Label, so a Label or an Alternate name still
-    // being typed in its open editor is saved first: they save as they blur,
-    // which a drag doesn't do. Lyric Sheet editing sends its Lines text first.
-    if (open === sectionId && document.activeElement instanceof HTMLElement) document.activeElement.blur();
     editing.change({ kind: 'addToSection', sectionId, targetId }).then(closed(sectionId));
   }
 

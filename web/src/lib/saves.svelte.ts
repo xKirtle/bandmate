@@ -79,6 +79,12 @@ export interface Typing {
   readonly typed: number;
   /** The Section it's typed in, if any. */
   readonly section?: number;
+  /**
+   * Sends what's typed now, rather than when the field would, e.g. before
+   * what it belongs to is made anew. Refused by the field's own rule, it
+   * stays where it is, unsaved.
+   */
+  saveNow(): void;
 }
 
 export interface SavesOptions {

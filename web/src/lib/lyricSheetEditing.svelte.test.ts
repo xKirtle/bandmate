@@ -465,6 +465,16 @@ const withBridge = () => {
   return { ...song, sections: [...song.sections, bridge], scrapbook: [2] };
 };
 
+/** The Hook, a third Section at the end of the Arrangement, of one empty Alternate. */
+const withHook = (song: Song): Song => {
+  const hook = {
+    id: 3,
+    label: 'Hook',
+    alternates: [{ id: 3, name: '', active: true, lines: [] }],
+  };
+  return { ...song, arrangement: [...song.arrangement, 3], sections: [...song.sections, hook] };
+};
+
 describe('Lyric Sheet editing, a Label or an Alternate’s name typed as its Section goes', () => {
   it('drops what’s typed, sending nothing, with no save error', async () => {
     const server = new FakeSongServer(withBridge());
@@ -592,7 +602,7 @@ describe('Lyric Sheet editing, Sync mode', () => {
   });
 });
 
-describe('Lyric Sheet editing, saving waiting text first', () => {
+describe('Lyric Sheet editing, sending what’s being typed first', () => {
   it('sends the Lines text still waiting in a Section before adding it to another, in order', async () => {
     const server = new FakeSongServer(withBridge());
     const { saves, editing } = await editingFor(server);
@@ -637,6 +647,45 @@ describe('Lyric Sheet editing, saving waiting text first', () => {
     await vi.advanceTimersByTimeAsync(800);
     expect(server.landed).toBe(2);
     expect(textOf(server.song)).toBe('One\nTwo\nThree');
+  });
+
+  it('sends the Label being typed in a Section before adding it to another, which names its Alternate', async () => {
+    const server = new FakeSongServer(withBridge());
+    const { editing } = await editingFor(server);
+    const label = editing.sectionLabel(2);
+    label.shown = 'Middle 8';
+    // No blur: a drag by the grip leaves the Label being typed in.
+    expect(await editing.change({ kind: 'addToSection', sectionId: 2, targetId: 1 })).toBe(true);
+    expect(server.landed).toBe(2);
+    expect(server.song.sections[0].alternates[1].name).toBe('Middle 8');
+    expect(editing.unsavedIn(2)).toBe(false);
+  });
+
+  it("sends an Alternate's name being typed in a Section before adding it to another", async () => {
+    const server = new FakeSongServer(withBridge());
+    const { editing } = await editingFor(server);
+    const name = editing.alternateName(2, 2);
+    name.shown = 'Darker';
+    expect(await editing.change({ kind: 'addToSection', sectionId: 2, targetId: 1 })).toBe(true);
+    expect(server.landed).toBe(2);
+    expect(server.song.sections[0].alternates[1].name).toBe('Darker');
+    expect(editing.unsavedIn(2)).toBe(false);
+  });
+
+  it('leaves a field being typed in outside the Section alone, in the one added to and elsewhere', async () => {
+    const server = new FakeSongServer(withHook(withBridge()));
+    const { editing } = await editingFor(server);
+    // The Section added to, and a third Section nowhere near the change.
+    const verse = editing.sectionLabel(1);
+    const hook = editing.sectionLabel(3);
+    verse.shown = 'Chorus';
+    hook.shown = 'Outro';
+    expect(await editing.change({ kind: 'addToSection', sectionId: 2, targetId: 1 })).toBe(true);
+    expect(server.landed).toBe(1);
+    expect(server.song.sections.map((s) => s.label)).toEqual(['Verse', 'Hook']);
+    expect([verse.shown, hook.shown]).toEqual(['Chorus', 'Outro']);
+    expect(editing.unsavedIn(1)).toBe(true);
+    expect(editing.unsavedIn(3)).toBe(true);
   });
 });
 
