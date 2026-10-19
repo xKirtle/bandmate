@@ -90,7 +90,7 @@ export function songServer(id: number): SongServer {
 // the write against if the Song has since changed elsewhere.
 
 /** Sends a write to the Song, under /songs/<id>, returning the Song it leaves. */
-const onSheet =
+const onSong =
   (at: SongAt) =>
   (method: string, path: string, body?: unknown): Promise<Song> =>
     request<Song>(method, `/songs/${at.id}${path}`, body, at);
@@ -108,7 +108,7 @@ function onTracks(clips: readonly (PlacedClip | PastedClip)[]) {
 
 /** Sends a Cue change, returning the Song it leaves. */
 function sendCueChange(at: SongAt, change: CueChange): Promise<Song> {
-  const send = onSheet(at);
+  const send = onSong(at);
   switch (change.kind) {
     case 'setLineCue':
       return change.cue === null
@@ -127,7 +127,7 @@ function sendCueChange(at: SongAt, change: CueChange): Promise<Song> {
 
 /** Sends a Lyric Sheet change, returning the Song it leaves. */
 function sendLyricSheetChange(at: SongAt, change: LyricSheetChange): Promise<Song> {
-  const send = onSheet(at);
+  const send = onSong(at);
   switch (change.kind) {
     case 'addSection':
       return send('POST', '/sections', { position: change.position });
