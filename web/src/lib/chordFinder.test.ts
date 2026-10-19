@@ -818,6 +818,14 @@ describe('spelling suggestions', () => {
     ]);
   });
 
+  it('can look up and voice every Chord every Key suggests', () => {
+    for (const key of keys) {
+      const s = suggest(key);
+      const chords = s.kind === 'key' ? s.chords : [];
+      for (const c of chords) expect(firstVoicing(c.chord, context), c.chord).not.toBeNull();
+    }
+  });
+
   it('leaves a Key with no letter to reuse as it was: B, C and Db major', () => {
     expect(kind('B', 'diatonic')).toEqual(['I B', 'ii C#m', 'iii D#m', 'IV E', 'V F#', 'vi G#m', 'vii° A#dim']);
     expect(kind('C', 'diatonic')).toEqual(['I C', 'ii Dm', 'iii Em', 'IV F', 'V G', 'vi Am', 'vii° Bdim']);

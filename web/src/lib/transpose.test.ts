@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { commonKeys } from './api';
 import { keys as finderKeys } from './chordFinder';
-import { keys, readKey, transposeChord, transposeKey } from './transpose';
+import { keys, plainSignature, readKey, signature, transposeChord, transposeKey } from './transpose';
 
 describe('transposeChord', () => {
   it('moves the root by semitones', () => {
@@ -109,6 +109,25 @@ describe("transposeChord with the Song's key", () => {
     ] as const;
     for (const [key, by] of keys) {
       expect(naturals.map((n) => transposeChord(n, by, key))).toEqual(naturals.map((n) => transposeChord(n, by)));
+    }
+  });
+});
+
+describe('a signature spelled by letter', () => {
+  it('is the plain one but where the key has spent the letter: only F# major, whose F is E#', () => {
+    const changed = Array.from({ length: 12 }, (_, tonic) => {
+      const plain = plainSignature(tonic, false);
+      return signature(tonic, false).flatMap((spelling, semitone) =>
+        spelling === plain[semitone] ? [] : [`${plain[tonic]} major: ${plain[semitone]} is ${spelling}`],
+      );
+    }).flat();
+    expect(changed).toEqual(['F# major: F is E#']);
+  });
+
+  it('never needs a double accidental for a key offered', () => {
+    for (const key of keys) {
+      const read = readKey(key)!;
+      for (const spelling of read.signature) expect(spelling).toMatch(/^[A-G][#b]?$/);
     }
   });
 });

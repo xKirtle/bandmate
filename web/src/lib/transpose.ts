@@ -14,9 +14,9 @@ const flats: Spelling = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', '
 /**
  * Each major key's plain signature, by its note's semitone from C: Db, Eb, F,
  * Ab and Bb major have flats, the rest sharps. C major has none, so it keeps
- * the common spellings. A minor key has its relative major's. Plain, because
- * it writes every semitone with one of the twelve everyday letters, where the
- * key's own seven are spelled by letter on top of it.
+ * the common spellings. Plain, because every semitone takes one of the twelve
+ * everyday spellings, none of them a letter the key has spent already: the
+ * signature `byLetter` derives from it spells the key's own seven exactly.
  */
 const plainSignatures: Spelling[] = [
   common, // C
@@ -34,31 +34,6 @@ const plainSignatures: Spelling[] = [
 ];
 
 const naturals: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
-
-const letters = 'CDEFGAB';
-
-/** The major scale's semitones above its tonic. */
-const majorScale = [0, 2, 4, 5, 7, 9, 11];
-
-/**
- * A signature's spellings with the key's own seven notes spelled by letter:
- * each degree takes the next letter, then whatever accidental lands it on the
- * right pitch, since a scale uses each of the seven letters exactly once. So
- * F# major, F# G# A# B C# D# E#, spells semitone 5 E#, not F, and its vii° is
- * E#dim. The other five semitones keep the plain spelling, the one a note
- * outside the key is written with.
- */
-function byLetter(plain: Spelling, tonic: number): Spelling {
-  const spelled = [...plain];
-  const from = letters.indexOf(plain[tonic][0]);
-  majorScale.forEach((step, degree) => {
-    const letter = letters[(from + degree) % 7];
-    const at = (tonic + step) % 12;
-    const off = ((at - naturals[letter] + 18) % 12) - 6;
-    spelled[at] = letter + (off < 0 ? 'b'.repeat(-off) : '#'.repeat(off));
-  });
-  return spelled;
-}
 const accidentals: Record<string, number> = { '#': 1, '♯': 1, b: -1, '♭': -1, '': 0 };
 
 /** A readable note at the start of text: a capital A–G, optionally followed by #, b, ♯ or ♭. */
@@ -93,6 +68,33 @@ export function readRoot(text: string): { letter: string; semitone: number; leng
 /** A readable note moved by semitones, as its semitone from C, 0–11. */
 function semitone(m: RegExpExecArray, by: number): number {
   return (((naturals[m[1]] + accidentals[m[2]] + by) % 12) + 12) % 12;
+}
+
+/** The seven letters a scale steps through, in order, so the next one wraps round to C. */
+const letters = 'CDEFGAB';
+
+/** The major scale's semitones above its tonic. */
+const majorScale = [0, 2, 4, 5, 7, 9, 11];
+
+/**
+ * A plain signature with the key's own seven notes spelled by letter: each
+ * degree takes the next letter, then whatever accidental lands it on the
+ * right pitch, since a scale uses each of the seven letters exactly once. So
+ * F# major, F# G# A# B C# D# E#, spells semitone 5 E#, not F, and its vii° is
+ * E#dim. The other five semitones keep the plain spelling, the one a note
+ * outside the key is written with.
+ */
+function byLetter(plain: Spelling, tonic: number): Spelling {
+  const spelled = [...plain];
+  const first = letters.indexOf(plain[tonic][0]);
+  majorScale.forEach((step, degree) => {
+    const letter = letters[(first + degree) % 7];
+    const semitone = (tonic + step) % 12;
+    // How far the letter is from the pitch, as -5…6, so the accidental is the shorter way round.
+    const accidental = ((semitone - naturals[letter] + 18) % 12) - 6;
+    spelled[semitone] = letter + (accidental < 0 ? 'b'.repeat(-accidental) : '#'.repeat(accidental));
+  });
+  return spelled;
 }
 
 /** Each major key's signature with its own seven notes spelled by letter. */
