@@ -34,6 +34,7 @@
   import type { SyncMode } from './syncMode.svelte';
   import { editHint, type Freeze } from './freeze';
   import { draggedFiles, fileDropTrack, type TrackRow } from './fileDrop';
+  import { nearestRow } from './gripDragging.svelte';
   import { keyHints } from './keyHints';
   import { formatVolume, maxVolume, minVolume, trackGains } from './mixer';
   import type { MenuAction } from './menu';
@@ -475,7 +476,7 @@
     () => trackIds.join(),
   );
   // The gap between Tracks the dragged one would drop into, if it moves at all.
-  const trackGap = $derived(trackDrag.current?.drop?.gap ?? null);
+  const trackGap = $derived(trackDrag.drop?.gap ?? null);
 
   function dropTrack(drop: TrackDrop) {
     editing.edit({ kind: 'reorderTracks', order: tracksDropped(trackIds, drop) });
@@ -1181,17 +1182,9 @@
 
   /** The Track whose lane is nearest to a height on the page. */
   function trackAt(clientY: number): number {
-    let best = 0;
-    let distance = Infinity;
     // Only the lanes of Tracks there now: a removed Track's may linger.
-    timeline.tracks.forEach((_, i) => {
-      const lane = laneElements[i];
-      if (!lane) return;
-      const box = lane.getBoundingClientRect();
-      const d = clientY < box.top ? box.top - clientY : clientY > box.bottom ? clientY - box.bottom : 0;
-      if (d < distance) [best, distance] = [i, d];
-    });
-    return timeline.tracks[best].id;
+    const lanes = timeline.tracks.map((_, i) => laneElements[i]?.getBoundingClientRect() ?? null);
+    return timeline.tracks[nearestRow(clientY, lanes) ?? 0].id;
   }
 
   // The Tracks area's height, dragged by the Timeline's top edge. Null is the
@@ -1874,14 +1867,14 @@
             class="head"
             class:chosen={track.id === chosen}
             class:file-target={track.id === fileTarget}
-            class:dragged={trackDrag.current?.from === i}
+            class:dragged={trackDrag.current?.dragged === i}
             class:drop-above={trackGap === i}
             class:drop-below={trackGap === timeline.tracks.length && i === timeline.tracks.length - 1}
             role="group"
             aria-label="Track {track.name}"
             aria-current={track.id === chosen ? 'true' : undefined}
             onclick={(e) => headClick(e, track)}
-            {@attach (el) => trackDrag.placeHead(el, i)}
+            {@attach (el) => trackDrag.placeRow(el, i)}
           >
             {#if editable.current}
               <!-- Pointer only: ↑ and ↓ move it from the keyboard. Its room stays while recording, so the lanes don't shift. -->
@@ -2069,7 +2062,7 @@
               <div
                 class="lane"
                 class:file-target={track.id === fileTarget}
-                class:dragged={trackDrag.current?.from === t}
+                class:dragged={trackDrag.current?.dragged === t}
                 class:drop-above={trackGap === t}
                 class:drop-below={trackGap === shown.length && t === shown.length - 1}
                 bind:this={laneElements[t]}

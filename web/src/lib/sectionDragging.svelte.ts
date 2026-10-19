@@ -1,5 +1,5 @@
-import { untrack } from 'svelte';
-import { dropFor, dropTarget, type Box, type Drop, type Dragged, type Target } from './sectionDrag';
+import { GripDragging, type At, type Span } from './gripDragging.svelte';
+import { dropFor, dropTarget, type Box, type Dragged, type Drop, type Target } from './sectionDrag';
 
 // On desktop in Write mode, a Section is dragged by the grip on its header:
 // within the Arrangement, from it to the Scrapbook or onto another Section in
@@ -8,13 +8,11 @@ import { dropFor, dropTarget, type Box, type Drop, type Dragged, type Target } f
 // as a Section of its own. Pointer events rather than HTML5 drag and drop,
 // so the drop shows between Sections and Esc cancels. One drag is shared by
 // the Lyric Sheet and the Scrapbook, as a drag goes from one to the other.
-export class SectionDragging {
-  /** The drag under way: what's dragged, where it would drop, and where the pointer is. */
-  current = $state<{ dragged: Dragged; target: Target | null; x: number; y: number } | null>(null);
-  /** What letting go now would do, if anything. */
-  readonly drop: Drop | null = $derived(this.current && dropFor(this.current.dragged, this.current.target));
-  /** Whether Sections can be dragged at all. */
-  readonly on: boolean = $derived.by(() => this.#enabled());
+// The drag itself is gripDragging's, with the Sections' rule for where it
+// aims and what dropping there does handed to it: a Section's place in the
+// Arrangement is a row, and the Arrangement's and the Scrapbook's own
+// columns are measured here beside them.
+export class SectionDragging extends GripDragging<Dragged, Target, Drop> {
   /** The place in the Arrangement of the Lyric Sheet Section being dragged, if one is. */
   readonly arrangementAt: number | null = $derived.by(() => {
     const dragged = this.current?.dragged;
@@ -32,11 +30,6 @@ export class SectionDragging {
     return dragged && 'alternate' in dragged ? dragged.alternate : null;
   });
 
-  #enabled: () => boolean;
-  #order: string = $derived.by(() => this.#orderOf());
-  #orderOf: () => string;
-  // Each Lyric Sheet Section's place on the page, by its place in the Arrangement.
-  #sections = new Map<number, HTMLElement>();
   #arrangement: HTMLElement | null = null;
   #scrapbook: HTMLElement | null = null;
 
@@ -49,27 +42,7 @@ export class SectionDragging {
    * what's being dragged. Other changes to the Song leave the drag be.
    */
   constructor(enabled: () => boolean, order: () => string) {
-    this.#enabled = enabled;
-    this.#orderOf = order;
-    $effect(() => {
-      if (!this.on) untrack(() => this.cancel());
-    });
-    $effect(() => {
-      void this.#order;
-      untrack(() => this.cancel());
-    });
-  }
-
-  cancel() {
-    this.current = null;
-  }
-
-  /** Attaches a Lyric Sheet Section's place on the page, at `index` in the Arrangement. */
-  placeSection(el: HTMLElement, index: number) {
-    this.#sections.set(index, el);
-    return () => {
-      if (this.#sections.get(index) === el) this.#sections.delete(index);
-    };
+    super({ enabled, order });
   }
 
   /** Attaches the Arrangement's place on the page: its column is where a Section drops into it. */
@@ -88,26 +61,21 @@ export class SectionDragging {
     };
   };
 
-  /** Aims the drag at where the pointer is, e.g. again as the page scrolls under it. */
-  aim(x: number, y: number) {
-    if (this.current) this.current = { ...this.current, target: this.#targetAt(this.current.dragged, x, y), x, y };
-  }
-
-  #targetAt(dragged: Dragged, x: number, y: number): Target | null {
+  protected targetAt(dragged: Dragged, at: At, rows: readonly (Span | null)[]): Target | null {
     const arrangement = this.#arrangement?.getBoundingClientRect();
     if (!arrangement) return null;
     // A Section not on the page has its gaps counted above the pointer.
-    const count = Math.max(-1, ...this.#sections.keys()) + 1;
-    const spans = Array.from({ length: count }, (_, i) => {
-      const box = this.#sections.get(i)?.getBoundingClientRect();
-      return box ? { top: box.top, bottom: box.bottom } : { top: -Infinity, bottom: -Infinity };
-    });
+    const spans = rows.map((row) => row ?? { top: -Infinity, bottom: -Infinity });
     // A Section drops onto any Section in the Arrangement but itself: over
     // itself, it's still in the gaps either side. An Alternate only drops
     // between Sections, to be one of its own.
     const canDropOnto = (at: number) =>
       'section' in dragged || ('arrangementAt' in dragged && at !== dragged.arrangementAt);
-    return dropTarget({ x, y }, this.#scrapbookBox(), arrangement, spans, canDropOnto);
+    return dropTarget(at, this.#scrapbookBox(), arrangement, spans, canDropOnto);
+  }
+
+  protected dropFor(dragged: Dragged, target: Target | null): Drop | null {
+    return dropFor(dragged, target);
   }
 
   // Only the part of the Scrapbook in view in its column can be dropped on.
@@ -120,28 +88,6 @@ export class SectionDragging {
       right: Math.min(box.right, column.right),
       top: Math.max(box.top, column.top),
       bottom: Math.min(box.bottom, column.bottom),
-    };
-  }
-
-  /**
-   * The pointer handlers for a grip dragging `dragged`, dropping by
-   * `onDrop` what letting go does.
-   */
-  grip(dragged: Dragged, onDrop: (drop: Drop) => void) {
-    return {
-      onpointerdown: (e: PointerEvent & { currentTarget: HTMLElement }) => {
-        if (e.button !== 0) return;
-        e.preventDefault();
-        e.currentTarget.setPointerCapture(e.pointerId);
-        this.current = { dragged, target: this.#targetAt(dragged, e.clientX, e.clientY), x: e.clientX, y: e.clientY };
-      },
-      onpointermove: (e: PointerEvent) => this.aim(e.clientX, e.clientY),
-      onpointerup: () => {
-        const drop = this.drop;
-        this.cancel();
-        if (drop) onDrop(drop);
-      },
-      onpointercancel: () => this.cancel(),
     };
   }
 }

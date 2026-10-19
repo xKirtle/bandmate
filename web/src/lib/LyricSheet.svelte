@@ -472,7 +472,7 @@
             class:drop-below={dropAt === song.arrangement.length && i === song.arrangement.length - 1}
             class:drop-onto={dropOnto === i}
             data-section={sectionId}
-            {@attach (el) => drag.placeSection(el, i)}
+            {@attach (el) => drag.placeRow(el, i)}
           >
             <SectionEditor
               {section}

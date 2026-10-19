@@ -506,7 +506,7 @@
     style:left="{dragging.current.x}px"
     style:top="{dragging.current.y}px"
   >
-    {dragging.current.song.title}
+    {dragging.current.dragged.title}
   </div>
 {/if}
 
