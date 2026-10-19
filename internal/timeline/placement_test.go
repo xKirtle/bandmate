@@ -284,7 +284,14 @@ func TestTrimming(t *testing.T) {
 	slowed.Tempo = 0.5
 	faded := beatClip(3, 200, 20)
 	faded.FadeIn, faded.FadeOut = 6, 6
-	tracks := [][]Clip{{beatClip(1, 10, 20), slowed, faded}}
+	// Trimmed in at its start, so trimming it back out moves its start
+	// towards 0:00, and past it if the trim goes far enough.
+	trimmedIn := beatClip(4, 2, 5)
+	trimmedIn.Offset = 10
+	// Trimmed in at its start too, with the Clip at 0:10 to 0:30 before it.
+	after := beatClip(5, 35, 5)
+	after.Offset = 10
+	tracks := [][]Clip{{trimmedIn, beatClip(1, 10, 20), after, slowed, faded}}
 	tests := []struct {
 		name           string
 		clipID         int64
@@ -338,6 +345,26 @@ func TestTrimming(t *testing.T) {
 			name:   "a Clip trimmed to no length at all",
 			clipID: 1, offset: 5, length: 0,
 			refusal: "a Clip must play for some time",
+		},
+		{
+			name: "a Clip trimmed back out so far that it would start before 0:00",
+			// It plays its source from 0:10 and starts at 0:02, so trimming
+			// back to the start of its source takes it to 0:08 before 0:00.
+			clipID: 4, offset: 0, length: 15,
+			refusal: "a Clip can't start before 0:00",
+		},
+		{
+			name: "a Clip trimmed out into the next Clip on its Track",
+			// 0:10 to 0:40, over the Clip at 0:35.
+			clipID: 1, offset: 0, length: 30,
+			refusal: "Clips can't overlap on a Track",
+		},
+		{
+			name: "a Clip trimmed back out into the Clip before it",
+			// Back to the start of its source, so from 0:25 rather than
+			// 0:35, over the Clip ending at 0:30.
+			clipID: 5, offset: 0, length: 15,
+			refusal: "Clips can't overlap on a Track",
 		},
 		{
 			name:   "a Clip that isn't on the Timeline",
@@ -1091,6 +1118,21 @@ func TestSettingTakes(t *testing.T) {
 			refusal: "a Clip's Fades can't together run longer than it",
 		},
 		{
+			name: "a Clip with Fades set to a window too short for them, which shorten to fit",
+			clips: func() []Clip {
+				c := clips()
+				c[0].FadeIn, c[0].FadeOut = 5, 3
+				return c
+			}(),
+			takes: takes[:1],
+			set: ClipTakes{Takes: []TakeAt{{ID: 7}}, ActiveTakeID: idOf(7),
+				Start: 10, Offset: 0, Length: 4},
+			want:      where{clipID: 1, trackID: 1, start: 10, length: 4},
+			wantIDs:   []int64{7},
+			wantAt:    []float64{0},
+			wantFades: Fades{In: 2.5, Out: 1.5},
+		},
+		{
 			name:  "a Clip of a Beat",
 			clips: []Clip{beatClip(1, 10, 10)},
 			takes: takes[:1],
@@ -1359,6 +1401,21 @@ func TestNudgingTake(t *testing.T) {
 			refusal: "a Clip can't play past the end of its source",
 		},
 		{
+			name: "a Take nudged in a slowed Clip, which nudges it in the recording's own time",
+			// At half speed the Clip plays 0:00 to 0:05 of its Takes' span
+			// over 0:10 to 0:20, and a 2-second nudge is 2 seconds of the
+			// recording, not of the Timeline.
+			clip: func() Clip {
+				c := takesClip(1, 10, 0, 10, Take{ID: 7, Number: 1})
+				c.Tempo = 0.5
+				return c
+			}(),
+			takeID: 7,
+			nudge:  -2,
+			want:   where{clipID: 1, trackID: 1, start: 10, offset: 2, length: 10},
+			wantAt: []float64{0},
+		},
+		{
 			name:    "a Take that isn't in the Clip",
 			clip:    takesClip(1, 10, 0, 10, Take{ID: 7, Number: 1}),
 			takeID:  9,
@@ -1472,14 +1529,29 @@ func TestReordering(t *testing.T) {
 }
 
 func TestSettingTempos(t *testing.T) {
+	// faded is a Clip with a Fade at each end, to see a Tempo change scale
+	// them with its length, keeping them on the same audio.
+	faded := func(c Clip) Clip {
+		c.FadeIn, c.FadeOut = 4, 3
+		return c
+	}
 	tests := []struct {
 		name       string
 		tracks     [][]Clip
 		tempos     []ClipTempo
 		want       []where
 		wantTracks []string
+		wantFades  *Fades
 		refusal    string
 	}{
+		{
+			name:       "a slowed Clip's Fades scale with its length",
+			tracks:     [][]Clip{{faded(beatClip(1, 0, 16))}},
+			tempos:     []ClipTempo{{ClipID: 1, Tempo: 0.8}},
+			want:       []where{{clipID: 1, trackID: 1, length: 20}},
+			wantTracks: []string{""},
+			wantFades:  &Fades{In: 5, Out: 3.75},
+		},
 		{
 			name:   "one Clip sped up and another slowed, both still fitting",
 			tracks: [][]Clip{{beatClip(1, 0, 10), beatClip(2, 20, 10)}},
@@ -1537,6 +1609,12 @@ func TestSettingTempos(t *testing.T) {
 			}
 			if got := trackNames(after); !reflect.DeepEqual(got, tt.wantTracks) {
 				t.Errorf("the Tracks = %v, want %v", got, tt.wantTracks)
+			}
+			if tt.wantFades != nil {
+				_, c, _ := after.clip(tt.tempos[0].ClipID)
+				if got := c.fades(); got != *tt.wantFades {
+					t.Errorf("its Fades = %+v, want %+v", got, *tt.wantFades)
+				}
 			}
 		})
 	}
@@ -1599,6 +1677,88 @@ func TestSplitting(t *testing.T) {
 				t.Errorf("the halves = %+v, want %+v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestSplittingASlowedClip(t *testing.T) {
+	// At half speed, the Clip plays 0:00 to 0:05 of its Beat over 0:00 to
+	// 0:10 of the Timeline, so a cut halfway along it falls 2.5 seconds
+	// into the audio.
+	clip := beatClip(1, 0, 10)
+	clip.Tempo = 0.5
+	after, err := edited(timelineOf([]Clip{clip}), func(tl Timeline, ids *ids) (Timeline, error) {
+		return tl.splitting(1, 5, ids.clip(), splitTakes{})
+	})
+	if err != nil {
+		t.Fatalf("splitting error = %v", err)
+	}
+	want := []where{
+		{clipID: 1, trackID: 1, start: 0, offset: 0, length: 5},
+		{clipID: 2, trackID: 1, start: 5, offset: 2.5, length: 5},
+	}
+	if got := clipsIn(after); !reflect.DeepEqual(got, want) {
+		t.Errorf("the halves = %+v, want %+v", got, want)
+	}
+}
+
+func TestSplittingSeveralClipsAtOnce(t *testing.T) {
+	tl := timelineOf([]Clip{beatClip(1, 0, 10)}, []Clip{beatClip(2, 0, 10)})
+	clipIDs := []int64{1, 2}
+	after, err := edited(tl, func(tl Timeline, ids *ids) (Timeline, error) {
+		var err error
+		for _, id := range clipIDs {
+			if tl, err = tl.splitting(id, 4, ids.clip(), splitTakes{}); err != nil {
+				return Timeline{}, err
+			}
+		}
+		return tl, nil
+	})
+	if err != nil {
+		t.Fatalf("splitting error = %v", err)
+	}
+	// Each Clip cut at the same time, in one change.
+	want := []where{
+		{clipID: 1, trackID: 1, start: 0, offset: 0, length: 4},
+		{clipID: 3, trackID: 1, start: 4, offset: 4, length: 6},
+		{clipID: 2, trackID: 2, start: 0, offset: 0, length: 4},
+		{clipID: 4, trackID: 2, start: 4, offset: 4, length: 6},
+	}
+	if got := clipsIn(after); !reflect.DeepEqual(got, want) {
+		t.Errorf("the halves = %+v, want %+v", got, want)
+	}
+}
+
+func TestSplittingAClipOfTakes(t *testing.T) {
+	// A Clip of two Takes, 0:00 to 0:20 of their span, cut at 0:08.
+	clip := takesClip(1, 0, 0, 20, Take{ID: 7, Number: 1}, Take{ID: 8, Number: 2, Position: 10})
+	// The copies of its Takes, as the change stores them before the edit
+	// places them, which the right half plays.
+	copies := []Take{{ID: 9, Number: 1, Duration: 10}, {ID: 10, Number: 2, Duration: 10, Position: 10}}
+	after, err := edited(timelineOf([]Clip{clip}), func(tl Timeline, ids *ids) (Timeline, error) {
+		return tl.splitting(1, 8, ids.clip(), splitTakes{takes: copies, active: idOf(9)})
+	})
+	if err != nil {
+		t.Fatalf("splitting error = %v", err)
+	}
+	want := []where{
+		{clipID: 1, trackID: 1, start: 0, offset: 0, length: 8},
+		{clipID: 2, trackID: 1, start: 8, offset: 8, length: 12},
+	}
+	if got := clipsIn(after); !reflect.DeepEqual(got, want) {
+		t.Errorf("the halves = %+v, want %+v", got, want)
+	}
+	// The left half keeps the Clip's Takes and the right half the copies,
+	// so a change to one leaves the other's alone.
+	_, left, _ := after.clip(1)
+	if want := []int64{7, 8}; !reflect.DeepEqual(takeIDsIn(left), want) {
+		t.Errorf("the left half's Takes = %v, want %v", takeIDsIn(left), want)
+	}
+	_, right, _ := after.clip(2)
+	if want := []int64{9, 10}; !reflect.DeepEqual(takeIDsIn(right), want) {
+		t.Errorf("the right half's Takes = %v, want %v", takeIDsIn(right), want)
+	}
+	if right.ActiveTakeID == nil || *right.ActiveTakeID != 9 {
+		t.Errorf("the right half plays Take %v, want 9", right.ActiveTakeID)
 	}
 }
 
