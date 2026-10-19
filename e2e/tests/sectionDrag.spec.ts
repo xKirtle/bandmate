@@ -6,7 +6,8 @@ import { middleOf, type Point } from '../songPage';
 // Dragging a Section by the grip on its header, on a Song of three Sections:
 // to a new place in the Arrangement, or onto another Section to add it to it.
 // Esc gives the drag up. A Section added to another is remade, so what's
-// being typed in it is saved first, and the caret stays where it is.
+// being typed in it is saved first, and the caret stays where it is. What a
+// move says, the Lyric Sheet says, however the move was made.
 
 /** The labels of a Song's Sections, in the order the Arrangement has them on the server. */
 async function serverArrangement(bandmate: Bandmate, songId: number): Promise<string[]> {
@@ -73,6 +74,8 @@ test('a Section dragged onto the middle of another is added to it as Alternates'
   await page.mouse.move(onto.x, onto.y, { steps: 5 });
   await page.mouse.up();
 
+  await expect(page.getByText('Bridge added to Chorus as an Alternate')).toBeVisible();
+
   // The Bridge is gone from the Arrangement, its text an Alternate of the Chorus.
   await expect.poll(() => serverArrangement(bandmate, song.id)).toEqual(['Verse 1', 'Chorus']);
   await expect(section(page, 'Bridge')).toHaveCount(0);
@@ -131,8 +134,10 @@ test('a Scrapbook Section dragged onto a Section leaves the caret in a field els
   await page.mouse.move(onto.x, onto.y, { steps: 5 });
   await page.mouse.up();
 
-  // Added to the Chorus as Alternates, with the caret left where it was.
+  // Added to the Chorus as Alternates, with the caret left where it was, and
+  // said in the Lyric Sheet as a Section dragged from the Arrangement is.
   await expect(idea).toHaveCount(0);
+  await expect(page.getByText('Night swim added to Chorus as an Alternate')).toBeVisible();
   await expect(lines).toBeFocused();
   await expect(lines).toHaveValue('Lanterns on the quay at night');
   await section(page, 'Chorus').getByRole('button', { name: 'Alternates' }).click();
@@ -151,4 +156,20 @@ test('Esc gives a Section drag up, leaving the Arrangement as it was', async ({ 
 
   await expect(bridge.getByRole('button', { name: 'Move up' })).toBeEnabled();
   expect(await serverArrangement(bandmate, song.id)).toEqual(['Verse 1', 'Chorus', 'Bridge']);
+});
+
+test('a Section with nothing written in it, taken out from its menu, says it wasn’t kept', async ({
+  page,
+  bandmate,
+}) => {
+  const song = await threeSections(page, bandmate);
+  const bridge = section(page, 'Bridge');
+
+  await bridge.getByRole('button', { name: 'Delete this Section' }).click();
+
+  // Nothing written in it, so it isn't kept in the Scrapbook but deleted,
+  // which is said here as it is for one dragged onto the Scrapbook.
+  await expect(page.getByText("Nothing was written in Bridge, so it wasn't kept.")).toBeVisible();
+  await expect.poll(() => serverArrangement(bandmate, song.id)).toEqual(['Verse 1', 'Chorus']);
+  await expect(page.getByRole('button', { name: /^Bridge/ })).toHaveCount(0);
 });

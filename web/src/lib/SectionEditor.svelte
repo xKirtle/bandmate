@@ -14,6 +14,7 @@
   import type { MenuAction } from './menu';
   import type { Drop } from './sectionDrag';
   import type { SectionDragging } from './sectionDragging.svelte';
+  import type { Landing } from './sectionMoves';
   import { activeAlternate, alternateName, alternatesLabel, labelOf, type Place } from './sections';
   import { cancelOnEscape, committedAsItGoes } from './typedField.svelte';
 
@@ -29,6 +30,8 @@
     places = [],
     onCaret,
     tour,
+    moveOut,
+    dropped,
   }: {
     section: Section;
     /** Focus the Label when this becomes true, e.g. for a Section just added. */
@@ -51,6 +54,10 @@
     onCaret?: CaretListener;
     /** Given, names the Section for the Tour to spotlight: its head and its Lines, as `data-tour` `<tour>-head` and `<tour>-lines`. */
     tour?: string;
+    /** Makes what moving one of the Section's Alternates out comes to, worked out and applied by the page (see sectionMoves.ts); resolves to whether it was saved. */
+    moveOut: (landing: Landing) => Promise<boolean>;
+    /** Makes what a drop by a grip in here comes to, worked out and applied by the page; resolves to whether it was saved. */
+    dropped: (drop: Drop) => Promise<boolean>;
   } = $props();
 
   // The server guarantees exactly one active Alternate.
@@ -132,26 +139,15 @@
     if (await editing.change({ kind: 'deleteAlternate', alternateId: alt.id })) radio(active.id)?.focus();
   }
 
-  async function moveToScrapbook(alt: Alternate) {
-    // Its ⋯ goes with it: the keyboard carries on from the active card.
-    if (await editing.change({ kind: 'moveAlternateToScrapbook', alternateId: alt.id })) radio(active.id)?.focus();
-  }
-
-  async function moveToArrangement(alt: Alternate, position: number) {
-    // Its ⋯ goes with it: the keyboard carries on from the active card.
-    if (await editing.change({ kind: 'moveAlternateToArrangement', alternateId: alt.id, position })) {
-      radio(active.id)?.focus();
-    }
+  /** Carries the keyboard on from the active card once an Alternate has moved out: its ⋯ goes with it. */
+  async function moved(made: Promise<boolean>) {
+    if (await made) radio(active.id)?.focus();
   }
 
   // Dragged by its card's grip, an inactive Alternate goes into a gap in the
-  // Lyric Sheet or onto the Scrapbook, as a Section of its own.
-  function dropAlternate(alt: Alternate) {
-    return (drop: Drop) => {
-      if ('alternateToArrangement' in drop) moveToArrangement(alt, drop.gap);
-      else if ('alternateToScrapbook' in drop) moveToScrapbook(alt);
-    };
-  }
+  // Lyric Sheet or onto the Scrapbook, as a Section of its own: where it lands
+  // says which, and the card hands the drop over as it is.
+  const dropAlternate = (drop: Drop) => moved(dropped(drop));
 
   // What an inactive Alternate's ⋯ does.
   function alternateActions(alt: Alternate): MenuAction[] {
@@ -160,14 +156,17 @@
         icon: X,
         label: 'Move to the Scrapbook',
         title: 'Move to the Scrapbook: keep it as a Section of its own, with its Cues',
-        run: () => moveToScrapbook(alt),
+        run: () => moved(moveOut({ alternateIntoScrapbook: alt.id })),
       },
     ];
     if (places.length > 0) {
       actions.push({
         icon: ArrowRightFromLine,
         label: 'Move to the Lyric Sheet…',
-        choices: places.map((place) => ({ label: place.name, run: () => moveToArrangement(alt, place.position) })),
+        choices: places.map((place) => ({
+          label: place.name,
+          run: () => moved(moveOut({ alternateIntoArrangement: { alternateId: alt.id, position: place.position } })),
+        })),
       });
     }
     actions.push({ icon: Trash2, label: 'Delete', run: () => remove(alt) });
@@ -268,7 +267,7 @@
                   class="grip"
                   aria-hidden="true"
                   title="Drag into the Lyric Sheet or onto the Scrapbook, as a Section of its own; Esc cancels"
-                  {...drag.grip({ alternate: alt.id }, dropAlternate(alt))}><GripVertical /></span
+                  {...drag.grip({ alternate: alt.id }, dropAlternate)}><GripVertical /></span
                 >
               {/if}
               <input
