@@ -44,7 +44,7 @@ export interface Lanes {
   /** How far along the lanes are scrolled, in pixels. */
   scrollLeft: number;
   /** Where the lanes' window is on the page, to measure a point against. */
-  getBoundingClientRect(): { left: number };
+  getBoundingClientRect(): { left: number; top: number };
 }
 
 /** The narrowest the scroll bar's thumb gets, in pixels, to stay easy to grab. */
@@ -129,9 +129,18 @@ export class TimelineViewing {
     this.#width = width;
   }
 
+  // The lanes element is this module's, so its box is measured here alone.
+  // What the places those pixels are on the Timeline are — the time, the
+  // Track — is timelinePlaces.ts, which reads them off this.
+
   /** How far a point on the page is from the left of the lanes' window, in pixels. */
   xIn(clientX: number): number {
     return clientX - this.#options.lanes()!.getBoundingClientRect().left;
+  }
+
+  /** How far a point on the page is down the lanes, in pixels. */
+  yIn(clientY: number): number {
+    return clientY - this.#options.lanes()!.getBoundingClientRect().top;
   }
 
   /** Shows the Timeline zoomed and scrolled as v has it, scrolling the lanes there. */

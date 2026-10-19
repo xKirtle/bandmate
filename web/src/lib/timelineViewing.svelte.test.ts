@@ -14,6 +14,8 @@ class FakeLanes implements Lanes {
   viewing!: TimelineViewing;
   /** Where the lanes' window starts on the page, in pixels. */
   left = 0;
+  /** How far the lanes are down the page, in pixels. */
+  top = 0;
 
   get scrollLeft(): number {
     return this.#scrollLeft;
@@ -31,7 +33,7 @@ class FakeLanes implements Lanes {
   }
 
   getBoundingClientRect() {
-    return { left: this.left };
+    return { left: this.left, top: this.top };
   }
 }
 
@@ -185,6 +187,16 @@ describe('revealing a time', () => {
     flushSync();
     await tick();
     expect(lanes.scrollLeft).toBe(720);
+  });
+});
+
+describe('a point on the page', () => {
+  it('is measured into the lanes, across them and down them', () => {
+    const { viewing, lanes } = viewingFor();
+    lanes.left = 40;
+    lanes.top = 120;
+    expect(viewing.xIn(100)).toBe(60);
+    expect(viewing.yIn(200)).toBe(80);
   });
 });
 
