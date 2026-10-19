@@ -185,7 +185,7 @@ On a song's page, press **?**, or the keyboard button by Write and Read, to see 
 | Enter | In Sync mode, mark the next line as starting now |
 | Ctrl+scroll | Zoom the timeline |
 
-Holding a shortcut's keys down does it once, however long you hold them: a held Ctrl+V pastes one copy. The exception is Alt+↑ and Alt+↓ on a line's time, which go on nudging it a tenth of a second at a time while you hold them.
+Holding a shortcut's keys down does it once, however long you hold them: a held Ctrl+V pastes one copy, and a held Ctrl+Z undoes one edit. Three keep going while you hold them: ← and → on the ruler, which scan the song 5 seconds at a time, or 15 with Shift; Alt+↑ and Alt+↓ on a line's time, which nudge it a tenth of a second at a time; and Home and End, which hold the playhead at the start or the end rather than letting the page scroll.
 
 These are the defaults. To change a shortcut's keys, open it in **Settings → Shortcuts**: click one of its keys and press the one you want, or **Add key** to give it another, or remove a key with its ×. Esc cancels. For a mouse shortcut, like Ctrl+click or Shift+drag, choose which of Ctrl, Alt and Shift (⌘, ⌥ and ⇧ on a Mac) you hold, at least one: the click, drag or scroll stays as it is, and pinching always zooms. A key another shortcut already has is refused, with a link to that shortcut so you can free the key there first, and so are keys the browser or the page needs, like Tab or Ctrl+W, and Shift alone with the scroll wheel, which scrolls the timeline sideways. **Reset** puts one shortcut back, and **Reset to defaults** puts them all back. Your keys are kept on each device, so each keyboard you use can have its own.
 

@@ -196,11 +196,11 @@ group('The list', () => {
     expect(keysLabel(shortcuts.selectAll.keys, 'mac')).toBe('⌘A');
   });
 
-  it('has the Cue nudge alone go on while its keys are held', () => {
+  it('has seeking, going to the start or end, and the Cue nudge alone go on while their keys are held', () => {
     const repeating = Object.entries(shortcuts)
       .filter(([, s]) => 'repeats' in s)
       .map(([id]) => id);
-    expect(repeating).toEqual(['nudgeCue']);
+    expect(repeating).toEqual(['startOrEnd', 'seek', 'seekFar', 'nudgeCue']);
   });
 
   it('describes every Shortcut in one line', () => {

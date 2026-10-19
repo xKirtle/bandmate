@@ -27,9 +27,10 @@ const keyboardShortcuts = (Object.keys(defaultKeyset) as ShortcutId[])
   .filter((id) => !isMouse(id))
   .map((id) => ({ id, list: listsOf(id)[0], key: keysIn(defaultKeyset, id, listsOf(id)[0])[0] }));
 
-// The Shortcuts that go on while their keys are held: nudging a Cue, where
-// holding it is the point.
-const repeating: readonly ShortcutId[] = ['nudgeCue'];
+// The Shortcuts that go on while their keys are held, and the only ones:
+// seeking and nudging a Cue, where holding it is the point, and going to
+// the start or end, which keeps the key so the page never scrolls instead.
+const repeating: readonly ShortcutId[] = ['startOrEnd', 'seek', 'seekFar', 'nudgeCue'];
 
 group('Which Shortcut a press is', () => {
   it.each(keyboardShortcuts)('answers $id for its own key', ({ id, list, key }) => {
@@ -61,9 +62,23 @@ group('A held key', () => {
     expect(held === null ? null : held.id).toBe(repeating.includes(id) ? id : null);
   });
 
-  it('pastes and cuts once, however long Ctrl+V or Ctrl+X is held', () => {
+  it('pastes, cuts and undoes once, however long Ctrl+V, Ctrl+X or Ctrl+Z is held', () => {
     expect(pressedOnPage(press('v', { ctrlKey: true, repeat: true }))).toBeNull();
     expect(pressedOnPage(press('x', { ctrlKey: true, repeat: true }))).toBeNull();
+    expect(pressedOnPage(press('z', { ctrlKey: true, repeat: true }))).toBeNull();
+  });
+
+  it('goes on going to the start or the end, so the page never scrolls instead', () => {
+    expect(pressedOnPage(press('Home', { repeat: true }))).toEqual({ id: 'startOrEnd', way: 'back' });
+    expect(pressedOnPage(press('End', { repeat: true }))).toEqual({ id: 'startOrEnd', way: 'forward' });
+  });
+
+  it('goes on seeking while held, which scans the Song', () => {
+    expect(pressedInControl(press('ArrowLeft', { repeat: true }))).toEqual({ id: 'seek', way: 'back' });
+    expect(pressedInControl(press('ArrowRight', { shiftKey: true, repeat: true }))).toEqual({
+      id: 'seekFar',
+      way: 'forward',
+    });
   });
 
   it('goes on nudging a Cue while held, which is the point of holding it', () => {
@@ -131,11 +146,13 @@ group('Keys as rebound on this device', () => {
   });
 
   it('keeps the repeat rule as it is, whatever keys a Shortcut is given', () => {
+    // Keys no other Shortcut has, as rebinding insists on.
     rebind({
-      pasteClips: { keys: [{ key: 'ArrowUp', shift: true }] },
+      pasteClips: { keys: [{ key: 'F7' }] },
       nudgeCue: { back: [], forward: [{ key: 'u' }] },
     });
-    expect(pressedOnPage(press('ArrowUp', { shiftKey: true, repeat: true }))).toBeNull();
+    expect(pressedOnPage(press('F7', { repeat: true }))).toBeNull();
+    expect(pressedOnPage(press('F7'))).toEqual({ id: 'pasteClips', way: null });
     expect(pressedInControl(press('u', { repeat: true }))).toEqual({ id: 'nudgeCue', way: 'forward' });
   });
 });

@@ -86,6 +86,11 @@ group('Home and End', () => {
     expect(songKey(press('End'), idle)).toBe('end');
   });
 
+  it('go on going while held down, so the page never scrolls instead', () => {
+    expect(songKey(press('Home', { repeat: true }), idle)).toBe('start');
+    expect(songKey(press('End', { repeat: true }), idle)).toBe('end');
+  });
+
   it('work in Read mode and on a phone, since moving the playhead is no edit', () => {
     expect(songKey(press('Home'), { ...idle, editable: false })).toBe('start');
     expect(songKey(press('End'), { ...idle, editable: false })).toBe('end');

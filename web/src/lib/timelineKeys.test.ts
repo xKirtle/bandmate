@@ -55,6 +55,11 @@ group('rulerSeek', () => {
     expect(rulerSeek(press('ArrowUp', { shiftKey: true }), position)).toBe(75);
   });
 
+  it('goes on seeking while the key is held, which scans the Song', () => {
+    expect(rulerSeek(press('ArrowLeft', { repeat: true }), position)).toBe(55);
+    expect(rulerSeek(press('ArrowRight', { shiftKey: true, repeat: true }), position)).toBe(75);
+  });
+
   it('leaves Home and End to the Song-wide Shortcut', () => {
     expect(rulerSeek(press('Home'), position)).toBeNull();
     expect(rulerSeek(press('End'), position)).toBeNull();
