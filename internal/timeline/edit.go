@@ -27,19 +27,32 @@ type edit func(tl Timeline, ids *ids) (Timeline, error)
 // writes it, and returns it as stored.
 func (s *Store) editTimeline(ctx context.Context, songID int64, based songversion.Version,
 	change edit) (Timeline, error) {
-	return s.editTimelineReading(ctx, songID, based,
-		func(context.Context, *sql.Tx, *audio.FileChanges, Timeline) (edit, error) {
-			return change, nil
-		})
+	return s.editTimelineReading(ctx, songID, based, always(change))
+}
+
+// always is a prepare that reads nothing and makes the change given.
+func always(change edit) func(context.Context, *sql.Tx, *audio.FileChanges, Timeline) (edit, error) {
+	return func(context.Context, *sql.Tx, *audio.FileChanges, Timeline) (edit, error) {
+		return change, nil
+	}
 }
 
 // editTimelineReading is editTimeline for a change that reads rows of its
 // own first: the Beat, the Sound or the Takes a Clip it places plays, which
-// the Timeline doesn't hold until a Clip plays them, and the copies of a
-// Clip of Takes' Takes, with their files. prepare reads and checks them
-// within the change, and returns the pure edit that places them, so the
-// pure part only works out placement.
+// the Timeline doesn't hold until a Clip plays them, the copies of a Clip of
+// Takes' Takes, with their files, and a Take just recorded, with its audio.
+// prepare reads and checks them within the change, and returns the pure
+// edit that places them, so the pure part only works out placement.
 func (s *Store) editTimelineReading(ctx context.Context, songID int64, based songversion.Version,
+	prepare func(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, before Timeline) (edit, error)) (Timeline, error) {
+	return s.editTimelineRewording(ctx, songID, based, nil, prepare)
+}
+
+// editTimelineRewording is editTimelineReading, its refusal for breaking a
+// placement rule in reword's words, unless reword is nil or gives nil, when
+// it's in the rule's own.
+func (s *Store) editTimelineRewording(ctx context.Context, songID int64, based songversion.Version,
+	reword func(violation) error,
 	prepare func(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, before Timeline) (edit, error)) (Timeline, error) {
 	var tl Timeline
 	if err := songversion.Change(ctx, s.db, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
@@ -60,6 +73,11 @@ func (s *Store) editTimelineReading(ctx context.Context, songID int64, based son
 			return err
 		}
 		if v := checkLayout(before, after); v != nil {
+			if reword != nil {
+				if err := reword(*v); err != nil {
+					return err
+				}
+			}
 			return v.err()
 		}
 		if err := writeTimeline(ctx, tx, songID, after); err != nil {
