@@ -755,12 +755,13 @@ func (s *Store) PasteClips(ctx context.Context, songID int64, based songversion.
 		func(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, _ Timeline) (edit, error) {
 			srcs := make([]clipSource, len(clips))
 			for i, c := range clips {
-				var err error
 				if len(c.Takes) == 0 {
 					// A Beat or a Sound the Clip was copied playing.
-					if srcs[i], err = readClipSource(ctx, tx, songID, c.pasted(), nil); err != nil {
+					src, err := readClipSource(ctx, tx, songID, c.pasted(), nil)
+					if err != nil {
 						return nil, err
 					}
+					srcs[i] = src
 					continue
 				}
 				takes, active, err := s.copyTakesAt(ctx, tx, changes, songID, c.Takes, *c.ActiveTakeID)
